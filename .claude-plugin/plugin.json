@@ -1,0 +1,23 @@
+{
+  "name": "evolve-loop",
+  "version": "3.1.0",
+  "description": "Self-evolving development pipeline — 13 AI agents across 8 phases with eval gating, continuous learning, and loop monitoring",
+  "author": {
+    "name": "Dan Lee"
+  },
+  "homepage": "https://github.com/mickeyyaya/evolve-loop",
+  "repository": "https://github.com/mickeyyaya/evolve-loop",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "agents",
+    "skills",
+    "evolve",
+    "autonomous",
+    "pipeline",
+    "tdd",
+    "code-review",
+    "security",
+    "e2e-testing"
+  ]
+}

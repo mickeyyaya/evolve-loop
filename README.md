@@ -24,11 +24,32 @@ Built on top of [Everything Claude Code](https://github.com/anthropics/everythin
 
 ### Installation
 
-```bash
-# Clone this repo
-git clone https://github.com/mickeyyaya/evolve-loop.git
+**Option A: As a Claude Code plugin (recommended)**
 
-# Run the installer
+Add to your `~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "evolve-loop@evolve-loop": true
+  },
+  "extraKnownMarketplaces": {
+    "evolve-loop": {
+      "source": {
+        "source": "github",
+        "repo": "mickeyyaya/evolve-loop"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Code. The skill and agents load automatically — no file copying needed.
+
+**Option B: Manual install**
+
+```bash
+git clone https://github.com/mickeyyaya/evolve-loop.git
 cd evolve-loop
 ./install.sh
 ```
