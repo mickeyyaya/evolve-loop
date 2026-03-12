@@ -95,9 +95,9 @@ Then proceed to next task (back to Phase 2) or Phase 4 if all tasks done.
 
 ---
 
-### Phase 4: SHIP (orchestrator inline)
+### Phase 4: SHIP (orchestrator inline — MANDATORY)
 
-No agent needed. The orchestrator handles shipping directly:
+No agent needed. The orchestrator handles shipping directly. **This phase is not optional — every cycle MUST commit and push.**
 
 1. **Verify all commits are clean:**
    ```bash
@@ -105,12 +105,19 @@ No agent needed. The orchestrator handles shipping directly:
    git log --oneline -<N>  # verify N commits from this cycle
    ```
 
-2. **Push (if remote exists and user has authorized):**
+2. **Commit any uncommitted changes** (if tasks were implemented inline by orchestrator):
+   ```bash
+   git add <changed files>
+   git commit -m "<type>: <description>"
+   ```
+
+3. **Push to remote:**
    ```bash
    git push origin <branch>
    ```
+   This is mandatory after every cycle. The cycle is not complete until code is pushed.
 
-3. **Update state.json:**
+4. **Update state.json:**
    - Mark completed tasks in `evaluatedTasks`
    - Reset `nothingToDoCount` to 0
    - Update `lastUpdated`

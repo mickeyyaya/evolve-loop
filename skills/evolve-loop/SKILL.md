@@ -77,7 +77,7 @@ You are the orchestrator. For each cycle:
 1. Launch Scout → collect task list
 2. For each task: Launch Builder (worktree) → Launch Auditor
 3. If Auditor PASS → commit. If WARN/FAIL → re-run Builder with issues (max 3 attempts)
-4. Ship all passing commits
+4. **Ship: commit and push** — every cycle MUST end with committed and pushed code
 5. Learn: archive, extract instincts, operator check
 
 For detailed phase-by-phase instructions, see [phases.md](phases.md).
