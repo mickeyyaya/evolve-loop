@@ -19,13 +19,14 @@ Built on top of [Everything Claude Code](https://github.com/anthropics/everythin
 ### Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
+- [Everything Claude Code](https://github.com/anthropics/everything-claude-code) (ECC) plugin installed — 5 agents delegate to ECC at runtime
 - A git repository to evolve
 
 ### Installation
 
 ```bash
 # Clone this repo
-git clone https://github.com/danleemh/evolve-loop.git
+git clone https://github.com/mickeyyaya/evolve-loop.git
 
 # Run the installer
 cd evolve-loop
@@ -105,22 +106,30 @@ Security ────→ security-report.md ───────┘
 
 ## Agents
 
-| Role | File | Source | Model | Workspace File |
-|------|------|--------|-------|----------------|
-| Operator | `evolve-operator.md` | ECC wrapper | sonnet | `loop-operator-log.md` |
-| PM | `evolve-pm.md` | Custom | sonnet | `briefing.md` |
-| Researcher | `evolve-researcher.md` | Custom | sonnet | `research-report.md` |
-| Scanner | `evolve-scanner.md` | Custom | sonnet | `scan-report.md` |
-| Planner | `evolve-planner.md` | Custom | opus | `backlog.md` + `evals/*.md` |
-| Architect | `evolve-architect.md` | ECC wrapper | opus | `design.md` |
-| Developer | `evolve-developer.md` | ECC wrapper | sonnet | `impl-notes.md` |
-| Reviewer | `evolve-reviewer.md` | ECC wrapper | sonnet | `review-report.md` |
-| E2E Runner | `evolve-e2e.md` | ECC wrapper | sonnet | `e2e-report.md` |
-| Security | `evolve-security.md` | ECC wrapper | sonnet | `security-report.md` |
-| Eval Runner | (orchestrator) | eval-runner.md | — | `eval-report.md` |
-| Deployer | `evolve-deployer.md` | Custom | sonnet | `deploy-log.md` |
+### Custom Agents (full instructions, `subagent_type: general-purpose`)
 
-**ECC wrapper agents** contain the full [Everything Claude Code](https://github.com/anthropics/everything-claude-code) agent content plus an `## Evolve Loop Integration` section for workspace ownership, ledger format, and context inputs. Self-contained — no symlinks.
+| Role | File | Model | Workspace File |
+|------|------|-------|----------------|
+| Operator | `evolve-operator.md` | sonnet | `loop-operator-log.md` |
+| PM | `evolve-pm.md` | sonnet | `briefing.md` |
+| Researcher | `evolve-researcher.md` | sonnet | `research-report.md` |
+| Scanner | `evolve-scanner.md` | sonnet | `scan-report.md` |
+| Planner | `evolve-planner.md` | opus | `backlog.md` + `evals/*.md` |
+| Deployer | `evolve-deployer.md` | sonnet | `deploy-log.md` |
+
+### ECC Context Overlays (~40 lines each, delegate to ECC at runtime)
+
+| Role | File | ECC subagent_type | Model | Workspace File |
+|------|------|-------------------|-------|----------------|
+| Architect | `evolve-architect.md` | `everything-claude-code:architect` | opus | `design.md` |
+| Developer | `evolve-developer.md` | `everything-claude-code:tdd-guide` | sonnet | `impl-notes.md` |
+| Reviewer | `evolve-reviewer.md` | `everything-claude-code:code-reviewer` | sonnet | `review-report.md` |
+| E2E Runner | `evolve-e2e.md` | `everything-claude-code:e2e-runner` | sonnet | `e2e-report.md` |
+| Security | `evolve-security.md` | `everything-claude-code:security-reviewer` | sonnet | `security-report.md` |
+
+**Eval Runner** — orchestrator-executed (not an agent), writes `eval-report.md`.
+
+**How overlays work:** The orchestrator reads the overlay file and passes it as the prompt. The ECC agent's built-in instructions load automatically via `subagent_type`. The overlay adds only evolve-specific concerns (workspace ownership, input/output format, ledger entry). No ECC content is duplicated — agents stay small, always current, and never stale.
 
 ## Key Mechanics
 

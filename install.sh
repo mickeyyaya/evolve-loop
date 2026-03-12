@@ -11,6 +11,38 @@ SKILLS_DIR="$HOME/.claude/skills/evolve-loop"
 echo "Installing Evolve Loop v3..."
 echo ""
 
+# Check ECC dependency
+ECC_MISSING=()
+for agent_type in architect tdd-guide code-reviewer e2e-runner security-reviewer; do
+  # Check if ECC agent files exist (common install locations)
+  if ! ls "$HOME/.claude/agents/${agent_type}.md" 1>/dev/null 2>&1 && \
+     ! ls "$HOME/.claude/agents/"*"${agent_type}"* 1>/dev/null 2>&1; then
+    ECC_MISSING+=("$agent_type")
+  fi
+done
+
+# Also check if ECC plugin is registered (look for the plugin marker)
+if [ ${#ECC_MISSING[@]} -gt 0 ]; then
+  echo "WARNING: Everything Claude Code (ECC) may not be installed."
+  echo ""
+  echo "Evolve Loop delegates to these ECC agents at runtime:"
+  echo "  - everything-claude-code:architect"
+  echo "  - everything-claude-code:tdd-guide"
+  echo "  - everything-claude-code:code-reviewer"
+  echo "  - everything-claude-code:e2e-runner"
+  echo "  - everything-claude-code:security-reviewer"
+  echo ""
+  echo "Install ECC first: https://github.com/anthropics/everything-claude-code"
+  echo ""
+  read -p "Continue anyway? [y/N] " -n 1 -r
+  echo ""
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 1
+  fi
+  echo ""
+fi
+
 # Create directories
 mkdir -p "$AGENTS_DIR"
 mkdir -p "$SKILLS_DIR"
@@ -44,7 +76,7 @@ echo ""
 echo "Installation complete!"
 echo ""
 echo "Installed:"
-echo "  - $(ls "$SCRIPT_DIR"/agents/evolve-*.md | wc -l | tr -d ' ') agents"
+echo "  - $(ls "$SCRIPT_DIR"/agents/evolve-*.md | wc -l | tr -d ' ') agents (6 custom + 5 ECC context overlays)"
 echo "  - $(ls "$SCRIPT_DIR"/skills/evolve-loop/*.md | wc -l | tr -d ' ') skill files"
 echo ""
 echo "Usage: /evolve-loop [cycles] [goal]"

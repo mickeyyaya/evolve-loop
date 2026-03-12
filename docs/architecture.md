@@ -52,17 +52,20 @@ Extracted patterns from completed cycles. YAML files with confidence scoring tha
 
 ## ECC Integration
 
-Six agents wrap Everything Claude Code (ECC) agents:
+Five agents delegate to ECC via `subagent_type` (the Operator uses `general-purpose` since no ECC subagent_type exists):
 
-| Evolve Agent | ECC Source |
-|-------------|-----------|
-| Operator | loop-operator |
-| Architect | architect |
-| Developer | tdd-guide |
-| Reviewer | code-reviewer |
-| E2E Runner | e2e-runner |
-| Security | security-reviewer |
+| Evolve Agent | ECC subagent_type |
+|-------------|-------------------|
+| Architect | `everything-claude-code:architect` |
+| Developer | `everything-claude-code:tdd-guide` |
+| Reviewer | `everything-claude-code:code-reviewer` |
+| E2E Runner | `everything-claude-code:e2e-runner` |
+| Security | `everything-claude-code:security-reviewer` |
 
-The wrapper pattern: full ECC content + `## Evolve Loop Integration` section. This keeps agents self-contained (no symlinks) while inheriting ECC's battle-tested instructions.
+**Context overlay pattern:** Each evolve agent file (~40 lines) contains only evolve-specific context — inputs, outputs, workspace ownership, ledger format. The ECC agent's full instructions load automatically via `subagent_type`. The orchestrator reads the overlay and passes it as the prompt.
 
-The `## ECC Source` marker in each wrapper records the copy date for manual sync when ECC updates.
+Benefits over the v3.0 "copy ECC content" approach:
+- **Always current** — ECC updates apply immediately, no manual sync
+- **Small files** — ~40 lines instead of ~150-200, saves context window
+- **No duplication** — users with ECC installed don't get instructions twice
+- **Clean separation** — ECC owns expertise, evolve owns workflow integration

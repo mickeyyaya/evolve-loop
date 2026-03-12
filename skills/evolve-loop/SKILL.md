@@ -74,26 +74,46 @@ For detailed phase-by-phase instructions, see [phases.md](phases.md).
 For the shared memory protocol (ledger format, workspace conventions, state.json schema), see [memory-protocol.md](memory-protocol.md).
 For the eval hard gate instructions, see [eval-runner.md](eval-runner.md).
 
+## Dependencies
+
+**Required:** [Everything Claude Code](https://github.com/anthropics/everything-claude-code) (ECC) plugin must be installed. Five agents use ECC subagent_types at runtime:
+
+| ECC subagent_type | Used by |
+|-------------------|---------|
+| `everything-claude-code:architect` | Phase 3: Architect |
+| `everything-claude-code:tdd-guide` | Phase 4: Developer |
+| `everything-claude-code:code-reviewer` | Phase 5: Reviewer |
+| `everything-claude-code:e2e-runner` | Phase 5: E2E Runner |
+| `everything-claude-code:security-reviewer` | Phase 5: Security |
+
 ## Agent Definitions
 
-All agent definitions are in `~/.claude/agents/`. When launching an agent, read its definition file and include the full instructions in the prompt.
+Agent files live in `~/.claude/agents/`. There are two types:
 
-| Role | Agent File | Source | Model | Workspace File |
-|------|-----------|--------|-------|----------------|
-| Operator | `evolve-operator.md` | ECC wrapper | sonnet | `loop-operator-log.md` |
-| PM | `evolve-pm.md` | Custom | sonnet | `briefing.md` |
-| Researcher | `evolve-researcher.md` | Custom | sonnet | `research-report.md` |
-| Scanner | `evolve-scanner.md` | Custom | sonnet | `scan-report.md` |
-| Planner | `evolve-planner.md` | Custom | opus | `backlog.md` + `evals/*.md` |
-| Architect | `evolve-architect.md` | ECC wrapper | opus | `design.md` |
-| Developer | `evolve-developer.md` | ECC wrapper | sonnet | `impl-notes.md` |
-| Reviewer | `evolve-reviewer.md` | ECC wrapper | sonnet | `review-report.md` |
-| E2E Runner | `evolve-e2e.md` | ECC wrapper | sonnet | `e2e-report.md` |
-| Security | `evolve-security.md` | ECC wrapper | sonnet | `security-report.md` |
-| Eval Runner | (orchestrator) | eval-runner.md | — | `eval-report.md` |
-| Deployer | `evolve-deployer.md` | Custom | sonnet | `deploy-log.md` |
+**Custom agents** — full self-contained instructions, launched with `subagent_type: general-purpose`:
 
-**ECC wrapper pattern:** Each wrapper agent contains the full ECC agent content + an `## Evolve Loop Integration` section (workspace ownership, ledger format, context inputs). Self-contained — no symlinks. `## ECC Source` marker for future sync.
+| Role | Agent File | Model | Workspace File |
+|------|-----------|-------|----------------|
+| Operator | `evolve-operator.md` | sonnet | `loop-operator-log.md` |
+| PM | `evolve-pm.md` | sonnet | `briefing.md` |
+| Researcher | `evolve-researcher.md` | sonnet | `research-report.md` |
+| Scanner | `evolve-scanner.md` | sonnet | `scan-report.md` |
+| Planner | `evolve-planner.md` | opus | `backlog.md` + `evals/*.md` |
+| Deployer | `evolve-deployer.md` | sonnet | `deploy-log.md` |
+
+**ECC context overlays** — thin files (~40 lines) that add evolve-specific context on top of ECC agents. Launched with the corresponding ECC `subagent_type`:
+
+| Role | Agent File | ECC subagent_type | Model | Workspace File |
+|------|-----------|-------------------|-------|----------------|
+| Architect | `evolve-architect.md` | `everything-claude-code:architect` | opus | `design.md` |
+| Developer | `evolve-developer.md` | `everything-claude-code:tdd-guide` | sonnet | `impl-notes.md` |
+| Reviewer | `evolve-reviewer.md` | `everything-claude-code:code-reviewer` | sonnet | `review-report.md` |
+| E2E Runner | `evolve-e2e.md` | `everything-claude-code:e2e-runner` | sonnet | `e2e-report.md` |
+| Security | `evolve-security.md` | `everything-claude-code:security-reviewer` | sonnet | `security-report.md` |
+
+**Eval Runner** — not an agent; orchestrator-executed instructions in [eval-runner.md](eval-runner.md). Writes `eval-report.md`.
+
+**Context overlay pattern:** The orchestrator reads the overlay file and passes its content as the prompt. The ECC agent's built-in instructions are loaded automatically via `subagent_type`. The overlay adds only evolve-specific concerns: workspace file ownership, input context, output format, ledger entry. No ECC content is duplicated.
 
 ## Anti-Patterns
 

@@ -80,10 +80,10 @@ After Planner completes:
 
 ### Phase 3: DESIGN
 
-Launch **Architect Agent** (model: opus, subagent_type: `general-purpose`):
-- Prompt: Include the `evolve-architect` agent instructions from `~/.claude/agents/evolve-architect.md`
+Launch **Architect Agent** (model: opus, subagent_type: `everything-claude-code:architect`):
+- Prompt: Read `~/.claude/agents/evolve-architect.md` and include its evolve-specific context overlay
 - Context: cycle number, paths to workspace/ledger
-- The Architect produces ADRs for significant decisions, implementation order, and testing strategy
+- The ECC architect agent provides core architecture expertise; the overlay adds ADR requirements, implementation order, and testing strategy
 
 After Architect completes:
 - Read `workspace/design.md` to verify it was written
@@ -92,10 +92,10 @@ After Architect completes:
 
 ### Phase 4: BUILD (in worktree)
 
-Launch **Developer Agent** (model: sonnet, subagent_type: `general-purpose`, isolation: `worktree`):
-- Prompt: Include the `evolve-developer` agent instructions from `~/.claude/agents/evolve-developer.md`
+Launch **Developer Agent** (model: sonnet, subagent_type: `everything-claude-code:tdd-guide`, isolation: `worktree`):
+- Prompt: Read `~/.claude/agents/evolve-developer.md` and include its evolve-specific context overlay
 - Context: cycle number, paths to workspace/ledger, branch name
-- The Developer reads instincts before coding, follows eval-driven TDD, and runs de-sloppify pass
+- The ECC tdd-guide agent provides core TDD methodology; the overlay adds instinct reading, eval-targeted tests, de-sloppify pass, and retry protocol
 
 After Developer completes:
 - Read `workspace/impl-notes.md`
@@ -124,19 +124,19 @@ After Operator completes:
 
 Launch **three agents in parallel** (single message, three Agent tool calls):
 
-1. **Reviewer Agent** (model: sonnet, subagent_type: `general-purpose`)
-   - Prompt: Include the `evolve-reviewer` agent instructions from `~/.claude/agents/evolve-reviewer.md`
+1. **Reviewer Agent** (model: sonnet, subagent_type: `everything-claude-code:code-reviewer`)
+   - Prompt: Read `~/.claude/agents/evolve-reviewer.md` and include its evolve-specific context overlay
    - Context: cycle number, diff command, paths to workspace/ledger
-   - **READ-ONLY** — must not edit source code
+   - **READ-ONLY** — the overlay enforces no source code edits
 
-2. **E2E Runner Agent** (model: sonnet, subagent_type: `general-purpose`)
-   - Prompt: Include the `evolve-e2e` agent instructions from `~/.claude/agents/evolve-e2e.md`
+2. **E2E Runner Agent** (model: sonnet, subagent_type: `everything-claude-code:e2e-runner`)
+   - Prompt: Read `~/.claude/agents/evolve-e2e.md` and include its evolve-specific context overlay
    - Context: cycle number, projectContext, diff command, paths to workspace/ledger
 
-3. **Security Reviewer Agent** (model: sonnet, subagent_type: `general-purpose`)
-   - Prompt: Include the `evolve-security` agent instructions from `~/.claude/agents/evolve-security.md`
+3. **Security Reviewer Agent** (model: sonnet, subagent_type: `everything-claude-code:security-reviewer`)
+   - Prompt: Read `~/.claude/agents/evolve-security.md` and include its evolve-specific context overlay
    - Context: cycle number, diff command, paths to workspace/ledger
-   - **READ-ONLY** — must not edit source code
+   - **READ-ONLY** — the overlay enforces no source code edits
 
 **WAIT** for all three to complete.
 
