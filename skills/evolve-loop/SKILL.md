@@ -1,13 +1,13 @@
 ---
 name: evolve-loop
-description: "Orchestrates a self-evolving development cycle with 13 role-specialized agents (Operator, PM, Researcher, Scanner, Planner, Architect, Developer, Reviewer, E2E Runner, Security Reviewer, Eval Runner, Deployer) across 8 phases. Integrates ECC battle-tested agents, eval-based quality gating, continuous learning via instinct extraction, and loop monitoring. Use when running autonomous improvement loops on a codebase."
+description: "Self-evolving development pipeline — 4 specialized agents (Scout, Builder, Auditor, Operator) across 5 phases. Build diverse small/medium tasks each cycle, iterate fast with quality gates. No external dependencies."
 argument-hint: "[cycles] [goal]"
 disable-model-invocation: true
 ---
 
-# Evolve Loop v3
+# Evolve Loop v4
 
-Orchestrates 13 specialized agents through 8 phases per cycle, maximizing parallel execution. Integrates Everything Claude Code (ECC) agents for architecture, TDD, code review, E2E testing, security review, and loop operation. Features eval-based hard gating, instinct extraction for continuous learning, and loop operator monitoring.
+Orchestrates 4 specialized agents through 5 lean phases per cycle. Optimized for fast iteration: discover → build → audit → ship → learn. Each cycle targets 2-4 small/medium tasks, builds them in isolated worktrees, and gates on MEDIUM+ audit findings.
 
 **Usage:** `/evolve-loop [cycles] [goal]`
 
@@ -26,23 +26,27 @@ Examples:
 
 ## Goal Modes
 
-**With goal (directed mode):** All discovery agents (PM, Researcher, Scanner) and the Planner focus their work toward achieving the goal. The PM assesses what's relevant to the goal, the Researcher searches for approaches and best practices related to the goal, the Scanner identifies code areas the goal will touch, and the Planner selects tasks that advance the goal.
+**With goal (directed mode):** Scout focuses discovery and task selection on advancing the goal. Builder implements goal-relevant tasks. Auditor checks goal alignment.
 
-**Without goal (autonomous mode):** Agents perform broad discovery — the PM evaluates all 8 dimensions, the Researcher searches for general trends, the Scanner does a full codebase audit, and the Planner picks the highest-impact work. This is the original behavior.
+**Without goal (autonomous mode):** Scout performs broad discovery, picks highest-impact work across all dimensions.
 
 ## Architecture
 
 ```
-Phase 0:   MONITOR-INIT ── sequential ──── [Loop Operator] pre-flight
-Phase 1:   DISCOVER ────── 3 PARALLEL ──── [PM] [Researcher] [Scanner]
-Phase 2:   PLAN ────────── sequential ──── [Planner] + user gate + eval defs
-Phase 3:   DESIGN ─────── sequential ──── [Architect (ECC)]
-Phase 4:   BUILD ────────── sequential ──── [Developer (ECC tdd-guide)] (worktree)
-Phase 4.5: CHECKPOINT ──── sequential ──── [Loop Operator] mid-cycle
-Phase 5:   VERIFY ─────── 3 PARALLEL ──── [Code-Reviewer] [E2E-Runner] [Security-Reviewer]
-Phase 5.5: EVAL ────────── sequential ──── [Eval Harness] HARD GATE
-Phase 6:   SHIP ────────── sequential ──── [Deployer] (only if eval PASS)
-Phase 7:   LOOP+LEARN ──── sequential ──── archive + instinct extraction + operator post-cycle
+Phase 1:   DISCOVER ─── sequential ─── [Scout] scan + research + task selection
+Phase 2:   BUILD ────── sequential ─── [Builder] design + implement + self-test (worktree)
+Phase 3:   AUDIT ────── sequential ─── [Auditor] review + security + eval gate
+Phase 4:   SHIP ──────── orchestrator ── commit + push (inline, no agent)
+Phase 5:   LEARN ──────── orchestrator ── archive + instinct extraction + operator check
+```
+
+For multiple tasks per cycle, Phase 2-3 loop:
+```
+Scout → [Task A, Task B, Task C]
+  → Builder(A) → Auditor(A) → commit
+  → Builder(B) → Auditor(B) → commit
+  → Builder(C) → Auditor(C) → commit
+→ Ship → Learn
 ```
 
 ## Initialization (once per session)
@@ -54,76 +58,52 @@ Phase 7:   LOOP+LEARN ──── sequential ──── archive + instinct ex
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","costBudget":null,"research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0}
+   {"lastUpdated":"<now>","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0}
    ```
 
 3. Auto-detect project context (language, framework, test commands, domain). Store as `projectContext`.
 
+4. **Pre-flight check** (inline, no agent):
+   ```bash
+   git status --porcelain   # must be clean
+   git worktree list        # worktree support available
+   ls .claude/evolve/evals/ 2>/dev/null  # evals exist (skip check on cycle 1)
+   ```
+   If git is dirty, warn user before proceeding.
+
 ## Orchestrator Loop
 
 You are the orchestrator. For each cycle:
-1. Parse arguments into `cycles` and `goal` (see Argument Parsing above)
-2. Pass `goal` (or null) in the context block to every agent
-3. Launch agents via the Agent tool — **maximize parallel launches**
-4. Collect results and verify workspace files
-5. Handle gates (operator HALT, user approval, eval gate, fix loops, exit conditions)
-
-**Key rule:** When agents have no data dependencies, launch them in a **single message with multiple Agent tool calls**.
+1. Launch Scout → collect task list
+2. For each task: Launch Builder (worktree) → Launch Auditor
+3. If Auditor PASS → commit. If WARN/FAIL → re-run Builder with issues (max 3 attempts)
+4. Ship all passing commits
+5. Learn: archive, extract instincts, operator check
 
 For detailed phase-by-phase instructions, see [phases.md](phases.md).
-For the shared memory protocol (ledger format, workspace conventions, state.json schema), see [memory-protocol.md](memory-protocol.md).
+For the shared memory protocol, see [memory-protocol.md](memory-protocol.md).
 For the eval hard gate instructions, see [eval-runner.md](eval-runner.md).
-
-## Dependencies
-
-**Required:** [Everything Claude Code](https://github.com/anthropics/everything-claude-code) (ECC) plugin must be installed. Five agents use ECC subagent_types at runtime:
-
-| ECC subagent_type | Used by |
-|-------------------|---------|
-| `everything-claude-code:architect` | Phase 3: Architect |
-| `everything-claude-code:tdd-guide` | Phase 4: Developer |
-| `everything-claude-code:code-reviewer` | Phase 5: Reviewer |
-| `everything-claude-code:e2e-runner` | Phase 5: E2E Runner |
-| `everything-claude-code:security-reviewer` | Phase 5: Security |
 
 ## Agent Definitions
 
-Agent files live in `~/.claude/agents/`. There are two types:
-
-**Custom agents** — full self-contained instructions, launched with `subagent_type: general-purpose`:
+All agents are custom, self-contained. No external dependencies.
 
 | Role | Agent File | Model | Workspace File |
 |------|-----------|-------|----------------|
-| Operator | `evolve-operator.md` | sonnet | `loop-operator-log.md` |
-| PM | `evolve-pm.md` | sonnet | `briefing.md` |
-| Researcher | `evolve-researcher.md` | sonnet | `research-report.md` |
-| Scanner | `evolve-scanner.md` | sonnet | `scan-report.md` |
-| Planner | `evolve-planner.md` | opus | `backlog.md` + `evals/*.md` |
-| Deployer | `evolve-deployer.md` | sonnet | `deploy-log.md` |
+| Scout | `evolve-scout.md` | sonnet | `scout-report.md` |
+| Builder | `evolve-builder.md` | sonnet | `build-report.md` |
+| Auditor | `evolve-auditor.md` | sonnet | `audit-report.md` |
+| Operator | `evolve-operator.md` | sonnet | `operator-log.md` |
 
-**ECC context overlays** — thin files (~40 lines) that add evolve-specific context on top of ECC agents. Launched with the corresponding ECC `subagent_type`:
-
-| Role | Agent File | ECC subagent_type | Model | Workspace File |
-|------|-----------|-------------------|-------|----------------|
-| Architect | `evolve-architect.md` | `everything-claude-code:architect` | opus | `design.md` |
-| Developer | `evolve-developer.md` | `everything-claude-code:tdd-guide` | sonnet | `impl-notes.md` |
-| Reviewer | `evolve-reviewer.md` | `everything-claude-code:code-reviewer` | sonnet | `review-report.md` |
-| E2E Runner | `evolve-e2e.md` | `everything-claude-code:e2e-runner` | sonnet | `e2e-report.md` |
-| Security | `evolve-security.md` | `everything-claude-code:security-reviewer` | sonnet | `security-report.md` |
-
-**Eval Runner** — not an agent; orchestrator-executed instructions in [eval-runner.md](eval-runner.md). Writes `eval-report.md`.
-
-**Context overlay pattern:** The orchestrator reads the overlay file and passes its content as the prompt. The ECC agent's built-in instructions are loaded automatically via `subagent_type`. The overlay adds only evolve-specific concerns: workspace file ownership, input context, output format, ledger entry. No ECC content is duplicated.
+**Eval Runner** — orchestrator-executed (not an agent), instructions in [eval-runner.md](eval-runner.md).
 
 ## Anti-Patterns
 
-1. **Serializing independent agents** — PM, Researcher, Scanner have NO data dependencies → always launch all 3 in parallel
-2. **Proceeding before reviewers finish** — WAIT for all parallel agents
-3. **Same context for author and reviewer** — Use separate Agent calls
-4. **No cross-iteration context** — Always read/write notes.md
-5. **Retrying the same failure** — Log in state.json, try alternative next cycle
-6. **Skipping the review barrier** — All 3 verifiers (Reviewer + E2E + Security) must pass
-7. **Agents writing outside their workspace file** — Each agent owns one file
-8. **Skipping the eval gate** — Phase 5.5 is a HARD gate. Never proceed to SHIP without PASS.
-9. **Ignoring instincts** — Developer and Planner MUST read instincts when available
-10. **Ignoring HALT** — When Loop Operator returns HALT, the orchestrator MUST pause and present issues to user
+1. **Over-discovery** — Scout should be incremental after cycle 1, not full audit every time
+2. **Big tasks** — Prefer 3 small tasks over 1 large task. Each should be <50K tokens to build
+3. **Retrying the same failure** — Log in state.json, try alternative next cycle
+4. **Skipping the audit** — Auditor verdict of WARN or FAIL blocks shipping
+5. **Ignoring instincts** — Builder MUST read instincts when available
+6. **Research every cycle** — 12hr cooldown on web research. Reuse cached results
+7. **Ceremony over substance** — Workspace files should be concise, not exhaustive
+8. **Ignoring HALT** — When Operator returns HALT, pause and present to user

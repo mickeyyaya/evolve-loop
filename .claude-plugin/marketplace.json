@@ -1,19 +1,19 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "evolve-loop",
-  "description": "Self-evolving development pipeline for Claude Code — orchestrates 13 AI agents across 8 phases to autonomously discover, plan, design, build, verify, and ship improvements",
+  "description": "Self-evolving development pipeline for Claude Code — 4 lean agents across 5 phases to autonomously discover, build, audit, and ship improvements",
   "owner": {
     "name": "Dan Lee"
   },
   "metadata": {
-    "description": "Self-evolving development pipeline with eval gating, continuous learning, and loop monitoring"
+    "description": "Self-evolving development pipeline with eval gating, continuous learning, and loop monitoring. No external dependencies."
   },
   "plugins": [
     {
       "name": "evolve-loop",
       "source": "./",
-      "description": "13 specialized AI agents across 8 phases — MONITOR, DISCOVER, PLAN, DESIGN, BUILD, CHECKPOINT, VERIFY, EVAL, SHIP, LEARN",
-      "version": "3.1.0",
+      "description": "4 specialized agents (Scout, Builder, Auditor, Operator) across 5 lean phases — DISCOVER, BUILD, AUDIT, SHIP, LEARN",
+      "version": "4.0.0",
       "author": {
         "name": "Dan Lee"
       },
@@ -25,7 +25,8 @@
         "skills",
         "evolve",
         "autonomous",
-        "pipeline"
+        "pipeline",
+        "self-evolving"
       ],
       "category": "workflow",
       "tags": [
@@ -33,8 +34,8 @@
         "skills",
         "autonomous",
         "pipeline",
-        "tdd",
-        "eval"
+        "eval",
+        "self-evolving"
       ],
       "strict": false
     }

@@ -1,25 +1,25 @@
 # Evolve Loop
 
-A self-evolving development pipeline for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Orchestrates 13 specialized AI agents across 8 phases to autonomously discover, plan, design, build, verify, and ship improvements to any codebase.
+A self-evolving development pipeline for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Orchestrates 4 specialized AI agents across 5 lean phases to autonomously discover, build, audit, and ship improvements to any codebase.
 
-Built on top of [Everything Claude Code](https://github.com/anthropics/everything-claude-code) (ECC) battle-tested agents for architecture, TDD, code review, E2E testing, security review, and loop operation.
+Optimized for fast iteration — diverse small/medium tasks per cycle, worktree isolation, 12hr research cooldown, and single-pass auditing.
 
 ## Features
 
-- **13 specialized agents** — each with a focused role and clear workspace ownership
-- **8-phase pipeline** — MONITOR → DISCOVER → PLAN → DESIGN → BUILD → CHECKPOINT → VERIFY → EVAL → SHIP → LEARN
-- **Parallel execution** — 3 agents run simultaneously in DISCOVER and VERIFY phases
-- **Eval hard gate** — code graders, regression evals, and acceptance checks must pass before deploy
-- **Continuous learning** — instinct extraction after each cycle, promoting patterns with high confidence
-- **Loop monitoring** — operator agent with pre-flight checks, mid-cycle checkpoints, and post-cycle assessment
-- **Goal-directed or autonomous** — focus on a specific goal or let agents discover improvements
+- **4 specialized agents** — Scout, Builder, Auditor, Operator
+- **5 lean phases** — DISCOVER → BUILD → AUDIT → SHIP → LEARN
+- **Multi-task per cycle** — 2-4 small tasks built and audited sequentially
+- **Worktree isolation** — Builder works in isolated git worktrees
+- **Eval hard gate** — Auditor runs code graders and acceptance checks before shipping
+- **Continuous learning** — instinct extraction after each cycle with deep reasoning
+- **Loop monitoring** — Operator detects stalls, quality degradation, and repeated failures
+- **No external dependencies** — fully self-contained, no plugins required
 
 ## Quick Start
 
 ### Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
-- [Everything Claude Code](https://github.com/anthropics/everything-claude-code) (ECC) plugin installed — 5 agents delegate to ECC at runtime
 - A git repository to evolve
 
 ### Installation
@@ -44,7 +44,7 @@ Add to your `~/.claude/settings.json`:
 }
 ```
 
-Restart Claude Code. The skill and agents load automatically — no file copying needed.
+Restart Claude Code. The skill and agents load automatically.
 
 **Option B: Manual install**
 
@@ -54,13 +54,9 @@ cd evolve-loop
 ./install.sh
 ```
 
-This copies agents to `~/.claude/agents/` and the skill to `~/.claude/skills/evolve-loop/`.
-
 ### Usage
 
 ```bash
-# In any git project directory:
-
 # Autonomous mode — 2 cycles, agents discover what to improve
 /evolve-loop
 
@@ -77,139 +73,99 @@ This copies agents to `~/.claude/agents/` and the skill to `~/.claude/skills/evo
 ## Architecture
 
 ```
-Phase 0:   MONITOR-INIT ── sequential ──── [Loop Operator] pre-flight
-Phase 1:   DISCOVER ────── 3 PARALLEL ──── [PM] [Researcher] [Scanner]
-Phase 2:   PLAN ────────── sequential ──── [Planner] + user gate + eval defs
-Phase 3:   DESIGN ─────── sequential ──── [Architect (ECC)]
-Phase 4:   BUILD ────────── sequential ──── [Developer (ECC tdd-guide)] (worktree)
-Phase 4.5: CHECKPOINT ──── sequential ──── [Loop Operator] mid-cycle
-Phase 5:   VERIFY ─────── 3 PARALLEL ──── [Code-Reviewer] [E2E-Runner] [Security-Reviewer]
-Phase 5.5: EVAL ────────── sequential ──── [Eval Harness] HARD GATE
-Phase 6:   SHIP ────────── sequential ──── [Deployer] (only if eval PASS)
-Phase 7:   LOOP+LEARN ──── sequential ──── archive + instinct extraction + operator post-cycle
+Phase 1:   DISCOVER ─── [Scout]     scan + research + task selection
+Phase 2:   BUILD ────── [Builder]   design + implement + self-test (worktree)
+Phase 3:   AUDIT ────── [Auditor]   review + security + eval gate
+Phase 4:   SHIP ──────── orchestrator   commit + push
+Phase 5:   LEARN ──────── orchestrator + [Operator]   instincts + health check
+```
+
+For multiple tasks per cycle, Phase 2-3 loop:
+```
+Scout → [Task A, Task B, Task C]
+  → Builder(A) → Auditor(A) → commit
+  → Builder(B) → Auditor(B) → commit
+  → Builder(C) → Auditor(C) → commit
+→ Ship → Learn
 ```
 
 ### Data Flow
 
 ```
-                    PHASE 0: Loop Operator → loop-operator-log.md (pre-flight)
-                              |
-                    PHASE 1: DISCOVER (3 parallel)
-PM ─────────→ briefing.md ──────────┐
-Researcher ──→ research-report.md ──┤
-Scanner ─────→ scan-report.md ──────┘
-                                     |
-                    PHASE 2: PLAN    v
-                    Planner → backlog.md + evals/<task>.md
-                                     |
-                    PHASE 3: DESIGN  v
-                    Architect → design.md
-                                     |
-                    PHASE 4: BUILD   v
-                    Developer → impl-notes.md
-                                     |
-                    PHASE 4.5: Loop Operator → checkpoint
-                                     |
-                    PHASE 5: VERIFY (3 parallel)
-Reviewer ────→ review-report.md ─────────┐
-E2E Runner ──→ e2e-report.md ────────────┤
-Security ────→ security-report.md ───────┘
-                                          |
-                    PHASE 5.5: EVAL       v
-                    Eval Runner → eval-report.md [HARD GATE]
-                                          |
-                    PHASE 6: SHIP         v (only if PASS)
-                    Deployer → deploy-log.md
-                                          |
-                    PHASE 7: LOOP+LEARN   v
-                    Archive + Instincts + Operator post-cycle
+Phase 1: Scout ──→ scout-report.md + evals/<task>.md
+              |
+Phase 2: Builder ──→ build-report.md  (per task, in worktree)
+              |
+Phase 3: Auditor ──→ audit-report.md  [GATE: MEDIUM+ blocks]
+              |
+Phase 4: Orchestrator ── git commit + push
+              |
+Phase 5: Orchestrator ── instincts + archive
+         Operator ──→ operator-log.md
 ```
 
 ## Agents
 
-### Custom Agents (full instructions, `subagent_type: general-purpose`)
-
-| Role | File | Model | Workspace File |
-|------|------|-------|----------------|
-| Operator | `evolve-operator.md` | sonnet | `loop-operator-log.md` |
-| PM | `evolve-pm.md` | sonnet | `briefing.md` |
-| Researcher | `evolve-researcher.md` | sonnet | `research-report.md` |
-| Scanner | `evolve-scanner.md` | sonnet | `scan-report.md` |
-| Planner | `evolve-planner.md` | opus | `backlog.md` + `evals/*.md` |
-| Deployer | `evolve-deployer.md` | sonnet | `deploy-log.md` |
-
-### ECC Context Overlays (~40 lines each, delegate to ECC at runtime)
-
-| Role | File | ECC subagent_type | Model | Workspace File |
-|------|------|-------------------|-------|----------------|
-| Architect | `evolve-architect.md` | `everything-claude-code:architect` | opus | `design.md` |
-| Developer | `evolve-developer.md` | `everything-claude-code:tdd-guide` | sonnet | `impl-notes.md` |
-| Reviewer | `evolve-reviewer.md` | `everything-claude-code:code-reviewer` | sonnet | `review-report.md` |
-| E2E Runner | `evolve-e2e.md` | `everything-claude-code:e2e-runner` | sonnet | `e2e-report.md` |
-| Security | `evolve-security.md` | `everything-claude-code:security-reviewer` | sonnet | `security-report.md` |
-
-**Eval Runner** — orchestrator-executed (not an agent), writes `eval-report.md`.
-
-**How overlays work:** The orchestrator reads the overlay file and passes it as the prompt. The ECC agent's built-in instructions load automatically via `subagent_type`. The overlay adds only evolve-specific concerns (workspace ownership, input/output format, ledger entry). No ECC content is duplicated — agents stay small, always current, and never stale.
+| Role | File | Model | Purpose |
+|------|------|-------|---------|
+| Scout | `evolve-scout.md` | sonnet | Discovery + analysis + task selection |
+| Builder | `evolve-builder.md` | sonnet | Design + implement + self-test |
+| Auditor | `evolve-auditor.md` | sonnet | Review + security + eval gate |
+| Operator | `evolve-operator.md` | sonnet | Loop health monitoring |
 
 ## Key Mechanics
 
-### Eval Hard Gate (Phase 5.5)
+### Scout (Phase 1)
+- **Cycle 1:** Full codebase scan + optional web research
+- **Cycle 2+:** Incremental scan (only what changed) + research cooldown (12hr)
+- Outputs 2-4 small/medium tasks with eval definitions
+- Reads instincts to avoid repeating mistakes
 
-The eval gate is the primary quality bar. It runs code-based graders, regression evals, and acceptance checks defined by the Planner in Phase 2.
+### Builder (Phase 2)
+- Designs and implements in a single pass (no architect → developer handoff)
+- Works in isolated worktree
+- Self-verifies against eval definitions before declaring done
+- Max 3 attempts per task, then logs failure and moves on
 
-- All checks must pass (pass@1 = 1.0)
-- If FAIL → re-launch Developer → re-run VERIFY + EVAL (max 3 attempts)
-- If still FAIL after 3 → log as failed approach, skip deploy
+### Auditor (Phase 3)
+- Single-pass review: code quality + security + pipeline integrity + eval checks
+- Blocks on MEDIUM+ severity findings
+- Assesses blast radius, reversibility, and convergence
+- WARN or FAIL triggers Builder retry (max 3 iterations)
 
-### Continuous Learning (Phase 7)
+### Instinct Extraction (Phase 5)
+- Deep reasoning about what worked, what failed, and why
+- Specific actionable patterns, not generic advice
+- Confidence scoring: starts at 0.5, increases with confirmation
+- After 5+ cycles, high-confidence instincts promote to global scope
 
-After each cycle, the orchestrator extracts instincts — patterns observed during the cycle:
-
-- Successful patterns (approaches, tools, libraries that worked)
-- Failed patterns (anti-patterns, pitfalls to avoid)
-- Repeated workflows worth encoding
-- Domain knowledge specific to the project
-
-Instincts start at confidence 0.5 and increase with repetition. After 5+ cycles, high-confidence instincts (>= 0.8) promote to global scope.
-
-### Loop Operator (3 checkpoints)
-
-- **Pre-flight (Phase 0):** Verify quality gates, eval baseline, rollback path, cost budget
-- **Checkpoint (Phase 4.5):** Check timing, detect stalls, flag cost drift
-- **Post-cycle (Phase 7):** Progress assessment, stall detection, recommendations
-- Returns `HALT` if issues found — orchestrator must pause and present to user
+### Operator (Phase 5)
+- Post-cycle health assessment
+- Stall detection (2+ consecutive no-ship cycles)
+- Quality trend tracking
+- HALT protocol: pauses loop for human attention
 
 ## Project Structure
 
 ```
 evolve-loop/
-├── agents/                      # 11 agent definition files
-│   ├── evolve-operator.md       # Loop monitoring (ECC wrapper)
-│   ├── evolve-pm.md             # Project manager (custom)
-│   ├── evolve-researcher.md     # External intelligence (custom)
-│   ├── evolve-scanner.md        # Code scanner (custom)
-│   ├── evolve-planner.md        # Task selection + eval defs (custom)
-│   ├── evolve-architect.md      # System design (ECC wrapper)
-│   ├── evolve-developer.md      # TDD implementation (ECC wrapper)
-│   ├── evolve-reviewer.md       # Code review (ECC wrapper)
-│   ├── evolve-e2e.md            # E2E testing (ECC wrapper)
-│   ├── evolve-security.md       # Security review (ECC wrapper)
-│   └── evolve-deployer.md       # Ship + CI (custom)
+├── agents/                     # 4 agent definition files
+│   ├── evolve-scout.md        # Discovery + task selection
+│   ├── evolve-builder.md      # Design + implement
+│   ├── evolve-auditor.md      # Review + security + eval
+│   └── evolve-operator.md     # Loop monitoring
 ├── skills/
 │   └── evolve-loop/
-│       ├── SKILL.md             # Entry point + orchestrator overview
-│       ├── phases.md            # Phase-by-phase instructions
-│       ├── memory-protocol.md   # Workspace, ledger, state schema
-│       └── eval-runner.md       # Eval hard gate instructions
+│       ├── SKILL.md           # Entry point + orchestrator
+│       ├── phases.md          # Phase-by-phase instructions
+│       ├── memory-protocol.md # Workspace, ledger, state schema
+│       └── eval-runner.md     # Eval gate instructions
 ├── docs/
-│   ├── architecture.md          # Detailed architecture docs
-│   ├── configuration.md         # Configuration reference
-│   └── writing-agents.md        # Guide for creating custom agents
-├── examples/
-│   └── eval-definition.md       # Example eval definition
-├── install.sh                   # Installation script
-├── uninstall.sh                 # Uninstallation script
+│   ├── architecture.md        # Detailed architecture docs
+│   ├── configuration.md       # Configuration reference
+│   └── writing-agents.md      # Guide for creating agents
+├── install.sh                 # Installation script
+├── uninstall.sh               # Uninstallation script
 ├── README.md
 ├── CONTRIBUTING.md
 ├── LICENSE
@@ -218,24 +174,14 @@ evolve-loop/
 
 ## Workspace Layout (per project)
 
-When evolve-loop runs, it creates this structure in the target project:
-
 ```
 .claude/evolve/
-├── workspace/           # Current cycle workspace (overwritten each cycle)
-│   ├── loop-operator-log.md
-│   ├── briefing.md
-│   ├── research-report.md
-│   ├── scan-report.md
-│   ├── backlog.md
-│   ├── design.md
-│   ├── impl-notes.md
-│   ├── review-report.md
-│   ├── e2e-report.md
-│   ├── security-report.md
-│   ├── eval-report.md
-│   └── deploy-log.md
-├── evals/               # Eval definitions (created by Planner)
+├── workspace/           # Current cycle (overwritten each cycle)
+│   ├── scout-report.md
+│   ├── build-report.md
+│   ├── audit-report.md
+│   └── operator-log.md
+├── evals/               # Eval definitions (created by Scout)
 ├── instincts/
 │   └── personal/        # Extracted patterns from cycles
 ├── history/
@@ -249,38 +195,7 @@ When evolve-loop runs, it creates this structure in the target project:
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 - Git (for worktree isolation)
-- A project with test infrastructure (npm test, pytest, go test, etc.)
-
-## Configuration
-
-### Cost Budget
-
-Set a per-cycle cost budget in `state.json`:
-
-```json
-{
-  "costBudget": 5.00
-}
-```
-
-The Loop Operator will flag cost drift exceeding 120% of average cycle cost.
-
-### Goal Modes
-
-| Mode | Usage | Behavior |
-|------|-------|----------|
-| Autonomous | `/evolve-loop` | Broad discovery across all dimensions |
-| Directed | `/evolve-loop add auth` | All agents focus on the specified goal |
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding agents, modifying phases, or improving the eval system.
 
 ## License
 
 [MIT](LICENSE)
-
-## Acknowledgments
-
-- [Everything Claude Code](https://github.com/anthropics/everything-claude-code) — battle-tested agents used as wrappers
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — the AI coding assistant powering the agents

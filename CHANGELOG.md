@@ -2,41 +2,61 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.0.0] - 2026-03-13
+
+### Added
+- **Scout agent** (`evolve-scout.md`) — combines PM, Researcher, Scanner, and Planner into one agent
+- **Builder agent** (`evolve-builder.md`) — combines Architect and Developer with self-evolution principles
+- **Auditor agent** (`evolve-auditor.md`) — single-pass review covering code quality, security, pipeline integrity, and eval gate
+- Multi-task per cycle — 2-4 small/medium tasks built and audited sequentially
+- 12hr research cooldown with cached results
+- Incremental discovery (cycle 2+ only scans what changed)
+- Self-evolution principles: minimal change, reversibility, compound thinking, blast radius assessment
+
+### Changed
+- **Pipeline simplified** — 5 phases (down from 8): DISCOVER → BUILD → AUDIT → SHIP → LEARN
+- **Operator simplified** — single post-cycle invocation (down from 3)
+- **Audit threshold** — MEDIUM+ blocks shipping (was only FAIL)
+- **Ship phase** — orchestrator inline (no Deployer agent)
+- **Learn phase** — orchestrator inline for instincts (deeper reasoning)
+- **Token usage** — ~60-70% reduction per cycle
+- **No external dependencies** — removed ECC requirement
+
+### Removed
+- **10 agents** — PM, Researcher, Scanner, Planner, Architect, Developer, Reviewer, E2E Runner, Security Reviewer, Deployer
+- **ECC dependency** — all agents are now self-contained
+- **3 phases** — MONITOR-INIT (pre-flight inline), CHECKPOINT (removed), DESIGN (merged into BUILD)
+- `costBudget` field from state.json (simplified)
+
+## [3.1.0] - 2026-03-12
+
+### Changed
+- ECC wrapper agents refactored from full content copies to thin context overlays using `subagent_type` delegation
+- Net reduction of 607 lines across 5 agent files
+- Added Claude Code plugin support (`.claude-plugin/` manifests)
+
 ## [3.0.0] - 2026-03-12
 
 ### Added
-- **Loop Operator agent** (`evolve-operator.md`) — 3 invocation modes: pre-flight, checkpoint, post-cycle
-- **E2E Runner agent** (`evolve-e2e.md`) — ECC wrapper for end-to-end testing
-- **Security Reviewer agent** (`evolve-security.md`) — ECC wrapper for OWASP security scanning
-- **Eval Runner** (`eval-runner.md`) — Phase 5.5 hard gate with code graders, regression evals, acceptance checks
-- **Phase 0: MONITOR-INIT** — Loop Operator pre-flight checks
-- **Phase 4.5: CHECKPOINT** — Loop Operator mid-cycle assessment
-- **Phase 5.5: EVAL** — Hard eval gate with retry protocol (max 3 attempts)
-- **Instinct extraction** in Phase 7 — continuous learning from cycle artifacts
-- **Instinct reading** in Developer and Planner agents
-- **Eval definition output** from Planner (writes to `.claude/evolve/evals/`)
-- 3 new anti-patterns: skip eval gate, ignore instincts, ignore HALT
-- `costBudget`, `evalHistory`, `instinctCount`, `operatorWarnings` in state.json
+- Loop Operator agent with 3 invocation modes
+- E2E Runner and Security Reviewer agents (ECC wrappers)
+- Eval Runner with hard gate and retry protocol
+- Phase 0 (MONITOR-INIT), Phase 4.5 (CHECKPOINT), Phase 5.5 (EVAL)
+- Instinct extraction in Phase 7
+- Eval definition output from Planner
 
 ### Changed
-- **Architect agent** → ECC wrapper (adds ADRs, testing strategy)
-- **Developer agent** → ECC wrapper (adds eval-driven TDD, instinct reading)
-- **Reviewer agent** → ECC wrapper (adds design compliance check, confidence filtering)
-- **Phase 5: VERIFY** expanded from 2 parallel agents to 3 (reviewer + e2e + security)
-- **Phase 7: LOOP** expanded to LOOP+LEARN (instinct extraction + operator post-cycle)
-- Deployer now checks eval-report.md as primary ship gate
-- Memory protocol updated with 4 new workspace files, Layers 4-5
+- Architect, Developer, Reviewer → ECC wrappers
+- Phase 5 expanded from 2 to 3 parallel agents
+- Phase 7 expanded to LOOP+LEARN
 
 ### Removed
-- **QA agent** (`evolve-qa.md`) — replaced by evolve-e2e + evolve-security
+- QA agent (replaced by E2E + Security)
 
 ## [2.0.0] - 2026-03-12
 
 ### Added
-- Initial 9-agent pipeline (PM, Researcher, Scanner, Planner, Architect, Developer, Reviewer, QA, Deployer)
-- 7-phase cycle (DISCOVER → PLAN → DESIGN → BUILD → VERIFY → SHIP → LOOP)
-- Parallel execution in DISCOVER (3 agents) and VERIFY (2 agents)
-- JSONL ledger + markdown workspace shared memory protocol
-- Goal-directed and autonomous discovery modes
-- Worktree isolation for BUILD phase
-- State.json for cross-cycle persistence
+- Initial 9-agent pipeline
+- 7-phase cycle
+- Parallel execution, JSONL ledger, workspace protocol
+- Goal-directed and autonomous modes

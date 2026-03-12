@@ -1,7 +1,7 @@
 {
   "name": "evolve-loop",
-  "version": "3.1.0",
-  "description": "Self-evolving development pipeline — 13 AI agents across 8 phases with eval gating, continuous learning, and loop monitoring",
+  "version": "4.0.0",
+  "description": "Self-evolving development pipeline — 4 lean agents across 5 phases with eval gating, continuous learning, and loop monitoring. No external dependencies.",
   "author": {
     "name": "Dan Lee"
   },
@@ -15,9 +15,7 @@
     "evolve",
     "autonomous",
     "pipeline",
-    "tdd",
-    "code-review",
-    "security",
-    "e2e-testing"
+    "self-evolving",
+    "eval"
   ]
 }
