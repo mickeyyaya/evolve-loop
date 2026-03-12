@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.1.0] - 2026-03-13
+
+### Changed
+- **Plugin packaging** — `plugin.json` now declares `agents` array (explicit file paths) and `skills` array for proper plugin system registration
+- **Agent frontmatter** — all 4 agents now include `name`, `description`, and `tools` fields required by the plugin system
+- **CI workflow** — validates plugin.json schema, marketplace.json, and agent frontmatter fields
+- **install.sh** — CI mode validates plugin structure without copying; manual mode shows plugin install as preferred
+- **README** — plugin install via `/plugin marketplace add` + `/plugin install` is now primary method
+
+### Removed
+- 10 legacy v3 agent files from installed agents (evolve-architect, evolve-deployer, evolve-developer, evolve-e2e, evolve-planner, evolve-pm, evolve-researcher, evolve-reviewer, evolve-scanner, evolve-security)
+
 ## [4.0.0] - 2026-03-13
 
 ### Added

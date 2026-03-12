@@ -6,6 +6,9 @@ Guide for creating new evolve-loop agents or modifying existing ones.
 
 ```markdown
 ---
+name: evolve-<role>
+description: <one-line description of what this agent does>
+tools: ["Read", "Grep", "Glob", "Bash"]  # tools this agent needs
 model: sonnet  # or opus
 ---
 
@@ -59,10 +62,11 @@ You will receive a JSON context block with:
 
 ## Adding a New Agent
 
-1. Create the agent file in `agents/evolve-<role>.md`
+1. Create the agent file in `agents/evolve-<role>.md` with full frontmatter (`name`, `description`, `tools`, `model`)
 2. Define clear inputs (JSON context block), responsibilities, and outputs
 3. Assign exactly one workspace file
-4. Update `skills/evolve-loop/phases.md` with when the agent runs
-5. Update `skills/evolve-loop/memory-protocol.md` with the new workspace file
-6. Update `skills/evolve-loop/SKILL.md` with the agent table entry
-7. Update `CHANGELOG.md`
+4. Add the agent path to `.claude-plugin/plugin.json` agents array
+5. Update `skills/evolve-loop/phases.md` with when the agent runs
+6. Update `skills/evolve-loop/memory-protocol.md` with the new workspace file
+7. Update `skills/evolve-loop/SKILL.md` with the agent table entry
+8. Update `CHANGELOG.md`
