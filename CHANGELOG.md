@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.2.0] - 2026-03-13
+
+### Added
+- **Denial-of-wallet guardrails** — `maxCyclesPerSession` (default 10) and `warnAfterCycles` (default 5) prevent runaway sessions; enforced in SKILL.md initialization and phases.md per-cycle check
+- **Orchestrator Policies** section in SKILL.md — graduated instincts (inst-004, inst-007) formalized as default pipeline behavior
+- **inst-010** instinct — deferred security tasks escalate to CRITICAL after 3 cycles
+
+### Changed
+- **Instinct consolidation** — inst-004 and inst-007 consolidated to confidence 0.9 with supersedes metadata
+- **state.json** — now includes `maxCyclesPerSession` and `warnAfterCycles` fields
+
 ## [4.1.0] - 2026-03-13
 
 ### Changed

@@ -102,6 +102,14 @@ All agents are custom, self-contained. No external dependencies.
 
 **Eval Runner** — orchestrator-executed (not an agent), instructions in [eval-runner.md](eval-runner.md).
 
+## Orchestrator Policies
+
+These are graduated instincts — patterns confirmed across multiple cycles with high confidence (0.9+).
+
+1. **Inline S-complexity tasks** (from inst-007, confidence 0.9): For small, well-defined tasks (S complexity, <10 lines changed, fully specified with eval definitions), the orchestrator may implement inline instead of spawning a builder agent. This saves ~30-50K tokens per task. Only applies when acceptance criteria and eval graders are unambiguous.
+
+2. **Grep-based evals** (from inst-004, confidence 0.9): For Markdown/Shell projects without test infrastructure, grep-based eval checks are effective acceptance gates. Define specific grep commands with expected match counts.
+
 ## Anti-Patterns
 
 1. **Over-discovery** — Scout should be incremental after cycle 1, not full audit every time
