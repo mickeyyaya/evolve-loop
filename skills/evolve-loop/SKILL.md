@@ -14,15 +14,19 @@ Orchestrates 4 specialized agents through 5 lean phases per cycle. Optimized for
 ## Argument Parsing
 
 Parse `$ARGUMENTS` as follows:
-- If the first token is a number → use it as `cycles`, remainder is `goal`
+- If the first token is a number → use it as `cycles` (number of NEW cycles to run), remainder is `goal`
 - If the first token is NOT a number → `cycles` defaults to 2, entire input is `goal`
 - If empty → `cycles` = 2, `goal` = null (autonomous discovery mode)
 
+The `cycles` argument is **additive** — it specifies how many cycles to run from the current position, not a total. The orchestrator reads `lastCycleNumber` from state.json and computes:
+- `startCycle = lastCycleNumber + 1`
+- `endCycle = lastCycleNumber + cycles`
+
 Examples:
-- `/evolve-loop` → cycles=2, goal=null
-- `/evolve-loop 3` → cycles=3, goal=null
-- `/evolve-loop 1 add dark mode support` → cycles=1, goal="add dark mode support"
-- `/evolve-loop add user authentication` → cycles=2, goal="add user authentication"
+- `/evolve-loop` → run 2 more cycles from current position
+- `/evolve-loop 3` → run 3 more cycles from current position
+- `/evolve-loop 1 add dark mode support` → run 1 more cycle, goal="add dark mode support"
+- `/evolve-loop add user authentication` → run 2 more cycles, goal="add user authentication"
 
 ## Goal Modes
 
@@ -58,13 +62,18 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5}
    ```
 
-   **Denial-of-wallet guardrails** (enforce after reading state.json):
+   **Compute cycle range** (after reading state.json):
+   - Read `lastCycleNumber` (default 0) from state.json
+   - `startCycle = lastCycleNumber + 1`
+   - `endCycle = lastCycleNumber + cycles`
+
+   **Denial-of-wallet guardrails** (enforce after computing cycle range):
    - Read `maxCyclesPerSession` (default 10) and `warnAfterCycles` (default 5) from state.json
-   - If `cycles` argument > `maxCyclesPerSession`: HALT — "Requested cycles ({cycles}) exceeds maxCyclesPerSession ({maxCyclesPerSession}). Reduce the cycle count or update state.json to raise the cap."
-   - If `cycles` argument >= `warnAfterCycles`: WARN — "Running {cycles} cycles. Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
+   - If `endCycle` > `maxCyclesPerSession`: HALT — "Requested cycles would reach cycle {endCycle}, exceeding maxCyclesPerSession ({maxCyclesPerSession}). Reduce the cycle count or update state.json to raise the cap."
+   - If `cycles` >= `warnAfterCycles`: WARN — "Running {cycles} cycles (cycle {startCycle}→{endCycle}). Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
 
 3. Auto-detect project context (language, framework, test commands, domain). Store as `projectContext`.
 

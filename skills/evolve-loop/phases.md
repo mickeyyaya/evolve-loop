@@ -4,7 +4,7 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 
 **Important:** Every agent context block must include `goal` (string or null).
 
-## FOR cycle = 1 to {cycles}:
+## FOR cycle = {startCycle} to {endCycle}:
 
 ### Phase 1: DISCOVER
 
@@ -119,6 +119,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
 4. **Update state.json:**
    - Mark completed tasks in `evaluatedTasks`
+   - Update `lastCycleNumber` to current cycle number
    - Reset `nothingToDoCount` to 0
    - Update `lastUpdated`
    - Add eval results to `evalHistory`
@@ -162,8 +163,10 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - If status is `HALT` → pause and present issues to user
 
    **Cycle cap check** (inline, before launching Operator):
-   - If current cycle number > `maxCyclesPerSession` (from state.json, default 10): HALT — "Session cycle cap reached ({maxCyclesPerSession}). Stop and review before continuing."
+   - If current cycle number > `maxCyclesPerSession` (from state.json, default 10): HALT — "Cumulative cycle cap reached ({maxCyclesPerSession}). Stop and review before continuing."
    - If current cycle number >= `warnAfterCycles` (from state.json, default 5): include warning in Operator context
+
+   **Update lastCycleNumber** in state.json to the current cycle number after each cycle completes.
 
 4. **Update notes.md** (always append, never overwrite):
    ```markdown

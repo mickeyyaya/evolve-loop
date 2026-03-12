@@ -37,6 +37,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 ```json
 {
   "lastUpdated": "2026-03-13T10:00:00Z",
+  "lastCycleNumber": 0,
   "research": {
     "queries": [
       {
@@ -71,8 +72,9 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Rejected tasks have optional `revisitAfter` — skip until date passes
 - Failed approaches logged with error context for alternative strategies
 - Completed tasks are never re-proposed
-- `maxCyclesPerSession` (default 10): hard cap — orchestrator halts if cycle count would exceed this value
-- `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when cycle count reaches this value
+- `lastCycleNumber` (default 0): the last completed cycle number — used to compute the start of the next invocation (additive cycling)
+- `maxCyclesPerSession` (default 10): hard cap — orchestrator halts if cumulative cycle number would exceed this value
+- `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when requesting this many cycles in a single invocation
 
 ### `.claude/evolve/notes.md`
 

@@ -1,5 +1,6 @@
 {
-  "lastUpdated": "2026-03-13T04:00:00Z",
+  "lastUpdated": "2026-03-13T06:00:00Z",
+  "lastCycleNumber": 5,
   "research": {
     "queries": [
       {"query": "AI agent orchestration frameworks 2025 2026", "date": "2026-03-13T00:10:00Z", "ttlHours": 12},
@@ -17,13 +18,21 @@
     {"slug": "add-ci-workflow", "decision": "completed", "cycle": 2},
     {"slug": "update-writing-agents-frontmatter-template", "decision": "completed", "cycle": 3},
     {"slug": "add-changelog-cycle3-plugin-packaging", "decision": "completed", "cycle": 3},
-    {"slug": "add-instinct-system-docs", "decision": "completed", "cycle": 3}
+    {"slug": "add-instinct-system-docs", "decision": "completed", "cycle": 3},
+    {"slug": "add-denial-of-wallet-guardrails", "decision": "completed", "cycle": 4},
+    {"slug": "audit-instinct-system-health", "decision": "completed", "cycle": 4},
+    {"slug": "graduate-inst-007-to-orchestrator-policy", "decision": "completed", "cycle": 4},
+    {"slug": "fix-cycle-cap-boundary-semantics", "decision": "completed", "cycle": 5},
+    {"slug": "bump-plugin-version-to-4-2-0", "decision": "completed", "cycle": 5},
+    {"slug": "add-guardrails-to-readme-features", "decision": "completed", "cycle": 5}
   ],
   "failedApproaches": [],
   "evalHistory": [
     {"cycle": 1, "verdict": "PASS", "checks": 9, "passed": 9, "failed": 0},
     {"cycle": 2, "verdict": "PASS", "checks": 11, "passed": 11, "failed": 0},
-    {"cycle": 3, "verdict": "PASS", "checks": 12, "passed": 12, "failed": 0}
+    {"cycle": 3, "verdict": "PASS", "checks": 12, "passed": 12, "failed": 0},
+    {"cycle": 4, "verdict": "PASS", "checks": 10, "passed": 10, "failed": 0},
+    {"cycle": 5, "verdict": "PASS", "checks": 8, "passed": 8, "failed": 0}
   ],
   "instinctCount": 12,
   "operatorWarnings": [],
