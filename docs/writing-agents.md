@@ -55,18 +55,28 @@ You will receive a JSON context block with:
 
 5. **Verdict for verification agents.** Agents in VERIFY/EVAL phases must output a verdict: PASS, WARN, or FAIL.
 
-## Creating an ECC Wrapper
+## Creating an ECC Wrapper (Context Overlay Pattern)
 
-To wrap an existing ECC agent:
+ECC wrappers are **thin context overlays**, not full copies. The ECC agent's content is loaded automatically via `subagent_type` delegation — your wrapper only adds evolve-loop-specific context on top.
 
-1. Copy the full content of the ECC agent file
-2. Add `## ECC Source` section with copy date
-3. Add `## Evolve Loop Integration` section with:
-   - Input context block schema
-   - Workspace file ownership
-   - Evolve-specific responsibilities
+To create an ECC wrapper:
+
+1. Create a new file `agents/evolve-<role>.md`
+2. Add the context overlay header referencing the ECC agent:
+   ```markdown
+   # Evolve <Role> — Context Overlay
+
+   > Launched via `subagent_type: "everything-claude-code:<ecc-agent-name>"`.
+   > This file provides evolve-loop-specific context layered on top of the ECC agent.
+   ```
+3. Add an `## Evolve Loop Integration` section with:
+   - Input context block schema (cycle, workspacePath, ledgerPath, etc.)
+   - Workspace file ownership (one file per agent)
+   - Evolve-specific responsibilities beyond the ECC agent's base behavior
    - Output format (workspace file + ledger entry)
-4. Save as `evolve-<role>.md`
+4. Do **NOT** copy the ECC agent's content into the file. The `subagent_type` field in the orchestrator handles delegation automatically.
+
+See `agents/evolve-reviewer.md` or `agents/evolve-e2e.md` for examples of this pattern.
 
 ## Adding a New Phase
 

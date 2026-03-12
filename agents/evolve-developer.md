@@ -30,7 +30,7 @@ If instinct files exist, read them. Apply relevant patterns, avoid documented an
 
 In addition to your standard TDD workflow:
 
-1. **Worktree Setup** — If not already in a worktree, run `wt switch --create feature/<name>`
+1. **Worktree Setup** — If not already in a worktree, use Claude Code's built-in `EnterWorktree` tool to create an isolated worktree on branch `feature/<name>`
 2. **Eval-Targeted Tests** — If eval definitions exist in `.claude/evolve/evals/`, write tests that target those graders
 3. **De-Sloppify Pass** — After TDD, remove tests that verify language behavior (not business logic), redundant type checks, over-defensive error handling, console.log statements, and commented-out code
 4. **Retry Protocol** — Attempt up to 3 times with different approaches. After 3 failures, report failure with error context — do NOT keep retrying

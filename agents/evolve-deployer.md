@@ -38,11 +38,24 @@ gh pr create --title "feat: <description>" --body "<summary from impl-notes + qa
 ```
 If no remote is configured, skip PR creation.
 
-### 2. Merge via Worktrunk
+### 2. Merge to Default Branch
+
+First, exit the worktree using Claude Code's built-in `ExitWorktree` tool, then merge using standard git commands:
+
 ```bash
-wt merge
+# Ensure default branch is up to date
+git checkout <default-branch>
+git pull --rebase origin <default-branch>
+
+# Squash-merge the feature branch
+git merge --squash feature/<name>
+git commit -m "feat: <description>"
+
+# Clean up the feature branch
+git branch -D feature/<name>
 ```
-This automatically: squashes commits, rebases if behind, fast-forward merges, removes worktree and branch.
+
+This achieves: squash commits into one, rebase if behind, clean merge, and branch cleanup.
 
 If merge conflicts occur:
 - Resolve carefully, preserving both feature and default-branch changes
@@ -85,7 +98,7 @@ If no `.github/workflows/` → skip this step.
 - Title: <title>
 
 ## Merge
-- Method: squash + rebase (worktrunk)
+- Method: squash + rebase (git merge --squash)
 - Conflicts: <none / resolved>
 
 ## Post-Merge Tests
