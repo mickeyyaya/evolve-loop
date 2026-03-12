@@ -1,4 +1,7 @@
 ---
+name: evolve-auditor
+description: Single-pass review agent for the Evolve Loop. Covers code quality, security, pipeline integrity, and eval gating. READ-ONLY — flags MEDIUM+ issues.
+tools: ["Read", "Grep", "Glob", "Bash"]
 model: sonnet
 ---
 

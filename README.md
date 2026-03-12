@@ -13,7 +13,7 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Eval hard gate** — Auditor runs code graders and acceptance checks before shipping
 - **Continuous learning** — instinct extraction after each cycle with deep reasoning
 - **Loop monitoring** — Operator detects stalls, quality degradation, and repeated failures
-- **No external dependencies** — fully self-contained, no plugins required
+- **No external dependencies** — fully self-contained Claude Code plugin
 
 ## Quick Start
 
@@ -26,25 +26,13 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 
 **Option A: As a Claude Code plugin (recommended)**
 
-Add to your `~/.claude/settings.json`:
-
-```json
-{
-  "enabledPlugins": {
-    "evolve-loop@evolve-loop": true
-  },
-  "extraKnownMarketplaces": {
-    "evolve-loop": {
-      "source": {
-        "source": "github",
-        "repo": "mickeyyaya/evolve-loop"
-      }
-    }
-  }
-}
+In Claude Code, run:
+```
+/plugin marketplace add mickeyyaya/evolve-loop
+/plugin install evolve-loop@evolve-loop
 ```
 
-Restart Claude Code. The skill and agents load automatically.
+The skill and agents load automatically.
 
 **Option B: Manual install**
 
@@ -149,6 +137,9 @@ Phase 5: Orchestrator ── instincts + archive
 
 ```
 evolve-loop/
+├── .claude-plugin/
+│   ├── plugin.json             # Plugin manifest (agents, skills, metadata)
+│   └── marketplace.json        # Marketplace distribution config
 ├── agents/                     # 4 agent definition files
 │   ├── evolve-scout.md        # Discovery + task selection
 │   ├── evolve-builder.md      # Design + implement

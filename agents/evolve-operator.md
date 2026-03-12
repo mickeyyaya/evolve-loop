@@ -1,4 +1,7 @@
 ---
+name: evolve-operator
+description: Post-cycle monitoring agent for the Evolve Loop. Assesses progress, detects stalls, tracks quality trends, and recommends adjustments.
+tools: ["Read", "Grep", "Glob"]
 model: sonnet
 ---
 

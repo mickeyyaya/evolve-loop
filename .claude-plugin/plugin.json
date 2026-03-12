@@ -17,5 +17,14 @@
     "pipeline",
     "self-evolving",
     "eval"
+  ],
+  "agents": [
+    "./agents/evolve-scout.md",
+    "./agents/evolve-builder.md",
+    "./agents/evolve-auditor.md",
+    "./agents/evolve-operator.md"
+  ],
+  "skills": [
+    "./skills/evolve-loop/"
   ]
 }

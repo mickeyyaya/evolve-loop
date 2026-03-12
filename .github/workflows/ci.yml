@@ -12,44 +12,57 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run install
+      - name: Validate plugin structure
         run: CI=true ./install.sh
 
-      - name: Verify agent files exist
+      - name: Verify plugin manifest
         run: |
-          for agent in evolve-scout evolve-builder evolve-auditor evolve-operator; do
-            if [ ! -f "agents/${agent}.md" ]; then
-              echo "FAIL: agents/${agent}.md not found"
-              exit 1
-            fi
-            echo "OK: agents/${agent}.md"
-          done
+          python3 -c "
+          import json, sys
+          with open('.claude-plugin/plugin.json') as f:
+              p = json.load(f)
+          required = ['name', 'version', 'description', 'agents', 'skills']
+          missing = [k for k in required if k not in p]
+          if missing:
+              print(f'FAIL: plugin.json missing fields: {missing}')
+              sys.exit(1)
+          if not isinstance(p['agents'], list):
+              print('FAIL: agents must be an array')
+              sys.exit(1)
+          if not isinstance(p['skills'], list):
+              print('FAIL: skills must be an array')
+              sys.exit(1)
+          print(f'OK: plugin.json has {len(p[\"agents\"])} agents, {len(p[\"skills\"])} skill paths')
+          "
 
-      - name: Verify skill files exist
+      - name: Verify marketplace manifest
         run: |
-          for skill in SKILL.md phases.md memory-protocol.md eval-runner.md; do
-            if [ ! -f "skills/evolve-loop/${skill}" ]; then
-              echo "FAIL: skills/evolve-loop/${skill} not found"
-              exit 1
-            fi
-            echo "OK: skills/evolve-loop/${skill}"
-          done
+          python3 -c "
+          import json, sys
+          with open('.claude-plugin/marketplace.json') as f:
+              m = json.load(f)
+          if 'plugins' not in m or len(m['plugins']) == 0:
+              print('FAIL: marketplace.json has no plugins')
+              sys.exit(1)
+          print(f'OK: marketplace.json has {len(m[\"plugins\"])} plugin(s)')
+          "
 
-      - name: Verify agent frontmatter
+      - name: Verify agent frontmatter has required fields
         run: |
           for agent in agents/evolve-*.md; do
             if ! head -1 "$agent" | grep -q "^---$"; then
               echo "FAIL: $agent missing YAML frontmatter"
               exit 1
             fi
-            echo "OK: $agent has frontmatter"
+            # Check for name and description in frontmatter
+            frontmatter=$(sed -n '2,/^---$/p' "$agent" | head -n -1)
+            if ! echo "$frontmatter" | grep -q "^name:"; then
+              echo "FAIL: $agent frontmatter missing 'name' field"
+              exit 1
+            fi
+            if ! echo "$frontmatter" | grep -q "^description:"; then
+              echo "FAIL: $agent frontmatter missing 'description' field"
+              exit 1
+            fi
+            echo "OK: $agent"
           done
-
-      - name: Verify plugin manifest
-        run: |
-          if [ ! -f ".claude-plugin/plugin.json" ]; then
-            echo "FAIL: .claude-plugin/plugin.json not found"
-            exit 1
-          fi
-          echo "OK: plugin.json exists"
-          python3 -c "import json; json.load(open('.claude-plugin/plugin.json'))" 2>/dev/null && echo "OK: plugin.json is valid JSON" || echo "WARN: could not validate JSON (python3 not available)"
