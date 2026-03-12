@@ -1,10 +1,10 @@
-# Eval Runner — Phase 5.5 Instructions
+# Eval Runner — Audit Phase Instructions
 
-The orchestrator uses these instructions to run the eval hard gate after VERIFY (Phase 5) and before SHIP (Phase 6).
+The orchestrator (or Auditor agent) uses these instructions to run eval checks as part of the audit gate in Phase 3.
 
 ## Purpose
 
-Eval definitions are created by the Planner in Phase 2 and stored in `.claude/evolve/evals/<task-name>.md`. The eval runner executes these definitions and determines PASS/FAIL.
+Eval definitions are created by the Scout in Phase 1 and stored in `.claude/evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
 
 ## Eval Definition Format
 
@@ -22,14 +22,12 @@ Each eval file in `.claude/evolve/evals/` follows this structure:
 - `npm test`
 - `npx playwright test` (if applicable)
 
-## Acceptance Checks (manual verification commands)
+## Acceptance Checks (verification commands)
 - `grep -r "export function newFeature" src/` → must find at least 1 match
 - `npm run build` → must exit 0
 
 ## Thresholds
-- Code graders: pass@1 = 1.0 (all must pass)
-- Regression: pass@1 = 1.0 (all must pass)
-- Acceptance: pass@1 = 1.0 (all must pass)
+- All checks: pass@1 = 1.0
 ```
 
 ## Orchestrator Execution Steps
@@ -63,40 +61,19 @@ For each command in `## Acceptance Checks`:
 - If ANY fail → **FAIL**
 
 ### 6. Write Eval Report
-Write to `workspace/eval-report.md`:
+Write to `workspace/audit-report.md` (eval results section) or `workspace/eval-report.md` if run standalone:
 
 ```markdown
-# Cycle {N} Eval Report
-
-## Verdict: PASS / FAIL
-
-## Code Graders
+## Eval Results
 | Command | Exit Code | Status |
 |---------|-----------|--------|
-| `npm test -- --grep "..."` | 0 | PASS |
-| `npx tsc --noEmit` | 1 | FAIL |
-
-## Regression Evals
-| Command | Exit Code | Status |
-|---------|-----------|--------|
-| `npm test` | 0 | PASS |
-
-## Acceptance Checks
-| Command | Exit Code | Status |
-|---------|-----------|--------|
-| `grep -r "..." src/` | 0 | PASS |
-
-## Failures (if any)
-### `npx tsc --noEmit`
-```
-<stderr output>
-```
+| `<command>` | 0 | PASS |
+| `<command>` | 1 | FAIL |
 
 ## Summary
 - Total checks: X
 - Passed: Y
 - Failed: Z
-- Pass rate: Y/X
 ```
 
 ### 7. Append Ledger Entry
@@ -108,21 +85,21 @@ Write to `workspace/eval-report.md`:
 
 If verdict is **FAIL**:
 
-1. **Iteration 1:** Re-launch Developer agent with failure details:
+1. **Iteration 1:** Re-launch Builder agent with failure details:
    - Pass failed check commands and their stderr
-   - Developer fixes and re-runs its own tests
-   - Re-run VERIFY (Phase 5) — all 3 parallel agents
-   - Re-run EVAL (Phase 5.5)
+   - Builder fixes and re-runs its own tests
+   - Re-run Auditor (Phase 3) with updated code
+   - Re-run eval checks
 
 2. **Iteration 2:** Same as iteration 1 with accumulated failure context
 
 3. **Iteration 3 (final):** If still FAIL:
    - Log as failed approach in `state.json` under `failedApproaches`
    - Record failed eval commands and error output
-   - Skip Phase 6 (SHIP)
-   - Proceed to Phase 7 (LOOP+LEARN) with failure context
+   - Skip Phase 4 (SHIP)
+   - Proceed to Phase 5 (LEARN) with failure context
    - Output warning: "Eval gate failed after 3 attempts. Skipping deploy."
 
 **Max total iterations: 3** (1 initial + 2 retries)
 
-If verdict is **PASS** → proceed to Phase 6 (SHIP).
+If verdict is **PASS** → proceed to Phase 4 (SHIP).
