@@ -162,7 +162,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - If status is `HALT` → pause and present issues to user
 
    **Cycle cap check** (inline, before launching Operator):
-   - If current cycle number >= `maxCyclesPerSession` (from state.json, default 10): HALT — "Session cycle cap reached ({maxCyclesPerSession}). Stop and review before continuing."
+   - If current cycle number > `maxCyclesPerSession` (from state.json, default 10): HALT — "Session cycle cap reached ({maxCyclesPerSession}). Stop and review before continuing."
    - If current cycle number >= `warnAfterCycles` (from state.json, default 5): include warning in Operator context
 
 4. **Update notes.md** (always append, never overwrite):
