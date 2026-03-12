@@ -1,0 +1,27 @@
+# Cycle 4 Instincts — Consolidation + New
+
+# Consolidated: inst-004 (supersedes cycle-1 inst-004 @ 0.6 and cycle-2 inst-004-update @ 0.8)
+- id: inst-004
+  pattern: "grep-based-evals-effective"
+  description: "For Markdown/Shell projects without test infrastructure, grep-based eval checks are effective for verifying acceptance criteria. Define specific grep commands with expected match counts. Confirmed across 4 cycles (9→11→12→7+ checks, all passing)."
+  confidence: 0.9
+  source: "cycle-1+2+3+4"
+  type: "successful-pattern"
+  supersedes: ["cycle-1:inst-004", "cycle-2:inst-004-update"]
+
+# Consolidated: inst-007 (supersedes cycle-2 inst-007 @ 0.6 and cycle-3 inst-007-update @ 0.8)
+- id: inst-007
+  pattern: "orchestrator-as-builder"
+  description: "For small well-defined tasks (S complexity, <10 lines changed), the orchestrator can implement directly instead of launching a Builder agent. Confirmed across cycles 2-4. Saves ~30-50K tokens per task. Only when task is fully specified with eval definitions."
+  confidence: 0.9
+  source: "cycle-2+3+4"
+  type: "process"
+  supersedes: ["cycle-2:inst-007", "cycle-3:inst-007-update"]
+
+# New: deferred security escalation pattern
+- id: inst-010
+  pattern: "deferred-security-escalates"
+  description: "Security-related tasks deferred across 3+ cycles become CRITICAL priority. Operator escalation ('further deferral not acceptable') should trigger immediate action next cycle. The denial-of-wallet guardrails were deferred cycles 1-3 and could have caused real cost issues."
+  confidence: 0.7
+  source: "cycle-4/add-denial-of-wallet-guardrails"
+  type: "process"
