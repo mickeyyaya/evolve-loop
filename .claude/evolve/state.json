@@ -1,0 +1,33 @@
+{
+  "lastUpdated": "2026-03-13T04:00:00Z",
+  "research": {
+    "queries": [
+      {"query": "AI agent orchestration frameworks 2025 2026", "date": "2026-03-13T00:10:00Z", "ttlHours": 12},
+      {"query": "Claude Code plugin development best practices", "date": "2026-03-13T00:10:00Z", "ttlHours": 12},
+      {"query": "multi-agent pipeline patterns eval-driven development", "date": "2026-03-13T00:10:00Z", "ttlHours": 12},
+      {"query": "AI coding assistant comparison 2026", "date": "2026-03-13T00:10:00Z", "ttlHours": 12},
+      {"query": "AI agent security prompt injection 2026", "date": "2026-03-13T00:10:00Z", "ttlHours": 12}
+    ]
+  },
+  "evaluatedTasks": [
+    {"slug": "fix-wt-worktree-references", "decision": "completed", "cycle": 1},
+    {"slug": "fix-docs-and-ledger-consistency", "decision": "completed", "cycle": 1},
+    {"slug": "fix-eval-runner-stale-refs", "decision": "completed", "cycle": 2},
+    {"slug": "add-install-ci-mode", "decision": "completed", "cycle": 2},
+    {"slug": "add-ci-workflow", "decision": "completed", "cycle": 2},
+    {"slug": "update-writing-agents-frontmatter-template", "decision": "completed", "cycle": 3},
+    {"slug": "add-changelog-cycle3-plugin-packaging", "decision": "completed", "cycle": 3},
+    {"slug": "add-instinct-system-docs", "decision": "completed", "cycle": 3}
+  ],
+  "failedApproaches": [],
+  "evalHistory": [
+    {"cycle": 1, "verdict": "PASS", "checks": 9, "passed": 9, "failed": 0},
+    {"cycle": 2, "verdict": "PASS", "checks": 11, "passed": 11, "failed": 0},
+    {"cycle": 3, "verdict": "PASS", "checks": 12, "passed": 12, "failed": 0}
+  ],
+  "instinctCount": 11,
+  "operatorWarnings": [],
+  "nothingToDoCount": 0,
+  "maxCyclesPerSession": 10,
+  "warnAfterCycles": 5
+}

@@ -58,8 +58,13 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0}
+   {"lastUpdated":"<now>","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5}
    ```
+
+   **Denial-of-wallet guardrails** (enforce after reading state.json):
+   - Read `maxCyclesPerSession` (default 10) and `warnAfterCycles` (default 5) from state.json
+   - If `cycles` argument > `maxCyclesPerSession`: HALT — "Requested cycles ({cycles}) exceeds maxCyclesPerSession ({maxCyclesPerSession}). Reduce the cycle count or update state.json to raise the cap."
+   - If `cycles` argument >= `warnAfterCycles`: WARN — "Running {cycles} cycles. Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
 
 3. Auto-detect project context (language, framework, test commands, domain). Store as `projectContext`.
 

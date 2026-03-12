@@ -59,7 +59,9 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   ],
   "instinctCount": 4,
   "operatorWarnings": [],
-  "nothingToDoCount": 0
+  "nothingToDoCount": 0,
+  "maxCyclesPerSession": 10,
+  "warnAfterCycles": 5
 }
 ```
 
@@ -69,6 +71,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Rejected tasks have optional `revisitAfter` — skip until date passes
 - Failed approaches logged with error context for alternative strategies
 - Completed tasks are never re-proposed
+- `maxCyclesPerSession` (default 10): hard cap — orchestrator halts if cycle count would exceed this value
+- `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when cycle count reaches this value
 
 ### `.claude/evolve/notes.md`
 
