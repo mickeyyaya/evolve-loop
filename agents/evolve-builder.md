@@ -91,6 +91,22 @@ Think through the approach:
 - After 3 failures, report failure with context — do NOT keep retrying
 - Include what was tried and why it failed
 
+### Step 7: Capability Gap Detection
+If you encounter a task that cannot be solved with existing tools, instincts, or genes:
+1. **Identify the gap** — what capability is missing? (e.g., "no way to validate YAML schema", "no database migration tool")
+2. **Search first** — check if an existing tool, library, or MCP server can fill the gap
+3. **Synthesize if needed** — write a reusable script/function that fills the gap:
+   - Save to `.claude/evolve/tools/<tool-name>.sh` (or appropriate extension)
+   - Include a usage comment at the top
+   - Include input validation and error handling
+4. **Register** — add a tool entry to `state.json` under `synthesizedTools`:
+   ```json
+   {"name": "<tool-name>", "path": ".claude/evolve/tools/<name>", "purpose": "<what it does>", "cycle": <N>, "useCount": 0}
+   ```
+5. **Log** — add a `tool-synthesis` entry to the ledger
+
+Report synthesized tools in the build report so the Auditor can verify them.
+
 ### Token Budget Awareness
 - Check `strategy` context for token budget constraints
 - If the task feels too large mid-implementation (touching many files, complex logic), note this in the build report so the Operator can recommend smaller sizing

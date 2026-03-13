@@ -75,7 +75,7 @@ Scout → [Task A, Task B, Task C]
 
 1. Ensure directories exist:
    ```bash
-   mkdir -p .claude/evolve/workspace .claude/evolve/history .claude/evolve/evals .claude/evolve/instincts/personal .claude/evolve/instincts/archived .claude/evolve/genes
+   mkdir -p .claude/evolve/workspace .claude/evolve/history .claude/evolve/evals .claude/evolve/instincts/personal .claude/evolve/instincts/archived .claude/evolve/genes .claude/evolve/tools
    ```
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
