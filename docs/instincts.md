@@ -16,7 +16,8 @@ Instincts are stored as YAML files in `.claude/evolve/instincts/personal/` and r
   description: "Specific, actionable description of what to do or avoid. Include context about why this matters and when it applies."
   confidence: 0.7      # 0.5 (new) to 1.0 (proven)
   source: "cycle-N/task-slug"
-  type: "anti-pattern"  # or: successful-pattern, convention, architecture, process
+  type: "anti-pattern"  # see Types section for full list
+  category: "episodic"  # episodic, semantic, or procedural
 ```
 
 ### Fields
@@ -32,11 +33,35 @@ Instincts are stored as YAML files in `.claude/evolve/instincts/personal/` and r
 
 ### Types
 
+Instincts are organized into three memory categories for targeted retrieval:
+
+#### Episodic (what happened)
 - **anti-pattern** — something that failed or caused problems; avoid this
 - **successful-pattern** — an approach that worked well; repeat this
+
+#### Semantic (domain knowledge)
 - **convention** — a naming/format/structure rule to follow consistently
 - **architecture** — a structural decision about the system
+- **domain** — codebase-specific knowledge (e.g., "this API uses camelCase for JSON keys")
+
+#### Procedural (how-to)
 - **process** — a workflow optimization for the loop itself
+- **technique** — a specific implementation technique that works in this codebase (e.g., "use barrel exports in index.ts")
+
+### Memory Categories
+
+Each instinct belongs to one of three memory categories. Agents use categories for targeted retrieval:
+
+| Category | Contains | When to Query |
+|----------|----------|---------------|
+| **Episodic** | Past experiences — what worked, what failed | Before selecting approaches, to avoid repeating failures |
+| **Semantic** | Domain knowledge — conventions, architecture, codebase facts | Before implementing, to follow existing patterns |
+| **Procedural** | How-to knowledge — techniques, process optimizations | During implementation, for specific techniques |
+
+Agents should query the relevant category based on their current phase:
+- **Scout** → episodic (what failed before) + semantic (conventions to maintain)
+- **Builder** → semantic (existing patterns) + procedural (how to implement)
+- **Auditor** → semantic (conventions to enforce) + episodic (past issues to check for)
 
 ## Confidence Scoring
 

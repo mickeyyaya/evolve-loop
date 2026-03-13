@@ -174,8 +174,14 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
      description: "<what was learned>"
      confidence: <0.5-1.0>  # starts at 0.5, increases with confirmation
      source: "cycle-<N>/<task-slug>"
-     type: "success|failure|domain|process"
+     type: "anti-pattern|successful-pattern|convention|architecture|domain|process|technique"
+     category: "episodic|semantic|procedural"
    ```
+
+   **Category assignment:**
+   - Episodic: anti-pattern, successful-pattern (things that happened)
+   - Semantic: convention, architecture, domain (knowledge about the codebase)
+   - Procedural: process, technique (how to do things)
 
    **Think hard about instincts.** Each one should be specific enough to be actionable in future cycles. "Code should be clean" is useless. "This codebase uses barrel exports in index.ts files — always add new exports there" is useful.
 
