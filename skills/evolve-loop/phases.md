@@ -209,6 +209,13 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    Update state.json `instinctCount`.
 
+   **Gene Extraction** (after instinct extraction):
+   If the Builder successfully fixed a recurring error pattern this cycle:
+   - Extract the fix as a gene with selector, steps, and validation commands
+   - Write to `.claude/evolve/genes/<gene-id>-<name>.yaml`
+   - If multiple genes were applied in sequence, bundle as a capsule
+   - See [docs/genes.md](docs/genes.md) for schema
+
    **Memory Consolidation** (every 3 cycles or when instinctCount > 20):
    Review all instinct files and consolidate:
 

@@ -75,7 +75,7 @@ Scout → [Task A, Task B, Task C]
 
 1. Ensure directories exist:
    ```bash
-   mkdir -p .claude/evolve/workspace .claude/evolve/history .claude/evolve/evals .claude/evolve/instincts/personal
+   mkdir -p .claude/evolve/workspace .claude/evolve/history .claude/evolve/evals .claude/evolve/instincts/personal .claude/evolve/instincts/archived .claude/evolve/genes
    ```
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
@@ -159,6 +159,8 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 3. **Meta-cycle self-improvement** (every 5 cycles): The orchestrator runs a meta-evaluation of its own pipeline effectiveness, analyzing success rates, agent efficiency, and stagnation patterns. May propose changes to agent prompts, strategies, or budgets. See Phase 5 step 6 in [phases.md](phases.md).
 
 4. **Automated prompt evolution** (during meta-cycles): Uses a critique-synthesize loop to refine agent prompts based on cycle outcomes. Maximum 2 edits per meta-cycle, auto-reverts if performance degrades. See Phase 5 step 6d in [phases.md](phases.md).
+
+5. **Gene/Capsule library**: Structured, reusable fix templates with pattern-matching selectors and pre/post validation. More actionable than instincts — genes describe *how to fix* with executable steps. See [docs/genes.md](docs/genes.md).
 
 ## Plan Template Caching
 

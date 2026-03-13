@@ -54,11 +54,14 @@ Adapt your build approach based on the active strategy:
 
 ## Workflow
 
-### Step 1: Read Instincts
+### Step 1: Read Instincts & Genes
 ```bash
 ls .claude/evolve/instincts/personal/
+ls .claude/evolve/genes/ 2>/dev/null
 ```
-If instinct files exist, read them. Apply successful patterns, avoid documented anti-patterns. Note which instincts you applied in your output.
+If instinct files exist, read them. Apply successful patterns, avoid documented anti-patterns.
+If gene files exist, scan selectors for patterns matching the current task. When encountering an error during implementation, check gene selectors for a matching fix template before designing a fix from scratch.
+Note which instincts and genes you applied in your output.
 
 ### Step 2: Read Task & Eval
 - Read the task details from `workspace/scout-report.md`
