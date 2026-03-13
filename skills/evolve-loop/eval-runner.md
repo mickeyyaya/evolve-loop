@@ -8,7 +8,7 @@ Eval definitions are created by the Scout in Phase 1 and stored in `.claude/evol
 
 ## Eval Definition Format
 
-Each eval file in `.claude/evolve/evals/` follows this structure:
+Each eval file in `.claude/evolve/evals/` follows this structure (see also [examples/eval-definition.md](../../examples/eval-definition.md)):
 
 ```markdown
 # Eval: <task-name>

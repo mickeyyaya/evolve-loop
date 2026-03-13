@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.2.0] - 2026-03-13
+
+### Added
+- **Example files** — annotated `examples/instinct-example.yaml` and `examples/gene-example.yaml` for contributor onboarding
+- **CI skill validation** — CI now verifies all 4 required skill files exist (SKILL.md, phases.md, memory-protocol.md, eval-runner.md)
+- **Uninstall CI mode** — `uninstall.sh` supports `--ci` dry-run mode, matching install.sh
+- **Examples cross-links** — README, docs, and eval-runner now link to example files
+
+### Fixed
+- **Stale templates** — bug report, feature request, and PR templates updated to v6 phase names and agent names
+- **Process rewards** — state.json processRewards now contains real scores instead of all zeros
+- **Instinct provenance** — added missing cycle-8-instincts.yaml
+
 ## [6.1.0] - 2026-03-13
 
 ### Added

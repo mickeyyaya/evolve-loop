@@ -117,6 +117,8 @@ This prevents unbounded memory growth and keeps the instinct set relevant and co
 
 Each cycle appends a new file. Instinct updates (confidence changes) reference the original ID with a `-update` suffix.
 
+For an annotated example, see [examples/instinct-example.yaml](../examples/instinct-example.yaml).
+
 ## How Agents Use Instincts
 
 - **Scout** reads all instincts before scanning. Applies relevant patterns to avoid re-discovering known issues and to focus on areas where past patterns suggest problems.

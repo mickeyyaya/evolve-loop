@@ -202,7 +202,12 @@ evolve-loop/
 │   ├── genes.md               # Gene/Capsule library docs
 │   ├── instincts.md           # Instinct system docs
 │   ├── island-model.md        # Island model evolution docs
+│   ├── meta-cycle.md           # Meta-cycle review docs
 │   └── writing-agents.md      # Guide for creating agents
+├── examples/
+│   ├── eval-definition.md     # Annotated eval definition example
+│   ├── gene-example.yaml      # Annotated gene/capsule example
+│   └── instinct-example.yaml  # Annotated instinct example
 ├── install.sh                 # Installation script
 ├── uninstall.sh               # Uninstallation script
 ├── README.md
