@@ -80,6 +80,24 @@ fi
 AGENTS_DIR="$HOME/.claude/agents"
 SKILLS_DIR="$HOME/.claude/skills/evolve-loop"
 
+# Check if plugin is already installed — warn about duplication
+PLUGIN_CACHE="$HOME/.claude/plugins/cache/evolve-loop"
+if [ -d "$PLUGIN_CACHE" ] || [ -d "$HOME/.claude/plugins/marketplaces/evolve-loop" ]; then
+  echo "WARNING: evolve-loop is already installed as a plugin."
+  echo "Manual install will create DUPLICATES (/evolve-loop will appear twice)."
+  echo ""
+  echo "To upgrade the plugin version instead, run in Claude Code:"
+  echo "  /plugin marketplace update evolve-loop"
+  echo "  /plugin update evolve-loop@evolve-loop"
+  echo "  /plugin reload"
+  echo ""
+  read -r -p "Continue with manual install anyway? [y/N] " response
+  if [[ ! "$response" =~ ^[Yy]$ ]]; then
+    echo "Aborted. Use plugin commands above to upgrade."
+    exit 0
+  fi
+fi
+
 echo "Installing Evolve Loop v4..."
 echo ""
 echo "NOTE: Preferred method is plugin install:"
