@@ -18,16 +18,11 @@ Describe the change you'd like to see.
 
 Which phase(s) would be affected?
 
-- [ ] Phase 0: MONITOR-INIT
-- [ ] Phase 1: DISCOVER
-- [ ] Phase 2: PLAN
-- [ ] Phase 3: DESIGN
-- [ ] Phase 4: BUILD
-- [ ] Phase 4.5: CHECKPOINT
-- [ ] Phase 5: VERIFY
-- [ ] Phase 5.5: EVAL
-- [ ] Phase 6: SHIP
-- [ ] Phase 7: LOOP+LEARN
+- [ ] Phase 1: DISCOVER (Scout)
+- [ ] Phase 2: BUILD (Builder)
+- [ ] Phase 3: AUDIT (Auditor)
+- [ ] Phase 4: SHIP (Orchestrator)
+- [ ] Phase 5: LEARN (Operator + instincts)
 
 ## Alternatives Considered
 

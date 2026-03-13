@@ -1,0 +1,64 @@
+# Example gene file — extracted during Phase 5 LEARN
+#
+# Genes are structured fix templates. While instincts describe WHAT was learned,
+# genes describe HOW TO FIX IT with executable steps and validation commands.
+# Genes live in .claude/evolve/genes/ and are matched by error pattern.
+
+# Example 1: A simple gene with selector and validation
+- id: gene-001
+  name: "fix-missing-barrel-export"
+  selector:
+    errorPattern: "Module.*has no exported member"
+    fileGlob: "src/**/index.ts"
+  action:
+    steps:
+      - "Find the symbol that's missing from the barrel export"
+      - "Locate the source file where the symbol is defined"
+      - "Add the export to the nearest index.ts barrel file"
+    commands:
+      - "grep -rn 'export.*${symbol}' src/"
+      - "echo 'export { ${symbol} } from \"./${sourceFile}\";' >> ${barrel}"
+  validation:
+    pre: "grep '${symbol}' ${barrel} | wc -l"    # expect: 0 (symbol not exported yet)
+    post: "grep '${symbol}' ${barrel} | wc -l"   # expect: 1 (symbol now exported)
+  confidence: 0.85
+  source: "cycle-5/fix-export-bug"
+  successCount: 4
+  failCount: 0
+
+# Example 2: A gene for a common CI/config error
+- id: gene-002
+  name: "fix-yaml-frontmatter-missing-field"
+  selector:
+    errorPattern: "frontmatter missing '(name|description)' field"
+    fileGlob: "agents/*.md"
+  action:
+    steps:
+      - "Open the agent file and locate the YAML frontmatter block (between --- markers)"
+      - "Add the missing field with an appropriate value derived from the file content"
+    commands:
+      - "head -10 ${file}"
+      - "sed -n '2,/^---$/p' ${file}"
+  validation:
+    pre: "sed -n '2,/^---$/p' ${file} | grep -c '^${field}:'"   # expect: 0
+    post: "sed -n '2,/^---$/p' ${file} | grep -c '^${field}:'"  # expect: 1
+  confidence: 0.9
+  source: "cycle-3/update-writing-agents-frontmatter-template"
+  successCount: 6
+  failCount: 1
+
+# Example 3: A capsule bundling multiple genes into a workflow
+- id: capsule-001
+  name: "add-new-agent"
+  genes: ["gene-002", "gene-001"]
+  sequence: "ordered"
+  description: "Full workflow for adding a new agent: create file with correct frontmatter, add to plugin.json agents array, verify CI passes"
+  successCount: 2
+
+# Notes:
+# - selector.errorPattern: regex matched against Builder error output
+# - selector.fileGlob: limits which files the gene applies to
+# - validation.pre/post: shell commands — pre confirms the bug exists, post confirms the fix worked
+# - confidence: starts at 0.5, increases with successful applications
+# - successCount/failCount: track reliability over time
+# - Capsules bundle genes into composite workflows (ordered or parallel)
