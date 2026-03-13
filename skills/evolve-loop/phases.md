@@ -215,8 +215,47 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    Instincts: <count>
    ```
 
-6. **Exit conditions** (in order):
+6. **Meta-Cycle Self-Improvement** (every 5 cycles):
+   If `cycle % 5 === 0`, run a meta-evaluation of the evolve-loop's own effectiveness:
+
+   a. **Collect metrics** from the last 5 cycles in `evalHistory` and `ledger.jsonl`:
+      - Tasks shipped vs attempted (success rate)
+      - Average audit iterations per task (Builder efficiency)
+      - Stagnation pattern count
+      - Instinct confidence trend (are instincts getting confirmed?)
+
+   b. **Evaluate agent effectiveness** — for each agent, ask:
+      - Scout: Are selected tasks the right size? Are they shipping?
+      - Builder: How many attempts per task? What's the self-verify pass rate?
+      - Auditor: Are WARN/FAIL verdicts being resolved or accumulating?
+      - Operator: Are recommendations being followed?
+
+   c. **Propose improvements** — write a `meta-review.md` to the workspace:
+      ```markdown
+      # Meta-Cycle Review — Cycles {N-4} to {N}
+
+      ## Pipeline Metrics
+      - Success rate: X/Y tasks (Z%)
+      - Avg audit iterations: N
+      - Stagnation patterns: N active
+      - Instinct trend: growing/stable/stale
+
+      ## Agent Effectiveness
+      | Agent | Assessment | Suggested Change |
+      |-------|-----------|-----------------|
+      | Scout | ... | ... |
+      | Builder | ... | ... |
+      | Auditor | ... | ... |
+      | Operator | ... | ... |
+
+      ## Recommended Changes
+      1. <specific change to agent prompt, strategy, or process>
+      ```
+
+   d. **Apply changes** — the orchestrator may update agent prompts, default strategy, or token budgets based on meta-review findings. Archive the `meta-review.md` to history.
+
+7. **Exit conditions** (in order):
    - Cycle limit reached → STOP
-   - Convergence (`nothingToDoCount >= 3`) → STOP
+   - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
    - Context exhaustion → suggest continuing in fresh session
    - Otherwise → next cycle

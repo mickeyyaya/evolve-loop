@@ -137,6 +137,8 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 
 2. **Grep-based evals** (from inst-004, confidence 0.9): For Markdown/Shell projects without test infrastructure, grep-based eval checks are effective acceptance gates. Define specific grep commands with expected match counts.
 
+3. **Meta-cycle self-improvement** (every 5 cycles): The orchestrator runs a meta-evaluation of its own pipeline effectiveness, analyzing success rates, agent efficiency, and stagnation patterns. May propose changes to agent prompts, strategies, or budgets. See Phase 5 step 6 in [phases.md](phases.md).
+
 ## Token Budgets
 
 Each task and cycle has a token budget to prevent runaway costs:
