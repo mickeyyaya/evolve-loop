@@ -121,6 +121,31 @@ Eval definitions are created by the Scout and stored in `.claude/evolve/evals/`.
 - All checks: pass@1 = 1.0
 ```
 
+## Process Rewards
+
+Per-phase scores tracking pipeline efficiency. Updated by the orchestrator in Phase 4 after each cycle:
+
+```json
+{
+  "processRewards": {
+    "discover": 0.0,
+    "build": 0.0,
+    "audit": 0.0,
+    "ship": 0.0,
+    "learn": 0.0
+  }
+}
+```
+
+Each score ranges from 0.0 to 1.0:
+- **discover** — task relevance (did selected tasks ship?) + sizing accuracy
+- **build** — first-attempt success rate + gene/instinct application rate
+- **audit** — false positive rate + eval coverage
+- **ship** — clean commit rate (no post-commit fixes needed)
+- **learn** — instinct quality (were new instincts confirmed in later cycles?)
+
+Process rewards feed into meta-cycle reviews (every 5 cycles) to identify which phases need improvement.
+
 ## Instinct Promotion
 
 After 5+ cycles, instincts with confidence >= 0.8 promote from project-level to global:

@@ -1,6 +1,7 @@
 {
-  "lastUpdated": "2026-03-13T06:00:00Z",
-  "lastCycleNumber": 5,
+  "lastUpdated": "2026-03-13T19:30:00Z",
+  "lastCycleNumber": 8,
+  "strategy": "balanced",
   "research": {
     "queries": [
       {"query": "AI agent orchestration frameworks 2025 2026", "date": "2026-03-13T00:10:00Z", "ttlHours": 12},
@@ -24,7 +25,16 @@
     {"slug": "graduate-inst-007-to-orchestrator-policy", "decision": "completed", "cycle": 4},
     {"slug": "fix-cycle-cap-boundary-semantics", "decision": "completed", "cycle": 5},
     {"slug": "bump-plugin-version-to-4-2-0", "decision": "completed", "cycle": 5},
-    {"slug": "add-guardrails-to-readme-features", "decision": "completed", "cycle": 5}
+    {"slug": "add-guardrails-to-readme-features", "decision": "completed", "cycle": 5},
+    {"slug": "bump-marketplace-version-to-6-0-0", "decision": "completed", "cycle": 6},
+    {"slug": "update-install-sh-version-string", "decision": "completed", "cycle": 6},
+    {"slug": "add-v6-dirs-to-readme-workspace-layout", "decision": "completed", "cycle": 6},
+    {"slug": "add-synthesizedtools-to-state-schema", "decision": "completed", "cycle": 6},
+    {"slug": "fix-install-usage-and-ci-docs-check", "decision": "completed", "cycle": 7},
+    {"slug": "update-architecture-docs-v6", "decision": "completed", "cycle": 7},
+    {"slug": "add-instinct-global-promotion-step", "decision": "completed", "cycle": 8},
+    {"slug": "update-memory-protocol-state-schema", "decision": "completed", "cycle": 8},
+    {"slug": "add-memory-consolidation-trigger", "decision": "completed", "cycle": 8}
   ],
   "failedApproaches": [],
   "evalHistory": [
@@ -32,11 +42,34 @@
     {"cycle": 2, "verdict": "PASS", "checks": 11, "passed": 11, "failed": 0},
     {"cycle": 3, "verdict": "PASS", "checks": 12, "passed": 12, "failed": 0},
     {"cycle": 4, "verdict": "PASS", "checks": 10, "passed": 10, "failed": 0},
-    {"cycle": 5, "verdict": "PASS", "checks": 8, "passed": 8, "failed": 0}
+    {"cycle": 5, "verdict": "PASS", "checks": 8, "passed": 8, "failed": 0},
+    {"cycle": 6, "verdict": "PASS", "checks": 4, "passed": 4, "failed": 0, "delta": {"tasksShipped": 4, "tasksAttempted": 4, "auditIterations": 1.0, "successRate": 1.0, "instinctsExtracted": 2, "stagnationPatterns": 0}},
+    {"cycle": 7, "verdict": "PASS", "checks": 6, "passed": 6, "failed": 0, "delta": {"tasksShipped": 2, "tasksAttempted": 2, "auditIterations": 1.0, "successRate": 1.0, "instinctsExtracted": 1, "stagnationPatterns": 0}},
+    {"cycle": 8, "verdict": "PASS", "checks": 10, "passed": 10, "failed": 0, "delta": {"tasksShipped": 3, "tasksAttempted": 3, "auditIterations": 1.0, "successRate": 1.0, "instinctsExtracted": 1, "stagnationPatterns": 0}}
   ],
-  "instinctCount": 12,
+  "instinctCount": 15,
   "operatorWarnings": [],
-  "nothingToDoCount": 0,
-  "maxCyclesPerSession": 10,
-  "warnAfterCycles": 5
+  "maxCyclesPerSession": 20,
+  "warnAfterCycles": 5,
+  "tokenBudget": {
+    "perTask": 80000,
+    "perCycle": 200000
+  },
+  "stagnation": {
+    "nothingToDoCount": 0,
+    "recentPatterns": []
+  },
+  "planCache": [],
+  "mastery": {
+    "level": "proficient",
+    "consecutiveSuccesses": 8
+  },
+  "synthesizedTools": [],
+  "processRewards": {
+    "discover": 0.0,
+    "build": 0.0,
+    "audit": 0.0,
+    "ship": 0.0,
+    "learn": 0.0
+  }
 }

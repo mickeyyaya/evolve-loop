@@ -133,7 +133,7 @@ Phase 5: Orchestrator ── instincts + archive
 | Scout | `evolve-scout.md` | sonnet | Discovery + analysis + task selection |
 | Builder | `evolve-builder.md` | sonnet | Design + implement + self-test |
 | Auditor | `evolve-auditor.md` | sonnet | Review + security + eval gate |
-| Operator | `evolve-operator.md` | sonnet | Loop health monitoring |
+| Operator | `evolve-operator.md` | haiku | Loop health monitoring |
 
 ## Key Mechanics
 
@@ -166,6 +166,11 @@ Phase 5: Orchestrator ── instincts + archive
 - Stagnation detection (same-file churn, error repeats, diminishing returns)
 - Quality trend tracking via quantitative delta analysis
 - HALT protocol: pauses loop for human attention
+
+### Context Management
+- At 60% context window usage, the orchestrator writes a handoff file with session state
+- The handoff includes remaining cycles, strategy, goal, active stagnation patterns, and a resume command
+- Next session reads the handoff to continue seamlessly — enables indefinite runtime across context boundaries
 
 ### Meta-Cycle (every 5 cycles)
 - Evaluates pipeline success rates, agent efficiency, stagnation
