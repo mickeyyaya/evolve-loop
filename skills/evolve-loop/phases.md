@@ -376,7 +376,26 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
       Target: >80% mutation kill rate. Below 60% triggers eval improvement as a priority task in the next cycle.
 
-   f. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
+   f. **Workflow Topology Review:**
+
+      Evaluate whether the current phase ordering and agent configuration is optimal:
+
+      1. **Phase skip analysis** — were any phases redundant this meta-cycle? (e.g., Auditor always PASS → consider lighter audit)
+      2. **Phase merge candidates** — could two phases be combined? (e.g., if Builder self-verify is reliable, reduce Auditor scope)
+      3. **Phase addition candidates** — is there a gap? (e.g., if security issues keep recurring, add a dedicated security scan phase)
+      4. **Parallel opportunities** — could independent tasks be built in parallel instead of sequentially?
+
+      Propose topology changes in the meta-review:
+      ```markdown
+      ## Topology Recommendations
+      - **Current:** DISCOVER → BUILD → AUDIT → SHIP → LEARN
+      - **Proposed:** DISCOVER → BUILD(parallel) → AUDIT(light) → SHIP → LEARN
+      - **Rationale:** <why this change would improve performance>
+      ```
+
+      **Safety:** Topology changes are proposals only — they require human approval before the orchestrator applies them. Never auto-apply topology changes.
+
+   g. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
 7. **Context Management (stop-hook pattern):**
 
