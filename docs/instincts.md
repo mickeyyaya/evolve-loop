@@ -76,9 +76,20 @@ Agents should query the relevant category based on their current phase:
 
 Confidence increases when an instinct is confirmed in a later cycle (e.g., the pattern still holds, the anti-pattern was correctly avoided). Confidence decreases if a pattern is contradicted.
 
-## Promotion
+## Global Promotion
 
-After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scope (`~/.claude/homunculus/instincts/personal/`), making them available across all projects.
+After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scope (`~/.claude/instincts/personal/`), making them available across all projects.
+
+**Promotion criteria:**
+- Confidence >= 0.8
+- Confirmed across 2+ cycles
+- Not project-specific (must be generalizable)
+
+**Promotion process:**
+1. Copy the instinct YAML entry to `~/.claude/instincts/personal/<instinct-id>.yaml`
+2. Add `promotedFrom: "<project-name>/cycle-<N>"` field
+3. Keep the original in the project's instincts directory (source of truth)
+4. The global copy is read by all projects' evolve-loop instances
 
 ## Memory Consolidation
 

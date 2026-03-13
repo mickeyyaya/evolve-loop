@@ -202,7 +202,15 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    cp .claude/evolve/workspace/*.md .claude/evolve/history/cycle-{N}/
    ```
 
-2. **Instinct Extraction:**
+2. **Memory Consolidation Check:**
+   Before extracting new instincts, check if consolidation is due:
+   ```
+   if (cycle % 3 === 0) OR (instinctCount > 20):
+     → run Memory Consolidation (see step 3 below)
+   ```
+   This ensures consolidation runs at predictable intervals and prevents instinct bloat.
+
+3. **Instinct Extraction:**
    Read ALL workspace files from this cycle and think deeply about patterns:
 
    - **Successful patterns** — What approach worked? Why? Would it work again?
@@ -237,6 +245,12 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - If multiple genes were applied in sequence, bundle as a capsule
    - See [docs/genes.md](docs/genes.md) for schema
 
+   **Instinct global promotion** (check after every instinct extraction):
+   For instincts with confidence >= 0.8 that are not project-specific:
+   1. Copy to `~/.claude/instincts/personal/<instinct-id>.yaml`
+   2. Add `promotedFrom` field with project name and cycle
+   3. Log promotion in the ledger as `type: "instinct-promotion"`
+
    **Memory Consolidation** (every 3 cycles or when instinctCount > 20):
    Review all instinct files and consolidate:
 
@@ -259,7 +273,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
       - Instincts after: <count>
       ```
 
-3. **Operator Check:**
+4. **Operator Check:**
    Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
    - Context: cycle number, mode=`post-cycle`, state.json, paths to workspace/ledger
    - Operator assesses: Did we ship? Are we stalling? Cost concerns? Recommendations?
@@ -271,7 +285,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    **Update lastCycleNumber** in state.json to the current cycle number after each cycle completes.
 
-4. **Update notes.md** (always append, never overwrite):
+5. **Update notes.md** (always append, never overwrite):
    ```markdown
    ## Cycle {N} — {date}
    - **Tasks:** <list of what was built>
@@ -282,7 +296,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - **Next cycle should consider:** <recommendations>
    ```
 
-5. **Output cycle summary:**
+6. **Output cycle summary:**
    ```
    CYCLE {N} COMPLETE
    ==================
@@ -293,7 +307,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    Instincts: <count>
    ```
 
-6. **Meta-Cycle Self-Improvement** (every 5 cycles):
+7. **Meta-Cycle Self-Improvement** (every 5 cycles):
    If `cycle % 5 === 0`, run a meta-evaluation of the evolve-loop's own effectiveness:
 
    a. **Collect metrics** from the last 5 cycles in `evalHistory` and `ledger.jsonl`:
@@ -405,7 +419,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    g. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
-7. **Context Management (stop-hook pattern):**
+8. **Context Management (stop-hook pattern):**
 
    After each cycle completes, assess context window usage. If context is above 60% capacity:
    - Write a **cycle handoff file** to `.claude/evolve/workspace/handoff.md`:
@@ -431,7 +445,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    This prevents context exhaustion mid-cycle. The handoff file ensures the next session has all context needed to continue seamlessly.
 
-8. **Exit conditions** (in order):
+9. **Exit conditions** (in order):
    - Cycle limit reached → STOP
    - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
    - Context above 60% after a cycle → write handoff, STOP
