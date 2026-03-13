@@ -98,7 +98,7 @@ if [ -d "$PLUGIN_CACHE" ] || [ -d "$HOME/.claude/plugins/marketplaces/evolve-loo
   fi
 fi
 
-echo "Installing Evolve Loop v4..."
+echo "Installing Evolve Loop v6..."
 echo ""
 echo "NOTE: Preferred method is plugin install:"
 echo "  /plugin marketplace add mickeyyaya/evolve-loop"

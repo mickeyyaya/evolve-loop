@@ -99,6 +99,9 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     "perTask": 80000,
     "perCycle": 200000
   },
+  "synthesizedTools": [
+    {"name": "validate-yaml", "path": ".claude/evolve/tools/validate-yaml.sh", "purpose": "Validate YAML syntax", "cycle": 7, "useCount": 0}
+  ],
   "planCache": [
     {
       "slug": "add-dark-mode",

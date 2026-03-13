@@ -194,6 +194,9 @@ evolve-loop/
 ├── docs/
 │   ├── architecture.md        # Detailed architecture docs
 │   ├── configuration.md       # Configuration reference
+│   ├── genes.md               # Gene/Capsule library docs
+│   ├── instincts.md           # Instinct system docs
+│   ├── island-model.md        # Island model evolution docs
 │   └── writing-agents.md      # Guide for creating agents
 ├── install.sh                 # Installation script
 ├── uninstall.sh               # Uninstallation script
@@ -214,7 +217,10 @@ evolve-loop/
 │   └── operator-log.md
 ├── evals/               # Eval definitions (created by Scout)
 ├── instincts/
-│   └── personal/        # Extracted patterns from cycles
+│   ├── personal/        # Extracted patterns from cycles
+│   └── archived/        # Superseded/stale instincts
+├── genes/               # Reusable fix templates (Gene/Capsule library)
+├── tools/               # Synthesized tools (capability gap detection)
 ├── history/
 │   └── cycle-N/         # Archived workspace per cycle
 ├── state.json           # Persistent cycle state
