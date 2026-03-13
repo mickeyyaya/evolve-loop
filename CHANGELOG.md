@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [5.0.0] - 2026-03-13
+
+### Added
+- **Strategy presets** — `innovate`, `harden`, `repair`, `balanced` (default) steer cycle intent without full goal strings. Each agent adapts discovery, building, and auditing behavior based on active strategy.
+- **Token budgets** — soft limits per task (80K) and per cycle (200K) to prevent runaway costs. Scout sizes tasks within budget, Operator recommends adjustments if exceeded.
+- **Pattern-based stagnation detection** — three detection patterns: same-file churn, same-error repeat, diminishing returns. Replaces simple `nothingToDoCount`. 3+ active patterns trigger Operator HALT.
+- **Rich failed-attempt memory** — failed approaches now include root cause reasoning, files affected, and cycle number alongside error and alternative.
+- **Meta-cycle self-improvement** — every 5 cycles, the orchestrator evaluates its own pipeline effectiveness (success rates, agent efficiency, stagnation) and may propose changes.
+- **Automated prompt evolution** — during meta-cycles, uses critique-synthesize loop to refine agent prompts. Max 2 edits per meta-cycle, auto-reverts on degradation.
+- **Multi-type instinct memory** — instincts categorized as episodic (what happened), semantic (domain knowledge), or procedural (how-to) for targeted agent retrieval.
+- **Delta evaluation metrics** — each cycle records quantitative metrics (success rate, audit iterations, tasks shipped) enabling trend analysis across cycles.
+
+### Changed
+- **state.json schema** — new fields: `strategy`, `tokenBudget`, `stagnation` (replaces flat `nothingToDoCount`)
+- **Argument parsing** — now accepts strategy as optional second argument: `/evolve-loop [cycles] [strategy] [goal]`
+- **All agent context blocks** — now include `strategy` field
+- **evalHistory entries** — now include `delta` object with quantitative metrics
+- **Instinct schema** — new `category` field (episodic/semantic/procedural) and new types (domain, technique)
+
 ## [4.2.0] - 2026-03-13
 
 ### Added

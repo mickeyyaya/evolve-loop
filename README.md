@@ -13,6 +13,13 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Eval hard gate** — Auditor runs code graders and acceptance checks before shipping
 - **Continuous learning** — instinct extraction after each cycle with deep reasoning
 - **Loop monitoring** — Operator detects stalls, quality degradation, and repeated failures
+- **Strategy presets** — `innovate`, `harden`, `repair`, `balanced` steer cycle intent
+- **Token budgets** — soft limits per task and per cycle prevent runaway costs
+- **Stagnation detection** — pattern-based detection of same-file churn, error repeats, diminishing returns
+- **Meta-cycle self-improvement** — every 5 cycles, the pipeline evaluates and improves itself
+- **Automated prompt evolution** — critique-synthesize loop refines agent prompts based on outcomes
+- **Delta evaluation** — quantitative trend tracking across cycles
+- **Multi-type instinct memory** — episodic, semantic, and procedural categories for targeted retrieval
 - **Denial-of-wallet guardrails** — configurable cycle caps prevent runaway sessions
 - **No external dependencies** — fully self-contained Claude Code plugin
 
@@ -58,17 +65,19 @@ cd evolve-loop
 ### Usage
 
 ```bash
-# Autonomous mode — 2 cycles, agents discover what to improve
+# Autonomous mode — 2 cycles, balanced strategy
 /evolve-loop
 
 # Goal-directed — 1 cycle focused on a specific feature
 /evolve-loop 1 add dark mode support
 
+# Strategy presets — steer cycle intent
+/evolve-loop innovate                    # feature-first mode
+/evolve-loop 3 harden                    # stability-first for 3 cycles
+/evolve-loop repair fix broken auth      # fix-only with directed goal
+
 # Multiple autonomous cycles
 /evolve-loop 5
-
-# Goal-directed with default 2 cycles
-/evolve-loop add user authentication
 ```
 
 ## Architecture
@@ -141,10 +150,16 @@ Phase 5: Orchestrator ── instincts + archive
 - After 5+ cycles, high-confidence instincts promote to global scope
 
 ### Operator (Phase 5)
-- Post-cycle health assessment
-- Stall detection (2+ consecutive no-ship cycles)
-- Quality trend tracking
+- Post-cycle health assessment with delta metrics
+- Stagnation detection (same-file churn, error repeats, diminishing returns)
+- Quality trend tracking via quantitative delta analysis
 - HALT protocol: pauses loop for human attention
+
+### Meta-Cycle (every 5 cycles)
+- Evaluates pipeline success rates, agent efficiency, stagnation
+- Automated prompt evolution via critique-synthesize loop
+- May adjust strategy, token budgets, or agent prompts
+- Auto-reverts prompt changes that degrade performance
 
 ## Project Structure
 
