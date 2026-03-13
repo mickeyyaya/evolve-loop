@@ -159,12 +159,15 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
        }
      }
      ```
-     Score each phase independently:
-     - **Discovery** — task relevance (did selected tasks ship?) + sizing accuracy (were tasks the right complexity?)
-     - **Build** — first-attempt success rate + gene/instinct application rate
-     - **Audit** — false positive rate (issues flagged that weren't real) + eval coverage
-     - **Ship** — clean commit rate (no post-commit fixes needed)
-     - **Learn** — instinct quality (were new instincts confirmed in later cycles?) + consolidation effectiveness
+     **Scoring rubric** — compute each dimension deterministically:
+
+     | Phase | Score = 1.0 | Score = 0.5 | Score = 0.0 |
+     |-------|-------------|-------------|-------------|
+     | **discover** | All selected tasks shipped | 50%+ tasks shipped | <50% tasks shipped |
+     | **build** | All tasks pass audit first attempt | Some tasks need retry | 3+ audit failures |
+     | **audit** | No false positives, all evals run | 1 false positive or missing eval | Multiple false positives |
+     | **ship** | Clean commit, no post-commit fixes | Minor fixup needed | Failed to push or dirty state |
+     | **learn** | New instincts extracted + consolidation ran if due | Instincts extracted, no consolidation needed | No instincts extracted |
 
      Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder.
 

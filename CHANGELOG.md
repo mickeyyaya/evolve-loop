@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.1.0] - 2026-03-13
+
+### Added
+- **Meta-cycle documentation** — standalone `docs/meta-cycle.md` reference for the meta-cycle review process (trigger, split-role critique, mutation testing, topology review)
+- **Process rewards scoring rubric** — deterministic scoring formula in phases.md with 3 score levels (1.0, 0.5, 0.0) per phase dimension
+- **Context Management section** — README Key Mechanics now documents the 60% context handoff pattern
+- **Global instinct promotion** — phases.md and docs/instincts.md now include concrete promotion steps and criteria
+- **Memory consolidation trigger** — explicit `cycle % 3` check step in Phase 5
+
+### Changed
+- **Architecture docs** — fully rewritten for v6 (strategy presets, stagnation detection, mastery graduation, gene library, model routing)
+- **CI workflow** — added docs validation step for v6 required docs
+- **State schema docs** — memory-protocol.md now documents mastery, processRewards, planCache, synthesizedTools
+- **Instinct path** — replaced `homunculus` references with `~/.claude/instincts/personal/`
+
+### Fixed
+- **Operator model** — README agents table corrected from sonnet to haiku
+- **install.sh usage** — updated to include `[strategy]` parameter
+
 ## [6.0.0] - 2026-03-13
 
 ### Added
