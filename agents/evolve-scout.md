@@ -93,7 +93,12 @@ Synthesize all findings into 2-4 small/medium tasks. For each task:
 3. Highest impact-to-effort ratio
 4. Reduces compound risk (things that get worse each cycle)
 
-**Task sizing:** Each task should be completable in a single Builder pass (~30-50K tokens). If a task is too large, break it into smaller pieces. Prefer 3 small tasks over 1 large task.
+**Task sizing:** Each task must fit within the per-task token budget (see `stateJson.tokenBudget.perTask`, default 80K). Total tasks per cycle must fit within the per-cycle budget (`tokenBudget.perCycle`, default 200K). If a task is too large, break it into smaller pieces. Prefer 3 small tasks over 1 large task.
+
+**Token estimation guidelines:**
+- S complexity (1-5 files, <20 lines changed): ~20-40K tokens
+- M complexity (3-10 files, 20-100 lines changed): ~40-80K tokens
+- Anything touching 10+ files or >100 lines: split into multiple tasks
 
 ### 5. Write Eval Definitions
 

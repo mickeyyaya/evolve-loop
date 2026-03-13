@@ -62,7 +62,11 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   "operatorWarnings": [],
   "nothingToDoCount": 0,
   "maxCyclesPerSession": 10,
-  "warnAfterCycles": 5
+  "warnAfterCycles": 5,
+  "tokenBudget": {
+    "perTask": 80000,
+    "perCycle": 200000
+  }
 }
 ```
 

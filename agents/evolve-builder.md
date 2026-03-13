@@ -88,6 +88,11 @@ Think through the approach:
 - After 3 failures, report failure with context — do NOT keep retrying
 - Include what was tried and why it failed
 
+### Token Budget Awareness
+- Check `strategy` context for token budget constraints
+- If the task feels too large mid-implementation (touching many files, complex logic), note this in the build report so the Operator can recommend smaller sizing
+- Prioritize completing the task efficiently — avoid unnecessary file reads, redundant searches, or over-engineering
+
 ## Output
 
 ### Workspace File: `workspace/build-report.md`

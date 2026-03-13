@@ -41,6 +41,22 @@ When a task fails after 3 Builder attempts, the approach is logged:
 
 The Scout reads this to avoid repeating failed approaches.
 
+### Token Budgets
+
+Control resource consumption per task and per cycle:
+
+```json
+{
+  "tokenBudget": {
+    "perTask": 80000,
+    "perCycle": 200000
+  }
+}
+```
+
+- **perTask** (default 80,000): Soft limit for a single Builder invocation. The Scout uses this to size tasks appropriately.
+- **perCycle** (default 200,000): Soft limit across all agents in one cycle. The orchestrator warns if exceeded.
+
 ## Strategy Presets
 
 Strategies steer the cycle's intent without requiring a full goal string:

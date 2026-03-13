@@ -80,7 +80,7 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]}}
    ```
 
    **Compute cycle range** (after reading state.json):
@@ -136,6 +136,17 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 1. **Inline S-complexity tasks** (from inst-007, confidence 0.9): For small, well-defined tasks (S complexity, <10 lines changed, fully specified with eval definitions), the orchestrator may implement inline instead of spawning a builder agent. This saves ~30-50K tokens per task. Only applies when acceptance criteria and eval graders are unambiguous.
 
 2. **Grep-based evals** (from inst-004, confidence 0.9): For Markdown/Shell projects without test infrastructure, grep-based eval checks are effective acceptance gates. Define specific grep commands with expected match counts.
+
+## Token Budgets
+
+Each task and cycle has a token budget to prevent runaway costs:
+
+- **Per-task budget** (`tokenBudget.perTask`, default 80,000): Maximum tokens a single Builder invocation should consume. If a task appears likely to exceed this (based on complexity/file count), the Scout should break it into smaller tasks.
+- **Per-cycle budget** (`tokenBudget.perCycle`, default 200,000): Maximum tokens across all agents in a single cycle. The orchestrator tracks cumulative token usage and halts the cycle if exceeded.
+
+**Budget enforcement:** These are soft limits — the orchestrator monitors usage and warns. If a Builder consistently exceeds the per-task budget, the Operator should recommend smaller task sizing in the next cycle.
+
+The Scout MUST consider token budgets when sizing tasks. A task with complexity M that touches 10+ files is likely to exceed 80K tokens and should be split.
 
 ## Anti-Patterns
 
