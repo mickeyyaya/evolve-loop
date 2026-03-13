@@ -17,9 +17,21 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Token budgets** — soft limits per task and per cycle prevent runaway costs
 - **Stagnation detection** — pattern-based detection of same-file churn, error repeats, diminishing returns
 - **Meta-cycle self-improvement** — every 5 cycles, the pipeline evaluates and improves itself
-- **Automated prompt evolution** — critique-synthesize loop refines agent prompts based on outcomes
+- **Automated prompt evolution** — TextGrad-style critique-synthesize loop refines agent prompts
 - **Delta evaluation** — quantitative trend tracking across cycles
 - **Multi-type instinct memory** — episodic, semantic, and procedural categories for targeted retrieval
+- **Dynamic model routing** — haiku/sonnet/opus selected per phase based on complexity
+- **Plan template caching** — reuse successful build plans for ~30-50% cost reduction
+- **Gene/Capsule library** — structured fix templates with selectors and validation
+- **Memory consolidation** — cluster, decay, and archive instincts to prevent unbounded growth
+- **Curriculum learning** — difficulty-graduated task queue with mastery levels
+- **Process rewards** — step-level scoring per phase for targeted improvement
+- **Mutation testing** — self-generated evals that test the tests themselves
+- **Safety & integrity** — eval tamper detection, memory provenance, rollback protocol
+- **Island model** — parallel configuration evolution with trait migration (advanced)
+- **Capability gap detection** — synthesize new tools when existing ones can't handle a task
+- **MAP-Elites fitness** — multi-dimensional scoring (speed, quality, cost, novelty)
+- **Stop-hook context reset** — indefinite runtime via session handoff
 - **Denial-of-wallet guardrails** — configurable cycle caps prevent runaway sessions
 - **No external dependencies** — fully self-contained Claude Code plugin
 

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.0.0] - 2026-03-13
+
+### Added
+- **Stop-hook context reset** — proactive context management at cycle boundaries. Writes handoff.md with session state and resume command when context exceeds 60%. Enables indefinite runtime across sessions.
+- **Dynamic model routing** — selects model per phase based on complexity: haiku for routine tasks (Operator, incremental scans), sonnet for standard work, opus for meta-cycle reasoning. Reduces cost while maintaining quality.
+- **Plan template caching** — caches successful build plans as reusable templates. Matches new tasks by type and file patterns. ~30-50% cost reduction on similar tasks. Auto-evicts unused templates after 10 cycles.
+- **Memory integrity & eval tamper detection** — instinct provenance verification, state.json schema validation, eval checksum tracking, objective hacking detection. Builder cannot modify eval criteria without authorization.
+- **Recursive memory consolidation** — every 3 cycles, clusters similar instincts into abstractions, applies temporal decay (0.1/pass), archives stale memories (<0.3 confidence). Entropy gating prevents duplicates.
+- **Difficulty-graduated task queue** — curriculum learning with mastery levels: novice (S-only), competent (S+M), proficient (all). Advances on 3+ consecutive 100% success cycles.
+- **Split-role critique personas** — three critic perspectives during meta-cycles: efficiency, correctness, novelty. Reduces blind spots in self-assessment.
+- **Gene/Capsule library** — structured fix templates with pattern-matching selectors and pre/post validation. Capsules bundle multiple genes into composite workflows. See docs/genes.md.
+- **Process rewards** — step-level scoring for each phase (0.0-1.0). Enables targeted agent improvement based on which phase underperforms.
+- **Self-generated mutation testing** — during meta-cycles, generates code mutations and verifies evals catch them. Tracks mutation kill rate; <60% triggers eval improvement.
+- **Island model evolution** — maintain 3-5 independent configurations evolving in parallel with periodic migration of best traits. See docs/island-model.md.
+- **Workflow topology review** — during meta-cycles, evaluates phase ordering for optimization: skipping, merging, addition, parallelization. Proposals require human approval.
+- **TextGrad prompt optimization** — generates textual gradients during prompt evolution: observed → desired → specific change → expected impact.
+- **Capability gap detection & tool synthesis** — Builder identifies missing capabilities, searches for existing tools, synthesizes reusable scripts in .claude/evolve/tools/.
+- **MAP-Elites fitness scoring** — Operator scores cycles across four dimensions: speed, quality, cost, novelty. Recommends strategy changes targeting the weakest dimension.
+
+### Changed
+- **Operator default model** — changed from sonnet to haiku (sufficient for routine post-cycle checks)
+- **state.json schema** — new fields: `planCache`, `mastery`, `synthesizedTools`
+- **Directory structure** — new directories: `instincts/archived/`, `genes/`, `tools/`
+- **Meta-cycle expanded** — now includes split-role critique, mutation testing, topology review, and TextGrad optimization
+
 ## [5.0.0] - 2026-03-13
 
 ### Added
