@@ -80,6 +80,17 @@ Confidence increases when an instinct is confirmed in a later cycle (e.g., the p
 
 After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scope (`~/.claude/homunculus/instincts/personal/`), making them available across all projects.
 
+## Memory Consolidation
+
+Every 3 cycles (or when instinct count exceeds 20), the orchestrator consolidates memory:
+
+1. **Cluster:** Merge instincts with >85% semantic similarity into higher-level abstractions
+2. **Archive:** Superseded instincts move to `archived/` (never deleted)
+3. **Temporal decay:** Unreferenced instincts lose 0.1 confidence per pass; below 0.3 → archived as stale
+4. **Entropy gating:** New instincts >90% similar to existing ones update the existing instinct instead of creating duplicates
+
+This prevents unbounded memory growth and keeps the instinct set relevant and compact.
+
 ## File Organization
 
 ```
@@ -88,6 +99,9 @@ After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scop
     cycle-1-instincts.yaml    # instincts from cycle 1
     cycle-2-instincts.yaml    # instincts from cycle 2
     ...
+  archived/
+    merged-instincts.yaml     # superseded instincts (provenance preserved)
+    stale-instincts.yaml      # decayed below 0.3 confidence
 ```
 
 Each cycle appends a new file. Instinct updates (confidence changes) reference the original ID with a `-update` suffix.

@@ -205,6 +205,28 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    Update state.json `instinctCount`.
 
+   **Memory Consolidation** (every 3 cycles or when instinctCount > 20):
+   Review all instinct files and consolidate:
+
+   a. **Cluster similar instincts:** Find instincts with overlapping patterns or descriptions (semantic similarity > 0.85). Merge them into a single higher-level abstraction.
+      - Example: `inst-003: "use camelCase for API keys"` + `inst-007: "use camelCase for config fields"` → `inst-003: "use camelCase for all JSON keys in this codebase"` (confidence = max of originals)
+
+   b. **Archive originals:** Move merged instincts to `.claude/evolve/instincts/archived/` with a `supersededBy` field. Never delete — only archive.
+
+   c. **Apply temporal decay:** Instincts not referenced in the last 5 cycles have their confidence reduced by 0.1 per consolidation pass. Instincts reaching confidence < 0.3 are archived as stale.
+
+   d. **Entropy gating:** Before storing a new instinct, check if it adds meaningful information beyond what's already stored. If a new instinct is >90% similar to an existing one, update the existing one's confidence instead of creating a duplicate.
+
+   e. **Write consolidation log** to `workspace/consolidation-log.md`:
+      ```markdown
+      ## Memory Consolidation — Cycle {N}
+      - Instincts before: <count>
+      - Merged: <count> clusters
+      - Decayed: <count>
+      - Archived: <count>
+      - Instincts after: <count>
+      ```
+
 3. **Operator Check:**
    Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
    - Context: cycle number, mode=`post-cycle`, state.json, paths to workspace/ledger
