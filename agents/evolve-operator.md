@@ -25,11 +25,16 @@ You will receive a JSON context block with:
 - Did this cycle ship code? How many tasks completed vs attempted?
 - Was the task sizing appropriate? (too large = failures, too small = overhead)
 
-### 2. Stall Detection
+### 2. Stall & Stagnation Detection
 - Read ledger entries across cycles
 - Count consecutive no-ship cycles. If 2+ → flag stall
+- Check `stagnation.recentPatterns` in state.json for active patterns:
+  - **Same-file churn** — same files appearing in failures across consecutive cycles
+  - **Same-error repeat** — identical error messages recurring across cycles
+  - **Diminishing returns** — each cycle shipping fewer tasks than the previous
 - Look for repeated failure patterns (same files failing, same errors)
 - Detect thrashing (changes that get reverted or re-done)
+- If 3+ stagnation patterns are active simultaneously → recommend HALT
 
 ### 3. Quality Trend
 - Are audit verdicts improving or degrading across cycles?

@@ -60,7 +60,17 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   ],
   "instinctCount": 4,
   "operatorWarnings": [],
-  "nothingToDoCount": 0,
+  "stagnation": {
+    "nothingToDoCount": 0,
+    "recentPatterns": [
+      {
+        "type": "same-file-churn|same-error-repeat|diminishing-returns",
+        "description": "brief description of the pattern",
+        "cycleRange": [3, 5],
+        "detectedAt": "2026-03-13T10:00:00Z"
+      }
+    ]
+  },
   "maxCyclesPerSession": 10,
   "warnAfterCycles": 5,
   "tokenBudget": {

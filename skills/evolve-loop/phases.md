@@ -30,9 +30,20 @@ After Scout completes:
 - Verify eval definitions were created in `.claude/evolve/evals/`
 - Merge research query updates into state.json (if research was performed)
 - If no tasks selected:
-  - Increment `nothingToDoCount` in state.json
-  - If `nothingToDoCount >= 3` → STOP: "Project has converged."
+  - Increment `stagnation.nothingToDoCount` in state.json
+  - If `stagnation.nothingToDoCount >= 3` → STOP: "Project has converged."
   - Otherwise → skip to Phase 5
+
+- **Stagnation detection** (run after every Scout phase):
+  Check `stagnation.recentPatterns` in state.json for repeated failure patterns:
+  1. **Same-file churn** — if the same file(s) appear in `failedApproaches` across 2+ consecutive cycles → flag as stagnation
+  2. **Same-error repeat** — if the same error message recurs across cycles → flag with suggestion to try alternative approach
+  3. **Diminishing returns** — if the last 3 cycles each shipped fewer tasks than the previous → flag as diminishing returns
+
+  When stagnation is detected, the orchestrator should:
+  - Log the pattern in `stagnation.recentPatterns` with type and cycle range
+  - Pass it to the Scout as context so it avoids the stagnant area
+  - If 3+ stagnation patterns are active simultaneously → trigger Operator HALT
 
 ---
 

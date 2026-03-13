@@ -86,6 +86,7 @@ Synthesize all findings into 2-4 small/medium tasks. For each task:
 - Skip tasks in `stateJson.evaluatedTasks` with `decision: "completed"`
 - Skip rejected tasks whose `revisitAfter` date hasn't passed
 - Avoid approaches listed in `stateJson.failedApproaches` — propose alternatives
+- Check `stateJson.stagnation.recentPatterns` — avoid files/areas flagged as stagnant unless you have a genuinely new approach
 
 **Then prioritize by:**
 1. Unblocks the pipeline or fixes broken functionality
