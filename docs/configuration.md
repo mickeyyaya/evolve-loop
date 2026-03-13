@@ -33,6 +33,9 @@ When a task fails after 3 Builder attempts, the approach is logged:
       "feature": "WebSocket sync",
       "approach": "Socket.io with Redis",
       "error": "Connection pooling in serverless",
+      "reasoning": "Serverless functions have ~10s timeout, WebSocket requires persistent connections. Redis pub/sub also needs a persistent subscriber.",
+      "filesAffected": ["src/sync/ws-handler.ts", "src/api/stream.ts"],
+      "cycle": 3,
       "alternative": "Consider SSE or polling"
     }
   ]

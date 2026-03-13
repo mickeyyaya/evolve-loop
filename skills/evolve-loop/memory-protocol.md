@@ -53,7 +53,15 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     {"slug": "add-feature-y", "decision": "rejected", "reason": "too complex", "revisitAfter": "2026-04-01"}
   ],
   "failedApproaches": [
-    {"feature": "real-time sync", "approach": "WebSocket", "error": "serverless incompatible", "alternative": "SSE polling"}
+    {
+      "feature": "real-time sync",
+      "approach": "WebSocket",
+      "error": "serverless incompatible",
+      "reasoning": "WebSocket requires persistent connections, but the deployment target (Vercel) uses serverless functions with ~10s timeout. The connection drops before any useful data can stream.",
+      "filesAffected": ["src/sync/ws-handler.ts", "src/api/stream.ts"],
+      "cycle": 3,
+      "alternative": "SSE polling or Vercel's AI SDK streaming"
+    }
   ],
   "evalHistory": [
     {"cycle": 1, "verdict": "PASS", "checks": 9, "passed": 9, "failed": 0}
@@ -84,7 +92,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Read at the start of every cycle
 - Research queries have a 12hr TTL — skip if still fresh
 - Rejected tasks have optional `revisitAfter` — skip until date passes
-- Failed approaches logged with error context for alternative strategies
+- Failed approaches logged with structured reasoning: `error` (what happened), `reasoning` (why it failed), `filesAffected` (blast radius), `cycle` (when), `alternative` (what to try instead)
 - Completed tasks are never re-proposed
 - `lastCycleNumber` (default 0): the last completed cycle number — used to compute the start of the next invocation (additive cycling)
 - `maxCyclesPerSession` (default 10): hard cap — orchestrator halts if cumulative cycle number would exceed this value

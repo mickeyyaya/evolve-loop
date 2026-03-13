@@ -69,7 +69,18 @@ Launch **Builder Agent** (model: sonnet, subagent_type: `general-purpose`, isola
 After Builder completes:
 - Read `workspace/build-report.md`
 - If status is FAIL after 3 attempts:
-  - Log failed approach in state.json under `failedApproaches`
+  - Log failed approach in state.json under `failedApproaches` with structured reasoning:
+    ```json
+    {
+      "feature": "<task name>",
+      "approach": "<what was tried>",
+      "error": "<error message or symptom>",
+      "reasoning": "<WHY it failed — root cause analysis, not just the error>",
+      "filesAffected": ["<files that were involved>"],
+      "cycle": <N>,
+      "alternative": "<suggested different approach for next cycle>"
+    }
+    ```
   - Skip this task, proceed to next task (or Phase 3 if last task)
 - If status is PASS → proceed to Phase 3 for this task
 

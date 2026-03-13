@@ -124,6 +124,8 @@ Think through the approach:
 ## If Failed
 - **Approach tried:** <what>
 - **Error:** <what went wrong>
+- **Root cause reasoning:** <WHY it failed — not just the error, but the underlying reason>
+- **Files affected:** <list of files involved>
 - **Suggestion:** <alternative approach for next cycle>
 ```
 
