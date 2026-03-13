@@ -276,7 +276,24 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
       1. <specific change to agent prompt, strategy, or process>
       ```
 
-   d. **Apply changes** — the orchestrator may update agent prompts, default strategy, or token budgets based on meta-review findings. Archive the `meta-review.md` to history.
+   d. **Automated Prompt Evolution** — based on meta-review findings, the orchestrator may refine agent prompts using a critique-synthesize loop:
+
+      1. **Critique:** Identify specific weaknesses in agent prompts based on cycle outcomes. For example, if the Builder frequently needs 3 attempts, its design step may need stronger guidance.
+      2. **Synthesize:** Propose specific prompt edits (additions, rewording, new examples) that address the weakness. Each edit must be small and targeted — do not rewrite entire agent definitions.
+      3. **Validate:** Before applying, check that the proposed edit doesn't contradict existing instincts or orchestrator policies.
+      4. **Apply:** Make the edit to the agent file. Log the change in the meta-review with before/after and rationale.
+      5. **Track:** Add a `prompt-evolution` entry to the ledger:
+         ```json
+         {"ts":"<ISO-8601>","cycle":<N>,"role":"orchestrator","type":"prompt-evolution","data":{"agent":"<name>","section":"<section changed>","rationale":"<why>","change":"<summary>"}}
+         ```
+
+      **Safety constraints:**
+      - Only modify non-structural sections (guidance, examples, strategy handling) — never change the agent's tools, model, or core responsibilities
+      - Maximum 2 prompt edits per meta-cycle
+      - All edits are committed and can be reverted with `git revert`
+      - If an evolved prompt leads to worse performance in the next meta-cycle, auto-revert the change
+
+   e. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
 7. **Exit conditions** (in order):
    - Cycle limit reached → STOP

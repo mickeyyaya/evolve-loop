@@ -139,6 +139,8 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 
 3. **Meta-cycle self-improvement** (every 5 cycles): The orchestrator runs a meta-evaluation of its own pipeline effectiveness, analyzing success rates, agent efficiency, and stagnation patterns. May propose changes to agent prompts, strategies, or budgets. See Phase 5 step 6 in [phases.md](phases.md).
 
+4. **Automated prompt evolution** (during meta-cycles): Uses a critique-synthesize loop to refine agent prompts based on cycle outcomes. Maximum 2 edits per meta-cycle, auto-reverts if performance degrades. See Phase 5 step 6d in [phases.md](phases.md).
+
 ## Token Budgets
 
 Each task and cycle has a token budget to prevent runaway costs:
