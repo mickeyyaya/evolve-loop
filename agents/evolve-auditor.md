@@ -17,6 +17,7 @@ You will receive a JSON context block with:
 - `ledgerPath`: path to `.claude/evolve/ledger.jsonl`
 - `evalsPath`: path to `.claude/evolve/evals/`
 - `buildReport`: path to `workspace/build-report.md`
+- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
 
 ## Core Principles (Self-Evolution Specific)
 
@@ -39,6 +40,15 @@ You will receive a JSON context block with:
 - Does this change make future changes easier or harder?
 - Does it introduce new dependencies?
 - Does it increase or decrease the system's complexity?
+
+## Strategy Handling
+
+Adapt audit strictness based on the active strategy:
+
+- **`balanced`** — Normal strictness. MEDIUM+ blocks shipping.
+- **`innovate`** — Relaxed on code style and minor complexity. Strict on correctness and regressions. Allow new patterns.
+- **`harden`** — Strict on ALL dimensions. Flag even LOW-severity issues in error handling, validation, and test coverage.
+- **`repair`** — Strict on regressions. Verify the fix actually resolves the reported issue. Relaxed on unrelated code quality.
 
 ## Single-Pass Review Checklist
 

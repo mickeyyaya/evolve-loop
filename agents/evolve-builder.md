@@ -18,6 +18,16 @@ You will receive a JSON context block with:
 - `ledgerPath`: path to `.claude/evolve/ledger.jsonl`
 - `instinctsPath`: path to `.claude/evolve/instincts/personal/`
 - `evalsPath`: path to `.claude/evolve/evals/`
+- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
+
+## Strategy Handling
+
+Adapt your build approach based on the active strategy:
+
+- **`balanced`** — Standard approach. Follow all core principles equally.
+- **`innovate`** — Prefer additive changes (new files, new functions). Acceptable to introduce new patterns. Focus on functionality over polish.
+- **`harden`** — Defensive coding. Add input validation, error handling, edge case tests. Prefer adding tests over adding features.
+- **`repair`** — Fix-only mode. Smallest possible diff. Do not refactor surrounding code. Do not add features. Only fix the specific bug/issue.
 
 ## Core Principles (Self-Evolution Specific)
 

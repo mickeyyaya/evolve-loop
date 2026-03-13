@@ -9,24 +9,42 @@ disable-model-invocation: true
 
 Orchestrates 4 specialized agents through 5 lean phases per cycle. Optimized for fast iteration: discover → build → audit → ship → learn. Each cycle targets 2-4 small/medium tasks, builds them in isolated worktrees, and gates on MEDIUM+ audit findings.
 
-**Usage:** `/evolve-loop [cycles] [goal]`
+**Usage:** `/evolve-loop [cycles] [strategy] [goal]`
 
 ## Argument Parsing
 
 Parse `$ARGUMENTS` as follows:
-- If the first token is a number → use it as `cycles` (number of NEW cycles to run), remainder is `goal`
-- If the first token is NOT a number → `cycles` defaults to 2, entire input is `goal`
-- If empty → `cycles` = 2, `goal` = null (autonomous discovery mode)
+- If the first token is a number → use it as `cycles` (number of NEW cycles to run)
+- If a token matches a strategy name (`innovate`, `harden`, `repair`) → use it as `strategy`
+- Remaining tokens → `goal`
+- Defaults: `cycles` = 2, `strategy` = `balanced`, `goal` = null (autonomous discovery mode)
+
+### Strategy Presets
+
+Strategies steer cycle intent without requiring a full goal string:
+
+| Strategy | Scout Focus | Builder Approach | Auditor Strictness |
+|----------|-------------|------------------|-------------------|
+| `balanced` | Broad discovery, mixed task types | Standard minimal-change | Normal (MEDIUM+ blocks) |
+| `innovate` | New features, missing functionality, gaps | Prefer additive changes, new files | Relaxed on style, strict on correctness |
+| `harden` | Stability, test coverage, error handling, edge cases | Defensive coding, add tests/validation | Strict on all dimensions |
+| `repair` | Bugs, broken functionality, failing tests | Fix-only, smallest possible diff | Strict on regressions, relaxed on new code |
+
+The strategy is passed to all agents via the context block as `"strategy": "<name>"`. Each agent adapts its behavior accordingly (see agent definitions for details).
+
+**Strategy + Goal interaction:** When both are provided, the strategy sets the *approach style* while the goal sets the *direction*. Example: `/evolve-loop 3 harden add payment processing` → build payment features with defensive coding and strict auditing.
 
 The `cycles` argument is **additive** — it specifies how many cycles to run from the current position, not a total. The orchestrator reads `lastCycleNumber` from state.json and computes:
 - `startCycle = lastCycleNumber + 1`
 - `endCycle = lastCycleNumber + cycles`
 
 Examples:
-- `/evolve-loop` → run 2 more cycles from current position
-- `/evolve-loop 3` → run 3 more cycles from current position
-- `/evolve-loop 1 add dark mode support` → run 1 more cycle, goal="add dark mode support"
-- `/evolve-loop add user authentication` → run 2 more cycles, goal="add user authentication"
+- `/evolve-loop` → run 2 more cycles, balanced strategy
+- `/evolve-loop 3` → run 3 more cycles, balanced strategy
+- `/evolve-loop innovate` → run 2 more cycles, innovate strategy
+- `/evolve-loop 3 harden` → run 3 more cycles, harden strategy
+- `/evolve-loop 1 add dark mode support` → run 1 more cycle, balanced, goal="add dark mode support"
+- `/evolve-loop 3 repair fix auth flow` → run 3 more cycles, repair strategy, goal="fix auth flow"
 
 ## Goal Modes
 
@@ -62,7 +80,7 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5}
    ```
 
    **Compute cycle range** (after reading state.json):

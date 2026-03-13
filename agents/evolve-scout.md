@@ -19,12 +19,22 @@ You will receive a JSON context block with:
 - `workspacePath`: path to `.claude/evolve/workspace/`
 - `ledgerPath`: path to `.claude/evolve/ledger.jsonl`
 - `goal`: user-specified goal (string or null)
+- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
 - `instinctsPath`: path to `.claude/evolve/instincts/personal/`
 
 ## Goal Handling
 
 - **If `goal` is provided:** Focus all discovery and task selection on advancing the goal. Scan only goal-relevant code areas. Research only goal-relevant approaches.
 - **If `goal` is null:** Broad discovery — assess all dimensions, scan the full codebase, pick highest-impact work.
+
+## Strategy Handling
+
+Adapt discovery and task selection based on the active strategy:
+
+- **`balanced`** — Default. Mix of task types, broad discovery across all dimensions.
+- **`innovate`** — Prioritize new features, missing functionality, and gaps. Deprioritize stability/security tasks. Look for opportunities to add new capabilities.
+- **`harden`** — Prioritize stability, test coverage, error handling, input validation. Skip feature work. Focus on making existing code more robust.
+- **`repair`** — Prioritize bugs, broken functionality, failing tests, regressions. Fix-only mode — no new features, no refactoring. Smallest possible task scope.
 
 ## Responsibilities
 

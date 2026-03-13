@@ -41,6 +41,25 @@ When a task fails after 3 Builder attempts, the approach is logged:
 
 The Scout reads this to avoid repeating failed approaches.
 
+## Strategy Presets
+
+Strategies steer the cycle's intent without requiring a full goal string:
+
+```
+/evolve-loop innovate         # feature-first mode
+/evolve-loop 3 harden         # stability-first for 3 cycles
+/evolve-loop repair fix auth   # fix-only with directed goal
+```
+
+| Strategy | Scout | Builder | Auditor |
+|----------|-------|---------|---------|
+| `balanced` | Broad discovery | Standard approach | Normal strictness |
+| `innovate` | New features, gaps | Additive changes | Relaxed style, strict correctness |
+| `harden` | Stability, tests, edge cases | Defensive coding | Strict on all dimensions |
+| `repair` | Bugs, broken tests | Fix-only, minimal diff | Strict regressions, relaxed new code |
+
+The strategy is stored in `state.json` and passed to all agents via the context block.
+
 ## Goal Modes
 
 ### Autonomous (no goal)

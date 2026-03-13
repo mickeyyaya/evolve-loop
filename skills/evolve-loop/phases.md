@@ -2,7 +2,7 @@
 
 Detailed orchestrator instructions for each phase. Optimized for fast iteration with diverse small/medium tasks per cycle.
 
-**Important:** Every agent context block must include `goal` (string or null).
+**Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`).
 
 ## FOR cycle = {startCycle} to {endCycle}:
 
@@ -20,7 +20,8 @@ Launch **Scout Agent** (model: sonnet, subagent_type: `general-purpose`):
     "workspacePath": ".claude/evolve/workspace/",
     "ledgerPath": ".claude/evolve/ledger.jsonl",
     "instinctsPath": ".claude/evolve/instincts/personal/",
-    "goal": <goal or null>
+    "goal": <goal or null>,
+    "strategy": <strategy>
   }
   ```
 
@@ -49,7 +50,8 @@ Launch **Builder Agent** (model: sonnet, subagent_type: `general-purpose`, isola
     "workspacePath": ".claude/evolve/workspace/",
     "ledgerPath": ".claude/evolve/ledger.jsonl",
     "instinctsPath": ".claude/evolve/instincts/personal/",
-    "evalsPath": ".claude/evolve/evals/"
+    "evalsPath": ".claude/evolve/evals/",
+    "strategy": <strategy>
   }
   ```
 
@@ -73,7 +75,8 @@ Launch **Auditor Agent** (model: sonnet, subagent_type: `general-purpose`):
     "workspacePath": ".claude/evolve/workspace/",
     "ledgerPath": ".claude/evolve/ledger.jsonl",
     "evalsPath": ".claude/evolve/evals/",
-    "buildReport": ".claude/evolve/workspace/build-report.md"
+    "buildReport": ".claude/evolve/workspace/build-report.md",
+    "strategy": <strategy>
   }
   ```
 
