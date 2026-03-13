@@ -205,6 +205,24 @@ This enables **indefinite runtime** across sessions. The handoff file carries fo
 
 The orchestrator reads `handoff.md` during initialization if it exists, applying the carried-forward context.
 
+## Safety & Integrity
+
+Self-modifying systems require explicit safety mechanisms to prevent misevolution:
+
+### Memory Integrity
+- **Instinct provenance:** Every instinct tracks its `source` (cycle + task). During meta-cycles, verify that instinct sources match actual cycle history in the ledger.
+- **State.json validation:** Before each cycle, validate state.json structure against the expected schema. If corrupted or unexpected fields appear, warn and reset to last known good state.
+
+### Eval Tamper Detection
+- **Protected eval infrastructure:** The Builder MUST NOT modify files in `skills/evolve-loop/`, `agents/`, or `.claude-plugin/` unless the task explicitly targets the evolve-loop itself.
+- **Eval checksum tracking:** After Scout creates eval definitions, the orchestrator records a checksum of each eval file. Before Auditor runs evals, verify checksums haven't changed. If they have and it wasn't a legitimate Scout update → HALT.
+- **Objective hacking detection:** If a Builder removes or weakens eval criteria, assertion counts, or test commands, the Auditor flags this as CRITICAL severity regardless of other results.
+
+### Rollback Protocol
+- All changes are committed atomically per task. Rollback is always `git revert <commit>`.
+- If 3 consecutive cycles show quality degradation (via delta metrics), auto-suggest rollback to the last stable cycle.
+- Prompt evolution changes (from meta-cycles) auto-revert if the next meta-cycle shows worse performance.
+
 ## Anti-Patterns
 
 1. **Over-discovery** — Scout should be incremental after cycle 1, not full audit every time

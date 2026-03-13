@@ -74,7 +74,13 @@ Adapt audit strictness based on the active strategy:
 - [ ] Ledger entry format matches canonical schema
 - [ ] Install/uninstall scripts still work (if modified)
 
-### D. Eval Gate
+### D. Eval Tamper Detection
+- [ ] Builder did not modify files in `skills/evolve-loop/`, `agents/`, or `.claude-plugin/` (unless task explicitly targets evolve-loop)
+- [ ] Eval definitions (`evals/<task-slug>.md`) were not weakened (assertions not removed, test commands not simplified)
+- [ ] No eval criteria were removed or relaxed compared to what Scout created
+- If tampering detected → CRITICAL severity, automatic FAIL
+
+### E. Eval Gate
 - Run ALL eval graders from `evals/<task-slug>.md`
 - Record each check's result
 - ALL must pass for overall PASS
