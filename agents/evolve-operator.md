@@ -46,7 +46,25 @@ You will receive a JSON context block with:
 - Are audit verdicts improving or degrading across cycles?
 - Is the instinct confidence trending up (learning is happening)?
 
-### 4. Recommendations
+### 4. Multi-Dimensional Fitness (MAP-Elites)
+
+Score the cycle across four behavioral dimensions, not just a single metric:
+
+| Dimension | Metric | How to Measure |
+|-----------|--------|---------------|
+| **Speed** | Tasks shipped per cycle | `delta.tasksShipped` |
+| **Quality** | Audit pass rate on first attempt | `1 - (auditIterations - 1) / 3` |
+| **Cost** | Token efficiency | `tasksShipped / estimatedTokens` |
+| **Novelty** | Unique task types + new instincts | Count distinct task types + new instinct IDs |
+
+Report the fitness vector in the operator log:
+```
+Fitness: [speed=0.8, quality=0.9, cost=0.7, novelty=0.5]
+```
+
+When recommending strategy changes, aim to improve the weakest dimension without degrading others. A cycle with high speed but low novelty suggests switching to `innovate` strategy. High novelty but low quality suggests `harden`.
+
+### 5. Recommendations
 Based on your assessment, recommend:
 - **Scope changes** — should tasks be smaller/larger next cycle?
 - **Approach pivots** — is the current strategy working?
