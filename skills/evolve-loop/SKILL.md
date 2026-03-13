@@ -1,7 +1,7 @@
 ---
 name: evolve-loop
 description: "Self-evolving development pipeline — 4 specialized agents (Scout, Builder, Auditor, Operator) across 5 phases. Build diverse small/medium tasks each cycle, iterate fast with quality gates. No external dependencies."
-argument-hint: "[cycles] [goal]"
+argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
 
