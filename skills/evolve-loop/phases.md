@@ -357,7 +357,26 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
       - All edits are committed and can be reverted with `git revert`
       - If an evolved prompt leads to worse performance in the next meta-cycle, auto-revert the change
 
-   e. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
+   e. **Self-Generated Evaluation (mutation testing):**
+
+      Test the quality of our evals by generating mutations:
+      1. For each task completed in the last 5 cycles, generate 2-3 small code mutations (e.g., remove a validation, change a return value, delete an import)
+      2. Run the existing eval graders against the mutated code
+      3. If evals DON'T catch a mutation → the eval is weak. Propose stronger eval criteria.
+      4. Track **mutation kill rate** (mutations caught / mutations generated)
+
+      ```markdown
+      ## Mutation Testing Results
+      - Mutations generated: <N>
+      - Mutations killed (caught by evals): <N>
+      - Kill rate: <percentage>
+      - Weak evals identified: <list>
+      - Proposed improvements: <list>
+      ```
+
+      Target: >80% mutation kill rate. Below 60% triggers eval improvement as a priority task in the next cycle.
+
+   f. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
 7. **Context Management (stop-hook pattern):**
 
