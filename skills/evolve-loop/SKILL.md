@@ -162,6 +162,8 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 
 5. **Gene/Capsule library**: Structured, reusable fix templates with pattern-matching selectors and pre/post validation. More actionable than instincts — genes describe *how to fix* with executable steps. See [docs/genes.md](docs/genes.md).
 
+6. **Island model evolution** (advanced): Maintain 3-5 independent configurations evolving in parallel, with periodic migration of best-performing traits. See [docs/island-model.md](docs/island-model.md).
+
 ## Plan Template Caching
 
 When a task is structurally similar to one solved in a previous cycle, reuse the plan template instead of full re-planning:
