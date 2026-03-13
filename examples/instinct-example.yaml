@@ -1,0 +1,45 @@
+# Example instinct file — extracted during Phase 5 LEARN
+#
+# Instincts are patterns learned from completed cycles. They start at
+# confidence 0.5 and increase when confirmed across multiple cycles.
+# At confidence 0.9+, instincts may graduate to orchestrator policy.
+
+# Example 1: An anti-pattern (episodic — something that happened)
+- id: inst-001
+  pattern: "large-refactors-fail-in-single-pass"
+  description: "Refactoring tasks touching 5+ files consistently fail on first Builder attempt. Split into 2-3 smaller tasks instead. Confirmed when a 'consolidate utils' task failed 3 times before being broken into per-module tasks that each passed."
+  confidence: 0.8
+  source: "cycle-3/consolidate-utils"
+  type: "anti-pattern"
+  category: "episodic"
+
+# Example 2: A convention (semantic — knowledge about the codebase)
+- id: inst-002
+  pattern: "api-routes-need-auth-middleware"
+  description: "All API routes in src/api/ must use the withAuth middleware wrapper. The auth check is not applied globally — each route handler must opt in. Routes without it will pass local tests but fail in production."
+  confidence: 0.9
+  source: "cycle-5/add-user-settings-api"
+  type: "convention"
+  category: "semantic"
+
+# Example 3: A process insight (procedural — how to do things)
+- id: inst-003
+  pattern: "eval-before-build-saves-tokens"
+  description: "Running existing eval graders BEFORE launching the Builder catches cases where the task is already done (from a previous partial attempt). Saves ~30-50K tokens per false start."
+  confidence: 0.7
+  source: "cycle-7/fix-login-redirect"
+  type: "process"
+  category: "procedural"
+
+# Confidence updates reference the original ID:
+- id: inst-001
+  pattern: "large-refactors-fail-in-single-pass"
+  description: "Confirmed again in cycle 8. Builder attempted a cross-module type rename (7 files) and failed twice before being split. Rule of thumb: max 4 files per task."
+  confidence: 0.9
+  source: "cycle-3+8"
+  type: "anti-pattern"
+  category: "episodic"
+  supersedes: ["cycle-3:inst-001"]
+
+# Valid types: anti-pattern, successful-pattern, convention, architecture, domain, process, technique
+# Valid categories: episodic (events), semantic (knowledge), procedural (how-to)

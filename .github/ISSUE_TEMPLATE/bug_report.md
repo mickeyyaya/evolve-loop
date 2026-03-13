@@ -14,20 +14,21 @@ A clear description of what went wrong.
 
 Which phase did the issue occur in?
 
-- [ ] Phase 0: MONITOR-INIT
-- [ ] Phase 1: DISCOVER
-- [ ] Phase 2: PLAN
-- [ ] Phase 3: DESIGN
-- [ ] Phase 4: BUILD
-- [ ] Phase 4.5: CHECKPOINT
-- [ ] Phase 5: VERIFY
-- [ ] Phase 5.5: EVAL
-- [ ] Phase 6: SHIP
-- [ ] Phase 7: LOOP+LEARN
+- [ ] Phase 1: DISCOVER (Scout)
+- [ ] Phase 2: BUILD (Builder)
+- [ ] Phase 3: AUDIT (Auditor)
+- [ ] Phase 4: SHIP (Orchestrator)
+- [ ] Phase 5: LEARN (Operator + instincts)
 
 ## Agent
 
-Which agent was involved? (e.g., evolve-developer, evolve-reviewer)
+Which agent was involved?
+
+- [ ] evolve-scout
+- [ ] evolve-builder
+- [ ] evolve-auditor
+- [ ] evolve-operator
+- [ ] Orchestrator (inline)
 
 ## Command Used
 
@@ -45,10 +46,11 @@ What actually happened? Include error messages or unexpected output.
 
 ## Workspace Files
 
-Attach or paste relevant workspace files (e.g., `impl-notes.md`, `eval-report.md`).
+Attach or paste relevant workspace files (e.g., `scout-report.md`, `build-report.md`, `audit-report.md`).
 
 ## Environment
 
 - OS: [e.g., macOS 15]
 - Claude Code version: [e.g., 1.x.x]
+- Evolve Loop version: [e.g., 6.1.0]
 - Project language/framework: [e.g., TypeScript/Next.js]

@@ -67,6 +67,21 @@ jobs:
             echo "OK: $agent"
           done
 
+      - name: Verify required skill files exist
+        run: |
+          ERRORS=0
+          for skill in skills/evolve-loop/SKILL.md skills/evolve-loop/phases.md skills/evolve-loop/memory-protocol.md skills/evolve-loop/eval-runner.md; do
+            if [ ! -f "$skill" ]; then
+              echo "FAIL: $skill not found"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: $skill"
+            fi
+          done
+          if [ "$ERRORS" -gt 0 ]; then
+            exit 1
+          fi
+
       - name: Verify v6 required docs exist
         run: |
           ERRORS=0
