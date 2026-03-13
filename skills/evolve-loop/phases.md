@@ -166,6 +166,10 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
      }
      ```
    - The `delta` object enables trend analysis across cycles. The Operator and meta-cycle review use these metrics to detect improvement or degradation.
+   - **Update mastery level:**
+     - If `delta.successRate === 1.0` → increment `mastery.consecutiveSuccesses`
+     - If `mastery.consecutiveSuccesses >= 3` and level is not `proficient` → advance level, reset counter
+     - If `delta.successRate < 0.5` for 2 consecutive cycles → regress level, reset counter
 
 ---
 

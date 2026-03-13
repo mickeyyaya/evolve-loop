@@ -94,6 +94,21 @@ Synthesize all findings into 2-4 small/medium tasks. For each task:
 3. Highest impact-to-effort ratio
 4. Reduces compound risk (things that get worse each cycle)
 
+**Difficulty graduation (curriculum learning):**
+Apply progressive difficulty based on the project's mastery level (tracked in `stateJson.mastery`):
+
+| Mastery Level | Cycle Range | Task Types Allowed |
+|--------------|-------------|-------------------|
+| `novice` | Cycles 1-3 | S-complexity only. Simple fixes, documentation, config. Build confidence. |
+| `competent` | Cycles 4-8 | S and M complexity. Features, refactoring, test coverage. |
+| `proficient` | Cycles 9+ | All complexities. Architecture changes, cross-cutting concerns. |
+
+Mastery advances when:
+- 3+ consecutive cycles with 100% success rate → advance one level
+- Success rate drops below 50% for 2 cycles → regress one level
+
+This prevents the loop from attempting complex tasks before building sufficient instincts and project understanding.
+
 **Task sizing:** Each task must fit within the per-task token budget (see `stateJson.tokenBudget.perTask`, default 80K). Total tasks per cycle must fit within the per-cycle budget (`tokenBudget.perCycle`, default 200K). If a task is too large, break it into smaller pieces. Prefer 3 small tasks over 1 large task.
 
 **Token estimation guidelines:**
