@@ -274,7 +274,17 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
       - Stagnation pattern count
       - Instinct confidence trend (are instincts getting confirmed?)
 
-   b. **Evaluate agent effectiveness** — for each agent, ask:
+   b. **Split-role critique** — use three specialized critic perspectives to avoid blind spots:
+
+      | Critic | Focus | Key Question |
+      |--------|-------|-------------|
+      | **Efficiency Critic** | Cost, token usage, task sizing, model routing | "Are we spending tokens wisely? Could tasks be smaller?" |
+      | **Correctness Critic** | Eval pass rates, audit verdicts, regression trends | "Are we shipping quality code? Are evals catching issues?" |
+      | **Novelty Critic** | Instinct diversity, task variety, stagnation patterns | "Are we learning new things? Or repeating the same work?" |
+
+      Each critic reviews the last 5 cycles independently and produces 1-3 findings. The orchestrator synthesizes findings into the meta-review, resolving conflicts by prioritizing correctness > efficiency > novelty.
+
+   c. **Evaluate agent effectiveness** — for each agent, ask:
       - Scout: Are selected tasks the right size? Are they shipping?
       - Builder: How many attempts per task? What's the self-verify pass rate?
       - Auditor: Are WARN/FAIL verdicts being resolved or accumulating?
