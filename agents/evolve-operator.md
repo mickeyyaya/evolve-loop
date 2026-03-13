@@ -36,9 +36,14 @@ You will receive a JSON context block with:
 - Detect thrashing (changes that get reverted or re-done)
 - If 3+ stagnation patterns are active simultaneously → recommend HALT
 
-### 3. Quality Trend
+### 3. Quality Trend (Delta Analysis)
+- Compare `delta` metrics across the last 3-5 cycles in `evalHistory`:
+  - **Success rate trend** — is `successRate` improving, stable, or declining?
+  - **Audit efficiency** — is `auditIterations` decreasing (Builder getting better)?
+  - **Productivity** — is `tasksShipped` per cycle stable or declining?
+  - **Learning rate** — is `instinctsExtracted` tapering off (diminishing insights)?
+  - **Stagnation** — is `stagnationPatterns` growing?
 - Are audit verdicts improving or degrading across cycles?
-- Are eval pass rates stable?
 - Is the instinct confidence trending up (learning is happening)?
 
 ### 4. Recommendations
@@ -68,6 +73,14 @@ Based on your assessment, recommend:
 - Repeated failures: <none / pattern description>
 - Quality trend: improving / stable / degrading
 - Instinct growth: <N> total, avg confidence <X>
+
+## Delta Metrics (last 3 cycles)
+| Metric | Cycle N-2 | Cycle N-1 | Cycle N | Trend |
+|--------|-----------|-----------|---------|-------|
+| Success rate | ... | ... | ... | ↑/→/↓ |
+| Audit iterations | ... | ... | ... | ↑/→/↓ |
+| Tasks shipped | ... | ... | ... | ↑/→/↓ |
+| Instincts extracted | ... | ... | ... | ↑/→/↓ |
 
 ## Recommendations
 1. <recommendation>

@@ -145,9 +145,27 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 4. **Update state.json:**
    - Mark completed tasks in `evaluatedTasks`
    - Update `lastCycleNumber` to current cycle number
-   - Reset `nothingToDoCount` to 0
+   - Reset `stagnation.nothingToDoCount` to 0
    - Update `lastUpdated`
-   - Add eval results to `evalHistory`
+   - Add eval results to `evalHistory` with **delta metrics**:
+     ```json
+     {
+       "cycle": <N>,
+       "verdict": "PASS|WARN|FAIL",
+       "checks": <total>,
+       "passed": <passed>,
+       "failed": <failed>,
+       "delta": {
+         "tasksShipped": <count>,
+         "tasksAttempted": <count>,
+         "auditIterations": <average iterations per task>,
+         "successRate": <shipped / attempted>,
+         "instinctsExtracted": <count this cycle>,
+         "stagnationPatterns": <active patterns count>
+       }
+     }
+     ```
+   - The `delta` object enables trend analysis across cycles. The Operator and meta-cycle review use these metrics to detect improvement or degradation.
 
 ---
 

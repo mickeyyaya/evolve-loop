@@ -64,7 +64,21 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     }
   ],
   "evalHistory": [
-    {"cycle": 1, "verdict": "PASS", "checks": 9, "passed": 9, "failed": 0}
+    {
+      "cycle": 1,
+      "verdict": "PASS",
+      "checks": 9,
+      "passed": 9,
+      "failed": 0,
+      "delta": {
+        "tasksShipped": 3,
+        "tasksAttempted": 3,
+        "auditIterations": 1.0,
+        "successRate": 1.0,
+        "instinctsExtracted": 4,
+        "stagnationPatterns": 0
+      }
+    }
   ],
   "instinctCount": 4,
   "operatorWarnings": [],
