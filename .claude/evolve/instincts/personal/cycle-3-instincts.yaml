@@ -1,0 +1,20 @@
+- id: inst-008
+  pattern: "plugin-manifest-must-declare-components"
+  description: "A Claude Code plugin's plugin.json MUST include 'agents' (array of explicit file paths) and 'skills' (array of directory paths) for the plugin system to register them. Without these, agents and skills exist in the repo but aren't loaded. Agent frontmatter must include name, description, and tools fields."
+  confidence: 0.8
+  source: "cycle-3/plugin-packaging-fix"
+  type: "convention"
+
+- id: inst-009
+  pattern: "docs-lag-behind-implementation"
+  description: "Documentation templates and guides (like writing-agents.md) lag behind implementation changes. When CI validation rules change (e.g., requiring new frontmatter fields), contributor docs showing the old format become actively misleading. Always update doc templates in the same commit as validation changes."
+  confidence: 0.7
+  source: "cycle-3/update-writing-agents-frontmatter-template"
+  type: "anti-pattern"
+
+- id: inst-007-update
+  pattern: "orchestrator-as-builder"
+  description: "For small well-defined tasks (S complexity, <10 lines changed), the orchestrator can implement directly instead of launching a Builder agent. Confirmed effective in cycle 3: 3 S-complexity tasks implemented inline, all passing evals on first attempt. Saves ~30-50K tokens per task."
+  confidence: 0.8
+  source: "cycle-2+3"
+  type: "process"

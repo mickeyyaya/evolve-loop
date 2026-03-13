@@ -1,0 +1,40 @@
+# Cycle 9 Instincts — Memory Consolidation
+
+# Merged: inst-005 + inst-009 + inst-013 → inst-005 (docs-lag-after-changes)
+- id: inst-005
+  pattern: "docs-lag-after-changes"
+  description: "Documentation (templates, guides, README, architecture docs) lags behind implementation and version changes. After any structural change (version bump, architecture rewrite, CI validation changes), scan ALL doc files and update in the same commit. Confirmed across cycles 2, 3, 7, 8, 9."
+  confidence: 0.9
+  source: "cycle-2+3+7+8+9"
+  type: "anti-pattern"
+  category: "semantic"
+  supersedes: ["cycle-2:inst-005", "cycle-3:inst-009", "cycle-7:inst-013"]
+
+# Merged: inst-011 + inst-012 → inst-011 (version-sync-all-files)
+- id: inst-011
+  pattern: "version-sync-all-files"
+  description: "After any version bump, scan ALL version-bearing and architecture-referencing files in one pass: plugin.json, marketplace.json, install.sh, SKILL.md, README, docs/architecture.md, CI workflow. Version drift between manifests is a recurring pattern. Confirmed across cycles 5, 6, 7, 8."
+  confidence: 0.9
+  source: "cycle-5+6+7+8"
+  type: "convention"
+  category: "semantic"
+  supersedes: ["cycle-5:inst-011", "cycle-6:inst-012", "cycle-7:inst-012"]
+
+# Temporal decay
+- id: inst-001
+  pattern: "wt-cli-not-real"
+  description: "The `wt` CLI tool referenced in agent files does not exist. Use Claude Code's built-in EnterWorktree/ExitWorktree tools."
+  confidence: 0.6
+  source: "cycle-1"
+  type: "anti-pattern"
+  category: "episodic"
+  note: "Decayed from 0.7 — not referenced since cycle 1"
+
+- id: inst-006
+  pattern: "ci-mode-for-scripts"
+  description: "Shell scripts that serve as test commands should support CI=true or --ci flag for machine-readable output."
+  confidence: 0.6
+  source: "cycle-2"
+  type: "successful-pattern"
+  category: "episodic"
+  note: "Decayed from 0.7 — not referenced since cycle 2"

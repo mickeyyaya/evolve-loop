@@ -1,0 +1,17 @@
+# Cycle 5 Instincts
+
+- id: inst-011
+  pattern: "version-sync-on-changelog"
+  description: "When adding a CHANGELOG entry with a new version number, always update plugin.json and marketplace.json in the same commit. Version drift was caught in cycle 5 after cycle 4 added [4.2.0] to CHANGELOG but left manifests at 4.1.0."
+  confidence: 0.7
+  source: "cycle-5/bump-plugin-version-to-4-2-0"
+  type: "convention"
+
+# Confidence updates
+- id: inst-004
+  pattern: "grep-based-evals-effective"
+  description: "Confirmed across 5 consecutive cycles. All eval checks passing. One false negative found (backtick formatting mismatch in grep pattern) — eval definitions should account for markdown formatting in grep targets."
+  confidence: 0.95
+  source: "cycle-1+2+3+4+5"
+  type: "successful-pattern"
+  supersedes: ["cycle-4:inst-004"]
