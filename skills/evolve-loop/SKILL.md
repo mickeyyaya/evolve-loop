@@ -120,12 +120,31 @@ For the eval hard gate instructions, see [eval-runner.md](eval-runner.md).
 
 All agents are custom, self-contained. No external dependencies.
 
-| Role | Agent File | Model | Workspace File |
-|------|-----------|-------|----------------|
+| Role | Agent File | Default Model | Workspace File |
+|------|-----------|---------------|----------------|
 | Scout | `evolve-scout.md` | sonnet | `scout-report.md` |
 | Builder | `evolve-builder.md` | sonnet | `build-report.md` |
 | Auditor | `evolve-auditor.md` | sonnet | `audit-report.md` |
-| Operator | `evolve-operator.md` | sonnet | `operator-log.md` |
+| Operator | `evolve-operator.md` | haiku | `operator-log.md` |
+
+## Dynamic Model Routing
+
+The orchestrator selects the model for each agent invocation based on phase complexity, optimizing cost without sacrificing quality:
+
+| Phase | Default Model | Upgrade Condition | Downgrade Condition |
+|-------|--------------|-------------------|---------------------|
+| Scout (DISCOVER) | sonnet | Goal requires deep research → opus | Cycle 2+ incremental scan → haiku |
+| Builder (BUILD) | sonnet | Task complexity M + 5+ files → opus | S-complexity inline tasks → haiku |
+| Auditor (AUDIT) | sonnet | Security-sensitive changes → opus | Clean build report, no risks flagged → haiku |
+| Operator (LEARN) | haiku | HALT conditions detected → sonnet | Standard post-cycle → haiku |
+| Meta-cycle review | opus | Always uses deep reasoning | — |
+
+**Routing rules:**
+- The orchestrator decides the model at launch time based on context (task complexity, strategy, cycle number)
+- Override with `model` parameter in agent context if needed
+- Track model usage in ledger entries for cost analysis
+- The `repair` strategy always uses sonnet+ for Builder (accuracy matters more than cost)
+- The `innovate` strategy can use haiku for Auditor on style checks (relaxed strictness)
 
 **Eval Runner** — orchestrator-executed (not an agent), instructions in [eval-runner.md](eval-runner.md).
 

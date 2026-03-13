@@ -8,7 +8,7 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 
 ### Phase 1: DISCOVER
 
-Launch **Scout Agent** (model: sonnet, subagent_type: `general-purpose`):
+Launch **Scout Agent** (model: per routing table — sonnet default, haiku for incremental, opus for deep research; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
   ```json
@@ -51,7 +51,7 @@ After Scout completes:
 
 For each task in the Scout's selected task list:
 
-Launch **Builder Agent** (model: sonnet, subagent_type: `general-purpose`, isolation: `worktree`):
+Launch **Builder Agent** (model: per routing table — sonnet default, opus for complex M tasks, haiku for S-complexity; subagent_type: `general-purpose`, isolation: `worktree`):
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json
@@ -88,7 +88,7 @@ After Builder completes:
 
 ### Phase 3: AUDIT
 
-Launch **Auditor Agent** (model: sonnet, subagent_type: `general-purpose`):
+Launch **Auditor Agent** (model: per routing table — sonnet default, opus for security-sensitive, haiku for clean builds; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-auditor.md` and pass as prompt
 - Context:
   ```json
@@ -206,7 +206,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    Update state.json `instinctCount`.
 
 3. **Operator Check:**
-   Launch **Operator Agent** (model: sonnet, subagent_type: `general-purpose`):
+   Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
    - Context: cycle number, mode=`post-cycle`, state.json, paths to workspace/ledger
    - Operator assesses: Did we ship? Are we stalling? Cost concerns? Recommendations?
    - If status is `HALT` → pause and present issues to user
