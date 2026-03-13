@@ -295,8 +295,34 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    e. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
-7. **Exit conditions** (in order):
+7. **Context Management (stop-hook pattern):**
+
+   After each cycle completes, assess context window usage. If context is above 60% capacity:
+   - Write a **cycle handoff file** to `.claude/evolve/workspace/handoff.md`:
+     ```markdown
+     # Cycle Handoff — Cycle {N}
+
+     ## Session State
+     - Cycles completed this session: <N>
+     - Strategy: <strategy>
+     - Goal: <goal or null>
+     - Remaining cycles: <endCycle - currentCycle>
+
+     ## Key Context to Carry Forward
+     - Active stagnation patterns: <list>
+     - Unresolved operator warnings: <list>
+     - Last delta metrics: <summary>
+
+     ## Resume Command
+     `/evolve-loop <remaining cycles> [strategy] [goal]`
+     ```
+   - Output the resume command to the user
+   - STOP the current session gracefully
+
+   This prevents context exhaustion mid-cycle. The handoff file ensures the next session has all context needed to continue seamlessly.
+
+8. **Exit conditions** (in order):
    - Cycle limit reached → STOP
    - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
-   - Context exhaustion → suggest continuing in fresh session
+   - Context above 60% after a cycle → write handoff, STOP
    - Otherwise → next cycle

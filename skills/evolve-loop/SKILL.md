@@ -152,6 +152,18 @@ Each task and cycle has a token budget to prevent runaway costs:
 
 The Scout MUST consider token budgets when sizing tasks. A task with complexity M that touches 10+ files is likely to exceed 80K tokens and should be split.
 
+## Context Management
+
+The evolve-loop uses a **stop-hook pattern** for context management (inspired by Ralph Loop). Instead of running until context exhaustion:
+
+1. After each cycle, assess context window usage
+2. If above 60% capacity → write a `handoff.md` file with session state and resume command
+3. STOP gracefully, allowing the user to resume in a fresh session
+
+This enables **indefinite runtime** across sessions. The handoff file carries forward all context needed to continue: strategy, goal, remaining cycles, stagnation patterns, and operator warnings.
+
+The orchestrator reads `handoff.md` during initialization if it exists, applying the carried-forward context.
+
 ## Anti-Patterns
 
 1. **Over-discovery** — Scout should be incremental after cycle 1, not full audit every time
