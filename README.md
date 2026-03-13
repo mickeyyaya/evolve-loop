@@ -35,6 +35,18 @@ In Claude Code, run:
 
 The skill and agents load automatically.
 
+**Upgrading to the latest version:**
+
+```
+/plugin marketplace update evolve-loop
+/plugin update evolve-loop@evolve-loop
+```
+
+Then reload in your current session:
+```
+/plugin reload
+```
+
 **Option B: Manual install**
 
 ```bash
