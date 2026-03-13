@@ -80,7 +80,7 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]}}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[]}
    ```
 
    **Compute cycle range** (after reading state.json):
@@ -159,6 +159,28 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 3. **Meta-cycle self-improvement** (every 5 cycles): The orchestrator runs a meta-evaluation of its own pipeline effectiveness, analyzing success rates, agent efficiency, and stagnation patterns. May propose changes to agent prompts, strategies, or budgets. See Phase 5 step 6 in [phases.md](phases.md).
 
 4. **Automated prompt evolution** (during meta-cycles): Uses a critique-synthesize loop to refine agent prompts based on cycle outcomes. Maximum 2 edits per meta-cycle, auto-reverts if performance degrades. See Phase 5 step 6d in [phases.md](phases.md).
+
+## Plan Template Caching
+
+When a task is structurally similar to one solved in a previous cycle, reuse the plan template instead of full re-planning:
+
+1. **Match:** After Scout selects tasks, check `state.json planCache` for templates matching the task type + affected file patterns
+2. **Adapt:** If a match is found (similarity > 0.7), pass the cached template to the Builder as `priorPlan` in context. The Builder adapts it rather than designing from scratch.
+3. **Store:** After a successful build (PASS audit), extract the plan as a reusable template:
+   ```json
+   {
+     "slug": "<task-slug>",
+     "taskType": "feature|stability|security|techdebt|performance",
+     "filePatterns": ["src/**/*.ts", "tests/**/*.test.ts"],
+     "approach": "<1-2 sentence approach summary>",
+     "steps": ["<step 1>", "<step 2>"],
+     "cycle": <N>,
+     "successCount": 1
+   }
+   ```
+4. **Evict:** Templates with 0 reuses after 10 cycles are pruned. Templates whose reuse leads to failure get demoted.
+
+Plan caching achieves ~30-50% cost reduction on repeated task patterns by avoiding redundant analysis.
 
 ## Token Budgets
 

@@ -98,7 +98,18 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   "tokenBudget": {
     "perTask": 80000,
     "perCycle": 200000
-  }
+  },
+  "planCache": [
+    {
+      "slug": "add-dark-mode",
+      "taskType": "feature",
+      "filePatterns": ["src/**/*.css", "src/components/**/*.tsx"],
+      "approach": "Add CSS custom properties for theme, toggle component",
+      "steps": ["Define CSS variables", "Create ThemeToggle", "Add localStorage persistence"],
+      "cycle": 3,
+      "successCount": 2
+    }
+  ]
 }
 ```
 
