@@ -351,6 +351,14 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
          {"ts":"<ISO-8601>","cycle":<N>,"role":"orchestrator","type":"prompt-evolution","data":{"agent":"<name>","section":"<section changed>","rationale":"<why>","change":"<summary>"}}
          ```
 
+      **TextGrad-style optimization:** For each proposed edit, generate a "textual gradient" — a natural language critique describing:
+      - What the current prompt produces (observed behavior)
+      - What it should produce (desired behavior)
+      - The specific text change that bridges the gap (the "gradient")
+      - Expected impact on process rewards for the affected phase
+
+      This is more rigorous than free-form critique. The gradient must reference specific prompt text and specific cycle outcomes.
+
       **Safety constraints:**
       - Only modify non-structural sections (guidance, examples, strategy handling) — never change the agent's tools, model, or core responsibilities
       - Maximum 2 prompt edits per meta-cycle
