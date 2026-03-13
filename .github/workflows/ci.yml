@@ -66,3 +66,18 @@ jobs:
             fi
             echo "OK: $agent"
           done
+
+      - name: Verify v6 required docs exist
+        run: |
+          ERRORS=0
+          for doc in docs/genes.md docs/island-model.md docs/instincts.md docs/configuration.md; do
+            if [ ! -f "$doc" ]; then
+              echo "FAIL: $doc not found"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: $doc"
+            fi
+          done
+          if [ "$ERRORS" -gt 0 ]; then
+            exit 1
+          fi
