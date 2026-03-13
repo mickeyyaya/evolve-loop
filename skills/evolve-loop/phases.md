@@ -147,6 +147,27 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - Update `lastCycleNumber` to current cycle number
    - Reset `stagnation.nothingToDoCount` to 0
    - Update `lastUpdated`
+   - Record **process rewards** for each phase this cycle (step-level scoring):
+     ```json
+     {
+       "processRewards": {
+         "discovery": <0.0-1.0>,
+         "build": <0.0-1.0>,
+         "audit": <0.0-1.0>,
+         "ship": <0.0-1.0>,
+         "learn": <0.0-1.0>
+       }
+     }
+     ```
+     Score each phase independently:
+     - **Discovery** — task relevance (did selected tasks ship?) + sizing accuracy (were tasks the right complexity?)
+     - **Build** — first-attempt success rate + gene/instinct application rate
+     - **Audit** — false positive rate (issues flagged that weren't real) + eval coverage
+     - **Ship** — clean commit rate (no post-commit fixes needed)
+     - **Learn** — instinct quality (were new instincts confirmed in later cycles?) + consolidation effectiveness
+
+     Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder.
+
    - Add eval results to `evalHistory` with **delta metrics**:
      ```json
      {
