@@ -206,7 +206,8 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
          "build": <0.0-1.0>,
          "audit": <0.0-1.0>,
          "ship": <0.0-1.0>,
-         "learn": <0.0-1.0>
+         "learn": <0.0-1.0>,
+         "skillEfficiency": <0.0-1.0>
        }
      }
      ```
@@ -219,8 +220,9 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
      | **audit** | No false positives, all evals run | 1 false positive or missing eval | Multiple false positives |
      | **ship** | Clean commit, no post-commit fixes | Minor fixup needed | Failed to push or dirty state |
      | **learn** | New instincts extracted + consolidation ran if due | Instincts extracted, no consolidation needed | No instincts extracted |
+     | **skillEfficiency** | Total skill+agent tokens decreased from `skillMetrics` baseline | Tokens stable (±5% of baseline) | Tokens increased from baseline |
 
-     Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder.
+     Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder. A low skillEfficiency score signals prompt bloat that should be addressed.
 
    - Add eval results to `evalHistory` with **delta metrics**:
      ```json

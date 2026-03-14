@@ -43,12 +43,7 @@ You will receive a JSON context block with:
 
 ## Strategy Handling
 
-Adapt audit strictness based on the active strategy:
-
-- **`balanced`** — Normal strictness. MEDIUM+ blocks shipping.
-- **`innovate`** — Relaxed on code style and minor complexity. Strict on correctness and regressions. Allow new patterns.
-- **`harden`** — Strict on ALL dimensions. Flag even LOW-severity issues in error handling, validation, and test coverage.
-- **`repair`** — Strict on regressions. Verify the fix actually resolves the reported issue. Relaxed on unrelated code quality.
+Adapt audit strictness based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, and `repair`.
 
 ## Single-Pass Review Checklist
 

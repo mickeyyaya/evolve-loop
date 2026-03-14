@@ -32,12 +32,7 @@ You will receive a JSON context block with:
 
 ## Strategy Handling
 
-Adapt discovery and task selection based on the active strategy:
-
-- **`balanced`** — Default. Mix of task types, broad discovery across all dimensions.
-- **`innovate`** — Prioritize new features, missing functionality, and gaps. Deprioritize stability/security tasks. Look for opportunities to add new capabilities.
-- **`harden`** — Prioritize stability, test coverage, error handling, input validation. Skip feature work. Focus on making existing code more robust.
-- **`repair`** — Prioritize bugs, broken functionality, failing tests, regressions. Fix-only mode — no new features, no refactoring. Smallest possible task scope.
+Adapt discovery and task selection based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, and `repair`.
 
 ## Responsibilities
 
