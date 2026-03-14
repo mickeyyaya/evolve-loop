@@ -22,6 +22,7 @@ You will receive a JSON context block with:
 - `recentLedger`: last 3 ledger entries (inline)
 - `instinctSummary`: compact instinct array from state.json (inline)
 - `workspacePath`: path to `.claude/evolve/workspace/`
+- `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
 - `goal`: user-specified goal (string or null)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
 
@@ -87,7 +88,23 @@ When researching:
 - Use WebFetch only on the most promising result
 - Record queries with timestamps for cooldown tracking
 
-### 4. Task Selection (this is your primary output)
+### 4. Introspection Pass (self-improvement proposals)
+
+Before selecting tasks, review the loop's own execution history to identify pipeline self-improvement opportunities. Read `stateJson.evalHistory` delta metrics for the last 3 cycles and `stateJson.pendingImprovements` (if present).
+
+**Self-improvement heuristics:**
+
+| Signal | Threshold | Proposed Task |
+|--------|-----------|---------------|
+| `instinctsExtracted == 0` | 2+ consecutive cycles | Instinct-enrichment: review recent builds for extractable patterns |
+| `auditIterations > 1.2` (avg) | Last 3 cycles | Builder guidance: add instincts or genes for recurring failure patterns |
+| `stagnationPatterns > 0` | Any cycle in last 3 | Task diversity: broaden discovery scope or change strategy |
+| `successRate < 0.8` | Last 2 cycles | Task sizing: reduce complexity, prefer S over M tasks |
+| `pendingImprovements` not empty | Any entries present | Include as high-priority task candidates |
+
+When an introspection heuristic fires, generate a task candidate labeled `source: "introspection"` in the scout report. Introspection tasks compete with codebase-discovered tasks during prioritization — they are not automatically selected, but get a priority boost (treat as priority level 2, after pipeline-blocking issues).
+
+### 5. Task Selection (this is your primary output)
 
 Synthesize all findings into 2-4 small/medium tasks. For each task:
 
@@ -99,9 +116,10 @@ Synthesize all findings into 2-4 small/medium tasks. For each task:
 
 **Then prioritize by:**
 1. Unblocks the pipeline or fixes broken functionality
-2. Directly advances the goal (if provided)
-3. Highest impact-to-effort ratio
-4. Reduces compound risk (things that get worse each cycle)
+2. `pendingImprovements` entries (auto-generated remediation tasks from process rewards — treat as high-priority task candidates when present)
+3. Directly advances the goal (if provided)
+4. Highest impact-to-effort ratio
+5. Reduces compound risk (things that get worse each cycle)
 
 **Difficulty graduation (curriculum learning):**
 Apply progressive difficulty based on the project's mastery level (tracked in `stateJson.mastery`):
@@ -125,7 +143,7 @@ This prevents the loop from attempting complex tasks before building sufficient 
 - M complexity (3-10 files, 20-100 lines changed): ~40-80K tokens
 - Anything touching 10+ files or >100 lines: split into multiple tasks
 
-### 5. Write Eval Definitions
+### 6. Write Eval Definitions
 
 For each selected task, write an eval definition to `.claude/evolve/evals/<task-slug>.md`:
 

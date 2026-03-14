@@ -224,6 +224,30 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
      Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder. A low skillEfficiency score signals prompt bloat that should be addressed.
 
+   - **Update `processRewardsHistory`** — append this cycle's scores to the rolling array, trimming to keep only the last 3 entries:
+     ```json
+     "processRewardsHistory": [
+       {"cycle": <N-2>, ...scores...},
+       {"cycle": <N-1>, ...scores...},
+       {"cycle": <N>, "discover": <score>, "build": <score>, "audit": <score>, "ship": <score>, "learn": <score>, "skillEfficiency": <score>}
+     ]
+     ```
+
+   - **Per-cycle remediation check** (self-improvement trigger):
+     After computing process rewards, check `processRewardsHistory` for sustained low scores:
+     - If any dimension scores below 0.7 for 2+ consecutive entries in the history → append a remediation entry to `state.json.pendingImprovements`:
+       ```json
+       {"dimension": "<dim>", "score": <latest>, "sustained": true, "suggestedTask": "<what to fix>", "cycle": <N>, "priority": "high"}
+       ```
+     - Suggested task mapping:
+       - `discover < 0.7` → "improve Scout task sizing or relevance"
+       - `build < 0.7` → "add Builder guidance or simplify task complexity"
+       - `audit < 0.7` → "review eval grader quality and coverage"
+       - `ship < 0.7` → "fix commit workflow or git state issues"
+       - `learn < 0.7` → "extract instincts from recent successful cycles"
+       - `skillEfficiency < 0.7` → "reduce prompt overhead in skill/agent files"
+     - Clear resolved entries: if a dimension's score rises above 0.7 for 2 consecutive cycles, remove its pendingImprovements entry
+
    - Add eval results to `evalHistory` with **delta metrics**:
      ```json
      {
