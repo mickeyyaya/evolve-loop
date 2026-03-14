@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.3.0] - 2026-03-14
+
+### Added
+- **Token optimization for multi-cycle runs** — 7 optimizations reducing per-cycle token usage by 40-65% at cycle 50+
+- **Convergence short-circuit** — skips Scout when `nothingToDoCount >= 2`, runs lightweight confirmation at `== 1` with forced web research
+- **Project digest** — `project-digest.md` generated on cycle 1, Scout reads digest instead of full codebase scan on cycle 2+
+- **Notes compression** — rolling window caps notes.md at ~5KB with pre-compression memory flush to state.json
+- **Ledger summary** — `ledgerSummary` in state.json so agents never read full ledger.jsonl
+- **Instinct summary** — `instinctSummary` in state.json replaces reading all instinct YAML files
+- **Inline eval graders** — Scout embeds eval criteria in task specs, Builder reads scout-report.md only
+- **Pre-computed context** — orchestrator pre-reads growing files, passes inline slices to agents
+- **Hotspot analysis** — project digest includes fan-in, size, and churn hotspots for Scout prioritization
+- **Context block ordering** — static → semi-stable → dynamic ordering in all agent context blocks
+
+### Changed
+- Agent context blocks no longer include `ledgerPath`, `notesPath`, or `instinctsPath` — replaced with inline data
+- `evalHistory` in state.json trimmed to last 5 entries (older data captured by `ledgerSummary`)
+- Operator supports `convergence-check` mode for when Scout is skipped
+
+### Removed
+- **Runtime state from git tracking** — `.claude/evolve/` state files (history, evals, instincts, workspace, ledger, notes, state.json) added to `.gitignore`
+
 ## [6.2.0] - 2026-03-13
 
 ### Added
