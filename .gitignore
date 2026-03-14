@@ -10,3 +10,14 @@ Thumbs.db
 
 # Node (if any tooling is added later)
 node_modules/
+
+# Evolve Loop runtime state (generated per-project, not part of the plugin)
+.claude/evolve/history/
+.claude/evolve/evals/
+.claude/evolve/instincts/
+.claude/evolve/workspace/
+.claude/evolve/tools/
+.claude/evolve/genes/
+.claude/evolve/ledger.jsonl
+.claude/evolve/notes.md
+.claude/evolve/state.json
