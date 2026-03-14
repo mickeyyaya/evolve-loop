@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.5.0] - 2026-03-14
+
+### Added
+- **Self-improvement feedback loops** — three interconnected mechanisms that enable the loop to automatically detect, diagnose, and propose fixes for its own performance issues
+- **Process rewards remediation loop** — per-cycle check that auto-generates `pendingImprovements` entries when any reward dimension scores below 0.7 for 2+ consecutive cycles, with dimension-specific suggested tasks
+- **Scout introspection pass** — new step in Scout responsibilities that reviews `evalHistory` delta metrics and proposes pipeline self-improvement tasks using 5 concrete heuristics (instinct enrichment, builder guidance, task diversity, task sizing, pending improvements)
+- **`processRewardsHistory`** — rolling 3-entry array in state.json enabling trend detection for sustained degradation vs one-off dips
+- **`pendingImprovements`** — state.json field for auto-generated remediation tasks, read by Scout as high-priority candidates
+- **Capability gap scanner** — extends Scout introspection to detect dormant instincts and overdue deferred tasks, proposing them as `source: "capability-gap"` candidates
+
+### Changed
+- Scout responsibilities expanded from 5 to 6 sections (added Introspection Pass before Task Selection)
+- Scout task prioritization now includes `pendingImprovements` at priority level 2
+
 ## [6.4.0] - 2026-03-14
 
 ### Added

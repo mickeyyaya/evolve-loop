@@ -120,6 +120,23 @@ Key optimizations:
 - **Plan template caching** — reuse plan structures for recurring task types (~30-50% savings)
 - **Dynamic model routing** — haiku for lightweight work, opus only when needed
 
+## Self-Improvement Infrastructure
+
+The loop includes three interconnected mechanisms for autonomous self-improvement:
+
+### Process Rewards Remediation Loop
+Per-cycle check in Phase 4: if any `processRewards` dimension scores below 0.7 for 2+ consecutive entries in `processRewardsHistory`, a structured remediation entry is auto-generated in `state.json.pendingImprovements`. The Scout reads these as high-priority task candidates, creating a tight feedback loop from metrics to action.
+
+### Scout Introspection Pass
+Before task selection, the Scout reviews `evalHistory` delta metrics and applies 7 heuristics to detect pipeline issues and capability gaps:
+- **Performance heuristics** (5): instinct stagnation, audit retry rate, stagnation patterns, success rate, pending improvements
+- **Capability gap signals** (2): overdue deferred tasks, dormant instincts uncited for 3+ cycles
+
+Introspection-sourced tasks are labeled `source: "introspection"` or `source: "capability-gap"` and receive a priority boost in task selection.
+
+### Process Rewards History
+Rolling 3-entry window (`processRewardsHistory` in state.json) enables trend detection — distinguishing sustained degradation from one-off dips. Feeds both the remediation loop and meta-cycle reviews.
+
 ## Context Management
 
 At 60% context usage, the orchestrator writes a `handoff.md` file with session state, then the stop-hook resets context. The next conversation resumes from `handoff.md`, enabling indefinite runtime across context boundaries.
