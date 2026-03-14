@@ -219,7 +219,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
      | **build** | All tasks pass audit first attempt | Some tasks need retry | 3+ audit failures |
      | **audit** | No false positives, all evals run | 1 false positive or missing eval | Multiple false positives |
      | **ship** | Clean commit, no post-commit fixes | Minor fixup needed | Failed to push or dirty state |
-     | **learn** | New instincts extracted + consolidation ran if due | Instincts extracted, no consolidation needed | No instincts extracted |
+     | **learn** | Instincts extracted AND at least one instinct cited in scout-report or build-report `instinctsApplied` | Instincts extracted but none cited this cycle | No instincts extracted |
      | **skillEfficiency** | Total skill+agent tokens decreased from `skillMetrics` baseline | Tokens stable (±5% of baseline) | Tokens increased from baseline |
 
      Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder. A low skillEfficiency score signals prompt bloat that should be addressed.
@@ -290,7 +290,14 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    ```
    This ensures consolidation runs at predictable intervals and prevents instinct bloat.
 
-3. **Instinct Extraction:**
+3. **Instinct Citation Collection:**
+   Before extracting new instincts, collect citation lists from this cycle's workspace files:
+   - Read `instinctsApplied` from `scout-report.md` and `build-report.md`
+   - Aggregate cited inst IDs into a `citedInstincts` set for this cycle
+   - For each cited instinct, increase its confidence by +0.05 (capped at 1.0) — application-driven confidence is more reliable than re-observation
+   - Update `instinctSummary` in state.json with new confidence values
+
+4. **Instinct Extraction:**
    Read ALL workspace files from this cycle and think deeply about patterns:
 
    - **Successful patterns** — What approach worked? Why? Would it work again?
@@ -362,7 +369,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
       - Instincts after: <count>
       ```
 
-4. **Operator Check:**
+5. **Operator Check:**
    Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
    - Context:
      ```json
@@ -389,7 +396,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    **Update lastCycleNumber** in state.json to the current cycle number after each cycle completes.
 
-5. **Update notes.md** (rolling window — keeps file size bounded):
+6. **Update notes.md** (rolling window — keeps file size bounded):
 
    Append the new cycle entry:
    ```markdown
@@ -417,7 +424,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    This caps notes.md at ~5KB regardless of cycle count.
 
-6. **Output cycle summary:**
+7. **Output cycle summary:**
    ```
    CYCLE {N} COMPLETE
    ==================

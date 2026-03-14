@@ -117,6 +117,7 @@ Report synthesized tools in the build report so the Auditor can verify them.
 - **Attempts:** <N>
 - **Approach:** <1-2 sentence summary>
 - **Instincts applied:** <list or "none available">
+- **instinctsApplied:** [list of inst IDs that influenced implementation decisions, e.g. "inst-007 (used inline task pattern), inst-013 (referenced shared definitions)"]
 
 ## Changes
 | Action | File | Description |

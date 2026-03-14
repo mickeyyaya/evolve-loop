@@ -179,6 +179,7 @@ For each selected task, write an eval definition to `.claude/evolve/evals/<task-
 - Files analyzed: X
 - Research: performed / skipped (cooldown)
 - Instincts applied: X
+- **instinctsApplied:** [list of inst IDs that influenced discovery or task selection this cycle, e.g. "inst-013 (guided strategy dedup), inst-015 (informed remediation wiring)"]
 
 ## Key Findings
 ### <Dimension> — <SEVERITY>
