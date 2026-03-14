@@ -121,6 +121,67 @@ Eval definitions are created by the Scout and stored in `.claude/evolve/evals/`.
 - All checks: pass@1 = 1.0
 ```
 
+## Ledger Summary
+
+Aggregated statistics from `ledger.jsonl`, stored in `state.json` so agents never need to read the full ledger file. Computed by the orchestrator in Phase 4:
+
+```json
+{
+  "ledgerSummary": {
+    "totalEntries": 30,
+    "cycleRange": [1, 16],
+    "scoutRuns": 16,
+    "builderRuns": 12,
+    "totalTasksShipped": 42,
+    "totalTasksFailed": 3,
+    "avgTasksPerCycle": 2.6
+  }
+}
+```
+
+Agents read `ledgerSummary` from state.json instead of reading ledger.jsonl directly. Only the orchestrator reads/writes the full ledger.
+
+## Instinct Summary
+
+Compact array of active instincts stored in `state.json`, updated during Phase 5 instinct extraction:
+
+```json
+{
+  "instinctSummary": [
+    {"id": "inst-004", "pattern": "grep-based-evals", "confidence": 0.95, "type": "technique"},
+    {"id": "inst-007", "pattern": "inline-s-tasks", "confidence": 0.9, "type": "process", "graduated": true}
+  ]
+}
+```
+
+Scout and Builder read `instinctSummary` from state.json instead of reading all instinct YAML files. Full files are only read during consolidation (every 3 cycles) or when `instinctCount` changes.
+
+## Notes Compression
+
+`notes.md` uses a rolling window to keep file size bounded (~5KB max):
+
+```markdown
+# Evolve Loop Cross-Cycle Notes
+
+## Summary (cycles 1 through N-5)
+<~500 byte paragraph: total tasks, key milestones, active deferred items>
+
+## Recent Cycles
+<full detail for last 5 cycles only>
+```
+
+Compression runs every 5 cycles (aligned with meta-cycle). Entries older than 5 cycles are compressed into the Summary section. Full history is always preserved in `history/cycle-N/` archives.
+
+## Project Digest
+
+Generated on cycle 1 (and regenerated every 10 cycles), stored at `.claude/evolve/workspace/project-digest.md` (~2-3KB):
+
+- Project structure tree with file sizes
+- Language/framework/conventions
+- Recent `git log --oneline -10`
+
+On cycle 2+, Scout reads the digest instead of re-scanning the full codebase. Only files listed in `changedFiles` (from `git diff HEAD~1 --name-only`) are read directly.
+
 ## Process Rewards
 
 Per-phase scores tracking pipeline efficiency. Updated by the orchestrator in Phase 4 after each cycle:

@@ -14,9 +14,9 @@ You are the **Auditor** in the Evolve Loop pipeline. You perform a single-pass r
 You will receive a JSON context block with:
 - `cycle`: current cycle number
 - `workspacePath`: path to `.claude/evolve/workspace/`
-- `ledgerPath`: path to `.claude/evolve/ledger.jsonl`
 - `evalsPath`: path to `.claude/evolve/evals/`
 - `buildReport`: path to `workspace/build-report.md`
+- `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
 
 ## Core Principles (Self-Evolution Specific)

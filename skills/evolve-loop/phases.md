@@ -8,20 +8,53 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 
 ### Phase 1: DISCOVER
 
+**Convergence Short-Circuit** (check BEFORE launching Scout):
+- Read `stagnation.nothingToDoCount` from state.json:
+  - If `>= 2`: Skip Scout entirely. Jump to Phase 5 with Operator in `"convergence-check"` mode. Operator can reset `nothingToDoCount` to 0 if it detects new work (e.g., external changes via `git log`).
+  - If `== 1`: Launch Scout in `"convergence-confirmation"` mode — Scout reads ONLY state.json + `git log --oneline -3` and MUST trigger new web research to find potential external tasks/updates, bypassing any cooldowns. No notes, no ledger, no instincts, no codebase scan. If still nothing found, increment to 2 and skip to Phase 5.
+  - If `== 0`: Proceed with normal Scout launch below.
+
+**Pre-compute context** (orchestrator reads files once, passes inline slices):
+```bash
+# Cycle 1: full mode — no digest exists yet
+# Cycle 2+: incremental mode — read digest + changed files
+if [ -f .claude/evolve/workspace/project-digest.md ]; then
+  MODE="incremental"
+  DIGEST=$(cat .claude/evolve/workspace/project-digest.md)
+  CHANGED=$(git diff HEAD~1 --name-only 2>/dev/null)
+else
+  MODE="full"
+fi
+
+# Read recent notes (last 5 cycle entries, not full file)
+RECENT_NOTES=$(# extract last 5 "## Cycle" sections from notes.md)
+
+# Read recent ledger (last 3 lines)
+RECENT_LEDGER=$(tail -3 .claude/evolve/ledger.jsonl)
+
+# instinctSummary and ledgerSummary come from state.json (already read)
+```
+
 Launch **Scout Agent** (model: per routing table — sonnet default, haiku for incremental, opus for deep research; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
   ```json
   {
-    "cycle": <N>,
+    // --- Static (stable across cycles, maximizes cache-like reuse) ---
     "projectContext": <auto-detected>,
-    "stateJson": <state.json contents>,
-    "notesPath": ".claude/evolve/notes.md",
+    "projectDigest": "<contents of project-digest.md, or null if cycle 1>",
     "workspacePath": ".claude/evolve/workspace/",
-    "ledgerPath": ".claude/evolve/ledger.jsonl",
-    "instinctsPath": ".claude/evolve/instincts/personal/",
     "goal": <goal or null>,
-    "strategy": <strategy>
+    "strategy": <strategy>,
+    // --- Semi-stable (changes slowly, every few cycles) ---
+    "instinctSummary": "<from state.json, inline>",
+    "stateJson": <state.json contents — evalHistory trimmed to last 5 entries>,
+    // --- Dynamic (changes every cycle) ---
+    "cycle": <N>,
+    "mode": "full|incremental|convergence-confirmation",
+    "changedFiles": ["<output of git diff HEAD~1 --name-only>"],
+    "recentNotes": "<last 5 cycle entries from notes.md, inline>",
+    "recentLedger": "<last 3 ledger entries, inline>"
   }
   ```
 
@@ -56,15 +89,18 @@ Launch **Builder Agent** (model: per routing table — sonnet default, opus for 
 - Context:
   ```json
   {
-    "cycle": <N>,
-    "task": <task object from scout-report>,
+    // --- Static ---
     "workspacePath": ".claude/evolve/workspace/",
-    "ledgerPath": ".claude/evolve/ledger.jsonl",
-    "instinctsPath": ".claude/evolve/instincts/personal/",
     "evalsPath": ".claude/evolve/evals/",
-    "strategy": <strategy>
+    "strategy": <strategy>,
+    // --- Semi-stable ---
+    "instinctSummary": "<from state.json, inline>",
+    // --- Dynamic ---
+    "cycle": <N>,
+    "task": <task object from scout-report — includes inline eval graders>
   }
   ```
+- **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
 
 After Builder completes:
 - Read `workspace/build-report.md`
@@ -93,12 +129,14 @@ Launch **Auditor Agent** (model: per routing table — sonnet default, opus for 
 - Context:
   ```json
   {
-    "cycle": <N>,
+    // --- Static ---
     "workspacePath": ".claude/evolve/workspace/",
-    "ledgerPath": ".claude/evolve/ledger.jsonl",
     "evalsPath": ".claude/evolve/evals/",
+    "strategy": <strategy>,
+    // --- Dynamic ---
+    "cycle": <N>,
     "buildReport": ".claude/evolve/workspace/build-report.md",
-    "strategy": <strategy>
+    "recentLedger": "<last 3 ledger entries, inline>"
   }
   ```
 
@@ -147,6 +185,19 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - Update `lastCycleNumber` to current cycle number
    - Reset `stagnation.nothingToDoCount` to 0
    - Update `lastUpdated`
+   - **Compute `ledgerSummary`** from ledger.jsonl (aggregated stats so agents never read the full ledger):
+     ```json
+     "ledgerSummary": {
+       "totalEntries": <count>,
+       "cycleRange": [<first>, <last>],
+       "scoutRuns": <count>,
+       "builderRuns": <count>,
+       "totalTasksShipped": <sum of tasksShipped across evalHistory>,
+       "totalTasksFailed": <sum of failed>,
+       "avgTasksPerCycle": <shipped / cycles>
+     }
+     ```
+   - **Trim `evalHistory`** in state.json to keep only the last 5 entries (older data is captured by `ledgerSummary`)
    - Record **process rewards** for each phase this cycle (step-level scoring):
      ```json
      {
@@ -241,6 +292,15 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    Update state.json `instinctCount`.
 
+   **Update `instinctSummary` in state.json** (compact array so agents read summary instead of all YAML files):
+   ```json
+   "instinctSummary": [
+     {"id": "inst-004", "pattern": "grep-based-evals", "confidence": 0.95, "type": "technique"},
+     {"id": "inst-007", "pattern": "inline-s-tasks", "confidence": 0.9, "type": "process", "graduated": true}
+   ]
+   ```
+   Scout and Builder read `instinctSummary` from state.json instead of reading all instinct YAML files. Full instinct files are only read during consolidation (every 3 cycles) or when `instinctCount` has changed since last cycle.
+
    **Gene Extraction** (after instinct extraction):
    If the Builder successfully fixed a recurring error pattern this cycle:
    - Extract the fix as a gene with selector, steps, and validation commands
@@ -278,7 +338,22 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
 4. **Operator Check:**
    Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
-   - Context: cycle number, mode=`post-cycle`, state.json, paths to workspace/ledger
+   - Context:
+     ```json
+     {
+       // --- Static ---
+       "workspacePath": ".claude/evolve/workspace/",
+       // --- Semi-stable ---
+       "stateJson": <state.json contents — includes ledgerSummary and instinctSummary>,
+       // --- Dynamic ---
+       "cycle": <N>,
+       "mode": "post-cycle|convergence-check",
+       "recentLedger": "<last 5 ledger entries, inline>",
+       "recentNotes": "<last 5 cycle entries from notes.md, inline>"
+     }
+     ```
+   - Operator reads `ledgerSummary` and `instinctSummary` from state.json instead of full ledger/instinct files.
+   - In `"convergence-check"` mode: Operator checks for external changes (`git log --oneline -3`), new issues, or changed project state. If new work detected, reset `nothingToDoCount` to 0.
    - Operator assesses: Did we ship? Are we stalling? Cost concerns? Recommendations?
    - If status is `HALT` → pause and present issues to user
 
@@ -288,7 +363,9 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    **Update lastCycleNumber** in state.json to the current cycle number after each cycle completes.
 
-5. **Update notes.md** (always append, never overwrite):
+5. **Update notes.md** (rolling window — keeps file size bounded):
+
+   Append the new cycle entry:
    ```markdown
    ## Cycle {N} — {date}
    - **Tasks:** <list of what was built>
@@ -298,6 +375,21 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - **Instincts:** <count> extracted
    - **Next cycle should consider:** <recommendations>
    ```
+
+   **Notes Compression** (every 5 cycles, aligned with meta-cycle):
+   If `cycle % 5 === 0`:
+   1. **Pre-compression memory flush** (inspired by OpenClaw's pre-compaction flush):
+      Before compressing, extract durable items from old entries into state.json:
+      - Deferred tasks → add to `evaluatedTasks` with `decision: "deferred"` and `revisitAfter`
+      - Unresolved decisions/blockers → add to `operatorWarnings`
+      - Recurring recommendations → validate they're captured in instincts
+      This prevents information loss that a ~500-byte summary can't capture.
+   2. Compress entries older than 5 cycles into a fixed-size `## Summary` section at the top (~500 bytes: total tasks shipped, key milestones, count of active deferred items)
+   3. Rewrite notes.md with: `## Summary (cycles 1 through N-5)` + last 5 cycle entries only
+   4. Full history is preserved in `history/cycle-N/` archives
+   5. Use haiku model for the compression summarization (it's a straightforward summarization task)
+
+   This caps notes.md at ~5KB regardless of cycle count.
 
 6. **Output cycle summary:**
    ```
@@ -422,7 +514,40 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    g. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
-8. **Context Management (stop-hook pattern):**
+   h. **Regenerate project digest** — during meta-cycle (every 5 cycles), regenerate `workspace/project-digest.md` to capture any structural changes.
+
+8. **Project Digest Generation** (cycle 1, or every 10 cycles during meta-cycle):
+
+   Generate `.claude/evolve/workspace/project-digest.md` (~2-3KB):
+   ```markdown
+   # Project Digest — Generated Cycle {N}
+
+   ## Structure
+   <project directory tree with file sizes, max 2 levels deep>
+
+   ## Tech Stack
+   - Language: <detected>
+   - Framework: <detected>
+   - Test command: <detected>
+   - Build command: <detected>
+
+   ## Hotspots
+   <files with highest fan-in: most imported/referenced by other files>
+   <largest files by line count>
+   <files with most recent churn: git log --format='%H' --follow -- <file> | wc -l>
+   These are high-impact targets for Scout task selection — changes here have large blast radius.
+
+   ## Conventions
+   <key patterns detected: naming, file org, exports, etc.>
+
+   ## Recent History
+   <git log --oneline -10>
+   ```
+
+   On cycle 1 (`mode: "full"`): Scout generates this after full codebase scan.
+   On cycle 2+: Scout reads this instead of re-scanning. Only changed files (from `changedFiles`) are read directly.
+
+9. **Context Management (stop-hook pattern):**
 
    After each cycle completes, assess context window usage. If context is above 60% capacity:
    - Write a **cycle handoff file** to `.claude/evolve/workspace/handoff.md`:
@@ -448,7 +573,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
    This prevents context exhaustion mid-cycle. The handoff file ensures the next session has all context needed to continue seamlessly.
 
-9. **Exit conditions** (in order):
+10. **Exit conditions** (in order):
    - Cycle limit reached → STOP
    - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
    - Context above 60% after a cycle → write handoff, STOP
