@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.4.0] - 2026-03-14
+
+### Added
+- **Skill efficiency guidelines** — new "Efficiency Guidelines" section in `docs/writing-agents.md` with 7 research-backed practices: progressive disclosure, 150-line target, context ordering, cross-agent deduplication, output template compression, relevant-context-only passing, and measurement tracking
+- **Skill metrics baseline** — `skillMetrics` field in state.json tracks line counts and estimated tokens for all skill and agent files (1,798 lines / 26,970 tokens baseline)
+- **Skill efficiency research** — documented findings from CodeAgents, OPTIMA, CLAUDE.md optimization research with 7 actionable recommendations (R1-R7)
+- **Plan cache templates** — 4 reusable task templates (`add-section-to-file`, `docs-update`, `version-bump`, `fix-stale-references`) populated from 42 historical tasks, activating the plan cache mechanism designed in v6.0.0
+- **`skillEfficiency` process reward** — new dimension in process rewards rubric tracks prompt token changes relative to baseline (1.0 = decreased, 0.5 = stable, 0.0 = increased)
+
+### Changed
+- **Agent prompt deduplication** — Strategy Handling sections in scout, builder, and auditor reduced from full strategy descriptions to 2-line SKILL.md references, saving 18 lines / ~270 tokens across agent files
+- Agent file line counts: scout 240→235, builder 152→147, auditor 148→143
+
 ## [6.3.0] - 2026-03-14
 
 ### Added
