@@ -407,7 +407,15 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
       - Instincts after: <count>
       ```
 
-5. **Operator Check:**
+5. **Counterfactual Accuracy Review** (optional, shadow-run check):
+   For any task completed this cycle that previously had a `counterfactual` entry in `evaluatedTasks`, compare the prediction to the actual outcome:
+   - Did `predictedComplexity` match the actual complexity?
+   - Did `estimatedReward` (predicted) align with the actual build outcome (PASS=1.0, FAIL=0.0, partial=0.5)?
+   - Was the `alternateApproach` viable? (Did the Builder use a similar or different path?)
+
+   Log accuracy notes as an instinct if a clear pattern emerges (e.g., "Scout consistently over-estimates complexity for config tasks"). No action required if no completed counterfactuals exist this cycle.
+
+6. **Operator Check:**
    Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
    - Context:
      ```json

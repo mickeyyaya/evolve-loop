@@ -50,7 +50,16 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   },
   "evaluatedTasks": [
     {"slug": "fix-bug-x", "decision": "completed", "cycle": 1},
-    {"slug": "add-feature-y", "decision": "rejected", "reason": "too complex", "revisitAfter": "2026-04-01"}
+    {"slug": "add-feature-y", "decision": "rejected", "reason": "too complex", "revisitAfter": "2026-04-01"},
+    {
+      "slug": "add-feature-z", "decision": "deferred", "cycle": 3,
+      "counterfactual": {
+        "predictedComplexity": "M",
+        "estimatedReward": 0.7,
+        "alternateApproach": "extend existing config loader instead of new abstraction",
+        "deferralReason": "blocked by missing test coverage in config module"
+      }
+    }
   ],
   "failedApproaches": [
     {
@@ -141,6 +150,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Read at the start of every cycle
 - Research queries have a 12hr TTL — skip if still fresh
 - Rejected tasks have optional `revisitAfter` — skip until date passes
+- Deferred tasks may include a `counterfactual` annotation: `{predictedComplexity, estimatedReward, alternateApproach, deferralReason}`. This lightweight what-if record enables retrospective accuracy checks — did the actual outcome match the prediction when the task was eventually completed?
 - Failed approaches logged with structured reasoning: `error` (what happened), `reasoning` (why it failed), `filesAffected` (blast radius), `cycle` (when), `alternative` (what to try instead)
 - Completed tasks are never re-proposed
 - `lastCycleNumber` (default 0): the last completed cycle number — used to compute the start of the next invocation (additive cycling)

@@ -211,6 +211,10 @@ For each selected task, write an eval definition to `.claude/evolve/evals/<task-
 
 ## Deferred
 - <task>: <reason>
+
+<!-- When deferring a task, populate a counterfactual annotation in state.json evaluatedTasks:
+     {"predictedComplexity": "S|M|L", "estimatedReward": 0.0-1.0, "alternateApproach": "<what approach would work if attempted now>", "deferralReason": "<why deferred this cycle>"}
+     This enables the Phase 5 LEARN step to verify prediction accuracy once the task is eventually completed. -->
 ```
 
 ### Ledger Entry
