@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.7.0] - 2026-03-15
+
+### Added
+- **Multi-armed bandit task selection** — Thompson Sampling-style weighting biases Scout task selection toward historically high-reward task types via `taskArms` in state.json
+- **Counterfactual annotations** — deferred tasks annotated with predicted complexity, estimated reward, and alternate approach for retrospective deferral quality analysis
+- **Semantic task crossover** — Scout recombines attributes from two high-performing planCache entries to generate novel task proposals (`source: "crossover"`)
+- **Intrinsic novelty reward** — tasks touching files not modified in 3+ cycles receive +1 priority boost via `fileExplorationMap`, preventing over-exploitation
+- **Scout decision trace** — structured `decisionTrace` array in scout-report showing candidate tasks with signals and final decisions for interpretability
+- **Prerequisite task graph** — optional `prerequisites` field on tasks enables dependency-aware scheduling with auto-deferral for unmet dependencies
+- **Builder retrospective** — Builder writes `workspace/builder-notes.md` with file fragility observations and recommendations consumed by Scout in incremental mode
+- **Auditor adaptive strictness** — `auditorProfile` tracks per-task-type consecutive clean passes; types with 5+ clean passes get reduced checklist (Security + Eval only)
+- **Agent mailbox** — typed cross-agent messaging via `workspace/agent-mailbox.md` with persistent/ephemeral message lifecycle
+
+### Changed
+- Scout agent expanded with 5 new mechanisms (bandit, crossover, novelty, prerequisites, decision trace)
+- Builder agent expanded with retrospective notes and mailbox steps
+- Auditor agent expanded with adaptive strictness and mailbox check
+- memory-protocol.md documents 6 new state.json fields and 2 new workspace files
+
 ## [6.6.0] - 2026-03-15
 
 ### Added

@@ -5,7 +5,7 @@ argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
 
-# Evolve Loop v6.6
+# Evolve Loop v6.7
 
 Orchestrates 4 specialized agents through 5 lean phases per cycle. Optimized for fast iteration: discover → build → audit → ship → learn. Each cycle targets 2-4 small/medium tasks, builds them in isolated worktrees, and gates on MEDIUM+ audit findings.
 
