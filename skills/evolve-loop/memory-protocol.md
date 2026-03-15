@@ -23,6 +23,29 @@ Overwritten each cycle. Each agent owns exactly one file:
 | `builder-notes.md` | Builder | Retrospective: file fragility observations, approach surprises, and recommendations for the next Scout run. Read by Scout in incremental mode as `builderNotes`. Persists across cycles (not cleared between cycles) so Phase 1 of the next cycle can always read the latest notes. |
 | `audit-report.md` | Auditor | Single-pass review + eval results |
 | `operator-log.md` | Operator | Post-cycle health assessment |
+| `agent-mailbox.md` | All agents | Cross-agent messages for the current cycle. Cleared of non-persistent messages in Phase 4. |
+
+### Agent Mailbox Schema (`workspace/agent-mailbox.md`)
+
+Agents post and read structured messages here to coordinate across phases within a cycle.
+
+```markdown
+## Messages
+
+| from | to | type | cycle | persistent | message |
+|------|----|------|-------|------------|---------|
+| scout | builder | hint | 5 | false | Prefer additive edits in phases.md — file has high blast radius |
+| builder | auditor | flag | 5 | false | Eval grader path uses absolute path — verify before running |
+| auditor | scout | warn | 5 | true | phases.md Phase 4 is growing; consider splitting next cycle |
+```
+
+Fields:
+- `from`: sending agent (`scout`, `builder`, `auditor`, `operator`)
+- `to`: recipient agent (`scout`, `builder`, `auditor`, `operator`, `all`)
+- `type`: `hint` (suggestion), `flag` (needs attention), `warn` (persistent concern), `info` (context)
+- `cycle`: cycle number when the message was posted
+- `persistent`: `true` = survives Phase 4 cleanup; `false` = cleared each cycle
+- `message`: free-text content (keep under 100 chars)
 
 Scout also appends a `decisionTrace` block — a workspace-only field (not persisted to `state.json`) listing all evaluated candidate tasks with their `finalDecision` and `signals` array. Consumed by the Novelty Critic during meta-cycle analysis to detect selection bias.
 

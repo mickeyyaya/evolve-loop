@@ -100,7 +100,11 @@ If you encounter a task that cannot be solved with existing tools, instincts, or
 
 Report synthesized tools in the build report so the Auditor can verify them.
 
-### Step 8: Retrospective
+### Step 8: Mailbox
+- Read `workspace/agent-mailbox.md` for messages addressed `to: "builder"` or `to: "all"` from this cycle. Apply any relevant hints or flags before finalizing your implementation.
+- After completing the build, post any coordination messages for other agents (e.g., flag a fragile file for the Auditor, hint a follow-up task for the Scout) by appending rows to the mailbox table.
+
+### Step 9: Retrospective
 After completing the build (pass or fail), write `workspace/builder-notes.md` with implementation-specific observations for the Scout to read next cycle:
 
 ```markdown

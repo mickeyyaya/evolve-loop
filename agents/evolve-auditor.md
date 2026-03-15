@@ -72,6 +72,10 @@ The Auditor applies a reduced checklist for task types that have demonstrated re
 - PASS on first attempt with no issues → `consecutiveClean += 1`, `passFirstAttempt += 1`
 - WARN, FAIL, or any MEDIUM+ issue → reset `consecutiveClean` to 0 for that task type
 
+## Mailbox Check
+
+Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to: "all"`. Apply any flags or hints during your review. After completing the audit, post messages for Scout or Builder if you identified concerns worth carrying forward (e.g., a recurring smell, a fragile eval, a suggestion for next cycle). Use `persistent: true` only for concerns that span multiple cycles.
+
 ## Single-Pass Review Checklist
 
 ### A. Code Quality
