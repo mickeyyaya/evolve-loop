@@ -238,3 +238,30 @@ Self-modifying systems require explicit safety mechanisms to prevent misevolutio
 7. **Ceremony over substance** — Workspace files should be concise, not exhaustive
 8. **Ignoring HALT** — When Operator returns HALT, pause and present to user
 9. **Complexity creep** — If a task adds more lines than proportional to its complexity (S-tasks >30 lines, M-tasks >80 lines), break it down into smaller tasks or simplify the approach. Autonomous systems tend toward accretion — actively resist by preferring deletions that maintain functionality over additions
+
+## Bandit Task Selection
+
+The Scout uses a multi-armed bandit mechanism to bias task selection toward historically high-reward task types. This makes the loop adaptive: task types that consistently ship successfully receive a selection boost, while types that stall or fail are deprioritized.
+
+### Mechanism
+
+Each task type (`feature`, `stability`, `security`, `techdebt`, `performance`) has an arm tracked in `state.json` under `taskArms`. The Scout reads `taskArms` before finalizing the task list and applies Thompson Sampling-style weighting:
+
+- **Exploration vs. exploitation**: Each arm accumulates `pulls` (times selected) and `totalReward` (sum of outcomes, 0 or 1 per shipped task). Arms with higher `avgReward` receive a priority boost of up to +1 complexity level (e.g., a normally M task from a high-reward type may be treated as S-priority).
+- **Boost rule**: If `avgReward >= 0.8` and `pulls >= 3`, the task type earns a +1 priority boost in selection ranking. The boost is capped at one level to avoid over-exploitation.
+- **Exploration floor**: Arms with fewer than 3 pulls are always eligible regardless of reward history, ensuring all task types remain in rotation.
+
+### Update Rule
+
+After Phase 4 (SHIP), the orchestrator updates `taskArms` for each shipped task type:
+- Successful ship: `totalReward += 1`, `pulls += 1`
+- Failed/aborted: `pulls += 1` (reward unchanged)
+- Recompute `avgReward = totalReward / pulls`
+
+### Interaction with Strategy
+
+The bandit boost is subordinate to the active strategy:
+- `innovate` — forces `feature` arm into consideration regardless of reward history
+- `repair` — forces `stability` arm; suppresses `feature` boost
+- `harden` — `stability` and `security` arms always eligible at full priority
+- `balanced` — bandit weighting applies without override

@@ -149,6 +149,17 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - `mastery.level`: difficulty graduation — `novice` (0-2 successes, S only), `competent` (3-5, S+M), `proficient` (6+, S+M+L). Updated in Phase 4 after each successful ship
 - `mastery.consecutiveSuccesses`: reset to 0 on any audit failure, incremented on each successful ship
 - `processRewards`: latest cycle's per-phase scores (0.0-1.0) for quick access. Updated in Phase 4
+- `taskArms`: multi-armed bandit state for task type selection. Tracks per-type reward history so the Scout can bias selection toward historically successful task types. Schema:
+  ```json
+  "taskArms": {
+    "feature":     {"type": "feature",     "pulls": 8, "totalReward": 7, "avgReward": 0.875},
+    "stability":   {"type": "stability",   "pulls": 4, "totalReward": 3, "avgReward": 0.75},
+    "security":    {"type": "security",    "pulls": 2, "totalReward": 2, "avgReward": 1.0},
+    "techdebt":    {"type": "techdebt",    "pulls": 3, "totalReward": 2, "avgReward": 0.667},
+    "performance": {"type": "performance", "pulls": 1, "totalReward": 0, "avgReward": 0.0}
+  }
+  ```
+  Fields per arm: `type` (task category), `pulls` (times selected), `totalReward` (cumulative shipped successes), `avgReward` (totalReward / pulls, or 0 if pulls=0). Updated in Phase 4 after each task outcome. Arms with `avgReward >= 0.8` and `pulls >= 3` earn a +1 priority boost in Scout task selection (see SKILL.md Bandit Task Selection).
 - `processRewardsHistory`: rolling 3-entry array of per-cycle process rewards for trend detection. Each entry includes `cycle` and all dimension scores. Kept to last 3 entries — older data is in `evalHistory`. Enables distinguishing sustained degradation from one-off dips. Schema:
   ```json
   "processRewardsHistory": [

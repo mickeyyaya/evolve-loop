@@ -137,6 +137,9 @@ Introspection-sourced tasks are labeled `source: "introspection"` or `source: "c
 ### Process Rewards History
 Rolling 3-entry window (`processRewardsHistory` in state.json) enables trend detection — distinguishing sustained degradation from one-off dips. Feeds both the remediation loop and meta-cycle reviews.
 
+### Multi-Armed Bandit Task Selection
+The Scout maintains a `taskArms` table in `state.json` with per-type reward history across five task types: `feature`, `stability`, `security`, `techdebt`, `performance`. After each shipped task, the arm for that task type is updated (pulls + 1, totalReward + 1 on success). Before finalizing the task list, the Scout applies Thompson Sampling-style weighting: arms with `avgReward >= 0.8` and `pulls >= 3` receive a +1 priority boost in selection ranking. This creates a closed feedback loop — the loop learns which task types it executes well and shifts investment toward them, without abandoning exploration of lower-pull arms.
+
 ## Context Management
 
 At 60% context usage, the orchestrator writes a `handoff.md` file with session state, then the stop-hook resets context. The next conversation resumes from `handoff.md`, enabling indefinite runtime across context boundaries.
