@@ -126,11 +126,14 @@ If `stateJson.planCache` has 4+ entries with `successCount >= 2`, attempt one cr
 - Avoid approaches listed in `stateJson.failedApproaches` — propose alternatives
 - Check `stateJson.stagnation.recentPatterns` — avoid files/areas flagged as stagnant unless you have a genuinely new approach
 
+**Novelty boost (apply before final ranking):**
+Read `stateJson.fileExplorationMap` (a `{filePath: lastTouchedCycle}` map). For each candidate task, check its target files. If all target files have `lastTouchedCycle <= currentCycle - 3` (or are absent from the map), apply a **+1 novelty priority boost**. This exploration reward prevents the loop from churning the same files each cycle.
+
 **Then prioritize by:**
 1. Unblocks the pipeline or fixes broken functionality
 2. `pendingImprovements` entries (auto-generated remediation tasks from process rewards — treat as high-priority task candidates when present)
 3. Directly advances the goal (if provided)
-4. Highest impact-to-effort ratio
+4. Highest impact-to-effort ratio (novelty boost applied above feeds into this ranking)
 5. Reduces compound risk (things that get worse each cycle)
 
 **Difficulty graduation (curriculum learning):**

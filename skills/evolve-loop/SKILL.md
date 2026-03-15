@@ -258,6 +258,14 @@ After Phase 4 (SHIP), the orchestrator updates `taskArms` for each shipped task 
 - Failed/aborted: `pulls += 1` (reward unchanged)
 - Recompute `avgReward = totalReward / pulls`
 
+### Novelty / Curiosity Bonus
+
+Tasks that touch files not recently modified receive a priority boost, encouraging exploration of under-visited areas. Scout computes novelty using `state.json fileExplorationMap`:
+
+- If a task's target files have `lastTouchedCycle <= currentCycle - 3` (or are absent from the map), the task receives **+1 priority boost** in selection ranking.
+- This exploration reward is subordinate to bandit boosts — novelty boost applies first, then bandit boost may stack.
+- Files touched this cycle are updated in `fileExplorationMap` during Phase 4 (SHIP).
+
 ### Interaction with Strategy
 
 The bandit boost is subordinate to the active strategy:
