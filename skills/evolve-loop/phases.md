@@ -222,14 +222,20 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    ```
    This is mandatory after every cycle. The cycle is not complete until code is pushed.
 
-4. **Clear non-persistent mailbox messages:**
+4. **Publish plugin update:**
+   ```bash
+   ./publish.sh
+   ```
+   This syncs the local plugin cache and registry so all new Claude Code sessions automatically load the latest version. The script auto-detects the version from `plugin.json`, validates source files, populates the cache, and updates the registry. **This step is mandatory after every push** — without it, new sessions will load a stale version.
+
+5. **Clear non-persistent mailbox messages:**
    Remove rows from `workspace/agent-mailbox.md` where `persistent` is `false`. Retain rows where `persistent` is `true` so cross-cycle warnings survive into the next cycle.
    ```bash
    # Filter in-place: keep header rows and persistent=true rows
    grep -v "| false |" .claude/evolve/workspace/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md .claude/evolve/workspace/agent-mailbox.md
    ```
 
-5. **Update state.json:**
+6. **Update state.json:**
    - Mark completed tasks in `evaluatedTasks`
    - Update `lastCycleNumber` to current cycle number
    - Reset `stagnation.nothingToDoCount` to 0
