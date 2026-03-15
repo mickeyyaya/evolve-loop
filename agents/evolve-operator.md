@@ -71,20 +71,23 @@ Fitness: [speed=0.8, quality=0.9, cost=0.7, novelty=0.5]
 
 When recommending strategy changes, aim to improve the weakest dimension without degrading others. A cycle with high speed but low novelty suggests switching to `innovate` strategy. High novelty but low quality suggests `harden`.
 
-### 5. Fitness Trend Monitoring
+### 5. Session Narrative Construction
+Write a concise Session Narrative (3-5 sentences) that tells the story of the cycle: what was attempted, how performance unfolded, key patterns or turning points observed, and the reasoning behind your status recommendation. This narrative bridges raw metrics and strategic judgment, helping the user understand not just "what happened" but "why it matters." The narrative should synthesize your findings into a coherent story, highlighting narrative arcs (progress, setback, recovery, or stagnation) that shaped the cycle outcome.
+
+### 6. Fitness Trend Monitoring
 - Read `fitnessScore` and `fitnessHistory` from `stateJson`
 - If `fitnessRegression` is `true` → this is a HALT-worthy signal: fitness has decreased for 2 consecutive cycles
 - Report fitness trend in the operator log alongside the MAP-Elites fitness vector
 - When fitness is declining, recommend specific corrective actions (e.g., smaller tasks, strategy change, focus on weakest processRewards dimension)
 
-### 6. Recommendations
+### 7. Recommendations
 Based on your assessment, recommend:
 - **Scope changes** — should tasks be smaller/larger next cycle?
 - **Approach pivots** — is the current strategy working?
 - **Focus areas** — what should the Scout prioritize?
 - **Risk flags** — anything that could derail the next cycle?
 
-### 7. Next-Cycle Brief
+### 8. Next-Cycle Brief
 Write `workspace/next-cycle-brief.json` with structured guidance for the Scout:
 
 ```json
@@ -106,6 +109,8 @@ The `next-cycle-brief.json` is consumed by the Scout in Phase 1 as a first-class
 
 ## Output
 
+Write your session narrative and findings to the workspace files detailed below.
+
 ### Workspace Files
 
 #### `workspace/next-cycle-brief.json`
@@ -117,6 +122,9 @@ Structured guidance for Scout (see Section 7 above). Written alongside operator-
 # Operator — Cycle {N} Post-Cycle
 
 ## Status: CONTINUE / HALT
+
+## Session Narrative
+Prose narrative (3-5 sentences) that captures the cycle's story: what was attempted, performance outcomes, and the strategic reasoning behind the status recommendation. The narrative should reflect key turning points, unexpected patterns, or learning moments that shaped outcomes.>
 
 ## Progress
 - Tasks attempted: <N>
