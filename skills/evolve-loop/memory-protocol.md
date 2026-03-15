@@ -23,6 +23,8 @@ Overwritten each cycle. Each agent owns exactly one file:
 | `audit-report.md` | Auditor | Single-pass review + eval results |
 | `operator-log.md` | Operator | Post-cycle health assessment |
 
+Scout also appends a `decisionTrace` block — a workspace-only field (not persisted to `state.json`) listing all evaluated candidate tasks with their `finalDecision` and `signals` array. Consumed by the Novelty Critic during meta-cycle analysis to detect selection bias.
+
 **Orchestrator-written files** (not agent-owned):
 | File | Written by | Contains |
 |------|-----------|----------|

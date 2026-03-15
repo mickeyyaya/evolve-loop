@@ -223,6 +223,22 @@ For each selected task, write an eval definition to `.claude/evolve/evals/<task-
 ## Deferred
 - <task>: <reason>
 
+## Decision Trace
+
+Structured log of all candidate tasks evaluated this cycle — selected and rejected alike. Enables meta-cycle analysis and Novelty Critic review.
+
+```json
+{
+  "decisionTrace": [
+    {
+      "slug": "<task-slug>",
+      "finalDecision": "selected | rejected | deferred",
+      "signals": ["<reason or boost applied, e.g. 'novelty+1', 'pendingImprovement', 'stagnant-file', 'capability-gap'>"]
+    }
+  ]
+}
+```
+
 <!-- When deferring a task, populate a counterfactual annotation in state.json evaluatedTasks:
      {"predictedComplexity": "S|M|L", "estimatedReward": 0.0-1.0, "alternateApproach": "<what approach would work if attempted now>", "deferralReason": "<why deferred this cycle>"}
      This enables the Phase 5 LEARN step to verify prediction accuracy once the task is eventually completed. -->
