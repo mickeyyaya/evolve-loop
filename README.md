@@ -33,6 +33,17 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **MAP-Elites fitness** — multi-dimensional scoring (speed, quality, cost, novelty)
 - **Stop-hook context reset** — indefinite runtime via session handoff
 - **Denial-of-wallet guardrails** — configurable cycle caps prevent runaway sessions
+- **Multi-armed bandit task selection** — Thompson Sampling biases Scout toward historically high-reward task types
+- **Semantic task crossover** — recombines successful plan templates to generate novel task proposals
+- **Intrinsic novelty reward** — priority boost for tasks touching files not modified in 3+ cycles
+- **Decision trace** — structured audit trail of Scout selection signals for interpretability
+- **Prerequisite task graph** — dependency-aware scheduling with auto-deferral for unmet prerequisites
+- **Counterfactual annotations** — deferred tasks annotated with predicted outcomes for retrospective analysis
+- **Builder retrospective** — cross-cycle learning via file fragility observations and recommendations
+- **Auditor adaptive strictness** — reduced checklist for proven task types, full scrutiny for new ones
+- **Agent mailbox** — typed cross-agent messaging for coordination across pipeline phases
+- **Operator next-cycle brief** — closed-loop feedback from monitoring to task selection
+- **Session narrative** — human-readable story synthesis of what the loop learned each cycle
 - **No external dependencies** — fully self-contained Claude Code plugin
 
 ## Quick Start

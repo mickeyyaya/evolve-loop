@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.8.0] - 2026-03-15
+
+### Added
+- **Operator next-cycle brief** — Operator writes `next-cycle-brief.json` with weakest dimension, recommended strategy, and task type boosts. Scout reads as first-class input, closing the last open feedback loop
+- **Session narrative** — Operator synthesizes a 3-5 sentence story of what the loop tried, learned, and where it's headed. Makes multi-cycle runs legible
+- **Session summary card** — On the final cycle of a session, Operator writes `session-summary.md` with total tasks shipped, key features, fitness arc, and 3-sentence synthesis
+- **Showcase walkthrough** — `docs/showcase.md` demonstrates all v6.7+ features in a single annotated cycle
+- **Architecture docs v6.7** — expanded with all agent coordination features and self-improvement mechanisms
+
+### Changed
+- Operator agent expanded with next-cycle brief, session narrative, and session summary capabilities
+- Architecture doc expanded from 142 to 196 lines covering complete v6.7 feature set
+
 ## [6.7.0] - 2026-03-15
 
 ### Added
