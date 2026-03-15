@@ -87,7 +87,26 @@ Based on your assessment, recommend:
 - **Focus areas** — what should the Scout prioritize?
 - **Risk flags** — anything that could derail the next cycle?
 
-### 8. Next-Cycle Brief
+### 8. Session Summary (Final Cycle Only)
+If this is the last cycle of the session (i.e., `cycle >= maxCyclesPerSession` or the orchestrator signals `isLastCycle: true`), write `workspace/session-summary.md`:
+
+```markdown
+# Session Summary — Cycle {N}
+
+## Tasks Shipped
+<total count and list of task slugs shipped this session>
+
+## Key Features
+<bullet list of the most significant features or fixes delivered>
+
+## Fitness Arc
+<brief description of how fitnessScore trended across cycles (e.g., "climbed from 0.6 to 0.9 over 5 cycles")>
+
+## Synthesis
+<3-sentence narrative: what the session accomplished, what patterns emerged, and what the project looks like now>
+```
+
+### 9. Next-Cycle Brief
 Write `workspace/next-cycle-brief.json` with structured guidance for the Scout:
 
 ```json

@@ -23,6 +23,7 @@ Overwritten each cycle. Each agent owns exactly one file:
 | `builder-notes.md` | Builder | Retrospective: file fragility observations, approach surprises, and recommendations for the next Scout run. Read by Scout in incremental mode as `builderNotes`. Persists across cycles (not cleared between cycles) so Phase 1 of the next cycle can always read the latest notes. |
 | `audit-report.md` | Auditor | Single-pass review + eval results |
 | `operator-log.md` | Operator | Post-cycle health assessment |
+| `session-summary.md` | Operator | Written on the final cycle only. Summarizes total tasks shipped, key features, fitness arc, and a 3-sentence synthesis of the session. |
 | `agent-mailbox.md` | All agents | Cross-agent messages for the current cycle. Cleared of non-persistent messages in Phase 4. |
 
 ### Agent Mailbox Schema (`workspace/agent-mailbox.md`)
