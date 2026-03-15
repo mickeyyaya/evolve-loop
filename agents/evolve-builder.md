@@ -46,6 +46,29 @@ Adapt your build approach based on the active `strategy` from context. See SKILL
 - Does this change create new dependencies or remove them?
 - Is this change consistent with existing patterns in the codebase?
 
+## Worktree Isolation (MANDATORY)
+
+The Builder MUST run in an isolated git worktree. This prevents interference between concurrent agents and protects the main working tree from partial changes.
+
+**The orchestrator launches the Builder with `isolation: "worktree"`**, which creates a temporary worktree automatically. The Builder MUST verify isolation before making any changes:
+
+```bash
+# Verify we are NOT in the main worktree
+MAIN_WORKTREE=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
+CURRENT_DIR=$(pwd)
+if [ "$MAIN_WORKTREE" = "$CURRENT_DIR" ]; then
+  echo "FATAL: Builder is running in the main worktree. Aborting."
+  exit 1
+fi
+```
+
+If the Builder detects it is in the main worktree, it MUST:
+1. Report FAIL in the build report with reason "worktree isolation violation"
+2. NOT modify any files
+3. Exit immediately
+
+All file modifications happen in the worktree. Changes are merged back to main only after the Auditor passes them.
+
 ## Workflow
 
 ### Step 1: Read Instincts & Genes

@@ -101,7 +101,23 @@ After Scout completes:
 
 For each task in the Scout's selected task list:
 
-Launch **Builder Agent** (model: per routing table — sonnet default, opus for complex M tasks, haiku for S-complexity; subagent_type: `general-purpose`, isolation: `worktree`):
+**Worktree isolation is MANDATORY.** The orchestrator MUST launch the Builder with `isolation: "worktree"` so it operates on an isolated copy of the repository. This prevents:
+- Builder changes from interfering with the main working tree during execution
+- Multiple Builder runs (if parallelized in the future) from conflicting with each other
+- Partial/failed changes from polluting the main branch
+
+**NEVER launch the Builder without `isolation: "worktree"`.** If the Agent tool does not support worktree isolation, the orchestrator MUST manually create a worktree before launching the Builder:
+```bash
+WORKTREE_DIR=$(mktemp -d)/evolve-build-cycle-<N>-<task-slug>
+git worktree add "$WORKTREE_DIR" HEAD
+# Launch Builder with cwd set to $WORKTREE_DIR
+# After Builder completes, merge changes back:
+cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
+cd <main-repo> && git apply /tmp/builder.patch
+git worktree remove "$WORKTREE_DIR"
+```
+
+Launch **Builder Agent** (model: per routing table — sonnet default, opus for complex M tasks, haiku for S-complexity; subagent_type: `general-purpose`, **isolation: `worktree`**):
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json
