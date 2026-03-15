@@ -135,6 +135,10 @@ Phase 5: Orchestrator ── instincts + archive
 | Auditor | `evolve-auditor.md` | sonnet | Review + security + eval gate |
 | Operator | `evolve-operator.md` | haiku | Loop health monitoring |
 
+## Showcase
+
+See [docs/showcase.md](docs/showcase.md) for an annotated walkthrough of a complete cycle — Scout decision trace with bandit/novelty/crossover signals, mailbox exchange between Builder and Auditor, Builder retrospective notes, extracted instinct, and Operator next-cycle brief and session narrative.
+
 ## Key Mechanics
 
 ### Scout (Phase 1)
