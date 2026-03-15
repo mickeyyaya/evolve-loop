@@ -48,26 +48,44 @@ Adapt your build approach based on the active `strategy` from context. See SKILL
 
 ## Worktree Isolation (MANDATORY)
 
-The Builder MUST run in an isolated git worktree. This prevents interference between concurrent agents and protects the main working tree from partial changes.
+The Builder MUST run in an isolated git worktree. The full lifecycle is: **verify isolation → implement → test → commit in worktree → report back**. The orchestrator handles merging and cleanup after the Auditor passes.
 
-**The orchestrator launches the Builder with `isolation: "worktree"`**, which creates a temporary worktree automatically. The Builder MUST verify isolation before making any changes:
+### Step 0: Verify Worktree Isolation
+
+Before ANY file modifications, verify you are NOT in the main worktree:
 
 ```bash
-# Verify we are NOT in the main worktree
+# Verify isolation
 MAIN_WORKTREE=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
 CURRENT_DIR=$(pwd)
 if [ "$MAIN_WORKTREE" = "$CURRENT_DIR" ]; then
   echo "FATAL: Builder is running in the main worktree. Aborting."
-  exit 1
+  # Write failure report and exit — do NOT modify any files
 fi
 ```
 
-If the Builder detects it is in the main worktree, it MUST:
-1. Report FAIL in the build report with reason "worktree isolation violation"
-2. NOT modify any files
-3. Exit immediately
+If in the main worktree → report FAIL with reason "worktree isolation violation", modify nothing, exit immediately.
 
-All file modifications happen in the worktree. Changes are merged back to main only after the Auditor passes them.
+### Worktree Commit Protocol
+
+After implementing and self-verifying (Steps 1-6), the Builder MUST commit all changes **inside the worktree** before reporting completion:
+
+```bash
+# Stage and commit all changes in the worktree
+git add -A
+git diff --cached --stat  # log what's being committed
+git commit -m "<type>: <description> [worktree-build]"
+```
+
+This commit stays in the worktree branch. The orchestrator will cherry-pick or merge it into main only after the Auditor passes. If the Auditor fails, the worktree commit is discarded — no partial changes touch main.
+
+**Include the worktree branch name and commit SHA in the build report** so the orchestrator knows exactly what to merge:
+```markdown
+## Worktree
+- **Branch:** <worktree branch name>
+- **Commit:** <SHA of worktree commit>
+- **Files changed:** <N>
+```
 
 ## Workflow
 
@@ -166,6 +184,11 @@ Keep this file concise (under 20 lines). It is read by Scout in incremental mode
 - **Approach:** <1-2 sentence summary>
 - **Instincts applied:** <list or "none available">
 - **instinctsApplied:** [list of inst IDs that influenced implementation decisions, e.g. "inst-007 (used inline task pattern), inst-013 (referenced shared definitions)"]
+
+## Worktree
+- **Branch:** <worktree branch name from `git branch --show-current`>
+- **Commit:** <SHA from `git rev-parse HEAD`>
+- **Files changed:** <N>
 
 ## Changes
 | Action | File | Description |

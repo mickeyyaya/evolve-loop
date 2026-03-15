@@ -150,6 +150,12 @@ This append-only log ensures every attempt is recorded. Scout reads `experiments
 After Builder completes:
 - Read `workspace/build-report.md`
 - If status is FAIL after 3 attempts:
+  - **Discard worktree** — the worktree branch contains failed changes, clean it up:
+    ```bash
+    # If the Agent tool created the worktree, it auto-cleans on failure
+    # If manual worktree, remove it:
+    git worktree remove "$WORKTREE_DIR" --force 2>/dev/null
+    ```
   - Log failed approach in state.json under `failedApproaches` with structured reasoning:
     ```json
     {
@@ -164,10 +170,13 @@ After Builder completes:
     ```
   - Skip this task, proceed to next task (or Phase 3 if last task)
 - If status is PASS → proceed to Phase 3 for this task
+  - **Do NOT merge yet** — worktree changes stay isolated until the Auditor passes
 
 ---
 
 ### Phase 3: AUDIT
+
+The Auditor reviews the Builder's changes **in the worktree** (or reads the diff from the build report). The worktree remains intact during audit.
 
 **Eval checksum verification** (before launching Auditor):
 Verify that eval files haven't been tampered with since Scout created them:
@@ -194,23 +203,43 @@ Launch **Auditor Agent** (model: per routing table — sonnet default, opus for 
   }
   ```
 
-**Update `auditorProfile` in state.json after each audit verdict:**
-- PASS with no MEDIUM+ issues (first attempt) → increment `auditorProfile.<taskType>.consecutiveClean` and `passFirstAttempt`
-- WARN, FAIL, or any MEDIUM+ issue → reset `auditorProfile.<taskType>.consecutiveClean` to 0
-
 After Auditor completes:
 - Read `workspace/audit-report.md`
 - **Verdict handling:**
-  - **PASS** → proceed to commit this task
-  - **WARN** (MEDIUM issues found) → re-launch Builder with issues, re-audit (max 3 total iterations)
-  - **FAIL** (CRITICAL/HIGH or eval failures) → re-launch Builder with issues, re-audit (max 3 total iterations)
-  - After 3 failures → log as failed approach, skip this task
+  - **PASS** → **Merge worktree changes into main and cleanup:**
+    ```bash
+    # Option A: If Agent tool managed the worktree (isolation: "worktree"),
+    # changes are already in the working tree — just commit:
+    git add -A
+    git commit -m "<type>: <description>"
 
-**Commit on PASS:**
+    # Option B: If manual worktree, cherry-pick the Builder's commit:
+    BUILDER_SHA=<commit SHA from build-report.md>
+    git cherry-pick "$BUILDER_SHA"
+    git worktree remove "$WORKTREE_DIR" --force
+
+    # Option C: If manual worktree, apply as patch:
+    cd "$WORKTREE_DIR" && git diff HEAD~1 > /tmp/builder.patch
+    cd <main-repo> && git apply /tmp/builder.patch
+    git add -A && git commit -m "<type>: <description>"
+    git worktree remove "$WORKTREE_DIR" --force
+    ```
+    Verify the merge is clean: `git status --porcelain` should show no uncommitted changes.
+  - **WARN** (MEDIUM issues found) → re-launch Builder **in a fresh worktree** with issues, re-audit (max 3 total iterations). Remove the old worktree first.
+  - **FAIL** (CRITICAL/HIGH or eval failures) → re-launch Builder **in a fresh worktree** with issues, re-audit (max 3 total iterations). Remove the old worktree first.
+  - After 3 failures → **discard worktree**, log as failed approach, skip this task
+
+**Worktree cleanup is MANDATORY.** After every task (pass or fail), verify no orphaned worktrees remain:
 ```bash
-git add -A
-git commit -m "<type>: <description>"
+# List worktrees — should only show the main worktree
+git worktree list
+# If stale worktrees exist, prune them:
+git worktree prune
 ```
+
+**Update `auditorProfile` in state.json after each audit verdict:**
+- PASS with no MEDIUM+ issues (first attempt) → increment `auditorProfile.<taskType>.consecutiveClean` and `passFirstAttempt`
+- WARN, FAIL, or any MEDIUM+ issue → reset `auditorProfile.<taskType>.consecutiveClean` to 0
 
 Then proceed to next task (back to Phase 2) or Phase 4 if all tasks done.
 
