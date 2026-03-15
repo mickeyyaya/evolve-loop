@@ -112,6 +112,14 @@ When an introspection heuristic fires, generate a task candidate labeled `source
 
 Synthesize all findings into 2-4 small/medium tasks. For each task:
 
+**Semantic Task Crossover (after initial candidate list is formed):**
+
+If `stateJson.planCache` has 4+ entries with `successCount >= 2`, attempt one crossover proposal:
+1. Select two high-performing cache entries (highest `successCount`, different `taskType` preferred)
+2. Recombine their attributes: combine `filePatterns` from one parent with the `approach` or `steps` from the other to generate a novel offspring task
+3. Label the offspring `source: "crossover"` and add parent slugs as `crossoverParents: ["slug-a", "slug-b"]`
+4. The crossover candidate competes in normal prioritization — it is not automatically selected
+
 **Filter first:**
 - Skip tasks in `stateJson.evaluatedTasks` with `decision: "completed"`
 - Skip rejected tasks whose `revisitAfter` date hasn't passed
