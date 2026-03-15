@@ -167,12 +167,18 @@ Launch **Auditor Agent** (model: per routing table — sonnet default, opus for 
     "workspacePath": ".claude/evolve/workspace/",
     "evalsPath": ".claude/evolve/evals/",
     "strategy": <strategy>,
+    // --- Semi-stable ---
+    "auditorProfile": "<state.json auditorProfile object>",
     // --- Dynamic ---
     "cycle": <N>,
     "buildReport": ".claude/evolve/workspace/build-report.md",
     "recentLedger": "<last 3 ledger entries, inline>"
   }
   ```
+
+**Update `auditorProfile` in state.json after each audit verdict:**
+- PASS with no MEDIUM+ issues (first attempt) → increment `auditorProfile.<taskType>.consecutiveClean` and `passFirstAttempt`
+- WARN, FAIL, or any MEDIUM+ issue → reset `auditorProfile.<taskType>.consecutiveClean` to 0
 
 After Auditor completes:
 - Read `workspace/audit-report.md`

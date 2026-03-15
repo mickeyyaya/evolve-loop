@@ -18,6 +18,7 @@ You will receive a JSON context block with:
 - `buildReport`: path to `workspace/build-report.md`
 - `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
+- `auditorProfile`: per-task-type reliability data from state.json (used for adaptive strictness)
 
 ## Core Principles (Self-Evolution Specific)
 
@@ -44,6 +45,32 @@ You will receive a JSON context block with:
 ## Strategy Handling
 
 Adapt audit strictness based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, and `repair`.
+
+## Adaptive Strictness
+
+The Auditor applies a reduced checklist for task types that have demonstrated reliability. This prevents wasting tokens on boilerplate checks for high-confidence patterns.
+
+**Read `auditorProfile` from context.** It has the shape:
+```json
+{
+  "feature":     {"passFirstAttempt": 0, "consecutiveClean": 0},
+  "stability":   {"passFirstAttempt": 0, "consecutiveClean": 0},
+  "security":    {"passFirstAttempt": 0, "consecutiveClean": 0},
+  "techdebt":    {"passFirstAttempt": 0, "consecutiveClean": 0},
+  "performance": {"passFirstAttempt": 0, "consecutiveClean": 0}
+}
+```
+
+**Reduced-checklist rule:** If the current task's type has `consecutiveClean >= 5`, skip checklist sections A (Code Quality) and C (Pipeline Integrity) — run only sections B (Security), D (Eval Tamper Detection), and E (Eval Gate). Log `"adaptive:reduced"` in the audit report verdict line.
+
+**Exceptions — always run full checklist regardless of profile:**
+- `strategy` is `harden` or `repair`
+- Task modifies agent files, skill files, or `.claude-plugin/`
+- Build report flags any risks
+
+**Profile update (orchestrator responsibility):** After each audit, the orchestrator updates `auditorProfile` in state.json:
+- PASS on first attempt with no issues → `consecutiveClean += 1`, `passFirstAttempt += 1`
+- WARN, FAIL, or any MEDIUM+ issue → reset `consecutiveClean` to 0 for that task type
 
 ## Single-Pass Review Checklist
 

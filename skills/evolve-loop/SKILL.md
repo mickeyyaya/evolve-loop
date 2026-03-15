@@ -80,7 +80,7 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[]}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
    ```
 
    **Compute cycle range** (after reading state.json):
@@ -238,6 +238,18 @@ Self-modifying systems require explicit safety mechanisms to prevent misevolutio
 7. **Ceremony over substance** — Workspace files should be concise, not exhaustive
 8. **Ignoring HALT** — When Operator returns HALT, pause and present to user
 9. **Complexity creep** — If a task adds more lines than proportional to its complexity (S-tasks >30 lines, M-tasks >80 lines), break it down into smaller tasks or simplify the approach. Autonomous systems tend toward accretion — actively resist by preferring deletions that maintain functionality over additions
+
+## Auditor Adaptive Strictness
+
+The Auditor uses `auditorProfile` (stored in state.json) to skip redundant checklist sections for task types that have built up a reliability record. This reduces token usage on routine audits without sacrificing safety on novel or high-risk changes.
+
+- `auditorProfile.<type>.consecutiveClean` — number of consecutive audits with no MEDIUM+ issues for that task type
+- `auditorProfile.<type>.passFirstAttempt` — cumulative count of audits that passed on the first attempt
+- When `consecutiveClean >= 5`: Auditor runs reduced checklist (Security + Eval Gate only). Code Quality and Pipeline Integrity sections are skipped.
+- The orchestrator resets `consecutiveClean` to 0 after any audit that produces a WARN, FAIL, or MEDIUM+ issue.
+- `harden`, `repair` strategies and tasks touching agent/skill files always receive the full checklist regardless of profile.
+
+The orchestrator passes `auditorProfile` as part of the Auditor context block (see phases.md Phase 3).
 
 ## Bandit Task Selection
 
