@@ -62,11 +62,21 @@ Adapt discovery and task selection based on the active `strategy` from context. 
 - If still nothing to do → report no tasks (orchestrator will increment nothingToDoCount)
 - If new work detected → switch to incremental mode behavior
 
-### 2. Mailbox Check
+### 2. Operator Brief Check
+
+If `workspace/next-cycle-brief.json` exists, read it **before** any task selection. Apply its fields as first-class inputs:
+- Override the context `strategy` with `recommendedStrategy` if it differs
+- Add a **+1 priority boost** to any task whose type appears in `taskTypeBoosts`
+- Treat `avoidAreas` entries the same as `stagnation.recentPatterns` — skip matching files unless you have a genuinely new approach
+- Note the `weakestDimension` when sizing tasks — if `quality` is weakest, prefer S-complexity; if `novelty` is weakest, favor unexplored files
+
+The `next-cycle-brief.json` is written by the Operator at the end of the previous cycle as focused guidance for the Scout.
+
+### 3. Mailbox Check
 
 Read `workspace/agent-mailbox.md` for messages addressed `to: "scout"` or `to: "all"`. Apply any hints, flags, or persistent warnings from prior agents when sizing tasks and selecting files. After writing `scout-report.md`, post any relevant hints for Builder or Auditor (e.g., high-blast-radius files, known fragile areas).
 
-### 3. Codebase Analysis
+### 4. Codebase Analysis
 
 Evaluate across these dimensions (severity: CRITICAL/HIGH/MEDIUM/LOW):
 - **Stability:** error handling, edge cases, test coverage gaps
@@ -77,7 +87,7 @@ Evaluate across these dimensions (severity: CRITICAL/HIGH/MEDIUM/LOW):
 
 Focus on what's actionable. Skip dimensions with no findings.
 
-### 4. Web Research (conditional)
+### 5. Web Research (conditional)
 
 **Skip research if:**
 - All queries in `stateJson.research.queries` have TTL that hasn't expired (12hr cooldown) (EXCEPT when mode is `"convergence-confirmation"`)
@@ -94,7 +104,7 @@ When researching:
 - Use WebFetch only on the most promising result
 - Record queries with timestamps for cooldown tracking
 
-### 5. Introspection Pass (self-improvement proposals)
+### 6. Introspection Pass (self-improvement proposals)
 
 Before selecting tasks, review the loop's own execution history to identify pipeline self-improvement opportunities. Read `stateJson.evalHistory` delta metrics for the last 3 cycles and `stateJson.pendingImprovements` (if present).
 
@@ -114,7 +124,7 @@ When an introspection heuristic fires, generate a task candidate labeled `source
 
 **Capability Gap Scanner:** The last two heuristic signals above form the capability gap scanner. When either signal fires, generate a task candidate labeled `source: "capability-gap"` instead of `source: "introspection"`. These signals surface work the loop previously deferred or has encoded as a learned pattern but never acted on. Capability-gap candidates receive the same priority boost as introspection tasks (priority level 2).
 
-### 6. Task Selection (this is your primary output)
+### 7. Task Selection (this is your primary output)
 
 Synthesize all findings into 2-4 small/medium tasks. For each task:
 
@@ -167,7 +177,7 @@ This prevents the loop from attempting complex tasks before building sufficient 
 - M complexity (3-10 files, 20-100 lines changed): ~40-80K tokens
 - Anything touching 10+ files or >100 lines: split into multiple tasks
 
-### 6. Write Eval Definitions
+### 8. Write Eval Definitions
 
 For each selected task, write an eval definition to `.claude/evolve/evals/<task-slug>.md`:
 

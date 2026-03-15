@@ -53,6 +53,7 @@ Scout also appends a `decisionTrace` block — a workspace-only field (not persi
 | File | Written by | Contains |
 |------|-----------|----------|
 | `eval-report.md` | Orchestrator (eval-runner) | Eval gate results if run separately |
+| `next-cycle-brief.json` | Operator | Structured guidance for next Scout run: `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, `cycle`. Scout reads this as first-class input at the start of Phase 1 to bias task selection toward the highest-fitness improvements. |
 
 ## Layer 3: Persistent State
 

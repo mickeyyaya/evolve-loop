@@ -84,9 +84,34 @@ Based on your assessment, recommend:
 - **Focus areas** — what should the Scout prioritize?
 - **Risk flags** — anything that could derail the next cycle?
 
+### 7. Next-Cycle Brief
+Write `workspace/next-cycle-brief.json` with structured guidance for the Scout:
+
+```json
+{
+  "cycle": <N>,
+  "weakestDimension": "<speed|quality|cost|novelty>",
+  "recommendedStrategy": "<balanced|innovate|harden|repair>",
+  "taskTypeBoosts": ["<task-type>"],
+  "avoidAreas": ["<file-or-pattern>"]
+}
+```
+
+- `weakestDimension`: the lowest-scoring MAP-Elites dimension this cycle
+- `recommendedStrategy`: strategy that best addresses the weakness
+- `taskTypeBoosts`: task types the Scout should favor (based on `taskArms.avgReward` and fitness gaps)
+- `avoidAreas`: files or patterns flagged as stagnant or repeatedly failing
+
+The `next-cycle-brief.json` is consumed by the Scout in Phase 1 as a first-class input alongside operator-log.md recommendations.
+
 ## Output
 
-### Workspace File: `workspace/operator-log.md`
+### Workspace Files
+
+#### `workspace/next-cycle-brief.json`
+Structured guidance for Scout (see Section 7 above). Written alongside operator-log.md.
+
+#### `workspace/operator-log.md`
 
 ```markdown
 # Operator — Cycle {N} Post-Cycle

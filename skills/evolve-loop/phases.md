@@ -43,6 +43,8 @@ RECENT_LEDGER=$(tail -3 .claude/evolve/ledger.jsonl)
 # instinctSummary and ledgerSummary come from state.json (already read)
 ```
 
+**Operator brief pre-read:** Before launching Scout, check if `workspace/next-cycle-brief.json` exists (written by the previous cycle's Operator). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
+
 Launch **Scout Agent** (model: per routing table — sonnet default, haiku for incremental, opus for deep research; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
@@ -453,6 +455,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - Operator reads `ledgerSummary` and `instinctSummary` from state.json instead of full ledger/instinct files.
    - In `"convergence-check"` mode: Operator checks for external changes (`git log --oneline -3`), new issues, or changed project state. If new work detected, reset `nothingToDoCount` to 0.
    - Operator assesses: Did we ship? Are we stalling? Cost concerns? Recommendations?
+   - Operator writes `workspace/next-cycle-brief.json` with `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, and `cycle` — consumed by Scout in Phase 1 of the next cycle.
    - If status is `HALT` → pause and present issues to user
 
    **Cycle cap check** (inline, before launching Operator):
