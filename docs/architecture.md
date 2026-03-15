@@ -122,7 +122,7 @@ Key optimizations:
 
 ## Self-Improvement Infrastructure
 
-The loop includes three interconnected mechanisms for autonomous self-improvement:
+The loop includes seven interconnected mechanisms for autonomous self-improvement:
 
 ### Process Rewards Remediation Loop
 Per-cycle check in Phase 4: if any `processRewards` dimension scores below 0.7 for 2+ consecutive entries in `processRewardsHistory`, a structured remediation entry is auto-generated in `state.json.pendingImprovements`. The Scout reads these as high-priority task candidates, creating a tight feedback loop from metrics to action.
@@ -139,6 +139,32 @@ Rolling 3-entry window (`processRewardsHistory` in state.json) enables trend det
 
 ### Multi-Armed Bandit Task Selection
 The Scout maintains a `taskArms` table in `state.json` with per-type reward history across five task types: `feature`, `stability`, `security`, `techdebt`, `performance`. After each shipped task, the arm for that task type is updated (pulls + 1, totalReward + 1 on success). Before finalizing the task list, the Scout applies Thompson Sampling-style weighting: arms with `avgReward >= 0.8` and `pulls >= 3` receive a +1 priority boost in selection ranking. This creates a closed feedback loop — the loop learns which task types it executes well and shifts investment toward them, without abandoning exploration of lower-pull arms.
+
+### Semantic Task Crossover
+When the Scout selects tasks, it checks the last 5 completed tasks for combinable patterns: if two completed task types haven't been combined before, a hybrid child task is synthesized (e.g., `security` + `performance` → a task that hardens a hot path). Crossover tasks are labeled `source: "crossover"` and carry both parent type signatures. This adds exploratory diversity without fully random mutations.
+
+### Intrinsic Novelty Reward
+A `fileExplorationMap` in `state.json` tracks which files each cycle has touched. When a Builder modifies a file not touched in the last 5 cycles, the task's reward is boosted by +0.1 (capped at 1.0). This nudges the loop toward unexplored areas of the codebase, preventing over-concentration on familiar files.
+
+### Scout Decision Trace
+The Scout appends a `decisionTrace` array to `scout-report.md` — one entry per candidate task listing `finalDecision` (selected/rejected/deferred) and `signals` (the reasons). This makes task selection auditable and gives the Operator a structured record for meta-cycle analysis.
+
+## Agent Coordination Features
+
+### Prerequisite Task Graph
+Tasks can declare `dependsOn: [slug, ...]` in the scout report. The orchestrator respects this ordering: a task is not started until all its prerequisites have shipped in the current cycle. Circular dependencies are detected and rejected at Scout time.
+
+### Builder Retrospective
+After each build, the Builder appends a `## Retrospective` block to `build-report.md` with: what went well, what was harder than expected, and a suggested follow-up task slug. The Operator reads these retrospectives during the health check and forwards high-signal suggestions to `state.json.pendingImprovements`.
+
+### Auditor Adaptive Strictness
+The Auditor reads `taskArms` from state to determine audit depth. Task types with `avgReward < 0.5` receive a stricter audit pass (all MINOR findings reported, tighter threshold for MEDIUM escalation). Task types with `avgReward >= 0.9` and `pulls >= 5` receive a fast-path audit (skip redundant heuristics). This concentrates audit effort where it matters most.
+
+### Agent Mailbox
+Each agent can leave a structured message for a downstream agent by appending to `workspace/mailbox.json` (array of `{from, to, subject, body}`). The downstream agent reads mailbox entries addressed to it at the start of its phase. This replaces ad-hoc inline notes in workspace files and gives inter-agent communication a durable, inspectable channel.
+
+### Operator Next-Cycle Brief and Session Narrative
+At the end of each cycle, the Operator writes two outputs: a `next-cycle-brief` embedded in `operator-report.md` (recommended strategy, priority task types, watchlist for next cycle) and a `session-narrative` paragraph summarizing the arc of the current cycle in plain prose. When `cycle == endCycle` (last cycle of a session), the Operator also writes `workspace/session-summary.md` — a full-session retrospective covering total tasks shipped, key features added, fitness trend, and a 3-sentence synthesis.
 
 ## Context Management
 
