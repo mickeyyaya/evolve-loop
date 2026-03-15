@@ -120,6 +120,9 @@ If `stateJson.planCache` has 4+ entries with `successCount >= 2`, attempt one cr
 3. Label the offspring `source: "crossover"` and add parent slugs as `crossoverParents: ["slug-a", "slug-b"]`
 4. The crossover candidate competes in normal prioritization — it is not automatically selected
 
+**Prerequisites (optional dependency declaration):**
+When proposing a task, you may specify `prerequisites: ["slug-a", "slug-b"]` — a list of task slugs that must be completed before this task is meaningful. If any listed slug is not present in `stateJson.evaluatedTasks` with `decision: "completed"`, the orchestrator will auto-defer the task with `deferralReason: "prerequisite not met: <slug>"`. This is a *lightweight suggestion mechanism*, not a hard constraint — you may omit `prerequisites` or note in the task rationale that the dependency is soft (i.e., the task is genuinely useful even without the prerequisite).
+
 **Filter first:**
 - Skip tasks in `stateJson.evaluatedTasks` with `decision: "completed"`
 - Skip rejected tasks whose `revisitAfter` date hasn't passed

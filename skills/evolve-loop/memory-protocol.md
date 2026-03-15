@@ -55,6 +55,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     {"slug": "add-feature-y", "decision": "rejected", "reason": "too complex", "revisitAfter": "2026-04-01"},
     {
       "slug": "add-feature-z", "decision": "deferred", "cycle": 3,
+      "prerequisites": ["fix-bug-x"],
       "counterfactual": {
         "predictedComplexity": "M",
         "estimatedReward": 0.7,
@@ -155,6 +156,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Deferred tasks may include a `counterfactual` annotation: `{predictedComplexity, estimatedReward, alternateApproach, deferralReason}`. This lightweight what-if record enables retrospective accuracy checks — did the actual outcome match the prediction when the task was eventually completed?
 - Failed approaches logged with structured reasoning: `error` (what happened), `reasoning` (why it failed), `filesAffected` (blast radius), `cycle` (when), `alternative` (what to try instead)
 - Completed tasks are never re-proposed
+- `prerequisites`: optional array of task slugs that must be `decision: "completed"` before a dependent task is eligible for building. Set when the Scout proposes a task with explicit dependencies. The orchestrator checks this field in Phase 1 and auto-defers any task whose prerequisites are unmet
 - `lastCycleNumber` (default 0): the last completed cycle number — used to compute the start of the next invocation (additive cycling)
 - `maxCyclesPerSession` (default 10): hard cap — orchestrator halts if cumulative cycle number would exceed this value
 - `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when requesting this many cycles in a single invocation

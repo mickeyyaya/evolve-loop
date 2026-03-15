@@ -65,6 +65,7 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
 
 After Scout completes:
 - Read `workspace/scout-report.md`
+- **Prerequisite check:** For each proposed task that includes a `prerequisites` field, verify all listed slugs appear in `state.json.evaluatedTasks` with `decision: "completed"`. Any task with an unmet prerequisite is automatically deferred: add it to `evaluatedTasks` with `decision: "deferred"` and `deferralReason: "prerequisite not met: <slug>"`, then log the prerequisite slug so the Scout can propose it in the next cycle. Tasks without a `prerequisites` field are unaffected. This check is a lightweight sequencing aid — the Scout may override it by omitting `prerequisites` when a task is genuinely independent of its nominal dependency.
 - Verify eval definitions were created in `.claude/evolve/evals/`
 - **Eval checksum capture:** Compute `sha256sum` of each eval file in `.claude/evolve/evals/` and store in `workspace/eval-checksums.json`:
   ```bash
