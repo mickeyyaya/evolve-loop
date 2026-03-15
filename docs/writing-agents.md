@@ -96,7 +96,23 @@ Output template sections (workspace file format, ledger entry schemas) are verbo
 
 When launching an agent, extract only the sections it needs. Don't pass the full scout-report to the Builder — pass only the specific task object. Don't pass full state.json — pass the relevant slices (instinctSummary, mastery, tokenBudget).
 
-### 7. Measure and Track
+### 7. Redirect Verbose Output
+
+When agents run eval graders, test commands, or build commands, redirect stdout/stderr to a log file and extract results via `grep`/`tail`:
+
+```bash
+# Instead of reading full output inline:
+npm test                          # ❌ full output floods agent context
+
+# Redirect and extract:
+npm test > .claude/evolve/workspace/run.log 2>&1   # ✅ capture to file
+tail -5 .claude/evolve/workspace/run.log            # ✅ read only what matters
+grep -c 'FAIL' .claude/evolve/workspace/run.log     # ✅ extract metrics
+```
+
+This pattern (inspired by autoresearch's `run.log`) reduces token consumption by 30-50% for verbose build/test output. Agents never need to see full compiler output, test runner logs, or install traces — only the results.
+
+### 8. Measure and Track
 
 Use `skillMetrics` in state.json to track prompt overhead over time. After any agent prompt change, re-measure line counts and estimated tokens. Regressions in prompt size should be justified by corresponding gains in effectiveness.
 

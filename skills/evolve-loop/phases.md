@@ -11,7 +11,12 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 **Convergence Short-Circuit** (check BEFORE launching Scout):
 - Read `stagnation.nothingToDoCount` from state.json:
   - If `>= 2`: Skip Scout entirely. Jump to Phase 5 with Operator in `"convergence-check"` mode. Operator can reset `nothingToDoCount` to 0 if it detects new work (e.g., external changes via `git log`).
-  - If `== 1`: Launch Scout in `"convergence-confirmation"` mode — Scout reads ONLY state.json + `git log --oneline -3` and MUST trigger new web research to find potential external tasks/updates, bypassing any cooldowns. No notes, no ledger, no instincts, no codebase scan. If still nothing found, increment to 2 and skip to Phase 5.
+  - If `== 1`: **Escalation before convergence** — before running convergence-confirmation, the orchestrator attempts to unlock new work:
+    1. Review the last 3 cycles' deferred tasks (from `evaluatedTasks` with `decision: "deferred"`) for items that could be combined into a single task
+    2. Check if switching strategy (e.g., `balanced` → `innovate` or `harden`) would surface new task candidates
+    3. Propose a "radical" task that challenges an existing assumption or convention in the codebase (think harder — re-read code for new angles)
+    If escalation produces a viable task → reset `nothingToDoCount` to 0, proceed with normal Scout launch using the escalated task as a seed.
+    If escalation fails → Launch Scout in `"convergence-confirmation"` mode — Scout reads ONLY state.json + `git log --oneline -3` and MUST trigger new web research to find potential external tasks/updates, bypassing any cooldowns. No notes, no ledger, no instincts, no codebase scan. If still nothing found, increment to 2 and skip to Phase 5.
   - If `== 0`: Proceed with normal Scout launch below.
 
 **Pre-compute context** (orchestrator reads files once, passes inline slices):
@@ -61,6 +66,11 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
 After Scout completes:
 - Read `workspace/scout-report.md`
 - Verify eval definitions were created in `.claude/evolve/evals/`
+- **Eval checksum capture:** Compute `sha256sum` of each eval file in `.claude/evolve/evals/` and store in `workspace/eval-checksums.json`:
+  ```bash
+  sha256sum .claude/evolve/evals/*.md > .claude/evolve/workspace/eval-checksums.json
+  ```
+  These checksums are verified before Auditor runs evals (Phase 3) to detect tampering.
 - Merge research query updates into state.json (if research was performed)
 - If no tasks selected:
   - Increment `stagnation.nothingToDoCount` in state.json
@@ -102,6 +112,18 @@ Launch **Builder Agent** (model: per routing table — sonnet default, opus for 
   ```
 - **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
 
+**Output Redirection:** When Builder runs eval graders, test commands, or build commands, redirect stdout/stderr to `.claude/evolve/workspace/run.log`:
+```bash
+<command> > .claude/evolve/workspace/run.log 2>&1
+```
+Builder and Auditor extract results via `grep`/`tail` on `run.log` rather than reading full output. This reduces token consumption by 30-50% for verbose build/test output.
+
+**Experiment Journal:** After each Builder attempt (pass or fail), append a one-line entry to `.claude/evolve/workspace/experiments.jsonl`:
+```jsonl
+{"cycle":N,"task":"<slug>","attempt":1,"verdict":"PASS|FAIL","approach":"<1-sentence summary>","metric":"<eval result or error>"}
+```
+This append-only log ensures every attempt is recorded. Scout reads `experiments.jsonl` to avoid re-proposing similar approaches that already failed.
+
 After Builder completes:
 - Read `workspace/build-report.md`
 - If status is FAIL after 3 attempts:
@@ -123,6 +145,13 @@ After Builder completes:
 ---
 
 ### Phase 3: AUDIT
+
+**Eval checksum verification** (before launching Auditor):
+Verify that eval files haven't been tampered with since Scout created them:
+```bash
+sha256sum -c .claude/evolve/workspace/eval-checksums.json
+```
+If any checksum fails → HALT: "Eval tamper detected — eval file modified after Scout created it. Investigate before proceeding."
 
 Launch **Auditor Agent** (model: per routing table — sonnet default, opus for security-sensitive, haiku for clean builds; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-auditor.md` and pass as prompt
@@ -185,6 +214,15 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - Update `lastCycleNumber` to current cycle number
    - Reset `stagnation.nothingToDoCount` to 0
    - Update `lastUpdated`
+   - **Compute `fitnessScore`** — weighted average of processRewards dimensions as a single "did the project get better?" signal:
+     ```json
+     "fitnessScore": round(0.25 * discover + 0.30 * build + 0.20 * audit + 0.15 * ship + 0.10 * learn, 2)
+     ```
+     After computing, compare to previous cycle's fitnessScore in state.json:
+     - If fitnessScore decreased for 2 consecutive cycles → set `fitnessRegression: true` in state.json. The Operator reads this as a HALT-worthy signal.
+     - If fitnessScore increased or held steady → set `fitnessRegression: false`.
+     - Store the score: `"fitnessScore": <value>` and `"fitnessHistory": [<last 3 scores>]` in state.json.
+
    - **Compute `ledgerSummary`** from ledger.jsonl (aggregated stats so agents never read the full ledger):
      ```json
      "ledgerSummary": {

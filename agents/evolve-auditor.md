@@ -54,6 +54,7 @@ Adapt audit strictness based on the active `strategy` from context. See SKILL.md
 - [ ] No dead code introduced
 - [ ] File sizes remain under 800 lines
 - [ ] Functions remain under 50 lines
+- [ ] **Simplicity criterion:** Net lines added are proportional to task complexity. S-tasks adding >30 lines or M-tasks adding >80 lines trigger a MEDIUM warning for complexity creep. Deletions that maintain functionality are preferred over additions
 
 ### B. Security
 - [ ] No hardcoded secrets, API keys, or tokens

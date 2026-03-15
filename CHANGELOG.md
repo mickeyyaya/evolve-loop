@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.6.0] - 2026-03-15
+
+### Added
+- **Monotonic fitness gate** — composite `fitnessScore` computed as weighted average of processRewards dimensions (0.25*discover + 0.30*build + 0.20*audit + 0.15*ship + 0.10*learn). Flags regression when score decreases for 2 consecutive cycles. Operator reads as HALT-worthy signal.
+- **Eval checksum verification** — `sha256sum` of eval files captured after Scout creates them, verified before Auditor runs evals. Tampered evals trigger HALT.
+- **Experiment journal** — append-only `experiments.jsonl` log recording every Builder attempt (pass or fail) with cycle, task, approach, and metric. Scout reads to avoid re-proposing failed approaches.
+- **Output redirection pattern** — Builder redirects build/test output to `run.log`, extracts results via `grep`/`tail`. Estimated 30-50% token reduction for verbose output.
+- **Simplicity criterion** — Auditor checks net lines added proportional to task complexity (S >30 lines, M >80 lines triggers MEDIUM warning). Added complexity creep anti-pattern to SKILL.md.
+- **Escalation protocol** — before convergence-confirmation, orchestrator reviews deferred tasks for combinable items, considers strategy changes, and proposes "radical" tasks. Only after escalation fails does convergence proceed.
+- **Fitness trend monitoring** — Operator reads `fitnessScore`, `fitnessHistory`, and `fitnessRegression` from state.json for HALT decisions
+
+### Changed
+- Operator responsibilities expanded from 5 to 6 sections (added Fitness Trend Monitoring)
+- Writing agents efficiency guidelines expanded from 7 to 8 sections (added Output Redirection)
+- Anti-patterns list expanded from 8 to 9 entries (added Complexity Creep)
+
 ## [6.5.0] - 2026-03-14
 
 ### Added

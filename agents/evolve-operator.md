@@ -71,7 +71,13 @@ Fitness: [speed=0.8, quality=0.9, cost=0.7, novelty=0.5]
 
 When recommending strategy changes, aim to improve the weakest dimension without degrading others. A cycle with high speed but low novelty suggests switching to `innovate` strategy. High novelty but low quality suggests `harden`.
 
-### 5. Recommendations
+### 5. Fitness Trend Monitoring
+- Read `fitnessScore` and `fitnessHistory` from `stateJson`
+- If `fitnessRegression` is `true` → this is a HALT-worthy signal: fitness has decreased for 2 consecutive cycles
+- Report fitness trend in the operator log alongside the MAP-Elites fitness vector
+- When fitness is declining, recommend specific corrective actions (e.g., smaller tasks, strategy change, focus on weakest processRewards dimension)
+
+### 6. Recommendations
 Based on your assessment, recommend:
 - **Scope changes** — should tasks be smaller/larger next cycle?
 - **Approach pivots** — is the current strategy working?

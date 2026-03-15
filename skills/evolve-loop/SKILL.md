@@ -5,7 +5,7 @@ argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
 
-# Evolve Loop v6
+# Evolve Loop v6.6
 
 Orchestrates 4 specialized agents through 5 lean phases per cycle. Optimized for fast iteration: discover → build → audit → ship → learn. Each cycle targets 2-4 small/medium tasks, builds them in isolated worktrees, and gates on MEDIUM+ audit findings.
 
@@ -237,3 +237,4 @@ Self-modifying systems require explicit safety mechanisms to prevent misevolutio
 6. **Research every cycle** — 12hr cooldown on web research. Reuse cached results
 7. **Ceremony over substance** — Workspace files should be concise, not exhaustive
 8. **Ignoring HALT** — When Operator returns HALT, pause and present to user
+9. **Complexity creep** — If a task adds more lines than proportional to its complexity (S-tasks >30 lines, M-tasks >80 lines), break it down into smaller tasks or simplify the approach. Autonomous systems tend toward accretion — actively resist by preferring deletions that maintain functionality over additions
