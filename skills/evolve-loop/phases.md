@@ -34,6 +34,9 @@ fi
 # Read recent notes (last 5 cycle entries, not full file)
 RECENT_NOTES=$(# extract last 5 "## Cycle" sections from notes.md)
 
+# Read builder notes from last cycle (if exists)
+BUILDER_NOTES=$(cat .claude/evolve/workspace/builder-notes.md 2>/dev/null || echo "")
+
 # Read recent ledger (last 3 lines)
 RECENT_LEDGER=$(tail -3 .claude/evolve/ledger.jsonl)
 
@@ -59,6 +62,7 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
     "mode": "full|incremental|convergence-confirmation",
     "changedFiles": ["<output of git diff HEAD~1 --name-only>"],
     "recentNotes": "<last 5 cycle entries from notes.md, inline>",
+    "builderNotes": "<contents of workspace/builder-notes.md from last cycle, or empty string>",
     "recentLedger": "<last 3 ledger entries, inline>"
   }
   ```
@@ -319,6 +323,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    ```bash
    mkdir -p .claude/evolve/history/cycle-{N}
    cp .claude/evolve/workspace/*.md .claude/evolve/history/cycle-{N}/
+   # builder-notes.md is included in *.md above; it is NOT cleared here so Phase 1 of the next cycle can read it
    ```
 
 2. **Memory Consolidation Check:**

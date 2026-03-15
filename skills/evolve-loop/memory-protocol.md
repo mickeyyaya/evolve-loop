@@ -20,6 +20,7 @@ Overwritten each cycle. Each agent owns exactly one file:
 |------|-------|----------|
 | `scout-report.md` | Scout | Discovery findings + selected task list |
 | `build-report.md` | Builder | Implementation notes per task |
+| `builder-notes.md` | Builder | Retrospective: file fragility observations, approach surprises, and recommendations for the next Scout run. Read by Scout in incremental mode as `builderNotes`. Persists across cycles (not cleared between cycles) so Phase 1 of the next cycle can always read the latest notes. |
 | `audit-report.md` | Auditor | Single-pass review + eval results |
 | `operator-log.md` | Operator | Post-cycle health assessment |
 

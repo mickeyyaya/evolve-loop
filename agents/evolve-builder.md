@@ -100,6 +100,27 @@ If you encounter a task that cannot be solved with existing tools, instincts, or
 
 Report synthesized tools in the build report so the Auditor can verify them.
 
+### Step 8: Retrospective
+After completing the build (pass or fail), write `workspace/builder-notes.md` with implementation-specific observations for the Scout to read next cycle:
+
+```markdown
+# Builder Notes — Cycle {N}
+
+## Task: <slug>
+
+### File Fragility
+- <file path>: <observation about brittleness, coupling, or blast radius>
+
+### Approach Surprises
+- <anything unexpected encountered during implementation>
+
+### Recommendations for Scout
+- <task sizing or scoping suggestions>
+- <areas to avoid or handle carefully in future tasks>
+```
+
+Keep this file concise (under 20 lines). It is read by Scout in incremental mode alongside `recentNotes`.
+
 ### Token Budget Awareness
 - Check `strategy` context for token budget constraints
 - If the task feels too large mid-implementation (touching many files, complex logic), note this in the build report so the Operator can recommend smaller sizing

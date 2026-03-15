@@ -19,6 +19,7 @@ You will receive a JSON context block with:
 - `projectDigest`: contents of `project-digest.md` (null on cycle 1)
 - `changedFiles`: list of files changed since last cycle (from `git diff HEAD~1 --name-only`)
 - `recentNotes`: last 5 cycle entries from notes.md (inline)
+- `builderNotes`: contents of `workspace/builder-notes.md` from last cycle (inline, empty string if none)
 - `recentLedger`: last 3 ledger entries (inline)
 - `instinctSummary`: compact instinct array from state.json (inline)
 - `workspacePath`: path to `.claude/evolve/workspace/`
@@ -48,6 +49,7 @@ Adapt discovery and task selection based on the active `strategy` from context. 
 **`mode: "incremental"` (cycle 2+):**
 - Read `projectDigest` from context (already inline) — do NOT re-scan the full codebase
 - Read `recentNotes` from context (already inline) — what was done, what was deferred
+- Read `builderNotes` from context (already inline) — file fragility observations and recommendations from last Builder run. Apply these when sizing tasks and selecting files to touch.
 - Read `changedFiles` from context — scan ONLY these changed files, not the entire codebase
 - Read `instinctSummary` from context — apply learned patterns, avoid known anti-patterns
 - Read `recentLedger` from context for recent cycle outcomes
