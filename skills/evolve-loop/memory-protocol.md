@@ -2,6 +2,24 @@
 
 All files live under `.claude/evolve/` in the **project directory** (not `~/.claude/`).
 
+## Layer 0: Shared Values (Core Rules)
+
+Static team constitution. All agents must follow these rules at all times. Place this section **first** in every agent context block for KV-cache optimization — it never changes between cycles, maximizing cache hit rate.
+
+### Behavioral Rules
+
+- **Immutability** — never mutate shared state directly; always write new versions (new files, new JSON objects, new lines)
+- **Scope discipline** — each agent reads/writes only its owned workspace file; do not modify files owned by other agents
+- **Blast radius awareness** — prefer S-complexity changes for hotspot files (phases.md, memory-protocol.md, SKILL.md); any edit to a hotspot must touch fewer than 30 lines
+- **Learning mandate** — when `instinctsExtracted == 0` for 2+ consecutive cycles, the orchestrator must extract at least one instinct before closing Phase 5
+
+### Parallel Agent Coordination
+
+When concurrent agents share the same workspace, shared values act as the coordination layer:
+- Agents must not write to each other's owned files
+- The mailbox (`agent-mailbox.md`) is the only shared write surface for cross-agent messages
+- All agents always read shared values first to align on core rules before acting
+
 ## Layer 1: JSONL Ledger (`.claude/evolve/ledger.jsonl`)
 
 Structured, append-only log. Each agent appends one entry per invocation.
