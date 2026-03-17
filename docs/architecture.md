@@ -66,6 +66,8 @@ Agents use different models based on task complexity:
 
 ## Shared Memory Architecture
 
+See [memory-hierarchy.md](memory-hierarchy.md) for details.
+
 ### Layer 1: JSONL Ledger
 Append-only structured log. Every agent appends one entry per invocation.
 
@@ -102,6 +104,8 @@ The system tracks mastery level based on consecutive successes:
 
 ## Token Optimization
 
+See [token-optimization.md](token-optimization.md) for details.
+
 | Component | Tokens | Notes |
 |-----------|--------|-------|
 | Discovery | ~40-60K | Incremental after cycle 1 |
@@ -121,6 +125,8 @@ Key optimizations:
 - **Dynamic model routing** — haiku for lightweight work, opus only when needed
 
 ## Self-Improvement Infrastructure
+
+See [self-learning.md](self-learning.md) for details.
 
 The loop includes seven interconnected mechanisms for autonomous self-improvement:
 
