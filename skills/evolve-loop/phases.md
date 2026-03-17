@@ -43,6 +43,8 @@ RECENT_LEDGER=$(tail -3 .claude/evolve/ledger.jsonl)
 # instinctSummary and ledgerSummary come from state.json (already read)
 ```
 
+**Shared values in agent context:** The Layer 0 core rules from `memory-protocol.md` must be included at the top of all agent context blocks. Placing shared values first maximizes KV-cache reuse across parallel agent launches — concurrent builders or auditors that share the same static prefix benefit from prompt cache hits without re-encoding the rules.
+
 **Operator brief pre-read:** Before launching Scout, check if `workspace/next-cycle-brief.json` exists (written by the previous cycle's Operator). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
 
 Launch **Scout Agent** (model: per routing table — sonnet default, haiku for incremental, opus for deep research; subagent_type: `general-purpose`):
