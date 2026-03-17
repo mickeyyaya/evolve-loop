@@ -1,7 +1,0 @@
-- id: inst-015
-  pattern: "signal-to-action-wiring"
-  description: "Metrics and scores are useless unless they trigger automatic actions. When adding a measurement (processRewards, skillMetrics), always wire it to a decision mechanism — a threshold check that generates a task proposal or behavior change."
-  confidence: 0.7
-  source: "cycle-19/add-process-rewards-remediation-loop"
-  type: "process"
-  category: "procedural"

@@ -1,7 +1,0 @@
-- id: inst-016
-  pattern: "gap-detection-over-degradation-only"
-  description: "Self-improvement systems must detect capability GAPS (what's missing) not just degradation (what's broken). The introspection pass initially only detected metric decline. Adding capability gap signals (dormant instincts, overdue deferred tasks) enables the loop to propose new features for itself, not just fix regressions."
-  confidence: 0.7
-  source: "cycle-20/add-scout-capability-gap-scanner"
-  type: "architecture"
-  category: "semantic"

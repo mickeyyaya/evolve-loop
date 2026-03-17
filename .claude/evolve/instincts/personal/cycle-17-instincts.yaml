@@ -1,7 +1,0 @@
-- id: inst-013
-  pattern: "progressive-disclosure-over-inline"
-  description: "Agent prompts should reference shared definitions (strategy tables, output schemas) instead of duplicating them inline. Pass only the active value via context block. Saves ~80-120 lines across 4 agents."
-  confidence: 0.6
-  source: "cycle-17/research-skill-efficiency-patterns"
-  type: "technique"
-  category: "procedural"
