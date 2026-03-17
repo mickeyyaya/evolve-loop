@@ -407,6 +407,22 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - For each cited instinct, increase its confidence by +0.05 (capped at 1.0) — application-driven confidence is more reliable than re-observation
    - Update `instinctSummary` in state.json with new confidence values
 
+3b. **Instinct Extraction Trigger (forced extraction on stall):**
+   Before running normal extraction, check if passive extraction has stalled:
+   ```
+   recentZero = evalHistory.slice(-2).every(c => c.instinctsExtracted === 0)
+   if (recentZero):
+     → run forced instinct extraction prompt (MemRL/MemEvolve pattern):
+       "For each of the last N cycle's tasks, identify:
+        (1) what approach was used,
+        (2) what the audit found,
+        (3) what a future agent should do differently — even under uniform success.
+        Write at least one instinct per cycle. No new instincts = extraction stall."
+     → this extraction block MUST produce ≥1 instinct before continuing to step 4
+   ```
+   This forces instinct generation when consecutive cycles with no new instincts
+   signal that passive extraction has stalled under uniform success conditions.
+
 4. **Instinct Extraction:**
    Read ALL workspace files from this cycle and think deeply about patterns:
 
