@@ -444,6 +444,23 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    ```
    Scout and Builder read `instinctSummary` from state.json instead of reading all instinct YAML files. Full instinct files are only read during consolidation (every 3 cycles) or when `instinctCount` has changed since last cycle.
 
+   **Self-Evaluation (LLM-as-a-Judge)** (after instinct extraction):
+   Score the cycle on 4 dimensions using a structured rubric. For each dimension, write a chain-of-thought justification BEFORE assigning the score. Binary threshold: ≥0.7 = pass, <0.7 = fail (triggers mandatory instinct extraction for that dimension).
+
+   | Dimension | Guiding questions | Threshold |
+   |-----------|------------------|-----------|
+   | **Correctness** | Did the build produce the intended behavior? Did evals pass? | ≥0.7 |
+   | **Completeness** | Were all acceptance criteria addressed? No missing edge cases? | ≥0.7 |
+   | **Novelty** | Did the cycle surface new patterns, techniques, or knowledge? | ≥0.7 |
+   | **Efficiency** | Were tokens, attempts, and file changes minimized? Was scope right-sized? | ≥0.7 |
+
+   Scoring protocol:
+   1. For each dimension: write 1–2 sentences of step-by-step reasoning (what happened, what evidence exists)
+   2. Assign a score 0.0–1.0 based on that justification
+   3. If any dimension scores <0.7: extract at least one instinct from that failure before moving on
+
+   Record scores in `workspace/build-report.md` under a `## Self-Evaluation` heading.
+
    **Gene Extraction** (after instinct extraction):
    If the Builder successfully fixed a recurring error pattern this cycle:
    - Extract the fix as a gene with selector, steps, and validation commands
