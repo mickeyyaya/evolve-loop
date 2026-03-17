@@ -2,7 +2,7 @@
 #
 # Genes are structured fix templates. While instincts describe WHAT was learned,
 # genes describe HOW TO FIX IT with executable steps and validation commands.
-# Genes live in .claude/evolve/genes/ and are matched by error pattern.
+# Genes live in .evolve/genes/ and are matched by error pattern.
 
 # Example 1: A simple gene with selector and validation
 - id: gene-001

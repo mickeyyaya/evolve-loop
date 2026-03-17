@@ -107,7 +107,7 @@ All notable changes to this project will be documented in this file.
 - Operator supports `convergence-check` mode for when Scout is skipped
 
 ### Removed
-- **Runtime state from git tracking** — `.claude/evolve/` state files (history, evals, instincts, workspace, ledger, notes, state.json) added to `.gitignore`
+- **Runtime state from git tracking** — `.evolve/` state files (history, evals, instincts, workspace, ledger, notes, state.json) added to `.gitignore`
 
 ## [6.2.0] - 2026-03-13
 
@@ -135,7 +135,7 @@ All notable changes to this project will be documented in this file.
 - **Architecture docs** — fully rewritten for v6 (strategy presets, stagnation detection, mastery graduation, gene library, model routing)
 - **CI workflow** — added docs validation step for v6 required docs
 - **State schema docs** — memory-protocol.md now documents mastery, processRewards, planCache, synthesizedTools
-- **Instinct path** — replaced `homunculus` references with `~/.claude/instincts/personal/`
+- **Instinct path** — replaced `homunculus` references with `~/.evolve/instincts/personal/`
 
 ### Fixed
 - **Operator model** — README agents table corrected from sonnet to haiku
@@ -157,7 +157,7 @@ All notable changes to this project will be documented in this file.
 - **Island model evolution** — maintain 3-5 independent configurations evolving in parallel with periodic migration of best traits. See docs/island-model.md.
 - **Workflow topology review** — during meta-cycles, evaluates phase ordering for optimization: skipping, merging, addition, parallelization. Proposals require human approval.
 - **TextGrad prompt optimization** — generates textual gradients during prompt evolution: observed → desired → specific change → expected impact.
-- **Capability gap detection & tool synthesis** — Builder identifies missing capabilities, searches for existing tools, synthesizes reusable scripts in .claude/evolve/tools/.
+- **Capability gap detection & tool synthesis** — Builder identifies missing capabilities, searches for existing tools, synthesizes reusable scripts in .evolve/tools/.
 - **MAP-Elites fitness scoring** — Operator scores cycles across four dimensions: speed, quality, cost, novelty. Recommends strategy changes targeting the weakest dimension.
 
 ### Changed

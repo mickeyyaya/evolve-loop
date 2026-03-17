@@ -1,6 +1,6 @@
 # Evolve Loop
 
-A self-evolving development pipeline for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Orchestrates 4 specialized AI agents across 5 lean phases to autonomously discover, build, audit, and ship improvements to any codebase.
+A self-evolving development pipeline for AI CLIs (like Gemini CLI, Claude Code). Orchestrates 4 specialized AI agents across 5 lean phases to autonomously discover, build, audit, and ship improvements to any codebase.
 
 Optimized for fast iteration — diverse small/medium tasks per cycle, worktree isolation, 12hr research cooldown, and single-pass auditing.
 
@@ -46,20 +46,20 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Agent mailbox** — typed cross-agent messaging for coordination across pipeline phases
 - **Operator next-cycle brief** — closed-loop feedback from monitoring to task selection
 - **Session narrative** — human-readable story synthesis of what the loop learned each cycle
-- **No external dependencies** — fully self-contained Claude Code plugin
+- **No external dependencies** — fully self-contained AI CLI plugin
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
+- An AI CLI (like Gemini CLI or Claude Code) installed
 - A git repository to evolve
 
 ### Installation
 
-**Option A: As a Claude Code plugin (recommended)**
+**Option A: As an AI CLI plugin (recommended)**
 
-In Claude Code, run:
+In your AI CLI, run:
 ```
 /plugin marketplace add mickeyyaya/evolve-loop
 /plugin install evolve-loop@evolve-loop
@@ -239,7 +239,7 @@ evolve-loop/
 ## Workspace Layout (per project)
 
 ```
-.claude/evolve/
+.evolve/
 ├── workspace/           # Current cycle (overwritten each cycle)
 │   ├── scout-report.md
 │   ├── build-report.md
@@ -260,7 +260,7 @@ evolve-loop/
 
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
+- AI CLI (like Gemini CLI or Claude Code)
 - Git (for worktree isolation)
 
 ## License

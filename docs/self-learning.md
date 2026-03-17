@@ -16,7 +16,7 @@ After each cycle, the orchestrator analyzes build reports, audit verdicts, and e
 
 Extraction is mandatory when any LLM-as-a-Judge dimension scores below 0.7. This forcing function prevents stalls during uniform-success periods when the gradient is weak.
 
-Instincts are stored as YAML files under `.claude/evolve/instincts/personal/` and injected into the Scout and Builder context as a compact `instinctSummary` array — avoiding full-file reads on each cycle.
+Instincts are stored as YAML files under `.evolve/instincts/personal/` and injected into the Scout and Builder context as a compact `instinctSummary` array — avoiding full-file reads on each cycle.
 
 ### b. LLM-as-a-Judge Self-Evaluation (Phase 5 LEARN)
 
@@ -50,7 +50,7 @@ Reusing a plan template typically saves 30–50% of build tokens for that task. 
 When `instinctCount > 20` or every 3 cycles, the orchestrator consolidates the instinct set:
 
 1. **Cluster** — Instincts with >85% semantic similarity are merged into higher-level abstractions. Example: two camelCase instincts merge into one covering all JSON keys.
-2. **Archive originals** — Superseded instincts move to `.claude/evolve/instincts/archived/` with a `supersededBy` field. Nothing is deleted.
+2. **Archive originals** — Superseded instincts move to `.evolve/instincts/archived/` with a `supersededBy` field. Nothing is deleted.
 3. **Temporal decay** — Instincts unreferenced in the last 5 cycles lose 0.1 confidence per consolidation pass. Below 0.3 they are archived as stale.
 4. **Entropy gating** — A new instinct that is >90% similar to an existing one updates the existing one's confidence instead of creating a duplicate.
 
@@ -58,7 +58,7 @@ Consolidation keeps the active instinct set compact, relevant, and non-redundant
 
 ### f. Instinct Promotion (project → global)
 
-High-confidence instincts that are not project-specific can be promoted to global scope at `~/.claude/instincts/personal/`. Promotion criteria:
+High-confidence instincts that are not project-specific can be promoted to global scope at `~/.evolve/instincts/personal/`. Promotion criteria:
 
 - Confidence >= 0.8
 - Confirmed across 2+ cycles

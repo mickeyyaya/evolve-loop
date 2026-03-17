@@ -27,7 +27,7 @@ Agents must not write to this layer. It is the team constitution.
 
 ### Layer 1: JSONL Ledger
 
-**Path:** `.claude/evolve/ledger.jsonl`
+**Path:** `.evolve/ledger.jsonl`
 
 Append-only structured log. Each agent appends exactly one entry per invocation:
 ```jsonl
@@ -38,7 +38,7 @@ The ledger is never truncated. It is the permanent audit trail. Agents do not re
 
 ### Layer 2: Markdown Workspace
 
-**Path:** `.claude/evolve/workspace/`
+**Path:** `.evolve/workspace/`
 
 Human-readable files overwritten each cycle. Each agent owns exactly one file:
 
@@ -55,7 +55,7 @@ Agents read upstream workspace files and write only their own. `agent-mailbox.md
 
 ### Layer 3: state.json
 
-**Path:** `.claude/evolve/state.json`
+**Path:** `.evolve/state.json`
 
 Persistent configuration and aggregated metrics that survive across cycles. Key fields:
 
@@ -72,7 +72,7 @@ Persistent configuration and aggregated metrics that survive across cycles. Key 
 
 ### Layer 4: Instincts
 
-**Path:** `.claude/evolve/instincts/personal/`
+**Path:** `.evolve/instincts/personal/`
 
 YAML files extracted during Phase 5 learning. Each instinct captures a reusable pattern with a confidence score (starts at 0.5, increases when confirmed across cycles). Instincts fall into three types: episodic, semantic, and procedural.
 
@@ -84,7 +84,7 @@ High-confidence instincts (0.9+) graduate to orchestrator policy — they become
 
 ### Layer 5: History Archives
 
-**Path:** `.claude/evolve/history/cycle-{N}/`
+**Path:** `.evolve/history/cycle-{N}/`
 
 Immutable snapshots of the workspace directory taken at the end of each completed cycle. Agents do not read these during normal operation — they are the audit trail and the source data for meta-cycle retrospectives.
 

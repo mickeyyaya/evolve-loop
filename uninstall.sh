@@ -75,5 +75,5 @@ fi
 echo ""
 echo "Uninstallation complete."
 echo ""
-echo "Note: Project workspace files (.claude/evolve/) are NOT removed."
+echo "Note: Project workspace files (.evolve/) are NOT removed."
 echo "Delete them manually if you no longer need cycle history."

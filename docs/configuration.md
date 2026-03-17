@@ -2,7 +2,7 @@
 
 ## state.json
 
-The primary configuration file is `.claude/evolve/state.json` in your project directory. It's auto-created on first run.
+The primary configuration file is `.evolve/state.json` in your project directory. It's auto-created on first run.
 
 ### Research Cooldown
 
@@ -101,7 +101,7 @@ Scout focuses discovery and task selection on the goal.
 
 ## Eval Definitions
 
-Eval definitions are created by the Scout and stored in `.claude/evolve/evals/`. You can also pre-create them manually:
+Eval definitions are created by the Scout and stored in `.evolve/evals/`. You can also pre-create them manually:
 
 ```markdown
 # Eval: add-auth
@@ -174,7 +174,7 @@ Compression runs every 5 cycles (aligned with meta-cycle). Entries older than 5 
 
 ## Project Digest
 
-Generated on cycle 1 (and regenerated every 10 cycles), stored at `.claude/evolve/workspace/project-digest.md` (~2-3KB):
+Generated on cycle 1 (and regenerated every 10 cycles), stored at `.evolve/workspace/project-digest.md` (~2-3KB):
 
 - Project structure tree with file sizes
 - Language/framework/conventions
@@ -210,5 +210,5 @@ Process rewards feed into meta-cycle reviews (every 5 cycles) to identify which 
 ## Instinct Promotion
 
 After 5+ cycles, instincts with confidence >= 0.8 promote from project-level to global:
-- **Project:** `.claude/evolve/instincts/personal/`
-- **Global:** `~/.claude/instincts/personal/`
+- **Project:** `.evolve/instincts/personal/`
+- **Global:** `~/.evolve/instincts/personal/`

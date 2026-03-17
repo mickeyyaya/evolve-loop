@@ -15,9 +15,9 @@ Periodically (every 5 cycles), the best-performing traits migrate between island
 ## How It Works
 
 ### Setup
-Create island directories under `.claude/evolve/islands/`:
+Create island directories under `.evolve/islands/`:
 ```
-.claude/evolve/islands/
+.evolve/islands/
   island-1/    # balanced strategy, standard budgets
   island-2/    # innovate strategy, higher budgets
   island-3/    # harden strategy, strict budgets

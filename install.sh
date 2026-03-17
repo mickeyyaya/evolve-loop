@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Evolve Loop Installer
 #
-# Preferred: Install as a Claude Code plugin:
+# Preferred: Install as an AI CLI plugin:
 #   /plugin marketplace add mickeyyaya/evolve-loop
 #   /plugin install evolve-loop@evolve-loop
 #
@@ -86,7 +86,7 @@ if [ -d "$PLUGIN_CACHE" ] || [ -d "$HOME/.claude/plugins/marketplaces/evolve-loo
   echo "WARNING: evolve-loop is already installed as a plugin."
   echo "Manual install will create DUPLICATES (/evolve-loop will appear twice)."
   echo ""
-  echo "To upgrade the plugin version instead, run in Claude Code:"
+  echo "To upgrade the plugin version instead, run in your AI CLI:"
   echo "  /plugin marketplace update evolve-loop"
   echo "  /plugin update evolve-loop@evolve-loop"
   echo "  /plugin reload"

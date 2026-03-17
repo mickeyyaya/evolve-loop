@@ -101,10 +101,10 @@ CACHE_DIR="$CACHE_BASE/$VERSION"
 echo "Caching to $CACHE_DIR"
 mkdir -p "$CACHE_DIR"
 
-# Copy all project files (excluding .git, .claude/evolve workspace data)
+# Copy all project files (excluding .git, .evolve workspace data)
 rsync -a --delete \
   --exclude='.git' \
-  --exclude='.claude/evolve' \
+  --exclude='.evolve' \
   "$SCRIPT_DIR/" "$CACHE_DIR/"
 
 echo "  Cached: $(ls "$CACHE_DIR" | wc -l | tr -d ' ') top-level items"

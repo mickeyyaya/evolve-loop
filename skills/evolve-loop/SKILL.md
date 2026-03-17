@@ -75,10 +75,10 @@ Scout → [Task A, Task B, Task C]
 
 1. Ensure directories exist:
    ```bash
-   mkdir -p .claude/evolve/workspace .claude/evolve/history .claude/evolve/evals .claude/evolve/instincts/personal .claude/evolve/instincts/archived .claude/evolve/genes .claude/evolve/tools
+   mkdir -p .evolve/workspace .evolve/history .evolve/evals .evolve/instincts/personal .evolve/instincts/archived .evolve/genes .evolve/tools
    ```
 
-2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
+2. Read `.evolve/state.json` if it exists. If not, initialize:
    ```json
    {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
    ```
@@ -98,7 +98,7 @@ Scout → [Task A, Task B, Task C]
    ```bash
    git status --porcelain   # must be clean
    git worktree list        # worktree support available
-   ls .claude/evolve/evals/ 2>/dev/null  # evals exist (skip check on cycle 1)
+   ls .evolve/evals/ 2>/dev/null  # evals exist (skip check on cycle 1)
    ```
    If git is dirty, warn user before proceeding.
 
@@ -217,7 +217,7 @@ Self-modifying systems require explicit safety mechanisms to prevent misevolutio
 - **State.json validation:** Before each cycle, validate state.json structure against the expected schema. If corrupted or unexpected fields appear, warn and reset to last known good state.
 
 ### Eval Tamper Detection
-- **Protected eval infrastructure:** The Builder MUST NOT modify files in `skills/evolve-loop/`, `agents/`, or `.claude-plugin/` unless the task explicitly targets the evolve-loop itself.
+- **Protected eval infrastructure:** The Builder MUST NOT modify files in `skills/evolve-loop/`, `agents/`, or CLI plugin metadata folders (like `.claude-plugin/`) unless the task explicitly targets the evolve-loop itself.
 - **Eval checksum tracking:** After Scout creates eval definitions, the orchestrator records a checksum of each eval file. Before Auditor runs evals, verify checksums haven't changed. If they have and it wasn't a legitimate Scout update → HALT.
 - **Objective hacking detection:** If a Builder removes or weakens eval criteria, assertion counts, or test commands, the Auditor flags this as CRITICAL severity regardless of other results.
 

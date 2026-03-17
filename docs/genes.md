@@ -71,7 +71,7 @@ During Phase 5 (LEARN), after instinct extraction:
 ## Storage
 
 ```
-.claude/evolve/genes/
+.evolve/genes/
   gene-001-fix-missing-export.yaml
   gene-002-add-test-file.yaml
   capsule-001-add-component.yaml

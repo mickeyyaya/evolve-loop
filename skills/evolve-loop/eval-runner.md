@@ -4,11 +4,11 @@ The orchestrator (or Auditor agent) uses these instructions to run eval checks a
 
 ## Purpose
 
-Eval definitions are created by the Scout in Phase 1 and stored in `.claude/evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
+Eval definitions are created by the Scout in Phase 1 and stored in `.evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
 
 ## Eval Definition Format
 
-Each eval file in `.claude/evolve/evals/` follows this structure (see also [examples/eval-definition.md](../../examples/eval-definition.md)):
+Each eval file in `.evolve/evals/` follows this structure (see also [examples/eval-definition.md](../../examples/eval-definition.md)):
 
 ```markdown
 # Eval: <task-name>
@@ -34,7 +34,7 @@ Each eval file in `.claude/evolve/evals/` follows this structure (see also [exam
 
 ### 1. Locate Eval Definitions
 ```bash
-ls .claude/evolve/evals/
+ls .evolve/evals/
 ```
 Read each `.md` file. If no eval files exist, log warning and auto-PASS (graceful degradation for cycle 1).
 

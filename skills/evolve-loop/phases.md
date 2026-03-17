@@ -23,9 +23,9 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 ```bash
 # Cycle 1: full mode — no digest exists yet
 # Cycle 2+: incremental mode — read digest + changed files
-if [ -f .claude/evolve/workspace/project-digest.md ]; then
+if [ -f .evolve/workspace/project-digest.md ]; then
   MODE="incremental"
-  DIGEST=$(cat .claude/evolve/workspace/project-digest.md)
+  DIGEST=$(cat .evolve/workspace/project-digest.md)
   CHANGED=$(git diff HEAD~1 --name-only 2>/dev/null)
 else
   MODE="full"
@@ -35,10 +35,10 @@ fi
 RECENT_NOTES=$(# extract last 5 "## Cycle" sections from notes.md)
 
 # Read builder notes from last cycle (if exists)
-BUILDER_NOTES=$(cat .claude/evolve/workspace/builder-notes.md 2>/dev/null || echo "")
+BUILDER_NOTES=$(cat .evolve/workspace/builder-notes.md 2>/dev/null || echo "")
 
 # Read recent ledger (last 3 lines)
-RECENT_LEDGER=$(tail -3 .claude/evolve/ledger.jsonl)
+RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
 
 # instinctSummary and ledgerSummary come from state.json (already read)
 ```
@@ -55,7 +55,7 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
     // --- Static (stable across cycles, maximizes cache-like reuse) ---
     "projectContext": <auto-detected>,
     "projectDigest": "<contents of project-digest.md, or null if cycle 1>",
-    "workspacePath": ".claude/evolve/workspace/",
+    "workspacePath": ".evolve/workspace/",
     "goal": <goal or null>,
     "strategy": <strategy>,
     // --- Semi-stable (changes slowly, every few cycles) ---
@@ -74,10 +74,10 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
 After Scout completes:
 - Read `workspace/scout-report.md`
 - **Prerequisite check:** For each proposed task that includes a `prerequisites` field, verify all listed slugs appear in `state.json.evaluatedTasks` with `decision: "completed"`. Any task with an unmet prerequisite is automatically deferred: add it to `evaluatedTasks` with `decision: "deferred"` and `deferralReason: "prerequisite not met: <slug>"`, then log the prerequisite slug so the Scout can propose it in the next cycle. Tasks without a `prerequisites` field are unaffected. This check is a lightweight sequencing aid — the Scout may override it by omitting `prerequisites` when a task is genuinely independent of its nominal dependency.
-- Verify eval definitions were created in `.claude/evolve/evals/`
-- **Eval checksum capture:** Compute `sha256sum` of each eval file in `.claude/evolve/evals/` and store in `workspace/eval-checksums.json`:
+- Verify eval definitions were created in `.evolve/evals/`
+- **Eval checksum capture:** Compute `sha256sum` of each eval file in `.evolve/evals/` and store in `workspace/eval-checksums.json`:
   ```bash
-  sha256sum .claude/evolve/evals/*.md > .claude/evolve/workspace/eval-checksums.json
+  sha256sum .evolve/evals/*.md > .evolve/workspace/eval-checksums.json
   ```
   These checksums are verified before Auditor runs evals (Phase 3) to detect tampering.
 - Merge research query updates into state.json (if research was performed)
@@ -125,8 +125,8 @@ Launch **Builder Agent** (model: per routing table — sonnet default, opus for 
   ```json
   {
     // --- Static ---
-    "workspacePath": ".claude/evolve/workspace/",
-    "evalsPath": ".claude/evolve/evals/",
+    "workspacePath": ".evolve/workspace/",
+    "evalsPath": ".evolve/evals/",
     "strategy": <strategy>,
     // --- Semi-stable ---
     "instinctSummary": "<from state.json, inline>",
@@ -137,13 +137,13 @@ Launch **Builder Agent** (model: per routing table — sonnet default, opus for 
   ```
 - **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
 
-**Output Redirection:** When Builder runs eval graders, test commands, or build commands, redirect stdout/stderr to `.claude/evolve/workspace/run.log`:
+**Output Redirection:** When Builder runs eval graders, test commands, or build commands, redirect stdout/stderr to `.evolve/workspace/run.log`:
 ```bash
-<command> > .claude/evolve/workspace/run.log 2>&1
+<command> > .evolve/workspace/run.log 2>&1
 ```
 Builder and Auditor extract results via `grep`/`tail` on `run.log` rather than reading full output. This reduces token consumption by 30-50% for verbose build/test output.
 
-**Experiment Journal:** After each Builder attempt (pass or fail), append a one-line entry to `.claude/evolve/workspace/experiments.jsonl`:
+**Experiment Journal:** After each Builder attempt (pass or fail), append a one-line entry to `.evolve/workspace/experiments.jsonl`:
 ```jsonl
 {"cycle":N,"task":"<slug>","attempt":1,"verdict":"PASS|FAIL","approach":"<1-sentence summary>","metric":"<eval result or error>"}
 ```
@@ -183,7 +183,7 @@ The Auditor reviews the Builder's changes **in the worktree** (or reads the diff
 **Eval checksum verification** (before launching Auditor):
 Verify that eval files haven't been tampered with since Scout created them:
 ```bash
-sha256sum -c .claude/evolve/workspace/eval-checksums.json
+sha256sum -c .evolve/workspace/eval-checksums.json
 ```
 If any checksum fails → HALT: "Eval tamper detected — eval file modified after Scout created it. Investigate before proceeding."
 
@@ -193,14 +193,14 @@ Launch **Auditor Agent** (model: per routing table — sonnet default, opus for 
   ```json
   {
     // --- Static ---
-    "workspacePath": ".claude/evolve/workspace/",
-    "evalsPath": ".claude/evolve/evals/",
+    "workspacePath": ".evolve/workspace/",
+    "evalsPath": ".evolve/evals/",
     "strategy": <strategy>,
     // --- Semi-stable ---
     "auditorProfile": "<state.json auditorProfile object>",
     // --- Dynamic ---
     "cycle": <N>,
-    "buildReport": ".claude/evolve/workspace/build-report.md",
+    "buildReport": ".evolve/workspace/build-report.md",
     "recentLedger": "<last 3 ledger entries, inline>"
   }
   ```
@@ -273,13 +273,13 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    ```bash
    ./publish.sh
    ```
-   This syncs the local plugin cache and registry so all new Claude Code sessions automatically load the latest version. The script auto-detects the version from `plugin.json`, validates source files, populates the cache, and updates the registry. **This step is mandatory after every push** — without it, new sessions will load a stale version.
+   This syncs the local plugin cache and registry so all new AI CLI sessions automatically load the latest version. The script auto-detects the version from `plugin.json`, validates source files, populates the cache, and updates the registry. **This step is mandatory after every push** — without it, new sessions will load a stale version.
 
 5. **Clear non-persistent mailbox messages:**
    Remove rows from `workspace/agent-mailbox.md` where `persistent` is `false`. Retain rows where `persistent` is `true` so cross-cycle warnings survive into the next cycle.
    ```bash
    # Filter in-place: keep header rows and persistent=true rows
-   grep -v "| false |" .claude/evolve/workspace/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md .claude/evolve/workspace/agent-mailbox.md
+   grep -v "| false |" .evolve/workspace/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md .evolve/workspace/agent-mailbox.md
    ```
 
 6. **Update state.json:**
@@ -389,8 +389,8 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
 1. **Archive workspace:**
    ```bash
-   mkdir -p .claude/evolve/history/cycle-{N}
-   cp .claude/evolve/workspace/*.md .claude/evolve/history/cycle-{N}/
+   mkdir -p .evolve/history/cycle-{N}
+   cp .evolve/workspace/*.md .evolve/history/cycle-{N}/
    # builder-notes.md is included in *.md above; it is NOT cleared here so Phase 1 of the next cycle can read it
    ```
 
@@ -433,7 +433,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - **Domain knowledge** — What did we learn about this specific codebase?
    - **Process insights** — Was the task sizing right? Were the evals effective?
 
-   Write instinct files to `.claude/evolve/instincts/personal/`:
+   Write instinct files to `.evolve/instincts/personal/`:
    ```yaml
    - id: inst-<NNN>
      pattern: "<short-name>"
@@ -482,13 +482,13 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    **Gene Extraction** (after instinct extraction):
    If the Builder successfully fixed a recurring error pattern this cycle:
    - Extract the fix as a gene with selector, steps, and validation commands
-   - Write to `.claude/evolve/genes/<gene-id>-<name>.yaml`
+   - Write to `.evolve/genes/<gene-id>-<name>.yaml`
    - If multiple genes were applied in sequence, bundle as a capsule
    - See [docs/genes.md](docs/genes.md) for schema
 
    **Instinct global promotion** (check after every instinct extraction):
    For instincts with confidence >= 0.8 that are not project-specific:
-   1. Copy to `~/.claude/instincts/personal/<instinct-id>.yaml`
+   1. Copy to `~/.evolve/instincts/personal/<instinct-id>.yaml`
    2. Add `promotedFrom` field with project name and cycle
    3. Log promotion in the ledger as `type: "instinct-promotion"`
 
@@ -498,7 +498,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    a. **Cluster similar instincts:** Find instincts with overlapping patterns or descriptions (semantic similarity > 0.85). Merge them into a single higher-level abstraction.
       - Example: `inst-003: "use camelCase for API keys"` + `inst-007: "use camelCase for config fields"` → `inst-003: "use camelCase for all JSON keys in this codebase"` (confidence = max of originals)
 
-   b. **Archive originals:** Move merged instincts to `.claude/evolve/instincts/archived/` with a `supersededBy` field. Never delete — only archive.
+   b. **Archive originals:** Move merged instincts to `.evolve/instincts/archived/` with a `supersededBy` field. Never delete — only archive.
 
    c. **Apply temporal decay:** Instincts not referenced in the last 5 cycles have their confidence reduced by 0.1 per consolidation pass. Instincts reaching confidence < 0.3 are archived as stale.
 
@@ -528,7 +528,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
      ```json
      {
        // --- Static ---
-       "workspacePath": ".claude/evolve/workspace/",
+       "workspacePath": ".evolve/workspace/",
        // --- Semi-stable ---
        "stateJson": <state.json contents — includes ledgerSummary and instinctSummary>,
        // --- Dynamic ---
@@ -704,7 +704,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 
 8. **Project Digest Generation** (cycle 1, or every 10 cycles during meta-cycle):
 
-   Generate `.claude/evolve/workspace/project-digest.md` (~2-3KB):
+   Generate `.evolve/workspace/project-digest.md` (~2-3KB):
    ```markdown
    # Project Digest — Generated Cycle {N}
 
@@ -736,7 +736,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
 9. **Context Management (stop-hook pattern):**
 
    After each cycle completes, assess context window usage. If context is above 60% capacity:
-   - Write a **cycle handoff file** to `.claude/evolve/workspace/handoff.md`:
+   - Write a **cycle handoff file** to `.evolve/workspace/handoff.md`:
      ```markdown
      # Cycle Handoff — Cycle {N}
 

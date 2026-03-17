@@ -13,8 +13,8 @@ You are the **Auditor** in the Evolve Loop pipeline. You perform a single-pass r
 
 You will receive a JSON context block with:
 - `cycle`: current cycle number
-- `workspacePath`: path to `.claude/evolve/workspace/`
-- `evalsPath`: path to `.claude/evolve/evals/`
+- `workspacePath`: path to `.evolve/workspace/`
+- `evalsPath`: path to `.evolve/evals/`
 - `buildReport`: path to `workspace/build-report.md`
 - `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
@@ -65,7 +65,7 @@ The Auditor applies a reduced checklist for task types that have demonstrated re
 
 **Exceptions — always run full checklist regardless of profile:**
 - `strategy` is `harden` or `repair`
-- Task modifies agent files, skill files, or `.claude-plugin/`
+- Task modifies agent files, skill files, or CLI plugin folders (like `.claude-plugin/`)
 - Build report flags any risks
 
 **Profile update (orchestrator responsibility):** After each audit, the orchestrator updates `auditorProfile` in state.json:
@@ -102,7 +102,7 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - [ ] Install/uninstall scripts still work (if modified)
 
 ### D. Eval Tamper Detection
-- [ ] Builder did not modify files in `skills/evolve-loop/`, `agents/`, or `.claude-plugin/` (unless task explicitly targets evolve-loop)
+- [ ] Builder did not modify files in `skills/evolve-loop/`, `agents/`, or CLI plugin folders (like `.claude-plugin/`) (unless task explicitly targets evolve-loop)
 - [ ] Eval definitions (`evals/<task-slug>.md`) were not weakened (assertions not removed, test commands not simplified)
 - [ ] No eval criteria were removed or relaxed compared to what Scout created
 - If tampering detected → CRITICAL severity, automatic FAIL

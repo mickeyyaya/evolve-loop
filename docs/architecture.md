@@ -2,7 +2,7 @@
 
 ## Overview
 
-Evolve Loop is a self-evolving development pipeline that orchestrates 4 specialized agents across 5 lean phases. The orchestrator (the main Claude Code session) coordinates agents via the Agent tool, managing data flow through a shared workspace, JSONL ledger, and persistent state with strategy-aware execution.
+Evolve Loop is a self-evolving development pipeline that orchestrates 4 specialized agents across 5 lean phases. The orchestrator (the main AI CLI session) coordinates agents via the Agent tool, managing data flow through a shared workspace, JSONL ledger, and persistent state with strategy-aware execution.
 
 ## Design Principles
 

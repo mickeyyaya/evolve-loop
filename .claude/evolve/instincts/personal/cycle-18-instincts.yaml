@@ -1,0 +1,7 @@
+- id: inst-014
+  pattern: "activate-dormant-infrastructure"
+  description: "When the project has designed but not populated a mechanism (planCache, genes, synthesizedTools), prioritize activating it over building new features. Existing infrastructure that works but is empty gives free value once populated."
+  confidence: 0.6
+  source: "cycle-18/populate-plan-cache-templates"
+  type: "process"
+  category: "procedural"

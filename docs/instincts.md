@@ -6,7 +6,7 @@ The evolve-loop learns from each cycle by extracting **instincts** — specific,
 
 During Phase 5 (LEARN), the orchestrator analyzes the cycle's artifacts — what was built, what passed/failed audit, what approaches worked — and extracts instincts with deep reasoning. Each instinct captures a single pattern with a confidence score.
 
-Instincts are stored as YAML files in `.claude/evolve/instincts/personal/` and read by the Scout and Builder at the start of each cycle.
+Instincts are stored as YAML files in `.evolve/instincts/personal/` and read by the Scout and Builder at the start of each cycle.
 
 ## Schema
 
@@ -78,7 +78,7 @@ Confidence increases when an instinct is confirmed in a later cycle (e.g., the p
 
 ## Global Promotion
 
-After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scope (`~/.claude/instincts/personal/`), making them available across all projects.
+After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scope (`~/.evolve/instincts/personal/`), making them available across all projects.
 
 **Promotion criteria:**
 - Confidence >= 0.8
@@ -86,7 +86,7 @@ After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scop
 - Not project-specific (must be generalizable)
 
 **Promotion process:**
-1. Copy the instinct YAML entry to `~/.claude/instincts/personal/<instinct-id>.yaml`
+1. Copy the instinct YAML entry to `~/.evolve/instincts/personal/<instinct-id>.yaml`
 2. Add `promotedFrom: "<project-name>/cycle-<N>"` field
 3. Keep the original in the project's instincts directory (source of truth)
 4. The global copy is read by all projects' evolve-loop instances
@@ -105,7 +105,7 @@ This prevents unbounded memory growth and keeps the instinct set relevant and co
 ## File Organization
 
 ```
-.claude/evolve/instincts/
+.evolve/instincts/
   personal/
     cycle-1-instincts.yaml    # instincts from cycle 1
     cycle-2-instincts.yaml    # instincts from cycle 2
@@ -130,11 +130,11 @@ For an annotated example, see [examples/instinct-example.yaml](../examples/insti
 To inspect current instincts:
 
 ```bash
-cat .claude/evolve/instincts/personal/*.yaml
+cat .evolve/instincts/personal/*.yaml
 ```
 
 To see instinct count and history:
 
 ```bash
-cat .claude/evolve/state.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Instincts: {d[\"instinctCount\"]}')"
+cat .evolve/state.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Instincts: {d[\"instinctCount\"]}')"
 ```

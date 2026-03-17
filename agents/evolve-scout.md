@@ -15,14 +15,14 @@ You will receive a JSON context block with:
 - `cycle`: current cycle number
 - `mode`: `"full"` (cycle 1), `"incremental"` (cycle 2+), or `"convergence-confirmation"` (nothingToDoCount == 1)
 - `projectContext`: auto-detected language, framework, test commands, domain
-- `stateJson`: contents of `.claude/evolve/state.json` (includes `ledgerSummary`, `instinctSummary`, `evalHistory` trimmed to last 5)
+- `stateJson`: contents of `.evolve/state.json` (includes `ledgerSummary`, `instinctSummary`, `evalHistory` trimmed to last 5)
 - `projectDigest`: contents of `project-digest.md` (null on cycle 1)
 - `changedFiles`: list of files changed since last cycle (from `git diff HEAD~1 --name-only`)
 - `recentNotes`: last 5 cycle entries from notes.md (inline)
 - `builderNotes`: contents of `workspace/builder-notes.md` from last cycle (inline, empty string if none)
 - `recentLedger`: last 3 ledger entries (inline)
 - `instinctSummary`: compact instinct array from state.json (inline)
-- `workspacePath`: path to `.claude/evolve/workspace/`
+- `workspacePath`: path to `.evolve/workspace/`
 - `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
 - `goal`: user-specified goal (string or null)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
@@ -179,7 +179,7 @@ This prevents the loop from attempting complex tasks before building sufficient 
 
 ### 8. Write Eval Definitions
 
-For each selected task, write an eval definition to `.claude/evolve/evals/<task-slug>.md`:
+For each selected task, write an eval definition to `.evolve/evals/<task-slug>.md`:
 
 ```markdown
 # Eval: <task-name>

@@ -20,8 +20,8 @@ model: sonnet  # or opus
 
 You will receive a JSON context block with:
 - `cycle`: current cycle number
-- `workspacePath`: path to `.claude/evolve/workspace/`
-- `ledgerPath`: path to `.claude/evolve/ledger.jsonl`
+- `workspacePath`: path to `.evolve/workspace/`
+- `ledgerPath`: path to `.evolve/ledger.jsonl`
 - <additional context fields>
 
 ## Responsibilities
@@ -105,9 +105,9 @@ When agents run eval graders, test commands, or build commands, redirect stdout/
 npm test                          # ❌ full output floods agent context
 
 # Redirect and extract:
-npm test > .claude/evolve/workspace/run.log 2>&1   # ✅ capture to file
-tail -5 .claude/evolve/workspace/run.log            # ✅ read only what matters
-grep -c 'FAIL' .claude/evolve/workspace/run.log     # ✅ extract metrics
+npm test > .evolve/workspace/run.log 2>&1   # ✅ capture to file
+tail -5 .evolve/workspace/run.log            # ✅ read only what matters
+grep -c 'FAIL' .evolve/workspace/run.log     # ✅ extract metrics
 ```
 
 This pattern (inspired by autoresearch's `run.log`) reduces token consumption by 30-50% for verbose build/test output. Agents never need to see full compiler output, test runner logs, or install traces — only the results.

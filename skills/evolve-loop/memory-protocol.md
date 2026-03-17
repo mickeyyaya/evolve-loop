@@ -1,6 +1,6 @@
 # Evolve Loop — Shared Memory Protocol
 
-All files live under `.claude/evolve/` in the **project directory** (not `~/.claude/`).
+All files live under `.evolve/` in the **project directory** (not your CLI's global config directory).
 
 ## Layer 0: Shared Values (Core Rules)
 
@@ -20,7 +20,7 @@ When concurrent agents share the same workspace, shared values act as the coordi
 - The mailbox (`agent-mailbox.md`) is the only shared write surface for cross-agent messages
 - All agents always read shared values first to align on core rules before acting
 
-## Layer 1: JSONL Ledger (`.claude/evolve/ledger.jsonl`)
+## Layer 1: JSONL Ledger (`.evolve/ledger.jsonl`)
 
 Structured, append-only log. Each agent appends one entry per invocation.
 
@@ -30,7 +30,7 @@ Structured, append-only log. Each agent appends one entry per invocation.
 
 Roles: `scout`, `builder`, `auditor`, `operator`, `eval`
 
-## Layer 2: Markdown Workspace (`.claude/evolve/workspace/`)
+## Layer 2: Markdown Workspace (`.evolve/workspace/`)
 
 Overwritten each cycle. Each agent owns exactly one file:
 
@@ -76,7 +76,7 @@ Scout also appends a `decisionTrace` block — a workspace-only field (not persi
 
 ## Layer 3: Persistent State
 
-### `.claude/evolve/state.json`
+### `.evolve/state.json`
 
 Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or retrying failed approaches.
 
@@ -155,7 +155,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     "perCycle": 200000
   },
   "synthesizedTools": [
-    {"name": "validate-yaml", "path": ".claude/evolve/tools/validate-yaml.sh", "purpose": "Validate YAML syntax", "cycle": 7, "useCount": 0}
+    {"name": "validate-yaml", "path": ".evolve/tools/validate-yaml.sh", "purpose": "Validate YAML syntax", "cycle": 7, "useCount": 0}
   ],
   "planCache": [
     {
@@ -246,7 +246,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - `fitnessRegression`: boolean flag set to `true` when fitnessScore decreases for 2 consecutive cycles. Operator reads this as a HALT-worthy signal
 - `evalHistory` is trimmed to the last 5 entries in state.json — older data is captured by `ledgerSummary`
 
-### `.claude/evolve/notes.md`
+### `.evolve/notes.md`
 
 Cross-cycle context with a rolling window structure:
 
@@ -262,23 +262,23 @@ Cross-cycle context with a rolling window structure:
 
 Every 5 cycles (aligned with meta-cycle), entries older than 5 cycles are compressed into the Summary section. Full history is preserved in `history/cycle-N/` archives.
 
-### `.claude/evolve/workspace/project-digest.md`
+### `.evolve/workspace/project-digest.md`
 
 Project structure digest (~2-3KB) generated on cycle 1 and regenerated every 10 cycles. Contains: directory tree with file sizes, tech stack, conventions, and recent git log. Scout reads this on cycle 2+ instead of full codebase scan.
 
-### `.claude/evolve/history/cycle-{N}/`
+### `.evolve/history/cycle-{N}/`
 
 Archived workspace from each completed cycle.
 
 ## Layer 4: Eval State
 
-### `.claude/evolve/evals/<task-slug>.md`
+### `.evolve/evals/<task-slug>.md`
 
 Eval definitions created by the Scout. Each file defines code graders, regression evals, and acceptance checks. Used by the Auditor and eval-runner.
 
 ## Layer 5: Instincts
 
-### `.claude/evolve/instincts/personal/`
+### `.evolve/instincts/personal/`
 
 Instinct files extracted during Phase 5 learning pass. YAML format with confidence scoring.
 
@@ -286,7 +286,7 @@ Instincts start at confidence 0.5 and increase when confirmed across multiple cy
 
 ## Layer 6: Experiment Journal
 
-### `.claude/evolve/workspace/experiments.jsonl`
+### `.evolve/workspace/experiments.jsonl`
 
 Append-only log of every Builder attempt (pass or fail). Inspired by autoresearch's `results.tsv` — logs ALL experiments, not just successes.
 

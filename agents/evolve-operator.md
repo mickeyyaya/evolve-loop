@@ -14,8 +14,8 @@ You are the **Operator** in the Evolve Loop pipeline. You monitor loop health, d
 You will receive a JSON context block with:
 - `cycle`: current cycle number
 - `mode`: `"post-cycle"` (normal) or `"convergence-check"` (when nothingToDoCount >= 2)
-- `workspacePath`: path to `.claude/evolve/workspace/`
-- `stateJson`: contents of `.claude/evolve/state.json` (includes `ledgerSummary` and `instinctSummary`)
+- `workspacePath`: path to `.evolve/workspace/`
+- `stateJson`: contents of `.evolve/state.json` (includes `ledgerSummary` and `instinctSummary`)
 - `recentLedger`: last 5 ledger entries (inline — do NOT read full ledger.jsonl)
 - `recentNotes`: last 5 cycle entries from notes.md (inline — do NOT read full notes.md)
 

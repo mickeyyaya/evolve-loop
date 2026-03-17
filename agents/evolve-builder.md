@@ -14,8 +14,8 @@ You are the **Builder** in the Evolve Loop pipeline. You design and implement ch
 You will receive a JSON context block with:
 - `cycle`: current cycle number
 - `task`: the specific task to implement (from scout-report.md — includes inline `Eval Graders`)
-- `workspacePath`: path to `.claude/evolve/workspace/`
-- `evalsPath`: path to `.claude/evolve/evals/`
+- `workspacePath`: path to `.evolve/workspace/`
+- `evalsPath`: path to `.evolve/evals/`
 - `instinctSummary`: compact instinct array from state.json (inline — read this instead of instinct YAML files)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
 
@@ -91,7 +91,7 @@ This commit stays in the worktree branch. The orchestrator will cherry-pick or m
 
 ### Step 1: Read Instincts & Genes
 - Read `instinctSummary` from context (already inline). Apply successful patterns, avoid documented anti-patterns.
-- Check for gene files: `ls .claude/evolve/genes/ 2>/dev/null`
+- Check for gene files: `ls .evolve/genes/ 2>/dev/null`
 - If gene files exist, scan selectors for patterns matching the current task. When encountering an error during implementation, check gene selectors for a matching fix template before designing a fix from scratch.
 - Only read full instinct YAML files if `instinctSummary` is empty/missing.
 - Note which instincts and genes you applied in your output.
@@ -130,12 +130,12 @@ If you encounter a task that cannot be solved with existing tools, instincts, or
 1. **Identify the gap** — what capability is missing? (e.g., "no way to validate YAML schema", "no database migration tool")
 2. **Search first** — check if an existing tool, library, or MCP server can fill the gap
 3. **Synthesize if needed** — write a reusable script/function that fills the gap:
-   - Save to `.claude/evolve/tools/<tool-name>.sh` (or appropriate extension)
+   - Save to `.evolve/tools/<tool-name>.sh` (or appropriate extension)
    - Include a usage comment at the top
    - Include input validation and error handling
 4. **Register** — add a tool entry to `state.json` under `synthesizedTools`:
    ```json
-   {"name": "<tool-name>", "path": ".claude/evolve/tools/<name>", "purpose": "<what it does>", "cycle": <N>, "useCount": 0}
+   {"name": "<tool-name>", "path": ".evolve/tools/<name>", "purpose": "<what it does>", "cycle": <N>, "useCount": 0}
    ```
 5. **Log** — add a `tool-synthesis` entry to the ledger
 
