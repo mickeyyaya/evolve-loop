@@ -80,7 +80,7 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.claude/evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"maxCyclesPerSession":10,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
    ```
 
    **Compute cycle range** (after reading state.json):
@@ -88,9 +88,8 @@ Scout → [Task A, Task B, Task C]
    - `startCycle = lastCycleNumber + 1`
    - `endCycle = lastCycleNumber + cycles`
 
-   **Denial-of-wallet guardrails** (enforce after computing cycle range):
-   - Read `maxCyclesPerSession` (default 10) and `warnAfterCycles` (default 5) from state.json
-   - If `endCycle` > `maxCyclesPerSession`: HALT — "Requested cycles would reach cycle {endCycle}, exceeding maxCyclesPerSession ({maxCyclesPerSession}). Reduce the cycle count or update state.json to raise the cap."
+   **Cost awareness** (after computing cycle range):
+   - Read `warnAfterCycles` (default 5) from state.json
    - If `cycles` >= `warnAfterCycles`: WARN — "Running {cycles} cycles (cycle {startCycle}→{endCycle}). Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
 
 3. Auto-detect project context (language, framework, test commands, domain). Store as `projectContext`.

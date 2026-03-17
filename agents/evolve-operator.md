@@ -88,7 +88,7 @@ Based on your assessment, recommend:
 - **Risk flags** — anything that could derail the next cycle?
 
 ### 8. Session Summary (Final Cycle Only)
-If this is the last cycle of the session (i.e., `cycle >= maxCyclesPerSession` or the orchestrator signals `isLastCycle: true`), write `workspace/session-summary.md`:
+If this is the last cycle of the session (i.e., the orchestrator signals `isLastCycle: true`), write `workspace/session-summary.md`:
 
 ```markdown
 # Session Summary — Cycle {N}

@@ -19,7 +19,7 @@ The Auditor gates on MEDIUM+ severity findings. Both code quality issues and eva
 Each cycle extracts instincts (episodic, semantic, procedural categories) that future cycles can read. Instincts are specific and actionable. High-confidence instincts graduate to orchestrator policy. Memory consolidation runs every 3 cycles.
 
 ### 5. Safe Autonomy
-The Operator monitors for stalls, quality degradation, and repeated failures using delta metrics and MAP-Elites fitness scoring. It can HALT the loop, requiring human intervention. Denial-of-wallet guardrails cap cycles per session.
+The Operator monitors for stalls, quality degradation, and repeated failures using delta metrics and MAP-Elites fitness scoring. It can HALT the loop, requiring human intervention.
 
 ### 6. No External Dependencies
 All agents are self-contained. No dependency on external plugins or frameworks.

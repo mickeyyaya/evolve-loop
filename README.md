@@ -32,7 +32,7 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Capability gap detection** — synthesize new tools when existing ones can't handle a task
 - **MAP-Elites fitness** — multi-dimensional scoring (speed, quality, cost, novelty)
 - **Stop-hook context reset** — indefinite runtime via session handoff
-- **Denial-of-wallet guardrails** — configurable cycle caps prevent runaway sessions
+- **Cost awareness** — soft warning threshold for long-running sessions
 - **Multi-armed bandit task selection** — Thompson Sampling biases Scout toward historically high-reward task types
 - **Semantic task crossover** — recombines successful plan templates to generate novel task proposals
 - **Intrinsic novelty reward** — priority boost for tasks touching files not modified in 3+ cycles

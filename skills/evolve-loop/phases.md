@@ -509,8 +509,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    - Operator writes `workspace/next-cycle-brief.json` with `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, and `cycle` — consumed by Scout in Phase 1 of the next cycle.
    - If status is `HALT` → pause and present issues to user
 
-   **Cycle cap check** (inline, before launching Operator):
-   - If current cycle number > `maxCyclesPerSession` (from state.json, default 10): HALT — "Cumulative cycle cap reached ({maxCyclesPerSession}). Stop and review before continuing."
+   **Cost awareness check** (inline, before launching Operator):
    - If current cycle number >= `warnAfterCycles` (from state.json, default 5): include warning in Operator context
 
    **Update lastCycleNumber** in state.json to the current cycle number after each cycle completes.

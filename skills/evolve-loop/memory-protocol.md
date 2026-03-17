@@ -131,7 +131,6 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
       }
     ]
   },
-  "maxCyclesPerSession": 10,
   "warnAfterCycles": 5,
   "tokenBudget": {
     "perTask": 80000,
@@ -184,7 +183,6 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Completed tasks are never re-proposed
 - `prerequisites`: optional array of task slugs that must be `decision: "completed"` before a dependent task is eligible for building. Set when the Scout proposes a task with explicit dependencies. The orchestrator checks this field in Phase 1 and auto-defers any task whose prerequisites are unmet
 - `lastCycleNumber` (default 0): the last completed cycle number — used to compute the start of the next invocation (additive cycling)
-- `maxCyclesPerSession` (default 10): hard cap — orchestrator halts if cumulative cycle number would exceed this value
 - `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when requesting this many cycles in a single invocation
 - `mastery.level`: difficulty graduation — `novice` (0-2 successes, S only), `competent` (3-5, S+M), `proficient` (6+, S+M+L). Updated in Phase 4 after each successful ship
 - `mastery.consecutiveSuccesses`: reset to 0 on any audit failure, incremented on each successful ship
