@@ -66,6 +66,18 @@ Evaluates whether the current phase ordering is optimal:
 
 Topology changes are proposals only — they require human approval.
 
+## LLM-as-a-Judge Self-Evaluation
+
+Added in cycle 27, the LLM-as-a-Judge mechanism integrates automated self-evaluation into the meta-cycle review process. Rather than relying solely on grep-based eval graders, the pipeline uses a judge LLM to assess build quality on subjective dimensions:
+
+- **Correctness** — Does the implementation satisfy the task intent, not just the letter of the eval graders?
+- **Coherence** — Are the changes internally consistent and well-integrated with existing code?
+- **Regression risk** — Does the change introduce fragility or break adjacent contracts?
+
+The judge produces a structured verdict (PASS / WARN / FAIL) with a reasoning trace. This verdict feeds into the meta-cycle's agent effectiveness review and informs prompt evolution priorities.
+
+See [docs/self-learning.md](./self-learning.md) for the full self-evaluation rubric, scoring weights, and integration with the learn process reward.
+
 ## Output
 
 The meta-cycle produces `workspace/meta-review.md` with:
@@ -74,3 +86,4 @@ The meta-cycle produces `workspace/meta-review.md` with:
 - Recommended changes
 - Mutation testing results
 - Topology recommendations (if any)
+- LLM-as-a-Judge self-evaluation summary
