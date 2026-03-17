@@ -31,6 +31,8 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Island model** — parallel configuration evolution with trait migration (advanced)
 - **Capability gap detection** — synthesize new tools when existing ones can't handle a task
 - **MAP-Elites fitness** — multi-dimensional scoring (speed, quality, cost, novelty)
+- **LLM-as-a-Judge self-evaluation** — structured rubric scores each cycle on correctness, quality, and safety before shipping
+- **Self-learning architecture** — 7 mechanisms (instinct extraction, meta-cycle, prompt evolution, gene library, curriculum, process rewards, mutation testing) compound across cycles
 - **Stop-hook context reset** — indefinite runtime via session handoff
 - **Cost awareness** — soft warning threshold for long-running sessions
 - **Multi-armed bandit task selection** — Thompson Sampling biases Scout toward historically high-reward task types
@@ -217,7 +219,10 @@ evolve-loop/
 │   ├── genes.md               # Gene/Capsule library docs
 │   ├── instincts.md           # Instinct system docs
 │   ├── island-model.md        # Island model evolution docs
+│   ├── memory-hierarchy.md    # Memory hierarchy guide (layers 0-6, access matrix)
 │   ├── meta-cycle.md           # Meta-cycle review docs
+│   ├── self-learning.md       # Self-learning architecture (7 mechanisms)
+│   ├── token-optimization.md  # Token optimization strategies
 │   └── writing-agents.md      # Guide for creating agents
 ├── examples/
 │   ├── eval-definition.md     # Annotated eval definition example
