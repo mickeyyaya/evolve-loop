@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.9.0] - 2026-03-17
+
+### Added
+- **LLM-as-a-Judge self-evaluation** — 4-dimension scoring rubric (Correctness, Completeness, Novelty, Efficiency) with chain-of-thought justification in Phase 5 LEARN
+- **Instinct extraction trigger** — active forcing function when instinct extraction stalls for 2+ consecutive cycles (MemRL pattern)
+- **Shared values protocol** — Layer 0 team constitution with behavioral rules for parallel agent coordination and KV-cache optimization
+- **Token optimization guide** — comprehensive reference doc covering all 8 token-saving mechanisms
+- **Self-learning architecture doc** — unified reference for the full self-learning pipeline, feedback loops, and anti-patterns
+- **Memory hierarchy guide** — reader-friendly architecture doc for all 6 memory layers with agent access matrix
+
 ## [6.8.0] - 2026-03-15
 
 ### Added
