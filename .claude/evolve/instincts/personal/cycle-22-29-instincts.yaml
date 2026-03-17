@@ -1,0 +1,51 @@
+# Instincts extracted from cycles 22-29
+# Source: meta-cycle analysis of 24 tasks shipped across 8 cycles
+# Extracted: cycle-30
+
+- id: inst-018
+  pattern: "new-file-over-hotspot-edit"
+  description: "Creating new docs/ or config files is safer and faster than editing high-traffic hotspot files (phases.md, architecture.md). Cycles 28-29 demonstrated zero merge conflicts across 6 parallel new-file creates. When a task can be accomplished with a new file instead of modifying a shared hotspot, prefer the new file."
+  confidence: 0.9
+  source: "cycle-28/meta-extraction"
+  type: "successful-pattern"
+  category: "procedural"
+
+- id: inst-019
+  pattern: "parallel-worktree-builds"
+  description: "Independent tasks targeting different files can be built in parallel worktrees with zero conflicts. Validated in cycles 28-29 with 6 parallel builds. Key condition: tasks must target non-overlapping files. The bandit task selector (cycle 22) and prerequisite graph (cycle 23) together enable safe parallelism by identifying independent task clusters."
+  confidence: 0.85
+  source: "cycle-28/meta-extraction"
+  type: "successful-pattern"
+  category: "procedural"
+
+- id: inst-020
+  pattern: "research-then-build-pattern"
+  description: "A 3-cycle pattern of research → build → polish is effective for knowledge-intensive goals. Cycle 27 (LLM-as-a-Judge rubric, instinct extraction trigger, shared values protocol) established the conceptual framework; cycle 28 built the doc artifacts; cycle 29 polished with cross-references and changelog. This pattern reduces rework by front-loading design decisions."
+  confidence: 0.8
+  source: "cycle-27/meta-extraction"
+  type: "technique"
+  category: "procedural"
+
+- id: inst-021
+  pattern: "version-bump-as-closing-task"
+  description: "Every multi-cycle feature arc should end with a version bump + changelog task to crystallize the work. Cycles 24 (v6.7.0), 26 (v6.8.0), and 29 (v6.9.0) all used this pattern successfully. The version bump signals feature completion, creates a clean rollback point, and forces explicit documentation of what was shipped."
+  confidence: 0.9
+  source: "cycle-24/meta-extraction"
+  type: "convention"
+  category: "procedural"
+
+- id: inst-022
+  pattern: "meta-cycle-extraction-stall"
+  description: "When instinctsExtracted == 0 for 5+ consecutive cycles, passive observation is insufficient — an active forcing function (explicit extraction task) is required. Cycles 22-29 shipped 24 tasks with zero instinct extractions until cycle 30 forced the issue. The instinct extraction trigger (cycle 27) and the explicit task (cycle 30) were the correct fix."
+  confidence: 0.85
+  source: "cycle-29/meta-extraction"
+  type: "anti-pattern"
+  category: "episodic"
+
+- id: inst-023
+  pattern: "agent-mailbox-coordination"
+  description: "The agent mailbox (added cycle 24) enables low-overhead cross-agent coordination without requiring synchronous communication. Builders use it to flag fragile files for the Auditor and coupled docs for the Scout. Cycles 24-29 demonstrated that scout hints in the mailbox reduce builder rework by providing context that is not captured in the task spec."
+  confidence: 0.75
+  source: "cycle-24/meta-extraction"
+  type: "successful-pattern"
+  category: "semantic"
