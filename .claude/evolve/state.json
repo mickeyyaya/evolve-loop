@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-03-17T12:00:00Z",
-  "lastCycleNumber": 29,
+  "lastUpdated": "2026-03-17T14:00:00Z",
+  "lastCycleNumber": 31,
   "strategy": "balanced",
   "research": {
     "queries": [
@@ -421,6 +421,31 @@
       "slug": "add-changelog-and-bump-v690",
       "decision": "completed",
       "cycle": 29
+    },
+    {
+      "slug": "populate-instinct-summary",
+      "decision": "completed",
+      "cycle": 30
+    },
+    {
+      "slug": "extract-instincts-cycles-22-29",
+      "decision": "completed",
+      "cycle": 30
+    },
+    {
+      "slug": "update-meta-cycle-doc-and-learn-score",
+      "decision": "completed",
+      "cycle": 30
+    },
+    {
+      "slug": "sync-instinct-summary-cycle31",
+      "decision": "completed",
+      "cycle": 31
+    },
+    {
+      "slug": "add-extraction-schedule-hint",
+      "decision": "completed",
+      "cycle": 31
     }
   ],
   "failedApproaches": [],
@@ -529,27 +554,180 @@
         "instinctsExtracted": 0,
         "stagnationPatterns": 0
       }
+    },
+    {
+      "cycle": 30,
+      "verdict": "PASS",
+      "checks": 12,
+      "passed": 12,
+      "failed": 0,
+      "delta": {
+        "tasksShipped": 3,
+        "tasksAttempted": 3,
+        "auditIterations": 1.0,
+        "successRate": 1.0,
+        "instinctsExtracted": 6,
+        "stagnationPatterns": 0
+      }
+    },
+    {
+      "cycle": 31,
+      "verdict": "PASS",
+      "checks": 4,
+      "passed": 4,
+      "failed": 0,
+      "delta": {
+        "tasksShipped": 2,
+        "tasksAttempted": 2,
+        "auditIterations": 1.0,
+        "successRate": 1.0,
+        "instinctsExtracted": 0,
+        "stagnationPatterns": 0
+      }
     }
   ],
-  "instinctCount": 24,
+  "instinctCount": 23,
   "instinctSummary": [
-    {"id": "inst-001", "pattern": "wt-cli-not-real", "confidence": 0.6, "type": "anti-pattern"},
-    {"id": "inst-002", "pattern": "ecc-overlay-not-copy", "confidence": 0.8, "type": "architecture"},
-    {"id": "inst-003", "pattern": "ledger-ts-not-timestamp", "confidence": 0.9, "type": "convention"},
-    {"id": "inst-004", "pattern": "grep-based-evals-effective", "confidence": 0.95, "type": "successful-pattern", "graduated": true},
-    {"id": "inst-005", "pattern": "docs-lag-after-changes", "confidence": 0.9, "type": "anti-pattern"},
-    {"id": "inst-006", "pattern": "ci-mode-for-scripts", "confidence": 0.6, "type": "successful-pattern"},
-    {"id": "inst-007", "pattern": "orchestrator-as-builder", "confidence": 0.9, "type": "process", "graduated": true},
-    {"id": "inst-008", "pattern": "plugin-manifest-must-declare-components", "confidence": 0.8, "type": "convention"},
-    {"id": "inst-009", "pattern": "docs-lag-behind-implementation", "confidence": 0.7, "type": "anti-pattern"},
-    {"id": "inst-010", "pattern": "deferred-security-escalates", "confidence": 0.7, "type": "process"},
-    {"id": "inst-011", "pattern": "version-sync-all-files", "confidence": 0.9, "type": "convention"},
-    {"id": "inst-012", "pattern": "v6-migration-check", "confidence": 0.8, "type": "convention"},
-    {"id": "inst-013", "pattern": "progressive-disclosure-over-inline", "confidence": 0.7, "type": "technique"},
-    {"id": "inst-014", "pattern": "activate-dormant-infrastructure", "confidence": 0.6, "type": "process"},
-    {"id": "inst-015", "pattern": "signal-to-action-wiring", "confidence": 0.7, "type": "process"},
-    {"id": "inst-016", "pattern": "gap-detection-over-degradation-only", "confidence": 0.7, "type": "architecture"},
-    {"id": "inst-017", "pattern": "citation-driven-confidence-over-passive-observation", "confidence": 0.6, "type": "process"}
+    {
+      "id": "inst-001",
+      "pattern": "wt-cli-not-real",
+      "confidence": 0.6,
+      "type": "anti-pattern"
+    },
+    {
+      "id": "inst-002",
+      "pattern": "ecc-overlay-not-copy",
+      "confidence": 0.8,
+      "type": "architecture"
+    },
+    {
+      "id": "inst-003",
+      "pattern": "ledger-ts-not-timestamp",
+      "confidence": 0.9,
+      "type": "convention"
+    },
+    {
+      "id": "inst-004",
+      "pattern": "grep-based-evals-effective",
+      "confidence": 0.95,
+      "type": "successful-pattern",
+      "graduated": true
+    },
+    {
+      "id": "inst-005",
+      "pattern": "docs-lag-after-changes",
+      "confidence": 0.9,
+      "type": "anti-pattern"
+    },
+    {
+      "id": "inst-006",
+      "pattern": "ci-mode-for-scripts",
+      "confidence": 0.6,
+      "type": "successful-pattern"
+    },
+    {
+      "id": "inst-007",
+      "pattern": "orchestrator-as-builder",
+      "confidence": 0.9,
+      "type": "process",
+      "graduated": true
+    },
+    {
+      "id": "inst-008",
+      "pattern": "plugin-manifest-must-declare-components",
+      "confidence": 0.8,
+      "type": "convention"
+    },
+    {
+      "id": "inst-009",
+      "pattern": "docs-lag-behind-implementation",
+      "confidence": 0.7,
+      "type": "anti-pattern"
+    },
+    {
+      "id": "inst-010",
+      "pattern": "deferred-security-escalates",
+      "confidence": 0.7,
+      "type": "process"
+    },
+    {
+      "id": "inst-011",
+      "pattern": "version-sync-all-files",
+      "confidence": 0.9,
+      "type": "convention"
+    },
+    {
+      "id": "inst-012",
+      "pattern": "v6-migration-check",
+      "confidence": 0.8,
+      "type": "convention"
+    },
+    {
+      "id": "inst-013",
+      "pattern": "progressive-disclosure-over-inline",
+      "confidence": 0.7,
+      "type": "technique"
+    },
+    {
+      "id": "inst-014",
+      "pattern": "activate-dormant-infrastructure",
+      "confidence": 0.6,
+      "type": "process"
+    },
+    {
+      "id": "inst-015",
+      "pattern": "signal-to-action-wiring",
+      "confidence": 0.7,
+      "type": "process"
+    },
+    {
+      "id": "inst-016",
+      "pattern": "gap-detection-over-degradation-only",
+      "confidence": 0.7,
+      "type": "architecture"
+    },
+    {
+      "id": "inst-017",
+      "pattern": "citation-driven-confidence-over-passive-observation",
+      "confidence": 0.6,
+      "type": "process"
+    },
+    {
+      "id": "inst-018",
+      "pattern": "new-file-over-hotspot-edit",
+      "confidence": 0.5,
+      "type": "successful-pattern"
+    },
+    {
+      "id": "inst-019",
+      "pattern": "parallel-worktree-builds",
+      "confidence": 0.5,
+      "type": "successful-pattern"
+    },
+    {
+      "id": "inst-020",
+      "pattern": "research-then-build-pattern",
+      "confidence": 0.5,
+      "type": "technique"
+    },
+    {
+      "id": "inst-021",
+      "pattern": "version-bump-as-closing-task",
+      "confidence": 0.5,
+      "type": "convention"
+    },
+    {
+      "id": "inst-022",
+      "pattern": "meta-cycle-extraction-stall",
+      "confidence": 0.5,
+      "type": "anti-pattern"
+    },
+    {
+      "id": "inst-023",
+      "pattern": "agent-mailbox-coordination",
+      "confidence": 0.5,
+      "type": "successful-pattern"
+    }
   ],
   "operatorWarnings": [],
   "maxCyclesPerSession": 30,
@@ -643,7 +821,7 @@
   ],
   "mastery": {
     "level": "proficient",
-    "consecutiveSuccesses": 33
+    "consecutiveSuccesses": 38
   },
   "synthesizedTools": [],
   "processRewards": {
@@ -651,7 +829,7 @@
     "build": 1.0,
     "audit": 1.0,
     "ship": 1.0,
-    "learn": 0.0
+    "learn": 0.5
   },
   "skillMetrics": {
     "measuredAt": "2026-03-14T11:00:00Z",
@@ -718,15 +896,26 @@
   ],
   "fitnessRegression": false,
   "ledgerSummary": {
-    "totalEntries": 62,
+    "totalEntries": 68,
     "cycleRange": [
       1,
-      29
+      31
     ],
-    "scoutRuns": 25,
-    "builderRuns": 59,
-    "totalTasksShipped": 78,
+    "scoutRuns": 27,
+    "builderRuns": 64,
+    "totalTasksShipped": 83,
     "totalTasksFailed": 0,
-    "avgTasksPerCycle": 2.69
-  }
+    "avgTasksPerCycle": 2.68
+  },
+  "pendingImprovements": [
+    {
+      "dimension": "learn",
+      "score": 0.0,
+      "sustained": true,
+      "suggestedTask": "extract instincts from cycles 30-34",
+      "cycle": 31,
+      "priority": "medium",
+      "nextExtractionCycle": 34
+    }
+  ]
 }
