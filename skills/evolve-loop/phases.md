@@ -391,7 +391,13 @@ After all tasks pass audit but before committing in Phase 4, run a targeted benc
 
 ### Phase 4: SHIP (orchestrator inline — MANDATORY)
 
-No agent needed. The orchestrator handles shipping directly. **This phase is not optional — every cycle MUST commit and push.**
+No agent needed. The orchestrator handles shipping directly. **This phase is not optional — every cycle MUST persist and distribute completed work.**
+
+The ship mechanism depends on `projectContext.shipMechanism` (set during initialization step 3):
+
+#### Ship by domain (`projectContext.shipMechanism`)
+
+**`git` (default — coding domain):**
 
 1. **Verify all commits are clean:**
    ```bash
@@ -399,7 +405,7 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    git log --oneline -<N>  # verify N commits from this cycle
    ```
 
-2. **Commit any uncommitted changes** (if tasks were implemented inline by orchestrator):
+2. **Commit any uncommitted changes:**
    ```bash
    git add <changed files>
    git commit -m "<type>: <description>"
@@ -409,13 +415,32 @@ No agent needed. The orchestrator handles shipping directly. **This phase is not
    ```bash
    git push origin <branch>
    ```
-   This is mandatory after every cycle. The cycle is not complete until code is pushed.
+   The cycle is not complete until code is pushed.
 
 4. **Publish plugin update:**
    ```bash
    ./publish.sh
    ```
-   This syncs the local plugin cache and registry so all new AI CLI sessions automatically load the latest version. The script auto-detects the version from `plugin.json`, validates source files, populates the cache, and updates the registry. **This step is mandatory after every push** — without it, new sessions will load a stale version.
+   Syncs the local plugin cache and registry. **Mandatory after every push.**
+
+**`file-save` (writing, research domains):**
+
+1. **Verify changes are saved:** All modified files exist and are non-empty.
+2. **Create backup:** Copy changed files to `.evolve/history/cycle-{N}/output/` as a restore point.
+3. **Log ship event** in the ledger (no git operations needed):
+   ```json
+   {"ts":"<ISO-8601>","cycle":<N>,"role":"orchestrator","type":"ship","data":{"mechanism":"file-save","files":["<list>"]}}
+   ```
+4. **Skip publish.sh** — plugin publishing is coding-domain only.
+
+**`export` (design domain):**
+
+1. **Export artifacts** from source files (e.g., SVG export, asset compilation).
+2. **Save to output directory:** `.evolve/history/cycle-{N}/exports/`
+3. **Log ship event** in the ledger.
+4. **Skip publish.sh.**
+
+**`custom`:** Read ship commands from `.evolve/domain.json` `shipCommands` array and execute each in order. Fall back to `file-save` if `shipCommands` is not defined.
 
 5. **Clear non-persistent mailbox messages:**
    Remove rows from `workspace/agent-mailbox.md` where `persistent` is `false`. Retain rows where `persistent` is `true` so cross-cycle warnings survive into the next cycle.

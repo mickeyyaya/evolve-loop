@@ -176,6 +176,24 @@ At the end of each cycle, the Operator writes two outputs: a `next-cycle-brief` 
 
 See [domain-adapters.md](domain-adapters.md) for the full adapter interface. The pipeline is structurally domain-agnostic; four touch points (build isolation, ship mechanism, eval graders, auto-detection) are currently coding-specific and can be swapped via adapters to support writing, research, and design domains.
 
+### Generalization Status
+
+**Completed (cycles 3-5):**
+- Domain adapter abstraction with 4 touch points identified and documented
+- Domain auto-detection signals for coding, writing, research, and design
+- Manual override via `.evolve/domain.json` with `evalMode`, `shipMechanism`, `buildIsolation` fields
+- Non-code eval grader patterns: rubric-based (writing), groundedness check (research), coverage check
+- Domain-aware initialization in SKILL.md with defaults table per domain
+- Domain-aware Phase 4 SHIP with git/file-save/export/custom mechanisms
+- Writing domain walkthrough in showcase.md demonstrating the full non-code pipeline
+
+**Remaining work:**
+- Phase 2 BUILD isolation adapter (file-copy for non-git projects) — not yet implemented in phases.md
+- Domain-specific benchmark dimensions (e.g., "prose clarity" instead of "modularity" for writing)
+- Research domain walkthrough and eval examples
+- Design domain detection and export pipeline
+- End-to-end validation: run `/evolve-loop` on an actual writing project
+
 ## Context Management
 
 At 60% context usage, the orchestrator writes a `handoff.md` file with session state, then the stop-hook resets context. The next conversation resumes from `handoff.md`, enabling indefinite runtime across context boundaries.
