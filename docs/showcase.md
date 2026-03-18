@@ -307,3 +307,73 @@ Each feature is independently useful. Together they form a closed loop: Scout se
 ```
 
 See [architecture.md](architecture.md) for a deep dive into data flow, and [instincts.md](instincts.md) for the instinct extraction and graduation system.
+
+---
+
+## Writing Domain Walkthrough
+
+The evolve-loop is not limited to code. Here's how the same pipeline works for a **writing project** — a technical blog maintained as a collection of Markdown articles.
+
+### Setup: domain.json
+
+```json
+{
+  "domain": "writing",
+  "evalMode": "rubric",
+  "shipMechanism": "file-save",
+  "buildIsolation": "file-copy"
+}
+```
+
+This tells the orchestrator: use LLM rubric grading instead of bash exit codes, save files instead of git commit/push, and copy files for isolation instead of git worktrees.
+
+### Scout discovers a task
+
+The Scout scans the writing project and finds:
+- `articles/api-design.md` has a "TODO: add rate limiting section" placeholder
+- No article covers the new v2 API endpoints announced last month
+
+It selects: **"Add rate limiting section to api-design.md"** (S-complexity, feature).
+
+### Eval definition: Rubric Grader (not bash)
+
+Instead of `grep -q "rate limit" articles/api-design.md`, the eval uses a rubric:
+
+```markdown
+# Eval: add-rate-limiting-section
+
+## Rubric Grader
+- Criterion: "Completeness — does the section cover rate limit headers, quotas, and retry guidance?"
+  - 0: Section missing or placeholder only
+  - 25: Mentions rate limiting but missing key details
+  - 50: Covers basics but missing retry guidance
+  - 75: Covers headers, quotas, and retry — minor gaps
+  - 100: Comprehensive coverage with examples
+- Model: haiku
+- Threshold: average score >= 60 to pass
+
+## Coverage Check
+- Required: ["Rate Limit Headers", "Quota Tiers", "Retry-After"]
+- Threshold: 100%
+```
+
+### Builder implements
+
+The Builder copies `articles/api-design.md` to a temp directory (file-copy isolation — no git worktree needed), writes the new section, and self-verifies against the rubric.
+
+### Ship mechanism: file-save (not git)
+
+Instead of `git commit && git push`, the orchestrator:
+1. Saves the updated file in place
+2. Logs the change in the ledger
+3. No git operations needed — the project may not even have a `.git` directory
+
+### What stays the same
+
+Everything else is identical to the coding walkthrough above:
+- Instinct extraction still runs in Phase 5
+- The Operator still checks for stalls and quality trends
+- Bandit task selection still tracks which task types succeed
+- The benchmark eval still scores project quality (dimensions may differ)
+
+The domain adapter swaps only the 4 touch points. The learning loop itself is universal.

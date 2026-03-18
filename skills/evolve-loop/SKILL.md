@@ -94,7 +94,57 @@ Scout → [Task A, Task B, Task C]
    - Read `warnAfterCycles` (default 5) from state.json
    - If `cycles` >= `warnAfterCycles`: WARN — "Running {cycles} cycles (cycle {startCycle}→{endCycle}). Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
 
-3. Auto-detect project context (language, framework, test commands, domain). Store as `projectContext`.
+3. **Detect project context and domain:**
+
+   **Step 3a — Check for domain override:**
+   ```bash
+   cat .evolve/domain.json 2>/dev/null
+   ```
+   If `.evolve/domain.json` exists, read its fields and merge into `projectContext`:
+   ```json
+   {
+     "domain": "coding|writing|research|design|mixed",
+     "evalMode": "bash|rubric|hybrid",
+     "shipMechanism": "git|file-save|export|custom",
+     "buildIsolation": "worktree|file-copy|branch|none"
+   }
+   ```
+
+   **Step 3b — Auto-detect (when domain.json absent or incomplete):**
+   Scan the project root for domain signals:
+   - `package.json`, `go.mod`, `Cargo.toml`, `*.py`, test commands → `domain: "coding"`
+   - `*.md`/`*.docx`/`*.txt` majority (>60%), no build commands → `domain: "writing"`
+   - `*.md` with citation patterns, `references/` dir → `domain: "research"`
+   - `*.figma`/`*.sketch`/`*.svg` majority → `domain: "design"`
+   - Default: `"coding"` (backward-compatible)
+
+   **Step 3c — Build projectContext:**
+   ```json
+   {
+     "projectContext": {
+       "domain": "<detected or overridden>",
+       "language": "<detected>",
+       "framework": "<detected>",
+       "testCommand": "<detected>",
+       "evalMode": "<from domain.json or default based on domain>",
+       "shipMechanism": "<from domain.json or default based on domain>",
+       "buildIsolation": "<from domain.json or default based on domain>"
+     }
+   }
+   ```
+
+   **Domain defaults** (when domain.json doesn't specify):
+   | Domain | evalMode | shipMechanism | buildIsolation |
+   |--------|----------|---------------|----------------|
+   | coding | bash | git | worktree |
+   | writing | rubric | file-save | file-copy |
+   | research | hybrid | file-save | file-copy |
+   | design | rubric | export | file-copy |
+   | mixed | hybrid | git | worktree |
+
+   `projectContext.domain` is passed to all agents via context blocks. Agents use it to select appropriate eval graders (see [eval-runner.md](eval-runner.md) Non-Code Eval Graders) and ship mechanisms (see [docs/domain-adapters.md](../docs/domain-adapters.md)).
+
+   See [docs/configuration.md](../docs/configuration.md) Domain Detection for full signal tables and override documentation.
 
 4. **Pre-flight check** (inline, no agent):
    ```bash
