@@ -48,7 +48,7 @@ The evolve-loop uses a 70/30 split in benchmark evaluation: 70% automated (deter
 
 ## Policy Graduation Lifecycle
 
-Policies evolve through a confidence-gated pipeline:
+See [skill-building.md](skill-building.md) for the full lifecycle reference. Policies evolve through a confidence-gated pipeline:
 
 ```
 Observation → Instinct (0.5) → Confirmed Instinct (0.8+) → Orchestrator Policy (0.9+)

@@ -118,6 +118,35 @@ The anti-pattern is "eager loading" — dumping all available context into every
 
 When agents return results, the orchestrator extracts only the essential output (task list, verdict, score) rather than passing raw agent output to downstream agents. Target: each agent-to-agent handoff should carry under 2K tokens of context. The workspace file pattern (scout-report.md, build-report.md, audit-report.md) enforces this by giving each agent a structured, bounded output format.
 
+### Context Window Management (Stop-Hook Pattern)
+
+The evolve-loop uses a **60% capacity threshold** to prevent context exhaustion mid-cycle. After each cycle completes, the orchestrator assesses context window usage:
+
+- **Below 60%:** Continue to next cycle normally.
+- **At or above 60%:** Write a `handoff.md` file and stop gracefully.
+
+The `handoff.md` file carries all context needed to resume in a fresh session:
+
+```markdown
+# Cycle Handoff — Cycle {N}
+
+## Session State
+- Cycles completed this session: <count>
+- Strategy: <current strategy>
+- Goal: <goal or null>
+- Remaining cycles: <endCycle - currentCycle>
+
+## Key Context to Carry Forward
+- Active stagnation patterns: <list>
+- Unresolved operator warnings: <list>
+- Last delta metrics: <summary>
+
+## Resume Command
+`/evolve-loop <remaining cycles> [strategy] [goal]`
+```
+
+This enables **indefinite runtime** across sessions. The next `/evolve-loop` invocation reads `handoff.md` during initialization and applies the carried-forward context. The key insight: it's better to stop cleanly at 60% and resume with full context capacity than to push to 90%+ and risk mid-cycle truncation where partial work is lost.
+
 ### Minimal Non-Overlapping Tool Sets
 
 Each agent receives only the tools it needs. Scout gets Read/Grep/Glob/Bash/WebSearch/WebFetch (discovery tools). Builder gets Read/Write/Edit/Bash/Grep/Glob (implementation tools). Auditor gets Read/Grep/Glob/Bash (review tools). Operator gets Read/Grep/Glob (assessment tools). No agent receives tools it doesn't use — this reduces tool-description overhead in the prompt and prevents misuse.
