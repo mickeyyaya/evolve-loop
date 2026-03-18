@@ -55,9 +55,11 @@ Examples:
 ## Architecture
 
 ```
+Phase 0:   CALIBRATE ── orchestrator ── project benchmark scoring (once per invocation)
 Phase 1:   DISCOVER ─── sequential ─── [Scout] scan + research + task selection
 Phase 2:   BUILD ────── sequential ─── [Builder] design + implement + self-test (worktree)
 Phase 3:   AUDIT ────── sequential ─── [Auditor] review + security + eval gate
+           Δ CHECK ──── orchestrator ── benchmark delta gate (between AUDIT and SHIP)
 Phase 4:   SHIP ──────── orchestrator ── commit + push (inline, no agent)
 Phase 5:   LEARN ──────── orchestrator ── archive + instinct extraction + operator check
 ```
@@ -80,7 +82,7 @@ Scout → [Task A, Task B, Task C]
 
 2. Read `.evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"projectBenchmark":{"lastCalibrated":null,"calibrationCycle":0,"overall":0,"dimensions":{},"history":[],"highWaterMarks":{}},"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
    ```
 
    **Compute cycle range** (after reading state.json):

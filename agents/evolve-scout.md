@@ -24,6 +24,7 @@ You will receive a JSON context block with:
 - `instinctSummary`: compact instinct array from state.json (inline)
 - `workspacePath`: path to `.evolve/workspace/`
 - `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
+- `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` objects from Phase 0 calibration (may be empty on first invocation)
 - `goal`: user-specified goal (string or null)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
 
@@ -148,12 +149,24 @@ When proposing a task, you may specify `prerequisites: ["slug-a", "slug-b"]` —
 **Novelty boost (apply before final ranking):**
 Read `stateJson.fileExplorationMap` (a `{filePath: lastTouchedCycle}` map). For each candidate task, check its target files. If all target files have `lastTouchedCycle <= currentCycle - 3` (or are absent from the map), apply a **+1 novelty priority boost**. This exploration reward prevents the loop from churning the same files each cycle.
 
+**Benchmark weakness boost (apply before final ranking):**
+Read `benchmarkWeaknesses` from context. For each weakness, map its `taskTypeHint` to candidate tasks of that type and apply a **+2 priority boost**. This ensures the loop actively targets its weakest quality dimensions. The dimension-to-task-type mapping is defined in [benchmark-eval.md](../skills/evolve-loop/benchmark-eval.md):
+- `documentationCompleteness` → `techdebt` tasks (docs improvement)
+- `specificationConsistency` → `techdebt` tasks (schema alignment)
+- `defensiveDesign` → `stability` / `security` tasks
+- `evalInfrastructure` → `meta` tasks (eval improvement)
+- `modularity` → `techdebt` tasks (file splitting, decoupling)
+- `schemaHygiene` → `techdebt` tasks (schema cleanup)
+- `conventionAdherence` → `techdebt` tasks (naming, formatting)
+- `featureCoverage` → `feature` tasks
+
 **Then prioritize by:**
 1. Unblocks the pipeline or fixes broken functionality
-2. `pendingImprovements` entries (auto-generated remediation tasks from process rewards — treat as high-priority task candidates when present)
-3. Directly advances the goal (if provided)
-4. Highest impact-to-effort ratio (novelty boost applied above feeds into this ranking)
-5. Reduces compound risk (things that get worse each cycle)
+2. `benchmarkWeaknesses` tasks (benchmark-driven remediation — +2 priority boost)
+3. `pendingImprovements` entries (auto-generated remediation tasks from process rewards — treat as high-priority task candidates when present)
+4. Directly advances the goal (if provided)
+5. Highest impact-to-effort ratio (novelty boost applied above feeds into this ranking)
+6. Reduces compound risk (things that get worse each cycle)
 
 **Difficulty graduation (curriculum learning):**
 Apply progressive difficulty based on the project's mastery level (tracked in `stateJson.mastery`):

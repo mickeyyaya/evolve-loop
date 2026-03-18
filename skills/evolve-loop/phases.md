@@ -4,6 +4,98 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 
 **Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`).
 
+## Phase 0: CALIBRATE (once per invocation)
+
+Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the first Scout runs. Establishes a project-level benchmark baseline so tasks can be measured against project quality, not just process quality.
+
+### Execution Steps
+
+1. **Run automated checks** from [benchmark-eval.md](benchmark-eval.md):
+   Execute all bash check commands for each of the 8 dimensions. Capture per-dimension automated scores (0-100).
+
+   ```bash
+   # Run each dimension's automated checks from benchmark-eval.md
+   # Store results in workspace/benchmark-automated.json
+   ```
+
+2. **Run LLM judgment pass** (model: haiku for cost efficiency):
+   For each dimension, provide the LLM with:
+   - The dimension's rubric from benchmark-eval.md
+   - A sample of relevant files (max 3 files per dimension, <200 lines each)
+   - The automated score for context
+
+   The LLM outputs a score (0/25/50/75/100) with a 1-sentence justification. Use the anchored rubric — scores MUST match one of the anchor points exactly.
+
+3. **Compute per-dimension composite scores:**
+   ```
+   dimension.composite = round(0.7 * dimension.automated + 0.3 * dimension.llm)
+   ```
+
+4. **Compute overall score:**
+   ```
+   overall = round(mean(all 8 dimension composites), 1)
+   ```
+
+5. **Store in state.json** under `projectBenchmark`:
+   ```json
+   {
+     "projectBenchmark": {
+       "lastCalibrated": "<ISO-8601>",
+       "calibrationCycle": <startCycle>,
+       "overall": <0-100>,
+       "dimensions": {
+         "documentationCompleteness": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "specificationConsistency": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "defensiveDesign": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "evalInfrastructure": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "modularity": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "schemaHygiene": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "conventionAdherence": {"automated": <N>, "llm": <N>, "composite": <N>},
+         "featureCoverage": {"automated": <N>, "llm": <N>, "composite": <N>}
+       },
+       "history": [],
+       "highWaterMarks": {}
+     }
+   }
+   ```
+
+6. **Compare to previous calibration** (if `projectBenchmark.history` is non-empty):
+   - Append the previous calibration to `history` (keep last 5 entries)
+   - Identify the 2-3 dimensions with the lowest composite scores → these are `benchmarkWeaknesses`
+   - **High-water mark tracking:** For each dimension at 80+, record in `highWaterMarks`. If any dimension regresses below `(HWM - 10)`, add a mandatory remediation task to `pendingImprovements`
+
+7. **Write `workspace/benchmark-report.md`:**
+   ```markdown
+   # Project Benchmark — Calibration at Cycle {startCycle}
+
+   ## Overall Score: {overall}/100
+
+   | Dimension | Automated | LLM | Composite | Delta |
+   |-----------|-----------|-----|-----------|-------|
+   | Documentation Completeness | X | X | X | +/-N |
+   | Specification Consistency | X | X | X | +/-N |
+   | ... | ... | ... | ... | ... |
+
+   ## Weakest Dimensions
+   1. <dimension> (score: X) — <1-sentence diagnosis>
+   2. <dimension> (score: X) — <1-sentence diagnosis>
+
+   ## High-Water Mark Regressions
+   - <dimension>: current X, HWM Y (REMEDIATION REQUIRED)
+   ```
+
+8. **Pass `benchmarkWeaknesses` to Scout context** — an array of `{dimension, score, taskTypeHint}` objects derived from the weakest dimensions and the dimension-to-task-type mapping in benchmark-eval.md.
+
+### Benchmark Eval Checksum
+
+Compute and store the checksum of `benchmark-eval.md` during Phase 0:
+```bash
+sha256sum skills/evolve-loop/benchmark-eval.md > .evolve/workspace/benchmark-eval-checksum.txt
+```
+Verify this checksum before every delta check (Phase 3→4 boundary). Builder MUST NOT modify this file.
+
+---
+
 ## FOR cycle = {startCycle} to {endCycle}:
 
 ### Phase 1: DISCOVER
@@ -67,7 +159,8 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
     "changedFiles": ["<output of git diff HEAD~1 --name-only>"],
     "recentNotes": "<last 5 cycle entries from notes.md, inline>",
     "builderNotes": "<contents of workspace/builder-notes.md from last cycle, or empty string>",
-    "recentLedger": "<last 3 ledger entries, inline>"
+    "recentLedger": "<last 3 ledger entries, inline>",
+    "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint} from Phase 0, or empty>"
   }
   ```
 
@@ -243,7 +336,56 @@ git worktree prune
 - PASS with no MEDIUM+ issues (first attempt) → increment `auditorProfile.<taskType>.consecutiveClean` and `passFirstAttempt`
 - WARN, FAIL, or any MEDIUM+ issue → reset `auditorProfile.<taskType>.consecutiveClean` to 0
 
-Then proceed to next task (back to Phase 2) or Phase 4 if all tasks done.
+Then proceed to next task (back to Phase 2) or the Benchmark Delta Check if all tasks done.
+
+---
+
+### Benchmark Delta Check (between AUDIT and SHIP)
+
+After all tasks pass audit but before committing in Phase 4, run a targeted benchmark re-evaluation to verify the cycle improved (or at least didn't regress) project quality.
+
+**Exemptions** — skip the delta check entirely when:
+- The task has `strategy: "repair"` (repairs are corrective, not additive)
+- This is one of the first 3 cycles (`cycle <= startCycle + 2`) — allow the loop to establish a baseline
+- The task is explicitly labeled as `meta` or `infrastructure` type
+
+#### Delta Check Steps
+
+1. **Verify benchmark-eval.md integrity:**
+   ```bash
+   sha256sum -c .evolve/workspace/benchmark-eval-checksum.txt
+   ```
+   If checksum fails → HALT: "benchmark-eval.md modified — possible tampering."
+
+2. **Identify relevant dimensions** for this cycle's task types using the dimension-to-task-type mapping in [benchmark-eval.md](benchmark-eval.md). Only re-run checks for relevant dimensions (not all 8).
+
+3. **Re-run automated checks** for relevant dimensions only. Compute new automated scores.
+
+4. **Compare to Phase 0 baseline** (from `state.json.projectBenchmark.dimensions`):
+
+   | Delta | Action |
+   |-------|--------|
+   | Any dimension improved (+2 or more) | **Ship.** Log improvement in benchmark report. |
+   | All dimensions stable (within +/- 1) | **Ship with warning:** "No measurable benchmark improvement this cycle." Log warning in operator-log. |
+   | Any dimension regressed (-3 or more) | **Block.** Return to Builder with regression details. |
+
+5. **On block:** The blocked task gets **1 retry**. Pass the regression details to the Builder:
+   ```json
+   {
+     "blockReason": "benchmark-regression",
+     "regressedDimensions": [{"dimension": "<name>", "baseline": <N>, "current": <N>, "delta": <N>}],
+     "guidance": "Fix the regression before shipping. Focus on: <specific dimension>"
+   }
+   ```
+   Re-run Builder in a fresh worktree → re-audit → re-check delta.
+
+6. **On second block (same task):** Drop the task entirely.
+   - Log as `"dropped: benchmark-regression"` in `experiments.jsonl`
+   - Add to `evaluatedTasks` with `decision: "dropped"`, `reason: "benchmark regression after retry"`
+   - The bandit system records reward = 0 for the dropped task's type
+   - Proceed to Phase 4 without this task's changes
+
+7. **Update `projectBenchmark.dimensions`** in state.json with the new scores for re-checked dimensions.
 
 ---
 

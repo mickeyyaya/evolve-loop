@@ -188,7 +188,24 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     "totalTasksFailed": 0,
     "avgTasksPerCycle": 0
   },
-  "instinctSummary": []
+  "instinctSummary": [],
+  "projectBenchmark": {
+    "lastCalibrated": null,
+    "calibrationCycle": 0,
+    "overall": 0,
+    "dimensions": {
+      "documentationCompleteness": {"automated": 0, "llm": 0, "composite": 0},
+      "specificationConsistency": {"automated": 0, "llm": 0, "composite": 0},
+      "defensiveDesign": {"automated": 0, "llm": 0, "composite": 0},
+      "evalInfrastructure": {"automated": 0, "llm": 0, "composite": 0},
+      "modularity": {"automated": 0, "llm": 0, "composite": 0},
+      "schemaHygiene": {"automated": 0, "llm": 0, "composite": 0},
+      "conventionAdherence": {"automated": 0, "llm": 0, "composite": 0},
+      "featureCoverage": {"automated": 0, "llm": 0, "composite": 0}
+    },
+    "history": [],
+    "highWaterMarks": {}
+  }
 }
 ```
 
@@ -245,6 +262,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - `fitnessHistory`: rolling array of last 3 fitnessScores for trend detection. Schema: `[{"cycle": N, "score": 0.85}, ...]`
 - `fitnessRegression`: boolean flag set to `true` when fitnessScore decreases for 2 consecutive cycles. Operator reads this as a HALT-worthy signal
 - `evalHistory` is trimmed to the last 5 entries in state.json — older data is captured by `ledgerSummary`
+- `projectBenchmark`: persistent project-level quality score computed during Phase 0 (CALIBRATE). Contains `lastCalibrated` (ISO timestamp), `calibrationCycle` (cycle number when last calibrated), `overall` (0-100 average), `dimensions` (per-dimension `{automated, llm, composite}` scores), `history` (last 5 calibration snapshots for trend analysis), and `highWaterMarks` (per-dimension highest composite score — once a dimension hits 80+, regression below `HWM - 10` triggers mandatory remediation). Phase 0 runs once per invocation, not per cycle. The delta check between Phase 3 and Phase 4 uses `projectBenchmark.dimensions` as the baseline for regression detection
 
 ### `.evolve/notes.md`
 
@@ -305,19 +323,25 @@ Append-only log of every Builder attempt (pass or fail). Inspired by autoresearc
 ## Data Flow
 
 ```
-Phase 1: DISCOVER
-Scout ──→ scout-report.md + evals/<task>.md
+Phase 0: CALIBRATE (once per invocation)
+Orchestrator ── benchmark-eval → projectBenchmark + benchmark-report.md
               |
-Phase 2: BUILD (per task)    v
+Phase 1: DISCOVER              v
+Scout ──→ scout-report.md + evals/<task>.md (reads benchmarkWeaknesses)
+              |
+Phase 2: BUILD (per task)      v
 Builder ──→ build-report.md
               |
-Phase 3: AUDIT               v
+Phase 3: AUDIT                 v
 Auditor ──→ audit-report.md [GATE: MEDIUM+ blocks]
               |
-Phase 4: SHIP                v (only if PASS)
+Δ CHECK: BENCHMARK DELTA       v (after all tasks audited)
+Orchestrator ── re-run relevant dimension checks [SOFT GATE: regression blocks]
+              |
+Phase 4: SHIP                  v (only if PASS + delta OK)
 Orchestrator ── git commit + push
               |
-Phase 5: LEARN               v
+Phase 5: LEARN                 v
 Orchestrator ── instincts + archive
-Operator ──→ operator-log.md (post-cycle)
+Operator ──→ operator-log.md (post-cycle, includes benchmark trend)
 ```

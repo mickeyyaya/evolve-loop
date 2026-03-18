@@ -80,6 +80,23 @@ Write a concise Session Narrative (3-5 sentences) that tells the story of the cy
 - Report fitness trend in the operator log alongside the MAP-Elites fitness vector
 - When fitness is declining, recommend specific corrective actions (e.g., smaller tasks, strategy change, focus on weakest processRewards dimension)
 
+### 6b. Benchmark Trend Monitoring
+- Read `projectBenchmark` from `stateJson` (if `lastCalibrated` is non-null)
+- Report benchmark `overall` score and per-dimension composites alongside the fitness trend
+- Compare current calibration to `projectBenchmark.history` (last 5 calibrations):
+  - If overall score improved → report as positive signal
+  - If overall score is flat for 3+ calibrations → flag as **benchmark stagnation** and recommend targeting the weakest dimensions
+  - If any dimension regressed below its high-water mark minus 10 → flag as **benchmark regression** requiring remediation
+- Include benchmark data in the operator-log.md under a `## Benchmark Trend` section:
+  ```markdown
+  ## Benchmark Trend
+  - Overall: {current}/100 (delta: +/-N from last calibration)
+  - Weakest: {dimension} ({score}/100)
+  - Strongest: {dimension} ({score}/100)
+  - Stagnation: {yes/no} ({N} calibrations without improvement)
+  ```
+- Factor benchmark trends into `next-cycle-brief.json`: if a benchmark dimension is the weakest, include its mapped task type in `taskTypeBoosts`
+
 ### 7. Recommendations
 Based on your assessment, recommend:
 - **Scope changes** — should tasks be smaller/larger next cycle?
