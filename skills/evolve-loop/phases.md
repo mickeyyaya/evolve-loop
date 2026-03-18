@@ -196,12 +196,16 @@ After Scout completes:
 
 For each task in the Scout's selected task list:
 
-**Worktree isolation is MANDATORY.** The orchestrator MUST launch the Builder with `isolation: "worktree"` so it operates on an isolated copy of the repository. This prevents:
+#### Build Isolation (by `projectContext.buildIsolation`)
+
+**`worktree` (default — coding domain):**
+
+**Worktree isolation is MANDATORY for coding projects.** The orchestrator MUST launch the Builder with `isolation: "worktree"` so it operates on an isolated copy of the repository. This prevents:
 - Builder changes from interfering with the main working tree during execution
 - Multiple Builder runs (if parallelized in the future) from conflicting with each other
 - Partial/failed changes from polluting the main branch
 
-**NEVER launch the Builder without `isolation: "worktree"`.** If the Agent tool does not support worktree isolation, the orchestrator MUST manually create a worktree before launching the Builder:
+**NEVER launch the Builder without isolation.** If the Agent tool does not support worktree isolation, the orchestrator MUST manually create a worktree before launching the Builder:
 ```bash
 WORKTREE_DIR=$(mktemp -d)/evolve-build-cycle-<N>-<task-slug>
 git worktree add "$WORKTREE_DIR" HEAD
@@ -211,6 +215,29 @@ cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
 cd <main-repo> && git apply /tmp/builder.patch
 git worktree remove "$WORKTREE_DIR"
 ```
+
+**`file-copy` (writing, research, design domains):**
+
+For non-git projects (or projects without git worktree support), use file-copy isolation:
+```bash
+COPY_DIR=$(mktemp -d)/evolve-build-cycle-<N>-<task-slug>
+# Copy project files (exclude .evolve/ runtime state)
+cp -rp . "$COPY_DIR" && rm -rf "$COPY_DIR/.evolve"
+# Launch Builder with cwd set to $COPY_DIR
+# After Builder completes, diff and apply changes back:
+diff -rq "$COPY_DIR" . --exclude='.evolve' --exclude='.git' > /tmp/changed-files.txt
+# For each changed file, copy from COPY_DIR back to main:
+while read line; do
+  FILE=$(echo "$line" | grep -oP '(?<=differ: ).*(?= and )' || echo "$line" | grep -oP '(?<=Only in '"$COPY_DIR"'/: ).*')
+  [ -n "$FILE" ] && cp "$COPY_DIR/$FILE" "./$FILE" 2>/dev/null
+done < /tmp/changed-files.txt
+rm -rf "$COPY_DIR"
+```
+
+**`none` (explicit opt-out — use with caution):**
+Builder operates directly on the working directory. Only suitable for append-only tasks where isolation provides no benefit (e.g., writing a new standalone document). The orchestrator should warn when this mode is active.
+
+The orchestrator selects the isolation mode from `projectContext.buildIsolation` (set during initialization step 3). Worktree remains the default fallback if `buildIsolation` is not specified.
 
 Launch **Builder Agent** (model: per routing table — sonnet default, opus for complex M tasks, haiku for S-complexity; subagent_type: `general-purpose`, **isolation: `worktree`**):
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt

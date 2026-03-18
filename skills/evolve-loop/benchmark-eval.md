@@ -383,7 +383,7 @@ overall = (DOC_AUTO*0.7 + DOC_LLM*0.3
 
 Round each dimension composite to nearest integer. Round overall to 1 decimal place.
 
-## Dimension-to-Task-Type Mapping
+## Task-Type-to-Dimension Mapping
 
 Used by the delta check to determine which dimensions to re-evaluate after a task:
 
@@ -395,3 +395,71 @@ Used by the delta check to determine which dimensions to re-evaluate after a tas
 | `techdebt` | Modularity, Schema Hygiene, Convention Adherence |
 | `performance` | Modularity, Feature Coverage |
 | `meta` | Specification Consistency, Eval Infrastructure, Schema Hygiene |
+
+---
+
+## Domain-Specific Dimension Examples
+
+The 8 coding dimensions above are the **default benchmark** and are always used when `projectContext.domain == "coding"`. For other domains, some dimensions should be replaced with domain-appropriate equivalents. The scoring formula (70% automated + 30% LLM) and anti-gaming policy remain identical.
+
+### Writing Domain
+
+When `projectContext.domain == "writing"`, replace 4 of the 8 dimensions:
+
+| Coding Dimension (replaced) | Writing Dimension | What it measures |
+|------------------------------|-------------------|-----------------|
+| Modularity | **Prose Clarity** | Readability scores, sentence complexity, jargon density |
+| Schema Hygiene | **Structural Coherence** | Consistent heading hierarchy, logical flow, no orphaned sections |
+| Convention Adherence | **Style Consistency** | Voice, tone, terminology consistency across documents |
+| Feature Coverage | **Content Completeness** | All topics covered, no placeholder/TODO sections remaining |
+
+**Prose Clarity automated checks** (example):
+```bash
+# Average sentence length (target: 15-25 words)
+AVG_SENT=$(cat articles/*.md | tr '.' '\n' | awk '{print NF}' | awk '{sum+=$1; n++} END{print sum/n}')
+# Heading-to-paragraph ratio (at least 1 heading per 500 words)
+HEADINGS=$(grep -c "^#" articles/*.md)
+```
+
+**Prose Clarity LLM rubric:**
+| Score | Criteria |
+|-------|----------|
+| 0 | Incomprehensible, no structure |
+| 25 | Readable but dense, requires re-reading |
+| 50 | Clear enough but inconsistent quality |
+| 75 | Consistently clear, well-structured |
+| 100 | Publication-ready, engaging, precise |
+
+Retained from coding: Documentation Completeness, Specification Consistency, Defensive Design (error handling in guides), Eval Infrastructure.
+
+### Research Domain
+
+When `projectContext.domain == "research"`, replace 4 dimensions:
+
+| Coding Dimension (replaced) | Research Dimension | What it measures |
+|------------------------------|-------------------|-----------------|
+| Feature Coverage | **Claim Accuracy** | Factual claims supported by cited sources, no hallucinated findings |
+| Convention Adherence | **Source Coverage** | All research questions addressed, key sources consulted |
+| Modularity | **Methodology Rigor** | Clear research questions, systematic approach, reproducible steps |
+| Schema Hygiene | **Citation Hygiene** | All citations formatted consistently, no broken references, sources accessible |
+
+**Claim Accuracy automated checks** (example):
+```bash
+# Count claims with citations vs total claims
+TOTAL_CLAIMS=$(grep -c '\.' findings/*.md)
+CITED_CLAIMS=$(grep -c '\[.*\]' findings/*.md)
+ACCURACY_PCT=$((CITED_CLAIMS * 100 / TOTAL_CLAIMS))
+```
+
+Retained from coding: Documentation Completeness, Specification Consistency, Defensive Design, Eval Infrastructure.
+
+### How Domains Select Dimensions
+
+During Phase 0 CALIBRATE, the orchestrator checks `projectContext.domain` and loads the appropriate dimension set:
+- `coding` → all 8 default dimensions (this file, unchanged)
+- `writing` → 4 writing-specific + 4 retained coding dimensions
+- `research` → 4 research-specific + 4 retained coding dimensions
+- `design` → define design-specific dimensions when design domain is implemented
+- `mixed` → use coding dimensions (broadest coverage, most automated checks available)
+
+The dimension names and automated checks change per domain, but the scoring formula, composite calculation, delta check mechanics, and anti-gaming policy are universal.
