@@ -93,3 +93,31 @@ The Auditor reads `auditorProfile` from `state.json` to skip redundant checklist
 - The orchestrator resets `consecutiveClean` to 0 after any WARN, FAIL, or MEDIUM+ finding
 
 Exceptions: `harden` and `repair` strategies, and tasks touching agent or skill files, always receive the full checklist regardless of profile.
+
+---
+
+## Context Engineering Principles
+
+These principles, drawn from Anthropic's context engineering best practices (2025), are already implemented across the evolve-loop pipeline. Naming them explicitly enables consistent application and audit.
+
+### Static-Before-Dynamic Ordering
+
+All agent context blocks place invariant content (Layer 0 shared values, project context) before dynamic content (cycle-specific data, task objects). This maximizes KV-cache prefix hits — the Claude API caches activations for the shared prefix and reuses them across all agent calls in a session. The KV-Cache Prefix Optimization section above is the evolve-loop's implementation of this principle.
+
+### Just-In-Time Retrieval
+
+Agents receive only the context they need for the current phase, not everything available:
+- Scout reads `instinctSummary` (compact array) instead of all instinct YAML files
+- Builder reads inline eval graders from scout-report instead of full eval files
+- Operator reads `ledgerSummary` instead of full `ledger.jsonl`
+- Incremental scan mode reads only `changedFiles` instead of the full codebase
+
+The anti-pattern is "eager loading" — dumping all available context into every agent prompt. Each additional token of irrelevant context dilutes attention on relevant information and increases cost.
+
+### Sub-Agent Compaction
+
+When agents return results, the orchestrator extracts only the essential output (task list, verdict, score) rather than passing raw agent output to downstream agents. Target: each agent-to-agent handoff should carry under 2K tokens of context. The workspace file pattern (scout-report.md, build-report.md, audit-report.md) enforces this by giving each agent a structured, bounded output format.
+
+### Minimal Non-Overlapping Tool Sets
+
+Each agent receives only the tools it needs. Scout gets Read/Grep/Glob/Bash/WebSearch/WebFetch (discovery tools). Builder gets Read/Write/Edit/Bash/Grep/Glob (implementation tools). Auditor gets Read/Grep/Glob/Bash (review tools). Operator gets Read/Grep/Glob (assessment tools). No agent receives tools it doesn't use — this reduces tool-description overhead in the prompt and prevents misuse.

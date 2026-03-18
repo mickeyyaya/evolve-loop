@@ -16,7 +16,7 @@ Each agent has a single responsibility and owns exactly one workspace file. Agen
 The Auditor gates on MEDIUM+ severity findings. Both code quality issues and eval check failures block shipping. Eval tamper detection prevents bypassing gates.
 
 ### 4. Continuous Learning
-Each cycle extracts instincts (episodic, semantic, procedural categories) that future cycles can read. Instincts are specific and actionable. High-confidence instincts graduate to orchestrator policy. Memory consolidation runs every 3 cycles.
+Each cycle extracts instincts (episodic, semantic, procedural categories) that future cycles can read. Instincts are specific and actionable. High-confidence instincts graduate to orchestrator policy. Memory consolidation runs every 3 cycles. See [policy-design.md](policy-design.md) for guidance on writing effective rules and policies.
 
 ### 5. Safe Autonomy
 The Operator monitors for stalls, quality degradation, and repeated failures using delta metrics and MAP-Elites fitness scoring. It can HALT the loop, requiring human intervention.
