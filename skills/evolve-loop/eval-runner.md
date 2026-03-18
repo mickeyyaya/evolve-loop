@@ -106,6 +106,78 @@ If verdict is **PASS** → proceed to the Benchmark Delta Check (then Phase 4).
 
 ---
 
+## Non-Code Eval Graders
+
+For domains beyond coding (writing, research, design), bash/grep graders are insufficient. The eval-runner supports three additional grader types that use LLM judgment with anchored rubrics. These graders complement — never replace — bash graders for coding tasks.
+
+### Rubric-Based Grader (writing, design)
+
+Uses an LLM to score output against a structured rubric. Each criterion has anchored score points (0/25/50/75/100) with examples to prevent score drift.
+
+```markdown
+## Rubric Grader
+- Criterion: "Clarity — is the text easy to understand?"
+  - 0: Incomprehensible or missing
+  - 25: Major ambiguities, reader must guess intent
+  - 50: Understandable but requires re-reading
+  - 75: Clear on first read, minor ambiguities
+  - 100: Crystal clear, no ambiguity, well-structured
+- Model: haiku (cost-efficient for rubric scoring)
+- Threshold: average score >= 60 to pass
+```
+
+The LLM receives the rubric + the artifact + a system prompt: "Score each criterion using ONLY the anchor points. Output JSON: `{criterion: score, justification: string}`." Haiku model is sufficient for rubric application (it follows structured instructions well).
+
+### Groundedness Check (research)
+
+Verifies that claims in a research output are supported by cited sources. The LLM receives the output text and its cited sources, then flags unsupported claims.
+
+```markdown
+## Groundedness Check
+- Input: research output + cited sources
+- Model: sonnet (requires reasoning about source-claim alignment)
+- Check: "For each factual claim, identify the supporting source. Flag claims with no source."
+- Threshold: >= 80% of claims grounded to pass
+```
+
+This prevents hallucinated findings in research tasks — a groundedness gate is the evolve-loop equivalent of a test suite for factual accuracy.
+
+### Coverage Check (research, writing)
+
+Verifies that the output addresses all required topics or questions. The LLM compares the output against a checklist of required coverage points.
+
+```markdown
+## Coverage Check
+- Input: output text + required coverage points (from acceptance criteria)
+- Model: haiku
+- Check: "For each coverage point, does the output address it? Output JSON: {point: bool}"
+- Threshold: 100% coverage to pass (all points addressed)
+```
+
+### Hybrid Mode (mixed domains)
+
+For projects with both code and non-code artifacts, eval definitions can mix grader types:
+
+```markdown
+# Eval: add-api-docs
+
+## Code Graders (bash — for the code changes)
+- `npm test`
+- `grep -q "export.*apiDocs" src/index.ts`
+
+## Rubric Grader (LLM — for the documentation quality)
+- Criterion: "Completeness — are all endpoints documented?"
+  - Threshold: >= 75
+
+## Coverage Check (LLM — for required sections)
+- Required: ["Authentication", "Rate Limits", "Error Codes", "Examples"]
+- Threshold: 100%
+```
+
+The eval-runner processes each section in order. ALL grader types must pass for an overall PASS verdict.
+
+---
+
 ## Benchmark Eval Execution
 
 Distinct from task-level evals. The benchmark eval measures project-wide quality across 8 dimensions defined in [benchmark-eval.md](benchmark-eval.md).

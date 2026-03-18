@@ -60,6 +60,51 @@ Control resource consumption per task and per cycle:
 - **perTask** (default 80,000): Soft limit for a single Builder invocation. The Scout uses this to size tasks appropriately.
 - **perCycle** (default 200,000): Soft limit across all agents in one cycle. The orchestrator warns if exceeded.
 
+## Domain Detection
+
+The evolve-loop auto-detects the project domain during initialization (SKILL.md step 3). Detection determines which eval grader patterns, build isolation, and ship mechanisms are available.
+
+### Detection Signals
+
+| Domain | Primary Signals | Secondary Signals | Confidence |
+|--------|----------------|-------------------|------------|
+| **coding** | `package.json`, `go.mod`, `Cargo.toml`, `*.py`, `.git` with source files | Test commands detected, build scripts, CI config | High (default) |
+| **writing** | `*.md`/`*.docx`/`*.txt` majority (>60% of files), no build commands | Prose-heavy content, style guides, editorial config | Medium |
+| **research** | `*.md` with citation patterns (`[1]`, `et al.`), `references/` dir, bibliography files | Research questions file, data sources, methodology docs | Medium |
+| **design** | `*.figma`/`*.sketch`/`*.svg` majority, design token files (`tokens.json`) | Component library, style dictionary, asset manifests | Medium |
+
+Detection runs once per session during initialization. The detected domain is stored as `projectContext.domain` and passed to all agents.
+
+### Manual Override: `.evolve/domain.json`
+
+If auto-detection is wrong or the project spans multiple domains, create `.evolve/domain.json`:
+
+```json
+{
+  "domain": "writing",
+  "evalMode": "rubric",
+  "shipMechanism": "file-save",
+  "buildIsolation": "file-copy"
+}
+```
+
+Fields:
+- **`domain`**: `coding` | `writing` | `research` | `design` | `mixed`
+- **`evalMode`**: `bash` (default for coding) | `rubric` (LLM-graded) | `hybrid` (bash + rubric)
+- **`shipMechanism`**: `git` (default) | `file-save` | `export` | `custom`
+- **`buildIsolation`**: `worktree` (default) | `file-copy` | `branch` | `none`
+
+When `domain.json` exists, it takes precedence over auto-detection. Fields not specified fall back to the auto-detected defaults.
+
+### Mixed-Domain Projects
+
+For projects that span coding and writing (e.g., a codebase with extensive documentation):
+- Set `domain: "mixed"` or let auto-detection resolve to the dominant domain
+- Coding tasks use bash eval graders; writing tasks use rubric graders
+- The Scout determines task domain from the files it targets, not the project-level domain
+
+See [domain-adapters.md](domain-adapters.md) for the full adapter interface.
+
 ## Strategy Presets
 
 Strategies steer the cycle's intent without requiring a full goal string:

@@ -172,6 +172,10 @@ Each agent can leave a structured message for a downstream agent by appending to
 ### Operator Next-Cycle Brief and Session Narrative
 At the end of each cycle, the Operator writes two outputs: a `next-cycle-brief` embedded in `operator-report.md` (recommended strategy, priority task types, watchlist for next cycle) and a `session-narrative` paragraph summarizing the arc of the current cycle in plain prose. When `cycle == endCycle` (last cycle of a session), the Operator also writes `workspace/session-summary.md` — a full-session retrospective covering total tasks shipped, key features added, fitness trend, and a 3-sentence synthesis.
 
+## Domain Generalization
+
+See [domain-adapters.md](domain-adapters.md) for the full adapter interface. The pipeline is structurally domain-agnostic; four touch points (build isolation, ship mechanism, eval graders, auto-detection) are currently coding-specific and can be swapped via adapters to support writing, research, and design domains.
+
 ## Context Management
 
 At 60% context usage, the orchestrator writes a `handoff.md` file with session state, then the stop-hook resets context. The next conversation resumes from `handoff.md`, enabling indefinite runtime across context boundaries.
