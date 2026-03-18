@@ -178,21 +178,22 @@ See [domain-adapters.md](domain-adapters.md) for the full adapter interface. The
 
 ### Generalization Status
 
-**Completed (cycles 3-5):**
-- Domain adapter abstraction with 4 touch points identified and documented
-- Domain auto-detection signals for coding, writing, research, and design
+**All 4 touch points generalized (cycles 3-7):**
+- Domain adapter abstraction with 4 touch points identified and documented ([domain-adapters.md](domain-adapters.md))
+- Domain auto-detection signals for coding, writing, research, and design ([configuration.md](configuration.md))
 - Manual override via `.evolve/domain.json` with `evalMode`, `shipMechanism`, `buildIsolation` fields
-- Non-code eval grader patterns: rubric-based (writing), groundedness check (research), coverage check
+- Non-code eval grader patterns: rubric-based (writing), groundedness check (research), coverage check ([eval-runner.md](../skills/evolve-loop/eval-runner.md))
 - Domain-aware initialization in SKILL.md with defaults table per domain
 - Domain-aware Phase 4 SHIP with git/file-save/export/custom mechanisms
+- Domain-aware Phase 2 BUILD isolation with file-copy for non-git projects (worktree remains default)
+- Domain-specific benchmark dimensions: Prose Clarity, Structural Coherence (writing), Claim Accuracy, Source Coverage (research) ([benchmark-eval.md](../skills/evolve-loop/benchmark-eval.md))
 - Writing domain walkthrough in showcase.md demonstrating the full non-code pipeline
+- Research domain walkthrough in showcase.md demonstrating groundedness eval and file-copy isolation
 
 **Remaining work:**
-- Phase 2 BUILD isolation adapter (file-copy for non-git projects) — not yet implemented in phases.md
-- Domain-specific benchmark dimensions (e.g., "prose clarity" instead of "modularity" for writing)
-- Research domain walkthrough and eval examples
-- Design domain detection and export pipeline
-- End-to-end validation: run `/evolve-loop` on an actual writing project
+- Design domain detection signals and export pipeline
+- End-to-end validation: run `/evolve-loop` on an actual writing or research project
+- Domain-specific instinct templates (non-code examples in phase5-learn.md)
 
 ## Context Management
 

@@ -377,3 +377,88 @@ Everything else is identical to the coding walkthrough above:
 - The benchmark eval still scores project quality (dimensions may differ)
 
 The domain adapter swaps only the 4 touch points. The learning loop itself is universal.
+
+---
+
+## Research Domain Walkthrough
+
+Here's how the evolve-loop works for a **research project** — a collection of findings documents with cited sources investigating a technical topic.
+
+### Setup: domain.json
+
+```json
+{
+  "domain": "research",
+  "evalMode": "hybrid",
+  "shipMechanism": "file-save",
+  "buildIsolation": "file-copy"
+}
+```
+
+Research uses `hybrid` eval mode: bash checks for structural requirements + LLM groundedness checks for factual accuracy. File-copy isolation since there's no git repository.
+
+### Scout discovers a task
+
+The Scout scans the research project and finds:
+- `findings/llm-scaling.md` has 5 claims but only 2 cite sources
+- The research question "What are the cost tradeoffs of multi-agent vs single-agent?" has no findings document
+
+It selects: **"Add source citations to llm-scaling.md"** (S-complexity, stability).
+
+### Eval definition: Groundedness + Coverage (not bash)
+
+```markdown
+# Eval: add-scaling-citations
+
+## Groundedness Check
+- Input: findings/llm-scaling.md + sources in references/
+- Model: sonnet
+- Check: "For each factual claim, identify the supporting source. Flag claims with no source."
+- Threshold: >= 80% of claims grounded to pass
+
+## Coverage Check
+- Required: ["Parameter scaling laws", "Training compute costs", "Inference latency"]
+- Threshold: 100%
+
+## Code Graders (structural checks)
+- `grep -c '\[.*\]' findings/llm-scaling.md | awk '{exit ($1 < 4)}'` → at least 4 citations
+```
+
+The hybrid approach: bash verifies citation count (deterministic), LLM verifies citation accuracy (requires reasoning).
+
+### Build isolation: file-copy (not worktree)
+
+```bash
+COPY_DIR=$(mktemp -d)/evolve-build-cycle-8-add-scaling-citations
+cp -rp . "$COPY_DIR" && rm -rf "$COPY_DIR/.evolve"
+# Builder works in $COPY_DIR, edits findings/llm-scaling.md
+# After pass, diff and apply changes back to main directory
+```
+
+No git operations needed. The Builder works on an isolated copy, and changes are merged back via file diff.
+
+### Ship mechanism: file-save
+
+```json
+{"ts":"2026-03-19T10:00:00Z","cycle":8,"role":"orchestrator","type":"ship","data":{"mechanism":"file-save","files":["findings/llm-scaling.md"]}}
+```
+
+The updated file is saved in place. A backup goes to `.evolve/history/cycle-8/output/`. No git commit, no push — the research project lives as local files.
+
+### Benchmark dimensions: research-specific
+
+Instead of "Modularity" and "Convention Adherence", the benchmark evaluates:
+- **Claim Accuracy** — are factual claims supported by cited sources?
+- **Source Coverage** — are all research questions addressed with findings?
+- **Methodology Rigor** — is the research approach systematic and reproducible?
+- **Citation Hygiene** — are citations formatted consistently with accessible sources?
+
+### What stays the same
+
+The research walkthrough shares 100% of the pipeline infrastructure with coding:
+- Scout discovers tasks and writes eval definitions
+- Builder implements in an isolated workspace
+- Auditor runs evals (different grader types, same pass/fail gate)
+- Operator monitors health, detects stalls, recommends strategy changes
+- Instincts are extracted and consolidated identically
+- Bandit arms track which research task types succeed
