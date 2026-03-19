@@ -257,3 +257,5 @@ KILL_RATE=$((MUTATIONS_KILLED * 100 / MUTATIONS_GENERATED))
 | < 60% | PRIORITY: Propose eval improvement task for next cycle. |
 
 Mutations that survive indicate graders that are too coarse — they pass both correct and incorrect code. The fix is usually to add a more targeted grep or assertion.
+
+For grader design patterns and anti-patterns, see `docs/eval-grader-best-practices.md`.
