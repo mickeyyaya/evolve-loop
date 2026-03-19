@@ -55,6 +55,45 @@ When a task is structurally similar to one solved in a prior cycle, the orchestr
 
 Templates are stored after successful builds and pruned after 10 cycles with zero reuses. Reuse failures demote the template. This achieves ~30-50% cost reduction on repeated task patterns.
 
+### Plan Cache Schema
+
+Each entry in `state.json planCache` follows this structure:
+
+```json
+{
+  "slug": "<task-slug that generated this template>",
+  "taskType": "feature|stability|security|techdebt|performance",
+  "filePatterns": ["src/**/*.ts", "tests/**/*.test.ts"],
+  "approach": "<1-2 sentence approach summary>",
+  "steps": ["<step 1>", "<step 2>", "..."],
+  "cycle": "<N>",
+  "successCount": 1,
+  "lastUsedCycle": "<N>",
+  "ttlCycles": 10
+}
+```
+
+**Write-Back Protocol** — when Builder ships a task successfully:
+
+1. Extract the `approach` and `steps` from `build-report.md`
+2. Generalize file paths to glob patterns (e.g., `docs/foo.md` → `docs/*.md`)
+3. Write the entry to `state.json planCache`
+4. If a matching entry already exists (same `slug` or high similarity), increment `successCount` rather than creating a duplicate
+
+**Similarity Matching Algorithm** — how the orchestrator selects a `priorPlan` template:
+
+1. Compare `taskType` — exact match required (contributes 0.3 to composite score)
+2. Compare `filePatterns` — Jaccard similarity of glob sets (contributes 0.3)
+3. Compare `approach` — keyword overlap ratio between candidate and stored approach strings (contributes 0.4)
+4. Composite score = `0.3 * taskType_match + 0.3 * filePatterns_jaccard + 0.4 * approach_overlap`
+5. Threshold: composite score > 0.7 triggers template reuse; Builder receives the template as `priorPlan`
+
+**Eviction Rules:**
+
+- Templates idle for 10 cycles with zero reuses are pruned from `planCache`
+- When a reused template leads to an Auditor FAIL verdict, `successCount` is decremented
+- Templates reaching `successCount <= 0` are flagged for manual review or removed next cycle
+
 ---
 
 ## Incremental Scan
