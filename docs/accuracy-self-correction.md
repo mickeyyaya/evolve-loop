@@ -78,3 +78,5 @@ Agents should explicitly state when confidence is low rather than generating pla
 | Uncertainty Acknowledgment | Deferred-task rationale | Confidence indicators, capability gaps | WARN vs FAIL thresholds | Operator warnings |
 
 For token optimization techniques that complement accuracy work (e.g., how context window management prevents mid-cycle truncation that can degrade output quality), see `docs/token-optimization.md`.
+
+For pipeline security mechanisms that protect accuracy (eval tamper detection, state integrity, prompt injection defense), see `docs/security-considerations.md`.
