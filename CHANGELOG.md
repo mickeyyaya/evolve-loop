@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.1.0] - 2026-03-19
+
+### Added
+- **Chain-of-thought (CoT) design requirement** — Builder agent Step 3 now requires numbered reasoning steps with evidence citations before selecting an approach (+35% accuracy on complex tasks)
+- **Multi-stage verification (MSV)** — Auditor agent applies segment→verify→reflect protocol for M-complexity tasks touching >3 files, with groundedness checking against filesToModify
+- **Mutation testing specification** — eval-runner.md now documents mutation generation, kill rate calculation (target >=80%), and interpretation thresholds
+- **Token budget awareness for Scout** — Scout agent now estimates per-task token cost and drops lowest-priority tasks when cycle budget (200K) would be exceeded
+- **Eval grader best practices guide** — new `docs/eval-grader-best-practices.md` covering grader precision, anti-patterns, composition patterns, worked examples, and mutation resistance
+- **Operator benchmark-to-brief translation** — Operator now maps projectBenchmark weakness scores to taskTypeBoosts in next-cycle brief, closing the benchmark→Scout feedback loop
+- **Cross-run research deduplication** — OCC-based query locking protocol prevents parallel runs from issuing duplicate web searches (saves 45-90K tokens per overlapping cycle)
+
+### Changed
+- **All 4 agent files updated** — Builder (CoT), Auditor (MSV), Scout (token budget), Operator (benchmark sync) now implement documented accuracy and performance techniques
+- **eval-runner.md** — mutation testing section + cross-reference to eval-grader-best-practices.md
+- **CHANGELOG refreshed** — cycles 13-15 documented
+
 ## [7.0.0] - 2026-03-19
 
 ### Added
@@ -286,3 +302,7 @@ All notable changes to this project will be documented in this file.
 - 7-phase cycle
 - Parallel execution, JSONL ledger, workspace protocol
 - Goal-directed and autonomous modes
+
+<!-- version links -->
+[7.1.0]: https://github.com/danleemh/evolve-loop/compare/v7.0.0...v7.1.0
+[7.0.0]: https://github.com/danleemh/evolve-loop/compare/v6.9.0...v7.0.0
