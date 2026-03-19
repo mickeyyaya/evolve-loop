@@ -112,6 +112,36 @@ This prevents duplicate research across cycles when the same topic recurs (e.g.,
 
 ---
 
+## Cross-Run Research Deduplication
+
+**Problem:** When multiple parallel evolve-loop invocations share the same `state.json`, each run checks cooldowns independently. If two runs start within seconds of each other, both see expired cooldowns and issue the same queries — doubling research token costs for the same information.
+
+**Protocol — query-level locking via state.json:**
+
+Before issuing any web search, each run executes this protocol:
+
+1. Read `state.json research.queries` with an OCC version check (read current `version`, compare after intended write).
+2. Check if any existing entry matches the intended topic: keyword overlap ratio > 0.5 AND `issuedAt` within the last 12 hours.
+3. **If match found** — skip the query and reuse cached `findings` from the matched entry. No API call is made.
+4. **If no match** — write a placeholder entry with `"status": "pending"` and the current timestamp to `state.json` before issuing the query. Increment `version` atomically (OCC retry if version changed since step 1).
+5. After the query completes, update the placeholder: replace `"status": "pending"` with `"status": "complete"` and write actual `findings`.
+6. **Stale lock protection:** Other runs that see a `"pending"` entry wait up to 60 seconds (polling every 5s), then re-check. If still `"pending"` after 60 seconds, the waiting run issues the query independently and overwrites the stale placeholder.
+
+**Pending entry schema:**
+```json
+{
+  "topic": "<keyword summary>",
+  "issuedAt": "<ISO-8601>",
+  "status": "pending",
+  "findings": null,
+  "cycleNumber": <N>
+}
+```
+
+**Expected savings:** Eliminates ~15-30K tokens per duplicate query avoided. With 3-4 queries per research phase, parallel runs save ~45-90K tokens per overlapping cycle.
+
+---
+
 ## Token Budget Schema
 
 Two soft limits are enforced per run:
