@@ -172,9 +172,9 @@ Scout → [Task A, Task B, Task C]
    | design | rubric | export | file-copy |
    | mixed | hybrid | git | worktree |
 
-   `projectContext.domain` is passed to all agents via context blocks. Agents use it to select appropriate eval graders (see [eval-runner.md](eval-runner.md) Non-Code Eval Graders) and ship mechanisms (see [docs/domain-adapters.md](../docs/domain-adapters.md)).
+   `projectContext.domain` is passed to all agents via context blocks. Agents use it to select appropriate eval graders (see [eval-runner.md](eval-runner.md) Non-Code Eval Graders) and ship mechanisms (see [docs/domain-adapters.md](../../docs/domain-adapters.md)).
 
-   See [docs/configuration.md](../docs/configuration.md) Domain Detection for full signal tables and override documentation.
+   See [docs/configuration.md](../../docs/configuration.md) Domain Detection for full signal tables and override documentation.
 
 4. **Pre-flight check** (inline, no agent):
    ```bash
@@ -250,9 +250,9 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 
 4. **Automated prompt evolution** (during meta-cycles): Uses a critique-synthesize loop to refine agent prompts based on cycle outcomes. Maximum 2 edits per meta-cycle, auto-reverts if performance degrades. See Phase 5 step 6d in [phases.md](phases.md).
 
-5. **Gene/Capsule library**: Structured, reusable fix templates with pattern-matching selectors and pre/post validation. More actionable than instincts — genes describe *how to fix* with executable steps. See [docs/genes.md](docs/genes.md).
+5. **Gene/Capsule library**: Structured, reusable fix templates with pattern-matching selectors and pre/post validation. More actionable than instincts — genes describe *how to fix* with executable steps. See [docs/genes.md](../../docs/genes.md).
 
-6. **Island model evolution** (advanced): Maintain 3-5 independent configurations evolving in parallel, with periodic migration of best-performing traits. See [docs/island-model.md](docs/island-model.md).
+6. **Island model evolution** (advanced): Maintain 3-5 independent configurations evolving in parallel, with periodic migration of best-performing traits. See [docs/island-model.md](../../docs/island-model.md).
 
 ## Plan Template Caching
 
