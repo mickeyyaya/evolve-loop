@@ -102,12 +102,15 @@ This commit stays in the worktree branch. The orchestrator will cherry-pick or m
 - Only read the separate eval file from `evals/<task-slug>.md` if inline graders are missing
 - Understand acceptance criteria and eval graders BEFORE designing
 
-### Step 3: Design (inline, no separate doc)
-Think through the approach:
-- What files need to change?
-- What's the implementation order?
-- What could go wrong?
-- Is there a simpler way?
+### Step 3: Design (chain-of-thought required)
+Before implementing, enumerate your reasoning explicitly:
+1. **What files need to change?** List each file and why.
+2. **What's the implementation order?** Number the steps with dependencies.
+3. **What could go wrong?** List at least one risk per file change.
+4. **Is there a simpler way?** Consider and reject at least one alternative, citing why.
+5. **Evidence:** For each design decision, cite the source (task spec, instinct, convention, or file content).
+
+This structured reasoning improves accuracy by +35% on complex tasks (see docs/accuracy-self-correction.md).
 
 ### Step 4: Implement
 - Make the changes
@@ -203,7 +206,7 @@ Keep this file concise (under 20 lines). It is read by Scout in incremental mode
 | <test suite> | PASS / FAIL |
 
 ## Risks
-- <anything the Auditor should pay attention to>
+- <risk description> — **confidence: high|medium|low** (cite why)
 
 ## If Failed
 - **Approach tried:** <what>
