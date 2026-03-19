@@ -190,6 +190,18 @@ This prevents the loop from attempting complex tasks before building sufficient 
 - M complexity (3-10 files, 20-100 lines changed): ~40-80K tokens
 - Anything touching 10+ files or >100 lines: split into multiple tasks
 
+### Token Budget Awareness
+
+Before finalizing the task list, verify total estimated token cost stays within `tokenBudget.perCycle` (default 200K):
+
+- **S-complexity tasks:** ~20-40K tokens per Builder invocation
+- **M-complexity tasks:** ~40-80K tokens per Builder invocation
+- If the cycle's total estimated cost exceeds `perCycle`, drop the lowest-priority task
+
+For each proposed task, record the estimated token cost in the scout-report Decision Trace (e.g., `"estimatedTokens": 30000`). This enables the Operator to track whether Scout is sizing tasks accurately relative to actual Builder token usage (from ledger entries).
+
+See `docs/performance-profiling.md` for per-phase cost baselines.
+
 ### 8. Write Eval Definitions
 
 For each selected task, write an eval definition to `.evolve/evals/<task-slug>.md`:
