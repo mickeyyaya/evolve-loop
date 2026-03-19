@@ -150,3 +150,37 @@ This enables **indefinite runtime** across sessions. The next `/evolve-loop` inv
 ### Minimal Non-Overlapping Tool Sets
 
 Each agent receives only the tools it needs. Scout gets Read/Grep/Glob/Bash/WebSearch/WebFetch (discovery tools). Builder gets Read/Write/Edit/Bash/Grep/Glob (implementation tools). Auditor gets Read/Grep/Glob/Bash (review tools). Operator gets Read/Grep/Glob (assessment tools). No agent receives tools it doesn't use — this reduces tool-description overhead in the prompt and prevents misuse.
+
+---
+
+## Agentic Plan Caching (APC) — Research Baseline
+
+Source: "Agentic Plan Caching: Test-Time Memory for Fast and Cost-Efficient LLM Agents" (NeurIPS 2025).
+
+Benchmark results on standard agentic benchmarks:
+- **50.31% cost reduction** vs. no caching baseline
+- **27.28% latency reduction**
+- **96.61% performance retention** (task solve rate nearly unchanged)
+
+How APC works (two-step template extraction from execution logs):
+
+1. **Rule-based filter** — strips verbose chain-of-thought reasoning and agent scratchpad from prior execution traces, keeping only the structural plan skeleton.
+2. **Lightweight LLM pass** — removes context-specific entities (file names, variable values, cycle numbers), producing a reusable template that generalises across structurally similar tasks.
+
+Relevance to evolve-loop: The `planCache` mechanism in `state.json` (similarity threshold > 0.7, template pruning after 10 zero-reuse cycles) is the evolve-loop's implementation of this pattern. The NeurIPS 2025 results provide an external benchmark for expected savings — the 30-50% estimate in the Plan Caching section above is conservative relative to the paper's 50.31% figure.
+
+---
+
+## Dynamic Turn Limits
+
+Hard turn caps in multi-turn agent loops are a blunt instrument. A probability-based approach cuts costs ~24% while maintaining solve rates.
+
+**The core problem:** Token usage in agentic loops grows quadratically with turn count (each turn adds to the context for all subsequent turns). A loop that runs 2x too many turns costs roughly 4x as many tokens on average.
+
+**Pattern — marginal value gating:**
+
+1. At each turn, estimate the probability that the current partial result is already sufficient (completion probability).
+2. Compute the expected marginal value of one more turn: `E[value_gain] = completion_probability_delta * task_value`.
+3. Stop early when `E[value_gain] < turn_cost` — i.e., when the expected improvement no longer justifies the token expenditure.
+
+**Evolve-loop application:** The `tokenBudget.perTask` soft limit (80K tokens) and Scout's task-sizing rules act as a static approximation of this dynamic approach. A future improvement would track per-turn token spend and emit a stop signal when marginal progress (measured by eval score delta) falls below a configurable threshold.
