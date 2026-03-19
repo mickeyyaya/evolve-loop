@@ -188,9 +188,9 @@ See [docs/showcase.md](docs/showcase.md) for an annotated walkthrough of a compl
 - HALT protocol: pauses loop for human attention
 
 ### Context Management
-- At 60% context window usage, the orchestrator writes a handoff file with session state
-- The handoff includes remaining cycles, strategy, goal, active stagnation patterns, and a resume command
-- Next session reads the handoff to continue seamlessly — enables indefinite runtime across context boundaries
+- The orchestrator runs continuously through all requested cycles without stopping — it never pauses for user input
+- A `handoff.md` checkpoint is written after each cycle as a safety measure for external interruptions
+- If a session is interrupted, the next `/evolve-loop` invocation reads the handoff to continue seamlessly
 
 ### Meta-Cycle (every 5 cycles)
 - Evaluates pipeline success rates, agent efficiency, stagnation

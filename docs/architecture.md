@@ -197,4 +197,4 @@ See [domain-adapters.md](domain-adapters.md) for the full adapter interface. The
 
 ## Context Management
 
-At 60% context usage, the orchestrator writes a `handoff.md` file with session state, then the stop-hook resets context. The next conversation resumes from `handoff.md`, enabling indefinite runtime across context boundaries.
+The orchestrator runs continuously through all requested cycles without stopping. A `handoff.md` checkpoint is written after each cycle as a safety measure — if a session is externally interrupted, a new session can read it to resume. The orchestrator never pauses for user input between cycles.

@@ -289,13 +289,13 @@ The Scout MUST consider token budgets when sizing tasks. A task with complexity 
 
 ## Context Management
 
-The evolve-loop uses a **stop-hook pattern** for context management (inspired by Ralph Loop). Instead of running until context exhaustion:
+The evolve-loop runs **continuously through all requested cycles without stopping**. It never pauses to ask the user to resume.
 
-1. After each cycle, assess context window usage
-2. If above 60% capacity → write a `handoff.md` file with session state and resume command
-3. STOP gracefully, allowing the user to resume in a fresh session
+1. After each cycle, write a `handoff.md` file with session state as a safety checkpoint (in case the session is interrupted externally)
+2. **Continue immediately to the next cycle** — do NOT stop, do NOT output a resume command, do NOT wait for user input
+3. If context window pressure is high, minimize workspace file sizes and rely on state.json summaries rather than re-reading full files
 
-This enables **indefinite runtime** across sessions. The handoff file carries forward all context needed to continue: strategy, goal, remaining cycles, stagnation patterns, and operator warnings.
+The handoff file is a **checkpoint only** — it exists so that if a session is externally interrupted, a new session can pick up where it left off. It is NOT a signal to stop.
 
 The orchestrator reads `handoff.md` during initialization if it exists, applying the carried-forward context.
 

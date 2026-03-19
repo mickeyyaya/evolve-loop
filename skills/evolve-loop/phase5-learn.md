@@ -384,34 +384,32 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    On cycle 1 (`mode: "full"`): Scout generates this after full codebase scan.
    On cycle 2+: Scout reads this instead of re-scanning. Only changed files (from `changedFiles`) are read directly.
 
-9. **Context Management (stop-hook pattern):**
+9. **Context Checkpoint (non-blocking):**
 
-   After each cycle completes, assess context window usage. If context is above 60% capacity:
-   - Write a **cycle handoff file** to `$WORKSPACE_PATH/handoff.md` (also copy to `.evolve/workspace/handoff.md` for backward compat):
-     ```markdown
-     # Cycle Handoff — Cycle {N}
+   After each cycle completes, write a **cycle handoff file** to `$WORKSPACE_PATH/handoff.md` (also copy to `.evolve/workspace/handoff.md` for backward compat) as a safety checkpoint:
+   ```markdown
+   # Cycle Handoff — Cycle {N}
 
-     ## Session State
-     - Cycles completed this session: <N>
-     - Strategy: <strategy>
-     - Goal: <goal or null>
-     - Remaining cycles: <remainingCycles>
+   ## Session State
+   - Cycles completed this session: <N>
+   - Strategy: <strategy>
+   - Goal: <goal or null>
+   - Remaining cycles: <remainingCycles>
 
-     ## Key Context to Carry Forward
-     - Active stagnation patterns: <list>
-     - Unresolved operator warnings: <list>
-     - Last delta metrics: <summary>
+   ## Key Context to Carry Forward
+   - Active stagnation patterns: <list>
+   - Unresolved operator warnings: <list>
+   - Last delta metrics: <summary>
+   ```
 
-     ## Resume Command
-     `/evolve-loop <remaining cycles> [strategy] [goal]`
-     ```
-   - Output the resume command to the user
-   - STOP the current session gracefully
+   **IMPORTANT: Do NOT stop. Do NOT output a resume command. Do NOT wait for user input.** The handoff file is a checkpoint only — if the session is externally interrupted, a new session can read it to resume. The orchestrator MUST continue immediately to the next cycle.
 
-   This prevents context exhaustion mid-cycle. The handoff file ensures the next session has all context needed to continue seamlessly.
+   If context window pressure is high, reduce token usage by:
+   - Using `instinctSummary` and `ledgerSummary` from state.json instead of reading full files
+   - Keeping workspace files concise
+   - Trimming agent context to essential fields only
 
 10. **Exit conditions** (in order):
    - Cycle limit reached → STOP
    - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
-   - Context above 60% after a cycle → write handoff, STOP
    - Otherwise → next cycle

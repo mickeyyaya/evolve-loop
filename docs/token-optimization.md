@@ -157,14 +157,11 @@ The anti-pattern is "eager loading" — dumping all available context into every
 
 When agents return results, the orchestrator extracts only the essential output (task list, verdict, score) rather than passing raw agent output to downstream agents. Target: each agent-to-agent handoff should carry under 2K tokens of context. The workspace file pattern (scout-report.md, build-report.md, audit-report.md) enforces this by giving each agent a structured, bounded output format.
 
-### Context Window Management (Stop-Hook Pattern)
+### Context Window Management (Continuous Execution)
 
-The evolve-loop uses a **60% capacity threshold** to prevent context exhaustion mid-cycle. After each cycle completes, the orchestrator assesses context window usage:
+The evolve-loop runs **continuously through all requested cycles without stopping**. It never pauses to ask the user to resume.
 
-- **Below 60%:** Continue to next cycle normally.
-- **At or above 60%:** Write a `handoff.md` file and stop gracefully.
-
-The `handoff.md` file carries all context needed to resume in a fresh session:
+After each cycle, a `handoff.md` checkpoint file is written with session state. This is a **safety checkpoint only** — if the session is externally interrupted (e.g., network drop, manual cancellation), a new session can read it to pick up where it left off.
 
 ```markdown
 # Cycle Handoff — Cycle {N}
@@ -179,12 +176,9 @@ The `handoff.md` file carries all context needed to resume in a fresh session:
 - Active stagnation patterns: <list>
 - Unresolved operator warnings: <list>
 - Last delta metrics: <summary>
-
-## Resume Command
-`/evolve-loop <remaining cycles> [strategy] [goal]`
 ```
 
-This enables **indefinite runtime** across sessions. The next `/evolve-loop` invocation reads `handoff.md` during initialization and applies the carried-forward context. The key insight: it's better to stop cleanly at 60% and resume with full context capacity than to push to 90%+ and risk mid-cycle truncation where partial work is lost.
+Under high context pressure, the orchestrator reduces token usage by relying on `instinctSummary` and `ledgerSummary` from state.json, keeping workspace files concise, and trimming agent context to essential fields only.
 
 ### Minimal Non-Overlapping Tool Sets
 

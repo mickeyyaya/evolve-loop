@@ -144,7 +144,7 @@ All notable changes to this project will be documented in this file.
 ## [6.0.0] - 2026-03-13
 
 ### Added
-- **Stop-hook context reset** — proactive context management at cycle boundaries. Writes handoff.md with session state and resume command when context exceeds 60%. Enables indefinite runtime across sessions.
+- **Context checkpointing** — writes handoff.md after each cycle as a safety checkpoint for external interruptions. The orchestrator runs continuously through all cycles without stopping — it never pauses for user input or outputs resume commands.
 - **Dynamic model routing** — selects model per phase based on complexity: haiku for routine tasks (Operator, incremental scans), sonnet for standard work, opus for meta-cycle reasoning. Reduces cost while maintaining quality.
 - **Plan template caching** — caches successful build plans as reusable templates. Matches new tasks by type and file patterns. ~30-50% cost reduction on similar tasks. Auto-evicts unused templates after 10 cycles.
 - **Memory integrity & eval tamper detection** — instinct provenance verification, state.json schema validation, eval checksum tracking, objective hacking detection. Builder cannot modify eval criteria without authorization.
