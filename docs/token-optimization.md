@@ -186,3 +186,5 @@ Hard turn caps in multi-turn agent loops are a blunt instrument. A probability-b
 **Evolve-loop application:** The `tokenBudget.perTask` soft limit (80K tokens) and Scout's task-sizing rules act as a static approximation of this dynamic approach. A future improvement would track per-turn token spend and emit a stop signal when marginal progress (measured by eval score delta) falls below a configurable threshold.
 
 For techniques that improve output accuracy and catch errors across these same agents and phases (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
+
+For per-phase profiling and cost-bottleneck identification, see `docs/performance-profiling.md`.
