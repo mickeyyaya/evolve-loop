@@ -143,6 +143,35 @@ Write `workspace/next-cycle-brief.json` with structured guidance for the Scout:
 
 The `next-cycle-brief.json` is consumed by the Scout in Phase 1 as a first-class input alongside operator-log.md recommendations.
 
+### Benchmark-to-Brief Translation
+
+When writing `next-cycle-brief.json`, read `stateJson.projectBenchmark.dimensions` and translate the weakest dimensions into actionable Scout guidance:
+
+1. Identify the 2-3 dimensions with the lowest composite scores
+2. Map each weak dimension to a `taskTypeHint` using the Task-Type-to-Dimension Mapping in benchmark-eval.md:
+   - `documentationCompleteness` → techdebt
+   - `modularity` → techdebt
+   - `defensiveDesign` → stability / security
+   - `evalInfrastructure` → meta
+   - `featureCoverage` → feature
+3. Include the mapped task types in `taskTypeBoosts` array
+4. Set `weakestDimension` to the dimension with the lowest score
+
+Example brief with benchmark translation:
+```json
+{
+  "cycle": 14,
+  "weakestDimension": "modularity",
+  "recommendedStrategy": "balanced",
+  "taskTypeBoosts": ["techdebt"],
+  "avoidAreas": ["phases.md (672 lines, splitting deferred)"],
+  "benchmarkGuidance": {
+    "modularity": {"score": 79, "hint": "Add new focused docs or split large files"},
+    "documentationCompleteness": {"score": 79, "hint": "Update stale docs, fix broken links"}
+  }
+}
+```
+
 ## Output
 
 Write your session narrative and findings to the workspace files detailed below.
