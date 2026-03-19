@@ -9,7 +9,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 1. **Archive workspace:**
    ```bash
    mkdir -p .evolve/history/cycle-{N}
-   cp .evolve/workspace/*.md .evolve/history/cycle-{N}/
+   cp $WORKSPACE_PATH/*.md .evolve/history/cycle-{N}/
    # builder-notes.md is included in *.md above; it is NOT cleared here so Phase 1 of the next cycle can read it
    ```
 
@@ -96,7 +96,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    2. Assign a score 0.0–1.0 based on that justification
    3. If any dimension scores <0.7: extract at least one instinct from that failure before moving on
 
-   Record scores in `workspace/build-report.md` under a `## Self-Evaluation` heading.
+   Record scores in `$WORKSPACE_PATH/build-report.md` under a `## Self-Evaluation` heading.
 
    **Gene Extraction** (after instinct extraction):
    If the Builder successfully fixed a recurring error pattern this cycle:
@@ -123,7 +123,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 
    d. **Entropy gating:** Before storing a new instinct, check if it adds meaningful information beyond what's already stored. If a new instinct is >90% similar to an existing one, update the existing one's confidence instead of creating a duplicate.
 
-   e. **Write consolidation log** to `workspace/consolidation-log.md`:
+   e. **Write consolidation log** to `$WORKSPACE_PATH/consolidation-log.md`:
       ```markdown
       ## Memory Consolidation — Cycle {N}
       - Instincts before: <count>
@@ -149,7 +149,8 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
      ```json
      {
        // --- Static ---
-       "workspacePath": ".evolve/workspace/",
+       "workspacePath": "<$WORKSPACE_PATH>",
+       "runId": "<$RUN_ID>",
        // --- Semi-stable ---
        "stateJson": <state.json contents — includes ledgerSummary and instinctSummary>,
        // --- Dynamic ---
@@ -162,7 +163,10 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    - Operator reads `ledgerSummary` and `instinctSummary` from state.json instead of full ledger/instinct files.
    - In `"convergence-check"` mode: Operator checks for external changes (`git log --oneline -3`), new issues, or changed project state. If new work detected, reset `nothingToDoCount` to 0.
    - Operator assesses: Did we ship? Are we stalling? Cost concerns? Recommendations?
-   - Operator writes `workspace/next-cycle-brief.json` with `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, and `cycle` — consumed by Scout in Phase 1 of the next cycle.
+   - Operator writes `next-cycle-brief.json` to both:
+     - `$WORKSPACE_PATH/next-cycle-brief.json` (run-local, for intra-run cycles)
+     - `.evolve/latest-brief.json` (shared, last-writer-wins — consumed by other parallel runs)
+     Contains `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, and `cycle` — consumed by Scout in Phase 1 of the next cycle.
    - If status is `HALT` → pause and present issues to user
 
    **Cost awareness check** (inline, before launching Operator):
@@ -172,9 +176,9 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 
 6. **Update notes.md** (rolling window — keeps file size bounded):
 
-   Append the new cycle entry:
+   Append the new cycle entry (under ship lock in Phase 4, so no concurrent writes):
    ```markdown
-   ## Cycle {N} — {date}
+   ## Cycle {N} ($RUN_ID) — {date}
    - **Tasks:** <list of what was built>
    - **Audit:** <verdict>
    - **Eval:** <passed/total>
@@ -323,11 +327,11 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 
    g. **Apply remaining changes** — update default strategy, token budgets, or other configuration based on meta-review findings. Archive the `meta-review.md` to history.
 
-   h. **Regenerate project digest** — during meta-cycle (every 5 cycles), regenerate `workspace/project-digest.md` to capture any structural changes.
+   h. **Regenerate project digest** — during meta-cycle (every 5 cycles), regenerate `.evolve/project-digest.md` (shared location) to capture any structural changes.
 
 8. **Project Digest Generation** (cycle 1, or every 10 cycles during meta-cycle):
 
-   Generate `.evolve/workspace/project-digest.md` (~2-3KB):
+   Generate `.evolve/project-digest.md` (shared location, ~2-3KB):
    ```markdown
    # Project Digest — Generated Cycle {N}
 
@@ -359,7 +363,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 9. **Context Management (stop-hook pattern):**
 
    After each cycle completes, assess context window usage. If context is above 60% capacity:
-   - Write a **cycle handoff file** to `.evolve/workspace/handoff.md`:
+   - Write a **cycle handoff file** to `$WORKSPACE_PATH/handoff.md` (also copy to `.evolve/workspace/handoff.md` for backward compat):
      ```markdown
      # Cycle Handoff — Cycle {N}
 
@@ -367,7 +371,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
      - Cycles completed this session: <N>
      - Strategy: <strategy>
      - Goal: <goal or null>
-     - Remaining cycles: <endCycle - currentCycle>
+     - Remaining cycles: <remainingCycles>
 
      ## Key Context to Carry Forward
      - Active stagnation patterns: <list>

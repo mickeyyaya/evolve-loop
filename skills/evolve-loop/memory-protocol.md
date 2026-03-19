@@ -20,19 +20,60 @@ When concurrent agents share the same workspace, shared values act as the coordi
 - The mailbox (`agent-mailbox.md`) is the only shared write surface for cross-agent messages
 - All agents always read shared values first to align on core rules before acting
 
+## Concurrency Protocol
+
+When multiple `/evolve-loop` invocations run in parallel, all shared state writes use **optimistic concurrency control (OCC)** via a `version` field in `state.json`.
+
+### OCC Write Protocol
+
+Every `state.json` write follows this sequence:
+
+1. **READ** `state.json`, note `version = V`
+2. **Compute mutations** (create a new object — never mutate the read copy)
+3. **WRITE** `state.json` with `version = V + 1`
+4. **Immediately RE-READ** and verify `version == V + 1`
+5. If `version != V + 1` (conflict — another run wrote between steps 1 and 3):
+   a. RE-READ the new state
+   b. REBASE mutations onto the new state using merge rules below
+   c. RETRY with `new version + 1`
+   d. Max 3 retries, then HALT with conflict error
+
+### Merge Rules
+
+When a conflict is detected, merge fields as follows:
+
+| Field | Merge Strategy |
+|-------|---------------|
+| `lastCycleNumber` | MAX of both values |
+| `evaluatedTasks` | Union by slug (don't overwrite existing entries) |
+| `evalHistory` | Append new cycle entry (keyed by unique cycle number) |
+| `fitnessHistory` | Append new entry |
+| `taskArms` | Sum `pulls` and `totalReward`, recompute `avgReward` |
+| `instinctCount` | MAX |
+| `instinctSummary` | Union by id |
+| `mastery.consecutiveSuccesses` | Recompute from merged evalHistory tail |
+| `research.queries` | Union by query string |
+| `stagnation` | MAX of `nothingToDoCount` |
+| `projectBenchmark` | First calibrator wins; skip if `lastCalibrated` < 1 hour ago |
+| `version` | Always use the latest read value + 1 |
+
+### Run Isolation
+
+Each invocation generates a unique `RUN_ID` (format: `run-<epoch-ms>-<random-4hex>`) and creates its own workspace directory at `.evolve/runs/$RUN_ID/workspace/`. Shared directories (`.evolve/evals/`, `.evolve/instincts/`, `.evolve/history/`) remain shared. Agent context blocks receive `workspacePath` and `runId` so all file reads/writes are scoped to the run directory.
+
 ## Layer 1: JSONL Ledger (`.evolve/ledger.jsonl`)
 
-Structured, append-only log. Each agent appends one entry per invocation.
+Structured, append-only log. Each agent appends one entry per invocation. Include `runId` for parallel run traceability.
 
 ```jsonl
-{"ts":"<ISO-8601>","cycle":<N>,"role":"<role>","type":"<type>","data":{...}}
+{"ts":"<ISO-8601>","cycle":<N>,"runId":"<RUN_ID>","role":"<role>","type":"<type>","data":{...}}
 ```
 
 Roles: `scout`, `builder`, `auditor`, `operator`, `eval`
 
-## Layer 2: Markdown Workspace (`.evolve/workspace/`)
+## Layer 2: Markdown Workspace (`$WORKSPACE_PATH`)
 
-Overwritten each cycle. Each agent owns exactly one file:
+Run-scoped workspace (`.evolve/runs/$RUN_ID/workspace/`). Each agent owns exactly one file. The shared `.evolve/workspace/` directory receives a copy of the final workspace after all cycles complete (backward compatibility).
 
 | File | Owner | Contains |
 |------|-------|----------|
@@ -72,7 +113,7 @@ Scout also appends a `decisionTrace` block — a workspace-only field (not persi
 | File | Written by | Contains |
 |------|-----------|----------|
 | `eval-report.md` | Orchestrator (eval-runner) | Eval gate results if run separately |
-| `next-cycle-brief.json` | Operator | Structured guidance for next Scout run: `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, `cycle`. Scout reads this as first-class input at the start of Phase 1 to bias task selection toward the highest-fitness improvements. |
+| `next-cycle-brief.json` | Operator | Structured guidance for next Scout run: `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, `cycle`. Written to both `$WORKSPACE_PATH/` (run-local) and `.evolve/latest-brief.json` (shared, last-writer-wins). Scout reads own run's brief first, falls back to shared `latest-brief.json`. |
 
 ## Layer 3: Persistent State
 
@@ -84,6 +125,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 {
   "lastUpdated": "2026-03-13T10:00:00Z",
   "lastCycleNumber": 0,
+  "version": 0,
   "research": {
     "queries": [
       {
@@ -217,7 +259,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - Failed approaches logged with structured reasoning: `error` (what happened), `reasoning` (why it failed), `filesAffected` (blast radius), `cycle` (when), `alternative` (what to try instead)
 - Completed tasks are never re-proposed
 - `prerequisites`: optional array of task slugs that must be `decision: "completed"` before a dependent task is eligible for building. Set when the Scout proposes a task with explicit dependencies. The orchestrator checks this field in Phase 1 and auto-defers any task whose prerequisites are unmet
-- `lastCycleNumber` (default 0): the last completed cycle number — used to compute the start of the next invocation (additive cycling)
+- `version` (default 0): optimistic concurrency control counter. Incremented on every state.json write. Used to detect parallel write conflicts (see Concurrency Protocol above)
+- `lastCycleNumber` (default 0): the last completed cycle number — used for atomic cycle number allocation (parallel-safe)
 - `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when requesting this many cycles in a single invocation
 - `mastery.level`: difficulty graduation — `novice` (0-2 successes, S only), `competent` (3-5, S+M), `proficient` (6+, S+M+L). Updated in Phase 4 after each successful ship
 - `mastery.consecutiveSuccesses`: reset to 0 on any audit failure, incremented on each successful ship
@@ -264,9 +307,15 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - `evalHistory` is trimmed to the last 5 entries in state.json — older data is captured by `ledgerSummary`
 - `projectBenchmark`: persistent project-level quality score computed during Phase 0 (CALIBRATE). Contains `lastCalibrated` (ISO timestamp), `calibrationCycle` (cycle number when last calibrated), `overall` (0-100 average), `dimensions` (per-dimension `{automated, llm, composite}` scores), `history` (last 5 calibration snapshots for trend analysis), and `highWaterMarks` (per-dimension highest composite score — once a dimension hits 80+, regression below `HWM - 10` triggers mandatory remediation). Phase 0 runs once per invocation, not per cycle. The delta check between Phase 3 and Phase 4 uses `projectBenchmark.dimensions` as the baseline for regression detection
 
-### `.evolve/notes.md`
+### `.evolve/notes.md` (shared, append under ship lock)
 
-Cross-cycle context with a rolling window structure:
+Cross-cycle context with a rolling window structure. Appends happen during Phase 4 under the ship lock, so no concurrent write risk. Each cycle entry includes the `runId` in its header for traceability:
+
+```markdown
+## Cycle 8 (run-1710820800000-a3f1) — 2026-03-19
+```
+
+Rolling window structure:
 
 ```markdown
 # Evolve Loop Cross-Cycle Notes
@@ -280,9 +329,9 @@ Cross-cycle context with a rolling window structure:
 
 Every 5 cycles (aligned with meta-cycle), entries older than 5 cycles are compressed into the Summary section. Full history is preserved in `history/cycle-N/` archives.
 
-### `.evolve/workspace/project-digest.md`
+### `.evolve/project-digest.md` (shared)
 
-Project structure digest (~2-3KB) generated on cycle 1 and regenerated every 10 cycles. Contains: directory tree with file sizes, tech stack, conventions, and recent git log. Scout reads this on cycle 2+ instead of full codebase scan.
+Project structure digest (~2-3KB) generated on cycle 1 and regenerated every 10 cycles. Contains: directory tree with file sizes, tech stack, conventions, and recent git log. Scout reads this on cycle 2+ instead of full codebase scan. Stored at the shared `.evolve/` level (read-mostly cache). Any run can refresh it; stale reads are acceptable since it's a cache.
 
 ### `.evolve/history/cycle-{N}/`
 
@@ -304,7 +353,7 @@ Instincts start at confidence 0.5 and increase when confirmed across multiple cy
 
 ## Layer 6: Experiment Journal
 
-### `.evolve/workspace/experiments.jsonl`
+### `$WORKSPACE_PATH/experiments.jsonl`
 
 Append-only log of every Builder attempt (pass or fail). Inspired by autoresearch's `results.tsv` — logs ALL experiments, not just successes.
 

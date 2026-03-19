@@ -34,9 +34,7 @@ The strategy is passed to all agents via the context block as `"strategy": "<nam
 
 **Strategy + Goal interaction:** When both are provided, the strategy sets the *approach style* while the goal sets the *direction*. Example: `/evolve-loop 3 harden add payment processing` → build payment features with defensive coding and strict auditing.
 
-The `cycles` argument is **additive** — it specifies how many cycles to run from the current position, not a total. The orchestrator reads `lastCycleNumber` from state.json and computes:
-- `startCycle = lastCycleNumber + 1`
-- `endCycle = lastCycleNumber + cycles`
+The `cycles` argument is **additive** — it specifies how many new cycles to run. Each cycle atomically claims its cycle number at runtime (see Atomic Cycle Number Allocation below), so multiple parallel invocations get non-colliding cycle numbers.
 
 Examples:
 - `/evolve-loop` → run 2 more cycles, balanced strategy
@@ -75,24 +73,56 @@ Scout → [Task A, Task B, Task C]
 
 ## Initialization (once per session)
 
-1. Ensure directories exist:
+1. Ensure directories exist and generate run ID:
    ```bash
-   mkdir -p .evolve/workspace .evolve/history .evolve/evals .evolve/instincts/personal .evolve/instincts/archived .evolve/genes .evolve/tools
+   mkdir -p .evolve/workspace .evolve/history .evolve/evals .evolve/instincts/personal .evolve/instincts/archived .evolve/genes .evolve/tools .evolve/runs
+
+   # Generate unique run ID for this invocation
+   RUN_ID="run-$(date +%s%3N)-$(openssl rand -hex 2)"
+   mkdir -p ".evolve/runs/$RUN_ID/workspace"
+   WORKSPACE_PATH=".evolve/runs/$RUN_ID/workspace"
+
+   # Prune run directories older than 48 hours
+   find .evolve/runs/ -maxdepth 1 -type d -name 'run-*' -mtime +2 -exec rm -rf {} \; 2>/dev/null
+   ```
+
+   All workspace files for this invocation are scoped to `$WORKSPACE_PATH` instead of `.evolve/workspace/`. Shared directories (`.evolve/evals/`, `.evolve/instincts/`, `.evolve/history/`, `.evolve/genes/`, `.evolve/tools/`) remain unchanged.
+
+   **Migration from pre-parallel layout** (one-time, idempotent):
+   ```bash
+   # Migrate project-digest.md to shared location
+   if [ -f .evolve/workspace/project-digest.md ] && [ ! -f .evolve/project-digest.md ]; then
+     cp .evolve/workspace/project-digest.md .evolve/project-digest.md
+   fi
+
+   # Migrate latest-brief.json to shared location
+   if [ -f .evolve/workspace/next-cycle-brief.json ] && [ ! -f .evolve/latest-brief.json ]; then
+     cp .evolve/workspace/next-cycle-brief.json .evolve/latest-brief.json
+   fi
+
+   # Seed run workspace from existing shared workspace (so first run has builder-notes, handoff, etc.)
+   if [ -d .evolve/workspace ] && [ "$(ls -A .evolve/workspace/ 2>/dev/null)" ]; then
+     cp -rn .evolve/workspace/* "$WORKSPACE_PATH/" 2>/dev/null || true
+   fi
    ```
 
 2. Read `.evolve/state.json` if it exists. If not, initialize:
    ```json
-   {"lastUpdated":"<now>","lastCycleNumber":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"projectBenchmark":{"lastCalibrated":null,"calibrationCycle":0,"overall":0,"dimensions":{},"history":[],"highWaterMarks":{}},"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
+   {"lastUpdated":"<now>","lastCycleNumber":0,"version":0,"strategy":"balanced","research":{"queries":[]},"evaluatedTasks":[],"failedApproaches":[],"evalHistory":[],"instinctCount":0,"operatorWarnings":[],"nothingToDoCount":0,"warnAfterCycles":5,"tokenBudget":{"perTask":80000,"perCycle":200000},"stagnation":{"nothingToDoCount":0,"recentPatterns":[]},"planCache":[],"mastery":{"level":"novice","consecutiveSuccesses":0},"synthesizedTools":[],"ledgerSummary":{"totalEntries":0,"cycleRange":[0,0],"scoutRuns":0,"builderRuns":0,"totalTasksShipped":0,"totalTasksFailed":0,"avgTasksPerCycle":0},"instinctSummary":[],"projectBenchmark":{"lastCalibrated":null,"calibrationCycle":0,"overall":0,"dimensions":{},"history":[],"highWaterMarks":{}},"auditorProfile":{"feature":{"passFirstAttempt":0,"consecutiveClean":0},"stability":{"passFirstAttempt":0,"consecutiveClean":0},"security":{"passFirstAttempt":0,"consecutiveClean":0},"techdebt":{"passFirstAttempt":0,"consecutiveClean":0},"performance":{"passFirstAttempt":0,"consecutiveClean":0}}}
    ```
 
-   **Compute cycle range** (after reading state.json):
-   - Read `lastCycleNumber` (default 0) from state.json
-   - `startCycle = lastCycleNumber + 1`
-   - `endCycle = lastCycleNumber + cycles`
+   **State migration** (after reading existing state.json):
+   - If `version` field is missing → add `"version": 0` (pre-parallel state.json)
+   - Write the migrated state back immediately
 
-   **Cost awareness** (after computing cycle range):
+   **Track remaining cycles:**
+   - Set `remainingCycles = cycles` (from argument parsing)
+   - Cycle numbers are claimed atomically at the start of each cycle (see phases.md), not computed upfront
+   - This allows parallel invocations to get non-colliding cycle numbers
+
+   **Cost awareness:**
    - Read `warnAfterCycles` (default 5) from state.json
-   - If `cycles` >= `warnAfterCycles`: WARN — "Running {cycles} cycles (cycle {startCycle}→{endCycle}). Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
+   - If `cycles` >= `warnAfterCycles`: WARN — "Running {cycles} cycles. Cost may be significant. Continue? (warnAfterCycles={warnAfterCycles})"
 
 3. **Detect project context and domain:**
 
@@ -157,11 +187,20 @@ Scout → [Task A, Task B, Task C]
 ## Orchestrator Loop
 
 You are the orchestrator. For each cycle:
-1. Launch Scout → collect task list
-2. For each task: Launch Builder (**MUST use `isolation: "worktree"`**) → Launch Auditor
-3. If Auditor PASS → commit. If WARN/FAIL → re-run Builder with issues (max 3 attempts, each in a fresh worktree)
-4. **Ship: commit and push** — every cycle MUST end with committed and pushed code
-5. Learn: archive, extract instincts, operator check
+1. **Claim cycle number** atomically via OCC protocol (see phases.md)
+2. Launch Scout → collect task list → **claim tasks** via OCC to prevent duplicates across parallel runs
+3. For each task: Launch Builder (**MUST use `isolation: "worktree"`**) → Launch Auditor
+4. If Auditor PASS → commit. If WARN/FAIL → re-run Builder with issues (max 3 attempts, each in a fresh worktree)
+5. **Ship: commit and push** — acquire `.evolve/.ship-lock` before pushing (serial SHIP phase)
+6. Learn: archive, extract instincts, operator check
+7. Decrement `remainingCycles`; if 0 → run cleanup and exit
+
+**Run Cleanup** (after all cycles complete):
+```bash
+# Copy final workspace to shared location for backward compatibility
+cp -rp "$WORKSPACE_PATH"/* .evolve/workspace/ 2>/dev/null
+# Keep run directory for 48 hours (pruned on next invocation init)
+```
 
 For detailed phase-by-phase instructions, see [phases.md](phases.md).
 For the shared memory protocol, see [memory-protocol.md](memory-protocol.md).

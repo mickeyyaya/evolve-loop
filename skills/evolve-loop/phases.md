@@ -8,6 +8,18 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 
 Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the first Scout runs. Establishes a project-level benchmark baseline so tasks can be measured against project quality, not just process quality.
 
+### Calibration Deduplication
+
+Before running calibration, check if a recent calibration already exists:
+```
+if state.json.projectBenchmark.lastCalibrated exists
+   AND (now - lastCalibrated) < 1 hour:
+   Skip CALIBRATE, use existing benchmark
+else:
+   Run CALIBRATE normally
+```
+This prevents redundant benchmark scoring when multiple parallel runs start close together.
+
 ### Execution Steps
 
 1. **Run automated checks** from [benchmark-eval.md](benchmark-eval.md):
@@ -15,7 +27,7 @@ Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the 
 
    ```bash
    # Run each dimension's automated checks from benchmark-eval.md
-   # Store results in workspace/benchmark-automated.json
+   # Store results in $WORKSPACE_PATH/benchmark-automated.json
    ```
 
 2. **Run LLM judgment pass** (model: haiku for cost efficiency):
@@ -41,7 +53,7 @@ Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the 
    {
      "projectBenchmark": {
        "lastCalibrated": "<ISO-8601>",
-       "calibrationCycle": <startCycle>,
+       "calibrationCycle": <lastCycleNumber + 1>,
        "overall": <0-100>,
        "dimensions": {
          "documentationCompleteness": {"automated": <N>, "llm": <N>, "composite": <N>},
@@ -64,9 +76,9 @@ Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the 
    - Identify the 2-3 dimensions with the lowest composite scores → these are `benchmarkWeaknesses`
    - **High-water mark tracking:** For each dimension at 80+, record in `highWaterMarks`. If any dimension regresses below `(HWM - 10)`, add a mandatory remediation task to `pendingImprovements`
 
-7. **Write `workspace/benchmark-report.md`:**
+7. **Write `$WORKSPACE_PATH/benchmark-report.md`:**
    ```markdown
-   # Project Benchmark — Calibration at Cycle {startCycle}
+   # Project Benchmark — Calibration at Cycle {lastCycleNumber + 1}
 
    ## Overall Score: {overall}/100
 
@@ -90,13 +102,27 @@ Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the 
 
 Compute and store the checksum of `benchmark-eval.md` during Phase 0:
 ```bash
-sha256sum skills/evolve-loop/benchmark-eval.md > .evolve/workspace/benchmark-eval-checksum.txt
+sha256sum skills/evolve-loop/benchmark-eval.md > $WORKSPACE_PATH/benchmark-eval-checksum.txt
 ```
 Verify this checksum before every delta check (Phase 3→4 boundary). Builder MUST NOT modify this file.
 
 ---
 
-## FOR cycle = {startCycle} to {endCycle}:
+## FOR each cycle (while remainingCycles > 0):
+
+### Atomic Cycle Number Allocation
+
+At the start of each cycle iteration, claim the next cycle number atomically:
+
+1. Read `state.json`, note `version = V` and `lastCycleNumber`
+2. `claimedCycle = lastCycleNumber + 1`
+3. Write `state.json` with `lastCycleNumber = claimedCycle`, `version = V + 1`
+4. Immediately re-read `state.json` and verify `version == V + 1`
+5. If version mismatch (another run claimed first) → re-read, re-claim next available number
+6. Use `claimedCycle` as this iteration's cycle number `N`
+7. Decrement `remainingCycles`
+
+This ensures parallel runs get non-colliding cycle numbers (e.g., Run A gets 8,9 while Run B gets 10,11).
 
 ### Phase 1: DISCOVER
 
@@ -115,9 +141,14 @@ Verify this checksum before every delta check (Phase 3→4 boundary). Builder MU
 ```bash
 # Cycle 1: full mode — no digest exists yet
 # Cycle 2+: incremental mode — read digest + changed files
-if [ -f .evolve/workspace/project-digest.md ]; then
+# Check shared digest first, then run-local
+if [ -f .evolve/project-digest.md ]; then
   MODE="incremental"
-  DIGEST=$(cat .evolve/workspace/project-digest.md)
+  DIGEST=$(cat .evolve/project-digest.md)
+  CHANGED=$(git diff HEAD~1 --name-only 2>/dev/null)
+elif [ -f $WORKSPACE_PATH/project-digest.md ]; then
+  MODE="incremental"
+  DIGEST=$(cat $WORKSPACE_PATH/project-digest.md)
   CHANGED=$(git diff HEAD~1 --name-only 2>/dev/null)
 else
   MODE="full"
@@ -126,8 +157,8 @@ fi
 # Read recent notes (last 5 cycle entries, not full file)
 RECENT_NOTES=$(# extract last 5 "## Cycle" sections from notes.md)
 
-# Read builder notes from last cycle (if exists)
-BUILDER_NOTES=$(cat .evolve/workspace/builder-notes.md 2>/dev/null || echo "")
+# Read builder notes: own run first, then shared fallback
+BUILDER_NOTES=$(cat $WORKSPACE_PATH/builder-notes.md 2>/dev/null || cat .evolve/workspace/builder-notes.md 2>/dev/null || echo "")
 
 # Read recent ledger (last 3 lines)
 RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
@@ -137,7 +168,7 @@ RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
 
 **Shared values in agent context:** The Layer 0 core rules from `memory-protocol.md` must be included at the top of all agent context blocks. Placing shared values first maximizes KV-cache reuse across parallel agent launches — concurrent builders or auditors that share the same static prefix benefit from prompt cache hits without re-encoding the rules.
 
-**Operator brief pre-read:** Before launching Scout, check if `workspace/next-cycle-brief.json` exists (written by the previous cycle's Operator). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
+**Operator brief pre-read:** Before launching Scout, check if `$WORKSPACE_PATH/next-cycle-brief.json` exists (from own run's previous cycle). If not found, fall back to `.evolve/latest-brief.json` (shared, written by most recent run). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
 
 Launch **Scout Agent** (model: per routing table — sonnet default, haiku for incremental, opus for deep research; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
@@ -147,7 +178,8 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
     // --- Static (stable across cycles, maximizes cache-like reuse) ---
     "projectContext": <auto-detected>,
     "projectDigest": "<contents of project-digest.md, or null if cycle 1>",
-    "workspacePath": ".evolve/workspace/",
+    "workspacePath": "<$WORKSPACE_PATH>",
+    "runId": "<$RUN_ID>",
     "goal": <goal or null>,
     "strategy": <strategy>,
     // --- Semi-stable (changes slowly, every few cycles) ---
@@ -158,19 +190,29 @@ Launch **Scout Agent** (model: per routing table — sonnet default, haiku for i
     "mode": "full|incremental|convergence-confirmation",
     "changedFiles": ["<output of git diff HEAD~1 --name-only>"],
     "recentNotes": "<last 5 cycle entries from notes.md, inline>",
-    "builderNotes": "<contents of workspace/builder-notes.md from last cycle, or empty string>",
+    "builderNotes": "<contents of builder-notes.md from last cycle, or empty string>",
     "recentLedger": "<last 3 ledger entries, inline>",
     "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint} from Phase 0, or empty>"
   }
   ```
 
 After Scout completes:
-- Read `workspace/scout-report.md`
+- Read `$WORKSPACE_PATH/scout-report.md`
+
+- **Task Claiming (parallel deduplication):**
+  Before building, claim each selected task via OCC protocol to prevent two parallel runs from building the same task:
+  1. Read `state.json.evaluatedTasks` (note version V)
+  2. Filter out any task whose slug already has `decision: "selected"` or `decision: "completed"`
+  3. Write remaining tasks to `evaluatedTasks` with `decision: "selected"`, `cycle: N`, `runId: $RUN_ID`
+  4. Write state.json with `version = V + 1`, verify via OCC protocol
+  5. If conflict → re-read, re-filter, retry (max 3 retries)
+  6. Only build tasks that were successfully claimed
+
 - **Prerequisite check:** For each proposed task that includes a `prerequisites` field, verify all listed slugs appear in `state.json.evaluatedTasks` with `decision: "completed"`. Any task with an unmet prerequisite is automatically deferred: add it to `evaluatedTasks` with `decision: "deferred"` and `deferralReason: "prerequisite not met: <slug>"`, then log the prerequisite slug so the Scout can propose it in the next cycle. Tasks without a `prerequisites` field are unaffected. This check is a lightweight sequencing aid — the Scout may override it by omitting `prerequisites` when a task is genuinely independent of its nominal dependency.
 - Verify eval definitions were created in `.evolve/evals/`
 - **Eval checksum capture:** Compute `sha256sum` of each eval file in `.evolve/evals/` and store in `workspace/eval-checksums.json`:
   ```bash
-  sha256sum .evolve/evals/*.md > .evolve/workspace/eval-checksums.json
+  sha256sum .evolve/evals/*.md > $WORKSPACE_PATH/eval-checksums.json
   ```
   These checksums are verified before Auditor runs evals (Phase 3) to detect tampering.
 - Merge research query updates into state.json (if research was performed)
@@ -245,7 +287,8 @@ Launch **Builder Agent** (model: per routing table — sonnet default, opus for 
   ```json
   {
     // --- Static ---
-    "workspacePath": ".evolve/workspace/",
+    "workspacePath": "<$WORKSPACE_PATH>",
+    "runId": "<$RUN_ID>",
     "evalsPath": ".evolve/evals/",
     "strategy": <strategy>,
     // --- Semi-stable ---
@@ -257,20 +300,20 @@ Launch **Builder Agent** (model: per routing table — sonnet default, opus for 
   ```
 - **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
 
-**Output Redirection:** When Builder runs eval graders, test commands, or build commands, redirect stdout/stderr to `.evolve/workspace/run.log`:
+**Output Redirection:** When Builder runs eval graders, test commands, or build commands, redirect stdout/stderr to `$WORKSPACE_PATH/run.log`:
 ```bash
-<command> > .evolve/workspace/run.log 2>&1
+<command> > $WORKSPACE_PATH/run.log 2>&1
 ```
 Builder and Auditor extract results via `grep`/`tail` on `run.log` rather than reading full output. This reduces token consumption by 30-50% for verbose build/test output.
 
-**Experiment Journal:** After each Builder attempt (pass or fail), append a one-line entry to `.evolve/workspace/experiments.jsonl`:
+**Experiment Journal:** After each Builder attempt (pass or fail), append a one-line entry to `$WORKSPACE_PATH/experiments.jsonl`:
 ```jsonl
 {"cycle":N,"task":"<slug>","attempt":1,"verdict":"PASS|FAIL","approach":"<1-sentence summary>","metric":"<eval result or error>"}
 ```
 This append-only log ensures every attempt is recorded. Scout reads `experiments.jsonl` to avoid re-proposing similar approaches that already failed.
 
 After Builder completes:
-- Read `workspace/build-report.md`
+- Read `$WORKSPACE_PATH/build-report.md`
 - If status is FAIL after 3 attempts:
   - **Discard worktree** — the worktree branch contains failed changes, clean it up:
     ```bash
@@ -303,7 +346,7 @@ The Auditor reviews the Builder's changes **in the worktree** (or reads the diff
 **Eval checksum verification** (before launching Auditor):
 Verify that eval files haven't been tampered with since Scout created them:
 ```bash
-sha256sum -c .evolve/workspace/eval-checksums.json
+sha256sum -c $WORKSPACE_PATH/eval-checksums.json
 ```
 If any checksum fails → HALT: "Eval tamper detected — eval file modified after Scout created it. Investigate before proceeding."
 
@@ -313,20 +356,21 @@ Launch **Auditor Agent** (model: per routing table — sonnet default, opus for 
   ```json
   {
     // --- Static ---
-    "workspacePath": ".evolve/workspace/",
+    "workspacePath": "<$WORKSPACE_PATH>",
+    "runId": "<$RUN_ID>",
     "evalsPath": ".evolve/evals/",
     "strategy": <strategy>,
     // --- Semi-stable ---
     "auditorProfile": "<state.json auditorProfile object>",
     // --- Dynamic ---
     "cycle": <N>,
-    "buildReport": ".evolve/workspace/build-report.md",
+    "buildReport": "<$WORKSPACE_PATH>/build-report.md",
     "recentLedger": "<last 3 ledger entries, inline>"
   }
   ```
 
 After Auditor completes:
-- Read `workspace/audit-report.md`
+- Read `$WORKSPACE_PATH/audit-report.md`
 - **Verdict handling:**
   - **PASS** → **Merge worktree changes into main and cleanup:**
     ```bash
@@ -373,14 +417,14 @@ After all tasks pass audit but before committing in Phase 4, run a targeted benc
 
 **Exemptions** — skip the delta check entirely when:
 - The task has `strategy: "repair"` (repairs are corrective, not additive)
-- This is one of the first 3 cycles (`cycle <= startCycle + 2`) — allow the loop to establish a baseline
+- This is one of the first 3 cycles of this invocation (`remainingCycles > cycles - 3`) — allow the loop to establish a baseline
 - The task is explicitly labeled as `meta` or `infrastructure` type
 
 #### Delta Check Steps
 
 1. **Verify benchmark-eval.md integrity:**
    ```bash
-   sha256sum -c .evolve/workspace/benchmark-eval-checksum.txt
+   sha256sum -c $WORKSPACE_PATH/benchmark-eval-checksum.txt
    ```
    If checksum fails → HALT: "benchmark-eval.md modified — possible tampering."
 
@@ -420,6 +464,42 @@ After all tasks pass audit but before committing in Phase 4, run a targeted benc
 
 No agent needed. The orchestrator handles shipping directly. **This phase is not optional — every cycle MUST persist and distribute completed work.**
 
+#### Serial SHIP Lock (parallel safety)
+
+The SHIP phase is inherently serial — only one run can push at a time. Acquire a lock before any git push operations:
+
+```bash
+# Acquire lock (mkdir is atomic on POSIX)
+LOCK_DIR=".evolve/.ship-lock"
+MAX_WAIT=60  # seconds
+WAITED=0
+
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  # Check for stale lock (>5 minutes old)
+  if [ -f "$LOCK_DIR/info.json" ]; then
+    LOCK_AGE=$(($(date +%s) - $(cat "$LOCK_DIR/info.json" | grep -o '"ts":[0-9]*' | cut -d: -f2)))
+    if [ "$LOCK_AGE" -gt 300 ]; then
+      rm -rf "$LOCK_DIR"  # break stale lock
+      continue
+    fi
+  fi
+  sleep 5
+  WAITED=$((WAITED + 5))
+  if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+    echo "HALT: Could not acquire ship lock after ${MAX_WAIT}s"
+    exit 1
+  fi
+done
+
+# Write lock info
+echo '{"runId":"'$RUN_ID'","ts":'$(date +%s)'}' > "$LOCK_DIR/info.json"
+```
+
+**All git operations below happen inside the lock. Release the lock at the end of Phase 4:**
+```bash
+rm -rf "$LOCK_DIR"
+```
+
 The ship mechanism depends on `projectContext.shipMechanism` (set during initialization step 3):
 
 #### Ship by domain (`projectContext.shipMechanism`)
@@ -438,8 +518,10 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
    git commit -m "<type>: <description>"
    ```
 
-3. **Push to remote:**
+3. **Rebase and push to remote:**
    ```bash
+   git pull --rebase origin main  # incorporate other parallel runs' changes
+   # If rebase conflicts → abort rebase, release lock, return to Builder for conflict resolution
    git push origin <branch>
    ```
    The cycle is not complete until code is pushed.
@@ -456,7 +538,7 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
 2. **Create backup:** Copy changed files to `.evolve/history/cycle-{N}/output/` as a restore point.
 3. **Log ship event** in the ledger (no git operations needed):
    ```json
-   {"ts":"<ISO-8601>","cycle":<N>,"role":"orchestrator","type":"ship","data":{"mechanism":"file-save","files":["<list>"]}}
+   {"ts":"<ISO-8601>","cycle":<N>,"runId":"<$RUN_ID>","role":"orchestrator","type":"ship","data":{"mechanism":"file-save","files":["<list>"]}}
    ```
 4. **Skip publish.sh** — plugin publishing is coding-domain only.
 
@@ -470,17 +552,18 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
 **`custom`:** Read ship commands from `.evolve/domain.json` `shipCommands` array and execute each in order. Fall back to `file-save` if `shipCommands` is not defined.
 
 5. **Clear non-persistent mailbox messages:**
-   Remove rows from `workspace/agent-mailbox.md` where `persistent` is `false`. Retain rows where `persistent` is `true` so cross-cycle warnings survive into the next cycle.
+   Remove rows from `$WORKSPACE_PATH/agent-mailbox.md` where `persistent` is `false`. Retain rows where `persistent` is `true` so cross-cycle warnings survive into the next cycle.
    ```bash
    # Filter in-place: keep header rows and persistent=true rows
-   grep -v "| false |" .evolve/workspace/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md .evolve/workspace/agent-mailbox.md
+   grep -v "| false |" $WORKSPACE_PATH/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md $WORKSPACE_PATH/agent-mailbox.md
    ```
 
-6. **Update state.json:**
+6. **Update state.json** (using OCC protocol — see memory-protocol.md Concurrency Protocol):
    - Mark completed tasks in `evaluatedTasks`
-   - Update `lastCycleNumber` to current cycle number
+   - Update `lastCycleNumber` to current cycle number (use MAX with existing value — another run may have advanced it)
    - Reset `stagnation.nothingToDoCount` to 0
    - Update `lastUpdated`
+   - Increment `version`
    - **Compute `fitnessScore`** — weighted average of processRewards dimensions as a single "did the project get better?" signal:
      ```json
      "fitnessScore": round(0.25 * discover + 0.30 * build + 0.20 * audit + 0.15 * ship + 0.10 * learn, 2)
@@ -576,6 +659,11 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
      - If `delta.successRate === 1.0` → increment `mastery.consecutiveSuccesses`
      - If `mastery.consecutiveSuccesses >= 3` and level is not `proficient` → advance level, reset counter
      - If `delta.successRate < 0.5` for 2 consecutive cycles → regress level, reset counter
+
+7. **Release ship lock:**
+   ```bash
+   rm -rf "$LOCK_DIR"
+   ```
 
 ---
 
