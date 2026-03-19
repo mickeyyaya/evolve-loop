@@ -146,3 +146,5 @@ Instincts extracted from an earlier codebase state may become incorrect as the c
 Aggressive clustering can merge genuinely distinct patterns into a single abstraction that is too coarse to be actionable. A merged instinct that conflates two different conventions provides weaker guidance than either original.
 
 **Mitigation:** Consolidation requires >85% semantic similarity (not just surface similarity). Archived originals are never deleted — they can be recovered if the merged form proves too broad. Entropy gating applies to new instincts, not to consolidation merges.
+
+For techniques that complement self-learning by improving the accuracy of outputs being evaluated (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
