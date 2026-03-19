@@ -34,7 +34,8 @@ AGENT_FM_PCT=$((AGENT_FM * 100 / (TOTAL_AGENTS > 0 ? TOTAL_AGENTS : 1)))
 README_EXISTS=$(test -s README.md -o -s CLAUDE.md && echo 100 || echo 0)
 
 # 4. No broken internal links (markdown references to files that don't exist)
-BROKEN_LINKS=$(grep -roh '\[.*\](\([^)]*\.md\))' skills/ agents/ docs/ 2>/dev/null | grep -oP '\(([^)]+)\)' | tr -d '()' | while read f; do test -f "$f" || echo "$f"; done | wc -l | tr -d ' ')
+# Note: uses -oE (not -oP) for macOS compatibility
+BROKEN_LINKS=$(grep -roh '\[.*\]([^)]*\.md)' skills/ agents/ docs/ 2>/dev/null | grep -oE '\([^)]+\)' | tr -d '()' | while read f; do test -f "$f" || echo "$f"; done | wc -l | tr -d ' ')
 LINK_SCORE=$((BROKEN_LINKS == 0 ? 100 : (BROKEN_LINKS < 3 ? 75 : (BROKEN_LINKS < 6 ? 50 : 25))))
 
 # 5. docs/ directory exists with content
@@ -63,27 +64,29 @@ Agents, skills, and memory-protocol agree on schemas, workflows, and field names
 ### Automated Checks (score 0-100)
 
 ```bash
+# Note: uses -oE (not -oP) for macOS/BSD grep compatibility throughout
+
 # 1. All agent files referenced in SKILL.md exist
-AGENT_REFS=$(grep -oP 'evolve-\w+\.md' skills/evolve-loop/SKILL.md | sort -u)
+AGENT_REFS=$(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u)
 MISSING_AGENTS=0
 for a in $AGENT_REFS; do test -f "agents/$a" || MISSING_AGENTS=$((MISSING_AGENTS + 1)); done
 AGENT_REF_SCORE=$((MISSING_AGENTS == 0 ? 100 : (100 - MISSING_AGENTS * 25)))
 
 # 2. state.json fields mentioned in phases.md exist in memory-protocol.md schema
-PHASES_FIELDS=$(grep -oP 'state\.json[. ]*\K\w+' skills/evolve-loop/phases.md 2>/dev/null | sort -u | head -20)
-PROTO_FIELDS=$(grep -oP '"(\w+)"' skills/evolve-loop/memory-protocol.md 2>/dev/null | tr -d '"' | sort -u)
+PHASES_FIELDS=$(grep -oE 'state\.json\.?[a-zA-Z]+' skills/evolve-loop/phases.md 2>/dev/null | sed 's/state\.json\.*//' | sort -u | head -20)
+PROTO_FIELDS=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md 2>/dev/null | tr -d '"' | sort -u)
 MISSING_FIELDS=0
-for f in $PHASES_FIELDS; do echo "$PROTO_FIELDS" | grep -qw "$f" || MISSING_FIELDS=$((MISSING_FIELDS + 1)); done
+for f in $PHASES_FIELDS; do [ -z "$f" ] && continue; echo "$PROTO_FIELDS" | grep -qw "$f" || MISSING_FIELDS=$((MISSING_FIELDS + 1)); done
 FIELD_SCORE=$((MISSING_FIELDS == 0 ? 100 : (100 - MISSING_FIELDS * 10)))
 
 # 3. Phase numbering is sequential (no gaps or duplicates)
-PHASE_NUMS=$(grep -oP 'Phase \K\d+' skills/evolve-loop/phases.md | sort -n | uniq)
+PHASE_NUMS=$(grep -oE 'Phase [0-9]+' skills/evolve-loop/phases.md | grep -oE '[0-9]+' | sort -n | uniq)
 EXPECTED_SEQ=$(seq 0 $(echo "$PHASE_NUMS" | tail -1))
 SEQ_SCORE=$(test "$(echo "$PHASE_NUMS" | tr '\n' ' ')" = "$(echo "$EXPECTED_SEQ" | tr '\n' ' ')" && echo 100 || echo 50)
 
 # 4. Workspace file names in memory-protocol.md match what phases.md references
-PROTO_FILES=$(grep -oP '\w+-\w+\.md' skills/evolve-loop/memory-protocol.md | sort -u)
-PHASE_FILES=$(grep -oP 'workspace/\K\w+-\w+\.md' skills/evolve-loop/phases.md | sort -u)
+PROTO_FILES=$(grep -oE '[a-z]+-[a-z]+\.md' skills/evolve-loop/memory-protocol.md | sort -u)
+PHASE_FILES=$(grep -oE 'workspace/[a-z]+-[a-z]+\.md' skills/evolve-loop/phases.md | sed 's|workspace/||' | sort -u)
 FILE_DIFF=$(comm -23 <(echo "$PHASE_FILES") <(echo "$PROTO_FILES") | wc -l | tr -d ' ')
 FILE_SCORE=$((FILE_DIFF == 0 ? 100 : (100 - FILE_DIFF * 20)))
 
@@ -110,25 +113,29 @@ Error handling, rollback protocols, safety guards, input validation.
 ### Automated Checks (score 0-100)
 
 ```bash
-# 1. Phases.md contains rollback/revert instructions
-ROLLBACK=$(grep -ci 'rollback\|revert\|git revert' skills/evolve-loop/phases.md)
+# Note: all grep commands use '|| true' to prevent exit code 1 on zero matches
+# Note: searches span skills/evolve-loop/ (not just phases.md) since content was split
+
+# 1. Skill files contain rollback/revert instructions
+ROLLBACK=$(grep -rci -e 'rollback' -e 'revert' -e 'git revert' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 ROLLBACK_SCORE=$((ROLLBACK >= 3 ? 100 : (ROLLBACK >= 1 ? 50 : 0)))
 
-# 2. HALT protocol exists in operator and phases
-HALT_PHASES=$(grep -c 'HALT' skills/evolve-loop/phases.md)
-HALT_OPERATOR=$(grep -c 'HALT' agents/evolve-operator.md)
-HALT_SCORE=$(( (HALT_PHASES > 0 && HALT_OPERATOR > 0) ? 100 : 50 ))
+# 2. HALT protocol exists in operator and skill files
+HALT_SKILLS=$(grep -rc 'HALT' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
+HALT_OPERATOR=$(grep -c 'HALT' agents/evolve-operator.md || true)
+HALT_OPERATOR=${HALT_OPERATOR:-0}
+HALT_SCORE=$(( (HALT_SKILLS > 0 && HALT_OPERATOR > 0) ? 100 : 50 ))
 
 # 3. Max retry limits defined (prevent infinite loops)
-RETRY=$(grep -ci 'max.*3\|3.*attempt\|max.*iteration' skills/evolve-loop/phases.md)
+RETRY=$(grep -rci -e 'max.*3' -e '3.*attempt' -e 'max.*iteration' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 RETRY_SCORE=$((RETRY >= 2 ? 100 : (RETRY >= 1 ? 50 : 0)))
 
 # 4. Worktree cleanup is enforced
-CLEANUP=$(grep -ci 'worktree.*cleanup\|worktree.*prune\|worktree.*remove' skills/evolve-loop/phases.md)
+CLEANUP=$(grep -rci -e 'worktree.*cleanup' -e 'worktree.*prune' -e 'worktree.*remove' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 CLEANUP_SCORE=$((CLEANUP >= 2 ? 100 : (CLEANUP >= 1 ? 50 : 0)))
 
 # 5. Input validation at system boundaries (state.json validation)
-VALIDATION=$(grep -ci 'validat' skills/evolve-loop/phases.md skills/evolve-loop/SKILL.md)
+VALIDATION=$(grep -rci 'validat' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 VALIDATION_SCORE=$((VALIDATION >= 2 ? 100 : (VALIDATION >= 1 ? 50 : 0)))
 
 # Composite
@@ -158,19 +165,20 @@ Eval definitions comprehensive, mutation kill rate, self-referential coverage.
 EVAL_RUNNER=$(test -f skills/evolve-loop/eval-runner.md && echo 100 || echo 0)
 
 # 2. Eval definition format is documented with all 3 sections
-EVAL_SECTIONS=$(grep -c '## Code Graders\|## Regression Evals\|## Acceptance Checks' skills/evolve-loop/eval-runner.md 2>/dev/null)
+EVAL_SECTIONS=$(grep -c '## Code Graders\|## Regression Evals\|## Acceptance Checks' skills/evolve-loop/eval-runner.md 2>/dev/null || true)
+EVAL_SECTIONS=${EVAL_SECTIONS:-0}
 EVAL_FORMAT_SCORE=$((EVAL_SECTIONS >= 3 ? 100 : (EVAL_SECTIONS * 33)))
 
-# 3. Eval checksum mechanism exists
-CHECKSUM=$(grep -c 'checksum\|sha256' skills/evolve-loop/phases.md)
+# 3. Eval checksum mechanism exists (search all skill files)
+CHECKSUM=$(grep -rc -e 'checksum' -e 'sha256' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 CHECKSUM_SCORE=$((CHECKSUM >= 2 ? 100 : (CHECKSUM >= 1 ? 50 : 0)))
 
-# 4. Eval tamper detection documented
-TAMPER=$(grep -ci 'tamper' skills/evolve-loop/phases.md skills/evolve-loop/SKILL.md)
+# 4. Eval tamper detection documented (sum across multiple files)
+TAMPER=$(grep -rci 'tamper' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 TAMPER_SCORE=$((TAMPER >= 2 ? 100 : (TAMPER >= 1 ? 50 : 0)))
 
-# 5. Meta-cycle mutation testing documented
-MUTATION=$(grep -ci 'mutation' skills/evolve-loop/phases.md)
+# 5. Meta-cycle mutation testing documented (search skill files including phase5-learn.md)
+MUTATION=$(grep -rci 'mutation' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 MUTATION_SCORE=$((MUTATION >= 3 ? 100 : (MUTATION >= 1 ? 50 : 0)))
 
 # Composite
@@ -240,9 +248,11 @@ All state.json fields documented, no orphaned keys, schemas match code.
 ### Automated Checks (score 0-100)
 
 ```bash
+# Note: uses -oE (not -oP) for macOS/BSD grep compatibility
+
 # 1. state.json initialization in SKILL.md matches memory-protocol.md schema
-INIT_FIELDS=$(grep -oP '"(\w+)"' skills/evolve-loop/SKILL.md | head -40 | tr -d '"' | sort -u)
-PROTO_SCHEMA=$(grep -oP '"(\w+)"' skills/evolve-loop/memory-protocol.md | tr -d '"' | sort -u)
+INIT_FIELDS=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/SKILL.md | head -40 | tr -d '"' | sort -u)
+PROTO_SCHEMA=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md | tr -d '"' | sort -u)
 INIT_MISSING=0
 for f in $INIT_FIELDS; do echo "$PROTO_SCHEMA" | grep -qw "$f" || INIT_MISSING=$((INIT_MISSING + 1)); done
 INIT_SCORE=$((INIT_MISSING == 0 ? 100 : (100 - INIT_MISSING * 10)))
@@ -251,16 +261,17 @@ INIT_SCORE=$((INIT_MISSING == 0 ? 100 : (100 - INIT_MISSING * 10)))
 # (reuse from Dimension 2, check 2)
 
 # 3. No duplicate field definitions in memory-protocol.md
-DUP_FIELDS=$(grep -oP '^\s*"(\w+)"' skills/evolve-loop/memory-protocol.md | sort | uniq -d | wc -l | tr -d ' ')
+DUP_FIELDS=$(grep -oE '^ *"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md | sort | uniq -d | wc -l | tr -d ' ')
 DUP_SCORE=$((DUP_FIELDS == 0 ? 100 : (100 - DUP_FIELDS * 20)))
 
 # 4. JSON examples in memory-protocol.md are syntactically valid (spot check)
-JSON_BLOCKS=$(grep -c '```json' skills/evolve-loop/memory-protocol.md)
+JSON_BLOCKS=$(grep -c '```json' skills/evolve-loop/memory-protocol.md || true)
+JSON_BLOCKS=${JSON_BLOCKS:-0}
 JSON_SCORE=$((JSON_BLOCKS >= 3 ? 100 : (JSON_BLOCKS >= 1 ? 75 : 50)))
 
 # 5. Layer numbering is sequential
-LAYERS=$(grep -oP 'Layer \K\d+' skills/evolve-loop/memory-protocol.md | sort -n)
-LAYER_SEQ_SCORE=$(test "$(echo "$LAYERS" | tr '\n' ' ' | xargs)" = "0 1 2 3 4 5 6" && echo 100 || echo 50)
+LAYERS=$(grep -oE 'Layer [0-9]+' skills/evolve-loop/memory-protocol.md | grep -oE '[0-9]+' | sort -n)
+LAYER_SEQ_SCORE=$(test "$(echo $LAYERS | xargs)" = "0 1 2 3 4 5 6" && echo 100 || echo 50)
 
 # Composite
 SCHEMA_AUTO=$(( (INIT_SCORE + DUP_SCORE + JSON_SCORE + LAYER_SEQ_SCORE) / 4 ))
@@ -290,19 +301,21 @@ AGENT_NAMING=$(find agents/ -name "evolve-*.md" | wc -l | tr -d ' ')
 TOTAL_AGENT_FILES=$(find agents/ -name "*.md" | wc -l | tr -d ' ')
 NAMING_SCORE=$((TOTAL_AGENT_FILES > 0 ? (AGENT_NAMING * 100 / TOTAL_AGENT_FILES) : 100))
 
-# 2. Skill files use kebab-case naming
-NON_KEBAB=$(find skills/evolve-loop/ -name "*.md" | grep -v '^[a-z0-9/-]*\.md$' | grep '[A-Z_]' | wc -l | tr -d ' ')
+# 2. Skill files use kebab-case naming (SKILL.md excluded — conventional name like README.md)
+NON_KEBAB=$(find skills/evolve-loop/ -name "*.md" ! -name "SKILL.md" | grep '[A-Z_]' | wc -l | tr -d ' ')
 KEBAB_SCORE=$((NON_KEBAB == 0 ? 100 : (100 - NON_KEBAB * 20)))
 
 # 3. Recent commits follow conventional format (type: description)
-CONVENTIONAL=$(git log --oneline -10 | grep -cP '^\w+ (feat|fix|refactor|docs|test|chore|perf|ci):')
+CONVENTIONAL=$(git log --oneline -10 | grep -cE '^[a-f0-9]+ (feat|fix|refactor|docs|test|chore|perf|ci):' || true)
+CONVENTIONAL=${CONVENTIONAL:-0}
 COMMIT_SCORE=$((CONVENTIONAL * 10))
 
 # 4. Directory structure follows conventions
 DIR_SCORE=$(test -d skills/evolve-loop -a -d agents -a -d docs && echo 100 || echo 50)
 
-# 5. Markdown headers use consistent style (## not ==)
-WRONG_HEADERS=$(grep -rn '^==\+$\|^--\+$' skills/ agents/ 2>/dev/null | wc -l | tr -d ' ')
+# 5. Markdown headers use consistent style (## not setext == or --)
+# Note: matches 4+ chars to avoid false positives on '---' horizontal rules/frontmatter
+WRONG_HEADERS=$(grep -rn -E '^={4,}$|^-{4,}$' skills/ agents/ 2>/dev/null | wc -l | tr -d ' ')
 HEADER_SCORE=$((WRONG_HEADERS == 0 ? 100 : (100 - WRONG_HEADERS * 10)))
 
 # Composite
@@ -329,11 +342,12 @@ All documented phases/features implemented, no dead code.
 
 ```bash
 # 1. All 5 phases referenced in phases.md
-PHASES_DEFINED=$(grep -cP '### Phase [0-9]+:' skills/evolve-loop/phases.md)
+PHASES_DEFINED=$(grep -cE '### Phase [0-9]+:' skills/evolve-loop/phases.md || true)
+PHASES_DEFINED=${PHASES_DEFINED:-0}
 PHASE_COV_SCORE=$((PHASES_DEFINED >= 5 ? 100 : (PHASES_DEFINED * 20)))
 
 # 2. All agent files exist that SKILL.md references
-SKILL_AGENTS=$(grep -oP 'evolve-\w+\.md' skills/evolve-loop/SKILL.md | sort -u)
+SKILL_AGENTS=$(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u)
 MISSING=0
 for a in $SKILL_AGENTS; do test -f "agents/$a" || MISSING=$((MISSING + 1)); done
 AGENT_COV_SCORE=$((MISSING == 0 ? 100 : (100 - MISSING * 25)))
