@@ -77,6 +77,67 @@ Agents should explicitly state when confidence is low rather than generating pla
 | Context Alignment | Task spec vs codebase | filesToModify coverage | Changes table vs task spec | Score vs outcome alignment |
 | Uncertainty Acknowledgment | Deferred-task rationale | Confidence indicators, capability gaps | WARN vs FAIL thresholds | Operator warnings |
 
+---
+
+## Implementation Patterns
+
+Concrete examples of the techniques above as runnable graders and procedural flows.
+
+### CoT-Enforcing Audit Grader
+
+A grep-based grader that checks whether a Builder build-report contains at least three numbered reasoning steps (indicating chain-of-thought was applied during design):
+
+```bash
+# Pass if build-report contains 3 or more numbered list items (e.g., "1. ", "2. ", "3. ")
+grep -cE '^[0-9]+\.' .evolve/workspace/build-report.md | awk '{exit ($1 < 3)}'
+```
+
+This grader can be added to any eval file where CoT compliance matters. It fails (exit 1) if fewer than three numbered steps appear, signaling the Builder skipped explicit reasoning. The Auditor can run this as a structural check independently of functional graders.
+
+### Multi-Stage Verification Flow
+
+Example: an Auditor reviewing a build that modifies 3 files (`config.json`, `lib/runner.js`, `docs/guide.md`).
+
+**Stage 1 — Segment.** Extract each row from the build-report Changes table as an independent claim:
+
+- Claim A: `config.json` was modified to add a `timeout` field
+- Claim B: `lib/runner.js` was modified to read the new `timeout` field
+- Claim C: `docs/guide.md` was updated to document the `timeout` option
+
+**Stage 2 — Verify.** For each claim, run a targeted tool check:
+
+```bash
+# Claim A: field exists in config
+grep -q '"timeout"' config.json && echo "A: PASS" || echo "A: FAIL"
+
+# Claim B: runner reads timeout
+grep -q 'timeout' lib/runner.js && echo "B: PASS" || echo "B: FAIL"
+
+# Claim C: docs mention timeout
+grep -qi 'timeout' docs/guide.md && echo "C: PASS" || echo "C: FAIL"
+```
+
+**Stage 3 — Reflect.** If Claim A passes but Claim B fails, surface the conflict: "config declares timeout but runner does not consume it — partial implementation, likely a WARN." Do not silently pick a verdict; state the contradiction explicitly in the Auditor findings.
+
+### Groundedness Check Example
+
+A one-liner that cross-references the files listed in the build-report Changes table against the `filesToModify` list in the scout-report, catching ungrounded file modifications:
+
+```bash
+# Extract changed files from build-report (assumes "| ACTION | path/to/file |" format)
+changed=$(grep -oP '(?<=\| \w{4,6} \| )[^|]+' .evolve/workspace/build-report.md | tr -d ' ')
+
+# Extract filesToModify from scout-report
+allowed=$(grep -A20 'filesToModify' .evolve/workspace/scout-report.md | grep -oP '`[^`]+`' | tr -d '`')
+
+# Flag any changed file not in the allowed list
+for f in $changed; do
+  echo "$allowed" | grep -qF "$f" || echo "UNGROUNDED: $f not in filesToModify"
+done
+```
+
+Any `UNGROUNDED:` line indicates the Builder modified a file outside the task scope — a direct groundedness failure that the Auditor should escalate to WARN or FAIL depending on severity.
+
 For token optimization techniques that complement accuracy work (e.g., how context window management prevents mid-cycle truncation that can degrade output quality), see `docs/token-optimization.md`.
 
 For pipeline security mechanisms that protect accuracy (eval tamper detection, state integrity, prompt injection defense), see `docs/security-considerations.md`.
