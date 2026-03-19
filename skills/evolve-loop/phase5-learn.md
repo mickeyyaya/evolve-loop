@@ -81,6 +81,30 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    ```
    Scout and Builder read `instinctSummary` from state.json instead of reading all instinct YAML files. Full instinct files are only read during consolidation (every 3 cycles) or when `instinctCount` has changed since last cycle.
 
+## Instinct Graduation
+
+   Instinct graduation promotes high-confidence, repeatedly-confirmed instincts to mandatory guidance status. Run the graduation check during Phase 5 LEARN, after Instinct Citation Collection (step 3) and before consolidation — check all instincts with confidence >= 0.75 that are not yet graduated.
+
+   **Graduation Threshold** — an instinct graduates when ALL three conditions are met:
+   - Confidence >= 0.75
+   - Confirmed across 3+ distinct cycles (cited in `instinctsApplied` by Scout or Builder in 3+ different cycle reports)
+   - Not contradicted by any failed approach in `state.json` `failedApproaches`
+
+   **Operational Effects of Graduation:**
+   - Set `"graduated": true` on the instinct entry in `instinctSummary`
+   - Builder treats graduated instincts as **mandatory guidance** — skip the "should I apply this?" evaluation and apply it directly
+   - Scout lists graduated instincts first in context, giving them attention priority over non-graduated instincts
+   - Each subsequent citation of a graduated instinct increases confidence by +0.1 (capped at 1.0)
+   - Graduated instincts are candidates for global promotion (copied to `~/.evolve/instincts/personal/`)
+
+   **Graduation Reversal** — revert graduation when quality evidence contradicts it:
+   - If a graduated instinct is contradicted by 2+ consecutive build failures where the instinct was applied → set `graduated: false`, reduce confidence by 0.2
+   - If confidence drops below 0.5 after reversal → archive the instinct (move to `.evolve/instincts/archived/` with `archivedReason: "reversal"`)
+   - Log reversal in the ledger as `type: "instinct-reversal"`:
+     ```json
+     {"ts":"<ISO-8601>","cycle":<N>,"role":"orchestrator","type":"instinct-reversal","data":{"instinct":"<id>","reason":"2 consecutive failures","confidenceAfter":<value>}}
+     ```
+
    **Self-Evaluation (LLM-as-a-Judge)** (after instinct extraction):
    Score the cycle on 4 dimensions using a structured rubric. For each dimension, write a chain-of-thought justification BEFORE assigning the score. Binary threshold: ≥0.7 = pass, <0.7 = fail (triggers mandatory instinct extraction for that dimension).
 
