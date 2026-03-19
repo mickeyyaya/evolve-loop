@@ -28,6 +28,9 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Process rewards** — step-level scoring per phase for targeted improvement
 - **Mutation testing** — self-generated evals that test the tests themselves
 - **Safety & integrity** — eval tamper detection, memory provenance, rollback protocol
+- **Accuracy self-correction** — chain-of-thought verification, multi-stage output correction
+- **Performance profiling** — cost-bottleneck analysis, per-phase token attribution
+- **Security pipeline integrity** — eval tamper detection, prompt injection defense, provenance tracking
 - **Island model** — parallel configuration evolution with trait migration (advanced)
 - **Capability gap detection** — synthesize new tools when existing ones can't handle a task
 - **MAP-Elites fitness** — multi-dimensional scoring (speed, quality, cost, novelty)
@@ -212,16 +215,26 @@ evolve-loop/
 │       ├── SKILL.md           # Entry point + orchestrator
 │       ├── phases.md          # Phase-by-phase instructions
 │       ├── memory-protocol.md # Workspace, ledger, state schema
-│       └── eval-runner.md     # Eval gate instructions
+│       ├── eval-runner.md     # Eval gate instructions
+│       ├── phase5-learn.md    # LEARN phase instinct extraction
+│       └── benchmark-eval.md  # Benchmark evaluation framework
 ├── docs/
+│   ├── accuracy-self-correction.md  # CoT + multi-stage verification
 │   ├── architecture.md        # Detailed architecture docs
 │   ├── configuration.md       # Configuration reference
+│   ├── domain-adapters.md     # Domain-specific adapter patterns
+│   ├── generalization-status.md  # Cross-domain generalization tracking
 │   ├── genes.md               # Gene/Capsule library docs
 │   ├── instincts.md           # Instinct system docs
 │   ├── island-model.md        # Island model evolution docs
 │   ├── memory-hierarchy.md    # Memory hierarchy guide (layers 0-6, access matrix)
-│   ├── meta-cycle.md           # Meta-cycle review docs
+│   ├── meta-cycle.md          # Meta-cycle review docs
+│   ├── performance-profiling.md  # Cost-bottleneck analysis + token attribution
+│   ├── policy-design.md       # Agent policy design patterns
+│   ├── security-considerations.md  # Pipeline integrity + prompt injection defense
 │   ├── self-learning.md       # Self-learning architecture (7 mechanisms)
+│   ├── showcase.md            # Annotated cycle walkthrough
+│   ├── skill-building.md      # Skill authoring guide
 │   ├── token-optimization.md  # Token optimization strategies
 │   └── writing-agents.md      # Guide for creating agents
 ├── examples/
