@@ -112,6 +112,24 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - Record each check's result
 - ALL must pass for overall PASS
 
+### F. Multi-Stage Verification (M-complexity tasks only)
+
+For tasks touching >3 files or flagged as `complexity: M+`, apply segment→verify→reflect:
+
+1. **Segment** — Decompose the build-report Changes table into individual claims (one file change = one claim)
+2. **Verify** — For each claim, verify against the actual diff:
+   - Does the file change match the description?
+   - Is the change consistent with the task's acceptance criteria?
+   - Run the relevant eval grader for this specific file if available
+3. **Reflect** — After verifying all claims:
+   - Are there any files changed that are NOT in the task's `filesToModify` list? (groundedness check)
+   - Do any changes contradict each other?
+   - Surface conflicts rather than silently resolving them
+
+Skip this section for S-complexity tasks with ≤3 file changes (the standard checklist is sufficient).
+
+See `docs/accuracy-self-correction.md` for the full pattern specification.
+
 ## Verdict Rules
 
 - **FAIL** if any CRITICAL or HIGH issue found, or any eval check fails
