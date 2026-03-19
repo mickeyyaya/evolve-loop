@@ -214,3 +214,46 @@ Run a targeted re-evaluation after all tasks pass audit:
 | Runs | After each Builder attempt | Phase 0 (full) + delta check (targeted) |
 | Gate type | Hard (FAIL blocks shipping) | Soft (regression blocks, stability warns) |
 | Tampering | Checksum-protected per cycle | Checksum-protected per invocation |
+
+---
+
+## Mutation Testing
+
+Mutation testing validates eval grader quality by introducing deliberate defects and checking if graders catch them. Run during meta-cycles (every 5 cycles) as part of Phase 5 step 6e.
+
+### What is a Mutation?
+
+A mutation is a small, deliberate change to a completed task's output that should cause at least one eval grader to fail. Examples:
+- **Deletion mutation:** Remove a key section heading from a markdown file
+- **Value mutation:** Change a numeric threshold (e.g., 0.7 → 0.3)
+- **Import mutation:** Remove a cross-reference link
+- **Logic mutation:** Invert a condition (e.g., `>=` → `<`)
+
+### Generating Mutations
+
+For each task completed in the last 5 cycles:
+1. Read the task's eval graders from `.evolve/evals/<slug>.md`
+2. Generate 2-3 targeted mutations that test different graders
+3. Apply each mutation to a temporary copy of the affected file
+4. Run the eval graders against the mutated file
+5. Record whether each grader caught the mutation
+
+### Mutation Kill Rate
+
+```bash
+# Example grader for mutation testing itself
+MUTATIONS_GENERATED=<N>
+MUTATIONS_KILLED=<caught by at least one grader>
+KILL_RATE=$((MUTATIONS_KILLED * 100 / MUTATIONS_GENERATED))
+# Target: >= 80%. Below 60% triggers eval improvement task.
+```
+
+### Interpreting Results
+
+| Kill Rate | Action |
+|-----------|--------|
+| >= 80% | Evals are robust. No action needed. |
+| 60-79% | Review weak graders. Consider adding more specific checks. |
+| < 60% | PRIORITY: Propose eval improvement task for next cycle. |
+
+Mutations that survive indicate graders that are too coarse — they pass both correct and incorrect code. The fix is usually to add a more targeted grep or assertion.
