@@ -326,7 +326,7 @@ To customize model mappings (e.g., use DeepSeek for tier-3 to cut costs):
 }
 ```
 
-When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](../../docs/configuration.md) for full schema.
+When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](docs/configuration.md) for full schema.
 
 ## Dynamic Model Routing
 
@@ -447,7 +447,7 @@ Self-modifying systems require explicit safety mechanisms to prevent misevolutio
 3. **Retrying the same failure** — Log in state.json, try alternative next cycle
 4. **Skipping the audit** — Auditor verdict of WARN or FAIL blocks shipping
 5. **Ignoring instincts** — Builder MUST read instincts when available
-6. **Research every cycle** — 12hr cooldown on web research. Reuse cached results. For cross-run deduplication in parallel executions, see [Cross-Run Research Deduplication](../../docs/token-optimization.md#cross-run-research-deduplication).
+6. **Research every cycle** — 12hr cooldown on web research. Reuse cached results. For cross-run deduplication in parallel executions, see [Cross-Run Research Deduplication](docs/token-optimization.md#cross-run-research-deduplication).
 7. **Ceremony over substance** — Workspace files should be concise, not exhaustive
 8. **Ignoring HALT** — When Operator returns HALT, pause and present to user
 9. **Complexity creep** — If a task adds more lines than proportional to its complexity (S-tasks >30 lines, M-tasks >80 lines), break it down into smaller tasks or simplify the approach. Autonomous systems tend toward accretion — actively resist by preferring deletions that maintain functionality over additions

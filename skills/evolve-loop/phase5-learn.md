@@ -130,7 +130,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    - Extract the fix as a gene with selector, steps, and validation commands
    - Write to `.evolve/genes/<gene-id>-<name>.yaml`
    - If multiple genes were applied in sequence, bundle as a capsule
-   - See [docs/genes.md](../../docs/genes.md) for schema
+   - See [docs/genes.md](docs/genes.md) for schema
 
    **Instinct global promotion** (check after every instinct extraction):
    For instincts with confidence >= 0.8 that are not project-specific:
