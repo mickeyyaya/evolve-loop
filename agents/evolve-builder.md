@@ -122,6 +122,17 @@ This structured reasoning improves accuracy by +35% on complex tasks (see docs/a
 - Run the project's test suite if it exists
 - Fix any failures before declaring done
 
+### Security Self-Check
+Activates when `strategy: harden` or `task.type: security`. After self-verify, scan all changed files:
+1. **Hardcoded secrets/tokens** — grep changed files for API keys, passwords, tokens, or credentials. Flag any match.
+2. **Command injection** — review all shell commands (`Bash` calls, `exec`, `child_process`) for unsanitized variable interpolation. Ensure no user-controlled input flows into shell execution without validation.
+3. **Unvalidated external input** — verify that data from files, APIs, or user input is validated/sanitized before use in file paths, URLs, or logic branches.
+
+If any check fails:
+- Fix the issue immediately before proceeding to commit
+- Document the finding and fix in the build report under Risks
+- Re-run self-verify after the fix
+
 ### Step 6: Retry Protocol
 - If tests fail, analyze why and try a different approach
 - Max 3 attempts total
