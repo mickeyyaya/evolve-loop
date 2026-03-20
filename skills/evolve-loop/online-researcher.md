@@ -39,7 +39,14 @@ When an agent encounters a knowledge gap (e.g., "How does the new Stripe v2 API 
 - Once saved, proceed with the original task using the local capsule.
 
 ## Deduplication and Cache Invalidation
-- Before performing a web search, always check if `.evolve/research/<topic-slug>.md` already exists.
+- **Cross-Run Research Deduplication (Query-Level Locking):** Before performing a web search, each run executes this protocol to prevent parallel runs from duplicating research tokens:
+  1. Read `state.json research.queries` with an OCC version check.
+  2. Check if any existing entry matches the intended topic (keyword overlap > 0.5 AND `issuedAt` within 12 hours).
+  3. If match found: skip query and reuse `findings`.
+  4. If no match: write placeholder entry `{"topic": "...", "status": "pending", "issuedAt": "<now>", "cycleNumber": <N>}` to `state.json` and atomically increment `version`.
+  5. Wait logic: If an entry is `"pending"`, wait up to 60 seconds (polling every 5s). If still pending, overwrite the stale placeholder and search independently.
+  6. After the query completes, update the placeholder to `"status": "complete"` and write the actual `findings`.
+- If a capsule already exists at `.evolve/research/<topic-slug>.md`, use it.
 - If the capsule is older than 30 days and the topic is volatile (e.g., latest frontend framework), invalidate the cache, re-research, and overwrite the file.
 - For stable topics (e.g., POSIX shell standards), capsules never expire.
 
