@@ -253,7 +253,13 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     },
     "history": [],
     "highWaterMarks": {}
-  }
+  },
+  "processRewardsHistory": [
+    {"cycle": 1, "discover": 1.0, "build": 1.0, "audit": 1.0, "ship": 1.0, "learn": 0.8, "skillEfficiency": 1.0}
+  ],
+  "fitnessScore": 0.0,
+  "fitnessHistory": [],
+  "fitnessRegression": false
 }
 ```
 
