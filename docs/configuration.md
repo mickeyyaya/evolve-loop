@@ -252,6 +252,77 @@ Each score ranges from 0.0 to 1.0:
 
 Process rewards feed into meta-cycle reviews (every 5 cycles) to identify which phases need improvement.
 
+## Model Configuration
+
+The evolve-loop uses a 3-tier model abstraction so it works across any LLM provider. The orchestrator resolves tiers to concrete models based on the active provider.
+
+### Default Provider Detection
+
+The orchestrator auto-detects the provider from the host CLI:
+- **Claude Code** → Anthropic models (opus/sonnet/haiku)
+- **Gemini CLI** → Google models (gemini-2.5-pro/flash)
+- **Other** → requires `.evolve/models.json`
+
+### Tier Definitions
+
+| Tier | Purpose | Cost Ratio |
+|------|---------|------------|
+| **tier-1** | Deep reasoning, complex architecture, strategic decisions | ~3-5x of tier-2 |
+| **tier-2** | Balanced coding, implementation, review | 1x (baseline) |
+| **tier-3** | Fast classification, simple edits, routine checks | ~0.1-0.3x of tier-2 |
+
+### Manual Override: `.evolve/models.json`
+
+Create this file to customize model mappings:
+
+```json
+{
+  "provider": "anthropic",
+  "tiers": {
+    "tier-1": "claude-opus-4-6",
+    "tier-2": "claude-sonnet-4-6",
+    "tier-3": "claude-haiku-4-5"
+  },
+  "overrides": {
+    "scout": "tier-2",
+    "builder": "tier-2",
+    "auditor": "tier-2",
+    "operator": "tier-3",
+    "calibrate": "tier-3",
+    "self-eval": "tier-2",
+    "meta-cycle": "tier-1"
+  },
+  "thinkingMode": {
+    "tier-1": "extended",
+    "tier-2": "default",
+    "tier-3": "disabled"
+  }
+}
+```
+
+Fields:
+- **`provider`**: `anthropic` | `google` | `openai` | `mistral` | `deepseek` | `custom`
+- **`tiers`**: Maps each tier to a concrete model ID for the active provider
+- **`overrides`**: Per-phase tier overrides (takes precedence over dynamic routing)
+- **`thinkingMode`**: Controls extended thinking / chain-of-thought per tier (`extended` | `default` | `disabled`)
+
+### Provider Model Mappings (Defaults)
+
+| Tier | Anthropic | Google | OpenAI | Mistral | DeepSeek |
+|------|-----------|--------|--------|---------|----------|
+| **tier-1** | claude-opus-4-6 | gemini-2.5-pro (thinking) | gpt-5.4 / o3 | mistral-large-2512 | deepseek-reasoner |
+| **tier-2** | claude-sonnet-4-6 | gemini-2.5-flash | gpt-5.4-mini / o4-mini | mistral-medium-3.1 | deepseek-chat |
+| **tier-3** | claude-haiku-4-5 | gemini-2.5-flash (no thinking) | gpt-4.1-nano | mistral-small-3.2 | deepseek-chat (cached) |
+
+When `models.json` exists, it takes precedence over auto-detection. When absent, the orchestrator uses the default mapping for the detected provider.
+
+### Context Window Considerations
+
+When routing to a specific model, the orchestrator should verify the model's context window can handle the prompt:
+- tier-1/tier-2 models generally support 200K-1M tokens
+- tier-3 models may have smaller windows (check provider docs)
+- If a prompt exceeds the target model's context, upgrade to the next tier
+
 ## Instinct Promotion
 
 After 5+ cycles, instincts with confidence >= 0.8 promote from project-level to global:

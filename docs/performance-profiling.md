@@ -113,21 +113,29 @@ Typical spend breakdown per cycle: Scout 10-60K (incremental vs. full scan), Bui
 
 ## Model Routing Cost Impact
 
-Model selection is the highest-leverage cost control. Approximate cost ratios (relative to sonnet):
+Model selection is the highest-leverage cost control. The evolve-loop uses a 3-tier abstraction (see SKILL.md § Model Tier System) so routing works across any LLM provider. Approximate cost ratios relative to tier-2:
 
-| Model | Relative Cost | Typical Phase |
-|-------|--------------|---------------|
-| haiku | ~0.04x | Operator (standard), Scout (incremental cycle 2+), Auditor (clean streak) |
-| sonnet | 1x | Builder (default), Scout (default), Auditor (default) |
-| opus | ~3-5x | Builder (M-complexity, 5+ files), Auditor (security-sensitive), Scout (deep research) |
+| Tier | Relative Cost | Typical Phase |
+|------|--------------|---------------|
+| tier-3 | ~0.1-0.3x | Operator (standard), Scout (cycle 4+ with mature bandit), Auditor (clean streak), Calibrate (subsequent) |
+| tier-2 | 1x | Builder (default), Scout (default), Auditor (default), Self-Eval (standard cycles) |
+| tier-1 | ~3-5x | Scout (cycle 1, goal-directed), Builder (M + 5+ files, audit retry ≥ 2), Self-Eval (problem cycles), Meta-cycle review |
 
-### When to Route to Haiku
+### When to Route to tier-3
 
-- Scout on cycle 2+ incremental scan (no research calls, no new domain detection needed)
-- Builder on S-complexity inline documentation tasks (this task is an example)
+- Scout on cycle 4+ with mature bandit data (3+ arms, pulls ≥ 3) — selection is data-driven
+- Builder on S-complexity tasks with plan cache hit — execution-only, plan is proven
 - Auditor after 5 consecutive clean audits (`consecutiveClean >= 5` in `auditorProfile`)
 - Operator on all standard post-cycle updates
+- Calibrate on subsequent calibrations (anchored by prior scores)
 
-Opus is justified when Builder touches agent orchestration logic (phases.md, SKILL.md), Auditor finds security-sensitive changes, or the `repair` strategy is active. Meta-cycle review always uses opus. A cycle routing Scout and Auditor to haiku while keeping Builder on sonnet saves approximately 40-60% of total cycle cost versus all-sonnet routing.
+### When to Route to tier-1
+
+- Scout on cycle 1 or goal-directed cycle ≤ 2 — strategic foundation sets session trajectory
+- Builder on audit retry attempt ≥ 2 — design mistake needs deeper reasoning
+- Self-Evaluation on problem cycles (audit retries, eval failures, miscalibration > 0.15)
+- Meta-cycle review — always uses deep reasoning
+
+tier-1 is justified at decision points with multiplicative downstream impact. A cycle routing Scout and Auditor to tier-3 while keeping Builder on tier-2 saves approximately 40-60% of total cycle cost versus all-tier-2 routing.
 
 For token reduction mechanisms including KV-cache prefix optimization, plan caching, and incremental scan, see `docs/token-optimization.md`.

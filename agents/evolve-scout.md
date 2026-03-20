@@ -2,7 +2,7 @@
 name: evolve-scout
 description: Discovery and planning agent for the Evolve Loop. Scans codebase, performs conditional web research, selects tasks, and writes eval definitions.
 tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
-model: sonnet
+model: tier-2
 ---
 
 # Evolve Scout

@@ -19,17 +19,19 @@ How the evolve-loop minimizes token usage across agents and cycles.
 
 ## Model Routing
 
-The orchestrator selects the model for each agent invocation based on phase complexity:
+The orchestrator selects the model tier for each agent invocation based on phase complexity. Tiers are provider-agnostic — see SKILL.md § Model Tier System for concrete model mappings per provider (Anthropic, Google, OpenAI, Mistral, DeepSeek, open-weight).
 
 | Phase | Default | Upgrade Condition | Downgrade Condition |
 |-------|---------|-------------------|---------------------|
-| Scout (DISCOVER) | sonnet | Deep research goal → opus | Cycle 2+ incremental scan → haiku |
-| Builder (BUILD) | sonnet | M-complexity + 5+ files → opus | S-complexity inline tasks → haiku |
-| Auditor (AUDIT) | sonnet | Security-sensitive changes → opus | Clean report, no risks → haiku |
-| Operator (LEARN) | haiku | HALT conditions → sonnet | Standard post-cycle → haiku |
-| Meta-cycle review | opus | Always | — |
+| Scout (DISCOVER) | tier-2 | Cycle 1 or goal-directed (cycle ≤ 2) → tier-1 | Cycle 4+ with mature bandit data (3+ arms, pulls ≥ 3) → tier-3 |
+| Builder (BUILD) | tier-2 | M + 5+ files → tier-1; audit retry (attempt ≥ 2) → tier-1 | S + plan cache hit → tier-3 |
+| Auditor (AUDIT) | tier-2 | Security-sensitive changes → tier-1 | Clean report, no risks → tier-3 |
+| Calibrate (Phase 0) | tier-3 | First calibration of session → tier-2 | Subsequent calibrations → tier-3 |
+| Operator (LEARN) | tier-3 | Last cycle / fitness regression / meta-cycle → tier-2 | Standard post-cycle → tier-3 |
+| Self-Evaluation | tier-2 (inline) | Audit retries / eval failures / miscalibration → tier-1 | All clean → tier-2 (inline) |
+| Meta-cycle review | tier-1 | Always | — |
 
-The `repair` strategy always uses sonnet+ for Builder (accuracy over cost). The `innovate` strategy permits haiku for Auditor on style-only checks.
+The `repair` strategy always uses tier-2+ for Builder (accuracy over cost). The `innovate` strategy permits tier-3 for Auditor on style-only checks. tier-1 routing targets decision points with multiplicative downstream impact — ~6.5% cost increase per 5-cycle session, offset by fewer wasted retries.
 
 ---
 
@@ -100,7 +102,7 @@ Each entry in `state.json planCache` follows this structure:
 
 On cycle 1, Scout performs a full codebase scan. On cycle 2+, Scout reads only the project digest (file list, recent changes, builder notes) instead of re-reading the entire codebase. This avoids redundant reads of files that have not changed, reducing Scout token usage by ~20-40K per cycle.
 
-The Scout downgrade rule in model routing also allows haiku on incremental scans, compounding the savings.
+The Scout downgrade rule in model routing also allows tier-3 on incremental scans, compounding the savings.
 
 ---
 

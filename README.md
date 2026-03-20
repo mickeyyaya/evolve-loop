@@ -20,7 +20,7 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Automated prompt evolution** — TextGrad-style critique-synthesize loop refines agent prompts
 - **Delta evaluation** — quantitative trend tracking across cycles
 - **Multi-type instinct memory** — episodic, semantic, and procedural categories for targeted retrieval
-- **Dynamic model routing** — haiku/sonnet/opus selected per phase based on complexity
+- **Dynamic model routing** — 3-tier model abstraction (tier-1/tier-2/tier-3) works across any LLM provider
 - **Plan template caching** — reuse successful build plans for ~30-50% cost reduction
 - **Gene/Capsule library** — structured fix templates with selectors and validation
 - **Memory consolidation** — cluster, decay, and archive instincts to prevent unbounded growth
@@ -144,12 +144,12 @@ Phase 5: Orchestrator ── instincts + archive
 
 ## Agents
 
-| Role | File | Model | Purpose |
-|------|------|-------|---------|
-| Scout | `evolve-scout.md` | sonnet | Discovery + analysis + task selection |
-| Builder | `evolve-builder.md` | sonnet | Design + implement + self-test |
-| Auditor | `evolve-auditor.md` | sonnet | Review + security + eval gate |
-| Operator | `evolve-operator.md` | haiku | Loop health monitoring |
+| Role | File | Default Tier | Purpose |
+|------|------|-------------|---------|
+| Scout | `evolve-scout.md` | tier-2 | Discovery + analysis + task selection |
+| Builder | `evolve-builder.md` | tier-2 | Design + implement + self-test |
+| Auditor | `evolve-auditor.md` | tier-2 | Review + security + eval gate |
+| Operator | `evolve-operator.md` | tier-3 | Loop health monitoring |
 
 ## Showcase
 

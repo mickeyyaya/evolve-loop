@@ -111,7 +111,7 @@ See [token-optimization.md](docs/token-optimization.md) for details.
 | Discovery | ~40-60K | Incremental after cycle 1 |
 | Build | ~30-50K | Per task, S-complexity inline |
 | Verify | ~20-30K | Single-pass audit |
-| Ship+Learn | ~5K | Inline + Operator (haiku) |
+| Ship+Learn | ~5K | Inline + Operator (tier-3) |
 | **Total/cycle** | **~100-150K** | **Budget: 200K/cycle** |
 
 Key optimizations:
@@ -122,7 +122,7 @@ Key optimizations:
 - **Inline ship** — orchestrator commits directly, no Deployer agent needed
 - **Inline S-tasks** — orchestrator implements small tasks directly (inst-007 policy)
 - **Plan template caching** — reuse plan structures for recurring task types (~30-50% savings)
-- **Dynamic model routing** — haiku for lightweight work, opus only when needed
+- **Dynamic model routing** — tier-3 for lightweight work, tier-1 only at high-leverage decision points
 
 ## Self-Improvement Infrastructure
 

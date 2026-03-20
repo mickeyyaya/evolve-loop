@@ -30,7 +30,7 @@ This prevents redundant benchmark scoring when multiple parallel runs start clos
    # Store results in $WORKSPACE_PATH/benchmark-automated.json
    ```
 
-2. **Run LLM judgment pass** (model: haiku for cost efficiency):
+2. **Run LLM judgment pass** (model: per routing table — tier-2 for first calibration of session to establish accurate baseline, tier-3 for subsequent calibrations):
    For each dimension, provide the LLM with:
    - The dimension's rubric from benchmark-eval.md
    - A sample of relevant files (max 3 files per dimension, <200 lines each)
@@ -181,7 +181,7 @@ RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
 
 **Operator brief pre-read:** Before launching Scout, check if `$WORKSPACE_PATH/next-cycle-brief.json` exists (from own run's previous cycle). If not found, fall back to `.evolve/latest-brief.json` (shared, written by most recent run). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
 
-Launch **Scout Agent** (model: per routing table — sonnet default, haiku for incremental, opus for deep research; subagent_type: `general-purpose`):
+Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-directed cycle ≤ 2 (strategic foundation sets trajectory for entire session), tier-3 if cycle 4+ with mature bandit data (3+ arms with pulls ≥ 3, selection becomes data-driven), tier-2 otherwise; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
   ```json
@@ -292,7 +292,7 @@ Builder operates directly on the working directory. Only suitable for append-onl
 
 The orchestrator selects the isolation mode from `projectContext.buildIsolation` (set during initialization step 3). Worktree remains the default fallback if `buildIsolation` is not specified.
 
-Launch **Builder Agent** (model: per routing table — sonnet default, opus for complex M tasks, haiku for S-complexity; subagent_type: `general-purpose`, **isolation: `worktree`**):
+Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + plan cache hit (execution-only, plan is proven), tier-1 if M-complexity + 5+ files OR audit retry attempt ≥ 2 (design mistake needs deeper reasoning about WHY it failed), tier-2 if strategy == "repair" (accuracy floor), tier-2 otherwise; subagent_type: `general-purpose`, **isolation: `worktree`**):
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json
@@ -361,7 +361,7 @@ sha256sum -c $WORKSPACE_PATH/eval-checksums.json
 ```
 If any checksum fails → HALT: "Eval tamper detected — eval file modified after Scout created it. Investigate before proceeding."
 
-Launch **Auditor Agent** (model: per routing table — sonnet default, opus for security-sensitive, haiku for clean builds; subagent_type: `general-purpose`):
+Launch **Auditor Agent** (model: per routing table — tier-2 default, tier-1 for security-sensitive, tier-3 for clean builds; subagent_type: `general-purpose`):
 - Prompt: Read `agents/evolve-auditor.md` and pass as prompt
 - Context:
   ```json

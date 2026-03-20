@@ -194,11 +194,13 @@ Layer 6: Genes ────────────── Structured fix templat
 
 **How it works:**
 1. Run automated bash checks for 8 quality dimensions (e.g., grep for broken links, check frontmatter presence, validate schema consistency)
-2. Run LLM judgment pass — haiku model scores each dimension against an anchored rubric (0/25/50/75/100)
+2. Run LLM judgment pass — tier-3 model (tier-2 for first calibration) scores each dimension against an anchored rubric (0/25/50/75/100)
 3. Compute composite: `dimension = 0.7 × automated + 0.3 × LLM`
 4. Compute overall: `mean(all 8 composites)`
 5. Store in `state.json.projectBenchmark`
 6. Identify weakest 2-3 dimensions → pass to Scout as `benchmarkWeaknesses`
+
+**Model routing:** First calibration uses tier-2 for accurate baseline; subsequent calibrations use tier-3.
 
 **Deduplication:** Skips if last calibration was <1 hour ago (parallel-run safe).
 
@@ -316,8 +318,8 @@ Select top 2-4 tasks within token budget (200K/cycle)
 | 2. Consolidation check | If cycle % 3 == 0 or instinctCount > 20 | Cluster, decay, archive |
 | 3. Instinct citation | Scan scout/build reports for `instinctsApplied` | Boost cited instinct confidence by +0.05 |
 | 4. Instinct extraction | Deep reasoning about what worked/failed | Write YAML to `.evolve/instincts/personal/` |
-| 5. Self-evaluation | LLM-as-a-Judge on 4 dimensions | Correctness, Completeness, Novelty, Efficiency (≥0.7 pass) |
-| 6. Operator check | Launch Operator agent | Stall detection, recommendations, next-cycle brief |
+| 5. Self-evaluation | LLM-as-a-Judge on 4 dimensions | Correctness, Completeness, Novelty, Efficiency (≥0.7 pass); tier-1 for problem cycles (audit retries/eval failures/miscalibration) |
+| 6. Operator check | Launch Operator agent | Stall detection, recommendations, next-cycle brief; tier-2 for last cycle/fitness regression/meta-cycle |
 | 7. Notes update | Append cycle entry to `notes.md` | Rolling window, compressed every 5 cycles |
 | 8. Cycle summary | Output enhanced box-format summary | Benchmark delta, audit iterations, warnings |
 | 9. Handoff | Write checkpoint to `handoff.md` | Compaction anchor for context survival |

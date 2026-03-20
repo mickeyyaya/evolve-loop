@@ -122,11 +122,11 @@ Uses an LLM to score output against a structured rubric. Each criterion has anch
   - 50: Understandable but requires re-reading
   - 75: Clear on first read, minor ambiguities
   - 100: Crystal clear, no ambiguity, well-structured
-- Model: haiku (cost-efficient for rubric scoring)
+- Model: tier-3 (cost-efficient for rubric scoring)
 - Threshold: average score >= 60 to pass
 ```
 
-The LLM receives the rubric + the artifact + a system prompt: "Score each criterion using ONLY the anchor points. Output JSON: `{criterion: score, justification: string}`." Haiku model is sufficient for rubric application (it follows structured instructions well).
+The LLM receives the rubric + the artifact + a system prompt: "Score each criterion using ONLY the anchor points. Output JSON: `{criterion: score, justification: string}`." tier-3 model is sufficient for rubric application (it follows structured instructions well).
 
 ### Groundedness Check (research)
 
@@ -135,7 +135,7 @@ Verifies that claims in a research output are supported by cited sources. The LL
 ```markdown
 ## Groundedness Check
 - Input: research output + cited sources
-- Model: sonnet (requires reasoning about source-claim alignment)
+- Model: tier-2 (requires reasoning about source-claim alignment)
 - Check: "For each factual claim, identify the supporting source. Flag claims with no source."
 - Threshold: >= 80% of claims grounded to pass
 ```
@@ -149,7 +149,7 @@ Verifies that the output addresses all required topics or questions. The LLM com
 ```markdown
 ## Coverage Check
 - Input: output text + required coverage points (from acceptance criteria)
-- Model: haiku
+- Model: tier-3
 - Check: "For each coverage point, does the output address it? Output JSON: {point: bool}"
 - Threshold: 100% coverage to pass (all points addressed)
 ```
@@ -187,7 +187,7 @@ Distinct from task-level evals. The benchmark eval measures project-wide quality
 Run the full benchmark eval before the first cycle:
 
 1. **Execute automated checks** for all 8 dimensions from benchmark-eval.md
-2. **Run LLM judgment** (haiku model) for each dimension using the anchored rubric
+2. **Run LLM judgment** (tier-3 model, tier-2 for first calibration) for each dimension using the anchored rubric
 3. **Compute composite scores:** `0.7 * automated + 0.3 * llm` per dimension
 4. **Store results** in `state.json.projectBenchmark`
 5. **Write `workspace/benchmark-report.md`** with per-dimension scores and weaknesses

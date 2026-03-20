@@ -106,6 +106,8 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
      ```
 
    **Self-Evaluation (LLM-as-a-Judge)** (after instinct extraction):
+   Model routing: If this cycle had audit retries (auditAttempts > 1), any eval failure, or calibration_error > 0.15 → launch self-evaluation as a dedicated sub-task with **tier-1** model (problem cycles have the richest learning signal and need the deepest reflection to extract accurate instincts). Otherwise, run inline with the orchestrator model (tier-2).
+
    Score the cycle on 4 dimensions using a structured rubric. For each dimension, write a chain-of-thought justification BEFORE assigning the score. Binary threshold: ≥0.7 = pass, <0.7 = fail (triggers mandatory instinct extraction for that dimension).
 
    | Dimension | Guiding questions | Threshold |
@@ -169,7 +171,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    Log accuracy notes as an instinct if a clear pattern emerges (e.g., "Scout consistently over-estimates complexity for config tasks"). No action required if no completed counterfactuals exist this cycle.
 
 6. **Operator Check:**
-   Launch **Operator Agent** (model: per routing table — haiku default, sonnet if HALT suspected; subagent_type: `general-purpose`):
+   Launch **Operator Agent** (model: per routing table — tier-2 if isLastCycle (session synthesis needs quality narrative), tier-2 if fitnessRegression detected (HALT-worthy signal needs careful diagnosis), tier-2 if cycle % 5 == 0 (meta-cycle analysis is consequential), tier-3 if mode == "convergence-check" (simple state check), tier-3 otherwise (routine post-cycle); subagent_type: `general-purpose`):
    - Context:
      ```json
      {
@@ -224,7 +226,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    2. Compress entries older than 5 cycles into a fixed-size `## Summary` section at the top (~500 bytes: total tasks shipped, key milestones, count of active deferred items)
    3. Rewrite notes.md with: `## Summary (cycles 1 through N-5)` + last 5 cycle entries only
    4. Full history is preserved in `history/cycle-N/` archives
-   5. Use haiku model for the compression summarization (it's a straightforward summarization task)
+   5. Use tier-3 model for the compression summarization (it's a straightforward summarization task)
 
    This caps notes.md at ~5KB regardless of cycle count.
 

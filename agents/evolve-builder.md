@@ -2,7 +2,7 @@
 name: evolve-builder
 description: Implementation agent for the Evolve Loop. Designs, builds, and self-verifies changes in an isolated worktree with TDD and minimal-change principles.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: tier-2
 ---
 
 # Evolve Builder

@@ -26,7 +26,7 @@
 │  │  ┌─────────────────── Agent Pool ──────────────────────────┐ │  │
 │  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐ │ │  │
 │  │  │  │  Scout   │  │ Builder  │  │ Auditor  │  │Operator│ │ │  │
-│  │  │  │ (sonnet) │  │ (sonnet) │  │ (sonnet) │  │(haiku) │ │ │  │
+│  │  │  │ (tier-2) │  │ (tier-2) │  │ (tier-2) │  │(tier-3)│ │ │  │
 │  │  │  │          │  │ worktree │  │ eval gate│  │ health │ │ │  │
 │  │  │  └──────────┘  └──────────┘  └──────────┘  └────────┘ │ │  │
 │  │  └─────────────────────────────────────────────────────────┘ │  │
@@ -364,21 +364,25 @@ Auto-disable when calibration_error < 0.10 for 2 consecutive cycles
 
 | Component | Typical | Budget | Optimization |
 |-----------|---------|--------|-------------|
-| Scout (Phase 1) | 40-60K | — | Incremental after cycle 1; haiku for simple scans |
+| Scout (Phase 1) | 40-60K | — | Incremental after cycle 1; tier-3 for simple scans |
 | Builder (Phase 2) | 30-50K per task | 80K/task | Inline S-tasks save ~30-50K; plan cache saves ~30-50% |
-| Auditor (Phase 3) | 20-30K | — | Adaptive strictness; haiku for clean builds |
-| Ship + Learn (Phase 4-5) | ~5K | — | Orchestrator inline + haiku Operator |
+| Auditor (Phase 3) | 20-30K | — | Adaptive strictness; tier-3 for clean builds |
+| Ship + Learn (Phase 4-5) | ~5K | — | Orchestrator inline + tier-3 Operator |
 | **Total/cycle** | **~100-150K** | **200K** | Lean mode after cycle 4 saves ~15-20K |
 
 ### Model Routing
 
 | Phase | Default | Upgrade → | Downgrade → |
 |-------|---------|-----------|-------------|
-| Scout | sonnet | opus (deep research) | haiku (incremental) |
-| Builder | sonnet | opus (M + 5+ files) | haiku (S inline) |
-| Auditor | sonnet | opus (security) | haiku (clean build) |
-| Operator | haiku | sonnet (HALT suspected) | — |
-| Meta-cycle | opus | — | — |
+| Scout | tier-2 | tier-1 (cycle 1 or goal-directed ≤ 2) | tier-3 (cycle 4+ with mature bandit) |
+| Builder | tier-2 | tier-1 (M + 5+ files; audit retry ≥ 2) | tier-3 (S + plan cache hit) |
+| Auditor | tier-2 | tier-1 (security) | tier-3 (clean build) |
+| Calibrate | tier-3 | tier-2 (first calibration of session) | tier-3 (subsequent) |
+| Operator | tier-3 | tier-2 (last cycle / regression / meta-cycle) | — |
+| Self-Eval | tier-2 (inline) | tier-1 (audit retries / eval failures / miscalibration) | — |
+| Meta-cycle | tier-1 | — | — |
+
+Tiers are provider-agnostic. See SKILL.md § Model Tier System for concrete model mappings per provider.
 
 ### Context Management
 
@@ -492,10 +496,10 @@ Tasks
 
 | File | Lines | Model | Workspace Output |
 |------|-------|-------|-----------------|
-| `agents/evolve-scout.md` | ~333 | sonnet | `scout-report.md` |
-| `agents/evolve-builder.md` | ~222 | sonnet | `build-report.md` |
-| `agents/evolve-auditor.md` | ~193 | sonnet | `audit-report.md` |
-| `agents/evolve-operator.md` | ~237 | haiku | `operator-log.md` |
+| `agents/evolve-scout.md` | ~333 | tier-2 | `scout-report.md` |
+| `agents/evolve-builder.md` | ~222 | tier-2 | `build-report.md` |
+| `agents/evolve-auditor.md` | ~193 | tier-2 | `audit-report.md` |
+| `agents/evolve-operator.md` | ~237 | tier-3 | `operator-log.md` |
 
 ### Documentation
 

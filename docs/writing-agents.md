@@ -9,7 +9,7 @@ Guide for creating new evolve-loop agents or modifying existing ones.
 name: evolve-<role>
 description: <one-line description of what this agent does>
 tools: ["Read", "Grep", "Glob", "Bash"]  # tools this agent needs
-model: sonnet  # or opus
+model: tier-2  # or tier-1 for deep reasoning tasks
 ---
 
 # Agent Name

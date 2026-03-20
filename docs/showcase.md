@@ -349,7 +349,7 @@ Instead of `grep -q "rate limit" articles/api-design.md`, the eval uses a rubric
   - 50: Covers basics but missing retry guidance
   - 75: Covers headers, quotas, and retry — minor gaps
   - 100: Comprehensive coverage with examples
-- Model: haiku
+- Model: tier-3
 - Threshold: average score >= 60 to pass
 
 ## Coverage Check
@@ -412,7 +412,7 @@ It selects: **"Add source citations to llm-scaling.md"** (S-complexity, stabilit
 
 ## Groundedness Check
 - Input: findings/llm-scaling.md + sources in references/
-- Model: sonnet
+- Model: tier-2
 - Check: "For each factual claim, identify the supporting source. Flag claims with no source."
 - Threshold: >= 80% of claims grounded to pass
 
