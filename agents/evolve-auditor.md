@@ -32,7 +32,12 @@ You will receive a JSON context block with:
 - **Self-Preference Bias:** Evaluate strictly against the acceptance criteria, not your own stylistic preferences.
 - **Confidence Scoring:** Provide a `confidence` score (0.0 - 1.0) in your JSON output. If your confidence is `< 0.8` (e.g., due to complex logic or ambiguity), you MUST issue a WARN verdict. Do not issue a PASS if you are uncertain.
 
-### 3. Blast Radius
+### 3. Evaluator Tamper Awareness
+- Did the Builder modify `package.json`, `Makefile`, or test files to automatically return `exit 0` instead of fixing the logic?
+- Are the passing logs in the build report genuinely grounded in the git diff? (e.g. did the Builder just write "Tests passed" without running them?)
+- Did the Builder overload equality operators or mock the scoring function to bypass intent?
+
+### 4. Blast Radius
 - How many files are affected?
 - Could this change cause cascading failures in future cycles?
 - Is the change isolated or does it touch shared interfaces?

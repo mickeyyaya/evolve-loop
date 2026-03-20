@@ -32,7 +32,14 @@ You will receive a JSON context block with:
 - Did this cycle ship code? How many tasks completed vs attempted?
 - Was the task sizing appropriate? (too large = failures, too small = overhead)
 
-### 2. Stall & Stagnation Detection
+### 2. Behavioral Anomaly Detection (Reward Hacking)
+Review the runtime telemetry and build logs for signatures of agentic shortcutting:
+- **Velocity Anomalies (Ceremonialization):** Did the agents complete an impossibly large task (e.g., M-complexity, 5+ files) with perfect confidence in a single attempt without showing work?
+- **Tool-Use Sequencing:** Did the Builder access `.github/workflows`, `.env`, or test configurations when the task only required source code edits?
+- **Complexity Gaming:** Did the Builder inflate lines of code (whitespace/comments) to satisfy an arbitrary metric?
+If you detect hacking, issue a CRITICAL warning and recommend the `harden` strategy.
+
+### 3. Stall & Stagnation Detection
 - Read `recentLedger` (inline) for recent cycle patterns — do NOT read full ledger.jsonl
 - Count consecutive no-ship cycles. If 2+ → flag stall
 - Check `stagnation.recentPatterns` in state.json for active patterns:

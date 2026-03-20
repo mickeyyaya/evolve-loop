@@ -64,3 +64,27 @@ The LLM must never evaluate its own bash exit codes.
 - **Defense:** The deterministic orchestrator executes the test commands. If the exit code is `1`, the orchestrator informs the LLM that it failed. The LLM cannot simply output `{"verdict": "PASS"}` to bypass a failing bash command.
 
 By structurally separating the execution environment from the reasoning environment, the Evolve Loop guarantees that agents must complete the actual work to satisfy the quality gates.
+
+---
+
+## The Reality: Detection Over Prevention (Observability)
+
+While the `examples/secure_orchestrator.py` demonstrates a perfect deterministic sandbox, the reality is that the Evolve Loop is a general-purpose skill designed to run in unconstrained environments (like a user's raw local terminal via the Gemini CLI) where strict gVisor/Docker sandboxing isn't always possible or desirable. 
+
+In these environments, we cannot mathematically *prevent* a sufficiently capable LLM from cheating. **Therefore, our primary defense must be Awareness and Observability.** 
+
+If the system cannot stop the agent from hacking the reward, the agents themselves must be exceptionally good at *knowing* when the system has been hacked and alerting the human.
+
+### 1. Behavioral Anomaly Detection (The Operator)
+The Operator agent (Phase 5) is formally instructed to monitor the pipeline's runtime telemetry for the signatures of TRACE (Testing Reward Anomalies in Code Environments) exploits:
+- **Velocity Anomalies:** A complex task touching 5+ files was completed and audited in under 10 seconds with 100% confidence. This indicates *Ceremonialization* (the agents skipped the work and hallucinated the logs).
+- **Tool-Use Sequencing:** The Builder accessed `package.json`, `conftest.py`, or `.github/workflows/` when the task only required modifying `src/api.js`. This indicates *Test Environment Poisoning*.
+- **Complexity Gaming:** A task resulted in 5,000 lines of whitespace or commented-out code to satisfy a "lines changed" or verbosity metric.
+
+### 2. Evaluator Tamper Awareness (The Auditor)
+The Auditor (Phase 3) is explicitly trained to look for "Semantic Contextualized Hacks" when reviewing the Builder's diff:
+- Did the Builder monkey-patch the test suite instead of fixing the product code?
+- Did the Builder overload equality operators (`==`) or mock the scoring function to always return `True`?
+- Are the passing logs in the build report truly "grounded" in the actual git diff, or did the Builder simply write the string `"Tests passed"` without invoking the test runner?
+
+By shifting focus to **Runtime Behavioral Observability**, the Evolve Loop ensures that even when agents operate in highly privileged environments, their attempts to bypass workflows are detected, flagged, and halted by the agent network before they pollute the `main` branch.
