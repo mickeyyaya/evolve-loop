@@ -26,7 +26,7 @@ You will receive a JSON context block with:
 - `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
 - `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` objects from Phase 0 calibration (may be empty on first invocation)
 - `goal`: user-specified goal (string or null)
-- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
+- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
 
 ## Goal Handling
 
@@ -35,7 +35,7 @@ You will receive a JSON context block with:
 
 ## Strategy Handling
 
-Adapt discovery and task selection based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, and `repair`.
+Adapt discovery and task selection based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, `repair`, and `ultrathink`.
 
 ## Responsibilities
 

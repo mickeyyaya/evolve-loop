@@ -20,7 +20,7 @@ The operator brief is the primary cross-cycle communication channel from the Ope
 |-------|------|-------------|
 | `cycle` | number | The cycle number when this brief was written |
 | `weakestDimension` | string | The benchmark dimension with the lowest composite score, or the dimension showing the most regression. Scout should prioritize tasks that improve this dimension. |
-| `recommendedStrategy` | string | One of `balanced`, `innovate`, `harden`, `repair`. Overrides the session-level strategy for task selection weighting. |
+| `recommendedStrategy` | string | One of `balanced`, `innovate`, `harden`, `repair`, `ultrathink`. Overrides the session-level strategy for task selection weighting. |
 | `taskTypeBoosts` | string[] | Task types (e.g., `feature`, `stability`) that should receive a +1 priority boost in the Scout's selection ranking. Complements the bandit mechanism. |
 | `avoidAreas` | string[] | Files or subsystems the Scout should not target this cycle. Typically recently-refactored areas or deferred work with explicit revisit dates. |
 

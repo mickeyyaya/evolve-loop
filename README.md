@@ -13,7 +13,7 @@ Optimized for fast iteration — diverse small/medium tasks per cycle, worktree 
 - **Eval hard gate** — Auditor runs code graders and acceptance checks before shipping
 - **Continuous learning** — instinct extraction after each cycle with deep reasoning
 - **Loop monitoring** — Operator detects stalls, quality degradation, and repeated failures
-- **Strategy presets** — `innovate`, `harden`, `repair`, `balanced` steer cycle intent
+- **Strategy presets** — `innovate`, `harden`, `repair`, `ultrathink`, `balanced` steer cycle intent
 - **Token budgets** — soft limits per task and per cycle prevent runaway costs
 - **Stagnation detection** — pattern-based detection of same-file churn, error repeats, diminishing returns
 - **Meta-cycle self-improvement** — every 5 cycles, the pipeline evaluates and improves itself

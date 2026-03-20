@@ -25,7 +25,7 @@ The Operator monitors for stalls, quality degradation, and repeated failures usi
 All agents are self-contained. No dependency on external plugins or frameworks.
 
 ### 7. Strategy-Driven Execution
-Four strategy presets (`balanced`, `innovate`, `harden`, `repair`) shape task selection, build approach, and audit strictness across all phases.
+Five strategy presets (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`) shape task selection, build approach, and audit strictness across all phases.
 
 ## Pipeline
 

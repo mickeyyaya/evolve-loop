@@ -89,7 +89,7 @@ These components work across all domains without modification:
 - **Phase 5 LEARN** — Instinct extraction, consolidation, operator health (universal)
 - **Bandit task selection** — Reward-based task type prioritization (universal)
 - **Benchmark evaluation** — Multi-dimensional quality scoring (dimensions may vary per domain)
-- **Strategy presets** — balanced/innovate/harden/repair intent mapping (universal)
+- **Strategy presets** — balanced/innovate/harden/repair/ultrathink intent mapping (universal)
 - **State management** — state.json, ledger, notes, history archival (universal)
 - **Stagnation detection** — Pattern recognition for repeated failures (universal)
 - **Context management** — Stop-hook, handoff, session resumption (universal)

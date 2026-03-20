@@ -121,6 +121,7 @@ Strategies steer the cycle's intent without requiring a full goal string:
 | `innovate` | New features, gaps | Additive changes | Relaxed style, strict correctness |
 | `harden` | Stability, tests, edge cases | Defensive coding | Strict on all dimensions |
 | `repair` | Bugs, broken tests | Fix-only, minimal diff | Strict regressions, relaxed new code |
+| `ultrathink` | Complex reasoning, structural refactors | Stepwise confidence estimation | Strict all dimensions |
 
 The strategy is stored in `state.json` and passed to all agents via the context block.
 

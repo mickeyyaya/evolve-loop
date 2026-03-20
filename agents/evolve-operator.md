@@ -130,7 +130,7 @@ Write `workspace/next-cycle-brief.json` with structured guidance for the Scout:
 {
   "cycle": <N>,
   "weakestDimension": "<speed|quality|cost|novelty>",
-  "recommendedStrategy": "<balanced|innovate|harden|repair>",
+  "recommendedStrategy": "<balanced|innovate|harden|repair|ultrathink>",
   "taskTypeBoosts": ["<task-type>"],
   "avoidAreas": ["<file-or-pattern>"]
 }

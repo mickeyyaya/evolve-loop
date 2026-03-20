@@ -2,7 +2,7 @@
 
 Detailed orchestrator instructions for each phase. Optimized for fast iteration with diverse small/medium tasks per cycle.
 
-**Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`).
+**Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`, `ultrathink`).
 
 ## Phase 0: CALIBRATE (once per invocation)
 
@@ -36,7 +36,7 @@ This prevents redundant benchmark scoring when multiple parallel runs start clos
    - A sample of relevant files (max 3 files per dimension, <200 lines each)
    - The automated score for context
 
-   The LLM outputs a score (0/25/50/75/100) with a 1-sentence justification. Use the anchored rubric — scores MUST match one of the anchor points exactly.
+   The LLM outputs a score (0/25/50/75/100) with a 1-sentence justification and a confidence score (0.0-1.0). Use the anchored rubric — scores MUST match one of the anchor points exactly. You MUST actively resist "verbosity bias" (assuming longer files are better) and score strictly on qualitative merit.
 
 3. **Compute per-dimension composite scores:**
    ```
@@ -142,7 +142,7 @@ This ensures parallel runs get non-colliding cycle numbers (e.g., Run A gets 8,9
   - If `>= 2`: Skip Scout entirely. Jump to Phase 5 with Operator in `"convergence-check"` mode. Operator can reset `nothingToDoCount` to 0 if it detects new work (e.g., external changes via `git log`).
   - If `== 1`: **Escalation before convergence** — before running convergence-confirmation, the orchestrator attempts to unlock new work:
     1. Review the last 3 cycles' deferred tasks (from `evaluatedTasks` with `decision: "deferred"`) for items that could be combined into a single task
-    2. Check if switching strategy (e.g., `balanced` → `innovate` or `harden`) would surface new task candidates
+    2. Check if switching strategy (e.g., `balanced` → `innovate`, `harden`, or `ultrathink`) would surface new task candidates
     3. Propose a "radical" task that challenges an existing assumption or convention in the codebase (think harder — re-read code for new angles)
     If escalation produces a viable task → reset `nothingToDoCount` to 0, proceed with normal Scout launch using the escalated task as a seed.
     If escalation fails → Launch Scout in `"convergence-confirmation"` mode — Scout reads ONLY state.json + `git log --oneline -3` and MUST trigger new web research to find potential external tasks/updates, bypassing any cooldowns. No notes, no ledger, no instincts, no codebase scan. If still nothing found, increment to 2 and skip to Phase 5.
@@ -301,7 +301,7 @@ Builder operates directly on the working directory. Only suitable for append-onl
 
 The orchestrator selects the isolation mode from `projectContext.buildIsolation` (set during initialization step 3). Worktree remains the default fallback if `buildIsolation` is not specified.
 
-Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + plan cache hit (execution-only, plan is proven), tier-1 if M-complexity + 5+ files OR audit retry attempt ≥ 2 (design mistake needs deeper reasoning about WHY it failed), tier-2 if strategy == "repair" (accuracy floor), tier-2 otherwise; subagent_type: `general-purpose`, **isolation: `worktree`**):
+Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + plan cache hit (execution-only, plan is proven), tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry attempt ≥ 2 (design mistake needs deeper reasoning about WHY it failed), tier-2 if strategy == "repair" (accuracy floor), tier-2 otherwise; subagent_type: `general-purpose`, **isolation: `worktree`**):
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json

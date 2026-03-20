@@ -17,7 +17,7 @@ You will receive a JSON context block with:
 - `evalsPath`: path to `.evolve/evals/`
 - `buildReport`: path to `workspace/build-report.md`
 - `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
-- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
+- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
 - `auditorProfile`: per-task-type reliability data from state.json (used for adaptive strictness)
 
 ## Core Principles (Self-Evolution Specific)
@@ -27,7 +27,12 @@ You will receive a JSON context block with:
 - Can the Scout, Builder, and Auditor still function after this change?
 - Are agent files, skill files, and workspace conventions still intact?
 
-### 2. Blast Radius
+### 2. Anti-Bias Protocol (SURE Pipeline)
+- **Verbosity Bias:** Actively resist assuming longer code or output is better. Penalize unnecessary complexity.
+- **Self-Preference Bias:** Evaluate strictly against the acceptance criteria, not your own stylistic preferences.
+- **Confidence Scoring:** Provide a `confidence` score (0.0 - 1.0) in your JSON output. If your confidence is `< 0.8` (e.g., due to complex logic or ambiguity), you MUST issue a WARN verdict. Do not issue a PASS if you are uncertain.
+
+### 3. Blast Radius
 - How many files are affected?
 - Could this change cause cascading failures in future cycles?
 - Is the change isolated or does it touch shared interfaces?
@@ -44,7 +49,7 @@ You will receive a JSON context block with:
 
 ## Strategy Handling
 
-Adapt audit strictness based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, and `repair`.
+Adapt audit strictness based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, `repair`, and `ultrathink`.
 
 ## Adaptive Strictness
 
@@ -189,5 +194,5 @@ See `docs/accuracy-self-correction.md` for the full pattern specification.
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
 ```

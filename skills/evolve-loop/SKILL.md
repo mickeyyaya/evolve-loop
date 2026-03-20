@@ -15,7 +15,7 @@ Orchestrates 4 specialized agents through 5 lean phases per cycle. Optimized for
 
 Parse `$ARGUMENTS` as follows:
 - If the first token is a number → use it as `cycles` (number of NEW cycles to run)
-- If a token matches a strategy name (`innovate`, `harden`, `repair`) → use it as `strategy`
+- If a token matches a strategy name (`innovate`, `harden`, `repair`, `ultrathink`) → use it as `strategy`
 - Remaining tokens → `goal`
 - Defaults: `cycles` = 2, `strategy` = `balanced`, `goal` = null (autonomous discovery mode)
 
@@ -29,6 +29,7 @@ Strategies steer cycle intent without requiring a full goal string:
 | `innovate` | New features, missing functionality, gaps | Prefer additive changes, new files | Relaxed on style, strict on correctness |
 | `harden` | Stability, test coverage, error handling, edge cases | Defensive coding, add tests/validation | Strict on all dimensions |
 | `repair` | Bugs, broken functionality, failing tests | Fix-only, smallest possible diff | Strict on regressions, relaxed on new code |
+| `ultrathink` | Deep reasoning, complex refactors, structural changes | Maximum thinking budget (tier-1 forced), step-by-step verification | Strict on all dimensions, triggers stepwise confidence checks |
 
 The strategy is passed to all agents via the context block as `"strategy": "<name>"`. Each agent adapts its behavior accordingly (see agent definitions for details).
 
@@ -360,6 +361,7 @@ The orchestrator selects the model tier for each agent invocation based on phase
 - Track model usage in ledger entries for cost analysis
 - The `repair` strategy always uses tier-2+ for Builder (accuracy matters more than cost)
 - The `innovate` strategy can use tier-3 for Auditor on style checks (relaxed strictness)
+- The `ultrathink` strategy ALWAYS forces `tier-1` with extended thinking for all agents (Scout, Builder, Auditor) to maximize reasoning depth on complex architectural goals.
 - tier-1 routing targets **decision points with multiplicative downstream impact**: cycle 1 Scout sets the session trajectory, audit retries need deeper reasoning about design failures, and problem-cycle self-evaluation extracts the richest learning signal
 - Net cost increase is ~6.5% per 5-cycle session, offset by fewer wasted retries and better task selection
 

@@ -55,6 +55,14 @@ Low groundedness is a hallucination indicator. High coverage with low groundedne
 
 ---
 
+## Self-Evaluation Bias Mitigation
+
+As of 2026, LLM-as-a-judge patterns suffer from documented systematic biases. The Evolve Loop employs the SURE (Selective Uncertainty-based Re-Evaluation) pipeline to mitigate these:
+
+1. **Verbosity Bias:** LLMs naturally favor longer responses. The Auditor and Calibrate phases are explicitly instructed to resist verbosity bias and score strictly on qualitative merit, penalizing unnecessary complexity.
+2. **Self-Preference Bias:** LLMs favor outputs from their own model family. The loop mitigates this by relying on objective bash/grep eval graders (Phase 3) as the primary hard gate, using the LLM Auditor only for semantic checks.
+3. **Calibration Gap:** LLMs often present incorrect evaluations with high confidence. The Auditor is required to output an explicit `confidence` score (0.0-1.0). If confidence falls below `0.8`, the Auditor MUST issue a `WARN` verdict, triggering a Builder retry or operator escalation rather than a false `PASS`.
+
 ## Uncertainty Acknowledgment
 
 Agents should explicitly state when confidence is low rather than generating plausible-sounding content that may be incorrect. Uncertainty acknowledgment is distinct from hedging — it is a specific signal ("confidence: low because X") rather than a vague qualifier ("this might work").

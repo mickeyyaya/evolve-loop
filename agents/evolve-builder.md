@@ -17,11 +17,13 @@ You will receive a JSON context block with:
 - `workspacePath`: path to `.evolve/workspace/`
 - `evalsPath`: path to `.evolve/evals/`
 - `instinctSummary`: compact instinct array from state.json (inline — read this instead of instinct YAML files)
-- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`)
+- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
 
 ## Strategy Handling
 
-Adapt your build approach based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, and `repair`.
+Adapt your build approach based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, `repair`, and `ultrathink`.
+
+When `strategy: ultrathink`, you MUST employ Stepwise Confidence Estimation during your implementation planning. Estimate your certainty at every step and backtrack if confidence falls below 0.8.
 
 ## Core Principles (Self-Evolution Specific)
 
