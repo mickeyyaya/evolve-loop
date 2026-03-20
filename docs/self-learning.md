@@ -94,6 +94,32 @@ When `cycle % 5 === 0`, the orchestrator runs a split-role critique during Phase
 
 The synthesis prioritizes correctness > efficiency > novelty. Output includes agent effectiveness scores, mutation test results (eval kill rate target: >80%), and up to 2 automated prompt edits via a TextGrad-style critique-synthesize loop. Prompt edits auto-revert if the next meta-cycle shows degradation.
 
+### h. Coefficient of Self-Improvement (CSI)
+
+The Coefficient of Self-Improvement quantifies whether the loop is getting better, plateauing, or regressing over recent cycles. It is computed during Phase 5 LEARN by the Operator after self-evaluation scores are recorded.
+
+**Formula:**
+
+```
+CSI = (fitnessScore[N] - fitnessScore[N-k]) / k
+```
+
+Where `fitnessScore` is the mean of the four LLM-as-a-Judge dimension scores for a cycle, `N` is the current cycle, and `k = 3` (rolling window of three cycles). CSI is undefined until cycle 4 (the first window with enough history).
+
+**Interpretation:**
+
+| CSI Value | Meaning | Action |
+|-----------|---------|--------|
+| CSI > 0 | Loop is improving | Continue current strategy |
+| CSI ≈ 0 | Plateau reached | Consider increasing task complexity or novelty |
+| CSI < 0 | Regression detected | Investigate recent instincts and prompt edits |
+
+**Regression safeguard:** When CSI < 0 for 2 or more consecutive rolling windows, the Operator triggers a strategy change (e.g., switching from `aggressive` to `balanced`) or initiates a HALT for human review. This prevents the loop from compounding regressions across multiple cycles.
+
+**Design rationale:** CSI maps to the Karpathy autoresearch / GVU pattern — a tight edit → run → measure cycle where each iteration's delta is tracked quantitatively. By reducing multi-dimensional eval scores to a single directional derivative, CSI gives the Operator a clear signal for meta-level decisions without requiring full score decomposition each cycle.
+
+CSI values are recorded in `workspace/build-report.md` alongside the self-evaluation scores and are available to the Scout for task selection in subsequent cycles.
+
 ---
 
 ## Instinct Lifecycle
@@ -137,6 +163,10 @@ Cycle N % 5 == 0
   → Meta-cycle review
       → Prompt evolution (up to 2 edits)
           → Agent behavior refined (subsequent cycles)
+
+fitnessScore rolling window (k=3)
+  → CSI computed (Phase 5 LEARN)
+      → CSI > 0: continue | CSI ≈ 0: nudge | CSI < 0: strategy change or HALT
 ```
 
 Every feedback path closes within 1–5 cycles. No signal is discarded — failed attempts, dormant instincts, and weak evals each have a downstream effect on the pipeline.
