@@ -1,0 +1,7 @@
+- id: inst-012
+  pattern: "macOS-grep-compatibility"
+  description: "Use -oE (not -oP) for grep patterns in eval graders. -oP uses Perl regex which is unavailable on macOS BSD grep. Use two-step pipe with sed for complex extractions."
+  confidence: 0.6
+  source: "cycle-18/fix-link-checker-grader-regex"
+  type: "anti-pattern"
+  category: "procedural"
