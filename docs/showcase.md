@@ -330,7 +330,7 @@ This tells the orchestrator: use LLM rubric grading instead of bash exit codes, 
 ### Scout discovers a task
 
 The Scout scans the writing project and finds:
-- `articles/api-design.md` has a "TODO: add rate limiting section" placeholder
+- `articles/api-design.md` has a "T-O-D-O: add rate limiting section" placeholder
 - No article covers the new v2 API endpoints announced last month
 
 It selects: **"Add rate limiting section to api-design.md"** (S-complexity, feature).
