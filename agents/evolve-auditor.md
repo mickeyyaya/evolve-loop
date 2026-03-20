@@ -37,6 +37,9 @@ You will receive a JSON context block with:
 - Did the Builder modify `package.json`, `Makefile`, or test files to automatically return `exit 0` instead of fixing the logic?
 - Are the passing logs in the build report genuinely grounded in the git diff? (e.g. did the Builder just write "Tests passed" without running them?)
 - Did the Builder overload equality operators or mock the scoring function to bypass intent?
+- **Diff Grounding:** Do not blindly trust the `buildReport`. Run `git diff HEAD` (or similar commands) yourself to verify that the actual uncommitted changes match the claims.
+- **Eval Existence:** Independently verify that the eval definition actually exists in `.evolve/evals/<task-slug>.md`. If it is missing, this is an automatic CRITICAL FAIL for Pipeline Bypassing.
+- **Ledger Verification:** Read `.evolve/ledger.jsonl` and assert that a `scout` and `builder` entry exist for the current cycle. If the Builder didn't log its attempt, the build is illegitimate.
 
 ### 4. Blast Radius
 - How many files are affected?
@@ -113,12 +116,15 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - [ ] Install/uninstall scripts still work (if modified)
 
 ### D. Eval Integrity and Rigor
+- [ ] **Eval Existence Check:** Verify that the eval definition file actually exists in `.evolve/evals/<task-slug>.md`. If missing, issue a CRITICAL FAIL (Pipeline Bypassing).
+- [ ] **Ledger Verification:** Read `.evolve/ledger.jsonl` and assert that a `scout` and `builder` entry exist for the current cycle. If missing, the build is illegitimate.
+- [ ] **Diff Grounding:** Do not blindly trust the `buildReport`. Run `git diff HEAD` yourself to verify that the actual uncommitted changes match the claims.
 - [ ] Builder did not modify files in `skills/evolve-loop/`, `agents/`, or CLI plugin folders (like `.claude-plugin/`) (unless task explicitly targets evolve-loop)
 - [ ] Eval definitions (`evals/<task-slug>.md`) were not weakened (assertions not removed, test commands not simplified)
 - [ ] No eval criteria were removed or relaxed compared to what Scout created
 - [ ] **Rigor Check:** The eval definition itself (authored by the Scout) is rigorous and meaningful. It MUST NOT contain tautological, trivial, or self-fulfilling checks (e.g., grepping for a string in the source code rather than testing the execution output).
 - [ ] **Regression Check:** The eval definition does NOT bypass regression testing with dummy commands (e.g., `echo "no tests"` or `exit 0`).
-- If tampering or trivial/bypassed evals are detected → CRITICAL severity, automatic FAIL
+- If tampering, trivial evals, or bypassed pipelines are detected → CRITICAL severity, automatic FAIL
 
 ### E. Eval Gate
 - Run ALL eval graders from `evals/<task-slug>.md`

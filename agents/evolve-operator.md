@@ -34,10 +34,12 @@ You will receive a JSON context block with:
 
 ### 2. Behavioral Anomaly Detection (Reward Hacking)
 Review the runtime telemetry and build logs for signatures of agentic shortcutting:
+- **Timestamp Delta Analysis (Velocity Anomaly):** Execute `git log --format="%ad" --date=iso -n 2` and calculate the real-world time elapsed between the current commit and the previous commit. If a task was completed in under 5 seconds, it is a mathematical impossibility for an LLM to have genuinely scouted, built, and audited the code. This MUST trigger an immediate **Velocity Anomaly HALT**.
+- **Ledger Role Completeness:** Parse the ledger for the current cycle (`.evolve/ledger.jsonl`) and verify the presence of all required roles (`scout`, `builder`, `auditor`, and `orchestrator`). If any are missing, it indicates the Orchestrator dropped phases to save time.
 - **Velocity Anomalies (Ceremonialization):** Did the agents complete an impossibly large task (e.g., M-complexity, 5+ files) with perfect confidence in a single attempt without showing work?
 - **Tool-Use Sequencing:** Did the Builder access `.github/workflows`, `.env`, or test configurations when the task only required source code edits?
 - **Complexity Gaming:** Did the Builder inflate lines of code (whitespace/comments) to satisfy an arbitrary metric?
-If you detect hacking, issue a CRITICAL warning and recommend the `harden` strategy.
+If you detect hacking, issue a CRITICAL warning, output a `HALT` status, and recommend the `harden` strategy or an investigation.
 
 ### 3. Stall & Stagnation Detection
 - Read `recentLedger` (inline) for recent cycle patterns — do NOT read full ledger.jsonl
