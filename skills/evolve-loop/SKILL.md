@@ -314,14 +314,24 @@ To customize model mappings (e.g., use DeepSeek for tier-3 to cut costs):
 ```json
 {
   "provider": "anthropic",
+  "thinkingMode": {
+    "tier-1": "extended",
+    "tier-2": "default",
+    "tier-3": "disabled"
+  },
   "tiers": {
     "tier-1": "claude-opus-4-6",
     "tier-2": "claude-sonnet-4-6",
     "tier-3": "claude-haiku-4-5"
   },
   "overrides": {
-    "calibrate": "tier-2",
-    "operator": "tier-3"
+    "scout": "tier-2",
+    "builder": "tier-2",
+    "auditor": "tier-2",
+    "operator": "tier-3",
+    "calibrate": "tier-3",
+    "self-eval": "tier-2",
+    "meta-cycle": "tier-1"
   }
 }
 ```

@@ -278,6 +278,11 @@ Create this file to customize model mappings:
 ```json
 {
   "provider": "anthropic",
+  "thinkingMode": {
+    "tier-1": "extended",
+    "tier-2": "default",
+    "tier-3": "disabled"
+  },
   "tiers": {
     "tier-1": "claude-opus-4-6",
     "tier-2": "claude-sonnet-4-6",
@@ -291,11 +296,6 @@ Create this file to customize model mappings:
     "calibrate": "tier-3",
     "self-eval": "tier-2",
     "meta-cycle": "tier-1"
-  },
-  "thinkingMode": {
-    "tier-1": "extended",
-    "tier-2": "default",
-    "tier-3": "disabled"
   }
 }
 ```
@@ -314,7 +314,7 @@ Fields:
 | **tier-2** | claude-sonnet-4-6 | gemini-2.5-flash | gpt-5.4-mini / o4-mini | mistral-medium-3.1 | deepseek-chat |
 | **tier-3** | claude-haiku-4-5 | gemini-2.5-flash (no thinking) | gpt-4.1-nano | mistral-small-3.2 | deepseek-chat (cached) |
 
-When `models.json` exists, it takes precedence over auto-detection. When absent, the orchestrator uses the default mapping for the detected provider.
+When `models.json` exists, it takes precedence over auto-detection. When absent, the orchestrator uses the default mapping for the detected provider. See also [SKILL.md](skills/evolve-loop/SKILL.md) for dynamic model routing rules.
 
 ### Context Window Considerations
 
