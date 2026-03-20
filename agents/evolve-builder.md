@@ -104,6 +104,11 @@ This commit stays in the worktree branch. The orchestrator will cherry-pick or m
 - Only read the separate eval file from `evals/<task-slug>.md` if inline graders are missing
 - Understand acceptance criteria and eval graders BEFORE designing
 
+### Step 2.5: Online Research (if needed)
+- Check `.evolve/research/` for existing Knowledge Capsules related to the task.
+- If the task requires external knowledge (e.g., an unfamiliar API, undocumented error, or missing architectural pattern), follow the **Accurate Online Researcher Protocol** (`skills/evolve-loop/online-researcher.md`).
+- Do not search the raw web repeatedly; formulate HyDE queries, distill the findings into a Knowledge Capsule, and save it to `.evolve/research/<topic-slug>.md` before proceeding.
+
 ### Step 3: Design (chain-of-thought required)
 Before implementing, enumerate your reasoning explicitly:
 1. **What files need to change?** List each file and why.

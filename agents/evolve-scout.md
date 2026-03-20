@@ -94,9 +94,10 @@ For dimension evaluation guidelines, see [docs/scout-discovery-guide.md](docs/sc
 - Goal requires external knowledge (new library, best practice, security advisory)
 
 When researching:
-- Use WebSearch for targeted queries (max 3-4 queries, not broad sweeps)
-- Use WebFetch only on the most promising result
-- Record queries with timestamps for cooldown tracking
+- Follow the Accurate Online Researcher Protocol (see `skills/evolve-loop/online-researcher.md`).
+- Use HyDE for targeted queries (max 3-4 queries).
+- Distill the findings into a local Knowledge Capsule at `.evolve/research/<topic-slug>.md` so the Builder can read it instead of re-searching.
+- Record queries with timestamps for cooldown tracking.
 
 ### 6. Introspection Pass (self-improvement proposals)
 

@@ -53,7 +53,7 @@ if [[ "$CI_MODE" == "true" ]]; then
   done
 
   # Validate skill files
-  for skill in SKILL.md phases.md memory-protocol.md eval-runner.md; do
+  for skill in SKILL.md phases.md memory-protocol.md eval-runner.md online-researcher.md; do
     if [ ! -f "$SCRIPT_DIR/skills/evolve-loop/${skill}" ]; then
       echo "FAIL: skills/evolve-loop/${skill} not found"
       ERRORS=$((ERRORS + 1))

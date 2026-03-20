@@ -57,7 +57,7 @@ for agent in evolve-scout evolve-builder evolve-auditor evolve-operator; do
     ERRORS=$((ERRORS + 1))
   fi
 done
-for skill in SKILL.md phases.md memory-protocol.md eval-runner.md; do
+for skill in SKILL.md phases.md memory-protocol.md eval-runner.md online-researcher.md; do
   if [[ ! -f "$SCRIPT_DIR/skills/evolve-loop/${skill}" ]]; then
     echo "FAIL: skills/evolve-loop/${skill} not found"
     ERRORS=$((ERRORS + 1))
@@ -194,10 +194,11 @@ echo "  SKILL.md written"
 # Agents
 cp "$SCRIPT_DIR/agents"/evolve-*.md "$GEMINI_SKILL_DIR/agents/"
 
-# Skill files (phases, memory-protocol, eval-runner)
+# Skill files (phases, memory-protocol, eval-runner, online-researcher)
 cp "$SCRIPT_DIR/skills/evolve-loop/phases.md" "$GEMINI_SKILL_DIR/skills/evolve-loop/"
 cp "$SCRIPT_DIR/skills/evolve-loop/memory-protocol.md" "$GEMINI_SKILL_DIR/skills/evolve-loop/"
 cp "$SCRIPT_DIR/skills/evolve-loop/eval-runner.md" "$GEMINI_SKILL_DIR/skills/evolve-loop/"
+cp "$SCRIPT_DIR/skills/evolve-loop/online-researcher.md" "$GEMINI_SKILL_DIR/skills/evolve-loop/"
 
 # Docs as references
 if [[ -d "$SCRIPT_DIR/docs" ]]; then
