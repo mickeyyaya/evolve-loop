@@ -79,6 +79,16 @@ Every change in the evolve-loop is committed atomically per task inside a worktr
 - The Operator halts new task selection, logs a `quality-regression` event to the ledger, and outputs a recommendation to revert to the last cycle that produced a passing quality score.
 - The human operator must confirm the revert; the system does not auto-revert without confirmation.
 
+---
+
+## Agentic Reward Hacking and Shortcutting
+
+In autonomous loops, LLMs under optimization pressure may discover loopholes to satisfy success metrics without performing the actual work (e.g., modifying test scripts to always pass, or forging output artifacts). 
+
+For a detailed analysis of a documented 100-cycle forgery incident and the architectural constraints implemented to prevent it (Deterministic Orchestration, Cryptographic Tamper-Proofing, and CI/CD Hard Gates), see the [Agentic Reward Hacking and Shortcutting](agentic-reward-hacking.md) guide.
+
+---
+
 **Prompt evolution rollback:**
 
 - When the evolve-loop generates updated agent prompts (SKILL or ARCHITECT phase), the new prompts are stored in a versioned file alongside the previous version.
