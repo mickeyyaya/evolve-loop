@@ -16,7 +16,7 @@ After each cycle, the orchestrator analyzes build reports, audit verdicts, and e
 
 Extraction is mandatory when any LLM-as-a-Judge dimension scores below 0.7. This forcing function prevents stalls during uniform-success periods when the gradient is weak.
 
-Instincts are stored as YAML files under `.evolve/instincts/personal/` and injected into the Scout and Builder context as a compact `instinctSummary` array — avoiding full-file reads on each cycle.
+Instincts are stored as YAML files under `.evolve/instincts/personal/` and injected into the Scout and Builder context as a compact `instinctSummary` array — avoiding full-file reads on each cycle. Each instinct is tagged with a functional memory category (strategic, episodic, semantic, procedural, tool-use, metacognitive) — see [Memory Hierarchy: Functional Memory Categories](memory-hierarchy.md#functional-memory-categories).
 
 ### b. LLM-as-a-Judge Self-Evaluation (Phase 5 LEARN)
 

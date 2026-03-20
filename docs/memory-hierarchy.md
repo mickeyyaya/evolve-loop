@@ -147,6 +147,25 @@ Consolidation prevents unbounded growth and keeps the instinct set focused on pa
 
 ---
 
+## Functional Memory Categories
+
+Beyond the storage-oriented layers above, the evolve-loop classifies memory by **function** — how agents use retained information during reasoning and action.
+
+| Category | Purpose | Examples |
+|----------|---------|----------|
+| **Strategic** | High-level goals, priorities, success criteria | Task-type weights from bandit arms, mastery level, cycle objectives |
+| **Episodic** | What happened in specific cycles | "Cycle 12 failed due to absolute-path mismatch in eval graders" |
+| **Semantic** | Stable domain knowledge and conventions | "Append-only files are safer than in-place rewrites", architecture facts |
+| **Procedural** | Step-by-step action templates | Gene capsules, plan-cache entries, eval-grader recipes |
+| **Tool-use** | Tool capabilities, constraints, failure modes | "grep -q needs quoted patterns", model routing heuristics |
+| **Metacognitive** | Self-assessment of reasoning quality | LLM-as-a-Judge scores, confidence calibration, extraction-stall detection |
+
+The strategic and metacognitive categories guide *what* to do; procedural and tool-use guide *how*; episodic and semantic provide the evidence base. During instinct extraction (Phase 5), each new instinct is tagged with its functional category so consolidation can cluster by function, not just similarity.
+
+See also: [Self-Learning Architecture](self-learning.md) for the feedback loops that populate these categories.
+
+---
+
 ## Cross-Agent Memory Sharing
 
 Agents share state through two channels:
