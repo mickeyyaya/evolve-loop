@@ -195,6 +195,12 @@ See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface
 - End-to-end validation: run `/evolve-loop` on an actual writing or research project
 - Domain-specific instinct templates (non-code examples in phase5-learn.md)
 
+## Reference Documents
+
+- [Operator Brief](operator-brief.md) — schema and usage of `next-cycle-brief.json`, the cross-cycle communication channel from Operator to Scout
+- [Run Isolation](run-isolation.md) — the `RUN_ID`/`WORKSPACE_PATH` model for parallel invocation safety
+- [Experiment Journal](experiment-journal.md) — `experiments.jsonl` schema and anti-repeat memory protocol
+
 ## Context Management
 
 The orchestrator runs continuously through all requested cycles without stopping. A `handoff.md` checkpoint is written after each cycle as a safety measure — if a session is externally interrupted, a new session can read it to resume. The orchestrator never pauses for user input between cycles.
