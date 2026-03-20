@@ -1,3 +1,8 @@
+---
+name: evolve-loop/memory-protocol
+description: "Shared memory protocol — defines all persistent state layers (JSONL ledger, workspace files, state.json, evals, instincts) and concurrency rules for the evolve-loop pipeline."
+---
+
 # Evolve Loop — Shared Memory Protocol
 
 All files live under `.evolve/` in the **project directory** (not your CLI's global config directory).
@@ -394,3 +399,23 @@ Phase 5: LEARN                 v
 Orchestrator ── instincts + archive
 Operator ──→ operator-log.md (post-cycle, includes benchmark trend)
 ```
+
+## Instinct Quality Scoring
+
+Extends the confidence-based instinct lifecycle (see `docs/self-learning.md`) with a dynamic `historicalSuccessRate` field inspired by EvolveR experience curation (arxiv 2510.16079). While `confidence` tracks belief strength via confirmation/contradiction, `historicalSuccessRate` tracks empirical build outcomes when the instinct was applied.
+
+### Schema Extension (per instinct YAML)
+
+```yaml
+historicalSuccessRate:
+  applied: 5        # times instinct was referenced in a build
+  passed: 4         # times the build passed audit after applying this instinct
+  rate: 0.80        # passed / applied (0.0 if applied == 0)
+```
+
+### Update Rules
+
+- **Phase 2 (BUILD):** When Builder references an instinct, increment `applied` for that instinct.
+- **Phase 4 (SHIP):** After audit verdict, increment `passed` for each applied instinct if the task passed. Recompute `rate = passed / applied`.
+- **Phase 5 (LEARN):** Instincts with `rate < 0.5` and `applied >= 3` are candidates for retirement or revision. Instincts with `rate >= 0.8` and `applied >= 3` earn a selection boost (+1 priority when Scout picks instincts to apply).
+- Both `confidence` and `historicalSuccessRate` inform instinct selection: `confidence` reflects pattern validity; `rate` reflects practical build impact.
