@@ -243,7 +243,7 @@ Each research method adopted into the self-learning architecture is tracked agai
 
 | Method | Source | Cycle | Target Dimension | Delta |
 |--------|--------|-------|-----------------|-------|
-| Stepwise Confidence | arxiv 2511.07364 | 16 | evalInfrastructure | +0 (spec only) |
+| Stepwise Confidence | arxiv 2511.07364 | 16 | evalInfrastructure | VALIDATED (wired in phase5-learn.md) |
 | EvolveR Experience Scoring | arxiv 2510.16079 | 16 | schemaHygiene | +2 |
 | MUSE Memory Categories | MUSE framework | 17 | featureCoverage | +2 |
 | CSI Metric | Karpathy/GVU | 17 | featureCoverage | +2 |
@@ -259,6 +259,6 @@ During each meta-cycle review (every 5 cycles), the Operator compares pre-adopti
 - **VALIDATED** — Methods whose target dimension shows a composite improvement of ≥+2 from the adoption baseline are marked as validated. These methods are permanent additions to the self-learning architecture.
 - **PROVISIONAL** — Methods that have not yet demonstrated ≥+2 improvement (e.g., spec-only adoptions with +0 delta) remain provisional. Provisional methods are re-evaluated at each subsequent meta-cycle and may be deprecated if they show no improvement after 10 cycles.
 
-Current status: EvolveR Experience Scoring, MUSE Memory Categories, CSI Metric, Confidence-Correctness, and Self-Evolving Taxonomy are VALIDATED. Stepwise Confidence is PROVISIONAL (adopted as specification only, pending empirical delta measurement).
+Current status: EvolveR Experience Scoring, MUSE Memory Categories, CSI Metric, Confidence-Correctness, Self-Evolving Taxonomy, and Stepwise Confidence are VALIDATED. Stepwise Confidence was promoted from PROVISIONAL after being wired as a mandatory protocol in phase5-learn.md.
 
 For techniques that complement self-learning by improving the accuracy of outputs being evaluated (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
