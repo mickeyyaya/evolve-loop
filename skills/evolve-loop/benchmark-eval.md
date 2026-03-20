@@ -35,7 +35,7 @@ README_EXISTS=$(test -s README.md -o -s CLAUDE.md && echo 100 || echo 0)
 
 # 4. No broken internal links (markdown references to files that don't exist)
 # Note: uses -oE (not -oP) for macOS compatibility
-BROKEN_LINKS=$(grep -roh '\[.*\]([^)]*\.md)' skills/ agents/ docs/ 2>/dev/null | grep -oE '\([^)]+\)' | tr -d '()' | while read f; do test -f "$f" || echo "$f"; done | wc -l | tr -d ' ')
+BROKEN_LINKS=$(grep -roh '\]([^)]*\.md)' skills/ agents/ docs/ 2>/dev/null | grep -oE '\([^)]+\)' | tr -d '()' | while read f; do test -f "$f" || echo "$f"; done | wc -l | tr -d ' ')
 LINK_SCORE=$((BROKEN_LINKS == 0 ? 100 : (BROKEN_LINKS < 3 ? 75 : (BROKEN_LINKS < 6 ? 50 : 25))))
 
 # 5. docs/ directory exists with content
