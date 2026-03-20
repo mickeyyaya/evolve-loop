@@ -115,9 +115,16 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    | **Novelty** | Did the cycle surface new patterns, techniques, or knowledge? | ≥0.7 |
    | **Efficiency** | Were tokens, attempts, and file changes minimized? Was scope right-sized? | ≥0.7 |
 
+   > **NOTE — Stepwise Evidence Gathering:** Before assigning each dimension score, enumerate
+   > 2-3 discrete evidence items and assign a mini-score (0.0-1.0) to each. Derive the final
+   > dimension score as the mean of the mini-scores. This per-step decomposition reduces
+   > anchoring bias and improves failure detection calibration by +15% AUC-ROC (arxiv
+   > 2511.07364, 2025). See `docs/self-learning.md` § Stepwise Confidence Scoring for the
+   > full protocol.
+
    Scoring protocol:
-   1. For each dimension: write 1–2 sentences of step-by-step reasoning (what happened, what evidence exists)
-   2. Assign a score 0.0–1.0 based on that justification
+   1. For each dimension: enumerate 2-3 evidence items and score each (stepwise decomposition), then write 1–2 sentences of reasoning
+   2. Assign a final score 0.0–1.0 as the mean of the evidence mini-scores
    3. If any dimension scores <0.7: extract at least one instinct from that failure before moving on
 
    Record scores in `$WORKSPACE_PATH/build-report.md` under a `## Self-Evaluation` heading.
@@ -127,7 +134,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    - Extract the fix as a gene with selector, steps, and validation commands
    - Write to `.evolve/genes/<gene-id>-<name>.yaml`
    - If multiple genes were applied in sequence, bundle as a capsule
-   - See [docs/genes.md](docs/genes.md) for schema
+   - See [docs/genes.md](../../docs/genes.md) for schema
 
    **Instinct global promotion** (check after every instinct extraction):
    For instincts with confidence >= 0.8 that are not project-specific:

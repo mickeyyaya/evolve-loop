@@ -141,3 +141,5 @@ Any `UNGROUNDED:` line indicates the Builder modified a file outside the task sc
 For token optimization techniques that complement accuracy work (e.g., how context window management prevents mid-cycle truncation that can degrade output quality), see `docs/token-optimization.md`.
 
 For pipeline security mechanisms that protect accuracy (eval tamper detection, state integrity, prompt injection defense), see `docs/security-considerations.md`.
+
+For per-step evidence decomposition that improves self-evaluation calibration (+15% AUC-ROC), see `docs/self-learning.md` § Stepwise Confidence Scoring.

@@ -31,6 +31,22 @@ After instinct extraction, the orchestrator scores the cycle on four dimensions 
 
 Any dimension scoring below 0.7 triggers mandatory instinct extraction for that failure before the cycle closes. Scores are recorded in `workspace/build-report.md` under `## Self-Evaluation`.
 
+### Stepwise Confidence Scoring
+
+Before assigning a holistic score per dimension, decompose the evaluation into 2-3 discrete evidence items and score each independently. The final dimension score is derived from the per-step scores rather than a single intuitive judgment.
+
+**Protocol:**
+
+1. For each dimension, enumerate 2-3 concrete evidence items (e.g., "eval graders all passed", "one acceptance criterion was partially met", "no new instincts surfaced").
+2. Assign a mini-score (0.0-1.0) to each evidence item based on observable outcomes.
+3. Derive the final dimension score as the mean of the mini-scores, rounded to one decimal.
+
+**Why stepwise scoring matters:**
+
+Per-step evidence decomposition improves calibration by reducing anchoring bias — the tendency to assign a score based on overall impression rather than specific evidence. Research (arxiv 2511.07364, 2025) demonstrates +15% AUC-ROC improvement in multi-step failure detection when evaluators score individual evidence items before deriving an aggregate score. This is especially effective for the Completeness and Correctness dimensions, where partial success can mask specific gaps.
+
+The stepwise approach is referenced in `skills/evolve-loop/phase5-learn.md` (Self-Evaluation section) and complements the chain-of-thought justification already required per dimension.
+
 ### c. Multi-Armed Bandit Task Selection
 
 The Scout maintains a `taskArms` table in `state.json` with per-type reward history across five task types: `feature`, `stability`, `security`, `techdebt`, `performance`. Each arm tracks pull count and cumulative reward.
