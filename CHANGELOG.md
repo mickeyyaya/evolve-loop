@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.2.0] - 2026-03-20
+
+### Added
+- **Stepwise self-evaluation** — Builder performs per-step correctness checks during implementation using stepwise verification (arxiv 2511.07364), catching errors before they compound
+- **Instinct quality scoring (EvolveR)** — instincts now carry quality scores derived from downstream task outcomes, enabling confidence-weighted retrieval and automatic pruning of low-value instincts
+- **MUSE functional memory categories** — instincts classified into functional categories (heuristic, constraint, pattern, anti-pattern) for targeted retrieval by agent role
+- **CSI metric (Confidence-Stability Index)** — new composite metric tracking confidence-correctness alignment across cycles, used by Operator for pipeline health assessment
+- **Phase 4 SHIP extraction** — shipping logic extracted into a dedicated, testable phase module with structured status reporting
+- **Confidence-correctness alignment** — process rewards calibrated so stated confidence correlates with actual correctness (arxiv 2603.06604), reducing overconfident shipping of flawed changes
+
+### Fixed
+- **30+ broken internal links** — comprehensive link audit and repair across all docs, skills, and agent files (Cycle 16)
+- **Link-checker grader regex** — fixed false negatives in the link-checker eval grader caused by overly strict regex patterns
+- **processRewards schema** — corrected field validation that rejected valid reward entries with optional dimensions
+
+### Changed
+- **Benchmark score: 87.4 to ~91.5** — 9 tasks shipped across 4 cycles with 5 research methods adopted from 8 sources
+- **CHANGELOG refreshed** — cycles 16-19 documented
+
 ## [7.1.0] - 2026-03-19
 
 ### Added
@@ -304,5 +323,6 @@ All notable changes to this project will be documented in this file.
 - Goal-directed and autonomous modes
 
 <!-- version links -->
+[7.2.0]: https://github.com/danleemh/evolve-loop/compare/v7.1.0...v7.2.0
 [7.1.0]: https://github.com/danleemh/evolve-loop/compare/v7.0.0...v7.1.0
 [7.0.0]: https://github.com/danleemh/evolve-loop/compare/v6.9.0...v7.0.0
