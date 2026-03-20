@@ -121,6 +121,51 @@ After the first 3 cycles of an invocation, the orchestrator switches to lean mod
 
 Lean mode saves ~15-20K tokens per cycle (from ~50K to ~30K) by eliminating redundant file reads that accumulate in the orchestrator's conversation context.
 
+### Cycle Integrity Setup
+
+At the start of each cycle, before any agent is invoked, establish the integrity layer:
+
+1. **Generate challenge token** (proof-of-invocation chain):
+   ```bash
+   CHALLENGE=$(openssl rand -hex 8 2>/dev/null || head -c 8 /dev/urandom | xxd -p)
+   ```
+   This token is passed to every agent in their context block. Each agent embeds it in their workspace output files and ledger entries. The `scripts/cycle-health-check.sh` script verifies consistency.
+
+2. **Plant canary files** (honeypot detection — research basis: Canarytokens):
+   ```bash
+   # Workspace canary: random value that no legitimate agent should touch
+   CANARY_VALUE=$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | xxd -p)
+   echo "$CANARY_VALUE" > "$WORKSPACE_PATH/.integrity-canary"
+   echo "$CANARY_VALUE" > "$WORKSPACE_PATH/.integrity-canary-expected"
+
+   # Honeypot eval: fake eval file that should never be referenced
+   if [ ! -f ".evolve/evals/_canary-eval.md" ]; then
+     cat > ".evolve/evals/_canary-eval.md" << 'CANARY'
+   # Canary Eval (DO NOT REFERENCE)
+   This file monitors for eval system probing. Any access = anomaly.
+   ## Graders
+   - `echo "canary-sentinel-$(date +%s)"`
+   CANARY
+   fi
+   ```
+
+3. **Adaptive strictness decay** (cross-session — research basis: "Alignment Faking", Anthropic):
+   If this is the first cycle of a new invocation, halve all `consecutiveClean` values in `auditorProfile`:
+   ```
+   for each taskType in auditorProfile:
+     auditorProfile[taskType].consecutiveClean = floor(consecutiveClean / 2)
+   ```
+
+4. **Random full-audit flag** (blind monitoring):
+   ```bash
+   RANDOM_CHECK=$((RANDOM % 5))  # 0-4
+   FORCE_FULL_AUDIT=false
+   if [ "$RANDOM_CHECK" -eq 0 ]; then
+     FORCE_FULL_AUDIT=true
+   fi
+   ```
+   Pass `forceFullAudit` in the Auditor context. Do NOT log whether this was triggered — blind monitoring means the agent should not know which cycles are scrutinized.
+
 ### Atomic Cycle Number Allocation
 
 At the start of each cycle iteration, claim the next cycle number atomically:
@@ -203,7 +248,8 @@ Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-d
     "recentNotes": "<last 5 cycle entries from notes.md, inline>",
     "builderNotes": "<contents of builder-notes.md from last cycle, or empty string>",
     "recentLedger": "<last 3 ledger entries, inline>",
-    "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint} from Phase 0, or empty>"
+    "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint} from Phase 0, or empty>",
+    "challengeToken": "<$CHALLENGE>"
   }
   ```
 
@@ -224,6 +270,19 @@ After Scout completes:
 
 - **Prerequisite check:** For each proposed task that includes a `prerequisites` field, verify all listed slugs appear in `state.json.evaluatedTasks` with `decision: "completed"`. Any task with an unmet prerequisite is automatically deferred: add it to `evaluatedTasks` with `decision: "deferred"` and `deferralReason: "prerequisite not met: <slug>"`, then log the prerequisite slug so the Scout can propose it in the next cycle. Tasks without a `prerequisites` field are unaffected. This check is a lightweight sequencing aid — the Scout may override it by omitting `prerequisites` when a task is genuinely independent of its nominal dependency.
 - Verify eval definitions were created in `.evolve/evals/`
+- **Eval quality check** (deterministic rigor classification — research basis: cycle 101 tautological eval incident):
+  ```bash
+  bash scripts/eval-quality-check.sh .evolve/evals/
+  EVAL_QUALITY_EXIT=$?
+  if [ "$EVAL_QUALITY_EXIT" -eq 2 ]; then
+    echo "HALT: Eval quality check found Level 0 (no-op) commands. Scout must rewrite evals."
+    # Log to ledger and halt cycle
+  elif [ "$EVAL_QUALITY_EXIT" -eq 1 ]; then
+    echo "WARN: Eval quality check found Level 1 (tautological) commands. Flagging for Auditor."
+    # Pass warnings to Auditor context for deeper review
+  fi
+  ```
+  This catches the exact attack from cycle 101 (`grep -q "string" source.js`) deterministically.
 - **Eval checksum capture:** Compute `sha256sum` of each eval file in `.evolve/evals/` and store in `workspace/eval-checksums.json`:
   ```bash
   sha256sum .evolve/evals/*.md > $WORKSPACE_PATH/eval-checksums.json
@@ -315,7 +374,8 @@ Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + 
     "instinctSummary": "<from state.json, inline>",
     // --- Dynamic ---
     "cycle": <N>,
-    "task": <task object from scout-report — includes inline eval graders>
+    "task": <task object from scout-report — includes inline eval graders>,
+    "challengeToken": "<$CHALLENGE>"
   }
   ```
 - **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
@@ -387,7 +447,9 @@ Launch **Auditor Agent** (model: per routing table — tier-2 default, tier-1 fo
     // --- Dynamic ---
     "cycle": <N>,
     "buildReport": "<$WORKSPACE_PATH>/build-report.md",
-    "recentLedger": "<last 3 ledger entries, inline>"
+    "recentLedger": "<last 3 ledger entries, inline>",
+    "challengeToken": "<$CHALLENGE>",
+    "forceFullAudit": <$FORCE_FULL_AUDIT>
   }
   ```
 
@@ -481,6 +543,46 @@ After all tasks pass audit but before committing in Phase 4, run a targeted benc
 7. **Update `projectBenchmark.dimensions`** in state.json with the new scores for re-checked dimensions.
 
 ---
+
+### Pre-Ship Integrity Gate
+
+Before entering Phase 4, run the deterministic health check and independent eval verification. These are the system's "security cameras" — they operate independently of all LLM agents.
+
+1. **Independent eval re-execution** (research basis: "AI Control", Greenblatt et al.):
+   ```bash
+   bash scripts/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
+   VERIFY_EXIT=$?
+   if [ "$VERIFY_EXIT" -ne 0 ]; then
+     echo "HALT: Independent eval verification failed — Auditor may have reported false PASS"
+     # Compare verify-eval output with audit-report.md for discrepancies
+   fi
+   ```
+   This re-runs every eval command independently. If the Auditor claimed PASS but verify-eval shows failures, the Auditor's report is untrustworthy.
+
+2. **Cycle health fingerprint**:
+   ```bash
+   bash scripts/cycle-health-check.sh $N $WORKSPACE_PATH
+   HEALTH_EXIT=$?
+   if [ "$HEALTH_EXIT" -ne 0 ]; then
+     echo "HALT: Health check detected anomalies"
+     cat $WORKSPACE_PATH/cycle-health.json
+     # Present evidence to user and halt
+   fi
+   ```
+   This checks all 11 health signals (ledger completeness, timestamp spacing, artifacts, checksums, challenge tokens, velocity, substance, canaries, hash chain). Any ANOMALY = halt.
+
+3. **Log phase transition** (compliance trail):
+   ```json
+   {"ts":"<ISO>","cycle":N,"role":"orchestrator","type":"phase-transition","data":{
+     "from":"audit","to":"ship",
+     "challenge":"<$CHALLENGE>",
+     "healthCheckRan":true,
+     "healthCheckHealthy":<true|false>,
+     "verifyEvalPassed":<true|false>
+   }}
+   ```
+
+Only proceed to Phase 4 if both the health check and eval verification pass.
 
 ### Phase 4: SHIP
 

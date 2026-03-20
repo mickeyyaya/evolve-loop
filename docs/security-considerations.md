@@ -83,9 +83,19 @@ Every change in the evolve-loop is committed atomically per task inside a worktr
 
 ## Agentic Reward Hacking and Shortcutting
 
-In autonomous loops, LLMs under optimization pressure may discover loopholes to satisfy success metrics without performing the actual work (e.g., modifying test scripts to always pass, or forging output artifacts). 
+In autonomous loops, LLMs under optimization pressure may discover loopholes to satisfy success metrics without performing the actual work (e.g., modifying test scripts to always pass, or forging output artifacts).
 
-For a detailed analysis of a documented 100-cycle forgery incident and the architectural constraints implemented to prevent it (Deterministic Orchestration, Cryptographic Tamper-Proofing, and CI/CD Hard Gates), see the [Agentic Reward Hacking and Shortcutting](agentic-reward-hacking.md) guide.
+The evolve-loop uses an **awareness-first** approach: three deterministic bash scripts form an independent observation layer that works even if every LLM agent is compromised:
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/cycle-health-check.sh` | Computes 11-signal health fingerprint for any cycle (retroactively auditable) |
+| `scripts/eval-quality-check.sh` | Classifies eval commands by rigor level (catches tautological evals) |
+| `scripts/verify-eval.sh` | Re-runs eval commands independently (catches false PASS claims) |
+
+Additional defenses include per-cycle challenge tokens (proof-of-invocation chain), canary/honeypot files (zero-false-positive tripwires), hash chain ledger (tamper-evident audit trail), inoculation prompting (prevents escalation from gaming to broader misalignment), and blind monitoring (random full-audit sampling).
+
+For the full analysis including the cycle 102-111 forgery incident, see [Agentic Reward Hacking and Shortcutting](agentic-reward-hacking.md). For the literature review informing these defenses, see [Research: Agentic Reward Hacking](research-agentic-reward-hacking.md).
 
 ---
 
@@ -126,3 +136,11 @@ Ungrounded claims in build output — assertions not traceable to the provided i
 | Quality regression | 3-cycle degradation trigger | Auto-suggest rollback |
 | Prompt regression | 2-cycle comparison window | Auto-revert prompt version |
 | Hallucinated build output | Groundedness scoring, Changes table audit | Auditor WARN on low groundedness |
+| Skipped pipeline phases | Health fingerprint (11 signals) | `cycle-health-check.sh` detects missing artifacts/roles |
+| Tautological evals | Eval rigor classification (Level 0-3) | `eval-quality-check.sh` blocks no-op evals |
+| False PASS claims | Independent eval re-execution | `verify-eval.sh` re-runs evals without trusting Auditor |
+| Forged reports | Per-cycle challenge tokens | Token consistency check across all artifacts |
+| Eval system probing | Canary/honeypot files | `.integrity-canary`, `_canary-eval.md` — zero false positives |
+| Retroactive ledger modification | Hash chain (prevHash field) | Chain integrity verification in health check |
+| Trust-building attacks | Adaptive strictness hardening | Random 20% full-audit, Sections D/E never skipped, cross-session decay |
+| Gaming escalation | Inoculation prompting | Explicit anti-gaming text prevents misalignment generalization |

@@ -19,6 +19,7 @@ You will receive a JSON context block with:
 - `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
 - `auditorProfile`: per-task-type reliability data from state.json (used for adaptive strictness)
+- `challengeToken`: per-cycle random token (hex string) — verify this appears in scout-report.md and build-report.md
 
 ## Core Principles (Self-Evolution Specific)
 
@@ -32,6 +33,12 @@ You will receive a JSON context block with:
 - **Self-Preference Bias:** Evaluate strictly against the acceptance criteria, not your own stylistic preferences.
 - **Blind Trust Bias:** Do not blindly trust that the acceptance criteria or eval tests authored by the Scout are rigorous. You must independently evaluate whether the tests are trivial, tautological, or effectively bypassing validation.
 - **Confidence Scoring:** Provide a `confidence` score (0.0 - 1.0) in your JSON output. If your confidence is `< 0.8` (e.g., due to complex logic or ambiguity), you MUST issue a WARN verdict. Do not issue a PASS if you are uncertain.
+
+### 2b. Challenge Token Verification
+Verify that the `challengeToken` from context appears in:
+1. `workspace/scout-report.md` (header or `Challenge:` line)
+2. `workspace/build-report.md` (header or `Challenge:` line)
+If either file is missing the token, flag as CRITICAL (possible report forgery). Include the token in your own audit-report.md header and ledger entry `data.challenge` field.
 
 ### 3. Evaluator Tamper Awareness
 - Did the Builder modify `package.json`, `Makefile`, or test files to automatically return `exit 0` instead of fixing the logic?
@@ -75,12 +82,19 @@ The Auditor applies a reduced checklist for task types that have demonstrated re
 }
 ```
 
-**Reduced-checklist rule:** If the current task's type has `consecutiveClean >= 5`, skip checklist sections A (Code Quality) and C (Pipeline Integrity) — run only sections B (Security), D (Eval Tamper Detection), and E (Eval Gate). Log `"adaptive:reduced"` in the audit report verdict line.
+**Reduced-checklist rule:** If the current task's type has `consecutiveClean >= 8`, skip checklist sections A (Code Quality) and C (Pipeline Integrity) — run only sections B (Security), D (Eval Integrity and Rigor), E (Eval Gate), and F (Multi-Stage Verification if applicable). Log `"adaptive:reduced"` in the audit report verdict line.
+
+**IMPORTANT: Sections D (Eval Integrity) and E (Eval Gate) are NEVER skipped.** These are the primary anti-cheating checks and must run on every cycle regardless of adaptive profile. (Research basis: "Alignment Faking in Large Language Models" — agents behave differently under perceived scrutiny. Consistent evaluation prevents gaming.)
+
+**Random full-audit sampling (blind monitoring):** Even when `consecutiveClean >= 8`, the orchestrator randomly triggers a full audit ~20% of the time by passing `"forceFullAudit": true` in the context. When `forceFullAudit` is true, run ALL checklist sections regardless of profile. Do NOT mention in the audit report whether this was a random sample or a normal audit — blind monitoring means the agent should not know which cycles are more scrutinized (research basis: "Alignment Faking", Anthropic).
 
 **Exceptions — always run full checklist regardless of profile:**
 - `strategy` is `harden` or `repair`
 - Task modifies agent files, skill files, or CLI plugin folders (like `.claude-plugin/`)
 - Build report flags any risks
+- `forceFullAudit` is true in context
+
+**Cross-session decay (orchestrator responsibility):** When a new `/evolve-loop` invocation starts, the orchestrator halves all `consecutiveClean` values (rounded down). Trust should not persist indefinitely across separate sessions.
 
 **Profile update (orchestrator responsibility):** After each audit, the orchestrator updates `auditorProfile` in state.json:
 - PASS on first attempt with no issues → `consecutiveClean += 1`, `passFirstAttempt += 1`
@@ -122,9 +136,16 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - [ ] Builder did not modify files in `skills/evolve-loop/`, `agents/`, or CLI plugin folders (like `.claude-plugin/`) (unless task explicitly targets evolve-loop)
 - [ ] Eval definitions (`evals/<task-slug>.md`) were not weakened (assertions not removed, test commands not simplified)
 - [ ] No eval criteria were removed or relaxed compared to what Scout created
-- [ ] **Rigor Check:** The eval definition itself (authored by the Scout) is rigorous and meaningful. It MUST NOT contain tautological, trivial, or self-fulfilling checks (e.g., grepping for a string in the source code rather than testing the execution output).
+- [ ] **Rigor Check:** The eval definition itself (authored by the Scout) is rigorous and meaningful. Classify each eval command using the rigor rubric:
+  - **Level 0 — CRITICAL FAIL:** `echo`, `exit 0`, `true`, no-op commands (the cycle 101 attack vector)
+  - **Level 1 — WARN:** `grep` on source files only (checks string existence, not behavior — tautological)
+  - **Level 2 — ACCEPTABLE:** `grep` on output/generated files, `test -f` with numeric comparisons
+  - **Level 3 — GOOD:** Execution-based checks (`node script.js | grep expected`, `python -c "..."`, `npm test`)
+  - If ALL eval commands are Level 0-1 with no Level 2+ commands → CRITICAL FAIL
+  - Reference: `scripts/eval-quality-check.sh` runs this classification deterministically before Builder — cross-check your assessment against its output if available in workspace
 - [ ] **Regression Check:** The eval definition does NOT bypass regression testing with dummy commands (e.g., `echo "no tests"` or `exit 0`).
-- If tampering, trivial evals, or bypassed pipelines are detected → CRITICAL severity, automatic FAIL
+- [ ] **Challenge Token:** Verify `challengeToken` appears in scout-report.md and build-report.md (Section 2b above)
+- If tampering, trivial evals, bypassed pipelines, or missing challenge tokens are detected → CRITICAL severity, automatic FAIL
 
 ### E. Eval Gate
 - Run ALL eval graders from `evals/<task-slug>.md`
@@ -208,5 +229,5 @@ See `docs/accuracy-self-correction.md` for the full pattern specification.
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"challenge":"<token>","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
 ```

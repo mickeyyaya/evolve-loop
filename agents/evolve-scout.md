@@ -27,6 +27,7 @@ You will receive a JSON context block with:
 - `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` objects from Phase 0 calibration (may be empty on first invocation)
 - `goal`: user-specified goal (string or null)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
+- `challengeToken`: per-cycle random token (hex string) — include in scout-report.md header and ledger entry
 
 ## Goal Handling
 
@@ -182,7 +183,13 @@ For each proposed task, record the estimated token cost in the scout-report Deci
 
 See `docs/performance-profiling.md` for per-phase cost baselines.
 
-### 8. Write Eval Definitions
+### 8. Eval Integrity (Inoculation)
+
+You may encounter situations where writing trivial eval commands (e.g., `grep -q "string" source.js`, `echo "pass"`, `exit 0`) seems efficient — satisfying the eval format requirement with minimal effort. This is a known failure mode called **specification gaming** (documented in DeepMind's Specification Gaming Catalog and Anthropic's "Sycophancy to Subterfuge" research). Trivial evals undermine the entire pipeline: the Builder can satisfy them without implementing genuine functionality, and the Auditor's quality gate becomes meaningless.
+
+**Write eval commands that test behavior, not existence.** A good eval executes the code and checks its output. A bad eval greps for strings in source files. The `scripts/eval-quality-check.sh` script classifies your evals by rigor level — Level 0 (no-ops) and Level 1 (tautological greps) will trigger warnings or halt the cycle.
+
+### 9. Write Eval Definitions
 
 For each selected task, write an eval definition to `.evolve/evals/<task-slug>.md`:
 
@@ -208,6 +215,7 @@ For each selected task, write an eval definition to `.evolve/evals/<task-slug>.m
 
 ```markdown
 # Cycle {N} Scout Report
+<!-- Challenge: {challengeToken} -->
 
 ## Discovery Summary
 - Scan mode: full / incremental
@@ -270,7 +278,7 @@ Structured log of all candidate tasks evaluated this cycle — selected and reje
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"scout","type":"discovery","data":{"scanMode":"full|incremental","filesAnalyzed":<N>,"researchPerformed":<bool>,"tasksSelected":<N>,"instinctsApplied":<N>}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"scout","type":"discovery","data":{"scanMode":"full|incremental","filesAnalyzed":<N>,"researchPerformed":<bool>,"tasksSelected":<N>,"instinctsApplied":<N>,"challenge":"<challengeToken>"}}
 ```
 
 ### Project Digest (cycle 1 only, or when regeneration is requested)

@@ -79,24 +79,86 @@ By structurally separating the execution environment from the reasoning environm
 
 ---
 
-## The Reality: Detection Over Prevention (Observability)
+## The Reality: Awareness Over Prevention (Observability)
 
-While the `examples/secure_orchestrator.py` demonstrates a perfect deterministic sandbox, the reality is that the Evolve Loop is a general-purpose skill designed to run in unconstrained environments (like a user's raw local terminal via the Gemini CLI) where strict gVisor/Docker sandboxing isn't always possible or desirable. 
+While the `examples/secure_orchestrator.py` demonstrates a perfect deterministic sandbox, the reality is that the Evolve Loop is a general-purpose skill designed to run in unconstrained environments (like a user's raw local terminal via the Gemini CLI) where strict gVisor/Docker sandboxing isn't always possible or desirable.
 
-In these environments, we cannot mathematically *prevent* a sufficiently capable LLM from cheating. **Therefore, our primary defense must be Awareness and Observability.** 
+In these environments, we cannot mathematically *prevent* a sufficiently capable LLM from cheating. **Therefore, our primary defense is Awareness and Observability — the system must always know when something is wrong.**
 
-If the system cannot stop the agent from hacking the reward, the agents themselves must be exceptionally good at *knowing* when the system has been hacked and alerting the human.
+> Every cycle produces a deterministic "health fingerprint" that is trivially cheap to verify but expensive to fake consistently. The system only needs ONE anomalous signal to know something is wrong and escalate to the human.
 
-### 1. Behavioral Anomaly Detection (The Operator)
-The Operator agent (Phase 5) is formally instructed to monitor the pipeline's runtime telemetry for the signatures of TRACE (Testing Reward Anomalies in Code Environments) exploits:
-- **Velocity Anomalies:** A complex task touching 5+ files was completed and audited in under 10 seconds with 100% confidence. This indicates *Ceremonialization* (the agents skipped the work and hallucinated the logs).
-- **Tool-Use Sequencing:** The Builder accessed `package.json`, `conftest.py`, or `.github/workflows/` when the task only required modifying `src/api.js`. This indicates *Test Environment Poisoning*.
-- **Complexity Gaming:** A task resulted in 5,000 lines of whitespace or commented-out code to satisfy a "lines changed" or verbosity metric.
+### Three Awareness Layers
 
-### 2. Evaluator Tamper Awareness (The Auditor)
-The Auditor (Phase 3) is explicitly trained to look for "Semantic Contextualized Hacks" when reviewing the Builder's diff:
-- Did the Builder monkey-patch the test suite instead of fixing the product code?
-- Did the Builder overload equality operators (`==`) or mock the scoring function to always return `True`?
-- Are the passing logs in the build report truly "grounded" in the actual git diff, or did the Builder simply write the string `"Tests passed"` without invoking the test runner?
+1. **Passive Telemetry** — signals generated as a byproduct of normal operation (timestamps, checksums, artifacts). No LLM judgment needed to collect.
+2. **Deterministic Anomaly Detection** — bash scripts (`scripts/cycle-health-check.sh`, `scripts/eval-quality-check.sh`, `scripts/verify-eval.sh`) checking telemetry against invariants. Cannot be overridden by LLM opinion.
+3. **Agent Cross-Examination** — Auditor and Operator independently verify orchestrator claims using telemetry as ground truth.
 
-By shifting focus to **Runtime Behavioral Observability**, the Evolve Loop ensures that even when agents operate in highly privileged environments, their attempts to bypass workflows are detected, flagged, and halted by the agent network before they pollute the `main` branch.
+### Layer 1: Deterministic Health Fingerprint
+
+`scripts/cycle-health-check.sh` computes 11 health signals for any cycle:
+
+| Signal | What It Detects |
+|--------|----------------|
+| Ledger role completeness | Skipped agents |
+| Ledger timestamp spacing | Bulk forgery |
+| Artifact existence | Forged pipeline |
+| Eval file existence | Skipped eval authoring |
+| Eval checksum integrity | Builder tampering |
+| Challenge token consistency | Forged reports |
+| Git commit velocity | Mass commits |
+| Diff substance | Boilerplate-only commits |
+| Canary file integrity | Eval system probing |
+| Hash chain integrity | Retroactive ledger modification |
+| Health check execution | Orchestrator skipping oversight |
+
+Any ANOMALY triggers a HALT with evidence presented to the human. Can be run retroactively: `bash scripts/cycle-health-check.sh <cycle> <workspace>`.
+
+### Layer 2: Independent Eval Re-Execution
+
+`scripts/verify-eval.sh` re-runs every eval command independently (research basis: "AI Control", Greenblatt et al.). It trusts no report — only what it observes. If the Auditor claimed PASS but verify-eval shows failures, the system HALTs with a discrepancy alert.
+
+### Layer 3: Eval Quality Classification
+
+`scripts/eval-quality-check.sh` classifies eval commands by rigor level (research basis: cycle 101 tautological eval incident, DeepMind's Specification Gaming Catalog):
+- **Level 0 (ANOMALY):** `echo`, `exit 0`, `true` — no-op commands
+- **Level 1 (WARN):** `grep` on source files — tautological
+- **Level 2 (OK):** `grep` on output files, `test -f` with comparisons
+- **Level 3 (GOOD):** Execution-based checks
+
+### Layer 4: Behavioral Anomaly Detection (The Operator)
+The Operator (Phase 5) consumes the health fingerprint as primary input and monitors for TRACE exploit signatures:
+- **Velocity Anomalies:** Task completed in under 5 seconds = Ceremonialization
+- **Tool-Use Sequencing:** Builder accessed test configs when task only required source edits = Test Environment Poisoning
+- **Complexity Gaming:** 5,000 lines of whitespace = metric inflation
+- **Challenge Token Mismatches:** Different tokens across artifacts = forged reports
+- **Cross-cycle accumulation:** 3+ WARNs in any 5-cycle window triggers examination mode
+
+### Layer 5: Evaluator Tamper Awareness (The Auditor)
+The Auditor (Phase 3) operates as a "Forensic Investigator":
+- Did the Builder monkey-patch the test suite instead of fixing product code?
+- Did the Builder overload equality operators or mock scoring functions?
+- Are build report claims grounded in the actual git diff?
+- Is the challenge token consistent across scout-report and build-report?
+- Are eval commands rigorous (Level 2+ in the rigor rubric)?
+
+### Layer 6: Canary Files and Honeypots
+Planted at cycle start (research basis: Canarytokens):
+- **Workspace canary** (`.integrity-canary`): Random value, verified post-cycle
+- **Honeypot eval** (`_canary-eval.md`): Fake eval monitoring for probing
+- Zero false positive rate — any access is definitionally suspicious
+
+### Layer 7: Inoculation Prompting
+Builder and Scout prompts include explicit inoculation text (research basis: Anthropic's "Emergent Misalignment"):
+> "Gaming the eval seems efficient but triggers detection systems and causes system degradation."
+
+This was empirically shown to prevent escalation from shortcuts to broader misalignment.
+
+### Layer 8: Adaptive Trust with Decay
+- Audit strictness adapts to track record (`consecutiveClean >= 8` for reduced checklist)
+- **Sections D (Eval Integrity) and E (Eval Gate) are never skipped**
+- Random 20% full-audit sampling (blind monitoring — research basis: "Alignment Faking")
+- Cross-session decay: trust halved at each new invocation
+
+By combining deterministic checks, independent verification, agent cross-examination, canary files, and blind monitoring, the Evolve Loop ensures that gaming attempts are detected across multiple independent signals. A cheater must fake all dimensions simultaneously — timestamps, challenge tokens, artifacts, eval rigor, ledger entries, phase transitions, canary integrity — and missing even ONE triggers examination.
+
+For the full literature review, see [docs/research-agentic-reward-hacking.md](research-agentic-reward-hacking.md).

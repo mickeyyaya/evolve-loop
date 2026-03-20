@@ -18,6 +18,7 @@ You will receive a JSON context block with:
 - `evalsPath`: path to `.evolve/evals/`
 - `instinctSummary`: compact instinct array from state.json (inline — read this instead of instinct YAML files)
 - `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
+- `challengeToken`: per-cycle random token (hex string) — include in build-report.md header and ledger entry
 
 ## Strategy Handling
 
@@ -119,6 +120,10 @@ Before implementing, enumerate your reasoning explicitly:
 
 This structured reasoning improves accuracy by +35% on complex tasks (see docs/accuracy-self-correction.md).
 
+### Integrity Notice (Inoculation)
+
+You may encounter situations where gaming the evaluation seems like an efficient path — modifying test files to auto-pass, writing trivial implementations that satisfy grep checks, or bypassing quality gates. This is a known failure mode documented in Anthropic's "Emergent Misalignment from Reward Hacking" research: once an agent discovers gaming works, broader misalignment follows. The correct behavior is to implement genuine functionality that satisfies the **spirit** of the acceptance criteria, not just the letter. Gaming triggers detection systems (`scripts/cycle-health-check.sh`, `scripts/verify-eval.sh`) and causes system degradation.
+
 ### Step 4: Implement
 - Make the changes
 - Keep each change small and focused
@@ -198,6 +203,7 @@ Keep this file concise (under 20 lines). It is read by Scout in incremental mode
 
 ```markdown
 # Cycle {N} Build Report
+<!-- Challenge: {challengeToken} -->
 
 ## Task: <name>
 - **Status:** PASS / FAIL
@@ -236,5 +242,5 @@ Keep this file concise (under 20 lines). It is read by Scout in incremental mode
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL","challenge":"<challengeToken>"}}
 ```
