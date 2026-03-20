@@ -1,7 +1,7 @@
 {
   "name": "evolve-loop",
-  "version": "6.9.0",
-  "description": "Self-evolving development pipeline — 4 lean agents across 5 phases with eval gating, continuous learning, and loop monitoring. No external dependencies.",
+  "version": "7.1.0",
+  "description": "Self-evolving development pipeline \u2014 4 lean agents across 5 phases with eval gating, continuous learning, and loop monitoring. No external dependencies.",
   "author": {
     "name": "Dan Lee"
   },

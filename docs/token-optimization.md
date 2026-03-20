@@ -35,7 +35,7 @@ The `repair` strategy always uses sonnet+ for Builder (accuracy over cost). The 
 
 ## KV-Cache Prefix Optimization
 
-Layer 0 shared values (the team constitution in `memory-protocol.md`) are placed **first** in every agent context block. Because this section never changes between cycles, the Claude API can cache the KV activations for that prefix and reuse them across all agent calls in a session, maximizing cache hit rate and reducing prompt processing cost.
+Layer 0 shared values (the team constitution in `memory-protocol.md`) are placed **first** in every agent context block. Because this section never changes between cycles, LLM APIs with prompt caching (e.g., prefix caching) can cache the KV activations for that prefix and reuse them across all agent calls in a session, maximizing cache hit rate and reducing prompt processing cost.
 
 Rule: static, invariant content must appear before dynamic content (task details, workspace files) in the context block.
 
@@ -171,7 +171,7 @@ These principles, drawn from Anthropic's context engineering best practices (202
 
 ### Static-Before-Dynamic Ordering
 
-All agent context blocks place invariant content (Layer 0 shared values, project context) before dynamic content (cycle-specific data, task objects). This maximizes KV-cache prefix hits — the Claude API caches activations for the shared prefix and reuses them across all agent calls in a session. The KV-Cache Prefix Optimization section above is the evolve-loop's implementation of this principle.
+All agent context blocks place invariant content (Layer 0 shared values, project context) before dynamic content (cycle-specific data, task objects). This maximizes KV-cache prefix hits — LLM APIs with prompt caching reuse activations for the shared prefix across all agent calls in a session. The KV-Cache Prefix Optimization section above is the evolve-loop's implementation of this principle.
 
 ### Just-In-Time Retrieval
 
@@ -197,18 +197,28 @@ After each cycle, a `handoff.md` checkpoint file is written with session state. 
 # Cycle Handoff — Cycle {N}
 
 ## Session State
-- Cycles completed this session: <count>
-- Strategy: <current strategy>
-- Goal: <goal or null>
-- Remaining cycles: <endCycle - currentCycle>
+- Cycles completed: <N> | Remaining: <M>
+- Strategy: <strategy> | Goal: <goal or null>
+- Benchmark: <overall>/100 (delta: +/-N from session start)
 
-## Key Context to Carry Forward
-- Active stagnation patterns: <list>
-- Unresolved operator warnings: <list>
-- Last delta metrics: <summary>
+## This Cycle
+- Tasks: <slug1> (PASS), <slug2> (PASS), <slug3> (FAIL)
+- Audit iterations: <avg attempts per task>
+- Instincts extracted: <N>
+
+## Carry Forward
+- Stagnation: <patterns or "none">
+- Operator warnings: <list or "none">
+- Research cooldowns: <expiry times>
+- Next cycle priorities: <from operator brief>
+
+## Cumulative Session Stats
+- Total shipped: <N> | Failed: <N>
+- Benchmark trajectory: <start> → <current>
+- Active instincts: <count> (last extracted: cycle <N>)
 ```
 
-Under high context pressure, the orchestrator reduces token usage by relying on `instinctSummary` and `ledgerSummary` from state.json, keeping workspace files concise, and trimming agent context to essential fields only.
+This handoff serves as a **compaction anchor** — when the host LLM auto-compacts conversation history, this structured summary ensures cross-cycle continuity survives summarization. Under high context pressure, the orchestrator reduces token usage by relying on `instinctSummary` and `ledgerSummary` from state.json, keeping workspace files concise, trimming agent context to essential fields only, and activating lean mode (see Orchestrator Context Management below).
 
 ### Minimal Non-Overlapping Tool Sets
 
@@ -247,6 +257,35 @@ Hard turn caps in multi-turn agent loops are a blunt instrument. A probability-b
 3. Stop early when `E[value_gain] < turn_cost` — i.e., when the expected improvement no longer justifies the token expenditure.
 
 **Evolve-loop application:** The `tokenBudget.perTask` soft limit (80K tokens) and Scout's task-sizing rules act as a static approximation of this dynamic approach. A future improvement would track per-turn token spend and emit a stop signal when marginal progress (measured by eval score delta) falls below a configurable threshold.
+
+---
+
+## Orchestrator Context Management
+
+### The Accumulation Problem
+
+The orchestrator's conversation context grows ~40-60K tokens per cycle from agent prompts, results, file reads, and state updates. By cycle 6, this accumulates to ~300K+ tokens, causing progressive slowdown and increased cost. Symptoms: each cycle takes noticeably longer than the previous one, and token usage per cycle increases even for similar-complexity tasks.
+
+### Lean Mode (cycles 4+)
+
+After the first 3 cycles of an invocation, the orchestrator activates lean mode to cap per-cycle context growth:
+- **State.json**: Read once at cycle start, not re-read before Phase 4
+- **Agent results**: Use returned summaries instead of reading full workspace files
+- **Scout report**: Extract task list from agent return value, not separate file read
+- **Eval checksums**: Compute once, verify from memory
+- **Benchmark delta**: Skip for S-complexity docs-only changes
+
+Estimated savings: ~15-20K tokens per cycle (from ~50K to ~30K).
+
+### Compaction Anchor Pattern
+
+The `handoff.md` written after each cycle serves as a **compaction anchor** — a structured summary that preserves cross-cycle continuity when the host LLM auto-compacts conversation history. The handoff captures session state, cycle results, carry-forward context, and cumulative stats in a format that survives summarization without information loss.
+
+### Recommended Batch Sizes
+
+For optimal efficiency, run 5-7 cycles per invocation. Beyond 7 cycles, context accumulation begins to degrade performance even with lean mode active. For longer runs, start a new invocation that reads the previous handoff.md to resume.
+
+---
 
 For techniques that improve output accuracy and catch errors across these same agents and phases (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
 

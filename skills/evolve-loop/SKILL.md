@@ -202,6 +202,67 @@ cp -rp "$WORKSPACE_PATH"/* .evolve/workspace/ 2>/dev/null
 # Keep run directory for 48 hours (pruned on next invocation init)
 ```
 
+**Final Session Report** — after all cycles complete, generate and output a comprehensive report:
+
+1. Read `state.json` for cumulative data: `ledgerSummary`, `projectBenchmark`, `evalHistory`, `instinctSummary`, `taskArms`, `mastery`, `fitnessScore`, `fitnessHistory`, `operatorWarnings`, `processRewardsHistory`
+2. Read `$WORKSPACE_PATH/session-summary.md` (written by Operator on last cycle)
+3. Generate `$WORKSPACE_PATH/final-report.md` and **output its contents to the user**:
+
+```markdown
+# Evolve Loop — Session Report
+
+**Run:** {RUN_ID} | **Cycles:** {first}–{last} | **Strategy:** {strategy} | **Goal:** {goal or "autonomous"}
+
+---
+
+## Summary
+<3-4 sentence narrative: what the session accomplished, key patterns, current project state. Source from session-summary.md synthesis.>
+
+## Tasks
+
+| Cycle | Task | Type | Verdict | Audit Attempts |
+|-------|------|------|---------|----------------|
+| {N} | {slug} | {type} | PASS/FAIL | {attempts} |
+| ... | ... | ... | ... | ... |
+
+**Shipped:** {totalShipped}/{totalAttempted} ({successRate}%) | **Failed:** {totalFailed}
+
+## Benchmark Trajectory
+
+| Dimension | Start | End | Delta |
+|-----------|-------|-----|-------|
+| Documentation Completeness | {X} | {Y} | {+/-N} |
+| ... | ... | ... | ... |
+| **Overall** | **{start}** | **{end}** | **{+/-N}** |
+
+## Learning
+
+- **Instincts extracted:** {count} | **Graduated:** {count}
+- **Mastery level:** {level} ({consecutiveSuccesses} consecutive successes)
+- **Top instincts this session:**
+  - {inst-id}: {pattern} (confidence: {value})
+  - ...
+
+## Task Type Performance
+
+| Type | Attempted | Shipped | Success Rate | Bandit Avg Reward |
+|------|-----------|---------|--------------|-------------------|
+| feature | {N} | {N} | {%} | {avgReward} |
+| stability | {N} | {N} | {%} | {avgReward} |
+| ... | ... | ... | ... | ... |
+
+## Warnings & Recommendations
+
+- {operator warnings, pending improvements, or "No active warnings"}
+- **Recommended next strategy:** {from operator brief}
+- **Weakest dimension:** {from benchmark}
+
+---
+*Report: .evolve/runs/{RUN_ID}/workspace/final-report.md*
+```
+
+4. Copy `final-report.md` to `.evolve/workspace/final-report.md` for easy access
+
 For detailed phase-by-phase instructions, see [phases.md](skills/evolve-loop/phases.md).
 For the shared memory protocol, see [memory-protocol.md](skills/evolve-loop/memory-protocol.md).
 For the eval hard gate instructions, see [eval-runner.md](skills/evolve-loop/eval-runner.md).
@@ -289,13 +350,21 @@ The Scout MUST consider token budgets when sizing tasks. A task with complexity 
 
 ## Context Management
 
-The evolve-loop runs **continuously through all requested cycles without stopping**. It never pauses to ask the user to resume.
+The evolve-loop runs continuously through all requested cycles. Between cycles, the orchestrator performs a **strategic compaction** to prevent context degradation:
 
-1. After each cycle, write a `handoff.md` file with session state as a safety checkpoint (in case the session is interrupted externally)
-2. **Continue immediately to the next cycle** — do NOT stop, do NOT output a resume command, do NOT wait for user input
-3. If context window pressure is high, minimize workspace file sizes and rely on state.json summaries rather than re-reading full files
+1. After each cycle, write `handoff.md` with full session state (existing behavior)
+2. **Output a structured cycle summary** (5-8 lines) that captures:
+   - Tasks shipped and their verdicts
+   - Benchmark delta (if measured)
+   - Any warnings or stagnation signals
+   - Key decisions for next cycle
+3. **Continue immediately to the next cycle** — do NOT stop or wait for user input
+4. If context window utilization exceeds 60%, the orchestrator SHOULD:
+   - Stop re-reading files already in context (use remembered values)
+   - Skip reading full agent results — extract only verdict + key metrics
+   - Rely on state.json and handoff.md rather than conversation history
 
-The handoff file is a **checkpoint only** — it exists so that if a session is externally interrupted, a new session can pick up where it left off. It is NOT a signal to stop.
+The handoff file is a **checkpoint and compaction anchor** — it exists so that if a session is externally interrupted, a new session can pick up where it left off. When the host LLM auto-compacts conversation history, the structured handoff ensures cross-cycle continuity survives summarization. It is NOT a signal to stop.
 
 The orchestrator reads `handoff.md` during initialization if it exists, applying the carried-forward context.
 

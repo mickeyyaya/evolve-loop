@@ -110,6 +110,17 @@ Verify this checksum before every delta check (Phase 3→4 boundary). Builder MU
 
 ## FOR each cycle (while remainingCycles > 0):
 
+### Lean Mode (cycles 4+ of an invocation)
+
+After the first 3 cycles of an invocation, the orchestrator switches to lean mode to prevent context bloat:
+- **State.json**: Read ONCE at cycle start. Do NOT re-read before Phase 4 — use the in-memory copy.
+- **Agent results**: Do NOT read full workspace files after agent completion. Instead, the agent's returned summary is sufficient. Only read the full file if the summary indicates a problem.
+- **Scout report**: Extract task list from agent return value, not by reading scout-report.md separately.
+- **Eval checksums**: Compute once, verify from memory — do not re-read the checksum file.
+- **Benchmark delta**: Skip for cycles where all tasks are S-complexity docs-only changes (no behavioral risk).
+
+Lean mode saves ~15-20K tokens per cycle (from ~50K to ~30K) by eliminating redundant file reads that accumulate in the orchestrator's conversation context.
+
 ### Atomic Cycle Number Allocation
 
 At the start of each cycle iteration, claim the next cycle number atomically:

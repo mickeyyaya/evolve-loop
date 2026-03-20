@@ -182,7 +182,8 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
        "cycle": <N>,
        "mode": "post-cycle|convergence-check",
        "recentLedger": "<last 5 ledger entries, inline>",
-       "recentNotes": "<last 5 cycle entries from notes.md, inline>"
+       "recentNotes": "<last 5 cycle entries from notes.md, inline>",
+       "isLastCycle": <true if remainingCycles == 0, false otherwise>
      }
      ```
    - Operator reads `ledgerSummary` and `instinctSummary` from state.json instead of full ledger/instinct files.
@@ -229,14 +230,20 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 
 7. **Output cycle summary:**
    ```
-   CYCLE {N} COMPLETE
-   ==================
-   Tasks:     <list>
-   Audit:     <verdict>
-   Eval:      <passed/total>
-   Shipped:   YES / NO
-   Instincts: <count>
+   ┌─────────────────────────────────────────┐
+   │ CYCLE {N} COMPLETE                      │
+   ├─────────────────────────────────────────┤
+   │ Tasks:      <slug1> (PASS), <slug2> (FAIL)
+   │ Shipped:    <N>/<total attempted>
+   │ Audit:      <avg attempts per task> iterations
+   │ Benchmark:  <overall>/100 (Δ +/-N)
+   │ Instincts:  <N> extracted, <N> graduated
+   │ Warnings:   <operator warnings or "none">
+   │ Next focus: <1-line from operator brief>
+   └─────────────────────────────────────────┘
    ```
+
+   This summary is the **primary user-facing output per cycle**. It must be concise enough to scan but informative enough to track session progress without reading workspace files.
 
 ### Meta-Cycle Self-Improvement & Context Management
 
@@ -385,23 +392,35 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    On cycle 1 (`mode: "full"`): Scout generates this after full codebase scan.
    On cycle 2+: Scout reads this instead of re-scanning. Only changed files (from `changedFiles`) are read directly.
 
-9. **Context Checkpoint (non-blocking):**
+9. **Context Checkpoint (compaction anchor):**
 
-   After each cycle completes, write a **cycle handoff file** to `$WORKSPACE_PATH/handoff.md` (also copy to `.evolve/workspace/handoff.md` for backward compat) as a safety checkpoint:
+   After each cycle completes, write a **cycle handoff file** to `$WORKSPACE_PATH/handoff.md` (also copy to `.evolve/workspace/handoff.md` for backward compat) as a safety checkpoint and compaction anchor:
    ```markdown
    # Cycle Handoff — Cycle {N}
 
    ## Session State
-   - Cycles completed this session: <N>
-   - Strategy: <strategy>
-   - Goal: <goal or null>
-   - Remaining cycles: <remainingCycles>
+   - Cycles completed: <N> | Remaining: <M>
+   - Strategy: <strategy> | Goal: <goal or null>
+   - Benchmark: <overall>/100 (delta: +/-N from session start)
 
-   ## Key Context to Carry Forward
-   - Active stagnation patterns: <list>
-   - Unresolved operator warnings: <list>
-   - Last delta metrics: <summary>
+   ## This Cycle
+   - Tasks: <slug1> (PASS), <slug2> (PASS), <slug3> (FAIL)
+   - Audit iterations: <avg attempts per task>
+   - Instincts extracted: <N>
+
+   ## Carry Forward
+   - Stagnation: <patterns or "none">
+   - Operator warnings: <list or "none">
+   - Research cooldowns: <expiry times>
+   - Next cycle priorities: <from operator brief>
+
+   ## Cumulative Session Stats
+   - Total shipped: <N> | Failed: <N>
+   - Benchmark trajectory: <start> → <current>
+   - Active instincts: <count> (last extracted: cycle <N>)
    ```
+
+   This handoff serves as the **compaction anchor** — when the host LLM auto-compacts conversation history, this structured summary ensures cross-cycle continuity survives summarization. All essential state is captured so the orchestrator can continue without re-reading prior cycle history.
 
    **IMPORTANT: Do NOT stop. Do NOT output a resume command. Do NOT wait for user input.** The handoff file is a checkpoint only — if the session is externally interrupted, a new session can read it to resume. The orchestrator MUST continue immediately to the next cycle.
 
@@ -409,6 +428,7 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    - Using `instinctSummary` and `ledgerSummary` from state.json instead of reading full files
    - Keeping workspace files concise
    - Trimming agent context to essential fields only
+   - Activating lean mode behaviors (see phases.md) even before cycle 4 if needed
 
 10. **Exit conditions** (in order):
    - Cycle limit reached → STOP
