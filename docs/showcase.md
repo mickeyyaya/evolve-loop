@@ -306,7 +306,7 @@ Each feature is independently useful. Together they form a closed loop: Scout se
 /evolve-loop 1 harden
 ```
 
-See [architecture.md](architecture.md) for a deep dive into data flow, and [instincts.md](instincts.md) for the instinct extraction and graduation system.
+See [architecture.md](docs/architecture.md) for a deep dive into data flow, and [instincts.md](docs/instincts.md) for the instinct extraction and graduation system.
 
 ---
 

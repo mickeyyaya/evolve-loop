@@ -172,9 +172,9 @@ Scout → [Task A, Task B, Task C]
    | design | rubric | export | file-copy |
    | mixed | hybrid | git | worktree |
 
-   `projectContext.domain` is passed to all agents via context blocks. Agents use it to select appropriate eval graders (see [eval-runner.md](eval-runner.md) Non-Code Eval Graders) and ship mechanisms (see [docs/domain-adapters.md](../../docs/domain-adapters.md)).
+   `projectContext.domain` is passed to all agents via context blocks. Agents use it to select appropriate eval graders (see [eval-runner.md](skills/evolve-loop/eval-runner.md) Non-Code Eval Graders) and ship mechanisms (see [docs/domain-adapters.md](docs/domain-adapters.md)).
 
-   See [docs/configuration.md](../../docs/configuration.md) Domain Detection for full signal tables and override documentation.
+   See [docs/configuration.md](docs/configuration.md) Domain Detection for full signal tables and override documentation.
 
 4. **Pre-flight check** (inline, no agent):
    ```bash
@@ -202,9 +202,9 @@ cp -rp "$WORKSPACE_PATH"/* .evolve/workspace/ 2>/dev/null
 # Keep run directory for 48 hours (pruned on next invocation init)
 ```
 
-For detailed phase-by-phase instructions, see [phases.md](phases.md).
-For the shared memory protocol, see [memory-protocol.md](memory-protocol.md).
-For the eval hard gate instructions, see [eval-runner.md](eval-runner.md).
+For detailed phase-by-phase instructions, see [phases.md](skills/evolve-loop/phases.md).
+For the shared memory protocol, see [memory-protocol.md](skills/evolve-loop/memory-protocol.md).
+For the eval hard gate instructions, see [eval-runner.md](skills/evolve-loop/eval-runner.md).
 
 ## Agent Definitions
 
@@ -236,7 +236,7 @@ The orchestrator selects the model for each agent invocation based on phase comp
 - The `repair` strategy always uses sonnet+ for Builder (accuracy matters more than cost)
 - The `innovate` strategy can use haiku for Auditor on style checks (relaxed strictness)
 
-**Eval Runner** — orchestrator-executed (not an agent), instructions in [eval-runner.md](eval-runner.md).
+**Eval Runner** — orchestrator-executed (not an agent), instructions in [eval-runner.md](skills/evolve-loop/eval-runner.md).
 
 ## Orchestrator Policies
 
@@ -246,13 +246,13 @@ These are graduated instincts — patterns confirmed across multiple cycles with
 
 2. **Grep-based evals** (from inst-004, confidence 0.9): For Markdown/Shell projects without test infrastructure, grep-based eval checks are effective acceptance gates. Define specific grep commands with expected match counts.
 
-3. **Meta-cycle self-improvement** (every 5 cycles): The orchestrator runs a meta-evaluation of its own pipeline effectiveness, analyzing success rates, agent efficiency, and stagnation patterns. May propose changes to agent prompts, strategies, or budgets. See Phase 5 step 6 in [phases.md](phases.md).
+3. **Meta-cycle self-improvement** (every 5 cycles): The orchestrator runs a meta-evaluation of its own pipeline effectiveness, analyzing success rates, agent efficiency, and stagnation patterns. May propose changes to agent prompts, strategies, or budgets. See Phase 5 step 6 in [phases.md](skills/evolve-loop/phases.md).
 
-4. **Automated prompt evolution** (during meta-cycles): Uses a critique-synthesize loop to refine agent prompts based on cycle outcomes. Maximum 2 edits per meta-cycle, auto-reverts if performance degrades. See Phase 5 step 6d in [phases.md](phases.md).
+4. **Automated prompt evolution** (during meta-cycles): Uses a critique-synthesize loop to refine agent prompts based on cycle outcomes. Maximum 2 edits per meta-cycle, auto-reverts if performance degrades. See Phase 5 step 6d in [phases.md](skills/evolve-loop/phases.md).
 
-5. **Gene/Capsule library**: Structured, reusable fix templates with pattern-matching selectors and pre/post validation. More actionable than instincts — genes describe *how to fix* with executable steps. See [docs/genes.md](../../docs/genes.md).
+5. **Gene/Capsule library**: Structured, reusable fix templates with pattern-matching selectors and pre/post validation. More actionable than instincts — genes describe *how to fix* with executable steps. See [docs/genes.md](docs/genes.md).
 
-6. **Island model evolution** (advanced): Maintain 3-5 independent configurations evolving in parallel, with periodic migration of best-performing traits. See [docs/island-model.md](../../docs/island-model.md).
+6. **Island model evolution** (advanced): Maintain 3-5 independent configurations evolving in parallel, with periodic migration of best-performing traits. See [docs/island-model.md](docs/island-model.md).
 
 ## Plan Template Caching
 

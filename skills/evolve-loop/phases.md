@@ -22,7 +22,7 @@ This prevents redundant benchmark scoring when multiple parallel runs start clos
 
 ### Execution Steps
 
-1. **Run automated checks** from [benchmark-eval.md](benchmark-eval.md):
+1. **Run automated checks** from [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md):
    Execute all bash check commands for each of the 8 dimensions. Capture per-dimension automated scores (0-100).
 
    ```bash
@@ -428,7 +428,7 @@ After all tasks pass audit but before committing in Phase 4, run a targeted benc
    ```
    If checksum fails → HALT: "benchmark-eval.md modified — possible tampering."
 
-2. **Identify relevant dimensions** for this cycle's task types using the dimension-to-task-type mapping in [benchmark-eval.md](benchmark-eval.md). Only re-run checks for relevant dimensions (not all 8).
+2. **Identify relevant dimensions** for this cycle's task types using the dimension-to-task-type mapping in [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md). Only re-run checks for relevant dimensions (not all 8).
 
 3. **Re-run automated checks** for relevant dimensions only. Compute new automated scores.
 
@@ -669,4 +669,4 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
 
 ### Phase 5: LEARN
 
-For detailed Phase 5 instructions (instinct extraction, memory consolidation, operator check, meta-cycle self-improvement, context management), see [phase5-learn.md](phase5-learn.md).
+For detailed Phase 5 instructions (instinct extraction, memory consolidation, operator check, meta-cycle self-improvement, context management), see [phase5-learn.md](skills/evolve-loop/phase5-learn.md).

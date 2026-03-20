@@ -150,7 +150,7 @@ When proposing a task, you may specify `prerequisites: ["slug-a", "slug-b"]` —
 Read `stateJson.fileExplorationMap` (a `{filePath: lastTouchedCycle}` map). For each candidate task, check its target files. If all target files have `lastTouchedCycle <= currentCycle - 3` (or are absent from the map), apply a **+1 novelty priority boost**. This exploration reward prevents the loop from churning the same files each cycle.
 
 **Benchmark weakness boost (apply before final ranking):**
-Read `benchmarkWeaknesses` from context. For each weakness, map its `taskTypeHint` to candidate tasks of that type and apply a **+2 priority boost**. This ensures the loop actively targets its weakest quality dimensions. The dimension-to-task-type mapping is defined in [benchmark-eval.md](../skills/evolve-loop/benchmark-eval.md):
+Read `benchmarkWeaknesses` from context. For each weakness, map its `taskTypeHint` to candidate tasks of that type and apply a **+2 priority boost**. This ensures the loop actively targets its weakest quality dimensions. The dimension-to-task-type mapping is defined in [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md):
 - `documentationCompleteness` → `techdebt` tasks (docs improvement)
 - `specificationConsistency` → `techdebt` tasks (schema alignment)
 - `defensiveDesign` → `stability` / `security` tasks

@@ -8,7 +8,7 @@ Eval definitions are created by the Scout in Phase 1 and stored in `.evolve/eval
 
 ## Eval Definition Format
 
-Each eval file in `.evolve/evals/` follows this structure (see also [examples/eval-definition.md](../../examples/eval-definition.md)):
+Each eval file in `.evolve/evals/` follows this structure (see also [examples/eval-definition.md](examples/eval-definition.md)):
 
 ```markdown
 # Eval: <task-name>
@@ -180,7 +180,7 @@ The eval-runner processes each section in order. ALL grader types must pass for 
 
 ## Benchmark Eval Execution
 
-Distinct from task-level evals. The benchmark eval measures project-wide quality across 8 dimensions defined in [benchmark-eval.md](benchmark-eval.md).
+Distinct from task-level evals. The benchmark eval measures project-wide quality across 8 dimensions defined in [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md).
 
 ### Phase 0 Calibration (once per invocation)
 

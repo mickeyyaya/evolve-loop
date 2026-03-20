@@ -76,7 +76,7 @@ Added in cycle 27, the LLM-as-a-Judge mechanism integrates automated self-evalua
 
 The judge produces a structured verdict (PASS / WARN / FAIL) with a reasoning trace. This verdict feeds into the meta-cycle's agent effectiveness review and informs prompt evolution priorities.
 
-See [docs/self-learning.md](./self-learning.md) for the full self-evaluation rubric, scoring weights, and integration with the learn process reward.
+See [docs/self-learning.md](docs/self-learning.md) for the full self-evaluation rubric, scoring weights, and integration with the learn process reward.
 
 ## Output
 

@@ -103,7 +103,7 @@ For projects that span coding and writing (e.g., a codebase with extensive docum
 - Coding tasks use bash eval graders; writing tasks use rubric graders
 - The Scout determines task domain from the files it targets, not the project-level domain
 
-See [domain-adapters.md](domain-adapters.md) for the full adapter interface.
+See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface.
 
 ## Strategy Presets
 

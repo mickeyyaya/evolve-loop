@@ -16,7 +16,7 @@ Each agent has a single responsibility and owns exactly one workspace file. Agen
 The Auditor gates on MEDIUM+ severity findings. Both code quality issues and eval check failures block shipping. Eval tamper detection prevents bypassing gates.
 
 ### 4. Continuous Learning
-Each cycle extracts instincts (episodic, semantic, procedural categories) that future cycles can read. Instincts are specific and actionable. High-confidence instincts graduate to orchestrator policy. Memory consolidation runs every 3 cycles. See [policy-design.md](policy-design.md) for guidance on writing effective rules and policies.
+Each cycle extracts instincts (episodic, semantic, procedural categories) that future cycles can read. Instincts are specific and actionable. High-confidence instincts graduate to orchestrator policy. Memory consolidation runs every 3 cycles. See [policy-design.md](docs/policy-design.md) for guidance on writing effective rules and policies.
 
 ### 5. Safe Autonomy
 The Operator monitors for stalls, quality degradation, and repeated failures using delta metrics and MAP-Elites fitness scoring. It can HALT the loop, requiring human intervention.
@@ -66,7 +66,7 @@ Agents use different models based on task complexity:
 
 ## Shared Memory Architecture
 
-See [memory-hierarchy.md](memory-hierarchy.md) for details.
+See [memory-hierarchy.md](docs/memory-hierarchy.md) for details.
 
 ### Layer 1: JSONL Ledger
 Append-only structured log. Every agent appends one entry per invocation.
@@ -104,7 +104,7 @@ The system tracks mastery level based on consecutive successes:
 
 ## Token Optimization
 
-See [token-optimization.md](token-optimization.md) for details.
+See [token-optimization.md](docs/token-optimization.md) for details.
 
 | Component | Tokens | Notes |
 |-----------|--------|-------|
@@ -126,7 +126,7 @@ Key optimizations:
 
 ## Self-Improvement Infrastructure
 
-See [self-learning.md](self-learning.md) for details.
+See [self-learning.md](docs/self-learning.md) for details.
 
 The loop includes seven interconnected mechanisms for autonomous self-improvement:
 
@@ -174,19 +174,19 @@ At the end of each cycle, the Operator writes two outputs: a `next-cycle-brief` 
 
 ## Domain Generalization
 
-See [domain-adapters.md](domain-adapters.md) for the full adapter interface. The pipeline is structurally domain-agnostic; four touch points (build isolation, ship mechanism, eval graders, auto-detection) are currently coding-specific and can be swapped via adapters to support writing, research, and design domains.
+See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface. The pipeline is structurally domain-agnostic; four touch points (build isolation, ship mechanism, eval graders, auto-detection) are currently coding-specific and can be swapped via adapters to support writing, research, and design domains.
 
 ### Generalization Status
 
 **All 4 touch points generalized (cycles 3-7):**
-- Domain adapter abstraction with 4 touch points identified and documented ([domain-adapters.md](domain-adapters.md))
-- Domain auto-detection signals for coding, writing, research, and design ([configuration.md](configuration.md))
+- Domain adapter abstraction with 4 touch points identified and documented ([domain-adapters.md](docs/domain-adapters.md))
+- Domain auto-detection signals for coding, writing, research, and design ([configuration.md](docs/configuration.md))
 - Manual override via `.evolve/domain.json` with `evalMode`, `shipMechanism`, `buildIsolation` fields
-- Non-code eval grader patterns: rubric-based (writing), groundedness check (research), coverage check ([eval-runner.md](../skills/evolve-loop/eval-runner.md))
+- Non-code eval grader patterns: rubric-based (writing), groundedness check (research), coverage check ([eval-runner.md](skills/evolve-loop/eval-runner.md))
 - Domain-aware initialization in SKILL.md with defaults table per domain
 - Domain-aware Phase 4 SHIP with git/file-save/export/custom mechanisms
 - Domain-aware Phase 2 BUILD isolation with file-copy for non-git projects (worktree remains default)
-- Domain-specific benchmark dimensions: Prose Clarity, Structural Coherence (writing), Claim Accuracy, Source Coverage (research) ([benchmark-eval.md](../skills/evolve-loop/benchmark-eval.md))
+- Domain-specific benchmark dimensions: Prose Clarity, Structural Coherence (writing), Claim Accuracy, Source Coverage (research) ([benchmark-eval.md](skills/evolve-loop/benchmark-eval.md))
 - Writing domain walkthrough in showcase.md demonstrating the full non-code pipeline
 - Research domain walkthrough in showcase.md demonstrating groundedness eval and file-copy isolation
 
