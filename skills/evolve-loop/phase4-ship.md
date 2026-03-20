@@ -75,7 +75,37 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
    ```
    The cycle is not complete until code is pushed.
 
-4. **Publish plugin update:**
+4. **Auto-bump plugin version:**
+   After pushing, bump the patch version in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to reflect shipped changes:
+   ```bash
+   # Read current version and increment patch
+   CURRENT_VER=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+   MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
+   MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
+   PATCH=$(echo "$CURRENT_VER" | cut -d. -f3)
+   NEW_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
+
+   # Update both files
+   python3 -c "
+   import json
+   for f in ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']:
+       with open(f) as fh: d = json.load(fh)
+       if 'version' in d: d['version'] = '$NEW_VER'
+       if 'plugins' in d: d['plugins'][0]['version'] = '$NEW_VER'
+       with open(f, 'w') as fh: json.dump(d, fh, indent=2)
+   "
+
+   git add .claude-plugin/plugin.json .claude-plugin/marketplace.json
+   git commit -m "chore: bump version to v${NEW_VER}"
+   git push origin <branch>
+   ```
+
+   **Version bump rules:**
+   - Each cycle bumps the **patch** version (e.g., 7.2.0 → 7.2.1)
+   - **Minor** bumps (e.g., 7.2.x → 7.3.0) are reserved for meta-cycle milestones (every 5 cycles) or manual override
+   - **Major** bumps are manual only
+
+5. **Publish plugin update:**
    ```bash
    ./publish.sh
    ```
