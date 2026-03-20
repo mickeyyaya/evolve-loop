@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.3.0] - 2026-03-20
+
+### Added
+- **Per-cycle enhanced summary** — each cycle now outputs a rich summary with benchmark delta, audit iterations, graduated instincts, operator warnings, and next focus
+- **Final session report** — comprehensive markdown report generated after all cycles complete, covering task table, benchmark trajectory, learning stats, and recommendations
+- **Auto version bump** — SHIP phase automatically increments patch version in plugin.json/marketplace.json after each cycle push
+- **Operator brief spec doc** — new `docs/operator-brief.md` documenting the `next-cycle-brief.json` schema and cross-cycle communication protocol
+- **Run isolation doc** — new `docs/run-isolation.md` documenting the `RUN_ID`/`WORKSPACE_PATH` parallel invocation safety model
+- **Experiment journal doc** — new `docs/experiment-journal.md` documenting `experiments.jsonl` anti-repeat memory protocol
+- **Scout discovery guide extraction** — modular discovery guide extracted from monolithic scout agent for better maintainability
+- **Security self-check** — Builder agent now performs security self-verification before completing builds
+- **Stepwise scoring enforcement** — mandatory stepwise confidence scoring wired into the evaluation protocol
+- **isLastCycle flag** — passed to Operator context for reliable session-summary.md generation on final cycle
+- **Instinct graduation section** — `docs/instincts.md` now documents the graduation lifecycle
+- **Parallel safety doc** — new `docs/parallel-safety.md` consolidating OCC, ship-lock, and run isolation
+
+### Fixed
+- **Schema hygiene** — missing fitness fields added to state.json schema example
+- **Method attribution** — validation protocol added for research source attribution
+
+### Changed
+- **Benchmark score: ~91** — 12+ tasks shipped across cycles 20-23
+- **Version: 7.2.0 → 7.3.0** — auto-bump now prevents version drift
+
 ## [7.2.0] - 2026-03-20
 
 ### Added

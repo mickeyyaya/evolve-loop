@@ -200,6 +200,7 @@ See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface
 - [Operator Brief](operator-brief.md) — schema and usage of `next-cycle-brief.json`, the cross-cycle communication channel from Operator to Scout
 - [Run Isolation](run-isolation.md) — the `RUN_ID`/`WORKSPACE_PATH` model for parallel invocation safety
 - [Experiment Journal](experiment-journal.md) — `experiments.jsonl` schema and anti-repeat memory protocol
+- [Parallel Safety](parallel-safety.md) — OCC, ship-lock, and run isolation coordination for concurrent invocations
 
 ## Context Management
 

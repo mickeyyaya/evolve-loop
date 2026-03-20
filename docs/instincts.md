@@ -91,6 +91,39 @@ After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scop
 3. Keep the original in the project's instincts directory (source of truth)
 4. The global copy is read by all projects' evolve-loop instances
 
+## Graduation
+
+High-confidence instincts that have been repeatedly confirmed graduate to **mandatory guidance** status. Graduated instincts are applied automatically by the Builder without the usual "should I apply this?" evaluation.
+
+### Graduation Threshold
+
+An instinct graduates when **all three conditions** are met:
+
+| Condition | Requirement |
+|-----------|-------------|
+| Confidence | >= 0.75 |
+| Cross-cycle confirmation | Cited in `instinctsApplied` by Scout or Builder in 3+ distinct cycles |
+| No contradictions | Not contradicted by any entry in `state.json failedApproaches` |
+
+### Operational Effects
+
+- The instinct's `graduated: true` flag is set in `instinctSummary`
+- Builder treats graduated instincts as **mandatory** — applies them directly without deliberation
+- Scout lists graduated instincts first in context, giving them attention priority
+- Each subsequent citation boosts confidence by +0.1 (capped at 1.0)
+- Graduated instincts are candidates for global promotion to `~/.evolve/instincts/personal/`
+
+### Reversal
+
+Graduation can be reverted when evidence contradicts the instinct:
+
+- **Trigger:** 2+ consecutive build failures where the graduated instinct was applied
+- **Action:** Set `graduated: false`, reduce confidence by 0.2
+- **Escalation:** If confidence drops below 0.5 after reversal, the instinct is archived with `archivedReason: "reversal"`
+- **Logging:** Reversal is recorded in the ledger as `type: "instinct-reversal"`
+
+See [phase5-learn.md](../skills/evolve-loop/phase5-learn.md) § Instinct Graduation for the full specification.
+
 ## Memory Consolidation
 
 Every 3 cycles (or when instinct count exceeds 20), the orchestrator consolidates memory:
