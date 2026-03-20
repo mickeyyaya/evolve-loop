@@ -336,7 +336,7 @@ To customize model mappings (e.g., use DeepSeek for tier-3 to cut costs):
 }
 ```
 
-When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](docs/configuration.md) for full schema.
+When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](docs/configuration.md) for full schema and [models-quickstart.md](docs/models-quickstart.md) for practical examples.
 
 ## Dynamic Model Routing
 

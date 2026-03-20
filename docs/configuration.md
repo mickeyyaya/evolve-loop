@@ -256,6 +256,8 @@ Process rewards feed into meta-cycle reviews (every 5 cycles) to identify which 
 
 The evolve-loop uses a 3-tier model abstraction so it works across any LLM provider. The orchestrator resolves tiers to concrete models based on the active provider.
 
+See [models-quickstart.md](models-quickstart.md) for practical configuration examples (cost optimization, provider switching, thinking mode control).
+
 ### Default Provider Detection
 
 The orchestrator auto-detects the provider from the host CLI:
