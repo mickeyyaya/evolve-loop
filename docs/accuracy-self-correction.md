@@ -143,3 +143,5 @@ For token optimization techniques that complement accuracy work (e.g., how conte
 For pipeline security mechanisms that protect accuracy (eval tamper detection, state integrity, prompt injection defense), see `docs/security-considerations.md`.
 
 For per-step evidence decomposition that improves self-evaluation calibration (+15% AUC-ROC), see `docs/self-learning.md` § Stepwise Confidence Scoring.
+
+For confidence-correctness alignment that detects when the LLM-as-a-Judge's stated confidence drifts from actual correctness rates and triggers automatic recalibration, see `docs/self-learning.md` § Confidence-Correctness Alignment.

@@ -120,6 +120,28 @@ Where `fitnessScore` is the mean of the four LLM-as-a-Judge dimension scores for
 
 CSI values are recorded in `workspace/build-report.md` alongside the self-evaluation scores and are available to the Scout for task selection in subsequent cycles.
 
+### i. Confidence-Correctness Alignment (Phase 5 LEARN)
+
+The LLM-as-a-Judge self-evaluation assigns confidence via stepwise scoring, but stated confidence can drift from actual correctness over time. Confidence-correctness alignment detects and corrects this miscalibration.
+
+**Concept:** Track the relationship between the Judge's stated confidence (dimension scores) and the actual correctness rate (determined by downstream eval pass/fail outcomes). When these diverge, the Judge is either overconfident or underconfident — both degrade learning signal quality. Reference: "Know When You're Wrong" (arxiv 2603.06604).
+
+**Calibration error formula:**
+
+```
+calibration_error = |mean_confidence - actual_accuracy|   (rolling window, k=5 cycles)
+```
+
+Where `mean_confidence` is the average self-evaluation score across dimensions and `actual_accuracy` is the fraction of eval graders that passed in the same window.
+
+**Recalibration trigger:** When `calibration_error > 0.15`, the Operator forces recalibration for the next cycle:
+
+1. **Force stepwise scoring** — Require per-evidence mini-scores (see § Stepwise Confidence Scoring) even if the dimension would otherwise score above 0.7.
+2. **Increase evidence requirements** — Raise the minimum evidence items per dimension from 2 to 3.
+3. **Log the miscalibration** — Record `calibrationError` and `recalibrationTriggered: true` in `workspace/build-report.md` so the Scout and future cycles can observe the correction.
+
+Recalibration auto-disables when `calibration_error` drops below 0.10 for two consecutive cycles. This mechanism maps directly to the self-evaluation protocol in Phase 5 LEARN and complements CSI by addressing score quality rather than score trajectory.
+
 ---
 
 ## Instinct Lifecycle
