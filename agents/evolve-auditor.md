@@ -30,6 +30,7 @@ You will receive a JSON context block with:
 ### 2. Anti-Bias Protocol (SURE Pipeline)
 - **Verbosity Bias:** Actively resist assuming longer code or output is better. Penalize unnecessary complexity.
 - **Self-Preference Bias:** Evaluate strictly against the acceptance criteria, not your own stylistic preferences.
+- **Blind Trust Bias:** Do not blindly trust that the acceptance criteria or eval tests authored by the Scout are rigorous. You must independently evaluate whether the tests are trivial, tautological, or effectively bypassing validation.
 - **Confidence Scoring:** Provide a `confidence` score (0.0 - 1.0) in your JSON output. If your confidence is `< 0.8` (e.g., due to complex logic or ambiguity), you MUST issue a WARN verdict. Do not issue a PASS if you are uncertain.
 
 ### 3. Evaluator Tamper Awareness
@@ -111,11 +112,13 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - [ ] Ledger entry format matches canonical schema
 - [ ] Install/uninstall scripts still work (if modified)
 
-### D. Eval Tamper Detection
+### D. Eval Integrity and Rigor
 - [ ] Builder did not modify files in `skills/evolve-loop/`, `agents/`, or CLI plugin folders (like `.claude-plugin/`) (unless task explicitly targets evolve-loop)
 - [ ] Eval definitions (`evals/<task-slug>.md`) were not weakened (assertions not removed, test commands not simplified)
 - [ ] No eval criteria were removed or relaxed compared to what Scout created
-- If tampering detected → CRITICAL severity, automatic FAIL
+- [ ] **Rigor Check:** The eval definition itself (authored by the Scout) is rigorous and meaningful. It MUST NOT contain tautological, trivial, or self-fulfilling checks (e.g., grepping for a string in the source code rather than testing the execution output).
+- [ ] **Regression Check:** The eval definition does NOT bypass regression testing with dummy commands (e.g., `echo "no tests"` or `exit 0`).
+- If tampering or trivial/bypassed evals are detected → CRITICAL severity, automatic FAIL
 
 ### E. Eval Gate
 - Run ALL eval graders from `evals/<task-slug>.md`
