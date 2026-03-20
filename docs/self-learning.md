@@ -235,4 +235,30 @@ Aggressive clustering can merge genuinely distinct patterns into a single abstra
 
 **Mitigation:** Consolidation requires >85% semantic similarity (not just surface similarity). Archived originals are never deleted — they can be recovered if the merged form proves too broad. Entropy gating applies to new instincts, not to consolidation merges.
 
+---
+
+## Method Attribution and Validation
+
+Each research method adopted into the self-learning architecture is tracked against the benchmark dimension it targets and the observed score delta at the cycle of adoption. This table serves as the provenance record for all externally sourced methods.
+
+| Method | Source | Cycle | Target Dimension | Delta |
+|--------|--------|-------|-----------------|-------|
+| Stepwise Confidence | arxiv 2511.07364 | 16 | evalInfrastructure | +0 (spec only) |
+| EvolveR Experience Scoring | arxiv 2510.16079 | 16 | schemaHygiene | +2 |
+| MUSE Memory Categories | MUSE framework | 17 | featureCoverage | +2 |
+| CSI Metric | Karpathy/GVU | 17 | featureCoverage | +2 |
+| Confidence-Correctness | arxiv 2603.06604 | 18 | featureCoverage | +2 |
+| Self-Evolving Taxonomy | arxiv 2507.21046 | 19 | featureCoverage | +2 |
+
+### Validation Protocol
+
+During each meta-cycle review (every 5 cycles), the Operator compares pre-adoption and post-adoption benchmark scores for each method's target dimension. The comparison uses the composite score from the cycle immediately before adoption as the baseline and the latest composite score as the current value.
+
+### Selection Criterion
+
+- **VALIDATED** — Methods whose target dimension shows a composite improvement of ≥+2 from the adoption baseline are marked as validated. These methods are permanent additions to the self-learning architecture.
+- **PROVISIONAL** — Methods that have not yet demonstrated ≥+2 improvement (e.g., spec-only adoptions with +0 delta) remain provisional. Provisional methods are re-evaluated at each subsequent meta-cycle and may be deprecated if they show no improvement after 10 cycles.
+
+Current status: EvolveR Experience Scoring, MUSE Memory Categories, CSI Metric, Confidence-Correctness, and Self-Evolving Taxonomy are VALIDATED. Stepwise Confidence is PROVISIONAL (adopted as specification only, pending empirical delta measurement).
+
 For techniques that complement self-learning by improving the accuracy of outputs being evaluated (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
