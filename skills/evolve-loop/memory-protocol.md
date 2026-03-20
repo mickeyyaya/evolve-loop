@@ -224,7 +224,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     "build": 0.0,
     "audit": 0.0,
     "ship": 0.0,
-    "learn": 0.0
+    "learn": 0.0,
+    "skillEfficiency": 0.0
   },
   "ledgerSummary": {
     "totalEntries": 0,
