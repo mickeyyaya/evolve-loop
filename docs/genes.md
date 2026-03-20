@@ -87,3 +87,5 @@ For an annotated example, see [examples/gene-example.yaml](../examples/gene-exam
 | Trigger | Read at start of cycle | Triggered by error pattern match |
 | Format | Description + confidence | Selector + steps + validation |
 | Evolution | Confidence scoring | Success/fail counting |
+
+See [memory-hierarchy.md](memory-hierarchy.md) for how genes fit into the broader memory architecture (Layer 6).

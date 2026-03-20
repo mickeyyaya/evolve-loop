@@ -70,3 +70,5 @@ After 5 cycles, compare island performance using delta metrics:
 - Requires more disk space for parallel state
 - Migration conflicts possible (contradictory instincts)
 - Best suited for projects with 20+ cycles of history
+
+See [self-learning.md](self-learning.md) § Meta-Cycle Review for the single-configuration self-improvement mechanisms that islands build upon.

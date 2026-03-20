@@ -201,6 +201,9 @@ See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface
 - [Run Isolation](run-isolation.md) — the `RUN_ID`/`WORKSPACE_PATH` model for parallel invocation safety
 - [Experiment Journal](experiment-journal.md) — `experiments.jsonl` schema and anti-repeat memory protocol
 - [Parallel Safety](parallel-safety.md) — OCC, ship-lock, and run isolation coordination for concurrent invocations
+- [Genes/Capsules](genes.md) — structured fix templates with selectors, validators, and reuse protocol
+- [Meta-Cycle Review](meta-cycle.md) — every-5-cycles self-evaluation with split-role critique and prompt evolution
+- [Island Model](island-model.md) — parallel configuration evolution with trait migration
 
 ## Context Management
 

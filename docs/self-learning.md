@@ -92,7 +92,9 @@ When `cycle % 5 === 0`, the orchestrator runs a split-role critique during Phase
 | Correctness Critic | Eval pass rates, audit verdicts, regression trends |
 | Novelty Critic | Instinct diversity, task variety, stagnation |
 
-The synthesis prioritizes correctness > efficiency > novelty. Output includes agent effectiveness scores, mutation test results (eval kill rate target: >80%), and up to 2 automated prompt edits via a TextGrad-style critique-synthesize loop. Prompt edits auto-revert if the next meta-cycle shows degradation.
+The synthesis prioritizes correctness > efficiency > novelty. Output includes agent effectiveness scores, mutation test results (eval kill rate target: >80%), and up to 2 automated prompt edits via a TextGrad-style critique-synthesize loop. Prompt edits auto-revert if the next meta-cycle shows degradation. See [meta-cycle.md](meta-cycle.md) for the full review protocol.
+
+For advanced multi-configuration evolution with trait migration across parallel islands, see [island-model.md](island-model.md).
 
 ### h. Coefficient of Self-Improvement (CSI)
 

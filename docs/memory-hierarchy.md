@@ -96,7 +96,7 @@ Immutable snapshots of the workspace directory taken at the end of each complete
 |------|-----------|--------|---------|
 | **Episodic** | What happened in a specific cycle | Build/audit reports | "Task A failed due to absolute path mismatch in cycle 12" |
 | **Semantic** | How the system works | Instinct extraction | "KV-cache hits require a stable prefix in Layer 0" |
-| **Procedural** | How to perform a task | Gene capsules, instincts | "When adding a doc: write eval graders first, then content" |
+| **Procedural** | How to perform a task | Gene capsules ([genes.md](genes.md)), instincts | "When adding a doc: write eval graders first, then content" |
 
 ---
 
