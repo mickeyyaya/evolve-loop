@@ -142,6 +142,26 @@ Where `mean_confidence` is the average self-evaluation score across dimensions a
 
 Recalibration auto-disables when `calibration_error` drops below 0.10 for two consecutive cycles. This mechanism maps directly to the self-evaluation protocol in Phase 5 LEARN and complements CSI by addressing score quality rather than score trajectory.
 
+### j. Self-Evolving Agent Taxonomy
+
+Reference: "Survey of Self-Evolving Agents" (arxiv 2507.21046). This survey formalizes a four-stage evolution lifecycle that applies to any agent system capable of autonomous improvement.
+
+**Four-stage evolution lifecycle:**
+
+| Stage | Description | Evolve-Loop Phase |
+|-------|-------------|-------------------|
+| Perceive | Observe environment, collect feedback signals | Scout (scans codebase, reads instincts, gathers evals) |
+| Learn | Extract patterns and update internal knowledge | Builder (extracts plan from Scout brief, applies instincts) |
+| Self-Modify | Apply learned patterns to change own behavior | Builder (implements changes, mutates prompts via meta-cycle) |
+| Verify | Validate modifications against quality criteria | Auditor (eval graders, LLM-as-a-Judge, audit verdicts) |
+
+**Taxonomy dimensions — what evolves and how:**
+
+- **What evolves:** Parameters (model weights), prompts (system instructions, templates), architecture (tool selection, agent topology). The evolve-loop operates at the *prompt level* — instincts, plan templates, and meta-cycle prompt edits are the primary mutation targets.
+- **How it evolves:** Self-play (agent critiques own output), environment feedback (eval graders, build pass/fail), reflection (Phase 5 self-evaluation, CSI tracking). The evolve-loop uses *reflection-based feedback* as its primary learning signal, augmented by environment feedback from deterministic eval graders.
+
+**Position in the taxonomy:** The evolve-loop is a prompt-level self-evolving system with reflection-based feedback. It does not modify model weights or agent architecture at runtime. Evolution is bounded by the meta-cycle review (every 5 cycles) which applies up to 2 prompt edits per pass, with automatic rollback on regression — placing it in the "constrained self-modification" category of the taxonomy.
+
 ---
 
 ## Instinct Lifecycle
