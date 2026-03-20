@@ -1,7 +1,7 @@
 - id: inst-012
-  pattern: "macOS-grep-compatibility"
-  description: "Use -oE (not -oP) for grep patterns in eval graders. -oP uses Perl regex which is unavailable on macOS BSD grep. Use two-step pipe with sed for complex extractions."
-  confidence: 0.6
-  source: "cycle-18/fix-link-checker-grader-regex"
+  pattern: "commit-inline-before-worktree"
+  description: "When mixing inline task execution (orchestrator implements directly) with worktree-isolated builder tasks in the same cycle, always commit inline changes BEFORE cherry-picking worktree commits. Otherwise cherry-pick conflicts are guaranteed on shared files."
+  confidence: 0.5
+  source: "cycle-25/fix-tier-system-relative-paths"
   type: "anti-pattern"
   category: "procedural"

@@ -207,7 +207,10 @@ Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-d
   }
   ```
 
+**IMPORTANT:** The Scout MUST write all output files (scout-report.md, cycle summaries) to `$WORKSPACE_PATH`, NOT to `.evolve/workspace/`. The `workspacePath` is passed in the context block above. If the Scout writes to the wrong location, copy the files to `$WORKSPACE_PATH` before proceeding.
+
 After Scout completes:
+- Verify `$WORKSPACE_PATH/scout-report.md` exists. If not, check `.evolve/workspace/scout-report.md` and copy it to `$WORKSPACE_PATH`.
 - Read `$WORKSPACE_PATH/scout-report.md`
 
 - **Task Claiming (parallel deduplication):**
@@ -247,7 +250,13 @@ After Scout completes:
 
 ### Phase 2: BUILD (loop per task)
 
-For each task in the Scout's selected task list:
+**Task Execution Ordering:** Before starting the build loop, partition the task list into two groups:
+1. **Inline tasks** — S-complexity tasks eligible for orchestrator inline execution (per inst-007 policy)
+2. **Worktree tasks** — all other tasks requiring Builder agent in isolated worktree
+
+**Execute all inline tasks first, committing each before proceeding.** Then execute all worktree tasks. This prevents cherry-pick merge conflicts that occur when inline changes modify files that worktree builders also touch (the worktree forked from a pre-inline commit).
+
+For each task in the (reordered) task list:
 
 #### Build Isolation (by `projectContext.buildIsolation`)
 
@@ -353,6 +362,8 @@ After Builder completes:
 ### Phase 3: AUDIT
 
 The Auditor reviews the Builder's changes **in the worktree** (or reads the diff from the build report). The worktree remains intact during audit.
+
+**Inline task audit:** For tasks implemented inline by the orchestrator (per inst-007 S-complexity policy), the orchestrator MUST still run eval graders before committing. At minimum, execute all bash eval graders from the task's eval definition and verify exit 0. If any grader fails, revert the inline changes (`git checkout -- <files>`) and either retry inline or escalate to a Builder agent. Do NOT skip the audit phase for inline tasks — the audit is the quality gate, not the builder.
 
 **Eval checksum verification** (before launching Auditor):
 Verify that eval files haven't been tampered with since Scout created them:

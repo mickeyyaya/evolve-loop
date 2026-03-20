@@ -189,11 +189,13 @@ Scout → [Task A, Task B, Task C]
 You are the orchestrator. For each cycle:
 1. **Claim cycle number** atomically via OCC protocol (see phases.md)
 2. Launch Scout → collect task list → **claim tasks** via OCC to prevent duplicates across parallel runs
-3. For each task: Launch Builder (**MUST use `isolation: "worktree"`**) → Launch Auditor
-4. If Auditor PASS → commit. If WARN/FAIL → re-run Builder with issues (max 3 attempts, each in a fresh worktree)
-5. **Ship: commit and push** — acquire `.evolve/.ship-lock` before pushing (serial SHIP phase)
-6. Learn: archive, extract instincts, operator check
-7. Decrement `remainingCycles`; if 0 → run cleanup and exit
+3. **Partition tasks:** inline-eligible (S-complexity, per inst-007) first, then worktree tasks. Execute inline tasks first, committing each before worktree tasks start (prevents cherry-pick conflicts).
+4. For inline tasks: implement directly → run eval graders → commit if PASS
+5. For worktree tasks: Launch Builder (**MUST use `isolation: "worktree"`**) → Launch Auditor → cherry-pick if PASS
+6. If Auditor WARN/FAIL → re-run Builder with issues (max 3 attempts, each in a fresh worktree)
+7. **Ship: push** — acquire `.evolve/.ship-lock` before pushing (serial SHIP phase)
+8. Learn: archive, extract instincts, operator check
+9. Decrement `remainingCycles`; if 0 → run cleanup and exit
 
 **Run Cleanup** (after all cycles complete):
 ```bash
