@@ -9,21 +9,22 @@ All files live under `.evolve/` in the **project directory** (not your CLI's glo
 
 ## Layer 0: Shared Values (Core Rules)
 
-Static team constitution. All agents must follow these rules at all times. Place this section **first** in every agent context block for KV-cache optimization — it never changes between cycles, maximizing cache hit rate.
+Static team constitution. Place this section **first** in every agent context block for KV-cache optimization — it never changes between cycles, maximizing cache hit rate.
 
-### Behavioral Rules
+**Canonical source:** The full `sharedValues` JSON block (antiBiasProtocols, requiredProtocols, qualityThresholds, integrityRules) is defined in [SKILL.md § Shared Agent Values](SKILL.md). That is the single source of truth — do NOT duplicate the JSON here.
+
+### Behavioral Rules (supplementary to sharedValues)
 
 - **Immutability** — never mutate shared state directly; always write new versions (new files, new JSON objects, new lines)
 - **Scope discipline** — each agent reads/writes only its owned workspace file; do not modify files owned by other agents
-- **Blast radius awareness** — prefer S-complexity changes for hotspot files (phases.md, memory-protocol.md, SKILL.md); any edit to a hotspot must touch fewer than 30 lines
+- **Blast radius awareness** — prefer S-complexity changes for hotspot files; any edit to a hotspot must touch fewer than 30 lines
 - **Learning mandate** — when `instinctsExtracted == 0` for 2+ consecutive cycles, the orchestrator must extract at least one instinct before closing Phase 5
 
 ### Parallel Agent Coordination
 
-When concurrent agents share the same workspace, shared values act as the coordination layer:
 - Agents must not write to each other's owned files
 - The mailbox (`agent-mailbox.md`) is the only shared write surface for cross-agent messages
-- All agents always read shared values first to align on core rules before acting
+- All agents read shared values first to align on core rules before acting
 
 ## Concurrency Protocol
 
@@ -219,14 +220,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     "level": "novice|competent|proficient",
     "consecutiveSuccesses": 0
   },
-  "processRewards": {
-    "discover": 0.0,
-    "build": 0.0,
-    "audit": 0.0,
-    "ship": 0.0,
-    "learn": 0.0,
-    "skillEfficiency": 0.0
-  },
+  "processRewardsHistory": [],
   "ledgerSummary": {
     "totalEntries": 0,
     "cycleRange": [0, 0],
@@ -276,7 +270,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - `warnAfterCycles` (default 5): soft threshold — orchestrator warns user when requesting this many cycles in a single invocation
 - `mastery.level`: difficulty graduation — `novice` (0-2 successes, S only), `competent` (3-5, S+M), `proficient` (6+, S+M+L). Updated in Phase 4 after each successful ship
 - `mastery.consecutiveSuccesses`: reset to 0 on any audit failure, incremented on each successful ship
-- `processRewards`: latest cycle's per-phase scores (0.0-1.0) for quick access. Updated in Phase 4
+- `processRewardsHistory`: rolling array of per-cycle process rewards for trend detection (see below for schema)
 - `taskArms`: multi-armed bandit state for task type selection. Tracks per-type reward history so the Scout can bias selection toward historically successful task types. Schema:
   ```json
   "taskArms": {
@@ -313,7 +307,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 - `fileExplorationMap`: rolling map of `{filePath: lastTouchedCycle}` tracking which files were modified each cycle. Updated in Phase 4 after each successful ship. Entries older than 10 cycles are pruned. Used by Scout to compute novelty scores — files with `lastTouchedCycle <= currentCycle - 3` are considered under-explored.
 - `ledgerSummary`: aggregated stats from ledger.jsonl so agents never need to read the full ledger. Updated in Phase 4. Contains `totalEntries`, `cycleRange`, `scoutRuns`, `builderRuns`, `totalTasksShipped`, `totalTasksFailed`, `avgTasksPerCycle`
 - `instinctSummary`: compact array of all active instincts with `id`, `pattern`, `confidence`, `type`, and optional `graduated` flag. Updated in Phase 5 after instinct extraction. Agents read this instead of all instinct YAML files
-- `fitnessScore`: composite score (0.0-1.0) computed as weighted average of processRewards: `0.25*discover + 0.30*build + 0.20*audit + 0.15*ship + 0.10*learn`. Updated in Phase 4. A single "did the project get better?" signal inspired by autoresearch's monotonic fitness gate
+- `fitnessScore`: composite score (0.0-1.0) computed as weighted average of processRewardsHistory dimensions: `0.25*discover + 0.30*build + 0.20*audit + 0.15*ship + 0.10*learn`. Updated in Phase 4. A single "did the project get better?" signal inspired by autoresearch's monotonic fitness gate
 - `fitnessHistory`: rolling array of last 3 fitnessScores for trend detection. Schema: `[{"cycle": N, "score": 0.85}, ...]`
 - `fitnessRegression`: boolean flag set to `true` when fitnessScore decreases for 2 consecutive cycles. Operator reads this as a HALT-worthy signal
 - `evalHistory` is trimmed to the last 5 entries in state.json — older data is captured by `ledgerSummary`

@@ -143,7 +143,7 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
    - Reset `stagnation.nothingToDoCount` to 0
    - Update `lastUpdated`
    - Increment `version`
-   - **Compute `fitnessScore`** — weighted average of processRewards dimensions as a single "did the project get better?" signal:
+   - **Compute `fitnessScore`** — weighted average of latest processRewardsHistory entry as a single "did the project get better?" signal:
      ```json
      "fitnessScore": round(0.25 * discover + 0.30 * build + 0.20 * audit + 0.15 * ship + 0.10 * learn, 2)
      ```
@@ -165,17 +165,16 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
      }
      ```
    - **Trim `evalHistory`** in state.json to keep only the last 5 entries (older data is captured by `ledgerSummary`)
-   - Record **process rewards** for each phase this cycle (step-level scoring):
+   - **Append to `processRewardsHistory`** (rolling array, keep last 3 entries):
      ```json
      {
-       "processRewards": {
-         "discovery": <0.0-1.0>,
-         "build": <0.0-1.0>,
-         "audit": <0.0-1.0>,
-         "ship": <0.0-1.0>,
-         "learn": <0.0-1.0>,
-         "skillEfficiency": <0.0-1.0>
-       }
+       "cycle": <N>,
+       "discover": <0.0-1.0>,
+       "build": <0.0-1.0>,
+       "audit": <0.0-1.0>,
+       "ship": <0.0-1.0>,
+       "learn": <0.0-1.0>,
+       "skillEfficiency": <0.0-1.0>
      }
      ```
      **Scoring rubric** — compute each dimension deterministically:
