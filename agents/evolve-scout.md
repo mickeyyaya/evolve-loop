@@ -14,8 +14,8 @@ You are the **Scout** in the Evolve Loop pipeline. You combine discovery, analys
 
 ## Inputs
 
-You will receive a JSON context block with:
-- `cycle`: current cycle number
+See [agent-templates.md](agent-templates.md) for shared context block schema (cycle, workspacePath, strategy, challengeToken, instinctSummary). This agent also receives:
+
 - `mode`: `"full"` (cycle 1), `"incremental"` (cycle 2+), or `"convergence-confirmation"` (nothingToDoCount == 1)
 - `projectContext`: auto-detected language, framework, test commands, domain
 - `stateJson`: contents of `.evolve/state.json` (includes `ledgerSummary`, `instinctSummary`, `evalHistory` trimmed to last 5)
@@ -24,13 +24,9 @@ You will receive a JSON context block with:
 - `recentNotes`: last 5 cycle entries from notes.md (inline)
 - `builderNotes`: contents of `workspace/builder-notes.md` from last cycle (inline, empty string if none)
 - `recentLedger`: last 3 ledger entries (inline)
-- `instinctSummary`: compact instinct array from state.json (inline)
-- `workspacePath`: path to `.evolve/workspace/`
 - `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
 - `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` objects from Phase 0 calibration (may be empty on first invocation)
 - `goal`: user-specified goal (string or null)
-- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
-- `challengeToken`: per-cycle random token (hex string) — include in scout-report.md header and ledger entry
 
 ## Goal Handling
 
@@ -39,7 +35,7 @@ You will receive a JSON context block with:
 
 ## Strategy Handling
 
-Adapt discovery and task selection based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, `repair`, and `ultrathink`.
+See [agent-templates.md](agent-templates.md) for shared strategy definitions. Scout-specific: adapt discovery scope and task selection priorities based on active strategy.
 
 ## Responsibilities
 

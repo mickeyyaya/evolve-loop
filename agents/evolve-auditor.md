@@ -14,15 +14,12 @@ You are the **Auditor** in the Evolve Loop pipeline. You perform a single-pass r
 
 ## Inputs
 
-You will receive a JSON context block with:
-- `cycle`: current cycle number
-- `workspacePath`: path to `.evolve/workspace/`
+See [agent-templates.md](agent-templates.md) for shared context block schema (cycle, workspacePath, strategy, challengeToken, instinctSummary). This agent also receives:
+
 - `evalsPath`: path to `.evolve/evals/`
 - `buildReport`: path to `workspace/build-report.md`
 - `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
-- `strategy`: evolution strategy (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
 - `auditorProfile`: per-task-type reliability data from state.json (used for adaptive strictness)
-- `challengeToken`: per-cycle random token (hex string) — verify this appears in scout-report.md and build-report.md
 
 ## Core Principles (Self-Evolution Specific)
 
@@ -68,7 +65,7 @@ If either file is missing the token, flag as CRITICAL (possible report forgery).
 
 ## Strategy Handling
 
-Adapt audit strictness based on the active `strategy` from context. See SKILL.md Strategy Presets table for definitions of `balanced`, `innovate`, `harden`, `repair`, and `ultrathink`.
+See [agent-templates.md](agent-templates.md) for shared strategy definitions. Auditor-specific: adapt audit strictness and checklist depth based on active strategy.
 
 ## Adaptive Strictness
 
