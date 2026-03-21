@@ -256,6 +256,43 @@ This handoff serves as a **compaction anchor** — when the host LLM auto-compac
 
 Each agent receives only the tools it needs. Scout gets Read/Grep/Glob/Bash/WebSearch/WebFetch (discovery tools). Builder gets Read/Write/Edit/Bash/Grep/Glob (implementation tools). Auditor gets Read/Grep/Glob/Bash (review tools). Operator gets Read/Grep/Glob (assessment tools). No agent receives tools it doesn't use — this reduces tool-description overhead in the prompt and prevents misuse.
 
+### Lazy Tool Loading
+
+<!-- challenge-token: d955dc5079de65ae -->
+
+Tool schemas are injected on-demand per phase rather than loaded upfront for all agents. Each tool definition consumes tokens in the system prompt; loading unused tools in every agent context is a direct token tax with no benefit.
+
+**Phase-to-tool mapping (enforce at injection time):**
+
+| Phase | Tools Injected |
+|-------|---------------|
+| Scout (DISCOVER) | Read, Grep, Glob, Bash, WebSearch, WebFetch |
+| Builder (BUILD) | Read, Write, Edit, Bash, Grep, Glob |
+| Auditor (AUDIT) | Read, Grep, Glob, Bash |
+| Operator (LEARN) | Read, Grep, Glob |
+
+Loading Builder tools (Write, Edit) in the Scout context wastes tokens on definitions the Scout will never invoke. At scale — with 10+ tool definitions each carrying 200-500 token schemas — this overhead reaches 2-5K tokens per agent call. Lazy loading eliminates it entirely by deferring injection to the phase that actually needs each tool.
+
+Source: OPENDEV multi-agent architecture patterns (arXiv:2603.05344).
+
+### System Reminders for Instruction Fade-Out
+
+In long sessions (7+ cycles), critical instructions drift out of effective attention as conversation history grows and earlier context is summarized or compacted. This instruction fade-out effect means rules injected only in the initial system prompt — such as "always use worktree isolation" or "never modify main directly" — lose their influence on agent behavior by cycle 8-10.
+
+**Mitigation: periodic re-injection of critical rules.** At the start of each agent invocation after cycle 6, the orchestrator prepends a compact "system reminder" block containing the highest-stakes invariants:
+
+```
+[System Reminder — Cycle {N}]
+- Worktree isolation: always verify before any file write
+- Challenge token: include verbatim in first file changed
+- Eval graders: run all before declaring PASS
+- Commit in worktree branch, not main
+```
+
+The reminder block is small (under 200 tokens) and placed immediately before the task object so it sits in the high-attention prefix zone. Re-injecting at each phase boundary ensures the instructions remain salient regardless of how much history has accumulated.
+
+Source: OPENDEV multi-agent architecture patterns (arXiv:2603.05344).
+
 ---
 
 ## Agentic Plan Caching (APC) — Research Baseline
