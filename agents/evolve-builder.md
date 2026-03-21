@@ -167,6 +167,28 @@ If you encounter a task that cannot be solved with existing tools, instincts, or
 
 Report synthesized tools in the build report so the Auditor can verify them.
 
+### Quality Signal Reporting
+
+After self-verification and before committing, the Builder MUST record the following quality signals in `build-report.md`. These signals feed the orchestrator's model routing decisions — specifically, whether to escalate future builds of this task type to a tier-1 model.
+
+**Required fields in build-report.md:**
+
+```markdown
+## Quality Signals
+- **Self-assessed confidence:** <0.0-1.0> — how confident are you in the correctness of this implementation? (1.0 = certain, 0.0 = guessing)
+- **Eval first-attempt result:** PASS / FAIL — did all eval graders pass on the very first run, before any fixes?
+- **Quality concerns:** <list any signals that warrant tier-1 escalation for this task type, or "none">
+```
+
+**Escalation signals to report** (any of these should be called out under "Quality concerns"):
+- Eval graders failed on first attempt (first-attempt FAIL triggers tier-1 upgrade — see `docs/token-optimization.md` Quality Guardrails)
+- Self-assessed confidence below 0.7
+- Task touched security-sensitive files or agent/skill definition files
+- Implementation required more than 2 retry attempts
+- `consecutiveClean` gate context: this data feeds the orchestrator's decision to allow or block tier-3 downgrading for this task type
+
+The orchestrator reads these signals after each cycle to update `auditorProfile.consecutiveClean` and model routing thresholds. Accurate self-reporting directly improves routing efficiency — under-reporting confidence causes unnecessary tier-1 escalations; over-reporting blocks warranted escalations.
+
 ### Step 8: Mailbox
 - Read `workspace/agent-mailbox.md` for messages addressed `to: "builder"` or `to: "all"` from this cycle. Apply any relevant hints or flags before finalizing your implementation.
 - After completing the build, post any coordination messages for other agents (e.g., flag a fragile file for the Auditor, hint a follow-up task for the Scout) by appending rows to the mailbox table.
