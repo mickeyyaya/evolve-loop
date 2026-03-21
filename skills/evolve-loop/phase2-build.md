@@ -1,0 +1,297 @@
+# Evolve Loop — Phase 2: BUILD
+
+Detailed orchestrator instructions for the BUILD phase. Each task from the Scout report is built in isolation, with parallel execution for independent tasks and sequential execution for dependent ones.
+
+---
+
+## Task Execution Ordering & Parallelization
+
+Before starting the build loop, partition the task list into three groups:
+1. **Inline tasks** — S-complexity tasks eligible for orchestrator inline execution (per inst-007 policy)
+2. **Worktree tasks (independent)** — tasks whose `filesToModify` lists share NO files with other worktree tasks
+3. **Worktree tasks (dependent)** — tasks that share files with another task; these run sequentially after their dependency completes
+
+### Dependency Partitioning Algorithm
+
+```
+1. Read filesToModify from each worktree task in the Scout report
+2. Build a conflict graph: edge between tasks A and B if filesToModify(A) ∩ filesToModify(B) ≠ ∅
+3. Connected components in the conflict graph form sequential groups
+4. Tasks with no edges (no shared files) are independent — build in parallel
+5. Within a sequential group, run tasks in Scout's priority order
+```
+
+### Execution Sequence
+
+1. Execute all inline tasks first sequentially, committing each before proceeding
+2. Launch all independent worktree tasks **in parallel** via your platform's parallel agent mechanism (each in its own isolated worktree — see Build Isolation below)
+3. After all parallel builds complete, audit each independently (also in parallel if multiple)
+4. Commit results sequentially in Scout's priority order (one at a time)
+5. Execute dependent worktree tasks sequentially after their dependencies commit
+
+Parallel execution of worktree tasks drastically reduces build phase latency. Because each task is isolated in its own worktree and the OCC protocol handles state.json conflicts, they can safely be built concurrently.
+
+For each worktree task:
+
+---
+
+## Build Isolation (by `projectContext.buildIsolation`)
+
+### `worktree` (default — coding domain)
+
+**Worktree isolation is MANDATORY for coding projects.** The orchestrator MUST ensure the Builder operates on an isolated copy of the repository. This prevents:
+- Builder changes from interfering with the main working tree during execution
+- Multiple Builder runs (if parallelized) from conflicting with each other
+- Partial/failed changes from polluting the main branch
+
+**NEVER launch the Builder without isolation.** Platform-specific methods:
+- **Claude Code:** Use the `Agent` tool with `isolation: "worktree"` (automatic worktree management)
+- **Gemini CLI / other platforms with subagent support:** Create a worktree manually before spawning the agent (see below)
+- **Generic LLM / no subagent support:** Create a worktree and run the Builder prompt in a new session with cwd set to the worktree
+
+If the platform does not support automatic worktree isolation, the orchestrator MUST manually create a worktree before launching the Builder:
+```bash
+WORKTREE_DIR=$(mktemp -d)/evolve-build-cycle-<N>-<task-slug>
+git worktree add "$WORKTREE_DIR" HEAD
+# Launch Builder with cwd set to $WORKTREE_DIR
+# After Builder completes, merge changes back:
+cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
+cd <main-repo> && git apply /tmp/builder.patch
+git worktree remove "$WORKTREE_DIR"
+```
+
+### `file-copy` (writing, research, design domains)
+
+For non-git projects (or projects without git worktree support), use file-copy isolation:
+```bash
+COPY_DIR=$(mktemp -d)/evolve-build-cycle-<N>-<task-slug>
+# Copy project files (exclude .evolve/ runtime state)
+cp -rp . "$COPY_DIR" && rm -rf "$COPY_DIR/.evolve"
+# Launch Builder with cwd set to $COPY_DIR
+# After Builder completes, diff and apply changes back:
+diff -rq "$COPY_DIR" . --exclude='.evolve' --exclude='.git' > /tmp/changed-files.txt
+# For each changed file, copy from COPY_DIR back to main:
+while read line; do
+  FILE=$(echo "$line" | grep -oP '(?<=differ: ).*(?= and )' || echo "$line" | grep -oP '(?<=Only in '"$COPY_DIR"'/: ).*')
+  [ -n "$FILE" ] && cp "$COPY_DIR/$FILE" "./$FILE" 2>/dev/null
+done < /tmp/changed-files.txt
+rm -rf "$COPY_DIR"
+```
+
+### `none` (explicit opt-out — use with caution)
+
+Builder operates directly on the working directory. Only suitable for append-only tasks where isolation provides no benefit (e.g., writing a new standalone document). The orchestrator should warn when this mode is active.
+
+The orchestrator selects the isolation mode from `projectContext.buildIsolation` (set during initialization step 3). Worktree remains the default fallback if `buildIsolation` is not specified.
+
+---
+
+## Builder Agent Launch
+
+Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + plan cache hit (execution-only, plan is proven), tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry attempt ≥ 2 (design mistake needs deeper reasoning about WHY it failed), tier-2 if strategy == "repair" (accuracy floor), tier-2 otherwise; **isolation: worktree required**):
+- **Platform dispatch:** Claude Code: `Agent` tool with `isolation: "worktree"`, `subagent_type: "general-purpose"`; Other platforms: create worktree manually (see Build Isolation above), then launch agent in the worktree directory.
+- Prompt: Read `agents/evolve-builder.md` and pass as prompt
+- Context:
+  ```json
+  {
+    // --- Static ---
+    "workspacePath": "<$WORKSPACE_PATH>",
+    "runId": "<$RUN_ID>",
+    "evalsPath": ".evolve/evals/",
+    "strategy": <strategy>,
+    // --- Semi-stable ---
+    "instinctSummary": "<from state.json, inline>",
+    // --- Dynamic ---
+    "cycle": <N>,
+    "task": <task object from scout-report — includes inline eval graders>,
+    "challengeToken": "<$CHALLENGE>",
+    "handoffFromScout": "<contents of handoff-scout.json>"
+  }
+  ```
+- **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
+
+---
+
+## Output Redirection
+
+When Builder runs eval graders, test commands, or build commands, redirect stdout/stderr to `$WORKSPACE_PATH/run.log`:
+```bash
+<command> > $WORKSPACE_PATH/run.log 2>&1
+```
+Builder and Auditor extract results via `grep`/`tail` on `run.log` rather than reading full output. This reduces token consumption by 30-50% for verbose build/test output.
+
+---
+
+## Experiment Journal
+
+After each Builder attempt (pass or fail), append a one-line entry to `$WORKSPACE_PATH/experiments.jsonl`:
+```jsonl
+{"cycle":N,"task":"<slug>","attempt":1,"verdict":"PASS|FAIL","approach":"<1-sentence summary>","metric":"<eval result or error>"}
+```
+This append-only log ensures every attempt is recorded. Scout reads `experiments.jsonl` to avoid re-proposing similar approaches that already failed.
+
+---
+
+## Post-Builder Handling
+
+After Builder completes:
+- Read `$WORKSPACE_PATH/build-report.md`
+- If status is FAIL after 3 attempts:
+  - **Discard worktree** — the worktree branch contains failed changes, clean it up:
+    ```bash
+    # If the platform auto-managed the worktree, it may auto-clean on failure
+    # Otherwise, remove it manually:
+    git worktree remove "$WORKTREE_DIR" --force 2>/dev/null
+    ```
+  - Log failed approach in state.json under `failedApproaches` with structured reasoning:
+    ```json
+    {
+      "feature": "<task name>",
+      "approach": "<what was tried>",
+      "error": "<error message or symptom>",
+      "reasoning": "<WHY it failed — root cause analysis, not just the error>",
+      "filesAffected": ["<files that were involved>"],
+      "cycle": <N>,
+      "alternative": "<suggested different approach for next cycle>"
+    }
+    ```
+  - Skip this task, proceed to next task (or Phase 3 if last task)
+- If status is PASS → proceed to Phase 3 for this task
+  - **Do NOT merge yet** — worktree changes stay isolated until the Auditor passes
+
+---
+
+## Post-Audit Verdict Handling (per task)
+
+After the Auditor completes for a task:
+- Read `$WORKSPACE_PATH/audit-report.md`
+- **Verdict handling:**
+  - **PASS** → **Merge worktree changes into main and cleanup:**
+    ```bash
+    # Option A: If platform auto-managed the worktree (e.g., Claude Code isolation: "worktree"),
+    # changes are already in the working tree — just commit:
+    git add -A
+    git commit -m "<type>: <description>"
+
+    # Option B: If manual worktree, cherry-pick the Builder's commit:
+    BUILDER_SHA=<commit SHA from build-report.md>
+    git cherry-pick "$BUILDER_SHA"
+    git worktree remove "$WORKTREE_DIR" --force
+
+    # Option C: If manual worktree, apply as patch:
+    cd "$WORKTREE_DIR" && git diff HEAD~1 > /tmp/builder.patch
+    cd <main-repo> && git apply /tmp/builder.patch
+    git add -A && git commit -m "<type>: <description>"
+    git worktree remove "$WORKTREE_DIR" --force
+    ```
+    Verify the merge is clean: `git status --porcelain` should show no uncommitted changes.
+  - **WARN** (MEDIUM issues found) → re-launch Builder **in a fresh worktree** with issues, re-audit (max 3 total iterations). Remove the old worktree first.
+  - **FAIL** (CRITICAL/HIGH or eval failures) → re-launch Builder **in a fresh worktree** with issues, re-audit (max 3 total iterations). Remove the old worktree first.
+  - After 3 failures → **discard worktree**, log as failed approach, skip this task
+
+**Worktree cleanup is MANDATORY.** After every task (pass or fail), verify no orphaned worktrees remain:
+```bash
+# List worktrees — should only show the main worktree
+git worktree list
+# If stale worktrees exist, prune them:
+git worktree prune
+```
+
+**Update `auditorProfile` in state.json after each audit verdict:**
+- PASS with no MEDIUM+ issues (first attempt) → increment `auditorProfile.<taskType>.consecutiveClean` and `passFirstAttempt`
+- WARN, FAIL, or any MEDIUM+ issue → reset `auditorProfile.<taskType>.consecutiveClean` to 0
+
+Then proceed to next task (back to Phase 2) or the Benchmark Delta Check if all tasks done.
+
+---
+
+## Benchmark Delta Check (between AUDIT and SHIP)
+
+After all tasks pass audit but before committing in Phase 4, run a targeted benchmark re-evaluation to verify the cycle improved (or at least didn't regress) project quality.
+
+**Exemptions** — skip the delta check entirely when:
+- The task has `strategy: "repair"` (repairs are corrective, not additive)
+- This is one of the first 3 cycles of this invocation (`remainingCycles > cycles - 3`) — allow the loop to establish a baseline
+- The task is explicitly labeled as `meta` or `infrastructure` type
+
+### Delta Check Steps
+
+1. **Verify benchmark-eval.md integrity:**
+   ```bash
+   sha256sum -c $WORKSPACE_PATH/benchmark-eval-checksum.txt
+   ```
+   If checksum fails → HALT: "benchmark-eval.md modified — possible tampering."
+
+2. **Identify relevant dimensions** for this cycle's task types using the dimension-to-task-type mapping in [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md). Only re-run checks for relevant dimensions (not all 8).
+
+3. **Re-run automated checks** for relevant dimensions only. Compute new automated scores.
+
+4. **Compare to Phase 0 baseline** (from `state.json.projectBenchmark.dimensions`):
+
+   | Delta | Action |
+   |-------|--------|
+   | Any dimension improved (+2 or more) | **Ship.** Log improvement in benchmark report. |
+   | All dimensions stable (within +/- 1) | **Ship with warning:** "No measurable benchmark improvement this cycle." Log warning in operator-log. |
+   | Any dimension regressed (-3 or more) | **Block.** Return to Builder with regression details. |
+
+5. **On block:** The blocked task gets **1 retry**. Pass the regression details to the Builder:
+   ```json
+   {
+     "blockReason": "benchmark-regression",
+     "regressedDimensions": [{"dimension": "<name>", "baseline": <N>, "current": <N>, "delta": <N>}],
+     "guidance": "Fix the regression before shipping. Focus on: <specific dimension>"
+   }
+   ```
+   Re-run Builder in a fresh worktree → re-audit → re-check delta.
+
+6. **On second block (same task):** Drop the task entirely.
+   - Log as `"dropped: benchmark-regression"` in `experiments.jsonl`
+   - Add to `evaluatedTasks` with `decision: "dropped"`, `reason: "benchmark regression after retry"`
+   - The bandit system records reward = 0 for the dropped task's type
+   - Proceed to Phase 4 without this task's changes
+
+7. **Update `projectBenchmark.dimensions`** in state.json with the new scores for re-checked dimensions.
+
+---
+
+## Pre-Ship Integrity Gate
+
+Before entering Phase 4, run the deterministic health check and independent eval verification. These are the system's "security cameras" — they operate independently of all LLM agents.
+
+1. **Independent eval re-execution** (research basis: "AI Control", Greenblatt et al.):
+   ```bash
+   bash scripts/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
+   VERIFY_EXIT=$?
+   if [ "$VERIFY_EXIT" -ne 0 ]; then
+     echo "HALT: Independent eval verification failed — Auditor may have reported false PASS"
+     # Compare verify-eval output with audit-report.md for discrepancies
+   fi
+   ```
+   This re-runs every eval command independently. If the Auditor claimed PASS but verify-eval shows failures, the Auditor's report is untrustworthy.
+
+2. **Cycle health fingerprint**:
+   ```bash
+   bash scripts/cycle-health-check.sh $N $WORKSPACE_PATH
+   HEALTH_EXIT=$?
+   if [ "$HEALTH_EXIT" -ne 0 ]; then
+     echo "HALT: Health check detected anomalies"
+     cat $WORKSPACE_PATH/cycle-health.json
+     # Present evidence to user and halt
+   fi
+   ```
+   This checks all 11 health signals (ledger completeness, timestamp spacing, artifacts, checksums, challenge tokens, velocity, substance, canaries, hash chain). Any ANOMALY = halt.
+
+3. **Log phase transition** (compliance trail):
+   ```json
+   {"ts":"<ISO>","cycle":N,"role":"orchestrator","type":"phase-transition","data":{
+     "from":"audit","to":"ship",
+     "challenge":"<$CHALLENGE>",
+     "prevHash":"<$PREV_HASH>",
+     "healthCheckRan":true,
+     "healthCheckHealthy":<true|false>,
+     "verifyEvalPassed":<true|false>
+   }}
+   ```
+   After writing, update `PREV_HASH` to the hash of this entry.
+
+Only proceed to Phase 4 if both the health check and eval verification pass.
