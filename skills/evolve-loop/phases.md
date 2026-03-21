@@ -244,26 +244,20 @@ RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
 ```
 Apply agent-specific overrides as documented in SKILL.md (e.g., Auditor adds confidence-scoring, Operator removes ledger-entry). Placing shared values first maximizes KV-cache reuse across parallel agent launches — concurrent builders or auditors that share the same static prefix benefit from prompt cache hits without re-encoding the rules.
 
-**Prompt caching with Anthropic APIs:** When invoking agents via the Anthropic API directly, you can activate server-side prompt caching by marking the static prefix with a cache breakpoint. Only the fields that are stable across cycles need the marker — dynamic per-cycle fields must NOT carry it, because adding `cache_control` to a changing field invalidates the cache every cycle and eliminates any savings.
+**Prompt caching (provider-specific optimization):** Most LLM API providers support some form of prompt caching for repeated prefixes. The evolve-loop's context block is structured with static fields first (shared values, project context) and dynamic fields last (cycle number, changed files) to maximize cache reuse.
 
-Apply `cache_control: {"type": "ephemeral"}` to the last static block in the context, which is typically the end of `projectContext` (Layer 0 shared values). Example structure:
+**Provider-specific implementation:**
+- **Anthropic API:** Apply `cache_control: {"type": "ephemeral"}` to the last static block (typically `projectContext`). Dynamic fields must NOT carry this marker.
+- **Google Gemini:** Use `cachedContent` resource for the static prefix. Create once per session, reference in subsequent calls.
+- **OpenAI:** Enable `store: true` on the static prefix messages. The API auto-caches identical prefixes.
+- **Generic / self-hosted:** Place static context first in system prompt. Many inference engines (vLLM, TGI) auto-cache matching prefixes.
 
-```json
-[
-  {"role": "user", "content": [
-    {"type": "text", "text": "<Layer 0 rules + projectContext>",
-     "cache_control": {"type": "ephemeral"}},
-    {"type": "text", "text": "<instinctSummary — semi-stable, no cache marker>"},
-    {"type": "text", "text": "<cycle-specific fields: cycle N, changedFiles, recentNotes>"}
-  ]}
-]
-```
-
-The `ephemeral` breakpoint tells the API to cache all tokens up to and including that block. Subsequent agent calls that share the identical static prefix will get a cache hit, reducing prompt-processing cost by 20-40% on repeated context. See `docs/token-optimization.md` § KV-Cache Prefix Optimization for background on prefix placement strategy.
+The key principle is universal: **static fields first, dynamic fields last**. This maximizes cache hits regardless of provider, reducing prompt-processing cost by 20-40% on repeated context. See `docs/token-optimization.md` § KV-Cache Prefix Optimization for background.
 
 **Operator brief pre-read:** Before launching Scout, check if `$WORKSPACE_PATH/next-cycle-brief.json` exists (from own run's previous cycle). If not found, fall back to `.evolve/latest-brief.json` (shared, written by most recent run). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
 
-Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-directed cycle ≤ 2 (strategic foundation sets trajectory for entire session), tier-3 if cycle 4+ with mature bandit data (3+ arms with pulls ≥ 3, selection becomes data-driven), tier-2 otherwise; subagent_type: `general-purpose`):
+Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-directed cycle ≤ 2 (strategic foundation sets trajectory for entire session), tier-3 if cycle 4+ with mature bandit data (3+ arms with pulls ≥ 3, selection becomes data-driven), tier-2 otherwise):
+- **Platform dispatch:** Use your platform's subagent mechanism — Claude Code: `Agent` tool with `subagent_type: "general-purpose"`; Gemini CLI: `spawn_agent`; Generic: launch a new LLM session with the prompt below.
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
   ```json
@@ -417,7 +411,7 @@ Before entering Phase 2, run precondition assertions:
 
 **Execution sequence:**
 1. Execute all inline tasks first sequentially, committing each before proceeding
-2. Launch all independent worktree tasks **in parallel** via multiple `Agent` tool calls (each with `isolation: "worktree"`)
+2. Launch all independent worktree tasks **in parallel** via your platform's parallel agent mechanism (each in its own isolated worktree — see Build Isolation below)
 3. After all parallel builds complete, audit each independently (also in parallel if multiple)
 4. Commit results sequentially in Scout's priority order (one at a time)
 5. Execute dependent worktree tasks sequentially after their dependencies commit
@@ -430,12 +424,17 @@ For each worktree task:
 
 **`worktree` (default — coding domain):**
 
-**Worktree isolation is MANDATORY for coding projects.** The orchestrator MUST launch the Builder with `isolation: "worktree"` so it operates on an isolated copy of the repository. This prevents:
+**Worktree isolation is MANDATORY for coding projects.** The orchestrator MUST ensure the Builder operates on an isolated copy of the repository. This prevents:
 - Builder changes from interfering with the main working tree during execution
-- Multiple Builder runs (if parallelized in the future) from conflicting with each other
+- Multiple Builder runs (if parallelized) from conflicting with each other
 - Partial/failed changes from polluting the main branch
 
-**NEVER launch the Builder without isolation.** If the Agent tool does not support worktree isolation, the orchestrator MUST manually create a worktree before launching the Builder:
+**NEVER launch the Builder without isolation.** Platform-specific methods:
+- **Claude Code:** Use the `Agent` tool with `isolation: "worktree"` (automatic worktree management)
+- **Gemini CLI / other platforms with subagent support:** Create a worktree manually before spawning the agent (see below)
+- **Generic LLM / no subagent support:** Create a worktree and run the Builder prompt in a new session with cwd set to the worktree
+
+If the platform does not support automatic worktree isolation, the orchestrator MUST manually create a worktree before launching the Builder:
 ```bash
 WORKTREE_DIR=$(mktemp -d)/evolve-build-cycle-<N>-<task-slug>
 git worktree add "$WORKTREE_DIR" HEAD
@@ -469,7 +468,8 @@ Builder operates directly on the working directory. Only suitable for append-onl
 
 The orchestrator selects the isolation mode from `projectContext.buildIsolation` (set during initialization step 3). Worktree remains the default fallback if `buildIsolation` is not specified.
 
-Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + plan cache hit (execution-only, plan is proven), tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry attempt ≥ 2 (design mistake needs deeper reasoning about WHY it failed), tier-2 if strategy == "repair" (accuracy floor), tier-2 otherwise; subagent_type: `general-purpose`, **isolation: `worktree`**):
+Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + plan cache hit (execution-only, plan is proven), tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry attempt ≥ 2 (design mistake needs deeper reasoning about WHY it failed), tier-2 if strategy == "repair" (accuracy floor), tier-2 otherwise; **isolation: worktree required**):
+- **Platform dispatch:** Claude Code: `Agent` tool with `isolation: "worktree"`, `subagent_type: "general-purpose"`; Other platforms: create worktree manually (see Build Isolation above), then launch agent in the worktree directory.
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json
@@ -507,8 +507,8 @@ After Builder completes:
 - If status is FAIL after 3 attempts:
   - **Discard worktree** — the worktree branch contains failed changes, clean it up:
     ```bash
-    # If the Agent tool created the worktree, it auto-cleans on failure
-    # If manual worktree, remove it:
+    # If the platform auto-managed the worktree, it may auto-clean on failure
+    # Otherwise, remove it manually:
     git worktree remove "$WORKTREE_DIR" --force 2>/dev/null
     ```
   - Log failed approach in state.json under `failedApproaches` with structured reasoning:
@@ -550,7 +550,8 @@ sha256sum -c $WORKSPACE_PATH/eval-checksums.json
 ```
 If any checksum fails → HALT: "Eval tamper detected — eval file modified after Scout created it. Investigate before proceeding."
 
-Launch **Auditor Agent** (model: per routing table — tier-2 default, tier-1 for security-sensitive, tier-3 for clean builds; subagent_type: `general-purpose`):
+Launch **Auditor Agent** (model: per routing table — tier-2 default, tier-1 for security-sensitive, tier-3 for clean builds):
+- **Platform dispatch:** Use your platform's subagent mechanism (Claude Code: `Agent` tool; Gemini CLI: `spawn_agent`; Generic: new LLM session).
 - Prompt: Read `agents/evolve-auditor.md` and pass as prompt
 - Context:
   ```json
@@ -577,7 +578,7 @@ After Auditor completes:
 - **Verdict handling:**
   - **PASS** → **Merge worktree changes into main and cleanup:**
     ```bash
-    # Option A: If Agent tool managed the worktree (isolation: "worktree"),
+    # Option A: If platform auto-managed the worktree (e.g., Claude Code isolation: "worktree"),
     # changes are already in the working tree — just commit:
     git add -A
     git commit -m "<type>: <description>"

@@ -1,8 +1,11 @@
 ---
 name: evolve-scout
 description: Discovery and planning agent for the Evolve Loop. Scans codebase, performs conditional web research, selects tasks, and writes eval definitions.
-tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
 model: tier-2
+capabilities: [file-read, search, shell, web-search, web-fetch]
+tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
+tools-gemini: ["ReadFile", "SearchCode", "RunShell", "WebSearch", "WebFetch"]
+tools-generic: ["read_file", "search_code", "search_files", "run_shell", "web_search", "web_fetch"]
 ---
 
 # Evolve Scout

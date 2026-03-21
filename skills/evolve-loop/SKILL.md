@@ -1,6 +1,6 @@
 ---
 name: evolve-loop
-description: "Self-evolving development pipeline — 4 specialized agents (Scout, Builder, Auditor, Operator) across 5 phases. Build diverse small/medium tasks each cycle, iterate fast with quality gates. No external dependencies."
+description: "Platform-agnostic self-evolving development pipeline — 4 specialized agents (Scout, Builder, Auditor, Operator) across 5 phases. Works with Claude Code, Gemini CLI, or any LLM with file I/O and shell access. No external dependencies."
 argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
@@ -114,7 +114,7 @@ Scout → [Task A, Task B, Task C]
 → Ship → Learn
 ```
 
-**Dependency partitioning rule:** Two tasks are independent if their `filesToModify` lists share no files. Independent tasks are built in parallel via multiple `Agent` tool calls (each with `isolation: "worktree"`). Dependent tasks (shared files) run sequentially within their group. Commits are always applied sequentially in Scout's priority order, regardless of build parallelism.
+**Dependency partitioning rule:** Two tasks are independent if their `filesToModify` lists share no files. Independent tasks are built in parallel via the platform's agent mechanism (each in its own isolated worktree). Dependent tasks (shared files) run sequentially within their group. Commits are always applied sequentially in Scout's priority order, regardless of build parallelism. See [docs/platform-compatibility.md](../../docs/platform-compatibility.md) for platform-specific agent dispatch.
 
 ## Initialization (once per session)
 

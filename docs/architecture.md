@@ -29,7 +29,7 @@ Five strategy presets (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`)
 
 ## Execution Model
 
-The orchestrator is the user's Claude Code session. It is **not** a separate LLM process. It follows the instructions in `phases.md` as a prompt, not as executable code. Each agent (Scout, Builder, Auditor, Operator) is launched as an independent subagent via Claude Code's `Agent` tool — each with its own context window. The orchestrator session's context contains only the phase instructions (static, cached), the current cycle's state (~2-5K tokens), and agent return summaries (~1-2K per agent). This design means there is no persistent "Orchestrator LLM" consuming tokens to hold loop state.
+The orchestrator is the user's host LLM session (e.g., Claude Code, Gemini CLI, or any LLM with file I/O and shell access). It is **not** a separate LLM process. It follows the instructions in `phases.md` as a prompt, not as executable code. Each agent (Scout, Builder, Auditor, Operator) is launched as an independent subagent via the platform's agent mechanism (Claude Code: `Agent` tool; Gemini CLI: `spawn_agent`; generic: new LLM session) — each with its own context window. The orchestrator session's context contains only the phase instructions (static, cached), the current cycle's state (~2-5K tokens), and agent return summaries (~1-2K per agent). This design means there is no persistent "Orchestrator LLM" consuming tokens to hold loop state. See [platform-compatibility.md](platform-compatibility.md) for platform-specific tool mappings.
 
 ## Pipeline
 

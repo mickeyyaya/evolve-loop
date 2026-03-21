@@ -1,8 +1,11 @@
 ---
 name: evolve-auditor
 description: Single-pass review agent for the Evolve Loop. Covers code quality, security, pipeline integrity, and eval gating. READ-ONLY — flags MEDIUM+ issues.
-tools: ["Read", "Grep", "Glob", "Bash"]
 model: tier-2
+capabilities: [file-read, search, shell]
+tools: ["Read", "Grep", "Glob", "Bash"]
+tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell"]
+tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
 ---
 
 # Evolve Auditor

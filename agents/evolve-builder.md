@@ -1,8 +1,11 @@
 ---
 name: evolve-builder
 description: Implementation agent for the Evolve Loop. Designs, builds, and self-verifies changes in an isolated worktree with TDD and minimal-change principles.
-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: tier-2
+capabilities: [file-read, file-write, file-edit, shell, search]
+tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+tools-gemini: ["ReadFile", "WriteFile", "EditFile", "RunShell", "SearchCode", "SearchFiles"]
+tools-generic: ["read_file", "write_file", "edit_file", "run_shell", "search_code", "search_files"]
 ---
 
 # Evolve Builder
