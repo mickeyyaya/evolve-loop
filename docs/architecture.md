@@ -209,3 +209,20 @@ See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface
 ## Context Management
 
 The orchestrator runs continuously through all requested cycles without stopping. A `handoff.md` checkpoint is written after each cycle as a safety measure — if a session is externally interrupted, a new session can read it to resume. The orchestrator never pauses for user input between cycles.
+
+## Research Documents Index
+
+A human-readable map of all research-related documents in the `docs/` directory.
+
+| Document | Description |
+|----------|-------------|
+| [docs/research-context-window-optimization.md](research-context-window-optimization.md) | Raw research findings (30+ papers on context optimization) |
+| [docs/research-agentic-reward-hacking.md](research-agentic-reward-hacking.md) | Raw research findings (25+ papers on reward hacking detection) |
+| [docs/research-applied-context-optimization.md](research-applied-context-optimization.md) | How research was applied to the evolve-loop (cycles 112-118) |
+| [docs/token-optimization.md](token-optimization.md) | Token optimization techniques implemented in the pipeline |
+| [docs/graph-exploration.md](graph-exploration.md) | Graph-based code navigation for Scout phase |
+| [docs/quality-cost-tradeoffs.md](quality-cost-tradeoffs.md) | Decision framework for quality vs cost tradeoffs |
+| [docs/persistent-memory-architecture.md](persistent-memory-architecture.md) | Mem0-inspired cross-session memory design |
+| [docs/human-learning-guide.md](human-learning-guide.md) | Guide for humans to learn from the evolve-loop |
+| [docs/agentic-reward-hacking.md](agentic-reward-hacking.md) | Awareness-first anti-reward-hacking design |
+| [docs/security-considerations.md](security-considerations.md) | Pipeline security mechanisms |
