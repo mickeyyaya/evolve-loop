@@ -3,7 +3,7 @@
 A comprehensive report documenting what we learned from published research, how each finding was applied to the evolve-loop, and what the results mean. Written for humans who want to understand the tradeoffs between token efficiency and output quality in multi-agent systems.
 
 **Date:** March 21, 2026
-**Cycles:** 112-114
+**Cycles:** 112-118
 **Research corpus:** 30+ papers from arXiv (2024-2026), Anthropic safety research, NeurIPS/WSDM/EMNLP proceedings
 
 ---
@@ -109,6 +109,36 @@ We implemented changes across cycles 112-114, organized by priority. Each change
 | Structured memory distillation format | `phase5-learn.md`, `token-optimization.md` | Structured Distillation | 11x on history |
 | Concrete model routing with quality guardrails | `token-optimization.md` | MasRouter | 52-70% cost |
 | Graph-based code exploration for Scout | `graph-exploration.md` (new) | RepoMaster, GraphReader | 95% on exploration |
+
+### Cycle 115: Quality & Human Learning
+
+| Change | File Modified | Research Basis | Impact |
+|--------|--------------|----------------|--------|
+| CEMM Context Quality Checklist | `phases.md` | Context Engineering Maturity Model (arXiv:2603.09619) | 5-criteria quality gate |
+| Human Learning Guide | `docs/human-learning-guide.md` (new) | User requirement | Transparency for human operators |
+| Builder Quality Signal Reporting | `evolve-builder.md` | MasRouter quality guardrails | Enables informed model routing |
+
+### Cycle 116: API & Runtime Optimization
+
+| Change | File Modified | Research Basis | Impact |
+|--------|--------------|----------------|--------|
+| Prompt Caching Guidance | `phases.md` | Anthropic prompt caching docs | 90% savings on cached tokens |
+| Session-Learned Template | `phase5-learn.md` | Human learning requirement | Human-readable session summary |
+| Lazy Tool Loading + System Reminders | `token-optimization.md` | OPENDEV (arXiv:2603.05344) | 5-10% prompt size reduction |
+
+### Cycle 117: Integration & Frameworks
+
+| Change | File Modified | Research Basis | Impact |
+|--------|--------------|----------------|--------|
+| Handoff Integration in Context Blocks | `phases.md` | CoDA/InfiAgent pattern | Phase isolation becomes operational |
+| Quality-Cost Decision Framework | `docs/quality-cost-tradeoffs.md` (new) | All research combined | Human decision guide |
+
+### Cycle 118: Memory & Analysis
+
+| Change | File Modified | Research Basis | Impact |
+|--------|--------------|----------------|--------|
+| Persistent Memory Architecture | `docs/persistent-memory-architecture.md` (new) | Mem0 (arXiv:2504.19413), MPR (arXiv:2509.03990) | Cross-session knowledge |
+| Phase Contribution Analysis | `evolve-operator.md` | HiveMind DAG-Shapley (arXiv:2512.06432) | Identify phase waste |
 
 ---
 
@@ -297,6 +327,16 @@ Some research techniques were not applied, and it's important to document why:
 | Model routing (with guardrails) | — | 52-70% | Neutral |
 | Structured memory distillation | 11x on history | Moderate | Neutral |
 | Graph exploration for Scout | 95% on exploration | Significant | Reduced (fewer reads) |
+
+### Total Shipped Tasks
+
+Across cycles 112-118, **21+ tasks** were shipped applying research findings:
+- Cycle 112: 3 changes (handoff format, turn budgets, context compression)
+- Cycle 113: 3 changes (memory distillation, model routing, graph exploration)
+- Cycle 115: 3 changes (CEMM quality checklist, human learning guide, builder quality signals)
+- Cycle 116: 3 changes (prompt caching guidance, session-learned template, lazy tool loading)
+- Cycle 117: 2 changes (handoff integration, quality-cost decision framework)
+- Cycle 118: 2 changes (persistent memory architecture, phase contribution analysis)
 
 ### Net Expected Impact
 
