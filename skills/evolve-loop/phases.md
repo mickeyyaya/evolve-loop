@@ -237,6 +237,23 @@ RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
 
 **Shared values in agent context:** The Layer 0 core rules from `memory-protocol.md` must be included at the top of all agent context blocks. Placing shared values first maximizes KV-cache reuse across parallel agent launches — concurrent builders or auditors that share the same static prefix benefit from prompt cache hits without re-encoding the rules.
 
+**Prompt caching with Anthropic APIs:** When invoking agents via the Anthropic API directly, you can activate server-side prompt caching by marking the static prefix with a cache breakpoint. Only the fields that are stable across cycles need the marker — dynamic per-cycle fields must NOT carry it, because adding `cache_control` to a changing field invalidates the cache every cycle and eliminates any savings.
+
+Apply `cache_control: {"type": "ephemeral"}` to the last static block in the context, which is typically the end of `projectContext` (Layer 0 shared values). Example structure:
+
+```json
+[
+  {"role": "user", "content": [
+    {"type": "text", "text": "<Layer 0 rules + projectContext>",
+     "cache_control": {"type": "ephemeral"}},
+    {"type": "text", "text": "<instinctSummary — semi-stable, no cache marker>"},
+    {"type": "text", "text": "<cycle-specific fields: cycle N, changedFiles, recentNotes>"}
+  ]}
+]
+```
+
+The `ephemeral` breakpoint tells the API to cache all tokens up to and including that block. Subsequent agent calls that share the identical static prefix will get a cache hit, reducing prompt-processing cost by 20-40% on repeated context. See `docs/token-optimization.md` § KV-Cache Prefix Optimization for background on prefix placement strategy.
+
 **Operator brief pre-read:** Before launching Scout, check if `$WORKSPACE_PATH/next-cycle-brief.json` exists (from own run's previous cycle). If not found, fall back to `.evolve/latest-brief.json` (shared, written by most recent run). If present, pass its contents in the Scout context so Scout can apply `recommendedStrategy`, `taskTypeBoosts`, and `avoidAreas` during task selection.
 
 Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-directed cycle ≤ 2 (strategic foundation sets trajectory for entire session), tier-3 if cycle 4+ with mature bandit data (3+ arms with pulls ≥ 3, selection becomes data-driven), tier-2 otherwise; subagent_type: `general-purpose`):
