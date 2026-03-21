@@ -204,6 +204,7 @@ See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface
 - [Genes/Capsules](genes.md) — structured fix templates with selectors, validators, and reuse protocol
 - [Meta-Cycle Review](meta-cycle.md) — every-5-cycles self-evaluation with split-role critique and prompt evolution
 - [Island Model](island-model.md) — parallel configuration evolution with trait migration
+- [Human Learning Guide](human-learning-guide.md) — how to read instincts, ledger, scout decisions, and intervene in the loop
 
 ## Context Management
 
