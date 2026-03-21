@@ -242,5 +242,5 @@ Keep this file concise (under 20 lines). It is read by Scout in incremental mode
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL","challenge":"<challengeToken>"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL","challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
 ```

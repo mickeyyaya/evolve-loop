@@ -278,7 +278,7 @@ Structured log of all candidate tasks evaluated this cycle — selected and reje
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"scout","type":"discovery","data":{"scanMode":"full|incremental","filesAnalyzed":<N>,"researchPerformed":<bool>,"tasksSelected":<N>,"instinctsApplied":<N>,"challenge":"<challengeToken>"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"scout","type":"discovery","data":{"scanMode":"full|incremental","filesAnalyzed":<N>,"researchPerformed":<bool>,"tasksSelected":<N>,"instinctsApplied":<N>,"challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
 ```
 
 ### Project Digest (cycle 1 only, or when regeneration is requested)

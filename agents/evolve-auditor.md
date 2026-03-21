@@ -229,5 +229,5 @@ See `docs/accuracy-self-correction.md` for the full pattern specification.
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"challenge":"<token>","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"challenge":"<token>","prevHash":"<hash of previous ledger entry>","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
 ```

@@ -243,7 +243,7 @@ Prose narrative (3-5 sentences) that captures the cycle's story: what was attemp
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"operator","type":"post-cycle","data":{"status":"CONTINUE|HALT","tasksShipped":<N>,"tasksAttempted":<N>,"consecutiveNoShip":<N>,"qualityTrend":"improving|stable|degrading"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"operator","type":"post-cycle","data":{"status":"CONTINUE|HALT","tasksShipped":<N>,"tasksAttempted":<N>,"consecutiveNoShip":<N>,"qualityTrend":"improving|stable|degrading","challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
 ```
 
 ## HALT Protocol

@@ -166,6 +166,19 @@ At the start of each cycle, before any agent is invoked, establish the integrity
    ```
    Pass `forceFullAudit` in the Auditor context. Do NOT log whether this was triggered — blind monitoring means the agent should not know which cycles are scrutinized.
 
+5. **Hash chain initialization** (tamper-evident ledger — research basis: SLSA transparency logs, in-toto):
+   Compute the hash of the last ledger entry to seed this cycle's chain:
+   ```bash
+   if command -v sha256sum &>/dev/null; then
+     PREV_HASH=$(tail -1 .evolve/ledger.jsonl 2>/dev/null | sha256sum | cut -d' ' -f1)
+   elif command -v shasum &>/dev/null; then
+     PREV_HASH=$(tail -1 .evolve/ledger.jsonl 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+   else
+     PREV_HASH="unsupported"
+   fi
+   ```
+   Every ledger entry written during this cycle MUST include `"prevHash":"<$PREV_HASH>"` in its `data` object. After writing each entry, update `PREV_HASH` to the hash of the entry just written. This creates a Merkle chain where inserting, deleting, or modifying entries retroactively breaks the chain. The `scripts/cycle-health-check.sh` verifies chain integrity.
+
 ### Atomic Cycle Number Allocation
 
 At the start of each cycle iteration, claim the next cycle number atomically:
@@ -271,16 +284,20 @@ After Scout completes:
 - **Prerequisite check:** For each proposed task that includes a `prerequisites` field, verify all listed slugs appear in `state.json.evaluatedTasks` with `decision: "completed"`. Any task with an unmet prerequisite is automatically deferred: add it to `evaluatedTasks` with `decision: "deferred"` and `deferralReason: "prerequisite not met: <slug>"`, then log the prerequisite slug so the Scout can propose it in the next cycle. Tasks without a `prerequisites` field are unaffected. This check is a lightweight sequencing aid — the Scout may override it by omitting `prerequisites` when a task is genuinely independent of its nominal dependency.
 - Verify eval definitions were created in `.evolve/evals/`
 - **Eval quality check** (deterministic rigor classification — research basis: cycle 101 tautological eval incident):
+  Run only on eval files created for THIS cycle's tasks (not the entire evals directory):
   ```bash
-  bash scripts/eval-quality-check.sh .evolve/evals/
-  EVAL_QUALITY_EXIT=$?
-  if [ "$EVAL_QUALITY_EXIT" -eq 2 ]; then
-    echo "HALT: Eval quality check found Level 0 (no-op) commands. Scout must rewrite evals."
-    # Log to ledger and halt cycle
-  elif [ "$EVAL_QUALITY_EXIT" -eq 1 ]; then
-    echo "WARN: Eval quality check found Level 1 (tautological) commands. Flagging for Auditor."
-    # Pass warnings to Auditor context for deeper review
-  fi
+  # Check each task's eval file individually
+  for TASK_SLUG in <task slugs from scout-report>; do
+    bash scripts/eval-quality-check.sh .evolve/evals/${TASK_SLUG}.md
+    EVAL_QUALITY_EXIT=$?
+    if [ "$EVAL_QUALITY_EXIT" -eq 2 ]; then
+      echo "HALT: Eval quality check found Level 0 (no-op) commands in ${TASK_SLUG}. Scout must rewrite evals."
+      # Log to ledger and halt cycle
+    elif [ "$EVAL_QUALITY_EXIT" -eq 1 ]; then
+      echo "WARN: Eval quality check found Level 1 (tautological) commands in ${TASK_SLUG}. Flagging for Auditor."
+      # Pass warnings to Auditor context for deeper review
+    fi
+  done
   ```
   This catches the exact attack from cycle 101 (`grep -q "string" source.js`) deterministically.
 - **Eval checksum capture:** Compute `sha256sum` of each eval file in `.evolve/evals/` and store in `workspace/eval-checksums.json`:
@@ -576,11 +593,13 @@ Before entering Phase 4, run the deterministic health check and independent eval
    {"ts":"<ISO>","cycle":N,"role":"orchestrator","type":"phase-transition","data":{
      "from":"audit","to":"ship",
      "challenge":"<$CHALLENGE>",
+     "prevHash":"<$PREV_HASH>",
      "healthCheckRan":true,
      "healthCheckHealthy":<true|false>,
      "verifyEvalPassed":<true|false>
    }}
    ```
+   After writing, update `PREV_HASH` to the hash of this entry.
 
 Only proceed to Phase 4 if both the health check and eval verification pass.
 

@@ -120,15 +120,48 @@ else
   add_signal "artifactExistence" "PASS" "All required workspace artifacts present"
 fi
 
-# ─── Signal 4: Eval File Existence ────────────────────────────────────
-# Scout must create eval definitions for each task.
+# ─── Signal 4: Eval File Existence (per-cycle) ───────────────────────
+# Scout must create eval definitions for the tasks in this cycle.
+# Cross-reference task slugs from ledger entries to verify matching eval files exist.
 
 if [ -d "$EVALS_DIR" ]; then
-  EVAL_COUNT=$(find "$EVALS_DIR" -name "*.md" -not -name "_canary*" 2>/dev/null | wc -l | tr -d '[:space:]')
-  if [ "$EVAL_COUNT" = "0" ]; then
-    add_signal "evalFileExistence" "ANOMALY" "No eval definitions found in ${EVALS_DIR}"
+  # Extract task slugs from this cycle's ledger entries (scout "tasksSelected" or builder "task" field)
+  CYCLE_TASK_SLUGS=""
+  if [ -f "$LEDGER" ]; then
+    CYCLE_TASK_SLUGS=$(grep "\"cycle\"[: ]*${CYCLE}[^0-9]" "$LEDGER" 2>/dev/null \
+      | grep -o '"task"[: ]*"[^"]*"' \
+      | sed 's/"task"[: ]*"//;s/"//' \
+      | sort -u || true)
+  fi
+
+  if [ -n "$CYCLE_TASK_SLUGS" ]; then
+    # Check that each task slug has a corresponding eval file
+    MISSING_EVALS=""
+    FOUND_EVALS=0
+    while IFS= read -r SLUG; do
+      [ -z "$SLUG" ] && continue
+      if [ -f "${EVALS_DIR}/${SLUG}.md" ]; then
+        FOUND_EVALS=$((FOUND_EVALS + 1))
+      else
+        MISSING_EVALS="${MISSING_EVALS}${SLUG}.md "
+      fi
+    done <<< "$CYCLE_TASK_SLUGS"
+
+    if [ -n "$MISSING_EVALS" ]; then
+      add_signal "evalFileExistence" "ANOMALY" "Missing eval definitions for cycle tasks: ${MISSING_EVALS}"
+    elif [ "$FOUND_EVALS" -gt 0 ]; then
+      add_signal "evalFileExistence" "PASS" "${FOUND_EVALS} eval definition(s) found for cycle tasks"
+    else
+      add_signal "evalFileExistence" "WARN" "No task slugs found in ledger to verify evals against"
+    fi
   else
-    add_signal "evalFileExistence" "PASS" "${EVAL_COUNT} eval definition(s) found"
+    # Fallback: no task slugs in ledger, check if any non-canary evals exist at all
+    EVAL_COUNT=$(find "$EVALS_DIR" -name "*.md" -not -name "_canary*" 2>/dev/null | wc -l | tr -d '[:space:]')
+    if [ "$EVAL_COUNT" = "0" ]; then
+      add_signal "evalFileExistence" "ANOMALY" "No eval definitions found in ${EVALS_DIR}"
+    else
+      add_signal "evalFileExistence" "WARN" "Cannot verify per-cycle evals (no task slugs in ledger); ${EVAL_COUNT} total eval(s) exist"
+    fi
   fi
 else
   add_signal "evalFileExistence" "ANOMALY" "Evals directory missing: ${EVALS_DIR}"
@@ -192,27 +225,68 @@ else
 fi
 
 # ─── Signal 7: Git Commit Velocity ────────────────────────────────────
-# Time between last 2 commits must be physically plausible.
+# Time between consecutive commits near this cycle must be physically plausible.
+# Uses ledger timestamps (cycle-specific) when available, falls back to git log.
 
-LAST_TWO_EPOCHS=$(git log --format="%at" -n 2 2>/dev/null || true)
-if [ -n "$LAST_TWO_EPOCHS" ]; then
-  TS_CURRENT=$(echo "$LAST_TWO_EPOCHS" | head -1)
-  TS_PREVIOUS=$(echo "$LAST_TWO_EPOCHS" | tail -1)
+VELOCITY_CHECKED=false
 
-  if [ -n "$TS_CURRENT" ] && [ -n "$TS_PREVIOUS" ]; then
-    DELTA=$((TS_CURRENT - TS_PREVIOUS))
-    if [ "$DELTA" -lt 5 ]; then
-      add_signal "gitCommitVelocity" "ANOMALY" "Only ${DELTA}s between last 2 commits (sub-5s = mass commit)"
-    elif [ "$DELTA" -lt 30 ]; then
-      add_signal "gitCommitVelocity" "WARN" "${DELTA}s between commits (tight but possible for S-complexity)"
+# Primary: use ledger timestamps for this cycle (cycle-specific, works retroactively)
+if [ -f "$LEDGER" ]; then
+  CYCLE_TS=$(grep "\"cycle\"[: ]*${CYCLE}[^0-9]" "$LEDGER" 2>/dev/null \
+    | grep -o '"ts"[: ]*"[^"]*"' | sed 's/"ts"[: ]*"//;s/"//' | sort || true)
+
+  if [ -n "$CYCLE_TS" ]; then
+    TS_COUNT=$(echo "$CYCLE_TS" | wc -l | tr -d '[:space:]')
+    if [ "$TS_COUNT" -ge 2 ]; then
+      # Already covered by Signal 2 (timestamp spacing), but also check
+      # against the PREVIOUS cycle's last entry for inter-cycle velocity
+      PREV_CYCLE=$((CYCLE - 1))
+      PREV_LAST_TS=$(grep "\"cycle\"[: ]*${PREV_CYCLE}[^0-9]" "$LEDGER" 2>/dev/null \
+        | grep -o '"ts"[: ]*"[^"]*"' | sed 's/"ts"[: ]*"//;s/"//' | sort | tail -1 || true)
+
+      if [ -n "$PREV_LAST_TS" ]; then
+        CURR_FIRST_TS=$(echo "$CYCLE_TS" | head -1)
+        PREV_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%S" "${PREV_LAST_TS%%.*}" "+%s" 2>/dev/null || date -d "${PREV_LAST_TS}" "+%s" 2>/dev/null || echo 0)
+        CURR_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%S" "${CURR_FIRST_TS%%.*}" "+%s" 2>/dev/null || date -d "${CURR_FIRST_TS}" "+%s" 2>/dev/null || echo 0)
+
+        if [ "$PREV_EPOCH" != "0" ] && [ "$CURR_EPOCH" != "0" ]; then
+          DELTA=$((CURR_EPOCH - PREV_EPOCH))
+          VELOCITY_CHECKED=true
+          if [ "$DELTA" -lt 5 ]; then
+            add_signal "gitCommitVelocity" "ANOMALY" "Only ${DELTA}s between cycle $((CYCLE-1)) and cycle ${CYCLE} (sub-5s = mass cycle)"
+          elif [ "$DELTA" -lt 30 ]; then
+            add_signal "gitCommitVelocity" "WARN" "${DELTA}s between cycles (tight but possible)"
+          else
+            add_signal "gitCommitVelocity" "PASS" "${DELTA}s between cycle $((CYCLE-1)) and cycle ${CYCLE}"
+          fi
+        fi
+      fi
+    fi
+  fi
+fi
+
+# Fallback: use git log (only valid when run immediately after cycle commits)
+if ! $VELOCITY_CHECKED; then
+  LAST_TWO_EPOCHS=$(git log --format="%at" -n 2 2>/dev/null || true)
+  if [ -n "$LAST_TWO_EPOCHS" ]; then
+    TS_CURRENT=$(echo "$LAST_TWO_EPOCHS" | head -1)
+    TS_PREVIOUS=$(echo "$LAST_TWO_EPOCHS" | tail -1)
+
+    if [ -n "$TS_CURRENT" ] && [ -n "$TS_PREVIOUS" ]; then
+      DELTA=$((TS_CURRENT - TS_PREVIOUS))
+      if [ "$DELTA" -lt 5 ]; then
+        add_signal "gitCommitVelocity" "ANOMALY" "Only ${DELTA}s between last 2 commits (sub-5s = mass commit)"
+      elif [ "$DELTA" -lt 30 ]; then
+        add_signal "gitCommitVelocity" "WARN" "${DELTA}s between commits (tight but possible for S-complexity)"
+      else
+        add_signal "gitCommitVelocity" "PASS" "${DELTA}s between last 2 commits"
+      fi
     else
-      add_signal "gitCommitVelocity" "PASS" "${DELTA}s between last 2 commits"
+      add_signal "gitCommitVelocity" "WARN" "Could not parse commit timestamps"
     fi
   else
-    add_signal "gitCommitVelocity" "WARN" "Could not parse commit timestamps"
+    add_signal "gitCommitVelocity" "WARN" "Fewer than 2 commits in history"
   fi
-else
-  add_signal "gitCommitVelocity" "WARN" "Fewer than 2 commits in history"
 fi
 
 # ─── Signal 8: Diff Substance ─────────────────────────────────────────
@@ -266,35 +340,59 @@ fi
 if [ -f "$LEDGER" ]; then
   CYCLE_ENTRIES=$(grep "\"cycle\"[: ]*${CYCLE}[^0-9]" "$LEDGER" 2>/dev/null || true)
   if [ -n "$CYCLE_ENTRIES" ]; then
-    # Check if prevHash field exists in entries
-    HAS_HASH_CHAIN=$(echo "$CYCLE_ENTRIES" | grep -c '"prevHash"' 2>/dev/null || echo 0)
-    HAS_HASH_CHAIN=$(echo "$HAS_HASH_CHAIN" | tr -d '[:space:]')
-    if [ "$HAS_HASH_CHAIN" != "0" ]; then
-      # Verify chain: each entry's prevHash should match sha256 of the previous line
+    # Check if prevHash field exists in entries (may be inside "data" object)
+    HAS_HASH_CHAIN=false
+    if echo "$CYCLE_ENTRIES" | grep -q '"prevHash"' 2>/dev/null; then
+      HAS_HASH_CHAIN=true
+    fi
+
+    if $HAS_HASH_CHAIN; then
+      # Verify chain: each entry's prevHash should match sha256 of the previous line in the full ledger
+      # We need to check entries in order, including the entry BEFORE this cycle
       CHAIN_VALID=true
-      PREV_HASH=""
+      BROKEN_AT=""
+
+      # Get the line just before the first cycle entry as the seed
+      FIRST_CYCLE_LINE=$(grep -n "\"cycle\"[: ]*${CYCLE}[^0-9]" "$LEDGER" 2>/dev/null | head -1 | cut -d: -f1)
+      if [ -n "$FIRST_CYCLE_LINE" ] && [ "$FIRST_CYCLE_LINE" -gt 1 ]; then
+        PREV_LINE_NUM=$((FIRST_CYCLE_LINE - 1))
+        SEED_LINE=$(sed -n "${PREV_LINE_NUM}p" "$LEDGER")
+        if command -v sha256sum &>/dev/null; then
+          EXPECTED_HASH=$(echo -n "$SEED_LINE" | sha256sum | cut -d' ' -f1)
+        elif command -v shasum &>/dev/null; then
+          EXPECTED_HASH=$(echo -n "$SEED_LINE" | shasum -a 256 | cut -d' ' -f1)
+        else
+          EXPECTED_HASH=""
+        fi
+      else
+        EXPECTED_HASH=""
+      fi
+
+      # Verify each cycle entry's prevHash against the computed hash
       while IFS= read -r line; do
-        if [ -n "$PREV_HASH" ]; then
-          ENTRY_PREV=$(echo "$line" | grep -o '"prevHash":"[^"]*"' | sed 's/"prevHash":"//;s/"//')
-          if [ -n "$ENTRY_PREV" ] && [ "$ENTRY_PREV" != "$PREV_HASH" ]; then
+        ENTRY_PREV=$(echo "$line" | grep -o '"prevHash"[: ]*"[^"]*"' | sed 's/"prevHash"[: ]*"//;s/"//')
+        if [ -n "$ENTRY_PREV" ] && [ -n "$EXPECTED_HASH" ]; then
+          if [ "$ENTRY_PREV" != "$EXPECTED_HASH" ]; then
             CHAIN_VALID=false
+            BROKEN_AT="expected ${EXPECTED_HASH:0:12}... got ${ENTRY_PREV:0:12}..."
             break
           fi
         fi
+        # Compute hash of this line for the next entry
         if command -v sha256sum &>/dev/null; then
-          PREV_HASH=$(echo -n "$line" | sha256sum | cut -d' ' -f1)
+          EXPECTED_HASH=$(echo -n "$line" | sha256sum | cut -d' ' -f1)
         elif command -v shasum &>/dev/null; then
-          PREV_HASH=$(echo -n "$line" | shasum -a 256 | cut -d' ' -f1)
+          EXPECTED_HASH=$(echo -n "$line" | shasum -a 256 | cut -d' ' -f1)
         fi
       done <<< "$CYCLE_ENTRIES"
 
       if $CHAIN_VALID; then
         add_signal "hashChainIntegrity" "PASS" "Ledger hash chain verified for cycle ${CYCLE}"
       else
-        add_signal "hashChainIntegrity" "ANOMALY" "Hash chain broken — ledger entries may have been modified"
+        add_signal "hashChainIntegrity" "ANOMALY" "Hash chain broken — ${BROKEN_AT}"
       fi
     else
-      add_signal "hashChainIntegrity" "WARN" "No prevHash fields in ledger — hash chain not active"
+      add_signal "hashChainIntegrity" "WARN" "No prevHash fields in ledger — hash chain not yet active for cycle ${CYCLE}"
     fi
   else
     add_signal "hashChainIntegrity" "WARN" "No entries for cycle ${CYCLE} to verify"
