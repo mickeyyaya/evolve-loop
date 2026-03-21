@@ -320,6 +320,56 @@ For optimal efficiency, run 5-7 cycles per invocation. Beyond 7 cycles, context 
 
 ---
 
+## Active Context Compression
+
+Source: "Active Context Compression for Long-Term Agentic Memory" (arXiv:2601.07190).
+
+The **Focus Agent** pattern addresses a core problem in multi-phase agentic pipelines: context windows fill with stale, redundant, or low-value history as the agent progresses through phases and tool calls. Rather than discarding context (losing information) or keeping everything (wasting tokens), Active Context Compression distils accumulated context into a compact structured summary that preserves all decision-relevant information.
+
+### When Compression Triggers
+
+Compression runs at two natural points in the evolve-loop:
+
+1. **Between phases** — after Scout completes and before Builder starts, and after Builder completes and before Auditor starts. Each phase boundary is a natural compaction point because the downstream agent needs the *results* of the prior phase, not its reasoning trace.
+2. **After tool-heavy operations** — when a Builder or Scout agent has issued 5+ tool calls (file reads, bash commands, searches), the accumulated tool results dominate the context. Compressing at this point before the next reasoning step recovers significant context headroom.
+
+### Structured Distillation Format
+
+The Focus Agent produces a **4-field compound summary** that captures all decision-relevant context from the compressed window:
+
+```json
+{
+  "exchange_core": "<key decisions made and their rationale, stripped of intermediate reasoning>",
+  "specific_context": "<concrete facts discovered: file names, error messages, API shapes, config values>",
+  "thematic_assignments": "<high-level task assignments and ownership — what each agent is responsible for>",
+  "files_touched": ["<path/to/file1>", "<path/to/file2>"]
+}
+```
+
+This Structured Distillation format is intentionally minimal — each field maps to a distinct retrieval need downstream agents have. `exchange_core` feeds into reasoning; `specific_context` feeds into implementation; `thematic_assignments` feeds into coordination; `files_touched` feeds into change-impact analysis.
+
+### Quantitative Results
+
+On the SWE-bench and WebArena benchmarks reported in arXiv:2601.07190:
+
+- **22.7% overall token reduction** across multi-phase agentic tasks
+- **57% peak reduction** on tool-heavy phases (phases with 10+ sequential tool calls)
+- **11x compression ratio** on verbose tool-call traces (e.g., bash output logs, search result dumps)
+
+Solve rate was maintained within 1.2% of the uncompressed baseline, confirming that the structured distillation preserves the information that actually matters for task completion.
+
+### Integration with Evolve-Loop Phases
+
+| Trigger Point | Compressor | Consumer | Expected Savings |
+|---------------|-----------|----------|-----------------|
+| Scout → Builder handoff | Scout agent (end of DISCOVER phase) | Builder context preamble | ~10-15K tokens per cycle |
+| Builder → Auditor handoff | Builder agent (end of BUILD phase) | Auditor context preamble | ~8-12K tokens per cycle |
+| Post tool-heavy scan | Scout or Builder inline | Same agent, next reasoning step | ~5-20K tokens per burst |
+
+The evolve-loop's existing sub-agent compaction principle (each agent-to-agent handoff carries under 2K tokens of context) is the architectural prerequisite for this pattern — the workspace file format (scout-report.md, build-report.md) already enforces bounded structured output. Active Context Compression extends this by applying distillation *within* a phase's tool-call sequence, not just at phase boundaries.
+
+---
+
 For techniques that improve output accuracy and catch errors across these same agents and phases (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
 
 For per-phase profiling and cost-bottleneck identification, see `docs/performance-profiling.md`.
