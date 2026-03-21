@@ -309,13 +309,13 @@ After Scout completes:
 
 ### Phase 2: BUILD (loop per task)
 
-**Task Execution Ordering:** Before starting the build loop, partition the task list into two groups:
+**Task Execution Ordering & Parallelization:** Before starting the build loop, partition the task list into two groups:
 1. **Inline tasks** — S-complexity tasks eligible for orchestrator inline execution (per inst-007 policy)
 2. **Worktree tasks** — all other tasks requiring Builder agent in isolated worktree
 
-**Execute all inline tasks first, committing each before proceeding.** Then execute all worktree tasks. This prevents cherry-pick merge conflicts that occur when inline changes modify files that worktree builders also touch (the worktree forked from a pre-inline commit).
+**Execute all inline tasks first sequentially, committing each before proceeding.** Then execute all worktree tasks **in parallel**. Parallel execution of worktree tasks drastically reduces the latency of the build phase. Because each task is isolated in its own worktree, they can safely be built concurrently.
 
-For each task in the (reordered) task list:
+For each worktree task (running in parallel):
 
 #### Build Isolation (by `projectContext.buildIsolation`)
 
@@ -419,9 +419,9 @@ After Builder completes:
 
 ---
 
-### Phase 3: AUDIT
+### Phase 3: AUDIT (Parallel)
 
-The Auditor reviews the Builder's changes **in the worktree** (or reads the diff from the build report). The worktree remains intact during audit.
+The Auditor reviews the Builder's changes **in the worktree** (or reads the diff from the build report). The worktree remains intact during audit. **Parallelization:** Because worktree tasks are built in parallel during Phase 2, they MUST also be audited in parallel during Phase 3 to minimize latency.
 
 **Inline task audit:** For tasks implemented inline by the orchestrator (per inst-007 S-complexity policy), the orchestrator MUST still run eval graders before committing. At minimum, execute all bash eval graders from the task's eval definition and verify exit 0. If any grader fails, revert the inline changes (`git checkout -- <files>`) and either retry inline or escalate to a Builder agent. Do NOT skip the audit phase for inline tasks — the audit is the quality gate, not the builder.
 

@@ -427,7 +427,7 @@ The evolve-loop runs continuously through all requested cycles. Between cycles, 
    - Any warnings or stagnation signals
    - Key decisions for next cycle
 3. **Continue immediately to the next cycle** — do NOT stop or wait for user input
-4. If context window utilization exceeds 60%, the orchestrator SHOULD:
+4. **Lean Context Mode (Cycles 4+):** To prevent context accumulation, past cycle 3, the orchestrator MUST aggressively truncate historical logs and ONLY pass the structured `handoff.md` and `instinctSummary` to downstream agents.
    - Stop re-reading files already in context (use remembered values)
    - Skip reading full agent results — extract only verdict + key metrics
    - Rely on state.json and handoff.md rather than conversation history
