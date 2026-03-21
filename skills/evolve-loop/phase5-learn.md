@@ -160,6 +160,21 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
       - Instincts after: <count>
       ```
 
+   f. **Structured Distillation format for memory entries** (arXiv:2603.13017):
+      When writing or merging instinct entries during consolidation, use the 4-field compound distillation format to maximise retrieval quality at minimum token cost. This format achieves 11x compression (371→38 tokens per entry) with 96% retrieval quality on downstream tasks.
+
+      Each consolidated memory entry should capture:
+      ```json
+      {
+        "exchange_core": "<key decisions and rationale from the cycles that produced this instinct>",
+        "specific_context": "<concrete facts: file names, error messages, API shapes, config values>",
+        "thematic_assignments": "<which agents or phases this instinct applies to>",
+        "files_touched": ["<path/to/relevant/file1>", "<path/to/relevant/file2>"]
+      }
+      ```
+
+      This format maps to distinct retrieval needs: `exchange_core` feeds reasoning steps; `specific_context` feeds implementation; `thematic_assignments` feeds coordination; `files_touched` feeds change-impact analysis. Apply this format when writing new instinct descriptions and when re-writing merged instincts — do not reformat existing instincts in bulk unless a consolidation pass is already running.
+
 ### Counterfactual & Operator
 
 5. **Counterfactual Accuracy Review** (optional, shadow-run check):

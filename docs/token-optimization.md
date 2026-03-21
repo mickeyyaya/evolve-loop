@@ -14,6 +14,7 @@ How the evolve-loop minimizes token usage across agents and cycles.
 | Research Cooldown | ~15-30K per avoided search | Repeated queries within 12hr |
 | Token Budget Schema | Prevents runaway costs | Every task and cycle |
 | Auditor Adaptive Strictness | ~10-20K per routine audit | After 5 consecutive clean audits |
+| Structured Distillation | 11x compression (371→38 tokens), 96% retrieval quality | Memory consolidation (every 3 cycles) |
 
 ---
 
