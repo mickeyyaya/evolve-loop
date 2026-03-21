@@ -271,6 +271,25 @@ evolve-loop/
 └── notes.md             # Cross-cycle context (append-only)
 ```
 
+## Research & Optimization
+
+<!-- challenge: 2d1190ca57c390ec -->
+
+The loop's design is grounded in applied research. Over 30 papers were surveyed covering context optimization, reward hacking detection, and agent efficiency to inform the pipeline's architecture and self-improvement mechanisms.
+
+Key techniques applied from that research:
+
+- **Phase isolation** — separate context windows per agent phase to prevent cross-contamination
+- **Dynamic turn budgets** — per-task token limits adjusted by complexity and strategy
+- **Compression** — instinct clustering, memory decay, and plan template caching to reduce redundancy
+- **Model routing** — 3-tier abstraction (tier-1/tier-2/tier-3) matching task complexity to model capability
+- **Graph exploration** — prerequisite task graphs with dependency-aware scheduling
+
+Human-readable research reports are in `docs/`:
+
+- [docs/research-applied-context-optimization.md](docs/research-applied-context-optimization.md) — main report: techniques surveyed, what was applied, and measured impact
+- [docs/human-learning-guide.md](docs/human-learning-guide.md) — plain-language guide to understanding what the loop learns and why it makes the decisions it does
+
 ## Requirements
 
 - AI CLI (like Gemini CLI or Claude Code)
