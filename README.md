@@ -209,14 +209,19 @@ evolve-loop/
 │   ├── evolve-scout.md        # Discovery + task selection
 │   ├── evolve-builder.md      # Design + implement
 │   ├── evolve-auditor.md      # Review + security + eval
-│   └── evolve-operator.md     # Loop monitoring
+│   ├── evolve-operator.md     # Loop monitoring
+│   └── agent-templates.md     # Shared Input/Output schemas
 ├── skills/
 │   └── evolve-loop/
 │       ├── SKILL.md           # Entry point + orchestrator
-│       ├── phases.md          # Phase-by-phase instructions
+│       ├── phases.md          # Phase sequencing (orchestrator)
+│       ├── phase0-calibrate.md # CALIBRATE (once per invocation)
+│       ├── phase2-build.md    # BUILD orchestration + parallelization
+│       ├── phase4-ship.md     # SHIP (commit + push)
+│       ├── phase5-learn.md    # LEARN (per-cycle instinct extraction)
+│       ├── phase6-metacycle.md # META-CYCLE (every 5 cycles)
 │       ├── memory-protocol.md # Workspace, ledger, state schema
 │       ├── eval-runner.md     # Eval gate instructions
-│       ├── phase5-learn.md    # LEARN phase instinct extraction
 │       └── benchmark-eval.md  # Benchmark evaluation framework
 ├── docs/
 │   ├── accuracy-self-correction.md  # CoT + multi-stage verification

@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.6.0] - 2026-03-22
+
+### Added
+- **Phase decomposition** — monolithic phases.md split into focused modules: `phase0-calibrate.md`, `phase2-build.md`, `phase5-learn.md`, `phase6-metacycle.md` (cycles 122-125)
+- **Agent templates** — `agents/agent-templates.md` consolidates shared Input/Output schemas across Scout, Builder, Auditor (cycle 122)
+- **Model routing doc** — `docs/model-routing.md` is the single source of truth for tier definitions, provider mappings, and routing rules (cycle 124)
+- **Changelog archive** — entries v2.0-v6.9 archived to `CHANGELOG-ARCHIVE.md`, keeping CHANGELOG.md lean (cycle 126)
+
+### Changed
+- **phases.md: 717 → 386 lines** (46% reduction) — Phase 0 and Phase 2 extracted to standalone modules
+- **phase5-learn.md: 596 → 334 lines** (44% reduction) — meta-cycle logic extracted to phase6-metacycle.md
+- **SKILL.md: 560 → 500 lines** (11% reduction) — model routing tables extracted to docs/model-routing.md
+- **token-optimization.md: 444 → 412 lines** — model routing duplication removed (references docs/model-routing.md)
+- **CHANGELOG.md: 368 → 102 lines** — old entries archived
+- **Shared values consolidated** — memory-protocol.md Layer 0 references SKILL.md as canonical source (no duplication)
+- **Dead state.json fields removed** — `processRewards` replaced by `processRewardsHistory` in schema
+- **Instinct docs deduplicated** — docs/self-learning.md references phase5-learn.md instead of duplicating algorithms
+- **Estimated token savings: 24-42K per cycle** (8-14% reduction) from modular loading and deduplication
+
+### Architecture
+```
+Before (v7.5.0):                    After (v7.6.0):
+phases.md (717 lines)               phases.md (386) — orchestrator sequencing
+                                    ├── phase0-calibrate.md (99) — once per invocation
+                                    ├── phase2-build.md (297) — build orchestration
+                                    ├── phase4-ship.md (244) — shipping
+                                    ├── phase5-learn.md (334) — per-cycle learning
+                                    └── phase6-metacycle.md (191) — every 5 cycles
+
+3 agents × duplicated boilerplate   agent-templates.md (68) + 3 lean agents
+1 monolithic model routing table    docs/model-routing.md (single source of truth)
+```
+
+## [7.5.0] - 2026-03-22
+
+### Added
+- **Platform compatibility doc** (`docs/platform-compatibility.md`) — tool mapping tables for 6 platforms, model tier mappings for 7 providers
+- **Multi-platform agent frontmatter** — `capabilities`, `tools-gemini`, `tools-generic` fields in all 4 agents
+- **Provider-agnostic prompt caching** — guidance for Anthropic, Google, OpenAI, and self-hosted engines
+
+### Changed
+- Agent invocation abstracted from Claude Code `Agent` tool to platform dispatch blocks
+- Architecture doc updated: "host LLM session" replaces "Claude Code session"
+- Model tier mappings updated to March 2026 latest (Gemini 3.1, GPT-5.4, Mistral Large 3, Qwen 3.5)
+
 ## [7.4.0] - 2026-03-21
 
 ### Added
