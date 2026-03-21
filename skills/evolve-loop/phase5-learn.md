@@ -217,6 +217,52 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
 
    **Update lastCycleNumber** in state.json to the current cycle number after each cycle completes.
 
+6b. **What the Loop Learned This Session** (operator writes at session end):
+
+   When `isLastCycle` is true, the Operator writes a human-readable session summary to `$WORKSPACE_PATH/session-learned.md`. This file is for human consumption — written so an operator can read it and understand what the LLM learned without digging through ledger entries or instinct YAML files.
+
+   Template:
+
+   ```markdown
+   # What the Loop Learned This Session — Cycle {N} / Run {RUN_ID}
+
+   ## Key Patterns Discovered
+   <!-- Key patterns that emerged across multiple cycles this session.
+        Each entry should be a concrete, reusable insight — not a one-off observation. -->
+   - <key pattern 1: what was discovered and why it matters>
+   - <key pattern 2: ...>
+
+   ## Surprising Failures
+   <!-- Tasks or approaches that failed unexpectedly — surprising given the task difficulty,
+        prior instinct guidance, or eval setup. Include root cause if known. -->
+   - <surprising failure 1: what failed, why it was unexpected, what we learned>
+   - <surprising failure 2: ...>
+
+   ## What to Watch Next Session
+   <!-- Areas of concern, fragile files, or patterns worth monitoring.
+        These are NOT tasks — they are signals the Scout should factor into selection. -->
+   - <watch item 1>
+   - <watch item 2>
+
+   ## Instincts Worth Reviewing
+   <!-- Instincts that were frequently cited, newly graduated, reversed, or contradicted this session.
+        Include the instinct ID and a plain-language reason to review it. -->
+   | Instinct ID | Pattern | Reason to Review |
+   |-------------|---------|-----------------|
+   | inst-<NNN> | <pattern name> | <cited N times / newly graduated / contradicted / reversed> |
+
+   ## Session Snapshot
+   - Cycles run: <N>
+   - Tasks shipped: <X> / <Y> attempted
+   - Instincts added: <N> | Graduated: <N> | Archived: <N>
+   - Fitness delta: <start> → <end> (<+/- N>)
+   ```
+
+   Cross-reference: see [docs/human-learning-guide.md](../../docs/human-learning-guide.md) section 6 ("How to Learn from the Loop") for guidance on interpreting patterns and what makes a finding actionable for human operators.
+
+   **When to write:** Only on `isLastCycle: true`. Skip on mid-session cycles to avoid stale files.
+   **Archive:** Copy `session-learned.md` to `.evolve/history/cycle-{N}/session-learned.md` alongside the other workspace files.
+
 6. **Update notes.md** (rolling window — keeps file size bounded):
 
    Append the new cycle entry (under ship lock in Phase 4, so no concurrent writes):
