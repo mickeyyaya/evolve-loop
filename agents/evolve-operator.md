@@ -102,6 +102,29 @@ Write a concise Session Narrative (3-5 sentences) that tells the story of the cy
 - Report fitness trend in the operator log alongside the MAP-Elites fitness vector
 - When fitness is declining, recommend specific corrective actions (e.g., smaller tasks, strategy change, focus on weakest processRewards dimension)
 
+### 6c. Phase Contribution Analysis
+
+Inspired by HiveMind DAG-Shapley (arXiv:2512.06432, AAAI 2026), which quantifies each node's marginal contribution to a collaborative outcome in a directed acyclic graph. Applied here without the math: track which pipeline phase consumed the most tokens, caused the most retries, and produced output most useful to downstream phases.
+
+For each cycle, record:
+- **Tokens consumed per phase** — estimate from ledger entry sizes and known model tier costs. Flag any phase where tokens consumed exceeded 30% of total cycle budget.
+- **Retries per phase** — read `auditIterations` from build-report.md (Builder retries) and any Scout re-runs. A phase with 2+ retries is a reliability risk.
+- **Downstream utility** — did the Scout's chosen task lead to a clean build? Did the Builder's output pass audit on first attempt? Did the Auditor's feedback result in an instinct? Score 1 (yes) or 0 (no) per phase.
+
+Include a phase contribution table in `operator-log.md`:
+
+```markdown
+## Phase Contribution
+| Phase | Tokens Consumed | Retries | Downstream Utility |
+|-------|----------------|---------|-------------------|
+| Scout | ~N tokens | N | 1/0 |
+| Builder | ~N tokens | N | 1/0 |
+| Auditor | ~N tokens | N | 1/0 |
+| Operator | ~N tokens | N | — |
+```
+
+Use this table to identify which phases waste tokens and which deserve more budget. If a phase consistently scores 0 on downstream utility for 3+ cycles, flag it in the Recommendations section as a structural inefficiency.
+
 ### 6b. Benchmark Trend Monitoring
 - Read `projectBenchmark` from `stateJson` (if `lastCalibrated` is non-null)
 - Report benchmark `overall` score and per-dimension composites alongside the fitness trend
