@@ -341,11 +341,11 @@ The evolve-loop uses a **3-tier model abstraction** so it works across any LLM p
 
 The orchestrator resolves tiers to concrete models based on the active provider. Default mappings (override via `.evolve/models.json`):
 
-| Tier | Anthropic (Claude) | Google (Gemini) | OpenAI | Mistral | DeepSeek | Open-Weight (Llama/etc.) |
-|------|-------------------|-----------------|--------|---------|----------|------------------------|
-| **tier-1** | claude-opus-4-6 | gemini-2.5-pro (thinking) | gpt-5.4 / o3 | mistral-large-2512 | deepseek-reasoner (R1) | llama-4-maverick |
-| **tier-2** | claude-sonnet-4-6 | gemini-2.5-flash | gpt-5.4-mini / o4-mini | mistral-medium-3.1 | deepseek-chat (V3.1) | llama-4-scout |
-| **tier-3** | claude-haiku-4-5 | gemini-2.5-flash (no thinking) | gpt-4.1-nano | mistral-small-3.2 | deepseek-chat (cached) | — |
+| Tier | Anthropic (Claude) | Google (Gemini) | OpenAI | Mistral | DeepSeek | Open-Weight |
+|------|-------------------|-----------------|--------|---------|----------|------------|
+| **tier-1** | claude-opus-4-6 | gemini-3.1-pro | gpt-5.4 / o3-pro | mistral-large-3 | deepseek-reasoner (R1) | llama-4-behemoth |
+| **tier-2** | claude-sonnet-4-6 | gemini-3-flash | gpt-5.3-instant | mistral-small-4 | deepseek-chat (V3) | qwen-3.5-397b-a17b |
+| **tier-3** | claude-haiku-4-5 | gemini-3.1-flash-lite | gpt-5.4-nano | ministral-3-14b | deepseek-chat (cached) | qwen-3.5-9b |
 
 **Provider auto-detection:** The orchestrator infers the active provider from the host CLI environment:
 - Claude Code → Anthropic mappings

@@ -27,9 +27,9 @@ Switch to Google Gemini when hitting rate limits or experimenting with another p
 {
   "provider": "google",
   "tiers": {
-    "tier-1": "gemini-2.5-pro",
-    "tier-2": "gemini-2.5-flash",
-    "tier-3": "gemini-2.5-flash"
+    "tier-1": "gemini-3.1-pro",
+    "tier-2": "gemini-3-flash",
+    "tier-3": "gemini-3.1-flash-lite"
   },
   "overrides": { "meta-cycle": "tier-1", "scout": "tier-2", "builder": "tier-2", "auditor": "tier-2", "operator": "tier-3" }
 }

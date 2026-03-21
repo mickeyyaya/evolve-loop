@@ -58,11 +58,11 @@ Agent definitions include a `capabilities` field (platform-agnostic) and platfor
 
 The evolve-loop uses a 3-tier model abstraction. Map to your provider's models:
 
-| Tier | Purpose | Anthropic | Google | OpenAI | Mistral | DeepSeek | Open-Source |
-|------|---------|-----------|--------|--------|---------|----------|-------------|
-| **tier-1** | Deep reasoning, complex tasks | Claude Opus 4 | Gemini 2.5 Pro | o3 / GPT-4.1 | Mistral Large | DeepSeek R1 | Llama 4 Maverick |
-| **tier-2** | Standard development work | Claude Sonnet 4 | Gemini 2.5 Flash | GPT-4.1 mini | Mistral Medium | DeepSeek V3 | Qwen 3 235B |
-| **tier-3** | Lightweight tasks, monitoring | Claude Haiku 4 | Gemini 2.0 Flash-Lite | GPT-4.1 nano | Mistral Small | DeepSeek V3 | Qwen 3 30B |
+| Tier | Purpose | Anthropic | Google | OpenAI | Mistral | DeepSeek | Open-Weight |
+|------|---------|-----------|--------|--------|---------|----------|------------|
+| **tier-1** | Deep reasoning, complex tasks | Claude Opus 4.6 | Gemini 3.1 Pro | GPT-5.4 / o3-pro | Mistral Large 3 | DeepSeek R1 | Llama 4 Behemoth |
+| **tier-2** | Standard development work | Claude Sonnet 4.6 | Gemini 3 Flash | GPT-5.3 Instant | Mistral Small 4 | DeepSeek V3 | Qwen 3.5 (397B MoE) |
+| **tier-3** | Lightweight tasks, monitoring | Claude Haiku 4.5 | Gemini 3.1 Flash-Lite | GPT-5.4 nano | Ministral 3 (14B) | DeepSeek V3 (cached) | Qwen 3.5 (9B) |
 
 **Override via `.evolve/models.json`:**
 ```json
