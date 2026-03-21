@@ -102,6 +102,7 @@ Phase 3:   AUDIT ────── sequential ─── [Auditor] review + secu
            Δ CHECK ──── orchestrator ── benchmark delta gate (between AUDIT and SHIP)
 Phase 4:   SHIP ──────── orchestrator ── commit + push (inline, no agent)
 Phase 5:   LEARN ──────── orchestrator ── archive + instinct extraction + operator check
+Phase 6:   META-CYCLE ──── orchestrator ── self-improvement (every 5 cycles, conditional)
 ```
 
 For multiple tasks per cycle, Phase 2-3 uses dependency-aware parallelization:
@@ -313,6 +314,7 @@ cp -rp "$WORKSPACE_PATH"/* .evolve/workspace/ 2>/dev/null
 For detailed phase-by-phase instructions, see [phases.md](skills/evolve-loop/phases.md).
 For the shared memory protocol, see [memory-protocol.md](skills/evolve-loop/memory-protocol.md).
 For the eval hard gate instructions, see [eval-runner.md](skills/evolve-loop/eval-runner.md).
+For meta-cycle self-improvement (every 5 cycles), see [phase6-metacycle.md](skills/evolve-loop/phase6-metacycle.md).
 
 ## Agent Definitions
 
