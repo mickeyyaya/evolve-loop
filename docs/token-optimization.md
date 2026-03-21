@@ -34,6 +34,35 @@ The orchestrator selects the model tier for each agent invocation based on phase
 
 The `repair` strategy always uses tier-2+ for Builder (accuracy over cost). The `innovate` strategy permits tier-3 for Auditor on style-only checks. tier-1 routing targets decision points with multiplicative downstream impact — ~6.5% cost increase per 5-cycle session, offset by fewer wasted retries.
 
+### Concrete Anthropic Model Mappings
+
+<!-- challenge-token: e191a9b7aee996f9 -->
+
+The tier system maps to specific Anthropic models as follows:
+
+| Tier | Model | Relative Cost | When to Use |
+|------|-------|--------------|-------------|
+| tier-1 | Claude Opus 4.6 | 1x (baseline) | Architectural decisions, meta-cycle review, security-sensitive audits, audit retries, goal-directed cycle 1-2 scout runs |
+| tier-2 | Claude Sonnet 4.6 | ~0.2x | Default for Scout, Builder, Auditor, and Self-Evaluation phases; most tasks land here |
+| tier-3 | Claude Haiku 4.5 | ~0.067x | Calibration, post-cycle Operator runs, incremental scout scans, Builder on S-complexity tasks with plan cache hit, Auditor on clean reports |
+
+**Cost ratios** are approximate relative to Claude Opus 4.6 at time of publication. Claude Sonnet 4.6 delivers ~80-95% of Opus quality at ~20% of the cost for code generation and structured reasoning tasks. Claude Haiku 4.5 delivers ~70-85% of Opus quality at ~6-7% of the cost for well-scoped, narrow tasks.
+
+**MasRouter research context:** The MasRouter framework (arXiv:2502.11133, "MasRouter: Learning to Route LLMs for Multi-Agent Systems") demonstrates 52-70% cost reduction through intelligent model routing in multi-agent systems without sacrificing task success rates. The evolve-loop tier system implements the same core principle: route each phase to the cheapest model that can handle it reliably, rather than defaulting to the most capable model for every call.
+
+### Quality Guardrails for Tier Downgrading
+
+Downgrading to a cheaper tier is only permitted when quality metrics confirm the cheaper model handles the task type well. Never sacrifice quality just for cost savings.
+
+**Quality thresholds for tier changes:**
+
+- **tier-2 → tier-3 (Sonnet → Haiku):** Allowed only when `consecutiveClean >= 3` for the same task type AND the task complexity is S or XS. If any Auditor WARN or FAIL verdict occurs after a tier-3 downgrade, the downgrade is reverted for that task type and `consecutiveClean` resets to 0.
+- **tier-1 → tier-2 (Opus → Sonnet):** Allowed for all standard phases after cycle 1. Upgrade back to tier-1 is triggered automatically on: audit retry (attempt >= 2), security-sensitive file changes, or eval grader failure.
+- **quality guard — eval gate:** Before finalizing a tier-3 downgrade for Builder, the orchestrator checks that the last 3 builds of the same task type passed eval graders on the first attempt. A first-attempt eval failure rate > 33% for a task type blocks tier-3 routing for that type.
+- **quality threshold — benchmark regression:** If the overall benchmark score drops more than 3 points across a 5-cycle window, the orchestrator suspends all tier-3 Builder routing until the benchmark recovers, regardless of `consecutiveClean` counts.
+
+These quality guardrails ensure that model routing decisions compound positively over time: cheaper tiers earn their routing allocation through demonstrated reliability, and lose it immediately when quality degrades.
+
 ---
 
 ## KV-Cache Prefix Optimization
