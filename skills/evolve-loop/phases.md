@@ -322,6 +322,18 @@ After Scout completes:
   - Pass it to the Scout as context so it avoids the stagnant area
   - If 3+ stagnation patterns are active simultaneously → trigger Operator HALT
 
+### Context Quality Checklist (CEMM)
+
+Based on the Context Engineering Maturity Model (arXiv:2603.09619), apply these five criteria to every context block assembled in Phase 1 before passing it to the Scout:
+
+1. **Relevance** — Is this context needed by the current phase? _(e.g., do not send the full benchmark report to Scout when Scout only needs `benchmarkWeaknesses`)_
+2. **Sufficiency** — Does the context have enough info for the agent to complete its task? _(e.g., Scout needs `recentNotes` + `changedFiles` + `stateJson` to propose meaningful tasks — omitting any one risks shallow proposals)_
+3. **Isolation** — Is this phase's context independent from other phases' internal state? _(e.g., Scout context must NOT include Builder worktree paths or Auditor verdicts from the same cycle — those are internal to later phases)_
+4. **Economy** — Are we sending the minimum tokens needed? _(e.g., pass `recentLedger` as last 3 lines, not the full ledger; pass instinct compact summary, not raw YAML files)_
+5. **Provenance** — Can we trace where each piece of context came from? _(e.g., `builderNotes` is sourced from `$WORKSPACE_PATH/builder-notes.md`, falling back to `.evolve/workspace/builder-notes.md` — always document the source path)_
+
+Violations should be logged in the build report under **Risks** and flagged to the Auditor.
+
 ### Inter-Phase Handoff Format
 
 Each phase writes a structured handoff file to `$WORKSPACE_PATH/handoff-<phase>.json` for the next phase to consume. This compact contract eliminates redundant file re-reads across phase boundaries, targeting 40-60% token savings on cross-phase context.
