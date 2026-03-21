@@ -27,6 +27,10 @@ All agents are self-contained. No dependency on external plugins or frameworks.
 ### 7. Strategy-Driven Execution
 Five strategy presets (`balanced`, `innovate`, `harden`, `repair`, `ultrathink`) shape task selection, build approach, and audit strictness across all phases.
 
+## Execution Model
+
+The orchestrator is the user's Claude Code session. It is **not** a separate LLM process. It follows the instructions in `phases.md` as a prompt, not as executable code. Each agent (Scout, Builder, Auditor, Operator) is launched as an independent subagent via Claude Code's `Agent` tool — each with its own context window. The orchestrator session's context contains only the phase instructions (static, cached), the current cycle's state (~2-5K tokens), and agent return summaries (~1-2K per agent). This design means there is no persistent "Orchestrator LLM" consuming tokens to hold loop state.
+
 ## Pipeline
 
 ```
@@ -44,6 +48,33 @@ Scout → [Task A, Task B, Task C]
   → Builder(B) → Auditor(B) → commit
   → Builder(C) → Auditor(C) → commit
 → Ship → Learn
+```
+
+### Phase Gate Table
+
+Each phase transition is guarded by deterministic preconditions. No transition proceeds unless all preconditions are satisfied.
+
+| Transition | Preconditions | Deterministic Check | Failure Action |
+|-----------|---------------|-------------------|---------------|
+| Calibrate → Discover | Benchmark scores computed and stored in state.json | `benchmark-report.md` exists and is non-empty | Halt with calibration error |
+| Discover → Build | Scout report exists with selected tasks; eval definitions created; eval quality passes | `scout-report.md` non-empty; `eval-quality-check.sh` exit 0; eval checksums captured | Halt if Level 0 evals; warn if Level 1 |
+| Build → Audit | Build report exists with PASS status; worktree changes committed | `build-report.md` non-empty with status PASS; eval checksums unchanged (`sha256sum -c`) | Skip task after 3 failures |
+| Audit → Ship | Audit verdict PASS; pre-ship integrity gate passes | `verify-eval.sh` exit 0; `cycle-health-check.sh` exit 0 (11 signals); benchmark delta check passes | Halt with evidence on any anomaly |
+| Ship → Learn | Changes committed to main; state.json updated | `git status --porcelain` clean; state.json version incremented | Halt with commit failure details |
+
+### Phase Boundary Precondition Assertions
+
+Lightweight checks that run at each phase boundary to catch skipped phases:
+
+```bash
+# Before Build: verify Scout output exists and is substantive
+[ -s "$WORKSPACE_PATH/scout-report.md" ] || { echo "HALT: Scout report missing or empty"; exit 1; }
+
+# Before Audit: verify build report exists and is substantive
+[ -s "$WORKSPACE_PATH/build-report.md" ] || { echo "HALT: Build report missing or empty"; exit 1; }
+
+# Before Ship: verify audit report exists
+[ -s "$WORKSPACE_PATH/audit-report.md" ] || { echo "HALT: Audit report missing or empty"; exit 1; }
 ```
 
 Every 5 cycles, Phase 5 includes a **meta-cycle**: split-role critique, agent effectiveness evaluation, prompt evolution, and mutation testing.
@@ -225,4 +256,5 @@ A human-readable map of all research-related documents in the `docs/` directory.
 | [docs/persistent-memory-architecture.md](persistent-memory-architecture.md) | Mem0-inspired cross-session memory design |
 | [docs/human-learning-guide.md](human-learning-guide.md) | Guide for humans to learn from the evolve-loop |
 | [docs/agentic-reward-hacking.md](agentic-reward-hacking.md) | Awareness-first anti-reward-hacking design |
+| [docs/thesis-orchestration-architecture.md](thesis-orchestration-architecture.md) | Why file-driven choreography cannot replace adaptive orchestration |
 | [docs/security-considerations.md](security-considerations.md) | Pipeline security mechanisms |

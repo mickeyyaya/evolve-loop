@@ -384,6 +384,14 @@ Each phase writes a structured handoff file to `$WORKSPACE_PATH/handoff-<phase>.
 
 ---
 
+### Phase Boundary: DISCOVER → BUILD
+
+Before entering Phase 2, run precondition assertions:
+```bash
+# Verify Scout produced substantive output
+[ -s "$WORKSPACE_PATH/scout-report.md" ] || { echo "HALT: Scout report missing or empty — Phase 1 may have been skipped"; exit 1; }
+```
+
 ### Phase 2: BUILD (loop per task)
 
 **Task Execution Ordering & Parallelization:** Before starting the build loop, partition the task list into two groups:
@@ -496,6 +504,14 @@ After Builder completes:
   - **Do NOT merge yet** — worktree changes stay isolated until the Auditor passes
 
 ---
+
+### Phase Boundary: BUILD → AUDIT
+
+Before entering Phase 3, run precondition assertions:
+```bash
+# Verify Builder produced substantive output
+[ -s "$WORKSPACE_PATH/build-report.md" ] || { echo "HALT: Build report missing or empty — Phase 2 may have been skipped"; exit 1; }
+```
 
 ### Phase 3: AUDIT (Parallel)
 
