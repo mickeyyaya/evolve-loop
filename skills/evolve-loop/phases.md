@@ -279,7 +279,8 @@ Launch **Scout Agent** (model: per routing table — tier-1 if cycle 1 or goal-d
     "builderNotes": "<contents of builder-notes.md from last cycle, or empty string>",
     "recentLedger": "<last 3 ledger entries, inline>",
     "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint} from Phase 0, or empty>",
-    "challengeToken": "<$CHALLENGE>"
+    "challengeToken": "<$CHALLENGE>",
+    "handoffFromOperator": "<contents of handoff-operator.json from previous cycle, or null>"
   }
   ```
 
@@ -451,7 +452,8 @@ Launch **Builder Agent** (model: per routing table — tier-3 if S-complexity + 
     // --- Dynamic ---
     "cycle": <N>,
     "task": <task object from scout-report — includes inline eval graders>,
-    "challengeToken": "<$CHALLENGE>"
+    "challengeToken": "<$CHALLENGE>",
+    "handoffFromScout": "<contents of handoff-scout.json>"
   }
   ```
 - **Note:** Builder reads eval acceptance criteria from the task object in scout-report.md (inline `Eval Graders` field) instead of reading separate eval files. Builder still reads full eval files from `evalsPath` only if inline graders are missing.
@@ -525,7 +527,8 @@ Launch **Auditor Agent** (model: per routing table — tier-2 default, tier-1 fo
     "buildReport": "<$WORKSPACE_PATH>/build-report.md",
     "recentLedger": "<last 3 ledger entries, inline>",
     "challengeToken": "<$CHALLENGE>",
-    "forceFullAudit": <$FORCE_FULL_AUDIT>
+    "forceFullAudit": <$FORCE_FULL_AUDIT>,
+    "handoffFromBuilder": "<contents of handoff-builder.json>"
   }
   ```
 
