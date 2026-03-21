@@ -248,9 +248,40 @@ Relevance to evolve-loop: The `planCache` mechanism in `state.json` (similarity 
 
 ## Dynamic Turn Limits
 
-Hard turn caps in multi-turn agent loops are a blunt instrument. A probability-based approach cuts costs ~24% while maintaining solve rates.
+Hard turn caps in multi-turn agent loops are a blunt instrument. Research on SWE-bench shows that dynamic turn budgets achieve 24-68% cost reduction with minimal solve-rate impact, and an additional 12-24% savings beyond fixed limits when extensions are only granted on-demand (Turn-Control, arXiv:2510.16786).
 
 **The core problem:** Token usage in agentic loops grows quadratically with turn count (each turn adds to the context for all subsequent turns). A loop that runs 2x too many turns costs roughly 4x as many tokens on average.
+
+### Per-Phase Turn Budgets
+
+| Phase | Default Budget | Extension Policy |
+|-------|---------------|-----------------|
+| Scout | 5 turns | None — tight budget enforced; Scout must produce a task list within 5 turns |
+| Builder | 10 turns | Dynamic extension: up to 5 additional turns granted when measurable progress is detected (eval delta > 0 or files changed) |
+| Auditor | 3 turns | None — verdict must be reached within 3 turns; complexity escalates to tier-1 model instead |
+| Operator | 2 turns | None — Operator writes state updates and brief; any deeper analysis deferred to meta-cycle |
+
+The 75th percentile of historical usage is the recommended sweet spot for fixed limits (Turn-Control, arXiv:2510.16786). The budgets above are set at approximately the 75th percentile based on observed evolve-loop phase durations.
+
+### Builder Dynamic Extension Mechanism
+
+When Builder reaches turn 10, the orchestrator evaluates continuation criteria before granting additional turns:
+
+1. **Progress check:** Has at least one file been modified since the last extension grant? If no files changed in the last 3 turns, the build is classified as stuck (see Early-Exit Detection below).
+2. **Eval delta check:** If eval graders were run, did any grader status improve since the last turn? A flat or regressing eval score signals diminishing returns.
+3. **Extension grant:** If both checks pass, up to 5 additional turns are granted (total cap: 15 turns). Extensions are non-renewable — if the builder reaches 15 turns it must report FAIL.
+4. **Reason logging:** The orchestrator logs the extension grant reason in the ledger (`"type": "turn-extension"`) for retrospective analysis.
+
+### Early-Exit Detection for Stuck Builds
+
+Source: Fan et al., arXiv:2509.09853 (SWE-Effi, Sep 2025). Agents burn massive tokens on unsolvable problems without recognizing they are stuck. Token accumulation becomes a snowball: each additional turn re-encodes the full conversation history, compounding the cost with no marginal progress.
+
+**Stuck build signals:**
+- No file changes in the last 3 consecutive turns
+- The same error or test failure repeating without variation across 2+ attempts
+- Token spend exceeds 60K with zero eval graders passing
+
+**On stuck detection:** The orchestrator terminates the build immediately (early exit), writes a FAIL report with `"stuckBuild": true`, and records the turn at which the stuck pattern was detected. The Scout picks this up next cycle and recommends a smaller or differently-scoped task.
 
 **Pattern — marginal value gating:**
 
@@ -258,7 +289,7 @@ Hard turn caps in multi-turn agent loops are a blunt instrument. A probability-b
 2. Compute the expected marginal value of one more turn: `E[value_gain] = completion_probability_delta * task_value`.
 3. Stop early when `E[value_gain] < turn_cost` — i.e., when the expected improvement no longer justifies the token expenditure.
 
-**Evolve-loop application:** The `tokenBudget.perTask` soft limit (80K tokens) and Scout's task-sizing rules act as a static approximation of this dynamic approach. A future improvement would track per-turn token spend and emit a stop signal when marginal progress (measured by eval score delta) falls below a configurable threshold.
+**Evolve-loop application:** The `tokenBudget.perTask` soft limit (80K tokens) and Scout's task-sizing rules act as a static approximation of this dynamic approach. The per-phase budgets above replace the single flat limit with phase-appropriate defaults backed by the Turn-Control research (arXiv:2510.16786).
 
 ---
 
