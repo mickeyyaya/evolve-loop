@@ -82,7 +82,7 @@ The Auditor applies a reduced checklist for task types that have demonstrated re
 }
 ```
 
-**Reduced-checklist rule:** If the current task's type has `consecutiveClean >= 8`, skip checklist sections A (Code Quality) and C (Pipeline Integrity) — run only sections B (Security), D (Eval Integrity and Rigor), E (Eval Gate), and F (Multi-Stage Verification if applicable). Log `"adaptive:reduced"` in the audit report verdict line.
+**Reduced-checklist rule:** If the current task's type has `consecutiveClean >= 8`, skip checklist sections A (Code Quality), B2 (Hallucination Detection), and C (Pipeline Integrity) — run only sections B (Security), D (Eval Integrity and Rigor), E (Eval Gate), and F (Multi-Stage Verification if applicable). Log `"adaptive:reduced"` in the audit report verdict line.
 
 **IMPORTANT: Sections D (Eval Integrity) and E (Eval Gate) are NEVER skipped.** These are the primary anti-cheating checks and must run on every cycle regardless of adaptive profile. (Research basis: "Alignment Faking in Large Language Models" — agents behave differently under perceived scrutiny. Consistent evaluation prevents gaming.)
 
@@ -122,6 +122,20 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - [ ] No unvalidated external input flowing into commands
 - [ ] No information leakage in error messages
 
+### B2. Hallucination Detection
+
+Checks for fabricated APIs, nonexistent imports, and phantom function signatures — a common LLM failure mode that can ship silently when eval graders don't exercise the hallucinated code path. (Research basis: agent-self-evaluation-patterns — hallucination is a distinct failure class from logic errors.)
+
+- [ ] **Import verification:** For each new `import`/`require`/`from` statement in the diff, verify the module exists:
+  - Internal imports: `grep -r "export.*<name>" src/` (or project-appropriate search path)
+  - External imports: check `package.json`, `requirements.txt`, `go.mod`, `Cargo.toml`, or language-equivalent manifest
+  - If the imported symbol is not found in either location → flag as POTENTIAL_HALLUCINATION (MEDIUM severity)
+- [ ] **API signature verification:** For each call to a function NOT defined in the changed files themselves, grep for its definition in the codebase. If not found in the project or in documented dependencies → POTENTIAL_HALLUCINATION (MEDIUM)
+- [ ] **Config key verification:** For new config keys, environment variables, or CLI flags referenced by the Builder, verify they exist in actual config files, `.env.example`, or documentation
+- [ ] **Escalation rule:** Two or more POTENTIAL_HALLUCINATION findings in the same build → escalate all to HIGH severity
+
+**Adaptive strictness:** This section follows the same `consecutiveClean >= 8` reduced-checklist rules as Sections A and C (can be skipped for reliable task types). Always runs when `strategy` is `harden` or `repair`, when `forceFullAudit` is true, or when the task modifies agent/skill files.
+
 ### C. Pipeline Integrity
 - [ ] Agent files still have required structure (if modified)
 - [ ] Cross-references between files still resolve
@@ -146,6 +160,17 @@ Read `workspace/agent-mailbox.md` for messages addressed `to: "auditor"` or `to:
 - [ ] **Regression Check:** The eval definition does NOT bypass regression testing with dummy commands (e.g., `echo "no tests"` or `exit 0`).
 - [ ] **Challenge Token:** Verify `challengeToken` appears in scout-report.md and build-report.md (Section 2b above)
 - If tampering, trivial evals, bypassed pipelines, or missing challenge tokens are detected → CRITICAL severity, automatic FAIL
+
+### D2. Step-Confidence Cross-Validation
+
+Cross-reference the Builder's step-level confidence table (from `build-report.md` "Build Steps" section) against your own findings. This detects calibration mismatches — steps where the Builder's self-assessment diverges from actual quality. (Research basis: eval-harness process rewards + Confidence-Correctness Alignment from `docs/accuracy-self-correction.md`.)
+
+- [ ] Read the Builder's `## Build Steps` table from build-report.md
+- [ ] For each step where Builder reported **confidence >= 0.8**: if you found an issue in that step's output → flag as CALIBRATION_MISMATCH (LOW severity, logged for Phase 5 learning). This indicates Builder overconfidence on this step type.
+- [ ] For each step where Builder reported **confidence < 0.7**: apply extra scrutiny to that step's output. Verify the Builder's self-doubt was warranted — if the step's output is actually fine, note it (Builder was overly cautious).
+- [ ] If the Build Steps table is missing or has generic placeholder steps → flag as MEDIUM warning (Builder must report meaningful step-level confidence)
+
+Step-confidence data feeds into Phase 5 LEARN for per-step pattern extraction. Do NOT block shipping on CALIBRATION_MISMATCH alone — it is an informational signal for meta-cycle analysis.
 
 ### E. Eval Gate
 - Run ALL eval graders from `evals/<task-slug>.md`
@@ -200,6 +225,13 @@ See `docs/accuracy-self-correction.md` for the full pattern specification.
 | No hardcoded secrets | PASS/FAIL | <detail> |
 | No injection vectors | PASS/FAIL | <detail> |
 | No info leakage | PASS/FAIL | <detail> |
+
+## Hallucination Detection
+| Check | Status | Details |
+|-------|--------|---------|
+| Import verification | PASS/WARN | <detail> |
+| API signature verification | PASS/WARN | <detail> |
+| Config key verification | PASS/WARN | <detail> |
 
 ## Pipeline Integrity
 | Check | Status | Details |

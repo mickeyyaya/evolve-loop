@@ -81,6 +81,33 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    ```
    Scout and Builder read `instinctSummary` from state.json instead of reading all instinct YAML files. Full instinct files are only read during consolidation (every 3 cycles) or when `instinctCount` has changed since last cycle.
 
+## Step-Level Process Reward Analysis
+
+After instinct extraction and before graduation, analyze the Builder's step-level confidence data from `build-report.md` and the Auditor's cross-validation from `audit-report.md`. This per-step analysis enables targeted Builder prompt improvements — not shotgun corrections. (Research basis: eval-harness process rewards — scoring intermediate steps yields finer learning signal than cycle-level evaluation.)
+
+**Aggregation steps:**
+1. Read the `## Build Steps` table from `build-report.md` — extract step descriptions, confidence scores, and any "Low-confidence step" flags
+2. Read CALIBRATION_MISMATCH entries from `audit-report.md` (Section D2) — these are steps where Builder confidence diverged from Auditor findings
+3. Cross-reference: which step types consistently show low confidence? Which show overconfidence (high confidence + Auditor issues)?
+
+**Pattern extraction triggers:**
+- If the same step type (e.g., "write eval graders") has confidence < 0.7 across 2+ recent cycles → extract a procedural instinct targeting that weakness (e.g., "When writing eval graders for documentation tasks, always include a coverage check for required sections")
+- If a step type has CALIBRATION_MISMATCH across 2+ cycles → extract an episodic instinct about overconfidence in that area
+- Feed step-level patterns into the meta-cycle's Agent Effectiveness Review (Section 7c) — the Efficiency Critic and Correctness Critic should reference step-level data when evaluating Builder performance
+
+**State tracking:**
+- Append step-level summary to `state.json` under `processRewardsHistory` (keep last 5 cycles):
+  ```json
+  {
+    "cycle": <N>,
+    "steps": [
+      {"description": "<step>", "builderConfidence": 0.8, "auditorIssue": false},
+      {"description": "<step>", "builderConfidence": 0.6, "auditorIssue": true, "mismatchType": "overconfident"}
+    ]
+  }
+  ```
+- The meta-cycle reads `processRewardsHistory` to identify systematic Builder weaknesses across 5-cycle windows
+
 ## Instinct Graduation
 
    Instinct graduation promotes high-confidence, repeatedly-confirmed instincts to mandatory guidance status. Run the graduation check during Phase 5 LEARN, after Instinct Citation Collection (step 3) and before consolidation — check all instincts with confidence >= 0.75 that are not yet graduated.
@@ -381,6 +408,76 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
       - Maximum 2 prompt edits per meta-cycle
       - All edits are committed and can be reverted with `git revert`
       - If an evolved prompt leads to worse performance in the next meta-cycle, auto-revert the change
+
+   d2. **Skill Synthesis Check** (meta-cycle only — after prompt evolution, before mutation testing):
+
+      After the split-role critique and prompt evolution, check whether any instinct clusters are ready to graduate into executable artifacts. This closes the loop between learning and capability expansion — instincts become structurally durable genes or skill fragments rather than passive hints. (Research basis: continuous-learning-v2 instinct→skill graduation, self-learning-agent-patterns pattern graduation pipelines.)
+
+      **Step 1: Identify synthesis candidates**
+      Query `instinctSummary` in state.json for clusters of 3+ instincts that meet ALL criteria:
+      - Same `category` (all procedural, all semantic, or all episodic)
+      - Related patterns (overlapping keywords, shared target file types, or similar domain)
+      - All confidence >= 0.8
+      - None marked `graduated: true` already (avoid re-synthesizing)
+
+      **Step 2: Determine synthesis target** for each qualifying cluster:
+
+      **Option A — Synthesize a Gene** (when instincts describe a repeatable fix/implementation pattern):
+      Write to `.evolve/genes/<pattern-name>.md`:
+      ```markdown
+      # Gene: <pattern-name>
+      <!-- Synthesized from instincts: inst-012, inst-017, inst-023 at cycle N -->
+
+      ## Selector
+      When to apply: <conditions under which this gene matches — task type, file patterns, error signatures>
+
+      ## Steps
+      1. <concrete implementation step>
+      2. <concrete implementation step>
+      3. <concrete implementation step>
+
+      ## Validation
+      - `<bash command to verify the gene was applied correctly>`
+      - `<bash command to check for regressions>`
+
+      ## Source Instincts
+      - inst-012: <pattern summary>
+      - inst-017: <pattern summary>
+      - inst-023: <pattern summary>
+      ```
+
+      **Option B — Synthesize a Skill Fragment** (when instincts describe agent behavior improvements):
+      Propose an addition to the relevant agent's prompt. Gate through the same TextGrad validation used for prompt evolution:
+      1. Draft the skill fragment as a new markdown section (max 20 lines)
+      2. Generate a textual gradient: current behavior → desired behavior → text change
+      3. Validate against existing instincts and policies (no contradictions)
+      4. Apply via the prompt evolution mechanism (counts toward the 2-edit-per-meta-cycle limit)
+
+      **Step 3: Record synthesis** in `state.json.synthesizedTools`:
+      ```json
+      {
+        "name": "<pattern-name>",
+        "path": ".evolve/genes/<pattern-name>.md",
+        "purpose": "<one-line description>",
+        "sourceInstincts": ["inst-012", "inst-017", "inst-023"],
+        "cycle": <N>,
+        "useCount": 0,
+        "type": "gene|skill-fragment"
+      }
+      ```
+
+      **Step 4: Update source instincts**
+      - Mark all source instincts as `graduated: true` in `instinctSummary`
+      - These instincts stop decaying (confidence is preserved) but are no longer individually injected — the gene/skill fragment subsumes them
+
+      **Safety constraints:**
+      - Maximum 1 synthesis per meta-cycle (avoid bulk generation of untested artifacts)
+      - Synthesized genes must pass the eval-quality-check rigor filter (no trivial validation commands)
+      - Skill fragments are subject to the same auto-revert rule as prompt evolution edits
+      - Log synthesis in the ledger:
+        ```json
+        {"ts":"<ISO-8601>","cycle":<N>,"role":"orchestrator","type":"skill-synthesis","data":{"name":"<pattern-name>","type":"gene|skill-fragment","sourceInstincts":["inst-012","inst-017","inst-023"]}}
+        ```
 
    e. **Self-Generated Evaluation (mutation testing):**
 

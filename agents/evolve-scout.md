@@ -191,23 +191,33 @@ You may encounter situations where writing trivial eval commands (e.g., `grep -q
 
 ### 9. Write Eval Definitions
 
-For each selected task, write an eval definition to `.evolve/evals/<task-slug>.md`:
+For each selected task, write an eval definition to `.evolve/evals/<task-slug>.md`. **Tag every eval command with its grader type** — see `eval-runner.md` Grader Type Taxonomy for the three types:
 
 ```markdown
 # Eval: <task-name>
 
 ## Code Graders (bash commands that must exit 0)
-- `<test command targeting the change>`
+- `[code]` `<test command targeting the change>`
 
 ## Regression Evals (full test suite)
-- `<project test command>`
+- `[code]` `<project test command>`
 
 ## Acceptance Checks (verification commands)
-- `<grep or check command verifying the change exists>`
+- `[code]` `<grep or check command verifying the change exists>`
+
+## Model-Based Checks (optional — only when bash cannot verify the criterion)
+- `[model]` Rubric: "<scoring criteria with anchored score points>" — threshold: >= 60
 
 ## Thresholds
 - All checks: pass@1 = 1.0
 ```
+
+**Grader type selection rules:**
+- Default to `[code]` — model-based and human graders require explicit justification in the eval file
+- Use `[model]` only for subjective quality dimensions (documentation clarity, API ergonomics, error message friendliness) that cannot be expressed as bash exit codes
+- Use `[human]` only for security-sensitive or irreversible changes — maximum 1 per eval definition
+- Maximum 2 `[model]` graders per eval to control token cost
+- Every eval MUST have at least one `[code]` grader (pure model-based evals are not allowed)
 
 ## Output
 

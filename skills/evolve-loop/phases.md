@@ -235,7 +235,14 @@ RECENT_LEDGER=$(tail -3 .evolve/ledger.jsonl)
 # instinctSummary and ledgerSummary come from state.json (already read)
 ```
 
-**Shared values in agent context:** The Layer 0 core rules from `memory-protocol.md` must be included at the top of all agent context blocks. Placing shared values first maximizes KV-cache reuse across parallel agent launches — concurrent builders or auditors that share the same static prefix benefit from prompt cache hits without re-encoding the rules.
+**Shared values in agent context:** The Layer 0 core rules from `memory-protocol.md` AND the `sharedValues` block from `SKILL.md` must be included at the top of all agent context blocks. Include `sharedValues` as a JSON field in every agent's static context:
+```json
+{
+  "sharedValues": { /* from SKILL.md Shared Agent Values section */ },
+  // ... rest of agent context
+}
+```
+Apply agent-specific overrides as documented in SKILL.md (e.g., Auditor adds confidence-scoring, Operator removes ledger-entry). Placing shared values first maximizes KV-cache reuse across parallel agent launches — concurrent builders or auditors that share the same static prefix benefit from prompt cache hits without re-encoding the rules.
 
 **Prompt caching with Anthropic APIs:** When invoking agents via the Anthropic API directly, you can activate server-side prompt caching by marking the static prefix with a cache breakpoint. Only the fields that are stable across cycles need the marker — dynamic per-cycle fields must NOT carry it, because adding `cache_control` to a changing field invalidates the cache every cycle and eliminates any savings.
 
@@ -394,13 +401,30 @@ Before entering Phase 2, run precondition assertions:
 
 ### Phase 2: BUILD (loop per task)
 
-**Task Execution Ordering & Parallelization:** Before starting the build loop, partition the task list into two groups:
+**Task Execution Ordering & Parallelization:** Before starting the build loop, partition the task list into three groups:
 1. **Inline tasks** — S-complexity tasks eligible for orchestrator inline execution (per inst-007 policy)
-2. **Worktree tasks** — all other tasks requiring Builder agent in isolated worktree
+2. **Worktree tasks (independent)** — tasks whose `filesToModify` lists share NO files with other worktree tasks
+3. **Worktree tasks (dependent)** — tasks that share files with another task; these run sequentially after their dependency completes
 
-**Execute all inline tasks first sequentially, committing each before proceeding.** Then execute all worktree tasks **in parallel**. Parallel execution of worktree tasks drastically reduces the latency of the build phase. Because each task is isolated in its own worktree, they can safely be built concurrently.
+**Dependency partitioning algorithm:**
+```
+1. Read filesToModify from each worktree task in the Scout report
+2. Build a conflict graph: edge between tasks A and B if filesToModify(A) ∩ filesToModify(B) ≠ ∅
+3. Connected components in the conflict graph form sequential groups
+4. Tasks with no edges (no shared files) are independent — build in parallel
+5. Within a sequential group, run tasks in Scout's priority order
+```
 
-For each worktree task (running in parallel):
+**Execution sequence:**
+1. Execute all inline tasks first sequentially, committing each before proceeding
+2. Launch all independent worktree tasks **in parallel** via multiple `Agent` tool calls (each with `isolation: "worktree"`)
+3. After all parallel builds complete, audit each independently (also in parallel if multiple)
+4. Commit results sequentially in Scout's priority order (one at a time)
+5. Execute dependent worktree tasks sequentially after their dependencies commit
+
+Parallel execution of worktree tasks drastically reduces build phase latency. Because each task is isolated in its own worktree and the OCC protocol handles state.json conflicts, they can safely be built concurrently.
+
+For each worktree task:
 
 #### Build Isolation (by `projectContext.buildIsolation`)
 

@@ -167,6 +167,28 @@ If you encounter a task that cannot be solved with existing tools, instincts, or
 
 Report synthesized tools in the build report so the Auditor can verify them.
 
+### Step-Level Confidence Reporting
+
+For every task, report confidence per build step in `build-report.md`. This enables the Auditor to cross-validate confidence vs outcomes, and the meta-cycle to identify which build phases are weakest. (Research basis: eval-harness process rewards — scoring intermediate steps, not just final outcome.)
+
+**Required table in build-report.md:**
+
+```markdown
+## Build Steps
+| # | Step | Confidence | Notes |
+|---|------|-----------|-------|
+| 1 | Read task & plan approach | 0.9 | Clear task, known pattern from instinct |
+| 2 | Implement core logic | 0.8 | Straightforward but touched 3 files |
+| 3 | Write/run eval graders | 0.6 | Unsure if graders cover edge cases |
+| 4 | Self-verify & fix | 0.9 | All passed on first run |
+```
+
+**Rules:**
+- Steps must be specific to the actual work done, not generic placeholders
+- Step count should match task complexity (S: 3-4 steps, M: 5-7 steps)
+- Confidence < 0.7 on ANY step → flag in build-report.md as "Low-confidence step: <reason>"
+- Be honest — overconfidence triggers calibration mismatch flags from the Auditor; underconfidence wastes review cycles. Accuracy feeds model routing improvements.
+
 ### Quality Signal Reporting
 
 After self-verification and before committing, the Builder MUST record the following quality signals in `build-report.md`. These signals feed the orchestrator's model routing decisions — specifically, whether to escalate future builds of this task type to a tier-1 model.
@@ -238,6 +260,12 @@ Keep this file concise (under 20 lines). It is read by Scout in incremental mode
 - **Branch:** <worktree branch name from `git branch --show-current`>
 - **Commit:** <SHA from `git rev-parse HEAD`>
 - **Files changed:** <N>
+
+## Build Steps
+| # | Step | Confidence | Notes |
+|---|------|-----------|-------|
+| 1 | <step description> | <0.0-1.0> | <reasoning for confidence level> |
+| 2 | <step description> | <0.0-1.0> | <reasoning> |
 
 ## Changes
 | Action | File | Description |

@@ -73,14 +73,40 @@ Policies are hard rules the orchestrator enforces without discretion. They bypas
 - Pattern is general (not specific to one task type or file)
 - The orchestrator can enforce it deterministically
 
-## Stage 5: Skill or Gene (optional)
+## Stage 5: Skill or Gene (synthesis from instinct clusters)
 
-For patterns that are complex enough to warrant their own file:
+When 3+ instincts in the same domain cluster all reach confidence >= 0.8, they carry enough information to synthesize into an executable artifact. This is not optional decoration — it closes the loop between learning and capability expansion. (Research basis: continuous-learning-v2 instinct→skill graduation, self-learning-agent-patterns pattern graduation pipelines.)
 
-- **Gene** — a structured fix template with selector, steps, and validation. Written to `.evolve/genes/`. Genes describe *how to fix* with executable steps.
-- **Skill** — a full agent instruction set. Only created when a pattern is complex enough to warrant multi-step guidance.
+**Synthesis runs during the meta-cycle** (every 5 cycles, in Phase 5 step d2). The orchestrator identifies qualifying clusters and synthesizes them into one of two artifact types:
 
-Most instincts never reach this stage. The majority stabilize as confirmed instincts or orchestrator policies.
+### Gene — Structured Fix Template
+For instinct clusters that describe a repeatable implementation or fix pattern. Written to `.evolve/genes/<pattern-name>.md`.
+
+**Structure:**
+- **Selector** — conditions under which this gene matches (task type, file patterns, error signatures)
+- **Steps** — concrete implementation steps the Builder follows
+- **Validation** — bash commands to verify correct application
+- **Source Instincts** — provenance chain back to the original observations
+
+**Example:** Three instincts about documentation tasks ("always add a table of contents", "use heading anchors for cross-references", "include a last-updated date") synthesize into a gene `doc-structure-template` with a complete template the Builder applies when creating markdown documentation.
+
+### Skill Fragment — Agent Prompt Addition
+For instinct clusters that describe agent behavior improvements. Applied as a new section in the relevant agent's prompt file, gated through TextGrad validation.
+
+**Example:** Three instincts about eval writing ("test behavior not existence", "include regression checks", "use execution-based graders") synthesize into a 15-line "Eval Writing Guidance" section added to `evolve-scout.md`.
+
+### Synthesis Lifecycle
+```
+3+ instincts (same category, confidence >= 0.8)
+  → Meta-cycle identifies cluster
+  → Synthesize gene or skill fragment
+  → Record in state.json.synthesizedTools
+  → Mark source instincts as graduated
+  → Builder/Scout apply the artifact in future cycles
+  → useCount tracks adoption
+```
+
+**Most instincts never reach this stage.** The majority stabilize as confirmed instincts or orchestrator policies. Synthesis is reserved for clusters of related instincts that together describe a complete, reusable pattern.
 
 ## Memory Consolidation
 

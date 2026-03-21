@@ -44,6 +44,18 @@ Based on findings, the orchestrator may refine agent prompts using a critique-sy
 - All edits are committed and revertable via `git revert`
 - Auto-revert if next meta-cycle shows degradation
 
+## Skill Synthesis (after prompt evolution, before mutation testing)
+
+After the split-role critique and prompt evolution, check whether instinct clusters are ready to graduate into executable artifacts (genes or skill fragments). See `skills/evolve-loop/phase5-learn.md` step d2 for the full synthesis protocol and `docs/skill-building.md` Stage 5 for the artifact schemas.
+
+**Quick summary:**
+1. Find clusters of 3+ instincts with same category, all confidence >= 0.8
+2. Synthesize into a gene (`.evolve/genes/`) or skill fragment (agent prompt addition)
+3. Record in `state.json.synthesizedTools`, mark source instincts as `graduated: true`
+4. Maximum 1 synthesis per meta-cycle; subject to TextGrad validation and auto-revert
+
+This connects the meta-cycle's analysis of what was learned (instinct clusters) with structural capability expansion (genes/skills that future agents can apply directly).
+
 ## Self-Generated Mutation Testing
 
 Tests eval quality by generating code mutations:

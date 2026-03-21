@@ -6,6 +6,40 @@ The orchestrator (or Auditor agent) uses these instructions to run eval checks a
 
 Eval definitions are created by the Scout in Phase 1 and stored in `.evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
 
+## Grader Type Taxonomy
+
+Every eval command belongs to one of three types. Scout MUST tag each command when creating eval definitions. The type determines execution method, cost, and reliability characteristics.
+
+### Type 1: Code-Based `[code]` (deterministic — preferred)
+Bash commands that exit 0 on success. Use for all objectively verifiable criteria.
+- **Properties:** Fast, reproducible, zero token cost, no hallucination risk
+- **Examples:** `npm test`, `grep -r "export" src/`, `test -f output.json`, `python -c "import module"`
+- **When to use:** Always the default. Use code-based graders whenever the criterion can be expressed as a bash command.
+
+### Type 2: Model-Based `[model]` (LLM-as-Judge — for subjective dimensions)
+Uses an LLM to score output against a structured rubric. For quality dimensions that bash commands cannot verify.
+- **Properties:** Costs ~2-5K tokens per evaluation, requires anchored rubric, non-deterministic
+- **Examples:** "Is this documentation clear?", "Does this API design follow RESTful conventions?", "Is the error message user-friendly?"
+- **When to use:** Only when no code-based grader can capture the criterion. Scout writes a rubric with anchored score points (0/25/50/75/100). Auditor invokes a model-based judge (tier-3 model) with the rubric and the Builder's output.
+- **PASS threshold:** Average rubric score >= 60
+- **Cost control:** Maximum 2 model-based graders per eval definition. If more are needed, consolidate into a single rubric with multiple criteria.
+
+### Type 3: Human-Gated `[human]` (halt-and-ask — for security/architecture decisions)
+Halts the pipeline for human review. For decisions where automated scoring is insufficient.
+- **Properties:** Blocks pipeline until human responds. Use very sparingly.
+- **Examples:** "Does this auth change maintain least-privilege?", "Is this database migration reversible?", "Does this API contract break existing clients?"
+- **When to use:** Only for security-sensitive changes, irreversible operations, or architectural decisions. Scout tags eval as `[human]` with evidence for the reviewer.
+- **Execution:** Auditor presents the evidence and halts with a clear question. Human responds PASS/FAIL with reasoning.
+
+### pass@k Tracking
+After each task ships, record how many Builder attempts it took to pass all evals:
+- `pass@1` = passed on first attempt (ideal)
+- `pass@2` = passed on second attempt after retry
+- `pass@3` = passed on third attempt (max retries)
+- Track per task type in `taskArms` alongside existing reward data. This enables the meta-cycle to identify which task types are reliably first-attempt vs frequently retried.
+
+---
+
 ## Eval Definition Format
 
 Each eval file in `.evolve/evals/` follows this structure (see also [examples/eval-definition.md](examples/eval-definition.md)):
@@ -14,20 +48,27 @@ Each eval file in `.evolve/evals/` follows this structure (see also [examples/ev
 # Eval: <task-name>
 
 ## Code Graders (bash commands that must exit 0)
-- `npm test -- --grep "feature-name"`
-- `npx tsc --noEmit`
-- `bash -c 'test $(wc -l < src/new-file.ts) -gt 0'`
+- `[code]` `npm test -- --grep "feature-name"`
+- `[code]` `npx tsc --noEmit`
+- `[code]` `bash -c 'test $(wc -l < src/new-file.ts) -gt 0'`
 
 ## Regression Evals (full test suite)
-- `npm test`
-- `npx playwright test` (if applicable)
+- `[code]` `npm test`
+- `[code]` `npx playwright test` (if applicable)
 
 ## Acceptance Checks (verification commands)
-- `grep -r "export function newFeature" src/` → must find at least 1 match
-- `npm run build` → must exit 0
+- `[code]` `grep -r "export function newFeature" src/` → must find at least 1 match
+- `[code]` `npm run build` → must exit 0
+
+## Model-Based Checks (optional — for subjective quality dimensions)
+- `[model]` Rubric: "Rate documentation clarity on 0-100 scale. 0=incomprehensible, 25=major gaps, 50=adequate, 75=clear, 100=exemplary" — threshold: >= 60
+
+## Human-Gated Checks (optional — for security/architecture decisions)
+- `[human]` "Review auth middleware changes for privilege escalation risk"
 
 ## Thresholds
 - All checks: pass@1 = 1.0
+- Grader type tags: `[code]` default, `[model]` requires rubric, `[human]` requires evidence
 ```
 
 ## Orchestrator Execution Steps

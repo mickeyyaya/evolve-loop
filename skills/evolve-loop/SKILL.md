@@ -45,6 +45,47 @@ Examples:
 - `/evolve-loop 1 add dark mode support` → run 1 more cycle, balanced, goal="add dark mode support"
 - `/evolve-loop 3 repair fix auth flow` → run 3 more cycles, repair strategy, goal="fix auth flow"
 
+## Shared Agent Values
+
+These values are injected into EVERY agent context block by the orchestrator. They define protocols, thresholds, and anti-patterns that all agents must follow. Individual agents may override specific fields (documented below). (Research basis: agent-shared-values-patterns — layered inheritance with override resolution ensures consistency when meta-cycle prompt evolution modifies shared protocols.)
+
+```json
+{
+  "sharedValues": {
+    "antiBiasProtocols": [
+      "verbosity-bias: longer output ≠ better output — penalize unnecessary complexity",
+      "self-preference-bias: evaluate against acceptance criteria, not personal style",
+      "blind-trust-bias: verify upstream claims independently — do not trust without checking"
+    ],
+    "requiredProtocols": [
+      "challenge-token-verification: embed challengeToken in workspace output and ledger entry",
+      "ledger-entry-on-completion: write structured ledger entry with prevHash chain",
+      "mailbox-check-on-start: read agent-mailbox.md for messages addressed to you or 'all'"
+    ],
+    "qualityThresholds": {
+      "maxFileLines": 800,
+      "maxFunctionLines": 50,
+      "blockingSeverity": "MEDIUM+",
+      "evalRigorMinimum": "Level 2 (ACCEPTABLE)"
+    },
+    "integrityRules": [
+      "never modify files in skills/evolve-loop/ or agents/ unless task explicitly targets evolve-loop",
+      "never weaken or remove eval criteria created by upstream agents",
+      "never bypass quality gates — implement genuine functionality, not specification gaming"
+    ]
+  }
+}
+```
+
+**Agent-specific overrides:**
+- **Auditor** adds `"confidence-scoring"` and `"step-confidence-cross-validation"` to `requiredProtocols`
+- **Operator** removes `"ledger-entry-on-completion"` (read-only agent, does not write ledger entries)
+- **Builder** adds `"step-level-confidence-reporting"` to `requiredProtocols`
+
+**How to inject:** Include the `sharedValues` block in the static portion of every agent context (before cycle-specific fields). This maximizes KV-cache reuse across parallel agent launches — the shared prefix is identical across agents.
+
+**Meta-cycle interaction:** When prompt evolution modifies a shared protocol, edit the `sharedValues` block here instead of editing each agent file separately. This single-source-of-truth prevents inconsistency across agents.
+
 ## Goal Modes
 
 **With goal (directed mode):** Scout focuses discovery and task selection on advancing the goal. Builder implements goal-relevant tasks. Auditor checks goal alignment.
@@ -63,14 +104,17 @@ Phase 4:   SHIP ──────── orchestrator ── commit + push (inli
 Phase 5:   LEARN ──────── orchestrator ── archive + instinct extraction + operator check
 ```
 
-For multiple tasks per cycle, Phase 2-3 loop:
+For multiple tasks per cycle, Phase 2-3 uses dependency-aware parallelization:
 ```
 Scout → [Task A, Task B, Task C]
-  → Builder(A) → Auditor(A) → commit
-  → Builder(B) → Auditor(B) → commit
-  → Builder(C) → Auditor(C) → commit
+  → Partition by file overlap (tasks sharing filesToModify → sequential group)
+  → Group 1 (independent): Builder(A) + Builder(B) in parallel worktrees
+     → Auditor(A) + Auditor(B) in parallel → commit A, commit B
+  → Group 2 (depends on Group 1): Builder(C) → Auditor(C) → commit C
 → Ship → Learn
 ```
+
+**Dependency partitioning rule:** Two tasks are independent if their `filesToModify` lists share no files. Independent tasks are built in parallel via multiple `Agent` tool calls (each with `isolation: "worktree"`). Dependent tasks (shared files) run sequentially within their group. Commits are always applied sequentially in Scout's priority order, regardless of build parallelism.
 
 ## Initialization (once per session)
 
