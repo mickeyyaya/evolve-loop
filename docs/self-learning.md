@@ -63,24 +63,15 @@ Reusing a plan template typically saves 30–50% of build tokens for that task. 
 
 ### e. Memory Consolidation (every 3 cycles)
 
-When `instinctCount > 20` or every 3 cycles, the orchestrator consolidates the instinct set:
+Keeps the active instinct set compact by clustering similar instincts, decaying unreferenced ones, and gating duplicates. Consolidation is where the episodic→semantic abstraction pathway operates: repeated observations merge into domain knowledge.
 
-1. **Cluster** — Instincts with >85% semantic similarity are merged into higher-level abstractions. Example: two camelCase instincts merge into one covering all JSON keys.
-2. **Archive originals** — Superseded instincts move to `.evolve/instincts/archived/` with a `supersededBy` field. Nothing is deleted.
-3. **Temporal decay** — Instincts unreferenced in the last 5 cycles lose 0.1 confidence per consolidation pass. Below 0.3 they are archived as stale.
-4. **Entropy gating** — A new instinct that is >90% similar to an existing one updates the existing one's confidence instead of creating a duplicate.
-
-Consolidation keeps the active instinct set compact, relevant, and non-redundant. The episodic→semantic abstraction pathway operates here: repeated episodic observations (what happened in cycle N) consolidate into semantic knowledge (domain conventions, architecture facts) that applies across all future cycles.
+For the full consolidation algorithm (cluster, archive, decay, entropy gating), see [phase5-learn.md § Memory Consolidation](../skills/evolve-loop/phase5-learn.md).
 
 ### f. Instinct Promotion (project → global)
 
-High-confidence instincts that are not project-specific can be promoted to global scope at `~/.evolve/instincts/personal/`. Promotion criteria:
+High-confidence instincts (>= 0.8, 2+ cycle confirmations, generalizable) promote to `~/.evolve/instincts/personal/` for cross-project use. The promoted copy includes a `promotedFrom` field; the original remains as source of truth.
 
-- Confidence >= 0.8
-- Confirmed across 2+ cycles
-- Generalizable beyond this codebase
-
-The promoted copy gets a `promotedFrom` field recording the project and cycle of origin. The original remains in the project instincts directory as the source of truth. Promoted instincts are available to all evolve-loop instances running on any project.
+For the full promotion protocol, see [phase5-learn.md § Instinct Graduation](../skills/evolve-loop/phase5-learn.md).
 
 ### g. Meta-Cycle Review (every 5 cycles)
 
