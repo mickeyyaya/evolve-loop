@@ -322,6 +322,36 @@ After Scout completes:
   - Pass it to the Scout as context so it avoids the stagnant area
   - If 3+ stagnation patterns are active simultaneously → trigger Operator HALT
 
+### Inter-Phase Handoff Format
+
+Each phase writes a structured handoff file to `$WORKSPACE_PATH/handoff-<phase>.json` for the next phase to consume. This compact contract eliminates redundant file re-reads across phase boundaries, targeting 40-60% token savings on cross-phase context.
+
+**Schema (`phaseHandoff`):**
+```json
+{
+  "phase": "<scout|builder|auditor|ship>",
+  "cycle": <N>,
+  "findings": "<1-3 sentence summary of what this phase discovered or verified>",
+  "decisions": ["<key decision 1>", "<key decision 2>"],
+  "files_modified": ["<path/to/file1>", "<path/to/file2>"],
+  "next_phase_context": {
+    "<key>": "<value>"
+  }
+}
+```
+
+**File naming convention:** `handoff-<phase>.json` where `<phase>` is the writing phase name (e.g., `handoff-scout.json`, `handoff-builder.json`, `handoff-auditor.json`).
+
+**Ownership table:**
+
+| File | Written by | Read by | Key fields passed |
+|------|-----------|---------|-------------------|
+| `handoff-scout.json` | Scout | Builder | `findings` (task rationale), `files_modified` (files to touch), `next_phase_context.taskSlug` |
+| `handoff-builder.json` | Builder | Auditor | `findings` (approach summary), `files_modified` (changed files list), `decisions` (design choices), `next_phase_context.worktreeBranch` |
+| `handoff-auditor.json` | Auditor | Orchestrator (Ship) | `findings` (audit verdict summary), `decisions` (issues found/waived), `next_phase_context.verdict` |
+
+**Usage:** The receiving phase reads the handoff file instead of re-reading the full workspace report. If the handoff file is absent or malformed, fall back to reading the full report (e.g., `scout-report.md`, `build-report.md`).
+
 ---
 
 ### Phase 2: BUILD (loop per task)
