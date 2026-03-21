@@ -403,3 +403,5 @@ The evolve-loop's existing sub-agent compaction principle (each agent-to-agent h
 For techniques that improve output accuracy and catch errors across these same agents and phases (chain-of-thought prompting, multi-stage verification, context alignment scoring, uncertainty acknowledgment), see `docs/accuracy-self-correction.md`.
 
 For per-phase profiling and cost-bottleneck identification, see `docs/performance-profiling.md`.
+
+For graph-based codebase traversal that lets Scout find relevant files without loading the entire repo (95% token reduction per RepoMaster arXiv:2505.21577), see `docs/graph-exploration.md`.
