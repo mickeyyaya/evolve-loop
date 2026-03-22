@@ -214,6 +214,18 @@ AgentAssay (arXiv:2603.02601) reveals that binary PASS/FAIL testing has **0% det
 
 **Adaptive trial budget (SPRT principle):** For flaky evals, use sequential testing: run the grader up to 3 times. If 2/3 pass → PASS. If 2/3 fail → FAIL. If 1/3 → INCONCLUSIVE. This reduces unnecessary re-runs by 78% compared to fixed 5-trial testing.
 
+## Agentic Uncertainty Quantification (AUQ-Inspired)
+
+Research on agentic uncertainty (arXiv:2601.15703, arXiv:2602.05073) shows that naive UQ methods produce near-random AUROC (0.468-0.685) on agent trajectories. The key insight: **action-conditional gating** — different action types carry different uncertainty profiles.
+
+| Action Type | Uncertainty Signal | Evolve-Loop Mapping |
+|-------------|-------------------|---------------------|
+| Information-gathering | Low risk, reduces uncertainty | Builder reading files, Scout scanning codebase |
+| State-changing | High risk, increases commitment | Builder editing files, orchestrator committing |
+| Reflective | Calibration opportunity | Auditor verdict, Phase 5 self-evaluation |
+
+**UAM/UAR dual-process pattern:** Before any state-changing action, the Builder should assess uncertainty (System 1: fast heuristic check). If uncertainty > threshold, trigger explicit reflection (System 2: deeper analysis). This prevents confident-but-wrong edits — the leading cause of audit retries.
+
 ---
 
 For token optimization techniques that complement accuracy work (e.g., how context window management prevents mid-cycle truncation that can degrade output quality), see `docs/token-optimization.md`.

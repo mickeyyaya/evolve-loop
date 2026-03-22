@@ -138,6 +138,18 @@ Model selection is the highest-leverage cost control. The evolve-loop uses a 3-t
 
 tier-1 is justified at decision points with multiplicative downstream impact. A cycle routing Scout and Auditor to tier-3 while keeping Builder on tier-2 saves approximately 40-60% of total cycle cost versus all-tier-2 routing.
 
+## Structured Output via Draft-Conditioned Decoding (DCCD-Inspired)
+
+DCCD (arXiv:2603.03305) demonstrates that constraining LLM output to a schema during generation causes a "projection tax" — feasible mass drops, confidence falls 39%, and accuracy degrades up to 24pp. The fix: **two-stage draft-then-constrain** — let the model reason freely first, then project the draft onto the required schema.
+
+**Application to Auditor verdicts:** The Auditor currently produces structured verdicts inline. DCCD suggests:
+1. **Draft stage:** Auditor reasons freely about the build quality (no format constraints)
+2. **Constrain stage:** Extract verdict fields (PASS/WARN/FAIL, severity, findings) from the draft into the structured audit-report format
+
+This preserves reasoning quality while ensuring structured output. The same pattern applies to Scout's JSON decision traces and Builder's structured build-report tables.
+
+---
+
 ## Budget-Aware Agent Scaling (BATS-Inspired)
 
 BATS (arXiv:2511.17006) demonstrates that injecting continuous `budgetRemaining` signals into agent context produces strictly superior cost-performance Pareto frontiers compared to budget-unaware agents. Agents without budget awareness spend resources on low-value actions early and run out before high-value actions.

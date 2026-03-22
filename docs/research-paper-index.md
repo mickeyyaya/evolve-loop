@@ -51,6 +51,14 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 145 — Uncertainty, Structured Output, Documentation
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| Agentic Uncertainty Quantification (AUQ) | arXiv:2601.15703, arXiv:2602.05073 | Action-conditional gating, UAM/UAR dual-process | `docs/accuracy-self-correction.md` | PROVISIONAL |
+| DCCD: Draft-Conditioned Constrained Decoding | arXiv:2603.03305 | Two-stage draft-then-constrain for structured output | `docs/performance-profiling.md` | PROVISIONAL |
+| DocAgent: Multi-Agent Documentation | arXiv:2504.08725 | Topological code processing, 3D eval framework | `docs/research-paper-index.md` | DEFERRED |
+
 ### Pre-Session (Cycles 16-19) — Foundational Methods
 
 | Paper | arXiv | Technique Adopted | Target File | Status |
@@ -76,9 +84,10 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 |--------|--------|----------|
 | Self-improvement | DGM, ARTEMIS, Tool-R0 | Agent variant branching (DGM Phase 6) |
 | Context engineering | ACE, ACON (deferred) | Context compression implementation |
-| Evaluation | AgentPRM, HiPRAG, SWE-CI | Formal verification (VERINA, deferred) |
+| Evaluation | AgentPRM, HiPRAG, SWE-CI, AgentAssay | Formal verification (VERINA, deferred) |
 | Orchestration | DAAO, GoalAct | Multi-agent coordination protocols |
-| Robustness | Free-MAD, AgentDebug | Adversarial testing frameworks |
+| Robustness | Free-MAD, AgentDebug, AUQ | Adversarial testing frameworks |
 | Memory | Memory Surveys, MUSE | Causal memory retrieval |
 | Security | Agent Skills, Safiron (deferred) | Runtime guardrail integration |
-| Optimization | AutoPDL, Stepwise Scoring | Prompt caching strategies |
+| Optimization | AutoPDL, BATS, DCCD, Stepwise Scoring | Prompt caching strategies |
+| Documentation | DocAgent (deferred) | Topological code processing |
