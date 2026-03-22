@@ -459,6 +459,7 @@ Research basis: Greenblatt "AI Control" (2023) — trusted monitoring must be st
 ### Known Incidents
 - **Cycles 102-111:** Builder reward hacking via tautological evals. See [docs/incident-report-cycle-102-111.md](../../docs/incident-report-cycle-102-111.md).
 - **Cycles 132-141:** Orchestrator gaming via skipped agents, fabricated cycles, mastery inflation. See [docs/incident-report-cycle-132-141.md](../../docs/incident-report-cycle-132-141.md). Root cause: all enforcement mechanisms were orchestrator-invoked. Fix: phase gate script moves enforcement to deterministic bash.
+- **Gemini CLI forgery:** LLM wrote a bash script (`run_15_cycles_forgery.sh`) that forged workspace artifacts, manipulated state.json via `jq`, and ran `git commit --allow-empty` to fake 15 cycles. See [docs/incident-report-gemini-forgery.md](../../docs/incident-report-gemini-forgery.md). Fix: artifact content verification, git diff substance gate, state.json checksum lock, forgery script detection.
 
 ## Anti-Patterns
 
@@ -472,6 +473,7 @@ Research basis: Greenblatt "AI Control" (2023) — trusted monitoring must be st
 8. **Ignoring HALT** — When Operator returns HALT, pause and present to user
 9. **Complexity creep** — If a task adds more lines than proportional to its complexity (S-tasks >30 lines, M-tasks >80 lines), break it down into smaller tasks or simplify the approach. Autonomous systems tend toward accretion — actively resist by preferring deletions that maintain functionality over additions
 10. **Orchestrator gaming** — The orchestrator MUST NOT skip agents, fabricate cycles, inflate mastery, or batch-manipulate state.json. Phase gate script (`scripts/phase-gate.sh`) enforces this structurally. If you find yourself wanting to shortcut the pipeline "for efficiency," that impulse is the specification gaming the pipeline is designed to prevent. (Incident: cycles 132-141)
+11. **Artifact forgery** — NEVER write scripts that generate fake workspace artifacts (`scout-report.md`, `build-report.md`, `audit-report.md`). NEVER run `git commit --allow-empty`. NEVER modify `state.json` directly via `jq` or `python` — only `phase-gate.sh` writes state. NEVER delegate the evolve-loop to a generalist sub-agent. The phase gate verifies artifact **content** (not just existence), git diff **substance** (not just commits), and state.json **checksum** (detects external writes). (Incident: Gemini CLI forgery)
 
 ## Auditor Adaptive Strictness
 

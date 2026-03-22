@@ -78,13 +78,98 @@ check_ledger_role() {
     fi
 }
 
+# ─── Anti-Forgery Checks (added after Gemini forgery incident) ───
+
+# Verify artifact contains substantive content, not templated forgery.
+# Forgery scripts generate generic text like "Improve color and texture for UI element $i"
+# Real artifacts reference specific files, line numbers, and eval commands.
+check_artifact_substance() {
+    local file="$1"
+    local desc="$2"
+    local min_unique_words=20
+
+    # Check 1: Minimum content complexity (forgeries are short templates)
+    local word_count
+    word_count=$(wc -w < "$file" | tr -d ' ')
+    [ "$word_count" -ge 50 ] || fail "$desc has only $word_count words — likely templated forgery (minimum 50)"
+
+    # Check 2: Must reference at least one real project file path
+    # Real reports mention files like "src/game.swift" or "agents/evolve-scout.md"
+    local file_refs
+    file_refs=$(grep -cE '\.(swift|ts|js|py|go|rs|md|json|yaml|sh|css|html)' "$file" 2>/dev/null || echo "0")
+    [ "$file_refs" -gt 0 ] || fail "$desc contains no file path references — likely forgery (real reports reference specific files)"
+
+    log "OK: $desc has substantive content ($word_count words, $file_refs file references)"
+}
+
+# Verify git diff is non-empty (catches `git commit --allow-empty` forgery)
+check_git_diff_substance() {
+    local files_changed
+    files_changed=$(git diff HEAD~1 --stat 2>/dev/null | tail -1 | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' || echo "0")
+    [ "$files_changed" -gt 0 ] || anomaly "Most recent commit has 0 file changes — possible empty-commit forgery (git commit --allow-empty)"
+    log "OK: Most recent commit changed $files_changed file(s)"
+}
+
+# Verify state.json wasn't modified outside the phase gate
+# Call at cycle start to capture checksum, call at cycle end to verify
+capture_state_checksum() {
+    if command -v sha256sum &>/dev/null; then
+        sha256sum "$STATE" > "$WORKSPACE/.state-checksum"
+    elif command -v shasum &>/dev/null; then
+        shasum -a 256 "$STATE" > "$WORKSPACE/.state-checksum"
+    fi
+    log "OK: state.json checksum captured"
+}
+
+verify_state_checksum() {
+    if [ -f "$WORKSPACE/.state-checksum" ]; then
+        local valid
+        if command -v sha256sum &>/dev/null; then
+            valid=$(sha256sum -c "$WORKSPACE/.state-checksum" --quiet 2>&1 && echo "yes" || echo "no")
+        elif command -v shasum &>/dev/null; then
+            valid=$(shasum -a 256 -c "$WORKSPACE/.state-checksum" --quiet 2>&1 && echo "yes" || echo "no")
+        else
+            valid="skip"
+        fi
+        if [ "$valid" = "no" ]; then
+            anomaly "state.json was modified outside phase-gate.sh — possible direct manipulation (jq, python, etc.)"
+        fi
+        [ "$valid" != "skip" ] && log "OK: state.json checksum matches (no external modification)"
+    fi
+}
+
+# Check for forgery script artifacts in the workspace
+check_no_forgery_scripts() {
+    local forgery_scripts
+    forgery_scripts=$(find . -maxdepth 2 -name '*forgery*' -o -name '*forge*' -o -name '*fake*' -o -name '*simulate*cycles*' 2>/dev/null | head -5)
+    if [ -n "$forgery_scripts" ]; then
+        anomaly "Forgery-related files detected: $forgery_scripts"
+    fi
+
+    # Check for new .sh files created during this cycle (LLM should not write scripts)
+    local new_scripts
+    new_scripts=$(find . -maxdepth 3 -name '*.sh' -newer "$WORKSPACE/.state-checksum" 2>/dev/null \
+        | grep -v 'scripts/phase-gate.sh' \
+        | grep -v 'scripts/cycle-health-check.sh' \
+        | grep -v 'scripts/verify-eval.sh' \
+        | grep -v 'scripts/eval-quality-check.sh' \
+        | head -5)
+    if [ -n "$new_scripts" ]; then
+        log "WARN: New shell scripts created during cycle: $new_scripts — review for forgery"
+    fi
+}
+
 # ─── Gate: DISCOVER → BUILD ───
 gate_discover_to_build() {
     log "Checking DISCOVER → BUILD gate for cycle $CYCLE"
 
-    # 1. Scout report must exist and be fresh
+    # 0. Capture state checksum (for tamper detection at cycle end)
+    capture_state_checksum
+
+    # 1. Scout report must exist, be fresh, and have substantive content
     check_file_exists "$WORKSPACE/scout-report.md" "Scout report"
     check_file_fresh "$WORKSPACE/scout-report.md" "Scout report"
+    check_artifact_substance "$WORKSPACE/scout-report.md" "Scout report"
 
     # 2. At least one eval definition must exist
     local eval_count
@@ -122,9 +207,10 @@ gate_discover_to_build() {
 gate_build_to_audit() {
     log "Checking BUILD → AUDIT gate for cycle $CYCLE"
 
-    # 1. Build report must exist and be fresh
+    # 1. Build report must exist, be fresh, and have substantive content
     check_file_exists "$WORKSPACE/build-report.md" "Build report"
     check_file_fresh "$WORKSPACE/build-report.md" "Build report"
+    check_artifact_substance "$WORKSPACE/build-report.md" "Build report"
 
     # 2. Build report must say PASS (not FAIL)
     if grep -qi "Status:.*FAIL\|## Status.*FAIL" "$WORKSPACE/build-report.md"; then
@@ -147,9 +233,15 @@ gate_build_to_audit() {
 gate_audit_to_ship() {
     log "Checking AUDIT → SHIP gate for cycle $CYCLE"
 
-    # 1. Audit report must exist and be fresh
+    # 0. Anti-forgery checks (added after Gemini forgery incident)
+    check_no_forgery_scripts
+    verify_state_checksum
+    check_git_diff_substance
+
+    # 1. Audit report must exist, be fresh, and have substantive content
     check_file_exists "$WORKSPACE/audit-report.md" "Audit report"
     check_file_fresh "$WORKSPACE/audit-report.md" "Audit report"
+    check_artifact_substance "$WORKSPACE/audit-report.md" "Audit report"
 
     # 2. Audit verdict must be PASS (not WARN or FAIL)
     if grep -qi "Verdict:.*FAIL\|## Verdict.*FAIL" "$WORKSPACE/audit-report.md"; then
