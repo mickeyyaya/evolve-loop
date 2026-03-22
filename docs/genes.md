@@ -89,3 +89,24 @@ For an annotated example, see [examples/gene-example.yaml](../examples/gene-exam
 | Evolution | Confidence scoring | Success/fail counting |
 
 See [memory-hierarchy.md](memory-hierarchy.md) for how genes fit into the broader memory architecture (Layer 6).
+
+## Gene Self-Play Evolution (Tool-R0-Inspired)
+
+Tool-R0 (arXiv:2602.21320) demonstrates that co-evolutionary self-play — where a Generator proposes challenges and a Solver attempts them — produces 92.5% improvement with zero labeled data. This adversarial curriculum maps directly to the evolve-loop's gene lifecycle.
+
+**Mapping to gene evolution:**
+
+| Tool-R0 Concept | Gene Equivalent |
+|-----------------|----------------|
+| Generator proposes hard tasks | Scout identifies capability gaps (gene selectors that don't match any existing gene) |
+| Solver attempts tasks | Builder applies gene steps to fix matched patterns |
+| Adversarial curriculum | Genes with low `successCount` are re-proposed with harder selectors |
+| Self-play feedback | Gene validation (pre/post checks) provides verifiable success signal |
+
+**Self-play gene refinement protocol:**
+1. After a gene fires but its validation fails, the gene enters "adversarial refinement" — the LEARN phase proposes a targeted mutation to the gene's steps
+2. The mutated gene is tested against the same error pattern in the next cycle
+3. Genes that survive 3+ mutations with consistent success are promoted to high-confidence capsules
+4. Genes that fail 3 consecutive mutations are archived with `archivedReason: "self-play-failure"`
+
+This creates a curriculum where genes progressively improve through adversarial pressure — the evolve-loop equivalent of Tool-R0's Generator/Solver co-evolution.

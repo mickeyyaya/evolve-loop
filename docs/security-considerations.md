@@ -124,6 +124,26 @@ Ungrounded claims in build output — assertions not traceable to the provided i
 
 ---
 
+## Instinct/Skill Trust Governance (Agent Skills Research-Inspired)
+
+Research on Agent Skills for LLMs (arXiv:2602.12430) found that **26.1% of community-contributed skills contain vulnerabilities** — from prompt injection vectors to over-privileged tool access. This directly motivates trust tier governance for instincts that are promoted globally or imported from external sources.
+
+**Trust tier framework for instincts:**
+
+| Tier | Origin | Trust Level | Restrictions |
+|------|--------|-------------|-------------|
+| Tier-1 | Extracted from this project's cycles | Full trust | None — first-party, version-controlled |
+| Tier-2 | Promoted from another verified project | Conditional | Cannot modify eval files or agent prompts |
+| Tier-3 | Imported from unverified external source | Minimal | Read-only application, no global promotion, sandboxed |
+
+**Global promotion gate:** Before an instinct is promoted to `~/.evolve/instincts/personal/` (cross-project scope), verify:
+1. Source cycle exists in the project's ledger (provenance check)
+2. Instinct does not reference eval file paths or agent prompt modifications (injection vector)
+3. Confidence >= 0.8 with 3+ cycle confirmations (quality gate)
+4. No `approach-flaw` failures in the source cycle's `failedApproaches` (stability gate)
+
+---
+
 ## Regression Prevention and Long-Term Maintenance (SWE-CI-Inspired)
 
 The SWE-CI benchmark (March 2026) reveals that 75% of AI coding agents break prior behavior during long-term maintenance — even when their initial patches pass all tests. The core finding: "Passing tests once is table stakes. Not breaking everything over time is the actual job."
