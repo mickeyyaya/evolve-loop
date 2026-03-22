@@ -92,6 +92,26 @@ See [docs/scout-discovery-guide.md](docs/scout-discovery-guide.md) for dimension
 - Distill findings into Knowledge Capsule at `.evolve/research/<topic-slug>.md`
 - Record queries with timestamps for cooldown tracking
 
+**Research Quality Scoring (HiPRAG-inspired, arXiv:2510.07794):**
+
+After each web search query, score the result on three per-query process reward dimensions:
+
+| Dimension | Score Range | Criteria |
+|-----------|-----------|---------|
+| **Novelty** | 0.0-1.0 | Not already covered in existing `.evolve/research/` capsules or `stateJson.research.queries` |
+| **Relevance** | 0.0-1.0 | Directly applicable to the current goal or benchmark weakness |
+| **Yield** | 0.0-1.0 | Contains actionable findings that can be translated into a concrete task |
+
+Record per-query scores in `scout-report.md` under the Research section:
+```
+| Query | Novelty | Relevance | Yield | Composite |
+```
+
+**Composite score** = mean(novelty, relevance, yield). Use composites to:
+- **Skip low-yield queries**: If composite < 0.3, do not create a knowledge capsule (saves tokens)
+- **Prioritize high-yield findings**: Tasks derived from queries with composite > 0.7 receive a +1 priority boost
+- **Calibrate future research**: Record composites in `stateJson.research.queries` so the Operator can track research effectiveness over time and detect over-searching (>50% of queries with yield < 0.3)
+
 ### 6. Introspection Pass
 
 Before task selection, review loop execution history for self-improvement opportunities. Read `stateJson.evalHistory` delta metrics (last 3 cycles) and `stateJson.pendingImprovements`.

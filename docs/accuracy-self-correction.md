@@ -76,6 +76,28 @@ Agents should explicitly state when confidence is low rather than generating pla
 
 ---
 
+## Anti-Conformity Audit Protocol (Free-MAD-Inspired)
+
+Free-MAD (arXiv:2509.11035) identifies a critical failure mode in LLM evaluation: **agent conformity**. LLMs have an inherent tendency to align with their initial assessment even when evidence contradicts it. This "self-herding" means a single-pass Auditor can confirm an incorrect PASS simply because its first impression was positive.
+
+**Split-role adversarial check:** Before finalizing any audit verdict, run an explicit anti-conformity step:
+
+1. **Initial assessment:** Auditor forms a preliminary verdict (PASS/WARN/FAIL) based on normal review
+2. **Adversarial challenge:** The Auditor then adopts the opposite stance:
+   - If initial = PASS → "actively search for one strong reason to FAIL"
+   - If initial = FAIL → "actively search for one strong reason to PASS"
+3. **Score-based decision:** Compare the strength of evidence for both positions. The verdict follows the stronger evidence, not the initial assessment
+
+**Anti-conformity injection prompt** (add to Auditor system context):
+> "Before finalizing your verdict, explicitly state your initial leaning. Then argue the opposite case with at least one concrete piece of evidence. Only finalize after you have genuinely considered both sides."
+
+**Trajectory consistency check** (for Phase 5 self-evaluation):
+If the LLM-as-a-Judge's chain-of-thought lists specific failures or concerns but then assigns a high score (>= 0.8), flag this as a conformity signal — the Judge is conforming to its own initial bias rather than following its evidence. Trigger recalibration when this pattern appears in 2+ consecutive cycles.
+
+**Token cost:** This is a single-round technique (no multi-round debate needed). Adds ~200-400 tokens to each audit verdict — minimal cost for substantially improved robustness.
+
+---
+
 ## Cross-Cutting Application
 
 | Technique | Scout | Builder | Auditor | Operator |

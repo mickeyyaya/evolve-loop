@@ -377,6 +377,9 @@ Each research method adopted into the self-learning architecture is tracked agai
 | Failure Pattern Analysis (DGM) | arxiv 2505.22954 | 139 | documentationCompleteness | PROVISIONAL |
 | Strategy Playbook (ACE) | arxiv 2510.04618 | 139 | featureCoverage | PROVISIONAL |
 | Difficulty-Aware Scoring (DAAO) | arxiv 2509.11079 | 139 | documentationCompleteness | PROVISIONAL |
+| Process Reward Analysis (AgentPRM) | arxiv 2502.10325 | 140 | evalInfrastructure | PROVISIONAL |
+| Anti-Conformity Audit (Free-MAD) | arxiv 2509.11035 | 140 | defensiveDesign | PROVISIONAL |
+| Research Quality Scoring (HiPRAG) | arxiv 2510.07794 | 140 | featureCoverage | PROVISIONAL |
 
 ### Validation Protocol
 
