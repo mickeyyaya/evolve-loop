@@ -51,6 +51,13 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 147 — Adversarial Co-Evolution and Hierarchical Planning
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| Code-A1: Adversarial Code/Test Co-Evolution | arXiv:2603.15611 | Mistake Book, composite rewards, adversarial eval separation | `docs/adversarial-eval-coevolution.md` | PROVISIONAL |
+| Hierarchical Multi-Agent with Prompt Optimization | arXiv:2602.21670 | TextGrad failure backpropagation, meta-prompt sharing | `docs/multi-agent-coordination.md` | PROVISIONAL |
+
 ### Cycle 146 — Multi-Agent Coordination and Observability
 
 | Paper | arXiv | Technique Adopted | Target File | Status |

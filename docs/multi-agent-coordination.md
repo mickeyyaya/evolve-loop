@@ -69,6 +69,25 @@ When multiple tasks ship in a single cycle, the Operator synthesizes lessons acr
 
 ---
 
+## Hierarchical Decomposition with Prompt Evolution (arXiv:2602.21670)
+
+A two-layer hierarchy (coordinator decomposes → specialists execute) outperforms flat single-agent planners by +59pp on vague tasks. When combined with TextGrad-style prompt optimization (failure critiques backpropagate as natural-language updates), gains increase by an additional +37pp.
+
+**Application to evolve-loop:**
+
+| Hierarchy Concept | Evolve-Loop Mapping |
+|-------------------|---------------------|
+| Coordinator decomposes vague goal | Scout breaks goal into milestones (GoalAct) then into tasks |
+| Specialists generate PDDL plans | Builder generates implementation plans per task |
+| TextGrad failure backpropagation | Auditor FAIL verdict feeds back as targeted retry context |
+| Meta-prompt sharing across same-layer agents | Instincts shared across Builder invocations within a cycle |
+
+**TextGrad-style prompt evolution:** When a Builder fails audit, the Auditor's critique should be structured as a prompt refinement signal — not just "this failed" but "the design step should have X." This critique feeds into the meta-cycle prompt evolution mechanism (Phase 6), where agent prompts are updated based on accumulated failure patterns.
+
+**Meta-prompt sharing:** When multiple tasks run in parallel, successful Builder approaches from task A can inform task B's prompt. The `experiments.jsonl` journal enables this: the orchestrator reads recent successful experiment entries and injects them as meta-prompts for subsequent Builder invocations.
+
+---
+
 ## Multi-Agent Coordination Anti-Patterns
 
 | Anti-Pattern | Description | Mitigation |
