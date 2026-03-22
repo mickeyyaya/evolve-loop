@@ -209,6 +209,42 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
 }
 ```
 
+### Strategy Playbook Update (ACE-Inspired)
+
+Based on Agentic Context Engineering (ACE, arXiv:2510.04618), the evolve-loop maintains a structured strategy playbook that grows incrementally across cycles. Unlike atomic instincts, the playbook organizes knowledge by domain section and uses a generation-reflection-curation (GRC) pipeline to prevent context collapse and brevity bias.
+
+**Playbook file:** `$WORKSPACE_PATH/strategy-playbook.md` (persists across cycles like builder-notes.md)
+
+**Playbook sections** (each section grows independently — never rewritten wholesale):
+
+| Section | Contents | Updated When |
+|---------|----------|-------------|
+| Task Selection | Patterns for choosing high-impact tasks, complexity estimation heuristics | Scout discovers a selection pattern that worked/failed |
+| File Handling | Fragile files, safe edit patterns, known coupling | Builder encounters file-specific issues |
+| Eval Patterns | Effective vs tautological eval strategies, grader templates | Eval quality check flags issues or discovers effective patterns |
+| Failure Modes | Recurring failure categories, root causes, proven alternatives | Any task fails audit or benchmark delta check |
+
+**Incremental update protocol (anti-collapse safeguards):**
+
+1. **Read the existing playbook section** (never start from scratch)
+2. **Append new observations** as bullet points under the relevant section
+3. **Preserve all specific references** (file paths, error messages, cycle numbers) — generalization loses actionable detail
+4. **Never merge entries from different sections** — cross-section consolidation causes context collapse
+5. **Cap consolidation ratio at 3:1** — merge at most 3 related bullets into 1 summary bullet, preserving the most specific example
+6. **Never perform wholesale rewrites** — only append, refine individual bullets, or consolidate within a section
+
+**Reflect-before-curate gate:**
+
+Before extracting instincts (step 4), run an explicit reflection step:
+
+1. **Reflect:** "What happened this cycle? What worked? What surprised me? What would I do differently?" — write 2-3 sentences of unstructured reflection
+2. **Curate:** Based on the reflection, decide what to add to the playbook vs what to extract as an instinct vs what to discard
+3. **Gate criterion:** Only add to the playbook observations that have appeared in 2+ cycles OR that caused a build failure. Single-cycle observations go to instincts (lower commitment) rather than the playbook (higher commitment)
+
+This GRC pipeline ensures the playbook accumulates high-quality, validated knowledge while instincts handle exploratory, lower-confidence observations.
+
+---
+
 ### Counterfactual & Operator
 
 5. **Counterfactual Accuracy Review** (optional):

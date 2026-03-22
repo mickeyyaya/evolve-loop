@@ -157,6 +157,55 @@ Reference: "Survey of Self-Evolving Agents" (arxiv 2507.21046). This survey form
 
 ---
 
+## Failure Pattern Analysis (DGM-Inspired)
+
+The Darwin Godel Machine (arXiv:2505.22954) demonstrates that structured failure analysis — not just recording what failed, but categorizing *why* and suggesting *alternatives* — is a key enabler of open-ended self-improvement. The DGM's archive-based evolutionary approach preserves diverse approaches (including partial successes) rather than discarding them, enabling "ancestor" strategies to later produce breakthrough descendants.
+
+The evolve-loop translates this into a structured `failurePatterns` system that upgrades the flat `failedApproaches` blocklist into an analyzable knowledge base.
+
+### Root Cause Categories
+
+Every failed task is classified into one of four root cause categories. The Scout reads these categories when selecting tasks to avoid repeating the same failure mode.
+
+| Category | Description | Example | Scout Action |
+|----------|-------------|---------|-------------|
+| `implementation-error` | Correct approach, flawed execution (typos, wrong API, syntax) | Builder used deprecated grep flag | Retry same approach with explicit constraints |
+| `scope-mismatch` | Task was too large, too small, or misaligned with actual need | M-complexity task estimated as S, exceeded token budget | Re-scope and re-propose at correct complexity |
+| `eval-gap` | Implementation was correct but eval graders failed to capture it | Grader checked wrong file path or used overly strict regex | Fix eval definition, re-run with same approach |
+| `approach-flaw` | Fundamental approach was wrong for this problem | Tried to refactor inline when worktree isolation was needed | Record alternativeApproach and try a different strategy |
+
+### Structured Failure Entry Schema
+
+Each entry in `state.json.failedApproaches` follows this enhanced schema:
+
+```json
+{
+  "feature": "<task name>",
+  "approach": "<what was tried>",
+  "rootCause": "<implementation-error|scope-mismatch|eval-gap|approach-flaw>",
+  "error": "<error message or symptom>",
+  "reasoning": "<WHY it failed — root cause analysis>",
+  "filesAffected": ["<files involved>"],
+  "cycle": "<N>",
+  "alternativeApproach": "<suggested different approach for next cycle>",
+  "noveltyScore": "<0.0-1.0 — how different is the alternative from what was tried>"
+}
+```
+
+### How Scout Reads Failure Patterns
+
+1. **Filter by root cause**: If the last 2 failures on the same file share a root cause, avoid that file entirely unless proposing a categorically different approach (noveltyScore > 0.7).
+2. **Alternative approach reuse**: When a failed task has an `alternativeApproach`, the Scout may re-propose the task using that alternative — effectively learning from failure rather than just avoiding it.
+3. **Archive-based diversity** (DGM novelty bonus): When selecting between candidate tasks, apply a +1 priority boost to tasks whose approach differs from the last 3 cycle's approaches. This prevents the loop from converging on a single strategy and preserves evolutionary diversity.
+
+### Failure Pattern Anti-Patterns
+
+- **Shallow logging**: Recording "it failed" without root cause analysis. Every failure MUST have a `rootCause` and `reasoning`.
+- **Alternative amnesia**: Not recording `alternativeApproach`. Every `approach-flaw` failure MUST suggest an alternative.
+- **Premature blocking**: Adding a file to avoid-list after a single `implementation-error`. Only `approach-flaw` failures justify area avoidance.
+
+---
+
 ## Instinct Lifecycle
 
 ```
@@ -208,6 +257,89 @@ Every feedback path closes within 1–5 cycles. No signal is discarded — faile
 
 ---
 
+## Difficulty-Aware Task Scoring (DAAO-Inspired)
+
+The DAAO framework (arXiv:2509.11079) demonstrates that difficulty-aware orchestration achieves +11.21% accuracy at only 64% of inference cost by dynamically routing tasks based on predicted difficulty rather than static rules. The evolve-loop translates this into a continuous difficulty scoring mechanism with cost-performance feedback.
+
+### Continuous Difficulty Scoring (1-10)
+
+Replace the binary S/M complexity classification with a continuous 1-10 difficultyScore that captures fine-grained task difficulty:
+
+| Score Range | Difficulty | Model Tier | Token Budget | Example |
+|-------------|-----------|------------|-------------|---------|
+| 1-3 | Simple | tier-3 | 20-30K | Docs update, config change, single-file rename |
+| 4-6 | Moderate | tier-2 | 30-60K | Feature addition, multi-file refactor, test coverage |
+| 7-9 | Complex | tier-1 | 60-100K | Cross-cutting architecture, security hardening, API redesign |
+| 10 | Extreme | tier-1 + extended thinking | 100K+ | Full module rewrite, breaking change migration |
+
+The Scout assigns an initial `difficultyScore` based on file count, change scope, and domain familiarity. This score is then adjusted by the per-task-type difficulty memory (see below).
+
+### Per-Task-Type Difficulty Memory (`taskTypeDifficulty`)
+
+Track difficulty calibration separately for each task type. Stored in `state.json.taskTypeDifficulty`:
+
+```json
+{
+  "feature": {
+    "avgDifficulty": 4.2,
+    "successRateByBand": {"1-3": 1.0, "4-6": 0.85, "7-9": 0.6},
+    "totalTasks": 15,
+    "lastUpdated": "<cycle>"
+  },
+  "stability": {
+    "avgDifficulty": 3.1,
+    "successRateByBand": {"1-3": 1.0, "4-6": 0.9, "7-9": 0.75},
+    "totalTasks": 8,
+    "lastUpdated": "<cycle>"
+  }
+}
+```
+
+When the Scout proposes a task of type `feature` with difficultyScore 7, it checks `successRateByBand["7-9"]`. If the rate is below 0.5, the Scout either:
+1. Splits the task into smaller pieces (reducing difficulty to the 4-6 band), or
+2. Upgrades the model tier for the Builder (tier-2 → tier-1)
+
+This self-adjusting difficulty policy calibrates automatically from success/failure outcomes — the DAAO paper's key insight.
+
+### Cost-Performance Feedback Loop
+
+After each task ships (or fails), record the actual vs estimated token cost:
+
+```json
+{
+  "cycle": "<N>",
+  "task": "<slug>",
+  "estimatedTokens": 30000,
+  "actualTokens": 45000,
+  "tokenCostDelta": 15000,
+  "difficultyScore": 5,
+  "adjustedDifficulty": 6,
+  "modelTier": "tier-2",
+  "verdict": "PASS"
+}
+```
+
+The `tokenCostDelta` (actual - estimated) feeds back into difficulty calibration:
+- If consistently underestimating (delta > +20%): increase `avgDifficulty` for that task type by +0.5
+- If consistently overestimating (delta < -20%): decrease `avgDifficulty` by -0.3
+- Stable estimates (within +/-20%): no adjustment
+
+This creates a closed feedback loop where the Scout's difficulty predictions improve with each cycle — directly translating DAAO's self-adjusting policy into the evolve-loop architecture.
+
+### Integration with Model Routing
+
+The difficulty score feeds directly into the dynamic model routing table in SKILL.md:
+
+| Current Rule | Difficulty-Aware Upgrade |
+|-------------|------------------------|
+| Builder default: tier-2 | difficultyScore >= 7: tier-1 |
+| Auditor default: tier-2 | difficultyScore <= 3 + clean build: tier-3 |
+| Scout default: tier-2 | All tasks difficultyScore <= 3 in last 3 cycles: tier-3 |
+
+This replaces static upgrade/downgrade conditions with learned, data-driven routing decisions.
+
+---
+
 ## Self-Learning Anti-Patterns
 
 ### Extraction Stall
@@ -242,6 +374,9 @@ Each research method adopted into the self-learning architecture is tracked agai
 | CSI Metric | Karpathy/GVU | 17 | featureCoverage | +2 |
 | Confidence-Correctness | arxiv 2603.06604 | 18 | featureCoverage | +2 |
 | Self-Evolving Taxonomy | arxiv 2507.21046 | 19 | featureCoverage | +2 |
+| Failure Pattern Analysis (DGM) | arxiv 2505.22954 | 139 | documentationCompleteness | PROVISIONAL |
+| Strategy Playbook (ACE) | arxiv 2510.04618 | 139 | featureCoverage | PROVISIONAL |
+| Difficulty-Aware Scoring (DAAO) | arxiv 2509.11079 | 139 | documentationCompleteness | PROVISIONAL |
 
 ### Validation Protocol
 
