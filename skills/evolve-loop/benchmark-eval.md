@@ -30,8 +30,9 @@ TOTAL_AGENTS=$(find agents/ -name "*.md" | wc -l | tr -d ' ')
 AGENT_FM=$(grep -rl "^tools:" agents/ --include="*.md" | wc -l | tr -d ' ')
 AGENT_FM_PCT=$((AGENT_FM * 100 / (TOTAL_AGENTS > 0 ? TOTAL_AGENTS : 1)))
 
-# 3. README or CLAUDE.md exists and is non-empty
-README_EXISTS=$(test -s README.md -o -s CLAUDE.md && echo 100 || echo 0)
+# 3. README or project instructions file exists and is non-empty
+# Checks for platform-agnostic instruction files: README.md, CLAUDE.md, GEMINI.md, AGENTS.md
+README_EXISTS=$(test -s README.md -o -s CLAUDE.md -o -s GEMINI.md -o -s AGENTS.md && echo 100 || echo 0)
 
 # 4. No broken internal links (markdown references to files that don't exist)
 # Note: uses -oE (not -oP) for macOS compatibility

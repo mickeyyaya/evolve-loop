@@ -1,8 +1,10 @@
-# CLAUDE.md
+# Project Instructions
+
+> This file is read by AI coding assistants. Platform equivalents: `CLAUDE.md` (Claude Code), `GEMINI.md` (Gemini CLI), `AGENTS.md` (generic). Content is platform-agnostic.
 
 ## Autonomous Execution
 
-If the user is in bypass permissions mode (yolo mode), YOU MUST:
+If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve), YOU MUST:
 
 1. **Continue all cycles without pausing** — complete every requested cycle end-to-end without stopping to ask for user approval. Never output "should I continue?" or wait for confirmation between cycles.
 2. **Run the FULL pipeline every cycle** — launch Scout, Builder, and Auditor agents for every cycle. No shortcuts, no inline edits that skip agents, no batch-claiming multiple cycles. Each cycle must produce workspace artifacts (scout-report.md, build-report.md, audit-report.md).
