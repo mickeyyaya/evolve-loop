@@ -124,6 +124,18 @@ Ungrounded claims in build output — assertions not traceable to the provided i
 
 ---
 
+## Regression Prevention and Long-Term Maintenance (SWE-CI-Inspired)
+
+The SWE-CI benchmark (March 2026) reveals that 75% of AI coding agents break prior behavior during long-term maintenance — even when their initial patches pass all tests. The core finding: "Passing tests once is table stakes. Not breaking everything over time is the actual job."
+
+**Zero-regression policy for M-complexity tasks:** Any task touching 3+ files or modifying existing functionality MUST include regression eval graders that verify prior behavior is preserved. The existing `## Regression Evals` slot in the eval format is optional — SWE-CI evidence argues it should be mandatory for M-complexity tasks.
+
+**Technical debt accumulation detection:** Track when Auditor WARNs reference the same files across 3+ consecutive cycles. Repeated WARNs on the same file indicate debt accumulation — each individual change passes but the cumulative effect degrades the codebase. This maps to SWE-CI's EvoScore concept: weight recent regressions more heavily than old successes.
+
+**EvoScore-inspired instinct stability:** An instinct that enabled 5 past successes but caused 2 recent failures should score lower than its raw success count suggests. The LEARN phase should implement time-decayed confidence: `adjusted_confidence = base_confidence * (1 - recent_failure_rate)`.
+
+---
+
 ## Summary
 
 | Threat | Mechanism | Mitigation |

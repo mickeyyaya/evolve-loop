@@ -244,3 +244,21 @@ For each task completed in the last 5 cycles:
 | < 60% | PRIORITY: Propose eval improvement task for next cycle. |
 
 Surviving mutations indicate graders too coarse. Fix by adding more targeted grep or assertion. See `docs/eval-grader-best-practices.md`.
+
+### Regression Eval Enforcement (SWE-CI-Inspired)
+
+The SWE-CI benchmark (March 2026) found that 75% of AI coding agents break prior behavior during maintenance. To preserve prior behavior, **Regression Evals** must be populated for any task that modifies existing functionality:
+
+**Mandatory regression eval triggers:**
+- Task modifies 3+ existing files (M-complexity or higher)
+- Task touches files that have been modified in the previous 3 cycles
+- Task modifies any file listed in `auditorProfile` with `consecutiveClean >= 3` (stable code being changed)
+
+**Regression eval format:**
+```markdown
+## Regression Evals (preserve prior behavior)
+- `<test command that verified existing behavior BEFORE this task>`
+- `<assertion that core functionality still works after changes>`
+```
+
+If a Scout proposes a task without Regression Evals and the triggers above apply, the orchestrator MUST add at least one regression grader before launching the Builder. A common pattern: snapshot the output of key commands before the build, then verify the same output after.

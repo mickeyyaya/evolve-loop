@@ -158,6 +158,25 @@ For an annotated example, see [examples/instinct-example.yaml](../examples/insti
 - **Builder** reads instincts before implementing. Follows successful patterns and avoids anti-patterns.
 - **Orchestrator** reads instincts during LEARN phase to update confidence scores and extract new ones.
 
+## Instinct Forgetting and Consolidation (Memory Research-Inspired)
+
+Research on agent memory operations (arXiv:2505.00675, arXiv:2603.07670) identifies six core memory operations. The evolve-loop's instinct store implements Store, Retrieve, and Update — but lacks **Forgetting** (strategic discard) and robust **Consolidation** (continual compression). Over 100+ cycles, zero-use instincts accumulate and degrade retrieval quality.
+
+**Forgetting protocol (every 10 cycles):**
+
+| Step | Action | Threshold |
+|------|--------|-----------|
+| Usage scan | Count instinct citations in ledger for last 10 cycles | — |
+| Candidate selection | Instincts with 0 citations in last 10 cycles | `usageFrequency == 0` |
+| Staleness check | Candidate confidence already < 0.4 | Automatic discard |
+| Causal review | Check if instinct was learned from a still-relevant failure | Retain if causal link active |
+| Discard | Move to `archived/` with `archivedReason: "zero-use-discard"` | Provenance preserved |
+| Merge candidates | Instincts with >85% similarity but different confidence | Merge, keep higher confidence |
+
+**Graduation interaction:** Graduated instincts (confidence >= 0.75, cited 3+ cycles) are exempt from forgetting — they have proven their value. Non-graduated instincts with zero use are the primary discard targets.
+
+**Anti-pattern:** Discarding instincts that are rarely used but prevent critical failures. The causal review step catches this: if an instinct's `source` cycle had a CRITICAL audit finding, the instinct is retained regardless of usage frequency.
+
 ## Viewing Instincts
 
 To inspect current instincts:

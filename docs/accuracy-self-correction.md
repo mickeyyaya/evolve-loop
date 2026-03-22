@@ -98,6 +98,36 @@ If the LLM-as-a-Judge's chain-of-thought lists specific failures or concerns but
 
 ---
 
+## Agent Error Taxonomy and Targeted Recovery (AgentDebug-Inspired)
+
+AgentDebug (arXiv:2509.25370) demonstrates that targeted feedback based on root cause classification produces +24% accuracy improvement over blank retries. When a Builder fails, the retry should know *where* the error occurred, not just *that* it failed.
+
+**Five-dimension error taxonomy for Builder failures:**
+
+| Dimension | Description | Evolve-Loop Mapping |
+|-----------|-------------|---------------------|
+| Memory error | Agent retrieves wrong/stale information | Builder applied outdated instinct or read wrong file |
+| Reflection error | Agent's self-assessment is wrong | Builder self-verified as PASS but Auditor found FAIL |
+| Planning error | Decomposition or ordering wrong | Wrong file scope selected, missed dependency |
+| Action error | Tool misuse, wrong parameters | Wrong grep flag, incorrect edit target |
+| System error | External environment failure | Eval runner timeout, missing tool, permission error |
+
+**Targeted retry protocol:** When Auditor issues FAIL, classify the failure against this taxonomy and include the dimension in the retry context:
+
+```json
+{
+  "retryContext": {
+    "failureDimension": "planning",
+    "rootCause": "Builder scoped to 2 files but task required 3",
+    "targetedFeedback": "Re-read acceptance criteria and enumerate ALL files before implementing"
+  }
+}
+```
+
+This replaces blank retries with iterative error recovery — the Builder receives a diagnosis, not just a rejection.
+
+---
+
 ## Cross-Cutting Application
 
 | Technique | Scout | Builder | Auditor | Operator |
