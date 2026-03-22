@@ -412,7 +412,7 @@ The evolve-loop runs continuously through all requested cycles. Between cycles, 
    - Benchmark delta (if measured)
    - Any warnings or stagnation signals
    - Key decisions for next cycle
-3. **Continue immediately to the next cycle** — do NOT stop or wait for user input
+3. **Continue immediately to the next cycle** — do NOT stop or wait for user input. In bypass/yolo mode, the orchestrator must complete ALL requested cycles without pausing. "Continue without asking" means maximum velocity with full pipeline compliance — it does NOT mean skip agents or fabricate cycles. Every cycle must run Scout → Builder → Auditor → phase-gate.sh verification.
 4. **Lean Context Mode (Cycles 4+):** To prevent context accumulation, past cycle 3, the orchestrator MUST aggressively truncate historical logs and ONLY pass the structured `handoff.md` and `instinctSummary` to downstream agents.
    - Stop re-reading files already in context (use remembered values)
    - Skip reading full agent results — extract only verdict + key metrics
