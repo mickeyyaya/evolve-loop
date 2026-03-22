@@ -51,6 +51,14 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 149 — Runtime Guardrails and Secure Code Generation
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| AgentSpec: Runtime Enforcement DSL | arXiv:2503.18666 | Trigger/predicate/enforcement phase-gate mapping | `docs/runtime-guardrails.md` | PROVISIONAL |
+| AEGIS: Pre-Execution Firewall | arXiv:2603.12621 | Three-stage pre-execution pipeline, tamper-evident audit | `docs/runtime-guardrails.md` | PROVISIONAL |
+| Persistent Feedback for Secure Code | arXiv:2602.05868 | Static analyzer limitations (61-65%), layered eval graders | `docs/secure-code-generation.md` | PROVISIONAL |
+
 ### Cycle 148 — World Models, Red-Teaming, Static Analysis
 
 | Paper | arXiv | Technique Adopted | Target File | Status |
