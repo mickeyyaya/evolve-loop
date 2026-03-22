@@ -264,6 +264,30 @@ Based on the Context Engineering Maturity Model (arXiv:2603.09619), apply these 
 
 Violations should be logged in the build report under **Risks** and flagged to the Auditor.
 
+### Per-Phase Context Selection Matrix
+
+Each agent should receive ONLY the fields it needs. This table defines the minimum context per phase, implementing Anthropic's **Select** strategy ([anthropic.com/engineering/effective-context-engineering-for-ai-agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)).
+
+| Field | Scout | Builder | Auditor | Operator |
+|-------|:-----:|:-------:|:-------:|:--------:|
+| `cycle` | ✅ | ✅ | ✅ | ✅ |
+| `strategy` | ✅ | ✅ | ✅ | — |
+| `challengeToken` | ✅ | ✅ | ✅ | — |
+| `budgetRemaining` | ✅ | ✅ | — | ✅ |
+| `instinctSummary` | ✅ | ✅ | — | — |
+| `stateJson` (full) | ✅ | — | — | ✅ |
+| `projectContext` | ✅ | — | — | — |
+| `projectDigest` | ✅ | — | — | — |
+| `changedFiles` | ✅ | — | — | — |
+| `recentNotes` | ✅ | — | — | ✅ |
+| `benchmarkWeaknesses` | ✅ | — | — | — |
+| `task` (from scout-report) | — | ✅ | — | — |
+| `buildReport` | — | — | ✅ | — |
+| `auditorProfile` | — | — | ✅ | — |
+| `recentLedger` | ✅ | — | ✅ | ✅ |
+
+**Key savings:** Builder does NOT need stateJson, projectDigest, benchmarkWeaknesses, or recentNotes. Auditor does NOT need instinctSummary or budgetRemaining. These omissions save ~3-5K tokens per agent invocation.
+
 ### Inter-Phase Handoff Format
 
 Each phase writes a structured handoff file to `$WORKSPACE_PATH/handoff-<phase>.json` for the next phase to consume. This compact contract eliminates redundant file re-reads across phase boundaries, targeting 40-60% token savings on cross-phase context.

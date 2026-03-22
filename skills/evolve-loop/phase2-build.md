@@ -31,6 +31,55 @@ Before starting the build loop, partition the task list into three groups:
 
 Parallel execution of worktree tasks drastically reduces build phase latency. Because each task is isolated in its own worktree and the OCC protocol handles state.json conflicts, they can safely be built concurrently.
 
+---
+
+## Self-MoA Parallel Builds (M-complexity tasks)
+
+For M-complexity tasks, the orchestrator MAY use **Self-MoA** (Self Mixture-of-Agents) to improve first-attempt pass rate and reduce latency. This runs 2-3 Builder agents from the same model with varied approaches, accepting the first passing result. (Research basis: M1-Parallel [arXiv:2507.08944] — 2.2x speedup with no accuracy loss; Self-MoA [arXiv:2502.00674] — single-model diversity outperforms multi-model mixing by 6.6%.)
+
+### When to use Self-MoA
+
+| Task Complexity | Self-MoA? | Rationale |
+|----------------|-----------|-----------|
+| **S** | No — single Builder | Single pass is sufficient; Self-MoA wastes tokens |
+| **M (≤5 files)** | Optional — 2 Builders | Moderate benefit; use if budget allows |
+| **M (>5 files)** | Yes — 2-3 Builders | High benefit; complex tasks benefit most from diversity |
+| **retry attempt ≥ 2** | Yes — 3 Builders | Previous approaches failed; maximize diversity |
+
+### Execution Protocol
+
+1. **Launch N Builder agents in parallel** (N=2 for standard M, N=3 for retry ≥ 2), each in its own worktree:
+   - All receive the same task context
+   - Each gets a different `selfMoaVariant` field in context: `"A"`, `"B"`, `"C"`
+   - Variant A: standard approach (as if single Builder)
+   - Variant B: alternative approach — Builder must explicitly choose a different design than its first instinct
+   - Variant C (if used): minimal approach — smallest possible diff, fewest files touched
+
+2. **Early termination**: As each Builder completes, immediately run its eval graders:
+   - First Builder whose output **passes all eval graders** → accept that result, cancel remaining Builders
+   - If no Builder passes on first attempt → collect all outputs, pass the best-scoring one to Auditor for detailed review
+
+3. **Cost control**:
+   - Self-MoA multiplies Builder token cost by N (2-3x). Only use when expected benefit outweighs cost.
+   - Track `selfMoaUsed: true/false` and `selfMoaWinner: "A"/"B"/"C"` in build-report.md for meta-cycle analysis
+   - If Self-MoA winners are consistently variant A (>80% of the time over 5 cycles), reduce to single Builder — diversity isn't helping
+
+4. **Anti-reward-hacking**: Each variant runs independently in its own worktree. The eval graders (not a reward model) select the winner. This avoids proxy reward misalignment because evals test real behavior.
+
+### Builder Context Addition
+
+When Self-MoA is active, add to the Builder context:
+```json
+{
+  "selfMoaVariant": "A|B|C",
+  "selfMoaInstruction": "You are variant <X> in a parallel build. Variant A uses the standard approach. Variant B must choose an explicitly different design. Variant C (if present) uses the minimal diff approach."
+}
+```
+
+The Builder should note its variant in the build report header.
+
+---
+
 For each worktree task:
 
 ---
