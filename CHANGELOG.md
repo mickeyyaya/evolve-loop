@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.7.0] - 2026-03-22
+
+### Research
+- **Pipeline optimization research** (`docs/research-pipeline-optimization.md`) — surveyed 25+ papers from 2025-2026 on parallelization, trimming, multi-model strategies. Key findings: 4-agent saturation (Google/MIT), Self-MoA > multi-model mixing (Princeton), speculative execution 48.7% latency reduction (Sherlock/Microsoft), AgentDiet 40-60% token savings
+
+### Added
+- **Self-MoA parallel builds** — spawn 2-3 Builder agents with approach diversity for M-complexity tasks; early termination accepts first passing result. Research: M1-Parallel 2.2x speedup (arXiv:2507.08944), Self-MoA (arXiv:2502.00674)
+- **Budget-aware agent context** — `budgetRemaining` field (cyclesLeft, estimatedTokensLeft, budgetPressure) enables agents to self-regulate effort. Research: BATS framework (arXiv:2511.17006)
+- **Per-phase context selection matrix** — each agent receives ONLY needed fields; saves 3-5K tokens per invocation. Research: Anthropic Select strategy
+- **Speculative Auditor execution** — start Auditor concurrently with Builder; rollback on failure. Research: Sherlock (arXiv:2511.00330)
+- **Eval-delta prediction** — Scout predicts benchmark impact per task; Phase 5 tracks prediction accuracy for calibration. Research: eval-driven development (arXiv:2411.13768)
+- **Eager context budget estimation** — pre-compute cycle token cost before launching agents; proactive lean mode entry. Research: OPENDEV (arXiv:2603.05344)
+- **AgentDiet trajectory compression** — prune useless/redundant/expired context between every phase transition. Research: AgentDiet (arXiv:2509.23586)
+
+### Changed
+- **Lean mode trigger** — now activates on budget pressure (not just cycle 4+), enabling earlier optimization
+- **Scout task output** — now includes "Expected eval delta" field for prediction tracking
+- **phase2-build.md** — expanded with Self-MoA dispatch, speculative auditor, trajectory compression sections
+
 ## [7.6.0] - 2026-03-22
 
 ### Added

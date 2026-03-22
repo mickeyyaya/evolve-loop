@@ -21,16 +21,51 @@ For detailed calibration instructions (deduplication check, automated + LLM scor
 
 ## FOR each cycle (while remainingCycles > 0):
 
-### Lean Mode (cycles 4+ of an invocation)
+### Eager Context Budget Estimation (every cycle)
 
-After the first 3 cycles of an invocation, the orchestrator switches to lean mode to prevent context bloat:
+At the start of each cycle, **before launching any agent**, estimate the total context cost for this cycle based on task complexity. This enables proactive lean mode entry and Self-MoA decisions. (Research basis: OPENDEV [arXiv:2603.05344] — eager context building beats lazy accumulation; Token Consumption Prediction [OpenReview:1bUeVB3fov] — input tokens dominate cost and can be predicted.)
+
+```
+estimatedCycleTokens = sum(perTaskEstimate) + orchestratorOverhead
+perTaskEstimate:
+  S-task inline:  ~5-10K tokens
+  S-task worktree: ~20-40K tokens
+  M-task worktree: ~40-80K tokens
+  M-task Self-MoA: ~80-160K tokens (N × single estimate)
+orchestratorOverhead: ~10-15K tokens (state reads, phase transitions, handoffs)
+```
+
+If `estimatedCycleTokens > tokenBudget.perCycle * 0.8`:
+- Drop lowest-priority tasks until under budget
+- Or switch M-tasks to single-Builder (skip Self-MoA)
+- Or activate lean mode immediately (don't wait for cycle 4)
+
+### Lean Mode (cycles 4+ OR budget pressure)
+
+Activated after 3 cycles OR when `budgetPressure == "high"` OR when `estimatedCycleTokens > tokenBudget.perCycle * 0.8`:
 - **State.json**: Read ONCE at cycle start. Do NOT re-read before Phase 4 — use the in-memory copy.
 - **Agent results**: Do NOT read full workspace files after agent completion. Instead, the agent's returned summary is sufficient. Only read the full file if the summary indicates a problem.
 - **Scout report**: Extract task list from agent return value, not by reading scout-report.md separately.
 - **Eval checksums**: Compute once, verify from memory — do not re-read the checksum file.
 - **Benchmark delta**: Skip for cycles where all tasks are S-complexity docs-only changes (no behavioral risk).
 
-Lean mode saves ~15-20K tokens per cycle (from ~50K to ~30K) by eliminating redundant file reads that accumulate in the orchestrator's conversation context.
+Lean mode saves ~15-20K tokens per cycle (from ~50K to ~30K) by eliminating redundant file reads.
+
+### AgentDiet Trajectory Compression (between every phase)
+
+Between phase transitions, compress the orchestrator's accumulated context by removing useless, redundant, and expired information. (Research basis: AgentDiet [arXiv:2509.23586] — 40-60% input token savings with negligible quality impact.)
+
+**What to prune at each phase boundary:**
+- **After DISCOVER:** Remove full Scout analysis — keep only the task list and eval definitions
+- **After BUILD:** Remove full Builder output — keep only build-report.md summary and worktree branch/SHA
+- **After AUDIT:** Remove full Auditor analysis — keep only verdict (PASS/WARN/FAIL) and issue list
+- **After SHIP:** Remove commit details — keep only commit SHA and benchmark delta
+
+**What to NEVER prune:**
+- Challenge token (integrity chain)
+- Eval checksums (tamper detection)
+- Failed approach details (needed for retry logic)
+- Stagnation patterns (needed for convergence detection)
 
 ### Cycle Integrity Setup
 
