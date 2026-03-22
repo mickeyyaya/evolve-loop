@@ -51,6 +51,13 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 146 — Multi-Agent Coordination and Observability
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| AdaptOrch: Task-Adaptive Orchestration | arXiv:2602.16873 | DAG-based topology routing, parallel eval execution | `docs/multi-agent-coordination.md` | PROVISIONAL |
+| From Features to Actions: Agent Explainability | arXiv:2602.06841 | Trajectory-level logging, state tracking checkpoints | `docs/agent-observability.md` | PROVISIONAL |
+
 ### Cycle 145 — Uncertainty, Structured Output, Documentation
 
 | Paper | arXiv | Technique Adopted | Target File | Status |
@@ -85,9 +92,10 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | Self-improvement | DGM, ARTEMIS, Tool-R0 | Agent variant branching (DGM Phase 6) |
 | Context engineering | ACE, ACON (deferred) | Context compression implementation |
 | Evaluation | AgentPRM, HiPRAG, SWE-CI, AgentAssay | Formal verification (VERINA, deferred) |
-| Orchestration | DAAO, GoalAct | Multi-agent coordination protocols |
+| Orchestration | DAAO, GoalAct, AdaptOrch | Swarm-level coordination |
 | Robustness | Free-MAD, AgentDebug, AUQ | Adversarial testing frameworks |
 | Memory | Memory Surveys, MUSE | Causal memory retrieval |
 | Security | Agent Skills, Safiron (deferred) | Runtime guardrail integration |
 | Optimization | AutoPDL, BATS, DCCD, Stepwise Scoring | Prompt caching strategies |
+| Observability | Agent Explainability | Runtime monitoring integration |
 | Documentation | DocAgent (deferred) | Topological code processing |
