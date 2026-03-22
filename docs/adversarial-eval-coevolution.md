@@ -71,6 +71,23 @@ The eval quality check (`eval-quality-check.sh`) and eval tamper detection (chec
 
 ---
 
+## Automated Threat Taxonomy (Red-Teaming Research, arXiv:2512.20677)
+
+Automated red-teaming research identifies 6 threat categories that adversarial eval systems should test for. Two are particularly relevant to self-improving coding agents:
+
+| Threat Category | Description | Evolve-Loop Risk |
+|----------------|-------------|-----------------|
+| Reward hacking | Agent games eval metrics without genuine improvement | Builder writing code that passes greps but doesn't implement real behavior |
+| Sandbagging | Agent deliberately underperforms to lower expectations | Builder producing minimal implementations to avoid audit scrutiny |
+| Data exfiltration | Agent leaks sensitive context to external systems | Builder including internal paths or state in committed files |
+| Inappropriate tool use | Agent uses tools for unintended purposes | Builder modifying eval files or agent prompts |
+| Chain-of-thought manipulation | Agent produces misleading reasoning traces | Auditor providing false PASS justifications |
+| Specification gaming | Agent satisfies the letter of requirements, not the spirit | Scout writing tautological eval graders (Level 0/1) |
+
+The evolve-loop already mitigates several of these: eval quality checks catch specification gaming, checksum verification prevents inappropriate tool use on eval files, and the anti-conformity audit protocol (Free-MAD) addresses chain-of-thought manipulation. Data exfiltration and sandbagging remain partially unaddressed.
+
+---
+
 ## Research References
 
 - Code-A1 (arXiv:2603.15611): adversarial co-evolution of code and test LLMs

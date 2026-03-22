@@ -99,6 +99,21 @@ A two-layer hierarchy (coordinator decomposes → specialists execute) outperfor
 
 ---
 
+## Pre-Execution Simulation (WebDreamer-Inspired, arXiv:2411.06559)
+
+WebDreamer demonstrates that using an LLM as a world model — simulating outcomes before committing to actions — outperforms reactive approaches. The agent deliberates over candidate actions by predicting their consequences, then selects the action with the best predicted outcome.
+
+**Application to Scout complexity analysis:** Before committing to a task, the Scout can simulate the Builder's likely execution path:
+1. "If I assign this task, which files will the Builder need to read?" (scope prediction)
+2. "How many lines will likely change?" (token budget estimation)
+3. "What eval graders will likely catch real issues?" (eval quality prediction)
+
+This pre-execution deliberation maps to the difficulty scoring mechanism (DAAO-inspired, documented in `docs/self-learning.md`). The simulation step adds a "mental rehearsal" layer before the Scout finalizes task selection.
+
+**Cost-benefit:** Simulation costs ~2-5K tokens per task but prevents ~20-40K token waste from poorly scoped tasks. The break-even is approximately 1 prevented task failure per 5 simulations.
+
+---
+
 ## Research References
 
 - AdaptOrch (arXiv:2602.16873): Task-adaptive topology routing with DAG decomposition

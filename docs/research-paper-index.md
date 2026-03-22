@@ -51,6 +51,15 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 148 — World Models, Red-Teaming, Static Analysis
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| WebDreamer: Model-Based Planning | arXiv:2411.06559 | Pre-execution simulation for task scoping | `docs/multi-agent-coordination.md` | PROVISIONAL |
+| Automated Red-Teaming Taxonomy | arXiv:2512.20677 | 6-category threat taxonomy for adversarial eval | `docs/adversarial-eval-coevolution.md` | PROVISIONAL |
+| Static Analysis Feedback Loop | arXiv:2508.14419 | Static analysis as eval complement | — | DEFERRED |
+| Skill Mining from GitHub | arXiv:2603.11808 | Automated skill extraction from repos | — | DEFERRED |
+
 ### Cycle 147 — Adversarial Co-Evolution and Hierarchical Planning
 
 | Paper | arXiv | Technique Adopted | Target File | Status |
@@ -103,6 +112,8 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | Robustness | Free-MAD, AgentDebug, AUQ | Adversarial testing frameworks |
 | Memory | Memory Surveys, MUSE | Causal memory retrieval |
 | Security | Agent Skills, Safiron (deferred) | Runtime guardrail integration |
+| Planning/Simulation | WebDreamer | World model integration |
+| Code Quality | Static Analysis (deferred) | Automated linting integration |
 | Optimization | AutoPDL, BATS, DCCD, Stepwise Scoring | Prompt caching strategies |
 | Observability | Agent Explainability | Runtime monitoring integration |
 | Documentation | DocAgent (deferred) | Topological code processing |
