@@ -81,6 +81,23 @@ Orchestrator inline + operator. This phase handles workspace archival, instinct 
    ```
    Scout and Builder read `instinctSummary` from state.json instead of reading all instinct YAML files. Full instinct files are only read during consolidation (every 3 cycles) or when `instinctCount` has changed since last cycle.
 
+## Eval-Delta Prediction Tracking
+
+Compare Scout's `Expected eval delta` predictions (from scout-report.md) against actual benchmark changes (from the delta check between Phase 3 and Phase 4). This feedback loop improves task selection over time. (Research basis: Eval-Driven Development — organizations using eval-guided task selection ship 5x faster; arXiv:2411.13768.)
+
+**Steps:**
+1. For each shipped task, read the Scout's `Expected eval delta` field from scout-report.md
+2. Read the actual dimension delta from the benchmark delta check (if one was run this cycle)
+3. Compare prediction vs actual:
+   - **Accurate** (within ±2 points): Scout prediction is reliable for this task type
+   - **Over-predicted** (actual < predicted by >3 points): Scout is too optimistic about this task type's impact
+   - **Under-predicted** (actual > predicted by >3 points): Scout is too conservative — this task type is higher-impact than expected
+4. Log prediction accuracy in `state.json` under `evalDeltaAccuracy`:
+   ```json
+   {"cycle": <N>, "task": "<slug>", "predicted": {"dimension": "+N"}, "actual": {"dimension": "+N"}, "accuracy": "accurate|over|under"}
+   ```
+5. After 5+ entries, compute Scout's prediction calibration. If over-prediction rate >50%, extract an instinct: "Scout over-estimates impact of <task-type> tasks on <dimension>"
+
 ## Step-Level Process Reward Analysis
 
 After instinct extraction and before graduation, analyze the Builder's step-level confidence data from `build-report.md` and the Auditor's cross-validation from `audit-report.md`. This per-step analysis enables targeted Builder prompt improvements — not shotgun corrections. (Research basis: eval-harness process rewards — scoring intermediate steps yields finer learning signal than cycle-level evaluation.)

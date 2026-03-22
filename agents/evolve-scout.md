@@ -249,6 +249,7 @@ For each selected task, write an eval definition to `.evolve/evals/<task-slug>.m
 - **Type:** feature / stability / security / techdebt / performance
 - **Complexity:** S / M
 - **Rationale:** <why this is highest impact>
+- **Expected eval delta:** <which benchmark dimension(s) this task improves and by how much, e.g., "modularity +3, schemaHygiene +2">
 - **Acceptance Criteria:**
   - [ ] <testable criterion>
   - [ ] <testable criterion>

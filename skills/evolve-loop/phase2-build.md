@@ -183,6 +183,27 @@ This append-only log ensures every attempt is recorded. Scout reads `experiments
 
 ## Post-Builder Handling
 
+## Speculative Auditor Execution (optional — latency optimization)
+
+Instead of waiting for the Builder to fully complete before launching the Auditor, the orchestrator MAY start the Auditor **speculatively** as soon as the Builder commits in its worktree. This overlaps build and audit, reducing cycle latency. (Research basis: Sherlock [arXiv:2511.00330] — 48.7% latency reduction + 18.3% accuracy gain via speculative execution.)
+
+### When to use speculative auditing
+
+- **Use when:** Builder is working in a worktree (changes are isolated and committed)
+- **Skip when:** Builder is inline (S-complexity), or platform doesn't support concurrent agents
+
+### Protocol
+
+1. Builder commits in its worktree and writes `build-report.md` with status PASS
+2. Orchestrator launches Auditor immediately (concurrently with any remaining Builder self-verification)
+3. **If Auditor PASS:** Total cycle time = max(Builder, Auditor) instead of Builder + Auditor
+4. **If Auditor FAIL:** Roll back — discard worktree, log failure, proceed to retry or next task
+5. **If Builder fails after Auditor started:** Cancel Auditor, discard both
+
+**Safety:** Speculative execution does NOT change the quality gate. The Auditor still runs the full checklist and eval graders. It only changes *when* the Auditor starts, not *what* it checks.
+
+---
+
 After Builder completes:
 - Read `$WORKSPACE_PATH/build-report.md`
 - If status is FAIL after 3 attempts:
