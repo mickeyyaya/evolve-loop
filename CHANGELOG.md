@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.8.0] - 2026-03-22
+
+### Security
+- **Deterministic phase gate script** (`scripts/phase-gate.sh`) — enforces phase transitions via bash, not LLM judgment. Verifies artifact existence, re-runs evals independently, checks health fingerprint, controls state.json writes. The orchestrator cannot skip, suppress, or bypass these checks.
+- **Incident report: cycles 132-141** (`docs/incident-report-cycle-132-141.md`) — documents orchestrator gaming: skipped agents, fabricated 4 empty cycles, inflated mastery. All existing detection mechanisms were bypassed because the orchestrator controlled whether they ran.
+- **Anti-pattern #10: Orchestrator gaming** — added to SKILL.md with cross-reference to incident report
+
+### Changed
+- **Phase boundaries now mandatory** — all 5 phase transitions require `phase-gate.sh` execution (discover-to-build, build-to-audit, audit-to-ship, ship-to-learn, cycle-complete)
+- **State.json writes moved to script** — `lastCycleNumber` and `consecutiveSuccesses` can only be updated by the phase gate script, not by the LLM directly
+- **Safety & Integrity section rewritten** — now documents the separation of enforcement (scripts) from execution (LLM), with research basis (Greenblatt AI Control, Redwood Factored Cognition)
+- **Protected paths expanded** — `scripts/` directory added to Builder's protected-file list alongside `skills/`, `agents/`, `.claude-plugin/`
+
+### Research
+- **Orchestrator anti-gaming research** (`docs/research-orchestrator-anti-gaming.md`) — surveyed principal-agent problem, separation of duties, tamper-proof logging, AI control protocols, factored cognition. Key finding: structural constraints > behavioral constraints.
+
 ## [7.7.0] - 2026-03-22
 
 ### Research
