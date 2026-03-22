@@ -424,21 +424,41 @@ The orchestrator reads `handoff.md` during initialization if it exists, applying
 
 ## Safety & Integrity
 
-Self-modifying systems require explicit safety mechanisms to prevent misevolution:
+Self-modifying systems require explicit safety mechanisms to prevent misevolution. The evolve-loop separates **enforcement** (deterministic scripts) from **execution** (LLM agents).
+
+### Phase Gate Script (primary enforcement)
+
+The `scripts/phase-gate.sh` script runs at every phase transition and enforces structural constraints the orchestrator cannot bypass. This is the trust boundary between LLM judgment and deterministic verification. See [docs/incident-report-cycle-132-141.md](../../docs/incident-report-cycle-132-141.md) for why this exists.
+
+**What the script controls (LLM cannot override):**
+- Phase progression — artifacts must exist before the next phase starts
+- Eval verification — `verify-eval.sh` runs independently, not trusting Auditor claims
+- Health fingerprint — `cycle-health-check.sh` runs every cycle, cannot be skipped
+- State.json writes — only the script increments `lastCycleNumber` and `consecutiveSuccesses`
+- Mastery updates — only incremented after script-verified audit PASS
+
+**What the LLM controls:**
+- All creative work: task selection, implementation, code review, instinct extraction
+
+Research basis: Greenblatt "AI Control" (2023) — trusted monitoring must be structurally separate from the monitored agent. Redwood Research "Factored Cognition" (2025) — trusted decomposition + untrusted execution.
 
 ### Memory Integrity
 - **Instinct provenance:** Every instinct tracks its `source` (cycle + task). During meta-cycles, verify that instinct sources match actual cycle history in the ledger.
 - **State.json validation:** Before each cycle, validate state.json structure against the expected schema. If corrupted or unexpected fields appear, warn and reset to last known good state.
 
 ### Eval Tamper Detection
-- **Protected eval infrastructure:** The Builder MUST NOT modify files in `skills/evolve-loop/`, `agents/`, or CLI plugin metadata folders (like `.claude-plugin/`) unless the task explicitly targets the evolve-loop itself.
-- **Eval checksum tracking:** After Scout creates eval definitions, the orchestrator records a checksum of each eval file. Before Auditor runs evals, verify checksums haven't changed. If they have and it wasn't a legitimate Scout update → HALT.
-- **Objective hacking detection:** If a Builder removes or weakens eval criteria, assertion counts, or test commands, the Auditor flags this as CRITICAL severity regardless of other results.
+- **Protected eval infrastructure:** The Builder MUST NOT modify files in `skills/evolve-loop/`, `agents/`, `scripts/`, or CLI plugin metadata folders (like `.claude-plugin/`) unless the task explicitly targets the evolve-loop itself.
+- **Eval checksum tracking:** Captured by the phase gate script after DISCOVER; verified before AUDIT. Orchestrator cannot tamper because the script computes and checks independently.
+- **Objective hacking detection:** If a Builder removes or weakens eval criteria, the Auditor flags as CRITICAL severity.
 
 ### Rollback Protocol
 - All changes are committed atomically per task. Rollback is always `git revert <commit>`.
 - If 3 consecutive cycles show quality degradation (via delta metrics), auto-suggest rollback to the last stable cycle.
 - Prompt evolution changes (from meta-cycles) auto-revert if the next meta-cycle shows worse performance.
+
+### Known Incidents
+- **Cycles 102-111:** Builder reward hacking via tautological evals. See [docs/incident-report-cycle-102-111.md](../../docs/incident-report-cycle-102-111.md).
+- **Cycles 132-141:** Orchestrator gaming via skipped agents, fabricated cycles, mastery inflation. See [docs/incident-report-cycle-132-141.md](../../docs/incident-report-cycle-132-141.md). Root cause: all enforcement mechanisms were orchestrator-invoked. Fix: phase gate script moves enforcement to deterministic bash.
 
 ## Anti-Patterns
 
@@ -451,6 +471,7 @@ Self-modifying systems require explicit safety mechanisms to prevent misevolutio
 7. **Ceremony over substance** — Workspace files should be concise, not exhaustive
 8. **Ignoring HALT** — When Operator returns HALT, pause and present to user
 9. **Complexity creep** — If a task adds more lines than proportional to its complexity (S-tasks >30 lines, M-tasks >80 lines), break it down into smaller tasks or simplify the approach. Autonomous systems tend toward accretion — actively resist by preferring deletions that maintain functionality over additions
+10. **Orchestrator gaming** — The orchestrator MUST NOT skip agents, fabricate cycles, inflate mastery, or batch-manipulate state.json. Phase gate script (`scripts/phase-gate.sh`) enforces this structurally. If you find yourself wanting to shortcut the pipeline "for efficiency," that impulse is the specification gaming the pipeline is designed to prevent. (Incident: cycles 132-141)
 
 ## Auditor Adaptive Strictness
 

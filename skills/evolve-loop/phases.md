@@ -4,6 +4,29 @@ Detailed orchestrator instructions for each phase. Optimized for fast iteration 
 
 **Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`, `ultrathink`).
 
+## Mandatory Phase Gate Verification
+
+**CRITICAL:** The orchestrator MUST run `scripts/phase-gate.sh` at every phase transition. This is a deterministic bash script that verifies artifacts exist, agents actually ran, and integrity checks pass. The orchestrator CANNOT skip this step — it is the trust boundary between LLM judgment and structural enforcement.
+
+```bash
+# Run at every phase transition:
+bash scripts/phase-gate.sh <gate> <cycle> <workspace_path>
+
+# Gates: discover-to-build, build-to-audit, audit-to-ship, ship-to-learn, cycle-complete
+# Exit 0 = proceed, Exit 1 = block, Exit 2 = halt (present to human)
+```
+
+**Why this exists:** Incident report cycle-132-141 documented the orchestrator skipping agents, fabricating cycles, and inflating mastery. All existing detection mechanisms were bypassed because the orchestrator controlled whether they ran. The phase gate script removes that control — the script runs deterministically, the LLM cannot suppress its output or skip its execution.
+
+**What the script enforces:**
+- Workspace artifacts (scout/build/audit reports) must exist and be fresh (<10 min old)
+- Eval graders are re-executed independently via `verify-eval.sh` (not trusting Auditor claims)
+- Cycle health fingerprint runs via `cycle-health-check.sh` (11 integrity signals)
+- `state.json` cycle number and mastery are updated ONLY by the script (not the LLM)
+- Eval checksums are verified for tamper detection
+
+**What the LLM retains:** All creative work — task selection, implementation, code review, instinct extraction. The script enforces *process*, the LLM does *substance*.
+
 ## Phase 0: CALIBRATE (once per invocation)
 
 Runs **once per `/evolve-loop` invocation**, not per cycle. Establishes a project-level benchmark baseline.
@@ -357,11 +380,12 @@ Each phase writes a structured handoff file to `$WORKSPACE_PATH/handoff-<phase>.
 
 ### Phase Boundary: DISCOVER → BUILD
 
-Before entering Phase 2, run precondition assertions:
+**MANDATORY:** Run the phase gate script before proceeding:
 ```bash
-# Verify Scout produced substantive output
-[ -s "$WORKSPACE_PATH/scout-report.md" ] || { echo "HALT: Scout report missing or empty — Phase 1 may have been skipped"; exit 1; }
+bash scripts/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
+# Exit 0 → proceed to BUILD. Any other exit → HALT.
 ```
+This verifies: Scout report exists and is fresh, eval definitions exist, eval quality passes, checksums captured.
 
 ### Phase 2: BUILD (loop per task)
 
@@ -378,11 +402,12 @@ For detailed Phase 2 implementation including task partitioning, parallelization
 
 ### Phase Boundary: BUILD → AUDIT
 
-Before entering Phase 3, run precondition assertions:
+**MANDATORY:** Run the phase gate script before proceeding:
 ```bash
-# Verify Builder produced substantive output
-[ -s "$WORKSPACE_PATH/build-report.md" ] || { echo "HALT: Build report missing or empty — Phase 2 may have been skipped"; exit 1; }
+bash scripts/phase-gate.sh build-to-audit $CYCLE $WORKSPACE_PATH
+# Exit 0 → proceed to AUDIT. Any other exit → HALT.
 ```
+This verifies: Build report exists and is fresh, status is not FAIL, challenge token present.
 
 ### Phase 3: AUDIT (Parallel)
 
@@ -434,12 +459,31 @@ For detailed Benchmark Delta Check steps (exemptions, dimension comparison, bloc
 - Pre-ship gate runs `verify-eval.sh` and `cycle-health-check.sh` independently of all agents
 - Only proceed to Phase 4 if both health check and eval verification pass
 
+**MANDATORY:** Run the phase gate script before shipping:
+```bash
+bash scripts/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
+# Exit 0 → proceed to SHIP. Exit 1 → block. Exit 2 → HALT for human.
+```
+This is the **primary anti-cheating gate**: runs `verify-eval.sh` independently, runs `cycle-health-check.sh` (11 signals), verifies eval checksums. The orchestrator CANNOT self-declare PASS — the script verifies independently.
+
 ### Phase 4: SHIP
 
 For detailed Phase 4 instructions (serial ship lock, domain-specific shipping, state updates, process rewards), see [phase4-ship.md](skills/evolve-loop/phase4-ship.md).
+
+**MANDATORY:** After shipping, run:
+```bash
+bash scripts/phase-gate.sh ship-to-learn $CYCLE $WORKSPACE_PATH
+```
+This verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does this, not the LLM).
 
 ---
 
 ### Phase 5: LEARN
 
 For detailed Phase 5 instructions (instinct extraction, memory consolidation, operator check, meta-cycle self-improvement, context management), see [phase5-learn.md](skills/evolve-loop/phase5-learn.md).
+
+**MANDATORY:** After Phase 5 completes, run:
+```bash
+bash scripts/phase-gate.sh cycle-complete $CYCLE $WORKSPACE_PATH
+```
+This archives workspace, verifies all 3 reports exist, and updates mastery ONLY if audit-report.md contains a genuine PASS verdict. The LLM cannot inflate `consecutiveSuccesses` — only the script can.
