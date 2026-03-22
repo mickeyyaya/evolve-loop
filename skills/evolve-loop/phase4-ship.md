@@ -3,28 +3,31 @@ name: phase4-ship
 description: "Phase 4 SHIP instructions — serial ship lock, domain-specific shipping, state updates, process rewards"
 ---
 
+> Read this file when orchestrating Phase 4 (SHIP). Covers serial ship lock, domain-specific shipping, state updates, fitness scoring, and process rewards.
+
+## Contents
+- [Serial SHIP Lock](#serial-ship-lock-parallel-safety) — atomic lock acquisition
+- [Shipping by Domain](#ship-by-domain-projectcontextshipmechanism) — git, file-save, export, custom
+- [Mailbox Cleanup](#clearing-mailbox) — non-persistent message removal
+- [State Updates](#updating-statejson) — OCC writes, fitness, ledger summary, eval history, mastery
+- [Process Rewards](#process-rewards) — per-dimension scoring rubric, remediation triggers
+
 # Evolve Loop — Phase 4: SHIP
 
-Orchestrator inline — no agent needed. This phase handles persisting and distributing completed work after all tasks pass audit.
+Orchestrator inline — no agent needed. **This phase is not optional — every cycle MUST persist and distribute completed work.**
 
 ---
 
-### Phase 4: SHIP (orchestrator inline — MANDATORY)
+## Serial SHIP Lock (parallel safety)
 
-No agent needed. The orchestrator handles shipping directly. **This phase is not optional — every cycle MUST persist and distribute completed work.**
-
-#### Serial SHIP Lock (parallel safety)
-
-The SHIP phase is inherently serial — only one run can push at a time. Acquire a lock before any git push operations:
+Only one run can push at a time. Acquire lock before any git push:
 
 ```bash
-# Acquire lock (mkdir is atomic on POSIX)
 LOCK_DIR=".evolve/.ship-lock"
-MAX_WAIT=60  # seconds
+MAX_WAIT=60
 WAITED=0
 
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-  # Check for stale lock (>5 minutes old)
   if [ -f "$LOCK_DIR/info.json" ]; then
     LOCK_AGE=$(($(date +%s) - $(cat "$LOCK_DIR/info.json" | grep -o '"ts":[0-9]*' | cut -d: -f2)))
     if [ "$LOCK_AGE" -gt 300 ]; then
@@ -40,52 +43,28 @@ while ! mkdir "$LOCK_DIR" 2>/dev/null; do
   fi
 done
 
-# Write lock info
 echo '{"runId":"'$RUN_ID'","ts":'$(date +%s)'}' > "$LOCK_DIR/info.json"
 ```
 
-**All git operations below happen inside the lock. Release the lock at the end of Phase 4:**
-```bash
-rm -rf "$LOCK_DIR"
-```
+All git operations below happen inside the lock. Release at end: `rm -rf "$LOCK_DIR"`
 
-The ship mechanism depends on `projectContext.shipMechanism` (set during initialization step 3):
+---
 
-#### Ship by domain (`projectContext.shipMechanism`)
+## Ship by Domain (`projectContext.shipMechanism`)
 
-**`git` (default — coding domain):**
+### `git` (default — coding domain)
 
-1. **Verify all commits are clean:**
-   ```bash
-   git status
-   git log --oneline -<N>  # verify N commits from this cycle
-   ```
-
-2. **Commit any uncommitted changes:**
-   ```bash
-   git add <changed files>
-   git commit -m "<type>: <description>"
-   ```
-
-3. **Rebase and push to remote:**
-   ```bash
-   git pull --rebase origin main  # incorporate other parallel runs' changes
-   # If rebase conflicts → abort rebase, release lock, return to Builder for conflict resolution
-   git push origin <branch>
-   ```
-   The cycle is not complete until code is pushed.
-
+1. **Verify commits are clean:** `git status` + `git log --oneline -<N>`
+2. **Commit uncommitted changes:** `git add <files>` + `git commit -m "<type>: <description>"`
+3. **Rebase and push:** `git pull --rebase origin main` then `git push origin <branch>`. If rebase conflicts → abort, release lock, return to Builder.
 4. **Auto-bump plugin version:**
-   After pushing, bump the patch version in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to reflect shipped changes:
    ```bash
-   # Read current version and increment patch
    CURRENT_VER=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
    MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
    MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
    PATCH=$(echo "$CURRENT_VER" | cut -d. -f3)
    NEW_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
 
-   # Update both files
    python3 -c "
    import json
    for f in ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']:
@@ -100,145 +79,114 @@ The ship mechanism depends on `projectContext.shipMechanism` (set during initial
    git push origin <branch>
    ```
 
-   **Version bump rules:**
-   - Each cycle bumps the **patch** version (e.g., 7.2.0 → 7.2.1)
-   - **Minor** bumps (e.g., 7.2.x → 7.3.0) are reserved for meta-cycle milestones (every 5 cycles) or manual override
-   - **Major** bumps are manual only
+   | Bump Type | When |
+   |-----------|------|
+   | Patch | Each cycle (e.g., 7.2.0 -> 7.2.1) |
+   | Minor | Meta-cycle milestones (every 5 cycles) or manual override |
+   | Major | Manual only |
 
-5. **Publish plugin update:**
-   ```bash
-   ./publish.sh
-   ```
-   Syncs the local plugin cache and registry. **Mandatory after every push.**
+5. **Publish:** `./publish.sh` — mandatory after every push.
 
-**`file-save` (writing, research domains):**
+### `file-save` (writing, research domains)
 
-1. **Verify changes are saved:** All modified files exist and are non-empty.
-2. **Create backup:** Copy changed files to `.evolve/history/cycle-{N}/output/` as a restore point.
-3. **Log ship event** in the ledger (no git operations needed):
-   ```json
-   {"ts":"<ISO-8601>","cycle":<N>,"runId":"<$RUN_ID>","role":"orchestrator","type":"ship","data":{"mechanism":"file-save","files":["<list>"]}}
-   ```
-4. **Skip publish.sh** — plugin publishing is coding-domain only.
+1. Verify changes saved and non-empty
+2. Backup to `.evolve/history/cycle-{N}/output/`
+3. Log ship event in ledger (no git needed)
+4. Skip publish.sh
 
-**`export` (design domain):**
+### `export` (design domain)
 
-1. **Export artifacts** from source files (e.g., SVG export, asset compilation).
-2. **Save to output directory:** `.evolve/history/cycle-{N}/exports/`
-3. **Log ship event** in the ledger.
-4. **Skip publish.sh.**
+1. Export artifacts from source files
+2. Save to `.evolve/history/cycle-{N}/exports/`
+3. Log ship event in ledger
+4. Skip publish.sh
 
-**`custom`:** Read ship commands from `.evolve/domain.json` `shipCommands` array and execute each in order. Fall back to `file-save` if `shipCommands` is not defined.
+### `custom`
 
-5. **Clear non-persistent mailbox messages:**
-   Remove rows from `$WORKSPACE_PATH/agent-mailbox.md` where `persistent` is `false`. Retain rows where `persistent` is `true` so cross-cycle warnings survive into the next cycle.
-   ```bash
-   # Filter in-place: keep header rows and persistent=true rows
-   grep -v "| false |" $WORKSPACE_PATH/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md $WORKSPACE_PATH/agent-mailbox.md
-   ```
+Read ship commands from `.evolve/domain.json` `shipCommands` array. Execute each in order. Fall back to `file-save` if undefined.
 
-6. **Update state.json** (using OCC protocol — see [memory-protocol.md](skills/evolve-loop/memory-protocol.md) Concurrency Protocol):
-   - Mark completed tasks in `evaluatedTasks`
-   - Update `lastCycleNumber` to current cycle number (use MAX with existing value — another run may have advanced it)
-   - Reset `stagnation.nothingToDoCount` to 0
-   - Update `lastUpdated`
-   - Increment `version`
-   - **Compute `fitnessScore`** — weighted average of latest processRewardsHistory entry as a single "did the project get better?" signal:
-     ```json
-     "fitnessScore": round(0.25 * discover + 0.30 * build + 0.20 * audit + 0.15 * ship + 0.10 * learn, 2)
-     ```
-     After computing, compare to previous cycle's fitnessScore in state.json:
-     - If fitnessScore decreased for 2 consecutive cycles → set `fitnessRegression: true` in state.json. The Operator reads this as a HALT-worthy signal.
-     - If fitnessScore increased or held steady → set `fitnessRegression: false`.
-     - Store the score: `"fitnessScore": <value>` and `"fitnessHistory": [<last 3 scores>]` in state.json.
+---
 
-   - **Compute `ledgerSummary`** from ledger.jsonl (aggregated stats so agents never read the full ledger):
-     ```json
-     "ledgerSummary": {
-       "totalEntries": <count>,
-       "cycleRange": [<first>, <last>],
-       "scoutRuns": <count>,
-       "builderRuns": <count>,
-       "totalTasksShipped": <sum of tasksShipped across evalHistory>,
-       "totalTasksFailed": <sum of failed>,
-       "avgTasksPerCycle": <shipped / cycles>
-     }
-     ```
-   - **Trim `evalHistory`** in state.json to keep only the last 5 entries (older data is captured by `ledgerSummary`)
-   - **Append to `processRewardsHistory`** (rolling array, keep last 3 entries):
-     ```json
-     {
-       "cycle": <N>,
-       "discover": <0.0-1.0>,
-       "build": <0.0-1.0>,
-       "audit": <0.0-1.0>,
-       "ship": <0.0-1.0>,
-       "learn": <0.0-1.0>,
-       "skillEfficiency": <0.0-1.0>
-     }
-     ```
-     **Scoring rubric** — compute each dimension deterministically:
+## Clearing Mailbox
 
-     | Phase | Score = 1.0 | Score = 0.5 | Score = 0.0 |
-     |-------|-------------|-------------|-------------|
-     | **discover** | All selected tasks shipped | 50%+ tasks shipped | <50% tasks shipped |
-     | **build** | All tasks pass audit first attempt | Some tasks need retry | 3+ audit failures |
-     | **audit** | No false positives, all evals run | 1 false positive or missing eval | Multiple false positives |
-     | **ship** | Clean commit, no post-commit fixes | Minor fixup needed | Failed to push or dirty state |
-     | **learn** | Instincts extracted AND at least one instinct cited in scout-report or build-report `instinctsApplied` | Instincts extracted but none cited this cycle | No instincts extracted |
-     | **skillEfficiency** | Total skill+agent tokens decreased from `skillMetrics` baseline | Tokens stable (±5% of baseline) | Tokens increased from baseline |
+Remove non-persistent messages from `$WORKSPACE_PATH/agent-mailbox.md`:
+```bash
+grep -v "| false |" $WORKSPACE_PATH/agent-mailbox.md > /tmp/mailbox-tmp.md && mv /tmp/mailbox-tmp.md $WORKSPACE_PATH/agent-mailbox.md
+```
 
-     Process rewards feed into meta-cycle reviews for targeted agent improvement. A consistently low discovery score means the Scout needs attention, not the Builder. A low skillEfficiency score signals prompt bloat that should be addressed.
+---
 
-   - **Update `processRewardsHistory`** — append this cycle's scores to the rolling array, trimming to keep only the last 3 entries:
-     ```json
-     "processRewardsHistory": [
-       {"cycle": <N-2>, ...scores...},
-       {"cycle": <N-1>, ...scores...},
-       {"cycle": <N>, "discover": <score>, "build": <score>, "audit": <score>, "ship": <score>, "learn": <score>, "skillEfficiency": <score>}
-     ]
-     ```
+## Updating state.json
 
-   - **Per-cycle remediation check** (self-improvement trigger):
-     After computing process rewards, check `processRewardsHistory` for sustained low scores:
-     - If any dimension scores below 0.7 for 2+ consecutive entries in the history → append a remediation entry to `state.json.pendingImprovements`:
-       ```json
-       {"dimension": "<dim>", "score": <latest>, "sustained": true, "suggestedTask": "<what to fix>", "cycle": <N>, "priority": "high"}
-       ```
-     - Suggested task mapping:
-       - `discover < 0.7` → "improve Scout task sizing or relevance"
-       - `build < 0.7` → "add Builder guidance or simplify task complexity"
-       - `audit < 0.7` → "review eval grader quality and coverage"
-       - `ship < 0.7` → "fix commit workflow or git state issues"
-       - `learn < 0.7` → "extract instincts from recent successful cycles"
-       - `skillEfficiency < 0.7` → "reduce prompt overhead in skill/agent files"
-     - Clear resolved entries: if a dimension's score rises above 0.7 for 2 consecutive cycles, remove its pendingImprovements entry
+Use OCC protocol (see [memory-protocol.md](skills/evolve-loop/memory-protocol.md)):
 
-   - Add eval results to `evalHistory` with **delta metrics**:
-     ```json
-     {
-       "cycle": <N>,
-       "verdict": "PASS|WARN|FAIL",
-       "checks": <total>,
-       "passed": <passed>,
-       "failed": <failed>,
-       "delta": {
-         "tasksShipped": <count>,
-         "tasksAttempted": <count>,
-         "auditIterations": <average iterations per task>,
-         "successRate": <shipped / attempted>,
-         "instinctsExtracted": <count this cycle>,
-         "stagnationPatterns": <active patterns count>
-       }
-     }
-     ```
-   - The `delta` object enables trend analysis across cycles. The Operator and meta-cycle review use these metrics to detect improvement or degradation.
-   - **Update mastery level:**
-     - If `delta.successRate === 1.0` → increment `mastery.consecutiveSuccesses`
-     - If `mastery.consecutiveSuccesses >= 3` and level is not `proficient` → advance level, reset counter
-     - If `delta.successRate < 0.5` for 2 consecutive cycles → regress level, reset counter
+| Update | Detail |
+|--------|--------|
+| `evaluatedTasks` | Mark completed tasks |
+| `lastCycleNumber` | MAX with existing value |
+| `stagnation.nothingToDoCount` | Reset to 0 |
+| `lastUpdated` | Current timestamp |
+| `version` | Increment |
 
-7. **Release ship lock:**
-   ```bash
-   rm -rf "$LOCK_DIR"
-   ```
+**Fitness scoring:**
+```
+fitnessScore = round(0.25 * discover + 0.30 * build + 0.20 * audit + 0.15 * ship + 0.10 * learn, 2)
+```
+- Decreased 2 consecutive cycles → `fitnessRegression: true` (Operator HALT signal)
+- Increased or steady → `fitnessRegression: false`
+- Store in `fitnessScore` and `fitnessHistory` (last 3 scores)
+
+**Ledger summary** (aggregated stats so agents never read full ledger):
+```json
+"ledgerSummary": {
+  "totalEntries": "<count>", "cycleRange": ["<first>", "<last>"],
+  "scoutRuns": "<count>", "builderRuns": "<count>",
+  "totalTasksShipped": "<sum>", "totalTasksFailed": "<sum>", "avgTasksPerCycle": "<ratio>"
+}
+```
+
+**Eval history:** Trim to last 5 entries. Append new entry with delta metrics:
+```json
+{
+  "cycle": "<N>", "verdict": "PASS|WARN|FAIL", "checks": "<total>", "passed": "<N>", "failed": "<N>",
+  "delta": {
+    "tasksShipped": "<count>", "tasksAttempted": "<count>", "auditIterations": "<avg>",
+    "successRate": "<ratio>", "instinctsExtracted": "<count>", "stagnationPatterns": "<count>"
+  }
+}
+```
+
+**Mastery updates:**
+- `successRate === 1.0` → increment `consecutiveSuccesses`
+- `consecutiveSuccesses >= 3` and not proficient → advance level, reset counter
+- `successRate < 0.5` for 2 consecutive cycles → regress level, reset counter
+
+---
+
+## Process Rewards
+
+Append to `processRewardsHistory` (rolling 3 entries):
+
+| Phase | 1.0 | 0.5 | 0.0 |
+|-------|-----|-----|-----|
+| **discover** | All selected tasks shipped | 50%+ shipped | <50% shipped |
+| **build** | All pass audit first attempt | Some need retry | 3+ audit failures |
+| **audit** | No false positives, all evals run | 1 false positive or missing eval | Multiple false positives |
+| **ship** | Clean commit, no post-commit fixes | Minor fixup needed | Failed push or dirty state |
+| **learn** | Instincts extracted AND cited | Extracted but none cited | None extracted |
+| **skillEfficiency** | Tokens decreased from baseline | Stable (+/-5%) | Tokens increased |
+
+**Per-cycle remediation check:** If any dimension < 0.7 for 2+ consecutive entries → append to `pendingImprovements`:
+
+| Dimension | Suggested Task |
+|-----------|---------------|
+| `discover < 0.7` | Improve Scout task sizing or relevance |
+| `build < 0.7` | Add Builder guidance or simplify task complexity |
+| `audit < 0.7` | Review eval grader quality and coverage |
+| `ship < 0.7` | Fix commit workflow or git state issues |
+| `learn < 0.7` | Extract instincts from recent successful cycles |
+| `skillEfficiency < 0.7` | Reduce prompt overhead in skill/agent files |
+
+Clear resolved entries when dimension rises above 0.7 for 2 consecutive cycles.
+
+7. **Release ship lock:** `rm -rf "$LOCK_DIR"`

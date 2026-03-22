@@ -1,15 +1,33 @@
+> Read this file when running benchmark evaluations (Phase 0 calibration or delta checks). Covers all 8 quality dimensions with automated checks and LLM rubrics, composite scoring, task-type mapping, and domain-specific variants.
+
+## Contents
+- [Anti-Gaming Policy](#anti-gaming-policy) — checksumming, monotonic ratchet
+- [Dimension 1: Documentation Completeness](#dimension-1-documentation-completeness)
+- [Dimension 2: Specification Consistency](#dimension-2-specification-consistency)
+- [Dimension 3: Defensive Design](#dimension-3-defensive-design)
+- [Dimension 4: Eval Infrastructure](#dimension-4-eval-infrastructure)
+- [Dimension 5: Modularity](#dimension-5-modularity)
+- [Dimension 6: Schema Hygiene](#dimension-6-schema-hygiene)
+- [Dimension 7: Convention Adherence](#dimension-7-convention-adherence)
+- [Dimension 8: Feature Coverage](#dimension-8-feature-coverage)
+- [Composite Score Calculation](#composite-score-calculation)
+- [Task-Type-to-Dimension Mapping](#task-type-to-dimension-mapping) — delta check dimension selection
+- [Domain-Specific Dimensions](#domain-specific-dimension-examples) — writing, research variants
+
 # Project Benchmark Evaluation
 
-Persistent, multi-dimensional quality score (0-100 per dimension) that exists independently of individual tasks. Measures **project quality**, not process quality. Overall score = unweighted average of all 8 dimensions.
+Persistent, multi-dimensional quality score (0-100 per dimension). Measures **project quality**, not process quality. Overall = unweighted average of all 8 dimensions.
 
 **Scoring formula per dimension:** `0.7 * automated_score + 0.3 * llm_score`
 
 ## Anti-Gaming Policy
 
-1. **This file is checksummed** — Builder MUST NOT modify `benchmark-eval.md`. The orchestrator computes `sha256sum skills/evolve-loop/benchmark-eval.md` during Phase 0 and verifies it before every delta check. Tampering triggers HALT.
-2. **Automated checks dominate** (70% weight) — deterministic, not gameable by LLM judgment.
-3. **Monotonic ratchet** — once a dimension hits 80+, its high-water mark is tracked in `state.json.projectBenchmark.highWaterMarks`. Regression below `(HWM - 10)` triggers mandatory remediation task.
-4. **External anchoring** — every 10 cycles, the Operator recalibrates thresholds against current project reality.
+| Rule | Detail |
+|------|--------|
+| Checksummed | Builder MUST NOT modify this file. `sha256sum` computed in Phase 0, verified before every delta check. Tampering triggers HALT. |
+| Automated dominance | 70% weight — deterministic, not gameable by LLM judgment. |
+| Monotonic ratchet | Dimensions at 80+ tracked in `highWaterMarks`. Regression below `HWM - 10` triggers mandatory remediation. |
+| External anchoring | Every 10 cycles, Operator recalibrates thresholds. |
 
 ---
 
@@ -31,17 +49,14 @@ AGENT_FM=$(grep -rl "^tools:" agents/ --include="*.md" | wc -l | tr -d ' ')
 AGENT_FM_PCT=$((AGENT_FM * 100 / (TOTAL_AGENTS > 0 ? TOTAL_AGENTS : 1)))
 
 # 3. README or project instructions file exists and is non-empty
-# Checks for platform-agnostic instruction files: README.md, CLAUDE.md, GEMINI.md, AGENTS.md
 README_EXISTS=$(test -s README.md -o -s CLAUDE.md -o -s GEMINI.md -o -s AGENTS.md && echo 100 || echo 0)
 
 # 4. No broken internal links (markdown references to files that don't exist)
-# Note: uses -oE (not -oP) for macOS compatibility
-# Resolves each link relative to the SOURCE FILE's directory, not repo root
+# Resolves each link relative to SOURCE FILE directory, not repo root
 BROKEN_LINKS=0
 for src in $(grep -rlE '\]\([^)]*\.md\)' skills/ agents/ docs/ 2>/dev/null); do
   srcdir=$(dirname "$src")
   for link in $(grep -oE '\]\([^)]*\.md[^)]*\)' "$src" | grep -oE '\([^)]+\)' | tr -d '()' | sed 's/#.*//'); do
-    # Try relative to source file directory first, then repo root
     if [ ! -f "$srcdir/$link" ] && [ ! -f "$link" ]; then
       BROKEN_LINKS=$((BROKEN_LINKS + 1))
     fi
@@ -75,7 +90,7 @@ Agents, skills, and memory-protocol agree on schemas, workflows, and field names
 ### Automated Checks (score 0-100)
 
 ```bash
-# Note: uses -oE (not -oP) for macOS/BSD grep compatibility throughout
+# Note: uses -oE (not -oP) for macOS/BSD grep compatibility
 
 # 1. All agent files referenced in SKILL.md exist
 AGENT_REFS=$(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u)
@@ -95,7 +110,7 @@ PHASE_NUMS=$(grep -oE 'Phase [0-9]+' skills/evolve-loop/phases.md | grep -oE '[0
 EXPECTED_SEQ=$(seq 0 $(echo "$PHASE_NUMS" | tail -1))
 SEQ_SCORE=$(test "$(echo "$PHASE_NUMS" | tr '\n' ' ')" = "$(echo "$EXPECTED_SEQ" | tr '\n' ' ')" && echo 100 || echo 50)
 
-# 4. Workspace file names in memory-protocol.md match what phases.md references
+# 4. Workspace file names in memory-protocol.md match phases.md references
 PROTO_FILES=$(grep -oE '[a-z]+-[a-z]+\.md' skills/evolve-loop/memory-protocol.md | sort -u)
 PHASE_FILES=$(grep -oE 'workspace/[a-z]+-[a-z]+\.md' skills/evolve-loop/phases.md | sed 's|workspace/||' | sort -u)
 FILE_DIFF=$(comm -23 <(echo "$PHASE_FILES") <(echo "$PROTO_FILES") | wc -l | tr -d ' ')
@@ -125,7 +140,7 @@ Error handling, rollback protocols, safety guards, input validation.
 
 ```bash
 # Note: all grep commands use '|| true' to prevent exit code 1 on zero matches
-# Note: searches span skills/evolve-loop/ (not just phases.md) since content was split
+# Searches span skills/evolve-loop/ since content was split across files
 
 # 1. Skill files contain rollback/revert instructions
 ROLLBACK=$(grep -rci -e 'rollback' -e 'revert' -e 'git revert' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
@@ -137,7 +152,7 @@ HALT_OPERATOR=$(grep -c 'HALT' agents/evolve-operator.md || true)
 HALT_OPERATOR=${HALT_OPERATOR:-0}
 HALT_SCORE=$(( (HALT_SKILLS > 0 && HALT_OPERATOR > 0) ? 100 : 50 ))
 
-# 3. Max retry limits defined (prevent infinite loops)
+# 3. Max retry limits defined
 RETRY=$(grep -rci -e 'max.*3' -e '3.*attempt' -e 'max.*iteration' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 RETRY_SCORE=$((RETRY >= 2 ? 100 : (RETRY >= 1 ? 50 : 0)))
 
@@ -145,7 +160,7 @@ RETRY_SCORE=$((RETRY >= 2 ? 100 : (RETRY >= 1 ? 50 : 0)))
 CLEANUP=$(grep -rci -e 'worktree.*cleanup' -e 'worktree.*prune' -e 'worktree.*remove' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 CLEANUP_SCORE=$((CLEANUP >= 2 ? 100 : (CLEANUP >= 1 ? 50 : 0)))
 
-# 5. Input validation at system boundaries (state.json validation)
+# 5. Input validation at system boundaries
 VALIDATION=$(grep -rci 'validat' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 VALIDATION_SCORE=$((VALIDATION >= 2 ? 100 : (VALIDATION >= 1 ? 50 : 0)))
 
@@ -158,9 +173,9 @@ DEFENSE_AUTO=$(( (ROLLBACK_SCORE + HALT_SCORE + RETRY_SCORE + CLEANUP_SCORE + VA
 | Score | Criteria |
 |-------|----------|
 | 0 | No error handling, no rollback, no safety guards |
-| 25 | Basic error handling exists but missing rollback or retry limits |
+| 25 | Basic error handling but missing rollback or retry limits |
 | 50 | Error handling and rollback exist but gaps in edge cases |
-| 75 | Comprehensive error handling with rollback, but some paths uncovered |
+| 75 | Comprehensive error handling with rollback, some paths uncovered |
 | 100 | All failure modes handled, rollback tested, retry limits enforced, input validated |
 
 ---
@@ -175,20 +190,20 @@ Eval definitions comprehensive, mutation kill rate, self-referential coverage.
 # 1. eval-runner.md exists and defines execution steps
 EVAL_RUNNER=$(test -f skills/evolve-loop/eval-runner.md && echo 100 || echo 0)
 
-# 2. Eval definition format is documented with all 3 sections
+# 2. Eval definition format documented with all 3 sections
 EVAL_SECTIONS=$(grep -c '## Code Graders\|## Regression Evals\|## Acceptance Checks' skills/evolve-loop/eval-runner.md 2>/dev/null || true)
 EVAL_SECTIONS=${EVAL_SECTIONS:-0}
 EVAL_FORMAT_SCORE=$((EVAL_SECTIONS >= 3 ? 100 : (EVAL_SECTIONS * 33)))
 
-# 3. Eval checksum mechanism exists (search all skill files)
+# 3. Eval checksum mechanism exists
 CHECKSUM=$(grep -rc -e 'checksum' -e 'sha256' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 CHECKSUM_SCORE=$((CHECKSUM >= 2 ? 100 : (CHECKSUM >= 1 ? 50 : 0)))
 
-# 4. Eval tamper detection documented (sum across multiple files)
+# 4. Eval tamper detection documented
 TAMPER=$(grep -rci 'tamper' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 TAMPER_SCORE=$((TAMPER >= 2 ? 100 : (TAMPER >= 1 ? 50 : 0)))
 
-# 5. Meta-cycle mutation testing documented (search skill files including phase5-learn.md)
+# 5. Meta-cycle mutation testing documented
 MUTATION=$(grep -rci 'mutation' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
 MUTATION_SCORE=$((MUTATION >= 3 ? 100 : (MUTATION >= 1 ? 50 : 0)))
 
@@ -204,7 +219,7 @@ EVAL_AUTO=$(( (EVAL_RUNNER + EVAL_FORMAT_SCORE + CHECKSUM_SCORE + TAMPER_SCORE +
 | 25 | Eval format defined but no tamper detection or mutation testing |
 | 50 | Eval format + tamper detection, but no mutation testing or weak coverage |
 | 75 | Full eval pipeline with mutation testing, minor gaps |
-| 100 | Comprehensive evals, tamper detection, mutation testing >80% kill rate, self-referential coverage |
+| 100 | Comprehensive evals, tamper detection, mutation testing >80% kill rate |
 
 ---
 
@@ -223,16 +238,15 @@ SIZE_SCORE=$((OVER_800 == 0 ? 100 : (OVER_800 == 1 ? 75 : (OVER_800 <= 3 ? 50 : 
 PHASES_LINES=$(wc -l < skills/evolve-loop/phases.md | tr -d ' ')
 PHASES_SCORE=$((PHASES_LINES < 400 ? 100 : (PHASES_LINES < 600 ? 75 : (PHASES_LINES < 800 ? 50 : 25))))
 
-# 3. Agent files are focused (each under 300 lines)
+# 3. Agent files focused (each under 300 lines)
 AGENT_MAX=$(find agents/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk '!/total/ {if ($1 > max) max=$1} END {print max+0}')
 AGENT_SIZE_SCORE=$((AGENT_MAX < 200 ? 100 : (AGENT_MAX < 300 ? 75 : (AGENT_MAX < 400 ? 50 : 25))))
 
-# 4. Separate files for separate concerns (skills/ has multiple files)
+# 4. Separate files for separate concerns
 SKILL_FILES=$(find skills/evolve-loop/ -name "*.md" | wc -l | tr -d ' ')
 SEPARATION_SCORE=$((SKILL_FILES >= 5 ? 100 : (SKILL_FILES >= 3 ? 75 : 50)))
 
 # 5. No circular references between files
-# Simplified: check that agents don't reference each other directly
 AGENT_CROSS=$(grep -rl 'evolve-builder\|evolve-auditor\|evolve-operator' agents/evolve-scout.md 2>/dev/null | wc -l | tr -d ' ')
 CIRCULAR_SCORE=$((AGENT_CROSS == 0 ? 100 : 50))
 
@@ -268,19 +282,16 @@ INIT_MISSING=0
 for f in $INIT_FIELDS; do echo "$PROTO_SCHEMA" | grep -qw "$f" || INIT_MISSING=$((INIT_MISSING + 1)); done
 INIT_SCORE=$((INIT_MISSING == 0 ? 100 : (100 - INIT_MISSING * 10)))
 
-# 2. All state.json fields used in phases.md are documented in memory-protocol.md
-# (reuse from Dimension 2, check 2)
-
-# 3. No duplicate field definitions in memory-protocol.md
+# 2. No duplicate field definitions in memory-protocol.md
 DUP_FIELDS=$(grep -oE '^ *"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md | sort | uniq -d | wc -l | tr -d ' ')
 DUP_SCORE=$((DUP_FIELDS == 0 ? 100 : (100 - DUP_FIELDS * 20)))
 
-# 4. JSON examples in memory-protocol.md are syntactically valid (spot check)
+# 3. JSON examples syntactically valid (spot check)
 JSON_BLOCKS=$(grep -c '```json' skills/evolve-loop/memory-protocol.md || true)
 JSON_BLOCKS=${JSON_BLOCKS:-0}
 JSON_SCORE=$((JSON_BLOCKS >= 3 ? 100 : (JSON_BLOCKS >= 1 ? 75 : 50)))
 
-# 5. Layer numbering is sequential
+# 4. Layer numbering is sequential
 LAYERS=$(grep -oE 'Layer [0-9]+' skills/evolve-loop/memory-protocol.md | grep -oE '[0-9]+' | sort -n)
 LAYER_SEQ_SCORE=$(test "$(echo $LAYERS | xargs)" = "0 1 2 3 4 5 6" && echo 100 || echo 50)
 
@@ -312,11 +323,11 @@ AGENT_NAMING=$(find agents/ -name "evolve-*.md" | wc -l | tr -d ' ')
 TOTAL_AGENT_FILES=$(find agents/ -name "*.md" | wc -l | tr -d ' ')
 NAMING_SCORE=$((TOTAL_AGENT_FILES > 0 ? (AGENT_NAMING * 100 / TOTAL_AGENT_FILES) : 100))
 
-# 2. Skill files use kebab-case naming (SKILL.md excluded — conventional name like README.md)
+# 2. Skill files use kebab-case naming (SKILL.md excluded)
 NON_KEBAB=$(find skills/evolve-loop/ -name "*.md" ! -name "SKILL.md" | grep '[A-Z_]' | wc -l | tr -d ' ')
 KEBAB_SCORE=$((NON_KEBAB == 0 ? 100 : (100 - NON_KEBAB * 20)))
 
-# 3. Recent commits follow conventional format (type: description)
+# 3. Recent commits follow conventional format
 CONVENTIONAL=$(git log --oneline -10 | grep -cE '^[a-f0-9]+ (feat|fix|refactor|docs|test|chore|perf|ci):' || true)
 CONVENTIONAL=${CONVENTIONAL:-0}
 COMMIT_SCORE=$((CONVENTIONAL * 10))
@@ -324,8 +335,8 @@ COMMIT_SCORE=$((CONVENTIONAL * 10))
 # 4. Directory structure follows conventions
 DIR_SCORE=$(test -d skills/evolve-loop -a -d agents -a -d docs && echo 100 || echo 50)
 
-# 5. Markdown headers use consistent style (## not setext == or --)
-# Note: matches 4+ chars to avoid false positives on '---' horizontal rules/frontmatter
+# 5. Markdown headers use consistent style (## not setext)
+# Matches 4+ chars to avoid false positives on '---' horizontal rules/frontmatter
 WRONG_HEADERS=$(grep -rn -E '^={4,}$|^-{4,}$' skills/ agents/ 2>/dev/null | wc -l | tr -d ' ')
 HEADER_SCORE=$((WRONG_HEADERS == 0 ? 100 : (100 - WRONG_HEADERS * 10)))
 
@@ -357,13 +368,13 @@ PHASES_DEFINED=$(grep -cE '### Phase [0-9]+:' skills/evolve-loop/phases.md || tr
 PHASES_DEFINED=${PHASES_DEFINED:-0}
 PHASE_COV_SCORE=$((PHASES_DEFINED >= 5 ? 100 : (PHASES_DEFINED * 20)))
 
-# 2. All agent files exist that SKILL.md references
+# 2. All agent files that SKILL.md references exist
 SKILL_AGENTS=$(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u)
 MISSING=0
 for a in $SKILL_AGENTS; do test -f "agents/$a" || MISSING=$((MISSING + 1)); done
 AGENT_COV_SCORE=$((MISSING == 0 ? 100 : (100 - MISSING * 25)))
 
-# 3. All referenced support files exist (eval-runner.md, memory-protocol.md, etc.)
+# 3. All referenced support files exist
 SUPPORT_FILES="skills/evolve-loop/eval-runner.md skills/evolve-loop/memory-protocol.md skills/evolve-loop/phases.md"
 SUP_MISSING=0
 for f in $SUPPORT_FILES; do test -f "$f" || SUP_MISSING=$((SUP_MISSING + 1)); done
@@ -410,7 +421,7 @@ Round each dimension composite to nearest integer. Round overall to 1 decimal pl
 
 ## Task-Type-to-Dimension Mapping
 
-Used by the delta check to determine which dimensions to re-evaluate after a task:
+Used by delta check to determine which dimensions to re-evaluate:
 
 | Task Type | Relevant Dimensions |
 |-----------|-------------------|
@@ -425,28 +436,27 @@ Used by the delta check to determine which dimensions to re-evaluate after a tas
 
 ## Domain-Specific Dimension Examples
 
-The 8 coding dimensions above are the **default benchmark** and are always used when `projectContext.domain == "coding"`. For other domains, some dimensions should be replaced with domain-appropriate equivalents. The scoring formula (70% automated + 30% LLM) and anti-gaming policy remain identical.
+The 8 coding dimensions above are the **default benchmark** for `projectContext.domain == "coding"`. For other domains, some dimensions are replaced. Scoring formula (70% automated + 30% LLM) and anti-gaming policy remain identical.
 
-### Writing Domain
+### Writing Domain (`projectContext.domain == "writing"`)
 
-When `projectContext.domain == "writing"`, replace 4 of the 8 dimensions:
+Replace 4 dimensions:
 
-| Coding Dimension (replaced) | Writing Dimension | What it measures |
-|------------------------------|-------------------|-----------------|
-| Modularity | **Prose Clarity** | Readability scores, sentence complexity, jargon density |
-| Schema Hygiene | **Structural Coherence** | Consistent heading hierarchy, logical flow, no orphaned sections |
-| Convention Adherence | **Style Consistency** | Voice, tone, terminology consistency across documents |
-| Feature Coverage | **Content Completeness** | All topics covered, no placeholder/TODO sections remaining |
+| Coding Dimension (replaced) | Writing Dimension | Measures |
+|------------------------------|-------------------|---------|
+| Modularity | **Prose Clarity** | Readability, sentence complexity, jargon density |
+| Schema Hygiene | **Structural Coherence** | Heading hierarchy, logical flow, no orphaned sections |
+| Convention Adherence | **Style Consistency** | Voice, tone, terminology consistency |
+| Feature Coverage | **Content Completeness** | All topics covered, no placeholder/TODO sections |
 
 **Prose Clarity automated checks** (example):
 ```bash
-# Average sentence length (target: 15-25 words)
 AVG_SENT=$(cat articles/*.md | tr '.' '\n' | awk '{print NF}' | awk '{sum+=$1; n++} END{print sum/n}')
-# Heading-to-paragraph ratio (at least 1 heading per 500 words)
 HEADINGS=$(grep -c "^#" articles/*.md)
 ```
 
 **Prose Clarity LLM rubric:**
+
 | Score | Criteria |
 |-------|----------|
 | 0 | Incomprehensible, no structure |
@@ -455,36 +465,36 @@ HEADINGS=$(grep -c "^#" articles/*.md)
 | 75 | Consistently clear, well-structured |
 | 100 | Publication-ready, engaging, precise |
 
-Retained from coding: Documentation Completeness, Specification Consistency, Defensive Design (error handling in guides), Eval Infrastructure.
+Retained: Documentation Completeness, Specification Consistency, Defensive Design, Eval Infrastructure.
 
-### Research Domain
+### Research Domain (`projectContext.domain == "research"`)
 
-When `projectContext.domain == "research"`, replace 4 dimensions:
+Replace 4 dimensions:
 
-| Coding Dimension (replaced) | Research Dimension | What it measures |
-|------------------------------|-------------------|-----------------|
-| Feature Coverage | **Claim Accuracy** | Factual claims supported by cited sources, no hallucinated findings |
-| Convention Adherence | **Source Coverage** | All research questions addressed, key sources consulted |
-| Modularity | **Methodology Rigor** | Clear research questions, systematic approach, reproducible steps |
-| Schema Hygiene | **Citation Hygiene** | All citations formatted consistently, no broken references, sources accessible |
+| Coding Dimension (replaced) | Research Dimension | Measures |
+|------------------------------|-------------------|---------|
+| Feature Coverage | **Claim Accuracy** | Claims supported by cited sources, no hallucinated findings |
+| Convention Adherence | **Source Coverage** | All questions addressed, key sources consulted |
+| Modularity | **Methodology Rigor** | Clear questions, systematic approach, reproducible steps |
+| Schema Hygiene | **Citation Hygiene** | Citations formatted consistently, no broken references |
 
 **Claim Accuracy automated checks** (example):
 ```bash
-# Count claims with citations vs total claims
 TOTAL_CLAIMS=$(grep -c '\.' findings/*.md)
 CITED_CLAIMS=$(grep -c '\[.*\]' findings/*.md)
 ACCURACY_PCT=$((CITED_CLAIMS * 100 / TOTAL_CLAIMS))
 ```
 
-Retained from coding: Documentation Completeness, Specification Consistency, Defensive Design, Eval Infrastructure.
+Retained: Documentation Completeness, Specification Consistency, Defensive Design, Eval Infrastructure.
 
-### How Domains Select Dimensions
+### Domain Selection During Calibration
 
-During Phase 0 CALIBRATE, the orchestrator checks `projectContext.domain` and loads the appropriate dimension set:
-- `coding` → all 8 default dimensions (this file, unchanged)
-- `writing` → 4 writing-specific + 4 retained coding dimensions
-- `research` → 4 research-specific + 4 retained coding dimensions
-- `design` → define design-specific dimensions when design domain is implemented
-- `mixed` → use coding dimensions (broadest coverage, most automated checks available)
+| Domain | Dimensions |
+|--------|-----------|
+| `coding` | All 8 default (this file) |
+| `writing` | 4 writing-specific + 4 retained |
+| `research` | 4 research-specific + 4 retained |
+| `design` | Define when implemented |
+| `mixed` | Use coding (broadest coverage) |
 
-The dimension names and automated checks change per domain, but the scoring formula, composite calculation, delta check mechanics, and anti-gaming policy are universal.
+Dimension names and automated checks change per domain; scoring formula, composite calculation, delta check mechanics, and anti-gaming policy are universal.

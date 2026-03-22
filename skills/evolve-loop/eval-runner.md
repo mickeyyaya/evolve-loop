@@ -1,48 +1,46 @@
+> Read this file when running eval checks during Phase 3 (AUDIT). Covers grader types, eval definition format, execution steps, retry protocol, non-code graders, benchmark eval execution, and mutation testing.
+
+## Contents
+- [Grader Type Taxonomy](#grader-type-taxonomy) — code, model, human grader types
+- [Eval Definition Format](#eval-definition-format) — file structure in `.evolve/evals/`
+- [Orchestrator Execution Steps](#orchestrator-execution-steps) — locate, run, compute, report
+- [Retry Protocol](#retry-protocol-hard-gate) — 3-attempt max, failure handling
+- [Non-Code Eval Graders](#non-code-eval-graders) — rubric, groundedness, coverage checks
+- [Benchmark Eval Execution](#benchmark-eval-execution) — Phase 0 calibration, delta checks
+- [Mutation Testing](#mutation-testing) — eval quality validation via deliberate defects
+
 # Eval Runner — Audit Phase Instructions
 
-The orchestrator (or Auditor agent) uses these instructions to run eval checks as part of the audit gate in Phase 3.
-
-## Purpose
-
-Eval definitions are created by the Scout in Phase 1 and stored in `.evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
+Eval definitions are created by the Scout in Phase 1, stored in `.evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
 
 ## Grader Type Taxonomy
 
-Every eval command belongs to one of three types. Scout MUST tag each command when creating eval definitions. The type determines execution method, cost, and reliability characteristics.
+Scout MUST tag each command when creating eval definitions. Type determines execution method, cost, and reliability.
 
-### Type 1: Code-Based `[code]` (deterministic — preferred)
-Bash commands that exit 0 on success. Use for all objectively verifiable criteria.
-- **Properties:** Fast, reproducible, zero token cost, no hallucination risk
-- **Examples:** `npm test`, `grep -r "export" src/`, `test -f output.json`, `python -c "import module"`
-- **When to use:** Always the default. Use code-based graders whenever the criterion can be expressed as a bash command.
+| Type | Tag | Properties | When to Use |
+|------|-----|-----------|-------------|
+| **Code-Based** | `[code]` | Fast, reproducible, zero token cost, no hallucination risk | Default. Use whenever criterion can be expressed as bash command. |
+| **Model-Based** | `[model]` | ~2-5K tokens, requires anchored rubric, non-deterministic | Only when no code-based grader can capture the criterion. Max 2 per eval definition. |
+| **Human-Gated** | `[human]` | Blocks pipeline until human responds | Only for security-sensitive, irreversible operations, or architectural decisions. |
 
-### Type 2: Model-Based `[model]` (LLM-as-Judge — for subjective dimensions)
-Uses an LLM to score output against a structured rubric. For quality dimensions that bash commands cannot verify.
-- **Properties:** Costs ~2-5K tokens per evaluation, requires anchored rubric, non-deterministic
-- **Examples:** "Is this documentation clear?", "Does this API design follow RESTful conventions?", "Is the error message user-friendly?"
-- **When to use:** Only when no code-based grader can capture the criterion. Scout writes a rubric with anchored score points (0/25/50/75/100). Auditor invokes a model-based judge (tier-3 model) with the rubric and the Builder's output.
-- **PASS threshold:** Average rubric score >= 60
-- **Cost control:** Maximum 2 model-based graders per eval definition. If more are needed, consolidate into a single rubric with multiple criteria.
+**Code-Based examples:** `npm test`, `grep -r "export" src/`, `test -f output.json`, `python -c "import module"`
 
-### Type 3: Human-Gated `[human]` (halt-and-ask — for security/architecture decisions)
-Halts the pipeline for human review. For decisions where automated scoring is insufficient.
-- **Properties:** Blocks pipeline until human responds. Use very sparingly.
-- **Examples:** "Does this auth change maintain least-privilege?", "Is this database migration reversible?", "Does this API contract break existing clients?"
-- **When to use:** Only for security-sensitive changes, irreversible operations, or architectural decisions. Scout tags eval as `[human]` with evidence for the reviewer.
-- **Execution:** Auditor presents the evidence and halts with a clear question. Human responds PASS/FAIL with reasoning.
+**Model-Based:** Scout writes rubric with anchored score points (0/25/50/75/100). Auditor invokes tier-3 model judge. PASS threshold: average >= 60.
+
+**Human-Gated:** Auditor presents evidence and halts with clear question. Human responds PASS/FAIL with reasoning.
 
 ### pass@k Tracking
-After each task ships, record how many Builder attempts it took to pass all evals:
-- `pass@1` = passed on first attempt (ideal)
-- `pass@2` = passed on second attempt after retry
-- `pass@3` = passed on third attempt (max retries)
-- Track per task type in `taskArms` alongside existing reward data. This enables the meta-cycle to identify which task types are reliably first-attempt vs frequently retried.
+
+After each task ships, record attempts to pass all evals. Track per task type in `taskArms`:
+- `pass@1` = first attempt (ideal)
+- `pass@2` = second attempt after retry
+- `pass@3` = third attempt (max retries)
 
 ---
 
 ## Eval Definition Format
 
-Each eval file in `.evolve/evals/` follows this structure (see also [examples/eval-definition.md](examples/eval-definition.md)):
+Each file in `.evolve/evals/` (see also [examples/eval-definition.md](examples/eval-definition.md)):
 
 ```markdown
 # Eval: <task-name>
@@ -57,13 +55,13 @@ Each eval file in `.evolve/evals/` follows this structure (see also [examples/ev
 - `[code]` `npx playwright test` (if applicable)
 
 ## Acceptance Checks (verification commands)
-- `[code]` `grep -r "export function newFeature" src/` → must find at least 1 match
-- `[code]` `npm run build` → must exit 0
+- `[code]` `grep -r "export function newFeature" src/`
+- `[code]` `npm run build`
 
-## Model-Based Checks (optional — for subjective quality dimensions)
-- `[model]` Rubric: "Rate documentation clarity on 0-100 scale. 0=incomprehensible, 25=major gaps, 50=adequate, 75=clear, 100=exemplary" — threshold: >= 60
+## Model-Based Checks (optional)
+- `[model]` Rubric: "Rate documentation clarity 0-100..." — threshold: >= 60
 
-## Human-Gated Checks (optional — for security/architecture decisions)
+## Human-Gated Checks (optional)
 - `[human]` "Review auth middleware changes for privilege escalation risk"
 
 ## Thresholds
@@ -77,32 +75,22 @@ Each eval file in `.evolve/evals/` follows this structure (see also [examples/ev
 ```bash
 ls .evolve/evals/
 ```
-Read each `.md` file. If no eval files exist, log warning and auto-PASS (graceful degradation for cycle 1).
+If no eval files exist, log warning and auto-PASS (graceful degradation for cycle 1).
 
 ### 2. Run Code Graders
-For each command in `## Code Graders`:
-- Execute the command
-- Record exit code, stdout, stderr
-- PASS if exit code = 0, FAIL otherwise
+Execute each command in `## Code Graders`. Record exit code, stdout, stderr. PASS if exit 0.
 
 ### 3. Run Regression Evals
-For each command in `## Regression Evals`:
-- Execute the command
-- Record exit code, stdout, stderr
-- PASS if exit code = 0, FAIL otherwise
+Execute each command in `## Regression Evals`. Record exit code, stdout, stderr. PASS if exit 0.
 
 ### 4. Run Acceptance Checks
-For each command in `## Acceptance Checks`:
-- Execute the command
-- Record exit code
-- PASS if exit code = 0, FAIL otherwise
+Execute each command in `## Acceptance Checks`. Record exit code. PASS if exit 0.
 
 ### 5. Compute Verdict
-- If ALL graders, regressions, and acceptance checks pass → **PASS**
-- If ANY fail → **FAIL**
+ALL graders, regressions, and acceptance checks pass → **PASS**. ANY fail → **FAIL**.
 
 ### 6. Write Eval Report
-Write to `workspace/audit-report.md` (eval results section) or `workspace/eval-report.md` if run standalone:
+Write to `workspace/audit-report.md` or `workspace/eval-report.md`:
 
 ```markdown
 ## Eval Results
@@ -119,41 +107,26 @@ Write to `workspace/audit-report.md` (eval results section) or `workspace/eval-r
 
 ### 7. Append Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"eval","type":"eval-gate","data":{"verdict":"PASS|FAIL","total":<N>,"passed":<N>,"failed":<N>,"failedChecks":["<cmd1>","<cmd2>"]}}
+{"ts":"<ISO-8601>","cycle":"<N>","role":"eval","type":"eval-gate","data":{"verdict":"PASS|FAIL","total":"<N>","passed":"<N>","failed":"<N>","failedChecks":["<cmd1>"]}}
 ```
 
 ## Retry Protocol (Hard Gate)
 
-If verdict is **FAIL**:
+| Iteration | Action |
+|-----------|--------|
+| 1 (initial fail) | Re-launch Builder with failed check commands and stderr. Builder fixes, re-runs tests. Re-audit, re-run evals. |
+| 2 | Same as iteration 1 with accumulated failure context. |
+| 3 (final) | Log as failed approach in `state.json`. Record failed commands. Skip Phase 4. Proceed to Phase 5 with failure context. Output: "Eval gate failed after 3 attempts. Skipping deploy." |
 
-1. **Iteration 1:** Re-launch Builder agent with failure details:
-   - Pass failed check commands and their stderr
-   - Builder fixes and re-runs its own tests
-   - Re-run Auditor (Phase 3) with updated code
-   - Re-run eval checks
-
-2. **Iteration 2:** Same as iteration 1 with accumulated failure context
-
-3. **Iteration 3 (final):** If still FAIL:
-   - Log as failed approach in `state.json` under `failedApproaches`
-   - Record failed eval commands and error output
-   - Skip Phase 4 (SHIP)
-   - Proceed to Phase 5 (LEARN) with failure context
-   - Output warning: "Eval gate failed after 3 attempts. Skipping deploy."
-
-**Max total iterations: 3** (1 initial + 2 retries)
-
-If verdict is **PASS** → proceed to the Benchmark Delta Check (then Phase 4).
+**Max total iterations: 3** (1 initial + 2 retries). If PASS → proceed to Benchmark Delta Check (then Phase 4).
 
 ---
 
 ## Non-Code Eval Graders
 
-For domains beyond coding (writing, research, design), bash/grep graders are insufficient. The eval-runner supports three additional grader types that use LLM judgment with anchored rubrics. These graders complement — never replace — bash graders for coding tasks.
+For domains beyond coding (writing, research, design). These complement — never replace — bash graders for coding tasks.
 
 ### Rubric-Based Grader (writing, design)
-
-Uses an LLM to score output against a structured rubric. Each criterion has anchored score points (0/25/50/75/100) with examples to prevent score drift.
 
 ```markdown
 ## Rubric Grader
@@ -163,94 +136,76 @@ Uses an LLM to score output against a structured rubric. Each criterion has anch
   - 50: Understandable but requires re-reading
   - 75: Clear on first read, minor ambiguities
   - 100: Crystal clear, no ambiguity, well-structured
-- Model: tier-3 (cost-efficient for rubric scoring)
-- Threshold: average score >= 60 to pass
+- Model: tier-3
+- Threshold: average score >= 60
 ```
 
-The LLM receives the rubric + the artifact + a system prompt: "Score each criterion using ONLY the anchor points. Output JSON: `{criterion: score, justification: string}`." tier-3 model is sufficient for rubric application (it follows structured instructions well).
+LLM receives rubric + artifact + system prompt: "Score each criterion using ONLY the anchor points. Output JSON: `{criterion: score, justification: string}`."
 
 ### Groundedness Check (research)
-
-Verifies that claims in a research output are supported by cited sources. The LLM receives the output text and its cited sources, then flags unsupported claims.
 
 ```markdown
 ## Groundedness Check
 - Input: research output + cited sources
 - Model: tier-2 (requires reasoning about source-claim alignment)
-- Check: "For each factual claim, identify the supporting source. Flag claims with no source."
-- Threshold: >= 80% of claims grounded to pass
+- Check: "For each factual claim, identify supporting source. Flag claims with no source."
+- Threshold: >= 80% grounded
 ```
-
-This prevents hallucinated findings in research tasks — a groundedness gate is the evolve-loop equivalent of a test suite for factual accuracy.
 
 ### Coverage Check (research, writing)
 
-Verifies that the output addresses all required topics or questions. The LLM compares the output against a checklist of required coverage points.
-
 ```markdown
 ## Coverage Check
-- Input: output text + required coverage points (from acceptance criteria)
+- Input: output text + required coverage points
 - Model: tier-3
 - Check: "For each coverage point, does the output address it? Output JSON: {point: bool}"
-- Threshold: 100% coverage to pass (all points addressed)
+- Threshold: 100% coverage
 ```
 
 ### Hybrid Mode (mixed domains)
 
-For projects with both code and non-code artifacts, eval definitions can mix grader types:
+Eval definitions can mix grader types. ALL types must pass for overall PASS.
 
 ```markdown
 # Eval: add-api-docs
 
-## Code Graders (bash — for the code changes)
+## Code Graders
 - `npm test`
 - `grep -q "export.*apiDocs" src/index.ts`
 
-## Rubric Grader (LLM — for the documentation quality)
-- Criterion: "Completeness — are all endpoints documented?"
-  - Threshold: >= 75
+## Rubric Grader
+- Criterion: "Completeness — all endpoints documented?" — Threshold: >= 75
 
-## Coverage Check (LLM — for required sections)
+## Coverage Check
 - Required: ["Authentication", "Rate Limits", "Error Codes", "Examples"]
 - Threshold: 100%
 ```
-
-The eval-runner processes each section in order. ALL grader types must pass for an overall PASS verdict.
 
 ---
 
 ## Benchmark Eval Execution
 
-Distinct from task-level evals. The benchmark eval measures project-wide quality across 8 dimensions defined in [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md).
+Distinct from task-level evals. Measures project-wide quality across 8 dimensions from [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md).
 
 ### Phase 0 Calibration (once per invocation)
 
-Run the full benchmark eval before the first cycle:
-
-1. **Execute automated checks** for all 8 dimensions from benchmark-eval.md
-2. **Run LLM judgment** (tier-3 model, tier-2 for first calibration) for each dimension using the anchored rubric
-3. **Compute composite scores:** `0.7 * automated + 0.3 * llm` per dimension
-4. **Store results** in `state.json.projectBenchmark`
-5. **Write `workspace/benchmark-report.md`** with per-dimension scores and weaknesses
+1. Execute automated checks for all 8 dimensions
+2. Run LLM judgment (tier-3, tier-2 for first calibration) with anchored rubric
+3. Compute composite: `0.7 * automated + 0.3 * llm` per dimension
+4. Store in `state.json.projectBenchmark`
+5. Write `workspace/benchmark-report.md`
 
 ### Delta Check Execution (between Phase 3 and Phase 4)
 
-Run a targeted re-evaluation after all tasks pass audit:
-
-1. **Verify `benchmark-eval.md` checksum** — HALT if tampered
-2. **Determine relevant dimensions** from the task type using the mapping in benchmark-eval.md
-3. **Re-run automated checks** for relevant dimensions only (not all 8)
-4. **Compare to Phase 0 baseline:**
-   - Improvement (+2 or more in any dimension) → proceed to Ship
-   - Stable (within +/- 1) → proceed with warning
-   - Regression (-3 or more in any dimension) → block, retry once, then drop
-5. **Update `state.json.projectBenchmark.dimensions`** with new scores
-
-### Benchmark Eval vs Task Eval
+1. Verify `benchmark-eval.md` checksum — HALT if tampered
+2. Determine relevant dimensions from task type mapping
+3. Re-run automated checks for relevant dimensions only
+4. Compare to baseline: improvement → ship; stable → warn; regression → block/retry/drop
+5. Update `state.json.projectBenchmark.dimensions`
 
 | Aspect | Task Eval | Benchmark Eval |
 |--------|-----------|----------------|
-| Scope | Single task's acceptance criteria | Entire project quality |
+| Scope | Single task acceptance criteria | Entire project quality |
 | Created by | Scout (per task) | Defined in benchmark-eval.md (static) |
 | Runs | After each Builder attempt | Phase 0 (full) + delta check (targeted) |
 | Gate type | Hard (FAIL blocks shipping) | Soft (regression blocks, stability warns) |
@@ -260,43 +215,32 @@ Run a targeted re-evaluation after all tasks pass audit:
 
 ## Mutation Testing
 
-Mutation testing validates eval grader quality by introducing deliberate defects and checking if graders catch them. Run during meta-cycles (every 5 cycles) as part of Phase 5 step 6e.
+Validates eval grader quality by introducing deliberate defects. Run during meta-cycles (every 5 cycles) as part of Phase 5.
 
-### What is a Mutation?
+### Mutation Types
 
-A mutation is a small, deliberate change to a completed task's output that should cause at least one eval grader to fail. Examples:
-- **Deletion mutation:** Remove a key section heading from a markdown file
-- **Value mutation:** Change a numeric threshold (e.g., 0.7 → 0.3)
-- **Import mutation:** Remove a cross-reference link
-- **Logic mutation:** Invert a condition (e.g., `>=` → `<`)
+| Mutation | Example |
+|----------|---------|
+| Deletion | Remove key section heading from markdown |
+| Value | Change numeric threshold (0.7 -> 0.3) |
+| Import | Remove cross-reference link |
+| Logic | Invert condition (>= -> <) |
 
 ### Generating Mutations
 
 For each task completed in the last 5 cycles:
-1. Read the task's eval graders from `.evolve/evals/<slug>.md`
-2. Generate 2-3 targeted mutations that test different graders
-3. Apply each mutation to a temporary copy of the affected file
-4. Run the eval graders against the mutated file
+1. Read eval graders from `.evolve/evals/<slug>.md`
+2. Generate 2-3 targeted mutations testing different graders
+3. Apply each to a temporary copy
+4. Run eval graders against mutated file
 5. Record whether each grader caught the mutation
-
-### Mutation Kill Rate
-
-```bash
-# Example grader for mutation testing itself
-MUTATIONS_GENERATED=<N>
-MUTATIONS_KILLED=<caught by at least one grader>
-KILL_RATE=$((MUTATIONS_KILLED * 100 / MUTATIONS_GENERATED))
-# Target: >= 80%. Below 60% triggers eval improvement task.
-```
 
 ### Interpreting Results
 
 | Kill Rate | Action |
 |-----------|--------|
-| >= 80% | Evals are robust. No action needed. |
-| 60-79% | Review weak graders. Consider adding more specific checks. |
+| >= 80% | Evals robust. No action needed. |
+| 60-79% | Review weak graders. Add more specific checks. |
 | < 60% | PRIORITY: Propose eval improvement task for next cycle. |
 
-Mutations that survive indicate graders that are too coarse — they pass both correct and incorrect code. The fix is usually to add a more targeted grep or assertion.
-
-For grader design patterns and anti-patterns, see `docs/eval-grader-best-practices.md`.
+Surviving mutations indicate graders too coarse. Fix by adding more targeted grep or assertion. See `docs/eval-grader-best-practices.md`.
