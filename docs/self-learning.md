@@ -340,6 +340,68 @@ This replaces static upgrade/downgrade conditions with learned, data-driven rout
 
 ---
 
+## Goal-Continuity Milestone Tracking (GoalAct-Inspired)
+
+GoalAct (arXiv:2504.16563) shows that LLM agents fail at long-horizon tasks by losing track of the overarching goal. A continuously updated global plan with milestone tracking produces 12.22% success rate improvement.
+
+**Goal anchor:** When a goal is active, Scout maintains a milestone map in `state.json.goalMilestones`:
+
+```json
+{"goalMilestones": {"goal": "<string>", "milestones": [
+  {"id": "m1", "description": "<milestone>", "status": "completed|pending", "cycle": null}
+]}}
+```
+
+**Protocol:** Cycle 1: Scout decomposes goal into 3-5 milestones. Each subsequent cycle: proposed tasks must advance a pending milestone — otherwise replan (GoalAct's "branch trap detection"). Mark milestones `completed` with cycle number when done.
+
+---
+
+## Prompt Variant Tracking (AutoPDL-Inspired)
+
+AutoPDL (arXiv:2504.04365) demonstrates that optimal prompting strategies differ per model AND per task — there is no universally best prompting pattern. Using successive halving over a combinatorial space of prompt patterns (Zero-Shot, Chain-of-Thought, CoT, ReAct, Few-Shot) produces average accuracy improvements of 9.21 percentage points, with gains up to 67.5pp on specific model-task pairs.
+
+**Prompt variant experiment protocol:** When the same task type fails twice (eval pass rate < 0.7), the Builder should try an alternate prompting pattern on the third attempt:
+
+| Failure Count | Action | Pattern to Try |
+|--------------|--------|---------------|
+| 1st failure | Retry with same prompt | (standard retry) |
+| 2nd failure | Switch prompt pattern | If using CoT → try ReAct; if ReAct → try structured decomposition |
+| 3rd failure | Drop task | Log both patterns as failed in `experiments.jsonl` |
+
+**Experiment journal integration:** Log the prompt variant in `experiments.jsonl`:
+```jsonl
+{"cycle":N,"task":"<slug>","attempt":2,"verdict":"FAIL","approach":"<summary>","promptPattern":"CoT","metric":"<result>"}
+{"cycle":N,"task":"<slug>","attempt":3,"verdict":"PASS","approach":"<summary>","promptPattern":"ReAct","metric":"<result>"}
+```
+
+The `promptPattern` field enables the Operator to track which patterns work best for which task types — closing the loop between AutoPDL's search-based prompt optimization and the evolve-loop's existing experiment journal.
+
+---
+
+## Agent Configuration Evolution (ARTEMIS-Inspired)
+
+ARTEMIS (arXiv:2512.09108) demonstrates that agent systems underperform due to suboptimal configurations rather than architectural flaws. Using semantically-aware genetic operators to evolve agent configurations (prompts, tool descriptions, parameters) produces 10-37% improvements without any code changes.
+
+**Mapping to evolve-loop mechanisms:**
+
+| ARTEMIS Concept | Evolve-Loop Equivalent | Status |
+|----------------|----------------------|--------|
+| Configurable components | Builder prompt, Scout search strategy, Auditor strictness | Partially tracked in `experiments.jsonl` |
+| Execution log signals | `experiments.jsonl` entries (approach, verdict, metric) | Implemented |
+| Genetic crossover | `planCache` crossover in Scout task selection | Implemented |
+| Performance-based selection | Bandit arm selection (`taskArms`) | Implemented |
+| **Missing:** Joint optimization | No `configVariant` tracking | Gap |
+
+**Recommended `configVariant` field for experiments.jsonl:**
+
+```jsonl
+{"cycle":N,"task":"<slug>","attempt":1,"verdict":"PASS","approach":"<summary>","configVariant":{"builderTier":"tier-2","promptPattern":"CoT","auditorStrictness":"normal"},"metric":"<result>"}
+```
+
+The `configVariant` field captures the full configuration state when the experiment ran. Over time, the Operator can identify which configuration combinations produce the highest success rates — ARTEMIS's joint optimization without requiring a separate evolutionary loop. The existing `planCache` crossover mechanism can then be extended to cross configuration variants (not just task approaches).
+
+---
+
 ## Self-Learning Anti-Patterns
 
 ### Extraction Stall
@@ -380,6 +442,9 @@ Each research method adopted into the self-learning architecture is tracked agai
 | Process Reward Analysis (AgentPRM) | arxiv 2502.10325 | 140 | evalInfrastructure | PROVISIONAL |
 | Anti-Conformity Audit (Free-MAD) | arxiv 2509.11035 | 140 | defensiveDesign | PROVISIONAL |
 | Research Quality Scoring (HiPRAG) | arxiv 2510.07794 | 140 | featureCoverage | PROVISIONAL |
+| Goal Milestone Tracking (GoalAct) | arxiv 2504.16563 | 141 | featureCoverage | PROVISIONAL |
+| Prompt Variant Tracking (AutoPDL) | arxiv 2504.04365 | 141 | documentationCompleteness | PROVISIONAL |
+| Config Evolution (ARTEMIS) | arxiv 2512.09108 | 141 | featureCoverage | PROVISIONAL |
 
 ### Validation Protocol
 
