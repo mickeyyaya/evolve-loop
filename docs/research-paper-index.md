@@ -44,6 +44,13 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | Agent Skills Governance | arXiv:2602.12430 | Trust tier framework for instinct global promotion | `docs/security-considerations.md` | PROVISIONAL |
 | Safiron: Pre-Execution Guardrails | arXiv:2510.09781 | Deferred — pre-execution risk classification | — | DEFERRED |
 
+### Cycle 144 — Evaluation and Budget Optimization
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
+| BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
+
 ### Pre-Session (Cycles 16-19) — Foundational Methods
 
 | Paper | arXiv | Technique Adopted | Target File | Status |

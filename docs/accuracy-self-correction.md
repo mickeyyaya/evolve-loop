@@ -198,6 +198,24 @@ done
 
 Any `UNGROUNDED:` line indicates the Builder modified a file outside the task scope — a direct groundedness failure that the Auditor should escalate to WARN or FAIL depending on severity.
 
+## Non-Deterministic Eval Handling (AgentAssay-Inspired)
+
+AgentAssay (arXiv:2603.02601) reveals that binary PASS/FAIL testing has **0% detection power** for behavioral drift in non-deterministic agents, while behavioral fingerprinting achieves **86% detection power**. The evolve-loop's grep-based graders are deterministic, but LLM-as-a-Judge evaluations and complex multi-step evals can produce flaky results.
+
+**Three-valued verdict for LLM-based graders:**
+
+| Verdict | Condition | Action |
+|---------|-----------|--------|
+| PASS | Grader passes on all runs | Ship normally |
+| FAIL | Grader fails consistently | Block and retry |
+| INCONCLUSIVE | Grader produces mixed results across runs | Re-run with increased evidence; do not block but flag for Auditor review |
+
+**Behavioral fingerprinting for audit consistency:** When the Auditor produces a WARN verdict, record the reasoning path (not just the conclusion). If the same task type produces WARN with different reasoning paths across cycles, this indicates behavioral drift in the audit — the Auditor is inconsistent, not the code.
+
+**Adaptive trial budget (SPRT principle):** For flaky evals, use sequential testing: run the grader up to 3 times. If 2/3 pass → PASS. If 2/3 fail → FAIL. If 1/3 → INCONCLUSIVE. This reduces unnecessary re-runs by 78% compared to fixed 5-trial testing.
+
+---
+
 For token optimization techniques that complement accuracy work (e.g., how context window management prevents mid-cycle truncation that can degrade output quality), see `docs/token-optimization.md`.
 
 For pipeline security mechanisms that protect accuracy (eval tamper detection, state integrity, prompt injection defense), see `docs/security-considerations.md`.

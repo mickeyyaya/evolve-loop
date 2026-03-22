@@ -138,4 +138,24 @@ Model selection is the highest-leverage cost control. The evolve-loop uses a 3-t
 
 tier-1 is justified at decision points with multiplicative downstream impact. A cycle routing Scout and Auditor to tier-3 while keeping Builder on tier-2 saves approximately 40-60% of total cycle cost versus all-tier-2 routing.
 
+## Budget-Aware Agent Scaling (BATS-Inspired)
+
+BATS (arXiv:2511.17006) demonstrates that injecting continuous `budgetRemaining` signals into agent context produces strictly superior cost-performance Pareto frontiers compared to budget-unaware agents. Agents without budget awareness spend resources on low-value actions early and run out before high-value actions.
+
+**Budget tracker injection:** Pass `budgetRemaining` to Builder and Scout context at each phase:
+
+```json
+{"budgetRemaining": {"tokens": 150000, "phase": "build", "strategy": "explore"}}
+```
+
+**Explore/exploit switching heuristic:**
+
+| Budget Remaining | Strategy | Agent Behavior |
+|-----------------|----------|----------------|
+| >60% of perCycle | **Explore** | Full codebase scan, multiple approach candidates, broader research |
+| 30-60% | **Prioritize** | Focus on highest-confidence approach, skip low-yield research |
+| <30% | **Exploit** | Commit to current approach, no new exploration, minimize file reads |
+
+**Integration with existing tokenBudget:** The orchestrator already tracks `tokenBudget.perTask` and `perCycle` in state.json. BATS adds dynamic strategy adaptation: after each agent invocation, recompute `budgetRemaining` and update the strategy field passed to the next agent. This prevents the common failure mode where early cycles consume 80% of budget on exploration, leaving insufficient tokens for later implementation.
+
 For token reduction mechanisms including KV-cache prefix optimization, plan caching, and incremental scan, see `docs/token-optimization.md`.
