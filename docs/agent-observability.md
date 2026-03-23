@@ -91,6 +91,24 @@ This ordering is based on the 2.7x correlation between state tracking failures a
 
 ---
 
+## Actionable Critique Protocol (CGI-Inspired, arXiv:2503.16024)
+
+Opaque verdicts ("FAIL: code quality") don't help the Builder fix the problem. CGI (Critique-Guided Improvement) demonstrates that dedicated critic models producing actionable language revision instructions outperform even GPT-4 as critics — because structured critiques are more useful than raw quality scores.
+
+**Auditor critique format:** When issuing WARN or FAIL, the Auditor should produce structured revision instructions:
+
+```markdown
+## Critique — <task-slug>
+**What failed:** <specific assertion or eval grader that failed>
+**Why it failed:** <root cause — file X missing section Y, not just "incomplete">
+**How to fix:** <concrete revision instruction — "add a table to line 45 of docs/foo.md">
+**Confidence:** <0.0-1.0>
+```
+
+This format ensures the Builder receives actionable guidance rather than repeating the same failed approach. It maps to AgentDebug's targeted retry protocol (5-dimension error taxonomy) but operates at the instruction level rather than the classification level.
+
+---
+
 ## Research References
 
 - "From Features to Actions" (arXiv:2602.06841): trajectory-level explainability, state tracking correlation

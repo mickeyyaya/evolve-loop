@@ -51,6 +51,13 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 150 — Reflection and Actionable Critique
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| MAR: Multi-Agent Reflexion | arXiv:2512.20845 | Multi-persona reflection, degeneration prevention | `docs/adversarial-eval-coevolution.md` | PROVISIONAL |
+| CGI: Critique-Guided Improvement | arXiv:2503.16024 | Structured actionable critique format for Auditor | `docs/agent-observability.md` | PROVISIONAL |
+
 ### Cycle 149 — Runtime Guardrails and Secure Code Generation
 
 | Paper | arXiv | Technique Adopted | Target File | Status |

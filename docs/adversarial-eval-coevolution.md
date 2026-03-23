@@ -88,6 +88,22 @@ The evolve-loop already mitigates several of these: eval quality checks catch sp
 
 ---
 
+## Multi-Agent Reflection Protocol (MAR-Inspired, arXiv:2512.20845)
+
+Single-model self-reflection degenerates — the same model that made an error repeats it during reflection. MAR solves this with multi-persona adversarial debate: multiple critic personas analyze the failure from different angles, and a judge synthesizes the best correction. Result: +6.2 points on HumanEval over single reflection.
+
+**Evolve-loop structural equivalence:**
+
+| MAR Role | Evolve-Loop Agent | Function |
+|----------|------------------|----------|
+| Actor | Builder | Generates the implementation |
+| Critics (multi-persona) | Auditor (split-role) | Reviews from multiple angles (Free-MAD anti-conformity) |
+| Judge | Orchestrator | Synthesizes verdict, decides retry strategy |
+
+**Multi-source reflection on retry:** When the Builder fails audit, the retry context should include reflections from multiple perspectives — not just the Auditor's verdict but also the eval grader output, the Builder's own risk assessment, and any relevant instincts. This prevents reflection degeneration by ensuring the retry sees the failure from angles the Builder's own reasoning cannot access.
+
+---
+
 ## Research References
 
 - Code-A1 (arXiv:2603.15611): adversarial co-evolution of code and test LLMs
