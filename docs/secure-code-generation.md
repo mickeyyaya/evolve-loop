@@ -14,7 +14,7 @@ Traditional security gates rely on static analyzers (CodeQL, Semgrep, Bandit) as
 | Semgrep | 65% | Rule-based, misses semantic vulnerabilities |
 | Bandit (Python) | ~70% | Language-specific, narrow scope |
 
-**Implication for evolve-loop eval graders:** L2 eval graders that rely solely on static analysis output provide a false sense of security. A grader that runs `semgrep --config=auto` and checks exit code 0 only catches 65% of vulnerabilities — 35% pass through undetected.
+**Implication for evolve-loop eval graders:** SecLayer-L2 eval graders that rely solely on static analysis output provide a false sense of security. A grader that runs `semgrep --config=auto` and checks exit code 0 only catches 65% of vulnerabilities — 35% pass through undetected.
 
 ---
 
@@ -41,14 +41,16 @@ The validated alternative (arXiv:2602.05868): combine static analysis with a per
 
 Given static analyzer limitations, security eval graders should be **layered**:
 
-| Layer | Technique | What It Catches |
-|-------|-----------|----------------|
-| L1 | `grep` for known-bad patterns (hardcoded secrets, eval()) | 40% — obvious issues |
-| L2 | Static analyzer (semgrep, bandit) | 65% — known vulnerability patterns |
-| L3 | Behavioral test (run code, check for unsafe behavior) | 80%+ — runtime security |
-| L4 | Instinct-based review (prior vulnerability patterns) | 90%+ — domain-specific issues |
+| Security Detection Layer | Technique | What It Catches |
+|--------------------------|-----------|----------------|
+| SecLayer-L1 | `grep` for known-bad patterns (hardcoded secrets, eval()) | 40% — obvious issues |
+| SecLayer-L2 | Static analyzer (semgrep, bandit) | 65% — known vulnerability patterns |
+| SecLayer-L3 | Behavioral test (run code, check for unsafe behavior) | 80%+ — runtime security |
+| SecLayer-L4 | Instinct-based review (prior vulnerability patterns) | 90%+ — domain-specific issues |
 
-**Recommendation:** Security-sensitive tasks (touching auth, input handling, API endpoints) should require L3+ eval graders, not just L1/L2 string matching.
+> **Disambiguation:** Security Detection Layers (SecLayer-L1 through L4) measure vulnerability detection rate by technique. They are distinct from Eval Rigor Levels (Rigor-L0 through L3) which measure eval grader quality — see [adversarial-eval-coevolution.md](adversarial-eval-coevolution.md).
+
+**Recommendation:** Security-sensitive tasks (touching auth, input handling, API endpoints) should require SecLayer-L3+ eval graders, not just SecLayer-L1/L2 string matching.
 
 ---
 

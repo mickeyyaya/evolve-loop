@@ -78,6 +78,8 @@ Agents should explicitly state when confidence is low rather than generating pla
 
 ## Anti-Conformity Audit Protocol (Free-MAD-Inspired)
 
+> **Operational protocol:** For the phase-specific Auditor implementation, see [reference-auditor-techniques.md § Anti-Conformity Check](reference-auditor-techniques.md). For multi-agent reflection extensions (MAR), see [adversarial-eval-coevolution.md § Multi-Agent Reflection](adversarial-eval-coevolution.md).
+
 Free-MAD (arXiv:2509.11035) identifies a critical failure mode in LLM evaluation: **agent conformity**. LLMs have an inherent tendency to align with their initial assessment even when evidence contradicts it. This "self-herding" means a single-pass Auditor can confirm an incorrect PASS simply because its first impression was positive.
 
 **Split-role adversarial check:** Before finalizing any audit verdict, run an explicit anti-conformity step:
@@ -99,6 +101,8 @@ If the LLM-as-a-Judge's chain-of-thought lists specific failures or concerns but
 ---
 
 ## Agent Error Taxonomy and Targeted Recovery (AgentDebug-Inspired)
+
+> **Operational protocol:** For the Builder's retry implementation using this taxonomy, see [reference-builder-techniques.md § Targeted Error Recovery](reference-builder-techniques.md).
 
 AgentDebug (arXiv:2509.25370) demonstrates that targeted feedback based on root cause classification produces +24% accuracy improvement over blank retries. When a Builder fails, the retry should know *where* the error occurred, not just *that* it failed.
 

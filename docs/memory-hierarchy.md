@@ -126,7 +126,7 @@ Every 3 cycles the orchestrator runs a memory consolidation pass:
 
 1. **Cluster** — group instincts with high semantic similarity
 2. **Merge** — combine related instincts into a single higher-confidence entry
-3. **Decay** — reduce confidence of instincts uncited for 3+ cycles
+3. **Decay** — reduce confidence of instincts uncited for 5+ cycles (see [instincts.md § Memory Operations](instincts.md) for the canonical thresholds; 3+ cycles is the dormant flagging threshold, not the decay threshold)
 4. **Archive** — move stale (confidence < 0.3) instincts to history
 5. **Compress** — rewrite the `notes.md` Summary section to a fixed-size paragraph
 

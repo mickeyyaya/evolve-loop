@@ -81,22 +81,22 @@ jq -r 'select(.role == "builder") | {cycle: .cycle, task: .data.task, attempts: 
   .evolve/ledger.jsonl | jq -s 'sort_by(-.attempts) | .[0:5]'
 ```
 
-### Using processRewards
+### Using processRewardsHistory
 
-The Operator writes `processRewards` into `state.json` after each cycle. This array tracks per-metric scores (efficiency, modularity, accuracy) over time and is the primary input for strategy adjustment.
+The Operator appends `processRewardsHistory` entries to `state.json` after each cycle (last 5 cycles retained). This stores **per-step Builder confidence cross-validated against Auditor findings** — not named dimension scores. See [phase5-learn.md § Step-Level Process Rewards](../skills/evolve-loop/phase5-learn.md) for the canonical schema.
 
 ```bash
-# Extract efficiency score trend
-jq '.processRewards | map({cycle: .cycle, efficiency: .scores.efficiency})' \
+# Extract step-level confidence vs auditor mismatch trend
+jq '.processRewardsHistory | map({cycle: .cycle, steps: [.steps[] | select(.auditorIssue)]})' \
   .evolve/state.json
 ```
 
-Efficiency score components relevant to profiling:
-- **tokenEfficiency** — eval score per 1K tokens spent (higher is better)
-- **retryRate** — fraction of build phases requiring retries
-- **auditPassRate** — fraction of builds passing audit on first submission
+Key profiling signals derived from processRewardsHistory:
+- **Overconfident steps** — `builderConfidence` high but `auditorIssue: true` → Builder miscalibration
+- **Underconfident steps** — `builderConfidence` low but `auditorIssue: false` → unnecessary caution
+- **Systematic weakness** — same step type flagged across 2+ cycles → extract procedural instinct
 
-A falling `tokenEfficiency` score over 3+ cycles is the strongest signal to reduce task complexity or enable more aggressive model downgrading.
+Meta-cycle reads `processRewardsHistory` to identify systematic Builder weaknesses. Note: the per-cycle self-evaluation uses 4 LLM-as-a-Judge dimensions (Correctness, Completeness, Novelty, Efficiency) — these are distinct from the step-level process rewards.
 
 ---
 

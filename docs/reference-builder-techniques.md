@@ -117,14 +117,14 @@ Log `promptPattern` field in `experiments.jsonl` for Operator analysis.
 
 **When:** Task touches auth, input handling, API endpoints, or sensitive data.
 
-| Eval Layer | Technique | Detection Rate |
-|-----------|-----------|---------------|
-| L1 | `grep` for known-bad patterns | ~40% |
-| L2 | Static analyzer (semgrep, bandit) | ~65% |
-| L3 | Behavioral test (run code, check behavior) | ~80% |
-| L4 | Instinct-based review (prior vulnerability patterns) | ~90% |
+| Security Detection Layer | Technique | Detection Rate |
+|--------------------------|-----------|---------------|
+| SecLayer-L1 | `grep` for known-bad patterns | ~40% |
+| SecLayer-L2 | Static analyzer (semgrep, bandit) | ~65% |
+| SecLayer-L3 | Behavioral test (run code, check behavior) | ~80% |
+| SecLayer-L4 | Instinct-based review (prior vulnerability patterns) | ~90% |
 
-**Rule:** Security-sensitive tasks require L3+ eval graders, not just L1/L2.
+**Rule:** Security-sensitive tasks require SecLayer-L3+ eval graders, not just L1/L2. Note: Security Detection Layers (vulnerability detection rate) are distinct from Eval Rigor Levels (eval grader quality, Rigor-L0 through L3) — see [adversarial-eval-coevolution.md](adversarial-eval-coevolution.md).
 
 ---
 

@@ -53,7 +53,7 @@ cycle_reward = ship_rate * 0.5 + eval_rigor * 0.3 + novelty * 0.2
 
 Where:
 - `ship_rate` = tasks shipped / tasks attempted
-- `eval_rigor` = average eval quality level (L0=0, L1=0.3, L2=0.7, L3=1.0)
+- `eval_rigor` = average Eval Rigor Level (Rigor-L0=0, Rigor-L1=0.3, Rigor-L2=0.7, Rigor-L3=1.0). Note: this scale measures eval grader quality (tautological → behavioral), distinct from Security Detection Layers (SecLayer-L1 through L4) which measure vulnerability detection rate — see [secure-code-generation.md](secure-code-generation.md)
 - `novelty` = fraction of tasks targeting untouched files
 
 This prevents the degenerate equilibrium where easy evals produce high ship rates but no real quality improvement.

@@ -2,6 +2,17 @@
 
 Pipeline security mechanisms that protect the evolve-loop from tampered evals, corrupted state, injected content, and runaway self-modification.
 
+## Security Documentation Map
+
+| Concern | Document | Audience |
+|---------|----------|----------|
+| Pipeline integrity (eval tamper, state corruption, reward hacking) | This file | Orchestrator, Operator |
+| Pre-execution enforcement (AgentSpec guardrails, AEGIS firewall) | [runtime-guardrails.md](runtime-guardrails.md) | Orchestrator |
+| Code-level security (generated code quality, SecLayer-L1 through L4) | [secure-code-generation.md](secure-code-generation.md) | Scout, Builder |
+| Audit-phase security checks (threat taxonomy, eval integrity) | [reference-auditor-techniques.md](reference-auditor-techniques.md) | Auditor |
+| Anti-gaming mechanisms (reward hacking defenses, incident reports) | [agentic-reward-hacking.md](agentic-reward-hacking.md) | All agents |
+| Anti-conformity audit (Free-MAD, self-herding prevention) | [accuracy-self-correction.md](accuracy-self-correction.md) | Auditor |
+
 ---
 
 ## Eval Tamper Detection
@@ -139,7 +150,7 @@ Research on Agent Skills for LLMs (arXiv:2602.12430) found that **26.1% of commu
 **Global promotion gate:** Before an instinct is promoted to `~/.evolve/instincts/personal/` (cross-project scope), verify:
 1. Source cycle exists in the project's ledger (provenance check)
 2. Instinct does not reference eval file paths or agent prompt modifications (injection vector)
-3. Confidence >= 0.8 with 3+ cycle confirmations (quality gate)
+3. Confidence >= 0.8 with 2+ cycle confirmations for first-party instincts, or 3 confirmations for external instincts via trust governance (see [instincts.md § Instinct Lifecycle Gates](instincts.md))
 4. No `approach-flaw` failures in the source cycle's `failedApproaches` (stability gate)
 
 ---

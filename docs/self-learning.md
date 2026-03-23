@@ -69,7 +69,7 @@ For the full consolidation algorithm (cluster, archive, decay, entropy gating), 
 
 ### f. Instinct Promotion (project → global)
 
-High-confidence instincts (>= 0.8, 2+ cycle confirmations, generalizable) promote to `~/.evolve/instincts/personal/` for cross-project use. The promoted copy includes a `promotedFrom` field; the original remains as source of truth.
+High-confidence instincts (>= 0.8, 2+ cycle confirmations, generalizable) promote to `~/.evolve/instincts/personal/` for cross-project use. The promoted copy includes a `promotedFrom` field; the original remains as source of truth. Note: promotion (2+ cycles, >= 0.8) is distinct from graduation (3+ cycles, >= 0.75) and trust governance (3 confirmations, >= 0.8 for external instincts). See [instincts.md § Instinct Lifecycle Gates](instincts.md) for the full comparison.
 
 For the full promotion protocol, see [phase5-learn.md § Instinct Graduation](../skills/evolve-loop/phase5-learn.md).
 
@@ -214,8 +214,8 @@ Extract → Score → Cite → Consolidate → Promote → Archive
 
 1. **Extraction** — Phase 5 extracts instincts from cycle artifacts. Forced if any self-evaluation dimension scores <0.7.
 2. **Confidence scoring** — New instincts start at 0.5–0.6. Confirmed in a later cycle: +0.1. Contradicted: -0.1.
-3. **Citation tracking** — Agents log which instinct IDs influenced their decisions (`instinctsApplied`). Uncited instincts for 3+ cycles are flagged as dormant by Scout introspection.
-4. **Consolidation** — Every 3 cycles: cluster similar instincts, archive superseded ones, apply temporal decay, enforce entropy gating.
+3. **Citation tracking** — Agents log which instinct IDs influenced their decisions (`instinctsApplied`). Uncited instincts for 3+ cycles are flagged as dormant by Scout introspection (soft signal only — distinct from temporal decay which uses a 5-cycle window, and forgetting which uses a 10-cycle window; see [instincts.md § Memory Operations](instincts.md)).
+4. **Consolidation** — Every 3 cycles: cluster similar instincts, archive superseded ones, apply temporal decay (5-cycle unreferenced window), enforce entropy gating.
 5. **Promotion** — Instincts reaching confidence >= 0.8 and confirmed across 2+ cycles are promoted to global scope.
 6. **Archival** — Stale instincts (confidence < 0.3) or superseded instincts move to `archived/`. Provenance is always preserved.
 

@@ -76,9 +76,23 @@ Agents should query the relevant category based on their current phase:
 
 Confidence increases when an instinct is confirmed in a later cycle (e.g., the pattern still holds, the anti-pattern was correctly avoided). Confidence decreases if a pattern is contradicted.
 
+## Instinct Lifecycle Gates
+
+Three distinct gates govern instinct advancement. Each serves a different purpose and has different thresholds — do not confuse them:
+
+| Gate | Purpose | Confidence | Cycle Confirmations | Additional Requirements |
+|------|---------|------------|--------------------|-----------------------|
+| **Graduation** | Instinct → mandatory Builder guidance | >= 0.75 | 3+ distinct cycles | No contradictions in `failedApproaches` |
+| **Global Promotion** | Project → cross-project sharing | >= 0.8 | 2+ cycles | Loop age 5+ cycles; must be generalizable |
+| **Trust Governance** | External → accepted instinct | >= 0.8 | 3 confirmations | Provenance check; no eval/prompt refs |
+
+**Why different thresholds:** Graduation is stricter on cycle count (3+) because graduated instincts bypass Builder deliberation — a wrong one directly causes failures. Promotion has a lower cycle bar (2+) because promoted instincts are still evaluated before application, but requires higher confidence (0.8) and loop maturity (5+ cycles). Trust governance is strictest on provenance because external instincts carry injection risk (arXiv:2602.12430: 26.1% community skills have vulnerabilities).
+
+See [phase5-learn.md](../skills/evolve-loop/phase5-learn.md) § Instinct Graduation for the canonical executable specification.
+
 ## Global Promotion
 
-After 5+ cycles, instincts with confidence >= 0.8 can be promoted to global scope (`~/.evolve/instincts/personal/`), making them available across all projects.
+After 5+ cycles of loop maturity, instincts with confidence >= 0.8 can be promoted to global scope (`~/.evolve/instincts/personal/`), making them available across all projects. The "5+ cycles" refers to the loop's total age, not the instinct's age — this prevents promoting instincts from an immature loop.
 
 **Promotion criteria:**
 - Confidence >= 0.8
@@ -105,6 +119,8 @@ An instinct graduates when **all three conditions** are met:
 | Cross-cycle confirmation | Cited in `instinctsApplied` by Scout or Builder in 3+ distinct cycles |
 | No contradictions | Not contradicted by any entry in `state.json failedApproaches` |
 
+Note: Graduation (3+ cycles, >= 0.75) is distinct from global promotion (2+ cycles, >= 0.8). See § Instinct Lifecycle Gates above.
+
 ### Operational Effects
 
 - The instinct's `graduated: true` flag is set in `instinctSummary`
@@ -124,13 +140,25 @@ Graduation can be reverted when evidence contradicts the instinct:
 
 See [phase5-learn.md](../skills/evolve-loop/phase5-learn.md) § Instinct Graduation for the full specification.
 
-## Memory Consolidation
+## Memory Operations
+
+Three distinct memory operations run at different cadences. They are complementary, not alternatives:
+
+| Operation | Frequency | Window | Action |
+|-----------|-----------|--------|--------|
+| **Dormant flagging** | Continuous (per-cycle Scout check) | 3+ cycles uncited | Soft signal: Scout notes dormant instincts in report for task selection |
+| **Consolidation + temporal decay** | Every 3 cycles (or instinctCount > 20) | Last 5 cycles unreferenced | Cluster, decay (-0.1 confidence/pass), archive below 0.3 |
+| **Forgetting (zero-use discard)** | Every 10 cycles | Last 10 cycles with 0 citations | Move to `archived/` after causal review |
+
+**Why a 5-cycle decay window (not 3):** A new instinct created in cycle N needs at least 2 consolidation passes before decay kicks in. This matches the 2+ cycle confirmation needed for promotion — an instinct that would be promoted should not be simultaneously decayed.
+
+### Consolidation (every 3 cycles)
 
 Every 3 cycles (or when instinct count exceeds 20), the orchestrator consolidates memory:
 
 1. **Cluster:** Merge instincts with >85% semantic similarity into higher-level abstractions
 2. **Archive:** Superseded instincts move to `archived/` (never deleted)
-3. **Temporal decay:** Unreferenced instincts lose 0.1 confidence per pass; below 0.3 → archived as stale
+3. **Temporal decay:** Instincts unreferenced in the last 5 cycles lose 0.1 confidence per pass; below 0.3 → archived as stale
 4. **Entropy gating:** New instincts >90% similar to existing ones update the existing instinct instead of creating duplicates
 
 This prevents unbounded memory growth and keeps the instinct set relevant and compact.

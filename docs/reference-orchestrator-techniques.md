@@ -64,7 +64,7 @@
 | Tier-2 | Verified project | Cannot modify eval files or agent prompts |
 | Tier-3 | Unverified external | Read-only, no promotion, sandboxed |
 
-**Gate:** Provenance check + no eval/prompt references + confidence >= 0.8 + 3 confirmations.
+**Gate:** Provenance check + no eval/prompt references + confidence >= 0.8 + 3 confirmations. Note: this trust governance gate (3 confirmations for external instincts) is distinct from graduation (3+ cycles for mandatory guidance) and promotion (2+ cycles for cross-project sharing). See [instincts.md § Instinct Lifecycle Gates](instincts.md).
 
 ---
 

@@ -20,6 +20,8 @@ CLEAR replaces accuracy-only benchmarking with 5 dimensions. Key finding: accura
 
 ### Application to Evolve-Loop Self-Evaluation
 
+> **Status: Reference framework.** CLEAR is not currently implemented as a per-cycle scoring system. The evolve-loop's implemented evaluation uses the 4-dimension LLM-as-a-Judge (Correctness, Completeness, Novelty, Efficiency) defined in [phase5-learn.md](../skills/evolve-loop/phase5-learn.md). CLEAR dimensions below are aspirational extensions.
+
 The Phase 5 LLM-as-a-Judge currently scores 4 dimensions (Correctness, Completeness, Novelty, Efficiency). CLEAR suggests expanding to include:
 - **Reliability** — does the same task type produce consistent results across cycles? (Track via `taskArms` variance)
 - **Assurance** — did the cycle comply with all safety constraints? (Track via health check pass rate)
