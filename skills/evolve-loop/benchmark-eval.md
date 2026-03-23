@@ -231,7 +231,8 @@ File sizes, coupling, cohesion, no god-files.
 
 ```bash
 # 1. No files exceed 800 lines
-OVER_800=$(find skills/ agents/ docs/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk '$1 > 800 && !/total/ {count++} END {print count+0}')
+# Note: uses index() instead of !/regex/ for macOS BSD awk compatibility
+OVER_800=$(find skills/ agents/ docs/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk 'index($0,"total")==0 && $1+0 > 800 {count++} END {print count+0}')
 SIZE_SCORE=$((OVER_800 == 0 ? 100 : (OVER_800 == 1 ? 75 : (OVER_800 <= 3 ? 50 : 25))))
 
 # 2. phases.md line count (god-file risk)
@@ -239,7 +240,8 @@ PHASES_LINES=$(wc -l < skills/evolve-loop/phases.md | tr -d ' ')
 PHASES_SCORE=$((PHASES_LINES < 400 ? 100 : (PHASES_LINES < 600 ? 75 : (PHASES_LINES < 800 ? 50 : 25))))
 
 # 3. Agent files focused (each under 300 lines)
-AGENT_MAX=$(find agents/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk '!/total/ {if ($1 > max) max=$1} END {print max+0}')
+# Note: uses index() instead of !/regex/ for macOS BSD awk compatibility
+AGENT_MAX=$(find agents/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk 'index($0,"total")==0 {if ($1+0 > max) max=$1+0} END {print max+0}')
 AGENT_SIZE_SCORE=$((AGENT_MAX < 200 ? 100 : (AGENT_MAX < 300 ? 75 : (AGENT_MAX < 400 ? 50 : 25))))
 
 # 4. Separate files for separate concerns
@@ -369,9 +371,11 @@ PHASES_DEFINED=${PHASES_DEFINED:-0}
 PHASE_COV_SCORE=$((PHASES_DEFINED >= 5 ? 100 : (PHASES_DEFINED * 20)))
 
 # 2. All agent files that SKILL.md references exist
-SKILL_AGENTS=$(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u)
+# Note: tr '\n' ' ' normalizes grep output for safe word-splitting in the for loop
 MISSING=0
-for a in $SKILL_AGENTS; do test -f "agents/$a" || MISSING=$((MISSING + 1)); done
+for a in $(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u | tr '\n' ' '); do
+  test -f "agents/$a" || MISSING=$((MISSING + 1))
+done
 AGENT_COV_SCORE=$((MISSING == 0 ? 100 : (100 - MISSING * 25)))
 
 # 3. All referenced support files exist
@@ -381,7 +385,10 @@ for f in $SUPPORT_FILES; do test -f "$f" || SUP_MISSING=$((SUP_MISSING + 1)); do
 SUPPORT_SCORE=$((SUP_MISSING == 0 ? 100 : (100 - SUP_MISSING * 33)))
 
 # 4. publish.sh exists and is executable
-PUBLISH_SCORE=$(test -x publish.sh && echo 100 || (test -f publish.sh && echo 50 || echo 0))
+# Note: uses if/elif/else to avoid exit-code propagation issues in && chains
+if test -x publish.sh; then PUBLISH_SCORE=100
+elif test -f publish.sh; then PUBLISH_SCORE=50
+else PUBLISH_SCORE=0; fi
 
 # 5. docs/ files are not empty stubs
 DOC_STUBS=0
