@@ -51,6 +51,15 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | AgentAssay: Regression Testing | arXiv:2603.02601 | Three-valued eval verdicts, behavioral fingerprinting, SPRT | `docs/accuracy-self-correction.md` | PROVISIONAL |
 | BATS: Budget-Aware Tool Scaling | arXiv:2511.17006 | budgetRemaining injection, explore/exploit switching | `docs/performance-profiling.md` | PROVISIONAL |
 
+### Cycle 151 — Enterprise Evaluation and Personalization
+
+| Paper | arXiv | Technique Adopted | Target File | Status |
+|-------|-------|-------------------|-------------|--------|
+| CLEAR: Enterprise Agent Eval Framework | arXiv:2511.14136 | 5D evaluation (Cost/Latency/Efficacy/Assurance/Reliability) | `docs/enterprise-agent-evaluation.md` | PROVISIONAL |
+| AgencyBench: Real-World Agent Benchmark | arXiv:2601.11044 | 138-task benchmark, structured task validation | `docs/enterprise-agent-evaluation.md` | PROVISIONAL |
+| PPP: Proactive Personalized Agents | arXiv:2511.02208 | Multi-objective RL, proactivity in task handling | `docs/agent-personalization.md` | PROVISIONAL |
+| Personalized Agents Survey | arXiv:2602.22680 | 4-capability taxonomy for personalization | `docs/agent-personalization.md` | PROVISIONAL |
+
 ### Cycle 150 — Reflection and Actionable Critique
 
 | Paper | arXiv | Technique Adopted | Target File | Status |
