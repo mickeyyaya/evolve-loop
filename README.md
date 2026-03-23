@@ -295,8 +295,5 @@ The short version:
 
 ## Links
 
-- [Annotated cycle walkthrough](docs/showcase.md) — see a complete cycle with every signal explained
-- [Architecture deep dive](docs/architecture.md)
-- [Self-learning mechanisms](docs/self-learning.md)
-- [Security considerations](docs/security-considerations.md)
+- [Documentation index](docs/INDEX.md) — all reference docs
 - [Changelog](CHANGELOG.md)

@@ -1,7 +1,0 @@
-- id: inst-012
-  pattern: "commit-inline-before-worktree"
-  description: "When mixing inline task execution (orchestrator implements directly) with worktree-isolated builder tasks in the same cycle, always commit inline changes BEFORE cherry-picking worktree commits. Otherwise cherry-pick conflicts are guaranteed on shared files."
-  confidence: 0.5
-  source: "cycle-25/fix-tier-system-relative-paths"
-  type: "anti-pattern"
-  category: "procedural"

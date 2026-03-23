@@ -1,7 +1,0 @@
-- id: inst-013
-  pattern: "research-to-phase-mapping"
-  description: "When adopting a research method, always map it to a specific evolve-loop phase (Scout=Perceive, Builder=Learn, Auditor=Verify, Operator=Monitor). This creates actionable integration points rather than abstract documentation."
-  confidence: 0.55
-  source: "cycle-17/add-muse-memory-categories"
-  type: "technique"
-  category: "procedural"

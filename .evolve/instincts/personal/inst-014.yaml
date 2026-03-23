@@ -1,7 +1,0 @@
-- id: inst-014
-  pattern: "s-task-line-budget-30"
-  description: "S-complexity tasks must add ≤30 net lines. Use compact tables instead of subsections, merge bullet points, and shorten prose to stay within budget. Two consecutive cycles exceeded budget before learning this constraint."
-  confidence: 0.65
-  source: "cycle-16/add-experience-scoring-memory-protocol + cycle-17/add-muse-memory-categories"
-  type: "process"
-  category: "procedural"
