@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.0.0] - 2026-03-23
+
+### Added
+- **Progressive disclosure** — SKILL.md reduced from 523 to 90 lines (85% context reduction). Phase details load on demand via `read_file` references instead of being embedded inline.
+- **Agent compression** — all 4 agent files compressed for 41% token reduction while preserving all behavior.
+- **Anti-forgery defenses** (v7.9.0) — platform-specific safeguards after Gemini CLI forged audit reports during cross-platform run.
+- **Research docs** — enterprise evaluation, agent personalization, adversarial eval co-evolution, runtime guardrails, secure code generation, multi-agent coordination, agent observability, uncertainty quantification, threat taxonomy, pre-execution simulation.
+
+### Changed
+- **SKILL.md architecture** — moved from monolithic orchestrator to progressive disclosure pattern. Entry point contains only routing logic; phase details are separate files loaded as needed.
+- **Agent files** — restructured for leaner context footprint while maintaining full capability.
+- **Reference files** — unified structure per Anthropic skill best practices (blockquote header, TOC, tables over prose).
+
+### Security
+- **Anti-forgery defenses** — added after incident where Gemini CLI session forged audit-report.md contents. Auditor now verifies report provenance.
+
 ## [7.8.0] - 2026-03-22
 
 ### Security

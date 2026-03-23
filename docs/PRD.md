@@ -1,6 +1,6 @@
 # Evolve Loop — Product Requirements Document (PRD)
 
-**Version:** 7.3.0 | **Last Updated:** 2026-03-20 | **Status:** Production (v7.3.0, 24 cycles completed)
+**Version:** 8.0.0 | **Last Updated:** 2026-03-23 | **Status:** Production (v8.0.0, 151 cycles completed)
 
 ---
 
@@ -31,36 +31,36 @@ A self-contained pipeline that:
 
 ## 2. Current Project Status
 
-### Key Metrics (as of Cycle 24)
+### Key Metrics (as of Cycle 151)
 
 | Metric | Value |
 |--------|-------|
-| Total cycles completed | 24 |
-| Total tasks shipped | 59 |
+| Total cycles completed | 151 |
+| Total tasks shipped | 67+ |
 | Total tasks failed | 0 |
 | Success rate | 100% |
 | Avg tasks per cycle | 2.5 |
-| Mastery level | Proficient (22 consecutive successes) |
-| Benchmark score | 91/100 |
-| Active instincts | 11 |
-| Fitness score | 0.95 |
-| Plugin version | v7.3.0 |
+| Mastery level | Proficient (32 consecutive successes) |
+| Benchmark score | 94.4/100 |
+| Commits | 285 |
+| Plugin version | v8.0.0 |
 
 ### Benchmark Trajectory
 
 ```
 Score
 100 ┤
- 95 ┤                                          ●━━━━━━━━●━━━●
- 91 ┤                                     ┌────┘
+ 95 ┤                                                    ●━━━━━━━━━━━━━━━━━●
+ 94 ┤                                               ┌────┘
+ 91 ┤                                     ┌──────────┘
  90 ┤                               ●─────┘
  88 ┤                         ●─────┘
  86 ┤                   ●─────┘
  84 ┤             ●─────┘
  83 ┤       ●─────┘
  80 ┤───────┘
-    └──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──
-       1  3  5  7  9  11 13 16 18 20 22 24   Cycle
+    └──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──
+       1  3  5  7  9  11 13 16 18 20 24    139  151  Cycle
 ```
 
 | Calibration Point | Cycle | Overall Score |
@@ -69,42 +69,23 @@ Score
 | Domain generalization start | 3 | 86.0 |
 | Research integration | 8 | 88.1 |
 | Post-research recalibration | 16 | 87.4* |
-| Current (estimated) | 24 | 91.0 |
+| Estimated mid-run | 24 | 91.0 |
+| Latest calibration | 139 | 94.4 |
 
 *\*Cycle 16 recalibration applied stricter LLM rubrics, explaining the apparent dip. Automated scores continued rising.*
 
-### Benchmark Dimensions (Last Calibration: Cycle 16)
+### Benchmark Dimensions (Last Calibration: Cycle 139)
 
-| Dimension | Automated | LLM | Composite | High Water |
-|-----------|-----------|-----|-----------|------------|
-| Defensive Design | 100 | 100 | **100** | 100 |
-| Convention Adherence | 92 | 100 | **94** | 100 |
-| Eval Infrastructure | 100 | 75 | **93** | 93 |
-| Documentation Completeness | 95 | 75 | **89** | 89 |
-| Specification Consistency | 93 | 75 | **88** | 88 |
-| Feature Coverage | 88 | 75 | **84** | 84 |
-| Modularity | 85 | 75 | **82** | — |
-| Schema Hygiene | 85 | 75 | **82** | — |
-
-### Task Type Distribution (Multi-Armed Bandit Arms)
-
-| Type | Tasks | Reward | Avg Reward | Exploration Status |
-|------|-------|--------|------------|-------------------|
-| techdebt | 18 | 18 | 1.0 | Fully explored |
-| feature | 18 | 18 | 1.0 | Fully explored |
-| stability | 7 | 7 | 1.0 | Explored |
-| security | 2 | 2 | 1.0 | Under-explored |
-| performance | 1 | 1 | 1.0 | Under-explored |
-
-### Instinct Summary
-
-| ID | Pattern | Type | Confidence |
-|----|---------|------|------------|
-| inst-005 | cross-reference-new-docs | convention | 0.70 (highest) |
-| inst-003 | inline-s-docs-tasks | process | 0.65 |
-| inst-001 | god-file-extraction | technique | 0.55 |
-| inst-004 | diversify-task-types | process | 0.55 |
-| inst-007 | case-sensitive-eval-graders | anti-pattern | 0.55 |
+| Dimension | Automated | LLM | Composite |
+|-----------|-----------|-----|-----------|
+| Defensive Design | 100 | 100 | **100** |
+| Convention Adherence | 100 | 100 | **100** |
+| Eval Infrastructure | 100 | 100 | **100** |
+| Feature Coverage | 100 | 100 | **100** |
+| Specification Consistency | 93 | 100 | **95** |
+| Modularity | 100 | 75 | **93** |
+| Schema Hygiene | 100 | 75 | **93** |
+| Documentation Completeness | 82 | 75 | **80** |
 
 ---
 
@@ -378,16 +359,15 @@ The loop stops when:
 | Research integration | 8-13 | CoT, MSV, mutation testing, bandit selection, plan caching |
 | Self-improvement | 16-21 | Stepwise scoring, CSI, confidence alignment, security self-check |
 | Documentation | 22-24 | Operator brief, run isolation, experiment journal, parallel safety |
+| Platform compatibility | 25-131 | Multi-platform support, phase decomposition, agent templates |
+| Pipeline optimization | 132-141 | Self-MoA builds, budget-aware agents, speculative auditor, phase gate |
+| Research expansion | 142-151 | Enterprise eval, agent personalization, adversarial co-evolution, runtime guardrails |
 
 ### Open Items
 
 - [ ] Design domain detection signals and export pipeline
 - [ ] End-to-end validation on a real writing or research project
 - [ ] Domain-specific instinct templates
-- [ ] `phases-full-split-all-phases` (deferred, revisit 2026-03-25)
-- [ ] `add-domain-benchmark-rubric` (deferred, revisit 2026-03-25)
-- [ ] Benchmark recalibration due (last: cycle 16, 8 cycles of improvements unscored)
-- [ ] Security and performance task types under-explored (2 and 1 pulls)
 
 ---
 
