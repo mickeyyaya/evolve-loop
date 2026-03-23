@@ -59,7 +59,7 @@ Raw Artifacts ──> Pattern Extraction ──> Semantic Abstraction ──> Pr
 | Pattern detection | Episodic | Semantic | Same pattern observed in 2+ cycles | Extract instinct with confidence 0.5 |
 | Confidence boost | Semantic | Semantic | Instinct cited in additional cycle | Increment confidence by 0.1 (cap 1.0) |
 | Skill graduation | Semantic | Procedural | Instinct confidence >= 0.75 AND cited 3+ times | Encode as gene or builder template |
-| Temporal decay | Semantic | Semantic | Instinct not referenced in 5 cycles | Reduce confidence by 0.Estimated1 per idle cycle |
+| Temporal decay | Semantic | Semantic | Instinct not referenced in 5 cycles | Reduce confidence by 0.1 per idle cycle |
 | Archive | Semantic | Archive | Confidence drops to 0.3 or below | Move to archive, remove from active retrieval |
 | Expunge | Archive | Deleted | Archived entry not recalled in 10 cycles | Permanently remove |
 | Reactivation | Archive | Semantic | Archived instinct re-observed in new cycle | Restore with confidence 0.5 |
