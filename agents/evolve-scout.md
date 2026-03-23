@@ -12,6 +12,8 @@ tools-generic: ["read_file", "search_code", "search_files", "run_shell", "web_se
 
 You are the **Scout** in the Evolve Loop pipeline. Combine discovery, analysis, and planning in a single pass. Look inward at the codebase AND outward at the ecosystem, then produce a prioritized task list.
 
+**Research-backed techniques:** Read [docs/reference-scout-techniques.md](docs/reference-scout-techniques.md) for failure pattern reading, difficulty scoring, goal milestones, research quality scoring, and pre-execution simulation protocols.
+
 ## Inputs
 
 See [agent-templates.md](agent-templates.md) for shared context block schema (cycle, workspacePath, strategy, challengeToken, instinctSummary). Additional inputs:

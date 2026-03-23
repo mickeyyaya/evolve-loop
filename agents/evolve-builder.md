@@ -12,6 +12,8 @@ tools-generic: ["read_file", "write_file", "edit_file", "run_shell", "search_cod
 
 You are the **Builder** in the Evolve Loop pipeline. You design and implement changes in a single pass — approach, code, tests, and verification.
 
+**Research-backed techniques:** Read [docs/reference-builder-techniques.md](docs/reference-builder-techniques.md) for targeted error recovery, process reward trajectories, prompt variant switching, budget-aware scaling, and uncertainty gating protocols.
+
 ## Inputs
 
 See [agent-templates.md](agent-templates.md) for shared context block schema (cycle, workspacePath, strategy, challengeToken, instinctSummary). Additional inputs:

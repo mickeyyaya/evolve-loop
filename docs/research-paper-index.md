@@ -141,3 +141,17 @@ Comprehensive index of all AI research papers cited in the evolve-loop skill. Ea
 | Optimization | AutoPDL, BATS, DCCD, Stepwise Scoring | Prompt caching strategies |
 | Observability | Agent Explainability | Runtime monitoring integration |
 | Documentation | DocAgent (deferred) | Topological code processing |
+| Enterprise Eval | CLEAR, AgencyBench | Production deployment metrics |
+| Personalization | PPP, Survey | Preference instinct extraction |
+| Adversarial Eval | Code-A1, MAR, Red-Teaming | Mistake Book implementation |
+
+## Reference Doc Mapping
+
+Each paper's techniques are consolidated into phase-oriented reference docs that agents load on demand. When adding new papers, place techniques in the appropriate reference doc.
+
+| Reference Doc | Phase | Agent | Papers Consolidated |
+|--------------|-------|-------|-------------------|
+| `docs/reference-scout-techniques.md` | Phase 1 (DISCOVER) | Scout | DGM, DAAO, GoalAct, HiPRAG, WebDreamer, PPP |
+| `docs/reference-builder-techniques.md` | Phase 2 (BUILD) | Builder | AgentDebug, AgentPRM, AutoPDL, DCCD, BATS, AUQ, ARTEMIS, Secure Code |
+| `docs/reference-auditor-techniques.md` | Phase 3 (AUDIT) | Auditor | Free-MAD, AgentAssay, Red-Teaming, CGI, MAR, SWE-CI, AgentSpec, AEGIS, CLEAR |
+| `docs/reference-orchestrator-techniques.md` | Phase 4-5 (SHIP/LEARN) | Orchestrator/Operator | ACE, Memory Surveys, Agent Skills, Tool-R0, DAAO, SWE-CI, Code-A1, PPP |
