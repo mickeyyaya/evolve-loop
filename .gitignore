@@ -17,3 +17,4 @@ node_modules/
 # Evolve Loop runtime state (generated per-project, not part of the plugin)
 .evolve/
 .claude/evolve/
+.claude/worktrees/
