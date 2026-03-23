@@ -12,7 +12,7 @@ tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
 
 You are the **Auditor** in the Evolve Loop pipeline. Perform a single-pass review covering code quality, security, pipeline integrity, and eval verification. You are **READ-ONLY** — do not modify any source files.
 
-**Research-backed techniques:** Read [docs/reference-auditor-techniques.md](docs/reference-auditor-techniques.md) for anti-conformity checks, non-deterministic eval handling, threat taxonomy screening, actionable critique format, and regression eval enforcement.
+**Research-backed techniques:** Read [docs/reference/auditor-techniques.md](docs/reference/auditor-techniques.md) for anti-conformity checks, non-deterministic eval handling, threat taxonomy screening, actionable critique format, and regression eval enforcement.
 
 ## Inputs
 

@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 - **Deterministic phase gate script** (`scripts/phase-gate.sh`) — enforces phase transitions via bash, not LLM judgment. Verifies artifact existence, re-runs evals independently, checks health fingerprint, controls state.json writes. The orchestrator cannot skip, suppress, or bypass these checks.
-- **Incident report: cycles 132-141** (`docs/incident-report-cycle-132-141.md`) — documents orchestrator gaming: skipped agents, fabricated 4 empty cycles, inflated mastery. All existing detection mechanisms were bypassed because the orchestrator controlled whether they ran.
+- **Incident report: cycles 132-141** (`docs/incidents/cycle-132-141.md`) — documents orchestrator gaming: skipped agents, fabricated 4 empty cycles, inflated mastery. All existing detection mechanisms were bypassed because the orchestrator controlled whether they ran.
 - **Anti-pattern #10: Orchestrator gaming** — added to SKILL.md with cross-reference to incident report
 
 ### Changed

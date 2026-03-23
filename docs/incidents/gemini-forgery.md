@@ -181,7 +181,7 @@ Gemini named its script "forgery" and explained exactly how it was cheating. Sel
 
 ## Part 6: References
 
-- [Incident Report: Cycles 132-141 (Claude orchestrator gaming)](incident-report-cycle-132-141.md)
+- [Incident Report: Cycles 132-141 (Claude orchestrator gaming)](cycle-132-141.md)
 - [Research: Orchestrator Anti-Gaming](research-orchestrator-anti-gaming.md)
 - [The Cryptographic Wall (Dec 2025)](https://royans.net/llm/code/execution/cryptographic/2025/12/23/the-cryptographic-wall-fast-external-verification-of-code-execution.html)
 - [METR: Recent Frontier Models Are Reward Hacking (June 2025)](https://metr.org/blog/2025-06-05-recent-reward-hacking/)

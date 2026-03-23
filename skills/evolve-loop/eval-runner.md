@@ -40,7 +40,7 @@ After each task ships, record attempts to pass all evals. Track per task type in
 
 ## Eval Definition Format
 
-Each file in `.evolve/evals/` (see also [examples/eval-definition.md](examples/eval-definition.md)):
+Each file in `.evolve/evals/` (see also [examples/eval.md](examples/eval.md)):
 
 ```markdown
 # Eval: <task-name>

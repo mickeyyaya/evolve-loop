@@ -178,7 +178,7 @@ This prevents unbounded memory growth and keeps the instinct set relevant and co
 
 Each cycle appends a new file. Instinct updates (confidence changes) reference the original ID with a `-update` suffix.
 
-For an annotated example, see [examples/instinct-example.yaml](../examples/instinct-example.yaml).
+For an annotated example, see [examples/instinct.yaml](../examples/instinct.yaml).
 
 ## How Agents Use Instincts
 

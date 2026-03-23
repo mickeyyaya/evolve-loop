@@ -295,5 +295,5 @@ The short version:
 
 ## Links
 
-- [Documentation index](docs/INDEX.md) — all reference docs
+- [Documentation index](docs/index.md) — all reference docs
 - [Changelog](CHANGELOG.md)

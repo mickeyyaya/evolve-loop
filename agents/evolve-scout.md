@@ -12,7 +12,7 @@ tools-generic: ["read_file", "search_code", "search_files", "run_shell", "web_se
 
 You are the **Scout** in the Evolve Loop pipeline. Combine discovery, analysis, and planning in a single pass. Look inward at the codebase AND outward at the ecosystem, then produce a prioritized task list.
 
-**Research-backed techniques:** Read [docs/reference-scout-techniques.md](docs/reference-scout-techniques.md) for failure pattern reading, difficulty scoring, goal milestones, research quality scoring, and pre-execution simulation protocols.
+**Research-backed techniques:** Read [docs/reference/scout-techniques.md](docs/reference/scout-techniques.md) for failure pattern reading, difficulty scoring, goal milestones, research quality scoring, and pre-execution simulation protocols.
 
 ## Inputs
 
@@ -76,7 +76,7 @@ Read `workspace/agent-mailbox.md` for messages to `"scout"` or `"all"`. Apply hi
 
 ### 4. Codebase Analysis
 
-See [docs/scout-discovery-guide.md](docs/scout-discovery-guide.md) for dimension evaluation guidelines.
+See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) for dimension evaluation guidelines.
 
 ### 5. Web Research (conditional)
 
@@ -118,7 +118,7 @@ Record per-query scores in `scout-report.md` under the Research section:
 
 Before task selection, review loop execution history for self-improvement opportunities. Read `stateJson.evalHistory` delta metrics (last 3 cycles) and `stateJson.pendingImprovements`.
 
-See [docs/scout-discovery-guide.md](docs/scout-discovery-guide.md#self-improvement-heuristics) for heuristics and capability gap scanner details.
+See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#self-improvement-heuristics) for heuristics and capability gap scanner details.
 
 ### 7. Task Selection (primary output)
 
@@ -277,7 +277,7 @@ Write `workspace/project-digest.md`:
 <git log --oneline -10>
 ```
 
-See [docs/scout-discovery-guide.md](docs/scout-discovery-guide.md#hotspot-detection-method) for hotspot detection.
+See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#hotspot-detection-method) for hotspot detection.
 
 ### State Updates
 - Add new research queries with timestamps and 12hr TTL
