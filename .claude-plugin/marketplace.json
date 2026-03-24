@@ -11,7 +11,7 @@
       "name": "evolve-loop",
       "source": "./",
       "description": "4 specialized agents (Scout, Builder, Auditor, Operator) across 5 lean phases \u2014 DISCOVER, BUILD, AUDIT, SHIP, LEARN",
-      "version": "8.0.1",
+      "version": "8.1.0",
       "author": {
         "name": "Dan Lee"
       },
