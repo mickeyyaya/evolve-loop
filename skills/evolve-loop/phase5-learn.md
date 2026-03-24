@@ -76,6 +76,18 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase6-metacy
 
    Each instinct must be specific and actionable. "Code should be clean" is useless. "This codebase uses barrel exports in index.ts — always add new exports there" is useful.
 
+4c. **Failure Root Cause Attribution** (for FAILED tasks only):
+   For each task that failed this cycle:
+   1. **Classify** the error into one of 5 categories:
+      - `planning` — wrong task scope or approach selected
+      - `tool-use` — wrong tool invocation or misconfigured command
+      - `reasoning` — incorrect conclusion or logic error
+      - `context` — stale, missing, or wrong context provided
+      - `integration` — individually correct steps combine incorrectly
+   2. **Attribute** to the specific agent step from build-report.md `Build Steps` table
+   3. **Record** in state.json `failedApproaches` with `errorCategory` and `failedStep` fields
+   4. If 3+ failures share the same `errorCategory` across last 5 cycles → flag as systemic issue
+
    Update state.json `instinctCount` and `instinctSummary`:
    ```json
    "instinctSummary": [

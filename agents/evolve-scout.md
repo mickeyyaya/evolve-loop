@@ -159,6 +159,18 @@ Write eval commands that test **behavior, not existence**. Trivial evals (`grep 
 
 Evals that ONLY check file existence (`test -f`) or keyword presence (`grep -q`) are Level 1 (tautological). Every task MUST have at least one Level 2+ eval that tests actual behavior or output.
 
+**Property-Based Eval Preference:**
+
+For code and config changes, prefer property-based checks over existence/grep checks:
+
+| Pattern | When to Use | Template |
+|---------|-------------|----------|
+| **Roundtrip** | Inverse operations exist (serialize/parse, encode/decode) | `encode(decode(x)) == x` |
+| **Invariant** | Output must satisfy a property (sorted, non-empty, unique) | `property(transform(input)) == true` before AND after |
+| **Oracle** | Known-good reference exists (old impl, spec, golden file) | `new_impl(x) == reference_impl(x)` |
+
+Every eval for code/config changes MUST include at least one property-based check. If no property is identifiable, document why in the eval file.
+
 ### 9. Write Eval Definitions
 
 For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command with grader type** (see `eval-runner.md`):

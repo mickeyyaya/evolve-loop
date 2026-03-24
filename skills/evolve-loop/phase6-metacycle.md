@@ -75,6 +75,20 @@ Write `meta-review.md` to workspace:
 
 Based on meta-review findings, refine agent prompts via critique-synthesize loop:
 
+**Agent Selection (concrete):**
+1. From last 5 cycles' `evalHistory`, compute per-agent scores:
+   - Scout: task ship rate (`shipped / selected`)
+   - Builder: first-attempt pass rate (`passedFirstAttempt / total`)
+   - Auditor: false-positive rate (`reversals / totalVerdicts`)
+2. Identify the agent with the lowest score as the evolution target
+3. Make ONE targeted edit to that agent's prompt (max 20 lines changed)
+4. Record the change in `state.json.promptVariants`:
+   ```json
+   {"agent": "<agent>", "cycle": "<N>", "edit": "<1-sentence summary>", "baselineScore": 0.X}
+   ```
+5. In the next meta-cycle, compare post-edit score to `baselineScore`. If worse → auto-revert.
+
+**Critique-Synthesize Loop:**
 1. **Critique:** Identify specific prompt weaknesses from cycle outcomes
 2. **Synthesize:** Propose targeted edits (additions, rewording, examples). Small and targeted — never rewrite entire definitions.
 3. **Validate:** Check proposed edit doesn't contradict instincts or policies

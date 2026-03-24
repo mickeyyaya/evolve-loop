@@ -153,7 +153,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   "failedApproaches": [
     {"feature": "real-time sync", "approach": "WebSocket", "error": "serverless incompatible",
      "reasoning": "WebSocket requires persistent connections but deployment uses serverless with ~10s timeout",
-     "filesAffected": ["src/sync/ws-handler.ts"], "cycle": 3, "alternative": "SSE polling or Vercel AI SDK streaming"}
+     "filesAffected": ["src/sync/ws-handler.ts"], "cycle": 3, "alternative": "SSE polling or Vercel AI SDK streaming",
+     "errorCategory": "integration", "failedStep": "Step 3: Implement WebSocket handler"}
   ],
   "evalHistory": [
     {"cycle": 1, "verdict": "PASS", "checks": 9, "passed": 9, "failed": 0,
@@ -183,7 +184,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   },
   "fitnessScore": 0.0,
   "fitnessHistory": [],
-  "fitnessRegression": false
+  "fitnessRegression": false,
+  "promptVariants": []
 }
 ```
 
@@ -206,7 +208,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 | `projectBenchmark` | Persistent quality score from Phase 0. `highWaterMarks`: regression below `HWM - 10` triggers remediation. |
 | `prerequisites` | Optional task slug array. Orchestrator auto-defers if unmet. |
 | `counterfactual` | Lightweight what-if record on deferred tasks for retrospective accuracy. |
-| `failedApproaches` | Structured reasoning: `error`, `reasoning`, `filesAffected`, `cycle`, `alternative`. |
+| `failedApproaches` | Structured reasoning: `error`, `reasoning`, `filesAffected`, `cycle`, `alternative`, `errorCategory` (planning/tool-use/reasoning/context/integration), `failedStep` (attributed step). |
+| `promptVariants` | Prompt evolution experiments from meta-cycle. Each: `{agent, cycle, edit, baselineScore}`. Compared at next meta-cycle for auto-revert. |
 
 ### `.evolve/notes.md` (shared, append under ship lock)
 

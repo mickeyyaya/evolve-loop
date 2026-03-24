@@ -358,8 +358,8 @@ For detailed Phase 2 implementation, see [phase2-build.md](skills/evolve-loop/ph
 | Step | Detail |
 |------|--------|
 | Inline S-tasks | Execute first (per inst-007), commit sequentially |
-| Independent worktree tasks | Build in parallel via platform agent mechanism |
-| Dependent tasks | Build sequentially within groups (shared files) |
+| Independent worktree tasks | Launch IN PARALLEL using multiple Agent tool calls in a single message (one per independent task, each with `isolation: "worktree"`). See phase2-build.md Dependency Partitioning Algorithm. |
+| Dependent tasks | Build sequentially within groups per phase2-build.md conflict graph |
 | Isolation | Builder MUST use worktree isolation for coding projects |
 | Retries | Max 3 attempts per task; failures logged to state.json |
 

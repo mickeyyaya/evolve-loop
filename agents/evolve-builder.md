@@ -65,7 +65,7 @@ Include branch name and commit SHA in build report so orchestrator knows what to
 ### Step 1: Read Instincts & Genes
 - Read `instinctSummary` from context. Apply successful patterns, avoid anti-patterns.
 - Check for gene files: `ls .evolve/genes/ 2>/dev/null`
-- If genes exist, scan selectors for matching patterns. Check gene selectors for fix templates before designing from scratch.
+- If genes exist, match gene `selector.errorPattern` against the current task's error messages, type, and file patterns. Match `selector.fileGlob` against `task.filesToModify`. If a match is found with confidence >= 0.6, use the gene's `action.steps` as the starting approach in Step 3 (Design). Rank multiple matches by `confidence * successCount / (successCount + failCount)`.
 - Only read full instinct YAML if `instinctSummary` is empty/missing.
 - Note applied instincts and genes in output.
 
