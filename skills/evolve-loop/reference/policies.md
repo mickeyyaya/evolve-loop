@@ -13,12 +13,9 @@ Patterns confirmed at confidence 0.9+ become mandatory behavior:
 | **Meta-cycle** | Every 5 cycles → split-role critique + prompt evolution | [phase6-metacycle.md](../phase6-metacycle.md) |
 | **Gene library** | Reusable fix templates in `.evolve/genes/` | [docs/genes.md](../../../docs/genes.md) |
 
-## Plan Template Caching
+## Plan Reuse
 
-1. **Match:** Check `state.json.planCache` by type + file patterns (similarity > 0.7)
-2. **Adapt:** Pass cached template as `priorPlan` to Builder
-3. **Store:** After PASS audit → extract plan, save to planCache
-4. **Evict:** Unused after 10 cycles → prune; failed reuse → demote
+Builder reads prior successful build-reports from `.evolve/history/` when facing a similar task type. No separate cache needed — the history directory IS the plan archive.
 
 ## Token Budgets
 

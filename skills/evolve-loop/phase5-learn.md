@@ -90,61 +90,6 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase6-metacy
    ```
    Scout and Builder read `instinctSummary` instead of all instinct YAML files. Full files read only during consolidation or when `instinctCount` changed.
 
-## Eval-Delta Prediction Tracking
-
-Compare Scout's `Expected eval delta` predictions against actual benchmark changes. (Research: Eval-Driven Development — arXiv:2411.13768.)
-
-1. Read Scout's `Expected eval delta` from scout-report.md for each shipped task
-2. Read actual dimension delta from benchmark delta check
-3. Compare:
-
-| Result | Condition |
-|--------|-----------|
-| Accurate | Within +/-2 points |
-| Over-predicted | Actual < predicted by >3 points |
-| Under-predicted | Actual > predicted by >3 points |
-
-4. Log in `state.json.evalDeltaAccuracy`:
-   ```json
-   {"cycle": "<N>", "task": "<slug>", "predicted": {"dimension": "+N"}, "actual": {"dimension": "+N"}, "accuracy": "accurate|over|under"}
-   ```
-5. After 5+ entries with >50% over-prediction rate, extract instinct: "Scout over-estimates impact of <task-type> on <dimension>"
-
-## Step-Level Process Reward Analysis (AgentPRM-Inspired)
-
-Analyze Builder step-level confidence and Auditor cross-validation for targeted improvements. Based on AgentPRM (arXiv:2502.10325): process rewards score each intermediate step, not just the final outcome, preventing reward hacking where the Builder skips planning to rush to implementation.
-
-**Trajectory decomposition:** Segment the Builder's execution into 4 phases and score each independently:
-
-| Phase | What to Score | Process Reward Signal |
-|-------|--------------|----------------------|
-| Design | Did Builder enumerate files and plan approach? | Positive if explicit file list + approach rationale present |
-| Discovery | Did Builder read relevant files before editing? | Positive if reads precede writes for each modified file |
-| Implementation | Did changes match the design? | Positive if changed files match design phase file list |
-| Self-verification | Did Builder run eval graders and check results? | Positive if all graders executed with per-grader results |
-
-**Scoring protocol:**
-1. Read `## Build Steps` table from `build-report.md` — extract confidence scores and flags
-2. Read CALIBRATION_MISMATCH entries from `audit-report.md` (Section D2)
-3. Cross-reference for patterns
-
-| Trigger | Action |
-|---------|--------|
-| Same step type confidence < 0.7 across 2+ cycles | Extract procedural instinct targeting that weakness |
-| CALIBRATION_MISMATCH across 2+ cycles | Extract episodic instinct about overconfidence |
-
-Append step-level summary to `state.json.processRewardsHistory` (keep last 5 cycles):
-```json
-{
-  "cycle": "<N>",
-  "steps": [
-    {"description": "<step>", "builderConfidence": 0.8, "auditorIssue": false},
-    {"description": "<step>", "builderConfidence": 0.6, "auditorIssue": true, "mismatchType": "overconfident"}
-  ]
-}
-```
-Meta-cycle reads `processRewardsHistory` to identify systematic Builder weaknesses.
-
 ## Instinct Graduation
 
 Promotes high-confidence, repeatedly-confirmed instincts to mandatory guidance. Run after Citation Collection and before consolidation.

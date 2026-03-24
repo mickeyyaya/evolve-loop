@@ -124,12 +124,6 @@ See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#self-i
 
 Synthesize findings into 2-4 small/medium tasks.
 
-**Semantic Task Crossover:** If `stateJson.planCache` has 4+ entries with `successCount >= 2`, attempt one crossover:
-1. Select two high-performing entries (highest `successCount`, different `taskType` preferred)
-2. Combine `filePatterns` from one with `approach`/`steps` from another
-3. Label `source: "crossover"`, add `crossoverParents: ["slug-a", "slug-b"]`
-4. Crossover candidate competes in normal prioritization
-
 **Prerequisites:** Optionally specify `prerequisites: ["slug-a"]` — tasks deferred if prerequisite not completed. Lightweight suggestion, not hard constraint.
 
 **Filter first:**
@@ -138,7 +132,7 @@ Synthesize findings into 2-4 small/medium tasks.
 - Avoid `failedApproaches` — propose alternatives
 - Check `stagnation.recentPatterns` — avoid stagnant files unless genuinely new approach
 
-**Novelty boost:** Read `stateJson.fileExplorationMap`. If all target files have `lastTouchedCycle <= currentCycle - 3` (or absent), apply **+1 priority boost**.
+**Novelty boost:** Check `git log --oneline -10 -- <target files>`. If target files have no commits in the last 3 cycles, apply **+1 priority boost**.
 
 **Benchmark weakness boost:** Read `benchmarkWeaknesses`. Map `taskTypeHint` to matching candidates, apply **+2 priority boost**. Dimension-to-task-type mapping (from [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md)):
 - `documentationCompleteness` / `specificationConsistency` / `modularity` / `schemaHygiene` / `conventionAdherence` → `techdebt`

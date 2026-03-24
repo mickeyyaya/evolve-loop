@@ -111,11 +111,7 @@ After prompt evolution, before mutation testing. Closes the loop between learnin
 | **Gene** | Instincts describe repeatable fix/implementation pattern | `.evolve/genes/<pattern-name>.md` with Selector, Steps, Validation, Source Instincts |
 | **Skill Fragment** | Instincts describe agent behavior improvements | New agent prompt section (max 20 lines), gated through TextGrad validation |
 
-**Step 3: Record** in `state.json.synthesizedTools`:
-```json
-{"name": "<pattern-name>", "path": ".evolve/genes/<pattern-name>.md", "purpose": "<description>",
- "sourceInstincts": ["inst-012", "inst-017"], "cycle": "<N>", "useCount": 0, "type": "gene|skill-fragment"}
-```
+**Step 3: Record** synthesis in the gene file itself (no state.json entry needed).
 
 **Step 4: Update source instincts** — mark `graduated: true`. Stop decaying but no longer individually injected.
 

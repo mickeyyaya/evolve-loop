@@ -58,14 +58,7 @@ JSON context block:
 If hacking detected: CRITICAL warning, HALT status, recommend `harden` strategy. Present evidence from health fingerprint to human (final arbiter).
 
 ### 3. Stall & Stagnation Detection
-- Read `recentLedger` (inline) — do NOT read full ledger.jsonl
-- 2+ consecutive no-ship cycles = flag stall
-- Check `stagnation.recentPatterns` in state.json:
-  - Same-file churn across consecutive cycles
-  - Same-error repeat across cycles
-  - Diminishing returns (fewer tasks shipped each cycle)
-- Detect thrashing (changes reverted or re-done)
-- 3+ simultaneous stagnation patterns = recommend HALT
+Stagnation detection is handled by `scripts/cycle-health-check.sh` (deterministic). Read stagnation findings from `$WORKSPACE/cycle-health.json`. If 3+ patterns active → recommend HALT.
 
 ### 4. Quality Trend (Delta Analysis)
 Compare `delta` metrics across last 3-5 cycles in `evalHistory`:

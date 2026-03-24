@@ -165,7 +165,7 @@ fitnessScore = round(0.25 * discover + 0.30 * build + 0.20 * audit + 0.15 * ship
 
 ## Process Rewards
 
-Append to `processRewardsHistory` (rolling 3 entries):
+Score process rewards for this cycle (used by fitness computation):
 
 | Phase | 1.0 | 0.5 | 0.0 |
 |-------|-----|-----|-----|
@@ -176,17 +176,6 @@ Append to `processRewardsHistory` (rolling 3 entries):
 | **learn** | Instincts extracted AND cited | Extracted but none cited | None extracted |
 | **skillEfficiency** | Tokens decreased from baseline | Stable (+/-5%) | Tokens increased |
 
-**Per-cycle remediation check:** If any dimension < 0.7 for 2+ consecutive entries → append to `pendingImprovements`:
-
-| Dimension | Suggested Task |
-|-----------|---------------|
-| `discover < 0.7` | Improve Scout task sizing or relevance |
-| `build < 0.7` | Add Builder guidance or simplify task complexity |
-| `audit < 0.7` | Review eval grader quality and coverage |
-| `ship < 0.7` | Fix commit workflow or git state issues |
-| `learn < 0.7` | Extract instincts from recent successful cycles |
-| `skillEfficiency < 0.7` | Reduce prompt overhead in skill/agent files |
-
-Clear resolved entries when dimension rises above 0.7 for 2 consecutive cycles.
+**Per-cycle check:** If any dimension scores 0.0, log as operatorWarning for investigation next cycle.
 
 7. **Release ship lock:** `rm -rf "$LOCK_DIR"`

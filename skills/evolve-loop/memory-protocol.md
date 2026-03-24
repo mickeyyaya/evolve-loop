@@ -164,10 +164,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   "stagnation": {"nothingToDoCount": 0, "recentPatterns": []},
   "warnAfterCycles": 5,
   "tokenBudget": {"perTask": 80000, "perCycle": 200000},
-  "synthesizedTools": [],
-  "planCache": [],
   "mastery": {"level": "novice|competent|proficient", "consecutiveSuccesses": 0},
-  "processRewardsHistory": [],
   "ledgerSummary": {"totalEntries": 0, "cycleRange": [0, 0], "scoutRuns": 0, "builderRuns": 0, "totalTasksShipped": 0, "totalTasksFailed": 0, "avgTasksPerCycle": 0},
   "instinctSummary": [],
   "projectBenchmark": {
@@ -199,13 +196,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 | `warnAfterCycles` (default 5) | Soft threshold — warn user when requesting this many cycles. |
 | `mastery.level` | Difficulty graduation: `novice` (0-2, S only), `competent` (3-5, S+M), `proficient` (6+, S+M+L). |
 | `mastery.consecutiveSuccesses` | Reset to 0 on audit failure, incremented on successful ship. |
-| `processRewardsHistory` | Rolling 3-entry array of per-cycle scores. Older data in `evalHistory`. |
 | `taskArms` | Multi-armed bandit state. Per-type: `pulls`, `totalReward`, `avgReward`. Arms with `avgReward >= 0.8` and `pulls >= 3` get +1 priority boost. |
-| `pendingImprovements` | Auto-generated remediation tasks when dimensions fall below 0.7 for 2+ consecutive cycles. |
-| `planCache` | Reusable plan templates: `slug`, `taskType`, `filePatterns`, `approach`, `steps`, `cycle`, `successCount`. |
-| `crossoverLog` | Crossover-generated tasks with lineage and outcome. |
-| `synthesizedTools` | Tools from Builder capability gap detection: `name`, `path`, `purpose`, `cycle`, `useCount`. |
-| `fileExplorationMap` | Rolling `{filePath: lastTouchedCycle}`. Pruned after 10 cycles. Files with `lastTouchedCycle <= currentCycle - 3` are under-explored. |
 | `ledgerSummary` | Aggregated ledger stats so agents never read full ledger. Updated in Phase 4. |
 | `instinctSummary` | Compact array of active instincts. Updated in Phase 5. |
 | `fitnessScore` | Weighted average: `0.25*discover + 0.30*build + 0.20*audit + 0.15*ship + 0.10*learn`. |

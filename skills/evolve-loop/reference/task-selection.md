@@ -24,7 +24,7 @@ Each task type has an arm in `state.json.taskArms`:
 
 ## Novelty Bonus
 
-Files not touched in 3+ cycles get **+1 priority** via `state.json.fileExplorationMap`. Stacks with bandit boost.
+Files not touched in 3+ cycles get **+1 priority** (check via `git log --oneline -10 -- <files>`). Stacks with bandit boost.
 
 ## Auditor Adaptive Strictness
 
@@ -32,8 +32,9 @@ Files not touched in 3+ cycles get **+1 priority** via `state.json.fileExplorati
 
 | Condition | Behavior |
 |-----------|----------|
-| `consecutiveClean >= 5` | Reduced checklist (Security + Eval Gate only) |
+| `consecutiveClean < 3` | Full checklist (not enough trust) |
+| `consecutiveClean 3-7` | Can skip C (Pipeline Integrity) only if no agent/skill files modified |
+| `consecutiveClean >= 8` | Full checklist mandatory (streak verification — long streaks mask drift) |
 | Any WARN/FAIL | Reset counter to 0 |
 | `harden`/`repair` strategy | Always full checklist |
-| Agent/skill file changes | Always full checklist |
 | New invocation | Halve all counters (cross-session decay) |

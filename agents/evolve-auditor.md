@@ -77,17 +77,24 @@ Read `auditorProfile` from context:
 }
 ```
 
-**Reduced-checklist rule:** If task type has `consecutiveClean >= 8`, skip sections A, B2, C — run only B, D, E, F. Log `"adaptive:reduced"` in verdict line.
+**Checklist rules by streak length:**
 
-**Sections D (Eval Integrity) and E (Eval Gate) are NEVER skipped** — primary anti-cheating checks, run every cycle.
+| `consecutiveClean` | Checklist | Rationale |
+|---------------------|-----------|-----------|
+| `< 3` (new/unstable) | Full checklist (all sections) | Not enough trust built |
+| `3-7` (stable) | Can skip C (Pipeline Integrity) ONLY if no agent/skill files modified | Core quality checks always run |
+| `>= 8` (long streak) | **Full checklist mandatory** (streak verification audit) | Long streaks mask slow drift — increase rigor |
 
-**Random full-audit sampling:** Orchestrator passes `"forceFullAudit": true` ~20% of the time. When true, run ALL sections. Do NOT mention in report whether this was a random sample (blind monitoring).
+**Sections A (Code Quality), B (Security), B2 (Hallucination), D (Eval Integrity) are NEVER skipped.**
+
+**Random full-audit sampling:** Orchestrator passes `"forceFullAudit": true` ~20% of the time. When true, run ALL sections regardless of streak. Do NOT mention in report whether this was a random sample (blind monitoring).
 
 **Always run full checklist when:**
 - `strategy` is `harden` or `repair`
 - Task modifies agent/skill files or `.claude-plugin/`
 - Build report flags risks
 - `forceFullAudit` is true
+- `consecutiveClean >= 8` (streak verification)
 
 **Cross-session decay (orchestrator):** New session halves all `consecutiveClean` values (rounded down).
 
@@ -119,7 +126,7 @@ Read `workspace/agent-mailbox.md` for messages to `"auditor"` or `"all"`. Apply 
 - [ ] **Config key verification:** Verify new config keys/env vars exist in actual config or docs
 - [ ] **Escalation:** 2+ POTENTIAL_HALLUCINATION in same build = escalate all to HIGH
 
-Follows same `consecutiveClean >= 8` reduced-checklist rules as A and C.
+B2 is NEVER skipped — hallucination detection runs every cycle regardless of streak.
 
 ### C. Pipeline Integrity
 - [ ] Agent files have required structure (if modified)
@@ -153,10 +160,13 @@ Follows same `consecutiveClean >= 8` reduced-checklist rules as A and C.
 
 CALIBRATION_MISMATCH is informational — does NOT block shipping alone.
 
-### E. Eval Gate
-- Run ALL eval graders from `evals/<task-slug>.md`
-- Record each result
-- ALL must pass for overall PASS
+### E. Eval Gate (DEFERRED to phase-gate)
+- Do NOT run eval graders directly — the phase-gate script (`verify-eval.sh`) runs them independently as the single source of truth
+- Instead, **review the eval definitions** in `evals/<task-slug>.md` for quality:
+  - Are graders testing behavior (Level 2+) or just existence (Level 1)?
+  - Are there enough graders to cover acceptance criteria?
+  - Flag tautological evals as MEDIUM issue
+- Output verdict as `PASS-PENDING-EVAL` (review passed, awaiting eval gate) or `WARN`/`FAIL`
 
 ### F. Multi-Stage Verification (M-complexity only)
 

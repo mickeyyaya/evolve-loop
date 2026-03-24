@@ -279,15 +279,7 @@ sha256sum .evolve/evals/*.md > $WORKSPACE_PATH/eval-checksums.json
 
 **If no tasks selected:** increment `stagnation.nothingToDoCount`. If >= 3 → STOP: "Project has converged." Otherwise → skip to Phase 5.
 
-**Stagnation detection** (run after every Scout phase):
-
-| Pattern | Trigger | Action |
-|---------|---------|--------|
-| Same-file churn | Same files in `failedApproaches` across 2+ cycles | Flag, pass to Scout as avoidance context |
-| Same-error repeat | Same error message recurs across cycles | Flag with alternative approach suggestion |
-| Diminishing returns | Last 3 cycles each shipped fewer tasks | Flag as diminishing returns |
-
-If 3+ stagnation patterns active simultaneously → trigger Operator HALT.
+**Stagnation detection:** Handled by `scripts/cycle-health-check.sh` (deterministic). Scout reads stagnation findings from `$WORKSPACE/cycle-health.json` if present. Orchestrator HALTs if 3+ stagnation patterns active.
 
 ### Context Quality Checklist (CEMM)
 
@@ -411,7 +403,11 @@ If any checksum fails → HALT: "Eval tamper detected."
   }
   ```
 
-After Auditor completes, handle verdict per [phase2-build.md](skills/evolve-loop/phase2-build.md) (verdict handling, worktree merge/cleanup, auditor profile updates).
+After Auditor completes:
+- If `PASS-PENDING-EVAL` → proceed to eval gate (phase-gate runs `verify-eval.sh` as single source of truth)
+- If `WARN` or `FAIL` → handle per [phase2-build.md](skills/evolve-loop/phase2-build.md) (retry/cleanup)
+- Phase-gate `audit-to-ship` promotes `PASS-PENDING-EVAL` → `PASS` only if `verify-eval.sh` passes
+- Auditor does NOT run eval graders directly — this eliminates redundant eval execution
 
 ---
 

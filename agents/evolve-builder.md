@@ -118,8 +118,7 @@ If task cannot be solved with existing tools/instincts/genes:
 1. Identify the gap
 2. Search for existing tool/library/MCP server
 3. If needed, write reusable script to `.evolve/tools/<tool-name>.sh` (with usage comment, input validation, error handling)
-4. Register in `state.json` under `synthesizedTools`
-5. Log `tool-synthesis` entry to ledger
+4. Log `tool-synthesis` entry to ledger
 
 ### Step-Level Confidence Reporting
 
