@@ -8,7 +8,7 @@ Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the 
 
 ```
 if state.json.projectBenchmark.lastCalibrated exists
-   AND (now - lastCalibrated) < 1 hour:
+   AND (now - lastCalibrated) < 24 hours:
    Skip CALIBRATE, use existing benchmark
 else:
    Run CALIBRATE normally
@@ -22,14 +22,11 @@ else:
    # Store results in $WORKSPACE_PATH/benchmark-automated.json
    ```
 
-2. **Run LLM judgment** (tier-2 for first calibration, tier-3 for subsequent):
-   Provide each dimension's rubric, sample files (max 3 per dimension, <200 lines each), and automated score. LLM outputs score (0/25/50/75/100) with 1-sentence justification and confidence (0.0-1.0). Use anchored rubric — resist "verbosity bias."
+2. **Compute composites:** `dimension.composite = automated` (automated scores only — LLM judgment removed to save ~30K tokens per calibration)
 
-3. **Compute composites:** `dimension.composite = round(0.7 * automated + 0.3 * llm)`
+3. **Compute overall:** `overall = round(mean(all 8 composites), 1)`
 
-4. **Compute overall:** `overall = round(mean(all 8 composites), 1)`
-
-5. **Store in state.json** under `projectBenchmark`:
+4. **Store in state.json** under `projectBenchmark`:
    ```json
    {
      "projectBenchmark": {
@@ -37,14 +34,14 @@ else:
        "calibrationCycle": "<lastCycleNumber + 1>",
        "overall": "<0-100>",
        "dimensions": {
-         "documentationCompleteness": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "specificationConsistency": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "defensiveDesign": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "evalInfrastructure": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "modularity": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "schemaHygiene": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "conventionAdherence": {"automated": "<N>", "llm": "<N>", "composite": "<N>"},
-         "featureCoverage": {"automated": "<N>", "llm": "<N>", "composite": "<N>"}
+         "documentationCompleteness": {"composite": "<N>"},
+         "specificationConsistency": {"composite": "<N>"},
+         "defensiveDesign": {"composite": "<N>"},
+         "evalInfrastructure": {"composite": "<N>"},
+         "modularity": {"composite": "<N>"},
+         "schemaHygiene": {"composite": "<N>"},
+         "conventionAdherence": {"composite": "<N>"},
+         "featureCoverage": {"composite": "<N>"}
        },
        "history": [],
        "highWaterMarks": {}
@@ -52,10 +49,10 @@ else:
    }
    ```
 
-6. **Compare to previous calibration** (if `history` non-empty):
+5. **Compare to previous calibration** (if `history` non-empty):
    - Append previous calibration to `history` (keep last 5)
    - Identify 2-3 lowest composite dimensions → `benchmarkWeaknesses`
-   - **High-water mark tracking:** Dimensions at 80+ recorded in `highWaterMarks`. Regression below `(HWM - 10)` → mandatory remediation task in `pendingImprovements`
+   - **High-water mark tracking:** Dimensions at 80+ recorded in `highWaterMarks`. Regression below `(HWM - 10)` → log as `benchmarkWeakness` for Scout
 
 7. **Write `$WORKSPACE_PATH/benchmark-report.md`:**
    ```markdown

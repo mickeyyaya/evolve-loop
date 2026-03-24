@@ -82,43 +82,9 @@ See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) for d
 
 **Skip if:** all queries in `stateJson.research.queries` have unexpired TTL (12hr cooldown) AND goal is purely internal — EXCEPT when mode is `"convergence-confirmation"`.
 
-**Do research if:**
-- Mode is `"convergence-confirmation"` (ALWAYS)
-- No prior queries (cycle 1)
-- Cooldown expired (>12hr)
-- Goal requires external knowledge
+**Do research if:** convergence-confirmation mode, no prior queries (cycle 1), cooldown expired (>12hr), or goal requires external knowledge.
 
-**When researching:**
-- Follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`)
-- Use HyDE for targeted queries (max 3-4)
-- Distill findings into Knowledge Capsule at `.evolve/research/<topic-slug>.md`
-- Record queries with timestamps for cooldown tracking
-
-**Research Quality Scoring (HiPRAG-inspired, arXiv:2510.07794):**
-
-After each web search query, score the result on three per-query process reward dimensions:
-
-| Dimension | Score Range | Criteria |
-|-----------|-----------|---------|
-| **Novelty** | 0.0-1.0 | Not already covered in existing `.evolve/research/` capsules or `stateJson.research.queries` |
-| **Relevance** | 0.0-1.0 | Directly applicable to the current goal or benchmark weakness |
-| **Yield** | 0.0-1.0 | Contains actionable findings that can be translated into a concrete task |
-
-Record per-query scores in `scout-report.md` under the Research section:
-```
-| Query | Novelty | Relevance | Yield | Composite |
-```
-
-**Composite score** = mean(novelty, relevance, yield). Use composites to:
-- **Skip low-yield queries**: If composite < 0.3, do not create a knowledge capsule (saves tokens)
-- **Prioritize high-yield findings**: Tasks derived from queries with composite > 0.7 receive a +1 priority boost
-- **Calibrate future research**: Record composites in `stateJson.research.queries` so the Operator can track research effectiveness over time and detect over-searching (>50% of queries with yield < 0.3)
-
-### 6. Introspection Pass
-
-Before task selection, review loop execution history for self-improvement opportunities. Read `stateJson.evalHistory` delta metrics (last 3 cycles) and `stateJson.pendingImprovements`.
-
-See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#self-improvement-heuristics) for heuristics and capability gap scanner details.
+**When researching:** Follow the protocol in `skills/evolve-loop/online-researcher.md`. Max 3-4 queries. Record queries with timestamps for cooldown tracking.
 
 ### 7. Task Selection (primary output)
 

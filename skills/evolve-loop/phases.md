@@ -44,9 +44,9 @@ For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-l
 
 | Step | Action |
 |------|--------|
-| Skip check | Skip if `projectBenchmark.lastCalibrated` < 1 hour ago |
+| Skip check | Skip if `projectBenchmark.lastCalibrated` < 24 hours ago |
 | Automated scoring | Run checks from `benchmark-eval.md` for all 8 dimensions |
-| Composite | `0.7 * automated + 0.3 * llm` per dimension |
+| Composite | `composite = automated` (automated scores only) |
 | Store | Write to `state.json.projectBenchmark`, pass `benchmarkWeaknesses` to Scout |
 | Tamper detection | Checksum `benchmark-eval.md` for verification in Phase 3-4 |
 

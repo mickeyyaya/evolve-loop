@@ -50,6 +50,23 @@ When an agent encounters a knowledge gap (e.g., "How does the new Stripe v2 API 
 - If the capsule is older than 30 days and the topic is volatile (e.g., latest frontend framework), invalidate the cache, re-research, and overwrite the file.
 - For stable topics (e.g., POSIX shell standards), capsules never expire.
 
+## Research Quality Scoring
+
+After each web search query, score the result to decide whether to create a capsule:
+
+| Dimension | Score | Criteria |
+|-----------|-------|---------|
+| **Novelty** | 0.0-1.0 | Not already covered in existing capsules or `research.queries` |
+| **Relevance** | 0.0-1.0 | Directly applicable to the current goal or benchmark weakness |
+| **Yield** | 0.0-1.0 | Contains actionable findings translatable into a concrete task |
+
+**Composite** = mean(novelty, relevance, yield). If composite < 0.3, skip capsule creation. If composite > 0.7, tasks derived from this query get +1 priority boost.
+
+Record scores in scout-report.md under the Research section:
+```
+| Query | Novelty | Relevance | Yield | Composite |
+```
+
 ## Cross-Agent Integration
 - **Scout (Phase 1):** Uses this protocol to scope complex tasks. If a task requires external knowledge, Scout performs the research and creates the capsule so the Builder doesn't have to spend its token budget on web searching.
 - **Builder (Phase 2):** Uses this protocol if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error) and caches the solution for future tasks.

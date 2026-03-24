@@ -39,18 +39,13 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase6-metacy
    - For each cited instinct, increase confidence by +0.05 (capped at 1.0)
    - Update `instinctSummary` in state.json
 
-3b. **Instinct Extraction Trigger (forced extraction on stall):**
-   ```
-   recentZero = evalHistory.slice(-2).every(c => c.instinctsExtracted === 0)
-   if (recentZero):
-     run forced extraction prompt (MemRL/MemEvolve pattern):
-       "For each of the last N cycle's tasks, identify:
-        (1) what approach was used,
-        (2) what the audit found,
-        (3) what a future agent should do differently.
-        Write at least one instinct per cycle."
-     MUST produce >= 1 instinct before continuing
-   ```
+3b. **Mandatory Instinct Extraction:**
+   Every cycle MUST produce at least 1 instinct. No exceptions.
+   For each task shipped this cycle, identify:
+   1. What approach was used
+   2. What the audit found
+   3. What a future agent should do differently
+   Write at least one instinct before continuing to step 4.
 
 4. **Instinct Extraction:**
    Read ALL workspace files from this cycle. Identify patterns:
@@ -164,71 +159,45 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
 }
 ```
 
-### Strategy Playbook Update (ACE-Inspired)
-
-Based on Agentic Context Engineering (ACE, arXiv:2510.04618), the evolve-loop maintains a structured strategy playbook that grows incrementally across cycles. Unlike atomic instincts, the playbook organizes knowledge by domain section and uses a generation-reflection-curation (GRC) pipeline to prevent context collapse and brevity bias.
+### Strategy Playbook Update
 
 **Playbook file:** `$WORKSPACE_PATH/strategy-playbook.md` (persists across cycles like builder-notes.md)
 
-**Playbook sections** (each section grows independently — never rewritten wholesale):
-
 | Section | Contents | Updated When |
 |---------|----------|-------------|
-| Task Selection | Patterns for choosing high-impact tasks, complexity estimation heuristics | Scout discovers a selection pattern that worked/failed |
-| File Handling | Fragile files, safe edit patterns, known coupling | Builder encounters file-specific issues |
-| Eval Patterns | Effective vs tautological eval strategies, grader templates | Eval quality check flags issues or discovers effective patterns |
-| Failure Modes | Recurring failure categories, root causes, proven alternatives | Any task fails audit or benchmark delta check |
+| What Worked | Successful approaches, effective patterns, high-yield task types | Task passes audit first attempt |
+| What Failed | Failed approaches, root causes, proven alternatives | Task fails audit or benchmark regression |
 
-**Incremental update protocol (anti-collapse safeguards):**
-
-1. **Read the existing playbook section** (never start from scratch)
-2. **Append new observations** as bullet points under the relevant section
-3. **Preserve all specific references** (file paths, error messages, cycle numbers) — generalization loses actionable detail
-4. **Never merge entries from different sections** — cross-section consolidation causes context collapse
-5. **Cap consolidation ratio at 3:1** — merge at most 3 related bullets into 1 summary bullet, preserving the most specific example
-6. **Never perform wholesale rewrites** — only append, refine individual bullets, or consolidate within a section
-
-**Reflect-before-curate gate:**
-
-Before extracting instincts (step 4), run an explicit reflection step:
-
-1. **Reflect:** "What happened this cycle? What worked? What surprised me? What would I do differently?" — write 2-3 sentences of unstructured reflection
-2. **Curate:** Based on the reflection, decide what to add to the playbook vs what to extract as an instinct vs what to discard
-3. **Gate criterion:** Only add to the playbook observations that have appeared in 2+ cycles OR that caused a build failure. Single-cycle observations go to instincts (lower commitment) rather than the playbook (higher commitment)
-
-This GRC pipeline ensures the playbook accumulates high-quality, validated knowledge while instincts handle exploratory, lower-confidence observations.
+**Update rules:** Append only. Preserve specific references (file paths, error messages, cycle numbers). Never rewrite wholesale. Cap at 50 entries per section — consolidate oldest 3 into 1 summary when exceeded.
 
 ---
 
-### Counterfactual & Operator
+### Post-Cycle Health (inline orchestrator — no Operator agent needed)
 
-5. **Counterfactual Accuracy Review** (optional):
-   For tasks with a `counterfactual` entry in `evaluatedTasks`, compare prediction to actual: complexity match, reward alignment, approach viability. Log instinct if clear pattern emerges.
+5. **Fitness computation** (inline):
+   ```
+   fitnessScore = round(0.25*discover + 0.30*build + 0.20*audit + 0.15*ship + 0.10*learn, 2)
+   ```
+   - Read process reward scores from this cycle
+   - If decreased 2 consecutive cycles → `fitnessRegression: true` → HALT
+   - Store in `fitnessHistory` (last 3)
 
-6. **Operator Check:**
-   Launch **Operator Agent** (model: tier-2 if isLastCycle, fitnessRegression, or cycle % 5 == 0; tier-3 if convergence-check or routine):
-   - Context:
-     ```json
-     {
-       "workspacePath": "<$WORKSPACE_PATH>",
-       "runId": "<$RUN_ID>",
-       "stateJson": "<state.json — includes ledgerSummary and instinctSummary>",
-       "cycle": "<N>",
-       "mode": "post-cycle|convergence-check",
-       "recentLedger": "<last 5 ledger entries>",
-       "recentNotes": "<last 5 cycle entries from notes.md>",
-       "isLastCycle": "<true if remainingCycles == 0>"
-     }
-     ```
-   - Operator reads `ledgerSummary` and `instinctSummary` from state.json instead of full files
-   - In `"convergence-check"` mode: check `git log --oneline -3` for external changes. If new work → reset `nothingToDoCount` to 0
-   - Writes `next-cycle-brief.json` to both `$WORKSPACE_PATH/` (run-local) and `.evolve/latest-brief.json` (shared)
-   - If status `HALT` → pause and present issues to user
-   - Cost check: if cycle >= `warnAfterCycles` → include warning in context
-   - Update `lastCycleNumber` in state.json
+6. **Next-cycle brief** (inline, deterministic):
+   ```json
+   {
+     "weakestDimension": "<argmin of projectBenchmark.dimensions>",
+     "recommendedStrategy": "<lookup: if weakest is defensiveDesign→harden, featureCoverage→innovate, else balanced>",
+     "taskTypeBoosts": ["<dimension-to-taskType mapping>"],
+     "avoidAreas": ["<files from failedApproaches>"],
+     "cycle": "<N>"
+   }
+   ```
+   Write to `$WORKSPACE_PATH/next-cycle-brief.json` and `.evolve/latest-brief.json`.
 
-6b. **Session Summary** (`isLastCycle` only):
-   Operator writes `$WORKSPACE_PATH/session-learned.md` with: Key Patterns Discovered, Surprising Failures, What to Watch Next Session, Instincts Worth Reviewing (table), Session Snapshot. Archive to `.evolve/history/cycle-{N}/`.
+7. **Convergence check:** If `nothingToDoCount >= 1`, check `git log --oneline -3` for external changes. New work → reset to 0.
+
+8. **Session summary** (`isLastCycle` only):
+   Generate inline (tier-3): Key Patterns, Surprising Failures, What to Watch, Instincts Worth Reviewing. Write to `$WORKSPACE_PATH/session-summary.md`. Archive to `.evolve/history/cycle-{N}/`.
 
 6. **Update notes.md** (append under ship lock):
    ```markdown

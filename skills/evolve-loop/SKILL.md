@@ -71,7 +71,8 @@ For each cycle:
 | Scout | `agents/evolve-scout.md` | tier-2 | `scout-report.md` |
 | Builder | `agents/evolve-builder.md` | tier-2 | `build-report.md` |
 | Auditor | `agents/evolve-auditor.md` | tier-2 | `audit-report.md` |
-| Operator | `agents/evolve-operator.md` | tier-3 | `operator-log.md` |
+
+Post-cycle health (fitness, brief generation, convergence check) is handled inline by the orchestrator in Phase 5 — no Operator agent needed.
 
 ## Model Routing
 
@@ -80,7 +81,6 @@ For each cycle:
 | Scout | tier-2 | Cycle 1 / goal → tier-1 | Cycle 4+ → tier-3 |
 | Builder | tier-2 | M+5 files / retry ≥ 2 → tier-1 | S + cache → tier-3 |
 | Auditor | tier-2 | Security → tier-1 | Clean → tier-3 |
-| Operator | tier-3 | Last cycle / regression → tier-2 | — |
 
 Full rules: [reference/model-routing.md](../../docs/model-routing.md)
 
