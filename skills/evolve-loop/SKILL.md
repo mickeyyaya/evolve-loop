@@ -21,10 +21,25 @@ Parse `$ARGUMENTS`:
 | Strategy | Focus | Approach | Strictness |
 |----------|-------|----------|------------|
 | `balanced` | Broad discovery | Standard | MEDIUM+ blocks |
-| `innovate` | New features, gaps | Additive | Relaxed style |
+| `innovate` | New features, gaps | Additive — implement into existing files | Relaxed style |
 | `harden` | Stability, tests | Defensive | Strict all |
 | `repair` | Bugs, broken tests | Fix-only, smallest diff | Strict regressions |
 | `ultrathink` | Complex refactors | tier-1 forced | Strict + confidence |
+
+**Innovate strategy note:** "Additive" means adding functionality TO existing project files, not creating standalone documentation. Research findings must be translated into code/config changes. Max 1 doc-only task per cycle.
+
+## What Makes Evolve-Loop Different
+
+Unlike plan-mode or one-shot implementation skills:
+
+| Capability | Evolve-Loop | Plan Mode / One-Shot |
+|-----------|-------------|---------------------|
+| Cross-cycle memory | Instincts persist, bandit learns, benchmark tracks | Starts fresh every time |
+| Self-verification | Independent eval scripts, integrity gates, adaptive auditor | Trusts itself |
+| Continuous depth | Meta-cycles improve prompts, mastery graduates complexity | Single pass |
+| Research→Implementation | Findings become code changes, not just docs | Research is separate |
+| Failure learning | Failed approaches DB prevents repeating mistakes | No memory of failures |
+| Quality regression prevention | 8D benchmark blocks regressions before shipping | No tracking |
 
 ## Architecture
 

@@ -166,6 +166,20 @@ Advance: 3+ consecutive 100% success cycles. Regress: <50% success for 2 cycles.
 
 **Task sizing:** Each task must fit `tokenBudget.perTask` (default 80K). Total must fit `tokenBudget.perCycle` (default 200K). Prefer 3 small tasks over 1 large. Token estimates: S ~20-40K, M ~40-80K, 10+ files or >100 lines = split.
 
+### Implementation-First Task Rule
+
+When research is performed (web search, paper analysis), tasks MUST target existing project files for modification — not creation of standalone reference docs.
+
+| Research Finding | Wrong Task | Right Task |
+|-----------------|------------|------------|
+| "Technique X improves Y" | Create `docs/technique-x.md` | Modify `src/module.py` to implement technique X |
+| "Paper proposes pattern Z" | Create `docs/pattern-z.md` | Add pattern Z to `config/settings.ts` and `lib/utils.ts` |
+| "Leader says do W" | Create `docs/leader-w.md` | Refactor `api/handler.go` to follow W approach |
+
+**Exception:** If `projectContext.domain == "writing"` or `"research"`, doc creation IS the implementation.
+
+**Exception:** If no existing files are suitable targets, create a NEW functional file (script, config, test) — not a reference doc. Docs are a last resort, max 1 per cycle.
+
 ### Token Budget Awareness
 
 Before finalizing, verify total estimated cost stays within `tokenBudget.perCycle` (default 200K). If exceeded, drop lowest-priority task. Record `estimatedTokens` per task in Decision Trace. See `docs/performance-profiling.md` for cost baselines.
@@ -173,6 +187,17 @@ Before finalizing, verify total estimated cost stays within `tokenBudget.perCycl
 ### 8. Eval Integrity (Inoculation)
 
 Write eval commands that test **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) are specification gaming. The `scripts/eval-quality-check.sh` classifies evals — Level 0-1 trigger warnings or halt the cycle.
+
+**Eval Depth Requirements:**
+
+| Task Type | Minimum Eval Depth |
+|-----------|-------------------|
+| Code change | Run tests, check output, verify behavior changed |
+| Config change | Validate config loads, check affected behavior |
+| Script change | Execute script, verify exit code and output |
+| Doc creation (exception only) | Check content structure + cross-references resolve |
+
+Evals that ONLY check file existence (`test -f`) or keyword presence (`grep -q`) are Level 1 (tautological). Every task MUST have at least one Level 2+ eval that tests actual behavior or output.
 
 ### 9. Write Eval Definitions
 
@@ -219,6 +244,11 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 
 ## Research (if performed)
 - <query>: <key finding> (source: <url>)
+
+## Research → Implementation Map
+| Finding | Source | Target File(s) | Change Description |
+|---------|--------|----------------|-------------------|
+| <technique/pattern> | <paper/url> | <existing file path> | <what to modify and why> |
 
 ## Selected Tasks
 

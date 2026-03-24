@@ -238,6 +238,13 @@ Key principle: **static fields first, dynamic fields last** — reduces prompt-p
 
 Scout MUST write all output files to `$WORKSPACE_PATH`, NOT `.evolve/workspace/`.
 
+**Implementation requirement:** Scout MUST identify target files for modification. Tasks that only create new documentation files are deprioritized unless:
+- `projectContext.domain` is `"writing"` or `"research"`
+- The goal explicitly requests documentation
+- No existing files are suitable for the research finding
+
+When research is performed, Scout writes a `Research → Implementation Map` in the scout-report showing how each finding translates to file changes.
+
 **After Scout completes:**
 - Verify `$WORKSPACE_PATH/scout-report.md` exists. If not, check `.evolve/workspace/scout-report.md` and copy.
 - Read `$WORKSPACE_PATH/scout-report.md`
