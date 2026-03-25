@@ -254,11 +254,14 @@ If `cycle % 5 === 0`, run full meta-cycle evaluation. See [phase6-metacycle.md](
 9. **Context Checkpoint (compaction anchor):**
    Write `$WORKSPACE_PATH/handoff.md` (also `.evolve/workspace/handoff.md`): Session State, This Cycle, Carry Forward, Cumulative Stats.
 
-   **Do NOT stop. Do NOT output a resume command. Do NOT wait for user input.** Continue immediately to next cycle.
+   Increment session cycle counter: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
+
+   **Do NOT stop. Do NOT output a resume command. Do NOT wait for user input.** Continue immediately to next cycle — unless context-budget.sh returns RED at the start of the next cycle.
 
    Under context pressure, reduce tokens by: using summaries from state.json, keeping workspace files concise, trimming agent context, activating lean mode early.
 
 10. **Exit conditions:**
     - Cycle limit reached → STOP
     - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
+    - Context budget RED → STOP (session break, output resume command)
     - Otherwise → next cycle

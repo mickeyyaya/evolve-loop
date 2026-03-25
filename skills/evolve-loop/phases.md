@@ -40,6 +40,31 @@ The LLM retains all creative work — task selection, implementation, code revie
 
 Runs **once per `/evolve-loop` invocation**, not per cycle. Establishes a project-level benchmark baseline.
 
+### Session Resume Check (before calibration)
+
+On every invocation, check for a prior session-break handoff:
+
+```bash
+HANDOFF_FILE=".evolve/workspace/handoff.md"
+if [ -f "$HANDOFF_FILE" ] && grep -q "Session Break Handoff" "$HANDOFF_FILE"; then
+  echo "Resuming from session break. Reading handoff..."
+  # Parse: remaining cycles, strategy, goal, carry-forward context
+  # The handoff contains orchestrator reasoning that only existed in session memory
+  # Read the "Carry Forward" section — this is context not derivable from state.json
+fi
+```
+
+Read the handoff to recover:
+- **Remaining cycles** (only source — not in state.json)
+- **Goal** (if user-provided, only in handoff)
+- **Carry Forward notes** (orchestrator observations from prior session)
+- **Task queue snapshot** (selected-but-incomplete tasks)
+- **Recent verdicts** (quick context without reading full ledger)
+
+After reading, the handoff has been consumed. The new session writes its own handoff at each cycle checkpoint.
+
+### Calibration
+
 For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-loop/phase0-calibrate.md).
 
 | Step | Action |
@@ -54,9 +79,33 @@ For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-l
 
 ## FOR each cycle (while remainingCycles > 0):
 
+### Context Window Budget Gate (MANDATORY — runs before anything else)
+
+Run `scripts/context-budget.sh` before any agent invocation. This is a hard gate — like `phase-gate.sh`, it cannot be skipped.
+
+```bash
+CYCLES_THIS_SESSION=${CYCLES_THIS_SESSION:-0}
+BUDGET_JSON=$(bash scripts/context-budget.sh "$CYCLE_NUMBER" "$CYCLES_THIS_SESSION" "$WORKSPACE_PATH" 2>/dev/null)
+BUDGET_EXIT=$?
+BUDGET_STATUS=$(echo "$BUDGET_JSON" | grep -o '"status": *"[^"]*"' | cut -d'"' -f4)
+REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *[0-9]*' | grep -o '[0-9]*$')
+```
+
+| Exit Code | Status | Action |
+|-----------|--------|--------|
+| 0 | **GREEN** | Continue to Eager Context Budget Estimation |
+| 1 | **YELLOW** | Force lean mode ON for this cycle. Log warning. Continue. |
+| 2 | **RED** | **STOP.** Execute Session Break Protocol (see [policies.md](reference/policies.md#session-break-protocol)). Do not launch any agents. |
+
+**On RED:** Write enriched `handoff.md` with remaining cycles, task queue, benchmark state, failed approaches, and resume command. Then STOP. The user resumes with `/evolve-loop <remaining>`.
+
+**On YELLOW:** Set `budgetPressure = "high"` and `leanMode = true` for the remainder of this session.
+
+Increment after each cycle completes: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
+
 ### Eager Context Budget Estimation
 
-At cycle start, **before launching any agent**, estimate total context cost. This enables proactive lean mode entry and Self-MoA decisions. (Research: OPENDEV [arXiv:2603.05344], Token Consumption Prediction [OpenReview:1bUeVB3fov].)
+At cycle start, **after passing the context window gate**, estimate total context cost for this specific cycle. This enables proactive lean mode entry and Self-MoA decisions. (Research: OPENDEV [arXiv:2603.05344], Token Consumption Prediction [OpenReview:1bUeVB3fov].)
 
 | Task Type | Estimated Tokens |
 |-----------|-----------------|
@@ -68,9 +117,9 @@ At cycle start, **before launching any agent**, estimate total context cost. Thi
 
 If `estimatedCycleTokens > tokenBudget.perCycle * 0.8`: drop lowest-priority tasks, switch M-tasks to single-Builder, or activate lean mode immediately.
 
-### Lean Mode (cycles 4+ OR budget pressure)
+### Lean Mode (cycles 4+ OR budget pressure OR YELLOW)
 
-Activated after 3 cycles OR when `budgetPressure == "high"` OR when estimated tokens exceed 80% of budget:
+Activated after 3 cycles OR when `budgetPressure == "high"` OR YELLOW from context-budget.sh OR when estimated tokens exceed 80% of budget:
 
 | Optimization | Detail |
 |-------------|--------|
