@@ -53,6 +53,19 @@ Phase 5: LEARN ───── instinct extraction + operator    → phase5-lear
 Phase 6: META ────── self-improvement (every 5 cycles) → phase6-metacycle.md
 ```
 
+## Compound Discovery Loop — Proposal Pipeline
+
+Beyond reactive gap-filling, evolve-loop runs a compound discovery loop that generates forward-looking improvements:
+
+| Stage | Agent | Output | Feed-forward |
+|-------|-------|--------|-------------|
+| Hypothesize | Scout | `## Hypotheses` in scout-report | High-confidence hypotheses auto-promote to task candidates |
+| Discover | Builder | `## Discoveries` in build-report | Adjacent bugs, smells, and opportunities found during implementation |
+| Propose | Learn | `state.json.proposals` | Discoveries and hypotheses converted to next-cycle task candidates |
+| Select | Scout (next cycle) | Task Selection | Proposals get +1 priority boost as pre-validated candidates |
+
+This creates a self-reinforcing cycle: building reveals opportunities, learning converts them to proposals, and scouting prioritizes them — compounding improvement across cycles rather than treating each cycle independently.
+
 ## Orchestrator Loop
 
 For each cycle:

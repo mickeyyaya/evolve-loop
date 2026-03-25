@@ -231,6 +231,7 @@ Key principle: **static fields first, dynamic fields last** — reduces prompt-p
     "builderNotes": "<contents of builder-notes.md, or empty>",
     "recentLedger": "<last 3 ledger entries>",
     "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint}, or empty>",
+    "priorHypotheses": "<array of hypotheses from previous cycle's scout-report, for validation tracking>",
     "challengeToken": "<$CHALLENGE>",
     "handoffFromOperator": "<contents of handoff-operator.json, or null>"
   }

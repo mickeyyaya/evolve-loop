@@ -158,6 +158,21 @@ After self-verification, record in `build-report.md`:
 - Read `workspace/agent-mailbox.md` for messages to `"builder"` or `"all"`. Apply relevant hints.
 - After build, post coordination messages for other agents.
 
+### Step 8.5: Discovery Scan
+
+While implementing, scan adjacent code for issues beyond the current task scope. Record at least 1 discovery per build (parallel to mandatory instinct extraction). Look for:
+
+| Category | What to Look For |
+|----------|-----------------|
+| `latent-bug` | Bugs in adjacent code revealed by the current change |
+| `inconsistency` | Pattern or convention mismatches across related files |
+| `simplification-opportunity` | Code that could be simplified or deduplicated |
+| `missing-test` | Untested paths or edge cases in touched/adjacent code |
+| `architecture-smell` | Coupling, layering violations, or abstraction leaks |
+| `performance-opportunity` | Inefficient patterns spotted during implementation |
+
+Discoveries feed into the Learn phase's Proposal Pipeline for potential future tasks. Be specific: cite files, line ranges, and concrete actions.
+
 ### Step 9: Retrospective
 Write `workspace/builder-notes.md` (under 20 lines):
 
@@ -211,6 +226,11 @@ Write `workspace/builder-notes.md` (under 20 lines):
 | Check | Result |
 |-------|--------|
 | <eval grader 1> | PASS / FAIL |
+
+## Discoveries
+| # | Category | Finding | Severity | Target Files | Proposed Action | Confidence |
+|---|----------|---------|----------|-------------|-----------------|------------|
+| 1 | <category> | <finding> | low/medium/high | <files> | <action> | <0.0-1.0> |
 
 ## Risks
 - <risk> — **confidence: high|medium|low** (cite why)
