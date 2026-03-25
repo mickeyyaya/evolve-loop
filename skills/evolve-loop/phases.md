@@ -103,6 +103,107 @@ REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *
 
 Increment after each cycle completes: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
 
+### Phase 0.5: RESEARCH (every cycle)
+
+Proactive research loop. Runs inline by the orchestrator (no separate agent). Transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.
+
+**Token budget:** Max `tokenBudget.researchPhase` (25K). Terminate iteration if exceeded.
+
+**Skip conditions:**
+- Lean mode active AND no benchmark weaknesses AND `researchAgenda.items` empty → skip, pass existing capsules
+- Budget YELLOW → 1 iteration max, 1 query only
+
+#### Step 1: ORIENT — Read evaluation signals
+
+Read from `state.json` (already loaded at cycle start):
+- `benchmarkWeaknesses` → dimensions below 80
+- `proposals[]` → pending proposals needing research backing
+- `evalHistory` (last 5) → success rate trends
+- `discoveryVelocity` → proposals/cycle trend
+- `failedApproaches` → what to avoid
+- `researchAgenda` → persistent research questions
+- `researchLedger` → what worked/didn't from prior cycles
+
+#### Step 2: GAP ANALYSIS — Identify blind spots
+
+1. For each benchmark dimension below 80: check `researchAgenda.capsuleIndex` for coverage
+2. For each proposal without research backing: flag as gap
+3. Identify dimensions with `diversityTracker.dimensionCoverage == 0` → auto-P0
+4. Check diversity: if same dimension in `lastResearchedDimensions[-3:]`, block it
+5. Output: ranked gap list → generate research agenda items if new
+
+#### Step 3: RESEARCH — Execute 2-3 web queries
+
+Follow `online-researcher.md` protocol:
+- Generate queries from gap analysis using Signal-to-Question Mapping (see `online-researcher.md`)
+- Execute via WebSearch/WebFetch tools
+- Write/update Knowledge Capsules to `.evolve/research/`
+- Update `researchAgenda.capsuleIndex` with new capsule categorizations
+- Score each query with Novelty/Relevance/Yield composite
+
+#### Step 4: CONCEPTUALIZE — Generate Concept Cards
+
+For each research finding with composite >= 0.5:
+- Create a Concept Card (schema in `online-researcher.md`)
+- Score: feasibility, impact, novelty → composite
+- Link to research agenda item and capsule
+
+#### Step 5: EVALUATE — Strict works/doesn't-work filter
+
+Check each concept against `researchLedger.triedConcepts[]`:
+
+| Ledger match | Action |
+|-------------|--------|
+| Similar concept with `DOESNT_WORK` | **Immediate DROP** — blocked by ledger |
+| Similar concept with `WORKS` | **Boost** composite +0.1 |
+| Similar concept with `INCONCLUSIVE` | Flag, no boost |
+| No match | Score normally |
+
+Apply diversity check: reject concepts clustering in same dimension as last 3 cycles.
+
+**Binary verdict:** composite >= 0.6 AND not blocked → **KEEP**. Everything else → **DROP**.
+
+#### Step 6: DECIDE — Re-research or exit
+
+- If ALL concepts DROPPED AND iteration < 2 → refine queries targeting different dimensions, go to Step 3
+- Otherwise → exit with KEPT concepts
+
+#### Output
+
+Write `$WORKSPACE_PATH/research-brief.md`:
+
+```markdown
+# Cycle {N} Research Brief
+
+## Gap Analysis
+| Gap | Dimension | Capsule Coverage | Priority |
+|-----|-----------|-----------------|----------|
+
+## Research Executed
+| Query | Composite Score | Capsule Written |
+|-------|----------------|-----------------|
+
+## Concept Cards
+| ID | Title | Feasibility | Impact | Novelty | Composite | Verdict |
+|----|-------|------------|--------|---------|-----------|---------|
+
+## Research Ledger Checks
+| Concept | Similar in Ledger? | Ledger Verdict | Action |
+|---------|-------------------|----------------|--------|
+
+## Diversity Status
+| Dimension | Coverage Count | Last Researched |
+|-----------|---------------|-----------------|
+```
+
+Pass `conceptCandidates[]` (KEPT concepts only) to Scout context.
+
+Update `state.json`: `researchAgenda` items, `capsuleIndex`, `diversityTracker.lastResearchedDimensions`.
+
+**Phase gate:** `bash scripts/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
+
+---
+
 ### Eager Context Budget Estimation
 
 At cycle start, **after passing the context window gate**, estimate total context cost for this specific cycle. This enables proactive lean mode entry and Self-MoA decisions. (Research: OPENDEV [arXiv:2603.05344], Token Consumption Prediction [OpenReview:1bUeVB3fov].)
@@ -281,6 +382,8 @@ Key principle: **static fields first, dynamic fields last** — reduces prompt-p
     "recentLedger": "<last 3 ledger entries>",
     "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint}, or empty>",
     "priorHypotheses": "<array of hypotheses from previous cycle's scout-report, for validation tracking>",
+    "researchBrief": "<contents of research-brief.md from Phase 0.5>",
+    "conceptCandidates": "<array of KEPT concept cards from Phase 0.5, each with +2 priority boost>",
     "challengeToken": "<$CHALLENGE>",
     "handoffFromOperator": "<contents of handoff-operator.json, or null>"
   }

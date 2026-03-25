@@ -36,6 +36,8 @@ Unlike plan-mode or one-shot implementation skills:
 |-----------|-------------|---------------------|
 | **Compound discovery** | Each cycle generates hypotheses, discoveries, and proposals that feed the next cycle | One-shot: plan → execute → done |
 | **Proactive insights** | Builder surfaces unsolicited findings ("Things Found Beyond Your Goal") | Only does what was asked |
+| **Proactive research** | Every cycle starts with evaluation-driven research: gap analysis → web queries → concept cards → strict keep/drop verdicts via Research Ledger | Research only when asked or when knowledge gap encountered |
+| **Research Ledger** | Strict WORKS/DOESN'T WORK verdicts on every research-driven change. Blocks known failures, boosts validated patterns, enforces diversity | No evaluation feedback on research quality |
 | **Knowledge-complete convergence** | Stops when nothing new to learn (discovery velocity = 0), not just when tasks are done | Stops when tasks are done |
 | **Cross-cycle memory** | Instincts persist, bandit learns, benchmark tracks, proposals compound | Starts fresh every time |
 | **Self-verification** | Independent eval scripts, integrity gates, adaptive auditor | Trusts itself |
@@ -54,6 +56,9 @@ Scout (Hypothesize) → Builder (Discover) → Learn (Propose) → Scout (Select
 
 | Mechanism | Agent/Phase | How It Works |
 |-----------|------------|-------------|
+| **Research Loop** | Phase 0.5 | Orient → gap analysis → web research → concept cards → strict evaluate → keep/drop |
+| **Research Ledger** | Phase 5 writes, Phase 0.5 reads | WORKS/DOESN'T WORK verdicts; blocks known failures; boosts validated patterns; enforces diversity |
+| **Concept Cards** | Phase 0.5 → Scout | Research-backed implementation ideas scored on feasibility/impact/novelty; +2 priority boost |
 | **Hypotheses** | Scout | Speculative improvements beyond gap-filling; confidence >= 0.7 auto-promote to task candidates |
 | **Discoveries** | Builder | Latent bugs, smells, opportunities found during implementation; structured with category + severity |
 | **Proposals** | Learn (Phase 5) | Discoveries + hypotheses converted to next-cycle candidates in `state.json.proposals` |
@@ -64,13 +69,14 @@ Scout (Hypothesize) → Builder (Discover) → Learn (Propose) → Scout (Select
 ## Architecture
 
 ```
-Phase 0: CALIBRATE ─ benchmark (once per invocation)  → phase0-calibrate.md
-Phase 1: DISCOVER ── [Scout] scan + task selection     → phases.md
-Phase 2: BUILD ───── [Builder] implement (worktree)    → phase2-build.md
-Phase 3: AUDIT ───── [Auditor] review + eval gate      → phases.md
-Phase 4: SHIP ────── commit + push                     → phase4-ship.md
-Phase 5: LEARN ───── instinct extraction + operator    → phase5-learn.md
-Phase 6: META ────── self-improvement (every 5 cycles) → phase6-metacycle.md
+Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phase0-calibrate.md
+Phase 0.5: RESEARCH ── proactive research loop          → online-researcher.md
+Phase 1:   DISCOVER ── [Scout] scan + task selection    → phases.md
+Phase 2:   BUILD ───── [Builder] implement (worktree)   → phase2-build.md
+Phase 3:   AUDIT ───── [Auditor] review + eval gate     → phases.md
+Phase 4:   SHIP ────── commit + push                    → phase4-ship.md
+Phase 5:   LEARN ───── instinct extraction + feedback   → phase5-learn.md
+Phase 6:   META ────── self-improvement (every 5 cycles) → phase6-metacycle.md
 ```
 
 ## Orchestrator Loop

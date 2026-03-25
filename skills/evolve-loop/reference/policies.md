@@ -24,6 +24,7 @@ Builder reads prior successful build-reports from `.evolve/history/` when facing
 | Per-task | 80K tokens | Scout breaks tasks exceeding this |
 | Per-cycle | 200K tokens | Orchestrator halts if exceeded |
 | Per-session | 300K tokens (30%) | Session break triggered |
+| Research phase | 25K tokens | Phase 0.5 terminates iteration if exceeded |
 | M-task + 10+ files | Likely exceeds budget | Split required |
 
 ## Context Window Strategy

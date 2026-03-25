@@ -28,6 +28,8 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 - `recentLedger`: last 3 ledger entries (inline)
 - `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
 - `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` from Phase 0 calibration (may be empty)
+- `researchBrief`: contents of `research-brief.md` from Phase 0.5 (gap analysis, queries, concept cards)
+- `conceptCandidates`: array of KEPT concept cards from Phase 0.5 with +2 priority boost
 - `goal`: user-specified goal (string or null)
 
 ## Goal Handling
@@ -78,13 +80,14 @@ Read `workspace/agent-mailbox.md` for messages to `"scout"` or `"all"`. Apply hi
 
 See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) for dimension evaluation guidelines.
 
-### 5. Web Research (conditional)
+### 5. Read Research Brief (from Phase 0.5)
 
-**Skip if:** all queries in `stateJson.research.queries` have unexpired TTL (12hr cooldown) AND goal is purely internal — EXCEPT when mode is `"convergence-confirmation"`.
+Research is performed in Phase 0.5 (RESEARCH) before Scout launches. Scout does NOT perform web research.
 
-**Do research if:** convergence-confirmation mode, no prior queries (cycle 1), cooldown expired (>12hr), or goal requires external knowledge.
-
-**When researching:** Follow the protocol in `skills/evolve-loop/online-researcher.md`. Max 3-4 queries. Record queries with timestamps for cooldown tracking.
+- Read `researchBrief` from context (contents of `$WORKSPACE_PATH/research-brief.md`)
+- Read `conceptCandidates` from context (KEPT concept cards from Phase 0.5)
+- Use gap analysis and concept cards to inform task selection priorities
+- Concept candidates have been pre-filtered through the Research Ledger (known failures already blocked)
 
 ### 6. Hypothesis Generation
 
@@ -109,6 +112,12 @@ Generate 1-3 hypotheses per cycle — speculative improvements beyond gap-fillin
 Synthesize findings into 2-4 small/medium tasks.
 
 **Prerequisites:** Optionally specify `prerequisites: ["slug-a"]` — tasks deferred if prerequisite not completed. Lightweight suggestion, not hard constraint.
+
+**Concept Candidates from Phase 0.5 Research:**
+- Read `conceptCandidates` from context — these are research-backed, ledger-verified implementation ideas
+- Apply **+2 priority boost** (same as benchmark weaknesses — research-backed concepts are high confidence)
+- Each concept includes `targetFiles`, `complexity`, `researchBacking` (capsule refs), and `agendaItemId`
+- When selecting a concept as a task, include `agendaItemId` in the task metadata for Learn phase tracking
 
 **Proposal Pipeline integration:**
 - Read `state.json.proposals` for active proposals from the Learn phase
@@ -313,5 +322,5 @@ Write `workspace/project-digest.md`:
 See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#hotspot-detection-method) for hotspot detection.
 
 ### State Updates
-- Add new research queries with timestamps and 12hr TTL
 - Add newly evaluated/deferred tasks
+- Research queries are managed by Phase 0.5 — Scout does not update research state

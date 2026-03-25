@@ -69,6 +69,10 @@ When multiple `/evolve-loop` invocations run in parallel, all shared state write
 | `research.queries` | Union by query string |
 | `stagnation` | MAX of `nothingToDoCount` |
 | `projectBenchmark` | First calibrator wins; skip if `lastCalibrated` < 1 hour ago |
+| `researchAgenda.items` | Union by id (don't overwrite existing) |
+| `researchAgenda.capsuleIndex` | Union by dimension key, dedupe slugs |
+| `researchLedger.triedConcepts` | Union by id |
+| `researchLedger.diversityTracker` | MAX per dimension count; concat lastResearchedDimensions |
 | `version` | Always latest read value + 1 |
 
 ### Run Isolation
@@ -125,6 +129,7 @@ Scout also appends a `decisionTrace` block listing evaluated candidates with `fi
 
 | File | Written by | Contains |
 |------|-----------|----------|
+| `research-brief.md` | Orchestrator (Phase 0.5) | Gap analysis + research findings + concept cards + keep/drop verdicts |
 | `eval-report.md` | Orchestrator (eval-runner) | Eval gate results if run separately |
 | `next-cycle-brief.json` | Operator | Guidance for next Scout: `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, `cycle`. Written to `$WORKSPACE_PATH/` and `.evolve/latest-brief.json`. |
 
@@ -164,7 +169,7 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   "operatorWarnings": [],
   "stagnation": {"nothingToDoCount": 0, "recentPatterns": []},
   "warnAfterCycles": 5,
-  "tokenBudget": {"perTask": 80000, "perCycle": 200000},
+  "tokenBudget": {"perTask": 80000, "perCycle": 200000, "researchPhase": 25000},
   "mastery": {"level": "novice|competent|proficient", "consecutiveSuccesses": 0},
   "ledgerSummary": {"totalEntries": 0, "cycleRange": [0, 0], "scoutRuns": 0, "builderRuns": 0, "totalTasksShipped": 0, "totalTasksFailed": 0, "avgTasksPerCycle": 0},
   "instinctSummary": [],
@@ -191,6 +196,66 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
     "rolling3": 0.0
   },
   "proposals": [],
+  "researchAgenda": {
+    "lastUpdated": null,
+    "items": [
+      {
+        "id": "ra-001",
+        "question": "string — the research question",
+        "priority": "P0|P1|P2",
+        "source": "benchmark-gap|proposal-backing|failure-pattern|velocity-decline",
+        "sourceDetail": "string — what triggered this question",
+        "originCycle": 0,
+        "status": "open|in-progress|resolved|stale",
+        "queries": [],
+        "capsuleRefs": [],
+        "conceptCards": [],
+        "resolvedCycle": null
+      }
+    ],
+    "capsuleIndex": {
+      "documentationCompleteness": [],
+      "specificationConsistency": [],
+      "defensiveDesign": [],
+      "evalInfrastructure": [],
+      "modularity": [],
+      "schemaHygiene": [],
+      "conventionAdherence": [],
+      "featureCoverage": []
+    }
+  },
+  "researchLedger": {
+    "triedConcepts": [
+      {
+        "id": "tc-001",
+        "conceptTitle": "string",
+        "researchSource": "ra-NNN",
+        "capsuleRef": "string — capsule slug",
+        "originCycle": 0,
+        "implementedCycle": 0,
+        "taskSlug": "string",
+        "verdict": "WORKS|DOESNT_WORK|INCONCLUSIVE",
+        "evidence": "string — e.g. 'dimension: 73 → 82 (+9)'",
+        "benchmarkBefore": {},
+        "benchmarkAfter": {},
+        "keepOrDrop": "KEEP|DROP",
+        "droppedReason": null
+      }
+    ],
+    "diversityTracker": {
+      "dimensionCoverage": {
+        "documentationCompleteness": 0,
+        "specificationConsistency": 0,
+        "defensiveDesign": 0,
+        "evalInfrastructure": 0,
+        "modularity": 0,
+        "schemaHygiene": 0,
+        "conventionAdherence": 0,
+        "featureCoverage": 0
+      },
+      "lastResearchedDimensions": []
+    }
+  },
   "promptVariants": []
 }
 ```
@@ -218,6 +283,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 | `discoveryVelocity` | Rolling 3-cycle average of proposals generated. `current`: this cycle's count, `history`: per-cycle entries, `rolling3`: 3-cycle average. Used for knowledge-complete convergence detection. |
 | `proposals` | Array of discovery proposals from Builder findings. Each: `{title, source, confidence, category, cycle, unsolicited}`. Consumed by Scout for future task generation. |
 | `promptVariants` | Prompt evolution experiments from meta-cycle. Each: `{agent, cycle, edit, baselineScore}`. Compared at next meta-cycle for auto-revert. |
+| `researchAgenda` | Persistent research questions derived from evaluation signals. `items[]`: individual questions with priority, status, linked capsules and concepts. `capsuleIndex`: maps benchmark dimensions to Knowledge Capsule slugs for gap analysis. |
+| `researchLedger` | Strict evaluation record of research-driven changes. `triedConcepts[]`: each concept with WORKS/DOESNT_WORK/INCONCLUSIVE verdict, benchmark before/after, KEEP/DROP decision. `diversityTracker`: prevents over-researching same dimension (max 3 consecutive, coverage counts). |
 
 ### `.evolve/notes.md` (shared, append under ship lock)
 
@@ -273,8 +340,13 @@ Append-only log of every Builder attempt. (Inspired by autoresearch's `results.t
 Phase 0: CALIBRATE (once per invocation)
 Orchestrator -- benchmark-eval -> projectBenchmark + benchmark-report.md
               |
+Phase 0.5: RESEARCH (every cycle)     v
+Orchestrator -- gap analysis + web queries -> research-brief.md + conceptCandidates
+              (reads: researchAgenda, researchLedger, benchmarkWeaknesses, proposals)
+              (writes: researchAgenda, capsuleIndex, research-brief.md)
+              |
 Phase 1: DISCOVER              v
-Scout --> scout-report.md + evals/<task>.md (reads benchmarkWeaknesses)
+Scout --> scout-report.md + evals/<task>.md (reads research-brief + conceptCandidates)
               |
 Phase 2: BUILD (per task)      v
 Builder --> build-report.md

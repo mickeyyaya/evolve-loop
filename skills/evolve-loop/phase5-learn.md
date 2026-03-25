@@ -133,6 +133,63 @@ Convert Builder Discoveries and Scout Hypotheses into next-cycle task candidates
 
 Scout reads `state.json.proposals` during Task Selection (step 7) and applies a +1 priority boost to active proposals.
 
+## Research Ledger Update
+
+7.6. **Research Ledger Update** (after proposal extraction):
+
+Score shipped tasks against the Research Ledger to determine what research-driven changes WORKED vs DIDN'T WORK. This creates the strict feedback loop for Phase 0.5's evaluation step.
+
+| Step | Action |
+|------|--------|
+| Identify research-backed tasks | Check if shipped task has `agendaItemId` in metadata (set by Scout when selecting a concept candidate) |
+| Snapshot benchmark before/after | Compare `projectBenchmark.dimensions` at cycle start vs after ship |
+| Write verdict | Apply verdict rules (below) |
+| Update ledger | Append to `state.json.researchLedger.triedConcepts[]` |
+| Update diversity tracker | Increment `dimensionCoverage` for researched dimensions; append to `lastResearchedDimensions` (keep last 9 entries, trim older) |
+
+**Verdict rules (strict, binary):**
+
+| Condition | Verdict | keepOrDrop |
+|-----------|---------|------------|
+| Benchmark dimension improved >= 3 points | `WORKS` | `KEEP` — boost similar concepts in future |
+| Benchmark dimension unchanged or declined | `DOESNT_WORK` | `DROP` — block similar concepts |
+| Eval PASS on first attempt (non-benchmark task) | `WORKS` | `KEEP` |
+| Eval FAIL after 2+ retries | `DOESNT_WORK` | `DROP` — record failure pattern |
+| Shipped but no measurable improvement | `INCONCLUSIVE` | Keep for 1 more cycle; if still no signal next cycle → `DROP` |
+
+**triedConcept entry:**
+```json
+{
+  "id": "tc-<NNN>",
+  "conceptTitle": "<from concept card>",
+  "researchSource": "<agenda item id>",
+  "capsuleRef": "<capsule slug>",
+  "originCycle": "<cycle concept was created>",
+  "implementedCycle": "<this cycle>",
+  "taskSlug": "<shipped task slug>",
+  "verdict": "WORKS|DOESNT_WORK|INCONCLUSIVE",
+  "evidence": "<dimension: before → after (+/-delta)>",
+  "benchmarkBefore": {"<dimension>": "<score>"},
+  "benchmarkAfter": {"<dimension>": "<score>"},
+  "keepOrDrop": "KEEP|DROP",
+  "droppedReason": "<null or explanation>"
+}
+```
+
+## Research Agenda Feedback
+
+7.7. **Research Agenda Feedback** (after research ledger update):
+
+Close the research loop by updating the Research Agenda based on cycle outcomes.
+
+| Step | Action |
+|------|--------|
+| Resolve agenda items | For each shipped task with `agendaItemId`: if verdict is `WORKS`, set agenda item status → `"resolved"`, set `resolvedCycle` |
+| Mark in-progress | For tasks selected but not yet shipped: set agenda item status → `"in-progress"` |
+| Create new items | For each proposal needing research backing (no `capsuleRef`): create new agenda item with `source: "proposal-backing"` |
+| Failure-driven items | If `failedApproaches` has 3+ entries with same `errorCategory`: create agenda item with `source: "failure-pattern"`, priority P0 |
+| Archive stale | Agenda items with `status: "open"` and `originCycle + 10 < currentCycle` → status `"stale"`, log in notes |
+
 ---
 
 ## Instinct Graduation

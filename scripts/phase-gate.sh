@@ -10,6 +10,7 @@
 # Usage: bash scripts/phase-gate.sh <gate> <cycle> <workspace_path>
 #
 # Gates:
+#   research-to-discover — Verify Phase 0.5 ran, research-brief exists
 #   discover-to-build   — Verify Scout ran, eval definitions exist
 #   build-to-audit      — Verify Builder ran, build-report exists
 #   audit-to-ship       — Verify Auditor ran, eval graders pass independently
@@ -157,6 +158,33 @@ check_no_forgery_scripts() {
     if [ -n "$new_scripts" ]; then
         log "WARN: New shell scripts created during cycle: $new_scripts — review for forgery"
     fi
+}
+
+# ─── Gate: RESEARCH → DISCOVER ───
+gate_research_to_discover() {
+    log "Checking RESEARCH → DISCOVER gate for cycle $CYCLE"
+
+    # 1. Research brief must exist and be fresh
+    check_file_exists "$WORKSPACE/research-brief.md" "Research brief"
+    check_file_fresh "$WORKSPACE/research-brief.md" "Research brief"
+
+    # 2. Research brief must have substantive content (not just headers)
+    local brief_words
+    brief_words=$(wc -w < "$WORKSPACE/research-brief.md" | tr -d ' ')
+    if [ "$brief_words" -lt 30 ]; then
+        fail "Research brief has only $brief_words words (min 30)"
+    fi
+
+    # 3. Research agenda must have been updated (check state.json)
+    if [ -f "$STATE" ]; then
+        local has_agenda
+        has_agenda=$(grep -c '"researchAgenda"' "$STATE" 2>/dev/null || echo "0")
+        if [ "$has_agenda" -eq 0 ]; then
+            log "WARN: No researchAgenda in state.json — may be first cycle"
+        fi
+    fi
+
+    log "PASS: RESEARCH → DISCOVER gate"
 }
 
 # ─── Gate: DISCOVER → BUILD ───
@@ -384,10 +412,11 @@ print('Mastery RESET: audit did not PASS')
 
 # ─── Dispatch ───
 case "$GATE" in
-    discover-to-build)   gate_discover_to_build ;;
-    build-to-audit)      gate_build_to_audit ;;
-    audit-to-ship)       gate_audit_to_ship ;;
-    ship-to-learn)       gate_ship_to_learn ;;
-    cycle-complete)      gate_cycle_complete ;;
-    *)                   fail "Unknown gate: $GATE" ;;
+    research-to-discover) gate_research_to_discover ;;
+    discover-to-build)    gate_discover_to_build ;;
+    build-to-audit)       gate_build_to_audit ;;
+    audit-to-ship)        gate_audit_to_ship ;;
+    ship-to-learn)        gate_ship_to_learn ;;
+    cycle-complete)       gate_cycle_complete ;;
+    *)                    fail "Unknown gate: $GATE" ;;
 esac
