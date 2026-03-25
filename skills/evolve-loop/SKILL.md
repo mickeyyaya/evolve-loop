@@ -5,7 +5,7 @@ argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
 
-# Evolve Loop v8.0
+# Evolve Loop v8.2
 
 Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle.
 
@@ -34,23 +34,32 @@ Unlike plan-mode or one-shot implementation skills:
 
 | Capability | Evolve-Loop | Plan Mode / One-Shot |
 |-----------|-------------|---------------------|
-| Cross-cycle memory | Instincts persist, bandit learns, benchmark tracks | Starts fresh every time |
-| Self-verification | Independent eval scripts, integrity gates, adaptive auditor | Trusts itself |
-| Continuous depth | Meta-cycles improve prompts, mastery graduates complexity | Single pass |
-| Research→Implementation | Findings become code changes, not just docs | Research is separate |
-| Failure learning | Failed approaches DB prevents repeating mistakes | No memory of failures |
-| Quality regression prevention | 8D benchmark blocks regressions before shipping | No tracking |
+| **Compound discovery** | Each cycle generates hypotheses, discoveries, and proposals that feed the next cycle | One-shot: plan → execute → done |
+| **Proactive insights** | Builder surfaces unsolicited findings ("Things Found Beyond Your Goal") | Only does what was asked |
+| **Knowledge-complete convergence** | Stops when nothing new to learn (discovery velocity = 0), not just when tasks are done | Stops when tasks are done |
+| **Cross-cycle memory** | Instincts persist, bandit learns, benchmark tracks, proposals compound | Starts fresh every time |
+| **Self-verification** | Independent eval scripts, integrity gates, adaptive auditor | Trusts itself |
+| **Meta-learning** | Meta-cycles improve prompts, mastery graduates complexity | Single pass |
+| **Failure learning** | Failed approaches DB prevents repeating mistakes | No memory of failures |
 
 ## Compound Discovery Loop
 
-Each cycle generates not just shipped code but new knowledge. The discovery loop tracks and compounds findings across cycles.
+Each cycle generates not just shipped code but new knowledge. The discovery loop compounds findings across cycles — this is what plan mode cannot do.
 
-| Mechanism | Description |
-|-----------|-------------|
-| Discovery Briefing | End-of-cycle output summarizing shipped tasks, discoveries, queued proposals, and benchmark delta |
-| Discovery velocity convergence | Rolling 3-cycle average of proposals generated; loop continues while discovery velocity > 0 even if Scout finds no explicit tasks |
-| Proactive Discovery | Builder insights unrelated to task acceptance criteria are tagged `unsolicited` and surfaced in session reports as "Things Found Beyond Your Goal" |
-| Proposal extraction | Builder findings written to state.json proposals with source, confidence, and category for future Scout consumption |
+```
+Scout (Hypothesize) → Builder (Discover) → Learn (Propose) → Scout (Select from proposals)
+     ↑                                                              |
+     └──────────────── proposals feed back as +1 priority ──────────┘
+```
+
+| Mechanism | Agent/Phase | How It Works |
+|-----------|------------|-------------|
+| **Hypotheses** | Scout | Speculative improvements beyond gap-filling; confidence >= 0.7 auto-promote to task candidates |
+| **Discoveries** | Builder | Latent bugs, smells, opportunities found during implementation; structured with category + severity |
+| **Proposals** | Learn (Phase 5) | Discoveries + hypotheses converted to next-cycle candidates in `state.json.proposals` |
+| **Discovery Briefing** | Orchestrator | End-of-cycle output: shipped tasks + discoveries + proposals queued + benchmark delta |
+| **Discovery Velocity** | Learn (Phase 5) | Rolling 3-cycle proposals/cycle; loop continues while velocity > 0; converges when nothing new to learn |
+| **Proactive Discovery** | Learn (Phase 5) | Builder insights beyond task scope tagged `unsolicited`; surfaced as "Things Found Beyond Your Goal" |
 
 ## Architecture
 
@@ -63,19 +72,6 @@ Phase 4: SHIP ────── commit + push                     → phase4-sh
 Phase 5: LEARN ───── instinct extraction + operator    → phase5-learn.md
 Phase 6: META ────── self-improvement (every 5 cycles) → phase6-metacycle.md
 ```
-
-## Compound Discovery Loop — Proposal Pipeline
-
-Beyond reactive gap-filling, evolve-loop runs a compound discovery loop that generates forward-looking improvements:
-
-| Stage | Agent | Output | Feed-forward |
-|-------|-------|--------|-------------|
-| Hypothesize | Scout | `## Hypotheses` in scout-report | High-confidence hypotheses auto-promote to task candidates |
-| Discover | Builder | `## Discoveries` in build-report | Adjacent bugs, smells, and opportunities found during implementation |
-| Propose | Learn | `state.json.proposals` | Discoveries and hypotheses converted to next-cycle task candidates |
-| Select | Scout (next cycle) | Task Selection | Proposals get +1 priority boost as pre-validated candidates |
-
-This creates a self-reinforcing cycle: building reveals opportunities, learning converts them to proposals, and scouting prioritizes them — compounding improvement across cycles rather than treating each cycle independently.
 
 ## Orchestrator Loop
 
