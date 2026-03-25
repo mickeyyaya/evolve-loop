@@ -10,16 +10,16 @@ Think of it as a tireless junior developer that gets smarter with every cycle.
 
 ## How It Works
 
-Each cycle runs through 5 phases:
+Each cycle runs through 6 phases — and each cycle feeds the next:
 
 ```
-DISCOVER ──→ BUILD ──→ AUDIT ──→ SHIP ──→ LEARN
+DISCOVER ──→ BUILD ──→ AUDIT ──→ SHIP ──→ LEARN ──→ next cycle
    │            │         │        │         │
-   │            │         │        │         └─ Extract patterns for next cycle
+   │            │         │        │         └─ Extract instincts + proposals
    │            │         │        └─ Commit and push
-   │            │         └─ Code review + security check (blocks bad code)
-   │            └─ Implement in isolated git worktree
-   └─ Scan codebase, pick 2-4 tasks
+   │            │         └─ Code review + eval gate (blocks bad code)
+   │            └─ Implement in worktree + surface discoveries
+   └─ Hypothesize + select tasks (including prior proposals)
 ```
 
 Four specialized AI agents handle the work:
@@ -84,6 +84,10 @@ cd evolve-loop
 
 ## What Makes It Different
 
+**It discovers things you didn't ask for.** While building, agents surface latent bugs, inconsistencies, and opportunities in your codebase. These "unsolicited insights" appear in your session report as "Things Found Beyond Your Goal."
+
+**It proposes its own next steps.** Each cycle generates hypotheses and discoveries that feed the next cycle as task candidates. The loop continues as long as there's something new to learn — not just something to do.
+
 **It learns from itself.** After every cycle, the pipeline extracts "instincts" — reusable patterns about what worked and what didn't. These feed back into future cycles, so the same mistakes don't repeat.
 
 **It guards its own quality.** The Auditor agent blocks any change rated MEDIUM severity or higher. Bad code doesn't ship.
@@ -100,17 +104,15 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.0) |
+| Metric | Start (v3.0) | Current (v8.2) |
 |--------|-------------|-----------------|
-| Agents | 11 (bloated) | 4 (lean) |
-| Phases | 3 | 5 + meta-cycle |
-| Cycles completed | 0 | 151 |
-| Tasks shipped | 0 | 67+ |
-| Commits | 1 | 285 |
-| Files | ~10 | 110 |
-| Lines of content | ~500 | 17,900+ |
-| Benchmark score | N/A | 94.4 / 100 |
-| Consecutive successes | 0 | 32 |
+| Agents | 11 (bloated) | 3 (lean) + inline Operator |
+| Phases | 3 | 6 (+ meta-cycle every 5) |
+| Cycles completed | 0 | 170+ |
+| Tasks shipped | 0 | 115+ |
+| Commits | 1 | 300+ |
+| Benchmark score | N/A | 89.9 / 100 |
+| Consecutive successes | 0 | 62 |
 | Mastery level | N/A | Proficient |
 
 ### Version History
@@ -127,6 +129,8 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v7.6 | Mar 22 | Major refactor — split monolithic phases into modules (46% reduction) |
 | v7.8 | Mar 22 | Deterministic phase gate script after gaming incident |
 | v8.0 | Mar 23 | Progressive disclosure (85% SKILL.md reduction), agent compression |
+| v8.1 | Mar 24 | Pipeline efficiency overhaul, inline Operator, slim Scout |
+| v8.2 | Mar 25 | Compound discovery loop — hypotheses, discoveries, proposals, velocity convergence |
 
 ### Benchmark Scores (v8.0)
 
