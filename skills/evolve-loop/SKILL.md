@@ -41,6 +41,17 @@ Unlike plan-mode or one-shot implementation skills:
 | Failure learning | Failed approaches DB prevents repeating mistakes | No memory of failures |
 | Quality regression prevention | 8D benchmark blocks regressions before shipping | No tracking |
 
+## Compound Discovery Loop
+
+Each cycle generates not just shipped code but new knowledge. The discovery loop tracks and compounds findings across cycles.
+
+| Mechanism | Description |
+|-----------|-------------|
+| Discovery Briefing | End-of-cycle output summarizing shipped tasks, discoveries, queued proposals, and benchmark delta |
+| Discovery velocity convergence | Rolling 3-cycle average of proposals generated; loop continues while discovery velocity > 0 even if Scout finds no explicit tasks |
+| Proactive Discovery | Builder insights unrelated to task acceptance criteria are tagged `unsolicited` and surfaced in session reports as "Things Found Beyond Your Goal" |
+| Proposal extraction | Builder findings written to state.json proposals with source, confidence, and category for future Scout consumption |
+
 ## Architecture
 
 ```
@@ -61,7 +72,7 @@ For each cycle:
 3. Scout → Builder → Auditor → phase-gate verification → Ship → Learn
 4. Inline S-tasks directly; worktree M-tasks with `isolation: "worktree"`
 5. Max 3 retries per task; WARN/FAIL blocks shipping
-6. Output 5-line cycle summary → continue immediately
+6. Output Discovery Briefing (shipped tasks, discoveries, proposals queued, benchmark, discovery velocity) → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles.**
 
 ## Agents

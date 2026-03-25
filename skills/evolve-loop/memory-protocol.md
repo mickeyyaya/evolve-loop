@@ -185,6 +185,12 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
   "fitnessScore": 0.0,
   "fitnessHistory": [],
   "fitnessRegression": false,
+  "discoveryVelocity": {
+    "current": 0,
+    "history": [{"cycle": 0, "proposalsGenerated": 0}],
+    "rolling3": 0.0
+  },
+  "proposals": [],
   "promptVariants": []
 }
 ```
@@ -209,6 +215,8 @@ Cycle memory — avoids repeating searches, re-evaluating rejected tasks, or ret
 | `prerequisites` | Optional task slug array. Orchestrator auto-defers if unmet. |
 | `counterfactual` | Lightweight what-if record on deferred tasks for retrospective accuracy. |
 | `failedApproaches` | Structured reasoning: `error`, `reasoning`, `filesAffected`, `cycle`, `alternative`, `errorCategory` (planning/tool-use/reasoning/context/integration), `failedStep` (attributed step). |
+| `discoveryVelocity` | Rolling 3-cycle average of proposals generated. `current`: this cycle's count, `history`: per-cycle entries, `rolling3`: 3-cycle average. Used for knowledge-complete convergence detection. |
+| `proposals` | Array of discovery proposals from Builder findings. Each: `{title, source, confidence, category, cycle, unsolicited}`. Consumed by Scout for future task generation. |
 | `promptVariants` | Prompt evolution experiments from meta-cycle. Each: `{agent, cycle, edit, baselineScore}`. Compared at next meta-cycle for auto-revert. |
 
 ### `.evolve/notes.md` (shared, append under ship lock)

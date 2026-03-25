@@ -184,6 +184,32 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
 
 ---
 
+### Proposal Extraction
+
+7.5. **Extract proposals from Builder findings:**
+   - Read `build-report.md` and `builder-notes.md` for discoveries (fragility observations, approach surprises, improvement ideas)
+   - For each finding, create a proposal entry:
+     ```json
+     {"title": "<short title>", "source": "builder-discovery", "confidence": 0.5, "category": "<category>", "cycle": N}
+     ```
+   - Proposals where the discovery was NOT related to the current task's acceptance criteria should be tagged `"unsolicited": true`
+   - Write proposals to state.json `proposals` array
+
+7.6. **Discovery Velocity computation:**
+   - Count proposals generated this cycle (`proposalsGenerated`)
+   - Read `discoveryVelocity.history` from state.json and compute rolling 3-cycle average
+   - Write to state.json:
+     ```json
+     "discoveryVelocity": {
+       "current": <proposalsGenerated>,
+       "history": [{"cycle": N, "proposalsGenerated": <count>}],
+       "rolling3": <average of last 3 cycles>
+     }
+     ```
+   - **Exit condition update:** Discovery velocity == 0 for 2 consecutive cycles AND `nothingToDoCount >= 2` → STOP (knowledge-complete convergence)
+
+---
+
 ### Post-Cycle Health (inline orchestrator — no Operator agent needed)
 
 5. **Fitness computation** (inline):
@@ -209,7 +235,7 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
 7. **Convergence check:** If `nothingToDoCount >= 1`, check `git log --oneline -3` for external changes. New work → reset to 0.
 
 8. **Session summary** (`isLastCycle` only):
-   Generate inline (tier-3): Key Patterns, Surprising Failures, What to Watch, Instincts Worth Reviewing. Write to `$WORKSPACE_PATH/session-summary.md`. Archive to `.evolve/history/cycle-{N}/`.
+   Generate inline (tier-3): Key Patterns, Surprising Failures, What to Watch, Instincts Worth Reviewing, **Compound Discoveries** (cross-cycle patterns that built on each other), **Unsolicited Insights — Things Found Beyond Your Goal** (aggregate all proposals with `"unsolicited": true` across cycles). Write to `$WORKSPACE_PATH/session-summary.md`. Archive to `.evolve/history/cycle-{N}/`.
 
 6. **Update notes.md** (append under ship lock):
    ```markdown
@@ -229,19 +255,16 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
    4. Full history preserved in `history/cycle-N/` archives
    5. Use tier-3 model for summarization
 
-7. **Output cycle summary:**
+7. **Output Discovery Briefing:**
    ```
-   +------------------------------------------+
-   | CYCLE {N} COMPLETE                       |
-   +------------------------------------------+
-   | Tasks:      <slug1> (PASS), <slug2> (FAIL)
-   | Shipped:    <N>/<total attempted>
-   | Audit:      <avg attempts per task> iterations
-   | Benchmark:  <overall>/100 (delta +/-N)
-   | Instincts:  <N> extracted, <N> graduated
-   | Warnings:   <operator warnings or "none">
-   | Next focus: <1-line from operator brief>
-   +------------------------------------------+
+   ### Cycle {N} Discovery Briefing
+   **Shipped:** <N> tasks (<slugs>)
+   **Discoveries This Cycle:** <count> findings from Builder
+     - <category>: <finding> → <proposed action>
+   **Proposals Queued:** <count> proposals added to state.json
+     - <title> (source: <source>, confidence: <score>)
+   **Benchmark:** <score>/100 (delta: <+/-N>)
+   **Discovery Velocity:** <proposals/cycle, 3-cycle rolling>
    ```
 
 ### Meta-Cycle Self-Improvement (every 5 cycles)
@@ -261,4 +284,5 @@ If `cycle % 5 === 0`, run full meta-cycle evaluation. See [phase6-metacycle.md](
 10. **Exit conditions:**
     - Cycle limit reached → STOP
     - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
+    - Knowledge-complete convergence (discoveryVelocity == 0 for 2 consecutive cycles AND `nothingToDoCount >= 2`) → STOP
     - Otherwise → next cycle
