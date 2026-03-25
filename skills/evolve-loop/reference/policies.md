@@ -168,5 +168,14 @@ After all cycles → generate `final-report.md`:
 - Summary narrative (3-4 sentences)
 - Task table (cycle, slug, type, verdict, attempts)
 - Benchmark trajectory (per-dimension start/end/delta)
+- Compound Discoveries (cross-cycle patterns: discoveries that built on each other, emergent themes, proposals that compound across cycles)
 - Learning stats (instincts, mastery)
 - Warnings and next strategy recommendation
+
+## Session Break Handoff Template
+
+When a session ends mid-run, write handoff with these sections in order:
+1. **Session State** — current cycle, remaining cycles, active strategy
+2. **Recent Cycle Verdicts** — last 3 cycles with task slugs and verdicts
+3. **Unsolicited Insights** — aggregate all proposals tagged `"unsolicited": true` across cycles; present as "Things Found Beyond Your Goal" for user review
+4. **Carry Forward** — pending tasks, deferred items, unresolved blockers
