@@ -97,6 +97,44 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase6-metacy
    ```
    Scout and Builder read `instinctSummary` instead of all instinct YAML files. Full files read only during consolidation or when `instinctCount` changed.
 
+## Proposal Extraction
+
+7.5. **Proposal Extraction** (after instinct extraction, before project digest):
+
+Convert Builder Discoveries and Scout Hypotheses into next-cycle task candidates.
+
+| Step | Action |
+|------|--------|
+| Read sources | Parse `## Discoveries` from `build-report.md` and `## Hypotheses` from `scout-report.md` |
+| Filter | Include discoveries with severity medium/high and confidence >= 0.5; include hypotheses with confidence >= 0.5 |
+| Convert | Transform each into a proposal object (schema below) |
+| Write | Append to `state.json.proposals` array |
+| Auto-archive | Remove proposals older than 5 cycles without selection (`originCycle + 5 < currentCycle`) |
+
+**Proposal schema:**
+```json
+{
+  "id": "prop-<NNN>",
+  "title": "<title>",
+  "source": "builder-discovery|hypothesis-validated|hypothesis-invalidated|audit-finding|cross-cycle-pattern",
+  "rationale": "<why>",
+  "proposedFiles": ["<files>"],
+  "complexity": "S|M",
+  "confidence": 0.0-1.0,
+  "originCycle": N
+}
+```
+
+**Source mapping:**
+- Builder `## Discoveries` entries → `source: "builder-discovery"`
+- Scout `## Hypotheses` with confidence >= 0.7 that were tested → `source: "hypothesis-validated"` or `"hypothesis-invalidated"`
+- Auditor findings from `audit-report.md` → `source: "audit-finding"`
+- Patterns seen across 3+ cycles → `source: "cross-cycle-pattern"`
+
+Scout reads `state.json.proposals` during Task Selection (step 7) and applies a +1 priority boost to active proposals.
+
+---
+
 ## Instinct Graduation
 
 Promotes high-confidence, repeatedly-confirmed instincts to mandatory guidance. Run after Citation Collection and before consolidation.

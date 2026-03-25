@@ -86,11 +86,35 @@ See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) for d
 
 **When researching:** Follow the protocol in `skills/evolve-loop/online-researcher.md`. Max 3-4 queries. Record queries with timestamps for cooldown tracking.
 
+### 6. Hypothesis Generation
+
+Generate 1-3 hypotheses per cycle — speculative improvements beyond gap-filling. Hypotheses are educated guesses about what could make the project better, informed by codebase patterns, research findings, and cross-cycle trends.
+
+**Generation criteria:**
+- Look for architectural patterns that could be improved
+- Consider techniques from research that haven't been tried
+- Identify cross-cutting concerns that span multiple files
+- Spot developer experience improvements
+- Find ecosystem opportunities (libraries, tools, integrations)
+
+**Auto-promotion:** Hypotheses with confidence >= 0.7 automatically become task candidates in Task Selection (step 7) with a +1 priority boost.
+
+**Confidence calibration:**
+- 0.3-0.5: Speculative, needs more evidence
+- 0.5-0.7: Plausible, worth investigating next cycle
+- 0.7-1.0: High-confidence, auto-promotes to task candidate
+
 ### 7. Task Selection (primary output)
 
 Synthesize findings into 2-4 small/medium tasks.
 
 **Prerequisites:** Optionally specify `prerequisites: ["slug-a"]` — tasks deferred if prerequisite not completed. Lightweight suggestion, not hard constraint.
+
+**Proposal Pipeline integration:**
+- Read `state.json.proposals` for active proposals from the Learn phase
+- Proposals are first-class task candidates alongside benchmark weaknesses and pending improvements
+- Apply **+1 priority boost** to proposals (they are pre-validated discoveries/hypotheses)
+- Proposals older than 5 cycles without selection are auto-archived by Learn — no action needed here
 
 **Filter first:**
 - Skip `evaluatedTasks` with `decision: "completed"`
@@ -221,6 +245,13 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 | Finding | Source | Target File(s) | Change Description |
 |---------|--------|----------------|-------------------|
 | <technique/pattern> | <paper/url> | <existing file path> | <what to modify and why> |
+
+## Hypotheses
+| # | Hypothesis | Evidence | Testable By | Category | Confidence |
+|---|-----------|----------|-------------|----------|------------|
+| 1 | <hypothesis> | <evidence> | <how to test> | <category> | <0.0-1.0> |
+
+Categories: `architecture-improvement`, `technique-adoption`, `cross-cutting-concern`, `developer-experience`, `ecosystem-opportunity`
 
 ## Selected Tasks
 
