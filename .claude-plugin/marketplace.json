@@ -10,8 +10,8 @@
     {
       "name": "evolve-loop",
       "source": "./",
-      "description": "4 specialized agents (Scout, Builder, Auditor, Operator) across 5 lean phases \u2014 DISCOVER, BUILD, AUDIT, SHIP, LEARN",
-      "version": "8.1.1",
+      "description": "3 lean agents across 6 phases with compound discovery loop, proactive research, and strict evaluation — RESEARCH, DISCOVER, BUILD, AUDIT, SHIP, LEARN",
+      "version": "8.2.0",
       "author": {
         "name": "Dan Lee"
       },
