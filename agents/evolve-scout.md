@@ -89,18 +89,29 @@ Research is performed in Phase 0.5 (RESEARCH) before Scout launches. Scout does 
 - Use gap analysis and concept cards to inform task selection priorities
 - Concept candidates have been pre-filtered through the Research Ledger (known failures already blocked)
 
-### 6. Hypothesis Generation
+### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
-Generate 1-3 hypotheses per cycle — speculative improvements beyond gap-filling. Hypotheses are educated guesses about what could make the project better, informed by codebase patterns, research findings, and cross-cycle trends.
+Generate 1-3 standard hypotheses PLUS 1-2 beyond-ask hypotheses per cycle.
 
-**Generation criteria:**
+**Standard hypotheses** — speculative improvements beyond gap-filling, informed by codebase patterns, research findings, and cross-cycle trends:
 - Look for architectural patterns that could be improved
 - Consider techniques from research that haven't been tried
 - Identify cross-cutting concerns that span multiple files
 - Spot developer experience improvements
 - Find ecosystem opportunities (libraries, tools, integrations)
 
-**Auto-promotion:** Hypotheses with confidence >= 0.7 automatically become task candidates in Task Selection (step 7) with a +1 priority boost.
+**Beyond-the-Ask hypotheses** — apply the provocation lenses from Phase 0.5 (passed in `researchBrief` context) to codebase findings:
+1. Read the 2 selected lenses from `researchBrief` → `Beyond-the-Ask Provocations` section
+2. For each lens, apply its provocation question to what you discovered in steps 1-5
+3. Generate 1 hypothesis per lens, tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
+4. These hypotheses represent ideas the user didn't ask for but should consider
+
+**Auto-promotion thresholds:**
+
+| Type | Confidence Threshold | Priority Boost |
+|------|---------------------|----------------|
+| Standard hypothesis | >= 0.7 | +1 |
+| Beyond-ask hypothesis | >= 0.6 (lower — proactive insights need less certainty) | +1 |
 
 **Confidence calibration:**
 - 0.3-0.5: Speculative, needs more evidence
@@ -256,9 +267,14 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 | <technique/pattern> | <paper/url> | <existing file path> | <what to modify and why> |
 
 ## Hypotheses
-| # | Hypothesis | Evidence | Testable By | Category | Confidence |
-|---|-----------|----------|-------------|----------|------------|
-| 1 | <hypothesis> | <evidence> | <how to test> | <category> | <0.0-1.0> |
+| # | Hypothesis | Evidence | Testable By | Category | Confidence | Source |
+|---|-----------|----------|-------------|----------|------------|--------|
+| 1 | <hypothesis> | <evidence> | <how to test> | <category> | <0.0-1.0> | standard |
+
+## Beyond-the-Ask Hypotheses
+| # | Lens | Provocation | Hypothesis | Confidence | Source |
+|---|------|------------|-----------|------------|--------|
+| 1 | <lens-name> | <provocation question applied> | <insight the user didn't ask for> | <0.0-1.0> | beyond-ask |
 
 Categories: `architecture-improvement`, `technique-adoption`, `cross-cutting-concern`, `developer-experience`, `ecosystem-opportunity`
 

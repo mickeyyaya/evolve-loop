@@ -290,6 +290,24 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
    - Proposals where the discovery was NOT related to the current task's acceptance criteria should be tagged `"unsolicited": true`
    - Write proposals to state.json `proposals` array
 
+7.55. **Beyond-the-Ask Tracking:**
+   Track outcomes of divergence trigger proposals to measure and improve proactive insight quality.
+
+   1. Read proposals with `"source": "beyond-ask"` from `state.json.proposals`
+   2. For shipped beyond-ask tasks: record lens used and benchmark delta
+   3. Update `state.json.beyondAsk`:
+      ```json
+      {
+        "beyondAsk": {
+          "lensHistory": [{"cycle": N, "lenses": ["<lens1>", "<lens2>"], "conceptsGenerated": 2, "conceptsKept": 1}],
+          "hitRate": "<% of beyond-ask proposals selected as tasks within 3 cycles>",
+          "lensEffectiveness": {"<lens>": {"attempts": N, "hits": N, "avgBenchmarkDelta": N}}
+        }
+      }
+      ```
+   4. **Lens replacement:** If a lens has < 10% hit rate after 10+ attempts, flag for meta-cycle replacement
+   5. Report in Discovery Briefing under `**Beyond-the-Ask:** <count> proactive insights generated (<count> kept)`
+
 7.6. **Discovery Velocity computation:**
    - Count proposals generated this cycle (`proposalsGenerated`)
    - Read `discoveryVelocity.history` from state.json and compute rolling 3-cycle average

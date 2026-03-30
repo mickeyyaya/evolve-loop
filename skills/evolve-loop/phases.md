@@ -132,16 +132,28 @@ Read from `state.json` (already loaded at cycle start):
 4. Check diversity: if same dimension in `lastResearchedDimensions[-3:]`, block it
 5. Output: ranked gap list → generate research agenda items if new
 
-#### Step 3: RESEARCH — Execute 2-3 web queries
+#### Step 2.5: DIVERGENCE TRIGGER — Beyond-the-Ask provocations
+
+Apply the Beyond-the-Ask Divergence Trigger from `online-researcher.md`:
+1. Select 2 provocation lenses (1 random + 1 matched to weakest benchmark dimension)
+2. Generate 1 provocation research query per lens
+3. Pass selected lenses to Scout context for hypothesis generation
+
+**Skip conditions:** lean mode active OR budget YELLOW → skip trigger, use standard queries only.
+
+#### Step 3: RESEARCH — Execute 2-3 web queries + provocation queries
 
 Follow `online-researcher.md` protocol with **search routing**:
-- Generate queries from gap analysis using Signal-to-Question Mapping (see `online-researcher.md`)
+- Generate standard queries from gap analysis using Signal-to-Question Mapping (see `online-researcher.md`)
+- Generate provocation queries from Step 2.5 lenses (tagged `beyond-ask`)
 - **Route each query** per the Search Routing table in `online-researcher.md`:
   - Survey/deep dive/comparison queries → **Smart Web Search** (`smart-web-search.md`)
   - Factual checks, simple gaps, budget-constrained → **Default WebSearch** (direct 1-2 queries)
+  - Provocation queries (typically Survey intent) → **Smart Web Search**
 - Write/update Knowledge Capsules to `.evolve/research/`
 - Update `researchAgenda.capsuleIndex` with new capsule categorizations
 - Score each query with Novelty/Relevance/Yield composite
+- Tag beyond-ask concept cards with `"source": "beyond-ask"` and `"lens": "<lens-name>"`
 
 #### Step 4: CONCEPTUALIZE — Generate Concept Cards
 

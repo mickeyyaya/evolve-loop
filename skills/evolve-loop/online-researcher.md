@@ -43,6 +43,104 @@ For quick lookups routed to Default WebSearch, call WebSearch directly (no smart
 
 Do NOT apply the 6-stage pipeline (intent classification, T1-T6 transforms, reflection scoring, iterative refinement) for Default WebSearch queries. The overhead is not justified for simple lookups.
 
+## Beyond-the-Ask Divergence Trigger
+
+A structured provocation system that stimulates the LLM to think beyond the user's explicit request. Fires during Phase 0.5 research and Scout hypothesis generation to surface ideas the user didn't ask for but should consider.
+
+**Research basis:** ProActLLM (arXiv:2410.12361) — proactive agents anticipate needs before expressed; ECIS 2024 — LLM-based divergent/convergent thinking in ideation; PROBE — proactive resolution of unspecified bottlenecks.
+
+### Provocation Lenses
+
+Each cycle, select **2 lenses** (1 random + 1 matched to weakest benchmark dimension). Apply them after gap analysis to generate divergent research queries and hypotheses.
+
+| Lens | Provocation Question | Best For |
+|------|---------------------|----------|
+| **Inversion** | "What if we did the exact opposite of the current approach?" | Breaking assumptions, finding anti-patterns |
+| **Analogy** | "What would this look like if borrowed from {adjacent domain}?" | Cross-pollination, novel techniques |
+| **10x Scale** | "What breaks if this needs to handle 10x the current load/complexity?" | Revealing hidden bottlenecks |
+| **Removal** | "What if we deleted this entirely — what would we lose and gain?" | Simplification, dead code discovery |
+| **User-Adjacent** | "What problem is the user going to hit NEXT after this one is solved?" | Proactive suggestions, workflow gaps |
+| **First Principles** | "Why does this exist? What fundamental constraint requires it?" | Challenging inherited complexity |
+| **Composition** | "What if we combined two unrelated features/modules into one?" | Emergent capabilities, DRY opportunities |
+| **Failure Mode** | "How would this fail silently? What's the worst undetected failure?" | Resilience, observability gaps |
+| **Ecosystem** | "What tool/library/pattern exists externally that makes this obsolete?" | Adoption opportunities, wheel reinvention |
+| **Time Travel** | "What will we wish we had built 3 months from now?" | Forward-looking architecture |
+
+### Lens Selection Protocol
+
+```
+# 1. Random lens (ensures diversity)
+RANDOM_LENS = lenses[RANDOM % len(lenses)]
+
+# 2. Dimension-matched lens (targeted)
+weakest = argmin(projectBenchmark.dimensions)
+MATCHED_LENS = dimensionToLens[weakest]
+```
+
+**Dimension-to-Lens mapping:**
+
+| Weakest Dimension | Matched Lens | Rationale |
+|-------------------|-------------|-----------|
+| documentationCompleteness | User-Adjacent | What docs will users need next? |
+| specificationConsistency | First Principles | Why do specs diverge? |
+| defensiveDesign | Failure Mode | What fails silently? |
+| evalInfrastructure | Inversion | What if evals tested the opposite? |
+| modularity | Removal | What can we delete to simplify? |
+| schemaHygiene | Composition | What schemas overlap? |
+| conventionAdherence | Analogy | How do best-in-class projects handle this? |
+| featureCoverage | Ecosystem | What external tools solve this? |
+
+### Trigger Execution (Phase 0.5, after gap analysis)
+
+1. **Select lenses** — 1 random + 1 dimension-matched (deduplicate if same)
+2. **Generate provocation queries** — for each lens, produce 1 research question using the provocation template applied to the current project context and goal
+3. **Route to appropriate search tool** — provocation queries are typically Survey/Deep dive intent → route to **Smart Web Search** per the Search Routing table
+4. **Score findings** — same Novelty/Relevance/Yield scoring as standard research
+5. **Tag outputs** — all concept cards from provocation queries get tagged `"source": "beyond-ask"` and `"lens": "<lens-name>"`
+6. **Apply +1 priority boost** to beyond-ask concepts (proactive insights are high-value)
+
+### Trigger Execution (Scout, hypothesis generation)
+
+Scout applies the **same 2 lenses** selected in Phase 0.5 when generating hypotheses (step 6). For each lens:
+1. Apply the provocation question to the codebase findings from discovery
+2. Generate 1 hypothesis tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
+3. Beyond-ask hypotheses with confidence >= 0.6 (lower threshold than standard 0.7) auto-promote to task candidates
+
+### Tracking and Feedback
+
+Phase 5 (LEARN) tracks beyond-ask outcomes separately:
+
+| Metric | How |
+|--------|-----|
+| **beyond-ask hit rate** | % of beyond-ask proposals that get selected as tasks within 3 cycles |
+| **beyond-ask value** | benchmark delta from shipped beyond-ask tasks vs standard tasks |
+| **lens effectiveness** | per-lens hit rate — lenses below 10% hit rate after 10 cycles get replaced |
+
+Store in `state.json.beyondAsk`:
+```json
+{
+  "beyondAsk": {
+    "lensHistory": [{"cycle": N, "lenses": ["inversion", "ecosystem"], "conceptsGenerated": 2, "conceptsKept": 1}],
+    "hitRate": 0.0-1.0,
+    "lensEffectiveness": {"inversion": {"attempts": 5, "hits": 2}, ...}
+  }
+}
+```
+
+### Output in Research Brief
+
+Add a `## Beyond-the-Ask Provocations` section to `research-brief.md`:
+
+```markdown
+## Beyond-the-Ask Provocations
+| Lens | Provocation | Finding | Concept Card? |
+|------|------------|---------|---------------|
+| Inversion | "What if eval graders tested failure instead of success?" | ... | cc-042 |
+| Ecosystem | "What external tool makes X obsolete?" | ... | DROPPED (low feasibility) |
+```
+
+---
+
 ## The Research Workflow (Search-Distill-Cache)
 
 When an agent encounters a knowledge gap (e.g., "How does the new Stripe v2 API work?" or "What are the latest 2026 Next.js routing patterns?"), follow this execution loop:
