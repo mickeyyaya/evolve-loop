@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.5.0] - 2026-03-30
+
+### Added
+- **Beyond-the-Ask divergence trigger** — structured provocation system with 10 lenses (Inversion, Analogy, 10x Scale, Removal, User-Adjacent, First Principles, Composition, Failure Mode, Ecosystem, Time Travel) that fire during Phase 0.5 and Scout hypothesis generation to surface ideas beyond the user's explicit request.
+- **Lens selection protocol** — each cycle selects 2 lenses (1 random + 1 matched to weakest benchmark dimension) for targeted creative divergence.
+- **Beyond-ask tracking** in Phase 5 — hit rate, lens effectiveness, and benchmark delta for proactive insights. Underperforming lenses flagged for meta-cycle replacement.
+
+### Changed
+- **Scout hypothesis generation** now produces standard + beyond-ask hypotheses with differentiated auto-promotion thresholds (0.7 standard, 0.6 beyond-ask).
+- **Phase 0.5** includes new Step 2.5 (DIVERGENCE TRIGGER) between gap analysis and research execution.
+- **Scout report format** includes separate `Beyond-the-Ask Hypotheses` table.
+- **Research brief format** includes `Beyond-the-Ask Provocations` section.
+
 ## [8.4.0] - 2026-03-30
 
 ### Added

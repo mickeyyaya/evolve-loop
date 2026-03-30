@@ -104,7 +104,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.4) |
+| Metric | Start (v3.0) | Current (v8.5) |
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
@@ -133,6 +133,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.2 | Mar 25 | Compound discovery loop — hypotheses, discoveries, proposals, velocity convergence |
 | v8.3 | Mar 30 | Smart Web Search skill — intent-aware 6-stage search pipeline |
 | v8.4 | Mar 30 | Search routing — Smart for deep research, Default for quick lookups |
+| v8.5 | Mar 30 | Beyond-the-Ask divergence trigger — proactive insight generation |
 
 ### Benchmark Scores (v8.0)
 
