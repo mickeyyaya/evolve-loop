@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.3.0] - 2026-03-30
+
+### Added
+- **Smart Web Search skill** — intent-aware 6-stage search pipeline that classifies questions, transforms queries using Query2doc/HyDE, iteratively searches and refines, and returns grounded cited answers.
+- **Release checklist script** (`scripts/release.sh`) — validates version consistency across all files before release to prevent version drift.
+
+### Changed
+- **Online Researcher** now leverages Smart Web Search skill for web searches.
+
 ## [8.0.0] - 2026-03-23
 
 ### Added

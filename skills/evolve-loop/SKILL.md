@@ -5,7 +5,7 @@ argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
 
-# Evolve Loop v8.2
+# Evolve Loop v8.3
 
 Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle.
 

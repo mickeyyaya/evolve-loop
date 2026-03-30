@@ -13,6 +13,18 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+## Release Checklist
+
+Before committing a version bump, **always run `scripts/release.sh`** to verify all version references are consistent. The files that must be updated for every release:
+
+1. `.claude-plugin/plugin.json` — canonical version (source of truth)
+2. `.claude-plugin/marketplace.json` — marketplace version
+3. `skills/evolve-loop/SKILL.md` — heading `# Evolve Loop vX.Y`
+4. `README.md` — "Current (vX.Y)" table + version history row
+5. `CHANGELOG.md` — `## [X.Y.Z]` entry with date and changes
+
+After push: create GitHub release `vX.Y.Z` via `gh release create`.
+
 ## Evolve Loop Task Priority
 
 When selecting tasks for `/evolve-loop` cycles, follow this priority order:
