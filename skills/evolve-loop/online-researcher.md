@@ -5,22 +5,62 @@ This protocol defines how evolve-loop conducts online research. Phase 0.5 (RESEA
 ## The Core Concept: Knowledge Capsules
 Instead of reading the web directly in the middle of a build task, agents must perform research, distill the required knowledge into a dense **Knowledge Capsule**, and save it locally. The LLM simply retrieves the needed knowledge from the internet, stores the critical parts locally, and performs its tasks from the local cache. Future cycles read the capsule instead of searching the internet.
 
+## Search Routing — Smart vs Default
+
+Not all queries need the full 6-stage Smart Web Search pipeline. Route each query to the appropriate tool based on its complexity and the current token budget.
+
+### Routing Decision Table
+
+| Condition | Route to | Reason |
+|-----------|----------|--------|
+| **Phase 0.5 research** (gap analysis, concept cards) | Smart Web Search | Deep research needs intent classification, query transformation, iterative refinement |
+| **Survey / Deep dive / Comparison** intent | Smart Web Search | Multi-angle queries, WebFetch extraction, and synthesis produce significantly better results |
+| **Builder reactive lookup** (unforeseen API gap, error fix) | Default WebSearch | Quick single-query lookup; saves ~60% tokens vs Smart |
+| **Budget LOW or EXHAUSTED** | Default WebSearch | Smart pipeline overhead exceeds value at low budgets |
+| **Budget YELLOW** (context pressure) | Default WebSearch | Conserve tokens for build/audit phases |
+| **Factual / Artifact** intent (single-fact lookup) | Default WebSearch | One query suffices; no need for transformation pipeline |
+| **Troubleshooting** (error string lookup) | Default WebSearch | Exact-quote search is already optimal; Smart adds minimal value |
+| **How-to with known official docs** | Default WebSearch + single WebFetch | Skip transformation; go directly to the source |
+
+### Cost Profile
+
+| Approach | Typical Tokens | Typical Duration | Best For |
+|----------|---------------|-----------------|----------|
+| Smart Web Search (FULL) | ~40-45K | ~230s | Surveys, deep dives, architecture research, concept card generation |
+| Smart Web Search (MEDIUM) | ~25-30K | ~150s | Moderate research with some depth needed |
+| Default WebSearch (1-2 queries) | ~5-10K | ~30-60s | Quick factual lookups, error resolution, API checks |
+| Default WebSearch (3-5 queries) | ~15-25K | ~90-150s | Broad landscape mapping, multi-topic quick scan |
+
+### How to Use Default WebSearch
+
+For quick lookups routed to Default WebSearch, call WebSearch directly (no smart-web-search.md pipeline):
+
+1. **Formulate a keyword query** — add year for volatile topics, exact-quote error strings
+2. **Execute 1-2 WebSearch calls** — one per distinct sub-topic
+3. **Scan results** — extract the key fact or URL needed
+4. **Optionally WebFetch** 1 URL if the snippet is insufficient
+5. **Distill and cache** — follow the same Distill and Cache steps below
+
+Do NOT apply the 6-stage pipeline (intent classification, T1-T6 transforms, reflection scoring, iterative refinement) for Default WebSearch queries. The overhead is not justified for simple lookups.
+
 ## The Research Workflow (Search-Distill-Cache)
 
 When an agent encounters a knowledge gap (e.g., "How does the new Stripe v2 API work?" or "What are the latest 2026 Next.js routing patterns?"), follow this execution loop:
 
-### 1. Search (via Smart Web Search)
+### 1. Search (route per Search Routing table above)
 
-Delegate ALL web search to the **Smart Web Search protocol** in `smart-web-search.md`. Do not call WebSearch or WebFetch directly — the protocol handles intent classification, query transformation, execution, result evaluation, and iterative refinement.
+**For deep research (Smart Web Search):** Delegate to the **Smart Web Search protocol** in `smart-web-search.md`. The protocol handles intent classification, query transformation, execution, result evaluation, and iterative refinement.
 
-**Invocation:**
+**Invocation (Smart):**
 - `question`: The knowledge gap as a specific question
 - `context`: The evolve-loop project context (domain, current benchmark weaknesses, what you already know)
 - `budget`: Map from `tokenBudget.researchPhase` remaining (>15K → FULL, 10-15K → MEDIUM, 5-10K → LOW, <5K → EXHAUSTED)
 
 **What you get back:** A grounded answer with inline citations, a source list, confidence level (HIGH/MEDIUM/LOW), and the queries that were executed.
 
-**If confidence is LOW:** Consider a second invocation with a rephrased question or narrower scope before proceeding.
+**For quick lookups (Default WebSearch):** Call WebSearch directly with 1-2 keyword queries. Add year filters for volatile topics. Extract the needed fact from result snippets. Optionally WebFetch 1 URL for more detail.
+
+**If confidence is LOW (either route):** Consider a second invocation with a rephrased question or narrower scope before proceeding.
 
 ### 2. Distill
 
@@ -80,9 +120,9 @@ Record scores in scout-report.md under the Research section:
 ```
 
 ## Cross-Agent Integration
-- **Phase 0.5 (RESEARCH):** Primary research consumer. Runs every cycle. Executes the Research Agenda Protocol (below) to generate queries from evaluation signals, then invokes `smart-web-search.md` for each query to produce Knowledge Capsules and create Concept Cards.
+- **Phase 0.5 (RESEARCH):** Primary research consumer. Runs every cycle. Executes the Research Agenda Protocol (below) to generate queries from evaluation signals, then routes to **Smart Web Search** (for surveys, deep dives, concept card research) or **Default WebSearch** (for factual checks, simple gap fills) per the Search Routing table above.
 - **Scout (Phase 1):** No longer performs web research. Reads `research-brief.md` from Phase 0.5 and consumes `conceptCandidates` for task selection.
-- **Builder (Phase 2):** Uses this protocol reactively if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error). Invokes `smart-web-search.md` with budget LOW or MEDIUM, then caches the result as a Knowledge Capsule for future tasks.
+- **Builder (Phase 2):** Uses this protocol reactively if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error). Routes to **Default WebSearch** (1-2 direct queries) unless the gap is a complex architecture question requiring depth. Caches the result as a Knowledge Capsule for future tasks.
 
 ## Research Agenda Protocol
 

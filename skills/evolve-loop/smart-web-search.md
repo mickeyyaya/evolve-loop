@@ -64,13 +64,22 @@ CLASSIFY → TRANSFORM → EXECUTE → EVALUATE → REFINE → SYNTHESIZE
 
 Each stage has specific decision tables. Follow them in order. Do not skip stages.
 
-**When to use this protocol:**
-- User asks to search, research, or find information online
-- You need to verify a claim against current sources
-- Another skill delegates a search task to you
-- You encounter a knowledge gap during implementation
+**When to use this protocol (deep research):**
+- Surveys, deep dives, comparisons, or architecture research
+- Phase 0.5 research producing concept cards
+- User explicitly asks to search, research, or find information online
+- Another skill delegates a complex search task to you
 
-**When NOT to use this protocol:**
+**When to use Default WebSearch instead (quick lookup):**
+- Factual single-answer lookups ("what is the API for X?")
+- Troubleshooting error strings (exact-quote search is already optimal)
+- Builder reactive lookups during implementation (API errors, config syntax)
+- Token budget is LOW or EXHAUSTED
+- Context budget pressure (YELLOW status)
+
+See the Search Routing table in `online-researcher.md` for the full decision matrix.
+
+**When NOT to use any web search:**
 - Question is about the local codebase (use Grep/Glob instead)
 - Question is purely mathematical or logical (answer directly)
 - User explicitly says "don't search" or "from memory only"

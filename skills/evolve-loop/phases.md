@@ -134,9 +134,11 @@ Read from `state.json` (already loaded at cycle start):
 
 #### Step 3: RESEARCH — Execute 2-3 web queries
 
-Follow `online-researcher.md` protocol:
+Follow `online-researcher.md` protocol with **search routing**:
 - Generate queries from gap analysis using Signal-to-Question Mapping (see `online-researcher.md`)
-- Execute via WebSearch/WebFetch tools
+- **Route each query** per the Search Routing table in `online-researcher.md`:
+  - Survey/deep dive/comparison queries → **Smart Web Search** (`smart-web-search.md`)
+  - Factual checks, simple gaps, budget-constrained → **Default WebSearch** (direct 1-2 queries)
 - Write/update Knowledge Capsules to `.evolve/research/`
 - Update `researchAgenda.capsuleIndex` with new capsule categorizations
 - Score each query with Novelty/Relevance/Yield composite
