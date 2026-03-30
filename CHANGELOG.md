@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.4.0] - 2026-03-30
+
+### Added
+- **Search routing** — decision table in `online-researcher.md` routes queries to Smart Web Search (deep research, surveys, concept cards) or Default WebSearch (quick lookups, error resolution, budget-constrained) based on complexity and token budget.
+- **Cost profile benchmarks** — documented token/duration costs for each search approach based on head-to-head comparison testing.
+
+### Changed
+- **Builder reactive lookups** now default to Default WebSearch (1-2 direct queries, ~60% token savings) instead of always using the full Smart Web Search pipeline.
+- **Phase 0.5 research** uses search routing — Smart for surveys/deep dives, Default for factual gap fills.
+- **`smart-web-search.md`** clarifies when to use Smart vs Default with explicit routing guidance.
+
 ## [8.3.0] - 2026-03-30
 
 ### Added
