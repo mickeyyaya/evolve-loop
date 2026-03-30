@@ -71,6 +71,7 @@ Scout (Hypothesize) → Builder (Discover) → Learn (Propose) → Scout (Select
 ```
 Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phase0-calibrate.md
 Phase 0.5: RESEARCH ── proactive research loop          → online-researcher.md
+Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
 Phase 1:   DISCOVER ── [Scout] scan + task selection    → phases.md
 Phase 2:   BUILD ───── [Builder] implement (worktree)   → phase2-build.md
 Phase 3:   AUDIT ───── [Auditor] review + eval gate     → phases.md

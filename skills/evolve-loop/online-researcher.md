@@ -5,38 +5,50 @@ This protocol defines how evolve-loop conducts online research. Phase 0.5 (RESEA
 ## The Core Concept: Knowledge Capsules
 Instead of reading the web directly in the middle of a build task, agents must perform research, distill the required knowledge into a dense **Knowledge Capsule**, and save it locally. The LLM simply retrieves the needed knowledge from the internet, stores the critical parts locally, and performs its tasks from the local cache. Future cycles read the capsule instead of searching the internet.
 
-## The Research Workflow (Plan-Route-Act-Verify)
+## The Research Workflow (Search-Distill-Cache)
 
 When an agent encounters a knowledge gap (e.g., "How does the new Stripe v2 API work?" or "What are the latest 2026 Next.js routing patterns?"), follow this execution loop:
 
-### 1. Plan (Query Transformation)
-- Do not search for the raw question.
-- Formulate 2-3 specific, orthogonal search queries. Use **Hypothetical Document Embeddings (HyDE)** strategy: think about what the *answer* document would look like and search for those terms.
+### 1. Search (via Smart Web Search)
 
-### 2. Route & Act (Targeted Retrieval)
-- Use your web search tool to execute the queries.
-- Fetch the top 2-3 most relevant URLs. Do not read 10+ pages; prioritize high-signal domains (official docs, GitHub issues, authoritative blogs).
+Delegate ALL web search to the **Smart Web Search protocol** in `smart-web-search.md`. Do not call WebSearch or WebFetch directly — the protocol handles intent classification, query transformation, execution, result evaluation, and iterative refinement.
 
-### 3. Verify & Distill
-- Extract ONLY the facts, code snippets, and architectural constraints relevant to the current project context.
-- Discard marketing fluff, outdated tutorials, and irrelevant tangents.
-- If the retrieved information conflicts, verify against a secondary source or explicit official documentation.
+**Invocation:**
+- `question`: The knowledge gap as a specific question
+- `context`: The evolve-loop project context (domain, current benchmark weaknesses, what you already know)
+- `budget`: Map from `tokenBudget.researchPhase` remaining (>15K → FULL, 10-15K → MEDIUM, 5-10K → LOW, <5K → EXHAUSTED)
 
-### 4. Cache (Local Storage)
-- Write the distilled findings to a local markdown file: `.evolve/research/<topic-slug>.md`.
-- Format the capsule exactly like this:
-  ```markdown
-  # Research: <Topic>
-  **Date:** <ISO-8601>
-  **Sources:** <URLs>
-  
-  ## Key Constraints
-  - <Must-dos and anti-patterns>
-  
-  ## Code Patterns
-  - <Executable, concise snippets>
-  ```
-- Once saved, proceed with the original task using the local capsule.
+**What you get back:** A grounded answer with inline citations, a source list, confidence level (HIGH/MEDIUM/LOW), and the queries that were executed.
+
+**If confidence is LOW:** Consider a second invocation with a rephrased question or narrower scope before proceeding.
+
+### 2. Distill
+
+From the smart-web-search answer, extract ONLY:
+- Facts, code snippets, and architectural constraints relevant to the current project context
+- Anti-patterns and "don't do this" warnings
+- Version-specific notes and compatibility requirements
+
+Discard: marketing fluff, outdated tutorials, tangential information, generic advice not specific to the project.
+
+If the search answer flagged conflicting sources, note the conflict in the capsule and prefer the higher-authority source.
+
+### 3. Cache (Local Storage)
+
+Write the distilled findings to a local Knowledge Capsule at `.evolve/research/<topic-slug>.md`:
+```markdown
+# Research: <Topic>
+**Date:** <ISO-8601>
+**Sources:** <URLs from smart-web-search source list>
+**Confidence:** <HIGH|MEDIUM|LOW from smart-web-search>
+
+## Key Constraints
+- <Must-dos and anti-patterns>
+
+## Code Patterns
+- <Executable, concise snippets>
+```
+Once saved, proceed with the original task using the local capsule.
 
 ## Deduplication and Cache Invalidation
 - **Cross-Run Research Deduplication (Query-Level Locking):** Before performing a web search, each run executes this protocol to prevent parallel runs from duplicating research tokens:
@@ -68,9 +80,9 @@ Record scores in scout-report.md under the Research section:
 ```
 
 ## Cross-Agent Integration
-- **Phase 0.5 (RESEARCH):** Primary research consumer. Runs every cycle. Executes the Research Agenda Protocol (below) to generate queries from evaluation signals, produce Knowledge Capsules, and create Concept Cards.
+- **Phase 0.5 (RESEARCH):** Primary research consumer. Runs every cycle. Executes the Research Agenda Protocol (below) to generate queries from evaluation signals, then invokes `smart-web-search.md` for each query to produce Knowledge Capsules and create Concept Cards.
 - **Scout (Phase 1):** No longer performs web research. Reads `research-brief.md` from Phase 0.5 and consumes `conceptCandidates` for task selection.
-- **Builder (Phase 2):** Uses this protocol reactively if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error) and caches the solution for future tasks.
+- **Builder (Phase 2):** Uses this protocol reactively if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error). Invokes `smart-web-search.md` with budget LOW or MEDIUM, then caches the result as a Knowledge Capsule for future tasks.
 
 ## Research Agenda Protocol
 
