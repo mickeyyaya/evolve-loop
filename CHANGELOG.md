@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.6.0] - 2026-03-31
+
+### Added
+- **External skill discovery and routing** — Phase 0 builds a skill inventory from installed plugins, categorizing ~150 skills into routing categories (security, testing, language:X, framework:X, etc.).
+- **Task-to-skill matching** — Scout matches tasks to relevant external skills using a category routing table, adding `recommendedSkills` to task metadata.
+- **Builder skill consultation** (Step 2.7) — Builder invokes matched skills via the `Skill` tool for domain-specific guidance before designing its approach.
+- **Skill usage verification** (Auditor D3) — Auditor checks whether recommended primary skills were invoked (informational, non-blocking).
+- **Skill effectiveness tracking** (Phase 5) — Tracks hit rate per skill; low-value skills demoted after 5+ invocations.
+- **Skill Awareness** section in `agent-templates.md` — shared schema for `recommendedSkills` field.
+
+### Changed
+- **Scout and Builder tools** now include `Skill` in their tool arrays.
+- **state.json schema** extended with `skillInventory` and `skillEffectiveness` fields.
+
 ## [8.5.0] - 2026-03-30
 
 ### Added
