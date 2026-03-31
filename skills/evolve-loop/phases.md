@@ -75,6 +75,53 @@ For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-l
 | Store | Write to `state.json.projectBenchmark`, pass `benchmarkWeaknesses` to Scout |
 | Tamper detection | Checksum `benchmark-eval.md` for verification in Phase 3-4 |
 
+### Skill Inventory (once per session)
+
+Build a compact inventory of available external skills from the system-reminder's skill listing. This is zero-cost — the data is already in the orchestrator's context window from session initialization.
+
+| Step | Action |
+|------|--------|
+| Skip check | If `state.json.skillInventory.lastBuilt` < 1 hour ago, reuse cached inventory |
+| Parse | Extract skill names and one-line descriptions from the `system-reminder` available skills list |
+| Categorize | Assign each skill to 1+ routing categories (see table below) |
+| Store | Write to `state.json.skillInventory` with `categoryIndex` |
+
+**Routing Categories:**
+
+| Category | Matches | Example Skills |
+|----------|---------|---------------|
+| `code-review` | code review, quality, patterns | `code-review:code-review`, `pr-review-workflow` |
+| `testing` | TDD, test generation, coverage | `everything-claude-code:tdd`, `testing-patterns` |
+| `security` | security audit, vulnerability | `everything-claude-code:security-review`, `security-patterns-code-review` |
+| `language:<lang>` | language-specific patterns | `python-review-patterns`, `go-review-patterns`, `typescript-review-patterns` |
+| `framework:<fw>` | framework-specific | `everything-claude-code:django-patterns`, `everything-claude-code:springboot-patterns` |
+| `architecture` | design patterns, DDD | `architectural-patterns`, `domain-driven-design-patterns` |
+| `debugging` | debugging, investigation | `superpowers:systematic-debugging`, `gstack-investigate` |
+| `performance` | profiling, caching, optimization | `performance-anti-patterns`, `caching-strategies` |
+| `frontend` | UI, components, design | `frontend-design:frontend-design`, `everything-claude-code:frontend-patterns` |
+| `database` | SQL, ORM, migrations | `database-review-patterns`, `everything-claude-code:postgres-patterns` |
+| `agent-design` | agent patterns, orchestration | `agent-orchestration-patterns`, `agent-memory-patterns` |
+| `docs` | documentation, API docs | `code-documentation-patterns`, `review-api-contract` |
+| `infra` | CI/CD, containers, deployment | `cicd-pipeline-patterns`, `container-kubernetes-patterns` |
+| `refactoring` | refactor, code smells | `refactor`, `detect-code-smells`, `refactoring-decision-matrix` |
+
+**Inventory schema (in state.json):**
+
+```json
+{
+  "skillInventory": {
+    "lastBuilt": "<ISO-8601>",
+    "categoryIndex": {
+      "security": ["everything-claude-code:security-review", "security-patterns-code-review"],
+      "language:python": ["everything-claude-code:python-testing", "python-review-patterns"],
+      "testing": ["everything-claude-code:tdd", "testing-patterns"]
+    }
+  }
+}
+```
+
+The inventory is compact (~1-2KB). It is NOT passed to agents in full — only the `categoryIndex` subset matching `projectContext` is passed to Scout as `skillCategories`.
+
 ---
 
 ## FOR each cycle (while remainingCycles > 0):
@@ -399,9 +446,12 @@ Key principle: **static fields first, dynamic fields last** — reduces prompt-p
     "researchBrief": "<contents of research-brief.md from Phase 0.5>",
     "conceptCandidates": "<array of KEPT concept cards from Phase 0.5, each with +2 priority boost>",
     "challengeToken": "<$CHALLENGE>",
-    "handoffFromOperator": "<contents of handoff-operator.json, or null>"
+    "handoffFromOperator": "<contents of handoff-operator.json, or null>",
+    "skillCategories": "<subset of skillInventory.categoryIndex matching projectContext language/framework — e.g., {testing: [...], language:python: [...], security: [...]}>"
   }
   ```
+
+**Skill routing context:** Pass `skillCategories` — the subset of `skillInventory.categoryIndex` keys that match `projectContext` (language, framework, domain). Always include `testing`, `security`, `code-review`, and `refactoring` categories regardless of project type. Scout uses these to populate `recommendedSkills` on each task (see [agent-templates.md](../../agents/agent-templates.md) § Skill Awareness).
 
 Scout MUST write all output files to `$WORKSPACE_PATH`, NOT `.evolve/workspace/`.
 

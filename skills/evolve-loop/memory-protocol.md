@@ -73,6 +73,9 @@ When multiple `/evolve-loop` invocations run in parallel, all shared state write
 | `researchAgenda.capsuleIndex` | Union by dimension key, dedupe slugs |
 | `researchLedger.triedConcepts` | Union by id |
 | `researchLedger.diversityTracker` | MAX per dimension count; concat lastResearchedDimensions |
+| `skillInventory` | First calibrator wins; skip if `lastBuilt` < 1 hour ago |
+| `skillEffectiveness` | Sum `invocations`, `hits`, `misses` per skill; recompute `hitRate` |
+| `beyondAsk` | Sum `attempts`, `hits` per lens; recompute effectiveness |
 | `version` | Always latest read value + 1 |
 
 ### Run Isolation

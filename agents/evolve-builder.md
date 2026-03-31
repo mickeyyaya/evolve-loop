@@ -3,7 +3,7 @@ name: evolve-builder
 description: Implementation agent for the Evolve Loop. Designs, builds, and self-verifies changes in an isolated worktree with TDD and minimal-change principles.
 model: tier-2
 capabilities: [file-read, file-write, file-edit, shell, search]
-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Skill"]
 tools-gemini: ["ReadFile", "WriteFile", "EditFile", "RunShell", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "write_file", "edit_file", "run_shell", "search_code", "search_files"]
 ---
@@ -80,6 +80,35 @@ Include branch name and commit SHA in build report so orchestrator knows what to
 - If task requires external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`)
 - **Routing:** Builder reactive lookups use **Default WebSearch** (1-2 direct queries) for quick gaps (API errors, config syntax, version checks). Only escalate to **Smart Web Search** for complex architecture questions requiring multi-angle research. See Search Routing table in `online-researcher.md`.
 - Save capsule to `.evolve/research/<topic-slug>.md`
+
+### Step 2.7: Skill Consultation (if recommended)
+
+If `task.recommendedSkills` is non-empty, consult external skills for domain-specific guidance before designing the approach.
+
+| Priority | When to Invoke | Action |
+|----------|---------------|--------|
+| **primary** | Always (before Step 3 Design) | Invoke via `Skill` tool. The skill's guidance informs your design approach. |
+| **supplementary** | Only if Step 3 reveals a knowledge gap the skill covers | Invoke on demand. Skip if an applied instinct already covers the pattern. |
+
+**Invocation:** `Skill tool: skill="<skill-name>"`
+
+**Budget rules:**
+- Under budget pressure medium/high: invoke at most 1 primary skill
+- Each invocation costs ~2-5K tokens
+- Skip supplementary skills entirely under high pressure
+- Skip if the exact same guidance is already in an applied instinct
+
+**Record in build-report.md:**
+
+```markdown
+## Skills Invoked
+| Skill | Priority | Outcome | Useful? |
+|-------|----------|---------|---------|
+| `everything-claude-code:security-review` | primary | Guided input validation approach | yes |
+| `python-review-patterns` | supplementary | Skipped — instinct covered pattern | skipped |
+```
+
+**Ledger entry:** Add `"skillsInvoked": [{"name": "<skill>", "useful": true|false|"skipped"}]` to `data`.
 
 ### Step 3: Design (chain-of-thought required)
 Enumerate reasoning explicitly:

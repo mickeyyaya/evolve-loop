@@ -308,7 +308,38 @@ Record scores in `$WORKSPACE_PATH/build-report.md` under `## Self-Evaluation`.
    4. **Lens replacement:** If a lens has < 10% hit rate after 10+ attempts, flag for meta-cycle replacement
    5. Report in Discovery Briefing under `**Beyond-the-Ask:** <count> proactive insights generated (<count> kept)`
 
-7.6. **Discovery Velocity computation:**
+7.6. **Skill Effectiveness Update** (after beyond-ask tracking):
+
+Track which external skills provided value to inform future routing.
+
+| Step | Action |
+|------|--------|
+| Read | Parse `## Skills Invoked` from `build-report.md` |
+| Score | For each invoked skill: `useful: true` + audit PASS → +1 hit; `useful: false` or audit FAIL → +1 miss; `skipped` → +1 skip |
+| Update | Write to `state.json.skillEffectiveness` |
+| Demote | Skills with `hitRate < 0.2` after 5+ invocations → flag as low-value (excluded from primary recommendations) |
+| Report | In Discovery Briefing: `**Skills Used:** <count> invoked (<count> helpful)` |
+
+**Schema (in state.json):**
+```json
+{
+  "skillEffectiveness": {
+    "<skill-name>": {
+      "invocations": 0,
+      "hits": 0,
+      "misses": 0,
+      "skips": 0,
+      "hitRate": 0.0,
+      "lastInvoked": "<ISO-8601>",
+      "lastCategory": "<routing category that triggered it>"
+    }
+  }
+}
+```
+
+**Feedback to Phase 0:** When building the skill inventory next session, sort skills within each category by `hitRate` descending. Skills with `hitRate < 0.2` after 5+ invocations are demoted — not recommended as primary unless explicitly matching.
+
+7.7. **Discovery Velocity computation:**
    - Count proposals generated this cycle (`proposalsGenerated`)
    - Read `discoveryVelocity.history` from state.json and compute rolling 3-cycle average
    - Write to state.json:

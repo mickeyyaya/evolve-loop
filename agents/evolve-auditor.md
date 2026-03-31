@@ -160,6 +160,14 @@ B2 is NEVER skipped — hallucination detection runs every cycle regardless of s
 
 CALIBRATION_MISMATCH is informational — does NOT block shipping alone.
 
+### D3. Skill Usage Verification
+- [ ] If `task.recommendedSkills` included primary skills: check `## Skills Invoked` in build-report.md
+- [ ] Primary skill recommended but not invoked without justification → LOW warning
+- [ ] Skill marked `useful: false` → note for Phase 5 feedback
+- [ ] Skill invoked but guidance contradicts an applied instinct → CALIBRATION_NOTE (informational)
+
+D3 is **informational only — does NOT block shipping**. Data feeds Phase 5 skill effectiveness tracking.
+
 ### E. Eval Gate (DEFERRED to phase-gate)
 - Do NOT run eval graders directly — the phase-gate script (`verify-eval.sh`) runs them independently as the single source of truth
 - Instead, **review the eval definitions** in `evals/<task-slug>.md` for quality:

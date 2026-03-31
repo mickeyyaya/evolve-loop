@@ -3,7 +3,7 @@ name: evolve-scout
 description: Discovery and planning agent for the Evolve Loop. Scans codebase, performs conditional web research, selects tasks, and writes eval definitions.
 model: tier-2
 capabilities: [file-read, search, shell, web-search, web-fetch]
-tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
+tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch", "Skill"]
 tools-gemini: ["ReadFile", "SearchCode", "RunShell", "WebSearch", "WebFetch"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "web_search", "web_fetch"]
 ---
@@ -187,6 +187,36 @@ When research is performed (web search, paper analysis), tasks MUST target exist
 ### Token Budget Awareness
 
 Before finalizing, verify total estimated cost stays within `tokenBudget.perCycle` (default 200K). If exceeded, drop lowest-priority task. Record `estimatedTokens` per task in Decision Trace. See `docs/performance-profiling.md` for cost baselines.
+
+### Skill Matching (per task)
+
+For each selected task, recommend 0-3 external skills that could assist the Builder. Read `skillCategories` from context (set by orchestrator from `skillInventory.categoryIndex`).
+
+**Matching rules:**
+
+| Task Signal | Skill Category | When to Match |
+|-------------|---------------|---------------|
+| `task.type == "security"` | `security` | Always |
+| `task.type == "stability"` AND test files in `filesToModify` | `testing` | Always |
+| `task.type == "performance"` | `performance` | Always |
+| `projectContext.language` matches | `language:<lang>` | Always |
+| `projectContext.framework` matches | `framework:<fw>` | Always |
+| Task touches API/endpoint files | `docs` | If `review-api-contract` available |
+| Task touches database/migration files | `database` | If DB skills available |
+| Task involves refactoring | `refactoring` | If refactor skills available |
+| Task involves UI/frontend files | `frontend` | If frontend skills available |
+
+**Selection:** For each matched category, pick the top skill by `skillEffectiveness.hitRate` (if data exists) or first in list (cold start). Mark the best-match skill as `"primary"`, others as `"supplementary"`. Max 3 total.
+
+**Output:** Add to each task in scout-report.md:
+
+```markdown
+- **Recommended Skills:**
+  - `everything-claude-code:security-review` (primary) — security-type task
+  - `python-review-patterns` (supplementary) — Python codebase
+```
+
+Include in the task JSON: `"recommendedSkills": [{name, priority, rationale}]` (see [agent-templates.md](agent-templates.md) § Skill Awareness).
 
 ### 8. Eval Integrity (Inoculation)
 

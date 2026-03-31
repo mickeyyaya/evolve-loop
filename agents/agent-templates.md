@@ -60,6 +60,34 @@ Each agent applies strategy to its own domain:
 - **Builder:** adapts implementation approach and risk tolerance
 - **Auditor:** adapts audit strictness and checklist depth
 
+## Skill Awareness
+
+Agents may receive `recommendedSkills` in their task context — a compact list of external skills (from installed plugins) that the orchestrator or Scout matched to the current task.
+
+**Schema:**
+
+```json
+"recommendedSkills": [
+  {"name": "everything-claude-code:security-review", "priority": "primary", "rationale": "security-type task"},
+  {"name": "python-review-patterns", "priority": "supplementary", "rationale": "Python codebase"}
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Skill name as registered (e.g., `"everything-claude-code:security-review"`) |
+| `priority` | string | `"primary"` (strongly relevant — invoke before design) or `"supplementary"` (nice to have — invoke only if needed) |
+| `rationale` | string | Why this skill is recommended (under 50 chars) |
+
+**Rules:**
+- 0-3 skills per task (compact — adds ~200 tokens to context)
+- Agents invoke via the `Skill` tool — invocation is **optional**, based on agent judgment
+- Under budget pressure (medium/high): invoke at most 1 primary skill
+- Skip supplementary skills if an applied instinct already covers the pattern
+- Each invocation costs ~2-5K tokens
+
+**Cross-platform:** The `Skill` tool is Claude Code-specific. On Gemini CLI / generic platforms, agents read the skill's SKILL.md file directly if available at the path in the plugin cache.
+
 ## Shared Output Conventions
 
 ### Challenge Token
