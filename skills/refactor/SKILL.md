@@ -25,6 +25,7 @@ description: Use when the user asks to refactor code, review code quality, or fi
 | [Prompt Engineering for Refactoring](#prompt-engineering-for-refactoring) | Prompt specificity ladder and subagent templates |
 | [Validation Metrics](#validation-metrics) | Before/after metric comparison and fitness functions |
 | [Quick Modes](#quick-modes) | Scoped invocations for targeted refactoring |
+| [Continuous Refactoring Integration](#continuous-refactoring-integration) | PR review, debt tracking, velocity |
 | [Smell-to-Technique Quick Reference](#smell-to-technique-quick-reference) | Fast lookup: smell → fix technique |
 | [Language-Specific Refactoring Notes](#language-specific-refactoring-notes) | TS/JS, Python, Go, Java guidance |
 | [Cross-Reference Map](#cross-reference-map) | Skill routing by issue type |
@@ -937,6 +938,50 @@ The user can scope the refactoring with arguments:
 | `/refactor auto` | Force auto mode — plan, partition, execute in parallel, merge without confirmation |
 | `/refactor arch` | Architecture-only analysis — circular deps, boundaries, centrality |
 | `/refactor complexity` | Cognitive complexity report only — no fixes |
+| `/refactor health` | Composite health score per function — multi-metric scoring |
+| `/refactor diff` | Scan only files changed since last commit |
+| `/refactor hotspots` | Git-history analysis — find high-churn, high-smell files |
+
+## Continuous Refactoring Integration
+
+Embed refactoring into the development workflow rather than treating it as a separate activity.
+
+### PR Review Integration
+
+Run `/refactor scan` automatically on PR diffs to catch smells before merge:
+
+| Trigger | Scope | Action |
+|---------|-------|--------|
+| PR opened/updated | Changed files only | Run scan pipeline, post smell report as PR comment |
+| PR touches >5 files | Full affected subgraph | Run architecture analysis, flag boundary violations |
+| PR increases complexity | Functions with delta >5 | Suggest specific refactoring technique inline |
+| PR introduces duplicates | New duplicate blocks | Flag with jscpd report |
+
+### Technical Debt Budget
+
+Track refactoring debt as a measurable quantity:
+
+| Metric | How to Compute | Target |
+|--------|---------------|--------|
+| Smell density | Total smells / total functions | <0.1 (10%) |
+| Average composite score | Mean of all function health scores | <0.3 |
+| Architecture violations | Count of boundary violations | 0 |
+| Circular dependency count | DFS cycle count | 0 |
+| Critical functions | Functions with composite score >0.7 | 0 |
+
+### Refactoring Velocity Tracking
+
+Track improvement over time:
+
+```
+| Sprint | Smells Found | Smells Fixed | Net Change | Debt Trend |
+|--------|-------------|-------------|------------|------------|
+| Week 1 | 45 | 0 | +45 | Baseline |
+| Week 2 | 48 | 12 | -9 | Improving |
+| Week 3 | 41 | 8 | -4 | Improving |
+```
+
+If debt trend reverses for 2+ sprints, escalate to team lead.
 
 ## Smell-to-Technique Quick Reference
 
