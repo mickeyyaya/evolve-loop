@@ -18,8 +18,12 @@ description: Use when the user asks to refactor code, review code quality, or fi
 | [Cognitive Complexity Scoring](#cognitive-complexity-scoring) | SonarQube-derived complexity algorithm |
 | [Architecture Analysis](#architecture-analysis) | Module graph analysis, circular deps, fan-in/fan-out |
 | [Code Smell Detection Catalog](#code-smell-detection-catalog) | Complete 22-smell catalog with thresholds |
+| [Multi-Metric Smell Scoring](#multi-metric-smell-scoring) | Composite health scores and git-history enrichment |
 | [Refactoring Technique Catalog](#refactoring-technique-catalog) | Complete 66-technique catalog by category |
 | [Speed Optimizations](#speed-optimizations) | Incremental analysis, caching, cycle-based execution |
+| [LLM Safety Protocols](#llm-safety-protocols) | RefactoringMirror pattern, re-prompting, multi-proposal |
+| [Prompt Engineering for Refactoring](#prompt-engineering-for-refactoring) | Prompt specificity ladder and subagent templates |
+| [Validation Metrics](#validation-metrics) | Before/after metric comparison and fitness functions |
 | [Quick Modes](#quick-modes) | Scoped invocations for targeted refactoring |
 | [Cross-Reference Map](#cross-reference-map) | Skill routing by issue type |
 
@@ -407,6 +411,39 @@ Final summary table:
 
 ---
 
+## Validation Metrics
+
+After every refactoring, compute before/after metrics to verify improvement:
+
+### Required Before/After Comparison
+
+| Metric | Must Not Increase | Must Not Decrease |
+|--------|------------------|-------------------|
+| Cyclomatic complexity | Yes | — |
+| Cognitive complexity | Yes | — |
+| Coupling between objects | Yes | — |
+| Duplicate code percentage | Yes | — |
+| Test count | — | Yes |
+| Test coverage | — | Yes |
+| Architecture boundary violations | Yes | — |
+| Circular dependency count | Yes | — |
+
+If ANY "must not increase" metric increased, the refactoring is REJECTED.
+If ANY "must not decrease" metric decreased, the refactoring requires justification.
+
+### Architecture Fitness Functions
+
+Run as part of validation to catch architectural regressions:
+
+| Rule | Validation Command |
+|------|-------------------|
+| No circular dependencies | `npx depcruise --output-type err-long --validate src/` |
+| Layer boundaries respected | `npx depcruise --validate .dependency-cruiser.js src/` |
+| No orphan modules | `npx depcruise --output-type err --include-only "^src" src/` |
+| Complexity under threshold | Custom: compute cognitive complexity, fail if any function >25 |
+
+---
+
 ## Automated Scan Pipeline
 
 Run all static analysis tools in parallel during Phase 1 to minimize wall-clock time. Launch these simultaneously:
@@ -615,6 +652,43 @@ Complete catalog of 22 code smells organized by category. Use during Phase 1 sca
 
 ---
 
+## Multi-Metric Smell Scoring
+
+Use composite scores instead of single thresholds for more accurate smell detection.
+
+### Composite Health Score per Function
+
+| Metric | Weight | Threshold | Score Formula |
+|--------|--------|-----------|--------------|
+| Cognitive complexity | 30% | >15 = smell | min(score/25, 1.0) |
+| Cyclomatic complexity | 20% | >10 = smell | min(score/20, 1.0) |
+| Lines of code | 15% | >50 = smell | min(lines/100, 1.0) |
+| Parameter count | 10% | >3 = smell | min(params/6, 1.0) |
+| Nesting depth | 15% | >4 = smell | min(depth/6, 1.0) |
+| Fan-out (dependencies) | 10% | >10 = smell | min(fanout/15, 1.0) |
+
+**Composite smell score** = weighted sum (0.0 = clean, 1.0 = severely smelly)
+
+| Score | Rating | Action |
+|-------|--------|--------|
+| 0.0-0.3 | Clean | No action |
+| 0.3-0.5 | Mild | Monitor, refactor if in hot path |
+| 0.5-0.7 | Moderate | Refactor in next sprint |
+| 0.7-1.0 | Severe | Refactor immediately |
+
+### Git-History Enrichment
+
+Enrich smell scores with git history signals:
+
+| Signal | How to Compute | Impact on Priority |
+|--------|---------------|-------------------|
+| Change frequency | `git log --oneline <file> \| wc -l` | High churn + high smell = urgent |
+| Bug correlation | Count fix commits touching this file | Bug-prone + smelly = critical |
+| Co-change coupling | Files that always change together | Indicates hidden dependencies |
+| Author count | Distinct authors in last 6 months | Many authors = communication cost |
+
+---
+
 ## Refactoring Technique Catalog
 
 Complete catalog of 66 refactoring techniques organized by category. Use during Phase 3 to select the right technique for each detected smell.
@@ -762,6 +836,87 @@ This pipeline eliminates 6-8% of false positive work from LLM-only analysis.
 ### Cycle-Based Execution
 
 Support up to 3 refactoring passes per group when refactoring creates emergent work. See [Phase 4: Execute](#phase-4-execute) for details. Limit to 3 passes to prevent infinite loops from oscillating fixes.
+
+---
+
+## LLM Safety Protocols
+
+Never apply LLM-generated refactored code directly. Follow the RefactoringMirror pattern:
+
+### RefactoringMirror Pattern (arXiv:2411.04444)
+
+Three-stage hybrid approach achieving 94.3% success with 0% unsafe edits:
+
+| Stage | Action | Tool |
+|-------|--------|------|
+| 1. Detect | Use LLM to generate refactored code, then diff original vs LLM output to identify what refactorings were applied | ReExtractor or AST diff |
+| 2. Extract | Extract detailed parameters for each detected refactoring (method name, target class, line range) | Custom extraction |
+| 3. Reapply | Execute the identified refactorings using battle-tested, deterministic IDE refactoring engines | IntelliJ IDEA, VS Code, or manual with tests |
+
+**Why this matters:** LLMs produce plausible but unsafe code ~7% of the time. The RefactoringMirror pattern uses the LLM as an *advisor* (what to refactor) and deterministic engines as *executors* (how to refactor).
+
+### Iterative Re-prompting Protocol
+
+When a refactoring fails compilation or tests:
+
+| Round | Action | Success Rate Improvement |
+|-------|--------|------------------------|
+| 1 | Re-prompt with exact error message | +25-30pp |
+| 2 | Re-prompt with error + stack trace + failing test | +10-15pp |
+| 3 | Re-prompt with alternative approach suggestion | +5-10pp |
+| 4-20 | Continue with decreasing returns | Diminishing |
+| >20 | STOP — escalate to human review | — |
+
+Total improvement from iterative re-prompting: +40-65 percentage points over single-shot.
+
+### Multi-Proposal Generation
+
+Generate multiple refactoring proposals and select the best:
+
+| Strategy | Correctness Gain |
+|----------|-----------------|
+| pass@1 (single proposal) | Baseline |
+| pass@3 | +15-20% |
+| pass@5 | +28.8% |
+| Best of 3 with test validation | Recommended balance of cost vs quality |
+
+### Safety Checklist (Before Applying Any Refactoring)
+
+- [ ] All existing tests pass on the refactored code
+- [ ] No new compiler/linter warnings introduced
+- [ ] Cyclomatic complexity did not increase
+- [ ] Cognitive complexity did not increase
+- [ ] No architecture boundary violations introduced
+- [ ] No circular dependencies introduced
+- [ ] Diff is minimal — only changes what was intended
+
+---
+
+## Prompt Engineering for Refactoring
+
+Prompt specificity dramatically affects LLM refactoring quality.
+
+### Prompt Specificity Ladder
+
+| Level | Prompt Template | Identification Rate |
+|-------|----------------|-------------------|
+| Generic | "Refactor this code" | 15.6% |
+| Type-specific | "Apply Extract Method refactoring to this code" | 52.2% |
+| Targeted | "Extract the loop body at lines 15-28 into a method called `processItem`" | 86.7% |
+| Few-shot | Same as targeted + 2-3 examples of similar refactorings | ~95%+ |
+
+**Rule:** Always use Level 3 (Targeted) or Level 4 (Few-shot) prompts in the refactoring pipeline.
+
+### Prompt Template for Subagents
+
+When dispatching refactoring work to a subagent, include:
+
+1. **Smell identified:** The specific smell name and detection signal
+2. **Technique prescribed:** The specific Fowler technique name (e.g., "Extract Method", not "refactor")
+3. **Target location:** File path, line range, function/class name
+4. **Expected outcome:** What the code should look like after (high-level)
+5. **Constraints:** What must NOT change (public API, test behavior)
+6. **Example (if available):** A similar before/after from the codebase or Fowler catalog
 
 ---
 
