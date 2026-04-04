@@ -25,6 +25,8 @@ description: Use when the user asks to refactor code, review code quality, or fi
 | [Prompt Engineering for Refactoring](#prompt-engineering-for-refactoring) | Prompt specificity ladder and subagent templates |
 | [Validation Metrics](#validation-metrics) | Before/after metric comparison and fitness functions |
 | [Quick Modes](#quick-modes) | Scoped invocations for targeted refactoring |
+| [Smell-to-Technique Quick Reference](#smell-to-technique-quick-reference) | Fast lookup: smell → fix technique |
+| [Language-Specific Refactoring Notes](#language-specific-refactoring-notes) | TS/JS, Python, Go, Java guidance |
 | [Cross-Reference Map](#cross-reference-map) | Skill routing by issue type |
 
 ## Auto Mode Detection
@@ -935,6 +937,69 @@ The user can scope the refactoring with arguments:
 | `/refactor auto` | Force auto mode — plan, partition, execute in parallel, merge without confirmation |
 | `/refactor arch` | Architecture-only analysis — circular deps, boundaries, centrality |
 | `/refactor complexity` | Cognitive complexity report only — no fixes |
+
+## Smell-to-Technique Quick Reference
+
+Fast lookup: given a detected smell, which technique(s) to apply.
+
+| Smell | Primary Technique | Secondary Technique | Skill |
+|-------|------------------|--------------------|----|
+| Long Method | Extract Method | Replace Temp with Query | `refactor-composing-methods` |
+| Large Class | Extract Class | Extract Subclass | `refactor-moving-features` |
+| Primitive Obsession | Replace Data Value with Object | Introduce Parameter Object | `refactor-organizing-data` |
+| Long Parameter List | Introduce Parameter Object | Preserve Whole Object | `refactor-simplifying-method-calls` |
+| Data Clumps | Extract Class | Introduce Parameter Object | `refactor-moving-features` |
+| Switch Statements | Replace Conditional with Polymorphism | Replace Type Code with Subclasses | `refactor-simplifying-conditionals` |
+| Temporary Field | Extract Class | Introduce Null Object | `refactor-moving-features` |
+| Refused Bequest | Replace Inheritance with Delegation | Push Down Method | `refactor-generalization` |
+| Divergent Change | Extract Class | Move Method | `refactor-moving-features` |
+| Shotgun Surgery | Move Method | Inline Class | `refactor-moving-features` |
+| Parallel Inheritance | Replace Inheritance with Delegation | — | `refactor-generalization` |
+| Duplicate Code | Extract Method | Pull Up Method | `refactor-composing-methods` |
+| Dead Code | Remove (delete it) | — | — |
+| Lazy Class | Inline Class | Collapse Hierarchy | `refactor-moving-features` |
+| Speculative Generality | Collapse Hierarchy | Inline Class | `refactor-generalization` |
+| Data Class | Move Method | Encapsulate Field | `refactor-organizing-data` |
+| Feature Envy | Move Method | Extract Method | `refactor-moving-features` |
+| Inappropriate Intimacy | Move Method | Hide Delegate | `refactor-moving-features` |
+| Message Chains | Hide Delegate | Extract Method | `refactor-moving-features` |
+| Middle Man | Remove Middle Man | Inline Method | `refactor-moving-features` |
+| Excessive Comments | Extract Method | Rename Method | `refactor-composing-methods` |
+| High Complexity (>15) | Decompose Conditional | Replace Nested Conditional with Guard Clauses | `refactor-simplifying-conditionals` |
+
+## Language-Specific Refactoring Notes
+
+### TypeScript/JavaScript
+| Concern | Guidance |
+|---------|----------|
+| Type narrowing | Prefer discriminated unions over type assertions when replacing conditionals |
+| Barrel exports | When extracting classes/modules, update `index.ts` barrel exports |
+| React components | Extract Method → Extract Component; watch for hook rules (no conditional hooks) |
+| Async patterns | When refactoring promise chains, prefer async/await; avoid mixing styles |
+
+### Python
+| Concern | Guidance |
+|---------|----------|
+| Dataclasses | Replace Data Class smell with `@dataclass` + methods |
+| Type hints | Add type hints when applying Extract Method or Introduce Parameter Object |
+| Dunder methods | When encapsulating fields, use `@property` not Java-style getters |
+| Module structure | Python favors flat module hierarchies; avoid deep nesting when extracting |
+
+### Go
+| Concern | Guidance |
+|---------|----------|
+| Interfaces | Extract Interface → define small interfaces at the consumer side |
+| Error handling | When simplifying conditionals, preserve explicit error handling (no swallowing) |
+| Packages | When extracting classes, prefer package-level organization over deep nesting |
+| Exported names | Extracted public functions must have doc comments |
+
+### Java
+| Concern | Guidance |
+|---------|----------|
+| Records | Replace Data Class smell with Java records (Java 16+) |
+| Sealed classes | Use sealed classes when replacing type codes with subclasses |
+| Streams | When refactoring loops, consider Stream API but avoid nested streams |
+| Dependency injection | When moving methods, update DI container configuration |
 
 ## Cross-Reference Map
 
