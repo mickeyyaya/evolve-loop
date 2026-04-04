@@ -5,9 +5,23 @@ description: Use when the user asks to refactor code, review code quality, or fi
 
 # /refactor — Full Refactoring Pipeline
 
-## Overview
+> Orchestrate the complete refactoring workflow: detect smells, prioritize by weighted scoring, partition into independent groups, execute in parallel worktrees via subagents, merge and verify. Enhanced with cognitive complexity scoring, architecture analysis, and speed-optimized parallel scan pipelines.
 
-Single entry point that orchestrates the complete refactoring workflow: detect smells → prioritize → partition into independent groups → execute in parallel worktrees via subagents → merge & verify.
+## Table of Contents
+
+| Section | Description |
+|---------|-------------|
+| [Auto Mode Detection](#auto-mode-detection) | Detect bypass/yolo mode for autonomous execution |
+| [Git Isolation](#git-isolation-mandatory) | Worktree-based isolation for all refactoring work |
+| [Workflow](#workflow) | 5-phase pipeline: Scan, Prioritize, Plan, Execute, Merge |
+| [Automated Scan Pipeline](#automated-scan-pipeline) | Parallel tool execution for Phase 1 speed |
+| [Cognitive Complexity Scoring](#cognitive-complexity-scoring) | SonarQube-derived complexity algorithm |
+| [Architecture Analysis](#architecture-analysis) | Module graph analysis, circular deps, fan-in/fan-out |
+| [Code Smell Detection Catalog](#code-smell-detection-catalog) | Complete 22-smell catalog with thresholds |
+| [Refactoring Technique Catalog](#refactoring-technique-catalog) | Complete 66-technique catalog by category |
+| [Speed Optimizations](#speed-optimizations) | Incremental analysis, caching, cycle-based execution |
+| [Quick Modes](#quick-modes) | Scoped invocations for targeted refactoring |
+| [Cross-Reference Map](#cross-reference-map) | Skill routing by issue type |
 
 ## Auto Mode Detection
 
@@ -49,10 +63,10 @@ Examples:
 ## Workflow
 
 ```
-Phase 1  SCAN ──────────── on main (read-only)
-Phase 2  PRIORITIZE ────── on main (read-only)
-Phase 3  PLAN & PARTITION ─ on main (read-only, dependency analysis)
-Phase 4  EXECUTE ────────── in worktrees (parallel subagents)
+Phase 1  SCAN ──────────── on main (read-only, parallel tool pipeline)
+Phase 2  PRIORITIZE ────── on main (read-only, weighted scoring)
+Phase 3  PLAN & PARTITION ─ on main (read-only, graph-based critical pair analysis)
+Phase 4  EXECUTE ────────── in worktrees (parallel subagents, up to 3 passes)
 Phase 5  MERGE & VERIFY ── back on main (sequential merge, final scan)
 ```
 
@@ -60,16 +74,18 @@ Phase 5  MERGE & VERIFY ── back on main (sequential merge, final scan)
 
 Runs on main. Read-only — no changes.
 
-1. Read the target file(s) the user specified
-2. Apply `detect-code-smells` — check for all 23 smells across 5 categories
-3. Apply `anti-patterns-catalog` — check for structural design problems
-4. Apply `performance-anti-patterns` — check for performance issues
-5. Apply `security-patterns-code-review` — quick security scan
+1. Launch the [Automated Scan Pipeline](#automated-scan-pipeline) — run all analysis tools in parallel
+2. Compute [Cognitive Complexity Score](#cognitive-complexity-scoring) for every function in scope
+3. Run [Architecture Analysis](#architecture-analysis) on the module graph
+4. Apply `detect-code-smells` — check for all smells in the [Code Smell Detection Catalog](#code-smell-detection-catalog)
+5. Apply `anti-patterns-catalog` — check for structural design problems
+6. Apply `performance-anti-patterns` — check for performance issues
+7. Apply `security-patterns-code-review` — quick security scan
 
 Report findings as a table:
 
 ```
-| # | File(s) | Smell/Issue | Severity | Category |
+| # | File(s) | Smell/Issue | Severity | Category | Complexity | Fan-in/out |
 ```
 
 If no issues found, say so and stop. **The File(s) column is critical** — it drives the dependency analysis in Phase 3.
@@ -78,14 +94,28 @@ If no issues found, say so and stop. **The File(s) column is critical** — it d
 
 Runs on main. Read-only.
 
+#### Weighted Prioritization Scoring
+
+Compute a priority score for each detected issue using weighted factors:
+
+| Factor | Weight | Source | Scoring |
+|--------|--------|--------|---------|
+| Cumulative maintenance cost | **High (3x)** | Smell severity + complexity score | Critical=4, High=3, Moderate=2, Low=1 |
+| Incident severity history | **High (3x)** | Git blame + issue tracker | Count of bugs in affected files |
+| Modification frequency | **Medium (2x)** | `git log --oneline <file> \| wc -l` | Normalize to 0-4 scale |
+| Dependency centrality | **Medium (2x)** | Fan-in + fan-out from architecture analysis | High centrality = higher priority |
+| Cyclical dependency involvement | **Critical (5x)** | Circular dependency detection | Boolean: in cycle = must-fix |
+
+**Priority score** = sum of (factor score * weight). Sort descending.
+
 Use `refactoring-decision-matrix` to:
-1. Map each detected smell to its primary fix technique
+1. Map each detected smell to its primary fix technique from the [Refactoring Technique Catalog](#refactoring-technique-catalog)
 2. Assess difficulty (Easy/Medium/Hard) and risk (Low/Medium/High)
 3. Check "When NOT to Refactor" criteria
 4. Present prioritized list to user:
 
 ```
-| # | Issue | File(s) | Fix Technique | Skill | Difficulty | Risk |
+| # | Issue | File(s) | Fix Technique | Skill | Difficulty | Risk | Priority Score |
 ```
 
 **If auto mode:** Select all issues automatically and proceed to Phase 3.
@@ -111,19 +141,27 @@ For each selected issue:
 4. Check type improvements → `type-system-patterns`
 5. Record the **complete file set** each fix will touch (source files + test files)
 
-#### Step 2: Dependency analysis & partitioning (STRICT ISOLATION)
+#### Step 2: Graph-based critical pair analysis & partitioning (STRICT ISOLATION)
 
-Build a dependency graph of all planned fixes. **Each worktree MUST be fully isolated — zero file overlap between groups.**
+Build a conflict graph of all planned fixes using graph transformation theory. **Each worktree MUST be fully isolated — zero file overlap between groups.**
 
-1. For each fix, list every file it will **read, write, or import from** (source files, test files, shared config, shared types)
-2. Expand transitive dependencies: if fix A writes `auth.ts` and fix B writes `middleware.ts` which imports from `auth.ts`, they are **dependent** — group them together
-3. Two fixes are **independent** ONLY if:
-   - Their write sets are completely disjoint
-   - Neither reads a file the other writes
-   - They share no import/dependency chain
-   - They share no shared state files (config, constants, types, schemas)
-4. Group dependent fixes together into a **refactoring group**
-5. Each group gets a descriptive slug based on its primary fix
+##### Conflict Graph Construction
+
+Model each planned fix as a node. Add an edge between two fixes (a "critical pair") when they conflict:
+
+1. For each fix, compute the **write set** (files it modifies) and **read set** (files it reads/imports)
+2. Add an edge between fix A and fix B if ANY of these hold:
+   - `write(A) ∩ write(B) ≠ ∅` — both write the same file
+   - `write(A) ∩ read(B) ≠ ∅` — A writes what B reads
+   - `read(A) ∩ write(B) ≠ ∅` — B writes what A reads
+   - Transitive: if fix A writes `auth.ts` and fix B writes `middleware.ts` which imports from `auth.ts`, they are **dependent**
+3. Expand shared state: config files, constants, types, schemas create implicit edges
+
+##### Partition via Connected Components
+
+1. Compute connected components of the conflict graph
+2. Each connected component = one **refactoring group** (must execute sequentially within the group)
+3. Disconnected components = **independent groups** (safe to execute in parallel)
 
 **Isolation verification matrix** — build this table and verify every cell is empty before approving parallel mode:
 
@@ -140,11 +178,11 @@ If ANY cell is non-empty (files appear in multiple groups), merge those groups i
 **Partition result table:**
 
 ```
-| Group | Slug | Issues | Write Set | Read Set | Isolated? |
-|-------|------|--------|-----------|----------|-----------|
-| A | extract-auth | #1, #3 | src/auth.ts, src/middleware.ts | src/types.ts | ✓ |
-| B | simplify-payment | #2 | src/payment.ts | src/types.ts | ✓ |
-| C | cleanup-utils | #4, #5 | src/utils.ts, src/helpers.ts | — | ✓ |
+| Group | Slug | Issues | Write Set | Read Set | Isolated? | Critical Pairs |
+|-------|------|--------|-----------|----------|-----------|----------------|
+| A | extract-auth | #1, #3 | src/auth.ts, src/middleware.ts | src/types.ts | ✓ | #1↔#3 |
+| B | simplify-payment | #2 | src/payment.ts | src/types.ts | ✓ | — |
+| C | cleanup-utils | #4, #5 | src/utils.ts, src/helpers.ts | — | ✓ | #4↔#5 |
 ```
 
 **Rules:**
@@ -212,6 +250,18 @@ Agent(prompt: "...", description: "Refactor: <slug-B>", run_in_background: true)
 Agent(prompt: "...", description: "Refactor: <slug-C>", run_in_background: true)
 ```
 
+#### Cycle-Based Execution (Up to 3 Passes)
+
+Refactoring can create emergent work — extracting a method may reveal a new smell in the extracted code. Support up to 3 execution passes per group:
+
+| Pass | Purpose | Trigger |
+|------|---------|---------|
+| Pass 1 | Execute all planned fixes | Always |
+| Pass 2 | Fix emergent smells from Pass 1 | Re-scan detects new issues in changed files |
+| Pass 3 | Final cleanup pass | Re-scan still detects issues (rare) |
+
+After each pass, re-scan ONLY the files modified in that pass. If no new issues are detected, stop early. Never exceed 3 passes — remaining issues carry to next `/refactor` invocation.
+
 #### Subagent Execution Prompt Template
 
 Each subagent receives a prompt that enforces strict isolation:
@@ -244,8 +294,9 @@ Read set: <explicit file list — you may read these but MUST NOT modify them>
    d. Commit each fix as a separate commit with a descriptive message
 4. Run the test suite: <test command>
 5. If tests fail, fix the issue — but only in your ALLOWED write set
-6. Before reporting, run `git diff --name-only main` and verify EVERY changed file is in your ALLOWED write set
-7. Report back: which issues were fixed, test results, files changed, any blockers
+6. Re-scan changed files for emergent smells (up to 3 passes total)
+7. Before reporting, run `git diff --name-only main` and verify EVERY changed file is in your ALLOWED write set
+8. Report back: which issues were fixed, test results, files changed, any blockers
 
 ## HARD CONSTRAINTS (violations = immediate abort)
 - MUST NOT modify files outside your ALLOWED write set
@@ -280,11 +331,11 @@ If a subagent violated isolation:
 The orchestrator waits for all subagents to complete. As each finishes, record:
 
 ```
-| Group | Slug | Status | Tests | Commits | Notes |
-|-------|------|--------|-------|---------|-------|
-| A | extract-auth | PASS | 42/42 | 2 | — |
-| B | simplify-payment | PASS | 38/38 | 1 | — |
-| C | cleanup-utils | FAIL | 35/37 | 1 | test_helpers.py failed |
+| Group | Slug | Status | Tests | Commits | Passes | Notes |
+|-------|------|--------|-------|---------|--------|-------|
+| A | extract-auth | PASS | 42/42 | 2 | 1 | — |
+| B | simplify-payment | PASS | 38/38 | 1 | 2 | Pass 2 fixed emergent smell |
+| C | cleanup-utils | FAIL | 35/37 | 1 | 1 | test_helpers.py failed |
 ```
 
 ### Phase 5: Merge & Verify
@@ -347,12 +398,372 @@ git branch -d refactor/<slug-C>
 Final summary table:
 
 ```
-| Group | Issues Fixed | Files Changed | Tests | Status |
-|-------|-------------|---------------|-------|--------|
-| A | #1, #3 | 2 | PASS | Merged |
-| B | #2 | 1 | PASS | Merged |
-| C | #4, #5 | 2 | FAIL | Skipped |
+| Group | Issues Fixed | Files Changed | Tests | Passes | Status |
+|-------|-------------|---------------|-------|--------|--------|
+| A | #1, #3 | 2 | PASS | 1 | Merged |
+| B | #2 | 1 | PASS | 2 | Merged |
+| C | #4, #5 | 2 | FAIL | 1 | Skipped |
 ```
+
+---
+
+## Automated Scan Pipeline
+
+Run all static analysis tools in parallel during Phase 1 to minimize wall-clock time. Launch these simultaneously:
+
+| Tool | Purpose | Output |
+|------|---------|--------|
+| jscpd | Duplicate code detection (>25 token threshold) | Duplicate block locations |
+| knip | Dead code and unused export detection | Unused files, exports, dependencies |
+| dependency-cruiser | Module graph and architecture boundary validation | Circular deps, violations |
+| Complexity analyzer | Cognitive complexity per function | Per-function scores |
+| ESLint/Biome/Ruff | Language-specific lint rules | Lint violations |
+
+### Pipeline Execution
+
+```bash
+# Launch all tools in parallel
+jscpd --min-tokens 25 --reporters json src/ &
+npx knip --reporter json &
+npx depcruise --output-type json src/ &
+# Complexity analysis runs inline (see Cognitive Complexity Scoring)
+wait
+```
+
+### Incremental Analysis
+
+When re-running on a previously scanned codebase, only analyze changed files:
+
+1. Compute changed files: `git diff --name-only <last-scan-commit>..HEAD`
+2. Run tools only on changed files
+3. Merge with cached results for unchanged files
+4. Invalidate cache entries for files whose dependencies changed
+
+### Static Analysis Pre-filtering
+
+Run IDE-level static checks before any LLM-based analysis to eliminate hallucination waste:
+
+1. Type checker (tsc, mypy, pyright) catches type errors the LLM might miss
+2. Linter catches formatting and convention issues
+3. Only pass genuine code smells and architectural issues to LLM analysis
+4. This eliminates approximately 6-8% of false positives from LLM-only analysis
+
+---
+
+## Cognitive Complexity Scoring
+
+Compute cognitive complexity for every function in scope using the SonarQube-derived algorithm. This measures how hard a function is to *understand*, not just how long it is.
+
+### Algorithm
+
+| Increment | Condition | Nesting penalty |
+|-----------|-----------|-----------------|
+| +1 | `if`, `else if`, `else` | +1 per nesting level |
+| +1 | `switch` | +1 per nesting level |
+| +1 | `for`, `while`, `do-while`, `for...of`, `for...in` | +1 per nesting level |
+| +1 | `catch` | +1 per nesting level |
+| +1 | Ternary operator `? :` | +1 per nesting level |
+| +1 | Mixed logical operator sequence (`a && b \|\| c`) | No nesting penalty |
+| +1 | Recursion (function calls itself) | No nesting penalty |
+
+### What Does NOT Count
+
+| Construct | Reason |
+|-----------|--------|
+| Null-coalescing (`??`, `?.`) | Simplifies code, not complexity |
+| Early returns / guard clauses | Reduce nesting, improve readability |
+| Lambda/arrow function definitions | Definition is not control flow |
+| Simple `try` blocks (without logic) | Structural, not cognitive |
+| `break`, `continue` | Flow interruption already counted at loop level |
+
+### Thresholds
+
+| Score | Rating | Action |
+|-------|--------|--------|
+| 0-10 | Good | No action required |
+| 11-15 | Moderate | Consider refactoring if in hot path |
+| 16-25 | High | Refactor — extract methods, simplify conditionals |
+| 26+ | Critical | Must refactor — function is unmaintainable |
+
+### Scoring Example
+
+```javascript
+function processOrder(order, user) {        // function declaration: 0
+  if (order.items.length === 0) {            // +1 (if)
+    return null;                             // early return: 0
+  }
+  for (const item of order.items) {          // +1 (for)
+    if (item.quantity > 0) {                 // +2 (if + 1 nesting)
+      if (item.price > 100                   // +3 (if + 2 nesting)
+          && user.isPremium                  // +0 (same operator)
+          || item.isOnSale) {               // +1 (mixed operators)
+        applyDiscount(item);
+      }
+    }
+  }
+}                                            // Total: 8 (Good)
+```
+
+---
+
+## Architecture Analysis
+
+Run during Phase 1 to detect structural problems in the module dependency graph.
+
+### Circular Dependency Detection
+
+Use depth-first search on the module import graph:
+
+1. Build directed graph: each file is a node, each import is an edge
+2. Run DFS, track visited and in-stack nodes
+3. When a back-edge is found (visiting a node already in the stack), record the cycle
+4. Report all cycles with the full path
+
+| Cycle length | Severity | Action |
+|--------------|----------|--------|
+| 2 (A↔B) | Critical | Break immediately — extract shared interface |
+| 3-4 | High | Refactor — introduce mediator or event bus |
+| 5+ | High | Architectural redesign needed |
+
+### Architecture Boundary Validation
+
+Define allowed dependency directions using configurable path rules:
+
+```
+| Source pattern | May depend on | Must NOT depend on |
+|----------------|--------------|-------------------|
+| src/ui/** | src/services/**, src/types/** | src/db/**, src/infra/** |
+| src/services/** | src/db/**, src/types/** | src/ui/** |
+| src/db/** | src/types/** | src/ui/**, src/services/** |
+```
+
+Flag any import that violates the boundary rules as an architecture smell.
+
+### Fan-in / Fan-out Centrality Analysis
+
+Compute centrality metrics for each module to identify high-risk refactoring targets:
+
+| Metric | Definition | Significance |
+|--------|-----------|--------------|
+| Fan-in | Number of modules that import this module | High fan-in = many dependents, high-risk changes |
+| Fan-out | Number of modules this module imports | High fan-out = high coupling, smell indicator |
+| Instability | Fan-out / (Fan-in + Fan-out) | 0 = stable (many dependents), 1 = unstable (many dependencies) |
+
+**Prioritization rule:** Modules with high fan-in (>10) should be refactored with extreme care. Modules with high fan-out (>10) are prime candidates for decomposition.
+
+### Orphan Module Detection
+
+Identify modules with zero fan-in (no other module imports them) that are not entry points:
+
+1. Build the full import graph
+2. Find all nodes with fan-in = 0
+3. Exclude known entry points (main, index, test files, config)
+4. Remaining nodes are orphan candidates — likely dead code
+
+---
+
+## Code Smell Detection Catalog
+
+Complete catalog of 22 code smells organized by category. Use during Phase 1 scan.
+
+### Bloaters
+
+| # | Smell | Detection Signal | Threshold |
+|---|-------|-----------------|-----------|
+| 1 | Long Method | Line count or cognitive complexity | >20 lines OR complexity >15 |
+| 2 | Large Class | Line count, field count, method count | >300 lines, >10 fields, OR >20 methods |
+| 3 | Primitive Obsession | Repeated primitive params representing a concept | 3+ primitives that belong together |
+| 4 | Long Parameter List | Parameter count per function | >3 parameters |
+| 5 | Data Clumps | Same group of fields appearing together | Same 3+ fields in 2+ locations |
+
+### Object-Orientation Abusers
+
+| # | Smell | Detection Signal | Threshold |
+|---|-------|-----------------|-----------|
+| 6 | Switch Statements | Switch/if-else chains on type codes | >3 cases dispatching on same value |
+| 7 | Temporary Field | Fields only set/used in certain paths | Field null/undefined in >50% of methods |
+| 8 | Refused Bequest | Subclass ignores parent methods/fields | Overrides >50% of inherited interface |
+| 9 | Alt Classes, Different Interfaces | Two classes doing the same thing differently | Similar method bodies, different signatures |
+
+### Change Preventers
+
+| # | Smell | Detection Signal | Threshold |
+|---|-------|-----------------|-----------|
+| 10 | Divergent Change | One class changed for many different reasons | >3 unrelated change reasons in git history |
+| 11 | Shotgun Surgery | One change requires edits across many files | Change spans >5 files |
+| 12 | Parallel Inheritance | Creating subclass in one hierarchy forces subclass in another | 1:1 subclass correspondence across hierarchies |
+
+### Dispensables
+
+| # | Smell | Detection Signal | Threshold |
+|---|-------|-----------------|-----------|
+| 13 | Duplicate Code | Token-level similarity between code blocks | >25 tokens duplicated |
+| 14 | Dead Code | Unreachable or unused code | Zero references (fan-in = 0, not entry point) |
+| 15 | Lazy Class | Class does too little to justify its existence | <3 methods AND <50 lines |
+| 16 | Speculative Generality | Abstractions created for future use that never came | Abstract class/interface with single implementation |
+| 17 | Data Class | Class with only fields and getters/setters, no behavior | 0 business-logic methods |
+| 18 | Excessive Comments | Comments compensating for unclear code | Comment-to-code ratio >0.5 in a function |
+
+### Couplers
+
+| # | Smell | Detection Signal | Threshold |
+|---|-------|-----------------|-----------|
+| 19 | Feature Envy | Method uses another class's data more than its own | >50% of references are to external class |
+| 20 | Inappropriate Intimacy | Two classes access each other's internals | Bidirectional private/protected access |
+| 21 | Message Chains | Long chains of method calls (a.b().c().d()) | >3 chained calls |
+| 22 | Middle Man | Class delegates most work to another class | >50% of methods are pure delegation |
+
+---
+
+## Refactoring Technique Catalog
+
+Complete catalog of 66 refactoring techniques organized by category. Use during Phase 3 to select the right technique for each detected smell.
+
+### Composing Methods (9 Techniques)
+
+| # | Technique | When to Apply | Detection Signal |
+|---|-----------|---------------|-----------------|
+| 1 | Extract Method | Long method, code comment explaining a block | Function >20 lines or complexity >15 |
+| 2 | Inline Method | Method body is as clear as its name | Single-line method called once |
+| 3 | Extract Variable | Complex expression hard to understand | Expression with 3+ operators |
+| 4 | Inline Temp | Temp variable used once, assigned simple expression | Single-use temp with trivial RHS |
+| 5 | Replace Temp with Query | Temp holds a computed value reusable elsewhere | Temp assigned then used in multiple places |
+| 6 | Split Temporary Variable | One temp assigned multiple times for different purposes | Variable reassigned with different semantics |
+| 7 | Remove Assignments to Parameters | Function parameter is reassigned | Parameter on LHS of assignment |
+| 8 | Replace Method with Method Object | Long method with many local variables preventing extraction | >5 local variables in a long method |
+| 9 | Substitute Algorithm | Algorithm can be replaced with a clearer one | Complex loop replaceable by built-in or library call |
+
+### Moving Features Between Objects (8 Techniques)
+
+| # | Technique | When to Apply | Detection Signal |
+|---|-----------|---------------|-----------------|
+| 10 | Move Method | Method uses more features of another class | >50% external references (Feature Envy) |
+| 11 | Move Field | Field used more by another class | >50% access from external class |
+| 12 | Extract Class | One class doing the work of two | Class has 2+ distinct responsibility clusters |
+| 13 | Inline Class | Class does too little | <3 methods, <50 lines (Lazy Class) |
+| 14 | Hide Delegate | Client calls through an object to get to another | Message Chain >3 links |
+| 15 | Remove Middle Man | Class has too many delegating methods | >50% delegation (Middle Man) |
+| 16 | Introduce Foreign Method | Utility method needed on a class you cannot modify | Repeated helper code for external class |
+| 17 | Introduce Local Extension | Multiple foreign methods needed for same class | 3+ foreign methods for one class |
+
+### Organizing Data (13 Techniques)
+
+| # | Technique | When to Apply | Detection Signal |
+|---|-----------|---------------|-----------------|
+| 18 | Self Encapsulate Field | Direct field access causes coupling issues | Subclass needs to override field access |
+| 19 | Replace Data Value with Object | Primitive represents a concept with behavior | Primitive + related validation/formatting logic |
+| 20 | Change Value to Reference | Many identical objects should be one shared instance | Equality checks on data that should be identity |
+| 21 | Change Reference to Value | Reference object is simple and immutable | Small object with no side effects |
+| 22 | Replace Array with Object | Array elements mean different things by position | Array with positional semantics (arr[0] = name) |
+| 23 | Duplicate Observed Data | Domain data trapped in UI class | UI class holds business state |
+| 24 | Change Unidirectional to Bidirectional | Two classes need to reference each other | Class A uses B, and B needs A |
+| 25 | Change Bidirectional to Unidirectional | Bidirectional reference no longer needed | One direction is never traversed |
+| 26 | Replace Magic Number with Constant | Hardcoded number with special meaning | Numeric literal in condition or calculation |
+| 27 | Encapsulate Field | Public field with no access control | Public field on a class |
+| 28 | Encapsulate Collection | Getter returns raw collection | Mutable collection returned by reference |
+| 29 | Replace Type Code with Class | Type code (int/string) represents a category | String/int constants used in conditionals |
+| 30 | Replace Type Code with Subclasses | Type code affects behavior | Switch/if on type code in multiple methods |
+
+### Simplifying Conditional Expressions (8 Techniques)
+
+| # | Technique | When to Apply | Detection Signal |
+|---|-----------|---------------|-----------------|
+| 31 | Decompose Conditional | Complex conditional expression | If-condition with 3+ clauses |
+| 32 | Consolidate Conditional Expression | Multiple conditionals with same result | Adjacent if-blocks returning same value |
+| 33 | Consolidate Duplicate Conditional Fragments | Same code in all branches | Identical statements in if and else |
+| 34 | Remove Control Flag | Boolean flag controlling loop exit | Variable set to break out of loop |
+| 35 | Replace Nested Conditional with Guard Clauses | Deep nesting from sequential checks | Nesting depth >3 from if-chains |
+| 36 | Replace Conditional with Polymorphism | Switch on type determines behavior | Switch statement in >1 method on same type |
+| 37 | Introduce Null Object | Repeated null checks for same object | >3 null checks for same variable |
+| 38 | Introduce Assertion | Code assumes a condition but does not verify it | Implicit precondition without validation |
+
+### Simplifying Method Calls (14 Techniques)
+
+| # | Technique | When to Apply | Detection Signal |
+|---|-----------|---------------|-----------------|
+| 39 | Rename Method | Name does not reveal intent | Name is generic (process, handle, doStuff) |
+| 40 | Add Parameter | Method needs additional data from caller | Caller computes value method should receive |
+| 41 | Remove Parameter | Parameter is no longer used | Parameter unused in method body |
+| 42 | Separate Query from Modifier | Method both returns value and changes state | Method with return value AND side effects |
+| 43 | Parameterize Method | Multiple methods do similar things with different values | 2+ methods differing only in a constant |
+| 44 | Replace Parameter with Explicit Methods | Method behavior depends entirely on parameter value | Boolean/enum param selecting code path |
+| 45 | Preserve Whole Object | Extracting values from object to pass individually | 3+ fields extracted then passed |
+| 46 | Replace Parameter with Method Call | Param value can be obtained by callee | Caller passes value callee can compute itself |
+| 47 | Introduce Parameter Object | Group of parameters always passed together | Same 3+ params in multiple signatures |
+| 48 | Remove Setting Method | Field should be set only at creation time | Setter called only in constructor |
+| 49 | Hide Method | Method only used inside its own class | Zero external callers |
+| 50 | Replace Constructor with Factory Method | Complex construction logic or multiple creation paths | Constructor with conditional logic |
+| 51 | Replace Error Code with Exception | Method returns error codes | Return value checked for error sentinel |
+| 52 | Replace Exception with Test | Exception used for control flow | Try/catch wrapping expected conditions |
+
+### Dealing with Generalization (14 Techniques)
+
+| # | Technique | When to Apply | Detection Signal |
+|---|-----------|---------------|-----------------|
+| 53 | Pull Up Field | Duplicate field in sibling subclasses | Same field in 2+ subclasses |
+| 54 | Pull Up Method | Duplicate method in sibling subclasses | Same method body in 2+ subclasses |
+| 55 | Pull Up Constructor Body | Duplicate constructor logic in subclasses | Identical constructor lines in subclasses |
+| 56 | Push Down Method | Method only relevant to one subclass | Method used by only 1 of N subclasses |
+| 57 | Push Down Field | Field only relevant to one subclass | Field accessed by only 1 of N subclasses |
+| 58 | Extract Subclass | Class has features used only in some instances | Fields/methods only used for subset of objects |
+| 59 | Extract Superclass | Two classes with similar features | 2 classes sharing 3+ similar methods/fields |
+| 60 | Extract Interface | Multiple classes share a subset of methods | Classes used interchangeably for some operations |
+| 61 | Collapse Hierarchy | Subclass adds no real behavior | Subclass with 0 additional methods/fields |
+| 62 | Form Template Method | Subclasses have methods with same structure but different steps | Similar method outlines in sibling classes |
+| 63 | Replace Inheritance with Delegation | Subclass uses only part of parent interface | Refused Bequest — overrides >50% of parent |
+| 64 | Replace Delegation with Inheritance | Class delegates everything to another class | Middle Man — >50% pure delegation |
+| 65 | Tease Apart Inheritance | One hierarchy serving two responsibilities | Inheritance tree splits along 2 dimensions |
+| 66 | Convert Procedural Design to Objects | Procedural code in an OO context | Long functions with data + behavior separated |
+
+---
+
+## Speed Optimizations
+
+Apply these patterns to reduce refactoring wall-clock time.
+
+### Parallel Scan Pipeline
+
+Run all Phase 1 analysis tools simultaneously rather than sequentially. See [Automated Scan Pipeline](#automated-scan-pipeline) for the full list. Expected speedup: 3-5x on typical codebases.
+
+### Incremental Re-analysis
+
+| Scenario | Strategy |
+|----------|----------|
+| First scan | Full analysis of all files in scope |
+| Re-scan after fix | Only re-analyze files in the fix's write set |
+| Re-scan after merge | Only re-analyze files changed since last scan commit |
+| Cached results | Store per-file analysis keyed by file content hash |
+
+### Scope-Limited Impact Analysis
+
+When planning a fix, do NOT analyze the full codebase for impact. Instead:
+
+1. Build the affected subgraph: start from the file being modified
+2. Walk outward through direct importers (fan-in, depth 1)
+3. Walk outward through importers of importers (depth 2) only if the public API changes
+4. Stop at depth 2 — changes rarely propagate further
+5. Only run tests that cover files in the affected subgraph
+
+### Analysis Ordering Strategy
+
+Run cheap deterministic checks before expensive LLM analysis:
+
+| Order | Check | Cost | Catches |
+|-------|-------|------|---------|
+| 1 | Type checker | Low | Type errors, null safety |
+| 2 | Linter | Low | Style, conventions, simple bugs |
+| 3 | Complexity analyzer | Low | Function complexity scores |
+| 4 | Duplicate detector | Medium | Copy-paste code blocks |
+| 5 | Architecture validator | Medium | Boundary violations, cycles |
+| 6 | LLM-based smell detection | High | Semantic smells, design issues |
+
+This pipeline eliminates 6-8% of false positive work from LLM-only analysis.
+
+### Cycle-Based Execution
+
+Support up to 3 refactoring passes per group when refactoring creates emergent work. See [Phase 4: Execute](#phase-4-execute) for details. Limit to 3 passes to prevent infinite loops from oscillating fixes.
+
+---
 
 ## Quick Modes
 
@@ -367,6 +778,8 @@ The user can scope the refactoring with arguments:
 | `/refactor performance` | Performance-focused scan using `performance-anti-patterns` |
 | `/refactor review` | Full code review using `review-cheat-sheet` as guide |
 | `/refactor auto` | Force auto mode — plan, partition, execute in parallel, merge without confirmation |
+| `/refactor arch` | Architecture-only analysis — circular deps, boundaries, centrality |
+| `/refactor complexity` | Cognitive complexity report only — no fixes |
 
 ## Cross-Reference Map
 

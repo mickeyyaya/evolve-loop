@@ -14,13 +14,23 @@
 
 set -euo pipefail
 
-EVAL_FILE="${1:?Usage: verify-eval.sh <eval-file.md> [workspace-path]}"
+EVAL_INPUT="${1:?Usage: verify-eval.sh <eval-file-or-dir> [workspace-path]}"
 WORKSPACE="${2:-.evolve/workspace}"
 
 TOTAL=0
 PASSED=0
 FAILED=0
 RESULTS=""
+
+# If a directory is passed, concatenate all eval files for command extraction
+if [ -d "$EVAL_INPUT" ]; then
+  EVAL_FILE=$(mktemp)
+  cat "$EVAL_INPUT"/*.md > "$EVAL_FILE" 2>/dev/null || true
+  CLEANUP_EVAL=true
+else
+  EVAL_FILE="$EVAL_INPUT"
+  CLEANUP_EVAL=false
+fi
 
 # Extract eval commands from markdown
 # Handles: - `command here` format
@@ -29,6 +39,11 @@ COMMANDS=$(grep -E '^\s*-\s*`[^`]+`' "$EVAL_FILE" 2>/dev/null | sed 's/.*`\(.*\)
 if [ -z "$COMMANDS" ]; then
   # Try alternate format
   COMMANDS=$(grep -E '^\s*-\s*command:\s*' "$EVAL_FILE" 2>/dev/null | sed 's/.*command:\s*//' | tr -d '"' || true)
+fi
+
+# Clean up temp file if created
+if [ "$CLEANUP_EVAL" = true ] && [ -f "$EVAL_FILE" ]; then
+  trap "rm -f $EVAL_FILE" EXIT
 fi
 
 if [ -z "$COMMANDS" ]; then

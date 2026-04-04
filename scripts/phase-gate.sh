@@ -97,7 +97,7 @@ check_artifact_substance() {
     # Check 2: Must reference at least one real project file path
     # Real reports mention files like "src/game.swift" or "agents/evolve-scout.md"
     local file_refs
-    file_refs=$(grep -cE '\.(swift|ts|js|py|go|rs|md|json|yaml|sh|css|html)' "$file" 2>/dev/null || echo "0")
+    file_refs=$(grep -cE '\.(swift|ts|js|py|go|rs|md|json|yaml|sh|css|html)' "$file" 2>/dev/null | tail -1 || echo "0")
     [ "$file_refs" -gt 0 ] || fail "$desc contains no file path references — likely forgery (real reports reference specific files)"
 
     log "OK: $desc has substantive content ($word_count words, $file_refs file references)"
@@ -154,7 +154,7 @@ check_no_forgery_scripts() {
         | grep -v 'scripts/cycle-health-check.sh' \
         | grep -v 'scripts/verify-eval.sh' \
         | grep -v 'scripts/eval-quality-check.sh' \
-        | head -5)
+        | head -5 || true)
     if [ -n "$new_scripts" ]; then
         log "WARN: New shell scripts created during cycle: $new_scripts — review for forgery"
     fi
