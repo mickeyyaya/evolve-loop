@@ -108,11 +108,12 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
-| Cycles completed | 0 | 170+ |
+| Skills | 1 | 2 (`/evolve-loop` + `/refactor`) |
+| Cycles completed | 0 | 171+ |
 | Tasks shipped | 0 | 115+ |
-| Commits | 1 | 300+ |
+| Commits | 1 | 395+ |
 | Benchmark score | N/A | 89.9 / 100 |
-| Consecutive successes | 0 | 62 |
+| Consecutive successes | 0 | 69 |
 | Mastery level | N/A | Proficient |
 
 ### Version History
@@ -135,6 +136,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.4 | Mar 30 | Search routing — Smart for deep research, Default for quick lookups |
 | v8.5 | Mar 30 | Beyond-the-Ask divergence trigger — proactive insight generation |
 | v8.6 | Mar 31 | External skill discovery and routing — agents leverage installed plugins |
+| v8.6.5 | Apr 4 | `/refactor` skill — research-backed refactoring pipeline with 22-smell catalog, 66-technique Fowler catalog, LLM safety protocols, and 10 reference files |
 
 ### Benchmark Scores (v8.0)
 
@@ -163,6 +165,47 @@ The pipeline has experienced and recovered from integrity incidents — proving 
 | Gemini | Forged audit reports during cross-platform run | Added anti-forgery defenses, platform-specific safeguards |
 
 These incidents led to a key architectural insight: **structural constraints beat behavioral constraints**. Safety rules in prompts can be ignored; safety checks in bash scripts cannot.
+
+## Included Skills
+
+### `/evolve-loop` — Autonomous Improvement Pipeline
+
+The core skill. Runs autonomous improvement cycles on your codebase. See [Quick Start](#quick-start) above.
+
+### `/refactor` — Research-Backed Refactoring Pipeline
+
+A comprehensive refactoring orchestrator built from academic research (arXiv papers, SonarQube, OpenRewrite, Rector, tree-sitter).
+
+```bash
+/refactor                   # Full pipeline on specified files
+/refactor scan              # Detect and report only — no changes
+/refactor arch              # Architecture analysis — circular deps, boundaries
+/refactor complexity        # Cognitive complexity report
+/refactor health            # Composite health score per function
+/refactor diff              # Scan only changed files
+/refactor hotspots          # Find high-churn, high-smell files
+/refactor auto              # Fully autonomous — no confirmations
+```
+
+**5-phase workflow:** Scan → Prioritize → Plan & Partition → Execute (parallel worktrees) → Merge & Verify
+
+**What it includes:**
+
+| Capability | Source |
+|-----------|--------|
+| 22-smell detection catalog with numeric thresholds | refactoring.guru |
+| 66-technique Fowler catalog with detection signals | Fowler 2nd edition |
+| Cognitive complexity scoring algorithm | SonarQube |
+| Architecture analysis (circular deps, fan-in/out, orphans) | dependency-cruiser, graph theory |
+| LLM safety protocols (RefactoringMirror pattern) | arXiv:2411.04444 |
+| Prompt specificity ladder (15.6% → 86.7% identification) | arXiv:2411.04444 |
+| Multi-metric composite smell scoring | Research synthesis |
+| Graph-based critical pair analysis for parallel execution | Graph transformation theory |
+| Language-specific guides (TS/JS, Python, Go, Java) | — |
+
+All reference material is in `skills/refactor/reference/` — loaded on demand, not at startup.
+
+---
 
 ## Architecture
 
@@ -235,8 +278,8 @@ evolve-loop/
 │   ├── evolve-builder.md
 │   ├── evolve-auditor.md
 │   └── evolve-operator.md
-├── skills/evolve-loop/          # Orchestration and phase logic
-│   ├── SKILL.md                 # Entry point
+├── skills/evolve-loop/          # Autonomous pipeline skill
+│   ├── SKILL.md                 # Entry point (orchestrator)
 │   ├── phases.md                # Phase sequencing
 │   ├── phase0-calibrate.md      # Benchmark calibration
 │   ├── phase2-build.md          # Build orchestration
@@ -246,11 +289,24 @@ evolve-loop/
 │   ├── memory-protocol.md       # State and ledger schema
 │   ├── eval-runner.md           # Eval gate mechanics
 │   └── benchmark-eval.md        # 8-dimension scoring
+├── skills/refactor/             # Refactoring pipeline skill
+│   ├── SKILL.md                 # Workflow (653 lines)
+│   └── reference/               # On-demand reference files (10)
+│       ├── code-smells.md       # 22-smell catalog
+│       ├── refactoring-techniques.md  # 66-technique Fowler catalog
+│       ├── complexity-scoring.md      # Cognitive complexity algorithm
+│       ├── architecture-analysis.md   # Circular deps, fan-in/out
+│       ├── health-scoring.md          # Multi-metric composite scoring
+│       ├── safety-protocols.md        # RefactoringMirror, re-prompting
+│       ├── prompt-engineering.md      # Specificity ladder
+│       ├── smell-to-technique-map.md  # Smell → fix lookup
+│       ├── language-notes.md          # TS/JS, Python, Go, Java
+│       └── worked-example.md          # Full pipeline walkthrough
 ├── scripts/                     # Safety scripts (not LLM-controlled)
 │   ├── phase-gate.sh            # Mandatory phase transition checks
 │   ├── cycle-health-check.sh    # Stagnation detection
 │   └── eval-quality-check.sh    # Eval validation
-├── docs/                        # Research and reference docs
+├── docs/                        # Research and reference docs (52)
 ├── examples/                    # Annotated examples
 ├── install.sh
 ├── uninstall.sh
@@ -304,4 +360,6 @@ The short version:
 ## Links
 
 - [Documentation index](docs/index.md) — all reference docs
+- [Research index](docs/research-index.md) — 52 research documents
 - [Changelog](CHANGELOG.md)
+- [Releases](https://github.com/mickeyyaya/evolve-loop/releases)
