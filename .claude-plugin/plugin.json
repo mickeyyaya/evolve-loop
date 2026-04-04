@@ -25,6 +25,7 @@
     "./agents/evolve-operator.md"
   ],
   "skills": [
-    "./skills/evolve-loop/"
+    "./skills/evolve-loop/",
+    "./skills/refactor/"
   ]
 }
