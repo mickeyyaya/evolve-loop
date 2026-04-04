@@ -8,9 +8,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Total documents | 49 |
-| Total lines | 8,742 |
-| Categories | 9 |
+| Total documents | 52 |
+| Total lines | 10,128 |
+| Categories | 10 |
 | Subdirectories | `reference/` (4 docs), `incidents/` (3 docs) |
 
 ---
@@ -161,6 +161,16 @@ Documents that reference other docs in this knowledge base.
 | [prompt-evolution-optimization.md](prompt-evolution-optimization.md) | eval graders |
 | [reference/builder-techniques.md](reference/builder-techniques.md) | scout-techniques.md |
 | [reference/orchestrator-techniques.md](reference/orchestrator-techniques.md) | instincts.md, genes.md |
+
+### Refactoring
+
+Automated refactoring research, tool landscape, and pipeline architecture.
+
+| Doc | Key Topic | Lines |
+|-----|-----------|-------|
+| [refactoring-llm-research.md](refactoring-llm-research.md) | LLM refactoring studies (arXiv 2024-2025), RefactoringMirror pattern, safety stats, model comparison | 574 |
+| [refactoring-tools-landscape.md](refactoring-tools-landscape.md) | Tool catalog (SonarQube, ESLint, jscpd, knip, dep-cruiser), 66-technique catalog, detection algorithms | 361 |
+| [refactoring-pipeline-architecture.md](refactoring-pipeline-architecture.md) | AST transformation tools (OpenRewrite, Rector, tree-sitter, jscodeshift), pipeline design, anti-patterns | 451 |
 
 ---
 
