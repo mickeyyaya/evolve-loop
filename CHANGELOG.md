@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.6.6] - 2026-04-05
+
+### Added
+- **Rate Limit Recovery Protocol** — Detects API rate limits after every agent dispatch (Scout, Builder, Auditor) and auto-schedules resumption via `/schedule` (remote trigger) or `/loop` (local retry) instead of silently dying.
+- **3-tier auto-resumption** — Priority cascade: remote trigger (≥1hr limits) → local loop (short limits) → manual fallback.
+- **Consecutive failure tracking** — 3+ sequential agent failures trigger rate limit recovery as a safety net.
+- **Plugin cache refresh in release flow** — `scripts/release.sh` now clears stale plugin cache, updates marketplace checkout, and refreshes the plugin registry automatically.
+
+### Changed
+- Orchestrator loop step 6 now includes rate limit check after every agent dispatch.
+- `reference/policies.md` extended with Rate Limit Recovery section and comparison table (rate limit vs context budget).
+- `phases.md` adds rate limit recovery gate wrapping all agent dispatches.
+
 ## [8.6.0] - 2026-03-31
 
 ### Added

@@ -170,7 +170,93 @@ check_contains "README.md" "v${MAJOR_MINOR}" "README.md version history row for 
 echo ""
 echo "--- Manual checks ---"
 printf "${YELLOW}REMIND${NC}   %-45s %s\n" "GitHub release" "Create release v${TARGET_VERSION} after push"
-printf "${YELLOW}REMIND${NC}   %-45s %s\n" "Plugin cache" "Users may need: claude plugin update evolve-loop@evolve-loop"
+
+# --- Plugin Cache Refresh ---
+
+echo ""
+echo "--- Plugin cache refresh ---"
+
+PLUGIN_CACHE_DIR="$HOME/.claude/plugins/cache/evolve-loop"
+PLUGIN_MARKETPLACE_DIR="$HOME/.claude/plugins/marketplaces/evolve-loop"
+PLUGIN_REGISTRY="$HOME/.claude/plugins/installed_plugins.json"
+CURRENT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+
+CACHE_REFRESHED=false
+
+# Clear stale cache directory
+if [[ -d "$PLUGIN_CACHE_DIR" ]]; then
+  rm -rf "$PLUGIN_CACHE_DIR"
+  printf "${GREEN}CLEANED${NC}  %-45s %s\n" "Plugin cache" "Removed stale cache at $PLUGIN_CACHE_DIR"
+  CACHE_REFRESHED=true
+else
+  printf "${GREEN}OK${NC}       %-45s %s\n" "Plugin cache" "No stale cache found"
+fi
+
+# Update marketplace checkout
+if [[ -d "$PLUGIN_MARKETPLACE_DIR/.git" ]]; then
+  MARKETPLACE_SHA=$(git -C "$PLUGIN_MARKETPLACE_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+  if [[ "$MARKETPLACE_SHA" != "$CURRENT_SHA" ]]; then
+    git -C "$PLUGIN_MARKETPLACE_DIR" pull origin main --ff-only 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+      printf "${GREEN}UPDATED${NC}  %-45s %s\n" "Marketplace checkout" "Pulled latest ($(git -C "$PLUGIN_MARKETPLACE_DIR" rev-parse --short HEAD))"
+      CACHE_REFRESHED=true
+    else
+      printf "${RED}FAILED${NC}   %-45s %s\n" "Marketplace checkout" "git pull failed — update manually"
+      ERRORS=$((ERRORS + 1))
+    fi
+  else
+    printf "${GREEN}OK${NC}       %-45s %s\n" "Marketplace checkout" "Already at latest ($CURRENT_SHA)"
+  fi
+elif [[ -d "$PLUGIN_MARKETPLACE_DIR" ]]; then
+  printf "${YELLOW}SKIP${NC}     %-45s %s\n" "Marketplace checkout" "Not a git repo — cannot auto-update"
+fi
+
+# Update installed_plugins.json registry
+if [[ -f "$PLUGIN_REGISTRY" ]]; then
+  # Check if the registry still points to the old version
+  REGISTRY_VERSION=$(sed -n '/"evolve-loop@evolve-loop"/,/\]/{ s/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p; }' "$PLUGIN_REGISTRY" | head -1)
+  if [[ -n "$REGISTRY_VERSION" && "$REGISTRY_VERSION" != "$TARGET_VERSION" ]]; then
+    # Update version
+    sed -i '' "s|\"installPath\": \".*cache/evolve-loop[^\"]*\"|\"installPath\": \"$PLUGIN_MARKETPLACE_DIR\"|" "$PLUGIN_REGISTRY"
+    sed -i '' "/"evolve-loop@evolve-loop"/,/\]/{
+      s/\"version\": \"[^\"]*\"/\"version\": \"$TARGET_VERSION\"/
+      s/\"gitCommitSha\": \"[^\"]*\"/\"gitCommitSha\": \"$CURRENT_SHA\"/
+    }" "$PLUGIN_REGISTRY" 2>/dev/null
+    # Simpler approach: use python for reliable JSON update
+    python3 -c "
+import json, sys
+with open('$PLUGIN_REGISTRY', 'r') as f:
+    data = json.load(f)
+key = 'evolve-loop@evolve-loop'
+if key in data.get('plugins', {}):
+    for entry in data['plugins'][key]:
+        entry['version'] = '$TARGET_VERSION'
+        entry['installPath'] = '$PLUGIN_MARKETPLACE_DIR'
+        entry['gitCommitSha'] = '$CURRENT_SHA'
+        entry['lastUpdated'] = '$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'
+    with open('$PLUGIN_REGISTRY', 'w') as f:
+        json.dump(data, f, indent=2)
+    print('updated')
+else:
+    print('not-found')
+" 2>/dev/null
+    RESULT=$?
+    if [[ $RESULT -eq 0 ]]; then
+      printf "${GREEN}UPDATED${NC}  %-45s %s\n" "Plugin registry" "Updated to v${TARGET_VERSION} (SHA: ${CURRENT_SHA:0:7})"
+      CACHE_REFRESHED=true
+    else
+      printf "${RED}FAILED${NC}   %-45s %s\n" "Plugin registry" "Could not update installed_plugins.json"
+      ERRORS=$((ERRORS + 1))
+    fi
+  else
+    printf "${GREEN}OK${NC}       %-45s %s\n" "Plugin registry" "Already at v${TARGET_VERSION}"
+  fi
+fi
+
+if $CACHE_REFRESHED; then
+  printf "\n${GREEN}Plugin cache refreshed.${NC} New sessions will use v${TARGET_VERSION}.\n"
+  printf "Run ${YELLOW}/reload-plugins${NC} in existing sessions to pick up the update.\n"
+fi
 
 # --- Summary ---
 
