@@ -126,6 +126,31 @@ The inventory is compact (~1-2KB). It is NOT passed to agents in full — only t
 
 ## FOR each cycle (while remainingCycles > 0):
 
+### Rate Limit Recovery (wraps every agent dispatch)
+
+Track consecutive agent failures across all phases. After every agent dispatch (Scout, Builder, Auditor), check the return value for rate limit signals. See [policies.md § Rate Limit Recovery Protocol](reference/policies.md#rate-limit-recovery-protocol) for full detection logic.
+
+```
+CONSECUTIVE_FAILURES=0
+
+# After each agent dispatch:
+check_rate_limit(agent_result):
+  if agent_result contains "rate limit|quota|overloaded|429|too many requests":
+    → execute Rate Limit Recovery Protocol
+  if agent_failed:
+    CONSECUTIVE_FAILURES += 1
+    if CONSECUTIVE_FAILURES >= 3:
+      → execute Rate Limit Recovery Protocol
+  else:
+    CONSECUTIVE_FAILURES = 0
+```
+
+**On rate limit detection:**
+1. Complete current phase (never break mid-phase)
+2. Write handoff using Session Break Handoff Template (cause: "API rate limit")
+3. Auto-schedule resume: try `/schedule` first (remote trigger at next hour), fall back to `/loop 5m`, fall back to manual resume instructions
+4. **STOP** — do not start next phase
+
 ### Context Window Budget Gate (MANDATORY — runs before anything else)
 
 Run `scripts/context-budget.sh` before any agent invocation. This is a hard gate — like `phase-gate.sh`, it cannot be skipped.

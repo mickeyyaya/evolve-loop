@@ -88,8 +88,9 @@ For each cycle:
 3. Scout → Builder → Auditor → phase-gate verification → Ship → Learn
 4. Inline S-tasks directly; worktree M-tasks with `isolation: "worktree"`
 5. Max 3 retries per task; WARN/FAIL blocks shipping
-6. Output Discovery Briefing (shipped tasks, discoveries, proposals queued, benchmark, discovery velocity) → continue immediately
-7. **Never stop to ask. Never skip agents. Never fabricate cycles.**
+6. **After every agent dispatch** → check for rate limit signals (see [policies.md](reference/policies.md#rate-limit-recovery-protocol)). If hit → write handoff → auto-schedule resume via `/schedule` or `/loop` → STOP
+7. Output Discovery Briefing (shipped tasks, discoveries, proposals queued, benchmark, discovery velocity) → continue immediately
+8. **Never stop to ask. Never skip agents. Never fabricate cycles.**
 
 ## Agents
 
@@ -134,7 +135,7 @@ Full rules: [reference/model-routing.md](../../docs/model-routing.md)
 ### Policies & Safety
 | File | When to read |
 |------|-------------|
-| [reference/policies.md](reference/policies.md) | Instincts, plan caching, token budgets, context management |
+| [reference/policies.md](reference/policies.md) | Instincts, plan caching, token budgets, context management, rate limit recovery |
 | [reference/safety.md](reference/safety.md) | Phase gate, anti-patterns, known incidents |
 | [reference/task-selection.md](reference/task-selection.md) | Bandit mechanism, novelty, adaptive strictness |
 | [agents/agent-templates.md](../../agents/agent-templates.md) | Shared agent schemas, budget awareness |

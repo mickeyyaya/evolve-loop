@@ -138,6 +138,7 @@ This template ensures zero information loss across session boundaries. Every fie
 | Budget pressure / lean mode | RESETS | Re-inferred | context-budget.sh re-evaluates from 0 |
 | Challenge token | RESETS | Regenerated | New token per cycle (by design) |
 | Orchestrator reasoning | PARTIAL | handoff.md "Carry Forward" | **Write anything non-obvious here** |
+| Rate limit trigger ID | YES | handoff.md "Carry Forward" | If auto-scheduled, include trigger ID for cleanup |
 
 ### Cycle-per-Session Estimates
 
@@ -152,6 +153,140 @@ This template ensures zero information loss across session boundaries. Every fie
 ### Why Not Auto-Compact?
 
 Claude Code's auto-compaction is lossy and unpredictable — it discards context at arbitrary points, potentially losing critical cycle state (eval checksums, challenge tokens, failed approaches). Deliberate session breaks with structured handoffs preserve 100% of decision-relevant context while resetting the noise floor.
+
+## Rate Limit Recovery Protocol
+
+API rate limits are a **hard external wall** — unlike context budget (internal quality concern), rate limits stop execution entirely. The orchestrator MUST detect rate limit signals and schedule automatic resumption instead of silently dying.
+
+### Detection Signals
+
+Rate limits manifest as tool call failures. After every agent dispatch or tool call, check for these patterns:
+
+| Signal | Detection | Meaning |
+|--------|-----------|---------|
+| Agent returns error with "rate limit" or "quota" | Check agent return value for error keywords | API rate limit hit |
+| Agent returns error with "overloaded" or "capacity" | Check agent return value | Server capacity limit |
+| `/usage` shows limit approaching | User reports or hook detects | Preemptive signal |
+| Repeated tool failures (3+ in sequence) | Track consecutive failures | Likely rate-limited |
+| Agent timeout without output | No response after extended wait | Possible silent throttle |
+
+### Detection Check (after every agent dispatch)
+
+```bash
+# After each Agent tool call, check the return for rate limit signals
+RATE_LIMITED=false
+if echo "$AGENT_RESULT" | grep -qi "rate.limit\|quota.exceeded\|overloaded\|capacity\|too.many.requests\|429"; then
+  RATE_LIMITED=true
+fi
+```
+
+The orchestrator also tracks consecutive agent failures:
+
+```
+CONSECUTIVE_FAILURES=${CONSECUTIVE_FAILURES:-0}
+if agent_failed; then
+  CONSECUTIVE_FAILURES=$(( CONSECUTIVE_FAILURES + 1 ))
+  if [ "$CONSECUTIVE_FAILURES" -ge 3 ]; then
+    RATE_LIMITED=true  # Assume rate-limited after 3 consecutive failures
+  fi
+else
+  CONSECUTIVE_FAILURES=0
+fi
+```
+
+### Recovery Protocol
+
+When `RATE_LIMITED=true`:
+
+1. **Complete current phase** (never break mid-phase — same as context budget RED)
+2. **Write handoff** using the standard Session Break Handoff Template, with `## Why Session Broke` set to:
+   ```markdown
+   ## Why Session Broke
+   - Cause: API rate limit detected
+   - Signal: <detection signal that triggered>
+   - Cycles completed this session: <N>
+   - Phase completed before break: <phase>
+   - Estimated reset: <+5 minutes for rate limit, +1 hour for quota>
+   ```
+3. **Schedule automatic resumption** using one of the methods below (in priority order)
+4. **Output resume instructions** to the user as fallback
+
+### Auto-Resumption Methods (priority order)
+
+| Priority | Method | When to Use | How |
+|----------|--------|-------------|-----|
+| 1 | `/schedule` (remote trigger) | Rate limit with known reset window (≥1 hour) | Create a one-time remote trigger that runs the resume command |
+| 2 | `/loop` (local recurring) | Short rate limits (<1 hour), user is present | Set up a local loop that retries at intervals |
+| 3 | Manual resume | Fallback if scheduling unavailable | Output resume command for user to run later |
+
+#### Method 1: Remote Trigger (`/schedule`)
+
+For rate limits with reset windows ≥1 hour. Creates a remote agent that resumes the loop independently:
+
+```
+Schedule a remote trigger:
+  name: "evolve-loop-resume-cycle-<N>"
+  cron: <next hour mark in UTC>
+  prompt: "/evolve-loop <remaining_cycles> <strategy> <goal>"
+  repo: <current repo URL>
+  enabled: true
+  one-shot: disable after first successful run
+```
+
+After creating the trigger, output:
+```
+Rate limit hit. Scheduled remote resume at <time> (<timezone>).
+Trigger: https://claude.ai/code/scheduled/<TRIGGER_ID>
+Manual resume: /evolve-loop <remaining> <strategy> <goal>
+```
+
+#### Method 2: Local Loop (`/loop`)
+
+For short rate limits where the user is present. Retries locally at intervals:
+
+```
+/loop 5m /evolve-loop <remaining_cycles> <strategy> <goal>
+```
+
+The loop will retry every 5 minutes until the rate limit resets and the loop succeeds.
+
+#### Method 3: Manual Resume (fallback)
+
+If neither `/schedule` nor `/loop` is available, output clear instructions:
+
+```
+⚠ Rate limit hit. Could not auto-schedule resume.
+Handoff written to: .evolve/workspace/handoff.md
+Resume when ready: /evolve-loop <remaining> <strategy> <goal>
+```
+
+### Integration with Orchestrator Loop
+
+The rate limit check wraps every agent dispatch in the main cycle. Add to the orchestrator's agent dispatch logic:
+
+```
+For each agent dispatch (Scout, Builder, Auditor):
+  1. Launch agent
+  2. Check return for rate limit signals
+  3. If RATE_LIMITED:
+     a. Complete current phase if possible
+     b. Write handoff (Session Break Handoff Template)
+     c. Attempt auto-resume scheduling (Method 1 → 2 → 3)
+     d. STOP — do not start next phase
+  4. If not rate limited → continue normally
+```
+
+This check is IN ADDITION TO the context budget check. Both can trigger session breaks independently.
+
+### Rate Limit vs Context Budget
+
+| Concern | Context Budget | Rate Limit |
+|---------|---------------|------------|
+| Type | Internal quality | External hard wall |
+| Detection | Proactive (estimated) | Reactive (error-based) |
+| Severity | Gradual (GREEN→YELLOW→RED) | Binary (hit or not) |
+| Recovery | User runs `/evolve-loop` | **Auto-scheduled** via `/schedule` or `/loop` |
+| Reset time | Immediate (new session) | Provider-dependent (minutes to hours) |
 
 ## Context Management
 
