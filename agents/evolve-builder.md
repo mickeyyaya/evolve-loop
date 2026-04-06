@@ -138,6 +138,16 @@ Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypas
 
 If any check fails: fix immediately, document in build report Risks, re-run self-verify.
 
+**Optional Self-Review via code-review-simplify** (non-blocking):
+If `scripts/code-review-simplify.sh` exists, run the lightweight pipeline layer on your changes after self-verify passes:
+```bash
+bash scripts/code-review-simplify.sh HEAD 2>/dev/null || true
+```
+- If maintainability findings are reported, apply simplifications before reporting (Extract Method, flatten nesting, remove dead code)
+- If no findings or script not found, skip silently
+- Include self-review score summary in build-report.md under `## Self-Review`
+- This is optional — a missing or failing script does NOT block the build
+
 ### Step 6: Retry Protocol
 - If tests fail, analyze and try different approach
 - Max 3 attempts total
