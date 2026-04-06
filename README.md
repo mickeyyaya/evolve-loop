@@ -104,16 +104,16 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.6) |
+| Metric | Start (v3.0) | Current (v8.7) |
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
-| Skills | 1 | 2 (`/evolve-loop` + `/refactor`) |
-| Cycles completed | 0 | 171+ |
-| Tasks shipped | 0 | 115+ |
-| Commits | 1 | 395+ |
+| Skills | 1 | 3 (`/evolve-loop` + `/refactor` + `/code-review-simplify`) |
+| Cycles completed | 0 | 174+ |
+| Tasks shipped | 0 | 123+ |
+| Commits | 1 | 400+ |
 | Benchmark score | N/A | 89.9 / 100 |
-| Consecutive successes | 0 | 69 |
+| Consecutive successes | 0 | 72 |
 | Mastery level | N/A | Proficient |
 
 ### Version History
@@ -137,6 +137,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.5 | Mar 30 | Beyond-the-Ask divergence trigger — proactive insight generation |
 | v8.6 | Mar 31 | External skill discovery and routing — agents leverage installed plugins |
 | v8.6.5 | Apr 4 | `/refactor` skill — research-backed refactoring pipeline with 22-smell catalog, 66-technique Fowler catalog, LLM safety protocols, and 10 reference files |
+| v8.7 | Apr 6 | `/code-review-simplify` skill — unified code review + simplification with hybrid pipeline+agentic architecture, 4-dimension scoring, adaptive depth routing |
 
 ### Benchmark Scores (v8.0)
 

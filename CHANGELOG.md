@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.7.0] - 2026-04-06
+
+### Added
+- **`/code-review-simplify` skill** — Unified code review and simplification engine integrated into the evolve-loop pipeline. Combines structured pattern checks with agentic reasoning in a single pass.
+- **Hybrid pipeline+agentic architecture** — Pipeline layer runs 6 deterministic checks (~0.5s, ~2-5K tokens) before agentic layer handles contextual analysis (~15-40K tokens). Saves 40-60% tokens vs. separate review + simplify agents.
+- **Multi-dimensional scoring** — 4 dimensions (correctness 0.35, security 0.25, performance 0.15, maintainability 0.25) with numeric 0.0-1.0 scores replace binary PASS/FAIL.
+- **Adaptive depth routing** — 3 tiers (lightweight < 50 lines, standard 50-200 lines, full review > 200 lines) with auto-escalation for security-sensitive files.
+- **`scripts/code-review-simplify.sh`** — Pipeline layer engine with 6 checks: file length (800), function length (50), nesting depth (4), secrets detection, cognitive complexity (15/function), near-duplicate detection.
+- **`scripts/complexity-check.sh`** — Per-function cognitive complexity scorer with `--threshold` flag and multi-language support (bash, Python, JS/TS, Go, Java, Rust).
+- **Auditor D4 integration** — Optional skill consultation for code changes > 20 lines; composite score supplements verdict; auto-generates simplification suggestions when maintainability < 0.7.
+- **Builder self-review** — Optional Step 5 enhancement runs lightweight pipeline after eval pass; applies simplifications before auditor sees the code.
+- **Simplification catalog** — 8 localized refactoring techniques (Extract Method, flatten nesting, decompose conditional, extract utility, rename, replace magic numbers, inline over-abstraction, remove dead code).
+- **Solution documentation** — `docs/code-review-simplify-solution.md` records research findings, build-vs-buy justification, architecture decisions, and future work.
+
+### Research Findings
+- Anthropic multi-agent code review: 16% → 54% substantive PR comments
+- Cursor BugBot: pipeline → agentic = biggest quality gain (70% resolution, 2M+ PRs/month)
+- Qodo 2.0: multi-agent specialists achieve F1 = 60.1%
+- CodeScene: simplified code reduces AI token consumption ~50%
+- ICSE 2025: LLMs excel at localized refactoring, weak at architectural
+
 ## [8.6.6] - 2026-04-05
 
 ### Added
