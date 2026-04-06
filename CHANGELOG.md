@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.8.0] - 2026-04-06
+
+### Added
+- **`/inspirer` skill** — Standalone creative divergence engine grounded in data-driven web research. Extracts the evolve-loop's internal creativity mechanisms (provocation lenses, concept scoring, research grounding) into a reusable skill invocable on any topic.
+- **6-stage pipeline** — FRAME (parse topic) → DIVERGE (apply lenses) → RESEARCH (web search) → SCORE (Inspiration Cards) → CONVERGE (rank & filter) → DELIVER (report/table/JSON).
+- **12 provocation lenses** — 10 from evolve-loop (Inversion, Analogy, 10x Scale, Removal, User-Adjacent, First Principles, Composition, Failure Mode, Ecosystem, Time Travel) + 2 new general-purpose lenses (Constraint Flip, Audience Shift).
+- **3 depth levels** — QUICK (~20K tokens, 3 lenses), STANDARD (~40K, 4 lenses), DEEP (~60K, 5 lenses) for explicit creativity-vs-cost tradeoff.
+- **Inspiration Cards** — Extended Concept Cards with one-liner pitch, implementation sketch (3-5 steps), risks, and next steps. Scored on feasibility x impact x novelty with KEEP/DROP verdicts.
+- **Research grounding requirement** — Every idea MUST be backed by at least 1 web research result. No research = auto-drop.
+- **3 output formats** — `full` (human-readable report), `brief` (compact table), `evolve` (JSON compatible with Scout task selection).
+- **Domain affinity matrix** — Maps 5 topic domains to optimal lens selections for targeted creative divergence.
+- **Phase 0.5 delegation hook** — Evolve-loop orchestrator can delegate to `/inspirer` when `strategy == "innovate"` or discovery velocity stagnates.
+- **Reference material** — `provocation-lenses.md` (12 lenses with examples), `scoring-rubric.md` (detailed criteria), `worked-examples.md` (3 end-to-end pipelines).
+- **Solution documentation** — `docs/inspirer-solution.md` recording design rationale and architecture decisions.
+
 ## [8.7.0] - 2026-04-06
 
 ### Added
