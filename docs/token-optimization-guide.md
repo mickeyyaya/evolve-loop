@@ -143,12 +143,42 @@ Actionable optimizations for the heaviest files:
 
 | Priority | Action | Effort | Token Savings | Status |
 |----------|--------|--------|---------------|--------|
-| **DONE** | Compress policies.md (318→176 lines) | S | 2.1K/read | Cycle 175 |
-| **DONE** | Create token-profiler.sh | M | Enables measurement | Cycle 175 |
+| **DONE** | Compress policies.md (318→176 lines, 44% reduction) | S | 2.1K/read | Cycle 175 |
+| **DONE** | Create token-profiler.sh with --json mode | M | Enables measurement | Cycle 175 |
+| **DONE** | Add --save-baseline and --compare to profiler | S | Enables delta tracking | Cycle 176 |
 | P1 | Split refactor/SKILL.md into entry + reference | M | ~7K/invocation | Future cycle |
 | P2 | Split smart-web-search.md into core + advanced | S | ~3K when basic only | Future cycle |
 | P3 | Add AgentDiet measurement to token-profiler | S | Validates 40-60% claim | Future cycle |
 | P4 | Verify per-phase context matrix compliance | S | ~3-5K/agent if violations found | Future cycle |
+
+---
+
+## Optimization Tracking
+
+Use `scripts/token-profiler.sh` to measure and track token footprint over time.
+
+### How to Track
+
+```bash
+# Save a baseline (do this before optimization)
+bash scripts/token-profiler.sh --save-baseline
+
+# After optimization, compare against baseline
+bash scripts/token-profiler.sh --compare
+
+# Full report with JSON for programmatic use
+bash scripts/token-profiler.sh --json
+```
+
+### Optimization History
+
+| Cycle | File | Before | After | Reduction | Technique |
+|-------|------|--------|-------|-----------|-----------|
+| 175 | policies.md | 318 lines (4,770 tokens) | 176 lines (2,640 tokens) | 44% | Removed duplicate handoff template, compressed verbose pseudocode into tables |
+
+### Baseline
+
+First baseline saved cycle 176: **149,175 tokens** across 9,945 lines (47 files scanned).
 
 ---
 

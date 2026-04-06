@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 # token-profiler.sh — Measure token footprint of all skill, agent, and phase files.
-# Usage: token-profiler.sh [--json]
+# Usage: token-profiler.sh [--json] [--save-baseline] [--compare]
 # Outputs a ranked table of files by estimated token count (1 line ≈ 15 tokens).
+# --save-baseline: Save current measurements to .evolve/token-baseline.json
+# --compare: Compare current measurements against saved baseline, show delta
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BASELINE_FILE="$REPO_ROOT/.evolve/token-baseline.json"
 JSON_OUTPUT=false
-[[ "${1:-}" == "--json" ]] && JSON_OUTPUT=true
+SAVE_BASELINE=false
+COMPARE_MODE=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --json) JSON_OUTPUT=true ;;
+    --save-baseline) SAVE_BASELINE=true ;;
+    --compare) COMPARE_MODE=true ;;
+  esac
+done
 
 declare -a ENTRIES=()
 TOTAL_LINES=0
@@ -92,4 +104,54 @@ else
   } END {
     for (cat in tokens) printf "| %-30s | %-8d | %-8d |\n", cat, lines[cat], tokens[cat]
   }' | sort -t'|' -k3 -rn
+fi
+
+# Save baseline
+if $SAVE_BASELINE; then
+  echo "{" > "$BASELINE_FILE"
+  echo "  \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"," >> "$BASELINE_FILE"
+  echo "  \"totalLines\": $TOTAL_LINES," >> "$BASELINE_FILE"
+  echo "  \"totalTokens\": $TOTAL_TOKENS," >> "$BASELINE_FILE"
+  echo "  \"files\": {" >> "$BASELINE_FILE"
+  for i in "${!SORTED[@]}"; do
+    IFS='|' read -r tokens lines category file <<< "${SORTED[$i]}"
+    comma=","
+    [[ $i -eq $((${#SORTED[@]} - 1)) ]] && comma=""
+    echo "    \"$file\": $tokens$comma" >> "$BASELINE_FILE"
+  done
+  echo "  }" >> "$BASELINE_FILE"
+  echo "}" >> "$BASELINE_FILE"
+  echo "Baseline saved to $BASELINE_FILE ($TOTAL_TOKENS tokens)" >&2
+fi
+
+# Compare against baseline
+if $COMPARE_MODE; then
+  if [[ ! -f "$BASELINE_FILE" ]]; then
+    echo "No baseline found. Run --save-baseline first." >&2
+    exit 1
+  fi
+  BASELINE_TOTAL=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['totalTokens'])")
+  BASELINE_TS=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['timestamp'])")
+  DELTA=$((TOTAL_TOKENS - BASELINE_TOTAL))
+  SIGN="+"
+  [[ "$DELTA" -lt 0 ]] && SIGN=""
+  echo ""
+  echo "## Comparison vs Baseline ($BASELINE_TS)"
+  echo ""
+  echo "| Metric | Baseline | Current | Delta |"
+  echo "|--------|----------|---------|-------|"
+  echo "| Total tokens | $BASELINE_TOTAL | $TOTAL_TOKENS | ${SIGN}${DELTA} |"
+  echo ""
+  echo "### Per-File Changes"
+  printf "| %-55s | %-8s | %-8s | %-8s |\n" "File" "Baseline" "Current" "Delta"
+  printf "|---------------------------------------------------------|----------|----------|----------|\n"
+  for entry in "${SORTED[@]}"; do
+    IFS='|' read -r tokens lines category file <<< "$entry"
+    baseline_tokens=$(python3 -c "import json; d=json.load(open('$BASELINE_FILE')); print(d['files'].get('$file', 0))" 2>/dev/null || echo 0)
+    file_delta=$((tokens - baseline_tokens))
+    [[ "$file_delta" -eq 0 ]] && continue
+    file_sign="+"
+    [[ "$file_delta" -lt 0 ]] && file_sign=""
+    printf "| %-55s | %-8s | %-8s | %-8s |\n" "$file" "$baseline_tokens" "$tokens" "${file_sign}${file_delta}"
+  done
 fi
