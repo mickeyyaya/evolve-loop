@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.9.0] - 2026-04-06
+
+### Added
+- **`/evaluator` skill** — Independent evaluation engine that works standalone or integrated with evolve-loop. 5-layer architecture (GRADE → DETECT → SCORE → DIRECT → META-EVAL) with 6 scoring dimensions.
+- **6 scoring dimensions** — correctness (0.25), security (0.20), maintainability (0.20), architecture (0.15), completeness (0.10), evolution (0.10). Each scored 0.0-1.0 with confidence levels and 5-point granularity rubrics.
+- **EST anti-gaming defenses** — Evaluator Stress Test (arXiv:2507.05619) protocol: perturbation tests detect format-dependent score inflation at 78% precision and 2.1% overhead. Includes saturation monitoring and proxy-true correlation tracking.
+- **Self-improving evaluation lifecycle** — 4-stage lifecycle from EDDOps (arXiv:2411.13768): baseline → calibration → steady state → evolution. Adaptive difficulty auto-introduces harder criteria when dimensions saturate.
+- **Strategic direction guidance** — Layer 4 (DIRECT) ranks improvement priorities by `(1.0 - score) * weight * feasibility` with evidence-linked recommendations tracing to specific files and lines.
+- **Meta-evaluation (Layer 5)** — Red-team protocol for the evaluator itself. Triggered by repeated gaming detection, saturation, or proxy correlation drops.
+- **3 evaluation scopes** — `task` (changed files), `project` (full codebase), `strategic` (trajectory and priorities).
+- **Phase 3 delegation hook** — Evolve-loop Auditor can invoke `/evaluator --scope task` when `strategy == "harden"` or `forceFullAudit == true`.
+- **`docs/evaluator-research.md`** — Comprehensive 414-line research archive documenting 14 papers, 8 agent benchmarks, 12 LLM-judge biases, reward hacking incidents, independent evaluation principles, and full cross-reference of existing evolve-loop eval mechanisms.
+- **Reference material** — `scoring-dimensions.md` (6-dimension rubric), `anti-gaming.md` (EST protocol + known gaming patterns), `eval-lifecycle.md` (4-stage lifecycle + drift detection + meta-evaluation).
+
+### Research Documented
+- EDDOps reference architecture (arXiv:2411.13768) — evaluation as continuous governing function
+- Evaluator Stress Test (arXiv:2507.05619) — gaming detection via format/content sensitivity
+- CALM framework (arXiv:2410.02736) — 12 LLM-judge biases with mitigations
+- METR reward hacking (June 2025) — frontier models actively hack evals
+- Anthropic eval principles — unambiguous tasks, outcome over path, saturation monitoring
+- AISI Inspect Toolkit — 3-axis sandbox isolation for evaluators
+- LiveAgentBench, SWE-Bench Verified, CLEAR — major agent benchmarks 2025-2026
+
 ## [8.8.1] - 2026-04-06
 
 ### Added

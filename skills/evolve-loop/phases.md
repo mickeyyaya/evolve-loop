@@ -647,6 +647,8 @@ If any checksum fails → HALT: "Eval tamper detected."
   }
   ```
 
+**Enhanced evaluation via `/evaluator` (optional):** When `strategy == "harden"` OR `forceFullAudit == true`, invoke `/evaluator --scope task --depth standard` for independent multi-dimensional assessment (6 dimensions with anti-gaming detection). Merge returned dimension scores into audit-report.md under `## Evaluator Scores`. Advisory only — supplements Auditor verdict, does not override. Skip when lean mode active or budget YELLOW/RED.
+
 After Auditor completes:
 - If `PASS-PENDING-EVAL` → proceed to eval gate (phase-gate runs `verify-eval.sh` as single source of truth)
 - If `WARN` or `FAIL` → handle per [phase2-build.md](skills/evolve-loop/phase2-build.md) (retry/cleanup)

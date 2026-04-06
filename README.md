@@ -104,11 +104,11 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.8) |
+| Metric | Start (v3.0) | Current (v8.9) |
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
-| Skills | 1 | 4 (`/evolve-loop` + `/refactor` + `/code-review-simplify` + `/inspirer`) |
+| Skills | 1 | 5 (`/evolve-loop` + `/refactor` + `/code-review-simplify` + `/inspirer` + `/evaluator`) |
 | Cycles completed | 0 | 176+ |
 | Tasks shipped | 0 | 128+ |
 | Commits | 1 | 410+ |
@@ -139,6 +139,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.6.5 | Apr 4 | `/refactor` skill — research-backed refactoring pipeline with 22-smell catalog, 66-technique Fowler catalog, LLM safety protocols, and 10 reference files |
 | v8.7 | Apr 6 | `/code-review-simplify` skill — unified code review + simplification with hybrid pipeline+agentic architecture, 4-dimension scoring, adaptive depth routing |
 | v8.8 | Apr 6 | `/inspirer` skill — standalone creative divergence engine with 12 provocation lenses, web-grounded research, scored Inspiration Cards, and evolve-loop integration |
+| v8.9 | Apr 6 | `/evaluator` skill — independent evaluation engine with 6-dimension scoring, EST anti-gaming defenses, self-improving criteria lifecycle, and strategic direction guidance |
 
 ### Benchmark Scores (v8.0)
 
