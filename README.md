@@ -109,11 +109,11 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
 | Skills | 1 | 4 (`/evolve-loop` + `/refactor` + `/code-review-simplify` + `/inspirer`) |
-| Cycles completed | 0 | 174+ |
-| Tasks shipped | 0 | 123+ |
-| Commits | 1 | 405+ |
+| Cycles completed | 0 | 176+ |
+| Tasks shipped | 0 | 128+ |
+| Commits | 1 | 410+ |
 | Benchmark score | N/A | 89.9 / 100 |
-| Consecutive successes | 0 | 72 |
+| Consecutive successes | 0 | 74 |
 | Mastery level | N/A | Proficient |
 
 ### Version History

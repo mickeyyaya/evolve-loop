@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.8.1] - 2026-04-06
+
+### Added
+- **`scripts/token-profiler.sh`** — Measures token footprint of all skill, agent, and script files. Outputs ranked table with line counts and estimated tokens. Supports `--json`, `--save-baseline`, and `--compare` flags for tracking optimization progress over time.
+- **`docs/token-optimization-guide.md`** — Research-backed optimization guide documenting 5 techniques (three-tier progressive disclosure, context block ordering, AgentDiet trajectory compression, event-driven reminders, per-phase context selection) with measured baselines and per-file recommendations. Cites 7 papers including AgentDiet (FSE 2026), OPENDEV, CEMM, and Prompt Compression Survey (NAACL 2025).
+
+### Changed
+- **`skills/evolve-loop/reference/policies.md`** — Compressed from 318 to 176 lines (44% reduction, ~2.1K tokens saved per read). Removed duplicate Session Break Handoff Template and compressed verbose rate limit pseudocode into tables. All 11+ functional sections preserved with zero quality loss.
+
 ## [8.8.0] - 2026-04-06
 
 ### Added
