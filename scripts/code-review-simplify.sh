@@ -73,10 +73,11 @@ while IFS= read -r file; do
             printf "MEDIUM:maintainability:%s:%d:Function %s is %d lines (>50)\n", FILENAME, NR-func_lines, func_name, func_lines
           }
         }
-      ' "$file" 2>/dev/null | while IFS= read -r finding; do
+      ' "$file" 2>/dev/null > /tmp/crs_func_findings.txt
+      while IFS= read -r finding; do
         FINDINGS+=("$finding")
         WARN_COUNT=$((WARN_COUNT + 1))
-      done
+      done < /tmp/crs_func_findings.txt
       ;;
   esac
 done <<< "$CHANGED_FILES"

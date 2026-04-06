@@ -62,9 +62,10 @@ case "$EXT" in
       [[ -z "$func_name" ]] && continue
       FUNC_COUNT=$((FUNC_COUNT + 1))
       # Extract function body (simplified — count keywords in entire file for now)
-      body=$(sed -n "/^${func_name}()/,/^}/p" "$FILE" 2>/dev/null || echo "")
+      escaped_name=$(printf '%s' "$func_name" | sed 's/[.[\*^$/]/\\&/g')
+      body=$(sed -n "/^${escaped_name}()/,/^}/p" "$FILE" 2>/dev/null || echo "")
       if [[ -z "$body" ]]; then
-        body=$(sed -n "/function ${func_name}/,/^}/p" "$FILE" 2>/dev/null || echo "")
+        body=$(sed -n "/function ${escaped_name}/,/^}/p" "$FILE" 2>/dev/null || echo "")
       fi
       score=$(count_complexity "$body")
       status="OK"
@@ -80,7 +81,8 @@ case "$EXT" in
     while IFS= read -r func_name; do
       [[ -z "$func_name" ]] && continue
       FUNC_COUNT=$((FUNC_COUNT + 1))
-      body=$(sed -n "/${func_name}/,/^[^ \t}\)]/p" "$FILE" 2>/dev/null | head -100 || echo "")
+      escaped_name=$(printf '%s' "$func_name" | sed 's/[.[\*^$/]/\\&/g')
+      body=$(sed -n "/${escaped_name}/,/^[^ \t}\)]/p" "$FILE" 2>/dev/null | head -100 || echo "")
       score=$(count_complexity "$body")
       status="OK"
       if [[ "$score" -gt "$THRESHOLD" ]]; then status="EXCEEDED"; EXCEEDED=1; fi
