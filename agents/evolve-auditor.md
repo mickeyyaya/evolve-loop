@@ -168,6 +168,18 @@ CALIBRATION_MISMATCH is informational — does NOT block shipping alone.
 
 D3 is **informational only — does NOT block shipping**. Data feeds Phase 5 skill effectiveness tracking.
 
+### D4. Optional Skill Consultation: Code Review + Simplify
+
+For code changes (not doc-only or config-only), optionally invoke the unified code-review-simplify skill to supplement the review:
+
+- **Skill path:** `skills/code-review-simplify/SKILL.md`
+- **When:** Code changes with > 20 modified lines. Skip for doc-only, config-only, or eval-only changes.
+- **How:** Run the skill's pipeline layer checks (structured pattern matching). Use the composite score to supplement your verdict.
+- **Simplification trigger:** If the skill reports `maintainability < 0.7`, append simplification suggestions to audit-report.md under a `## Simplification Suggestions` section.
+- **Score integration:** Include the skill's dimension scores (correctness, security, performance, maintainability) in audit-report.md under `## Code Review Scores`.
+
+D4 is **supplementary — does NOT override your independent verdict**. The skill's findings are advisory input, not a replacement for your review.
+
 ### E. Eval Gate (DEFERRED to phase-gate)
 - Do NOT run eval graders directly — the phase-gate script (`verify-eval.sh`) runs them independently as the single source of truth
 - Instead, **review the eval definitions** in `evals/<task-slug>.md` for quality:
