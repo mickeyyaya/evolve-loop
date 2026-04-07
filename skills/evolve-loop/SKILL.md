@@ -117,8 +117,10 @@ Full rules: [reference/model-routing.md](../../docs/model-routing.md)
 ### Phase Instructions
 | File | When to read |
 |------|-------------|
-| [phases.md](phases.md) | Phase sequencing, context blocks, gates |
+| [phases.md](phases.md) | Phase sequencing, context blocks, gates (orchestration spine) |
 | [phase0-calibrate.md](phase0-calibrate.md) | Once per invocation (benchmark) |
+| [phase05-research.md](phase05-research.md) | Every cycle (gap analysis, web research, concept cards) |
+| [phase1-discover.md](phase1-discover.md) | Every cycle (Scout launch, task claiming, eval checks) |
 | [phase2-build.md](phase2-build.md) | Build orchestration, Self-MoA, parallelization |
 | [phase4-ship.md](phase4-ship.md) | Commit, push, process rewards |
 | [phase5-learn.md](phase5-learn.md) | Instinct extraction, consolidation |
