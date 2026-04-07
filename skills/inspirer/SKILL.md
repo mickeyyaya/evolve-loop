@@ -1,6 +1,6 @@
 ---
 name: inspirer
-description: "Creative divergence engine grounded in data-driven research. Apply provocation lenses to any topic, validate ideas through web research, and produce actionable recommendations with evidence. Use when the user invokes /inspirer or asks to think outside the box, brainstorm creatively, or explore unconventional approaches."
+description: Use when the user invokes /inspirer or asks to brainstorm creatively, think outside the box, explore unconventional approaches, break out of stagnation, or generate research-backed ideas with provocation lenses
 argument-hint: "[topic/question] [--depth QUICK|STANDARD|DEEP] [--lenses N] [--format full|brief|evolve]"
 ---
 

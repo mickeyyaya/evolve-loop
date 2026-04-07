@@ -1,6 +1,6 @@
 ---
 name: evaluator
-description: "Independent evaluation engine with multi-dimensional scoring, anti-gaming defenses, and strategic direction guidance. Evaluates code quality, project health, or guides improvement priorities. Use when the user invokes /evaluator or asks to evaluate, assess, score, or audit code independently."
+description: Use when the user invokes /evaluator or asks to evaluate, assess, score, or independently audit code quality, project health, or improvement priorities with multi-dimensional scoring and anti-gaming defenses
 argument-hint: "[target] [--scope task|project|strategic] [--depth quick|standard|deep]"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: evolve-loop
-description: "Self-evolving development pipeline with 4 agents across 6 phases. Discovers, builds, audits, and ships improvements autonomously. Works with Claude Code, Gemini CLI, or any LLM with file I/O and shell access. Use when the user invokes /evolve-loop or asks to run autonomous improvement cycles."
+description: Use when the user invokes /evolve-loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
 argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---

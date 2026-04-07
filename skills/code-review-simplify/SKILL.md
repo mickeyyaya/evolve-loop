@@ -1,6 +1,6 @@
 ---
 name: code-review-simplify
-description: Unified code review and simplification skill for the evolve-loop pipeline. Combines structured pattern checks with agentic reasoning in a single pass to review and simplify code changes.
+description: Use when reviewing code changes for quality, security, performance, or maintainability issues and identifying simplification opportunities in a single token-efficient pass
 ---
 
 > Unified code review + simplification. Single-pass, multi-dimensional scoring, adaptive depth. Integrates with evolve-loop auditor and builder phases.
