@@ -1,6 +1,7 @@
 ---
 name: code-review-simplify
 description: Use when reviewing code changes for quality, security, performance, or maintainability issues and identifying simplification opportunities in a single token-efficient pass
+argument-hint: "[--tier lightweight|standard|full] [--files <paths>]"
 ---
 
 > Unified code review + simplification. Single-pass, multi-dimensional scoring, adaptive depth. Integrates with evolve-loop auditor and builder phases.

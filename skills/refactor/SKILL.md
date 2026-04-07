@@ -1,6 +1,7 @@
 ---
 name: refactor
 description: Use when the user asks to refactor code, review code quality, or fix code smells — orchestrates the full refactoring pipeline from detection through fix, with parallel worktree isolation per independent refactoring group
+argument-hint: "[scan|fix|security|performance|review|auto|arch|complexity|health|diff|hotspots]"
 ---
 
 # /refactor — Full Refactoring Pipeline

@@ -7,9 +7,20 @@ disable-model-invocation: true
 
 # Evolve Loop v8.9
 
-Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle.
+> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. `disable-model-invocation: true` prevents auto-triggering — this skill performs destructive operations (commits, pushes, version bumps) and must only run when explicitly invoked by the user.
 
 **Usage:** `/evolve-loop [cycles] [strategy] [goal]`
+
+## Contents
+
+- [Quick Start](#quick-start)
+- [What Makes Evolve-Loop Different](#what-makes-evolve-loop-different)
+- [Compound Discovery Loop](#compound-discovery-loop)
+- [Architecture](#architecture)
+- [Orchestrator Loop](#orchestrator-loop)
+- [Agents](#agents)
+- [Model Routing](#model-routing)
+- [Reference (read on demand)](#reference-read-on-demand)
 
 ## Quick Start
 
