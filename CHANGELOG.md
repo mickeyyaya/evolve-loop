@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.9.1] - 2026-04-07
+
+### Changed
+- **Skill descriptions standardized to "Use when..." trigger format** — rewrote descriptions across all skills to start with concrete trigger conditions, improving auto-invocation accuracy.
+- **`smart-web-search.md` split into reference files** — 654 → 112 lines. Extracted query transformation patterns, intent classification, and provider routing into `reference/`.
+- **`phases.md` Phase 0.5 and Phase 1 extracted** — 700 → 474 lines. Each phase now has its own focused file (`phase05-research.md`, `phase1-discover.md`).
+- **`refactor/SKILL.md` split into reference files** — 653 → 154 lines. Detection rules, fix patterns, and worktree orchestration moved to `reference/`.
+- **Skill routing policy added** (`skill-routing.md`) — formal policy for which skill handles which kind of request, reducing dispatch ambiguity.
+- **SKILL.md frontmatter standardized** — consistent header format and field ordering across all skills.
+
+### Notes
+Patch release. No behavior changes — all updates are documentation, file organization, and skill discoverability improvements.
+
 ## [8.9.0] - 2026-04-06
 
 ### Added
