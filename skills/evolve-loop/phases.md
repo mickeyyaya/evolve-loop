@@ -90,7 +90,7 @@ Build a compact inventory of available external skills from the system-reminder'
 
 | Category | Matches | Example Skills |
 |----------|---------|---------------|
-| `code-review` | code review, quality, patterns | `code-review:code-review`, `pr-review-workflow` |
+| `code-review` | code review, quality, patterns | `/code-review-simplify` (built-in), `code-review:code-review`, `pr-review-workflow` |
 | `testing` | TDD, test generation, coverage | `everything-claude-code:tdd`, `testing-patterns` |
 | `security` | security audit, vulnerability | `everything-claude-code:security-review`, `security-patterns-code-review` |
 | `language:<lang>` | language-specific patterns | `python-review-patterns`, `go-review-patterns`, `typescript-review-patterns` |
@@ -103,7 +103,9 @@ Build a compact inventory of available external skills from the system-reminder'
 | `agent-design` | agent patterns, orchestration | `agent-orchestration-patterns`, `agent-memory-patterns` |
 | `docs` | documentation, API docs | `code-documentation-patterns`, `review-api-contract` |
 | `infra` | CI/CD, containers, deployment | `cicd-pipeline-patterns`, `container-kubernetes-patterns` |
-| `refactoring` | refactor, code smells | `refactor`, `detect-code-smells`, `refactoring-decision-matrix` |
+| `refactoring` | refactor, code smells | `/refactor` (built-in), `detect-code-smells`, `refactoring-decision-matrix` |
+
+For skill precedence, conflict resolution, phase eligibility, and budget-aware depth routing, see [reference/skill-routing.md](reference/skill-routing.md).
 
 **Inventory schema (in state.json):**
 
@@ -112,9 +114,11 @@ Build a compact inventory of available external skills from the system-reminder'
   "skillInventory": {
     "lastBuilt": "<ISO-8601>",
     "categoryIndex": {
+      "code-review": ["/code-review-simplify", "code-review:code-review", "pr-review-workflow"],
       "security": ["everything-claude-code:security-review", "security-patterns-code-review"],
       "language:python": ["everything-claude-code:python-testing", "python-review-patterns"],
-      "testing": ["everything-claude-code:tdd", "testing-patterns"]
+      "testing": ["everything-claude-code:tdd", "testing-patterns"],
+      "refactoring": ["/refactor", "detect-code-smells", "refactoring-decision-matrix"]
     }
   }
 }

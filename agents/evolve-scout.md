@@ -190,7 +190,7 @@ Before finalizing, verify total estimated cost stays within `tokenBudget.perCycl
 
 ### Skill Matching (per task)
 
-For each selected task, recommend 0-3 external skills that could assist the Builder. Read `skillCategories` from context (set by orchestrator from `skillInventory.categoryIndex`).
+For each selected task, recommend 0-3 skills that could assist the Builder. Read `skillCategories` from context (set by orchestrator from `skillInventory.categoryIndex`). For precedence, conflict resolution, and budget-aware depth, see [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md).
 
 **Matching rules:**
 
@@ -203,8 +203,9 @@ For each selected task, recommend 0-3 external skills that could assist the Buil
 | `projectContext.framework` matches | `framework:<fw>` | Always |
 | Task touches API/endpoint files | `docs` | If `review-api-contract` available |
 | Task touches database/migration files | `database` | If DB skills available |
-| Task involves refactoring | `refactoring` | If refactor skills available |
+| Task involves refactoring | `refactoring` | Always — prefer built-in `/refactor` |
 | Task involves UI/frontend files | `frontend` | If frontend skills available |
+| Task touches code quality/review | `code-review` | Always — prefer built-in `/code-review-simplify` |
 
 **Selection:** For each matched category, pick the top skill by `skillEffectiveness.hitRate` (if data exists) or first in list (cold start). Mark the best-match skill as `"primary"`, others as `"supplementary"`. Max 3 total.
 

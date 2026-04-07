@@ -92,10 +92,11 @@ If `task.recommendedSkills` is non-empty, consult external skills for domain-spe
 
 **Invocation:** `Skill tool: skill="<skill-name>"`
 
-**Budget rules:**
-- Under budget pressure medium/high: invoke at most 1 primary skill
-- Each invocation costs ~2-5K tokens
-- Skip supplementary skills entirely under high pressure
+**Budget rules** (see [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) § Token-Budget Depth Routing):
+- **Low pressure (GREEN):** Invoke up to 3 skills (1 primary + 2 supplementary). Built-in skills at full depth.
+- **Medium pressure (YELLOW):** Invoke at most 1 primary skill. Built-in skills at reduced depth (`/code-review-simplify` pipeline-only, `/refactor` single-pass).
+- **High pressure (RED):** Skip all skills except forced `/evaluator` at `--depth quick`.
+- Each external invocation costs ~2-5K tokens; built-in `/code-review-simplify` pipeline costs ~5K
 - Skip if the exact same guidance is already in an applied instinct
 
 **Record in build-report.md:**

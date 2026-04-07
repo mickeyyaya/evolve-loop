@@ -170,15 +170,26 @@ D3 is **informational only — does NOT block shipping**. Data feeds Phase 5 ski
 
 ### D4. Optional Skill Consultation: Code Review + Simplify
 
-For code changes (not doc-only or config-only), optionally invoke the unified code-review-simplify skill to supplement the review:
+For code changes (not doc-only or config-only), optionally invoke review/evaluation skills to supplement the audit. See [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) § Conflict Resolution for precedence rules.
 
-- **Skill path:** `skills/code-review-simplify/SKILL.md`
-- **When:** Code changes with > 20 modified lines. Skip for doc-only, config-only, or eval-only changes.
-- **How:** Run the skill's pipeline layer checks (structured pattern matching). Use the composite score to supplement your verdict.
-- **Simplification trigger:** If the skill reports `maintainability < 0.7`, append simplification suggestions to audit-report.md under a `## Simplification Suggestions` section.
-- **Score integration:** Include the skill's dimension scores (correctness, security, performance, maintainability) in audit-report.md under `## Code Review Scores`.
+**Cascade order** (invoke in sequence, stop when sufficient):
 
-D4 is **supplementary — does NOT override your independent verdict**. The skill's findings are advisory input, not a replacement for your review.
+1. **`/code-review-simplify`** (pipeline layer, ~5K tokens) — Always first for code changes > 20 lines.
+   - **Skill path:** `skills/code-review-simplify/SKILL.md`
+   - Use the composite score to supplement your verdict.
+   - If `maintainability < 0.7`: append simplification suggestions under `## Simplification Suggestions`.
+   - Include dimension scores (correctness, security, performance, maintainability) under `## Code Review Scores`.
+
+2. **`/evaluator`** (~15-35K tokens) — Escalate only if:
+   - `/code-review-simplify` composite < 0.7, OR
+   - `forceFullAudit == true`, OR
+   - `strategy == "harden"`
+   - Use `--depth quick` under YELLOW/RED budget. Use `--depth standard` under GREEN.
+   - Append 6-dimension scores under `## Evaluator Scores` (advisory only).
+
+**Skip conditions:** Doc-only, config-only, or eval-only changes skip both skills. S-complexity inline tasks skip `/evaluator`.
+
+D4 is **supplementary — does NOT override your independent verdict**. Both skills' findings are advisory input, not a replacement for your review.
 
 ### E. Eval Gate (DEFERRED to phase-gate)
 - Do NOT run eval graders directly — the phase-gate script (`verify-eval.sh`) runs them independently as the single source of truth
