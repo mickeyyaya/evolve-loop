@@ -30,7 +30,7 @@
 
 ### Evolve-Loop Integration
 
-When this protocol is invoked from `online-researcher.md` or Phase 0.5:
+When this protocol is invoked from `online-researcher.md` or Phase 1:
 
 1. Execute the full 6-stage pipeline as normal
 2. In addition to `.smart-search-cache/`, also write a Knowledge Capsule to `.evolve/research/<topic-slug>.md` using the standard capsule format:

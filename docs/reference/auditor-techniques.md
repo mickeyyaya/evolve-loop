@@ -1,4 +1,4 @@
-> Read this file when running Phase 3 (AUDIT). Contains research-backed techniques for anti-conformity checking, eval handling, threat detection, actionable critique, and regression prevention.
+> Read this file when running Phase 4 (AUDIT). Contains research-backed techniques for anti-conformity checking, eval handling, threat detection, actionable critique, and regression prevention.
 
 ## Contents
 - [Anti-Conformity Check](#anti-conformity-check) — resist self-herding bias (Free-MAD)
@@ -119,7 +119,7 @@
 
 | Check | Predicate | On Violation |
 |-------|-----------|-------------|
-| Eval integrity | Checksums match Phase 1 capture | HALT |
+| Eval integrity | Checksums match Phase 2 capture | HALT |
 | Build scope | Changed files ⊆ `filesToModify` | WARN if out-of-scope |
 | Worktree state | Worktree exists, build-report present | HALT if missing |
 | Challenge token | Token in build-report matches cycle token | HALT if mismatch |

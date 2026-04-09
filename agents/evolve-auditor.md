@@ -152,9 +152,24 @@ B2 is NEVER skipped — hallucination detection runs every cycle regardless of s
 - [ ] **Challenge Token:** Verify token in scout-report.md and build-report.md
 - If tampering, trivial evals, bypassed pipelines, or missing tokens detected = CRITICAL, automatic FAIL
 
+### D.5 — E2E Grounding (UI/browser tasks only)
+
+**Activation:** run this check ONLY if the eval file at `.evolve/evals/<task-slug>.md` contains an `## E2E Graders` section OR the task touches UI/routing/forms/auth flows.
+
+| Check | Verification | On Failure |
+|---|---|---|
+| Test file exists in worktree diff | `git show <branch>:tests/e2e/<slug>.spec.ts` returns non-empty content | **HIGH** — eval references a test that wasn't committed |
+| Selectors map to real DOM | For each `data-testid`, `id`, `role`, or text locator in the spec, grep source for a matching element | **CRITICAL** — hallucinated selector (Level 0 hallucination) |
+| No skipped/only tests | `grep -E 'test\.(skip\|only)\|xdescribe\|xit' tests/e2e/<slug>.spec.ts` returns empty | **HIGH** — test effectively disabled |
+| Artifacts produced | `playwright-report/index.html` exists and is non-empty | **HIGH** — test didn't actually run |
+| `## E2E Verification` present in build-report | Section exists with PASS status (or explicit SKIPPED + reason) | **HIGH** — Builder skipped Step 4.5 without justification |
+| Generated test not weakened vs. previous cycle | If `.spec.ts` existed in a previous cycle, current version must not have fewer assertions | **CRITICAL** — eval tampering |
+
+D.5 is **never skipped** when activated — E2E grounding is a first-class anti-hallucination check on par with D (Eval Integrity). If task has no UI surface area, skip D.5 entirely and note "N/A (non-UI task)" in audit-report.md.
+
 ### D2. Step-Confidence Cross-Validation
 - [ ] Read Builder's `## Build Steps` table
-- [ ] Confidence >= 0.8 but you found an issue = CALIBRATION_MISMATCH (LOW, logged for Phase 5)
+- [ ] Confidence >= 0.8 but you found an issue = CALIBRATION_MISMATCH (LOW, logged for Phase 6)
 - [ ] Confidence < 0.7: apply extra scrutiny; note if self-doubt was unwarranted
 - [ ] Missing/generic Build Steps table = MEDIUM warning
 
@@ -163,10 +178,10 @@ CALIBRATION_MISMATCH is informational — does NOT block shipping alone.
 ### D3. Skill Usage Verification
 - [ ] If `task.recommendedSkills` included primary skills: check `## Skills Invoked` in build-report.md
 - [ ] Primary skill recommended but not invoked without justification → LOW warning
-- [ ] Skill marked `useful: false` → note for Phase 5 feedback
+- [ ] Skill marked `useful: false` → note for Phase 6 feedback
 - [ ] Skill invoked but guidance contradicts an applied instinct → CALIBRATION_NOTE (informational)
 
-D3 is **informational only — does NOT block shipping**. Data feeds Phase 5 skill effectiveness tracking.
+D3 is **informational only — does NOT block shipping**. Data feeds Phase 6 skill effectiveness tracking.
 
 ### D4. Optional Skill Consultation: Code Review + Simplify
 
@@ -252,6 +267,16 @@ Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.
 | Check | Command | Result |
 |-------|---------|--------|
 | <grader> | `<command>` | PASS/FAIL |
+
+## E2E Grounding (D.5)
+<!-- Include ONLY for UI tasks; otherwise write "N/A (non-UI task)" -->
+| Check | Status | Details |
+|-------|--------|---------|
+| Test file committed | PASS/FAIL | `tests/e2e/<slug>.spec.ts` |
+| Selectors grounded | PASS/FAIL | <N> locators verified against source |
+| No skipped/only tests | PASS/FAIL | — |
+| Artifacts produced | PASS/FAIL | `playwright-report/index.html` |
+| Build-report E2E Verification | PASS/FAIL | — |
 
 ## Issues
 | Severity | Description | File | Line |

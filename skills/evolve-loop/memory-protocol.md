@@ -34,7 +34,7 @@ Static team constitution. Place **first** in every agent context block for KV-ca
 | Immutability | Never mutate shared state directly; write new versions |
 | Scope discipline | Each agent reads/writes only its owned workspace file |
 | Blast radius awareness | Prefer S-complexity for hotspot files; edits < 30 lines |
-| Learning mandate | When `instinctsExtracted == 0` for 2+ cycles, extract at least one before closing Phase 5 |
+| Learning mandate | When `instinctsExtracted == 0` for 2+ cycles, extract at least one before closing Phase 6 |
 
 ### Parallel Agent Coordination
 
@@ -115,7 +115,7 @@ Run-scoped workspace (`.evolve/runs/$RUN_ID/workspace/`). Each agent owns exactl
 |------|----|------|-------|------------|---------|
 | scout | builder | hint | 5 | false | Prefer additive edits in phases.md |
 | builder | auditor | flag | 5 | false | Eval grader path uses absolute path |
-| auditor | scout | warn | 5 | true | phases.md Phase 4 is growing; consider splitting |
+| auditor | scout | warn | 5 | true | phases.md Phase 5 is growing; consider splitting |
 ```
 
 | Field | Values |
@@ -123,7 +123,7 @@ Run-scoped workspace (`.evolve/runs/$RUN_ID/workspace/`). Each agent owns exactl
 | `from` | `scout`, `builder`, `auditor`, `operator` |
 | `to` | `scout`, `builder`, `auditor`, `operator`, `all` |
 | `type` | `hint` (suggestion), `flag` (needs attention), `warn` (persistent), `info` (context) |
-| `persistent` | `true` = survives Phase 4 cleanup; `false` = cleared each cycle |
+| `persistent` | `true` = survives Phase 5 cleanup; `false` = cleared each cycle |
 | `message` | Free-text, under 100 chars |
 
 Scout also appends a `decisionTrace` block listing evaluated candidates with `finalDecision` and `signals`. Consumed by Novelty Critic during meta-cycle.
@@ -132,7 +132,7 @@ Scout also appends a `decisionTrace` block listing evaluated candidates with `fi
 
 | File | Written by | Contains |
 |------|-----------|----------|
-| `research-brief.md` | Orchestrator (Phase 0.5) | Gap analysis + research findings + concept cards + keep/drop verdicts |
+| `research-brief.md` | Orchestrator (Phase 1) | Gap analysis + research findings + concept cards + keep/drop verdicts |
 | `eval-report.md` | Orchestrator (eval-runner) | Eval gate results if run separately |
 | `next-cycle-brief.json` | Operator | Guidance for next Scout: `weakestDimension`, `recommendedStrategy`, `taskTypeBoosts`, `avoidAreas`, `cycle`. Written to `$WORKSPACE_PATH/` and `.evolve/latest-brief.json`. |
 
@@ -316,7 +316,7 @@ Eval definitions created by Scout. Each defines code graders, regression evals, 
 
 ### `.evolve/instincts/personal/`
 
-YAML instinct files from Phase 5 learning pass. Start at confidence 0.5, increase with confirmation.
+YAML instinct files from Phase 6 learning pass. Start at confidence 0.5, increase with confirmation.
 
 ## Layer 6: Experiment Journal
 
@@ -332,7 +332,7 @@ Append-only log of every Builder attempt. (Inspired by autoresearch's `results.t
 
 | Rule | Detail |
 |------|--------|
-| Write timing | Builder appends after each attempt (Phase 2) |
+| Write timing | Builder appends after each attempt (Phase 3) |
 | Consumer | Scout reads to avoid re-proposing failed approaches |
 | Truncation | Never — complete experiment history |
 | Fields | `cycle`, `task` (slug), `attempt` (1-indexed), `verdict`, `approach` (1-sentence), `metric` |
@@ -343,27 +343,27 @@ Append-only log of every Builder attempt. (Inspired by autoresearch's `results.t
 Phase 0: CALIBRATE (once per invocation)
 Orchestrator -- benchmark-eval -> projectBenchmark + benchmark-report.md
               |
-Phase 0.5: RESEARCH (every cycle)     v
+Phase 1: RESEARCH (every cycle)     v
 Orchestrator -- gap analysis + web queries -> research-brief.md + conceptCandidates
               (reads: researchAgenda, researchLedger, benchmarkWeaknesses, proposals)
               (writes: researchAgenda, capsuleIndex, research-brief.md)
               |
-Phase 1: DISCOVER              v
+Phase 2: DISCOVER              v
 Scout --> scout-report.md + evals/<task>.md (reads research-brief + conceptCandidates)
               |
-Phase 2: BUILD (per task)      v
+Phase 3: BUILD (per task)      v
 Builder --> build-report.md
               |
-Phase 3: AUDIT                 v
+Phase 4: AUDIT                 v
 Auditor --> audit-report.md [GATE: MEDIUM+ blocks]
               |
 Delta CHECK: BENCHMARK         v (after all tasks audited)
 Orchestrator -- re-run relevant dimension checks [SOFT GATE: regression blocks]
               |
-Phase 4: SHIP                  v (only if PASS + delta OK)
+Phase 5: SHIP                  v (only if PASS + delta OK)
 Orchestrator -- git commit + push
               |
-Phase 5: LEARN                 v
+Phase 6: LEARN                 v
 Orchestrator -- instincts + archive
 Operator --> operator-log.md (post-cycle, includes benchmark trend)
 ```
@@ -385,8 +385,8 @@ historicalSuccessRate:
 
 | Phase | Action |
 |-------|--------|
-| Phase 2 (BUILD) | When Builder references instinct, increment `applied` |
-| Phase 4 (SHIP) | After audit verdict, increment `passed` for applied instincts if task passed. Recompute `rate`. |
-| Phase 5 (LEARN) | `rate < 0.5` and `applied >= 3` → candidate for retirement. `rate >= 0.8` and `applied >= 3` → +1 selection boost. |
+| Phase 3 (BUILD) | When Builder references instinct, increment `applied` |
+| Phase 5 (SHIP) | After audit verdict, increment `passed` for applied instincts if task passed. Recompute `rate`. |
+| Phase 6 (LEARN) | `rate < 0.5` and `applied >= 3` → candidate for retirement. `rate >= 0.8` and `applied >= 3` → +1 selection boost. |
 
 Both `confidence` (pattern validity) and `rate` (practical build impact) inform instinct selection.

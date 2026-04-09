@@ -309,7 +309,7 @@ Default: **STANDARD**
 
 When invoked from within the evolve-loop pipeline, the inspirer provides enhanced creative divergence.
 
-### Phase 0.5 Delegation
+### Phase 1 Delegation
 
 The orchestrator can delegate to inspirer at Step 2.5 (DIVERGENCE TRIGGER):
 

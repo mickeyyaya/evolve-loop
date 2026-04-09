@@ -60,7 +60,7 @@ Low groundedness is a hallucination indicator. High coverage with low groundedne
 As of 2026, LLM-as-a-judge patterns suffer from documented systematic biases. The Evolve Loop employs the SURE (Selective Uncertainty-based Re-Evaluation) pipeline to mitigate these:
 
 1. **Verbosity Bias:** LLMs naturally favor longer responses. The Auditor and Calibrate phases are explicitly instructed to resist verbosity bias and score strictly on qualitative merit, penalizing unnecessary complexity.
-2. **Self-Preference Bias:** LLMs favor outputs from their own model family. The loop mitigates this by relying on objective bash/grep eval graders (Phase 3) as the primary hard gate, using the LLM Auditor only for semantic checks.
+2. **Self-Preference Bias:** LLMs favor outputs from their own model family. The loop mitigates this by relying on objective bash/grep eval graders (Phase 4) as the primary hard gate, using the LLM Auditor only for semantic checks.
 3. **Calibration Gap:** LLMs often present incorrect evaluations with high confidence. The Auditor is required to output an explicit `confidence` score (0.0-1.0). If confidence falls below `0.8`, the Auditor MUST issue a `WARN` verdict, triggering a Builder retry or operator escalation rather than a false `PASS`.
 
 ## Uncertainty Acknowledgment
@@ -93,7 +93,7 @@ Free-MAD (arXiv:2509.11035) identifies a critical failure mode in LLM evaluation
 **Anti-conformity injection prompt** (add to Auditor system context):
 > "Before finalizing your verdict, explicitly state your initial leaning. Then argue the opposite case with at least one concrete piece of evidence. Only finalize after you have genuinely considered both sides."
 
-**Trajectory consistency check** (for Phase 5 self-evaluation):
+**Trajectory consistency check** (for Phase 6 self-evaluation):
 If the LLM-as-a-Judge's chain-of-thought lists specific failures or concerns but then assigns a high score (>= 0.8), flag this as a conformity signal — the Judge is conforming to its own initial bias rather than following its evidence. Trigger recalibration when this pattern appears in 2+ consecutive cycles.
 
 **Token cost:** This is a single-round technique (no multi-round debate needed). Adds ~200-400 tokens to each audit verdict — minimal cost for substantially improved robustness.
@@ -226,7 +226,7 @@ Research on agentic uncertainty (arXiv:2601.15703, arXiv:2602.05073) shows that 
 |-------------|-------------------|---------------------|
 | Information-gathering | Low risk, reduces uncertainty | Builder reading files, Scout scanning codebase |
 | State-changing | High risk, increases commitment | Builder editing files, orchestrator committing |
-| Reflective | Calibration opportunity | Auditor verdict, Phase 5 self-evaluation |
+| Reflective | Calibration opportunity | Auditor verdict, Phase 6 self-evaluation |
 
 **UAM/UAR dual-process pattern:** Before any state-changing action, the Builder should assess uncertainty (System 1: fast heuristic check). If uncertainty > threshold, trigger explicit reflection (System 2: deeper analysis). This prevents confident-but-wrong edits — the leading cause of audit retries.
 

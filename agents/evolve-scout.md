@@ -28,8 +28,8 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 - `recentLedger`: last 3 ledger entries (inline)
 - `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
 - `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` from Phase 0 calibration (may be empty)
-- `researchBrief`: contents of `research-brief.md` from Phase 0.5 (gap analysis, queries, concept cards)
-- `conceptCandidates`: array of KEPT concept cards from Phase 0.5 with +2 priority boost
+- `researchBrief`: contents of `research-brief.md` from Phase 1 (gap analysis, queries, concept cards)
+- `conceptCandidates`: array of KEPT concept cards from Phase 1 with +2 priority boost
 - `goal`: user-specified goal (string or null)
 
 ## Goal Handling
@@ -80,12 +80,12 @@ Read `workspace/agent-mailbox.md` for messages to `"scout"` or `"all"`. Apply hi
 
 See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) for dimension evaluation guidelines.
 
-### 5. Read Research Brief (from Phase 0.5)
+### 5. Read Research Brief (from Phase 1)
 
-Research is performed in Phase 0.5 (RESEARCH) before Scout launches. Scout does NOT perform web research.
+Research is performed in Phase 1 (RESEARCH) before Scout launches. Scout does NOT perform web research.
 
 - Read `researchBrief` from context (contents of `$WORKSPACE_PATH/research-brief.md`)
-- Read `conceptCandidates` from context (KEPT concept cards from Phase 0.5)
+- Read `conceptCandidates` from context (KEPT concept cards from Phase 1)
 - Use gap analysis and concept cards to inform task selection priorities
 - Concept candidates have been pre-filtered through the Research Ledger (known failures already blocked)
 
@@ -100,7 +100,7 @@ Generate 1-3 standard hypotheses PLUS 1-2 beyond-ask hypotheses per cycle.
 - Spot developer experience improvements
 - Find ecosystem opportunities (libraries, tools, integrations)
 
-**Beyond-the-Ask hypotheses** — apply the provocation lenses from Phase 0.5 (passed in `researchBrief` context) to codebase findings:
+**Beyond-the-Ask hypotheses** — apply the provocation lenses from Phase 1 (passed in `researchBrief` context) to codebase findings:
 1. Read the 2 selected lenses from `researchBrief` → `Beyond-the-Ask Provocations` section
 2. For each lens, apply its provocation question to what you discovered in steps 1-5
 3. Generate 1 hypothesis per lens, tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
@@ -124,7 +124,7 @@ Synthesize findings into 2-4 small/medium tasks.
 
 **Prerequisites:** Optionally specify `prerequisites: ["slug-a"]` — tasks deferred if prerequisite not completed. Lightweight suggestion, not hard constraint.
 
-**Concept Candidates from Phase 0.5 Research:**
+**Concept Candidates from Phase 1 Research:**
 - Read `conceptCandidates` from context — these are research-backed, ledger-verified implementation ideas
 - Apply **+2 priority boost** (same as benchmark weaknesses — research-backed concepts are high confidence)
 - Each concept includes `targetFiles`, `complexity`, `researchBacking` (capsule refs), and `agendaItemId`
@@ -204,6 +204,7 @@ For each selected task, recommend 0-3 skills that could assist the Builder. Read
 | Task touches API/endpoint files | `docs` | If `review-api-contract` available |
 | Task touches database/migration files | `database` | If DB skills available |
 | Task involves refactoring | `refactoring` | Always — prefer built-in `/refactor` |
+| Task involves UI/frontend files, routing, forms, or user-facing flows | `e2e` | Always — prefer `everything-claude-code:e2e-testing` (primary for UI tasks) |
 | Task involves UI/frontend files | `frontend` | If frontend skills available |
 | Task touches code quality/review | `code-review` | Always — prefer built-in `/code-review-simplify` |
 
@@ -246,6 +247,17 @@ For code and config changes, prefer property-based checks over existence/grep ch
 
 Every eval for code/config changes MUST include at least one property-based check. If no property is identifiable, document why in the eval file.
 
+**E2E Eval Requirements (UI/browser tasks):**
+
+When a task touches UI, routing, forms, auth flows, or user-facing pages, the eval MUST include a `## E2E Graders` section with:
+
+| Grader | Purpose |
+|---|---|
+| `[code]` `npx playwright test tests/e2e/<slug>.spec.ts` | Runs the Builder-generated Playwright test |
+| `[code]` `test -s playwright-report/index.html` | Asserts the HTML artifact exists and is non-empty |
+
+Scout does NOT write the Playwright test file itself — Scout writes only the *eval graders* that will run it. The Builder generates the actual `.spec.ts` by invoking the `everything-claude-code:e2e-testing` skill in Phase 2. Auditor D.5 cross-checks selectors against real DOM.
+
 ### 9. Write Eval Definitions
 
 For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command with grader type** (see `eval-runner.md`):
@@ -258,6 +270,9 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 - `[code]` `<project test command>`
 ## Acceptance Checks
 - `[code]` `<verification command>`
+## E2E Graders (UI/browser tasks only — omit for non-UI tasks)
+- `[code]` `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`
+- `[code]` `test -s playwright-report/index.html`
 ## Model-Based Checks (optional — only when bash cannot verify)
 - `[model]` Rubric: "<criteria>" — threshold: >= 60
 ## Thresholds
@@ -342,7 +357,7 @@ Categories: `architecture-improvement`, `technique-adoption`, `cross-cutting-con
 
 <!-- Deferred tasks: populate counterfactual in state.json evaluatedTasks:
      {"predictedComplexity": "S|M|L", "estimatedReward": 0.0-1.0, "alternateApproach": "<approach>", "deferralReason": "<reason>"}
-     Enables Phase 5 LEARN to verify prediction accuracy. -->
+     Enables Phase 6 LEARN to verify prediction accuracy. -->
 ```
 
 ### Ledger Entry
@@ -370,4 +385,4 @@ See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#hotspo
 
 ### State Updates
 - Add newly evaluated/deferred tasks
-- Research queries are managed by Phase 0.5 — Scout does not update research state
+- Research queries are managed by Phase 1 — Scout does not update research state

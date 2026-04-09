@@ -1,4 +1,4 @@
-# Phase 0.5: RESEARCH
+# Phase 1: RESEARCH
 
 > Read this file at the start of every cycle. Proactive research loop that transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.
 

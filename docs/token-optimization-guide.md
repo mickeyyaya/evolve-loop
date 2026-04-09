@@ -37,7 +37,7 @@ Measured using `scripts/token-profiler.sh` (1 line ≈ 15 tokens):
 | 3 | skills/refactor/SKILL.md | 653 | 9,795 |
 | 4 | skills/evolve-loop/benchmark-eval.md | 507 | 7,605 |
 | 5 | scripts/cycle-health-check.sh | 443 | 6,645 |
-| 6 | skills/evolve-loop/phase5-learn.md | 435 | 6,525 |
+| 6 | skills/evolve-loop/phase6-learn.md | 435 | 6,525 |
 | 7 | scripts/phase-gate.sh | 422 | 6,330 |
 | 8 | skills/evolve-loop/memory-protocol.md | 392 | 5,880 |
 | 9 | agents/evolve-scout.md | 372 | 5,580 |
@@ -131,10 +131,10 @@ Actionable optimizations for the heaviest files:
 | File | Current | Recommendation | Expected Savings |
 |------|---------|---------------|-----------------|
 | **phases.md** (694 lines) | Monolithic phase instructions | Already well-structured with on-demand reading. The Per-Phase Context Matrix and AgentDiet sections minimize what's actually loaded per cycle. | Low further savings — already optimized |
-| **smart-web-search.md** (654 lines) | Full 6-stage pipeline | Only loaded for Phase 0.5 research. Could split into core (stages 1-3) + advanced (stages 4-6) with lazy loading markers | ~3K tokens when only basic search needed |
+| **smart-web-search.md** (654 lines) | Full 6-stage pipeline | Only loaded for Phase 1 research. Could split into core (stages 1-3) + advanced (stages 4-6) with lazy loading markers | ~3K tokens when only basic search needed |
 | **refactor/SKILL.md** (653 lines) | Monolithic skill file | Split into SKILL.md (entry point, ~150 lines) + reference files for technique catalog, smell mapping | ~7K tokens saved at invocation |
 | **benchmark-eval.md** (507 lines) | 8-dimension scoring rubric | Only loaded once per invocation (Phase 0). Already appropriate — calibration is expensive but infrequent | No change needed |
-| **phase5-learn.md** (435 lines) | Learn phase instructions | Only loaded once per cycle for Phase 5. Appropriate size for its scope | No change needed |
+| **phase6-learn.md** (435 lines) | Learn phase instructions | Only loaded once per cycle for Phase 5. Appropriate size for its scope | No change needed |
 | **policies.md** (176 lines) | **Compressed this cycle** from 318 lines | 44% reduction achieved. Removed duplicate handoff template, compressed verbose pseudocode into tables | **2.1K tokens saved** |
 
 ---

@@ -56,6 +56,22 @@ cd evolve-loop
 ./install.sh
 ```
 
+### Setup (one-time, auto-runs at Phase 0)
+
+The orchestrator automatically runs `scripts/setup-skill-inventory.sh` at the start of each session to build a deterministic map of every installed skill — project-local, user-global (`~/.claude/skills/`), and plugin cache (`~/.claude/plugins/cache/*/skills/`). The output lives at `.evolve/skill-inventory.json` and is cached for 1 hour.
+
+You can also run it manually:
+
+```bash
+# Fresh scan (default; cache-hit if <1h old)
+bash scripts/setup-skill-inventory.sh
+
+# Force rebuild (ignores cache)
+bash scripts/setup-skill-inventory.sh --force
+```
+
+This replaces the legacy LLM-side parsing of the session's skill listing with a zero-token filesystem scan. Scout and Builder look up skills via the cached index; the ecc:e2e skill, for example, is automatically routed as a primary skill for any UI task without the orchestrator having to re-discover it every session.
+
 ### Run
 
 ```bash
@@ -104,7 +120,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.9) |
+| Metric | Start (v3.0) | Current (v8.10) |
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
@@ -140,6 +156,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.7 | Apr 6 | `/code-review-simplify` skill — unified code review + simplification with hybrid pipeline+agentic architecture, 4-dimension scoring, adaptive depth routing |
 | v8.8 | Apr 6 | `/inspirer` skill — standalone creative divergence engine with 12 provocation lenses, web-grounded research, scored Inspiration Cards, and evolve-loop integration |
 | v8.9 | Apr 6 | `/evaluator` skill — independent evaluation engine with 6-dimension scoring, EST anti-gaming defenses, self-improving criteria lifecycle, and strategic direction guidance |
+| v8.10 | Apr 9 | `ecc:e2e` first-class integration (Scout routing → Builder generation → Auditor D.5 grounding → phase-gate ship block), deterministic `setup-skill-inventory.sh` (replaces LLM parsing, 281 skills indexed), phases renumbered to eliminate `Phase 0.5` (now 0-7 linear) with aligned filenames |
 
 ### Benchmark Scores (v8.0)
 
@@ -217,22 +234,22 @@ All reference material is in `skills/refactor/reference/` — loaded on demand, 
 **Phase 0 — CALIBRATE** (once per session)
 Initialize workspace, load state, run benchmark if stale.
 
-**Phase 1 — DISCOVER** (Scout agent)
+**Phase 2 — DISCOVER** (Scout agent)
 Scan the codebase, read operator brief from last cycle, select 2-4 tasks with eval definitions. Uses multi-armed bandit for task type selection, novelty scoring to avoid over-touched files.
 
-**Phase 2 — BUILD** (Builder agent)
+**Phase 3 — BUILD** (Builder agent)
 Implement each task in an isolated git worktree. Self-verify against eval definitions. Max 3 attempts per task. Supports parallel builds for independent tasks.
 
-**Phase 3 — AUDIT** (Auditor agent)
+**Phase 4 — AUDIT** (Auditor agent)
 Single-pass review covering code quality, security, pipeline integrity, and eval checks. Blocks on MEDIUM+ severity. Failed audits trigger Builder retry.
 
-**Phase 4 — SHIP**
+**Phase 5 — SHIP**
 Commit and push changes. Auto-increment patch version.
 
-**Phase 5 — LEARN** (Operator agent)
+**Phase 6 — LEARN** (Operator agent)
 Extract instincts from the cycle. Run health checks. Detect stagnation patterns. Write operator brief for next cycle.
 
-**Phase 6 — META-CYCLE** (every 5 cycles)
+**Phase 7 — META-CYCLE** (every 5 cycles)
 Evaluate pipeline performance. Evolve agent prompts via critique-synthesize loop. Adjust strategies and budgets. Auto-revert changes that degrade performance.
 
 ### Multi-Task Flow
@@ -285,10 +302,10 @@ evolve-loop/
 │   ├── SKILL.md                 # Entry point (orchestrator)
 │   ├── phases.md                # Phase sequencing
 │   ├── phase0-calibrate.md      # Benchmark calibration
-│   ├── phase2-build.md          # Build orchestration
-│   ├── phase4-ship.md           # Commit and push
-│   ├── phase5-learn.md          # Instinct extraction
-│   ├── phase6-metacycle.md      # Meta-cycle self-improvement
+│   ├── phase3-build.md          # Build orchestration
+│   ├── phase5-ship.md           # Commit and push
+│   ├── phase6-learn.md          # Instinct extraction
+│   ├── phase7-meta.md      # Meta-cycle self-improvement
 │   ├── memory-protocol.md       # State and ledger schema
 │   ├── eval-runner.md           # Eval gate mechanics
 │   └── benchmark-eval.md        # 8-dimension scoring

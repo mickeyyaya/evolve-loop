@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.10.0] - 2026-04-09
+
+### Added
+- **`ecc:e2e` first-class integration** — UI/browser tasks now auto-invoke the `everything-claude-code:e2e-testing` skill to generate and run Playwright tests. Scout routes UI work to a new `e2e` skill category; Builder Step 4.5 generates `tests/e2e/<slug>.spec.ts`; Auditor checklist D.5 verifies selector grounding, artifact presence, and `## E2E Verification` in the build-report; `phase-gate.sh` blocks ship if a UI task is missing e2e evidence.
+- **`scripts/setup-skill-inventory.sh` + `scripts/setup_skill_inventory.py`** — deterministic filesystem scanner that indexes every installed skill (project, user-global, plugin cache) and writes `.evolve/skill-inventory.json`. Replaces LLM-side parsing of the session's skill listing with a zero-token, cache-friendly scan. Automatically picks newest plugin version, skips IDE mirror dirs (`.cursor/skills`, `.kiro/skills`), and categorizes via the routing taxonomy. Tested: 281 skills indexed across 7 scopes.
+- **New E2E Graders eval-runner section** (`skills/evolve-loop/eval-runner.md`) — first-class grader type with artifact locations (`playwright-report/`, `test-results/`, `artifacts/*.zip`), flake handling, and skip-condition semantics.
+- **Auditor audit-report template** extended with `## E2E Grounding (D.5)` table.
+- **Builder build-report template** extended with `## E2E Verification` section.
+
+### Changed
+- **Phases renumbered to eliminate `x.5` irregularity.** Phase 0.5 → 1, cascade 1-6 → 2-7:
+  - Phase 0: CALIBRATE (unchanged)
+  - Phase 1: RESEARCH (was 0.5)
+  - Phase 2: DISCOVER (was 1)
+  - Phase 3: BUILD (was 2)
+  - Phase 4: AUDIT (was 3)
+  - Phase 5: SHIP (was 4)
+  - Phase 6: LEARN (was 5)
+  - Phase 7: META (was 6)
+- **Phase markdown files renamed** to align filenames with phase numbers and descriptions:
+  - `phase05-research.md` → `phase1-research.md`
+  - `phase1-discover.md` → `phase2-discover.md`
+  - `phase2-build.md` → `phase3-build.md`
+  - `phase4-ship.md` → `phase5-ship.md`
+  - `phase5-learn.md` → `phase6-learn.md`
+  - `phase6-metacycle.md` → `phase7-meta.md` (filename now matches the `Phase 7: META` heading text)
+- **Phase 0 Skill Inventory step** now calls `scripts/setup-skill-inventory.sh` instead of LLM-parsing the system-reminder skill list. Deterministic, faster, and complete across every installed plugin.
+- **Scout skill-matching table** adds an `e2e` category row routing UI tasks to `everything-claude-code:e2e-testing` as primary.
+- **251 phase references** (text + filepaths) rewritten across 43 source files; TOC anchor slugs updated to match renumbered headers; `phase-gate.sh` anti-forgery whitelist extended with `setup-skill-inventory.sh`.
+
+### Migration notes
+- Phase numbering is an internal convention — plugin consumers invoke `/evolve-loop` as before.
+- `.evolve/` runtime artifacts from prior cycles still reference old phase names in historical logs; the next cycle's Scout will naturally write new-naming references.
+- `skills/refactor/` has its own independent phase pipeline (SCAN/PRIORITIZE/PLAN/EXECUTE/MERGE) and was deliberately left unchanged.
+
 ## [8.9.1] - 2026-04-07
 
 ### Changed

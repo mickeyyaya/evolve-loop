@@ -4,7 +4,7 @@ The evolve-loop learns from each cycle by extracting **instincts** — specific,
 
 ## How It Works
 
-During Phase 5 (LEARN), the orchestrator analyzes the cycle's artifacts — what was built, what passed/failed audit, what approaches worked — and extracts instincts with deep reasoning. Each instinct captures a single pattern with a confidence score.
+During Phase 6 (LEARN), the orchestrator analyzes the cycle's artifacts — what was built, what passed/failed audit, what approaches worked — and extracts instincts with deep reasoning. Each instinct captures a single pattern with a confidence score.
 
 Instincts are stored as YAML files in `.evolve/instincts/personal/` and read by the Scout and Builder at the start of each cycle.
 
@@ -88,7 +88,7 @@ Three distinct gates govern instinct advancement. Each serves a different purpos
 
 **Why different thresholds:** Graduation is stricter on cycle count (3+) because graduated instincts bypass Builder deliberation — a wrong one directly causes failures. Promotion has a lower cycle bar (2+) because promoted instincts are still evaluated before application, but requires higher confidence (0.8) and loop maturity (5+ cycles). Trust governance is strictest on provenance because external instincts carry injection risk (arXiv:2602.12430: 26.1% community skills have vulnerabilities).
 
-See [phase5-learn.md](../skills/evolve-loop/phase5-learn.md) § Instinct Graduation for the canonical executable specification.
+See [phase6-learn.md](../skills/evolve-loop/phase6-learn.md) § Instinct Graduation for the canonical executable specification.
 
 ## Global Promotion
 
@@ -138,7 +138,7 @@ Graduation can be reverted when evidence contradicts the instinct:
 - **Escalation:** If confidence drops below 0.5 after reversal, the instinct is archived with `archivedReason: "reversal"`
 - **Logging:** Reversal is recorded in the ledger as `type: "instinct-reversal"`
 
-See [phase5-learn.md](../skills/evolve-loop/phase5-learn.md) § Instinct Graduation for the full specification.
+See [phase6-learn.md](../skills/evolve-loop/phase6-learn.md) § Instinct Graduation for the full specification.
 
 ## Memory Operations
 

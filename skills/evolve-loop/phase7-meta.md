@@ -11,7 +11,7 @@
 - [Workflow Topology Review](#workflow-topology-review) — phase ordering optimization
 - [Applying Changes](#applying-remaining-changes) — config updates, digest regeneration
 
-# Evolve Loop — Phase 6: META-CYCLE
+# Evolve Loop — Phase 7: META-CYCLE
 
 Runs ONLY when `cycle % 5 === 0`. Evaluates the evolve-loop's own effectiveness and proposes improvements to agent prompts, strategies, and pipeline topology.
 

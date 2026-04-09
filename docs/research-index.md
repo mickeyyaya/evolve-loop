@@ -127,11 +127,11 @@ Roadmap, configuration, technique references, and performance profiling.
 | [index.md](index.md) | Top-level documentation index | 33 |
 | [configuration.md](configuration.md) | state.json configuration reference | 333 |
 | [performance-profiling.md](performance-profiling.md) | Token spend measurement and cost bottleneck identification | 173 |
-| [reference/scout-techniques.md](reference/scout-techniques.md) | Phase 1 (DISCOVER) techniques: task selection, difficulty estimation | 117 |
+| [reference/scout-techniques.md](reference/scout-techniques.md) | Phase 2 (DISCOVER) techniques: task selection, difficulty estimation | 117 |
 | [reference/scout-discovery.md](reference/scout-discovery.md) | Scout discovery and analysis phase guidelines | 40 |
-| [reference/builder-techniques.md](reference/builder-techniques.md) | Phase 2 (BUILD) techniques: error recovery, structured output | 142 |
-| [reference/auditor-techniques.md](reference/auditor-techniques.md) | Phase 3 (AUDIT) techniques: anti-conformity, threat detection | 141 |
-| [reference/orchestrator-techniques.md](reference/orchestrator-techniques.md) | Phase 4-5 (SHIP/LEARN) techniques: memory, instinct lifecycle | 182 |
+| [reference/builder-techniques.md](reference/builder-techniques.md) | Phase 3 (BUILD) techniques: error recovery, structured output | 142 |
+| [reference/auditor-techniques.md](reference/auditor-techniques.md) | Phase 4 (AUDIT) techniques: anti-conformity, threat detection | 141 |
+| [reference/orchestrator-techniques.md](reference/orchestrator-techniques.md) | Phase 5-6 (SHIP/LEARN) techniques: memory, instinct lifecycle | 182 |
 | [agent-config-versioning.md](agent-config-versioning.md) | Tracking agent configuration versions for traceability and rollback | 189 |
 
 ---
@@ -187,10 +187,10 @@ Recommended sequence for newcomers to the evolve-loop knowledge base.
 | 5 | [instincts.md](instincts.md) | Learn the learning mechanism |
 | 6 | [genes.md](genes.md) | Understand reusable fix templates |
 | 7 | [memory-consolidation-pipeline.md](memory-consolidation-pipeline.md) | See how knowledge persists across cycles |
-| 8 | [reference/scout-techniques.md](reference/scout-techniques.md) | Phase 1 techniques |
-| 9 | [reference/builder-techniques.md](reference/builder-techniques.md) | Phase 2 techniques |
-| 10 | [reference/auditor-techniques.md](reference/auditor-techniques.md) | Phase 3 techniques |
-| 11 | [reference/orchestrator-techniques.md](reference/orchestrator-techniques.md) | Phase 4-5 techniques |
+| 8 | [reference/scout-techniques.md](reference/scout-techniques.md) | Phase 2 techniques |
+| 9 | [reference/builder-techniques.md](reference/builder-techniques.md) | Phase 3 techniques |
+| 10 | [reference/auditor-techniques.md](reference/auditor-techniques.md) | Phase 4 techniques |
+| 11 | [reference/orchestrator-techniques.md](reference/orchestrator-techniques.md) | Phase 5-6 techniques |
 | 12 | [eval-grader-best-practices.md](eval-grader-best-practices.md) | Understand evaluation quality |
 | 13 | [reward-hacking-prevention.md](reward-hacking-prevention.md) | Learn safety guardrails |
 | 14 | [incidents/cycle-102-111.md](incidents/cycle-102-111.md) | Study real failure case |

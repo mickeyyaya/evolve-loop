@@ -237,7 +237,7 @@ Default: **standard**
 
 ## Evolve-Loop Integration
 
-### Phase 3 Delegation (Optional)
+### Phase 4 Delegation (Optional)
 
 When invoked from evolve-loop's Auditor phase:
 - **Trigger:** `strategy == "harden"` OR `forceFullAudit == true`

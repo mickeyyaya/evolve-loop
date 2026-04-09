@@ -1,4 +1,4 @@
-> Read this file when running Phase 2 (BUILD). Contains research-backed techniques for implementation, error recovery, structured output, prompt variants, and budget awareness.
+> Read this file when running Phase 3 (BUILD). Contains research-backed techniques for implementation, error recovery, structured output, prompt variants, and budget awareness.
 
 ## Contents
 - [Targeted Error Recovery](#targeted-error-recovery) — classify failures before retry (AgentDebug)

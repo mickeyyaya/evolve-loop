@@ -1,4 +1,4 @@
-# Phase 1: DISCOVER
+# Phase 2: DISCOVER
 
 > Read this file when launching the Scout agent for codebase discovery, gap analysis, and task selection.
 
@@ -6,7 +6,7 @@
 
 | `nothingToDoCount` | Action |
 |--------------------|--------|
-| `>= 2` | Check `discoveryVelocity`: if `discoveryVelocity.rolling3 > 0`, reset `nothingToDoCount` to 1 (discoveries pending → keep going). Otherwise skip Scout. Jump to Phase 5 with Operator in `"convergence-check"` mode. Operator can reset to 0 if new work detected. |
+| `>= 2` | Check `discoveryVelocity`: if `discoveryVelocity.rolling3 > 0`, reset `nothingToDoCount` to 1 (discoveries pending → keep going). Otherwise skip Scout. Jump to Phase 6 with Operator in `"convergence-check"` mode. Operator can reset to 0 if new work detected. |
 | `== 1` | **Escalation before convergence:** review last 3 cycles' deferred tasks for combinations, check strategy switch, propose a "radical" task. If viable task found → reset to 0, proceed. If not → launch Scout in `"convergence-confirmation"` mode (reads ONLY state.json + `git log --oneline -3`, MUST trigger new web research). If still nothing → increment to 2, skip to Phase 5. |
 | `== 0` | Normal Scout launch. |
 
@@ -79,8 +79,8 @@ Model selection: tier-1 if cycle 1 or goal-directed cycle <= 2; tier-3 if cycle 
   "recentLedger": "<last 3 ledger entries>",
   "benchmarkWeaknesses": "<array of {dimension, score, taskTypeHint}, or empty>",
   "priorHypotheses": "<array of hypotheses from previous cycle's scout-report, for validation tracking>",
-  "researchBrief": "<contents of research-brief.md from Phase 0.5>",
-  "conceptCandidates": "<array of KEPT concept cards from Phase 0.5, each with +2 priority boost>",
+  "researchBrief": "<contents of research-brief.md from Phase 1>",
+  "conceptCandidates": "<array of KEPT concept cards from Phase 1, each with +2 priority boost>",
   "challengeToken": "<$CHALLENGE>",
   "handoffFromOperator": "<contents of handoff-operator.json, or null>",
   "skillCategories": "<subset of skillInventory.categoryIndex matching projectContext language/framework — e.g., {testing: [...], language:python: [...], security: [...]}>"

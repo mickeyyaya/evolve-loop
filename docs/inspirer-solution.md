@@ -23,10 +23,10 @@ The evolve-loop has powerful creativity mechanisms — 10 provocation lenses, Sm
 
 | Mechanism | Where It Lives | Limitation |
 |-----------|---------------|-----------|
-| Provocation lenses | Phase 0.5 Step 2.5 | Only fires during evolve-loop cycles |
-| Smart Web Search | Phase 0.5 Step 3 | Only accessible to evolve-loop orchestrator |
-| Concept Cards | Phase 0.5 Step 4 | Output only consumed by Scout agent |
-| Research Ledger | Phase 5 feedback | Only tracks evolve-loop cycle outcomes |
+| Provocation lenses | Phase 1 Step 2.5 | Only fires during evolve-loop cycles |
+| Smart Web Search | Phase 1 Step 3 | Only accessible to evolve-loop orchestrator |
+| Concept Cards | Phase 1 Step 4 | Output only consumed by Scout agent |
+| Research Ledger | Phase 6 feedback | Only tracks evolve-loop cycle outcomes |
 
 **The gap:** A developer asking "how should I approach X?" cannot access these creative thinking tools without running a full evolve-loop cycle. The mechanisms are excellent but trapped.
 
@@ -162,7 +162,7 @@ For each research result, the skill captures: source URL, key finding, relevance
 
 ## Evolve-Loop Integration
 
-### Phase 0.5 Delegation (Optional)
+### Phase 1 Delegation (Optional)
 
 When the evolve-loop orchestrator detects creativity is needed:
 
@@ -183,7 +183,7 @@ Returned concept cards merge with standard gap-analysis cards and flow to Scout 
 | `skills/inspirer/reference/provocation-lenses.md` | 12 lenses with examples and domain affinity matrix | ~200 |
 | `skills/inspirer/reference/scoring-rubric.md` | Inspiration Card schema and scoring criteria | ~120 |
 | `skills/inspirer/reference/worked-examples.md` | 3 end-to-end pipeline examples | ~200 |
-| `skills/evolve-loop/phases.md` (modified) | Phase 0.5 delegation hook | +3 lines |
+| `skills/evolve-loop/phases.md` (modified) | Phase 1 delegation hook | +3 lines |
 | `.claude-plugin/plugin.json` (modified) | Skill registration | +1 line |
 
 ## References

@@ -1,4 +1,4 @@
-> Read this file when running eval checks during Phase 3 (AUDIT). Covers grader types, eval definition format, execution steps, retry protocol, non-code graders, benchmark eval execution, and mutation testing.
+> Read this file when running eval checks during Phase 4 (AUDIT). Covers grader types, eval definition format, execution steps, retry protocol, non-code graders, benchmark eval execution, and mutation testing.
 
 ## Contents
 - [Grader Type Taxonomy](#grader-type-taxonomy) — code, model, human grader types
@@ -11,7 +11,7 @@
 
 # Eval Runner — Audit Phase Instructions
 
-Eval definitions are created by the Scout in Phase 1, stored in `.evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
+Eval definitions are created by the Scout in Phase 2, stored in `.evolve/evals/<task-slug>.md`. The eval runner executes these definitions and determines PASS/FAIL.
 
 ## Grader Type Taxonomy
 
@@ -52,7 +52,10 @@ Each file in `.evolve/evals/` (see also [examples/eval.md](examples/eval.md)):
 
 ## Regression Evals (full test suite)
 - `[code]` `npm test`
-- `[code]` `npx playwright test` (if applicable)
+
+## E2E Graders (UI/browser tasks)
+- `[code]` `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`
+- `[code]` `test -s playwright-report/index.html`
 
 ## Acceptance Checks (verification commands)
 - `[code]` `grep -r "export function newFeature" src/`
@@ -82,6 +85,24 @@ Execute each command in `## Code Graders`. Record exit code, stdout, stderr. PAS
 
 ### 3. Run Regression Evals
 Execute each command in `## Regression Evals`. Record exit code, stdout, stderr. PASS if exit 0.
+
+### 3.5. Run E2E Graders (if section present)
+
+Execute each command in `## E2E Graders`. These are first-class and MUST pass for any UI/browser task.
+
+**Expected artifacts** (verified by Auditor D.5):
+
+| Artifact | Path |
+|---|---|
+| HTML report | `playwright-report/index.html` |
+| Per-test output | `test-results/` |
+| Trace files (optional) | `artifacts/*.zip` |
+
+**Generation:** Builder invokes the `everything-claude-code:e2e-testing` skill to generate `tests/e2e/<task-slug>.spec.ts` using the Page Object Model pattern before running these graders.
+
+**Flake handling:** If a grader fails on a network-dependent selector, retry once before marking FAIL. Persistent flakes → quarantine via the `e2e-testing` skill and propose a follow-up task in Phase 6 LEARN.
+
+**Skip condition:** Tasks without UI/browser surface area omit this section entirely — do NOT auto-fail when absent.
 
 ### 4. Run Acceptance Checks
 Execute each command in `## Acceptance Checks`. Record exit code. PASS if exit 0.
@@ -116,9 +137,9 @@ Write to `workspace/audit-report.md` or `workspace/eval-report.md`:
 |-----------|--------|
 | 1 (initial fail) | Re-launch Builder with failed check commands and stderr. Builder fixes, re-runs tests. Re-audit, re-run evals. |
 | 2 | Same as iteration 1 with accumulated failure context. |
-| 3 (final) | Log as failed approach in `state.json`. Record failed commands. Skip Phase 4. Proceed to Phase 5 with failure context. Output: "Eval gate failed after 3 attempts. Skipping deploy." |
+| 3 (final) | Log as failed approach in `state.json`. Record failed commands. Skip Phase 4. Proceed to Phase 6 with failure context. Output: "Eval gate failed after 3 attempts. Skipping deploy." |
 
-**Max total iterations: 3** (1 initial + 2 retries). If PASS → proceed to Benchmark Delta Check (then Phase 4).
+**Max total iterations: 3** (1 initial + 2 retries). If PASS → proceed to Benchmark Delta Check (then Phase 5).
 
 ---
 
@@ -195,7 +216,7 @@ Distinct from task-level evals. Measures project-wide quality across 8 dimension
 4. Store in `state.json.projectBenchmark`
 5. Write `workspace/benchmark-report.md`
 
-### Delta Check Execution (between Phase 3 and Phase 4)
+### Delta Check Execution (between Phase 4 and Phase 5)
 
 1. Verify `benchmark-eval.md` checksum — HALT if tampered
 2. Determine relevant dimensions from task type mapping

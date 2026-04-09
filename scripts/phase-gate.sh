@@ -10,7 +10,7 @@
 # Usage: bash scripts/phase-gate.sh <gate> <cycle> <workspace_path>
 #
 # Gates:
-#   research-to-discover — Verify Phase 0.5 ran, research-brief exists
+#   research-to-discover — Verify Phase 1 ran, research-brief exists
 #   discover-to-build   — Verify Scout ran, eval definitions exist
 #   build-to-audit      — Verify Builder ran, build-report exists
 #   audit-to-ship       — Verify Auditor ran, eval graders pass independently
@@ -154,6 +154,7 @@ check_no_forgery_scripts() {
         | grep -v 'scripts/cycle-health-check.sh' \
         | grep -v 'scripts/verify-eval.sh' \
         | grep -v 'scripts/eval-quality-check.sh' \
+        | grep -v 'scripts/setup-skill-inventory.sh' \
         | head -5 || true)
     if [ -n "$new_scripts" ]; then
         log "WARN: New shell scripts created during cycle: $new_scripts — review for forgery"
@@ -305,6 +306,30 @@ gate_audit_to_ship() {
             fail "Health check FAILED (exit $exit_code)"
         }
         log "OK: Cycle health check PASSED"
+    fi
+
+    # 4b. E2E artifact check (only when evals reference playwright)
+    # Narrow guard: if any eval file declares an E2E Graders section or playwright
+    # command, require that the Builder produced real e2e artifacts. Non-UI
+    # cycles are unaffected because the grep returns no match.
+    if grep -rql -e '## E2E Graders' -e 'playwright' "$EVOLVE_DIR/evals/" 2>/dev/null; then
+        local e2e_report="playwright-report/index.html"
+        local e2e_verification_documented="no"
+        if grep -q '## E2E Verification' "$WORKSPACE/build-report.md" 2>/dev/null; then
+            e2e_verification_documented="yes"
+        fi
+        if [ ! -s "$e2e_report" ] && [ "$e2e_verification_documented" = "no" ]; then
+            fail "Eval references playwright but no e2e artifacts found ($e2e_report missing/empty) and build-report.md lacks '## E2E Verification' section"
+        fi
+        # If artifacts are missing but Builder explicitly documented SKIPPED with reason, allow through as WARN.
+        if [ ! -s "$e2e_report" ] && [ "$e2e_verification_documented" = "yes" ]; then
+            if ! grep -qE 'SKIPPED.*reason' "$WORKSPACE/build-report.md"; then
+                fail "E2E Verification section present but status is not PASS or SKIPPED-with-reason, and no playwright-report/index.html found"
+            fi
+            log "WARN: E2E Verification marked SKIPPED with reason — allowing ship"
+        else
+            log "OK: E2E artifacts present or documented"
+        fi
     fi
 
     # 5. Eval checksum integrity (detect tampering)

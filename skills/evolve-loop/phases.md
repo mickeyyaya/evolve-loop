@@ -4,13 +4,14 @@
 - [Mandatory Phase Gate Verification](#mandatory-phase-gate-verification) — deterministic trust boundary at every transition
 - [Phase 0: CALIBRATE](#phase-0-calibrate-once-per-invocation) — project benchmark baseline
 - [Cycle Setup](#for-each-cycle-while-remainingcycles--0) — context budget, lean mode, integrity
-- [Phase 1: DISCOVER](#phase-1-discover) — Scout launch, task claiming, stagnation detection
+- [Phase 1: RESEARCH](#phase-1-research-every-cycle) — see phase1-research.md
+- [Phase 2: DISCOVER](#phase-2-discover) — Scout launch, task claiming, stagnation detection
 - [Context Quality & Handoffs](#context-quality-checklist-cemm) — CEMM checklist, per-phase matrix, handoff format
-- [Phase 2: BUILD](#phase-2-build-loop-per-task) — Builder dispatch (see phase2-build.md)
-- [Phase 3: AUDIT](#phase-3-audit-parallel) — Auditor launch, eval checksum verification
+- [Phase 3: BUILD](#phase-3-build-loop-per-task) — Builder dispatch (see phase3-build.md)
+- [Phase 4: AUDIT](#phase-4-audit-parallel) — Auditor launch, eval checksum verification
 - [Benchmark Delta & Pre-Ship Gate](#benchmark-delta-check--pre-ship-integrity-gate) — regression detection, health check
-- [Phase 4: SHIP](#phase-4-ship) — see phase4-ship.md
-- [Phase 5: LEARN](#phase-5-learn) — see phase5-learn.md
+- [Phase 5: SHIP](#phase-5-ship) — see phase5-ship.md
+- [Phase 6: LEARN](#phase-6-learn) — see phase6-learn.md
 
 # Evolve Loop — Phase Instructions
 
@@ -73,18 +74,30 @@ For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-l
 | Automated scoring | Run checks from `benchmark-eval.md` for all 8 dimensions |
 | Composite | `composite = automated` (automated scores only) |
 | Store | Write to `state.json.projectBenchmark`, pass `benchmarkWeaknesses` to Scout |
-| Tamper detection | Checksum `benchmark-eval.md` for verification in Phase 3-4 |
+| Tamper detection | Checksum `benchmark-eval.md` for verification in Phase 4-5 |
 
 ### Skill Inventory (once per session)
 
-Build a compact inventory of available external skills from the system-reminder's skill listing. This is zero-cost — the data is already in the orchestrator's context window from session initialization.
+Build a compact, deterministic inventory of every installed skill — project-local, user-global (`~/.claude/skills/`), and plugin cache (`~/.claude/plugins/cache/*/skills/`). This is done by a filesystem-scan script, NOT by LLM parsing of the system-reminder list, because the scripted scan is cheaper (zero tokens), more complete (every installed skill regardless of context window), and cached across sessions.
 
 | Step | Action |
 |------|--------|
-| Skip check | If `state.json.skillInventory.lastBuilt` < 1 hour ago, reuse cached inventory |
-| Parse | Extract skill names and one-line descriptions from the `system-reminder` available skills list |
-| Categorize | Assign each skill to 1+ routing categories (see table below) |
-| Store | Write to `state.json.skillInventory` with `categoryIndex` |
+| Run script | `bash scripts/setup-skill-inventory.sh` — idempotent, freshness-gated (1h cache) |
+| Skip check | Script exits early with cache-hit message if `.evolve/skill-inventory.json` is <1 hour old (pass `--force` to rebuild) |
+| Read output | Orchestrator reads `.evolve/skill-inventory.json` — already categorized, already sorted |
+| Pass to Scout | Extract subset of `categoryIndex` matching `projectContext.language`/`framework`/task types; pass as `skillCategories` in the Scout context block |
+
+**Output file:** `.evolve/skill-inventory.json` (schema matches the `state.json.skillInventory` shape below, plus a `skills` map keyed by name with `path`, `origin`, `referenceFiles`, and `categories` fields).
+
+**Scopes scanned** (precedence: project > user > plugin — first-seen wins on name collision):
+
+| Scope | Path | Typical count |
+|---|---|---|
+| `project` | `./skills/**/SKILL.md` | 5-20 |
+| `user` | `~/.claude/skills/*/SKILL.md` | 50-300 |
+| `plugin:<marketplace>:<plugin>` | `~/.claude/plugins/cache/<m>/<p>/<newest-version>/skills/*/SKILL.md` | 10-100 per plugin |
+
+IDE-specific mirror dirs (`.cursor/skills/`, `.kiro/skills/`, `.agents/skills/`) are **skipped** — only the canonical `skills/` directory of each plugin version is consumed.
 
 **Routing Categories:**
 
@@ -107,24 +120,40 @@ Build a compact inventory of available external skills from the system-reminder'
 
 For skill precedence, conflict resolution, phase eligibility, and budget-aware depth routing, see [reference/skill-routing.md](reference/skill-routing.md).
 
-**Inventory schema (in state.json):**
+**Inventory schema (`.evolve/skill-inventory.json`, written by `scripts/setup-skill-inventory.sh`):**
 
 ```json
 {
-  "skillInventory": {
-    "lastBuilt": "<ISO-8601>",
-    "categoryIndex": {
-      "code-review": ["/code-review-simplify", "code-review:code-review", "pr-review-workflow"],
-      "security": ["everything-claude-code:security-review", "security-patterns-code-review"],
-      "language:python": ["everything-claude-code:python-testing", "python-review-patterns"],
-      "testing": ["everything-claude-code:tdd", "testing-patterns"],
-      "refactoring": ["/refactor", "detect-code-smells", "refactoring-decision-matrix"]
+  "lastBuilt": "<ISO-8601>",
+  "totalSkills": 281,
+  "scopes": {
+    "project": 5,
+    "user": 226,
+    "plugin:ecc:ecc": 32,
+    "plugin:claude-plugins-official:superpowers": 14
+  },
+  "categoryIndex": {
+    "code-review": ["code-reviewer", "pr-review-workflow", ...],
+    "security": ["security-review", "security-patterns-code-review", ...],
+    "language:python": ["python-patterns", "python-review-patterns", "python-testing"],
+    "e2e": ["e2e-testing", "ui-demo", ...]
+  },
+  "skills": {
+    "e2e-testing": {
+      "name": "e2e-testing",
+      "description": "Playwright E2E testing patterns, Page Object...",
+      "origin": "user",
+      "path": "/Users/.../e2e-testing/SKILL.md",
+      "referenceFiles": ["references/playwright-config.md", ...],
+      "categories": ["testing", "e2e"]
     }
   }
 }
 ```
 
-The inventory is compact (~1-2KB). It is NOT passed to agents in full — only the `categoryIndex` subset matching `projectContext` is passed to Scout as `skillCategories`.
+The full file runs ~50-200KB depending on installed plugins. The orchestrator does NOT pass it whole to agents — it reads the file, extracts the `categoryIndex` subset matching `projectContext.language`/`framework`/task-type signals, and passes only that slice to Scout as `skillCategories`. Individual `skills[<name>]` entries (including `path` and `referenceFiles`) are looked up on demand when Builder wants to open a specific skill's reference material.
+
+**Fallback behavior:** If `.evolve/skill-inventory.json` is missing (e.g., first-ever cycle, setup script not yet run), the orchestrator MUST invoke `bash scripts/setup-skill-inventory.sh` before launching Scout. If the script fails (e.g., `python3` unavailable), fall back to the legacy LLM-parsing path and log a WARN to the ledger so the next session can retry.
 
 ---
 
@@ -179,11 +208,11 @@ REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *
 
 Increment after each cycle completes: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
 
-### Phase 0.5: RESEARCH (every cycle)
+### Phase 1: RESEARCH (every cycle)
 
 Proactive research loop. Runs inline by the orchestrator (no separate agent). Transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.
 
-For the full 6-step protocol (ORIENT → GAP ANALYSIS → DIVERGENCE → RESEARCH → CONCEPTUALIZE → EVALUATE → DECIDE), see [phase05-research.md](phase05-research.md).
+For the full 6-step protocol (ORIENT → GAP ANALYSIS → DIVERGENCE → RESEARCH → CONCEPTUALIZE → EVALUATE → DECIDE), see [phase1-research.md](phase1-research.md).
 
 **Token budget:** 25K max. Skip when lean mode + no weaknesses + empty agenda. Phase gate: `bash scripts/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
 
@@ -295,9 +324,9 @@ At cycle start, before any agent invocation, establish the integrity layer:
 6. Use `claimedCycle` as this iteration's cycle number `N`
 7. Decrement `remainingCycles`
 
-### Phase 1: DISCOVER
+### Phase 2: DISCOVER
 
-For the full Phase 1 protocol — convergence short-circuit, context pre-compute, prompt caching, Scout launch with full context schema, task claiming, eval quality check, and stagnation handling — see [phase1-discover.md](phase1-discover.md).
+For the full Phase 2 protocol — convergence short-circuit, context pre-compute, prompt caching, Scout launch with full context schema, task claiming, eval quality check, and stagnation handling — see [phase2-discover.md](phase2-discover.md).
 
 **Convergence short-circuit:** If `nothingToDoCount >= 2` and `discoveryVelocity.rolling3 == 0`, skip Scout and jump to Phase 5.
 
@@ -373,15 +402,15 @@ bash scripts/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to BUILD. Any other exit -> HALT.
 ```
 
-### Phase 2: BUILD (loop per task)
+### Phase 3: BUILD (loop per task)
 
-For detailed Phase 2 implementation, see [phase2-build.md](skills/evolve-loop/phase2-build.md).
+For detailed Phase 3 implementation, see [phase3-build.md](skills/evolve-loop/phase3-build.md).
 
 | Step | Detail |
 |------|--------|
 | Inline S-tasks | Execute first (per inst-007), commit sequentially |
-| Independent worktree tasks | Launch IN PARALLEL using multiple Agent tool calls in a single message (one per independent task, each with `isolation: "worktree"`). See phase2-build.md Dependency Partitioning Algorithm. |
-| Dependent tasks | Build sequentially within groups per phase2-build.md conflict graph |
+| Independent worktree tasks | Launch IN PARALLEL using multiple Agent tool calls in a single message (one per independent task, each with `isolation: "worktree"`). See phase3-build.md Dependency Partitioning Algorithm. |
+| Dependent tasks | Build sequentially within groups per phase3-build.md conflict graph |
 | Isolation | Builder MUST use worktree isolation for coding projects |
 | Retries | Max 3 attempts per task; failures logged to state.json |
 
@@ -394,9 +423,9 @@ bash scripts/phase-gate.sh build-to-audit $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to AUDIT. Any other exit -> HALT.
 ```
 
-### Phase 3: AUDIT (Parallel)
+### Phase 4: AUDIT (Parallel)
 
-The Auditor reviews Builder changes **in the worktree**. Worktree tasks built in parallel during Phase 2 MUST also be audited in parallel.
+The Auditor reviews Builder changes **in the worktree**. Worktree tasks built in parallel during Phase 3 MUST also be audited in parallel.
 
 **Inline task audit:** Run eval graders before committing. If any grader fails, revert (`git checkout -- <files>`) and retry inline or escalate to Builder agent. Do NOT skip audit for inline tasks.
 
@@ -429,7 +458,7 @@ If any checksum fails → HALT: "Eval tamper detected."
 
 After Auditor completes:
 - If `PASS-PENDING-EVAL` → proceed to eval gate (phase-gate runs `verify-eval.sh` as single source of truth)
-- If `WARN` or `FAIL` → handle per [phase2-build.md](skills/evolve-loop/phase2-build.md) (retry/cleanup)
+- If `WARN` or `FAIL` → handle per [phase3-build.md](skills/evolve-loop/phase3-build.md) (retry/cleanup)
 - Phase-gate `audit-to-ship` promotes `PASS-PENDING-EVAL` → `PASS` only if `verify-eval.sh` passes
 - Auditor does NOT run eval graders directly — this eliminates redundant eval execution
 
@@ -437,7 +466,7 @@ After Auditor completes:
 
 ### Benchmark Delta Check & Pre-Ship Integrity Gate
 
-For detailed steps, see [phase2-build.md](skills/evolve-loop/phase2-build.md).
+For detailed steps, see [phase3-build.md](skills/evolve-loop/phase3-build.md).
 
 | Check | Detail |
 |-------|--------|
@@ -453,9 +482,9 @@ bash scripts/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
 
 This is the **primary anti-cheating gate**: runs `verify-eval.sh` independently, runs `cycle-health-check.sh` (11 signals), verifies eval checksums.
 
-### Phase 4: SHIP
+### Phase 5: SHIP
 
-For detailed instructions, see [phase4-ship.md](skills/evolve-loop/phase4-ship.md).
+For detailed instructions, see [phase5-ship.md](skills/evolve-loop/phase5-ship.md).
 
 ```bash
 bash scripts/phase-gate.sh ship-to-learn $CYCLE $WORKSPACE_PATH
@@ -464,9 +493,9 @@ Verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does 
 
 ---
 
-### Phase 5: LEARN
+### Phase 6: LEARN
 
-For detailed instructions, see [phase5-learn.md](skills/evolve-loop/phase5-learn.md).
+For detailed instructions, see [phase6-learn.md](skills/evolve-loop/phase6-learn.md).
 
 ```bash
 bash scripts/phase-gate.sh cycle-complete $CYCLE $WORKSPACE_PATH

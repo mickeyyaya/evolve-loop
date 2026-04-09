@@ -18,11 +18,11 @@ Describe the change you'd like to see.
 
 Which phase(s) would be affected?
 
-- [ ] Phase 1: DISCOVER (Scout)
-- [ ] Phase 2: BUILD (Builder)
-- [ ] Phase 3: AUDIT (Auditor)
-- [ ] Phase 4: SHIP (Orchestrator)
-- [ ] Phase 5: LEARN (Operator + instincts)
+- [ ] Phase 2: DISCOVER (Scout)
+- [ ] Phase 3: BUILD (Builder)
+- [ ] Phase 4: AUDIT (Auditor)
+- [ ] Phase 5: SHIP (Orchestrator)
+- [ ] Phase 6: LEARN (Operator + instincts)
 
 ## Alternatives Considered
 

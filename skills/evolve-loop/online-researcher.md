@@ -1,6 +1,6 @@
 # Accurate Online Researcher Protocol (2026 Standard)
 
-This protocol defines how evolve-loop conducts online research. Phase 0.5 (RESEARCH) is the primary consumer — it runs the research loop every cycle. Builder uses this protocol reactively for unforeseen knowledge gaps during implementation.
+This protocol defines how evolve-loop conducts online research. Phase 1 (RESEARCH) is the primary consumer — it runs the research loop every cycle. Builder uses this protocol reactively for unforeseen knowledge gaps during implementation.
 
 ## The Core Concept: Knowledge Capsules
 Instead of reading the web directly in the middle of a build task, agents must perform research, distill the required knowledge into a dense **Knowledge Capsule**, and save it locally. The LLM simply retrieves the needed knowledge from the internet, stores the critical parts locally, and performs its tasks from the local cache. Future cycles read the capsule instead of searching the internet.
@@ -13,7 +13,7 @@ Not all queries need the full 6-stage Smart Web Search pipeline. Route each quer
 
 | Condition | Route to | Reason |
 |-----------|----------|--------|
-| **Phase 0.5 research** (gap analysis, concept cards) | Smart Web Search | Deep research needs intent classification, query transformation, iterative refinement |
+| **Phase 1 research** (gap analysis, concept cards) | Smart Web Search | Deep research needs intent classification, query transformation, iterative refinement |
 | **Survey / Deep dive / Comparison** intent | Smart Web Search | Multi-angle queries, WebFetch extraction, and synthesis produce significantly better results |
 | **Builder reactive lookup** (unforeseen API gap, error fix) | Default WebSearch | Quick single-query lookup; saves ~60% tokens vs Smart |
 | **Budget LOW or EXHAUSTED** | Default WebSearch | Smart pipeline overhead exceeds value at low budgets |
@@ -45,7 +45,7 @@ Do NOT apply the 6-stage pipeline (intent classification, T1-T6 transforms, refl
 
 ## Beyond-the-Ask Divergence Trigger
 
-A structured provocation system that stimulates the LLM to think beyond the user's explicit request. Fires during Phase 0.5 research and Scout hypothesis generation to surface ideas the user didn't ask for but should consider.
+A structured provocation system that stimulates the LLM to think beyond the user's explicit request. Fires during Phase 1 research and Scout hypothesis generation to surface ideas the user didn't ask for but should consider.
 
 **Research basis:** ProActLLM (arXiv:2410.12361) — proactive agents anticipate needs before expressed; ECIS 2024 — LLM-based divergent/convergent thinking in ideation; PROBE — proactive resolution of unspecified bottlenecks.
 
@@ -90,7 +90,7 @@ MATCHED_LENS = dimensionToLens[weakest]
 | conventionAdherence | Analogy | How do best-in-class projects handle this? |
 | featureCoverage | Ecosystem | What external tools solve this? |
 
-### Trigger Execution (Phase 0.5, after gap analysis)
+### Trigger Execution (Phase 1, after gap analysis)
 
 1. **Select lenses** — 1 random + 1 dimension-matched (deduplicate if same)
 2. **Generate provocation queries** — for each lens, produce 1 research question using the provocation template applied to the current project context and goal
@@ -101,14 +101,14 @@ MATCHED_LENS = dimensionToLens[weakest]
 
 ### Trigger Execution (Scout, hypothesis generation)
 
-Scout applies the **same 2 lenses** selected in Phase 0.5 when generating hypotheses (step 6). For each lens:
+Scout applies the **same 2 lenses** selected in Phase 1 when generating hypotheses (step 6). For each lens:
 1. Apply the provocation question to the codebase findings from discovery
 2. Generate 1 hypothesis tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
 3. Beyond-ask hypotheses with confidence >= 0.6 (lower threshold than standard 0.7) auto-promote to task candidates
 
 ### Tracking and Feedback
 
-Phase 5 (LEARN) tracks beyond-ask outcomes separately:
+Phase 6 (LEARN) tracks beyond-ask outcomes separately:
 
 | Metric | How |
 |--------|-----|
@@ -218,13 +218,13 @@ Record scores in scout-report.md under the Research section:
 ```
 
 ## Cross-Agent Integration
-- **Phase 0.5 (RESEARCH):** Primary research consumer. Runs every cycle. Executes the Research Agenda Protocol (below) to generate queries from evaluation signals, then routes to **Smart Web Search** (for surveys, deep dives, concept card research) or **Default WebSearch** (for factual checks, simple gap fills) per the Search Routing table above.
-- **Scout (Phase 1):** No longer performs web research. Reads `research-brief.md` from Phase 0.5 and consumes `conceptCandidates` for task selection.
-- **Builder (Phase 2):** Uses this protocol reactively if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error). Routes to **Default WebSearch** (1-2 direct queries) unless the gap is a complex architecture question requiring depth. Caches the result as a Knowledge Capsule for future tasks.
+- **Phase 1 (RESEARCH):** Primary research consumer. Runs every cycle. Executes the Research Agenda Protocol (below) to generate queries from evaluation signals, then routes to **Smart Web Search** (for surveys, deep dives, concept card research) or **Default WebSearch** (for factual checks, simple gap fills) per the Search Routing table above.
+- **Scout (Phase 2):** No longer performs web research. Reads `research-brief.md` from Phase 1 and consumes `conceptCandidates` for task selection.
+- **Builder (Phase 3):** Uses this protocol reactively if an unforeseen knowledge gap arises during implementation (e.g., an obscure API error). Routes to **Default WebSearch** (1-2 direct queries) unless the gap is a complex architecture question requiring depth. Caches the result as a Knowledge Capsule for future tasks.
 
 ## Research Agenda Protocol
 
-Phase 0.5 uses the Research Agenda (`state.json.researchAgenda`) to generate targeted queries. This protocol transforms evaluation signals into research questions.
+Phase 1 uses the Research Agenda (`state.json.researchAgenda`) to generate targeted queries. This protocol transforms evaluation signals into research questions.
 
 ### Signal-to-Question Mapping
 
@@ -255,7 +255,7 @@ When creating or referencing a capsule, categorize it in `researchAgenda.capsule
 
 ## Concept Card Schema
 
-Phase 0.5 converts research findings into structured implementation ideas.
+Phase 1 converts research findings into structured implementation ideas.
 
 ```json
 {
@@ -293,7 +293,7 @@ Phase 0.5 converts research findings into structured implementation ideas.
 
 ## Research Ledger Integration
 
-Before generating Concept Cards, Phase 0.5 MUST check `researchLedger.triedConcepts[]`:
+Before generating Concept Cards, Phase 1 MUST check `researchLedger.triedConcepts[]`:
 
 1. For each potential concept, search `triedConcepts` for similar titles (keyword overlap > 0.5)
 2. If match found with `verdict: "DOESNT_WORK"` → **immediate drop**, do not create concept card
@@ -310,7 +310,7 @@ Check `researchLedger.diversityTracker` before executing queries:
 | Underserved dimensions get P0 | `dimensionCoverage[dim] == 0` | Auto-promote to P0 regardless of signal |
 | Max capsules per dimension | `capsuleIndex[dim].length >= 3` | Deprioritize, switch to underserved |
 
-### Verdict Rules (Phase 5 writes, Phase 0.5 reads)
+### Verdict Rules (Phase 6 writes, Phase 1 reads)
 
 | Condition | Verdict | Keep/Drop |
 |-----------|---------|-----------|

@@ -63,7 +63,7 @@ Capsules are composite bundles combining multiple genes into a workflow:
 
 ## Gene Extraction
 
-During Phase 5 (LEARN), after instinct extraction:
+During Phase 6 (LEARN), after instinct extraction:
 - If a Builder successfully fixed a recurring error type, extract the fix as a gene
 - If a sequence of genes was applied together successfully, bundle as a capsule
 - Genes with `failCount > successCount` are archived

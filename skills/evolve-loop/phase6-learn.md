@@ -1,7 +1,7 @@
-> Read this file when orchestrating Phase 5 (LEARN). Covers workspace archival, instinct extraction and graduation, memory consolidation, operator check, and context management.
+> Read this file when orchestrating Phase 6 (LEARN). Covers workspace archival, instinct extraction and graduation, memory consolidation, operator check, and context management.
 
 ## Contents
-- [Workspace Archival](#phase-5-learn-orchestrator-inline--operator) — copy workspace to history
+- [Workspace Archival](#phase-6-learn-orchestrator-inline--operator) — copy workspace to history
 - [Memory Consolidation Check](#memory-consolidation-check) — trigger conditions
 - [Instinct Citation Collection](#instinct-citation-collection) — confidence updates from applied instincts
 - [Instinct Extraction](#instinct-extraction) — pattern identification, YAML format, categories
@@ -9,23 +9,23 @@
 - [Step-Level Process Reward Analysis](#step-level-process-reward-analysis) — Builder confidence cross-validation
 - [Instinct Graduation](#instinct-graduation) — promotion to mandatory guidance
 - [Counterfactual & Operator](#counterfactual--operator) — accuracy review, operator launch, notes
-- [Meta-Cycle Dispatch](#meta-cycle-self-improvement-every-5-cycles) — conditional Phase 6
+- [Meta-Cycle Dispatch](#meta-cycle-self-improvement-every-5-cycles) — conditional Phase 7
 - [Context Checkpoint](#context-checkpoint-compaction-anchor) — handoff file, exit conditions
 
-# Evolve Loop — Phase 5: LEARN
+# Evolve Loop — Phase 6: LEARN
 
-Orchestrator inline + operator. Meta-cycle self-improvement is in [phase6-metacycle.md](phase6-metacycle.md).
+Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.md](phase7-meta.md).
 
 ---
 
-### Phase 5: LEARN (orchestrator inline + operator)
+### Phase 6: LEARN (orchestrator inline + operator)
 
 1. **Archive workspace:**
    ```bash
    mkdir -p .evolve/history/cycle-{N}
    cp $WORKSPACE_PATH/*.md .evolve/history/cycle-{N}/
    ```
-   builder-notes.md persists across cycles (not cleared) so Phase 1 of the next cycle can read it.
+   builder-notes.md persists across cycles (not cleared) so Phase 2 of the next cycle can read it.
 
 2. **Memory Consolidation Check:**
    ```
@@ -137,7 +137,7 @@ Scout reads `state.json.proposals` during Task Selection (step 7) and applies a 
 
 7.6. **Research Ledger Update** (after proposal extraction):
 
-Score shipped tasks against the Research Ledger to determine what research-driven changes WORKED vs DIDN'T WORK. This creates the strict feedback loop for Phase 0.5's evaluation step.
+Score shipped tasks against the Research Ledger to determine what research-driven changes WORKED vs DIDN'T WORK. This creates the strict feedback loop for Phase 1's evaluation step.
 
 | Step | Action |
 |------|--------|
@@ -413,7 +413,7 @@ Track which external skills provided value to inform future routing.
 
 ### Meta-Cycle Self-Improvement (every 5 cycles)
 
-If `cycle % 5 === 0`, run full meta-cycle evaluation. See [phase6-metacycle.md](phase6-metacycle.md). Skip on non-meta-cycles (saves ~4-6K tokens).
+If `cycle % 5 === 0`, run full meta-cycle evaluation. See [phase7-meta.md](phase7-meta.md). Skip on non-meta-cycles (saves ~4-6K tokens).
 
 8. **Project Digest Generation** (cycle 1, or every 10 cycles during meta-cycle):
    Generate `.evolve/project-digest.md` (~2-3KB): Structure, Tech Stack, Hotspots, Conventions, Recent History. Scout reads this on cycle 2+ instead of full codebase scan.

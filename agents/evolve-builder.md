@@ -127,6 +127,26 @@ Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypas
 - Make changes — small and focused
 - Follow existing code patterns and conventions
 
+### Step 4.5: E2E Test Generation (conditional)
+
+**Trigger:** activate this step if ANY of the following is true:
+- `task.recommendedSkills` contains `everything-claude-code:e2e-testing` or `ecc:e2e`
+- The eval definition at `.evolve/evals/<task-slug>.md` contains an `## E2E Graders` section
+- `task.filesToModify` touches routes, pages, components, forms, or auth flows
+
+**Workflow:**
+
+1. Invoke the `everything-claude-code:e2e-testing` skill via the `Skill` tool. Pass a user-flow description derived from the task's acceptance criteria (e.g., "verify /health page renders with status text and correct HTTP 200").
+2. The skill generates `tests/e2e/<task-slug>.spec.ts` using the Page Object Model pattern.
+3. Run the generated test inside the worktree: `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`.
+4. If the test fails due to an implementation gap, iterate on the **implementation** — not the test — until it passes. Weakening/skipping the generated test is eval tampering (Auditor D.5 flags CRITICAL).
+5. Commit the generated test file(s) as part of the task's worktree commit.
+6. Record the test path and pass result in `build-report.md` under a new `## E2E Verification` section (see Output template below).
+
+**Skip condition:** None of the triggers apply. Do not invoke the skill speculatively.
+
+**Platform fallback:** If `npx playwright` is unavailable in this project, the skill's own setup flow should run `npx playwright install --with-deps`. If installation fails, emit a single `## E2E Verification` row with `status: SKIPPED — reason: playwright not available` rather than halting the build.
+
 ### Step 5: Self-Verify
 - Run eval graders from `evals/<task-slug>.md`
 - Run project test suite if it exists
@@ -267,6 +287,12 @@ Write `workspace/builder-notes.md` (under 20 lines):
 | Check | Result |
 |-------|--------|
 | <eval grader 1> | PASS / FAIL |
+
+## E2E Verification
+<!-- Include ONLY when task triggered Step 4.5. Omit entirely for non-UI tasks. -->
+| Test File | Command | Status | Report |
+|-----------|---------|--------|--------|
+| `tests/e2e/<slug>.spec.ts` | `npx playwright test tests/e2e/<slug>.spec.ts` | PASS / FAIL / SKIPPED | `playwright-report/index.html` |
 
 ## Discoveries
 | # | Category | Finding | Severity | Target Files | Proposed Action | Confidence |

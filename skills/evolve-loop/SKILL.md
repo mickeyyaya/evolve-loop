@@ -5,7 +5,7 @@ argument-hint: "[cycles] [strategy] [goal]"
 disable-model-invocation: true
 ---
 
-# Evolve Loop v8.9
+# Evolve Loop v8.10
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. `disable-model-invocation: true` prevents auto-triggering — this skill performs destructive operations (commits, pushes, version bumps) and must only run when explicitly invoked by the user.
 
@@ -67,28 +67,28 @@ Scout (Hypothesize) → Builder (Discover) → Learn (Propose) → Scout (Select
 
 | Mechanism | Agent/Phase | How It Works |
 |-----------|------------|-------------|
-| **Research Loop** | Phase 0.5 | Orient → gap analysis → web research → concept cards → strict evaluate → keep/drop |
-| **Research Ledger** | Phase 5 writes, Phase 0.5 reads | WORKS/DOESN'T WORK verdicts; blocks known failures; boosts validated patterns; enforces diversity |
-| **Concept Cards** | Phase 0.5 → Scout | Research-backed implementation ideas scored on feasibility/impact/novelty; +2 priority boost |
+| **Research Loop** | Phase 1 | Orient → gap analysis → web research → concept cards → strict evaluate → keep/drop |
+| **Research Ledger** | Phase 6 writes, Phase 1 reads | WORKS/DOESN'T WORK verdicts; blocks known failures; boosts validated patterns; enforces diversity |
+| **Concept Cards** | Phase 1 → Scout | Research-backed implementation ideas scored on feasibility/impact/novelty; +2 priority boost |
 | **Hypotheses** | Scout | Speculative improvements beyond gap-filling; confidence >= 0.7 auto-promote to task candidates |
 | **Discoveries** | Builder | Latent bugs, smells, opportunities found during implementation; structured with category + severity |
-| **Proposals** | Learn (Phase 5) | Discoveries + hypotheses converted to next-cycle candidates in `state.json.proposals` |
+| **Proposals** | Learn (Phase 6) | Discoveries + hypotheses converted to next-cycle candidates in `state.json.proposals` |
 | **Discovery Briefing** | Orchestrator | End-of-cycle output: shipped tasks + discoveries + proposals queued + benchmark delta |
-| **Discovery Velocity** | Learn (Phase 5) | Rolling 3-cycle proposals/cycle; loop continues while velocity > 0; converges when nothing new to learn |
-| **Proactive Discovery** | Learn (Phase 5) | Builder insights beyond task scope tagged `unsolicited`; surfaced as "Things Found Beyond Your Goal" |
+| **Discovery Velocity** | Learn (Phase 6) | Rolling 3-cycle proposals/cycle; loop continues while velocity > 0; converges when nothing new to learn |
+| **Proactive Discovery** | Learn (Phase 6) | Builder insights beyond task scope tagged `unsolicited`; surfaced as "Things Found Beyond Your Goal" |
 
 ## Architecture
 
 ```
 Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phase0-calibrate.md
-Phase 0.5: RESEARCH ── proactive research loop          → online-researcher.md
+Phase 1: RESEARCH ── proactive research loop          → online-researcher.md
 Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
-Phase 1:   DISCOVER ── [Scout] scan + task selection    → phases.md
-Phase 2:   BUILD ───── [Builder] implement (worktree)   → phase2-build.md
-Phase 3:   AUDIT ───── [Auditor] review + eval gate     → phases.md
-Phase 4:   SHIP ────── commit + push                    → phase4-ship.md
-Phase 5:   LEARN ───── instinct extraction + feedback   → phase5-learn.md
-Phase 6:   META ────── self-improvement (every 5 cycles) → phase6-metacycle.md
+Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
+Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
+Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
+Phase 5:   SHIP ────── commit + push                    → phase5-ship.md
+Phase 6:   LEARN ───── instinct extraction + feedback   → phase6-learn.md
+Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-meta.md
 ```
 
 ## Orchestrator Loop
@@ -111,7 +111,7 @@ For each cycle:
 | Builder | `agents/evolve-builder.md` | tier-2 | `build-report.md` |
 | Auditor | `agents/evolve-auditor.md` | tier-2 | `audit-report.md` |
 
-Post-cycle health (fitness, brief generation, convergence check) is handled inline by the orchestrator in Phase 5 — no Operator agent needed.
+Post-cycle health (fitness, brief generation, convergence check) is handled inline by the orchestrator in Phase 6 — no Operator agent needed.
 
 ## Model Routing
 
@@ -130,12 +130,12 @@ Full rules: [reference/model-routing.md](../../docs/model-routing.md)
 |------|-------------|
 | [phases.md](phases.md) | Phase sequencing, context blocks, gates (orchestration spine) |
 | [phase0-calibrate.md](phase0-calibrate.md) | Once per invocation (benchmark) |
-| [phase05-research.md](phase05-research.md) | Every cycle (gap analysis, web research, concept cards) |
-| [phase1-discover.md](phase1-discover.md) | Every cycle (Scout launch, task claiming, eval checks) |
-| [phase2-build.md](phase2-build.md) | Build orchestration, Self-MoA, parallelization |
-| [phase4-ship.md](phase4-ship.md) | Commit, push, process rewards |
-| [phase5-learn.md](phase5-learn.md) | Instinct extraction, consolidation |
-| [phase6-metacycle.md](phase6-metacycle.md) | Every 5 cycles (critique, prompt evolution) |
+| [phase1-research.md](phase1-research.md) | Every cycle (gap analysis, web research, concept cards) |
+| [phase2-discover.md](phase2-discover.md) | Every cycle (Scout launch, task claiming, eval checks) |
+| [phase3-build.md](phase3-build.md) | Build orchestration, Self-MoA, parallelization |
+| [phase5-ship.md](phase5-ship.md) | Commit, push, process rewards |
+| [phase6-learn.md](phase6-learn.md) | Instinct extraction, consolidation |
+| [phase7-meta.md](phase7-meta.md) | Every 5 cycles (critique, prompt evolution) |
 
 ### Configuration & Protocols
 | File | When to read |

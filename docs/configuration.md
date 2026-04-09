@@ -169,7 +169,7 @@ Eval definitions are created by the Scout and stored in `.evolve/evals/`. You ca
 
 ## Ledger Summary
 
-Aggregated statistics from `ledger.jsonl`, stored in `state.json` so agents never need to read the full ledger file. Computed by the orchestrator in Phase 4:
+Aggregated statistics from `ledger.jsonl`, stored in `state.json` so agents never need to read the full ledger file. Computed by the orchestrator in Phase 5:
 
 ```json
 {
@@ -189,7 +189,7 @@ Agents read `ledgerSummary` from state.json instead of reading ledger.jsonl dire
 
 ## Instinct Summary
 
-Compact array of active instincts stored in `state.json`, updated during Phase 5 instinct extraction:
+Compact array of active instincts stored in `state.json`, updated during Phase 6 instinct extraction:
 
 ```json
 {
@@ -230,7 +230,7 @@ On cycle 2+, Scout reads the digest instead of re-scanning the full codebase. On
 
 ## Process Rewards
 
-Per-phase scores tracking pipeline efficiency. Updated by the orchestrator in Phase 4 after each cycle:
+Per-phase scores tracking pipeline efficiency. Updated by the orchestrator in Phase 5 after each cycle:
 
 ```json
 {

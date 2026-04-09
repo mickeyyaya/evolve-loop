@@ -1,4 +1,4 @@
-> Read this file when running Phase 4 (SHIP) or Phase 5 (LEARN). Contains research-backed techniques for memory management, instinct lifecycle, coordination, self-evaluation, and meta-learning.
+> Read this file when running Phase 5 (SHIP) or Phase 6 (LEARN). Contains research-backed techniques for memory management, instinct lifecycle, coordination, self-evaluation, and meta-learning.
 
 ## Contents
 - [Strategy Playbook Protocol](#strategy-playbook-protocol) — incremental knowledge accumulation (ACE)
@@ -19,7 +19,7 @@
 
 **Source:** ACE (arXiv:2510.04618)
 
-**When:** Phase 5, before instinct extraction (step 4).
+**When:** Phase 6, before instinct extraction (step 4).
 
 **Protocol (Generation-Reflection-Curation):**
 1. **Reflect:** "What happened? What worked? What surprised me?" (2-3 sentences)
@@ -85,7 +85,7 @@
 
 **Source:** arXiv:2603.06604
 
-**When:** Phase 5, after self-evaluation scores recorded.
+**When:** Phase 6, after self-evaluation scores recorded.
 
 ```
 calibration_error = |mean_confidence - actual_accuracy| (k=5 cycle window)
@@ -100,7 +100,7 @@ calibration_error = |mean_confidence - actual_accuracy| (k=5 cycle window)
 
 ## Coefficient of Self-Improvement
 
-**When:** Phase 5, after fitness scores recorded.
+**When:** Phase 6, after fitness scores recorded.
 
 ```
 CSI = (fitnessScore[N] - fitnessScore[N-k]) / k    (k=3)
@@ -133,7 +133,7 @@ Parallel eval graders: run independently, reduce wall-clock time.
 
 **Source:** Code-A1 (arXiv:2603.15611)
 
-**When:** Phase 5, reviewing eval grader effectiveness.
+**When:** Phase 6, reviewing eval grader effectiveness.
 
 **Mistake Book pattern:** Retain eval graders that caught real bugs across cycles. Archive graders that only caught trivial issues. Eval graders should become harder as mastery level increases.
 
@@ -148,7 +148,7 @@ cycle_reward = ship_rate * 0.5 + eval_rigor * 0.3 + novelty * 0.2
 
 **Source:** SWE-CI (March 2026)
 
-**When:** Phase 5, updating instinct confidence.
+**When:** Phase 6, updating instinct confidence.
 
 Recent failures weight more than old successes:
 ```
@@ -163,7 +163,7 @@ Track repeated Auditor WARNs on same files across 3+ cycles → technical debt s
 
 **Source:** DAAO (arXiv:2509.11079)
 
-**When:** Phase 4, after task ships.
+**When:** Phase 5, after task ships.
 
 Record actual vs estimated token cost. Update `taskTypeDifficulty`:
 - Delta > +20% consistently → increase avgDifficulty +0.5
@@ -175,7 +175,7 @@ Record actual vs estimated token cost. Update `taskTypeDifficulty`:
 
 **Source:** PPP (arXiv:2511.02208), arXiv:2602.22680
 
-**When:** Phase 5, during instinct extraction.
+**When:** Phase 6, during instinct extraction.
 
 Add preference dimension: instincts can capture user/project preferences (not just technical patterns).
 

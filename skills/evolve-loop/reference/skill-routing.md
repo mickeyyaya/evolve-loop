@@ -1,6 +1,6 @@
 # Skill Routing Policy
 
-> Read this file when building the skill inventory (Phase 0), matching skills to tasks (Phase 1), or resolving skill conflicts during build/audit. Cross-references: [policies.md](policies.md), [task-selection.md](task-selection.md).
+> Read this file when building the skill inventory (Phase 0), matching skills to tasks (Phase 2), or resolving skill conflicts during build/audit. Cross-references: [policies.md](policies.md), [task-selection.md](task-selection.md).
 
 ## Layer Precedence
 
@@ -19,7 +19,7 @@ Skills are organized in 4 layers. Higher layers take precedence when capabilitie
 
 Which skills may be invoked at each pipeline phase. `--` means ineligible.
 
-| Skill | Phase 0 (Calibrate) | Phase 0.5 (Research) | Phase 1 (Discover) | Phase 2 (Build) | Phase 3 (Audit) | Phase 5 (Learn) |
+| Skill | Phase 0 (Calibrate) | Phase 1 (Research) | Phase 2 (Discover) | Phase 3 (Build) | Phase 4 (Audit) | Phase 6 (Learn) |
 |-------|:---:|:---:|:---:|:---:|:---:|:---:|
 | `/inspirer` | -- | ~20K QUICK | -- | -- | -- | -- |
 | `/evaluator` | project scope | -- | -- | -- | ~15-35K | -- |
@@ -30,11 +30,11 @@ Which skills may be invoked at each pipeline phase. `--` means ineligible.
 | Domain Reference catalogs | -- | -- | Scout reads | Builder reads | -- | -- |
 
 **Rules:**
-- Phase 0.5: Only `/inspirer` — external `brainstorming` is redundant (inspirer produces Concept Cards with composite scores).
-- Phase 1: Scout reads domain catalogs as reference but does NOT invoke skills via the Skill tool.
-- Phase 2: Builder invokes recommended skills per Step 2.7. Built-in `/refactor` eligible when `task.type == "refactoring"`.
-- Phase 3: Auditor may invoke `/evaluator` and `/code-review-simplify`. External review skills are supplementary only.
-- Phase 5: No skill invocations. Effectiveness data is tracked, not generated.
+- Phase 1: Only `/inspirer` — external `brainstorming` is redundant (inspirer produces Concept Cards with composite scores).
+- Phase 2: Scout reads domain catalogs as reference but does NOT invoke skills via the Skill tool.
+- Phase 3: Builder invokes recommended skills per Step 2.7. Built-in `/refactor` eligible when `task.type == "refactoring"`.
+- Phase 4: Auditor may invoke `/evaluator` and `/code-review-simplify`. External review skills are supplementary only.
+- Phase 6: No skill invocations. Effectiveness data is tracked, not generated.
 
 ## Task-Type Routing Table
 
@@ -92,7 +92,7 @@ Routing decisions connect to `state.json.skillEffectiveness` tracking. Built-in 
 | New skill (0 invocations) | Eligible as supplementary; promote after 3+ hits |
 | Skill not invoked in 10+ cycles | Reset effectiveness data (stale) |
 
-**Phase 5 feedback loop:** Sort skills within each category by `hitRate` descending when building the inventory next session. Demoted skills are never recommended as primary unless they match an explicit task signal (e.g., security task always gets `security-review` regardless of hitRate).
+**Phase 6 feedback loop:** Sort skills within each category by `hitRate` descending when building the inventory next session. Demoted skills are never recommended as primary unless they match an explicit task signal (e.g., security task always gets `security-review` regardless of hitRate).
 
 ## Category Extensions
 
@@ -103,6 +103,6 @@ Add built-in skills to the existing routing categories in `state.json.skillInven
 | `code-review` | `/code-review-simplify` | First (highest precedence) |
 | `refactoring` | `/refactor` | First (highest precedence) |
 
-`/inspirer` and `/evaluator` are **not** categorized — they are triggered by strategy/state conditions (Phase 0.5 and Phase 3), not task-type matching. Their invocation is governed by:
+`/inspirer` and `/evaluator` are **not** categorized — they are triggered by strategy/state conditions (Phase 1 and Phase 4), not task-type matching. Their invocation is governed by:
 - `/inspirer`: `strategy == "innovate"` OR `discoveryVelocity.rolling3 < 0.5`
 - `/evaluator`: `strategy == "harden"` OR `forceFullAudit == true`

@@ -1,4 +1,4 @@
-> Read this file when running Phase 1 (DISCOVER). Contains research-backed techniques for task selection, research quality, goal tracking, and difficulty estimation.
+> Read this file when running Phase 2 (DISCOVER). Contains research-backed techniques for task selection, research quality, goal tracking, and difficulty estimation.
 
 ## Contents
 - [Failure Pattern Reading](#failure-pattern-reading) — avoid repeating failures (DGM)

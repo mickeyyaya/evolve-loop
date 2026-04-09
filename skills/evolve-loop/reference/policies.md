@@ -10,7 +10,7 @@ Patterns confirmed at confidence 0.9+ become mandatory behavior:
 |--------|------|---------|
 | **Inline S-tasks** (inst-007) | S-complexity, <10 lines, clear eval → implement inline, skip Builder | ~30-50K tokens |
 | **Grep-based evals** (inst-004) | Markdown/shell projects → grep commands with match counts | — |
-| **Meta-cycle** | Every 5 cycles → split-role critique + prompt evolution | [phase6-metacycle.md](../phase6-metacycle.md) |
+| **Meta-cycle** | Every 5 cycles → split-role critique + prompt evolution | [phase7-meta.md](../phase7-meta.md) |
 | **Gene library** | Reusable fix templates in `.evolve/genes/` | [docs/genes.md](../../../docs/genes.md) |
 
 ## Plan Reuse
@@ -24,7 +24,7 @@ Builder reads prior successful build-reports from `.evolve/history/` when facing
 | Per-task | 80K tokens | Scout breaks tasks exceeding this |
 | Per-cycle | 200K tokens | Orchestrator halts if exceeded |
 | Per-session | 300K tokens (30%) | Session break triggered |
-| Research phase | 25K tokens | Phase 0.5 terminates iteration if exceeded |
+| Research phase | 25K tokens | Phase 1 terminates iteration if exceeded |
 | M-task + 10+ files | Likely exceeds budget | Split required |
 
 ## Context Window Strategy

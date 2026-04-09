@@ -1,4 +1,4 @@
-> Read this file when orchestrating Phase 2 (BUILD). Covers task partitioning, worktree isolation, Builder dispatch, Self-MoA parallel builds, and post-audit verdict handling.
+> Read this file when orchestrating Phase 3 (BUILD). Covers task partitioning, worktree isolation, Builder dispatch, Self-MoA parallel builds, and post-audit verdict handling.
 
 ## Contents
 - [Task Execution Ordering](#task-execution-ordering--parallelization) — dependency graph, parallel groups
@@ -13,7 +13,7 @@
 - [Benchmark Delta Check](#benchmark-delta-check-between-audit-and-ship) — regression detection
 - [Pre-Ship Integrity Gate](#pre-ship-integrity-gate) — independent verification
 
-# Evolve Loop — Phase 2: BUILD
+# Evolve Loop — Phase 3: BUILD
 
 Each task from the Scout report is built in isolation, with parallel execution for independent tasks and sequential execution for dependent ones.
 
@@ -187,6 +187,7 @@ Speculative execution does NOT change the quality gate — only *when* Auditor s
 
 After Builder completes:
 - Read `$WORKSPACE_PATH/build-report.md`
+- **UI/browser tasks:** if the eval at `.evolve/evals/<slug>.md` contains an `## E2E Graders` section, verify the build-report has an `## E2E Verification` section (PASS or SKIPPED-with-reason). Builder invokes the `everything-claude-code:e2e-testing` skill in Step 4.5 to generate `tests/e2e/<slug>.spec.ts`; see `agents/evolve-builder.md` § Step 4.5 and `agents/evolve-auditor.md` § D.5. Missing E2E Verification on a UI task blocks ship at `phase-gate.sh audit-to-ship`.
 - If FAIL after 3 attempts:
   - Discard worktree: `git worktree remove "$WORKTREE_DIR" --force 2>/dev/null`
   - Log failed approach in state.json under `failedApproaches`:
@@ -201,8 +202,8 @@ After Builder completes:
       "alternative": "<suggested different approach>"
     }
     ```
-  - Skip task, proceed to next (or Phase 3 if last)
-- If PASS → proceed to Phase 3 (do NOT merge yet — worktree stays isolated until Auditor passes)
+  - Skip task, proceed to next (or Phase 4 if last)
+- If PASS → proceed to Phase 4 (do NOT merge yet — worktree stays isolated until Auditor passes)
 
 ---
 
@@ -251,7 +252,7 @@ git worktree prune   # remove stale worktrees
 
 ## Benchmark Delta Check (between AUDIT and SHIP)
 
-After all tasks pass audit, before committing in Phase 4, verify project quality.
+After all tasks pass audit, before committing in Phase 5, verify project quality.
 
 **Exemptions** — skip when:
 - `strategy: "repair"` (corrective, not additive)
@@ -305,4 +306,4 @@ Run deterministic health check and independent eval verification before Phase 4.
    }}
    ```
 
-Proceed to Phase 4 only if both health check and eval verification pass.
+Proceed to Phase 5 only if both health check and eval verification pass.

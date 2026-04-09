@@ -416,27 +416,27 @@ These must be built on top of tree-sitter by the tool author.
 ### Recommended Architecture for a Skill-Based Refactoring Orchestrator
 
 ```
-Phase 1: DETECT (fast, incremental)
+Phase 2: DETECT (fast, incremental)
     - Tree-sitter incremental parsing for candidate identification
     - Graph-based dependency analysis for prioritization
     - Risk scoring (centrality + change frequency + incident history)
     |
-Phase 2: PLAN (graph-aware)
+Phase 3: PLAN (graph-aware)
     - Critical pair analysis to identify parallelizable vs. sequential operations
     - Topological sort for dependency-ordered execution
     - Cycle budget allocation (max iterations before escalating to human)
     |
-Phase 3: TRANSFORM (type-aware, composable)
+Phase 4: TRANSFORM (type-aware, composable)
     - Deterministic AST rules for well-defined patterns (Rector/OpenRewrite style)
     - LLM agents for ambiguous/context-dependent transformations
     - Static analysis pre-filtering to catch hallucinations
     |
-Phase 4: VALIDATE (incremental)
+Phase 5: VALIDATE (incremental)
     - Scope-limited impact analysis (affected subgraph only)
     - Incremental test execution (only tests touching changed code)
     - Rollback points at each transformation step
     |
-Phase 5: LEARN (feedback loop)
+Phase 6: LEARN (feedback loop)
     - Track which rules succeeded/failed
     - Adjust prioritization weights based on outcomes
     - Promote successful LLM transformations to deterministic rules

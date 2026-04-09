@@ -23,7 +23,7 @@
 | **Validate** | Run tool against test inputs; verify idempotency and error paths | Builder, Auditor | All test inputs produce expected output; no side effects on failure | Validation log in build-report.md |
 | **Register** | Add tool metadata to `state.json` under `synthesizedTools` | Builder | Validation passed; no duplicate tool name | `synthesizedTools` entry with `name`, `path`, `purpose`, `cycle`, `useCount` |
 | **Version** | Update tool when requirements change; increment in-place or create v2 | Builder | Existing tool fails new use case; backward compatibility preserved | Updated tool file; `useCount` reset if interface changed |
-| **Retire** | Remove tool when `useCount` stays 0 for 10+ cycles or superseded | Meta-cycle (Phase 6) | Zero usage confirmed; no downstream dependencies | Tool file deleted; `synthesizedTools` entry removed |
+| **Retire** | Remove tool when `useCount` stays 0 for 10+ cycles or superseded | Meta-cycle (Phase 7) | Zero usage confirmed; no downstream dependencies | Tool file deleted; `synthesizedTools` entry removed |
 
 ---
 
@@ -34,8 +34,8 @@
 | **Scout** | Detect capability gaps | Flag repeated manual steps or missing automation in scout-report.md |
 | **Builder** | Generate, validate, register tools | Write tool to `.evolve/tools/`, run validation, register in `state.json.synthesizedTools` |
 | **Auditor** | Verify tool quality | Check tool meets validation protocol in audit-report.md Section D |
-| **Phase 5 (Learn)** | Track tool effectiveness | Aggregate `useCount` trends; flag underused tools for retirement |
-| **Phase 6 (Meta-cycle)** | Graduate or retire tools | Promote high-use tools to skills/genes; retire zero-use tools |
+| **Phase 6 (Learn)** | Track tool effectiveness | Aggregate `useCount` trends; flag underused tools for retirement |
+| **Phase 7 (Meta-cycle)** | Graduate or retire tools | Promote high-use tools to skills/genes; retire zero-use tools |
 | **`state.json.synthesizedTools`** | Tool registry | Array of `{name, path, purpose, cycle, useCount}` entries |
 | **`.evolve/tools/`** | Tool storage | Directory containing generated tool scripts |
 | **Ledger** | Audit trail | `tool-synthesis` entries log creation, updates, and retirement |

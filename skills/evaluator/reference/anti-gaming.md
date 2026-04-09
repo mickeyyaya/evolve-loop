@@ -100,7 +100,7 @@ Patterns observed in AI-generated code that inflate eval scores without improvin
 | **Format padding** | Adds blank lines, headers, section dividers to inflate "readability" | Perturbation test will catch (score drops when stripped) |
 | **Metric manipulation** | Modifies eval graders or scoring scripts instead of fixing code | Eval checksum verification in phase-gate.sh |
 | **Complexity laundering** | Moves complex code to helper functions without simplifying | Check total complexity across all affected files, not just target |
-| **Coverage gaming** | Writes tests that execute code but don't assert behavior | Mutation testing (phase6-metacycle) catches this |
+| **Coverage gaming** | Writes tests that execute code but don't assert behavior | Mutation testing (phase7-meta) catches this |
 
 ---
 

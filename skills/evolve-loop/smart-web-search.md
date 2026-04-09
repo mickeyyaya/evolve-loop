@@ -23,7 +23,7 @@ Each stage has specific decision tables. Follow them in order. Do not skip stage
 
 **Use this protocol (deep research):**
 - Surveys, deep dives, comparisons, or architecture research
-- Phase 0.5 research producing concept cards
+- Phase 1 research producing concept cards
 - User explicitly asks to search, research, or find information online
 - Another skill delegates a complex search task to you
 

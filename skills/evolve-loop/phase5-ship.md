@@ -1,9 +1,9 @@
 ---
-name: phase4-ship
-description: "Phase 4 SHIP instructions — serial ship lock, domain-specific shipping, state updates, process rewards"
+name: phase5-ship
+description: "Phase 5 SHIP instructions — serial ship lock, domain-specific shipping, state updates, process rewards"
 ---
 
-> Read this file when orchestrating Phase 4 (SHIP). Covers serial ship lock, domain-specific shipping, state updates, fitness scoring, and process rewards.
+> Read this file when orchestrating Phase 5 (SHIP). Covers serial ship lock, domain-specific shipping, state updates, fitness scoring, and process rewards.
 
 ## Contents
 - [Serial SHIP Lock](#serial-ship-lock-parallel-safety) — atomic lock acquisition
@@ -12,7 +12,7 @@ description: "Phase 4 SHIP instructions — serial ship lock, domain-specific sh
 - [State Updates](#updating-statejson) — OCC writes, fitness, ledger summary, eval history, mastery
 - [Process Rewards](#process-rewards) — per-dimension scoring rubric, remediation triggers
 
-# Evolve Loop — Phase 4: SHIP
+# Evolve Loop — Phase 5: SHIP
 
 Orchestrator inline — no agent needed. **This phase is not optional — every cycle MUST persist and distribute completed work.**
 

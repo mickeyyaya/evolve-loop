@@ -80,4 +80,4 @@ Compute and store during Phase 0:
 ```bash
 sha256sum skills/evolve-loop/benchmark-eval.md > $WORKSPACE_PATH/benchmark-eval-checksum.txt
 ```
-Verify before every delta check (Phase 3-4 boundary). Builder MUST NOT modify this file.
+Verify before every delta check (Phase 4-5 boundary). Builder MUST NOT modify this file.

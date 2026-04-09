@@ -83,7 +83,7 @@ jq -r 'select(.role == "builder") | {cycle: .cycle, task: .data.task, attempts: 
 
 ### Using processRewardsHistory
 
-The Operator appends `processRewardsHistory` entries to `state.json` after each cycle (last 5 cycles retained). This stores **per-step Builder confidence cross-validated against Auditor findings** — not named dimension scores. See [phase5-learn.md § Step-Level Process Rewards](../skills/evolve-loop/phase5-learn.md) for the canonical schema.
+The Operator appends `processRewardsHistory` entries to `state.json` after each cycle (last 5 cycles retained). This stores **per-step Builder confidence cross-validated against Auditor findings** — not named dimension scores. See [phase6-learn.md § Step-Level Process Rewards](../skills/evolve-loop/phase6-learn.md) for the canonical schema.
 
 ```bash
 # Extract step-level confidence vs auditor mismatch trend
