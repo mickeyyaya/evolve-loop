@@ -100,8 +100,9 @@ For each cycle:
 4. Inline S-tasks directly; worktree M-tasks with `isolation: "worktree"`
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. **After every agent dispatch** → check for rate limit signals (see [policies.md](reference/policies.md#rate-limit-recovery-protocol)). If hit → write handoff → auto-schedule resume via `/schedule` or `/loop` → STOP
-7. Output Discovery Briefing (shipped tasks, discoveries, proposals queued, benchmark, discovery velocity) → continue immediately
-8. **Never stop to ask. Never skip agents. Never fabricate cycles.**
+7. **Context budget gates are checkpoints, not stops.** YELLOW → lean mode, continue. RED → write handoff, continue (auto-compaction frees space). Only STOP on two consecutive RED cycle starts.
+8. Output Discovery Briefing (shipped tasks, discoveries, proposals queued, benchmark, discovery velocity) → continue immediately
+9. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
 
 ## Agents
 

@@ -22,26 +22,30 @@ Builder reads prior successful build-reports from `.evolve/history/` when facing
 | Scope | Limit | Enforcement |
 |-------|-------|-------------|
 | Per-task | 80K tokens | Scout breaks tasks exceeding this |
-| Per-cycle | 200K tokens | Orchestrator halts if exceeded |
-| Per-session | 300K tokens (30%) | Session break triggered |
+| Per-cycle | 35K tokens (normal) / 20K (lean) | Per-cycle budget gate |
 | Research phase | 25K tokens | Phase 1 terminates iteration if exceeded |
 | M-task + 10+ files | Likely exceeds budget | Split required |
 
+**Note:** There is no per-session cumulative budget. Each cycle is an independent plan-mode unit. Auto-compaction reclaims context from older cycles. The budget gate checks "does ONE more cycle fit?" not "how much total have we used?"
+
 ## Context Window Strategy
 
-Research basis: LLM performance degrades continuously as context fills. Effective context is 25-50% of theoretical max (arXiv:2410.18745). "Lost in the Middle" (Stanford 2023) shows 20%+ accuracy drop for mid-context information.
+Each cycle is an **independent unit** — it has its own goal, runs its own agents (in isolated subagent context), and persists all results to files. Between cycles, Claude Code auto-compresses older conversation turns. The only accumulated context is:
+- Static overhead (system prompt, rules): ~25K — always present
+- Recent orchestrator conversation (~1-2 cycles): ~50K — not yet compacted
+- Residual growth (~3K/cycle): compressed summaries, handoff fragments
 
-**Target: keep context usage at 20-30% of window (200-300K of 1M).**
+This means effective context usage is **roughly constant** regardless of cycle count, with only slow residual growth. A 10-cycle and a 3-cycle session use similar amounts of live context.
 
 ### Context Budget Check (mandatory at cycle start)
 
-Run `scripts/context-budget.sh` at the start of every cycle:
+Run `scripts/context-budget.sh` at the start of every cycle. It answers: "Is there room for one more cycle?"
 
-| Status | Exit Code | Action |
-|--------|-----------|--------|
-| **GREEN** (< 20%) | 0 | Continue normally |
-| **YELLOW** (20-30%) | 1 | Activate lean mode. Complete current cycle, then evaluate session break |
-| **RED** (> 30%) | 2 | **Session break required.** Finish current phase, write handoff, STOP |
+| Status | Exit Code | Trigger | Action |
+|--------|-----------|---------|--------|
+| **GREEN** | 0 | Cycles 1-9 (default) | Continue normally — full per-cycle budget available |
+| **YELLOW** | 1 | Cycle 10+ OR headroom tight | Lean mode for this cycle. **Continue — YELLOW is NOT a stop signal.** |
+| **RED** | 2 | Cycle 30+ OR headroom < one lean cycle | Write handoff checkpoint. Only STOP on two consecutive RED cycle starts. |
 
 ### Session Break Protocol
 
@@ -102,19 +106,24 @@ Required sections (all mandatory):
 | Benchmark, instincts, failed approaches | state.json | Orchestrator reasoning | Partial via "Carry Forward" |
 | Eval definitions | .evolve/evals/ (checksummed) | Auditor strictness | Decayed 50% on new invocation |
 
-### Cycle-per-Session Estimates
+### Cycles per Session
 
-| Mode | Tokens/Cycle | Cycles Before RED |
-|------|-------------|-------------------|
-| Normal (cycles 1-3) | ~62K | ~3 cycles |
-| Lean (cycles 4+) | ~42K | ~4-5 cycles |
-| Inline S-tasks only | ~27K | ~7-8 cycles |
+With the per-cycle budget model, cycle count is limited by residual growth (3K/cycle), not cumulative cost:
 
-**Rule of thumb: plan for 3-4 cycles per session.**
+| Mode | Per-Cycle Cost | GREEN Until | YELLOW Until | RED At |
+|------|---------------|-------------|-------------|--------|
+| Normal | ~35K | Cycle 10 | — | — |
+| Lean (auto from cycle 10) | ~20K | — | Cycle 30 | Cycle 30+ |
 
-### Why Not Auto-Compact?
+**No practical limit for 10-cycle requests.** Even 20+ cycles complete in YELLOW (lean mode, no stop). RED is a safety valve at cycle 30+ for edge cases.
 
-Claude Code's auto-compaction is lossy and unpredictable — it discards context at arbitrary points, potentially losing critical cycle state (eval checksums, challenge tokens, failed approaches). Deliberate session breaks with structured handoffs preserve 100% of decision-relevant context.
+### Auto-Compaction + Handoff Hybrid
+
+Claude Code automatically compresses older conversation turns between cycles. The evolve-loop leverages this by persisting ALL critical state in files (state.json, reports, evals, ledger) — conversation history is supplementary orchestration context, not the source of truth.
+
+Each cycle is independent: plan → implement → audit → ship → learn → done. The next cycle starts with a nearly fresh context window (static overhead + recent turns + residual growth).
+
+Handoff files (`handoff.md`) are written at every cycle checkpoint as insurance. But compaction is the primary mechanism for long sessions — session breaks are a **LAST RESORT** triggered only at RED (cycle 30+ or headroom exhausted) after two consecutive RED confirmations.
 
 ## Rate Limit Recovery Protocol
 

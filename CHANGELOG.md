@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.10.1] - 2026-04-11
+
+### Fixed
+- **Context budget gate redesigned from cumulative to per-cycle model.** The old gate accumulated estimated token costs across all cycles (50K/cycle × N), hitting a 300K RED threshold at cycle 4-5 and forcing premature session breaks. The new gate asks "is there room for ONE more cycle?" — since agents run in isolated subagent context and auto-compaction reclaims older turns, effective context stays ~75-165K regardless of cycle count. Result: 10-cycle requests complete entirely in GREEN; YELLOW (lean mode) at cycle 10+; RED safety valve at cycle 30+.
+- **YELLOW no longer suggests session break.** Old YELLOW recommendation said "Consider session break after this cycle" — the LLM over-interpreted this as a stop instruction. New YELLOW says "Lean mode activated — continue."
+- **RED requires two consecutive confirmations to stop.** A single RED writes a handoff checkpoint but continues (auto-compaction frees space). Only two consecutive RED cycle starts trigger an actual session break.
+
 ## [8.10.0] - 2026-04-09
 
 ### Added

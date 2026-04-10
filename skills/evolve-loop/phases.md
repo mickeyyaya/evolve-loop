@@ -186,7 +186,7 @@ check_rate_limit(agent_result):
 
 ### Context Window Budget Gate (MANDATORY — runs before anything else)
 
-Run `scripts/context-budget.sh` before any agent invocation. This is a hard gate — like `phase-gate.sh`, it cannot be skipped.
+Run `scripts/context-budget.sh` before each cycle. This is a **per-cycle** gate — it checks "is there room for ONE more cycle?" not cumulative session usage. Each cycle is an independent plan-mode unit; auto-compaction reclaims context from older cycles between runs.
 
 ```bash
 CYCLES_THIS_SESSION=${CYCLES_THIS_SESSION:-0}
@@ -196,15 +196,17 @@ BUDGET_STATUS=$(echo "$BUDGET_JSON" | grep -o '"status": *"[^"]*"' | cut -d'"' -
 REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *[0-9]*' | grep -o '[0-9]*$')
 ```
 
-| Exit Code | Status | Action |
-|-----------|--------|--------|
-| 0 | **GREEN** | Continue to Eager Context Budget Estimation |
-| 1 | **YELLOW** | Force lean mode ON for this cycle. Log warning. Continue. |
-| 2 | **RED** | **STOP.** Execute Session Break Protocol (see [policies.md](reference/policies.md#session-break-protocol)). Do not launch any agents. |
+| Exit Code | Status | Trigger | Action |
+|-----------|--------|---------|--------|
+| 0 | **GREEN** | Cycles 1-9 | Continue — full per-cycle budget available |
+| 1 | **YELLOW** | Cycle 10+ or headroom tight | Force lean mode ON for this cycle. **Continue — YELLOW is NOT a stop signal.** |
+| 2 | **RED** | Cycle 30+ or headroom < one lean cycle | Write handoff checkpoint. Continue if `remainingCycles > 0`. Only STOP if RED triggers on **two consecutive cycle starts** — this confirms context is genuinely exhausted. |
 
-**On RED:** Write enriched `handoff.md` with remaining cycles, task queue, benchmark state, failed approaches, and resume command. Then STOP. The user resumes with `/evolve-loop <remaining>`.
+**On RED (first occurrence):** Write enriched `handoff.md` as a safety checkpoint. Then **continue immediately** — auto-compaction should free context. The handoff preserves state as insurance.
 
-**On YELLOW:** Set `budgetPressure = "high"` and `leanMode = true` for the remainder of this session.
+**On RED (second consecutive):** STOP. Output resume command: `/evolve-loop <remaining> <strategy> <goal>`.
+
+**On YELLOW:** Set `leanMode = true` for this cycle only. Lean mode reduces agent prompt depth and file reads — it does NOT trigger a session break.
 
 Increment after each cycle completes: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
 
@@ -232,9 +234,9 @@ At cycle start, **after passing the context window gate**, estimate total contex
 
 If `estimatedCycleTokens > tokenBudget.perCycle * 0.8`: drop lowest-priority tasks, switch M-tasks to single-Builder, or activate lean mode immediately.
 
-### Lean Mode (cycles 4+ OR budget pressure OR YELLOW)
+### Lean Mode (cycle 10+ OR YELLOW from budget gate)
 
-Activated after 3 cycles OR when `budgetPressure == "high"` OR YELLOW from context-budget.sh OR when estimated tokens exceed 80% of budget:
+Activated when `context-budget.sh` returns YELLOW (cycle 10+ or headroom tight) OR when estimated cycle tokens exceed 80% of per-cycle budget:
 
 | Optimization | Detail |
 |-------------|--------|
@@ -244,7 +246,7 @@ Activated after 3 cycles OR when `budgetPressure == "high"` OR YELLOW from conte
 | Eval checksums | Compute once, verify from memory |
 | Benchmark delta | Skip for cycles where all tasks are S-complexity docs-only |
 
-Saves ~15-20K tokens per cycle (from ~50K to ~30K).
+Saves ~10-15K tokens per cycle (from ~35K to ~20K).
 
 ### AgentDiet Trajectory Compression
 

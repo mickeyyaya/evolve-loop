@@ -430,6 +430,6 @@ If `cycle % 5 === 0`, run full meta-cycle evaluation. See [phase7-meta.md](phase
 10. **Exit conditions:**
     - Cycle limit reached → STOP
     - Convergence (`stagnation.nothingToDoCount >= 3`) → STOP
-    - Context budget RED → STOP (session break, output resume command)
+    - Context budget RED on **two consecutive cycle starts** → STOP (session break, output resume command). A single RED writes a handoff checkpoint but does NOT stop — auto-compaction reclaims space between cycles.
     - Knowledge-complete convergence (discoveryVelocity == 0 for 2 consecutive cycles AND `nothingToDoCount >= 2`) → STOP
-    - Otherwise → next cycle
+    - Otherwise → **continue immediately to next cycle. Never stop to ask. Never output a resume command unless the above conditions are met.**
