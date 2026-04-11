@@ -2,12 +2,11 @@
 name: evolve-loop
 description: Use when the user invokes /evolve-loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
 argument-hint: "[cycles] [strategy] [goal]"
-disable-model-invocation: true
 ---
 
 # Evolve Loop v8.10
 
-> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. `disable-model-invocation: true` prevents auto-triggering — this skill performs destructive operations (commits, pushes, version bumps) and must only run when explicitly invoked by the user.
+> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
 **Usage:** `/evolve-loop [cycles] [strategy] [goal]`
 

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.10.3] - 2026-04-11
+
+### Fixed
+- **Removed `disable-model-invocation: true` from SKILL.md.** This flag blocked ALL Skill tool calls, including explicit `/evolve-loop` slash commands, causing "Error: Skill evolve-loop:evolve-loop cannot be used with Skill tool due to disable-model-invocation". The skill description is specific enough ("Use when the user invokes /evolve-loop") to prevent unwanted auto-triggering without the flag.
+
 ## [8.10.2] - 2026-04-11
 
 ### Fixed
