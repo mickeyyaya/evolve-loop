@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.10.2] - 2026-04-11
+
+### Fixed
+- **`release.sh` plugin cache refresh now works post-push.** The old logic compared marketplace SHA to local HEAD (which was the pre-push commit), so the marketplace always appeared "up to date" with the old version. Now: always pulls unconditionally, then checks if the marketplace plugin.json version matches the target. Pre-push runs show "BEHIND — push first, then re-run"; post-push runs correctly refresh cache and registry.
+
 ## [8.10.1] - 2026-04-11
 
 ### Fixed

@@ -179,52 +179,58 @@ echo "--- Plugin cache refresh ---"
 PLUGIN_CACHE_DIR="$HOME/.claude/plugins/cache/evolve-loop"
 PLUGIN_MARKETPLACE_DIR="$HOME/.claude/plugins/marketplaces/evolve-loop"
 PLUGIN_REGISTRY="$HOME/.claude/plugins/installed_plugins.json"
-CURRENT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 
 CACHE_REFRESHED=false
 
-# Clear stale cache directory
-if [[ -d "$PLUGIN_CACHE_DIR" ]]; then
-  rm -rf "$PLUGIN_CACHE_DIR"
-  printf "${GREEN}CLEANED${NC}  %-45s %s\n" "Plugin cache" "Removed stale cache at $PLUGIN_CACHE_DIR"
-  CACHE_REFRESHED=true
-else
-  printf "${GREEN}OK${NC}       %-45s %s\n" "Plugin cache" "No stale cache found"
-fi
-
-# Update marketplace checkout
+# Always pull the marketplace checkout (fast-forward only). Don't compare
+# SHAs — this script may run before OR after `git push`, so the local HEAD
+# is unreliable as a "latest" reference. Instead, pull unconditionally and
+# then check if the marketplace version matches TARGET_VERSION.
 if [[ -d "$PLUGIN_MARKETPLACE_DIR/.git" ]]; then
-  MARKETPLACE_SHA=$(git -C "$PLUGIN_MARKETPLACE_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
-  if [[ "$MARKETPLACE_SHA" != "$CURRENT_SHA" ]]; then
-    git -C "$PLUGIN_MARKETPLACE_DIR" pull origin main --ff-only 2>/dev/null
-    if [[ $? -eq 0 ]]; then
-      printf "${GREEN}UPDATED${NC}  %-45s %s\n" "Marketplace checkout" "Pulled latest ($(git -C "$PLUGIN_MARKETPLACE_DIR" rev-parse --short HEAD))"
-      CACHE_REFRESHED=true
-    else
-      printf "${RED}FAILED${NC}   %-45s %s\n" "Marketplace checkout" "git pull failed — update manually"
-      ERRORS=$((ERRORS + 1))
-    fi
+  git -C "$PLUGIN_MARKETPLACE_DIR" pull origin main --ff-only 2>&1 | tail -1
+  MARKETPLACE_VERSION=$(extract_json_version "$PLUGIN_MARKETPLACE_DIR/.claude-plugin/plugin.json" 2>/dev/null)
+  MARKETPLACE_SHA=$(git -C "$PLUGIN_MARKETPLACE_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+  if [[ "$MARKETPLACE_VERSION" == "$TARGET_VERSION" ]]; then
+    printf "${GREEN}OK${NC}       %-45s %s\n" "Marketplace checkout" "v${MARKETPLACE_VERSION} (${MARKETPLACE_SHA})"
   else
-    printf "${GREEN}OK${NC}       %-45s %s\n" "Marketplace checkout" "Already at latest ($CURRENT_SHA)"
+    printf "${YELLOW}BEHIND${NC}   %-45s %s\n" "Marketplace checkout" "v${MARKETPLACE_VERSION} — expected v${TARGET_VERSION}. Push first, then re-run."
   fi
 elif [[ -d "$PLUGIN_MARKETPLACE_DIR" ]]; then
+  MARKETPLACE_VERSION=""
+  MARKETPLACE_SHA="unknown"
   printf "${YELLOW}SKIP${NC}     %-45s %s\n" "Marketplace checkout" "Not a git repo — cannot auto-update"
 fi
 
+# Clear stale cache if marketplace version matches target (cache holds old version)
+if [[ -d "$PLUGIN_CACHE_DIR" ]]; then
+  CACHE_VERSION=$(extract_json_version "$(find "$PLUGIN_CACHE_DIR" -name plugin.json -path "*/.claude-plugin/*" 2>/dev/null | head -1)" 2>/dev/null)
+  if [[ "$CACHE_VERSION" != "$TARGET_VERSION" ]]; then
+    rm -rf "$PLUGIN_CACHE_DIR"
+    printf "${GREEN}CLEANED${NC}  %-45s %s\n" "Plugin cache" "Removed v${CACHE_VERSION} cache (stale)"
+    CACHE_REFRESHED=true
+  else
+    printf "${GREEN}OK${NC}       %-45s %s\n" "Plugin cache" "Cache at v${CACHE_VERSION}"
+  fi
+else
+  printf "${GREEN}OK${NC}       %-45s %s\n" "Plugin cache" "No cache present"
+fi
+
 # Update installed_plugins.json registry
-if [[ -f "$PLUGIN_REGISTRY" ]]; then
-  # Check if the registry still points to the old version
-  REGISTRY_VERSION=$(sed -n '/"evolve-loop@evolve-loop"/,/\]/{ s/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p; }' "$PLUGIN_REGISTRY" | head -1)
-  if [[ -n "$REGISTRY_VERSION" && "$REGISTRY_VERSION" != "$TARGET_VERSION" ]]; then
-    # Update version
-    sed -i '' "s|\"installPath\": \".*cache/evolve-loop[^\"]*\"|\"installPath\": \"$PLUGIN_MARKETPLACE_DIR\"|" "$PLUGIN_REGISTRY"
-    sed -i '' "/"evolve-loop@evolve-loop"/,/\]/{
-      s/\"version\": \"[^\"]*\"/\"version\": \"$TARGET_VERSION\"/
-      s/\"gitCommitSha\": \"[^\"]*\"/\"gitCommitSha\": \"$CURRENT_SHA\"/
-    }" "$PLUGIN_REGISTRY" 2>/dev/null
-    # Simpler approach: use python for reliable JSON update
+if [[ -f "$PLUGIN_REGISTRY" && -n "$MARKETPLACE_VERSION" && "$MARKETPLACE_VERSION" == "$TARGET_VERSION" ]]; then
+  REGISTRY_VERSION=$(python3 -c "
+import json
+with open('$PLUGIN_REGISTRY') as f:
+    data = json.load(f)
+key = 'evolve-loop@evolve-loop'
+entries = data.get('plugins', {}).get(key, [])
+print(entries[0].get('version', '') if entries else '')
+" 2>/dev/null)
+
+  if [[ "$REGISTRY_VERSION" != "$TARGET_VERSION" ]]; then
+    FULL_SHA=$(git -C "$PLUGIN_MARKETPLACE_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
     python3 -c "
-import json, sys
+import json, datetime
 with open('$PLUGIN_REGISTRY', 'r') as f:
     data = json.load(f)
 key = 'evolve-loop@evolve-loop'
@@ -232,8 +238,8 @@ if key in data.get('plugins', {}):
     for entry in data['plugins'][key]:
         entry['version'] = '$TARGET_VERSION'
         entry['installPath'] = '$PLUGIN_MARKETPLACE_DIR'
-        entry['gitCommitSha'] = '$CURRENT_SHA'
-        entry['lastUpdated'] = '$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'
+        entry['gitCommitSha'] = '$FULL_SHA'
+        entry['lastUpdated'] = datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%S.000Z')
     with open('$PLUGIN_REGISTRY', 'w') as f:
         json.dump(data, f, indent=2)
     print('updated')
@@ -242,7 +248,7 @@ else:
 " 2>/dev/null
     RESULT=$?
     if [[ $RESULT -eq 0 ]]; then
-      printf "${GREEN}UPDATED${NC}  %-45s %s\n" "Plugin registry" "Updated to v${TARGET_VERSION} (SHA: ${CURRENT_SHA:0:7})"
+      printf "${GREEN}UPDATED${NC}  %-45s %s\n" "Plugin registry" "Updated to v${TARGET_VERSION} (SHA: ${MARKETPLACE_SHA})"
       CACHE_REFRESHED=true
     else
       printf "${RED}FAILED${NC}   %-45s %s\n" "Plugin registry" "Could not update installed_plugins.json"
@@ -251,6 +257,8 @@ else:
   else
     printf "${GREEN}OK${NC}       %-45s %s\n" "Plugin registry" "Already at v${TARGET_VERSION}"
   fi
+elif [[ -f "$PLUGIN_REGISTRY" ]]; then
+  printf "${YELLOW}SKIP${NC}     %-45s %s\n" "Plugin registry" "Marketplace not at target version — push first"
 fi
 
 if $CACHE_REFRESHED; then
