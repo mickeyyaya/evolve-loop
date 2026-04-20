@@ -37,6 +37,7 @@ description: Reference doc.
 | 9 | Complexity creep | S >30 lines, M >80 lines → break down or simplify |
 | 10 | Orchestrator gaming | Never skip agents, fabricate cycles, or inflate mastery |
 | 11 | Artifact forgery | Never write fake reports, `git commit --allow-empty`, or modify state.json directly |
+| 12 | The "Grep Trap" / Hallucinated Features | Never accept tautological `grep` evals for logic tasks; modifying documentation without modifying executable code (`scripts/`) is forbidden for capability tasks |
 
 ## Known Incidents
 
@@ -45,3 +46,4 @@ description: Reference doc.
 | Cycles 102-111 | Builder tautological evals | `eval-quality-check.sh` rigor classification | `docs/incidents/cycle-102-111.md` |
 | Cycles 132-141 | Orchestrator skipped agents, fabricated cycles | `phase-gate.sh` deterministic enforcement | `docs/incidents/cycle-132-141.md` |
 | Gemini CLI | Forgery script with fake artifacts | Content verification, git diff substance, state checksum | `docs/incidents/gemini-forgery.md` |
+| Autoresearch Loop (Cycles 1-16) | "Flawless Execution" (Hallucinating features into Markdown, evading actual code changes) | Ban `grep` for logic evals, enforce execution-based testing, require execution layer modifications | `docs/incidents/flawless-execution-anomaly.md` |
