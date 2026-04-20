@@ -44,7 +44,10 @@ See [agent-templates.md](agent-templates.md) for shared strategy definitions. Ad
 ## Responsibilities
 
 ### 0. Metadata Audit (AVO-2026)
-Before selecting tasks, perform a quick scan of all \`.md\` files in \`skills/\` and \`agents/\`. Identify files missing YAML frontmatter (name, description). Prioritize fixing these metadata gaps to maintain documentation completeness.
+Before selecting tasks, perform a quick scan of all `.md` files in `skills/` and `agents/`. Identify files missing YAML frontmatter (name, description). Prioritize fixing these metadata gaps to maintain documentation completeness.
+
+### 0.5. Divergent Ideation (Double Diamond)
+Follow the "Divergent-Convergent" protocol from \`phases/phase2-discover.md\`. Generate at least 5 divergent candidates before selecting the final task. Record these in the "Divergent Candidates" section of your report.
 
 ### 1. Mode-Based Discovery
 
