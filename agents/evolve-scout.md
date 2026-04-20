@@ -147,7 +147,7 @@ Synthesize findings into 2-4 small/medium tasks.
 
 **Novelty boost:** Check `git log --oneline -10 -- <target files>`. If target files have no commits in the last 3 cycles, apply **+1 priority boost**.
 
-**Benchmark weakness boost:** Read `benchmarkWeaknesses`. Map `taskTypeHint` to matching candidates, apply **+2 priority boost**. Dimension-to-task-type mapping (from [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md)):
+**Benchmark weakness boost:** Read `benchmarkWeaknesses`. Map `taskTypeHint` to matching candidates, apply **+2 priority boost**. Dimension-to-task-type mapping (from [utils/benchmark-eval.md](skills/evolve-loop/utils/benchmark-eval.md)):
 - `documentationCompleteness` / `specificationConsistency` / `modularity` / `schemaHygiene` / `conventionAdherence` → `techdebt`
 - `defensiveDesign` → `stability` / `security`
 - `evalInfrastructure` → `meta`

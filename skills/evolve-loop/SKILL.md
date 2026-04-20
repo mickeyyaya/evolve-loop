@@ -100,15 +100,15 @@ Parse `$ARGUMENTS`:
 ## Architecture
 
 ```
-Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phase0-calibrate.md
-Phase 1: RESEARCH ── proactive research loop          → online-researcher.md
-Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
-Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
-Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
-Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
-Phase 5:   SHIP ────── commit + push                    → phase5-ship.md
-Phase 6:   LEARN ───── instinct extraction + feedback   → phase6-learn.md
-Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-meta.md
+Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phases/phase0-calibrate.md
+Phase 1: RESEARCH ── proactive research loop          → utils/online-researcher.md
+Utility:   SEARCH ─── intent-aware web search engine    → utils/smart-web-search.md
+Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases/phases.md
+Phase 3:   BUILD ───── [Builder] implement (worktree)   → phases/phase3-build.md
+Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases/phases.md
+Phase 5:   SHIP ────── commit + push                    → phases/phase5-ship.md
+Phase 6:   LEARN ───── instinct extraction + feedback   → phases/phase6-learn.md
+Phase 7:   META ────── self-improvement (every 5 cycles) → phases/phase7-meta.md
 ```
 
 ## Orchestrator Loop

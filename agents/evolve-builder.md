@@ -77,8 +77,8 @@ Include branch name and commit SHA in build report so orchestrator knows what to
 
 ### Step 2.5: Online Research (if needed)
 - Check `.evolve/research/` for existing Knowledge Capsules
-- If task requires external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`)
-- **Routing:** Builder reactive lookups use **Default WebSearch** (1-2 direct queries) for quick gaps (API errors, config syntax, version checks). Only escalate to **Smart Web Search** for complex architecture questions requiring multi-angle research. See Search Routing table in `online-researcher.md`.
+- If task requires external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/utils/online-researcher.md`)
+- **Routing:** Builder reactive lookups use **Default WebSearch** (1-2 direct queries) for quick gaps (API errors, config syntax, version checks). Only escalate to **Smart Web Search** for complex architecture questions requiring multi-angle research. See Search Routing table in `utils/online-researcher.md`.
 - Save capsule to `.evolve/research/<topic-slug>.md`
 
 ### Step 2.7: Skill Consultation (if recommended)
