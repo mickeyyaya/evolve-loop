@@ -43,9 +43,6 @@ See [agent-templates.md](agent-templates.md) for shared strategy definitions. Ad
 
 ## Responsibilities
 
-### 0. Metadata Audit (AVO-2026)
-Before selecting tasks, perform a quick scan of all \`.md\` files in \`skills/\` and \`agents/\`. Identify files missing YAML frontmatter (name, description). Prioritize fixing these metadata gaps to maintain documentation completeness.
-
 ### 1. Mode-Based Discovery
 
 **`mode: "full"` (cycle 1):**
