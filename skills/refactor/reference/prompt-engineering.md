@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 4 execution. Prompt specificity ladder and structured subagent prompt template for refactoring tasks.
 
 # Prompt Engineering for Refactoring

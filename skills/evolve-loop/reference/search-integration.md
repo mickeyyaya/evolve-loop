@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Smart Web Search — Cache, Budget, Operators, Integration
 
 > Read this file when caching results, managing budget tiers, looking up operator syntax, integrating from another skill, or studying worked examples.

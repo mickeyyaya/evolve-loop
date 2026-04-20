@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Task Selection
 
 > Read this file when the Scout selects tasks or the Auditor determines checklist depth.

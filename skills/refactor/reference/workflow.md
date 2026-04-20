@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Refactor Workflow — Detailed Phases
 
 > Read this file when executing the full /refactor pipeline. Covers Phases 1-5 with subagent prompts, isolation rules, and merge protocol.

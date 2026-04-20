@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Smart Web Search — Detailed Stages
 
 > Read this file when executing the 6-stage search pipeline. Contains all stage protocols, decision tables, and transformation rules.

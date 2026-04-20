@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 1 scan. SonarQube-derived cognitive complexity algorithm with scoring rules, thresholds, and worked example.
 
 # Cognitive Complexity Scoring

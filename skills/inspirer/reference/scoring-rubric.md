@@ -1,3 +1,8 @@
+---
+name: scoring-rubric
+description: Reference doc.
+---
+
 # Scoring Rubric — Inspiration Cards
 
 > Detailed scoring criteria, card schema, and worked examples for the `/inspirer` skill's Stage 4 (SCORE).

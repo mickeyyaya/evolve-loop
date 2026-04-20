@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Continuous Refactoring Integration
 
 > Read this file to embed refactoring into PR review, debt tracking, and velocity dashboards rather than treating it as a separate activity.

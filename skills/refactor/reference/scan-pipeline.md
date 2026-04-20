@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Automated Scan Pipeline & Speed Optimizations
 
 > Read this file during Phase 1 (Scan) to launch parallel analysis tools and optimize wall-clock time on re-scans.

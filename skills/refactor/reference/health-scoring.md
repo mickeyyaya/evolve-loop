@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 2 prioritization. Composite multi-metric smell scoring formula and git-history enrichment signals.
 
 # Multi-Metric Smell Scoring

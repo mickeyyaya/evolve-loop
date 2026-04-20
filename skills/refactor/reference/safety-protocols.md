@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 4 execution. LLM safety guardrails including RefactoringMirror pattern, iterative re-prompting, and multi-proposal generation.
 
 # LLM Safety Protocols

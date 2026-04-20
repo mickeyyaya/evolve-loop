@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file for quick smell-to-fix lookup. Maps each of the 22 code smells to primary and secondary refactoring techniques with skill references.
 
 # Smell-to-Technique Quick Reference

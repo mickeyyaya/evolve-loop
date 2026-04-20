@@ -1,3 +1,9 @@
+---
+name: agent-templates
+description: Base schemas and context blocks for all agents.
+tools: []
+---
+
 # Agent Templates — Shared Schemas
 
 Shared input/output schemas for evolve-loop agents. Each agent references this file instead of duplicating boilerplate. Agent-specific fields are documented in the individual agent files.

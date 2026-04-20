@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 3 planning. Complete 66-technique Fowler catalog with detection signals, organized by category.
 
 # Refactoring Technique Catalog

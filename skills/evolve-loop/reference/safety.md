@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Safety & Integrity
 
 > Read this file when handling security concerns, audit failures, or suspected gaming behavior.

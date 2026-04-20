@@ -1,3 +1,8 @@
+---
+name: evolve-loop/phase0-calibrate
+description: Phase 0 Calibration logic.
+---
+
 > Read this file when running Phase 0 (CALIBRATE). Covers deduplication check, automated + LLM scoring, composite computation, high-water mark tracking, and benchmark report writing.
 
 # Evolve Loop — Phase 0: CALIBRATE

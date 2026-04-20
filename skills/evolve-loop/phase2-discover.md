@@ -1,3 +1,8 @@
+---
+name: evolve-loop/phase2-discover
+description: Phase 2 Discovery logic.
+---
+
 # Phase 2: DISCOVER
 
 > Read this file when launching the Scout agent for codebase discovery, gap analysis, and task selection.

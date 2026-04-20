@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Skill Routing Policy
 
 > Read this file when building the skill inventory (Phase 0), matching skills to tasks (Phase 2), or resolving skill conflicts during build/audit. Cross-references: [policies.md](policies.md), [task-selection.md](task-selection.md).

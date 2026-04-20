@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 3-4 for language-specific refactoring guidance. Covers TypeScript/JavaScript, Python, Go, and Java.
 
 # Language-Specific Refactoring Notes

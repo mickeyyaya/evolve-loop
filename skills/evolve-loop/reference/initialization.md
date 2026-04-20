@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 # Session Initialization
 
 > Read this file once at the start of each `/evolve-loop` invocation.

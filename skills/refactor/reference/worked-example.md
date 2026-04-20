@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file to understand the full refactoring pipeline end-to-end. Demonstrates all 5 phases on a hypothetical UserService class.
 
 # Worked Example: End-to-End Pipeline

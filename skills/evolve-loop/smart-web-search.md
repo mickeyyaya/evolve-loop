@@ -1,3 +1,8 @@
+---
+name: evolve-loop/smart-web-search
+description: Intent-aware search utility.
+---
+
 # Smart Web Search Protocol
 
 > Intent-aware web search engine for LLM agents. Classifies user intent, transforms queries for maximum retrieval quality, executes iterative search-evaluate-refine loops, and produces grounded, cited responses. Works with WebSearch and WebFetch only. Usable standalone (`/smart-search`) or as a building block for other skills. Based on: Query2doc, Self-RAG, FLARE, ReAct, and Perplexity's RAG pipeline.

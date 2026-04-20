@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 1 scan. Module graph analysis for circular dependencies, boundary validation, fan-in/fan-out centrality, and orphan detection.
 
 # Architecture Analysis

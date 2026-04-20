@@ -1,3 +1,8 @@
+---
+name: evolve-loop/phase1-research
+description: Phase 1 Research logic.
+---
+
 # Phase 1: RESEARCH
 
 > Read this file at the start of every cycle. Proactive research loop that transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.

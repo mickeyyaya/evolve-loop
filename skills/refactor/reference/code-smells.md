@@ -1,3 +1,8 @@
+---
+name: reference
+description: Reference doc.
+---
+
 > Read this file during Phase 1 scan. Complete 22-smell catalog with detection signals and numeric thresholds.
 
 # Code Smell Detection Catalog
