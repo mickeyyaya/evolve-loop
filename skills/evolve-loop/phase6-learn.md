@@ -238,19 +238,6 @@ Promotes high-confidence, repeatedly-confirmed instincts to mandatory guidance. 
 - If confidence drops below 0.5 → archive to `.evolve/instincts/archived/` with `archivedReason: "reversal"`
 - Log in ledger as `type: "instinct-reversal"`
 
-1c. **Skill Crystallization (2026 Standards):**
-   When instincts graduate and cluster, convert them from loose guidance into a structured **Skill (SKILL.md)**. This moves the system from "remembering" to "possessing" the capability.
-
-   | Trigger | Action |
-   |---------|--------|
-   | Cluster Found | 3+ related instincts with confidence >= 0.8. |
-   | Verifiability | An automated test suite exists to verify the skill. |
-   | Execution | Generate a new \`skills/<name>/SKILL.md\` proposal. |
-
-   **Crystallization Logic:**
-   - Use the **Trace2Skill** algorithm: synthesize the "Best Known Method" from multiple success traces.
-   - The resulting skill MUST be model-agnostic and include YAML metadata for auto-activation.
-
 **Self-Evaluation (LLM-as-a-Judge):**
 Model routing: tier-1 if audit retries > 1, eval failure, or calibration_error > 0.15 (richest learning signal). Otherwise inline with tier-2.
 
