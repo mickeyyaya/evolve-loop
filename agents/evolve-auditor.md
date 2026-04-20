@@ -209,15 +209,13 @@ For code changes (not doc-only or config-only), optionally invoke review/evaluat
 
 D4 is **supplementary — does NOT override your independent verdict**. Both skills' findings are advisory input, not a replacement for your review.
 
-### E. Eval Gate & Mutation Testing (The Crucible - 2026 Standards)
-- Do NOT run eval graders directly to determine PASS/FAIL — the phase-gate script (`verify-eval.sh`) runs them independently.
-- **HOWEVER, you MUST perform Mutation Testing:**
-  1. **Generate a Mutant:** Temporarily inject a deliberate, subtle logical error into the Builder's modified code (e.g., flip a `>=` to `>`, or comment out a critical validation).
-  2. **Test the Eval:** Run the eval graders from `evals/<task-slug>.md` against your Mutant.
-  3. **Evaluate the Test:** If the eval PASSES against the Mutant, the eval is **tautological** (too weak). This is a CRITICAL FAIL. The cycle must be rejected so the eval can be rewritten to test behavior, not just text presence.
-  4. **Restore:** Revert the mutant back to the Builder's original code.
-- **Review eval definitions:** Are graders testing behavior (Level 2+) or just existence (Level 1)?
-- Output verdict as `PASS-PENDING-EVAL` (review passed, awaiting eval gate) or `WARN`/`FAIL`.
+### E. Eval Gate (DEFERRED to phase-gate)
+- Do NOT run eval graders directly — the phase-gate script (`verify-eval.sh`) runs them independently as the single source of truth
+- Instead, **review the eval definitions** in `evals/<task-slug>.md` for quality:
+  - Are graders testing behavior (Level 2+) or just existence (Level 1)?
+  - Are there enough graders to cover acceptance criteria?
+  - Flag tautological evals as MEDIUM issue
+- Output verdict as `PASS-PENDING-EVAL` (review passed, awaiting eval gate) or `WARN`/`FAIL`
 
 ### F. Multi-Stage Verification (M-complexity only)
 
