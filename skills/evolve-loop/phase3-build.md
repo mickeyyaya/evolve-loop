@@ -3,6 +3,7 @@
 ## Contents
 - [Task Execution Ordering](#task-execution-ordering--parallelization) — dependency graph, parallel groups
 - [Self-MoA Parallel Builds](#self-moa-parallel-builds-m-complexity-tasks) — multi-Builder for M-complexity
+- [Step-Level Reflection](#step-level-reflection-resilience) — Builder cyclic self-correction
 - [Build Isolation](#build-isolation-by-projectcontextbuildisolation) — worktree, file-copy, none modes
 - [Builder Agent Launch](#builder-agent-launch) — context block, model routing
 - [Output Redirection](#output-redirection) — token-saving log strategy
@@ -82,6 +83,19 @@ When Self-MoA is active, add to Builder context:
   "selfMoaInstruction": "You are variant <X> in a parallel build. Variant A uses the standard approach. Variant B must choose an explicitly different design. Variant C (if present) uses the minimal diff approach."
 }
 ```
+
+---
+
+## Step-Level Reflection (Resilience)
+
+Builders are authorized to perform **Step-Level Reflection** (cyclic self-correction) within a single task build.
+
+| Feature | Protocol |
+|---------|----------|
+| **Trigger** | Immediate logical contradiction or lint failure in a sub-step. |
+| **Action** | Pause, analyze against blueprint, mini-retry. |
+| **Limit** | Max 2 reflections per step; prevents infinite loops. |
+| **Logging** | Attribute "Reflection Action" in the build report. |
 
 ---
 
