@@ -61,6 +61,23 @@ import os
 import re
 import sys
 from pathlib import Path
+from pydantic import BaseModel, Field
+from typing import List, Dict
+
+# --- Pydantic Schema Definitions (2026 Standards) ---
+class SkillOutput(BaseModel):
+    name: str
+    description: str
+    origin: str
+    path: str
+    referenceFiles: List[str]
+    categories: List[str]
+
+class InventorySchema(BaseModel):
+    lastBuilt: str
+    scopes: Dict[str, int]
+    categoryIndex: Dict[str, List[str]]
+    skills: Dict[str, SkillOutput]
 
 # ─── Categorization rules ────────────────────────────────────────────────────
 # Keyword → category. Matched against skill name + description (lowercased).
@@ -296,7 +313,8 @@ def build_inventory(project_root: Path) -> dict:
             continue
         description_trim = description[:300]
         cats = categorize(name, description_trim)
-        skills[name] = {
+        
+        skill_data = {
             "name": name,
             "description": description_trim,
             "origin": origin,
@@ -304,23 +322,38 @@ def build_inventory(project_root: Path) -> dict:
             "referenceFiles": sibling_reference_files(skill_md),
             "categories": cats,
         }
-        scope_counts[origin] = scope_counts.get(origin, 0) + 1
-        for c in cats:
-            category_index.setdefault(c, []).append(name)
+        
+        try:
+            validated_skill = SkillOutput(**skill_data)
+            skills[name] = validated_skill.model_dump()
+            scope_counts[origin] = scope_counts.get(origin, 0) + 1
+            for c in cats:
+                category_index.setdefault(c, []).append(name)
+        except Exception as e:
+            print(f"[setup_skill_inventory] Warning: Skipping {skill_md} due to validation error: {e}", file=sys.stderr)
+            skipped.append(str(skill_md))
 
     # Sort category index for stable output
     for c in category_index:
         category_index[c].sort()
 
-    return {
+    inventory_data = {
         "lastBuilt": datetime.datetime.now(datetime.UTC)
             .strftime("%Y-%m-%dT%H:%M:%SZ"),
         "scopes": dict(sorted(scope_counts.items())),
-        "totalSkills": len(skills),
         "categoryIndex": dict(sorted(category_index.items())),
         "skills": dict(sorted(skills.items())),
-        "skipped": skipped,
     }
+    
+    try:
+        validated_inventory = InventorySchema(**inventory_data)
+        result = validated_inventory.model_dump()
+        result["totalSkills"] = len(skills)
+        result["skipped"] = skipped
+        return result
+    except Exception as e:
+        print(f"[setup_skill_inventory] FATAL: Final inventory failed schema validation: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────
