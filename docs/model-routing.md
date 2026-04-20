@@ -79,14 +79,8 @@ When `models.json` exists, it takes precedence over auto-detection. See [configu
 - tier-1 routing targets **decision points with multiplicative downstream impact**: cycle 1 Scout sets the session trajectory, audit retries need deeper reasoning about design failures, and problem-cycle self-evaluation extracts the richest learning signal
 - Net cost increase is ~6.5% per 5-cycle session, offset by fewer wasted retries and better task selection
 
-## Reasoning Asymmetry (Planner-Auditor Pattern)
+## Quality Guardrails
 
-To avoid the **Self-Correction Blind Spot**, the evolve-loop enforces **Reasoning Asymmetry**: the Auditor should ideally operate at a higher reasoning capacity than the Builder.
-
-| Builder Tier | Recommended Auditor Tier | Rationale |
-|--------------|--------------------------|-----------|
-| **tier-2** (Flash) | **tier-1** (Pro/Opus) | Catch logic gaps and shallow reasoning |
-| **tier-1** (Pro) | **tier-1** (Extended Thinking) | Deep architectural cross-verification |
-| **tier-3** (Lite) | **tier-2** (Flash) | Efficient verification of mechanical tasks |
-
-The orchestrator should prioritize upgrading the Auditor whenever budget allows, especially for tasks with \`S\` complexity where the Builder uses a lower tier.
+- Downgrade to tier-3 only when `consecutiveClean >= 3` AND task is S/XS complexity
+- First-attempt eval failure >33% blocks tier-3 routing for that task type
+- Benchmark score drop >3 points suspends all tier-3 routing until recovery
