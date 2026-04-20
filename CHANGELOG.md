@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.11.1] - 2026-04-20
+
+### Fixed
+- **Stability**: Enforce execution-based evals by blocking tautological checks [cycle 15].
+- **Safety Guidelines**: Added incident report for Flawless Execution Anomaly and updated safety guidelines.
+- Reverted "stability: implement Reasoning Asymmetry for Planner-Auditor [cycle 2]".
+
 ## [8.11.0] - 2026-04-20
 
 ### Added
