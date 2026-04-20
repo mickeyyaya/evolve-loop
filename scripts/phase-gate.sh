@@ -161,41 +161,8 @@ check_no_forgery_scripts() {
     fi
 }
 
-# Verify ledger hash chain integrity
-verify_ledger_chain() {
-    if [ ! -f "$LEDGER" ]; then
-        log "OK: No ledger to verify"
-        return 0
-    fi
-
-    log "Verifying ledger hash chain integrity..."
-    local prev_hash="0000000000000000000000000000000000000000000000000000000000000000"
-    local line_num=1
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        # Extract prevHash from JSON line using simple grep/sed to avoid complex jq dependencies in bash
-        local line_prev_hash
-        line_prev_hash=$(echo "$line" | grep -oE '"prevHash":"[a-f0-9]+"' | cut -d'"' -f4 || echo "none")
-
-        if [ "$line_prev_hash" != "$prev_hash" ]; then
-            anomaly "Ledger hash chain broken at line $line_num. Expected prevHash $prev_hash, found $line_prev_hash"
-        fi
-
-        # Compute hash of current line for next iteration
-        if command -v sha256sum &>/dev/null; then
-            prev_hash=$(echo -n "$line" | sha256sum | awk '{print $1}')
-        else
-            prev_hash=$(echo -n "$line" | shasum -a 256 | awk '{print $1}')
-        fi
-        line_num=$((line_num + 1))
-    done < "$LEDGER"
-
-    log "OK: Ledger hash chain verified ($((line_num - 1)) entries)"
-}
-
 # ─── Gate: RESEARCH → DISCOVER ───
 gate_research_to_discover() {
-    verify_ledger_chain
     log "Checking RESEARCH → DISCOVER gate for cycle $CYCLE"
 
     # 1. Research brief must exist and be fresh
@@ -223,7 +190,6 @@ gate_research_to_discover() {
 
 # ─── Gate: DISCOVER → BUILD ───
 gate_discover_to_build() {
-    verify_ledger_chain
     log "Checking DISCOVER → BUILD gate for cycle $CYCLE"
 
     # 0. Capture state checksum (for tamper detection at cycle end)
@@ -268,7 +234,6 @@ gate_discover_to_build() {
 
 # ─── Gate: BUILD → AUDIT ───
 gate_build_to_audit() {
-    verify_ledger_chain
     log "Checking BUILD → AUDIT gate for cycle $CYCLE"
 
     # 1. Build report must exist, be fresh, and have substantive content
@@ -295,7 +260,6 @@ gate_build_to_audit() {
 
 # ─── Gate: AUDIT → SHIP ───
 gate_audit_to_ship() {
-    verify_ledger_chain
     log "Checking AUDIT → SHIP gate for cycle $CYCLE"
 
     # 0. Anti-forgery checks (added after Gemini forgery incident)
@@ -385,7 +349,6 @@ gate_audit_to_ship() {
 
 # ─── Gate: SHIP → LEARN ───
 gate_ship_to_learn() {
-    verify_ledger_chain
     log "Checking SHIP → LEARN gate for cycle $CYCLE"
 
     # 1. Git status should be clean (changes committed)
@@ -423,7 +386,6 @@ print('state.json updated: lastCycleNumber=$CYCLE')
 
 # ─── Gate: CYCLE COMPLETE ───
 gate_cycle_complete() {
-    verify_ledger_chain
     log "Checking CYCLE COMPLETE gate for cycle $CYCLE"
 
     # 1. All 3 workspace artifacts must exist

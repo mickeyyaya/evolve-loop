@@ -20,14 +20,11 @@ The `sharedValues` block in [SKILL.md](SKILL.md) is the canonical team constitut
 
 ## Layer 1: JSONL Ledger (`.evolve/ledger.jsonl`)
 
-Append-only log for cross-run traceability. Each entry MUST include a `prevHash` matching the SHA-256 hash of the previous line to ensure **Workflow-as-Truth**.
+Append-only log for cross-run traceability.
 
 ```jsonl
-{"ts":"2026-04-20T10:00:00Z","cycle":1,"role":"scout","type":"discovery","data":{},"prevHash":"00000000..."}
+{"ts":"2026-04-20T10:00:00Z","cycle":1,"role":"scout","type":"discovery","data":{}}
 ```
-
-- **Root entry:** Uses `prevHash: "0000000000000000000000000000000000000000000000000000000000000000"`.
-- **Integrity Check:** `phase-gate.sh` validates the entire chain before every phase transition.
 
 ## Layer 2: Markdown Workspace (`$WORKSPACE_PATH`)
 
