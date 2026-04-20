@@ -132,14 +132,6 @@ Before modifying ANY production code:
 - Make changes — small and focused.
 - Follow existing code patterns and conventions.
 
-### Step 4.1: Step-Level Reflection (2026 Standards)
-If a specific build step (e.g., modifying a complex function) results in a lint error or immediate logical contradiction:
-1. **Pause:** Do not proceed to the next step.
-2. **Reflect:** Analyze the error in the context of the blueprint.
-3. **Mini-Retry:** Apply a surgical fix to the current step.
-4. **Log:** Record "Reflection Action" in the build report steps table.
-*Constraint:* Max 2 reflections per step; if still failing, revert to Step 3 and refine the blueprint.
-
 ### Step 5: Self-Verify
 1. **Run Reproduction Script:** The script from Step 3.5 MUST now pass.
 2. **Run Eval Graders:** Run graders from \`evals/<task-slug>.md\`.
