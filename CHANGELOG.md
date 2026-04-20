@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.11.0] - 2026-04-20
+
+### Added
+- **`autoresearch` strategy** implemented for hypothesis testing against fixed metrics, embracing failure, and deep out-of-the-box exploration.
+- **Platform-agnostic generalization**: dynamically scales context windows for Gemini CLI (2M tokens) and gracefully supports non-Claude worktree orchestration and skill lookups.
+
+### Changed
+- **Decriminalized failure**: Under `autoresearch` and `innovate` strategies, experimental failures no longer drop consecutive clean scores or discard worktrees.
+- **Smart Web Search forced**: Context budget constraints are overridden for divergent strategies to guarantee deep research via the 6-stage pipeline.
+
 ## [8.10.3] - 2026-04-11
 
 ### Fixed

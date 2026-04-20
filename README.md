@@ -120,7 +120,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.10) |
+| Metric | Start (v3.0) | Current (v8.11) |
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
@@ -157,6 +157,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.8 | Apr 6 | `/inspirer` skill — standalone creative divergence engine with 12 provocation lenses, web-grounded research, scored Inspiration Cards, and evolve-loop integration |
 | v8.9 | Apr 6 | `/evaluator` skill — independent evaluation engine with 6-dimension scoring, EST anti-gaming defenses, self-improving criteria lifecycle, and strategic direction guidance |
 | v8.10 | Apr 9 | `ecc:e2e` first-class integration (Scout routing → Builder generation → Auditor D.5 grounding → phase-gate ship block), deterministic `setup-skill-inventory.sh` (replaces LLM parsing, 281 skills indexed), phases renumbered to eliminate `Phase 0.5` (now 0-7 linear) with aligned filenames |
+| v8.11 | Apr 20 | Added `autoresearch` strategy for testing hypotheses against fixed metrics, decriminalizing failure and overriding budget constraints for deep out-of-the-box exploration. Added dynamic context scaling (2M tokens for Gemini CLI) and cross-platform support. |
 
 ### Benchmark Scores (v8.0)
 
