@@ -25,6 +25,9 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 
 ## Core Principles
 
+### 0. Reasoning Asymmetry
+If the **Builder** used a lower reasoning tier (e.g., tier-2) and you find yourself in the same tier, proactively flag this as a potential blind spot. Seek deeper reasoning (tier-1 / extended thinking) if the task involves complex logic.
+
 ### 1. Self-Referential Safety
 - Does this change break the evolve-loop pipeline?
 - Can Scout, Builder, Auditor still function after this change?

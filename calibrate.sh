@@ -27,7 +27,7 @@ MISSING_AGENTS=0
 for a in $AGENT_REFS; do test -f "agents/$a" || MISSING_AGENTS=$((MISSING_AGENTS + 1)); done
 AGENT_REF_SCORE=$((MISSING_AGENTS == 0 ? 100 : (100 - MISSING_AGENTS * 25)))
 PHASES_FIELDS=$(grep -oE 'state\.json\.?[a-zA-Z]+' skills/evolve-loop/phases.md 2>/dev/null | sed 's/state\.json\.*//' | sort -u | head -20)
-PROTO_FIELDS=$(grep -oE '"[a-zA-Z]+":' skills/evolve-loop/memory-protocol.md 2>/dev/null | tr -d '"' | sort -u)
+PROTO_FIELDS=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md 2>/dev/null | tr -d '"' | sort -u)
 MISSING_FIELDS=0
 for f in $PHASES_FIELDS; do [ -z "$f" ] && continue; echo "$PROTO_FIELDS" | grep -qw "$f" || MISSING_FIELDS=$((MISSING_FIELDS + 1)); done
 FIELD_SCORE=$((MISSING_FIELDS == 0 ? 100 : (100 - MISSING_FIELDS * 10)))
@@ -83,12 +83,12 @@ CIRCULAR_SCORE=$((AGENT_CROSS == 0 ? 100 : 50))
 MOD_AUTO=$(( (SIZE_SCORE + PHASES_SCORE + AGENT_SIZE_SCORE + SEPARATION_SCORE + CIRCULAR_SCORE) / 5 ))
 
 # Dimension 6: Schema Hygiene
-INIT_FIELDS=$(grep -oE '"[a-zA-Z]+":' skills/evolve-loop/SKILL.md | head -200 | tr -d '"' | sort -u)
-PROTO_SCHEMA=$(grep -oE '"[a-zA-Z]+":' skills/evolve-loop/memory-protocol.md | tr -d '"' | sort -u)
+INIT_FIELDS=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/SKILL.md | head -40 | tr -d '"' | sort -u)
+PROTO_SCHEMA=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md | tr -d '"' | sort -u)
 INIT_MISSING=0
 for f in $INIT_FIELDS; do echo "$PROTO_SCHEMA" | grep -qw "$f" || INIT_MISSING=$((INIT_MISSING + 1)); done
 INIT_SCORE=$((INIT_MISSING == 0 ? 100 : (100 - INIT_MISSING * 10)))
-DUP_FIELDS=$(grep -oE '^ *"[a-zA-Z]+":' skills/evolve-loop/memory-protocol.md | sort | uniq -d | wc -l | tr -d ' ')
+DUP_FIELDS=$(grep -oE '^ *"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md | sort | uniq -d | wc -l | tr -d ' ')
 DUP_SCORE=$((DUP_FIELDS == 0 ? 100 : (100 - DUP_FIELDS * 20)))
 JSON_BLOCKS=$(grep -c '```json' skills/evolve-loop/memory-protocol.md 2>/dev/null || true)
 JSON_BLOCKS=${JSON_BLOCKS:-0}
