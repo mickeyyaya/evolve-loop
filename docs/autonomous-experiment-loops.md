@@ -105,6 +105,20 @@ The autonomous experiment loop is a self-improving cycle where an AI agent formu
 
 ---
 
+## Addressing the "Always Pass" Paradox & Autoresearch
+
+A common failure mode in autonomous loops is the "Always Pass" paradox, where the agent heavily penalizes failure (e.g. dropping mastery, max retries) leading the Scout to write trivial, tautological evaluations that guarantee passing. While `evolve-loop`'s robust anti-gaming protections (checksums, deterministic execution) protect the *engine*, the LLM still controls the goalposts.
+
+Additionally, strict budget constraints (e.g. falling back to `Default WebSearch` when context gets tight) and "additive" constraints in standard strategies often throttle true innovation, preventing the LLM from making deep, out-of-the-box structural changes. 
+
+To achieve true `autoresearch` behavior, we implemented the `autoresearch` strategy that overrides these safety limits:
+
+1. **Fixed-Metric Evaluations:** Under `autoresearch`, the Scout is forbidden from writing custom shell evaluations. It MUST use an external, immutable evaluation script (e.g., `npm run benchmark`) provided by the user.
+2. **Decriminalized Failure:** Builders no longer discard worktrees or lose consecutive clean scores upon failure. A failed experiment is logged as `EXPERIMENT_FAILED`—treating negative results as valuable scientific data. 
+3. **Mandatory Deep Research:** `autoresearch` overrides context budget limits, forcing the use of `Smart Web Search` with provocation lenses to guarantee divergent thinking.
+
+---
+
 ## Implementation Patterns
 
 ### Scout: Generate Testable Hypotheses

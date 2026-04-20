@@ -14,10 +14,11 @@ Not all queries need the full 6-stage Smart Web Search pipeline. Route each quer
 | Condition | Route to | Reason |
 |-----------|----------|--------|
 | **Phase 1 research** (gap analysis, concept cards) | Smart Web Search | Deep research needs intent classification, query transformation, iterative refinement |
+| **`autoresearch` or `ultrathink` strategy** | **Smart Web Search** | **MANDATORY:** Overrides budget limits to guarantee out-of-the-box thinking and divergent research. |
 | **Survey / Deep dive / Comparison** intent | Smart Web Search | Multi-angle queries, WebFetch extraction, and synthesis produce significantly better results |
 | **Builder reactive lookup** (unforeseen API gap, error fix) | Default WebSearch | Quick single-query lookup; saves ~60% tokens vs Smart |
 | **Budget LOW or EXHAUSTED** | Default WebSearch | Smart pipeline overhead exceeds value at low budgets |
-| **Budget YELLOW** (context pressure) | Default WebSearch | Conserve tokens for build/audit phases |
+| **Budget YELLOW** (context pressure) | Default WebSearch | Conserve tokens for build/audit phases (unless overridden by strategy) |
 | **Factual / Artifact** intent (single-fact lookup) | Default WebSearch | One query suffices; no need for transformation pipeline |
 | **Troubleshooting** (error string lookup) | Default WebSearch | Exact-quote search is already optimal; Smart adds minimal value |
 | **How-to with known official docs** | Default WebSearch + single WebFetch | Skip transformation; go directly to the source |

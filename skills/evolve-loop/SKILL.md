@@ -35,6 +35,7 @@ Parse `$ARGUMENTS`:
 | `harden` | Stability, tests | Defensive | Strict all |
 | `repair` | Bugs, broken tests | Fix-only, smallest diff | Strict regressions |
 | `ultrathink` | Complex refactors | tier-1 forced | Strict + confidence |
+| `autoresearch` | Hypothesis testing | Fixed metrics, embraces failure | Divergent, unpenalized |
 
 **Innovate strategy note:** "Additive" means adding functionality TO existing project files, not creating standalone documentation. Research findings must be translated into code/config changes. Max 1 doc-only task per cycle.
 

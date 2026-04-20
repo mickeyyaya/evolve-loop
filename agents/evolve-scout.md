@@ -232,8 +232,9 @@ Write eval commands that test **behavior, not existence**. Trivial evals (`grep 
 | Config change | Validate config loads, check affected behavior |
 | Script change | Execute script, verify exit code and output |
 | Doc creation (exception only) | Check content structure + cross-references resolve |
+| **autoresearch / innovate strategy** | **MANDATORY:** Use pre-existing, fixed regression/metric scripts (e.g., `npm run benchmark`, `python test.py`). Do NOT write custom shell commands that test superficial success. The LLM must not define the goalposts. |
 
-Evals that ONLY check file existence (`test -f`) or keyword presence (`grep -q`) are Level 1 (tautological). Every task MUST have at least one Level 2+ eval that tests actual behavior or output.
+Evals that ONLY check file existence (`test -f`) or keyword presence (`grep -q`) are Level 1 (tautological). Every task MUST have at least one Level 2+ eval that tests actual behavior or output. For `autoresearch` strategy, any custom test creation is considered specification gaming; you must use an immutable, external evaluation script.
 
 **Property-Based Eval Preference:**
 

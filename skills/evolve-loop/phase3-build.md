@@ -215,7 +215,8 @@ After Auditor completes, read `$WORKSPACE_PATH/audit-report.md`:
 | **PASS** | Merge worktree changes and cleanup (see merge options below) |
 | **WARN** (MEDIUM issues) | Re-launch Builder in fresh worktree with issues, re-audit (max 3 total) |
 | **FAIL** (CRITICAL/HIGH or eval failures) | Re-launch Builder in fresh worktree with issues, re-audit (max 3 total) |
-| After 3 failures | Discard worktree, log as failed approach, skip task |
+| After 3 failures (Normal) | Discard worktree, log as failed approach, skip task |
+| After 3 failures (`autoresearch`/`innovate`) | **Decriminalize Failure:** Do NOT discard worktree. Log as `EXPERIMENT_FAILED` (valid outcome). Merge worktree (optional) or stash it to preserve learnings. Do not penalize `consecutiveClean`. |
 
 ### Merge Options (on PASS)
 

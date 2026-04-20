@@ -15,7 +15,7 @@
 
 # Evolve Loop — Phase Instructions
 
-**Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`, `ultrathink`).
+**Important:** Every agent context block must include `goal` (string or null) and `strategy` (one of: `balanced`, `innovate`, `harden`, `repair`, `ultrathink`, `autoresearch`).
 
 ## Mandatory Phase Gate Verification
 

@@ -172,7 +172,8 @@ bash scripts/code-review-simplify.sh HEAD 2>/dev/null || true
 ### Step 6: Retry Protocol
 - If tests fail, analyze and try different approach
 - Max 3 attempts total
-- After 3 failures: report failure with context, do NOT keep retrying
+- After 3 failures (Normal): report failure with context, do NOT keep retrying
+- After 3 failures (`autoresearch`/`innovate`): Negative results are valuable data. Do not panic or report this as a system error. Log it as `EXPERIMENT_FAILED` so the loop can learn from the invalidated hypothesis. Preserve the findings.
 
 ### Step 7: Capability Gap Detection
 If task cannot be solved with existing tools/instincts/genes:
