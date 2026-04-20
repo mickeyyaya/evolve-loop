@@ -26,17 +26,17 @@ AGENT_REFS=$(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u)
 MISSING_AGENTS=0
 for a in $AGENT_REFS; do test -f "agents/$a" || MISSING_AGENTS=$((MISSING_AGENTS + 1)); done
 AGENT_REF_SCORE=$((MISSING_AGENTS == 0 ? 100 : (100 - MISSING_AGENTS * 25)))
-PHASES_FIELDS=$(grep -oE 'state\.json\.?[a-zA-Z]+' skills/evolve-loop/phases/phases.md 2>/dev/null | sed 's/state\.json\.*//' | sort -u | head -20)
+PHASES_FIELDS=$(grep -oE 'state\.json\.?[a-zA-Z]+' skills/evolve-loop/phases.md 2>/dev/null | sed 's/state\.json\.*//' | sort -u | head -20)
 PROTO_FIELDS=$(grep -oE '"[a-zA-Z]+"' skills/evolve-loop/memory-protocol.md 2>/dev/null | tr -d '"' | sort -u)
 MISSING_FIELDS=0
 for f in $PHASES_FIELDS; do [ -z "$f" ] && continue; echo "$PROTO_FIELDS" | grep -qw "$f" || MISSING_FIELDS=$((MISSING_FIELDS + 1)); done
 FIELD_SCORE=$((MISSING_FIELDS == 0 ? 100 : (100 - MISSING_FIELDS * 10)))
-PHASE_NUMS=$(grep -oE 'Phase [0-9]+' skills/evolve-loop/phases/phases.md | grep -oE '[0-9]+' | sort -n | uniq)
+PHASE_NUMS=$(grep -oE 'Phase [0-9]+' skills/evolve-loop/phases.md | grep -oE '[0-9]+' | sort -n | uniq)
 MAX_PHASE=$(echo "$PHASE_NUMS" | tail -1)
 EXPECTED_SEQ=$(seq 0 $MAX_PHASE)
 SEQ_SCORE=$(test "$(echo "$PHASE_NUMS" | tr '\n' ' ')" = "$(echo "$EXPECTED_SEQ" | tr '\n' ' ')" && echo 100 || echo 50)
 PROTO_FILES=$(grep -oE '[a-z]+-[a-z]+\.md' skills/evolve-loop/memory-protocol.md | sort -u)
-PHASE_FILES=$(grep -oE 'workspace/[a-z]+-[a-z]+\.md' skills/evolve-loop/phases/phases.md | sed 's|workspace/||' | sort -u)
+PHASE_FILES=$(grep -oE 'workspace/[a-z]+-[a-z]+\.md' skills/evolve-loop/phases.md | sed 's|workspace/||' | sort -u)
 FILE_DIFF=$(comm -23 <(echo "$PHASE_FILES") <(echo "$PROTO_FILES") | wc -l | tr -d ' ')
 FILE_SCORE=$((FILE_DIFF == 0 ? 100 : (100 - FILE_DIFF * 20)))
 SPEC_AUTO=$(( (AGENT_REF_SCORE + FIELD_SCORE + SEQ_SCORE + FILE_SCORE) / 4 ))
@@ -57,8 +57,8 @@ VALIDATION_SCORE=$((VALIDATION >= 2 ? 100 : (VALIDATION >= 1 ? 50 : 0)))
 DEFENSE_AUTO=$(( (ROLLBACK_SCORE + HALT_SCORE + RETRY_SCORE + CLEANUP_SCORE + VALIDATION_SCORE) / 5 ))
 
 # Dimension 4: Eval Infrastructure
-EVAL_RUNNER=$(test -f skills/evolve-loop/utils/eval-runner.md && echo 100 || echo 0)
-EVAL_SECTIONS=$(grep -cE '## Code Graders|## Regression Evals|## Acceptance Checks' skills/evolve-loop/utils/eval-runner.md 2>/dev/null || true)
+EVAL_RUNNER=$(test -f skills/evolve-loop/eval-runner.md && echo 100 || echo 0)
+EVAL_SECTIONS=$(grep -cE '## Code Graders|## Regression Evals|## Acceptance Checks' skills/evolve-loop/eval-runner.md 2>/dev/null || true)
 EVAL_SECTIONS=${EVAL_SECTIONS:-0}
 EVAL_FORMAT_SCORE=$((EVAL_SECTIONS >= 3 ? 100 : (EVAL_SECTIONS * 33)))
 CHECKSUM=$(grep -rc -e 'checksum' -e 'sha256' skills/evolve-loop/ 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
@@ -72,7 +72,7 @@ EVAL_AUTO=$(( (EVAL_RUNNER + EVAL_FORMAT_SCORE + CHECKSUM_SCORE + TAMPER_SCORE +
 # Dimension 5: Modularity
 OVER_800=$(find skills/ agents/ docs/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk 'index($0,"total")==0 && $1+0 > 800 {count++} END {print count+0}')
 SIZE_SCORE=$((OVER_800 == 0 ? 100 : (OVER_800 == 1 ? 75 : (OVER_800 <= 3 ? 50 : 25))))
-PHASES_LINES=$(wc -l < skills/evolve-loop/phases/phases.md | tr -d ' ')
+PHASES_LINES=$(wc -l < skills/evolve-loop/phases.md | tr -d ' ')
 PHASES_SCORE=$((PHASES_LINES < 400 ? 100 : (PHASES_LINES < 600 ? 75 : (PHASES_LINES < 800 ? 50 : 25))))
 AGENT_MAX=$(find agents/ -name "*.md" -exec wc -l {} + 2>/dev/null | awk 'index($0,"total")==0 {if ($1+0 > max) max=$1+0} END {print max+0}')
 AGENT_SIZE_SCORE=$((AGENT_MAX < 200 ? 100 : (AGENT_MAX < 300 ? 75 : (AGENT_MAX < 400 ? 50 : 25))))
@@ -112,7 +112,7 @@ HEADER_SCORE=$((WRONG_HEADERS == 0 ? 100 : (100 - WRONG_HEADERS * 10)))
 CONV_AUTO=$(( (NAMING_SCORE + KEBAB_SCORE + COMMIT_SCORE + DIR_SCORE + HEADER_SCORE) / 5 ))
 
 # Dimension 8: Feature Coverage
-PHASES_DEFINED=$(grep -cE '### Phase [0-9]+:' skills/evolve-loop/phases/phases.md 2>/dev/null || true)
+PHASES_DEFINED=$(grep -cE '### Phase [0-9]+:' skills/evolve-loop/phases.md 2>/dev/null || true)
 PHASES_DEFINED=${PHASES_DEFINED:-0}
 PHASE_COV_SCORE=$((PHASES_DEFINED >= 5 ? 100 : (PHASES_DEFINED * 20)))
 MISSING=0
@@ -120,7 +120,7 @@ for a in $(grep -oE 'evolve-[a-z]+\.md' skills/evolve-loop/SKILL.md | sort -u | 
   test -f "agents/$a" || MISSING=$((MISSING + 1))
 done
 AGENT_COV_SCORE=$((MISSING == 0 ? 100 : (100 - MISSING * 25)))
-SUPPORT_FILES="skills/evolve-loop/utils/eval-runner.md skills/evolve-loop/memory-protocol.md skills/evolve-loop/phases/phases.md"
+SUPPORT_FILES="skills/evolve-loop/eval-runner.md skills/evolve-loop/memory-protocol.md skills/evolve-loop/phases.md"
 SUP_MISSING=0
 for f in $SUPPORT_FILES; do test -f "$f" || SUP_MISSING=$((SUP_MISSING + 1)); done
 SUPPORT_SCORE=$((SUP_MISSING == 0 ? 100 : (100 - SUP_MISSING * 33)))
