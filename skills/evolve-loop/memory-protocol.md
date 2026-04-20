@@ -101,6 +101,12 @@ The `state.json` file is the **State Manifest**.
 }
 ```
 
+### Scoped Fields (2026 Standards)
+To maximize **Information Density per Token (IDpT)**, agents receive a filtered version of `state.json` (Scoped State Pattern):
+- **Scout:** Receives `researchAgenda`, `researchLedger`, `projectBenchmark`, `proposals`.
+- **Builder:** Receives `failedApproaches`, `instinctSummary`, `mastery`, `tokenBudget`.
+- **Auditor:** Receives `projectBenchmark`, `evalHistory`, `mastery`.
+
 ## Layer 4: Eval State
 
 ## Layer 5: Instincts

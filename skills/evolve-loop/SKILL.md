@@ -117,7 +117,8 @@ For each cycle:
 1. Claim cycle number (OCC protocol)
 2. **`bash scripts/phase-gate.sh <gate> $CYCLE $WORKSPACE`** — MANDATORY at every phase transition
 3. Scout → Builder → Auditor → phase-gate verification → Ship → Learn
-4. Inline S-tasks directly; worktree M-tasks with `isolation: "worktree"`
+4. **Scoped Context (2026 Standards):** When launching agents, filter the state context to include ONLY relevant fields (see \`memory-protocol.md\`). This prevents context bloat and reduces "Correlated Errors".
+5. Inline S-tasks directly; worktree M-tasks with \`isolation: "worktree"\`
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
