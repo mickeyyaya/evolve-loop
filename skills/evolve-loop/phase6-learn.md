@@ -27,6 +27,25 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
    ```
    builder-notes.md persists across cycles (not cleared) so Phase 2 of the next cycle can read it.
 
+1b. **Contextual Distillation (2026 Standards):**
+   Aggressively prune history by distilling this cycle's outcomes into the **State Manifest**. This ensures future cycles are hydrated from structured data rather than raw logs.
+
+   | Step | Action |
+   |------|--------|
+   | Summarize | Compress Build Report into a "Contextual Snapshot" (under 200 words). |
+   | Update Manifest | Append the snapshot to \`state.json.ledgerSummary.distilledFacts\`. |
+   | Prune | Flag this cycle's reports as "Ready for Archival" to free context space. |
+
+   **Structured Distillation format** (arXiv:2603.13017):
+   ```json
+   {
+     "exchange_core": "<key decisions and rationale>",
+     "specific_context": "<concrete facts: files, errors, API shapes>",
+     "thematic_assignments": "<which agents/phases this applies to>",
+     "files_touched": ["<path/to/file1>"]
+   }
+   ```
+
 2. **Memory Consolidation Check:**
    ```
    if (cycle % 3 === 0) OR (instinctCount > 20):
