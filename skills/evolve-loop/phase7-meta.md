@@ -71,29 +71,22 @@ Write `meta-review.md` to workspace:
 1. <specific change to agent prompt, strategy, or process>
 ```
 
-## Automated Prompt Evolution
+## Automated Prompt Evolution (Agentic Variation Operator - AVO)
 
-Based on meta-review findings, refine agent prompts via critique-synthesize loop:
+Based on meta-review findings, refine agent prompts via the **Agentic Variation Operator (AVO)**—a recursive critique-synthesize-validate loop:
 
-**Agent Selection (concrete):**
-1. From last 5 cycles' `evalHistory`, compute per-agent scores:
-   - Scout: task ship rate (`shipped / selected`)
-   - Builder: first-attempt pass rate (`passedFirstAttempt / total`)
-   - Auditor: false-positive rate (`reversals / totalVerdicts`)
-2. Identify the agent with the lowest score as the evolution target
-3. Make ONE targeted edit to that agent's prompt (max 20 lines changed)
-4. Record the change in `state.json.promptVariants`:
-   ```json
-   {"agent": "<agent>", "cycle": "<N>", "edit": "<1-sentence summary>", "baselineScore": 0.X}
-   ```
-5. In the next meta-cycle, compare post-edit score to `baselineScore`. If worse → auto-revert.
+**AVO Execution Protocol:**
+1. **Target Selection:** Identify the agent with the lowest performance score (ship rate, pass rate, or accuracy).
+2. **Metacognitive Analysis:** The meta-agent reflects on the *root cause* of the agent's failure (e.g., "The Builder lacks specific instruction on X").
+3. **Synthesis (The Variation):** Propose a targeted prompt edit (max 20 lines). Use "TextGrad" style optimization to ensure the change is grounded in evidence.
+4. **Validation:** Use a different model tier to "shadow audit" the new prompt against the last 5 cycle failures.
+5. **Crystallization:** Commit the new instruction directly to the agent file.
 
-**Critique-Synthesize Loop:**
-1. **Critique:** Identify specific prompt weaknesses from cycle outcomes
-2. **Synthesize:** Propose targeted edits (additions, rewording, examples). Small and targeted — never rewrite entire definitions.
-3. **Validate:** Check proposed edit doesn't contradict instincts or policies
-4. **Apply:** Edit agent file. Log before/after and rationale in meta-review.
-5. **Track:** Append `prompt-evolution` ledger entry
+**Record AVO results in `meta-review.md`:**
+- **Target:** <agent>
+- **Variation:** <diff summary>
+- **Metacognitive Rationale:** <why this change solves the bottleneck>
+- **Baseline Score:** <X.X>
 
 **TextGrad-style optimization:** For each edit, generate a "textual gradient":
 - What the current prompt produces (observed)
