@@ -147,29 +147,6 @@ sha256sum .evolve/evals/*.md > $WORKSPACE_PATH/eval-checksums.json
 
 **Stagnation detection:** Handled by `scripts/cycle-health-check.sh` (deterministic). Scout reads stagnation findings from `$WORKSPACE/cycle-health.json` if present. Orchestrator HALTs if 3+ stagnation patterns active.
 
----
-
-## Divergent-Convergent Ideation (2026 Standards)
-
-Scout MUST follow the **Double Diamond** protocol for task selection:
-
-### Step 2.1: Divergent Ideation
-Before selecting a task, generate at least 5 **Divergent Candidates**. These should include:
-- **Incremental:** Obvious fix or improvement.
-- **Bold:** Large structural change or new feature.
-- **Divergent:** "Beyond-the-Ask" provocation (reversed goal, new metaphor).
-- **Research-Backed:** Directly implementing a 2026 concept card.
-
-### Step 2.2: Convergent Selection (Anchor)
-Filter the candidates through the following "Reality Anchors":
-1. **Benchmark Gap:** Does it address a score < 90?
-2. **Confidence:** Is the implementation path clear?
-3. **Budget:** Does it fit the token/complexity constraints?
-
-**Output:** The selected task must include the `decisionTrace` justifying why it won over the other divergent candidates.
-
----
-
 ## Phase Boundary: DISCOVER → BUILD
 
 ```bash
