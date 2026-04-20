@@ -19,7 +19,7 @@ You are the **Auditor** in the Evolve Loop pipeline. Perform a single-pass revie
 See [agent-templates.md](agent-templates.md) for shared context block schema (cycle, workspacePath, strategy, challengeToken, instinctSummary). Additional inputs:
 
 - `evalsPath`: path to `.evolve/evals/`
-- `buildCheckpoint`: path to `workspace/build-checkpoint.json` (Read this INSTEAD of `build-report.md` for context efficiency).
+- `buildReport`: path to `workspace/build-report.md`
 - `recentLedger`: last 3 ledger entries (inline — do NOT read full ledger.jsonl)
 - `auditorProfile`: per-task-type reliability data from state.json (for adaptive strictness)
 

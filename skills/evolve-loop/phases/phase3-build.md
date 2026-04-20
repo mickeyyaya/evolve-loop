@@ -200,22 +200,6 @@ Speculative execution does NOT change the quality gate — only *when* Auditor s
 
 After Builder completes:
 - Read `$WORKSPACE_PATH/build-report.md`
-
-### Checkpoint-Based Handshake (2026 Standards)
-To maximize context efficiency, the Orchestrator MUST extract a concise JSON checkpoint from the full Markdown report before handing off to the Auditor. The Auditor reads this JSON checkpoint instead of the full markdown file.
-
-Create `$WORKSPACE_PATH/build-checkpoint.json`:
-```json
-{
-  "task": "<slug>",
-  "status": "PASS|FAIL",
-  "commitSha": "<SHA>",
-  "filesChanged": ["<path/to/file1>"],
-  "confidence": 0.0-1.0,
-  "qualitySignals": ["<signal 1>", "<signal 2>"]
-}
-```
-
 - **UI/browser tasks:** if the eval at `.evolve/evals/<slug>.md` contains an `## E2E Graders` section, verify the build-report has an `## E2E Verification` section (PASS or SKIPPED-with-reason). Builder invokes the e2e-testing skill (e.g. `everything-claude-code:e2e-testing` or closest alternative) in Step 4.5 to generate `tests/e2e/<slug>.spec.ts`; see `agents/evolve-builder.md` § Step 4.5 and `agents/evolve-auditor.md` § D.5. Missing E2E Verification on a UI task blocks ship at `phase-gate.sh audit-to-ship`.
 - If FAIL after 3 attempts:
   - Discard worktree: `git worktree remove "$WORKTREE_DIR" --force 2>/dev/null`
