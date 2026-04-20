@@ -89,13 +89,13 @@ Build a compact, deterministic inventory of every installed skill — project-lo
 
 **Output file:** `.evolve/skill-inventory.json` (schema matches the `state.json.skillInventory` shape below, plus a `skills` map keyed by name with `path`, `origin`, `referenceFiles`, and `categories` fields).
 
-**Scopes scanned** (precedence: project > user > plugin — first-seen wins on name collision):
+**Scopes scanned** (precedence: project > user > plugin/extension — first-seen wins on name collision):
 
 | Scope | Path | Typical count |
 |---|---|---|
 | `project` | `./skills/**/SKILL.md` | 5-20 |
-| `user` | `~/.claude/skills/*/SKILL.md` | 50-300 |
-| `plugin:<marketplace>:<plugin>` | `~/.claude/plugins/cache/<m>/<p>/<newest-version>/skills/*/SKILL.md` | 10-100 per plugin |
+| `user` | `~/.claude/skills/*/SKILL.md` or `~/.gemini/skills/*/SKILL.md` | 50-300 |
+| `plugin/extension` | `~/.claude/plugins/.../SKILL.md` or `~/.gemini/extensions/*/skills/*/SKILL.md` | 10-100 per plugin |
 
 IDE-specific mirror dirs (`.cursor/skills/`, `.kiro/skills/`, `.agents/skills/`) are **skipped** — only the canonical `skills/` directory of each plugin version is consumed.
 

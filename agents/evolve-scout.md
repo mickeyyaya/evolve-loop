@@ -204,7 +204,7 @@ For each selected task, recommend 0-3 skills that could assist the Builder. Read
 | Task touches API/endpoint files | `docs` | If `review-api-contract` available |
 | Task touches database/migration files | `database` | If DB skills available |
 | Task involves refactoring | `refactoring` | Always — prefer built-in `/refactor` |
-| Task involves UI/frontend files, routing, forms, or user-facing flows | `e2e` | Always — prefer `everything-claude-code:e2e-testing` (primary for UI tasks) |
+| Task involves UI/frontend files, routing, forms, or user-facing flows | `e2e` | Always — prefer `everything-claude-code:e2e-testing` (or closest available `e2e` alternative, primary for UI tasks) |
 | Task involves UI/frontend files | `frontend` | If frontend skills available |
 | Task touches code quality/review | `code-review` | Always — prefer built-in `/code-review-simplify` |
 
@@ -256,7 +256,7 @@ When a task touches UI, routing, forms, auth flows, or user-facing pages, the ev
 | `[code]` `npx playwright test tests/e2e/<slug>.spec.ts` | Runs the Builder-generated Playwright test |
 | `[code]` `test -s playwright-report/index.html` | Asserts the HTML artifact exists and is non-empty |
 
-Scout does NOT write the Playwright test file itself — Scout writes only the *eval graders* that will run it. The Builder generates the actual `.spec.ts` by invoking the `everything-claude-code:e2e-testing` skill in Phase 2. Auditor D.5 cross-checks selectors against real DOM.
+Scout does NOT write the Playwright test file itself — Scout writes only the *eval graders* that will run it. The Builder generates the actual `.spec.ts` by invoking the e2e-testing skill (e.g. `everything-claude-code:e2e-testing` or alternative) in Phase 2. Auditor D.5 cross-checks selectors against real DOM.
 
 ### 9. Write Eval Definitions
 

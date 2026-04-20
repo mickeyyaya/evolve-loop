@@ -86,7 +86,7 @@ Agents may receive `recommendedSkills` in their task context — a compact list 
 - Skip supplementary skills if an applied instinct already covers the pattern
 - Each invocation costs ~2-5K tokens
 
-**Cross-platform:** The `Skill` tool is Claude Code-specific. On Gemini CLI / generic platforms, agents read the skill's SKILL.md file directly if available at the path in the plugin cache.
+**Cross-platform & Fallbacks:** Use your platform's native skill invocation method (e.g., the `Skill` tool on Claude Code). On Gemini CLI / generic platforms, read the skill's `SKILL.md` file directly if available at the path in the skill inventory. If a specific recommended skill (e.g., `everything-claude-code:security-review`) is not found in the inventory, search the inventory for the closest available alternative in the same category.
 
 ## Shared Output Conventions
 

@@ -136,7 +136,7 @@ Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypas
 
 **Workflow:**
 
-1. Invoke the `everything-claude-code:e2e-testing` skill via the `Skill` tool. Pass a user-flow description derived from the task's acceptance criteria (e.g., "verify /health page renders with status text and correct HTTP 200").
+1. Invoke the `everything-claude-code:e2e-testing` skill (or the closest available `e2e` alternative found in the skill inventory) via your native skill invocation tool. Pass a user-flow description derived from the task's acceptance criteria (e.g., "verify /health page renders with status text and correct HTTP 200").
 2. The skill generates `tests/e2e/<task-slug>.spec.ts` using the Page Object Model pattern.
 3. Run the generated test inside the worktree: `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`.
 4. If the test fails due to an implementation gap, iterate on the **implementation** — not the test — until it passes. Weakening/skipping the generated test is eval tampering (Auditor D.5 flags CRITICAL).

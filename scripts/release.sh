@@ -171,6 +171,9 @@ echo ""
 echo "--- Manual checks ---"
 printf "${YELLOW}REMIND${NC}   %-45s %s\n" "GitHub release" "Create release v${TARGET_VERSION} after push"
 
+# 8. Embedded Skills Strategy
+printf "${YELLOW}REMIND${NC}   %-45s %s\n" "Embedded Skills" "Ensure critical skills (e2e-testing, security) are embedded or documented for Gemini CLI distribution"
+
 # --- Plugin Cache Refresh ---
 
 echo ""

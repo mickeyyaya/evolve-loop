@@ -97,8 +97,7 @@ When Self-MoA is active, add to Builder context:
 
 **Never launch Builder without isolation.** Platform-specific methods:
 - **Claude Code:** `Agent` tool with `isolation: "worktree"` (automatic)
-- **Gemini CLI / other:** Create worktree manually before spawning agent
-- **Generic LLM:** Create worktree, run Builder in new session with cwd set to worktree
+- **Gemini CLI / generic:** Create worktree manually before spawning agent/generalist
 
 Manual worktree creation:
 ```bash
@@ -126,7 +125,7 @@ rm -rf "$COPY_DIR"
 ## Builder Agent Launch
 
 Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry >= 2; tier-2 if strategy == "repair"; tier-2 otherwise; **isolation: worktree required**):
-- **Platform dispatch:** Claude Code: `Agent` tool with `isolation: "worktree"`, `subagent_type: "general-purpose"`; Other: create worktree manually, launch in worktree directory.
+- **Platform dispatch:** Use your native agent-spawning tool (e.g., `Agent` tool with `isolation: "worktree"` for Claude Code; `generalist` / `spawn_agent` in a manually created worktree for Gemini CLI; or open a new session in generic CLI).
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json
@@ -187,7 +186,7 @@ Speculative execution does NOT change the quality gate — only *when* Auditor s
 
 After Builder completes:
 - Read `$WORKSPACE_PATH/build-report.md`
-- **UI/browser tasks:** if the eval at `.evolve/evals/<slug>.md` contains an `## E2E Graders` section, verify the build-report has an `## E2E Verification` section (PASS or SKIPPED-with-reason). Builder invokes the `everything-claude-code:e2e-testing` skill in Step 4.5 to generate `tests/e2e/<slug>.spec.ts`; see `agents/evolve-builder.md` § Step 4.5 and `agents/evolve-auditor.md` § D.5. Missing E2E Verification on a UI task blocks ship at `phase-gate.sh audit-to-ship`.
+- **UI/browser tasks:** if the eval at `.evolve/evals/<slug>.md` contains an `## E2E Graders` section, verify the build-report has an `## E2E Verification` section (PASS or SKIPPED-with-reason). Builder invokes the e2e-testing skill (e.g. `everything-claude-code:e2e-testing` or closest alternative) in Step 4.5 to generate `tests/e2e/<slug>.spec.ts`; see `agents/evolve-builder.md` § Step 4.5 and `agents/evolve-auditor.md` § D.5. Missing E2E Verification on a UI task blocks ship at `phase-gate.sh audit-to-ship`.
 - If FAIL after 3 attempts:
   - Discard worktree: `git worktree remove "$WORKTREE_DIR" --force 2>/dev/null`
   - Log failed approach in state.json under `failedApproaches`:

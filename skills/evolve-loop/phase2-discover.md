@@ -54,7 +54,7 @@ Key principle: **static fields first, dynamic fields last** — reduces prompt-p
 
 Model selection: tier-1 if cycle 1 or goal-directed cycle <= 2; tier-3 if cycle 4+ with mature bandit data; tier-2 otherwise.
 
-- **Platform dispatch:** Claude Code: `Agent` tool with `subagent_type: "general-purpose"`; Gemini CLI: `spawn_agent`; Generic: new LLM session.
+- **Platform dispatch:** Use your native agent-spawning tool (e.g., `Agent` tool for Claude Code, `generalist` / `spawn_agent` for Gemini CLI, or open a new session in generic platforms).
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
 

@@ -157,6 +157,14 @@ def plugin_cache_root() -> Path:
     return Path.home() / ".claude" / "plugins" / "cache"
 
 
+def gemini_user_skills_root() -> Path:
+    return Path.home() / ".gemini" / "skills"
+
+
+def gemini_extensions_root() -> Path:
+    return Path.home() / ".gemini" / "extensions"
+
+
 def newest_version_dir(plugin_dir: Path) -> Path | None:
     """For ~/.claude/plugins/cache/<marketplace>/<plugin>/, pick the newest
     version subdirectory (lexicographic max — matches semver for common cases).
@@ -226,28 +234,43 @@ def scan_project(project_root: Path) -> list[tuple[Path, str]]:
 
 
 def scan_user_global() -> list[tuple[Path, str]]:
-    return [(p, "user") for p in find_skill_md_files(user_skills_root())]
+    claude_skills = [(p, "user") for p in find_skill_md_files(user_skills_root())]
+    gemini_skills = [(p, "user") for p in find_skill_md_files(gemini_user_skills_root())]
+    return claude_skills + gemini_skills
 
 
 def scan_plugin_cache() -> list[tuple[Path, str]]:
-    """Walk ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/skills/."""
-    cache = plugin_cache_root()
-    if not cache.is_dir():
-        return []
+    """Walk ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/skills/ and ~/.gemini/extensions/*/skills/."""
     out: list[tuple[Path, str]] = []
-    for marketplace_dir in sorted(cache.iterdir()):
-        if not marketplace_dir.is_dir():
-            continue
-        for plugin_dir in sorted(marketplace_dir.iterdir()):
-            if not plugin_dir.is_dir():
+    
+    # Claude plugins
+    cache = plugin_cache_root()
+    if cache.is_dir():
+        for marketplace_dir in sorted(cache.iterdir()):
+            if not marketplace_dir.is_dir():
                 continue
-            version_dir = newest_version_dir(plugin_dir)
-            if version_dir is None:
+            for plugin_dir in sorted(marketplace_dir.iterdir()):
+                if not plugin_dir.is_dir():
+                    continue
+                version_dir = newest_version_dir(plugin_dir)
+                if version_dir is None:
+                    continue
+                skills_dir = version_dir / "skills"
+                origin = f"plugin:{marketplace_dir.name}:{plugin_dir.name}"
+                for skill_md in find_skill_md_files(skills_dir):
+                    out.append((skill_md, origin))
+                    
+    # Gemini extensions
+    gemini_exts = gemini_extensions_root()
+    if gemini_exts.is_dir():
+        for ext_dir in sorted(gemini_exts.iterdir()):
+            if not ext_dir.is_dir():
                 continue
-            skills_dir = version_dir / "skills"
-            origin = f"plugin:{marketplace_dir.name}:{plugin_dir.name}"
+            skills_dir = ext_dir / "skills"
+            origin = f"extension:{ext_dir.name}"
             for skill_md in find_skill_md_files(skills_dir):
                 out.append((skill_md, origin))
+                
     return out
 
 

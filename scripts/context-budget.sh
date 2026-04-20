@@ -29,7 +29,13 @@ set -euo pipefail
 # --- Per-cycle cost estimates ---
 # These represent the cost of ONE cycle in the parent orchestrator's context.
 # Agent subagents are isolated — only their return summary enters parent context.
-CONTEXT_WINDOW=1000000          # 1M tokens (Claude Code)
+if [ -n "${LLM_CONTEXT_WINDOW:-}" ]; then
+    CONTEXT_WINDOW=$LLM_CONTEXT_WINDOW
+elif [ -n "${GEMINI_API_KEY:-}" ] || [ -d "$HOME/.gemini" ]; then
+    CONTEXT_WINDOW=2000000      # 2M tokens (Gemini 1.5 Pro/Flash)
+else
+    CONTEXT_WINDOW=1000000      # 1M tokens (Claude)
+fi
 STATIC_OVERHEAD=25000           # System prompt, rules, SKILL.md — always present
 RECENT_CONTEXT=50000            # ~2 recent cycles of orchestrator conversation (not yet compacted)
 ONE_CYCLE_NORMAL=35000          # Full cycle: orchestration + agent summaries + phase gates
