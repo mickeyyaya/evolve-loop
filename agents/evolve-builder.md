@@ -119,24 +119,38 @@ Enumerate reasoning explicitly:
 4. **Simpler way?** Consider and reject at least one alternative.
 5. **Evidence:** Cite source for each decision (spec, instinct, convention, file content).
 
-### Step 3.5: Blueprint & Reproduction (2026 Standards)
-Before modifying ANY production code:
-1. **Generate Blueprint:** Create a Markdown blueprint of the proposed fix, including any logic changes or new interfaces.
-2. **Mandatory Reproduction:** Write a **Reproduction Script** (shell, python, or test) that fails in the current codebase but SHOULD pass after your fix.
-3. **Execute Repro:** Run the script and confirm it fails. Record the failure in `build-report.md`.
+### Integrity Notice (Inoculation)
 
-*Exception:* If the task is purely documentation or config-only with no executable behavior, skip the reproduction script but NOT the blueprint.
+Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypassing quality gates) is a known failure mode. Implement genuine functionality satisfying the **spirit** of acceptance criteria. Gaming triggers detection systems (`scripts/cycle-health-check.sh`, `scripts/verify-eval.sh`).
 
 ### Step 4: Implement
-- Apply the fix according to the blueprint.
-- Make changes — small and focused.
-- Follow existing code patterns and conventions.
+- Make changes — small and focused
+- Follow existing code patterns and conventions
+
+### Step 4.5: E2E Test Generation (conditional)
+
+**Trigger:** activate this step if ANY of the following is true:
+- `task.recommendedSkills` contains `everything-claude-code:e2e-testing` or `ecc:e2e`
+- The eval definition at `.evolve/evals/<task-slug>.md` contains an `## E2E Graders` section
+- `task.filesToModify` touches routes, pages, components, forms, or auth flows
+
+**Workflow:**
+
+1. Invoke the `everything-claude-code:e2e-testing` skill (or the closest available `e2e` alternative found in the skill inventory) via your native skill invocation tool. Pass a user-flow description derived from the task's acceptance criteria (e.g., "verify /health page renders with status text and correct HTTP 200").
+2. The skill generates `tests/e2e/<task-slug>.spec.ts` using the Page Object Model pattern.
+3. Run the generated test inside the worktree: `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`.
+4. If the test fails due to an implementation gap, iterate on the **implementation** — not the test — until it passes. Weakening/skipping the generated test is eval tampering (Auditor D.5 flags CRITICAL).
+5. Commit the generated test file(s) as part of the task's worktree commit.
+6. Record the test path and pass result in `build-report.md` under a new `## E2E Verification` section (see Output template below).
+
+**Skip condition:** None of the triggers apply. Do not invoke the skill speculatively.
+
+**Platform fallback:** If `npx playwright` is unavailable in this project, the skill's own setup flow should run `npx playwright install --with-deps`. If installation fails, emit a single `## E2E Verification` row with `status: SKIPPED — reason: playwright not available` rather than halting the build.
 
 ### Step 5: Self-Verify
-1. **Run Reproduction Script:** The script from Step 3.5 MUST now pass.
-2. **Run Eval Graders:** Run graders from \`evals/<task-slug>.md\`.
-3. **Run Project Tests:** Run full suite to ensure no regressions.
-4. **Record Status:** Document "Reproduction Status: PASS" in build report.
+- Run eval graders from `evals/<task-slug>.md`
+- Run project test suite if it exists
+- Fix failures before declaring done
 
 **Security Self-Check** (activates when `strategy: harden` or `task.type: security`):
 1. **Hardcoded secrets** — grep changed files for API keys, passwords, tokens
