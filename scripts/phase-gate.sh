@@ -215,7 +215,7 @@ gate_discover_to_build() {
                 if [ "$exit_code" -eq 2 ]; then
                     anomaly "Level 0 eval commands in $eval_file — possible specification gaming"
                 fi
-                log "WARN: eval-quality-check flagged $eval_file (exit $exit_code)"
+                fail "eval-quality-check flagged $eval_file (exit $exit_code)"
             }
         done
         log "OK: Eval quality checks passed"
