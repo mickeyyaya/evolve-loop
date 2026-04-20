@@ -51,7 +51,7 @@ The `state.json` file is the **State Manifest**.
   "warnAfterCycles": 5,
   "tokenBudget": {"perTask": 80000, "perCycle": 200000, "researchPhase": 25000},
   "mastery": {"level": "novice", "consecutiveSuccesses": 0},
-  "ledgerSummary": {"totalEntries": 0, "cycleRange": [0, 0], "scoutRuns": 0, "builderRuns": 0, "totalTasksShipped": 0, "totalTasksFailed": 0, "avgTasksPerCycle": 0, "distilledFacts": []},
+  "ledgerSummary": {"totalEntries": 0, "cycleRange": [0, 0], "scoutRuns": 0, "builderRuns": 0, "totalTasksShipped": 0, "totalTasksFailed": 0, "crystallizedSkills": 0, "avgTasksPerCycle": 0, "distilledFacts": []},
   "instinctSummary": [],
   "projectBenchmark": {
     "lastCalibrated": null, "calibrationCycle": 0, "overall": 0,
