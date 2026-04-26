@@ -241,7 +241,16 @@ Default: **standard**
 
 When invoked from evolve-loop's Auditor phase:
 - **Trigger:** `strategy == "harden"` OR `forceFullAudit == true`
-- **Invocation:** `/evaluator --scope task --depth standard`
+- **Invocation (in-process):** `/evaluator --scope task --depth standard`
+- **Invocation (subprocess-isolated, REQUIRED in production cycles):**
+
+  ```bash
+  echo "/evaluator --scope task --depth standard" | \
+      bash scripts/subagent-run.sh evaluator "$CYCLE" "$WORKSPACE_PATH"
+  ```
+
+  The runner enforces the evaluator profile (`.evolve/profiles/evaluator.json`) which is read-only at the filesystem level (no Edit/Write outside the evaluator-output artifact) and explicitly disallows WebSearch/WebFetch — the evaluator must score the artifacts on disk, not invent context from the network. Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle.
+
 - **Result:** Dimension scores merged into audit-report.md under `## Evaluator Scores`
 - **Impact:** Advisory — supplements Auditor verdict, does not override
 

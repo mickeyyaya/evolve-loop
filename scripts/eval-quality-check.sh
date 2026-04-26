@@ -48,7 +48,28 @@ check_eval_file() {
   fi
 
   if [ -z "$COMMANDS" ]; then
-    ISSUES="${ISSUES}  WARN: No eval commands found in ${FILE}\n"
+    # Try fenced code blocks (```bash ... ```). An attacker might use this format
+    # to evade the inline-code-in-list parser. Extract everything between the
+    # opening ```{lang} and closing ```, treating each non-blank, non-comment
+    # line as a candidate command.
+    COMMANDS=$(awk '
+        /^[[:space:]]*```/ {
+            if (in_block) { in_block = 0; next }
+            if ($0 ~ /^[[:space:]]*```(bash|sh|shell)?[[:space:]]*$/) { in_block = 1; next }
+        }
+        in_block && NF > 0 && $0 !~ /^[[:space:]]*#/ { print }
+    ' "$FILE" 2>/dev/null || true)
+    if [ -n "$COMMANDS" ]; then
+      ISSUES="${ISSUES}  WARN: Eval commands found only in fenced block (non-canonical format) in ${FILE}\n"
+    fi
+  fi
+
+  if [ -z "$COMMANDS" ]; then
+    # No eval commands found in any supported format. Treat as ANOMALY: either
+    # the file is malformed (orchestrator should regenerate) or an attacker is
+    # hiding commands in a format the parser doesn't understand.
+    ISSUES="${ISSUES}  ANOMALY: No eval commands found in ${FILE} (any supported format)\n"
+    LEVEL_0_COUNT=$((LEVEL_0_COUNT + 1))
     return
   fi
 

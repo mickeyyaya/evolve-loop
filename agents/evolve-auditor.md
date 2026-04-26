@@ -227,7 +227,7 @@ Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.
 
 - **FAIL** — any CRITICAL/HIGH issue or any eval check fails
 - **WARN** — MEDIUM issues but all evals pass (WARN blocks shipping)
-- **PASS** — no MEDIUM+ issues and all evals pass
+- **PASS** — every acceptance criterion has positive executable evidence (test output, diff hunk, or reproduction command) AND all evals pass AND no MEDIUM+ issues. Absence of MEDIUM+ issues alone is NOT sufficient — you must affirmatively cite the evidence per criterion. (See ADVERSARIAL AUDIT MODE injected at runtime by subagent-run.sh.)
 
 ## Output
 

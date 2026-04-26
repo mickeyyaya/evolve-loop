@@ -1,0 +1,76 @@
+{
+  "name": "builder",
+  "role": "builder",
+  "cli": "claude",
+  "model_tier_default": "sonnet",
+  "model_tier_overrides": {
+    "ultrathink_strategy": "opus",
+    "m_complex_5plus_files": "opus",
+    "audit_retry_2plus": "opus",
+    "s_complex_with_cache": "haiku"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Edit",
+    "Write",
+    "MultiEdit",
+    "NotebookEdit",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Edit(.evolve/evals/**)",
+    "Edit(CLAUDE.md)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)",
+    "Write(.evolve/evals/**)",
+    "Write(CLAUDE.md)",
+    "Bash(git push:*)",
+    "Bash(git config:*)",
+    "Bash(jq -i:*)",
+    "Bash(jq --in-place:*)"
+  ],
+  "add_dir": [
+    "{worktree_path}"
+  ],
+  "max_budget_usd": 2.50,
+  "max_turns": 80,
+  "permission_mode": "acceptEdits",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
+  "challenge_token_required": true,
+  "isolation": "worktree",
+  "extra_flags": [
+    "--no-session-persistence",
+    "--exclude-dynamic-system-prompt-sections"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      "{worktree_path}",
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": false,
+    "deny_subpaths": [
+      ".git",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": true
+  }
+}

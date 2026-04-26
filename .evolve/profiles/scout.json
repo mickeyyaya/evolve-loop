@@ -1,0 +1,101 @@
+{
+  "name": "scout",
+  "role": "scout",
+  "cli": "claude",
+  "model_tier_default": "sonnet",
+  "model_tier_overrides": {
+    "cycle_1_or_low_goal": "opus",
+    "cycle_4_plus_mature": "haiku"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "WebSearch",
+    "WebFetch",
+    "Bash(git status)",
+    "Bash(git status:*)",
+    "Bash(git log:*)",
+    "Bash(git diff:*)",
+    "Bash(git show:*)",
+    "Bash(git ls-files:*)",
+    "Bash(git rev-parse:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(tail:*)",
+    "Bash(wc:*)",
+    "Bash(find:*)",
+    "Bash(test:*)",
+    "Write(.evolve/runs/cycle-*/scout-report.md)",
+    "Write(.evolve/runs/cycle-*/handoff-scout.json)",
+    "Write(.evolve/runs/cycle-*/scout-stdout.log)",
+    "Write(.evolve/evals/cycle-*/*)",
+    "Edit(.evolve/runs/cycle-*/scout-report.md)",
+    "Edit(.evolve/runs/cycle-*/handoff-scout.json)"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git worktree:*)",
+    "Bash(jq*)",
+    "Bash(rm*)",
+    "Bash(mv*)",
+    "Bash(curl*)",
+    "Bash(wget*)",
+    "Bash(npm*)",
+    "Bash(pip*)",
+    "Bash(brew*)",
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 0.50,
+  "max_turns": 30,
+  "permission_mode": "acceptEdits",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",
+  "challenge_token_required": true,
+  "extra_flags": [
+    "--bare",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--exclude-dynamic-system-prompt-sections"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*",
+      ".evolve/evals/cycle-*"
+    ],
+    "read_only_repo": false,
+    "deny_subpaths": [
+      ".git",
+      "scripts",
+      "skills",
+      "agents",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles"
+    ],
+    "allow_network": true
+  }
+}

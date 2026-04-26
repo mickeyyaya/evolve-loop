@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.12.0] - 2026-04-27
+
+### Added
+- **Subagent subprocess isolation runner (`scripts/subagent-run.sh`)** — single entry point for invoking phase agents (Scout, Builder, Auditor, Inspirer, Evaluator) as isolated subprocesses with per-agent CLI permission profiles. Per-invocation challenge tokens detect forged artifacts; tamper-evident SHA256 ledger entries detect post-run mutation.
+- **Per-agent permission profiles (`.evolve/profiles/*.json`)** — least-privilege CLI flag templates encoding `allowed_tools`, `disallowed_tools`, `permission_mode`, `add_dir`, sandbox config, and budget caps for each phase agent.
+- **CLI adapter abstraction (`scripts/cli_adapters/{claude,gemini,codex}.sh`)** — uniform interface for provider-agnostic subagent dispatch. Claude adapter wraps invocations in `sandbox-exec` (macOS) or `bwrap` (Linux) when `EVOLVE_SANDBOX=1`.
+- **OS-level sandboxing** for every Claude subprocess. Auditor and Evaluator profiles run with `read_only_repo: true` (read-only mount of the repo); Evaluator additionally has `allow_network: false`.
+- **Mutation-testing pre-flight (`scripts/mutate-eval.sh`)** — applies language-aware mutations to source-under-test and verifies eval kill rate ≥ 0.8. `phase-gate.sh gate_discover_to_build` runs this against every new eval and flags tautological checks (rollout phase 1: WARN-only).
+- **Adversarial Auditor mode** (default-on) — runner injects an "ADVERSARIAL AUDIT MODE" prefix that requires positive executable evidence (test output, diff hunk, or repro command) for PASS verdicts. Counters same-model-judge sycophancy. Auditor model defaults to a different family from Builder (Opus vs Sonnet). Disable with `ADVERSARIAL_AUDIT=0` for permissive sweeps.
+- **Subagent ledger match check** — `phase-gate.sh check_subagent_ledger_match` re-hashes each artifact and compares with the SHA256 recorded by the runner at write time, catching post-run mutation.
+- **Smoke tests** — `scripts/subagent-run-test.sh` (10 checks: profile validation, forgery rejection, token presence, unknown-agent, missing-artifact, legacy-fallback) and `scripts/subagent-adversarial-test.sh`.
+
+### Changed
+- **CLAUDE.md** — added rules 5-8 codifying subprocess-isolation, OS sandboxing, mutation pre-flight, and adversarial auditor as non-negotiable defaults.
+- **Skill phase docs** (`phase2-discover.md`, `phase3-build.md`, `phases.md`, `inspirer/SKILL.md`, `evaluator/SKILL.md`, top-level `evolve-loop/SKILL.md`) — replaced platform-dispatch boilerplate with the `subagent-run.sh` invocation contract. `LEGACY_AGENT_DISPATCH=1` documented as a one-A/B-cycle escape hatch only.
+- **`agents/evolve-auditor.md`** — PASS verdict criterion tightened to require positive per-criterion evidence; absence of MEDIUM+ issues alone is not sufficient.
+- **`scripts/eval-quality-check.sh`** — fenced-code-block fallback parser. Files with eval commands only inside fenced blocks now WARN; files with no parseable commands emit `ANOMALY` (not silent skip).
+- **`.gitignore`** — surgical exception so `.evolve/profiles/*.json` ship with the plugin while runtime state under `.evolve/` (state.json, ledger.jsonl, runs/, evals/, history/) remains ignored.
+
+### Fixed
+- **`scripts/subagent-run.sh:322`** — successful agent run now exits 0 (per documented contract) instead of 1. Previously every successful subagent invocation was reported as a failure to the orchestrator.
+
+### Documentation
+- Added `docs/reports/2026-04-26-subagent-isolation-hardening-report.md` — full incident-style report on the isolation hardening initiative.
+
 ## [8.11.1] - 2026-04-20
 
 ### Fixed

@@ -438,6 +438,16 @@ sha256sum -c $WORKSPACE_PATH/eval-checksums.json
 If any checksum fails → HALT: "Eval tamper detected."
 
 **Launch Auditor Agent** (model: tier-2 default, tier-1 for security-sensitive, tier-3 for clean builds):
+- **Subagent invocation (REQUIRED):** Run via the runner script. The Auditor profile (`.evolve/profiles/auditor.json`) is read-only at the filesystem level (no `Edit`/`Write` outside the audit-report path) and bash is restricted to test runners and integrity scripts — Auditor cannot commit, push, or modify state.
+
+  ```bash
+  cat agents/evolve-auditor.md context.json | \
+      MODEL_TIER_HINT="<resolved tier>" \
+      bash scripts/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"
+  ```
+
+  Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle only.
+
 - Prompt: Read `agents/evolve-auditor.md` and pass as prompt
 - Context:
   ```json

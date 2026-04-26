@@ -18,6 +18,13 @@ node_modules/
 .smart-search-cache/
 
 # Evolve Loop runtime state (generated per-project, not part of the plugin)
-.evolve/
+# Ignore every direct child of .evolve/ ...
+.evolve/*
+# ... except the agent permission profiles, which ship with the plugin and are
+# required by scripts/subagent-run.sh for least-privilege subagent invocation.
+!.evolve/profiles/
+.evolve/profiles/*
+!.evolve/profiles/*.json
 .claude/evolve/
 .claude/worktrees/
+.clone/

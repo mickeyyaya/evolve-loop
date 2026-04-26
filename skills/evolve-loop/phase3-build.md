@@ -125,7 +125,31 @@ rm -rf "$COPY_DIR"
 ## Builder Agent Launch
 
 Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry >= 2; tier-2 if strategy == "repair"; tier-2 otherwise; **isolation: worktree required**):
-- **Platform dispatch:** Use your native agent-spawning tool (e.g., `Agent` tool with `isolation: "worktree"` for Claude Code; `generalist` / `spawn_agent` in a manually created worktree for Gemini CLI; or open a new session in generic CLI).
+- **Subagent invocation (REQUIRED):** Run via the runner script with `WORKTREE_PATH` set. The runner enforces the Builder profile (`.evolve/profiles/builder.json`) which blocks writes to `skills/`, `agents/`, `scripts/`, `.claude-plugin/`, and `.evolve/state.json` at the CLI permission layer — a hard guarantee, not a post-hoc audit check.
+
+  ```bash
+  # Worktree must be created BEFORE invoking the runner.
+  WORKTREE_DIR=$(mktemp -d)/evolve-build-cycle-${CYCLE}-${TASK_SLUG}
+  git worktree add "$WORKTREE_DIR" HEAD
+
+  cat agents/evolve-builder.md context.json | \
+      WORKTREE_PATH="$WORKTREE_DIR" \
+      MODEL_TIER_HINT="<resolved tier>" \
+      bash scripts/subagent-run.sh builder "$CYCLE" "$WORKSPACE_PATH"
+
+  # After exit:
+  cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
+  cd <main-repo> && git apply /tmp/builder.patch
+  git worktree remove "$WORKTREE_DIR"
+  ```
+
+  - Exit 0 = build report written and verified.
+  - Exit 1/2 = same semantics as Scout. Read `${WORKSPACE_PATH}/builder-stderr.log`.
+
+  **Parallel independent tasks:** Launch multiple `subagent-run.sh builder` invocations in parallel (one per worktree). Each gets its own challenge token and ledger entry. Do NOT share worktrees.
+
+  Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle only — see CLAUDE.md.
+
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
   ```json

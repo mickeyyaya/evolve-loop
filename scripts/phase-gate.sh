@@ -79,6 +79,49 @@ check_ledger_role() {
     fi
 }
 
+# Verify subagent-run.sh ledger entries match on-disk artifacts.
+# When subagents are invoked via scripts/subagent-run.sh, each invocation appends
+# an "agent_subprocess" ledger entry containing the SHA256 of the artifact at
+# write time. This check verifies the artifact has not been mutated between the
+# subagent's exit and the phase gate. Catches the "wrote artifact then mutated"
+# forgery class.
+check_subagent_ledger_match() {
+    local role="$1"
+    [ -f "$LEDGER" ] || { log "WARN: ledger missing, skipping subagent match check"; return 0; }
+    if ! command -v jq >/dev/null 2>&1; then
+        log "WARN: jq not available, skipping subagent_ledger_match"
+        return 0
+    fi
+    # Find the most recent agent_subprocess entry for this cycle+role.
+    local entry
+    entry=$(grep "\"kind\":\"agent_subprocess\"" "$LEDGER" 2>/dev/null \
+        | jq -c --argjson cycle "$CYCLE" --arg role "$role" \
+            'select(.cycle == $cycle and .role == $role)' 2>/dev/null \
+        | tail -1)
+    if [ -z "$entry" ]; then
+        # Subagent runner was not used for this role/cycle (legacy path or no run yet).
+        # Don't fail — this check is additive for the subprocess-isolation rollout.
+        log "INFO: no agent_subprocess ledger entry for $role cycle $CYCLE (legacy dispatch?)"
+        return 0
+    fi
+    local exit_code recorded_sha artifact_path
+    exit_code=$(echo "$entry" | jq -r '.exit_code')
+    recorded_sha=$(echo "$entry" | jq -r '.artifact_sha256')
+    artifact_path=$(echo "$entry" | jq -r '.artifact_path')
+    [ "$exit_code" = "0" ] || fail "subagent $role cycle $CYCLE exit_code=$exit_code in ledger"
+    [ -f "$artifact_path" ] || fail "subagent $role artifact missing on disk: $artifact_path"
+    local actual_sha
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual_sha=$(sha256sum "$artifact_path" | awk '{print $1}')
+    else
+        actual_sha=$(shasum -a 256 "$artifact_path" | awk '{print $1}')
+    fi
+    if [ "$recorded_sha" != "$actual_sha" ]; then
+        anomaly "subagent $role artifact mutated post-run: ledger=$recorded_sha actual=$actual_sha"
+    fi
+    log "OK: subagent $role artifact SHA256 matches ledger ($recorded_sha)"
+}
+
 # ─── Anti-Forgery Checks (added after Gemini forgery incident) ───
 
 # Verify artifact contains substantive content, not templated forgery.
@@ -199,6 +242,7 @@ gate_discover_to_build() {
     check_file_exists "$WORKSPACE/scout-report.md" "Scout report"
     check_file_fresh "$WORKSPACE/scout-report.md" "Scout report"
     check_artifact_substance "$WORKSPACE/scout-report.md" "Scout report"
+    check_subagent_ledger_match "scout"
 
     # 2. At least one eval definition must exist
     local eval_count
@@ -229,6 +273,35 @@ gate_discover_to_build() {
     fi
     log "OK: Eval checksums captured"
 
+    # 5. Mutation testing — verify each eval actually catches behavioral defects.
+    # If an eval still passes after the source-under-test is mutated, the eval is
+    # tautological (cycles 102-111 reward-hacking class). First-rollout: WARN only.
+    # After one verification cycle, escalate to fail "..." to block the gate.
+    if [ -x "scripts/mutate-eval.sh" ]; then
+        local mutation_warnings=0
+        for eval_file in "$EVOLVE_DIR/evals/"*.md; do
+            [ -f "$eval_file" ] || continue
+            local mut_out mut_rc
+            mut_out=$(bash scripts/mutate-eval.sh "$eval_file" --threshold 0.8 2>&1)
+            mut_rc=$?
+            case "$mut_rc" in
+                0) ;;  # rigorous, no action
+                1)
+                    log "WARN: $eval_file kill rate below 0.8 — Auditor must verify behavioral coverage"
+                    mutation_warnings=$((mutation_warnings + 1)) ;;
+                2)
+                    log "WARN: $eval_file mutation testing inconclusive (no inferable source files)" ;;
+                127)
+                    log "WARN: mutate-eval.sh missing required binary; skipping mutation pass" ;;
+            esac
+        done
+        if [ "$mutation_warnings" -gt 0 ]; then
+            log "MUTATION-WARN: $mutation_warnings eval(s) failed mutation testing this cycle (rollout: WARN-only)"
+        else
+            log "OK: All evals passed mutation testing"
+        fi
+    fi
+
     log "PASS: DISCOVER → BUILD gate"
 }
 
@@ -240,6 +313,7 @@ gate_build_to_audit() {
     check_file_exists "$WORKSPACE/build-report.md" "Build report"
     check_file_fresh "$WORKSPACE/build-report.md" "Build report"
     check_artifact_substance "$WORKSPACE/build-report.md" "Build report"
+    check_subagent_ledger_match "builder"
 
     # 2. Build report must say PASS (not FAIL)
     if grep -qi "Status:.*FAIL\|## Status.*FAIL" "$WORKSPACE/build-report.md"; then
@@ -271,6 +345,7 @@ gate_audit_to_ship() {
     check_file_exists "$WORKSPACE/audit-report.md" "Audit report"
     check_file_fresh "$WORKSPACE/audit-report.md" "Audit report"
     check_artifact_substance "$WORKSPACE/audit-report.md" "Audit report"
+    check_subagent_ledger_match "auditor"
 
     # 2. Audit verdict must be PASS (not WARN or FAIL)
     if grep -qi "Verdict:.*FAIL\|## Verdict.*FAIL" "$WORKSPACE/audit-report.md"; then

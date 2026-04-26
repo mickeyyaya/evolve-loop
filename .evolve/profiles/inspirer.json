@@ -1,0 +1,81 @@
+{
+  "name": "inspirer",
+  "role": "inspirer",
+  "cli": "claude",
+  "model_tier_default": "sonnet",
+  "model_tier_overrides": {
+    "cold_start": "opus"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "WebSearch",
+    "WebFetch",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(wc:*)",
+    "Bash(find .evolve:*)",
+    "Write(.evolve/runs/cycle-*/inspirer-output.md)",
+    "Write(.evolve/runs/cycle-*/inspirer-stdout.log)",
+    "Edit(.evolve/runs/cycle-*/inspirer-output.md)"
+  ],
+  "disallowed_tools": [
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Edit(.evolve/evals/**)",
+    "Edit(CLAUDE.md)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)",
+    "Write(.evolve/evals/**)",
+    "Write(CLAUDE.md)",
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(jq -i:*)",
+    "Bash(rm*)"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 0.30,
+  "max_turns": 20,
+  "permission_mode": "acceptEdits",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/inspirer-output.md",
+  "challenge_token_required": true,
+  "extra_flags": [
+    "--bare",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--exclude-dynamic-system-prompt-sections"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": false,
+    "deny_subpaths": [
+      ".git",
+      "scripts",
+      "skills",
+      "agents",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": true
+  }
+}

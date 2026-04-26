@@ -4,7 +4,7 @@ description: Use when the user invokes /evolve-loop or asks to run autonomous im
 argument-hint: "[cycles] [strategy] [goal]"
 ---
 
-# Evolve Loop v8.11
+# Evolve Loop v8.12
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
@@ -117,7 +117,7 @@ For each cycle:
 1. Claim cycle number (OCC protocol)
 2. **`bash scripts/phase-gate.sh <gate> $CYCLE $WORKSPACE`** — MANDATORY at every phase transition
 3. Scout → Builder → Auditor → phase-gate verification → Ship → Learn
-4. Inline S-tasks directly; worktree M-tasks with `isolation: "worktree"`
+4. **Subagents MUST be launched via `bash scripts/subagent-run.sh <agent> $CYCLE $WORKSPACE`** — never via the in-process `Agent` tool in production. Builder gets its worktree via `WORKTREE_PATH` env var. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes a tamper-evident ledger entry. Legacy `LEGACY_AGENT_DISPATCH=1` fallback permitted for one A/B cycle only.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**

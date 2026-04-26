@@ -59,7 +59,23 @@ Key principle: **static fields first, dynamic fields last** — reduces prompt-p
 
 Model selection: tier-1 if cycle 1 or goal-directed cycle <= 2; tier-3 if cycle 4+ with mature bandit data; tier-2 otherwise.
 
-- **Platform dispatch:** Use your native agent-spawning tool (e.g., `Agent` tool for Claude Code, `generalist` / `spawn_agent` for Gemini CLI, or open a new session in generic platforms).
+- **Subagent invocation (REQUIRED):** Run via the runner script. Do NOT use the in-process `Agent` tool in production cycles. The runner enforces per-agent CLI permission profiles (`.evolve/profiles/scout.json`), generates a challenge token, and writes a tamper-evident ledger entry.
+
+  ```bash
+  # Build the prompt by appending agents/evolve-scout.md and the JSON context block
+  # below into a temporary file, then pipe via stdin:
+  cat agents/evolve-scout.md context.json | \
+      MODEL_TIER_HINT="<resolved tier>" \
+      bash scripts/subagent-run.sh scout "$CYCLE" "$WORKSPACE_PATH"
+  ```
+
+  - Exit 0 = scout report written and verified (challenge token present, fresh).
+  - Exit 1 = runtime failure — read `${WORKSPACE_PATH}/scout-stderr.log`.
+  - Exit 2 = integrity failure — artifact missing, stale, or forged.
+
+  Legacy fallback: set `LEGACY_AGENT_DISPATCH=1` to skip subprocess and use the
+  in-process `Agent` tool. Permitted for one A/B cycle only — see CLAUDE.md.
+
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
 

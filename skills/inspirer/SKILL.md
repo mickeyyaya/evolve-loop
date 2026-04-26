@@ -319,7 +319,16 @@ The orchestrator can delegate to inspirer at Step 2.5 (DIVERGENCE TRIGGER):
 - Lean mode is NOT active
 - Strategy is NOT `repair` or `harden`
 
-**Invocation:** `/inspirer [goal] --depth QUICK --format evolve --lenses 3`
+**Invocation (in-process):** `/inspirer [goal] --depth QUICK --format evolve --lenses 3`
+
+**Invocation (subprocess-isolated, REQUIRED in production cycles):**
+
+```bash
+echo "/inspirer $GOAL --depth QUICK --format evolve --lenses 3" | \
+    bash scripts/subagent-run.sh inspirer "$CYCLE" "$WORKSPACE_PATH"
+```
+
+The runner enforces the inspirer profile (`.evolve/profiles/inspirer.json`) which restricts writes to the inspirer-output artifact only and disallows state/ledger/profile mutation. WebSearch and WebFetch remain enabled for research-grounded ideation. Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle.
 
 **Result:** Returned concept cards merge with standard gap-analysis cards and flow to Scout with +2 priority boost (same as research-backed concepts).
 
