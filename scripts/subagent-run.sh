@@ -14,7 +14,7 @@
 #   bash scripts/subagent-run.sh --check-token <artifact_path> <token>
 #
 # Arguments:
-#   <agent>           — one of: scout, builder, auditor, inspirer, evaluator, retrospective
+#   <agent>           — one of: scout, builder, auditor, inspirer, evaluator, retrospective, orchestrator
 #   <cycle>           — current cycle number (integer)
 #   <workspace_path>  — absolute path to .evolve/runs/cycle-N/ for this cycle
 #
@@ -77,9 +77,27 @@ generate_challenge_token() {
     openssl rand -hex 8 2>/dev/null || head -c 16 /dev/urandom | xxd -p | tr -d '\n' | head -c 16
 }
 
+capture_git_state() {
+    # Returns "<HEAD-sha>:<tree-diff-sha>" describing the repo at this moment.
+    # tree-diff-sha = SHA256 of `git diff HEAD` output, capturing all uncommitted
+    # (staged + unstaged) modifications. Two repo states with the same HEAD and
+    # same tree-diff-sha are byte-for-byte equivalent for the purpose of
+    # "what code did the auditor see?". v8.13.0 cycle-binding (H2 from feat
+    # branch). Used by ship.sh to refuse shipping when current state diverges
+    # from what was audited.
+    local head_sha tree_diff_sha
+    head_sha=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+    if command -v sha256sum >/dev/null 2>&1; then
+        tree_diff_sha=$(git diff HEAD 2>/dev/null | sha256sum | awk '{print $1}')
+    else
+        tree_diff_sha=$(git diff HEAD 2>/dev/null | shasum -a 256 | awk '{print $1}')
+    fi
+    echo "${head_sha}:${tree_diff_sha}"
+}
+
 write_ledger_entry() {
     local cycle="$1" agent="$2" model="$3" exit_code="$4" duration_s="$5"
-    local artifact_path="$6" challenge_token="$7"
+    local artifact_path="$6" challenge_token="$7" git_state="${8:-unknown:unknown}"
     local artifact_sha=""
     if [ -f "$artifact_path" ]; then
         if command -v sha256sum >/dev/null 2>&1; then
@@ -88,8 +106,13 @@ write_ledger_entry() {
             artifact_sha=$(shasum -a 256 "$artifact_path" | awk '{print $1}')
         fi
     fi
+    local git_head="${git_state%%:*}"
+    local tree_state_sha="${git_state##*:}"
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    # CYCLE-BINDING (v8.13.0): git_head + tree_state_sha pin the audit to the
+    # exact code state at audit time. ship.sh requires the current state to
+    # match these — preventing "audit cycle 50, ship cycle 51" exploits.
     jq -nc \
         --arg ts "$ts" \
         --argjson cycle "$cycle" \
@@ -100,10 +123,13 @@ write_ledger_entry() {
         --arg artifact_path "$artifact_path" \
         --arg artifact_sha256 "$artifact_sha" \
         --arg challenge_token "$challenge_token" \
+        --arg git_head "$git_head" \
+        --arg tree_state_sha "$tree_state_sha" \
         '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_subprocess",
           model: $model, exit_code: $exit_code, duration_s: $duration_s,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
-          challenge_token: $challenge_token}' \
+          challenge_token: $challenge_token,
+          git_head: $git_head, tree_state_sha: $tree_state_sha}' \
         >> "$LEDGER"
 }
 
@@ -171,7 +197,7 @@ cmd_check_token() {
 
 cmd_run() {
     local agent="$1" cycle="$2" workspace="$3"
-    [[ "$agent" =~ ^(scout|builder|auditor|inspirer|evaluator|retrospective)$ ]] || fail "unknown agent: $agent"
+    [[ "$agent" =~ ^(scout|builder|auditor|inspirer|evaluator|retrospective|orchestrator)$ ]] || fail "unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
 
@@ -227,6 +253,12 @@ cmd_run() {
     # Generate challenge token; pass to subagent via prompt prefix.
     local challenge_token
     challenge_token=$(generate_challenge_token)
+
+    # Capture the repo's code state at the moment the agent starts. This is
+    # what the agent will see; the ledger pins the audit to this exact state
+    # so ship.sh can refuse to ship a different state. v8.13.0 cycle-binding.
+    local git_state_at_start
+    git_state_at_start=$(capture_git_state)
 
     # Resolve prompt source: file override > stdin > error.
     local prompt_file
@@ -348,7 +380,7 @@ EOF
     if [ "$cli_exit" -ne 0 ]; then
         log "CLI exited non-zero: $cli_exit"
         log "stderr tail: $(tail -5 "$stderr_log" 2>/dev/null || echo '<empty>')"
-        write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token"
+        write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start"
         exit 1
     fi
 
@@ -378,7 +410,7 @@ EOF
         fi
     fi
 
-    write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token"
+    write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start"
     record_phase finalize_ms
 
     # Phase-timing sidecar: a per-phase ms breakdown that lets us identify
@@ -416,7 +448,7 @@ Usage:
   subagent-run.sh --validate-profile <agent>
   subagent-run.sh --check-token <artifact_path> <token>
 
-Agents: scout | builder | auditor | inspirer | evaluator | retrospective
+Agents: scout | builder | auditor | inspirer | evaluator | retrospective | orchestrator
 USAGE
     exit 1
 }

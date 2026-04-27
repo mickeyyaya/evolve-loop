@@ -1,0 +1,16 @@
+{
+  "_comment": "Project-scoped settings shipped with the evolve-loop plugin. The PreToolUse hook below wires scripts/guards/ship-gate.sh, which enforces the v8.13.0 ship-class allowlist: git commit, git push, gh release create/edit must go through scripts/ship.sh (the canonical atomic shipper that internally verifies an Auditor PASS verdict, audit-report SHA, cycle-binding HEAD/tree state). Bypass for emergency rollback only: EVOLVE_BYPASS_SHIP_GATE=1.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/scripts/guards/ship-gate.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

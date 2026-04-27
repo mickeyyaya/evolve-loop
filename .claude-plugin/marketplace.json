@@ -11,7 +11,7 @@
       "name": "evolve-loop",
       "source": "./",
       "description": "3 lean agents across 6 phases with compound discovery loop, proactive research, and strict evaluation \u2014 RESEARCH, DISCOVER, BUILD, AUDIT, SHIP, LEARN",
-      "version": "8.12.4",
+      "version": "8.13.0",
       "author": {
         "name": "Dan Lee"
       },

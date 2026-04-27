@@ -2,6 +2,100 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.0] - 2026-04-27
+
+### **BREAKING — atomic ship-gate via canonical `scripts/ship.sh`**
+
+After 5+ audit cycles of parser-bypass arms races (cycles 8121-8129), v8.13.0 reframes the problem. Instead of detecting ship-class commands (git commit / git push / gh release create) inside arbitrary bash via increasingly clever parsers, the gate now allowlists exactly ONE canonical script: `scripts/ship.sh`. The gate's check is trivially simple: "does this command's first executable, resolved via realpath, equal `scripts/ship.sh`?" If yes, allow (ship.sh enforces the audit-first contract internally). If no AND the command contains ship verbs, deny.
+
+**This kills the parser-bypass arms race.** D1-D3 from cycle 8122 (bare-newline, pipe-to-shell, here-string), D6 (commit→push workflow regression), and D-NEW-1 from cycle 8130 (bash -c bypass) are all resolved.
+
+### Breaking change for users
+
+Raw `git commit`, `git push`, and `gh release create` invocations are now **denied** by the ship-gate hook (`scripts/guards/ship-gate.sh`, wired via `.claude/settings.json`).
+
+**To ship a commit:**
+
+```bash
+bash scripts/ship.sh "<commit-message>"
+# Optionally with release notes for a GitHub release:
+EVOLVE_SHIP_RELEASE_NOTES="$(cat NOTES.md)" bash scripts/ship.sh "<commit-message>"
+```
+
+**Emergency bypass:**
+
+```bash
+EVOLVE_BYPASS_SHIP_GATE=1 git commit -m "<msg>"     # bypasses the gate
+EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh    # bypasses ship.sh's internal audit checks
+```
+
+Both bypasses are logged with explicit WARN.
+
+### Added — `scripts/ship.sh` (canonical atomic shipper, ~190 lines)
+
+Enforces the full audit-first contract before any git operation:
+
+1. **TOFU self-SHA verification** — pins ship.sh's SHA256 in `.evolve/state.json` on first run; subsequent modifications fail loudly. To intentionally update ship.sh, remove `state.json:expected_ship_sha` first.
+2. **Latest auditor ledger entry** — must exist with `exit_code: 0`.
+3. **Audit-report SHA match** — recorded SHA256 must equal current file SHA256 (catches post-audit mutation).
+4. **Verdict: PASS** in the audit report (word-anchored regex, no PASSABLE/PASSTHROUGH false matches).
+5. **Cycle binding** (the H2 fix) — current `git rev-parse HEAD` and `sha256(git diff HEAD)` must match the ledger entry's `git_head` and `tree_state_sha`. Refuses to ship work that wasn't audited.
+6. **Audit freshness** — 7-day cap.
+7. **Atomic commit + push** (+ optional `gh release create`) — all in one bash invocation; the gate fires once on the outer call.
+
+### Added — `scripts/guards/ship-gate.sh` (simplified PreToolUse hook, ~170 lines)
+
+- **Step 1**: realpath-resolves first executable; allows ship.sh canonical path.
+- **Step 1.5**: detects `bash -c "..."`, `sh -c "..."`, `eval "..."` patterns and recursively checks the inner snippet (D-NEW-1 fix from cycle 8130).
+- **Step 2**: regex-checks for ship verbs at tokenizable boundaries; awk pre-processor strips heredoc bodies first (no false positives on build reports that mention "git commit" in their text).
+
+### Added — telemetry tests (34 total)
+
+- `scripts/guards-test.sh` (19 unit tests): canonical-path allow, ship verbs blocked across raw/chained/subshell/pipe/heredoc/eval forms.
+- `scripts/ship-integration-test.sh` (7 end-to-end tests in temp git repos): no-ledger refusal, PASS audit succeeds, WARN refusal, tree-state-mismatch refusal, HEAD-moved refusal, ship.sh self-SHA tampering refusal, bypass switch.
+- `scripts/subagent-run-test.sh`: extended to validate the new orchestrator profile (12/12, was 11/11).
+
+### Added — `.evolve/profiles/orchestrator.json` (orchestrator subagent profile, scaffolding)
+
+The orchestrator-as-subagent vision from `feat/orchestrator-as-subagent` (commit 8bc2759, parked since cycle 8121) lands as scaffolding. Without v8.13.1's `scripts/run-cycle.sh` deterministic driver, this profile is not yet invoked by anything. It provides the M2-fix interpreter denials when the spawner ships:
+
+- Disallowed: `Bash(perl:*)`, `Bash(perl -e:*)`, `Bash(ruby:*)`, `Bash(ruby -e:*)`, `Bash(python -c:*)`, `Bash(python3 -c:*)`, `Bash(node -e:*)`, `Bash(osascript:*)`, `Bash(sh -c:*)`, `Bash(bash -c:*)`, `Bash(zsh -c:*)`, `Bash(env:*)`, `Bash(exec:*)`, `Bash(eval:*)`, `Bash(awk:*)`.
+- Sandbox: `read_only_repo: true`, allow_network: true (orchestrator may need to reach Anthropic API for sub-subagent invocation).
+- Allowed: `Bash(bash scripts/ship.sh:*)`, `Bash(bash scripts/subagent-run.sh:*)`, narrow git read commands (status, log, diff, show, ls-files, rev-parse, branch, stash list, worktree list).
+
+### Changed — cycle-binding fields in ledger
+
+`scripts/subagent-run.sh` now captures `git_head` (= `git rev-parse HEAD`) and `tree_state_sha` (= sha256 of `git diff HEAD`) at agent-start time and emits both in every `agent_subprocess` ledger entry. ship.sh uses these to enforce the cycle-binding contract.
+
+### Audit history
+
+| Cycle | Verdict | Defects |
+|---|---|---|
+| 8121 | FAIL | H1 parser bypasses (≥6 classes), H2 no cycle binding, M1 dead code, M2 interpreter holes |
+| 8122 | FAIL | D1 bare-newline, D2 pipe-to-shell, D3 here-string, D5 backwards-compat, D6 commit→push workflow regression |
+| 8126 (RC3 TMPDIR) | FAIL | TMPDIR override empirically non-functional |
+| 8127 (RC4 worktree) | FAIL | Auto-worktree had three failure modes |
+| 8128 (RC5 reverted) | PASS | Shipped v8.12.3 with EPERM as known issue |
+| 8129 (v8.12.4) | PASS | Sandbox /tmp read fix |
+| 8130 (RC1) | FAIL | D-NEW-1 bash -c bypass, D-NEW-2 missing CHANGELOG, D-NEW-3 atomic-ship doc, D-NEW-4 verdict regex word anchor |
+| **8131 (RC2)** | **PASS** | All 4 D-NEW defects fixed; 19 guards-test + 7 ship-integration-test all pass |
+
+### Migration
+
+This is the FIRST release that uses ship.sh to ship itself. The `.claude/settings.json` is created in this cycle with the PreToolUse hook wiring; first run after merge will set up the TOFU self-SHA pin in `.evolve/state.json`.
+
+For existing v8.12.4 users:
+- Pull the new code; the next `git commit` will be denied unless via ship.sh
+- One-time setup: run any audit cycle, then `bash scripts/ship.sh "<msg>"` — it'll pin its own SHA on first run
+- The ship-gate is project-scoped via `.claude/settings.json` — only fires inside this repo's working directory
+
+### Out of scope (deferred to v8.13.1+)
+
+- `scripts/run-cycle.sh` — deterministic driver that sequences phases and spawns the orchestrator subagent. Without it, the orchestrator profile shipped here is scaffolding only.
+- `scripts/guards/role-gate.sh` — block Edit/Write outside cycle workspace mid-cycle.
+- `scripts/guards/phase-gate-precondition.sh` — block out-of-order phases.
+- Skill rewrite for `/evolve-loop` to invoke the orchestrator subagent.
+
 ## [8.12.4] - 2026-04-27
 
 ### Fixed — EPERM on bash tool output files (5-cycle hunt resolved)

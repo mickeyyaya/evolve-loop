@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+#
+# ship.sh — Canonical atomic shipper for the evolve-loop project.
+#
+# This is the ONLY script the v8.13.0 ship-gate hook allowlists for git
+# commit / git push / gh release create operations. It enforces the audit-
+# first contract before doing any git work and runs all git operations
+# atomically as a single Bash invocation from the orchestrator's perspective.
+#
+# Why this exists: cycles 8121, 8122 audits identified that a parser-based
+# ship-gate that tries to detect ship-class commands inside arbitrary bash
+# always loses the arms race (D1 bare-newline, D2 pipe-to-shell, D3
+# here-string bypasses kept emerging). v8.13.0 reframes: instead of a smart
+# parser, the gate allowlists exactly one canonical path (this script).
+# ship.sh enforces the audit-first contract internally; the gate just checks
+# "is this script the entry point?".
+#
+# Usage:
+#   bash scripts/ship.sh "<commit-message>"
+#
+# Environment overrides:
+#   EVOLVE_SHIP_RELEASE_NOTES — if set, also creates a GitHub release tagged
+#                               v<VERSION> with these notes after a successful
+#                               commit + push. VERSION is read from
+#                               .claude-plugin/plugin.json.
+#   EVOLVE_BYPASS_SHIP_VERIFY — if "1", skip all audit/cycle-binding checks.
+#                               Logged loudly. EMERGENCY USE ONLY.
+#
+# Exit codes:
+#   0  — shipped successfully
+#   1  — runtime failure (missing arg, missing tools, git failure)
+#   2  — integrity failure (no audit, audit not PASS, SHA mismatch, HEAD
+#         moved since audit, ship.sh self-SHA mismatch)
+# 127  — required binary missing (jq, git, gh)
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
+STATE="$REPO_ROOT/.evolve/state.json"
+
+log()           { echo "[ship] $*" >&2; }
+fail()          { log "FAIL: $*"; exit 1; }
+integrity_fail(){ log "INTEGRITY-FAIL: $*"; exit 2; }
+
+# --- 0. Pre-flight -----------------------------------------------------------
+
+[ $# -ge 1 ] || fail "usage: ship.sh <commit-message>"
+COMMIT_MSG="$1"
+[ -n "$COMMIT_MSG" ] || fail "commit message must be non-empty"
+
+for bin in git jq; do
+    command -v "$bin" >/dev/null 2>&1 || { log "missing required binary: $bin"; exit 127; }
+done
+
+cd "$REPO_ROOT"
+
+# Determine sha256 binary.
+if command -v sha256sum >/dev/null 2>&1; then
+    SHA256() { sha256sum "$@" | awk '{print $1}'; }
+elif command -v shasum >/dev/null 2>&1; then
+    SHA256() { shasum -a 256 "$@" | awk '{print $1}'; }
+else
+    log "missing sha256sum and shasum"; exit 127
+fi
+sha256_stdin() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}';
+    else shasum -a 256 | awk '{print $1}'; fi
+}
+
+# --- 1. ship.sh self-SHA verification (TOFU) ---------------------------------
+#
+# Defends against an attacker (or a confused LLM) editing ship.sh to bypass
+# its own checks. The expected SHA is pinned in state.json on first run
+# (trust-on-first-use); subsequent modifications fail loudly. To intentionally
+# update ship.sh, delete state.json's expected_ship_sha first or run the
+# update through a release process that re-pins it.
+
+ACTUAL_SHIP_SHA=$(SHA256 "${BASH_SOURCE[0]}")
+if [ -f "$STATE" ]; then
+    EXPECTED_SHIP_SHA=$(jq -r '.expected_ship_sha // empty' "$STATE" 2>/dev/null)
+else
+    EXPECTED_SHIP_SHA=""
+fi
+
+if [ -z "$EXPECTED_SHIP_SHA" ]; then
+    # First run — pin (TOFU). Initialize state.json if missing.
+    if [ ! -f "$STATE" ]; then
+        echo '{}' > "$STATE"
+    fi
+    TMP=$(mktemp)
+    jq --arg sha "$ACTUAL_SHIP_SHA" '. + {expected_ship_sha: $sha}' "$STATE" > "$TMP" && mv "$TMP" "$STATE"
+    log "TOFU: pinned ship.sh SHA256 in state.json (first run)"
+elif [ "$EXPECTED_SHIP_SHA" != "$ACTUAL_SHIP_SHA" ]; then
+    integrity_fail "ship.sh has been modified since the SHA was pinned (expected=$EXPECTED_SHIP_SHA actual=$ACTUAL_SHIP_SHA). To intentionally update: remove .evolve/state.json:expected_ship_sha and re-run."
+fi
+
+# --- 2. Bypass switch (emergency only) ---------------------------------------
+
+if [ "${EVOLVE_BYPASS_SHIP_VERIFY:-0}" = "1" ]; then
+    log "WARN: EVOLVE_BYPASS_SHIP_VERIFY=1 — proceeding without audit verification"
+    log "WARN: this is an emergency override; the resulting commit will not have audit provenance"
+else
+    # --- 3. Locate the most recent Auditor ledger entry --------------------------
+
+    [ -f "$LEDGER" ] || integrity_fail "no ledger at $LEDGER — no Auditor has ever run"
+
+    # `grep` on a ledger with no matching entries returns rc=1, which under
+    # `set -e -o pipefail` would trip a script-exit before we get to the
+    # explicit "no Auditor entry" check below. Wrap with `|| true` to defer
+    # the missing-entry decision to the integrity_fail call.
+    LATEST_AUDIT=$( { grep '"kind":"agent_subprocess"' "$LEDGER" 2>/dev/null || true; } \
+        | jq -c 'select(.role == "auditor")' 2>/dev/null \
+        | tail -1 )
+
+    [ -n "$LATEST_AUDIT" ] || integrity_fail "no Auditor ledger entry found — independent review missing"
+
+    # --- 4. Verify Auditor exit_code, artifact existence + SHA, verdict --------
+
+    EXIT_CODE=$(echo "$LATEST_AUDIT" | jq -r '.exit_code')
+    ARTIFACT_PATH=$(echo "$LATEST_AUDIT" | jq -r '.artifact_path')
+    RECORDED_SHA=$(echo "$LATEST_AUDIT" | jq -r '.artifact_sha256')
+
+    [ "$EXIT_CODE" = "0" ] || integrity_fail "most recent Auditor exited $EXIT_CODE"
+    [ -f "$ARTIFACT_PATH" ] || integrity_fail "audit-report.md missing on disk: $ARTIFACT_PATH"
+
+    ACTUAL_SHA=$(SHA256 "$ARTIFACT_PATH")
+    [ "$ACTUAL_SHA" = "$RECORDED_SHA" ] || integrity_fail "audit-report.md SHA mismatch (ledger=$RECORDED_SHA actual=$ACTUAL_SHA) — artifact mutated post-audit"
+
+    # Verdict must be PASS. Use word-boundary regex to avoid false matches
+    # like PASSABLE, PASSTHROUGH, etc. (D-NEW-4 from cycle 8130 audit).
+    if ! grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$ARTIFACT_PATH"; then
+        integrity_fail "audit-report.md does not declare 'Verdict: PASS'"
+    fi
+
+    # --- 5. Cycle binding: current state must match audited state -------------
+
+    LEDGER_HEAD=$(echo "$LATEST_AUDIT" | jq -r '.git_head // empty')
+    LEDGER_TREE=$(echo "$LATEST_AUDIT" | jq -r '.tree_state_sha // empty')
+
+    if [ -z "$LEDGER_HEAD" ] || [ -z "$LEDGER_TREE" ]; then
+        integrity_fail "Auditor ledger entry predates v8.13.0 cycle-binding (no git_head/tree_state_sha) — re-run audit"
+    fi
+
+    CURRENT_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+    CURRENT_TREE=$(git diff HEAD 2>/dev/null | sha256_stdin)
+
+    if [ "$CURRENT_HEAD" != "$LEDGER_HEAD" ]; then
+        integrity_fail "git HEAD has moved since audit (audited=$LEDGER_HEAD current=$CURRENT_HEAD) — re-run Auditor on the new state"
+    fi
+    if [ "$CURRENT_TREE" != "$LEDGER_TREE" ]; then
+        integrity_fail "uncommitted changes have been added since audit (tree-state mismatch) — re-run Auditor"
+    fi
+
+    # --- 6. Audit freshness (7d cap when cycle-binding present, else 24h) ----
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        ARTIFACT_MTIME=$(stat -f %m "$ARTIFACT_PATH")
+    else
+        ARTIFACT_MTIME=$(stat -c %Y "$ARTIFACT_PATH")
+    fi
+    ARTIFACT_AGE_S=$(( $(date +%s) - ARTIFACT_MTIME ))
+    MAX_AGE_S=$((7 * 24 * 3600))   # 7 days when cycle-bound
+    if [ "$ARTIFACT_AGE_S" -gt "$MAX_AGE_S" ]; then
+        integrity_fail "audit-report.md is ${ARTIFACT_AGE_S}s old (>${MAX_AGE_S}s); re-run Auditor"
+    fi
+
+    log "OK: audit verified — verdict PASS, SHA matches, HEAD/tree bound to audit, age ${ARTIFACT_AGE_S}s"
+fi
+
+# --- 7. Atomic ship: stage + commit + push (+ optional release) -------------
+#
+# All git operations happen inside this single Bash invocation, so the
+# orchestrator session sees one allowed bash call (bash scripts/ship.sh ...)
+# and the inner git operations don't fire the gate individually. Solves the
+# v8.12.x D6 workflow regression.
+
+# Determine current branch (block accidental ship from detached HEAD).
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+[ -n "$CURRENT_BRANCH" ] || fail "detached HEAD — refuse to ship; checkout a branch first"
+
+# Stage everything (intentional — audit was based on full diff HEAD).
+git add -A
+
+# If nothing to commit, log and exit cleanly.
+if git diff --cached --quiet; then
+    log "no staged changes to ship; exiting cleanly (audit was for an empty diff)"
+    exit 0
+fi
+
+# Commit. Use array form to avoid arg injection.
+COMMIT_ARGS=(commit -m "$COMMIT_MSG")
+git "${COMMIT_ARGS[@]}"
+log "OK: committed to $CURRENT_BRANCH"
+
+# Push.
+git push origin "$CURRENT_BRANCH"
+log "OK: pushed to origin/$CURRENT_BRANCH"
+
+# --- 8. Optional GitHub release (if EVOLVE_SHIP_RELEASE_NOTES set) -----------
+
+if [ -n "${EVOLVE_SHIP_RELEASE_NOTES:-}" ]; then
+    PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
+    if [ ! -f "$PLUGIN_JSON" ]; then
+        log "WARN: no .claude-plugin/plugin.json — skipping release"
+    else
+        VERSION=$(jq -r '.version' "$PLUGIN_JSON")
+        TAG="v${VERSION}"
+        if command -v gh >/dev/null 2>&1; then
+            log "creating GitHub release $TAG..."
+            # gh release create must be done as the same atomic event from the
+            # gate's perspective. It runs after push so the tag points at the
+            # just-pushed commit.
+            if echo "$EVOLVE_SHIP_RELEASE_NOTES" | gh release create "$TAG" --title "$TAG" --notes-file - 2>&1; then
+                log "OK: GitHub release $TAG created"
+            else
+                log "WARN: gh release create failed (release may already exist)"
+            fi
+        else
+            log "WARN: gh CLI not available — skipping release"
+        fi
+    fi
+fi
+
+log "DONE: shipped $CURRENT_BRANCH at $(git rev-parse HEAD)"
+exit 0
