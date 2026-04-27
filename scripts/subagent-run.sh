@@ -175,11 +175,32 @@ cmd_run() {
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
 
+    # Phase timing instrumentation (bash 3.2 compatible — macOS default shell
+    # lacks associative arrays). Each phase boundary records elapsed ms to a
+    # temp file as "phase_name <space> ms" lines. Final sidecar writer reads
+    # the file. The adapter-invocation phase (which dominates) is the wall-
+    # clock window during which `claude -p` runs; subtract from total to get
+    # pure runner overhead.
+    local timing_log
+    timing_log=$(mktemp -t "evolve-timing-XXXXXX") || timing_log=""
+    local ts_phase_start_ms
+    ts_phase_start_ms=$(($(date +%s%N 2>/dev/null || echo "$(date +%s)000000000")/1000000))
+    record_phase() {
+        [ -z "$timing_log" ] && return 0
+        local phase="$1"
+        local ts_now_ms
+        ts_now_ms=$(($(date +%s%N 2>/dev/null || echo "$(date +%s)000000000")/1000000))
+        local elapsed=$((ts_now_ms - ts_phase_start_ms))
+        echo "$phase $elapsed" >> "$timing_log"
+        ts_phase_start_ms="$ts_now_ms"
+    }
+
     local profile="$PROFILES_DIR/${agent}.json"
     [ -f "$profile" ] || fail "profile not found: $profile"
 
     require_bin jq
     jq empty "$profile" || fail "profile is not valid JSON: $profile"
+    record_phase profile_load_ms
 
     local cli adapter
     cli=$(jq -r '.cli' "$profile")
@@ -277,6 +298,22 @@ EOF
     local stdout_log="$workspace/${agent}-stdout.log"
     local stderr_log="$workspace/${agent}-stderr.log"
 
+    # NOTE: cycle 8127 RC4 audit empirically demonstrated that the auto-
+    # worktree EPERM fix had three failures:
+    # (1) writes still denied because the profile's relative-path patterns
+    #     don't match the auditor's absolute-path resolution under cwd=worktree;
+    # (2) `git worktree add --detach HEAD` shows the COMMITTED state at HEAD,
+    #     not the orchestrator's uncommitted working tree, so the subagent
+    #     audits the wrong code;
+    # (3) EPERM still occurred — Claude Code's cleanup is NOT keyed on
+    #     project-path-hash alone.
+    # The auto-worktree code has been reverted. EPERM remains an open issue
+    # tracked for v8.12.4 with a different research path (likely targeting
+    # the actual cleanup trigger — possibly `.claude/` directory location
+    # or parent PID, not cwd).
+
+    record_phase prep_total_ms
+
     log "starting $agent (cycle $cycle, model $model, cli $cli, token $challenge_token)"
     local start_ts
     start_ts=$(date +%s)
@@ -294,6 +331,7 @@ EOF
     bash "$adapter"
     local cli_exit=$?
     set -e
+    record_phase adapter_invoke_ms
 
     local end_ts duration
     end_ts=$(date +%s)
@@ -317,7 +355,55 @@ EOF
     # Post-run integrity verification.
     verify_artifact "$artifact_path" "$challenge_token"
 
+    # Telemetry sidecar: extract `usage` block from the final JSON line of
+    # stdout (claude -p --output-format json emits one JSON object per session)
+    # so future Auditor invocations can verify empirical token reduction
+    # without parsing their own stdout. Suggested by cycle 8124 audit
+    # (LOW-finding: empirical-test-not-instrumentable). Best-effort: jq failure
+    # leaves the sidecar absent rather than failing the run.
+    local usage_sidecar="$workspace/${agent}-usage.json"
+    if command -v jq >/dev/null 2>&1 && [ -s "$stdout_log" ]; then
+        # Take the last line containing a "usage" key. claude -p produces a
+        # single-line JSON for --output-format json, but be defensive.
+        local last_json
+        last_json=$(grep -F '"usage"' "$stdout_log" 2>/dev/null | tail -1)
+        if [ -n "$last_json" ]; then
+            echo "$last_json" | jq -c '{
+                duration_ms: .duration_ms,
+                num_turns: .num_turns,
+                total_cost_usd: .total_cost_usd,
+                usage: .usage,
+                modelUsage: .modelUsage
+            }' > "$usage_sidecar" 2>/dev/null || rm -f "$usage_sidecar"
+        fi
+    fi
+
     write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token"
+    record_phase finalize_ms
+
+    # Phase-timing sidecar: a per-phase ms breakdown that lets us identify
+    # which parts of the runner are slow vs the dominant adapter_invoke_ms
+    # (the actual claude -p call). Reads the temp file populated by
+    # record_phase calls. Total = sum of phase values.
+    local timing_sidecar="$workspace/${agent}-timing.json"
+    if command -v jq >/dev/null 2>&1 && [ -n "$timing_log" ] && [ -f "$timing_log" ]; then
+        local total_ms=0
+        local timing_json="{"
+        local first=1
+        while IFS=' ' read -r phase ms; do
+            [ -z "$phase" ] && continue
+            [ "$first" = "1" ] && first=0 || timing_json+=","
+            timing_json+="\"$phase\":$ms"
+            total_ms=$((total_ms + ms))
+        done < "$timing_log"
+        timing_json+="}"
+        echo "$timing_json" | jq --argjson total "$total_ms" \
+            --arg agent "$agent" --argjson cycle "$cycle" \
+            '. + {agent: $agent, cycle: $cycle, total_ms: $total}' \
+            > "$timing_sidecar" 2>/dev/null || rm -f "$timing_sidecar"
+        rm -f "$timing_log"
+    fi
+
     log "DONE: $agent cycle $cycle in ${duration}s, artifact at $artifact_path"
     exit 0
 }

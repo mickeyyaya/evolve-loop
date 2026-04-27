@@ -471,8 +471,13 @@ If any checksum fails → HALT: "Eval tamper detected."
 After Auditor completes:
 - If `PASS-PENDING-EVAL` → proceed to eval gate (phase-gate runs `verify-eval.sh` as single source of truth)
 - If `PASS` (post-eval) → proceed to **Phase 5 Ship**: `git apply` worktree patch, commit, push.
-- If `WARN`, `FAIL`, or `SHIP_GATE_DENIED` → **drop the work, run retrospective, do NOT commit.** Capture `git diff HEAD > $WORKSPACE_PATH/failed.patch` from the worktree, then invoke the `evolve-retrospective` subagent (see [phase6-learn.md § 4c](phase6-learn.md)). The subagent writes a structured retrospective + one or more failure-lesson YAMLs into `.evolve/instincts/lessons/`. After retrospective exits, `git worktree remove --force` discards the failed code; the patch and reports remain in `.evolve/runs/cycle-N/` for forensic review. Future cycles consume the lessons via `instinctSummary`.
-- For Builder retries (within the cycle), see [phase3-build.md](skills/evolve-loop/phase3-build.md) (retry/cleanup). Retry budget is consumed at Builder; once retries are exhausted and Auditor still says FAIL/WARN, the retrospective branch above takes over.
+- If `WARN`, `FAIL`, or `SHIP_GATE_DENIED` → **drop the work, RECORD the failure, do NOT commit.** Lightweight failed-path:
+  1. `git diff HEAD > "$WORKSPACE_PATH/failed.patch"` (capture failed code state for forensic review).
+  2. `bash scripts/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"` (append structured failure entry to `state.json.failedApproaches[]` — defects + verdict + audit-report SHA256 + git HEAD/tree state). Cost: 0 LLM calls, ~50ms.
+  3. `git worktree remove --force "$WORKTREE_DIR"` (discard the failed code).
+
+  The retrospective subagent is **NOT invoked per cycle.** It runs **separately, on demand or in batches** (e.g., weekly, or after N failures) — synthesizing cross-cycle patterns into failure-lesson YAMLs that feed into future `instinctSummary`. See [phase6-learn.md § 4c](phase6-learn.md) for the deferred-retrospective flow.
+- For Builder retries (within the cycle), see [phase3-build.md](skills/evolve-loop/phase3-build.md) (retry/cleanup). Retry budget is consumed at Builder; once retries are exhausted and Auditor still says FAIL/WARN, the failed-path recording above runs.
 - Phase-gate `audit-to-ship` promotes `PASS-PENDING-EVAL` → `PASS` only if `verify-eval.sh` passes
 - Auditor does NOT run eval graders directly — this eliminates redundant eval execution
 

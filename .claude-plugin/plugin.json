@@ -1,6 +1,6 @@
 {
   "name": "evolve-loop",
-  "version": "8.12.2",
+  "version": "8.12.3",
   "description": "Self-evolving development pipeline \u2014 3 lean agents across 6 phases with compound discovery loop, proactive research, and strict evaluation. No external dependencies.",
   "author": {
     "name": "Dan Lee"

@@ -2,6 +2,70 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.12.3] - 2026-04-27
+
+### Added — Token economy: subagent prompt prefix reduced ~75%
+
+Six profile JSONs (`scout`, `builder`, `auditor`, `inspirer`, `evaluator`, `retrospective`) now pass `--disable-slash-commands`, `--setting-sources`, `project` to `claude -p`. These flags drop the 227 user-level skills' metadata (~50–90K tokens) from every subagent's system prompt. None of the subagents grant the `Skill` tool in their allowed_tools, so they couldn't invoke `/skill-name` anyway — the metadata was pure overhead.
+
+**Empirically verified** (cycle 8124 audit):
+- `cache_creation_input_tokens`: 135,173 → 45,424 (66% reduction)
+- `cache_read_input_tokens`: 2,414,580 → 529,642 (78% reduction)
+- Audit duration: 625s → 162s (74% faster on Sonnet)
+
+### Added — Subagent telemetry sidecars
+
+After every successful agent run, `scripts/subagent-run.sh` writes two sidecar files into the workspace:
+
+- **`${agent}-usage.json`** — extracts `usage`, `modelUsage`, `duration_ms`, `num_turns`, `total_cost_usd` from the agent's stdout JSON. Future audits can self-verify empirical token effects without parsing their own stdout.
+- **`${agent}-timing.json`** — per-phase ms breakdown (`profile_load_ms`, `prep_total_ms`, `adapter_invoke_ms`, `finalize_ms`, `total_ms`). Bash 3.2-compatible (uses temp file, not `declare -A`). Confirmed empirically that 99.9% of subagent runtime is the `claude -p` API call; pure runner overhead is ~110ms.
+
+### Added — Lightweight failure recording (design pivot from v8.12.2)
+
+Per user direction, the `evolve-retrospective` subagent (shipped in v8.12.2) is **no longer invoked per-cycle**. Instead, when an audit returns FAIL/WARN/SHIP_GATE_DENIED:
+
+1. Capture `git diff HEAD > $WORKSPACE_PATH/failed.patch` (forensic)
+2. Run `scripts/record-failure-to-state.sh $WORKSPACE_PATH $VERDICT` — extracts audit defects (severity + title) from `audit-report.md`, captures cycle/git-head/tree-state SHA + audit-report SHA256, appends a structured entry to `state.json.failedApproaches[]` with `retrospected: false`. **Total cost: ~50ms shell, no LLM calls.**
+3. `git worktree remove --force` discards the failed code.
+
+The retrospective subagent runs separately in **batches** (on-demand or scheduled), synthesizing cross-cycle patterns from accumulated `failedApproaches` entries. This is more useful than per-cycle retrospectives because failure patterns ("3rd parser bypass this month") only emerge from multiple data points.
+
+**Net change**: per-FAIL cycle saves ~$0.50 + 3-5 minutes. Forensic information preserved (audit-report.md + failed.patch + state.json entry).
+
+### Changed — Phase docs
+
+- **`skills/evolve-loop/phase6-learn.md`** § 4c rewritten: documents the lightweight inline recording flow + the deferred batch-retrospective pattern. Heading enumerates `FAIL / WARN / SHIP_GATE_DENIED` (no longer ambiguous "FAILED tasks only").
+- **`skills/evolve-loop/phases.md`** audit-to-ship branch updated: PASS → ship; FAIL/WARN/SHIP_GATE_DENIED → drop + record-failure (lightweight, no subagent). Reference to phase6-learn.md § 4c for the deferred-retrospective flow.
+
+### Known issue — deferred to v8.12.4
+
+**EPERM on `/tmp/claude-${UID}/...` task output files** during concurrent claude-session collisions. Three approaches investigated and rejected:
+- v8.12.3 RC3 TMPDIR-override: empirically non-functional (Claude Code uses hardcoded `/tmp/claude-${UID}/`, not `${TMPDIR}/`).
+- v8.12.3 RC4 auto-worktree (per-subagent unique cwd): empirically non-functional (cwd-hash alone doesn't prevent cleanup; broke profile's relative-path Write patterns; showed worktree HEAD instead of orchestrator's working tree).
+
+EPERM remains an open issue. Documented in `scripts/subagent-run.sh:295-313` with the failed approaches enumerated. Next investigation should target the actual cleanup trigger (likely `.claude/` directory location or parent PID, not cwd).
+
+### Audit
+
+- RC1 (cycle 8124, Sonnet): PASS — empirical token reduction verified.
+- RC2 (cycle 8125, attempted): build progressed; audit aborted by user.
+- RC3 (cycle 8126, Sonnet): FAIL — TMPDIR fix non-functional. Reverted.
+- RC4 (cycle 8127, Sonnet): FAIL — auto-worktree fix had three failure modes. Reverted.
+- RC5 (cycle 8128, Sonnet): **PASS** — auto-worktree reverted, all 8 acceptance criteria met, 0 MEDIUM+ defects, 2 LOW non-blocking notes (criterion 2 grep count off by 1 in build template; criterion 7 empirically unverifiable due to EPERM). Recommended ship.
+
+### Latency analysis
+
+Empirical phase-timing from the cycle 8128 audit (`auditor-timing.json`):
+```
+profile_load_ms:      14
+prep_total_ms:        57
+adapter_invoke_ms: 187,769  ← 99.9% of wall-clock
+finalize_ms:          39
+total_ms:         187,879
+```
+
+The runner overhead is ~110ms; everything else is the `claude -p` API call. To reduce audit latency further, the lever is **turn count** (~27 in this audit) — pre-running tests in the orchestrator and inlining results would cut to ~10 turns. Deferred to v8.12.4 / v8.13.0.
+
 ## [8.12.2] - 2026-04-27
 
 ### Added — Failed-cycle retrospective + lessons-learned pipeline

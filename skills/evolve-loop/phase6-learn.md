@@ -76,40 +76,81 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
 
    Each instinct must be specific and actionable. "Code should be clean" is useless. "This codebase uses barrel exports in index.ts — always add new exports there" is useful.
 
-4c. **Failure Root Cause Attribution** (for `FAIL` / `WARN` / `SHIP_GATE_DENIED` cycles — the "failed-path" branch):
+4c. **Failure Recording** (for `FAIL` / `WARN` / `SHIP_GATE_DENIED` cycles — the "failed-path" branch):
 
-   **REQUIRED:** Invoke the `evolve-retrospective` subagent. Do NOT classify failures inline in the orchestrator — this is dedicated subagent work, mirroring the Scout/Builder/Auditor pattern. Inline classification is a documented anti-pattern (see prior incident reports under `docs/reports/`).
+   **Lightweight inline recording, NOT a per-cycle retrospective subagent.**
+
+   The retrospective subagent (`agents/evolve-retrospective.md`) is **available but invoked separately**, on-demand or in batches — not on every failed cycle. Each per-cycle retrospective costs ~$0.50 of model time; with frequent failures during exploration, that adds up. Per the v8.12.3 design, the orchestrator's failed-path responsibility is just to **record the facts** so a later batch retrospective can synthesize lessons across multiple failures.
+
+   ### The lightweight failed-path
 
    ```bash
-   echo "$retrospective_prompt" | \
-       bash scripts/subagent-run.sh retrospective "$CYCLE" "$WORKSPACE_PATH"
+   # Capture the failed code state for forensic review (before discarding worktree).
+   git diff HEAD > "$WORKSPACE_PATH/failed.patch"
+
+   # Record the failure into state.json.failedApproaches[].
+   bash scripts/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"  # FAIL | WARN | SHIP_GATE_DENIED
+
+   # Discard the failed worktree.
+   git worktree remove --force "$WORKTREE_DIR"
    ```
 
-   Where `$retrospective_prompt` is constructed by reading `agents/evolve-retrospective.md` and appending a context block with: `auditVerdict` (FAIL/WARN/SHIP_GATE_DENIED), `auditReportPath`, `buildReportPath`, `scoutReportPath`, `failedDiffPath` (saved `git diff HEAD` from the worktree before discard), `priorLessons` (recent lesson IDs from `.evolve/instincts/lessons/` matching this task's category), and `nextLessonId` (next monotonic ID).
+   Total cost: 0 LLM calls, ~50ms of shell. The `record-failure-to-state.sh` helper extracts the audit's defect list (severity + title) from `audit-report.md`, captures the cycle number / git HEAD / tree state SHA / audit-report SHA256, and appends a structured entry to `state.json.failedApproaches[]` with `retrospected: false`.
 
-   The subagent runs under `.evolve/profiles/retrospective.json` — read-only across the repo, write-only within `.evolve/runs/cycle-*/retrospective-*` and `.evolve/instincts/lessons/*.yaml`. Network is disabled. Cannot mutate existing personal instincts.
+   **Schema of each failedApproaches entry:**
 
-   **What the subagent produces:**
+   ```json
+   {
+     "ts": "2026-04-27T01:55:33Z",
+     "cycle": 8126,
+     "verdict": "FAIL|WARN|SHIP_GATE_DENIED",
+     "auditReportPath": ".evolve/runs/cycle-N/audit-report.md",
+     "auditReportSha256": "<sha256>",
+     "gitHead": "<git-sha>",
+     "treeStateSha": "<sha256-of-git-diff-HEAD>",
+     "defects": [{"severity": "HIGH", "title": "..."}, ...],
+     "retrospected": false
+   }
+   ```
 
-   1. `.evolve/runs/cycle-N/retrospective-report.md` — narrative post-mortem.
-   2. `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml` — one or more failure-lesson YAMLs (one per **root cause**, not per defect).
-   3. `.evolve/runs/cycle-N/handoff-retrospective.json` — compact summary the orchestrator merges.
+   ### Batch retrospective (when, how — separately invoked)
 
-   **Lesson YAML schema** (extends the existing instinct format):
+   When you want to extract lessons from accumulated failures (e.g., once a week, after every N failures, or when you spot a recurring pattern), invoke the retrospective subagent **once** with a batch of recent failures as context. Pattern:
+
+   ```bash
+   # Find the un-retrospected failures (or any criterion you choose).
+   UNRETRO_CYCLES=$(jq -r '.failedApproaches[] | select(.retrospected == false) | .cycle' .evolve/state.json)
+
+   # Pass the batch to a single retrospective subagent invocation. Build the
+   # prompt by reading agents/evolve-retrospective.md and appending the batch
+   # context (multiple cycles' audit-report.md content + their failedApproaches
+   # entries). The subagent synthesizes cross-cycle patterns into one or more
+   # failure-lesson YAMLs — useful precisely BECAUSE patterns emerge across
+   # multiple failures, not from a single cycle.
+   bash scripts/subagent-run.sh retrospective <next-cycle-id> <workspace>
+
+   # After the subagent writes its lessons, mark the batch as retrospected.
+   # (The orchestrator/operator does this; the subagent profile cannot mutate
+   # state.json — see retrospective.json:disallowed_tools.)
+   ```
+
+   The batch retrospective produces the same artifacts as the original per-cycle design (retrospective-report.md + lesson YAMLs + handoff-retrospective.json) — just with richer cross-cycle context. The lessons feed into future cycles via `state.json.instinctSummary[]` once `merge-lesson-into-state.sh` runs.
+
+   ### Lesson YAML schema (unchanged from v8.12.2)
 
    - `id`: `inst-LXXX` (the `L` prefix distinguishes lessons from technique-instincts)
    - `pattern`: kebab-case
    - `description`: imperative-voice failure pattern + corrective action
-   - `confidence`: 0.5 first observation; higher only if `priorLessons` confirm pattern
-   - `source`: `cycle-N/<task-slug>`
+   - `confidence`: 0.5 first observation; higher only if multi-cycle pattern
+   - `source`: `cycle-N/<task-slug>` (or comma-separated if batched)
    - `type`: `failure-lesson`
    - `category`: `episodic`
-   - `failureContext`: `{ cycle, task, errorCategory, failedStep, auditVerdict, auditDefects[] }`
+   - `failureContext`: `{ cycles[], errorCategory, failedStep, auditVerdicts[] }`
    - `preventiveAction`: concrete, testable instruction
    - `relatedInstincts[]`: cross-links
    - `contradicts[]`: prior instinct IDs this lesson invalidates
 
-   **Error-category and failed-step taxonomies** (used by the subagent):
+   ### Error-category and failed-step taxonomies (used by the batch retrospective subagent)
 
    | `errorCategory` | Meaning |
    |---|---|
@@ -121,21 +162,12 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
 
    `failedStep` is one of `scout`, `build`, `audit`.
 
-   **Orchestrator post-processing** (after retrospective subagent exits):
+   ### Why deferred (rationale)
 
-   1. Read `handoff-retrospective.json`. Append each `lessonIds[i]` to `state.json.failedApproaches[]` with full schema (`{slug, errorCategory, failedStep, cycle, lessonId}`).
-   2. Append the new lesson IDs to `state.json.instinctSummary[]` so future Scout/Builder/Auditor agents see them in their context block.
-   3. If `handoff-retrospective.json:systemic == true` (3+ failures with same `errorCategory` across last 5 cycles), log a `SYSTEMIC_FAILURE` event in the ledger.
-   4. For each ID in `handoff-retrospective.json:contradictedInstincts[]`, the next `prune` slash-command run reduces that instinct's confidence by 0.3 and re-evaluates against the new lesson.
-
-   **Discard the worktree** *after* the retrospective writes its artifacts (it needs to read `failedDiffPath`):
-
-   ```bash
-   git diff HEAD > "$WORKSPACE_PATH/failed.patch"   # capture before discard
-   git worktree remove --force "$WORKTREE_DIR"
-   ```
-
-   The patch is preserved in the workspace for forensic review; the worktree itself is removed.
+   - **Cost**: ~$0.50 saved per FAIL cycle (significant during exploratory rounds with many failures).
+   - **Latency**: removes ~3-5 minutes of subagent work from the failed-path; cycle ends in <100ms.
+   - **Quality**: cross-cycle patterns ("this is the 4th time we hit a parser bypass") are MORE useful than per-cycle "what failed in cycle N" — and only emerge from batch.
+   - **Forensic preservation**: `failed.patch` + `audit-report.md` + `state.json.failedApproaches[]` together preserve all the raw material the retrospective will need later. No information is lost by deferring.
 
    Update state.json `instinctCount` and `instinctSummary`:
    ```json

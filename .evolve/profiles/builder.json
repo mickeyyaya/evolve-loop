@@ -46,7 +46,7 @@
   "add_dir": [
     "{worktree_path}"
   ],
-  "max_budget_usd": 2.50,
+  "max_budget_usd": 2.5,
   "max_turns": 80,
   "permission_mode": "acceptEdits",
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
@@ -54,7 +54,10 @@
   "isolation": "worktree",
   "extra_flags": [
     "--no-session-persistence",
-    "--exclude-dynamic-system-prompt-sections"
+    "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
+    "--setting-sources",
+    "project"
   ],
   "sandbox": {
     "enabled": true,

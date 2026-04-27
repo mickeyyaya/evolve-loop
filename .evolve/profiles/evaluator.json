@@ -52,7 +52,7 @@
   "add_dir": [
     "."
   ],
-  "max_budget_usd": 0.30,
+  "max_budget_usd": 0.3,
   "max_turns": 20,
   "permission_mode": "acceptEdits",
   "output_artifact": ".evolve/runs/cycle-{cycle}/evaluator-output.md",
@@ -61,7 +61,10 @@
     "--bare",
     "--no-session-persistence",
     "--strict-mcp-config",
-    "--exclude-dynamic-system-prompt-sections"
+    "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
+    "--setting-sources",
+    "project"
   ],
   "sandbox": {
     "enabled": true,

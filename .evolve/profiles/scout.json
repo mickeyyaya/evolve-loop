@@ -68,7 +68,7 @@
   "add_dir": [
     "."
   ],
-  "max_budget_usd": 0.50,
+  "max_budget_usd": 0.5,
   "max_turns": 30,
   "permission_mode": "acceptEdits",
   "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",
@@ -77,7 +77,10 @@
     "--bare",
     "--no-session-persistence",
     "--strict-mcp-config",
-    "--exclude-dynamic-system-prompt-sections"
+    "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
+    "--setting-sources",
+    "project"
   ],
   "sandbox": {
     "enabled": true,
