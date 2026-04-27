@@ -37,6 +37,34 @@ bash scripts/phase-gate.sh <gate> <cycle> <workspace_path>
 
 The LLM retains all creative work — task selection, implementation, code review, instinct extraction. The script enforces *process*, the LLM does *substance*.
 
+### v8.13.1: cycle-state.json + kernel hooks
+
+In addition to `phase-gate.sh` (which runs at transitions), v8.13.1 introduces continuous enforcement via three PreToolUse kernel hooks reading `.evolve/cycle-state.json`:
+
+- **`scripts/guards/role-gate.sh`** (Edit/Write matcher): denies file writes outside the active phase's path allowlist. Calibrate/research/discover → workspace only. Build → workspace + active worktree. Audit → audit-report + handoff. Ship → version-bump files. Learn → orchestrator-report + lessons + state.json.
+- **`scripts/guards/phase-gate-precondition.sh`** (Bash matcher, second hook after ship-gate): denies `subagent-run.sh` invocations that don't match the expected next agent given current phase.
+- **`scripts/guards/ship-gate.sh`** (Bash matcher, first hook): denies any git commit/push/gh release except via `scripts/ship.sh` (carried over from v8.13.0).
+
+Lifecycle integration:
+
+```bash
+# At cycle start (run-cycle.sh handles this automatically):
+bash scripts/cycle-state.sh init <cycle> <workspace>
+
+# At each phase transition (orchestrator advances; runner DOES NOT auto-advance):
+bash scripts/cycle-state.sh advance <new_phase> <agent> [worktree]
+
+# At cycle end:
+bash scripts/cycle-state.sh clear
+```
+
+When cycle-state.json is absent (no cycle in progress), all three hooks pass through transparently — they do not block ad-hoc work outside cycles.
+
+Bypasses (emergency only, logged WARN):
+- `EVOLVE_BYPASS_ROLE_GATE=1`
+- `EVOLVE_BYPASS_PHASE_GATE=1`
+- `EVOLVE_BYPASS_SHIP_GATE=1`
+
 ## Phase 0: CALIBRATE (once per invocation)
 
 Runs **once per `/evolve-loop` invocation**, not per cycle. Establishes a project-level benchmark baseline.

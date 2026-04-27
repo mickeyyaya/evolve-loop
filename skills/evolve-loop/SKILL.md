@@ -8,6 +8,8 @@ argument-hint: "[cycles] [strategy] [goal]"
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
+> **v8.13.1**: trust boundary now enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `scripts/ship.sh` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `bash scripts/run-cycle.sh [GOAL]` — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
+
 ## Shared Agent Values
 
 The following JSON block is the canonical state initialization for the evolve-loop. Agents must use these field names when reading from or writing to `state.json`.
@@ -121,6 +123,19 @@ For each cycle:
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
+
+### v8.13.1 alternative: declarative cycle driver
+
+Instead of running the loop from inside this skill's prompt, you may invoke `bash scripts/run-cycle.sh [GOAL]`. The driver:
+
+1. Picks the next cycle number (or accepts `--cycle N`).
+2. Initializes `.evolve/cycle-state.json` with `phase=calibrate`.
+3. Spawns the orchestrator subagent (`bash scripts/subagent-run.sh orchestrator $CYCLE $WORKSPACE`) under the orchestrator profile (Edit/Write/git ops blocked at the kernel hook layer).
+4. Clears cycle-state on exit.
+
+The orchestrator subagent (`agents/evolve-orchestrator.md`) calls `bash scripts/cycle-state.sh advance <phase> <agent>` between phases; `phase-gate-precondition.sh` reads cycle-state to validate that the next subagent invocation matches the expected order.
+
+Use this when you want every gate active (recommended for autonomous cycles). Use the in-line skill loop when you need tighter control or are debugging.
 
 ## Agents
 

@@ -7,7 +7,7 @@
     "cycle_1_or_low_goal": "opus",
     "cycle_4_plus_mature": "haiku"
   },
-  "_design_notes": "v8.13.0 orchestrator subagent profile. SCAFFOLDING ONLY — without the v8.13.1 run-cycle.sh deterministic driver, this profile is not yet invoked by anything. It lands now so that when v8.13.1 wires the spawner, the profile is ready. allowed_tools is intentionally narrow: orchestrator can RUN scripts (via Bash(bash scripts/...:*)) but cannot Edit/Write source code (that's Builder's job inside a worktree) and cannot directly invoke git commit/push/gh release create (must go through scripts/ship.sh which the ship-gate hook allowlists).",
+  "_design_notes": "v8.13.1 orchestrator subagent profile. The orchestrator subagent is spawned by scripts/run-cycle.sh and constrained by three PreToolUse hooks (ship-gate, phase-gate-precondition, role-gate). allowed_tools is intentionally narrow: orchestrator can RUN scripts (via Bash(bash scripts/...:*)) but cannot Edit/Write source code (that's Builder's job inside a worktree — role-gate enforces) and cannot directly invoke git commit/push/gh release create (must go through scripts/ship.sh which ship-gate allowlists). Phase ordering is enforced by phase-gate-precondition: subagent-run.sh invocations must respect the Scout→Builder→Auditor sequence in cycle-state.json. v8.13.1 audit MEDIUM-1 fix: cycle-state.sh permissions are restricted to {advance,set-agent,get,exists,dump,path} subcommands; init+clear are denied so the orchestrator cannot self-disable the gates by removing cycle-state.json. run-cycle.sh's parent process (NOT the orchestrator subagent) handles init/clear lifecycle.",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -21,6 +21,16 @@
     "Bash(bash scripts/cycle-health-check.sh:*)",
     "Bash(bash scripts/verify-eval.sh:*)",
     "Bash(bash scripts/record-failure-to-state.sh:*)",
+    "Bash(bash scripts/cycle-state.sh advance:*)",
+    "Bash(bash scripts/cycle-state.sh set-agent:*)",
+    "Bash(bash scripts/cycle-state.sh get:*)",
+    "Bash(bash scripts/cycle-state.sh exists:*)",
+    "Bash(bash scripts/cycle-state.sh exists)",
+    "Bash(bash scripts/cycle-state.sh dump:*)",
+    "Bash(bash scripts/cycle-state.sh dump)",
+    "Bash(bash scripts/cycle-state.sh path:*)",
+    "Bash(bash scripts/cycle-state.sh path)",
+    "Bash(bash scripts/run-cycle.sh:*)",
     "Bash(scripts/guards-test.sh:*)",
     "Bash(scripts/subagent-run-test.sh:*)",
     "Bash(scripts/ship-integration-test.sh:*)",
@@ -51,6 +61,10 @@
     "Edit(.evolve/runs/cycle-*/handoff-orchestrator.json)"
   ],
   "disallowed_tools": [
+    "Bash(bash scripts/cycle-state.sh clear:*)",
+    "Bash(bash scripts/cycle-state.sh clear)",
+    "Bash(bash scripts/cycle-state.sh init:*)",
+    "Bash(bash scripts/cycle-state.sh init)",
     "Bash(git commit:*)",
     "Bash(git commit)",
     "Bash(git push:*)",

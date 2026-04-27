@@ -2,6 +2,76 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.1] - 2026-04-27
+
+### Trust boundary completed: role-gate + phase-gate-precondition + run-cycle.sh
+
+v8.13.0 shipped the atomic ship-gate (`scripts/ship.sh` allowlist on Bash). v8.13.1 adds the two remaining structural gates and a declarative cycle driver, completing the trust-boundary the user originally requested ("orchestrator should only execute phases, can't interfere"):
+
+- **`scripts/guards/role-gate.sh`** (NEW, ~190 lines) — PreToolUse hook on `Edit|Write`. Reads `.evolve/cycle-state.json` and enforces a per-phase write allowlist:
+  - `calibrate`/`research`/`discover` → workspace only
+  - `build` → workspace + active worktree
+  - `audit` → audit-report.md + handoff-auditor.json
+  - `ship` → version-bump files only (plugin.json, marketplace.json, CHANGELOG.md, README.md, SKILL.md)
+  - `learn` → orchestrator-report.md + lessons/*.yaml + state.json
+
+  Always allows `/tmp/`, `/var/folders/`, `$HOME/.claude/`. Transparent passthrough when no cycle is in progress. Bypass: `EVOLVE_BYPASS_ROLE_GATE=1`.
+
+- **`scripts/guards/phase-gate-precondition.sh`** (NEW, ~150 lines) — Second PreToolUse hook on Bash matcher (after ship-gate). Triggers ONLY for `bash scripts/subagent-run.sh <agent> ...` invocations. Reads cycle-state.phase and denies invocations that don't match the expected next agent (Scout→Builder→Auditor sequence). Bypass: `EVOLVE_BYPASS_PHASE_GATE=1`.
+
+- **`scripts/run-cycle.sh`** (NEW, ~170 lines) — Convenience driver. Picks next cycle ID, initializes cycle-state.json, spawns orchestrator subagent under its profile-restricted permissions. Includes `--dry-run` for inspection. Cleans up cycle-state on exit (success or failure).
+
+- **`scripts/cycle-state.sh`** (NEW, ~150 lines) — Helpers (`init`/`advance`/`set-agent`/`get`/`clear`/`exists`/`dump`/`path`) for `.evolve/cycle-state.json`. Atomic mv-of-temp-file updates. Schema: cycle_id, phase, started_at, phase_started_at, active_agent, active_worktree, completed_phases, workspace_path.
+
+- **`agents/evolve-orchestrator.md`** (NEW, ~80 lines) — Orchestrator subagent prompt. Sequences Scout→Builder→Auditor; on PASS invokes ship.sh; on FAIL/WARN invokes record-failure-to-state.sh (no inline retrospective per v8.12.3 design pivot). Cannot edit source code, commit, or push (kernel hooks block).
+
+### Tests
+
+- `scripts/role-gate-test.sh` — 20 tests covering all phases + always-safe paths + bypass + malformed state + relative-path resolution.
+- `scripts/phase-gate-precondition-test.sh` — 15 tests covering trigger detection, per-phase allowlist, re-spawn, no-cycle passthrough, bypass.
+- `scripts/guards-test.sh` — 34 tests (unchanged from v8.13.0 RC5).
+
+Combined: **69/69 unit tests pass**.
+
+### Modified
+
+- `.claude/settings.json` — wires role-gate.sh on `Edit|Write`, adds phase-gate-precondition.sh as second hook on Bash matcher.
+- `.evolve/profiles/orchestrator.json` — allows `Bash(bash scripts/cycle-state.sh:*)` and `Bash(bash scripts/run-cycle.sh:*)`. Updated `_design_notes` (no longer "scaffolding only").
+- `skills/evolve-loop/SKILL.md` — documents `bash scripts/run-cycle.sh` as the declarative alternative.
+- `skills/evolve-loop/phases.md` — documents cycle-state.json + the three kernel hooks at every transition.
+
+### Removed (branch cleanup)
+
+- `feat/orchestrator-as-subagent` — superseded by v8.13.0 (clean rewrite). 1 unmerged WIP commit `8bc2759` discarded.
+- `feat/v8.13.0-ship-gate` — already merged into main as `ca5a5e3`. Local cleanup only.
+
+### Why this is the right v8.13.1
+
+The trust-boundary the user requested at session start is now structurally enforced by allowlist-shaped gates (parser-bypass arms races converge on enumeration, allowlists converge on canonical paths):
+
+- **ship-gate (v8.13.0)** — canonical-script-allowlist
+- **role-gate (v8.13.1)** — path-allowlist, per-phase
+- **phase-gate-precondition (v8.13.1)** — sequence-allowlist
+
+The architectural pattern is now consistent across all three gates. Same test discipline as v8.13.0: every gate ships with a unit-test suite that exercises both ALLOW and DENY paths plus the bypass env var.
+
+### v8.13.1 audit RC1 follow-ups (incorporated before ship)
+
+- **MEDIUM-1 fix**: orchestrator profile narrowed from `Bash(bash scripts/cycle-state.sh:*)` to specific subcommands `{advance, set-agent, get, exists, dump, path}`. The `init` and `clear` subcommands are now in `disallowed_tools`, preventing the orchestrator subagent from silently disabling the v8.13.1 gates by removing `cycle-state.json`. `run-cycle.sh`'s parent process owns the init/clear lifecycle.
+- **LOW-2 fix**: `role-gate.sh` strips trailing slash from `ACTIVE_WT` and `WORKSPACE_PATH` after reading from cycle-state.json. Defensive trim against caller-supplied trailing-slash paths. New unit test (Test 21) covers this.
+- **LOW-1**: canonicalize() docstring is cosmetic; deferred (no behavior change).
+- **LOW-3**: run-cycle.sh dry-run log message wording is cosmetic; deferred.
+- **LOW-4**: malformed cycle-state fail-open is intentional graceful degradation; cycle-health-check audit-time assertion deferred to v8.13.2.
+
+### Out of scope (deferred to v8.13.2 / v8.14.0+)
+
+- Cycle-state staleness detection (interrupted cycles leaving cycle-state.json behind).
+- Cross-machine state sync (single-machine assumption holds).
+- True orchestrator-as-subprocess (run-cycle.sh delegates to a `claude -p` subagent that itself spawns more subprocesses; this works but adds 1 layer of subprocess overhead).
+- Audit-time check that "if cycle is in progress, cycle-state.json must parse" (LOW-4 follow-up).
+
+---
+
 ## [8.13.0] - 2026-04-27
 
 ### **BREAKING — atomic ship-gate via canonical `scripts/ship.sh`**
