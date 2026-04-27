@@ -174,6 +174,17 @@ generate_macos_sandbox_profile() {
 (allow file-read* (subpath "/dev"))
 ; Claude needs to read user config (auth, settings) and write its own session/cache state
 (allow file-read* (subpath "$HOME"))
+; /tmp and /var/folders need BOTH read and write — claude -p writes bash tool
+; output files (e.g. /tmp/claude-${UID}/<project>/<session>/tasks/*.output) and
+; then reads them back to return the result to the LLM. Without read access
+; the read fails with EPERM, which presented in cycles 8121-8128 audits as
+; "Bash command execution was blocked" / "another Claude Code process deleted
+; it during startup cleanup". Root cause was sandbox-exec's missing read rule,
+; not concurrent-session collision. v8.12.4 fix.
+(allow file-read* (subpath "/tmp"))
+(allow file-read* (subpath "/private/tmp"))
+(allow file-read* (subpath "/var/folders"))
+(allow file-read* (subpath "/private/var/folders"))
 (allow file-write* (subpath "/private/tmp"))
 (allow file-write* (subpath "/tmp"))
 (allow file-write* (subpath "/var/folders"))

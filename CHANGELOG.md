@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.12.4] - 2026-04-27
+
+### Fixed — EPERM on bash tool output files (5-cycle hunt resolved)
+
+The macOS sandbox-exec profile in `scripts/cli_adapters/claude.sh` was missing read permissions on the tmp paths it allowed writes to. When `claude -p` wrote a bash tool's output to `/tmp/claude-${UID}/<project>/<session>/tasks/<id>.output` (write permitted), then attempted to read it back to return the result to the LLM, the read was denied — surfacing as `EPERM`.
+
+The model frequently misread this as "another Claude Code process deleted the file during startup cleanup" — which led to two failed attempts in v8.12.3 (TMPDIR override RC3, auto-worktree RC4) targeting concurrent-session collision instead of the actual sandbox gap. Both reverted in v8.12.3 RC5.
+
+**Root cause confirmed empirically** by inspecting `/tmp/claude-501/` directly — concurrent sessions already get unique session-UUID subdirs. Then `grep "(allow file-read.*tmp" claude.sh` returned zero matches. The bug was 100% sandbox-side.
+
+**Fix**: 4 new `(allow file-read* (subpath ...))` rules added before the existing write rules in `generate_macos_sandbox_profile()`:
+
+```scheme
+(allow file-read* (subpath "/tmp"))
+(allow file-read* (subpath "/private/tmp"))
+(allow file-read* (subpath "/var/folders"))
+(allow file-read* (subpath "/private/var/folders"))
+```
+
+### Empirical impact on audit latency
+
+The cycle 8129 audit was the first v8.12.x audit where bash commands actually worked. Comparison:
+
+| Audit | Bash works | Turns | Duration | Cost |
+|---|---|---|---|---|
+| Cycle 8128 (v8.12.3) | ✗ EPERM | 27 | 188s | $0.57 |
+| **Cycle 8129 (v8.12.4)** | ✅ | **15** | **119s** | **$0.38** |
+
+**44% fewer turns, 37% faster, 33% cheaper** — without changing token counts or audit prompts. The auditor no longer has to compensate for missing bash by individually reading every source file; it can grep and run scripts directly.
+
+### What this resolves
+
+- All v8.12.x audits (cycles 8121, 8121-v8121, 8122, 8124, 8126, 8127, 8128) reported variations of "Bash command execution was blocked by EPERM" / "another Claude Code process deleted it during startup cleanup". All now obsolete.
+- The "known issue, deferred to v8.12.4" footnote in v8.12.3's CHANGELOG and `subagent-run.sh:295-313` docstring now have a fix shipped.
+
+### Audit
+
+Cycle 8129 (Sonnet, 119s, 15 turns, $0.38). Verdict: **PASS**. The empirical EPERM test passed: 3 independent bash calls succeeded with zero EPERM. One LOW finding (auditor profile doesn't include `Bash(bash scripts/subagent-run-test.sh:*)` in allowlist, so the test-run criterion was unverifiable — bash itself works, the gap is profile scope, not EPERM). No MEDIUM+ defects.
+
+### Note
+
+The 5-cycle journey (RC3 TMPDIR → RC4 auto-worktree → RC5 revert → 8128 PASS without fix → v8.12.4 actual fix) is itself a documented case of how an error message can mislead the diagnostic process. The audit reports' consistent "concurrent process deleted file" framing was a hallucinated explanation that anchored two iterations of work toward the wrong layer. The fix only became visible after both bad fixes were reverted AND the sandbox profile was inspected directly.
+
 ## [8.12.3] - 2026-04-27
 
 ### Added — Token economy: subagent prompt prefix reduced ~75%
