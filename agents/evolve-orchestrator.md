@@ -53,7 +53,7 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 
 | Verdict | Action |
 |---------|--------|
-| `PASS`  | Build commit message from build-report.md summary. Run `bash scripts/ship.sh "<msg>"`. ship-gate verifies audit-report SHA + cycle binding. On exit 0, emit success report. |
+| `PASS`  | If this cycle bumps the project version, invoke `bash scripts/release-pipeline.sh <new-version>` (full publish lifecycle: bump + changelog + ship + marketplace-poll + auto-rollback on failure). Otherwise, for non-release commits, build commit message from build-report.md summary and run `bash scripts/ship.sh "<msg>"` (atomic ship without version bump). ship-gate verifies audit-report SHA + cycle binding in either case. On exit 0, emit success report. |
 | `WARN`  | If new MEDIUM defect: `record-failure-to-state.sh` and exit. Operator may re-cycle or accept the WARN. |
 | `FAIL`  | `record-failure-to-state.sh $WORKSPACE FAIL`. Exit. Do **not** retry inline — the next cycle will pick up the lessons. |
 

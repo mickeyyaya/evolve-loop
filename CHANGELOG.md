@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.2] - 2026-04-27
+
+### Self-healing release pipeline
+
+The /insights audit flagged "release_publish" as the #1 friction class — silent stale-marketplace failures, ambiguous "publish" semantics, cache-refresh ordering bugs, no rollback on failure. v8.13.2 introduces a single declarative entry point that owns the entire release lifecycle and auto-rolls-back on any post-push failure.
+
+### Added
+
+- **`scripts/release-pipeline.sh`** (~280 lines) — top-level orchestrator. Sequences pre-flight → bump → changelog → consistency-check → ship → marketplace-poll → cache-refresh. On any post-push failure, auto-invokes `rollback.sh` (deletes GitHub release + remote tag, creates revert commit). Writes a per-publish journal at `.evolve/release-journal/<version>-<ts>.json` for rollback to consult. Supports `--dry-run`, `--no-rollback`, `--skip-tests`, `--max-poll-wait-s`.
+- **`scripts/release/preflight.sh`** (~190 lines) — pre-flight gate. Checks: clean working tree, branch attached, target-version is a valid semver bump, audit ledger has a recent (<7d) PASS verdict, all four gate-test suites green.
+- **`scripts/release/version-bump.sh`** (~140 lines) — atomic version updater for `plugin.json`, `marketplace.json` (`.plugins[0].version` path), `SKILL.md` heading, `README.md` "Current" + history row. Idempotent.
+- **`scripts/release/changelog-gen.sh`** (~150 lines) — conventional-commits parser. Buckets `feat:`/`fix:`/`refactor:`/`perf:`/`docs:` plus an explicit `### Other` fallback for the ~40% of historical commits without prefixes. Idempotent — preserves manually-curated entries.
+- **`scripts/release/marketplace-poll.sh`** (~150 lines) — post-publish marketplace propagation verifier. Polls `~/.claude/plugins/marketplaces/evolve-loop/` for up to 5 minutes (configurable via `--max-wait-s`). On convergence, re-invokes `release.sh <target>` to refresh `installed_plugins.json` registry. **Closes the cache-refresh ordering bug** by sequencing release.sh-refresh AFTER convergence, never before.
+- **`scripts/release/rollback.sh`** (~190 lines) — auto-revert. Reads release journal. Three independently-auditable steps: (a) `gh release delete vX.Y.Z`, (b) `git push origin :refs/tags/vX.Y.Z`, (c) revert commit pushed via `EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh "revert: ..."`. Logs every step to `.evolve/release-rollbacks.jsonl` for audit trail.
+- **`docs/release-protocol.md`** (~250 lines) — canonical vocabulary doc. Defines push, tag, release, propagate, publish, ship. Operational runbook with annotated examples. Conventional-commits guide. Marketplace topology diagram. Common failure modes table.
+- **5 new test suites** (54 tests total): `preflight-test.sh` (10), `changelog-gen-test.sh` (14), `marketplace-poll-test.sh` (10), `rollback-test.sh` (8), `release-pipeline-test.sh` (12). Includes explicit regression tests for **the cache-refresh ordering bug** (Test 9 of release-pipeline-test) and **the stale-version regression** (Test 3 of marketplace-poll-test, Test 10 of release-pipeline-test).
+
+### Changed
+
+- **`agents/evolve-orchestrator.md`** — verdict→PASS branch now invokes `release-pipeline.sh <new-version>` for version-bumping releases (vs. direct `ship.sh` for non-release commits).
+- **`skills/evolve-loop/SKILL.md`** — Phase 5 description points at `release-pipeline.sh` as the canonical publish entry point. New v8.13.2 callout in the front-matter.
+- **`.evolve/profiles/orchestrator.json`** — allows `Bash(bash scripts/release-pipeline.sh:*)` and the five `scripts/release/*.sh` components.
+- **`CLAUDE.md`** — replaced "Release Checklist" section with "Release & Publish Workflow" pointing at the protocol doc and the pipeline.
+
+### Documentation
+
+- New `docs/release-protocol.md` is the canonical answer to "what does publish mean?"
+
+### Test Results
+
+131/131 pass: 54 new (preflight 10 + changelog-gen 14 + marketplace-poll 10 + rollback 8 + release-pipeline 12) + 77 v8.13.x regression suites (role-gate 21 + phase-gate-precondition 15 + guards 34 + ship-integration 7).
+
+### Architectural pattern (consistent with v8.13.0/v8.13.1)
+
+Every component:
+- Has a `--dry-run` mode that mutates nothing.
+- Is independently testable (each ships with its own unit-test suite).
+- Composes through a thin top-level orchestrator (no logic duplication).
+- Calls existing `ship.sh` for the actual atomic git ops (the v8.13.0 audit-binding contract is preserved unchanged).
+
+### v8.13.2 audit RC1 follow-ups (incorporated before ship)
+
+- **MEDIUM-1 fix**: `scripts/release/rollback.sh` now exits 1 (not 0) when any cleanup step (`gh release delete`, remote tag delete) explicitly fails, even if the revert commit succeeds. Pre-fix logic only consulted step3 — masking dangling-release incidents during partial-failure rollbacks. Regression test added (`rollback-test.sh` Test 9): simulates `gh release delete` returning non-zero, asserts exit 1 and a journal entry with `release_delete:"failed"`.
+- **LOW-1**: preflight.sh `parse_semver` discards `[+-]suffix` (e.g., `1.0.0-rc1` → "1 0 0"). Project does not use pre-release versions; deferred. Documented as design choice.
+- **LOW-2**: marketplace-poll.sh swallows `git fetch`/`git reset --hard` errors. Trade-off: retry-on-transient-failure semantics; deferred.
+
+### Out of scope (deferred to v8.13.3 / v8.14.x)
+
+- CDN-based marketplace propagation (current is git-based local).
+- Cross-machine cache invalidation.
+- Auto-incrementing semver from commit types.
+- Pre-release / RC channels (`vX.Y.Z-rc1`) — preflight.sh semver fix needed if adopted.
+- Slack/email notifications on rollback.
+
+---
+
 ## [8.13.1] - 2026-04-27
 
 ### Trust boundary completed: role-gate + phase-gate-precondition + run-cycle.sh

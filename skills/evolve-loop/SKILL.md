@@ -10,6 +10,8 @@ argument-hint: "[cycles] [strategy] [goal]"
 
 > **v8.13.1**: trust boundary now enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `scripts/ship.sh` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `bash scripts/run-cycle.sh [GOAL]` — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
 
+> **v8.13.2**: self-healing release pipeline. For version-bump releases, prefer `bash scripts/release-pipeline.sh <version>` over direct `ship.sh`. The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `ship.sh`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
+
 ## Shared Agent Values
 
 The following JSON block is the canonical state initialization for the evolve-loop. Agents must use these field names when reading from or writing to `state.json`.
@@ -108,7 +110,7 @@ Utility:   SEARCH ─── intent-aware web search engine    → smart-web-sear
 Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
 Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
 Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
-Phase 5:   SHIP ────── commit + push                    → phase5-ship.md
+Phase 5:   SHIP ────── publish via release-pipeline.sh   → phase5-ship.md (or scripts/ship.sh for non-release commits)
 Phase 6:   LEARN ───── instinct extraction + feedback   → phase6-learn.md
 Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-meta.md
 ```
