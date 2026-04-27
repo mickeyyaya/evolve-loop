@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.12.1] - 2026-04-27
+
+### Fixed
+- **`scripts/cli_adapters/claude.sh`** — two latent v8.12.0 adapter bugs:
+  1. **Tool-pattern word-split**: `Bash(python -m pytest:*)` and similar patterns containing spaces were word-split when passed via `--allowedTools $JOINED_STRING`, producing tokens like `Bash(python` and `-m`. Claude's CLI parser rejected `-m` as an unknown flag (`error: unknown option '-m'`), silently breaking the auditor profile. The runner's `--validate-profile` path didn't catch it because validate-only never invokes `claude` — it only constructs the command line. Fix: read JSON arrays into bash arrays via portable `while IFS= read -r line; do … done < <(jq -r '.field[]?' …)` (bash 3.2 compatible — macOS default shell), then pass with `CMD+=(--allowedTools "${ALLOWED_TOOLS[@]}")` so each pattern survives shell tokenization as its own argv element.
+  2. **`--bare` blocks OAuth auth**: `claude --bare` per `claude --help` "is strictly ANTHROPIC_API_KEY or apiKeyHelper via --settings (OAuth and keychain are never read)". Most Claude Code users authenticate via OAuth (no `ANTHROPIC_API_KEY` env var), so subagent subprocesses launched with `--bare` returned `"Not logged in · Please run /login"`. Fix: drop `--bare` automatically when `ANTHROPIC_API_KEY` is unset; emit WARN to stderr; `EVOLVE_FORCE_BARE=1` retains it for users who do have the API key set.
+
+### Audit
+- Reviewed by Auditor subagent (cycle 8121-v8121, model: opus, sandbox-exec macOS). Verdict: **PASS** — all 6 acceptance criteria verified, 3 LOW non-blocking observations, 0 MEDIUM+ defects.
+
+### Deferred
+- The orchestrator-as-subagent + ship-gate hook + Python shlex parser work tested in this cycle on `feat/orchestrator-as-subagent` (commit `8bc2759`) returned FAIL on two audits (cycle 8121, 8122) due to parser bypasses (D1 bare-newline, D2 pipe-to-sh, D3 here-string) and a workflow regression (D6: `git push` denied after `git commit` due to HEAD movement). That work is parked for v8.13.0, where it will land alongside the deterministic `run-cycle.sh` driver and `role-gate.sh` / `phase-gate-precondition.sh`. Failed-cycle retrospective + lessons-learned pipeline planned as v8.12.2.
+
 ## [8.12.0] - 2026-04-27
 
 ### Added

@@ -40,22 +40,36 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 # --- Read profile fields -----------------------------------------------------
-ALLOWED_TOOLS=$(jq -r '.allowed_tools | join(" ")' "$PROFILE_PATH")
-DISALLOWED_TOOLS=$(jq -r '.disallowed_tools | join(" ")' "$PROFILE_PATH")
+# CRITICAL: Tool patterns may contain spaces (e.g., "Bash(python -m pytest:*)",
+# "Bash(git status)"). They MUST be passed to claude as separate argv elements
+# with each element internally preserving its spaces — otherwise bash word-
+# splitting on `--allowedTools $JOINED_STRING` produces tokens like `Bash(python`
+# and `-m`, the latter of which claude's CLI parser interprets as an unknown
+# short option ("error: unknown option '-m'"). v8.12.0 shipped with that bug
+# silently — validate-profile didn't catch it because it never executes claude.
+# Portable array population (mapfile is bash 4+; macOS default bash is 3.2).
+ALLOWED_TOOLS=()
+DISALLOWED_TOOLS=()
+ADD_DIRS_ARR=()
+EXTRA_FLAGS_ARR=()
+while IFS= read -r line; do [ -n "$line" ] && ALLOWED_TOOLS+=("$line"); done < <(jq -r '.allowed_tools[]?' "$PROFILE_PATH")
+while IFS= read -r line; do [ -n "$line" ] && DISALLOWED_TOOLS+=("$line"); done < <(jq -r '.disallowed_tools[]?' "$PROFILE_PATH")
+while IFS= read -r line; do [ -n "$line" ] && ADD_DIRS_ARR+=("$line"); done < <(jq -r '.add_dir[]?' "$PROFILE_PATH")
+while IFS= read -r line; do [ -n "$line" ] && EXTRA_FLAGS_ARR+=("$line"); done < <(jq -r '.extra_flags[]?' "$PROFILE_PATH")
 MAX_BUDGET=$(jq -r '.max_budget_usd' "$PROFILE_PATH")
 MAX_TURNS=$(jq -r '.max_turns' "$PROFILE_PATH")
 PERMISSION_MODE=$(jq -r '.permission_mode' "$PROFILE_PATH")
-EXTRA_FLAGS=$(jq -r '.extra_flags | join(" ")' "$PROFILE_PATH")
 
 # Resolve add_dir, substituting {worktree_path} placeholder if present.
-ADD_DIRS=$(jq -r '.add_dir | join(" ")' "$PROFILE_PATH")
-if [[ "$ADD_DIRS" == *"{worktree_path}"* ]]; then
-    if [ -z "${WORKTREE_PATH:-}" ]; then
-        echo "claude.sh: ERROR: profile references {worktree_path} but WORKTREE_PATH is unset" >&2
-        exit 2
+for i in "${!ADD_DIRS_ARR[@]}"; do
+    if [[ "${ADD_DIRS_ARR[$i]}" == *"{worktree_path}"* ]]; then
+        if [ -z "${WORKTREE_PATH:-}" ]; then
+            echo "claude.sh: ERROR: profile references {worktree_path} but WORKTREE_PATH is unset" >&2
+            exit 2
+        fi
+        ADD_DIRS_ARR[$i]="${ADD_DIRS_ARR[$i]//\{worktree_path\}/$WORKTREE_PATH}"
     fi
-    ADD_DIRS="${ADD_DIRS//\{worktree_path\}/$WORKTREE_PATH}"
-fi
+done
 
 # --- Build command -----------------------------------------------------------
 declare -a CMD
@@ -68,26 +82,42 @@ if [[ "$MAX_BUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$MAX_BUDGET > 0" | b
     CMD+=(--max-budget-usd "$MAX_BUDGET")
 fi
 
-# Allowed/disallowed tools — pass as space-separated list per `claude -p --help`.
-if [ -n "$ALLOWED_TOOLS" ] && [ "$ALLOWED_TOOLS" != "null" ]; then
-    # shellcheck disable=SC2086
-    CMD+=(--allowedTools $ALLOWED_TOOLS)
+# Allowed/disallowed tools — each pattern as its own argv element so spaces
+# inside parentheses survive shell tokenization.
+if [ "${#ALLOWED_TOOLS[@]}" -gt 0 ]; then
+    CMD+=(--allowedTools "${ALLOWED_TOOLS[@]}")
 fi
-if [ -n "$DISALLOWED_TOOLS" ] && [ "$DISALLOWED_TOOLS" != "null" ]; then
-    # shellcheck disable=SC2086
-    CMD+=(--disallowedTools $DISALLOWED_TOOLS)
-fi
-
-# Add-dir(s) — claude accepts multiple values after the flag.
-if [ -n "$ADD_DIRS" ] && [ "$ADD_DIRS" != "null" ]; then
-    # shellcheck disable=SC2086
-    CMD+=(--add-dir $ADD_DIRS)
+if [ "${#DISALLOWED_TOOLS[@]}" -gt 0 ]; then
+    CMD+=(--disallowedTools "${DISALLOWED_TOOLS[@]}")
 fi
 
-# Extra flags (--bare, --no-session-persistence, etc.)
-if [ -n "$EXTRA_FLAGS" ] && [ "$EXTRA_FLAGS" != "null" ]; then
-    # shellcheck disable=SC2086
-    CMD+=($EXTRA_FLAGS)
+# Add-dir(s) — each path as its own argv element.
+if [ "${#ADD_DIRS_ARR[@]}" -gt 0 ]; then
+    CMD+=(--add-dir "${ADD_DIRS_ARR[@]}")
+fi
+
+# Extra flags (--bare, --no-session-persistence, etc.) — already valid CLI flags.
+# CAVEAT: `--bare` makes claude refuse to read OAuth/keychain credentials,
+# requiring ANTHROPIC_API_KEY in the env. Most Claude Code users authenticate
+# via OAuth (no env var). Dropping --bare for those users so the subagent can
+# authenticate. The remaining isolation flags (--no-session-persistence,
+# --strict-mcp-config, --exclude-dynamic-system-prompt-sections) still apply.
+# Override with EVOLVE_FORCE_BARE=1 if you do have ANTHROPIC_API_KEY set.
+if [ "${#EXTRA_FLAGS_ARR[@]}" -gt 0 ]; then
+    if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ "${EVOLVE_FORCE_BARE:-0}" != "1" ]; then
+        FILTERED=()
+        for flag in "${EXTRA_FLAGS_ARR[@]}"; do
+            if [ "$flag" = "--bare" ]; then
+                echo "[claude-adapter] WARN: dropping --bare (no ANTHROPIC_API_KEY); set EVOLVE_FORCE_BARE=1 to retain" >&2
+                continue
+            fi
+            FILTERED+=("$flag")
+        done
+        EXTRA_FLAGS_ARR=("${FILTERED[@]}")
+    fi
+    if [ "${#EXTRA_FLAGS_ARR[@]}" -gt 0 ]; then
+        CMD+=("${EXTRA_FLAGS_ARR[@]}")
+    fi
 fi
 
 # Working directory: worktree for Builder, repo root for everyone else.
