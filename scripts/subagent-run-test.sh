@@ -34,7 +34,7 @@ header() { echo; echo "=== $* ==="; TESTS_TOTAL=$((TESTS_TOTAL + 1)); }
 
 # --- Test 1: validate every profile ------------------------------------------
 header "Test 1: --validate-profile succeeds for every shipped profile"
-for agent in scout builder auditor inspirer evaluator; do
+for agent in scout builder auditor inspirer evaluator retrospective; do
     if [ "$agent" = "builder" ]; then
         # Builder profile uses {worktree_path}; provide a stub.
         if WORKTREE_PATH="$REPO_ROOT" bash "$RUNNER" --validate-profile "$agent" >/dev/null 2>&1; then

@@ -76,17 +76,66 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
 
    Each instinct must be specific and actionable. "Code should be clean" is useless. "This codebase uses barrel exports in index.ts — always add new exports there" is useful.
 
-4c. **Failure Root Cause Attribution** (for FAILED tasks only):
-   For each task that failed this cycle:
-   1. **Classify** the error into one of 5 categories:
-      - `planning` — wrong task scope or approach selected
-      - `tool-use` — wrong tool invocation or misconfigured command
-      - `reasoning` — incorrect conclusion or logic error
-      - `context` — stale, missing, or wrong context provided
-      - `integration` — individually correct steps combine incorrectly
-   2. **Attribute** to the specific agent step from build-report.md `Build Steps` table
-   3. **Record** in state.json `failedApproaches` with `errorCategory` and `failedStep` fields
-   4. If 3+ failures share the same `errorCategory` across last 5 cycles → flag as systemic issue
+4c. **Failure Root Cause Attribution** (for `FAIL` / `WARN` / `SHIP_GATE_DENIED` cycles — the "failed-path" branch):
+
+   **REQUIRED:** Invoke the `evolve-retrospective` subagent. Do NOT classify failures inline in the orchestrator — this is dedicated subagent work, mirroring the Scout/Builder/Auditor pattern. Inline classification is a documented anti-pattern (see prior incident reports under `docs/reports/`).
+
+   ```bash
+   echo "$retrospective_prompt" | \
+       bash scripts/subagent-run.sh retrospective "$CYCLE" "$WORKSPACE_PATH"
+   ```
+
+   Where `$retrospective_prompt` is constructed by reading `agents/evolve-retrospective.md` and appending a context block with: `auditVerdict` (FAIL/WARN/SHIP_GATE_DENIED), `auditReportPath`, `buildReportPath`, `scoutReportPath`, `failedDiffPath` (saved `git diff HEAD` from the worktree before discard), `priorLessons` (recent lesson IDs from `.evolve/instincts/lessons/` matching this task's category), and `nextLessonId` (next monotonic ID).
+
+   The subagent runs under `.evolve/profiles/retrospective.json` — read-only across the repo, write-only within `.evolve/runs/cycle-*/retrospective-*` and `.evolve/instincts/lessons/*.yaml`. Network is disabled. Cannot mutate existing personal instincts.
+
+   **What the subagent produces:**
+
+   1. `.evolve/runs/cycle-N/retrospective-report.md` — narrative post-mortem.
+   2. `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml` — one or more failure-lesson YAMLs (one per **root cause**, not per defect).
+   3. `.evolve/runs/cycle-N/handoff-retrospective.json` — compact summary the orchestrator merges.
+
+   **Lesson YAML schema** (extends the existing instinct format):
+
+   - `id`: `inst-LXXX` (the `L` prefix distinguishes lessons from technique-instincts)
+   - `pattern`: kebab-case
+   - `description`: imperative-voice failure pattern + corrective action
+   - `confidence`: 0.5 first observation; higher only if `priorLessons` confirm pattern
+   - `source`: `cycle-N/<task-slug>`
+   - `type`: `failure-lesson`
+   - `category`: `episodic`
+   - `failureContext`: `{ cycle, task, errorCategory, failedStep, auditVerdict, auditDefects[] }`
+   - `preventiveAction`: concrete, testable instruction
+   - `relatedInstincts[]`: cross-links
+   - `contradicts[]`: prior instinct IDs this lesson invalidates
+
+   **Error-category and failed-step taxonomies** (used by the subagent):
+
+   | `errorCategory` | Meaning |
+   |---|---|
+   | `planning` | wrong task scope or approach selected |
+   | `tool-use` | wrong tool invocation or misconfigured command |
+   | `reasoning` | incorrect conclusion or logic error |
+   | `context` | stale, missing, or wrong context provided |
+   | `integration` | individually correct steps combine incorrectly |
+
+   `failedStep` is one of `scout`, `build`, `audit`.
+
+   **Orchestrator post-processing** (after retrospective subagent exits):
+
+   1. Read `handoff-retrospective.json`. Append each `lessonIds[i]` to `state.json.failedApproaches[]` with full schema (`{slug, errorCategory, failedStep, cycle, lessonId}`).
+   2. Append the new lesson IDs to `state.json.instinctSummary[]` so future Scout/Builder/Auditor agents see them in their context block.
+   3. If `handoff-retrospective.json:systemic == true` (3+ failures with same `errorCategory` across last 5 cycles), log a `SYSTEMIC_FAILURE` event in the ledger.
+   4. For each ID in `handoff-retrospective.json:contradictedInstincts[]`, the next `prune` slash-command run reduces that instinct's confidence by 0.3 and re-evaluates against the new lesson.
+
+   **Discard the worktree** *after* the retrospective writes its artifacts (it needs to read `failedDiffPath`):
+
+   ```bash
+   git diff HEAD > "$WORKSPACE_PATH/failed.patch"   # capture before discard
+   git worktree remove --force "$WORKTREE_DIR"
+   ```
+
+   The patch is preserved in the workspace for forensic review; the worktree itself is removed.
 
    Update state.json `instinctCount` and `instinctSummary`:
    ```json

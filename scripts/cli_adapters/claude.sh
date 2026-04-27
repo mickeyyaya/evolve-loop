@@ -186,9 +186,16 @@ generate_macos_sandbox_profile() {
 EOF
 
     # Per-agent write paths.
+    # When read_only_repo=true, explicitly DENY repo-wide writes BEFORE the
+    # write_subpaths allow loop. Per sandbox-exec SBPL semantics, later rules
+    # override earlier rules for overlapping subpaths — so a specific
+    # write_subpath (e.g., .evolve/runs/cycle-*) re-permits that subdirectory.
+    # The deny is belt-and-suspenders documentation of the contract: even
+    # without it, the repo is implicitly write-denied because no broader allow
+    # rule covers it. The explicit deny protects against future changes adding
+    # a broader $HOME or repo allow.
     if [ "$read_only_repo" = "true" ]; then
-        # Read-only repo mode: only the explicit write_subpaths inside the repo are writable.
-        :
+        echo "(deny file-write* (subpath \"$repo_root\"))"
     fi
     while IFS= read -r wp; do
         [ -z "$wp" ] && continue
@@ -274,15 +281,27 @@ if [ "$SANDBOX_USE" = "1" ]; then
         EXIT_CODE=$?
     elif command -v bwrap >/dev/null 2>&1; then
         REPO_ROOT_BWRAP="$(cd "$PWD" && pwd)"
-        echo "[claude-adapter] wrapping in bwrap (Linux)" >&2
-        # Read-only repo with selective writable workspace.
-        bwrap --ro-bind / / \
-              --bind "$REPO_ROOT_BWRAP/.evolve/runs" "$REPO_ROOT_BWRAP/.evolve/runs" \
-              --bind "${WORKTREE_PATH:-$REPO_ROOT_BWRAP}" "${WORKTREE_PATH:-$REPO_ROOT_BWRAP}" \
-              --tmpfs /tmp \
-              --share-net \
-              --proc /proc --dev /dev \
-              "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
+        # Re-read allow_network from the profile so the bwrap branch matches the
+        # macOS branch's network policy. Without this, --share-net was hardcoded
+        # and the profile's allow_network: false (e.g., evaluator, retrospective)
+        # was silently ignored on Linux. Equivalent to (deny network*) on macOS.
+        BWRAP_ALLOW_NETWORK=$(jq -r '.sandbox.allow_network // true' "$PROFILE_PATH" 2>/dev/null)
+        echo "[claude-adapter] wrapping in bwrap (Linux, network=$BWRAP_ALLOW_NETWORK)" >&2
+
+        # Build bwrap argv as an array so --share-net is conditionally included.
+        BWRAP_ARGS=(
+            --ro-bind / /
+            --bind "$REPO_ROOT_BWRAP/.evolve/runs" "$REPO_ROOT_BWRAP/.evolve/runs"
+            --bind "${WORKTREE_PATH:-$REPO_ROOT_BWRAP}" "${WORKTREE_PATH:-$REPO_ROOT_BWRAP}"
+            --tmpfs /tmp
+            --proc /proc --dev /dev
+        )
+        if [ "$BWRAP_ALLOW_NETWORK" = "true" ]; then
+            BWRAP_ARGS+=(--share-net)
+        else
+            BWRAP_ARGS+=(--unshare-net)
+        fi
+        bwrap "${BWRAP_ARGS[@]}" "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
         EXIT_CODE=$?
     else
         echo "[claude-adapter] WARN: sandbox requested but neither sandbox-exec (macOS) nor bwrap (Linux) available; running unwrapped" >&2

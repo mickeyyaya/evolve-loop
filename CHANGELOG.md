@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.12.2] - 2026-04-27
+
+### Added — Failed-cycle retrospective + lessons-learned pipeline
+
+- **`agents/evolve-retrospective.md`** — new failure post-mortem subagent. Fires only on Auditor `FAIL`/`WARN` or `SHIP_GATE_DENIED`. Reads cycle artifacts (audit-report, build-report, scout-report, the failed diff) and writes a structured retrospective + one or more failure-lesson YAMLs into `.evolve/instincts/lessons/`. Read-only outside the lesson directory; cannot mutate state.json, ledger, profiles, or personal instincts.
+- **`.evolve/profiles/retrospective.json`** — least-privilege permission profile. `read_only_repo: true`, `allow_network: false`. Allowed writes: only the retrospective report, handoff JSON, and lesson YAMLs. Disallows all source code mutation, git commit/push/release, all interpreter `-c`/`-e` flags, and network tools (WebFetch, WebSearch, curl, wget). Sandboxed via macOS sandbox-exec or Linux bwrap.
+- **`scripts/merge-lesson-into-state.sh`** — orchestrator post-processor. Reads `handoff-retrospective.json`, appends new lesson IDs to `state.json.instinctSummary[]` (so future Scout/Builder/Auditor agents see them in their context block via the existing channel), appends a structured `failedApproaches[]` entry, and emits a `SYSTEMIC_FAILURE` ledger event when the retrospective flagged 3+ same-error-category failures across recent cycles. The retrospective profile cannot mutate state.json directly — this helper runs under orchestrator permissions.
+- **`scripts/merge-lesson-test.sh`** — 7-check smoke test (no-op on missing handoff, single-lesson merge, failedApproaches append, missing-YAML integrity exit 2, SYSTEMIC_FAILURE ledger event, malformed-handoff exit 1, multi-lesson merge).
+- **`.evolve/instincts/lessons/.keep`** — directory marker so the lessons directory ships with the plugin. Per-project lesson YAMLs (`inst-L*.yaml`) remain gitignored.
+- **`scripts/subagent-run.sh`**: registered `retrospective` as a recognized agent role. Updated header docs and usage text.
+- **`scripts/subagent-run-test.sh`**: extended Test 1 to validate the retrospective profile (now 11/11 from 10/10).
+
+### Changed — Skill docs document the explicit FAIL branch
+
+- **`skills/evolve-loop/phase6-learn.md`** § 4c rewritten to invoke the `evolve-retrospective` subagent (mirroring Scout/Builder/Auditor pattern) instead of doing classification inline. Documents lesson schema, error-category taxonomy (`planning` / `tool-use` / `reasoning` / `context` / `integration`), failed-step taxonomy, and orchestrator post-processing. Heading explicitly lists `FAIL` / `WARN` / `SHIP_GATE_DENIED` (was ambiguous "FAILED tasks only").
+- **`skills/evolve-loop/phases.md`** audit-to-ship transition: PASS → ship; `WARN`, `FAIL`, or `SHIP_GATE_DENIED` → drop work via `git worktree remove --force`, run retrospective, do NOT commit.
+- **`agents/evolve-auditor.md`** Verdict Rules: added "Downstream consumer note" instructing the Auditor to write per-defect root causes (not just symptoms), use consistent severity labels and IDs, and name contradicted prior instincts so the retrospective can propagate them via the lesson's `contradicts` field.
+
+### Fixed — sandbox enforcement bugs (also affects all v8.12.0+ profiles with `read_only_repo: true`)
+
+- **`scripts/cli_adapters/claude.sh`**: the `read_only_repo: true` branch in the macOS sandbox profile generator was a `:` placeholder. Replaced with `echo "(deny file-write* (subpath \"$repo_root\"))"` — emitted before the `write_subpaths` allow loop so per-agent allows correctly override (SBPL last-match-wins). Belt-and-suspenders against future broader allow rules; the auditor, evaluator, scout, and retrospective profiles all benefit.
+- **`scripts/cli_adapters/claude.sh`**: the Linux bwrap branch hard-coded `--share-net`, ignoring `allow_network: false` in profiles. Replaced with conditional `--share-net` (when true) / `--unshare-net` (when false). Now mirrors the macOS branch's network policy. The retrospective profile's stated guarantee ("network is disabled") is now actually enforced on Linux.
+- **`scripts/merge-lesson-into-state.sh`**: removed unused `mapfile_compat` function.
+- **`.evolve/profiles/retrospective.json`**: removed extraneous `Write(.evolve/runs/cycle-*/retrospective-stdout.log)` allow — the runner adapter writes stdout via redirection, not the subagent.
+
+### Audit
+
+- RC1 (Sonnet): WARN — 3 MEDIUM defects (sandbox enforcement bug, Linux bwrap network gap, ambiguous heading). All 9 acceptance criteria PASS otherwise.
+- RC2 (Sonnet): PASS — all 5 defects (3 MEDIUM + 2 LOW) verified fixed; 0 new defects introduced; pre-existing LOW-bwrap-bind-coverage flagged for v8.13.0 backlog.
+
+### Notes
+
+- v8.12.0's `read_only_repo: true` flag was advertised as enforcement but was a no-op for ~24 hours. The flag set is now correctly enforced as of v8.12.2. No security incident is known; the implicit deny via "no allow rule covering the repo" provided defense in practice. The explicit deny added in this release is belt-and-suspenders documentation of the contract.
+
 ## [8.12.1] - 2026-04-27
 
 ### Fixed

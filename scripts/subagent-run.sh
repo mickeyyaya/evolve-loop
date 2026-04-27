@@ -14,7 +14,7 @@
 #   bash scripts/subagent-run.sh --check-token <artifact_path> <token>
 #
 # Arguments:
-#   <agent>           — one of: scout, builder, auditor, inspirer, evaluator
+#   <agent>           — one of: scout, builder, auditor, inspirer, evaluator, retrospective
 #   <cycle>           — current cycle number (integer)
 #   <workspace_path>  — absolute path to .evolve/runs/cycle-N/ for this cycle
 #
@@ -171,7 +171,7 @@ cmd_check_token() {
 
 cmd_run() {
     local agent="$1" cycle="$2" workspace="$3"
-    [[ "$agent" =~ ^(scout|builder|auditor|inspirer|evaluator)$ ]] || fail "unknown agent: $agent"
+    [[ "$agent" =~ ^(scout|builder|auditor|inspirer|evaluator|retrospective)$ ]] || fail "unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
 
@@ -330,7 +330,7 @@ Usage:
   subagent-run.sh --validate-profile <agent>
   subagent-run.sh --check-token <artifact_path> <token>
 
-Agents: scout | builder | auditor | inspirer | evaluator
+Agents: scout | builder | auditor | inspirer | evaluator | retrospective
 USAGE
     exit 1
 }

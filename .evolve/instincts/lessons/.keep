@@ -1,0 +1,8 @@
+# Failure-lesson directory
+
+Lessons in this directory are produced by the evolve-retrospective subagent
+when a cycle's audit returns FAIL or WARN. Each .yaml file describes one
+root cause of the failure plus a preventiveAction for future cycles.
+
+Schema: see agents/evolve-retrospective.md § 'Write the lesson YAML(s)'.
+Lifecycle: see skills/evolve-loop/phase6-learn.md.

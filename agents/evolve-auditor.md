@@ -229,6 +229,12 @@ Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.
 - **WARN** — MEDIUM issues but all evals pass (WARN blocks shipping)
 - **PASS** — every acceptance criterion has positive executable evidence (test output, diff hunk, or reproduction command) AND all evals pass AND no MEDIUM+ issues. Absence of MEDIUM+ issues alone is NOT sufficient — you must affirmatively cite the evidence per criterion. (See ADVERSARIAL AUDIT MODE injected at runtime by subagent-run.sh.)
 
+**Downstream consumer note:** On `FAIL` or `WARN`, the orchestrator invokes the `evolve-retrospective` subagent. That subagent reads YOUR audit report as its primary input — your defect descriptions, severities, and root-cause attributions become the seed for failure-lesson YAMLs that future Scout/Builder/Auditor agents will receive in their `instinctSummary` context. Specifically:
+
+- For each defect, write the defect's **root cause** explicitly, not just its surface symptom. The retrospective synthesizes per-defect root causes into a lesson; vague defect descriptions produce vague lessons.
+- Use consistent severity labels (`HIGH`/`MEDIUM`/`LOW`) and consistent ID prefixes (`H1`, `M1`, `L1`) so the retrospective can cite them unambiguously.
+- If you suspect a defect contradicts a prior instinct (`instinctSummary` entries with `type: failure-lesson` or `type: technique`), name the instinct ID. This propagates into the lesson's `contradicts` field and feeds the next `prune` cycle.
+
 ## Output
 
 ### Workspace File: `workspace/audit-report.md`

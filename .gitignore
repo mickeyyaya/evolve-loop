@@ -25,6 +25,14 @@ node_modules/
 !.evolve/profiles/
 .evolve/profiles/*
 !.evolve/profiles/*.json
+# ... and except the directory marker for failure-lessons. Generated lesson
+# YAMLs (inst-L*.yaml) are per-project runtime state and remain ignored, but
+# the .keep marker ships so the directory exists in fresh installs.
+!.evolve/instincts/
+.evolve/instincts/*
+!.evolve/instincts/lessons/
+.evolve/instincts/lessons/*
+!.evolve/instincts/lessons/.keep
 .claude/evolve/
 .claude/worktrees/
 .clone/
