@@ -2,6 +2,82 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.3] - 2026-04-27
+
+### /insights report improvements
+
+The `/insights` report (https://github.com/anthropics/claude-code) generated a structured analysis of friction patterns across 47 sessions / 370h / 229 commits. v8.13.3 ships the actionable improvements from that report. The "On the horizon" multi-day projects (parallel multi-agent evolve loops, autonomous bug hunter) are deferred to v8.14.x backlog.
+
+### Added
+
+- **`scripts/probe-tool.sh`** (~110 lines) — canonical CLI-availability probe. Checks `command -v`, `type -P`, plus 5 common install locations (`/usr/local/bin/`, `/opt/homebrew/bin/`, `$HOME/.local/bin/`, `$HOME/bin/`, `/usr/bin/`). Emits `--json` for scripted use. Closes the "no gws command" false-negative class — the audit caught one real instance where Claude declared `gws` unavailable when it was installed at `~/.local/bin/`. 7-test unit suite at `scripts/probe-tool-test.sh`.
+- **`scripts/postedit-validate.sh`** (~115 lines) — PostToolUse hook on `Edit|Write` that syntax-checks the modified file by extension: `.json` → `jq empty`, `.sh` → `bash -n`, `.py` → `python3 -m py_compile`. Other extensions: silent no-op. Never blocks (PostToolUse can't); emits stderr WARN visible to LLM, prompting immediate re-edit. Catches the `bash 3.2` incompat class (`declare -A`, regex `\b` truncation) at edit time instead of cycle time. 11-test unit suite at `scripts/postedit-validate-test.sh`. Bypass: `EVOLVE_BYPASS_POSTEDIT_VALIDATE=1`.
+- **`skills/publish/SKILL.md`** — slash command wrapper for `/publish`. Documents the v8.13.2 release-pipeline.sh entry point. Disambiguates "publish" from "push" with explicit vocabulary callouts.
+- **`skills/verify-release/SKILL.md`** — slash command wrapper for `/verify-release`. Standalone post-publish marketplace-poll for diagnosing stale-plugin reports.
+- **3 new memory files** for the user's auto-memory:
+  - `feedback_probe_before_unavailable.md` — the gws-not-found pattern
+  - `feedback_read_before_implement.md` — the imagined-API pattern (Builder worktrees calling functions that don't exist on target modules)
+  - `feedback_bash_3_2_compat.md` — banned bash 4+ features + required idioms
+
+### Changed
+
+- **`CLAUDE.md`** — three new top-level sections:
+  - "Verification Before Claiming Done" — three patterns (probe CLIs, read actual exports, report test counts) before declaring a task complete
+  - "Shell & Environment Conventions" — bash 3.2 target, banned features, required idioms, SSE/streaming guidance
+  - "Confirm Direction Before Multi-Cycle Work" — 3-bullet plan with success criteria for ambiguous multi-cycle requests, prevents the "25-cycle giant useless circle" failure mode
+- **`.claude/settings.json`** — added PostToolUse hook on `Edit|Write` for postedit-validate.sh. Updated `_comment` documentation.
+- **`.claude-plugin/plugin.json`** — added `./skills/publish/` and `./skills/verify-release/` to the skills array.
+
+### Tests
+
+- `scripts/probe-tool-test.sh` — 7 unit tests
+- `scripts/postedit-validate-test.sh` — 11 unit tests
+- All v8.13.x regression suites still pass (no edits to those files).
+
+### /insights items addressed (mapped to action)
+
+| /insights item | Action |
+|---|---|
+| CLAUDE.md addition: Release & Publish Workflow | Already done in v8.13.2 |
+| CLAUDE.md addition: Verification Before Claiming Done | New section in CLAUDE.md |
+| CLAUDE.md addition: Shell & Environment Conventions | New section in CLAUDE.md |
+| Custom skill: `/publish` | `skills/publish/SKILL.md` wraps release-pipeline.sh |
+| Custom skill: `/verify-release` | `skills/verify-release/SKILL.md` wraps marketplace-poll.sh |
+| Hook: PostToolUse syntax check | `scripts/postedit-validate.sh` + wired in settings.json |
+| Pattern: confirm direction before exploring | New section in CLAUDE.md |
+| Pattern: verify external state after publish | Already done by marketplace-poll.sh in v8.13.2 |
+| Pattern: probe environment before assuming missing | `scripts/probe-tool.sh` + memory `feedback_probe_before_unavailable.md` |
+| On the horizon: parallel multi-agent evolve loops | DEFERRED to v8.14.x backlog (multi-day project) |
+| On the horizon: autonomous bug hunter | DEFERRED to v8.14.x backlog (multi-day project) |
+| On the horizon: self-healing release pipeline | Already shipped as v8.13.2 |
+
+### v8.13.3 audit RC1 + RC2 follow-ups (incorporated before ship)
+
+- **MEDIUM-1 fix** (`scripts/postedit-validate.sh:33-43`): suppressed stderr from `mkdir -p` and `log()`'s `>> $GUARDS_LOG` when `.evolve/guards.log` is unwritable (auditor sandbox `read_only_repo: true`, any read-only CI). RC2's first attempt got the redirection order wrong (`>> file 2>/dev/null` opens before redirect activates → EPERM still leaks); RC3 corrects to `2>/dev/null >> file` (redirect first, then open). Test 11 of `postedit-validate-test.sh` now uses `chmod 0444` on an existing `guards.log` file (the actual auditor sandbox semantics — not `chmod -w` on a temp dir, which is a different syscall codepath that masked the RC2 bug). Same defensive pattern as ship-gate.sh and role-gate.sh. Audit cycle 8205 caught the RC2 mistake; cycle 8206 RC3 verified the fix.
+- **LOW-1 cleanup**: removed dead `probe_path()` helper from `scripts/probe-tool.sh` (defined but never called; loop inlined the same logic). No behavior change.
+- **Builder process improvement (DEFECT-2 LOW)**: build reports must now run read-only-context tests against an actual `chmod 0444` on the existing log file, not `chmod -w` on a temp dir — different kernel codepaths produce different observable behavior. RC2's "verified empirically" claim was a process gap that v8.13.3 RC3's strengthened Test 11 now closes.
+
+### Out of scope (deferred to v8.13.4 / v8.14.x)
+
+- Parallel multi-agent evolve loops with tournament evaluator (worktree fan-out, scoring, auto-merge winner). Multi-day project; needs its own RC arc.
+- Test-driven autonomous bug hunter (mine git history for `fix:` commits, generate property-based regression tests). Multi-day project; depends on `fix:` conformance which is currently ~20%.
+- `/publish` flag for `--allow-dirty-bound` (skip preflight clean-tree check when audit-binding still matches). Would let the pipeline self-publish v8.13.4+. Currently the pipeline's preflight requires a clean tree; v8.13.3 ships via `ship.sh` directly.
+- `shellcheck` integration in postedit-validate (catches more than `bash -n`, but adds a tool dependency). Add when shellcheck is a guaranteed dependency.
+
+### Why this is the right v8.13.3
+
+The `/insights` report ranks self-introduced bugs (10 instances) and ambiguous commands (6 instances) as the top friction classes. Every v8.13.3 component maps to one of these:
+
+- **probe-tool.sh** + `feedback_probe_before_unavailable.md` — closes the "tool not found" false-negative pattern
+- **postedit-validate.sh hook** — catches bash/json/python syntax errors at edit time (not cycle time), preventing the "declare -A" + "regex \b truncation" classes
+- **CLAUDE.md "Read actual exports"** + `feedback_read_before_implement.md` — addresses the worktree imagined-API pattern
+- **CLAUDE.md "Confirm direction"** — prevents the multi-cycle wrong-direction class (the force-graph "giant useless circle")
+- **`/publish` + `/verify-release`** — codifies the v8.13.2 release pipeline as discoverable slash commands, addressing the "publish ambiguous" pattern
+
+The architectural pattern stays consistent with v8.13.x: small composable scripts, allowlist-shaped permissions, tests-first, memory updates that compound over time.
+
+---
+
 ## [8.13.2] - 2026-04-27
 
 ### Self-healing release pipeline

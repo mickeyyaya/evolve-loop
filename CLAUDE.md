@@ -51,6 +51,72 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Verification Before Claiming Done (v8.13.3+)
+
+Three patterns the /insights audit identified as recurring friction. Apply ALL of them before reporting a task complete:
+
+1. **Probe before declaring a CLI unavailable.** Never say "no `<tool>` command" without first running:
+   ```bash
+   bash scripts/probe-tool.sh <tool>      # canonical helper, checks PATH + common install dirs
+   # or directly:
+   command -v <tool> 2>/dev/null || which <tool> 2>/dev/null || ls /usr/local/bin/<tool> ~/.local/bin/<tool> 2>/dev/null
+   ```
+   The audit caught one instance where Claude said "no gws command" when `gws` was installed at `~/.local/bin/`. List what you checked in your response.
+
+2. **Read actual exports before implementing against a module.** When working in a worktree or generating code that imports from `module X`, run `Read` on `X` first and list its real exports. Do not invent function names from context. The audit caught Builder agents shipping code against imagined APIs that didn't match `enhancedAdaptive.ts`'s actual exports — requiring full rewrites.
+
+3. **Run tests after multi-file refactors and report pass/fail counts.** A claim of "tests pass" without explicit numbers is unverified. Format: `bash scripts/<suite>.sh — N/N PASS, no regression`.
+
+If any of the three doesn't apply (e.g., no test infra exists), say so explicitly rather than skipping.
+
+## Shell & Environment Conventions (v8.13.3+)
+
+This project's shell scripts target **bash 3.2** (macOS default) for portability. Multiple regressions in /insights traced to bash-4-only features.
+
+### Banned in shell scripts:
+
+- `declare -A` (associative arrays — bash 4+)
+- `mapfile` / `readarray` (bash 4+)
+- `${var^^}` / `${var,,}` case modifications (bash 4+)
+- GNU-only sed flags: `sed -i ''` is BSD-incompatible — write to a `.tmp.$$` file and `mv` instead
+- GNU-only `date -d` — use `date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s` on macOS, fallback chain `gdate || date -d || date -j -f` for portability
+
+### Required for shell scripts:
+
+- `set -uo pipefail` (NOT `set -e` for orchestrator scripts that need to capture sub-script exit codes — `set -e` interacts badly with `if !cmd; then; rc=$?` patterns where `rc` ends up 0)
+- Atomic writes via mv-of-temp: `printf ... > "${file}.tmp.$$" && mv -f "${file}.tmp.$$" "$file"`
+- `git diff HEAD` to capture tree-state SHAs (untracked files don't count — match the audit-binding model)
+
+### SSE / streaming endpoints (when you encounter them):
+
+- Disable middleware buffering explicitly
+- Add explicit timeouts
+- Provide a cancel-UI button — don't rely on browser-side timeout alone
+
+The audit caught the wiki Add Topics feature where SSE buffering blocked article generation; resolution required all three.
+
+## Confirm Direction Before Multi-Cycle Work (v8.13.3+)
+
+For ambiguous requests like "research X and integrate into Y" or "design a system for Z", produce a **3-bullet plan with success criteria** before invoking any tools beyond Read/Grep. Wait for user confirmation before proceeding.
+
+Multi-cycle evolve-loop runs (≥5 cycles) MUST do this. The audit identified the "giant useless circle" force-graph as a case where Claude built for 25 cycles in the wrong direction; a 3-bullet pre-check would have caught it in <5 minutes.
+
+Format:
+
+```
+Direction:
+- <approach in one sentence>
+- <key decision and tradeoff>
+- <what success looks like, measurably>
+
+Proceed? (yes/redirect)
+```
+
+This rule does NOT apply to:
+- Single-cycle bug fixes
+- Tasks where the user has already specified file paths and behavior
+- Tasks invoked from a previously-approved plan (the plan is the confirmation)
+
 ## Evolve Loop Task Priority
 
 When selecting tasks for `/evolve-loop` cycles, follow this priority order:
