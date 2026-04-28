@@ -32,6 +32,19 @@ EOF
     echo "$f"
 }
 
+# v8.13.5: profile with budget_tiers. Tiers override max_budget_usd when
+# EVOLVE_TASK_MODE is set and matches a key.
+make_profile_with_tiers() {
+    local default_budget="$1"
+    local tiers_json="$2"   # e.g., '{"research":1.50,"deep":2.50}'
+    local f
+    f=$(mktemp -t claude-adapter-test.XXXXXX.json)
+    cat > "$f" <<EOF
+{"name":"x","cli":"claude","model_tier_default":"sonnet","max_budget_usd":${default_budget},"max_turns":30,"permission_mode":"default","allowed_tools":[],"disallowed_tools":[],"add_dir":[],"output_artifact":"out.md","challenge_token_required":false,"extra_flags":[],"budget_tiers":${tiers_json}}
+EOF
+    echo "$f"
+}
+
 run_adapter() {
     # Args: <profile_path> [extra env=value ...]
     local profile="$1"; shift
@@ -129,6 +142,66 @@ if echo "$out" | grep -q "WARN: EVOLVE_MAX_BUDGET_USD='-1'" \
     pass "negative value rejected"
 else
     fail_ "out=$(echo "$out" | grep -E 'max-budget|override|WARN' | head -3)"
+fi
+
+# === Test 8 (v8.13.5): EVOLVE_TASK_MODE=research with tiers → tier value ====
+header "Test 8: EVOLVE_TASK_MODE=research with budget_tiers → tier value used"
+p=$(make_profile_with_tiers 0.50 '{"research":1.50,"deep":2.50}'); cleanup_files+=("$p")
+out=$(run_adapter "$p" EVOLVE_TASK_MODE=research)
+if echo "$out" | grep -q "max-budget-usd 1.50" \
+   && echo "$out" | grep -q "task-mode tier: research"; then
+    pass "tier resolved + applied"
+else
+    fail_ "out=$(echo "$out" | grep -E 'max-budget|task-mode|override|WARN' | head -3)"
+fi
+
+# === Test 9: EVOLVE_TASK_MODE with mode key absent → WARN, profile default ==
+header "Test 9: EVOLVE_TASK_MODE=nonexistent → WARN, fallback to profile"
+p=$(make_profile_with_tiers 0.50 '{"research":1.50}'); cleanup_files+=("$p")
+out=$(run_adapter "$p" EVOLVE_TASK_MODE=nonexistent)
+if echo "$out" | grep -q "WARN: EVOLVE_TASK_MODE='nonexistent'" \
+   && echo "$out" | grep -q "max-budget-usd 0.50"; then
+    pass "missing tier key warned + profile fallback"
+else
+    fail_ "out=$(echo "$out" | grep -E 'max-budget|task-mode|override|WARN' | head -3)"
+fi
+
+# === Test 10: EVOLVE_TASK_MODE without budget_tiers in profile → WARN =======
+header "Test 10: EVOLVE_TASK_MODE=research with NO budget_tiers in profile → WARN"
+p=$(make_profile 0.50); cleanup_files+=("$p")  # no budget_tiers key at all
+out=$(run_adapter "$p" EVOLVE_TASK_MODE=research)
+if echo "$out" | grep -q "WARN: EVOLVE_TASK_MODE='research'" \
+   && echo "$out" | grep -q "max-budget-usd 0.50"; then
+    pass "no-tiers profile → WARN, profile fallback"
+else
+    fail_ "out=$(echo "$out" | grep -E 'max-budget|task-mode|override|WARN' | head -3)"
+fi
+
+# === Test 11: EVOLVE_MAX_BUDGET_USD wins over EVOLVE_TASK_MODE ==============
+# Precedence chain: env-var override > task-mode tier > profile default.
+header "Test 11: EVOLVE_MAX_BUDGET_USD overrides EVOLVE_TASK_MODE"
+p=$(make_profile_with_tiers 0.50 '{"research":1.50}'); cleanup_files+=("$p")
+out=$(run_adapter "$p" EVOLVE_TASK_MODE=research EVOLVE_MAX_BUDGET_USD=3.00)
+if echo "$out" | grep -q "max-budget-usd 3.00" \
+   && echo "$out" | grep -q "task-mode tier: research" \
+   && echo "$out" | grep -q "override max-budget-usd: 3.00"; then
+    pass "precedence: override > tier > default"
+else
+    fail_ "out=$(echo "$out" | grep -E 'max-budget|task-mode|override|WARN' | head -3)"
+fi
+
+# === Test 12: EVOLVE_TASK_MODE=default → tier value used ====================
+# The "default" key is just another tier name, no special meaning. Operators
+# can declare it for explicitness, but EVOLVE_TASK_MODE=default still has to
+# match a key called "default" in budget_tiers — there's no implicit fallback.
+header "Test 12: EVOLVE_TASK_MODE=default with 'default' key in tiers → resolved"
+p=$(make_profile_with_tiers 0.50 '{"default":0.75,"research":1.50}'); cleanup_files+=("$p")
+out=$(run_adapter "$p" EVOLVE_TASK_MODE=default)
+if echo "$out" | grep -q "max-budget-usd 0.75" \
+   && echo "$out" | grep -q "task-mode tier: default"; then
+    pass "explicit 'default' tier resolves"
+else
+    fail_ "out=$(echo "$out" | grep -E 'max-budget|task-mode|override|WARN' | head -3)"
 fi
 
 # === Summary ==================================================================

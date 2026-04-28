@@ -69,6 +69,12 @@
     "."
   ],
   "max_budget_usd": 0.5,
+  "_budget_tiers_doc": "v8.13.5: declarative tiers selected via EVOLVE_TASK_MODE. 'research' covers Scout invocations doing 5+ web searches (motivated by cycle 8210's $0.51 burn). 'deep' covers exploratory cycles where Scout needs to read large portions of the codebase before proposing tasks. EVOLVE_MAX_BUDGET_USD always wins; tiers are a structured fallback below that.",
+  "budget_tiers": {
+    "default": 0.5,
+    "research": 1.5,
+    "deep": 2.5
+  },
   "max_turns": 30,
   "permission_mode": "acceptEdits",
   "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",

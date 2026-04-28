@@ -60,6 +60,24 @@ MAX_BUDGET=$(jq -r '.max_budget_usd' "$PROFILE_PATH")
 MAX_TURNS=$(jq -r '.max_turns' "$PROFILE_PATH")
 PERMISSION_MODE=$(jq -r '.permission_mode' "$PROFILE_PATH")
 
+# v8.13.5 token-opt: declarative task-mode budget tiers.
+# Profiles MAY define a budget_tiers map ({"research": 1.50, "deep": 2.50, ...}).
+# When EVOLVE_TASK_MODE=<mode> is set AND the mode key exists in the profile's
+# budget_tiers, that value is used. Falls back silently to the static
+# max_budget_usd when no tier matches (with WARN if EVOLVE_TASK_MODE was set
+# but the key wasn't found — caller's typo is loud, not silent).
+# Precedence (set later, by EVOLVE_MAX_BUDGET_USD block below):
+#   EVOLVE_MAX_BUDGET_USD > EVOLVE_TASK_MODE-resolved tier > profile default.
+if [ -n "${EVOLVE_TASK_MODE:-}" ]; then
+    TIER_VALUE=$(jq -r --arg mode "$EVOLVE_TASK_MODE" '.budget_tiers[$mode] // empty' "$PROFILE_PATH" 2>/dev/null || echo "")
+    if [ -n "$TIER_VALUE" ] && [[ "$TIER_VALUE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "[claude-adapter] task-mode tier: $EVOLVE_TASK_MODE → \$$TIER_VALUE (was $MAX_BUDGET from profile $(basename "$PROFILE_PATH"))" >&2
+        MAX_BUDGET="$TIER_VALUE"
+    else
+        echo "[claude-adapter] WARN: EVOLVE_TASK_MODE='$EVOLVE_TASK_MODE' has no matching budget_tiers entry in $(basename "$PROFILE_PATH") — using profile default $MAX_BUDGET" >&2
+    fi
+fi
+
 # v8.13.4 token-opt: per-invocation budget override.
 # The static profile max_budget_usd is sized for typical workloads (codebase
 # scan, modest builds). Research-heavy or unusually long tasks may need more

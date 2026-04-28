@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.5] - 2026-04-28
+
+### Cycle 2 of 3 in the /evolve-loop token-optimization batch
+
+Builds on v8.13.4's per-invocation override (`EVOLVE_MAX_BUDGET_USD`). v8.13.5 adds the declarative companion: profile-level `budget_tiers` selected via `EVOLVE_TASK_MODE`. Tiers solve "agent X has structurally different workloads" (Scout codebase-scan vs Scout research-heavy); per-invocation override solves "I'm doing something unusual just this once."
+
+### Added
+
+- **`budget_tiers` field in subagent profiles** — optional map of mode-name → budget value. Profiles without the field behave identically to v8.13.4. The Scout profile (`.evolve/profiles/scout.json`) ships with three tiers as the canonical example: `default` ($0.50), `research` ($1.50), `deep` ($2.50). Other profiles can adopt incrementally.
+- **`EVOLVE_TASK_MODE` env var** — selects a tier. When set + matching key in profile's `budget_tiers` → tier value used (logged loudly). When set without matching key (typo, or profile has no `budget_tiers`) → WARN + profile default. When unset → no-op.
+- **Precedence chain** (highest first): `EVOLVE_MAX_BUDGET_USD` > `EVOLVE_TASK_MODE`-resolved tier > `max_budget_usd` profile default. All three coexist; later mechanisms can override earlier resolution; every step logs to stderr for auditability.
+- **5 new tests in `scripts/claude-adapter-test.sh`** (Tests 8-12): tier resolution + applied, missing tier key → WARN, no `budget_tiers` in profile → WARN, override > tier > default precedence chain, explicit `default` tier resolves.
+
+### Changed
+
+- **`scripts/cli_adapters/claude.sh`** — added 14-LOC tier-resolution block between profile parse and the v8.13.4 override block. jq query reads `.budget_tiers[$mode]`.
+- **`.evolve/profiles/scout.json`** — added `budget_tiers` map with `default`/`research`/`deep` tiers + an inline `_budget_tiers_doc` field documenting the rationale (cycle 8210's $0.51 burn).
+- **`CLAUDE.md` "Subagent Budget Controls" section** — restructured to show the 3-mechanism precedence chain explicitly. Documents when to use override vs tier vs profile-default, with examples.
+
+### Test Results
+
+- `scripts/claude-adapter-test.sh` — 12/12 PASS (was 7 in v8.13.4; +5 for tiers).
+- All v8.13.x baseline regression suites — 150/150 PASS, no regression.
+- **Total: 162/162 PASS**.
+
+### Why this is the right v8.13.5
+
+The v8.13.4 env-var override was a tactical fix for cycle 8210's friction. v8.13.5 promotes the same mechanism into a declarative shape — the profile encodes "this agent has these legitimate workload classes" and the env var selects among them. The structured form is testable, version-controllable, and discoverable (a new operator can `cat .evolve/profiles/scout.json` and see the tiers).
+
+The override remains the right tool for one-offs the tiers don't predict; the tiers are the right tool for routine workload classes. Both ship; both are tested.
+
+### What this DOES NOT do
+
+- Does NOT change the ship-gate, role-gate, phase-gate-precondition, or audit-binding contract.
+- Does NOT auto-detect task mode from prompt content (deferred — speculative).
+- Does NOT add tiers to Builder/Auditor/etc. profiles (incremental adoption — v8.13.6 or later).
+
+### Future
+
+- v8.13.6 (cycle 8212) — per-phase telemetry: extend the existing subagent-run.sh ledger model_usage breakdown into a queryable structure that can correlate $$ spend with task mode (so operators can answer "do my `research` invocations actually need $1.50, or could it be $1.00?" with data).
+- v8.14.x — Anthropic `task_budget` integration when Claude Code adds CLI support; would slot in as a fourth precedence tier (model-self-pacing inside the operator's hard cap).
+
+---
+
 ## [8.13.4] - 2026-04-28
 
 ### Cycle 1 of 3 in the /evolve-loop token-optimization batch

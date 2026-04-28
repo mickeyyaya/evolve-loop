@@ -51,7 +51,17 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
-## Subagent Budget Override (v8.13.4+)
+## Subagent Budget Controls (v8.13.4 / v8.13.5)
+
+evolve-loop subagents have **three** budget-control mechanisms, evaluated in priority order:
+
+### Precedence (highest priority first)
+
+1. **`EVOLVE_MAX_BUDGET_USD`** (v8.13.4) — operator-controlled per-invocation override. Overrides all else.
+2. **`EVOLVE_TASK_MODE` + `budget_tiers`** (v8.13.5) — declarative profile tier select. Used when the profile has a `budget_tiers` map AND the env var matches a key.
+3. **`max_budget_usd`** (v8.12.x baseline) — static profile default. Always present.
+
+### v8.13.4: per-invocation override
 
 When a subagent task is unusually research-heavy or long-running and the static `max_budget_usd` in `.evolve/profiles/<agent>.json` is too tight, override per-invocation:
 
@@ -59,13 +69,40 @@ When a subagent task is unusually research-heavy or long-running and the static 
 EVOLVE_MAX_BUDGET_USD=1.50 bash scripts/subagent-run.sh scout <cycle> <workspace>
 ```
 
-The adapter logs the override loudly to stderr (`[claude-adapter] override max-budget-usd: ... (was ... from profile)`) so the deviation is auditable in the subagent's stdout/stderr logs. Empty string and malformed values are ignored (with WARN); negative values are rejected.
+The adapter logs the override loudly (`[claude-adapter] override max-budget-usd: ... (was ... from profile)`). Empty/malformed values → WARN + profile fallback. Negative values → rejected.
 
-**When to use**: research-heavy Scout invocations (web search loops), large-codebase audit cycles, or any one-off task where the profile default is sized for typical-but-not-this-specific work. Cycle 8210's Scout literally hit `error_max_budget_usd` at $0.51 with 8 web searches but no completed report — `EVOLVE_MAX_BUDGET_USD=1.50` lets the same researcher finish.
+**When to use**: one-offs where the structured tier doesn't fit. Routine bypassing = CLAUDE.md violation; if your agent consistently needs more budget, declare a tier instead.
 
-**Don't use** as a routine bypass — if your agent type consistently needs more budget, raise the profile baseline instead. Routine override = a CLAUDE.md violation. The override exists for legitimate one-offs.
+### v8.13.5: declarative task-mode tiers
 
-This is a complement to (not a replacement for) Anthropic's `task_budget` (model-self-pacing). Once Claude Code adds `task_budget` support (currently API-only — see [Anthropic docs](https://platform.claude.com/docs/en/build-with-claude/task-budgets)), evolve-loop will integrate it; the env-var override remains useful for operator-controlled hard caps.
+For agents with structurally-different workloads (e.g., Scout doing codebase-scan vs Scout doing research-heavy web search), declare named tiers in the profile:
+
+```json
+{
+  "max_budget_usd": 0.50,
+  "budget_tiers": {
+    "default": 0.50,
+    "research": 1.50,
+    "deep": 2.50
+  }
+}
+```
+
+Then select via `EVOLVE_TASK_MODE`:
+
+```bash
+EVOLVE_TASK_MODE=research bash scripts/subagent-run.sh scout <cycle> <workspace>
+```
+
+Adapter logs: `[claude-adapter] task-mode tier: research → $1.50 (was 0.50 from profile scout.json)`. Mode key absent from `budget_tiers` → WARN + profile fallback. No `budget_tiers` in profile + `EVOLVE_TASK_MODE` set → WARN.
+
+**When to use**: agents whose workloads naturally cluster into 2-3 budget classes. The Scout profile (`.evolve/profiles/scout.json`) ships with `default` / `research` / `deep` tiers as the canonical example.
+
+**Combining both**: `EVOLVE_TASK_MODE=research EVOLVE_MAX_BUDGET_USD=3.00` runs Scout with $3.00 cap; the explicit override wins, but the tier-resolution log line still appears for observability.
+
+### Forward compatibility
+
+These mechanisms complement (don't replace) Anthropic's `task_budget` (model-self-pacing). Once Claude Code adds `task_budget` support (currently API-only — see [Anthropic docs](https://platform.claude.com/docs/en/build-with-claude/task-budgets)), evolve-loop will integrate it as a fourth tier in the precedence chain. Hard $$ caps and declarative tiers remain useful even with model-self-pacing.
 
 ## Verification Before Claiming Done (v8.13.3+)
 
