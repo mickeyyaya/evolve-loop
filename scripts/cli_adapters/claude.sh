@@ -60,6 +60,24 @@ MAX_BUDGET=$(jq -r '.max_budget_usd' "$PROFILE_PATH")
 MAX_TURNS=$(jq -r '.max_turns' "$PROFILE_PATH")
 PERMISSION_MODE=$(jq -r '.permission_mode' "$PROFILE_PATH")
 
+# v8.13.4 token-opt: per-invocation budget override.
+# The static profile max_budget_usd is sized for typical workloads (codebase
+# scan, modest builds). Research-heavy or unusually long tasks may need more
+# headroom — cycle 8210's Scout invocation hit error_max_budget_usd at $0.51
+# during research, wasting the partial work. Operators can now pass
+# EVOLVE_MAX_BUDGET_USD=<value> to bump for ONE invocation without permanently
+# raising the profile baseline. Logged loudly for auditability.
+# Validation: must be a non-negative decimal; non-numeric values are ignored
+# with a warning rather than silently corrupting the budget arg.
+if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
+    if [[ "$EVOLVE_MAX_BUDGET_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "[claude-adapter] override max-budget-usd: $EVOLVE_MAX_BUDGET_USD (was $MAX_BUDGET from profile $(basename "$PROFILE_PATH"))" >&2
+        MAX_BUDGET="$EVOLVE_MAX_BUDGET_USD"
+    else
+        echo "[claude-adapter] WARN: EVOLVE_MAX_BUDGET_USD='$EVOLVE_MAX_BUDGET_USD' is not a valid decimal — ignoring, using profile value $MAX_BUDGET" >&2
+    fi
+fi
+
 # Resolve add_dir, substituting {worktree_path} placeholder if present.
 for i in "${!ADD_DIRS_ARR[@]}"; do
     if [[ "${ADD_DIRS_ARR[$i]}" == *"{worktree_path}"* ]]; then

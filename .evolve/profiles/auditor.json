@@ -57,6 +57,7 @@
     "Bash(bash scripts/probe-tool-test.sh:*)",
     "Bash(bash scripts/postedit-validate.sh:*)",
     "Bash(bash scripts/postedit-validate-test.sh:*)",
+    "Bash(bash scripts/claude-adapter-test.sh:*)",
     "Bash(bash scripts/release.sh:*)",
     "Bash(bash scripts/subagent-run.sh:*)",
     "Write(.evolve/runs/cycle-*/audit-report.md)",

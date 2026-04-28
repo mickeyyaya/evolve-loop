@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.4] - 2026-04-28
+
+### Cycle 1 of 3 in the /evolve-loop token-optimization batch
+
+The user invoked `/evolve-loop:evolve-loop 3 online search to learn what we can do to optimize the token usage in the meantime to maximize the accuracy and performance.` This is the first of three planned cycles. Online research findings + the highest-leverage immediate optimization ship together as v8.13.4.
+
+### Research findings (Scout phase, full report in `.evolve/runs/cycle-8210/scout-report.md`)
+
+Four searches across [Anthropic prompt caching docs](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/cost-tracking), [task_budget](https://platform.claude.com/docs/en/build-with-claude/task-budgets), and [arXiv 2509.23586 — AgentDiet](https://arxiv.org/abs/2509.23586). Key conclusion:
+
+- **`task_budget` (Anthropic's official self-pacing API) is NOT yet available via Claude Code CLI** — only via direct Messages API on Opus 4.7 beta. evolve-loop's existing `claude -p` adapter cannot use it. **Tracked as v8.14.x backlog.**
+- **AgentDiet trajectory reduction (40-60% input savings)** applies to multi-turn agents; evolve-loop's Scout/Builder/Auditor are single-shot subagents. Builder operating in a worktree DOES accumulate trajectory, but implementation is multi-day. **Tracked as v8.14.x backlog.**
+- **Server-side compaction** (Opus 4.7/4.6, Sonnet 4.6 beta) auto-applies — evolve-loop already benefits transparently.
+- **Cycle 8210's own Scout invocation hit `error_max_budget_usd` at $0.51** during research with 8 web searches and no completed report. The static `max_budget_usd: 0.50` in `scout.json` is sized for codebase-scan, not research-heavy mode. This is the empirically-demonstrated highest-leverage v8.13.4 optimization.
+
+### Added
+
+- **`EVOLVE_MAX_BUDGET_USD` per-invocation override** (`scripts/cli_adapters/claude.sh`) — operator can bump the budget for one subagent invocation without permanently raising the profile baseline. Logs the deviation loudly to stderr for auditability. Empty/malformed/negative values are rejected (with WARN) — fallback to profile value.
+- **`scripts/claude-adapter-test.sh`** — 7 unit tests covering: profile-default path, override picked up, integer override, decimal override, malformed (string) rejection, empty-string treated as unset, negative value rejection. New file specifically because the adapter previously had no dedicated test suite.
+
+### Changed
+
+- **`scripts/cli_adapters/claude.sh`** — added the override block (~17 LOC including comments + WARN path).
+- **`CLAUDE.md`** — new "Subagent Budget Override (v8.13.4+)" section documents when to use it, when NOT to, and why it complements (doesn't replace) future task_budget integration.
+
+### What this DOES NOT do
+
+- Does NOT integrate Anthropic's `task_budget` (API-only; not in Claude Code yet).
+- Does NOT change any subagent profile's default budget — operators decide per-invocation.
+- Does NOT touch ship-gate, role-gate, phase-gate-precondition, audit-binding, or any v8.13.x trust-boundary primitive.
+
+### Why this is the right v8.13.4
+
+The user's goal was research → implementation. Research surfaced one clean operational fix that addresses a real friction (cycle 8210's Scout failure was the proof). Bigger optimizations (task_budget integration, AgentDiet) are tracked in the backlog but require Claude Code upstream changes or multi-day implementation. v8.13.4 delivers the one immediate win without scope-creep.
+
+### Future cycles in this batch
+
+- **v8.13.5** (cycle 8211): based on cycle-8210's research, will likely focus on **task-mode budget tiers** — dynamic per-task-type budget (scan vs research vs build) selected via env var. Cleaner than per-invocation override; layers on top of v8.13.4's foundation.
+- **v8.13.6** (cycle 8212): per-phase telemetry — extending the existing subagent-run.sh ledger model_usage breakdown into a queryable structure, so operators can see "this cycle spent $X on Scout, $Y on Builder, $Z on Auditor" at a glance.
+
+---
+
 ## [8.13.3] - 2026-04-27
 
 ### /insights report improvements

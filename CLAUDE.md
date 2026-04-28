@@ -51,6 +51,22 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Subagent Budget Override (v8.13.4+)
+
+When a subagent task is unusually research-heavy or long-running and the static `max_budget_usd` in `.evolve/profiles/<agent>.json` is too tight, override per-invocation:
+
+```bash
+EVOLVE_MAX_BUDGET_USD=1.50 bash scripts/subagent-run.sh scout <cycle> <workspace>
+```
+
+The adapter logs the override loudly to stderr (`[claude-adapter] override max-budget-usd: ... (was ... from profile)`) so the deviation is auditable in the subagent's stdout/stderr logs. Empty string and malformed values are ignored (with WARN); negative values are rejected.
+
+**When to use**: research-heavy Scout invocations (web search loops), large-codebase audit cycles, or any one-off task where the profile default is sized for typical-but-not-this-specific work. Cycle 8210's Scout literally hit `error_max_budget_usd` at $0.51 with 8 web searches but no completed report — `EVOLVE_MAX_BUDGET_USD=1.50` lets the same researcher finish.
+
+**Don't use** as a routine bypass — if your agent type consistently needs more budget, raise the profile baseline instead. Routine override = a CLAUDE.md violation. The override exists for legitimate one-offs.
+
+This is a complement to (not a replacement for) Anthropic's `task_budget` (model-self-pacing). Once Claude Code adds `task_budget` support (currently API-only — see [Anthropic docs](https://platform.claude.com/docs/en/build-with-claude/task-budgets)), evolve-loop will integrate it; the env-var override remains useful for operator-controlled hard caps.
+
 ## Verification Before Claiming Done (v8.13.3+)
 
 Three patterns the /insights audit identified as recurring friction. Apply ALL of them before reporting a task complete:
