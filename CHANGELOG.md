@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.13.6] - 2026-04-28
+
+### Cycle 3 of 3 in the /evolve-loop token-optimization batch (closing the loop)
+
+Final cycle bundles the originally-planned per-phase telemetry with two process improvements identified by cycle 8211's audit (LOW-2: auditor profile blocks parallel-Bash patterns; LOW-3: rate-limit handling). Bundling avoids 3 separate ships for closely-related operational improvements.
+
+### Added
+
+- **`scripts/show-cycle-cost.sh`** (~165 lines) — per-cycle cost telemetry. Reads each subagent's `<workspace>/<agent>-stdout.log` (existing v8.12.x data — no new instrumentation) and prints a per-phase breakdown of `total_cost_usd`, `cache_read_input_tokens`, `cache_creation_input_tokens`, and output tokens. Human-readable table by default; `--json` for scripting. Closes the question "this cycle cost X — where did it go?" with one command. 8 unit tests.
+- **`scripts/run-all-regression-tests.sh`** (~140 lines) — single-command runner for all 14 regression suites. Cycle 8211 audit identified that the auditor profile allowlists individual `Bash(bash scripts/<test>.sh:*)` entries but NOT compositions (`bash a & bash b & wait`, `for s in ...; do bash $s; done`). This helper is one allowlisted command that runs them all. Sequential or `--parallel`. `--json` for machine-readable summary. `SUITES_OVERRIDE` env var lets tests inject stubs without rewriting the script. 7 unit tests.
+- **8 new tests in `scripts/show-cycle-cost-test.sh`** — covering: missing args, non-int cycle, missing workspace, empty workspace, single-phase render, multi-phase totals (numeric comparison via bc), JSON shape, malformed-log graceful fallback.
+- **7 new tests in `scripts/run-all-regression-tests-test.sh`** — covering: all-pass, mixed pass/fail with diagnostic tail, JSON shape, parallel mode, bad flag, --help, single-suite SUITES_OVERRIDE.
+
+### Changed
+
+- **`.evolve/profiles/auditor.json`** — added 4 new allowlist entries: `scripts/run-all-regression-tests.sh` (and its test), `scripts/show-cycle-cost.sh` (and its test). Future audit cycles can run all 14 suites via one allowlisted command instead of needing 14 separate entries OR `&`-chained patterns the profile rejects. Closes cycle 8211 audit's LOW-2.
+
+### What this DOES NOT do
+
+- Does NOT add 429 detection to `subagent-run.sh` (cycle 8211 audit's LOW-3). Deferred — the right shape is a graceful retry-after-N-minutes signal, which needs more design than this cycle has scope for. Tracked for v8.13.7+.
+- Does NOT change ship-gate, role-gate, phase-gate-precondition, audit-binding, or any v8.13.x trust-boundary primitive.
+- Does NOT add tier adoption to other profiles (still incremental from v8.13.5).
+
+### Test Results
+
+- `scripts/show-cycle-cost-test.sh` — 8/8 PASS
+- `scripts/run-all-regression-tests-test.sh` — 7/7 PASS
+- `scripts/run-all-regression-tests.sh` (full 14-suite dogfood) — 14/14 PASS, 53 seconds
+- All v8.13.x regression suites — 162/162 PASS (no regression)
+- **Total: 177/177 PASS** (162 baseline + 8 telemetry + 7 run-all).
+
+### /evolve-loop token-optimization batch summary (v8.13.4 + v8.13.5 + v8.13.6)
+
+| Cycle | Ship | Mechanism | Lines |
+|-------|------|-----------|-------|
+| 8210 | v8.13.4 | `EVOLVE_MAX_BUDGET_USD` per-invocation override | 17 + 7 tests |
+| 8211 | v8.13.5 | `EVOLVE_TASK_MODE` declarative budget tiers | 14 + 5 tests |
+| 8212 | v8.13.6 | `show-cycle-cost.sh` + `run-all-regression-tests.sh` | 305 + 15 tests |
+
+Combined effect:
+- Operators can size budget per-invocation (override), per-workload (tier), or measure post-hoc (telemetry).
+- Auditors can run all 14 regression suites with one allowlisted command.
+- Future cycles can answer "where did $X go?" quantitatively via show-cycle-cost.
+- Foundation laid for v8.14.x's `task_budget` integration (when Claude Code adds CLI support — currently API-only per Anthropic docs).
+
+### Future
+
+- v8.13.7 — 429 rate-limit detection + retry semantics in `subagent-run.sh` (LOW-3 from cycle 8211 audit).
+- v8.14.x — Anthropic `task_budget` integration as 4th precedence tier; AgentDiet trajectory reduction for Builder worktree sessions; 1h cache TTL via API-direct path.
+
+---
+
 ## [8.13.5] - 2026-04-28
 
 ### Cycle 2 of 3 in the /evolve-loop token-optimization batch
