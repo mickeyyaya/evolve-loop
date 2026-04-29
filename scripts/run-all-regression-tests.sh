@@ -48,8 +48,11 @@ if [ -n "${SUITES_OVERRIDE:-}" ]; then
 else
     SUITES=(
         "scripts/claude-adapter-test.sh"
+        "scripts/codex-adapter-test.sh"
+        "scripts/gemini-adapter-test.sh"
         "scripts/probe-tool-test.sh"
         "scripts/postedit-validate-test.sh"
+        "scripts/cycle-state-test.sh"
         "scripts/role-gate-test.sh"
         "scripts/phase-gate-precondition-test.sh"
         "scripts/guards-test.sh"
@@ -60,6 +63,8 @@ else
         "scripts/release-pipeline-test.sh"
         "scripts/ship-integration-test.sh"
         "scripts/show-cycle-cost-test.sh"
+        "scripts/merge-lesson-test.sh"
+        "scripts/subagent-run-test.sh"
         "scripts/run-all-regression-tests-test.sh"
     )
 fi
