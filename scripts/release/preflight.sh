@@ -164,18 +164,25 @@ step_audit_recent() {
     fi
     [ -f "$LEDGER" ] || fail "no ledger at $LEDGER — no Auditor has ever run"
     command -v jq >/dev/null 2>&1 || fail "jq required"
+    # The ledger schema uses {role, ts} — historical preflight.sh searched
+    # {agent, timestamp} which never matched any real entry. Three-bug fix
+    # in v8.14.0: (1) role not agent, (2) ts not timestamp, (3) markdown-bold
+    # PASS verdict (`**Verdict: PASS**`) is the common auditor output but the
+    # old regex `^Verdict:` rejected it.
     local latest
-    latest=$(grep '"agent":"auditor"' "$LEDGER" 2>/dev/null | tail -1 || true)
+    latest=$(grep '"role":"auditor"' "$LEDGER" 2>/dev/null | tail -1 || true)
     [ -n "$latest" ] || fail "no auditor entry in ledger"
-    local artifact_path verdict_ok now ts age
+    local artifact_path now ts age
     artifact_path=$(echo "$latest" | jq -r '.artifact_path // empty')
     [ -n "$artifact_path" ] || fail "ledger entry missing artifact_path"
     [ -f "$artifact_path" ] || fail "audit artifact missing on disk: $artifact_path"
-    if ! grep -qE '^Verdict:[[:space:]]*PASS\b' "$artifact_path"; then
+    # Match ship.sh's permissive verdict regex so `**Verdict: PASS**`,
+    # `Verdict: **PASS**`, and `Verdict: PASS` all qualify.
+    if ! grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$artifact_path"; then
         fail "most recent audit-report.md does not declare 'Verdict: PASS' ($artifact_path)"
     fi
-    ts=$(echo "$latest" | jq -r '.timestamp // empty')
-    [ -n "$ts" ] || fail "ledger entry missing timestamp"
+    ts=$(echo "$latest" | jq -r '.ts // empty')
+    [ -n "$ts" ] || fail "ledger entry missing ts"
     if command -v gdate >/dev/null 2>&1; then
         ts_s=$(gdate -d "$ts" +%s 2>/dev/null || echo "")
     else
