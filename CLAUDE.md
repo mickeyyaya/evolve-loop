@@ -170,6 +170,33 @@ This rule does NOT apply to:
 - Tasks where the user has already specified file paths and behavior
 - Tasks invoked from a previously-approved plan (the plan is the confirmation)
 
+## Cross-Platform Behavior (v8.15.0+)
+
+evolve-loop ships as a Claude Code plugin but is invocable from Gemini CLI via a hybrid driver. The skill content is platform-neutral; the runtime requires the `claude` binary regardless of which CLI initiated the conversation.
+
+### How dispatch works per CLI
+
+| Caller | Skill activation | `cli` field in profile | Adapter | Engine |
+|---|---|---|---|---|
+| Claude Code | `Skill` tool | `claude` | `scripts/cli_adapters/claude.sh` | `claude -p` (sandboxed) |
+| Gemini CLI | `activate_skill` | `gemini` | `scripts/cli_adapters/gemini.sh` (hybrid shim) | delegates to `claude.sh` → `claude -p` |
+| Codex CLI | (stub) | `codex` | `scripts/cli_adapters/codex.sh` | exits 99 — unsupported |
+
+The hybrid pattern exists because Gemini CLI lacks non-interactive prompt mode (`gemini -p`), `--max-budget-usd`, and subagent dispatch. Without these, the trust boundary (`role-gate`, `ship-gate`, `phase-gate-precondition`) can't structurally enforce phase isolation. By delegating to `claude.sh`, Gemini-driven cycles inherit the full Claude Code kernel-hook protection. See [docs/incidents/gemini-forgery.md](docs/incidents/gemini-forgery.md) for why this matters.
+
+### Where the platform-specific knowledge lives
+
+- `docs/platform-compatibility.md` — top-level support matrix and adapter contract
+- `skills/evolve-loop/reference/platform-detect.md` — env-var probe table for runtime detection
+- `skills/evolve-loop/reference/<platform>-tools.md` — tool name translation (`Read` → `read_file`, etc.)
+- `skills/evolve-loop/reference/<platform>-runtime.md` — invocation patterns per CLI
+- `scripts/detect-cli.sh` — shell helper that returns one of `claude | gemini | codex | unknown`
+- `scripts/cli_adapters/<cli>.sh` — runtime adapter; receives env-var contract from `subagent-run.sh`
+
+### When implementing for a new CLI
+
+Mirror the hybrid pattern (delegate to `claude.sh`) before attempting a native adapter. The native-adapter path requires verifying the new CLI has: non-interactive prompt mode, profile-scoped permissions, and either a budget cap flag or external cost tracking. Until those are confirmed, the hybrid path keeps the trust boundary intact.
+
 ## Evolve Loop Task Priority
 
 When selecting tasks for `/evolve-loop` cycles, follow this priority order:

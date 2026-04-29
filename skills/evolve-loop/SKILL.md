@@ -8,6 +8,10 @@ argument-hint: "[cycles] [strategy] [goal]"
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
+## Platform overlay (v8.15.0+)
+
+Tool and command names in this file use **Claude Code conventions** (`Read`, `Bash`, `Skill`, `Agent`, etc.). If you are running this skill from a different CLI (Gemini, Codex, generic), read [reference/platform-detect.md](reference/platform-detect.md) FIRST — it tells you which translation overlay to load (`reference/<platform>-tools.md` for tool names, `reference/<platform>-runtime.md` for invocation patterns). On non-Claude platforms the runtime falls back to the hybrid driver: shell scripts dispatch through `scripts/cli_adapters/<cli>.sh`, which delegates to the Claude binary for actual subagent execution. See [docs/platform-compatibility.md](../../docs/platform-compatibility.md) for the support matrix.
+
 ## STRICT MODE — Read this first (v8.13.7+)
 
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command:
@@ -18,10 +22,10 @@ bash scripts/evolve-loop-dispatch.sh <args>
 
 …and then read its summary. Nothing else. The dispatcher loops `bash scripts/run-cycle.sh` once per cycle and asserts each cycle produced Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
-**You MUST NOT, when activating this skill:**
-- Use TodoWrite to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
-- Invoke Edit, Write, or Bash for any task other than the dispatcher itself (and reading its output).
-- Invoke the in-process Agent tool to run Scout/Builder/Auditor. Phase agents are spawned by `subagent-run.sh` from inside `run-cycle.sh`. They are profile-restricted; the in-process Agent tool is not.
+**You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
+- Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
+- Invoke Edit, Write, or Bash (or `replace`/`write_file`/`run_shell_command` on Gemini, etc.) for any task other than the dispatcher itself (and reading its output).
+- Invoke the in-process Agent / Task / `activate_skill`-as-subagent dispatch to run Scout/Builder/Auditor. Phase agents are spawned by `subagent-run.sh` from inside `run-cycle.sh`. They are profile-restricted; the in-process subagent dispatch is not.
 - "Help out" by editing files between cycles. Builder edits files inside its worktree, gated by `role-gate.sh`. You are not Builder.
 
 **Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries — meaning Scout and Builder were either skipped or run via the in-process Agent tool that bypasses the kernel hooks (`role-gate`, `phase-gate-precondition`, `ship-gate`). The dispatcher closes that gap structurally: every cycle goes through `run-cycle.sh`, which spawns the orchestrator subagent under `.evolve/profiles/orchestrator.json` (Edit/Write/git ops blocked at the kernel layer); that orchestrator then invokes Scout, Builder, Auditor via `subagent-run.sh` (sequence enforced by `phase-gate-precondition.sh`).
@@ -154,7 +158,7 @@ For each cycle:
 1. Claim cycle number (OCC protocol)
 2. **`bash scripts/phase-gate.sh <gate> $CYCLE $WORKSPACE`** — MANDATORY at every phase transition
 3. Scout → Builder → Auditor → phase-gate verification → Ship → Learn
-4. **Subagents MUST be launched via `bash scripts/subagent-run.sh <agent> $CYCLE $WORKSPACE`** — never via the in-process `Agent` tool in production. Builder gets its worktree via `WORKTREE_PATH` env var. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes a tamper-evident ledger entry. Legacy `LEGACY_AGENT_DISPATCH=1` fallback permitted for one A/B cycle only.
+4. **Subagents MUST be launched via `bash scripts/subagent-run.sh <agent> $CYCLE $WORKSPACE`** — never via the in-process `Agent` tool (or `activate_skill`-as-subagent on Gemini, or any equivalent same-session dispatch) in production. Builder gets its worktree via `WORKTREE_PATH` env var. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes a tamper-evident ledger entry. On non-Claude CLIs, `subagent-run.sh` dispatches to the per-platform adapter at `scripts/cli_adapters/<cli>.sh`; the Gemini adapter uses the hybrid pattern (delegates to Claude binary). Legacy `LEGACY_AGENT_DISPATCH=1` fallback permitted for one A/B cycle only.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
