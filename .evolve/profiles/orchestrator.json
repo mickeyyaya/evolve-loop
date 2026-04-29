@@ -159,10 +159,13 @@
     "--setting-sources",
     "project"
   ],
+  "_sandbox_design_notes": "v8.13.7 cycle 8215-rc3: orchestrator needs OS-level write access to (a) .evolve/cycle-state.json + its _atomic_write '.tmp.$$' sibling, (b) .evolve/ledger.jsonl (subagent-run.sh appends), (c) .evolve/runs/cycle-* (its own report). cycle-state* uses a glob because sandbox-exec '(subpath FILE)' matches the file and descendants but NOT siblings sharing a prefix; generator at scripts/cli_adapters/claude.sh:265-267 dirname()s glob entries to .evolve/. To prevent that broadening from exposing other .evolve/ files, deny_subpaths explicitly enumerates EVERY top-level .evolve/ entry that is NOT one of the three intended write targets: state.json, state.json.bak, profiles/, evals/, instincts/ (parent), calibrate.sh, run_10_cycles.py, history/, research/, workspace/, genes/, tools/, skill-inventory.json, token-baseline.json, domain.json, latest-brief.json, notes.md, guards.log, current_run_id, .current_run. The .current_run dotfile must be quoted carefully — sandbox-exec subpath of a hidden filename works the same as a regular filename. Forge-resistance for ledger.jsonl is provided by hash-chain verification (cycle-health-check.sh + verify-eval.sh), NOT by the sandbox.",
   "sandbox": {
     "enabled": true,
     "write_subpaths": [
-      ".evolve/runs/cycle-*"
+      ".evolve/runs/cycle-*",
+      ".evolve/cycle-state*",
+      ".evolve/ledger.jsonl"
     ],
     "read_only_repo": true,
     "deny_subpaths": [
@@ -173,12 +176,25 @@
       ".claude-plugin",
       ".claude/settings.json",
       ".evolve/state.json",
-      ".evolve/ledger.jsonl",
+      ".evolve/state.json.bak",
       ".evolve/profiles",
       ".evolve/evals",
-      ".evolve/instincts/personal",
-      ".evolve/instincts/archived",
-      ".evolve/instincts/lessons",
+      ".evolve/instincts",
+      ".evolve/calibrate.sh",
+      ".evolve/run_10_cycles.py",
+      ".evolve/history",
+      ".evolve/research",
+      ".evolve/workspace",
+      ".evolve/genes",
+      ".evolve/tools",
+      ".evolve/skill-inventory.json",
+      ".evolve/token-baseline.json",
+      ".evolve/domain.json",
+      ".evolve/latest-brief.json",
+      ".evolve/notes.md",
+      ".evolve/guards.log",
+      ".evolve/current_run_id",
+      ".evolve/.current_run",
       "CHANGELOG.md",
       "README.md",
       "CLAUDE.md"

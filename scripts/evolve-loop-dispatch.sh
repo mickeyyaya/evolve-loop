@@ -209,11 +209,11 @@ for ((i=1; i<=CYCLES; i++)); do
 
     # Run the cycle. Pass strategy via env (run-cycle.sh accepts $EVOLVE_STRATEGY,
     # though current run-cycle.sh ignores it — the orchestrator subagent reads
-    # state.json's strategy field). Goal is the first positional.
-    set +e
+    # state.json's strategy field). Goal is the first positional. Per CLAUDE.md
+    # bash convention this script uses `set -uo pipefail` (no `set -e`), so the
+    # `rc=$?` capture is sufficient — no `set +e`/`set -e` toggling needed.
     EVOLVE_STRATEGY="$STRATEGY" bash "$RUN_CYCLE" "$GOAL"
     rc=$?
-    set -e
 
     if [ "$rc" -ne 0 ]; then
         log "FAIL: run-cycle.sh cycle $i exited rc=$rc — aborting batch"
