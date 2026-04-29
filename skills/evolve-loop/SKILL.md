@@ -4,9 +4,42 @@ description: Use when the user invokes /evolve-loop or asks to run autonomous im
 argument-hint: "[cycles] [strategy] [goal]"
 ---
 
-# Evolve Loop v8.13
+# Evolve Loop v8.13.7
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
+
+## STRICT MODE — Read this first (v8.13.7+)
+
+When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command:
+
+```bash
+bash scripts/evolve-loop-dispatch.sh <args>
+```
+
+…and then read its summary. Nothing else. The dispatcher loops `bash scripts/run-cycle.sh` once per cycle and asserts each cycle produced Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
+
+**You MUST NOT, when activating this skill:**
+- Use TodoWrite to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
+- Invoke Edit, Write, or Bash for any task other than the dispatcher itself (and reading its output).
+- Invoke the in-process Agent tool to run Scout/Builder/Auditor. Phase agents are spawned by `subagent-run.sh` from inside `run-cycle.sh`. They are profile-restricted; the in-process Agent tool is not.
+- "Help out" by editing files between cycles. Builder edits files inside its worktree, gated by `role-gate.sh`. You are not Builder.
+
+**Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries — meaning Scout and Builder were either skipped or run via the in-process Agent tool that bypasses the kernel hooks (`role-gate`, `phase-gate-precondition`, `ship-gate`). The dispatcher closes that gap structurally: every cycle goes through `run-cycle.sh`, which spawns the orchestrator subagent under `.evolve/profiles/orchestrator.json` (Edit/Write/git ops blocked at the kernel layer); that orchestrator then invokes Scout, Builder, Auditor via `subagent-run.sh` (sequence enforced by `phase-gate-precondition.sh`).
+
+**Reading the summary correctly:**
+
+| Dispatcher exit | Meaning | Your follow-up |
+|---|---|---|
+| `0` | All cycles ran AND ledger verified end-to-end | Report the summary; that's it |
+| `1` | A `run-cycle.sh` invocation failed | Surface the specific cycle's stderr and stop — do NOT retry inline |
+| `2` | A cycle bypassed Scout/Builder/Auditor (CRITICAL) | Quote the exact ledger counts to the user; recommend `git log` of the offending cycle dir under `.evolve/runs/cycle-N/` to investigate; STOP |
+| `10` | Bad arguments | Re-prompt with valid args |
+
+**Legacy escape hatch:** `EVOLVE_DISPATCH_VERIFY=0` skips the per-cycle ledger verification (used only for debugging the dispatcher itself). Never set this for real `/evolve-loop` use — the WARN it prints is your tripwire that someone disabled the only structural enforcement of pipeline completeness.
+
+The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `run-cycle.sh` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
+
+---
 
 > **v8.13.1**: trust boundary now enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `scripts/ship.sh` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `bash scripts/run-cycle.sh [GOAL]` — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
 

@@ -50,6 +50,7 @@ else
         "scripts/claude-adapter-test.sh"
         "scripts/codex-adapter-test.sh"
         "scripts/gemini-adapter-test.sh"
+        "scripts/evolve-loop-dispatch-test.sh"
         "scripts/probe-tool-test.sh"
         "scripts/postedit-validate-test.sh"
         "scripts/cycle-state-test.sh"
