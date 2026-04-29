@@ -8,6 +8,22 @@
   "homepage": "https://github.com/mickeyyaya/evolve-loop",
   "repository": "https://github.com/mickeyyaya/evolve-loop",
   "license": "MIT",
+  "compatibility": {
+    "primary_cli": "claude-code",
+    "tiers": {
+      "claude-code": "tier-1",
+      "gemini-cli": "tier-1-hybrid",
+      "codex-cli": "tier-3-stub",
+      "other": "tier-4-skill-text-only"
+    },
+    "tier_notes": {
+      "tier-1": "Production. Both skill content and runtime tested.",
+      "tier-1-hybrid": "Skill activates via Gemini CLI; runtime delegates to claude binary via scripts/cli_adapters/gemini.sh. Requires Claude CLI installed.",
+      "tier-3-stub": "Adapter exits 99. Skill content is portable; runtime not implemented.",
+      "tier-4-skill-text-only": "Documentation portable; no tested runtime adapter."
+    },
+    "see_also": "docs/platform-compatibility.md"
+  },
   "keywords": [
     "claude-code",
     "agents",

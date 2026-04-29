@@ -105,3 +105,10 @@ Until then, the hybrid driver is the only supported path.
 - [reference/platform-detect.md](platform-detect.md) — how the skill identifies its platform
 - [reference/claude-runtime.md](claude-runtime.md) — what gemini.sh delegates to
 - [docs/incidents/gemini-forgery.md](../../../docs/incidents/gemini-forgery.md) — the historical incident this design responds to
+
+## Last verified
+
+- **Date:** 2026-04-30
+- **Gemini CLI capability claims** (no `gemini -p`, no `--max-budget-usd`, no Task tool): cross-checked against `~/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/using-superpowers/references/gemini-tools.md`, the 2026-03 forgery incident report, and the upstream Gemini CLI repo at github.com/google-gemini/gemini-cli (as of 2026-04).
+- **Re-verify cadence:** quarterly, or whenever Google announces a Gemini CLI feature release. Replace this section with current-date evidence; if any of the three primitives ship, update both `gemini-tools.md` and the "Why hybrid" section above.
+- **Quick re-verify command:** `gemini --version && gemini --help 2>&1 | grep -E 'budget|prompt|task|tool'`

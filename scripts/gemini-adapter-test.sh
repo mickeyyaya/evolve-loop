@@ -50,7 +50,7 @@ fi
 # --- Test 3: --probe returns 99 when claude is forced missing ---------------
 header "Test 3: --probe exits 99 when claude is forced missing via test seam"
 set +e
-EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe >/dev/null 2>&1
+EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe >/dev/null 2>&1
 rc=$?
 set -e
 if [ "$rc" = "99" ]; then
@@ -62,7 +62,7 @@ fi
 # --- Test 4: error message identifies adapter + install hint ----------------
 header "Test 4: 'claude missing' error names adapter + install URL"
 set +e
-out=$(EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>&1)
+out=$(EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>&1)
 set -e
 if echo "$out" | grep -q "gemini-adapter" \
    && echo "$out" | grep -qE "claude.ai/code|claude binary not found"; then
@@ -74,8 +74,8 @@ fi
 # --- Test 5: error written to stderr, not stdout ----------------------------
 header "Test 5: 'claude missing' error routed to stderr"
 set +e
-stdout_only=$(EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>/dev/null)
-stderr_only=$(EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>&1 1>/dev/null)
+stdout_only=$(EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>/dev/null)
+stderr_only=$(EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>&1 1>/dev/null)
 set -e
 if [ -z "$stdout_only" ] && [ -n "$stderr_only" ]; then
     pass "error correctly routed to stderr"
@@ -87,6 +87,7 @@ fi
 header "Test 6: delegation log line emitted on run-mode invocation"
 if command -v claude >/dev/null 2>&1 && [ -f "$SCOUT_PROFILE" ]; then
     tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
     echo "test prompt" > "$tmpdir/prompt"
     stderr_log="$tmpdir/adapter-stderr.log"
     set +e
@@ -108,6 +109,7 @@ if command -v claude >/dev/null 2>&1 && [ -f "$SCOUT_PROFILE" ]; then
         fail_ "delegation log missing. stderr captured: $(cat "$stderr_log")"
     fi
     rm -rf "$tmpdir"
+    trap - EXIT
 else
     pass "skipped: claude not on PATH or scout profile missing (delegation test n/a)"
 fi

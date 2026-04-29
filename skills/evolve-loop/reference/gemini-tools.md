@@ -40,3 +40,10 @@ When SKILL.md says "invoke the Skill tool", on Gemini you call `activate_skill`.
 When SKILL.md or any phase doc says "spawn via subagent-run.sh" or "the in-process Agent tool is forbidden", that sentence applies on Gemini too: you don't try to invent a Gemini subagent — you invoke the same shell script (`bash scripts/subagent-run.sh ...`), which dispatches to the hybrid `gemini.sh` adapter, which spawns a real `claude -p` subprocess. The subagent isolation comes from the underlying Claude binary, not from Gemini.
 
 See [reference/gemini-runtime.md](gemini-runtime.md) for invocation details.
+
+## Last verified
+
+- **Date:** 2026-04-30
+- **Source:** `~/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/using-superpowers/references/gemini-tools.md`, plus 2026-03 forgery incident report
+- **Re-verify with:** `gemini --help 2>&1 | grep -E 'tools|prompt|budget'` (capability surface) and the `~/.claude/plugins/.../using-superpowers/references/gemini-tools.md` upstream
+- **Re-verify cadence:** quarterly. If Gemini CLI ships `gemini -p` (non-interactive prompt mode) or a `Task`-equivalent subagent dispatcher, this table needs updates and the hybrid-driver caveat in `gemini-runtime.md` may be relaxable.

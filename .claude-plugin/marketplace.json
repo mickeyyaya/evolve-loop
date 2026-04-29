@@ -27,6 +27,15 @@
         "eval",
         "self-evolving"
       ],
+      "compatibility": {
+        "primary_cli": "claude-code",
+        "tiers": {
+          "claude-code": "tier-1",
+          "gemini-cli": "tier-1-hybrid",
+          "codex-cli": "tier-3-stub"
+        },
+        "see_also": "docs/platform-compatibility.md"
+      },
       "strict": false
     }
   ]

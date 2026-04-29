@@ -7,7 +7,7 @@
 | CLI | Runtime tier | Status (v8.15+) | Notes |
 |---|---|---|---|
 | **Claude Code** | Tier 1 — primary | Production | The reference runtime. Every phase, gate, and subagent dispatch is tested here first. |
-| **Gemini CLI** | Tier 1 — hybrid driver | Supported | Gemini drives the conversation; subagents execute via `claude -p` (Claude binary required). See [Why hybrid](#why-hybrid). |
+| **Gemini CLI** | Tier 1 — hybrid driver (**requires Claude CLI on PATH**) | Supported | Gemini drives the conversation; subagents execute via `claude -p` — **the `claude` binary must be installed independently**. Without it, `gemini.sh` exits 99. See [Why hybrid](#why-hybrid). |
 | **Codex CLI** | Tier 3 — stub | Unsupported | `scripts/cli_adapters/codex.sh` exits 99. No production use. Implementing requires the same shape as `gemini.sh`. |
 | **Copilot CLI** | Tier 3 — not attempted | Unsupported | No adapter exists. Skill text is portable; runtime is not. |
 | **Other agentic CLIs** | Tier 4 — generic fallback | Skill-text-only | Any CLI that can read markdown and invoke shell scripts can read SKILL.md and follow the dispatcher path, but won't have a tested adapter. |
