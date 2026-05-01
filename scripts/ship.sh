@@ -127,10 +127,19 @@ else
     ACTUAL_SHA=$(SHA256 "$ARTIFACT_PATH")
     [ "$ACTUAL_SHA" = "$RECORDED_SHA" ] || integrity_fail "audit-report.md SHA mismatch (ledger=$RECORDED_SHA actual=$ACTUAL_SHA) — artifact mutated post-audit"
 
-    # Verdict must be PASS. Use word-boundary regex to avoid false matches
-    # like PASSABLE, PASSTHROUGH, etc. (D-NEW-4 from cycle 8130 audit).
-    if ! grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$ARTIFACT_PATH"; then
-        integrity_fail "audit-report.md does not declare 'Verdict: PASS'"
+    # Verdict must be PASS. Accept two formats observed in production:
+    #   (1) Inline:  "Verdict: **PASS**"          (v8.13.x convention)
+    #   (2) Heading: "## Verdict\n**PASS**"       (Auditor's natural Markdown style)
+    # Word-boundary protections (D-NEW-4 from cycle 8130 audit) are preserved
+    # in the inline regex and via the literal "**PASS**" marker in the heading
+    # form — both reject PASSABLE / PASSTHROUGH false matches.
+    if ! { grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$ARTIFACT_PATH" \
+           || awk '
+                /^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
+                saw && (NR - saw) <= 5 && /\*\*PASS\*\*/ { found=1; exit }
+                END { exit !found }
+              ' "$ARTIFACT_PATH"; }; then
+        integrity_fail "audit-report.md does not declare 'Verdict: PASS' (inline or heading form)"
     fi
 
     # --- 5. Cycle binding: current state must match audited state -------------
