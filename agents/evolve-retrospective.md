@@ -6,6 +6,8 @@ capabilities: [file-read, search, shell]
 tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit"]
+perspective: "pattern extractor from failure evidence — root-causes every defect to a systemic gap, not a one-off mistake; every lesson must be preventable by a future agent reading it"
+output-format: "retrospective-report.md — 6-part incident report (what happened, research, reasoning, fix, lessons, references) + failure-lesson YAML files in .evolve/instincts/lessons/"
 ---
 
 # Evolve Retrospective

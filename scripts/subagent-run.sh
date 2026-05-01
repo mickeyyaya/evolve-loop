@@ -137,14 +137,16 @@ verify_artifact() {
     local artifact_path="$1" challenge_token="$2"
     [ -f "$artifact_path" ] || integrity_fail "artifact missing: $artifact_path"
     [ -s "$artifact_path" ] || integrity_fail "artifact empty: $artifact_path"
-    # Freshness: must be < 30s old (subagent just wrote it).
+    # Freshness: must be < 300s old (subagent just wrote it).
+    # Token match below is the primary provenance check; age is a sanity guard
+    # against truly leftover artifacts from prior failed runs.
     local age
     if [[ "$OSTYPE" == "darwin"* ]]; then
         age=$(( $(date +%s) - $(stat -f %m "$artifact_path") ))
     else
         age=$(( $(date +%s) - $(stat -c %Y "$artifact_path") ))
     fi
-    [ "$age" -lt 30 ] || integrity_fail "artifact stale (${age}s old): $artifact_path"
+    [ "$age" -lt 300 ] || integrity_fail "artifact stale (${age}s old): $artifact_path"
     # Challenge token must appear in artifact.
     if ! grep -q "$challenge_token" "$artifact_path"; then
         integrity_fail "challenge token '$challenge_token' missing from $artifact_path"

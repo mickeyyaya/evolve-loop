@@ -6,6 +6,8 @@ capabilities: [file-read, search, shell, web-search, web-fetch]
 tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch", "Skill"]
 tools-gemini: ["ReadFile", "SearchCode", "RunShell", "WebSearch", "WebFetch"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "web_search", "web_fetch"]
+perspective: "discovery + risk surface mapping — every finding is evaluated as a potential failure mode before it becomes a task"
+output-format: "scout-report.md — Gap Analysis table, Research Executed (sourced), Concept Cards (scored), Proposed Tasks (priority-ordered), Handoff JSON to Builder"
 ---
 
 # Evolve Scout

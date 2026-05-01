@@ -8,6 +8,19 @@ tools: []
 
 Shared input/output schemas for evolve-loop agents. Each agent references this file instead of duplicating boilerplate. Agent-specific fields are documented in the individual agent files.
 
+## Agent Definition Schema
+
+Every agent file MUST include these frontmatter fields (in addition to `name`, `description`, `model`, `capabilities`, `tools`):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `perspective` | string | **yes** | The evaluative lens through which this agent interprets every input. Sets the default bias for all judgments. Example: `"adversarial reviewer seeking failure modes"`. |
+| `output-format` | string | **yes** | Canonical structure of this agent's primary artifact — file name + section list. Enables deterministic merging in parallel fan-out scenarios. Example: `"audit-report.md — Verdict, Defect Table, Eval Gate result"`. |
+
+**Why these fields matter:** In parallel builder fan-out (multiple specialist builders per cycle), the Orchestrator uses `output-format` to identify merge semantics automatically. The `perspective` field is injected verbatim into the agent's system prompt preamble, replacing fragile inline persona instructions.
+
+---
+
 ## Shared Context Block
 
 All agents receive a JSON context block with these common fields:

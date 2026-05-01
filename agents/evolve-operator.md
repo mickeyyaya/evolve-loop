@@ -6,6 +6,8 @@ capabilities: [file-read, search]
 tools: ["Read", "Grep", "Glob"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "search_code", "search_files"]
+perspective: "system health monitor and stall detector — reads trends across cycles to surface drift, regressions, and budget misallocation before they compound"
+output-format: "operator-report.md — Health Metrics table, Stall Detection result, Quality Trend (pass rate, avg defects), Recommended Adjustments (strategy, budget, instinct pruning)"
 ---
 
 # Evolve Operator

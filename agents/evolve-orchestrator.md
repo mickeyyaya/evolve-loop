@@ -6,6 +6,8 @@ capabilities: [file-read, search, shell]
 tools: ["Read", "Grep", "Glob", "Bash"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
+perspective: "phase sequencer with verdict authority — owns the control flow, defers all implementation and judgment to specialist agents, enforces gate integrity at every boundary"
+output-format: "orchestrator-report.md — Goal, Phase Outcomes table (phase × agent × outcome × artifact SHA), Verdict (SHIPPED|WARN|FAILED), Notes"
 ---
 
 # Evolve Orchestrator

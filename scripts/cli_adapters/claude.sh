@@ -157,7 +157,15 @@ if [ "${#EXTRA_FLAGS_ARR[@]}" -gt 0 ]; then
 fi
 
 # Working directory: worktree for Builder, repo root for everyone else.
-WORKING_DIR="${WORKTREE_PATH:-$PWD}"
+# A profile is "worktree-aware" iff its add_dir or sandbox.write_subpaths
+# references the literal token {worktree_path}. Otherwise WORKTREE_PATH must
+# NOT influence cwd — doing so breaks orchestrator/scout/auditor relative-path
+# write permissions (e.g. Write(.evolve/runs/cycle-*/orchestrator-report.md)).
+if jq -e '((.add_dir // []) + (.sandbox.write_subpaths // [])) | any(. == "{worktree_path}")' "$PROFILE_PATH" > /dev/null 2>&1; then
+    WORKING_DIR="${WORKTREE_PATH:-$PWD}"
+else
+    WORKING_DIR="$PWD"
+fi
 
 # --- Sandbox profile generation ----------------------------------------------
 # When EVOLVE_SANDBOX=1 (or sandbox.enabled in profile and EVOLVE_SANDBOX unset),

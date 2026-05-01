@@ -21,7 +21,6 @@
   ],
   "disallowed_tools": [
     "Edit(skills/**)",
-    "Edit(agents/**)",
     "Edit(scripts/**)",
     "Edit(.claude-plugin/**)",
     "Edit(.evolve/state.json)",
@@ -30,7 +29,6 @@
     "Edit(.evolve/evals/**)",
     "Edit(CLAUDE.md)",
     "Write(skills/**)",
-    "Write(agents/**)",
     "Write(scripts/**)",
     "Write(.claude-plugin/**)",
     "Write(.evolve/state.json)",

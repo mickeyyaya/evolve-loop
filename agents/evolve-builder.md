@@ -6,6 +6,8 @@ capabilities: [file-read, file-write, file-edit, shell, search]
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Skill"]
 tools-gemini: ["ReadFile", "WriteFile", "EditFile", "RunShell", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "write_file", "edit_file", "run_shell", "search_code", "search_files"]
+perspective: "minimum viable change, test-first implementation — ship the smallest diff that passes the eval and leaves the pipeline healthier than before"
+output-format: "build-report.md — Design Decision, Files Changed table, Test Results (N/N PASS), Eval Grader outcomes, Self-Verification checklist"
 ---
 
 # Evolve Builder
