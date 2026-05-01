@@ -116,11 +116,20 @@ fi
 REQUESTED_AGENT="${REQUESTED_AGENT%[\"\']}"
 REQUESTED_AGENT="${REQUESTED_AGENT#[\"\']}"
 
-# Recognized agents — anything else falls through (let subagent-run.sh
-# print its own error message).
+# Recognized agents (canonical phase agents and Sprint 1 fan-out workers).
+# Worker names are of the form `<role>-worker-<subtask>`. For workers, derive
+# the parent role and check sequence as if the parent role were invoked.
+# Unrecognized agents fall through (subagent-run.sh prints its own error).
+DERIVED_ROLE=""
 case "$REQUESTED_AGENT" in
-    scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective)
-        : ;;
+    scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer)
+        DERIVED_ROLE="$REQUESTED_AGENT"
+        ;;
+    scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*)
+        # Strip "-worker-<subtask>" to get parent role.
+        DERIVED_ROLE="${REQUESTED_AGENT%%-worker-*}"
+        log "worker-pattern: agent='$REQUESTED_AGENT' derived_role='$DERIVED_ROLE'"
+        ;;
     *)
         log "unrecognized agent '$REQUESTED_AGENT'; ALLOW (delegating to subagent-run.sh)"
         exit 0
@@ -164,27 +173,31 @@ fi
 
 EXPECTED=""
 case "$PHASE" in
-    calibrate)  EXPECTED="scout orchestrator" ;;
-    research)   EXPECTED="scout inspirer orchestrator" ;;
-    discover)   EXPECTED="scout tdd-engineer builder orchestrator" ;;
-    tdd)        EXPECTED="tdd-engineer builder orchestrator" ;;
-    build)      EXPECTED="builder auditor orchestrator" ;;
-    audit)      EXPECTED="auditor evaluator retrospective orchestrator" ;;
-    ship)       EXPECTED="orchestrator retrospective" ;;
-    learn)      EXPECTED="retrospective inspirer orchestrator" ;;
-    *)          EXPECTED="" ;;
+    calibrate)    EXPECTED="scout orchestrator" ;;
+    research)     EXPECTED="scout inspirer orchestrator" ;;
+    discover)     EXPECTED="scout plan-reviewer tdd-engineer builder orchestrator" ;;
+    plan-review)  EXPECTED="plan-reviewer scout tdd-engineer orchestrator" ;;
+    tdd)          EXPECTED="tdd-engineer builder orchestrator" ;;
+    build)        EXPECTED="builder auditor orchestrator" ;;
+    audit)        EXPECTED="auditor evaluator retrospective orchestrator" ;;
+    ship)         EXPECTED="orchestrator retrospective" ;;
+    learn)        EXPECTED="retrospective inspirer orchestrator" ;;
+    *)            EXPECTED="" ;;
 esac
 
-# Re-spawn always OK.
-if [ -n "$ACTIVE_AGENT" ] && [ "$REQUESTED_AGENT" = "$ACTIVE_AGENT" ]; then
-    log "ALLOW (re-spawn) phase=$PHASE cycle=$CYCLE_ID agent=$REQUESTED_AGENT"
-    exit 0
+# Re-spawn always OK. For workers, the prefix (parent role) is what counts.
+if [ -n "$ACTIVE_AGENT" ]; then
+    if [ "$REQUESTED_AGENT" = "$ACTIVE_AGENT" ] || [ "$DERIVED_ROLE" = "$ACTIVE_AGENT" ]; then
+        log "ALLOW (re-spawn) phase=$PHASE cycle=$CYCLE_ID agent=$REQUESTED_AGENT (derived=$DERIVED_ROLE)"
+        exit 0
+    fi
 fi
 
-# Check expected set.
+# Check expected set against the derived role (so workers inherit their
+# parent role's phase eligibility).
 ALLOWED=0
 for cand in $EXPECTED; do
-    if [ "$cand" = "$REQUESTED_AGENT" ]; then
+    if [ "$cand" = "$REQUESTED_AGENT" ] || [ "$cand" = "$DERIVED_ROLE" ]; then
         ALLOWED=1
         break
     fi

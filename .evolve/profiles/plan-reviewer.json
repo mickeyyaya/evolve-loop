@@ -1,0 +1,127 @@
+{
+  "name": "plan-reviewer",
+  "role": "plan-reviewer",
+  "cli": "claude",
+  "model_tier_default": "sonnet",
+  "model_tier_overrides": {
+    "high_ambiguity": "opus",
+    "routine_review": "haiku"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash(git status:*)",
+    "Bash(git log:*)",
+    "Bash(git diff:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(tail:*)",
+    "Bash(wc:*)",
+    "Bash(find:*)",
+    "Write(.evolve/runs/cycle-*/plan-review.md)",
+    "Write(.evolve/runs/cycle-*/handoff-plan-reviewer.json)",
+    "Write(.evolve/runs/cycle-*/workers/*)",
+    "Edit(.evolve/runs/cycle-*/plan-review.md)",
+    "Edit(.evolve/runs/cycle-*/handoff-plan-reviewer.json)",
+    "Edit(.evolve/runs/cycle-*/workers/*)"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git worktree:*)",
+    "Bash(rm:*)",
+    "Bash(mv:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "Bash(npm:*)",
+    "Bash(pip:*)",
+    "Bash(brew:*)",
+    "WebFetch",
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(CHANGELOG.md)",
+    "Edit(README.md)",
+    "Edit(CLAUDE.md)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Edit(.evolve/evals/**)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)",
+    "Write(.evolve/evals/**)"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 1.0,
+  "_budget_tiers_doc": "Plan-review is a read-heavy critique phase. Default tier sufficient for routine cycles; bump to 'deep' when the scout-report.md proposes architectural changes spanning many files.",
+  "budget_tiers": {
+    "default": 1.0,
+    "deep": 2.0
+  },
+  "max_turns": 20,
+  "permission_mode": "acceptEdits",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/plan-review.md",
+  "challenge_token_required": true,
+  "extra_flags": [
+    "--bare",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
+    "--setting-sources",
+    "project"
+  ],
+  "_parallel_subtasks_doc": "Sprint 2 multi-lens plan review (gstack /autoplan inspired): four lens reviewers run concurrently on the scout-report.md task list. Each scores the plan 0-10 on its dimension and emits 'Score: <0-10>' as the first content line. Aggregator computes verdict: PROCEED (avg >= 7, no lens < 5), REVISE (avg >= 5, any lens < 5), ABORT (avg < 5 or any critical-security flag).",
+  "parallel_subtasks": [
+    {
+      "name": "ceo",
+      "prompt_template": "You are plan-ceo-reviewer for cycle {cycle}. Read the scout-report.md task list and review through the CEO/founder lens: is this ambitious enough, does it solve a real problem worth solving, would scope EXPANSION yield a 10-star outcome? Score 0-10 (10 = 10-star product, 0 = busy work). First content line MUST be 'Score: <N>' followed by 'Verdict: <PROCEED|REVISE|ABORT>'. Body explains your reasoning + concrete revisions if score < 8."
+    },
+    {
+      "name": "eng",
+      "prompt_template": "You are plan-eng-reviewer for cycle {cycle}. Read scout-report.md and review through the eng-manager lens: architectural soundness, edge case coverage, test feasibility, risk of unintended impact. Score 0-10 (10 = bulletproof execution plan, 0 = will break in production). First content line MUST be 'Score: <N>' followed by 'Verdict: <PROCEED|REVISE|ABORT>'. Body lists architectural concerns and required test additions."
+    },
+    {
+      "name": "design",
+      "prompt_template": "You are plan-design-reviewer for cycle {cycle}. Read scout-report.md and review through the designer/UX lens: API surface ergonomics, naming clarity, conceptual integrity, user experience for downstream consumers (humans or other agents). Score 0-10 (10 = elegant and intuitive, 0 = confusing). First content line MUST be 'Score: <N>' followed by 'Verdict: <PROCEED|REVISE|ABORT>'. Body proposes naming/UX revisions if score < 8."
+    },
+    {
+      "name": "security",
+      "prompt_template": "You are plan-security-reviewer for cycle {cycle}. Read scout-report.md and review through the security/threat-modeling lens: does the plan widen the attack surface, weaken sandbox guarantees, expose secrets, or break trust kernel invariants (challenge tokens, ledger SHA, phase-gate)? Score 0-10 (10 = improves security posture, 0 = critical regression). First content line MUST be 'Score: <N>' followed by 'Verdict: <PROCEED|REVISE|ABORT>'. CRITICAL-SECURITY flag any sandbox or kernel weakening: scoring < 5 with security concerns triggers ABORT regardless of other lens scores."
+    }
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      "scripts",
+      "skills",
+      "agents",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "_design_notes": "Sprint 2 of the swarm architecture. Reads .evolve/runs/cycle-N/scout-report.md and produces .evolve/runs/cycle-N/plan-review.md with verdict PROCEED/REVISE/ABORT. The orchestrator routes accordingly: PROCEED -> tdd phase; REVISE -> Scout re-runs (max 2 retries); ABORT -> cycle ends. Default off via EVOLVE_PLAN_REVIEW=0 until eval-quality is verified."
+}

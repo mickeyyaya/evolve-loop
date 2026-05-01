@@ -36,9 +36,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROFILES_DIR="$REPO_ROOT/.evolve/profiles"
+PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$REPO_ROOT/.evolve/profiles}"
 ADAPTERS_DIR="$REPO_ROOT/scripts/cli_adapters"
-LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
+LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$REPO_ROOT/.evolve/ledger.jsonl}"
 
 log() { echo "[subagent-run] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
@@ -199,7 +199,17 @@ cmd_check_token() {
 
 cmd_run() {
     local agent="$1" cycle="$2" workspace="$3"
-    [[ "$agent" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator)$ ]] || fail "unknown agent: $agent"
+    # Accept canonical agent names AND fan-out worker names of the form
+    # `<role>-worker-<subtask>` (e.g., scout-worker-codebase). For workers,
+    # the profile is loaded from <role>.json and the artifact path is
+    # overridden to <workspace>/workers/<agent>.md.
+    local agent_role="$agent"
+    local worker_name=""
+    if [[ "$agent" =~ ^([a-z][a-z-]+)-worker-([a-z][a-z0-9-]+)$ ]]; then
+        agent_role="${BASH_REMATCH[1]}"
+        worker_name="${BASH_REMATCH[2]}"
+    fi
+    [[ "$agent_role" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer)$ ]] || fail "unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
 
@@ -223,7 +233,8 @@ cmd_run() {
         ts_phase_start_ms="$ts_now_ms"
     }
 
-    local profile="$PROFILES_DIR/${agent}.json"
+    # Workers borrow the parent role's profile but write to a per-worker artifact.
+    local profile="$PROFILES_DIR/${agent_role}.json"
     [ -f "$profile" ] || fail "profile not found: $profile"
 
     require_bin jq
@@ -245,10 +256,15 @@ cmd_run() {
 
     local model
     model=$(resolve_model_tier "$profile" "$cycle")
-    local artifact_template
-    artifact_template=$(jq -r '.output_artifact' "$profile")
-    local artifact_path
-    artifact_path="$REPO_ROOT/$(resolve_artifact_path "$artifact_template" "$cycle")"
+    local artifact_template artifact_path
+    if [ -n "$worker_name" ]; then
+        # Workers write to <workspace>/workers/<full-agent>.md regardless of
+        # the parent profile's output_artifact template.
+        artifact_path="$workspace/workers/${agent}.md"
+    else
+        artifact_template=$(jq -r '.output_artifact' "$profile")
+        artifact_path="$REPO_ROOT/$(resolve_artifact_path "$artifact_template" "$cycle")"
+    fi
 
     mkdir -p "$(dirname "$artifact_path")"
 
@@ -442,11 +458,195 @@ EOF
     exit 0
 }
 
+# Sprint 1 — parallel fan-out dispatcher. Reads the parent agent's profile
+# `parallel_subtasks` array, generates worker commands, runs them via
+# fanout-dispatch.sh, then merges their artifacts via aggregator.sh into the
+# canonical phase artifact. Writes one parent ledger entry of kind
+# `agent_fanout` referencing all worker child entries.
+#
+# Worker command resolution:
+#   - If EVOLVE_FANOUT_TEST_EXECUTOR is set, the worker command runs that
+#     script with EVOLVE_FANOUT_WORKER_{NAME,ARTIFACT,TOKEN,CYCLE,WORKSPACE}
+#     env vars populated. Used by dispatch-parallel-test.sh.
+#   - Otherwise, the worker command recurses into this script as
+#     `<agent>-worker-<name>`, with PROMPT_FILE_OVERRIDE pointing to the
+#     rendered subtask prompt. cmd_run handles the worker pattern (above).
+cmd_dispatch_parallel() {
+    local agent="${1:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
+    local cycle="${2:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
+    local workspace="${3:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
+
+    [[ "$agent" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer)$ ]] \
+        || fail "dispatch-parallel: unknown agent: $agent"
+    [[ "$cycle" =~ ^[0-9]+$ ]] || fail "dispatch-parallel: cycle must be integer: $cycle"
+    [ -d "$workspace" ] || fail "dispatch-parallel: workspace dir missing: $workspace"
+
+    local profile="$PROFILES_DIR/${agent}.json"
+    [ -f "$profile" ] || fail "dispatch-parallel: profile not found: $profile"
+    require_bin jq
+
+    # Extract parallel_subtasks; require at least one entry.
+    local subtask_count
+    subtask_count=$(jq -r '.parallel_subtasks // [] | length' "$profile")
+    if [ "$subtask_count" = "0" ] || [ "$subtask_count" = "null" ]; then
+        fail "dispatch-parallel: profile $profile has no parallel_subtasks array"
+    fi
+
+    log "dispatch-parallel: agent=$agent cycle=$cycle workers=$subtask_count"
+
+    local workers_dir="$workspace/workers"
+    mkdir -p "$workers_dir"
+
+    # Map phase name to aggregator merge mode (Scout-class agents → concat,
+    # auditor → verdict, retrospective → lessons).
+    local merge_phase
+    case "$agent" in
+        scout)         merge_phase="scout" ;;
+        auditor)       merge_phase="audit" ;;
+        retrospective) merge_phase="learn" ;;
+        *)             merge_phase="$agent" ;; # passthrough; aggregator validates
+    esac
+
+    # Determine canonical aggregate artifact path: profile.output_artifact if
+    # present, otherwise <workspace>/<agent>-report.md.
+    local agg_template agg_path
+    agg_template=$(jq -r '.output_artifact // empty' "$profile")
+    if [ -n "$agg_template" ]; then
+        agg_path="$REPO_ROOT/$(resolve_artifact_path "$agg_template" "$cycle")"
+    else
+        agg_path="$workspace/${agent}-report.md"
+    fi
+    mkdir -p "$(dirname "$agg_path")"
+
+    local parent_token
+    parent_token=$(generate_challenge_token)
+    local git_state_at_start
+    git_state_at_start=$(capture_git_state)
+
+    # Build commands.tsv: <worker_name>\t<command>
+    local commands_tsv="$workers_dir/.fanout-commands.tsv"
+    : > "$commands_tsv"
+
+    # Track worker names + artifact paths for the aggregator pass.
+    local worker_names="" worker_artifacts=""
+
+    local i=0
+    while [ "$i" -lt "$subtask_count" ]; do
+        local sname stemplate sprompt_file worker_artifact worker_token cmd
+        sname=$(jq -r ".parallel_subtasks[$i].name" "$profile")
+        stemplate=$(jq -r ".parallel_subtasks[$i].prompt_template // \"\"" "$profile")
+        worker_artifact="$workers_dir/${agent}-${sname}.md"
+        worker_token=$(generate_challenge_token)
+
+        # Render prompt template (substitute {cycle}, {agent}, {worker}, {workspace}).
+        sprompt_file="$workers_dir/.prompt-${sname}.txt"
+        printf '%s' "$stemplate" \
+            | sed "s|{cycle}|$cycle|g; s|{agent}|$agent|g; s|{worker}|$sname|g; s|{workspace}|$workspace|g" \
+            > "$sprompt_file"
+
+        if [ -n "${EVOLVE_FANOUT_TEST_EXECUTOR:-}" ]; then
+            # Test mode: run the test executor with env vars; no LLM call.
+            cmd="EVOLVE_FANOUT_PARENT_AGENT=$agent EVOLVE_FANOUT_WORKER_NAME=$sname EVOLVE_FANOUT_WORKER_ARTIFACT=$worker_artifact EVOLVE_FANOUT_WORKER_TOKEN=$worker_token EVOLVE_FANOUT_CYCLE=$cycle EVOLVE_FANOUT_WORKSPACE=$workspace bash $EVOLVE_FANOUT_TEST_EXECUTOR"
+        else
+            # Production mode: recurse through subagent-run.sh as <agent>-worker-<name>.
+            # The worker borrows the parent profile but writes its own artifact.
+            cmd="PROMPT_FILE_OVERRIDE=$sprompt_file bash ${BASH_SOURCE[0]} ${agent}-worker-${sname} $cycle $workspace"
+        fi
+        printf '%s\t%s\n' "${agent}-${sname}" "$cmd" >> "$commands_tsv"
+
+        worker_names="$worker_names ${agent}-${sname}"
+        worker_artifacts="$worker_artifacts $worker_artifact"
+        i=$((i + 1))
+    done
+
+    # Run workers in parallel.
+    local results_tsv="$workers_dir/.fanout-results.tsv"
+    local fanout_rc=0
+    bash "$REPO_ROOT/scripts/fanout-dispatch.sh" "$commands_tsv" "$results_tsv" || fanout_rc=$?
+
+    if [ "$fanout_rc" -ne 0 ]; then
+        log "dispatch-parallel: fanout-dispatch returned non-zero (rc=$fanout_rc); per-worker exit codes:"
+        if [ -f "$results_tsv" ]; then
+            sed 's/^/  /' "$results_tsv" >&2
+        fi
+        # Continue to write a parent ledger entry recording the failure, then exit.
+        local agg_path_or_empty=""
+        [ -f "$agg_path" ] && agg_path_or_empty="$agg_path"
+        _write_fanout_ledger_entry "$cycle" "$agent" "$parent_token" "$git_state_at_start" \
+            "$worker_names" "$subtask_count" "$fanout_rc" "$agg_path_or_empty" "$results_tsv"
+        exit 1
+    fi
+
+    # Aggregate worker artifacts into canonical phase artifact.
+    local agg_rc=0
+    # shellcheck disable=SC2086
+    bash "$REPO_ROOT/scripts/aggregator.sh" "$merge_phase" "$agg_path" $worker_artifacts || agg_rc=$?
+
+    # Write parent ledger entry regardless of agg_rc (record outcome).
+    _write_fanout_ledger_entry "$cycle" "$agent" "$parent_token" "$git_state_at_start" \
+        "$worker_names" "$subtask_count" "$agg_rc" "$agg_path" "$results_tsv"
+
+    if [ "$agg_rc" -ne 0 ]; then
+        log "dispatch-parallel: aggregator returned non-zero (rc=$agg_rc) for phase=$merge_phase"
+        exit 1
+    fi
+    log "dispatch-parallel: DONE agent=$agent cycle=$cycle aggregate=$agg_path workers=$subtask_count"
+    exit 0
+}
+
+# Helper: write a single ledger entry for a fan-out parent invocation.
+# Args: cycle agent token git_state worker_names_space_separated worker_count exit_code agg_path results_tsv
+_write_fanout_ledger_entry() {
+    local cycle="$1" agent="$2" token="$3" git_state="$4"
+    local worker_names="$5" worker_count="$6" exit_code="$7"
+    local agg_path="$8" results_tsv="$9"
+    local artifact_sha=""
+    if [ -n "$agg_path" ] && [ -f "$agg_path" ]; then
+        if command -v sha256sum >/dev/null 2>&1; then
+            artifact_sha=$(sha256sum "$agg_path" | awk '{print $1}')
+        else
+            artifact_sha=$(shasum -a 256 "$agg_path" | awk '{print $1}')
+        fi
+    fi
+    local ts; ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local git_head="${git_state%%:*}"
+    local tree_state_sha="${git_state##*:}"
+
+    # Build workers JSON array via jq.
+    local workers_json="[]"
+    if [ -n "$worker_names" ]; then
+        # shellcheck disable=SC2086
+        workers_json=$(printf '%s\n' $worker_names | jq -R . | jq -s .)
+    fi
+
+    mkdir -p "$(dirname "$LEDGER")"
+    jq -nc \
+        --arg ts "$ts" \
+        --argjson cycle "$cycle" \
+        --arg agent "$agent" \
+        --argjson exit_code "$exit_code" \
+        --arg artifact_path "$agg_path" \
+        --arg artifact_sha256 "$artifact_sha" \
+        --arg challenge_token "$token" \
+        --arg git_head "$git_head" \
+        --arg tree_state_sha "$tree_state_sha" \
+        --argjson worker_count "$worker_count" \
+        --argjson workers "$workers_json" \
+        '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_fanout",
+          exit_code: $exit_code,
+          artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
+          challenge_token: $challenge_token,
+          git_head: $git_head, tree_state_sha: $tree_state_sha,
+          worker_count: $worker_count, workers: $workers}' \
+        >> "$LEDGER"
+}
+
 # --- Main --------------------------------------------------------------------
 
 [ $# -ge 1 ] || { cat >&2 <<'USAGE'
 Usage:
   subagent-run.sh <agent> <cycle> <workspace_path>
+  subagent-run.sh dispatch-parallel <agent> <cycle> <workspace_path>
   subagent-run.sh --validate-profile <agent>
   subagent-run.sh --check-token <artifact_path> <token>
 
@@ -458,5 +658,6 @@ USAGE
 case "$1" in
     --validate-profile) shift; cmd_validate_profile "$@" ;;
     --check-token) shift; cmd_check_token "$@" ;;
+    dispatch-parallel) shift; cmd_dispatch_parallel "$@" ;;
     *) cmd_run "$@" ;;
 esac

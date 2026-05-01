@@ -197,6 +197,76 @@ The hybrid pattern exists because Gemini CLI lacks non-interactive prompt mode (
 
 Mirror the hybrid pattern (delegate to `claude.sh`) before attempting a native adapter. The native-adapter path requires verifying the new CLI has: non-interactive prompt mode, profile-scoped permissions, and either a budget cap flag or external cost tracking. Until those are confirmed, the hybrid path keeps the trust boundary intact.
 
+## Swarm Architecture (v8.16+)
+
+evolve-loop is structured around three composable layers (see [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md) for the formal spec):
+
+| Layer | Files | Purpose |
+|---|---|---|
+| **Skill** | `skills/<name>/SKILL.md` | Workflow + steps + exit criteria — the *how* |
+| **Persona** | `agents/<role>.md` | One role, one perspective, one output format — the *who* |
+| **Command** | `.claude-plugin/commands/<name>.md` | User-facing entry point — the *when* (orchestration) |
+
+**The governing rule:** the user (or a slash command) is the orchestrator. **Personas do not invoke other personas.** Claude Code enforces this at runtime: subagents cannot spawn subagents.
+
+### Sprint 1 — Pattern 3 fan-out (parallel sub-personas + aggregator)
+
+Scout, Auditor, and Retrospective each fan out into specialized parallel sub-personas, then `scripts/aggregator.sh` merges them into the canonical phase artifact:
+
+```bash
+EVOLVE_FANOUT_ENABLED=1 EVOLVE_FANOUT_SCOUT=1 \
+  bash scripts/subagent-run.sh dispatch-parallel scout <cycle> <workspace>
+```
+
+| Phase | Sub-personas | Default-off env flag |
+|---|---|---|
+| Scout | scout-codebase, scout-research, scout-evals | `EVOLVE_FANOUT_SCOUT` |
+| Auditor | audit-eval-replay, audit-lint, audit-regression, audit-build-quality | `EVOLVE_FANOUT_AUDITOR` |
+| Retrospective | retro-instinct, retro-gene, retro-failure | `EVOLVE_FANOUT_RETROSPECTIVE` |
+
+Master switch: `EVOLVE_FANOUT_ENABLED=1`. Concurrency cap: `EVOLVE_FANOUT_CONCURRENCY` (default 4). Per-worker timeout: `EVOLVE_FANOUT_TIMEOUT` (default 600s). Builder is **excluded** from fan-out — single-writer invariant on the worktree.
+
+### Sprint 2 — Multi-lens plan review (gstack `/autoplan` inspired)
+
+A new `plan-review` phase between `discover` and `tdd` runs four lens reviewers (CEO/Eng/Design/Security) in parallel against `scout-report.md`. Aggregator computes verdict:
+
+| Verdict | Trigger | Orchestrator action |
+|---|---|---|
+| PROCEED | Avg ≥ 7 AND no lens < 5 | Advance to TDD |
+| REVISE | Avg ≥ 5 AND any lens < 5 | Re-run Scout (max 2 retries) |
+| ABORT | Any explicit ABORT, OR avg < 5 | End cycle |
+
+Default-off via `EVOLVE_PLAN_REVIEW=0`. Phase gate `gate_plan_review_to_tdd` enforces verdict at the kernel layer.
+
+### Sprint 3 — Tri-layer composable skill catalog
+
+7 new composable skills (`skills/evolve-{spec,plan-review,tdd,build,audit,ship,retro}/`) compose with the existing macro:
+
+| Skill | Maps to slash command | Pattern |
+|---|---|---|
+| `evolve-spec` | `/scout` (codebase sub-scout) | Pattern 3 fan-out |
+| `evolve-plan-review` | `/plan-review` | Pattern 3 fan-out |
+| `evolve-tdd` | `/tdd` | Pattern 1/2 (single persona) |
+| `evolve-build` | `/build` | Pattern 1/2 (single, single-writer) |
+| `evolve-audit` | `/audit` | Pattern 3 fan-out |
+| `evolve-ship` | `/ship` | Pattern 1/2 (atomic) |
+| `evolve-retro` | `/retro` | Pattern 3 fan-out |
+| `evolve-loop` (existing macro) | `/loop` | **Pattern 5** auto-orchestrated under trust kernel |
+
+**Pattern 5 is specific to evolve-loop** because the trust kernel (sandbox + ledger SHA + phase-gate) substitutes for the human checkpoints addyosmani's framework relies on — see [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md) for justification.
+
+### Worker name pattern (`<role>-worker-<subtask>`)
+
+Fan-out workers invoke `subagent-run.sh <role>-worker-<name>`. Examples:
+- `scout-worker-codebase`, `scout-worker-research`, `scout-worker-evals`
+- `auditor-worker-eval-replay`, `auditor-worker-lint`, `auditor-worker-regression`, `auditor-worker-build-quality`
+
+`cmd_run` strips the `-worker-<name>` suffix to find the parent profile (`scout.json`), but writes to `<workspace>/workers/<full-agent>.md`. `phase-gate-precondition.sh` derives the parent role for sequence checking — workers inherit phase eligibility from their parent role's expected-agent set.
+
+### Verifying the swarm architecture
+
+Run `bash scripts/swarm-architecture-test.sh` to verify all three layers wire correctly (40 assertions covering plugin.json registrations, skill files, slash commands, persona files, profile parallel_subtasks, state machine, phase gate, aggregator merge modes, dispatch-parallel command, and end-to-end smoke test).
+
 ## Evolve Loop Task Priority
 
 When selecting tasks for `/evolve-loop` cycles, follow this priority order:

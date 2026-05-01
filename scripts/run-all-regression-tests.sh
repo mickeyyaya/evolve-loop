@@ -68,6 +68,10 @@ else
         "scripts/merge-lesson-test.sh"
         "scripts/subagent-run-test.sh"
         "scripts/run-all-regression-tests-test.sh"
+        "scripts/fanout-dispatch-test.sh"
+        "scripts/aggregator-test.sh"
+        "scripts/dispatch-parallel-test.sh"
+        "scripts/swarm-architecture-test.sh"
     )
 fi
 

@@ -30,9 +30,11 @@
     "Write(.evolve/runs/cycle-*/scout-report.md)",
     "Write(.evolve/runs/cycle-*/handoff-scout.json)",
     "Write(.evolve/runs/cycle-*/scout-stdout.log)",
+    "Write(.evolve/runs/cycle-*/workers/*)",
     "Write(.evolve/evals/cycle-*/*)",
     "Edit(.evolve/runs/cycle-*/scout-report.md)",
-    "Edit(.evolve/runs/cycle-*/handoff-scout.json)"
+    "Edit(.evolve/runs/cycle-*/handoff-scout.json)",
+    "Edit(.evolve/runs/cycle-*/workers/*)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",
@@ -87,6 +89,21 @@
     "--disable-slash-commands",
     "--setting-sources",
     "project"
+  ],
+  "_parallel_subtasks_doc": "Sprint 1.1 fan-out: when invoked via `subagent-run.sh dispatch-parallel scout`, three sub-scouts run concurrently. Each writes to .evolve/runs/cycle-N/workers/scout-<name>.md and aggregator.sh merges into the canonical scout-report.md. Default-off — see EVOLVE_FANOUT_ENABLED in CLAUDE.md.",
+  "parallel_subtasks": [
+    {
+      "name": "codebase",
+      "prompt_template": "You are scout-codebase for cycle {cycle}. Focus exclusively on codebase analysis: read source files, dependency graphs, recent commits, and identify candidate task targets. DO NOT do web research. Your output is one of three sub-scout reports that will be merged."
+    },
+    {
+      "name": "research",
+      "prompt_template": "You are scout-research for cycle {cycle}. Focus exclusively on web research: prior art, library documentation, competitor implementations relevant to the cycle's goal. DO NOT analyze the codebase. Your output is one of three sub-scout reports that will be merged."
+    },
+    {
+      "name": "evals",
+      "prompt_template": "You are scout-evals for cycle {cycle}. Focus exclusively on eval definition design: propose 1-3 testable evals for the candidate tasks, with mutation-test specs ready for scripts/mutate-eval.sh. DO NOT do codebase grepping or web research beyond what's needed for eval design. Your output is one of three sub-scout reports that will be merged."
+    }
   ],
   "sandbox": {
     "enabled": true,

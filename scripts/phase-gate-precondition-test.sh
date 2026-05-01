@@ -150,6 +150,34 @@ set_state build builder
 expect_allow "leading-ws + auditor" \
     '{"tool_input":{"command":"   bash scripts/subagent-run.sh auditor 99000 .evolve/runs/cycle-99000"}}'
 
+# === Test 16: scout-worker-* allowed in research phase (parent role check) ===
+# Workers (Sprint 1 fan-out) should be sequence-checked against their parent
+# role's expected-agent set.
+header "Test 16: research + scout-worker-codebase → ALLOW (worker for valid parent)"
+set_state research scout
+expect_allow "research→scout-worker-codebase" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-codebase 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 17: auditor-worker-* allowed in audit phase ========================
+header "Test 17: audit + auditor-worker-eval → ALLOW"
+set_state audit auditor
+expect_allow "audit→auditor-worker-eval" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh auditor-worker-eval 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 18: scout-worker-* denied in build phase (out of order) ============
+header "Test 18: build + scout-worker-codebase → DENY (worker for wrong-phase parent)"
+set_state build builder
+expect_deny "build→scout-worker-codebase" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-codebase 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 19: worker re-spawn match against active_agent =====================
+# When active_agent=scout and a worker scout-worker-codebase is requested,
+# the prefix should re-spawn-match (active_agent is the parent role).
+header "Test 19: active=scout + scout-worker-research → ALLOW (re-spawn prefix)"
+set_state research scout
+expect_allow "research→scout-worker-research" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-research 99000 .evolve/runs/cycle-99000"}}'
+
 # === Summary =================================================================
 echo
 echo "=========================================="

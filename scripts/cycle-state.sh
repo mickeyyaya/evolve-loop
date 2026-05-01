@@ -113,7 +113,7 @@ cycle_state_advance() {
         '
         . as $s
         | .phase as $cur
-        | (["calibrate","research","discover","tdd","build","audit","ship","learn"]) as $known
+        | (["calibrate","research","discover","plan-review","tdd","build","audit","ship","learn"]) as $known
         | .completed_phases =
             (if ($known | index($cur)) and (($s.completed_phases | index($cur)) == null)
              then $s.completed_phases + [$cur]
@@ -123,6 +123,42 @@ cycle_state_advance() {
         | .active_agent = (if $agent == null then .active_agent else $agent end)
         | .active_worktree = (if $worktree == null then .active_worktree else $worktree end)
         ')
+    _atomic_write "$updated"
+}
+
+cycle_state_set_parallel_workers() {
+    # Sprint 1.1 observability: record that a fan-out dispatch is in flight.
+    # Field shape: parallel_workers = {agent: <name>, count: <N>, started_at: <iso>}.
+    # This is purely informational — phase-gate-precondition.sh continues to
+    # gate on active_agent. dispatch-parallel writes one of these on entry,
+    # clears it on exit.
+    local agent="${1:?agent required}"
+    local count="${2:?count required}"
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot set_parallel_workers — state file missing" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required" >&2
+        return 1
+    fi
+    local now; now=$(_iso_now)
+    local current; current=$(cat "$CYCLE_STATE_FILE")
+    local updated
+    updated=$(echo "$current" | jq -c \
+        --arg agent "$agent" \
+        --argjson count "$count" \
+        --arg now "$now" \
+        '.parallel_workers = {agent: $agent, count: $count, started_at: $now}')
+    _atomic_write "$updated"
+}
+
+cycle_state_clear_parallel_workers() {
+    if ! cycle_state_exists; then return 0; fi
+    if ! command -v jq >/dev/null 2>&1; then return 0; fi
+    local current; current=$(cat "$CYCLE_STATE_FILE")
+    local updated
+    updated=$(echo "$current" | jq -c 'del(.parallel_workers)')
     _atomic_write "$updated"
 }
 
@@ -181,14 +217,16 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     cmd="${1:-}"
     shift || true
     case "$cmd" in
-        init)         cycle_state_init "$@" ;;
-        advance)      cycle_state_advance "$@" ;;
-        set-agent)    cycle_state_set_agent "$@" ;;
-        clear)        cycle_state_clear ;;
-        get)          cycle_state_get "$@" ;;
-        exists)       cycle_state_exists && echo yes || { echo no; exit 1; } ;;
-        dump)         cycle_state_dump ;;
-        path)         cycle_state_path ;;
-        *)            echo "usage: cycle-state.sh {init|advance|set-agent|clear|get|exists|dump|path}" >&2; exit 2 ;;
+        init)                    cycle_state_init "$@" ;;
+        advance)                 cycle_state_advance "$@" ;;
+        set-agent)               cycle_state_set_agent "$@" ;;
+        set-parallel-workers)    cycle_state_set_parallel_workers "$@" ;;
+        clear-parallel-workers)  cycle_state_clear_parallel_workers ;;
+        clear)                   cycle_state_clear ;;
+        get)                     cycle_state_get "$@" ;;
+        exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
+        dump)                    cycle_state_dump ;;
+        path)                    cycle_state_path ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-parallel-workers|clear-parallel-workers|clear|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

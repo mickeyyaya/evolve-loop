@@ -305,6 +305,46 @@ gate_discover_to_build() {
     log "PASS: DISCOVER → BUILD gate"
 }
 
+# ─── Gate: PLAN-REVIEW → TDD (Sprint 2) ───
+# Requires plan-review.md fresh + substantive + verdict != ABORT.
+# Verdict semantics:
+#   PROCEED — orchestrator routes cycle to TDD phase
+#   REVISE  — orchestrator returns to Scout (max 2 retries; tracked in cycle-state)
+#   ABORT   — gate fails the cycle; ship.sh would refuse anyway
+gate_plan_review_to_tdd() {
+    log "Checking PLAN-REVIEW → TDD gate for cycle $CYCLE"
+
+    check_file_exists "$WORKSPACE/plan-review.md" "Plan-review report"
+    check_file_fresh "$WORKSPACE/plan-review.md" "Plan-review report"
+    check_artifact_substance "$WORKSPACE/plan-review.md" "Plan-review report"
+
+    # Look for ledger entry from plan-reviewer (either as agent_subprocess or
+    # agent_fanout from dispatch-parallel).
+    if ! grep -q '"role":"plan-reviewer"' "$LEDGER" 2>/dev/null; then
+        fail "No plan-reviewer ledger entry for cycle $CYCLE"
+    fi
+
+    # First content line must be 'Verdict: <X>'.
+    local verdict
+    verdict=$(awk 'tolower($0) ~ /^verdict:/ { gsub(/^[^:]*:[[:space:]]*/, ""); gsub(/[[:space:]].*/, ""); print toupper($0); exit }' "$WORKSPACE/plan-review.md")
+    case "$verdict" in
+        PROCEED)
+            log "OK: Plan-review verdict PROCEED"
+            ;;
+        REVISE)
+            fail "Plan-review verdict REVISE — orchestrator should re-run Scout (not advance to TDD)"
+            ;;
+        ABORT)
+            fail "Plan-review verdict ABORT — cycle should end (do not advance to TDD)"
+            ;;
+        *)
+            fail "Plan-review verdict missing or unrecognized: '$verdict'"
+            ;;
+    esac
+
+    log "PASS: PLAN-REVIEW → TDD gate"
+}
+
 # ─── Gate: BUILD → AUDIT ───
 gate_build_to_audit() {
     log "Checking BUILD → AUDIT gate for cycle $CYCLE"

@@ -38,15 +38,36 @@
     "./agents/evolve-scout.md",
     "./agents/evolve-builder.md",
     "./agents/evolve-auditor.md",
-    "./agents/evolve-operator.md"
+    "./agents/evolve-operator.md",
+    "./agents/evolve-tdd-engineer.md",
+    "./agents/evolve-retrospective.md",
+    "./agents/evolve-orchestrator.md",
+    "./agents/plan-reviewer.md"
   ],
   "skills": [
     "./skills/evolve-loop/",
+    "./skills/evolve-spec/",
+    "./skills/evolve-plan-review/",
+    "./skills/evolve-tdd/",
+    "./skills/evolve-build/",
+    "./skills/evolve-audit/",
+    "./skills/evolve-ship/",
+    "./skills/evolve-retro/",
     "./skills/refactor/",
     "./skills/code-review-simplify/",
     "./skills/inspirer/",
     "./skills/evaluator/",
     "./skills/publish/",
     "./skills/verify-release/"
+  ],
+  "commands": [
+    "./.claude-plugin/commands/scout.md",
+    "./.claude-plugin/commands/plan-review.md",
+    "./.claude-plugin/commands/tdd.md",
+    "./.claude-plugin/commands/build.md",
+    "./.claude-plugin/commands/audit.md",
+    "./.claude-plugin/commands/ship.md",
+    "./.claude-plugin/commands/retro.md",
+    "./.claude-plugin/commands/loop.md"
   ]
 }
