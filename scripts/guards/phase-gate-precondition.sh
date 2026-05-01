@@ -153,7 +153,8 @@ fi
 # Mapping (current phase → set of acceptable next agents):
 #   calibrate  → scout (research starts)
 #   research   → scout (still researching) | inspirer (heuristic injection)
-#   discover   → scout (continuing) | builder (next phase)
+#   discover   → scout (continuing) | tdd-engineer (TDD phase) | builder (skip-tdd path)
+#   tdd        → tdd-engineer (re-spawn) | builder (next phase, after RED tests written)
 #   build      → builder (re-spawn) | auditor (next phase)
 #   audit      → auditor (re-spawn) | retrospective (on FAIL/WARN — orchestrator decides) | evaluator
 #   ship       → orchestrator (re-spawn) | retrospective
@@ -165,7 +166,8 @@ EXPECTED=""
 case "$PHASE" in
     calibrate)  EXPECTED="scout orchestrator" ;;
     research)   EXPECTED="scout inspirer orchestrator" ;;
-    discover)   EXPECTED="scout builder orchestrator" ;;
+    discover)   EXPECTED="scout tdd-engineer builder orchestrator" ;;
+    tdd)        EXPECTED="tdd-engineer builder orchestrator" ;;
     build)      EXPECTED="builder auditor orchestrator" ;;
     audit)      EXPECTED="auditor evaluator retrospective orchestrator" ;;
     ship)       EXPECTED="orchestrator retrospective" ;;

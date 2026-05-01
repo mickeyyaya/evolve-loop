@@ -1,0 +1,100 @@
+{
+  "name": "tdd-engineer",
+  "role": "tdd-engineer",
+  "cli": "claude",
+  "model_tier_default": "sonnet",
+  "model_tier_overrides": {
+    "ultrathink_strategy": "opus",
+    "m_complex_5plus_files": "opus",
+    "audit_retry_2plus": "opus",
+    "s_complex_with_cache": "haiku"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Edit",
+    "Write",
+    "MultiEdit",
+    "NotebookEdit",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/cli_adapters/**)",
+    "Edit(scripts/guards/**)",
+    "Edit(scripts/run-cycle.sh)",
+    "Edit(scripts/subagent-run.sh)",
+    "Edit(scripts/ship.sh)",
+    "Edit(scripts/cycle-state.sh)",
+    "Edit(scripts/release/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Edit(.evolve/evals/**)",
+    "Edit(CLAUDE.md)",
+    "Edit(README.md)",
+    "Edit(CHANGELOG.md)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/cli_adapters/**)",
+    "Write(scripts/guards/**)",
+    "Write(scripts/run-cycle.sh)",
+    "Write(scripts/subagent-run.sh)",
+    "Write(scripts/ship.sh)",
+    "Write(scripts/cycle-state.sh)",
+    "Write(scripts/release/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)",
+    "Write(.evolve/evals/**)",
+    "Write(CLAUDE.md)",
+    "Write(README.md)",
+    "Write(CHANGELOG.md)",
+    "Bash(git push:*)",
+    "Bash(git commit:*)",
+    "Bash(git config:*)",
+    "Bash(jq -i:*)",
+    "Bash(jq --in-place:*)"
+  ],
+  "add_dir": [
+    "{worktree_path}"
+  ],
+  "max_budget_usd": 1.5,
+  "max_turns": 60,
+  "permission_mode": "acceptEdits",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/test-report.md",
+  "challenge_token_required": true,
+  "isolation": "worktree",
+  "extra_flags": [
+    "--no-session-persistence",
+    "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
+    "--setting-sources",
+    "project"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      "{worktree_path}/tests",
+      "{worktree_path}/scripts/*-test.sh",
+      "{worktree_path}/scripts/test-*.sh",
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": false,
+    "deny_subpaths": [
+      ".git",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals",
+      "agents",
+      "skills"
+    ],
+    "allow_network": false
+  }
+}

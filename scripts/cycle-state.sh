@@ -113,7 +113,7 @@ cycle_state_advance() {
         '
         . as $s
         | .phase as $cur
-        | (["calibrate","research","discover","build","audit","ship","learn"]) as $known
+        | (["calibrate","research","discover","tdd","build","audit","ship","learn"]) as $known
         | .completed_phases =
             (if ($known | index($cur)) and (($s.completed_phases | index($cur)) == null)
              then $s.completed_phases + [$cur]

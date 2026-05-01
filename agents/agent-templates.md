@@ -76,6 +76,7 @@ Adapt behavior based on the active `strategy` from context. See SKILL.md Strateg
 
 Each agent applies strategy to its own domain:
 - **Scout:** adapts discovery scope and task selection priorities
+- **TDD Engineer:** adapts test depth and coverage threshold enforcement
 - **Builder:** adapts implementation approach and risk tolerance
 - **Auditor:** adapts audit strictness and checklist depth
 
@@ -142,3 +143,23 @@ Agent-specific `data` fields are defined in each agent file's Ledger Entry secti
 - **On start:** Read `workspace/agent-mailbox.md` for messages addressed to you (by role name) or `to: "all"`. Apply any hints, flags, or persistent warnings from prior agents.
 - **On completion:** Post messages for other agents if you identified concerns worth carrying forward (e.g., fragile files, recurring smells, follow-up suggestions).
 - Use `persistent: true` only for concerns spanning multiple cycles.
+
+---
+
+## Pipeline Agents
+
+The full evolve-loop pipeline and the agent responsible for each phase:
+
+| Phase | Agent | File | Output Artifact |
+|-------|-------|------|-----------------|
+| Calibrate | Orchestrator | `evolve-orchestrator.md` | cycle-state.json |
+| Research / Discover | Scout | `evolve-scout.md` | `scout-report.md` |
+| Test Contract (TDD) | TDD Engineer | `evolve-tdd-engineer.md` | `test-report.md` |
+| Build | Builder | `evolve-builder.md` | `build-report.md` |
+| Audit | Auditor | `evolve-auditor.md` | `audit-report.md` |
+| Ship | Orchestrator / ship.sh | `evolve-orchestrator.md` | commit SHA |
+| Learn | Retrospective | `evolve-retrospective.md` | instinct entries |
+
+**TDD Engineer contract:** Runs after Scout selects a task and before Builder implements. Writes failing tests that encode acceptance criteria (RED phase). Builder must make those tests pass without modifying them. See [evolve-tdd-engineer.md](evolve-tdd-engineer.md) for the full workflow.
+
+**Phase sequence enforcement:** `phase-gate-precondition.sh` blocks out-of-order agent invocations. The TDD engineer phase (`tdd`) must be advanced via `cycle-state.sh advance tdd tdd-engineer` before Builder can be invoked.
