@@ -176,10 +176,17 @@ step_audit_recent() {
     artifact_path=$(echo "$latest" | jq -r '.artifact_path // empty')
     [ -n "$artifact_path" ] || fail "ledger entry missing artifact_path"
     [ -f "$artifact_path" ] || fail "audit artifact missing on disk: $artifact_path"
-    # Match ship.sh's permissive verdict regex so `**Verdict: PASS**`,
-    # `Verdict: **PASS**`, and `Verdict: PASS` all qualify.
-    if ! grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$artifact_path"; then
-        fail "most recent audit-report.md does not declare 'Verdict: PASS' ($artifact_path)"
+    # Match ship.sh's accepted formats so `**Verdict: PASS**`, `Verdict: **PASS**`,
+    # `Verdict: PASS`, AND heading form `## Verdict\n**PASS**` all qualify.
+    # The heading-form fix (commit 8ced03a) was applied to ship.sh; this aligns
+    # preflight with that contract.
+    if ! { grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$artifact_path" \
+           || awk '
+                /^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
+                saw && (NR - saw) <= 5 && /\*\*PASS\*\*/ { found=1; exit }
+                END { exit !found }
+              ' "$artifact_path"; }; then
+        fail "most recent audit-report.md does not declare 'Verdict: PASS' ($artifact_path) — neither inline nor heading form"
     fi
     ts=$(echo "$latest" | jq -r '.ts // empty')
     [ -n "$ts" ] || fail "ledger entry missing ts"
