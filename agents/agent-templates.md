@@ -163,3 +163,31 @@ The full evolve-loop pipeline and the agent responsible for each phase:
 **TDD Engineer contract:** Runs after Scout selects a task and before Builder implements. Writes failing tests that encode acceptance criteria (RED phase). Builder must make those tests pass without modifying them. See [evolve-tdd-engineer.md](evolve-tdd-engineer.md) for the full workflow.
 
 **Phase sequence enforcement:** `phase-gate-precondition.sh` blocks out-of-order agent invocations. The TDD engineer phase (`tdd`) must be advanced via `cycle-state.sh advance tdd tdd-engineer` before Builder can be invoked.
+
+---
+
+## Team Context Bus
+
+A human-readable shared narrative document at `.evolve/runs/cycle-N/team-context.md`. Replaces fragile JSON handoffs between phases — every pipeline agent appends a section before exiting; the next agent reads the whole bus before starting.
+
+### Sections (canonical order)
+
+| Section | Populated by | Purpose |
+|---------|--------------|---------|
+| Goal | Orchestrator (during init) | The user's instruction in their own words |
+| Scout Findings | Scout | Selected task, acceptance criteria, research sources |
+| TDD Contract | TDD Engineer | Test files written, RED evidence, exit criteria for Builder |
+| Build Report | Builder | Files modified, test pass evidence, deviations from contract |
+| Audit Verdict | Auditor | PASS/WARN/FAIL with evidence; defects table if non-PASS |
+
+### Protocol
+
+- **On start:** Read `.evolve/runs/cycle-<N>/team-context.md` in its entirety. Other agents' sections are your context — do not duplicate their work.
+- **On completion:** Append your section via `bash scripts/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
+- **Verification:** `bash scripts/team-context.sh verify <cycle> <workspace> --require scout,tdd-engineer,builder,auditor` exits non-zero if any required section is empty (still `_pending_`).
+
+### Phase-gate hook (opt-in)
+
+When `EVOLVE_REQUIRE_TEAM_CONTEXT=1` is exported in the dispatcher environment, `phase-gate-precondition.sh` blocks Builder invocations until both Scout's and TDD-Engineer's sections are populated in the bus. Default off for backward compatibility with cycles that predate the bus.
+
+See [scripts/team-context.sh](../scripts/team-context.sh) for the implementation.

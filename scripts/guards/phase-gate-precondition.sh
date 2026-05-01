@@ -182,11 +182,39 @@ if [ -n "$ACTIVE_AGENT" ] && [ "$REQUESTED_AGENT" = "$ACTIVE_AGENT" ]; then
 fi
 
 # Check expected set.
+ALLOWED=0
 for cand in $EXPECTED; do
     if [ "$cand" = "$REQUESTED_AGENT" ]; then
-        log "ALLOW phase=$PHASE cycle=$CYCLE_ID requested=$REQUESTED_AGENT (in expected={$EXPECTED})"
-        exit 0
+        ALLOWED=1
+        break
     fi
 done
 
-deny "phase=$PHASE cycle=$CYCLE_ID active=$ACTIVE_AGENT completed=[$COMPLETED] requested=$REQUESTED_AGENT not in expected={$EXPECTED}"
+if [ "$ALLOWED" = "0" ]; then
+    deny "phase=$PHASE cycle=$CYCLE_ID active=$ACTIVE_AGENT completed=[$COMPLETED] requested=$REQUESTED_AGENT not in expected={$EXPECTED}"
+fi
+
+# ---- Team-context bus precondition (env-flag-gated, default off) ----------
+# When EVOLVE_REQUIRE_TEAM_CONTEXT=1, builder invocations require that the
+# team-context.md bus has Scout's findings AND TDD-Engineer's contract
+# populated — otherwise builder would be implementing without the test
+# contract. Other agents and other phases are unaffected. Default off so
+# existing cycles that predate the bus continue to work.
+if [ "${EVOLVE_REQUIRE_TEAM_CONTEXT:-0}" = "1" ] && [ "$REQUESTED_AGENT" = "builder" ]; then
+    WORKSPACE_PATH=$(jq -r '.workspace_path // empty' "$CYCLE_STATE_FILE" 2>/dev/null)
+    if [ -z "$WORKSPACE_PATH" ]; then
+        log "team-context check: cycle-state has no workspace_path — skipping"
+    else
+        TEAM_CTX_SH="$REPO_ROOT/scripts/team-context.sh"
+        if [ ! -x "$TEAM_CTX_SH" ]; then
+            log "team-context check: $TEAM_CTX_SH not executable — skipping"
+        elif ! "$TEAM_CTX_SH" verify "$CYCLE_ID" "$WORKSPACE_PATH" --require scout,tdd-engineer >/dev/null 2>&1; then
+            deny "EVOLVE_REQUIRE_TEAM_CONTEXT=1 active; builder blocked: team-context.md missing scout or tdd-engineer section in $WORKSPACE_PATH"
+        else
+            log "team-context check OK: scout + tdd-engineer sections populated"
+        fi
+    fi
+fi
+
+log "ALLOW phase=$PHASE cycle=$CYCLE_ID requested=$REQUESTED_AGENT (in expected={$EXPECTED})"
+exit 0
