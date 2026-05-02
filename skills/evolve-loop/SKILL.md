@@ -34,12 +34,17 @@ bash scripts/evolve-loop-dispatch.sh <args>
 
 | Dispatcher exit | Meaning | Your follow-up |
 |---|---|---|
-| `0` | All cycles ran AND ledger verified end-to-end | Report the summary; that's it |
+| `0` | All cycles ran AND ledger verified clean | Report the summary; that's it |
 | `1` | A `run-cycle.sh` invocation failed | Surface the specific cycle's stderr and stop — do NOT retry inline |
-| `2` | A cycle bypassed Scout/Builder/Auditor (CRITICAL) | Quote the exact ledger counts to the user; recommend `git log` of the offending cycle dir under `.evolve/runs/cycle-N/` to investigate; STOP |
+| `2` | INTEGRITY BREACH: orchestrator silently skipped Scout/Builder/Auditor (no orchestrator-report.md, or report doesn't disclose the gap) — CRITICAL | Quote the exact ledger counts to the user; recommend inspecting `.evolve/runs/cycle-N/` to investigate; STOP |
+| `3` | Batch completed with one or more recoverable failures (infrastructure / audit-fail / build-fail). Failure modes recorded to `state.json:failedApproaches[]` for the next dispatch's orchestrator to read and adapt | Report which cycles had which classification; surface state.json:failedApproaches summary; offer to re-run with the same goal so subsequent cycles can adapt |
 | `10` | Bad arguments | Re-prompt with valid args |
 
+**Exit code 3 is the evolutionary path (v8.16.1+)**: when a cycle's `orchestrator-report.md` honestly declares "INFRASTRUCTURE FAILURE", an audit `Verdict: FAIL`, or a build failure, the dispatcher records the failure to `state.json:failedApproaches[]` and continues to the next cycle. The next cycle's orchestrator reads `failedApproaches` and adapts its approach (different scope, alternative path, or operator escalation). This is what "evolve-loop" means: learn from failure, try a different approach, move forward. STOP-class behavior (rc=2) is preserved for actual kernel breaches.
+
 **Legacy escape hatch:** `EVOLVE_DISPATCH_VERIFY=0` skips the per-cycle ledger verification (used only for debugging the dispatcher itself). Never set this for real `/evolve-loop` use — the WARN it prints is your tripwire that someone disabled the only structural enforcement of pipeline completeness.
+
+**Strict fail-fast (legacy behavior):** `EVOLVE_DISPATCH_STOP_ON_FAIL=1` reverts to pre-v8.16.1 behavior — any verification failure stops the batch with rc=2, regardless of whether the failure is recoverable or a kernel breach. Use only when you explicitly want fail-fast (e.g., CI gates, regression hunts where every failure is a blocker).
 
 The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `run-cycle.sh` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
 

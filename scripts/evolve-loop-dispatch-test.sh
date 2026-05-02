@@ -379,6 +379,139 @@ else
     fail_ "rc=$rc; out: $out"
 fi
 
+# === Test 19: recoverable infrastructure failure → rc=3, continues to next cycle =========
+header "Test 19: missing auditor + 'INFRASTRUCTURE FAILURE' report → rc=3, continued, recorded"
+ws=$(make_workspace)
+state="$ws/state.json"; ledger="$ws/ledger.jsonl"; runs_dir="$ws/runs"
+write_state "$state" 200
+: > "$ledger"
+mkdir -p "$runs_dir/cycle-201" "$runs_dir/cycle-202"
+# Cycle 201's report honestly declares INFRASTRUCTURE FAILURE on auditor.
+cat > "$runs_dir/cycle-201/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 201
+## Phase Outcomes
+| Phase | Agent | Outcome |
+| audit | auditor | **INFRASTRUCTURE FAILURE** — sandbox-exec EPERM |
+## Verdict
+FAILED
+## Failure Root Cause: sandbox-exec Permission Denied
+sandbox_apply: Operation not permitted on Darwin 25.4.0 — nested sandboxing blocked.
+EOF
+# Cycle 202 (the second cycle) honestly produces all 3 entries.
+mock=$(make_mock_run_cycle)
+# Need a custom mock that produces partial ledger for cycle 201 (no auditor)
+# but full ledger for cycle 202.
+infra_mock=$(mktemp -t infra-mock.XXXXXX.sh); cleanup_files+=("$infra_mock")
+cat > "$infra_mock" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+state="$STATE_OVERRIDE"; ledger="$LEDGER_OVERRIDE"
+last=$(jq -r '.lastCycleNumber // 0' "$state")
+new=$((last + 1))
+# state.json doesn't advance lastCycleNumber when audit fails (matches real run-cycle.sh)
+if [ "$new" = "201" ]; then
+    # Cycle 201: scout + builder only; auditor missing.
+    for role in scout builder; do
+        printf '{"ts":"2026-04-29T03:00:00Z","kind":"agent_subprocess","role":"%s","cycle":%s,"exit_code":0}\n' \
+            "$role" "$new" >> "$ledger"
+    done
+else
+    # Cycle 202+: complete ledger.
+    for role in scout builder auditor; do
+        printf '{"ts":"2026-04-29T03:00:00Z","kind":"agent_subprocess","role":"%s","cycle":%s,"exit_code":0}\n' \
+            "$role" "$new" >> "$ledger"
+    done
+    jq --argjson n "$new" '.lastCycleNumber = $n' "$state" > "$state.tmp" && mv "$state.tmp" "$state"
+fi
+exit 0
+EOF
+chmod +x "$infra_mock"
+set +e
+out=$(STATE_OVERRIDE="$state" LEDGER_OVERRIDE="$ledger" RUNS_DIR_OVERRIDE="$runs_dir" \
+      RUN_CYCLE_OVERRIDE="$infra_mock" bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "3" ]; then
+    pass "rc=3 (recoverable failure exit code)"
+else
+    fail_ "expected rc=3, got rc=$rc"
+fi
+if echo "$out" | grep -q "RECOVERABLE-FAILURE.*infrastructure"; then
+    pass "log mentions RECOVERABLE-FAILURE classification=infrastructure"
+else
+    fail_ "missing RECOVERABLE-FAILURE log; out: $out"
+fi
+if echo "$out" | grep -qE "cycle 2 / 2|cycle 202"; then
+    pass "dispatcher continued past cycle 201 to cycle 202"
+else
+    fail_ "dispatcher did NOT continue; out: $out"
+fi
+if jq -e '.failedApproaches | length >= 1' "$state" >/dev/null 2>&1; then
+    pass "state.json:failedApproaches has new entry"
+    fa=$(jq -r '.failedApproaches[0].classification' "$state")
+    if [ "$fa" = "infrastructure" ]; then
+        pass "failedApproaches[0].classification=infrastructure"
+    else
+        fail_ "expected classification=infrastructure, got '$fa'"
+    fi
+else
+    fail_ "state.json:failedApproaches missing entry"
+fi
+
+# === Test 20: integrity-breach (no orchestrator-report.md) → rc=2 STOP ========
+header "Test 20: missing auditor + NO orchestrator-report.md → rc=2 (integrity-breach STOP)"
+ws=$(make_workspace)
+state="$ws/state.json"; ledger="$ws/ledger.jsonl"; runs_dir="$ws/runs"
+write_state "$state" 300
+: > "$ledger"
+# No orchestrator-report.md created — simulates silent shortcut
+mkdir -p "$runs_dir/cycle-301"
+mock=$(make_mock_run_cycle)
+set +e
+out=$(MOCK_SKIP_ROLE=auditor STATE_OVERRIDE="$state" LEDGER_OVERRIDE="$ledger" \
+      RUNS_DIR_OVERRIDE="$runs_dir" RUN_CYCLE_OVERRIDE="$mock" bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "2" ]; then
+    pass "rc=2 (integrity-breach when report missing)"
+else
+    fail_ "expected rc=2, got rc=$rc"
+fi
+if echo "$out" | grep -q "INTEGRITY-BREACH"; then
+    pass "log mentions INTEGRITY-BREACH"
+else
+    fail_ "missing INTEGRITY-BREACH log"
+fi
+
+# === Test 21: EVOLVE_DISPATCH_STOP_ON_FAIL=1 restores fail-fast ===============
+header "Test 21: STOP_ON_FAIL=1 + recoverable failure → rc=2 (legacy fail-fast)"
+ws=$(make_workspace)
+state="$ws/state.json"; ledger="$ws/ledger.jsonl"; runs_dir="$ws/runs"
+write_state "$state" 400
+: > "$ledger"
+mkdir -p "$runs_dir/cycle-401"
+cat > "$runs_dir/cycle-401/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 401
+| audit | auditor | INFRASTRUCTURE FAILURE — EPERM |
+EOF
+mock=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_DISPATCH_STOP_ON_FAIL=1 MOCK_SKIP_ROLE=auditor \
+      STATE_OVERRIDE="$state" LEDGER_OVERRIDE="$ledger" RUNS_DIR_OVERRIDE="$runs_dir" \
+      RUN_CYCLE_OVERRIDE="$mock" bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "2" ]; then
+    pass "STOP_ON_FAIL=1 → rc=2 (legacy behavior preserved)"
+else
+    fail_ "expected rc=2, got rc=$rc"
+fi
+if echo "$out" | grep -q "legacy fail-fast"; then
+    pass "log mentions legacy fail-fast"
+else
+    fail_ "missing legacy fail-fast log"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
