@@ -37,6 +37,14 @@
 
 set -uo pipefail
 
+# v8.16.2: explicitly export runtime knobs so they propagate through nested
+# bash + sandbox-exec invocations to the deepest claude.sh call. Bash inherits
+# env by default, but sandbox-exec on macOS may not propagate all variables
+# reliably across nested invocations. Explicit export removes ambiguity.
+[ -n "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ] && export EVOLVE_SANDBOX_FALLBACK_ON_EPERM
+[ -n "${EVOLVE_DISPATCH_STOP_ON_FAIL:-}" ] && export EVOLVE_DISPATCH_STOP_ON_FAIL
+[ -n "${EVOLVE_BYPASS_PHASE_GATE:-}" ] && export EVOLVE_BYPASS_PHASE_GATE
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$REPO_ROOT/.evolve/state.json"
 CYCLE_STATE_HELPER="$REPO_ROOT/scripts/cycle-state.sh"

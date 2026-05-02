@@ -40,6 +40,10 @@ PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$REPO_ROOT/.evolve/profiles}"
 ADAPTERS_DIR="$REPO_ROOT/scripts/cli_adapters"
 LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$REPO_ROOT/.evolve/ledger.jsonl}"
 
+# v8.16.2: explicitly export runtime knobs so they reach the adapter through
+# any nested bash/sandbox-exec layer. Belt-and-suspenders for env propagation.
+[ -n "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ] && export EVOLVE_SANDBOX_FALLBACK_ON_EPERM
+
 log() { echo "[subagent-run] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
 integrity_fail() { log "INTEGRITY-FAIL: $*"; exit 2; }

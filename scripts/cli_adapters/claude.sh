@@ -309,6 +309,8 @@ echo "[claude-adapter] prompt-file=$PROMPT_FILE" >&2
 echo "[claude-adapter] artifact=$ARTIFACT_PATH" >&2
 echo "[claude-adapter] max-turns=$MAX_TURNS (advisory; not enforced by claude flag)" >&2
 echo "[claude-adapter] sandbox=$SANDBOX_USE" >&2
+# v8.16.2: diagnostic — record runtime knob values so we can trace propagation.
+echo "[claude-adapter] env: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-unset}" >&2
 
 # Validate-only mode: print and exit without running.
 if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
