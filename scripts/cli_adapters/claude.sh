@@ -334,6 +334,23 @@ if [ "$SANDBOX_USE" = "1" ]; then
         echo "[claude-adapter] wrapping in sandbox-exec ($(echo "$SANDBOX_PROFILE_TXT" | wc -l | tr -d ' ') profile lines)" >&2
         /usr/bin/sandbox-exec -p "$SANDBOX_PROFILE_TXT" "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
         EXIT_CODE=$?
+        # Sandbox EPERM fallback (v8.16.1+): on Darwin 25.4+, sandbox_apply()
+        # returns EPERM when the parent process is itself sandboxed (nested
+        # sandboxing disallowed). When EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1, detect
+        # the specific error and retry unsandboxed with loud WARN. Opt-in only —
+        # security-degraded but lets cycles run on Darwin 25.4 environments.
+        if [ "$EXIT_CODE" -eq 71 ] && grep -q "sandbox_apply: Operation not permitted" "$STDERR_LOG" 2>/dev/null; then
+            echo "[claude-adapter] DETECTED: sandbox-exec EPERM (Darwin nested sandbox disallowed)" >&2
+            if [ "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-0}" = "1" ]; then
+                echo "[claude-adapter] WARN: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 — retrying without sandbox-exec" >&2
+                echo "[claude-adapter] WARN: kernel hooks (role-gate, ship-gate, phase-gate) still apply, but OS-level sandbox is BYPASSED" >&2
+                "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
+                EXIT_CODE=$?
+                echo "[claude-adapter] WARN: completed unsandboxed (rc=$EXIT_CODE) — record this in cycle audit notes" >&2
+            else
+                echo "[claude-adapter] HINT: set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 to retry without sandbox (security-degraded; opt-in for Darwin 25.4)" >&2
+            fi
+        fi
     elif command -v bwrap >/dev/null 2>&1; then
         REPO_ROOT_BWRAP="$(cd "$PWD" && pwd)"
         # Re-read allow_network from the profile so the bwrap branch matches the

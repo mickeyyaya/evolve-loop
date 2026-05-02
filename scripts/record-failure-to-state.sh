@@ -42,11 +42,24 @@ VERDICT="$2"
 
 case "$VERDICT" in
     FAIL|WARN|SHIP_GATE_DENIED) ;;
-    *) fail "verdict must be FAIL, WARN, or SHIP_GATE_DENIED — got: $VERDICT" ;;
+    # v8.16.1+: extended verdicts for orchestrator adaptive behavior. These can
+    # be recorded WITHOUT a complete audit-report.md (because the audit phase
+    # may have been skipped due to recurring infrastructure failure).
+    WARN-NO-AUDIT|BLOCKED-RECURRING-AUDIT-FAIL|BLOCKED-RECURRING-BUILD-FAIL|BLOCKED-SYSTEMIC) ;;
+    *) fail "verdict must be FAIL, WARN, SHIP_GATE_DENIED, WARN-NO-AUDIT, or BLOCKED-* — got: $VERDICT" ;;
 esac
 
 AUDIT_REPORT="$WORKSPACE/audit-report.md"
-[ -f "$AUDIT_REPORT" ] || fail "audit-report.md missing in workspace: $AUDIT_REPORT"
+# WARN-NO-AUDIT and BLOCKED-* verdicts may be recorded without an audit report
+# (the orchestrator skipped the audit phase due to a recurring infrastructure
+# failure). For other verdicts the audit-report.md is required.
+case "$VERDICT" in
+    WARN-NO-AUDIT|BLOCKED-*) AUDIT_REPORT_REQUIRED=0 ;;
+    *)                       AUDIT_REPORT_REQUIRED=1 ;;
+esac
+if [ "$AUDIT_REPORT_REQUIRED" = "1" ] && [ ! -f "$AUDIT_REPORT" ]; then
+    fail "audit-report.md missing in workspace: $AUDIT_REPORT"
+fi
 
 command -v jq >/dev/null 2>&1 || fail "jq required"
 
@@ -59,6 +72,10 @@ CYCLE=$(basename "$WORKSPACE" | sed -n 's/^cycle-\([0-9]*\).*$/\1/p')
 #   - HIGH/MEDIUM/LOW severity heading
 #   - "Defects Found" section
 #   - File:line references
+if [ ! -f "$AUDIT_REPORT" ]; then
+    DEFECTS_JSON="[]"
+    VERDICT_IN_REPORT=""
+else
 DEFECTS_JSON=$(awk '
     BEGIN { in_defects = 0; n = 0 }
     /^## Defects Found/ { in_defects = 1; next }
@@ -89,16 +106,22 @@ DEFECTS_JSON="[$DEFECTS_JSON]"
 
 # Extract verdict line for sanity check
 VERDICT_IN_REPORT=$(grep -oE '^Verdict[[:space:]]*:[[:space:]]*\*\*?(PASS|WARN|FAIL|SHIP_GATE_DENIED)' "$AUDIT_REPORT" | head -1 | sed 's/.*\*\*\?//;s/\*\*//' | tr -d ':[:space:]')
+fi  # close "if [ ! -f $AUDIT_REPORT ]; then ... else"
 
 if [ -n "$VERDICT_IN_REPORT" ] && [ "$VERDICT_IN_REPORT" != "$VERDICT" ]; then
     log "WARN: passed verdict '$VERDICT' differs from audit-report.md verdict '$VERDICT_IN_REPORT'"
 fi
 
 # Compute audit-report.md SHA256 (for forensic integrity check later).
-if command -v sha256sum >/dev/null 2>&1; then
-    REPORT_SHA=$(sha256sum "$AUDIT_REPORT" | awk '{print $1}')
+# Skipped when audit-report.md doesn't exist (WARN-NO-AUDIT / BLOCKED-* verdicts).
+if [ -f "$AUDIT_REPORT" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        REPORT_SHA=$(sha256sum "$AUDIT_REPORT" | awk '{print $1}')
+    else
+        REPORT_SHA=$(shasum -a 256 "$AUDIT_REPORT" | awk '{print $1}')
+    fi
 else
-    REPORT_SHA=$(shasum -a 256 "$AUDIT_REPORT" | awk '{print $1}')
+    REPORT_SHA=""
 fi
 
 # Capture git head + tree state at the moment of recording.

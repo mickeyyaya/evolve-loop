@@ -280,6 +280,18 @@ record_failed_approach() {
     tmp="${STATE_FILE}.tmp.$$"
     printf '%s\n' "$updated" > "$tmp" && mv -f "$tmp" "$STATE_FILE"
     log "recorded failed approach: cycle=$cycle classification=$classification → state.json:failedApproaches"
+
+    # ALSO advance lastCycleNumber so the next iteration uses a fresh cycle
+    # number / workspace. Without this, every retry overwrites the previous
+    # attempt's workspace artifacts, losing diagnostic evidence (the issue
+    # exposed in the 2026-05-02 evolutionary-dispatcher run where 3 attempts
+    # all wrote to .evolve/runs/cycle-17/).
+    local current2 advanced
+    current2=$(cat "$STATE_FILE")
+    advanced=$(echo "$current2" | jq -c --argjson n "$cycle" '.lastCycleNumber = $n')
+    tmp="${STATE_FILE}.tmp.$$"
+    printf '%s\n' "$advanced" > "$tmp" && mv -f "$tmp" "$STATE_FILE"
+    log "advanced state.json:lastCycleNumber to $cycle (so next attempt uses cycle-$((cycle + 1)))"
 }
 
 # Pick the cycle number used by the most recent run-cycle invocation.
