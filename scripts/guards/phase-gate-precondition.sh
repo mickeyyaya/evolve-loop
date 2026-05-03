@@ -28,9 +28,14 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GUARDS_LOG="$REPO_ROOT/.evolve/guards.log"
-CYCLE_STATE_FILE="${EVOLVE_CYCLE_STATE_FILE:-$REPO_ROOT/.evolve/cycle-state.json}"
+# v8.18.0: dual-root. guards.log + cycle-state.json are writable artifacts under
+# the user's project. team-context.sh is read-only and lives with the plugin.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/../resolve-roots.sh"
+unset __rr_self
+
+GUARDS_LOG="$EVOLVE_PROJECT_ROOT/.evolve/guards.log"
+CYCLE_STATE_FILE="${EVOLVE_CYCLE_STATE_FILE:-$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json}"
 
 mkdir -p "$(dirname "$GUARDS_LOG")"
 
@@ -218,7 +223,7 @@ if [ "${EVOLVE_REQUIRE_TEAM_CONTEXT:-0}" = "1" ] && [ "$REQUESTED_AGENT" = "buil
     if [ -z "$WORKSPACE_PATH" ]; then
         log "team-context check: cycle-state has no workspace_path — skipping"
     else
-        TEAM_CTX_SH="$REPO_ROOT/scripts/team-context.sh"
+        TEAM_CTX_SH="$EVOLVE_PLUGIN_ROOT/scripts/team-context.sh"
         if [ ! -x "$TEAM_CTX_SH" ]; then
             log "team-context check: $TEAM_CTX_SH not executable — skipping"
         elif ! "$TEAM_CTX_SH" verify "$CYCLE_ID" "$WORKSPACE_PATH" --require scout,tdd-engineer >/dev/null 2>&1; then

@@ -28,10 +28,17 @@
 
 set -euo pipefail
 
+# v8.18.0: dual-root resolution. phase-gate.sh reads ledger and state under the
+# user's project (writable side). Previously used relative ".evolve/..." paths
+# which depended on cwd; now resolves explicitly via EVOLVE_PROJECT_ROOT.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+
 GATE="${1:?Usage: phase-gate.sh <gate> <cycle> <workspace_path>}"
 CYCLE="${2:?Missing cycle number}"
 WORKSPACE="${3:?Missing workspace path}"
-EVOLVE_DIR=".evolve"
+EVOLVE_DIR="$EVOLVE_PROJECT_ROOT/.evolve"
 LEDGER="$EVOLVE_DIR/ledger.jsonl"
 STATE="$EVOLVE_DIR/state.json"
 

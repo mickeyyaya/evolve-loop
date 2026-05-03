@@ -35,10 +35,20 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$REPO_ROOT/.evolve/profiles}"
-ADAPTERS_DIR="$REPO_ROOT/scripts/cli_adapters"
-LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$REPO_ROOT/.evolve/ledger.jsonl}"
+# v8.18.0: dual-root resolution. Profiles & adapters are immutable plugin
+# resources; ledger and per-cycle artifacts are writable project state.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+
+# Backwards-compat: many helper functions below still reference $REPO_ROOT.
+# Map it to PROJECT_ROOT (the writable side) for those callsites — read-only
+# resources (profiles, adapters, sibling scripts) explicitly use PLUGIN_ROOT.
+REPO_ROOT="$EVOLVE_PROJECT_ROOT"
+
+PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/.evolve/profiles}"
+ADAPTERS_DIR="$EVOLVE_PLUGIN_ROOT/scripts/cli_adapters"
+LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
 
 # v8.16.2: explicitly export runtime knobs so they reach the adapter through
 # any nested bash/sandbox-exec layer. Belt-and-suspenders for env propagation.
@@ -566,7 +576,7 @@ cmd_dispatch_parallel() {
     # Run workers in parallel.
     local results_tsv="$workers_dir/.fanout-results.tsv"
     local fanout_rc=0
-    bash "$REPO_ROOT/scripts/fanout-dispatch.sh" "$commands_tsv" "$results_tsv" || fanout_rc=$?
+    bash "$EVOLVE_PLUGIN_ROOT/scripts/fanout-dispatch.sh" "$commands_tsv" "$results_tsv" || fanout_rc=$?
 
     if [ "$fanout_rc" -ne 0 ]; then
         log "dispatch-parallel: fanout-dispatch returned non-zero (rc=$fanout_rc); per-worker exit codes:"
@@ -584,7 +594,7 @@ cmd_dispatch_parallel() {
     # Aggregate worker artifacts into canonical phase artifact.
     local agg_rc=0
     # shellcheck disable=SC2086
-    bash "$REPO_ROOT/scripts/aggregator.sh" "$merge_phase" "$agg_path" $worker_artifacts || agg_rc=$?
+    bash "$EVOLVE_PLUGIN_ROOT/scripts/aggregator.sh" "$merge_phase" "$agg_path" $worker_artifacts || agg_rc=$?
 
     # Write parent ledger entry regardless of agg_rc (record outcome).
     _write_fanout_ledger_entry "$cycle" "$agent" "$parent_token" "$git_state_at_start" \

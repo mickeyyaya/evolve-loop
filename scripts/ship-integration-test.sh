@@ -18,6 +18,7 @@ unset EVOLVE_SHIP_RELEASE_NOTES
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHIP_SH="$REPO_ROOT/scripts/ship.sh"
+RESOLVE_ROOTS_SH="$REPO_ROOT/scripts/resolve-roots.sh"  # v8.18.0: ship.sh sources this
 SCRATCH=$(mktemp -d -t "ship-integration-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -38,6 +39,8 @@ make_repo() {
     mkdir -p "$repo/scripts" "$repo/.evolve/runs/cycle-1"
     cp "$SHIP_SH" "$repo/scripts/ship.sh"
     chmod +x "$repo/scripts/ship.sh"
+    # v8.18.0: ship.sh sources resolve-roots.sh from its own dir; copy it too.
+    cp "$RESOLVE_ROOTS_SH" "$repo/scripts/resolve-roots.sh"
     # Mimic production .gitignore — .evolve/ is runtime state, not tracked.
     # Without this, the TOFU SHA pin (which writes to .evolve/state.json)
     # would mutate the tracked tree and trip ship.sh's own tree-state check.

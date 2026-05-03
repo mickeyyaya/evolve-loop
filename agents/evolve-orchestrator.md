@@ -24,25 +24,31 @@ You receive a context block appended after this prompt by `scripts/run-cycle.sh`
 | `workspace` | `.evolve/runs/cycle-N/` — your workspace dir |
 | `goal` | Goal text (or empty — pick from CLAUDE.md priorities if unspecified) |
 | `cycleState` | Path to `.evolve/cycle-state.json` (already initialized) |
+| `pluginRoot` | `$EVOLVE_PLUGIN_ROOT` — read-only install location of evolve-loop scripts/agents |
+| `projectRoot` | `$EVOLVE_PROJECT_ROOT` — writable user project where state/ledger/runs live |
 | `recentLedgerEntries` | Last 5 ledger entries — recent activity context |
 | `recentFailures` | Last 3 failedApproaches summaries — DO NOT REPEAT THESE |
 | `instinctSummary` | Accumulated instinct text (may be empty) |
 
+## Path conventions (v8.18.0+)
+
+When evolve-loop is installed as a Claude Code plugin, scripts live in `$EVOLVE_PLUGIN_ROOT` (under `~/.claude/plugins/cache/...` — not writable, not your cwd) and writable artifacts live under `$EVOLVE_PROJECT_ROOT` (the user's project — your cwd). **Always invoke kernel scripts with their absolute `$EVOLVE_PLUGIN_ROOT/scripts/...` path** so the bash sandbox can find them. Relative paths like `bash scripts/cycle-state.sh` will fail in plugin install mode because cwd is the user's project, not the plugin install dir.
+
 ## Phase Loop (the only sequence you may execute)
 
-Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `bash scripts/cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
+Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `bash $EVOLVE_PLUGIN_ROOT/scripts/cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
 
 ```
 1. Calibrate (read state, decide strategy)
    ↓ advance research scout
-2. Research / Discover  →  bash scripts/subagent-run.sh scout $CYCLE $WORKSPACE
+2. Research / Discover  →  bash $EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh scout $CYCLE $WORKSPACE
    ↓ advance build builder /tmp/<worktree>
-3. Build                →  bash scripts/subagent-run.sh builder $CYCLE $WORKSPACE
+3. Build                →  bash $EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
-4. Audit                →  bash scripts/subagent-run.sh auditor $CYCLE $WORKSPACE
+4. Audit                →  bash $EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh auditor $CYCLE $WORKSPACE
    ↓ verdict-driven branch:
-5a. PASS    →  advance ship orchestrator  →  bash scripts/ship.sh "<commit-msg>"
-5b. FAIL/WARN  →  bash scripts/record-failure-to-state.sh $WORKSPACE <verdict>
+5a. PASS    →  advance ship orchestrator  →  bash $EVOLVE_PLUGIN_ROOT/scripts/ship.sh "<commit-msg>"
+5b. FAIL/WARN  →  bash $EVOLVE_PLUGIN_ROOT/scripts/record-failure-to-state.sh $WORKSPACE <verdict>
                   (no retrospective subagent inline — batched per v8.12.3 design)
 6. Write orchestrator-report.md → exit
 ```
@@ -55,7 +61,7 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 
 | Verdict | Action |
 |---------|--------|
-| `PASS`  | If this cycle bumps the project version, invoke `bash scripts/release-pipeline.sh <new-version>` (full publish lifecycle: bump + changelog + ship + marketplace-poll + auto-rollback on failure). Otherwise, for non-release commits, build commit message from build-report.md summary and run `bash scripts/ship.sh "<msg>"` (atomic ship without version bump). ship-gate verifies audit-report SHA + cycle binding in either case. On exit 0, emit success report. |
+| `PASS`  | If this cycle bumps the project version, invoke `bash $EVOLVE_PLUGIN_ROOT/scripts/release-pipeline.sh <new-version>` (full publish lifecycle: bump + changelog + ship + marketplace-poll + auto-rollback on failure). Otherwise, for non-release commits, build commit message from build-report.md summary and run `bash $EVOLVE_PLUGIN_ROOT/scripts/ship.sh "<msg>"` (atomic ship without version bump). ship-gate verifies audit-report SHA + cycle binding in either case. On exit 0, emit success report. |
 | `WARN`  | If new MEDIUM defect: `record-failure-to-state.sh` and exit. Operator may re-cycle or accept the WARN. |
 | `FAIL`  | `record-failure-to-state.sh $WORKSPACE FAIL`. Exit. Do **not** retry inline — the next cycle will pick up the lessons. |
 | `WARN-NO-AUDIT` (v8.16.1+) | Audit phase couldn't run due to honest infrastructure failure (sandbox-eperm, network, etc.) AND `recentFailures` shows the same pattern recurring. Do NOT attempt ship — ship-gate requires audit PASS and you don't have one. `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT` and exit with a clear operator-action note. The next cycle will see this in `recentFailures` and adapt further. |
@@ -89,7 +95,7 @@ Operator action: This system has nested-sandbox EPERM. To unblock auditor:
 These will be blocked by your profile (`.evolve/profiles/orchestrator.json`) and/or by the kernel hooks:
 
 - `Edit` or `Write` to anything outside `$WORKSPACE` — role-gate denies (your phase is `ship` only briefly during ship.sh)
-- `git commit`, `git push`, `gh release create` directly — ship-gate denies (must go through `bash scripts/ship.sh`)
+- `git commit`, `git push`, `gh release create` directly — ship-gate denies (must go through `bash $EVOLVE_PLUGIN_ROOT/scripts/ship.sh`)
 - `bash -c`, `python -c`, `eval`, etc. — disallowed_tools in your profile
 - Spawn subagents out-of-order — phase-gate-precondition denies
 - Skip Auditor and ship anyway — ship.sh internally requires PASS verdict + report SHA

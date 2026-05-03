@@ -35,9 +35,16 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
-STATE="$REPO_ROOT/.evolve/state.json"
+# v8.18.0: dual-root. git operations target the project repo (where the cycle's
+# changes live); ledger/state are writable artifacts in the same project tree.
+# REPO_ROOT alias is kept for the many existing references below — it points
+# to PROJECT_ROOT (writable side, where git ops happen).
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+REPO_ROOT="$EVOLVE_PROJECT_ROOT"
+LEDGER="$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl"
+STATE="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
 
 log()           { echo "[ship] $*" >&2; }
 fail()          { log "FAIL: $*"; exit 1; }

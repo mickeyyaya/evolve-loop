@@ -86,11 +86,17 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_CYCLE="${RUN_CYCLE_OVERRIDE:-$REPO_ROOT/scripts/run-cycle.sh}"
-LEDGER="${LEDGER_OVERRIDE:-$REPO_ROOT/.evolve/ledger.jsonl}"
-STATE_FILE="${STATE_OVERRIDE:-$REPO_ROOT/.evolve/state.json}"
-RUNS_DIR="${RUNS_DIR_OVERRIDE:-$REPO_ROOT/.evolve/runs}"
+# v8.18.0: dual-root resolution — see resolve-roots.sh.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+
+# Read-only: run-cycle.sh ships with the plugin
+RUN_CYCLE="${RUN_CYCLE_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/scripts/run-cycle.sh}"
+# Writable: ledger, state, runs/ live in the user's project (or evolve-loop in dev)
+LEDGER="${LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
+STATE_FILE="${STATE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
+RUNS_DIR="${RUNS_DIR_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/runs}"
 
 log()  { echo "[dispatch] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }

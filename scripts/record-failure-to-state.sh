@@ -27,8 +27,11 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE="$REPO_ROOT/.evolve/state.json"
+# v8.18.0: dual-root — state.json is a writable artifact under the user's project.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+STATE="${EVOLVE_STATE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
 
 log() { echo "[record-failure] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }

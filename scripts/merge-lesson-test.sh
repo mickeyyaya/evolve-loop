@@ -72,7 +72,7 @@ EOF
 header "Test 1: missing handoff is a no-op (PASS cycle)"
 ROOT=$(make_repo)
 mkdir -p "$ROOT/.evolve/runs/cycle-1"
-if bash "$ROOT/scripts/merge-lesson-into-state.sh" "$ROOT/.evolve/runs/cycle-1" >/dev/null 2>&1; then
+if EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-1" >/dev/null 2>&1; then
     if [ "$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")" = "0" ]; then
         pass "no-op when handoff missing"
     else
@@ -87,7 +87,7 @@ header "Test 2: single lesson appended to instinctSummary"
 ROOT=$(make_repo)
 write_lesson "$ROOT" "inst-L001" "shell-substring-bypass" "reasoning"
 write_handoff "$ROOT" 99 '["inst-L001"]'
-if bash "$ROOT/scripts/merge-lesson-into-state.sh" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1; then
+if EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1; then
     LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
     if [ "$LEN" = "1" ]; then
         ID=$(jq -r '.instinctSummary[0].id' "$ROOT/.evolve/state.json")
@@ -114,7 +114,7 @@ header "Test 4: missing lesson YAML triggers exit 2"
 ROOT=$(make_repo)
 write_handoff "$ROOT" 99 '["inst-L999"]'   # YAML never written
 set +e
-bash "$ROOT/scripts/merge-lesson-into-state.sh" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
 RC=$?
 set -e
 [ "$RC" = "2" ] && pass "exit 2 on missing lesson YAML" || fail "wrong exit: $RC (expected 2)"
@@ -124,7 +124,7 @@ header "Test 5: systemic flag writes SYSTEMIC_FAILURE ledger event"
 ROOT=$(make_repo)
 write_lesson "$ROOT" "inst-L002" "recurring-issue" "context"
 write_handoff "$ROOT" 100 '["inst-L002"]' "FAIL" "true"
-bash "$ROOT/scripts/merge-lesson-into-state.sh" "$ROOT/.evolve/runs/cycle-100" >/dev/null 2>&1
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-100" >/dev/null 2>&1
 if grep -q '"kind":"SYSTEMIC_FAILURE"' "$ROOT/.evolve/ledger.jsonl"; then
     pass "SYSTEMIC_FAILURE event written"
 else
@@ -137,7 +137,7 @@ ROOT=$(make_repo)
 mkdir -p "$ROOT/.evolve/runs/cycle-99"
 echo "not json" > "$ROOT/.evolve/runs/cycle-99/handoff-retrospective.json"
 set +e
-bash "$ROOT/scripts/merge-lesson-into-state.sh" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
 RC=$?
 set -e
 [ "$RC" = "1" ] && pass "exit 1 on malformed handoff" || fail "wrong exit: $RC"
@@ -148,7 +148,7 @@ ROOT=$(make_repo)
 write_lesson "$ROOT" "inst-L010" "pattern-a" "reasoning"
 write_lesson "$ROOT" "inst-L011" "pattern-b" "context"
 write_handoff "$ROOT" 101 '["inst-L010","inst-L011"]'
-bash "$ROOT/scripts/merge-lesson-into-state.sh" "$ROOT/.evolve/runs/cycle-101" >/dev/null 2>&1
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-101" >/dev/null 2>&1
 LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
 [ "$LEN" = "2" ] && pass "two lessons merged" || fail "expected 2 entries, got $LEN"
 

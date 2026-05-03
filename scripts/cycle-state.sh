@@ -40,8 +40,14 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CYCLE_STATE_FILE="${EVOLVE_CYCLE_STATE_FILE:-$REPO_ROOT/.evolve/cycle-state.json}"
+# v8.18.0: dual-root resolution. cycle-state.json must be written to the user's
+# project (writable), not to the plugin cache (read-only sensitive path under
+# ~/.claude/). resolve-roots.sh defines EVOLVE_PROJECT_ROOT for writes.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+
+CYCLE_STATE_FILE="${EVOLVE_CYCLE_STATE_FILE:-$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json}"
 
 _iso_now() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"

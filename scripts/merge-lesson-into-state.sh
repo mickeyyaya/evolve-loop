@@ -26,10 +26,14 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE="$REPO_ROOT/.evolve/state.json"
-LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
-LESSONS_DIR="$REPO_ROOT/.evolve/instincts/lessons"
+# v8.18.0: dual-root — state, ledger, and lessons are writable artifacts under
+# the user's project. Distinct from the plugin's read-only scripts/agents.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+STATE="${EVOLVE_STATE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
+LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
+LESSONS_DIR="$EVOLVE_PROJECT_ROOT/.evolve/instincts/lessons"
 
 log() { echo "[merge-lesson] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }

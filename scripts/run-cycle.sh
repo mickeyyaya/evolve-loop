@@ -45,13 +45,21 @@ set -uo pipefail
 [ -n "${EVOLVE_DISPATCH_STOP_ON_FAIL:-}" ] && export EVOLVE_DISPATCH_STOP_ON_FAIL
 [ -n "${EVOLVE_BYPASS_PHASE_GATE:-}" ] && export EVOLVE_BYPASS_PHASE_GATE
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_FILE="$REPO_ROOT/.evolve/state.json"
-CYCLE_STATE_HELPER="$REPO_ROOT/scripts/cycle-state.sh"
-SUBAGENT_RUN="$REPO_ROOT/scripts/subagent-run.sh"
-ORCHESTRATOR_PROMPT="$REPO_ROOT/agents/evolve-orchestrator.md"
-LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
-INSTINCT_SUMMARY="$REPO_ROOT/.evolve/instincts/personal/summary.md"
+# v8.18.0: dual-root resolution. PLUGIN_ROOT for read-only scripts/agents,
+# PROJECT_ROOT for writable state/ledger/runs/instincts. See resolve-roots.sh.
+__rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$__rr_self/resolve-roots.sh"
+unset __rr_self
+
+# Read-only resources from the plugin install
+CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/cycle-state.sh"
+SUBAGENT_RUN="$EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh"
+ORCHESTRATOR_PROMPT="$EVOLVE_PLUGIN_ROOT/agents/evolve-orchestrator.md"
+
+# Writable artifacts under the user's project (or evolve-loop repo in dev mode)
+STATE_FILE="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
+LEDGER="$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl"
+INSTINCT_SUMMARY="$EVOLVE_PROJECT_ROOT/.evolve/instincts/personal/summary.md"
 
 log()  { echo "[run-cycle] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
@@ -109,7 +117,7 @@ if [ -z "$CYCLE" ]; then
 fi
 [[ "$CYCLE" =~ ^[0-9]+$ ]] || fail "cycle must be integer, got: $CYCLE"
 
-WORKSPACE="$REPO_ROOT/.evolve/runs/cycle-$CYCLE"
+WORKSPACE="$EVOLVE_PROJECT_ROOT/.evolve/runs/cycle-$CYCLE"
 
 # ---- Collision check -------------------------------------------------------
 
@@ -150,7 +158,9 @@ ORCHESTRATOR CONTEXT (injected by run-cycle.sh)
 cycle: $cycle
 workspace: $workspace
 goal: ${goal:-<unspecified — pick from CLAUDE.md priorities>}
-cycleState: $REPO_ROOT/.evolve/cycle-state.json (already initialized to phase=calibrate)
+cycleState: $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json (already initialized to phase=calibrate)
+pluginRoot: $EVOLVE_PLUGIN_ROOT (read-only — scripts/, agents/, profiles/ live here)
+projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts go here)
 
 recentLedgerEntries:
 $ledger_tail
