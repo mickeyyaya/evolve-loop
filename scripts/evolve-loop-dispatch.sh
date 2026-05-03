@@ -102,6 +102,44 @@ log()  { echo "[dispatch] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
 abort_args() { log "BAD-ARG: $*"; exit 10; }
 
+# --- v8.18.1: pre-flight environment guards ---------------------------------
+#
+# Two failure modes exposed by the 2026-05-03 plugin-cwd incident:
+#
+# 1. Operator cd's into the plugin install directory before invoking. With
+#    dual-root resolution (v8.18.0), EVOLVE_PROJECT_ROOT then resolves to the
+#    plugin source tree itself, and cycles spin up against the wrong project.
+#    Symptom: $0.57 spent on calibration before orchestrator notices the
+#    goal-project mismatch.
+#
+# 2. claude -p drops --bare when ANTHROPIC_API_KEY is absent, which collapses
+#    the orchestrator's profile-scoped permissions back to main-session prompts
+#    and silently blocks subagent writes. Symptom: integrity-fail because no
+#    artifact was persisted.
+#
+# Both are caught here at the dispatcher's earliest moment so the operator
+# pays $0 instead of $0.57+.
+#
+# Tests bypass these via:
+#   - RUN_CYCLE_OVERRIDE        — implies test mode (substitute mock run-cycle)
+#   - EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 — explicit operator opt-in to running
+#                                  in interactive Claude Code without API key
+#                                  (degraded but supported scenario)
+#
+# The cwd guard fires unconditionally because it indicates an operator mistake
+# even in dry-run / VALIDATE_ONLY mode (you don't want to validate a plan
+# pointed at the wrong directory).
+
+case "$EVOLVE_PROJECT_ROOT" in
+    */plugins/cache/*|*/plugins/marketplaces/*)
+        log "BAD-ARG: cwd is a plugin install directory ($EVOLVE_PROJECT_ROOT)"
+        log "         Plugin installs are not valid project workspaces."
+        log "         FIX: cd to your actual project, then run /evolve-loop"
+        log "         Or:  EVOLVE_PROJECT_ROOT=/path/to/project bash <plugin>/scripts/evolve-loop-dispatch.sh ..."
+        exit 10
+        ;;
+esac
+
 # --- Argument parsing -------------------------------------------------------
 
 DRY_RUN=0
@@ -180,6 +218,34 @@ fi
 
 [ -f "$RUN_CYCLE" ] || fail "missing run-cycle.sh at $RUN_CYCLE"
 command -v jq >/dev/null 2>&1 || fail "jq is required for ledger verification"
+
+# v8.18.1: API-key precondition. Autonomous cycles spawn `claude -p --bare`
+# subagents whose profile-scoped permissions are the trust kernel's main
+# enforcement layer. Without ANTHROPIC_API_KEY the adapter drops --bare and
+# the subagent runs under main-session permissions instead — which silently
+# blocks orchestrator-report.md writes and turns the cycle into an integrity
+# fail at unrecoverable cost.
+#
+# Skipped in two cases:
+#   - RUN_CYCLE_OVERRIDE set: tests substitute a mock run-cycle.sh; no real
+#     claude invocation happens.
+#   - EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1: explicit operator opt-in to a
+#     degraded interactive mode. Caller accepts that subagent writes may
+#     prompt; this is the supported escape hatch for "I'm exploring without
+#     an API key, I know the trust kernel is weakened."
+if [ -z "${RUN_CYCLE_OVERRIDE:-}" ] && \
+   [ -z "${ANTHROPIC_API_KEY:-}" ] && \
+   [ -z "${EVOLVE_ALLOW_INTERACTIVE_FALLBACK:-}" ]; then
+    fail "ANTHROPIC_API_KEY is unset.
+       Autonomous /evolve-loop requires API auth so subagents can run with
+       --bare (their own profile-scoped permissions). Without --bare, writes
+       route through the main-session permission prompts and the trust
+       kernel cannot enforce profile isolation. Symptoms: orchestrator-
+       report.md write blocked → integrity-fail → cycle wasted.
+       FIX:    export ANTHROPIC_API_KEY=sk-... and re-invoke.
+       Bypass: EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 (degraded; expect orchestrator
+               write failures unless main-session permissions are pre-configured)."
+fi
 
 # --- Helpers ---------------------------------------------------------------
 

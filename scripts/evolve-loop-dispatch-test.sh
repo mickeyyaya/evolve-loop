@@ -512,6 +512,123 @@ else
     fail_ "missing legacy fail-fast log"
 fi
 
+# === Test 22: cwd inside */plugins/cache/* is rejected (v8.18.1) ==============
+header "Test 22: cwd inside plugin-cache path → BAD-ARG rc=10"
+fakeplugin_cache=$(mktemp -d -t evolve-test-cache.XXXXXX)
+# Mimic the user's plugins/cache install layout. The path itself doesn't need
+# to be a real plugin checkout — the dispatcher matches on path *pattern*.
+mkdir -p "$fakeplugin_cache/plugins/cache/evolve-loop/evolve-loop/8.18.0"
+target_cache="$fakeplugin_cache/plugins/cache/evolve-loop/evolve-loop/8.18.0"
+( cd "$target_cache" && git init -q . && git commit --allow-empty -q -m init ) >/dev/null 2>&1
+set +e
+out=$(cd "$target_cache" && VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+rm -rf "$fakeplugin_cache"
+if [ "$rc" = "10" ] && echo "$out" | grep -q "cwd is a plugin install"; then
+    pass "plugin-cache cwd rejected with rc=10"
+else
+    fail_ "rc=$rc (want 10); out: $out"
+fi
+
+# === Test 23: cwd inside */plugins/marketplaces/* is rejected (v8.18.1) =======
+header "Test 23: cwd inside plugin-marketplaces path → BAD-ARG rc=10"
+fakeplugin_mkt=$(mktemp -d -t evolve-test-mkt.XXXXXX)
+mkdir -p "$fakeplugin_mkt/plugins/marketplaces/evolve-loop"
+target_mkt="$fakeplugin_mkt/plugins/marketplaces/evolve-loop"
+( cd "$target_mkt" && git init -q . && git commit --allow-empty -q -m init ) >/dev/null 2>&1
+set +e
+out=$(cd "$target_mkt" && VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+rm -rf "$fakeplugin_mkt"
+if [ "$rc" = "10" ] && echo "$out" | grep -q "cwd is a plugin install"; then
+    pass "plugin-marketplaces cwd rejected with rc=10"
+else
+    fail_ "rc=$rc (want 10); out: $out"
+fi
+
+# === Test 24: ANTHROPIC_API_KEY unset → fail fast for real runs (v8.18.1) =====
+# Tests so far have used RUN_CYCLE_OVERRIDE to substitute a stub run-cycle.sh.
+# In test mode (override set), the API-key check is skipped. Without override,
+# real production runs without a key should fail fast with rc=1.
+header "Test 24: real run without ANTHROPIC_API_KEY + no bypass → fail rc=1"
+set +e
+# Unset everything that would mask the check; deliberately omit RUN_CYCLE_OVERRIDE.
+out=$(env -u ANTHROPIC_API_KEY -u EVOLVE_ALLOW_INTERACTIVE_FALLBACK \
+      bash "$DISPATCH" --dry-run 1 2>&1)
+rc=$?
+set -e
+# --dry-run exits 0 before reaching the API-key check, which is correct: dry-run
+# doesn't actually invoke claude. So that path is not the right test entry.
+# Use VALIDATE_ONLY=0 + RUN_CYCLE pointing at the real script, but stop short
+# of actually running. The simplest reliable signal: invoke without --dry-run,
+# without VALIDATE_ONLY, without RUN_CYCLE_OVERRIDE — the API-key check fires
+# before the real run-cycle.sh is invoked.
+set +e
+out=$(env -u ANTHROPIC_API_KEY -u EVOLVE_ALLOW_INTERACTIVE_FALLBACK \
+      bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "1" ] && echo "$out" | grep -q "ANTHROPIC_API_KEY"; then
+    pass "missing API key fails with clear rc=1 message"
+else
+    fail_ "rc=$rc (want 1); out: $out"
+fi
+
+# === Test 25: EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 bypass works (v8.18.1) ======
+header "Test 25: EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 disables API-key check"
+# With the bypass, the dispatcher should proceed past the API-key check. Since
+# we don't supply a real run-cycle.sh, it'll fail later — but NOT on API-key
+# grounds. We assert the message does NOT mention ANTHROPIC_API_KEY.
+mock=$(make_mock_run_cycle)
+ws=$(make_workspace)
+write_state "$ws/state.json" 0
+: > "$ws/ledger.jsonl"
+mkdir -p "$ws/runs/cycle-1"
+cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+EOF
+set +e
+out=$(env -u ANTHROPIC_API_KEY EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 \
+      STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
+      bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if echo "$out" | grep -q "ANTHROPIC_API_KEY"; then
+    fail_ "bypass did not disable API-key check; out mentions key"
+else
+    pass "bypass disables API-key check"
+fi
+
+# === Test 26: RUN_CYCLE_OVERRIDE alone implies test mode (v8.18.1) ===========
+# Tests routinely set RUN_CYCLE_OVERRIDE to substitute a mock run-cycle.sh.
+# When that's set, the API-key check should be implicitly skipped — otherwise
+# every existing dispatch test would need to set EVOLVE_ALLOW_INTERACTIVE_FALLBACK.
+# This is verified by the fact that tests 11-21 don't set the bypass and pass.
+header "Test 26: RUN_CYCLE_OVERRIDE implies test mode (no API-key check)"
+mock=$(make_mock_run_cycle)
+ws=$(make_workspace)
+write_state "$ws/state.json" 0
+: > "$ws/ledger.jsonl"
+mkdir -p "$ws/runs/cycle-1"
+cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+EOF
+set +e
+out=$(env -u ANTHROPIC_API_KEY -u EVOLVE_ALLOW_INTERACTIVE_FALLBACK \
+      STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
+      bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if echo "$out" | grep -q "ANTHROPIC_API_KEY"; then
+    fail_ "RUN_CYCLE_OVERRIDE did not imply test mode; out mentions API key"
+else
+    pass "RUN_CYCLE_OVERRIDE implies test mode (key check skipped)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
