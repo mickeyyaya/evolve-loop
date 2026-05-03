@@ -216,7 +216,10 @@ log "OK: pushed to origin/$CURRENT_BRANCH"
 # --- 8. Optional GitHub release (if EVOLVE_SHIP_RELEASE_NOTES set) -----------
 
 if [ -n "${EVOLVE_SHIP_RELEASE_NOTES:-}" ]; then
-    PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
+    # v8.18.0: plugin.json is a read-only plugin resource, never a user-project
+    # file. Must use EVOLVE_PLUGIN_ROOT, not the REPO_ROOT compat alias which
+    # points at PROJECT_ROOT.
+    PLUGIN_JSON="$EVOLVE_PLUGIN_ROOT/.claude-plugin/plugin.json"
     if [ ! -f "$PLUGIN_JSON" ]; then
         log "WARN: no .claude-plugin/plugin.json — skipping release"
     else

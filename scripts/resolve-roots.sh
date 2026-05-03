@@ -56,7 +56,16 @@
 # bash 3.2 compatible. No associative arrays. No GNU-only date/sed.
 
 # Idempotency guard — re-sourcing keeps existing values.
-[ -n "${EVOLVE_RESOLVE_ROOTS_LOADED:-}" ] && return 0 2>/dev/null || true
+#
+# `return 0 2>/dev/null || exit 0` handles two cases cleanly:
+#   - Sourced (the supported mode): return 0 succeeds, body is skipped.
+#   - Executed directly (mistake, but recoverable): return prints to stderr
+#     (suppressed) and fails; exit 0 then exits the subshell cleanly so the
+#     body never runs twice. This preserves the no-op contract under both
+#     invocation styles. Pre-fix used `|| true` which silently re-ran the body.
+if [ -n "${EVOLVE_RESOLVE_ROOTS_LOADED:-}" ]; then
+    return 0 2>/dev/null || exit 0
+fi
 
 # --- EVOLVE_PLUGIN_ROOT — derived from this file's location -----------------
 #

@@ -97,6 +97,32 @@ out=$(cd "$REPO_ROOT" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
     bash -c "source '$HELPER'; echo \"\${EVOLVE_PROJECT_WRITABLE:-unset}\"" 2>&1)
 [ "$out" = "1" ] && pass "EVOLVE_PROJECT_WRITABLE=1 (repo is writable)" || fail_ "EVOLVE_PROJECT_WRITABLE=$out (expected 1)"
 
+# === Test 7: empty-string EVOLVE_PROJECT_ROOT override falls through to git ==
+header "Test 7: empty-string override is treated as unset (falls through)"
+out=$(cd "$REPO_ROOT" && env -u EVOLVE_PLUGIN_ROOT EVOLVE_PROJECT_ROOT="" \
+    bash -c "source '$HELPER'; printf 'PROJECT=%s\n' \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
+project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
+# Empty string should not pin PROJECT_ROOT to ""; auto-detect should resolve to repo root.
+[ "$project" = "$REPO_ROOT" ] && pass "empty override → auto-detect engaged ($project)" || fail_ "empty override mishandled: PROJECT_ROOT=$project"
+
+# === Test 8: nested git worktree — PROJECT_ROOT resolves to the worktree ====
+header "Test 8: git worktree path is honored (not the main tree)"
+mainrepo=$(mktemp -d -t evolve-test-main.XXXXXX); cleanup_dirs+=("$mainrepo")
+worktreedir=$(mktemp -d -t evolve-test-wtparent.XXXXXX); cleanup_dirs+=("$worktreedir")
+( cd "$mainrepo" && git init -q . && git commit --allow-empty -q -m init && git checkout -q -b feat 2>/dev/null && git worktree add -q "$worktreedir/wt" main 2>/dev/null ) >/dev/null 2>&1 || true
+if [ -d "$worktreedir/wt/.git" ] || [ -f "$worktreedir/wt/.git" ]; then
+    out=$(cd "$worktreedir/wt" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+        bash -c "source '$HELPER'; printf 'PROJECT=%s\n' \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
+    project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
+    wt_real=$(cd "$worktreedir/wt" && pwd -P)
+    # git rev-parse --show-toplevel returns the worktree path (NOT the main tree).
+    # If a future change accidentally prefers --show-superproject-working-tree
+    # or similar, this assertion will catch the regression.
+    { [ "$project" = "$worktreedir/wt" ] || [ "$project" = "$wt_real" ]; } && pass "worktree resolved correctly ($project)" || fail_ "worktree mishandled: PROJECT=$project"
+else
+    pass "worktree creation unsupported in this env — skipped (not a regression)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "==========================================="
