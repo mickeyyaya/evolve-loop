@@ -76,12 +76,16 @@ PHASE_NAMES=()
 COSTS=()
 CACHE_READS=()
 CACHE_WRITES=()
+CACHE_1H=()
+CACHE_5M=()
 OUTPUT_TOKENS=()
 INPUT_TOKENS=()
 
 TOTAL_COST=0
 TOTAL_CACHE_READ=0
 TOTAL_CACHE_WRITE=0
+TOTAL_CACHE_1H=0
+TOTAL_CACHE_5M=0
 TOTAL_OUTPUT=0
 TOTAL_INPUT=0
 
@@ -95,6 +99,11 @@ for log in "${LOG_FILES[@]}"; do
     cost=$(echo "$last_json" | jq -r '.total_cost_usd // 0' 2>/dev/null || echo 0)
     cache_read=$(echo "$last_json" | jq -r '.usage.cache_read_input_tokens // 0' 2>/dev/null || echo 0)
     cache_write=$(echo "$last_json" | jq -r '.usage.cache_creation_input_tokens // 0' 2>/dev/null || echo 0)
+    # TTL bucket split — claude -p emits these nested under usage.cache_creation
+    # when the API returns the per-bucket breakdown. Legacy logs omit the
+    # nested object; default to 0 so existing telemetry continues to render.
+    cache_1h=$(echo "$last_json" | jq -r '.usage.cache_creation.ephemeral_1h_input_tokens // 0' 2>/dev/null || echo 0)
+    cache_5m=$(echo "$last_json" | jq -r '.usage.cache_creation.ephemeral_5m_input_tokens // 0' 2>/dev/null || echo 0)
     output_t=$(echo "$last_json" | jq -r '.usage.output_tokens // 0' 2>/dev/null || echo 0)
     input_t=$(echo "$last_json" | jq -r '.usage.input_tokens // 0' 2>/dev/null || echo 0)
 
@@ -102,6 +111,8 @@ for log in "${LOG_FILES[@]}"; do
     COSTS+=("$cost")
     CACHE_READS+=("$cache_read")
     CACHE_WRITES+=("$cache_write")
+    CACHE_1H+=("$cache_1h")
+    CACHE_5M+=("$cache_5m")
     OUTPUT_TOKENS+=("$output_t")
     INPUT_TOKENS+=("$input_t")
 
@@ -109,6 +120,8 @@ for log in "${LOG_FILES[@]}"; do
     TOTAL_COST=$(echo "$TOTAL_COST + $cost" | bc -l 2>/dev/null || echo "$TOTAL_COST")
     TOTAL_CACHE_READ=$((TOTAL_CACHE_READ + cache_read))
     TOTAL_CACHE_WRITE=$((TOTAL_CACHE_WRITE + cache_write))
+    TOTAL_CACHE_1H=$((TOTAL_CACHE_1H + cache_1h))
+    TOTAL_CACHE_5M=$((TOTAL_CACHE_5M + cache_5m))
     TOTAL_OUTPUT=$((TOTAL_OUTPUT + output_t))
     TOTAL_INPUT=$((TOTAL_INPUT + input_t))
 done
@@ -121,6 +134,8 @@ if [ "$JSON" = "1" ]; then
     json_costs=$(printf '%s\n' "${COSTS[@]}" | jq -R 'tonumber' | jq -s .)
     json_cache_reads=$(printf '%s\n' "${CACHE_READS[@]}" | jq -R 'tonumber' | jq -s .)
     json_cache_writes=$(printf '%s\n' "${CACHE_WRITES[@]}" | jq -R 'tonumber' | jq -s .)
+    json_cache_1h=$(printf '%s\n' "${CACHE_1H[@]}" | jq -R 'tonumber' | jq -s .)
+    json_cache_5m=$(printf '%s\n' "${CACHE_5M[@]}" | jq -R 'tonumber' | jq -s .)
     json_outputs=$(printf '%s\n' "${OUTPUT_TOKENS[@]}" | jq -R 'tonumber' | jq -s .)
     json_inputs=$(printf '%s\n' "${INPUT_TOKENS[@]}" | jq -R 'tonumber' | jq -s .)
     jq -nc \
@@ -129,11 +144,15 @@ if [ "$JSON" = "1" ]; then
         --argjson costs "$json_costs" \
         --argjson cache_reads "$json_cache_reads" \
         --argjson cache_writes "$json_cache_writes" \
+        --argjson cache_1h "$json_cache_1h" \
+        --argjson cache_5m "$json_cache_5m" \
         --argjson outputs "$json_outputs" \
         --argjson inputs "$json_inputs" \
         --arg total_cost "$TOTAL_COST" \
         --argjson total_cache_read "$TOTAL_CACHE_READ" \
         --argjson total_cache_write "$TOTAL_CACHE_WRITE" \
+        --argjson total_cache_1h "$TOTAL_CACHE_1H" \
+        --argjson total_cache_5m "$TOTAL_CACHE_5M" \
         --argjson total_output "$TOTAL_OUTPUT" \
         --argjson total_input "$TOTAL_INPUT" \
         '{
@@ -143,6 +162,8 @@ if [ "$JSON" = "1" ]; then
                 cost_usd: $costs[.],
                 cache_read_input_tokens: $cache_reads[.],
                 cache_creation_input_tokens: $cache_writes[.],
+                cache_creation_1h_input_tokens: $cache_1h[.],
+                cache_creation_5m_input_tokens: $cache_5m[.],
                 output_tokens: $outputs[.],
                 input_tokens: $inputs[.]
             })),
@@ -150,6 +171,8 @@ if [ "$JSON" = "1" ]; then
                 cost_usd: $total_cost | tonumber,
                 cache_read_input_tokens: $total_cache_read,
                 cache_creation_input_tokens: $total_cache_write,
+                cache_creation_1h_input_tokens: $total_cache_1h,
+                cache_creation_5m_input_tokens: $total_cache_5m,
                 output_tokens: $total_output,
                 input_tokens: $total_input
             }
@@ -186,5 +209,15 @@ total_ot_fmt=$(printf "%'d" "$TOTAL_OUTPUT" 2>/dev/null || echo "$TOTAL_OUTPUT")
 total_it_fmt=$(printf "%'d" "$TOTAL_INPUT" 2>/dev/null || echo "$TOTAL_INPUT")
 printf '│ %-15s │ %8.4f │ %12s │ %12s │ %10s │ %10s │\n' "TOTAL" "$TOTAL_COST" "$total_cr_fmt" "$total_cw_fmt" "$total_ot_fmt" "$total_it_fmt"
 printf '└─────────────────┴──────────┴──────────────┴──────────────┴────────────┴────────────┘\n'
+
+# Cache TTL bucket split — surfaces whether cache writes hit the 1-hour or
+# 5-minute bucket. On Max-tier subscriptions the 1h bucket dominates (cheaper
+# amortized writes); a sudden shift toward 5m signals an Anthropic-side flag
+# regression (see GitHub anthropics/claude-code#46829, March 2026 incident).
+# Zero in both buckets means legacy logs without the nested cache_creation
+# breakdown — not a failure mode, just older telemetry.
+total_1h_fmt=$(printf "%'d" "$TOTAL_CACHE_1H" 2>/dev/null || echo "$TOTAL_CACHE_1H")
+total_5m_fmt=$(printf "%'d" "$TOTAL_CACHE_5M" 2>/dev/null || echo "$TOTAL_CACHE_5M")
+printf 'Cache TTL split: 1h=%s  5m=%s\n' "$total_1h_fmt" "$total_5m_fmt"
 
 exit 0

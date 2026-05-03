@@ -31,6 +31,16 @@ write_phase_log() {
 EOF
 }
 
+# Variant: includes the nested cache_creation.ephemeral_{1h,5m}_input_tokens
+# breakdown that real claude -p runs emit. Used to test TTL-bucket telemetry.
+write_phase_log_with_ttl() {
+    local cycle_dir="$1" phase="$2" cost="$3" cache_read="$4" cache_1h="$5" cache_5m="$6" output="$7"
+    local cache_write=$((cache_1h + cache_5m))
+    cat > "$cycle_dir/$phase-stdout.log" <<EOF
+{"type":"result","subtype":"success","total_cost_usd":$cost,"usage":{"input_tokens":4,"cache_read_input_tokens":$cache_read,"cache_creation_input_tokens":$cache_write,"output_tokens":$output,"cache_creation":{"ephemeral_1h_input_tokens":$cache_1h,"ephemeral_5m_input_tokens":$cache_5m}}}
+EOF
+}
+
 # === Test 1: missing cycle arg → exit 10 ====================================
 header "Test 1: no cycle arg → exit 10"
 set +e; out=$(bash "$SCRIPT" 2>&1); rc=$?; set -e
@@ -119,6 +129,54 @@ if [ "$rc" = "0" ] && echo "$out" | grep -q "0.0000"; then
     pass "malformed log → zero values, rc=0"
 else
     fail_ "rc=$rc out=$out"
+fi
+
+# === Test 9: --json surfaces TTL bucket breakdown per phase + total ==========
+header "Test 9: --json includes cache_creation_1h/5m_input_tokens"
+d=$(make_cycle 994); cleanup_dirs+=("$d")
+mkdir -p "$d/scripts"
+cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+write_phase_log_with_ttl "$d/.evolve/runs/cycle-994" "scout"   "0.50" "100" "150" "50"  "50"
+write_phase_log_with_ttl "$d/.evolve/runs/cycle-994" "auditor" "1.00" "200" "200" "100" "75"
+out=$(bash "$d/scripts/show-cycle-cost.sh" 994 --json 2>&1)
+scout_1h=$(echo "$out" | jq -r '.phases[] | select(.phase=="scout") | .cache_creation_1h_input_tokens' 2>/dev/null)
+scout_5m=$(echo "$out" | jq -r '.phases[] | select(.phase=="scout") | .cache_creation_5m_input_tokens' 2>/dev/null)
+total_1h=$(echo "$out" | jq -r '.total.cache_creation_1h_input_tokens' 2>/dev/null)
+total_5m=$(echo "$out" | jq -r '.total.cache_creation_5m_input_tokens' 2>/dev/null)
+if [ "$scout_1h" = "150" ] && [ "$scout_5m" = "50" ] && [ "$total_1h" = "350" ] && [ "$total_5m" = "150" ]; then
+    pass "TTL split: scout 1h=150 5m=50; total 1h=350 5m=150"
+else
+    fail_ "scout_1h=$scout_1h scout_5m=$scout_5m total_1h=$total_1h total_5m=$total_5m"
+fi
+
+# === Test 10: legacy logs without nested cache_creation default to 0 ==========
+header "Test 10: backward-compat — legacy logs (no nested cache_creation) → 0"
+d=$(make_cycle 993); cleanup_dirs+=("$d")
+mkdir -p "$d/scripts"
+cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+write_phase_log "$d/.evolve/runs/cycle-993" "scout" "0.50" "100" "200" "50"
+out=$(bash "$d/scripts/show-cycle-cost.sh" 993 --json 2>&1)
+scout_1h=$(echo "$out" | jq -r '.phases[0].cache_creation_1h_input_tokens' 2>/dev/null)
+scout_5m=$(echo "$out" | jq -r '.phases[0].cache_creation_5m_input_tokens' 2>/dev/null)
+if [ "$scout_1h" = "0" ] && [ "$scout_5m" = "0" ]; then
+    pass "legacy log → 1h=0, 5m=0"
+else
+    fail_ "scout_1h=$scout_1h scout_5m=$scout_5m"
+fi
+
+# === Test 11: human-readable footer surfaces TTL split ========================
+header "Test 11: human output includes TTL bucket footer"
+d=$(make_cycle 992); cleanup_dirs+=("$d")
+mkdir -p "$d/scripts"
+cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+write_phase_log_with_ttl "$d/.evolve/runs/cycle-992" "auditor" "1.00" "500" "850" "0" "100"
+out=$(bash "$d/scripts/show-cycle-cost.sh" 992 2>&1)
+# Footer must mention both 1h and 5m buckets so a regression (e.g., Anthropic
+# flipping the account flag) becomes visible in the cycle summary.
+if echo "$out" | grep -qE "1h.*850|850.*1h" && echo "$out" | grep -qE "5m.*0|0.*5m"; then
+    pass "footer mentions 1h=850 and 5m=0"
+else
+    fail_ "footer missing TTL bucket breakdown: $out"
 fi
 
 echo
