@@ -548,21 +548,42 @@ else
     fail_ "rc=$rc (want 10); out: $out"
 fi
 
-# === Test 24: no API key but subscription file present → no warning (v8.19.2) =
-# v8.19.2 removed the hard block. Subscription auth (~/.claude.json) is the
-# primary supported path. With it present, no auth warning should fire.
-header "Test 24: subscription auth (~/.claude.json) present → no auth warning"
-# This test runs in the real repo with the user's real ~/.claude.json. We only
-# assert that the dispatcher does NOT abort with rc=1 due to missing API key.
-# Use VALIDATE_ONLY mode so we don't actually invoke run-cycle.
+# === Test 24: subscription auth path skips the no-auth warning (v8.19.2) =====
+# v8.19.2 treats ~/.claude.json as primary auth. When it exists, no warning
+# fires (and no hard block exists either way). This test sets HOME to a
+# tempdir with a fake ~/.claude.json, uses RUN_CYCLE_OVERRIDE to avoid
+# spawning real claude, and asserts the warning is correctly suppressed.
+#
+# Why this matters: Test 24's prior version used VALIDATE_ONLY=1 which short-
+# circuits BEFORE the auth check, so the test would pass identically under
+# the v8.18.1 hard block (tautological). This rewrite reaches the auth check
+# and asserts the new v8.19.2 behavior.
+header "Test 24: ~/.claude.json present → no-auth warning is suppressed"
+mock=$(make_mock_run_cycle)
+ws=$(make_workspace)
+write_state "$ws/state.json" 0
+: > "$ws/ledger.jsonl"
+mkdir -p "$ws/runs/cycle-1"
+cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+EOF
+fakehome=$(mktemp -d -t test-sub-auth.XXXXXX)
+echo '{"subscriptionId":"test"}' > "$fakehome/.claude.json"
 set +e
-out=$(env -u ANTHROPIC_API_KEY VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+out=$(env -u ANTHROPIC_API_KEY HOME="$fakehome" \
+      STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
+      bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
-if [ "$rc" = "0" ]; then
-    pass "no hard block on missing API key (rc=0 with VALIDATE_ONLY)"
+rm -rf "$fakehome"
+# The warning should NOT appear because $HOME/.claude.json was present.
+# Note: RUN_CYCLE_OVERRIDE alone also suppresses, but we verify the
+# subscription path independently by checking grep absence.
+if echo "$out" | grep -q 'no subscription credentials'; then
+    fail_ "warning fired despite ~/.claude.json being present"
 else
-    fail_ "rc=$rc (want 0); v8.19.2 removed the hard block"
+    pass "subscription auth path correctly skips no-auth warning"
 fi
 
 # === Test 25: no auth at all → warning emitted, but dispatcher continues =====
