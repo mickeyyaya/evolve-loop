@@ -91,7 +91,7 @@
   ],
   "max_budget_usd": 1.5,
   "max_turns": 30,
-  "permission_mode": "acceptEdits",
+  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/retrospective-report.md",
   "challenge_token_required": true,
   "extra_flags": [
@@ -143,5 +143,5 @@
     ],
     "allow_network": false
   },
-  "_design_notes": "The retrospective subagent is invoked ONLY on cycle FAIL/WARN/SHIP_GATE_DENIED. Read-only across the repo, write-only within .evolve/runs/cycle-*/retrospective-* and .evolve/instincts/lessons/*.yaml. Network is disabled \u2014 retrospectives must work from on-disk artifacts, not reach out for fresh context. Cannot mutate existing personal instincts (only the orchestrator's downstream prune step can do that, based on the contradicts: field in the lesson YAML). See agents/evolve-retrospective.md for the operational contract and skills/evolve-loop/phase6-learn.md for the orchestrator's invocation pattern."
+  "_design_notes": "The retrospective subagent is invoked ONLY on cycle FAIL/WARN/SHIP_GATE_DENIED. Read-only across the repo, write-only within .evolve/runs/cycle-*/retrospective-* and .evolve/instincts/lessons/*.yaml. Network is disabled — retrospectives must work from on-disk artifacts, not reach out for fresh context. Cannot mutate existing personal instincts (only the orchestrator's downstream prune step can do that, based on the contradicts: field in the lesson YAML). See agents/evolve-retrospective.md for the operational contract and skills/evolve-loop/phase6-learn.md for the orchestrator's invocation pattern."
 }

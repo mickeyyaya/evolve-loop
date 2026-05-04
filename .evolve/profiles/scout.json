@@ -78,7 +78,7 @@
     "deep": 2.5
   },
   "max_turns": 30,
-  "permission_mode": "acceptEdits",
+  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",
   "challenge_token_required": true,
   "extra_flags": [

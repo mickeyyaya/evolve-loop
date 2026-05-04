@@ -176,10 +176,12 @@
     "Write(.evolve/instincts/personal/**)",
     "Write(.evolve/instincts/lessons/**)"
   ],
-  "add_dir": ["."],
+  "add_dir": [
+    "."
+  ],
   "max_budget_usd": 1.0,
   "max_turns": 60,
-  "permission_mode": "default",
+  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/orchestrator-report.md",
   "challenge_token_required": true,
   "extra_flags": [

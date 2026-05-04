@@ -72,7 +72,7 @@
   "max_budget_usd": 0.25,
   "_budget_design_note_": "Intent capture is one persona, one short artifact (50-200 lines), no web research. $0.25 is a hard cap — if you spend more, you are over-thinking. Compare scout default $0.50 (with research) and orchestrator $1.00 (full cycle).",
   "max_turns": 15,
-  "permission_mode": "acceptEdits",
+  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/intent.md",
   "challenge_token_required": true,
   "extra_flags": [

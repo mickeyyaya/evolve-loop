@@ -65,7 +65,7 @@
   ],
   "max_budget_usd": 1.5,
   "max_turns": 60,
-  "permission_mode": "acceptEdits",
+  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/test-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",

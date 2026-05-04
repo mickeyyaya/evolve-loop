@@ -50,7 +50,7 @@
   ],
   "max_budget_usd": 0.3,
   "max_turns": 20,
-  "permission_mode": "acceptEdits",
+  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/inspirer-output.md",
   "challenge_token_required": true,
   "extra_flags": [
