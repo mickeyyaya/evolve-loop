@@ -45,10 +45,10 @@ else
     fail_ "plugin.json has only $SKILL_COUNT skills"
 fi
 CMD_COUNT=$(jq '.commands | length' "$PLUGIN" 2>/dev/null)
-if [ "$CMD_COUNT" = "8" ]; then
-    pass "plugin.json registers 8 commands"
+if [ "$CMD_COUNT" = "9" ]; then
+    pass "plugin.json registers 9 commands"
 else
-    fail_ "plugin.json has $CMD_COUNT commands (expected 8)"
+    fail_ "plugin.json has $CMD_COUNT commands (expected 9)"
 fi
 if jq -r '.agents[]' "$PLUGIN" 2>/dev/null | grep -q "plan-reviewer"; then
     pass "plan-reviewer registered in agents"
@@ -74,7 +74,7 @@ done
 
 # --- Test 3: 8 slash commands exist ------------------------------------------
 header "Test 3: 8 slash command files exist"
-for c in scout plan-review tdd build audit ship retro loop; do
+for c in scout plan-review tdd build audit ship retro loop intent; do
     f="$REPO_ROOT/.claude-plugin/commands/$c.md"
     if [ -f "$f" ]; then
         if head -5 "$f" | grep -q "^description:"; then

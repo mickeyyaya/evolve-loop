@@ -161,6 +161,8 @@ goal: ${goal:-<unspecified — pick from CLAUDE.md priorities>}
 cycleState: $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json (already initialized to phase=calibrate)
 pluginRoot: $EVOLVE_PLUGIN_ROOT (read-only — scripts/, agents/, profiles/ live here)
 projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts go here)
+intentRequired: ${EVOLVE_REQUIRE_INTENT:-0} (v8.19.0+: when 1, run intent persona before scout; cycle-state.intent_required is the authoritative source)
+intentArtifactPath: $workspace/intent.md (only present if intent persona has run)
 
 recentLedgerEntries:
 $ledger_tail

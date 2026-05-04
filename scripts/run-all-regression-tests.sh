@@ -55,6 +55,7 @@ else
         "scripts/postedit-validate-test.sh"
         "scripts/cycle-state-test.sh"
         "scripts/resolve-roots-test.sh"
+        "scripts/intent-test.sh"
         "scripts/orchestrator-sandbox-coverage-test.sh"
         "scripts/role-gate-test.sh"
         "scripts/phase-gate-precondition-test.sh"

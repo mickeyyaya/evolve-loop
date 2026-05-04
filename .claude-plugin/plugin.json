@@ -42,7 +42,8 @@
     "./agents/evolve-tdd-engineer.md",
     "./agents/evolve-retrospective.md",
     "./agents/evolve-orchestrator.md",
-    "./agents/plan-reviewer.md"
+    "./agents/plan-reviewer.md",
+    "./agents/evolve-intent.md"
   ],
   "skills": [
     "./skills/evolve-loop/",
@@ -53,6 +54,7 @@
     "./skills/evolve-audit/",
     "./skills/evolve-ship/",
     "./skills/evolve-retro/",
+    "./skills/evolve-intent/",
     "./skills/refactor/",
     "./skills/code-review-simplify/",
     "./skills/inspirer/",
@@ -68,6 +70,7 @@
     "./.claude-plugin/commands/audit.md",
     "./.claude-plugin/commands/ship.md",
     "./.claude-plugin/commands/retro.md",
-    "./.claude-plugin/commands/loop.md"
+    "./.claude-plugin/commands/loop.md",
+    "./.claude-plugin/commands/intent.md"
   ]
 }

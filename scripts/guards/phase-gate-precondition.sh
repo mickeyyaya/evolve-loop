@@ -127,10 +127,10 @@ REQUESTED_AGENT="${REQUESTED_AGENT#[\"\']}"
 # Unrecognized agents fall through (subagent-run.sh prints its own error).
 DERIVED_ROLE=""
 case "$REQUESTED_AGENT" in
-    scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer)
+    intent|scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer)
         DERIVED_ROLE="$REQUESTED_AGENT"
         ;;
-    scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*)
+    intent-worker-*|scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*)
         # Strip "-worker-<subtask>" to get parent role.
         DERIVED_ROLE="${REQUESTED_AGENT%%-worker-*}"
         log "worker-pattern: agent='$REQUESTED_AGENT' derived_role='$DERIVED_ROLE'"
@@ -178,7 +178,8 @@ fi
 
 EXPECTED=""
 case "$PHASE" in
-    calibrate)    EXPECTED="scout orchestrator" ;;
+    calibrate)    EXPECTED="intent scout orchestrator" ;;
+    intent)       EXPECTED="intent orchestrator" ;;
     research)     EXPECTED="scout inspirer orchestrator" ;;
     discover)     EXPECTED="scout plan-reviewer tdd-engineer builder orchestrator" ;;
     plan-review)  EXPECTED="plan-reviewer scout tdd-engineer orchestrator" ;;
@@ -210,6 +211,40 @@ done
 
 if [ "$ALLOWED" = "0" ]; then
     deny "phase=$PHASE cycle=$CYCLE_ID active=$ACTIVE_AGENT completed=[$COMPLETED] requested=$REQUESTED_AGENT not in expected={$EXPECTED}"
+fi
+
+# ---- Intent-phase precondition (state-gated, v8.19.0) ---------------------
+# When the cycle was initialized with intent_required=true (from
+# EVOLVE_REQUIRE_INTENT=1 at init time), scout invocations require that the
+# intent persona has produced intent.md AND a corresponding agent_subprocess
+# ledger entry exists for cycle+role=intent. Otherwise scout would be running
+# without a structured intent, defeating the skill's purpose. Other agents
+# and other phases are unaffected.
+#
+# Reads intent_required from cycle-state.json (NOT env) — this means a
+# mid-stream env flip cannot retroactively block in-flight cycles, and a
+# cycle that was init'd with intent_required=true will continue to enforce
+# even if env is later unset.
+#
+# Default off: cycles initialized without EVOLVE_REQUIRE_INTENT=1 have
+# intent_required=false in cycle-state.json, and this block is a no-op.
+if [ "$REQUESTED_AGENT" = "scout" ] && command -v jq >/dev/null 2>&1; then
+    INTENT_REQUIRED=$(jq -r '.intent_required // false' "$CYCLE_STATE_FILE" 2>/dev/null)
+    if [ "$INTENT_REQUIRED" = "true" ]; then
+        WORKSPACE_PATH=$(jq -r '.workspace_path // empty' "$CYCLE_STATE_FILE" 2>/dev/null)
+        LEDGER_PATH="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
+        if [ ! -f "$LEDGER_PATH" ]; then
+            deny "intent_required=true but ledger missing at $LEDGER_PATH; intent persona must run first"
+        fi
+        # Look for a recent intent ledger entry for this cycle.
+        INTENT_ENTRY=$(grep '"kind":"agent_subprocess"' "$LEDGER_PATH" 2>/dev/null \
+            | jq -c --argjson cycle "$CYCLE_ID" 'select(.cycle == $cycle and .role == "intent")' 2>/dev/null \
+            | tail -1)
+        if [ -z "$INTENT_ENTRY" ]; then
+            deny "intent_required=true (cycle $CYCLE_ID) but no intent ledger entry found; run \`bash \$EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh intent $CYCLE_ID $WORKSPACE_PATH\` before scout"
+        fi
+        log "intent precondition OK: ledger has intent entry for cycle $CYCLE_ID"
+    fi
 fi
 
 # ---- Team-context bus precondition (env-flag-gated, default off) ----------

@@ -76,9 +76,14 @@ cycle_state_init() {
     local workspace_path="${2:-.evolve/runs/cycle-${cycle_id}}"
     local now
     now=$(_iso_now)
+    # v8.19.0: capture intent_required from env at init time so mid-stream
+    # env-var flips don't break in-flight cycles. Cycles initialized without
+    # the flag continue to operate under the default (no intent phase) flow
+    # even if EVOLVE_REQUIRE_INTENT is later set.
+    local intent_required="false"
+    [ "${EVOLVE_REQUIRE_INTENT:-0}" = "1" ] && intent_required="true"
     if ! command -v jq >/dev/null 2>&1; then
-        # Fallback: hand-rolled JSON if jq not available (rare on dev machines).
-        _atomic_write "{\"cycle_id\":${cycle_id},\"phase\":\"calibrate\",\"started_at\":\"${now}\",\"phase_started_at\":\"${now}\",\"active_agent\":null,\"active_worktree\":null,\"completed_phases\":[],\"workspace_path\":\"${workspace_path}\"}"
+        _atomic_write "{\"cycle_id\":${cycle_id},\"phase\":\"calibrate\",\"started_at\":\"${now}\",\"phase_started_at\":\"${now}\",\"active_agent\":null,\"active_worktree\":null,\"completed_phases\":[],\"workspace_path\":\"${workspace_path}\",\"intent_required\":${intent_required}}"
         return 0
     fi
     local json
@@ -86,7 +91,8 @@ cycle_state_init() {
         --argjson cycle_id "$cycle_id" \
         --arg now "$now" \
         --arg workspace "$workspace_path" \
-        '{cycle_id: $cycle_id, phase: "calibrate", started_at: $now, phase_started_at: $now, active_agent: null, active_worktree: null, completed_phases: [], workspace_path: $workspace}')
+        --argjson intent_required "$intent_required" \
+        '{cycle_id: $cycle_id, phase: "calibrate", started_at: $now, phase_started_at: $now, active_agent: null, active_worktree: null, completed_phases: [], workspace_path: $workspace, intent_required: $intent_required}')
     _atomic_write "$json"
 }
 
@@ -119,7 +125,7 @@ cycle_state_advance() {
         '
         . as $s
         | .phase as $cur
-        | (["calibrate","research","discover","plan-review","tdd","build","audit","ship","learn"]) as $known
+        | (["calibrate","intent","research","discover","plan-review","tdd","build","audit","ship","learn"]) as $known
         | .completed_phases =
             (if ($known | index($cur)) and (($s.completed_phases | index($cur)) == null)
              then $s.completed_phases + [$cur]

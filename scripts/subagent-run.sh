@@ -14,7 +14,7 @@
 #   bash scripts/subagent-run.sh --check-token <artifact_path> <token>
 #
 # Arguments:
-#   <agent>           — one of: scout, tdd-engineer, builder, auditor, inspirer, evaluator, retrospective, orchestrator
+#   <agent>           — one of: intent, scout, tdd-engineer, builder, auditor, inspirer, evaluator, retrospective, orchestrator, plan-reviewer
 #   <cycle>           — current cycle number (integer)
 #   <workspace_path>  — absolute path to .evolve/runs/cycle-N/ for this cycle
 #
@@ -223,7 +223,7 @@ cmd_run() {
         agent_role="${BASH_REMATCH[1]}"
         worker_name="${BASH_REMATCH[2]}"
     fi
-    [[ "$agent_role" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer)$ ]] || fail "unknown agent: $agent"
+    [[ "$agent_role" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent)$ ]] || fail "unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
 
@@ -490,7 +490,7 @@ cmd_dispatch_parallel() {
     local cycle="${2:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
     local workspace="${3:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
 
-    [[ "$agent" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer)$ ]] \
+    [[ "$agent" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent)$ ]] \
         || fail "dispatch-parallel: unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "dispatch-parallel: cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "dispatch-parallel: workspace dir missing: $workspace"
@@ -664,7 +664,7 @@ Usage:
   subagent-run.sh --validate-profile <agent>
   subagent-run.sh --check-token <artifact_path> <token>
 
-Agents: scout | tdd-engineer | builder | auditor | inspirer | evaluator | retrospective | orchestrator
+Agents: intent | scout | tdd-engineer | builder | auditor | inspirer | evaluator | retrospective | orchestrator | plan-reviewer
 USAGE
     exit 1
 }

@@ -40,6 +40,8 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 
 ```
 1. Calibrate (read state, decide strategy)
+   ↓ if cycle-state.intent_required==true: advance intent intent
+1b. Intent (only when intent_required) → bash $EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh intent $CYCLE $WORKSPACE
    ↓ advance research scout
 2. Research / Discover  →  bash $EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh scout $CYCLE $WORKSPACE
    ↓ advance build builder /tmp/<worktree>
@@ -78,6 +80,8 @@ The dispatcher records every recoverable failure to `state.json:failedApproaches
 | 2+ prior `audit-fail` on the same task description | Cycle BLOCKED. Don't run Builder. `record-failure-to-state.sh $WORKSPACE BLOCKED-RECURRING-AUDIT-FAIL` and exit. Next cycle should pick a different task from scout-report. |
 | 2+ prior `build-fail` on the same task | Cycle BLOCKED. Don't retry Build. Same flow as above with `BLOCKED-RECURRING-BUILD-FAIL`. |
 | 3+ prior failures of any kind on consecutive cycles | Treat as systemic. Declare `BLOCKED-SYSTEMIC` and exit immediately after Calibrate. Operator must intervene. |
+| 1+ prior `intent-missing` (v8.19.0+) | Intent persona produced no/invalid intent.md. Re-spawn intent persona once with explicit "your prior output was missing/invalid" feedback. If second attempt also fails, classify as `intent-missing` (NOT `audit-fail`) so the systemic-block aggregation does not include it. |
+| 1 prior `intent-ibtc-rejection` (v8.19.0+) | Intent persona classified the goal as out-of-scope (IBTC). Do NOT retry — report verdict `SCOPE-REJECTED` and exit. The user must refine the goal before next cycle. |
 
 **Principle**: "Same input → same output" is failure to evolve. If `recentFailures` shows the same classification on the same phase, the next attempt MUST do something materially different — skip the phase, change scope, escalate, or apply a known workaround. Document your adaptation in the orchestrator-report.md `## Notes` section.
 

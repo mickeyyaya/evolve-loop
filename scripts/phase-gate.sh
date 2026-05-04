@@ -557,8 +557,99 @@ print('Mastery RESET: audit did not PASS')
     log "PASS: Cycle $CYCLE complete"
 }
 
+# ─── Gate: CALIBRATE → INTENT (v8.19.0, opt-in) ───
+#
+# Fires only when cycle-state.intent_required==true (set at cycle init from
+# EVOLVE_REQUIRE_INTENT env). Always passes structurally — its job is to
+# *acknowledge* that the cycle is on the intent-enabled path. The real
+# verification happens at gate_intent_to_research below.
+gate_calibrate_to_intent() {
+    log "Gate: CALIBRATE → INTENT (cycle $CYCLE)"
+    local cycle_state="${EVOLVE_CYCLE_STATE_FILE:-$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json}"
+    if [ ! -f "$cycle_state" ]; then
+        log "WARN: cycle-state.json missing — gate passes (caller responsible)"
+        return 0
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        log "WARN: jq missing — gate passes"
+        return 0
+    fi
+    local ir
+    ir=$(jq -r '.intent_required // false' "$cycle_state" 2>/dev/null)
+    if [ "$ir" != "true" ]; then
+        log "INFO: cycle has intent_required=$ir — gate not applicable, default flow"
+        return 0
+    fi
+    log "OK: cycle is intent-enabled (intent_required=true)"
+}
+
+# ─── Gate: INTENT → RESEARCH (v8.19.0, opt-in) ───
+#
+# Verifies the structured intent.md the intent persona produced is sound:
+#   - Exists in workspace
+#   - Has YAML frontmatter with awn_class
+#   - awn_class is NOT IBTC (out-of-scope short-circuit)
+#   - challenged_premises has >= 1 entry
+#   - Latest intent ledger entry SHA matches the on-disk file (no tampering)
+#
+# This is purely structural — no human approval needed. Autonomy is preserved.
+gate_intent_to_research() {
+    log "Gate: INTENT → RESEARCH (cycle $CYCLE)"
+    local intent_file="$WORKSPACE/intent.md"
+    [ -f "$intent_file" ] || fail "intent.md missing at $intent_file — intent persona did not produce artifact"
+
+    # Extract YAML frontmatter (between first two --- lines)
+    local fm
+    fm=$(awk '/^---$/{n++; next} n==1' "$intent_file")
+    [ -n "$fm" ] || fail "intent.md has no YAML frontmatter"
+
+    # awn_class must be present and not IBTC
+    local awn_class
+    awn_class=$(printf '%s\n' "$fm" | awk -F': *' '/^awn_class: */ {print $2; exit}' | tr -d ' "')
+    [ -n "$awn_class" ] || fail "intent.md frontmatter missing awn_class field"
+    case "$awn_class" in
+        IMKI|IMR|IwE|CLEAR) ;;
+        IBTC)
+            fail "intent.md awn_class=IBTC (Instructions Beyond Tool Capabilities) — scope rejection. Cycle should not proceed; user goal is out of scope for this system."
+            ;;
+        *)
+            fail "intent.md awn_class=$awn_class is invalid (must be IMKI|IMR|IwE|IBTC|CLEAR)"
+            ;;
+    esac
+
+    # challenged_premises must have at least one entry. We count list items
+    # that start with "- premise:" (canonical schema form).
+    local premise_count
+    premise_count=$(awk '/^challenged_premises:/{flag=1; next} /^[a-z_]+:/{flag=0} flag && /^[[:space:]]*- premise:/{n++} END{print n+0}' "$intent_file")
+    [ "$premise_count" -ge 1 ] || fail "intent.md challenged_premises must have >= 1 entry (found $premise_count); per Karpathy + Socratic literature, premise-challenging is mandatory"
+
+    log "OK: intent.md structure valid (awn_class=$awn_class, challenged_premises=$premise_count)"
+
+    # SHA verification: latest intent ledger entry must match on-disk file
+    if [ -f "$LEDGER" ] && command -v jq >/dev/null 2>&1; then
+        local entry recorded_sha actual_sha
+        entry=$(grep '"kind":"agent_subprocess"' "$LEDGER" 2>/dev/null \
+            | jq -c --argjson cycle "$CYCLE" 'select(.cycle == $cycle and .role == "intent")' 2>/dev/null \
+            | tail -1)
+        if [ -n "$entry" ]; then
+            recorded_sha=$(echo "$entry" | jq -r '.artifact_sha256')
+            if command -v sha256sum >/dev/null 2>&1; then
+                actual_sha=$(sha256sum "$intent_file" | awk '{print $1}')
+            else
+                actual_sha=$(shasum -a 256 "$intent_file" | awk '{print $1}')
+            fi
+            [ "$recorded_sha" = "$actual_sha" ] || fail "intent.md tampered post-write: ledger=$recorded_sha actual=$actual_sha"
+            log "OK: intent.md SHA matches latest ledger entry ($recorded_sha)"
+        else
+            log "INFO: no intent ledger entry yet (legacy or pre-runner path)"
+        fi
+    fi
+}
+
 # ─── Dispatch ───
 case "$GATE" in
+    calibrate-to-intent)  gate_calibrate_to_intent ;;
+    intent-to-research)   gate_intent_to_research ;;
     research-to-discover) gate_research_to_discover ;;
     discover-to-build)    gate_discover_to_build ;;
     build-to-audit)       gate_build_to_audit ;;

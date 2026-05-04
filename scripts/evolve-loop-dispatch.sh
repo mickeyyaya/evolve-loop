@@ -266,13 +266,32 @@ count_role() {
 
 # verify_cycle <cycle> — exits 0 if the cycle has scout, builder, AND auditor
 # entries; emits a diagnostic and returns 2 if any are missing.
+# v8.19.0: when cycle was init'd with intent_required=true, also assert
+# the cycle has an `intent` agent_subprocess entry. Read intent_required from
+# state.json (NOT env) so mid-stream env flips don't change verification.
 verify_cycle() {
     local cycle="$1"
     local s b a
     s=$(count_role "$cycle" "scout")
     b=$(count_role "$cycle" "builder")
     a=$(count_role "$cycle" "auditor")
-    log "ledger: cycle=$cycle scout=$s builder=$b auditor=$a"
+    local i_required="false" i=0
+    if command -v jq >/dev/null 2>&1 && [ -f "$STATE_FILE" ]; then
+        # State carries the most-recent cycle's intent_required. For batch
+        # verification this is good enough — each cycle's run-cycle.sh init's
+        # state with the right value at the start.
+        i_required=$(jq -r '.intent_required // false' "$STATE_FILE" 2>/dev/null || echo false)
+    fi
+    if [ "$i_required" = "true" ]; then
+        i=$(count_role "$cycle" "intent")
+        log "ledger: cycle=$cycle intent=$i scout=$s builder=$b auditor=$a"
+        if [ "$i" -lt 1 ]; then
+            log "VERIFY-INCOMPLETE: cycle $cycle missing intent entry (intent_required=true; intent=$i scout=$s builder=$b auditor=$a)"
+            return 2
+        fi
+    else
+        log "ledger: cycle=$cycle scout=$s builder=$b auditor=$a"
+    fi
     if [ "$s" -lt 1 ] || [ "$b" -lt 1 ] || [ "$a" -lt 1 ]; then
         log "VERIFY-INCOMPLETE: cycle $cycle pipeline incomplete (scout=$s builder=$b auditor=$a)"
         return 2
