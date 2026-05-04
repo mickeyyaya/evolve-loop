@@ -91,6 +91,12 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/resolve-roots.sh"
 unset __rr_self
 
+# v8.20.0: PATH-based kernel script invocation. Prepend plugin's scripts dir
+# so subagents can invoke kernel scripts by bare name. Eliminates the
+# install-layout-fragile path-pattern enumeration in orchestrator/auditor
+# allowlists. Inherits to claude -p subprocess via env propagation.
+export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/scripts/release:$PATH"
+
 # Read-only: run-cycle.sh ships with the plugin
 RUN_CYCLE="${RUN_CYCLE_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/scripts/run-cycle.sh}"
 # Writable: ledger, state, runs/ live in the user's project (or evolve-loop in dev)

@@ -282,6 +282,49 @@ else
     fail_ "loop.md execution diagram missing /intent — phase ordering doc out of sync"
 fi
 
+# === Test 16: orchestrator profile uses bare-name patterns (v8.20.0+) =========
+# The v8.20.0 PATH-based architecture requires kernel-script invocations to be
+# bare names (cycle-state.sh advance) — NOT path-prefixed (bash scripts/...,
+# bash **/scripts/..., bash /*/.claude/plugins/...). This test fails loudly
+# if any of the 4 path-prefixed pattern forms re-appear in orchestrator.json.
+#
+# Why this matters: v8.18.x → v8.19.5 shipped 5 patches in 48 hours each adding
+# more path-variant patterns to handle install-layout differences (140 patterns
+# total). v8.20.0 collapsed to ~16 bare-name patterns by prepending PATH. If
+# someone reverts to path-prefixed patterns, install-layout fragility returns.
+header "Test 16: orchestrator.json uses bare-name patterns (no path-prefixed Bash kernel patterns)"
+ORCH_PROFILE="$REPO_ROOT/.evolve/profiles/orchestrator.json"
+[ -f "$ORCH_PROFILE" ] || fail_ "orchestrator profile not at $ORCH_PROFILE"
+# Look for any of the 4 known fragile pattern forms applied to kernel-script
+# invocations. Match patterns like:
+#   Bash(bash scripts/...
+#   Bash(bash **/scripts/...
+#   Bash(bash /*/.claude/plugins/marketplaces/*/scripts/...
+#   Bash(bash /*/.claude/plugins/cache/*/*/*/scripts/...
+# Use jq to extract ONLY the actual list entries (skip _design_notes which
+# may legitimately reference old patterns as historical documentation).
+fragile_count=0
+if command -v jq >/dev/null 2>&1; then
+    fragile_count=$(jq -r '(.allowed_tools // []) + (.disallowed_tools // []) | .[]' "$ORCH_PROFILE" \
+        | grep -cE 'Bash\(bash (scripts/|\*\*/scripts/|/\*/\.claude/plugins/(marketplaces|cache))' || true)
+fi
+if [ "$fragile_count" = "0" ]; then
+    pass "no path-prefixed kernel-script patterns in allowlists (architecture preserved)"
+else
+    fail_ "$fragile_count path-prefixed kernel-script patterns found in allowlists — v8.20.0 collapse reverted"
+fi
+# Positive-evidence check: bare-name kernel-script patterns must be present.
+bare_name_count=0
+if command -v jq >/dev/null 2>&1; then
+    bare_name_count=$(jq -r '.allowed_tools[]?' "$ORCH_PROFILE" \
+        | grep -cE '^Bash\((cycle-state\.sh|ship\.sh|subagent-run\.sh)' || true)
+fi
+if [ "$bare_name_count" -ge 3 ]; then
+    pass "bare-name kernel-script patterns present (count=$bare_name_count, positive architecture evidence)"
+else
+    fail_ "only $bare_name_count bare-name kernel-script patterns in orchestrator allowlist (expected >=3)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="

@@ -51,6 +51,17 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/resolve-roots.sh"
 unset __rr_self
 
+# v8.20.0: Prepend the plugin's scripts dir (and release/ subdir) to PATH so
+# kernel scripts are findable by bare name from subagent subprocesses. This
+# eliminates the install-layout-fragile `bash $EVOLVE_PLUGIN_ROOT/scripts/foo.sh`
+# invocation pattern that required 4 path-variant allowlist entries per script
+# (relative + ** glob + marketplace + cache absolute) — 140 patterns total in
+# orchestrator.json. With PATH set, orchestrator invokes `cycle-state.sh advance`
+# (bare name) and the allowlist needs ONE pattern: Bash(cycle-state.sh advance:*).
+# Works in dev (cwd=repo), marketplace, cache, and any future install layout.
+# Inherits to claude -p subprocess via standard env propagation.
+export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/scripts/release:$PATH"
+
 # Read-only resources from the plugin install
 CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/cycle-state.sh"
 SUBAGENT_RUN="$EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh"
