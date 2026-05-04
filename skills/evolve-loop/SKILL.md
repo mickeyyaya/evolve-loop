@@ -17,10 +17,12 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command:
 
 ```bash
-bash scripts/evolve-loop-dispatch.sh <args>
+EVOLVE_REQUIRE_INTENT=1 bash scripts/evolve-loop-dispatch.sh <args>
 ```
 
-…and then read its summary. Nothing else. The dispatcher loops `bash scripts/run-cycle.sh` once per cycle and asserts each cycle produced Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
+…and then read its summary. Nothing else. The dispatcher loops `bash scripts/run-cycle.sh` once per cycle and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
+
+**Why `EVOLVE_REQUIRE_INTENT=1`** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase. **This flag is the documented default for the slash command path; do not omit it.**
 
 **You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
 - Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
@@ -147,6 +149,8 @@ Parse `$ARGUMENTS`:
 
 ```
 Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phase0-calibrate.md
+Phase 0b: INTENT ─── [Intent] structure user goal     → docs/architecture/intent-phase.md
+                     (always-on for /evolve-loop slash command path; v8.19.1+)
 Phase 1: RESEARCH ── proactive research loop          → online-researcher.md
 Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
 Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
@@ -162,7 +166,7 @@ Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-
 For each cycle:
 1. Claim cycle number (OCC protocol)
 2. **`bash scripts/phase-gate.sh <gate> $CYCLE $WORKSPACE`** — MANDATORY at every phase transition
-3. Scout → Builder → Auditor → phase-gate verification → Ship → Learn
+3. Intent (v8.19.1+, always for /evolve-loop) → Scout → Builder → Auditor → phase-gate verification → Ship → Learn
 4. **Subagents MUST be launched via `bash scripts/subagent-run.sh <agent> $CYCLE $WORKSPACE`** — never via the in-process `Agent` tool (or `activate_skill`-as-subagent on Gemini, or any equivalent same-session dispatch) in production. Builder gets its worktree via `WORKTREE_PATH` env var. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes a tamper-evident ledger entry. On non-Claude CLIs, `subagent-run.sh` dispatches to the per-platform adapter at `scripts/cli_adapters/<cli>.sh`; the Gemini adapter uses the hybrid pattern (delegates to Claude binary). Legacy `LEGACY_AGENT_DISPATCH=1` fallback permitted for one A/B cycle only.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately

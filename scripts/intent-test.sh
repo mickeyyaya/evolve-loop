@@ -260,6 +260,28 @@ rc=$?
 set -e
 [ "$rc" = "0" ] && pass "gate passes when intent_required=true (rc=0)" || fail_ "rc=$rc (expected 0)"
 
+# === Test 14: /evolve-loop SKILL.md strict-mode invocation enables intent (v8.19.1) =
+header "Test 14: /evolve-loop strict-mode bash command includes EVOLVE_REQUIRE_INTENT=1"
+SKILL_FILE="$REPO_ROOT/skills/evolve-loop/SKILL.md"
+[ -f "$SKILL_FILE" ] || fail_ "SKILL.md not at $SKILL_FILE"
+# Look for the canonical invocation line in the strict-mode block. The line
+# must set EVOLVE_REQUIRE_INTENT=1 before calling evolve-loop-dispatch.sh.
+if grep -E '^EVOLVE_REQUIRE_INTENT=1[[:space:]]+bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" >/dev/null 2>&1; then
+    pass "SKILL.md sets EVOLVE_REQUIRE_INTENT=1 for /evolve-loop default path"
+else
+    fail_ "SKILL.md strict-mode invocation does not set EVOLVE_REQUIRE_INTENT=1 — /evolve-loop would skip intent capture"
+fi
+
+# === Test 15: commands/loop.md phase diagram lists /intent as first phase ===
+header "Test 15: commands/loop.md execution diagram includes /intent"
+LOOP_CMD="$REPO_ROOT/.claude-plugin/commands/loop.md"
+[ -f "$LOOP_CMD" ] || fail_ "loop.md not at $LOOP_CMD"
+if grep -qE '^/intent\b' "$LOOP_CMD"; then
+    pass "loop.md execution diagram includes /intent"
+else
+    fail_ "loop.md execution diagram missing /intent — phase ordering doc out of sync"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
