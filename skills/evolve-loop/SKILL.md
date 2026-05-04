@@ -17,12 +17,16 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command:
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 bash scripts/evolve-loop-dispatch.sh <args>
+EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash scripts/evolve-loop-dispatch.sh <args>
 ```
 
 …and then read its summary. Nothing else. The dispatcher loops `bash scripts/run-cycle.sh` once per cycle and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
-**Why `EVOLVE_REQUIRE_INTENT=1`** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase. **This flag is the documented default for the slash command path; do not omit it.**
+**Why `EVOLVE_REQUIRE_INTENT=1`** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
+
+**Why `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1`** (v8.20.1+): on macOS Darwin 25.4+, `sandbox-exec` cannot be nested. When the orchestrator subagent (already wrapped in sandbox) tries to spawn the builder subagent (which also wraps in sandbox), the inner `sandbox_apply()` returns `EPERM` because the outer sandbox forbids creating new sandbox profiles. This is a kernel-level macOS restriction, not a config bug. The flag tells the adapter: on EPERM, retry the inner subagent without sandbox-exec — preserving sandbox where the kernel allows it, degrading only where the kernel forces it. On Linux (`bwrap`) the flag is a no-op because nested namespaces work. Without this flag, every macOS `/evolve-loop` cycle that needs a builder fails at the orchestrator → builder hand-off with `rc=71 sandbox_apply: Operation not permitted`.
+
+**Both flags are the documented default for the slash command path; do not omit them.**
 
 **You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
 - Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).

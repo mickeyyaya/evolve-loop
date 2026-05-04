@@ -266,7 +266,7 @@ SKILL_FILE="$REPO_ROOT/skills/evolve-loop/SKILL.md"
 [ -f "$SKILL_FILE" ] || fail_ "SKILL.md not at $SKILL_FILE"
 # Look for the canonical invocation line in the strict-mode block. The line
 # must set EVOLVE_REQUIRE_INTENT=1 before calling evolve-loop-dispatch.sh.
-if grep -E '^EVOLVE_REQUIRE_INTENT=1[[:space:]]+bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" >/dev/null 2>&1; then
+if grep -E '^EVOLVE_REQUIRE_INTENT=1[[:space:]]' "$SKILL_FILE" | grep -E 'bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' >/dev/null 2>&1; then
     pass "SKILL.md sets EVOLVE_REQUIRE_INTENT=1 for /evolve-loop default path"
 else
     fail_ "SKILL.md strict-mode invocation does not set EVOLVE_REQUIRE_INTENT=1 — /evolve-loop would skip intent capture"
@@ -280,6 +280,22 @@ if grep -qE '^/intent\b' "$LOOP_CMD"; then
     pass "loop.md execution diagram includes /intent"
 else
     fail_ "loop.md execution diagram missing /intent — phase ordering doc out of sync"
+fi
+
+# === Test 17: SKILL.md auto-sets EVOLVE_SANDBOX_FALLBACK_ON_EPERM (v8.20.1+) ==
+# macOS Darwin 25.4+ kernel-level restriction: sandbox-exec cannot be nested.
+# When orchestrator (sandboxed) spawns builder (also sandboxed), the inner
+# sandbox_apply() returns EPERM. EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 tells the
+# adapter to retry without sandbox on EPERM. Must be auto-set by SKILL.md so
+# `/evolve-loop` users on macOS don't hit this trap. No-op on Linux.
+header "Test 17: /evolve-loop auto-sets EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
+SKILL_FILE="$REPO_ROOT/skills/evolve-loop/SKILL.md"
+[ -f "$SKILL_FILE" ] || fail_ "SKILL.md not at $SKILL_FILE"
+# The strict-mode bash invocation must include both env vars before the dispatcher.
+if grep -E '^EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1[[:space:]]+bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" >/dev/null 2>&1; then
+    pass "SKILL.md auto-sets both EVOLVE_REQUIRE_INTENT=1 and EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
+else
+    fail_ "SKILL.md strict-mode invocation does not auto-set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 — macOS users will hit nested-sandbox EPERM"
 fi
 
 # === Test 16: orchestrator profile uses bare-name patterns (v8.20.0+) =========
