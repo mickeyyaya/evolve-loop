@@ -266,7 +266,7 @@ SKILL_FILE="$REPO_ROOT/skills/evolve-loop/SKILL.md"
 [ -f "$SKILL_FILE" ] || fail_ "SKILL.md not at $SKILL_FILE"
 # Look for the canonical invocation line in the strict-mode block. The line
 # must set EVOLVE_REQUIRE_INTENT=1 before calling evolve-loop-dispatch.sh.
-if grep -E '^EVOLVE_REQUIRE_INTENT=1[[:space:]]' "$SKILL_FILE" | grep -E 'bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' >/dev/null 2>&1; then
+if grep -E '^EVOLVE_REQUIRE_INTENT=1[[:space:]]' "$SKILL_FILE" | grep -E 'evolve-loop-dispatch\.sh' >/dev/null 2>&1; then
     pass "SKILL.md sets EVOLVE_REQUIRE_INTENT=1 for /evolve-loop default path"
 else
     fail_ "SKILL.md strict-mode invocation does not set EVOLVE_REQUIRE_INTENT=1 — /evolve-loop would skip intent capture"
@@ -292,10 +292,34 @@ header "Test 17: /evolve-loop auto-sets EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
 SKILL_FILE="$REPO_ROOT/skills/evolve-loop/SKILL.md"
 [ -f "$SKILL_FILE" ] || fail_ "SKILL.md not at $SKILL_FILE"
 # The strict-mode bash invocation must include both env vars before the dispatcher.
-if grep -E '^EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1[[:space:]]+bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" >/dev/null 2>&1; then
+if grep -E '^EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1' "$SKILL_FILE" | grep -E 'evolve-loop-dispatch\.sh' >/dev/null 2>&1; then
     pass "SKILL.md auto-sets both EVOLVE_REQUIRE_INTENT=1 and EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
 else
     fail_ "SKILL.md strict-mode invocation does not auto-set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 — macOS users will hit nested-sandbox EPERM"
+fi
+
+# === Test 18: SKILL.md dispatcher path is cwd-independent (v8.20.2+) ==========
+# The slash-command agent's cwd is the user's project, NOT the plugin install.
+# A relative `bash scripts/evolve-loop-dispatch.sh` will fail with rc=127. The
+# SKILL.md must use an absolute or find-based path that resolves regardless of
+# cwd. Without this, the v8.18.0 boundary class returns from the dead.
+header "Test 18: SKILL.md dispatcher invocation is cwd-independent (v8.20.2+)"
+# Negative: fail if SKILL.md uses bare relative `bash scripts/evolve-loop-dispatch.sh`.
+# Allow it inside `\$EVOLVE_PLUGIN_ROOT/scripts/...` form (different concept).
+# Search for the bad pattern: 'bash scripts/' with no $-prefix or $HOME or
+# $(...) command substitution before it.
+bad_relative=$(grep -E '^[A-Z_=0-9 ]*bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" | grep -vE '^[[:space:]]*#|^[[:space:]]*>' || true)
+if [ -z "$bad_relative" ]; then
+    pass "no bare-relative `bash scripts/evolve-loop-dispatch.sh` in SKILL.md (cwd-independent)"
+else
+    fail_ "SKILL.md uses bare-relative dispatcher path — fails when slash-command cwd is user project: $bad_relative"
+fi
+# Positive: dispatcher path must be either find-based or $HOME-prefixed
+if grep -qE 'bash "\$\(find.*evolve-loop-dispatch' "$SKILL_FILE" || \
+   grep -qE '\$HOME/\.claude/plugins.*evolve-loop-dispatch' "$SKILL_FILE"; then
+    pass "SKILL.md uses cwd-independent dispatcher resolution (find or \$HOME)"
+else
+    fail_ "SKILL.md missing cwd-independent dispatcher resolution"
 fi
 
 # === Test 16: orchestrator profile uses bare-name patterns (v8.20.0+) =========

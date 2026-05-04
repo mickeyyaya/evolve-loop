@@ -14,13 +14,17 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 
 ## STRICT MODE — Read this first (v8.13.7+)
 
-When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command:
+When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command. **Your cwd is the user's project directory, NOT the plugin install** — relative paths like `bash scripts/...` will fail with rc=127. Use this exact one-liner which resolves the dispatcher's absolute path regardless of install layout:
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash scripts/evolve-loop-dispatch.sh <args>
+EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash "$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/scripts/evolve-loop-dispatch.sh' -o -path '*/cache/evolve-loop/evolve-loop/*/scripts/evolve-loop-dispatch.sh' \) -type f 2>/dev/null | sort | tail -1)" <args>
 ```
 
-…and then read its summary. Nothing else. The dispatcher loops `bash scripts/run-cycle.sh` once per cycle and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
+The `find` expression locates the dispatcher in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install if both exist (cache install dirs sort by version since the dir name is the version number). The `bash "$(...)"` invocation is **one** command from the shell's perspective — the substitution happens before bash runs.
+
+**DO NOT** invent paths like `<plugin_root>/skills/evolve-loop/scripts/...` — the dispatcher is at `<plugin_root>/scripts/`, NOT under `skills/`. The skill (this file) and the dispatcher live in sibling directories under the plugin root.
+
+…and then read its summary. Nothing else. The dispatcher loops `run-cycle.sh` once per cycle and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
 **Why `EVOLVE_REQUIRE_INTENT=1`** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
 
