@@ -276,11 +276,17 @@ verify_cycle() {
     b=$(count_role "$cycle" "builder")
     a=$(count_role "$cycle" "auditor")
     local i_required="false" i=0
-    if command -v jq >/dev/null 2>&1 && [ -f "$STATE_FILE" ]; then
-        # State carries the most-recent cycle's intent_required. For batch
-        # verification this is good enough — each cycle's run-cycle.sh init's
-        # state with the right value at the start.
-        i_required=$(jq -r '.intent_required // false' "$STATE_FILE" 2>/dev/null || echo false)
+    if command -v jq >/dev/null 2>&1; then
+        # v8.19.0 (audit MEDIUM-1 fix): prefer the per-cycle workspace's own
+        # cycle-state.json if it survives in the workspace dir, then fall back
+        # to global state.json. The global state only holds the most-recent
+        # cycle's intent_required, so for historical cycles it can be wrong.
+        local per_cycle_state="$RUNS_DIR/cycle-${cycle}/cycle-state.json"
+        if [ -f "$per_cycle_state" ]; then
+            i_required=$(jq -r '.intent_required // false' "$per_cycle_state" 2>/dev/null || echo false)
+        elif [ -f "$STATE_FILE" ]; then
+            i_required=$(jq -r '.intent_required // false' "$STATE_FILE" 2>/dev/null || echo false)
+        fi
     fi
     if [ "$i_required" = "true" ]; then
         i=$(count_role "$cycle" "intent")

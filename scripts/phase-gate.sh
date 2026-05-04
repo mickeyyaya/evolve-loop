@@ -605,7 +605,7 @@ gate_intent_to_research() {
 
     # awn_class must be present and not IBTC
     local awn_class
-    awn_class=$(printf '%s\n' "$fm" | awk -F': *' '/^awn_class: */ {print $2; exit}' | tr -d ' "')
+    awn_class=$(printf '%s\n' "$fm" | awk -F': *' '/^awn_class: */ {print $2; exit}' | tr -d " '\"")
     [ -n "$awn_class" ] || fail "intent.md frontmatter missing awn_class field"
     case "$awn_class" in
         IMKI|IMR|IwE|CLEAR) ;;
