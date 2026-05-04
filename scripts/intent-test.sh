@@ -310,7 +310,7 @@ header "Test 18: SKILL.md dispatcher invocation is cwd-independent (v8.20.2+)"
 # $(...) command substitution before it.
 bad_relative=$(grep -E '^[A-Z_=0-9 ]*bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" | grep -vE '^[[:space:]]*#|^[[:space:]]*>' || true)
 if [ -z "$bad_relative" ]; then
-    pass "no bare-relative `bash scripts/evolve-loop-dispatch.sh` in SKILL.md (cwd-independent)"
+    pass 'no bare-relative bash dispatcher invocation in SKILL.md (cwd-independent)'
 else
     fail_ "SKILL.md uses bare-relative dispatcher path — fails when slash-command cwd is user project: $bad_relative"
 fi
