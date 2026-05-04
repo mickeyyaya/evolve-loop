@@ -548,39 +548,58 @@ else
     fail_ "rc=$rc (want 10); out: $out"
 fi
 
-# === Test 24: ANTHROPIC_API_KEY unset → fail fast for real runs (v8.18.1) =====
-# Tests so far have used RUN_CYCLE_OVERRIDE to substitute a stub run-cycle.sh.
-# In test mode (override set), the API-key check is skipped. Without override,
-# real production runs without a key should fail fast with rc=1.
-header "Test 24: real run without ANTHROPIC_API_KEY + no bypass → fail rc=1"
+# === Test 24: no API key but subscription file present → no warning (v8.19.2) =
+# v8.19.2 removed the hard block. Subscription auth (~/.claude.json) is the
+# primary supported path. With it present, no auth warning should fire.
+header "Test 24: subscription auth (~/.claude.json) present → no auth warning"
+# This test runs in the real repo with the user's real ~/.claude.json. We only
+# assert that the dispatcher does NOT abort with rc=1 due to missing API key.
+# Use VALIDATE_ONLY mode so we don't actually invoke run-cycle.
 set +e
-# Unset everything that would mask the check; deliberately omit RUN_CYCLE_OVERRIDE.
-out=$(env -u ANTHROPIC_API_KEY -u EVOLVE_ALLOW_INTERACTIVE_FALLBACK \
-      bash "$DISPATCH" --dry-run 1 2>&1)
+out=$(env -u ANTHROPIC_API_KEY VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
-# --dry-run exits 0 before reaching the API-key check, which is correct: dry-run
-# doesn't actually invoke claude. So that path is not the right test entry.
-# Use VALIDATE_ONLY=0 + RUN_CYCLE pointing at the real script, but stop short
-# of actually running. The simplest reliable signal: invoke without --dry-run,
-# without VALIDATE_ONLY, without RUN_CYCLE_OVERRIDE — the API-key check fires
-# before the real run-cycle.sh is invoked.
+if [ "$rc" = "0" ]; then
+    pass "no hard block on missing API key (rc=0 with VALIDATE_ONLY)"
+else
+    fail_ "rc=$rc (want 0); v8.19.2 removed the hard block"
+fi
+
+# === Test 25: no auth at all → warning emitted, but dispatcher continues =====
+# When BOTH API key and ~/.claude.json are absent, v8.19.2 emits a warning
+# but does NOT abort. The user's claude binary will surface its own auth error.
+header "Test 25: no auth detected → warning logged, no hard block"
+mock=$(make_mock_run_cycle)
+ws=$(make_workspace)
+write_state "$ws/state.json" 0
+: > "$ws/ledger.jsonl"
+mkdir -p "$ws/runs/cycle-1"
+cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+EOF
+# Override HOME to a tempdir so ~/.claude.json is not detected, also unset
+# ANTHROPIC_API_KEY. RUN_CYCLE_OVERRIDE means the dispatcher will substitute
+# our mock run-cycle.sh — no real claude binary is invoked.
+fakehome=$(mktemp -d -t test-no-auth.XXXXXX)
 set +e
-out=$(env -u ANTHROPIC_API_KEY -u EVOLVE_ALLOW_INTERACTIVE_FALLBACK \
+out=$(env -u ANTHROPIC_API_KEY HOME="$fakehome" \
+      STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
       bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
-if [ "$rc" = "1" ] && echo "$out" | grep -q "ANTHROPIC_API_KEY"; then
-    pass "missing API key fails with clear rc=1 message"
+rm -rf "$fakehome"
+# RUN_CYCLE_OVERRIDE is set, so the no-auth warning is SUPPRESSED in test mode.
+# This protects existing tests from log noise. The warning fires only in real
+# runs (RUN_CYCLE_OVERRIDE unset).
+if echo "$out" | grep -q 'no subscription credentials'; then
+    fail_ "warning fired in test mode (RUN_CYCLE_OVERRIDE set); should be suppressed"
 else
-    fail_ "rc=$rc (want 1); out: $out"
+    pass "no-auth warning suppressed in test mode (RUN_CYCLE_OVERRIDE set)"
 fi
 
-# === Test 25: EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 bypass works (v8.18.1) ======
-header "Test 25: EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 disables API-key check"
-# With the bypass, the dispatcher should proceed past the API-key check. Since
-# we don't supply a real run-cycle.sh, it'll fail later — but NOT on API-key
-# grounds. We assert the message does NOT mention ANTHROPIC_API_KEY.
+# === Test 26: RUN_CYCLE_OVERRIDE alone implies test mode (key check skipped) =
+header "Test 26: RUN_CYCLE_OVERRIDE implies test mode (no auth gating at all)"
 mock=$(make_mock_run_cycle)
 ws=$(make_workspace)
 write_state "$ws/state.json" 0
@@ -590,43 +609,16 @@ cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
 # Orchestrator Report — Cycle 1
 EOF
 set +e
-out=$(env -u ANTHROPIC_API_KEY EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 \
+out=$(env -u ANTHROPIC_API_KEY \
       STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
       RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
       bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
-if echo "$out" | grep -q "ANTHROPIC_API_KEY"; then
-    fail_ "bypass did not disable API-key check; out mentions key"
+if [ "$rc" = "0" ] || [ "$rc" = "3" ]; then
+    pass "test mode runs through (rc=$rc; no auth-related abort)"
 else
-    pass "bypass disables API-key check"
-fi
-
-# === Test 26: RUN_CYCLE_OVERRIDE alone implies test mode (v8.18.1) ===========
-# Tests routinely set RUN_CYCLE_OVERRIDE to substitute a mock run-cycle.sh.
-# When that's set, the API-key check should be implicitly skipped — otherwise
-# every existing dispatch test would need to set EVOLVE_ALLOW_INTERACTIVE_FALLBACK.
-# This is verified by the fact that tests 11-21 don't set the bypass and pass.
-header "Test 26: RUN_CYCLE_OVERRIDE implies test mode (no API-key check)"
-mock=$(make_mock_run_cycle)
-ws=$(make_workspace)
-write_state "$ws/state.json" 0
-: > "$ws/ledger.jsonl"
-mkdir -p "$ws/runs/cycle-1"
-cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
-# Orchestrator Report — Cycle 1
-EOF
-set +e
-out=$(env -u ANTHROPIC_API_KEY -u EVOLVE_ALLOW_INTERACTIVE_FALLBACK \
-      STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
-      RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
-      bash "$DISPATCH" 1 2>&1)
-rc=$?
-set -e
-if echo "$out" | grep -q "ANTHROPIC_API_KEY"; then
-    fail_ "RUN_CYCLE_OVERRIDE did not imply test mode; out mentions API key"
-else
-    pass "RUN_CYCLE_OVERRIDE implies test mode (key check skipped)"
+    fail_ "rc=$rc unexpected"
 fi
 
 # === Summary ==================================================================

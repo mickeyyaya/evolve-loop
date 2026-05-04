@@ -219,32 +219,31 @@ fi
 [ -f "$RUN_CYCLE" ] || fail "missing run-cycle.sh at $RUN_CYCLE"
 command -v jq >/dev/null 2>&1 || fail "jq is required for ledger verification"
 
-# v8.18.1: API-key precondition. Autonomous cycles spawn `claude -p --bare`
-# subagents whose profile-scoped permissions are the trust kernel's main
-# enforcement layer. Without ANTHROPIC_API_KEY the adapter drops --bare and
-# the subagent runs under main-session permissions instead — which silently
-# blocks orchestrator-report.md writes and turns the cycle into an integrity
-# fail at unrecoverable cost.
+# v8.19.2: Auth path note (informational, not a hard block).
 #
-# Skipped in two cases:
-#   - RUN_CYCLE_OVERRIDE set: tests substitute a mock run-cycle.sh; no real
-#     claude invocation happens.
-#   - EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1: explicit operator opt-in to a
-#     degraded interactive mode. Caller accepts that subagent writes may
-#     prompt; this is the supported escape hatch for "I'm exploring without
-#     an API key, I know the trust kernel is weakened."
+# Claude Code subscription auth (~/.claude.json) is the PRIMARY supported path
+# for /evolve-loop. The claude-adapter automatically drops --bare when no
+# ANTHROPIC_API_KEY is present so the subagent inherits OAuth credentials —
+# which is the correct behavior for subscription users running under bypass-
+# permissions. The kernel hooks (role-gate, ship-gate, phase-gate-precondition)
+# fire at the file-system / Bash level regardless of --bare state.
+#
+# v8.18.1's hard block was over-protective: it assumed --bare was load-bearing
+# for kernel isolation, but the hooks fire on the tool-call layer above
+# Claude Code's session-permission layer. Subscription auth + bypass-permissions
+# is sufficient for autonomous cycles.
+#
+# What this section now does: emit a one-line warning if NEITHER auth path
+# is detectable, so users running without any auth see a clear message before
+# claude exits with its own auth error. Skipped when RUN_CYCLE_OVERRIDE is
+# set (test mode).
 if [ -z "${RUN_CYCLE_OVERRIDE:-}" ] && \
    [ -z "${ANTHROPIC_API_KEY:-}" ] && \
-   [ -z "${EVOLVE_ALLOW_INTERACTIVE_FALLBACK:-}" ]; then
-    fail "ANTHROPIC_API_KEY is unset.
-       Autonomous /evolve-loop requires API auth so subagents can run with
-       --bare (their own profile-scoped permissions). Without --bare, writes
-       route through the main-session permission prompts and the trust
-       kernel cannot enforce profile isolation. Symptoms: orchestrator-
-       report.md write blocked → integrity-fail → cycle wasted.
-       FIX:    export ANTHROPIC_API_KEY=sk-... and re-invoke.
-       Bypass: EVOLVE_ALLOW_INTERACTIVE_FALLBACK=1 (degraded; expect orchestrator
-               write failures unless main-session permissions are pre-configured)."
+   [ ! -f "$HOME/.claude.json" ] && \
+   [ ! -f "$HOME/.config/claude/config.json" ]; then
+    log "WARN: no subscription credentials (~/.claude.json) and no ANTHROPIC_API_KEY found."
+    log "      The claude binary will likely fail to authenticate. Run \`claude auth\` to log in,"
+    log "      or export ANTHROPIC_API_KEY=sk-... to use API-key auth. Continuing anyway."
 fi
 
 # --- Helpers ---------------------------------------------------------------
