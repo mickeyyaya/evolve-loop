@@ -548,42 +548,23 @@ else
     fail_ "rc=$rc (want 10); out: $out"
 fi
 
-# === Test 24: subscription auth path skips the no-auth warning (v8.19.2) =====
-# v8.19.2 treats ~/.claude.json as primary auth. When it exists, no warning
-# fires (and no hard block exists either way). This test sets HOME to a
-# tempdir with a fake ~/.claude.json, uses RUN_CYCLE_OVERRIDE to avoid
-# spawning real claude, and asserts the warning is correctly suppressed.
+# === Test 24: regression guard — v8.18.1 hard-block source line is removed ===
+# Two prior cycles found that any runtime test using RUN_CYCLE_OVERRIDE will
+# pass identically under v8.18.1 (which had the same RUN_CYCLE_OVERRIDE
+# short-circuit) and v8.19.2. The runtime difference can only be exercised
+# without RUN_CYCLE_OVERRIDE, which would invoke real claude — not viable
+# in a unit test.
 #
-# Why this matters: Test 24's prior version used VALIDATE_ONLY=1 which short-
-# circuits BEFORE the auth check, so the test would pass identically under
-# the v8.18.1 hard block (tautological). This rewrite reaches the auth check
-# and asserts the new v8.19.2 behavior.
-header "Test 24: ~/.claude.json present → no-auth warning is suppressed"
-mock=$(make_mock_run_cycle)
-ws=$(make_workspace)
-write_state "$ws/state.json" 0
-: > "$ws/ledger.jsonl"
-mkdir -p "$ws/runs/cycle-1"
-cat > "$ws/runs/cycle-1/orchestrator-report.md" <<'EOF'
-# Orchestrator Report — Cycle 1
-EOF
-fakehome=$(mktemp -d -t test-sub-auth.XXXXXX)
-echo '{"subscriptionId":"test"}' > "$fakehome/.claude.json"
-set +e
-out=$(env -u ANTHROPIC_API_KEY HOME="$fakehome" \
-      STATE_OVERRIDE="$ws/state.json" LEDGER_OVERRIDE="$ws/ledger.jsonl" \
-      RUNS_DIR_OVERRIDE="$ws/runs" RUN_CYCLE_OVERRIDE="$mock" \
-      bash "$DISPATCH" 1 2>&1)
-rc=$?
-set -e
-rm -rf "$fakehome"
-# The warning should NOT appear because $HOME/.claude.json was present.
-# Note: RUN_CYCLE_OVERRIDE alone also suppresses, but we verify the
-# subscription path independently by checking grep absence.
-if echo "$out" | grep -q 'no subscription credentials'; then
-    fail_ "warning fired despite ~/.claude.json being present"
+# Instead: assert the dispatcher source no longer contains the v8.18.1
+# fail() call for ANTHROPIC_API_KEY. This is a code-presence regression
+# guard — if anyone re-introduces the hard block, this test fires loudly.
+# Tests 25/26 cover the runtime warning-suppression behavior. Together,
+# they provide non-tautological coverage of v8.19.2.
+header "Test 24: v8.18.1 hard-block ANTHROPIC_API_KEY fail() removed from dispatcher"
+if grep -qE 'fail.*ANTHROPIC_API_KEY is unset' "$DISPATCH"; then
+    fail_ "dispatcher still contains v8.18.1 hard-block fail() — must be removed in v8.19.2+"
 else
-    pass "subscription auth path correctly skips no-auth warning"
+    pass "v8.18.1 hard-block fail() not found in dispatcher source"
 fi
 
 # === Test 25: no auth at all → warning emitted, but dispatcher continues =====
