@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.23.1] - 2026-05-05
+
+Critical hotfix for v8.22.0's `failure_compute_expires_at`. A second-Claude-session running 10 cycles against a downstream project surfaced the symptom: every cycle blocked at calibrate with `BLOCKED-SYSTEMIC` despite the failure-adapter being designed to age out infrastructure failures after 1 day. Root cause: the v8.22.0 expiresAt computation was silently broken since release.
+
+### Fixed
+
+- **`scripts/failure-classifications.sh:failure_compute_expires_at`**: pre-v8.23.1 used `echo "$now_iso" | jq -r '. | fromdateiso8601'`. ISO timestamps like `2026-05-05T03:30:13Z` are NOT valid JSON without explicit string quotes — jq parses the leading digit as a number and blows up at the first dash. The error went to stderr; stdout was empty. Bash arithmetic `(( "" + 86400 ))` then yielded `86400`, which `jq -r '. | todate'` formatted as `1970-01-02T00:00:00Z`. Every v8.22.0 expiresAt was actually 1 day after the epoch — but the dispatcher swallowed the stderr, so the bug was invisible in cycle logs. **Fixed**: use `jq -rn --arg s "$now_iso" '$s | fromdateiso8601'` (proper JSON-string injection), validate the result is numeric before doing arithmetic, fall back to `date -u +%s` when conversion fails. Plus an integer-validation guard on `now_s` to refuse silent zero-substitution.
+
+- **Legacy null-expiresAt poisoning** (`scripts/failure-adapter.sh` + `scripts/cycle-state.sh:prune-expired-failures`): pre-v8.23.1 kept entries with `expiresAt: null` indefinitely "for backward compat." In practice this meant 18+ legacy `infrastructure`-classification entries from v8.21.x days never aged out, permanently triggering the adapter's "3+ consecutive infrastructure-transient" → `BLOCK-OPERATOR-ACTION` rule. **Fixed**: when `expiresAt` is null but `recordedAt` is present, use `recordedAt + 1d` as the effective TTL (matches the tightest classification age-out window). Truly ancient entries with both fields null are still kept (defensive — they're rare and inert with no recognizable classification).
+
+### Migration
+
+If you have an existing `state.json` poisoned with null-expiresAt entries from v8.22.x:
+- Automatic: `bash scripts/cycle-state.sh prune-expired-failures` will now remove entries whose `recordedAt` is older than 1 day. Run once after upgrading.
+- Manual surgical: `bash scripts/state-prune.sh --classification infrastructure` removes only the legacy free-form entries while keeping any structured-taxonomy code failures.
+- Nuclear: `bash scripts/state-prune.sh --all --yes` wipes everything.
+
+### Verification
+
+- `bash scripts/failure-classifications.sh` → `failure_compute_expires_at infrastructure-transient "2026-05-05T03:30:13Z"` now returns `2026-05-06T03:30:13Z` (correct +1d) instead of `1970-01-02T00:00:00Z`
+- 29/29 regression tests pass
+- Synthetic 4-entry state.json with 25-hour-old `recordedAt` + null `expiresAt` → adapter returns `PROCEED` with `non_expired_count=0`
+
+### Why this slipped through v8.22.0's tests
+
+The v8.22.0 unit tests for `failure_compute_expires_at` (in `failure-classifications.sh` smoke checks) used the function with no second argument — the path that defaults to `date -u +%s` for `now_s`, bypassing the broken jq invocation. The bug only fired when `record-failure-to-state.sh` and the dispatcher passed an explicit ISO timestamp as the second argument, which only happened in real cycle runs. Lesson: always test the 2-arg form when adding such functions.
+
+---
+
 ## [8.23.0] - 2026-05-05
 
 Swarm optimization release. Implements Tasks B, C, D from cycle 25's autoresearch scout-report — three optimizations to the existing Sprint 1 Pattern-3 fan-out (parallel sub-personas for Scout/Auditor/Retrospective). All three are env-flag-gated so v8.22.0 behavior is preserved when disabled.

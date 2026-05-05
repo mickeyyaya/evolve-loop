@@ -308,11 +308,17 @@ cycle_state_prune_expired_failures() {
     local now_s; now_s=$(date -u +%s)
     local before; before=$(jq '(.failedApproaches // []) | length' "$state_file")
     local tmp="${state_file}.tmp.$$"
+    # v8.23.1: same legacy-handling logic as failure-adapter.sh's read filter.
+    # Entries with null expiresAt + non-null recordedAt get an effective TTL
+    # of recordedAt + 1d (matches the tightest classification age-out window)
+    # so legacy entries age out instead of poisoning the lookback indefinitely.
     jq --argjson now "$now_s" \
         '.failedApproaches = ((.failedApproaches // []) | map(
             select(
-                (.expiresAt // "") == "" or
-                (.expiresAt | (try fromdateiso8601 catch ($now + 1))) > $now
+                ((.expiresAt // null) != null and ((.expiresAt | (try fromdateiso8601 catch ($now + 1))) > $now))
+                or ((.expiresAt // null) == null and (.recordedAt // null) == null)
+                or ((.expiresAt // null) == null and (.recordedAt // null) != null
+                    and ((.recordedAt | (try fromdateiso8601 catch 0)) + 86400) > $now)
             )
         ))' "$state_file" > "$tmp" && mv -f "$tmp" "$state_file"
     local after; after=$(jq '(.failedApproaches // []) | length' "$state_file")

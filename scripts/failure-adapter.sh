@@ -100,12 +100,33 @@ bash "$EVOLVE_PLUGIN_ROOT/scripts/cycle-state.sh" prune-expired-failures "$STATE
 
 NOW_S=$(date -u +%s)
 
-# Filter out expired entries one more time defensively, then compute features.
+# v8.23.1: legacy entries (pre-v8.22.0 schema OR v8.22.0 entries written with
+# the buggy `failure_compute_expires_at` that silently produced null) have
+# `expiresAt: null`. Originally we kept these "indefinitely" for backward
+# compat — but in practice they permanently poisoned the lookback (the user's
+# state.json had 18 such entries triggering BLOCKED-SYSTEMIC for 10 cycles
+# straight before any subagent could spawn).
+#
+# New behavior: when expiresAt is null/missing AND recordedAt is present,
+# synthesize an expiresAt = recordedAt + 1d (the tightest age-out window for
+# any classification). Pre-v8.22 entries get a 1d effective TTL, which means
+# they age out after their first day of inactivity — same as if they'd been
+# recorded as fresh infrastructure-transient. This matches operator intent
+# without requiring a manual prune step on every plugin upgrade.
+#
+# When BOTH expiresAt and recordedAt are missing (truly ancient legacy data),
+# we still keep them (defensive) — but they're rare and inert (no recognizable
+# classification to drive the adapter's rules anyway).
 ENTRIES=$(jq -c --argjson now "$NOW_S" \
     '(.failedApproaches // [])
      | map(select(
-         (.expiresAt // "") == "" or
-         (.expiresAt | (try fromdateiso8601 catch ($now + 1))) > $now
+         # Case 1: explicit non-null expiresAt that is in the future
+         ((.expiresAt // null) != null and ((.expiresAt | (try fromdateiso8601 catch ($now + 1))) > $now))
+         # Case 2: missing expiresAt + missing recordedAt → keep (truly legacy)
+         or ((.expiresAt // null) == null and (.recordedAt // null) == null)
+         # Case 3: missing expiresAt but recordedAt present → effective TTL = 1d
+         or ((.expiresAt // null) == null and (.recordedAt // null) != null
+             and ((.recordedAt | (try fromdateiso8601 catch 0)) + 86400) > $now)
        ))' "$STATE_PATH")
 
 NON_EXPIRED_COUNT=$(echo "$ENTRIES" | jq 'length')

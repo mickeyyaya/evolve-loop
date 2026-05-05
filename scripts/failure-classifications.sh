@@ -139,6 +139,15 @@ EOF
 # Compute an ISO-8601 expiresAt timestamp given a classification and a
 # starting timestamp (defaults to now).
 #
+# v8.23.1 BUG FIX: pre-v8.23.1, `echo "$now_iso" | jq -r '. | fromdateiso8601'`
+# silently failed because ISO timestamps without JSON quotes are NOT valid
+# JSON (`2026-05-05T03:30:13Z` ← starts with a digit, jq parses as a number,
+# blows up at the dash). When jq failed, `$now_s` was empty, then `(( "" + age_s ))`
+# yielded `age_s`, producing a "1970-01-02T..." expiresAt — every future
+# expiresAt was actually 1 day after the epoch. The fix: use `--arg` to inject
+# the string with proper JSON-escaping, and refuse to silently fall back to
+# epoch math if conversion fails.
+#
 # Usage:
 #   exp=$(failure_compute_expires_at infrastructure-transient)
 #   exp=$(failure_compute_expires_at code-audit-fail "2026-05-05T01:00:00Z")
@@ -149,15 +158,19 @@ failure_compute_expires_at() {
     age_s=$(failure_age_out_seconds "$classification")
 
     # Compute target epoch.
-    local now_s
+    local now_s=""
     if [ -n "$now_iso" ]; then
-        # Convert ISO to epoch via jq (portable across macOS/Linux).
-        now_s=$(echo "$now_iso" | jq -r '. | fromdateiso8601')
-    else
+        # v8.23.1: --arg injects the value as a JSON string (quoted automatically).
+        # `-n` means no input — we don't pipe anything in, jq generates from --arg.
+        now_s=$(jq -rn --arg s "$now_iso" '$s | fromdateiso8601' 2>/dev/null || true)
+    fi
+    # Fallback: use current time if conversion failed or arg was empty.
+    if [ -z "$now_s" ] || ! [ "$now_s" -eq "$now_s" ] 2>/dev/null; then
         now_s=$(date -u +%s)
     fi
     local target_s=$(( now_s + age_s ))
 
     # Convert epoch back to ISO-8601 via jq's `todate` filter.
+    # Numeric input doesn't need --arg; raw stdin works.
     echo "$target_s" | jq -r '. | todate'
 }
