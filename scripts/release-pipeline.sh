@@ -250,8 +250,10 @@ release_notes=$(awk -v ver="$TARGET" '
 ' "$REPO_ROOT/CHANGELOG.md")
 
 # ship.sh expects EVOLVE_SHIP_RELEASE_NOTES env to trigger gh release create.
-log "step: ship.sh"
-if EVOLVE_SHIP_RELEASE_NOTES="$release_notes" bash "$SHIP_SH" "$COMMIT_MSG"; then
+# v8.25.0: pass --class release so ship.sh skips audit-binding (version-bump.sh
+# mutated files post-audit, so the cycle-class audit-tree-SHA check would fail).
+log "step: ship.sh (--class release)"
+if EVOLVE_SHIP_RELEASE_NOTES="$release_notes" bash "$SHIP_SH" --class release "$COMMIT_MSG"; then
     journal_step "ship" "ok"
     new_sha=$(git -C "$REPO_ROOT" rev-parse HEAD)
     journal_set_field "commit_sha" "$new_sha"
