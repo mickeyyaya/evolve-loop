@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.23.4] - 2026-05-05
+
+Defense-in-depth on top of v8.23.3. v8.23.3 fixed three concrete bugs (BUG-008..010), but the user's failure mode included "Claude binary's own permission layer blocks writes despite --add-dir" — a class of failure that may persist in some nested-claude environments even after v8.23.3's cwd fix. v8.23.4 adds a clean operator escape hatch and diagnostic logging so the next failure is loud and self-explaining.
+
+### Added
+
+- **`EVOLVE_SKIP_WORKTREE=1` escape hatch** (`scripts/run-cycle.sh`): bypasses worktree provisioning entirely when the parent Claude Code OS sandbox blocks `.evolve/worktrees/` writes regardless of cwd. Sets `cycle-state.active_worktree = $EVOLVE_PROJECT_ROOT`. Builder/tdd-engineer profiles pre-expand to the main repo path. Loud WARN logs make the no-isolation tradeoff explicit. At cleanup, if the main repo has uncommitted changes from the cycle, the operator is told to inspect via `git status` / `git diff` and decide manually.
+
+- **EPERM-class diagnostic block** (`scripts/cli_adapters/claude.sh`): when the inner `claude -p` exits with rc≠0 AND stderr contains EACCES/EPERM/permission-denied/sandbox_apply patterns, dump structured triage data to dispatcher stderr:
+  - cwd at exec time
+  - `--add-dir` value
+  - sandbox-use + fallback flag state
+  - parent `CLAUDECODE` env presence
+  - last 30 lines of stderr
+  - explicit operator-action recommendations (set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 or EVOLVE_SKIP_WORKTREE=1 with caveats)
+
+### Tradeoffs documented
+
+`EVOLVE_SKIP_WORKTREE=1` removes the v8.21.0 isolation guarantee:
+- Pro: cycles can land on environments where worktree writes are blocked by parent OS sandbox
+- Con: builder edits land directly in main repo; failed audit means manual `git restore .` or selective rollback
+- When to flip on: nested Claude Code session where v8.23.3 still EPERMs at builder phase
+- When NOT: standalone shell (no parent sandbox issue to work around)
+- Cleanup: at exit, run-cycle.sh logs "main repo has N changed file(s)" if cycle made any changes — operator's responsibility to commit, stash, or restore
+
+### Verification
+
+- Dry-run with `EVOLVE_SKIP_WORKTREE=1`: WARN logged, `active_worktree` set to main repo, cleanup correctly skips worktree-remove, dirty-file warning fires
+- Default behavior unchanged when flag unset (worktree provisioned + cleaned up as before)
+- 29/29 regression tests pass
+
+### How it composes with v8.23.3
+
+v8.23.3 fixed three concrete bugs (set-e dead fallback, v8.23.2 cwd regression, intent budget). v8.23.4 adds belt-and-suspenders for the residual class of "even with all v8.23.3 fixes applied, the parent OS sandbox cascades to deny writes." Together:
+
+| If you hit | Set | Effect |
+|---|---|---|
+| sandbox-exec EPERM at startup | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` (auto-set by dispatcher in nested-claude) | Retry without sandbox-exec, kernel hooks remain |
+| Builder cd in wrong dir | (no flag — v8.23.3 fixes structurally) | WORKING_DIR honors `EVOLVE_PROFILE_WORKTREE_AWARE=1` env hint |
+| Worktree EPERM despite correct cwd | `EVOLVE_SKIP_WORKTREE=1` | Builder writes to main repo directly (no isolation) |
+| Intent budget overflow | `EVOLVE_TASK_MODE=heavy_rules` | $1.00 budget instead of $0.50 default |
+
+---
+
 ## [8.23.3] - 2026-05-05
 
 Three architectural bugs landed in one fix release. A second-Claude session running cycle 1 of `/loop 10` against a downstream `/learning` project surfaced all three after ~17 minutes:

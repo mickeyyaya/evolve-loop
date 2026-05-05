@@ -429,4 +429,26 @@ if [ "$SANDBOX_USE" = "1" ]; then
 else
     "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG" || EXIT_CODE=$?
 fi
+
+# v8.23.4 BUG-012 diagnostic: when the inner claude exits with an EPERM-like
+# rc, dump enough context to the dispatcher's stderr that the operator can
+# triage without re-running. Targets the "claude binary's own permission layer
+# blocks writes despite --add-dir" symptom that v8.23.3 didn't fully eliminate
+# in some nested-claude environments. Loud-but-bounded — tail the last 30
+# lines of stderr, never log artifacts (could be huge).
+if [ "$EXIT_CODE" -ne 0 ] && [ -s "$STDERR_LOG" ]; then
+    if grep -qiE 'EACCES|EPERM|permission denied|operation not permitted|sandbox_apply' "$STDERR_LOG" 2>/dev/null; then
+        echo "[claude-adapter] DIAGNOSTIC: inner claude exited rc=$EXIT_CODE with EPERM-class signal" >&2
+        echo "[claude-adapter]   cwd at exec was: $WORKING_DIR" >&2
+        echo "[claude-adapter]   --add-dir was: ${ADD_DIRS_ARR[*]:-<none>}" >&2
+        echo "[claude-adapter]   sandbox use: $SANDBOX_USE  fallback: ${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-0}" >&2
+        echo "[claude-adapter]   parent CLAUDECODE: ${CLAUDECODE:-<unset>} (set => parent is Claude Code)" >&2
+        echo "[claude-adapter]   stderr tail (last 30 lines):" >&2
+        tail -30 "$STDERR_LOG" 2>/dev/null | sed 's/^/    /' >&2
+        echo "[claude-adapter] OPERATOR ACTION: if rc=71 (sandbox-exec EPERM), set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1." >&2
+        echo "[claude-adapter] OPERATOR ACTION: if rc=1 with 'EACCES' on a worktree path, set EVOLVE_SKIP_WORKTREE=1 (v8.23.4+)." >&2
+        echo "[claude-adapter]                  caveat: skipping worktree disables isolation; builder edits land in main repo." >&2
+    fi
+fi
+
 exit "$EXIT_CODE"

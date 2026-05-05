@@ -253,7 +253,37 @@ log "cycle-state.json initialized at phase=calibrate"
 WORKTREE_PATH=""
 WORKTREE_BRANCH=""
 WORKTREE_PROVISIONED=0
-if [ "$DRY_RUN" = "0" ] || [ "${EVOLVE_DRY_RUN_PROVISION_WORKTREE:-1}" = "1" ]; then
+
+# v8.23.4 BUG-011 escape hatch: EVOLVE_SKIP_WORKTREE=1 disables worktree
+# provisioning entirely and points cycle-state.active_worktree at the main
+# project root. Use this when the parent Claude Code session's OS sandbox
+# blocks writes to .evolve/worktrees/ even after the v8.23.3 cwd fix and
+# v8.22.0 EPERM fallback. Tradeoff: builder edits land directly in the main
+# repo (no isolation, no easy rollback). Operator must manually `git diff`
+# and either commit or `git restore .` after each cycle.
+#
+# When NOT to use:
+#   - Standalone shell (no parent Claude Code) — worktree provisioning works
+#     normally; EVOLVE_SKIP_WORKTREE=1 just removes safety with no upside.
+#   - When you can grant write access via .claude/settings.json instead.
+# When TO use:
+#   - Nested-claude environments where v8.23.3 still EPERMs at the build phase
+#   - One-off recovery from cycles that need to land NOW
+#
+# Loud WARN log so the operator knows isolation is off.
+if [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
+    log "WARN: EVOLVE_SKIP_WORKTREE=1 — bypassing worktree isolation"
+    log "  → Builder will edit \$EVOLVE_PROJECT_ROOT directly (no worktree, no easy rollback)"
+    log "  → After cycle: inspect \`git status\` and \`git diff\` manually"
+    log "  → Set EVOLVE_SKIP_WORKTREE=0 (default) once the underlying sandbox issue is resolved"
+    WORKTREE_PATH="$EVOLVE_PROJECT_ROOT"
+    WORKTREE_BRANCH=""
+    WORKTREE_PROVISIONED=0   # NOT provisioned — cleanup must skip worktree-remove
+    bash "$CYCLE_STATE_HELPER" set-worktree "$WORKTREE_PATH" \
+        || fail "set-worktree failed for $WORKTREE_PATH"
+    export WORKTREE_PATH
+    log "active_worktree=$WORKTREE_PATH (main repo, no isolation)"
+elif [ "$DRY_RUN" = "0" ] || [ "${EVOLVE_DRY_RUN_PROVISION_WORKTREE:-1}" = "1" ]; then
     WORKTREE_BASE="$EVOLVE_PROJECT_ROOT/.evolve/worktrees"
     WORKTREE_PATH="$WORKTREE_BASE/cycle-$CYCLE"
     WORKTREE_BRANCH="evolve/cycle-$CYCLE"
@@ -300,6 +330,17 @@ cleanup() {
         fi
         if [ -n "$WORKTREE_BRANCH" ]; then
             git -C "$EVOLVE_PROJECT_ROOT" branch -D "$WORKTREE_BRANCH" 2>/dev/null || true
+        fi
+    elif [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
+        # v8.23.4: when worktree was bypassed, tell the operator what (if anything)
+        # the builder left in the working tree. This is the only safety net for
+        # the no-isolation path — operator must manually decide what to keep.
+        local dirty_files
+        dirty_files=$(git -C "$EVOLVE_PROJECT_ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$dirty_files" -gt 0 ]; then
+            log "WARN: EVOLVE_SKIP_WORKTREE=1 — main repo has $dirty_files changed file(s) from this cycle"
+            log "  → Run \`git status\` and \`git diff\` to inspect"
+            log "  → \`git restore .\` to discard, or commit/stash to keep"
         fi
     fi
     bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
