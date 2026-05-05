@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.23.3] - 2026-05-05
+
+Three architectural bugs landed in one fix release. A second-Claude session running cycle 1 of `/loop 10` against a downstream `/learning` project surfaced all three after ~17 minutes:
+1. The `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` flag had been **silently dead since v8.16.1** due to a `set -e` interaction.
+2. v8.23.2's profile pre-expansion **introduced a regression** that broke claude.sh's worktree-cwd detection.
+3. Intent persona's $0.25 budget was insufficient for projects with heavy CLAUDE.md, returning rc=1 even when the artifact was complete.
+
+### Fixed
+
+- **BUG-008 (CRITICAL)**: `scripts/cli_adapters/claude.sh` had `set -euo pipefail` enabled at line 36 + 5 places using `<command>; EXIT_CODE=$?` to capture exit codes. When the inner command failed (e.g., sandbox-exec returned 71/EPERM), `set -e` exited the script BEFORE `EXIT_CODE=$?` ran. The Darwin-25.4 nested-sandbox fallback `if` block at line 363 NEVER fired in production — the documented `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` workaround has been silently dead since v8.16.1 introduced it. **Fixed**: all 5 EXIT_CODE assignments now use `|| EXIT_CODE=$?` (the bash idiom that lets `set -e` skip the failure as a logical-or branch). `EXIT_CODE=0` initialized at the top of the execute block so the success path retains rc=0.
+
+  Reproduction (pre-fix):
+  ```bash
+  $ bash -c 'set -euo pipefail; echo before; /usr/bin/false; EC=$?; echo "EC=$EC"'
+  before
+  $ echo "rc=$?"
+  rc=1
+  # ↑ "EC=" line never printed; script exited at false
+  ```
+
+- **BUG-009 (HIGH, regression from v8.23.2)**: subagent-run.sh's profile pre-expansion replaced `{worktree_path}` placeholders in the profile JSON with the actual path. claude.sh's WORKING_DIR detection at line ~165 still looked for the literal `{worktree_path}` string to determine "is this a worktree-aware profile?" — and after v8.23.2's pre-expansion, that string was never found. Result: WORKING_DIR fell through to `$PWD` (main repo), claude `cd`'d into the main repo, builder Edits targeted main-repo absolute paths but `--add-dir` was the worktree-only path → Edit denied at the Claude tool layer. **Fixed**: subagent-run.sh now exports `EVOLVE_PROFILE_WORKTREE_AWARE=1` whenever the ORIGINAL profile contained `{worktree_path}` (BEFORE expansion). claude.sh checks this env hint as the canonical signal; the literal-string match remains as a fallback for direct adapter invocations that bypass subagent-run.sh.
+
+- **BUG-010 (MEDIUM)**: `.evolve/profiles/intent.json:max_budget_usd` was 0.25 — too tight for projects with heavy CLAUDE.md (>3K tokens). Intent persona running opus + reading rules blew the cap in 3 turns, returning rc=1 even though intent.md was complete. **Fixed**: raised default to $0.50, added `budget_tiers` (default $0.50, `heavy_rules` $1.00, `minimal` $0.20). Set `EVOLVE_TASK_MODE=heavy_rules` for projects whose CLAUDE.md is >3K tokens.
+
+### Verification
+
+- 29/29 regression tests pass
+- `set -e` fallback reproduction (post-fix): `EC=$?` correctly captures the failed command's exit code, and the EPERM-fallback `if` block executes
+- subagent-run.sh exports `EVOLVE_PROFILE_WORKTREE_AWARE=1` when original profile has `{worktree_path}`; claude.sh honors it; WORKING_DIR resolves to the worktree
+
+### Migration
+
+No migration needed. The fixes are transparent: existing dispatcher invocations automatically benefit from all three. If you've hit the v8.16.1+ silent EPERM-fallback bug and worked around it by exporting `EVOLVE_SANDBOX=0`, you can now stop — `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` (default-set by the dispatcher in nested-claude scenarios since v8.22.0) actually works.
+
+### What 4 v8.23 patches in 2 days reveal
+
+| Patch | Bug | Discovery path |
+|---|---|---|
+| v8.23.0 | (feature) Tasks B/C/D from cycle 25 research | Planned |
+| v8.23.1 | `failure_compute_expires_at` jq-quoting bug | Cycle 53 in /learning project surfaced "everything blocked at calibrate" |
+| v8.23.2 | `{worktree_path}` substitution gap across adapters | Cycle 53 follow-up surfaced builder write EPERM |
+| v8.23.3 | `set -e` + EXIT_CODE bug, v8.23.2 regression, intent budget | Cycle 1 of `/loop 10` against /learning surfaced all three |
+
+The pattern: **production cycles surface bugs that unit tests can't.** Each v8.23.x patch closed a layer that had been silently broken for one or more prior versions. v8.16.1's introduction of `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` shipped a flag that never fired (the `set -e` interaction wasn't tested) — until now, 7 minor versions later. Adding integration tests that actually trigger sandbox-exec EPERM (e.g., via a dummy sandbox profile that always returns 71) is now a v8.24+ candidate.
+
+---
+
 ## [8.23.2] - 2026-05-05
 
 Defense-in-depth fix for `{worktree_path}` placeholder expansion. A second-Claude session running cycle 53 against a downstream `/learning` project surfaced this: builder Edits returned EPERM despite WORKTREE_PATH being set, despite v8.21.0's claude.sh substitution, despite EVOLVE_SANDBOX=0. The orchestrator's diagnosis: "in subagent-run.sh, substitute `{worktree_path}` with `$WORKTREE_PATH` (already exported by run-cycle.sh) before invoking the builder profile."

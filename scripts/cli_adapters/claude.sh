@@ -161,7 +161,18 @@ fi
 # references the literal token {worktree_path}. Otherwise WORKTREE_PATH must
 # NOT influence cwd — doing so breaks orchestrator/scout/auditor relative-path
 # write permissions (e.g. Write(.evolve/runs/cycle-*/orchestrator-report.md)).
-if jq -e '((.add_dir // []) + (.sandbox.write_subpaths // [])) | any(. == "{worktree_path}")' "$PROFILE_PATH" > /dev/null 2>&1; then
+#
+# v8.23.3 BUG-009 fix: subagent-run.sh exports EVOLVE_PROFILE_WORKTREE_AWARE=1
+# when the original (pre-expansion) profile contains {worktree_path}. We trust
+# that env hint as the canonical signal because v8.23.2's pre-expansion sweeps
+# the literal token out of the profile JSON before this script reads it — the
+# old `any(. == "{worktree_path}")` check would always return false on
+# pre-expanded profiles, falling through to PWD and breaking the builder's
+# cwd. The literal-string check remains as a fallback for direct claude.sh
+# invocations that bypass subagent-run.sh (tests, ad-hoc).
+if [ "${EVOLVE_PROFILE_WORKTREE_AWARE:-0}" = "1" ]; then
+    WORKING_DIR="${WORKTREE_PATH:-$PWD}"
+elif jq -e '((.add_dir // []) + (.sandbox.write_subpaths // [])) | any(. == "{worktree_path}")' "$PROFILE_PATH" > /dev/null 2>&1; then
     WORKING_DIR="${WORKTREE_PATH:-$PWD}"
 else
     WORKING_DIR="$PWD"
@@ -338,12 +349,23 @@ fi
 # --- Execute -----------------------------------------------------------------
 # Read prompt from PROMPT_FILE on stdin so command line stays clean.
 cd "$WORKING_DIR"
+
+# v8.23.3 BUG-008 fix: capture inner-command exit codes via `|| EXIT_CODE=$?`
+# instead of `; EXIT_CODE=$?`. The script enables `set -euo pipefail` at line 36;
+# the bare-then-capture pattern caused `set -e` to exit the script *before*
+# EXIT_CODE was assigned when sandbox-exec returned EPERM (rc=71). The Darwin-25.4
+# nested-sandbox EPERM-fallback `if` block at line 354 NEVER ran in production
+# because of this — the documented EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 workaround
+# has been silently dead since v8.16.1. The fix: `|| EXIT_CODE=$?` lets `set -e`
+# treat the failure as a logical-or branch (allowed), capturing the exit code
+# correctly. All 5 EXIT_CODE assignments updated. Initialize EXIT_CODE=0 so the
+# success path (exit 0 → `||` skipped → EXIT_CODE remains 0) works.
+EXIT_CODE=0
 if [ "$SANDBOX_USE" = "1" ]; then
     if [[ "$OSTYPE" == "darwin"* ]] && command -v sandbox-exec >/dev/null 2>&1; then
         SANDBOX_PROFILE_TXT=$(generate_macos_sandbox_profile)
         echo "[claude-adapter] wrapping in sandbox-exec ($(echo "$SANDBOX_PROFILE_TXT" | wc -l | tr -d ' ') profile lines)" >&2
-        /usr/bin/sandbox-exec -p "$SANDBOX_PROFILE_TXT" "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
-        EXIT_CODE=$?
+        /usr/bin/sandbox-exec -p "$SANDBOX_PROFILE_TXT" "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG" || EXIT_CODE=$?
         # Sandbox EPERM fallback (v8.16.1+): on Darwin 25.4+, sandbox_apply()
         # returns EPERM when the parent process is itself sandboxed (nested
         # sandboxing disallowed). When EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1, detect
@@ -365,8 +387,10 @@ if [ "$SANDBOX_USE" = "1" ]; then
                 # enforced trust boundaries even without OS-level wrapping.
                 echo "[claude-adapter] retry without sandbox-exec (nested-claude scenario)" >&2
                 echo "[claude-adapter] note: kernel hooks (role-gate, ship-gate, phase-gate) remain enforced" >&2
-                "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
-                EXIT_CODE=$?
+                # v8.23.3: reset EXIT_CODE before the retry so the || guard is correct
+                # (the retry is supposed to succeed; if it doesn't, capture its rc).
+                EXIT_CODE=0
+                "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG" || EXIT_CODE=$?
                 echo "[claude-adapter] completed unsandboxed (rc=$EXIT_CODE)" >&2
             else
                 echo "[claude-adapter] HINT: nested sandbox-exec is forbidden by Darwin 25.4+. To unblock:" >&2
@@ -397,15 +421,12 @@ if [ "$SANDBOX_USE" = "1" ]; then
         else
             BWRAP_ARGS+=(--unshare-net)
         fi
-        bwrap "${BWRAP_ARGS[@]}" "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
-        EXIT_CODE=$?
+        bwrap "${BWRAP_ARGS[@]}" "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG" || EXIT_CODE=$?
     else
         echo "[claude-adapter] WARN: sandbox requested but neither sandbox-exec (macOS) nor bwrap (Linux) available; running unwrapped" >&2
-        "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
-        EXIT_CODE=$?
+        "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG" || EXIT_CODE=$?
     fi
 else
-    "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
-    EXIT_CODE=$?
+    "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG" || EXIT_CODE=$?
 fi
 exit "$EXIT_CODE"

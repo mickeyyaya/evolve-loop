@@ -451,7 +451,16 @@ EOF
     # PROFILE_PATH is updated to point at it. The original profile in
     # .evolve/profiles/ is never modified.
     local effective_profile="$profile"
+    local profile_worktree_aware="0"
     if grep -q '{worktree_path}' "$profile" 2>/dev/null; then
+        # v8.23.3: ALWAYS mark the profile as worktree-aware (even if expansion
+        # fails or WORKTREE_PATH is unset). claude.sh uses this env hint to set
+        # WORKING_DIR=WORKTREE_PATH instead of relying on the literal token
+        # being present in the profile (v8.23.2 regression: pre-expansion swept
+        # the literal out, causing claude.sh's WORKING_DIR detection at line ~165
+        # to fall through to PWD, which made the builder cd into the main repo
+        # instead of the worktree → builder Edits hit --add-dir EPERM).
+        profile_worktree_aware="1"
         if [ -z "${WORKTREE_PATH:-}" ]; then
             log "WARN: profile $profile contains {worktree_path} but WORKTREE_PATH is unset"
             # fall through — adapter will fail loudly with its own check
@@ -481,6 +490,7 @@ EOF
     CYCLE="$cycle" \
     WORKSPACE_PATH="$workspace" \
     WORKTREE_PATH="${WORKTREE_PATH:-}" \
+    EVOLVE_PROFILE_WORKTREE_AWARE="$profile_worktree_aware" \
     STDOUT_LOG="$stdout_log" \
     STDERR_LOG="$stderr_log" \
     ARTIFACT_PATH="$artifact_path" \

@@ -69,8 +69,13 @@
   "add_dir": [
     "."
   ],
-  "max_budget_usd": 0.25,
-  "_budget_design_note_": "Intent capture is one persona, one short artifact (50-200 lines), no web research. $0.25 is a hard cap — if you spend more, you are over-thinking. Compare scout default $0.50 (with research) and orchestrator $1.00 (full cycle).",
+  "max_budget_usd": 0.50,
+  "budget_tiers": {
+    "default":     0.50,
+    "heavy_rules": 1.00,
+    "minimal":     0.20
+  },
+  "_budget_design_note_": "v8.23.3: raised default from $0.25 to $0.50 after BUG-010 (intent rc=1 budget overflow on projects with heavy CLAUDE.md). Use EVOLVE_TASK_MODE=heavy_rules ($1.00 cap) for projects whose CLAUDE.md exceeds ~3K tokens (cycle 1 of /learning had a 200-line CLAUDE.md and opus blew $0.25 in 3 turns). EVOLVE_TASK_MODE=minimal ($0.20) for trivial goals on small projects. Intent capture is still one persona, one short artifact (50-200 lines), no web research — $0.50 is a generous default that handles most non-trivial CLAUDE.md sizes; raise via tier when needed.",
   "max_turns": 15,
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/intent.md",
