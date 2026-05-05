@@ -205,6 +205,8 @@
       ".evolve/guards.log",
       ".evolve/current_run_id",
       ".evolve/.current_run",
+      ".evolve/release-journal",
+      ".evolve/worktrees",
       "CHANGELOG.md",
       "README.md",
       "CLAUDE.md"

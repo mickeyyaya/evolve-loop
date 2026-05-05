@@ -123,6 +123,10 @@ EOF
 GITIGNORE
 
         # Audit ledger entry — PASS verdict.
+        # v8.21.1: schema must match production ({ts, role, kind, artifact_sha256}).
+        # Pre-v8.21.1 used {timestamp, agent, artifact_sha} which never matched
+        # preflight.sh's grep '"role":"auditor"' — silently failing every test
+        # that depends on preflight passing.
         local now
         now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         cat > .evolve/runs/cycle-99/audit-report.md <<'EOF'
@@ -131,7 +135,7 @@ GITIGNORE
 Verdict: PASS
 EOF
         cat > .evolve/ledger.jsonl <<EOF
-{"timestamp":"${now}","cycle":99,"agent":"auditor","model":"opus","exit_code":0,"duration_s":60,"artifact_path":"$d/.evolve/runs/cycle-99/audit-report.md","artifact_sha":"deadbeef","challenge_token":"x","git_head":"none","tree_state_sha":"none"}
+{"ts":"${now}","cycle":99,"role":"auditor","kind":"agent_subprocess","model":"opus","exit_code":0,"duration_s":"60","artifact_path":"$d/.evolve/runs/cycle-99/audit-report.md","artifact_sha256":"deadbeef","challenge_token":"x","git_head":"none","tree_state_sha":"none"}
 EOF
         # Initial commit and tag for the previous version.
         git add -A

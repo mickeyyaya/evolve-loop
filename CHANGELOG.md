@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.21.1] - 2026-05-05
+
+Test infrastructure cleanup. Closes 3 long-standing pre-existing test failures uncovered during v8.21.0's regression posture review. Zero production-code changes — only test fixtures, drift classification, and one profile entry.
+
+### Fixed
+
+- `orchestrator-sandbox-coverage-test.sh` Test 2: `.evolve/release-journal` and `.evolve/worktrees` were on disk but unclassified in `orchestrator.json:sandbox`. Both added to `deny_subpaths` — the orchestrator must NOT write to release journals (release-pipeline.sh's privilege) or worktree parents (run-cycle.sh's privilege).
+- `release-pipeline-test.sh` Tests 2, 4, 5, 6, 7, 8, 9, 10: `make_stub_repo`'s ledger fixture used the pre-v8.14.0 schema (`{timestamp, agent, artifact_sha}`) but `preflight.sh` reads `{ts, role, artifact_sha256}`. Updated fixture to match production schema. **8 cascading test failures resolved by a one-line fix.**
+- `release/preflight-test.sh` Tests 4, 8: same schema mismatch as above. Same one-line fix.
+
+### Notes
+
+This release does not change the published evolve-loop runtime behavior. The fixes restore the regression-suite truth signal so future contributions can rely on `bash scripts/run-all-regression-tests.sh` showing 27/27 PASS instead of `24/27 PASS, 3 known-flaky`.
+
+---
+
 ## [8.21.0] - 2026-05-05
 
 Architectural fix release. Closes the v8.13.x — v8.20.2 worktree-provisioning gap that caused recurring builder EPERM on macOS Darwin 25.4 and required the deprecated `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` workaround. Restores Anthropic's recommended kernel-sandbox enforcement by default.
