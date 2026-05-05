@@ -231,6 +231,109 @@ else
 fi
 cd "$REPO_ROOT"
 
+# --- Test H: --class release skips audit and ships --------------------------
+# release class is for scripts/release-pipeline.sh use; skips audit-binding
+# (because version-bump.sh mutates files post-audit) but logs RELEASE class.
+header "Test H: v8.25.0 --class release ships without audit"
+REPO=$(make_repo)
+cd "$REPO"
+echo "release bump" > release.txt
+BARE="$SCRATCH/remote-test-h-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+bash scripts/ship.sh --class release "release: v9.99.99" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "0" ] && grep -q "class: release" /tmp/ship-out; then
+    pass "--class release ships and logs class line"
+else
+    fail "rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test I: --class manual without tty refuses ------------------------------
+# manual class requires interactive y/N; if stdin is not a tty AND no
+# auto-confirm env, ship.sh must refuse rather than silently proceed.
+header "Test I: v8.25.0 --class manual without tty + no auto-confirm → refuses"
+REPO=$(make_repo)
+cd "$REPO"
+echo "manual change" > manual.txt
+BARE="$SCRATCH/remote-test-i-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+bash scripts/ship.sh --class manual "manual change" </dev/null >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "2" ] && grep -q "requires interactive stdin" /tmp/ship-out; then
+    pass "non-tty manual class refused with rc=2 + helpful message"
+else
+    fail "rc=$RC; tail: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test J: --class manual + EVOLVE_SHIP_AUTO_CONFIRM=1 ships --------------
+# CI mode: auto-confirm bypasses the y/N prompt. This is the migration path
+# for scripts that used to set EVOLVE_BYPASS_SHIP_VERIFY=1.
+header "Test J: v8.25.0 --class manual + AUTO_CONFIRM=1 → ships"
+REPO=$(make_repo)
+cd "$REPO"
+echo "ci change" > ci.txt
+BARE="$SCRATCH/remote-test-j-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/ship.sh --class manual "ci change" </dev/null >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "0" ] && grep -q "auto-confirmed" /tmp/ship-out; then
+    pass "manual + auto-confirm ships and logs auto-confirmed"
+else
+    fail "rc=$RC; tail: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test K: legacy EVOLVE_BYPASS_SHIP_VERIFY emits deprecation warning -----
+# Backward compat: EVOLVE_BYPASS_SHIP_VERIFY=1 still works but logs a
+# DEPRECATION line pointing to --class manual.
+header "Test K: v8.25.0 legacy BYPASS_SHIP_VERIFY → deprecation warning logged"
+REPO=$(make_repo)
+cd "$REPO"
+echo "bridge change" > bridge.txt
+BARE="$SCRATCH/remote-test-k-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh "legacy bypass" </dev/null >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "0" ] && grep -q "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1 is deprecated" /tmp/ship-out; then
+    pass "legacy bypass works + emits deprecation pointer to --class manual"
+else
+    fail "rc=$RC; tail: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test L: invalid --class argument rejected -------------------------------
+header "Test L: v8.25.0 --class garbage → rejected with rc=1"
+REPO=$(make_repo)
+cd "$REPO"
+set +e
+bash scripts/ship.sh --class garbage "msg" </dev/null >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "1" ] && grep -q "invalid --class" /tmp/ship-out; then
+    pass "invalid class rejected"
+else
+    fail "rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
 # --- Summary ----------------------------------------------------------------
 echo
 echo "==========================================="

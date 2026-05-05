@@ -208,6 +208,7 @@
       ".evolve/.current_run",
       ".evolve/release-journal",
       ".evolve/worktrees",
+      ".evolve/environment.json",
       "CHANGELOG.md",
       "README.md",
       "CLAUDE.md"

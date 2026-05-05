@@ -146,68 +146,102 @@ case "$EVOLVE_PROJECT_ROOT" in
         ;;
 esac
 
-# --- v8.22.0: nested-claude auto-detection ---------------------------------
+# --- v8.25.0: capability-detection pre-flight -------------------------------
 #
-# When /evolve-loop is invoked from inside Claude Code (the slash-command path
-# AND direct CLI path covered here), the parent process is itself sandboxed.
-# macOS Darwin 25.4+ refuses nested sandbox-exec apply, returning EPERM (rc=71)
-# from sandbox_apply(). Without EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1, every
-# sub-claude invocation (intent, scout, builder, auditor) hits this wall.
+# Replaces the prior nested-Claude auto-detection block (v8.22.0/v8.24.0).
+# Runs scripts/preflight-environment.sh which probes the host once and emits
+# a structured JSON capability profile. The dispatcher reads auto_config and
+# applies the flags it recommends, with operator override via direct edit
+# of $EVOLVE_PROJECT_ROOT/.evolve/environment.json.
 #
-# SKILL.md auto-sets the flag for the slash-command entry point. This block
-# adds defense-in-depth: any direct dispatcher invocation from inside Claude
-# Code also gets the flag auto-enabled.
+# Why this design:
+#   - Discoverable: ONE file (.evolve/environment.json) replaces 6+ env vars
+#   - Observable: profile is human-readable, version-controllable
+#   - Anti-gaming preserved: probe runs in privileged shell; profile is read-
+#     only to phase agents (deny-listed in profiles); Tier-1 kernel hooks
+#     verify behavior post-execution regardless of profile contents
 #
-# The detection signal is the CLAUDECODE / CLAUDE_CODE_* env-var family
-# (Claude Code's parent-env beacons). On non-Claude-Code shells (terminal,
-# CI, scripts), the detector returns "standalone" and this block is a no-op.
-#
-# The flag is a no-op on Linux (bwrap supports nested namespaces). Symmetric
-# detection still fires for log-uniformity but doesn't change behavior.
-#
-# Override: set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=0 explicitly to skip the
-# auto-set (e.g., when running an outer sandbox-exec wrapper that handles
-# isolation differently).
-if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh" ]; then
-    if [ "$(bash "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh")" = "nested" ]; then
-        nested_announced=0
+# Override mechanics:
+#   1. If the operator already set EVOLVE_SANDBOX_FALLBACK_ON_EPERM /
+#      EVOLVE_SKIP_WORKTREE explicitly (any value, including 0), the dispatcher
+#      respects the operator's choice and does NOT overwrite from the profile.
+#   2. Otherwise the profile's auto_config wins.
+#   3. Power-users can edit .evolve/environment.json:auto_config directly.
+PREFLIGHT_SCRIPT="$EVOLVE_PLUGIN_ROOT/scripts/preflight-environment.sh"
+if [ -x "$PREFLIGHT_SCRIPT" ]; then
+    PROFILE_JSON=$(bash "$PREFLIGHT_SCRIPT" --write 2>/dev/null || echo "")
+    if [ -n "$PROFILE_JSON" ]; then
+        env_summary=$(echo "$PROFILE_JSON" | jq -r \
+            '"\(.host.os) \(.host.os_version), nested-claude=\(.claude_code.nested), sandbox-works=\(.sandbox.expected_to_work)"' 2>/dev/null || echo "unparseable")
+        log "ENVIRONMENT: $env_summary"
+        env_reason=$(echo "$PROFILE_JSON" | jq -r '.auto_config.reasoning // ""' 2>/dev/null)
+        [ -n "$env_reason" ] && log "  → $env_reason"
+
+        auto_eperm=$(echo "$PROFILE_JSON" | jq -r '.auto_config.EVOLVE_SANDBOX_FALLBACK_ON_EPERM // "0"' 2>/dev/null)
+        auto_wt_base=$(echo "$PROFILE_JSON" | jq -r '.auto_config.worktree_base // ""' 2>/dev/null)
+
         if [ -z "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ]; then
-            log "DETECTED: nested-claude (CLAUDECODE / CLAUDE_CODE_* env set)"
-            nested_announced=1
-            log "  → auto-enabling EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
-            log "  → Darwin 25.4+ kernel forbids nested sandbox-exec; this flag retries"
-            log "    sub-claude subprocesses unsandboxed when sandbox_apply hits EPERM."
-            log "  → kernel hooks (role-gate, ship-gate, phase-gate) still enforce. To"
-            log "    skip auto-set: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=0 bash $0 ..."
-            export EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1
+            if [ "$auto_eperm" = "1" ]; then
+                log "  → auto-enabling EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (from environment.json)"
+                export EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1
+            fi
+        else
+            log "  → operator set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=$EVOLVE_SANDBOX_FALLBACK_ON_EPERM (override profile)"
         fi
-        # v8.24.0: auto-relax Tier-2 OS isolation in nested-Claude.
-        #
-        # Even after the v8.22.0 EPERM-startup fallback (above) and the v8.23.3
-        # cwd fix, the parent Claude Code's OS sandbox can still deny writes
-        # *inside* .evolve/worktrees/cycle-N once the inner subprocess actually
-        # tries to Edit/Write. That's an execution-time EPERM, not a startup
-        # EPERM, so FALLBACK_ON_EPERM=1 doesn't help. Symptom: cycle-N runs
-        # repeatedly, never advances state.json, dispatcher loops on the same
-        # number and burns budget.
-        #
-        # The auto-relax follows the same precedent as the v8.22.0 block: the
-        # operator can opt back in to strict isolation by setting
-        # EVOLVE_SKIP_WORKTREE=0 explicitly. Tier-1 kernel hooks (phase-gate
-        # ledger SHA, role-gate, ship-gate) still enforce structural integrity
-        # without the worktree — this is the relaxation we can afford.
-        if [ -z "${EVOLVE_SKIP_WORKTREE:-}" ]; then
-            [ "$nested_announced" = "0" ] && log "DETECTED: nested-claude (CLAUDECODE / CLAUDE_CODE_* env set)"
-            log "  → auto-enabling EVOLVE_SKIP_WORKTREE=1 (Tier-2 OS isolation auto-relax)"
-            log "  → Reason: parent OS sandbox blocks writes to .evolve/worktrees/ in some"
-            log "    nested-claude environments. Skipping worktree lets the builder edit"
-            log "    \$EVOLVE_PROJECT_ROOT directly. Tier-1 kernel hooks still enforce."
-            log "  → To opt back in to strict isolation: EVOLVE_SKIP_WORKTREE=0 bash $0 ..."
-            export EVOLVE_SKIP_WORKTREE=1
+
+        # v8.25.0: per-cycle worktree relocation (replaces auto-SKIP_WORKTREE).
+        # Worktrees go to a sandbox-friendly path (typically $TMPDIR) so we
+        # KEEP per-cycle isolation instead of skipping it. Operator override
+        # via EVOLVE_WORKTREE_BASE.
+        if [ -z "${EVOLVE_WORKTREE_BASE:-}" ]; then
+            if [ -n "$auto_wt_base" ]; then
+                log "  → worktree_base: $auto_wt_base"
+                export EVOLVE_WORKTREE_BASE="$auto_wt_base"
+            else
+                log "FAIL: no writable worktree base could be selected. See .evolve/environment.json"
+                log "      Operator must either:"
+                log "        - Set EVOLVE_WORKTREE_BASE=<writable-dir> and re-run, OR"
+                log "        - Fix permissions on \$TMPDIR / ~/.cache, OR"
+                log "        - Run from a shell with broader permissions"
+                log "      Last-resort (loses per-cycle isolation): EVOLVE_SKIP_WORKTREE=1 bash $0 ..."
+                exit 1
+            fi
+        else
+            log "  → operator set EVOLVE_WORKTREE_BASE=$EVOLVE_WORKTREE_BASE (override profile)"
         fi
-        unset nested_announced
+
+        # SKIP_WORKTREE is no longer auto-enabled. v8.25.0 makes it a true
+        # emergency operator-only flag. If operator explicitly set it, log
+        # a loud warning so they know they're losing isolation.
+        if [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
+            log "  → WARN: EVOLVE_SKIP_WORKTREE=1 (operator-set)"
+            log "         Per-cycle worktree isolation DISABLED. Builder edits land directly"
+            log "         in \$EVOLVE_PROJECT_ROOT. This is the v8.24-era behavior; v8.25.0+"
+            log "         prefers worktree relocation (EVOLVE_WORKTREE_BASE) instead."
+            log "         You probably want to UNSET this flag and let the new default work."
+        fi
+
+        unset auto_eperm auto_wt_base env_summary env_reason PROFILE_JSON
+    else
+        log "WARN: preflight-environment.sh failed; falling back to legacy detect-nested-claude.sh"
+        # Legacy fallback: when preflight script is broken, set sandbox-fallback
+        # only and pick a TMPDIR worktree base inline so cycles can still run.
+        # This path is rare (only fires if jq is missing or preflight crashes).
+        if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh" ] && \
+           [ "$(bash "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh")" = "nested" ]; then
+            [ -z "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ] && export EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1
+            if [ -z "${EVOLVE_WORKTREE_BASE:-}" ] && [ -n "${TMPDIR:-}" ]; then
+                fallback_hash=$(printf '%s' "$EVOLVE_PROJECT_ROOT" | shasum -a 256 2>/dev/null | head -c 8 || echo "default")
+                export EVOLVE_WORKTREE_BASE="${TMPDIR%/}/evolve-loop/$fallback_hash"
+                log "  → legacy fallback: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1, EVOLVE_WORKTREE_BASE=$EVOLVE_WORKTREE_BASE"
+                unset fallback_hash
+            else
+                log "  → legacy fallback: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (no TMPDIR; worktree stays in-project)"
+            fi
+        fi
     fi
 fi
+unset PREFLIGHT_SCRIPT
 
 # --- Argument parsing -------------------------------------------------------
 

@@ -16,21 +16,46 @@
 # "is this script the entry point?".
 #
 # Usage:
-#   bash scripts/ship.sh "<commit-message>"
+#   bash scripts/ship.sh "<commit-message>"                   # default --class cycle
+#   bash scripts/ship.sh --class manual "<commit-message>"    # interactive confirm
+#   bash scripts/ship.sh --class release "<commit-message>"   # release-pipeline only
+#
+# Commit classes (v8.25.0+):
+#   cycle    (default) — Audit-bound. Most recent Auditor entry must be PASS,
+#                        SHAs must match, HEAD/tree must be cycle-bound. This
+#                        is the integrity-critical path used by /evolve-loop.
+#   manual   — Operator-driven commit (manual feature work, hot-fix). Skips
+#              audit verification but REQUIRES interactive y/N confirmation
+#              after printing `git diff --cached --stat`. Refuses if stdin is
+#              not a tty (an LLM agent cannot answer the prompt — that's the
+#              boundary). Replaces the EVOLVE_BYPASS_SHIP_VERIFY=1 escape
+#              hatch with an auditable lifecycle.
+#   release  — Internal use by scripts/release-pipeline.sh. Skips audit
+#              verification because version-bump.sh mutates files
+#              post-audit. Logs RELEASE class loudly. NOT for general use.
 #
 # Environment overrides:
 #   EVOLVE_SHIP_RELEASE_NOTES — if set, also creates a GitHub release tagged
 #                               v<VERSION> with these notes after a successful
 #                               commit + push. VERSION is read from
 #                               .claude-plugin/plugin.json.
-#   EVOLVE_BYPASS_SHIP_VERIFY — if "1", skip all audit/cycle-binding checks.
-#                               Logged loudly. EMERGENCY USE ONLY.
+#   EVOLVE_BYPASS_SHIP_VERIFY — DEPRECATED in v8.25.0. Equivalent to --class
+#                               manual but without the interactive prompt.
+#                               Continues to work but emits a deprecation
+#                               warning and treats commit as `manual` class
+#                               with an "auto-confirmed" provenance marker.
+#                               Migrate to `--class manual` (interactive) or
+#                               `--class release` (pipeline-internal).
+#   EVOLVE_SHIP_AUTO_CONFIRM  — if "1", skip the interactive y/N prompt for
+#                               --class manual (CI use). Equivalent in effect
+#                               to EVOLVE_BYPASS_SHIP_VERIFY but explicitly
+#                               scoped to the manual class. Logged.
 #
 # Exit codes:
 #   0  — shipped successfully
 #   1  — runtime failure (missing arg, missing tools, git failure)
 #   2  — integrity failure (no audit, audit not PASS, SHA mismatch, HEAD
-#         moved since audit, ship.sh self-SHA mismatch)
+#         moved since audit, ship.sh self-SHA mismatch, manual confirm denied)
 # 127  — required binary missing (jq, git, gh)
 
 set -euo pipefail
@@ -52,9 +77,57 @@ integrity_fail(){ log "INTEGRITY-FAIL: $*"; exit 2; }
 
 # --- 0. Pre-flight -----------------------------------------------------------
 
-[ $# -ge 1 ] || fail "usage: ship.sh <commit-message>"
-COMMIT_MSG="$1"
-[ -n "$COMMIT_MSG" ] || fail "commit message must be non-empty"
+# v8.25.0: Parse --class flag (and any future flags) before the positional
+# commit message. Default class is "cycle" (audit-bound) for backward compat.
+SHIP_CLASS="cycle"
+COMMIT_MSG=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --class)
+            shift
+            [ $# -ge 1 ] || fail "--class requires a value (cycle|manual|release)"
+            SHIP_CLASS="$1"
+            shift
+            ;;
+        --help|-h)
+            sed -n '2,52p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        --*)
+            fail "unknown flag: $1"
+            ;;
+        *)
+            if [ -z "$COMMIT_MSG" ]; then
+                COMMIT_MSG="$1"
+                shift
+            else
+                fail "extra positional arg: $1 (only one commit message expected)"
+            fi
+            ;;
+    esac
+done
+
+[ -n "$COMMIT_MSG" ] || fail "usage: ship.sh [--class cycle|manual|release] <commit-message>"
+
+case "$SHIP_CLASS" in
+    cycle|manual|release) ;;
+    *) fail "invalid --class '$SHIP_CLASS' (must be: cycle|manual|release)" ;;
+esac
+
+# v8.25.0: Translate legacy EVOLVE_BYPASS_SHIP_VERIFY=1 to --class manual with
+# auto-confirm. This is the deprecation bridge: existing scripts/cron jobs
+# using the env var continue to work but emit a one-time warning.
+if [ "${EVOLVE_BYPASS_SHIP_VERIFY:-0}" = "1" ]; then
+    if [ "$SHIP_CLASS" = "cycle" ]; then
+        log "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1 is deprecated in v8.25.0+"
+        log "  → Migrate to: bash scripts/ship.sh --class manual \"<msg>\""
+        log "  → Or for CI:  EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/ship.sh --class manual \"<msg>\""
+        log "  → Treating this invocation as: --class manual + EVOLVE_SHIP_AUTO_CONFIRM=1"
+        SHIP_CLASS="manual"
+        export EVOLVE_SHIP_AUTO_CONFIRM=1
+    fi
+fi
 
 for bin in git jq; do
     command -v "$bin" >/dev/null 2>&1 || { log "missing required binary: $bin"; exit 127; }
@@ -102,12 +175,78 @@ elif [ "$EXPECTED_SHIP_SHA" != "$ACTUAL_SHIP_SHA" ]; then
     integrity_fail "ship.sh has been modified since the SHA was pinned (expected=$EXPECTED_SHIP_SHA actual=$ACTUAL_SHIP_SHA). To intentionally update: remove .evolve/state.json:expected_ship_sha and re-run."
 fi
 
-# --- 2. Bypass switch (emergency only) ---------------------------------------
+# --- 2. Class-aware verification (v8.25.0+) ----------------------------------
+#
+# Three commit classes determine which checks run:
+#   cycle   → full audit-binding (the default, for /evolve-loop cycle commits)
+#   manual  → interactive y/N confirmation (operator-driven manual commits)
+#   release → no audit (release-pipeline mutates post-audit; logs RELEASE)
+#
+# The class is logged in the commit message footer so the lifecycle is
+# auditable from `git log` alone — no need to consult ledger.jsonl to know
+# whether a given commit was cycle-bound or manual.
 
-if [ "${EVOLVE_BYPASS_SHIP_VERIFY:-0}" = "1" ]; then
-    log "WARN: EVOLVE_BYPASS_SHIP_VERIFY=1 — proceeding without audit verification"
-    log "WARN: this is an emergency override; the resulting commit will not have audit provenance"
-else
+CLASS_PROVENANCE=""
+
+case "$SHIP_CLASS" in
+    cycle)
+        log "class: cycle (audit-bound)"
+        CLASS_PROVENANCE="cycle (audit-verified)"
+        ;;
+    manual)
+        log "class: manual (operator-driven)"
+        # Stage everything first so `git diff --cached --stat` reflects what
+        # will actually ship.
+        git add -A
+        if git diff --cached --quiet; then
+            log "no staged changes; nothing to ship"
+            exit 0
+        fi
+        echo "" >&2
+        echo "=== git diff --cached --stat ===" >&2
+        git diff --cached --stat >&2
+        echo "" >&2
+        echo "=== git diff --cached (first 80 lines) ===" >&2
+        # `git diff | head -80` fires SIGPIPE on git when head closes; under
+        # `set -euo pipefail` that aborts the script. Capture into a temp,
+        # truncate manually, and emit. Avoids both the SIGPIPE and the
+        # pipefail-vs-SIGPIPE interaction.
+        diff_tmp=$(mktemp -t ship-diff.XXXXXX)
+        git diff --cached > "$diff_tmp" 2>/dev/null || true
+        awk 'NR<=80 {print} NR==81 {print "  ... (diff truncated; see git diff --cached for full)"; exit}' "$diff_tmp" >&2
+        rm -f "$diff_tmp"
+        echo "" >&2
+
+        if [ "${EVOLVE_SHIP_AUTO_CONFIRM:-0}" = "1" ]; then
+            log "EVOLVE_SHIP_AUTO_CONFIRM=1 — skipping interactive prompt (CI mode)"
+            CLASS_PROVENANCE="manual (auto-confirmed via env)"
+        else
+            # Interactive boundary: an LLM agent cannot read the prompt.
+            # If stdin is not a tty, refuse — this is the security boundary
+            # that distinguishes manual class from a silent bypass.
+            if [ ! -t 0 ]; then
+                integrity_fail "--class manual requires interactive stdin (not a tty). Set EVOLVE_SHIP_AUTO_CONFIRM=1 for non-interactive use (CI), or run from a real terminal."
+            fi
+            printf '[ship] Confirm manual commit? Type EXACTLY "yes" to ship, anything else aborts: ' >&2
+            read -r confirm
+            if [ "$confirm" != "yes" ]; then
+                log "manual confirmation declined — aborting"
+                exit 2
+            fi
+            CLASS_PROVENANCE="manual (interactive-confirmed)"
+        fi
+        ;;
+    release)
+        log "class: release (pipeline-internal)"
+        log "  → audit verification skipped: version-bump.sh mutates files post-audit"
+        log "  → this commit must be created by scripts/release-pipeline.sh only"
+        CLASS_PROVENANCE="release (pipeline-generated)"
+        ;;
+esac
+log "provenance: $CLASS_PROVENANCE"
+
+# Audit-binding only runs for cycle class; manual/release skip to section 7.
+if [ "$SHIP_CLASS" = "cycle" ]; then
     # --- 3. Locate the most recent Auditor ledger entry --------------------------
 
     [ -f "$LEDGER" ] || integrity_fail "no ledger at $LEDGER — no Auditor has ever run"

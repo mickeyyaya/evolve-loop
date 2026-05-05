@@ -76,6 +76,7 @@ else
         "scripts/swarm-architecture-test.sh"
         "scripts/failure-adapter-test.sh"
         "scripts/state-prune-test.sh"
+        "scripts/preflight-environment-test.sh"
     )
 fi
 

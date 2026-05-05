@@ -730,39 +730,57 @@ else
     fail_ "rc=$rc; breaker_fired=$(echo "$out" | grep -c 'ABORT: same cycle')"
 fi
 
-# === Test 30: v8.24.0 — nested-claude detection auto-sets EVOLVE_SKIP_WORKTREE ===
-# When CLAUDECODE env is set, dispatcher should auto-export both
-# EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 AND EVOLVE_SKIP_WORKTREE=1.
-# We use VALIDATE_ONLY=1 to short-circuit before any cycle runs and just
-# inspect the log output for the expected DETECTED + auto-enabling lines.
-header "Test 30: v8.24.0 — CLAUDECODE set → both env vars auto-enabled"
+# === Test 30: v8.25.0 — nested-claude env profile relocates worktree =========
+# v8.25.0 (final form): replaces SKIP_WORKTREE auto-enable with worktree
+# relocation. In nested-Claude, dispatcher should auto-set:
+#   - EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (sandbox startup fallback)
+#   - EVOLVE_WORKTREE_BASE=<TMPDIR-or-cache path> (per-cycle isolation kept)
+# It should NOT auto-set SKIP_WORKTREE — that's now operator-only.
+header "Test 30: v8.25.0 — CLAUDECODE → ENVIRONMENT + sandbox-fallback + worktree-relocate"
 set +e
 out=$(env CLAUDECODE=1 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "0" ] \
-   && echo "$out" | grep -q "DETECTED: nested-claude" \
+   && echo "$out" | grep -qE "ENVIRONMENT: .*nested-claude=true" \
    && echo "$out" | grep -q "auto-enabling EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1" \
-   && echo "$out" | grep -q "auto-enabling EVOLVE_SKIP_WORKTREE=1"; then
-    pass "both auto-enable lines present"
+   && echo "$out" | grep -qE "worktree_base: .+/evolve-loop/[a-f0-9]+" \
+   && ! echo "$out" | grep -q "auto-enabling EVOLVE_SKIP_WORKTREE"; then
+    pass "ENVIRONMENT summary + sandbox-fallback + worktree-relocate (no SKIP_WORKTREE)"
 else
     fail_ "rc=$rc; out: $(echo "$out" | tail -15)"
 fi
 
-# === Test 31: v8.24.0 — explicit EVOLVE_SKIP_WORKTREE=0 suppresses auto-set ===
-# Operator opt-out: setting the var explicitly to 0 should leave it at 0,
-# even when nested-claude is detected. Sanity check that auto-relax is
-# discoverable but overridable.
-header "Test 31: v8.24.0 — explicit EVOLVE_SKIP_WORKTREE=0 → no auto-set message"
+# === Test 31: v8.25.0 — explicit EVOLVE_WORKTREE_BASE overrides profile ======
+# Operator-set worktree base should win over the auto-detected one.
+header "Test 31: v8.25.0 — explicit EVOLVE_WORKTREE_BASE → override message logged"
+override_dir=$(mktemp -d -t test-wt-override.XXXXXX)
+cleanup_dirs+=("$override_dir")
 set +e
-out=$(env CLAUDECODE=1 EVOLVE_SKIP_WORKTREE=0 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+out=$(env CLAUDECODE=1 EVOLVE_WORKTREE_BASE="$override_dir" VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
-# Should still see SANDBOX_FALLBACK auto-set (operator didn't disable that),
-# but NOT the SKIP_WORKTREE auto-enable line.
 if [ "$rc" = "0" ] \
-   && ! echo "$out" | grep -q "auto-enabling EVOLVE_SKIP_WORKTREE=1"; then
-    pass "explicit override suppresses SKIP_WORKTREE auto-set"
+   && echo "$out" | grep -qF "operator set EVOLVE_WORKTREE_BASE=$override_dir (override profile)" \
+   && ! echo "$out" | grep -qE "→ worktree_base: /var/folders"; then
+    pass "explicit EVOLVE_WORKTREE_BASE overrides + logs override message"
+else
+    fail_ "rc=$rc; out: $(echo "$out" | tail -15)"
+fi
+
+# === Test 32: v8.25.0 — explicit SKIP_WORKTREE=1 emits warning ===============
+# When operator manually sets SKIP_WORKTREE=1, dispatcher must log a loud
+# warning telling them v8.25.0+ prefers worktree relocation. SKIP_WORKTREE
+# is no longer auto-enabled, only operator-driven (emergency hatch).
+header "Test 32: v8.25.0 — operator-set EVOLVE_SKIP_WORKTREE=1 → loud WARN"
+set +e
+out=$(env CLAUDECODE=1 EVOLVE_SKIP_WORKTREE=1 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "0" ] \
+   && echo "$out" | grep -q "WARN: EVOLVE_SKIP_WORKTREE=1 (operator-set)" \
+   && echo "$out" | grep -q "Per-cycle worktree isolation DISABLED"; then
+    pass "operator SKIP_WORKTREE=1 surfaces deprecation warning"
 else
     fail_ "rc=$rc; out: $(echo "$out" | tail -15)"
 fi

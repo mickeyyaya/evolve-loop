@@ -284,10 +284,20 @@ if [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
     export WORKTREE_PATH
     log "active_worktree=$WORKTREE_PATH (main repo, no isolation)"
 elif [ "$DRY_RUN" = "0" ] || [ "${EVOLVE_DRY_RUN_PROVISION_WORKTREE:-1}" = "1" ]; then
-    WORKTREE_BASE="$EVOLVE_PROJECT_ROOT/.evolve/worktrees"
+    # v8.25.0: worktree base is selected by preflight-environment.sh and
+    # exported as EVOLVE_WORKTREE_BASE by the dispatcher. Falls back to the
+    # legacy in-project location if the env var is unset (direct run-cycle
+    # invocation without a preflight pass, or test harnesses that don't
+    # invoke the dispatcher). The fallback preserves backward compatibility.
+    if [ -n "${EVOLVE_WORKTREE_BASE:-}" ]; then
+        WORKTREE_BASE="$EVOLVE_WORKTREE_BASE"
+    else
+        WORKTREE_BASE="$EVOLVE_PROJECT_ROOT/.evolve/worktrees"
+    fi
     WORKTREE_PATH="$WORKTREE_BASE/cycle-$CYCLE"
     WORKTREE_BRANCH="evolve/cycle-$CYCLE"
-    mkdir -p "$WORKTREE_BASE"
+    mkdir -p "$WORKTREE_BASE" 2>/dev/null \
+        || fail "cannot create worktree base $WORKTREE_BASE — set EVOLVE_WORKTREE_BASE to a writable path"
 
     # Idempotent: clean a stale worktree from a prior cycle with the same id
     # (typically a hard-killed run that didn't reach the cleanup trap).

@@ -101,28 +101,51 @@ This closes the architectural gap that made v8.13.x — v8.20.2 require `EVOLVE_
 
 If you ever need the worktree path from agent context, read it via `cycle-state.sh get active_worktree`. Never compute it yourself — the dispatcher is the canonical source.
 
-## Three-Tier Strictness Model (v8.24.0+)
+## Three-Tier Strictness Model (v8.24.0+, refined v8.25.0)
 
-evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came from conflating layers; v8.24.0 makes the layers explicit and lets Tier-2 auto-relax in environments where it can't function.
+evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came from conflating layers; v8.24.0 made the layers explicit; v8.25.0 replaced "skip the worktree" with "relocate the worktree" so isolation is preserved even in nested-Claude.
 
-| Tier | Mechanism | Default | Auto-relax? | What it catches |
+| Tier | Mechanism | Default | Auto-adapt? | What it catches |
 |---|---|---|---|---|
 | **1 — Structural integrity** | phase-gate, ledger SHA, role-gate, ship-gate (`scripts/guards/`) | Always on | NEVER | Reward hacking, phase-skipping, integrity breach (cycle 102–111, cycle 132–141 incidents) |
-| **2 — OS isolation** | `sandbox-exec`/`bwrap`, per-cycle worktree | On (standalone), auto-relaxed (nested-claude) | YES — auto-disabled in nested-claude | Compromised builder writing outside its sandbox; one cycle's edits leaking into another's workspace |
+| **2 — OS isolation** | `sandbox-exec`/`bwrap`, per-cycle worktree | On (always) | Worktree path auto-selected per environment; sandbox falls back when nested | Compromised builder writing outside its sandbox; one cycle's edits leaking into another's workspace |
 | **3 — Workflow defaults** | intent capture, fan-out, mutation testing, adversarial audit | Opt-in via env flags | N/A — already opt-in | Vague goals, sycophantic audits, tautological evals |
 
-**The governing rule:** Tier 1 is non-negotiable and runs in privileged shell context (no sandbox dependency). Tier 2 is defense-in-depth and degrades gracefully when the host environment can't support it. Tier 3 is operator-controlled per-run.
+**The governing rule:** Tier 1 is non-negotiable and runs in privileged shell context (no sandbox dependency). Tier 2 *adapts to* the environment instead of *degrading* — per-cycle worktrees always exist; only the path moves. Tier 3 is operator-controlled per-run.
 
-### What auto-relax does in nested-claude
+### Capability detection (v8.25.0+)
 
-When `scripts/detect-nested-claude.sh` returns `nested` (CLAUDECODE / CLAUDE_CODE_* env present), the dispatcher auto-sets:
+`scripts/preflight-environment.sh` runs at dispatcher start, probes the host, and emits a JSON profile to `.evolve/environment.json`. The dispatcher reads `auto_config` and applies it. **One observable file replaces the 6+ env flags that accumulated as escape hatches.**
 
-- `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` (since v8.22.0) — handles startup EPERM (rc=71)
-- `EVOLVE_SKIP_WORKTREE=1` (since v8.24.0) — handles execution-time write EPERM in `.evolve/worktrees/`
+`auto_config` decides:
+- `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` (`0`/`1`) — set `1` when nested-Claude is detected (Darwin sandbox-exec startup will EPERM otherwise)
+- `worktree_base` (path) — selected by priority: operator-set `EVOLVE_WORKTREE_BASE` > in-project `.evolve/worktrees/` (standalone shell) > `$TMPDIR/evolve-loop/<hash>` (nested-Claude default) > `~/Library/Caches/evolve-loop/<hash>` (macOS) or `~/.cache/evolve-loop/<hash>` (Linux)
 
-Both flags log a loud `DETECTED:` line. Operator can opt back in to strict isolation by setting either var to `0` explicitly.
+The dispatcher exports `EVOLVE_WORKTREE_BASE`; `run-cycle.sh` provisions worktrees there via `git worktree add`. Worktrees can live anywhere — `git`'s `.git/worktrees/cycle-N` pointer file handles cross-directory references — so cleanup, isolation, and audit binding work regardless of physical path.
 
-**Trade-off when SKIP_WORKTREE auto-fires:** builder edits land in `$EVOLVE_PROJECT_ROOT` directly (no per-cycle worktree, no easy rollback). Tier-1 hooks still verify ledger SHA against on-disk artifacts, so integrity guarantees survive. The cost is operator must `git status`/`git diff` after a failed cycle to inspect uncommitted edits.
+**Operator overrides** are observable: edit `.evolve/environment.json` directly, or set `EVOLVE_WORKTREE_BASE=/path` before invoking the dispatcher. The dispatcher logs `operator set EVOLVE_WORKTREE_BASE=... (override profile)` so the override is loud.
+
+### EVOLVE_SKIP_WORKTREE is a true emergency hatch (v8.25.0+)
+
+Pre-v8.25.0, `EVOLVE_SKIP_WORKTREE=1` was auto-enabled in nested-Claude. **This was wrong** — it abandoned per-cycle isolation, breaking fast-rollback and audit binding. v8.25.0 removes the auto-enable. The flag still exists as an operator-only emergency override, with a loud WARN. **Do not auto-enable this flag.** If the v8.25.0 worktree relocation can't find a writable base, the dispatcher fails loud at startup with a remediation message — preferable to silently disabling isolation.
+
+### Ship commit classifiers (v8.25.0+)
+
+`scripts/ship.sh` now requires an explicit class via `--class`:
+
+| Class | Use case | Verification |
+|---|---|---|
+| `cycle` (default) | `/evolve-loop` cycle commits | Full audit-binding (must have recent PASS, SHA matches, HEAD/tree bound) |
+| `manual` | Operator-driven manual commits | Skips audit; requires interactive y/N confirmation after `git diff --cached --stat` preview. Refuses when stdin is not a tty. CI mode via `EVOLVE_SHIP_AUTO_CONFIRM=1`. |
+| `release` | Internal — `scripts/release-pipeline.sh` only | Skips audit (version-bump.sh mutates files post-audit); logs RELEASE class loudly |
+
+**Migration path:** scripts/cron jobs that previously used `EVOLVE_BYPASS_SHIP_VERIFY=1` continue to work but emit a deprecation warning pointing to `--class manual` (interactive) or `EVOLVE_SHIP_AUTO_CONFIRM=1 ... --class manual` (CI). The legacy env var will not be removed in v8.x — it's a permanent compatibility bridge.
+
+**Anti-gaming preserved because:**
+- Interactive y/N for `--class manual` is a boundary an LLM agent cannot cross (no tty access)
+- Class is logged via `provenance:` line so commit lifecycle is observable from `git log` + ship.sh stderr
+- Ship-gate kernel hook stays as the structural enforcer (denies bare `git push`)
+- `release` class can only be invoked from the release-pipeline (gated by ship-gate's allowlist)
 
 ### Dispatcher safety nets (v8.24.0+)
 
