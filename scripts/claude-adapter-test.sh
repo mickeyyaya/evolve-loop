@@ -47,6 +47,30 @@ EOF
 
 run_adapter() {
     # Args: <profile_path> [extra env=value ...]
+    # v8.26.0: EVOLVE_BUDGET_ENFORCE=1 is set by default so legacy budget-
+    # resolution tests continue to verify the resolved value reaches the
+    # final command line. Tests that want the v8.26.0 default-unlimited
+    # path use run_adapter_unlimited (defined below).
+    local profile="$1"; shift
+    local out
+    out=$(env CYCLE=99 \
+              WORKSPACE_PATH=/tmp \
+              PROFILE_PATH="$profile" \
+              RESOLVED_MODEL=sonnet \
+              PROMPT_FILE=/dev/null \
+              STDOUT_LOG=/dev/null \
+              STDERR_LOG=/dev/null \
+              ARTIFACT_PATH=/dev/null \
+              VALIDATE_ONLY=1 \
+              EVOLVE_BUDGET_ENFORCE=1 \
+              "$@" \
+              bash "$ADAPTER" 2>&1)
+    echo "$out"
+}
+
+# v8.26.0: variant that exercises the new default-unlimited behavior.
+# Used by new tests asserting that --max-budget-usd=999999 is the default.
+run_adapter_unlimited() {
     local profile="$1"; shift
     local out
     out=$(env CYCLE=99 \
@@ -280,6 +304,58 @@ if echo "$out" | grep -qE "sandbox=0 \(source: EVOLVE_INNER_SANDBOX=0"; then
     pass "operator explicit-disable wins over profile.sandbox.enabled"
 else
     fail_ "out=$(echo "$out" | grep -E 'sandbox|inner' | head -5)"
+fi
+
+# === Test 16: v8.26.0 — default unlimited budget when ENFORCE not set =======
+# v8.26.0: by default, the adapter passes --max-budget-usd 999999 (effectively
+# unlimited) regardless of what the profile says. This eliminates the
+# BUDGET_EXCEEDED friction that aborted complex meta-goal cycles in v8.25.x.
+# Anti-gaming is unaffected — budget caps don't prevent reward hacking.
+header "Test 16: v8.26.0 — default unlimited (no EVOLVE_BUDGET_ENFORCE) → max-budget-usd 999999"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(run_adapter_unlimited "$p")
+if echo "$out" | grep -qE 'budget cap unlimited \(max-budget-usd=999999\)' \
+   && echo "$out" | grep -q "max-budget-usd 999999" \
+   && echo "$out" | grep -q "was \$0.50 from profile"; then
+    pass "default unlimited budget; profile value preserved in log for traceability"
+else
+    fail_ "out=$(echo "$out" | grep -E 'budget|max-budget' | head -3)"
+fi
+
+# === Test 17: v8.26.0 — EVOLVE_BUDGET_CAP pins a hard cap ==================
+# Operator override: explicit hard cap. Wins over both default and ENFORCE.
+header "Test 17: v8.26.0 — EVOLVE_BUDGET_CAP=2.50 → hard cap, profile value ignored"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(run_adapter_unlimited "$p" EVOLVE_BUDGET_CAP=2.50)
+if echo "$out" | grep -qE 'EVOLVE_BUDGET_CAP=\$2\.50 \(operator pin' \
+   && echo "$out" | grep -q "max-budget-usd 2.50"; then
+    pass "operator hard cap honored"
+else
+    fail_ "out=$(echo "$out" | grep -E 'budget|max-budget' | head -3)"
+fi
+
+# === Test 18: v8.26.0 — EVOLVE_BUDGET_ENFORCE=1 uses resolved profile value =
+# Legacy strict mode: operator can opt back into the pre-v8.26.0 behavior
+# where the profile/env-resolved value gates the spend.
+header "Test 18: v8.26.0 — EVOLVE_BUDGET_ENFORCE=1 → uses resolved budget"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(run_adapter_unlimited "$p" EVOLVE_BUDGET_ENFORCE=1)
+if echo "$out" | grep -q "EVOLVE_BUDGET_ENFORCE=1: using resolved budget" \
+   && echo "$out" | grep -q "max-budget-usd 0.50"; then
+    pass "ENFORCE=1 restores legacy strict cap"
+else
+    fail_ "out=$(echo "$out" | grep -E 'budget|max-budget' | head -3)"
+fi
+
+# === Test 19: v8.26.0 — invalid EVOLVE_BUDGET_CAP falls through to unlimited =
+header "Test 19: v8.26.0 — EVOLVE_BUDGET_CAP=garbage → WARN + fall through to unlimited"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(run_adapter_unlimited "$p" EVOLVE_BUDGET_CAP=garbage)
+if echo "$out" | grep -q "WARN: EVOLVE_BUDGET_CAP='garbage' invalid" \
+   && echo "$out" | grep -q "max-budget-usd 999999"; then
+    pass "invalid cap → WARN + fall through to default unlimited"
+else
+    fail_ "out=$(echo "$out" | grep -E 'budget|max-budget|WARN' | head -3)"
 fi
 
 # === Summary ==================================================================

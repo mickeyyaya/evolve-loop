@@ -113,10 +113,39 @@ CMD=(claude -p --model "$RESOLVED_MODEL")
 CMD+=(--permission-mode "$PERMISSION_MODE")
 CMD+=(--output-format json)
 
-# Budget cap is critical — only attach if numeric and > 0.
-if [[ "$MAX_BUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$MAX_BUDGET > 0" | bc -l) )); then
-    CMD+=(--max-budget-usd "$MAX_BUDGET")
+# v8.26.0: budget cap default-unlimited.
+#
+# Pre-v8.26.0, MAX_BUDGET came from the profile (~$0.18 Scout default, $0.50
+# Intent, $1.00 Orchestrator). Complex meta-goals routinely exceeded these
+# caps mid-thought, exiting subagents with BUDGET_EXCEEDED (rc=1) and aborting
+# the cycle with no useful output — friction without protection (budget caps
+# don't prevent reward hacking; they only limit cost).
+#
+# v8.26.0 sets `--max-budget-usd` to 999999 (effectively unlimited) by default.
+# The flag is still passed (claude binary expects it) but the value never
+# triggers BUDGET_EXCEEDED in any realistic cycle.
+#
+# Operator overrides:
+#   EVOLVE_BUDGET_CAP=<value>   — pin a hard cap (operator-set, takes priority)
+#   EVOLVE_BUDGET_ENFORCE=1     — use the resolved-from-profile MAX_BUDGET
+#                                 (legacy behavior; opt back in for cost discipline)
+ORIGINAL_MAX_BUDGET="$MAX_BUDGET"
+if [ -n "${EVOLVE_BUDGET_CAP:-}" ]; then
+    if [[ "$EVOLVE_BUDGET_CAP" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$EVOLVE_BUDGET_CAP > 0" | bc -l) )); then
+        MAX_BUDGET="$EVOLVE_BUDGET_CAP"
+        echo "[claude-adapter] EVOLVE_BUDGET_CAP=\$$MAX_BUDGET (operator pin; was \$$ORIGINAL_MAX_BUDGET from profile)" >&2
+    else
+        echo "[claude-adapter] WARN: EVOLVE_BUDGET_CAP='$EVOLVE_BUDGET_CAP' invalid — falling through to default" >&2
+        MAX_BUDGET=999999
+    fi
+elif [ "${EVOLVE_BUDGET_ENFORCE:-0}" = "1" ]; then
+    echo "[claude-adapter] EVOLVE_BUDGET_ENFORCE=1: using resolved budget \$$MAX_BUDGET (legacy strict cap)" >&2
+else
+    MAX_BUDGET=999999
+    echo "[claude-adapter] budget cap unlimited (max-budget-usd=$MAX_BUDGET); was \$$ORIGINAL_MAX_BUDGET from profile. Set EVOLVE_BUDGET_CAP=<value> for a hard cap, or EVOLVE_BUDGET_ENFORCE=1 to use the profile value." >&2
 fi
+# Always attach — claude binary expects the flag.
+CMD+=(--max-budget-usd "$MAX_BUDGET")
 
 # Allowed/disallowed tools — each pattern as its own argv element so spaces
 # inside parentheses survive shell tokenization.

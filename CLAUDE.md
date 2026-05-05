@@ -203,6 +203,24 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Budget Cap Default-Unlimited (v8.26.0+)
+
+Pre-v8.26.0, `--max-budget-usd` was sized per-phase from the profile (~$0.18 Scout default, $0.50 Intent, $1.00 Orchestrator). Complex meta-goals routinely exceeded these caps mid-thought, exiting subagents with `BUDGET_EXCEEDED` (rc=1) and aborting cycles with no useful output. The caps prevented cost runaway but did not prevent reward hacking — that's enforced entirely by Tier-1 hooks (phase-gate, role-gate, ledger SHA).
+
+v8.26.0 sets `--max-budget-usd` to `999999` (effectively unlimited) by default. The flag is still passed because the claude binary expects it, but the value never triggers `BUDGET_EXCEEDED` in any realistic cycle. The profile's `max_budget_usd` is preserved in adapter logs for traceability.
+
+| Env var | Effect |
+|---|---|
+| (default) | `--max-budget-usd 999999` — effectively unlimited |
+| `EVOLVE_BUDGET_CAP=<value>` | Operator pin: hard cap at `<value>`, wins over both default and ENFORCE |
+| `EVOLVE_BUDGET_ENFORCE=1` | Legacy strict mode: use the profile/env-resolved `MAX_BUDGET` |
+| `EVOLVE_MAX_BUDGET_USD=<value>` | Per-invocation override of resolved budget (still works, only applies under `ENFORCE=1`) |
+| `EVOLVE_TASK_MODE=<tier>` | Tier resolution from `budget_tiers` (still works, only applies under `ENFORCE=1`) |
+
+**Anti-gaming preserved:** budget caps don't prevent reward hacking. The Tier-1 hooks enforce structural integrity regardless of how much an agent is allowed to spend. A buggy or hostile agent attempting to game the system will be caught by ledger SHA verification, phase-gate ordering, role-gate path allowlists, and ship-gate atomicity — not by `BUDGET_EXCEEDED`.
+
+**Cost discipline:** operators who need hard cost ceilings should set `EVOLVE_BUDGET_CAP=<value>` (single hard ceiling for the run) or `EVOLVE_BUDGET_ENFORCE=1` (use resolved per-phase profile values). Both options remain operator-accessible; the change is only the default.
+
 ## Subagent Budget Controls (v8.13.4 / v8.13.5)
 
 evolve-loop subagents have **three** budget-control mechanisms, evaluated in priority order:
