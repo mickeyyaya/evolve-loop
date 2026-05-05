@@ -248,8 +248,54 @@ else
     fail_ "phase=$final_phase, completed=$completed_count, file_exists=$([ -f "$sf" ] && echo y || echo n)"
 fi
 
-# === Test 16: bad subcommand returns rc=2 ====================================
-header "Test 16: unknown subcommand returns rc=2 with usage line"
+# === Test 16: set-worktree updates active_worktree without changing phase ====
+# v8.21.0: privileged-shell entry point used by run-cycle.sh. Sets the canonical
+# worktree path, atomic mv, no phase mutation. The orchestrator profile denies
+# this command — only run-cycle.sh (privileged shell) is allowed to invoke it.
+header "Test 16: set-worktree writes active_worktree and round-trips via get"
+sf=$(fresh_state); cleanup_files+=("$sf")
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init 9016 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worktree /tmp/wt-fresh >/dev/null 2>&1
+phase_after=$(jq -r '.phase' "$sf")
+wt_after=$(jq -r '.active_worktree' "$sf")
+roundtrip=$(EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" get active_worktree)
+if [ "$phase_after" = "calibrate" ] && [ "$wt_after" = "/tmp/wt-fresh" ] && [ "$roundtrip" = "/tmp/wt-fresh" ]; then
+    pass "set-worktree wrote /tmp/wt-fresh; phase unchanged; get returned /tmp/wt-fresh"
+else
+    fail_ "phase=$phase_after wt=$wt_after roundtrip=$roundtrip"
+fi
+
+# === Test 17: set-worktree is idempotent — second call overwrites ============
+header "Test 17: set-worktree overwrites previous active_worktree value"
+sf=$(fresh_state); cleanup_files+=("$sf")
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init 9017 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worktree /tmp/wt-first >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worktree /tmp/wt-second >/dev/null 2>&1
+wt_final=$(jq -r '.active_worktree' "$sf")
+if [ "$wt_final" = "/tmp/wt-second" ]; then
+    pass "set-worktree second call overwrote first"
+else
+    fail_ "expected /tmp/wt-second, got $wt_final"
+fi
+
+# === Test 18: set-worktree without init fails with clear error ===============
+# Mirror of Test 11 (advance-without-init): privileged-shell helpers must
+# refuse to operate on a missing state file rather than silently creating one.
+header "Test 18: set-worktree without init returns rc!=0 + 'state file missing'"
+sf=$(fresh_state); cleanup_files+=("$sf")
+set +e
+out=$(EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worktree /tmp/wt 2>&1)
+rc=$?
+set -e
+# Use string compare not eval so the error message text isn't executed.
+if [ "$rc" != "0" ] && echo "$out" | grep -q "state file missing"; then
+    pass "set-worktree-without-init returns rc=\$rc + 'state file missing'"
+else
+    fail_ "expected rc!=0 with 'state file missing', got rc=$rc out='$out'"
+fi
+
+# === Test 19: bad subcommand returns rc=2 ====================================
+header "Test 19: unknown subcommand returns rc=2 with usage line"
 set +e
 out=$(bash "$SCRIPT" not-a-real-command 2>&1)
 rc=$?

@@ -198,13 +198,67 @@ bash "$CYCLE_STATE_HELPER" init "$CYCLE" ".evolve/runs/cycle-$CYCLE" \
     || fail "cycle_state_init failed"
 log "cycle-state.json initialized at phase=calibrate"
 
-# Always clear cycle-state on exit (success OR failure), unless dry-run.
+# v8.21.0: privileged-shell worktree provisioning — closes the trust-boundary
+# gap where the orchestrator profile (correctly) denies `git worktree add` but
+# nothing else provisioned the worktree, leaving cycle-state.active_worktree
+# null and the builder's sandbox profile expanding {worktree_path} to empty.
+# This block runs BEFORE the orchestrator subprocess so the worktree is ready
+# by the time the build phase starts. The orchestrator and all phase agents
+# may NOT call `git worktree add/remove` — only this privileged shell context.
+WORKTREE_PATH=""
+WORKTREE_BRANCH=""
+WORKTREE_PROVISIONED=0
+if [ "$DRY_RUN" = "0" ] || [ "${EVOLVE_DRY_RUN_PROVISION_WORKTREE:-1}" = "1" ]; then
+    WORKTREE_BASE="$EVOLVE_PROJECT_ROOT/.evolve/worktrees"
+    WORKTREE_PATH="$WORKTREE_BASE/cycle-$CYCLE"
+    WORKTREE_BRANCH="evolve/cycle-$CYCLE"
+    mkdir -p "$WORKTREE_BASE"
+
+    # Idempotent: clean a stale worktree from a prior cycle with the same id
+    # (typically a hard-killed run that didn't reach the cleanup trap).
+    if git -C "$EVOLVE_PROJECT_ROOT" worktree list --porcelain 2>/dev/null \
+         | grep -q "^worktree $WORKTREE_PATH$"; then
+        log "removing stale worktree at $WORKTREE_PATH"
+        git -C "$EVOLVE_PROJECT_ROOT" worktree remove --force "$WORKTREE_PATH" 2>/dev/null || true
+    fi
+    [ -d "$WORKTREE_PATH" ] && rm -rf "$WORKTREE_PATH"
+    if git -C "$EVOLVE_PROJECT_ROOT" branch --list "$WORKTREE_BRANCH" 2>/dev/null \
+         | grep -q "$WORKTREE_BRANCH"; then
+        log "removing stale branch $WORKTREE_BRANCH"
+        git -C "$EVOLVE_PROJECT_ROOT" branch -D "$WORKTREE_BRANCH" 2>/dev/null || true
+    fi
+
+    if git -C "$EVOLVE_PROJECT_ROOT" worktree add -b "$WORKTREE_BRANCH" "$WORKTREE_PATH" HEAD 2>&1 \
+         | sed 's/^/[run-cycle:worktree] /' >&2; then
+        WORKTREE_PROVISIONED=1
+        bash "$CYCLE_STATE_HELPER" set-worktree "$WORKTREE_PATH" \
+            || fail "set-worktree failed for $WORKTREE_PATH"
+        export WORKTREE_PATH
+        log "worktree provisioned at $WORKTREE_PATH (branch $WORKTREE_BRANCH)"
+    else
+        fail "worktree provisioning failed for cycle $CYCLE — see log above"
+    fi
+fi
+
+# Always clean up cycle-state AND worktree on exit (success OR failure).
+# v8.21.0: extended to tear down the worktree provisioned above. The
+# WORKTREE_PROVISIONED flag prevents accidental deletion of a pre-existing
+# branch in the rare race where the variable was set but the worktree never
+# came online.
 cleanup() {
     local rc=$?
-    if [ "$DRY_RUN" = "0" ]; then
-        bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
-        log "cycle-state cleared (rc=$rc)"
+    if [ "$WORKTREE_PROVISIONED" = "1" ]; then
+        if [ -d "$WORKTREE_PATH" ]; then
+            log "cleanup: removing worktree $WORKTREE_PATH"
+            git -C "$EVOLVE_PROJECT_ROOT" worktree remove --force "$WORKTREE_PATH" 2>/dev/null \
+                || rm -rf "$WORKTREE_PATH"
+        fi
+        if [ -n "$WORKTREE_BRANCH" ]; then
+            git -C "$EVOLVE_PROJECT_ROOT" branch -D "$WORKTREE_BRANCH" 2>/dev/null || true
+        fi
     fi
+    bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
+    log "cycle-state cleared (rc=$rc)"
     exit $rc
 }
 trap cleanup EXIT INT TERM
@@ -224,11 +278,11 @@ log "prompt written to $PROMPT_FILE ($(wc -l < "$PROMPT_FILE") lines)"
 if [ "$DRY_RUN" = "1" ]; then
     log "DRY RUN — would spawn:"
     log "  PROMPT_FILE_OVERRIDE=$PROMPT_FILE bash scripts/subagent-run.sh orchestrator $CYCLE $WORKSPACE"
-    log "(cycle-state.json left in place for inspection)"
+    log "cycle-state snapshot before EXIT trap clears it:"
     bash "$CYCLE_STATE_HELPER" dump | jq . >&2 || true
-    # Disable cleanup trap so dry-run leaves state visible.
-    trap - EXIT INT TERM
-    bash "$CYCLE_STATE_HELPER" clear >/dev/null 2>&1 || true
+    # v8.21.0: let the EXIT trap fire naturally — it tears down both the
+    # worktree (if provisioned) and cycle-state.json. Set EVOLVE_DRY_RUN_PROVISION_WORKTREE=0
+    # to skip worktree provisioning entirely in dry-run.
     exit 0
 fi
 

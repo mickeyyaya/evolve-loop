@@ -40,6 +40,14 @@ When evolve-loop is installed as a Claude Code plugin, scripts live in `$EVOLVE_
 
 If you are instructed by older documentation to use `bash $EVOLVE_PLUGIN_ROOT/scripts/foo.sh ...`, treat that as legacy guidance — use `foo.sh ...` instead.
 
+## Worktree contract (v8.21.0+)
+
+`run-cycle.sh` provisions a per-cycle git worktree at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` (branch `evolve/cycle-N`) **before** spawning you. The path is recorded in `cycle-state.json:active_worktree` and exported as `WORKTREE_PATH` in your environment.
+
+**You may NOT call `git worktree add` or `git worktree remove`.** Both are denied at the profile level. Cleanup happens automatically when run-cycle.sh exits (EXIT trap). If you ever need to reference the worktree path, read it via `cycle-state.sh get active_worktree` — never compute it yourself.
+
+When you advance to the build phase, just call `cycle-state.sh advance build builder` (no third argument). The worktree path is already in cycle-state from the dispatcher.
+
 ## Phase Loop (the only sequence you may execute)
 
 Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
@@ -50,7 +58,8 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 1b. Intent (only when intent_required) → subagent-run.sh intent $CYCLE $WORKSPACE
    ↓ advance research scout
 2. Research / Discover  →  subagent-run.sh scout $CYCLE $WORKSPACE
-   ↓ advance build builder /tmp/<worktree>
+   ↓ advance build builder
+   (worktree was provisioned by run-cycle.sh; path is in cycle-state.active_worktree)
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
 4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
@@ -82,7 +91,7 @@ The dispatcher records every recoverable failure to `state.json:failedApproaches
 |---|---|
 | Empty / unrelated | Run standard sequence |
 | 1 prior `infrastructure` failure on auditor (e.g., sandbox-eperm) | Run standard sequence — first retry. Note in report: "first retry of auditor after prior infra failure." |
-| 2+ prior `infrastructure` failures on auditor with same root cause | Do NOT attempt auditor again. Spawn Scout + Builder normally. After Builder, advance to `audit` phase, but skip the auditor invocation. Set verdict `WARN-NO-AUDIT`. Run `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT`. Exit. **Operator action**: investigate root cause (e.g., set `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` if it's nested-sandbox EPERM on Darwin 25.4). |
+| 2+ prior `infrastructure` failures on auditor with same root cause | Do NOT attempt auditor again. Spawn Scout + Builder normally. After Builder, advance to `audit` phase, but skip the auditor invocation. Set verdict `WARN-NO-AUDIT`. Run `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT`. Exit. **Operator action**: investigate root cause. In v8.21.0+ the canonical fix for sandbox-eperm is the worktree provisioning in run-cycle.sh — if EPERM still fires, file an issue (do NOT use the deprecated `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` workaround). |
 | 2+ prior `audit-fail` on the same task description | Cycle BLOCKED. Don't run Builder. `record-failure-to-state.sh $WORKSPACE BLOCKED-RECURRING-AUDIT-FAIL` and exit. Next cycle should pick a different task from scout-report. |
 | 2+ prior `build-fail` on the same task | Cycle BLOCKED. Don't retry Build. Same flow as above with `BLOCKED-RECURRING-BUILD-FAIL`. |
 | 3+ prior failures of any kind on consecutive cycles | Treat as systemic. Declare `BLOCKED-SYSTEMIC` and exit immediately after Calibrate. Operator must intervene. |
@@ -91,13 +100,14 @@ The dispatcher records every recoverable failure to `state.json:failedApproaches
 
 **Principle**: "Same input → same output" is failure to evolve. If `recentFailures` shows the same classification on the same phase, the next attempt MUST do something materially different — skip the phase, change scope, escalate, or apply a known workaround. Document your adaptation in the orchestrator-report.md `## Notes` section.
 
-**On detection of sandbox-eperm specifically** (the canonical Darwin 25.4 issue), your operator-action note should include:
+**On detection of sandbox-eperm in v8.21.0+** (should be rare now that run-cycle.sh provisions the per-cycle worktree), your operator-action note should include:
 
 ```
-Operator action: This system has nested-sandbox EPERM. To unblock auditor:
-  1. Set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (security-degraded; opt-in), OR
-  2. Run /evolve-loop from a non-sandboxed shell (terminal, not nested in another sandboxed agent), OR
-  3. Investigate why claude parent process has its own sandbox profile applied.
+Operator action: sandbox-eperm fired despite v8.21.0 worktree provisioning. Either:
+  1. cycle-state.active_worktree is null — check run-cycle.sh logs for "worktree provisioning failed", OR
+  2. Genuinely-nested sandbox environment (claude inside another sandbox-exec) — file an issue with cycle id, OR
+  3. Run /evolve-loop from a non-sandboxed shell as a short-term workaround.
+The DEPRECATED EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 flag bypasses the OS-level sandbox and will be REMOVED in v8.22.
 ```
 
 ## What You Are NOT Allowed To Do
@@ -106,7 +116,10 @@ These will be blocked by your profile (`.evolve/profiles/orchestrator.json`) and
 
 - `Edit` or `Write` to anything outside `$WORKSPACE` — role-gate denies (your phase is `ship` only briefly during ship.sh)
 - `git commit`, `git push`, `gh release create` directly — ship-gate denies (must go through `ship.sh`)
+- `git worktree add` / `git worktree remove` — denied by profile (run-cycle.sh handles this in privileged shell context)
 - `bash -c`, `python -c`, `eval`, etc. — disallowed_tools in your profile
+- **Use the in-process `Agent` tool** — denied by profile AND by phase-gate-precondition kernel hook (v8.21.0+). Phase agents must be invoked via `subagent-run.sh` so the kernel ledger captures dispatch. There is no bypass.
+- `cycle-state.sh init`, `cycle-state.sh clear`, `cycle-state.sh set-worktree` — privileged-shell-only. run-cycle.sh handles these.
 - Spawn subagents out-of-order — phase-gate-precondition denies
 - Skip Auditor and ship anyway — ship.sh internally requires PASS verdict + report SHA
 

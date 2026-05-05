@@ -255,8 +255,16 @@ EOF
     while IFS= read -r wp; do
         [ -z "$wp" ] && continue
         # Substitute {worktree_path} placeholder if present.
+        # v8.21.0: parity with the add_dir substitution at the top of this file
+        # (lines ~99-108). Both substitution sites now fail loudly when
+        # WORKTREE_PATH is unset. The previous silent `continue` at this site
+        # collapsed the rule to nothing, masking BUG-001 (no component
+        # provisioned the build worktree) for multiple releases.
         if [[ "$wp" == *"{worktree_path}"* ]]; then
-            [ -z "${WORKTREE_PATH:-}" ] && continue
+            if [ -z "${WORKTREE_PATH:-}" ]; then
+                echo "claude.sh: ERROR: profile sandbox.write_subpaths references {worktree_path} but WORKTREE_PATH is unset" >&2
+                exit 2
+            fi
             wp="${wp//\{worktree_path\}/$WORKTREE_PATH}"
         fi
         # Resolve relative paths against repo_root.
@@ -344,13 +352,23 @@ if [ "$SANDBOX_USE" = "1" ]; then
         if [ "$EXIT_CODE" -eq 71 ] && grep -q "sandbox_apply: Operation not permitted" "$STDERR_LOG" 2>/dev/null; then
             echo "[claude-adapter] DETECTED: sandbox-exec EPERM (Darwin nested sandbox disallowed)" >&2
             if [ "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-0}" = "1" ]; then
-                echo "[claude-adapter] WARN: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 — retrying without sandbox-exec" >&2
-                echo "[claude-adapter] WARN: kernel hooks (role-gate, ship-gate, phase-gate) still apply, but OS-level sandbox is BYPASSED" >&2
+                # v8.21.0: This flag is DEPRECATED. Now that run-cycle.sh provisions
+                # the per-cycle worktree (BUG-001 fix), the EPERM cascade should no
+                # longer fire. If you see this WARN in v8.21+, it indicates either
+                # a worktree-provisioning regression or a genuinely-nested sandbox
+                # environment. Either way, the OS-level enforcement layer is being
+                # bypassed and Anthropic's Secure Deployment Guide explicitly warns
+                # that --allowedTools is "a permission gate, not a sandbox."
+                echo "[claude-adapter] WARN: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 engaged — OS-level sandbox BYPASSED" >&2
+                echo "[claude-adapter] WARN: This flag is DEPRECATED in v8.21 and will be REMOVED in v8.22.0." >&2
+                echo "[claude-adapter] WARN: If you see this in v8.21+, file an issue with cycle id and orchestrator-report.md." >&2
+                echo "[claude-adapter] WARN: Kernel hooks (role-gate, ship-gate, phase-gate) still apply, but OS-level sandbox is OFF." >&2
                 "${CMD[@]}" < "$PROMPT_FILE" >"$STDOUT_LOG" 2>"$STDERR_LOG"
                 EXIT_CODE=$?
                 echo "[claude-adapter] WARN: completed unsandboxed (rc=$EXIT_CODE) — record this in cycle audit notes" >&2
             else
-                echo "[claude-adapter] HINT: set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 to retry without sandbox (security-degraded; opt-in for Darwin 25.4)" >&2
+                echo "[claude-adapter] HINT: this is unexpected in v8.21+. Check that run-cycle.sh provisioned a worktree (cycle-state.active_worktree should be non-null)." >&2
+                echo "[claude-adapter] HINT: short-term workaround: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (DEPRECATED — to be removed in v8.22)." >&2
             fi
         fi
     elif command -v bwrap >/dev/null 2>&1; then

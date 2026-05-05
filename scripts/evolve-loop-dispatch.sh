@@ -415,6 +415,23 @@ DISPATCH_RC=0
 for ((i=1; i<=CYCLES; i++)); do
     log "------------------ cycle $i / $CYCLES ------------------"
 
+    # v8.21.0: harden against cwd drift between iterations and against
+    # plugin-update mid-batch. Subagent subprocesses can leave cwd shifted
+    # (sandboxed cd in claude.sh, etc.), and a plugin upgrade between
+    # cycles N and N+1 could move/delete RUN_CYCLE. Pinning + re-validation
+    # at iteration start makes both classes of failure loud (rc=1 with a
+    # specific log line) rather than silently propagating as rc=127.
+    if ! cd "$EVOLVE_PROJECT_ROOT" 2>/dev/null; then
+        log "FAIL: cannot cd to \$EVOLVE_PROJECT_ROOT=$EVOLVE_PROJECT_ROOT — aborting batch"
+        DISPATCH_RC=1
+        break
+    fi
+    if [ ! -x "$RUN_CYCLE" ]; then
+        log "FAIL: RUN_CYCLE not executable: $RUN_CYCLE — aborting batch"
+        DISPATCH_RC=1
+        break
+    fi
+
     # Capture cycle number BEFORE run-cycle.sh so we can verify the right one.
     last_before=$(read_last_cycle)
 

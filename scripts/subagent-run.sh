@@ -362,8 +362,8 @@ EOF
     local stdout_log="$workspace/${agent}-stdout.log"
     local stderr_log="$workspace/${agent}-stderr.log"
 
-    # NOTE: cycle 8127 RC4 audit empirically demonstrated that the auto-
-    # worktree EPERM fix had three failures:
+    # NOTE: cycle 8127 RC4 audit empirically demonstrated that an earlier
+    # auto-worktree-in-subagent-run.sh attempt had three failures:
     # (1) writes still denied because the profile's relative-path patterns
     #     don't match the auditor's absolute-path resolution under cwd=worktree;
     # (2) `git worktree add --detach HEAD` shows the COMMITTED state at HEAD,
@@ -371,10 +371,20 @@ EOF
     #     audits the wrong code;
     # (3) EPERM still occurred — Claude Code's cleanup is NOT keyed on
     #     project-path-hash alone.
-    # The auto-worktree code has been reverted. EPERM remains an open issue
-    # tracked for v8.12.4 with a different research path (likely targeting
-    # the actual cleanup trigger — possibly `.claude/` directory location
-    # or parent PID, not cwd).
+    # That code was reverted. v8.21.0 fixed the issue at the correct
+    # architectural layer: run-cycle.sh (privileged shell) provisions the
+    # worktree before the orchestrator subprocess starts and records it in
+    # cycle-state.json. subagent-run.sh now consumes that path, never creates.
+
+    # v8.21.0: Single source of truth — cycle-state.json. If the env var is
+    # already set (manual test, legacy caller), respect it. Otherwise read the
+    # canonical path that run-cycle.sh wrote via `cycle-state.sh set-worktree`.
+    if [ -z "${WORKTREE_PATH:-}" ]; then
+        WORKTREE_PATH=$("$EVOLVE_PLUGIN_ROOT/scripts/cycle-state.sh" get active_worktree 2>/dev/null || true)
+        if [ -n "$WORKTREE_PATH" ]; then
+            log "WORKTREE_PATH derived from cycle-state.json: $WORKTREE_PATH"
+        fi
+    fi
 
     record_phase prep_total_ms
 

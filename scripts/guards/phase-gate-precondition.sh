@@ -70,8 +70,10 @@ if [ -z "$COMMAND" ]; then
 fi
 
 if [ -z "$COMMAND" ]; then
-    log "no command in payload; ALLOW"
-    exit 0
+    # COMMAND is only populated for Bash tool calls. Other tools (Edit, Write,
+    # Agent, etc.) reach here with empty COMMAND. Continue past this guard so
+    # the v8.21.0 Agent-tool check below can still inspect the payload.
+    :
 fi
 
 # ---- Bypass switch ---------------------------------------------------------
@@ -79,6 +81,40 @@ fi
 if [ "${EVOLVE_BYPASS_PHASE_GATE:-0}" = "1" ]; then
     log "WARN: EVOLVE_BYPASS_PHASE_GATE=1 — bypassing for: ${COMMAND:0:100}"
     echo "[phase-gate-pre] WARN: bypass active; gate not enforcing" >&2
+    exit 0
+fi
+
+# ---- v8.21.0: Agent tool denial during cycles ------------------------------
+# CLAUDE.md rule #5 documents that the in-process `Agent` tool is forbidden
+# in production cycles — phase agents must be invoked via subagent-run.sh so
+# the kernel ledger captures every dispatch. The orchestrator profile denies
+# Agent, but a misconfigured/missing profile would let the bypass slip
+# through. This kernel hook is defense-in-depth: even if the profile fails
+# open, the Agent tool cannot be invoked while a cycle-state.json exists.
+#
+# Triggers ONLY when (a) the tool is Agent and (b) a cycle is in flight.
+# Ad-hoc Agent invocations outside cycles fall through.
+TOOL_NAME=""
+if command -v jq >/dev/null 2>&1; then
+    TOOL_NAME=$(echo "$PAYLOAD" | jq -r '.tool_name // empty' 2>/dev/null || true)
+fi
+if [ -z "$TOOL_NAME" ]; then
+    TOOL_NAME=$(echo "$PAYLOAD" | sed -n 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+fi
+
+if [ "$TOOL_NAME" = "Agent" ]; then
+    if [ -f "$CYCLE_STATE_FILE" ] && [ -s "$CYCLE_STATE_FILE" ]; then
+        deny "Agent tool forbidden during evolve-loop cycles — use \`bash scripts/subagent-run.sh <agent> <cycle> <workspace>\` so the kernel ledger captures dispatch"
+    else
+        log "Agent tool: no cycle-state — ALLOW (ad-hoc)"
+        exit 0
+    fi
+fi
+
+# Below this point, only Bash-tool subagent-run.sh invocations are checked.
+# Empty COMMAND on a non-Agent tool means we have nothing further to inspect.
+if [ -z "$COMMAND" ]; then
+    log "no command in payload (non-Bash tool); ALLOW"
     exit 0
 fi
 

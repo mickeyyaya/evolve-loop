@@ -197,6 +197,27 @@ cycle_state_set_agent() {
     _atomic_write "$updated"
 }
 
+# v8.21.0: privileged-shell sets active_worktree without changing phase.
+# Called by run-cycle.sh after `git worktree add` succeeds. The orchestrator
+# is denied this command at the profile level — only privileged shell context
+# may write the canonical worktree path.
+cycle_state_set_worktree() {
+    local worktree="${1:?worktree path required}"
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot set-worktree — state file missing" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for set-worktree" >&2
+        return 1
+    fi
+    local current
+    current=$(cat "$CYCLE_STATE_FILE")
+    local updated
+    updated=$(echo "$current" | jq -c --arg wt "$worktree" '.active_worktree = $wt')
+    _atomic_write "$updated"
+}
+
 cycle_state_clear() {
     if [ -f "$CYCLE_STATE_FILE" ]; then
         rm -f "$CYCLE_STATE_FILE"
@@ -232,6 +253,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         init)                    cycle_state_init "$@" ;;
         advance)                 cycle_state_advance "$@" ;;
         set-agent)               cycle_state_set_agent "$@" ;;
+        set-worktree)            cycle_state_set_worktree "$@" ;;
         set-parallel-workers)    cycle_state_set_parallel_workers "$@" ;;
         clear-parallel-workers)  cycle_state_clear_parallel_workers ;;
         clear)                   cycle_state_clear ;;
@@ -239,6 +261,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-parallel-workers|clear-parallel-workers|clear|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|clear|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

@@ -19,6 +19,9 @@ node_modules/
 
 # Evolve Loop runtime state (generated per-project, not part of the plugin)
 # Ignore every direct child of .evolve/ ...
+# v8.21.0+: per-cycle git worktrees live at .evolve/worktrees/cycle-N — also
+# implicitly ignored by this rule. Worktrees are created by run-cycle.sh
+# and removed via its EXIT trap; they should never appear in commits.
 .evolve/*
 # ... except the agent permission profiles, which ship with the plugin and are
 # required by scripts/subagent-run.sh for least-privilege subagent invocation.

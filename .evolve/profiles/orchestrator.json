@@ -67,10 +67,13 @@
     "Edit(.evolve/runs/cycle-*/handoff-orchestrator.json)"
   ],
   "disallowed_tools": [
+    "Agent",
     "Bash(cycle-state.sh clear:*)",
     "Bash(cycle-state.sh clear)",
     "Bash(cycle-state.sh init:*)",
     "Bash(cycle-state.sh init)",
+    "Bash(cycle-state.sh set-worktree:*)",
+    "Bash(cycle-state.sh set-worktree)",
     "Bash(git commit:*)",
     "Bash(git commit)",
     "Bash(git push:*)",
