@@ -31,13 +31,13 @@ trap '
 ' EXIT
 
 # === Test 1: default invocation emits valid JSON ============================
-header "Test 1: JSON output is parseable and reports schema_version=2"
+header "Test 1: JSON output is parseable and reports schema_version=3"
 out=$(bash "$PREFLIGHT" 2>/dev/null)
 schema=$(echo "$out" | jq -r '.schema_version // ""' 2>/dev/null || echo "")
-if [ "$schema" = "2" ]; then
-    pass "schema_version=2 in JSON output"
+if [ "$schema" = "3" ]; then
+    pass "schema_version=3 in JSON output"
 else
-    fail_ "schema_version=$schema (want 2); first 200 chars of out: ${out:0:200}"
+    fail_ "schema_version=$schema (want 3); first 200 chars of out: ${out:0:200}"
 fi
 
 # === Test 2: --summary mode produces text not JSON ==========================
@@ -61,14 +61,20 @@ else
     fail_ "nested=$nested fallback=$fallback wt_base=$wt_base"
 fi
 
-# === Test 4: auto_config NEVER mentions EVOLVE_SKIP_WORKTREE (invariant) ====
-header "Test 4: auto_config does NOT contain EVOLVE_SKIP_WORKTREE field (v8.25.0)"
+# === Test 4: schema invariants — no SKIP_WORKTREE; nested → inner_sandbox=false ===
+# v8.25.0 dropped EVOLVE_SKIP_WORKTREE from auto_config (replaced by relocation).
+# v8.25.1 ADDS inner_sandbox: must be false in nested-Claude (decouple inner
+# sandbox-exec from the outer Claude Code OS sandbox).
+header "Test 4: v8.25.1 — schema invariants (no SKIP_WORKTREE; nested→inner_sandbox=false)"
 out=$(env CLAUDECODE=1 bash "$PREFLIGHT" 2>/dev/null)
-skip_field=$(echo "$out" | jq -r '.auto_config.EVOLVE_SKIP_WORKTREE // "MISSING"')
-if [ "$skip_field" = "MISSING" ]; then
-    pass "auto_config has no EVOLVE_SKIP_WORKTREE field (relocation is the cure, not skip)"
+# Use `has()` instead of `//` because jq's // treats `false` as missing.
+skip_field=$(echo "$out" | jq -r '.auto_config | if has("EVOLVE_SKIP_WORKTREE") then .EVOLVE_SKIP_WORKTREE | tostring else "MISSING" end')
+inner_sb=$(echo "$out" | jq -r '.auto_config | if has("inner_sandbox") then .inner_sandbox | tostring else "MISSING" end')
+inner_reason=$(echo "$out" | jq -r '.auto_config.inner_sandbox_reason // ""')
+if [ "$skip_field" = "MISSING" ] && [ "$inner_sb" = "false" ] && echo "$inner_reason" | grep -q "nested-Claude"; then
+    pass "no SKIP_WORKTREE field; nested→inner_sandbox=false (reason: $inner_reason)"
 else
-    fail_ "auto_config still contains EVOLVE_SKIP_WORKTREE=$skip_field — v8.25.0 invariant violated"
+    fail_ "skip_field=$skip_field (want MISSING); inner_sb=$inner_sb (want false); reason=$inner_reason"
 fi
 
 # === Test 5: explicit EVOLVE_WORKTREE_BASE is honored if writable ===========
@@ -111,8 +117,8 @@ cleanup_dirs+=("$ws")
 ( cd "$ws" && git init -q . 2>/dev/null && EVOLVE_BYPASS_SHIP_GATE=1 git commit --allow-empty -q -m init 2>/dev/null ) || true
 out=$(cd "$ws" && bash "$PREFLIGHT" --write 2>&1 >/dev/null)
 if [ -f "$ws/.evolve/environment.json" ] \
-   && jq -e '.schema_version == 2' "$ws/.evolve/environment.json" >/dev/null 2>&1; then
-    pass "wrote environment.json with schema_version=2"
+   && jq -e '.schema_version == 3' "$ws/.evolve/environment.json" >/dev/null 2>&1; then
+    pass "wrote environment.json with schema_version=3"
 else
     fail_ "environment.json not persisted or invalid; out: $out; ls: $(ls -la "$ws/.evolve/" 2>&1)"
 fi
@@ -132,6 +138,35 @@ if [ "$nested" = "false" ] && echo "$wt_base" | grep -qF "$ws8/.evolve/worktrees
     pass "standalone selected in-project base: $wt_base"
 else
     fail_ "nested=$nested wt_base=$wt_base reason=$wt_reason"
+fi
+
+# === Test 9: standalone shell with working sandbox → inner_sandbox=true =====
+# v8.25.1 invariant: inner_sandbox is true (defense-in-depth) when:
+#   - Not nested-Claude
+#   - sandbox.expected_to_work is true
+# This test runs in a standalone subshell on Darwin (sandbox-exec available).
+# Linux CI without bwrap would yield expected_to_work=false → inner_sandbox=false,
+# so we only assert true on Darwin standalone.
+header "Test 9: v8.25.1 — standalone (Darwin/sandbox-exec available) → inner_sandbox=true"
+ws9=$(mktemp -d -t test-pre-std-inner.XXXXXX)
+cleanup_dirs+=("$ws9")
+( cd "$ws9" && git init -q . 2>/dev/null && EVOLVE_BYPASS_SHIP_GATE=1 git commit --allow-empty -q -m init 2>/dev/null ) || true
+out=$(cd "$ws9" && env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_EXECPATH bash "$PREFLIGHT" 2>/dev/null)
+nested=$(echo "$out" | jq -r '.claude_code.nested')
+sb_works=$(echo "$out" | jq -r '.sandbox.expected_to_work')
+inner=$(echo "$out" | jq -r '.auto_config.inner_sandbox')
+# When standalone AND sandbox works, expect inner=true (defense-in-depth).
+# When standalone but sandbox unavailable (Linux without bwrap), inner=false is correct.
+if [ "$nested" = "false" ]; then
+    if [ "$sb_works" = "true" ] && [ "$inner" = "true" ]; then
+        pass "standalone+sandbox-works → inner_sandbox=true (defense-in-depth)"
+    elif [ "$sb_works" = "false" ] && [ "$inner" = "false" ]; then
+        pass "standalone+sandbox-broken → inner_sandbox=false (no point wrapping with broken sandbox)"
+    else
+        fail_ "nested=$nested sb_works=$sb_works inner=$inner — schema mismatch"
+    fi
+else
+    fail_ "Test environment is detected as nested when it shouldn't be"
 fi
 
 # === Summary ================================================================

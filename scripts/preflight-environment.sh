@@ -57,7 +57,7 @@
 #   1 — usage error
 #  10 — bad arguments
 #
-# OUTPUT SCHEMA (v2 — adds worktree_base)
+# OUTPUT SCHEMA (v3 — adds inner_sandbox; v2 added worktree_base)
 #
 #   {
 #     "schema_version": 2,
@@ -95,14 +95,24 @@
 #       "EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "0|1",
 #       "worktree_base": "<absolute path>",
 #       "worktree_base_reason": "<plain-English why this path was selected>",
+#       "inner_sandbox": true|false,
+#       "inner_sandbox_reason": "<plain-English why true or false>",
 #       "reasoning": "<aggregate reasoning>"
 #     }
 #   }
 #
-# NOTE: v2 removes EVOLVE_SKIP_WORKTREE from auto_config. Per-cycle worktree
+# v2 removed EVOLVE_SKIP_WORKTREE from auto_config: per-cycle worktree
 # isolation is non-negotiable; we just relocate the worktree to a sandbox-
-# friendly path instead of skipping it. EVOLVE_SKIP_WORKTREE remains as a
-# true emergency operator-set flag (handled in run-cycle.sh).
+# friendly path instead of skipping it.
+#
+# v3 adds inner_sandbox: when true, claude-adapter wraps phase agents in
+# sandbox-exec (defense-in-depth). When false, the wrapping is skipped and
+# Tier-1 kernel hooks (phase-gate-precondition, role-gate, ledger-SHA) plus
+# the OUTER Claude Code OS sandbox + claude --add-dir provide the trust
+# boundary. nested-Claude is the dominant case where inner_sandbox=false
+# because the outer OS sandbox already provides isolation and the inner
+# sandbox-exec only intersects (cannot expand) what the outer permits.
+# Operator overrides via EVOLVE_FORCE_INNER_SANDBOX=1 or EVOLVE_INNER_SANDBOX=0.
 
 set -uo pipefail
 
@@ -341,11 +351,41 @@ if [ "$NESTED_BOOL" = "true" ]; then
     AUTO_FALLBACK_ON_EPERM=1
 fi
 
+# v8.25.1: inner_sandbox decision.
+#
+# In nested-Claude, the OUTER Claude Code OS sandbox already provides
+# process-level isolation. The INNER sandbox-exec wrapper added by
+# claude-adapter is a SECOND nested sandbox layer. Because nested
+# sandboxes can only intersect (restrict further), never union (expand),
+# the inner wrapper:
+#   - Adds NO new protection (the outer already provides OS isolation)
+#   - DOES introduce execution-time EPERM that the v8.22.0 startup-EPERM
+#     fallback can't catch (writes fail mid-build, no auto-recovery)
+#
+# When inner_sandbox=false, claude-adapter skips the sandbox-exec wrapping.
+# Tier-1 kernel hooks remain enforced (phase-gate-precondition, role-gate,
+# ledger-SHA verification all run OUTSIDE the sandbox layer entirely).
+# claude --add-dir continues to gate Edit/Write tool paths.
+#
+# Standalone shell with sandbox-exec/bwrap available: inner_sandbox=true
+# (defense-in-depth, no nesting issue).
+INNER_SANDBOX=true
+INNER_SANDBOX_REASON=""
+if [ "$NESTED_BOOL" = "true" ]; then
+    INNER_SANDBOX=false
+    INNER_SANDBOX_REASON="nested-Claude: outer Claude Code OS sandbox + Tier-1 hooks suffice; inner sandbox-exec adds friction without protection (intersect-only nesting)"
+elif [ "$SANDBOX_EXPECTED_TO_WORK" = "false" ]; then
+    INNER_SANDBOX=false
+    INNER_SANDBOX_REASON="sandbox not expected to work on this host: $SANDBOX_REASON"
+else
+    INNER_SANDBOX_REASON="standalone shell with working sandbox: defense-in-depth enabled"
+fi
+
 if [ -n "$WORKTREE_BASE" ]; then
     if [ "$NESTED_BOOL" = "true" ]; then
-        AUTO_REASONING="nested-Claude detected. Sandbox startup-fallback enabled (EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1). Worktree relocated to sandbox-friendly path: $WORKTREE_BASE ($WORKTREE_BASE_REASON). Per-cycle isolation preserved; Tier-1 kernel hooks enforce."
+        AUTO_REASONING="nested-Claude detected. Sandbox startup-fallback enabled (EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1). Worktree relocated to sandbox-friendly path: $WORKTREE_BASE ($WORKTREE_BASE_REASON). Inner sandbox-exec DISABLED ($INNER_SANDBOX_REASON). Tier-1 kernel hooks (phase-gate, role-gate, ledger SHA) keep enforcing."
     else
-        AUTO_REASONING="standalone shell. Worktree base: $WORKTREE_BASE ($WORKTREE_BASE_REASON). Full Tier-2 OS isolation enabled."
+        AUTO_REASONING="standalone shell. Worktree base: $WORKTREE_BASE ($WORKTREE_BASE_REASON). Inner sandbox-exec: $INNER_SANDBOX ($INNER_SANDBOX_REASON)."
     fi
 else
     AUTO_REASONING="ERROR: no writable worktree base. Tried in-project ($IN_PROJECT_WORKTREES_WRITABLE), TMPDIR ($TMPDIR_WRITABLE), cache dir ($CACHE_DIR_WRITABLE). OPERATOR ACTION: set EVOLVE_WORKTREE_BASE to a writable directory, or run from a different shell with broader permissions. Last-resort: EVOLVE_SKIP_WORKTREE=1 (loses per-cycle isolation, NOT recommended)."
@@ -377,9 +417,11 @@ PROFILE_JSON=$(jq -n \
     --arg auto_eperm       "$AUTO_FALLBACK_ON_EPERM" \
     --arg auto_wt_base     "$WORKTREE_BASE" \
     --arg auto_wt_reason   "$WORKTREE_BASE_REASON" \
+    --argjson auto_inner   "$INNER_SANDBOX" \
+    --arg auto_inner_rsn   "$INNER_SANDBOX_REASON" \
     --arg auto_reason      "$AUTO_REASONING" \
     '{
-        schema_version: 2,
+        schema_version: 3,
         probed_at: $probed_at,
         host: {
             os: $os,
@@ -414,6 +456,8 @@ PROFILE_JSON=$(jq -n \
             EVOLVE_SANDBOX_FALLBACK_ON_EPERM: $auto_eperm,
             worktree_base:                    $auto_wt_base,
             worktree_base_reason:             $auto_wt_reason,
+            inner_sandbox:                    $auto_inner,
+            inner_sandbox_reason:             $auto_inner_rsn,
             reasoning:                        $auto_reason
         }
     }')
@@ -447,6 +491,8 @@ case "$MODE" in
         echo "    EVOLVE_SANDBOX_FALLBACK_ON_EPERM=$AUTO_FALLBACK_ON_EPERM"
         echo "    worktree_base=${WORKTREE_BASE:-<NONE>}"
         echo "    worktree_base_reason: $WORKTREE_BASE_REASON"
+        echo "    inner_sandbox=$INNER_SANDBOX"
+        echo "    inner_sandbox_reason: $INNER_SANDBOX_REASON"
         echo "    Reasoning: $AUTO_REASONING"
         ;;
 esac

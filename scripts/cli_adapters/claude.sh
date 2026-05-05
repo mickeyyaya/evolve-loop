@@ -186,12 +186,66 @@ fi
 # (Anthropic's Secure Deployment Guide notes --allowedTools is a permission gate,
 # not a sandbox; an agent can pipe to python3 to bypass the allowlist parser).
 SANDBOX_USE=0
+SANDBOX_USE_SOURCE="default"
 if [ "${EVOLVE_SANDBOX:-}" = "1" ]; then
     SANDBOX_USE=1
+    SANDBOX_USE_SOURCE="EVOLVE_SANDBOX=1"
 elif [ "${EVOLVE_SANDBOX:-}" != "0" ]; then
     # No explicit env override; defer to profile.
     if jq -e '.sandbox.enabled == true' "$PROFILE_PATH" > /dev/null 2>&1; then
         SANDBOX_USE=1
+        SANDBOX_USE_SOURCE="profile sandbox.enabled=true"
+    fi
+fi
+
+# v8.25.1: inner_sandbox decision from preflight environment.json.
+#
+# In nested-Claude (CLAUDECODE / CLAUDE_CODE_* env present), the OUTER Claude
+# Code OS sandbox already provides process-level isolation. Wrapping with a
+# nested sandbox-exec adds NO new protection (nested sandboxes can only
+# intersect — restrict further — never union — expand) AND introduces
+# execution-time EPERM that the v8.22.0 startup-fallback can't catch.
+#
+# preflight-environment.sh writes auto_config.inner_sandbox to
+# .evolve/environment.json. When false, claude-adapter skips sandbox-exec
+# wrapping entirely. Tier-1 kernel hooks (phase-gate-precondition, role-gate,
+# ledger-SHA verification) all run OUTSIDE the sandbox layer and continue
+# to enforce structural integrity. claude --add-dir continues to gate
+# Edit/Write tool paths.
+#
+# Override priority (highest first):
+#   1. EVOLVE_FORCE_INNER_SANDBOX=1 — operator force-enable (paranoid mode)
+#   2. EVOLVE_INNER_SANDBOX=0       — operator force-disable (explicit hatch)
+#   3. environment.json:auto_config.inner_sandbox == false → SANDBOX_USE=0
+#   4. (existing decision above stands)
+#
+# When inner_sandbox=false drives SANDBOX_USE=0, log loudly so operators see
+# the posture and can tell defense-in-depth is preserved at Tier-1.
+ENV_PROFILE_JSON=""
+if [ -n "${EVOLVE_PROJECT_ROOT:-}" ] && [ -f "$EVOLVE_PROJECT_ROOT/.evolve/environment.json" ]; then
+    ENV_PROFILE_JSON="$EVOLVE_PROJECT_ROOT/.evolve/environment.json"
+fi
+
+if [ "${EVOLVE_FORCE_INNER_SANDBOX:-0}" = "1" ]; then
+    SANDBOX_USE=1
+    SANDBOX_USE_SOURCE="EVOLVE_FORCE_INNER_SANDBOX=1 (operator force-enable)"
+elif [ "${EVOLVE_INNER_SANDBOX:-}" = "0" ]; then
+    SANDBOX_USE=0
+    SANDBOX_USE_SOURCE="EVOLVE_INNER_SANDBOX=0 (operator force-disable)"
+elif [ -n "$ENV_PROFILE_JSON" ]; then
+    # Use `has()` then `tostring` because jq's `// null` treats `false` as missing.
+    auto_inner=$(jq -r '.auto_config | if has("inner_sandbox") then .inner_sandbox | tostring else "MISSING" end' "$ENV_PROFILE_JSON" 2>/dev/null)
+    if [ "$auto_inner" = "false" ]; then
+        if [ "$SANDBOX_USE" = "1" ]; then
+            inner_reason=$(jq -r '.auto_config.inner_sandbox_reason // ""' "$ENV_PROFILE_JSON" 2>/dev/null)
+            echo "[claude-adapter] inner sandbox-exec DISABLED (from environment.json:auto_config.inner_sandbox=false)" >&2
+            echo "[claude-adapter]   reason: $inner_reason" >&2
+            echo "[claude-adapter]   outer Claude Code OS sandbox + Tier-1 kernel hooks remain enforced" >&2
+            echo "[claude-adapter]   role-gate + phase-gate-precondition + ledger-SHA verify writes" >&2
+            echo "[claude-adapter]   (operator force-enable: EVOLVE_FORCE_INNER_SANDBOX=1)" >&2
+        fi
+        SANDBOX_USE=0
+        SANDBOX_USE_SOURCE="environment.json:auto_config.inner_sandbox=false"
     fi
 fi
 
@@ -327,7 +381,7 @@ echo "[claude-adapter] command=${CMD[*]}" >&2
 echo "[claude-adapter] prompt-file=$PROMPT_FILE" >&2
 echo "[claude-adapter] artifact=$ARTIFACT_PATH" >&2
 echo "[claude-adapter] max-turns=$MAX_TURNS (advisory; not enforced by claude flag)" >&2
-echo "[claude-adapter] sandbox=$SANDBOX_USE" >&2
+echo "[claude-adapter] sandbox=$SANDBOX_USE (source: $SANDBOX_USE_SOURCE)" >&2
 # v8.16.2: diagnostic — record runtime knob values so we can trace propagation.
 echo "[claude-adapter] env: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-unset}" >&2
 

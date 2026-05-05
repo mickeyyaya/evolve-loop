@@ -204,6 +204,84 @@ else
     fail_ "out=$(echo "$out" | grep -E 'max-budget|task-mode|override|WARN' | head -3)"
 fi
 
+# === Test 13: v8.25.1 — environment.json:inner_sandbox=false → SANDBOX_USE=0 ===
+# Construct a fake project root containing .evolve/environment.json with
+# auto_config.inner_sandbox=false. Adapter must respect it: SANDBOX_USE=0
+# AND log the source as "environment.json:auto_config.inner_sandbox=false".
+header "Test 13: v8.25.1 — environment.json:inner_sandbox=false → sandbox=0 from environment.json"
+ws13=$(mktemp -d -t claude-adapter-inner.XXXXXX)
+cleanup_files+=("$ws13")  # cleanup uses rm -f; rm -rf for dirs handled by trap
+mkdir -p "$ws13/.evolve"
+cat > "$ws13/.evolve/environment.json" <<'EOF'
+{
+  "schema_version": 3,
+  "auto_config": {
+    "inner_sandbox": false,
+    "inner_sandbox_reason": "test-injected: nested-Claude scenario"
+  }
+}
+EOF
+# Profile has sandbox.enabled=true to test the override hierarchy correctly.
+p13=$(mktemp -t claude-adapter-test.XXXXXX.json)
+cleanup_files+=("$p13")
+cat > "$p13" <<EOF
+{"name":"x","cli":"claude","model_tier_default":"sonnet","max_budget_usd":0.50,"max_turns":30,"permission_mode":"default","allowed_tools":[],"disallowed_tools":[],"add_dir":[],"output_artifact":"out.md","challenge_token_required":false,"extra_flags":[],"sandbox":{"enabled":true}}
+EOF
+out=$(env CYCLE=99 WORKSPACE_PATH=/tmp PROFILE_PATH="$p13" \
+       RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+       STDOUT_LOG=/dev/null STDERR_LOG=/dev/null \
+       ARTIFACT_PATH=/dev/null VALIDATE_ONLY=1 \
+       EVOLVE_PROJECT_ROOT="$ws13" \
+       bash "$ADAPTER" 2>&1)
+rm -rf "$ws13"
+if echo "$out" | grep -q "inner sandbox-exec DISABLED" \
+   && echo "$out" | grep -qE "sandbox=0 \(source: environment.json"; then
+    pass "environment.json:inner_sandbox=false → sandbox=0 with explanation logged"
+else
+    fail_ "out=$(echo "$out" | grep -E 'sandbox|inner' | head -5)"
+fi
+
+# === Test 14: v8.25.1 — EVOLVE_FORCE_INNER_SANDBOX=1 overrides environment.json ===
+# Operator paranoid mode: force inner sandbox ON even when environment.json says false.
+header "Test 14: v8.25.1 — EVOLVE_FORCE_INNER_SANDBOX=1 → sandbox=1 from operator override"
+ws14=$(mktemp -d -t claude-adapter-force.XXXXXX)
+mkdir -p "$ws14/.evolve"
+cat > "$ws14/.evolve/environment.json" <<'EOF'
+{"schema_version":3,"auto_config":{"inner_sandbox":false,"inner_sandbox_reason":"nested-Claude"}}
+EOF
+out=$(env CYCLE=99 WORKSPACE_PATH=/tmp PROFILE_PATH="$p13" \
+       RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+       STDOUT_LOG=/dev/null STDERR_LOG=/dev/null \
+       ARTIFACT_PATH=/dev/null VALIDATE_ONLY=1 \
+       EVOLVE_PROJECT_ROOT="$ws14" EVOLVE_FORCE_INNER_SANDBOX=1 \
+       bash "$ADAPTER" 2>&1)
+rm -rf "$ws14"
+if echo "$out" | grep -qE "sandbox=1 \(source: EVOLVE_FORCE_INNER_SANDBOX=1"; then
+    pass "operator force-enable overrides environment.json"
+else
+    fail_ "out=$(echo "$out" | grep -E 'sandbox|inner' | head -5)"
+fi
+
+# === Test 15: v8.25.1 — EVOLVE_INNER_SANDBOX=0 overrides profile-enabled sandbox ===
+# Operator explicit-disable: even without environment.json, EVOLVE_INNER_SANDBOX=0
+# disables the inner sandbox.
+header "Test 15: v8.25.1 — EVOLVE_INNER_SANDBOX=0 → sandbox=0 (no environment.json)"
+ws15=$(mktemp -d -t claude-adapter-disable.XXXXXX)
+mkdir -p "$ws15/.evolve"
+# No environment.json — adapter uses profile (sandbox.enabled=true) AND env override
+out=$(env CYCLE=99 WORKSPACE_PATH=/tmp PROFILE_PATH="$p13" \
+       RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+       STDOUT_LOG=/dev/null STDERR_LOG=/dev/null \
+       ARTIFACT_PATH=/dev/null VALIDATE_ONLY=1 \
+       EVOLVE_PROJECT_ROOT="$ws15" EVOLVE_INNER_SANDBOX=0 \
+       bash "$ADAPTER" 2>&1)
+rm -rf "$ws15"
+if echo "$out" | grep -qE "sandbox=0 \(source: EVOLVE_INNER_SANDBOX=0"; then
+    pass "operator explicit-disable wins over profile.sandbox.enabled"
+else
+    fail_ "out=$(echo "$out" | grep -E 'sandbox|inner' | head -5)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="

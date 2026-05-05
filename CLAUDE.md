@@ -113,17 +113,29 @@ evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came fr
 
 **The governing rule:** Tier 1 is non-negotiable and runs in privileged shell context (no sandbox dependency). Tier 2 *adapts to* the environment instead of *degrading* — per-cycle worktrees always exist; only the path moves. Tier 3 is operator-controlled per-run.
 
-### Capability detection (v8.25.0+)
+### Capability detection (v8.25.0+, refined v8.25.1)
 
-`scripts/preflight-environment.sh` runs at dispatcher start, probes the host, and emits a JSON profile to `.evolve/environment.json`. The dispatcher reads `auto_config` and applies it. **One observable file replaces the 6+ env flags that accumulated as escape hatches.**
+`scripts/preflight-environment.sh` runs at dispatcher start, probes the host, and emits a JSON profile to `.evolve/environment.json` (schema v3 since v8.25.1). The dispatcher reads `auto_config` and applies it. **One observable file replaces the 6+ env flags that accumulated as escape hatches.**
 
-`auto_config` decides:
-- `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` (`0`/`1`) — set `1` when nested-Claude is detected (Darwin sandbox-exec startup will EPERM otherwise)
-- `worktree_base` (path) — selected by priority: operator-set `EVOLVE_WORKTREE_BASE` > in-project `.evolve/worktrees/` (standalone shell) > `$TMPDIR/evolve-loop/<hash>` (nested-Claude default) > `~/Library/Caches/evolve-loop/<hash>` (macOS) or `~/.cache/evolve-loop/<hash>` (Linux)
+`auto_config` decides three things:
+
+| Field | Values | Decision rule |
+|---|---|---|
+| `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | `"0"` / `"1"` | `1` when nested-Claude is detected (Darwin sandbox-exec startup will EPERM otherwise) |
+| `worktree_base` | absolute path | priority: operator-set `EVOLVE_WORKTREE_BASE` > in-project `.evolve/worktrees/` (standalone) > `$TMPDIR/evolve-loop/<hash>` (nested-Claude default) > user cache dir |
+| `inner_sandbox` | `true` / `false` | `false` when nested-Claude OR sandbox not expected to work; `true` when standalone with working sandbox-exec/bwrap |
 
 The dispatcher exports `EVOLVE_WORKTREE_BASE`; `run-cycle.sh` provisions worktrees there via `git worktree add`. Worktrees can live anywhere — `git`'s `.git/worktrees/cycle-N` pointer file handles cross-directory references — so cleanup, isolation, and audit binding work regardless of physical path.
 
-**Operator overrides** are observable: edit `.evolve/environment.json` directly, or set `EVOLVE_WORKTREE_BASE=/path` before invoking the dispatcher. The dispatcher logs `operator set EVOLVE_WORKTREE_BASE=... (override profile)` so the override is loud.
+`scripts/cli_adapters/claude.sh` reads `inner_sandbox` and **skips the inner sandbox-exec wrapper** when false. This is the v8.25.1 fix: in nested-Claude, the OUTER Claude Code OS sandbox already provides process isolation; the INNER nested sandbox-exec adds no protection (nested sandboxes can only intersect, never expand) AND introduces execution-time EPERM that no startup-fallback can catch. Skipping it lets builds actually land while Tier-1 hooks (phase-gate, role-gate, ledger-SHA) keep enforcing structural integrity.
+
+**Operator overrides** are observable:
+- Edit `.evolve/environment.json` directly (schema is documented in `scripts/preflight-environment.sh`)
+- Set `EVOLVE_WORKTREE_BASE=/path` before invoking the dispatcher (dispatcher logs `operator set EVOLVE_WORKTREE_BASE=... (override profile)`)
+- Set `EVOLVE_FORCE_INNER_SANDBOX=1` to force-enable inner sandbox-exec even in nested-Claude (paranoid mode)
+- Set `EVOLVE_INNER_SANDBOX=0` to force-disable inner sandbox-exec everywhere (debugging)
+
+The claude-adapter logs the source of each sandbox decision: `[claude-adapter] sandbox=0 (source: environment.json:auto_config.inner_sandbox=false)`.
 
 ### EVOLVE_SKIP_WORKTREE is a true emergency hatch (v8.25.0+)
 

@@ -785,6 +785,36 @@ else
     fail_ "rc=$rc; out: $(echo "$out" | tail -15)"
 fi
 
+# === Test 33: v8.25.1 — environment.json contains inner_sandbox=false ========
+# v8.25.1: dispatcher runs preflight which writes auto_config.inner_sandbox.
+# The dispatcher logs ENVIRONMENT summary (test 30 covers that). Here we
+# verify the persisted file ALSO contains inner_sandbox=false in nested-Claude
+# so that downstream claude-adapter invocations read it correctly.
+header "Test 33: v8.25.1 — CLAUDECODE → environment.json has inner_sandbox=false"
+ws33=$(make_workspace)
+write_state "$ws33/state.json" 0
+: > "$ws33/ledger.jsonl"
+mkdir -p "$ws33/.evolve"
+set +e
+out=$(env CLAUDECODE=1 EVOLVE_PROJECT_ROOT="$ws33" \
+        STATE_OVERRIDE="$ws33/state.json" LEDGER_OVERRIDE="$ws33/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws33/runs" \
+        VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+env_file="$ws33/.evolve/environment.json"
+if [ "$rc" = "0" ] && [ -f "$env_file" ]; then
+    inner=$(jq -r '.auto_config | if has("inner_sandbox") then .inner_sandbox | tostring else "MISSING" end' "$env_file")
+    schema=$(jq -r '.schema_version' "$env_file")
+    if [ "$inner" = "false" ] && [ "$schema" = "3" ]; then
+        pass "environment.json schema_version=3, inner_sandbox=false"
+    else
+        fail_ "schema=$schema inner=$inner"
+    fi
+else
+    fail_ "rc=$rc; env_file_exists=$([ -f "$env_file" ] && echo yes || echo no)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
