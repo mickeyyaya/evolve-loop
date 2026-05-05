@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.23.2] - 2026-05-05
+
+Defense-in-depth fix for `{worktree_path}` placeholder expansion. A second-Claude session running cycle 53 against a downstream `/learning` project surfaced this: builder Edits returned EPERM despite WORKTREE_PATH being set, despite v8.21.0's claude.sh substitution, despite EVOLVE_SANDBOX=0. The orchestrator's diagnosis: "in subagent-run.sh, substitute `{worktree_path}` with `$WORKTREE_PATH` (already exported by run-cycle.sh) before invoking the builder profile."
+
+Pre-v8.23.2, only `scripts/cli_adapters/claude.sh` substituted `{worktree_path}` — and only at TWO specific sites (`add_dir`, `sandbox.write_subpaths`). Other adapters (`gemini.sh`, `codex.sh`) and any tool-permission engine that consulted the profile JSON directly would see literal `{worktree_path}` tokens. v8.23.2 moves substitution upstream into `subagent-run.sh:cmd_run` so EVERY adapter gets a fully-expanded profile.
+
+### Fixed
+
+- **BUG-007 (HIGH)**: Builder `Edit` calls returning EPERM despite worktree being correctly provisioned and `WORKTREE_PATH` correctly set in the env. Root cause was an undiscovered substitution gap — likely Claude Code's tool-permission engine consulting an unexpanded profile field outside `add_dir` and `sandbox.write_subpaths`.
+
+### Added
+
+- `scripts/subagent-run.sh:cmd_run` — pre-expands `{worktree_path}` in EVERY string field of the profile JSON via `jq walk`. Result is written to `<workspace>/<agent>-profile-expanded.json` (per-cycle, traceable artifact). `PROFILE_PATH` env var passed to the adapter points at the expanded copy. The original profile in `.evolve/profiles/` is never modified.
+- The expanded profile is opt-in: only triggered when `grep '{worktree_path}'` matches in the profile (no perf impact for profiles without placeholders).
+
+### Changed
+
+- `scripts/cli_adapters/claude.sh` substitution remains in place as second-line defense — but it should now never need to fire (the profile arrives already expanded). If it does fire, that's a signal that subagent-run.sh's expansion path was bypassed.
+
+### Verification
+
+- `jq --arg wp '/path' 'walk(if type == "string" then gsub("\\{worktree_path\\}"; $wp) else . end)' builder.json` correctly expands all 3 placeholder occurrences (`add_dir[0]`, `sandbox.write_subpaths[0]`).
+- `tdd-engineer.json` with subpath-style placeholders (`{worktree_path}/tests`, `{worktree_path}/scripts/*-test.sh`) also correctly expands.
+- Profiles without placeholders (orchestrator, scout, auditor) are no-ops — `walk` doesn't change them.
+- 29/29 regression tests pass.
+
+### Migration
+
+No migration needed. The fix is transparent: existing code calling `cmd_run` automatically gets the expanded profile. If `WORKTREE_PATH` is unset (atypical for builder/tdd-engineer cycles), a WARN is logged and the original profile is used (adapter then enforces its own check).
+
+### Out of scope
+
+- Direct `bash scripts/cli_adapters/claude.sh` invocations bypass `subagent-run.sh` and lose the pre-expansion benefit. They still rely on claude.sh's own substitution at `add_dir` and `sandbox.write_subpaths`. This is acceptable: production code paths always go through `subagent-run.sh`; only test fixtures invoke the adapter directly, and they typically don't use `{worktree_path}` profiles.
+
+---
+
 ## [8.23.1] - 2026-05-05
 
 Critical hotfix for v8.22.0's `failure_compute_expires_at`. A second-Claude-session running 10 cycles against a downstream project surfaced the symptom: every cycle blocked at calibrate with `BLOCKED-SYSTEMIC` despite the failure-adapter being designed to age out infrastructure failures after 1 day. Root cause: the v8.22.0 expiresAt computation was silently broken since release.

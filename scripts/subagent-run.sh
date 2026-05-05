@@ -436,6 +436,38 @@ EOF
         fi
     fi
 
+    # v8.23.2 BUG-007 fix: pre-expand {worktree_path} placeholders in EVERY string
+    # field of the profile before the adapter sees it. Pre-v8.23.2, only claude.sh
+    # substituted at two specific sites (add_dir, sandbox.write_subpaths). Other
+    # adapters (gemini.sh, codex.sh) and any future tool-permission engine that
+    # reads the profile would see the literal "{worktree_path}" token. Cycle 53
+    # of a downstream user's project surfaced this when builder Edits returned
+    # EPERM despite WORKTREE_PATH being set — Claude Code's tool-permission layer
+    # was evidently consulting an unexpanded profile path.
+    #
+    # The fix: jq's `walk` recurses through every value in the profile JSON; for
+    # string values, substitute "{worktree_path}" → "$WORKTREE_PATH". The expanded
+    # profile is written to the workspace (per-cycle, traceable artifact), and
+    # PROFILE_PATH is updated to point at it. The original profile in
+    # .evolve/profiles/ is never modified.
+    local effective_profile="$profile"
+    if grep -q '{worktree_path}' "$profile" 2>/dev/null; then
+        if [ -z "${WORKTREE_PATH:-}" ]; then
+            log "WARN: profile $profile contains {worktree_path} but WORKTREE_PATH is unset"
+            # fall through — adapter will fail loudly with its own check
+        else
+            local expanded_profile="$workspace/${agent}-profile-expanded.json"
+            if jq --arg wp "$WORKTREE_PATH" \
+                'walk(if type == "string" then gsub("\\{worktree_path\\}"; $wp) else . end)' \
+                "$profile" > "$expanded_profile" 2>/dev/null; then
+                effective_profile="$expanded_profile"
+                log "profile pre-expanded: $expanded_profile (WORKTREE_PATH=$WORKTREE_PATH)"
+            else
+                log "WARN: jq walk failed on $profile — falling back to original; adapter must substitute"
+            fi
+        fi
+    fi
+
     record_phase prep_total_ms
 
     log "starting $agent (cycle $cycle, model $model, cli $cli, token $challenge_token)"
@@ -443,7 +475,7 @@ EOF
     start_ts=$(date +%s)
 
     set +e
-    PROFILE_PATH="$profile" \
+    PROFILE_PATH="$effective_profile" \
     RESOLVED_MODEL="$model" \
     PROMPT_FILE="$injected_prompt" \
     CYCLE="$cycle" \
