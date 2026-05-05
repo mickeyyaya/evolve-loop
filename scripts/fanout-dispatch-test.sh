@@ -210,6 +210,137 @@ else
 fi
 rm -rf "$WS"
 
+# --- v8.23.0 tests below (Tasks B, C, D) ------------------------------------
+
+# --- Test 9: Task C — --cache-prefix-file flag accepted, exported to workers
+header "Test 9: --cache-prefix-file=PATH flag exposes \$EVOLVE_FANOUT_CACHE_PREFIX_FILE to workers"
+WS=$(fresh_workspace)
+mkdir -p "$WS"
+PREFIX_FILE="$WS/cache-prefix.md"
+printf 'shared prefix bytes\n' > "$PREFIX_FILE"
+# Worker that prints the env var to its stdout so we can assert.
+printf 'check_env\techo PREFIX_PATH=$EVOLVE_FANOUT_CACHE_PREFIX_FILE\n' > "$WS/cmds.tsv"
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+    bash "$SCRIPT" --cache-prefix-file "$PREFIX_FILE" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+RC=$?
+WORKER_OUT=$(cat "$WS/check_env.out" 2>/dev/null || echo "")
+if [ "$RC" = "0" ] && echo "$WORKER_OUT" | grep -q "^PREFIX_PATH=$PREFIX_FILE$"; then
+    pass "worker received EVOLVE_FANOUT_CACHE_PREFIX_FILE env"
+else
+    fail_ "rc=$RC, worker_out='$WORKER_OUT'"
+fi
+rm -rf "$WS"
+
+# --- Test 10: Task C — missing --cache-prefix-file path → exit 2 -------------
+header "Test 10: --cache-prefix-file pointing to nonexistent file → exit 2"
+WS=$(fresh_workspace)
+printf 'noop\ttrue\n' > "$WS/cmds.tsv"
+set +e
+bash "$SCRIPT" --cache-prefix-file "$WS/does-not-exist.md" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+RC=$?
+set -e
+if [ "$RC" = "2" ]; then
+    pass "missing prefix file → rc=2"
+else
+    fail_ "expected rc=2, got rc=$RC"
+fi
+rm -rf "$WS"
+
+# --- Test 11: Task D — worker status callbacks update cycle-state ------------
+header "Test 11: EVOLVE_FANOUT_TRACK_WORKERS=1 writes worker status to cycle-state.json"
+WS=$(fresh_workspace)
+# Provide a stub cycle-state.json + mock cycle-state.sh so we don't depend on
+# the real EVOLVE_PROJECT_ROOT.
+STATE="$WS/cycle-state.json"
+echo '{"cycle_id":1,"phase":"research"}' > "$STATE"
+mkdir -p "$WS/scripts"
+cat > "$WS/scripts/cycle-state.sh" <<'STUB'
+#!/usr/bin/env bash
+# Stub: log calls to a sibling .calls file so the test can assert.
+echo "$@" >> "$EVOLVE_CYCLE_STATE_FILE.calls"
+STUB
+chmod +x "$WS/scripts/cycle-state.sh"
+printf 'noop\ttrue\n' > "$WS/cmds.tsv"
+EVOLVE_PLUGIN_ROOT="$WS" \
+EVOLVE_CYCLE_STATE_FILE="$STATE" \
+EVOLVE_FANOUT_TRACK_WORKERS=1 \
+    bash "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+CALLS=$(cat "$STATE.calls" 2>/dev/null)
+if echo "$CALLS" | grep -q "set-worker-status noop running" \
+   && echo "$CALLS" | grep -q "set-worker-status noop done 0"; then
+    pass "worker status: running → done 0 recorded"
+else
+    fail_ "expected running + done 0 calls; got: $CALLS"
+fi
+rm -rf "$WS"
+
+# --- Test 12: Task D — track-workers disabled → no cycle-state writes --------
+header "Test 12: EVOLVE_FANOUT_TRACK_WORKERS=0 → no cycle-state.sh calls"
+WS=$(fresh_workspace)
+mkdir -p "$WS/scripts"
+cat > "$WS/scripts/cycle-state.sh" <<'STUB'
+#!/usr/bin/env bash
+echo "$@" >> "$WS_CALLS_LOG"
+STUB
+chmod +x "$WS/scripts/cycle-state.sh"
+printf 'noop\ttrue\n' > "$WS/cmds.tsv"
+EVOLVE_PLUGIN_ROOT="$WS" \
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+WS_CALLS_LOG="$WS/calls.log" \
+    bash "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+if [ ! -s "$WS/calls.log" ]; then
+    pass "track-workers=0 → no cycle-state.sh calls"
+else
+    fail_ "expected no calls; got: $(cat $WS/calls.log)"
+fi
+rm -rf "$WS"
+
+# --- Test 13: Task B — consensus-cancel SIGTERMs slow workers when 2 fail ----
+header "Test 13: EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1 cancels remaining when K=2 FAIL"
+WS=$(fresh_workspace)
+# 4 workers: 2 emit Verdict: FAIL quickly; 2 sleep long. Without consensus,
+# wall-time = max(slow workers) ~5s. With consensus, wall-time ~1-2s.
+{
+    printf 'fast_fail_a\tprintf "Verdict: FAIL\\n" >&1; exit 1\n'
+    printf 'fast_fail_b\tprintf "Verdict: FAIL\\n" >&1; exit 1\n'
+    printf 'slow_a\tsleep 5; printf "Verdict: PASS\\n" >&1; exit 0\n'
+    printf 'slow_b\tsleep 5; printf "Verdict: PASS\\n" >&1; exit 0\n'
+} > "$WS/cmds.tsv"
+START=$(date +%s)
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1 \
+EVOLVE_FANOUT_CONSENSUS_K=2 \
+EVOLVE_FANOUT_CONSENSUS_POLL_S=1 \
+    bash "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1 || true
+END=$(date +%s)
+ELAPSED=$((END - START))
+if [ "$ELAPSED" -le 4 ]; then
+    pass "consensus reached → cancelled slow workers (elapsed=${ELAPSED}s ≤ 4s)"
+else
+    fail_ "expected ≤4s, got ${ELAPSED}s — consensus did not cancel"
+fi
+rm -rf "$WS"
+
+# --- Test 14: Task B — consensus disabled → WAIT-ALL still applies -----------
+header "Test 14: EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=0 (default) → all workers run"
+WS=$(fresh_workspace)
+{
+    printf 'fast_fail\tprintf "Verdict: FAIL\\n" >&1; exit 1\n'
+    printf 'slow_ok\tsleep 2; exit 0\n'
+} > "$WS/cmds.tsv"
+START=$(date +%s)
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+    bash "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1 || true
+END=$(date +%s)
+ELAPSED=$((END - START))
+ROWS=$(wc -l < "$WS/results.tsv" 2>/dev/null | tr -d ' ')
+if [ "$ELAPSED" -ge 2 ] && [ "$ROWS" = "2" ]; then
+    pass "WAIT-ALL preserved (elapsed=${ELAPSED}s ≥ 2s, both workers in TSV)"
+else
+    fail_ "expected ≥2s elapsed and 2 rows; got elapsed=${ELAPSED}s rows=$ROWS"
+fi
+rm -rf "$WS"
+
 # --- Summary -----------------------------------------------------------------
 echo
 echo "=== Summary ==="

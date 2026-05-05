@@ -294,8 +294,71 @@ else
     fail_ "expected rc!=0 with 'state file missing', got rc=$rc out='$out'"
 fi
 
-# === Test 19: bad subcommand returns rc=2 ====================================
-header "Test 19: unknown subcommand returns rc=2 with usage line"
+# === Test 19: init-workers populates parallel_workers.workers[] ==============
+# v8.23.0 Task D: cycle_state_init_workers seeds the workers list with pending entries.
+header "Test 19: init-workers seeds 3 pending workers"
+sf=$(fresh_state); cleanup_files+=("$sf")
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init 9019 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init-workers scout codebase research evals >/dev/null 2>&1
+agent=$(jq -r '.parallel_workers.agent' "$sf")
+count=$(jq -r '.parallel_workers.count' "$sf")
+worker_names=$(jq -r '.parallel_workers.workers | map(.name) | join(",")' "$sf")
+all_pending=$(jq -r '[.parallel_workers.workers[] | select(.status == "pending")] | length' "$sf")
+if [ "$agent" = "scout" ] && [ "$count" = "3" ] && [ "$worker_names" = "codebase,research,evals" ] && [ "$all_pending" = "3" ]; then
+    pass "init-workers: agent=scout, 3 workers, all pending"
+else
+    fail_ "agent=$agent count=$count names=$worker_names pending_count=$all_pending"
+fi
+
+# === Test 20: set-worker-status pending → running records started_at =========
+header "Test 20: set-worker-status running records started_at"
+sf=$(fresh_state); cleanup_files+=("$sf")
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init 9020 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init-workers scout codebase research evals >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worker-status codebase running >/dev/null 2>&1
+status=$(jq -r '.parallel_workers.workers[] | select(.name == "codebase") | .status' "$sf")
+has_started=$(jq -r '.parallel_workers.workers[] | select(.name == "codebase") | .started_at | type' "$sf")
+no_ended=$(jq -r '.parallel_workers.workers[] | select(.name == "codebase") | .ended_at // "absent"' "$sf")
+if [ "$status" = "running" ] && [ "$has_started" = "string" ] && [ "$no_ended" = "absent" ]; then
+    pass "codebase: status=running, started_at set, ended_at absent"
+else
+    fail_ "status=$status has_started=$has_started ended=$no_ended"
+fi
+
+# === Test 21: set-worker-status terminal records ended_at + exit_code ========
+header "Test 21: terminal status (done/failed) records ended_at + exit_code"
+sf=$(fresh_state); cleanup_files+=("$sf")
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init 9021 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init-workers scout codebase research evals >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worker-status codebase running >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worker-status codebase done 0 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worker-status research failed 1 >/dev/null 2>&1
+codebase_done=$(jq -r '.parallel_workers.workers[] | select(.name == "codebase") | "\(.status):\(.exit_code)"' "$sf")
+research_failed=$(jq -r '.parallel_workers.workers[] | select(.name == "research") | "\(.status):\(.exit_code)"' "$sf")
+evals_pending=$(jq -r '.parallel_workers.workers[] | select(.name == "evals") | .status' "$sf")
+if [ "$codebase_done" = "done:0" ] && [ "$research_failed" = "failed:1" ] && [ "$evals_pending" = "pending" ]; then
+    pass "codebase done:0, research failed:1, evals still pending"
+else
+    fail_ "codebase=$codebase_done research=$research_failed evals=$evals_pending"
+fi
+
+# === Test 22: set-worker-status invalid status returns error ================
+header "Test 22: invalid status returns rc=1 with error message"
+sf=$(fresh_state); cleanup_files+=("$sf")
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init 9022 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" init-workers scout w1 w2 >/dev/null 2>&1
+set +e
+out=$(EVOLVE_CYCLE_STATE_FILE="$sf" bash "$SCRIPT" set-worker-status w1 invalid-status 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "1" ] && echo "$out" | grep -q "invalid status"; then
+    pass "invalid status rejected with rc=1"
+else
+    fail_ "rc=$rc out=$out"
+fi
+
+# === Test 23: bad subcommand returns rc=2 ====================================
+header "Test 23: unknown subcommand returns rc=2 with usage line"
 set +e
 out=$(bash "$SCRIPT" not-a-real-command 2>&1)
 rc=$?

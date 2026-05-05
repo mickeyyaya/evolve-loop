@@ -210,7 +210,8 @@ if [ "$rc" = "0" ]; then
 else
     fail_ "dispatch-parallel scout failed: rc=$rc"
 fi
-WORKER_COUNT=$(ls -1 "$WS/workers/"*.md 2>/dev/null | wc -l | tr -d ' ')
+# v8.23.0: workers/ also contains cache-prefix.md (Task C, shared input not a per-worker artifact). Exclude it.
+WORKER_COUNT=$(ls -1 "$WS/workers/"*.md 2>/dev/null | grep -v cache-prefix.md | wc -l | tr -d ' ')
 if [ "$WORKER_COUNT" = "3" ]; then
     pass "3 worker artifacts produced"
 else

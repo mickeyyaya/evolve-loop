@@ -174,6 +174,99 @@ cycle_state_clear_parallel_workers() {
     _atomic_write "$updated"
 }
 
+# v8.23.0 Task D: extend parallel_workers with per-worker status tracking.
+# Schema after this call: parallel_workers = {agent, count, started_at, workers: [{name, status, started_at, ended_at, exit_code}]}.
+# Each worker initialized with status=pending, no started_at/ended_at/exit_code yet.
+# Called by subagent-run.sh:cmd_dispatch_parallel BEFORE fanout-dispatch.sh spawns.
+cycle_state_init_workers() {
+    local agent="${1:?agent required}"
+    shift
+    if [ $# -lt 1 ]; then
+        echo "[cycle-state] ERROR: init-workers requires at least one worker name" >&2
+        return 1
+    fi
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot init-workers — state file missing" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required" >&2
+        return 1
+    fi
+    # Build the workers JSON array via jq -n + --args (bash 3.2 safe).
+    local workers_json
+    workers_json=$(jq -nc --args '$ARGS.positional | map({name: ., status: "pending"})' -- "$@")
+    local now; now=$(_iso_now)
+    local count=$#
+    local current; current=$(cat "$CYCLE_STATE_FILE")
+    local updated
+    updated=$(echo "$current" | jq -c \
+        --arg agent "$agent" \
+        --argjson count "$count" \
+        --arg now "$now" \
+        --argjson workers "$workers_json" \
+        '.parallel_workers = {agent: $agent, count: $count, started_at: $now, workers: $workers}')
+    _atomic_write "$updated"
+}
+
+# v8.23.0 Task D: atomic upsert of a worker's status into parallel_workers.workers[].
+# Status values: pending | running | done | failed.
+# When status is "running", started_at is recorded. When status is "done"/"failed",
+# ended_at + exit_code are recorded. Caller passes exit_code for terminal statuses;
+# omitted for "pending" / "running".
+#
+# Bash 3.2 safe — uses jq's map+if expressions, not associative arrays.
+cycle_state_set_worker_status() {
+    local name="${1:?worker name required}"
+    local status="${2:?status required (pending|running|done|failed)}"
+    local exit_code="${3:-}"
+    case "$status" in
+        pending|running|done|failed) ;;
+        *) echo "[cycle-state] ERROR: invalid status '$status' (expected pending|running|done|failed)" >&2; return 1 ;;
+    esac
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot set-worker-status — state file missing" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required" >&2
+        return 1
+    fi
+    local now; now=$(_iso_now)
+    local current; current=$(cat "$CYCLE_STATE_FILE")
+    # Build the worker patch as a jq filter that updates the matching entry, or
+    # appends a new one if the worker name isn't already in the list.
+    local exit_code_arg='null'
+    [ -n "$exit_code" ] && exit_code_arg="$exit_code"
+    local updated
+    updated=$(echo "$current" | jq -c \
+        --arg name "$name" \
+        --arg status "$status" \
+        --arg now "$now" \
+        --argjson exit_code "$exit_code_arg" \
+        '
+        .parallel_workers = (.parallel_workers // {agent: "unknown", count: 0, started_at: $now, workers: []})
+        | .parallel_workers.workers = (
+            (.parallel_workers.workers // []) as $ws
+            | (([range(0; ($ws | length)) | $ws[.] | select(.name == $name)] | length) > 0) as $exists
+            | if $exists then
+                $ws | map(
+                    if .name == $name then
+                        .status = $status
+                        | (if $status == "running" then .started_at = (.started_at // $now) else . end)
+                        | (if ($status == "done" or $status == "failed") then .ended_at = $now | .exit_code = $exit_code else . end)
+                    else . end
+                )
+              else
+                $ws + [{name: $name, status: $status} as $base
+                       | (if $status == "running" then $base + {started_at: $now} else $base end)
+                       | (if ($status == "done" or $status == "failed") then . + {ended_at: $now, exit_code: $exit_code} else . end)]
+              end
+          )
+        ')
+    _atomic_write "$updated"
+}
+
 cycle_state_set_agent() {
     local agent="${1:?agent required}"
     local worktree="${2:-}"
@@ -290,11 +383,13 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         prune-expired-failures)  cycle_state_prune_expired_failures "$@" ;;
         set-parallel-workers)    cycle_state_set_parallel_workers "$@" ;;
         clear-parallel-workers)  cycle_state_clear_parallel_workers ;;
+        init-workers)            cycle_state_init_workers "$@" ;;
+        set-worker-status)       cycle_state_set_worker_status "$@" ;;
         clear)                   cycle_state_clear ;;
         get)                     cycle_state_get "$@" ;;
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|prune-expired-failures|clear|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

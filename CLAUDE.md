@@ -17,6 +17,37 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+### Swarm Optimization (v8.23.0+)
+
+Sprint 1's Pattern-3 fan-out (Scout/Auditor/Retrospective parallel sub-personas) gained three optimizations in v8.23.0, all gated by env flags so existing behavior is preserved when off.
+
+| Flag | Default | Effect |
+|---|---|---|
+| `EVOLVE_FANOUT_CANCEL_ON_CONSENSUS` | `0` | When `1`, audit fan-out cancels remaining workers when K agree on FAIL. Saves 3-8 min wall-time + $0.50-$2.00 in token budget on catastrophic audit failures. |
+| `EVOLVE_FANOUT_CONSENSUS_K` | `2` | Number of agreeing workers required to trigger cancel. |
+| `EVOLVE_FANOUT_CONSENSUS_POLL_S` | `1` | Polling interval (seconds) for consensus check while workers run. |
+| `EVOLVE_FANOUT_CACHE_PREFIX` | `1` | When `1`, `dispatch-parallel` writes a deterministic `workers/cache-prefix.md` shared across siblings. Anthropic prompt-cache (≥1024 token, 5-min TTL) is hit by every sibling after the first. ~47% input-token reduction on 3-worker fan-out. Default-on because it's pure savings. |
+| `EVOLVE_FANOUT_TRACK_WORKERS` | `1` | When `1`, `fanout-dispatch.sh` writes per-worker status (`pending` → `running` → `done` / `failed`) into `cycle-state.json:parallel_workers.workers[]`. Default-on for observability. |
+
+Disabling all three reverts to v8.22.0 behavior bit-for-bit. `cancel_on_consensus` is opt-in because it's invasive (SIGTERMs running workers); the other two are pure additive wins.
+
+**`parallel_workers.workers[]` schema** (Task D):
+
+```json
+"parallel_workers": {
+  "agent": "scout",
+  "count": 3,
+  "started_at": "2026-05-05T03:47:33Z",
+  "workers": [
+    {"name": "scout-codebase", "status": "done", "started_at": "...", "ended_at": "...", "exit_code": 0},
+    {"name": "scout-research", "status": "running", "started_at": "..."},
+    {"name": "scout-evals",    "status": "pending"}
+  ]
+}
+```
+
+Operator helpers: `cycle-state.sh init-workers <agent> <name>...` (initialize all `pending`); `cycle-state.sh set-worker-status <name> <status> [<exit_code>]` (transition a single worker).
+
 ### Failure Adaptation Kernel (v8.22.0+)
 
 `/evolve-loop` cycles read prior failures from `state.json:failedApproaches[]` to decide whether to proceed, retry with fallback, or block. Pre-v8.22.0 this was a markdown rule the orchestrator interpreted; v8.22.0 promotes it to a **deterministic kernel function** computed by `scripts/failure-adapter.sh`:

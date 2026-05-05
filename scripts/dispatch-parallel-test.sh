@@ -108,7 +108,10 @@ else
     sed 's/^/      /' "$WS/stderr" | head -10
 fi
 # Each worker should have written its artifact.
-WORKER_COUNT=$(ls -1 "$WS/workspace/cycle-1/workers/"*.md 2>/dev/null | wc -l | tr -d ' ')
+# v8.23.0: count only worker artifacts (scout-codebase.md, scout-research.md, ...).
+# The workers/ dir also holds cache-prefix.md (Task C) which is a shared input,
+# not a per-worker output, so we exclude it from this count.
+WORKER_COUNT=$(ls -1 "$WS/workspace/cycle-1/workers/"*.md 2>/dev/null | grep -v cache-prefix.md | wc -l | tr -d ' ')
 if [ "$WORKER_COUNT" = "3" ]; then
     pass "3 worker artifacts written"
 else
@@ -212,6 +215,65 @@ if grep -q '"workers":\[.*"codebase".*"research".*"evals".*\]' "$WS/ledger.jsonl
     pass "ledger entry references workers"
 else
     fail_ "ledger entry should list/count workers"
+fi
+rm -rf "$WS"
+
+# --- v8.23.0 integration tests (Tasks B + C + D) ----------------------------
+
+# --- Test 6: Task C — cmd_dispatch_parallel writes cache-prefix.md ----------
+header "Test 6: dispatch-parallel writes cache-prefix.md to workers/ dir"
+WS=$(fresh_workspace)
+setup_env "$WS"
+mkdir -p "$WS/workspace/cycle-1"
+EVOLVE_PROFILES_DIR_OVERRIDE="$WS/profiles" \
+EVOLVE_FANOUT_TEST_EXECUTOR="$WS/stub-executor.sh" \
+"$SCRIPT" dispatch-parallel scout 1 "$WS/workspace/cycle-1" >/dev/null 2>&1
+PREFIX="$WS/workspace/cycle-1/workers/cache-prefix.md"
+if [ -f "$PREFIX" ] && [ -s "$PREFIX" ]; then
+    if grep -q "Cache-prefix\|cache-prefix\|Cycle Goal\|Trust Boundary" "$PREFIX"; then
+        pass "cache-prefix.md created with expected sections"
+    else
+        fail_ "cache-prefix.md exists but missing canonical sections"
+    fi
+else
+    fail_ "cache-prefix.md not written"
+fi
+rm -rf "$WS"
+
+# --- Test 7: Task C — cache-prefix.md is byte-identical across runs (idempotent) -
+header "Test 7: cache-prefix.md is deterministic (same cycle/workspace → same SHA)"
+WS=$(fresh_workspace)
+setup_env "$WS"
+mkdir -p "$WS/workspace/cycle-1"
+EVOLVE_PROFILES_DIR_OVERRIDE="$WS/profiles" \
+EVOLVE_FANOUT_TEST_EXECUTOR="$WS/stub-executor.sh" \
+"$SCRIPT" dispatch-parallel scout 1 "$WS/workspace/cycle-1" >/dev/null 2>&1
+SHA1=$(shasum -a 256 "$WS/workspace/cycle-1/workers/cache-prefix.md" 2>/dev/null | awk '{print $1}')
+# Re-run dispatch-parallel; prefix should be regenerated identically.
+EVOLVE_PROFILES_DIR_OVERRIDE="$WS/profiles" \
+EVOLVE_FANOUT_TEST_EXECUTOR="$WS/stub-executor.sh" \
+"$SCRIPT" dispatch-parallel scout 1 "$WS/workspace/cycle-1" >/dev/null 2>&1
+SHA2=$(shasum -a 256 "$WS/workspace/cycle-1/workers/cache-prefix.md" 2>/dev/null | awk '{print $1}')
+if [ -n "$SHA1" ] && [ "$SHA1" = "$SHA2" ]; then
+    pass "cache-prefix bytes deterministic across re-runs"
+else
+    fail_ "expected identical SHAs; got SHA1=$SHA1 SHA2=$SHA2"
+fi
+rm -rf "$WS"
+
+# --- Test 8: Task C — EVOLVE_FANOUT_CACHE_PREFIX=0 disables prefix generation -
+header "Test 8: EVOLVE_FANOUT_CACHE_PREFIX=0 → no cache-prefix.md created"
+WS=$(fresh_workspace)
+setup_env "$WS"
+mkdir -p "$WS/workspace/cycle-1"
+EVOLVE_PROFILES_DIR_OVERRIDE="$WS/profiles" \
+EVOLVE_FANOUT_TEST_EXECUTOR="$WS/stub-executor.sh" \
+EVOLVE_FANOUT_CACHE_PREFIX=0 \
+"$SCRIPT" dispatch-parallel scout 1 "$WS/workspace/cycle-1" >/dev/null 2>&1
+if [ ! -f "$WS/workspace/cycle-1/workers/cache-prefix.md" ]; then
+    pass "cache-prefix disabled → file not created"
+else
+    fail_ "cache-prefix.md should NOT exist when feature disabled"
 fi
 rm -rf "$WS"
 
