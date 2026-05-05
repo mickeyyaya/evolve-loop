@@ -197,6 +197,39 @@ cycle_state_set_agent() {
     _atomic_write "$updated"
 }
 
+# v8.22.0: auto-prune expired entries from state.json:failedApproaches[].
+# Operates on EVOLVE_PROJECT_ROOT/.evolve/state.json (NOT cycle-state.json).
+# Called by record-failure-to-state.sh and the dispatcher's record_failed_approach
+# at write time so the file size stays bounded. failure-adapter.sh also calls
+# this before computing its decision so stale entries can't poison the lookback.
+#
+# An entry is "expired" if its expiresAt timestamp (ISO-8601) is older than now.
+# Entries without expiresAt (legacy) are kept (no false-prune of pre-v8.22 data).
+cycle_state_prune_expired_failures() {
+    local state_file="${1:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
+    [ -f "$state_file" ] || return 0
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] WARN: jq missing; cannot prune-expired" >&2
+        return 0
+    fi
+    local now_s; now_s=$(date -u +%s)
+    local before; before=$(jq '(.failedApproaches // []) | length' "$state_file")
+    local tmp="${state_file}.tmp.$$"
+    jq --argjson now "$now_s" \
+        '.failedApproaches = ((.failedApproaches // []) | map(
+            select(
+                (.expiresAt // "") == "" or
+                (.expiresAt | (try fromdateiso8601 catch ($now + 1))) > $now
+            )
+        ))' "$state_file" > "$tmp" && mv -f "$tmp" "$state_file"
+    local after; after=$(jq '(.failedApproaches // []) | length' "$state_file")
+    local removed=$((before - after))
+    if [ "$removed" -gt 0 ]; then
+        echo "[cycle-state] prune-expired: removed $removed expired failedApproaches entries (before=$before after=$after)" >&2
+    fi
+    return 0
+}
+
 # v8.21.0: privileged-shell sets active_worktree without changing phase.
 # Called by run-cycle.sh after `git worktree add` succeeds. The orchestrator
 # is denied this command at the profile level — only privileged shell context
@@ -254,6 +287,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         advance)                 cycle_state_advance "$@" ;;
         set-agent)               cycle_state_set_agent "$@" ;;
         set-worktree)            cycle_state_set_worktree "$@" ;;
+        prune-expired-failures)  cycle_state_prune_expired_failures "$@" ;;
         set-parallel-workers)    cycle_state_set_parallel_workers "$@" ;;
         clear-parallel-workers)  cycle_state_clear_parallel_workers ;;
         clear)                   cycle_state_clear ;;
@@ -261,6 +295,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|clear|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|prune-expired-failures|clear|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

@@ -154,10 +154,31 @@ build_context() {
         instinct=$(cat "$INSTINCT_SUMMARY" 2>/dev/null || echo "")
     fi
 
-    # Recent failed approaches — orchestrator should avoid these.
+    # v8.22.0: deterministic failure-adapter decision. Replaces the prompt-only
+    # markdown rule the orchestrator used to interpret. The adapter computes the
+    # right action (PROCEED | RETRY-WITH-FALLBACK | BLOCK-CODE | BLOCK-OPERATOR-ACTION)
+    # from non-expired failedApproaches and emits a structured JSON object.
+    # The orchestrator reads this JSON and follows the action verbatim.
+    local adapter_decision=""
+    if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/failure-adapter.sh" ]; then
+        adapter_decision=$(bash "$EVOLVE_PLUGIN_ROOT/scripts/failure-adapter.sh" decide --state "$STATE_FILE" 2>/dev/null || echo '')
+    fi
+
+    # Read-side defense-in-depth: filter failedApproaches by expiresAt before
+    # exposing as recentFailures to the orchestrator. Even if a write-time prune
+    # missed an entry, expired ones never reach the LLM context.
+    local now_s
+    now_s=$(date -u +%s)
     local failed=""
     if [ -f "$STATE_FILE" ]; then
-        failed=$(jq -r '(.failedApproaches // []) | .[-3:] | .[] | "- " + (.summary // .verdict // "unknown")' "$STATE_FILE" 2>/dev/null || echo "")
+        failed=$(jq -r --argjson now "$now_s" '
+            (.failedApproaches // [])
+            | map(select(
+                (.expiresAt // "") == "" or
+                (.expiresAt | (try fromdateiso8601 catch ($now + 1))) > $now
+              ))
+            | .[-3:] | .[] | "- [" + (.classification // "legacy") + "] " + (.summary // .verdict // "unknown")
+        ' "$STATE_FILE" 2>/dev/null || echo "")
     fi
 
     cat <<EOF
@@ -175,10 +196,13 @@ projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts g
 intentRequired: ${EVOLVE_REQUIRE_INTENT:-0} (v8.19.0+: when 1, run intent persona before scout; cycle-state.intent_required is the authoritative source)
 intentArtifactPath: $workspace/intent.md (only present if intent persona has run)
 
+adaptiveFailureDecision (v8.22.0+ — deterministic kernel verdict — FOLLOW VERBATIM):
+$adapter_decision
+
 recentLedgerEntries:
 $ledger_tail
 
-recentFailures:
+recentFailures (non-expired, last 3):
 $failed
 
 instinctSummary:
@@ -186,6 +210,27 @@ $instinct
 
 ---
 EOF
+}
+
+# v8.22.0: Honor failure-adapter's set_env directive at the run-cycle layer.
+# The dispatcher already auto-sets EVOLVE_SANDBOX_FALLBACK_ON_EPERM for nested-
+# claude (defense-in-depth). The adapter's set_env covers the case where the
+# dispatcher path was skipped (direct run-cycle.sh invocation, tests, etc.).
+honor_adapter_set_env() {
+    [ -x "$EVOLVE_PLUGIN_ROOT/scripts/failure-adapter.sh" ] || return 0
+    local decision
+    decision=$(bash "$EVOLVE_PLUGIN_ROOT/scripts/failure-adapter.sh" decide --state "$STATE_FILE" 2>/dev/null || echo '')
+    [ -n "$decision" ] || return 0
+    if command -v jq >/dev/null 2>&1; then
+        # Iterate set_env keys and export each.
+        while IFS=$'\t' read -r k v; do
+            [ -n "$k" ] || continue
+            if [ -z "${!k:-}" ]; then
+                log "adapter: setting $k=$v"
+                export "$k=$v"
+            fi
+        done < <(echo "$decision" | jq -r '(.set_env // {}) | to_entries[] | "\(.key)\t\(.value)"' 2>/dev/null)
+    fi
 }
 
 # ---- Setup workspace -------------------------------------------------------
@@ -262,6 +307,11 @@ cleanup() {
     exit $rc
 }
 trap cleanup EXIT INT TERM
+
+# v8.22.0: honor failure-adapter's set_env directive (e.g., auto-enable
+# EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 when prior infra-transient failures are
+# present and the dispatcher path didn't already set it).
+honor_adapter_set_env
 
 # ---- Build prompt ----------------------------------------------------------
 

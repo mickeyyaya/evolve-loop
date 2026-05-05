@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.22.0] - 2026-05-05
+
+Architectural overhaul of the adaptive-failure system. Closes 6 structural defects exposed when v8.21.0's worktree fix didn't unblock `/loop` invocations from inside Claude Code: the actual blocker was nested sandbox-exec EPERM at sub-claude *startup* (orthogonal to the worktree fix at the *builder* phase), and the orchestrator's "3+ failures of any kind → BLOCKED-SYSTEMIC" prompt rule conflated transient infra issues with code-quality evidence — leaving the loop permanently stuck after a few EPERM retries.
+
+### Architectural invariant
+
+> **Failure adaptation is a deterministic kernel function, not a prompt rule.** Given a structured failure history with retention policy and a richer classification taxonomy, `scripts/failure-adapter.sh` computes the next action — `PROCEED | RETRY-WITH-FALLBACK | BLOCK-CODE | BLOCK-OPERATOR-ACTION` — which the orchestrator consumes verbatim. Same input → same output, unit-testable, phase-gate-enforceable.
+
+### Added
+
+- `scripts/detect-nested-claude.sh` — single-purpose probe for `CLAUDECODE` / `CLAUDE_CODE_*` env-var family. Returns `nested` or `standalone`.
+- `scripts/evolve-loop-dispatch.sh` auto-detection: when nested-claude is detected, auto-enables `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` with WARN log. Defense-in-depth alongside `SKILL.md`'s slash-command auto-set — direct CLI dispatcher invocations now also work.
+- `scripts/failure-classifications.sh` (sourced library) — 7-value structured classification taxonomy with per-class age-out windows + severity tier + retry policy. Helpers: `failure_age_out_seconds`, `failure_severity_of`, `failure_retry_policy`, `failure_normalize_legacy`, `failure_compute_expires_at`.
+- `scripts/failure-adapter.sh decide` — deterministic decision kernel emitting JSON `{action, reason, remediation, set_env, skip_phases, verdict_for_block, evidence}`. Reads non-expired failedApproaches, applies 7 priority-ordered rules, returns the canonical action for the orchestrator to follow verbatim.
+- `scripts/failure-adapter-test.sh` — 12 unit tests covering each decision rule + edge cases (expired entries, legacy null-classification, priority ordering).
+- `scripts/state-prune.sh` — operator utility: `--classification`, `--age <duration>`, `--cycle <N>`, `--all --yes`, `--dry-run`. Atomic mv-of-temp.
+- `scripts/state-prune-test.sh` — 7 unit tests covering each mode + edge cases (refuse `--all` without `--yes`, missing state file, dry-run preserves SHA).
+- `scripts/cycle-state.sh prune-expired-failures` — programmatic auto-aging-out subcommand. Called automatically by failure-adapter and the dispatcher's record_failed_approach.
+
+### Changed
+
+- `scripts/cli_adapters/claude.sh` — un-deprecates `EVOLVE_SANDBOX_FALLBACK_ON_EPERM`. The v8.21 deprecation was scope-mismatched (worktree fix targets builder writes; flag targets sub-claude startup — orthogonal layers). Updated WARN messaging to reflect the dual-context model.
+- `scripts/record-failure-to-state.sh` — emits structured classification + `expiresAt` timestamp + FIFO cap (50 entries). Backward-compat: existing `verdict` field preserved.
+- `scripts/evolve-loop-dispatch.sh:record_failed_approach` — same: classification + expiresAt + FIFO cap. Legacy classifications (`infrastructure`, `audit-fail`, `build-fail`) auto-mapped to v8.22 taxonomy via `failure_normalize_legacy`.
+- `scripts/run-cycle.sh` — `build_context` invokes failure-adapter and injects `adaptiveFailureDecision` JSON into the orchestrator's context block. Also filters `recentFailures` by `expiresAt` at read time (read-side defense in depth). New `honor_adapter_set_env` exports the adapter's `set_env` directives before spawning the orchestrator.
+- `agents/evolve-orchestrator.md` — replaced the markdown decision table with a single rule: "read the adapter JSON's `action` field and follow it verbatim." Added "Operator Action Required block template" section. ~50 lines simplified to ~30.
+- `.evolve/profiles/orchestrator.json` — added `Bash(failure-adapter.sh decide:*)` to allowed_tools.
+- `CLAUDE.md` — un-deprecated `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` in rule #6 with dual-context explanation. Added "Failure Adaptation Kernel (v8.22.0+)" subsection covering taxonomy, retention, decision rules, and operator utilities.
+
+### Reverted
+
+- v8.21's deprecation of `EVOLVE_SANDBOX_FALLBACK_ON_EPERM`. The flag is now permanent — required for nested-claude (the primary use case for `/evolve-loop`). Future removal would require a non-sandbox-based isolation primitive on Darwin.
+
+### Fixed
+
+- **DEFECT-1 (CRITICAL)**: `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` deprecated prematurely in v8.21. Now un-deprecated with auto-enable for nested-claude.
+- **DEFECT-2 (HIGH)**: Nested-sandbox auto-detection only in SKILL.md. Direct dispatcher invocations bypassed the auto-set. Now `evolve-loop-dispatch.sh` also auto-detects via `detect-nested-claude.sh`.
+- **DEFECT-3 (HIGH)**: Failure classification was free-form. Now a structured 7-value enum with per-class metadata.
+- **DEFECT-4 (HIGH)**: `failedApproaches` had no retention policy. Now: per-classification age-out + FIFO cap of 50. Read-side filter at `run-cycle.sh:build_context` excludes expired entries from orchestrator context.
+- **DEFECT-5 (HIGH)**: Blocking decision was prompt-only ("3+ of any kind → BLOCKED-SYSTEMIC"). Now deterministic shell + jq, separately scoring code and infrastructure failures, with priority-ordered rules and unit tests.
+- **DEFECT-6 (MEDIUM)**: No operator-action surface. New "Operator Action Required" block template; `state-prune.sh` provides the canonical recovery utility.
+
+### Migration
+
+Pre-v8.22 entries with free-form `classification` ("infrastructure", "audit-fail", "build-fail") or `verdict` ("FAIL", "BLOCKED-SYSTEMIC") are auto-mapped to the v8.22 taxonomy on read by `failure_normalize_legacy`. No manual migration required. Entries lacking `expiresAt` are kept indefinitely (no false-prune of legacy data) until you choose to remove them via `state-prune.sh`.
+
+---
+
 ## [8.21.1] - 2026-05-05
 
 Test infrastructure cleanup. Closes 3 long-standing pre-existing test failures uncovered during v8.21.0's regression posture review. Zero production-code changes — only test fixtures, drift classification, and one profile entry.

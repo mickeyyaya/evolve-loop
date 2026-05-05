@@ -74,6 +74,8 @@ else
         "scripts/aggregator-test.sh"
         "scripts/dispatch-parallel-test.sh"
         "scripts/swarm-architecture-test.sh"
+        "scripts/failure-adapter-test.sh"
+        "scripts/state-prune-test.sh"
     )
 fi
 

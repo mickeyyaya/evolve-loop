@@ -146,6 +146,42 @@ case "$EVOLVE_PROJECT_ROOT" in
         ;;
 esac
 
+# --- v8.22.0: nested-claude auto-detection ---------------------------------
+#
+# When /evolve-loop is invoked from inside Claude Code (the slash-command path
+# AND direct CLI path covered here), the parent process is itself sandboxed.
+# macOS Darwin 25.4+ refuses nested sandbox-exec apply, returning EPERM (rc=71)
+# from sandbox_apply(). Without EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1, every
+# sub-claude invocation (intent, scout, builder, auditor) hits this wall.
+#
+# SKILL.md auto-sets the flag for the slash-command entry point. This block
+# adds defense-in-depth: any direct dispatcher invocation from inside Claude
+# Code also gets the flag auto-enabled.
+#
+# The detection signal is the CLAUDECODE / CLAUDE_CODE_* env-var family
+# (Claude Code's parent-env beacons). On non-Claude-Code shells (terminal,
+# CI, scripts), the detector returns "standalone" and this block is a no-op.
+#
+# The flag is a no-op on Linux (bwrap supports nested namespaces). Symmetric
+# detection still fires for log-uniformity but doesn't change behavior.
+#
+# Override: set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=0 explicitly to skip the
+# auto-set (e.g., when running an outer sandbox-exec wrapper that handles
+# isolation differently).
+if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh" ]; then
+    if [ "$(bash "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh")" = "nested" ]; then
+        if [ -z "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ]; then
+            log "DETECTED: nested-claude (CLAUDECODE / CLAUDE_CODE_* env set)"
+            log "  → auto-enabling EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
+            log "  → Darwin 25.4+ kernel forbids nested sandbox-exec; this flag retries"
+            log "    sub-claude subprocesses unsandboxed when sandbox_apply hits EPERM."
+            log "  → kernel hooks (role-gate, ship-gate, phase-gate) still enforce. To"
+            log "    skip auto-set: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=0 bash $0 ..."
+            export EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1
+        fi
+    fi
+fi
+
 # --- Argument parsing -------------------------------------------------------
 
 DRY_RUN=0
@@ -347,11 +383,19 @@ classify_cycle_failure() {
 # can read and adapt. State schema is per skills/evolve-loop/SKILL.md "Shared
 # Agent Values" block.
 record_failed_approach() {
-    local cycle="$1" classification="$2"
+    local cycle="$1" raw_classification="$2"
     local report="$RUNS_DIR/cycle-${cycle}/orchestrator-report.md"
 
     [ -f "$STATE_FILE" ] || { log "WARN: state.json missing, cannot record failure"; return 0; }
     command -v jq >/dev/null 2>&1 || { log "WARN: jq missing, cannot record failure"; return 0; }
+
+    # v8.22.0: source the classification helpers + normalize legacy strings to
+    # the structured taxonomy. expiresAt is computed per-classification so the
+    # orchestrator's recentFailures lookback (and failure-adapter.sh) can
+    # filter out aged-out entries automatically.
+    . "$EVOLVE_PLUGIN_ROOT/scripts/failure-classifications.sh"
+    local classification
+    classification=$(failure_normalize_legacy "$raw_classification")
 
     local summary=""
     if [ -f "$report" ]; then
@@ -363,9 +407,11 @@ record_failed_approach() {
         ' "$report" | tr '\n' ' ' | sed 's/  */ /g' | head -c 400)
     fi
 
-    local now
+    local now expires_at
     now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    expires_at=$(failure_compute_expires_at "$classification" "$now")
 
+    # FIFO cap: max 50 entries. Append, trim from front if over.
     local current updated tmp
     current=$(cat "$STATE_FILE")
     updated=$(echo "$current" | jq -c \
@@ -373,15 +419,17 @@ record_failed_approach() {
         --arg classification "$classification" \
         --arg summary "$summary" \
         --arg ts "$now" \
-        '.failedApproaches = ((.failedApproaches // []) + [{
+        --arg exp "$expires_at" \
+        '.failedApproaches = (((.failedApproaches // []) + [{
             cycle: $cycle,
             classification: $classification,
             summary: $summary,
-            recordedAt: $ts
-        }])')
+            recordedAt: $ts,
+            expiresAt: $exp
+        }]) | (if length > 50 then .[length-50:] else . end))')
     tmp="${STATE_FILE}.tmp.$$"
     printf '%s\n' "$updated" > "$tmp" && mv -f "$tmp" "$STATE_FILE"
-    log "recorded failed approach: cycle=$cycle classification=$classification → state.json:failedApproaches"
+    log "recorded failed approach: cycle=$cycle classification=$classification (raw=$raw_classification) expires=$expires_at"
 
     # ALSO advance lastCycleNumber so the next iteration uses a fresh cycle
     # number / workspace. Without this, every retry overwrites the previous

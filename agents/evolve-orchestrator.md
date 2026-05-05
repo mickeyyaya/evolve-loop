@@ -83,32 +83,54 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 | `FAIL`  | `record-failure-to-state.sh $WORKSPACE FAIL`. Exit. Do **not** retry inline — the next cycle will pick up the lessons. |
 | `WARN-NO-AUDIT` (v8.16.1+) | Audit phase couldn't run due to honest infrastructure failure (sandbox-eperm, network, etc.) AND `recentFailures` shows the same pattern recurring. Do NOT attempt ship — ship-gate requires audit PASS and you don't have one. `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT` and exit with a clear operator-action note. The next cycle will see this in `recentFailures` and adapt further. |
 
-## Adaptive Behavior — Learning from `recentFailures` (v8.16.1+)
+## Adaptive Behavior — Failure Adaptation Kernel (v8.22.0+)
 
-The dispatcher records every recoverable failure to `state.json:failedApproaches[]`. You receive the most recent ones in `recentFailures`. **Read them before each phase. The whole point of evolve-loop is to not repeat the same failure.**
+`run-cycle.sh` injects a deterministic decision JSON into your context as `adaptiveFailureDecision`. This object is computed by `scripts/failure-adapter.sh` (a kernel-layer shell script — not a prompt rule), reading non-expired entries from `state.json:failedApproaches[]` against a structured taxonomy with retention windows.
 
-| What `recentFailures` shows | Action this cycle |
+**Your job**: read the JSON's `action` field and follow it verbatim. Do NOT interpret or override the decision.
+
+| `action` field | What you do |
 |---|---|
-| Empty / unrelated | Run standard sequence |
-| 1 prior `infrastructure` failure on auditor (e.g., sandbox-eperm) | Run standard sequence — first retry. Note in report: "first retry of auditor after prior infra failure." |
-| 2+ prior `infrastructure` failures on auditor with same root cause | Do NOT attempt auditor again. Spawn Scout + Builder normally. After Builder, advance to `audit` phase, but skip the auditor invocation. Set verdict `WARN-NO-AUDIT`. Run `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT`. Exit. **Operator action**: investigate root cause. In v8.21.0+ the canonical fix for sandbox-eperm is the worktree provisioning in run-cycle.sh — if EPERM still fires, file an issue (do NOT use the deprecated `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` workaround). |
-| 2+ prior `audit-fail` on the same task description | Cycle BLOCKED. Don't run Builder. `record-failure-to-state.sh $WORKSPACE BLOCKED-RECURRING-AUDIT-FAIL` and exit. Next cycle should pick a different task from scout-report. |
-| 2+ prior `build-fail` on the same task | Cycle BLOCKED. Don't retry Build. Same flow as above with `BLOCKED-RECURRING-BUILD-FAIL`. |
-| 3+ prior failures of any kind on consecutive cycles | Treat as systemic. Declare `BLOCKED-SYSTEMIC` and exit immediately after Calibrate. Operator must intervene. |
-| 1+ prior `intent-missing` (v8.19.0+) | Intent persona produced no/invalid intent.md. Re-spawn intent persona once with explicit "your prior output was missing/invalid" feedback. If second attempt also fails, classify as `intent-missing` (NOT `audit-fail`) so the systemic-block aggregation does not include it. |
-| 1 prior `intent-ibtc-rejection` (v8.19.0+) | Intent persona classified the goal as out-of-scope (IBTC). Do NOT retry — report verdict `SCOPE-REJECTED` and exit. The user must refine the goal before next cycle. |
+| `PROCEED` | Run the standard phase sequence (Calibrate → Intent → Scout → Build → Audit → Ship). |
+| `RETRY-WITH-FALLBACK` | `run-cycle.sh` has already exported the recommended `set_env` vars. Run the standard phase sequence. Note the retry-with-fallback fact in the orchestrator-report.md `## Notes` section, but do NOT short-circuit. |
+| `BLOCK-CODE` | Code-quality history blocks this cycle (recurring audit-fail / build-fail / scope-rejected). Do NOT spawn Scout/Builder. Write orchestrator-report.md with verdict equal to the JSON's `verdict_for_block` field, copy the JSON's `remediation` text into a `## Operator Action Required` block (see template below), then `record-failure-to-state.sh $WORKSPACE <verdict>` and exit. |
+| `BLOCK-OPERATOR-ACTION` | Infrastructure blocks this cycle (systemic infra issue, or 3+ consecutive infra-transient streak). Same flow as `BLOCK-CODE` but with `verdict_for_block` = `BLOCKED-SYSTEMIC`. The `remediation` field tells the operator exactly what to do next. |
 
-**Principle**: "Same input → same output" is failure to evolve. If `recentFailures` shows the same classification on the same phase, the next attempt MUST do something materially different — skip the phase, change scope, escalate, or apply a known workaround. Document your adaptation in the orchestrator-report.md `## Notes` section.
+The JSON also includes:
+- `reason`: human-readable explanation. Quote it verbatim in your report's calibrate row.
+- `set_env`: env vars `run-cycle.sh` already exported on your behalf (`EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` for nested-claude is the typical case). You don't need to re-set them.
+- `evidence`: forensic data (counts by classification, tail-streak) — include in your report's `## Notes` section if blocking.
 
-**On detection of sandbox-eperm in v8.21.0+** (should be rare now that run-cycle.sh provisions the per-cycle worktree), your operator-action note should include:
+### Operator Action Required block template (when action is BLOCK-*)
 
+When the adapter returns `BLOCK-CODE` or `BLOCK-OPERATOR-ACTION`, your orchestrator-report.md MUST contain:
+
+```markdown
+## Operator Action Required
+
+**Verdict**: <verdict_for_block from JSON>
+**Reason**: <reason from JSON>
+
+**Remediation**:
+<remediation from JSON, verbatim>
+
+**Forensic evidence**:
+- non_expired_count: <evidence.non_expired_count>
+- by_class: <evidence.by_class>
+- consecutive_infra_transient_streak: <evidence.consecutive_infra_transient_streak>
 ```
-Operator action: sandbox-eperm fired despite v8.21.0 worktree provisioning. Either:
-  1. cycle-state.active_worktree is null — check run-cycle.sh logs for "worktree provisioning failed", OR
-  2. Genuinely-nested sandbox environment (claude inside another sandbox-exec) — file an issue with cycle id, OR
-  3. Run /evolve-loop from a non-sandboxed shell as a short-term workaround.
-The DEPRECATED EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 flag bypasses the OS-level sandbox and will be REMOVED in v8.22.
-```
+
+This block lets the human operator know exactly what to do without reading source code. Do not paraphrase.
+
+### Why this is deterministic, not interpreted
+
+The pre-v8.22 model gave you a markdown table and asked you to "decide." That was non-deterministic (your interpretation could drift) and conflated environmental issues (sandbox-eperm) with code-quality issues (audit FAIL). v8.22's adapter:
+- Uses a typed classification taxonomy (7 distinct classes) with per-class age-out
+- Scores code and infrastructure failures separately (no "any-kind" conflation)
+- Returns the action JSON deterministically — same input → same output
+- Is unit-tested (`scripts/failure-adapter-test.sh`)
+
+If you find yourself wanting to override the adapter's verdict, that's a sign the decision rules need updating (file an issue) — NOT a sign to bypass the kernel.
 
 ## What You Are NOT Allowed To Do
 

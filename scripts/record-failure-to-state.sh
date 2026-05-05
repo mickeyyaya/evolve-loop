@@ -149,34 +149,44 @@ fi
 
 NOW_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Append the entry. Schema (intentionally minimal — full retrospective happens
-# on batch, this is just the raw fact-record):
-#   { ts, cycle, verdict, auditReportPath, auditReportSha256, gitHead, treeStateSha,
-#     defects: [{severity, title}], retrospected: false }
+# v8.22.0: source classification helpers and derive structured classification
+# + expiresAt from the verdict. Backward-compat: existing readers that look at
+# `verdict` still see it; new readers (failure-adapter.sh) use `classification`.
+. "$EVOLVE_PLUGIN_ROOT/scripts/failure-classifications.sh"
+CLASSIFICATION=$(failure_normalize_legacy "$VERDICT")
+EXPIRES_AT=$(failure_compute_expires_at "$CLASSIFICATION" "$NOW_TS")
+
+# Append the entry. v8.22 schema adds: classification, expiresAt. Existing
+# fields preserved for backward compat. FIFO cap (50) applied at append time.
 TMP=$(mktemp)
 jq --arg ts "$NOW_TS" \
    --argjson cycle "$CYCLE" \
    --arg verdict "$VERDICT" \
+   --arg classification "$CLASSIFICATION" \
+   --arg expires_at "$EXPIRES_AT" \
    --arg path "$AUDIT_REPORT" \
    --arg sha "$REPORT_SHA" \
    --arg gh "$GIT_HEAD" \
    --arg ts2 "$TREE_SHA" \
    --argjson defects "$DEFECTS_JSON" \
-   '.failedApproaches += [{
+   '.failedApproaches = (((.failedApproaches // []) + [{
        ts: $ts,
        cycle: $cycle,
        verdict: $verdict,
+       classification: $classification,
+       recordedAt: $ts,
+       expiresAt: $expires_at,
        auditReportPath: $path,
        auditReportSha256: $sha,
        gitHead: $gh,
        treeStateSha: $ts2,
        defects: $defects,
        retrospected: false
-   }]' "$STATE" > "$TMP"
+   }]) | (if length > 50 then .[length-50:] else . end))' "$STATE" > "$TMP"
 mv "$TMP" "$STATE"
 
 DEFECT_COUNT=$(echo "$DEFECTS_JSON" | jq 'length')
-log "OK: recorded $VERDICT for cycle $CYCLE ($DEFECT_COUNT defects); state.json.failedApproaches[-1] now contains the entry"
+log "OK: recorded $VERDICT (classification=$CLASSIFICATION, expires=$EXPIRES_AT) for cycle $CYCLE ($DEFECT_COUNT defects)"
 log "to retrospect later: bash scripts/subagent-run.sh retrospective <cycle> <workspace> on this entry"
 
 exit 0

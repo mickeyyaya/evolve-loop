@@ -11,11 +11,54 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 3. **Run phase-gate.sh at every transition** — the deterministic phase gate script (`scripts/phase-gate.sh`) must execute at every phase boundary. This is non-negotiable even in bypass mode. Bypass permissions means "don't ask the user" — it does NOT mean "skip integrity checks."
 4. **Never fabricate cycles** — claiming cycle numbers without doing work is a CRITICAL violation. Every cycle number must correspond to real Scout → Build → Audit → Ship → Learn execution.
 5. **Phase agents MUST be invoked via `scripts/subagent-run.sh`** — the in-process `Agent` tool is forbidden in production cycles. v8.21.0 made this **structurally enforced**: `Agent` is denied in `orchestrator.json:disallowed_tools` AND blocked at the kernel layer by `phase-gate-precondition.sh` whenever `cycle-state.json` exists. There is no bypass. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` (least-privilege isolation), generates a per-invocation challenge token, and writes a tamper-evident ledger entry that `phase-gate.sh check_subagent_ledger_match` verifies against the on-disk artifact's SHA256.
-6. **OS-level sandboxing wraps every claude subprocess.** When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), the runner wraps `claude -p` in `sandbox-exec` (macOS) or `bwrap` (Linux). Anthropic's Secure Deployment Guide states `--allowedTools` is "a permission gate, not a sandbox" — so kernel-layer enforcement is non-negotiable in production. Auditor and Evaluator profiles run with `read_only_repo: true` (read-only mount of the repo). The `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` flag (sandbox bypass on Darwin nested-sandbox EPERM) is **DEPRECATED in v8.21 and will be REMOVED in v8.22.0** — its purpose is obviated by the v8.21.0 worktree provisioning fix. Engaging it now emits loud WARN logs.
+6. **OS-level sandboxing wraps every claude subprocess.** When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), the runner wraps `claude -p` in `sandbox-exec` (macOS) or `bwrap` (Linux). Anthropic's Secure Deployment Guide states `--allowedTools` is "a permission gate, not a sandbox" — so kernel-layer enforcement is non-negotiable in production. Auditor and Evaluator profiles run with `read_only_repo: true` (read-only mount of the repo). **`EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` is REQUIRED for nested-claude scenarios** (the primary use case for `/evolve-loop`, where the slash command runs from inside Claude Code's own sandbox). On Darwin 25.4+, `sandbox_apply()` returns EPERM when the parent process is itself sandboxed — the flag instructs `claude.sh` to retry the inner subagent unsandboxed, while kernel hooks (role-gate, ship-gate, phase-gate-precondition) remain active and enforce trust boundaries structurally. **`scripts/evolve-loop-dispatch.sh` auto-enables the flag** via `scripts/detect-nested-claude.sh` whenever `CLAUDECODE` / `CLAUDE_CODE_*` env vars are present (defense-in-depth alongside `SKILL.md`). The v8.21 deprecation of this flag was reverted in v8.22.0 after evidence showed the worktree-provisioning fix and the EPERM fallback target *orthogonal* layers (builder writes vs sub-claude startup).
 7. **Mutation testing pre-flight on every eval.** `phase-gate.sh gate_discover_to_build` runs `scripts/mutate-eval.sh` against each new eval definition. If kill rate < 0.8, eval is flagged as tautological. Rollout phase 1: WARN-only logging. Rollout phase 2 (after one verification cycle): fail the gate.
 8. **Adversarial Auditor mode is default-on.** The runner prepends an "ADVERSARIAL AUDIT MODE" framing to the auditor's prompt that requires positive evidence for PASS verdicts. Auditor model defaults to Opus (different family from Builder's Sonnet) to break same-model-judge sycophancy. Disable only with `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps.
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
+
+### Failure Adaptation Kernel (v8.22.0+)
+
+`/evolve-loop` cycles read prior failures from `state.json:failedApproaches[]` to decide whether to proceed, retry with fallback, or block. Pre-v8.22.0 this was a markdown rule the orchestrator interpreted; v8.22.0 promotes it to a **deterministic kernel function** computed by `scripts/failure-adapter.sh`:
+
+```bash
+bash scripts/failure-adapter.sh decide --state .evolve/state.json
+# emits JSON: {action, reason, remediation, set_env, skip_phases, verdict_for_block, evidence}
+```
+
+**Structured taxonomy** (7 classifications, each with severity tier + age-out window + retry policy — defined in `scripts/failure-classifications.sh`):
+
+| Classification | Age-out | Severity |
+|---|---|---|
+| `infrastructure-transient` (sandbox-eperm, network blip, rate-limit) | 1 day | low |
+| `infrastructure-systemic` (host broken, tooling missing, claude-cli down) | 7 days | high |
+| `intent-malformed` (intent persona output invalid) | 1 day | low |
+| `intent-rejected` (IBTC out-of-scope) | never | terminal |
+| `code-build-fail` (builder couldn't compile/test) | 30 days | high |
+| `code-audit-fail` (auditor returned FAIL) | 30 days | high |
+| `human-abort` (operator killed run) | 1 hour | low |
+
+**Retention policy**: each entry has an `expiresAt` timestamp. Both write paths (`record-failure-to-state.sh` and the dispatcher's `record_failed_approach`) compute `expiresAt = recordedAt + age-out-window` and apply a FIFO cap (max 50 entries). The adapter and read-side filter exclude expired entries automatically.
+
+**Decision rules** (priority order):
+1. `intent-rejected` (any non-expired) → `BLOCK-CODE` / `SCOPE-REJECTED` (operator must refine goal)
+2. `infrastructure-systemic` (any non-expired) → `BLOCK-OPERATOR-ACTION` / `BLOCKED-SYSTEMIC`
+3. 2+ `code-audit-fail` → `BLOCK-CODE` / `BLOCKED-RECURRING-AUDIT-FAIL`
+4. 2+ `code-build-fail` → `BLOCK-CODE` / `BLOCKED-RECURRING-BUILD-FAIL`
+5. 3+ consecutive `infrastructure-transient` (tail streak) → `BLOCK-OPERATOR-ACTION` / `BLOCKED-SYSTEMIC`
+6. 1+ `infrastructure-transient` (anywhere) → `RETRY-WITH-FALLBACK` (auto-set `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1`)
+7. otherwise → `PROCEED`
+
+Code and infrastructure failures are **scored separately** — 17 infra failures + 0 code failures still yields `PROCEED` (with fallback) for code work. No more "any-kind" conflation.
+
+**Operator utilities**:
+- `bash scripts/state-prune.sh --classification <name>` — drop entries by classification
+- `bash scripts/state-prune.sh --age 7d` — drop entries older than 7 days
+- `bash scripts/state-prune.sh --cycle <N>` — drop a specific cycle's entry
+- `bash scripts/state-prune.sh --all --yes` — wipe entirely (with confirmation)
+- `bash scripts/cycle-state.sh prune-expired-failures` — programmatic auto-aging-out
+
+The orchestrator agent (`agents/evolve-orchestrator.md`) reads the adapter's JSON verbatim and follows the action — it no longer interprets adaptation rules from prose. When the action is `BLOCK-*`, the orchestrator-report.md must contain a structured "## Operator Action Required" block with the remediation field embedded so humans know exactly what to do.
 
 ### Worktree Provisioning Contract (v8.21.0+)
 

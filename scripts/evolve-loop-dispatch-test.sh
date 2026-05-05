@@ -449,10 +449,14 @@ fi
 if jq -e '.failedApproaches | length >= 1' "$state" >/dev/null 2>&1; then
     pass "state.json:failedApproaches has new entry"
     fa=$(jq -r '.failedApproaches[0].classification' "$state")
-    if [ "$fa" = "infrastructure" ]; then
-        pass "failedApproaches[0].classification=infrastructure"
+    # v8.22.0: classify_cycle_failure returns the legacy "infrastructure" string,
+    # but record_failed_approach normalizes it to "infrastructure-transient" via
+    # failure_normalize_legacy before writing to state.json. Both forms are
+    # acceptable for backward compat — accept either.
+    if [ "$fa" = "infrastructure" ] || [ "$fa" = "infrastructure-transient" ]; then
+        pass "failedApproaches[0].classification=$fa (v8.22 normalized)"
     else
-        fail_ "expected classification=infrastructure, got '$fa'"
+        fail_ "expected classification=infrastructure or infrastructure-transient, got '$fa'"
     fi
 else
     fail_ "state.json:failedApproaches missing entry"

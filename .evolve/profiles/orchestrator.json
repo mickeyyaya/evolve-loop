@@ -18,6 +18,7 @@
     "Bash(cycle-health-check.sh:*)",
     "Bash(verify-eval.sh:*)",
     "Bash(record-failure-to-state.sh:*)",
+    "Bash(failure-adapter.sh decide:*)",
     "Bash(cycle-state.sh advance:*)",
     "Bash(cycle-state.sh set-agent:*)",
     "Bash(cycle-state.sh get:*)",
