@@ -448,6 +448,17 @@ if [ "$EXIT_CODE" -ne 0 ] && [ -s "$STDERR_LOG" ]; then
         echo "[claude-adapter] OPERATOR ACTION: if rc=71 (sandbox-exec EPERM), set EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1." >&2
         echo "[claude-adapter] OPERATOR ACTION: if rc=1 with 'EACCES' on a worktree path, set EVOLVE_SKIP_WORKTREE=1 (v8.23.4+)." >&2
         echo "[claude-adapter]                  caveat: skipping worktree disables isolation; builder edits land in main repo." >&2
+        # v8.24.0: copy-paste rerun command. The dispatcher already auto-sets
+        # both flags when nested-claude is detected, but a manual recovery from
+        # a bare `bash run-cycle.sh` invocation needs an explicit rerun line.
+        # Note: $EVOLVE_REINVOKE_CMD is exported by evolve-loop-dispatch.sh on
+        # nested-claude detection (v8.24.0). Falls back to a generic hint.
+        echo "[claude-adapter] RECOVERY (copy-paste):" >&2
+        if [ -n "${EVOLVE_REINVOKE_CMD:-}" ]; then
+            echo "    EVOLVE_SKIP_WORKTREE=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 $EVOLVE_REINVOKE_CMD" >&2
+        else
+            echo "    EVOLVE_SKIP_WORKTREE=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 <re-run last command>" >&2
+        fi
     fi
 fi
 

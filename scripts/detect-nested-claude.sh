@@ -13,8 +13,14 @@
 # This script provides the canonical detection: returns "nested" if any
 # Claude Code parent-env signal is present, "standalone" otherwise. The
 # dispatcher (scripts/evolve-loop-dispatch.sh) reads this at startup and
-# auto-enables EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 when nested — defense in
-# depth alongside SKILL.md's slash-command auto-set.
+# auto-enables BOTH:
+#   - EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (since v8.22.0) — handles the
+#     sandbox-exec startup EPERM (rc=71, Point A in three-tier model)
+#   - EVOLVE_SKIP_WORKTREE=1 (since v8.24.0) — handles the worktree-subdir
+#     execution-time EPERM that the startup fallback can't reach (Point C).
+# Both are Tier-2 (OS isolation) auto-relaxations; Tier-1 kernel hooks
+# (phase-gate ledger SHA, role-gate, ship-gate) remain fully enforced.
+# Operator can opt back in to either by setting the var to 0 explicitly.
 #
 # Usage:
 #   bash scripts/detect-nested-claude.sh

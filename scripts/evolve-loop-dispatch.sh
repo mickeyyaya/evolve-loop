@@ -170,8 +170,10 @@ esac
 # isolation differently).
 if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh" ]; then
     if [ "$(bash "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh")" = "nested" ]; then
+        nested_announced=0
         if [ -z "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ]; then
             log "DETECTED: nested-claude (CLAUDECODE / CLAUDE_CODE_* env set)"
+            nested_announced=1
             log "  → auto-enabling EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"
             log "  → Darwin 25.4+ kernel forbids nested sandbox-exec; this flag retries"
             log "    sub-claude subprocesses unsandboxed when sandbox_apply hits EPERM."
@@ -179,6 +181,31 @@ if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/detect-nested-claude.sh" ]; then
             log "    skip auto-set: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=0 bash $0 ..."
             export EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1
         fi
+        # v8.24.0: auto-relax Tier-2 OS isolation in nested-Claude.
+        #
+        # Even after the v8.22.0 EPERM-startup fallback (above) and the v8.23.3
+        # cwd fix, the parent Claude Code's OS sandbox can still deny writes
+        # *inside* .evolve/worktrees/cycle-N once the inner subprocess actually
+        # tries to Edit/Write. That's an execution-time EPERM, not a startup
+        # EPERM, so FALLBACK_ON_EPERM=1 doesn't help. Symptom: cycle-N runs
+        # repeatedly, never advances state.json, dispatcher loops on the same
+        # number and burns budget.
+        #
+        # The auto-relax follows the same precedent as the v8.22.0 block: the
+        # operator can opt back in to strict isolation by setting
+        # EVOLVE_SKIP_WORKTREE=0 explicitly. Tier-1 kernel hooks (phase-gate
+        # ledger SHA, role-gate, ship-gate) still enforce structural integrity
+        # without the worktree — this is the relaxation we can afford.
+        if [ -z "${EVOLVE_SKIP_WORKTREE:-}" ]; then
+            [ "$nested_announced" = "0" ] && log "DETECTED: nested-claude (CLAUDECODE / CLAUDE_CODE_* env set)"
+            log "  → auto-enabling EVOLVE_SKIP_WORKTREE=1 (Tier-2 OS isolation auto-relax)"
+            log "  → Reason: parent OS sandbox blocks writes to .evolve/worktrees/ in some"
+            log "    nested-claude environments. Skipping worktree lets the builder edit"
+            log "    \$EVOLVE_PROJECT_ROOT directly. Tier-1 kernel hooks still enforce."
+            log "  → To opt back in to strict isolation: EVOLVE_SKIP_WORKTREE=0 bash $0 ..."
+            export EVOLVE_SKIP_WORKTREE=1
+        fi
+        unset nested_announced
     fi
 fi
 
@@ -251,6 +278,10 @@ log "PLAN: run_cycle=$RUN_CYCLE"
 log "PLAN: ledger=$LEDGER"
 log "PLAN: verify=$([ "${EVOLVE_DISPATCH_VERIFY:-1}" = "1" ] && echo "on" || echo "OFF")"
 
+# v8.24.0: export the reinvocation command so claude.sh's EPERM diagnostic
+# can suggest a copy-paste recovery line. Quote args defensively.
+export EVOLVE_REINVOKE_CMD="bash $0 $CYCLES $STRATEGY${GOAL:+ \"$GOAL\"}"
+
 if [ "${VALIDATE_ONLY:-0}" = "1" ] || [ "$DRY_RUN" = "1" ]; then
     log "VALIDATE_ONLY/DRY_RUN — not invoking run-cycle.sh"
     exit 0
@@ -260,6 +291,38 @@ fi
 
 [ -f "$RUN_CYCLE" ] || fail "missing run-cycle.sh at $RUN_CYCLE"
 command -v jq >/dev/null 2>&1 || fail "jq is required for ledger verification"
+
+# v8.24.0: pre-flight state.json writability check.
+#
+# Before v8.24.0, dispatcher silently lost cycle-progress writes when the OS
+# sandbox blocked .evolve/state.json updates: record_failed_approach()
+# attempted `printf > tmp && mv -f tmp $STATE_FILE`, swallowed the EPERM,
+# and unconditionally logged success. lastCycleNumber never advanced; the
+# loop kept guessing the same cycle number and burned 5 cycles' budget.
+#
+# This pre-flight catches the unwritable case at $0 cost: touch a sentinel
+# in the state directory, abort with a copy-paste remediation if it fails.
+# Skipped in test mode (RUN_CYCLE_OVERRIDE set) to avoid interfering with
+# tests that mount STATE_OVERRIDE on read-only paths intentionally.
+if [ -z "${RUN_CYCLE_OVERRIDE:-}" ]; then
+    state_dir="$(dirname "$STATE_FILE")"
+    mkdir -p "$state_dir" 2>/dev/null || true
+    state_probe="${state_dir}/.writable-probe.$$"
+    if ! { : > "$state_probe"; } 2>/dev/null; then
+        log "FAIL: cannot write to state directory: $state_dir"
+        log "      The dispatcher needs to update state.json:lastCycleNumber after"
+        log "      each cycle. If this write fails silently, the loop deadlocks on"
+        log "      the same cycle number and burns budget. Aborting before any cycle."
+        log "REMEDIATION:"
+        log "  - If running inside Claude Code's sandbox, the parent process may be"
+        log "    blocking writes. Try: EVOLVE_SKIP_WORKTREE=1 bash $0 $* (worktree off)"
+        log "  - Or run the dispatcher from a standalone terminal (not nested-claude)"
+        log "  - Or check filesystem permissions: ls -la \"$state_dir\""
+        exit 1
+    fi
+    rm -f "$state_probe"
+    unset state_dir state_probe
+fi
 
 # v8.19.2: Auth path note (informational, not a hard block).
 #
@@ -428,7 +491,13 @@ record_failed_approach() {
             expiresAt: $exp
         }]) | (if length > 50 then .[length-50:] else . end))')
     tmp="${STATE_FILE}.tmp.$$"
-    printf '%s\n' "$updated" > "$tmp" && mv -f "$tmp" "$STATE_FILE"
+    if ! { printf '%s\n' "$updated" > "$tmp" && mv -f "$tmp" "$STATE_FILE"; } 2>/dev/null; then
+        rm -f "$tmp" 2>/dev/null
+        log "FATAL: state.json write failed (EPERM?) at: $STATE_FILE"
+        log "       Cannot record failed approach; cycle progress cannot be persisted."
+        log "       This is the silent-deadlock case from pre-v8.24.0. Aborting batch."
+        return 1
+    fi
     log "recorded failed approach: cycle=$cycle classification=$classification (raw=$raw_classification) expires=$expires_at"
 
     # ALSO advance lastCycleNumber so the next iteration uses a fresh cycle
@@ -440,7 +509,13 @@ record_failed_approach() {
     current2=$(cat "$STATE_FILE")
     advanced=$(echo "$current2" | jq -c --argjson n "$cycle" '.lastCycleNumber = $n')
     tmp="${STATE_FILE}.tmp.$$"
-    printf '%s\n' "$advanced" > "$tmp" && mv -f "$tmp" "$STATE_FILE"
+    if ! { printf '%s\n' "$advanced" > "$tmp" && mv -f "$tmp" "$STATE_FILE"; } 2>/dev/null; then
+        rm -f "$tmp" 2>/dev/null
+        log "FATAL: state.json write failed (EPERM?) when advancing lastCycleNumber"
+        log "       Without this advance, every retry hits the same cycle workspace and"
+        log "       overwrites prior diagnostic evidence. Aborting batch."
+        return 1
+    fi
     log "advanced state.json:lastCycleNumber to $cycle (so next attempt uses cycle-$((cycle + 1)))"
 }
 
@@ -459,6 +534,16 @@ read_last_cycle() {
 
 START_TS=$(date -u +%s)
 DISPATCH_RC=0
+
+# v8.24.0: circuit-breaker for the "cycle-N runs M× without progress" deadlock.
+# Track the last ran_cycle and a streak counter; abort the batch when N
+# consecutive iterations report the same cycle number. Threshold is 3 — that
+# leaves room for legitimate retries (one infra blip + one recovery + a third
+# clean run) while catching the systemic-failure case before it burns a full
+# 10-cycle budget. Tunable via env if a use case ever justifies it.
+PREV_RAN_CYCLE=""
+SAME_CYCLE_STREAK=0
+SAME_CYCLE_THRESHOLD="${EVOLVE_DISPATCH_REPEAT_THRESHOLD:-3}"
 
 for ((i=1; i<=CYCLES; i++)); do
     log "------------------ cycle $i / $CYCLES ------------------"
@@ -509,6 +594,31 @@ for ((i=1; i<=CYCLES; i++)); do
         log "NOTE: lastCycleNumber did not advance; verifying cycle $ran_cycle (likely WARN/FAIL audit verdict — that is acceptable, but pipeline must still have been complete)"
     fi
 
+    # v8.24.0: same-cycle circuit-breaker. If iteration after iteration reports
+    # the same cycle number, the dispatcher is deadlocked — either state.json
+    # writes silently fail (pre-v8.24.0 bug, now caught by record_failed_approach
+    # FATAL guards) or run-cycle.sh is failing in a way that blocks progress
+    # before the cycle even begins. Either way, looping further wastes budget.
+    if [ "$ran_cycle" = "$PREV_RAN_CYCLE" ]; then
+        SAME_CYCLE_STREAK=$((SAME_CYCLE_STREAK + 1))
+    else
+        SAME_CYCLE_STREAK=1
+        PREV_RAN_CYCLE="$ran_cycle"
+    fi
+    if [ "$SAME_CYCLE_STREAK" -ge "$SAME_CYCLE_THRESHOLD" ]; then
+        log "ABORT: same cycle number ($ran_cycle) reported $SAME_CYCLE_STREAK consecutive times (threshold=$SAME_CYCLE_THRESHOLD)"
+        log "       The dispatcher cannot make progress. Aborting batch to avoid wasting budget."
+        log "REMEDIATION:"
+        log "  - Most likely: state.json writes are blocked by the parent OS sandbox."
+        log "    Set EVOLVE_SKIP_WORKTREE=1 (or run from a standalone terminal)."
+        log "  - If state.json IS writable, inspect $RUNS_DIR/cycle-${ran_cycle}/orchestrator-report.md"
+        log "    for the underlying failure reason."
+        log "  - To raise the threshold for legitimate-retry scenarios:"
+        log "    EVOLVE_DISPATCH_REPEAT_THRESHOLD=N bash $0 ..."
+        DISPATCH_RC=1
+        break
+    fi
+
     # Verify the pipeline ran end-to-end (scout, builder, auditor all present).
     # Skippable via env for legacy debugging only.
     if [ "${EVOLVE_DISPATCH_VERIFY:-1}" = "1" ]; then
@@ -531,7 +641,14 @@ for ((i=1; i<=CYCLES; i++)); do
                 infrastructure|audit-fail|build-fail)
                     log "RECOVERABLE-FAILURE: cycle $ran_cycle classification=$classification"
                     log "  → recording to state.json:failedApproaches; next cycle's orchestrator will read this and adapt"
-                    record_failed_approach "$ran_cycle" "$classification"
+                    if ! record_failed_approach "$ran_cycle" "$classification"; then
+                        # v8.24.0: state.json itself is unwritable. The pre-flight
+                        # should have caught this, but if a mid-batch permission
+                        # change happens, fail loud rather than silently looping.
+                        log "ABORT: state.json unwritable mid-batch. See FATAL above."
+                        DISPATCH_RC=1
+                        break
+                    fi
                     DISPATCH_RC=3   # batch will end with rc=3 if any cycle fails recoverably
                     # IMPORTANT: do NOT break; continue to next cycle (evolutionary behavior)
                     ;;

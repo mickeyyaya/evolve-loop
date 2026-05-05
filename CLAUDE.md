@@ -101,6 +101,39 @@ This closes the architectural gap that made v8.13.x — v8.20.2 require `EVOLVE_
 
 If you ever need the worktree path from agent context, read it via `cycle-state.sh get active_worktree`. Never compute it yourself — the dispatcher is the canonical source.
 
+## Three-Tier Strictness Model (v8.24.0+)
+
+evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came from conflating layers; v8.24.0 makes the layers explicit and lets Tier-2 auto-relax in environments where it can't function.
+
+| Tier | Mechanism | Default | Auto-relax? | What it catches |
+|---|---|---|---|---|
+| **1 — Structural integrity** | phase-gate, ledger SHA, role-gate, ship-gate (`scripts/guards/`) | Always on | NEVER | Reward hacking, phase-skipping, integrity breach (cycle 102–111, cycle 132–141 incidents) |
+| **2 — OS isolation** | `sandbox-exec`/`bwrap`, per-cycle worktree | On (standalone), auto-relaxed (nested-claude) | YES — auto-disabled in nested-claude | Compromised builder writing outside its sandbox; one cycle's edits leaking into another's workspace |
+| **3 — Workflow defaults** | intent capture, fan-out, mutation testing, adversarial audit | Opt-in via env flags | N/A — already opt-in | Vague goals, sycophantic audits, tautological evals |
+
+**The governing rule:** Tier 1 is non-negotiable and runs in privileged shell context (no sandbox dependency). Tier 2 is defense-in-depth and degrades gracefully when the host environment can't support it. Tier 3 is operator-controlled per-run.
+
+### What auto-relax does in nested-claude
+
+When `scripts/detect-nested-claude.sh` returns `nested` (CLAUDECODE / CLAUDE_CODE_* env present), the dispatcher auto-sets:
+
+- `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` (since v8.22.0) — handles startup EPERM (rc=71)
+- `EVOLVE_SKIP_WORKTREE=1` (since v8.24.0) — handles execution-time write EPERM in `.evolve/worktrees/`
+
+Both flags log a loud `DETECTED:` line. Operator can opt back in to strict isolation by setting either var to `0` explicitly.
+
+**Trade-off when SKIP_WORKTREE auto-fires:** builder edits land in `$EVOLVE_PROJECT_ROOT` directly (no per-cycle worktree, no easy rollback). Tier-1 hooks still verify ledger SHA against on-disk artifacts, so integrity guarantees survive. The cost is operator must `git status`/`git diff` after a failed cycle to inspect uncommitted edits.
+
+### Dispatcher safety nets (v8.24.0+)
+
+Three structural fixes prevent the pre-v8.24.0 "cycle-N runs M× and burns budget" deadlock:
+
+1. **Pre-flight state.json writability check.** Dispatcher tests writability before any cycle. If unwritable, abort with copy-paste remediation. Catches the OS-sandbox-blocks-state.json case at $0 cost.
+2. **Fail-loud on `record_failed_approach` write EPERM.** Both `mv -f` calls now error-checked; FATAL log + return 1 if write fails. Caller propagates as DISPATCH_RC=1 + break (no silent loop).
+3. **Same-cycle circuit-breaker.** Tracks `prev_ran_cycle`; aborts batch when N consecutive iterations report the same cycle number (default `EVOLVE_DISPATCH_REPEAT_THRESHOLD=3`). Catches systemic failures the other guards miss.
+
+If you ever see "ABORT: same cycle number" in the dispatcher log, the remediation block tells you exactly which env var to set. The cost of the failed batch is bounded to ~3 cycles, not the full requested N.
+
 ## Release & Publish Workflow (v8.13.2+)
 
 **"publish" ≠ "push".** See [docs/release-protocol.md](docs/release-protocol.md) for the canonical vocabulary (push, tag, release, propagate, publish, ship). When the user asks to "publish vX.Y.Z", use the self-healing pipeline:

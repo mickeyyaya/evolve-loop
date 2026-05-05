@@ -627,6 +627,146 @@ else
     fail_ "rc=$rc unexpected"
 fi
 
+# === Test 27: v8.24.0 — pre-flight aborts on unwritable state.json ===========
+# Simulates the pre-v8.24.0 silent-deadlock scenario by pointing STATE_OVERRIDE
+# at a path the dispatcher can't write to. Uses RUN_CYCLE_OVERRIDE=<missing>
+# is no good (test mode skips the pre-flight); instead, leave RUN_CYCLE_OVERRIDE
+# unset and use a chmod'd parent directory.
+#
+# We use a fake plugin layout so EVOLVE_PLUGIN_ROOT resolves correctly and the
+# dispatcher's pre-flight runs. The dispatcher should abort BEFORE invoking
+# run-cycle.sh.
+header "Test 27: v8.24.0 — unwritable state dir → rc=1 with REMEDIATION block"
+ws27=$(make_workspace)
+mkdir -p "$ws27/.evolve"
+chmod 555 "$ws27/.evolve"  # read+exec but no write
+# Use a clean cwd inside ws27 (not the test repo) so EVOLVE_PROJECT_ROOT resolves
+# to ws27 and the pre-flight applies. We also need a git repo or the cwd-guard
+# might fire; since RUN_CYCLE_OVERRIDE is unset, the pre-flight is the operative
+# guard. Initialize a tiny git repo so resolve-roots.sh treats it as a project.
+( cd "$ws27" && git init -q . && git commit --allow-empty -q -m init ) >/dev/null 2>&1
+set +e
+out=$(cd "$ws27" && env -u RUN_CYCLE_OVERRIDE \
+        STATE_OVERRIDE="$ws27/.evolve/state.json" \
+        bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+chmod 755 "$ws27/.evolve"  # restore so trap can clean up
+if [ "$rc" = "1" ] && echo "$out" | grep -q "cannot write to state directory" && echo "$out" | grep -q "REMEDIATION"; then
+    pass "unwritable state dir → rc=1 with REMEDIATION"
+else
+    fail_ "rc=$rc; out tail: $(echo "$out" | tail -10)"
+fi
+
+# === Test 28: v8.24.0 — same-cycle circuit-breaker ===========================
+# Construct the deadlock scenario: state.json's lastCycleNumber stays at 0
+# across iterations (mock keeps wiping it), ledger gets appended-to so
+# verify_cycle(1) passes each iteration, ran_cycle = last_before+1 = 1 every
+# time. After threshold (3 by default), breaker must fire with rc=1.
+#
+# This is the genuine "cycle-1 ran 5×" scenario the user reported, modeled
+# in unit-test form.
+header "Test 28: v8.24.0 — 3 consecutive same-cycle → rc=1 ABORT"
+mock_stuck=$(mktemp -t mock-stuck.XXXXXX.sh)
+cleanup_files+=("$mock_stuck")
+cat > "$mock_stuck" <<'EOF'
+#!/usr/bin/env bash
+# Mock run-cycle that simulates the user's "lastCycleNumber never advances"
+# scenario: re-write state.lastCycleNumber=0 (so dispatcher always falls back
+# to last_before+1=1) AND append a complete cycle-1 ledger so verify_cycle(1)
+# succeeds — mirroring "cycle pipeline complete on paper, state stuck."
+set -uo pipefail
+state="$STATE_OVERRIDE"
+ledger="$LEDGER_OVERRIDE"
+# Force state back to 0 (simulates record_failed_approach silently failing
+# pre-v8.24.0; or any path where state writes don't stick).
+echo '{"lastCycleNumber":0,"version":1}' > "$state"
+# Append cycle-1 ledger entries so verify_cycle(1) keeps passing.
+for role in scout builder auditor; do
+    printf '{"ts":"2026-04-29T03:00:00Z","kind":"agent_subprocess","role":"%s","cycle":1,"exit_code":0}\n' \
+        "$role" >> "$ledger"
+done
+echo "[mock-stuck] cycle-1 ledger appended; state forced to 0" >&2
+exit 0
+EOF
+chmod +x "$mock_stuck"
+ws28=$(make_workspace)
+write_state "$ws28/state.json" 0
+: > "$ws28/ledger.jsonl"
+mkdir -p "$ws28/runs"
+set +e
+out=$(env STATE_OVERRIDE="$ws28/state.json" LEDGER_OVERRIDE="$ws28/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws28/runs" RUN_CYCLE_OVERRIDE="$mock_stuck" \
+        bash "$DISPATCH" 5 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "1" ] && echo "$out" | grep -q "ABORT: same cycle number" && echo "$out" | grep -q "consecutive times"; then
+    pass "same-cycle circuit-breaker fired with rc=1"
+else
+    fail_ "rc=$rc; out tail: $(echo "$out" | tail -15)"
+fi
+
+# === Test 29: v8.24.0 — circuit-breaker threshold tunable via env ============
+# Same stuck setup; raise threshold to 10. With only 5 cycles requested, the
+# breaker can't fire (loop ends naturally at cycles=5). Batch should complete
+# rc=0 (all cycles "verified" via the appended ledger entries).
+header "Test 29: v8.24.0 — threshold=10 with cycles=5 → no breaker, batch completes"
+ws29=$(make_workspace)
+write_state "$ws29/state.json" 0
+: > "$ws29/ledger.jsonl"
+mkdir -p "$ws29/runs"
+set +e
+out=$(env STATE_OVERRIDE="$ws29/state.json" LEDGER_OVERRIDE="$ws29/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws29/runs" RUN_CYCLE_OVERRIDE="$mock_stuck" \
+        EVOLVE_DISPATCH_REPEAT_THRESHOLD=10 \
+        bash "$DISPATCH" 5 2>&1)
+rc=$?
+set -e
+# verify_cycle passes each iter (ledger has scout+builder+auditor for cycle 1),
+# so DISPATCH_RC stays at 0. Breaker would fire at iter 10 but cycles=5.
+if [ "$rc" = "0" ] && ! echo "$out" | grep -q "ABORT: same cycle number"; then
+    pass "raised threshold suppressed breaker; batch completed rc=0"
+else
+    fail_ "rc=$rc; breaker_fired=$(echo "$out" | grep -c 'ABORT: same cycle')"
+fi
+
+# === Test 30: v8.24.0 — nested-claude detection auto-sets EVOLVE_SKIP_WORKTREE ===
+# When CLAUDECODE env is set, dispatcher should auto-export both
+# EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 AND EVOLVE_SKIP_WORKTREE=1.
+# We use VALIDATE_ONLY=1 to short-circuit before any cycle runs and just
+# inspect the log output for the expected DETECTED + auto-enabling lines.
+header "Test 30: v8.24.0 — CLAUDECODE set → both env vars auto-enabled"
+set +e
+out=$(env CLAUDECODE=1 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "0" ] \
+   && echo "$out" | grep -q "DETECTED: nested-claude" \
+   && echo "$out" | grep -q "auto-enabling EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1" \
+   && echo "$out" | grep -q "auto-enabling EVOLVE_SKIP_WORKTREE=1"; then
+    pass "both auto-enable lines present"
+else
+    fail_ "rc=$rc; out: $(echo "$out" | tail -15)"
+fi
+
+# === Test 31: v8.24.0 — explicit EVOLVE_SKIP_WORKTREE=0 suppresses auto-set ===
+# Operator opt-out: setting the var explicitly to 0 should leave it at 0,
+# even when nested-claude is detected. Sanity check that auto-relax is
+# discoverable but overridable.
+header "Test 31: v8.24.0 — explicit EVOLVE_SKIP_WORKTREE=0 → no auto-set message"
+set +e
+out=$(env CLAUDECODE=1 EVOLVE_SKIP_WORKTREE=0 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+# Should still see SANDBOX_FALLBACK auto-set (operator didn't disable that),
+# but NOT the SKIP_WORKTREE auto-enable line.
+if [ "$rc" = "0" ] \
+   && ! echo "$out" | grep -q "auto-enabling EVOLVE_SKIP_WORKTREE=1"; then
+    pass "explicit override suppresses SKIP_WORKTREE auto-set"
+else
+    fail_ "rc=$rc; out: $(echo "$out" | tail -15)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
