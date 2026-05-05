@@ -246,6 +246,7 @@ unset PREFLIGHT_SCRIPT
 # --- Argument parsing -------------------------------------------------------
 
 DRY_RUN=0
+RESET_FAILURES=0
 CYCLES=""
 STRATEGY=""
 GOAL=""
@@ -256,6 +257,16 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --dry-run)
             DRY_RUN=1
+            shift
+            ;;
+        --reset)
+            # v8.27.0: operator-driven recovery from BLOCKED-SYSTEMIC and
+            # accumulated transient entries. Prunes infrastructure-{systemic,
+            # transient} and ship-gate-config from state.json:failedApproaches[]
+            # before the cycle loop starts. Logs loudly so the operator's
+            # choice is auditable. Does NOT bypass any kernel hook — Tier-1
+            # phase-gate, ledger SHA, role-gate, ship-gate all stay enforced.
+            RESET_FAILURES=1
             shift
             ;;
         --help|-h)
@@ -446,6 +457,10 @@ verify_cycle() {
 # classify_cycle_failure <cycle> — reads the cycle's orchestrator-report.md
 # and returns a classification on stdout:
 #   infrastructure   — sandbox EPERM, rate limit, timeout, network
+#   ship-gate-config — audit declared PASS but ship-gate refused (v8.27.0,
+#                      e.g., auditor exit-code semantics mismatch). Distinct
+#                      from audit-fail because the audit itself succeeded;
+#                      the rejection is in the post-audit gate config/logic.
 #   audit-fail       — cycle ran but Auditor verdict was FAIL/WARN
 #   build-fail       — Builder couldn't turn tests GREEN
 #   integrity-breach — report missing or unclassifiable (treat as STOP)
@@ -459,6 +474,16 @@ classify_cycle_failure() {
     # Infrastructure markers (recoverable, often deterministic).
     if grep -qiE 'INFRASTRUCTURE FAILURE|sandbox-exec.*Operation not permitted|sandbox_apply.*permitted|EPERM|rate.?limit|429.*Too Many|connection.refused|ETIMEDOUT|operation timed out' "$report"; then
         echo "infrastructure"
+        return
+    fi
+    # v8.27.0: ship-gate rejected an audit-PASS cycle. Tested BEFORE audit-fail
+    # because a SHIP_GATE_DENIED report can also mention the verdict in passing,
+    # and we want to classify it as ship-gate-config (1d age-out, low severity)
+    # rather than code-audit-fail (30d, high). The marker is intentionally
+    # specific to avoid false-positives: SHIP_GATE_DENIED phrase OR ship-gate
+    # rejection patterns from ship.sh's integrity_fail messages.
+    if grep -qiE 'SHIP_GATE_DENIED|ship-?gate.*(rejected|denied|exited)|integrity.?fail.*Auditor exited' "$report"; then
+        echo "ship-gate-config"
         return
     fi
     # Audit verdict failures (cycle ran but didn't pass the gate).
@@ -563,6 +588,37 @@ read_last_cycle() {
         echo 0
     fi
 }
+
+# --- v8.27.0: --reset operator unblock --------------------------------------
+#
+# When the failure-adapter has accumulated infrastructure-systemic entries,
+# every new cycle BLOCKs at calibrate before any phase agent runs. The
+# downstream user's report (cycle-25 evidence): 4 systemic entries, 5+
+# blocked invocations, kernel state locked.
+#
+# --reset prunes infrastructure-systemic + infrastructure-transient + ship-
+# gate-config entries before the cycle loop starts. The operator's choice
+# is auditable in the log. Pre-existing kernel rules continue to enforce
+# anti-gaming on the actual code work this cycle does.
+if [ "$RESET_FAILURES" = "1" ]; then
+    PRUNE="$EVOLVE_PLUGIN_ROOT/scripts/state-prune.sh"
+    if [ -x "$PRUNE" ]; then
+        log "--reset: pruning infrastructure-{systemic,transient} + ship-gate-config from $STATE_FILE"
+        log "  → operator-driven recovery; DO NOT use to mask repeating real systemic failures"
+        # state-prune.sh honors EVOLVE_STATE_FILE_OVERRIDE (different name than
+        # the dispatcher's STATE_OVERRIDE). Pass STATE_FILE explicitly so
+        # tests using STATE_OVERRIDE see the prune target the correct file.
+        for cls in infrastructure-systemic infrastructure-transient ship-gate-config; do
+            EVOLVE_STATE_FILE_OVERRIDE="$STATE_FILE" \
+                bash "$PRUNE" --classification "$cls" --yes 2>&1 | sed 's/^/[--reset] /' >&2 || \
+                log "  WARN: state-prune for $cls failed (non-fatal; continuing)"
+        done
+        log "--reset: complete — Tier-1 hooks (phase-gate, role-gate, ledger SHA, ship-gate) remain enforced"
+    else
+        log "WARN: --reset requested but state-prune.sh not executable at $PRUNE (skipping)"
+    fi
+    unset PRUNE cls
+fi
 
 # --- Main loop -------------------------------------------------------------
 
@@ -672,7 +728,7 @@ for ((i=1; i<=CYCLES; i++)); do
             fi
 
             case "$classification" in
-                infrastructure|audit-fail|build-fail)
+                infrastructure|audit-fail|build-fail|ship-gate-config)
                     log "RECOVERABLE-FAILURE: cycle $ran_cycle classification=$classification"
                     log "  → recording to state.json:failedApproaches; next cycle's orchestrator will read this and adapt"
                     if ! record_failed_approach "$ran_cycle" "$classification"; then

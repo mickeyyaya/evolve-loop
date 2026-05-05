@@ -267,7 +267,30 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
     ARTIFACT_PATH=$(echo "$LATEST_AUDIT" | jq -r '.artifact_path')
     RECORDED_SHA=$(echo "$LATEST_AUDIT" | jq -r '.artifact_sha256')
 
-    [ "$EXIT_CODE" = "0" ] || integrity_fail "most recent Auditor exited $EXIT_CODE"
+    # v8.27.0: relaxed exit_code check.
+    #
+    # The auditor CLI follows Unix convention:
+    #   exit 0 — no findings (cleanest possible audit)
+    #   exit 1 — findings present (NORMAL — every realistic audit has findings)
+    #   exit 2+ — true error (crash, signal, malformed invocation)
+    #
+    # Pre-v8.27.0, ship-gate rejected ANY non-zero exit, treating "findings
+    # present" as integrity failure. This conflicted with the auditor's
+    # actual semantics and produced a deterministic deadlock: every cycle
+    # with findings (i.e., every realistic cycle) failed to ship even when
+    # the artifact explicitly declared Verdict: PASS. The downstream user's
+    # report (cycle-25 evidence): 5+ blocked invocations, 0 successful auto-
+    # commits, kernel state locked at 4 infrastructure-systemic entries.
+    #
+    # The artifact-content checks below (SHA + Verdict text) are the actual
+    # source of truth. They run regardless of exit_code. Anti-gaming is
+    # preserved by SHA verification (artifact wasn't mutated post-audit) +
+    # Verdict text grep (audit explicitly declared PASS). Cycle 102-111 /
+    # 132-141 / Gemini-forgery were caught by these, not by the exit_code.
+    case "$EXIT_CODE" in
+        0|1) ;;
+        *)   integrity_fail "most recent Auditor exited $EXIT_CODE (error state — not a Unix-convention findings signal)" ;;
+    esac
     [ -f "$ARTIFACT_PATH" ] || integrity_fail "audit-report.md missing on disk: $ARTIFACT_PATH"
 
     ACTUAL_SHA=$(SHA256 "$ARTIFACT_PATH")

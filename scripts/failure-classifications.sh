@@ -69,6 +69,7 @@ failure_age_out_seconds() {
         intent-rejected)           echo 999999999 ;; # effectively never
         code-build-fail)           echo 2592000 ;;   # 30 days
         code-audit-fail)           echo 2592000 ;;   # 30 days
+        ship-gate-config)          echo 86400 ;;     # 1 day (v8.27.0 — config issue, not systemic)
         human-abort)               echo 3600 ;;      # 1 hour
         integrity-breach)          echo 604800 ;;    # 7 days (legacy/escalation)
         *)                         echo 86400 ;;     # default 1d for unknowns
@@ -77,7 +78,7 @@ failure_age_out_seconds() {
 
 failure_severity_of() {
     case "${1:-}" in
-        infrastructure-transient|intent-malformed|human-abort) echo low ;;
+        infrastructure-transient|intent-malformed|human-abort|ship-gate-config) echo low ;;
         infrastructure-systemic|code-build-fail|code-audit-fail|integrity-breach) echo high ;;
         intent-rejected) echo terminal ;;
         *) echo unknown ;;
@@ -86,7 +87,7 @@ failure_severity_of() {
 
 failure_retry_policy() {
     case "${1:-}" in
-        infrastructure-transient|intent-malformed|human-abort) echo yes ;;
+        infrastructure-transient|intent-malformed|human-abort|ship-gate-config) echo yes ;;
         infrastructure-systemic|integrity-breach) echo needs-operator ;;
         intent-rejected) echo no ;;
         # Code failures: retry only if task description differs (orchestrator
@@ -104,14 +105,16 @@ failure_retry_policy() {
 failure_normalize_legacy() {
     case "${1:-}" in
         infrastructure-transient|infrastructure-systemic|intent-malformed|intent-rejected| \
-        code-build-fail|code-audit-fail|human-abort|integrity-breach)
+        code-build-fail|code-audit-fail|human-abort|integrity-breach|ship-gate-config)
             echo "$1" ;;
         # Legacy dispatcher classifications:
         infrastructure)        echo infrastructure-transient ;;
         audit-fail)            echo code-audit-fail ;;
         build-fail)            echo code-build-fail ;;
+        ship-gate-rejection)   echo ship-gate-config ;;   # v8.27.0
         # Legacy orchestrator verdicts:
-        FAIL|WARN|SHIP_GATE_DENIED) echo code-audit-fail ;;
+        FAIL|WARN)             echo code-audit-fail ;;
+        SHIP_GATE_DENIED)      echo ship-gate-config ;;   # v8.27.0 — was code-audit-fail
         WARN-NO-AUDIT)         echo infrastructure-systemic ;;
         BLOCKED-RECURRING-AUDIT-FAIL) echo code-audit-fail ;;
         BLOCKED-RECURRING-BUILD-FAIL) echo code-build-fail ;;
@@ -131,6 +134,7 @@ intent-malformed
 intent-rejected
 code-build-fail
 code-audit-fail
+ship-gate-config
 human-abort
 integrity-breach
 EOF

@@ -229,6 +229,45 @@ else
     fail_ "expected PROCEED, got $action"
 fi
 
+# === Test 13: v8.27.0 — ship-gate-config does NOT trigger BLOCK-SYSTEMIC =====
+# v8.27.0 introduces ship-gate-config classification (1d age-out, low severity)
+# for cycles where audit declared PASS but ship-gate refused. It must NOT be
+# counted toward infrastructure-systemic, even with multiple non-expired entries.
+header "Test 13: v8.27.0 — 5 ship-gate-config entries → PROCEED (not BLOCK-SYSTEMIC)"
+exp=$(FUTURE_ISO 1)
+sf=$(make_state "[
+  {\"cycle\":10,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":11,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":12,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":13,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":14,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+if [ "$action" = "PROCEED" ]; then
+    pass "ship-gate-config entries do not trigger BLOCK rules; loop continues"
+else
+    fail_ "expected PROCEED, got $action; full out: $out"
+fi
+
+# === Test 14: v8.27.0 — mix of ship-gate-config + 1 infra-systemic → BLOCK ===
+# Sanity: the new classification doesn't accidentally suppress the existing
+# BLOCK-SYSTEMIC rule when a real systemic entry is present.
+header "Test 14: v8.27.0 — ship-gate-config doesn't mask infra-systemic block"
+exp=$(FUTURE_ISO 1)
+sf=$(make_state "[
+  {\"cycle\":10,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":11,\"classification\":\"infrastructure-systemic\",\"summary\":\"real systemic issue\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+verdict=$(echo "$out" | jq -r '.verdict_for_block // ""')
+if [ "$action" = "BLOCK-OPERATOR-ACTION" ] && [ "$verdict" = "BLOCKED-SYSTEMIC" ]; then
+    pass "real infra-systemic still blocks even when ship-gate-config also present"
+else
+    fail_ "expected BLOCK-OPERATOR-ACTION+BLOCKED-SYSTEMIC, got $action+$verdict"
+fi
+
 # === Summary =================================================================
 echo
 echo "=========================================="

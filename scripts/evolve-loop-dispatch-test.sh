@@ -815,6 +815,135 @@ else
     fail_ "rc=$rc; env_file_exists=$([ -f "$env_file" ] && echo yes || echo no)"
 fi
 
+# === Test 34: v8.27.0 — --reset prunes failedApproaches before cycle loop ===
+# v8.27.0: --reset clears infrastructure-{systemic,transient} + ship-gate-
+# config entries from state.json so the next cycle starts unblocked.
+# Operator-driven recovery from BLOCKED-SYSTEMIC deadlock.
+header "Test 34: v8.27.0 — --reset prunes failedApproaches and proceeds"
+ws34=$(make_workspace)
+# Seed state with 4 systemic entries (mimicking the downstream user's deadlock).
+mock=$(make_mock_run_cycle)
+cat > "$ws34/state.json" <<'EOF'
+{
+  "lastCycleNumber": 0,
+  "version": 1,
+  "failedApproaches": [
+    {"cycle": 1, "classification": "infrastructure-systemic", "summary": "test entry 1", "recordedAt": "2026-05-05T00:00:00Z", "expiresAt": "2026-05-12T00:00:00Z"},
+    {"cycle": 2, "classification": "infrastructure-systemic", "summary": "test entry 2", "recordedAt": "2026-05-05T00:00:00Z", "expiresAt": "2026-05-12T00:00:00Z"},
+    {"cycle": 3, "classification": "infrastructure-transient", "summary": "test entry 3", "recordedAt": "2026-05-05T00:00:00Z", "expiresAt": "2026-05-06T00:00:00Z"},
+    {"cycle": 4, "classification": "ship-gate-config", "summary": "test entry 4", "recordedAt": "2026-05-05T00:00:00Z", "expiresAt": "2026-05-06T00:00:00Z"}
+  ]
+}
+EOF
+: > "$ws34/ledger.jsonl"
+mkdir -p "$ws34/runs/cycle-1"
+cat > "$ws34/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+EOF
+set +e
+out=$(env STATE_OVERRIDE="$ws34/state.json" LEDGER_OVERRIDE="$ws34/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws34/runs" RUN_CYCLE_OVERRIDE="$mock" \
+        bash "$DISPATCH" --reset 1 2>&1)
+rc=$?
+set -e
+# Count remaining entries with the targeted classifications.
+remaining_systemic=$(jq '[.failedApproaches[] | select(.classification == "infrastructure-systemic")] | length' "$ws34/state.json" 2>/dev/null || echo "?")
+remaining_transient=$(jq '[.failedApproaches[] | select(.classification == "infrastructure-transient")] | length' "$ws34/state.json" 2>/dev/null || echo "?")
+remaining_shipgate=$(jq '[.failedApproaches[] | select(.classification == "ship-gate-config")] | length' "$ws34/state.json" 2>/dev/null || echo "?")
+if echo "$out" | grep -q -- "--reset: pruning" \
+   && [ "$remaining_systemic" = "0" ] \
+   && [ "$remaining_transient" = "0" ] \
+   && [ "$remaining_shipgate" = "0" ]; then
+    pass "--reset pruned all 3 target classifications from failedApproaches"
+else
+    fail_ "rc=$rc systemic=$remaining_systemic transient=$remaining_transient shipgate=$remaining_shipgate; out: $(echo "$out" | grep -E 'reset|PLAN' | head -5)"
+fi
+
+# === Test 35: v8.27.0 — without --reset, entries survive the dispatch ========
+# Negative test: confirm --reset is the gating action, not an automatic prune.
+header "Test 35: v8.27.0 — without --reset, infrastructure-systemic entries survive"
+ws35=$(make_workspace)
+mock=$(make_mock_run_cycle)
+cat > "$ws35/state.json" <<'EOF'
+{
+  "lastCycleNumber": 0,
+  "version": 1,
+  "failedApproaches": [
+    {"cycle": 1, "classification": "infrastructure-systemic", "summary": "test entry", "recordedAt": "2026-05-05T00:00:00Z", "expiresAt": "2026-05-12T00:00:00Z"}
+  ]
+}
+EOF
+: > "$ws35/ledger.jsonl"
+mkdir -p "$ws35/runs/cycle-1"
+cat > "$ws35/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+EOF
+set +e
+env STATE_OVERRIDE="$ws35/state.json" LEDGER_OVERRIDE="$ws35/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws35/runs" RUN_CYCLE_OVERRIDE="$mock" \
+        bash "$DISPATCH" 1 >/dev/null 2>&1
+set -e
+remaining=$(jq '[.failedApproaches[] | select(.classification == "infrastructure-systemic")] | length' "$ws35/state.json" 2>/dev/null || echo "?")
+if [ "$remaining" = "1" ]; then
+    pass "without --reset, systemic entries persist (1 remaining)"
+else
+    fail_ "expected 1 systemic entry, got $remaining"
+fi
+
+# === Test 36: v8.27.0 — ship-gate-config classification accepted as recoverable ===
+# When orchestrator-report contains SHIP_GATE_DENIED, classifier returns
+# ship-gate-config (not infrastructure-systemic). Cycle continues; the entry
+# ages out in 1 day, not 7.
+header "Test 36: v8.27.0 — SHIP_GATE_DENIED report → ship-gate-config classification"
+ws36=$(make_workspace)
+mock=$(make_mock_run_cycle)
+write_state "$ws36/state.json" 0
+: > "$ws36/ledger.jsonl"
+mkdir -p "$ws36/runs/cycle-1"
+cat > "$ws36/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+
+## Verdict
+SHIP_GATE_DENIED
+
+ship-gate rejected the cycle. Audit verdict was PASS.
+EOF
+# Mock that does NOT advance state.lastCycleNumber and does NOT write all 3 ledger
+# roles, so the dispatcher will trigger classify_cycle_failure.
+mock_partial=$(mktemp -t mock-partial.XXXXXX.sh)
+cleanup_files+=("$mock_partial")
+cat > "$mock_partial" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+# Append scout + builder + auditor for cycle 1 (verify_cycle is satisfied)
+# but make audit verdict a SHIP_GATE_DENIED case via the report.md.
+# Note: we want classify_cycle_failure to fire, which only happens if
+# verify_cycle FAILS. So we omit the auditor entry.
+state="$STATE_OVERRIDE"
+ledger="$LEDGER_OVERRIDE"
+last=$(jq -r '.lastCycleNumber // 0' "$state" 2>/dev/null || echo 0)
+new=$((last + 1))
+jq --argjson n "$new" '.lastCycleNumber = $n' "$state" > "$state.tmp" && mv "$state.tmp" "$state"
+for role in scout builder; do
+    printf '{"ts":"2026-04-29T03:00:00Z","kind":"agent_subprocess","role":"%s","cycle":%s,"exit_code":0}\n' \
+        "$role" "$new" >> "$ledger"
+done
+exit 0
+EOF
+chmod +x "$mock_partial"
+set +e
+out=$(env STATE_OVERRIDE="$ws36/state.json" LEDGER_OVERRIDE="$ws36/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws36/runs" RUN_CYCLE_OVERRIDE="$mock_partial" \
+        bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+classification=$(jq -r '.failedApproaches[0].classification // ""' "$ws36/state.json" 2>/dev/null)
+if [ "$classification" = "ship-gate-config" ] && echo "$out" | grep -q "ship-gate-config"; then
+    pass "SHIP_GATE_DENIED → ship-gate-config classification (low severity, 1d age-out)"
+else
+    fail_ "rc=$rc classification='$classification'; out tail: $(echo "$out" | tail -10)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="

@@ -334,6 +334,131 @@ else
 fi
 cd "$REPO_ROOT"
 
+# --- Test M: v8.27.0 — auditor exit_code=1 + Verdict: PASS → ship succeeds ---
+# Pre-v8.27.0 BUG: ship-gate rejected ANY non-zero exit_code, even when the
+# audit-report.md declared Verdict: PASS. This conflicted with the auditor
+# CLI's Unix-convention semantics (exit 1 = findings present, normal).
+# v8.27.0 accepts exit 0 OR 1 if the artifact verdict + SHA + freshness all
+# verify. Anti-gaming preserved by SHA + Verdict-text checks.
+header "Test M: v8.27.0 — auditor exit_code=1 + Verdict:PASS → ship succeeds"
+REPO=$(make_repo)
+cd "$REPO"
+echo "modified for exit-1 test" >> fixture.txt
+# Inline seed: like seed_audit but with exit_code=1 in the ledger entry.
+audit_path="$REPO/.evolve/runs/cycle-1/audit-report.md"
+cat > "$audit_path" <<EOF
+<!-- challenge-token: testtoken123 -->
+# Audit Report — Cycle 1
+
+Verdict: PASS
+
+Findings noted but not blocking. Test fixture for v8.27.0 exit-1 semantics.
+EOF
+sha=$(sha256 "$audit_path")
+head_sha=$(git -C "$REPO" rev-parse HEAD)
+tree_sha=$(git -C "$REPO" diff HEAD | (
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}';
+    else shasum -a 256 | awk '{print $1}'; fi
+))
+# CRITICAL: exit_code is 1 here, not 0 — this is the v8.27.0 case
+cat > "$REPO/.evolve/ledger.jsonl" <<EOF
+{"ts":"2026-04-27T00:00:00Z","cycle":1,"role":"auditor","kind":"agent_subprocess","model":"sonnet","exit_code":1,"duration_s":"30","artifact_path":"$audit_path","artifact_sha256":"$sha","challenge_token":"testtoken123","git_head":"$head_sha","tree_state_sha":"$tree_sha"}
+EOF
+BARE="$SCRATCH/remote-test-m-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+bash scripts/ship.sh "feat: ship with exit-1" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "0" ]; then
+    pass "exit_code=1 + Verdict:PASS → ship succeeded (v8.27.0 fluency fix)"
+else
+    fail "expected rc=0, got rc=$RC; output: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test N: v8.27.0 — auditor exit_code=2 (true error) → ship STILL refuses ---
+# Anti-gaming regression: the v8.27.0 relaxation accepts 0 or 1 only.
+# exit 2+ indicates a true crash/error and must still block ship.
+header "Test N: v8.27.0 — auditor exit_code=2 → ship refuses (anti-gaming preserved)"
+REPO=$(make_repo)
+cd "$REPO"
+echo "modified for exit-2 test" >> fixture.txt
+audit_path="$REPO/.evolve/runs/cycle-1/audit-report.md"
+cat > "$audit_path" <<EOF
+<!-- challenge-token: testtoken123 -->
+# Audit Report — Cycle 1
+
+Verdict: PASS
+
+(But auditor exit code claims error state.)
+EOF
+sha=$(sha256 "$audit_path")
+head_sha=$(git -C "$REPO" rev-parse HEAD)
+tree_sha=$(git -C "$REPO" diff HEAD | (
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}';
+    else shasum -a 256 | awk '{print $1}'; fi
+))
+cat > "$REPO/.evolve/ledger.jsonl" <<EOF
+{"ts":"2026-04-27T00:00:00Z","cycle":1,"role":"auditor","kind":"agent_subprocess","model":"sonnet","exit_code":2,"duration_s":"30","artifact_path":"$audit_path","artifact_sha256":"$sha","challenge_token":"testtoken123","git_head":"$head_sha","tree_state_sha":"$tree_sha"}
+EOF
+BARE="$SCRATCH/remote-test-n-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+bash scripts/ship.sh "feat: ship with exit-2" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "2" ] && grep -q "Auditor exited 2" /tmp/ship-out; then
+    pass "exit_code=2 → ship refused (rc=2) with diagnostic"
+else
+    fail "expected rc=2 with 'Auditor exited 2', got rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test O: v8.27.0 anti-gaming regression — exit_code=0 + Verdict:FAIL → refuses ---
+# Verdict text is the source of truth. Even exit_code=0 must NOT bypass the
+# Verdict: PASS requirement.
+header "Test O: v8.27.0 — exit_code=0 + Verdict:FAIL → ship refuses (verdict text wins)"
+REPO=$(make_repo)
+cd "$REPO"
+echo "modified for verdict-fail test" >> fixture.txt
+audit_path="$REPO/.evolve/runs/cycle-1/audit-report.md"
+cat > "$audit_path" <<EOF
+<!-- challenge-token: testtoken123 -->
+# Audit Report — Cycle 1
+
+Verdict: FAIL
+
+Critical issues found. Do not ship.
+EOF
+sha=$(sha256 "$audit_path")
+head_sha=$(git -C "$REPO" rev-parse HEAD)
+tree_sha=$(git -C "$REPO" diff HEAD | (
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}';
+    else shasum -a 256 | awk '{print $1}'; fi
+))
+cat > "$REPO/.evolve/ledger.jsonl" <<EOF
+{"ts":"2026-04-27T00:00:00Z","cycle":1,"role":"auditor","kind":"agent_subprocess","model":"sonnet","exit_code":0,"duration_s":"30","artifact_path":"$audit_path","artifact_sha256":"$sha","challenge_token":"testtoken123","git_head":"$head_sha","tree_state_sha":"$tree_sha"}
+EOF
+BARE="$SCRATCH/remote-test-o-$RANDOM.git"
+git init -q --bare "$BARE"
+git remote add origin "$BARE"
+git branch -M main
+set +e
+bash scripts/ship.sh "feat: ship with verdict fail" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "2" ] && grep -q "Verdict: PASS" /tmp/ship-out; then
+    pass "exit_code=0 + Verdict:FAIL → ship refused (verdict text caught it; anti-gaming preserved)"
+else
+    fail "expected rc=2 with verdict diagnostic, got rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
 # --- Summary ----------------------------------------------------------------
 echo
 echo "==========================================="

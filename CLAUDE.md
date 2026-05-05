@@ -203,6 +203,18 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Loop Continuation (v8.27.0+) — exit-code semantics + --reset
+
+Three fixes in v8.27.0 close a remaining deadlock where audit-PASS cycles couldn't ship.
+
+**Fix 1 — `ship.sh` accepts auditor exit_code 0 OR 1.** The auditor CLI follows Unix convention: `exit 0` = no findings (cleanest), `exit 1` = findings present (normal — every realistic audit has findings), `exit 2+` = true error. Pre-v8.27.0 ship-gate rejected ANY non-zero exit, treating "findings present" as integrity failure. The artifact-content checks (SHA + Verdict text + cycle binding + freshness) are the actual source of truth and run regardless of exit_code. Layer 6 was vestigial.
+
+**Fix 2 — `ship-gate-config` classification.** Cycles where audit declared PASS but ship-gate refused (e.g., the v8.27.0 exit-code mismatch) are now classified as `ship-gate-config` (1d age-out, low severity, retry-yes), NOT `infrastructure-systemic` (7d, BLOCK-OPERATOR-ACTION). A config/logic mismatch in the plugin is not a "host broken" condition — the failure-adapter shouldn't conflate them. `dispatcher.classify_cycle_failure()` detects `SHIP_GATE_DENIED` markers and routes to the new classification.
+
+**Fix 3 — `--reset` flag.** `bash scripts/evolve-loop-dispatch.sh --reset [N] [strategy] [goal]` runs `state-prune.sh` against `infrastructure-{systemic,transient}` + `ship-gate-config` entries before the cycle loop. Operator-driven recovery from BLOCKED-SYSTEMIC deadlock without bypassing any kernel hook. Logged loudly so the choice is auditable.
+
+**Anti-gaming preserved.** Cycle 102–111, 132–141, and Gemini-forgery were all caught by SHA + verdict-text + phase-gate, none of which change. The exit_code check (the relaxation) was never the structural defense — it was an over-restrictive gate that conflicted with the auditor's actual exit semantics.
+
 ## Budget Cap Default-Unlimited (v8.26.0+)
 
 Pre-v8.26.0, `--max-budget-usd` was sized per-phase from the profile (~$0.18 Scout default, $0.50 Intent, $1.00 Orchestrator). Complex meta-goals routinely exceeded these caps mid-thought, exiting subagents with `BUDGET_EXCEEDED` (rc=1) and aborting cycles with no useful output. The caps prevented cost runaway but did not prevent reward hacking — that's enforced entirely by Tier-1 hooks (phase-gate, role-gate, ledger SHA).
