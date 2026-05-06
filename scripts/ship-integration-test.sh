@@ -134,17 +134,45 @@ else
 fi
 cd "$REPO_ROOT"
 
-# --- Test C: WARN verdict → ship.sh refuses ---------------------------------
-header "Test C: WARN audit → ship.sh refuses"
+# --- Test C: v8.28.0 — WARN verdict ships by default (fluent mode) ----------
+# Pre-v8.28.0: WARN was treated like FAIL (block ship). v8.28.0 inverts:
+# WARN ships by default, with a log line. Operator opts back to strict
+# blocking via EVOLVE_STRICT_AUDIT=1.
+header "Test C: v8.28.0 — WARN audit ships by default (fluent)"
 REPO=$(make_repo)
 cd "$REPO"
-echo "another change" > other.txt
+echo "warn change" >> fixture.txt
 seed_audit "$REPO" "WARN"
+BARE_C="$SCRATCH/remote-test-c-$RANDOM.git"
+git init -q --bare "$BARE_C"
+git remote add origin "$BARE_C"
+git branch -M main
 set +e
-bash scripts/ship.sh "should not ship" >/tmp/ship-out 2>&1
+bash scripts/ship.sh "feat: shipping with WARN" >/tmp/ship-out 2>&1
 RC=$?
 set -e
-[ "$RC" = "2" ] && pass "WARN verdict → exit 2 (rc=$RC)" || fail "expected rc=2, got rc=$RC"
+if [ "$RC" = "0" ] && grep -q "audit verdict: WARN — shipping" /tmp/ship-out; then
+    pass "WARN ships by default + logs the relaxation"
+else
+    fail "expected rc=0 with WARN-shipping log; got rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test C2: v8.28.0 — EVOLVE_STRICT_AUDIT=1 restores WARN → block ---------
+header "Test C2: v8.28.0 — EVOLVE_STRICT_AUDIT=1 → WARN audit refuses"
+REPO=$(make_repo)
+cd "$REPO"
+echo "warn change strict" >> fixture.txt
+seed_audit "$REPO" "WARN"
+set +e
+EVOLVE_STRICT_AUDIT=1 bash scripts/ship.sh "should not ship" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "2" ] && grep -q "EVOLVE_STRICT_AUDIT=1" /tmp/ship-out; then
+    pass "STRICT_AUDIT=1 restores legacy WARN→block"
+else
+    fail "expected rc=2 with strict-audit message; got rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
 cd "$REPO_ROOT"
 
 # --- Test D: PASS audit but tracked-file change since audit → refuses --------
@@ -452,7 +480,7 @@ set +e
 bash scripts/ship.sh "feat: ship with verdict fail" >/tmp/ship-out 2>&1
 RC=$?
 set -e
-if [ "$RC" = "2" ] && grep -q "Verdict: PASS" /tmp/ship-out; then
+if [ "$RC" = "2" ] && grep -qE "Verdict: ?FAIL|auditor explicitly rejected" /tmp/ship-out; then
     pass "exit_code=0 + Verdict:FAIL → ship refused (verdict text caught it; anti-gaming preserved)"
 else
     fail "expected rc=2 with verdict diagnostic, got rc=$RC; tail: $(tail -3 /tmp/ship-out)"

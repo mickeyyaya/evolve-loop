@@ -296,20 +296,67 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
     ACTUAL_SHA=$(SHA256 "$ARTIFACT_PATH")
     [ "$ACTUAL_SHA" = "$RECORDED_SHA" ] || integrity_fail "audit-report.md SHA mismatch (ledger=$RECORDED_SHA actual=$ACTUAL_SHA) — artifact mutated post-audit"
 
-    # Verdict must be PASS. Accept two formats observed in production:
-    #   (1) Inline:  "Verdict: **PASS**"          (v8.13.x convention)
-    #   (2) Heading: "## Verdict\n**PASS**"       (Auditor's natural Markdown style)
-    # Word-boundary protections (D-NEW-4 from cycle 8130 audit) are preserved
-    # in the inline regex and via the literal "**PASS**" marker in the heading
-    # form — both reject PASSABLE / PASSTHROUGH false matches.
-    if ! { grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$ARTIFACT_PATH" \
-           || awk '
+    # v8.28.0: Verdict semantics relaxed to fluent-by-default.
+    #
+    # PASS  → ship (always)
+    # WARN  → ship by default. Auditor expressed concerns but proceed.
+    #         Operator opts back to strict blocking via EVOLVE_STRICT_AUDIT=1.
+    # FAIL  → block. Auditor said "do not ship".
+    #
+    # Rationale: WARN typically means "minor findings to address in next
+    # cycle". Pre-v8.28.0 treated WARN like FAIL, preventing iterative
+    # improvement. The downstream user's analysis: "if we never accept WARN,
+    # the audit-fail count climbs forever and the loop deadlocks."
+    #
+    # Anti-gaming preserved: the auditor still distinguishes PASS/WARN/FAIL
+    # by writing different verdict text. The kernel can't prevent the LLM
+    # from writing "PASS" when it should be "FAIL" — that's not a structural
+    # threat, it's a model-quality concern. Tier-1 hooks (SHA, cycle binding,
+    # ship-gate atomicity) still prevent FAKERY (orchestrator can't pretend
+    # the auditor ran when it didn't).
+    #
+    # FAIL detection is FIRST (priority): if FAIL is declared, block
+    # regardless of any PASS/WARN that might also appear (defensive against
+    # malformed reports that include both).
+    AUDIT_VERDICT_RAW="$(cat "$ARTIFACT_PATH")"
+    has_fail() {
+        echo "$AUDIT_VERDICT_RAW" | grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*FAIL([[:space:]]|$|\*)' \
+            || echo "$AUDIT_VERDICT_RAW" | awk '
+                /^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
+                saw && (NR - saw) <= 5 && /\*\*FAIL\*\*/ { found=1; exit }
+                END { exit !found }
+              '
+    }
+    has_pass() {
+        echo "$AUDIT_VERDICT_RAW" | grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' \
+            || echo "$AUDIT_VERDICT_RAW" | awk '
                 /^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
                 saw && (NR - saw) <= 5 && /\*\*PASS\*\*/ { found=1; exit }
                 END { exit !found }
-              ' "$ARTIFACT_PATH"; }; then
-        integrity_fail "audit-report.md does not declare 'Verdict: PASS' (inline or heading form)"
+              '
+    }
+    has_warn() {
+        echo "$AUDIT_VERDICT_RAW" | grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*WARN([[:space:]]|$|\*)' \
+            || echo "$AUDIT_VERDICT_RAW" | awk '
+                /^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
+                saw && (NR - saw) <= 5 && /\*\*WARN\*\*/ { found=1; exit }
+                END { exit !found }
+              '
+    }
+
+    if has_fail; then
+        integrity_fail "audit-report.md declares 'Verdict: FAIL' — auditor explicitly rejected this build"
+    elif has_pass; then
+        : # ship — clean PASS
+    elif has_warn; then
+        if [ "${EVOLVE_STRICT_AUDIT:-0}" = "1" ]; then
+            integrity_fail "audit-report.md declares 'Verdict: WARN' and EVOLVE_STRICT_AUDIT=1 — strict mode rejects WARN"
+        fi
+        log "audit verdict: WARN — shipping per fluent-by-default policy (set EVOLVE_STRICT_AUDIT=1 to block on WARN)"
+    else
+        integrity_fail "audit-report.md declares no recognizable verdict (PASS/WARN/FAIL) — auditor output malformed"
     fi
+    unset AUDIT_VERDICT_RAW
 
     # --- 5. Cycle binding: current state must match audited state -------------
 

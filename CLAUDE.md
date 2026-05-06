@@ -203,6 +203,27 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Fluent-by-Default (v8.28.0+) — proceed unless faking work
+
+Operating principle declared: **reduce friction is the top priority; preventing the LLM from gaming the system is equal priority but only structural fakery counts.** Five Tier-1 hooks prove fakery (phase-gate, ledger SHA, role-gate, ship-gate canonical entry, cycle binding). Everything else is operational policy that has accumulated friction without proportional protection.
+
+v8.28.0 inverts the default. Strict-mode behaviors are now opt-in.
+
+| Behavior | Pre-v8.28.0 default | v8.28.0 default | Restore via |
+|---|---|---|---|
+| Audit `Verdict: WARN` | Block ship | **Ships, logs WARN** | `EVOLVE_STRICT_AUDIT=1` |
+| Audit `Verdict: FAIL` | Block ship | Block ship (unchanged) | — |
+| 1+ infrastructure-systemic | BLOCK-OPERATOR-ACTION | **PROCEED with awareness** | `EVOLVE_STRICT_FAILURES=1` |
+| 2+ code-audit-fail | BLOCK-CODE | **PROCEED with awareness** | `EVOLVE_STRICT_FAILURES=1` |
+| 2+ code-build-fail | BLOCK-CODE | **PROCEED with awareness** | `EVOLVE_STRICT_FAILURES=1` |
+| 3+ consecutive infra-transient | BLOCK-OPERATOR-ACTION | **PROCEED with awareness + EPERM fallback set_env** | `EVOLVE_STRICT_FAILURES=1` |
+| Same-cycle circuit-breaker | 3 iterations | **5 iterations** | `EVOLVE_DISPATCH_REPEAT_THRESHOLD=3` |
+| Expired failedApproaches entries | Linger on disk | **Auto-pruned at dispatcher start** | `EVOLVE_AUTO_PRUNE=0` |
+
+**Awareness instead of blocks**: when a would-have-blocked rule fires in fluent mode, the failure-adapter accumulates a `would-have-blocked: <action> — <reason>` line in the PROCEED reason field. The orchestrator reads this and adapts approach in the next cycle (smaller scope, alternative path) without the loop halting.
+
+**Anti-gaming preserved.** The cycle 102–111, 132–141, and Gemini-forgery incidents — the canonical reward-hacking threats — were all caught by Tier-1 (SHA verification + verdict text + phase-gate ordering). None of those structural defenses change. v8.28.0 only relaxes operational policy that was over-engineered.
+
 ## Loop Continuation (v8.27.0+) — exit-code semantics + --reset
 
 Three fixes in v8.27.0 close a remaining deadlock where audit-PASS cycles couldn't ship.

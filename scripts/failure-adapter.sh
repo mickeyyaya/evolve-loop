@@ -200,76 +200,109 @@ emit() {
         }'
 }
 
-# Decision tree (priority order — first match wins):
+# v8.28.0: fluent-by-default. The adapter accumulates AWARENESS context
+# (so the orchestrator can read about prior failures and adapt) but emits
+# BLOCK only when EVOLVE_STRICT_FAILURES=1. Each rule below would have
+# emitted a BLOCK pre-v8.28.0; now it adds a line to AWARENESS_LINES and
+# falls through unless strict mode is on.
+STRICT="${EVOLVE_STRICT_FAILURES:-0}"
+AWARENESS_LINES=()
+SET_ENV_FLUENT='{}'
+
+emit_or_advise() {
+    local block_action="$1" reason="$2" remediation="$3" verdict="$4"
+    local set_env="${5:-}"
+    [ -z "$set_env" ] && set_env='{}'
+    if [ "$STRICT" = "1" ]; then
+        emit "$block_action" "$reason" "$remediation" "$verdict" "$set_env"
+        exit 0
+    fi
+    AWARENESS_LINES+=("would-have-blocked: $block_action — $reason")
+    # Merge any set_env hint into the fluent-mode env (e.g., FALLBACK_ON_EPERM)
+    if [ -n "$set_env" ] && [ "$set_env" != '{}' ]; then
+        SET_ENV_FLUENT=$(printf '%s\n%s\n' "$SET_ENV_FLUENT" "$set_env" | jq -sc 'add // {}')
+    fi
+}
+
+# Decision tree (priority order). In strict mode the first match exits
+# with BLOCK; in fluent mode each match accumulates awareness and the
+# loop continues to PROCEED below.
 #
 # 1. intent-rejected (any non-expired) → BLOCK-CODE, SCOPE-REJECTED.
-#    User goal is out of scope; loop cannot proceed without operator refinement.
 if [ "$INTENT_REJECTED_COUNT" -gt 0 ]; then
-    emit "BLOCK-CODE" \
+    emit_or_advise "BLOCK-CODE" \
         "$INTENT_REJECTED_COUNT prior intent-rejected (out-of-scope IBTC)" \
         "Refine the goal description to be in-scope, then re-run /evolve-loop." \
         "SCOPE-REJECTED"
-    exit 0
 fi
 
 # 2. infrastructure-systemic (any non-expired) → BLOCK-OPERATOR-ACTION.
-#    Tooling-missing / host-broken — operator must intervene.
 if [ "$SYSTEMIC_COUNT" -gt 0 ]; then
     last_systemic_summary=$(echo "$ENTRIES" | jq -r '
         map(select(.classification == "infrastructure-systemic")) | last | .summary // "(no summary)"' \
         | head -c 200)
-    emit "BLOCK-OPERATOR-ACTION" \
+    emit_or_advise "BLOCK-OPERATOR-ACTION" \
         "$SYSTEMIC_COUNT non-expired infrastructure-systemic failure(s); last summary: $last_systemic_summary" \
         "Investigate the systemic infrastructure issue (tooling, host, claude-cli). Use scripts/state-prune.sh --classification infrastructure-systemic after fixing." \
         "BLOCKED-SYSTEMIC"
-    exit 0
 fi
 
 # 3. 2+ code-audit-fail → BLOCK-CODE, BLOCKED-RECURRING-AUDIT-FAIL.
 if [ "$CODE_AUDIT_FAIL_COUNT" -ge 2 ]; then
-    emit "BLOCK-CODE" \
+    emit_or_advise "BLOCK-CODE" \
         "$CODE_AUDIT_FAIL_COUNT non-expired code-audit-fail entries (within 30d retention)" \
         "Auditor has rejected code N times. Pick a materially different task or prune via scripts/state-prune.sh --classification code-audit-fail after addressing root cause." \
         "BLOCKED-RECURRING-AUDIT-FAIL"
-    exit 0
 fi
 
 # 4. 2+ code-build-fail → BLOCK-CODE, BLOCKED-RECURRING-BUILD-FAIL.
 if [ "$CODE_BUILD_FAIL_COUNT" -ge 2 ]; then
-    emit "BLOCK-CODE" \
+    emit_or_advise "BLOCK-CODE" \
         "$CODE_BUILD_FAIL_COUNT non-expired code-build-fail entries (within 30d retention)" \
         "Builder has failed to compile/test N times. Pick a materially different task or prune via scripts/state-prune.sh --classification code-build-fail." \
         "BLOCKED-RECURRING-BUILD-FAIL"
-    exit 0
 fi
 
 # 5. 3+ consecutive infrastructure-transient (TAIL streak) → BLOCK-OPERATOR-ACTION.
-#    The fallback flag isn't unblocking the cycle. Operator must investigate
-#    nested-claude or run from non-sandboxed shell.
 if [ "$INFRA_TAIL_STREAK" -ge 3 ]; then
-    emit "BLOCK-OPERATOR-ACTION" \
-        "$INFRA_TAIL_STREAK consecutive infrastructure-transient failures despite EPERM-fallback. The kernel sandbox-exec is being rejected at every retry." \
+    emit_or_advise "BLOCK-OPERATOR-ACTION" \
+        "$INFRA_TAIL_STREAK consecutive infrastructure-transient failures despite EPERM-fallback." \
         "Either: (1) run /evolve-loop from a non-sandboxed terminal, OR (2) run scripts/state-prune.sh --classification infrastructure-transient after confirming the underlying issue is resolved, OR (3) file an issue with cycle ledger entry." \
         "BLOCKED-SYSTEMIC"
-    exit 0
 fi
 
-# 6. 1+ infrastructure-transient → RETRY-WITH-FALLBACK.
-#    Auto-enable the EPERM fallback (defense in depth — dispatcher already
-#    sets it for nested-claude, this is belt-and-suspenders).
+# 6. 1+ infrastructure-transient → RETRY-WITH-FALLBACK (always emit, both modes).
+#    Auto-enable the EPERM fallback. This is a non-blocking RETRY hint, not
+#    a BLOCK, so it fires identically in fluent and strict modes.
 INFRA_T_COUNT=$(count_class "infrastructure-transient")
 if [ "$INFRA_T_COUNT" -gt 0 ]; then
-    emit "RETRY-WITH-FALLBACK" \
-        "$INFRA_T_COUNT prior infrastructure-transient (within 1d retention); attempting with EPERM fallback enabled" \
-        "" \
-        "null" \
-        '{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM":"1"}'
-    exit 0
+    if [ "$STRICT" = "1" ]; then
+        emit "RETRY-WITH-FALLBACK" \
+            "$INFRA_T_COUNT prior infrastructure-transient (within 1d retention); attempting with EPERM fallback enabled" \
+            "" \
+            "null" \
+            '{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM":"1"}'
+        exit 0
+    fi
+    SET_ENV_FLUENT=$(printf '%s\n%s\n' "$SET_ENV_FLUENT" '{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM":"1"}' | jq -sc 'add // {}')
+    AWARENESS_LINES+=("infra-transient: $INFRA_T_COUNT prior; EPERM fallback enabled")
 fi
 
-# 7. Default: PROCEED (no concerning failure history).
-emit "PROCEED" \
-    "no recent failures requiring adaptation (non-expired count=$NON_EXPIRED_COUNT)" \
-    "" \
-    "null"
+# 7. Default / fluent terminus: PROCEED with accumulated awareness.
+if [ ${#AWARENESS_LINES[@]} -gt 0 ]; then
+    # Fluent mode hit one or more would-have-blocked rules. Emit PROCEED
+    # with the awareness so the orchestrator knows what would-have-blocked
+    # in strict mode. The orchestrator's prompt context displays these.
+    awareness_str=$(printf '%s; ' "${AWARENESS_LINES[@]}")
+    emit "PROCEED" \
+        "fluent mode (set EVOLVE_STRICT_FAILURES=1 for legacy blocking): ${awareness_str% ; }" \
+        "Awareness only — orchestrator should consider the prior failures when planning. Set EVOLVE_STRICT_FAILURES=1 to restore legacy block-on-recurring-failure behavior." \
+        "null" \
+        "$SET_ENV_FLUENT"
+else
+    emit "PROCEED" \
+        "no recent failures requiring adaptation (non-expired count=$NON_EXPIRED_COUNT)" \
+        "" \
+        "null"
+fi
 exit 0

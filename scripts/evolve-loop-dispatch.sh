@@ -589,6 +589,27 @@ read_last_cycle() {
     fi
 }
 
+# --- v8.28.0: auto-prune expired entries on dispatcher start ----------------
+#
+# Pre-v8.28.0: failedApproaches entries past their expiresAt remained on disk
+# (the failure-adapter filtered them at READ time, but operators saw the
+# accumulation in state.json and got confused). v8.28.0 cleans them up
+# proactively at dispatcher start.
+#
+# This is purely cosmetic — the adapter's read-time expiresAt filter already
+# prevented expired entries from influencing decisions. But "why are there 4
+# entries in failedApproaches?" was operator-archeology friction.
+#
+# Operator opt-out: EVOLVE_AUTO_PRUNE=0 disables this pre-cycle prune.
+if [ "${EVOLVE_AUTO_PRUNE:-1}" = "1" ] && [ -z "${RUN_CYCLE_OVERRIDE:-}" ] && [ -f "$STATE_FILE" ]; then
+    CSH="$EVOLVE_PLUGIN_ROOT/scripts/cycle-state.sh"
+    if [ -x "$CSH" ]; then
+        bash "$CSH" prune-expired-failures "$STATE_FILE" 2>&1 | sed 's/^/[auto-prune] /' >&2 \
+            || true   # non-fatal — cosmetic cleanup
+    fi
+    unset CSH
+fi
+
 # --- v8.27.0: --reset operator unblock --------------------------------------
 #
 # When the failure-adapter has accumulated infrastructure-systemic entries,
@@ -633,7 +654,7 @@ DISPATCH_RC=0
 # 10-cycle budget. Tunable via env if a use case ever justifies it.
 PREV_RAN_CYCLE=""
 SAME_CYCLE_STREAK=0
-SAME_CYCLE_THRESHOLD="${EVOLVE_DISPATCH_REPEAT_THRESHOLD:-3}"
+SAME_CYCLE_THRESHOLD="${EVOLVE_DISPATCH_REPEAT_THRESHOLD:-5}"
 
 for ((i=1; i<=CYCLES; i++)); do
     log "------------------ cycle $i / $CYCLES ------------------"

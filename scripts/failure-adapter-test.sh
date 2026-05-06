@@ -40,7 +40,12 @@ EOF
     echo "$f"
 }
 
-decide() { bash "$SCRIPT" decide --state "$1"; }
+# v8.28.0: BLOCK semantics moved to opt-in via EVOLVE_STRICT_FAILURES=1.
+# Legacy tests that expected BLOCK-* verdicts now use decide_strict, which
+# sets the env var so the adapter restores pre-v8.28.0 blocking. New tests
+# that assert v8.28.0 fluent semantics (PROCEED with awareness) use decide.
+decide()        { bash "$SCRIPT" decide --state "$1"; }
+decide_strict() { EVOLVE_STRICT_FAILURES=1 bash "$SCRIPT" decide --state "$1"; }
 
 # === Test 1: empty failedApproaches → PROCEED ================================
 header "Test 1: no failures → PROCEED"
@@ -65,11 +70,13 @@ else
     fail_ "expected PROCEED, got $action"
 fi
 
-# === Test 3: 1 infra-transient (non-expired) → RETRY-WITH-FALLBACK ===========
-header "Test 3: 1 infra-transient → RETRY-WITH-FALLBACK + set_env"
+# === Test 3: 1 infra-transient + STRICT → RETRY-WITH-FALLBACK ================
+# In v8.28.0 fluent default this becomes PROCEED+set_env; Test 17 covers that.
+# Strict mode preserves the legacy RETRY-WITH-FALLBACK action verbatim.
+header "Test 3: 1 infra-transient + STRICT → RETRY-WITH-FALLBACK + set_env"
 exp=$(FUTURE_ISO 1)
 sf=$(make_state "[{\"cycle\":10,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"}]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 flag=$(echo "$out" | jq -r '.set_env.EVOLVE_SANDBOX_FALLBACK_ON_EPERM // "(unset)"')
 if [ "$action" = "RETRY-WITH-FALLBACK" ] && [ "$flag" = "1" ]; then
@@ -78,26 +85,26 @@ else
     fail_ "action=$action flag=$flag"
 fi
 
-# === Test 4: 3 consecutive infra-transient → BLOCK-OPERATOR-ACTION ===========
-header "Test 4: 3 consecutive infra-transient (tail streak) → BLOCK-OPERATOR-ACTION"
+# === Test 4: 3 consecutive infra-transient → BLOCK-OPERATOR-ACTION (strict) ===
+header "Test 4: 3 consecutive infra-transient (tail streak) + STRICT → BLOCK-OPERATOR-ACTION"
 exp=$(FUTURE_ISO 1)
 sf=$(make_state "[
   {\"cycle\":1,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"},
   {\"cycle\":2,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"},
   {\"cycle\":3,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"}
 ]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 verdict=$(echo "$out" | jq -r '.verdict_for_block // "null"')
 streak=$(echo "$out" | jq -r '.evidence.consecutive_infra_transient_streak')
 if [ "$action" = "BLOCK-OPERATOR-ACTION" ] && [ "$verdict" = "BLOCKED-SYSTEMIC" ] && [ "$streak" = "3" ]; then
-    pass "BLOCK-OPERATOR-ACTION (BLOCKED-SYSTEMIC), tail-streak=3"
+    pass "STRICT: BLOCK-OPERATOR-ACTION (BLOCKED-SYSTEMIC), tail-streak=3"
 else
     fail_ "action=$action verdict=$verdict streak=$streak"
 fi
 
-# === Test 5: streak interrupted by code failure → only RETRY-WITH-FALLBACK ===
-header "Test 5: 2 infra-transient + 1 code-audit-fail + 1 infra-transient → RETRY (streak=1)"
+# === Test 5: streak interrupted + STRICT → only RETRY-WITH-FALLBACK ==========
+header "Test 5: 2 infra-transient + 1 code-audit-fail + 1 infra-transient + STRICT → RETRY (streak=1)"
 exp=$(FUTURE_ISO 1)
 sf=$(make_state "[
   {\"cycle\":1,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"},
@@ -105,7 +112,7 @@ sf=$(make_state "[
   {\"cycle\":3,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
   {\"cycle\":4,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"}
 ]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 streak=$(echo "$out" | jq -r '.evidence.consecutive_infra_transient_streak')
 # 1 code-audit-fail → does NOT trigger 2+ rule. 1 infra-transient at tail → RETRY.
@@ -115,60 +122,60 @@ else
     fail_ "action=$action tail-streak=$streak"
 fi
 
-# === Test 6: 2 code-audit-fail → BLOCK-CODE BLOCKED-RECURRING-AUDIT-FAIL =====
-header "Test 6: 2 code-audit-fail → BLOCK-CODE + BLOCKED-RECURRING-AUDIT-FAIL"
+# === Test 6: 2 code-audit-fail → BLOCK-CODE (strict) =========================
+header "Test 6: 2 code-audit-fail + STRICT → BLOCK-CODE + BLOCKED-RECURRING-AUDIT-FAIL"
 exp=$(FUTURE_ISO 5)
 sf=$(make_state "[
   {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
   {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
 ]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 verdict=$(echo "$out" | jq -r '.verdict_for_block')
 if [ "$action" = "BLOCK-CODE" ] && [ "$verdict" = "BLOCKED-RECURRING-AUDIT-FAIL" ]; then
-    pass "BLOCK-CODE + BLOCKED-RECURRING-AUDIT-FAIL"
+    pass "STRICT: BLOCK-CODE + BLOCKED-RECURRING-AUDIT-FAIL"
 else
     fail_ "action=$action verdict=$verdict"
 fi
 
-# === Test 7: 2 code-build-fail → BLOCK-CODE BLOCKED-RECURRING-BUILD-FAIL =====
-header "Test 7: 2 code-build-fail → BLOCK-CODE + BLOCKED-RECURRING-BUILD-FAIL"
+# === Test 7: 2 code-build-fail → BLOCK-CODE (strict) =========================
+header "Test 7: 2 code-build-fail + STRICT → BLOCK-CODE + BLOCKED-RECURRING-BUILD-FAIL"
 exp=$(FUTURE_ISO 5)
 sf=$(make_state "[
   {\"cycle\":1,\"classification\":\"code-build-fail\",\"expiresAt\":\"$exp\"},
   {\"cycle\":2,\"classification\":\"code-build-fail\",\"expiresAt\":\"$exp\"}
 ]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 verdict=$(echo "$out" | jq -r '.verdict_for_block')
 if [ "$action" = "BLOCK-CODE" ] && [ "$verdict" = "BLOCKED-RECURRING-BUILD-FAIL" ]; then
-    pass "BLOCK-CODE + BLOCKED-RECURRING-BUILD-FAIL"
+    pass "STRICT: BLOCK-CODE + BLOCKED-RECURRING-BUILD-FAIL"
 else
     fail_ "action=$action verdict=$verdict"
 fi
 
-# === Test 8: 1 intent-rejected → BLOCK-CODE SCOPE-REJECTED ===================
-header "Test 8: 1 intent-rejected (non-expired) → BLOCK-CODE + SCOPE-REJECTED"
+# === Test 8: 1 intent-rejected → BLOCK-CODE (strict) =========================
+header "Test 8: 1 intent-rejected + STRICT → BLOCK-CODE + SCOPE-REJECTED"
 exp=$(FUTURE_ISO 365)  # intent-rejected has very long expiry
 sf=$(make_state "[{\"cycle\":1,\"classification\":\"intent-rejected\",\"expiresAt\":\"$exp\"}]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 verdict=$(echo "$out" | jq -r '.verdict_for_block')
 if [ "$action" = "BLOCK-CODE" ] && [ "$verdict" = "SCOPE-REJECTED" ]; then
-    pass "BLOCK-CODE + SCOPE-REJECTED"
+    pass "STRICT: BLOCK-CODE + SCOPE-REJECTED"
 else
     fail_ "action=$action verdict=$verdict"
 fi
 
-# === Test 9: 1 infrastructure-systemic → BLOCK-OPERATOR-ACTION ===============
-header "Test 9: 1 infra-systemic (non-expired) → BLOCK-OPERATOR-ACTION"
+# === Test 9: 1 infrastructure-systemic → BLOCK-OPERATOR-ACTION (strict) ======
+header "Test 9: 1 infra-systemic + STRICT → BLOCK-OPERATOR-ACTION"
 exp=$(FUTURE_ISO 5)
 sf=$(make_state "[{\"cycle\":1,\"classification\":\"infrastructure-systemic\",\"expiresAt\":\"$exp\",\"summary\":\"claude-cli not installed\"}]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 verdict=$(echo "$out" | jq -r '.verdict_for_block')
 if [ "$action" = "BLOCK-OPERATOR-ACTION" ] && [ "$verdict" = "BLOCKED-SYSTEMIC" ]; then
-    pass "BLOCK-OPERATOR-ACTION + BLOCKED-SYSTEMIC"
+    pass "STRICT: BLOCK-OPERATOR-ACTION + BLOCKED-SYSTEMIC"
 else
     fail_ "action=$action verdict=$verdict"
 fi
@@ -195,14 +202,14 @@ fi
 # === Test 11: priority — intent-rejected wins over other failures ============
 # An intent-rejected entry should block even if there are also code failures or
 # infra streaks (operator must refine goal first).
-header "Test 11: intent-rejected + 2 code-audit-fail → SCOPE-REJECTED (priority)"
+header "Test 11: STRICT — intent-rejected + 2 code-audit-fail → SCOPE-REJECTED (priority)"
 exp=$(FUTURE_ISO 5)
 sf=$(make_state "[
   {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
   {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
   {\"cycle\":3,\"classification\":\"intent-rejected\",\"expiresAt\":\"$exp\"}
 ]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 verdict=$(echo "$out" | jq -r '.verdict_for_block')
 if [ "$verdict" = "SCOPE-REJECTED" ]; then
     pass "SCOPE-REJECTED takes priority over BLOCKED-RECURRING-AUDIT-FAIL"
@@ -250,22 +257,69 @@ else
     fail_ "expected PROCEED, got $action; full out: $out"
 fi
 
-# === Test 14: v8.27.0 — mix of ship-gate-config + 1 infra-systemic → BLOCK ===
+# === Test 14: v8.27.0 — ship-gate-config + infra-systemic in STRICT → BLOCK ==
 # Sanity: the new classification doesn't accidentally suppress the existing
-# BLOCK-SYSTEMIC rule when a real systemic entry is present.
-header "Test 14: v8.27.0 — ship-gate-config doesn't mask infra-systemic block"
+# BLOCK-SYSTEMIC rule when a real systemic entry is present (strict mode).
+header "Test 14: STRICT — ship-gate-config doesn't mask infra-systemic block"
 exp=$(FUTURE_ISO 1)
 sf=$(make_state "[
   {\"cycle\":10,\"classification\":\"ship-gate-config\",\"expiresAt\":\"$exp\"},
   {\"cycle\":11,\"classification\":\"infrastructure-systemic\",\"summary\":\"real systemic issue\",\"expiresAt\":\"$exp\"}
 ]")
-out=$(decide "$sf")
+out=$(decide_strict "$sf")
 action=$(echo "$out" | jq -r '.action')
 verdict=$(echo "$out" | jq -r '.verdict_for_block // ""')
 if [ "$action" = "BLOCK-OPERATOR-ACTION" ] && [ "$verdict" = "BLOCKED-SYSTEMIC" ]; then
-    pass "real infra-systemic still blocks even when ship-gate-config also present"
+    pass "STRICT: real infra-systemic still blocks even when ship-gate-config also present"
 else
     fail_ "expected BLOCK-OPERATOR-ACTION+BLOCKED-SYSTEMIC, got $action+$verdict"
+fi
+
+# === Test 15: v8.28.0 — fluent default: same scenario as Test 9 → PROCEED ====
+# Pre-v8.28.0: 1+ infra-systemic = immediate BLOCK-OPERATOR-ACTION.
+# v8.28.0: fluent by default — adapter emits PROCEED with awareness.
+header "Test 15: v8.28.0 — 1 infra-systemic in FLUENT default → PROCEED with awareness"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[{\"cycle\":1,\"classification\":\"infrastructure-systemic\",\"expiresAt\":\"$exp\",\"summary\":\"the kind of failure that used to deadlock\"}]")
+out=$(decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+reason=$(echo "$out" | jq -r '.reason // ""')
+if [ "$action" = "PROCEED" ] && echo "$reason" | grep -q "would-have-blocked"; then
+    pass "FLUENT default: PROCEED with would-have-blocked awareness in reason"
+else
+    fail_ "expected PROCEED with awareness, got action=$action reason=$reason"
+fi
+
+# === Test 16: v8.28.0 — fluent default: 2 code-audit-fail → PROCEED ==========
+header "Test 16: v8.28.0 — 2 code-audit-fail in FLUENT default → PROCEED with awareness"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+if [ "$action" = "PROCEED" ]; then
+    pass "FLUENT default: 2 code-audit-fail → PROCEED (loop continues, orchestrator gets awareness)"
+else
+    fail_ "expected PROCEED, got $action"
+fi
+
+# === Test 17: v8.28.0 — fluent emits set_env from infra-transient awareness ==
+# When infra-transient awareness is accumulated in fluent mode, the
+# EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 env hint should still be emitted so
+# the next subagent attempt benefits from the fallback even though we
+# didn't explicitly RETRY-WITH-FALLBACK as a verdict.
+header "Test 17: v8.28.0 — fluent default: infra-transient awareness still sets EPERM fallback env"
+exp=$(FUTURE_ISO 1)
+sf=$(make_state "[{\"cycle\":1,\"classification\":\"infrastructure-transient\",\"expiresAt\":\"$exp\"}]")
+out=$(decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+flag=$(echo "$out" | jq -r '.set_env.EVOLVE_SANDBOX_FALLBACK_ON_EPERM // ""')
+if [ "$action" = "PROCEED" ] && [ "$flag" = "1" ]; then
+    pass "FLUENT default: infra-transient → PROCEED + EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 in set_env"
+else
+    fail_ "action=$action set_env.fallback=$flag"
 fi
 
 # === Summary =================================================================
