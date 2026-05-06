@@ -235,27 +235,26 @@ honor_adapter_set_env() {
 
 # ---- Setup workspace -------------------------------------------------------
 
-mkdir -p "$WORKSPACE"
-log "workspace=$WORKSPACE"
-
-# v8.29.0: clear stale phase artifacts BEFORE cycle_state_init.
-# Cycle-N can be reused across batches (when lastCycleNumber didn't advance
-# because audit failed). Stale build-report.md / audit-report.md / scout-
-# report.md from a prior attempt would otherwise be reused by the new
-# orchestrator's "if artifact exists, reuse it" optimization, but their
-# SHA was signed against a worktree state that no longer matches → ship.sh
-# INTEGRITY-FAIL with SHA mismatch (downstream user's "expected 773ab8d7…
-# actual daa208e8…" trap, 5 retries → dispatcher abort).
+# v8.30.1: clear stale cycle directory BEFORE cycle_state_init.
 #
-# We're certain this is a fresh start (collision check at line 137 already
-# refused if cycle-state.json exists). Safe to wipe artifact files.
-if [ -d "$WORKSPACE" ]; then
-    find "$WORKSPACE" -maxdepth 1 -type f \( \
-        -name '*-report.md' -o -name 'intent.md' -o -name 'audit-report.md' \
-        -o -name 'handoff-*.json' -o -name '*-stdout.log' -o -name '*-stderr.log' \
-        -o -name '*-timing.json' -o -name '*-usage.json' -o -name '*-prompt.md' \
-        \) -delete 2>/dev/null || true
-fi
+# Replaces v8.29.0's named-pattern wipe (find -name '*-report.md' ...) which
+# missed files outside the pattern set: worker-*.md from fan-out, cache-
+# prefix.md, test-patch.diff/txt, and any future artifact types. Downstream
+# user analysis pinpointed the deeper issue: when cycle-N is reused across
+# batches (lastCycleNumber didn't advance because audit failed), ANY file
+# in $WORKSPACE could have been written by a prior worktree that's now
+# destroyed. The orchestrator's "if artifact exists, reuse it" optimization
+# then picks up cross-fingerprint stale data, audit signs it against the
+# new worktree, ship.sh's worktree-content SHA check correctly refuses
+# ("expected 773ab8d7… actual daa208e8…" — 5 retries → dispatcher abort).
+#
+# Right behavior per user: clear the cycle directory entirely at start of
+# every fresh run. Collision check at line 137 already refused if cycle-
+# state.json exists, so reaching this point guarantees fresh start. Safe
+# to nuke. Subdirectories (workers/) recreated by phase agents as needed.
+rm -rf "$WORKSPACE"
+mkdir -p "$WORKSPACE"
+log "workspace=$WORKSPACE (cleared for fresh cycle-init)"
 
 # v8.29.0: register cleanup trap BEFORE cycle_state_init.
 # Pre-v8.29.0, the trap was set ~117 lines later, so any failure in worktree
