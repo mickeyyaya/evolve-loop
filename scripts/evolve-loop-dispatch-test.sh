@@ -1097,6 +1097,64 @@ else
 fi
 
 # === Summary ==================================================================
+# === Test 41: v8.33.0 — per-cycle cost summary log line emitted ==============
+# Verify the dispatcher emits a "cost: $N (phase=$M, ...) cache_hit=P%" line
+# after a cycle completes. Pre-seed cycle-1/ with synthetic *-stdout.log files
+# (claude -p result JSON) so show-cycle-cost.sh has data to aggregate.
+header "Test 41: v8.33.0 — per-cycle cost summary log line"
+ws41=$(make_workspace)
+write_state "$ws41/state.json" 0
+: > "$ws41/ledger.jsonl"
+mkdir -p "$ws41/runs/cycle-1"
+# Pre-seed claude -p result JSONs in stdout.log files. show-cycle-cost.sh tails
+# the last line of each, so a single-line file is sufficient. Schema mirrors
+# real claude -p output.
+for phase in scout builder auditor; do
+    cat > "$ws41/runs/cycle-1/${phase}-stdout.log" <<EOF
+{"type":"result","subtype":"success","total_cost_usd":0.5234,"usage":{"input_tokens":1000,"output_tokens":500,"cache_read_input_tokens":4000,"cache_creation_input_tokens":2000}}
+EOF
+done
+mock_rc41=$(make_mock_run_cycle)
+set +e
+out=$(env STATE_OVERRIDE="$ws41/state.json" LEDGER_OVERRIDE="$ws41/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws41/runs" RUN_CYCLE_OVERRIDE="$mock_rc41" \
+        bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+# Expected log line shape: "cycle 1 cost: $N.NNNN (scout=$0.5234, builder=$0.5234, auditor=$0.5234) cache_hit=NN%"
+if [ "$rc" = "0" ] && \
+   echo "$out" | grep -qE 'cycle 1 cost: \$[0-9]+\.?[0-9]*' && \
+   echo "$out" | grep -qE 'scout=\$0\.5234' && \
+   echo "$out" | grep -qE 'builder=\$0\.5234' && \
+   echo "$out" | grep -qE 'auditor=\$0\.5234' && \
+   echo "$out" | grep -qE 'cache_hit=[0-9]+%'; then
+    pass "cost summary emitted with per-phase costs and cache_hit %"
+else
+    fail_ "rc=$rc; expected cost-summary log line. Tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 42: v8.33.0 — cost summary skipped when no stdout.log files =========
+# Defensive: if a cycle ran but produced no stdout.log (early failure), the
+# cost summary block is a no-op (does not error, does not emit garbage).
+header "Test 42: v8.33.0 — no stdout.log → cost summary silently skipped"
+ws42=$(make_workspace)
+write_state "$ws42/state.json" 0
+: > "$ws42/ledger.jsonl"
+mkdir -p "$ws42/runs/cycle-1"   # exists but empty, no stdout.log
+mock_rc42=$(make_mock_run_cycle)
+set +e
+out=$(env STATE_OVERRIDE="$ws42/state.json" LEDGER_OVERRIDE="$ws42/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws42/runs" RUN_CYCLE_OVERRIDE="$mock_rc42" \
+        bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+# Should NOT emit a cost line (no data); rc=0 (clean dispatch).
+if [ "$rc" = "0" ] && ! echo "$out" | grep -q "cycle 1 cost:"; then
+    pass "no stdout.log → no cost line emitted, dispatch still clean"
+else
+    fail_ "rc=$rc; got unexpected cost line. Tail: $(echo "$out" | tail -5)"
+fi
+
 echo
 echo "=========================================="
 echo "  Total tests: $TESTS_TOTAL"

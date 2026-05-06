@@ -17,6 +17,24 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+### Token Optimization (v8.33.0+)
+
+Three surgical fixes targeting per-cycle input-token spend without touching agent behavior:
+
+1. **Cache-friendly prompt order**: `run-cycle.sh:build_context()` already emits the static agent prompt first (read verbatim from `agents/<role>.md`), then dynamic context last. This pattern hits Anthropic's automatic prompt cache (Sonnet ≥1024 tokens, 5-minute TTL, 0.1× cost on reads). Three back-to-back cycles in one batch hit the cache after the first.
+
+2. **Conditional context blocks**: Pre-v8.33, every cycle injected `recentLedgerEntries:`, `recentFailures:`, `instinctSummary:` headers unconditionally — even with empty bodies. For cycle 1 with empty state, this padded ~500–1000 tokens of useless boilerplate. v8.33.0 emits each block only when its data source is non-empty.
+
+3. **Per-cycle cost summary in dispatcher**: After each cycle's ledger verification, the dispatcher invokes `show-cycle-cost.sh --json` and emits one log line:
+   ```
+   [dispatch] cycle 25 cost: $1.5702 (scout=$0.5234, builder=$0.5234, auditor=$0.5234) cache_hit=66%
+   ```
+   Surfaces the optimization (cache hit %) AND the cost-driver phases without operators grepping sidecar JSON. Best-effort — silently no-ops if the cycle didn't produce stdout.log files.
+
+**Side fix in v8.33.0**: `show-cycle-cost.sh` now honors `EVOLVE_PROJECT_ROOT` (writable side of dual-root) instead of script-relative `REPO_ROOT`. Pre-v8.33 it was broken in plugin-install scenarios because cycle data lives under the user's project, not under the plugin install. Tests can also override via `RUNS_DIR_OVERRIDE`.
+
+Quality impact: zero. The three fixes are pure cost-side; same agents, same prompts, same artifacts, same verdicts.
+
 ### Swarm Optimization (v8.23.0+)
 
 Sprint 1's Pattern-3 fan-out (Scout/Auditor/Retrospective parallel sub-personas) gained three optimizations in v8.23.0, all gated by env flags so existing behavior is preserved when off.

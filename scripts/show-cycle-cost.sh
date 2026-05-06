@@ -31,7 +31,11 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# v8.33.0: honor EVOLVE_PROJECT_ROOT (writable side of dual-root) so the script
+# works in plugin-install scenarios where the script's directory is the plugin
+# cache (read-only) and cycle data lives under the user's project. Also accept
+# RUNS_DIR_OVERRIDE for tests that want a fully-isolated workspace.
+PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 CYCLE=""
 JSON=0
@@ -52,7 +56,9 @@ done
 [ -n "$CYCLE" ] || { echo "[show-cycle-cost] usage: show-cycle-cost.sh <cycle> [--json]" >&2; exit 10; }
 [[ "$CYCLE" =~ ^[0-9]+$ ]] || { echo "[show-cycle-cost] cycle must be integer" >&2; exit 10; }
 
-WORKSPACE="$REPO_ROOT/.evolve/runs/cycle-$CYCLE"
+# Tests can override the runs directory directly. Otherwise compute from project root.
+RUNS_DIR="${RUNS_DIR_OVERRIDE:-$PROJECT_ROOT/.evolve/runs}"
+WORKSPACE="$RUNS_DIR/cycle-$CYCLE"
 [ -d "$WORKSPACE" ] || { echo "[show-cycle-cost] no workspace at $WORKSPACE" >&2; exit 1; }
 
 # Find all *-stdout.log files in the workspace.

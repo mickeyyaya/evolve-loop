@@ -181,35 +181,54 @@ build_context() {
         ' "$STATE_FILE" 2>/dev/null || echo "")
     fi
 
-    cat <<EOF
+    # v8.33.0: emit only non-empty blocks. Pre-v8.33 emitted every block
+    # unconditionally (including empty headers like "instinctSummary:\n\n"
+    # which padded each prompt with ~500-1000 tokens of useless boilerplate).
+    # Now: skip the block entirely when its data source is empty. No quality
+    # impact (empty data is empty whether we ship the empty header or not).
+    {
+        echo
+        echo "---"
+        echo "ORCHESTRATOR CONTEXT (injected by run-cycle.sh)"
+        echo "---"
+        echo
+        echo "cycle: $cycle"
+        echo "workspace: $workspace"
+        echo "goal: ${goal:-<unspecified — pick from CLAUDE.md priorities>}"
+        echo "cycleState: $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json (already initialized to phase=calibrate)"
+        echo "pluginRoot: $EVOLVE_PLUGIN_ROOT (read-only — scripts/, agents/, profiles/ live here)"
+        echo "projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts go here)"
+        echo "intentRequired: ${EVOLVE_REQUIRE_INTENT:-0} (v8.19.0+: when 1, run intent persona before scout; cycle-state.intent_required is the authoritative source)"
+        echo "intentArtifactPath: $workspace/intent.md (only present if intent persona has run)"
+        echo
 
----
-ORCHESTRATOR CONTEXT (injected by run-cycle.sh)
----
+        # Adaptive failure decision: always include (even empty-ish) — orchestrator
+        # uses this as its FOLLOW-VERBATIM directive; absence is meaningful.
+        echo "adaptiveFailureDecision (v8.22.0+ — deterministic kernel verdict — FOLLOW VERBATIM):"
+        echo "${adapter_decision:-<no decision available — proceed normally>}"
+        echo
 
-cycle: $cycle
-workspace: $workspace
-goal: ${goal:-<unspecified — pick from CLAUDE.md priorities>}
-cycleState: $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json (already initialized to phase=calibrate)
-pluginRoot: $EVOLVE_PLUGIN_ROOT (read-only — scripts/, agents/, profiles/ live here)
-projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts go here)
-intentRequired: ${EVOLVE_REQUIRE_INTENT:-0} (v8.19.0+: when 1, run intent persona before scout; cycle-state.intent_required is the authoritative source)
-intentArtifactPath: $workspace/intent.md (only present if intent persona has run)
+        # v8.33.0: conditional blocks. Emit header + body only when body is non-empty.
+        if [ -n "$ledger_tail" ]; then
+            echo "recentLedgerEntries:"
+            echo "$ledger_tail"
+            echo
+        fi
 
-adaptiveFailureDecision (v8.22.0+ — deterministic kernel verdict — FOLLOW VERBATIM):
-$adapter_decision
+        if [ -n "$failed" ]; then
+            echo "recentFailures (non-expired, last 3):"
+            echo "$failed"
+            echo
+        fi
 
-recentLedgerEntries:
-$ledger_tail
+        if [ -n "$instinct" ]; then
+            echo "instinctSummary:"
+            echo "$instinct"
+            echo
+        fi
 
-recentFailures (non-expired, last 3):
-$failed
-
-instinctSummary:
-$instinct
-
----
-EOF
+        echo "---"
+    }
 }
 
 # v8.22.0: Honor failure-adapter's set_env directive at the run-cycle layer.

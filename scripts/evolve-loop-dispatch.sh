@@ -746,6 +746,37 @@ for ((i=1; i<=CYCLES; i++)); do
         log "NOTE: lastCycleNumber did not advance; verifying cycle $ran_cycle (likely WARN/FAIL audit verdict — that is acceptable, but pipeline must still have been complete)"
     fi
 
+    # v8.33.0: per-cycle cost summary. Reuse show-cycle-cost.sh's --json mode
+    # to aggregate per-phase usage.json sidecars and emit one log line per
+    # cycle. Surfaces the optimization (cache hits) AND the cost-driver phases
+    # without operators needing to grep sidecar JSON manually. Best-effort —
+    # if the cycle didn't produce sidecar files (early failure), this is a
+    # no-op.
+    #
+    # Field path note: show-cycle-cost.sh's --json output nests totals under
+    # `.total.{cost_usd,cache_read_input_tokens,cache_creation_input_tokens,input_tokens}`.
+    # All field accesses use `// 0` defaults so missing fields don't break jq.
+    SCC="$EVOLVE_PLUGIN_ROOT/scripts/show-cycle-cost.sh"
+    if [ -x "$SCC" ] && [ -d "$RUNS_DIR/cycle-${ran_cycle}" ]; then
+        # Pass RUNS_DIR through so show-cycle-cost.sh finds the workspace even
+        # in test isolation (RUNS_DIR_OVERRIDE) or plugin-install (project_root
+        # ≠ plugin_root) scenarios.
+        cost_json=$(RUNS_DIR_OVERRIDE="$RUNS_DIR" bash "$SCC" "$ran_cycle" --json 2>/dev/null || echo "")
+        if [ -n "$cost_json" ]; then
+            cost_line=$(echo "$cost_json" | jq -r '
+                . as $c
+                | (.total.cost_usd // 0) as $tc
+                | ((.total.cache_read_input_tokens // 0) + (.total.cache_creation_input_tokens // 0)) as $cache_in
+                | ((.total.input_tokens // 0) + $cache_in) as $all_input
+                | (if $all_input > 0 then ($cache_in / $all_input * 100) | floor else 0 end) as $hit_pct
+                | ($c.phases | map("\(.phase)=$\((.cost_usd // 0) | (. * 10000 | round / 10000) | tostring)") | join(", ")) as $phase_str
+                | "cycle \($c.cycle) cost: $\($tc | (. * 10000 | round / 10000) | tostring) (\($phase_str)) cache_hit=\($hit_pct)%"
+            ' 2>/dev/null || echo "")
+            [ -n "$cost_line" ] && log "$cost_line"
+        fi
+    fi
+    unset SCC cost_json cost_line
+
     # v8.24.0: same-cycle circuit-breaker. If iteration after iteration reports
     # the same cycle number, the dispatcher is deadlocked — either state.json
     # writes silently fail (pre-v8.24.0 bug, now caught by record_failed_approach
