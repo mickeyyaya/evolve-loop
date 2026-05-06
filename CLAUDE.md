@@ -203,6 +203,14 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Builder Write-Leak Fix (v8.31.0+)
+
+The Builder profile previously had `Edit(scripts/**)` + `Edit(skills/**)` (and Write counterparts) in `disallowed_tools` AND bare `Bash` in `allowed_tools`. This combination forced Builder to use Bash for any script-edit work (Edit was denied → fallback to `cat > scripts/foo` or `python3 -c "open(...)"`). Bare Bash has no path gating: `--add-dir` only restricts the Edit/Write tools, not Bash redirects. With v8.25.1 disabling inner `sandbox-exec` in nested-Claude, nothing prevented Builder from writing to `/Users/.../evolve-loop/scripts/foo` directly.
+
+**Cycle-25 evidence**: 5 files modified in main repo's working tree post-cycle, despite `active_worktree=/var/folders/.../cycle-25`. The build-report claimed "directly in worktree via Python3+Bash" but the changes ended up in main repo.
+
+**Fix**: Builder's `disallowed_tools` now removes the redundant `Edit(scripts/**)` etc. denials (path gating is already enforced by `role-gate.sh` per-phase allowlists) and adds the same interpreter-execution Bash denials that orchestrator already has: `perl`, `ruby`, `python3 -c`, `node -e`, `sh -c`, `bash -c`, `zsh -c`, `env`, `exec`, `eval`, `awk`, `unlink`, `ln`. Net result: Builder uses Edit tool (gated to worktree by role-gate) instead of falling back to Bash; arbitrary-code-execution Bash patterns are blocked. `cat > FILE` still works for legitimate worktree writes since `cat` itself isn't in the denial list — but `python3 -c "open('/Users/.../scripts/foo', 'w').write(...)"` is.
+
 ## Operational Polish (v8.30.0+)
 
 Four small fixes that close v8.30 candidate tickets without philosophical changes:
