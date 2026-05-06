@@ -64,8 +64,11 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
    ↓ advance audit auditor
 4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
    ↓ verdict-driven branch:
-5a. PASS    →  advance ship orchestrator  →  ship.sh "<commit-msg>"
-5b. FAIL/WARN  →  record-failure-to-state.sh $WORKSPACE <verdict>
+5a. PASS         →  advance ship orchestrator  →  ship.sh "<commit-msg>"
+5b. WARN (v8.35.0+) →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
+                       advance ship orchestrator  →  ship.sh "<commit-msg>"
+                       (ship.sh accepts WARN per v8.28.0 fluent-by-default policy)
+5c. FAIL         →  record-failure-to-state.sh $WORKSPACE FAIL  (no ship)
                   (no retrospective subagent inline — batched per v8.12.3 design)
 6. Write orchestrator-report.md → exit
 ```
@@ -79,8 +82,8 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 | Verdict | Action |
 |---------|--------|
 | `PASS`  | If this cycle bumps the project version, invoke `release-pipeline.sh <new-version>` (full publish lifecycle: bump + changelog + ship + marketplace-poll + auto-rollback on failure). Otherwise, for non-release commits, build commit message from build-report.md summary and run `ship.sh "<msg>"` (atomic ship without version bump). ship-gate verifies audit-report SHA + cycle binding in either case. On exit 0, emit success report. |
-| `WARN`  | If new MEDIUM defect: `record-failure-to-state.sh` and exit. Operator may re-cycle or accept the WARN. |
-| `FAIL`  | `record-failure-to-state.sh $WORKSPACE FAIL`. Exit. Do **not** retry inline — the next cycle will pick up the lessons. |
+| `WARN` (v8.35.0+) | **Ship by default.** Run `record-failure-to-state.sh $WORKSPACE WARN` first (low-severity awareness, 1d age-out, classification=`code-audit-warn`), then advance to ship phase and run `ship.sh "<commit-msg>"`. ship.sh's v8.28.0 fluent policy accepts WARN. Verdict in your orchestrator-report.md should be `SHIPPED-WITH-WARNINGS`. **If `EVOLVE_STRICT_AUDIT=1`, revert to legacy block-on-WARN behavior**: skip ship phase, just record-failure and exit (verdict=WARN). Rationale: WARN means "minor findings to address in next cycle"; pre-v8.35.0 the orchestrator skipped ship on WARN, deadlocking the loop. ship.sh has been fluent on WARN since v8.28.0 — orchestrator now matches. |
+| `FAIL`  | `record-failure-to-state.sh $WORKSPACE FAIL`. Exit. Do **not** retry inline — the next cycle will pick up the lessons. Verdict in orchestrator-report.md = `FAILED`. |
 | `WARN-NO-AUDIT` (v8.16.1+) | Audit phase couldn't run due to honest infrastructure failure (sandbox-eperm, network, etc.) AND `recentFailures` shows the same pattern recurring. Do NOT attempt ship — ship-gate requires audit PASS and you don't have one. `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT` and exit with a clear operator-action note. The next cycle will see this in `recentFailures` and adapt further. |
 
 ## Adaptive Behavior — Failure Adaptation Kernel (v8.22.0+)
@@ -165,7 +168,7 @@ Write `$WORKSPACE/orchestrator-report.md` (your only allowed Edit/Write target o
 | ship  | (ship.sh) | committed @<commit-sha> | — |
 
 ## Verdict
-SHIPPED | WARN | FAILED | WARN-NO-AUDIT | BLOCKED-RECURRING-AUDIT-FAIL | BLOCKED-RECURRING-BUILD-FAIL | BLOCKED-SYSTEMIC
+SHIPPED | SHIPPED-WITH-WARNINGS | WARN | FAILED | WARN-NO-AUDIT | BLOCKED-RECURRING-AUDIT-FAIL | BLOCKED-RECURRING-BUILD-FAIL | BLOCKED-SYSTEMIC
 
 ## Notes
 <any orchestrator observations — what surprised you, what lessons stand out>

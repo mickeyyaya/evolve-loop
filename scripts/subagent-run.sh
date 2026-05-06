@@ -79,6 +79,45 @@ resolve_model_tier() {
         echo "$MODEL_TIER_HINT"
         return
     fi
+    # v8.35.0: adaptive auditor model selection. The auditor profile defaults
+    # to opus, but trivial diffs (≤3 files, ≤100 lines, no security paths)
+    # are well within Sonnet's reasoning capacity. Auto-downgrading saves
+    # ~$1.89/cycle on routine cycles. Operators can force opus by setting
+    # MODEL_TIER_HINT=opus or EVOLVE_AUDITOR_TIER_OVERRIDE=opus.
+    #
+    # Only applies to the auditor agent. All other agents use profile default.
+    # When EVOLVE_DIFF_COMPLEXITY_DISABLE=1 is set, fall through to the
+    # profile default (kill switch for paranoid runs / CI sweeps).
+    local agent_role
+    agent_role=$(jq -r '.role // .name // ""' "$profile_path")
+    if [ "$agent_role" = "auditor" ] && [ "${EVOLVE_DIFF_COMPLEXITY_DISABLE:-0}" != "1" ]; then
+        if [ -n "${EVOLVE_AUDITOR_TIER_OVERRIDE:-}" ]; then
+            echo "$EVOLVE_AUDITOR_TIER_OVERRIDE"
+            return
+        fi
+        # Plugin-install dual-root: diff-complexity.sh lives next to this
+        # script, not under the user's project. Use script-relative lookup.
+        local diff_complexity_script
+        diff_complexity_script="$(dirname "${BASH_SOURCE[0]}")/diff-complexity.sh"
+        if [ -x "$diff_complexity_script" ] && command -v jq >/dev/null 2>&1; then
+            local tier
+            # Use --cached against the worktree if WORKTREE_PATH is set
+            # (Builder's per-cycle worktree); otherwise fall back to HEAD diff
+            # in the current dir. The diff complexity computation tolerates
+            # missing/empty diffs gracefully.
+            tier=$(cd "${WORKTREE_PATH:-$REPO_ROOT}" 2>/dev/null && \
+                bash "$diff_complexity_script" 2>/dev/null | jq -r '.tier // "complex"' 2>/dev/null \
+                || echo "complex")
+            case "$tier" in
+                trivial)
+                    # Cheap, fast model — Sonnet covers ≤3 files / ≤100 lines easily.
+                    echo "sonnet"; return ;;
+                standard|complex|*)
+                    # Fall through to profile default (opus for auditor).
+                    : ;;
+            esac
+        fi
+    fi
     # Default tier for now; per-cycle override logic can be added here as the
     # orchestrator passes more state. Profile-encoded overrides are advisory
     # documentation of intent — actual selection lives in the orchestrator
@@ -802,6 +841,17 @@ USAGE
 case "$1" in
     --validate-profile) shift; cmd_validate_profile "$@" ;;
     --check-token) shift; cmd_check_token "$@" ;;
+    # v8.35.0: testability hook for adaptive auditor model selection.
+    # Usage: --resolve-tier <agent> — prints the tier resolved for that agent
+    # given current env (MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, etc.).
+    --resolve-tier)
+        shift
+        agent="${1:?usage: --resolve-tier <agent>}"
+        profile="$PROFILES_DIR/${agent}.json"
+        [ -f "$profile" ] || { echo "[subagent-run] no profile: $profile" >&2; exit 1; }
+        resolve_model_tier "$profile" "0"
+        exit 0
+        ;;
     dispatch-parallel) shift; cmd_dispatch_parallel "$@" ;;
     *) cmd_run "$@" ;;
 esac

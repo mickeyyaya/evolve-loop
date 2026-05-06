@@ -322,6 +322,70 @@ else
     fail_ "action=$action set_env.fallback=$flag"
 fi
 
+# === Test 18: v8.35.0 — code-audit-warn classification works ===============
+# code-audit-warn is added in v8.35.0 as the right home for WARN audits
+# (previously misclassified as code-audit-fail). Severity=low, age-out=1d.
+# The adapter should treat it like other low-severity entries: no BLOCK.
+header "Test 18: v8.35.0 — 5 code-audit-warn entries → PROCEED (low severity)"
+exp=$(FUTURE_ISO 1)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":3,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":4,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":5,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+if [ "$action" = "PROCEED" ]; then
+    pass "5 code-audit-warn → PROCEED (no BLOCK; warn is low-severity awareness only)"
+else
+    fail_ "expected PROCEED, got $action"
+fi
+
+# === Test 19: v8.35.0 — STRICT mode also doesn't block on code-audit-warn ====
+# Even in strict mode, code-audit-warn should not trigger a code-block.
+# Only code-audit-fail (FAIL verdicts) trigger that rule.
+header "Test 19: v8.35.0 — STRICT — 3 code-audit-warn → PROCEED (still not a FAIL block)"
+exp=$(FUTURE_ISO 1)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":3,\"classification\":\"code-audit-warn\",\"expiresAt\":\"$exp\"}
+]")
+out=$(EVOLVE_STRICT_FAILURES=1 decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+if [ "$action" = "PROCEED" ]; then
+    pass "STRICT + 3 code-audit-warn → PROCEED (warn ≠ fail)"
+else
+    fail_ "expected PROCEED, got $action; reason: $(echo "$out" | jq -r '.reason')"
+fi
+
+# === Test 20: v8.35.0 — failure-classifications metadata for code-audit-warn ==
+# Direct assertion against the helper functions (sourced).
+header "Test 20: v8.35.0 — failure-classifications.sh metadata: code-audit-warn"
+# Source classifications under a fresh shell (the file uses an idempotency guard).
+# Use a subshell to avoid polluting parent env.
+result=$(EVOLVE_FAILURE_CLASSIFICATIONS_LOADED=0 bash -c '
+    . "'"$REPO_ROOT"'/scripts/failure-classifications.sh"
+    echo "age=$(failure_age_out_seconds code-audit-warn)"
+    echo "sev=$(failure_severity_of code-audit-warn)"
+    echo "ret=$(failure_retry_policy code-audit-warn)"
+    echo "norm_warn=$(failure_normalize_legacy WARN)"
+    echo "norm_fail=$(failure_normalize_legacy FAIL)"
+')
+age=$(echo "$result" | grep '^age=' | cut -d= -f2)
+sev=$(echo "$result" | grep '^sev=' | cut -d= -f2)
+ret=$(echo "$result" | grep '^ret=' | cut -d= -f2)
+norm_warn=$(echo "$result" | grep '^norm_warn=' | cut -d= -f2)
+norm_fail=$(echo "$result" | grep '^norm_fail=' | cut -d= -f2)
+if [ "$age" = "86400" ] && [ "$sev" = "low" ] && [ "$ret" = "yes" ] \
+   && [ "$norm_warn" = "code-audit-warn" ] && [ "$norm_fail" = "code-audit-fail" ]; then
+    pass "metadata: age=86400, severity=low, retry=yes; WARN→code-audit-warn, FAIL→code-audit-fail"
+else
+    fail_ "got age=$age sev=$sev ret=$ret norm_warn=$norm_warn norm_fail=$norm_fail"
+fi
+
 # === Summary =================================================================
 echo
 echo "=========================================="

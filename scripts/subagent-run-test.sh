@@ -128,6 +128,123 @@ else
     fail "legacy fallback signal wrong: got '$out' expected 'LEGACY_DISPATCH'"
 fi
 
+# --- Test 7: v8.35.0 — auditor + trivial diff resolves to sonnet ------------
+# When MODEL_TIER_HINT is unset and the diff is trivial (≤3 files, ≤100 lines,
+# no security paths), resolve_model_tier should auto-downgrade auditor to
+# sonnet. Pre-v8.35.0 behavior: always opus (profile default). v8.35.0 saves
+# ~$1.89/cycle on routine cycles.
+header "Test 7: v8.35.0 — auditor + trivial diff → sonnet"
+TIER_REPO=$(mktemp -d -t "subagent-tier-XXX")
+cd "$TIER_REPO"
+git init -q
+git config user.email t@t.t
+git config user.name t
+echo "init" > seed.txt
+git add seed.txt
+EVOLVE_BYPASS_SHIP_GATE=1 git -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m initial 2>&1 >/dev/null || true
+echo "small change" > tiny.txt
+git add tiny.txt
+# Resolve tier with WORKTREE_PATH pointing here. Note: diff-complexity.sh uses
+# `git diff HEAD` by default which sees uncommitted+staged changes.
+unset MODEL_TIER_HINT EVOLVE_AUDITOR_TIER_OVERRIDE EVOLVE_DIFF_COMPLEXITY_DISABLE
+out=$(WORKTREE_PATH="$TIER_REPO" bash "$RUNNER" --resolve-tier auditor 2>&1)
+if [ "$out" = "sonnet" ]; then
+    pass "v8.35.0: trivial diff → auditor=sonnet"
+else
+    fail "expected 'sonnet', got '$out'"
+fi
+cd "$REPO_ROOT" >/dev/null
+rm -rf "$TIER_REPO"
+
+# --- Test 8: v8.35.0 — auditor + complex diff stays opus --------------------
+header "Test 8: v8.35.0 — auditor + complex diff (>10 files) → opus"
+TIER_REPO=$(mktemp -d -t "subagent-tier-XXX")
+cd "$TIER_REPO"
+git init -q
+git config user.email t@t.t
+git config user.name t
+echo "init" > seed.txt
+git add seed.txt
+EVOLVE_BYPASS_SHIP_GATE=1 git -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m initial 2>&1 >/dev/null || true
+for i in $(seq 1 12); do echo "$i" > "f_$i.txt"; done
+git add -A
+unset MODEL_TIER_HINT EVOLVE_AUDITOR_TIER_OVERRIDE EVOLVE_DIFF_COMPLEXITY_DISABLE
+out=$(WORKTREE_PATH="$TIER_REPO" bash "$RUNNER" --resolve-tier auditor 2>&1)
+if [ "$out" = "opus" ]; then
+    pass "v8.35.0: complex diff → auditor=opus (profile default)"
+else
+    fail "expected 'opus', got '$out'"
+fi
+cd "$REPO_ROOT" >/dev/null
+rm -rf "$TIER_REPO"
+
+# --- Test 9: v8.35.0 — MODEL_TIER_HINT overrides auto-tier ------------------
+header "Test 9: v8.35.0 — MODEL_TIER_HINT=opus + trivial diff → opus (hint wins)"
+TIER_REPO=$(mktemp -d -t "subagent-tier-XXX")
+cd "$TIER_REPO"
+git init -q
+git config user.email t@t.t
+git config user.name t
+echo "init" > seed.txt
+git add seed.txt
+EVOLVE_BYPASS_SHIP_GATE=1 git -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m initial 2>&1 >/dev/null || true
+echo "trivial" > tiny.txt
+git add -A
+out=$(MODEL_TIER_HINT=opus WORKTREE_PATH="$TIER_REPO" bash "$RUNNER" --resolve-tier auditor 2>&1)
+if [ "$out" = "opus" ]; then
+    pass "v8.35.0: MODEL_TIER_HINT=opus wins over auto-tier"
+else
+    fail "expected 'opus', got '$out'"
+fi
+cd "$REPO_ROOT" >/dev/null
+rm -rf "$TIER_REPO"
+
+# --- Test 10: v8.35.0 — non-auditor agents unaffected by auto-tier ----------
+header "Test 10: v8.35.0 — non-auditor (scout) trivial diff → profile default"
+TIER_REPO=$(mktemp -d -t "subagent-tier-XXX")
+cd "$TIER_REPO"
+git init -q
+git config user.email t@t.t
+git config user.name t
+echo "init" > seed.txt
+git add seed.txt
+EVOLVE_BYPASS_SHIP_GATE=1 git -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m initial 2>&1 >/dev/null || true
+echo "trivial" > tiny.txt
+git add -A
+unset MODEL_TIER_HINT EVOLVE_AUDITOR_TIER_OVERRIDE
+expected_default=$(jq -r '.model_tier_default' "$PROFILES_DIR/scout.json")
+out=$(WORKTREE_PATH="$TIER_REPO" bash "$RUNNER" --resolve-tier scout 2>&1)
+if [ "$out" = "$expected_default" ]; then
+    pass "v8.35.0: scout uses profile default ($expected_default), unaffected by auto-tier"
+else
+    fail "expected '$expected_default' (scout default), got '$out'"
+fi
+cd "$REPO_ROOT" >/dev/null
+rm -rf "$TIER_REPO"
+
+# --- Test 11: v8.35.0 — kill switch disables auto-tier ----------------------
+header "Test 11: v8.35.0 — EVOLVE_DIFF_COMPLEXITY_DISABLE=1 → profile default"
+TIER_REPO=$(mktemp -d -t "subagent-tier-XXX")
+cd "$TIER_REPO"
+git init -q
+git config user.email t@t.t
+git config user.name t
+echo "init" > seed.txt
+git add seed.txt
+EVOLVE_BYPASS_SHIP_GATE=1 git -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m initial 2>&1 >/dev/null || true
+echo "trivial" > tiny.txt
+git add -A
+unset MODEL_TIER_HINT EVOLVE_AUDITOR_TIER_OVERRIDE
+out=$(EVOLVE_DIFF_COMPLEXITY_DISABLE=1 WORKTREE_PATH="$TIER_REPO" \
+    bash "$RUNNER" --resolve-tier auditor 2>&1)
+if [ "$out" = "opus" ]; then
+    pass "v8.35.0: kill switch returns profile default (opus)"
+else
+    fail "expected 'opus', got '$out'"
+fi
+cd "$REPO_ROOT" >/dev/null
+rm -rf "$TIER_REPO"
+
 # --- Summary -----------------------------------------------------------------
 rm -rf "$TMPDIR_TEST"
 echo

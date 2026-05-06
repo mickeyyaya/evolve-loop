@@ -17,6 +17,59 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+### Orchestrator Fluency on WARN + Adaptive Auditor (v8.35.0+)
+
+Two structural fixes addressing downstream-user pain ($25/5-cycle batch with 0 ships):
+
+**Fix 1 — Orchestrator ships on WARN by default** (matches v8.28.0 ship.sh policy).
+Pre-v8.35.0 the orchestrator persona pre-decided to skip ship on any non-PASS verdict, recording WARN as `code-audit-fail`. ship.sh's v8.28.0 fluent-by-default policy (WARN ships unless `EVOLVE_STRICT_AUDIT=1`) never got a chance to apply because ship.sh was never invoked. v8.35.0 updates `agents/evolve-orchestrator.md` so:
+
+| Verdict | Pre-v8.35.0 | v8.35.0 |
+|---|---|---|
+| PASS | ship.sh | ship.sh (unchanged) |
+| **WARN** | record-failure-to-state.sh, skip ship | **record (low-severity awareness) THEN ship.sh** — ship.sh accepts WARN per v8.28.0 |
+| FAIL | record-failure-to-state.sh, skip ship | (unchanged) |
+| EVOLVE_STRICT_AUDIT=1 + WARN | skip ship | skip ship (legacy behavior preserved) |
+
+The orchestrator's verdict in its report becomes `SHIPPED-WITH-WARNINGS` for the WARN-shipped path.
+
+**Fix 2 — New `code-audit-warn` classification + adaptive auditor model**.
+Pre-v8.35.0, `failure_normalize_legacy "WARN" → code-audit-fail` (HIGH severity, 30-day age-out). This polluted the failure-adapter's lookback. v8.35.0 introduces:
+
+- `code-audit-warn` classification: severity=low, age_out=86400 (1d), retry=yes
+- `failure_normalize_legacy "WARN" → code-audit-warn` (was `code-audit-fail`)
+- `failure_normalize_legacy "FAIL" → code-audit-fail` (unchanged)
+- The failure-adapter's existing `code-audit-fail`-block rule is FAIL-only; WARN entries can't trigger it
+
+**Fix 3 — Adaptive auditor model selection** via `scripts/diff-complexity.sh`.
+The auditor profile defaulted to Opus on every cycle regardless of diff size. A 2-file 50-line diff doesn't need Opus — Sonnet catches the same findings at ~$0.50 instead of $2.39. v8.35.0 adds tier-based auto-selection:
+
+- **trivial** (≤3 files AND ≤100 lines AND no security paths) → Sonnet (~$0.40)
+- **complex** (>10 files OR >500 lines OR matches `(auth|crypto|payment|secret|\.env|password|token)` regex) → Opus (~$2.39, current default)
+- **standard** (everything else) → Opus (conservative; can downgrade later if quality holds)
+
+Operators can override:
+- `MODEL_TIER_HINT=opus` — force Opus regardless of diff
+- `EVOLVE_AUDITOR_TIER_OVERRIDE=opus` — auditor-only override
+- `EVOLVE_DIFF_COMPLEXITY_DISABLE=1` — kill switch (revert to profile default everywhere)
+
+Builder model unchanged. Same-family-judge concern (Builder=Sonnet + Auditor=Sonnet for trivial cycles) mitigated by: adversarial-audit framing (prompt-level), small surface area (≤100 lines), three independent inputs (scout-report + build-report + git diff), and security-path force-Opus.
+
+**Cost projection for the downstream "$25 with 0 ships" scenario**:
+
+| Cycle | Pre-v8.35.0 | Post-v8.35.0 |
+|---|---|---|
+| 1 | $4.27 (no ship) | $3.30 (ships if PASS/WARN) |
+| 2 | $4.89 (WARN-skipped) | $3.30 (WARN ships) |
+| 3 | $5.00 (retry) | $3.30 (NEW work, no retry needed) |
+| 4 | $5.00 (retry) | $3.30 |
+| 5 | $5.00 (retry) | $3.30 |
+| **Total** | **~$24, 0 ships** | **~$16.50, 4-5 ships** |
+
+40% cost reduction + 4-5× more delivered work.
+
+**Anti-gaming preserved**. Tier-1 hooks (phase-gate, role-gate, ship-gate canonical entry, cycle binding, ledger SHA, audit-report verdict text) all unchanged. v8.34.0's actual-diff commit footer still records ground truth in `git log`.
+
 ### Pipeline Continuation + Diff Transparency (v8.34.0+)
 
 Two structural fixes addressing real-world friction reported from a downstream user:

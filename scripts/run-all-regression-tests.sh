@@ -77,6 +77,7 @@ else
         "scripts/failure-adapter-test.sh"
         "scripts/state-prune-test.sh"
         "scripts/preflight-environment-test.sh"
+        "scripts/diff-complexity-test.sh"
     )
 fi
 
