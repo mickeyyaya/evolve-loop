@@ -148,31 +148,77 @@ sha256_stdin() {
     else shasum -a 256 | awk '{print $1}'; fi
 }
 
-# --- 1. ship.sh self-SHA verification (TOFU) ---------------------------------
+# --- 1. ship.sh self-SHA verification (version-aware TOFU, v8.32.0) ---------
 #
 # Defends against an attacker (or a confused LLM) editing ship.sh to bypass
-# its own checks. The expected SHA is pinned in state.json on first run
-# (trust-on-first-use); subsequent modifications fail loudly. To intentionally
-# update ship.sh, delete state.json's expected_ship_sha first or run the
-# update through a release process that re-pins it.
+# its own checks. Pre-v8.32.0 used naïve TOFU: pin the SHA on first run; any
+# subsequent change → INTEGRITY-FAIL.
+#
+# THE TRAP pre-v8.32.0 fixed: every plugin update ships a new ship.sh with
+# different content → SHA changes → pin no longer matches → cycles fail at
+# ship-gate until operator manually deletes state.json:expected_ship_sha.
+# This was friction without proportional protection — local tampering of
+# ship.sh is a weak threat (attacker with write access to ~/.claude/plugins/
+# can also tamper with role-gate.sh, ship-gate.sh, profiles, etc., none of
+# which had TOFU).
+#
+# v8.32.0 makes TOFU VERSION-AWARE: pin BOTH the SHA AND the plugin version
+# (read from $EVOLVE_PLUGIN_ROOT/.claude-plugin/plugin.json). On verification:
+#   - Same version + same SHA → clean (pass)
+#   - Same version + different SHA → REAL TAMPERING (fail)
+#   - Different version (plugin updated) → re-pin both, log loudly, continue
+#   - No pinned version (legacy state.json) → migrate: re-pin both
+#
+# Within-version SHA changes still trip the integrity check (the threat
+# model that matters). Cross-version SHA changes auto-recover (the false-
+# positive that tortured operators every release).
 
 ACTUAL_SHIP_SHA=$(SHA256 "${BASH_SOURCE[0]}")
+PLUGIN_VERSION=""
+if [ -f "$EVOLVE_PLUGIN_ROOT/.claude-plugin/plugin.json" ]; then
+    PLUGIN_VERSION=$(jq -r '.version // empty' "$EVOLVE_PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null || echo "")
+fi
+EXPECTED_SHIP_SHA=""
+EXPECTED_SHIP_VERSION=""
 if [ -f "$STATE" ]; then
     EXPECTED_SHIP_SHA=$(jq -r '.expected_ship_sha // empty' "$STATE" 2>/dev/null)
-else
-    EXPECTED_SHIP_SHA=""
+    EXPECTED_SHIP_VERSION=$(jq -r '.expected_ship_version // empty' "$STATE" 2>/dev/null)
 fi
 
-if [ -z "$EXPECTED_SHIP_SHA" ]; then
-    # First run — pin (TOFU). Initialize state.json if missing.
+# Reusable pinning helper (DRY: first-run, version-bump, and migration paths).
+_repin_ship_sha() {
+    local reason="$1"
     if [ ! -f "$STATE" ]; then
         echo '{}' > "$STATE"
     fi
-    TMP=$(mktemp)
-    jq --arg sha "$ACTUAL_SHIP_SHA" '. + {expected_ship_sha: $sha}' "$STATE" > "$TMP" && mv "$TMP" "$STATE"
-    log "TOFU: pinned ship.sh SHA256 in state.json (first run)"
-elif [ "$EXPECTED_SHIP_SHA" != "$ACTUAL_SHIP_SHA" ]; then
-    integrity_fail "ship.sh has been modified since the SHA was pinned (expected=$EXPECTED_SHIP_SHA actual=$ACTUAL_SHIP_SHA). To intentionally update: remove .evolve/state.json:expected_ship_sha and re-run."
+    local _tmp; _tmp=$(mktemp)
+    jq --arg sha "$ACTUAL_SHIP_SHA" --arg ver "$PLUGIN_VERSION" \
+       '. + {expected_ship_sha: $sha, expected_ship_version: $ver}' "$STATE" > "$_tmp" \
+       && mv "$_tmp" "$STATE"
+    log "TOFU: $reason — pinned ship.sh SHA + plugin version='$PLUGIN_VERSION'"
+}
+
+if [ -z "$EXPECTED_SHIP_SHA" ]; then
+    # First run — pin both SHA and version.
+    _repin_ship_sha "first run"
+elif [ "$EXPECTED_SHIP_SHA" = "$ACTUAL_SHIP_SHA" ]; then
+    # SHA matches; ensure pinned version is current (auto-update on first
+    # run after v8.32.0 if SHA happened not to change).
+    if [ -z "$EXPECTED_SHIP_VERSION" ] && [ -n "$PLUGIN_VERSION" ]; then
+        _repin_ship_sha "schema migration (no expected_ship_version recorded)"
+    fi
+elif [ -z "$EXPECTED_SHIP_VERSION" ]; then
+    # Legacy state.json (pre-v8.32.0): SHA-only pin, no version recorded.
+    # Auto-migrate: re-pin with current SHA + version. This is the path
+    # that unblocks operators stuck on a stale pin from before v8.32.0.
+    _repin_ship_sha "migrating legacy SHA-only pin to version-aware schema"
+elif [ "$PLUGIN_VERSION" != "$EXPECTED_SHIP_VERSION" ]; then
+    # Plugin version changed (update or downgrade). Treat as plugin-managed
+    # update; re-pin SHA. Real tampering would have to also forge plugin.json.
+    _repin_ship_sha "plugin version changed: '$EXPECTED_SHIP_VERSION' → '$PLUGIN_VERSION'"
+else
+    # Same version, different SHA — REAL local tampering.
+    integrity_fail "ship.sh has been modified WITHIN plugin version $PLUGIN_VERSION (expected=$EXPECTED_SHIP_SHA actual=$ACTUAL_SHIP_SHA). This indicates real local tampering or plugin install corruption. To intentionally update: remove .evolve/state.json:expected_ship_sha and re-run."
 fi
 
 # --- 2. Class-aware verification (v8.25.0+) ----------------------------------

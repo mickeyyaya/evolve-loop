@@ -203,6 +203,26 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Version-Aware TOFU (v8.32.0+) — close the plugin-update SHA trap
+
+Pre-v8.32.0, `ship.sh` pinned its own SHA in `state.json:expected_ship_sha` on first run (TOFU = trust-on-first-use). Subsequent runs verified the SHA matched. **The dominant cause of SHA changes is plugin updates** — every `/reload-plugins` after a v8.X release ships a new ship.sh with different content. The TOFU pin then refused to ship until the operator manually deleted `expected_ship_sha` from state.json. Real-world report: every plugin upgrade caused INTEGRITY-FAIL on the next cycle's ship phase.
+
+**v8.32.0 fix**: pin BOTH SHA AND plugin version. Verification logic:
+
+| State | What v8.32.0 does |
+|---|---|
+| First run (no pin) | Pin both SHA + version |
+| Same version + same SHA | Pass (clean) |
+| Same version + different SHA | **REAL TAMPERING** — fail integrity check |
+| Different version (plugin updated) | **Re-pin** SHA + version, log loudly, continue |
+| Legacy state.json (SHA pinned, no version) | Auto-migrate to version-aware schema |
+
+The within-version-different-SHA path still fails — that's the threat model TOFU was designed for (someone editing ship.sh in place to bypass checks while plugin version stays the same). Cross-version SHA changes auto-recover, eliminating the false-positive on plugin updates. This is the fluent-philosophy applied to TOFU: detect update vs tampering, only block on tampering.
+
+**Anti-gaming impact**: minimal. The within-version threat (an attacker with write access to `~/.claude/plugins/.../scripts/ship.sh` who modifies it without bumping plugin.json:version) still trips. The cross-version threat is weaker because the attacker would need to forge `plugin.json:version` too — and at that point they have full write access and can also tamper with role-gate.sh, ship-gate.sh, profiles, etc. (all of which never had TOFU). The Tier-1 hooks (phase-gate, role-gate, ledger SHA, ship-gate atomicity) remain the real defense.
+
+**Operator impact**: plugin updates no longer trigger SHA-pin traps. The cycle-pipeline-completion guarantee is preserved across releases. Existing pinned states auto-migrate on next ship.sh run.
+
 ## Builder Write-Leak Fix (v8.31.0+)
 
 The Builder profile previously had `Edit(scripts/**)` + `Edit(skills/**)` (and Write counterparts) in `disallowed_tools` AND bare `Bash` in `allowed_tools`. This combination forced Builder to use Bash for any script-edit work (Edit was denied → fallback to `cat > scripts/foo` or `python3 -c "open(...)"`). Bare Bash has no path gating: `--add-dir` only restricts the Edit/Write tools, not Bash redirects. With v8.25.1 disabling inner `sandbox-exec` in nested-Claude, nothing prevented Builder from writing to `/Users/.../evolve-loop/scripts/foo` directly.

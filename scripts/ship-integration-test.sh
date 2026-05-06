@@ -217,30 +217,36 @@ else
 fi
 cd "$REPO_ROOT"
 
-# --- Test F: ship.sh modified post-pin → refuses ----------------------------
-header "Test F: ship.sh modified after SHA pinned → refuses"
+# --- Test F: v8.32.0 — ship.sh modified WITHIN same plugin version → refuses ---
+# The threat model that matters: tampering of ship.sh while plugin version
+# is unchanged. v8.32.0's version-aware TOFU still catches this.
+header "Test F: v8.32.0 — ship.sh modified within same plugin version → refuses"
 REPO=$(make_repo)
 cd "$REPO"
+# v8.32.0: seed plugin.json so PLUGIN_VERSION is non-empty (otherwise the
+# legacy-migration path fires on second ship and we'd never see the same-
+# version-different-SHA path which is what we want to test).
+mkdir -p "$REPO/.claude-plugin"
+echo '{"version":"1.0.0"}' > "$REPO/.claude-plugin/plugin.json"
 seed_audit "$REPO" "PASS"
-# First run pins the SHA (TOFU); needs a remote configured
 BARE="$SCRATCH/remote-test-f-$RANDOM.git"
 git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 echo "audited" > audited.txt
 seed_audit "$REPO" "PASS"
-# First run: pins SHA + commits. Should succeed.
+# First run: pins SHA + version=1.0.0, commits. Should succeed.
 set +e; bash scripts/ship.sh "first ship" >/tmp/ship-out 2>&1; RC1=$?; set -e
-# Now MODIFY ship.sh to simulate tampering
+# Modify ship.sh — simulates tampering. plugin.json:version stays at 1.0.0.
 echo "# malicious comment" >> scripts/ship.sh
-# Try to ship again — should refuse due to SHA mismatch
+# Second ship: same version, different SHA → REAL tampering → rc=2.
 echo "another change" > another.txt
 seed_audit "$REPO" "PASS"
 set +e; bash scripts/ship.sh "second ship" >/tmp/ship-out 2>&1; RC2=$?; set -e
-if [ "$RC2" = "2" ] && grep -q "ship.sh has been modified" /tmp/ship-out 2>/dev/null; then
-    pass "ship.sh modification detected (first rc=$RC1, second rc=$RC2)"
+if [ "$RC2" = "2" ] && grep -q "WITHIN plugin version" /tmp/ship-out 2>/dev/null; then
+    pass "v8.32.0: same-version-different-SHA → integrity fail (first rc=$RC1, second rc=$RC2)"
 else
-    fail "expected second rc=2 with self-SHA error; got rc=$RC2; output: $(tail -3 /tmp/ship-out)"
+    fail "expected second rc=2 with within-version error; got rc=$RC2; output: $(tail -3 /tmp/ship-out)"
 fi
 cd "$REPO_ROOT"
 
@@ -531,6 +537,64 @@ if [ "$RC" = "2" ] && grep -q "BOTH 'Verdict: FAIL' AND 'Verdict: PASS'" /tmp/sh
     pass "dual-verdict refused with auditor-inconsistency message"
 else
     fail "rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test Q: v8.32.0 — plugin version bump + ship.sh SHA change → re-pin ----
+# The dominant cause of SHA changes is plugin updates. Pre-v8.32.0 caught
+# every update as INTEGRITY-FAIL. v8.32.0 detects version mismatch and
+# re-pins automatically.
+header "Test Q: v8.32.0 — plugin version bump → re-pin SHA, ship continues"
+REPO=$(make_repo)
+cd "$REPO"
+mkdir -p "$REPO/.claude-plugin"
+echo '{"version":"1.0.0"}' > "$REPO/.claude-plugin/plugin.json"
+seed_audit "$REPO" "PASS"
+BARE_Q="$SCRATCH/remote-test-q-$RANDOM.git"
+git init -q --bare "$BARE_Q"
+git remote add origin "$BARE_Q"
+git branch -M main
+echo "first audited" > q1.txt
+seed_audit "$REPO" "PASS"
+set +e; bash scripts/ship.sh "first ship at v1.0.0" >/tmp/ship-out 2>&1; RC1=$?; set -e
+# Bump plugin version AND modify ship.sh to simulate plugin update
+echo '{"version":"1.1.0"}' > "$REPO/.claude-plugin/plugin.json"
+echo "# v1.1.0 ship.sh tweak" >> scripts/ship.sh
+echo "second" > q2.txt
+seed_audit "$REPO" "PASS"
+set +e; bash scripts/ship.sh "ship at v1.1.0" >/tmp/ship-out 2>&1; RC2=$?; set -e
+if [ "$RC2" = "0" ] && grep -q "plugin version changed: '1.0.0' → '1.1.0'" /tmp/ship-out; then
+    pass "v8.32.0: plugin version bump auto-re-pins (first rc=$RC1, second rc=$RC2)"
+else
+    fail "expected rc=0 with version-change log; got rc=$RC2; tail: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test R: v8.32.0 — legacy state.json (SHA-only pin) → migrate ---------
+# Pre-v8.32.0 state.json has expected_ship_sha but no expected_ship_version.
+# v8.32.0 detects this and migrates to version-aware schema.
+header "Test R: v8.32.0 — legacy SHA-only pin migrates on first run"
+REPO=$(make_repo)
+cd "$REPO"
+mkdir -p "$REPO/.claude-plugin"
+echo '{"version":"2.0.0"}' > "$REPO/.claude-plugin/plugin.json"
+# Seed state.json with a pin matching the CURRENT ship.sh SHA but no version
+ACTUAL=$(sha256 "$REPO/scripts/ship.sh")
+jq --arg sha "$ACTUAL" '. + {expected_ship_sha: $sha}' "$REPO/.evolve/state.json" > "$REPO/.evolve/state.json.tmp" \
+    && mv "$REPO/.evolve/state.json.tmp" "$REPO/.evolve/state.json"
+seed_audit "$REPO" "PASS"
+BARE_R="$SCRATCH/remote-test-r-$RANDOM.git"
+git init -q --bare "$BARE_R"
+git remote add origin "$BARE_R"
+git branch -M main
+echo "audited" > r.txt
+seed_audit "$REPO" "PASS"
+set +e; bash scripts/ship.sh "ship after migration" >/tmp/ship-out 2>&1; RC=$?; set -e
+new_ver=$(jq -r '.expected_ship_version // empty' "$REPO/.evolve/state.json")
+if [ "$RC" = "0" ] && [ "$new_ver" = "2.0.0" ] && grep -qE "(migrating legacy SHA-only pin|schema migration)" /tmp/ship-out; then
+    pass "v8.32.0: legacy SHA-only pin migrated to version-aware (rc=$RC, version='$new_ver')"
+else
+    fail "rc=$RC; new_ver='$new_ver'; tail: $(tail -5 /tmp/ship-out)"
 fi
 cd "$REPO_ROOT"
 
