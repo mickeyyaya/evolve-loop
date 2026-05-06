@@ -292,6 +292,10 @@ cleanup() {
             git -C "$EVOLVE_PROJECT_ROOT" worktree remove --force "$WORKTREE_PATH" 2>/dev/null \
                 || rm -rf "$WORKTREE_PATH"
         fi
+        # v8.36.0: defensive prune. If worktree-remove silently failed (e.g., the
+        # directory was already gone but admin entry remained), this catches it
+        # so the next cycle's pre-flight starts clean.
+        git -C "$EVOLVE_PROJECT_ROOT" worktree prune 2>/dev/null || true
         if [ -n "$WORKTREE_BRANCH" ]; then
             git -C "$EVOLVE_PROJECT_ROOT" branch -D "$WORKTREE_BRANCH" 2>/dev/null || true
         fi
@@ -379,6 +383,13 @@ elif [ "$DRY_RUN" = "0" ] || [ "${EVOLVE_DRY_RUN_PROVISION_WORKTREE:-1}" = "1" ]
         git -C "$EVOLVE_PROJECT_ROOT" worktree remove --force "$WORKTREE_PATH" 2>/dev/null || true
     fi
     [ -d "$WORKTREE_PATH" ] && rm -rf "$WORKTREE_PATH"
+    # v8.36.0: prune stale worktree admin entries BEFORE branch deletion. Pre-v8.36.0,
+    # if a prior cycle was hard-killed at a different worktree path (typical in
+    # nested-Claude where TMPDIR changes per session), .git/worktrees/<name>/ retained
+    # an admin pointer whose directory no longer exists. `git branch -D` then silently
+    # no-ops on the still-"checked-out" branch, and `git worktree add` fails with
+    # "branch already exists". Pruning frees the branch.
+    git -C "$EVOLVE_PROJECT_ROOT" worktree prune 2>/dev/null || true
     if git -C "$EVOLVE_PROJECT_ROOT" branch --list "$WORKTREE_BRANCH" 2>/dev/null \
          | grep -q "$WORKTREE_BRANCH"; then
         log "removing stale branch $WORKTREE_BRANCH"

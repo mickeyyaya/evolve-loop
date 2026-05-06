@@ -78,6 +78,7 @@ else
         "scripts/state-prune-test.sh"
         "scripts/preflight-environment-test.sh"
         "scripts/diff-complexity-test.sh"
+        "scripts/run-cycle-worktree-test.sh"
     )
 fi
 

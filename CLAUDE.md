@@ -17,6 +17,18 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+### Worktree Provisioning Robustness (v8.36.0+)
+
+`run-cycle.sh` pre-flight cleanup now runs `git worktree prune` BEFORE attempting `git branch -D`. Closes a recurring failure mode in nested-Claude environments: when a prior cycle was hard-killed at a different `$TMPDIR`-based worktree path (e.g., session 1 used `/var/folders/.../HASH_A/cycle-N/`, session 2 uses `/var/folders/.../HASH_B/cycle-N/`), `.git/worktrees/cycle-N/` retained a stale admin pointer to the old path. `git branch -D` silently no-ops on a branch that's still admin-checked-out; `git worktree add` then fails with `fatal: a branch named 'evolve/cycle-N' already exists`.
+
+The fix: `git worktree prune` removes admin entries for worktrees whose directories no longer exist. Active worktrees (whose dirs still exist) are NOT touched, so concurrent cycles are safe. The prune is idempotent (no-op on clean repos) so it's safe to run unconditionally.
+
+Two locations got the fix:
+1. **Pre-flight cleanup** (`scripts/run-cycle.sh:~382`, before stale-branch deletion) — primary fix.
+2. **`cleanup()` EXIT trap** (`scripts/run-cycle.sh:~298`, after worktree-remove) — defensive belt-and-suspenders, ensures next cycle starts clean even if the trap's worktree-remove silently failed.
+
+Test: `scripts/run-cycle-worktree-test.sh` (8 assertions) reproduces the bug, verifies the fix, and checks safety properties (idempotent on clean repo, doesn't touch active worktrees).
+
 ### Orchestrator Fluency on WARN + Adaptive Auditor (v8.35.0+)
 
 Two structural fixes addressing downstream-user pain ($25/5-cycle batch with 0 ships):
