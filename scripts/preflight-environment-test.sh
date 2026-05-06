@@ -115,7 +115,7 @@ header "Test 7: --write persists profile to project's .evolve/environment.json"
 ws=$(mktemp -d -t test-pre-write.XXXXXX)
 cleanup_dirs+=("$ws")
 ( cd "$ws" && git init -q . 2>/dev/null && EVOLVE_BYPASS_SHIP_GATE=1 git commit --allow-empty -q -m init 2>/dev/null ) || true
-out=$(cd "$ws" && bash "$PREFLIGHT" --write 2>&1 >/dev/null)
+out=$(cd "$ws" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT -u EVOLVE_RESOLVE_ROOTS_LOADED bash "$PREFLIGHT" --write 2>&1 >/dev/null)
 if [ -f "$ws/.evolve/environment.json" ] \
    && jq -e '.schema_version == 3' "$ws/.evolve/environment.json" >/dev/null 2>&1; then
     pass "wrote environment.json with schema_version=3"
@@ -130,7 +130,9 @@ header "Test 8: standalone shell + writable in-project → in-project base prefe
 ws8=$(mktemp -d -t test-pre-std.XXXXXX)
 cleanup_dirs+=("$ws8")
 ( cd "$ws8" && git init -q . 2>/dev/null && EVOLVE_BYPASS_SHIP_GATE=1 git commit --allow-empty -q -m init 2>/dev/null ) || true
-out=$(cd "$ws8" && env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_EXECPATH bash "$PREFLIGHT" 2>/dev/null)
+out=$(cd "$ws8" && env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_EXECPATH \
+    -u EVOLVE_WORKTREE_BASE -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT -u EVOLVE_RESOLVE_ROOTS_LOADED \
+    bash "$PREFLIGHT" 2>/dev/null)
 nested=$(echo "$out" | jq -r '.claude_code.nested')
 wt_base=$(echo "$out" | jq -r '.auto_config.worktree_base')
 wt_reason=$(echo "$out" | jq -r '.auto_config.worktree_base_reason')

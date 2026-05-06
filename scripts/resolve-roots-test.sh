@@ -43,6 +43,7 @@ trap 'for d in "${cleanup_dirs[@]}"; do rm -rf "$d"; done' EXIT
 # === Test 1: dev mode (script lives in the same tree as cwd) ==================
 header "Test 1: dev mode — PROJECT_ROOT and PLUGIN_ROOT both resolve to repo"
 out=$(cd "$REPO_ROOT" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+    -u EVOLVE_RESOLVE_ROOTS_LOADED \
     bash -c "source '$HELPER'; printf 'PLUGIN=%s\nPROJECT=%s\n' \"\$EVOLVE_PLUGIN_ROOT\" \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
 plugin=$(printf '%s\n' "$out" | awk -F= '/^PLUGIN=/{print $2}')
 project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
@@ -57,6 +58,7 @@ mkdir -p "$fakeplugin/scripts"
 cp "$HELPER" "$fakeplugin/scripts/resolve-roots.sh"
 cd "$fakeproject" && git init -q . && git commit --allow-empty -q -m init >/dev/null 2>&1 || true
 out=$(cd "$fakeproject" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+    -u EVOLVE_RESOLVE_ROOTS_LOADED \
     bash -c "source '$fakeplugin/scripts/resolve-roots.sh'; printf 'PLUGIN=%s\nPROJECT=%s\n' \"\$EVOLVE_PLUGIN_ROOT\" \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
 plugin=$(printf '%s\n' "$out" | awk -F= '/^PLUGIN=/{print $2}')
 project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
@@ -71,6 +73,7 @@ fproj_real=$(cd "$fakeproject" && pwd -P)
 header "Test 3: EVOLVE_PROJECT_ROOT env override wins over auto-detect"
 override=$(mktemp -d -t evolve-test-override.XXXXXX); cleanup_dirs+=("$override")
 out=$(cd "$REPO_ROOT" && EVOLVE_PROJECT_ROOT="$override" env -u EVOLVE_PLUGIN_ROOT \
+    -u EVOLVE_RESOLVE_ROOTS_LOADED \
     bash -c "source '$HELPER'; printf 'PROJECT=%s\n' \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
 project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
 override_real=$(cd "$override" && pwd -P)
@@ -80,6 +83,7 @@ override_real=$(cd "$override" && pwd -P)
 header "Test 4: cwd not in git repo — PROJECT_ROOT falls back to \$PWD"
 nogit=$(mktemp -d -t evolve-test-nogit.XXXXXX); cleanup_dirs+=("$nogit")
 out=$(cd "$nogit" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+    -u EVOLVE_RESOLVE_ROOTS_LOADED \
     bash -c "source '$HELPER'; printf 'PROJECT=%s\n' \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
 project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
 nogit_real=$(cd "$nogit" && pwd -P)
@@ -88,18 +92,21 @@ nogit_real=$(cd "$nogit" && pwd -P)
 # === Test 5: idempotent sourcing ==============================================
 header "Test 5: sourcing twice is idempotent (no re-resolution, no errors)"
 out=$(cd "$REPO_ROOT" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+    -u EVOLVE_RESOLVE_ROOTS_LOADED \
     bash -c "source '$HELPER'; first=\$EVOLVE_PROJECT_ROOT; source '$HELPER'; second=\$EVOLVE_PROJECT_ROOT; [ \"\$first\" = \"\$second\" ] && echo OK || echo MISMATCH:\$first/\$second" 2>&1)
 [ "$out" = "OK" ] && pass "second source preserved value" || fail_ "idempotency failed: $out"
 
 # === Test 6: writable check — PROJECT_ROOT must be writable, PLUGIN need not =
 header "Test 6: helper exposes EVOLVE_PROJECT_WRITABLE indicator"
 out=$(cd "$REPO_ROOT" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+    -u EVOLVE_RESOLVE_ROOTS_LOADED \
     bash -c "source '$HELPER'; echo \"\${EVOLVE_PROJECT_WRITABLE:-unset}\"" 2>&1)
 [ "$out" = "1" ] && pass "EVOLVE_PROJECT_WRITABLE=1 (repo is writable)" || fail_ "EVOLVE_PROJECT_WRITABLE=$out (expected 1)"
 
 # === Test 7: empty-string EVOLVE_PROJECT_ROOT override falls through to git ==
 header "Test 7: empty-string override is treated as unset (falls through)"
-out=$(cd "$REPO_ROOT" && env -u EVOLVE_PLUGIN_ROOT EVOLVE_PROJECT_ROOT="" \
+out=$(cd "$REPO_ROOT" && env -u EVOLVE_PLUGIN_ROOT -u EVOLVE_RESOLVE_ROOTS_LOADED \
+    EVOLVE_PROJECT_ROOT="" \
     bash -c "source '$HELPER'; printf 'PROJECT=%s\n' \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
 project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
 # Empty string should not pin PROJECT_ROOT to ""; auto-detect should resolve to repo root.
@@ -112,6 +119,7 @@ worktreedir=$(mktemp -d -t evolve-test-wtparent.XXXXXX); cleanup_dirs+=("$worktr
 ( cd "$mainrepo" && git init -q . && git commit --allow-empty -q -m init && git checkout -q -b feat 2>/dev/null && git worktree add -q "$worktreedir/wt" main 2>/dev/null ) >/dev/null 2>&1 || true
 if [ -d "$worktreedir/wt/.git" ] || [ -f "$worktreedir/wt/.git" ]; then
     out=$(cd "$worktreedir/wt" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
+        -u EVOLVE_RESOLVE_ROOTS_LOADED \
         bash -c "source '$HELPER'; printf 'PROJECT=%s\n' \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
     project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
     wt_real=$(cd "$worktreedir/wt" && pwd -P)

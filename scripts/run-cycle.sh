@@ -238,6 +238,60 @@ honor_adapter_set_env() {
 mkdir -p "$WORKSPACE"
 log "workspace=$WORKSPACE"
 
+# v8.29.0: clear stale phase artifacts BEFORE cycle_state_init.
+# Cycle-N can be reused across batches (when lastCycleNumber didn't advance
+# because audit failed). Stale build-report.md / audit-report.md / scout-
+# report.md from a prior attempt would otherwise be reused by the new
+# orchestrator's "if artifact exists, reuse it" optimization, but their
+# SHA was signed against a worktree state that no longer matches → ship.sh
+# INTEGRITY-FAIL with SHA mismatch (downstream user's "expected 773ab8d7…
+# actual daa208e8…" trap, 5 retries → dispatcher abort).
+#
+# We're certain this is a fresh start (collision check at line 137 already
+# refused if cycle-state.json exists). Safe to wipe artifact files.
+if [ -d "$WORKSPACE" ]; then
+    find "$WORKSPACE" -maxdepth 1 -type f \( \
+        -name '*-report.md' -o -name 'intent.md' -o -name 'audit-report.md' \
+        -o -name 'handoff-*.json' -o -name '*-stdout.log' -o -name '*-stderr.log' \
+        -o -name '*-timing.json' -o -name '*-usage.json' -o -name '*-prompt.md' \
+        \) -delete 2>/dev/null || true
+fi
+
+# v8.29.0: register cleanup trap BEFORE cycle_state_init.
+# Pre-v8.29.0, the trap was set ~117 lines later, so any failure in worktree
+# provisioning (lines 246-326) left cycle-state.json orphaned — the next
+# dispatch would fail with "INTEGRITY-FAIL: cycle-state.json already exists
+# for cycle N" until manual `cycle-state.sh clear`. Reproduced 3× this
+# session when worktree-add hit "branch already exists".
+WORKTREE_PATH=""
+WORKTREE_BRANCH=""
+WORKTREE_PROVISIONED=0
+cleanup() {
+    local rc=$?
+    if [ "$WORKTREE_PROVISIONED" = "1" ]; then
+        if [ -d "$WORKTREE_PATH" ]; then
+            log "cleanup: removing worktree $WORKTREE_PATH"
+            git -C "$EVOLVE_PROJECT_ROOT" worktree remove --force "$WORKTREE_PATH" 2>/dev/null \
+                || rm -rf "$WORKTREE_PATH"
+        fi
+        if [ -n "$WORKTREE_BRANCH" ]; then
+            git -C "$EVOLVE_PROJECT_ROOT" branch -D "$WORKTREE_BRANCH" 2>/dev/null || true
+        fi
+    elif [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
+        local dirty_files
+        dirty_files=$(git -C "$EVOLVE_PROJECT_ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$dirty_files" -gt 0 ]; then
+            log "WARN: EVOLVE_SKIP_WORKTREE=1 — main repo has $dirty_files changed file(s) from this cycle"
+            log "  → Run \`git status\` and \`git diff\` to inspect"
+            log "  → \`git restore .\` to discard, or commit/stash to keep"
+        fi
+    fi
+    bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
+    log "cycle-state cleared (rc=$rc)"
+    exit $rc
+}
+trap cleanup EXIT INT TERM
+
 # Initialize cycle-state.json (phase=calibrate, no agent yet).
 bash "$CYCLE_STATE_HELPER" init "$CYCLE" ".evolve/runs/cycle-$CYCLE" \
     || fail "cycle_state_init failed"
@@ -325,39 +379,11 @@ elif [ "$DRY_RUN" = "0" ] || [ "${EVOLVE_DRY_RUN_PROVISION_WORKTREE:-1}" = "1" ]
     fi
 fi
 
-# Always clean up cycle-state AND worktree on exit (success OR failure).
-# v8.21.0: extended to tear down the worktree provisioned above. The
-# WORKTREE_PROVISIONED flag prevents accidental deletion of a pre-existing
-# branch in the rare race where the variable was set but the worktree never
-# came online.
-cleanup() {
-    local rc=$?
-    if [ "$WORKTREE_PROVISIONED" = "1" ]; then
-        if [ -d "$WORKTREE_PATH" ]; then
-            log "cleanup: removing worktree $WORKTREE_PATH"
-            git -C "$EVOLVE_PROJECT_ROOT" worktree remove --force "$WORKTREE_PATH" 2>/dev/null \
-                || rm -rf "$WORKTREE_PATH"
-        fi
-        if [ -n "$WORKTREE_BRANCH" ]; then
-            git -C "$EVOLVE_PROJECT_ROOT" branch -D "$WORKTREE_BRANCH" 2>/dev/null || true
-        fi
-    elif [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
-        # v8.23.4: when worktree was bypassed, tell the operator what (if anything)
-        # the builder left in the working tree. This is the only safety net for
-        # the no-isolation path — operator must manually decide what to keep.
-        local dirty_files
-        dirty_files=$(git -C "$EVOLVE_PROJECT_ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$dirty_files" -gt 0 ]; then
-            log "WARN: EVOLVE_SKIP_WORKTREE=1 — main repo has $dirty_files changed file(s) from this cycle"
-            log "  → Run \`git status\` and \`git diff\` to inspect"
-            log "  → \`git restore .\` to discard, or commit/stash to keep"
-        fi
-    fi
-    bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
-    log "cycle-state cleared (rc=$rc)"
-    exit $rc
-}
-trap cleanup EXIT INT TERM
+# v8.29.0: cleanup() and trap moved to BEFORE cycle_state_init (line ~244).
+# This block is intentionally empty — kept as a comment anchor for the audit
+# trail of the pre-v8.29.0 location. Anything that needs to run between
+# worktree provisioning and orchestrator spawn should be added below this
+# anchor.
 
 # v8.22.0: honor failure-adapter's set_env directive (e.g., auto-enable
 # EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 when prior infra-transient failures are

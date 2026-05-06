@@ -15,6 +15,11 @@ set -uo pipefail
 
 unset EVOLVE_BYPASS_SHIP_VERIFY
 unset EVOLVE_SHIP_RELEASE_NOTES
+# v8.29.0: unset evolve-loop env vars that leak from the Claude Code parent session.
+# Without this, resolve-roots.sh's idempotency guard fires (EVOLVE_RESOLVE_ROOTS_LOADED=1)
+# and ship.sh reads the production state.json (with stale expected_ship_sha) instead
+# of each test's fresh repo state.
+unset EVOLVE_PROJECT_ROOT EVOLVE_PLUGIN_ROOT EVOLVE_RESOLVE_ROOTS_LOADED
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHIP_SH="$REPO_ROOT/scripts/ship.sh"

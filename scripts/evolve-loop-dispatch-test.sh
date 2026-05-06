@@ -525,7 +525,7 @@ mkdir -p "$fakeplugin_cache/plugins/cache/evolve-loop/evolve-loop/8.18.0"
 target_cache="$fakeplugin_cache/plugins/cache/evolve-loop/evolve-loop/8.18.0"
 ( cd "$target_cache" && git init -q . && git commit --allow-empty -q -m init ) >/dev/null 2>&1
 set +e
-out=$(cd "$target_cache" && VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+out=$(cd "$target_cache" && unset EVOLVE_WORKTREE_BASE EVOLVE_SANDBOX_FALLBACK_ON_EPERM CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_EXECPATH EVOLVE_PROJECT_ROOT EVOLVE_PLUGIN_ROOT EVOLVE_RESOLVE_ROOTS_LOADED; VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
 rm -rf "$fakeplugin_cache"
@@ -542,7 +542,7 @@ mkdir -p "$fakeplugin_mkt/plugins/marketplaces/evolve-loop"
 target_mkt="$fakeplugin_mkt/plugins/marketplaces/evolve-loop"
 ( cd "$target_mkt" && git init -q . && git commit --allow-empty -q -m init ) >/dev/null 2>&1
 set +e
-out=$(cd "$target_mkt" && VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+out=$(cd "$target_mkt" && unset EVOLVE_WORKTREE_BASE EVOLVE_SANDBOX_FALLBACK_ON_EPERM CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_EXECPATH EVOLVE_PROJECT_ROOT EVOLVE_PLUGIN_ROOT EVOLVE_RESOLVE_ROOTS_LOADED; VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
 rm -rf "$fakeplugin_mkt"
@@ -738,7 +738,7 @@ fi
 # It should NOT auto-set SKIP_WORKTREE — that's now operator-only.
 header "Test 30: v8.25.0 — CLAUDECODE → ENVIRONMENT + sandbox-fallback + worktree-relocate"
 set +e
-out=$(env CLAUDECODE=1 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
+out=$(unset EVOLVE_WORKTREE_BASE EVOLVE_SANDBOX_FALLBACK_ON_EPERM; env CLAUDECODE=1 VALIDATE_ONLY=1 bash "$DISPATCH" 1 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "0" ] \
