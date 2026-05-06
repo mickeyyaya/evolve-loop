@@ -688,9 +688,50 @@ for ((i=1; i<=CYCLES; i++)); do
     rc=$?
 
     if [ "$rc" -ne 0 ]; then
-        log "FAIL: run-cycle.sh cycle $i exited rc=$rc — aborting batch"
-        DISPATCH_RC=1
-        break
+        # v8.30.0: classify before aborting — fluent-mode philosophy.
+        #
+        # Pre-v8.30.0: ANY non-zero exit from run-cycle.sh aborted the entire
+        # batch. But run-cycle.sh exits 1 for many reasons:
+        #   - orchestrator subagent crashed mid-cycle (transient)
+        #   - claude-adapter timeout / API issue (transient)
+        #   - worktree provisioning hit a race (now mostly fixed in v8.29.0)
+        # Aborting the whole batch on a single transient cycle failure is
+        # exactly the friction the fluent-default philosophy wants to remove.
+        #
+        # v8.30.0: when orchestrator-report.md exists for the attempted cycle
+        # and classifies as recoverable (infrastructure / audit-fail / build-
+        # fail / ship-gate-config), record the failure and continue to the
+        # next cycle. Only abort when no report exists (genuine breach) OR
+        # classification is integrity-breach.
+        attempted_cycle=$(read_last_cycle)
+        attempted_cycle=$((attempted_cycle + 1))
+        attempted_report="$RUNS_DIR/cycle-${attempted_cycle}/orchestrator-report.md"
+        if [ -f "$attempted_report" ]; then
+            classification=$(classify_cycle_failure "$attempted_cycle")
+            log "run-cycle.sh exited rc=$rc; classifying via orchestrator-report.md: $classification"
+            case "$classification" in
+                infrastructure|audit-fail|build-fail|ship-gate-config)
+                    log "RECOVERABLE-FAILURE: run-cycle rc=$rc but report classifies as $classification"
+                    log "  → recording to state.json:failedApproaches; continuing batch"
+                    if ! record_failed_approach "$attempted_cycle" "$classification"; then
+                        log "ABORT: state.json unwritable mid-batch (FATAL above)"
+                        DISPATCH_RC=1
+                        break
+                    fi
+                    DISPATCH_RC=3
+                    continue   # next cycle iteration
+                    ;;
+                integrity-breach|*)
+                    log "INTEGRITY-BREACH: run-cycle rc=$rc + orchestrator-report unclassifiable"
+                    DISPATCH_RC=2
+                    break
+                    ;;
+            esac
+        else
+            log "FAIL: run-cycle.sh cycle $i exited rc=$rc with no orchestrator-report.md — aborting batch"
+            DISPATCH_RC=1
+            break
+        fi
     fi
 
     # Identify which cycle ran. run-cycle.sh increments lastCycleNumber on

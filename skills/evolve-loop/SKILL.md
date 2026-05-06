@@ -22,6 +22,18 @@ EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash "$(find $HOME/.c
 
 The `find` expression locates the dispatcher in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install if both exist (cache install dirs sort by version since the dir name is the version number). The `bash "$(...)"` invocation is **one** command from the shell's perspective — the substitution happens before bash runs.
 
+**Quote `<args>` correctly (v8.30.0).** When `<args>` contains an apostrophe (e.g., `doesn't`, `won't`, `it's`), the shell tokenizer breaks because `'` opens an unmatched quoted string. Always wrap the goal portion in double quotes:
+
+```bash
+# CYCLES STRATEGY then a SINGLE double-quoted goal:
+... bash "$(find ...)" 3 balanced "make UI more elegant; user said it doesn't work"
+
+# Or just CYCLES + double-quoted goal (strategy defaults to balanced):
+... bash "$(find ...)" 5 "the goal isn't trivial — needs research"
+```
+
+Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args — the shell parses `doesn't` as `doesn` + opening-`'t` and waits for a closing single-quote that never comes.
+
 **DO NOT** invent paths like `<plugin_root>/skills/evolve-loop/scripts/...` — the dispatcher is at `<plugin_root>/scripts/`, NOT under `skills/`. The skill (this file) and the dispatcher live in sibling directories under the plugin root.
 
 …and then read its summary. Nothing else. The dispatcher loops `run-cycle.sh` once per cycle and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.

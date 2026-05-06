@@ -492,6 +492,48 @@ else
 fi
 cd "$REPO_ROOT"
 
+# --- Test P: v8.30.0 — dual-verdict (PASS + FAIL) → ship refuses with explanation ---
+# Real audit-report observed in cycle-25: header "## Verdict\n**FAIL**" +
+# per-eval section showing PASS for all 4 evals. Pre-v8.30.0, ship-gate
+# blocked with "declares Verdict: FAIL". v8.30.0 surfaces it explicitly as
+# auditor inconsistency.
+header "Test P: v8.30.0 — dual-verdict (PASS + FAIL) → refuse with auditor-inconsistency message"
+REPO=$(make_repo)
+cd "$REPO"
+echo "dual-verdict change" >> fixture.txt
+audit_path="$REPO/.evolve/runs/cycle-1/audit-report.md"
+cat > "$audit_path" <<EOF
+<!-- challenge-token: testtoken123 -->
+# Audit Report — Cycle 1
+
+## Verdict
+**FAIL**
+
+But also somewhere in this report:
+Verdict: PASS
+
+(simulating cycle-25's actual audit-report.md inconsistency)
+EOF
+sha=$(sha256 "$audit_path")
+head_sha=$(git -C "$REPO" rev-parse HEAD)
+tree_sha=$(git -C "$REPO" diff HEAD | (
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}';
+    else shasum -a 256 | awk '{print $1}'; fi
+))
+cat > "$REPO/.evolve/ledger.jsonl" <<EOF
+{"ts":"2026-04-27T00:00:00Z","cycle":1,"role":"auditor","kind":"agent_subprocess","model":"sonnet","exit_code":0,"duration_s":"30","artifact_path":"$audit_path","artifact_sha256":"$sha","challenge_token":"testtoken123","git_head":"$head_sha","tree_state_sha":"$tree_sha"}
+EOF
+set +e
+bash scripts/ship.sh "ship dual-verdict" </dev/null >/tmp/ship-out 2>&1
+RC=$?
+set -e
+if [ "$RC" = "2" ] && grep -q "BOTH 'Verdict: FAIL' AND 'Verdict: PASS'" /tmp/ship-out; then
+    pass "dual-verdict refused with auditor-inconsistency message"
+else
+    fail "rc=$RC; tail: $(tail -3 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
 # --- Summary ----------------------------------------------------------------
 echo
 echo "==========================================="

@@ -203,6 +203,18 @@ Auto-changelog buckets commits by type prefix:
 - `chore:` / `ci:` / `test:` / `build:` / `revert:` / `release:` → skipped
 - no prefix → `### Other` (audit found ~40% of historical commits)
 
+## Operational Polish (v8.30.0+)
+
+Four small fixes that close v8.30 candidate tickets without philosophical changes:
+
+1. **`run-cycle.sh` exit 1 → recoverable when orchestrator-report exists.** Pre-v8.30, ANY non-zero exit from `run-cycle.sh` aborted the dispatcher batch. Now: if `orchestrator-report.md` exists for the attempted cycle and classifies as `infrastructure`/`audit-fail`/`build-fail`/`ship-gate-config`, the dispatcher records the failure and continues (rc=3). Only abort when no report exists (true breach) or classification is `integrity-breach`. Aligns with v8.28.0 fluent philosophy: don't kill the batch on a single transient cycle failure.
+
+2. **`ship.sh` rejects dual-verdict reports.** When audit-report.md contains both `Verdict: PASS` AND `Verdict: FAIL`, ship-gate now refuses with a clear "auditor produced inconsistent artifact" message instead of just blocking on FAIL. Catches the cycle-25 inconsistency (FAIL header + PASS per-eval evidence) explicitly.
+
+3. **`cycle-state.sh advance` clears `parallel_workers`.** Prevents stale per-worker state from one phase contaminating the next phase's display. Cosmetic but real: previously `phase=audit` could show `parallel_workers.agent=scout` from the prior fan-out.
+
+4. **SKILL.md goal-quoting docs.** When `<args>` contains an apostrophe, the shell tokenizer breaks. Documented the fix: wrap the goal in double quotes.
+
 ## Fluent-by-Default (v8.28.0+) — proceed unless faking work
 
 Operating principle declared: **reduce friction is the top priority; preventing the LLM from gaming the system is equal priority but only structural fakery counts.** Five Tier-1 hooks prove fakery (phase-gate, ledger SHA, role-gate, ship-gate canonical entry, cycle binding). Everything else is operational policy that has accumulated friction without proportional protection.

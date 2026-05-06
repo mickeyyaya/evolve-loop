@@ -134,6 +134,7 @@ cycle_state_advance() {
         | .phase_started_at = $now
         | .active_agent = (if $agent == null then .active_agent else $agent end)
         | .active_worktree = (if $worktree == null then .active_worktree else $worktree end)
+        | del(.parallel_workers)
         ')
     _atomic_write "$updated"
 }

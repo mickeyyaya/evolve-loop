@@ -1019,6 +1019,83 @@ else
     fail_ "expected 1 entry preserved, got $remaining"
 fi
 
+# === Test 39: v8.30.0 — run-cycle exit 1 + recoverable report → continue ====
+# Pre-v8.30.0: ANY rc!=0 from run-cycle aborted the batch (DISPATCH_RC=1, break).
+# v8.30.0: when orchestrator-report.md exists for the attempted cycle and
+# classifies as recoverable (infrastructure / audit-fail / build-fail / ship-
+# gate-config), the dispatcher records the failure and continues to the next
+# cycle — fluent-mode philosophy.
+header "Test 39: v8.30.0 — run-cycle rc=1 + audit-fail report → record + continue (rc=3)"
+ws39=$(make_workspace)
+write_state "$ws39/state.json" 0
+: > "$ws39/ledger.jsonl"
+mkdir -p "$ws39/runs/cycle-1"
+# Seed an orchestrator-report.md classifying as audit-fail (Verdict: FAIL)
+cat > "$ws39/runs/cycle-1/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 1
+
+## Phase Outcomes
+
+audit | auditor | FAIL — Builder did not address E1 finding
+
+## Verdict
+
+FAIL
+
+Verdict: FAIL — auditor caught defect.
+EOF
+# Mock that exits 1 (run-cycle "failed") but the report exists
+mock_rc1=$(mktemp -t mock-rc1.XXXXXX.sh)
+cleanup_files+=("$mock_rc1")
+cat > "$mock_rc1" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+echo "[mock-rc1] simulating run-cycle exit 1 with report present" >&2
+exit 1
+EOF
+chmod +x "$mock_rc1"
+# Also seed a 2nd cycle's report (since the dispatcher loop continues, the
+# 2nd iteration will look for cycle-2). Use a recoverable classification.
+mkdir -p "$ws39/runs/cycle-2"
+cat > "$ws39/runs/cycle-2/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 2
+## Verdict
+FAIL — also audit-fail
+Verdict: FAIL
+EOF
+set +e
+out=$(env STATE_OVERRIDE="$ws39/state.json" LEDGER_OVERRIDE="$ws39/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws39/runs" RUN_CYCLE_OVERRIDE="$mock_rc1" \
+        bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+# rc=3 means batch finished with recoverable failures (continued). rc=1 = legacy abort.
+if [ "$rc" = "3" ] && echo "$out" | grep -q "RECOVERABLE-FAILURE: run-cycle rc=1"; then
+    pass "rc=1 + report classifies as audit-fail → recorded + continued (DISPATCH_RC=3)"
+else
+    fail_ "rc=$rc; expected 3 with RECOVERABLE-FAILURE log. Tail: $(echo "$out" | tail -10)"
+fi
+
+# === Test 40: v8.30.0 — run-cycle exit 1 + NO report → still abort (rc=1) ===
+# Defensive: if orchestrator-report.md is missing, that's a true integrity
+# breach (run-cycle didn't even produce evidence). Maintain abort.
+header "Test 40: v8.30.0 — run-cycle rc=1 + no report → abort batch (rc=1)"
+ws40=$(make_workspace)
+write_state "$ws40/state.json" 0
+: > "$ws40/ledger.jsonl"
+mkdir -p "$ws40/runs"   # no per-cycle subdir, so no report
+set +e
+out=$(env STATE_OVERRIDE="$ws40/state.json" LEDGER_OVERRIDE="$ws40/ledger.jsonl" \
+        RUNS_DIR_OVERRIDE="$ws40/runs" RUN_CYCLE_OVERRIDE="$mock_rc1" \
+        bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "1" ] && echo "$out" | grep -q "no orchestrator-report.md"; then
+    pass "rc=1 + missing report → abort with clear message"
+else
+    fail_ "rc=$rc; tail: $(echo "$out" | tail -5)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="

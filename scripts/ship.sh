@@ -344,6 +344,15 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
               '
     }
 
+    # v8.30.0: detect dual-verdict (auditor wrote both PASS and FAIL).
+    # Real audit-report observed in cycle-25: header "## Verdict\n**FAIL**"
+    # with per-eval section showing all 4 evals PASS. Pre-v8.30.0, FAIL
+    # detection would block (via the priority order below). v8.30.0 detects
+    # the inconsistency and reports it as a malformed-artifact integrity
+    # failure — auditor should commit to a single verdict per artifact.
+    if has_fail && has_pass; then
+        integrity_fail "audit-report.md declares BOTH 'Verdict: FAIL' AND 'Verdict: PASS' — auditor produced an inconsistent artifact. Re-run audit, or split into separate Verdict and per-eval-result sections."
+    fi
     if has_fail; then
         integrity_fail "audit-report.md declares 'Verdict: FAIL' — auditor explicitly rejected this build"
     elif has_pass; then
