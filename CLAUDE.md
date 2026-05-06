@@ -17,6 +17,34 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+### Pipeline Continuation + Diff Transparency (v8.34.0+)
+
+Two structural fixes addressing real-world friction reported from a downstream user:
+
+**Fix 1 — `ship.sh` advances `state.json:lastCycleNumber` on successful cycle ship.**
+Pre-v8.34, only failure paths (`record_failed_approach` in the dispatcher) wrote `lastCycleNumber`. Successful ships left it unchanged → the dispatcher's next iteration computed `ran_cycle = last_before + 1 = the SAME cycle just shipped` → 5-repeat circuit-breaker fired prematurely on legitimate runs (downstream user saw cycle 1 ran 5 times before abort). v8.34.0 has `ship.sh` read `cycle_id` from `cycle-state.json` and atomically write it to `state.json:lastCycleNumber` after a successful push. **Only for `--class cycle`** (manual + release classes don't have cycle semantics).
+
+**Fix 2 — `ship.sh` appends an `## Actual diff` footer to commit messages.**
+Cycles 102+ on a downstream project shipped commits whose messages claimed major refactors (e.g., "moved StudyReminder + Recommendations to 4 above-fold blocks") but `git diff` showed unrelated 2-line moves. The auditor scored the build-report's narrative without verifying it against the actual diff. Per the user's "record, don't block" principle: v8.34.0 records the actual diff in the commit message itself so reviewers (and future audits) can spot message-vs-diff divergence in `git log`. Format:
+
+```
+<original commit message>
+
+---
+## Actual diff (v8.34.0+)
+
+Files modified (N):
+- M path/to/file1.ts
+- A path/to/newfile.tsx
+- D path/to/removed.tsx
+
+ N files changed, NN insertions(+), NN deletions(-)
+```
+
+Skipped for `--class release` (version-bump commits have well-defined scope; the footer adds bulk without value). Applied to both `--class cycle` and `--class manual`.
+
+**This is intentionally non-blocking.** No ship is refused for claim-vs-diff divergence — the divergence is recorded in `git log` and surfaces during review. Per the user's directive: *"if the design cannot consider too many layer and use cases, we should keep the action history and record for further improvement but not directly blocking (unless it's fundamental rules)."*
+
 ### Token Optimization (v8.33.0+)
 
 Three surgical fixes targeting per-cycle input-token spend without touching agent behavior:

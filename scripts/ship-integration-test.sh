@@ -598,6 +598,114 @@ else
 fi
 cd "$REPO_ROOT"
 
+# --- Test S: v8.34.0 — successful cycle ship advances state.json:lastCycleNumber ---
+# Pre-v8.34, ship.sh committed/pushed but never wrote state.json:lastCycleNumber.
+# The dispatcher's next iteration computed last_before unchanged → ran_cycle =
+# the SAME cycle number → 5-repeat circuit-breaker fired prematurely on
+# legitimate runs. v8.34.0 has ship.sh advance the counter from cycle-state.json:cycle_id.
+header "Test S: v8.34.0 — cycle ship advances state.json:lastCycleNumber"
+REPO=$(make_repo)
+cd "$REPO"
+echo "v8.34.0 cycle ship test" >> fixture.txt
+seed_audit "$REPO" "PASS"
+# Seed cycle-state.json so ship.sh can read cycle_id.
+echo '{"cycle_id":1,"phase":"ship"}' > "$REPO/.evolve/cycle-state.json"
+# Initial state.json has lastCycleNumber=0
+jq '. + {lastCycleNumber: 0}' "$REPO/.evolve/state.json" > "$REPO/.evolve/state.json.tmp" \
+    && mv "$REPO/.evolve/state.json.tmp" "$REPO/.evolve/state.json"
+BARE_S="$SCRATCH/remote-test-s-$RANDOM.git"
+git init -q --bare "$BARE_S"
+git remote add origin "$BARE_S"
+git branch -M main
+set +e; bash scripts/ship.sh "feat: cycle 1 work" >/tmp/ship-out 2>&1; RC=$?; set -e
+new_lcn=$(jq -r '.lastCycleNumber // 0' "$REPO/.evolve/state.json")
+if [ "$RC" = "0" ] && [ "$new_lcn" = "1" ] && grep -q "advanced state.json:lastCycleNumber to 1" /tmp/ship-out; then
+    pass "v8.34.0: cycle ship advanced lastCycleNumber 0→1"
+else
+    fail "rc=$RC, lastCycleNumber=$new_lcn (expected 1); tail: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test T: v8.34.0 — manual class does NOT advance lastCycleNumber --------
+# Defensive: only --class cycle commits represent a "completed cycle." Manual
+# (operator) commits and release commits don't have cycle semantics.
+header "Test T: v8.34.0 — manual ship leaves lastCycleNumber unchanged"
+REPO=$(make_repo)
+cd "$REPO"
+echo "manual change v8.34" >> fixture.txt
+echo '{"cycle_id":99,"phase":"ship"}' > "$REPO/.evolve/cycle-state.json"
+jq '. + {lastCycleNumber: 5}' "$REPO/.evolve/state.json" > "$REPO/.evolve/state.json.tmp" \
+    && mv "$REPO/.evolve/state.json.tmp" "$REPO/.evolve/state.json"
+BARE_T="$SCRATCH/remote-test-t-$RANDOM.git"
+git init -q --bare "$BARE_T"
+git remote add origin "$BARE_T"
+git branch -M main
+set +e
+EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/ship.sh --class manual "manual: ad-hoc fix" </dev/null >/tmp/ship-out 2>&1
+RC=$?
+set -e
+final_lcn=$(jq -r '.lastCycleNumber // 0' "$REPO/.evolve/state.json")
+if [ "$RC" = "0" ] && [ "$final_lcn" = "5" ]; then
+    pass "v8.34.0: manual ship preserved lastCycleNumber=5 (no advance)"
+else
+    fail "rc=$RC, lastCycleNumber=$final_lcn (expected 5 unchanged); tail: $(tail -5 /tmp/ship-out)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test U: v8.34.0 — actual-diff footer appended to commit message --------
+# Records file list + line counts in `git log` so reviewers can spot
+# message-vs-diff divergence. Not a blocking layer — just transparency.
+header "Test U: v8.34.0 — actual-diff footer appended to cycle commit"
+REPO=$(make_repo)
+cd "$REPO"
+echo "diff transparency test" >> fixture.txt
+echo "new file content" > newfile.txt
+seed_audit "$REPO" "PASS"
+echo '{"cycle_id":2,"phase":"ship"}' > "$REPO/.evolve/cycle-state.json"
+BARE_U="$SCRATCH/remote-test-u-$RANDOM.git"
+git init -q --bare "$BARE_U"
+git remote add origin "$BARE_U"
+git branch -M main
+set +e
+bash scripts/ship.sh "feat: claims do not match" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+last_msg=$(git -C "$REPO" log -1 --format='%B')
+if [ "$RC" = "0" ] \
+   && echo "$last_msg" | grep -q "## Actual diff (v8.34.0+)" \
+   && echo "$last_msg" | grep -qE "Files modified \([0-9]+\)" \
+   && echo "$last_msg" | grep -q "fixture.txt" \
+   && echo "$last_msg" | grep -q "newfile.txt"; then
+    pass "v8.34.0: actual-diff footer appended with file list"
+else
+    fail "rc=$RC; commit message tail: $(echo "$last_msg" | tail -10)"
+fi
+cd "$REPO_ROOT"
+
+# --- Test V: v8.34.0 — release class skips diff footer (release commits don't need it) ---
+# Release commits are version bumps + CHANGELOG; the file list is structurally
+# well-defined (plugin.json, marketplace.json, SKILL.md, README.md, CHANGELOG.md)
+# and the footer adds bulk without value.
+header "Test V: v8.34.0 — release class skips actual-diff footer"
+REPO=$(make_repo)
+cd "$REPO"
+echo "release content" >> fixture.txt
+BARE_V="$SCRATCH/remote-test-v-$RANDOM.git"
+git init -q --bare "$BARE_V"
+git remote add origin "$BARE_V"
+git branch -M main
+set +e
+bash scripts/ship.sh --class release "release: v9.0.0" >/tmp/ship-out 2>&1
+RC=$?
+set -e
+last_msg=$(git -C "$REPO" log -1 --format='%B')
+if [ "$RC" = "0" ] && ! echo "$last_msg" | grep -q "## Actual diff"; then
+    pass "v8.34.0: release class commit has no actual-diff footer"
+else
+    fail "rc=$RC; release commit message: $(echo "$last_msg" | head -10)"
+fi
+cd "$REPO_ROOT"
+
 # --- Summary ----------------------------------------------------------------
 echo
 echo "==========================================="

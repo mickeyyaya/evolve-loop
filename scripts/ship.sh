@@ -468,6 +468,41 @@ if git diff --cached --quiet; then
     exit 0
 fi
 
+# v8.34.0: Append actual-diff footer to commit message for cycle/manual classes.
+# Records the real file list + line counts in `git log` so reviewers (and future
+# audits) can compare the agent's narrative against what actually shipped. This
+# is the "record, don't block" pattern: per-cycle audits in cycles 102+ shipped
+# commits whose messages claimed major refactors but diffs were trivial 2-line
+# moves. The auditor scored claims, not diff. Now `git log` carries both.
+#
+# Skipped for --class release (release commits are version bumps; the footer
+# adds bulk without value because release scope is structurally well-defined).
+if [ "$SHIP_CLASS" = "cycle" ] || [ "$SHIP_CLASS" = "manual" ]; then
+    diff_files=$(git diff --cached --name-status 2>/dev/null || echo "")
+    diff_stat=$(git diff --cached --shortstat 2>/dev/null || echo "")
+    if [ -n "$diff_files" ]; then
+        # Bash 3.2-safe count: pipe through wc -l (count of newlines).
+        # diff_files always ends with a newline so this is the correct count.
+        file_count=$(printf '%s\n' "$diff_files" | grep -c '^' || echo 0)
+        # Build the footer. Two newlines before "---" so it's separate from any
+        # existing trailing content in COMMIT_MSG (which may or may not end with
+        # newline).
+        diff_footer=$(cat <<FOOTER
+
+---
+## Actual diff (v8.34.0+)
+
+Files modified ($file_count):
+$(printf '%s' "$diff_files" | sed 's/^/- /')
+
+$diff_stat
+FOOTER
+)
+        COMMIT_MSG="$COMMIT_MSG$diff_footer"
+    fi
+    unset diff_files diff_stat file_count diff_footer
+fi
+
 # Commit. Use array form to avoid arg injection.
 COMMIT_ARGS=(commit -m "$COMMIT_MSG")
 git "${COMMIT_ARGS[@]}"
@@ -476,6 +511,33 @@ log "OK: committed to $CURRENT_BRANCH"
 # Push.
 git push origin "$CURRENT_BRANCH"
 log "OK: pushed to origin/$CURRENT_BRANCH"
+
+# v8.34.0: Advance state.json:lastCycleNumber on successful cycle ship.
+# Pre-v8.34, only failure paths (record_failed_approach in dispatcher) wrote
+# lastCycleNumber. Successful ships left the counter unchanged → dispatcher's
+# next iteration computed ran_cycle = last_before + 1 = the SAME cycle just
+# shipped → 5-repeat circuit-breaker fired prematurely on legitimate runs.
+# Fix: write lastCycleNumber from cycle-state.json:cycle_id atomically.
+# Defensive — only for --class cycle, only when cycle-state.json exists with a
+# valid cycle_id; otherwise no-op.
+if [ "$SHIP_CLASS" = "cycle" ]; then
+    cycle_state_file="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
+    state_file="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
+    if [ -f "$cycle_state_file" ] && [ -f "$state_file" ]; then
+        cycle_id=$(jq -r '.cycle_id // empty' "$cycle_state_file" 2>/dev/null || echo "")
+        if [ -n "$cycle_id" ] && [ "$cycle_id" != "null" ]; then
+            tmp_state="${state_file}.tmp.$$"
+            if jq --argjson n "$cycle_id" '.lastCycleNumber = $n' "$state_file" > "$tmp_state" 2>/dev/null \
+               && mv -f "$tmp_state" "$state_file"; then
+                log "OK: advanced state.json:lastCycleNumber to $cycle_id"
+            else
+                rm -f "$tmp_state" 2>/dev/null
+                log "WARN: could not advance lastCycleNumber (state.json write failed)"
+            fi
+        fi
+    fi
+    unset cycle_state_file state_file cycle_id tmp_state
+fi
 
 # --- 8. Optional GitHub release (if EVOLVE_SHIP_RELEASE_NOTES set) -----------
 
