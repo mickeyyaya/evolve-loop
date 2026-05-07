@@ -17,6 +17,38 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
+### Tamper-Evident Ledger Hash Chain (v8.37.0+)
+
+The ledger (`.evolve/ledger.jsonl`) records every subagent invocation with cycle binding (HEAD + tree_state_sha at audit time), challenge-token, and artifact_sha256. v8.37.0 hardens the **forensic integrity** of this record so future audits, retrospectives, and operator investigations can detect tampering — covering threats the runtime enforcement layers (phase-gate, role-gate, ship-gate) don't address:
+
+| Threat | Detection in v8.37.0 |
+|---|---|
+| **Entry rewrite** (modify a historical line to flip a verdict, change cycle attribution, alter timestamps) | Each new entry's `prev_hash` = SHA256 of the previous entry's full JSON line. Modifying any historical entry breaks every entry after it. |
+| **Entry forgery / insertion** (splice a fake entry between two real ones) | The next legitimate entry's `prev_hash` references the original previous-entry SHA — chain breaks immediately. |
+| **Truncation** (lop the last N entries to hide a failed cycle) | `.evolve/ledger.tip` records `<seq>:<sha256>` of the latest entry. Truncation makes tip-vs-actual-last-line mismatch. |
+| **Concurrent fan-out race** (two writers compute the same prev_hash) | Verifier flags duplicate prev_hash as a chain anomaly (surfaces real concurrency bug rather than masking it). |
+
+**Pipeline impact: zero.** The `prev_hash` and `entry_seq` fields are additive. Existing readers (`failure-adapter.sh`, `phase-gate.sh`, `phase-gate-precondition.sh`, `ship.sh`, `release/preflight.sh`) all use jq's `// empty` pattern — unknown fields are ignored. No reader was modified. No agent persona was modified. No profile was modified. No phase ordering, no Tier-1 hook semantics changed.
+
+**Verifier:** `bash scripts/verify-ledger-chain.sh` walks the ledger end-to-end, recomputes each entry's prev_hash, and reports any break. Exit codes:
+- `0` — chain intact, tip matches
+- `1` — chain break (rewrite or forgery)
+- `2` — tip mismatch (truncation or untracked write)
+- `--json` for machine-readable output, `--quiet` for CI gating, `--ledger PATH` for alternate ledger paths
+
+**Migration:** soft-start. Pre-v8.37 entries (no `prev_hash` field) are tolerated as a boundary; the first v8.37+ entry chains from the last pre-v8.37 entry's SHA. Pre-v8.37 entries themselves are not retro-validated (they predate the field). Existing 363-entry ledgers verify cleanly out of the box.
+
+**Three writers updated** (the ledger has exactly three append paths):
+- `scripts/subagent-run.sh:write_ledger_entry()` — primary `agent_subprocess` writer
+- `scripts/subagent-run.sh:_write_fanout_ledger_entry()` — Pattern-3 fan-out writer (`agent_fanout` kind)
+- `scripts/merge-lesson-into-state.sh` — `SYSTEMIC_FAILURE` retrospective writer
+
+Each writer now: (1) reads the last line of `.evolve/ledger.jsonl`, (2) computes `prev_hash` and `entry_seq`, (3) emits the new entry with both fields, (4) updates `.evolve/ledger.tip` atomically with the new entry's SHA.
+
+**What v8.37.0 does NOT add:** no Sigstore signing (cross-org attestation is v8.39+ candidate), no Merkle tree (linear chain is sufficient at our scale), no new enforcement hooks (the verifier is read-only diagnostic).
+
+**Threat model context:** runtime cheating is structurally prevented by the existing pipeline. v8.37.0 is the **forensics layer** — when an AI agent attempts to cheat in unexpected ways, the ledger remains the authoritative reconstruction surface. Without hash-chaining, a sufficiently-clever agent could rewrite history to hide misbehavior; with hash-chaining, any post-hoc modification is structurally detectable.
+
 ### Worktree Provisioning Robustness (v8.36.0+)
 
 `run-cycle.sh` pre-flight cleanup now runs `git worktree prune` BEFORE attempting `git branch -D`. Closes a recurring failure mode in nested-Claude environments: when a prior cycle was hard-killed at a different `$TMPDIR`-based worktree path (e.g., session 1 used `/var/folders/.../HASH_A/cycle-N/`, session 2 uses `/var/folders/.../HASH_B/cycle-N/`), `.git/worktrees/cycle-N/` retained a stale admin pointer to the old path. `git branch -D` silently no-ops on a branch that's still admin-checked-out; `git worktree add` then fails with `fatal: a branch named 'evolve/cycle-N' already exists`.

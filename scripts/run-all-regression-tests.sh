@@ -79,6 +79,7 @@ else
         "scripts/preflight-environment-test.sh"
         "scripts/diff-complexity-test.sh"
         "scripts/run-cycle-worktree-test.sh"
+        "scripts/verify-ledger-chain-test.sh"
     )
 fi
 

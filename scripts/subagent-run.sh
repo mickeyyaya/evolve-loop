@@ -198,6 +198,53 @@ _write_cache_prefix() {
     } > "$out_path"
 }
 
+# v8.37.0: tamper-evident ledger hash-chain helpers.
+#
+# Each new ledger entry's prev_hash is the SHA256 of the previous entry's
+# full JSON line. Modifying any historical entry breaks the chain at the
+# next entry, detectable by scripts/verify-ledger-chain.sh. After write,
+# the new entry's SHA256 is recorded to .evolve/ledger.tip atomically;
+# the tip detects truncation that the chain alone cannot catch.
+#
+# Pipeline impact: zero. Both fields are additive; existing readers ignore
+# them via jq's `// empty` pattern. Pre-v8.37 entries (no prev_hash) are
+# tolerated by the verifier as a soft-start boundary.
+
+_ledger_sha256_stdin() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}';
+    else shasum -a 256 | awk '{print $1}'; fi
+}
+
+# Compute (prev_hash, entry_seq) for the next ledger entry.
+# Echoes "PREV_HASH ENTRY_SEQ" as space-separated tokens.
+_ledger_chain_link() {
+    local prev_hash="0000000000000000000000000000000000000000000000000000000000000000"
+    local entry_seq=0
+    if [ -f "$LEDGER" ] && [ -s "$LEDGER" ]; then
+        local last_line
+        last_line=$(tail -1 "$LEDGER" 2>/dev/null || echo "")
+        if [ -n "$last_line" ]; then
+            prev_hash=$(printf '%s' "$last_line" | _ledger_sha256_stdin)
+        fi
+        # entry_seq = current line count (next 0-indexed position).
+        # Bash 3.2 portable. Tolerates pre-v8.37 entries (counted unfielded).
+        entry_seq=$(wc -l < "$LEDGER" 2>/dev/null | tr -d ' ' || echo 0)
+        [ -z "$entry_seq" ] && entry_seq=0
+    fi
+    printf '%s %s\n' "$prev_hash" "$entry_seq"
+}
+
+# Update .evolve/ledger.tip atomically with seq:sha256 of the latest entry.
+_ledger_update_tip() {
+    local seq="$1" sha="$2"
+    local tip_file
+    tip_file="$(dirname "$LEDGER")/ledger.tip"
+    local tmp="${tip_file}.tmp.$$"
+    printf '%s:%s\n' "$seq" "$sha" > "$tmp" 2>/dev/null \
+        && mv -f "$tmp" "$tip_file" 2>/dev/null \
+        || rm -f "$tmp" 2>/dev/null
+}
+
 write_ledger_entry() {
     local cycle="$1" agent="$2" model="$3" exit_code="$4" duration_s="$5"
     local artifact_path="$6" challenge_token="$7" git_state="${8:-unknown:unknown}"
@@ -213,10 +260,17 @@ write_ledger_entry() {
     local tree_state_sha="${git_state##*:}"
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    # v8.37.0: tamper-evident hash chain. Compute prev_hash + entry_seq
+    # from the existing ledger BEFORE writing the new entry.
+    local prev_hash entry_seq chain_link
+    chain_link=$(_ledger_chain_link)
+    prev_hash="${chain_link%% *}"
+    entry_seq="${chain_link##* }"
     # CYCLE-BINDING (v8.13.0): git_head + tree_state_sha pin the audit to the
     # exact code state at audit time. ship.sh requires the current state to
     # match these — preventing "audit cycle 50, ship cycle 51" exploits.
-    jq -nc \
+    local new_line
+    new_line=$(jq -nc \
         --arg ts "$ts" \
         --argjson cycle "$cycle" \
         --arg agent "$agent" \
@@ -228,12 +282,19 @@ write_ledger_entry() {
         --arg challenge_token "$challenge_token" \
         --arg git_head "$git_head" \
         --arg tree_state_sha "$tree_state_sha" \
+        --argjson entry_seq "$entry_seq" \
+        --arg prev_hash "$prev_hash" \
         '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_subprocess",
           model: $model, exit_code: $exit_code, duration_s: $duration_s,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
           challenge_token: $challenge_token,
-          git_head: $git_head, tree_state_sha: $tree_state_sha}' \
-        >> "$LEDGER"
+          git_head: $git_head, tree_state_sha: $tree_state_sha,
+          entry_seq: $entry_seq, prev_hash: $prev_hash}')
+    printf '%s\n' "$new_line" >> "$LEDGER"
+    # v8.37.0: update tip with new entry's SHA256.
+    local new_sha
+    new_sha=$(printf '%s' "$new_line" | _ledger_sha256_stdin)
+    _ledger_update_tip "$entry_seq" "$new_sha"
 }
 
 verify_artifact() {
@@ -803,7 +864,13 @@ _write_fanout_ledger_entry() {
     fi
 
     mkdir -p "$(dirname "$LEDGER")"
-    jq -nc \
+    # v8.37.0: tamper-evident hash chain.
+    local prev_hash entry_seq chain_link
+    chain_link=$(_ledger_chain_link)
+    prev_hash="${chain_link%% *}"
+    entry_seq="${chain_link##* }"
+    local new_line
+    new_line=$(jq -nc \
         --arg ts "$ts" \
         --argjson cycle "$cycle" \
         --arg agent "$agent" \
@@ -815,13 +882,19 @@ _write_fanout_ledger_entry() {
         --arg tree_state_sha "$tree_state_sha" \
         --argjson worker_count "$worker_count" \
         --argjson workers "$workers_json" \
+        --argjson entry_seq "$entry_seq" \
+        --arg prev_hash "$prev_hash" \
         '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_fanout",
           exit_code: $exit_code,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
           challenge_token: $challenge_token,
           git_head: $git_head, tree_state_sha: $tree_state_sha,
-          worker_count: $worker_count, workers: $workers}' \
-        >> "$LEDGER"
+          worker_count: $worker_count, workers: $workers,
+          entry_seq: $entry_seq, prev_hash: $prev_hash}')
+    printf '%s\n' "$new_line" >> "$LEDGER"
+    local new_sha
+    new_sha=$(printf '%s' "$new_line" | _ledger_sha256_stdin)
+    _ledger_update_tip "$entry_seq" "$new_sha"
 }
 
 # --- Main --------------------------------------------------------------------

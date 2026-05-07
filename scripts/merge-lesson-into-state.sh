@@ -187,17 +187,47 @@ mv "$TMP_STATE" "$STATE"
 log "OK: merged ${#LESSON_IDS[@]} lesson(s) into instinctSummary; appended failedApproaches entry for cycle $CYCLE"
 
 # Patch 3: log systemic failure event to the ledger.
+# v8.37.0: includes prev_hash + entry_seq for tamper-evident chain.
 if [ "$SYSTEMIC" = "true" ]; then
-    jq -nc \
+    # Compute chain link inline (avoid sourcing subagent-run.sh).
+    _ml_prev_hash="0000000000000000000000000000000000000000000000000000000000000000"
+    _ml_entry_seq=0
+    if [ -f "$LEDGER" ] && [ -s "$LEDGER" ]; then
+        _ml_last_line=$(tail -1 "$LEDGER" 2>/dev/null || echo "")
+        if [ -n "$_ml_last_line" ]; then
+            if command -v sha256sum >/dev/null 2>&1; then
+                _ml_prev_hash=$(printf '%s' "$_ml_last_line" | sha256sum | awk '{print $1}')
+            else
+                _ml_prev_hash=$(printf '%s' "$_ml_last_line" | shasum -a 256 | awk '{print $1}')
+            fi
+        fi
+        _ml_entry_seq=$(wc -l < "$LEDGER" 2>/dev/null | tr -d ' ' || echo 0)
+        [ -z "$_ml_entry_seq" ] && _ml_entry_seq=0
+    fi
+    _ml_new_line=$(jq -nc \
         --arg ts "$NOW_TS" \
         --argjson cycle "$CYCLE" \
         --arg verdict "$VERDICT" \
         --arg error_cat "$ERROR_CATEGORY" \
         --argjson lesson_ids "$(printf '%s\n' "${LESSON_IDS[@]}" | jq -R . | jq -s .)" \
+        --argjson entry_seq "$_ml_entry_seq" \
+        --arg prev_hash "$_ml_prev_hash" \
         '{ts: $ts, cycle: $cycle, role: "orchestrator", kind: "SYSTEMIC_FAILURE",
-          auditVerdict: $verdict, errorCategory: $error_cat, lessonIds: $lesson_ids}' \
-        >> "$LEDGER"
-    log "OK: SYSTEMIC_FAILURE event written to ledger"
+          auditVerdict: $verdict, errorCategory: $error_cat, lessonIds: $lesson_ids,
+          entry_seq: $entry_seq, prev_hash: $prev_hash}')
+    printf '%s\n' "$_ml_new_line" >> "$LEDGER"
+    # Update tip
+    if command -v sha256sum >/dev/null 2>&1; then
+        _ml_new_sha=$(printf '%s' "$_ml_new_line" | sha256sum | awk '{print $1}')
+    else
+        _ml_new_sha=$(printf '%s' "$_ml_new_line" | shasum -a 256 | awk '{print $1}')
+    fi
+    _ml_tip_file="$(dirname "$LEDGER")/ledger.tip"
+    _ml_tmp="${_ml_tip_file}.tmp.$$"
+    printf '%s:%s\n' "$_ml_entry_seq" "$_ml_new_sha" > "$_ml_tmp" 2>/dev/null \
+        && mv -f "$_ml_tmp" "$_ml_tip_file" 2>/dev/null \
+        || rm -f "$_ml_tmp" 2>/dev/null
+    log "OK: SYSTEMIC_FAILURE event written to ledger (seq=$_ml_entry_seq)"
 fi
 
 # Patch 4: contradicted instincts. The retrospective profile cannot mutate
