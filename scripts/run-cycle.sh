@@ -209,9 +209,14 @@ build_context() {
         echo
 
         # v8.33.0: conditional blocks. Emit header + body only when body is non-empty.
+        # v8.44.0: emit compact digest (ts cycle role exit sha8) instead of raw JSONL
+        # to reduce recentLedgerEntries from ~783 tokens to ~100 tokens per block.
         if [ -n "$ledger_tail" ]; then
-            echo "recentLedgerEntries:"
-            echo "$ledger_tail"
+            echo "recentLedgerEntries (digest — ts cycle role exit sha8):"
+            while IFS= read -r entry; do
+                [ -z "$entry" ] && continue
+                echo "$entry" | jq -r '"[" + (.ts[0:10]) + " cycle:" + (.cycle|tostring) + " role:" + .role + " exit:" + (.exit_code|tostring) + " sha:" + ((.artifact_sha256 // "-")[0:8]) + "]"' 2>/dev/null
+            done <<< "$ledger_tail"
             echo
         fi
 

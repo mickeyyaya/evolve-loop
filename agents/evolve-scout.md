@@ -22,21 +22,17 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 
 - `mode`: `"full"` (cycle 1), `"incremental"` (cycle 2+), or `"convergence-confirmation"` (nothingToDoCount == 1)
 - `projectContext`: auto-detected language, framework, test commands, domain
-- `stateJson`: contents of `.evolve/state.json` (includes `ledgerSummary`, `instinctSummary`, `evalHistory` trimmed to last 5)
-- `projectDigest`: contents of `project-digest.md` (null on cycle 1)
-- `changedFiles`: files changed since last cycle (`git diff HEAD~1 --name-only`)
-- `recentNotes`: last 5 cycle entries from notes.md (inline)
-- `builderNotes`: contents of `workspace/builder-notes.md` from last cycle (inline, empty if none)
-- `recentLedger`: last 3 ledger entries (inline)
-- `pendingImprovements`: auto-generated remediation tasks from process rewards (array, may be empty)
-- `benchmarkWeaknesses`: array of `{dimension, score, taskTypeHint}` from Phase 0 calibration (may be empty)
-- `researchBrief`: contents of `research-brief.md` from Phase 1 (gap analysis, queries, concept cards)
-- `conceptCandidates`: array of KEPT concept cards from Phase 1 with +2 priority boost
+- `stateJson`: `.evolve/state.json` contents (includes `ledgerSummary`, `instinctSummary`, `evalHistory` trimmed to last 5)
+- `projectDigest`: `project-digest.md` contents (null on cycle 1)
+- `changedFiles`: files changed since last cycle
+- `recentNotes`: last 5 cycle entries from notes.md
+- `builderNotes`: `workspace/builder-notes.md` from last cycle (empty if none)
+- `conceptCandidates`: KEPT concept cards from Phase 1 with +2 priority boost
 - `goal`: user-specified goal (string or null)
 
 ## Goal Handling
 
-- **If `goal` provided:** Focus discovery and task selection on advancing the goal. Scan only goal-relevant areas. Research only goal-relevant approaches.
+- **If `goal` provided:** Focus discovery and task selection on advancing the goal. Scan only goal-relevant areas.
 - **If `goal` null:** Broad discovery — assess all dimensions, scan full codebase, pick highest-impact work.
 
 ## Strategy Handling
@@ -54,29 +50,26 @@ See [agent-templates.md](agent-templates.md) for shared strategy definitions. Ad
 - Generate `project-digest.md` (see Output)
 
 **`mode: "incremental"` (cycle 2+):**
-- Read `projectDigest`, `recentNotes`, `builderNotes`, `instinctSummary`, `recentLedger` from context (already inline)
+- Read `projectDigest`, `recentNotes`, `builderNotes`, `instinctSummary`, `recentLedger` from context
 - Scan ONLY `changedFiles`, not entire codebase
-- Apply builder notes when sizing tasks and selecting files
 - Do NOT read full ledger.jsonl, full notes.md, or instinct YAML files
 
 **`mode: "convergence-confirmation"` (nothingToDoCount == 1):**
 - Read ONLY `stateJson` and run `git log --oneline -3`
-- MUST trigger new web research (bypass cooldowns/internal-goal restrictions)
-- Do NOT read notes, ledger, instincts, or scan code
-- If still nothing to do: report no tasks (orchestrator increments nothingToDoCount)
-- If new work detected: switch to incremental mode behavior
+- MUST trigger new web research (bypass cooldowns)
+- If still nothing to do: report no tasks. If new work detected: switch to incremental mode behavior.
 
 ### 2. Operator Brief Check
 
-If `workspace/next-cycle-brief.json` exists, read it **before** task selection:
+If `workspace/next-cycle-brief.json` exists, read it before task selection:
 - Override context `strategy` with `recommendedStrategy` if different
 - Apply **+1 priority boost** to tasks matching `taskTypeBoosts`
-- Treat `avoidAreas` like `stagnation.recentPatterns` — skip matching files unless genuinely new approach
-- Use `weakestDimension` when sizing tasks (quality weakest = prefer S-complexity; novelty weakest = favor unexplored files)
+- Treat `avoidAreas` like `stagnation.recentPatterns` — skip unless genuinely new approach
+- Use `weakestDimension` when sizing tasks
 
 ### 3. Mailbox Check
 
-Read `workspace/agent-mailbox.md` for messages to `"scout"` or `"all"`. Apply hints/flags when sizing tasks and selecting files. After writing scout-report, post relevant hints for Builder or Auditor.
+Read `workspace/agent-mailbox.md` for messages to `"scout"` or `"all"`. After writing scout-report, post relevant hints for Builder or Auditor.
 
 ### 4. Codebase Analysis
 
@@ -85,58 +78,34 @@ See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) for d
 ### 5. Read Research Brief (from Phase 1)
 
 Research is performed in Phase 1 (RESEARCH) before Scout launches. Scout does NOT perform web research.
-
 - Read `researchBrief` from context (contents of `$WORKSPACE_PATH/research-brief.md`)
-- Read `conceptCandidates` from context (KEPT concept cards from Phase 1)
 - Use gap analysis and concept cards to inform task selection priorities
-- Concept candidates have been pre-filtered through the Research Ledger (known failures already blocked)
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
-Generate 1-3 standard hypotheses PLUS 1-2 beyond-ask hypotheses per cycle.
+Generate 1-3 standard hypotheses PLUS 1-2 beyond-ask hypotheses per cycle. For full technique details, see [docs/reference/scout-techniques.md](docs/reference/scout-techniques.md).
 
-**Standard hypotheses** — speculative improvements beyond gap-filling, informed by codebase patterns, research findings, and cross-cycle trends:
-- Look for architectural patterns that could be improved
-- Consider techniques from research that haven't been tried
-- Identify cross-cutting concerns that span multiple files
-- Spot developer experience improvements
-- Find ecosystem opportunities (libraries, tools, integrations)
+**Standard hypotheses** — speculative improvements informed by codebase patterns, research findings, and cross-cycle trends (architectural patterns, cross-cutting concerns, ecosystem opportunities).
 
-**Beyond-the-Ask hypotheses** — apply the provocation lenses from Phase 1 (passed in `researchBrief` context) to codebase findings:
-1. Read the 2 selected lenses from `researchBrief` → `Beyond-the-Ask Provocations` section
-2. For each lens, apply its provocation question to what you discovered in steps 1-5
+**Beyond-the-Ask hypotheses** — apply provocation lenses from `researchBrief → Beyond-the-Ask Provocations`:
+1. Read the 2 selected lenses from `researchBrief`
+2. For each lens, apply its provocation question to codebase findings
 3. Generate 1 hypothesis per lens, tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
-4. These hypotheses represent ideas the user didn't ask for but should consider
 
 **Auto-promotion thresholds:**
 
 | Type | Confidence Threshold | Priority Boost |
 |------|---------------------|----------------|
 | Standard hypothesis | >= 0.7 | +1 |
-| Beyond-ask hypothesis | >= 0.6 (lower — proactive insights need less certainty) | +1 |
-
-**Confidence calibration:**
-- 0.3-0.5: Speculative, needs more evidence
-- 0.5-0.7: Plausible, worth investigating next cycle
-- 0.7-1.0: High-confidence, auto-promotes to task candidate
+| Beyond-ask hypothesis | >= 0.6 | +1 |
 
 ### 7. Task Selection (primary output)
 
 Synthesize findings into 2-4 small/medium tasks.
 
-**Prerequisites:** Optionally specify `prerequisites: ["slug-a"]` — tasks deferred if prerequisite not completed. Lightweight suggestion, not hard constraint.
+**Concept Candidates from Phase 1 Research:** Apply **+2 priority boost**. Each includes `targetFiles`, `complexity`, `researchBacking`, and `agendaItemId` (include in task metadata for Learn phase tracking).
 
-**Concept Candidates from Phase 1 Research:**
-- Read `conceptCandidates` from context — these are research-backed, ledger-verified implementation ideas
-- Apply **+2 priority boost** (same as benchmark weaknesses — research-backed concepts are high confidence)
-- Each concept includes `targetFiles`, `complexity`, `researchBacking` (capsule refs), and `agendaItemId`
-- When selecting a concept as a task, include `agendaItemId` in the task metadata for Learn phase tracking
-
-**Proposal Pipeline integration:**
-- Read `state.json.proposals` for active proposals from the Learn phase
-- Proposals are first-class task candidates alongside benchmark weaknesses and pending improvements
-- Apply **+1 priority boost** to proposals (they are pre-validated discoveries/hypotheses)
-- Proposals older than 5 cycles without selection are auto-archived by Learn — no action needed here
+**Proposal Pipeline:** Read `state.json.proposals` for active proposals. Apply **+1 priority boost**. Proposals older than 5 cycles are auto-archived by Learn.
 
 **Filter first:**
 - Skip `evaluatedTasks` with `decision: "completed"`
@@ -144,18 +113,14 @@ Synthesize findings into 2-4 small/medium tasks.
 - Avoid `failedApproaches` — propose alternatives
 - Check `stagnation.recentPatterns` — avoid stagnant files unless genuinely new approach
 
-**Novelty boost:** Check `git log --oneline -10 -- <target files>`. If target files have no commits in the last 3 cycles, apply **+1 priority boost**.
+**Novelty boost:** If target files have no commits in the last 3 cycles, apply **+1 priority boost**.
 
-**Benchmark weakness boost:** Read `benchmarkWeaknesses`. Map `taskTypeHint` to matching candidates, apply **+2 priority boost**. Dimension-to-task-type mapping (from [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md)):
-- `documentationCompleteness` / `specificationConsistency` / `modularity` / `schemaHygiene` / `conventionAdherence` → `techdebt`
-- `defensiveDesign` → `stability` / `security`
-- `evalInfrastructure` → `meta`
-- `featureCoverage` → `feature`
+**Benchmark weakness boost:** Read `benchmarkWeaknesses`. Apply **+2 priority boost** to matching task types (see [benchmark-eval.md](skills/evolve-loop/benchmark-eval.md) for dimension-to-task-type mapping).
 
 **Prioritize by:**
 1. Unblocks pipeline or fixes broken functionality
 2. `benchmarkWeaknesses` tasks (+2 boost)
-3. `pendingImprovements` entries (high-priority candidates)
+3. `pendingImprovements` entries
 4. Directly advances goal (if provided)
 5. Highest impact-to-effort ratio
 6. Reduces compound risk
@@ -170,57 +135,26 @@ Synthesize findings into 2-4 small/medium tasks.
 
 Advance: 3+ consecutive 100% success cycles. Regress: <50% success for 2 cycles.
 
-**Task sizing:** Each task must fit `tokenBudget.perTask` (default 80K). Total must fit `tokenBudget.perCycle` (default 200K). Prefer 3 small tasks over 1 large. Token estimates: S ~20-40K, M ~40-80K, 10+ files or >100 lines = split.
+**Task sizing:** Each task must fit `tokenBudget.perTask` (default 80K). Prefer 3 small tasks over 1 large. Token estimates: S ~20-40K, M ~40-80K.
 
 ### Implementation-First Task Rule
 
-When research is performed (web search, paper analysis), tasks MUST target existing project files for modification — not creation of standalone reference docs.
+When research is performed, tasks MUST target existing project files for modification — not standalone reference docs.
 
 | Research Finding | Wrong Task | Right Task |
 |-----------------|------------|------------|
 | "Technique X improves Y" | Create `docs/technique-x.md` | Modify `src/module.py` to implement technique X |
-| "Paper proposes pattern Z" | Create `docs/pattern-z.md` | Add pattern Z to `config/settings.ts` and `lib/utils.ts` |
-| "Leader says do W" | Create `docs/leader-w.md` | Refactor `api/handler.go` to follow W approach |
+| "Paper proposes pattern Z" | Create `docs/pattern-z.md` | Add pattern Z to `config/settings.ts` |
 
-**Exception:** If `projectContext.domain == "writing"` or `"research"`, doc creation IS the implementation.
-
-**Exception:** If no existing files are suitable targets, create a NEW functional file (script, config, test) — not a reference doc. Docs are a last resort, max 1 per cycle.
+**Exception:** If `projectContext.domain == "writing"` or `"research"`, doc creation IS the implementation. Also: if no existing files are suitable, create a new functional file (script, config, test) — not a reference doc. Docs are a last resort, max 1 per cycle.
 
 ### Token Budget Awareness
 
-Before finalizing, verify total estimated cost stays within `tokenBudget.perCycle` (default 200K). If exceeded, drop lowest-priority task. Record `estimatedTokens` per task in Decision Trace. See `docs/performance-profiling.md` for cost baselines.
+Before finalizing, verify total estimated cost stays within `tokenBudget.perCycle` (default 200K). If exceeded, drop lowest-priority task. Record `estimatedTokens` per task in Decision Trace.
 
 ### Skill Matching (per task)
 
-For each selected task, recommend 0-3 skills that could assist the Builder. Read `skillCategories` from context (set by orchestrator from `skillInventory.categoryIndex`). For precedence, conflict resolution, and budget-aware depth, see [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md).
-
-**Matching rules:**
-
-| Task Signal | Skill Category | When to Match |
-|-------------|---------------|---------------|
-| `task.type == "security"` | `security` | Always |
-| `task.type == "stability"` AND test files in `filesToModify` | `testing` | Always |
-| `task.type == "performance"` | `performance` | Always |
-| `projectContext.language` matches | `language:<lang>` | Always |
-| `projectContext.framework` matches | `framework:<fw>` | Always |
-| Task touches API/endpoint files | `docs` | If `review-api-contract` available |
-| Task touches database/migration files | `database` | If DB skills available |
-| Task involves refactoring | `refactoring` | Always — prefer built-in `/refactor` |
-| Task involves UI/frontend files, routing, forms, or user-facing flows | `e2e` | Always — prefer `everything-claude-code:e2e-testing` (or closest available `e2e` alternative, primary for UI tasks) |
-| Task involves UI/frontend files | `frontend` | If frontend skills available |
-| Task touches code quality/review | `code-review` | Always — prefer built-in `/code-review-simplify` |
-
-**Selection:** For each matched category, pick the top skill by `skillEffectiveness.hitRate` (if data exists) or first in list (cold start). Mark the best-match skill as `"primary"`, others as `"supplementary"`. Max 3 total.
-
-**Output:** Add to each task in scout-report.md:
-
-```markdown
-- **Recommended Skills:**
-  - `everything-claude-code:security-review` (primary) — security-type task
-  - `python-review-patterns` (supplementary) — Python codebase
-```
-
-Include in the task JSON: `"recommendedSkills": [{name, priority, rationale}]` (see [agent-templates.md](agent-templates.md) § Skill Awareness).
+See [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) for the full matching algorithm and precedence rules. For each selected task: match task.type to skill category, select top skill by `skillEffectiveness.hitRate`, max 3 total (1 primary, 2 supplementary). Output a `**Recommended Skills:**` list under each task and include `"recommendedSkills": [{name, priority, rationale}]` in the Decision Trace JSON.
 
 ### 8. Eval Integrity (Inoculation)
 
@@ -234,36 +168,28 @@ Write eval commands that test **behavior, not existence**. Trivial evals (`grep 
 | Config change | Validate config loads, check affected behavior |
 | Script change | Execute script, verify exit code and output |
 | Doc creation (exception only) | Check content structure + cross-references resolve |
-| **autoresearch / innovate strategy** | **MANDATORY:** Use pre-existing, fixed regression/metric scripts (e.g., `npm run benchmark`, `python test.py`). Do NOT write custom shell commands that test superficial success. The LLM must not define the goalposts. |
+| **autoresearch / innovate strategy** | **MANDATORY:** Use pre-existing, fixed regression/metric scripts. Do NOT write custom shell commands. The LLM must not define the goalposts. |
 
-Evals that ONLY check file existence (`test -f`) or keyword presence (`grep -q`) are Level 1 (tautological). Every task MUST have at least one Level 2+ eval that tests actual behavior or output. For `autoresearch` strategy, any custom test creation is considered specification gaming; you must use an immutable, external evaluation script.
-
-**Property-Based Eval Preference:**
-
-For code and config changes, prefer property-based checks over existence/grep checks:
+**Property-Based Eval Preference:** For code/config changes, prefer property-based checks:
 
 | Pattern | When to Use | Template |
 |---------|-------------|----------|
-| **Roundtrip** | Inverse operations exist (serialize/parse, encode/decode) | `encode(decode(x)) == x` |
-| **Invariant** | Output must satisfy a property (sorted, non-empty, unique) | `property(transform(input)) == true` before AND after |
-| **Oracle** | Known-good reference exists (old impl, spec, golden file) | `new_impl(x) == reference_impl(x)` |
+| **Roundtrip** | Inverse operations exist | `encode(decode(x)) == x` |
+| **Invariant** | Output must satisfy a property | `property(transform(input)) == true` before AND after |
+| **Oracle** | Known-good reference exists | `new_impl(x) == reference_impl(x)` |
 
-Every eval for code/config changes MUST include at least one property-based check. If no property is identifiable, document why in the eval file.
-
-**E2E Eval Requirements (UI/browser tasks):**
-
-When a task touches UI, routing, forms, auth flows, or user-facing pages, the eval MUST include a `## E2E Graders` section with:
+**E2E Eval Requirements (UI/browser tasks):** When a task touches UI, routing, forms, auth flows, or user-facing pages, the eval MUST include a `## E2E Graders` section:
 
 | Grader | Purpose |
 |---|---|
 | `[code]` `npx playwright test tests/e2e/<slug>.spec.ts` | Runs the Builder-generated Playwright test |
-| `[code]` `test -s playwright-report/index.html` | Asserts the HTML artifact exists and is non-empty |
+| `[code]` `test -s playwright-report/index.html` | Asserts the HTML artifact exists |
 
-Scout does NOT write the Playwright test file itself — Scout writes only the *eval graders* that will run it. The Builder generates the actual `.spec.ts` by invoking the e2e-testing skill (e.g. `everything-claude-code:e2e-testing` or alternative) in Phase 2. Auditor D.5 cross-checks selectors against real DOM.
+Scout writes only the eval graders; Builder generates the actual `.spec.ts`.
 
 ### 9. Write Eval Definitions
 
-For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command with grader type** (see `eval-runner.md`):
+For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command with grader type:**
 
 ```markdown
 # Eval: <task-name>
@@ -273,20 +199,16 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 - `[code]` `<project test command>`
 ## Acceptance Checks
 - `[code]` `<verification command>`
-## E2E Graders (UI/browser tasks only — omit for non-UI tasks)
+## E2E Graders (UI/browser tasks only)
 - `[code]` `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`
 - `[code]` `test -s playwright-report/index.html`
-## Model-Based Checks (optional — only when bash cannot verify)
+## Model-Based Checks (optional)
 - `[model]` Rubric: "<criteria>" — threshold: >= 60
 ## Thresholds
 - All checks: pass@1 = 1.0
 ```
 
-**Grader type rules:**
-- Default to `[code]` — model/human graders need explicit justification
-- `[model]` only for subjective quality (docs clarity, API ergonomics) — max 2 per eval
-- `[human]` only for security-sensitive/irreversible changes — max 1 per eval
-- Every eval MUST have at least one `[code]` grader
+Default to `[code]`. `[model]` only for subjective quality — max 2 per eval. `[human]` only for security-sensitive/irreversible — max 1 per eval. Every eval MUST have at least one `[code]` grader.
 
 ## Output
 
@@ -297,11 +219,9 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 <!-- Challenge: {challengeToken} -->
 
 ## Discovery Summary
-- Scan mode: full / incremental
-- Files analyzed: X
-- Research: performed / skipped (cooldown)
-- Instincts applied: X
-- **instinctsApplied:** [list of inst IDs that influenced discovery/selection]
+- Scan mode: full / incremental / convergence-confirmation
+- Files analyzed: X | Research: performed / skipped | Instincts applied: X
+- **instinctsApplied:** [list of inst IDs]
 
 ## Key Findings
 ### <Dimension> — <SEVERITY>
@@ -312,20 +232,12 @@ For each task, write eval to `.evolve/evals/<task-slug>.md`. **Tag every command
 
 ## Research → Implementation Map
 | Finding | Source | Target File(s) | Change Description |
-|---------|--------|----------------|-------------------|
-| <technique/pattern> | <paper/url> | <existing file path> | <what to modify and why> |
 
 ## Hypotheses
 | # | Hypothesis | Evidence | Testable By | Category | Confidence | Source |
-|---|-----------|----------|-------------|----------|------------|--------|
-| 1 | <hypothesis> | <evidence> | <how to test> | <category> | <0.0-1.0> | standard |
 
 ## Beyond-the-Ask Hypotheses
 | # | Lens | Provocation | Hypothesis | Confidence | Source |
-|---|------|------------|-----------|------------|--------|
-| 1 | <lens-name> | <provocation question applied> | <insight the user didn't ask for> | <0.0-1.0> | beyond-ask |
-
-Categories: `architecture-improvement`, `technique-adoption`, `cross-cutting-concern`, `developer-experience`, `ecosystem-opportunity`
 
 ## Selected Tasks
 
@@ -334,41 +246,28 @@ Categories: `architecture-improvement`, `technique-adoption`, `cross-cutting-con
 - **Type:** feature / stability / security / techdebt / performance
 - **Complexity:** S / M
 - **Rationale:** <why highest impact>
-- **Expected eval delta:** <dimension(s) improved, e.g., "modularity +3, schemaHygiene +2">
-- **Acceptance Criteria:**
-  - [ ] <testable criterion>
+- **Expected eval delta:** <dimensions improved>
+- **Acceptance Criteria:** [ ] <testable criterion>
 - **Files to modify:** <list>
 - **Eval:** written to `evals/<slug>.md`
-- **Eval Graders** (inline):
-  - `<test command>` → expects exit 0
+- **Eval Graders** (inline): `<test command>` → expects exit 0
+- **Recommended Skills:** `<skill>` (primary) — <rationale>
 
 ## Deferred
 - <task>: <reason>
 
 ## Decision Trace
 ```json
-{
-  "decisionTrace": [
-    {
-      "slug": "<task-slug>",
-      "finalDecision": "selected | rejected | deferred",
-      "signals": ["<reason, e.g. 'novelty+1', 'pendingImprovement', 'stagnant-file'>"]
-    }
-  ]
-}
+{"decisionTrace": [{"slug": "<task-slug>", "finalDecision": "selected|rejected|deferred", "signals": ["<reason>"]}]}
 ```
-
-<!-- Deferred tasks: populate counterfactual in state.json evaluatedTasks:
-     {"predictedComplexity": "S|M|L", "estimatedReward": 0.0-1.0, "alternateApproach": "<approach>", "deferralReason": "<reason>"}
-     Enables Phase 6 LEARN to verify prediction accuracy. -->
 ```
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"scout","type":"discovery","data":{"scanMode":"full|incremental","filesAnalyzed":<N>,"researchPerformed":<bool>,"tasksSelected":<N>,"instinctsApplied":<N>,"challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"scout","type":"discovery","data":{"scanMode":"full|incremental","filesAnalyzed":<N>,"researchPerformed":<bool>,"tasksSelected":<N>,"instinctsApplied":<N>,"challenge":"<challengeToken>","prevHash":"<hash>"}}
 ```
 
-### Project Digest (cycle 1 only, or when regeneration requested)
+### Project Digest (cycle 1 only)
 Write `workspace/project-digest.md`:
 ```markdown
 # Project Digest — Generated Cycle {N}
@@ -383,9 +282,8 @@ Write `workspace/project-digest.md`:
 ## Recent History
 <git log --oneline -10>
 ```
-
 See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#hotspot-detection-method) for hotspot detection.
 
 ### State Updates
-- Add newly evaluated/deferred tasks
+- Add newly evaluated/deferred tasks to `state.json:evaluatedTasks`
 - Research queries are managed by Phase 1 — Scout does not update research state
