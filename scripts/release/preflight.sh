@@ -216,10 +216,10 @@ step_gate_tests() {
         return 0
     fi
     local suites=(
-        "scripts/guards-test.sh"
-        "scripts/ship-integration-test.sh"
-        "scripts/role-gate-test.sh"
-        "scripts/phase-gate-precondition-test.sh"
+        "scripts/tests/guards-test.sh"
+        "scripts/tests/ship-integration-test.sh"
+        "scripts/tests/role-gate-test.sh"
+        "scripts/tests/phase-gate-precondition-test.sh"
     )
     local s
     for s in "${suites[@]}"; do
