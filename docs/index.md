@@ -20,9 +20,9 @@
 | [model-routing.md](model-routing.md) | Tier-based model selection rules |
 | [configuration.md](configuration.md) | Configuration schema and domain detection |
 | [reference/scout-discovery.md](reference/scout-discovery.md) | Codebase scanning and hotspot detection |
-| [accuracy-self-correction.md](accuracy-self-correction.md) | CoT verification and anti-conformity checks |
-| [performance-profiling.md](performance-profiling.md) | Token attribution and cost baselines |
-| [eval-grader-best-practices.md](eval-grader-best-practices.md) | Eval grader precision and mutation resistance |
+| [accuracy-self-correction.md](research/accuracy-self-correction.md) | CoT verification and anti-conformity checks |
+| [performance-profiling.md](research/performance-profiling.md) | Token attribution and cost baselines |
+| [eval-grader-best-practices.md](research/eval-grader-best-practices.md) | Eval grader precision and mutation resistance |
 
 ## Incident Reports
 
