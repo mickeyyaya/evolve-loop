@@ -178,6 +178,33 @@ set_state research scout
 expect_allow "research→scout-worker-research" \
     '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-research 99000 .evolve/runs/cycle-99000"}}'
 
+# === Test 20: v8.45.0 — phase=audit + retrospective → ALLOW (FAIL/WARN path) =
+# Retrospective is in the audit phase EXPECTED list (auditor evaluator
+# retrospective orchestrator), so the precondition allows the dispatch.
+# Whether retrospective should fire is a verdict-driven orchestrator decision;
+# the kernel just permits it.
+header "Test 20: v8.45.0 — audit + retrospective → ALLOW (auto-retrospective path)"
+set_state audit auditor
+expect_allow "audit→retrospective (FAIL/WARN auto-retrospective)" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 21: v8.45.0 — phase=ship + retrospective → ALLOW (WARN path) =======
+# After WARN ship, orchestrator advances to retrospective. The kernel allows
+# retrospective in the ship phase per the EXPECTED list (orchestrator retrospective).
+header "Test 21: v8.45.0 — ship + retrospective → ALLOW (WARN-then-retro path)"
+set_state ship orchestrator
+expect_allow "ship→retrospective (WARN-then-retrospective)" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 22: v8.45.0 — retrospective phase recognized in cycle-state =======
+# Test that cycle-state.sh advance to retrospective doesn't fail. Indirect test
+# via the precondition reading cycle-state — if retrospective wasn't a valid
+# phase value, set_state's cycle-state.sh advance call would have failed.
+header "Test 22: v8.45.0 — retrospective is a valid cycle-state phase"
+set_state retrospective retrospective
+expect_allow "retrospective→retrospective (re-spawn or continuation)" \
+    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+
 # === Summary =================================================================
 echo
 echo "=========================================="

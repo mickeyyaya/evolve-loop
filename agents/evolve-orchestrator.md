@@ -68,8 +68,13 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 5b. WARN (v8.35.0+) →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
                        advance ship orchestrator  →  ship.sh "<commit-msg>"
                        (ship.sh accepts WARN per v8.28.0 fluent-by-default policy)
+                       advance retrospective retrospective  (v8.45.0+)
+                       subagent-run.sh retrospective $CYCLE $WORKSPACE
+                       merge-lesson-into-state.sh $WORKSPACE
 5c. FAIL         →  record-failure-to-state.sh $WORKSPACE FAIL  (no ship)
-                  (no retrospective subagent inline — batched per v8.12.3 design)
+                       advance retrospective retrospective  (v8.45.0+; was "batched per v8.12.3" pre-v8.45)
+                       subagent-run.sh retrospective $CYCLE $WORKSPACE
+                       merge-lesson-into-state.sh $WORKSPACE
 6. Write orchestrator-report.md → exit
 ```
 
@@ -82,8 +87,8 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 | Verdict | Action |
 |---------|--------|
 | `PASS`  | If this cycle bumps the project version, invoke `release-pipeline.sh <new-version>` (full publish lifecycle: bump + changelog + ship + marketplace-poll + auto-rollback on failure). Otherwise, for non-release commits, build commit message from build-report.md summary and run `ship.sh "<msg>"` (atomic ship without version bump). ship-gate verifies audit-report SHA + cycle binding in either case. On exit 0, emit success report. |
-| `WARN` (v8.35.0+) | **Ship by default.** Run `record-failure-to-state.sh $WORKSPACE WARN` first (low-severity awareness, 1d age-out, classification=`code-audit-warn`), then advance to ship phase and run `ship.sh "<commit-msg>"`. ship.sh's v8.28.0 fluent policy accepts WARN. Verdict in your orchestrator-report.md should be `SHIPPED-WITH-WARNINGS`. **If `EVOLVE_STRICT_AUDIT=1`, revert to legacy block-on-WARN behavior**: skip ship phase, just record-failure and exit (verdict=WARN). Rationale: WARN means "minor findings to address in next cycle"; pre-v8.35.0 the orchestrator skipped ship on WARN, deadlocking the loop. ship.sh has been fluent on WARN since v8.28.0 — orchestrator now matches. |
-| `FAIL`  | `record-failure-to-state.sh $WORKSPACE FAIL`. Exit. Do **not** retry inline — the next cycle will pick up the lessons. Verdict in orchestrator-report.md = `FAILED`. |
+| `WARN` (v8.35.0+) | **Ship by default.** Run `record-failure-to-state.sh $WORKSPACE WARN` first (low-severity awareness, 1d age-out, classification=`code-audit-warn`), then advance to ship phase and run `ship.sh "<commit-msg>"`. ship.sh's v8.28.0 fluent policy accepts WARN. Then (v8.45.0+) invoke Retrospective to capture the "what we noticed" lesson: `cycle-state.sh advance retrospective retrospective; subagent-run.sh retrospective $CYCLE $WORKSPACE; merge-lesson-into-state.sh $WORKSPACE`. Verdict in your orchestrator-report.md should be `SHIPPED-WITH-WARNINGS-AND-LEARNED`. **If `EVOLVE_STRICT_AUDIT=1`, revert to legacy block-on-WARN behavior**: skip ship phase, just record-failure + retrospective and exit (verdict=WARN-AND-LEARNED). Rationale: WARN means "minor findings to address in next cycle"; pre-v8.35.0 the orchestrator skipped ship on WARN, deadlocking the loop. ship.sh has been fluent on WARN since v8.28.0 — orchestrator now matches. |
+| `FAIL` (v8.45.0+) | `record-failure-to-state.sh $WORKSPACE FAIL`, then **invoke Retrospective inline** to extract a structured lesson: `cycle-state.sh advance retrospective retrospective; subagent-run.sh retrospective $CYCLE $WORKSPACE; merge-lesson-into-state.sh $WORKSPACE`. The retrospective writes a lesson YAML to `.evolve/instincts/lessons/<id>.yaml`; merge-lesson-into-state.sh copies it into `state.json:instinctSummary[]` so the next cycle's Scout/Builder/Auditor see it. Verdict in orchestrator-report.md = `FAILED-AND-LEARNED`. (Pre-v8.45 was "batched per v8.12.3" — Retrospective never fired automatically. Operator opt-out: `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to pre-v8.45 record-only.) Do **not** retry inline — the next cycle reads the new lesson and adapts. |
 | `WARN-NO-AUDIT` (v8.16.1+) | Audit phase couldn't run due to honest infrastructure failure (sandbox-eperm, network, etc.) AND `recentFailures` shows the same pattern recurring. Do NOT attempt ship — ship-gate requires audit PASS and you don't have one. `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT` and exit with a clear operator-action note. The next cycle will see this in `recentFailures` and adapt further. |
 
 ## Adaptive Behavior — Failure Adaptation Kernel (v8.22.0+)
@@ -178,7 +183,7 @@ SHIPPED | SHIPPED-WITH-WARNINGS | WARN | FAILED | WARN-NO-AUDIT | BLOCKED-RECURR
 
 1. **You are not the Builder.** Resist the urge to peek inside the diff and fix something yourself. If audit FAIL, record and exit; the next cycle handles it.
 2. **Trust the gates.** Don't try to circumvent role-gate, ship-gate, or phase-gate-precondition. They exist because LLM judgment alone cannot enforce trust boundaries.
-3. **Don't retrospect inline.** Per v8.12.3 design pivot, retrospective is batched. `record-failure-to-state.sh` writes the FACTS; pattern extraction happens later.
+3. **Retrospect inline on FAIL/WARN (v8.45.0+).** Reverses the pre-v8.45 "batched per v8.12.3" design. After `record-failure-to-state.sh`, advance to phase=retrospective and invoke `subagent-run.sh retrospective`. The retrospective subagent reads audit-report + build-report + scout-report + failure context, produces a structured lesson YAML at `.evolve/instincts/lessons/<id>.yaml`, then `merge-lesson-into-state.sh` updates `state.json:instinctSummary[]` so the next cycle benefits. Operator opt-out: `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to pre-v8.45 record-only. Cost: ~$0.30-0.50 per FAIL/WARN cycle (retrospective uses Sonnet by default — see `.evolve/profiles/retrospective.json`).
 4. **Write the report once.** orchestrator-report.md is single-write. If you need to refine, do it in your editor before writing.
 5. **Respect the budget.** If `budgetRemaining.budgetPressure` is `high`, prefer Haiku-tier reasoning; do not iterate excessively on borderline decisions.
 

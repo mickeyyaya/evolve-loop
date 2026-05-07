@@ -469,6 +469,39 @@ gate_audit_to_ship() {
     log "PASS: AUDIT → SHIP gate"
 }
 
+# ─── Gate: AUDIT → RETROSPECTIVE (v8.45.0+) ───
+# Allows the orchestrator to advance to the retrospective phase after a FAIL or
+# WARN audit verdict. Mirrors gate_audit_to_ship's anti-forgery + audit-report
+# verification, but accepts FAIL/WARN verdicts (PASS goes to ship instead).
+gate_audit_to_retrospective() {
+    log "Checking AUDIT → RETROSPECTIVE gate for cycle $CYCLE"
+
+    # Anti-forgery checks (same as audit-to-ship)
+    check_no_forgery_scripts
+    verify_state_checksum
+    check_git_diff_substance
+
+    # Audit report must exist + match ledger SHA + have substantive content
+    check_file_exists "$WORKSPACE/audit-report.md" "Audit report"
+    check_file_fresh "$WORKSPACE/audit-report.md" "Audit report"
+    check_artifact_substance "$WORKSPACE/audit-report.md" "Audit report"
+    check_subagent_ledger_match "auditor"
+
+    # Verdict must be FAIL or WARN (PASS uses gate_audit_to_ship)
+    if grep -qiE "Verdict:[[:space:]]*\*?\*?[[:space:]]*PASS|## Verdict[[:space:]]*\*?\*?[[:space:]]*PASS" "$WORKSPACE/audit-report.md"; then
+        # PASS without FAIL/WARN — wrong gate, should be audit-to-ship
+        if ! grep -qiE "Verdict:.*FAIL|Verdict:.*WARN|## Verdict.*FAIL|## Verdict.*WARN" "$WORKSPACE/audit-report.md"; then
+            fail "Audit verdict is PASS — use audit-to-ship gate, not audit-to-retrospective"
+        fi
+    fi
+    if ! grep -qiE "Verdict:.*FAIL|Verdict:.*WARN|## Verdict.*FAIL|## Verdict.*WARN" "$WORKSPACE/audit-report.md"; then
+        fail "Audit verdict not FAIL or WARN — retrospective requires a failure-class verdict"
+    fi
+    log "OK: Audit verdict is FAIL or WARN — retrospective phase appropriate"
+
+    log "OK: AUDIT → RETROSPECTIVE gate passed"
+}
+
 # ─── Gate: SHIP → LEARN ───
 gate_ship_to_learn() {
     log "Checking SHIP → LEARN gate for cycle $CYCLE"
@@ -654,6 +687,7 @@ case "$GATE" in
     discover-to-build)    gate_discover_to_build ;;
     build-to-audit)       gate_build_to_audit ;;
     audit-to-ship)        gate_audit_to_ship ;;
+    audit-to-retrospective) gate_audit_to_retrospective ;;
     ship-to-learn)        gate_ship_to_learn ;;
     cycle-complete)       gate_cycle_complete ;;
     *)                    fail "Unknown gate: $GATE" ;;

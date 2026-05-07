@@ -25,6 +25,26 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 > For implementation details and version history (v8.21–v8.37), see [docs/release-archive.md](docs/release-archive.md).
 
+## Auto-Retrospective on FAIL/WARN (v8.45.0+)
+
+Reverses the pre-v8.45 "batched per v8.12.3" design where Retrospective never fired automatically — failures got recorded as raw `state.json:failedApproaches[]` entries (single-loop) but the structured lesson YAML (double-loop, per Argyris & Schon 1978) never got produced.
+
+Post-v8.45.0 orchestrator flow:
+
+| Verdict | Pre-v8.45 | Post-v8.45 |
+|---|---|---|
+| PASS | ship → learn | ship → learn (unchanged) |
+| WARN (fluent default) | record + ship | record + ship + **retrospective + merge-lesson** |
+| FAIL | record-only | record + **retrospective + merge-lesson** |
+
+The retrospective subagent runs inline. Cost: ~$0.30-0.50 per FAIL/WARN cycle (Sonnet model per `.evolve/profiles/retrospective.json`). Lesson YAML is written to `.evolve/instincts/lessons/<id>.yaml` and merged into `state.json:instinctSummary[]` so the next cycle's Scout/Builder/Auditor see it.
+
+**Operator opt-out**: `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to pre-v8.45 record-only behavior. Useful for tight cost-control deployments.
+
+**Why this matters**: completes the Reflexion-style verbal-RL loop (Shinn et al. 2023). Pre-v8.45 the failure-recording side worked but the reflection side never fired. Post-v8.45 the loop is structurally complete: failure → reflection → instinct → next-cycle-input.
+
+**Kernel changes**: `scripts/phase-gate.sh` gained `gate_audit_to_retrospective`; `scripts/cycle-state.sh` recognizes `retrospective` as a valid phase; orchestrator profile gained `Bash(merge-lesson-into-state.sh:*)`. `scripts/guards/phase-gate-precondition.sh` already permitted `retrospective` agent during audit/ship phases — v8.45 just wires the orchestrator persona to use it.
+
 ## Three-Tier Strictness Model (v8.24.0+, refined v8.25.0)
 
 evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came from conflating layers; v8.24.0 made the layers explicit; v8.25.0 replaced "skip the worktree" with "relocate the worktree" so isolation is preserved even in nested-Claude.
