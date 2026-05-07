@@ -1,5 +1,8 @@
 # Project Instructions
 
+> **Cross-CLI canonical instructions are in [AGENTS.md](AGENTS.md).** This file (CLAUDE.md) is the Claude Code-specific overlay — runtime hooks, plugin manifest details, version-specific notes, and incident history. Read AGENTS.md first for the universal pipeline contract; come here for Claude Code runtime specifics.
+
+
 > This file is read by AI coding assistants. Platform equivalents: `CLAUDE.md` (Claude Code), `GEMINI.md` (Gemini CLI), `AGENTS.md` (generic). Content is platform-agnostic.
 
 ## Autonomous Execution

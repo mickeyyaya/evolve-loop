@@ -35,7 +35,10 @@ Four specialized AI agents handle the work:
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed
+- One of:
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (tier-1, primary)
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) (tier-1-hybrid — requires `claude` binary for runtime)
+  - [Codex CLI](https://github.com/openai/codex) (tier-3-stub — skill content portable, runtime adapter not yet implemented)
 - A git repository you want to improve
 
 ### Install
@@ -376,6 +379,17 @@ The short version:
 3. Make changes
 4. Test with `./install.sh && /evolve-loop 1` on a sample project
 5. Submit a PR
+
+## Community
+
+evolve-loop follows standard open-source community practices:
+
+- **Code of Conduct**: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — adopts [Contributor Covenant 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
+- **Security policy**: see [SECURITY.md](SECURITY.md) for vulnerability reporting (preferred: GitHub Security Advisories).
+- **Contributing**: see [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
+- **Cross-CLI standard**: skills live at both `skills/<name>/` (Claude Code primary) and `.agents/skills/<name>/` (Codex/Gemini open standard via symlinks). Edit either path; both resolve to the same SKILL.md.
+- **AI agent instructions**: [AGENTS.md](AGENTS.md) is the canonical cross-CLI source-of-truth. CLI-specific overlays at [CLAUDE.md](CLAUDE.md) and [GEMINI.md](GEMINI.md).
+
 
 ## License
 

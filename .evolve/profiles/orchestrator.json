@@ -211,7 +211,8 @@
       ".evolve/environment.json",
       "CHANGELOG.md",
       "README.md",
-      "CLAUDE.md"
+      "CLAUDE.md",
+      ".evolve/ledger.tip"
     ],
     "allow_network": true
   }
