@@ -238,7 +238,8 @@ allow_for_phase() {
                 "$REPO_ROOT/.claude-plugin/marketplace.json" \
                 "$REPO_ROOT/CHANGELOG.md" \
                 "$REPO_ROOT/README.md" \
-                "$REPO_ROOT/skills/evolve-loop/SKILL.md"
+                "$REPO_ROOT/skills/evolve-loop/SKILL.md" \
+                "$REPO_ROOT/.agents/skills/evolve-loop/SKILL.md"
             ;;
         learn)
             match_any "$path" \
