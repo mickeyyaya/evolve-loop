@@ -95,7 +95,7 @@ unset __rr_self
 # so subagents can invoke kernel scripts by bare name. Eliminates the
 # install-layout-fragile path-pattern enumeration in orchestrator/auditor
 # allowlists. Inherits to claude -p subprocess via env propagation.
-export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/scripts/release:$PATH"
+export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/scripts/release:$EVOLVE_PLUGIN_ROOT/scripts/tests:$PATH"
 
 # Read-only: run-cycle.sh ships with the plugin
 RUN_CYCLE="${RUN_CYCLE_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/scripts/run-cycle.sh}"
