@@ -459,11 +459,85 @@ fi
 CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 [ -n "$CURRENT_BRANCH" ] || fail "detached HEAD — refuse to ship; checkout a branch first"
 
+# v8.43.0: worktree-aware shipping. Pre-v8.43, ship.sh ran git add+commit
+# from main repo cwd; Builder edits live in active_worktree on branch
+# evolve/cycle-N which is invisible from main's working tree, so ship.sh
+# saw a clean tree and exited 0 with nothing shipped. Cycles correctly
+# built improvements; ship was a no-op; lastCycleNumber didn't advance;
+# 5-repeat circuit-breaker wasted ~$18.92 in the observed regression.
+#
+# Fix: when --class cycle and active_worktree is set, do the commit IN
+# the worktree (where Builder's changes live), then fast-forward merge
+# evolve/cycle-N into main, then push main. --ff-only refuses divergent
+# history rather than silently auto-merging.
+WORKTREE_COMMIT_DONE=0
+if [ "$SHIP_CLASS" = "cycle" ]; then
+    cycle_state_file="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
+    if [ -f "$cycle_state_file" ]; then
+        active_worktree=$(jq -r '.active_worktree // empty' "$cycle_state_file" 2>/dev/null || echo "")
+        if [ -n "$active_worktree" ] && [ -d "$active_worktree" ] \
+           && [ "$active_worktree" != "$EVOLVE_PROJECT_ROOT" ]; then
+            log "v8.43.0: worktree-aware ship — committing in active_worktree=$active_worktree"
+            cycle_branch=$(git -C "$active_worktree" symbolic-ref --short HEAD 2>/dev/null || echo "")
+            if [ -z "$cycle_branch" ]; then
+                fail "could not resolve cycle branch from worktree $active_worktree"
+            fi
+            log "  cycle branch: $cycle_branch"
+            git -C "$active_worktree" add -A
+            if git -C "$active_worktree" diff --cached --quiet; then
+                ahead=$(git rev-list --count "$CURRENT_BRANCH..$cycle_branch" 2>/dev/null || echo 0)
+                if [ "$ahead" = "0" ]; then
+                    log "no changes in worktree AND branch not ahead of $CURRENT_BRANCH; exiting cleanly"
+                    exit 0
+                fi
+                log "  no uncommitted worktree changes but branch is $ahead commit(s) ahead; will merge"
+            else
+                diff_files=$(git -C "$active_worktree" diff --cached --name-status 2>/dev/null || echo "")
+                diff_stat=$(git -C "$active_worktree" diff --cached --shortstat 2>/dev/null || echo "")
+                if [ -n "$diff_files" ]; then
+                    file_count=$(printf '%s\n' "$diff_files" | grep -c '^' || echo 0)
+                    diff_footer=$(cat <<FOOTER
+
+---
+## Actual diff (v8.34.0+)
+
+Files modified ($file_count):
+$(printf '%s' "$diff_files" | sed 's/^/- /')
+
+$diff_stat
+FOOTER
+)
+                    WORKTREE_COMMIT_MSG="$COMMIT_MSG$diff_footer"
+                else
+                    WORKTREE_COMMIT_MSG="$COMMIT_MSG"
+                fi
+                git -C "$active_worktree" -c commit.gpgsign=false commit -m "$WORKTREE_COMMIT_MSG" \
+                    || fail "git commit in worktree failed"
+                log "  OK: committed in worktree on $cycle_branch"
+                unset WORKTREE_COMMIT_MSG diff_files diff_stat file_count diff_footer
+            fi
+            git merge --ff-only "$cycle_branch" \
+                || fail "ff-merge $cycle_branch into $CURRENT_BRANCH failed (divergent history); re-run cycle from clean main"
+            log "  OK: ff-merged $cycle_branch into $CURRENT_BRANCH"
+            git push origin "$CURRENT_BRANCH" \
+                || fail "git push failed; main is at $(git rev-parse HEAD)"
+            log "OK: pushed to origin/$CURRENT_BRANCH"
+            WORKTREE_COMMIT_DONE=1
+        fi
+    fi
+fi
+
 # Stage everything (intentional — audit was based on full diff HEAD).
-git add -A
+# Skipped for v8.43.0 worktree-ship path (handled above).
+if [ "$WORKTREE_COMMIT_DONE" = "0" ]; then
+    git add -A
+fi
 
 # If nothing to commit, log and exit cleanly.
-if git diff --cached --quiet; then
+# Skipped if v8.43.0 worktree-ship already completed (commit+push handled above).
+if [ "$WORKTREE_COMMIT_DONE" = "1" ]; then
+    : # worktree path completed; skip remaining flow
+elif git diff --cached --quiet; then
     log "no staged changes to ship; exiting cleanly (audit was for an empty diff)"
     exit 0
 fi
@@ -503,14 +577,17 @@ FOOTER
     unset diff_files diff_stat file_count diff_footer
 fi
 
-# Commit. Use array form to avoid arg injection.
-COMMIT_ARGS=(commit -m "$COMMIT_MSG")
-git "${COMMIT_ARGS[@]}"
-log "OK: committed to $CURRENT_BRANCH"
+# Commit + push. Skipped when v8.43.0 worktree-ship already pushed above.
+if [ "$WORKTREE_COMMIT_DONE" = "0" ]; then
+    # Commit. Use array form to avoid arg injection.
+    COMMIT_ARGS=(commit -m "$COMMIT_MSG")
+    git "${COMMIT_ARGS[@]}"
+    log "OK: committed to $CURRENT_BRANCH"
 
-# Push.
-git push origin "$CURRENT_BRANCH"
-log "OK: pushed to origin/$CURRENT_BRANCH"
+    # Push.
+    git push origin "$CURRENT_BRANCH"
+    log "OK: pushed to origin/$CURRENT_BRANCH"
+fi
 
 # v8.34.0: Advance state.json:lastCycleNumber on successful cycle ship.
 # Pre-v8.34, only failure paths (record_failed_approach in dispatcher) wrote
