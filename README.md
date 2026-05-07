@@ -238,26 +238,47 @@ All reference material is in `skills/refactor/reference/` — loaded on demand, 
 
 ### Phase Details
 
-**Phase 0 — CALIBRATE** (once per session)
-Initialize workspace, load state, run benchmark if stale.
+For the **complete walkthrough** (per-phase: who runs, when, inputs, what it checks/does, outputs, model selection, version-specific behavior, kernel-hook integration), see [docs/phase-architecture.md](docs/phase-architecture.md). For the **research citations** that motivated each design decision (Reflexion, Voyager, Constitutional AI, Self-Refine, METR reward-hacking, Crosby & Wallach tamper-evident logging, IETF Agent Audit Trail draft, etc.), see [docs/phase-architecture-citations.md](docs/phase-architecture-citations.md).
 
-**Phase 2 — DISCOVER** (Scout agent)
-Scan the codebase, read operator brief from last cycle, select 2-4 tasks with eval definitions. Uses multi-armed bandit for task type selection, novelty scoring to avoid over-touched files.
+Brief summaries below.
+
+**Phase 0 — CALIBRATE** (once per `/evolve-loop` invocation)
+Compute `projectBenchmark` across 8 dimensions (documentation, defensive design, eval infrastructure, modularity, schema hygiene, convention adherence, feature coverage, specification consistency). Hybrid automated + LLM probes. Scout uses these scores to weight task selection; regressions trigger `fitnessRegression` flag. Grounded in ISO/IEC 25010 + Goodhart's-Law mitigation via composite scoring.
+
+**Phase 0b — INTENT** (v8.19.1+, always-on for `/evolve-loop`)
+The "Intent Architect" persona converts vague user goals into a structured `intent.md` (8 fields + AwN classifier `IMKI/IMR/IwE/IBTC/CLEAR` + ≥1 challenged_premise). Closes the 56% "missing key information" gap (arXiv 2409.00557) before Scout starts. The mandatory ≥1 challenged_premise rule is the anti-sycophancy mechanism at the structuring layer (motivated by Sharma et al. 2024).
+
+**Phase 1 / 2 — DISCOVER** (Scout agent)
+Scan the codebase, identify highest-leverage tasks (1-3 per cycle), write evals (acceptance graders) Builder is measured against. Mode-aware: `full` (cycle 1, full scan), `incremental` (cycle 2+, diff-only), `convergence-confirmation` (no work to do). Mutation-test pre-flight (Jia & Harman 2011) blocks tautological evals. Optional Pattern-3 fan-out splits Scout into codebase / research / evals sub-personas (Du et al. 2023 multi-agent debate).
 
 **Phase 3 — BUILD** (Builder agent)
-Implement each task in an isolated git worktree. Self-verify against eval definitions. Max 3 attempts per task. Supports parallel builds for independent tasks.
+Implement Scout's tasks in an isolated git worktree on branch `evolve/cycle-N`. Profile-scoped permissions (writes only to worktree path). 8-step workflow: verify isolation → read instincts/genes → read task → research → skill consultation → design (chain-of-thought) → implement → self-verify (run eval graders) → commit → report. Genes (`.evolve/genes/<id>.yaml`) are reusable action recipes accumulated from prior cycles (Voyager-style skill library). Self-Refine pattern (Madaan et al. 2023) drives the iterate-until-tests-green loop.
 
 **Phase 4 — AUDIT** (Auditor agent)
-Single-pass review covering code quality, security, pipeline integrity, and eval checks. Blocks on MEDIUM+ severity. Failed audits trigger Builder retry.
+Cross-checks Builder's narrative against ground truth via the Single-Pass Review Checklist (Code Quality, Security, Hallucination Detection, Pipeline Integrity, Eval Integrity, E2E Grounding). Verdict: PASS / WARN / FAIL. Default model: Opus (different family from Builder's Sonnet — breaks same-family-judge sycophancy per Sharma et al. 2024); v8.35.0 auto-downgrades to Sonnet for trivial diffs. Adversarial framing requires *positive evidence* for PASS (Constitutional AI / Bai et al. 2022). Cycle binding (git_head + tree_state_sha + ledger SHA + v8.37.0 hash chain) makes the verdict structurally unforgeable post-hoc.
 
-**Phase 5 — SHIP**
-Commit and push changes. Auto-increment patch version.
+**Phase 5 — SHIP / RECORD**
+Two paths driven by audit verdict:
+- **PASS or WARN**: `scripts/ship.sh` (the canonical entry point allowlisted by `ship-gate.sh`) commits in the worktree, fast-forward merges into main, pushes to origin. v8.43.0 added the worktree-aware path; before that the Builder→main bridge was structurally missing. WARN ships by default since v8.28.0 (operator opts back to legacy strict via `EVOLVE_STRICT_AUDIT=1`).
+- **FAIL**: `record-failure-to-state.sh` appends to `state.json:failedApproaches[]` with structured classification (9 classes per `failure-classifications.sh`, each with severity + age-out + retry policy). The next cycle's `failure-adapter.sh` reads non-expired entries and emits a deterministic decision the orchestrator follows verbatim. Triggers Phase 6.
 
-**Phase 6 — LEARN** (Operator agent)
-Extract instincts from the cycle. Run health checks. Detect stagnation patterns. Write operator brief for next cycle.
+**Phase 6 — LEARN** (Retrospective agent)
+Fires only on FAIL or WARN. Extracts a reusable lesson (one per *root cause*, not one per defect). Writes `.evolve/instincts/lessons/<id>.yaml` with `description` + `preventiveAction` + `contradicts` (older instincts this supersedes) + `relatedInstincts` (cross-links). Future cycles' Scout/Builder/Auditor read `instinctSummary` from state.json. Reflexion-style verbal-RL loop (Shinn et al. 2023) — failure → reflection → instinct → next-cycle-input. Double-loop learning (Argyris & Schon) demands the *underlying assumption that turned out to be wrong*, not just the defect list.
 
-**Phase 7 — META-CYCLE** (every 5 cycles)
-Evaluate pipeline performance. Evolve agent prompts via critique-synthesize loop. Adjust strategies and budgets. Auto-revert changes that degrade performance.
+**Phase 7 — META** (every 5 cycles, optional)
+Self-improvement of the loop itself. Pattern detection across last 5 cycles → proposals in `state.json:proposals[]` (operator-reviewable). Operator approval gate prevents runaway self-modification (Asilomar AI Principles). Promptbreeder-style evolutionary improvement (Fernando et al. 2023).
+
+### Cross-cutting structural integrity
+
+Three Tier-1 kernel hooks fire as PreToolUse in every cycle, structurally enforced (cannot be bypassed during normal operation):
+
+| Hook | Watches | Denies |
+|---|---|---|
+| `phase-gate-precondition.sh` | `subagent-run.sh` invocations | Out-of-order phases |
+| `role-gate.sh` | Edit/Write tool calls | Writes outside the active phase's allowlist |
+| `ship-gate.sh` | Bash with git/gh verbs | Anything except `scripts/ship.sh` doing commit/push/release |
+
+Plus the v8.37.0 tamper-evident hash-chained ledger (`prev_hash` chains every entry; `.evolve/ledger.tip` detects truncation; `bash scripts/verify-ledger-chain.sh` walks the chain). All grounded in Saltzer & Schroeder 1975's complete-mediation principle and Crosby & Wallach 2009's tamper-evident logging.
 
 ### Multi-Task Flow
 
