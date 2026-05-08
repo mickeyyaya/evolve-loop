@@ -46,8 +46,8 @@ Raw Artifacts ──> Pattern Extraction ──> Semantic Abstraction ──> Pr
 |-------|-------|---------|--------|---------|
 | 1. Raw Artifacts | Cycle execution | Scout, Builder, Auditor produce reports | Episodic entries in `workspace/` | Every cycle completion |
 | 2. Pattern Extraction | 2+ episodic entries with shared signal | Compare artifacts across cycles, identify recurring patterns | Candidate instinct with initial confidence | Pattern appears in 2+ consecutive or 3+ total cycles |
-| 3. Semantic Abstraction | Candidate instinct | Validate pattern, assign confidence score, categorize | Instinct entry in `docs/instincts.md` | Extraction confidence >= 0.5 |
-| 4. Procedural Encoding | High-confidence instinct | Convert instinct into executable gene or template | Gene file in `docs/genes.md` or plan cache entry | Instinct confidence >= 0.75, cited in 3+ cycles |
+| 3. Semantic Abstraction | Candidate instinct | Validate pattern, assign confidence score, categorize | Instinct entry in `docs/reference/instincts.md` | Extraction confidence >= 0.5 |
+| 4. Procedural Encoding | High-confidence instinct | Convert instinct into executable gene or template | Gene file in `docs/reference/genes.md` or plan cache entry | Instinct confidence >= 0.75, cited in 3+ cycles |
 | 5. Retrieval Indexing | Procedural entry | Add to retrieval index with tags and search metadata | Indexed gene/template available for Scout discovery | Procedural entry created or updated |
 
 ---

@@ -238,7 +238,7 @@ All reference material is in `skills/refactor/reference/` — loaded on demand, 
 
 ### Phase Details
 
-For the **complete walkthrough** (per-phase: who runs, when, inputs, what it checks/does, outputs, model selection, version-specific behavior, kernel-hook integration), see [docs/phase-architecture.md](docs/phase-architecture.md). For the **research citations** that motivated each design decision (Reflexion, Voyager, Constitutional AI, Self-Refine, METR reward-hacking, Crosby & Wallach tamper-evident logging, IETF Agent Audit Trail draft, etc.), see [docs/phase-architecture-citations.md](docs/phase-architecture-citations.md).
+For the **complete walkthrough** (per-phase: who runs, when, inputs, what it checks/does, outputs, model selection, version-specific behavior, kernel-hook integration), see [docs/architecture/phase-architecture.md](docs/architecture/phase-architecture.md). For the **research citations** that motivated each design decision (Reflexion, Voyager, Constitutional AI, Self-Refine, METR reward-hacking, Crosby & Wallach tamper-evident logging, IETF Agent Audit Trail draft, etc.), see [docs/architecture/phase-architecture-citations.md](docs/architecture/phase-architecture-citations.md).
 
 Brief summaries below.
 

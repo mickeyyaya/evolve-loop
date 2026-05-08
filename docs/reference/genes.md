@@ -77,7 +77,7 @@ During Phase 6 (LEARN), after instinct extraction:
   capsule-001-add-component.yaml
 ```
 
-For an annotated example, see [examples/gene.yaml](../examples/gene.yaml).
+For an annotated example, see [examples/gene.yaml](../../examples/gene.yaml).
 
 ## Relationship to Instincts
 

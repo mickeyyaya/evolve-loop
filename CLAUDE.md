@@ -23,7 +23,7 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **Runtime constraints (current behavior):** Per-cycle git worktrees are provisioned by `run-cycle.sh` (recorded in `cycle-state.json:active_worktree`). Orchestrator and all phase agents MAY NOT call `git worktree add/remove` (denied by profiles). The failure-adapter (`scripts/failure/failure-adapter.sh`) computes a deterministic PROCEED/RETRY/BLOCK decision from `state.json:failedApproaches[]` — orchestrator reads this JSON and follows it verbatim. Ledger entries include `prev_hash` + `entry_seq` for tamper-evident hash-chaining; verify with `bash scripts/observability/verify-ledger-chain.sh`. Audit `Verdict: WARN` ships by default (set `EVOLVE_STRICT_AUDIT=1` to block). `ship.sh` advances `state.json:lastCycleNumber` after every successful cycle ship.
 
-> For implementation details and version history (v8.21–v8.37), see [docs/release-archive.md](docs/release-archive.md).
+> For implementation details and version history (v8.21–v8.37), see [docs/release/release-archive.md](docs/release/release-archive.md).
 
 ## Auto-Retrospective on FAIL/WARN (v8.45.0+)
 
@@ -83,7 +83,7 @@ Scripts/cron jobs using `EVOLVE_BYPASS_SHIP_VERIFY=1` continue to work (permanen
 
 ## Release & Publish Workflow (v8.13.2+)
 
-**"publish" ≠ "push".** See [docs/release-protocol.md](docs/release-protocol.md) for the canonical vocabulary (push, tag, release, propagate, publish, ship). When the user asks to "publish vX.Y.Z", use the self-healing pipeline:
+**"publish" ≠ "push".** See [docs/release/release-protocol.md](docs/release/release-protocol.md) for the canonical vocabulary (push, tag, release, propagate, publish, ship). When the user asks to "publish vX.Y.Z", use the self-healing pipeline:
 
 ```bash
 bash scripts/release-pipeline.sh X.Y.Z              # full publish
@@ -125,7 +125,7 @@ evolve-loop subagents have three budget-control mechanisms (highest priority fir
 
 Default is `--max-budget-usd 999999` (effectively unlimited, since v8.26.0). For hard cost ceilings: `EVOLVE_BUDGET_CAP=<value>` (single ceiling) or `EVOLVE_BUDGET_ENFORCE=1` (use profile-resolved per-phase caps). The Scout profile ships with `default` / `research` / `deep` budget tiers as the canonical `EVOLVE_TASK_MODE` example.
 
-> For detailed usage examples and forward-compatibility notes, see [docs/release-archive.md](docs/release-archive.md).
+> For detailed usage examples and forward-compatibility notes, see [docs/release/release-archive.md](docs/release/release-archive.md).
 
 ## Verification Before Claiming Done (v8.13.3+)
 
@@ -209,7 +209,7 @@ The hybrid pattern exists because Gemini CLI lacks non-interactive prompt mode, 
 
 ### Where the platform-specific knowledge lives
 
-- `docs/platform-compatibility.md` — top-level support matrix and adapter contract
+- `docs/architecture/platform-compatibility.md` — top-level support matrix and adapter contract
 - `skills/evolve-loop/reference/platform-detect.md` — env-var probe table for runtime detection
 - `skills/evolve-loop/reference/<platform>-tools.md` — tool name translation (`Read` → `read_file`, etc.)
 - `skills/evolve-loop/reference/<platform>-runtime.md` — invocation patterns per CLI

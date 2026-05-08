@@ -100,7 +100,7 @@ You can override detection with `EVOLVE_PLATFORM=<cli>`. The skill reads `refere
 
 ## See also
 
-- [reference/platform-detect.md](../skills/evolve-loop/reference/platform-detect.md) — env-var probe table the LLM consults at skill activation
-- [reference/claude-tools.md](../skills/evolve-loop/reference/claude-tools.md), [reference/gemini-tools.md](../skills/evolve-loop/reference/gemini-tools.md), [reference/codex-tools.md](../skills/evolve-loop/reference/codex-tools.md) — per-platform tool name maps
-- [reference/claude-runtime.md](../skills/evolve-loop/reference/claude-runtime.md), [reference/gemini-runtime.md](../skills/evolve-loop/reference/gemini-runtime.md), [reference/generic-runtime.md](../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
-- [docs/incidents/gemini-forgery.md](incidents/gemini-forgery.md) — why hybrid driving exists
+- [reference/platform-detect.md](../../skills/evolve-loop/reference/platform-detect.md) — env-var probe table the LLM consults at skill activation
+- [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [reference/gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [reference/codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md) — per-platform tool name maps
+- [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [reference/gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [reference/generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
+- [docs/incidents/gemini-forgery.md](../incidents/gemini-forgery.md) — why hybrid driving exists

@@ -88,7 +88,7 @@ Three distinct gates govern instinct advancement. Each serves a different purpos
 
 **Why different thresholds:** Graduation is stricter on cycle count (3+) because graduated instincts bypass Builder deliberation — a wrong one directly causes failures. Promotion has a lower cycle bar (2+) because promoted instincts are still evaluated before application, but requires higher confidence (0.8) and loop maturity (5+ cycles). Trust governance is strictest on provenance because external instincts carry injection risk (arXiv:2602.12430: 26.1% community skills have vulnerabilities).
 
-See [phase6-learn.md](../skills/evolve-loop/phase6-learn.md) § Instinct Graduation for the canonical executable specification.
+See [phase6-learn.md](../../skills/evolve-loop/phase6-learn.md) § Instinct Graduation for the canonical executable specification.
 
 ## Global Promotion
 
@@ -138,7 +138,7 @@ Graduation can be reverted when evidence contradicts the instinct:
 - **Escalation:** If confidence drops below 0.5 after reversal, the instinct is archived with `archivedReason: "reversal"`
 - **Logging:** Reversal is recorded in the ledger as `type: "instinct-reversal"`
 
-See [phase6-learn.md](../skills/evolve-loop/phase6-learn.md) § Instinct Graduation for the full specification.
+See [phase6-learn.md](../../skills/evolve-loop/phase6-learn.md) § Instinct Graduation for the full specification.
 
 ## Memory Operations
 
@@ -178,7 +178,7 @@ This prevents unbounded memory growth and keeps the instinct set relevant and co
 
 Each cycle appends a new file. Instinct updates (confidence changes) reference the original ID with a `-update` suffix.
 
-For an annotated example, see [examples/instinct.yaml](../examples/instinct.yaml).
+For an annotated example, see [examples/instinct.yaml](../../examples/instinct.yaml).
 
 ## How Agents Use Instincts
 

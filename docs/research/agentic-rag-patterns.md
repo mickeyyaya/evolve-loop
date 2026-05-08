@@ -67,8 +67,8 @@ Use a three-level retrieval hierarchy. Route queries to the cheapest level that 
 | Retrieval Step | Level | Source | Purpose |
 |---|---|---|---|
 | Read instinctSummary | L1 | `workspace/instinct-summary.md` | Load compressed behavioral guidance |
-| Read full instinct files | L2 | `docs/instincts.md`, individual instinct files | Get detailed implementation guidance |
-| Read gene definitions | L2 | `docs/genes.md`, relevant gene files | Understand constraints and quality criteria |
+| Read full instinct files | L2 | `docs/reference/instincts.md`, individual instinct files | Get detailed implementation guidance |
+| Read gene definitions | L2 | `docs/reference/genes.md`, relevant gene files | Understand constraints and quality criteria |
 | Scan implementation context | L3 | Source files referenced in scout-report | Deep understanding for code changes |
 
 ### Auditor Phase

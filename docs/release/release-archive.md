@@ -2,7 +2,7 @@
 
 > This file contains implementation details, incident post-mortems, and migration notes for v8.13–v8.37. It is **not** auto-loaded into agent context — it is reference documentation for operators investigating historical behavior or debugging regressions.
 >
-> For current behavioral rules, see [CLAUDE.md](../CLAUDE.md).
+> For current behavioral rules, see [CLAUDE.md](../../CLAUDE.md).
 
 ---
 

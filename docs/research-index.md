@@ -28,7 +28,7 @@ Role design, multi-agent coordination, and orchestration patterns.
 | [agent-orchestration-anti-patterns.md](research/agent-orchestration-anti-patterns.md) | Catalog of orchestration mistakes with detection heuristics | 98 |
 | [agent-skill-composition.md](research/agent-skill-composition.md) | Combining atomic skills into complex agent behaviors | 196 |
 | [self-evolving-tool-creation.md](research/self-evolving-tool-creation.md) | Agents detecting capability gaps and creating tools at runtime | 119 |
-| [model-routing.md](model-routing.md) | 3-tier model abstraction and dynamic routing per phase | 86 |
+| [model-routing.md](reference/model-routing.md) | 3-tier model abstraction and dynamic routing per phase | 86 |
 | [emergent-agent-behaviors.md](research/emergent-agent-behaviors.md) | Taxonomy and containment of unexpected agent capabilities | 184 |
 
 ### Agent Safety & Security
@@ -52,8 +52,8 @@ Memory consolidation, instincts, genes, and knowledge distillation.
 | Doc | Key Topic | Lines |
 |-----|-----------|-------|
 | [memory-consolidation-pipeline.md](research/memory-consolidation-pipeline.md) | Three-tier episodic/semantic/procedural memory model | 122 |
-| [instincts.md](instincts.md) | Instinct system for learning actionable patterns per cycle | 220 |
-| [genes.md](genes.md) | Reusable fix templates with executable steps and validation | 112 |
+| [instincts.md](reference/instincts.md) | Instinct system for learning actionable patterns per cycle | 220 |
+| [genes.md](reference/genes.md) | Reusable fix templates with executable steps and validation | 112 |
 | [knowledge-distillation-agents.md](research/knowledge-distillation-agents.md) | Compressing reasoning traces into reusable compact formats | 139 |
 
 ### Agent Evaluation
@@ -125,7 +125,7 @@ Roadmap, configuration, technique references, and performance profiling.
 | Doc | Key Topic | Lines |
 |-----|-----------|-------|
 | [index.md](index.md) | Top-level documentation index | 33 |
-| [configuration.md](configuration.md) | state.json configuration reference | 333 |
+| [configuration.md](reference/configuration.md) | state.json configuration reference | 333 |
 | [performance-profiling.md](research/performance-profiling.md) | Token spend measurement and cost bottleneck identification | 173 |
 | [reference/scout-techniques.md](reference/scout-techniques.md) | Phase 2 (DISCOVER) techniques: task selection, difficulty estimation | 117 |
 | [reference/scout-discovery.md](reference/scout-discovery.md) | Scout discovery and analysis phase guidelines | 40 |
@@ -148,15 +148,15 @@ Documents that reference other docs in this knowledge base.
 | [agent-interoperability-protocols.md](research/agent-interoperability-protocols.md) | protocol specs |
 | [agent-lifecycle-management.md](research/agent-lifecycle-management.md) | phase references |
 | [agentic-rag-patterns.md](research/agentic-rag-patterns.md) | token optimization |
-| [configuration.md](configuration.md) | models-quickstart, architecture |
+| [configuration.md](reference/configuration.md) | models-quickstart, architecture |
 | [eval-grader-best-practices.md](research/eval-grader-best-practices.md) | configuration, phases |
-| [genes.md](genes.md) | instincts.md |
+| [genes.md](reference/genes.md) | instincts.md |
 | [incidents/cycle-132-141.md](incidents/cycle-132-141.md) | cycle-102-111.md, research references |
 | [incidents/gemini-forgery.md](incidents/gemini-forgery.md) | cycle-132-141.md, adversarial eval |
 | [index.md](index.md) | reference/* docs |
-| [instincts.md](instincts.md) | genes.md, configuration.md |
+| [instincts.md](reference/instincts.md) | genes.md, configuration.md |
 | [memory-consolidation-pipeline.md](research/memory-consolidation-pipeline.md) | instincts.md, genes.md |
-| [model-routing.md](model-routing.md) | configuration.md |
+| [model-routing.md](reference/model-routing.md) | configuration.md |
 | [performance-profiling.md](research/performance-profiling.md) | configuration.md, token optimization |
 | [prompt-evolution-optimization.md](research/prompt-evolution-optimization.md) | eval graders |
 | [reference/builder-techniques.md](reference/builder-techniques.md) | scout-techniques.md |
@@ -181,11 +181,11 @@ Recommended sequence for newcomers to the evolve-loop knowledge base.
 | Step | Doc | Rationale |
 |------|-----|-----------|
 | 1 | [index.md](index.md) | Orient with the top-level documentation structure |
-| 2 | [configuration.md](configuration.md) | Understand the runtime configuration model |
-| 3 | [model-routing.md](model-routing.md) | Learn the 3-tier model abstraction |
+| 2 | [configuration.md](reference/configuration.md) | Understand the runtime configuration model |
+| 3 | [model-routing.md](reference/model-routing.md) | Learn the 3-tier model abstraction |
 | 4 | [agent-role-specialization.md](research/agent-role-specialization.md) | Understand how agent roles are designed |
-| 5 | [instincts.md](instincts.md) | Learn the learning mechanism |
-| 6 | [genes.md](genes.md) | Understand reusable fix templates |
+| 5 | [instincts.md](reference/instincts.md) | Learn the learning mechanism |
+| 6 | [genes.md](reference/genes.md) | Understand reusable fix templates |
 | 7 | [memory-consolidation-pipeline.md](research/memory-consolidation-pipeline.md) | See how knowledge persists across cycles |
 | 8 | [reference/scout-techniques.md](reference/scout-techniques.md) | Phase 2 techniques |
 | 9 | [reference/builder-techniques.md](reference/builder-techniques.md) | Phase 3 techniques |

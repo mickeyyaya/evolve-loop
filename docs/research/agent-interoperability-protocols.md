@@ -92,7 +92,7 @@ Map evolve-loop's existing coordination mechanisms to formal protocol concepts.
 | **Phase contract** | `handoff-*.json` files passed between phases | `workspace/handoff-scout.json`, `workspace/handoff-builder.json` |
 | **Message passing** | Agent mailbox pattern via task artifacts | `workspace/*.md` (scout-report, build-report, audit-report) |
 | **Service discovery** | Agent role declarations in CLAUDE.md | `CLAUDE.md`, `agents/*.md` |
-| **Shared values** | Protocol baseline enforced across all agents | `docs/instincts.md`, `docs/genes.md` |
+| **Shared values** | Protocol baseline enforced across all agents | `docs/reference/instincts.md`, `docs/reference/genes.md` |
 | **Event log** | Ledger recording all phase transitions | `ledger.jsonl` |
 | **Authentication** | Not applicable (single-machine, single-user) | N/A |
 | **Schema registry** | Contract definitions in reference docs | `docs/reference/` |

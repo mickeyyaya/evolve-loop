@@ -48,7 +48,7 @@ Use this matrix to select the right technique based on your constraints.
 | Evolve-Loop Concept | Prompt Evolution Analog | Technique to Apply | Implementation Location |
 |---------------------|------------------------|-------------------|------------------------|
 | Instinct evolution | Prompt evolution across generations | Evolutionary search (MIPROv2) | `state.json` instinct field; mutate per cycle |
-| Gene mutation | Discrete prompt parameter variation | SIMBA segment-level mutation | Gene definitions in `docs/genes.md`; vary gene values as prompt segments |
+| Gene mutation | Discrete prompt parameter variation | SIMBA segment-level mutation | Gene definitions in `docs/reference/genes.md`; vary gene values as prompt segments |
 | Scout prompt refinement | Iterative prompt improvement based on eval feedback | Prochemy-style patching | Scout system prompt; patch based on audit-report failures |
 | Builder prompt refinement | Targeted improvement of code generation instructions | Iterative refinement (APO) | Builder system prompt; optimize based on build success rate |
 | Auditor prompt refinement | Calibrate evaluation criteria over cycles | Meta-prompting + eval feedback | Auditor system prompt; adjust scoring rubrics based on false positive/negative rates |

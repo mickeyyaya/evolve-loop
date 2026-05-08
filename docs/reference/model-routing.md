@@ -54,7 +54,7 @@ Default mappings (override via `.evolve/models.json`):
 }
 ```
 
-When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](configuration.md) for full schema and [models-quickstart.md](models-quickstart.md) for practical examples.
+When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](../reference/configuration.md) for full schema and [models-quickstart.md](models-quickstart.md) for practical examples.
 
 ## Dynamic Model Routing
 

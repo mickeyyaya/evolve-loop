@@ -1635,7 +1635,7 @@ The /insights audit flagged "release_publish" as the #1 friction class — silen
 - **`scripts/release/changelog-gen.sh`** (~150 lines) — conventional-commits parser. Buckets `feat:`/`fix:`/`refactor:`/`perf:`/`docs:` plus an explicit `### Other` fallback for the ~40% of historical commits without prefixes. Idempotent — preserves manually-curated entries.
 - **`scripts/release/marketplace-poll.sh`** (~150 lines) — post-publish marketplace propagation verifier. Polls `~/.claude/plugins/marketplaces/evolve-loop/` for up to 5 minutes (configurable via `--max-wait-s`). On convergence, re-invokes `release.sh <target>` to refresh `installed_plugins.json` registry. **Closes the cache-refresh ordering bug** by sequencing release.sh-refresh AFTER convergence, never before.
 - **`scripts/release/rollback.sh`** (~190 lines) — auto-revert. Reads release journal. Three independently-auditable steps: (a) `gh release delete vX.Y.Z`, (b) `git push origin :refs/tags/vX.Y.Z`, (c) revert commit pushed via `EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh "revert: ..."`. Logs every step to `.evolve/release-rollbacks.jsonl` for audit trail.
-- **`docs/release-protocol.md`** (~250 lines) — canonical vocabulary doc. Defines push, tag, release, propagate, publish, ship. Operational runbook with annotated examples. Conventional-commits guide. Marketplace topology diagram. Common failure modes table.
+- **`docs/release/release-protocol.md`** (~250 lines) — canonical vocabulary doc. Defines push, tag, release, propagate, publish, ship. Operational runbook with annotated examples. Conventional-commits guide. Marketplace topology diagram. Common failure modes table.
 - **5 new test suites** (54 tests total): `preflight-test.sh` (10), `changelog-gen-test.sh` (14), `marketplace-poll-test.sh` (10), `rollback-test.sh` (8), `release-pipeline-test.sh` (12). Includes explicit regression tests for **the cache-refresh ordering bug** (Test 9 of release-pipeline-test) and **the stale-version regression** (Test 3 of marketplace-poll-test, Test 10 of release-pipeline-test).
 
 ### Changed
@@ -1647,7 +1647,7 @@ The /insights audit flagged "release_publish" as the #1 friction class — silen
 
 ### Documentation
 
-- New `docs/release-protocol.md` is the canonical answer to "what does publish mean?"
+- New `docs/release/release-protocol.md` is the canonical answer to "what does publish mean?"
 
 ### Test Results
 
@@ -2113,7 +2113,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 - **Meta-evaluation (Layer 5)** — Red-team protocol for the evaluator itself. Triggered by repeated gaming detection, saturation, or proxy correlation drops.
 - **3 evaluation scopes** — `task` (changed files), `project` (full codebase), `strategic` (trajectory and priorities).
 - **Phase 3 delegation hook** — Evolve-loop Auditor can invoke `/evaluator --scope task` when `strategy == "harden"` or `forceFullAudit == true`.
-- **`docs/evaluator-research.md`** — Comprehensive 414-line research archive documenting 14 papers, 8 agent benchmarks, 12 LLM-judge biases, reward hacking incidents, independent evaluation principles, and full cross-reference of existing evolve-loop eval mechanisms.
+- **`docs/research/evaluator-research.md`** — Comprehensive 414-line research archive documenting 14 papers, 8 agent benchmarks, 12 LLM-judge biases, reward hacking incidents, independent evaluation principles, and full cross-reference of existing evolve-loop eval mechanisms.
 - **Reference material** — `scoring-dimensions.md` (6-dimension rubric), `anti-gaming.md` (EST protocol + known gaming patterns), `eval-lifecycle.md` (4-stage lifecycle + drift detection + meta-evaluation).
 
 ### Research Documented
@@ -2129,7 +2129,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 
 ### Added
 - **`scripts/observability/token-profiler.sh`** — Measures token footprint of all skill, agent, and script files. Outputs ranked table with line counts and estimated tokens. Supports `--json`, `--save-baseline`, and `--compare` flags for tracking optimization progress over time.
-- **`docs/token-optimization-guide.md`** — Research-backed optimization guide documenting 5 techniques (three-tier progressive disclosure, context block ordering, AgentDiet trajectory compression, event-driven reminders, per-phase context selection) with measured baselines and per-file recommendations. Cites 7 papers including AgentDiet (FSE 2026), OPENDEV, CEMM, and Prompt Compression Survey (NAACL 2025).
+- **`docs/research/token-optimization-guide.md`** — Research-backed optimization guide documenting 5 techniques (three-tier progressive disclosure, context block ordering, AgentDiet trajectory compression, event-driven reminders, per-phase context selection) with measured baselines and per-file recommendations. Cites 7 papers including AgentDiet (FSE 2026), OPENDEV, CEMM, and Prompt Compression Survey (NAACL 2025).
 
 ### Changed
 - **`skills/evolve-loop/reference/policies.md`** — Compressed from 318 to 176 lines (44% reduction, ~2.1K tokens saved per read). Removed duplicate Session Break Handoff Template and compressed verbose rate limit pseudocode into tables. All 11+ functional sections preserved with zero quality loss.
@@ -2147,7 +2147,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 - **Domain affinity matrix** — Maps 5 topic domains to optimal lens selections for targeted creative divergence.
 - **Phase 0.5 delegation hook** — Evolve-loop orchestrator can delegate to `/inspirer` when `strategy == "innovate"` or discovery velocity stagnates.
 - **Reference material** — `provocation-lenses.md` (12 lenses with examples), `scoring-rubric.md` (detailed criteria), `worked-examples.md` (3 end-to-end pipelines).
-- **Solution documentation** — `docs/inspirer-solution.md` recording design rationale and architecture decisions.
+- **Solution documentation** — `docs/reports/inspirer-solution.md` recording design rationale and architecture decisions.
 
 ## [8.7.0] - 2026-04-06
 
@@ -2161,7 +2161,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 - **Auditor D4 integration** — Optional skill consultation for code changes > 20 lines; composite score supplements verdict; auto-generates simplification suggestions when maintainability < 0.7.
 - **Builder self-review** — Optional Step 5 enhancement runs lightweight pipeline after eval pass; applies simplifications before auditor sees the code.
 - **Simplification catalog** — 8 localized refactoring techniques (Extract Method, flatten nesting, decompose conditional, extract utility, rename, replace magic numbers, inline over-abstraction, remove dead code).
-- **Solution documentation** — `docs/code-review-simplify-solution.md` records research findings, build-vs-buy justification, architecture decisions, and future work.
+- **Solution documentation** — `docs/reports/code-review-simplify-solution.md` records research findings, build-vs-buy justification, architecture decisions, and future work.
 
 ### Research Findings
 - Anthropic multi-agent code review: 16% → 54% substantive PR comments
@@ -2286,14 +2286,14 @@ Patch release. No behavior changes — all updates are documentation, file organ
 ### Added
 - **Phase decomposition** — monolithic phases.md split into focused modules: `phase0-calibrate.md`, `phase2-build.md`, `phase5-learn.md`, `phase6-metacycle.md` (cycles 122-125)
 - **Agent templates** — `agents/agent-templates.md` consolidates shared Input/Output schemas across Scout, Builder, Auditor (cycle 122)
-- **Model routing doc** — `docs/model-routing.md` is the single source of truth for tier definitions, provider mappings, and routing rules (cycle 124)
+- **Model routing doc** — `docs/reference/model-routing.md` is the single source of truth for tier definitions, provider mappings, and routing rules (cycle 124)
 - **Changelog archive** — entries v2.0-v6.9 archived to `CHANGELOG-ARCHIVE.md`, keeping CHANGELOG.md lean (cycle 126)
 
 ### Changed
 - **phases.md: 717 → 386 lines** (46% reduction) — Phase 0 and Phase 2 extracted to standalone modules
 - **phase5-learn.md: 596 → 334 lines** (44% reduction) — meta-cycle logic extracted to phase6-metacycle.md
-- **SKILL.md: 560 → 500 lines** (11% reduction) — model routing tables extracted to docs/model-routing.md
-- **token-optimization.md: 444 → 412 lines** — model routing duplication removed (references docs/model-routing.md)
+- **SKILL.md: 560 → 500 lines** (11% reduction) — model routing tables extracted to docs/reference/model-routing.md
+- **token-optimization.md: 444 → 412 lines** — model routing duplication removed (references docs/reference/model-routing.md)
 - **CHANGELOG.md: 368 → 102 lines** — old entries archived
 - **Shared values consolidated** — memory-protocol.md Layer 0 references SKILL.md as canonical source (no duplication)
 - **Dead state.json fields removed** — `processRewards` replaced by `processRewardsHistory` in schema
@@ -2311,13 +2311,13 @@ phases.md (717 lines)               phases.md (386) — orchestrator sequencing
                                     └── phase6-metacycle.md (191) — every 5 cycles
 
 3 agents × duplicated boilerplate   agent-templates.md (68) + 3 lean agents
-1 monolithic model routing table    docs/model-routing.md (single source of truth)
+1 monolithic model routing table    docs/reference/model-routing.md (single source of truth)
 ```
 
 ## [7.5.0] - 2026-03-22
 
 ### Added
-- **Platform compatibility doc** (`docs/platform-compatibility.md`) — tool mapping tables for 6 platforms, model tier mappings for 7 providers
+- **Platform compatibility doc** (`docs/architecture/platform-compatibility.md`) — tool mapping tables for 6 platforms, model tier mappings for 7 providers
 - **Multi-platform agent frontmatter** — `capabilities`, `tools-gemini`, `tools-generic` fields in all 4 agents
 - **Provider-agnostic prompt caching** — guidance for Anthropic, Google, OpenAI, and self-hosted engines
 
@@ -2355,7 +2355,7 @@ phases.md (717 lines)               phases.md (386) — orchestrator sequencing
 - **Security self-check** — Builder agent now performs security self-verification before completing builds
 - **Stepwise scoring enforcement** — mandatory stepwise confidence scoring wired into the evaluation protocol
 - **isLastCycle flag** — passed to Operator context for reliable session-summary.md generation on final cycle
-- **Instinct graduation section** — `docs/instincts.md` now documents the graduation lifecycle
+- **Instinct graduation section** — `docs/reference/instincts.md` now documents the graduation lifecycle
 - **Parallel safety doc** — new `docs/parallel-safety.md` consolidating OCC, ship-lock, and run isolation
 
 ### Fixed

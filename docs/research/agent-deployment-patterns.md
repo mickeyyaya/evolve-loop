@@ -94,7 +94,7 @@ Map deployment concepts to evolve-loop pipeline components.
 | **Shadow deployment** | Parallel Builder execution | Run new Builder version alongside current; diff outputs without shipping |
 | **Rollback** | Git revert + re-publish | Revert to previous tagged version and re-run `publish.sh` |
 | **Staged rollout** | Scout -> Builder -> Auditor promotion | Deploy to Scout first, then Builder, then Auditor after validation at each stage |
-| **Feature flag** | Gene toggles in `docs/genes.md` | Enable/disable specific behaviors per agent role |
+| **Feature flag** | Gene toggles in `docs/reference/genes.md` | Enable/disable specific behaviors per agent role |
 | **Monitoring dashboard** | Cycle metrics in `metrics/` | Track fitnessScore, token cost, and eval results across cycles |
 
 ### Evolve-Loop Deployment Sequence

@@ -1,0 +1,35 @@
+# .editorconfig — universal indentation/EOL conventions for evolve-loop.
+# https://editorconfig.org/
+#
+# Honored by VS Code, IntelliJ, Sublime, Vim (with editorconfig-vim plugin),
+# and most modern editors. No-op for editors that don't read it — harmless.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Python — PEP 8 prescribes 4-space indent.
+[*.py]
+indent_size = 4
+
+# Shell scripts — POSIX/bash convention is 4-space indent in this repo.
+[*.sh]
+indent_size = 4
+
+# Makefiles require literal tabs.
+[Makefile]
+indent_style = tab
+
+# Markdown — preserve trailing whitespace (used for line breaks).
+[*.md]
+trim_trailing_whitespace = false
+
+# JSON — 2-space indent (matches plugin.json, marketplace.json conventions).
+[*.json]
+indent_size = 2

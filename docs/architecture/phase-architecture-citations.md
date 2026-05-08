@@ -1,6 +1,6 @@
 # Phase Architecture — Citations & Design Rationale
 
-> Maps every load-bearing design decision in [phase-architecture.md](phase-architecture.md) to the public research, technical reports, or industry standards that motivated it. When a structural choice is "non-obvious", this doc explains *which paper made us think this was important*. Updated alongside each release that adds a new structural mechanism.
+> Maps every load-bearing design decision in [phase-architecture.md](../architecture/phase-architecture.md) to the public research, technical reports, or industry standards that motivated it. When a structural choice is "non-obvious", this doc explains *which paper made us think this was important*. Updated alongside each release that adds a new structural mechanism.
 
 ## How to read this
 

@@ -51,7 +51,7 @@ This file covers the universal contract. CLI-specific runtime details live in co
 If you are an AI agent activating in this repository:
 
 1. **Identify your CLI**: Claude Code, Codex, Gemini, or other.
-2. **Read your CLI-specific overlay**: CLAUDE.md, GEMINI.md, or `docs/platform-compatibility.md`.
+2. **Read your CLI-specific overlay**: CLAUDE.md, GEMINI.md, or `docs/architecture/platform-compatibility.md`.
 3. **Read this AGENTS.md** in full — the cross-CLI invariants apply to you.
 4. **Discover available skills**: scan `.agents/skills/*/SKILL.md` (cross-CLI standard) or `skills/*/SKILL.md` (Claude Code primary).
 5. **Discover available agents**: scan `agents/*.md`.
@@ -76,4 +76,4 @@ Tier 1 is non-negotiable and runs in privileged shell context. Tier 2 adapts to 
 - Code of conduct: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md)
 - Pipeline issues: GitHub Issues at https://github.com/mickeyyaya/evolve-loop/issues
-- Architecture / release protocol: [docs/release-protocol.md](docs/release-protocol.md), [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md)
+- Architecture / release protocol: [docs/release/release-protocol.md](docs/release/release-protocol.md), [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md)
