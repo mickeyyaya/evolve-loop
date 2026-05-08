@@ -311,6 +311,8 @@ bash scripts/cli_adapters/_capability-compose.sh hybrid full hybrid
 # Output: hybrid
 ```
 
+> **HYBRID Mode Warning**: Setting `"cli": "gemini"` (or `"cli": "codex"`) in a profile when `claude` is on PATH does NOT invoke Gemini's intelligence — `gemini.sh` delegates to `claude.sh`, which runs `claude -p` under the hood. You are running Claude, not Gemini. The "gemini" tier name refers to the adapter shim, not to the Gemini LLM. To get actual Gemini intelligence in audit cycles, use API-based adapters (v8.52.0+ roadmap); they are not yet available in this release.
+
 **Caveats**:
 - `.evolve/profiles/` is writable even in plugin-install mode (it lives in PROJECT_ROOT, not PLUGIN_ROOT).
 - Profile changes persist across cycles; restore to `"cli": "claude"` after testing unless you intend a permanent change.
