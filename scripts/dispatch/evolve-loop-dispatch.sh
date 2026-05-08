@@ -269,6 +269,16 @@ while [ $# -gt 0 ]; do
             RESET_FAILURES=1
             shift
             ;;
+        --consensus-audit)
+            # v8.54.0+: opt-in cross-CLI auditor consensus. Sets
+            # EVOLVE_CONSENSUS_AUDIT=1 which the orchestrator reads to dispatch
+            # the audit phase via consensus-dispatch.sh (cross-cli-vote merge
+            # mode) instead of standard cmd_dispatch_parallel. Cost is N x
+            # audit budget where N = profile.consensus.cli_voters length.
+            # See docs/architecture/multi-llm-review.md for protocol.
+            export EVOLVE_CONSENSUS_AUDIT=1
+            shift
+            ;;
         --help|-h)
             sed -n '2,55p' "$0" | sed 's/^# \{0,1\}//'
             exit 0

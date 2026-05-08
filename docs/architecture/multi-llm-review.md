@@ -1,4 +1,5 @@
-> **Version**: v8.51.1 — produced by evolve-loop cycle 2
+> **Version**: v8.51.1 — produced by evolve-loop cycle 2 (extended for v8.54.0 cross-CLI consensus auditor)
+> **v8.54.0 Update**: Axis C (cross-CLI consensus) is now operationally available. See [Cross-CLI Consensus Auditor (v8.54.0)](#cross-cli-consensus-auditor-v8540) below.
 > **Status**: AUTHORITATIVE — supersedes any prior informal notes on multi-LLM design.
 > **Scope**: Per-phase CLI assignment (Axis A). Cross-CLI consensus fan-out (Axis C) is noted but explicitly deferred.
 
@@ -317,6 +318,100 @@ bash scripts/cli_adapters/_capability-compose.sh hybrid full hybrid
 - `.evolve/profiles/` is writable even in plugin-install mode (it lives in PROJECT_ROOT, not PLUGIN_ROOT).
 - Profile changes persist across cycles; restore to `"cli": "claude"` after testing unless you intend a permanent change.
 - The gemini/codex adapters in DEGRADED mode (no claude binary on PATH) do not make LLM calls themselves — the calling LLM writes the artifact directly. Only use DEGRADED mode when you understand the reduced isolation implications.
+
+---
+
+## Cross-CLI Consensus Auditor (v8.54.0) {#cross-cli-consensus-auditor-v8540}
+
+> **Status**: SHIPPED — operator-facing opt-in via `--consensus-audit` flag or `EVOLVE_CONSENSUS_AUDIT=1` env var.
+
+v8.54.0 wires the v8.53.0 `cross-cli-vote` merge mode into the Auditor phase as opt-in cross-CLI consensus. This is the architectural answer to **same-vendor sycophancy** — the failure mode where an Auditor running on the same LLM family as the Builder agrees uncritically because they share training data biases and reasoning conventions.
+
+### When to use
+
+- High-risk releases where a false-positive PASS verdict would be expensive to roll back
+- Cycles touching authentication, payments, kernel hooks, or other security-sensitive surfaces
+- Releases that deviate significantly from prior shipped patterns (where the Auditor's reasonable-baseline assumption is least valid)
+- Forensic cycles after a near-miss incident (cycle 102-111 reward hacking, Gemini Forgery 2026-03-23)
+
+NOT recommended for routine cycles — the cost is roughly N× the standard audit budget (N = number of voters), and the marginal value over a single Adversarial Auditor (default-on, Opus auditing Sonnet's builds) is small for low-risk diffs.
+
+### Consensus protocol: MAJORITY-PASS with FAIL-VETO
+
+The aggregator's `cross-cli-vote` merge mode applies these rules:
+
+| Vote pattern | Consensus | rc | Rationale |
+|---|---|---|---|
+| All N return PASS | PASS | 0 | Unanimous; ship |
+| ≥ ceil(N/2) PASS, no FAIL | PASS | 0 | Quorum met without veto |
+| Any FAIL | **FAIL** | **1** | Veto rule: any one CLI smelled blood |
+| < ceil(N/2) PASS, no FAIL | WARN | 0 | Below quorum; ships per fluent default unless `EVOLVE_STRICT_AUDIT=1` |
+
+The veto rule is the central insight: a single dissenting CLI is more informative than M agreeing CLIs, because agreement could be sycophancy. The protocol biases toward false negatives (block ship when uncertain) over false positives (ship when divergence exists).
+
+### Profile schema
+
+The Auditor profile (`.evolve/profiles/auditor.json`) declares its consensus configuration:
+
+```jsonc
+{
+  "name": "auditor",
+  "cli": "claude",                       // default for non-consensus mode
+  "model_tier_default": "opus",
+  "consensus": {
+    "enabled": false,                    // opt-in default; set via env or flag
+    "cli_voters": ["claude", "gemini", "codex"],
+    "quorum": 2,                         // ceil(N/2) by default
+    "require_min_tier": "hybrid"         // exclude voters below this capability tier
+  },
+  "parallel_subtasks": [...]             // semantic dimensions, unchanged
+}
+```
+
+`require_min_tier` filters voters by their adapter capability tier (full/hybrid/degraded/none from v8.51.0 capability framework). A degraded-mode adapter cannot reliably participate in consensus because its trust kernel is reduced; the default `hybrid` minimum keeps consensus voters at production-grade isolation.
+
+### Operator UX
+
+Three opt-in surfaces:
+
+```bash
+# Flag form (preferred — explicit per-invocation)
+/evolve-loop --consensus-audit 1 polish "audit hardening"
+
+# Env var form (CI-friendly, persistent across multiple dispatches)
+EVOLVE_CONSENSUS_AUDIT=1 bash scripts/dispatch/evolve-loop-dispatch.sh 1 polish "..."
+
+# Profile-side persistence (always-on for this auditor profile)
+jq '.consensus.enabled = true' .evolve/profiles/auditor.json > .evolve/profiles/auditor.json.tmp     && mv .evolve/profiles/auditor.json.tmp .evolve/profiles/auditor.json
+```
+
+When enabled:
+- Orchestrator dispatches the audit phase via `scripts/dispatch/consensus-dispatch.sh` instead of `subagent-run.sh dispatch-parallel auditor`
+- Each `cli_voters` entry runs the full audit prompt under that CLI (parallel via `fanout-dispatch.sh`)
+- Per-voter artifacts at `.evolve/runs/cycle-N/consensus-workers/<cli>-audit.md`
+- Aggregated verdict at `.evolve/runs/cycle-N/audit-report.md` (replaces what standard auditor would produce)
+- Ledger entry kind: `agent_fanout` with workers list and consensus quality_tier
+
+### Cost note
+
+Consensus audit costs ≈ N × standard audit. With cli_voters=[claude, gemini, codex] and the Auditor's default Opus tier (~$1.10/audit), a single consensus audit is ~$3.30. Operators should not enable `consensus.enabled: true` profile-side without explicit budgetary intent.
+
+The `quality_tier` per-CLI annotation in fan-out ledger entries (v8.52.0) makes per-vendor cost auditable post-hoc.
+
+### Defense-in-depth linkage
+
+This pattern responds to two prior incidents documented elsewhere:
+
+- **Gemini Forgery (2026-03-23)** — same-vendor reasoning produced internally-consistent but fabricated artifacts. A cross-CLI Auditor would have surfaced the discrepancy (different vendors trained on different corpora produce divergent outputs on novel content; agreement signals truth more than within-vendor agreement does).
+- **Cycle 102-111 reward hacking** — the Auditor and Builder were both Sonnet, so the Auditor accepted tautological evals the Builder authored. A cross-CLI consensus would have given non-Sonnet voters a chance to spot the tautology.
+
+Neither of these incidents is fully solved by consensus auditing alone — kernel hooks, mutation testing, and audit-binding remain the primary defenses — but consensus closes the residual same-vendor-sycophancy gap.
+
+### Roadmap
+
+- v8.54.x — orchestrator integration: when `EVOLVE_CONSENSUS_AUDIT=1`, the orchestrator subagent prompt routes to consensus-dispatch.sh automatically
+- v8.55.0 — cost surfacing: per-CLI cost breakdown in orchestrator-report.md
+- v8.56.0 — `consensus.required` field at the cycle level (force consensus for cycles touching specific paths, e.g., kernel hooks)
 
 ---
 

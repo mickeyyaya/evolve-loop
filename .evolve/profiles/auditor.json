@@ -176,5 +176,16 @@
       ".evolve/evals"
     ],
     "allow_network": true
+  },
+  "consensus": {
+    "enabled": false,
+    "_doc": "v8.54.0+: cross-CLI consensus auditing. When enabled (via EVOLVE_CONSENSUS_AUDIT=1 or --consensus-audit flag on dispatcher), the audit phase fans out across cli_voters[] and aggregates via aggregator.sh's cross-cli-vote merge mode (MAJORITY-PASS with FAIL-VETO). Defeats same-vendor sycophancy at the cost of N x audit budget. See docs/architecture/multi-llm-review.md for protocol details.",
+    "cli_voters": [
+      "claude",
+      "gemini",
+      "codex"
+    ],
+    "quorum": 2,
+    "require_min_tier": "hybrid"
   }
 }
