@@ -13,6 +13,9 @@
 #   scout / research / discover → concat with "## Worker: <name>" headers
 #   audit                       → ALL-PASS verdict; any FAIL fails the aggregate
 #   learn / retrospective       → union of "## Lesson:" sections, deduped by title
+#   audit-consensus / cross-cli-vote (v8.53+)
+#                               → MAJORITY-PASS with FAIL-VETO across CLIs;
+#                                 quorum = ceil(N/2); any FAIL → consensus FAIL
 #
 # Usage:
 #   aggregator.sh <phase> <output-path> <worker-artifact-1> [<worker-2> ...]
@@ -63,6 +66,7 @@ case "$PHASE" in
     audit)                            MERGE_MODE=verdict ;;
     learn|retrospective|retro)        MERGE_MODE=lessons ;;
     plan-review)                      MERGE_MODE=plan_review ;;
+    audit-consensus|cross-cli-vote)   MERGE_MODE=cross_cli_vote ;;
     *)
         echo "[aggregator] error: unknown phase '$PHASE'" >&2
         exit 2
@@ -221,6 +225,78 @@ case "$MERGE_MODE" in
         } > "$TMP"
         rm -f "$TMP_LESSONS"
         ;;
+
+    cross_cli_vote)
+        # v8.53.0+: cross-CLI consensus merge — multi-LLM Auditor fan-out.
+        #
+        # Each worker is an Auditor running under a DIFFERENT CLI (Claude,
+        # Gemini, Codex). The merge logic enforces consensus to defeat
+        # same-vendor sycophancy (the failure mode the cycle 102-111 tautological-
+        # eval incident and the 2026-03-23 Gemini Forgery both touch on).
+        #
+        # Protocol: MAJORITY-PASS with FAIL-VETO.
+        #   - Any single FAIL → consensus FAIL (any one CLI smelled blood)
+        #   - >= ceil(N/2) PASS verdicts AND no FAIL → consensus PASS
+        #   - Otherwise → consensus WARN (mixed signal; ship per fluent default
+        #     unless EVOLVE_STRICT_AUDIT=1 elevates WARN → block)
+        #
+        # Quorum override: profile.consensus.quorum (in caller's profile JSON;
+        # not read here — caller sizes the worker count to match the quorum).
+        #
+        # Schema parity with verdict mode: Verdict: <PASS|WARN|FAIL> on first
+        # line so ship.sh's audit-binding logic works unchanged.
+        ANY_FAIL=0
+        PASS_COUNT=0
+        TOTAL_COUNT=0
+        WORKER_VERDICTS=""
+        for w in "$@"; do
+            v=$(awk 'tolower($0) ~ /^[[:space:]]*verdict:/ { print; exit }' "$w" \
+                | sed -E 's/^[[:space:]]*[Vv]erdict:[[:space:]]*//' \
+                | tr '[:lower:]' '[:upper:]' \
+                | awk '{print $1}')
+            local_name="$(basename "$w" .md)"
+            WORKER_VERDICTS="${WORKER_VERDICTS}${WORKER_VERDICTS:+, }${local_name}=${v:-MISSING}"
+            TOTAL_COUNT=$((TOTAL_COUNT + 1))
+            case "$v" in
+                PASS) PASS_COUNT=$((PASS_COUNT + 1)) ;;
+                FAIL) ANY_FAIL=1 ;;
+                *) : ;;  # WARN, MISSING, or unrecognized — counts toward TOTAL but not PASS
+            esac
+        done
+
+        # Compute quorum threshold (default: ceil(N/2) = (N+1)/2 with integer math).
+        QUORUM_THRESHOLD=$(( (TOTAL_COUNT + 1) / 2 ))
+
+        if [ "$ANY_FAIL" = "1" ]; then
+            VERDICT="FAIL"
+            CONSENSUS_REASON="cross-cli-vote: at least one CLI returned FAIL (veto rule)"
+        elif [ "$PASS_COUNT" -ge "$QUORUM_THRESHOLD" ]; then
+            VERDICT="PASS"
+            CONSENSUS_REASON="cross-cli-vote: $PASS_COUNT of $TOTAL_COUNT CLIs returned PASS (quorum=$QUORUM_THRESHOLD)"
+        else
+            VERDICT="WARN"
+            CONSENSUS_REASON="cross-cli-vote: $PASS_COUNT of $TOTAL_COUNT PASS (below quorum=$QUORUM_THRESHOLD); ships per fluent default unless EVOLVE_STRICT_AUDIT=1"
+        fi
+
+        {
+            printf 'Verdict: %s\n\n' "$VERDICT"
+            printf '# Aggregated Cross-CLI Consensus Audit\n\n'
+            printf '_Aggregated by aggregator.sh at %s. CLIs voting: %d (PASS=%d, FAIL=%d-veto-active=%s, quorum=%d)._\n\n' \
+                "$NOW" "$TOTAL_COUNT" "$PASS_COUNT" "$ANY_FAIL" "$([ "$ANY_FAIL" = "1" ] && echo yes || echo no)" "$QUORUM_THRESHOLD"
+            printf '## Consensus Decision\n\n'
+            printf '**Verdict**: %s\n\n' "$VERDICT"
+            printf '**Reason**: %s\n\n' "$CONSENSUS_REASON"
+            printf '**Per-CLI verdicts**: %s\n\n' "$WORKER_VERDICTS"
+            printf '**Protocol**: MAJORITY-PASS with FAIL-VETO. Any FAIL forces consensus FAIL (defends against false-positive PASS from sycophantic same-vendor agreement). >= quorum PASS with no FAIL → consensus PASS. Otherwise WARN.\n\n'
+            printf '## Per-CLI Audit Reports\n\n'
+            for w in "$@"; do
+                local_name="$(basename "$w" .md)"
+                printf '### Worker: %s\n\n' "$local_name"
+                cat "$w"
+                printf '\n\n'
+            done
+        } > "$TMP"
+        ;;
 esac
 
 mv -f "$TMP" "$OUTPUT"
@@ -232,6 +308,12 @@ if [ "$MERGE_MODE" = "verdict" ] && [ "$VERDICT" = "FAIL" ]; then
     exit 1
 fi
 if [ "$MERGE_MODE" = "plan_review" ] && [ "$VERDICT" = "ABORT" ]; then
+    exit 1
+fi
+# v8.53.0: cross_cli_vote FAIL is a hard signal (any one CLI smelled blood);
+# WARN follows fluent-default policy and exits 0 (ship.sh's audit-binding
+# decides whether to ship based on its own EVOLVE_STRICT_AUDIT logic).
+if [ "$MERGE_MODE" = "cross_cli_vote" ] && [ "$VERDICT" = "FAIL" ]; then
     exit 1
 fi
 exit 0
