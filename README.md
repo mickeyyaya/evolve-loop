@@ -123,7 +123,7 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 
 ### Growth Over Time
 
-| Metric | Start (v3.0) | Current (v8.46) |
+| Metric | Start (v3.0) | Current (v8.47) |
 |--------|-------------|-----------------|
 | Agents | 11 (bloated) | 3 (lean) + inline Operator |
 | Phases | 3 | 6 (+ meta-cycle every 5) |
