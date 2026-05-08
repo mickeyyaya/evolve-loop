@@ -69,6 +69,7 @@ else
         "scripts/tests/ship-dry-run-test.sh"
         "scripts/tests/cycle-simulate-test.sh"
         "scripts/tests/full-dry-run-test.sh"
+        "scripts/tests/skill-doc-paths-test.sh"
         "scripts/tests/show-cycle-cost-test.sh"
         "scripts/tests/merge-lesson-test.sh"
         "scripts/tests/subagent-run-test.sh"

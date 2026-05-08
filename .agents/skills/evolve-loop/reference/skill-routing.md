@@ -73,7 +73,7 @@ When built-in and external skills overlap, apply these resolutions.
 
 ## Token-Budget Depth Routing
 
-Adjust skill invocation depth based on `scripts/context-budget.sh` exit status.
+Adjust skill invocation depth based on `scripts/verification/context-budget.sh` exit status.
 
 | Budget Status | Built-in Depth | External Invocations | Max Skills/Task |
 |--------------|---------------|---------------------|:---:|

@@ -14,7 +14,7 @@ Run the Builder phase against the current cycle. Implements the minimum code to 
 ## Execution
 
 ```bash
-bash scripts/subagent-run.sh builder <cycle> <workspace>
+bash scripts/dispatch/subagent-run.sh builder <cycle> <workspace>
 ```
 
 The builder runs in an isolated worktree (`EVOLVE_BUILDER_WORKTREE` set by the runner). Concurrent builders are structurally blocked by `phase-gate-precondition.sh`.

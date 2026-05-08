@@ -19,7 +19,7 @@ Five 2026 sources converge: 56% of real-world user instructions are missing key 
 ## Execution
 
 ```bash
-bash $EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh intent <cycle> <workspace>
+bash $EVOLVE_PLUGIN_ROOT/scripts/dispatch/subagent-run.sh intent <cycle> <workspace>
 ```
 
 In autonomous mode (orchestrator-driven), this fires automatically when `cycle-state.intent_required==true`.
@@ -27,7 +27,7 @@ In autonomous mode (orchestrator-driven), this fires automatically when `cycle-s
 ## Enabling autonomous use
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 bash $EVOLVE_PLUGIN_ROOT/scripts/evolve-loop-dispatch.sh 5 balanced "your goal"
+EVOLVE_REQUIRE_INTENT=1 bash $EVOLVE_PLUGIN_ROOT/scripts/dispatch/evolve-loop-dispatch.sh 5 balanced "your goal"
 ```
 
 The flag is captured at cycle init and stored in `cycle-state.intent_required`, so mid-stream env flips do not break in-flight cycles.

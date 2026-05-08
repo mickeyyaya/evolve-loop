@@ -49,6 +49,6 @@ Fan-out controlled by `.evolve/profiles/retrospective.json:parallel_subtasks` (3
 ## Reference
 
 - `.evolve/profiles/retrospective.json`
-- `scripts/aggregator.sh` (phase=learn → lessons mode with dedup)
+- `scripts/dispatch/aggregator.sh` (phase=learn → lessons mode with dedup)
 - `agents/evolve-retrospective.md`
 - `skills/evolve-loop/phase6-learn.md` (legacy detailed workflow)

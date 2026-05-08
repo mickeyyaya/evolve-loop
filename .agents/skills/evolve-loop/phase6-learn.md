@@ -89,7 +89,7 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
    git diff HEAD > "$WORKSPACE_PATH/failed.patch"
 
    # Record the failure into state.json.failedApproaches[].
-   bash scripts/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"  # FAIL | WARN | SHIP_GATE_DENIED
+   bash scripts/failure/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"  # FAIL | WARN | SHIP_GATE_DENIED
 
    # Discard the failed worktree.
    git worktree remove --force "$WORKTREE_DIR"
@@ -127,7 +127,7 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
    # entries). The subagent synthesizes cross-cycle patterns into one or more
    # failure-lesson YAMLs — useful precisely BECAUSE patterns emerge across
    # multiple failures, not from a single cycle.
-   bash scripts/subagent-run.sh retrospective <next-cycle-id> <workspace>
+   bash scripts/dispatch/subagent-run.sh retrospective <next-cycle-id> <workspace>
 
    # After the subagent writes its lessons, mark the batch as retrospected.
    # (The orchestrator/operator does this; the subagent profile cannot mutate

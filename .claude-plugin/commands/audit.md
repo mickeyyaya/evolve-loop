@@ -7,7 +7,7 @@ description: Validate the build via four parallel sub-auditors (eval-replay, lin
 Run the Auditor phase against the current cycle. Spawns four sub-auditors in parallel:
 - `audit-eval-replay` — re-runs evals from `.evolve/evals/cycle-*/`
 - `audit-lint` — static analysis on changed files
-- `audit-regression` — runs `scripts/run-all-regression-tests.sh`
+- `audit-regression` — runs `scripts/utility/run-all-regression-tests.sh`
 - `audit-build-quality` — dep hygiene, secret scan, large-file check
 
 ALL-PASS rule: aggregate verdict is `PASS` only if every sub-auditor reports PASS. Any FAIL → aggregate FAIL.
@@ -20,7 +20,7 @@ ALL-PASS rule: aggregate verdict is `PASS` only if every sub-auditor reports PAS
 ## Execution
 
 ```bash
-bash scripts/subagent-run.sh dispatch-parallel auditor <cycle> <workspace>
+bash scripts/dispatch/subagent-run.sh dispatch-parallel auditor <cycle> <workspace>
 ```
 
 ## Adversarial mode (default ON)
@@ -34,4 +34,4 @@ Disable only with `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps.
 - `skills/evolve-audit/SKILL.md`
 - `agents/evolve-auditor.md`
 - `.evolve/profiles/auditor.json`
-- `scripts/aggregator.sh` (phase=audit)
+- `scripts/dispatch/aggregator.sh` (phase=audit)

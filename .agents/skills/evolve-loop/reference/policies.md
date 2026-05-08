@@ -44,7 +44,7 @@ This means effective context usage is **roughly constant** regardless of cycle c
 
 ### Context Budget Check (mandatory at cycle start)
 
-Run `scripts/context-budget.sh` at the start of every cycle. It answers: "Is there room for one more cycle?"
+Run `scripts/verification/context-budget.sh` at the start of every cycle. It answers: "Is there room for one more cycle?"
 
 | Status | Exit Code | Trigger | Action |
 |--------|-----------|---------|--------|

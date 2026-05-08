@@ -66,7 +66,7 @@ Model selection: tier-1 if cycle 1 or goal-directed cycle <= 2; tier-3 if cycle 
   # below into a temporary file, then pipe via stdin:
   cat agents/evolve-scout.md context.json | \
       MODEL_TIER_HINT="<resolved tier>" \
-      bash scripts/subagent-run.sh scout "$CYCLE" "$WORKSPACE_PATH"
+      bash scripts/dispatch/subagent-run.sh scout "$CYCLE" "$WORKSPACE_PATH"
   ```
 
   - Exit 0 = scout report written and verified (challenge token present, fresh).
@@ -141,7 +141,7 @@ Run on THIS cycle's eval files only:
 
 ```bash
 for TASK_SLUG in <task slugs from scout-report>; do
-  bash scripts/eval-quality-check.sh .evolve/evals/${TASK_SLUG}.md
+  bash scripts/verification/eval-quality-check.sh .evolve/evals/${TASK_SLUG}.md
   EVAL_QUALITY_EXIT=$?
   if [ "$EVAL_QUALITY_EXIT" -eq 2 ]; then
     echo "HALT: Level 0 (no-op) commands in ${TASK_SLUG}. Scout must rewrite evals."
@@ -161,11 +161,11 @@ sha256sum .evolve/evals/*.md > $WORKSPACE_PATH/eval-checksums.json
 
 **If no tasks selected:** increment `stagnation.nothingToDoCount`. If >= 3 → STOP: "Project has converged." Otherwise → skip to Phase 5.
 
-**Stagnation detection:** Handled by `scripts/cycle-health-check.sh` (deterministic). Scout reads stagnation findings from `$WORKSPACE/cycle-health.json` if present. Orchestrator HALTs if 3+ stagnation patterns active.
+**Stagnation detection:** Handled by `scripts/observability/cycle-health-check.sh` (deterministic). Scout reads stagnation findings from `$WORKSPACE/cycle-health.json` if present. Orchestrator HALTs if 3+ stagnation patterns active.
 
 ## Phase Boundary: DISCOVER → BUILD
 
 ```bash
-bash scripts/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
+bash scripts/lifecycle/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to BUILD. Any other exit -> HALT.
 ```

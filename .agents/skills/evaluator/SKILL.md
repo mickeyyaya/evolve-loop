@@ -84,7 +84,7 @@ Run deterministic checks and model-based judgment. Two passes: fast pipeline + d
 
 ### Pass 1: Pipeline Checks (deterministic)
 
-Reuse `scripts/code-review-simplify.sh` if available, else run equivalent checks:
+Reuse `scripts/utility/code-review-simplify.sh` if available, else run equivalent checks:
 
 | Check | Threshold | Dimension Fed |
 |-------|-----------|--------------|
@@ -246,7 +246,7 @@ When invoked from evolve-loop's Auditor phase:
 
   ```bash
   echo "/evaluator --scope task --depth standard" | \
-      bash scripts/subagent-run.sh evaluator "$CYCLE" "$WORKSPACE_PATH"
+      bash scripts/dispatch/subagent-run.sh evaluator "$CYCLE" "$WORKSPACE_PATH"
   ```
 
   The runner enforces the evaluator profile (`.evolve/profiles/evaluator.json`) which is read-only at the filesystem level (no Edit/Write outside the evaluator-output artifact) and explicitly disallows WebSearch/WebFetch — the evaluator must score the artifacts on disk, not invent context from the network. Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle.

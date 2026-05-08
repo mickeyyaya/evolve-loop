@@ -9,7 +9,7 @@ description: Reference doc.
 
 ## Phase Gate Script
 
-`scripts/phase-gate.sh` is the trust boundary. Runs at every phase transition — the LLM cannot skip it.
+`scripts/lifecycle/phase-gate.sh` is the trust boundary. Runs at every phase transition — the LLM cannot skip it.
 
 | Controls | Owner |
 |----------|-------|

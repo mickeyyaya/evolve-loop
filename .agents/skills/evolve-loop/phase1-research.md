@@ -121,4 +121,4 @@ Pass `conceptCandidates[]` (KEPT concepts only) to Scout context.
 
 Update `state.json`: `researchAgenda` items, `capsuleIndex`, `diversityTracker.lastResearchedDimensions`.
 
-**Phase gate:** `bash scripts/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
+**Phase gate:** `bash scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`

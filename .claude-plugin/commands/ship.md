@@ -14,7 +14,7 @@ Atomically ship the current cycle: verify audit verdict PASS, run release consis
 ## Execution
 
 ```bash
-bash scripts/ship.sh "<commit message>"
+bash scripts/lifecycle/ship.sh "<commit message>"
 ```
 
 Or for a full release with version bump and changelog:
@@ -27,7 +27,7 @@ See `docs/release-protocol.md` for the canonical vocabulary (push / tag / releas
 
 ## Cycle-binding (v8.13.0+)
 
-`scripts/ship.sh` refuses to ship if the current tree-state SHA differs from the SHA in the auditor's ledger entry. Prevents "audit cycle 50, ship cycle 51" exploits.
+`scripts/lifecycle/ship.sh` refuses to ship if the current tree-state SHA differs from the SHA in the auditor's ledger entry. Prevents "audit cycle 50, ship cycle 51" exploits.
 
 ## Bypass (rare; explicit)
 
@@ -36,6 +36,6 @@ For non-cycle commits, set `EVOLVE_BYPASS_SHIP_VERIFY=1` (NOT `_GATE` — see CL
 ## See also
 
 - `skills/evolve-ship/SKILL.md`
-- `scripts/ship.sh`
+- `scripts/lifecycle/ship.sh`
 - `scripts/release-pipeline.sh`
 - `docs/release-protocol.md`

@@ -19,7 +19,7 @@ Aggregator dedups `## Lesson:` blocks across workers (by title).
 ## Execution
 
 ```bash
-bash scripts/subagent-run.sh dispatch-parallel retrospective <cycle> <workspace>
+bash scripts/dispatch/subagent-run.sh dispatch-parallel retrospective <cycle> <workspace>
 ```
 
 ## Output

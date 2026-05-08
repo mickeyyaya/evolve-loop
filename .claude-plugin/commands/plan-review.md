@@ -21,7 +21,7 @@ Aggregator computes verdict and writes `<workspace>/plan-review.md`.
 ## Execution
 
 ```bash
-EVOLVE_PLAN_REVIEW=1 bash scripts/subagent-run.sh dispatch-parallel plan-reviewer <cycle> <workspace>
+EVOLVE_PLAN_REVIEW=1 bash scripts/dispatch/subagent-run.sh dispatch-parallel plan-reviewer <cycle> <workspace>
 ```
 
 ## Verdict semantics
@@ -37,4 +37,4 @@ EVOLVE_PLAN_REVIEW=1 bash scripts/subagent-run.sh dispatch-parallel plan-reviewe
 - `skills/evolve-plan-review/SKILL.md`
 - `agents/plan-reviewer.md`
 - `.evolve/profiles/plan-reviewer.json`
-- `scripts/phase-gate.sh:gate_plan_review_to_tdd`
+- `scripts/lifecycle/phase-gate.sh:gate_plan_review_to_tdd`

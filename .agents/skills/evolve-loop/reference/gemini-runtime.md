@@ -13,17 +13,17 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ detects platform = gemini, reads reference/gemini-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash scripts/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓ (Gemini calls run_shell_command)
 
 Dispatcher loops once per cycle:
-  bash scripts/run-cycle.sh "improve dispatcher"
+  bash scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 
 run-cycle.sh spawns the orchestrator subagent via:
-  bash scripts/subagent-run.sh orchestrator $CYCLE $WORKSPACE
+  bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
 
   ↓
 
@@ -80,7 +80,7 @@ VALIDATE_ONLY=1 bash scripts/cli_adapters/gemini.sh
 # Expected: exit 0, log line "[gemini-adapter] hybrid-mode: delegating to claude.sh"
 
 # 3. Smoke-test detection
-bash scripts/detect-cli.sh
+bash scripts/dispatch/detect-cli.sh
 # Expected: prints "gemini" if you're in a Gemini session
 
 # 4. Run the contract test

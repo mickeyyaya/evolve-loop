@@ -325,7 +325,7 @@ The orchestrator can delegate to inspirer at Step 2.5 (DIVERGENCE TRIGGER):
 
 ```bash
 echo "/inspirer $GOAL --depth QUICK --format evolve --lenses 3" | \
-    bash scripts/subagent-run.sh inspirer "$CYCLE" "$WORKSPACE_PATH"
+    bash scripts/dispatch/subagent-run.sh inspirer "$CYCLE" "$WORKSPACE_PATH"
 ```
 
 The runner enforces the inspirer profile (`.evolve/profiles/inspirer.json`) which restricts writes to the inspirer-output artifact only and disallows state/ledger/profile mutation. WebSearch and WebFetch remain enabled for research-grounded ideation. Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle.

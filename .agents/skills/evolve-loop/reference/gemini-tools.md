@@ -37,7 +37,7 @@
 
 When SKILL.md says "invoke the Skill tool", on Gemini you call `activate_skill`. When a phase doc says "use Bash to run X", on Gemini you call `run_shell_command`. The semantic intent is identical.
 
-When SKILL.md or any phase doc says "spawn via subagent-run.sh" or "the in-process Agent tool is forbidden", that sentence applies on Gemini too: you don't try to invent a Gemini subagent — you invoke the same shell script (`bash scripts/subagent-run.sh ...`), which dispatches to the hybrid `gemini.sh` adapter, which spawns a real `claude -p` subprocess. The subagent isolation comes from the underlying Claude binary, not from Gemini.
+When SKILL.md or any phase doc says "spawn via subagent-run.sh" or "the in-process Agent tool is forbidden", that sentence applies on Gemini too: you don't try to invent a Gemini subagent — you invoke the same shell script (`bash scripts/dispatch/subagent-run.sh ...`), which dispatches to the hybrid `gemini.sh` adapter, which spawns a real `claude -p` subprocess. The subagent isolation comes from the underlying Claude binary, not from Gemini.
 
 See [reference/gemini-runtime.md](gemini-runtime.md) for invocation details.
 

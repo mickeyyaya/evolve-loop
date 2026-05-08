@@ -17,7 +17,7 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command. **Your cwd is the user's project directory, NOT the plugin install** — relative paths like `bash scripts/...` will fail with rc=127. Use this exact one-liner which resolves the dispatcher's absolute path regardless of install layout:
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash "$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/scripts/evolve-loop-dispatch.sh' -o -path '*/cache/evolve-loop/evolve-loop/*/scripts/evolve-loop-dispatch.sh' \) -type f 2>/dev/null | sort | tail -1)" <args>
+EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash "$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/scripts/dispatch/evolve-loop-dispatch.sh' -o -path '*/cache/evolve-loop/evolve-loop/*/scripts/dispatch/evolve-loop-dispatch.sh' \) -type f 2>/dev/null | sort | tail -1)" <args>
 ```
 
 The `find` expression locates the dispatcher in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install if both exist (cache install dirs sort by version since the dir name is the version number). The `bash "$(...)"` invocation is **one** command from the shell's perspective — the substitution happens before bash runs.
@@ -72,7 +72,7 @@ The rest of this file (architecture, model routing, phase docs) is reference mat
 
 ---
 
-> **v8.13.1**: trust boundary now enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `scripts/ship.sh` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `bash scripts/run-cycle.sh [GOAL]` — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
+> **v8.13.1**: trust boundary now enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `scripts/lifecycle/ship.sh` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `bash scripts/dispatch/run-cycle.sh [GOAL]` — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
 
 > **v8.13.2**: self-healing release pipeline. For version-bump releases, prefer `bash scripts/release-pipeline.sh <version>` over direct `ship.sh`. The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `ship.sh`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
@@ -176,7 +176,7 @@ Utility:   SEARCH ─── intent-aware web search engine    → smart-web-sear
 Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
 Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
 Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
-Phase 5:   SHIP ────── publish via release-pipeline.sh   → phase5-ship.md (or scripts/ship.sh for non-release commits)
+Phase 5:   SHIP ────── publish via release-pipeline.sh   → phase5-ship.md (or scripts/lifecycle/ship.sh for non-release commits)
 Phase 6:   LEARN ───── instinct extraction + feedback   → phase6-learn.md
 Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-meta.md
 ```
@@ -185,23 +185,23 @@ Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-
 
 For each cycle:
 1. Claim cycle number (OCC protocol)
-2. **`bash scripts/phase-gate.sh <gate> $CYCLE $WORKSPACE`** — MANDATORY at every phase transition
+2. **`bash scripts/lifecycle/phase-gate.sh <gate> $CYCLE $WORKSPACE`** — MANDATORY at every phase transition
 3. Intent (v8.19.1+, always for /evolve-loop) → Scout → Builder → Auditor → phase-gate verification → Ship → Learn
-4. **Subagents MUST be launched via `bash scripts/subagent-run.sh <agent> $CYCLE $WORKSPACE`** — never via the in-process `Agent` tool (or `activate_skill`-as-subagent on Gemini, or any equivalent same-session dispatch) in production. Builder gets its worktree via `WORKTREE_PATH` env var. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes a tamper-evident ledger entry. On non-Claude CLIs, `subagent-run.sh` dispatches to the per-platform adapter at `scripts/cli_adapters/<cli>.sh`; the Gemini adapter uses the hybrid pattern (delegates to Claude binary). Legacy `LEGACY_AGENT_DISPATCH=1` fallback permitted for one A/B cycle only.
+4. **Subagents MUST be launched via `bash scripts/dispatch/subagent-run.sh <agent> $CYCLE $WORKSPACE`** — never via the in-process `Agent` tool (or `activate_skill`-as-subagent on Gemini, or any equivalent same-session dispatch) in production. Builder gets its worktree via `WORKTREE_PATH` env var. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes a tamper-evident ledger entry. On non-Claude CLIs, `subagent-run.sh` dispatches to the per-platform adapter at `scripts/cli_adapters/<cli>.sh`; the Gemini adapter uses the hybrid pattern (delegates to Claude binary). Legacy `LEGACY_AGENT_DISPATCH=1` fallback permitted for one A/B cycle only.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
 
 ### v8.13.1 alternative: declarative cycle driver
 
-Instead of running the loop from inside this skill's prompt, you may invoke `bash scripts/run-cycle.sh [GOAL]`. The driver:
+Instead of running the loop from inside this skill's prompt, you may invoke `bash scripts/dispatch/run-cycle.sh [GOAL]`. The driver:
 
 1. Picks the next cycle number (or accepts `--cycle N`).
 2. Initializes `.evolve/cycle-state.json` with `phase=calibrate`.
-3. Spawns the orchestrator subagent (`bash scripts/subagent-run.sh orchestrator $CYCLE $WORKSPACE`) under the orchestrator profile (Edit/Write/git ops blocked at the kernel hook layer).
+3. Spawns the orchestrator subagent (`bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE`) under the orchestrator profile (Edit/Write/git ops blocked at the kernel hook layer).
 4. Clears cycle-state on exit.
 
-The orchestrator subagent (`agents/evolve-orchestrator.md`) calls `bash scripts/cycle-state.sh advance <phase> <agent>` between phases; `phase-gate-precondition.sh` reads cycle-state to validate that the next subagent invocation matches the expected order.
+The orchestrator subagent (`agents/evolve-orchestrator.md`) calls `bash scripts/lifecycle/cycle-state.sh advance <phase> <agent>` between phases; `phase-gate-precondition.sh` reads cycle-state to validate that the next subagent invocation matches the expected order.
 
 Use this when you want every gate active (recommended for autonomous cycles). Use the in-line skill loop when you need tighter control or are debugging.
 

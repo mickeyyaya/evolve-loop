@@ -16,11 +16,11 @@
 
 ## Helper script
 
-If you have shell access, the canonical detection happens in `scripts/detect-cli.sh`:
+If you have shell access, the canonical detection happens in `scripts/dispatch/detect-cli.sh`:
 
 ```bash
-bash scripts/detect-cli.sh        # prints one of: claude, gemini, codex, unknown
-EVOLVE_PLATFORM=gemini bash scripts/detect-cli.sh   # honours the override; prints: gemini
+bash scripts/dispatch/detect-cli.sh        # prints one of: claude, gemini, codex, unknown
+EVOLVE_PLATFORM=gemini bash scripts/dispatch/detect-cli.sh   # honours the override; prints: gemini
 ```
 
 This script is platform-neutral — any CLI that can run bash can call it.
@@ -44,7 +44,7 @@ Without reading these overlays first, you may try to invoke a tool that doesn't 
 If no probe matches, the skill is running on a CLI without an established adapter. You can still:
 
 - Read SKILL.md and phase docs (purely informational).
-- Run `bash scripts/evolve-loop-dispatch.sh ...` directly if your platform has shell access — it does not require a specific CLI to be the caller.
+- Run `bash scripts/dispatch/evolve-loop-dispatch.sh ...` directly if your platform has shell access — it does not require a specific CLI to be the caller.
 
 You **cannot**:
 

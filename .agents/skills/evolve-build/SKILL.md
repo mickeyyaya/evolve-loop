@@ -23,7 +23,7 @@ description: Use after evolve-tdd has written RED tests and the contract is in t
 |---|---|---|
 | 1 | Read TDD contract from team-context.md | Contract loaded |
 | 2 | Implement minimum code to turn RED → GREEN | Tests pass locally |
-| 3 | Run regression suite (`scripts/run-all-regression-tests.sh`) | No new regressions |
+| 3 | Run regression suite (`scripts/utility/run-all-regression-tests.sh`) | No new regressions |
 | 4 | Write `<workspace>/build-report.md` | Report present + fresh + token-bound |
 
 ## Single-writer invariant

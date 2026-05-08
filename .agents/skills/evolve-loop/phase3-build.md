@@ -135,7 +135,7 @@ Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1
   cat agents/evolve-builder.md context.json | \
       WORKTREE_PATH="$WORKTREE_DIR" \
       MODEL_TIER_HINT="<resolved tier>" \
-      bash scripts/subagent-run.sh builder "$CYCLE" "$WORKSPACE_PATH"
+      bash scripts/dispatch/subagent-run.sh builder "$CYCLE" "$WORKSPACE_PATH"
 
   # After exit:
   cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
@@ -308,13 +308,13 @@ Run deterministic health check and independent eval verification before Phase 4.
 
 1. **Independent eval re-execution:**
    ```bash
-   bash scripts/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
+   bash scripts/verification/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
    ```
    If exit != 0 → HALT: "Independent eval verification failed."
 
 2. **Cycle health fingerprint:**
    ```bash
-   bash scripts/cycle-health-check.sh $N $WORKSPACE_PATH
+   bash scripts/observability/cycle-health-check.sh $N $WORKSPACE_PATH
    ```
    Checks 11 signals (ledger completeness, timestamps, artifacts, checksums, challenge tokens, velocity, substance, canaries, hash chain). Any ANOMALY = halt.
 

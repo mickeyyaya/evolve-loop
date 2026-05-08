@@ -20,7 +20,7 @@ Aggregator merges the three worker reports into `<workspace>/scout-report.md`.
 ## Execution
 
 ```bash
-bash scripts/subagent-run.sh dispatch-parallel scout <cycle> <workspace>
+bash scripts/dispatch/subagent-run.sh dispatch-parallel scout <cycle> <workspace>
 ```
 
 Default fan-out: 3 workers. Override with `EVOLVE_FANOUT_CONCURRENCY` (cap) or `EVOLVE_TASK_MODE=research` (boost per-worker budget).

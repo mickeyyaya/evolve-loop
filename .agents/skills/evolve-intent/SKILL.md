@@ -55,7 +55,7 @@ Cannot be:
 - `agents/evolve-intent.md` (persona)
 - `.evolve/profiles/intent.json` (permission profile)
 - `.claude-plugin/commands/intent.md` (slash command)
-- `scripts/phase-gate.sh` (`gate_calibrate_to_intent`, `gate_intent_to_research`)
+- `scripts/lifecycle/phase-gate.sh` (`gate_calibrate_to_intent`, `gate_intent_to_research`)
 - `scripts/guards/phase-gate-precondition.sh` (scout-blocked-without-intent enforcement)
 - `.evolve/research/intent-capture-patterns.md` (5-source research grounding)
 - `docs/architecture/intent-phase.md` (full architecture)

@@ -6,7 +6,7 @@
 
 You can read SKILL.md, the phase docs (`phases.md`, `phase0-calibrate.md`, etc.), and the reference files. The information is platform-neutral.
 
-You can invoke `bash scripts/evolve-loop-dispatch.sh ...` directly if your CLI has shell access. The dispatcher itself is platform-neutral — it loops over `run-cycle.sh` and verifies ledger entries. It does not require a specific CLI to be the caller.
+You can invoke `bash scripts/dispatch/evolve-loop-dispatch.sh ...` directly if your CLI has shell access. The dispatcher itself is platform-neutral — it loops over `run-cycle.sh` and verifies ledger entries. It does not require a specific CLI to be the caller.
 
 ## What does NOT work
 
@@ -28,7 +28,7 @@ Mirror what `scripts/cli_adapters/gemini.sh` does: implement a thin shim that pr
 
 ### Option 3 — Native adapter
 
-Implement a real `scripts/cli_adapters/<cli>.sh` against your CLI's flag surface. Cost: 500–1000 lines (mirror `claude.sh`). Benefit: no Claude binary required. Trade-off: must verify your CLI supports profile-scoped permissions, non-interactive prompt mode, and either a budget cap flag or external cost tracking. Tier 1 designation requires passing the same regression suite Claude does (`scripts/run-all-regression-tests.sh`).
+Implement a real `scripts/cli_adapters/<cli>.sh` against your CLI's flag surface. Cost: 500–1000 lines (mirror `claude.sh`). Benefit: no Claude binary required. Trade-off: must verify your CLI supports profile-scoped permissions, non-interactive prompt mode, and either a budget cap flag or external cost tracking. Tier 1 designation requires passing the same regression suite Claude does (`scripts/utility/run-all-regression-tests.sh`).
 
 See [docs/platform-compatibility.md](../../../docs/platform-compatibility.md) "Adapter contract" section for the env-var interface every adapter must satisfy.
 

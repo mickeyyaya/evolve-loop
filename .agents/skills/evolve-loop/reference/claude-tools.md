@@ -41,6 +41,6 @@
 
 ## Notes for evolve-loop
 
-- The skill explicitly forbids using the in-process `Agent` tool to spawn Scout/Builder/Auditor in production cycles. Subagents go through `bash scripts/subagent-run.sh`, which invokes the per-platform adapter at `scripts/cli_adapters/<cli>.sh`. See SKILL.md's STRICT MODE section.
+- The skill explicitly forbids using the in-process `Agent` tool to spawn Scout/Builder/Auditor in production cycles. Subagents go through `bash scripts/dispatch/subagent-run.sh`, which invokes the per-platform adapter at `scripts/cli_adapters/<cli>.sh`. See SKILL.md's STRICT MODE section.
 - `--allowedTools` and `--disallowedTools` flags on `claude -p` accept patterns like `Bash(git status:*)` and `Write(.evolve/runs/cycle-*/*)`. These syntaxes are documented in `.evolve/profiles/*.json`.
 - Slash commands like `/evolve-loop` are registered via `.claude-plugin/plugin.json`.

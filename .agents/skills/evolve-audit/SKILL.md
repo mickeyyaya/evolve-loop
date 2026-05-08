@@ -53,6 +53,6 @@ Fan-out controlled by `.evolve/profiles/auditor.json:parallel_subtasks` (4 entri
 ## Reference
 
 - `.evolve/profiles/auditor.json`
-- `scripts/aggregator.sh` (phase=audit)
-- `scripts/phase-gate.sh:gate_audit_to_ship`
+- `scripts/dispatch/aggregator.sh` (phase=audit)
+- `scripts/lifecycle/phase-gate.sh:gate_audit_to_ship`
 - `skills/evolve-loop/phase4-audit.md` (legacy detailed workflow)

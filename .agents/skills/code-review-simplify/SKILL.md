@@ -77,7 +77,7 @@ Run deterministic checks on each changed file:
 
 | Check | Tool | Threshold | Finding Type |
 |-------|------|-----------|-------------|
-| Cognitive complexity | `scripts/complexity-check.sh` | > 15 per function | `complexity` |
+| Cognitive complexity | `scripts/verification/complexity-check.sh` | > 15 per function | `complexity` |
 | Nesting depth | grep-based | > 4 levels | `complexity` |
 | Function length | line count | > 50 lines | `maintainability` |
 | File length | line count | > 800 lines | `maintainability` |

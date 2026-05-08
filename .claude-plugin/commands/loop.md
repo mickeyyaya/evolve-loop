@@ -44,7 +44,7 @@ The `/loop` skill (existing, in `skills/evolve-loop/`) drives the sequence. With
 
 When you type `/evolve-loop "your goal"`, the skill prepends `EVOLVE_REQUIRE_INTENT=1` to the dispatcher invocation. The intent persona structures your goal into `intent.md` (8 fields + AwN classifier + ≥1 challenged premise), the kernel verifies structure, then Scout proceeds against the structured intent rather than the raw goal text. **No human checkpoint, no pause** — the autonomy invariant is preserved end-to-end.
 
-Direct CLI invocations (e.g., `bash scripts/evolve-loop-dispatch.sh ...`) remain opt-in via `EVOLVE_REQUIRE_INTENT=1` — only the slash-command path defaults intent on. This keeps existing test infrastructure unchanged.
+Direct CLI invocations (e.g., `bash scripts/dispatch/evolve-loop-dispatch.sh ...`) remain opt-in via `EVOLVE_REQUIRE_INTENT=1` — only the slash-command path defaults intent on. This keeps existing test infrastructure unchanged.
 
 ## Why this is safe (vs. addyosmani's anti-pattern C)
 
