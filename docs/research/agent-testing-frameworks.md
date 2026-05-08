@@ -93,8 +93,8 @@ Map each testing layer to existing evolve-loop infrastructure.
 | Testing Layer | Evolve-Loop Component | Role | Location |
 |---------------|----------------------|------|----------|
 | **Unit** | Eval graders | Assert specific output properties via bash commands (`grep`, `test`, `jq`) | Task `eval` field in cycle workspace |
-| **Integration** | `phase-gate.sh` | Validate phase transitions: Scout → Build → Audit handoffs produce required artifacts | `scripts/phase-gate.sh` |
-| **E2E** | `cycle-health-check.sh` | Verify full cycle completion: all reports exist, no integrity violations, metrics recorded | `scripts/cycle-health-check.sh` |
+| **Integration** | `phase-gate.sh` | Validate phase transitions: Scout → Build → Audit handoffs produce required artifacts | `scripts/lifecycle/phase-gate.sh` |
+| **E2E** | `cycle-health-check.sh` | Verify full cycle completion: all reports exist, no integrity violations, metrics recorded | `scripts/observability/cycle-health-check.sh` |
 | **Regression** | `experiments.jsonl` replay | Re-run past experiment inputs and compare to stored baselines | `experiments.jsonl` |
 
 ### Agent-Specific Test Points

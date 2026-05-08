@@ -17,7 +17,7 @@
 evolve-loop has two surfaces, and each platform supports them independently:
 
 1. **Skill content surface** — what the LLM reads. SKILL.md, phase docs, references. Platform-neutral. Any CLI that can load a markdown skill can consume this.
-2. **Runtime surface** — how cycles actually execute. The dispatcher (`scripts/evolve-loop-dispatch.sh`) calls `scripts/run-cycle.sh`, which spawns subagents via `scripts/subagent-run.sh`, which dispatches to a per-CLI adapter at `scripts/cli_adapters/<cli>.sh`. The adapter is the platform-specific layer.
+2. **Runtime surface** — how cycles actually execute. The dispatcher (`scripts/dispatch/evolve-loop-dispatch.sh`) calls `scripts/dispatch/run-cycle.sh`, which spawns subagents via `scripts/dispatch/subagent-run.sh`, which dispatches to a per-CLI adapter at `scripts/cli_adapters/<cli>.sh`. The adapter is the platform-specific layer.
 
 Tier 1 means both surfaces work. Tier 3 means only the skill content surface works — the runtime returns exit 99.
 
@@ -89,7 +89,7 @@ See `scripts/cli_adapters/claude.sh` for the canonical implementation, including
 
 ## Detection
 
-The skill auto-detects which CLI it's running under via `scripts/detect-cli.sh`. Detection signals (priority order):
+The skill auto-detects which CLI it's running under via `scripts/dispatch/detect-cli.sh`. Detection signals (priority order):
 
 1. `CLAUDE_CODE_INTERACTIVE` set → `claude`
 2. `GEMINI_CLI` or `GEMINI_API_KEY` set → `gemini`

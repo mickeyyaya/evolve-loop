@@ -169,16 +169,16 @@ The pipeline layer eliminates 60-70% of issues before the agentic layer runs. Th
 | File | Purpose | Lines |
 |------|---------|-------|
 | `skills/code-review-simplify/SKILL.md` | Skill definition — architecture, flow, scoring, integration hooks | 271 |
-| `scripts/code-review-simplify.sh` | Pipeline layer engine — 6 deterministic checks | 200 |
-| `scripts/complexity-check.sh` | Per-function cognitive complexity scorer | 110 |
+| `scripts/utility/code-review-simplify.sh` | Pipeline layer engine — 6 deterministic checks | 200 |
+| `scripts/verification/complexity-check.sh` | Per-function cognitive complexity scorer | 110 |
 | `agents/evolve-auditor.md` (D4 section) | Auditor integration hook | +12 lines |
 | `agents/evolve-builder.md` (Step 5) | Builder self-review integration | +10 lines |
 
-### Pipeline Script (`scripts/code-review-simplify.sh`)
+### Pipeline Script (`scripts/utility/code-review-simplify.sh`)
 
 ```bash
 # Usage
-bash scripts/code-review-simplify.sh [GIT_REF] [--json]
+bash scripts/utility/code-review-simplify.sh [GIT_REF] [--json]
 # GIT_REF defaults to HEAD~1
 ```
 
@@ -188,16 +188,16 @@ bash scripts/code-review-simplify.sh [GIT_REF] [--json]
 | Function length | > 50 lines | `maintainability` | `awk` function extraction |
 | Nesting depth | > 4 levels | `maintainability` | `awk` indent measurement |
 | Hardcoded secrets | Pattern match | `security` | `grep -E` on password/secret/token/key patterns |
-| Cognitive complexity | > 15/function | `maintainability` | `scripts/complexity-check.sh` |
+| Cognitive complexity | > 15/function | `maintainability` | `scripts/verification/complexity-check.sh` |
 | Near-duplicates | > 6 similar lines | `maintainability` | Line-by-line `awk` comparison |
 
 **Output:** Structured markdown report with findings table, tier classification, and recommendation (PASS/WARN/FAIL).
 
-### Complexity Check Script (`scripts/complexity-check.sh`)
+### Complexity Check Script (`scripts/verification/complexity-check.sh`)
 
 ```bash
 # Usage
-bash scripts/complexity-check.sh <file> [--threshold N]
+bash scripts/verification/complexity-check.sh <file> [--threshold N]
 ```
 
 Counts control flow keywords (`if`, `for`, `while`, `case`, `catch`) and nesting increments per function. Outputs colon-delimited per-function scores:
@@ -415,8 +415,8 @@ Prioritized backlog for remaining cycles:
 | File | Relationship |
 |------|-------------|
 | `skills/code-review-simplify/SKILL.md` | Canonical skill definition |
-| `scripts/code-review-simplify.sh` | Pipeline layer implementation |
-| `scripts/complexity-check.sh` | Complexity scoring engine |
+| `scripts/utility/code-review-simplify.sh` | Pipeline layer implementation |
+| `scripts/verification/complexity-check.sh` | Complexity scoring engine |
 | `agents/evolve-auditor.md` § D4 | Auditor integration hook |
 | `agents/evolve-builder.md` § Step 5 | Builder self-review integration |
 | `docs/ai-code-review-agents.md` | Prior research on review agent architectures |

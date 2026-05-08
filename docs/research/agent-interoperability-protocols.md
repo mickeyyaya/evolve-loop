@@ -96,7 +96,7 @@ Map evolve-loop's existing coordination mechanisms to formal protocol concepts.
 | **Event log** | Ledger recording all phase transitions | `ledger.jsonl` |
 | **Authentication** | Not applicable (single-machine, single-user) | N/A |
 | **Schema registry** | Contract definitions in reference docs | `docs/reference/` |
-| **Health check** | Phase-gate script validating artifacts | `scripts/phase-gate.sh` |
+| **Health check** | Phase-gate script validating artifacts | `scripts/lifecycle/phase-gate.sh` |
 
 ### Handoff Flow
 

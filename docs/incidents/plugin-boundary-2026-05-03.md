@@ -6,7 +6,7 @@
 
 A user invoked `/evolve-loop` from a project at `/Users/danleemh/ai/claude/learning`. The orchestrator subagent attempted to execute the calibrate phase and aborted before reaching scout. Two distinct failures:
 
-1. **Bash sandbox mismatch.** The orchestrator's bash was scoped to the project root (`/Users/danleemh/ai/claude/learning`). Phase scripts (`scripts/cycle-state.sh`, `scripts/subagent-run.sh`) live in the plugin install directory (`~/.claude/plugins/cache/evolve-loop/evolve-loop/8.17.0/`) and the orchestrator-prompt invoked them with relative paths (`bash scripts/cycle-state.sh advance ...`). Relative paths resolved against cwd, where the scripts do not exist, so bash failed.
+1. **Bash sandbox mismatch.** The orchestrator's bash was scoped to the project root (`/Users/danleemh/ai/claude/learning`). Phase scripts (`scripts/lifecycle/cycle-state.sh`, `scripts/dispatch/subagent-run.sh`) live in the plugin install directory (`~/.claude/plugins/cache/evolve-loop/evolve-loop/8.17.0/`) and the orchestrator-prompt invoked them with relative paths (`bash scripts/lifecycle/cycle-state.sh advance ...`). Relative paths resolved against cwd, where the scripts do not exist, so bash failed.
 
 2. **Sensitive-path write block.** The orchestrator attempted to write `orchestrator-report.md` into the workspace path `~/.claude/plugins/cache/evolve-loop/evolve-loop/8.17.0/.evolve/runs/cycle-1/`. Claude Code blocks all writes under `~/.claude/` as a sensitive-path policy. The dispatcher's chosen workspace location was therefore unwritable.
 
@@ -25,19 +25,19 @@ Two distinct roots resolved by a new shared helper, sourced into every kernel sc
 | `EVOLVE_PLUGIN_ROOT` | `dirname/..` of the script (the install location) | Read-only resources: `scripts/`, `agents/`, `.evolve/profiles/`, `skills/` |
 | `EVOLVE_PROJECT_ROOT` | env override → git toplevel of cwd → `$PWD` | Writable: `state.json`, `ledger.jsonl`, `runs/`, `cycle-state.json`, `instincts/` |
 
-`scripts/resolve-roots.sh` is the single source of truth for this resolution. Every kernel script sources it as the first non-comment line after `set -uo pipefail`. The helper is idempotent — sourcing twice is a no-op.
+`scripts/lifecycle/resolve-roots.sh` is the single source of truth for this resolution. Every kernel script sources it as the first non-comment line after `set -uo pipefail`. The helper is idempotent — sourcing twice is a no-op.
 
 Scripts updated:
 
-- `scripts/run-cycle.sh`
-- `scripts/evolve-loop-dispatch.sh`
-- `scripts/cycle-state.sh`
-- `scripts/subagent-run.sh`
-- `scripts/phase-gate.sh`
+- `scripts/dispatch/run-cycle.sh`
+- `scripts/dispatch/evolve-loop-dispatch.sh`
+- `scripts/lifecycle/cycle-state.sh`
+- `scripts/dispatch/subagent-run.sh`
+- `scripts/lifecycle/phase-gate.sh`
 - `scripts/guards/phase-gate-precondition.sh`
-- `scripts/record-failure-to-state.sh`
-- `scripts/merge-lesson-into-state.sh`
-- `scripts/ship.sh`
+- `scripts/failure/record-failure-to-state.sh`
+- `scripts/failure/merge-lesson-into-state.sh`
+- `scripts/lifecycle/ship.sh`
 
 Orchestrator prompt updated:
 
@@ -59,7 +59,7 @@ Tests updated:
 
 ```
 bash scripts/resolve-roots-test.sh           # 9/9 PASS, no regression
-bash scripts/run-all-regression-tests.sh     # 24/27 PASS, 3 pre-existing failures unrelated
+bash scripts/utility/run-all-regression-tests.sh     # 24/27 PASS, 3 pre-existing failures unrelated
 ```
 
 Pre-existing failures (verified by git-stash bisect — same failure count on `main` before this change):

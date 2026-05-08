@@ -107,7 +107,7 @@ Without `EVOLVE_REQUIRE_INTENT=1` at init, `cycle-state.intent_required` is `fal
 - `skills/evolve-intent/SKILL.md` — workflow
 - `.claude-plugin/commands/intent.md` — slash command
 - `.evolve/profiles/intent.json` — permission profile
-- `scripts/phase-gate.sh` — `gate_calibrate_to_intent`, `gate_intent_to_research`
+- `scripts/lifecycle/phase-gate.sh` — `gate_calibrate_to_intent`, `gate_intent_to_research`
 - `scripts/guards/phase-gate-precondition.sh` — scout-blocked-without-intent block
 - `.evolve/research/intent-capture-patterns.md` — full research grounding (5 sources)
 - `arxiv 2409.00557` — Ask-when-Needed framework (4 ambiguity types, AwN classifier)

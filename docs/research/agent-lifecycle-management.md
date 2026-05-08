@@ -122,7 +122,7 @@ Map each lifecycle stage to existing evolve-loop infrastructure.
 | **Develop** | Builder agent | `build-report.md`, agent implementation | Implement agent per spec; write tests |
 | **Test** | Auditor agent, eval graders | `audit-report.md`, eval results | Validate correctness and safety |
 | **Deploy** | `scripts/publish.sh` | Published skill/agent, deployment record | Ship agent to production |
-| **Monitor** | Operator, `scripts/cycle-health-check.sh` | Health reports, drift alerts | Track quality, cost, drift continuously |
+| **Monitor** | Operator, `scripts/observability/cycle-health-check.sh` | Health reports, drift alerts | Track quality, cost, drift continuously |
 | **Improve** | Meta-cycle (Scout re-evaluation) | Updated agent, new baselines | Identify improvement opportunities |
 | **Decommission** | Instinct archival process | Archived instincts, migration records | Retire agent and redirect dependents |
 
@@ -131,8 +131,8 @@ Map each lifecycle stage to existing evolve-loop infrastructure.
 | Transition | Gate | Enforced By |
 |---|---|---|
 | Design -> Develop | Agent spec reviewed and approved | Scout report includes spec validation |
-| Develop -> Test | All unit tests pass; code review complete | Builder phase gate (`scripts/phase-gate.sh`) |
-| Test -> Deploy | Eval scores meet baseline; no safety violations | Auditor phase gate (`scripts/phase-gate.sh`) |
+| Develop -> Test | All unit tests pass; code review complete | Builder phase gate (`scripts/lifecycle/phase-gate.sh`) |
+| Test -> Deploy | Eval scores meet baseline; no safety violations | Auditor phase gate (`scripts/lifecycle/phase-gate.sh`) |
 | Deploy -> Monitor | Health checks pass; monitoring configured | Deployment verification in `publish.sh` |
 | Monitor -> Improve | Drift or regression detected | Operator alerts trigger Scout re-evaluation |
 | Improve -> Test | Updated agent ready for re-evaluation | Cycle loops back through Test stage |
@@ -194,7 +194,7 @@ Map each lifecycle stage to existing evolve-loop infrastructure.
 | **No Retirement Plan** | Agents accumulate indefinitely; routing becomes complex; costs grow | Define retirement criteria at Design stage; review every 10 cycles |
 | **Shadow Agents** | Unofficial agents bypass monitoring and safety checks | Require registry for all agents; audit for unregistered tool usage |
 | **Monitoring Only Throughput** | Misses reasoning quality degradation, hallucination drift, cost bloat | Track all metrics in [Monitoring Beyond Latency](#monitoring-beyond-latency) |
-| **Manual Lifecycle Management** | Error-prone; stages skipped under time pressure; no audit trail | Automate stage gates with `scripts/phase-gate.sh`; enforce via CI |
+| **Manual Lifecycle Management** | Error-prone; stages skipped under time pressure; no audit trail | Automate stage gates with `scripts/lifecycle/phase-gate.sh`; enforce via CI |
 | **Immortal Instincts** | Outdated instincts conflict with current guidelines; cause regressions | Review instincts every meta-cycle; archive stale ones per retirement protocol |
 | **Big-Bang Deployment** | Deploying untested agents directly to production without canary | Use shadow or canary deployment; gate on eval scores before full rollout |
 | **Monolithic Agents** | Single agent handles too many responsibilities; hard to test and retire | Follow single-responsibility principle; split into focused agents |

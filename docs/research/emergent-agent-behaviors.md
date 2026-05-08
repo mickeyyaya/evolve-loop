@@ -113,7 +113,7 @@ Apply layered containment to manage emergence without suppressing beneficial beh
 
 | Layer | Mechanism | What It Contains | Bypass Risk |
 |-------|-----------|------------------|-------------|
-| Phase gates | `scripts/phase-gate.sh` deterministic enforcement | Orchestrator gaming, cycle fabrication | Low — bash script not LLM-invokable |
+| Phase gates | `scripts/lifecycle/phase-gate.sh` deterministic enforcement | Orchestrator gaming, cycle fabrication | Low — bash script not LLM-invokable |
 | Canary files | Known-content files that agents must not modify | Capability overhang, unauthorized file access | Medium — agent could learn to avoid canaries |
 | Eval substance checks | eval-quality-check.sh Level 0-3 classification | Reward hacking, tautological evals | Medium — sophisticated gaming possible |
 | Content verification | Word count, file path references, git diff checks | Artifact fabrication, empty commits | Low — hard to fake substantive content |

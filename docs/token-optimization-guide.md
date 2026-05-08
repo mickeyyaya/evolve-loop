@@ -14,7 +14,7 @@
 
 ## Token Footprint Baseline
 
-Measured using `scripts/token-profiler.sh` (1 line ≈ 15 tokens):
+Measured using `scripts/observability/token-profiler.sh` (1 line ≈ 15 tokens):
 
 ### By Category
 
@@ -36,9 +36,9 @@ Measured using `scripts/token-profiler.sh` (1 line ≈ 15 tokens):
 | 2 | skills/evolve-loop/smart-web-search.md | 654 | 9,810 |
 | 3 | skills/refactor/SKILL.md | 653 | 9,795 |
 | 4 | skills/evolve-loop/benchmark-eval.md | 507 | 7,605 |
-| 5 | scripts/cycle-health-check.sh | 443 | 6,645 |
+| 5 | scripts/observability/cycle-health-check.sh | 443 | 6,645 |
 | 6 | skills/evolve-loop/phase6-learn.md | 435 | 6,525 |
-| 7 | scripts/phase-gate.sh | 422 | 6,330 |
+| 7 | scripts/lifecycle/phase-gate.sh | 422 | 6,330 |
 | 8 | skills/evolve-loop/memory-protocol.md | 392 | 5,880 |
 | 9 | agents/evolve-scout.md | 372 | 5,580 |
 | 10 | skills/inspirer/SKILL.md | 336 | 5,040 |
@@ -155,19 +155,19 @@ Actionable optimizations for the heaviest files:
 
 ## Optimization Tracking
 
-Use `scripts/token-profiler.sh` to measure and track token footprint over time.
+Use `scripts/observability/token-profiler.sh` to measure and track token footprint over time.
 
 ### How to Track
 
 ```bash
 # Save a baseline (do this before optimization)
-bash scripts/token-profiler.sh --save-baseline
+bash scripts/observability/token-profiler.sh --save-baseline
 
 # After optimization, compare against baseline
-bash scripts/token-profiler.sh --compare
+bash scripts/observability/token-profiler.sh --compare
 
 # Full report with JSON for programmatic use
-bash scripts/token-profiler.sh --json
+bash scripts/observability/token-profiler.sh --json
 ```
 
 ### Optimization History

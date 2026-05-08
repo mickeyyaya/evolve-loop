@@ -316,19 +316,19 @@ Self-improving agents must evaluate their own improvement process, not just thei
 
 | # | Mechanism | File Path | What It Evaluates | Score Type | Gate Type | Independence | Coupling |
 |---|---|---|---|---|---|---|---|
-| 1 | **Phase gate script** | `scripts/phase-gate.sh` | Artifact existence, freshness, substance | Pass/Fail (exit code) | Hard | High — runs outside LLM | Low |
+| 1 | **Phase gate script** | `scripts/lifecycle/phase-gate.sh` | Artifact existence, freshness, substance | Pass/Fail (exit code) | Hard | High — runs outside LLM | Low |
 | 2 | **Canary eval** | `.evolve/evals/_canary-eval.md` | Eval system probing/gaming | Anomaly detection | Hard | High — tripwire pattern | None |
 | 3 | **Eval graders** | `.evolve/evals/*.md` (per-task) | Task-specific acceptance criteria | Pass/Fail (bash exit) | Hard | Medium — agent writes, gate runs | Medium |
 | 4 | **Auditor agent** | `agents/evolve-auditor.md` | Code quality, security, pipeline integrity | PASS/WARN/FAIL + confidence | Soft | Medium — LLM-based review | Medium |
-| 5 | **Anti-forgery checks** | `scripts/phase-gate.sh` (lines 82-122) | Artifact substance, empty commits, state tampering | Pass/Fail | Hard | High — deterministic hash checks | Low |
+| 5 | **Anti-forgery checks** | `scripts/lifecycle/phase-gate.sh` (lines 82-122) | Artifact substance, empty commits, state tampering | Pass/Fail | Hard | High — deterministic hash checks | Low |
 | 6 | **Ledger logging** | `.evolve/ledger.jsonl` | Cycle execution audit trail | Structured JSON events | Soft | Medium — append-only log | Low |
 | 7 | **Challenge token** | Auditor agent protocol | Agent identity verification | Token match | Hard | Medium — per-cycle token | Low |
 | 8 | **Mastery scoring** | `skills/evolve-loop/SKILL.md`, `state.json` | Cumulative capability tracking | Numeric score | Soft | Low — self-reported | High |
 | 9 | **Process rewards** | Phase-specific scoring | Step-by-step quality assessment | Weighted numeric | Soft | Low — inline computation | High |
 | 10 | **Instinct confidence** | `.claude/evolve/instincts/` | Learned pattern reliability | 0.0-1.0 confidence | Soft | Low — self-assessed | Medium |
 | 11 | **Build report review** | `workspace/build-report.md` | Builder self-assessment of changes | Prose + metrics | Soft | Low — self-reported | High |
-| 12 | **State checksum** | `scripts/phase-gate.sh` (lines 116-130) | State file integrity across cycle | SHA-256 hash match | Hard | High — cryptographic verification | None |
-| 13 | **Git diff substance** | `scripts/phase-gate.sh` (lines 107-112) | Non-empty commits | File change count > 0 | Hard | High — git-level check | None |
+| 12 | **State checksum** | `scripts/lifecycle/phase-gate.sh` (lines 116-130) | State file integrity across cycle | SHA-256 hash match | Hard | High — cryptographic verification | None |
+| 13 | **Git diff substance** | `scripts/lifecycle/phase-gate.sh` (lines 107-112) | Non-empty commits | File change count > 0 | Hard | High — git-level check | None |
 | 14 | **Auditor adaptive strictness** | `.claude/evolve/evals/add-auditor-adaptive-strictness.md` | Per-task-type reliability calibration | Profile-based threshold | Soft | Medium — historical data driven | Medium |
 
 ---

@@ -15,7 +15,7 @@ The /insights audit (cycle 8200 onward) flagged "publish" as ambiguous: sometime
 | **release** | `gh release create vX.Y.Z` — creates a GitHub Release object with notes, tied to a tag. | Yes (`gh release delete vX.Y.Z`). |
 | **propagate** | Marketplace checkouts (`~/.claude/plugins/marketplaces/evolve-loop/`) `git pull` the new tag, then Claude Code's `installed_plugins.json` registry refreshes. | N/A (eventually consistent; verifiable). |
 | **publish** | Composite atomic operation: pre-flight → bump → changelog → audit-bound ship → propagate-verify → rollback-on-fail. | Yes (auto-rollback if propagation fails or post-push gh-release fails). |
-| **ship** | DEPRECATED informal alias for "push." Use **publish** for new releases. `bash scripts/ship.sh` remains the gate-allowlisted atomic primitive that publish calls internally. | — |
+| **ship** | DEPRECATED informal alias for "push." Use **publish** for new releases. `bash scripts/lifecycle/ship.sh` remains the gate-allowlisted atomic primitive that publish calls internally. | — |
 
 **Rule of thumb:** when an operator says "publish", they almost always mean *the full pipeline*, not just `git push`. When in doubt, use `bash scripts/release-pipeline.sh <version>`.
 
@@ -59,10 +59,10 @@ Every component supports `--dry-run`. The orchestrator plumbs the flag through.
 | 1 | Pre-flight | `scripts/release/preflight.sh` | exit 1; abort before any mutation |
 | 2 | Auto-changelog | `scripts/release/changelog-gen.sh <prev-tag> HEAD <version>` | exit 1; abort |
 | 3 | Version bump | `scripts/release/version-bump.sh <version>` | exit 1; abort |
-| 4 | Consistency check | `scripts/release.sh <version>` | exit 1; abort (no commits made yet — bumped files left in working tree, operator can investigate) |
-| 5 | Atomic ship | `scripts/ship.sh "release: vX.Y.Z"` | exit 2; abort (nothing pushed) |
+| 4 | Consistency check | `scripts/utility/release.sh <version>` | exit 1; abort (no commits made yet — bumped files left in working tree, operator can investigate) |
+| 5 | Atomic ship | `scripts/lifecycle/ship.sh "release: vX.Y.Z"` | exit 2; abort (nothing pushed) |
 | 6 | Marketplace poll | `scripts/release/marketplace-poll.sh <version> --max-wait-s 300` | exit 3; auto-rollback (deletes release + tag, reverts commit) unless `--no-rollback` |
-| 7 | Cache refresh | `scripts/release.sh <version>` (re-run) | logged WARN; manual `bash scripts/release.sh <version>` |
+| 7 | Cache refresh | `scripts/utility/release.sh <version>` (re-run) | logged WARN; manual `bash scripts/utility/release.sh <version>` |
 
 ## Runbook
 
@@ -168,7 +168,7 @@ Propagation lag = time between `git push` finishing and the marketplace checkout
 
 The release pipeline runs **on top of** the v8.13.0/v8.13.1 trust-boundary gates:
 
-- **ship-gate** denies any `git commit` / `git push` / `gh release create` not via `scripts/ship.sh`. The pipeline calls ship.sh (allowed). Direct `git push` from Claude Code is denied — even from the pipeline's own session.
+- **ship-gate** denies any `git commit` / `git push` / `gh release create` not via `scripts/lifecycle/ship.sh`. The pipeline calls ship.sh (allowed). Direct `git push` from Claude Code is denied — even from the pipeline's own session.
 - **role-gate** denies Edit/Write outside the active phase's path allowlist when a cycle is in progress. The pipeline doesn't run during cycles; it runs at release time when `cycle-state.json` is absent → role-gate is transparent passthrough.
 - **phase-gate-precondition** enforces Scout→Builder→Auditor sequence. Doesn't apply to the release pipeline (no `subagent-run.sh` invocations).
 
@@ -190,7 +190,7 @@ Routinely setting any of these is a CLAUDE.md violation. The pipeline never sets
 | Symptom | Diagnosis | Recovery |
 |---------|-----------|----------|
 | `preflight: target X not greater than current Y` | You forgot to update `--cycle` arg, or the version bump was already applied. | Run `cat .claude-plugin/plugin.json` to check current; pick a higher target. |
-| `preflight: most recent audit-report.md does not declare 'Verdict: PASS'` | Last audit was WARN/FAIL, or you haven't run an audit recently. | Spawn an audit: `bash scripts/subagent-run.sh auditor <cycle> <workspace>`. |
+| `preflight: most recent audit-report.md does not declare 'Verdict: PASS'` | Last audit was WARN/FAIL, or you haven't run an audit recently. | Spawn an audit: `bash scripts/dispatch/subagent-run.sh auditor <cycle> <workspace>`. |
 | `marketplace-poll: TIMEOUT` | Marketplace checkout didn't pull within --max-wait-s. Possible causes: network lag, marketplace dir corrupted, push didn't actually land. | Check `git -C ~/.claude/plugins/marketplaces/evolve-loop log --oneline | head -3`. If origin/main has the new commit but checkout doesn't, `git -C <dir> pull --ff-only`. |
 | `rollback: PARTIAL` | Some rollback step (release-delete, tag-delete, revert) failed. | `cat .evolve/release-rollbacks.jsonl` shows which step. Manually finish (e.g., `gh release delete vX.Y.Z` if release-delete failed). |
 

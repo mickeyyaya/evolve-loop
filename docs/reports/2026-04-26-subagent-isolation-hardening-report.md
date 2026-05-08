@@ -142,7 +142,7 @@ You already do independent eval re-execution via `verify-eval.sh`. METR's MALT d
 
 ```bash
 git clone --depth 1 . "/tmp/eval-$CHALLENGE_TOKEN"
-cd "/tmp/eval-$CHALLENGE_TOKEN" && bash scripts/verify-eval.sh ...
+cd "/tmp/eval-$CHALLENGE_TOKEN" && bash scripts/verification/verify-eval.sh ...
 ```
 
 **Effort:** 30 min addition to `verify-eval.sh`.
@@ -216,15 +216,15 @@ Every report must satisfy a schema. `build-report.md` requires `executable_chang
 
 **Created:**
 - `.evolve/profiles/{scout,builder,auditor,inspirer,evaluator}.json` — agent permission profiles
-- `scripts/subagent-run.sh` — runner
+- `scripts/dispatch/subagent-run.sh` — runner
 - `scripts/cli_adapters/{claude,gemini,codex}.sh` — CLI adapters (claude full, others stubs)
 - `scripts/subagent-run-test.sh` — runner smoke tests (10 checks)
 - `scripts/subagent-adversarial-test.sh` — adversarial integrity tests (21 attacks)
 - `docs/reports/2026-04-26-subagent-isolation-hardening-report.md` — this file
 
 **Modified:**
-- `scripts/phase-gate.sh` — added `check_subagent_ledger_match()`, wired into 3 gates
-- `scripts/eval-quality-check.sh` — fenced-block parsing + zero-commands ANOMALY
+- `scripts/lifecycle/phase-gate.sh` — added `check_subagent_ledger_match()`, wired into 3 gates
+- `scripts/verification/eval-quality-check.sh` — fenced-block parsing + zero-commands ANOMALY
 - `skills/evolve-loop/{SKILL,phase2-discover,phase3-build,phases}.md`
 - `skills/inspirer/SKILL.md`, `skills/evaluator/SKILL.md`
 - `CLAUDE.md` Autonomous Execution rule #5

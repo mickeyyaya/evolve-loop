@@ -19,9 +19,9 @@ The ledger (`.evolve/ledger.jsonl`) records every subagent invocation with cycle
 
 **Pipeline impact: zero.** The `prev_hash` and `entry_seq` fields are additive. Existing readers all use jq's `// empty` pattern — unknown fields are ignored.
 
-**Verifier:** `bash scripts/verify-ledger-chain.sh` — exit 0 = chain intact, 1 = chain break, 2 = tip mismatch.
+**Verifier:** `bash scripts/observability/verify-ledger-chain.sh` — exit 0 = chain intact, 1 = chain break, 2 = tip mismatch.
 
-**Three writers updated:** `scripts/subagent-run.sh:write_ledger_entry()`, `scripts/subagent-run.sh:_write_fanout_ledger_entry()`, `scripts/merge-lesson-into-state.sh`.
+**Three writers updated:** `scripts/dispatch/subagent-run.sh:write_ledger_entry()`, `scripts/dispatch/subagent-run.sh:_write_fanout_ledger_entry()`, `scripts/failure/merge-lesson-into-state.sh`.
 
 **Pre-v8.37 entries** (no `prev_hash` field) are tolerated as a boundary; the first v8.37+ entry chains from the last pre-v8.37 entry's SHA.
 
@@ -33,7 +33,7 @@ The ledger (`.evolve/ledger.jsonl`) records every subagent invocation with cycle
 
 The fix: `git worktree prune` removes admin entries for worktrees whose directories no longer exist. Active worktrees (whose dirs still exist) are NOT touched, so concurrent cycles are safe.
 
-Two locations got the fix: pre-flight cleanup (`scripts/run-cycle.sh:~382`, primary fix) and the `cleanup()` EXIT trap (`scripts/run-cycle.sh:~298`, defensive).
+Two locations got the fix: pre-flight cleanup (`scripts/dispatch/run-cycle.sh:~382`, primary fix) and the `cleanup()` EXIT trap (`scripts/dispatch/run-cycle.sh:~298`, defensive).
 
 Test: `scripts/run-cycle-worktree-test.sh` (8 assertions).
 
@@ -52,7 +52,7 @@ Test: `scripts/run-cycle-worktree-test.sh` (8 assertions).
 
 **Fix 2 — New `code-audit-warn` classification:** severity=low, age_out=86400 (1d), retry=yes. `failure_normalize_legacy "WARN" → code-audit-warn` (was `code-audit-fail`).
 
-**Fix 3 — Adaptive auditor model selection** via `scripts/diff-complexity.sh`:
+**Fix 3 — Adaptive auditor model selection** via `scripts/utility/diff-complexity.sh`:
 - **trivial** (≤3 files AND ≤100 lines AND no security paths) → Sonnet
 - **complex** (>10 files OR >500 lines OR security path regex) → Opus (default)
 - **standard** → Opus (conservative)
@@ -128,11 +128,11 @@ Operator helpers: `cycle-state.sh init-workers <agent> <name>...`, `cycle-state.
 Promotes failure adaptation from a prompt rule to a deterministic kernel function:
 
 ```bash
-bash scripts/failure-adapter.sh decide --state .evolve/state.json
+bash scripts/failure/failure-adapter.sh decide --state .evolve/state.json
 # emits JSON: {action, reason, remediation, set_env, skip_phases, verdict_for_block, evidence}
 ```
 
-**Structured taxonomy** (7 classifications in `scripts/failure-classifications.sh`):
+**Structured taxonomy** (7 classifications in `scripts/failure/failure-classifications.sh`):
 
 | Classification | Age-out | Severity |
 |---|---|---|
@@ -153,13 +153,13 @@ bash scripts/failure-adapter.sh decide --state .evolve/state.json
 6. 1+ `infrastructure-transient` → `RETRY-WITH-FALLBACK`
 7. otherwise → `PROCEED`
 
-**Operator utilities:** `bash scripts/state-prune.sh --classification <name>`, `--age 7d`, `--cycle <N>`, `--all --yes`.
+**Operator utilities:** `bash scripts/failure/state-prune.sh --classification <name>`, `--age 7d`, `--cycle <N>`, `--all --yes`.
 
 ---
 
 ## v8.21.0 — Worktree Provisioning Contract
 
-Per-cycle git worktrees are provisioned by `scripts/run-cycle.sh` at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` on branch `evolve/cycle-N`. The path is recorded in `cycle-state.json:active_worktree`, exported as `WORKTREE_PATH`, and torn down via the EXIT trap.
+Per-cycle git worktrees are provisioned by `scripts/dispatch/run-cycle.sh` at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` on branch `evolve/cycle-N`. The path is recorded in `cycle-state.json:active_worktree`, exported as `WORKTREE_PATH`, and torn down via the EXIT trap.
 
 **Trust-boundary invariant:** the orchestrator and all phase agents may NOT call `git worktree add` or `git worktree remove`. Both are denied in `orchestrator.json` and in every phase profile that has a deny list.
 
@@ -235,7 +235,7 @@ Operating principle: reduce friction is top priority; preventing structural fake
 
 **Fix 2 — `ship-gate-config` classification.** Cycles where audit declared PASS but ship-gate refused are now classified as `ship-gate-config` (1d age-out, low severity, retry-yes), NOT `infrastructure-systemic`.
 
-**Fix 3 — `--reset` flag.** `bash scripts/evolve-loop-dispatch.sh --reset [N] [strategy] [goal]` runs `state-prune.sh` against `infrastructure-{systemic,transient}` + `ship-gate-config` entries before the cycle loop.
+**Fix 3 — `--reset` flag.** `bash scripts/dispatch/evolve-loop-dispatch.sh --reset [N] [strategy] [goal]` runs `state-prune.sh` against `infrastructure-{systemic,transient}` + `ship-gate-config` entries before the cycle loop.
 
 ---
 
@@ -260,7 +260,7 @@ v8.26.0 sets `--max-budget-usd` to `999999` (effectively unlimited) by default. 
 ### v8.13.4: per-invocation override
 
 ```bash
-EVOLVE_MAX_BUDGET_USD=1.50 bash scripts/subagent-run.sh scout <cycle> <workspace>
+EVOLVE_MAX_BUDGET_USD=1.50 bash scripts/dispatch/subagent-run.sh scout <cycle> <workspace>
 ```
 
 The adapter logs the override loudly. Empty/malformed values → WARN + profile fallback. Negative values → rejected.
@@ -285,7 +285,7 @@ Declare named tiers in the profile:
 Then select via `EVOLVE_TASK_MODE`:
 
 ```bash
-EVOLVE_TASK_MODE=research bash scripts/subagent-run.sh scout <cycle> <workspace>
+EVOLVE_TASK_MODE=research bash scripts/dispatch/subagent-run.sh scout <cycle> <workspace>
 ```
 
 Adapter logs: `[claude-adapter] task-mode tier: research → $1.50 (was 0.50 from profile scout.json)`. The Scout profile (`.evolve/profiles/scout.json`) ships with `default` / `research` / `deep` tiers as the canonical example.
