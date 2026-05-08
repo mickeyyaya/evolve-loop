@@ -177,7 +177,8 @@
     "write_subpaths": [
       ".evolve/runs/cycle-*",
       ".evolve/cycle-state*",
-      ".evolve/ledger.jsonl"
+      ".evolve/ledger.jsonl",
+      ".evolve/audit-investigations/*"
     ],
     "read_only_repo": true,
     "deny_subpaths": [

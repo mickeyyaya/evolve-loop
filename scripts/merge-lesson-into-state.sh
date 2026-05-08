@@ -239,4 +239,73 @@ if [ -n "$CONTRADICTED" ]; then
     log "      run \`prune\` to reconcile (not auto-applied)."
 fi
 
+# Patch 5 (v8.46.0+): populate .evolve/audit-investigations/<slug>/ for
+# human-readable failure review. Each FAIL/WARN cycle gets a dated dir
+# with frozen evidence + investigation narrative + improvements + status.
+# This is the operator-facing surface; lesson YAML in instincts/lessons/
+# remains the runtime/agent-facing surface (different audiences, same
+# source-of-truth).
+INV_BASE="$EVOLVE_PROJECT_ROOT/.evolve/audit-investigations"
+if [ -d "$INV_BASE" ] && [ -n "${VERDICT:-}" ]; then
+    case "$VERDICT" in
+        FAIL|WARN|WARN-NO-AUDIT)
+            INV_SLUG=$(jq -r '.errorCategory // .lessons[0].id // "unspecified"' "$HANDOFF" 2>/dev/null \
+                | sed 's/[^a-zA-Z0-9-]/-/g; s/--*/-/g; s/^-//; s/-$//' | head -c 50)
+            [ -z "$INV_SLUG" ] && INV_SLUG="unspecified"
+            INV_DATE=$(date -u +"%Y-%m-%d")
+            INV_DIR="$INV_BASE/${INV_DATE}-cycle-${CYCLE}-${VERDICT}-${INV_SLUG}"
+            mkdir -p "$INV_DIR/evidence"
+            for art in audit-report.md build-report.md orchestrator-report.md intent.md scout-report.md retrospective-report.md; do
+                [ -f "$WORKSPACE/$art" ] && cp "$WORKSPACE/$art" "$INV_DIR/evidence/$art" 2>/dev/null || true
+            done
+            if [ -f "$WORKSPACE/retrospective-report.md" ]; then
+                cp "$WORKSPACE/retrospective-report.md" "$INV_DIR/investigation.md"
+            else
+                cat > "$INV_DIR/investigation.md" <<INVEOF
+# Investigation — Cycle $CYCLE ($VERDICT)
+
+**Date**: $INV_DATE
+**Verdict**: $VERDICT
+**Cycle**: $CYCLE
+**Lesson IDs**: ${LESSON_IDS[@]:-(none)}
+
+(retrospective-report.md not produced; this is a stub. See evidence/ for raw artifacts.)
+INVEOF
+            fi
+            IMP_TEXT=$(jq -r '.improvementSuggestions // .lessons[0].preventiveAction // empty' "$HANDOFF" 2>/dev/null)
+            if [ -n "$IMP_TEXT" ]; then
+                cat > "$INV_DIR/improvements.md" <<IMPEOF
+# Improvement Suggestions — Cycle $CYCLE
+
+$IMP_TEXT
+IMPEOF
+            else
+                cat > "$INV_DIR/improvements.md" <<IMPEOF
+# Improvement Suggestions — Cycle $CYCLE
+
+(No structured suggestions in handoff. Operator: extract from investigation.md and document concrete fixes here.)
+IMPEOF
+            fi
+            FIRST_LESSON_ID="${LESSON_IDS[0]:-}"
+            if [ -n "$FIRST_LESSON_ID" ] && [ -f "$LESSONS_DIR/${FIRST_LESSON_ID}.yaml" ]; then
+                cp "$LESSONS_DIR/${FIRST_LESSON_ID}.yaml" "$INV_DIR/lesson.yaml"
+            fi
+            jq -n --arg state "open" \
+                  --arg verdict "$VERDICT" \
+                  --argjson cycle "$CYCLE" \
+                  --arg lesson_id "${FIRST_LESSON_ID:-unspecified}" \
+                  --arg opened "$NOW_TS" \
+                  '{state: $state, verdict: $verdict, cycle: $cycle, lesson_id: $lesson_id, opened_at: $opened, actioned_at: null, action_refs: []}' \
+                  > "$INV_DIR/status.json"
+            log "OK: investigation dir created at $INV_DIR"
+            INDEX_SCRIPT="$EVOLVE_PLUGIN_ROOT/scripts/index-investigations.sh"
+            [ -x "$INDEX_SCRIPT" ] && bash "$INDEX_SCRIPT" >/dev/null 2>&1 || \
+                log "WARN: index-investigations.sh not refreshed"
+            ;;
+        *)
+            log "verdict $VERDICT not in {FAIL,WARN,WARN-NO-AUDIT} — skipping investigation dir"
+            ;;
+    esac
+fi
+
 exit 0
