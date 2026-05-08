@@ -182,7 +182,7 @@ step_audit_recent() {
     # preflight with that contract.
     if ! { grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$artifact_path" \
            || awk '
-                /^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
+                /^#+[[:space:]]+([0-9]+\.[[:space:]]+)?Verdict[[:space:]]*$/ { saw=NR; next }
                 saw && (NR - saw) <= 5 && /\*\*PASS\*\*/ { found=1; exit }
                 END { exit !found }
               ' "$artifact_path"; }; then
