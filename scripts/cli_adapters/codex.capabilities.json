@@ -1,0 +1,38 @@
+{
+  "adapter": "codex",
+  "version": 1,
+  "capabilities": {
+    "subprocess_isolation": {
+      "modes": ["hybrid", "degraded"],
+      "default": "degraded",
+      "warning": "claude binary not on PATH; running in same-session degraded mode. Pipeline kernel hooks and forgery defenses still apply."
+    },
+    "budget_cap": {
+      "modes": ["hybrid", "none"],
+      "default": "none",
+      "warning": "no known native budget cap on Codex CLI; consider EVOLVE_RUN_TIMEOUT"
+    },
+    "sandbox": {
+      "modes": ["hybrid", "none"],
+      "default": "none"
+    },
+    "profile_permissions": {
+      "modes": ["hybrid", "none"],
+      "default": "none",
+      "warning": "Codex CLI profile-permission support unconfirmed; assume none and rely on pipeline-level hooks"
+    },
+    "challenge_token": {
+      "modes": ["hybrid", "degraded"],
+      "default": "degraded"
+    }
+  },
+  "probes": [
+    {
+      "check": "claude_on_path",
+      "if_true_mode": "hybrid",
+      "if_false_mode": "degraded",
+      "applies_to": ["subprocess_isolation", "budget_cap", "sandbox", "profile_permissions", "challenge_token"]
+    }
+  ],
+  "notes": "v8.51.0 introduces Codex as tier-1 hybrid. Mirrors Gemini's pattern: when claude binary is available, delegate to claude.sh for full isolation; otherwise run in same-session degraded mode. Native Codex execution (no claude) deferred to v8.54.0 pending CLI-side primitives."
+}

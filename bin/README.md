@@ -9,6 +9,7 @@ Thin wrappers exposing read-only observability scripts via short, discoverable n
 | `./bin/health <cycle> <workspace>` | `scripts/observability/cycle-health-check.sh` | Anomaly fingerprint for any cycle (read-only) |
 | `./bin/verify-chain` | `scripts/observability/verify-ledger-chain.sh` | Tamper-evident ledger chain check |
 | `./bin/preflight` (v8.50+) | `scripts/release/full-dry-run.sh` | Full pipeline dry-run: regression + cycle simulate + release-pipeline --dry-run |
+| `./bin/check-caps` (v8.51+) | `scripts/cli_adapters/_capability-check.sh` | Resolved capability tier for an adapter (auto-detects CLI if no arg) |
 
 All wrappers are read-only. None mutate state, commit, or push. They are safe to run at any time, including mid-cycle.
 

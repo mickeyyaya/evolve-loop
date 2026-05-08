@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# bin/check-caps — Operator entry: show capability tier of an adapter (v8.51+).
+#
+# Wraps scripts/cli_adapters/_capability-check.sh. Useful before running cycles
+# on Gemini or Codex to confirm whether you're in HYBRID or DEGRADED mode.
+#
+# Usage:
+#   ./bin/check-caps                  # auto-detect active CLI + show its caps
+#   ./bin/check-caps claude           # show claude adapter's resolved caps
+#   ./bin/check-caps gemini           # gemini caps
+#   ./bin/check-caps codex            # codex caps
+#   ./bin/check-caps --list           # list all available adapter manifests
+#   ./bin/check-caps --json           # machine-readable JSON
+
+set -uo pipefail
+
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_repo_root="$(cd "$_self_dir/.." && pwd)"
+
+ADAPTER=""
+FLAGS=()
+JSON=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --list)  exec bash "$_repo_root/scripts/cli_adapters/_capability-check.sh" --list-adapters ;;
+        --json)  JSON=1 ;;
+        --help|-h)
+            sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        --*)     FLAGS+=("$arg") ;;
+        *)       ADAPTER="$arg" ;;
+    esac
+done
+
+if [ -z "$ADAPTER" ]; then
+    if [ -x "$_repo_root/scripts/dispatch/detect-cli.sh" ]; then
+        ADAPTER=$(bash "$_repo_root/scripts/dispatch/detect-cli.sh" 2>/dev/null || echo "")
+    fi
+    if [ -z "$ADAPTER" ] || [ "$ADAPTER" = "unknown" ]; then
+        echo "[check-caps] could not auto-detect CLI; specify one (claude|gemini|codex)" >&2
+        exit 10
+    fi
+fi
+
+if [ "$JSON" = "1" ]; then
+    exec bash "$_repo_root/scripts/cli_adapters/_capability-check.sh" "$ADAPTER" ${FLAGS[@]+"${FLAGS[@]}"}
+else
+    exec bash "$_repo_root/scripts/cli_adapters/_capability-check.sh" "$ADAPTER" --human ${FLAGS[@]+"${FLAGS[@]}"}
+fi

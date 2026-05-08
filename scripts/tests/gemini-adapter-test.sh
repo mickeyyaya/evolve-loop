@@ -47,28 +47,62 @@ else
     pass "skipped: claude not on PATH on this machine (probe-availability test n/a)"
 fi
 
-# --- Test 3: --probe returns 99 when claude is forced missing ---------------
-header "Test 3: --probe exits 99 when claude is forced missing via test seam"
+# --- Test 3: v8.51.0 — probe defaults to DEGRADED (rc=0) when claude missing ---
+header "Test 3: v8.51.0 — --probe with claude missing → rc=0 (DEGRADED default)"
 set +e
 EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe >/dev/null 2>&1
 rc=$?
 set -e
-if [ "$rc" = "99" ]; then
-    pass "probe returned 99 when EVOLVE_GEMINI_CLAUDE_PATH=\"\""
+if [ "$rc" = "0" ]; then
+    pass "probe rc=0 with claude missing (degraded mode default since v8.51.0)"
 else
-    fail_ "expected rc=99 with forced-missing seam, got rc=$rc"
+    fail_ "expected rc=0 with degraded default, got rc=$rc"
 fi
 
-# --- Test 4: error message identifies adapter + install hint ----------------
-header "Test 4: 'claude missing' error names adapter + install URL"
+# --- Test 3b: v8.51.0 — --require-full + claude missing → exit 99 (run mode) ---
+header "Test 3b: v8.51.0 — run mode + --require-full + claude missing → exit 99"
+set +e
+# Use run mode, not --probe (probe is informational; only run mode enforces require-full)
+PROFILE_PATH="$SCOUT_PROFILE" RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+    CYCLE=0 WORKSPACE_PATH=/tmp STDOUT_LOG=/tmp/x STDERR_LOG=/tmp/y \
+    ARTIFACT_PATH=/tmp/z \
+    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" \
+    EVOLVE_GEMINI_REQUIRE_FULL=1 \
+    bash "$ADAPTER" >/dev/null 2>&1
+rc=$?
+set -e
+if [ "$rc" = "99" ]; then
+    pass "require-full + claude missing → rc=99 (opt-in hard-fail preserved)"
+else
+    fail_ "expected rc=99, got rc=$rc"
+fi
+
+# --- Test 4: v8.51.0 — degraded probe identifies adapter + tier ---------------
+header "Test 4: v8.51.0 — degraded probe message names adapter + tier"
 set +e
 out=$(EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$ADAPTER" --probe 2>&1)
 set -e
 if echo "$out" | grep -q "gemini-adapter" \
-   && echo "$out" | grep -qE "claude.ai/code|claude binary not found"; then
-    pass "error names adapter + install guidance"
+   && echo "$out" | grep -qE "DEGRADED|tier="; then
+    pass "probe message names adapter + tier info"
 else
-    fail_ "error missing required signals; got: $out"
+    fail_ "probe missing required signals; got: $out"
+fi
+
+# Test 4b: --require-full message names install URL
+header "Test 4b: --require-full + claude missing message includes install URL"
+set +e
+out=$(PROFILE_PATH=/dev/null RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+    CYCLE=0 WORKSPACE_PATH=/tmp STDOUT_LOG=/tmp/x STDERR_LOG=/tmp/y \
+    ARTIFACT_PATH=/tmp/z \
+    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" \
+    EVOLVE_GEMINI_REQUIRE_FULL=1 \
+    bash "$ADAPTER" 2>&1)
+set -e
+if echo "$out" | grep -q "claude.ai/code"; then
+    pass "require-full error includes install URL"
+else
+    fail_ "install URL missing from --require-full error: $out"
 fi
 
 # --- Test 5: error written to stderr, not stdout ----------------------------
@@ -103,7 +137,7 @@ if command -v claude >/dev/null 2>&1 && [ -f "$SCOUT_PROFILE" ]; then
         bash "$ADAPTER" 2>"$stderr_log" >/dev/null
     rc=$?
     set -e
-    if grep -q "hybrid-mode: delegating to claude.sh" "$stderr_log" 2>/dev/null; then
+    if grep -q "HYBRID mode: delegating to claude.sh" "$stderr_log" 2>/dev/null; then
         pass "delegation log line emitted (claude.sh exit code: $rc)"
     else
         fail_ "delegation log missing. stderr captured: $(cat "$stderr_log")"
@@ -121,7 +155,7 @@ PROFILE_PATH="" RESOLVED_MODEL="" PROMPT_FILE="" \
     bash "$ADAPTER" --probe >/dev/null 2>&1
 rc=$?
 set -e
-# rc should be 0 (claude found) or 99 (claude missing) — not a "missing env" 127 or similar
+# v8.51.0+: rc should be 0 always (probe is informational; degraded is default) — not a "missing env" 127 or similar
 if [ "$rc" = "0" ] || [ "$rc" = "99" ]; then
     pass "probe rc=$rc (decoupled from run-mode env contract)"
 else

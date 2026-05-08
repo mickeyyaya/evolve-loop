@@ -203,7 +203,7 @@ evolve-loop ships as a Claude Code plugin but is invocable from Gemini CLI via a
 |---|---|---|---|---|
 | Claude Code | `Skill` tool | `claude` | `scripts/cli_adapters/claude.sh` | `claude -p` (sandboxed) |
 | Gemini CLI | `activate_skill` | `gemini` | `scripts/cli_adapters/gemini.sh` (hybrid shim) | delegates to `claude.sh` → `claude -p` |
-| Codex CLI | (stub) | `codex` | `scripts/cli_adapters/codex.sh` | exits 99 — unsupported |
+| Codex CLI | hybrid (v8.51.0+) | `codex` | `scripts/cli_adapters/codex.sh` | delegates to `claude.sh` when claude on PATH; DEGRADED same-session mode otherwise |
 
 The hybrid pattern exists because Gemini CLI lacks non-interactive prompt mode, `--max-budget-usd`, and subagent dispatch — so trust-boundary hooks can't structurally enforce phase isolation. Delegating to `claude.sh` gives Gemini-driven cycles full kernel-hook protection. See [docs/incidents/gemini-forgery.md](docs/incidents/gemini-forgery.md).
 

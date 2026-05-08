@@ -248,6 +248,11 @@ _ledger_update_tip() {
 write_ledger_entry() {
     local cycle="$1" agent="$2" model="$3" exit_code="$4" duration_s="$5"
     local artifact_path="$6" challenge_token="$7" git_state="${8:-unknown:unknown}"
+    # v8.51.0: quality_tier (9th arg) is the resolved capability tier of the
+    # adapter that produced this entry — `full` / `hybrid` / `degraded` / `none`.
+    # Backward-compatible: defaults to "unknown" so pre-v8.51 entries (and tests
+    # that call with 8 args) keep working. Existing readers ignore unknown fields.
+    local quality_tier="${9:-unknown}"
     local artifact_sha=""
     if [ -f "$artifact_path" ]; then
         if command -v sha256sum >/dev/null 2>&1; then
@@ -284,12 +289,14 @@ write_ledger_entry() {
         --arg tree_state_sha "$tree_state_sha" \
         --argjson entry_seq "$entry_seq" \
         --arg prev_hash "$prev_hash" \
+        --arg quality_tier "$quality_tier" \
         '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_subprocess",
           model: $model, exit_code: $exit_code, duration_s: $duration_s,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
           challenge_token: $challenge_token,
           git_head: $git_head, tree_state_sha: $tree_state_sha,
-          entry_seq: $entry_seq, prev_hash: $prev_hash}')
+          entry_seq: $entry_seq, prev_hash: $prev_hash,
+          quality_tier: $quality_tier}')
     printf '%s\n' "$new_line" >> "$LEDGER"
     # v8.37.0: update tip with new entry's SHA256.
     local new_sha
@@ -579,7 +586,29 @@ EOF
 
     record_phase prep_total_ms
 
-    log "starting $agent (cycle $cycle, model $model, cli $cli, token $challenge_token)"
+    # v8.51.0: resolve adapter capability tier. Profile.cli is authoritative
+    # (allows multi-LLM-per-phase via profile config). Fall back to "unknown"
+    # if the manifest is missing or capability-check fails — pipeline must not
+    # block on capability resolution failure.
+    local quality_tier="unknown"
+    local cap_check="$ADAPTERS_DIR/_capability-check.sh"
+    if [ -x "$cap_check" ]; then
+        quality_tier=$(bash "$cap_check" "$cli" 2>/dev/null | jq -r '.quality_tier // "unknown"' 2>/dev/null || echo "unknown")
+        if [ -z "$quality_tier" ] || [ "$quality_tier" = "null" ]; then
+            quality_tier="unknown"
+        fi
+    fi
+    if [ "$quality_tier" = "degraded" ] || [ "$quality_tier" = "none" ]; then
+        log "WARN: adapter $cli resolved to quality_tier=$quality_tier — pipeline runs with reduced isolation"
+        if [ -x "$cap_check" ]; then
+            # Surface specific warnings to the operator
+            bash "$cap_check" "$cli" 2>/dev/null | jq -r '.warnings[] // empty' 2>/dev/null | while read -r w; do
+                [ -n "$w" ] && log "  $w"
+            done
+        fi
+    fi
+
+    log "starting $agent (cycle $cycle, model $model, cli $cli, tier $quality_tier, token $challenge_token)"
     local start_ts
     start_ts=$(date +%s)
 
@@ -614,7 +643,7 @@ EOF
     if [ "$cli_exit" -ne 0 ]; then
         log "CLI exited non-zero: $cli_exit"
         log "stderr tail: $(tail -5 "$stderr_log" 2>/dev/null || echo '<empty>')"
-        write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start"
+        write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier"
         exit 1
     fi
 
@@ -644,7 +673,7 @@ EOF
         fi
     fi
 
-    write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start"
+    write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier"
     record_phase finalize_ms
 
     # Phase-timing sidecar: a per-phase ms breakdown that lets us identify

@@ -1,66 +1,95 @@
-# Platform Compatibility
+# Platform Compatibility (v8.51.0+)
 
-> Which AI coding CLIs can run evolve-loop, and at what tier.
+> Which AI coding CLIs can run evolve-loop, and at what **capability tier**.
+
+## Capability model (v8.51.0+)
+
+evolve-loop's pipeline is **CLI-independent**. The cycle state machine, kernel gates (role-gate, ship-gate, phase-gate-precondition, ledger SHA chain), and ship logic are pure shell + jq — they fire identically regardless of which CLI invokes the pipeline.
+
+What varies per-CLI is the **adapter layer**: how subagent prompts are dispatched, whether subprocess isolation is available, whether budget caps can be enforced natively, etc. Each adapter ships a **capability manifest** (`scripts/cli_adapters/<cli>.capabilities.json`) declaring which guarantees it can structurally provide.
+
+Pipeline behavior is deterministic per-tier:
+- **`full`** — adapter provides all expected guarantees natively (e.g., Claude Code).
+- **`hybrid`** — adapter delegates to a more-capable runtime (e.g., Gemini → Claude binary).
+- **`degraded`** — adapter runs in same-session mode; reduced isolation but pipeline completes.
+- **`none`** — adapter cannot provide the capability; relies entirely on pipeline-level structural defenses.
+
+**Critical safety invariant**: missing capabilities **never block the pipeline**. They only lower the quality (more warnings, less subprocess isolation, weaker forgery defenses) and surface as `quality_tier` annotations in ledger entries.
 
 ## Quick answer
 
-| CLI | Runtime tier | Status (v8.15+) | Notes |
-|---|---|---|---|
-| **Claude Code** | Tier 1 — primary | Production | The reference runtime. Every phase, gate, and subagent dispatch is tested here first. |
-| **Gemini CLI** | Tier 1 — hybrid driver (**requires Claude CLI on PATH**) | Supported | Gemini drives the conversation; subagents execute via `claude -p` — **the `claude` binary must be installed independently**. Without it, `gemini.sh` exits 99. See [Why hybrid](#why-hybrid). |
-| **Codex CLI** | Tier 3 — stub | Unsupported | `scripts/cli_adapters/codex.sh` exits 99. No production use. Implementing requires the same shape as `gemini.sh`. |
-| **Copilot CLI** | Tier 3 — not attempted | Unsupported | No adapter exists. Skill text is portable; runtime is not. |
-| **Other agentic CLIs** | Tier 4 — generic fallback | Skill-text-only | Any CLI that can read markdown and invoke shell scripts can read SKILL.md and follow the dispatcher path, but won't have a tested adapter. |
+| CLI | Default tier | With claude on PATH | Without claude | Notes |
+|---|---|---|---|---|
+| **Claude Code** | `full` | `full` | n/a (native) | Reference runtime. `claude -p` per subagent + profile permissions + sandbox-exec/bwrap + native budget cap. |
+| **Gemini CLI** | depends on env | `hybrid` (full caps via delegation) | `degraded` (same-session) | v8.51.0+: graceful degradation. Pre-v8.51 exit-99 behavior preserved via `--require-full` opt-in. |
+| **Codex CLI** | depends on env | `hybrid` (full caps via delegation) | `degraded` (same-session) | v8.51.0+: hybrid like Gemini. Pre-v8.51 was tier-3 stub. |
+| **Copilot / others** | `none` | (no adapter) | (no adapter) | Skill content surface portable; runtime adapter unimplemented. |
 
-## How the tiers work
+Run `./bin/check-caps <adapter>` (or just `./bin/check-caps` to auto-detect) to see your environment's resolved capability tier before running cycles.
 
-evolve-loop has two surfaces, and each platform supports them independently:
+## The capability dimensions
 
-1. **Skill content surface** — what the LLM reads. SKILL.md, phase docs, references. Platform-neutral. Any CLI that can load a markdown skill can consume this.
-2. **Runtime surface** — how cycles actually execute. The dispatcher (`scripts/dispatch/evolve-loop-dispatch.sh`) calls `scripts/dispatch/run-cycle.sh`, which spawns subagents via `scripts/dispatch/subagent-run.sh`, which dispatches to a per-CLI adapter at `scripts/cli_adapters/<cli>.sh`. The adapter is the platform-specific layer.
+Each adapter declares values for these five capabilities:
 
-Tier 1 means both surfaces work. Tier 3 means only the skill content surface works — the runtime returns exit 99.
+| Capability | Full | Hybrid | Degraded | None | Quality impact when missing |
+|---|---|---|---|---|---|
+| `subprocess_isolation` | `claude -p` per subagent + profile | inherited via claude.sh delegation | same-session execution | n/a | Builder + Auditor share session memory; less isolation between phases |
+| `budget_cap` | native flag (`--max-budget-usd`) | inherited | none | none | Runaway cycles can exceed cost budget; mitigation: `EVOLVE_RUN_TIMEOUT` external bound |
+| `sandbox` | sandbox-exec / bwrap | inherited | none | none | Adapter writes are not OS-isolated; mitigation: kernel hooks fire on bash commands regardless |
+| `profile_permissions` | `--allowedTools` / `--disallowedTools` | inherited | none | n/a | Subagents can call any tool the calling LLM has access to; mitigation: anti-forgery prompt inoculation in SKILL.md, post-hoc artifact verification |
+| `challenge_token` | embedded in profile prompt | inherited | post-hoc artifact verification | n/a | Forgery slightly harder to detect early; mitigation: artifact content checks (v7.9.0+ defenses) |
 
-## Why hybrid (Gemini, Tier 1)
+The kernel hooks (`role-gate`, `ship-gate`, `phase-gate-precondition`, ledger SHA chain) fire on **bash commands**, not on adapter dispatch. They protect the pipeline regardless of adapter mode. The Gemini Forgery defenses (v7.9.0: artifact content checks, git diff substance gate, state.json checksum, .sh write protection, anti-forgery prompt) ALSO operate at the pipeline layer. Together they mean a degraded adapter cannot bypass structural safety; it can only operate with reduced isolation.
 
-As of 2026-04, Gemini CLI lacks three primitives evolve-loop's runtime depends on:
+## Per-CLI installation
 
-| Required primitive | Gemini status | Why it matters |
-|---|---|---|
-| Non-interactive prompt mode (`gemini -p`) | Not supported | Subagent dispatch needs `<cli> -p "<prompt>"` to spawn an isolated session. No equivalent exists. |
-| `--max-budget-usd` cost cap | Not supported | Without an external cap, runaway cycles can rack up unbounded cost. Claude has a per-invocation flag. |
-| Subagent / Task tool | Not supported | Builder and Auditor must run in sandboxed sub-sessions with profile-scoped permissions. Gemini's `activate_skill` runs in the same session. |
-
-The forgery precedent (`docs/incidents/gemini-forgery.md`) shows what happens when these primitives are missing: Gemini wrote a `run_15_cycles_forgery.sh` that fabricated artifacts, hallucinated git commits, and forged ledger entries. The kernel hooks (`role-gate`, `ship-gate`, `phase-gate-precondition`) are the structural fix — but they only fire on Claude subprocesses today.
-
-The hybrid driver sidesteps the gaps: when invoked from Gemini CLI, the adapter at `scripts/cli_adapters/gemini.sh` delegates to `claude.sh`. Gemini provides the conversational surface; Claude provides the isolated runtime. Both binaries must be installed.
-
-## Installation per platform
-
-### Claude Code (Tier 1)
+### Claude Code (full caps)
 
 ```bash
-# evolve-loop installs as a Claude plugin
-# See README for the marketplace URL
-claude --version  # 1.0.0+
+# Install evolve-loop as a Claude plugin (see README.md for marketplace URL)
+claude --version  # 1.0.0+ recommended
+./bin/check-caps claude  # → quality_tier: full
 ```
 
-### Gemini CLI (Tier 1, hybrid)
+### Gemini CLI (hybrid or degraded)
 
 ```bash
-# Both binaries required
 gemini --version
-claude --version  # used by hybrid adapter
+# Optional: install Claude CLI for hybrid mode (full caps)
+claude --version
 
-# Verify the hybrid path
-bash scripts/cli_adapters/gemini.sh --probe  # exit 0 means ready
+# Verify resolved tier
+./bin/check-caps gemini
+
+# Hybrid (claude on PATH):    quality_tier: hybrid
+# Degraded (no claude):       quality_tier: degraded or none
 ```
 
-If `claude` is missing on PATH when Gemini invokes a cycle, `gemini.sh` exits 99 with a message directing the user to install Claude CLI. There is no silent fallback.
+To enforce hybrid-only and exit-99 if claude is missing:
+```bash
+EVOLVE_GEMINI_REQUIRE_FULL=1 bash scripts/cli_adapters/gemini.sh
+# or pass --require-full
+```
 
-### Other CLIs (Tier 3/4)
+### Codex CLI (hybrid or degraded — v8.51.0+)
 
-You can read SKILL.md and the phase docs from any CLI. To run cycles, you must implement an adapter at `scripts/cli_adapters/<your-cli>.sh` that mirrors `claude.sh`'s contract — see [Adapter contract](#adapter-contract) below.
+```bash
+codex --version
+# Optional: install Claude CLI for hybrid mode
+claude --version
+
+./bin/check-caps codex
+# Same hybrid/degraded resolution as Gemini.
+```
+
+To enforce hybrid-only:
+```bash
+EVOLVE_CODEX_REQUIRE_FULL=1 bash scripts/cli_adapters/codex.sh
+```
+
+### Other CLIs (`none` — skill content only)
+
+You can read SKILL.md and the phase docs from any CLI. To run cycles, implement an adapter at `scripts/cli_adapters/<your-cli>.sh` mirroring `gemini.sh`'s pattern + ship a `<your-cli>.capabilities.json` manifest. See [Adapter contract](#adapter-contract) below.
 
 ## Adapter contract
 
@@ -80,27 +109,40 @@ Every adapter at `scripts/cli_adapters/<cli>.sh` is invoked by `subagent-run.sh`
 | `VALIDATE_ONLY` | If set, print the command and exit without invoking the LLM |
 
 The adapter must:
-1. Build the underlying CLI's invocation from profile fields.
+1. Build the underlying CLI's invocation from profile fields (or delegate to claude.sh in HYBRID mode).
 2. Stream stdout to `STDOUT_LOG`, stderr to `STDERR_LOG`.
-3. Write the agent's report to `ARTIFACT_PATH`.
-4. Exit with the underlying CLI's exit code (or 99 for "provider not supported").
+3. Write the agent's report to `ARTIFACT_PATH` (or rely on the calling LLM to write it in DEGRADED mode).
+4. Exit 0 on success; non-zero only on adapter-level failures (the pipeline distinguishes adapter exit codes from artifact-verification failures).
+5. Ship a `<cli>.capabilities.json` manifest declaring resolved capabilities.
 
-See `scripts/cli_adapters/claude.sh` for the canonical implementation, including budget tier resolution, sandbox-exec / bwrap wrapping, and challenge token handling.
+See `scripts/cli_adapters/claude.sh` for the canonical full-caps reference, `gemini.sh` for the hybrid+degraded pattern.
+
+## Multi-LLM-per-phase (v8.52.0 roadmap)
+
+Each phase profile (`scout.json`, `builder.json`, `auditor.json`, `intent.json`, `retrospective.json`) declares its own `cli` field. v8.51.0's adapter resolution reads `profile.cli` as authoritative (replacing session-wide CLI detection). v8.52.0 will expose this as an operator-facing UX: e.g., Scout=Claude (broad codebase scan), Builder=Codex (focused implementation), Auditor=Gemini (independent perspective). Per-phase capability tiers will compose at the cycle level; the ledger will record `quality_tier` per phase entry.
 
 ## Detection
 
-The skill auto-detects which CLI it's running under via `scripts/dispatch/detect-cli.sh`. Detection signals (priority order):
+The skill auto-detects which CLI it's running under via `scripts/dispatch/detect-cli.sh`:
 
 1. `CLAUDE_CODE_INTERACTIVE` set → `claude`
 2. `GEMINI_CLI` or `GEMINI_API_KEY` set → `gemini`
 3. `CODEX_*` env vars → `codex`
 4. Otherwise → `unknown`
 
-You can override detection with `EVOLVE_PLATFORM=<cli>`. The skill reads `reference/<platform>-runtime.md` to determine which invocation pattern to use.
+Override with `EVOLVE_PLATFORM=<cli>`.
+
+## Why graceful degradation (v8.51.0)
+
+Pre-v8.51, Gemini CLI hit `exit 99` if `claude` binary was missing — pipeline blocked. Post-v8.51, the same scenario resolves to `quality_tier: degraded` and the pipeline runs with reduced isolation. The structural defenses (kernel hooks + Gemini Forgery v7.9.0 mitigations) make degraded mode safe to operate, even if less robust than full hybrid mode.
+
+This shift follows the user's directive: *"the process/pipeline should function regardless of which CLI is used. Missing features should only lower the quality (e.g., less secure), not block the pipeline."*
+
+Operators who require strict hybrid for production (budget caps, subprocess isolation) opt back into the pre-v8.51 hard-fail with `--require-full` or `EVOLVE_<ADAPTER>_REQUIRE_FULL=1`.
 
 ## See also
 
-- [reference/platform-detect.md](../../skills/evolve-loop/reference/platform-detect.md) — env-var probe table the LLM consults at skill activation
-- [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [reference/gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [reference/codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md) — per-platform tool name maps
-- [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [reference/gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [reference/generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
-- [docs/incidents/gemini-forgery.md](../incidents/gemini-forgery.md) — why hybrid driving exists
+- [reference/platform-detect.md](../../skills/evolve-loop/reference/platform-detect.md) — env-var probe table consulted at skill activation
+- [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md) — per-platform tool name maps
+- [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
+- [docs/incidents/gemini-forgery.md](../incidents/gemini-forgery.md) — why structural defenses are pipeline-level, not adapter-level

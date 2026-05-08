@@ -1,0 +1,16 @@
+{
+  "adapter": "claude",
+  "version": 1,
+  "capabilities": {
+    "subprocess_isolation": "full",
+    "budget_cap": "full",
+    "sandbox": {
+      "modes": ["full", "degraded"],
+      "default": "full",
+      "warning": "sandbox-exec/bwrap unavailable on this OS; bash invocation gates remain active"
+    },
+    "profile_permissions": "full",
+    "challenge_token": "full"
+  },
+  "notes": "Reference adapter. claude -p provides per-subagent isolation, --max-budget-usd, and --allowedTools/--disallowedTools. Sandbox depends on Darwin sandbox-exec or Linux bwrap availability — degrades to bash-gates-only on systems without."
+}

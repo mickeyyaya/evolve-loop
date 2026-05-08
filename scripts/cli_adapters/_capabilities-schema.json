@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evolve-loop://cli_adapters/_capabilities-schema.json",
+  "title": "evolve-loop CLI adapter capability manifest",
+  "description": "Each CLI adapter ships a manifest declaring what guarantees it can structurally provide. The pipeline reads this at dispatch time and applies graceful degradation when capabilities are absent. Pipeline never blocks on missing capabilities — it only logs warnings and annotates ledger entries with the resolved quality_tier. v8.51.0+",
+  "type": "object",
+  "required": ["adapter", "version", "capabilities"],
+  "additionalProperties": false,
+  "properties": {
+    "adapter": {
+      "type": "string",
+      "description": "Adapter name (matches scripts/cli_adapters/<name>.sh)",
+      "enum": ["claude", "gemini", "codex"]
+    },
+    "version": {
+      "type": "integer",
+      "description": "Manifest schema version. Bump when fields are added or semantics change.",
+      "const": 1
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Capability tier per dimension. Each capability has at least one possible mode; the resolver may select among them at runtime based on environment probes.",
+      "additionalProperties": false,
+      "properties": {
+        "subprocess_isolation": { "$ref": "#/$defs/capability_value" },
+        "budget_cap": { "$ref": "#/$defs/capability_value" },
+        "sandbox": { "$ref": "#/$defs/capability_value" },
+        "profile_permissions": { "$ref": "#/$defs/capability_value" },
+        "challenge_token": { "$ref": "#/$defs/capability_value" }
+      },
+      "required": [
+        "subprocess_isolation",
+        "budget_cap",
+        "sandbox",
+        "profile_permissions",
+        "challenge_token"
+      ]
+    },
+    "probes": {
+      "type": "array",
+      "description": "Runtime probes the resolver runs to pick among available modes.",
+      "items": {
+        "type": "object",
+        "required": ["check", "if_true_mode"],
+        "additionalProperties": false,
+        "properties": {
+          "check": { "type": "string" },
+          "if_true_mode": {
+            "type": "string",
+            "enum": ["full", "hybrid", "degraded", "none"]
+          },
+          "if_false_mode": {
+            "type": "string",
+            "enum": ["full", "hybrid", "degraded", "none"]
+          },
+          "applies_to": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "capability_value": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["full", "hybrid", "degraded", "none"]
+        },
+        {
+          "type": "object",
+          "required": ["modes", "default"],
+          "additionalProperties": false,
+          "properties": {
+            "modes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["full", "hybrid", "degraded", "none"]
+              },
+              "minItems": 1
+            },
+            "default": {
+              "type": "string",
+              "enum": ["full", "hybrid", "degraded", "none"]
+            },
+            "warning": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}

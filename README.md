@@ -112,8 +112,13 @@ Read-only observability commands live in `bin/`:
 | `./bin/health <cycle> <workspace>` | Anomaly fingerprint for any past cycle |
 | `./bin/verify-chain` | Tamper-evident ledger chain check |
 | `./bin/preflight` (v8.50+) | Full pipeline dry-run: regression + cycle simulate + release-pipeline dry-run |
+| `./bin/check-caps [cli]` (v8.51+) | Show resolved capability tier for an adapter (auto-detects CLI if no arg) |
 
-All five are read-only — safe to run at any time, including mid-cycle. See [bin/README.md](bin/README.md) for the contract.
+All six are read-only — safe to run at any time, including mid-cycle. See [bin/README.md](bin/README.md) for the contract.
+
+### Cross-CLI deployment (v8.51+)
+
+`/evolve-loop` runs on Claude Code (full caps), Gemini CLI (hybrid or degraded), and Codex CLI (hybrid or degraded). Pipeline behavior is identical across CLIs; what differs is the **capability tier** — how much native isolation, budget control, and sandboxing the adapter can provide. Run `./bin/check-caps` to see your environment's resolved tier. Missing capabilities only lower quality (less isolation, no native budget caps), never block the pipeline. See [docs/architecture/platform-compatibility.md](docs/architecture/platform-compatibility.md) for the full capability matrix.
 
 ### Pre-release validation (v8.50+)
 

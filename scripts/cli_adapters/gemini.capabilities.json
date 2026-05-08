@@ -1,0 +1,39 @@
+{
+  "adapter": "gemini",
+  "version": 1,
+  "capabilities": {
+    "subprocess_isolation": {
+      "modes": ["hybrid", "degraded"],
+      "default": "degraded",
+      "warning": "claude binary not on PATH; running in same-session degraded mode. Subagents will execute in the calling Gemini session rather than isolated subprocesses. Pipeline kernel hooks (role-gate, ship-gate, phase-gate-precondition) and Gemini-Forgery defenses (v7.9.0+ artifact content checks, git diff substance gate, state.json checksum) still apply."
+    },
+    "budget_cap": {
+      "modes": ["hybrid", "none"],
+      "default": "none",
+      "warning": "no native budget cap on Gemini CLI; consider EVOLVE_RUN_TIMEOUT for external bound"
+    },
+    "sandbox": {
+      "modes": ["hybrid", "none"],
+      "default": "none"
+    },
+    "profile_permissions": {
+      "modes": ["hybrid", "none"],
+      "default": "none",
+      "warning": "Gemini CLI has no profile-permission flags; subagents have access to whatever tools the calling Gemini session permits. Mitigation: anti-forgery prompt inoculation in SKILL.md and post-hoc artifact verification."
+    },
+    "challenge_token": {
+      "modes": ["hybrid", "degraded"],
+      "default": "degraded",
+      "warning": "challenge token verified post-hoc on artifact rather than embedded in subprocess profile"
+    }
+  },
+  "probes": [
+    {
+      "check": "claude_on_path",
+      "if_true_mode": "hybrid",
+      "if_false_mode": "degraded",
+      "applies_to": ["subprocess_isolation", "budget_cap", "sandbox", "profile_permissions", "challenge_token"]
+    }
+  ],
+  "notes": "Gemini CLI lacks non-interactive prompt mode, --max-budget-usd, and subagent dispatch primitives as of 2026-05. The HYBRID mode (when claude is on PATH) inherits all capabilities from claude.sh. The DEGRADED mode (no claude) runs the pipeline in same-session execution; structural safety is provided by pipeline-level kernel hooks rather than per-subagent isolation. See docs/incidents/gemini-forgery.md for the structural defenses that make degraded mode safe."
+}
