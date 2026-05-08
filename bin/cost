@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#
+# bin/cost — Operator entry point for per-cycle token + cost telemetry.
+#
+# Thin wrapper for scripts/observability/show-cycle-cost.sh.
+#
+# Usage:
+#   ./bin/cost <cycle>          # human-readable table
+#   ./bin/cost <cycle> --json   # machine-readable
+#
+# Example:
+#   ./bin/cost 8210
+
+set -uo pipefail
+
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_repo_root="$(cd "$_self_dir/.." && pwd)"
+
+exec bash "$_repo_root/scripts/observability/show-cycle-cost.sh" "$@"

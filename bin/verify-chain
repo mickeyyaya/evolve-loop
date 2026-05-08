@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# bin/verify-chain — Operator entry point for tamper-evident ledger verification.
+#
+# Thin wrapper for scripts/observability/verify-ledger-chain.sh. Walks
+# .evolve/ledger.jsonl, recomputes prev_hash for each v8.37+ entry, and
+# verifies the chain plus the rolling tip file (.evolve/ledger.tip).
+#
+# Detects: entry rewrites, truncation, forgery insertion, fan-out anomalies.
+#
+# Usage:
+#   ./bin/verify-chain
+#   ./bin/verify-chain --verbose
+#
+# Exit codes:
+#   0 — chain intact
+#   1 — chain break (entry tampering)
+#   2 — tip mismatch (truncation)
+
+set -uo pipefail
+
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_repo_root="$(cd "$_self_dir/.." && pwd)"
+
+exec bash "$_repo_root/scripts/observability/verify-ledger-chain.sh" "$@"

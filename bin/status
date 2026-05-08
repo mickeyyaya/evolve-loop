@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#
+# bin/status — Operator entry point for evolve-loop runtime status.
+#
+# Thin wrapper for scripts/observability/evolve-status.py.
+#
+# Usage:
+#   ./bin/status              # current cycle + recent ledger summary
+#   ./bin/status --help
+
+set -uo pipefail
+
+# Resolve the implementation path relative to the repo root, regardless of cwd.
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_repo_root="$(cd "$_self_dir/.." && pwd)"
+
+exec python3 "$_repo_root/scripts/observability/evolve-status.py" "$@"

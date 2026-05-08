@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#
+# bin/health — Operator entry point for cycle health-check fingerprint.
+#
+# Thin wrapper for scripts/observability/cycle-health-check.sh. Read-only —
+# inspects cycle artifacts and reports anomalies as JSON. Never blocks.
+#
+# Usage:
+#   ./bin/health <cycle-number> <workspace-path>
+#
+# Example:
+#   ./bin/health 8210 .evolve/runs/cycle-8210
+
+set -uo pipefail
+
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_repo_root="$(cd "$_self_dir/.." && pwd)"
+
+exec bash "$_repo_root/scripts/observability/cycle-health-check.sh" "$@"

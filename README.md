@@ -101,6 +101,19 @@ This replaces the legacy LLM-side parsing of the session's skill listing with a 
 /plugin reload
 ```
 
+### Operator commands (v8.49+)
+
+Read-only observability commands live in `bin/`:
+
+| Command | Purpose |
+|---|---|
+| `./bin/status` | Current cycle + recent ledger summary |
+| `./bin/cost <cycle>` | Per-cycle token + cost breakdown (use `--json` for machine output) |
+| `./bin/health <cycle> <workspace>` | Anomaly fingerprint for any past cycle |
+| `./bin/verify-chain` | Tamper-evident ledger chain check |
+
+All four are read-only — safe to run at any time, including mid-cycle. See [bin/README.md](bin/README.md) for the contract.
+
 ## What Makes It Different
 
 **It discovers things you didn't ask for.** While building, agents surface latent bugs, inconsistencies, and opportunities in your codebase. These "unsolicited insights" appear in your session report as "Things Found Beyond Your Goal."
