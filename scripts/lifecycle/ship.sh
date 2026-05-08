@@ -19,6 +19,12 @@
 #   bash scripts/lifecycle/ship.sh "<commit-message>"                   # default --class cycle
 #   bash scripts/lifecycle/ship.sh --class manual "<commit-message>"    # interactive confirm
 #   bash scripts/lifecycle/ship.sh --class release "<commit-message>"   # release-pipeline only
+#   bash scripts/lifecycle/ship.sh --dry-run "<msg>"                    # simulate, no mutations
+#
+# --dry-run (v8.50.0+): runs all read-only checks (audit binding, TOFU SHA,
+#   sequence) but skips git commit, git push, and gh release create. Writes a
+#   .evolve/release-journal/dry-run-<ts>.json preview of the would-be ops. Safe
+#   to run at any time. Combine with --class manual/release as needed.
 #
 # Commit classes (v8.25.0+):
 #   cycle    (default) — Audit-bound. Most recent Auditor entry must be PASS,
@@ -75,12 +81,56 @@ log()           { echo "[ship] $*" >&2; }
 fail()          { log "FAIL: $*"; exit 1; }
 integrity_fail(){ log "INTEGRITY-FAIL: $*"; exit 2; }
 
+# v8.50.0: --dry-run helpers. dry_log emits a "would" message; dry_skip is the
+# semantic guard at every git/gh mutation site. Read-only checks (audit-binding,
+# TOFU SHA verification, sequence checks) ALWAYS run regardless of DRY_RUN —
+# the goal is to validate the entire pre-mutation pipeline, then halt before
+# touching the working tree, the remote, or the GitHub release surface.
+dry_log() { [ "${DRY_RUN:-0}" = "1" ] && log "[DRY-RUN] would: $*"; }
+
+# DRY_RUN_OPS is appended to as each would-be mutation is short-circuited. It
+# becomes the body of the journal preview written at exit.
+DRY_RUN_OPS=""
+dry_record() {
+    DRY_RUN_OPS="${DRY_RUN_OPS}${DRY_RUN_OPS:+
+}$1"
+}
+
+# Write the dry-run journal preview. Called before EVERY exit-0 path inside
+# ship.sh so even early-exits ("no staged changes") leave evidence of what
+# the simulator/operator was attempting. Idempotent — no-op if not DRY_RUN.
+write_dry_run_preview() {
+    [ "${DRY_RUN:-0}" = "1" ] || return 0
+    local journal_dir="$EVOLVE_PROJECT_ROOT/.evolve/release-journal"
+    mkdir -p "$journal_dir" 2>/dev/null || true
+    local ts; ts=$(date -u +%Y%m%dT%H%M%SZ)
+    local preview="$journal_dir/dry-run-${ts}.json"
+    local head_sha; head_sha=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+    local branch; branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    local ops_json="[]"
+    if [ -n "$DRY_RUN_OPS" ]; then
+        ops_json=$(printf '%s\n' "$DRY_RUN_OPS" | jq -R . | jq -s .)
+    fi
+    jq -n \
+        --arg ts "$ts" \
+        --arg class "${SHIP_CLASS:-cycle}" \
+        --arg msg "${COMMIT_MSG:-}" \
+        --arg branch "$branch" \
+        --arg head "$head_sha" \
+        --arg exit_reason "${1:-normal}" \
+        --argjson ops "$ops_json" \
+        '{ts:$ts, class:$class, branch:$branch, head_sha_at_dry_run:$head, commit_msg:$msg, exit_reason:$exit_reason, would_have:$ops}' \
+        > "$preview" 2>/dev/null || true
+    log "DRY-RUN: journal preview written to $preview"
+}
+
 # --- 0. Pre-flight -----------------------------------------------------------
 
 # v8.25.0: Parse --class flag (and any future flags) before the positional
 # commit message. Default class is "cycle" (audit-bound) for backward compat.
 SHIP_CLASS="cycle"
 COMMIT_MSG=""
+DRY_RUN=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -88,6 +138,10 @@ while [ $# -gt 0 ]; do
             shift
             [ $# -ge 1 ] || fail "--class requires a value (cycle|manual|release)"
             SHIP_CLASS="$1"
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=1
             shift
             ;;
         --help|-h)
@@ -488,6 +542,7 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
                 ahead=$(git rev-list --count "$CURRENT_BRANCH..$cycle_branch" 2>/dev/null || echo 0)
                 if [ "$ahead" = "0" ]; then
                     log "no changes in worktree AND branch not ahead of $CURRENT_BRANCH; exiting cleanly"
+                    write_dry_run_preview "no-changes-no-ahead"
                     exit 0
                 fi
                 log "  no uncommitted worktree changes but branch is $ahead commit(s) ahead; will merge"
@@ -511,17 +566,31 @@ FOOTER
                 else
                     WORKTREE_COMMIT_MSG="$COMMIT_MSG"
                 fi
-                git -C "$active_worktree" -c commit.gpgsign=false commit -m "$WORKTREE_COMMIT_MSG" \
-                    || fail "git commit in worktree failed"
-                log "  OK: committed in worktree on $cycle_branch"
+                if [ "$DRY_RUN" = "1" ]; then
+                    dry_log "git -C $active_worktree commit -m <msg>"
+                    dry_record "worktree-commit:$cycle_branch"
+                    log "  [DRY-RUN] would commit in worktree on $cycle_branch"
+                else
+                    git -C "$active_worktree" -c commit.gpgsign=false commit -m "$WORKTREE_COMMIT_MSG" \
+                        || fail "git commit in worktree failed"
+                    log "  OK: committed in worktree on $cycle_branch"
+                fi
                 unset WORKTREE_COMMIT_MSG diff_files diff_stat file_count diff_footer
             fi
-            git merge --ff-only "$cycle_branch" \
-                || fail "ff-merge $cycle_branch into $CURRENT_BRANCH failed (divergent history); re-run cycle from clean main"
-            log "  OK: ff-merged $cycle_branch into $CURRENT_BRANCH"
-            git push origin "$CURRENT_BRANCH" \
-                || fail "git push failed; main is at $(git rev-parse HEAD)"
-            log "OK: pushed to origin/$CURRENT_BRANCH"
+            if [ "$DRY_RUN" = "1" ]; then
+                dry_log "git merge --ff-only $cycle_branch"
+                dry_log "git push origin $CURRENT_BRANCH"
+                dry_record "merge-ff:$cycle_branch->$CURRENT_BRANCH"
+                dry_record "push:$CURRENT_BRANCH"
+                log "  [DRY-RUN] would ff-merge + push $cycle_branch into $CURRENT_BRANCH"
+            else
+                git merge --ff-only "$cycle_branch" \
+                    || fail "ff-merge $cycle_branch into $CURRENT_BRANCH failed (divergent history); re-run cycle from clean main"
+                log "  OK: ff-merged $cycle_branch into $CURRENT_BRANCH"
+                git push origin "$CURRENT_BRANCH" \
+                    || fail "git push failed; main is at $(git rev-parse HEAD)"
+                log "OK: pushed to origin/$CURRENT_BRANCH"
+            fi
             WORKTREE_COMMIT_DONE=1
         fi
     fi
@@ -539,6 +608,7 @@ if [ "$WORKTREE_COMMIT_DONE" = "1" ]; then
     : # worktree path completed; skip remaining flow
 elif git diff --cached --quiet; then
     log "no staged changes to ship; exiting cleanly (audit was for an empty diff)"
+    write_dry_run_preview "no-staged-changes"
     exit 0
 fi
 
@@ -579,14 +649,22 @@ fi
 
 # Commit + push. Skipped when v8.43.0 worktree-ship already pushed above.
 if [ "$WORKTREE_COMMIT_DONE" = "0" ]; then
-    # Commit. Use array form to avoid arg injection.
-    COMMIT_ARGS=(commit -m "$COMMIT_MSG")
-    git "${COMMIT_ARGS[@]}"
-    log "OK: committed to $CURRENT_BRANCH"
+    if [ "$DRY_RUN" = "1" ]; then
+        dry_log "git commit -m <msg>"
+        dry_log "git push origin $CURRENT_BRANCH"
+        dry_record "commit:$CURRENT_BRANCH"
+        dry_record "push:$CURRENT_BRANCH"
+        log "[DRY-RUN] would commit + push to $CURRENT_BRANCH"
+    else
+        # Commit. Use array form to avoid arg injection.
+        COMMIT_ARGS=(commit -m "$COMMIT_MSG")
+        git "${COMMIT_ARGS[@]}"
+        log "OK: committed to $CURRENT_BRANCH"
 
-    # Push.
-    git push origin "$CURRENT_BRANCH"
-    log "OK: pushed to origin/$CURRENT_BRANCH"
+        # Push.
+        git push origin "$CURRENT_BRANCH"
+        log "OK: pushed to origin/$CURRENT_BRANCH"
+    fi
 fi
 
 # v8.34.0: Advance state.json:lastCycleNumber on successful cycle ship.
@@ -597,7 +675,7 @@ fi
 # Fix: write lastCycleNumber from cycle-state.json:cycle_id atomically.
 # Defensive — only for --class cycle, only when cycle-state.json exists with a
 # valid cycle_id; otherwise no-op.
-if [ "$SHIP_CLASS" = "cycle" ]; then
+if [ "$SHIP_CLASS" = "cycle" ] && [ "$DRY_RUN" = "0" ]; then
     cycle_state_file="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
     state_file="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
     if [ -f "$cycle_state_file" ] && [ -f "$state_file" ]; then
@@ -614,6 +692,9 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
         fi
     fi
     unset cycle_state_file state_file cycle_id tmp_state
+elif [ "$SHIP_CLASS" = "cycle" ] && [ "$DRY_RUN" = "1" ]; then
+    dry_log "advance state.json:lastCycleNumber"
+    dry_record "state-bump:lastCycleNumber"
 fi
 
 # --- 8. Optional GitHub release (if EVOLVE_SHIP_RELEASE_NOTES set) -----------
@@ -628,7 +709,11 @@ if [ -n "${EVOLVE_SHIP_RELEASE_NOTES:-}" ]; then
     else
         VERSION=$(jq -r '.version' "$PLUGIN_JSON")
         TAG="v${VERSION}"
-        if command -v gh >/dev/null 2>&1; then
+        if [ "$DRY_RUN" = "1" ]; then
+            dry_log "gh release create $TAG"
+            dry_record "gh-release:$TAG"
+            log "[DRY-RUN] would create GitHub release $TAG"
+        elif command -v gh >/dev/null 2>&1; then
             log "creating GitHub release $TAG..."
             # gh release create must be done as the same atomic event from the
             # gate's perspective. It runs after push so the tag points at the
@@ -642,6 +727,12 @@ if [ -n "${EVOLVE_SHIP_RELEASE_NOTES:-}" ]; then
             log "WARN: gh CLI not available — skipping release"
         fi
     fi
+fi
+
+if [ "$DRY_RUN" = "1" ]; then
+    write_dry_run_preview "normal"
+    log "DRY-RUN DONE: no commit, no push, no release. tree clean."
+    exit 0
 fi
 
 log "DONE: shipped $CURRENT_BRANCH at $(git rev-parse HEAD)"

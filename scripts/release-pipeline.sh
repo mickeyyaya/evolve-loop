@@ -57,6 +57,7 @@ fail() { log "FAIL: $*"; exit 1; }
 DRY_RUN=0
 NO_ROLLBACK=0
 SKIP_TESTS=0
+REQUIRE_PREFLIGHT="${EVOLVE_RELEASE_REQUIRE_PREFLIGHT:-0}"
 MAX_POLL_WAIT_S=300
 FROM_TAG=""
 TARGET=""
@@ -66,6 +67,7 @@ while [ $# -gt 0 ]; do
         --dry-run)         DRY_RUN=1 ;;
         --no-rollback)     NO_ROLLBACK=1 ;;
         --skip-tests)      SKIP_TESTS=1 ;;
+        --require-preflight) REQUIRE_PREFLIGHT=1 ;;
         --max-poll-wait-s) shift; MAX_POLL_WAIT_S="$1" ;;
         --from-tag)        shift; FROM_TAG="$1" ;;
         --help|-h)         sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -176,6 +178,30 @@ run_step() {
 # ---- Initialize journal --------------------------------------------------
 
 init_journal
+
+# ---- Step 0: full preflight harness (opt-in, v8.50.0+) -------------------
+# When --require-preflight (or EVOLVE_RELEASE_REQUIRE_PREFLIGHT=1) is set,
+# run the full dry-run harness (regression + simulate + release-dry-run)
+# BEFORE any of the real release steps. Aborts on any failure. Off by
+# default to preserve existing release-pipeline behavior; opt in for
+# high-risk releases or as a CI gate.
+
+if [ "$REQUIRE_PREFLIGHT" = "1" ]; then
+    log "step: full-dry-run preflight (--require-preflight)"
+    fdr="$REPO_ROOT/scripts/release/full-dry-run.sh"
+    if [ ! -x "$fdr" ]; then
+        log "FAIL: $fdr missing or not executable"
+        exit 1
+    fi
+    # The harness already runs the regression suite and a release-pipeline
+    # dry-run; pass --version so it targets the correct version.
+    if ! bash "$fdr" --version "$TARGET"; then
+        log "FAIL: full-dry-run preflight reported failures; aborting release"
+        log "  → To proceed despite this, retry without --require-preflight (and explain why in the commit body)"
+        exit 1
+    fi
+    log "OK: full-dry-run preflight passed"
+fi
 
 # ---- Step 1: preflight ----------------------------------------------------
 

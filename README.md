@@ -111,8 +111,35 @@ Read-only observability commands live in `bin/`:
 | `./bin/cost <cycle>` | Per-cycle token + cost breakdown (use `--json` for machine output) |
 | `./bin/health <cycle> <workspace>` | Anomaly fingerprint for any past cycle |
 | `./bin/verify-chain` | Tamper-evident ledger chain check |
+| `./bin/preflight` (v8.50+) | Full pipeline dry-run: regression + cycle simulate + release-pipeline dry-run |
 
-All four are read-only — safe to run at any time, including mid-cycle. See [bin/README.md](bin/README.md) for the contract.
+All five are read-only — safe to run at any time, including mid-cycle. See [bin/README.md](bin/README.md) for the contract.
+
+### Pre-release validation (v8.50+)
+
+Before shipping a release, validate the entire pipeline end-to-end without making any LLM calls or git mutations:
+
+```bash
+./bin/preflight                    # use auto-bumped version
+./bin/preflight --version X.Y.Z    # explicit version
+./bin/preflight --json             # machine-readable summary
+```
+
+Or wire it into the release pipeline as a structural pre-check:
+
+```bash
+EVOLVE_RELEASE_REQUIRE_PREFLIGHT=1 bash scripts/release-pipeline.sh X.Y.Z
+# or
+bash scripts/release-pipeline.sh X.Y.Z --require-preflight
+```
+
+When `--require-preflight` is set, the release aborts if any preflight sub-suite fails. The harness exercises:
+
+1. All 36 regression tests (`scripts/utility/run-all-regression-tests.sh`)
+2. A full cycle simulation (`scripts/dispatch/cycle-simulator.sh` — no LLM calls)
+3. A `release-pipeline.sh --dry-run` for the target version
+
+Each is independently runnable; `--skip <suite>` opts out per stage.
 
 ## What Makes It Different
 

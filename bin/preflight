@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# bin/preflight — Operator entry point for the full pipeline dry-run harness.
+#
+# Runs three sub-suites in sequence and reports a single PASS/FAIL summary:
+#   - Regression test suite (35 suites)
+#   - Cycle pipeline simulator (no LLM)
+#   - Release-pipeline.sh --dry-run
+#
+# Safe to run at any time, including before every release. Read-only across
+# all stages (no mutations to git or remote).
+#
+# Usage:
+#   ./bin/preflight                        # use auto-bumped version
+#   ./bin/preflight --version 8.51.0       # use explicit version
+#   ./bin/preflight --skip simulate        # skip a sub-suite (regression|simulate|release)
+#   ./bin/preflight --json                 # machine-readable summary
+
+set -uo pipefail
+
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_repo_root="$(cd "$_self_dir/.." && pwd)"
+
+exec bash "$_repo_root/scripts/release/full-dry-run.sh" "$@"

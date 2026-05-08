@@ -14,6 +14,7 @@
 #   bash scripts/dispatch/run-cycle.sh [GOAL]
 #   bash scripts/dispatch/run-cycle.sh --cycle 8200 [GOAL]
 #   bash scripts/dispatch/run-cycle.sh --dry-run   # print what would happen without spawning
+#   bash scripts/dispatch/run-cycle.sh --simulate  # walk every phase via cycle-simulator.sh (no LLM)
 #
 # Lifecycle:
 #   1. Resolve cycle ID (next-after-state OR explicit --cycle).
@@ -79,6 +80,7 @@ integrity_fail() { log "INTEGRITY-FAIL: $*"; exit 2; }
 # ---- Argument parsing ------------------------------------------------------
 
 DRY_RUN=0
+SIMULATE=0
 CYCLE=""
 GOAL=""
 
@@ -91,6 +93,9 @@ while [ $# -gt 0 ]; do
             ;;
         --dry-run)
             DRY_RUN=1
+            ;;
+        --simulate)
+            SIMULATE=1
             ;;
         --help|-h)
             sed -n '2,30p' "$0" | sed 's/^# //; s/^#//'
@@ -445,6 +450,24 @@ if [ "$DRY_RUN" = "1" ]; then
     # worktree (if provisioned) and cycle-state.json. Set EVOLVE_DRY_RUN_PROVISION_WORKTREE=0
     # to skip worktree provisioning entirely in dry-run.
     exit 0
+fi
+
+# ---- Simulate? -------------------------------------------------------------
+# v8.50.0: --simulate uses cycle-simulator.sh in place of the real orchestrator.
+# The simulator advances cycle-state through every phase, writes deterministic
+# artifacts, appends ledger entries, and invokes ship.sh --dry-run. No LLM
+# calls. This validates the cycle plumbing end-to-end without spending tokens.
+
+if [ "$SIMULATE" = "1" ]; then
+    SIMULATOR="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/cycle-simulator.sh"
+    [ -f "$SIMULATOR" ] || fail "missing $SIMULATOR (cycle-simulator.sh)"
+    log "simulate mode: invoking cycle-simulator.sh (no LLM)"
+    set +e
+    bash "$SIMULATOR" "$CYCLE" "$WORKSPACE"
+    rc=$?
+    set -e
+    log "simulator exited rc=$rc"
+    exit "$rc"
 fi
 
 # ---- Spawn orchestrator ----------------------------------------------------

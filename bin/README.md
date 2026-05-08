@@ -8,6 +8,7 @@ Thin wrappers exposing read-only observability scripts via short, discoverable n
 | `./bin/cost <cycle>` | `scripts/observability/show-cycle-cost.sh` | Per-cycle token + cost breakdown |
 | `./bin/health <cycle> <workspace>` | `scripts/observability/cycle-health-check.sh` | Anomaly fingerprint for any cycle (read-only) |
 | `./bin/verify-chain` | `scripts/observability/verify-ledger-chain.sh` | Tamper-evident ledger chain check |
+| `./bin/preflight` (v8.50+) | `scripts/release/full-dry-run.sh` | Full pipeline dry-run: regression + cycle simulate + release-pipeline --dry-run |
 
 All wrappers are read-only. None mutate state, commit, or push. They are safe to run at any time, including mid-cycle.
 
