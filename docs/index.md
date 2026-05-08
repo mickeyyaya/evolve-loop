@@ -32,6 +32,7 @@
 | [phase-architecture-citations.md](architecture/phase-architecture-citations.md) | Public-paper citations behind each phase's design |
 | [platform-compatibility.md](architecture/platform-compatibility.md) | Cross-CLI support matrix + adapter contract |
 | [tri-layer.md](architecture/tri-layer.md) | Skill/Persona/Command layered orchestration model |
+| [capability-schema.md](architecture/capability-schema.md) | Adapter capability manifest schema + authoring guide for new CLIs |
 | [intent-phase.md](architecture/intent-phase.md) | Intent capture phase + AwN classifier specification |
 
 ## Release & Operations

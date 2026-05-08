@@ -38,7 +38,7 @@ Four specialized AI agents handle the work:
 - One of:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (tier-1, primary)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) (tier-1-hybrid — requires `claude` binary for runtime)
-  - [Codex CLI](https://github.com/openai/codex) (tier-3-stub — skill content portable, runtime adapter not yet implemented)
+  - [Codex CLI](https://github.com/openai/codex) (tier-1 hybrid since v8.51.0 — full caps via Claude delegation OR same-session degraded mode)
 - A git repository you want to improve
 
 ### Install

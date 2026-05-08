@@ -142,6 +142,7 @@ Operators who require strict hybrid for production (budget caps, subprocess isol
 
 ## See also
 
+- [capability-schema.md](capability-schema.md) — adapter capability manifest schema + authoring guide for new CLIs
 - [reference/platform-detect.md](../../skills/evolve-loop/reference/platform-detect.md) — env-var probe table consulted at skill activation
 - [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md) — per-platform tool name maps
 - [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns

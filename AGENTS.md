@@ -40,7 +40,7 @@ This file covers the universal contract. CLI-specific runtime details live in co
 
 - **Claude Code**: see [CLAUDE.md](CLAUDE.md). Tier-1 production. Skills at `skills/<name>/SKILL.md`, plugin manifest at `.claude-plugin/plugin.json`. Slash commands at `.claude-plugin/commands/`. Kernel hooks fire as PreToolUse hooks per `.claude/settings.json`.
 
-- **Codex CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md` (this directory exists as symlinks to `skills/<name>/`). Codex reads this AGENTS.md as its canonical config. Currently tier-3-stub (adapter at `scripts/cli_adapters/codex.sh` exits 99). Skill content is portable; runtime needs adapter implementation.
+- **Codex CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md` (this directory exists as symlinks to `skills/<name>/`). Codex reads this AGENTS.md as its canonical config. Tier-1 hybrid since v8.51.0: `scripts/cli_adapters/codex.sh` delegates to `claude.sh` when `claude` is on PATH (full caps), or runs in same-session DEGRADED mode otherwise (pipeline still completes; reduced isolation). Capability tier visible via `./bin/check-caps codex`.
 
 - **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. Tier-1-hybrid: skill activates from Gemini, runtime delegates to `claude` binary via `scripts/cli_adapters/gemini.sh`.
 

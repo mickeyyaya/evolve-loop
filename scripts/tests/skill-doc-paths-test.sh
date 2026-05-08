@@ -113,10 +113,47 @@ else
     fail_ "dispatcher PATH missing one or more v8.47 subdirs"
 fi
 
+# === Test 5: v8.51.0 — no stale 'tier-3-stub' or 'exits 99' references for codex
+# Catches the v8.50→v8.51 doc-language regression: the audit found stale
+# 'tier-3-stub' descriptions in README and AGENTS after v8.51 promoted Codex
+# to tier-1 hybrid. Guard against reintroduction.
+header "Test 5: v8.51.0 — no 'tier-3-stub' or codex 'exits 99' in operator-facing docs"
+total_stale=0
+for f in README.md AGENTS.md CLAUDE.md; do
+    full="$REPO_ROOT/$f"
+    [ -f "$full" ] || continue
+    if grep -qE "tier-3-stub|codex\.sh.*exits 99|codex.*tier-3" "$full"; then
+        total_stale=$((total_stale + 1))
+        echo "    STALE in $f:" >&2
+        grep -n -E "tier-3-stub|codex\.sh.*exits 99|codex.*tier-3" "$full" | head -2 >&2
+    fi
+done
+if [ "$total_stale" = "0" ]; then
+    pass "no stale tier-3-stub language in README/AGENTS/CLAUDE"
+else
+    fail_ "$total_stale files still reference stale codex tier"
+fi
+
+# === Test 6: v8.51.0 — codex-runtime.md exists (parity with claude/gemini) =====
+header "Test 6: v8.51.0 — codex-runtime.md present (multi-CLI doc symmetry)"
+RUNTIME_DIR="$REPO_ROOT/skills/evolve-loop/reference"
+all_present=1
+for cli in claude gemini codex; do
+    if [ ! -f "$RUNTIME_DIR/${cli}-runtime.md" ]; then
+        echo "    missing: ${cli}-runtime.md" >&2
+        all_present=0
+    fi
+done
+if [ "$all_present" = "1" ]; then
+    pass "all 3 <cli>-runtime.md files present"
+else
+    fail_ "asymmetric runtime docs"
+fi
+
 # === Summary ====================================================================
 echo
 echo "==========================================="
-echo "  Total: 4 tests"
+echo "  Total: 6 tests"
 echo "  PASS:  $PASS"
 echo "  FAIL:  $FAIL"
 echo "==========================================="
