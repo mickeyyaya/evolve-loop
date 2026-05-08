@@ -61,16 +61,16 @@ cd evolve-loop
 
 ### Setup (one-time, auto-runs at Phase 0)
 
-The orchestrator automatically runs `scripts/setup-skill-inventory.sh` at the start of each session to build a deterministic map of every installed skill — project-local, user-global (`~/.claude/skills/`), and plugin cache (`~/.claude/plugins/cache/*/skills/`). The output lives at `.evolve/skill-inventory.json` and is cached for 1 hour.
+The orchestrator automatically runs `scripts/utility/setup-skill-inventory.sh` at the start of each session to build a deterministic map of every installed skill — project-local, user-global (`~/.claude/skills/`), and plugin cache (`~/.claude/plugins/cache/*/skills/`). The output lives at `.evolve/skill-inventory.json` and is cached for 1 hour.
 
 You can also run it manually:
 
 ```bash
 # Fresh scan (default; cache-hit if <1h old)
-bash scripts/setup-skill-inventory.sh
+bash scripts/utility/setup-skill-inventory.sh
 
 # Force rebuild (ignores cache)
-bash scripts/setup-skill-inventory.sh --force
+bash scripts/utility/setup-skill-inventory.sh --force
 ```
 
 This replaces the legacy LLM-side parsing of the session's skill listing with a zero-token filesystem scan. Scout and Builder look up skills via the cached index; the ecc:e2e skill, for example, is automatically routed as a primary skill for any UI task without the orchestrator having to re-discover it every session.
@@ -161,8 +161,8 @@ Evolve Loop has been running on its own codebase since March 12, 2026. Here's ho
 | v8.9 | Apr 6 | `/evaluator` skill — independent evaluation engine with 6-dimension scoring, EST anti-gaming defenses, self-improving criteria lifecycle, and strategic direction guidance |
 | v8.10 | Apr 9 | `ecc:e2e` first-class integration (Scout routing → Builder generation → Auditor D.5 grounding → phase-gate ship block), deterministic `setup-skill-inventory.sh` (replaces LLM parsing, 281 skills indexed), phases renumbered to eliminate `Phase 0.5` (now 0-7 linear) with aligned filenames |
 | v8.11 | Apr 20 | Added `autoresearch` strategy for testing hypotheses against fixed metrics, decriminalizing failure and overriding budget constraints for deep out-of-the-box exploration. Added dynamic context scaling (2M tokens for Gemini CLI) and cross-platform support. |
-| v8.12 | Apr 27 | **Subagent subprocess isolation hardening** — phase agents now invoked via `scripts/subagent-run.sh` with per-agent CLI permission profiles (`.evolve/profiles/*.json`), per-invocation challenge tokens, tamper-evident SHA256 ledger entries, and OS-level sandboxing (`sandbox-exec` on macOS, `bwrap` on Linux). Mutation-testing pre-flight (`scripts/mutate-eval.sh`) blocks tautological evals at the discover→build gate (kill-rate ≥ 0.8). Adversarial Auditor mode (default-on) requires positive evidence per acceptance criterion. CLI adapters for Claude / Gemini / Codex enable provider-agnostic dispatch. |
-| v8.13 | Apr 27 | **Atomic ship-gate via canonical `scripts/ship.sh` allowlist** (v8.13.0) — replaces v8.12.x's parser-bypass arms race with a single canonical ship path. The PreToolUse hook (`scripts/guards/ship-gate.sh`) allowlists exactly one realpath-resolved script for `git commit`/`git push`/`gh release create`. ship.sh enforces audit-first contract internally: TOFU self-SHA verification, audit verdict + report-SHA check, cycle-binding (HEAD + tree-state SHA must match what auditor audited), atomic commit/push/release. Breaking change: raw `git commit`/`git push`/`gh release create` denied unless via `bash scripts/ship.sh "<msg>"`. **v8.13.1 — trust boundary completed:** added `role-gate.sh` (path-allowlist on Edit/Write per active phase), `phase-gate-precondition.sh` (sequence-allowlist on `subagent-run.sh` invocations), `cycle-state.sh` helpers + `.evolve/cycle-state.json` runtime state, `run-cycle.sh` declarative cycle driver, and `agents/evolve-orchestrator.md` subagent prompt. 69/69 unit tests across the three gates. The orchestrator can no longer edit source code outside the build worktree, run phases out of order, or commit without going through ship.sh — all enforced at the kernel hook layer, not LLM cooperation. |
+| v8.12 | Apr 27 | **Subagent subprocess isolation hardening** — phase agents now invoked via `scripts/dispatch/subagent-run.sh` with per-agent CLI permission profiles (`.evolve/profiles/*.json`), per-invocation challenge tokens, tamper-evident SHA256 ledger entries, and OS-level sandboxing (`sandbox-exec` on macOS, `bwrap` on Linux). Mutation-testing pre-flight (`scripts/verification/mutate-eval.sh`) blocks tautological evals at the discover→build gate (kill-rate ≥ 0.8). Adversarial Auditor mode (default-on) requires positive evidence per acceptance criterion. CLI adapters for Claude / Gemini / Codex enable provider-agnostic dispatch. |
+| v8.13 | Apr 27 | **Atomic ship-gate via canonical `scripts/lifecycle/ship.sh` allowlist** (v8.13.0) — replaces v8.12.x's parser-bypass arms race with a single canonical ship path. The PreToolUse hook (`scripts/guards/ship-gate.sh`) allowlists exactly one realpath-resolved script for `git commit`/`git push`/`gh release create`. ship.sh enforces audit-first contract internally: TOFU self-SHA verification, audit verdict + report-SHA check, cycle-binding (HEAD + tree-state SHA must match what auditor audited), atomic commit/push/release. Breaking change: raw `git commit`/`git push`/`gh release create` denied unless via `bash scripts/lifecycle/ship.sh "<msg>"`. **v8.13.1 — trust boundary completed:** added `role-gate.sh` (path-allowlist on Edit/Write per active phase), `phase-gate-precondition.sh` (sequence-allowlist on `subagent-run.sh` invocations), `cycle-state.sh` helpers + `.evolve/cycle-state.json` runtime state, `run-cycle.sh` declarative cycle driver, and `agents/evolve-orchestrator.md` subagent prompt. 69/69 unit tests across the three gates. The orchestrator can no longer edit source code outside the build worktree, run phases out of order, or commit without going through ship.sh — all enforced at the kernel hook layer, not LLM cooperation. |
 | v8.14 | Apr 29 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ### Benchmark Scores (v8.0)
@@ -259,7 +259,7 @@ Cross-checks Builder's narrative against ground truth via the Single-Pass Review
 
 **Phase 5 — SHIP / RECORD**
 Two paths driven by audit verdict:
-- **PASS or WARN**: `scripts/ship.sh` (the canonical entry point allowlisted by `ship-gate.sh`) commits in the worktree, fast-forward merges into main, pushes to origin. v8.43.0 added the worktree-aware path; before that the Builder→main bridge was structurally missing. WARN ships by default since v8.28.0 (operator opts back to legacy strict via `EVOLVE_STRICT_AUDIT=1`).
+- **PASS or WARN**: `scripts/lifecycle/ship.sh` (the canonical entry point allowlisted by `ship-gate.sh`) commits in the worktree, fast-forward merges into main, pushes to origin. v8.43.0 added the worktree-aware path; before that the Builder→main bridge was structurally missing. WARN ships by default since v8.28.0 (operator opts back to legacy strict via `EVOLVE_STRICT_AUDIT=1`).
 - **FAIL**: `record-failure-to-state.sh` appends to `state.json:failedApproaches[]` with structured classification (9 classes per `failure-classifications.sh`, each with severity + age-out + retry policy). The next cycle's `failure-adapter.sh` reads non-expired entries and emits a deterministic decision the orchestrator follows verbatim. Triggers Phase 6.
 
 **Phase 6 — LEARN** (Retrospective agent)
@@ -276,9 +276,9 @@ Three Tier-1 kernel hooks fire as PreToolUse in every cycle, structurally enforc
 |---|---|---|
 | `phase-gate-precondition.sh` | `subagent-run.sh` invocations | Out-of-order phases |
 | `role-gate.sh` | Edit/Write tool calls | Writes outside the active phase's allowlist |
-| `ship-gate.sh` | Bash with git/gh verbs | Anything except `scripts/ship.sh` doing commit/push/release |
+| `ship-gate.sh` | Bash with git/gh verbs | Anything except `scripts/lifecycle/ship.sh` doing commit/push/release |
 
-Plus the v8.37.0 tamper-evident hash-chained ledger (`prev_hash` chains every entry; `.evolve/ledger.tip` detects truncation; `bash scripts/verify-ledger-chain.sh` walks the chain). All grounded in Saltzer & Schroeder 1975's complete-mediation principle and Crosby & Wallach 2009's tamper-evident logging.
+Plus the v8.37.0 tamper-evident hash-chained ledger (`prev_hash` chains every entry; `.evolve/ledger.tip` detects truncation; `bash scripts/observability/verify-ledger-chain.sh` walks the chain). All grounded in Saltzer & Schroeder 1975's complete-mediation principle and Crosby & Wallach 2009's tamper-evident logging.
 
 ### Multi-Task Flow
 

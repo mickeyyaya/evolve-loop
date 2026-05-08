@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ship-integration-test.sh — End-to-end tests for scripts/ship.sh.
+# ship-integration-test.sh — End-to-end tests for scripts/lifecycle/ship.sh.
 #
 # Each test creates a fresh temp git repo, copies ship.sh into it, seeds
 # fake .evolve/ledger.jsonl + audit-report.md, then invokes ship.sh and
@@ -22,8 +22,8 @@ unset EVOLVE_SHIP_RELEASE_NOTES
 unset EVOLVE_PROJECT_ROOT EVOLVE_PLUGIN_ROOT EVOLVE_RESOLVE_ROOTS_LOADED
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SHIP_SH="$REPO_ROOT/scripts/ship.sh"
-RESOLVE_ROOTS_SH="$REPO_ROOT/scripts/resolve-roots.sh"  # v8.18.0: ship.sh sources this
+SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
+RESOLVE_ROOTS_SH="$REPO_ROOT/scripts/lifecycle/resolve-roots.sh"  # v8.18.0: ship.sh sources this
 SCRATCH=$(mktemp -d -t "ship-integration-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -41,11 +41,11 @@ sha256() {
 # Create a fresh git repo with ship.sh installed and basic state.
 make_repo() {
     local repo="$SCRATCH/repo-$RANDOM"
-    mkdir -p "$repo/scripts" "$repo/.evolve/runs/cycle-1"
-    cp "$SHIP_SH" "$repo/scripts/ship.sh"
-    chmod +x "$repo/scripts/ship.sh"
+    mkdir -p "$repo/scripts/lifecycle" "$repo/.evolve/runs/cycle-1"
+    cp "$SHIP_SH" "$repo/scripts/lifecycle/ship.sh"
+    chmod +x "$repo/scripts/lifecycle/ship.sh"
     # v8.18.0: ship.sh sources resolve-roots.sh from its own dir; copy it too.
-    cp "$RESOLVE_ROOTS_SH" "$repo/scripts/resolve-roots.sh"
+    cp "$RESOLVE_ROOTS_SH" "$repo/scripts/lifecycle/resolve-roots.sh"
     # Mimic production .gitignore — .evolve/ is runtime state, not tracked.
     # Without this, the TOFU SHA pin (which writes to .evolve/state.json)
     # would mutate the tracked tree and trip ship.sh's own tree-state check.
@@ -109,7 +109,7 @@ header "Test A: no auditor ledger entry → ship.sh refuses"
 REPO=$(make_repo)
 cd "$REPO"
 set +e
-bash scripts/ship.sh "test commit" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "test commit" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 [ "$RC" = "2" ] && pass "no audit → exit 2 (rc=$RC)" || fail "expected rc=2, got rc=$RC; output: $(tail -3 /tmp/ship-out)"
@@ -129,7 +129,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-bash scripts/ship.sh "feat: test" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "feat: test" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ]; then
@@ -153,7 +153,7 @@ git init -q --bare "$BARE_C"
 git remote add origin "$BARE_C"
 git branch -M main
 set +e
-bash scripts/ship.sh "feat: shipping with WARN" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "feat: shipping with WARN" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ] && grep -q "audit verdict: WARN — shipping" /tmp/ship-out; then
@@ -170,7 +170,7 @@ cd "$REPO"
 echo "warn change strict" >> fixture.txt
 seed_audit "$REPO" "WARN"
 set +e
-EVOLVE_STRICT_AUDIT=1 bash scripts/ship.sh "should not ship" >/tmp/ship-out 2>&1
+EVOLVE_STRICT_AUDIT=1 bash scripts/lifecycle/ship.sh "should not ship" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -q "EVOLVE_STRICT_AUDIT=1" /tmp/ship-out; then
@@ -191,7 +191,7 @@ seed_audit "$REPO" "PASS"
 # Now modify the SAME tracked file AFTER audit — this changes git diff HEAD
 echo "version 2 — added after audit" >> fixture.txt
 set +e
-bash scripts/ship.sh "should refuse" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "should refuse" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -q "tree-state mismatch\|uncommitted changes" /tmp/ship-out 2>/dev/null; then
@@ -207,7 +207,7 @@ REPO=$(make_repo)
 cd "$REPO"
 seed_audit "$REPO" "PASS" "0000000000000000000000000000000000000000" ""
 set +e
-bash scripts/ship.sh "should refuse" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "should refuse" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -q "HEAD has moved" /tmp/ship-out 2>/dev/null; then
@@ -236,13 +236,13 @@ git branch -M main
 echo "audited" > audited.txt
 seed_audit "$REPO" "PASS"
 # First run: pins SHA + version=1.0.0, commits. Should succeed.
-set +e; bash scripts/ship.sh "first ship" >/tmp/ship-out 2>&1; RC1=$?; set -e
+set +e; bash scripts/lifecycle/ship.sh "first ship" >/tmp/ship-out 2>&1; RC1=$?; set -e
 # Modify ship.sh — simulates tampering. plugin.json:version stays at 1.0.0.
-echo "# malicious comment" >> scripts/ship.sh
+echo "# malicious comment" >> scripts/lifecycle/ship.sh
 # Second ship: same version, different SHA → REAL tampering → rc=2.
 echo "another change" > another.txt
 seed_audit "$REPO" "PASS"
-set +e; bash scripts/ship.sh "second ship" >/tmp/ship-out 2>&1; RC2=$?; set -e
+set +e; bash scripts/lifecycle/ship.sh "second ship" >/tmp/ship-out 2>&1; RC2=$?; set -e
 if [ "$RC2" = "2" ] && grep -q "WITHIN plugin version" /tmp/ship-out 2>/dev/null; then
     pass "v8.32.0: same-version-different-SHA → integrity fail (first rc=$RC1, second rc=$RC2)"
 else
@@ -260,7 +260,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh "emergency" >/tmp/ship-out 2>&1
+EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh "emergency" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ]; then
@@ -282,7 +282,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-bash scripts/ship.sh --class release "release: v9.99.99" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh --class release "release: v9.99.99" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ] && grep -q "class: release" /tmp/ship-out; then
@@ -304,7 +304,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-bash scripts/ship.sh --class manual "manual change" </dev/null >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh --class manual "manual change" </dev/null >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -q "requires interactive stdin" /tmp/ship-out; then
@@ -326,7 +326,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/ship.sh --class manual "ci change" </dev/null >/tmp/ship-out 2>&1
+EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/lifecycle/ship.sh --class manual "ci change" </dev/null >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ] && grep -q "auto-confirmed" /tmp/ship-out; then
@@ -348,7 +348,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh "legacy bypass" </dev/null >/tmp/ship-out 2>&1
+EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh "legacy bypass" </dev/null >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ] && grep -q "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1 is deprecated" /tmp/ship-out; then
@@ -363,7 +363,7 @@ header "Test L: v8.25.0 --class garbage → rejected with rc=1"
 REPO=$(make_repo)
 cd "$REPO"
 set +e
-bash scripts/ship.sh --class garbage "msg" </dev/null >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh --class garbage "msg" </dev/null >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "1" ] && grep -q "invalid --class" /tmp/ship-out; then
@@ -408,7 +408,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-bash scripts/ship.sh "feat: ship with exit-1" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "feat: ship with exit-1" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ]; then
@@ -448,7 +448,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-bash scripts/ship.sh "feat: ship with exit-2" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "feat: ship with exit-2" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -q "Auditor exited 2" /tmp/ship-out; then
@@ -488,7 +488,7 @@ git init -q --bare "$BARE"
 git remote add origin "$BARE"
 git branch -M main
 set +e
-bash scripts/ship.sh "feat: ship with verdict fail" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "feat: ship with verdict fail" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -qE "Verdict: ?FAIL|auditor explicitly rejected" /tmp/ship-out; then
@@ -530,7 +530,7 @@ cat > "$REPO/.evolve/ledger.jsonl" <<EOF
 {"ts":"2026-04-27T00:00:00Z","cycle":1,"role":"auditor","kind":"agent_subprocess","model":"sonnet","exit_code":0,"duration_s":"30","artifact_path":"$audit_path","artifact_sha256":"$sha","challenge_token":"testtoken123","git_head":"$head_sha","tree_state_sha":"$tree_sha"}
 EOF
 set +e
-bash scripts/ship.sh "ship dual-verdict" </dev/null >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "ship dual-verdict" </dev/null >/tmp/ship-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ] && grep -q "BOTH 'Verdict: FAIL' AND 'Verdict: PASS'" /tmp/ship-out; then
@@ -556,13 +556,13 @@ git remote add origin "$BARE_Q"
 git branch -M main
 echo "first audited" > q1.txt
 seed_audit "$REPO" "PASS"
-set +e; bash scripts/ship.sh "first ship at v1.0.0" >/tmp/ship-out 2>&1; RC1=$?; set -e
+set +e; bash scripts/lifecycle/ship.sh "first ship at v1.0.0" >/tmp/ship-out 2>&1; RC1=$?; set -e
 # Bump plugin version AND modify ship.sh to simulate plugin update
 echo '{"version":"1.1.0"}' > "$REPO/.claude-plugin/plugin.json"
-echo "# v1.1.0 ship.sh tweak" >> scripts/ship.sh
+echo "# v1.1.0 ship.sh tweak" >> scripts/lifecycle/ship.sh
 echo "second" > q2.txt
 seed_audit "$REPO" "PASS"
-set +e; bash scripts/ship.sh "ship at v1.1.0" >/tmp/ship-out 2>&1; RC2=$?; set -e
+set +e; bash scripts/lifecycle/ship.sh "ship at v1.1.0" >/tmp/ship-out 2>&1; RC2=$?; set -e
 if [ "$RC2" = "0" ] && grep -q "plugin version changed: '1.0.0' → '1.1.0'" /tmp/ship-out; then
     pass "v8.32.0: plugin version bump auto-re-pins (first rc=$RC1, second rc=$RC2)"
 else
@@ -579,7 +579,7 @@ cd "$REPO"
 mkdir -p "$REPO/.claude-plugin"
 echo '{"version":"2.0.0"}' > "$REPO/.claude-plugin/plugin.json"
 # Seed state.json with a pin matching the CURRENT ship.sh SHA but no version
-ACTUAL=$(sha256 "$REPO/scripts/ship.sh")
+ACTUAL=$(sha256 "$REPO/scripts/lifecycle/ship.sh")
 jq --arg sha "$ACTUAL" '. + {expected_ship_sha: $sha}' "$REPO/.evolve/state.json" > "$REPO/.evolve/state.json.tmp" \
     && mv "$REPO/.evolve/state.json.tmp" "$REPO/.evolve/state.json"
 seed_audit "$REPO" "PASS"
@@ -589,7 +589,7 @@ git remote add origin "$BARE_R"
 git branch -M main
 echo "audited" > r.txt
 seed_audit "$REPO" "PASS"
-set +e; bash scripts/ship.sh "ship after migration" >/tmp/ship-out 2>&1; RC=$?; set -e
+set +e; bash scripts/lifecycle/ship.sh "ship after migration" >/tmp/ship-out 2>&1; RC=$?; set -e
 new_ver=$(jq -r '.expected_ship_version // empty' "$REPO/.evolve/state.json")
 if [ "$RC" = "0" ] && [ "$new_ver" = "2.0.0" ] && grep -qE "(migrating legacy SHA-only pin|schema migration)" /tmp/ship-out; then
     pass "v8.32.0: legacy SHA-only pin migrated to version-aware (rc=$RC, version='$new_ver')"
@@ -617,7 +617,7 @@ BARE_S="$SCRATCH/remote-test-s-$RANDOM.git"
 git init -q --bare "$BARE_S"
 git remote add origin "$BARE_S"
 git branch -M main
-set +e; bash scripts/ship.sh "feat: cycle 1 work" >/tmp/ship-out 2>&1; RC=$?; set -e
+set +e; bash scripts/lifecycle/ship.sh "feat: cycle 1 work" >/tmp/ship-out 2>&1; RC=$?; set -e
 new_lcn=$(jq -r '.lastCycleNumber // 0' "$REPO/.evolve/state.json")
 if [ "$RC" = "0" ] && [ "$new_lcn" = "1" ] && grep -q "advanced state.json:lastCycleNumber to 1" /tmp/ship-out; then
     pass "v8.34.0: cycle ship advanced lastCycleNumber 0→1"
@@ -641,7 +641,7 @@ git init -q --bare "$BARE_T"
 git remote add origin "$BARE_T"
 git branch -M main
 set +e
-EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/ship.sh --class manual "manual: ad-hoc fix" </dev/null >/tmp/ship-out 2>&1
+EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/lifecycle/ship.sh --class manual "manual: ad-hoc fix" </dev/null >/tmp/ship-out 2>&1
 RC=$?
 set -e
 final_lcn=$(jq -r '.lastCycleNumber // 0' "$REPO/.evolve/state.json")
@@ -667,7 +667,7 @@ git init -q --bare "$BARE_U"
 git remote add origin "$BARE_U"
 git branch -M main
 set +e
-bash scripts/ship.sh "feat: claims do not match" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh "feat: claims do not match" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 last_msg=$(git -C "$REPO" log -1 --format='%B')
@@ -695,7 +695,7 @@ git init -q --bare "$BARE_V"
 git remote add origin "$BARE_V"
 git branch -M main
 set +e
-bash scripts/ship.sh --class release "release: v9.0.0" >/tmp/ship-out 2>&1
+bash scripts/lifecycle/ship.sh --class release "release: v9.0.0" >/tmp/ship-out 2>&1
 RC=$?
 set -e
 last_msg=$(git -C "$REPO" log -1 --format='%B')

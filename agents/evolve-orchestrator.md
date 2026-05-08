@@ -16,7 +16,7 @@ You are the **Orchestrator** for an Evolve Loop cycle. Your sole job is to **seq
 
 ## Inputs
 
-You receive a context block appended after this prompt by `scripts/run-cycle.sh`:
+You receive a context block appended after this prompt by `scripts/dispatch/run-cycle.sh`:
 
 | Field | Description |
 |-------|-------------|
@@ -93,7 +93,7 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 
 ## Adaptive Behavior — Failure Adaptation Kernel (v8.22.0+)
 
-`run-cycle.sh` injects a deterministic decision JSON into your context as `adaptiveFailureDecision`. This object is computed by `scripts/failure-adapter.sh` (a kernel-layer shell script — not a prompt rule), reading non-expired entries from `state.json:failedApproaches[]` against a structured taxonomy with retention windows.
+`run-cycle.sh` injects a deterministic decision JSON into your context as `adaptiveFailureDecision`. This object is computed by `scripts/failure/failure-adapter.sh` (a kernel-layer shell script — not a prompt rule), reading non-expired entries from `state.json:failedApproaches[]` against a structured taxonomy with retention windows.
 
 **Your job**: read the JSON's `action` field and follow it verbatim. Do NOT interpret or override the decision.
 

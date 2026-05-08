@@ -11,7 +11,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/failure-adapter.sh"
+SCRIPT="$REPO_ROOT/scripts/failure/failure-adapter.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -367,7 +367,7 @@ header "Test 20: v8.35.0 — failure-classifications.sh metadata: code-audit-war
 # Source classifications under a fresh shell (the file uses an idempotency guard).
 # Use a subshell to avoid polluting parent env.
 result=$(EVOLVE_FAILURE_CLASSIFICATIONS_LOADED=0 bash -c '
-    . "'"$REPO_ROOT"'/scripts/failure-classifications.sh"
+    . "'"$REPO_ROOT"'/scripts/failure/failure-classifications.sh"
     echo "age=$(failure_age_out_seconds code-audit-warn)"
     echo "sev=$(failure_severity_of code-audit-warn)"
     echo "ret=$(failure_retry_policy code-audit-warn)"

@@ -16,7 +16,7 @@ unset EVOLVE_BYPASS_ROLE_GATE
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GATE="$REPO_ROOT/scripts/guards/role-gate.sh"
-HELPER="$REPO_ROOT/scripts/cycle-state.sh"
+HELPER="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
 
 # Use an isolated cycle-state file so this test never collides with a real cycle
 # in progress. The gate honors EVOLVE_CYCLE_STATE_FILE.

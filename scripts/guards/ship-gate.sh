@@ -6,13 +6,13 @@
 # ship-class commands (git commit / git push / gh release create) inside
 # arbitrary bash command strings via a parser (which kept losing the arms
 # race in cycles 8121-8122 audits), this gate allowlists exactly ONE
-# canonical script: scripts/ship.sh.
+# canonical script: scripts/lifecycle/ship.sh.
 #
 # Logic:
 #   1. Extract command from JSON payload (Claude Code passes one per Bash call).
 #   2. If command is empty / not parseable → allow (passthrough).
 #   3. If command's first executable, resolved via realpath, equals
-#      $REPO_ROOT/scripts/ship.sh → allow (ship.sh enforces audit contract internally).
+#      $REPO_ROOT/scripts/lifecycle/ship.sh → allow (ship.sh enforces audit contract internally).
 #   4. If command contains ship verbs (git commit/push, gh release create/edit) at
 #      a tokenizable boundary → deny.
 #   5. Otherwise → allow.
@@ -31,7 +31,7 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GUARDS_LOG="$REPO_ROOT/.evolve/guards.log"
-SHIP_SH="$REPO_ROOT/scripts/ship.sh"
+SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
 
 mkdir -p "$(dirname "$GUARDS_LOG")"
 
@@ -74,7 +74,7 @@ fi
 #
 # Strip leading whitespace, extract the first non-whitespace token (or the
 # second if it's `bash`), resolve via realpath / cd-pwd fallback. If it
-# resolves to scripts/ship.sh, allow.
+# resolves to scripts/lifecycle/ship.sh, allow.
 
 # Determine which token to resolve.
 TRIMMED="${COMMAND#"${COMMAND%%[![:space:]]*}"}"   # left-trim
@@ -83,7 +83,7 @@ TARGET_TOKEN=""
 case "$FIRST_TOKEN" in
     bash|sh|/bin/bash|/bin/sh|/usr/bin/env)
         # If the first token is a shell, the SECOND token is the script path.
-        # `env bash scripts/ship.sh` → resolve "scripts/ship.sh".
+        # `env bash scripts/lifecycle/ship.sh` → resolve "scripts/lifecycle/ship.sh".
         # Take whichever token is the first non-flag, non-shell token.
         TARGET_TOKEN=$(echo "$TRIMMED" | awk '
             {
@@ -195,8 +195,8 @@ if [ -n "$INNER_CMD" ]; then
     if echo "$INNER_CMD" | grep -qE '(^|[[:space:];&|()`"\x27])(git[[:space:]]+(commit|push)|gh[[:space:]]+release[[:space:]]+(create|edit))([[:space:]]|$|[\x27"])'; then
         log "DENY: $FIRST_TOKEN with ship-class inner command: ${COMMAND:0:120}"
         {
-            echo "[ship-gate] DENY: ship-class commands inside $FIRST_TOKEN -c \"...\" must go through scripts/ship.sh"
-            echo "[ship-gate] Use: bash scripts/ship.sh \"<commit-message>\""
+            echo "[ship-gate] DENY: ship-class commands inside $FIRST_TOKEN -c \"...\" must go through scripts/lifecycle/ship.sh"
+            echo "[ship-gate] Use: bash scripts/lifecycle/ship.sh \"<commit-message>\""
             echo "[ship-gate] To bypass (emergency only): EVOLVE_BYPASS_SHIP_GATE=1"
         } >&2
         exit 2
@@ -246,10 +246,10 @@ STRIPPED=$(printf '%s' "$COMMAND" | awk '
 ')
 
 if echo "$STRIPPED" | grep -qE '(^|[[:space:];&|()`])(git[[:space:]]+(commit|push)|gh[[:space:]]+release[[:space:]]+(create|edit))([[:space:]]|$)'; then
-    log "DENY: ship-class command outside scripts/ship.sh: ${COMMAND:0:120}"
+    log "DENY: ship-class command outside scripts/lifecycle/ship.sh: ${COMMAND:0:120}"
     {
-        echo "[ship-gate] DENY: ship-class commands (git commit, git push, gh release create) must go through scripts/ship.sh"
-        echo "[ship-gate] Use: bash scripts/ship.sh \"<commit-message>\""
+        echo "[ship-gate] DENY: ship-class commands (git commit, git push, gh release create) must go through scripts/lifecycle/ship.sh"
+        echo "[ship-gate] Use: bash scripts/lifecycle/ship.sh \"<commit-message>\""
         echo "[ship-gate] To bypass (emergency only): EVOLVE_BYPASS_SHIP_GATE=1"
     } >&2
     exit 2

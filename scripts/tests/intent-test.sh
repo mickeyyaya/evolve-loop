@@ -21,8 +21,8 @@ unset EVOLVE_BYPASS_PHASE_GATE
 unset EVOLVE_REQUIRE_INTENT
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CYCLE_STATE="$REPO_ROOT/scripts/cycle-state.sh"
-PHASE_GATE="$REPO_ROOT/scripts/phase-gate.sh"
+CYCLE_STATE="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
+PHASE_GATE="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
 PRECONDITION="$REPO_ROOT/scripts/guards/phase-gate-precondition.sh"
 
 TEST_DIR=$(mktemp -d -t intent-test.XXXXXX)
@@ -215,7 +215,7 @@ header "Test 10: precondition denies scout when intent_required=true and no inte
 reset_state
 EVOLVE_REQUIRE_INTENT=1 bash "$CYCLE_STATE" init 99 ".evolve/runs/cycle-99" >/dev/null 2>&1
 # Initial phase=calibrate, intent_required=true, no intent ledger entry yet
-payload='{"tool_input":{"command":"bash scripts/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+payload='{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 set +e
 echo "$payload" | bash "$PRECONDITION" >/dev/null 2>&1
 rc=$?
@@ -231,7 +231,7 @@ bash "$CYCLE_STATE" advance intent intent >/dev/null 2>&1
 bash "$CYCLE_STATE" advance research scout >/dev/null 2>&1
 write_valid_intent "$TEST_WORKSPACE/intent.md"
 write_intent_ledger 99 "$TEST_WORKSPACE/intent.md"
-payload='{"tool_input":{"command":"bash scripts/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+payload='{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 set +e
 echo "$payload" | bash "$PRECONDITION" >/dev/null 2>&1
 rc=$?
@@ -243,7 +243,7 @@ header "Test 12: default flow (intent_required=false) — scout allowed at calib
 reset_state
 unset EVOLVE_REQUIRE_INTENT
 bash "$CYCLE_STATE" init 99 ".evolve/runs/cycle-99" >/dev/null 2>&1
-payload='{"tool_input":{"command":"bash scripts/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+payload='{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 set +e
 echo "$payload" | bash "$PRECONDITION" >/dev/null 2>&1
 rc=$?
@@ -300,11 +300,11 @@ fi
 
 # === Test 18: SKILL.md dispatcher path is cwd-independent (v8.20.2+) ==========
 # The slash-command agent's cwd is the user's project, NOT the plugin install.
-# A relative `bash scripts/evolve-loop-dispatch.sh` will fail with rc=127. The
+# A relative `bash scripts/dispatch/evolve-loop-dispatch.sh` will fail with rc=127. The
 # SKILL.md must use an absolute or find-based path that resolves regardless of
 # cwd. Without this, the v8.18.0 boundary class returns from the dead.
 header "Test 18: SKILL.md dispatcher invocation is cwd-independent (v8.20.2+)"
-# Negative: fail if SKILL.md uses bare relative `bash scripts/evolve-loop-dispatch.sh`.
+# Negative: fail if SKILL.md uses bare relative `bash scripts/dispatch/evolve-loop-dispatch.sh`.
 # Allow it inside `\$EVOLVE_PLUGIN_ROOT/scripts/...` form (different concept).
 # Search for the bad pattern: 'bash scripts/' with no $-prefix or $HOME or
 # $(...) command substitution before it.

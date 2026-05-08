@@ -4,10 +4,10 @@
 #
 # v8.13.0 reframes the gate from "parse arbitrary bash for ship verbs"
 # (the v8.12.x approach that lost arms races in cycles 8121, 8122) to
-# "allowlist exactly one canonical path: scripts/ship.sh". These tests
+# "allowlist exactly one canonical path: scripts/lifecycle/ship.sh". These tests
 # exercise the gate's decision logic under realistic JSON payloads.
 #
-# Tests do NOT exercise scripts/ship.sh's internal audit verification
+# Tests do NOT exercise scripts/lifecycle/ship.sh's internal audit verification
 # (that's covered by ship-integration-test.sh which uses temp git repos).
 #
 # Usage: bash scripts/guards-test.sh
@@ -82,9 +82,9 @@ set +e; echo "" | bash "$GATE" >/dev/null 2>&1; rc=$?; set -e
 header "Test 2: non-ship command (ls -la) allowed"
 expect_allow "ls -la passthrough" '{"tool_input":{"command":"ls -la"}}'
 
-# --- Test 3: bash scripts/ship.sh "msg" allowed (canonical path) -------------
-header "Test 3: bash scripts/ship.sh canonical path allowed"
-expect_allow "bash scripts/ship.sh allowed" '{"tool_input":{"command":"bash scripts/ship.sh \"feat: x\""}}'
+# --- Test 3: bash scripts/lifecycle/ship.sh "msg" allowed (canonical path) -------------
+header "Test 3: bash scripts/lifecycle/ship.sh canonical path allowed"
+expect_allow "bash scripts/lifecycle/ship.sh allowed" '{"tool_input":{"command":"bash scripts/lifecycle/ship.sh \"feat: x\""}}'
 
 # --- Test 4: raw git commit denied ------------------------------------------
 header "Test 4: raw $GC denied"

@@ -14,7 +14,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/verify-ledger-chain.sh"
+SCRIPT="$REPO_ROOT/scripts/observability/verify-ledger-chain.sh"
 SCRATCH=$(mktemp -d -t "verify-ledger-XXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 

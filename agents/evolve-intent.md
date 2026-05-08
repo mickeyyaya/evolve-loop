@@ -122,6 +122,6 @@ If `priorIntent` is non-null (this is a re-run via the user re-invoking `/intent
 - `.evolve/research/intent-capture-patterns.md` — research grounding for this design
 - `.evolve/profiles/intent.json` — permission profile
 - `skills/evolve-intent/SKILL.md` — workflow steps + exit criteria
-- `scripts/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
+- `scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
 - `arxiv 2409.00557` — Ask-when-Needed framework
 - `agents/evolve-orchestrator.md` — Phase Loop integration point

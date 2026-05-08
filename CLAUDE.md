@@ -12,16 +12,16 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 1. **Continue all cycles without pausing** — complete every requested cycle end-to-end without stopping to ask for user approval. Never output "should I continue?" or wait for confirmation between cycles.
 2. **Run the FULL pipeline every cycle** — launch Scout, Builder, and Auditor agents for every cycle. No shortcuts, no inline edits that skip agents, no batch-claiming multiple cycles. Each cycle must produce workspace artifacts (scout-report.md, build-report.md, audit-report.md).
-3. **Run phase-gate.sh at every transition** — the deterministic phase gate script (`scripts/phase-gate.sh`) must execute at every phase boundary. This is non-negotiable even in bypass mode. Bypass permissions means "don't ask the user" — it does NOT mean "skip integrity checks."
+3. **Run phase-gate.sh at every transition** — the deterministic phase gate script (`scripts/lifecycle/phase-gate.sh`) must execute at every phase boundary. This is non-negotiable even in bypass mode. Bypass permissions means "don't ask the user" — it does NOT mean "skip integrity checks."
 4. **Never fabricate cycles** — claiming cycle numbers without doing work is a CRITICAL violation. Every cycle number must correspond to real Scout → Build → Audit → Ship → Learn execution.
-5. **Phase agents MUST be invoked via `scripts/subagent-run.sh`** — the in-process `Agent` tool is forbidden in production cycles. v8.21.0 made this **structurally enforced**: `Agent` is denied in `orchestrator.json:disallowed_tools` AND blocked at the kernel layer by `phase-gate-precondition.sh` whenever `cycle-state.json` exists. There is no bypass. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` (least-privilege isolation), generates a per-invocation challenge token, and writes a tamper-evident ledger entry that `phase-gate.sh check_subagent_ledger_match` verifies against the on-disk artifact's SHA256.
-6. **OS-level sandboxing wraps every claude subprocess.** When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), the runner wraps `claude -p` in `sandbox-exec` (macOS) or `bwrap` (Linux). Anthropic's Secure Deployment Guide states `--allowedTools` is "a permission gate, not a sandbox" — so kernel-layer enforcement is non-negotiable in production. Auditor and Evaluator profiles run with `read_only_repo: true` (read-only mount of the repo). **`EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` is REQUIRED for nested-claude scenarios** (the primary use case for `/evolve-loop`, where the slash command runs from inside Claude Code's own sandbox). On Darwin 25.4+, `sandbox_apply()` returns EPERM when the parent process is itself sandboxed — the flag instructs `claude.sh` to retry the inner subagent unsandboxed, while kernel hooks (role-gate, ship-gate, phase-gate-precondition) remain active and enforce trust boundaries structurally. **`scripts/evolve-loop-dispatch.sh` auto-enables the flag** via `scripts/detect-nested-claude.sh` whenever `CLAUDECODE` / `CLAUDE_CODE_*` env vars are present (defense-in-depth alongside `SKILL.md`). The v8.21 deprecation of this flag was reverted in v8.22.0 after evidence showed the worktree-provisioning fix and the EPERM fallback target *orthogonal* layers (builder writes vs sub-claude startup).
-7. **Mutation testing pre-flight on every eval.** `phase-gate.sh gate_discover_to_build` runs `scripts/mutate-eval.sh` against each new eval definition. If kill rate < 0.8, eval is flagged as tautological. Rollout phase 1: WARN-only logging. Rollout phase 2 (after one verification cycle): fail the gate.
+5. **Phase agents MUST be invoked via `scripts/dispatch/subagent-run.sh`** — the in-process `Agent` tool is forbidden in production cycles. v8.21.0 made this **structurally enforced**: `Agent` is denied in `orchestrator.json:disallowed_tools` AND blocked at the kernel layer by `phase-gate-precondition.sh` whenever `cycle-state.json` exists. There is no bypass. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/` (least-privilege isolation), generates a per-invocation challenge token, and writes a tamper-evident ledger entry that `phase-gate.sh check_subagent_ledger_match` verifies against the on-disk artifact's SHA256.
+6. **OS-level sandboxing wraps every claude subprocess.** When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), the runner wraps `claude -p` in `sandbox-exec` (macOS) or `bwrap` (Linux). Anthropic's Secure Deployment Guide states `--allowedTools` is "a permission gate, not a sandbox" — so kernel-layer enforcement is non-negotiable in production. Auditor and Evaluator profiles run with `read_only_repo: true` (read-only mount of the repo). **`EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` is REQUIRED for nested-claude scenarios** (the primary use case for `/evolve-loop`, where the slash command runs from inside Claude Code's own sandbox). On Darwin 25.4+, `sandbox_apply()` returns EPERM when the parent process is itself sandboxed — the flag instructs `claude.sh` to retry the inner subagent unsandboxed, while kernel hooks (role-gate, ship-gate, phase-gate-precondition) remain active and enforce trust boundaries structurally. **`scripts/dispatch/evolve-loop-dispatch.sh` auto-enables the flag** via `scripts/dispatch/detect-nested-claude.sh` whenever `CLAUDECODE` / `CLAUDE_CODE_*` env vars are present (defense-in-depth alongside `SKILL.md`). The v8.21 deprecation of this flag was reverted in v8.22.0 after evidence showed the worktree-provisioning fix and the EPERM fallback target *orthogonal* layers (builder writes vs sub-claude startup).
+7. **Mutation testing pre-flight on every eval.** `phase-gate.sh gate_discover_to_build` runs `scripts/verification/mutate-eval.sh` against each new eval definition. If kill rate < 0.8, eval is flagged as tautological. Rollout phase 1: WARN-only logging. Rollout phase 2 (after one verification cycle): fail the gate.
 8. **Adversarial Auditor mode is default-on.** The runner prepends an "ADVERSARIAL AUDIT MODE" framing to the auditor's prompt that requires positive evidence for PASS verdicts. Auditor model defaults to Opus (different family from Builder's Sonnet) to break same-model-judge sycophancy. Disable only with `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps.
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
-**Runtime constraints (current behavior):** Per-cycle git worktrees are provisioned by `run-cycle.sh` (recorded in `cycle-state.json:active_worktree`). Orchestrator and all phase agents MAY NOT call `git worktree add/remove` (denied by profiles). The failure-adapter (`scripts/failure-adapter.sh`) computes a deterministic PROCEED/RETRY/BLOCK decision from `state.json:failedApproaches[]` — orchestrator reads this JSON and follows it verbatim. Ledger entries include `prev_hash` + `entry_seq` for tamper-evident hash-chaining; verify with `bash scripts/verify-ledger-chain.sh`. Audit `Verdict: WARN` ships by default (set `EVOLVE_STRICT_AUDIT=1` to block). `ship.sh` advances `state.json:lastCycleNumber` after every successful cycle ship.
+**Runtime constraints (current behavior):** Per-cycle git worktrees are provisioned by `run-cycle.sh` (recorded in `cycle-state.json:active_worktree`). Orchestrator and all phase agents MAY NOT call `git worktree add/remove` (denied by profiles). The failure-adapter (`scripts/failure/failure-adapter.sh`) computes a deterministic PROCEED/RETRY/BLOCK decision from `state.json:failedApproaches[]` — orchestrator reads this JSON and follows it verbatim. Ledger entries include `prev_hash` + `entry_seq` for tamper-evident hash-chaining; verify with `bash scripts/observability/verify-ledger-chain.sh`. Audit `Verdict: WARN` ships by default (set `EVOLVE_STRICT_AUDIT=1` to block). `ship.sh` advances `state.json:lastCycleNumber` after every successful cycle ship.
 
 > For implementation details and version history (v8.21–v8.37), see [docs/release-archive.md](docs/release-archive.md).
 
@@ -43,7 +43,7 @@ The retrospective subagent runs inline. Cost: ~$0.30-0.50 per FAIL/WARN cycle (S
 
 **Why this matters**: completes the Reflexion-style verbal-RL loop (Shinn et al. 2023). Pre-v8.45 the failure-recording side worked but the reflection side never fired. Post-v8.45 the loop is structurally complete: failure → reflection → instinct → next-cycle-input.
 
-**Kernel changes**: `scripts/phase-gate.sh` gained `gate_audit_to_retrospective`; `scripts/cycle-state.sh` recognizes `retrospective` as a valid phase; orchestrator profile gained `Bash(merge-lesson-into-state.sh:*)`. `scripts/guards/phase-gate-precondition.sh` already permitted `retrospective` agent during audit/ship phases — v8.45 just wires the orchestrator persona to use it.
+**Kernel changes**: `scripts/lifecycle/phase-gate.sh` gained `gate_audit_to_retrospective`; `scripts/lifecycle/cycle-state.sh` recognizes `retrospective` as a valid phase; orchestrator profile gained `Bash(merge-lesson-into-state.sh:*)`. `scripts/guards/phase-gate-precondition.sh` already permitted `retrospective` agent during audit/ship phases — v8.45 just wires the orchestrator persona to use it.
 
 ## Three-Tier Strictness Model (v8.24.0+, refined v8.25.0)
 
@@ -59,7 +59,7 @@ evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came fr
 
 ### Capability detection (v8.25.0+)
 
-`scripts/preflight-environment.sh` emits `.evolve/environment.json` (schema v3). The dispatcher reads `auto_config`:
+`scripts/dispatch/preflight-environment.sh` emits `.evolve/environment.json` (schema v3). The dispatcher reads `auto_config`:
 
 | Field | Values | Decision rule |
 |---|---|---|
@@ -71,7 +71,7 @@ Operator overrides: `EVOLVE_WORKTREE_BASE=/path`, `EVOLVE_FORCE_INNER_SANDBOX=1`
 
 ### Ship commit classifiers (v8.25.0+)
 
-`scripts/ship.sh` requires an explicit class via `--class`:
+`scripts/lifecycle/ship.sh` requires an explicit class via `--class`:
 
 | Class | Use case | Verification |
 |---|---|---|
@@ -91,9 +91,9 @@ bash scripts/release-pipeline.sh X.Y.Z --dry-run    # simulate, no mutations
 bash scripts/release-pipeline.sh X.Y.Z --skip-tests # hot-fix path (CI-pre-verified)
 ```
 
-The pipeline owns the entire lifecycle: pre-flight gate → version bump → auto-changelog from conventional commits → consistency check → atomic ship via `scripts/ship.sh` → marketplace propagation polling (5 min) → cache refresh → auto-rollback on any post-push failure.
+The pipeline owns the entire lifecycle: pre-flight gate → version bump → auto-changelog from conventional commits → consistency check → atomic ship via `scripts/lifecycle/ship.sh` → marketplace propagation polling (5 min) → cache refresh → auto-rollback on any post-push failure.
 
-**Bare `git push origin main` is denied by ship-gate** (since v8.13.0). Direct commits and pushes go through `scripts/ship.sh`. The release pipeline calls ship.sh internally; it does not bypass the gate.
+**Bare `git push origin main` is denied by ship-gate** (since v8.13.0). Direct commits and pushes go through `scripts/lifecycle/ship.sh`. The release pipeline calls ship.sh internally; it does not bypass the gate.
 
 ### Required version markers (all auto-bumped by `version-bump.sh`)
 
@@ -103,7 +103,7 @@ The pipeline owns the entire lifecycle: pre-flight gate → version bump → aut
 4. `README.md` — "Current (vX.Y)" + version history row (only if major.minor changed)
 5. `CHANGELOG.md` — `## [X.Y.Z]` block (auto-generated by `changelog-gen.sh`)
 
-`scripts/release.sh` is now a **consistency verifier** invoked by the pipeline. Run standalone for diagnostics: `bash scripts/release.sh <version>`.
+`scripts/utility/release.sh` is now a **consistency verifier** invoked by the pipeline. Run standalone for diagnostics: `bash scripts/utility/release.sh <version>`.
 
 ### Conventional commits
 
@@ -133,7 +133,7 @@ Three patterns the /insights audit identified as recurring friction. Apply ALL o
 
 1. **Probe before declaring a CLI unavailable.** Never say "no `<tool>` command" without first running:
    ```bash
-   bash scripts/probe-tool.sh <tool>      # canonical helper, checks PATH + common install dirs
+   bash scripts/utility/probe-tool.sh <tool>      # canonical helper, checks PATH + common install dirs
    # or directly:
    command -v <tool> 2>/dev/null || which <tool> 2>/dev/null || ls /usr/local/bin/<tool> ~/.local/bin/<tool> 2>/dev/null
    ```
@@ -213,7 +213,7 @@ The hybrid pattern exists because Gemini CLI lacks non-interactive prompt mode, 
 - `skills/evolve-loop/reference/platform-detect.md` — env-var probe table for runtime detection
 - `skills/evolve-loop/reference/<platform>-tools.md` — tool name translation (`Read` → `read_file`, etc.)
 - `skills/evolve-loop/reference/<platform>-runtime.md` — invocation patterns per CLI
-- `scripts/detect-cli.sh` — shell helper that returns one of `claude | gemini | codex | unknown`
+- `scripts/dispatch/detect-cli.sh` — shell helper that returns one of `claude | gemini | codex | unknown`
 - `scripts/cli_adapters/<cli>.sh` — runtime adapter; receives env-var contract from `subagent-run.sh`
 
 Mirror the hybrid pattern (delegate to `claude.sh`) before attempting a native adapter. The native-adapter path requires: non-interactive prompt mode, profile-scoped permissions, and either a budget cap flag or external cost tracking.
@@ -270,7 +270,7 @@ Fan-out workers invoke `subagent-run.sh <role>-worker-<name>`. `cmd_run` strips 
 
 ### Verifying the swarm architecture
 
-Run `bash scripts/swarm-architecture-test.sh` to verify all three layers wire correctly (40 assertions covering plugin.json registrations, skill files, slash commands, persona files, profile parallel_subtasks, state machine, phase gate, aggregator merge modes, dispatch-parallel command, and end-to-end smoke test).
+Run `bash scripts/tests/swarm-architecture-test.sh` to verify all three layers wire correctly (40 assertions covering plugin.json registrations, skill files, slash commands, persona files, profile parallel_subtasks, state machine, phase gate, aggregator merge modes, dispatch-parallel command, and end-to-end smoke test).
 
 ## Evolve Loop Task Priority
 

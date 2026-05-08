@@ -14,14 +14,14 @@
 # These tests do NOT execute the live `claude` CLI — they exercise the runner
 # and adapter logic up to and including --validate-profile (which short-circuits
 # before claude runs). End-to-end CLI invocation is covered by the smoke tests
-# in scripts/run-cycle.sh / phase-gate.sh integration runs.
+# in scripts/dispatch/run-cycle.sh / phase-gate.sh integration runs.
 #
 # Usage: bash scripts/subagent-run-test.sh
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RUNNER="$REPO_ROOT/scripts/subagent-run.sh"
+RUNNER="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
 PROFILES_DIR="$REPO_ROOT/.evolve/profiles"
 
 PASS=0
@@ -82,7 +82,7 @@ cat > "$GOOD_ARTIFACT" <<EOF
 <!-- challenge-token: $TOKEN -->
 # Genuine Report
 
-Body content here, with file references like scripts/subagent-run.sh and
+Body content here, with file references like scripts/dispatch/subagent-run.sh and
 plenty of words to satisfy the substance check.
 EOF
 

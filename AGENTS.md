@@ -14,10 +14,10 @@ These rules apply regardless of which CLI you are running under. They are STRUCT
 Phases run Scout → Builder → Auditor → Ship/Record in that exact order. The phase-gate kernel hook (`scripts/guards/phase-gate-precondition.sh`) denies any subagent invocation that violates the sequence. There is no bypass short of an emergency operator override (`EVOLVE_BYPASS_PHASE_GATE=1`) which is logged loudly and considered a CRITICAL violation.
 
 ### 2. Subagents are spawned via `subagent-run.sh`, never via in-process tool calls
-Every phase agent is spawned by `bash scripts/subagent-run.sh <agent> <cycle> <workspace>`. This is enforced by the kernel hook. The in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex) is **denied during a cycle**. Reason: in-process subagents bypass profile-scoped permissions and the tamper-evident ledger.
+Every phase agent is spawned by `bash scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace>`. This is enforced by the kernel hook. The in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex) is **denied during a cycle**. Reason: in-process subagents bypass profile-scoped permissions and the tamper-evident ledger.
 
-### 3. Commits go through `scripts/ship.sh`, never bare `git commit / git push`
-The ship-gate kernel hook (`scripts/guards/ship-gate.sh`) denies bare git commit/push/gh release create. The only canonical entry point is `scripts/ship.sh`. ship.sh enforces audit verification, cycle binding (HEAD + tree_state_sha match), and v8.32+ version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or `EVOLVE_BYPASS_SHIP_GATE=1` (emergency).
+### 3. Commits go through `scripts/lifecycle/ship.sh`, never bare `git commit / git push`
+The ship-gate kernel hook (`scripts/guards/ship-gate.sh`) denies bare git commit/push/gh release create. The only canonical entry point is `scripts/lifecycle/ship.sh`. ship.sh enforces audit verification, cycle binding (HEAD + tree_state_sha match), and v8.32+ version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or `EVOLVE_BYPASS_SHIP_GATE=1` (emergency).
 
 ### 4. Builder writes only inside its worktree
 Each cycle gets a per-cycle git worktree (provisioned by `run-cycle.sh`, recorded in `cycle-state.json:active_worktree`). Builder's profile (`.evolve/profiles/builder.json`) restricts Edit/Write to the worktree path. The role-gate kernel hook (`scripts/guards/role-gate.sh`) denies edits outside that boundary. v8.31+ closed the Bash-redirect leak by adding interpreter-execution Bash denials.
@@ -26,13 +26,13 @@ Each cycle gets a per-cycle git worktree (provisioned by `run-cycle.sh`, recorde
 Auditor writes `audit-report.md` with one of three verdicts. PASS ships. **WARN ships** (v8.28.0+ fluent-by-default; orchestrator persona aligned in v8.35.0). FAIL blocks. Operator opts back to legacy strict-on-WARN via `EVOLVE_STRICT_AUDIT=1`. The fluency policy is encoded in ship.sh; the orchestrator persona invokes ship.sh in both PASS and WARN paths.
 
 ### 6. The ledger is tamper-evident (v8.37.0+)
-`.evolve/ledger.jsonl` records every subagent invocation with cycle binding, challenge token, artifact SHA, **prev_hash**, and **entry_seq**. Each new entry's prev_hash is the SHA256 of the previous entry's full JSON line. `.evolve/ledger.tip` records the latest entry's SHA atomically — truncation detection. Run `bash scripts/verify-ledger-chain.sh` to confirm history integrity. Modifying any historical entry breaks the chain at the next entry.
+`.evolve/ledger.jsonl` records every subagent invocation with cycle binding, challenge token, artifact SHA, **prev_hash**, and **entry_seq**. Each new entry's prev_hash is the SHA256 of the previous entry's full JSON line. `.evolve/ledger.tip` records the latest entry's SHA atomically — truncation detection. Run `bash scripts/observability/verify-ledger-chain.sh` to confirm history integrity. Modifying any historical entry breaks the chain at the next entry.
 
 ### 7. Failure adaptation is fluent-by-default (v8.28.0+)
-Prior failures are recorded in `state.json:failedApproaches[]` with structured classifications (infrastructure-transient, code-audit-fail, code-audit-warn, etc.). The failure-adapter (`scripts/failure-adapter.sh`) returns deterministic decisions; the orchestrator follows them verbatim. Default mode is fluent (would-have-blocked rules emit awareness, not BLOCK). Strict mode (`EVOLVE_STRICT_FAILURES=1`) restores legacy block-on-recurring behavior.
+Prior failures are recorded in `state.json:failedApproaches[]` with structured classifications (infrastructure-transient, code-audit-fail, code-audit-warn, etc.). The failure-adapter (`scripts/failure/failure-adapter.sh`) returns deterministic decisions; the orchestrator follows them verbatim. Default mode is fluent (would-have-blocked rules emit awareness, not BLOCK). Strict mode (`EVOLVE_STRICT_FAILURES=1`) restores legacy block-on-recurring behavior.
 
 ### 8. Cost adaptation (v8.35.0+)
-The auditor profile defaults to Opus, but `scripts/diff-complexity.sh` auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
+The auditor profile defaults to Opus, but `scripts/utility/diff-complexity.sh` auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
 
 ## Per-CLI runtime details
 

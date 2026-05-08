@@ -3,7 +3,7 @@
 # phase-gate-precondition-test.sh — Unit tests for
 # scripts/guards/phase-gate-precondition.sh (v8.13.1).
 #
-# Tests: trigger detection (only `bash scripts/subagent-run.sh`), per-phase
+# Tests: trigger detection (only `bash scripts/dispatch/subagent-run.sh`), per-phase
 # expected-agent allowlist, re-spawn handling, no-cycle passthrough, bypass.
 #
 # Usage: bash scripts/phase-gate-precondition-test.sh
@@ -15,7 +15,7 @@ unset EVOLVE_BYPASS_PHASE_GATE
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GATE="$REPO_ROOT/scripts/guards/phase-gate-precondition.sh"
-HELPER="$REPO_ROOT/scripts/cycle-state.sh"
+HELPER="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
 
 TEST_STATE_DIR=$(mktemp -d -t pgpre-test.XXXXXX)
 TEST_STATE="$TEST_STATE_DIR/cycle-state.json"
@@ -68,71 +68,71 @@ header "Test 1: non-subagent-run command → ALLOW"
 set_state build builder
 expect_allow "ls -la" '{"tool_input":{"command":"ls -la"}}'
 
-# === Test 2: bash scripts/ship.sh → ALLOW (not our trigger) ===================
-header "Test 2: bash scripts/ship.sh → ALLOW (passthrough)"
+# === Test 2: bash scripts/lifecycle/ship.sh → ALLOW (not our trigger) ===================
+header "Test 2: bash scripts/lifecycle/ship.sh → ALLOW (passthrough)"
 set_state build builder
-expect_allow "ship.sh invocation" '{"tool_input":{"command":"bash scripts/ship.sh \"feat: x\""}}'
+expect_allow "ship.sh invocation" '{"tool_input":{"command":"bash scripts/lifecycle/ship.sh \"feat: x\""}}'
 
 # === Test 3: no cycle-state → ALLOW (ad-hoc invocation) =======================
 header "Test 3: no cycle-state → ALLOW"
 rm -f "$TEST_STATE"
 expect_allow "ad-hoc subagent-run" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 
 # === Test 4: phase=calibrate, agent=scout → ALLOW =============================
 header "Test 4: phase=calibrate + scout → ALLOW"
 set_state calibrate ""
 expect_allow "calibrate→scout" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 5: phase=calibrate, agent=builder → DENY ============================
 header "Test 5: phase=calibrate + builder → DENY (out of order)"
 set_state calibrate ""
 expect_deny "calibrate→builder" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 6: phase=build, agent=auditor → ALLOW ===============================
 header "Test 6: phase=build + auditor → ALLOW (next phase)"
 set_state build builder
 expect_allow "build→auditor" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh auditor 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh auditor 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 7: phase=build, agent=builder (re-spawn) → ALLOW ====================
 header "Test 7: phase=build + builder re-spawn → ALLOW"
 set_state build builder
 expect_allow "build→builder re-spawn" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 8: phase=build, agent=scout → DENY (going backwards) ================
 header "Test 8: phase=build + scout → DENY (going backwards)"
 set_state build builder
 expect_deny "build→scout (backwards)" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 9: phase=audit, agent=retrospective → ALLOW =========================
 header "Test 9: phase=audit + retrospective → ALLOW"
 set_state audit auditor
 expect_allow "audit→retrospective" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 10: phase=audit, agent=builder → DENY ===============================
 header "Test 10: phase=audit + builder → DENY (cannot revert)"
 set_state audit auditor
 expect_deny "audit→builder" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 11: bypass env → ALLOW even when would deny =========================
 header "Test 11: EVOLVE_BYPASS_PHASE_GATE=1 → ALLOW"
 set_state calibrate ""
 expect_allow "bypass + builder during calibrate" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}' \
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}' \
     "EVOLVE_BYPASS_PHASE_GATE=1"
 
 # === Test 12: unrecognized agent name → ALLOW (delegate) ======================
 header "Test 12: unrecognized agent name → ALLOW (delegate to subagent-run.sh)"
 set_state build builder
 expect_allow "unknown agent 'foobar'" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh foobar 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh foobar 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 13: empty payload → ALLOW (manual invocation) =======================
 header "Test 13: empty payload → ALLOW"
@@ -142,13 +142,13 @@ expect_allow "empty payload" ""
 header "Test 14: phase=discover + builder → ALLOW (next phase)"
 set_state discover scout
 expect_allow "discover→builder" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 15: leading whitespace + tabs in command → still parsed correctly ===
 header "Test 15: leading whitespace handled"
 set_state build builder
 expect_allow "leading-ws + auditor" \
-    '{"tool_input":{"command":"   bash scripts/subagent-run.sh auditor 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"   bash scripts/dispatch/subagent-run.sh auditor 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 16: scout-worker-* allowed in research phase (parent role check) ===
 # Workers (Sprint 1 fan-out) should be sequence-checked against their parent
@@ -156,19 +156,19 @@ expect_allow "leading-ws + auditor" \
 header "Test 16: research + scout-worker-codebase → ALLOW (worker for valid parent)"
 set_state research scout
 expect_allow "research→scout-worker-codebase" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-codebase 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout-worker-codebase 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 17: auditor-worker-* allowed in audit phase ========================
 header "Test 17: audit + auditor-worker-eval → ALLOW"
 set_state audit auditor
 expect_allow "audit→auditor-worker-eval" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh auditor-worker-eval 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh auditor-worker-eval 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 18: scout-worker-* denied in build phase (out of order) ============
 header "Test 18: build + scout-worker-codebase → DENY (worker for wrong-phase parent)"
 set_state build builder
 expect_deny "build→scout-worker-codebase" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-codebase 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout-worker-codebase 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 19: worker re-spawn match against active_agent =====================
 # When active_agent=scout and a worker scout-worker-codebase is requested,
@@ -176,7 +176,7 @@ expect_deny "build→scout-worker-codebase" \
 header "Test 19: active=scout + scout-worker-research → ALLOW (re-spawn prefix)"
 set_state research scout
 expect_allow "research→scout-worker-research" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh scout-worker-research 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout-worker-research 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 20: v8.45.0 — phase=audit + retrospective → ALLOW (FAIL/WARN path) =
 # Retrospective is in the audit phase EXPECTED list (auditor evaluator
@@ -186,7 +186,7 @@ expect_allow "research→scout-worker-research" \
 header "Test 20: v8.45.0 — audit + retrospective → ALLOW (auto-retrospective path)"
 set_state audit auditor
 expect_allow "audit→retrospective (FAIL/WARN auto-retrospective)" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 21: v8.45.0 — phase=ship + retrospective → ALLOW (WARN path) =======
 # After WARN ship, orchestrator advances to retrospective. The kernel allows
@@ -194,7 +194,7 @@ expect_allow "audit→retrospective (FAIL/WARN auto-retrospective)" \
 header "Test 21: v8.45.0 — ship + retrospective → ALLOW (WARN-then-retro path)"
 set_state ship orchestrator
 expect_allow "ship→retrospective (WARN-then-retrospective)" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
 
 # === Test 22: v8.45.0 — retrospective phase recognized in cycle-state =======
 # Test that cycle-state.sh advance to retrospective doesn't fail. Indirect test
@@ -203,7 +203,7 @@ expect_allow "ship→retrospective (WARN-then-retrospective)" \
 header "Test 22: v8.45.0 — retrospective is a valid cycle-state phase"
 set_state retrospective retrospective
 expect_allow "retrospective→retrospective (re-spawn or continuation)" \
-    '{"tool_input":{"command":"bash scripts/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
 
 # === Summary =================================================================
 echo

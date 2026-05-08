@@ -7,7 +7,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/run-all-regression-tests.sh"
+SCRIPT="$REPO_ROOT/scripts/utility/run-all-regression-tests.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -23,7 +23,7 @@ make_stub_repo() {
     local good="$1" bad="$2"
     local d
     d=$(mktemp -d -t runall-test.XXXXXX)
-    mkdir -p "$d/scripts"
+    mkdir -p "$d/scripts/utility"
     local i=0
     for ((i=0; i<good; i++)); do
         cat > "$d/scripts/stub-good-$i.sh" <<'EOF'
@@ -57,9 +57,9 @@ build_suites_str() {
 # We need to copy run-all itself into the stub.
 run_with_stubs() {
     local repo="$1"; shift
-    cp "$SCRIPT" "$repo/scripts/run-all-regression-tests.sh"
-    chmod +x "$repo/scripts/run-all-regression-tests.sh"
-    bash "$repo/scripts/run-all-regression-tests.sh" "$@"
+    cp "$SCRIPT" "$repo/scripts/utility/run-all-regression-tests.sh"
+    chmod +x "$repo/scripts/utility/run-all-regression-tests.sh"
+    bash "$repo/scripts/utility/run-all-regression-tests.sh" "$@"
 }
 
 # === Test 1: all stubs pass → rc=0 ===========================================

@@ -149,7 +149,7 @@ B2 is NEVER skipped — hallucination detection runs every cycle regardless of s
   - Level 2 — ACCEPTABLE: `grep` on output files, `test -f` with comparisons
   - Level 3 — GOOD: Execution-based checks (`node script.js | grep`, `npm test`)
   - ALL Level 0-1 with no Level 2+ = CRITICAL FAIL
-  - Cross-check against `scripts/eval-quality-check.sh` output if available
+  - Cross-check against `scripts/verification/eval-quality-check.sh` output if available
 - [ ] **Regression Check:** Eval does not bypass regression testing with dummy commands
 - [ ] **Challenge Token:** Verify token in scout-report.md and build-report.md
 - If tampering, trivial evals, bypassed pipelines, or missing tokens detected = CRITICAL, automatic FAIL

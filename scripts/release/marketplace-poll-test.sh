@@ -38,15 +38,15 @@ EOF
 make_fake_repo() {
     local d
     d=$(mktemp -d -t mkpoll-repo.XXXXXX)
-    mkdir -p "$d/scripts/release"
+    mkdir -p "$d/scripts/release" "$d/scripts/utility"
     cp "$POLL" "$d/scripts/release/marketplace-poll.sh"
     chmod +x "$d/scripts/release/marketplace-poll.sh"
-    cat > "$d/scripts/release.sh" <<'EOF'
+    cat > "$d/scripts/utility/release.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "[fake-release.sh] $@" >&2
 exit 0
 EOF
-    chmod +x "$d/scripts/release.sh"
+    chmod +x "$d/scripts/utility/release.sh"
     echo "$d"
 }
 
@@ -127,17 +127,17 @@ fi
 header "Test 5: cache-refresh ordering — release.sh invoked AFTER convergence"
 m=$(make_marketplace "1.2.3"); cleanup_dirs+=("$m")
 r=$(mktemp -d -t mkpoll-repo.XXXXXX); cleanup_dirs+=("$r")
-mkdir -p "$r/scripts/release"
+mkdir -p "$r/scripts/release" "$r/scripts/utility" "$r/scripts/lifecycle"
 cp "$POLL" "$r/scripts/release/marketplace-poll.sh"
 chmod +x "$r/scripts/release/marketplace-poll.sh"
 # Fake release.sh that records the version arg it was called with.
 SENTINEL="$r/release-sh-called.log"
-cat > "$r/scripts/release.sh" <<EOF
+cat > "$r/scripts/utility/release.sh" <<EOF
 #!/usr/bin/env bash
 echo "called with: \$*" >> "$SENTINEL"
 exit 0
 EOF
-chmod +x "$r/scripts/release.sh"
+chmod +x "$r/scripts/utility/release.sh"
 set +e
 out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 5 --poll-interval-s 1 2>&1)
@@ -176,12 +176,12 @@ header "Test 7: --dry-run prints intent, exits 0, makes no calls"
 m=$(make_marketplace "0.9.0"); cleanup_dirs+=("$m")
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 SENTINEL="$r/release-sh-called.log"
-cat > "$r/scripts/release.sh" <<EOF
+cat > "$r/scripts/utility/release.sh" <<EOF
 #!/usr/bin/env bash
 echo "DRY-RUN-LEAK: \$*" >> "$SENTINEL"
 exit 1
 EOF
-chmod +x "$r/scripts/release.sh"
+chmod +x "$r/scripts/utility/release.sh"
 set +e
 out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 60 --poll-interval-s 1 --dry-run 2>&1)
@@ -224,14 +224,14 @@ fi
 header "Test 10: release.sh exits non-zero → poll exits 2"
 m=$(make_marketplace "1.2.3"); cleanup_dirs+=("$m")
 r=$(mktemp -d -t mkpoll-repo.XXXXXX); cleanup_dirs+=("$r")
-mkdir -p "$r/scripts/release"
+mkdir -p "$r/scripts/release" "$r/scripts/utility" "$r/scripts/lifecycle"
 cp "$POLL" "$r/scripts/release/marketplace-poll.sh"
 chmod +x "$r/scripts/release/marketplace-poll.sh"
-cat > "$r/scripts/release.sh" <<'EOF'
+cat > "$r/scripts/utility/release.sh" <<'EOF'
 #!/usr/bin/env bash
 exit 7
 EOF
-chmod +x "$r/scripts/release.sh"
+chmod +x "$r/scripts/utility/release.sh"
 set +e
 out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 5 --poll-interval-s 1 2>&1)

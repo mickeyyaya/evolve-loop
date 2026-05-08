@@ -46,8 +46,8 @@ CHANGELOG_GEN="$RELEASE_DIR/changelog-gen.sh"
 VERSION_BUMP="$RELEASE_DIR/version-bump.sh"
 MARKETPLACE_POLL="$RELEASE_DIR/marketplace-poll.sh"
 ROLLBACK="$RELEASE_DIR/rollback.sh"
-RELEASE_SH="$REPO_ROOT/scripts/release.sh"
-SHIP_SH="$REPO_ROOT/scripts/ship.sh"
+RELEASE_SH="$REPO_ROOT/scripts/utility/release.sh"
+SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
 
 log()  { echo "[release-pipeline] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }

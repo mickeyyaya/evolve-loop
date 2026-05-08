@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# fanout-dispatch-test.sh — Unit tests for scripts/fanout-dispatch.sh.
+# fanout-dispatch-test.sh — Unit tests for scripts/dispatch/fanout-dispatch.sh.
 #
 # fanout-dispatch.sh is the parallel-worker dispatcher used by Sprint 1
 # of the swarm architecture (see plans/does-the-flow-allow-jaunty-hummingbird.md).
@@ -25,7 +25,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/fanout-dispatch.sh"
+SCRIPT="$REPO_ROOT/scripts/dispatch/fanout-dispatch.sh"
 
 PASS=0
 FAIL=0
@@ -39,7 +39,7 @@ fresh_workspace() {
 }
 
 # --- Test 1: script exists ---------------------------------------------------
-header "Test 1: scripts/fanout-dispatch.sh exists and is executable"
+header "Test 1: scripts/dispatch/fanout-dispatch.sh exists and is executable"
 if [ -f "$SCRIPT" ] && [ -x "$SCRIPT" ]; then
     pass "$SCRIPT present and executable"
 else
@@ -253,13 +253,13 @@ WS=$(fresh_workspace)
 # the real EVOLVE_PROJECT_ROOT.
 STATE="$WS/cycle-state.json"
 echo '{"cycle_id":1,"phase":"research"}' > "$STATE"
-mkdir -p "$WS/scripts"
-cat > "$WS/scripts/cycle-state.sh" <<'STUB'
+mkdir -p "$WS/scripts/lifecycle"
+cat > "$WS/scripts/lifecycle/cycle-state.sh" <<'STUB'
 #!/usr/bin/env bash
 # Stub: log calls to a sibling .calls file so the test can assert.
 echo "$@" >> "$EVOLVE_CYCLE_STATE_FILE.calls"
 STUB
-chmod +x "$WS/scripts/cycle-state.sh"
+chmod +x "$WS/scripts/lifecycle/cycle-state.sh"
 printf 'noop\ttrue\n' > "$WS/cmds.tsv"
 EVOLVE_PLUGIN_ROOT="$WS" \
 EVOLVE_CYCLE_STATE_FILE="$STATE" \
@@ -277,12 +277,12 @@ rm -rf "$WS"
 # --- Test 12: Task D — track-workers disabled → no cycle-state writes --------
 header "Test 12: EVOLVE_FANOUT_TRACK_WORKERS=0 → no cycle-state.sh calls"
 WS=$(fresh_workspace)
-mkdir -p "$WS/scripts"
-cat > "$WS/scripts/cycle-state.sh" <<'STUB'
+mkdir -p "$WS/scripts/lifecycle"
+cat > "$WS/scripts/lifecycle/cycle-state.sh" <<'STUB'
 #!/usr/bin/env bash
 echo "$@" >> "$WS_CALLS_LOG"
 STUB
-chmod +x "$WS/scripts/cycle-state.sh"
+chmod +x "$WS/scripts/lifecycle/cycle-state.sh"
 printf 'noop\ttrue\n' > "$WS/cmds.tsv"
 EVOLVE_PLUGIN_ROOT="$WS" \
 EVOLVE_FANOUT_TRACK_WORKERS=0 \

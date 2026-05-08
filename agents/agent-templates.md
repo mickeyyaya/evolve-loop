@@ -183,11 +183,11 @@ A human-readable shared narrative document at `.evolve/runs/cycle-N/team-context
 ### Protocol
 
 - **On start:** Read `.evolve/runs/cycle-<N>/team-context.md` in its entirety. Other agents' sections are your context — do not duplicate their work.
-- **On completion:** Append your section via `bash scripts/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
-- **Verification:** `bash scripts/team-context.sh verify <cycle> <workspace> --require scout,tdd-engineer,builder,auditor` exits non-zero if any required section is empty (still `_pending_`).
+- **On completion:** Append your section via `bash scripts/utility/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
+- **Verification:** `bash scripts/utility/team-context.sh verify <cycle> <workspace> --require scout,tdd-engineer,builder,auditor` exits non-zero if any required section is empty (still `_pending_`).
 
 ### Phase-gate hook (opt-in)
 
 When `EVOLVE_REQUIRE_TEAM_CONTEXT=1` is exported in the dispatcher environment, `phase-gate-precondition.sh` blocks Builder invocations until both Scout's and TDD-Engineer's sections are populated in the bus. Default off for backward compatibility with cycles that predate the bus.
 
-See [scripts/team-context.sh](../scripts/team-context.sh) for the implementation.
+See [scripts/utility/team-context.sh](../scripts/utility/team-context.sh) for the implementation.

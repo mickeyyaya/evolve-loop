@@ -32,7 +32,7 @@
 #   EVOLVE_GEMINI_CLAUDE_PATH overrides the claude probe — TESTING ONLY.
 #   Honoured only when EVOLVE_TESTING=1 is also set, to prevent accidental
 #   production use. When active, a WARN line is emitted to stderr.
-#     unset             → normal probe via scripts/probe-tool.sh
+#     unset             → normal probe via scripts/utility/probe-tool.sh
 #     empty string      → simulate "claude not found" (forced missing)
 #     non-empty path    → use that path verbatim (must be executable)
 #   NOTE: this seam only affects --probe; claude.sh resolves the binary
@@ -50,7 +50,7 @@ set -uo pipefail
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 CLAUDE_ADAPTER="$ADAPTER_DIR/claude.sh"
-PROBE_TOOL="$REPO_ROOT/scripts/probe-tool.sh"
+PROBE_TOOL="$REPO_ROOT/scripts/utility/probe-tool.sh"
 
 # --- Probe whether claude is available ---------------------------------------
 # Returns 0 (and prints path to stdout) if found, non-zero otherwise.

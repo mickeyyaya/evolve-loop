@@ -3,7 +3,7 @@
 # claude.sh — CLI adapter for Anthropic Claude Code.
 #
 # Translates an evolve-loop agent profile JSON into a fully-formed `claude -p`
-# command. Called by scripts/subagent-run.sh; not intended for direct use.
+# command. Called by scripts/dispatch/subagent-run.sh; not intended for direct use.
 #
 # Inputs (env vars set by subagent-run.sh):
 #   PROFILE_PATH        — absolute path to profile JSON
@@ -479,7 +479,7 @@ if [ "$SANDBOX_USE" = "1" ]; then
                 echo "[claude-adapter] HINT: nested sandbox-exec is forbidden by Darwin 25.4+. To unblock:" >&2
                 echo "  - From inside Claude Code: dispatcher auto-enables fallback (v8.22.0+)." >&2
                 echo "  - From terminal: this should not happen; file an issue if it does." >&2
-                echo "  - Manual override: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash scripts/evolve-loop-dispatch.sh ..." >&2
+                echo "  - Manual override: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash scripts/dispatch/evolve-loop-dispatch.sh ..." >&2
             fi
         fi
     elif command -v bwrap >/dev/null 2>&1; then

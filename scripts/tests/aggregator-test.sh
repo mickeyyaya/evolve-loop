@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# aggregator-test.sh — Unit tests for scripts/aggregator.sh.
+# aggregator-test.sh — Unit tests for scripts/dispatch/aggregator.sh.
 #
 # aggregator.sh merges N worker artifacts produced by fanout-dispatch.sh
 # into a single canonical phase artifact. It is a PURE SHELL merge — no LLM
@@ -28,7 +28,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/aggregator.sh"
+SCRIPT="$REPO_ROOT/scripts/dispatch/aggregator.sh"
 
 PASS=0
 FAIL=0
@@ -42,7 +42,7 @@ fresh_workspace() {
 }
 
 # --- Test 1: script exists ---------------------------------------------------
-header "Test 1: scripts/aggregator.sh exists and is executable"
+header "Test 1: scripts/dispatch/aggregator.sh exists and is executable"
 if [ -f "$SCRIPT" ] && [ -x "$SCRIPT" ]; then
     pass "$SCRIPT present and executable"
 else

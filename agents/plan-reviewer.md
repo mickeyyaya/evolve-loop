@@ -34,7 +34,7 @@ Each lens scores 0–10 and emits `Verdict: <PROCEED|REVISE|ABORT>` as the secon
 
 ## Verdict aggregation
 
-The aggregator (`scripts/aggregator.sh phase=plan-review`) computes:
+The aggregator (`scripts/dispatch/aggregator.sh phase=plan-review`) computes:
 
 | Verdict | Trigger |
 |---|---|

@@ -38,7 +38,7 @@ Full table: [skills/evolve-loop/reference/gemini-tools.md](skills/evolve-loop/re
 The cross-CLI invariants in [AGENTS.md](AGENTS.md) apply unchanged:
 - Pipeline ordering (Scout → Builder → Auditor → Ship)
 - Subagents via `subagent-run.sh`, never `activate_skill`-as-subagent
-- Commits via `scripts/ship.sh`, never bare git
+- Commits via `scripts/lifecycle/ship.sh`, never bare git
 - Builder writes inside its worktree only
 - Audit verdicts: PASS/WARN/FAIL semantics (WARN ships by default v8.35.0+)
 - Ledger tamper-evidence (v8.37.0+) — `verify-ledger-chain.sh` works identically

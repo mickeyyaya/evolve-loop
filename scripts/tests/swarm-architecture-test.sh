@@ -124,7 +124,7 @@ done
 
 # --- Test 6: cycle-state knows plan-review phase -----------------------------
 header "Test 6: cycle-state.sh recognizes plan-review phase"
-if grep -q '"plan-review"' "$REPO_ROOT/scripts/cycle-state.sh"; then
+if grep -q '"plan-review"' "$REPO_ROOT/scripts/lifecycle/cycle-state.sh"; then
     pass "cycle-state.sh known phases includes plan-review"
 else
     fail_ "cycle-state.sh missing plan-review phase"
@@ -151,7 +151,7 @@ fi
 
 # --- Test 8: aggregator.sh has 4 merge modes ---------------------------------
 header "Test 8: aggregator.sh supports all 4 merge modes"
-AGG="$REPO_ROOT/scripts/aggregator.sh"
+AGG="$REPO_ROOT/scripts/dispatch/aggregator.sh"
 for mode in concat verdict lessons plan_review; do
     if grep -q "MERGE_MODE=$mode" "$AGG"; then
         pass "aggregator supports $mode mode"
@@ -162,7 +162,7 @@ done
 
 # --- Test 9: subagent-run.sh dispatcher --------------------------------------
 header "Test 9: subagent-run.sh dispatch-parallel + worker pattern"
-SR="$REPO_ROOT/scripts/subagent-run.sh"
+SR="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
 if grep -q "cmd_dispatch_parallel" "$SR"; then
     pass "subagent-run.sh has cmd_dispatch_parallel"
 else
@@ -200,7 +200,7 @@ rc=0
 EVOLVE_FANOUT_TEST_EXECUTOR="$TMPDIR/stub.sh" \
 EVOLVE_LEDGER_OVERRIDE="$TMPDIR/ledger.jsonl" \
 EVOLVE_BYPASS_PHASE_GATE=1 \
-bash scripts/subagent-run.sh dispatch-parallel scout 99000 "$WS" >/dev/null 2>&1 || rc=$?
+bash scripts/dispatch/subagent-run.sh dispatch-parallel scout 99000 "$WS" >/dev/null 2>&1 || rc=$?
 
 # Clean up the canonical artifact (scout.json points to .evolve/runs/cycle-{cycle}/).
 rm -rf .evolve/runs/cycle-99000 2>/dev/null

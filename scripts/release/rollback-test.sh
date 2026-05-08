@@ -24,16 +24,16 @@ make_repo_with_journal() {
     local journal_json="$1"
     local d
     d=$(mktemp -d -t rollback-test.XXXXXX)
-    mkdir -p "$d/scripts/release" "$d/.evolve"
+    mkdir -p "$d/scripts/release" "$d/scripts/lifecycle" "$d/scripts/utility" "$d/.evolve"
     cp "$ROLLBACK" "$d/scripts/release/rollback.sh"
     chmod +x "$d/scripts/release/rollback.sh"
     # Provide a stub ship.sh — the script may reference it.
-    cat > "$d/scripts/ship.sh" <<'EOF'
+    cat > "$d/scripts/lifecycle/ship.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "[stub-ship.sh] $*" >&2
 exit 0
 EOF
-    chmod +x "$d/scripts/ship.sh"
+    chmod +x "$d/scripts/lifecycle/ship.sh"
     if [ -n "$journal_json" ]; then
         printf '%s\n' "$journal_json" > "$d/.evolve/journal.json"
     fi
@@ -165,12 +165,12 @@ fi
 header "Test 8: ship.sh receives EVOLVE_BYPASS_SHIP_VERIFY=1"
 r=$(make_repo_with_journal "$JOURNAL_FULL"); cleanup_dirs+=("$r")
 # Override the stub ship.sh with one that records the env var.
-cat > "$r/scripts/ship.sh" <<'EOF'
+cat > "$r/scripts/lifecycle/ship.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "BYPASS=$EVOLVE_BYPASS_SHIP_VERIFY MSG=$*" >> "$0.calls.log"
 exit 0
 EOF
-chmod +x "$r/scripts/ship.sh"
+chmod +x "$r/scripts/lifecycle/ship.sh"
 # Initialize git in the repo so revert can run. Skip if revert fails (no commits).
 ( cd "$r" && git init -q -b main && git config user.email t@t.t && git config user.name t \
   && echo init > x.txt && git add . && git c""ommit -q -m "init commit" \
@@ -181,10 +181,10 @@ echo "{\"version\":\"1.2.3\",\"tag\":\"v1.2.3\",\"commit_sha\":\"$sha\",\"branch
 set +e
 (cd "$r" && bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "bypass test" 2>&1) >/dev/null
 set -e
-if [ -f "$r/scripts/ship.sh.calls.log" ] && grep -q "BYPASS=1" "$r/scripts/ship.sh.calls.log"; then
+if [ -f "$r/scripts/lifecycle/ship.sh.calls.log" ] && grep -q "BYPASS=1" "$r/scripts/lifecycle/ship.sh.calls.log"; then
     pass "ship.sh invoked with BYPASS_SHIP_VERIFY=1"
 else
-    fail_ "calls log: $([ -f "$r/scripts/ship.sh.calls.log" ] && cat "$r/scripts/ship.sh.calls.log" || echo '<missing>')"
+    fail_ "calls log: $([ -f "$r/scripts/lifecycle/ship.sh.calls.log" ] && cat "$r/scripts/lifecycle/ship.sh.calls.log" || echo '<missing>')"
 fi
 
 # === Test 9 (MEDIUM-1 regression): partial rollback exits 1 ==================

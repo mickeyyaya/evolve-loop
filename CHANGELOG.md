@@ -708,7 +708,7 @@ Defense-in-depth on top of v8.23.3. v8.23.3 fixed three concrete bugs (BUG-008..
 
 ### Added
 
-- **`EVOLVE_SKIP_WORKTREE=1` escape hatch** (`scripts/run-cycle.sh`): bypasses worktree provisioning entirely when the parent Claude Code OS sandbox blocks `.evolve/worktrees/` writes regardless of cwd. Sets `cycle-state.active_worktree = $EVOLVE_PROJECT_ROOT`. Builder/tdd-engineer profiles pre-expand to the main repo path. Loud WARN logs make the no-isolation tradeoff explicit. At cleanup, if the main repo has uncommitted changes from the cycle, the operator is told to inspect via `git status` / `git diff` and decide manually.
+- **`EVOLVE_SKIP_WORKTREE=1` escape hatch** (`scripts/dispatch/run-cycle.sh`): bypasses worktree provisioning entirely when the parent Claude Code OS sandbox blocks `.evolve/worktrees/` writes regardless of cwd. Sets `cycle-state.active_worktree = $EVOLVE_PROJECT_ROOT`. Builder/tdd-engineer profiles pre-expand to the main repo path. Loud WARN logs make the no-isolation tradeoff explicit. At cleanup, if the main repo has uncommitted changes from the cycle, the operator is told to inspect via `git status` / `git diff` and decide manually.
 
 - **EPERM-class diagnostic block** (`scripts/cli_adapters/claude.sh`): when the inner `claude -p` exits with rc≠0 AND stderr contains EACCES/EPERM/permission-denied/sandbox_apply patterns, dump structured triage data to dispatcher stderr:
   - cwd at exec time
@@ -805,7 +805,7 @@ Pre-v8.23.2, only `scripts/cli_adapters/claude.sh` substituted `{worktree_path}`
 
 ### Added
 
-- `scripts/subagent-run.sh:cmd_run` — pre-expands `{worktree_path}` in EVERY string field of the profile JSON via `jq walk`. Result is written to `<workspace>/<agent>-profile-expanded.json` (per-cycle, traceable artifact). `PROFILE_PATH` env var passed to the adapter points at the expanded copy. The original profile in `.evolve/profiles/` is never modified.
+- `scripts/dispatch/subagent-run.sh:cmd_run` — pre-expands `{worktree_path}` in EVERY string field of the profile JSON via `jq walk`. Result is written to `<workspace>/<agent>-profile-expanded.json` (per-cycle, traceable artifact). `PROFILE_PATH` env var passed to the adapter points at the expanded copy. The original profile in `.evolve/profiles/` is never modified.
 - The expanded profile is opt-in: only triggered when `grep '{worktree_path}'` matches in the profile (no perf impact for profiles without placeholders).
 
 ### Changed
@@ -835,20 +835,20 @@ Critical hotfix for v8.22.0's `failure_compute_expires_at`. A second-Claude-sess
 
 ### Fixed
 
-- **`scripts/failure-classifications.sh:failure_compute_expires_at`**: pre-v8.23.1 used `echo "$now_iso" | jq -r '. | fromdateiso8601'`. ISO timestamps like `2026-05-05T03:30:13Z` are NOT valid JSON without explicit string quotes — jq parses the leading digit as a number and blows up at the first dash. The error went to stderr; stdout was empty. Bash arithmetic `(( "" + 86400 ))` then yielded `86400`, which `jq -r '. | todate'` formatted as `1970-01-02T00:00:00Z`. Every v8.22.0 expiresAt was actually 1 day after the epoch — but the dispatcher swallowed the stderr, so the bug was invisible in cycle logs. **Fixed**: use `jq -rn --arg s "$now_iso" '$s | fromdateiso8601'` (proper JSON-string injection), validate the result is numeric before doing arithmetic, fall back to `date -u +%s` when conversion fails. Plus an integer-validation guard on `now_s` to refuse silent zero-substitution.
+- **`scripts/failure/failure-classifications.sh:failure_compute_expires_at`**: pre-v8.23.1 used `echo "$now_iso" | jq -r '. | fromdateiso8601'`. ISO timestamps like `2026-05-05T03:30:13Z` are NOT valid JSON without explicit string quotes — jq parses the leading digit as a number and blows up at the first dash. The error went to stderr; stdout was empty. Bash arithmetic `(( "" + 86400 ))` then yielded `86400`, which `jq -r '. | todate'` formatted as `1970-01-02T00:00:00Z`. Every v8.22.0 expiresAt was actually 1 day after the epoch — but the dispatcher swallowed the stderr, so the bug was invisible in cycle logs. **Fixed**: use `jq -rn --arg s "$now_iso" '$s | fromdateiso8601'` (proper JSON-string injection), validate the result is numeric before doing arithmetic, fall back to `date -u +%s` when conversion fails. Plus an integer-validation guard on `now_s` to refuse silent zero-substitution.
 
-- **Legacy null-expiresAt poisoning** (`scripts/failure-adapter.sh` + `scripts/cycle-state.sh:prune-expired-failures`): pre-v8.23.1 kept entries with `expiresAt: null` indefinitely "for backward compat." In practice this meant 18+ legacy `infrastructure`-classification entries from v8.21.x days never aged out, permanently triggering the adapter's "3+ consecutive infrastructure-transient" → `BLOCK-OPERATOR-ACTION` rule. **Fixed**: when `expiresAt` is null but `recordedAt` is present, use `recordedAt + 1d` as the effective TTL (matches the tightest classification age-out window). Truly ancient entries with both fields null are still kept (defensive — they're rare and inert with no recognizable classification).
+- **Legacy null-expiresAt poisoning** (`scripts/failure/failure-adapter.sh` + `scripts/lifecycle/cycle-state.sh:prune-expired-failures`): pre-v8.23.1 kept entries with `expiresAt: null` indefinitely "for backward compat." In practice this meant 18+ legacy `infrastructure`-classification entries from v8.21.x days never aged out, permanently triggering the adapter's "3+ consecutive infrastructure-transient" → `BLOCK-OPERATOR-ACTION` rule. **Fixed**: when `expiresAt` is null but `recordedAt` is present, use `recordedAt + 1d` as the effective TTL (matches the tightest classification age-out window). Truly ancient entries with both fields null are still kept (defensive — they're rare and inert with no recognizable classification).
 
 ### Migration
 
 If you have an existing `state.json` poisoned with null-expiresAt entries from v8.22.x:
-- Automatic: `bash scripts/cycle-state.sh prune-expired-failures` will now remove entries whose `recordedAt` is older than 1 day. Run once after upgrading.
-- Manual surgical: `bash scripts/state-prune.sh --classification infrastructure` removes only the legacy free-form entries while keeping any structured-taxonomy code failures.
-- Nuclear: `bash scripts/state-prune.sh --all --yes` wipes everything.
+- Automatic: `bash scripts/lifecycle/cycle-state.sh prune-expired-failures` will now remove entries whose `recordedAt` is older than 1 day. Run once after upgrading.
+- Manual surgical: `bash scripts/failure/state-prune.sh --classification infrastructure` removes only the legacy free-form entries while keeping any structured-taxonomy code failures.
+- Nuclear: `bash scripts/failure/state-prune.sh --all --yes` wipes everything.
 
 ### Verification
 
-- `bash scripts/failure-classifications.sh` → `failure_compute_expires_at infrastructure-transient "2026-05-05T03:30:13Z"` now returns `2026-05-06T03:30:13Z` (correct +1d) instead of `1970-01-02T00:00:00Z`
+- `bash scripts/failure/failure-classifications.sh` → `failure_compute_expires_at infrastructure-transient "2026-05-05T03:30:13Z"` now returns `2026-05-06T03:30:13Z` (correct +1d) instead of `1970-01-02T00:00:00Z`
 - 29/29 regression tests pass
 - Synthetic 4-entry state.json with 25-hour-old `recordedAt` + null `expiresAt` → adapter returns `PROCEED` with `non_expired_count=0`
 
@@ -865,26 +865,26 @@ Swarm optimization release. Implements Tasks B, C, D from cycle 25's autoresearc
 ### Added
 
 - **Task D — `parallel_workers.workers[]` observability** (`EVOLVE_FANOUT_TRACK_WORKERS=1` default-on):
-  - `scripts/cycle-state.sh init-workers <agent> <name>...` — initialize all workers in `pending` status before fan-out dispatches.
-  - `scripts/cycle-state.sh set-worker-status <name> <status> [<exit_code>]` — atomic upsert for `pending` → `running` → `done` / `failed` transitions. Records `started_at` on `running`, `ended_at` + `exit_code` on terminal statuses.
-  - `scripts/fanout-dispatch.sh:_run_worker` calls these at subprocess start/end so orchestrator can read `cycle-state.json` without re-scanning workspace artifacts.
+  - `scripts/lifecycle/cycle-state.sh init-workers <agent> <name>...` — initialize all workers in `pending` status before fan-out dispatches.
+  - `scripts/lifecycle/cycle-state.sh set-worker-status <name> <status> [<exit_code>]` — atomic upsert for `pending` → `running` → `done` / `failed` transitions. Records `started_at` on `running`, `ended_at` + `exit_code` on terminal statuses.
+  - `scripts/dispatch/fanout-dispatch.sh:_run_worker` calls these at subprocess start/end so orchestrator can read `cycle-state.json` without re-scanning workspace artifacts.
   - 4 new tests in `scripts/cycle-state-test.sh` (init-workers, status transitions, terminal records, invalid-status rejection).
 
 - **Task C — Shared prompt-cache prefix across siblings** (`EVOLVE_FANOUT_CACHE_PREFIX=1` default-on):
-  - `scripts/subagent-run.sh:cmd_dispatch_parallel` writes `workers/cache-prefix.md` — a deterministic shared context block (cycle goal, condensed cycle-state, trust-boundary reminders).
-  - `scripts/fanout-dispatch.sh` accepts new `--cache-prefix-file=PATH` flag; exports `EVOLVE_FANOUT_CACHE_PREFIX_FILE` to each worker subprocess.
+  - `scripts/dispatch/subagent-run.sh:cmd_dispatch_parallel` writes `workers/cache-prefix.md` — a deterministic shared context block (cycle goal, condensed cycle-state, trust-boundary reminders).
+  - `scripts/dispatch/fanout-dispatch.sh` accepts new `--cache-prefix-file=PATH` flag; exports `EVOLVE_FANOUT_CACHE_PREFIX_FILE` to each worker subprocess.
   - Same cycle + same workspace → byte-identical prefix bytes (no timestamps, no random salts). Sibling workers in the same fan-out batch hit Anthropic's prompt cache (≥1024 token, 5-min TTL) for ~47% input-token reduction on 3-worker fan-out.
   - 2 new tests in `fanout-dispatch-test.sh` (--cache-prefix-file flag accepted; missing file → exit 2). 3 new tests in `dispatch-parallel-test.sh` (file written; deterministic SHA across re-runs; opt-out flag respected).
 
 - **Task B — Early-cancel on consensus** (`EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1` opt-in):
-  - `scripts/fanout-dispatch.sh:_check_fail_consensus` — polls completed workers' `.out` files for `Verdict: FAIL` (inline OR `## Verdict\n**FAIL**` heading-form). When `>= EVOLVE_FANOUT_CONSENSUS_K` workers (default 2) agree on FAIL, SIGTERMs remaining background PIDs.
+  - `scripts/dispatch/fanout-dispatch.sh:_check_fail_consensus` — polls completed workers' `.out` files for `Verdict: FAIL` (inline OR `## Verdict\n**FAIL**` heading-form). When `>= EVOLVE_FANOUT_CONSENSUS_K` workers (default 2) agree on FAIL, SIGTERMs remaining background PIDs.
   - Audit-style fan-out only — `verdict` merge mode has the binary FAIL/PASS semantics that map cleanly. Other merge modes (concat for scout/retro, plan_review for sprint-2 lenses) keep WAIT-ALL.
   - 2 new tests (consensus-cancel observed in <4s with synthetic 4-worker job; default-off behavior unchanged).
 
 ### Changed
 
-- `scripts/fanout-dispatch.sh` — argument parser refactored from positional-only to flag-aware. Backward-compat: bare `<cmds.tsv> <results.tsv>` invocation still works.
-- `scripts/cycle-state.sh` CLI usage line — extended with `init-workers` and `set-worker-status` subcommands.
+- `scripts/dispatch/fanout-dispatch.sh` — argument parser refactored from positional-only to flag-aware. Backward-compat: bare `<cmds.tsv> <results.tsv>` invocation still works.
+- `scripts/lifecycle/cycle-state.sh` CLI usage line — extended with `init-workers` and `set-worker-status` subcommands.
 - `.evolve/profiles/orchestrator.json` — no profile change required (workers are spawned by `fanout-dispatch.sh`, not directly by the orchestrator).
 
 ### Performance
@@ -900,7 +900,7 @@ Swarm optimization release. Implements Tasks B, C, D from cycle 25's autoresearc
 - `bash scripts/cycle-state-test.sh` → 23/23 PASS (was 19, added 4)
 - `bash scripts/fanout-dispatch-test.sh` → 22/22 PASS (was 16, added 6)
 - `bash scripts/dispatch-parallel-test.sh` → 13/13 PASS (was 10, added 3)
-- `bash scripts/run-all-regression-tests.sh` → all suites pass
+- `bash scripts/utility/run-all-regression-tests.sh` → all suites pass
 
 ### Out of scope (deferred to future cycles)
 
@@ -917,25 +917,25 @@ Architectural overhaul of the adaptive-failure system. Closes 6 structural defec
 
 ### Architectural invariant
 
-> **Failure adaptation is a deterministic kernel function, not a prompt rule.** Given a structured failure history with retention policy and a richer classification taxonomy, `scripts/failure-adapter.sh` computes the next action — `PROCEED | RETRY-WITH-FALLBACK | BLOCK-CODE | BLOCK-OPERATOR-ACTION` — which the orchestrator consumes verbatim. Same input → same output, unit-testable, phase-gate-enforceable.
+> **Failure adaptation is a deterministic kernel function, not a prompt rule.** Given a structured failure history with retention policy and a richer classification taxonomy, `scripts/failure/failure-adapter.sh` computes the next action — `PROCEED | RETRY-WITH-FALLBACK | BLOCK-CODE | BLOCK-OPERATOR-ACTION` — which the orchestrator consumes verbatim. Same input → same output, unit-testable, phase-gate-enforceable.
 
 ### Added
 
-- `scripts/detect-nested-claude.sh` — single-purpose probe for `CLAUDECODE` / `CLAUDE_CODE_*` env-var family. Returns `nested` or `standalone`.
-- `scripts/evolve-loop-dispatch.sh` auto-detection: when nested-claude is detected, auto-enables `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` with WARN log. Defense-in-depth alongside `SKILL.md`'s slash-command auto-set — direct CLI dispatcher invocations now also work.
-- `scripts/failure-classifications.sh` (sourced library) — 7-value structured classification taxonomy with per-class age-out windows + severity tier + retry policy. Helpers: `failure_age_out_seconds`, `failure_severity_of`, `failure_retry_policy`, `failure_normalize_legacy`, `failure_compute_expires_at`.
-- `scripts/failure-adapter.sh decide` — deterministic decision kernel emitting JSON `{action, reason, remediation, set_env, skip_phases, verdict_for_block, evidence}`. Reads non-expired failedApproaches, applies 7 priority-ordered rules, returns the canonical action for the orchestrator to follow verbatim.
+- `scripts/dispatch/detect-nested-claude.sh` — single-purpose probe for `CLAUDECODE` / `CLAUDE_CODE_*` env-var family. Returns `nested` or `standalone`.
+- `scripts/dispatch/evolve-loop-dispatch.sh` auto-detection: when nested-claude is detected, auto-enables `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` with WARN log. Defense-in-depth alongside `SKILL.md`'s slash-command auto-set — direct CLI dispatcher invocations now also work.
+- `scripts/failure/failure-classifications.sh` (sourced library) — 7-value structured classification taxonomy with per-class age-out windows + severity tier + retry policy. Helpers: `failure_age_out_seconds`, `failure_severity_of`, `failure_retry_policy`, `failure_normalize_legacy`, `failure_compute_expires_at`.
+- `scripts/failure/failure-adapter.sh decide` — deterministic decision kernel emitting JSON `{action, reason, remediation, set_env, skip_phases, verdict_for_block, evidence}`. Reads non-expired failedApproaches, applies 7 priority-ordered rules, returns the canonical action for the orchestrator to follow verbatim.
 - `scripts/failure-adapter-test.sh` — 12 unit tests covering each decision rule + edge cases (expired entries, legacy null-classification, priority ordering).
-- `scripts/state-prune.sh` — operator utility: `--classification`, `--age <duration>`, `--cycle <N>`, `--all --yes`, `--dry-run`. Atomic mv-of-temp.
+- `scripts/failure/state-prune.sh` — operator utility: `--classification`, `--age <duration>`, `--cycle <N>`, `--all --yes`, `--dry-run`. Atomic mv-of-temp.
 - `scripts/state-prune-test.sh` — 7 unit tests covering each mode + edge cases (refuse `--all` without `--yes`, missing state file, dry-run preserves SHA).
-- `scripts/cycle-state.sh prune-expired-failures` — programmatic auto-aging-out subcommand. Called automatically by failure-adapter and the dispatcher's record_failed_approach.
+- `scripts/lifecycle/cycle-state.sh prune-expired-failures` — programmatic auto-aging-out subcommand. Called automatically by failure-adapter and the dispatcher's record_failed_approach.
 
 ### Changed
 
 - `scripts/cli_adapters/claude.sh` — un-deprecates `EVOLVE_SANDBOX_FALLBACK_ON_EPERM`. The v8.21 deprecation was scope-mismatched (worktree fix targets builder writes; flag targets sub-claude startup — orthogonal layers). Updated WARN messaging to reflect the dual-context model.
-- `scripts/record-failure-to-state.sh` — emits structured classification + `expiresAt` timestamp + FIFO cap (50 entries). Backward-compat: existing `verdict` field preserved.
-- `scripts/evolve-loop-dispatch.sh:record_failed_approach` — same: classification + expiresAt + FIFO cap. Legacy classifications (`infrastructure`, `audit-fail`, `build-fail`) auto-mapped to v8.22 taxonomy via `failure_normalize_legacy`.
-- `scripts/run-cycle.sh` — `build_context` invokes failure-adapter and injects `adaptiveFailureDecision` JSON into the orchestrator's context block. Also filters `recentFailures` by `expiresAt` at read time (read-side defense in depth). New `honor_adapter_set_env` exports the adapter's `set_env` directives before spawning the orchestrator.
+- `scripts/failure/record-failure-to-state.sh` — emits structured classification + `expiresAt` timestamp + FIFO cap (50 entries). Backward-compat: existing `verdict` field preserved.
+- `scripts/dispatch/evolve-loop-dispatch.sh:record_failed_approach` — same: classification + expiresAt + FIFO cap. Legacy classifications (`infrastructure`, `audit-fail`, `build-fail`) auto-mapped to v8.22 taxonomy via `failure_normalize_legacy`.
+- `scripts/dispatch/run-cycle.sh` — `build_context` invokes failure-adapter and injects `adaptiveFailureDecision` JSON into the orchestrator's context block. Also filters `recentFailures` by `expiresAt` at read time (read-side defense in depth). New `honor_adapter_set_env` exports the adapter's `set_env` directives before spawning the orchestrator.
 - `agents/evolve-orchestrator.md` — replaced the markdown decision table with a single rule: "read the adapter JSON's `action` field and follow it verbatim." Added "Operator Action Required block template" section. ~50 lines simplified to ~30.
 - `.evolve/profiles/orchestrator.json` — added `Bash(failure-adapter.sh decide:*)` to allowed_tools.
 - `CLAUDE.md` — un-deprecated `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` in rule #6 with dual-context explanation. Added "Failure Adaptation Kernel (v8.22.0+)" subsection covering taxonomy, retention, decision rules, and operator utilities.
@@ -971,7 +971,7 @@ Test infrastructure cleanup. Closes 3 long-standing pre-existing test failures u
 
 ### Notes
 
-This release does not change the published evolve-loop runtime behavior. The fixes restore the regression-suite truth signal so future contributions can rely on `bash scripts/run-all-regression-tests.sh` showing 27/27 PASS instead of `24/27 PASS, 3 known-flaky`.
+This release does not change the published evolve-loop runtime behavior. The fixes restore the regression-suite truth signal so future contributions can rely on `bash scripts/utility/run-all-regression-tests.sh` showing 27/27 PASS instead of `24/27 PASS, 3 known-flaky`.
 
 ---
 
@@ -981,18 +981,18 @@ Architectural fix release. Closes the v8.13.x — v8.20.2 worktree-provisioning 
 
 ### Added
 
-- `scripts/run-cycle.sh` provisions a per-cycle git worktree at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` (branch `evolve/cycle-N`) **before** spawning the orchestrator. Privileged-shell context — structurally outside any LLM agent's reach. EXIT trap tears down both worktree and cycle-state on every exit path.
-- `scripts/cycle-state.sh set-worktree <path>` — atomic update of `active_worktree` without phase change. Privileged-shell-only (denied in orchestrator profile).
+- `scripts/dispatch/run-cycle.sh` provisions a per-cycle git worktree at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` (branch `evolve/cycle-N`) **before** spawning the orchestrator. Privileged-shell context — structurally outside any LLM agent's reach. EXIT trap tears down both worktree and cycle-state on every exit path.
+- `scripts/lifecycle/cycle-state.sh set-worktree <path>` — atomic update of `active_worktree` without phase change. Privileged-shell-only (denied in orchestrator profile).
 - `scripts/cycle-state-test.sh` — Tests 16-18 cover set-worktree (fresh, idempotent overwrite, init-required). 19 tests total, all passing.
 - `scripts/guards/phase-gate-precondition.sh` — kernel hook now denies the in-process `Agent` tool whenever `cycle-state.json` exists. Defense-in-depth alongside the orchestrator profile deny.
 
 ### Changed
 
 - `scripts/cli_adapters/claude.sh` — empty `WORKTREE_PATH` now fails loudly at BOTH substitution sites (was silent skip in `sandbox.write_subpaths`, loud exit in `add_dir`). The silent-skip path masked the worktree-provisioning gap for multiple releases.
-- `scripts/subagent-run.sh` — `WORKTREE_PATH` is now derived from `cycle-state.json` by default; env var becomes a fallback for tests/manual invocations.
+- `scripts/dispatch/subagent-run.sh` — `WORKTREE_PATH` is now derived from `cycle-state.json` by default; env var becomes a fallback for tests/manual invocations.
 - `.evolve/profiles/orchestrator.json` — `disallowed_tools` adds `Agent`, `Bash(cycle-state.sh set-worktree:*)`, and `Bash(cycle-state.sh set-worktree)`.
 - `agents/evolve-orchestrator.md` — phase-advance no longer carries a worktree placeholder; new "Worktree contract" section documents the privileged-shell provisioning model.
-- `scripts/evolve-loop-dispatch.sh` — loop body pins cwd to `$EVOLVE_PROJECT_ROOT` and re-validates `RUN_CYCLE` is executable per iteration, hardening against subagent-induced cwd drift and plugin-update mid-batch.
+- `scripts/dispatch/evolve-loop-dispatch.sh` — loop body pins cwd to `$EVOLVE_PROJECT_ROOT` and re-validates `RUN_CYCLE` is executable per iteration, hardening against subagent-induced cwd drift and plugin-update mid-batch.
 - `CLAUDE.md` — Rule #5 (Agent tool) updated to document the structural enforcement; Rule #6 (sandbox) marks `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` deprecated; new "Worktree Provisioning Contract" subsection.
 
 ### Deprecated
@@ -1366,14 +1366,14 @@ Final cycle bundles the originally-planned per-phase telemetry with two process 
 
 ### Added
 
-- **`scripts/show-cycle-cost.sh`** (~165 lines) — per-cycle cost telemetry. Reads each subagent's `<workspace>/<agent>-stdout.log` (existing v8.12.x data — no new instrumentation) and prints a per-phase breakdown of `total_cost_usd`, `cache_read_input_tokens`, `cache_creation_input_tokens`, and output tokens. Human-readable table by default; `--json` for scripting. Closes the question "this cycle cost X — where did it go?" with one command. 8 unit tests.
-- **`scripts/run-all-regression-tests.sh`** (~140 lines) — single-command runner for all 14 regression suites. Cycle 8211 audit identified that the auditor profile allowlists individual `Bash(bash scripts/<test>.sh:*)` entries but NOT compositions (`bash a & bash b & wait`, `for s in ...; do bash $s; done`). This helper is one allowlisted command that runs them all. Sequential or `--parallel`. `--json` for machine-readable summary. `SUITES_OVERRIDE` env var lets tests inject stubs without rewriting the script. 7 unit tests.
+- **`scripts/observability/show-cycle-cost.sh`** (~165 lines) — per-cycle cost telemetry. Reads each subagent's `<workspace>/<agent>-stdout.log` (existing v8.12.x data — no new instrumentation) and prints a per-phase breakdown of `total_cost_usd`, `cache_read_input_tokens`, `cache_creation_input_tokens`, and output tokens. Human-readable table by default; `--json` for scripting. Closes the question "this cycle cost X — where did it go?" with one command. 8 unit tests.
+- **`scripts/utility/run-all-regression-tests.sh`** (~140 lines) — single-command runner for all 14 regression suites. Cycle 8211 audit identified that the auditor profile allowlists individual `Bash(bash scripts/<test>.sh:*)` entries but NOT compositions (`bash a & bash b & wait`, `for s in ...; do bash $s; done`). This helper is one allowlisted command that runs them all. Sequential or `--parallel`. `--json` for machine-readable summary. `SUITES_OVERRIDE` env var lets tests inject stubs without rewriting the script. 7 unit tests.
 - **8 new tests in `scripts/show-cycle-cost-test.sh`** — covering: missing args, non-int cycle, missing workspace, empty workspace, single-phase render, multi-phase totals (numeric comparison via bc), JSON shape, malformed-log graceful fallback.
 - **7 new tests in `scripts/run-all-regression-tests-test.sh`** — covering: all-pass, mixed pass/fail with diagnostic tail, JSON shape, parallel mode, bad flag, --help, single-suite SUITES_OVERRIDE.
 
 ### Changed
 
-- **`.evolve/profiles/auditor.json`** — added 4 new allowlist entries: `scripts/run-all-regression-tests.sh` (and its test), `scripts/show-cycle-cost.sh` (and its test). Future audit cycles can run all 14 suites via one allowlisted command instead of needing 14 separate entries OR `&`-chained patterns the profile rejects. Closes cycle 8211 audit's LOW-2.
+- **`.evolve/profiles/auditor.json`** — added 4 new allowlist entries: `scripts/utility/run-all-regression-tests.sh` (and its test), `scripts/observability/show-cycle-cost.sh` (and its test). Future audit cycles can run all 14 suites via one allowlisted command instead of needing 14 separate entries OR `&`-chained patterns the profile rejects. Closes cycle 8211 audit's LOW-2.
 
 ### What this DOES NOT do
 
@@ -1385,7 +1385,7 @@ Final cycle bundles the originally-planned per-phase telemetry with two process 
 
 - `scripts/show-cycle-cost-test.sh` — 8/8 PASS
 - `scripts/run-all-regression-tests-test.sh` — 7/7 PASS
-- `scripts/run-all-regression-tests.sh` (full 14-suite dogfood) — 14/14 PASS, 53 seconds
+- `scripts/utility/run-all-regression-tests.sh` (full 14-suite dogfood) — 14/14 PASS, 53 seconds
 - All v8.13.x regression suites — 162/162 PASS (no regression)
 - **Total: 177/177 PASS** (162 baseline + 8 telemetry + 7 run-all).
 
@@ -1504,8 +1504,8 @@ The `/insights` report (https://github.com/anthropics/claude-code) generated a s
 
 ### Added
 
-- **`scripts/probe-tool.sh`** (~110 lines) — canonical CLI-availability probe. Checks `command -v`, `type -P`, plus 5 common install locations (`/usr/local/bin/`, `/opt/homebrew/bin/`, `$HOME/.local/bin/`, `$HOME/bin/`, `/usr/bin/`). Emits `--json` for scripted use. Closes the "no gws command" false-negative class — the audit caught one real instance where Claude declared `gws` unavailable when it was installed at `~/.local/bin/`. 7-test unit suite at `scripts/probe-tool-test.sh`.
-- **`scripts/postedit-validate.sh`** (~115 lines) — PostToolUse hook on `Edit|Write` that syntax-checks the modified file by extension: `.json` → `jq empty`, `.sh` → `bash -n`, `.py` → `python3 -m py_compile`. Other extensions: silent no-op. Never blocks (PostToolUse can't); emits stderr WARN visible to LLM, prompting immediate re-edit. Catches the `bash 3.2` incompat class (`declare -A`, regex `\b` truncation) at edit time instead of cycle time. 11-test unit suite at `scripts/postedit-validate-test.sh`. Bypass: `EVOLVE_BYPASS_POSTEDIT_VALIDATE=1`.
+- **`scripts/utility/probe-tool.sh`** (~110 lines) — canonical CLI-availability probe. Checks `command -v`, `type -P`, plus 5 common install locations (`/usr/local/bin/`, `/opt/homebrew/bin/`, `$HOME/.local/bin/`, `$HOME/bin/`, `/usr/bin/`). Emits `--json` for scripted use. Closes the "no gws command" false-negative class — the audit caught one real instance where Claude declared `gws` unavailable when it was installed at `~/.local/bin/`. 7-test unit suite at `scripts/probe-tool-test.sh`.
+- **`scripts/verification/postedit-validate.sh`** (~115 lines) — PostToolUse hook on `Edit|Write` that syntax-checks the modified file by extension: `.json` → `jq empty`, `.sh` → `bash -n`, `.py` → `python3 -m py_compile`. Other extensions: silent no-op. Never blocks (PostToolUse can't); emits stderr WARN visible to LLM, prompting immediate re-edit. Catches the `bash 3.2` incompat class (`declare -A`, regex `\b` truncation) at edit time instead of cycle time. 11-test unit suite at `scripts/postedit-validate-test.sh`. Bypass: `EVOLVE_BYPASS_POSTEDIT_VALIDATE=1`.
 - **`skills/publish/SKILL.md`** — slash command wrapper for `/publish`. Documents the v8.13.2 release-pipeline.sh entry point. Disambiguates "publish" from "push" with explicit vocabulary callouts.
 - **`skills/verify-release/SKILL.md`** — slash command wrapper for `/verify-release`. Standalone post-publish marketplace-poll for diagnosing stale-plugin reports.
 - **3 new memory files** for the user's auto-memory:
@@ -1537,18 +1537,18 @@ The `/insights` report (https://github.com/anthropics/claude-code) generated a s
 | CLAUDE.md addition: Shell & Environment Conventions | New section in CLAUDE.md |
 | Custom skill: `/publish` | `skills/publish/SKILL.md` wraps release-pipeline.sh |
 | Custom skill: `/verify-release` | `skills/verify-release/SKILL.md` wraps marketplace-poll.sh |
-| Hook: PostToolUse syntax check | `scripts/postedit-validate.sh` + wired in settings.json |
+| Hook: PostToolUse syntax check | `scripts/verification/postedit-validate.sh` + wired in settings.json |
 | Pattern: confirm direction before exploring | New section in CLAUDE.md |
 | Pattern: verify external state after publish | Already done by marketplace-poll.sh in v8.13.2 |
-| Pattern: probe environment before assuming missing | `scripts/probe-tool.sh` + memory `feedback_probe_before_unavailable.md` |
+| Pattern: probe environment before assuming missing | `scripts/utility/probe-tool.sh` + memory `feedback_probe_before_unavailable.md` |
 | On the horizon: parallel multi-agent evolve loops | DEFERRED to v8.14.x backlog (multi-day project) |
 | On the horizon: autonomous bug hunter | DEFERRED to v8.14.x backlog (multi-day project) |
 | On the horizon: self-healing release pipeline | Already shipped as v8.13.2 |
 
 ### v8.13.3 audit RC1 + RC2 follow-ups (incorporated before ship)
 
-- **MEDIUM-1 fix** (`scripts/postedit-validate.sh:33-43`): suppressed stderr from `mkdir -p` and `log()`'s `>> $GUARDS_LOG` when `.evolve/guards.log` is unwritable (auditor sandbox `read_only_repo: true`, any read-only CI). RC2's first attempt got the redirection order wrong (`>> file 2>/dev/null` opens before redirect activates → EPERM still leaks); RC3 corrects to `2>/dev/null >> file` (redirect first, then open). Test 11 of `postedit-validate-test.sh` now uses `chmod 0444` on an existing `guards.log` file (the actual auditor sandbox semantics — not `chmod -w` on a temp dir, which is a different syscall codepath that masked the RC2 bug). Same defensive pattern as ship-gate.sh and role-gate.sh. Audit cycle 8205 caught the RC2 mistake; cycle 8206 RC3 verified the fix.
-- **LOW-1 cleanup**: removed dead `probe_path()` helper from `scripts/probe-tool.sh` (defined but never called; loop inlined the same logic). No behavior change.
+- **MEDIUM-1 fix** (`scripts/verification/postedit-validate.sh:33-43`): suppressed stderr from `mkdir -p` and `log()`'s `>> $GUARDS_LOG` when `.evolve/guards.log` is unwritable (auditor sandbox `read_only_repo: true`, any read-only CI). RC2's first attempt got the redirection order wrong (`>> file 2>/dev/null` opens before redirect activates → EPERM still leaks); RC3 corrects to `2>/dev/null >> file` (redirect first, then open). Test 11 of `postedit-validate-test.sh` now uses `chmod 0444` on an existing `guards.log` file (the actual auditor sandbox semantics — not `chmod -w` on a temp dir, which is a different syscall codepath that masked the RC2 bug). Same defensive pattern as ship-gate.sh and role-gate.sh. Audit cycle 8205 caught the RC2 mistake; cycle 8206 RC3 verified the fix.
+- **LOW-1 cleanup**: removed dead `probe_path()` helper from `scripts/utility/probe-tool.sh` (defined but never called; loop inlined the same logic). No behavior change.
 - **Builder process improvement (DEFECT-2 LOW)**: build reports must now run read-only-context tests against an actual `chmod 0444` on the existing log file, not `chmod -w` on a temp dir — different kernel codepaths produce different observable behavior. RC2's "verified empirically" claim was a process gap that v8.13.3 RC3's strengthened Test 11 now closes.
 
 ### Out of scope (deferred to v8.13.4 / v8.14.x)
@@ -1585,7 +1585,7 @@ The /insights audit flagged "release_publish" as the #1 friction class — silen
 - **`scripts/release/version-bump.sh`** (~140 lines) — atomic version updater for `plugin.json`, `marketplace.json` (`.plugins[0].version` path), `SKILL.md` heading, `README.md` "Current" + history row. Idempotent.
 - **`scripts/release/changelog-gen.sh`** (~150 lines) — conventional-commits parser. Buckets `feat:`/`fix:`/`refactor:`/`perf:`/`docs:` plus an explicit `### Other` fallback for the ~40% of historical commits without prefixes. Idempotent — preserves manually-curated entries.
 - **`scripts/release/marketplace-poll.sh`** (~150 lines) — post-publish marketplace propagation verifier. Polls `~/.claude/plugins/marketplaces/evolve-loop/` for up to 5 minutes (configurable via `--max-wait-s`). On convergence, re-invokes `release.sh <target>` to refresh `installed_plugins.json` registry. **Closes the cache-refresh ordering bug** by sequencing release.sh-refresh AFTER convergence, never before.
-- **`scripts/release/rollback.sh`** (~190 lines) — auto-revert. Reads release journal. Three independently-auditable steps: (a) `gh release delete vX.Y.Z`, (b) `git push origin :refs/tags/vX.Y.Z`, (c) revert commit pushed via `EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh "revert: ..."`. Logs every step to `.evolve/release-rollbacks.jsonl` for audit trail.
+- **`scripts/release/rollback.sh`** (~190 lines) — auto-revert. Reads release journal. Three independently-auditable steps: (a) `gh release delete vX.Y.Z`, (b) `git push origin :refs/tags/vX.Y.Z`, (c) revert commit pushed via `EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh "revert: ..."`. Logs every step to `.evolve/release-rollbacks.jsonl` for audit trail.
 - **`docs/release-protocol.md`** (~250 lines) — canonical vocabulary doc. Defines push, tag, release, propagate, publish, ship. Operational runbook with annotated examples. Conventional-commits guide. Marketplace topology diagram. Common failure modes table.
 - **5 new test suites** (54 tests total): `preflight-test.sh` (10), `changelog-gen-test.sh` (14), `marketplace-poll-test.sh` (10), `rollback-test.sh` (8), `release-pipeline-test.sh` (12). Includes explicit regression tests for **the cache-refresh ordering bug** (Test 9 of release-pipeline-test) and **the stale-version regression** (Test 3 of marketplace-poll-test, Test 10 of release-pipeline-test).
 
@@ -1632,7 +1632,7 @@ Every component:
 
 ### Trust boundary completed: role-gate + phase-gate-precondition + run-cycle.sh
 
-v8.13.0 shipped the atomic ship-gate (`scripts/ship.sh` allowlist on Bash). v8.13.1 adds the two remaining structural gates and a declarative cycle driver, completing the trust-boundary the user originally requested ("orchestrator should only execute phases, can't interfere"):
+v8.13.0 shipped the atomic ship-gate (`scripts/lifecycle/ship.sh` allowlist on Bash). v8.13.1 adds the two remaining structural gates and a declarative cycle driver, completing the trust-boundary the user originally requested ("orchestrator should only execute phases, can't interfere"):
 
 - **`scripts/guards/role-gate.sh`** (NEW, ~190 lines) — PreToolUse hook on `Edit|Write`. Reads `.evolve/cycle-state.json` and enforces a per-phase write allowlist:
   - `calibrate`/`research`/`discover` → workspace only
@@ -1643,11 +1643,11 @@ v8.13.0 shipped the atomic ship-gate (`scripts/ship.sh` allowlist on Bash). v8.1
 
   Always allows `/tmp/`, `/var/folders/`, `$HOME/.claude/`. Transparent passthrough when no cycle is in progress. Bypass: `EVOLVE_BYPASS_ROLE_GATE=1`.
 
-- **`scripts/guards/phase-gate-precondition.sh`** (NEW, ~150 lines) — Second PreToolUse hook on Bash matcher (after ship-gate). Triggers ONLY for `bash scripts/subagent-run.sh <agent> ...` invocations. Reads cycle-state.phase and denies invocations that don't match the expected next agent (Scout→Builder→Auditor sequence). Bypass: `EVOLVE_BYPASS_PHASE_GATE=1`.
+- **`scripts/guards/phase-gate-precondition.sh`** (NEW, ~150 lines) — Second PreToolUse hook on Bash matcher (after ship-gate). Triggers ONLY for `bash scripts/dispatch/subagent-run.sh <agent> ...` invocations. Reads cycle-state.phase and denies invocations that don't match the expected next agent (Scout→Builder→Auditor sequence). Bypass: `EVOLVE_BYPASS_PHASE_GATE=1`.
 
-- **`scripts/run-cycle.sh`** (NEW, ~170 lines) — Convenience driver. Picks next cycle ID, initializes cycle-state.json, spawns orchestrator subagent under its profile-restricted permissions. Includes `--dry-run` for inspection. Cleans up cycle-state on exit (success or failure).
+- **`scripts/dispatch/run-cycle.sh`** (NEW, ~170 lines) — Convenience driver. Picks next cycle ID, initializes cycle-state.json, spawns orchestrator subagent under its profile-restricted permissions. Includes `--dry-run` for inspection. Cleans up cycle-state on exit (success or failure).
 
-- **`scripts/cycle-state.sh`** (NEW, ~150 lines) — Helpers (`init`/`advance`/`set-agent`/`get`/`clear`/`exists`/`dump`/`path`) for `.evolve/cycle-state.json`. Atomic mv-of-temp-file updates. Schema: cycle_id, phase, started_at, phase_started_at, active_agent, active_worktree, completed_phases, workspace_path.
+- **`scripts/lifecycle/cycle-state.sh`** (NEW, ~150 lines) — Helpers (`init`/`advance`/`set-agent`/`get`/`clear`/`exists`/`dump`/`path`) for `.evolve/cycle-state.json`. Atomic mv-of-temp-file updates. Schema: cycle_id, phase, started_at, phase_started_at, active_agent, active_worktree, completed_phases, workspace_path.
 
 - **`agents/evolve-orchestrator.md`** (NEW, ~80 lines) — Orchestrator subagent prompt. Sequences Scout→Builder→Auditor; on PASS invokes ship.sh; on FAIL/WARN invokes record-failure-to-state.sh (no inline retrospective per v8.12.3 design pivot). Cannot edit source code, commit, or push (kernel hooks block).
 
@@ -1662,8 +1662,8 @@ Combined: **69/69 unit tests pass**.
 ### Modified
 
 - `.claude/settings.json` — wires role-gate.sh on `Edit|Write`, adds phase-gate-precondition.sh as second hook on Bash matcher.
-- `.evolve/profiles/orchestrator.json` — allows `Bash(bash scripts/cycle-state.sh:*)` and `Bash(bash scripts/run-cycle.sh:*)`. Updated `_design_notes` (no longer "scaffolding only").
-- `skills/evolve-loop/SKILL.md` — documents `bash scripts/run-cycle.sh` as the declarative alternative.
+- `.evolve/profiles/orchestrator.json` — allows `Bash(bash scripts/lifecycle/cycle-state.sh:*)` and `Bash(bash scripts/dispatch/run-cycle.sh:*)`. Updated `_design_notes` (no longer "scaffolding only").
+- `skills/evolve-loop/SKILL.md` — documents `bash scripts/dispatch/run-cycle.sh` as the declarative alternative.
 - `skills/evolve-loop/phases.md` — documents cycle-state.json + the three kernel hooks at every transition.
 
 ### Removed (branch cleanup)
@@ -1683,7 +1683,7 @@ The architectural pattern is now consistent across all three gates. Same test di
 
 ### v8.13.1 audit RC1 follow-ups (incorporated before ship)
 
-- **MEDIUM-1 fix**: orchestrator profile narrowed from `Bash(bash scripts/cycle-state.sh:*)` to specific subcommands `{advance, set-agent, get, exists, dump, path}`. The `init` and `clear` subcommands are now in `disallowed_tools`, preventing the orchestrator subagent from silently disabling the v8.13.1 gates by removing `cycle-state.json`. `run-cycle.sh`'s parent process owns the init/clear lifecycle.
+- **MEDIUM-1 fix**: orchestrator profile narrowed from `Bash(bash scripts/lifecycle/cycle-state.sh:*)` to specific subcommands `{advance, set-agent, get, exists, dump, path}`. The `init` and `clear` subcommands are now in `disallowed_tools`, preventing the orchestrator subagent from silently disabling the v8.13.1 gates by removing `cycle-state.json`. `run-cycle.sh`'s parent process owns the init/clear lifecycle.
 - **LOW-2 fix**: `role-gate.sh` strips trailing slash from `ACTIVE_WT` and `WORKSPACE_PATH` after reading from cycle-state.json. Defensive trim against caller-supplied trailing-slash paths. New unit test (Test 21) covers this.
 - **LOW-1**: canonicalize() docstring is cosmetic; deferred (no behavior change).
 - **LOW-3**: run-cycle.sh dry-run log message wording is cosmetic; deferred.
@@ -1700,9 +1700,9 @@ The architectural pattern is now consistent across all three gates. Same test di
 
 ## [8.13.0] - 2026-04-27
 
-### **BREAKING — atomic ship-gate via canonical `scripts/ship.sh`**
+### **BREAKING — atomic ship-gate via canonical `scripts/lifecycle/ship.sh`**
 
-After 5+ audit cycles of parser-bypass arms races (cycles 8121-8129), v8.13.0 reframes the problem. Instead of detecting ship-class commands (git commit / git push / gh release create) inside arbitrary bash via increasingly clever parsers, the gate now allowlists exactly ONE canonical script: `scripts/ship.sh`. The gate's check is trivially simple: "does this command's first executable, resolved via realpath, equal `scripts/ship.sh`?" If yes, allow (ship.sh enforces the audit-first contract internally). If no AND the command contains ship verbs, deny.
+After 5+ audit cycles of parser-bypass arms races (cycles 8121-8129), v8.13.0 reframes the problem. Instead of detecting ship-class commands (git commit / git push / gh release create) inside arbitrary bash via increasingly clever parsers, the gate now allowlists exactly ONE canonical script: `scripts/lifecycle/ship.sh`. The gate's check is trivially simple: "does this command's first executable, resolved via realpath, equal `scripts/lifecycle/ship.sh`?" If yes, allow (ship.sh enforces the audit-first contract internally). If no AND the command contains ship verbs, deny.
 
 **This kills the parser-bypass arms race.** D1-D3 from cycle 8122 (bare-newline, pipe-to-shell, here-string), D6 (commit→push workflow regression), and D-NEW-1 from cycle 8130 (bash -c bypass) are all resolved.
 
@@ -1713,21 +1713,21 @@ Raw `git commit`, `git push`, and `gh release create` invocations are now **deni
 **To ship a commit:**
 
 ```bash
-bash scripts/ship.sh "<commit-message>"
+bash scripts/lifecycle/ship.sh "<commit-message>"
 # Optionally with release notes for a GitHub release:
-EVOLVE_SHIP_RELEASE_NOTES="$(cat NOTES.md)" bash scripts/ship.sh "<commit-message>"
+EVOLVE_SHIP_RELEASE_NOTES="$(cat NOTES.md)" bash scripts/lifecycle/ship.sh "<commit-message>"
 ```
 
 **Emergency bypass:**
 
 ```bash
 EVOLVE_BYPASS_SHIP_GATE=1 git commit -m "<msg>"     # bypasses the gate
-EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh    # bypasses ship.sh's internal audit checks
+EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh    # bypasses ship.sh's internal audit checks
 ```
 
 Both bypasses are logged with explicit WARN.
 
-### Added — `scripts/ship.sh` (canonical atomic shipper, ~190 lines)
+### Added — `scripts/lifecycle/ship.sh` (canonical atomic shipper, ~190 lines)
 
 Enforces the full audit-first contract before any git operation:
 
@@ -1753,15 +1753,15 @@ Enforces the full audit-first contract before any git operation:
 
 ### Added — `.evolve/profiles/orchestrator.json` (orchestrator subagent profile, scaffolding)
 
-The orchestrator-as-subagent vision from `feat/orchestrator-as-subagent` (commit 8bc2759, parked since cycle 8121) lands as scaffolding. Without v8.13.1's `scripts/run-cycle.sh` deterministic driver, this profile is not yet invoked by anything. It provides the M2-fix interpreter denials when the spawner ships:
+The orchestrator-as-subagent vision from `feat/orchestrator-as-subagent` (commit 8bc2759, parked since cycle 8121) lands as scaffolding. Without v8.13.1's `scripts/dispatch/run-cycle.sh` deterministic driver, this profile is not yet invoked by anything. It provides the M2-fix interpreter denials when the spawner ships:
 
 - Disallowed: `Bash(perl:*)`, `Bash(perl -e:*)`, `Bash(ruby:*)`, `Bash(ruby -e:*)`, `Bash(python -c:*)`, `Bash(python3 -c:*)`, `Bash(node -e:*)`, `Bash(osascript:*)`, `Bash(sh -c:*)`, `Bash(bash -c:*)`, `Bash(zsh -c:*)`, `Bash(env:*)`, `Bash(exec:*)`, `Bash(eval:*)`, `Bash(awk:*)`.
 - Sandbox: `read_only_repo: true`, allow_network: true (orchestrator may need to reach Anthropic API for sub-subagent invocation).
-- Allowed: `Bash(bash scripts/ship.sh:*)`, `Bash(bash scripts/subagent-run.sh:*)`, narrow git read commands (status, log, diff, show, ls-files, rev-parse, branch, stash list, worktree list).
+- Allowed: `Bash(bash scripts/lifecycle/ship.sh:*)`, `Bash(bash scripts/dispatch/subagent-run.sh:*)`, narrow git read commands (status, log, diff, show, ls-files, rev-parse, branch, stash list, worktree list).
 
 ### Changed — cycle-binding fields in ledger
 
-`scripts/subagent-run.sh` now captures `git_head` (= `git rev-parse HEAD`) and `tree_state_sha` (= sha256 of `git diff HEAD`) at agent-start time and emits both in every `agent_subprocess` ledger entry. ship.sh uses these to enforce the cycle-binding contract.
+`scripts/dispatch/subagent-run.sh` now captures `git_head` (= `git rev-parse HEAD`) and `tree_state_sha` (= sha256 of `git diff HEAD`) at agent-start time and emits both in every `agent_subprocess` ledger entry. ship.sh uses these to enforce the cycle-binding contract.
 
 ### Audit history
 
@@ -1782,12 +1782,12 @@ This is the FIRST release that uses ship.sh to ship itself. The `.claude/setting
 
 For existing v8.12.4 users:
 - Pull the new code; the next `git commit` will be denied unless via ship.sh
-- One-time setup: run any audit cycle, then `bash scripts/ship.sh "<msg>"` — it'll pin its own SHA on first run
+- One-time setup: run any audit cycle, then `bash scripts/lifecycle/ship.sh "<msg>"` — it'll pin its own SHA on first run
 - The ship-gate is project-scoped via `.claude/settings.json` — only fires inside this repo's working directory
 
 ### Out of scope (deferred to v8.13.1+)
 
-- `scripts/run-cycle.sh` — deterministic driver that sequences phases and spawns the orchestrator subagent. Without it, the orchestrator profile shipped here is scaffolding only.
+- `scripts/dispatch/run-cycle.sh` — deterministic driver that sequences phases and spawns the orchestrator subagent. Without it, the orchestrator profile shipped here is scaffolding only.
 - `scripts/guards/role-gate.sh` — block Edit/Write outside cycle workspace mid-cycle.
 - `scripts/guards/phase-gate-precondition.sh` — block out-of-order phases.
 - Skill rewrite for `/evolve-loop` to invoke the orchestrator subagent.
@@ -1848,7 +1848,7 @@ Six profile JSONs (`scout`, `builder`, `auditor`, `inspirer`, `evaluator`, `retr
 
 ### Added — Subagent telemetry sidecars
 
-After every successful agent run, `scripts/subagent-run.sh` writes two sidecar files into the workspace:
+After every successful agent run, `scripts/dispatch/subagent-run.sh` writes two sidecar files into the workspace:
 
 - **`${agent}-usage.json`** — extracts `usage`, `modelUsage`, `duration_ms`, `num_turns`, `total_cost_usd` from the agent's stdout JSON. Future audits can self-verify empirical token effects without parsing their own stdout.
 - **`${agent}-timing.json`** — per-phase ms breakdown (`profile_load_ms`, `prep_total_ms`, `adapter_invoke_ms`, `finalize_ms`, `total_ms`). Bash 3.2-compatible (uses temp file, not `declare -A`). Confirmed empirically that 99.9% of subagent runtime is the `claude -p` API call; pure runner overhead is ~110ms.
@@ -1858,7 +1858,7 @@ After every successful agent run, `scripts/subagent-run.sh` writes two sidecar f
 Per user direction, the `evolve-retrospective` subagent (shipped in v8.12.2) is **no longer invoked per-cycle**. Instead, when an audit returns FAIL/WARN/SHIP_GATE_DENIED:
 
 1. Capture `git diff HEAD > $WORKSPACE_PATH/failed.patch` (forensic)
-2. Run `scripts/record-failure-to-state.sh $WORKSPACE_PATH $VERDICT` — extracts audit defects (severity + title) from `audit-report.md`, captures cycle/git-head/tree-state SHA + audit-report SHA256, appends a structured entry to `state.json.failedApproaches[]` with `retrospected: false`. **Total cost: ~50ms shell, no LLM calls.**
+2. Run `scripts/failure/record-failure-to-state.sh $WORKSPACE_PATH $VERDICT` — extracts audit defects (severity + title) from `audit-report.md`, captures cycle/git-head/tree-state SHA + audit-report SHA256, appends a structured entry to `state.json.failedApproaches[]` with `retrospected: false`. **Total cost: ~50ms shell, no LLM calls.**
 3. `git worktree remove --force` discards the failed code.
 
 The retrospective subagent runs separately in **batches** (on-demand or scheduled), synthesizing cross-cycle patterns from accumulated `failedApproaches` entries. This is more useful than per-cycle retrospectives because failure patterns ("3rd parser bypass this month") only emerge from multiple data points.
@@ -1876,7 +1876,7 @@ The retrospective subagent runs separately in **batches** (on-demand or schedule
 - v8.12.3 RC3 TMPDIR-override: empirically non-functional (Claude Code uses hardcoded `/tmp/claude-${UID}/`, not `${TMPDIR}/`).
 - v8.12.3 RC4 auto-worktree (per-subagent unique cwd): empirically non-functional (cwd-hash alone doesn't prevent cleanup; broke profile's relative-path Write patterns; showed worktree HEAD instead of orchestrator's working tree).
 
-EPERM remains an open issue. Documented in `scripts/subagent-run.sh:295-313` with the failed approaches enumerated. Next investigation should target the actual cleanup trigger (likely `.claude/` directory location or parent PID, not cwd).
+EPERM remains an open issue. Documented in `scripts/dispatch/subagent-run.sh:295-313` with the failed approaches enumerated. Next investigation should target the actual cleanup trigger (likely `.claude/` directory location or parent PID, not cwd).
 
 ### Audit
 
@@ -1905,10 +1905,10 @@ The runner overhead is ~110ms; everything else is the `claude -p` API call. To r
 
 - **`agents/evolve-retrospective.md`** — new failure post-mortem subagent. Fires only on Auditor `FAIL`/`WARN` or `SHIP_GATE_DENIED`. Reads cycle artifacts (audit-report, build-report, scout-report, the failed diff) and writes a structured retrospective + one or more failure-lesson YAMLs into `.evolve/instincts/lessons/`. Read-only outside the lesson directory; cannot mutate state.json, ledger, profiles, or personal instincts.
 - **`.evolve/profiles/retrospective.json`** — least-privilege permission profile. `read_only_repo: true`, `allow_network: false`. Allowed writes: only the retrospective report, handoff JSON, and lesson YAMLs. Disallows all source code mutation, git commit/push/release, all interpreter `-c`/`-e` flags, and network tools (WebFetch, WebSearch, curl, wget). Sandboxed via macOS sandbox-exec or Linux bwrap.
-- **`scripts/merge-lesson-into-state.sh`** — orchestrator post-processor. Reads `handoff-retrospective.json`, appends new lesson IDs to `state.json.instinctSummary[]` (so future Scout/Builder/Auditor agents see them in their context block via the existing channel), appends a structured `failedApproaches[]` entry, and emits a `SYSTEMIC_FAILURE` ledger event when the retrospective flagged 3+ same-error-category failures across recent cycles. The retrospective profile cannot mutate state.json directly — this helper runs under orchestrator permissions.
+- **`scripts/failure/merge-lesson-into-state.sh`** — orchestrator post-processor. Reads `handoff-retrospective.json`, appends new lesson IDs to `state.json.instinctSummary[]` (so future Scout/Builder/Auditor agents see them in their context block via the existing channel), appends a structured `failedApproaches[]` entry, and emits a `SYSTEMIC_FAILURE` ledger event when the retrospective flagged 3+ same-error-category failures across recent cycles. The retrospective profile cannot mutate state.json directly — this helper runs under orchestrator permissions.
 - **`scripts/merge-lesson-test.sh`** — 7-check smoke test (no-op on missing handoff, single-lesson merge, failedApproaches append, missing-YAML integrity exit 2, SYSTEMIC_FAILURE ledger event, malformed-handoff exit 1, multi-lesson merge).
 - **`.evolve/instincts/lessons/.keep`** — directory marker so the lessons directory ships with the plugin. Per-project lesson YAMLs (`inst-L*.yaml`) remain gitignored.
-- **`scripts/subagent-run.sh`**: registered `retrospective` as a recognized agent role. Updated header docs and usage text.
+- **`scripts/dispatch/subagent-run.sh`**: registered `retrospective` as a recognized agent role. Updated header docs and usage text.
 - **`scripts/subagent-run-test.sh`**: extended Test 1 to validate the retrospective profile (now 11/11 from 10/10).
 
 ### Changed — Skill docs document the explicit FAIL branch
@@ -1921,7 +1921,7 @@ The runner overhead is ~110ms; everything else is the `claude -p` API call. To r
 
 - **`scripts/cli_adapters/claude.sh`**: the `read_only_repo: true` branch in the macOS sandbox profile generator was a `:` placeholder. Replaced with `echo "(deny file-write* (subpath \"$repo_root\"))"` — emitted before the `write_subpaths` allow loop so per-agent allows correctly override (SBPL last-match-wins). Belt-and-suspenders against future broader allow rules; the auditor, evaluator, scout, and retrospective profiles all benefit.
 - **`scripts/cli_adapters/claude.sh`**: the Linux bwrap branch hard-coded `--share-net`, ignoring `allow_network: false` in profiles. Replaced with conditional `--share-net` (when true) / `--unshare-net` (when false). Now mirrors the macOS branch's network policy. The retrospective profile's stated guarantee ("network is disabled") is now actually enforced on Linux.
-- **`scripts/merge-lesson-into-state.sh`**: removed unused `mapfile_compat` function.
+- **`scripts/failure/merge-lesson-into-state.sh`**: removed unused `mapfile_compat` function.
 - **`.evolve/profiles/retrospective.json`**: removed extraneous `Write(.evolve/runs/cycle-*/retrospective-stdout.log)` allow — the runner adapter writes stdout via redirection, not the subagent.
 
 ### Audit
@@ -1949,11 +1949,11 @@ The runner overhead is ~110ms; everything else is the `claude -p` API call. To r
 ## [8.12.0] - 2026-04-27
 
 ### Added
-- **Subagent subprocess isolation runner (`scripts/subagent-run.sh`)** — single entry point for invoking phase agents (Scout, Builder, Auditor, Inspirer, Evaluator) as isolated subprocesses with per-agent CLI permission profiles. Per-invocation challenge tokens detect forged artifacts; tamper-evident SHA256 ledger entries detect post-run mutation.
+- **Subagent subprocess isolation runner (`scripts/dispatch/subagent-run.sh`)** — single entry point for invoking phase agents (Scout, Builder, Auditor, Inspirer, Evaluator) as isolated subprocesses with per-agent CLI permission profiles. Per-invocation challenge tokens detect forged artifacts; tamper-evident SHA256 ledger entries detect post-run mutation.
 - **Per-agent permission profiles (`.evolve/profiles/*.json`)** — least-privilege CLI flag templates encoding `allowed_tools`, `disallowed_tools`, `permission_mode`, `add_dir`, sandbox config, and budget caps for each phase agent.
 - **CLI adapter abstraction (`scripts/cli_adapters/{claude,gemini,codex}.sh`)** — uniform interface for provider-agnostic subagent dispatch. Claude adapter wraps invocations in `sandbox-exec` (macOS) or `bwrap` (Linux) when `EVOLVE_SANDBOX=1`.
 - **OS-level sandboxing** for every Claude subprocess. Auditor and Evaluator profiles run with `read_only_repo: true` (read-only mount of the repo); Evaluator additionally has `allow_network: false`.
-- **Mutation-testing pre-flight (`scripts/mutate-eval.sh`)** — applies language-aware mutations to source-under-test and verifies eval kill rate ≥ 0.8. `phase-gate.sh gate_discover_to_build` runs this against every new eval and flags tautological checks (rollout phase 1: WARN-only).
+- **Mutation-testing pre-flight (`scripts/verification/mutate-eval.sh`)** — applies language-aware mutations to source-under-test and verifies eval kill rate ≥ 0.8. `phase-gate.sh gate_discover_to_build` runs this against every new eval and flags tautological checks (rollout phase 1: WARN-only).
 - **Adversarial Auditor mode** (default-on) — runner injects an "ADVERSARIAL AUDIT MODE" prefix that requires positive executable evidence (test output, diff hunk, or repro command) for PASS verdicts. Counters same-model-judge sycophancy. Auditor model defaults to a different family from Builder (Opus vs Sonnet). Disable with `ADVERSARIAL_AUDIT=0` for permissive sweeps.
 - **Subagent ledger match check** — `phase-gate.sh check_subagent_ledger_match` re-hashes each artifact and compares with the SHA256 recorded by the runner at write time, catching post-run mutation.
 - **Smoke tests** — `scripts/subagent-run-test.sh` (10 checks: profile validation, forgery rejection, token presence, unknown-agent, missing-artifact, legacy-fallback) and `scripts/subagent-adversarial-test.sh`.
@@ -1962,11 +1962,11 @@ The runner overhead is ~110ms; everything else is the `claude -p` API call. To r
 - **CLAUDE.md** — added rules 5-8 codifying subprocess-isolation, OS sandboxing, mutation pre-flight, and adversarial auditor as non-negotiable defaults.
 - **Skill phase docs** (`phase2-discover.md`, `phase3-build.md`, `phases.md`, `inspirer/SKILL.md`, `evaluator/SKILL.md`, top-level `evolve-loop/SKILL.md`) — replaced platform-dispatch boilerplate with the `subagent-run.sh` invocation contract. `LEGACY_AGENT_DISPATCH=1` documented as a one-A/B-cycle escape hatch only.
 - **`agents/evolve-auditor.md`** — PASS verdict criterion tightened to require positive per-criterion evidence; absence of MEDIUM+ issues alone is not sufficient.
-- **`scripts/eval-quality-check.sh`** — fenced-code-block fallback parser. Files with eval commands only inside fenced blocks now WARN; files with no parseable commands emit `ANOMALY` (not silent skip).
+- **`scripts/verification/eval-quality-check.sh`** — fenced-code-block fallback parser. Files with eval commands only inside fenced blocks now WARN; files with no parseable commands emit `ANOMALY` (not silent skip).
 - **`.gitignore`** — surgical exception so `.evolve/profiles/*.json` ship with the plugin while runtime state under `.evolve/` (state.json, ledger.jsonl, runs/, evals/, history/) remains ignored.
 
 ### Fixed
-- **`scripts/subagent-run.sh:322`** — successful agent run now exits 0 (per documented contract) instead of 1. Previously every successful subagent invocation was reported as a failure to the orchestrator.
+- **`scripts/dispatch/subagent-run.sh:322`** — successful agent run now exits 0 (per documented contract) instead of 1. Previously every successful subagent invocation was reported as a failure to the orchestrator.
 
 ### Documentation
 - Added `docs/reports/2026-04-26-subagent-isolation-hardening-report.md` — full incident-style report on the isolation hardening initiative.
@@ -2009,7 +2009,7 @@ The runner overhead is ~110ms; everything else is the `claude -p` API call. To r
 
 ### Added
 - **`ecc:e2e` first-class integration** — UI/browser tasks now auto-invoke the `everything-claude-code:e2e-testing` skill to generate and run Playwright tests. Scout routes UI work to a new `e2e` skill category; Builder Step 4.5 generates `tests/e2e/<slug>.spec.ts`; Auditor checklist D.5 verifies selector grounding, artifact presence, and `## E2E Verification` in the build-report; `phase-gate.sh` blocks ship if a UI task is missing e2e evidence.
-- **`scripts/setup-skill-inventory.sh` + `scripts/setup_skill_inventory.py`** — deterministic filesystem scanner that indexes every installed skill (project, user-global, plugin cache) and writes `.evolve/skill-inventory.json`. Replaces LLM-side parsing of the session's skill listing with a zero-token, cache-friendly scan. Automatically picks newest plugin version, skips IDE mirror dirs (`.cursor/skills`, `.kiro/skills`), and categorizes via the routing taxonomy. Tested: 281 skills indexed across 7 scopes.
+- **`scripts/utility/setup-skill-inventory.sh` + `scripts/utility/setup_skill_inventory.py`** — deterministic filesystem scanner that indexes every installed skill (project, user-global, plugin cache) and writes `.evolve/skill-inventory.json`. Replaces LLM-side parsing of the session's skill listing with a zero-token, cache-friendly scan. Automatically picks newest plugin version, skips IDE mirror dirs (`.cursor/skills`, `.kiro/skills`), and categorizes via the routing taxonomy. Tested: 281 skills indexed across 7 scopes.
 - **New E2E Graders eval-runner section** (`skills/evolve-loop/eval-runner.md`) — first-class grader type with artifact locations (`playwright-report/`, `test-results/`, `artifacts/*.zip`), flake handling, and skip-condition semantics.
 - **Auditor audit-report template** extended with `## E2E Grounding (D.5)` table.
 - **Builder build-report template** extended with `## E2E Verification` section.
@@ -2031,7 +2031,7 @@ The runner overhead is ~110ms; everything else is the `claude -p` API call. To r
   - `phase4-ship.md` → `phase5-ship.md`
   - `phase5-learn.md` → `phase6-learn.md`
   - `phase6-metacycle.md` → `phase7-meta.md` (filename now matches the `Phase 7: META` heading text)
-- **Phase 0 Skill Inventory step** now calls `scripts/setup-skill-inventory.sh` instead of LLM-parsing the system-reminder skill list. Deterministic, faster, and complete across every installed plugin.
+- **Phase 0 Skill Inventory step** now calls `scripts/utility/setup-skill-inventory.sh` instead of LLM-parsing the system-reminder skill list. Deterministic, faster, and complete across every installed plugin.
 - **Scout skill-matching table** adds an `e2e` category row routing UI tasks to `everything-claude-code:e2e-testing` as primary.
 - **251 phase references** (text + filepaths) rewritten across 43 source files; TOC anchor slugs updated to match renumbered headers; `phase-gate.sh` anti-forgery whitelist extended with `setup-skill-inventory.sh`.
 
@@ -2079,7 +2079,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 ## [8.8.1] - 2026-04-06
 
 ### Added
-- **`scripts/token-profiler.sh`** — Measures token footprint of all skill, agent, and script files. Outputs ranked table with line counts and estimated tokens. Supports `--json`, `--save-baseline`, and `--compare` flags for tracking optimization progress over time.
+- **`scripts/observability/token-profiler.sh`** — Measures token footprint of all skill, agent, and script files. Outputs ranked table with line counts and estimated tokens. Supports `--json`, `--save-baseline`, and `--compare` flags for tracking optimization progress over time.
 - **`docs/token-optimization-guide.md`** — Research-backed optimization guide documenting 5 techniques (three-tier progressive disclosure, context block ordering, AgentDiet trajectory compression, event-driven reminders, per-phase context selection) with measured baselines and per-file recommendations. Cites 7 papers including AgentDiet (FSE 2026), OPENDEV, CEMM, and Prompt Compression Survey (NAACL 2025).
 
 ### Changed
@@ -2107,8 +2107,8 @@ Patch release. No behavior changes — all updates are documentation, file organ
 - **Hybrid pipeline+agentic architecture** — Pipeline layer runs 6 deterministic checks (~0.5s, ~2-5K tokens) before agentic layer handles contextual analysis (~15-40K tokens). Saves 40-60% tokens vs. separate review + simplify agents.
 - **Multi-dimensional scoring** — 4 dimensions (correctness 0.35, security 0.25, performance 0.15, maintainability 0.25) with numeric 0.0-1.0 scores replace binary PASS/FAIL.
 - **Adaptive depth routing** — 3 tiers (lightweight < 50 lines, standard 50-200 lines, full review > 200 lines) with auto-escalation for security-sensitive files.
-- **`scripts/code-review-simplify.sh`** — Pipeline layer engine with 6 checks: file length (800), function length (50), nesting depth (4), secrets detection, cognitive complexity (15/function), near-duplicate detection.
-- **`scripts/complexity-check.sh`** — Per-function cognitive complexity scorer with `--threshold` flag and multi-language support (bash, Python, JS/TS, Go, Java, Rust).
+- **`scripts/utility/code-review-simplify.sh`** — Pipeline layer engine with 6 checks: file length (800), function length (50), nesting depth (4), secrets detection, cognitive complexity (15/function), near-duplicate detection.
+- **`scripts/verification/complexity-check.sh`** — Per-function cognitive complexity scorer with `--threshold` flag and multi-language support (bash, Python, JS/TS, Go, Java, Rust).
 - **Auditor D4 integration** — Optional skill consultation for code changes > 20 lines; composite score supplements verdict; auto-generates simplification suggestions when maintainability < 0.7.
 - **Builder self-review** — Optional Step 5 enhancement runs lightweight pipeline after eval pass; applies simplifications before auditor sees the code.
 - **Simplification catalog** — 8 localized refactoring techniques (Extract Method, flatten nesting, decompose conditional, extract utility, rename, replace magic numbers, inline over-abstraction, remove dead code).
@@ -2127,7 +2127,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 - **Rate Limit Recovery Protocol** — Detects API rate limits after every agent dispatch (Scout, Builder, Auditor) and auto-schedules resumption via `/schedule` (remote trigger) or `/loop` (local retry) instead of silently dying.
 - **3-tier auto-resumption** — Priority cascade: remote trigger (≥1hr limits) → local loop (short limits) → manual fallback.
 - **Consecutive failure tracking** — 3+ sequential agent failures trigger rate limit recovery as a safety net.
-- **Plugin cache refresh in release flow** — `scripts/release.sh` now clears stale plugin cache, updates marketplace checkout, and refreshes the plugin registry automatically.
+- **Plugin cache refresh in release flow** — `scripts/utility/release.sh` now clears stale plugin cache, updates marketplace checkout, and refreshes the plugin registry automatically.
 
 ### Changed
 - Orchestrator loop step 6 now includes rate limit check after every agent dispatch.
@@ -2176,7 +2176,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 
 ### Added
 - **Smart Web Search skill** — intent-aware 6-stage search pipeline that classifies questions, transforms queries using Query2doc/HyDE, iteratively searches and refines, and returns grounded cited answers.
-- **Release checklist script** (`scripts/release.sh`) — validates version consistency across all files before release to prevent version drift.
+- **Release checklist script** (`scripts/utility/release.sh`) — validates version consistency across all files before release to prevent version drift.
 
 ### Changed
 - **Online Researcher** now leverages Smart Web Search skill for web searches.
@@ -2200,7 +2200,7 @@ Patch release. No behavior changes — all updates are documentation, file organ
 ## [7.8.0] - 2026-03-22
 
 ### Security
-- **Deterministic phase gate script** (`scripts/phase-gate.sh`) — enforces phase transitions via bash, not LLM judgment. Verifies artifact existence, re-runs evals independently, checks health fingerprint, controls state.json writes. The orchestrator cannot skip, suppress, or bypass these checks.
+- **Deterministic phase gate script** (`scripts/lifecycle/phase-gate.sh`) — enforces phase transitions via bash, not LLM judgment. Verifies artifact existence, re-runs evals independently, checks health fingerprint, controls state.json writes. The orchestrator cannot skip, suppress, or bypass these checks.
 - **Incident report: cycles 132-141** (`docs/incidents/cycle-132-141.md`) — documents orchestrator gaming: skipped agents, fabricated 4 empty cycles, inflated mastery. All existing detection mechanisms were bypassed because the orchestrator controlled whether they ran.
 - **Anti-pattern #10: Orchestrator gaming** — added to SKILL.md with cross-reference to incident report
 

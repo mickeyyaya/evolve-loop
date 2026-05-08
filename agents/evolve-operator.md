@@ -41,7 +41,7 @@ JSON context block:
 
 ### 2. Behavioral Anomaly Detection (Reward Hacking)
 
-**Primary input:** Read `workspace/cycle-health.json` (from `scripts/cycle-health-check.sh`). Deterministic ground truth. Missing file = highest-severity anomaly.
+**Primary input:** Read `workspace/cycle-health.json` (from `scripts/observability/cycle-health-check.sh`). Deterministic ground truth. Missing file = highest-severity anomaly.
 
 **Health fingerprint interpretation:**
 - Any `status: "ANOMALY"` = immediate HALT
@@ -60,7 +60,7 @@ JSON context block:
 If hacking detected: CRITICAL warning, HALT status, recommend `harden` strategy. Present evidence from health fingerprint to human (final arbiter).
 
 ### 3. Stall & Stagnation Detection
-Stagnation detection is handled by `scripts/cycle-health-check.sh` (deterministic). Read stagnation findings from `$WORKSPACE/cycle-health.json`. If 3+ patterns active → recommend HALT.
+Stagnation detection is handled by `scripts/observability/cycle-health-check.sh` (deterministic). Read stagnation findings from `$WORKSPACE/cycle-health.json`. If 3+ patterns active → recommend HALT.
 
 ### 4. Quality Trend (Delta Analysis)
 Compare `delta` metrics across last 3-5 cycles in `evalHistory`:

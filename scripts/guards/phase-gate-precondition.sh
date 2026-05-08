@@ -3,12 +3,12 @@
 # phase-gate-precondition.sh — PreToolUse hook for Claude Code Bash calls (v8.13.1).
 #
 # Blocks out-of-order subagent invocations. Triggers ONLY for commands of the
-# form `bash scripts/subagent-run.sh <agent> <cycle> <workspace>` — every other
+# form `bash scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace>` — every other
 # command falls through with ALLOW.
 #
 # Decision tree:
 #   1. Read JSON payload from stdin → extract command.
-#   2. If command does not match `bash scripts/subagent-run.sh ...` → ALLOW.
+#   2. If command does not match `bash scripts/dispatch/subagent-run.sh ...` → ALLOW.
 #   3. If .evolve/cycle-state.json missing → ALLOW (manual ad-hoc invocation).
 #   4. Read cycle_state.phase + completed_phases.
 #   5. Compute expected next agent for current phase. If requested agent is in
@@ -31,7 +31,7 @@ set -uo pipefail
 # v8.18.0: dual-root. guards.log + cycle-state.json are writable artifacts under
 # the user's project. team-context.sh is read-only and lives with the plugin.
 __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$__rr_self/../resolve-roots.sh"
+. "$__rr_self/../lifecycle/resolve-roots.sh"
 unset __rr_self
 
 GUARDS_LOG="$EVOLVE_PROJECT_ROOT/.evolve/guards.log"
@@ -104,7 +104,7 @@ fi
 
 if [ "$TOOL_NAME" = "Agent" ]; then
     if [ -f "$CYCLE_STATE_FILE" ] && [ -s "$CYCLE_STATE_FILE" ]; then
-        deny "Agent tool forbidden during evolve-loop cycles — use \`bash scripts/subagent-run.sh <agent> <cycle> <workspace>\` so the kernel ledger captures dispatch"
+        deny "Agent tool forbidden during evolve-loop cycles — use \`bash scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace>\` so the kernel ledger captures dispatch"
     else
         log "Agent tool: no cycle-state — ALLOW (ad-hoc)"
         exit 0
@@ -119,12 +119,12 @@ if [ -z "$COMMAND" ]; then
 fi
 
 # ---- Trigger detection -----------------------------------------------------
-# Match `bash scripts/subagent-run.sh ...` (with optional ./, /full/path/, and
+# Match `bash scripts/dispatch/subagent-run.sh ...` (with optional ./, /full/path/, and
 # leading whitespace). Anything else: passthrough.
 
 TRIMMED="${COMMAND#"${COMMAND%%[![:space:]]*}"}"
 case "$TRIMMED" in
-    bash*scripts/subagent-run.sh*|sh*scripts/subagent-run.sh*|*/subagent-run.sh*)
+    bash*scripts/dispatch/subagent-run.sh*|sh*scripts/dispatch/subagent-run.sh*|*/subagent-run.sh*)
         : # match — fall through to checks
         ;;
     *)
@@ -277,7 +277,7 @@ if [ "$REQUESTED_AGENT" = "scout" ] && command -v jq >/dev/null 2>&1; then
             | jq -c --argjson cycle "$CYCLE_ID" 'select(.cycle == $cycle and .role == "intent")' 2>/dev/null \
             | tail -1)
         if [ -z "$INTENT_ENTRY" ]; then
-            deny "intent_required=true (cycle $CYCLE_ID) but no intent ledger entry found; run \`bash \$EVOLVE_PLUGIN_ROOT/scripts/subagent-run.sh intent $CYCLE_ID $WORKSPACE_PATH\` before scout"
+            deny "intent_required=true (cycle $CYCLE_ID) but no intent ledger entry found; run \`bash \$EVOLVE_PLUGIN_ROOT/scripts/dispatch/subagent-run.sh intent $CYCLE_ID $WORKSPACE_PATH\` before scout"
         fi
         log "intent precondition OK: ledger has intent entry for cycle $CYCLE_ID"
     fi
@@ -294,7 +294,7 @@ if [ "${EVOLVE_REQUIRE_TEAM_CONTEXT:-0}" = "1" ] && [ "$REQUESTED_AGENT" = "buil
     if [ -z "$WORKSPACE_PATH" ]; then
         log "team-context check: cycle-state has no workspace_path — skipping"
     else
-        TEAM_CTX_SH="$EVOLVE_PLUGIN_ROOT/scripts/team-context.sh"
+        TEAM_CTX_SH="$EVOLVE_PLUGIN_ROOT/scripts/utility/team-context.sh"
         if [ ! -x "$TEAM_CTX_SH" ]; then
             log "team-context check: $TEAM_CTX_SH not executable — skipping"
         elif ! "$TEAM_CTX_SH" verify "$CYCLE_ID" "$WORKSPACE_PATH" --require scout,tdd-engineer >/dev/null 2>&1; then

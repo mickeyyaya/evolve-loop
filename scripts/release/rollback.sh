@@ -8,7 +8,7 @@
 #   1. Delete the GitHub Release (if present): `gh release delete vX.Y.Z`
 #   2. Delete the tag from origin: `git push origin :refs/tags/vX.Y.Z`
 #   3. Create a revert commit and push it via:
-#        EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh "revert: ..."
+#        EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh "revert: ..."
 #      The bypass is REQUIRED because the original audit was bound to the
 #      now-reverted HEAD + tree_state_sha; ship.sh would refuse without it.
 #      The bypass is logged as `[rollback] BYPASS_VERIFY` so the deviation is
@@ -42,7 +42,7 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ROLLBACK_LEDGER="$REPO_ROOT/.evolve/release-rollbacks.jsonl"
-SHIP_SH="$REPO_ROOT/scripts/ship.sh"
+SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
 
 log()  { echo "[rollback] $*" >&2; }
 fail() { log "FAIL: $*"; exit 2; }
@@ -166,7 +166,7 @@ fi
 step3_status="skipped"
 if [ "$DRY_RUN" = "1" ]; then
     log "DRY-RUN: would git revert --no-edit $COMMIT_SHA"
-    log "DRY-RUN: would EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/ship.sh \"revert: $REASON [rollback of v$VERSION]\""
+    log "DRY-RUN: would EVOLVE_BYPASS_SHIP_VERIFY=1 bash scripts/lifecycle/ship.sh \"revert: $REASON [rollback of v$VERSION]\""
     step3_status="dry-run-ok"
 else
     revert_msg="revert: $REASON [rollback of v$VERSION]"

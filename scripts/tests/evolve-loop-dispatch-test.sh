@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# evolve-loop-dispatch-test.sh — Unit tests for scripts/evolve-loop-dispatch.sh.
+# evolve-loop-dispatch-test.sh — Unit tests for scripts/dispatch/evolve-loop-dispatch.sh.
 #
 # Tests three concerns:
 #   1. Argument parsing — cycles + strategy + goal positional ordering and defaults
@@ -18,7 +18,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DISPATCH="$REPO_ROOT/scripts/evolve-loop-dispatch.sh"
+DISPATCH="$REPO_ROOT/scripts/dispatch/evolve-loop-dispatch.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

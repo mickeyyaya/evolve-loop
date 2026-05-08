@@ -2,10 +2,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/scripts/evolve-status.py"
+PYTHON_SCRIPT="$SCRIPT_DIR/scripts/observability/evolve-status.py"
 
 if [ ! -f "$PYTHON_SCRIPT" ]; then
-    echo "Error: scripts/evolve-status.py not found at $PYTHON_SCRIPT"
+    echo "Error: scripts/observability/evolve-status.py not found at $PYTHON_SCRIPT"
     exit 1
 fi
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# resolve-roots-test.sh — Unit tests for scripts/resolve-roots.sh (v8.18.0).
+# resolve-roots-test.sh — Unit tests for scripts/lifecycle/resolve-roots.sh (v8.18.0).
 #
 # resolve-roots.sh is the dual-root helper that fixes the plugin-vs-project
 # boundary issue introduced when evolve-loop is installed as a Claude Code
@@ -27,7 +27,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HELPER="$REPO_ROOT/scripts/resolve-roots.sh"
+HELPER="$REPO_ROOT/scripts/lifecycle/resolve-roots.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -54,12 +54,12 @@ project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
 header "Test 2: plugin mode — cwd in a separate git repo, scripts elsewhere"
 fakeproject=$(mktemp -d -t evolve-test-project.XXXXXX); cleanup_dirs+=("$fakeproject")
 fakeplugin=$(mktemp -d -t evolve-test-plugin.XXXXXX); cleanup_dirs+=("$fakeplugin")
-mkdir -p "$fakeplugin/scripts"
-cp "$HELPER" "$fakeplugin/scripts/resolve-roots.sh"
+mkdir -p "$fakeplugin/scripts/lifecycle"
+cp "$HELPER" "$fakeplugin/scripts/lifecycle/resolve-roots.sh"
 cd "$fakeproject" && git init -q . && git commit --allow-empty -q -m init >/dev/null 2>&1 || true
 out=$(cd "$fakeproject" && env -u EVOLVE_PROJECT_ROOT -u EVOLVE_PLUGIN_ROOT \
     -u EVOLVE_RESOLVE_ROOTS_LOADED \
-    bash -c "source '$fakeplugin/scripts/resolve-roots.sh'; printf 'PLUGIN=%s\nPROJECT=%s\n' \"\$EVOLVE_PLUGIN_ROOT\" \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
+    bash -c "source '$fakeplugin/scripts/lifecycle/resolve-roots.sh'; printf 'PLUGIN=%s\nPROJECT=%s\n' \"\$EVOLVE_PLUGIN_ROOT\" \"\$EVOLVE_PROJECT_ROOT\"" 2>&1)
 plugin=$(printf '%s\n' "$out" | awk -F= '/^PLUGIN=/{print $2}')
 project=$(printf '%s\n' "$out" | awk -F= '/^PROJECT=/{print $2}')
 # Resolve symlinks on macOS (mktemp returns /var/folders/... but realpath returns /private/var/folders/...)

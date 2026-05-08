@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# cycle-state-test.sh — Unit tests for scripts/cycle-state.sh (v8.13.1).
+# cycle-state-test.sh — Unit tests for scripts/lifecycle/cycle-state.sh (v8.13.1).
 #
 # v8.13.7: cycle-state.sh is on the hot path of TWO gates (role-gate and
 # phase-gate-precondition), but had only indirect coverage via role-gate-test.sh.
@@ -16,7 +16,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/cycle-state.sh"
+SCRIPT="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

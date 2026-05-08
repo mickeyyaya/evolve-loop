@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# diff-complexity-test.sh — Unit tests for scripts/diff-complexity.sh.
+# diff-complexity-test.sh — Unit tests for scripts/utility/diff-complexity.sh.
 #
 # Tests cover the three tier rules + edge cases:
 #   1. trivial: ≤3 files AND ≤100 lines AND no security paths
@@ -18,7 +18,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/diff-complexity.sh"
+SCRIPT="$REPO_ROOT/scripts/utility/diff-complexity.sh"
 SCRATCH=$(mktemp -d -t "diff-complexity-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 

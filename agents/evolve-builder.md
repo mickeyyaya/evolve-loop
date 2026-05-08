@@ -123,7 +123,7 @@ Enumerate reasoning explicitly:
 
 ### Integrity Notice (Inoculation)
 
-Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypassing quality gates) is a known failure mode. Implement genuine functionality satisfying the **spirit** of acceptance criteria. Gaming triggers detection systems (`scripts/cycle-health-check.sh`, `scripts/verify-eval.sh`).
+Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypassing quality gates) is a known failure mode. Implement genuine functionality satisfying the **spirit** of acceptance criteria. Gaming triggers detection systems (`scripts/observability/cycle-health-check.sh`, `scripts/verification/verify-eval.sh`).
 
 ### Step 4: Implement
 - Make changes — small and focused
@@ -162,9 +162,9 @@ Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypas
 If any check fails: fix immediately, document in build report Risks, re-run self-verify.
 
 **Optional Self-Review via code-review-simplify** (non-blocking):
-If `scripts/code-review-simplify.sh` exists, run the lightweight pipeline layer on your changes after self-verify passes:
+If `scripts/utility/code-review-simplify.sh` exists, run the lightweight pipeline layer on your changes after self-verify passes:
 ```bash
-bash scripts/code-review-simplify.sh HEAD 2>/dev/null || true
+bash scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
 ```
 - If maintainability findings are reported, apply simplifications before reporting (Extract Method, flatten nesting, remove dead code)
 - If no findings or script not found, skip silently

@@ -27,11 +27,11 @@
 set -uo pipefail   # Note: no -e — we expect some commands to fail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RUNNER="$REPO_ROOT/scripts/subagent-run.sh"
-PHASE_GATE="$REPO_ROOT/scripts/phase-gate.sh"
+RUNNER="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
+PHASE_GATE="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
 PROFILES_DIR="$REPO_ROOT/.evolve/profiles"
 LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
-EVAL_QC="$REPO_ROOT/scripts/eval-quality-check.sh"
+EVAL_QC="$REPO_ROOT/scripts/verification/eval-quality-check.sh"
 
 PASS=0
 FAIL=0
@@ -92,7 +92,7 @@ cat > "$FAKE" <<'EOF'
 # Scout Report (cycle 99001)
 
 This report has plenty of content discussing the codebase, references
-files like scripts/subagent-run.sh and scripts/phase-gate.sh, and would
+files like scripts/dispatch/subagent-run.sh and scripts/lifecycle/phase-gate.sh, and would
 pass substance checks. But it lacks the challenge token the runner mints
 per invocation.
 EOF
@@ -109,7 +109,7 @@ GOOD="$TEST_WORKSPACE/scout-report.md"
 cat > "$GOOD" <<'EOF'
 <!-- challenge-token: TESTTOKEN0000001 -->
 # Scout Report
-Genuine content here referencing scripts/subagent-run.sh and at least 50 words
+Genuine content here referencing scripts/dispatch/subagent-run.sh and at least 50 words
 of substantive analysis of the evolve-loop subprocess isolation architecture.
 EOF
 ORIGINAL_SHA=$(sha_of "$GOOD")
@@ -388,12 +388,12 @@ TAUT_EVAL_FILE="$TMPDIR_TEST/eval-A13-taut.md"
 cat > "$TAUT_EVAL_FILE" <<EOF
 # Eval: log function exists somewhere
 
-- \`grep -q "log" scripts/eval-quality-check.sh\`
-- \`test -f scripts/eval-quality-check.sh\`
+- \`grep -q "log" scripts/verification/eval-quality-check.sh\`
+- \`test -f scripts/verification/eval-quality-check.sh\`
 EOF
-if [ -x "$REPO_ROOT/scripts/mutate-eval.sh" ]; then
+if [ -x "$REPO_ROOT/scripts/verification/mutate-eval.sh" ]; then
     set +e
-    bash "$REPO_ROOT/scripts/mutate-eval.sh" "$TAUT_EVAL_FILE" --threshold 0.8 >/dev/null 2>&1
+    bash "$REPO_ROOT/scripts/verification/mutate-eval.sh" "$TAUT_EVAL_FILE" --threshold 0.8 >/dev/null 2>&1
     mut_rc=$?
     set -e
     if [ "$mut_rc" -eq 1 ]; then
@@ -404,7 +404,7 @@ if [ -x "$REPO_ROOT/scripts/mutate-eval.sh" ]; then
         miss "A13 mutate-eval returned unexpected exit $mut_rc"
     fi
     # Verify the source file was restored (no permanent corruption).
-    if (cd "$REPO_ROOT" && git diff --exit-code scripts/eval-quality-check.sh >/dev/null 2>&1); then
+    if (cd "$REPO_ROOT" && git diff --exit-code scripts/verification/eval-quality-check.sh >/dev/null 2>&1); then
         pass "A13 source file restored after mutation testing (no permanent corruption)"
     else
         # Check if the diff is just our prior intentional patches (which is fine).

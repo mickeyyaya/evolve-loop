@@ -5,7 +5,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/show-cycle-cost.sh"
+SCRIPT="$REPO_ROOT/scripts/observability/show-cycle-cost.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -64,19 +64,19 @@ header "Test 4: workspace with no *-stdout.log → exit 1"
 d=$(make_cycle 999); cleanup_dirs+=("$d")
 set +e; out=$(EVOLVE_REPO_ROOT_OVERRIDE="$d" bash "$SCRIPT" 999 2>&1); rc=$?; set -e
 # Note: script uses its own REPO_ROOT detection; we need to copy the script in.
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
-set +e; out=$(bash "$d/scripts/show-cycle-cost.sh" 999 2>&1); rc=$?; set -e
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
+set +e; out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 999 2>&1); rc=$?; set -e
 if [ "$rc" = "1" ]; then pass "empty workspace → 1"
 else fail_ "rc=$rc out=$out"; fi
 
 # === Test 5: single phase with cost data → human table prints =================
 header "Test 5: 1-phase cycle → human table"
 d=$(make_cycle 998); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 write_phase_log "$d/.evolve/runs/cycle-998" "scout" "0.5128" "101097" "39751" "1533"
-set +e; out=$(bash "$d/scripts/show-cycle-cost.sh" 998 2>&1); rc=$?; set -e
+set +e; out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 998 2>&1); rc=$?; set -e
 if [ "$rc" = "0" ] && echo "$out" | grep -q "scout" && echo "$out" | grep -q "0.5128" && echo "$out" | grep -q "TOTAL"; then
     pass "single phase rendered with cost + total row"
 else
@@ -86,11 +86,11 @@ fi
 # === Test 6: multi-phase totals correct ======================================
 header "Test 6: 2-phase cycle → totals = sum of phases"
 d=$(make_cycle 997); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 write_phase_log "$d/.evolve/runs/cycle-997" "scout"   "0.50" "100" "200" "50"
 write_phase_log "$d/.evolve/runs/cycle-997" "auditor" "1.00" "200" "300" "75"
-set +e; out=$(bash "$d/scripts/show-cycle-cost.sh" 997 --json 2>&1); rc=$?; set -e
+set +e; out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 997 --json 2>&1); rc=$?; set -e
 total_cost=$(echo "$out" | jq -r '.total.cost_usd' 2>/dev/null)
 total_cr=$(echo "$out" | jq -r '.total.cache_read_input_tokens' 2>/dev/null)
 total_cw=$(echo "$out" | jq -r '.total.cache_creation_input_tokens' 2>/dev/null)
@@ -106,10 +106,10 @@ fi
 # === Test 7: --json shape valid ==============================================
 header "Test 7: --json output is valid JSON with phases array"
 d=$(make_cycle 996); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 write_phase_log "$d/.evolve/runs/cycle-996" "scout" "0.50" "100" "200" "50"
-out=$(bash "$d/scripts/show-cycle-cost.sh" 996 --json 2>&1)
+out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 996 --json 2>&1)
 phase_count=$(echo "$out" | jq -r '.phases | length' 2>/dev/null)
 cycle_field=$(echo "$out" | jq -r '.cycle' 2>/dev/null)
 if [ "$phase_count" = "1" ] && [ "$cycle_field" = "996" ]; then
@@ -121,10 +121,10 @@ fi
 # === Test 8: log with malformed JSON → graceful (zero values, no crash) ======
 header "Test 8: malformed stdout log → graceful zero values"
 d=$(make_cycle 995); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 echo "not json at all" > "$d/.evolve/runs/cycle-995/scout-stdout.log"
-set +e; out=$(bash "$d/scripts/show-cycle-cost.sh" 995 2>&1); rc=$?; set -e
+set +e; out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 995 2>&1); rc=$?; set -e
 if [ "$rc" = "0" ] && echo "$out" | grep -q "0.0000"; then
     pass "malformed log → zero values, rc=0"
 else
@@ -134,11 +134,11 @@ fi
 # === Test 9: --json surfaces TTL bucket breakdown per phase + total ==========
 header "Test 9: --json includes cache_creation_1h/5m_input_tokens"
 d=$(make_cycle 994); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 write_phase_log_with_ttl "$d/.evolve/runs/cycle-994" "scout"   "0.50" "100" "150" "50"  "50"
 write_phase_log_with_ttl "$d/.evolve/runs/cycle-994" "auditor" "1.00" "200" "200" "100" "75"
-out=$(bash "$d/scripts/show-cycle-cost.sh" 994 --json 2>&1)
+out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 994 --json 2>&1)
 scout_1h=$(echo "$out" | jq -r '.phases[] | select(.phase=="scout") | .cache_creation_1h_input_tokens' 2>/dev/null)
 scout_5m=$(echo "$out" | jq -r '.phases[] | select(.phase=="scout") | .cache_creation_5m_input_tokens' 2>/dev/null)
 total_1h=$(echo "$out" | jq -r '.total.cache_creation_1h_input_tokens' 2>/dev/null)
@@ -152,10 +152,10 @@ fi
 # === Test 10: legacy logs without nested cache_creation default to 0 ==========
 header "Test 10: backward-compat — legacy logs (no nested cache_creation) → 0"
 d=$(make_cycle 993); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 write_phase_log "$d/.evolve/runs/cycle-993" "scout" "0.50" "100" "200" "50"
-out=$(bash "$d/scripts/show-cycle-cost.sh" 993 --json 2>&1)
+out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 993 --json 2>&1)
 scout_1h=$(echo "$out" | jq -r '.phases[0].cache_creation_1h_input_tokens' 2>/dev/null)
 scout_5m=$(echo "$out" | jq -r '.phases[0].cache_creation_5m_input_tokens' 2>/dev/null)
 if [ "$scout_1h" = "0" ] && [ "$scout_5m" = "0" ]; then
@@ -167,10 +167,10 @@ fi
 # === Test 11: human-readable footer surfaces TTL split ========================
 header "Test 11: human output includes TTL bucket footer"
 d=$(make_cycle 992); cleanup_dirs+=("$d")
-mkdir -p "$d/scripts"
-cp "$SCRIPT" "$d/scripts/show-cycle-cost.sh"
+mkdir -p "$d/scripts/observability"
+cp "$SCRIPT" "$d/scripts/observability/show-cycle-cost.sh"
 write_phase_log_with_ttl "$d/.evolve/runs/cycle-992" "auditor" "1.00" "500" "850" "0" "100"
-out=$(bash "$d/scripts/show-cycle-cost.sh" 992 2>&1)
+out=$(bash "$d/scripts/observability/show-cycle-cost.sh" 992 2>&1)
 # Footer must mention both 1h and 5m buckets so a regression (e.g., Anthropic
 # flipping the account flag) becomes visible in the cycle summary.
 if echo "$out" | grep -qE "1h.*850|850.*1h" && echo "$out" | grep -qE "5m.*0|0.*5m"; then

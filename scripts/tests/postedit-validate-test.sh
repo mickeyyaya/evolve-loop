@@ -9,7 +9,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HOOK="$REPO_ROOT/scripts/postedit-validate.sh"
+HOOK="$REPO_ROOT/scripts/verification/postedit-validate.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -175,12 +175,12 @@ fi
 header "Test 11: read-only guards.log → exit 0 silent (no stderr leak)"
 # Build an isolated REPO_ROOT-like dir that mimics the auditor sandbox.
 d=$(mktemp -d -t pe-readonly.XXXXXX); cleanup_files+=("$d")
-mkdir -p "$d/.evolve" "$d/scripts"
+mkdir -p "$d/.evolve" "$d/scripts/verification"
 touch "$d/.evolve/guards.log"
 chmod 0444 "$d/.evolve/guards.log"
-cp "$HOOK" "$d/scripts/postedit-validate.sh"
+cp "$HOOK" "$d/scripts/verification/postedit-validate.sh"
 # Empty payload — exercises only the early log() call path.
-out=$(echo "" | bash "$d/scripts/postedit-validate.sh" 2>&1)
+out=$(echo "" | bash "$d/scripts/verification/postedit-validate.sh" 2>&1)
 rc=$?
 chmod 0644 "$d/.evolve/guards.log" 2>/dev/null || true
 if [ "$rc" = "0" ] && [ -z "$out" ]; then

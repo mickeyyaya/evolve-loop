@@ -46,7 +46,7 @@ make_stub_repo() {
         git config user.email t@t.t
         git config user.name t
 
-        mkdir -p scripts/release scripts/guards .claude-plugin .evolve/runs/cycle-99
+        mkdir -p scripts/release scripts/guards scripts/utility scripts/lifecycle .claude-plugin .evolve/runs/cycle-99
         cp "$RELEASE_DIR_REAL/preflight.sh"        scripts/release/
         cp "$RELEASE_DIR_REAL/changelog-gen.sh"    scripts/release/
         cp "$RELEASE_DIR_REAL/version-bump.sh"     scripts/release/
@@ -65,15 +65,15 @@ make_stub_repo() {
         # Stubs write their call log to a path OUTSIDE the repo (so git revert
         # in rollback tests doesn't remove the log when reverting a commit).
         # Test passes the path in via $TEST_CALLS_LOG env var.
-        cat > scripts/release.sh <<'EOF'
+        cat > scripts/utility/release.sh <<'EOF'
 #!/usr/bin/env bash
 log_path="${TEST_CALLS_LOG:-$(dirname "$0")/.calls.log}"
 echo "release.sh:$@" >> "$log_path"
 exit 0
 EOF
-        chmod +x scripts/release.sh
+        chmod +x scripts/utility/release.sh
 
-        cat > scripts/ship.sh <<'EOF'
+        cat > scripts/lifecycle/ship.sh <<'EOF'
 #!/usr/bin/env bash
 log_path="${TEST_CALLS_LOG:-$(dirname "$0")/.calls.log}"
 echo "ship.sh:BYPASS=${EVOLVE_BYPASS_SHIP_VERIFY:-0}:NOTES=${EVOLVE_SHIP_RELEASE_NOTES:+yes}:$@" >> "$log_path"
@@ -81,7 +81,7 @@ git add -A 2>/dev/null
 git c""ommit -q -m "$1" --allow-empty 2>/dev/null || true
 exit 0
 EOF
-        chmod +x scripts/ship.sh
+        chmod +x scripts/lifecycle/ship.sh
 
         cat > .claude-plugin/plugin.json <<EOF
 {"name":"x","version":"${init_version}"}

@@ -158,7 +158,7 @@ See [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) for the
 
 ### 8. Eval Integrity (Inoculation)
 
-Write eval commands that test **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) are specification gaming. The `scripts/eval-quality-check.sh` classifies evals — Level 0-1 trigger warnings or halt the cycle.
+Write eval commands that test **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) are specification gaming. The `scripts/verification/eval-quality-check.sh` classifies evals — Level 0-1 trigger warnings or halt the cycle.
 
 **Eval Depth Requirements:**
 
