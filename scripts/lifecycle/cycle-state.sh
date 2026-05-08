@@ -378,6 +378,69 @@ cycle_state_dump() {
     cat "$CYCLE_STATE_FILE"
 }
 
+# v8.52.0: record per-phase quality_tier into cycle-state.json:quality_tiers[].
+# Called by orchestrator at each phase boundary so a cycle-level tier can be
+# composed via cycle_state_compute_cycle_tier. Backward-compatible: pre-v8.52
+# state files without the field are treated as `unknown`.
+cycle_state_record_quality_tier() {
+    local tier="${1:?usage: record-quality-tier <full|hybrid|degraded|none|unknown>}"
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot record-quality-tier — state file missing" >&2
+        return 1
+    fi
+    case "$tier" in
+        full|hybrid|degraded|none|unknown) ;;
+        *) echo "[cycle-state] ERROR: invalid tier '$tier'" >&2; return 1 ;;
+    esac
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required" >&2
+        return 1
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(echo "$current" | jq -c --arg t "$tier" '
+        .quality_tiers = ((.quality_tiers // []) + [$t])
+    ')
+    _atomic_write "$updated"
+}
+
+# v8.52.0: compute cycle-level quality_tier as the minimum across all recorded
+# entries. Returns full/hybrid/degraded/none, or "unknown" if no records.
+cycle_state_compute_cycle_tier() {
+    if ! cycle_state_exists; then
+        echo "unknown"
+        return 0
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "unknown"
+        return 0
+    fi
+    local tiers
+    tiers=$(jq -r '.quality_tiers // [] | .[]' "$CYCLE_STATE_FILE" 2>/dev/null)
+    if [ -z "$tiers" ]; then
+        echo "unknown"
+        return 0
+    fi
+    # Local rank/composition (avoid cross-script dependency for portability).
+    local low_rank=3
+    for t in $tiers; do
+        local r=0
+        case "$t" in
+            full)     r=3 ;;
+            hybrid)   r=2 ;;
+            degraded) r=1 ;;
+            *)        r=0 ;;
+        esac
+        [ "$r" -lt "$low_rank" ] && low_rank=$r
+    done
+    case "$low_rank" in
+        3) echo "full" ;;
+        2) echo "hybrid" ;;
+        1) echo "degraded" ;;
+        *) echo "none" ;;
+    esac
+}
+
 # CLI dispatcher: only fires when this file is executed directly.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     cmd="${1:-}"
@@ -393,10 +456,12 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         init-workers)            cycle_state_init_workers "$@" ;;
         set-worker-status)       cycle_state_set_worker_status "$@" ;;
         clear)                   cycle_state_clear ;;
+        record-quality-tier)     cycle_state_record_quality_tier "$@" ;;
+        compute-cycle-tier)      cycle_state_compute_cycle_tier ;;
         get)                     cycle_state_get "$@" ;;
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

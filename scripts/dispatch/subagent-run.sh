@@ -739,6 +739,20 @@ cmd_dispatch_parallel() {
 
     log "dispatch-parallel: agent=$agent cycle=$cycle workers=$subtask_count"
 
+    # v8.52.0: resolve quality_tier per profile.cli for the fan-out parent
+    # ledger entry. All fan-out workers share the same profile (and cli), so
+    # one tier represents the whole fan-out.
+    local fanout_quality_tier="unknown"
+    local _cap_check="$EVOLVE_PLUGIN_ROOT/scripts/cli_adapters/_capability-check.sh"
+    local _fanout_cli
+    _fanout_cli=$(jq -r '.cli // "claude"' "$profile" 2>/dev/null)
+    if [ -x "$_cap_check" ] && [ -n "$_fanout_cli" ]; then
+        fanout_quality_tier=$(bash "$_cap_check" "$_fanout_cli" 2>/dev/null | jq -r '.quality_tier // "unknown"' 2>/dev/null || echo "unknown")
+        [ -z "$fanout_quality_tier" ] && fanout_quality_tier="unknown"
+        [ "$fanout_quality_tier" = "null" ] && fanout_quality_tier="unknown"
+    fi
+    log "dispatch-parallel: fanout_quality_tier=$fanout_quality_tier (cli=$_fanout_cli)"
+
     local workers_dir="$workspace/workers"
     mkdir -p "$workers_dir"
 
@@ -846,7 +860,7 @@ cmd_dispatch_parallel() {
         local agg_path_or_empty=""
         [ -f "$agg_path" ] && agg_path_or_empty="$agg_path"
         _write_fanout_ledger_entry "$cycle" "$agent" "$parent_token" "$git_state_at_start" \
-            "$worker_names" "$subtask_count" "$fanout_rc" "$agg_path_or_empty" "$results_tsv"
+            "$worker_names" "$subtask_count" "$fanout_rc" "$agg_path_or_empty" "$results_tsv" "$fanout_quality_tier"
         exit 1
     fi
 
@@ -857,7 +871,7 @@ cmd_dispatch_parallel() {
 
     # Write parent ledger entry regardless of agg_rc (record outcome).
     _write_fanout_ledger_entry "$cycle" "$agent" "$parent_token" "$git_state_at_start" \
-        "$worker_names" "$subtask_count" "$agg_rc" "$agg_path" "$results_tsv"
+        "$worker_names" "$subtask_count" "$agg_rc" "$agg_path" "$results_tsv" "$fanout_quality_tier"
 
     if [ "$agg_rc" -ne 0 ]; then
         log "dispatch-parallel: aggregator returned non-zero (rc=$agg_rc) for phase=$merge_phase"
@@ -873,6 +887,9 @@ _write_fanout_ledger_entry() {
     local cycle="$1" agent="$2" token="$3" git_state="$4"
     local worker_names="$5" worker_count="$6" exit_code="$7"
     local agg_path="$8" results_tsv="$9"
+    # v8.52.0: quality_tier (10th arg) — resolved per profile.cli at fan-out
+    # dispatch time. All workers in a fan-out share the same agent profile.
+    local quality_tier="${10:-unknown}"
     local artifact_sha=""
     if [ -n "$agg_path" ] && [ -f "$agg_path" ]; then
         if command -v sha256sum >/dev/null 2>&1; then
@@ -913,13 +930,15 @@ _write_fanout_ledger_entry() {
         --argjson workers "$workers_json" \
         --argjson entry_seq "$entry_seq" \
         --arg prev_hash "$prev_hash" \
+        --arg quality_tier "$quality_tier" \
         '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_fanout",
           exit_code: $exit_code,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
           challenge_token: $challenge_token,
           git_head: $git_head, tree_state_sha: $tree_state_sha,
           worker_count: $worker_count, workers: $workers,
-          entry_seq: $entry_seq, prev_hash: $prev_hash}')
+          entry_seq: $entry_seq, prev_hash: $prev_hash,
+          quality_tier: $quality_tier}')
     printf '%s\n' "$new_line" >> "$LEDGER"
     local new_sha
     new_sha=$(printf '%s' "$new_line" | _ledger_sha256_stdin)

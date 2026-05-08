@@ -73,6 +73,8 @@ else
         "scripts/tests/cli-capability-test.sh"
         "scripts/tests/cli-degradation-test.sh"
         "scripts/tests/cross-cli-parity-test.sh"
+        "scripts/tests/multi-cli-cycle-test.sh"
+        "scripts/tests/cycle-quality-tier-test.sh"
         "scripts/tests/show-cycle-cost-test.sh"
         "scripts/tests/merge-lesson-test.sh"
         "scripts/tests/subagent-run-test.sh"
