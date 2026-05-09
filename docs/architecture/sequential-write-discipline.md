@@ -204,6 +204,7 @@ bash scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification g
 ```
 
 Acceptance criterion: fan-out cycle cost ≤ 1.5× sequential cycle cost AND wall-time ≤ 0.7× sequential. If both hold, fan-out is pareto-acceptable for opt-in operators. If either fails, fan-out is not yet production-ready (drives v8.56 lean-cycle work).
+**Cycle 55 verification:** exercised under `EVOLVE_FANOUT_ENABLED=1` + `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.10`; fan-out concurrency cap and per-worker budget rails confirmed engaged.
 
 ### Why default-off after the rails ship
 
