@@ -156,8 +156,15 @@ count_class() {
     echo "$ENTRIES" | jq --arg c "$1" 'map(select(.classification == $c)) | length'
 }
 
-CODE_AUDIT_FAIL_COUNT=$(count_class "code-audit-fail")
-CODE_BUILD_FAIL_COUNT=$(count_class "code-build-fail")
+# Count distinct `.cycle` values with the given classification.
+# Used for threshold checks that should not double-count retry artifacts
+# from the same cycle. Raw counts remain in BY_CLASS for forensics.
+count_distinct_cycles_by_class() {
+    echo "$ENTRIES" | jq --arg c "$1" 'map(select(.classification == $c)) | map(.cycle // "unknown") | unique | length'
+}
+
+CODE_AUDIT_FAIL_COUNT=$(count_distinct_cycles_by_class "code-audit-fail")
+CODE_BUILD_FAIL_COUNT=$(count_distinct_cycles_by_class "code-build-fail")
 INTENT_REJECTED_COUNT=$(count_class "intent-rejected")
 SYSTEMIC_COUNT=$(count_class "infrastructure-systemic")
 

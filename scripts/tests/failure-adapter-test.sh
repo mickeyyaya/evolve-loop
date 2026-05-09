@@ -386,6 +386,62 @@ else
     fail_ "got age=$age sev=$sev ret=$ret norm_warn=$norm_warn norm_fail=$norm_fail"
 fi
 
+# === Test 21: same-cycle duplicates → NO false BLOCK (strict) ================
+# Regression test for the retry-storm false-positive. Two entries from the same
+# cycle should count as 1 distinct cycle, which is below the threshold of 2.
+header "Test 21: same-cycle duplicates → no false BLOCK (strict)"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":5,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":5,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide_strict "$sf")
+action=$(echo "$out" | jq -r '.action')
+by_class_count=$(echo "$out" | jq -r '.evidence.by_class["code-audit-fail"] // 0')
+# Fix: 1 distinct cycle < threshold 2 → PROCEED; forensic raw count still shows 2.
+if [ "$action" = "PROCEED" ] && [ "$by_class_count" = "2" ]; then
+    pass "STRICT: same-cycle dupes → PROCEED (1 distinct cycle); forensic by_class still shows 2"
+else
+    fail_ "action=$action (expected PROCEED), by_class[code-audit-fail]=$by_class_count (expected 2)"
+fi
+
+# === Test 22: distinct cycles → correct BLOCK (strict) =======================
+# Ensure the threshold still fires when cycles ARE genuinely distinct.
+header "Test 22: distinct cycles → correct BLOCK (strict)"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide_strict "$sf")
+action=$(echo "$out" | jq -r '.action')
+verdict=$(echo "$out" | jq -r '.verdict_for_block')
+if [ "$action" = "BLOCK-CODE" ] && [ "$verdict" = "BLOCKED-RECURRING-AUDIT-FAIL" ]; then
+    pass "STRICT: 2 distinct cycles → BLOCK-CODE + BLOCKED-RECURRING-AUDIT-FAIL"
+else
+    fail_ "action=$action verdict=$verdict"
+fi
+
+# === Test 23: mixed partial dedup → correct count (strict) ===================
+# {cycle:5, cycle:5, cycle:6} reduces to 2 distinct cycles → still blocks.
+header "Test 23: mixed partial dedup — 2 distinct cycles → BLOCK (strict)"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":5,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":5,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":6,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+out=$(decide_strict "$sf")
+action=$(echo "$out" | jq -r '.action')
+verdict=$(echo "$out" | jq -r '.verdict_for_block')
+by_class_count=$(echo "$out" | jq -r '.evidence.by_class["code-audit-fail"] // 0')
+# {5,5,6} → distinct={5,6} = 2 → threshold met → BLOCK; raw count=3
+if [ "$action" = "BLOCK-CODE" ] && [ "$verdict" = "BLOCKED-RECURRING-AUDIT-FAIL" ] && [ "$by_class_count" = "3" ]; then
+    pass "STRICT: {5,5,6} → 2 distinct → BLOCK-CODE; forensic raw count=3"
+else
+    fail_ "action=$action verdict=$verdict by_class=$by_class_count"
+fi
+
 # === Summary =================================================================
 echo
 echo "=========================================="
