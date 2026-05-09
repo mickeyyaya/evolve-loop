@@ -730,6 +730,25 @@ cmd_dispatch_parallel() {
     [ -f "$profile" ] || fail "dispatch-parallel: profile not found: $profile"
     require_bin jq
 
+    # v8.55.0: structural enforcement of the parallelization-discipline
+    # principle. A role can only be dispatched in parallel if its profile
+    # explicitly declares parallel_eligible=true. The default is false (safe).
+    # Profiles that mutate state (Builder, Intent, Orchestrator, tdd-engineer,
+    # ship.sh) must declare false. Profiles that are READ-ONLY summarizers
+    # (Scout, Auditor, Retrospective, plan-reviewer, evaluator, inspirer) may
+    # declare true. See docs/architecture/sequential-write-discipline.md.
+    local parallel_eligible
+    parallel_eligible=$(jq -r '.parallel_eligible // false' "$profile" 2>/dev/null)
+    if [ "$parallel_eligible" != "true" ]; then
+        log "PROFILE-ERROR: agent '$agent' is not parallel-eligible (parallel_eligible=$parallel_eligible)"
+        log "  Roles that WRITE state (Builder, Intent, Orchestrator, tdd-engineer) must run sequentially."
+        log "  Only READ-ONLY summarizing roles (Scout, Auditor, Retrospective, plan-reviewer, evaluator, inspirer)"
+        log "  may opt-in by declaring parallel_eligible=true in their profile JSON."
+        log "  See: docs/architecture/sequential-write-discipline.md"
+        log "  Single-writer invariant preserved: refusing dispatch-parallel for $agent."
+        exit 2
+    fi
+
     # Extract parallel_subtasks; require at least one entry.
     local subtask_count
     subtask_count=$(jq -r '.parallel_subtasks // [] | length' "$profile")

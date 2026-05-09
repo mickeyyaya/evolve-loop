@@ -53,6 +53,8 @@ setup_env() {
   "cli": "claude",
   "model_tier_default": "sonnet",
   "max_budget_usd": 0.5,
+  "parallel_eligible": true,
+  "_parallel_eligible_reason": "test fixture; scout is canonically read-only summarizer",
   "parallel_subtasks": [
     { "name": "codebase", "prompt_template": "Focus on codebase analysis for cycle {cycle}." },
     { "name": "research", "prompt_template": "Web research for cycle {cycle}." },
@@ -141,6 +143,7 @@ cat > "$WS/profiles/scout.json" <<JSON
 {
   "cli": "claude",
   "model_tier_default": "sonnet",
+  "parallel_eligible": true,
   "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",
   "allowed_tools": [],
   "sandbox": { "enabled": false }

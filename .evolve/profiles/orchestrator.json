@@ -217,5 +217,7 @@
       ".evolve/ledger.tip"
     ],
     "allow_network": true
-  }
+  },
+  "parallel_eligible": false,
+  "_parallel_eligible_reason": "Sequential cycle coordination (writes orchestrator-report.md)"
 }

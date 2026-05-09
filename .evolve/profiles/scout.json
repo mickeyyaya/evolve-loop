@@ -90,7 +90,7 @@
     "--setting-sources",
     "project"
   ],
-  "_parallel_subtasks_doc": "Sprint 1.1 fan-out: when invoked via `subagent-run.sh dispatch-parallel scout`, three sub-scouts run concurrently. Each writes to .evolve/runs/cycle-N/workers/scout-<name>.md and aggregator.sh merges into the canonical scout-report.md. Default-off — see EVOLVE_FANOUT_ENABLED in CLAUDE.md.",
+  "_parallel_subtasks_doc": "Sprint 1.1 fan-out: when invoked via `subagent-run.sh dispatch-parallel scout`, three sub-scouts run concurrently. Each writes to .evolve/runs/cycle-N/workers/scout-<name>.md and aggregator.sh merges into the canonical scout-report.md. Default-off \u2014 see EVOLVE_FANOUT_ENABLED in CLAUDE.md.",
   "parallel_subtasks": [
     {
       "name": "codebase",
@@ -123,5 +123,7 @@
       ".evolve/profiles"
     ],
     "allow_network": true
-  }
+  },
+  "parallel_eligible": true,
+  "_parallel_eligible_reason": "READ-ONLY summarizer (codebase scan, research, eval mining)"
 }

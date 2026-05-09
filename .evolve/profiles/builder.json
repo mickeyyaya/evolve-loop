@@ -79,5 +79,7 @@
       ".evolve/evals"
     ],
     "allow_network": true
-  }
+  },
+  "parallel_eligible": false,
+  "_parallel_eligible_reason": "Single-writer invariant on worktree"
 }

@@ -77,6 +77,7 @@ else
         "scripts/tests/cycle-quality-tier-test.sh"
         "scripts/tests/cross-cli-consensus-test.sh"
         "scripts/tests/consensus-dispatch-test.sh"
+        "scripts/tests/parallelization-discipline-test.sh"
         "scripts/tests/show-cycle-cost-test.sh"
         "scripts/tests/merge-lesson-test.sh"
         "scripts/tests/subagent-run-test.sh"

@@ -5,10 +5,11 @@
 # fanout-dispatch.sh is the parallel-worker dispatcher used by Sprint 1
 # of the swarm architecture (see plans/does-the-flow-allow-jaunty-hummingbird.md).
 # It runs N worker commands concurrently (bounded by EVOLVE_FANOUT_CONCURRENCY,
-# default 4), enforces a per-worker timeout (EVOLVE_FANOUT_TIMEOUT, default 600s),
-# captures each worker's exit code + duration to a TSV file, and uses WAIT-ALL
-# semantics (every worker runs to completion or timeout regardless of others'
-# failures).
+# default 2 since v8.55.0 — lowered from 4 to halve peak token-burn rate during
+# fan-out so subscription quotas are not exhausted on multi-hour /loop runs),
+# enforces a per-worker timeout (EVOLVE_FANOUT_TIMEOUT, default 600s), captures
+# each worker's exit code + duration to a TSV file, and uses WAIT-ALL semantics
+# (every worker runs to completion or timeout regardless of others' failures).
 #
 # Tests cover:
 #   1. script exists and is executable
@@ -19,6 +20,10 @@
 #   6. concurrency cap honored (N=2 with 4 sleep-1 workers → wall clock ~2s, not ~1s or ~4s)
 #   7. timeout honored (worker sleeping 5s with timeout=1s → exit code 124, dispatcher exits non-zero)
 #   8. WAIT-ALL: one worker fails fast, another succeeds slowly → both rows in TSV
+#   9–14. v8.23 cache-prefix + worker-tracking + consensus-cancel coverage
+#   15. v8.55.0 — default-cap test: unset EVOLVE_FANOUT_CONCURRENCY → cap=2 (NOT 4)
+#   16. v8.55.0 — operator-override test: EVOLVE_FANOUT_CONCURRENCY=4 → all 4 in parallel
+#   17. v8.55.0 — cap-1 edge case: EVOLVE_FANOUT_CONCURRENCY=1 → workers serialize
 #
 # Bash 3.2 compatible per CLAUDE.md (no declare -A, no mapfile, no GNU-only flags).
 
@@ -338,6 +343,81 @@ if [ "$ELAPSED" -ge 2 ] && [ "$ROWS" = "2" ]; then
     pass "WAIT-ALL preserved (elapsed=${ELAPSED}s ≥ 2s, both workers in TSV)"
 else
     fail_ "expected ≥2s elapsed and 2 rows; got elapsed=${ELAPSED}s rows=$ROWS"
+fi
+rm -rf "$WS"
+
+# --- Test 15 (v8.55.0): default-cap — unset env → 2 concurrent workers -------
+# Token-burn-rate guardrail. Subscription users on continuous /loop runs cannot
+# tolerate 4-concurrent fan-out; default 2 halves peak burn at the cost of
+# longer wall time. Unsetting the env var must resolve to 2, not 4.
+header "Test 15 (v8.55.0): unset EVOLVE_FANOUT_CONCURRENCY → cap=2 (4 sleep-1 workers → ~2s)"
+WS=$(fresh_workspace)
+{
+    printf 'd1\tsleep 1\n'
+    printf 'd2\tsleep 1\n'
+    printf 'd3\tsleep 1\n'
+    printf 'd4\tsleep 1\n'
+} > "$WS/commands.tsv"
+START=$(date +%s)
+unset EVOLVE_FANOUT_CONCURRENCY
+"$SCRIPT" "$WS/commands.tsv" "$WS/results.tsv" >/dev/null 2>&1
+END=$(date +%s)
+ELAPSED=$((END - START))
+# Expected: ~2s (two batches of 2). Reject < 2s (would mean cap > 2 in effect).
+# Allow up to 4s for slow CI; reject ≥ 4s (would mean cap=1).
+if [ "$ELAPSED" -ge 2 ] && [ "$ELAPSED" -lt 4 ]; then
+    pass "default cap honored: ${ELAPSED}s wall time (expected ~2s for cap=2)"
+elif [ "$ELAPSED" -lt 2 ]; then
+    fail_ "wall time ${ELAPSED}s — default cap appears to be > 2 (token-burn risk!)"
+else
+    fail_ "wall time ${ELAPSED}s — default cap appears to be 1 or workers serialized"
+fi
+rm -rf "$WS"
+
+# --- Test 16 (v8.55.0): operator override path — =4 → all parallel -----------
+# Confirms that operators on API plans (no quota concern) can still bump the
+# cap back to 4 with the existing env var. Mechanism is unchanged; only the
+# default value moved.
+header "Test 16 (v8.55.0): EVOLVE_FANOUT_CONCURRENCY=4 → all 4 parallel (~1s)"
+WS=$(fresh_workspace)
+{
+    printf 'o1\tsleep 1\n'
+    printf 'o2\tsleep 1\n'
+    printf 'o3\tsleep 1\n'
+    printf 'o4\tsleep 1\n'
+} > "$WS/commands.tsv"
+START=$(date +%s)
+EVOLVE_FANOUT_CONCURRENCY=4 "$SCRIPT" "$WS/commands.tsv" "$WS/results.tsv" >/dev/null 2>&1
+END=$(date +%s)
+ELAPSED=$((END - START))
+# Expected: ~1s (all 4 in single batch). Reject ≥ 2s (would mean override ignored).
+if [ "$ELAPSED" -lt 2 ]; then
+    pass "override honored: ${ELAPSED}s wall time (expected ~1s for cap=4)"
+else
+    fail_ "wall time ${ELAPSED}s — override path appears broken (expected <2s for cap=4)"
+fi
+rm -rf "$WS"
+
+# --- Test 17 (v8.55.0): cap-1 edge case — full serialization ----------------
+# Sanity check: setting cap=1 must serialize all workers (degenerate case where
+# fan-out reduces to sequential). 4 sleep-1 workers → ~4s wall time.
+header "Test 17 (v8.55.0): EVOLVE_FANOUT_CONCURRENCY=1 → workers serialize (~4s)"
+WS=$(fresh_workspace)
+{
+    printf 's1\tsleep 1\n'
+    printf 's2\tsleep 1\n'
+    printf 's3\tsleep 1\n'
+    printf 's4\tsleep 1\n'
+} > "$WS/commands.tsv"
+START=$(date +%s)
+EVOLVE_FANOUT_CONCURRENCY=1 "$SCRIPT" "$WS/commands.tsv" "$WS/results.tsv" >/dev/null 2>&1
+END=$(date +%s)
+ELAPSED=$((END - START))
+# Expected: ~4s (full serial). Allow 4-6s window; reject < 4s (would mean cap > 1).
+if [ "$ELAPSED" -ge 4 ] && [ "$ELAPSED" -le 6 ]; then
+    pass "cap=1 serializes: ${ELAPSED}s wall time (expected ~4s)"
+else
+    fail_ "wall time ${ELAPSED}s — cap=1 should serialize 4 workers to ~4s"
 fi
 rm -rf "$WS"
 

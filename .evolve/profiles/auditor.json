@@ -187,5 +187,7 @@
     ],
     "quorum": 2,
     "require_min_tier": "hybrid"
-  }
+  },
+  "parallel_eligible": true,
+  "_parallel_eligible_reason": "READ-ONLY validator (eval-replay, lint, regression, build-quality, cross-CLI consensus)"
 }

@@ -34,6 +34,7 @@
 | [tri-layer.md](architecture/tri-layer.md) | Skill/Persona/Command layered orchestration model |
 | [capability-schema.md](architecture/capability-schema.md) | Adapter capability manifest schema + authoring guide for new CLIs |
 | [intent-phase.md](architecture/intent-phase.md) | Intent capture phase + AwN classifier specification |
+| [sequential-write-discipline.md](architecture/sequential-write-discipline.md) | Parallelization discipline rule (`parallel_eligible`) + concurrency cap (default 2 since v8.55.0) — when may a role fan out, and how many workers run at once |
 
 ## Release & Operations
 

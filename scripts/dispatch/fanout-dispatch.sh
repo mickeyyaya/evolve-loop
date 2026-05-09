@@ -3,7 +3,7 @@
 # fanout-dispatch.sh — Bounded-concurrency parallel worker dispatcher (Sprint 1).
 #
 # Reads a TSV commands file (`<worker_name>\t<command>\n`) and runs each
-# command concurrently, bounded by EVOLVE_FANOUT_CONCURRENCY (default 4).
+# command concurrently, bounded by EVOLVE_FANOUT_CONCURRENCY (default 2).
 # Each worker is wrapped in a per-worker timeout (EVOLVE_FANOUT_TIMEOUT,
 # default 600s). WAIT-ALL semantics: every worker runs to completion or
 # timeout regardless of others' failures, so partial failures are diagnosed
@@ -70,7 +70,7 @@ if [ ! -f "$CMD_FILE" ]; then
     exit 2
 fi
 
-CONCURRENCY="${EVOLVE_FANOUT_CONCURRENCY:-4}"
+CONCURRENCY="${EVOLVE_FANOUT_CONCURRENCY:-2}"
 TIMEOUT_SECS="${EVOLVE_FANOUT_TIMEOUT:-600}"
 
 # v8.23.0 Task B knobs: early-cancel on consensus.
@@ -82,7 +82,7 @@ CONSENSUS_POLL_INTERVAL="${EVOLVE_FANOUT_CONSENSUS_POLL_S:-1}"
 TRACK_WORKERS="${EVOLVE_FANOUT_TRACK_WORKERS:-1}"
 
 # Validate numeric env values; reject negative or non-numeric.
-case "$CONCURRENCY" in ''|*[!0-9]*) CONCURRENCY=4 ;; esac
+case "$CONCURRENCY" in ''|*[!0-9]*) CONCURRENCY=2 ;; esac
 case "$TIMEOUT_SECS" in ''|*[!0-9]*) TIMEOUT_SECS=600 ;; esac
 case "$CONSENSUS_K" in ''|*[!0-9]*) CONSENSUS_K=2 ;; esac
 case "$CONSENSUS_POLL_INTERVAL" in ''|*[!0-9]*) CONSENSUS_POLL_INTERVAL=1 ;; esac

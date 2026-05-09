@@ -65,17 +65,17 @@
     "Write(.evolve/evals/**)",
     "Write(CLAUDE.md)"
   ],
-  "_disallowed_design_note_": "WebSearch/WebFetch are explicitly denied — intent persona's job is to STRUCTURE, not RESEARCH. Scout researches. Otherwise mirrors scout.json's denylist verbatim per Plan-agent finding (intent persona must not become weakest-link attack surface).",
+  "_disallowed_design_note_": "WebSearch/WebFetch are explicitly denied \u2014 intent persona's job is to STRUCTURE, not RESEARCH. Scout researches. Otherwise mirrors scout.json's denylist verbatim per Plan-agent finding (intent persona must not become weakest-link attack surface).",
   "add_dir": [
     "."
   ],
-  "max_budget_usd": 0.50,
+  "max_budget_usd": 0.5,
   "budget_tiers": {
-    "default":     0.50,
-    "heavy_rules": 1.00,
-    "minimal":     0.20
+    "default": 0.5,
+    "heavy_rules": 1.0,
+    "minimal": 0.2
   },
-  "_budget_design_note_": "v8.23.3: raised default from $0.25 to $0.50 after BUG-010 (intent rc=1 budget overflow on projects with heavy CLAUDE.md). Use EVOLVE_TASK_MODE=heavy_rules ($1.00 cap) for projects whose CLAUDE.md exceeds ~3K tokens (cycle 1 of /learning had a 200-line CLAUDE.md and opus blew $0.25 in 3 turns). EVOLVE_TASK_MODE=minimal ($0.20) for trivial goals on small projects. Intent capture is still one persona, one short artifact (50-200 lines), no web research — $0.50 is a generous default that handles most non-trivial CLAUDE.md sizes; raise via tier when needed.",
+  "_budget_design_note_": "v8.23.3: raised default from $0.25 to $0.50 after BUG-010 (intent rc=1 budget overflow on projects with heavy CLAUDE.md). Use EVOLVE_TASK_MODE=heavy_rules ($1.00 cap) for projects whose CLAUDE.md exceeds ~3K tokens (cycle 1 of /learning had a 200-line CLAUDE.md and opus blew $0.25 in 3 turns). EVOLVE_TASK_MODE=minimal ($0.20) for trivial goals on small projects. Intent capture is still one persona, one short artifact (50-200 lines), no web research \u2014 $0.50 is a generous default that handles most non-trivial CLAUDE.md sizes; raise via tier when needed.",
   "max_turns": 15,
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/intent.md",
@@ -108,5 +108,7 @@
     ],
     "allow_network": false
   },
-  "_sandbox_design_note_": "allow_network: false because intent persona has no legitimate network reason. Scout has allow_network: true. Smaller blast radius if persona is hijacked."
+  "_sandbox_design_note_": "allow_network: false because intent persona has no legitimate network reason. Scout has allow_network: true. Smaller blast radius if persona is hijacked.",
+  "parallel_eligible": false,
+  "_parallel_eligible_reason": "Sequential strategic framing (writes intent.md)"
 }
