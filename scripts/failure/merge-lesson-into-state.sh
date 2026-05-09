@@ -71,6 +71,38 @@ done < <(jq -r '.lessonIds[]?' "$HANDOFF")
 
 if [ "${#LESSON_IDS[@]}" -eq 0 ]; then
     log "WARN: handoff lists zero lessonIds for $VERDICT cycle $CYCLE"
+    # Fallback: lessonFiles present when retrospective wrote to workspace instead
+    # of canonical location (e.g. agent mis-reported role-gate block). Copy each
+    # file to LESSONS_DIR and derive its ID from the YAML id field.
+    while IFS= read -r fname; do
+        [ -n "$fname" ] || continue
+        src="$WORKSPACE/$fname"
+        [ -f "$src" ] || continue
+        lid=$(python3 -c "
+try:
+    import yaml
+    with open('$src') as f:
+        d = yaml.safe_load(f)
+        item = d[0] if isinstance(d, list) else d
+        print(item.get('id', ''))
+except Exception: pass
+" 2>/dev/null)
+        [ -n "$lid" ] || lid=$(grep -E '^- id:|^  id:' "$src" | head -1 | sed 's/.*id:[[:space:]]*//')
+        if [ -z "$lid" ]; then
+            log "WARN: cannot derive id from $fname; skipping"
+            continue
+        fi
+        dest="$LESSONS_DIR/${lid}.yaml"
+        if cp "$src" "$dest"; then
+            LESSON_IDS+=("$lid")
+            log "INFO: recovered $lid from workspace ($fname)"
+        else
+            log "WARN: failed to copy $src to $dest; skipping"
+        fi
+    done < <(jq -r '.lessonFiles[]?' "$HANDOFF" 2>/dev/null)
+    if [ "${#LESSON_IDS[@]}" -gt 0 ]; then
+        log "INFO: lessonFiles fallback recovered ${#LESSON_IDS[@]} lesson(s)"
+    fi
 fi
 
 # Verify each referenced lesson YAML exists on disk.
@@ -164,6 +196,19 @@ except Exception:
         }]' "$STATE" > "$TMP_STATE"
     mv "$TMP_STATE" "$STATE"
 done
+
+# Mark matching failedApproaches entries as retrospected=true after successful lesson merge.
+if [ "${#LESSON_IDS[@]}" -gt 0 ]; then
+    RETRO_AUDIT_SHA=$(jq -r '.auditReportSha256 // empty' "$HANDOFF" 2>/dev/null || echo "")
+    jq --argjson cycle "$CYCLE" \
+       --arg sha "$RETRO_AUDIT_SHA" \
+       '.failedApproaches = [.failedApproaches[] |
+            if (.cycle == $cycle) and (($sha == "") or (.auditReportSha256 == $sha))
+            then . + {retrospected: true}
+            else . end]' "$STATE" > "$TMP_STATE"
+    mv "$TMP_STATE" "$STATE"
+    log "OK: marked failedApproaches[cycle=$CYCLE] as retrospected=true"
+fi
 
 # Patch 2: append failedApproaches entry (one per cycle, summarizing).
 jq --argjson cycle "$CYCLE" \

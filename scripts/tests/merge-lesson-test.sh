@@ -244,6 +244,72 @@ else
     fail "expected WARN about defer_count=3 in stderr; got: $WARN_OUT"
 fi
 
+# --- Test 12 (v8.58.0): lessonFiles fallback — workspace lessons recovered ----
+header "Test 12 (v8.58.0): lessonFiles fallback — workspace lessons merged when lessonIds empty"
+ROOT=$(make_repo)
+mkdir -p "$ROOT/.evolve/runs/cycle-500"
+cat > "$ROOT/.evolve/runs/cycle-500/lesson-alpha.yaml" <<YAMLEOF
+- id: inst-T12-alpha
+  pattern: "test-12-pattern-alpha"
+  description: "Test 12 lesson alpha from workspace fallback."
+  confidence: 0.75
+  type: "failure-lesson"
+  failureContext:
+    errorCategory: "code-audit-warn"
+YAMLEOF
+cat > "$ROOT/.evolve/runs/cycle-500/lesson-beta.yaml" <<YAMLEOF
+- id: inst-T12-beta
+  pattern: "test-12-pattern-beta"
+  description: "Test 12 lesson beta from workspace fallback."
+  confidence: 0.80
+  type: "failure-lesson"
+  failureContext:
+    errorCategory: "code-audit-warn"
+YAMLEOF
+cat > "$ROOT/.evolve/runs/cycle-500/handoff-retrospective.json" <<HEOF
+{
+  "cycle": 500,
+  "auditVerdict": "WARN",
+  "lessonIds": [],
+  "lessonFiles": ["lesson-alpha.yaml", "lesson-beta.yaml"],
+  "lessonFilesNote": "role-gate blocked write to canonical dir; lessons in workspace",
+  "errorCategory": "code-audit-warn",
+  "failedStep": "audit",
+  "systemic": false,
+  "contradictedInstincts": []
+}
+HEOF
+if EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-500" >/dev/null 2>&1; then
+    LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
+    [ "$LEN" = "2" ] && pass "lessonFiles fallback: 2 workspace lessons merged into instinctSummary" || fail "expected 2 instinctSummary entries, got $LEN"
+    HAS_ALPHA=$(jq -r '.instinctSummary[] | select(.id=="inst-T12-alpha") | .id' "$ROOT/.evolve/state.json")
+    [ "$HAS_ALPHA" = "inst-T12-alpha" ] && pass "inst-T12-alpha recovered via lessonFiles fallback" || fail "inst-T12-alpha missing from instinctSummary"
+    HAS_BETA=$(jq -r '.instinctSummary[] | select(.id=="inst-T12-beta") | .id' "$ROOT/.evolve/state.json")
+    [ "$HAS_BETA" = "inst-T12-beta" ] && pass "inst-T12-beta recovered via lessonFiles fallback" || fail "inst-T12-beta missing from instinctSummary"
+    [ -f "$ROOT/.evolve/instincts/lessons/inst-T12-alpha.yaml" ] && pass "lesson YAML copied to canonical LESSONS_DIR" || fail "lesson not copied to canonical LESSONS_DIR"
+else
+    fail "merge returned non-zero for lessonFiles fallback"
+fi
+
+# --- Test 13 (v8.58.0): retrospected flag updated after successful merge ------
+header "Test 13 (v8.58.0): retrospected flag set to true after lesson merge"
+ROOT=$(make_repo)
+# Pre-populate with two failedApproaches entries: cycle 99 (target) and cycle 1 (untouched)
+jq '.failedApproaches = [
+    {ts:"2026-01-01T00:00:00Z", cycle:99, verdict:"WARN", retrospected:false, auditReportSha256:"abc123"},
+    {ts:"2026-01-02T00:00:00Z", cycle:1,  verdict:"WARN", retrospected:false, auditReportSha256:"def456"}
+]' "$ROOT/.evolve/state.json" > "$ROOT/.evolve/state.json.tmp" && \
+    mv "$ROOT/.evolve/state.json.tmp" "$ROOT/.evolve/state.json"
+write_lesson "$ROOT" "inst-T13-retro" "retrospect-flag-test" "reasoning"
+write_handoff "$ROOT" 99 '["inst-T13-retro"]' "WARN"
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
+# cycle-99 entry (has explicit retrospected field) must now be true
+FALSE_99=$(jq '[.failedApproaches[] | select(.cycle==99 and .retrospected==false)] | length' "$ROOT/.evolve/state.json")
+[ "$FALSE_99" = "0" ] && pass "cycle-99 failedApproaches entry marked retrospected=true" || fail "cycle-99 still has $FALSE_99 entry/entries with retrospected=false"
+# cycle-1 entry must remain unchanged (different cycle)
+FALSE_1=$(jq '[.failedApproaches[] | select(.cycle==1 and .retrospected==false)] | length' "$ROOT/.evolve/state.json")
+[ "$FALSE_1" = "1" ] && pass "cycle-1 failedApproaches entry remains retrospected=false (untouched)" || fail "cycle-1 entry was unexpectedly modified"
+
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"
 echo
