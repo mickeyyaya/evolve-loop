@@ -152,6 +152,98 @@ EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-101" >/dev/
 LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
 [ "$LEN" = "2" ] && pass "two lessons merged" || fail "expected 2 entries, got $LEN"
 
+# --- Test 8 (v8.56.0): instinctSummary capped at N=5 most-recent ------------
+header "Test 8 (v8.56.0): instinctSummary capped at N=5; older archived"
+ROOT=$(make_repo)
+# Pre-populate state.json with 5 existing entries — adding 1 more should evict oldest.
+jq '.instinctSummary = [
+    {id:"inst-L100", pattern:"old-1", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L101", pattern:"old-2", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L102", pattern:"old-3", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L103", pattern:"old-4", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L104", pattern:"old-5", confidence:0.5, type:"failure-lesson", errorCategory:"context"}
+]' "$ROOT/.evolve/state.json" > "$ROOT/.evolve/state.json.tmp" && \
+    mv "$ROOT/.evolve/state.json.tmp" "$ROOT/.evolve/state.json"
+write_lesson "$ROOT" "inst-L200" "new-pattern" "reasoning"
+write_handoff "$ROOT" 200 '["inst-L200"]'
+EVOLVE_INSTINCT_SUMMARY_CAP=5 EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-200" >/dev/null 2>&1
+LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
+if [ "$LEN" = "5" ]; then
+    pass "instinctSummary capped at 5 entries (was 5+1, now 5)"
+else
+    fail "expected 5 entries after cap, got $LEN"
+fi
+# The newly added inst-L200 must be present; the oldest (inst-L100) must be evicted.
+HAS_NEW=$(jq -r '.instinctSummary[] | select(.id=="inst-L200") | .id' "$ROOT/.evolve/state.json")
+HAS_OLD=$(jq -r '.instinctSummary[] | select(.id=="inst-L100") | .id' "$ROOT/.evolve/state.json")
+[ "$HAS_NEW" = "inst-L200" ] && pass "newest entry retained" || fail "newest entry not retained"
+[ -z "$HAS_OLD" ] && pass "oldest entry evicted (FIFO)" || fail "oldest entry NOT evicted (FIFO violated)"
+# Archive file must exist with the evicted entry.
+ARCHIVE="$ROOT/.evolve/archive/lessons/instinct-summary-archive.jsonl"
+if [ -f "$ARCHIVE" ] && grep -q '"id":"inst-L100"' "$ARCHIVE"; then
+    pass "evicted entry written to archive"
+else
+    fail "archive file missing or evicted entry not present: $ARCHIVE"
+fi
+
+# --- Test 9 (v8.56.0): carryoverTodos round-trip ----------------------------
+header "Test 9 (v8.56.0): carryover-todos.json round-trips into state.json"
+ROOT=$(make_repo)
+write_lesson "$ROOT" "inst-L300" "carry-pattern" "context"
+write_handoff "$ROOT" 300 '["inst-L300"]'
+# Simulate the retrospective writing carryover-todos.json
+mkdir -p "$ROOT/.evolve/runs/cycle-300"
+cat > "$ROOT/.evolve/runs/cycle-300/carryover-todos.json" <<TODOEOF
+[
+  {"id":"todo-1","action":"Add unit test for shell parser edge cases","priority":"high","evidence_pointer":"audit-report.md#D1"},
+  {"id":"todo-2","action":"Document bash 3.2 compat requirement","priority":"medium","evidence_pointer":"build-report.md"}
+]
+TODOEOF
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-300" >/dev/null 2>&1
+TODO_LEN=$(jq -r '.carryoverTodos | length' "$ROOT/.evolve/state.json" 2>/dev/null)
+if [ "$TODO_LEN" = "2" ]; then
+    pass "carryoverTodos has 2 entries"
+else
+    fail "expected 2 carryoverTodos, got $TODO_LEN"
+fi
+# Each todo gains defer_count=0 on first write
+DC=$(jq -r '.carryoverTodos[0].defer_count // empty' "$ROOT/.evolve/state.json")
+[ "$DC" = "0" ] && pass "defer_count initialized to 0" || fail "defer_count missing or wrong: '$DC'"
+# Cycle pointer is recorded
+CYC=$(jq -r '.carryoverTodos[0].first_seen_cycle // empty' "$ROOT/.evolve/state.json")
+[ "$CYC" = "300" ] && pass "first_seen_cycle recorded" || fail "first_seen_cycle wrong: '$CYC'"
+
+# --- Test 10 (v8.56.0): re-deferring same todo increments defer_count -------
+header "Test 10 (v8.56.0): re-deferring increments defer_count"
+# Run AGAIN with the same todo id — defer_count should bump from 0 → 1
+write_handoff "$ROOT" 301 '["inst-L300"]'
+mkdir -p "$ROOT/.evolve/runs/cycle-301"
+cat > "$ROOT/.evolve/runs/cycle-301/carryover-todos.json" <<TODOEOF
+[
+  {"id":"todo-1","action":"Add unit test for shell parser edge cases","priority":"high","evidence_pointer":"audit-report.md#D1"}
+]
+TODOEOF
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-301" >/dev/null 2>&1
+DC=$(jq -r '.carryoverTodos[] | select(.id=="todo-1") | .defer_count' "$ROOT/.evolve/state.json")
+[ "$DC" = "1" ] && pass "defer_count incremented on re-defer" || fail "defer_count not incremented: '$DC'"
+
+# --- Test 11 (v8.56.0): warn on defer_count >= 3 ----------------------------
+header "Test 11 (v8.56.0): defer_count >= 3 emits WARN to stderr"
+# Bump defer_count to 2 directly via jq, then run merge once more → should be 3 → WARN
+jq '.carryoverTodos = [.carryoverTodos[] | if .id=="todo-1" then .defer_count=2 else . end]' "$ROOT/.evolve/state.json" > "$ROOT/.evolve/state.json.tmp" && \
+    mv "$ROOT/.evolve/state.json.tmp" "$ROOT/.evolve/state.json"
+write_handoff "$ROOT" 302 '["inst-L300"]'
+mkdir -p "$ROOT/.evolve/runs/cycle-302"
+cat > "$ROOT/.evolve/runs/cycle-302/carryover-todos.json" <<TODOEOF
+[{"id":"todo-1","action":"Add unit test for shell parser edge cases","priority":"high","evidence_pointer":"audit-report.md#D1"}]
+TODOEOF
+WARN_OUT=$(EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-302" 2>&1 >/dev/null)
+if echo "$WARN_OUT" | grep -q "WARN.*defer.*3"; then
+    pass "WARN emitted when defer_count reaches 3"
+else
+    fail "expected WARN about defer_count=3 in stderr; got: $WARN_OUT"
+fi
+
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"
 echo

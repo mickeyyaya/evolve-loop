@@ -58,6 +58,13 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 1b. Intent (only when intent_required) → subagent-run.sh intent $CYCLE $WORKSPACE
    ↓ advance research scout
 2. Research / Discover  →  subagent-run.sh scout $CYCLE $WORKSPACE
+   ↓ if EVOLVE_TRIAGE_ENABLED=1 (v8.56.0+): advance triage triage
+2b. Triage (v8.56.0+, opt-in) → subagent-run.sh triage $CYCLE $WORKSPACE
+       Reads scout-report + state.json:carryoverTodos[]; emits triage-decision.md
+       with top_n[]/deferred[]/dropped[]/cycle_size_estimate. phase-gate
+       (`triage-to-plan-review`) blocks on cycle_size_estimate=large (split required).
+   ↓ if EVOLVE_PLAN_REVIEW=1: advance plan-review plan-reviewer (Sprint 2)
+2c. Plan-review (opt-in) → see Sprint 2 docs
    ↓ advance build builder
    (worktree was provisioned by run-cycle.sh; path is in cycle-state.active_worktree)
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
@@ -79,6 +86,25 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 ```
 
 **phase-gate-precondition.sh enforces this sequence at the kernel layer.** If you try to invoke `subagent-run.sh builder` while phase=calibrate, the hook denies the call. There is no way around it short of `EVOLVE_BYPASS_PHASE_GATE=1` — and bypassing is a CRITICAL violation per CLAUDE.md.
+
+### Per-phase prompt context (v8.56.0+, Layer B)
+
+When you write the task prompt for a phase agent, **prepend the role-filtered context** produced by `role-context-builder.sh`. Each role gets only its declared inputs (Builder doesn't need retrospective theory; Auditor doesn't need Scout's raw research). This replaces the pre-v8.56 pattern where every subagent got the kitchen-sink artifact dump.
+
+```bash
+# Example: assemble Builder's prompt
+ROLE_CTX=$(bash scripts/lifecycle/role-context-builder.sh builder $CYCLE $WORKSPACE)
+cat <<TASK_PROMPT | bash scripts/dispatch/subagent-run.sh builder $CYCLE $WORKSPACE
+$ROLE_CTX
+
+## Builder task
+<your imperative for THIS cycle's build>
+TASK_PROMPT
+```
+
+The helper emits a `## Intent`, `## Scout report`, etc. block — only the artifacts that role should see. Do NOT manually re-include `audit-report.md`, `retrospective-report.md`, or `failedApproaches[]` content in a Builder prompt; the kernel won't block you, but the role-context-builder is the canonical source-of-truth for what each role sees.
+
+If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stderr WARN — your job in that case is to *trim* before re-dispatching (e.g., by extracting only the relevant scout-report sections), not to silently ship an over-cap prompt.
 
 ## Verdict Decision Tree (after Audit)
 

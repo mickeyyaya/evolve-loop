@@ -516,6 +516,24 @@ EOF
     echo "" >> "$injected_prompt"
     echo "--- END TASK PROMPT ---" >> "$injected_prompt"
 
+    # v8.56.0 Layer B: soft prompt-size guard. Kernel-layer check that
+    # the orchestrator's prompt assembly didn't blow past the budget.
+    # Token estimation uses the 1-token≈4-bytes English upper bound.
+    # WARN-only by default; set EVOLVE_PROMPT_BUDGET_ENFORCE=1 to make it
+    # a hard exit (operator opt-in). Guard is INFORMATIONAL — it cannot
+    # know if the orchestrator legitimately needs a big prompt for this
+    # role (Retrospective is the synthesizer; it sees everything).
+    local _prompt_max="${EVOLVE_PROMPT_MAX_TOKENS:-30000}"
+    local _prompt_bytes
+    _prompt_bytes=$(wc -c < "$injected_prompt" | tr -d ' ')
+    local _prompt_tokens=$((_prompt_bytes / 4))
+    if [ "$_prompt_tokens" -gt "$_prompt_max" ]; then
+        echo "[subagent-run] WARN: $agent prompt is ~$_prompt_tokens tokens (cap=$_prompt_max). Consider role-context-builder.sh for filtered context. Layer-B reference: agents/evolve-orchestrator.md#per-phase-prompt-context" >&2
+        if [ "${EVOLVE_PROMPT_BUDGET_ENFORCE:-0}" = "1" ]; then
+            fail "EVOLVE_PROMPT_BUDGET_ENFORCE=1 + prompt over cap; aborting"
+        fi
+    fi
+
     local stdout_log="$workspace/${agent}-stdout.log"
     local stderr_log="$workspace/${agent}-stderr.log"
 

@@ -312,6 +312,61 @@ gate_discover_to_build() {
     log "PASS: DISCOVER → BUILD gate"
 }
 
+# ─── Gate: DISCOVER → TRIAGE (v8.56.0 Layer C, opt-in) ───
+# Triage is a single-writer phase that picks the top-N items from scout-report
+# backlog + carryoverTodos, defers the rest, and surfaces large items as
+# requiring split. It runs between Scout and Plan-review when
+# EVOLVE_TRIAGE_ENABLED=1 (default off; legacy direct discover→plan-review or
+# discover→build paths still work).
+gate_discover_to_triage() {
+    log "Checking DISCOVER → TRIAGE gate for cycle $CYCLE"
+
+    check_file_exists "$WORKSPACE/scout-report.md" "Scout report"
+    check_file_fresh "$WORKSPACE/scout-report.md" "Scout report"
+    check_artifact_substance "$WORKSPACE/scout-report.md" "Scout report"
+
+    # Don't require any extra ledger entry — Scout's ledger entry already
+    # exists from the discover→build path. We just need the scout-report
+    # to be readable input for Triage.
+    log "PASS: DISCOVER → TRIAGE gate"
+}
+
+# ─── Gate: TRIAGE → PLAN-REVIEW (v8.56.0 Layer C) ───
+# Requires triage-decision.md fresh + substantive + a top_n list (even if
+# 0 — that's a valid signal that Triage decided not to ship anything this
+# cycle, in which case the cycle should be closed without entering plan-review).
+gate_triage_to_plan_review() {
+    log "Checking TRIAGE → PLAN-REVIEW gate for cycle $CYCLE"
+
+    check_file_exists "$WORKSPACE/triage-decision.md" "Triage decision"
+    check_file_fresh "$WORKSPACE/triage-decision.md" "Triage decision"
+    check_artifact_substance "$WORKSPACE/triage-decision.md" "Triage decision"
+
+    if ! grep -q '"role":"triage"' "$LEDGER" 2>/dev/null; then
+        fail "No triage ledger entry for cycle $CYCLE"
+    fi
+
+    # cycle_size_estimate=large means Triage is asking for a split. Block.
+    local size
+    size=$(awk '/^cycle_size_estimate:/ { gsub(/^[^:]*:[[:space:]]*/, ""); gsub(/[[:space:]].*/, ""); print tolower($0); exit }' "$WORKSPACE/triage-decision.md")
+    case "$size" in
+        small|medium)
+            log "OK: cycle_size_estimate=$size"
+            ;;
+        large)
+            fail "Triage flagged cycle_size_estimate=large — split required (do not advance to plan-review with this scope). Defer items until top_n is small/medium."
+            ;;
+        "")
+            fail "triage-decision.md missing 'cycle_size_estimate:' line"
+            ;;
+        *)
+            fail "Unrecognized cycle_size_estimate: '$size' (expected small|medium|large)"
+            ;;
+    esac
+
+    log "PASS: TRIAGE → PLAN-REVIEW gate"
+}
+
 # ─── Gate: PLAN-REVIEW → TDD (Sprint 2) ───
 # Requires plan-review.md fresh + substantive + verdict != ABORT.
 # Verdict semantics:
@@ -685,6 +740,8 @@ case "$GATE" in
     intent-to-research)   gate_intent_to_research ;;
     research-to-discover) gate_research_to_discover ;;
     discover-to-build)    gate_discover_to_build ;;
+    discover-to-triage)   gate_discover_to_triage ;;
+    triage-to-plan-review) gate_triage_to_plan_review ;;
     build-to-audit)       gate_build_to_audit ;;
     audit-to-ship)        gate_audit_to_ship ;;
     audit-to-retrospective) gate_audit_to_retrospective ;;

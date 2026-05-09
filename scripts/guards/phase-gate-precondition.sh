@@ -163,10 +163,10 @@ REQUESTED_AGENT="${REQUESTED_AGENT#[\"\']}"
 # Unrecognized agents fall through (subagent-run.sh prints its own error).
 DERIVED_ROLE=""
 case "$REQUESTED_AGENT" in
-    intent|scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer)
+    intent|scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer|triage)
         DERIVED_ROLE="$REQUESTED_AGENT"
         ;;
-    intent-worker-*|scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*)
+    intent-worker-*|scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*|triage-worker-*)
         # Strip "-worker-<subtask>" to get parent role.
         DERIVED_ROLE="${REQUESTED_AGENT%%-worker-*}"
         log "worker-pattern: agent='$REQUESTED_AGENT' derived_role='$DERIVED_ROLE'"
@@ -217,7 +217,8 @@ case "$PHASE" in
     calibrate)    EXPECTED="intent scout orchestrator" ;;
     intent)       EXPECTED="intent orchestrator" ;;
     research)     EXPECTED="scout inspirer orchestrator" ;;
-    discover)     EXPECTED="scout plan-reviewer tdd-engineer builder orchestrator" ;;
+    discover)     EXPECTED="scout triage plan-reviewer tdd-engineer builder orchestrator" ;;
+    triage)       EXPECTED="triage plan-reviewer orchestrator" ;;
     plan-review)  EXPECTED="plan-reviewer scout tdd-engineer orchestrator" ;;
     tdd)          EXPECTED="tdd-engineer builder orchestrator" ;;
     build)        EXPECTED="builder auditor orchestrator" ;;

@@ -172,6 +172,53 @@ Output path: `.evolve/runs/cycle-N/handoff-retrospective.json`. Compact summary 
 }
 ```
 
+### 7. Write carryover TODOs (v8.56.0+)
+
+Output path: `.evolve/runs/cycle-N/carryover-todos.json`. Structured action items the next cycle's Triage and Scout agents will reason about. Format:
+
+```json
+[
+  {
+    "id": "todo-<short-slug>",
+    "action": "Imperative-voice instruction. e.g., 'Add unit tests for shell parser bare-newline chains'.",
+    "priority": "high|medium|low",
+    "evidence_pointer": "audit-report.md#D1"
+  }
+]
+```
+
+Rules:
+- **Emit only the action items the next cycle should consider.** Not every preventive action becomes a todo — only the ones that are deferrable, scope-able work units. Process changes (e.g., "Auditor must run mutation testing") that already exist as guard rails do NOT need todos.
+- **Re-using IDs across cycles is intentional.** If the same action carries over, reuse the same `id` — `merge-lesson-into-state.sh` will increment `defer_count`. After 3 deferrals the operator gets a WARN to manually triage.
+- **Priority** drives Triage's top-N selection in the next cycle.  Reserve `high` for blockers; `medium` for next-cycle work; `low` for nice-to-have.
+- **evidence_pointer** must reference an artifact in this cycle's run dir (audit-report.md, build-report.md, etc.) so future agents can verify the original failure context.
+
+If there are no action items worth carrying forward (rare on FAIL/WARN cycles), write `[]`. Empty file is valid.
+
+### 8. Write the digest (v8.56.0+)
+
+Output path: `.evolve/runs/cycle-N/lessons-digest.md`. A compressed (≤ 500 token) markdown summary that the next cycle's role-context-builder loads in place of the full lesson detail. Format:
+
+```markdown
+# Cycle N Retrospective Digest
+
+## Root cause (1 sentence)
+<the underlying assumption that turned out to be wrong>
+
+## Lessons (one bullet per lesson)
+- **inst-LXXX** (errorCategory): <pattern> — <what to check>
+- ...
+
+## Carryover TODOs (top 3 by priority)
+- [high] todo-<slug>: <action> (evidence: <pointer>)
+- ...
+
+## Contradicted instincts
+- <inst-NNN>: <why> (recommend confidence -X.X)
+```
+
+Keep this file under 500 tokens (≈ 2000 chars). The detail YAMLs in `.evolve/instincts/lessons/` remain the long-form audit trail; the digest is the "elevator pitch" agents read first.
+
 ## Out of scope
 
 - **You do not modify state.json.** The orchestrator merges your handoff JSON.
@@ -189,5 +236,7 @@ Before your last write, verify:
 3. The handoff JSON's `lessonIds` matches the YAML files actually written.
 4. No prose contains placeholder text like "TBD", "TODO", or "<insert>".
 5. The `description` and `preventiveAction` are specific enough that a fresh agent could act on them.
+6. **(v8.56.0+)** `carryover-todos.json` is valid JSON (an array, possibly empty). Each todo has `id`, `action`, `priority`, `evidence_pointer`.
+7. **(v8.56.0+)** `lessons-digest.md` exists and is ≤ 2000 chars. It contains the root-cause sentence, lesson bullets, top carryover todos, and contradicted instincts (if any).
 
 If any check fails, fix in place. If you cannot complete the retrospective due to missing inputs, write a brief retrospective explicitly stating what was unavailable — do not fabricate.

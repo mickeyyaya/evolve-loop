@@ -186,6 +186,76 @@ mv "$TMP_STATE" "$STATE"
 
 log "OK: merged ${#LESSON_IDS[@]} lesson(s) into instinctSummary; appended failedApproaches entry for cycle $CYCLE"
 
+# v8.56.0 Layer A: cap instinctSummary at N=5 most-recent; archive evictees.
+# Rationale: pre-v8.56 instinctSummary grew unbounded; agents received
+# >10k tokens of stale lesson context per cycle.  Cap at N=5 keeps the
+# context lean.  Older entries land in
+# .evolve/archive/lessons/instinct-summary-archive.jsonl (gitignored)
+# so retrospective lookup is still possible offline.
+SUMMARY_CAP="${EVOLVE_INSTINCT_SUMMARY_CAP:-5}"
+CURRENT_LEN=$(jq -r '.instinctSummary | length' "$STATE")
+if [ "$CURRENT_LEN" -gt "$SUMMARY_CAP" ]; then
+    EVICT_COUNT=$((CURRENT_LEN - SUMMARY_CAP))
+    ARCHIVE_DIR="$EVOLVE_PROJECT_ROOT/.evolve/archive/lessons"
+    ARCHIVE_FILE="$ARCHIVE_DIR/instinct-summary-archive.jsonl"
+    mkdir -p "$ARCHIVE_DIR"
+    # Append evicted (oldest, FIFO) to archive — one JSON object per line.
+    jq -c --argjson n "$EVICT_COUNT" \
+       '.instinctSummary[0:$n] | .[] | . + {evicted_at: now | todate, evicted_at_cycle: '"$CYCLE"'}' \
+       "$STATE" >> "$ARCHIVE_FILE"
+    # Truncate state to most-recent SUMMARY_CAP.
+    jq --argjson n "$SUMMARY_CAP" '.instinctSummary = .instinctSummary[-$n:]' "$STATE" > "$TMP_STATE"
+    mv "$TMP_STATE" "$STATE"
+    log "OK: instinctSummary capped to $SUMMARY_CAP entries; $EVICT_COUNT evicted to $ARCHIVE_FILE"
+fi
+
+# v8.56.0 Layer A: merge carryover-todos.json into state.json:carryoverTodos[].
+# Workflow: retrospective subagent emits carryover-todos.json as a separate
+# artifact alongside lessons-detail YAML.  Each todo is `{id, action,
+# priority, evidence_pointer}`.  We track first_seen_cycle (constant across
+# re-defers) and defer_count (bumped on re-encounter).  WARN at >= 3.
+TODOS_PATH="$WORKSPACE/carryover-todos.json"
+if [ -f "$TODOS_PATH" ]; then
+    if ! jq empty "$TODOS_PATH" 2>/dev/null; then
+        log "WARN: carryover-todos.json malformed; skipping"
+    else
+        # Ensure carryoverTodos exists in state.json
+        if ! jq -e '.carryoverTodos' "$STATE" >/dev/null 2>&1; then
+            jq '. + {carryoverTodos: []}' "$STATE" > "$TMP_STATE" && mv "$TMP_STATE" "$STATE"
+        fi
+        TODO_COUNT=$(jq -r 'length' "$TODOS_PATH")
+        WARN_IDS=()
+        for i in $(seq 0 $((TODO_COUNT - 1))); do
+            new_todo=$(jq -c ".[$i]" "$TODOS_PATH")
+            new_id=$(echo "$new_todo" | jq -r '.id')
+            [ -z "$new_id" ] || [ "$new_id" = "null" ] && continue
+            existing=$(jq -c --arg id "$new_id" '.carryoverTodos[] | select(.id==$id)' "$STATE")
+            if [ -n "$existing" ]; then
+                # Re-defer: bump defer_count.
+                cur_dc=$(echo "$existing" | jq -r '.defer_count // 0')
+                new_dc=$((cur_dc + 1))
+                jq --arg id "$new_id" --argjson dc "$new_dc" --argjson cyc "$CYCLE" \
+                   '.carryoverTodos = [.carryoverTodos[] | if .id==$id then .defer_count = $dc | .last_seen_cycle = $cyc else . end]' \
+                   "$STATE" > "$TMP_STATE"
+                mv "$TMP_STATE" "$STATE"
+                if [ "$new_dc" -ge 3 ]; then
+                    WARN_IDS+=("$new_id (defer=${new_dc})")
+                fi
+            else
+                # First sighting: tag with defer_count=0, first_seen_cycle=CYCLE.
+                jq --argjson todo "$new_todo" --argjson cyc "$CYCLE" \
+                   '.carryoverTodos += [($todo + {defer_count: 0, first_seen_cycle: $cyc, last_seen_cycle: $cyc})]' \
+                   "$STATE" > "$TMP_STATE"
+                mv "$TMP_STATE" "$STATE"
+            fi
+        done
+        log "OK: merged $TODO_COUNT carryoverTodo(s) into state.json"
+        if [ "${#WARN_IDS[@]}" -gt 0 ]; then
+            log "WARN: carryoverTodos with defer_count >= 3 (operator review needed): ${WARN_IDS[*]}"
+        fi
+    fi
+fi
+
 # Patch 3: log systemic failure event to the ledger.
 # v8.37.0: includes prev_hash + entry_seq for tamper-evident chain.
 if [ "$SYSTEMIC" = "true" ]; then
