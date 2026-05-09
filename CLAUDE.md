@@ -234,11 +234,14 @@ evolve-loop is structured around three composable layers (see [docs/architecture
 
 Scout, Auditor, Retrospective, Plan-reviewer, Evaluator, and Inspirer can fan out into parallel sub-personas. Builder, Intent, Orchestrator, and TDD-engineer are **excluded** — single-writer invariant on shared state. The exclusion is structurally enforced (v8.55.0+) via `parallel_eligible` in profile JSON; `cmd_dispatch_parallel` rejects with exit 2 otherwise. See [docs/architecture/sequential-write-discipline.md](docs/architecture/sequential-write-discipline.md) for the full rule, role taxonomy, and the why.
 
+> **Production posture (v8.55.0+):** Keep `EVOLVE_FANOUT_ENABLED=0` (the default) until v8.56 lean-cycle reduces baseline cost. The discipline + concurrency cap + per-worker budget cap rails ship in v8.55.0 so the feature is *defensibly disable-able*; operators who want speed at extra cost may opt in with the flags below, but the canonical operational mode remains sequential single-writer. Run the cycle-55 verification protocol (see `docs/architecture/sequential-write-discipline.md` "Operational posture") before flipping any flag in production.
+
 | Flag | Default | Effect |
 |---|---|---|
 | `EVOLVE_FANOUT_ENABLED` | `0` | Master switch |
 | `EVOLVE_FANOUT_SCOUT` / `_AUDITOR` / `_RETROSPECTIVE` | `0` | Enable fan-out per phase |
 | `EVOLVE_FANOUT_CONCURRENCY` | `2` (was `4` pre-v8.55) | Max parallel workers in flight; lowered to halve peak token-burn rate so subscription quotas survive multi-hour `/loop` runs. Operators on API plans bump to `4`+ explicitly. |
+| `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD` | `0.20` (v8.55.0+) | Per-worker $ cap auto-injected as `EVOLVE_MAX_BUDGET_USD` when operator hasn't set one. Total fan-out spend ≤ `concurrency × cap × ceil(subtasks/concurrency)`. Operator-set `EVOLVE_MAX_BUDGET_USD` always wins. |
 | `EVOLVE_FANOUT_CANCEL_ON_CONSENSUS` | `0` | Cancel remaining workers when K agree on FAIL |
 | `EVOLVE_FANOUT_CACHE_PREFIX` | `1` | Write shared cache-prefix.md for prompt-cache hit on siblings (~47% token reduction) |
 

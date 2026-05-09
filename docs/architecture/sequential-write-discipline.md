@@ -135,6 +135,85 @@ EVOLVE_FANOUT_CONCURRENCY=1 /loop  # serialize entirely (degenerate)
 
 Per-profile overrides are deliberately *not* supported. Per-environment is enough; per-profile is scope creep deferred to v8.56+.
 
+### Cost cap (Phase E, v8.55.0+)
+
+The concurrency cap limits *how many* workers run at once. The cost cap limits *how much each worker may spend*. Together they bound total fan-out spend deterministically:
+
+```
+total_fanout_cost  ≤  concurrency × per_worker_budget × ceil(subtasks / concurrency)
+```
+
+For default values (concurrency=2, per_worker_budget=$0.20):
+
+| Role | Subtasks | Batches | Max fan-out cost |
+|---|---|---|---|
+| Scout | 3 | 2 (rounded up) | 2 × $0.20 × 2 = **$0.80** |
+| Auditor | 4 | 2 | 2 × $0.20 × 2 = **$0.80** |
+| Retrospective | 3 | 2 | 2 × $0.20 × 2 = **$0.80** |
+
+This is a deliberately tight ceiling. The implementation conditionally injects the cap into each worker's environment as `EVOLVE_MAX_BUDGET_USD` only when the operator hasn't set one externally:
+
+```bash
+# scripts/dispatch/fanout-dispatch.sh:_run_worker()
+if [ -z "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
+    export EVOLVE_MAX_BUDGET_USD="$PER_WORKER_BUDGET_USD"
+fi
+```
+
+Operator override always wins. If a release pipeline or per-cycle override sets `EVOLVE_MAX_BUDGET_USD=5.00`, fan-out workers see `5.00`. The fan-out tier default is conservative because subscription users running continuous `/loop` are the canonical at-risk profile; API users with high quota override explicitly.
+
+```bash
+EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.05 /loop  # tighter cap (small verification cycle)
+EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=1.00 /loop  # looser cap (large complex cycle)
+```
+
+Phase E does *not* implement mid-flight kill on cumulative cost overflow — that would require IPC + race resolution. The per-worker cap is enforced by the underlying `claude --max-budget-usd` mechanism (deterministic, race-free). Workers that exceed their individual budget abort cleanly; sibling workers continue.
+
+---
+
+## Operational Posture (v8.55.0+)
+
+The discipline + concurrency cap + cost cap rails ship in v8.55.0. They make fan-out *defensibly disable-able* — when operators opt in, they know the worst-case cost; when they leave the default, they pay nothing extra.
+
+The operational stance is conservative:
+
+| Mode | When | How |
+|---|---|---|
+| **Default (off)** | Production, subscription quota, anything sensitive to peak burn rate | `EVOLVE_FANOUT_ENABLED=0` (default; no flag flip needed) |
+| **Opt-in (on)** | API plan with high quota, deliberate experimentation, post-v8.56 lean-cycle | `EVOLVE_FANOUT_ENABLED=1` + selective per-phase enables; tighten per-worker budget if needed |
+| **Verification cycle** | One-shot per release: prove the rails work end-to-end | `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.10` + all fan-out enables; capture cost telemetry; record in CHANGELOG |
+
+### Verification protocol (cycle 55)
+
+After v8.55.0 ships, run one verification cycle:
+
+```bash
+# Baseline: sequential (default)
+bash scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
+
+# Fan-out enabled with tight budget
+EVOLVE_FANOUT_ENABLED=1 \
+EVOLVE_FANOUT_SCOUT=1 \
+EVOLVE_FANOUT_AUDITOR=1 \
+EVOLVE_FANOUT_RETROSPECTIVE=1 \
+EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.10 \
+bash scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
+
+# Capture cost from .evolve/runs/cycle-N/<agent>-usage.json
+# Append findings to CHANGELOG.md under v8.55.0
+```
+
+Acceptance criterion: fan-out cycle cost ≤ 1.5× sequential cycle cost AND wall-time ≤ 0.7× sequential. If both hold, fan-out is pareto-acceptable for opt-in operators. If either fails, fan-out is not yet production-ready (drives v8.56 lean-cycle work).
+
+### Why default-off after the rails ship
+
+This is intentional, not a regression:
+
+- **Sequential is the canonical correctness path.** Single-writer per phase prevents race conditions, audit-binding violations, and concurrent ledger writes by construction.
+- **Fan-out adds latency reduction at cost premium.** With current per-role context dump sizes, fan-out's wall-time gain is partially offset by token cost increase from running N parallel subprocesses each loading full context.
+- **v8.56 lean-cycle changes the math.** Per-role context filter (Layer B) shrinks each subprocess's input by ~40%. After that, fan-out's cost premium drops below the value premium and default-on becomes credible.
+- **Until then, the rails exist for defensibility, not for routine use.** Operators who explicitly want fan-out know how to opt in; operators who don't, get sequential by default.
+
 ---
 
 ## Adding a New Role

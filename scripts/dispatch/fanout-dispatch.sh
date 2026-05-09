@@ -81,11 +81,22 @@ CONSENSUS_POLL_INTERVAL="${EVOLVE_FANOUT_CONSENSUS_POLL_S:-1}"
 # v8.23.0 Task D knob: per-worker status writes into cycle-state.parallel_workers.workers[].
 TRACK_WORKERS="${EVOLVE_FANOUT_TRACK_WORKERS:-1}"
 
+# v8.55.0 Phase E knob: per-worker budget cap for fan-out workers.
+# Default $0.20 USD per worker subprocess. Total fan-out spend ≤ concurrency × cap × batches.
+# Injected into _run_worker() as EVOLVE_MAX_BUDGET_USD ONLY if the operator hasn't already
+# set it externally — operator override always wins. See:
+# docs/architecture/sequential-write-discipline.md "Cost cap" section.
+PER_WORKER_BUDGET_USD="${EVOLVE_FANOUT_PER_WORKER_BUDGET_USD:-0.20}"
+
 # Validate numeric env values; reject negative or non-numeric.
 case "$CONCURRENCY" in ''|*[!0-9]*) CONCURRENCY=2 ;; esac
 case "$TIMEOUT_SECS" in ''|*[!0-9]*) TIMEOUT_SECS=600 ;; esac
 case "$CONSENSUS_K" in ''|*[!0-9]*) CONSENSUS_K=2 ;; esac
 case "$CONSENSUS_POLL_INTERVAL" in ''|*[!0-9]*) CONSENSUS_POLL_INTERVAL=1 ;; esac
+# Per-worker budget allows decimals (e.g., 0.20). Reject anything with chars
+# outside [0-9.]; fall back to default. Multi-dot is technically allowed by this
+# filter but downstream `claude --max-budget-usd` will reject malformed values.
+case "$PER_WORKER_BUDGET_USD" in ''|*[!0-9.]*) PER_WORKER_BUDGET_USD="0.20" ;; esac
 [ "$CONCURRENCY" -lt 1 ] && CONCURRENCY=1
 [ "$CONSENSUS_K" -lt 1 ] && CONSENSUS_K=2
 
@@ -136,6 +147,15 @@ _run_worker() {
     local err="$RESULTS_DIR/${name}.err"
     local meta="$RESULTS_DIR/${name}.meta"
     local start end rc=0
+
+    # v8.55.0 Phase E: inject per-worker budget cap. Conditional — preserves operator
+    # override. If the operator has set EVOLVE_MAX_BUDGET_USD externally (e.g., via
+    # release pipeline or per-cycle override), don't clobber it. The fan-out tier
+    # default is much tighter than the global default ($0.20 vs $999999) so that
+    # fan-out cannot accidentally drain a subscription quota even with cap=2.
+    if [ -z "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
+        export EVOLVE_MAX_BUDGET_USD="$PER_WORKER_BUDGET_USD"
+    fi
 
     # Task D: mark running before subprocess starts.
     if [ "$TRACK_WORKERS" = "1" ] && [ -n "$CYCLE_STATE_HELPER" ]; then

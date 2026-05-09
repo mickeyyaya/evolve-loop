@@ -24,6 +24,10 @@
 #   15. v8.55.0 — default-cap test: unset EVOLVE_FANOUT_CONCURRENCY → cap=2 (NOT 4)
 #   16. v8.55.0 — operator-override test: EVOLVE_FANOUT_CONCURRENCY=4 → all 4 in parallel
 #   17. v8.55.0 — cap-1 edge case: EVOLVE_FANOUT_CONCURRENCY=1 → workers serialize
+#   18. v8.55.0 Phase E — default per-worker budget cap = $0.20 (auto-injected into worker env)
+#   19. v8.55.0 Phase E — operator EVOLVE_MAX_BUDGET_USD override preserved (not clobbered)
+#   20. v8.55.0 Phase E — EVOLVE_FANOUT_PER_WORKER_BUDGET_USD overrides default
+#   21. v8.55.0 Phase E — malformed budget value falls back to 0.20 (no crash)
 #
 # Bash 3.2 compatible per CLAUDE.md (no declare -A, no mapfile, no GNU-only flags).
 
@@ -418,6 +422,79 @@ if [ "$ELAPSED" -ge 4 ] && [ "$ELAPSED" -le 6 ]; then
     pass "cap=1 serializes: ${ELAPSED}s wall time (expected ~4s)"
 else
     fail_ "wall time ${ELAPSED}s — cap=1 should serialize 4 workers to ~4s"
+fi
+rm -rf "$WS"
+
+# --- Test 18 (v8.55.0 Phase E): default per-worker budget = $0.20 -----------
+# When neither EVOLVE_MAX_BUDGET_USD nor EVOLVE_FANOUT_PER_WORKER_BUDGET_USD is
+# set, fan-out workers must see EVOLVE_MAX_BUDGET_USD=0.20 in their env.
+# Total fan-out spend is capped at concurrency × cap × batches.
+header "Test 18 (v8.55.0): default per-worker budget exported to worker env"
+WS=$(fresh_workspace)
+# Worker prints the env var so we can inspect.
+printf 'budget_check\techo MAX_BUDGET_USD=$EVOLVE_MAX_BUDGET_USD\n' > "$WS/cmds.tsv"
+unset EVOLVE_MAX_BUDGET_USD
+unset EVOLVE_FANOUT_PER_WORKER_BUDGET_USD
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+    "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+WORKER_OUT=$(cat "$WS/budget_check.out" 2>/dev/null)
+if echo "$WORKER_OUT" | grep -q "^MAX_BUDGET_USD=0.20$"; then
+    pass "default per-worker budget = 0.20"
+else
+    fail_ "expected MAX_BUDGET_USD=0.20; got: '$WORKER_OUT'"
+fi
+rm -rf "$WS"
+
+# --- Test 19 (v8.55.0 Phase E): operator override preserved -----------------
+# If operator already set EVOLVE_MAX_BUDGET_USD externally (e.g., via release
+# pipeline or per-cycle override), fan-out must NOT clobber it.
+header "Test 19 (v8.55.0): EVOLVE_MAX_BUDGET_USD operator override preserved"
+WS=$(fresh_workspace)
+printf 'budget_check\techo MAX_BUDGET_USD=$EVOLVE_MAX_BUDGET_USD\n' > "$WS/cmds.tsv"
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+EVOLVE_MAX_BUDGET_USD=5.00 \
+    "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+WORKER_OUT=$(cat "$WS/budget_check.out" 2>/dev/null)
+if echo "$WORKER_OUT" | grep -q "^MAX_BUDGET_USD=5.00$"; then
+    pass "operator override preserved: 5.00 (NOT clobbered to 0.20)"
+else
+    fail_ "expected operator value 5.00 preserved; got: '$WORKER_OUT'"
+fi
+rm -rf "$WS"
+
+# --- Test 20 (v8.55.0 Phase E): fan-out-specific override --------------------
+# EVOLVE_FANOUT_PER_WORKER_BUDGET_USD lets operators tune fan-out separately
+# from per-cycle budget. Set 0.05 → workers see 0.05.
+header "Test 20 (v8.55.0): EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.05 → 0.05"
+WS=$(fresh_workspace)
+printf 'budget_check\techo MAX_BUDGET_USD=$EVOLVE_MAX_BUDGET_USD\n' > "$WS/cmds.tsv"
+unset EVOLVE_MAX_BUDGET_USD
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.05 \
+    "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+WORKER_OUT=$(cat "$WS/budget_check.out" 2>/dev/null)
+if echo "$WORKER_OUT" | grep -q "^MAX_BUDGET_USD=0.05$"; then
+    pass "fan-out-specific override honored: 0.05"
+else
+    fail_ "expected 0.05; got: '$WORKER_OUT'"
+fi
+rm -rf "$WS"
+
+# --- Test 21 (v8.55.0 Phase E): malformed value falls back to default --------
+# Defensive: bad operator input shouldn't crash; falls back to 0.20.
+header "Test 21 (v8.55.0): malformed EVOLVE_FANOUT_PER_WORKER_BUDGET_USD → 0.20 fallback"
+WS=$(fresh_workspace)
+printf 'budget_check\techo MAX_BUDGET_USD=$EVOLVE_MAX_BUDGET_USD\n' > "$WS/cmds.tsv"
+unset EVOLVE_MAX_BUDGET_USD
+EVOLVE_FANOUT_TRACK_WORKERS=0 \
+EVOLVE_FANOUT_PER_WORKER_BUDGET_USD="foo-bar" \
+    "$SCRIPT" "$WS/cmds.tsv" "$WS/results.tsv" >/dev/null 2>&1
+RC=$?
+WORKER_OUT=$(cat "$WS/budget_check.out" 2>/dev/null)
+if [ "$RC" -eq 0 ] && echo "$WORKER_OUT" | grep -q "^MAX_BUDGET_USD=0.20$"; then
+    pass "malformed → fallback to 0.20 (no crash; rc=$RC)"
+else
+    fail_ "expected rc=0 + 0.20 fallback; got rc=$RC, out='$WORKER_OUT'"
 fi
 rm -rf "$WS"
 
