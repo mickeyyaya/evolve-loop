@@ -310,6 +310,87 @@ FALSE_99=$(jq '[.failedApproaches[] | select(.cycle==99 and .retrospected==false
 FALSE_1=$(jq '[.failedApproaches[] | select(.cycle==1 and .retrospected==false)] | length' "$ROOT/.evolve/state.json")
 [ "$FALSE_1" = "1" ] && pass "cycle-1 failedApproaches entry remains retrospected=false (untouched)" || fail "cycle-1 entry was unexpectedly modified"
 
+# --- Test 14 (v8.59.0): instinctCount updated on single lesson append --------
+header "Test 14 (v8.59.0): instinctCount=1 after single lesson append to empty state"
+ROOT=$(make_repo)
+write_lesson "$ROOT" "inst-L014" "test-14-pattern" "reasoning"
+write_handoff "$ROOT" 14 '["inst-L014"]'
+if EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-14" >/dev/null 2>&1; then
+    COUNT=$(jq -r '.instinctCount // 0' "$ROOT/.evolve/state.json")
+    LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
+    if [ "$COUNT" = "1" ] && [ "$LEN" = "1" ]; then
+        pass "instinctCount=1 after single append (Fix A: counter updated)"
+    else
+        fail "instinctCount=$COUNT instinctSummary.length=$LEN; expected both=1"
+    fi
+else
+    fail "merge returned non-zero"
+fi
+
+# --- Test 15 (v8.59.0): self-heal fires when instinctCount drifted ----------
+header "Test 15 (v8.59.0): self-heal: instinctCount=0 with instinctSummary.length=3 → heals to 4 after append, WARN logged"
+ROOT=$(make_repo)
+jq '.instinctSummary = [
+    {id:"inst-L015-pre1", pattern:"pre-1", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L015-pre2", pattern:"pre-2", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L015-pre3", pattern:"pre-3", confidence:0.5, type:"failure-lesson", errorCategory:"context"}
+] | .instinctCount = 0' "$ROOT/.evolve/state.json" > "$ROOT/.evolve/state.json.tmp" && \
+    mv "$ROOT/.evolve/state.json.tmp" "$ROOT/.evolve/state.json"
+write_lesson "$ROOT" "inst-L015-new" "test-15-new-pattern" "reasoning"
+write_handoff "$ROOT" 15 '["inst-L015-new"]'
+STDERR_15=$(EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-15" 2>&1 >/dev/null)
+COUNT=$(jq -r '.instinctCount // 0' "$ROOT/.evolve/state.json")
+LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
+if [ "$COUNT" = "4" ] && [ "$LEN" = "4" ]; then
+    pass "instinctCount=4 after self-heal + append (Fix C + Fix A)"
+else
+    fail "instinctCount=$COUNT instinctSummary.length=$LEN; expected both=4"
+fi
+if echo "$STDERR_15" | grep -q "WARN \[bookkeeping\]"; then
+    pass "WARN [bookkeeping] logged for drifted instinctCount (Fix C)"
+else
+    fail "expected WARN [bookkeeping] in stderr; got: $STDERR_15"
+fi
+
+# --- Test 16 (v8.59.0): dedup guard — same lesson ID merged twice → no count change ---
+header "Test 16 (v8.59.0): idempotent re-merge: same lesson ID merged twice → instinctCount=1"
+ROOT=$(make_repo)
+write_lesson "$ROOT" "inst-L016-dup" "test-16-dup-pattern" "reasoning"
+write_handoff "$ROOT" 16 '["inst-L016-dup"]'
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-16" >/dev/null 2>&1
+COUNT=$(jq -r '.instinctCount // 0' "$ROOT/.evolve/state.json")
+[ "$COUNT" = "1" ] && pass "instinctCount=1 after first merge" || fail "instinctCount=$COUNT after first merge; expected 1"
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-16" >/dev/null 2>&1
+COUNT=$(jq -r '.instinctCount // 0' "$ROOT/.evolve/state.json")
+LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
+if [ "$COUNT" = "1" ] && [ "$LEN" = "1" ]; then
+    pass "instinctCount=1 and length=1 after second merge (dedup guard + Fix A)"
+else
+    fail "instinctCount=$COUNT instinctSummary.length=$LEN after second merge; expected both=1"
+fi
+
+# --- Test 17 (v8.59.0): instinctCount updated after cap trim -----------------
+header "Test 17 (v8.59.0): instinctCount=5 after cap trim from 6 to 5"
+ROOT=$(make_repo)
+jq '.instinctSummary = [
+    {id:"inst-L017-old1", pattern:"old-1", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L017-old2", pattern:"old-2", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L017-old3", pattern:"old-3", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L017-old4", pattern:"old-4", confidence:0.5, type:"failure-lesson", errorCategory:"context"},
+    {id:"inst-L017-old5", pattern:"old-5", confidence:0.5, type:"failure-lesson", errorCategory:"context"}
+] | .instinctCount = 5' "$ROOT/.evolve/state.json" > "$ROOT/.evolve/state.json.tmp" && \
+    mv "$ROOT/.evolve/state.json.tmp" "$ROOT/.evolve/state.json"
+write_lesson "$ROOT" "inst-L017-new" "test-17-new-pattern" "reasoning"
+write_handoff "$ROOT" 17 '["inst-L017-new"]'
+EVOLVE_INSTINCT_SUMMARY_CAP=5 EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" "$ROOT/.evolve/runs/cycle-17" >/dev/null 2>&1
+COUNT=$(jq -r '.instinctCount // 0' "$ROOT/.evolve/state.json")
+LEN=$(jq -r '.instinctSummary | length' "$ROOT/.evolve/state.json")
+if [ "$COUNT" = "5" ] && [ "$LEN" = "5" ]; then
+    pass "instinctCount=5 after cap trim (Fix B: counter updated after cap)"
+else
+    fail "instinctCount=$COUNT instinctSummary.length=$LEN; expected both=5 after cap"
+fi
+
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"
 echo

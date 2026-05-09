@@ -123,6 +123,20 @@ if [ ! -f "$STATE" ]; then
     echo '{"instinctSummary": [], "failedApproaches": []}' > "$STATE"
 fi
 
+# Self-heal: sync instinctCount if it has drifted from actual instinctSummary length.
+# Rationale: pre-v8.59 writes populated instinctSummary[] without updating the sibling
+# counter; self-heal ensures any in-flight inconsistency is corrected before the new
+# lesson is appended. Logs WARN to stderr so the drift is visible in the ledger.
+_heal_count=$(jq -r '.instinctCount // 0' "$STATE")
+_heal_len=$(jq -r '.instinctSummary | length' "$STATE")
+if [ "$_heal_count" != "$_heal_len" ]; then
+    log "WARN [bookkeeping]: instinctCount=$_heal_count != instinctSummary.length=$_heal_len; self-healing"
+    TMP_HEAL=$(mktemp)
+    jq '.instinctCount = (.instinctSummary | length)' "$STATE" > "$TMP_HEAL" \
+        && mv -f "$TMP_HEAL" "$STATE"
+fi
+unset _heal_count _heal_len
+
 # Build the patches.
 NOW_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -187,13 +201,15 @@ except Exception:
     jq --arg id "$id" --arg pattern "$pattern" \
        --argjson confidence "$confidence" \
        --arg error_cat "$error_cat" \
-       '.instinctSummary += [{
-            id: $id,
-            pattern: $pattern,
-            confidence: $confidence,
-            type: "failure-lesson",
-            errorCategory: $error_cat
-        }]' "$STATE" > "$TMP_STATE"
+       'if (.instinctSummary | map(.id) | any(. == $id)) | not
+        then .instinctSummary += [{
+                 id: $id,
+                 pattern: $pattern,
+                 confidence: $confidence,
+                 type: "failure-lesson",
+                 errorCategory: $error_cat
+             }]
+        else . end | .instinctCount = (.instinctSummary | length)' "$STATE" > "$TMP_STATE"
     mv "$TMP_STATE" "$STATE"
 done
 
@@ -249,7 +265,9 @@ if [ "$CURRENT_LEN" -gt "$SUMMARY_CAP" ]; then
        '.instinctSummary[0:$n] | .[] | . + {evicted_at: now | todate, evicted_at_cycle: '"$CYCLE"'}' \
        "$STATE" >> "$ARCHIVE_FILE"
     # Truncate state to most-recent SUMMARY_CAP.
-    jq --argjson n "$SUMMARY_CAP" '.instinctSummary = .instinctSummary[-$n:]' "$STATE" > "$TMP_STATE"
+    jq --argjson n "$SUMMARY_CAP" \
+       '.instinctSummary = .instinctSummary[-$n:] | .instinctCount = (.instinctSummary | length)' \
+       "$STATE" > "$TMP_STATE"
     mv "$TMP_STATE" "$STATE"
     log "OK: instinctSummary capped to $SUMMARY_CAP entries; $EVICT_COUNT evicted to $ARCHIVE_FILE"
 fi
