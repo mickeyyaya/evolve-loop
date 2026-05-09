@@ -12,6 +12,7 @@
     "Bash(ship.sh:*)",
     "Bash(subagent-run.sh:*)",
     "Bash(merge-lesson-into-state.sh:*)",
+    "Bash(reconcile-carryover-todos.sh:*)",
     "Bash(phase-gate.sh:*)",
     "Bash(release.sh:*)",
     "Bash(eval-quality-check.sh:*)",

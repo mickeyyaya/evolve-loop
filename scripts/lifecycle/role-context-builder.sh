@@ -98,7 +98,9 @@ emit_carryover_todos() {
     todos=$(jq -r '.carryoverTodos // [] | length' "$STATE" 2>/dev/null || echo 0)
     [ "$todos" = "0" ] && return 0
     echo "## carryoverTodos"
-    jq -r '.carryoverTodos[] | "- [" + (.priority // "?") + "] " + .id + ": " + .action + " (defer=" + ((.defer_count // 0) | tostring) + ", evidence=" + (.evidence_pointer // "none") + ")"' "$STATE" 2>/dev/null
+    # v8.57.0 Layer D: surface cycles_unpicked so consumers (Scout, Triage)
+    # see the freshness signal — items closer to threshold lose priority.
+    jq -r '.carryoverTodos[] | "- [" + (.priority // "?") + "] " + .id + ": " + .action + " (defer=" + ((.defer_count // 0) | tostring) + ", unpicked=" + ((.cycles_unpicked // 0) | tostring) + ", evidence=" + (.evidence_pointer // "none") + ")"' "$STATE" 2>/dev/null
     echo
 }
 

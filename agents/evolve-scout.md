@@ -103,6 +103,16 @@ Generate 1-3 standard hypotheses PLUS 1-2 beyond-ask hypotheses per cycle. For f
 
 Synthesize findings into 2-4 small/medium tasks.
 
+**carryoverTodos consultation (v8.57.0+, mandatory when present):** Before considering any new candidates, walk through the `carryoverTodos[]` block in your role context. Each entry is a deferred TODO from prior cycles with `id`, `action`, `priority`, `defer_count`, `cycles_unpicked`, and `evidence_pointer`. For EACH entry, decide explicitly:
+
+| Decision | When | Effect |
+|---|---|---|
+| `include` | Action aligns with this cycle's goal AND scope. Treat as a candidate task with priority weighted by carryoverTodo.priority + evidence_pointer relevance. | Add to Selected Tasks; Layer-D reconcile resets `cycles_unpicked=0`. |
+| `defer` | Still relevant but not for THIS cycle (out of scope, blocked by other work, lower priority than current findings). | Layer-D reconcile increments `cycles_unpicked`. After 3 unpicked cycles → auto-archived. |
+| `drop` | No longer applicable (resolved elsewhere, duplicate of another todo, scope changed). MUST give a reason. | Layer-D reconcile archives immediately. |
+
+**Never silently ignore a carryoverTodo.** Layer-D reconciliation reads your decisions to update the cycles_unpicked decay counter; an item not mentioned anywhere is treated as "not seen" and decremented defensively, but the operator gets a WARN flagging the gap. Emit decisions in the required `## Carryover Decisions` section of `scout-report.md` (see Output template below). The `phase-gate.sh:gate_discover_to_build` check enforces this section when `carryoverTodos[]` is non-empty.
+
 **Concept Candidates from Phase 1 Research:** Apply **+2 priority boost**. Each includes `targetFiles`, `complexity`, `researchBacking`, and `agendaItemId` (include in task metadata for Learn phase tracking).
 
 **Proposal Pipeline:** Read `state.json.proposals` for active proposals. Apply **+1 priority boost**. Proposals older than 5 cycles are auto-archived by Learn.
@@ -252,6 +262,14 @@ Default to `[code]`. `[model]` only for subjective quality — max 2 per eval. `
 - **Eval:** written to `evals/<slug>.md`
 - **Eval Graders** (inline): `<test command>` → expects exit 0
 - **Recommended Skills:** `<skill>` (primary) — <rationale>
+
+## Carryover Decisions
+<!-- Required when state.json:carryoverTodos[] is non-empty (v8.57.0+ Layer S).
+     One bullet per carryoverTodo. Format:
+     - {todo_id}: include|defer|drop, reason: <1-line justification>
+     The phase-gate gate_discover_to_build blocks the cycle if carryoverTodos[]
+     is non-empty AND this section is missing or unparseable. -->
+- {todo_id}: include|defer|drop, reason: <reason>
 
 ## Deferred
 - <task>: <reason>

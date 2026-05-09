@@ -163,10 +163,10 @@ REQUESTED_AGENT="${REQUESTED_AGENT#[\"\']}"
 # Unrecognized agents fall through (subagent-run.sh prints its own error).
 DERIVED_ROLE=""
 case "$REQUESTED_AGENT" in
-    intent|scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer|triage)
+    intent|scout|builder|auditor|evaluator|inspirer|orchestrator|retrospective|tdd-engineer|plan-reviewer|triage|memo)
         DERIVED_ROLE="$REQUESTED_AGENT"
         ;;
-    intent-worker-*|scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*|triage-worker-*)
+    intent-worker-*|scout-worker-*|builder-worker-*|auditor-worker-*|evaluator-worker-*|inspirer-worker-*|retrospective-worker-*|tdd-engineer-worker-*|plan-reviewer-worker-*|triage-worker-*|memo-worker-*)
         # Strip "-worker-<subtask>" to get parent role.
         DERIVED_ROLE="${REQUESTED_AGENT%%-worker-*}"
         log "worker-pattern: agent='$REQUESTED_AGENT' derived_role='$DERIVED_ROLE'"
@@ -224,7 +224,7 @@ case "$PHASE" in
     build)        EXPECTED="builder auditor orchestrator" ;;
     audit)        EXPECTED="auditor evaluator retrospective orchestrator" ;;
     ship)         EXPECTED="orchestrator retrospective" ;;
-    learn)        EXPECTED="retrospective inspirer orchestrator" ;;
+    learn)        EXPECTED="retrospective inspirer orchestrator memo" ;;
     *)            EXPECTED="" ;;
 esac
 

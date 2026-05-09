@@ -72,16 +72,22 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
    ↓ verdict-driven branch:
 5a. PASS         →  advance ship orchestrator  →  ship.sh "<commit-msg>"
+                    advance learn memo  (v8.57.0+ Layer P)
+                    subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json)
+                    merge-lesson-into-state.sh $WORKSPACE  (writes new carryoverTodos with cycles_unpicked=0)
+                    reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict PASS  (Layer D)
 5b. WARN (v8.35.0+) →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
                        advance ship orchestrator  →  ship.sh "<commit-msg>"
                        (ship.sh accepts WARN per v8.28.0 fluent-by-default policy)
                        advance retrospective retrospective  (v8.45.0+)
                        subagent-run.sh retrospective $CYCLE $WORKSPACE
                        merge-lesson-into-state.sh $WORKSPACE
+                       reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict WARN  (v8.57.0+)
 5c. FAIL         →  record-failure-to-state.sh $WORKSPACE FAIL  (no ship)
                        advance retrospective retrospective  (v8.45.0+; was "batched per v8.12.3" pre-v8.45)
                        subagent-run.sh retrospective $CYCLE $WORKSPACE
                        merge-lesson-into-state.sh $WORKSPACE
+                       reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict FAIL  (v8.57.0+)
 6. Write orchestrator-report.md → exit
 ```
 

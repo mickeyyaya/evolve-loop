@@ -44,7 +44,8 @@
     "./agents/evolve-orchestrator.md",
     "./agents/plan-reviewer.md",
     "./agents/evolve-intent.md",
-    "./agents/evolve-triage.md"
+    "./agents/evolve-triage.md",
+    "./agents/evolve-memo.md"
   ],
   "skills": [
     "./skills/evolve-loop/",

@@ -242,9 +242,11 @@ if [ -f "$TODOS_PATH" ]; then
                     WARN_IDS+=("$new_id (defer=${new_dc})")
                 fi
             else
-                # First sighting: tag with defer_count=0, first_seen_cycle=CYCLE.
+                # First sighting: tag with defer_count=0, first_seen_cycle=CYCLE,
+                # cycles_unpicked=0 (v8.57.0 Layer D — used by reconcile-carryover-todos.sh
+                # to track natural die-out via cycles-unpicked decay).
                 jq --argjson todo "$new_todo" --argjson cyc "$CYCLE" \
-                   '.carryoverTodos += [($todo + {defer_count: 0, first_seen_cycle: $cyc, last_seen_cycle: $cyc})]' \
+                   '.carryoverTodos += [($todo + {defer_count: 0, cycles_unpicked: 0, first_seen_cycle: $cyc, last_seen_cycle: $cyc})]' \
                    "$STATE" > "$TMP_STATE"
                 mv "$TMP_STATE" "$STATE"
             fi

@@ -251,6 +251,21 @@ gate_discover_to_build() {
     check_artifact_substance "$WORKSPACE/scout-report.md" "Scout report"
     check_subagent_ledger_match "scout"
 
+    # 1b. v8.57.0 Layer S: when state.json:carryoverTodos[] is non-empty, the
+    # scout-report MUST contain a '## Carryover Decisions' section so Layer-D
+    # reconcile can update cycles_unpicked correctly. Empty carryoverTodos[]
+    # means no requirement — backward-compatible with v8.56.0 cycles.
+    if [ -f "$STATE" ]; then
+        local _carryover_count
+        _carryover_count=$(jq -r '(.carryoverTodos // []) | length' "$STATE" 2>/dev/null || echo 0)
+        if [ "${_carryover_count:-0}" -gt 0 ]; then
+            if ! grep -qE '^##[[:space:]]+Carryover[[:space:]]+Decisions' "$WORKSPACE/scout-report.md"; then
+                fail "carryoverTodos[] has $_carryover_count entries but scout-report.md is missing required '## Carryover Decisions' section (v8.57.0 Layer S — see agents/evolve-scout.md Task Selection)"
+            fi
+            log "OK: scout-report contains '## Carryover Decisions' section ($_carryover_count carryover(s) to reconcile)"
+        fi
+    fi
+
     # 2. At least one eval definition must exist
     local eval_count
     eval_count=$(ls "$EVOLVE_DIR/evals/"*.md 2>/dev/null | wc -l | tr -d ' ')
