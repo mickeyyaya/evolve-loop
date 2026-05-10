@@ -69,6 +69,85 @@ USG
 STATE="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
 MAX_TOKENS="${EVOLVE_PROMPT_MAX_TOKENS:-30000}"
 
+# v8.63.0 Cycle C1+C2: extract a named anchor region from a markdown file.
+# Boundary convention: `<!-- ANCHOR:NAME -->` opens; the next `<!-- ANCHOR:`
+# of any name (or EOF) closes. Markers are HTML comments — invisible in
+# rendered markdown, easy to extract via awk, and LLM-friendly (one marker
+# per section, no close-tag to remember).
+#
+# Usage: extract_anchor "$file" "<anchor_name>"
+# Output: anchor content (between marker and next marker/EOF) on stdout,
+#         OR empty string if anchor not found.
+# Caller must check empty-string and fall back to emit_artifact.
+extract_anchor() {
+    local path="$1" anchor="$2"
+    [ -f "$path" ] || return 0
+    awk -v anchor="$anchor" '
+        # Open marker: tolerate spaces around the name.
+        $0 ~ "^[[:space:]]*<!--[[:space:]]+ANCHOR:[[:space:]]*" anchor "[[:space:]]*-->" {
+            in_anchor=1; next
+        }
+        # Any subsequent ANCHOR: marker (any name) closes the current capture.
+        in_anchor && $0 ~ "^[[:space:]]*<!--[[:space:]]+ANCHOR:" { exit }
+        in_anchor { print }
+    ' "$path"
+}
+
+# v8.63.0 Cycle C2: detect whether a file has ANY anchor markers. Used to
+# decide between per-section extraction and a single full-file fallback —
+# without this check, emitting N anchors from a marker-less file produces
+# N copies of the full file (2x+ duplication regression).
+file_has_anchors() {
+    local path="$1"
+    [ -f "$path" ] || return 1
+    grep -qE '^[[:space:]]*<!--[[:space:]]+ANCHOR:' "$path" 2>/dev/null
+}
+
+# Emit a named anchor section from an artifact. Caller is responsible for
+# checking file_has_anchors() first and falling back to emit_artifact when
+# the file has NO markers. When the file has markers but the specific anchor
+# is absent, this function emits a placeholder noting the missing anchor —
+# do NOT emit the full file (caller already verified anchors exist).
+emit_artifact_anchored() {
+    local label="$1" path="$2" anchor="$3"
+    [ -f "$path" ] || return 0
+    local content
+    content=$(extract_anchor "$path" "$anchor")
+    if [ -n "$content" ]; then
+        echo "## $label (anchored: $anchor)"
+        echo "<!-- extracted from $path :: $anchor -->"
+        echo
+        printf '%s\n' "$content"
+        echo
+    else
+        # File has anchors but THIS one is missing. Emit a small note rather
+        # than the full file — the caller's job is to pick anchors that exist.
+        echo "## $label (anchored: $anchor)"
+        echo "<!-- $path has anchors but lacks ANCHOR:$anchor; section omitted -->"
+        echo
+    fi
+}
+
+# v8.63.0 Cycle C2: convenience wrapper for the per-phase assembly. Decides
+# between anchor-mode and full-file-mode based on whether the file has
+# ANY anchor markers. anchor_list is space-separated.
+emit_artifact_with_anchors() {
+    local label="$1" path="$2"; shift 2
+    local anchor_list="$*"
+    [ -f "$path" ] || return 0
+    if file_has_anchors "$path"; then
+        local a
+        for a in $anchor_list; do
+            emit_artifact_anchored "$label" "$path" "$a"
+        done
+    else
+        # Backwards-compat: pre-v8.63 artifacts lack anchors. Emit the full
+        # file ONCE (legacy behavior). Logged so operators can see the
+        # cycle is using a pre-anchored artifact.
+        emit_artifact "$label" "$path"
+    fi
+}
+
 emit_artifact() {
     local label="$1" path="$2"
     if [ -f "$path" ]; then
@@ -237,7 +316,14 @@ emit_for_role() {
             # Layer C: Triage gets the backlog plus carryover context to choose top-N.
             header_block
             emit_intent_compact
-            emit_artifact "Scout backlog" "$WORKSPACE/scout-report.md"
+            # v8.63.0 Cycle C2/C3: under anchor mode, triage only needs the
+            # proposed_tasks section of scout-report — not gap analysis,
+            # research, hypotheses. Falls back to full file if anchors absent.
+            if [ "${EVOLVE_ANCHOR_EXTRACT:-0}" = "1" ]; then
+                emit_artifact_with_anchors "Scout backlog" "$WORKSPACE/scout-report.md" proposed_tasks
+            else
+                emit_artifact "Scout backlog" "$WORKSPACE/scout-report.md"
+            fi
             # Triage primarily needs todos; instincts are lower priority.
             if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
                 emit_digest_summary
@@ -277,12 +363,25 @@ emit_for_role() {
             # — not a compact summary. Always emit full file.
             header_block
             emit_artifact "Intent (acceptance criteria)" "$WORKSPACE/intent.md"
-            emit_artifact "Build report" "$WORKSPACE/build-report.md"
-            # Scout-report is included as a *relevant subset* — the orchestrator
-            # would normally trim to acceptance-relevant sections; here we ship
-            # the whole file because trimming requires LLM judgement. Token cap
-            # warns operator if this overflows.
-            emit_artifact "Scout report (acceptance scope)" "$WORKSPACE/scout-report.md"
+            # v8.63.0 Cycle C2/C3: under anchor mode, auditor reads only the
+            # diff_summary + test_results sections of build-report (not the
+            # full builder narrative) and only proposed_tasks + acceptance_criteria
+            # of scout-report. Falls back to full file if anchors absent.
+            if [ "${EVOLVE_ANCHOR_EXTRACT:-0}" = "1" ]; then
+                # Auditor needs diff + test results from build-report; proposed
+                # tasks + acceptance criteria from scout-report. Each is a
+                # space-separated anchor list per file. Falls back to whole
+                # file if anchors absent (e.g., pre-v8.63 artifacts).
+                emit_artifact_with_anchors "Build report" "$WORKSPACE/build-report.md" diff_summary test_results
+                emit_artifact_with_anchors "Scout report (acceptance scope)" "$WORKSPACE/scout-report.md" proposed_tasks acceptance_criteria
+            else
+                emit_artifact "Build report" "$WORKSPACE/build-report.md"
+                # Scout-report is included as a *relevant subset* — the orchestrator
+                # would normally trim to acceptance-relevant sections; here we ship
+                # the whole file because trimming requires LLM judgement. Token cap
+                # warns operator if this overflows.
+                emit_artifact "Scout report (acceptance scope)" "$WORKSPACE/scout-report.md"
+            fi
             ;;
         retrospective)
             # Synthesizer: gets every phase artifact (full files; this is the

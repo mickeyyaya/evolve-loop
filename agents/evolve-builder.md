@@ -281,11 +281,13 @@ Write `workspace/builder-notes.md` (under 20 lines):
 |---|------|-----------|-------|
 | 1 | <step> | <0.0-1.0> | <reasoning> |
 
+<!-- ANCHOR:diff_summary -->
 ## Changes
 | Action | File | Description |
 |--------|------|-------------|
 | MODIFY | path/to/file | <what changed> |
 
+<!-- ANCHOR:test_results -->
 ## Self-Verification
 | Check | Result |
 |-------|--------|

@@ -117,6 +117,7 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 ## Has this happened before?
 <scan priorLessons. If ≥2 prior with same errorCategory + similar pattern, flag as SYSTEMIC>
 
+<!-- ANCHOR:lessons -->
 ## Lessons extracted
 - inst-LXXX-<slug> (see .evolve/instincts/lessons/inst-LXXX-<slug>.yaml)
   - Pattern: <kebab-case-summary>

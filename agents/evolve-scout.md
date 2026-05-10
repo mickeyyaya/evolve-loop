@@ -243,12 +243,14 @@ Default to `[code]`. `[model]` only for subjective quality — max 2 per eval. `
 ## Research → Implementation Map
 | Finding | Source | Target File(s) | Change Description |
 
+<!-- ANCHOR:gap_analysis -->
 ## Hypotheses
 | # | Hypothesis | Evidence | Testable By | Category | Confidence | Source |
 
 ## Beyond-the-Ask Hypotheses
 | # | Lens | Provocation | Hypothesis | Confidence | Source |
 
+<!-- ANCHOR:proposed_tasks -->
 ## Selected Tasks
 
 ### Task 1: <name>
@@ -262,6 +264,14 @@ Default to `[code]`. `[model]` only for subjective quality — max 2 per eval. `
 - **Eval:** written to `evals/<slug>.md`
 - **Eval Graders** (inline): `<test command>` → expects exit 0
 - **Recommended Skills:** `<skill>` (primary) — <rationale>
+
+<!-- ANCHOR:acceptance_criteria -->
+## Acceptance Criteria Summary
+<!-- Top-level summary of acceptance criteria across ALL Selected Tasks above.
+     Bullet list with task slug + criterion. v8.63.0 Cycle C2: this section
+     enables auditor + tdd phases to load only acceptance criteria via
+     extract_anchor() instead of the full scout-report. -->
+- <task-slug>: <testable criterion>
 
 ## Carryover Decisions
 <!-- Required when state.json:carryoverTodos[] is non-empty (v8.57.0+ Layer S).

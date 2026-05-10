@@ -244,6 +244,7 @@ Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.
 ```markdown
 # Cycle {N} Audit Report
 
+<!-- ANCHOR:verdict -->
 ## Verdict: PASS / WARN / FAIL
 
 ## Code Quality
@@ -286,6 +287,7 @@ Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.
 | Artifacts produced | PASS/FAIL | `playwright-report/index.html` |
 | Build-report E2E Verification | PASS/FAIL | — |
 
+<!-- ANCHOR:defects -->
 ## Issues
 | Severity | Description | File | Line |
 |----------|-------------|------|------|
