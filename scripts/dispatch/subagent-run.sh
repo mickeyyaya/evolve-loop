@@ -462,10 +462,60 @@ cmd_run() {
         fail "no prompt provided: pass via stdin pipe or PROMPT_FILE_OVERRIDE env var"
     fi
 
-    # Inject challenge token + artifact-path mandate into prompt prefix.
+    # Build the prompt that the LLM will see. Two ordering modes:
+    #
+    # v1 (default — EVOLVE_CACHE_PREFIX_V2=0): legacy ordering with dynamic
+    # data (challenge_token, artifact_path) injected at the TOP. Backwards
+    # compatible; preserved unchanged from v8.60-and-earlier behavior.
+    #
+    # v2 (opt-in — EVOLVE_CACHE_PREFIX_V2=1): static-first / dynamic-last
+    # ordering recommended by Anthropic for prompt-cache reuse. The static
+    # bedrock comes from build-invocation-context.sh (byte-identical for
+    # same role across runs); dynamic data lives in a small INVOCATION
+    # CONTEXT block at the bottom. v8.61.0 Layer 1 (Campaign A — Tier 1).
     local injected_prompt
     injected_prompt=$(mktemp)
-    cat > "$injected_prompt" <<EOF
+
+    if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ]; then
+        # --- v2 path: static-first ordering ---
+        local _bic_script="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/build-invocation-context.sh"
+        if [ ! -x "$_bic_script" ]; then
+            fail "EVOLVE_CACHE_PREFIX_V2=1 but build-invocation-context.sh missing or non-executable at $_bic_script"
+        fi
+        # 1. Static bedrock — byte-identical for same role.
+        bash "$_bic_script" "$agent" > "$injected_prompt"
+        # 2. Strip Adversarial Audit Mode if explicitly disabled (auditor only).
+        if [ "$agent" = "auditor" ] && [ "${ADVERSARIAL_AUDIT:-1}" = "0" ]; then
+            awk '/^## Adversarial Audit Mode/{stop=1} !stop {print}' \
+                "$injected_prompt" > "${injected_prompt}.tmp.$$" \
+                && mv -f "${injected_prompt}.tmp.$$" "$injected_prompt"
+        fi
+        # 3. Dynamic INVOCATION CONTEXT block (small; trails the bedrock).
+        cat >> "$injected_prompt" <<EOF
+
+---
+
+## INVOCATION CONTEXT
+
+- Agent: $agent
+- Cycle: $cycle
+- Workspace: $workspace
+- Artifact path: $artifact_path
+- Challenge token: $challenge_token
+- Profile: $(basename "$profile")
+
+EOF
+        # 4. Task-prompt envelope (unchanged shape; Claude has been trained
+        # on the BEGIN/END markers from v8.x).
+        cat >> "$injected_prompt" <<EOF
+--- BEGIN TASK PROMPT ---
+EOF
+        cat "$prompt_file" >> "$injected_prompt"
+        echo "" >> "$injected_prompt"
+        echo "--- END TASK PROMPT ---" >> "$injected_prompt"
+    else
+        # --- v1 path: legacy ordering (preserved verbatim) ---
+        cat > "$injected_prompt" <<EOF
 EVOLVE-LOOP SUBAGENT INVOCATION
 
 You are running as the **$agent** subagent for cycle $cycle.
@@ -485,11 +535,11 @@ CYCLE: $cycle
 
 EOF
 
-    # Adversarial Auditor framing — default-on for the auditor agent.
-    # Counters sycophancy in same-model judges (arxiv 2506.03332). Toggle off
-    # with ADVERSARIAL_AUDIT=0 only for deliberately permissive sweeps.
-    if [ "$agent" = "auditor" ] && [ "${ADVERSARIAL_AUDIT:-1}" != "0" ]; then
-        cat >> "$injected_prompt" <<'ADVEOF'
+        # Adversarial Auditor framing — default-on for the auditor agent.
+        # Counters sycophancy in same-model judges (arxiv 2506.03332). Toggle off
+        # with ADVERSARIAL_AUDIT=0 only for deliberately permissive sweeps.
+        if [ "$agent" = "auditor" ] && [ "${ADVERSARIAL_AUDIT:-1}" != "0" ]; then
+            cat >> "$injected_prompt" <<'ADVEOF'
 ADVERSARIAL AUDIT MODE (default-on)
 
 Your role is not to confirm correctness; it is to find a real defect.
@@ -507,14 +557,15 @@ Treat the build as guilty until proven innocent. Specifically:
   file:line and a reproduction command.
 
 ADVEOF
-    fi
+        fi
 
-    cat >> "$injected_prompt" <<EOF
+        cat >> "$injected_prompt" <<EOF
 --- BEGIN TASK PROMPT ---
 EOF
-    cat "$prompt_file" >> "$injected_prompt"
-    echo "" >> "$injected_prompt"
-    echo "--- END TASK PROMPT ---" >> "$injected_prompt"
+        cat "$prompt_file" >> "$injected_prompt"
+        echo "" >> "$injected_prompt"
+        echo "--- END TASK PROMPT ---" >> "$injected_prompt"
+    fi
 
     # v8.56.0 Layer B: soft prompt-size guard. Kernel-layer check that
     # the orchestrator's prompt assembly didn't blow past the budget.

@@ -157,6 +157,7 @@
 |------|--------|---------|
 | `EVOLVE_PROMPT_MAX_TOKENS` | ACTIVE | Soft prompt token cap for role-context-builder |
 | `EVOLVE_PROMPT_BUDGET_ENFORCE` | ACTIVE | Make prompt-over-cap a hard error |
+| `EVOLVE_CACHE_PREFIX_V2` | OPT-IN (default `0`) | v8.61.0 Campaign A — static-first / dynamic-last prompt ordering for prompt-cache reuse. When `1`, subagent-run.sh prepends `build-invocation-context.sh` bedrock and trails the dynamic INVOCATION CONTEXT block. Promotion ladder: default-off → verify → default-on (target v8.62) → enforce. |
 | `EVOLVE_RUN_TIMEOUT` | ACTIVE | Per-subagent run timeout |
 | `EVOLVE_INSTINCT_SUMMARY_CAP` | ACTIVE | Max instinct summaries in state.json |
 | `EVOLVE_CARRYOVER_TODO_MAX_UNPICKED` | ACTIVE | Carryover todos threshold |
