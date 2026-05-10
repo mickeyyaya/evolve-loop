@@ -128,12 +128,14 @@ else
 fi
 
 # Capture git head + tree state at the moment of recording.
+# Use git rev-parse HEAD^{tree} (the committed tree object SHA) instead of
+# hashing `git diff HEAD`. After builder commits, git diff HEAD is empty, making
+# the diff-hash always equal to SHA-256("") = e3b0c44... — forensically useless.
+# The tree-object SHA is content-addressable and stable across re-recording at
+# the same commit; falls back to "unknown" if not in a git repo or no commits.
 GIT_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-if command -v sha256sum >/dev/null 2>&1; then
-    TREE_SHA=$(git diff HEAD 2>/dev/null | sha256sum | awk '{print $1}')
-else
-    TREE_SHA=$(git diff HEAD 2>/dev/null | shasum -a 256 | awk '{print $1}')
-fi
+TREE_SHA=$(git rev-parse 'HEAD^{tree}' 2>/dev/null) || TREE_SHA="unknown"
+[ -z "$TREE_SHA" ] && TREE_SHA="unknown"
 
 # Init state.json if missing.
 if [ ! -f "$STATE" ]; then
