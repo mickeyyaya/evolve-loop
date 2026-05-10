@@ -207,6 +207,61 @@ else
     fail_ "expected 8 anchors, got $ok"
 fi
 
+# --- Test 11 (Cycle C3): profile JSONs declare context_anchors --------------
+header "Test 11 (Cycle C3): expected profiles declare context_anchors"
+declare -i ok2=0
+for p in auditor triage plan-reviewer tdd-engineer; do
+    if jq -e '(.context_anchors // []) | length > 0' "$REPO_ROOT/.evolve/profiles/${p}.json" >/dev/null 2>&1; then
+        ok2=$((ok2+1))
+    else
+        echo "  MISSING: $p.json:context_anchors"
+    fi
+done
+if [ "$ok2" = "4" ]; then
+    pass "all 4 profiles (auditor/triage/plan-reviewer/tdd-engineer) declare context_anchors"
+else
+    fail_ "expected 4 profiles, got $ok2"
+fi
+
+# --- Test 12 (Cycle C3): context_anchors entries use file:anchor format -----
+header "Test 12 (Cycle C3): context_anchors entries are file:anchor strings"
+malformed=0
+for p in auditor triage plan-reviewer tdd-engineer; do
+    bad=$(jq -r '(.context_anchors // []) | map(select(type != "string" or (contains(":") | not))) | length' "$REPO_ROOT/.evolve/profiles/${p}.json" 2>/dev/null || echo "?")
+    if [ "$bad" != "0" ]; then
+        malformed=$((malformed+1))
+        echo "  MALFORMED: $p.json has $bad non-string-or-no-colon entries"
+    fi
+done
+if [ "$malformed" = "0" ]; then
+    pass "all context_anchors entries are well-formed (file:anchor)"
+else
+    fail_ "$malformed profile(s) have malformed entries"
+fi
+
+# --- Test 13 (Cycle C3): role-context-builder reads profile context_anchors -
+header "Test 13 (Cycle C3): triage anchor mode reads profile.context_anchors"
+# Use the multi-anchor fixture from Test setup; create a minimal profile with
+# context_anchors so we can verify the helper reads it (vs hardcoded fallback).
+TMP_PROFILE_DIR="$TMP_ROOT/.evolve/profiles"
+mkdir -p "$TMP_PROFILE_DIR"
+cat > "$TMP_PROFILE_DIR/triage.json" <<'PROFILE'
+{"context_anchors": ["scout-report.md:gap_analysis"]}
+PROFILE
+cp "$TMP_ROOT/multi-anchor.md" "$TMP_ROOT/.evolve/runs/cycle-99/scout-report.md"
+# Use EVOLVE_PROFILES_DIR_OVERRIDE — the canonical test-seam (matches
+# subagent-run.sh:49). EVOLVE_PLUGIN_ROOT alone gets overridden by
+# resolve-roots.sh based on script location.
+out=$(EVOLVE_PROJECT_ROOT="$TMP_ROOT" EVOLVE_PROFILES_DIR_OVERRIDE="$TMP_PROFILE_DIR" EVOLVE_ANCHOR_EXTRACT=1 bash "$RCB" triage 99 "$TMP_ROOT/.evolve/runs/cycle-99" 2>/dev/null)
+# With profile.context_anchors=["scout-report.md:gap_analysis"], output should
+# contain Gap Analysis content (not Selected Tasks, which is what the hardcoded
+# fallback would produce).
+if echo "$out" | grep -q "Gap Analysis" && echo "$out" | grep -q "anchored: gap_analysis"; then
+    pass "triage anchor mode reads profile.context_anchors (gap_analysis, not hardcoded proposed_tasks)"
+else
+    fail_ "profile.context_anchors not honored; out: $(echo "$out" | head -10)"
+fi
+
 # --- Summary -----------------------------------------------------------------
 echo
 echo "=========================================="

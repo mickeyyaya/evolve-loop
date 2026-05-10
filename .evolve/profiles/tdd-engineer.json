@@ -98,5 +98,8 @@
     "allow_network": false
   },
   "parallel_eligible": false,
-  "_parallel_eligible_reason": "WRITES test files (sequential single-writer)"
+  "_parallel_eligible_reason": "WRITES test files (sequential single-writer)",
+  "context_anchors": [
+    "scout-report.md:acceptance_criteria"
+  ]
 }

@@ -148,6 +148,82 @@ emit_artifact_with_anchors() {
     fi
 }
 
+# v8.63.0 Cycle C3: resolve profile path from role name. Handles the
+# role→profile mapping for roles whose persona file uses a different
+# basename than the role argument (plan_review→plan-reviewer, tdd→tdd-engineer).
+# Honors EVOLVE_PROFILES_DIR_OVERRIDE matching subagent-run.sh:49 — the
+# canonical test-seam pattern across this codebase.
+_resolve_profile_path() {
+    local role="$1"
+    local mapped="$role"
+    case "$role" in
+        plan_review)  mapped="plan-reviewer" ;;
+        tdd)          mapped="tdd-engineer" ;;
+    esac
+    local profiles_dir="${EVOLVE_PROFILES_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/.evolve/profiles}"
+    echo "${profiles_dir}/${mapped}.json"
+}
+
+# v8.63.0 Cycle C3: emit anchored sections defined in profile.context_anchors.
+# Format: "filename:anchor_name" strings. Groups anchors by file so each
+# file is checked once via file_has_anchors().
+#
+# Returns 0 if profile.context_anchors was found and processed (caller skips
+# any hardcoded fallback). Returns 1 if no profile anchors configured (caller
+# uses its hardcoded list — preserved for backwards compat with cycles
+# B-and-earlier where no profile.context_anchors existed).
+emit_profile_context_anchors() {
+    local profile_path
+    profile_path=$(_resolve_profile_path "$ROLE")
+    [ -f "$profile_path" ] || return 1
+    command -v jq >/dev/null 2>&1 || return 1
+
+    local anchor_count
+    anchor_count=$(jq -r '(.context_anchors // []) | length' "$profile_path" 2>/dev/null || echo 0)
+    [ "$anchor_count" = "0" ] && return 1
+
+    # Group "file:anchor" entries by file so we can call emit_artifact_with_anchors
+    # once per file (not once per anchor — that would cause N-fold full-file
+    # fallback duplication for unanchored artifacts).
+    local entries
+    entries=$(jq -r '.context_anchors[]?' "$profile_path" 2>/dev/null)
+    [ -z "$entries" ] && return 1
+
+    # Bash 3.2 portable: build a unique file list, then per-file anchor list,
+    # without associative arrays.
+    local files=""
+    local entry file
+    for entry in $entries; do
+        file=$(echo "$entry" | cut -d: -f1)
+        case " $files " in
+            *" $file "*) ;;
+            *) files="$files $file" ;;
+        esac
+    done
+
+    for file in $files; do
+        local anchors_for_file=""
+        for entry in $entries; do
+            case "$entry" in
+                "$file:"*)
+                    anchors_for_file="$anchors_for_file $(echo "$entry" | cut -d: -f2-)"
+                    ;;
+            esac
+        done
+        local label
+        case "$file" in
+            scout-report.md)         label="Scout report" ;;
+            build-report.md)         label="Build report" ;;
+            audit-report.md)         label="Audit report" ;;
+            retrospective-report.md) label="Retrospective report" ;;
+            triage-decision.md)      label="Triage decision" ;;
+            *)                       label="$file" ;;
+        esac
+        emit_artifact_with_anchors "$label" "$WORKSPACE/$file" $anchors_for_file
+    done
+    return 0
+}
+
 emit_artifact() {
     local label="$1" path="$2"
     if [ -f "$path" ]; then
@@ -318,9 +394,12 @@ emit_for_role() {
             emit_intent_compact
             # v8.63.0 Cycle C2/C3: under anchor mode, triage only needs the
             # proposed_tasks section of scout-report — not gap analysis,
-            # research, hypotheses. Falls back to full file if anchors absent.
+            # research, hypotheses. C3 reads context_anchors from profile JSON
+            # if present; falls back to hardcoded default for backwards compat.
             if [ "${EVOLVE_ANCHOR_EXTRACT:-0}" = "1" ]; then
-                emit_artifact_with_anchors "Scout backlog" "$WORKSPACE/scout-report.md" proposed_tasks
+                if ! emit_profile_context_anchors; then
+                    emit_artifact_with_anchors "Scout backlog" "$WORKSPACE/scout-report.md" proposed_tasks
+                fi
             else
                 emit_artifact "Scout backlog" "$WORKSPACE/scout-report.md"
             fi
@@ -368,12 +447,13 @@ emit_for_role() {
             # full builder narrative) and only proposed_tasks + acceptance_criteria
             # of scout-report. Falls back to full file if anchors absent.
             if [ "${EVOLVE_ANCHOR_EXTRACT:-0}" = "1" ]; then
-                # Auditor needs diff + test results from build-report; proposed
-                # tasks + acceptance criteria from scout-report. Each is a
-                # space-separated anchor list per file. Falls back to whole
-                # file if anchors absent (e.g., pre-v8.63 artifacts).
-                emit_artifact_with_anchors "Build report" "$WORKSPACE/build-report.md" diff_summary test_results
-                emit_artifact_with_anchors "Scout report (acceptance scope)" "$WORKSPACE/scout-report.md" proposed_tasks acceptance_criteria
+                # v8.63.0 Cycle C3: prefer profile.context_anchors for the
+                # auditor's anchor list. If profile has no context_anchors,
+                # fall back to the hardcoded set (backwards-compat).
+                if ! emit_profile_context_anchors; then
+                    emit_artifact_with_anchors "Build report" "$WORKSPACE/build-report.md" diff_summary test_results
+                    emit_artifact_with_anchors "Scout report (acceptance scope)" "$WORKSPACE/scout-report.md" proposed_tasks acceptance_criteria
+                fi
             else
                 emit_artifact "Build report" "$WORKSPACE/build-report.md"
                 # Scout-report is included as a *relevant subset* — the orchestrator

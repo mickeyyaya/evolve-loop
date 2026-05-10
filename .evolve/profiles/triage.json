@@ -67,7 +67,9 @@
     "Write(.evolve/evals/**)",
     "Write(.evolve/instincts/**)"
   ],
-  "add_dir": ["."],
+  "add_dir": [
+    "."
+  ],
   "max_budget_usd": 0.75,
   "max_turns": 15,
   "permission_mode": "bypassPermissions",
@@ -84,7 +86,9 @@
   ],
   "sandbox": {
     "enabled": true,
-    "write_subpaths": [".evolve/runs/cycle-*"],
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
     "read_only_repo": true,
     "deny_subpaths": [
       ".git",
@@ -105,5 +109,8 @@
   },
   "_design_notes": "v8.56.0 Layer C single-writer triage phase. Sits between scout (discover) and plan-review. Reads scout-report.md backlog + state.json:carryoverTodos[], emits triage-decision.md with top_n[] (commit this cycle), deferred[] (carry to next cycle), dropped[] (rejected), cycle_size_estimate (small|medium|large). Default-off: orchestrator only enters this phase when EVOLVE_TRIAGE_ENABLED=1. parallel_eligible:false because triage-decision.md is a single-writer artifact; parallel deciders would race on backlog choice.",
   "parallel_eligible": false,
-  "_parallel_eligible_reason": "Single-writer of triage-decision.md (deciding top_n cannot be parallelized — would race on what gets shipped this cycle)"
+  "_parallel_eligible_reason": "Single-writer of triage-decision.md (deciding top_n cannot be parallelized — would race on what gets shipped this cycle)",
+  "context_anchors": [
+    "scout-report.md:proposed_tasks"
+  ]
 }
