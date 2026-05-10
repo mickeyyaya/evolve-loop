@@ -477,24 +477,21 @@ cmd_run() {
     injected_prompt=$(mktemp)
 
     if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ]; then
-        # --- v2 path: static-first ordering ---
+        # --- v2 path: bedrock moves to --append-system-prompt at adapter ---
+        # Cycle A2 (v8.61.0): the static role bedrock (build-invocation-context.sh)
+        # now flows via claude.sh's --append-system-prompt flag. The system
+        # prompt slot caches automatically without breakpoint management, and
+        # keeping role identity OUT of the user prompt makes the user prompt
+        # smaller AND the system prompt deterministic per-role across cycles.
+        # Verify the bedrock script exists; the adapter will WARN-only if it
+        # actually fails to invoke, but failing fast here surfaces config bugs
+        # earlier than runtime.
         local _bic_script="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/build-invocation-context.sh"
         if [ ! -x "$_bic_script" ]; then
             fail "EVOLVE_CACHE_PREFIX_V2=1 but build-invocation-context.sh missing or non-executable at $_bic_script"
         fi
-        # 1. Static bedrock — byte-identical for same role.
-        bash "$_bic_script" "$agent" > "$injected_prompt"
-        # 2. Strip Adversarial Audit Mode if explicitly disabled (auditor only).
-        if [ "$agent" = "auditor" ] && [ "${ADVERSARIAL_AUDIT:-1}" = "0" ]; then
-            awk '/^## Adversarial Audit Mode/{stop=1} !stop {print}' \
-                "$injected_prompt" > "${injected_prompt}.tmp.$$" \
-                && mv -f "${injected_prompt}.tmp.$$" "$injected_prompt"
-        fi
-        # 3. Dynamic INVOCATION CONTEXT block (small; trails the bedrock).
-        cat >> "$injected_prompt" <<EOF
-
----
-
+        # The user prompt under v2 is just INVOCATION CONTEXT + task envelope.
+        cat > "$injected_prompt" <<EOF
 ## INVOCATION CONTEXT
 
 - Agent: $agent
@@ -505,8 +502,8 @@ cmd_run() {
 - Profile: $(basename "$profile")
 
 EOF
-        # 4. Task-prompt envelope (unchanged shape; Claude has been trained
-        # on the BEGIN/END markers from v8.x).
+        # Task-prompt envelope (unchanged shape; Claude has been trained on
+        # the BEGIN/END markers from v8.x).
         cat >> "$injected_prompt" <<EOF
 --- BEGIN TASK PROMPT ---
 EOF
@@ -682,6 +679,8 @@ EOF
     start_ts=$(date +%s)
 
     set +e
+    # v8.61.0 Cycle A2: pass AGENT to adapter so claude.sh can emit the
+    # role-specific bedrock as --append-system-prompt under v2.
     PROFILE_PATH="$effective_profile" \
     RESOLVED_MODEL="$model" \
     PROMPT_FILE="$injected_prompt" \
@@ -692,6 +691,7 @@ EOF
     STDOUT_LOG="$stdout_log" \
     STDERR_LOG="$stderr_log" \
     ARTIFACT_PATH="$artifact_path" \
+    AGENT="$agent" \
     bash "$adapter"
     local cli_exit=$?
     set -e

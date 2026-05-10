@@ -157,7 +157,7 @@
 |------|--------|---------|
 | `EVOLVE_PROMPT_MAX_TOKENS` | ACTIVE | Soft prompt token cap for role-context-builder |
 | `EVOLVE_PROMPT_BUDGET_ENFORCE` | ACTIVE | Make prompt-over-cap a hard error |
-| `EVOLVE_CACHE_PREFIX_V2` | OPT-IN (default `0`) | v8.61.0 Campaign A — static-first / dynamic-last prompt ordering for prompt-cache reuse. When `1`, subagent-run.sh prepends `build-invocation-context.sh` bedrock and trails the dynamic INVOCATION CONTEXT block. Promotion ladder: default-off → verify → default-on (target v8.62) → enforce. |
+| `EVOLVE_CACHE_PREFIX_V2` | OPT-IN (default `0`) | v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promotion ladder: default-off → verify → default-on (target v8.62) → enforce. |
 | `EVOLVE_RUN_TIMEOUT` | ACTIVE | Per-subagent run timeout |
 | `EVOLVE_INSTINCT_SUMMARY_CAP` | ACTIVE | Max instinct summaries in state.json |
 | `EVOLVE_CARRYOVER_TODO_MAX_UNPICKED` | ACTIVE | Carryover todos threshold |

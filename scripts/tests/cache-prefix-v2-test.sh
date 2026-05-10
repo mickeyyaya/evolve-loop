@@ -163,6 +163,56 @@ else
     fail_ "subagent-run.sh does not reference build-invocation-context.sh"
 fi
 
+# --- Test 13: claude.sh adapter has v2 system-prompt block (Cycle A2) --------
+header "Test 13 (Cycle A2): claude.sh has v2 system-prompt block"
+ADAPTER="$REPO_ROOT/scripts/cli_adapters/claude.sh"
+if grep -q "EVOLVE_CACHE_PREFIX_V2:-0" "$ADAPTER" \
+   && grep -q -- "--append-system-prompt" "$ADAPTER" \
+   && grep -q "build-invocation-context.sh" "$ADAPTER"; then
+    pass "claude.sh wires bedrock to --append-system-prompt under V2"
+else
+    fail_ "claude.sh missing v2 system-prompt wiring"
+fi
+
+# --- Test 14: claude.sh uses --exclude-dynamic-system-prompt-sections under V2
+header "Test 14 (Cycle A2): claude.sh uses --exclude-dynamic-system-prompt-sections under v2"
+if grep -q -- "--exclude-dynamic-system-prompt-sections" "$ADAPTER"; then
+    pass "claude.sh adds --exclude-dynamic-system-prompt-sections"
+else
+    fail_ "claude.sh missing --exclude-dynamic-system-prompt-sections"
+fi
+
+# --- Test 15: subagent-run.sh exports AGENT env to adapter -------------------
+header "Test 15 (Cycle A2): subagent-run.sh exports AGENT env to adapter"
+if grep -q 'AGENT="\$agent"' "$RUNNER"; then
+    pass "subagent-run.sh exports AGENT to adapter"
+else
+    fail_ "subagent-run.sh does not export AGENT to adapter"
+fi
+
+# --- Test 16: under v2, user prompt no longer contains role bedrock at top ---
+header "Test 16 (Cycle A2): v2 path emits INVOCATION CONTEXT first (not bedrock)"
+# Look for the v2 fork in subagent-run.sh; check that INVOCATION CONTEXT is the
+# FIRST major section in the user prompt under v2 (no bedrock prepend).
+v2_section=$(awk '/EVOLVE_CACHE_PREFIX_V2:-0.*= ?"1"/,/--- v1 path/' "$RUNNER")
+if echo "$v2_section" | grep -q "INVOCATION CONTEXT" \
+   && ! echo "$v2_section" | grep -qE 'bash "?\$_bic_script"? "?\$agent"? > "?\$injected_prompt"?'; then
+    pass "v2 path no longer prepends bedrock to user prompt (delegated to system prompt)"
+else
+    fail_ "v2 path still prepends bedrock to user prompt OR INVOCATION CONTEXT missing"
+fi
+
+# --- Test 17: claude.sh strips Adversarial Audit Mode when ADVERSARIAL_AUDIT=0
+header "Test 17 (Cycle A2): claude.sh strips Adversarial Audit Mode when disabled"
+# Extended-regex match — claude.sh has both the env-var check and the
+# Adversarial Audit Mode literal needed for the strip awk pattern.
+if grep -qE 'ADVERSARIAL_AUDIT.*=.*"0"' "$ADAPTER" \
+   && grep -q "Adversarial Audit Mode" "$ADAPTER"; then
+    pass "claude.sh has ADVERSARIAL_AUDIT=0 strip logic"
+else
+    fail_ "claude.sh missing ADVERSARIAL_AUDIT=0 strip logic for system prompt"
+fi
+
 # --- Summary -----------------------------------------------------------------
 echo
 echo "=========================================="

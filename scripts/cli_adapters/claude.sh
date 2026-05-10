@@ -172,6 +172,38 @@ if [ "${#ADD_DIRS_ARR[@]}" -gt 0 ]; then
     CMD+=(--add-dir "${ADD_DIRS_ARR[@]}")
 fi
 
+# v8.61.0 Cycle A2: when EVOLVE_CACHE_PREFIX_V2=1 AND AGENT env is set,
+# emit the static bedrock as a system prompt via --append-system-prompt.
+# claude CLI's system prompt is cached separately from the user prompt and
+# requires no manual cache-breakpoint management — the cleanest place for
+# byte-stable role identity content.
+#
+# Also passes --exclude-dynamic-system-prompt-sections so per-machine
+# sections (cwd, env info, memory paths, git status) move OUT of the
+# system prompt and INTO the first user message — claude's docs note this
+# "improves cross-user prompt-cache reuse" by keeping the system layer
+# free of per-invocation entropy.
+if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ] && [ -n "${AGENT:-}" ]; then
+    _bic="${EVOLVE_PLUGIN_ROOT:-}/scripts/dispatch/build-invocation-context.sh"
+    if [ -x "$_bic" ]; then
+        _bedrock_text=$(bash "$_bic" "$AGENT" 2>/dev/null || true)
+        # Honor ADVERSARIAL_AUDIT=0 by stripping the Adversarial Audit Mode
+        # section (auditor only — other roles never include it).
+        if [ "$AGENT" = "auditor" ] && [ "${ADVERSARIAL_AUDIT:-1}" = "0" ] && [ -n "$_bedrock_text" ]; then
+            _bedrock_text=$(echo "$_bedrock_text" | awk '/^## Adversarial Audit Mode/{stop=1} !stop {print}')
+        fi
+        if [ -n "$_bedrock_text" ]; then
+            CMD+=(--append-system-prompt "$_bedrock_text")
+            CMD+=(--exclude-dynamic-system-prompt-sections)
+            echo "[claude-adapter] system-prompt: bedrock attached (~$(echo "$_bedrock_text" | wc -c | tr -d ' ') bytes for role=$AGENT)" >&2
+        else
+            echo "[claude-adapter] WARN: build-invocation-context.sh produced empty output for AGENT=$AGENT" >&2
+        fi
+    else
+        echo "[claude-adapter] WARN: EVOLVE_CACHE_PREFIX_V2=1 but build-invocation-context.sh missing or non-executable at $_bic" >&2
+    fi
+fi
+
 # Extra flags (--bare, --no-session-persistence, etc.) — already valid CLI flags.
 # CAVEAT: `--bare` makes claude refuse to read OAuth/keychain credentials,
 # requiring ANTHROPIC_API_KEY in the env. Most Claude Code users authenticate
