@@ -10,24 +10,12 @@
   "_design_note_": "Opus default because intent capture is reasoning-heavy: surfacing the right premise to challenge from a vague goal is exactly the failure mode Karpathy named (#1: wrong assumptions running uncaught). Cheaper than burning $0.50+ on a Scout pointed at the wrong direction.",
   "allowed_tools": [
     "Read",
-    "Grep",
-    "Glob",
-    "Bash(ls:*)",
     "Bash(cat:*)",
-    "Bash(head:*)",
-    "Bash(tail:*)",
-    "Bash(wc:*)",
-    "Bash(find:*)",
-    "Bash(test:*)",
-    "Bash(git status:*)",
-    "Bash(git log:*)",
-    "Bash(git diff:*)",
-    "Bash(git ls-files:*)",
-    "Bash(git rev-parse:*)",
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/intent-stdout.log)",
     "Edit(.evolve/runs/cycle-*/intent.md)"
   ],
+  "_allowed_tools_design_note_": "v9.0.2: stripped exploration surface (Grep, Glob, Bash(ls/head/tail/wc/find/test/git*)). The intent persona's job is to STRUCTURE the goal, not VERIFY it. With exploration tools available, the persona did 7 turns of evidence-gathering in cycle 11 ($1.05). Scout re-reads the same files anyway. Keeping Read + Bash(cat:*) so the persona can read its own scratchpad or a pre-loaded context file if the orchestrator stages one; everything else removed forces a single-pass parse-then-write flow.",
   "disallowed_tools": [
     "WebSearch",
     "WebFetch",
@@ -69,14 +57,15 @@
   "add_dir": [
     "."
   ],
-  "max_budget_usd": 0.5,
+  "max_budget_usd": 0.3,
   "budget_tiers": {
-    "default": 0.5,
-    "heavy_rules": 1.0,
-    "minimal": 0.2
+    "default": 0.3,
+    "heavy_rules": 0.6,
+    "minimal": 0.15
   },
-  "_budget_design_note_": "v8.23.3: raised default from $0.25 to $0.50 after BUG-010 (intent rc=1 budget overflow on projects with heavy CLAUDE.md). Use EVOLVE_TASK_MODE=heavy_rules ($1.00 cap) for projects whose CLAUDE.md exceeds ~3K tokens (cycle 1 of /learning had a 200-line CLAUDE.md and opus blew $0.25 in 3 turns). EVOLVE_TASK_MODE=minimal ($0.20) for trivial goals on small projects. Intent capture is still one persona, one short artifact (50-200 lines), no web research \u2014 $0.50 is a generous default that handles most non-trivial CLAUDE.md sizes; raise via tier when needed.",
-  "max_turns": 15,
+  "_budget_design_note_": "v9.0.2: lowered default from $0.50 to $0.30 after cycle-11 evidence ($1.05 burn on a goal of moderate complexity). With exploration tools stripped (v9.0.2 allowed_tools change), the agent is structurally bounded to 1-2 turns and ~30-80 lines of output. heavy_rules tier kept for genuinely heavy CLAUDE.md cases but capped lower ($0.60). minimal=$0.15. The old $0.50 cap was set as a generous backstop assuming multi-turn exploration was load-bearing; v9.0.2's evidence shows it was paying for duplicate work Scout redoes.",
+  "max_turns": 4,
+  "_max_turns_design_note_": "v9.0.2: lowered from 15 to 4. Two turns are the design target (parse + write); 4 leaves headroom for one re-write iteration or a tool-call mistake. With exploration tools stripped, the agent literally cannot productively use 15 turns.",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/intent.md",
   "challenge_token_required": true,

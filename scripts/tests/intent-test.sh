@@ -365,6 +365,63 @@ else
     fail_ "only $bare_name_count bare-name kernel-script patterns in orchestrator allowlist (expected >=3)"
 fi
 
+# === Test 19 (v9.0.2): intent profile has stripped exploration tools ==========
+# v9.0.2 reduces intent's allowed_tools to {Read, Bash(cat:*), Write/Edit on
+# intent.md}. The previous toolkit (Grep, Glob, Bash(ls/head/tail/wc/find/test/
+# git status/git log/git diff/git ls-files/git rev-parse)) enabled the persona
+# to do 7-turn investigation in cycle 11 ($1.05 burn, 13 distinct code refs).
+header "Test 19 (v9.0.2): intent profile strips exploration tools"
+INTENT_PROFILE="$REPO_ROOT/.evolve/profiles/intent.json"
+if command -v jq >/dev/null 2>&1; then
+    has_forbidden=0
+    for forbidden in "Grep" "Glob" "Bash(ls:*)" "Bash(head:*)" "Bash(tail:*)" "Bash(wc:*)" "Bash(find:*)" "Bash(git log:*)" "Bash(git diff:*)" "Bash(git ls-files:*)" "Bash(git rev-parse:*)" "Bash(git status:*)"; do
+        if jq -r '.allowed_tools[]?' "$INTENT_PROFILE" 2>/dev/null | grep -qxF "$forbidden"; then
+            has_forbidden=$((has_forbidden + 1))
+            echo "  FORBIDDEN (should be stripped): $forbidden"
+        fi
+    done
+    if [ "$has_forbidden" = "0" ]; then
+        pass "all v9.0.2-stripped exploration tools absent from allowed_tools"
+    else
+        fail_ "$has_forbidden v9.0.2-stripped tools still present in allowed_tools"
+    fi
+fi
+
+# === Test 20 (v9.0.2): intent profile budget cap is tightened ==================
+header "Test 20 (v9.0.2): intent max_budget_usd tightened to 0.30 or less"
+if command -v jq >/dev/null 2>&1; then
+    budget=$(jq -r '.max_budget_usd' "$INTENT_PROFILE")
+    # bc may not be available; use shell arithmetic on cents.
+    cents=$(printf '%.0f' "$(echo "$budget * 100" | awk '{print $1*100}')" 2>/dev/null || echo "100")
+    cents=$(awk -v b="$budget" 'BEGIN { printf "%d", b * 100 }')
+    if [ "$cents" -le 30 ]; then
+        pass "max_budget_usd=$budget (≤ \$0.30)"
+    else
+        fail_ "max_budget_usd=$budget exceeds \$0.30 v9.0.2 target"
+    fi
+fi
+
+# === Test 21 (v9.0.2): intent profile max_turns tightened =====================
+header "Test 21 (v9.0.2): intent max_turns tightened to 4 or less"
+if command -v jq >/dev/null 2>&1; then
+    mt=$(jq -r '.max_turns' "$INTENT_PROFILE")
+    if [ "$mt" -le 4 ]; then
+        pass "max_turns=$mt (≤ 4)"
+    else
+        fail_ "max_turns=$mt exceeds 4 v9.0.2 target"
+    fi
+fi
+
+# === Test 22 (v9.0.2): persona has explicit turn budget instruction ===========
+header "Test 22 (v9.0.2): evolve-intent.md has Turn budget section"
+INTENT_PERSONA="$REPO_ROOT/agents/evolve-intent.md"
+if grep -q "^## Turn budget" "$INTENT_PERSONA" \
+   && grep -qE "(Maximum 2 turns|max(imum)? 2 turns)" "$INTENT_PERSONA"; then
+    pass "Turn budget section + 2-turn cap present in persona"
+else
+    fail_ "Turn budget section or 2-turn cap missing from persona"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
