@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 #
+# v8.58.0 (Layer I) — symlink-canonicalization fix:
+#   Applies realpath() to ACTIVE_WT (worktree boundary) before the case-glob
+#   comparison, matching the canonicalization already applied to the target
+#   path. Fixes DENY false-positives when worktrees live under macOS $TMPDIR
+#   (/var/folders/... symlinks to /private/var/folders/...). See Test 22.
+#
 # role-gate.sh — PreToolUse hook for Claude Code Edit/Write tool calls (v8.13.1).
 #
 # Enforces: "only the active agent for this phase can write only to its
