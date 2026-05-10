@@ -205,6 +205,54 @@ else
     fail_ "digest=$digest_bytes bytes EXCEEDS 8KB cap"
 fi
 
+# --- Test 13: role-context-builder consumes digest under EVOLVE_CONTEXT_DIGEST=1
+# Use a real-cycle workspace if available; check that digest mode produces
+# a smaller scout context than legacy mode (the canonical Cycle B2 win).
+header "Test 13 (Cycle B2): digest mode reduces scout context size"
+RCB="$REPO_ROOT/scripts/lifecycle/role-context-builder.sh"
+existing_cycle=$(ls "$REPO_ROOT/.evolve/runs/" 2>/dev/null | grep -E "^cycle-[0-9]+$" | grep -v "^cycle-[0-9]\{5,\}$" | head -1 | sed 's/cycle-//')
+if [ -n "$existing_cycle" ] && [ -d "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" ]; then
+    legacy_bytes=$(bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null | wc -c | tr -d ' ')
+    digest_bytes=$(EVOLVE_CONTEXT_DIGEST=1 bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null | wc -c | tr -d ' ')
+    if [ "$digest_bytes" -lt "$legacy_bytes" ]; then
+        pct=$(( (legacy_bytes - digest_bytes) * 100 / legacy_bytes ))
+        pass "digest mode shrinks scout context: $legacy_bytes -> $digest_bytes bytes (${pct}%% reduction)"
+    else
+        fail_ "digest=$digest_bytes >= legacy=$legacy_bytes (no compression)"
+    fi
+else
+    pass "skipped (no real cycle workspace)"
+fi
+
+# --- Test 14: digest mode emits compact intent block ------------------------
+header "Test 14 (Cycle B2): digest mode emits compact intent block"
+if [ -n "$existing_cycle" ]; then
+    out=$(EVOLVE_CONTEXT_DIGEST=1 bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null)
+    if echo "$out" | grep -q "Intent (compact" && echo "$out" | grep -q "Tier 2 digest"; then
+        pass "compact intent block emitted with Tier 2 marker"
+    else
+        fail_ "compact intent block missing or unmarked"
+    fi
+else
+    pass "skipped (no real cycle workspace)"
+fi
+
+# --- Test 15: legacy mode still emits full intent.md ------------------------
+# Match the EXACT compact-mode marker "Intent (compact" with parenthesis,
+# not the word "compact" alone (which can occur in real intent text —
+# e.g. "compacted", "compaction", etc).
+header "Test 15 (Cycle B2): legacy mode preserves full intent.md cat"
+if [ -n "$existing_cycle" ]; then
+    out=$(bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null)
+    if echo "$out" | grep -q "^## Intent$" && ! echo "$out" | grep -qF "Intent (compact"; then
+        pass "legacy mode emits full Intent (no compact-mode marker)"
+    else
+        fail_ "legacy mode polluted with compact-mode marker OR missing Intent header"
+    fi
+else
+    pass "skipped (no real cycle workspace)"
+fi
+
 # --- Summary -----------------------------------------------------------------
 echo
 echo "=========================================="

@@ -40,6 +40,12 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     # Fallback for test isolation: derive project root from arg 3 if given.
     EVOLVE_PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(pwd)}"
 }
+# v8.62.0 Cycle B2: ensure PLUGIN_ROOT is set so digest-mode can lazy-build
+# via $EVOLVE_PLUGIN_ROOT/scripts/lifecycle/build-cycle-digest.sh. Derive
+# from this script's directory if resolve-roots.sh didn't set it.
+if [ -z "${EVOLVE_PLUGIN_ROOT:-}" ]; then
+    EVOLVE_PLUGIN_ROOT="$(cd "$__rr_self/../.." && pwd)"
+fi
 unset __rr_self
 
 ROLE="${1:-}"
@@ -116,6 +122,82 @@ emit_instincts() {
     echo
 }
 
+# v8.62.0 Cycle B2: digest-mode emitters. When EVOLVE_CONTEXT_DIGEST=1 these
+# replace emit_carryover_todos + emit_instincts with pointer-only summaries
+# read from cycle-digest.json. Phases that need full body content can Read
+# .evolve/instincts/lessons/<id>.yaml on demand. Lazy-build the digest if
+# missing — the writer is idempotent and cheap.
+_ensure_digest() {
+    local digest_path="$WORKSPACE/cycle-digest.json"
+    if [ ! -f "$digest_path" ]; then
+        local writer="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/build-cycle-digest.sh"
+        if [ -x "$writer" ]; then
+            bash "$writer" "$CYCLE" "$WORKSPACE" >/dev/null 2>&1 || return 1
+        else
+            return 1
+        fi
+    fi
+    [ -f "$digest_path" ]
+}
+
+emit_digest_summary() {
+    # Single block that summarizes recent_failures + instinct_pointers +
+    # todos_summary from cycle-digest.json. Replaces the older patterns of
+    # emit_carryover_todos + emit_instincts when EVOLVE_CONTEXT_DIGEST=1.
+    _ensure_digest || return 0
+    local digest="$WORKSPACE/cycle-digest.json"
+    echo "## Cycle Digest (Tier 2 — pointer-only summary)"
+    echo "(source: $digest — full bodies via Read on .evolve/instincts/lessons/*.yaml)"
+    echo
+    # Recent failures.
+    local rf_count
+    rf_count=$(jq -r '(.recent_failures // []) | length' "$digest" 2>/dev/null || echo 0)
+    if [ "$rf_count" != "0" ] && [ "$rf_count" != "null" ]; then
+        echo "### Recent failures (last $rf_count)"
+        jq -r '.recent_failures[] | "- " + .id + ": " + .summary' "$digest" 2>/dev/null
+        echo
+    fi
+    # Instinct pointers.
+    local ip_count
+    ip_count=$(jq -r '(.instinct_pointers // []) | length' "$digest" 2>/dev/null || echo 0)
+    if [ "$ip_count" != "0" ] && [ "$ip_count" != "null" ]; then
+        echo "### Instinct pointers (top $ip_count by recency)"
+        jq -r '.instinct_pointers[] | "- " + .id + " (conf=" + (.confidence | tostring) + "): " + .headline' "$digest" 2>/dev/null
+        echo
+    fi
+    # Todos summary.
+    local todo_count
+    todo_count=$(jq -r '.todos_summary.count // 0' "$digest" 2>/dev/null)
+    if [ "$todo_count" != "0" ]; then
+        echo "### Carryover todos (count = $todo_count)"
+        jq -r '.todos_summary.ids[]? | "- " + .' "$digest" 2>/dev/null
+        echo "(oldest_unpicked_cycle = $(jq -r '.todos_summary.oldest_unpicked_cycle // "none"' "$digest"))"
+        echo
+    fi
+}
+
+# v8.62.0 Cycle B2: emit a compact intent block from the digest instead of
+# `cat`-ing the full intent.md (which is ~12.8KB of YAML metadata, non-goals,
+# constraints, and premises that most phases don't need). Used by phases that
+# only need the raw goal + acceptance criteria summary.
+emit_intent_compact() {
+    if [ "${EVOLVE_CONTEXT_DIGEST:-0}" != "1" ] || ! _ensure_digest; then
+        # Fallback: full file (legacy mode).
+        emit_artifact "Intent" "$WORKSPACE/intent.md"
+        return
+    fi
+    local digest="$WORKSPACE/cycle-digest.json"
+    echo "## Intent (compact — Tier 2 digest)"
+    echo "(source: $digest — full file at $WORKSPACE/intent.md if deep context needed)"
+    echo
+    echo "### Goal"
+    jq -r '.intent_anchor // "(no intent)"' "$digest" 2>/dev/null
+    echo
+    echo "### Acceptance criteria"
+    jq -r '.acceptance_criteria // "(no acceptance criteria)"' "$digest" 2>/dev/null
+    echo
+}
+
 # Header common to all roles.
 header_block() {
     cat <<EOF
@@ -129,44 +211,70 @@ workspace: $WORKSPACE
 EOF
 }
 
+# v8.62.0 Cycle B2: dispatch the carryover/instincts content via either the
+# legacy per-array path (default) or the new digest path when EVOLVE_CONTEXT_DIGEST=1.
+emit_state_summary() {
+    # $1 = instinct limit (only honored in legacy mode)
+    local limit="${1:-5}"
+    if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
+        emit_digest_summary
+    else
+        emit_carryover_todos
+        emit_instincts "$limit"
+    fi
+}
+
 # ---- Per-role assembly -----------------------------------------------------
 emit_for_role() {
     case "$ROLE" in
         scout)
             header_block
-            emit_artifact "Intent" "$WORKSPACE/intent.md"
-            emit_carryover_todos
-            emit_instincts 5
+            # Scout needs the goal + acceptance — compact intent suffices in digest mode.
+            emit_intent_compact
+            emit_state_summary 5
             ;;
         triage)
             # Layer C: Triage gets the backlog plus carryover context to choose top-N.
             header_block
-            emit_artifact "Intent" "$WORKSPACE/intent.md"
+            emit_intent_compact
             emit_artifact "Scout backlog" "$WORKSPACE/scout-report.md"
-            emit_carryover_todos
+            # Triage primarily needs todos; instincts are lower priority.
+            if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
+                emit_digest_summary
+            else
+                emit_carryover_todos
+            fi
             ;;
         plan_review)
             header_block
-            emit_artifact "Intent" "$WORKSPACE/intent.md"
+            emit_intent_compact
             emit_artifact "Scout report" "$WORKSPACE/scout-report.md"
-            emit_carryover_todos
+            if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
+                emit_digest_summary
+            else
+                emit_carryover_todos
+            fi
             ;;
         tdd)
             header_block
-            emit_artifact "Intent" "$WORKSPACE/intent.md"
+            emit_intent_compact
             emit_artifact "Scout selected backlog" "$WORKSPACE/scout-report.md"
-            # tdd gets a *small* slice of instincts — top-3 only
-            emit_instincts 3
+            # tdd gets a *small* slice of instincts — top-3 only (legacy mode);
+            # in digest mode the digest already caps instinct_pointers at 5.
+            emit_state_summary 3
             ;;
         builder)
             header_block
-            emit_artifact "Intent" "$WORKSPACE/intent.md"
+            emit_intent_compact
             emit_artifact "Scout selected backlog" "$WORKSPACE/scout-report.md"
             # RED test file (TDD output) if present
             emit_artifact "RED test (must turn GREEN)" "$WORKSPACE/red-test.md"
-            # Builder gets NO retrospective theory and NO whole instinctSummary.
+            # Builder gets NO retrospective theory and NO whole instinctSummary
+            # in either mode (it's the writer; concentration on diff matters).
             ;;
         auditor)
+            # Auditor needs the FULL intent for deep acceptance-criteria checks
+            # — not a compact summary. Always emit full file.
             header_block
             emit_artifact "Intent (acceptance criteria)" "$WORKSPACE/intent.md"
             emit_artifact "Build report" "$WORKSPACE/build-report.md"
@@ -177,15 +285,15 @@ emit_for_role() {
             emit_artifact "Scout report (acceptance scope)" "$WORKSPACE/scout-report.md"
             ;;
         retrospective)
-            # Synthesizer: gets every phase artifact.
+            # Synthesizer: gets every phase artifact (full files; this is the
+            # only role that legitimately needs the whole intent.md).
             header_block
             emit_artifact "Intent" "$WORKSPACE/intent.md"
             emit_artifact "Scout report" "$WORKSPACE/scout-report.md"
             emit_artifact "Build report" "$WORKSPACE/build-report.md"
             emit_artifact "Audit report" "$WORKSPACE/audit-report.md"
             emit_artifact "Triage decision (if Layer C ran)" "$WORKSPACE/triage-decision.md"
-            emit_carryover_todos
-            emit_instincts 5
+            emit_state_summary 5
             ;;
         *)
             echo "ERROR: unknown role: $ROLE" >&2
