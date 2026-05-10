@@ -1339,6 +1339,90 @@ else
     fail_ "expected both BUDGET=50 + CYCLES=3 in plan; tail: $(echo "$out" | tail -8)"
 fi
 
+# === Test 54 (v8.60.0 Layer 1): --budget-usd alias parses identically to --budget ===
+header "Test 54 (v8.60.0): --budget-usd 5 recognized (not BAD-ARG)"
+set +e
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --budget-usd 5 balanced "stub goal" 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "0" ] && ! echo "$out" | grep -q "BAD-ARG"; then
+    pass "--budget-usd 5 accepted (no BAD-ARG, rc=0)"
+else
+    fail_ "rc=$rc; got BAD-ARG for --budget-usd; tail: $(echo "$out" | tail -5)"
+fi
+if echo "$out" | grep -qE "BUDGET[^_].*= ?\\\$?5|budget.*5"; then
+    pass "--budget-usd 5 reflected in plan output"
+else
+    fail_ "budget value not in plan; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 55 (v8.60.0 Layer 1): --budget-usd with non-numeric arg → BAD-ARG ===
+header "Test 55 (v8.60.0): --budget-usd abc → BAD-ARG with non-zero exit"
+set +e
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --budget-usd abc balanced "stub goal" 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "10" ] && echo "$out" | grep -q "BAD-ARG"; then
+    pass "--budget-usd abc rejected with BAD-ARG + rc=10"
+else
+    fail_ "expected rc=10 + BAD-ARG, got rc=$rc; tail: $(echo "$out" | tail -5)"
+fi
+
+# === Test 56 (v8.60.0 Layer 1): budget-mode → summary emits stop_reason=budget ===
+# Mock run-cycle.sh that seeds a cost sidecar so batch cap fires after 1 cycle.
+header "Test 56 (v8.60.0): budget-mode stops + summary has stop_reason=budget cycles_run=1"
+ws56=$(make_workspace)
+write_state "$ws56/state.json" 0
+: > "$ws56/ledger.jsonl"
+mkdir -p "$ws56/runs/cycle-1"
+# Pre-seed a cost sidecar with $10 so a $0.01 budget trips after 1 cycle.
+cat > "$ws56/runs/cycle-1/scout-stdout.log" <<'EOF'
+{"type":"result","subtype":"success","total_cost_usd":10.0,"usage":{"input_tokens":1000,"output_tokens":500,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}
+EOF
+mock56=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_BATCH_BUDGET_DISABLE=0 \
+      STATE_OVERRIDE="$ws56/state.json" LEDGER_OVERRIDE="$ws56/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws56/runs" RUN_CYCLE_OVERRIDE="$mock56" \
+      bash "$DISPATCH" --budget-usd 0.01 50 2>&1)
+rc=$?
+set -e
+if echo "$out" | grep -qE "stop_reason=budget"; then
+    pass "budget-mode summary contains stop_reason=budget"
+else
+    fail_ "missing stop_reason=budget; tail: $(echo "$out" | tail -8)"
+fi
+if echo "$out" | grep -qE "cycles_run=1"; then
+    pass "cycles_run=1 in summary"
+else
+    fail_ "missing cycles_run=1; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 57 (v8.60.0 Layer 1): cycles-mode → summary emits stop_reason=cycles ===
+header "Test 57 (v8.60.0): cycles-mode stops + summary has stop_reason=cycles"
+ws57=$(make_workspace)
+write_state "$ws57/state.json" 0
+: > "$ws57/ledger.jsonl"
+mkdir -p "$ws57/runs/cycle-1" "$ws57/runs/cycle-2"
+mock57=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_BATCH_BUDGET_DISABLE=1 \
+      STATE_OVERRIDE="$ws57/state.json" LEDGER_OVERRIDE="$ws57/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws57/runs" RUN_CYCLE_OVERRIDE="$mock57" \
+      bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+if echo "$out" | grep -qE "stop_reason=cycles"; then
+    pass "cycles-mode summary contains stop_reason=cycles"
+else
+    fail_ "missing stop_reason=cycles; tail: $(echo "$out" | tail -8)"
+fi
+if echo "$out" | grep -qE "cycles_run=2"; then
+    pass "cycles_run=2 in summary"
+else
+    fail_ "missing cycles_run=2; tail: $(echo "$out" | tail -8)"
+fi
+
 echo
 echo "=========================================="
 echo "  Total tests: $TESTS_TOTAL"

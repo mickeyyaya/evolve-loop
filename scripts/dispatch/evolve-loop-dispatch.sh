@@ -261,9 +261,9 @@ BUDGET=""
 LEGACY_POSITIONAL_USED=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        --budget)
+        --budget-usd|--budget)
             shift
-            [ $# -gt 0 ] || abort_args "--budget requires a dollar value"
+            [ $# -gt 0 ] || abort_args "--budget-usd requires a dollar value"
             BUDGET="$1"
             shift
             ;;
@@ -764,6 +764,11 @@ else
     fi
 fi
 
+# v8.60.0 Layer 1: structured output counters — track cycles actually run
+# and reason for stopping (budget|batch_cap|cycles|unknown).
+CYCLES_RAN=0
+STOP_REASON=""
+
 for ((i=1; i<=CYCLES; i++)); do
     log "------------------ cycle $i / $CYCLES ------------------"
 
@@ -827,6 +832,7 @@ for ((i=1; i<=CYCLES; i++)); do
                         break
                     fi
                     DISPATCH_RC=3
+                    CYCLES_RAN=$((CYCLES_RAN + 1))
                     continue   # next cycle iteration
                     ;;
                 integrity-breach|*)
@@ -909,14 +915,17 @@ for ((i=1; i<=CYCLES; i++)); do
             if [ "$DISPATCH_MODE" = "budget" ]; then
                 log "BUDGET-EXHAUSTED: cumulative \$${BATCH_TOTAL_COST} >= budget \$${BATCH_CAP} (after cycle $ran_cycle)"
                 log "  ran $i of safety_max=$CYCLES cycles; budget-driven completion"
-                log "  override: --budget <higher> on next invocation"
+                log "  override: --budget-usd <higher> on next invocation"
+                STOP_REASON="budget"
                 DISPATCH_RC=0
             else
                 log "BATCH-BUDGET-EXCEEDED: cumulative \$${BATCH_TOTAL_COST} > cap \$${BATCH_CAP} (after cycle $ran_cycle)"
                 log "  override: EVOLVE_BATCH_BUDGET_CAP=<higher> or EVOLVE_BATCH_BUDGET_DISABLE=1"
                 log "  remaining cycles ($((CYCLES - i)) of $CYCLES) will be skipped"
+                STOP_REASON="batch_cap"
                 DISPATCH_RC=4
             fi
+            CYCLES_RAN=$((CYCLES_RAN + 1))
             break
         fi
     fi
@@ -1010,7 +1019,11 @@ for ((i=1; i<=CYCLES; i++)); do
     else
         log "WARN: EVOLVE_DISPATCH_POLICY=off — skipping ledger pipeline check (LEGACY)"
     fi
+    CYCLES_RAN=$((CYCLES_RAN + 1))
 done
+
+# Set stop reason for normal cycles-exhausted exit (STOP_REASON not set by tripwire).
+[ -z "$STOP_REASON" ] && STOP_REASON="cycles"
 
 ELAPSED=$(( $(date -u +%s) - START_TS ))
 
@@ -1029,6 +1042,9 @@ if [ "${BATCH_BUDGET_DISABLE:-0}" = "1" ]; then
 else
     log "batch_total_cost=\$${BATCH_TOTAL_COST:-0.00} / cap=\$${BATCH_CAP:-20.00}"
 fi
+# v8.60.0 Layer 1: structured stop summary — machine-parseable fields for
+# downstream tooling and acceptance-check assertions.
+log "stop_reason=${STOP_REASON:-unknown} cycles_run=${CYCLES_RAN} total_cost_usd=\$${BATCH_TOTAL_COST:-0.00}"
 
 if [ "$DISPATCH_RC" = "0" ]; then
     log "DONE: all $CYCLES cycles completed AND verified end-to-end"
