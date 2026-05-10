@@ -67,7 +67,7 @@ evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came fr
 | `worktree_base` | absolute path | `EVOLVE_WORKTREE_BASE` > `.evolve/worktrees/` > `$TMPDIR/evolve-loop/<hash>` |
 | `inner_sandbox` | `true` / `false` | `false` when nested-Claude or sandbox broken |
 
-Operator overrides: `EVOLVE_WORKTREE_BASE=/path`, `EVOLVE_FORCE_INNER_SANDBOX=1`, `EVOLVE_INNER_SANDBOX=0`. **Do not auto-enable `EVOLVE_SKIP_WORKTREE=1`** — it abandons per-cycle isolation and is an operator-only emergency hatch with a loud WARN.
+Operator overrides: `EVOLVE_WORKTREE_BASE=/path`, `EVOLVE_INNER_SANDBOX=1` (force-enable), `EVOLVE_INNER_SANDBOX=0` (force-disable). `EVOLVE_FORCE_INNER_SANDBOX=1` is deprecated (v8.60+); use `EVOLVE_INNER_SANDBOX=1`. **Do not auto-enable `EVOLVE_SKIP_WORKTREE=1`** — it abandons per-cycle isolation and is an operator-only emergency hatch with a loud WARN.
 
 ### Ship commit classifiers (v8.25.0+)
 

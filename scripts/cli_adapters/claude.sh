@@ -242,8 +242,16 @@ fi
 # to enforce structural integrity. claude --add-dir continues to gate
 # Edit/Write tool paths.
 #
+# Deprecation bridge (v8.60.0+): EVOLVE_FORCE_INNER_SANDBOX=1 → EVOLVE_INNER_SANDBOX=1.
+# Emits one stderr WARN per process invocation. Removal target: v8.61+.
+if [ "${EVOLVE_FORCE_INNER_SANDBOX:-0}" = "1" ] && [ -z "${EVOLVE_INNER_SANDBOX:-}" ]; then
+    echo "[claude-adapter] WARN: EVOLVE_FORCE_INNER_SANDBOX is deprecated; use EVOLVE_INNER_SANDBOX=1" >&2
+    echo "[claude-adapter]   Removal target: v8.61+. Update scripts to EVOLVE_INNER_SANDBOX=1." >&2
+    EVOLVE_INNER_SANDBOX=1
+fi
+
 # Override priority (highest first):
-#   1. EVOLVE_FORCE_INNER_SANDBOX=1 — operator force-enable (paranoid mode)
+#   1. EVOLVE_INNER_SANDBOX=1       — operator force-enable (was EVOLVE_FORCE_INNER_SANDBOX=1)
 #   2. EVOLVE_INNER_SANDBOX=0       — operator force-disable (explicit hatch)
 #   3. environment.json:auto_config.inner_sandbox == false → SANDBOX_USE=0
 #   4. (existing decision above stands)
@@ -255,9 +263,9 @@ if [ -n "${EVOLVE_PROJECT_ROOT:-}" ] && [ -f "$EVOLVE_PROJECT_ROOT/.evolve/envir
     ENV_PROFILE_JSON="$EVOLVE_PROJECT_ROOT/.evolve/environment.json"
 fi
 
-if [ "${EVOLVE_FORCE_INNER_SANDBOX:-0}" = "1" ]; then
+if [ "${EVOLVE_INNER_SANDBOX:-}" = "1" ]; then
     SANDBOX_USE=1
-    SANDBOX_USE_SOURCE="EVOLVE_FORCE_INNER_SANDBOX=1 (operator force-enable)"
+    SANDBOX_USE_SOURCE="EVOLVE_INNER_SANDBOX=1 (operator force-enable)"
 elif [ "${EVOLVE_INNER_SANDBOX:-}" = "0" ]; then
     SANDBOX_USE=0
     SANDBOX_USE_SOURCE="EVOLVE_INNER_SANDBOX=0 (operator force-disable)"
@@ -271,7 +279,7 @@ elif [ -n "$ENV_PROFILE_JSON" ]; then
             echo "[claude-adapter]   reason: $inner_reason" >&2
             echo "[claude-adapter]   outer Claude Code OS sandbox + Tier-1 kernel hooks remain enforced" >&2
             echo "[claude-adapter]   role-gate + phase-gate-precondition + ledger-SHA verify writes" >&2
-            echo "[claude-adapter]   (operator force-enable: EVOLVE_FORCE_INNER_SANDBOX=1)" >&2
+            echo "[claude-adapter]   (operator force-enable: EVOLVE_INNER_SANDBOX=1)" >&2
         fi
         SANDBOX_USE=0
         SANDBOX_USE_SOURCE="environment.json:auto_config.inner_sandbox=false"

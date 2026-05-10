@@ -265,9 +265,9 @@ else
     fail_ "out=$(echo "$out" | grep -E 'sandbox|inner' | head -5)"
 fi
 
-# === Test 14: v8.25.1 — EVOLVE_FORCE_INNER_SANDBOX=1 overrides environment.json ===
+# === Test 14: v8.60.0 — EVOLVE_INNER_SANDBOX=1 overrides environment.json (canonical) ===
 # Operator paranoid mode: force inner sandbox ON even when environment.json says false.
-header "Test 14: v8.25.1 — EVOLVE_FORCE_INNER_SANDBOX=1 → sandbox=1 from operator override"
+header "Test 14: v8.60.0 — EVOLVE_INNER_SANDBOX=1 → sandbox=1 from operator override"
 ws14=$(mktemp -d -t claude-adapter-force.XXXXXX)
 mkdir -p "$ws14/.evolve"
 cat > "$ws14/.evolve/environment.json" <<'EOF'
@@ -277,13 +277,34 @@ out=$(env CYCLE=99 WORKSPACE_PATH=/tmp PROFILE_PATH="$p13" \
        RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
        STDOUT_LOG=/dev/null STDERR_LOG=/dev/null \
        ARTIFACT_PATH=/dev/null VALIDATE_ONLY=1 \
-       EVOLVE_PROJECT_ROOT="$ws14" EVOLVE_FORCE_INNER_SANDBOX=1 \
+       EVOLVE_PROJECT_ROOT="$ws14" EVOLVE_INNER_SANDBOX=1 \
        bash "$ADAPTER" 2>&1)
 rm -rf "$ws14"
-if echo "$out" | grep -qE "sandbox=1 \(source: EVOLVE_FORCE_INNER_SANDBOX=1"; then
+if echo "$out" | grep -qE "sandbox=1 \(source: EVOLVE_INNER_SANDBOX=1"; then
     pass "operator force-enable overrides environment.json"
 else
     fail_ "out=$(echo "$out" | grep -E 'sandbox|inner' | head -5)"
+fi
+
+# === Test 14b: v8.60.0 — EVOLVE_FORCE_INNER_SANDBOX=1 deprecated; bridge fires + WARN emitted ===
+header "Test 14b: v8.60.0 — deprecated EVOLVE_FORCE_INNER_SANDBOX=1 → bridge fires, WARN on stderr, sandbox=1"
+ws14b=$(mktemp -d -t claude-adapter-deprecated.XXXXXX)
+mkdir -p "$ws14b/.evolve"
+cat > "$ws14b/.evolve/environment.json" <<'EOF'
+{"schema_version":3,"auto_config":{"inner_sandbox":false,"inner_sandbox_reason":"nested-Claude"}}
+EOF
+out=$(env CYCLE=99 WORKSPACE_PATH=/tmp PROFILE_PATH="$p13" \
+       RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+       STDOUT_LOG=/dev/null STDERR_LOG=/dev/null \
+       ARTIFACT_PATH=/dev/null VALIDATE_ONLY=1 \
+       EVOLVE_PROJECT_ROOT="$ws14b" EVOLVE_FORCE_INNER_SANDBOX=1 \
+       bash "$ADAPTER" 2>&1)
+rm -rf "$ws14b"
+if echo "$out" | grep -q "EVOLVE_FORCE_INNER_SANDBOX is deprecated" \
+   && echo "$out" | grep -qE "sandbox=1 \(source: EVOLVE_INNER_SANDBOX=1"; then
+    pass "deprecated flag emits WARN + achieves same sandbox=1 via bridge"
+else
+    fail_ "out=$(echo "$out" | grep -E 'sandbox|deprecated|FORCE' | head -5)"
 fi
 
 # === Test 15: v8.25.1 — EVOLVE_INNER_SANDBOX=0 overrides profile-enabled sandbox ===

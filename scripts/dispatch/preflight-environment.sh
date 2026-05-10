@@ -112,7 +112,8 @@
 # boundary. nested-Claude is the dominant case where inner_sandbox=false
 # because the outer OS sandbox already provides isolation and the inner
 # sandbox-exec only intersects (cannot expand) what the outer permits.
-# Operator overrides via EVOLVE_FORCE_INNER_SANDBOX=1 or EVOLVE_INNER_SANDBOX=0.
+# Operator overrides via EVOLVE_INNER_SANDBOX=1 (force-enable) or EVOLVE_INNER_SANDBOX=0 (force-disable).
+# EVOLVE_FORCE_INNER_SANDBOX=1 is deprecated (v8.60+); bridged to EVOLVE_INNER_SANDBOX=1 in claude.sh.
 
 set -uo pipefail
 

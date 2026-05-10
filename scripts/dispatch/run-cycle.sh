@@ -326,6 +326,23 @@ WORKTREE_BRANCH=""
 WORKTREE_PROVISIONED=0
 cleanup() {
     local rc=$?
+    # v8.60.0: hoist gitignored baseline artifacts from worktree to project root
+    # BEFORE worktree removal. Worktree cleanup destroys .evolve/baselines/*.json
+    # since they are gitignored (not committed).
+    if [ "$WORKTREE_PROVISIONED" = "1" ] && [ -d "${WORKTREE_PATH:-}/.evolve/baselines" ]; then
+        local dst="$EVOLVE_PROJECT_ROOT/.evolve/baselines"
+        mkdir -p "$dst" 2>/dev/null || true
+        for f in "$WORKTREE_PATH/.evolve/baselines/"*.json; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f")
+            if cp "$f" "$dst/$base.tmp.$$" 2>/dev/null && mv -f "$dst/$base.tmp.$$" "$dst/$base" 2>/dev/null; then
+                log "baseline hoisted: $base → $dst/$base"
+            else
+                rm -f "$dst/$base.tmp.$$" 2>/dev/null
+                log "WARN: could not hoist $base to $dst"
+            fi
+        done
+    fi
     if [ "$WORKTREE_PROVISIONED" = "1" ]; then
         if [ -d "$WORKTREE_PATH" ]; then
             log "cleanup: removing worktree $WORKTREE_PATH"

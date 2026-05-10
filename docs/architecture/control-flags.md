@@ -32,11 +32,11 @@
 |------|--------|---------|
 | `EVOLVE_SANDBOX` | ACTIVE | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | ACTIVE | EPERM fallback for nested-Claude (Darwin 25.4+) |
-| `EVOLVE_INNER_SANDBOX` | ACTIVE | Force-disable inner sandbox (operator hatch) |
-| `EVOLVE_FORCE_INNER_SANDBOX` | ACTIVE | Force-enable inner sandbox |
+| `EVOLVE_INNER_SANDBOX` | ACTIVE | Tri-state inner sandbox: `1`=force-enable, `0`=force-disable, unset=auto from environment.json |
+| `EVOLVE_FORCE_INNER_SANDBOX` | DEPRECATED | Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ |
 
-> **Cycle 8 target**: `EVOLVE_INNER_SANDBOX` (disable) and `EVOLVE_FORCE_INNER_SANDBOX` (enable) are
-> opposing levers for the same feature. Consolidate to `EVOLVE_INNER_SANDBOX=0|1` with deprecation bridge.
+> **Cycle 8 delivered**: `EVOLVE_FORCE_INNER_SANDBOX` is now deprecated with a bridge in `claude.sh`.
+> Use `EVOLVE_INNER_SANDBOX=1` for force-enable, `EVOLVE_INNER_SANDBOX=0` for force-disable.
 
 ## Budget Cluster
 
@@ -191,6 +191,6 @@
 | Cycle | Cluster | Action |
 |-------|---------|--------|
 | 7 (done) | State-file | Deprecated `EVOLVE_STATE_OVERRIDE` → `EVOLVE_STATE_FILE_OVERRIDE` |
-| 8 | Sandbox | Consolidate `EVOLVE_INNER_SANDBOX` / `EVOLVE_FORCE_INNER_SANDBOX` |
+| 8 (done) | Sandbox | Deprecated `EVOLVE_FORCE_INNER_SANDBOX` → `EVOLVE_INNER_SANDBOX=1` bridge (v8.60) |
 | 9 | Budget | Audit `EVOLVE_BUDGET_CAP` vs `EVOLVE_MAX_BUDGET_USD` precedence |
 | 10 | Dead flags | Remove `EVOLVE_PROJECT_ROOT_OVERRIDE`, `EVOLVE_REPO_ROOT_OVERRIDE` |
