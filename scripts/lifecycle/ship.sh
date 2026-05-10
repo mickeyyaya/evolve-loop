@@ -541,6 +541,18 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
             if git -C "$active_worktree" diff --cached --quiet; then
                 ahead=$(git rev-list --count "$CURRENT_BRANCH..$cycle_branch" 2>/dev/null || echo 0)
                 if [ "$ahead" = "0" ]; then
+                    # v8.58.0 Layer E4: warn before silent-exit-0 if main has
+                    # uncommitted modifications. Cycle-6 verification showed
+                    # Builder can escape the worktree (via Bash shell redirects
+                    # or absolute paths) — when this happens the worktree stays
+                    # clean but main accumulates the work without ever shipping.
+                    main_dirty=$(git status --porcelain 2>/dev/null | head -10)
+                    if [ -n "$main_dirty" ]; then
+                        dirty_count=$(printf '%s\n' "$main_dirty" | wc -l | tr -d ' ')
+                        log "WARN: worktree clean BUT main working tree has $dirty_count modified/untracked files (possible Builder isolation breach):"
+                        printf '%s\n' "$main_dirty" | head -10 >&2
+                        log "WARN: investigate before next cycle — see scripts/guards/role-gate.sh and recent .evolve/guards.log DENY entries"
+                    fi
                     log "no changes in worktree AND branch not ahead of $CURRENT_BRANCH; exiting cleanly"
                     write_dry_run_preview "no-changes-no-ahead"
                     exit 0
@@ -607,6 +619,13 @@ fi
 if [ "$WORKTREE_COMMIT_DONE" = "1" ]; then
     : # worktree path completed; skip remaining flow
 elif git diff --cached --quiet; then
+    # v8.58.0 Layer E4: warn on dirty main even on the non-worktree-cycle path.
+    main_dirty=$(git status --porcelain 2>/dev/null | head -10)
+    if [ -n "$main_dirty" ]; then
+        dirty_count=$(printf '%s\n' "$main_dirty" | wc -l | tr -d ' ')
+        log "WARN: nothing staged BUT main has $dirty_count uncommitted file(s) — operator review recommended:"
+        printf '%s\n' "$main_dirty" | head -10 >&2
+    fi
     log "no staged changes to ship; exiting cleanly (audit was for an empty diff)"
     write_dry_run_preview "no-staged-changes"
     exit 0

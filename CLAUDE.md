@@ -125,6 +125,17 @@ evolve-loop subagents have three budget-control mechanisms (highest priority fir
 
 Default is `--max-budget-usd 999999` (effectively unlimited, since v8.26.0). For hard cost ceilings: `EVOLVE_BUDGET_CAP=<value>` (single ceiling) or `EVOLVE_BUDGET_ENFORCE=1` (use profile-resolved per-phase caps). The Scout profile ships with `default` / `research` / `deep` budget tiers as the canonical `EVOLVE_TASK_MODE` example.
 
+### Per-batch cumulative cap (v8.58.0+, Layer B)
+
+Per-cycle caps remain unlimited by default (preserving v8.26's friction-free reasoning), but the dispatcher now tracks a **cumulative batch total** with a tripwire. After each cycle's cost is logged via `show-cycle-cost.sh --json`, the dispatcher accumulates `total.cost_usd` into `BATCH_TOTAL_COST` and checks it against `EVOLVE_BATCH_BUDGET_CAP` (default `20.00`). When exceeded, the batch breaks early with `DISPATCH_RC=4` — completed cycles are reported, remaining cycles skipped.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `EVOLVE_BATCH_BUDGET_CAP` | `20.00` | USD ceiling for cumulative cycle costs in a single dispatcher invocation |
+| `EVOLVE_BATCH_BUDGET_DISABLE` | `0` | Set `1` to disable the tripwire (preserve pre-v8.58 unlimited-batch posture) |
+
+The summary line emits `batch_total_cost=$X.XX / cap=$Y.YY` so post-run forensics is one grep away. Cycle telemetry that fails to produce `show-cycle-cost.sh` JSON contributes `$0` to the running total (best-effort accumulation; never blocks a legitimate cycle on a missing sidecar).
+
 > For detailed usage examples and forward-compatibility notes, see [docs/release/release-archive.md](docs/release/release-archive.md).
 
 ## Verification Before Claiming Done (v8.13.3+)

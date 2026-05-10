@@ -466,11 +466,19 @@ gate_audit_to_ship() {
 
     # 2. Audit verdict must be PASS (not WARN or FAIL)
     if grep -qi "Verdict:.*FAIL\|## Verdict.*FAIL" "$WORKSPACE/audit-report.md"; then
+        # v8.58.0 Layer E1: write .cycle-verdict before failing so dispatcher
+        # forensics can see what verdict was observed even when the gate aborts.
+        echo "FAIL" > "$WORKSPACE/.cycle-verdict"
         fail "Audit verdict is FAIL — cannot ship"
     fi
     if grep -qi "Verdict:.*WARN\|## Verdict.*WARN" "$WORKSPACE/audit-report.md"; then
+        echo "WARN" > "$WORKSPACE/.cycle-verdict"
         fail "Audit verdict is WARN — MEDIUM+ issues block shipping"
     fi
+    # v8.58.0 Layer E1: write .cycle-verdict=PASS as the canonical signal that
+    # downstream gates (gate_ship_to_learn) and the dispatcher's verify_cycle
+    # consume to enforce Layer P (memo on PASS).
+    echo "PASS" > "$WORKSPACE/.cycle-verdict"
     log "OK: Audit verdict is PASS"
 
     # 3. Independent eval verification (CRITICAL — this is the main anti-cheating gate)
@@ -567,6 +575,14 @@ gate_audit_to_retrospective() {
     if ! grep -qiE "Verdict:.*FAIL|Verdict:.*WARN|## Verdict.*FAIL|## Verdict.*WARN" "$WORKSPACE/audit-report.md"; then
         fail "Audit verdict not FAIL or WARN — retrospective requires a failure-class verdict"
     fi
+    # v8.58.0 Layer E1: write .cycle-verdict so downstream gates know which
+    # failure-class verdict was observed (FAIL vs WARN). Disambiguates so memo
+    # enforcement can be skipped on non-PASS cycles.
+    if grep -qiE "Verdict:.*FAIL|## Verdict.*FAIL" "$WORKSPACE/audit-report.md"; then
+        echo "FAIL" > "$WORKSPACE/.cycle-verdict"
+    else
+        echo "WARN" > "$WORKSPACE/.cycle-verdict"
+    fi
     log "OK: Audit verdict is FAIL or WARN — retrospective phase appropriate"
 
     log "OK: AUDIT → RETROSPECTIVE gate passed"
@@ -583,6 +599,32 @@ gate_ship_to_learn() {
         fail "Git working tree is dirty after ship — changes not committed"
     fi
     log "OK: Git working tree is clean"
+
+    # v8.58.0 Layer E2: PASS-cycle memo enforcement. The v8.57 contract said
+    # PASS cycles MUST emit carryover-todos.json via the memo subagent so the
+    # next cycle's Scout sees the deferred backlog. The orchestrator persona
+    # advised this but skipped it 3/3 times in production verification. The
+    # only structural enforcement is here.
+    #
+    # Backward-compat: cycles without .cycle-verdict (pre-v8.58 fixtures) skip
+    # this check. After v8.58 ships, gate_audit_to_ship always writes it.
+    if [ -f "$WORKSPACE/.cycle-verdict" ]; then
+        local _v
+        _v=$(cat "$WORKSPACE/.cycle-verdict" 2>/dev/null)
+        if [ "$_v" = "PASS" ]; then
+            if ! grep -q "\"role\":\"memo\".*\"cycle\":$CYCLE\|\"cycle\":$CYCLE.*\"role\":\"memo\"" "$LEDGER" 2>/dev/null; then
+                fail "PASS verdict but no memo ledger entry for cycle $CYCLE — orchestrator skipped Layer P (v8.57 contract violation; see agents/evolve-orchestrator.md PASS branch)"
+            fi
+            if [ ! -f "$WORKSPACE/carryover-todos.json" ]; then
+                fail "PASS verdict + memo ran but $WORKSPACE/carryover-todos.json missing"
+            fi
+            log "OK: PASS cycle has memo ledger entry + carryover-todos.json"
+        else
+            log "OK: $_v cycle (memo not required on non-PASS verdicts)"
+        fi
+    else
+        log "INFO: no .cycle-verdict file (pre-v8.58 cycle or audit-to-ship gate not run); skipping memo check"
+    fi
 
     # 2. Increment state.json cycle number (SCRIPT does this, not LLM)
     if [ -f "$STATE" ]; then

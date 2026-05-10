@@ -206,6 +206,52 @@ jq -c '.phase = "build" | .active_agent = "builder" | .active_worktree = "/tmp/w
 expect_allow "build + worktree path under trailing-slash worktree" \
     "{\"tool_input\":{\"file_path\":\"/tmp/wt-trail-99000/src/foo.py\"},\"cwd\":\"$REPO_ROOT\"}"
 
+# === Test 22 (v8.58.0 Layer I): symlinked worktree boundary canonicalization =
+# The bug: role-gate canonicalizes the *target* path via realpath (line 130),
+# but the *boundary* (ACTIVE_WT, line 161) is read raw. If they sit on opposite
+# sides of a symlink the glob comparison fails (DENY false-positive on
+# legitimate writes inside the worktree).
+# Note: /var/folders/* and /tmp/* are always-safe (line 136) and would short-
+# circuit this test, so we use a path under REPO_ROOT (not always-safe) and
+# create a synthetic symlink there. Cleanup is critical — the fixture lives
+# inside the repo dir.
+header "Test 22 (v8.58.0): symlinked worktree boundary canonicalizes correctly"
+if ! command -v realpath >/dev/null 2>&1; then
+    pass "(skipped: realpath unavailable on this system)"
+else
+    # Use /tmp for the REAL worktree (always-safe, won't pollute repo) but
+    # SYMLINK from a non-safe path inside the test-state dir (which is also
+    # under /var/folders... that's still always-safe). Hmm — every tempdir on
+    # macOS is /var/folders. To force non-always-safe boundary we need a path
+    # outside /tmp, /var/folders, /private/{tmp,var/folders}, $HOME/.claude.
+    # $HOME itself works. Use $HOME with a uniquely-named hidden test dir we
+    # clean up unconditionally.
+    LAYER_I_TESTROOT="$HOME/.evolve-layer-i-test-$$"
+    LAYER_I_REAL_WT="$LAYER_I_TESTROOT/real-wt"
+    LAYER_I_SYMLINK_WT="$LAYER_I_TESTROOT/symlink-wt"
+    mkdir -p "$LAYER_I_REAL_WT/src"
+    ln -s "$LAYER_I_REAL_WT" "$LAYER_I_SYMLINK_WT"
+    : > "$LAYER_I_REAL_WT/src/builder-output.txt"
+
+    # Set ACTIVE_WT to the SYMLINK path; the target's realpath resolves to the
+    # REAL_WT path. Without canonicalization on the boundary, comparison fails.
+    rm -f "$TEST_STATE"
+    bash "$HELPER" init 99000 .evolve/runs/cycle-99000 >/dev/null
+    jq -c --arg wt "$LAYER_I_SYMLINK_WT" \
+        '.phase = "build" | .active_agent = "builder" | .active_worktree = $wt' \
+        "$TEST_STATE" > "$TEST_STATE.tmp" && mv "$TEST_STATE.tmp" "$TEST_STATE"
+    CANONICAL_TARGET=$(realpath "$LAYER_I_REAL_WT/src/builder-output.txt")
+    expect_allow "symlinked worktree: canonical-target inside symlink-WT" \
+        "{\"tool_input\":{\"file_path\":\"$CANONICAL_TARGET\"},\"cwd\":\"$REPO_ROOT\"}"
+
+    # Negative: a target genuinely outside the worktree (and not always-safe)
+    # must still DENY. Use a path inside REPO_ROOT (not in always-safe set).
+    OUTSIDE_TARGET="$REPO_ROOT/.evolve/instincts/lessons/escape-attempt.yaml"
+    expect_deny "symlinked worktree: outside-WT path still DENIED" \
+        "{\"tool_input\":{\"file_path\":\"$OUTSIDE_TARGET\"},\"cwd\":\"$REPO_ROOT\"}"
+    rm -rf "$LAYER_I_TESTROOT"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="

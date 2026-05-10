@@ -461,6 +461,24 @@ verify_cycle() {
         log "VERIFY-INCOMPLETE: cycle $cycle pipeline incomplete (scout=$s builder=$b auditor=$a)"
         return 2
     fi
+    # v8.58.0 Layer E3: PASS-cycle memo enforcement (defense-in-depth alongside
+    # gate_ship_to_learn). If the cycle's audit was PASS (read .cycle-verdict
+    # written by gate_audit_to_ship), the memo subagent MUST have produced a
+    # ledger entry. Without this, the v8.57 contract is silently violated.
+    local verdict_file="$RUNS_DIR/cycle-${cycle}/.cycle-verdict"
+    if [ -f "$verdict_file" ]; then
+        local cycle_verdict
+        cycle_verdict=$(cat "$verdict_file" 2>/dev/null)
+        if [ "$cycle_verdict" = "PASS" ]; then
+            local m
+            m=$(count_role "$cycle" "memo")
+            if [ "$m" -lt 1 ]; then
+                log "VERIFY-INCOMPLETE: PASS cycle $cycle has zero memo ledger entries (Layer P contract violated; orchestrator skipped memo)"
+                return 2
+            fi
+            log "ledger: cycle=$cycle memo=$m (PASS contract met)"
+        fi
+    fi
     return 0
 }
 
@@ -666,6 +684,22 @@ PREV_RAN_CYCLE=""
 SAME_CYCLE_STREAK=0
 SAME_CYCLE_THRESHOLD="${EVOLVE_DISPATCH_REPEAT_THRESHOLD:-5}"
 
+# v8.58.0 Layer B: per-batch cumulative budget cap. Per-cycle profile caps
+# default to $999999 (effectively unlimited) per v8.26's friction-free reasoning
+# choice. The 10-cycle v8.57 verification batch cost ~$30 with no tripwire.
+# This adds a batch-level ceiling (default $20) — opt-out via
+# EVOLVE_BATCH_BUDGET_DISABLE=1. The cap counts only successfully-costed cycles
+# (those with valid show-cycle-cost.sh JSON); cycles that failed before
+# producing usage sidecars contribute $0 to the batch total.
+BATCH_TOTAL_COST="0.00"
+BATCH_CAP="${EVOLVE_BATCH_BUDGET_CAP:-20.00}"
+BATCH_BUDGET_DISABLE="${EVOLVE_BATCH_BUDGET_DISABLE:-0}"
+if [ "$BATCH_BUDGET_DISABLE" = "1" ]; then
+    log "BATCH-BUDGET: disabled (EVOLVE_BATCH_BUDGET_DISABLE=1)"
+else
+    log "BATCH-BUDGET: cap=\$${BATCH_CAP} (override via EVOLVE_BATCH_BUDGET_CAP, disable via EVOLVE_BATCH_BUDGET_DISABLE=1)"
+fi
+
 for ((i=1; i<=CYCLES; i++)); do
     log "------------------ cycle $i / $CYCLES ------------------"
 
@@ -783,9 +817,34 @@ for ((i=1; i<=CYCLES; i++)); do
                 | "cycle \($c.cycle) cost: $\($tc | (. * 10000 | round / 10000) | tostring) (\($phase_str)) cache_hit=\($hit_pct)%"
             ' 2>/dev/null || echo "")
             [ -n "$cost_line" ] && log "$cost_line"
+            # v8.58.0 Layer B: accumulate this cycle's cost into the batch total.
+            # Use bc for fractional arithmetic; fall back to integer-cents on systems
+            # without bc. Best-effort — invalid/missing cost contributes $0.
+            _cycle_cost=$(echo "$cost_json" | jq -r '.total.cost_usd // 0' 2>/dev/null || echo "0")
+            if command -v bc >/dev/null 2>&1; then
+                BATCH_TOTAL_COST=$(echo "$BATCH_TOTAL_COST + $_cycle_cost" | bc -l 2>/dev/null || echo "$BATCH_TOTAL_COST")
+            fi
+            if [ "$BATCH_BUDGET_DISABLE" != "1" ]; then
+                log "BATCH-BUDGET: cumulative \$${BATCH_TOTAL_COST} / \$${BATCH_CAP}"
+            fi
+            unset _cycle_cost
         fi
     fi
     unset SCC cost_json cost_line
+
+    # v8.58.0 Layer B: tripwire check. After the cycle's cost is added, if the
+    # cumulative total exceeds the cap, stop the batch — remaining cycles are
+    # skipped. This is the operator-facing tripwire that the v8.57 verification
+    # didn't have. Set EVOLVE_BATCH_BUDGET_DISABLE=1 to opt out.
+    if [ "$BATCH_BUDGET_DISABLE" != "1" ] && command -v bc >/dev/null 2>&1; then
+        if [ "$(echo "$BATCH_TOTAL_COST > $BATCH_CAP" | bc -l 2>/dev/null)" = "1" ]; then
+            log "BATCH-BUDGET-EXCEEDED: cumulative \$${BATCH_TOTAL_COST} > cap \$${BATCH_CAP} (after cycle $ran_cycle)"
+            log "  override: EVOLVE_BATCH_BUDGET_CAP=<higher> or EVOLVE_BATCH_BUDGET_DISABLE=1"
+            log "  remaining cycles ($((CYCLES - i)) of $CYCLES) will be skipped"
+            DISPATCH_RC=4
+            break
+        fi
+    fi
 
     # v8.24.0: same-cycle circuit-breaker. If iteration after iteration reports
     # the same cycle number, the dispatcher is deadlocked — either state.json
@@ -864,6 +923,13 @@ log "------------------ summary ------------------"
 log "elapsed: ${ELAPSED}s"
 log "cycles_requested=$CYCLES"
 log "exit_code=$DISPATCH_RC"
+# v8.58.0 Layer B: surface batch total in summary so operators can verify
+# spend at a glance without grepping show-cycle-cost.sh per cycle.
+if [ "${BATCH_BUDGET_DISABLE:-0}" = "1" ]; then
+    log "batch_total_cost=\$${BATCH_TOTAL_COST:-0.00} (cap disabled)"
+else
+    log "batch_total_cost=\$${BATCH_TOTAL_COST:-0.00} / cap=\$${BATCH_CAP:-20.00}"
+fi
 
 if [ "$DISPATCH_RC" = "0" ]; then
     log "DONE: all $CYCLES cycles completed AND verified end-to-end"

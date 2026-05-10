@@ -166,6 +166,16 @@ CYCLE_ID=$(jq -r '.cycle_id // empty' "$CYCLE_STATE_FILE" 2>/dev/null || true)
 ACTIVE_WT="${ACTIVE_WT%/}"
 WORKSPACE_PATH="${WORKSPACE_PATH%/}"
 
+# v8.58.0 Layer I: canonicalize the worktree boundary (the target is already
+# canonicalized at line 130). Asymmetric symlink resolution between target and
+# boundary caused DENY false-positives on legitimate writes when the worktree
+# path included a symlink (e.g., macOS $TMPDIR is /var/folders → /private/var/
+# folders). Now both sides resolve symlinks before the glob comparison.
+if [ -n "$ACTIVE_WT" ] && [ -d "$ACTIVE_WT" ] && command -v realpath >/dev/null 2>&1; then
+    _canonical_wt=$(realpath "$ACTIVE_WT" 2>/dev/null) && [ -n "$_canonical_wt" ] && ACTIVE_WT="$_canonical_wt"
+    unset _canonical_wt
+fi
+
 if [ -z "$PHASE" ] || [ -z "$WORKSPACE_PATH" ]; then
     log "cycle-state malformed (phase=$PHASE, workspace=$WORKSPACE_PATH); ALLOW"
     exit 0
