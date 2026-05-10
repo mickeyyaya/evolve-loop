@@ -44,6 +44,7 @@ set -uo pipefail
 # reliably across nested invocations. Explicit export removes ambiguity.
 [ -n "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ] && export EVOLVE_SANDBOX_FALLBACK_ON_EPERM
 [ -n "${EVOLVE_DISPATCH_STOP_ON_FAIL:-}" ] && export EVOLVE_DISPATCH_STOP_ON_FAIL
+[ -n "${EVOLVE_DISPATCH_POLICY:-}" ] && export EVOLVE_DISPATCH_POLICY
 [ -n "${EVOLVE_BYPASS_PHASE_GATE:-}" ] && export EVOLVE_BYPASS_PHASE_GATE
 
 # v8.18.0: dual-root resolution. PLUGIN_ROOT for read-only scripts/agents,

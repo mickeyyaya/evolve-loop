@@ -64,9 +64,7 @@ Single quotes inside the goal are fine when the goal itself is double-quoted. Av
 
 **Exit code 3 is the evolutionary path (v8.16.1+)**: when a cycle's `orchestrator-report.md` honestly declares "INFRASTRUCTURE FAILURE", an audit `Verdict: FAIL`, or a build failure, the dispatcher records the failure to `state.json:failedApproaches[]` and continues to the next cycle. The next cycle's orchestrator reads `failedApproaches` and adapts its approach (different scope, alternative path, or operator escalation). This is what "evolve-loop" means: learn from failure, try a different approach, move forward. STOP-class behavior (rc=2) is preserved for actual kernel breaches.
 
-**Legacy escape hatch:** `EVOLVE_DISPATCH_VERIFY=0` skips the per-cycle ledger verification (used only for debugging the dispatcher itself). Never set this for real `/evolve-loop` use — the WARN it prints is your tripwire that someone disabled the only structural enforcement of pipeline completeness.
-
-**Strict fail-fast (legacy behavior):** `EVOLVE_DISPATCH_STOP_ON_FAIL=1` reverts to pre-v8.16.1 behavior — any verification failure stops the batch with rc=2, regardless of whether the failure is recoverable or a kernel breach. Use only when you explicitly want fail-fast (e.g., CI gates, regression hunts where every failure is a blocker).
+**Dispatch policy (v8.60+):** `EVOLVE_DISPATCH_POLICY=off|verify|stop` controls per-cycle pipeline verification. `verify` (default) checks scout/builder/auditor ledger entries and continues on recoverable failures. `stop` reverts to fail-fast (rc=2 on any failure; use for CI gates). `off` skips verification entirely (legacy debug only). The deprecated flags `EVOLVE_DISPATCH_VERIFY=0` and `EVOLVE_DISPATCH_STOP_ON_FAIL=1` bridge to `EVOLVE_DISPATCH_POLICY=off` and `=stop` respectively with a one-time stderr WARN.
 
 The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `run-cycle.sh` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
 

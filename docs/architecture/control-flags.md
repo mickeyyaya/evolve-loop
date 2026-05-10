@@ -55,8 +55,11 @@
 > `EVOLVE_MAX_BUDGET_USD` is the single canonical per-subagent ceiling flag. When both are set, `EVOLVE_MAX_BUDGET_USD` wins.
 > Builder cost-overrun guard (`_check_builder_cost_overrun` in `phase-gate.sh`) reads `builder-usage.json` against the threshold.
 >
-> **Cycle 10 target**: Workflow Defaults cluster audit — `EVOLVE_STRICT_*` family (3 flags) and `EVOLVE_DISPATCH_*` family (2 flags)
-> share "tighten the pipeline" semantics and are candidates for consolidation into a single severity-level flag.
+> **Cycle 10 CLOSED**: Workflow Defaults cluster — `EVOLVE_STRICT_*` (2 flags) and `EVOLVE_DISPATCH_*` (2 policy flags; REPEAT_THRESHOLD excluded as numeric threshold) consolidated.
+> `EVOLVE_STRICT_FAILURES` bridged to `EVOLVE_STRICT_AUDIT` (canonical). `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` bridged to `EVOLVE_DISPATCH_POLICY={off|verify|stop}` (canonical).
+> Note: cycle-9 callout misstated the counts as "3 STRICT + 2 DISPATCH" — actual was 2 STRICT + 3 DISPATCH (REPEAT_THRESHOLD is a numeric threshold, not a policy switch).
+>
+> **Cycle 11 target**: `EVOLVE_REQUIRE_*` family audit — `EVOLVE_REQUIRE_INTENT` and `EVOLVE_REQUIRE_TEAM_CONTEXT` share "force phase on every cycle" semantics; investigate unified `EVOLVE_REQUIRED_PHASES` list flag. Lower priority (rarely set by operators); treat as `investigate` not `commit`.
 
 ## State File Cluster (cycle 7 consolidation)
 
@@ -129,15 +132,16 @@
 
 | Flag | Status | Purpose |
 |------|--------|---------|
-| `EVOLVE_STRICT_AUDIT` | ACTIVE | WARN→FAIL promotion (v8.35+ strict mode) |
-| `EVOLVE_STRICT_FAILURES` | ACTIVE | Strict failure-adapter blocking |
+| `EVOLVE_STRICT_AUDIT` | ACTIVE (canonical) | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
+| `EVOLVE_STRICT_FAILURES` | DEPRECATED | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ |
 | `EVOLVE_TASK_MODE` | ACTIVE | Profile tier selector (default/research/deep) |
 | `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
 | `EVOLVE_REQUIRE_TEAM_CONTEXT` | ACTIVE | Require team context before builder |
 | `EVOLVE_PLAN_REVIEW` | ACTIVE | Enable Sprint 2 plan-review phase (opt-in) |
 | `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` | ACTIVE | Opt-out of inline retrospective on FAIL/WARN |
-| `EVOLVE_DISPATCH_STOP_ON_FAIL` | ACTIVE | Restore fail-fast on dispatch error |
-| `EVOLVE_DISPATCH_VERIFY` | ACTIVE | Verify dispatch tool (legacy) |
+| `EVOLVE_DISPATCH_POLICY` | ACTIVE (canonical) | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
+| `EVOLVE_DISPATCH_STOP_ON_FAIL` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+ |
+| `EVOLVE_DISPATCH_VERIFY` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=off` (when `=0`); emits stderr WARN; removal target v8.61+ |
 | `EVOLVE_DISPATCH_REPEAT_THRESHOLD` | ACTIVE | Threshold for repeat-cycle detection |
 | `EVOLVE_AUTO_PRUNE` | ACTIVE | Enable auto-prune of expired state entries |
 | `EVOLVE_STRATEGY` | ACTIVE | Cycle strategy override |
@@ -199,4 +203,5 @@
 | 7 (done) | State-file | Deprecated `EVOLVE_STATE_OVERRIDE` → `EVOLVE_STATE_FILE_OVERRIDE` |
 | 8 (done) | Sandbox | Deprecated `EVOLVE_FORCE_INNER_SANDBOX` → `EVOLVE_INNER_SANDBOX=1` bridge (v8.60) |
 | 9 (done) | Budget | Deprecated `EVOLVE_BUDGET_CAP` → `EVOLVE_MAX_BUDGET_USD` bridge (v8.60); added builder cost-overrun guard |
-| 10 | Workflow Defaults | Audit `EVOLVE_STRICT_*` family + `EVOLVE_DISPATCH_*` family — consolidate shared "tighten the pipeline" flags |
+| 10 (done) | Workflow Defaults | Deprecated `EVOLVE_STRICT_FAILURES` → `EVOLVE_STRICT_AUDIT`; deprecated `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` → `EVOLVE_DISPATCH_POLICY={off\|verify\|stop}` (v8.60) |
+| 11 | Require Phases | Investigate `EVOLVE_REQUIRE_INTENT` + `EVOLVE_REQUIRE_TEAM_CONTEXT` → unified `EVOLVE_REQUIRED_PHASES` list flag |

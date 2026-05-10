@@ -331,7 +331,7 @@ esac
 log "PLAN: cycles=$CYCLES strategy=$STRATEGY goal='${GOAL:-<autonomous>}'"
 log "PLAN: run_cycle=$RUN_CYCLE"
 log "PLAN: ledger=$LEDGER"
-log "PLAN: verify=$([ "${EVOLVE_DISPATCH_VERIFY:-1}" = "1" ] && echo "on" || echo "OFF")"
+log "PLAN: dispatch_policy=${EVOLVE_DISPATCH_POLICY:-verify}$([ -n "${EVOLVE_DISPATCH_VERIFY:-}" ] && echo " (DEPRECATED EVOLVE_DISPATCH_VERIFY set)" || true)$([ -n "${EVOLVE_DISPATCH_STOP_ON_FAIL:-}" ] && echo " (DEPRECATED EVOLVE_DISPATCH_STOP_ON_FAIL set)" || true)"
 
 # v8.24.0: export the reinvocation command so claude.sh's EPERM diagnostic
 # can suggest a copy-paste recovery line. Quote args defensively.
@@ -871,9 +871,29 @@ for ((i=1; i<=CYCLES; i++)); do
         break
     fi
 
+    # v8.60+: resolve canonical dispatch policy from EVOLVE_DISPATCH_POLICY or
+    # legacy deprecated flags (EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL).
+    # Resolution runs once per cycle (idempotent via _DISPATCH_POLICY_WARNED guard).
+    _DISPATCH_POLICY="${EVOLVE_DISPATCH_POLICY:-verify}"
+    if [ -z "${_DISPATCH_POLICY_WARNED:-}" ]; then
+        export _DISPATCH_POLICY_WARNED=1
+        _legacy_verify="${EVOLVE_DISPATCH_VERIFY:-}"
+        _legacy_stop="${EVOLVE_DISPATCH_STOP_ON_FAIL:-}"
+        if [ -n "$_legacy_stop" ] && [ "$_legacy_stop" = "1" ] && [ -n "$_legacy_verify" ] && [ "$_legacy_verify" = "0" ]; then
+            echo "WARN: Both EVOLVE_DISPATCH_STOP_ON_FAIL=1 and EVOLVE_DISPATCH_VERIFY=0 set — STOP_ON_FAIL wins (most restrictive). Use EVOLVE_DISPATCH_POLICY=stop. Both flags deprecated (v8.60+)." >&2
+            _DISPATCH_POLICY="stop"
+        elif [ -n "$_legacy_stop" ] && [ "$_legacy_stop" = "1" ]; then
+            echo "WARN: EVOLVE_DISPATCH_STOP_ON_FAIL is deprecated (v8.60+); use EVOLVE_DISPATCH_POLICY=stop (bridging now)." >&2
+            _DISPATCH_POLICY="stop"
+        elif [ -n "$_legacy_verify" ] && [ "$_legacy_verify" = "0" ]; then
+            echo "WARN: EVOLVE_DISPATCH_VERIFY=0 is deprecated (v8.60+); use EVOLVE_DISPATCH_POLICY=off (bridging now)." >&2
+            _DISPATCH_POLICY="off"
+        fi
+    fi
+
     # Verify the pipeline ran end-to-end (scout, builder, auditor all present).
-    # Skippable via env for legacy debugging only.
-    if [ "${EVOLVE_DISPATCH_VERIFY:-1}" = "1" ]; then
+    # Controlled by EVOLVE_DISPATCH_POLICY: off skips, verify/stop both check.
+    if [ "$_DISPATCH_POLICY" != "off" ]; then
         if ! verify_cycle "$ran_cycle"; then
             # Verification failed — classify before deciding STOP vs CONTINUE.
             # The orchestrator-report.md tells us if this was honest infrastructure
@@ -883,8 +903,8 @@ for ((i=1; i<=CYCLES; i++)); do
 
             # Legacy fail-fast can be restored explicitly (per CLAUDE.md autonomous rule,
             # the default is now to learn-and-continue).
-            if [ "${EVOLVE_DISPATCH_STOP_ON_FAIL:-0}" = "1" ]; then
-                log "EVOLVE_DISPATCH_STOP_ON_FAIL=1 — legacy fail-fast: aborting batch"
+            if [ "$_DISPATCH_POLICY" = "stop" ]; then
+                log "EVOLVE_DISPATCH_POLICY=stop — legacy fail-fast: aborting batch"
                 DISPATCH_RC=2
                 break
             fi
@@ -913,7 +933,7 @@ for ((i=1; i<=CYCLES; i++)); do
             esac
         fi
     else
-        log "WARN: EVOLVE_DISPATCH_VERIFY=0 — skipping ledger pipeline check (LEGACY)"
+        log "WARN: EVOLVE_DISPATCH_POLICY=off — skipping ledger pipeline check (LEGACY)"
     fi
 done
 

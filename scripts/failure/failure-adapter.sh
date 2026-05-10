@@ -209,10 +209,20 @@ emit() {
 
 # v8.28.0: fluent-by-default. The adapter accumulates AWARENESS context
 # (so the orchestrator can read about prior failures and adapt) but emits
-# BLOCK only when EVOLVE_STRICT_FAILURES=1. Each rule below would have
+# BLOCK only when EVOLVE_STRICT_AUDIT=1. Each rule below would have
 # emitted a BLOCK pre-v8.28.0; now it adds a line to AWARENESS_LINES and
 # falls through unless strict mode is on.
-STRICT="${EVOLVE_STRICT_FAILURES:-0}"
+# v8.60+: EVOLVE_STRICT_FAILURES is deprecated; bridges to EVOLVE_STRICT_AUDIT.
+if [ -n "${EVOLVE_STRICT_FAILURES:-}" ] && [ -z "${_STRICT_FAILURES_WARNED:-}" ]; then
+    export _STRICT_FAILURES_WARNED=1
+    if [ -n "${EVOLVE_STRICT_AUDIT:-}" ]; then
+        echo "WARN: EVOLVE_STRICT_FAILURES is deprecated (v8.60+); EVOLVE_STRICT_AUDIT already set — STRICT_AUDIT takes precedence. Use EVOLVE_STRICT_AUDIT=1." >&2
+    else
+        echo "WARN: EVOLVE_STRICT_FAILURES is deprecated (v8.60+); use EVOLVE_STRICT_AUDIT=1 (bridging now)." >&2
+        export EVOLVE_STRICT_AUDIT="${EVOLVE_STRICT_FAILURES}"
+    fi
+fi
+STRICT="${EVOLVE_STRICT_AUDIT:-0}"
 AWARENESS_LINES=()
 SET_ENV_FLUENT='{}'
 
@@ -302,8 +312,8 @@ if [ ${#AWARENESS_LINES[@]} -gt 0 ]; then
     # in strict mode. The orchestrator's prompt context displays these.
     awareness_str=$(printf '%s; ' "${AWARENESS_LINES[@]}")
     emit "PROCEED" \
-        "fluent mode (set EVOLVE_STRICT_FAILURES=1 for legacy blocking): ${awareness_str% ; }" \
-        "Awareness only — orchestrator should consider the prior failures when planning. Set EVOLVE_STRICT_FAILURES=1 to restore legacy block-on-recurring-failure behavior." \
+        "fluent mode (set EVOLVE_STRICT_AUDIT=1 for legacy blocking): ${awareness_str% ; }" \
+        "Awareness only — orchestrator should consider the prior failures when planning. Set EVOLVE_STRICT_AUDIT=1 to restore legacy block-on-recurring-failure behavior." \
         "null" \
         "$SET_ENV_FLUENT"
 else

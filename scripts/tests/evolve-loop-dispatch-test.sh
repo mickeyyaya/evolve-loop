@@ -1155,6 +1155,120 @@ else
     fail_ "rc=$rc; got unexpected cost line. Tail: $(echo "$out" | tail -5)"
 fi
 
+# === Test 43: v8.60+ — EVOLVE_DISPATCH_POLICY=off lets bad cycles through ====
+# Canonical replacement for EVOLVE_DISPATCH_VERIFY=0. Should pass all cycles
+# without checking scout/builder/auditor ledger completeness.
+header "Test 43: v8.60+ DISPATCH_POLICY=off + missing builder → rc=0 (no verification)"
+ws43=$(make_workspace)
+write_state "$ws43/state.json" 0
+: > "$ws43/ledger.jsonl"
+mkdir -p "$ws43/runs/cycle-1"
+mock43=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_DISPATCH_POLICY=off MOCK_SKIP_ROLE=builder \
+      STATE_OVERRIDE="$ws43/state.json" LEDGER_OVERRIDE="$ws43/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws43/runs" RUN_CYCLE_OVERRIDE="$mock43" \
+      bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "0" ]; then
+    pass "DISPATCH_POLICY=off → rc=0 (bad cycle passes through, no check)"
+else
+    fail_ "expected rc=0, got rc=$rc"
+fi
+if echo "$out" | grep -q "DISPATCH_POLICY=off"; then
+    pass "DISPATCH_POLICY=off log emitted"
+else
+    fail_ "missing DISPATCH_POLICY=off log; out: $(echo "$out" | tail -5)"
+fi
+
+# === Test 44: v8.60+ — EVOLVE_DISPATCH_POLICY=stop restores fail-fast =======
+# Canonical replacement for EVOLVE_DISPATCH_STOP_ON_FAIL=1.
+header "Test 44: v8.60+ DISPATCH_POLICY=stop + recoverable failure → rc=2 (fail-fast)"
+ws44=$(make_workspace)
+write_state "$ws44/state.json" 400
+: > "$ws44/ledger.jsonl"
+mkdir -p "$ws44/runs/cycle-401"
+cat > "$ws44/runs/cycle-401/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 401
+| audit | auditor | INFRASTRUCTURE FAILURE — EPERM |
+EOF
+mock44=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_DISPATCH_POLICY=stop MOCK_SKIP_ROLE=auditor \
+      STATE_OVERRIDE="$ws44/state.json" LEDGER_OVERRIDE="$ws44/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws44/runs" RUN_CYCLE_OVERRIDE="$mock44" \
+      bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "2" ]; then
+    pass "DISPATCH_POLICY=stop → rc=2 (fail-fast preserved)"
+else
+    fail_ "expected rc=2, got rc=$rc"
+fi
+if echo "$out" | grep -q "legacy fail-fast"; then
+    pass "log mentions legacy fail-fast"
+else
+    fail_ "missing fail-fast log; tail: $(echo "$out" | tail -5)"
+fi
+
+# === Test 45: v8.60+ bridge — EVOLVE_DISPATCH_VERIFY=0 → warns + behaves as off ===
+# Deprecated flag still triggers correct behavior but emits a deprecation WARN.
+header "Test 45: v8.60+ bridge — EVOLVE_DISPATCH_VERIFY=0 → WARN + behaves as DISPATCH_POLICY=off"
+ws45=$(make_workspace)
+write_state "$ws45/state.json" 0
+: > "$ws45/ledger.jsonl"
+mkdir -p "$ws45/runs/cycle-1"
+mock45=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_DISPATCH_VERIFY=0 MOCK_SKIP_ROLE=builder \
+      STATE_OVERRIDE="$ws45/state.json" LEDGER_OVERRIDE="$ws45/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws45/runs" RUN_CYCLE_OVERRIDE="$mock45" \
+      bash "$DISPATCH" 1 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "0" ]; then
+    pass "DISPATCH_VERIFY=0 bridge → rc=0 (bad cycle passes)"
+else
+    fail_ "expected rc=0, got rc=$rc"
+fi
+if echo "$out" | grep -q "deprecated"; then
+    pass "DISPATCH_VERIFY=0 emits deprecation WARN"
+else
+    fail_ "missing deprecation WARN; tail: $(echo "$out" | tail -5)"
+fi
+
+# === Test 46: v8.60+ bridge — both deprecated flags set → stop wins =========
+# EVOLVE_DISPATCH_STOP_ON_FAIL=1 is more restrictive than DISPATCH_VERIFY=0;
+# when both are set, stop wins and a precedence WARN is emitted.
+header "Test 46: v8.60+ bridge — DISPATCH_VERIFY=0 + DISPATCH_STOP_ON_FAIL=1 → stop wins + precedence WARN"
+ws46=$(make_workspace)
+write_state "$ws46/state.json" 400
+: > "$ws46/ledger.jsonl"
+mkdir -p "$ws46/runs/cycle-401"
+cat > "$ws46/runs/cycle-401/orchestrator-report.md" <<'EOF'
+# Orchestrator Report — Cycle 401
+| audit | auditor | INFRASTRUCTURE FAILURE — EPERM |
+EOF
+mock46=$(make_mock_run_cycle)
+set +e
+out=$(EVOLVE_DISPATCH_VERIFY=0 EVOLVE_DISPATCH_STOP_ON_FAIL=1 MOCK_SKIP_ROLE=auditor \
+      STATE_OVERRIDE="$ws46/state.json" LEDGER_OVERRIDE="$ws46/ledger.jsonl" \
+      RUNS_DIR_OVERRIDE="$ws46/runs" RUN_CYCLE_OVERRIDE="$mock46" \
+      bash "$DISPATCH" 2 2>&1)
+rc=$?
+set -e
+if [ "$rc" = "2" ]; then
+    pass "both deprecated flags → rc=2 (stop wins)"
+else
+    fail_ "expected rc=2, got rc=$rc"
+fi
+if echo "$out" | grep -q "STOP_ON_FAIL wins"; then
+    pass "precedence WARN emitted (STOP_ON_FAIL wins)"
+else
+    fail_ "missing precedence WARN; tail: $(echo "$out" | tail -5)"
+fi
+
 echo
 echo "=========================================="
 echo "  Total tests: $TESTS_TOTAL"

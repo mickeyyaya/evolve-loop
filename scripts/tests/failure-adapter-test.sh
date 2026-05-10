@@ -442,6 +442,73 @@ else
     fail_ "action=$action verdict=$verdict by_class=$by_class_count"
 fi
 
+# === Test 24: v8.60+ bridge — EVOLVE_STRICT_FAILURES=1 bridges to STRICT_AUDIT ===
+# When only STRICT_FAILURES is set (no STRICT_AUDIT), the bridge emits a WARN
+# and sets STRICT_AUDIT=1 so the adapter blocks as if STRICT_AUDIT=1.
+header "Test 24: v8.60+ bridge — EVOLVE_STRICT_FAILURES=1 only → blocks + emits WARN"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+out=$(EVOLVE_STRICT_FAILURES=1 _STRICT_FAILURES_WARNED="" decide "$sf" 2>&1)
+stderr_part=$(EVOLVE_STRICT_FAILURES=1 _STRICT_FAILURES_WARNED="" bash "$SCRIPT" decide --state "$sf" 2>&1 >/dev/null || true)
+action=$(echo "$out" | grep -v '^WARN:' | jq -r '.action' 2>/dev/null || echo "")
+if echo "$stderr_part" | grep -q "EVOLVE_STRICT_FAILURES is deprecated"; then
+    pass "bridge emits deprecation WARN"
+else
+    fail_ "bridge WARN not emitted; stderr: $stderr_part"
+fi
+out2=$(EVOLVE_STRICT_FAILURES=1 _STRICT_FAILURES_WARNED="" decide "$sf")
+action2=$(echo "$out2" | jq -r '.action')
+if [ "$action2" = "BLOCK-CODE" ]; then
+    pass "STRICT_FAILURES=1 bridge → BLOCK-CODE (same as STRICT_AUDIT=1)"
+else
+    fail_ "expected BLOCK-CODE via bridge, got $action2"
+fi
+
+# === Test 25: v8.60+ bridge — EVOLVE_STRICT_AUDIT=1 only (canonical, no WARN) ===
+header "Test 25: v8.60+ canonical — EVOLVE_STRICT_AUDIT=1 → blocks without WARN"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+stderr_canonical=$(EVOLVE_STRICT_AUDIT=1 bash "$SCRIPT" decide --state "$sf" 2>&1 >/dev/null || true)
+out=$(EVOLVE_STRICT_AUDIT=1 decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+if [ "$action" = "BLOCK-CODE" ]; then
+    pass "STRICT_AUDIT=1 canonical → BLOCK-CODE"
+else
+    fail_ "expected BLOCK-CODE, got $action"
+fi
+if ! echo "$stderr_canonical" | grep -q "deprecated"; then
+    pass "canonical STRICT_AUDIT=1 emits no deprecation WARN"
+else
+    fail_ "unexpected deprecation WARN from canonical flag; stderr: $stderr_canonical"
+fi
+
+# === Test 26: v8.60+ bridge — both STRICT_FAILURES=1 + STRICT_AUDIT=1 → STRICT_AUDIT wins ===
+header "Test 26: v8.60+ bridge — both STRICT_FAILURES=1 + STRICT_AUDIT=1 → STRICT_AUDIT takes precedence"
+exp=$(FUTURE_ISO 5)
+sf=$(make_state "[
+  {\"cycle\":1,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"},
+  {\"cycle\":2,\"classification\":\"code-audit-fail\",\"expiresAt\":\"$exp\"}
+]")
+stderr_both=$(EVOLVE_STRICT_FAILURES=1 EVOLVE_STRICT_AUDIT=1 _STRICT_FAILURES_WARNED="" bash "$SCRIPT" decide --state "$sf" 2>&1 >/dev/null || true)
+out=$(EVOLVE_STRICT_FAILURES=1 EVOLVE_STRICT_AUDIT=1 _STRICT_FAILURES_WARNED="" decide "$sf")
+action=$(echo "$out" | jq -r '.action')
+if echo "$stderr_both" | grep -q "STRICT_AUDIT takes precedence"; then
+    pass "both set → STRICT_AUDIT-takes-precedence WARN emitted"
+else
+    fail_ "missing precedence WARN; stderr: $stderr_both"
+fi
+if [ "$action" = "BLOCK-CODE" ]; then
+    pass "both set → BLOCK-CODE (STRICT_AUDIT wins)"
+else
+    fail_ "expected BLOCK-CODE, got $action"
+fi
+
 # === Summary =================================================================
 echo
 echo "=========================================="
