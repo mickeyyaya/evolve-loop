@@ -78,6 +78,23 @@ if [ -n "${EVOLVE_TASK_MODE:-}" ]; then
     fi
 fi
 
+# v8.60+ deprecation bridge: EVOLVE_BUDGET_CAP → EVOLVE_MAX_BUDGET_USD
+# Emits one stderr WARN per process invocation (idempotency guard: _BUDGET_CAP_WARNED).
+# EVOLVE_MAX_BUDGET_USD always wins when both are set. Removal target: v8.61+.
+if [ -n "${EVOLVE_BUDGET_CAP:-}" ] && [ -z "${_BUDGET_CAP_WARNED:-}" ]; then
+    export _BUDGET_CAP_WARNED=1
+    if [[ "${EVOLVE_BUDGET_CAP}" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$EVOLVE_BUDGET_CAP > 0" | bc -l) )); then
+        if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
+            echo "[claude-adapter] DEPRECATED EVOLVE_BUDGET_CAP: EVOLVE_MAX_BUDGET_USD=$EVOLVE_MAX_BUDGET_USD takes precedence; remove EVOLVE_BUDGET_CAP" >&2
+        else
+            echo "[claude-adapter] DEPRECATED EVOLVE_BUDGET_CAP: use EVOLVE_MAX_BUDGET_USD instead (bridging for this invocation)" >&2
+            export EVOLVE_MAX_BUDGET_USD="$EVOLVE_BUDGET_CAP"
+        fi
+    else
+        echo "[claude-adapter] WARN: EVOLVE_BUDGET_CAP='$EVOLVE_BUDGET_CAP' invalid — falling through to default" >&2
+    fi
+fi
+
 # v8.13.4 token-opt: per-invocation budget override.
 # The static profile max_budget_usd is sized for typical workloads (codebase
 # scan, modest builds). Research-heavy or unusually long tasks may need more
@@ -125,24 +142,18 @@ CMD+=(--output-format json)
 # The flag is still passed (claude binary expects it) but the value never
 # triggers BUDGET_EXCEEDED in any realistic cycle.
 #
-# Operator overrides:
-#   EVOLVE_BUDGET_CAP=<value>   — pin a hard cap (operator-set, takes priority)
-#   EVOLVE_BUDGET_ENFORCE=1     — use the resolved-from-profile MAX_BUDGET
-#                                 (legacy behavior; opt back in for cost discipline)
+# Operator overrides (v8.60+: EVOLVE_BUDGET_CAP is deprecated; use EVOLVE_MAX_BUDGET_USD):
+#   EVOLVE_MAX_BUDGET_USD=<value> — pin a hard cap (operator-set, highest priority)
+#   EVOLVE_BUDGET_ENFORCE=1       — use the resolved-from-profile MAX_BUDGET
+#                                   (legacy behavior; opt back in for cost discipline)
 ORIGINAL_MAX_BUDGET="$MAX_BUDGET"
-if [ -n "${EVOLVE_BUDGET_CAP:-}" ]; then
-    if [[ "$EVOLVE_BUDGET_CAP" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$EVOLVE_BUDGET_CAP > 0" | bc -l) )); then
-        MAX_BUDGET="$EVOLVE_BUDGET_CAP"
-        echo "[claude-adapter] EVOLVE_BUDGET_CAP=\$$MAX_BUDGET (operator pin; was \$$ORIGINAL_MAX_BUDGET from profile)" >&2
-    else
-        echo "[claude-adapter] WARN: EVOLVE_BUDGET_CAP='$EVOLVE_BUDGET_CAP' invalid — falling through to default" >&2
-        MAX_BUDGET=999999
-    fi
+if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
+    : # operator override already applied in step 3 above; preserve it, skip unlimited default
 elif [ "${EVOLVE_BUDGET_ENFORCE:-0}" = "1" ]; then
     echo "[claude-adapter] EVOLVE_BUDGET_ENFORCE=1: using resolved budget \$$MAX_BUDGET (legacy strict cap)" >&2
 else
     MAX_BUDGET=999999
-    echo "[claude-adapter] budget cap unlimited (max-budget-usd=$MAX_BUDGET); was \$$ORIGINAL_MAX_BUDGET from profile. Set EVOLVE_BUDGET_CAP=<value> for a hard cap, or EVOLVE_BUDGET_ENFORCE=1 to use the profile value." >&2
+    echo "[claude-adapter] budget cap unlimited (max-budget-usd=$MAX_BUDGET); was \$$ORIGINAL_MAX_BUDGET from profile. Set EVOLVE_MAX_BUDGET_USD=<value> for a hard cap, or EVOLVE_BUDGET_ENFORCE=1 to use the profile value." >&2
 fi
 # Always attach — claude binary expects the flag.
 CMD+=(--max-budget-usd "$MAX_BUDGET")

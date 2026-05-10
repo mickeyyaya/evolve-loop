@@ -343,16 +343,17 @@ else
     fail_ "out=$(echo "$out" | grep -E 'budget|max-budget' | head -3)"
 fi
 
-# === Test 17: v8.26.0 — EVOLVE_BUDGET_CAP pins a hard cap ==================
-# Operator override: explicit hard cap. Wins over both default and ENFORCE.
-header "Test 17: v8.26.0 — EVOLVE_BUDGET_CAP=2.50 → hard cap, profile value ignored"
+# === Test 17: v8.60+ — EVOLVE_BUDGET_CAP deprecated, bridged to EVOLVE_MAX_BUDGET_USD
+# v8.60+: EVOLVE_BUDGET_CAP is deprecated. Bridge sets EVOLVE_MAX_BUDGET_USD
+# and emits a DEPRECATED WARN. max-budget-usd should be 2.50 via the bridge.
+header "Test 17: v8.60+ — EVOLVE_BUDGET_CAP=2.50 → deprecated bridge → max-budget-usd 2.50"
 p=$(make_profile 0.50); cleanup_files+=("$p")
 out=$(run_adapter_unlimited "$p" EVOLVE_BUDGET_CAP=2.50)
-if echo "$out" | grep -qE 'EVOLVE_BUDGET_CAP=\$2\.50 \(operator pin' \
+if echo "$out" | grep -q "DEPRECATED EVOLVE_BUDGET_CAP" \
    && echo "$out" | grep -q "max-budget-usd 2.50"; then
-    pass "operator hard cap honored"
+    pass "EVOLVE_BUDGET_CAP deprecated bridge honored (WARN emitted + value bridged)"
 else
-    fail_ "out=$(echo "$out" | grep -E 'budget|max-budget' | head -3)"
+    fail_ "out=$(echo "$out" | grep -E 'budget|max-budget|DEPRECATED' | head -3)"
 fi
 
 # === Test 18: v8.26.0 — EVOLVE_BUDGET_ENFORCE=1 uses resolved profile value =

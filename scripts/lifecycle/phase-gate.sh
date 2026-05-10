@@ -437,6 +437,39 @@ gate_plan_review_to_tdd() {
     log "PASS: PLAN-REVIEW → TDD gate"
 }
 
+# ─── Builder cost-overrun guard (v8.60+) ───
+# Reads builder-usage.json total_cost_usd against a threshold and emits an
+# audit-visible WARN when exceeded. Default mode: non-blocking (WARN only).
+# Set EVOLVE_BUILDER_COST_GUARD_STRICT=1 to fail-fast on overrun.
+_check_builder_cost_overrun() {
+    local usage_file="$WORKSPACE/builder-usage.json"
+    if [ ! -f "$usage_file" ]; then
+        log "SKIP: builder-usage.json not found — cost-overrun guard inactive"
+        return 0
+    fi
+    local actual_cost threshold
+    actual_cost=$(jq -r '.total_cost_usd // 0' "$usage_file" 2>/dev/null || echo 0)
+    if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
+        threshold="$EVOLVE_MAX_BUDGET_USD"
+    elif [ -n "${EVOLVE_BUILDER_COST_THRESHOLD:-}" ]; then
+        threshold="$EVOLVE_BUILDER_COST_THRESHOLD"
+    else
+        threshold="2.00"
+    fi
+    local overrun
+    overrun=$(echo "$actual_cost > $threshold" | bc -l 2>/dev/null || echo 0)
+    if [ "${overrun}" = "1" ]; then
+        if [ "${EVOLVE_BUILDER_COST_GUARD_STRICT:-0}" = "1" ]; then
+            fail "Builder cost overrun: \$$actual_cost > threshold \$$threshold (EVOLVE_BUILDER_COST_GUARD_STRICT=1)"
+        else
+            echo "[phase-gate] WARN: Builder cost overrun: \$$actual_cost > threshold \$$threshold. Set EVOLVE_BUILDER_COST_GUARD_STRICT=1 to fail-fast." >&2
+            printf '\n## Cost Guard Warning\nBuilder spent $%s vs threshold $%s. Review for scope creep.\n' "$actual_cost" "$threshold" >> "$WORKSPACE/build-report.md"
+        fi
+    else
+        log "OK: Builder cost within threshold (\$$actual_cost <= \$$threshold)"
+    fi
+}
+
 # ─── Gate: BUILD → AUDIT ───
 gate_build_to_audit() {
     log "Checking BUILD → AUDIT gate for cycle $CYCLE"
@@ -460,6 +493,9 @@ gate_build_to_audit() {
         fi
         log "OK: Challenge token present in build report"
     fi
+
+    # 4. Builder cost-overrun guard (v8.60+)
+    _check_builder_cost_overrun
 
     log "PASS: BUILD → AUDIT gate"
 }

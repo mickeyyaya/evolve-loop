@@ -42,15 +42,21 @@
 
 | Flag | Status | Purpose |
 |------|--------|---------|
-| `EVOLVE_MAX_BUDGET_USD` | ACTIVE | Per-subagent budget cap (operator override, highest priority) |
-| `EVOLVE_BUDGET_CAP` | ACTIVE | Hard per-subagent budget ceiling |
-| `EVOLVE_BUDGET_ENFORCE` | ACTIVE | Use profile-resolved per-phase caps |
+| `EVOLVE_MAX_BUDGET_USD` | ACTIVE | Per-subagent budget cap (operator override, highest priority; use for all ceiling needs) |
+| `EVOLVE_BUDGET_CAP` | DEPRECATED | Bridged to `EVOLVE_MAX_BUDGET_USD` (v8.60+); emits stderr WARN; removal target v8.61+ |
+| `EVOLVE_BUDGET_ENFORCE` | ACTIVE | Use profile-resolved per-phase caps (legacy strict mode) |
 | `EVOLVE_BATCH_BUDGET_CAP` | ACTIVE | Cumulative batch budget ceiling (default $20, v8.58+) |
 | `EVOLVE_BATCH_BUDGET_DISABLE` | ACTIVE | Disable batch budget tripwire |
 | `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD` | ACTIVE | Per-fanout-worker budget cap |
+| `EVOLVE_BUILDER_COST_THRESHOLD` | ACTIVE | Builder cost-overrun guard threshold (default $2.00; v8.60+) |
+| `EVOLVE_BUILDER_COST_GUARD_STRICT` | ACTIVE | Make builder cost-overrun a hard gate failure (default off; v8.60+) |
 
-> **Cycle 9 target**: `EVOLVE_BUDGET_CAP` and `EVOLVE_MAX_BUDGET_USD` serve overlapping roles.
-> Consolidation requires auditing all read-sites for priority precedence.
+> **Cycle 9 CLOSED**: `EVOLVE_BUDGET_CAP` is now deprecated with a bridge to `EVOLVE_MAX_BUDGET_USD` (v8.60+).
+> `EVOLVE_MAX_BUDGET_USD` is the single canonical per-subagent ceiling flag. When both are set, `EVOLVE_MAX_BUDGET_USD` wins.
+> Builder cost-overrun guard (`_check_builder_cost_overrun` in `phase-gate.sh`) reads `builder-usage.json` against the threshold.
+>
+> **Cycle 10 target**: Workflow Defaults cluster audit — `EVOLVE_STRICT_*` family (3 flags) and `EVOLVE_DISPATCH_*` family (2 flags)
+> share "tighten the pipeline" semantics and are candidates for consolidation into a single severity-level flag.
 
 ## State File Cluster (cycle 7 consolidation)
 
@@ -192,5 +198,5 @@
 |-------|---------|--------|
 | 7 (done) | State-file | Deprecated `EVOLVE_STATE_OVERRIDE` → `EVOLVE_STATE_FILE_OVERRIDE` |
 | 8 (done) | Sandbox | Deprecated `EVOLVE_FORCE_INNER_SANDBOX` → `EVOLVE_INNER_SANDBOX=1` bridge (v8.60) |
-| 9 | Budget | Audit `EVOLVE_BUDGET_CAP` vs `EVOLVE_MAX_BUDGET_USD` precedence |
-| 10 | Dead flags | Remove `EVOLVE_PROJECT_ROOT_OVERRIDE`, `EVOLVE_REPO_ROOT_OVERRIDE` |
+| 9 (done) | Budget | Deprecated `EVOLVE_BUDGET_CAP` → `EVOLVE_MAX_BUDGET_USD` bridge (v8.60); added builder cost-overrun guard |
+| 10 | Workflow Defaults | Audit `EVOLVE_STRICT_*` family + `EVOLVE_DISPATCH_*` family — consolidate shared "tighten the pipeline" flags |

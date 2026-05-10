@@ -123,7 +123,9 @@ evolve-loop subagents have three budget-control mechanisms (highest priority fir
 2. **`EVOLVE_TASK_MODE` + `budget_tiers`** (v8.13.5) — declarative profile tier select. Used when the profile has a `budget_tiers` map AND the env var matches a key.
 3. **`max_budget_usd`** (v8.12.x baseline) — static profile default. Always present.
 
-Default is `--max-budget-usd 999999` (effectively unlimited, since v8.26.0). For hard cost ceilings: `EVOLVE_BUDGET_CAP=<value>` (single ceiling) or `EVOLVE_BUDGET_ENFORCE=1` (use profile-resolved per-phase caps). The Scout profile ships with `default` / `research` / `deep` budget tiers as the canonical `EVOLVE_TASK_MODE` example.
+Default is `--max-budget-usd 999999` (effectively unlimited, since v8.26.0). For hard cost ceilings: `EVOLVE_MAX_BUDGET_USD=<value>` (single ceiling, highest priority) or `EVOLVE_BUDGET_ENFORCE=1` (use profile-resolved per-phase caps). `EVOLVE_BUDGET_CAP` is **deprecated** (v8.60+) — it bridges to `EVOLVE_MAX_BUDGET_USD` with a stderr WARN; removal target v8.61+. The Scout profile ships with `default` / `research` / `deep` budget tiers as the canonical `EVOLVE_TASK_MODE` example.
+
+Builder cost-overrun guard (v8.60+): `phase-gate.sh gate_build_to_audit` reads `builder-usage.json` against `EVOLVE_MAX_BUDGET_USD` (or `EVOLVE_BUILDER_COST_THRESHOLD`, default `$2.00`) and appends an audit-visible defect on overrun. Set `EVOLVE_BUILDER_COST_GUARD_STRICT=1` to fail-fast instead of WARN.
 
 ### Per-batch cumulative cap (v8.58.0+, Layer B)
 
