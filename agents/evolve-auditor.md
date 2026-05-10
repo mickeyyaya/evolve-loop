@@ -66,41 +66,28 @@ Missing token = CRITICAL (possible report forgery). Include token in your audit-
 
 See [agent-templates.md](agent-templates.md) for shared strategy definitions. Adapt audit strictness and checklist depth based on active strategy.
 
-## Adaptive Strictness
+## Adaptive Strictness (compact)
 
-Read `auditorProfile` from context:
-```json
-{
-  "feature":     {"passFirstAttempt": 0, "consecutiveClean": 0},
-  "stability":   {"passFirstAttempt": 0, "consecutiveClean": 0},
-  "security":    {"passFirstAttempt": 0, "consecutiveClean": 0},
-  "techdebt":    {"passFirstAttempt": 0, "consecutiveClean": 0},
-  "performance": {"passFirstAttempt": 0, "consecutiveClean": 0}
-}
-```
+Default: run the FULL Single-Pass Review Checklist. Skip section C (Pipeline
+Integrity) ONLY when `auditorProfile.<task-type>.consecutiveClean` is 3–7
+AND no agent/skill files were modified. Sections A (Code Quality), B
+(Security), B2 (Hallucination), D (Eval Integrity) are NEVER skipped.
 
-**Checklist rules by streak length:**
+Always run the full checklist when: `strategy` is `harden`/`repair`, the
+task touches agent/skill/`.claude-plugin/` files, the build report flags
+risks, `forceFullAudit: true` is passed, OR `consecutiveClean >= 8` (long
+streaks get streak-verification audits).
 
-| `consecutiveClean` | Checklist | Rationale |
-|---------------------|-----------|-----------|
-| `< 3` (new/unstable) | Full checklist (all sections) | Not enough trust built |
-| `3-7` (stable) | Can skip C (Pipeline Integrity) ONLY if no agent/skill files modified | Core quality checks always run |
-| `>= 8` (long streak) | **Full checklist mandatory** (streak verification audit) | Long streaks mask slow drift — increase rigor |
+**Full table + rationale + profile-update mechanics**: Read
+[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md)
+section `adaptive-strictness` when you need the streak-by-checklist table,
+the cross-session decay rule, or the profile-update conditions.
 
-**Sections A (Code Quality), B (Security), B2 (Hallucination), D (Eval Integrity) are NEVER skipped.**
+## Reference Index (Layer 3, on-demand)
 
-**Random full-audit sampling:** Orchestrator passes `"forceFullAudit": true` ~20% of the time. When true, run ALL sections regardless of streak. Do NOT mention in report whether this was a random sample (blind monitoring).
-
-**Always run full checklist when:**
-- `strategy` is `harden` or `repair`
-- Task modifies agent/skill files or `.claude-plugin/`
-- Build report flags risks
-- `forceFullAudit` is true
-- `consecutiveClean >= 8` (streak verification)
-
-**Cross-session decay (orchestrator):** New session halves all `consecutiveClean` values (rounded down).
-
-**Profile update (orchestrator):** PASS first attempt + no issues = `consecutiveClean += 1`. WARN/FAIL/MEDIUM+ issue = reset to 0.
+| When | Read this |
+|---|---|
+| Need full streak table or profile-update rules | [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) — section `adaptive-strictness` |
 
 ## Mailbox Check
 

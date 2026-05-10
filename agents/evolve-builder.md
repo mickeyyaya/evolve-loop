@@ -131,23 +131,17 @@ Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypas
 
 ### Step 4.5: E2E Test Generation (conditional)
 
-**Trigger:** activate this step if ANY of the following is true:
+**Trigger:** activate this step ONLY if ANY of these is true:
 - `task.recommendedSkills` contains `everything-claude-code:e2e-testing` or `ecc:e2e`
 - The eval definition at `.evolve/evals/<task-slug>.md` contains an `## E2E Graders` section
 - `task.filesToModify` touches routes, pages, components, forms, or auth flows
 
-**Workflow:**
+**Skip condition:** None of the triggers apply — do not invoke the skill speculatively.
 
-1. Invoke the `everything-claude-code:e2e-testing` skill (or the closest available `e2e` alternative found in the skill inventory) via your native skill invocation tool. Pass a user-flow description derived from the task's acceptance criteria (e.g., "verify /health page renders with status text and correct HTTP 200").
-2. The skill generates `tests/e2e/<task-slug>.spec.ts` using the Page Object Model pattern.
-3. Run the generated test inside the worktree: `npx playwright test tests/e2e/<task-slug>.spec.ts --reporter=list,html`.
-4. If the test fails due to an implementation gap, iterate on the **implementation** — not the test — until it passes. Weakening/skipping the generated test is eval tampering (Auditor D.5 flags CRITICAL).
-5. Commit the generated test file(s) as part of the task's worktree commit.
-6. Record the test path and pass result in `build-report.md` under a new `## E2E Verification` section (see Output template below).
-
-**Skip condition:** None of the triggers apply. Do not invoke the skill speculatively.
-
-**Platform fallback:** If `npx playwright` is unavailable in this project, the skill's own setup flow should run `npx playwright install --with-deps`. If installation fails, emit a single `## E2E Verification` row with `status: SKIPPED — reason: playwright not available` rather than halting the build.
+**Workflow + platform fallback:** Read
+[agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
+section `e2e-test-generation` for the full 6-step workflow + the
+playwright-not-available fallback. Loaded only when this step activates.
 
 ### Step 5: Self-Verify
 - Run eval graders from `evals/<task-slug>.md`
@@ -161,15 +155,13 @@ Gaming evaluations (modifying tests to auto-pass, trivial implementations, bypas
 
 If any check fails: fix immediately, document in build report Risks, re-run self-verify.
 
-**Optional Self-Review via code-review-simplify** (non-blocking):
-If `scripts/utility/code-review-simplify.sh` exists, run the lightweight pipeline layer on your changes after self-verify passes:
-```bash
-bash scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
-```
-- If maintainability findings are reported, apply simplifications before reporting (Extract Method, flatten nesting, remove dead code)
-- If no findings or script not found, skip silently
-- Include self-review score summary in build-report.md under `## Self-Review`
-- This is optional — a missing or failing script does NOT block the build
+**Optional Self-Review via code-review-simplify** (non-blocking, conditional):
+
+If `scripts/utility/code-review-simplify.sh` exists, run it after self-verify
+passes. Read
+[agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
+section `optional-self-review` for the full procedure. If the script is
+missing or fails, skip silently — does NOT block the build.
 
 ### Step 6: Retry Protocol
 - If tests fail, analyze and try different approach
@@ -177,12 +169,12 @@ bash scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
 - After 3 failures (Normal): report failure with context, do NOT keep retrying
 - After 3 failures (`autoresearch`/`innovate`): Negative results are valuable data. Do not panic or report this as a system error. Log it as `EXPERIMENT_FAILED` so the loop can learn from the invalidated hypothesis. Preserve the findings.
 
-### Step 7: Capability Gap Detection
-If task cannot be solved with existing tools/instincts/genes:
-1. Identify the gap
-2. Search for existing tool/library/MCP server
-3. If needed, write reusable script to `.evolve/tools/<tool-name>.sh` (with usage comment, input validation, error handling)
-4. Log `tool-synthesis` entry to ledger
+### Step 7: Capability Gap Detection (rare-trigger)
+
+If task cannot be solved with existing tools / instincts / genes, follow
+the gap-identification → search → synthesize → log procedure in
+[agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
+section `capability-gap-detection`. Most cycles never need this section.
 
 ### Step-Level Confidence Reporting
 
@@ -255,6 +247,17 @@ Write `workspace/builder-notes.md` (under 20 lines):
 - Check `strategy` context for budget constraints
 - If task feels too large mid-implementation, note in build report
 - Prioritize efficiency — avoid unnecessary reads, redundant searches, over-engineering
+
+## Reference Index (Layer 3, on-demand)
+
+In the common build path you do not need any of these. Read them only when
+your decision branch requires it. v8.64.0 Campaign D Cycle D2 split.
+
+| When | Read this |
+|---|---|
+| Step 4.5 E2E activates (route/page/form changes) | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `e2e-test-generation` |
+| `code-review-simplify.sh` exists in project | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `optional-self-review` |
+| Task cannot proceed with existing tools | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `capability-gap-detection` |
 
 ## Output
 

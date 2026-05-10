@@ -102,6 +102,83 @@ else
     fail_ "expected 5 in Layer 3, got $count_l3"
 fi
 
+# --- Test 9 (D2): builder reference file exists -----------------------------
+header "Test 9 (Cycle D2): builder reference file exists"
+BUILDER_REF="$REPO_ROOT/agents/evolve-builder-reference.md"
+if [ -f "$BUILDER_REF" ]; then
+    pass "builder reference file present"
+else
+    fail_ "missing agents/evolve-builder-reference.md"
+fi
+
+# --- Test 10 (D2): builder persona has Reference Index ----------------------
+header "Test 10 (Cycle D2): builder persona has Reference Index"
+BUILDER="$REPO_ROOT/agents/evolve-builder.md"
+if grep -q "^## Reference Index" "$BUILDER" && grep -q "evolve-builder-reference.md" "$BUILDER"; then
+    pass "builder Reference Index linked to reference file"
+else
+    fail_ "builder missing Reference Index or link"
+fi
+
+# --- Test 11 (D2): builder reference declares expected sections ------------
+header "Test 11 (Cycle D2): builder reference declares e2e + capability + self-review sections"
+declare -i bok=0
+for s in e2e-test-generation capability-gap-detection optional-self-review; do
+    if grep -q "^## Section: ${s}" "$BUILDER_REF"; then
+        bok=$((bok + 1))
+    else
+        echo "  MISSING: $s"
+    fi
+done
+if [ "$bok" = "3" ]; then
+    pass "all 3 builder reference sections declared"
+else
+    fail_ "expected 3, got $bok"
+fi
+
+# --- Test 12 (D2): auditor reference file exists ----------------------------
+header "Test 12 (Cycle D2): auditor reference file exists"
+AUDITOR_REF="$REPO_ROOT/agents/evolve-auditor-reference.md"
+if [ -f "$AUDITOR_REF" ]; then
+    pass "auditor reference file present"
+else
+    fail_ "missing agents/evolve-auditor-reference.md"
+fi
+
+# --- Test 13 (D2): auditor persona has Reference Index ---------------------
+header "Test 13 (Cycle D2): auditor persona has Reference Index"
+AUDITOR="$REPO_ROOT/agents/evolve-auditor.md"
+if grep -q "^## Reference Index" "$AUDITOR" && grep -q "evolve-auditor-reference.md" "$AUDITOR"; then
+    pass "auditor Reference Index linked to reference file"
+else
+    fail_ "auditor missing Reference Index or link"
+fi
+
+# --- Test 14 (D2): auditor reference declares adaptive-strictness ----------
+header "Test 14 (Cycle D2): auditor reference declares adaptive-strictness section"
+if grep -q "^## Section: adaptive-strictness" "$AUDITOR_REF"; then
+    pass "auditor reference has adaptive-strictness section"
+else
+    fail_ "auditor reference missing adaptive-strictness section"
+fi
+
+# --- Test 15 (D2): no persona exceeds size cap -----------------------------
+header "Test 15 (Cycle D2): no persona exceeds size cap"
+declare -i cap=18000
+declare -i over=0
+for f in evolve-orchestrator evolve-builder evolve-auditor; do
+    sz=$(wc -c < "$REPO_ROOT/agents/${f}.md" | tr -d ' ')
+    if [ "$sz" -ge "$cap" ]; then
+        echo "  OVER: ${f}.md = $sz bytes"
+        over=$((over + 1))
+    fi
+done
+if [ "$over" = "0" ]; then
+    pass "all 3 split personas under $cap bytes"
+else
+    fail_ "$over persona(s) over cap"
+fi
+
 # --- Summary -----------------------------------------------------------------
 echo
 echo "=========================================="
