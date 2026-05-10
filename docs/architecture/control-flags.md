@@ -158,7 +158,6 @@
 
 | Flag | Status | Purpose |
 |------|--------|---------|
-| `EVOLVE_CYCLE_STATE_FILE` | ACTIVE | Override cycle-state.json path |
 | `EVOLVE_LEDGER_OVERRIDE` | ACTIVE | Override ledger.jsonl path |
 | `EVOLVE_PROFILES_DIR_OVERRIDE` | ACTIVE | Override profiles dir path |
 | `EVOLVE_PROFILE_OVERRIDE` | ACTIVE | Override pre-built profile path |
