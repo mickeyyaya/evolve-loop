@@ -69,46 +69,58 @@ USG
 STATE="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
 MAX_TOKENS="${EVOLVE_PROMPT_MAX_TOKENS:-30000}"
 
-# v8.63.0 Cycle C1+C2: extract a named anchor region from a markdown file.
-# Boundary convention: `<!-- ANCHOR:NAME -->` opens; the next `<!-- ANCHOR:`
-# of any name (or EOF) closes. Markers are HTML comments — invisible in
-# rendered markdown, easy to extract via awk, and LLM-friendly (one marker
-# per section, no close-tag to remember).
+# v8.63.0 Cycle C1+C2 / v9.0.1 SIMP-1: anchor marker regex.
 #
-# Usage: extract_anchor "$file" "<anchor_name>"
+# Boundary convention: `<!-- ANCHOR:NAME -->` opens a region; the next
+# `<!-- ANCHOR:` of any name (or EOF) closes it. Markers are HTML comments —
+# invisible in rendered markdown, easy to extract via awk, LLM-friendly
+# (one marker per section, no close-tag to remember).
+#
+# v9.0.1 SIMP-1: prefix pattern shared between extract_anchor (awk)
+# and file_has_anchors (grep) as a single shell constant. The two
+# regexes still differ (awk needs the named-anchor full match, grep
+# only needs the prefix detection), but the prefix is now a single
+# source of truth.
+_ANCHOR_PREFIX_RE='^[[:space:]]*<!--[[:space:]]+ANCHOR:'
+
+# Extract a named anchor region from a markdown file.
+# Usage:  extract_anchor "$file" "<anchor_name>"
 # Output: anchor content (between marker and next marker/EOF) on stdout,
 #         OR empty string if anchor not found.
 # Caller must check empty-string and fall back to emit_artifact.
 extract_anchor() {
     local path="$1" anchor="$2"
     [ -f "$path" ] || return 0
-    awk -v anchor="$anchor" '
+    awk -v anchor="$anchor" -v prefix="$_ANCHOR_PREFIX_RE" '
         # Open marker: tolerate spaces around the name.
-        $0 ~ "^[[:space:]]*<!--[[:space:]]+ANCHOR:[[:space:]]*" anchor "[[:space:]]*-->" {
+        $0 ~ prefix "[[:space:]]*" anchor "[[:space:]]*-->" {
             in_anchor=1; next
         }
         # Any subsequent ANCHOR: marker (any name) closes the current capture.
-        in_anchor && $0 ~ "^[[:space:]]*<!--[[:space:]]+ANCHOR:" { exit }
+        in_anchor && $0 ~ prefix { exit }
         in_anchor { print }
     ' "$path"
 }
 
-# v8.63.0 Cycle C2: detect whether a file has ANY anchor markers. Used to
-# decide between per-section extraction and a single full-file fallback —
-# without this check, emitting N anchors from a marker-less file produces
-# N copies of the full file (2x+ duplication regression).
+# Detect whether a file has ANY anchor markers. Used to decide between
+# per-section extraction and a single full-file fallback — without this
+# check, emitting N anchors from a marker-less file produces N copies of
+# the full file (2x+ duplication regression).
 file_has_anchors() {
     local path="$1"
     [ -f "$path" ] || return 1
-    grep -qE '^[[:space:]]*<!--[[:space:]]+ANCHOR:' "$path" 2>/dev/null
+    grep -qE "$_ANCHOR_PREFIX_RE" "$path" 2>/dev/null
 }
 
-# Emit a named anchor section from an artifact. Caller is responsible for
-# checking file_has_anchors() first and falling back to emit_artifact when
-# the file has NO markers. When the file has markers but the specific anchor
-# is absent, this function emits a placeholder noting the missing anchor —
-# do NOT emit the full file (caller already verified anchors exist).
-emit_artifact_anchored() {
+# v8.63.0 Cycle C2 / v9.0.1 SIMP-2: emit a named anchor section. Now a
+# private helper (was emit_artifact_anchored). The only public entry
+# point for anchor-mode emission is emit_artifact_with_anchors below.
+#
+# Caller (emit_artifact_with_anchors) is responsible for checking
+# file_has_anchors() first; this function trusts that the file has
+# markers. If the SPECIFIC anchor is absent, emits a one-line placeholder
+# (NOT the full file — caller has already gated that path).
+_emit_artifact_anchored() {
     local label="$1" path="$2" anchor="$3"
     [ -f "$path" ] || return 0
     local content
@@ -120,17 +132,16 @@ emit_artifact_anchored() {
         printf '%s\n' "$content"
         echo
     else
-        # File has anchors but THIS one is missing. Emit a small note rather
-        # than the full file — the caller's job is to pick anchors that exist.
         echo "## $label (anchored: $anchor)"
         echo "<!-- $path has anchors but lacks ANCHOR:$anchor; section omitted -->"
         echo
     fi
 }
 
-# v8.63.0 Cycle C2: convenience wrapper for the per-phase assembly. Decides
-# between anchor-mode and full-file-mode based on whether the file has
-# ANY anchor markers. anchor_list is space-separated.
+# v8.63.0 Cycle C2: public entry point for per-phase anchor-mode emission.
+# Decides between anchor-mode and full-file-mode based on whether the file
+# has ANY anchor markers. anchor_list is space-separated. anchor names
+# MUST be single tokens (no whitespace) — caller responsibility.
 emit_artifact_with_anchors() {
     local label="$1" path="$2"; shift 2
     local anchor_list="$*"
@@ -138,12 +149,12 @@ emit_artifact_with_anchors() {
     if file_has_anchors "$path"; then
         local a
         for a in $anchor_list; do
-            emit_artifact_anchored "$label" "$path" "$a"
+            _emit_artifact_anchored "$label" "$path" "$a"
         done
     else
         # Backwards-compat: pre-v8.63 artifacts lack anchors. Emit the full
-        # file ONCE (legacy behavior). Logged so operators can see the
-        # cycle is using a pre-anchored artifact.
+        # file ONCE (legacy behavior). Operators can audit the workspace if
+        # they expected an anchored artifact and see the legacy fallback.
         emit_artifact "$label" "$path"
     fi
 }
@@ -189,28 +200,25 @@ emit_profile_context_anchors() {
     entries=$(jq -r '.context_anchors[]?' "$profile_path" 2>/dev/null)
     [ -z "$entries" ] && return 1
 
-    # Bash 3.2 portable: build a unique file list, then per-file anchor list,
-    # without associative arrays.
-    local files=""
-    local entry file
-    for entry in $entries; do
-        file=$(echo "$entry" | cut -d: -f1)
-        case " $files " in
-            *" $file "*) ;;
-            *) files="$files $file" ;;
-        esac
-    done
+    # v9.0.1 MEDIUM fix + SIMP-4: use sort -u for the unique-file list and
+    # quote-safe `while IFS= read` for the entries loop. This is bash 3.2
+    # portable (no associative arrays) and handles entries with spaces.
+    # SIMPLIFICATION-4: replaces the prior nested O(n^2) for-loops with a
+    # single pipeline (sort -u) plus one pass per file.
+    local files
+    files=$(printf '%s\n' "$entries" | cut -d: -f1 | sort -u)
 
-    for file in $files; do
+    local file label entry
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
         local anchors_for_file=""
-        for entry in $entries; do
+        while IFS= read -r entry; do
             case "$entry" in
                 "$file:"*)
-                    anchors_for_file="$anchors_for_file $(echo "$entry" | cut -d: -f2-)"
+                    anchors_for_file="$anchors_for_file $(printf '%s' "$entry" | cut -d: -f2-)"
                     ;;
             esac
-        done
-        local label
+        done <<< "$entries"
         case "$file" in
             scout-report.md)         label="Scout report" ;;
             build-report.md)         label="Build report" ;;
@@ -219,8 +227,12 @@ emit_profile_context_anchors() {
             triage-decision.md)      label="Triage decision" ;;
             *)                       label="$file" ;;
         esac
+        # anchors_for_file is intentionally word-split here — anchor names
+        # are constrained to snake_case identifiers (no whitespace) by
+        # convention. file_has_anchors / extract_anchor reject anchor names
+        # containing whitespace upstream.
         emit_artifact_with_anchors "$label" "$WORKSPACE/$file" $anchors_for_file
-    done
+    done <<< "$files"
     return 0
 }
 

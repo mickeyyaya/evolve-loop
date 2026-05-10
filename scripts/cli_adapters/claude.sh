@@ -189,8 +189,24 @@ if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ] && [ -n "${AGENT:-}" ]; then
         _bedrock_text=$(bash "$_bic" "$AGENT" 2>/dev/null || true)
         # Honor ADVERSARIAL_AUDIT=0 by stripping the Adversarial Audit Mode
         # section (auditor only — other roles never include it).
+        #
+        # v9.0.1 HIGH-2 fix: section-aware strip. The previous awk pattern
+        # (/^## Adversarial Audit Mode/{stop=1} !stop {print}) printed lines
+        # until the section header, then stopped FOREVER — silently dropping
+        # any content that happened to follow the section. Today the section
+        # is the last block in the auditor bedrock, so the bug was latent;
+        # but adding any future content after Adversarial Audit Mode would
+        # be silently dropped under ADVERSARIAL_AUDIT=0.
+        #
+        # The fix: skip lines from `## Adversarial Audit Mode` until the
+        # NEXT level-2 heading (or EOF), then resume printing. This excises
+        # exactly the named section regardless of what surrounds it.
         if [ "$AGENT" = "auditor" ] && [ "${ADVERSARIAL_AUDIT:-1}" = "0" ] && [ -n "$_bedrock_text" ]; then
-            _bedrock_text=$(echo "$_bedrock_text" | awk '/^## Adversarial Audit Mode/{stop=1} !stop {print}')
+            _bedrock_text=$(echo "$_bedrock_text" | awk '
+                /^## Adversarial Audit Mode/ { skip=1; next }
+                skip && /^## / && !/^## Adversarial Audit Mode/ { skip=0 }
+                !skip { print }
+            ')
         fi
         if [ -n "$_bedrock_text" ]; then
             CMD+=(--append-system-prompt "$_bedrock_text")

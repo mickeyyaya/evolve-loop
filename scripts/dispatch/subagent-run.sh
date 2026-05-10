@@ -476,6 +476,20 @@ cmd_run() {
     local injected_prompt
     injected_prompt=$(mktemp)
 
+    # v9.0.1 SIMP-3: shared task-prompt envelope. Both v1 and v2 paths
+    # close the user prompt with the same `--- BEGIN/END TASK PROMPT ---`
+    # delimiters around $prompt_file. Defining the envelope as a single
+    # helper keeps its format a single source of truth.
+    _write_task_envelope() {
+        # $1 = injected_prompt path, $2 = prompt_file path
+        cat >> "$1" <<EOF
+--- BEGIN TASK PROMPT ---
+EOF
+        cat "$2" >> "$1"
+        echo "" >> "$1"
+        echo "--- END TASK PROMPT ---" >> "$1"
+    }
+
     if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ]; then
         # --- v2 path: bedrock moves to --append-system-prompt at adapter ---
         # Cycle A2 (v8.61.0): the static role bedrock (build-invocation-context.sh)
@@ -502,14 +516,7 @@ cmd_run() {
 - Profile: $(basename "$profile")
 
 EOF
-        # Task-prompt envelope (unchanged shape; Claude has been trained on
-        # the BEGIN/END markers from v8.x).
-        cat >> "$injected_prompt" <<EOF
---- BEGIN TASK PROMPT ---
-EOF
-        cat "$prompt_file" >> "$injected_prompt"
-        echo "" >> "$injected_prompt"
-        echo "--- END TASK PROMPT ---" >> "$injected_prompt"
+        _write_task_envelope "$injected_prompt" "$prompt_file"
     else
         # --- v1 path: legacy ordering (preserved verbatim) ---
         cat > "$injected_prompt" <<EOF
@@ -556,12 +563,7 @@ Treat the build as guilty until proven innocent. Specifically:
 ADVEOF
         fi
 
-        cat >> "$injected_prompt" <<EOF
---- BEGIN TASK PROMPT ---
-EOF
-        cat "$prompt_file" >> "$injected_prompt"
-        echo "" >> "$injected_prompt"
-        echo "--- END TASK PROMPT ---" >> "$injected_prompt"
+        _write_task_envelope "$injected_prompt" "$prompt_file"
     fi
 
     # v8.56.0 Layer B: soft prompt-size guard. Kernel-layer check that

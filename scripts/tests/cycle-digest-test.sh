@@ -111,11 +111,11 @@ else
 fi
 
 # --- Test 5: required schema fields ------------------------------------------
+# v9.0.1: built_at removed for determinism (HIGH-1 fix).
 header "Test 5: digest has all required schema fields"
 if jq -e '
     .schema_version and
     .cycle and
-    .built_at and
     .intent_anchor and
     .top_task and
     .acceptance_criteria and
@@ -127,6 +127,28 @@ if jq -e '
     pass "all required fields present"
 else
     fail_ "missing required fields"
+fi
+
+# --- Test 5b (v9.0.1): digest is BYTE-IDENTICAL across re-runs ---------------
+# Replaces the old test 11 (which excluded built_at). Now that built_at is
+# gone, byte-identity must hold unconditionally. This is the determinism
+# invariant the HIGH-1 fix delivers.
+header "Test 5b (v9.0.1 HIGH-1): digest is byte-identical across re-runs"
+sleep 1
+EVOLVE_PROJECT_ROOT="$TMP_ROOT" bash "$SCRIPT" 99 "$TMP_ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
+DIGEST_RERUN=$(cat "$DIGEST")
+if [ "$DIGEST_RERUN" = "$(cat "$DIGEST")" ]; then
+    # Read again and compare
+    A=$(EVOLVE_PROJECT_ROOT="$TMP_ROOT" bash "$SCRIPT" 99 "$TMP_ROOT/.evolve/runs/cycle-99" 2>/dev/null; cat "$DIGEST")
+    sleep 1
+    B=$(EVOLVE_PROJECT_ROOT="$TMP_ROOT" bash "$SCRIPT" 99 "$TMP_ROOT/.evolve/runs/cycle-99" 2>/dev/null; cat "$DIGEST")
+    if [ "$A" = "$B" ]; then
+        pass "digest is byte-identical (no built_at drift)"
+    else
+        fail_ "digest differs across re-runs"
+    fi
+else
+    fail_ "digest re-read mismatch"
 fi
 
 # --- Test 6: intent_anchor is YAML goal text --------------------------------
@@ -176,19 +198,15 @@ else
     fail_ "expected 2, got $todo_count"
 fi
 
-# --- Test 11: idempotent — second run produces equivalent digest ------------
-header "Test 11: digest is deterministic per cycle (idempotent re-runs)"
-DIGEST_A=$(cat "$DIGEST")
-sleep 1  # ensure built_at would differ if naively used
-EVOLVE_PROJECT_ROOT="$TMP_ROOT" bash "$SCRIPT" 99 "$TMP_ROOT/.evolve/runs/cycle-99" >/dev/null 2>&1
-DIGEST_B=$(cat "$DIGEST")
-# All fields except `built_at` should be identical.
-A_NO_TS=$(echo "$DIGEST_A" | jq -S 'del(.built_at)')
-B_NO_TS=$(echo "$DIGEST_B" | jq -S 'del(.built_at)')
-if [ "$A_NO_TS" = "$B_NO_TS" ]; then
-    pass "digest body deterministic across re-runs (built_at excluded)"
+# --- Test 11: schema_version is 1.1 (v9.0.1: built_at removal) -------------
+# Replaces the older idempotency test which now lives at 5b above (since
+# byte-identity is the unconditional invariant after HIGH-1).
+header "Test 11 (v9.0.1): schema_version is 1.1 (post HIGH-1 fix)"
+schema_ver=$(jq -r '.schema_version' "$DIGEST")
+if [ "$schema_ver" = "1.1" ]; then
+    pass "schema_version = 1.1"
 else
-    fail_ "digest body changed between runs (excluding built_at)"
+    fail_ "expected 1.1, got $schema_ver"
 fi
 
 # --- Test 12: digest is bounded (not bloated) -------------------------------

@@ -8,8 +8,8 @@
 # that subsequent role-context-builder calls reference instead of re-reading
 # full state.json arrays. The digest contains:
 #
-#   cycle              (number)
-#   built_at           (ISO 8601 UTC timestamp)
+#   schema_version     "1.1" (v9.0.1: removed built_at field for determinism)
+#   cycle              (number — canonical "when" pointer)
 #   intent_anchor      (raw goal text, ≤500 chars; never paraphrased — Factory pattern)
 #   top_task           (Scout's chosen task, ≤200 chars)
 #   acceptance_criteria(≤500 chars; from intent.md or scout-report.md)
@@ -243,15 +243,21 @@ RECENT_FAILURES=$(_extract_recent_failures)
 INSTINCT_POINTERS=$(_extract_instinct_pointers 5)
 TODOS_SUMMARY=$(_extract_todos_summary)
 LEDGER_TIP=$(_extract_ledger_tip)
-BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Atomic write via tmp + mv (bash 3.2 portable; never leaves partial JSON
 # on disk if interrupted).
+#
+# v9.0.1 HIGH-1 fix: built_at timestamp removed. Same inputs MUST produce
+# byte-identical digest output regardless of when the build runs. Without
+# this, two fan-out workers racing to lazy-build the digest within a sub-
+# second window each get a different built_at — breaking idempotency and
+# causing prompt-cache misses. The cycle number itself is the canonical
+# "when" pointer (cycle 10 means cycle-10 workspace; ledger_tip provides
+# tamper-evident temporal binding).
 TMP="${DIGEST_FILE}.tmp.$$"
 
 jq -n \
     --argjson cycle "$CYCLE" \
-    --arg built_at "$BUILT_AT" \
     --arg intent_anchor "$INTENT_ANCHOR" \
     --arg top_task "$TOP_TASK" \
     --arg acceptance_criteria "$ACCEPTANCE" \
@@ -260,9 +266,8 @@ jq -n \
     --argjson todos_summary "$TODOS_SUMMARY" \
     --arg ledger_tip "$LEDGER_TIP" \
     '{
-        schema_version: "1.0",
+        schema_version: "1.1",
         cycle: $cycle,
-        built_at: $built_at,
         intent_anchor: $intent_anchor,
         top_task: $top_task,
         acceptance_criteria: $acceptance_criteria,
