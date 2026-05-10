@@ -31,7 +31,11 @@ set -uo pipefail
 __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/../lifecycle/resolve-roots.sh"
 unset __rr_self
-STATE="${EVOLVE_STATE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
+if [ -n "${EVOLVE_STATE_OVERRIDE:-}" ] && [ -z "${EVOLVE_STATE_FILE_OVERRIDE:-}" ]; then
+    echo "[deprecation] EVOLVE_STATE_OVERRIDE is renamed to EVOLVE_STATE_FILE_OVERRIDE" >&2
+    EVOLVE_STATE_FILE_OVERRIDE="$EVOLVE_STATE_OVERRIDE"
+fi
+STATE="${EVOLVE_STATE_FILE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
 
 log() { echo "[record-failure] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }

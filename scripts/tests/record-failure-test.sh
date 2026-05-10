@@ -58,7 +58,7 @@ run_recorder() {
     # Initialize a minimal state.json for the recorder to append to.
     echo '{"failedApproaches":[]}' > "$sf"
     ( cd "$git_dir" && \
-      EVOLVE_STATE_OVERRIDE="$sf" \
+      EVOLVE_STATE_FILE_OVERRIDE="$sf" \
       EVOLVE_PROJECT_ROOT="$git_dir" \
       bash "$SCRIPT" "$ws" WARN 2>/dev/null )
 }
@@ -87,10 +87,10 @@ gr=$(make_git_repo)
 ws=$(make_workspace)
 sf=$(mktemp -t record-failure-test.XXXXXX.json); cleanup_files+=("$sf")
 echo '{"failedApproaches":[]}' > "$sf"
-( cd "$gr" && EVOLVE_STATE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr" bash "$SCRIPT" "$ws" WARN 2>/dev/null )
+( cd "$gr" && EVOLVE_STATE_FILE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr" bash "$SCRIPT" "$ws" WARN 2>/dev/null )
 ts1=$(extract_tree_sha "$sf")
 # Append a second entry (state.json already has one entry; recorder appends again).
-( cd "$gr" && EVOLVE_STATE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr" bash "$SCRIPT" "$ws" WARN 2>/dev/null )
+( cd "$gr" && EVOLVE_STATE_FILE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr" bash "$SCRIPT" "$ws" WARN 2>/dev/null )
 ts2=$(jq -r '.failedApproaches[-1].treeStateSha // "MISSING"' "$sf")
 if [ "$ts1" = "$ts2" ] && [ "$ts1" != "MISSING" ] && [ "$ts1" != "$EMPTY_STRING_SHA" ]; then
     pass "replay determinism: both recordings produced treeStateSha=$ts1"
@@ -130,12 +130,25 @@ git -C "$gr_empty" config user.name "Test"
 ws=$(make_workspace)
 sf=$(mktemp -t record-failure-test.XXXXXX.json); cleanup_files+=("$sf")
 echo '{"failedApproaches":[]}' > "$sf"
-( cd "$gr_empty" && EVOLVE_STATE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr_empty" bash "$SCRIPT" "$ws" WARN 2>/dev/null ) || true
+( cd "$gr_empty" && EVOLVE_STATE_FILE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr_empty" bash "$SCRIPT" "$ws" WARN 2>/dev/null ) || true
 ts=$(extract_tree_sha "$sf")
 if [ "$ts" = "unknown" ]; then
     pass "defensive guard: empty repo → treeStateSha=unknown"
 else
     fail_ "expected \"unknown\" for empty repo, got treeStateSha=$ts"
+fi
+
+# === Test 5: legacy EVOLVE_STATE_OVERRIDE emits deprecation WARN on stderr ====
+header "Test 5: legacy EVOLVE_STATE_OVERRIDE → deprecation WARN on stderr"
+gr=$(make_git_repo)
+ws=$(make_workspace)
+sf=$(mktemp -t record-failure-test.XXXXXX.json); cleanup_files+=("$sf")
+echo '{"failedApproaches":[]}' > "$sf"
+dep_warn=$( cd "$gr" && EVOLVE_STATE_OVERRIDE="$sf" EVOLVE_PROJECT_ROOT="$gr" bash "$SCRIPT" "$ws" WARN 2>&1 >/dev/null ) || true
+if echo "$dep_warn" | grep -q "EVOLVE_STATE_FILE_OVERRIDE"; then
+    pass "legacy flag emits deprecation warning naming EVOLVE_STATE_FILE_OVERRIDE"
+else
+    fail_ "expected deprecation WARN naming EVOLVE_STATE_FILE_OVERRIDE in stderr; got: $dep_warn"
 fi
 
 # === Summary ==================================================================
