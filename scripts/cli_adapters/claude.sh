@@ -194,7 +194,10 @@ if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ] && [ -n "${AGENT:-}" ]; then
         fi
         if [ -n "$_bedrock_text" ]; then
             CMD+=(--append-system-prompt "$_bedrock_text")
-            CMD+=(--exclude-dynamic-system-prompt-sections)
+            # NB: --exclude-dynamic-system-prompt-sections is already present
+            # in every shipped profile's extra_flags, so it flows through via
+            # EXTRA_FLAGS_ARR a few lines below — do NOT add it here too
+            # (Cycle A3 fix: the duplicate from Cycle A2 was redundant).
             echo "[claude-adapter] system-prompt: bedrock attached (~$(echo "$_bedrock_text" | wc -c | tr -d ' ') bytes for role=$AGENT)" >&2
         else
             echo "[claude-adapter] WARN: build-invocation-context.sh produced empty output for AGENT=$AGENT" >&2
