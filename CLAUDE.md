@@ -256,6 +256,20 @@ Scout, Auditor, Retrospective, Plan-reviewer, Evaluator, and Inspirer can fan ou
 | `EVOLVE_FANOUT_CANCEL_ON_CONSENSUS` | `0` | Cancel remaining workers when K agree on FAIL |
 | `EVOLVE_FANOUT_CACHE_PREFIX` | `1` | Write shared cache-prefix.md for prompt-cache hit on siblings (~47% token reduction) |
 
+### Triage default-on (v8.59.0+, was opt-in EVOLVE_TRIAGE_ENABLED in v8.56–v8.58)
+
+The cycle-scope Triage phase (Layer C) now runs on **every** cycle unless the operator opts out with `EVOLVE_TRIAGE_DISABLE=1`. Promotion path follows the v8.55 default-off→verify→default-on→enforce ladder:
+
+| Version | Default | Enforcement |
+|---|---|---|
+| v8.56–v8.58 | off (`EVOLVE_TRIAGE_ENABLED=1` to enable) | Persona-advisory only |
+| v8.59.0 | **on** (this version) | Soft WARN in `gate_discover_to_build` if Triage skipped without `EVOLVE_TRIAGE_DISABLE=1` |
+| v8.60+ candidate | on | Promote WARN to FAIL after one verification cycle confirms orchestrator follows |
+
+Operator overrides:
+- `EVOLVE_TRIAGE_DISABLE=1` — opt out (e.g., for tight cost-control runs where the extra ~$0.50/cycle is unacceptable)
+- The `cycle_size_estimate=large` block in `gate_triage_to_plan_review` remains active when Triage is on — operators must split before re-entering.
+
 ### Plan review (Sprint 2)
 
 `EVOLVE_PLAN_REVIEW=1` enables a four-lens review (CEO/Eng/Design/Security) between discover and build. Phase gate `gate_plan_review_to_tdd` enforces verdict. Default-off.

@@ -281,6 +281,36 @@ honor_adapter_set_env() {
 # every fresh run. Collision check at line 137 already refused if cycle-
 # state.json exists, so reaching this point guarantees fresh start. Safe
 # to nuke. Subdirectories (workers/) recreated by phase agents as needed.
+#
+# v8.59.0 Layer O: BUT first archive any artifacts that the ledger references.
+# v8.58 release was blocked by `preflight.sh:step_audit_recent` because cycle 6's
+# audit-report.md had been deleted in a retry's cycle-init (this very rm -rf),
+# but the ledger entry still pointed to it. Solution: if the ledger has any
+# agent_subprocess entries with artifact_path inside this WORKSPACE, move the
+# whole workspace to .evolve/runs/archive/cycle-N-TIMESTAMP/ before clearing.
+# Forensic recovery is preserved; preflight finds the file at the recorded path.
+_archive_if_needed() {
+    local ws="$1" cycle="$2"
+    local ledger="$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl"
+    [ -d "$ws" ] || return 0
+    [ -f "$ledger" ] || return 0
+    # Cheap predicate: does any agent_subprocess line reference this workspace?
+    if grep -q '"artifact_path":"'"$ws"'/' "$ledger" 2>/dev/null; then
+        local archive_base="$EVOLVE_PROJECT_ROOT/.evolve/runs/archive"
+        local ts
+        ts=$(date -u +%Y%m%dT%H%M%SZ)
+        local dest="$archive_base/cycle-${cycle}-${ts}"
+        mkdir -p "$archive_base" 2>/dev/null || true
+        if mv "$ws" "$dest" 2>/dev/null; then
+            log "workspace archived to $dest (ledger references preserved)"
+            return 0
+        else
+            log "WARN: archive mv failed; falling back to rm -rf (ledger references will be orphaned)"
+        fi
+    fi
+    return 0
+}
+_archive_if_needed "$WORKSPACE" "$CYCLE"
 rm -rf "$WORKSPACE"
 mkdir -p "$WORKSPACE"
 log "workspace=$WORKSPACE (cleared for fresh cycle-init)"

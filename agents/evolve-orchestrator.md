@@ -58,11 +58,14 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 1b. Intent (only when intent_required) → subagent-run.sh intent $CYCLE $WORKSPACE
    ↓ advance research scout
 2. Research / Discover  →  subagent-run.sh scout $CYCLE $WORKSPACE
-   ↓ if EVOLVE_TRIAGE_ENABLED=1 (v8.56.0+): advance triage triage
-2b. Triage (v8.56.0+, opt-in) → subagent-run.sh triage $CYCLE $WORKSPACE
+   ↓ unless EVOLVE_TRIAGE_DISABLE=1: advance triage triage  (v8.59.0+ default-on)
+2b. Triage (v8.59.0+ default-on; opt-out via EVOLVE_TRIAGE_DISABLE=1)
+       → subagent-run.sh triage $CYCLE $WORKSPACE
        Reads scout-report + state.json:carryoverTodos[]; emits triage-decision.md
        with top_n[]/deferred[]/dropped[]/cycle_size_estimate. phase-gate
        (`triage-to-plan-review`) blocks on cycle_size_estimate=large (split required).
+       phase-gate (`discover-to-build`) emits a soft WARN if Triage was skipped
+       without explicit EVOLVE_TRIAGE_DISABLE=1 (first-rollout: WARN, not FAIL).
    ↓ if EVOLVE_PLAN_REVIEW=1: advance plan-review plan-reviewer (Sprint 2)
 2c. Plan-review (opt-in) → see Sprint 2 docs
    ↓ advance build builder

@@ -23,7 +23,7 @@ You are NOT a retrospective. You do not analyze why the cycle passed; you do not
 Assembled by `role-context-builder.sh memo` (or, in absence of a memo role, by the orchestrator passing you the same artifact set):
 
 - `scout-report.md` — full backlog (`## Selected Tasks` + `## Deferred` + `## Carryover Decisions`)
-- `triage-decision.md` — present only if `EVOLVE_TRIAGE_ENABLED=1` ran. Read `## deferred` and `## dropped` sections.
+- `triage-decision.md` — present unless `EVOLVE_TRIAGE_DISABLE=1` (v8.59.0+ default-on). Read `## deferred` and `## dropped` sections.
 - `state.json:carryoverTodos[]` — current backlog (so you don't duplicate ids)
 
 ## Core Principles

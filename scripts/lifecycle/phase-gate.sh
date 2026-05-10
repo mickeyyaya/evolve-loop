@@ -266,6 +266,21 @@ gate_discover_to_build() {
         fi
     fi
 
+    # 1c. v8.59.0 Layer T: Triage default-on (opt-out via EVOLVE_TRIAGE_DISABLE=1).
+    # Soft WARN if cycle skipped Triage without explicit opt-out. First-rollout
+    # is WARN-only so v8.58 cycles aren't retroactively blocked. Promote to fail
+    # in v8.60+ after one verification cycle confirms orchestrator follows the
+    # default-on instruction. Mirrors the v8.55 default-off→verify→default-on→
+    # enforce ladder used for fan-out + budget-cap.
+    if [ "${EVOLVE_TRIAGE_DISABLE:-0}" != "1" ]; then
+        if [ ! -f "$WORKSPACE/triage-decision.md" ]; then
+            log "WARN: Triage default-on (v8.59.0+) but triage-decision.md missing in workspace — orchestrator skipped Layer C"
+            log "  → set EVOLVE_TRIAGE_DISABLE=1 if intentional; otherwise check agents/evolve-orchestrator.md PASS branch"
+        else
+            log "OK: triage-decision.md present (Triage ran)"
+        fi
+    fi
+
     # 2. At least one eval definition must exist
     local eval_count
     eval_count=$(ls "$EVOLVE_DIR/evals/"*.md 2>/dev/null | wc -l | tr -d ' ')
@@ -331,7 +346,7 @@ gate_discover_to_build() {
 # Triage is a single-writer phase that picks the top-N items from scout-report
 # backlog + carryoverTodos, defers the rest, and surfaces large items as
 # requiring split. It runs between Scout and Plan-review when
-# EVOLVE_TRIAGE_ENABLED=1 (default off; legacy direct discover→plan-review or
+# default-on as of v8.59.0 (was opt-in EVOLVE_TRIAGE_ENABLED=1 in v8.56-v8.58); legacy
 # discover→build paths still work).
 gate_discover_to_triage() {
     log "Checking DISCOVER → TRIAGE gate for cycle $CYCLE"
