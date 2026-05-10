@@ -253,8 +253,26 @@ GOAL=""
 
 # Pull off --flags first so positional parsing doesn't see them.
 POSITIONAL=()
+# v8.60.0 Layer 1: budget-driven dispatch flags. --budget makes batch budget the
+# primary stop condition; --cycles is the explicit cycle-count form. Positional
+# integer (legacy) still parses as cycles but emits a deprecation WARN — v8.62
+# will flip positional integer semantics to dollars.
+BUDGET=""
+LEGACY_POSITIONAL_USED=0
 while [ $# -gt 0 ]; do
     case "$1" in
+        --budget)
+            shift
+            [ $# -gt 0 ] || abort_args "--budget requires a dollar value"
+            BUDGET="$1"
+            shift
+            ;;
+        --cycles)
+            shift
+            [ $# -gt 0 ] || abort_args "--cycles requires an integer"
+            CYCLES="$1"
+            shift
+            ;;
         --dry-run)
             DRY_RUN=1
             shift
@@ -295,9 +313,15 @@ done
 
 # Now consume positional in the documented order:
 # [CYCLES] [STRATEGY] [GOAL...]
+# v8.60.0 Layer 1: positional integer is still parsed as CYCLES (legacy) when no
+# --cycles or --budget flag is set. Emits a deprecation WARN; v8.62 will flip
+# positional integer semantics to dollars.
 if [ "${#POSITIONAL[@]}" -gt 0 ]; then
     if [[ "${POSITIONAL[0]}" =~ ^[0-9]+$ ]]; then
-        CYCLES="${POSITIONAL[0]}"
+        if [ -z "$CYCLES" ] && [ -z "$BUDGET" ]; then
+            CYCLES="${POSITIONAL[0]}"
+            LEGACY_POSITIONAL_USED=1
+        fi
         POSITIONAL=("${POSITIONAL[@]:1}")
     fi
 fi
@@ -314,9 +338,28 @@ if [ "${#POSITIONAL[@]}" -gt 0 ]; then
     GOAL="${POSITIONAL[*]}"
 fi
 
+# v8.60.0 Layer 1: budget-mode setup. When --budget is set, CYCLES becomes a
+# safety upper bound (default 50) and the cumulative-cost tripwire is the
+# primary stop. Otherwise CYCLES applies its normal default of 2.
+if [ -n "$BUDGET" ]; then
+    # Validate budget is a positive dollar value (allow 50, 50.00, .50)
+    case "$BUDGET" in
+        ''|*[!0-9.]*) abort_args "--budget must be a positive number (got: $BUDGET)" ;;
+    esac
+    # Default CYCLES in budget mode is the safety upper bound.
+    [ -n "$CYCLES" ] || CYCLES="${EVOLVE_BUDGET_MAX_CYCLES:-50}"
+fi
+
 # Apply defaults.
 [ -n "$CYCLES" ]   || CYCLES=2
 [ -n "$STRATEGY" ] || STRATEGY=balanced
+
+# v8.60.0 Layer 1: emit deprecation WARN when legacy positional integer was
+# used (no --cycles or --budget flag). v8.62 will flip positional integer to
+# dollars; users should migrate to --cycles N or --budget N for clarity.
+if [ "$LEGACY_POSITIONAL_USED" = "1" ]; then
+    log "DEPRECATION: positional integer is interpreted as cycles in v8.60-v8.61, will mean DOLLARS in v8.62 — migrate to --cycles N or --budget N"
+fi
 
 # Validate.
 [[ "$CYCLES" =~ ^[0-9]+$ ]] || abort_args "CYCLES must be a non-negative integer (got: $CYCLES)"
@@ -328,14 +371,22 @@ esac
 
 # --- Plan ---------------------------------------------------------------------
 
-log "PLAN: cycles=$CYCLES strategy=$STRATEGY goal='${GOAL:-<autonomous>}'"
+if [ -n "$BUDGET" ]; then
+    log "PLAN: BUDGET=\$$BUDGET CYCLES=$CYCLES (safety upper bound) strategy=$STRATEGY mode=budget-mode goal='${GOAL:-<autonomous>}'"
+else
+    log "PLAN: CYCLES=$CYCLES strategy=$STRATEGY mode=cycles-mode goal='${GOAL:-<autonomous>}'"
+fi
 log "PLAN: run_cycle=$RUN_CYCLE"
 log "PLAN: ledger=$LEDGER"
 log "PLAN: dispatch_policy=${EVOLVE_DISPATCH_POLICY:-verify}$([ -n "${EVOLVE_DISPATCH_VERIFY:-}" ] && echo " (DEPRECATED EVOLVE_DISPATCH_VERIFY set)" || true)$([ -n "${EVOLVE_DISPATCH_STOP_ON_FAIL:-}" ] && echo " (DEPRECATED EVOLVE_DISPATCH_STOP_ON_FAIL set)" || true)"
 
 # v8.24.0: export the reinvocation command so claude.sh's EPERM diagnostic
 # can suggest a copy-paste recovery line. Quote args defensively.
-export EVOLVE_REINVOKE_CMD="bash $0 $CYCLES $STRATEGY${GOAL:+ \"$GOAL\"}"
+if [ -n "$BUDGET" ]; then
+    export EVOLVE_REINVOKE_CMD="bash $0 --budget $BUDGET $STRATEGY${GOAL:+ \"$GOAL\"}"
+else
+    export EVOLVE_REINVOKE_CMD="bash $0 $CYCLES $STRATEGY${GOAL:+ \"$GOAL\"}"
+fi
 
 if [ "${VALIDATE_ONLY:-0}" = "1" ] || [ "$DRY_RUN" = "1" ]; then
     log "VALIDATE_ONLY/DRY_RUN — not invoking run-cycle.sh"
@@ -692,12 +743,25 @@ SAME_CYCLE_THRESHOLD="${EVOLVE_DISPATCH_REPEAT_THRESHOLD:-5}"
 # (those with valid show-cycle-cost.sh JSON); cycles that failed before
 # producing usage sidecars contribute $0 to the batch total.
 BATCH_TOTAL_COST="0.00"
-BATCH_CAP="${EVOLVE_BATCH_BUDGET_CAP:-20.00}"
+# v8.60.0 Layer 1: --budget flag overrides EVOLVE_BATCH_BUDGET_CAP. In budget
+# mode, the cap IS the budget — explicit and primary. In cycle mode, cap stays
+# at the v8.58 default backstop (or env override).
+if [ -n "$BUDGET" ]; then
+    BATCH_CAP="$BUDGET"
+    DISPATCH_MODE="budget"
+else
+    BATCH_CAP="${EVOLVE_BATCH_BUDGET_CAP:-20.00}"
+    DISPATCH_MODE="cycles"
+fi
 BATCH_BUDGET_DISABLE="${EVOLVE_BATCH_BUDGET_DISABLE:-0}"
 if [ "$BATCH_BUDGET_DISABLE" = "1" ]; then
     log "BATCH-BUDGET: disabled (EVOLVE_BATCH_BUDGET_DISABLE=1)"
 else
-    log "BATCH-BUDGET: cap=\$${BATCH_CAP} (override via EVOLVE_BATCH_BUDGET_CAP, disable via EVOLVE_BATCH_BUDGET_DISABLE=1)"
+    if [ "$DISPATCH_MODE" = "budget" ]; then
+        log "BATCH-BUDGET: cap=\$${BATCH_CAP} (budget-mode — primary stop condition, safety upper bound CYCLES=$CYCLES)"
+    else
+        log "BATCH-BUDGET: cap=\$${BATCH_CAP} (override via EVOLVE_BATCH_BUDGET_CAP, disable via EVOLVE_BATCH_BUDGET_DISABLE=1)"
+    fi
 fi
 
 for ((i=1; i<=CYCLES; i++)); do
@@ -838,10 +902,21 @@ for ((i=1; i<=CYCLES; i++)); do
     # didn't have. Set EVOLVE_BATCH_BUDGET_DISABLE=1 to opt out.
     if [ "$BATCH_BUDGET_DISABLE" != "1" ] && command -v bc >/dev/null 2>&1; then
         if [ "$(echo "$BATCH_TOTAL_COST > $BATCH_CAP" | bc -l 2>/dev/null)" = "1" ]; then
-            log "BATCH-BUDGET-EXCEEDED: cumulative \$${BATCH_TOTAL_COST} > cap \$${BATCH_CAP} (after cycle $ran_cycle)"
-            log "  override: EVOLVE_BATCH_BUDGET_CAP=<higher> or EVOLVE_BATCH_BUDGET_DISABLE=1"
-            log "  remaining cycles ($((CYCLES - i)) of $CYCLES) will be skipped"
-            DISPATCH_RC=4
+            # v8.60.0 Layer 1: in budget-mode, hitting the budget IS success
+            # (we ran cycles until budget consumed — the user-requested behavior).
+            # In cycles-mode, hitting the cap is a backstop (operator override
+            # needed for more cycles), so rc=4 distinguishes overrun.
+            if [ "$DISPATCH_MODE" = "budget" ]; then
+                log "BUDGET-EXHAUSTED: cumulative \$${BATCH_TOTAL_COST} >= budget \$${BATCH_CAP} (after cycle $ran_cycle)"
+                log "  ran $i of safety_max=$CYCLES cycles; budget-driven completion"
+                log "  override: --budget <higher> on next invocation"
+                DISPATCH_RC=0
+            else
+                log "BATCH-BUDGET-EXCEEDED: cumulative \$${BATCH_TOTAL_COST} > cap \$${BATCH_CAP} (after cycle $ran_cycle)"
+                log "  override: EVOLVE_BATCH_BUDGET_CAP=<higher> or EVOLVE_BATCH_BUDGET_DISABLE=1"
+                log "  remaining cycles ($((CYCLES - i)) of $CYCLES) will be skipped"
+                DISPATCH_RC=4
+            fi
             break
         fi
     fi
@@ -941,7 +1016,11 @@ ELAPSED=$(( $(date -u +%s) - START_TS ))
 
 log "------------------ summary ------------------"
 log "elapsed: ${ELAPSED}s"
-log "cycles_requested=$CYCLES"
+if [ -n "$BUDGET" ]; then
+    log "mode=budget budget=\$$BUDGET cycles_safety_max=$CYCLES"
+else
+    log "mode=cycles cycles_requested=$CYCLES"
+fi
 log "exit_code=$DISPATCH_RC"
 # v8.58.0 Layer B: surface batch total in summary so operators can verify
 # spend at a glance without grepping show-cycle-cost.sh per cycle.

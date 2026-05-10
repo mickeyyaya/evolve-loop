@@ -105,7 +105,7 @@ fi
 # === Test 2: defaults applied when no args ====================================
 header "Test 2: no args → cycles=2 strategy=balanced goal=<autonomous>"
 out=$(VALIDATE_ONLY=1 bash "$DISPATCH" 2>&1)
-if echo "$out" | grep -q "cycles=2 strategy=balanced goal='<autonomous>'"; then
+if echo "$out" | grep -q "CYCLES=2 strategy=balanced mode=cycles-mode goal='<autonomous>'"; then
     pass "defaults correct"
 else
     fail_ "out: $out"
@@ -114,7 +114,7 @@ fi
 # === Test 3: parse cycles + strategy + goal ===================================
 header "Test 3: '5 harden polish the layout' → cycles=5 strategy=harden goal='polish the layout'"
 out=$(VALIDATE_ONLY=1 bash "$DISPATCH" 5 harden polish the layout 2>&1)
-if echo "$out" | grep -q "cycles=5 strategy=harden goal='polish the layout'"; then
+if echo "$out" | grep -q "CYCLES=5 strategy=harden mode=cycles-mode goal='polish the layout'"; then
     pass "all three parsed"
 else
     fail_ "out: $out"
@@ -123,7 +123,7 @@ fi
 # === Test 4: cycles only, strategy default ====================================
 header "Test 4: '7' → cycles=7 strategy=balanced goal=<autonomous>"
 out=$(VALIDATE_ONLY=1 bash "$DISPATCH" 7 2>&1)
-if echo "$out" | grep -q "cycles=7 strategy=balanced goal='<autonomous>'"; then
+if echo "$out" | grep -q "CYCLES=7 strategy=balanced mode=cycles-mode goal='<autonomous>'"; then
     pass "cycles-only parsed; strategy/goal defaulted"
 else
     fail_ "out: $out"
@@ -133,7 +133,7 @@ fi
 header "Test 5: 'fix the typo' → cycles=2 strategy=balanced goal='fix the typo'"
 # 'fix' is not a strategy keyword, so the whole string becomes the goal.
 out=$(VALIDATE_ONLY=1 bash "$DISPATCH" fix the typo 2>&1)
-if echo "$out" | grep -q "cycles=2 strategy=balanced goal='fix the typo'"; then
+if echo "$out" | grep -q "CYCLES=2 strategy=balanced mode=cycles-mode goal='fix the typo'"; then
     pass "goal-only parsed; cycles/strategy defaulted"
 else
     fail_ "out: $out"
@@ -142,7 +142,7 @@ fi
 # === Test 6: cycles + goal (no strategy keyword) ==============================
 header "Test 6: '3 implement feature X' → cycles=3 strategy=balanced goal='implement feature X'"
 out=$(VALIDATE_ONLY=1 bash "$DISPATCH" 3 implement feature X 2>&1)
-if echo "$out" | grep -q "cycles=3 strategy=balanced goal='implement feature X'"; then
+if echo "$out" | grep -q "CYCLES=3 strategy=balanced mode=cycles-mode goal='implement feature X'"; then
     pass "cycles+goal parsed; strategy defaulted (not consumed by 'implement')"
 else
     fail_ "out: $out"
@@ -1267,6 +1267,76 @@ if echo "$out" | grep -q "STOP_ON_FAIL wins"; then
     pass "precedence WARN emitted (STOP_ON_FAIL wins)"
 else
     fail_ "missing precedence WARN; tail: $(echo "$out" | tail -5)"
+fi
+
+# === Test 47 (v8.60.0 Layer 1): --budget flag is parsed ==================
+header "Test 47 (v8.60.0): --budget 50 sets BUDGET, makes BATCH_CAP=50"
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --budget 50 balanced "stub goal" 2>&1)
+if echo "$out" | grep -qE "BUDGET[^_].*= ?50|budget.*50"; then
+    pass "--budget 50 surfaced in plan output"
+else
+    fail_ "no BUDGET=50 in plan; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 48 (v8.60.0): --cycles flag is parsed ==========================
+header "Test 48 (v8.60.0): --cycles 5 sets CYCLES explicitly"
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --cycles 5 balanced "stub goal" 2>&1)
+if echo "$out" | grep -qE "CYCLES.*= ?5|cycles=5"; then
+    pass "--cycles 5 surfaced in plan output"
+else
+    fail_ "no CYCLES=5 in plan; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 49 (v8.60.0): legacy positional integer emits deprecation WARN ==
+header "Test 49 (v8.60.0): positional integer parses as cycles + emits DEPRECATION WARN"
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" 3 balanced "legacy goal" 2>&1)
+if echo "$out" | grep -qiE "DEPRECATION|positional.*cycles|--budget.*--cycles"; then
+    pass "deprecation WARN emitted for legacy positional integer"
+else
+    fail_ "no deprecation WARN for positional 3; tail: $(echo "$out" | tail -8)"
+fi
+# Backward compat: positional 3 should still set CYCLES=3
+if echo "$out" | grep -qE "CYCLES.*= ?3|cycles=3"; then
+    pass "positional integer still sets CYCLES (backward compat)"
+else
+    fail_ "positional integer didn't set CYCLES; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 50 (v8.60.0): --budget surfaces budget-mode in plan ============
+header "Test 50 (v8.60.0): --budget mode flagged in PLAN line"
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --budget 25 balanced "test" 2>&1)
+if echo "$out" | grep -qiE "budget.?mode|BUDGET-MODE|mode.*budget"; then
+    pass "PLAN announces budget-mode"
+else
+    fail_ "PLAN doesn't announce budget mode; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 51 (v8.60.0): --budget overrides EVOLVE_BATCH_BUDGET_CAP =======
+header "Test 51 (v8.60.0): --budget value overrides EVOLVE_BATCH_BUDGET_CAP env"
+out=$(EVOLVE_BATCH_BUDGET_CAP=999 VALIDATE_ONLY=1 bash "$DISPATCH" --budget 25 balanced "test" 2>&1)
+if echo "$out" | grep -qE 'PLAN.*BUDGET=\$25'; then
+    pass "--budget 25 overrides env-var EVOLVE_BATCH_BUDGET_CAP=999"
+else
+    fail_ "flag didn't override env; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 52 (v8.60.0): --budget mode bypasses CYCLES validation =========
+header "Test 52 (v8.60.0): --budget mode + no --cycles → safety upper bound used"
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --budget 30 balanced "test" 2>&1)
+# Lenient check: as long as it doesn't fail validation with low CYCLES default
+if ! echo "$out" | grep -qiE "BAD-ARG|abort_args"; then
+    pass "budget mode passes validation without explicit --cycles"
+else
+    fail_ "budget mode failed validation; tail: $(echo "$out" | tail -8)"
+fi
+
+# === Test 53 (v8.60.0): both --budget and --cycles supplied → both honored ===
+header "Test 53 (v8.60.0): --budget 50 --cycles 3 → cycle-bound = 3, budget cap = 50"
+out=$(VALIDATE_ONLY=1 bash "$DISPATCH" --budget 50 --cycles 3 balanced "test" 2>&1)
+if echo "$out" | grep -qE 'CYCLES=3' && echo "$out" | grep -qE 'BUDGET=\$50'; then
+    pass "both flags honored together"
+else
+    fail_ "expected both BUDGET=50 + CYCLES=3 in plan; tail: $(echo "$out" | tail -8)"
 fi
 
 echo
