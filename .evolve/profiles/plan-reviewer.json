@@ -67,7 +67,6 @@
     "."
   ],
   "max_budget_usd": 1.0,
-  "_budget_tiers_doc": "Plan-review is a read-heavy critique phase. Default tier sufficient for routine cycles; bump to 'deep' when the scout-report.md proposes architectural changes spanning many files.",
   "budget_tiers": {
     "default": 1.0,
     "deep": 2.0
@@ -85,7 +84,6 @@
     "--setting-sources",
     "project"
   ],
-  "_parallel_subtasks_doc": "Sprint 2 multi-lens plan review (gstack /autoplan inspired): four lens reviewers run concurrently on the scout-report.md task list. Each scores the plan 0-10 on its dimension and emits 'Score: <0-10>' as the first content line. Aggregator computes verdict: PROCEED (avg >= 7, no lens < 5), REVISE (avg >= 5, any lens < 5), ABORT (avg < 5 or any critical-security flag).",
   "parallel_subtasks": [
     {
       "name": "ceo",
@@ -123,9 +121,7 @@
     ],
     "allow_network": false
   },
-  "_design_notes": "Sprint 2 of the swarm architecture. Reads .evolve/runs/cycle-N/scout-report.md and produces .evolve/runs/cycle-N/plan-review.md with verdict PROCEED/REVISE/ABORT. The orchestrator routes accordingly: PROCEED -> tdd phase; REVISE -> Scout re-runs (max 2 retries); ABORT -> cycle ends. Default off via EVOLVE_PLAN_REVIEW=0 until eval-quality is verified.",
   "parallel_eligible": true,
-  "_parallel_eligible_reason": "READ-ONLY review lens (CEO/Eng/Design/Security)",
   "context_anchors": [
     "scout-report.md:proposed_tasks",
     "scout-report.md:gap_analysis"

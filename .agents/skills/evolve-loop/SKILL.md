@@ -72,7 +72,7 @@ The dispatcher locates the most recent paused cycle, validates state (git HEAD u
 | `3` | Batch completed with one or more recoverable failures (infrastructure / audit-fail / build-fail). Failure modes recorded to `state.json:failedApproaches[]` for the next dispatch's orchestrator to read and adapt | Report which cycles had which classification; surface state.json:failedApproaches summary; offer to re-run with the same goal so subsequent cycles can adapt |
 | `10` | Bad arguments | Re-prompt with valid args |
 
-**Dispatch policy (`EVOLVE_DISPATCH_POLICY`):** See CLAUDE.md § Dispatch policy for flag details.
+**Dispatch policy (`EVOLVE_DISPATCH_POLICY`):** See [docs/architecture/control-flags.md](docs/architecture/control-flags.md) § `EVOLVE_DISPATCH_POLICY` for flag details (`off` / `verify` / `stop`; default: `verify`).
 
 The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `run-cycle.sh` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
 

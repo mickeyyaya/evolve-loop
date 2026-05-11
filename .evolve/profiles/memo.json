@@ -77,8 +77,10 @@
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/orchestrator-report.md)"
   ],
-  "add_dir": ["."],
-  "max_budget_usd": 0.30,
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 0.3,
   "max_turns": 10,
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/carryover-todos.json",
@@ -94,7 +96,9 @@
   ],
   "sandbox": {
     "enabled": true,
-    "write_subpaths": [".evolve/runs/cycle-*"],
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
     "read_only_repo": true,
     "deny_subpaths": [
       ".git",
@@ -113,7 +117,5 @@
     ],
     "allow_network": false
   },
-  "_design_notes": "v8.57.0 Layer P single-writer PASS-cycle memo. Fires only on PASS verdicts after ship.sh succeeds. Reads scout-report.md + triage-decision.md (if present); writes ONLY carryover-todos.json. Cheap (~$0.10-0.20 per cycle, max_budget_usd=0.30). Cannot mutate any other artifact, cannot write retrospective/digest (those are FAIL/WARN retrospective's job). parallel_eligible:false because carryover-todos.json is a single-writer artifact for this cycle. Challenge token NOT required because the artifact is a JSON array (machine-parsed, not LLM-judged) and forgery surface is small.",
-  "parallel_eligible": false,
-  "_parallel_eligible_reason": "Single-writer of carryover-todos.json on PASS path (sequential write discipline)"
+  "parallel_eligible": false
 }

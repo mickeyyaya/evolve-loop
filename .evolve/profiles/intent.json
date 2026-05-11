@@ -7,7 +7,6 @@
     "vague_goal": "opus",
     "clear_goal": "sonnet"
   },
-  "_design_note_": "Opus default because intent capture is reasoning-heavy: surfacing the right premise to challenge from a vague goal is exactly the failure mode Karpathy named (#1: wrong assumptions running uncaught). Cheaper than burning $0.50+ on a Scout pointed at the wrong direction.",
   "allowed_tools": [
     "Read",
     "Bash(cat:*)",
@@ -15,7 +14,6 @@
     "Write(.evolve/runs/cycle-*/intent-stdout.log)",
     "Edit(.evolve/runs/cycle-*/intent.md)"
   ],
-  "_allowed_tools_design_note_": "v9.0.2: stripped exploration surface (Grep, Glob, Bash(ls/head/tail/wc/find/test/git*)). The intent persona's job is to STRUCTURE the goal, not VERIFY it. With exploration tools available, the persona did 7 turns of evidence-gathering in cycle 11 ($1.05). Scout re-reads the same files anyway. Keeping Read + Bash(cat:*) so the persona can read its own scratchpad or a pre-loaded context file if the orchestrator stages one; everything else removed forces a single-pass parse-then-write flow.",
   "disallowed_tools": [
     "WebSearch",
     "WebFetch",
@@ -53,7 +51,6 @@
     "Write(.evolve/evals/**)",
     "Write(CLAUDE.md)"
   ],
-  "_disallowed_design_note_": "WebSearch/WebFetch are explicitly denied \u2014 intent persona's job is to STRUCTURE, not RESEARCH. Scout researches. Otherwise mirrors scout.json's denylist verbatim per Plan-agent finding (intent persona must not become weakest-link attack surface).",
   "add_dir": [
     "."
   ],
@@ -63,9 +60,7 @@
     "heavy_rules": 0.6,
     "minimal": 0.15
   },
-  "_budget_design_note_": "v9.0.2: lowered default from $0.50 to $0.30 after cycle-11 evidence ($1.05 burn on a goal of moderate complexity). With exploration tools stripped (v9.0.2 allowed_tools change), the agent is structurally bounded to 1-2 turns and ~30-80 lines of output. heavy_rules tier kept for genuinely heavy CLAUDE.md cases but capped lower ($0.60). minimal=$0.15. The old $0.50 cap was set as a generous backstop assuming multi-turn exploration was load-bearing; v9.0.2's evidence shows it was paying for duplicate work Scout redoes.",
   "max_turns": 4,
-  "_max_turns_design_note_": "v9.0.2: lowered from 15 to 4. Two turns are the design target (parse + write); 4 leaves headroom for one re-write iteration or a tool-call mistake. With exploration tools stripped, the agent literally cannot productively use 15 turns.",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/intent.md",
   "challenge_token_required": true,
@@ -97,7 +92,5 @@
     ],
     "allow_network": false
   },
-  "_sandbox_design_note_": "allow_network: false because intent persona has no legitimate network reason. Scout has allow_network: true. Smaller blast radius if persona is hijacked.",
-  "parallel_eligible": false,
-  "_parallel_eligible_reason": "Sequential strategic framing (writes intent.md)"
+  "parallel_eligible": false
 }

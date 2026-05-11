@@ -46,4 +46,4 @@ description: Reference doc.
 | Cycles 102-111 | Builder tautological evals | `eval-quality-check.sh` rigor classification | `docs/incidents/cycle-102-111.md` |
 | Cycles 132-141 | Orchestrator skipped agents, fabricated cycles | `phase-gate.sh` deterministic enforcement | `docs/incidents/cycle-132-141.md` |
 | Gemini CLI | Forgery script with fake artifacts | Content verification, git diff substance, state checksum | `docs/incidents/gemini-forgery.md` |
-| Autoresearch Loop (Cycles 1-16) | "Flawless Execution" (Hallucinating features into Markdown, evading actual code changes) | Ban `grep` for logic evals, enforce execution-based testing, require execution layer modifications | `docs/incidents/flawless-execution-anomaly.md` |
+| Autoresearch Loop (Cycles 1-16) | "Flawless Execution" (Hallucinating features into Markdown, evading actual code changes) | Ban `grep` for logic evals, enforce execution-based testing, require execution layer modifications | CHANGELOG v8.x |

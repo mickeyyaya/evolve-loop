@@ -85,6 +85,5 @@
     ],
     "allow_network": false
   },
-  "parallel_eligible": true,
-  "_parallel_eligible_reason": "READ-ONLY scoring"
+  "parallel_eligible": true
 }

@@ -107,7 +107,6 @@
     "--setting-sources",
     "project"
   ],
-  "_parallel_subtasks_doc": "Sprint 1.3 fan-out: when invoked via `subagent-run.sh dispatch-parallel retrospective`, three sub-reflectors run concurrently. Each emits '## Lesson: <title>' blocks; aggregator.sh dedups by title across workers. Default-off \u2014 see EVOLVE_FANOUT_RETROSPECTIVE in CLAUDE.md.",
   "parallel_subtasks": [
     {
       "name": "instinct",
@@ -147,7 +146,5 @@
     ],
     "allow_network": false
   },
-  "_design_notes": "The retrospective subagent is invoked ONLY on cycle FAIL/WARN/SHIP_GATE_DENIED. Read-only across the repo, write-only within .evolve/runs/cycle-*/retrospective-* and .evolve/instincts/lessons/*.yaml. Network is disabled \u2014 retrospectives must work from on-disk artifacts, not reach out for fresh context. Cannot mutate existing personal instincts (only the orchestrator's downstream prune step can do that, based on the contradicts: field in the lesson YAML). See agents/evolve-retrospective.md for the operational contract and skills/evolve-loop/phase6-learn.md for the orchestrator's invocation pattern.",
-  "parallel_eligible": true,
-  "_parallel_eligible_reason": "READ-ONLY analyst (sandboxed read_only_repo:true)"
+  "parallel_eligible": true
 }
