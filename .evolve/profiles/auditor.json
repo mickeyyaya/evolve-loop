@@ -173,7 +173,8 @@
       ".evolve/ledger.jsonl",
       ".evolve/profiles",
       ".evolve/evals",
-      "knowledge-base"
+      "knowledge-base",
+      "docs/private"
     ],
     "allow_network": true
   },

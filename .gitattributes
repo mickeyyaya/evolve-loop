@@ -7,13 +7,18 @@
 #
 # Note: Claude Code's plugin installer does NOT currently use `git archive` —
 # it clones the source repo and applies a separate hardcoded filter — so
-# the `knowledge-base/` directive here may be a no-op for /plugin install.
-# We declare it anyway because:
+# these directives here may be no-ops for /plugin install. We declare them
+# anyway because:
 #   1. It's the standard Git mechanism (documentation-as-config)
 #   2. Other consumers (Gemini CLI, Codex CLI, manual `git archive` users)
 #      may honor it
 #   3. Future Claude Code versions may honor it
 #
-# See docs/architecture/knowledge-base.md for the full architecture.
+# docs/private/ is the agent-context-excluded folder. The legacy
+# knowledge-base/ path is kept during the v9.1.x doc consolidation
+# (Commit A of expand→move→re-link→contract) and removed in Commit D.
+#
+# See docs/architecture/private-context-policy.md for the full architecture.
 
+docs/private/ export-ignore
 knowledge-base/ export-ignore

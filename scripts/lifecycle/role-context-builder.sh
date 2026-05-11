@@ -238,13 +238,19 @@ emit_profile_context_anchors() {
 
 emit_artifact() {
     local label="$1" path="$2"
-    # v9.1.x: cross-CLI knowledge-base exclusion (Layer B safety net). The
+    # v9.1.x: cross-CLI private-context exclusion (Layer B safety net). The
     # primary mechanism is agent profile deny_subpaths (kernel-enforced via
     # the OS sandbox); this is the Layer-B fallback that protects against
-    # a future caller passing a knowledge-base/ path through here.
-    # knowledge-base/ holds developer-only reference content and MUST NOT
-    # appear in any agent's prompt context. See docs/architecture/knowledge-base.md.
+    # a future caller passing an excluded path through here.
+    # docs/private/ holds developer-only reference content and MUST NOT
+    # appear in any agent's prompt context. The legacy knowledge-base/ path
+    # is kept here during the v9.1.x doc consolidation (Commit A of the
+    # expand→move→re-link→contract ladder) and will be removed in Commit D
+    # once all files have moved. See docs/architecture/private-context-policy.md.
     case "$path" in
+        docs/private/*|./docs/private/*|*/docs/private/*)
+            return 0
+            ;;
         knowledge-base/*|./knowledge-base/*|*/knowledge-base/*)
             return 0
             ;;
