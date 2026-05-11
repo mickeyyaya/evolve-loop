@@ -42,17 +42,17 @@ Eval definitions and the eval runner live in `skills/evolve-loop/eval-runner.md`
 evolve-loop maintains two content surfaces:
 
 - `docs/research/` — actively cited by personas/skills/scripts; **loaded** into agent context during cycles
-- `knowledge-base/research/` — developer-only reference; **NOT loaded** into agent context (kernel-blocked across all CLIs)
+- `docs/private/research/` — developer-only reference; **NOT loaded** into agent context (kernel-blocked across all CLIs)
 
 **Decision rule when filing a new research note:**
 
 > Will any persona, skill, or script reference this doc?
 > - **YES** → `docs/research/`
-> - **NO**  → `knowledge-base/research/`
+> - **NO**  → `docs/private/research/`
 
-Cross-references count even if the doc isn't loaded into every cycle's context — what matters is whether any runtime artifact *could* read it. See [docs/architecture/knowledge-base.md](docs/architecture/knowledge-base.md) for the full convention.
+Cross-references count even if the doc isn't loaded into every cycle's context — what matters is whether any runtime artifact *could* read it. See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the full convention.
 
-**For agents writing research citations during cycles:** the stewardship rule (v9.1.x+) requires that every learned/applied/verified citation be persisted to `knowledge-base/research/` if not already present. Scout adds the entry; Builder cross-references it from build-report.md; Auditor verifies it exists.
+**For agents writing research citations during cycles:** the stewardship rule (v9.1.x+) requires that every learned/applied/verified citation be persisted to `docs/private/research/` if not already present. Scout adds the entry; Builder cross-references it from build-report.md; Auditor verifies it exists.
 
 ## Pull Request Process
 

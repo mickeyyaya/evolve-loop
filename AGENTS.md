@@ -76,4 +76,4 @@ Tier 1 is non-negotiable and runs in privileged shell context. Tier 2 adapts to 
 - Code of conduct: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md)
 - Pipeline issues: GitHub Issues at https://github.com/mickeyyaya/evolve-loop/issues
-- Architecture / release protocol: [docs/release/release-protocol.md](docs/release/release-protocol.md), [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md)
+- Architecture / release protocol: [docs/guides/publishing-releases.md](docs/guides/publishing-releases.md), [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md)

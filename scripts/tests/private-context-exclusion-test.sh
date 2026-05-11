@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# v9.1.x knowledge-base exclusion test.
+# v9.1.x private-context exclusion test.
 #
-# Verifies the two-folder content model: knowledge-base/ is git-tracked but
-# excluded from agent runtime context across all CLIs.
+# Verifies the two-folder content model: docs/private/ is git-tracked but
+# excluded from agent runtime context across all CLIs. The folder was
+# renamed from knowledge-base/ in the v9.1.x doc consolidation; runtime
+# behavior is unchanged.
 #
 # Three layers of enforcement, each asserted independently:
 #   L1 — OS sandbox (profile deny_subpaths)
@@ -43,20 +45,20 @@ expect_match() {
     fi
 }
 
-echo "=== Test 1 (L1+L2): profile deny_subpaths includes knowledge-base ==="
+echo "=== Test 1 (L1+L2): profile deny_subpaths includes docs/private ==="
 for p in scout auditor orchestrator; do
-    if jq -e '.sandbox.deny_subpaths | any(. == "knowledge-base")' \
+    if jq -e '.sandbox.deny_subpaths | any(. == "docs/private")' \
             "$PROFILES_DIR/${p}.json" >/dev/null 2>&1; then
-        expect "$p deny_subpaths blocks knowledge-base" "yes" "yes"
+        expect "$p deny_subpaths blocks docs/private" "yes" "yes"
     else
-        expect "$p deny_subpaths blocks knowledge-base" "no" "yes"
+        expect "$p deny_subpaths blocks docs/private" "no" "yes"
     fi
 done
 
 echo
-echo "=== Test 2 (L1+L2 negative): builder profile does NOT need knowledge-base in deny_subpaths ==="
-# Builder runs in worktree-only mode. Adding knowledge-base to its deny_subpaths
-# would be redundant (knowledge-base is outside the worktree) but not harmful.
+echo "=== Test 2 (L1+L2 negative): builder profile does NOT need docs/private in deny_subpaths ==="
+# Builder runs in worktree-only mode. Adding docs/private to its deny_subpaths
+# would be redundant (docs/private is outside the worktree) but not harmful.
 # This test documents the deliberate omission.
 if jq -e '.add_dir | any(. == "{worktree_path}")' "$PROFILES_DIR/builder.json" >/dev/null 2>&1; then
     expect "builder restricted to worktree" "yes" "yes"
@@ -66,35 +68,35 @@ else
 fi
 
 echo
-echo "=== Test 3 (L3): role-context-builder.sh emit_artifact filters knowledge-base ==="
+echo "=== Test 3 (L3): role-context-builder.sh emit_artifact filters docs/private ==="
 src=$(cat "$ROLE_CTX_BUILDER")
-expect_match "knowledge-base filter present" "$src" "knowledge-base/.*return 0"
-expect_match "filter has cross-CLI comment" "$src" "cross-CLI knowledge-base exclusion"
+expect_match "docs/private filter present" "$src" "docs/private/.*return 0"
+expect_match "filter has cross-CLI comment" "$src" "cross-CLI private-context exclusion"
 # The filter must catch the three common path shapes
-expect_match "filter matches absolute prefix" "$src" "knowledge-base/\*"
-expect_match "filter matches relative prefix" "$src" "\\./knowledge-base/\*"
-expect_match "filter matches nested prefix" "$src" "\\*/knowledge-base/\*"
+expect_match "filter matches absolute prefix" "$src" "docs/private/\*"
+expect_match "filter matches relative prefix" "$src" "\\./docs/private/\*"
+expect_match "filter matches nested prefix" "$src" "\\*/docs/private/\*"
 
 echo
 echo "=== Test 4 (distribution): .gitattributes declares export-ignore ==="
 if [ -f "$GITATTRIBUTES" ]; then
-    if grep -q "^knowledge-base/[[:space:]]\+export-ignore" "$GITATTRIBUTES" 2>/dev/null; then
-        expect ".gitattributes has knowledge-base/ export-ignore" "yes" "yes"
+    if grep -q "^docs/private/[[:space:]]\+export-ignore" "$GITATTRIBUTES" 2>/dev/null; then
+        expect ".gitattributes has docs/private/ export-ignore" "yes" "yes"
     else
-        expect ".gitattributes has knowledge-base/ export-ignore" "no" "yes"
+        expect ".gitattributes has docs/private/ export-ignore" "no" "yes"
     fi
 else
     expect ".gitattributes exists" "no" "yes"
 fi
 
 echo
-echo "=== Test 5 (provenance): knowledge-base/research/ exists with 42 restored files ==="
-KB_DIR="$PROJECT_ROOT/knowledge-base/research"
+echo "=== Test 5 (provenance): docs/private/research/ exists with 42 restored files ==="
+KB_DIR="$PROJECT_ROOT/docs/private/research"
 if [ -d "$KB_DIR" ]; then
     count=$(ls "$KB_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-    expect "42 files restored to knowledge-base/research/" "$count" "42"
+    expect "42 files in docs/private/research/" "$count" "42"
 else
-    expect "knowledge-base/research/ exists" "no" "yes"
+    expect "docs/private/research/ exists" "no" "yes"
 fi
 
 echo
@@ -109,24 +111,24 @@ for f in agent-economics.md workflow-dag-patterns.md hitl-trust-calibration.md; 
 done
 
 echo
-echo "=== Test 7 (no add_dir leak): no agent profile includes knowledge-base in add_dir ==="
+echo "=== Test 7 (no add_dir leak): no agent profile includes docs/private in add_dir ==="
 for p in scout auditor orchestrator builder; do
-    if jq -e '.add_dir | any(. == "knowledge-base" or . == "knowledge-base/" or . == "./knowledge-base")' \
+    if jq -e '.add_dir | any(. == "docs/private" or . == "docs/private/" or . == "./docs/private")' \
             "$PROFILES_DIR/${p}.json" >/dev/null 2>&1; then
-        expect "$p add_dir does NOT leak knowledge-base" "leaked" "clean"
+        expect "$p add_dir does NOT leak docs/private" "leaked" "clean"
     else
-        expect "$p add_dir does NOT leak knowledge-base" "clean" "clean"
+        expect "$p add_dir does NOT leak docs/private" "clean" "clean"
     fi
 done
 
 echo
-echo "=== Test 8 (convention doc): knowledge-base/README.md + docs/architecture/knowledge-base.md exist ==="
-[ -f "$PROJECT_ROOT/knowledge-base/README.md" ] \
-    && expect "knowledge-base/README.md exists" "yes" "yes" \
-    || expect "knowledge-base/README.md exists" "no" "yes"
-[ -f "$PROJECT_ROOT/docs/architecture/knowledge-base.md" ] \
-    && expect "docs/architecture/knowledge-base.md exists" "yes" "yes" \
-    || expect "docs/architecture/knowledge-base.md exists" "no" "yes"
+echo "=== Test 8 (convention doc): docs/private/README.md + docs/architecture/private-context-policy.md exist ==="
+[ -f "$PROJECT_ROOT/docs/private/README.md" ] \
+    && expect "docs/private/README.md exists" "yes" "yes" \
+    || expect "docs/private/README.md exists" "no" "yes"
+[ -f "$PROJECT_ROOT/docs/architecture/private-context-policy.md" ] \
+    && expect "docs/architecture/private-context-policy.md exists" "yes" "yes" \
+    || expect "docs/architecture/private-context-policy.md exists" "no" "yes"
 
 echo
 echo "=== Summary ==="

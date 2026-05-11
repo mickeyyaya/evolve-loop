@@ -162,12 +162,12 @@ The pipeline has two distinct content surfaces:
 | Surface | Path | Loaded into agent context? | Audience |
 |---|---|---|---|
 | Runtime context | `docs/research/` (5 active refs), `agents/`, `skills/`, `scripts/`, `docs/architecture/` | YES — agents read during cycles | Agents + contributors |
-| Developer knowledge base | `knowledge-base/research/` (42 archived refs + future additions) | **NO** — explicitly excluded across all CLIs | Contributors only |
+| Developer knowledge base | `docs/private/research/` (42 archived refs + future additions) | **NO** — explicitly excluded across all CLIs | Contributors only |
 
 **How it's used in the skill:**
 
-1. **Scout** cites research in `scout-report.md` (publication + GitHub repo). If the cited paper / repo / pattern is novel (not previously archived), Scout adds a corresponding `knowledge-base/research/<slug>.md` summarizing the source's relevance, the section it informed, and a link to the cycle's report.
-2. **Builder** applies the cited research and records the application in `build-report.md` with a cross-reference to the knowledge-base entry. If the application reveals new sub-references (e.g., a transitive citation), Builder adds those to knowledge-base/ too.
+1. **Scout** cites research in `scout-report.md` (publication + GitHub repo). If the cited paper / repo / pattern is novel (not previously archived), Scout adds a corresponding `docs/private/research/<slug>.md` summarizing the source's relevance, the section it informed, and a link to the cycle's report.
+2. **Builder** applies the cited research and records the application in `build-report.md` with a cross-reference to the knowledge-base entry. If the application reveals new sub-references (e.g., a transitive citation), Builder adds those to `docs/private/research/` too.
 3. **Auditor** verifies that the cited research is real (non-fabricated) and that the knowledge-base entry has been created. WARNs on missing entries (low-severity, awareness-only); FAILs on fabricated citations.
 4. **Retrospective** on FAIL/WARN cross-links the lesson YAML to the knowledge-base entry that informed the failed approach — so future cycles see both "what we tried" and "what research informed it."
 
@@ -177,9 +177,9 @@ The pipeline has two distinct content surfaces:
 - **Audit trail for design decisions.** Six months later, "why did we adopt pattern X in cycle N?" should be answerable in <30 seconds. The knowledge-base entry is that pointer.
 - **Cross-cycle learning.** Lessons in `state.json:instinctSummary[]` are compact; they don't carry the full context. The knowledge-base entry holds the expanded context that the lesson abbreviates.
 - **Stop hollow citations.** Without a persistent surface, agents can cite papers they haven't read. Requiring the knowledge-base entry forces the agent to summarize the source — which catches fabrication.
-- **Survives runtime exclusion.** `knowledge-base/` is invisible to agents during cycles (Liu et al. 2023 "Lost in the Middle" context-noise mitigation), so persistence doesn't re-introduce the noise problem cycle 13 fixed.
+- **Survives runtime exclusion.** `docs/private/` is invisible to agents during cycles (Liu et al. 2023 "Lost in the Middle" context-noise mitigation), so persistence doesn't re-introduce the noise problem cycle 13 fixed.
 
-See [docs/architecture/knowledge-base.md](docs/architecture/knowledge-base.md) for the full convention and the three-layer runtime-exclusion mechanism (OS sandbox + adapter passthrough + Layer-B context-builder filter).
+See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the full convention and the three-layer runtime-exclusion mechanism (OS sandbox + adapter passthrough + Layer-B context-builder filter).
 
 ## Architecture
 
@@ -243,7 +243,7 @@ Seven mechanisms compound across cycles:
 4. **Gene library** — reusable fix templates with selectors and validation
 5. **Curriculum learning** — difficulty-graduated task queue with mastery levels
 6. **Process rewards** — step-level scoring per phase
-7. **Knowledge-base persistence** — every cycle's research citations land in `knowledge-base/` for future cross-cycle reference (see § Knowledge Base Stewardship above)
+7. **Knowledge-base persistence** — every cycle's research citations land in `docs/private/` for future cross-cycle reference (see § Knowledge Base Stewardship above)
 
 ## Evolution Data
 
@@ -257,9 +257,9 @@ evolve-loop has been running on its own codebase since March 12, 2026. Selected 
 | Phases | 8 + meta-cycle every 5 |
 | Skills | 8+ (`/evolve-loop`, `/scout`, `/build`, `/audit`, `/ship`, `/retro`, `/refactor`, `/code-review-simplify`, etc.) |
 | Cycles completed | 200+ |
-| Trust kernel test suites | swarm-architecture (41 assertions), role-gate (23), checkpoint-roundtrip (19), preemptive-checkpoint (18), reactive-quota-classify (15), resume-cycle (28), orchestrator-resume-mode (23), context-window-control (22), knowledge-base-exclusion (20) |
+| Trust kernel test suites | swarm-architecture (41 assertions), role-gate (23), checkpoint-roundtrip (19), preemptive-checkpoint (18), reactive-quota-classify (15), resume-cycle (28), orchestrator-resume-mode (23), context-window-control (22), private-context-exclusion (20) |
 | Active research refs (`docs/research/`) | 5 |
-| Archived research refs (`knowledge-base/research/`) | 42 |
+| Archived research refs (`docs/private/research/`) | 42 |
 
 ### Version History (highlights)
 
@@ -298,7 +298,7 @@ evolve-loop has been running on its own codebase since March 12, 2026. Selected 
 | v9.0.0 | May 11 | Four-tier token-optimization rebuild: invocation context, cycle digest, role-filtered context, persona Layer 1/3 split |
 | v9.0.1-5 | May 11 | Per-phase token fixes: intent 7→≤2 turns, scout 49→≤8-12, builder 58→≤15-20; cycle→cost doc closure |
 | **v9.1.0** | **May 11** | **Checkpoint-resume + context-window control. `--resume` flag; per-cycle context-monitor.json; autotrim opt-in; reactive quota-likely classification; pre-emptive 80/95% thresholds; orchestrator resume-mode protocol** |
-| v9.1.x | May 11 | Knowledge-base content model: separate runtime context (`docs/research/`) from developer-only reference (`knowledge-base/research/`); 42 archived files restored; three-layer cross-CLI exclusion; end-to-end resume bug fix (collision check + WORKTREE_PATH reset) |
+| v9.1.x | May 11 | Knowledge-base content model: separate runtime context (`docs/research/`) from developer-only reference (`docs/private/research/`); 42 archived files restored; three-layer cross-CLI exclusion; end-to-end resume bug fix (collision check + WORKTREE_PATH reset) |
 
 ### Incidents and recovery
 
@@ -328,13 +328,19 @@ evolve-loop/
 │   ├── guards/                  # PreToolUse hooks: ship-gate, role-gate, phase-gate-precondition
 │   ├── observability/           # show-cycle-cost.sh, show-context-monitor.sh, verify-ledger-chain.sh
 │   └── tests/                   # Trust kernel + per-feature regression suites
-├── docs/
-│   ├── architecture/            # checkpoint-resume.md, context-window-control.md, knowledge-base.md, ...
-│   ├── research/                # 5 ACTIVE research refs (loaded into agent context)
-│   └── release/                 # Release protocol, archive
-├── knowledge-base/              # v9.1.x+: developer-only reference content
-│   ├── README.md                # Convention + how runtime exclusion works
-│   └── research/                # 42 ARCHIVED research refs (NOT loaded into agent context)
+├── docs/                        # Single doc root (v9.1.x+ consolidation)
+│   ├── README.md                # Layout + distinguishing principle
+│   ├── architecture/            # checkpoint-resume.md, context-window-control.md, private-context-policy.md, ...
+│   ├── reference/               # Per-agent technique manuals
+│   ├── guides/                  # How-to (operational tasks, publishing-releases.md)
+│   ├── research/                # 5 ACTIVE research refs (agent-accessible on demand)
+│   ├── operations/              # Release archive + release-notes/
+│   ├── incidents/               # Forensic post-mortems
+│   ├── reports/                 # Eval results, benchmarks
+│   ├── private/                 # v9.1.x+: AGENT-CONTEXT-EXCLUDED research backlog
+│   │   ├── README.md            # Convention + how runtime exclusion works
+│   │   └── research/            # 42 ARCHIVED research refs (NOT loaded into agent context)
+│   └── MOVED.md                 # (transitional) old→new path map; removed in v9.2.x or v9.3.x
 ├── bin/                         # Read-only operator commands
 ├── examples/                    # Annotated examples
 ├── install.sh
@@ -375,9 +381,9 @@ evolve-loop maintains two distinct content surfaces:
 | Surface | Folder | Loaded into agent context? | Audience |
 |---|---|---|---|
 | Runtime context | `docs/research/`, `agents/`, `skills/`, `scripts/`, `docs/architecture/` | YES — agents read these | Agents + contributors |
-| Developer knowledge base | `knowledge-base/` | NO — kernel-blocked across all CLIs | Contributors only |
+| Developer knowledge base | `docs/private/` | NO — kernel-blocked across all CLIs | Contributors only |
 
-The runtime exclusion uses three layers (OS sandbox + adapter permission-mode + Layer-B context-builder filter). See [docs/architecture/knowledge-base.md](docs/architecture/knowledge-base.md) for the architecture and [knowledge-base/README.md](knowledge-base/README.md) for the contributor-facing convention.
+The runtime exclusion uses three layers (OS sandbox + adapter permission-mode + Layer-B context-builder filter). See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the architecture and [docs/private/README.md](docs/private/README.md) for the contributor-facing convention.
 
 ## Requirements
 
@@ -389,7 +395,7 @@ No other dependencies. The entire system is markdown + bash that AI agents inter
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, including the "where to file research?" rule (active runtime ref → `docs/research/`; archived reference → `knowledge-base/research/`).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, including the "where to file research?" rule (active runtime ref → `docs/research/`; archived reference → `docs/private/research/`).
 
 ## Community
 
@@ -406,6 +412,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, including t
 
 - [Documentation index](docs/index.md) — all reference docs
 - [Research index](docs/research-index.md) — 5 active refs + 42 archived
-- [Architecture docs](docs/architecture/) — phase architecture, checkpoint-resume, context-window-control, knowledge-base
+- [Architecture docs](docs/architecture/) — phase architecture, checkpoint-resume, context-window-control, private-context-policy
 - [Changelog](CHANGELOG.md)
 - [Releases](https://github.com/mickeyyaya/evolve-loop/releases)

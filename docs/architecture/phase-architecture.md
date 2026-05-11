@@ -660,9 +660,9 @@ If you're learning evolve-loop's architecture, read in this order:
 1. [README.md](../../README.md) — high-level project overview
 2. [AGENTS.md](../../AGENTS.md) — cross-CLI invariants (the universal pipeline contract)
 3. **This file** — phase-by-phase deep dive
-4. [docs/release/release-protocol.md](../release/release-protocol.md) — vocabulary (push != tag != release != publish != propagate)
+4. [docs/guides/publishing-releases.md](../guides/publishing-releases.md) — vocabulary (push != tag != release != publish != propagate)
 5. [docs/architecture/tri-layer.md](tri-layer.md) — Skill / Persona / Command separation
 6. [CLAUDE.md](../../CLAUDE.md) — Claude Code-specific runtime + version-by-version notes
-7. [docs/release-notes/index.md](../release-notes/index.md) — per-version theme index
+7. [docs/operations/release-notes/index.md](../operations/release-notes/index.md) — per-version theme index
 
 Each version of evolve-loop encodes hard-won lessons from real failures. The version notes in CLAUDE.md describe the concrete incidents that motivated each structural change. If a section here references "vN.NN.0+" — that's where to find the incident report.

@@ -2,7 +2,7 @@
 
 > **Cross-CLI canonical instructions are in [AGENTS.md](AGENTS.md).** This file (CLAUDE.md) is the Claude Code-specific overlay — runtime hooks, plugin manifest details, version-specific notes, and incident history. Read AGENTS.md first for the universal pipeline contract; come here for Claude Code runtime specifics.
 
-> **Per-version release notes index**: [docs/release-notes/](docs/release-notes/index.md) — quick navigation to specific version sections + complete chronology in [CHANGELOG.md](CHANGELOG.md).
+> **Per-version release notes index**: [docs/operations/release-notes/](docs/operations/release-notes/index.md) — quick navigation to specific version sections + complete chronology in [CHANGELOG.md](CHANGELOG.md).
 
 > This file is read by AI coding assistants. Platform equivalents: `CLAUDE.md` (Claude Code), `GEMINI.md` (Gemini CLI), `AGENTS.md` (generic). Content is platform-agnostic.
 
@@ -23,7 +23,7 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 **Runtime constraints (current behavior):** Per-cycle git worktrees are provisioned by `run-cycle.sh` (recorded in `cycle-state.json:active_worktree`). Orchestrator and all phase agents MAY NOT call `git worktree add/remove` (denied by profiles). The failure-adapter (`scripts/failure/failure-adapter.sh`) computes a deterministic PROCEED/RETRY/BLOCK decision from `state.json:failedApproaches[]` — orchestrator reads this JSON and follows it verbatim. Ledger entries include `prev_hash` + `entry_seq` for tamper-evident hash-chaining; verify with `bash scripts/observability/verify-ledger-chain.sh`. Audit `Verdict: WARN` ships by default (set `EVOLVE_STRICT_AUDIT=1` to block). `ship.sh` advances `state.json:lastCycleNumber` after every successful cycle ship.
 
-> For implementation details and version history (v8.21–v8.37), see [docs/release/release-archive.md](docs/release/release-archive.md).
+> For implementation details and version history (v8.21–v8.37), see [docs/operations/release-archive.md](docs/operations/release-archive.md).
 
 ## Auto-Retrospective on FAIL/WARN (v8.45.0+)
 
@@ -120,7 +120,7 @@ Scripts/cron jobs using `EVOLVE_BYPASS_SHIP_VERIFY=1` continue to work (permanen
 
 ## Release & Publish Workflow (v8.13.2+)
 
-**"publish" ≠ "push".** See [docs/release/release-protocol.md](docs/release/release-protocol.md) for the canonical vocabulary (push, tag, release, propagate, publish, ship). When the user asks to "publish vX.Y.Z", use the self-healing pipeline:
+**"publish" ≠ "push".** See [docs/guides/publishing-releases.md](docs/guides/publishing-releases.md) for the canonical vocabulary (push, tag, release, propagate, publish, ship). When the user asks to "publish vX.Y.Z", use the self-healing pipeline:
 
 ```bash
 bash scripts/release-pipeline.sh X.Y.Z              # full publish
@@ -187,7 +187,7 @@ The summary line emits `batch_total_cost=$X.XX / cap=$Y.YY` so post-run forensic
 | SKILL.md `argument-hint` advertises both modes | ✅ shipped v8.60.0 |
 | Positional integer (bare `/evolve-loop 3 ...`) | ⚠️ still parses as **cycles** with deprecation WARN. v10.0.0 candidate will consider flipping to dollars (breaking change — warrants a major-version-bump signal). Prefer the explicit flag (`--cycles N` or `--budget-usd N`) to be flip-safe. |
 
-> For detailed usage examples and forward-compatibility notes, see [docs/release/release-archive.md](docs/release/release-archive.md).
+> For detailed usage examples and forward-compatibility notes, see [docs/operations/release-archive.md](docs/operations/release-archive.md).
 
 ## Verification Before Claiming Done (v8.13.3+)
 
