@@ -441,6 +441,84 @@ cycle_state_compute_cycle_tier() {
     esac
 }
 
+# v9.1.0 Cycle 1: checkpoint operations for the resumable-cycle feature.
+# Writes a `checkpoint` block into cycle-state.json (additive schema —
+# pre-v9.1 readers ignore unknown fields via jq's `// empty`).
+#
+# Three triggers can fire a checkpoint (see docs/architecture/checkpoint-resume.md):
+#   - quota-likely      — phase exit 1 with empty stderr + cost ≥ 80% cap
+#   - batch-cap-near    — cumulative cost ≥ EVOLVE_CHECKPOINT_AT_PCT (default 95%)
+#   - operator-requested — manual checkpoint via cycle-state.sh checkpoint manual
+#
+# The checkpoint preserves: current phase, completed_phases[], active_worktree,
+# cost-at-checkpoint, git HEAD at pause. The resume-cycle.sh script reads this
+# block to re-initialize a paused cycle from its last-good phase boundary.
+cycle_state_checkpoint() {
+    local reason="${1:?usage: checkpoint <reason>; reasons: quota-likely | batch-cap-near | operator-requested}"
+    case "$reason" in
+        quota-likely|batch-cap-near|operator-requested) ;;
+        *) echo "[cycle-state] ERROR: invalid checkpoint reason '$reason'" >&2; return 1 ;;
+    esac
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot checkpoint — state file missing (cycle not active?)" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for checkpoint" >&2
+        return 1
+    fi
+    local now git_head
+    now=$(_iso_now)
+    git_head=$(git -C "$EVOLVE_PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")
+    local cost="${EVOLVE_CHECKPOINT_COST_USD:-0.00}"
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(echo "$current" | jq -c \
+        --arg reason "$reason" \
+        --arg now "$now" \
+        --arg git_head "$git_head" \
+        --argjson cost "$cost" \
+        '. + {checkpoint: {
+            enabled: true,
+            reason: $reason,
+            savedAt: $now,
+            resumeFromPhase: .phase,
+            worktreePath: (.active_worktree // ""),
+            completedPhases: (.completed_phases // []),
+            gitHead: $git_head,
+            costAtCheckpoint: $cost
+        }}')
+    _atomic_write "$updated"
+    echo "[cycle-state] CHECKPOINT written: reason=$reason resume_from_phase=$(echo "$updated" | jq -r '.checkpoint.resumeFromPhase')" >&2
+}
+
+# v9.1.0: query whether the current cycle-state has an active checkpoint.
+# Exit 0 if checkpointed (paused), exit 1 otherwise. Used by run-cycle.sh's
+# EXIT trap to decide whether to skip cleanup.
+cycle_state_is_checkpointed() {
+    cycle_state_exists || return 1
+    if command -v jq >/dev/null 2>&1; then
+        local enabled
+        enabled=$(jq -r '.checkpoint.enabled // false' "$CYCLE_STATE_FILE" 2>/dev/null)
+        [ "$enabled" = "true" ]
+    else
+        # Naive sed fallback — matches `"enabled":true` inside a checkpoint block.
+        grep -q '"checkpoint"' "$CYCLE_STATE_FILE" 2>/dev/null && \
+            grep -q '"enabled"[[:space:]]*:[[:space:]]*true' "$CYCLE_STATE_FILE" 2>/dev/null
+    fi
+}
+
+# v9.1.0: print the phase to resume from. Caller uses this to seed
+# cycle_state_init in resume-cycle.sh. Empty string if no checkpoint.
+cycle_state_resume_phase() {
+    cycle_state_exists || return 1
+    if command -v jq >/dev/null 2>&1; then
+        jq -r '.checkpoint.resumeFromPhase // empty' "$CYCLE_STATE_FILE" 2>/dev/null
+    else
+        sed -n 's/.*"resumeFromPhase"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CYCLE_STATE_FILE" | head -1
+    fi
+}
+
 # CLI dispatcher: only fires when this file is executed directly.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     cmd="${1:-}"
@@ -458,10 +536,13 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         clear)                   cycle_state_clear ;;
         record-quality-tier)     cycle_state_record_quality_tier "$@" ;;
         compute-cycle-tier)      cycle_state_compute_cycle_tier ;;
+        checkpoint)              cycle_state_checkpoint "$@" ;;
+        is-checkpointed)         cycle_state_is_checkpointed && echo yes || { echo no; exit 1; } ;;
+        resume-phase)            cycle_state_resume_phase ;;
         get)                     cycle_state_get "$@" ;;
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

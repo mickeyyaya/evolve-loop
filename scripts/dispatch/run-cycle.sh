@@ -327,10 +327,29 @@ WORKTREE_BRANCH=""
 WORKTREE_PROVISIONED=0
 cleanup() {
     local rc=$?
+
+    # v9.1.0 Cycle 1: checkpoint-aware cleanup. If a phase wrote a checkpoint
+    # block to cycle-state.json (via cycle-state.sh checkpoint <reason>), or
+    # the dispatcher signaled EVOLVE_CHECKPOINT_TRIGGERED=1 due to reactive
+    # quota-likely failure classification, PRESERVE the worktree + state so
+    # `resume-cycle.sh` can pick up exactly where this cycle paused. The
+    # legacy cleanup path is the default — only an explicit checkpoint
+    # flips us into preserve mode.
+    local checkpointed=0
+    if bash "$CYCLE_STATE_HELPER" is-checkpointed >/dev/null 2>&1; then
+        checkpointed=1
+    elif [ "${EVOLVE_CHECKPOINT_TRIGGERED:-0}" = "1" ]; then
+        # The phase aborted via reactive classification but never got a chance
+        # to write the checkpoint block; do it on its behalf so resume works.
+        bash "$CYCLE_STATE_HELPER" checkpoint "quota-likely" 2>/dev/null && checkpointed=1
+    fi
+
     # v8.60.0: hoist gitignored baseline artifacts from worktree to project root
     # BEFORE worktree removal. Worktree cleanup destroys .evolve/baselines/*.json
-    # since they are gitignored (not committed).
-    if [ "$WORKTREE_PROVISIONED" = "1" ] && [ -d "${WORKTREE_PATH:-}/.evolve/baselines" ]; then
+    # since they are gitignored (not committed). Skip when checkpointed —
+    # the worktree stays around, so hoisting is unnecessary (and the next
+    # resume run will see the same baselines in-place).
+    if [ "$checkpointed" = "0" ] && [ "$WORKTREE_PROVISIONED" = "1" ] && [ -d "${WORKTREE_PATH:-}/.evolve/baselines" ]; then
         local dst="$EVOLVE_PROJECT_ROOT/.evolve/baselines"
         mkdir -p "$dst" 2>/dev/null || true
         for f in "$WORKTREE_PATH/.evolve/baselines/"*.json; do
@@ -344,6 +363,15 @@ cleanup() {
             fi
         done
     fi
+
+    if [ "$checkpointed" = "1" ]; then
+        log "[run-cycle] CHECKPOINT: worktree + state preserved at ${WORKTREE_PATH:-<none>}; resume with --resume"
+        log "[run-cycle] preserved cycle-state at .evolve/cycle-state.json (phase=$(bash "$CYCLE_STATE_HELPER" resume-phase 2>/dev/null))"
+        # Do NOT remove worktree, do NOT clear cycle-state, do NOT delete branch.
+        # The dispatcher's caller (`resume-cycle.sh`) will own that lifecycle.
+        exit $rc
+    fi
+
     if [ "$WORKTREE_PROVISIONED" = "1" ]; then
         if [ -d "$WORKTREE_PATH" ]; then
             log "cleanup: removing worktree $WORKTREE_PATH"
