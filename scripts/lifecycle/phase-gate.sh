@@ -509,6 +509,15 @@ gate_build_to_audit() {
         fi
     fi
 
+    # 6. Optional evolve-code-reviewer advisory lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1, default OFF)
+    # Runs AFTER builder exits, BEFORE primary Auditor starts. Sonnet tier vs. Auditor's Opus —
+    # model-family rotation reduces sycophancy risk. Advisory only; never blocks cycle.
+    if [ "${EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER:-0}" = "1" ]; then
+        log "Running evolve-code-reviewer advisory lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1)..."
+        subagent-run.sh code-reviewer "$CYCLE" "$WORKSPACE" 2>/dev/null || true
+        log "OK: Code-reviewer lens complete (result in $WORKSPACE/workers/code-reviewer.md)"
+    fi
+
     log "PASS: BUILD → AUDIT gate"
 }
 

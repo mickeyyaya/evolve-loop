@@ -1,6 +1,6 @@
 # Token-Reduction Roadmap (Cycles 15–19+)
 
-> **Status:** v9.1.1 baseline — Cycle 15 research deliverable. Cycle 16 shipped: `code-simplifier` agent profile + persona + `builder-simplify-advisory.sh` wired into `gate_build_to_audit` (`EVOLVE_SIMPLIFY_ENABLED=1`, default OFF).
+> **Status:** v9.1.1 baseline — Cycle 15 research deliverable. Cycle 16 shipped: `code-simplifier` agent profile + persona + `builder-simplify-advisory.sh` wired into `gate_build_to_audit` (`EVOLVE_SIMPLIFY_ENABLED=1`, default OFF). Cycle 17 shipped: `evolve-code-reviewer` persona + profile + `EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER` fan-out lens wired into `gate_build_to_audit` (Sonnet tier, sycophancy-break rotation, default OFF).
 > For context-floor history see [token-floor-history.md](token-floor-history.md).
 > For Cycle-11 cost forensics see [token-economics-2026.md](token-economics-2026.md).
 
@@ -211,6 +211,23 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Verification** | `EVOLVE_SIMPLIFY_ENABLED=0` run produces no ledger entry for `code-simplifier`; `EVOLVE_SIMPLIFY_ENABLED=1` run produces `code-simplifier-report.md` with challenge token |
 
 **Notes:** Mirrors the Cycle 15 `EVOLVE_AUDIT_ADVISORY_REVIEW` pattern but invokes a Haiku subagent (not static shell script). Uses `subagent-run.sh code-simplifier` for ledger-tracked, profile-scoped execution at ≤$0.30/cycle. Validates Haiku-tier quality for Cycle 18 promotion decision.
+
+---
+
+## Cycle 17 Deliverable: evolve-code-reviewer Auditor Fan-out Lens
+
+### P-C17 — evolve-code-reviewer opt-in sycophancy-break lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1)
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `.evolve/profiles/code-reviewer.json` + `agents/evolve-code-reviewer.md` + `phase-gate.sh gate_build_to_audit` inline trigger |
+| **Expected saving** | Observability + sycophancy break. Direct cost saving deferred to P-NEW-2 (Cycle 18+ Auditor right-sizing). |
+| **LoC delta** | ~232 net additions across 6 files (3 new + 3 modified) |
+| **Risk** | Low — advisory only; `EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=0` default preserves byte-equivalence |
+| **Target cycle** | 17 (SHIPPED) |
+| **Verification** | `jq .model_tier_default .evolve/profiles/code-reviewer.json` → `"sonnet"`; flag=1 cycle produces `workers/code-reviewer.md` with challenge token |
+
+**Notes:** Sonnet model tier (vs. Auditor's Opus) is the structural sycophancy-break mechanism. Combined with adversarial framing directive ("must find at least one HIGH defect or produce positive evidence"), this lens catches defects that same-model-judge patterns systematically miss. Inlined in `gate_build_to_audit` (no separate advisory shell script) to preserve the ≤6 file budget for the eval grader file.
 
 ---
 
