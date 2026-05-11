@@ -124,3 +124,15 @@ The 4-tier architecture explicitly maps to 2026 production-state patterns:
   openreview.net/pdf?id=7JbSwX6bNL).
 
 Detailed citations live in `memory/reference_token_optimization_research.md`.
+
+## Runtime-side dataset (cycle 11, post-v9.0.2)
+
+This doc captures STATIC context-floor measurements (input bytes loaded into
+each phase's prompt). The complementary *runtime* dataset — per-phase cost,
+turn count, cache-create vs cache-read split, and the optimization roadmap
+that follows — lives at [`token-economics-2026.md`](token-economics-2026.md).
+
+Headline cycle-11 number: **$6.70 total**, of which cache-creation paid 5×
+(once per phase) is ~$2.00 of fixed overhead. Scout (49 turns) and Builder
+(58 turns) are the next biggest reduction targets, following the v9.0.2
+intent fix pattern.
