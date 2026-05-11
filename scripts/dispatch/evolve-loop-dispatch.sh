@@ -904,6 +904,44 @@ for ((i=1; i<=CYCLES; i++)); do
     fi
     unset SCC cost_json cost_line
 
+    # v9.1.0 Cycle 2: pre-emptive checkpoint thresholds.
+    # Two thresholds fire BEFORE the hard tripwire below:
+    #
+    #   EVOLVE_CHECKPOINT_WARN_AT_PCT (default 80) — log a WARN advising
+    #     the operator that they're approaching the cap. No state change.
+    #
+    #   EVOLVE_CHECKPOINT_AT_PCT (default 95) — set EVOLVE_CHECKPOINT_REQUEST=1
+    #     in the dispatcher's env so the NEXT cycle's orchestrator sees the
+    #     signal in its invocation context. The orchestrator persona reads
+    #     this and writes a checkpoint at the next phase boundary instead
+    #     of continuing. The cycle that's already in progress completes; the
+    #     pre-emption is for the cycle that hasn't started yet. This avoids
+    #     forcing a mid-cycle abort (which would lose phase-coherent state).
+    #
+    # Rationale: the v8.58 tripwire is binary (over/under). When you cross
+    # the cap mid-batch, work in flight is lost. The 95% pre-emptive signal
+    # gives the orchestrator a chance to graceful-pause at the next clean
+    # phase boundary, where resume is straightforward.
+    CHECKPOINT_WARN_AT_PCT="${EVOLVE_CHECKPOINT_WARN_AT_PCT:-80}"
+    CHECKPOINT_AT_PCT="${EVOLVE_CHECKPOINT_AT_PCT:-95}"
+    if [ "$BATCH_BUDGET_DISABLE" != "1" ] && command -v bc >/dev/null 2>&1 \
+            && [ "${EVOLVE_CHECKPOINT_DISABLE:-0}" != "1" ]; then
+        # Compute integer percentage (truncated). bc's `scale=0` gives floor.
+        _pct=$(echo "scale=2; $BATCH_TOTAL_COST / $BATCH_CAP * 100" | bc -l 2>/dev/null | awk -F. '{print $1+0}')
+        _pct="${_pct:-0}"
+        if [ "$_pct" -ge "$CHECKPOINT_AT_PCT" ] && [ "${EVOLVE_CHECKPOINT_REQUEST:-0}" != "1" ]; then
+            log "BATCH-BUDGET CRITICAL: cumulative \$${BATCH_TOTAL_COST} (${_pct}%) >= ${CHECKPOINT_AT_PCT}% — signaling next cycle to checkpoint at phase boundary"
+            log "  next cycle's orchestrator will receive EVOLVE_CHECKPOINT_REQUEST=1 in its invocation context"
+            log "  to resume after this batch ends: bash scripts/dispatch/evolve-loop-dispatch.sh --resume"
+            export EVOLVE_CHECKPOINT_REQUEST=1
+            export EVOLVE_CHECKPOINT_REASON="batch-cap-near"
+        elif [ "$_pct" -ge "$CHECKPOINT_WARN_AT_PCT" ]; then
+            log "BATCH-BUDGET WARN: cumulative \$${BATCH_TOTAL_COST} (${_pct}%) >= ${CHECKPOINT_WARN_AT_PCT}% — consider operator review"
+            log "  pre-emptive checkpoint fires at ${CHECKPOINT_AT_PCT}% (\$$(echo "scale=2; $BATCH_CAP * $CHECKPOINT_AT_PCT / 100" | bc -l 2>/dev/null))"
+        fi
+        unset _pct
+    fi
+
     # v8.58.0 Layer B: tripwire check. After the cycle's cost is added, if the
     # cumulative total exceeds the cap, stop the batch — remaining cycles are
     # skipped. This is the operator-facing tripwire that the v8.57 verification

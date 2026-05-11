@@ -46,6 +46,15 @@ set -uo pipefail
 [ -n "${EVOLVE_DISPATCH_STOP_ON_FAIL:-}" ] && export EVOLVE_DISPATCH_STOP_ON_FAIL
 [ -n "${EVOLVE_DISPATCH_POLICY:-}" ] && export EVOLVE_DISPATCH_POLICY
 [ -n "${EVOLVE_BYPASS_PHASE_GATE:-}" ] && export EVOLVE_BYPASS_PHASE_GATE
+# v9.1.0 Cycle 2: propagate checkpoint signals from the dispatcher to the
+# orchestrator subprocess. EVOLVE_CHECKPOINT_REQUEST is set by the dispatcher
+# at 95% batch-budget consumption; the orchestrator reads it from its
+# invocation env and writes a checkpoint at the next phase boundary.
+[ -n "${EVOLVE_CHECKPOINT_REQUEST:-}" ] && export EVOLVE_CHECKPOINT_REQUEST
+[ -n "${EVOLVE_CHECKPOINT_REASON:-}" ] && export EVOLVE_CHECKPOINT_REASON
+[ -n "${EVOLVE_CHECKPOINT_TRIGGERED:-}" ] && export EVOLVE_CHECKPOINT_TRIGGERED
+[ -n "${EVOLVE_CHECKPOINT_AT_PCT:-}" ] && export EVOLVE_CHECKPOINT_AT_PCT
+[ -n "${EVOLVE_CHECKPOINT_WARN_AT_PCT:-}" ] && export EVOLVE_CHECKPOINT_WARN_AT_PCT
 
 # v8.18.0: dual-root resolution. PLUGIN_ROOT for read-only scripts/agents,
 # PROJECT_ROOT for writable state/ledger/runs/instincts. See resolve-roots.sh.
