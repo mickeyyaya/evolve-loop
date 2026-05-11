@@ -82,6 +82,35 @@ expect_match "SKIP_NORMAL_INIT flag set" "$src" "SKIP_NORMAL_INIT=1"
 expect_match "worktree-provision gated" "$src" "SKIP_NORMAL_INIT.*= ?.1.?"
 
 echo
+echo "=== Test 4b (regression): collision check honors EVOLVE_RESUME_MODE ==="
+# v9.1.0 post-ship bug: the early collision check (cycle-state.json already
+# exists for cycle N — refusing to clobber) fired unconditionally and aborted
+# resume before the RESUME-MODE branch could run. The fix gates it.
+# Verify the collision check is inside an `if [ ... EVOLVE_RESUME_MODE ... != "1" ]` block.
+collision_gated=$(awk '
+    /^if \[ "\$\{EVOLVE_RESUME_MODE:-0\}" != "1" \]; then$/ { in_gate=1; next }
+    in_gate && /^fi$/ { in_gate=0; next }
+    in_gate && /cycle-state\.json already exists for cycle/ { print "GATED"; exit }
+' "$RUN_CYCLE")
+[ "$collision_gated" = "GATED" ] \
+    && expect "collision check gated by EVOLVE_RESUME_MODE" "yes" "yes" \
+    || expect "collision check gated by EVOLVE_RESUME_MODE" "no" "yes"
+
+echo
+echo "=== Test 4c (regression): WORKTREE_PATH reset gated by SKIP_NORMAL_INIT ==="
+# v9.1.0 post-ship bug: WORKTREE_PATH=""/_BRANCH=""/_PROVISIONED=0 at the start of the
+# worktree-provision block clobbered the value the RESUME-MODE branch had just set
+# from cycle-state.json. The fix gates the reset behind `SKIP_NORMAL_INIT != "1"`.
+reset_gated=$(awk '
+    /^if \[ "\$SKIP_NORMAL_INIT" != "1" \]; then$/ { in_gate=1; next }
+    in_gate && /^fi$/ { in_gate=0; next }
+    in_gate && /^[[:space:]]*WORKTREE_PATH=""/ { print "GATED"; exit }
+' "$RUN_CYCLE")
+[ "$reset_gated" = "GATED" ] \
+    && expect "WORKTREE_PATH reset gated by SKIP_NORMAL_INIT" "yes" "yes" \
+    || expect "WORKTREE_PATH reset gated by SKIP_NORMAL_INIT" "no" "yes"
+
+echo
 echo "=== Test 5: resume-cycle.sh exit 2 when no cycle-state ==="
 # Run resume-cycle.sh against a non-existent state dir.
 TMP=$(mktemp -d)

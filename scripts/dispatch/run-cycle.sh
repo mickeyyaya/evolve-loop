@@ -147,9 +147,22 @@ WORKSPACE="$EVOLVE_PROJECT_ROOT/.evolve/runs/cycle-$CYCLE"
 
 # ---- Collision check -------------------------------------------------------
 
-if bash "$CYCLE_STATE_HELPER" exists >/dev/null 2>&1; then
-    existing=$(bash "$CYCLE_STATE_HELPER" get cycle_id || true)
-    integrity_fail "cycle-state.json already exists for cycle $existing — refusing to clobber. Run: bash scripts/lifecycle/cycle-state.sh clear"
+# v9.1.0 Cycle 4 ADDENDUM (post-ship discovery, 2026-05-11): in resume mode
+# the existing cycle-state.json is INTENTIONAL — that's the preserved state we
+# are resuming from. The collision check must NOT fire here; if it does, the
+# entire --resume path is broken (resume-cycle.sh validates state then spawns
+# run-cycle.sh with EVOLVE_RESUME_MODE=1, but this gate would abort before
+# the resume-aware branch at line ~412 has a chance to run).
+#
+# This bug was caught only by end-to-end positive resume testing — source-level
+# tests (resume-cycle-test.sh) saw the new RESUME-MODE code at line ~412 and
+# passed; they didn't simulate the actual handoff from resume-cycle.sh into
+# run-cycle.sh, which is where the collision fires.
+if [ "${EVOLVE_RESUME_MODE:-0}" != "1" ]; then
+    if bash "$CYCLE_STATE_HELPER" exists >/dev/null 2>&1; then
+        existing=$(bash "$CYCLE_STATE_HELPER" get cycle_id || true)
+        integrity_fail "cycle-state.json already exists for cycle $existing — refusing to clobber. Run: bash scripts/lifecycle/cycle-state.sh clear"
+    fi
 fi
 
 # ---- Build context block ---------------------------------------------------
@@ -459,9 +472,17 @@ fi
 # This block runs BEFORE the orchestrator subprocess so the worktree is ready
 # by the time the build phase starts. The orchestrator and all phase agents
 # may NOT call `git worktree add/remove` — only this privileged shell context.
-WORKTREE_PATH=""
-WORKTREE_BRANCH=""
-WORKTREE_PROVISIONED=0
+#
+# v9.1.0 Cycle 4 ADDENDUM (post-ship discovery, 2026-05-11): in resume mode the
+# RESUME-MODE branch above already populated WORKTREE_PATH from the preserved
+# cycle-state.json (line 451). Skipping the reset preserves that value so the
+# downstream `re-using paused cycle's worktree at $WORKTREE_PATH` log is
+# accurate AND the orchestrator subagent can find the worktree.
+if [ "$SKIP_NORMAL_INIT" != "1" ]; then
+    WORKTREE_PATH=""
+    WORKTREE_BRANCH=""
+    WORKTREE_PROVISIONED=0
+fi
 
 # v8.23.4 BUG-011 escape hatch: EVOLVE_SKIP_WORKTREE=1 disables worktree
 # provisioning entirely and points cycle-state.active_worktree at the main
