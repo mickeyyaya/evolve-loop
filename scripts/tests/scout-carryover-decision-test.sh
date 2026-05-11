@@ -179,6 +179,37 @@ set -e
 [ "$RC" = "0" ] && pass "gate ALLOWS scout-report with Carryover Decisions section" || \
     fail "gate REJECTED valid scout-report (rc=$RC)"
 
+# --- Test 5 (v9.0.3): scout persona has Turn budget section ----------------
+header "Test 5 (v9.0.3): scout persona has Turn budget section"
+if grep -q "^## Turn budget" "$SCOUT_PERSONA" \
+   && grep -qE "(8.{1,3}12 turns|Target.*8|Maximum.{1,4}15)" "$SCOUT_PERSONA"; then
+    pass "Turn budget section + 8-12 target / 15 max present in persona"
+else
+    fail "Turn budget section or turn-count target missing from scout persona"
+fi
+
+# --- Test 6 (v9.0.3): scout.json max_turns tightened to 15 or less --------
+header "Test 6 (v9.0.3): scout max_turns tightened to 15 or less"
+SCOUT_PROFILE="$REPO_ROOT/.evolve/profiles/scout.json"
+if command -v jq >/dev/null 2>&1; then
+    mt=$(jq -r '.max_turns' "$SCOUT_PROFILE")
+    if [ "$mt" -le 15 ]; then
+        pass "scout max_turns=$mt (≤ 15)"
+    else
+        fail "scout max_turns=$mt exceeds v9.0.3 target of 15"
+    fi
+fi
+
+# --- Test 7 (v9.0.3): scout persona instructs main flow to skip web -------
+# Web tools remain in profile for fan-out research sub-scout, but main-flow
+# scout is instructed NOT to use them. Verify the persona language is present.
+header "Test 7 (v9.0.3): scout persona defers web research to Phase 1"
+if grep -qE "Skip web research in the main flow|WebSearch.*fan-out|main.path scout does NOT" "$SCOUT_PERSONA"; then
+    pass "persona defers web research to Phase 1 / fan-out research sub-scout"
+else
+    fail "persona missing v9.0.3 web-research deferral guidance"
+fi
+
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"
 echo

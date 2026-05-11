@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.0.3] - 2026-05-11
+
+P1 of the v9.0.2 token-economics roadmap (see
+`docs/architecture/token-economics-2026.md`). Drives the **scout phase**
+from cycle-11's measured 49 turns / $1.32 down to a target of 8–12
+turns / ~$0.50. Same playbook as v9.0.2's intent fix, adapted to scout's
+legitimately-larger discovery surface.
+
+### Background
+
+Cycle 11 measured: scout = 49 turns, $1.32, 16,378 output tokens. The
+profile's `max_turns: 30` advisory was exceeded by 19. Root cause: open-
+ended exploration — the persona instructed "Read ALL project
+documentation" in cycle-1 mode and offered no turn budget in incremental
+mode, so scout did 4–6 rounds of file reads to ground each hypothesis.
+
+### Fixed
+
+- **Scout profile (`.evolve/profiles/scout.json`).** `max_turns: 30 → 15`
+  (advisory cap; design target is 8–12). WebSearch/WebFetch retained
+  for the fan-out 'research' sub-scout (`parallel_subtasks[].research`);
+  main-flow scout is instructed by the persona to defer web work to
+  Phase 1 RESEARCH (the persona's existing rule at line 80 — now
+  reinforced by the new Turn budget section).
+- **Scout persona (`agents/evolve-scout.md`).** Added explicit
+  `## Turn budget` section directly above Responsibilities:
+  - Target 8–12 turns, max 15 (profile-enforced)
+  - Lead with pre-loaded context (`projectDigest`, `carryoverTodos`,
+    `instinctSummary`, `recentLedger`, `failedApproaches`,
+    `evaluatedTasks` — all already in role-context) rather than grep
+    expeditions
+  - Cap directed file reads at ≤5 per cycle; reads beyond that need a
+    specific premise being tested (or invoke `EVOLVE_TASK_MODE=deep`)
+  - Cap Grep/Glob at ≤3 per cycle
+  - Write scout-report.md ONCE (each Edit counts as a turn)
+- **Responsibilities §1 (Mode-Based Discovery) tightened** with per-
+  mode turn budgets:
+  - `full` (cycle 1): 10–12 turns — targeted scans, not full dir walks
+  - `incremental` (cycle 2+): 6–8 turns — pre-loaded context is enough
+    for many cycles; if `carryoverTodos` resolves the cycle, skip
+    codebase exploration entirely
+  - `convergence-confirmation`: 3–5 turns — flag + stop
+
+### Verified
+
+- `scripts/tests/scout-carryover-decision-test.sh` extended from 4 to 7
+  tests (8 sub-assertions); all PASS. Asserts persona has Turn budget
+  section + 8-12 / 15 numerics, profile max_turns ≤ 15, persona defers
+  web research to Phase 1.
+- No regressions: swarm-architecture 41/41, role-gate 23/23.
+
+### Pending follow-up (P2 from the roadmap)
+
+Builder ran 58 turns / $1.95 in cycle 11. v9.0.4 will apply the same
+playbook to builder.
+
 ## [9.0.2] - 2026-05-11
 
 Patch release that drives the intent phase from **7 turns / $1.05** to a

@@ -77,7 +77,8 @@
     "research": 1.5,
     "deep": 2.5
   },
-  "max_turns": 30,
+  "max_turns": 15,
+  "_max_turns_design_note_": "v9.0.3: lowered from 30 to 15 after cycle-11 evidence (49 turns / $1.32 — exceeded both old advisory caps). Design target is 8-12 turns; 15 leaves headroom for the few legitimate exploratory cycles. The advisory max_turns + persona-side ## Turn budget section together bound scout's discovery surface without stripping its tools. WebSearch/WebFetch retained for the fan-out 'research' sub-scout (parallel_subtasks); main-path scout is instructed by the persona to defer web work to Phase 1 RESEARCH.",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",
   "challenge_token_required": true,

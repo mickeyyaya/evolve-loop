@@ -39,24 +39,41 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 
 See [agent-templates.md](agent-templates.md) for shared strategy definitions. Adapt discovery scope and task selection priorities based on active strategy.
 
+## Turn budget (v9.0.3)
+
+**Target: 8–12 turns. Maximum: 15 (enforced by profile).** This is structural, not advisory.
+
+Cycle-11 evidence (pre-v9.0.3): scout ran **49 turns / $1.32** — far over the previous 30-turn advisory cap and the $0.50 budget. The root cause was open-ended exploration: scout greps for evidence, reads files to inform hypotheses, then reads more files to inform tasks. Each evidence-grounding loop is a turn.
+
+The v9.0.3 fix bounds scout's exploration scope structurally:
+
+- **Lead with pre-loaded context**, not grep expeditions. Your role context already includes: `projectDigest`, `carryoverTodos`, `instinctSummary`, `recentLedger`, `failedApproaches`, `evaluatedTasks`. Most cycles can propose tasks from these alone — no codebase grepping needed for "do we already know what to do?"
+- **Cap directed reads at ≤5 files per cycle.** Reads beyond 5 should be justified by a specific premise being tested, not "let me look around more." If you find yourself reading file #6+, you're in deep-mode territory and should explicitly invoke `EVOLVE_TASK_MODE=deep` instead.
+- **Cap Grep/Glob at ≤3 per cycle.** Grep is a high-information tool but each invocation = 1 turn. Three is enough to scope: one for the changed-area, one for the affected-pattern, one for a sanity-check.
+- **Skip web research in the main flow.** Phase 1 RESEARCH already ran before you spawned (see Responsibility §5). WebSearch/WebFetch tools are present in your profile ONLY for the fan-out 'research' sub-scout (which fires when `EVOLVE_FANOUT_ENABLED=1`); main-path scout does NOT use them.
+- **Write `scout-report.md` ONCE.** Multiple Edits to the same artifact each count as a turn. Draft internally, then write.
+
+If you exceed 15 turns, `max_turns` aborts you. If you hit 12 turns without a scout-report draft ready, that's a quality signal — emit a partial report with `## Discovery Summary: time-bounded; X dimensions not covered` and stop. The orchestrator handles partial reports.
+
 ## Responsibilities
 
-### 1. Mode-Based Discovery
+### 1. Mode-Based Discovery (turn budget per mode)
 
-**`mode: "full"` (cycle 1):**
-- Read ALL project documentation (`.md`, config, README)
-- Full codebase scan (file sizes, complexity, coverage, dependencies)
-- Detect project context (language, framework, test/build commands)
+**`mode: "full"` (cycle 1) — 10–12 turn budget:**
+- Read top-level project documentation (README, ONE primary `.md`)
+- Targeted codebase scan via `git ls-files | head -100` + Grep on identified patterns
+- Detect project context (language, framework, test/build commands) — use `Read` on package.json/Cargo.toml/etc., not full directory walks
 - Generate `project-digest.md` (see Output)
 
-**`mode: "incremental"` (cycle 2+):**
-- Read `projectDigest`, `recentNotes`, `builderNotes`, `instinctSummary`, `recentLedger` from context
+**`mode: "incremental"` (cycle 2+) — 6–8 turn budget:**
+- Read `projectDigest`, `recentNotes`, `builderNotes`, `instinctSummary`, `recentLedger` from your role context (already pre-loaded — do NOT re-fetch)
 - Scan ONLY `changedFiles`, not entire codebase
 - Do NOT read full ledger.jsonl, full notes.md, or instinct YAML files
+- If `carryoverTodos[]` resolves the cycle without further reading, propose tasks directly from it and skip codebase exploration entirely
 
-**`mode: "convergence-confirmation"` (nothingToDoCount == 1):**
+**`mode: "convergence-confirmation"` (nothingToDoCount == 1) — 3–5 turn budget:**
 - Read ONLY `stateJson` and run `git log --oneline -3`
-- MUST trigger new web research (bypass cooldowns)
+- MUST trigger new web research (bypass cooldowns) — Phase 1 RESEARCH handles this; you flag the trigger and stop
 - If still nothing to do: report no tasks. If new work detected: switch to incremental mode behavior.
 
 ### 2. Operator Brief Check
