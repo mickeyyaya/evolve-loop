@@ -497,6 +497,18 @@ gate_build_to_audit() {
     # 4. Builder cost-overrun guard (v8.60+)
     _check_builder_cost_overrun
 
+    # 5. Optional code-simplifier advisory pass (EVOLVE_SIMPLIFY_ENABLED=1, default OFF)
+    # Runs AFTER builder exits — purely informational; does not affect audit decision.
+    if [ "${EVOLVE_SIMPLIFY_ENABLED:-0}" = "1" ]; then
+        if [ -f "scripts/lifecycle/builder-simplify-advisory.sh" ]; then
+            log "Running code-simplifier advisory pass (EVOLVE_SIMPLIFY_ENABLED=1)..."
+            bash scripts/lifecycle/builder-simplify-advisory.sh "$CYCLE" "$WORKSPACE" 2>/dev/null || true
+            log "OK: Code-simplifier pass complete (result in $WORKSPACE/code-simplifier-report.md)"
+        else
+            log "WARN: builder-simplify-advisory.sh not found; simplifier pass skipped"
+        fi
+    fi
+
     log "PASS: BUILD → AUDIT gate"
 }
 

@@ -1,0 +1,80 @@
+{
+  "name": "code-simplifier",
+  "role": "code-simplifier",
+  "cli": "claude",
+  "model_tier_default": "haiku",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git status:*)",
+    "Bash(ls:*)",
+    "Bash(wc:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Write(.evolve/runs/cycle-*/code-simplifier-report.md)",
+    "Edit(.evolve/runs/cycle-*/code-simplifier-report.md)"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git worktree:*)",
+    "Bash(gh:*)",
+    "Bash(rm:*)",
+    "Bash(mv:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "Bash(npm:*)",
+    "Bash(pip:*)",
+    "Bash(brew:*)",
+    "WebFetch",
+    "WebSearch"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 0.30,
+  "max_turns": 8,
+  "permission_mode": "bypassPermissions",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/code-simplifier-report.md",
+  "challenge_token_required": true,
+  "extra_flags": [
+    "--bare",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
+    "--setting-sources",
+    "project"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      "skills",
+      "agents",
+      "scripts",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals",
+      ".evolve/instincts",
+      "CHANGELOG.md",
+      "README.md",
+      "CLAUDE.md"
+    ],
+    "allow_network": false
+  },
+  "parallel_eligible": false
+}

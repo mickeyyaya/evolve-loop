@@ -1,6 +1,6 @@
 # Token-Reduction Roadmap (Cycles 15–19+)
 
-> **Status:** v9.1.1 baseline — Cycle 15 research deliverable.
+> **Status:** v9.1.1 baseline — Cycle 15 research deliverable. Cycle 16 shipped: `code-simplifier` agent profile + persona + `builder-simplify-advisory.sh` wired into `gate_build_to_audit` (`EVOLVE_SIMPLIFY_ENABLED=1`, default OFF).
 > For context-floor history see [token-floor-history.md](token-floor-history.md).
 > For Cycle-11 cost forensics see [token-economics-2026.md](token-economics-2026.md).
 
@@ -194,6 +194,23 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Risk** | Low (bridges emit stderr WARN; removal is planned; operators warned) |
 | **Target cycle** | 16 |
 | **Verification** | `guards-test.sh` + `dispatch-test.sh`; assert no regression |
+
+---
+
+## Cycle 16 Deliverable: code-simplifier Advisory Infrastructure
+
+### P-C16 — code-simplifier opt-in advisory pass (EVOLVE_SIMPLIFY_ENABLED=1)
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `.evolve/profiles/code-simplifier.json` + `agents/code-simplifier.md` + `scripts/lifecycle/builder-simplify-advisory.sh` + `phase-gate.sh gate_build_to_audit` hook |
+| **Expected saving** | Observability infrastructure — not a direct cost reduction. Enables Cycle 17+ promotion decisions by surfacing simplification opportunities per cycle. |
+| **LoC delta** | ~193 LoC (3 new files + 3 modified files) |
+| **Risk** | Low — advisory only; `EVOLVE_SIMPLIFY_ENABLED=0` default preserves byte-equivalence |
+| **Target cycle** | 16 (SHIPPED) |
+| **Verification** | `EVOLVE_SIMPLIFY_ENABLED=0` run produces no ledger entry for `code-simplifier`; `EVOLVE_SIMPLIFY_ENABLED=1` run produces `code-simplifier-report.md` with challenge token |
+
+**Notes:** Mirrors the Cycle 15 `EVOLVE_AUDIT_ADVISORY_REVIEW` pattern but invokes a Haiku subagent (not static shell script). Uses `subagent-run.sh code-simplifier` for ledger-tracked, profile-scoped execution at ≤$0.30/cycle. Validates Haiku-tier quality for Cycle 18 promotion decision.
 
 ---
 
