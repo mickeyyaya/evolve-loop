@@ -1,10 +1,10 @@
 ---
 name: evolve-loop
 description: Use when the user invokes /evolve-loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
-argument-hint: "[--budget-usd N | --cycles N] [strategy] [goal]"
+argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
 ---
 
-# Evolve Loop v9.0
+# Evolve Loop v9.1
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
@@ -37,6 +37,12 @@ The `find` expression locates the dispatcher in either install layout (marketpla
 Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args — the shell parses `doesn't` as `doesn` + opening-`'t` and waits for a closing single-quote that never comes.
 
 **Budget-driven dispatch (v8.60.0+):** Pass `--budget-usd N` (or `--budget N`) to run cycles until cumulative cost ≥ $N, rather than a fixed count. Example: `... bash "$(find ...)" --budget-usd 5 "improve test coverage"`. The cycle count becomes a safety upper bound (default 50). Passing both `--budget-usd N --cycles M` stops at whichever comes first.
+
+**Resume after pause (v9.1.0+):** If a cycle was checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), recover with `--resume`:
+```bash
+... bash "$(find ...)" --resume
+```
+The dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree exists), and re-spawns the orchestrator from the paused phase boundary. Trust kernel is preserved — phase-gate, role-gate, ship-gate enforce the same invariants during resume. See [docs/architecture/checkpoint-resume.md](../../docs/architecture/checkpoint-resume.md) for the full protocol.
 
 **DO NOT** invent paths like `<plugin_root>/skills/evolve-loop/scripts/...` — the dispatcher is at `<plugin_root>/scripts/`, NOT under `skills/`. The skill (this file) and the dispatcher live in sibling directories under the plugin root.
 

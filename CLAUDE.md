@@ -45,6 +45,43 @@ The retrospective subagent runs inline. Cost: ~$0.30-0.50 per FAIL/WARN cycle (S
 
 **Kernel changes**: `scripts/lifecycle/phase-gate.sh` gained `gate_audit_to_retrospective`; `scripts/lifecycle/cycle-state.sh` recognizes `retrospective` as a valid phase; orchestrator profile gained `Bash(merge-lesson-into-state.sh:*)`. `scripts/guards/phase-gate-precondition.sh` already permitted `retrospective` agent during audit/ship phases — v8.45 just wires the orchestrator persona to use it.
 
+## Checkpoint-Resume + Context-Window Control (v9.1.0+)
+
+Two paired capabilities that handle resource exhaustion gracefully instead of losing in-flight work. Pre-v9.1.0, a cycle that hit a Claude Code subscription quota (GitHub #29579 signature: rc=1 + empty stderr after substantial work) lost the worktree, the cycle-state, and all Builder edits. Same for context exhaustion — operator had to start over.
+
+### Checkpoint-Resume
+
+| Layer | What it does | When it fires |
+|---|---|---|
+| Reactive (Cycle 3) | `_quota_likely` heuristic in `subagent-run.sh` writes a checkpoint when phase rc=1 + stderr empty + cost ≥80% of `BATCH_CAP` | Per-phase failure |
+| Pre-emptive (Cycle 2) | Dispatcher exports `EVOLVE_CHECKPOINT_REQUEST=1` when cumulative cost crosses 95% (`EVOLVE_CHECKPOINT_AT_PCT`) | Per-cycle boundary |
+| Operator-requested | `cycle-state.sh checkpoint operator-requested` | Manual |
+
+When a checkpoint fires: `run-cycle.sh`'s EXIT trap preserves worktree + cycle-state + workspace artifacts. Operator types `/evolve-loop --resume` to pick up at the paused phase boundary. Trust kernel (phase-gate, role-gate, ship-gate, ledger SHA-chain) is unchanged — resume goes through the same enforcement.
+
+### Context-Window Control
+
+| Layer | What it does | Default |
+|---|---|---|
+| Per-phase autotrim | When `EVOLVE_CONTEXT_AUTOTRIM=1` AND prompt > `EVOLVE_PROMPT_MAX_TOKENS` (30k), trim head-60% + tail-35% with marker | opt-in |
+| Per-cycle monitor JSON | `.evolve/runs/cycle-N/context-monitor.json` per-phase input_tokens + cumulative | always-on |
+| Observability | `scripts/observability/show-context-monitor.sh <cycle>` (tabular, `--watch`, `--json`) | n/a |
+| Threshold integration | At ≥95% cumulative context, sets `EVOLVE_CHECKPOINT_REQUEST=1` — same channel as cost-based pre-emption | n/a |
+
+### v9.1.0 env-var reference
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `EVOLVE_CHECKPOINT_AT_PCT` | `95` | Pre-emptive trigger % (cost) |
+| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | `80` | Advisory WARN % (cost + context) |
+| `EVOLVE_CHECKPOINT_DISABLE` | `0` | Set 1 to disable all checkpoint thresholds |
+| `EVOLVE_QUOTA_DANGER_PCT` | `80` | Cost % below which reactive classification skips empty-stderr rc=1 |
+| `EVOLVE_RESUME_ALLOW_HEAD_MOVED` | `0` | Set 1 to bypass HEAD-drift guard on resume |
+| `EVOLVE_CONTEXT_AUTOTRIM` | `0` | Opt-in head/tail-preserving prompt trim |
+| `EVOLVE_PROMPT_MAX_TOKENS` | `30000` | Per-phase prompt cap (unchanged from v8.56) |
+
+See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md) and [docs/architecture/context-window-control.md](docs/architecture/context-window-control.md) for the full protocols.
+
 ## Three-Tier Strictness Model (v8.24.0+, refined v8.25.0)
 
 evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came from conflating layers; v8.24.0 made the layers explicit; v8.25.0 replaced "skip the worktree" with "relocate the worktree" so isolation is preserved even in nested-Claude.
