@@ -82,6 +82,15 @@ When a checkpoint fires: `run-cycle.sh`'s EXIT trap preserves worktree + cycle-s
 
 See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md) and [docs/architecture/context-window-control.md](docs/architecture/context-window-control.md) for the full protocols.
 
+## Token-Reduction Campaign (Cycles 15–19+)
+
+Cycle 15 ships a research deliverable (`docs/architecture/token-reduction-roadmap.md`, P1–P8+ roadmap)
+and a pilot opt-in advisory hook (`EVOLVE_AUDIT_ADVISORY_REVIEW=1`, default OFF) that invokes the
+existing `code-review-simplify` SKILL as a post-verdict observability pass. Subsequent cycles introduce
+code-simplifier (16), code-reviewer (17), and promote the highest-value roadmap items per the
+verify→default-on ladder. See [docs/architecture/token-reduction-roadmap.md](docs/architecture/token-reduction-roadmap.md)
+for P1–P8 details, expected savings (~48% = ~$3.20/cycle by Cycle 18), and per-cycle targets.
+
 ## Three-Tier Strictness Model (v8.24.0+, refined v8.25.0)
 
 evolve-loop's strictness is layered. The user-facing pain in pre-v8.24.0 came from conflating layers; v8.24.0 made the layers explicit; v8.25.0 replaced "skip the worktree" with "relocate the worktree" so isolation is preserved even in nested-Claude.

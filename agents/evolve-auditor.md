@@ -195,6 +195,12 @@ For code changes (not doc-only or config-only), optionally invoke review/evaluat
 
 D4 is **supplementary — does NOT override your independent verdict**. Both skills' findings are advisory input, not a replacement for your review.
 
+### D4.1 — Advisory Review Artifact (opt-in post-gate, v9.1.1+)
+
+When `EVOLVE_AUDIT_ADVISORY_REVIEW=1`, `gate_audit_to_ship` writes `$WORKSPACE/audit-advisory-review.md`
+after your verdict is finalized. This artifact is **opt-in, read-only, and advisory** — it does NOT bear
+verdict authority and MUST NOT cause you to re-open a closed verdict.
+
 ### E. Eval Gate (DEFERRED to phase-gate)
 - Do NOT run eval graders directly — the phase-gate script (`verify-eval.sh`) runs them independently as the single source of truth
 - Instead, **review the eval definitions** in `evals/<task-slug>.md` for quality:

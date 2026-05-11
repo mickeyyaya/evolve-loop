@@ -595,6 +595,18 @@ gate_audit_to_ship() {
         log "OK: Eval checksums match"
     fi
 
+    # 6. Optional advisory code-review pass (EVOLVE_AUDIT_ADVISORY_REVIEW=1, default OFF)
+    # Runs AFTER verdict is bound — purely informational; does not affect ship decision.
+    if [ "${EVOLVE_AUDIT_ADVISORY_REVIEW:-0}" = "1" ]; then
+        if [ -f "scripts/lifecycle/audit-advisory-review.sh" ]; then
+            log "Running advisory code-review pass (EVOLVE_AUDIT_ADVISORY_REVIEW=1)..."
+            bash scripts/lifecycle/audit-advisory-review.sh "$CYCLE" "$WORKSPACE" 2>/dev/null || true
+            log "OK: Advisory pass complete (result in $WORKSPACE/audit-advisory-review.md)"
+        else
+            log "WARN: audit-advisory-review.sh not found; advisory pass skipped"
+        fi
+    fi
+
     log "PASS: AUDIT → SHIP gate"
 }
 
