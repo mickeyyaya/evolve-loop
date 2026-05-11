@@ -148,13 +148,13 @@ Each is independently runnable; `--skip <suite>` opts out per stage.
 
 ## What Makes It Different
 
-**It discovers things you didn't ask for.** While building, agents surface latent bugs, inconsistencies, and opportunities in your codebase. These "unsolicited insights" appear in your session report as "Things Found Beyond Your Goal."
+Unlike `/goal`, `/mission`, and other long-running-LLM skills that orchestrate agents via prompt instructions alone, evolve-loop enforces its pipeline at the OS layer — three PreToolUse kernel hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) that run *before* the agent can act, not after.
 
-**It proposes its own next steps.** Each cycle generates hypotheses and discoveries that feed the next cycle as task candidates. The loop continues as long as there's something new to learn — not just something to do.
+**Phases enforced by shell, not promises.** Most long-running-LLM skills (/goal, /mission) sequence phases via prompt instructions — agents can and do skip them. evolve-loop's `phase-gate-precondition.sh` fires as a kernel hook before every subagent dispatch and denies the call if phases are out of order. A 2026-04-29 flow audit found 12 consecutive cycles where Scout and Builder were silently skipped by an orchestrator following prompt rules; the shell gate eliminated the pattern structurally (see `docs/incidents/` for the orchestrator-gaming post-mortem).
 
-**It learns from itself.** After every cycle, the pipeline extracts "instincts" — reusable patterns about what worked and what didn't. These feed back into future cycles, so the same mistakes don't repeat.
+**Every artifact is SHA-chained and forgery-resistant.** Each phase embeds a per-invocation challenge token and records its SHA256 in a hash-chained ledger (`ledger.jsonl`). Before any commit, `ship.sh` verifies the auditor's artifact SHA against the file on disk — not what the agent claims it produced. A cross-CLI forgery attempt (a fabricated PASS audit report) was detected and blocked by this chain (see `docs/incidents/gemini-forgery.md`). Run `./bin/verify-chain` to inspect any cycle's ledger integrity.
 
-**It guards its own quality.** The Auditor agent blocks any change rated MEDIUM severity or higher. Bad code doesn't ship.
+**Failures become structured lessons, not repeated mistakes.** On every FAIL or WARN verdict, the Retrospective agent (Reflexion / Shinn et al. 2023) converts the failure into a structured YAML lesson merged into the pipeline's memory (`state.json:instinctSummary[]`). The next cycle's Scout reads that lesson before choosing tasks. A deterministic shell script (`failure-adapter.sh`) — not an LLM — classifies failure patterns and blocks cycles that have exhausted recoverable paths, escalating to the operator with a specific remediation. /goal-style skills retry from scratch; evolve-loop's loop tightens on each pass.
 
 **It runs in isolation.** The Builder works in a separate git worktree, so your working directory is never touched. If a build fails, nothing is affected.
 

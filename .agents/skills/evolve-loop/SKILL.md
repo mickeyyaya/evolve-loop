@@ -12,6 +12,8 @@ argument-hint: "[--budget-usd N | --cycles N] [strategy] [goal]"
 
 Tool and command names in this file use **Claude Code conventions** (`Read`, `Bash`, `Skill`, `Agent`, etc.). If you are running this skill from a different CLI (Gemini, Codex, generic), read [reference/platform-detect.md](reference/platform-detect.md) FIRST — it tells you which translation overlay to load (`reference/<platform>-tools.md` for tool names, `reference/<platform>-runtime.md` for invocation patterns). On non-Claude platforms the runtime falls back to the hybrid driver: shell scripts dispatch through `scripts/cli_adapters/<cli>.sh`, which delegates to the Claude binary for actual subagent execution. See [docs/platform-compatibility.md](../../docs/platform-compatibility.md) for the support matrix.
 
+> **What this does in one paragraph:** Each `/evolve-loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `ship.sh` commits only what passes. A trust kernel of three shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) enforces phase order and artifact integrity at the OS layer, not the prompt layer — so the pipeline's safety properties hold even in autonomous / bypass-permissions mode. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
+
 ## STRICT MODE — Read this first (v8.13.7+)
 
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command. **Your cwd is the user's project directory, NOT the plugin install** — relative paths like `bash scripts/...` will fail with rc=127. Use this exact one-liner which resolves the dispatcher's absolute path regardless of install layout:
