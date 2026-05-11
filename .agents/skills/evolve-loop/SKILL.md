@@ -66,9 +66,7 @@ Single quotes inside the goal are fine when the goal itself is double-quoted. Av
 | `3` | Batch completed with one or more recoverable failures (infrastructure / audit-fail / build-fail). Failure modes recorded to `state.json:failedApproaches[]` for the next dispatch's orchestrator to read and adapt | Report which cycles had which classification; surface state.json:failedApproaches summary; offer to re-run with the same goal so subsequent cycles can adapt |
 | `10` | Bad arguments | Re-prompt with valid args |
 
-**Exit code 3 is the evolutionary path (v8.16.1+)**: when a cycle's `orchestrator-report.md` honestly declares "INFRASTRUCTURE FAILURE", an audit `Verdict: FAIL`, or a build failure, the dispatcher records the failure to `state.json:failedApproaches[]` and continues to the next cycle. The next cycle's orchestrator reads `failedApproaches` and adapts its approach (different scope, alternative path, or operator escalation). This is what "evolve-loop" means: learn from failure, try a different approach, move forward. STOP-class behavior (rc=2) is preserved for actual kernel breaches.
-
-**Dispatch policy (v8.60+):** `EVOLVE_DISPATCH_POLICY=off|verify|stop` controls per-cycle pipeline verification. `verify` (default) checks scout/builder/auditor ledger entries and continues on recoverable failures. `stop` reverts to fail-fast (rc=2 on any failure; use for CI gates). `off` skips verification entirely (legacy debug only). The deprecated flags `EVOLVE_DISPATCH_VERIFY=0` and `EVOLVE_DISPATCH_STOP_ON_FAIL=1` bridge to `EVOLVE_DISPATCH_POLICY=off` and `=stop` respectively with a one-time stderr WARN.
+**Dispatch policy (`EVOLVE_DISPATCH_POLICY`):** See CLAUDE.md § Dispatch policy for flag details.
 
 The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `run-cycle.sh` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
 

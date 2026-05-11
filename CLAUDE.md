@@ -187,6 +187,7 @@ This project's shell scripts target **bash 3.2** (macOS default) for portability
 - `set -uo pipefail` (NOT `set -e` for orchestrator scripts that need to capture sub-script exit codes — `set -e` interacts badly with `if !cmd; then; rc=$?` patterns where `rc` ends up 0)
 - Atomic writes via mv-of-temp: `printf ... > "${file}.tmp.$$" && mv -f "${file}.tmp.$$" "$file"`
 - `git diff HEAD` to capture tree-state SHAs (untracked files don't count — match the audit-binding model)
+- Since v8.42.0, `skills/<name>/` directories are **symlinks** to `../.agents/skills/<name>/`. Git tracks content changes at the `.agents/` canonical path — this is expected. Auditors verifying SKILL.md edits should diff `git diff HEAD -- .agents/skills/evolve-loop/SKILL.md`, not the symlink path.
 
 ### SSE / streaming endpoints (when you encounter them):
 
