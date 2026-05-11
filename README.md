@@ -464,6 +464,6 @@ evolve-loop follows standard open-source community practices:
 ## Links
 
 - [Documentation index](docs/index.md) — all reference docs
-- [Research index](docs/research-index.md) — 52 research documents
+- [Research index](docs/research-index.md) — 5 research documents
 - [Changelog](CHANGELOG.md)
 - [Releases](https://github.com/mickeyyaya/evolve-loop/releases)
