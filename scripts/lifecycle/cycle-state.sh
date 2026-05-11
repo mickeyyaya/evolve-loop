@@ -519,6 +519,24 @@ cycle_state_resume_phase() {
     fi
 }
 
+# v9.1.0 Cycle 5: clear the checkpoint block from cycle-state.json. The
+# orchestrator calls this at the start of resume mode to signal "the pause is
+# over; from here, regular cleanup rules apply." Without this step, the next
+# --resume invocation would see the still-active checkpoint and try to resume
+# the same cycle again (idempotency hole).
+cycle_state_clear_checkpoint() {
+    cycle_state_exists || return 1
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for clear-checkpoint" >&2
+        return 1
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(echo "$current" | jq -c 'del(.checkpoint)')
+    _atomic_write "$updated"
+    echo "[cycle-state] checkpoint block cleared" >&2
+}
+
 # CLI dispatcher: only fires when this file is executed directly.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     cmd="${1:-}"
@@ -539,10 +557,11 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         checkpoint)              cycle_state_checkpoint "$@" ;;
         is-checkpointed)         cycle_state_is_checkpointed && echo yes || { echo no; exit 1; } ;;
         resume-phase)            cycle_state_resume_phase ;;
+        clear-checkpoint)        cycle_state_clear_checkpoint ;;
         get)                     cycle_state_get "$@" ;;
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

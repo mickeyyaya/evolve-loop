@@ -115,6 +115,39 @@ The helper emits a `## Intent`, `## Scout report`, etc. block — only the artif
 
 If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stderr WARN — your job in that case is to *trim* before re-dispatching (e.g., by extracting only the relevant scout-report sections), not to silently ship an over-cap prompt.
 
+## Resume Mode (v9.1.0+)
+
+When the dispatcher invokes you with `EVOLVE_RESUME_MODE=1` in your env, you are picking up a previously-paused cycle. The pause was caused by one of:
+
+- **`quota-likely`** — A phase exited rc=1 with empty stderr while cost was in the 80% danger zone — the Claude Code subscription quota signature.
+- **`batch-cap-near`** — The dispatcher's batch budget crossed 95% (`EVOLVE_CHECKPOINT_AT_PCT`); the previous cycle's orchestrator wrote a checkpoint at a clean phase boundary instead of continuing.
+- **`operator-requested`** — Someone manually ran `cycle-state.sh checkpoint operator-requested`.
+
+**Three env vars carry the resume signal:**
+
+| Var | Content | What you do |
+|---|---|---|
+| `EVOLVE_RESUME_MODE` | `1` | Switch to resume-mode behavior (this section) instead of the normal Phase Loop |
+| `EVOLVE_RESUME_PHASE` | the phase to resume from (e.g., `build`) | Skip every phase that comes BEFORE this one |
+| `EVOLVE_RESUME_COMPLETED_PHASES` | comma-separated list (e.g., `calibrate,intent,research,triage`) | Do NOT re-run these — their artifacts already exist in `$WORKSPACE` |
+
+**Resume protocol (execute in order):**
+
+1. **Read the preserved cycle-state**: `cycle-state.sh get cycle_id`, `cycle-state.sh get phase`, `cycle-state.sh resume-phase`. Verify cycle-state.json has the `checkpoint.enabled: true` block — if it doesn't, something cleared it; abort with verdict `RESUME-FAILED` and a note in `## Notes`.
+2. **Skip completed phases**: for each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, the artifact (e.g., `intent.md`, `scout-report.md`) is already on disk in `$WORKSPACE`. Trust it. Do NOT re-spawn the subagent — `phase-gate-precondition.sh` may not allow it anyway (the phase already advanced).
+3. **Clear the checkpoint flag** before the first phase advance: `cycle-state.sh clear-checkpoint` (or directly: `jq 'del(.checkpoint)' .evolve/cycle-state.json > tmp && mv tmp .evolve/cycle-state.json`). This signals "the pause is over; from here, regular cleanup rules apply." If you crash before this step, the next `--resume` invocation will see the still-active checkpoint and try again.
+4. **Pick up at `EVOLVE_RESUME_PHASE`**: invoke that phase's subagent normally. From this point, the Phase Loop continues exactly as in a fresh cycle.
+5. **If the cycle pauses again** (e.g., quota still exhausted): write a new checkpoint via `cycle-state.sh checkpoint quota-likely` and exit. The `--resume` workflow can be repeated.
+
+**What you must NOT do during resume:**
+
+- **Do not re-run completed phases.** Even if their artifacts look stale, the kernel will not allow re-running a phase that already advanced. Trust the preserved state.
+- **Do not advance to a phase BEFORE `EVOLVE_RESUME_PHASE`.** `cycle-state.sh advance` rejects backward transitions.
+- **Do not delete the worktree.** `resume-cycle.sh` re-binds the worktree from the preserved cycle-state; the EXIT trap honors this. Manual `git worktree remove` is denied by the orchestrator profile anyway.
+- **Do not skip the verdict-decision step at the end.** Even in resume mode, the cycle still produces an audit + ship + retrospective if applicable. Resume is "continue from phase X", not "skip directly to ship".
+
+**Checkpoint on intentional pause:** during resume (or during a normal cycle), if you detect `EVOLVE_CHECKPOINT_REQUEST=1` in env (set by the dispatcher's pre-emptive threshold), pause AT THE NEXT CLEAN PHASE BOUNDARY: run `cycle-state.sh checkpoint batch-cap-near`, write `orchestrator-report.md` with `Verdict: CHECKPOINT-PAUSED`, advance cycle-state phase to `checkpoint`, exit 0. Do NOT abort mid-phase — that loses the phase's in-flight work.
+
 ## Verdict Decision Tree (after Audit)
 
 Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
