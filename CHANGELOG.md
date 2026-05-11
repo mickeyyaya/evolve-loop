@@ -2,6 +2,101 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.1.0] - 2026-05-11
+
+Two paired capabilities for graceful resource-exhaustion handling:
+**checkpoint-resume** for cost-budget exhaustion (and Claude Code
+subscription quota walls), and **context-window control** for context-
+budget exhaustion. Pre-v9.1.0, a cycle that hit either wall lost all
+in-flight work; v9.1.0 preserves the worktree + cycle-state so operators
+can recover with `/evolve-loop --resume`.
+
+### Background
+
+Three consecutive `/evolve-loop` dispatcher runs in the 2026-05-11 session
+aborted at rc=1 with the same signature: orchestrator subagent exits non-
+zero, empty stderr tail, after substantial cycle work. Diagnosed as
+Claude Code subscription quota exhaustion (GitHub #29579). Pre-v9.1.0
+recovery was impossible — worktree gone, state cleared, batch loop dead.
+
+### Added
+
+- **Checkpoint write infrastructure** (Cycle 1) — Three new ops in
+  `scripts/lifecycle/cycle-state.sh`: `checkpoint <reason>`,
+  `is-checkpointed`, `resume-phase`. Additive schema — pre-v9.1 readers
+  ignore the new block. `run-cycle.sh`'s EXIT trap honors `is-checkpointed`
+  and preserves worktree + cycle-state instead of cleaning up.
+- **Pre-emptive checkpoint thresholds** (Cycle 2) — Dispatcher emits
+  `BATCH-BUDGET WARN` at 80% (`EVOLVE_CHECKPOINT_WARN_AT_PCT`) and
+  exports `EVOLVE_CHECKPOINT_REQUEST=1` at 95% (`EVOLVE_CHECKPOINT_AT_PCT`).
+  Next cycle's orchestrator reads this and pauses at the next phase
+  boundary (graceful, not mid-cycle abort).
+- **Reactive quota-likely classification** (Cycle 3) — `subagent-run.sh`
+  detects the subscription quota signature (`cli_exit==1 + empty stderr
+  + cost ≥ 80% of cap`) and writes a checkpoint automatically.
+  `EVOLVE_QUOTA_DANGER_PCT=0` fires for any empty-stderr rc=1;
+  `=100` effectively disables.
+- **`--resume` flag and `resume-cycle.sh`** (Cycle 4) — Locates the
+  most recent checkpointed cycle, validates state (git HEAD unchanged,
+  worktree exists), re-spawns the orchestrator with `EVOLVE_RESUME_MODE=1`
+  plus `EVOLVE_RESUME_PHASE` and `EVOLVE_RESUME_COMPLETED_PHASES`.
+  Operator override: `EVOLVE_RESUME_ALLOW_HEAD_MOVED=1`.
+- **Orchestrator persona resume-mode protocol** (Cycle 5) — `## Resume Mode`
+  section in `agents/evolve-orchestrator.md` documents the 5-step protocol:
+  read preserved state → skip completed phases → clear-checkpoint flag →
+  pick up at resume phase → re-pause if needed. Adds the matching
+  `cycle-state.sh clear-checkpoint` operation.
+- **Context-window control** (Cycle 6) — Paired capability for
+  context-budget exhaustion. `subagent-run.sh` writes per-phase
+  `context-monitor.json` with input_tokens + cumulative tracker.
+  `EVOLVE_CONTEXT_AUTOTRIM=1` enables aggressive prompt trim (head 60%
+  + tail 35% + marker) when over `EVOLVE_PROMPT_MAX_TOKENS` (default 30k).
+- **`scripts/observability/show-context-monitor.sh`** — Operator-facing
+  observability: tabular, `--watch` live-tail, `--json` for scripts.
+  Emits WARN/CRITICAL annotations at the same percentage thresholds as
+  the cost-side checkpoint logic.
+
+### Documentation
+
+- **`docs/architecture/checkpoint-resume.md`** — Canonical reference:
+  three pause triggers, recovery scenarios, env-var matrix, trust-kernel
+  invariants preserved.
+- **`docs/architecture/context-window-control.md`** — Canonical reference:
+  autotrim algorithm, monitor JSON schema, interaction with
+  checkpoint-resume, env-var reference.
+- **`CLAUDE.md`** — v9.1.0 section between Auto-Retrospective and
+  Three-Tier Strictness Model.
+- **SKILL.md** — `argument-hint` updated to include `--resume`; Quick
+  Start adds "Resume after pause" stanza.
+
+### Test coverage
+
+- `scripts/tests/checkpoint-roundtrip-test.sh` — 19 assertions
+- `scripts/tests/preemptive-checkpoint-test.sh` — 18 assertions
+- `scripts/tests/reactive-quota-classify-test.sh` — 15 assertions
+- `scripts/tests/resume-cycle-test.sh` — 26 assertions
+- `scripts/tests/orchestrator-resume-mode-test.sh` — 23 assertions
+- `scripts/tests/context-window-control-test.sh` — 22 assertions
+
+Total v9.1.0 test count: **123/123 PASS** (5× stability verified).
+Kernel regression unchanged: swarm-architecture 41/41, role-gate 23/23.
+
+### Trust kernel invariants (unchanged)
+
+phase-gate, role-gate, ship-gate, ledger SHA-chain all enforce identically
+across paused → resumed cycles. The checkpoint block is additive schema;
+the resume protocol goes through the same phase-gate-precondition
+allowlist as a fresh cycle.
+
+### Operator opt-out
+
+`EVOLVE_CHECKPOINT_DISABLE=1` disables both pre-emptive thresholds.
+`EVOLVE_CONTEXT_AUTOTRIM` defaults to `0` (opt-in). The default behavior
+(no checkpoint requested, no resume) is byte-identical to v9.0.5.
+
+
+---
+
 ## [9.0.5] - 2026-05-11
 
 Doc-closure release for the cycle→cost input migration. **No behavior
