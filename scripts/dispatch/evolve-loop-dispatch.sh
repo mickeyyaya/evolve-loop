@@ -247,6 +247,7 @@ unset PREFLIGHT_SCRIPT
 
 DRY_RUN=0
 RESET_FAILURES=0
+RESUME_MODE=0
 CYCLES=""
 STRATEGY=""
 GOAL=""
@@ -295,6 +296,15 @@ while [ $# -gt 0 ]; do
             # audit budget where N = profile.consensus.cli_voters length.
             # See docs/architecture/multi-llm-review.md for protocol.
             export EVOLVE_CONSENSUS_AUDIT=1
+            shift
+            ;;
+        --resume)
+            # v9.1.0 Cycle 4: locate the most recent checkpointed cycle and
+            # pick up from its resumeFromPhase. Delegates to resume-cycle.sh
+            # which runs ONE cycle from the resume point; control returns
+            # here and the normal batch loop continues if more cycles remain
+            # in the budget.
+            RESUME_MODE=1
             shift
             ;;
         --help|-h)
@@ -771,7 +781,41 @@ fi
 CYCLES_RAN=0
 STOP_REASON=""
 
+# v9.1.0 Cycle 4: --resume flag handling. When set, the dispatcher delegates
+# the first cycle of the batch to resume-cycle.sh, which locates the most
+# recent checkpointed cycle and picks up from its resumeFromPhase. After
+# that one resume cycle completes, control returns here and the normal
+# batch loop runs the remaining cycles (subject to budget caps).
+if [ "$RESUME_MODE" = "1" ]; then
+    RESUME_SCRIPT="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/resume-cycle.sh"
+    if [ ! -f "$RESUME_SCRIPT" ]; then
+        log "FAIL: --resume requested but resume-cycle.sh not found at $RESUME_SCRIPT"
+        DISPATCH_RC=1
+    else
+        log "------------------ RESUME ------------------"
+        log "Resuming the most recent checkpointed cycle via $RESUME_SCRIPT"
+        bash "$RESUME_SCRIPT"
+        resume_rc=$?
+        if [ "$resume_rc" -eq 0 ]; then
+            CYCLES_RAN=$((CYCLES_RAN + 1))
+            log "RESUME: completed — continuing with normal batch loop (if any cycles remain)"
+        else
+            log "RESUME: failed (rc=$resume_rc) — see resume-cycle.sh output above"
+            DISPATCH_RC=1
+            # Bypass the normal batch loop on resume failure: there's nothing
+            # to fall through to safely (the resumed cycle's state is in an
+            # ambiguous half-state).
+            STOP_REASON="resume_failed"
+        fi
+        unset RESUME_SCRIPT resume_rc
+    fi
+fi
+
 for ((i=1; i<=CYCLES; i++)); do
+    # Skip the loop entirely if resume mode failed (DISPATCH_RC already set).
+    if [ "$RESUME_MODE" = "1" ] && [ "${STOP_REASON:-}" = "resume_failed" ]; then
+        break
+    fi
     log "------------------ cycle $i / $CYCLES ------------------"
 
     # v8.21.0: harden against cwd drift between iterations and against

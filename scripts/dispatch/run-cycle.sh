@@ -409,10 +409,48 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Initialize cycle-state.json (phase=calibrate, no agent yet).
-bash "$CYCLE_STATE_HELPER" init "$CYCLE" ".evolve/runs/cycle-$CYCLE" \
-    || fail "cycle_state_init failed"
-log "cycle-state.json initialized at phase=calibrate"
+# v9.1.0 Cycle 4: resume mode — if the dispatcher invoked us with
+# EVOLVE_RESUME_MODE=1, the cycle-state.json + worktree from the paused
+# cycle are already on disk. Skip the init and worktree-provision blocks
+# entirely and hand off to the orchestrator with the resume env vars set.
+if [ "${EVOLVE_RESUME_MODE:-0}" = "1" ]; then
+    log "RESUME-MODE: skipping cycle_state_init (preserving paused cycle's state)"
+    if ! bash "$CYCLE_STATE_HELPER" is-checkpointed >/dev/null 2>&1; then
+        fail "RESUME-MODE: cycle-state.json has no checkpoint block — was the pause cleared?"
+    fi
+    # Re-read the cycle number from the preserved cycle-state.
+    RESUMED_CYCLE=$(bash "$CYCLE_STATE_HELPER" get cycle_id 2>/dev/null || echo "")
+    if [ -z "$RESUMED_CYCLE" ]; then
+        # Fallback: read directly from the JSON in case the get subcommand
+        # doesn't support cycle_id on older state.
+        STATE_FILE_PATH="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
+        RESUMED_CYCLE=$(jq -r '.cycle_id // .cycle // empty' "$STATE_FILE_PATH" 2>/dev/null || echo "")
+        unset STATE_FILE_PATH
+    fi
+    [ -n "$RESUMED_CYCLE" ] || fail "RESUME-MODE: cannot read cycle_id from cycle-state.json"
+    CYCLE="$RESUMED_CYCLE"
+    WORKSPACE=".evolve/runs/cycle-$CYCLE"
+    log "RESUME-MODE: cycle=$CYCLE workspace=$WORKSPACE resume_phase=${EVOLVE_RESUME_PHASE:-?}"
+    # Pull the preserved worktree path back into env so the orchestrator can
+    # find it. Mark as NOT-provisioned-by-this-process so the EXIT trap won't
+    # try to clean up something it didn't create (resume-cycle.sh owns the
+    # lifecycle of the paused worktree).
+    WORKTREE_PATH=$(jq -r '.active_worktree // empty' "$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json" 2>/dev/null || echo "")
+    WORKTREE_BRANCH=""
+    WORKTREE_PROVISIONED=0
+    [ -n "$WORKTREE_PATH" ] && export WORKTREE_PATH
+    # Skip the normal init + worktree provision below.
+    SKIP_NORMAL_INIT=1
+else
+    SKIP_NORMAL_INIT=0
+fi
+
+if [ "$SKIP_NORMAL_INIT" = "0" ]; then
+    # Initialize cycle-state.json (phase=calibrate, no agent yet).
+    bash "$CYCLE_STATE_HELPER" init "$CYCLE" ".evolve/runs/cycle-$CYCLE" \
+        || fail "cycle_state_init failed"
+    log "cycle-state.json initialized at phase=calibrate"
+fi
 
 # v8.21.0: privileged-shell worktree provisioning — closes the trust-boundary
 # gap where the orchestrator profile (correctly) denies `git worktree add` but
@@ -442,7 +480,9 @@ WORKTREE_PROVISIONED=0
 #   - One-off recovery from cycles that need to land NOW
 #
 # Loud WARN log so the operator knows isolation is off.
-if [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
+if [ "$SKIP_NORMAL_INIT" = "1" ]; then
+    log "RESUME-MODE: skipping worktree provision (re-using paused cycle's worktree at $WORKTREE_PATH)"
+elif [ "${EVOLVE_SKIP_WORKTREE:-0}" = "1" ]; then
     log "WARN: EVOLVE_SKIP_WORKTREE=1 — bypassing worktree isolation"
     log "  → Builder will edit \$EVOLVE_PROJECT_ROOT directly (no worktree, no easy rollback)"
     log "  → After cycle: inspect \`git status\` and \`git diff\` manually"
