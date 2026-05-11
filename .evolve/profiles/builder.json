@@ -50,8 +50,9 @@
   "add_dir": [
     "{worktree_path}"
   ],
-  "max_budget_usd": 2.5,
-  "max_turns": 80,
+  "max_budget_usd": 1.0,
+  "max_turns": 25,
+  "_v9_0_4_design_note_": "Lowered max_budget_usd 2.5 → 1.0 and max_turns 80 → 25 after cycle-11 evidence (58 turns / $1.95). Design target is 15-20 turns; 25 leaves headroom for the legitimate cases where a build needs an extra retry. Tool surface is unchanged — builder genuinely needs Read/Grep/Glob/Edit/Write/MultiEdit/NotebookEdit/Bash to do its work. Turn count is bounded by persona-side ## Turn budget section + per-step turn caps in Workflow.",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
   "challenge_token_required": true,

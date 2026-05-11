@@ -2,6 +2,70 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.0.4] - 2026-05-11
+
+P2 of the v9.0.2 token-economics roadmap. Drives the **builder phase**
+from cycle-11's measured **58 turns / $1.95** to a target of **15–20
+turns / ~$1.00**. Same playbook as v9.0.2 (intent) and v9.0.3 (scout):
+persona-side `## Turn budget` section + advisory cap tightening,
+without stripping the legitimately code-writing toolkit.
+
+### Background
+
+Cycle 11 measured: builder = 58 turns, $1.95, 19,866 output tokens —
+the heaviest cycle phase. The profile's `max_turns: 80` advisory was
+soft and unshaped; cycle 11 didn't approach it. Root cause: builder's
+7-step Workflow (Step 0 → Step 7) plus several sub-steps multiplies
+turns rapidly when each Edit is its own turn.
+
+### Fixed
+
+- **Builder profile (`.evolve/profiles/builder.json`).**
+  - `max_turns: 80 → 25` (advisory cap; design target is 15–20).
+  - `max_budget_usd: 2.50 → 1.00` (cycle-11 evidence: $1.95 spent;
+    target reduction to ~$1.00 = ~50%).
+  - Tool surface unchanged — builder genuinely needs Read/Grep/Glob/
+    Edit/Write/MultiEdit/NotebookEdit/Bash. Turn count is bounded by
+    persona discipline, not by tool-stripping.
+- **Builder persona (`agents/evolve-builder.md`).** New `## Turn budget`
+  section above the Workflow section:
+  - Target 15–20 turns; max 25 (profile-enforced).
+  - **Batch Edit calls; use MultiEdit when changing the same file
+    multiple times.** Each Edit is 1 turn; one MultiEdit with 5 ops
+    is 1 turn vs 5 sequential Edits = 5 turns.
+  - **Read once, edit decisively.** Don't re-read between sequential
+    Edits to the same file.
+  - **Self-Verify is ONCE, not interleaved.** Run test suite after
+    implementation, not after each Edit.
+  - **Retry budget hard-capped at 3** (Step 6) — beyond that, report
+    failure and let the next cycle adapt.
+  - Per-step turn budget table: Step 0 = 1, Step 1 = 1, Step 2 = 2–3,
+    Step 3 = 1, Step 4 = 5–10, Step 4.5 = 0–3, Step 5 = 1–2, Step 6 =
+    0–5, Step 7 = 0 → sum ≤ 20.
+
+### Verified
+
+- `scripts/tests/persona-progressive-disclosure-test.sh` extended from
+  15 to 19 tests; all PASS. New assertions: builder persona has Turn
+  budget section + 15-20 / 25 numerics, profile max_turns ≤ 25,
+  max_budget_usd ≤ $1.00, persona instructs MultiEdit-aggressive
+  pattern. Also widened the persona size cap from 18000 → 20000 bytes
+  to accommodate the new Turn budget section.
+- No regressions: intent-test 24/24 (v9.0.2), scout-carryover 8/8
+  (v9.0.3), swarm-architecture 41/41, role-gate 23/23.
+
+### Roadmap status
+
+P1 (scout, v9.0.3) ✅. P2 (builder, v9.0.4) ✅. Next:
+- P3: Triage bedrock right-sizing (~$0.10/cycle saved)
+- P4: Auditor anchor mode for intent.md (~$0.05/cycle saved)
+- P5: Retrospective YAML template externalization (~$0.05/cycle saved)
+- P6: PSMAS-style phase-skip via triage classification (up to $2/cycle
+  on skipped cycles)
+
+Items P3–P5 are small one-touch changes; P6 is a research-stage
+architectural item. See `docs/architecture/token-economics-2026.md`.
+
 ## [9.0.3] - 2026-05-11
 
 P1 of the v9.0.2 token-economics roadmap (see

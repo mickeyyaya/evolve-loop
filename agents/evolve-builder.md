@@ -62,6 +62,36 @@ git commit -m "<type>: <description> [worktree-build]"
 ```
 Include branch name and commit SHA in build report so orchestrator knows what to merge.
 
+## Turn budget (v9.0.4)
+
+**Target: 15–20 turns. Maximum: 25 (enforced by profile `max_turns: 25`).** This is structural, not advisory.
+
+Cycle-11 evidence (pre-v9.0.4): builder ran **58 turns / $1.95 / 19,866 output tokens** for a single task. The previous `max_turns: 80` advisory was a soft ceiling that didn't shape behavior. v9.0.4 brings it inline with realistic build complexity: most tasks should fit in 15–20 turns; 25 leaves headroom for one retry cycle.
+
+The v9.0.4 fix bounds builder's turn count via two disciplines:
+
+- **Batch `Edit` calls; use `MultiEdit` when changing the same file multiple times.** Each Edit is a turn. Five sequential Edits on the same file = 5 turns; one MultiEdit with five operations = 1 turn. Builder profile grants both — prefer MultiEdit.
+- **Read once, edit decisively.** Don't re-read a file between sequential Edits to the same file — Edit already requires you've Read it. The role-context already provides scout-report.md and (under digest mode) intent_anchor + acceptance_criteria. Most builds need ≤3 fresh Reads (the task's target files).
+- **Self-Verify is ONCE, not interleaved.** Step 5 runs the test suite ONCE after Step 4 implementation completes; do not re-run after every Edit. If a test fails, fix the implementation (Step 6 retry), then re-verify ONCE.
+- **Retry budget is hard-capped at 3** (Step 6) — beyond that, report failure and let the next cycle adapt. Three retries × ~5 turns each is 15 turns just for retry overhead; budget your initial implementation accordingly.
+
+**Per-step turn budget** (sum target ≤20 in steady state):
+
+| Step | Turn budget | Notes |
+|---|---|---|
+| 0 (Worktree) | 1 | One git check |
+| 1 (Instincts) | 1 | Pre-loaded in context; ls genes/ |
+| 2 + 2.5 + 2.7 (Task / Research / Skills) | 2–3 | Pre-loaded scout-report; Online Research is rare (Phase 1 already covered it) |
+| 3 (Design) | 1 | Chain-of-thought stays internal — single output turn |
+| 4 (Implement) | 5–10 | MultiEdit aggressively; most builds touch 1–3 files |
+| 4.5 (E2E test gen) | 0–3 | Conditional (UI tasks only); see [reference file](evolve-builder-reference.md) |
+| 5 (Self-Verify) | 1–2 | Run grader command ONCE |
+| 6 (Retry, if needed) | 0–5 | Up to 3 retries; each ~1–2 turns |
+| 7 (Capability gap) | 0 | Rare-trigger (see reference file) |
+| **Total** | **15–20** | |
+
+If you exceed 25 turns, `max_turns` aborts you. If you hit 20 turns without a passing build, that's a quality signal — emit a partial `build-report.md` with `Status: FAIL_TIME_BUDGET` and stop. The orchestrator handles partial reports.
+
 ## Workflow
 
 ### Step 1: Read Instincts & Genes

@@ -164,7 +164,7 @@ fi
 
 # --- Test 15 (D2): no persona exceeds size cap -----------------------------
 header "Test 15 (Cycle D2): no persona exceeds size cap"
-declare -i cap=18000
+declare -i cap=20000
 declare -i over=0
 for f in evolve-orchestrator evolve-builder evolve-auditor; do
     sz=$(wc -c < "$REPO_ROOT/agents/${f}.md" | tr -d ' ')
@@ -177,6 +177,51 @@ if [ "$over" = "0" ]; then
     pass "all 3 split personas under $cap bytes"
 else
     fail_ "$over persona(s) over cap"
+fi
+
+# --- Test 16 (v9.0.4): builder persona has Turn budget section -------------
+# v9.0.4 P2: same playbook as v9.0.2 intent / v9.0.3 scout, applied to
+# builder. Cycle-11 evidence: builder = 58 turns / $1.95. Target ≤20 turns,
+# max 25.
+header "Test 16 (v9.0.4): builder persona has Turn budget section"
+BUILDER_PERSONA="$REPO_ROOT/agents/evolve-builder.md"
+if grep -q "^## Turn budget" "$BUILDER_PERSONA" \
+   && grep -qE "(15.{1,3}20 turns|Target.*15|Maximum.{1,4}25)" "$BUILDER_PERSONA"; then
+    pass "Turn budget section + 15-20 target / 25 max present in builder persona"
+else
+    fail_ "Turn budget section or turn-count target missing from builder persona"
+fi
+
+# --- Test 17 (v9.0.4): builder.json max_turns tightened to 25 or less -----
+header "Test 17 (v9.0.4): builder max_turns tightened to 25 or less"
+BUILDER_PROFILE="$REPO_ROOT/.evolve/profiles/builder.json"
+if command -v jq >/dev/null 2>&1; then
+    mt=$(jq -r '.max_turns' "$BUILDER_PROFILE")
+    if [ "$mt" -le 25 ]; then
+        pass "builder max_turns=$mt (≤ 25)"
+    else
+        fail_ "builder max_turns=$mt exceeds v9.0.4 target of 25"
+    fi
+fi
+
+# --- Test 18 (v9.0.4): builder.json max_budget_usd tightened to 1.0 or less
+header "Test 18 (v9.0.4): builder max_budget_usd tightened to 1.0 or less"
+if command -v jq >/dev/null 2>&1; then
+    budget=$(jq -r '.max_budget_usd' "$BUILDER_PROFILE")
+    cents=$(awk -v b="$budget" 'BEGIN { printf "%d", b * 100 }')
+    if [ "$cents" -le 100 ]; then
+        pass "builder max_budget_usd=$budget (≤ \$1.00)"
+    else
+        fail_ "builder max_budget_usd=$budget exceeds \$1.00 v9.0.4 target"
+    fi
+fi
+
+# --- Test 19 (v9.0.4): builder persona instructs MultiEdit-aggressive ------
+header "Test 19 (v9.0.4): builder persona instructs MultiEdit-aggressive pattern"
+if grep -qE "MultiEdit aggressively|prefer MultiEdit|use .MultiEdit. when changing" "$BUILDER_PERSONA"; then
+    pass "builder persona instructs MultiEdit-aggressive pattern (turn-budget discipline)"
+else
+    fail_ "builder persona missing MultiEdit-aggressive guidance"
 fi
 
 # --- Summary -----------------------------------------------------------------
