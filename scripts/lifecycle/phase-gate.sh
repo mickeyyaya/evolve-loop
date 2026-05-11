@@ -437,6 +437,61 @@ gate_plan_review_to_tdd() {
     log "PASS: PLAN-REVIEW → TDD gate"
 }
 
+# ─── Builder isolation breach detector (v8.N) ───
+# Scans PROJECT_ROOT sensitive directories for files newer than the scout-report
+# (written before the build phase). Files newer than scout-report were written
+# during the build phase; if they land in sensitive PROJECT_ROOT dirs instead of
+# the worktree, it is a builder isolation breach.
+#
+# EVOLVE_BUILDER_ISOLATION_CHECK=1  — enable detection (default OFF)
+# EVOLVE_BUILDER_ISOLATION_STRICT=1 — fail the gate on breach (requires CHECK=1; default OFF)
+#
+# When both flags are at their defaults (0), this function returns immediately —
+# Tier-1 byte-equivalence: PASS-path artifacts are untouched.
+_check_builder_isolation_breach() {
+    [ "${EVOLVE_BUILDER_ISOLATION_CHECK:-0}" = "1" ] || return 0
+
+    local ref_file="$WORKSPACE/scout-report.md"
+    if [ ! -f "$ref_file" ]; then
+        log "WARN[builder-isolation]: scout-report.md missing, skipping isolation check"
+        return 0
+    fi
+
+    local stray_found=0
+    local stray_list=""
+    local dir
+    for dir in "$EVOLVE_DIR/evals" "$EVOLVE_DIR/instincts"; do
+        [ -d "$dir" ] || continue
+        local found
+        found=$(find "$dir" -newer "$ref_file" -type f 2>/dev/null | head -20 | tr '\n' ' ' || true)
+        if [ -n "$found" ]; then
+            stray_list="${stray_list}${found}"
+            stray_found=1
+        fi
+    done
+
+    if [ "$stray_found" = "1" ]; then
+        log "WARN[builder-isolation-breach]: Builder wrote to PROJECT_ROOT sensitive paths during build phase:"
+        log "  Stray files: $stray_list"
+        if command -v jq >/dev/null 2>&1 && [ -f "${LEDGER:-}" ]; then
+            local ts
+            ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            local entry
+            entry=$(jq -nc \
+                --arg ts "$ts" \
+                --argjson cycle "${CYCLE:-0}" \
+                --arg stray "$stray_list" \
+                '{ts:$ts,cycle:$cycle,kind:"gate-observation",classification:"builder-isolation-breach",stray_files:$stray}')
+            printf '%s\n' "$entry" >> "$LEDGER" 2>/dev/null || true
+        fi
+        if [ "${EVOLVE_BUILDER_ISOLATION_STRICT:-0}" = "1" ]; then
+            fail "Builder isolation breach: files written to PROJECT_ROOT sensitive paths (set EVOLVE_BUILDER_ISOLATION_STRICT=0 for warn-only)"
+        fi
+    else
+        log "OK: No builder isolation breach detected in PROJECT_ROOT sensitive paths"
+    fi
+}
+
 # ─── Builder cost-overrun guard (v8.60+) ───
 # Reads builder-usage.json total_cost_usd against a threshold and emits an
 # audit-visible WARN when exceeded. Default mode: non-blocking (WARN only).
@@ -496,6 +551,9 @@ gate_build_to_audit() {
 
     # 4. Builder cost-overrun guard (v8.60+)
     _check_builder_cost_overrun
+
+    # 4b. Builder isolation breach detector (v8.N, default OFF; see EVOLVE_BUILDER_ISOLATION_CHECK)
+    _check_builder_isolation_breach
 
     # 5. Optional code-simplifier advisory pass (EVOLVE_SIMPLIFY_ENABLED=1, default OFF)
     # Runs AFTER builder exits — purely informational; does not affect audit decision.

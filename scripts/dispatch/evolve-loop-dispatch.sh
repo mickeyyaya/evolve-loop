@@ -587,6 +587,34 @@ classify_cycle_failure() {
         echo "build-fail"
         return
     fi
+    # v8.N: Two-factor orchestrator-hang detector (EVOLVE_HANG_CLASSIFIER=1, default OFF).
+    # When the orchestrator writes its report (SHIPPED verdict) and commits, but then
+    # hangs and is killed (rc=1, empty stderr), the report exists with a SHIPPED verdict
+    # but no error markers — falling through to integrity-breach is a false positive.
+    # Two-factor: SHIPPED verdict in report AND cycle commit present on main.
+    if [ "${EVOLVE_HANG_CLASSIFIER:-0}" = "1" ]; then
+        if grep -qiE 'Verdict[[:space:]]*:[[:space:]]*(SHIPPED|SHIPPED-WITH-WARNINGS)' "$report" 2>/dev/null; then
+            local _git_commit
+            _git_commit=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" log --oneline \
+                --grep="cycle $cycle" main 2>/dev/null | head -1 || true)
+            if [ -n "$_git_commit" ]; then
+                local ts
+                ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                local _ledger="${LEDGER:-${EVOLVE_PROJECT_ROOT:-.}/.evolve/ledger.jsonl}"
+                if command -v jq >/dev/null 2>&1 && [ -f "$_ledger" ]; then
+                    local entry
+                    entry=$(jq -nc \
+                        --arg ts "$ts" \
+                        --argjson cycle "${cycle}" \
+                        --arg commit "$_git_commit" \
+                        '{ts:$ts,cycle:$cycle,kind:"classification",classification:"exit-transport-hang",commit:$commit,note:"reclassified from integrity-breach; rc=1 with SHIPPED verdict + commit on main"}')
+                    printf '%s\n' "$entry" >> "$_ledger" 2>/dev/null || true
+                fi
+                echo "exit-transport-hang"
+                return
+            fi
+        fi
+    fi
     # Report exists but doesn't transparently explain the gap → treat as breach.
     echo "integrity-breach"
 }
@@ -869,7 +897,7 @@ for ((i=1; i<=CYCLES; i++)); do
             classification=$(classify_cycle_failure "$attempted_cycle")
             log "run-cycle.sh exited rc=$rc; classifying via orchestrator-report.md: $classification"
             case "$classification" in
-                infrastructure|audit-fail|build-fail|ship-gate-config)
+                infrastructure|audit-fail|build-fail|ship-gate-config|exit-transport-hang)
                     log "RECOVERABLE-FAILURE: run-cycle rc=$rc but report classifies as $classification"
                     log "  → recording to state.json:failedApproaches; continuing batch"
                     if ! record_failed_approach "$attempted_cycle" "$classification"; then
@@ -1078,7 +1106,7 @@ for ((i=1; i<=CYCLES; i++)); do
             fi
 
             case "$classification" in
-                infrastructure|audit-fail|build-fail|ship-gate-config)
+                infrastructure|audit-fail|build-fail|ship-gate-config|exit-transport-hang)
                     log "RECOVERABLE-FAILURE: cycle $ran_cycle classification=$classification"
                     log "  → recording to state.json:failedApproaches; next cycle's orchestrator will read this and adapt"
                     if ! record_failed_approach "$ran_cycle" "$classification"; then

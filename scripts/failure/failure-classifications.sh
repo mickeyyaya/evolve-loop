@@ -59,6 +59,8 @@ export EVOLVE_FAILURE_CLASSIFICATIONS_LOADED=1
 #   - code-build-fail / code-audit-fail: 30 days. Real code-quality evidence;
 #     longer retention so similar tasks don't waste cycles re-attempting.
 #   - human-abort: 1 hour. SIGTERM/SIGINT shouldn't block the next attempt.
+#   - exit-transport-hang: 1 hour. claude -p hangs post-artifact and is killed;
+#     cycle already shipped (SHIPPED verdict + commit on main). Low severity, retry.
 #   - integrity-breach (legacy): 7 days. Treated as systemic infra by default.
 
 failure_age_out_seconds() {
@@ -76,6 +78,8 @@ failure_age_out_seconds() {
         code-audit-warn)           echo 86400 ;;     # 1 day
         ship-gate-config)          echo 86400 ;;     # 1 day (v8.27.0 — config issue, not systemic)
         human-abort)               echo 3600 ;;      # 1 hour
+        # v8.N: orchestrator hung post-artifact (cycle already shipped); 1h same as human-abort
+        exit-transport-hang)       echo 3600 ;;      # 1 hour
         integrity-breach)          echo 604800 ;;    # 7 days (legacy/escalation)
         *)                         echo 86400 ;;     # default 1d for unknowns
     esac
@@ -83,7 +87,7 @@ failure_age_out_seconds() {
 
 failure_severity_of() {
     case "${1:-}" in
-        infrastructure-transient|intent-malformed|human-abort|ship-gate-config|code-audit-warn) echo low ;;
+        infrastructure-transient|intent-malformed|human-abort|ship-gate-config|code-audit-warn|exit-transport-hang) echo low ;;
         infrastructure-systemic|code-build-fail|code-audit-fail|integrity-breach) echo high ;;
         intent-rejected) echo terminal ;;
         *) echo unknown ;;
@@ -92,7 +96,7 @@ failure_severity_of() {
 
 failure_retry_policy() {
     case "${1:-}" in
-        infrastructure-transient|intent-malformed|human-abort|ship-gate-config|code-audit-warn) echo yes ;;
+        infrastructure-transient|intent-malformed|human-abort|ship-gate-config|code-audit-warn|exit-transport-hang) echo yes ;;
         infrastructure-systemic|integrity-breach) echo needs-operator ;;
         intent-rejected) echo no ;;
         # Code failures: retry only if task description differs (orchestrator
@@ -110,13 +114,16 @@ failure_retry_policy() {
 failure_normalize_legacy() {
     case "${1:-}" in
         infrastructure-transient|infrastructure-systemic|intent-malformed|intent-rejected| \
-        code-build-fail|code-audit-fail|code-audit-warn|human-abort|integrity-breach|ship-gate-config)
+        code-build-fail|code-audit-fail|code-audit-warn|human-abort|integrity-breach|ship-gate-config| \
+        exit-transport-hang)
             echo "$1" ;;
         # Legacy dispatcher classifications:
         infrastructure)        echo infrastructure-transient ;;
         audit-fail)            echo code-audit-fail ;;
         build-fail)            echo code-build-fail ;;
         ship-gate-rejection)   echo ship-gate-config ;;   # v8.27.0
+        # v8.N: alternate casings for exit-transport-hang
+        EXIT_TRANSPORT_HANG|exit_transport_hang) echo "exit-transport-hang" ;;
         # Legacy orchestrator verdicts:
         FAIL)                  echo code-audit-fail ;;
         # v8.35.0: WARN gets its own classification (was conflated with FAIL).
@@ -144,6 +151,7 @@ code-audit-fail
 code-audit-warn
 ship-gate-config
 human-abort
+exit-transport-hang
 integrity-breach
 EOF
 }
