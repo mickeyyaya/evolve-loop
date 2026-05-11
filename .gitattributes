@@ -1,0 +1,19 @@
+# Git attributes for evolve-loop.
+#
+# export-ignore is honored by `git archive` (when producing tarballs from
+# git). It tells `git archive` to exclude matching paths from the generated
+# archive. This is the standard mechanism for "track in repo, exclude from
+# distribution tarballs".
+#
+# Note: Claude Code's plugin installer does NOT currently use `git archive` —
+# it clones the source repo and applies a separate hardcoded filter — so
+# the `knowledge-base/` directive here may be a no-op for /plugin install.
+# We declare it anyway because:
+#   1. It's the standard Git mechanism (documentation-as-config)
+#   2. Other consumers (Gemini CLI, Codex CLI, manual `git archive` users)
+#      may honor it
+#   3. Future Claude Code versions may honor it
+#
+# See docs/architecture/knowledge-base.md for the full architecture.
+
+knowledge-base/ export-ignore

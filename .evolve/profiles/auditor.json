@@ -172,7 +172,8 @@
       ".evolve/state.json",
       ".evolve/ledger.jsonl",
       ".evolve/profiles",
-      ".evolve/evals"
+      ".evolve/evals",
+      "knowledge-base"
     ],
     "allow_network": true
   },

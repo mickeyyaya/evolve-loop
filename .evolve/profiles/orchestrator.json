@@ -220,7 +220,8 @@
       "CHANGELOG.md",
       "README.md",
       "CLAUDE.md",
-      ".evolve/ledger.tip"
+      ".evolve/ledger.tip",
+      "knowledge-base"
     ],
     "allow_network": true
   },

@@ -238,6 +238,17 @@ emit_profile_context_anchors() {
 
 emit_artifact() {
     local label="$1" path="$2"
+    # v9.1.x: cross-CLI knowledge-base exclusion (Layer B safety net). The
+    # primary mechanism is agent profile deny_subpaths (kernel-enforced via
+    # the OS sandbox); this is the Layer-B fallback that protects against
+    # a future caller passing a knowledge-base/ path through here.
+    # knowledge-base/ holds developer-only reference content and MUST NOT
+    # appear in any agent's prompt context. See docs/architecture/knowledge-base.md.
+    case "$path" in
+        knowledge-base/*|./knowledge-base/*|*/knowledge-base/*)
+            return 0
+            ;;
+    esac
     if [ -f "$path" ]; then
         echo "## $label"
         echo "(source: $path)"

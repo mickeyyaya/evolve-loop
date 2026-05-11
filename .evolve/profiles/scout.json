@@ -118,7 +118,8 @@
       ".claude-plugin",
       ".evolve/state.json",
       ".evolve/ledger.jsonl",
-      ".evolve/profiles"
+      ".evolve/profiles",
+      "knowledge-base"
     ],
     "allow_network": true
   },
