@@ -22,11 +22,13 @@ expect_match() {
     local label="$1"
     local actual="$2"
     local pattern="$3"
-    if echo "$actual" | grep -qE "$pattern"; then
+    # Use bash's =~ operator to avoid SIGPIPE races on `echo | grep -q` under
+    # set -o pipefail when piping large multi-line content.
+    if [[ "$actual" =~ $pattern ]]; then
         printf "  PASS: %s\n" "$label"
         PASS=$((PASS + 1))
     else
-        printf "  FAIL: %s\n    pattern=%s\n    actual =%s\n" "$label" "$pattern" "$actual" >&2
+        printf "  FAIL: %s\n    pattern=%s\n" "$label" "$pattern" >&2
         FAIL=$((FAIL + 1))
     fi
 }
@@ -35,11 +37,11 @@ expect_no_match() {
     local label="$1"
     local actual="$2"
     local pattern="$3"
-    if ! echo "$actual" | grep -qE "$pattern"; then
+    if [[ ! "$actual" =~ $pattern ]]; then
         printf "  PASS: %s\n" "$label"
         PASS=$((PASS + 1))
     else
-        printf "  FAIL: %s\n    pattern (should-not-match)=%s\n    actual =%s\n" "$label" "$pattern" "$actual" >&2
+        printf "  FAIL: %s\n    pattern (should-not-match)=%s\n" "$label" "$pattern" >&2
         FAIL=$((FAIL + 1))
     fi
 }

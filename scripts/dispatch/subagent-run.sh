@@ -58,6 +58,65 @@ log() { echo "[subagent-run] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
 integrity_fail() { log "INTEGRITY-FAIL: $*"; exit 2; }
 
+# v9.1.0 Cycle 3: classify the current failure as quota-likely if it matches
+# the Claude Code subscription quota-exhaustion signature.
+#
+# Inputs:
+#   $1 — stderr tail (last 5 lines from the failed claude -p invocation)
+#   $2 — current cycle number (for cost lookup)
+#
+# Heuristics (all must hold):
+#   - stderr tail is empty/blank or contains only whitespace
+#   - cumulative batch cost is ≥ EVOLVE_QUOTA_DANGER_PCT (default 80) of
+#     EVOLVE_BATCH_BUDGET_CAP (default 20.00). The reasoning: random rc=1
+#     errors happen anywhere in a batch, but quota-exhaustion correlates
+#     with substantial cost already consumed.
+#
+# Returns exit 0 (true) if quota-likely, exit 1 otherwise.
+#
+# Operator overrides:
+#   - EVOLVE_QUOTA_DANGER_PCT=0 forces every empty-stderr rc=1 to classify
+#     as quota-likely (useful when running under low budgets where the
+#     cost-correlation heuristic doesn't apply).
+#   - EVOLVE_QUOTA_DANGER_PCT=100 disables the heuristic (only the explicit
+#     `EVOLVE_CHECKPOINT_TRIGGERED=1` operator signal can checkpoint).
+_quota_likely() {
+    local stderr_tail="$1" cycle="$2"
+    local danger_pct="${EVOLVE_QUOTA_DANGER_PCT:-80}"
+    local cap="${EVOLVE_BATCH_BUDGET_CAP:-20.00}"
+
+    # Heuristic 1: stderr must be empty/blank. Real errors have content.
+    local stripped
+    stripped=$(echo "$stderr_tail" | tr -d '[:space:]')
+    if [ -n "$stripped" ] && [ "$stderr_tail" != "<empty>" ]; then
+        return 1
+    fi
+    unset stripped
+
+    # Heuristic 2: cost-correlation. Read the cycle's cost-so-far.
+    if ! command -v bc >/dev/null 2>&1; then
+        # No bc → can't do the correlation check; conservatively return false.
+        return 1
+    fi
+    local scc="$EVOLVE_PLUGIN_ROOT/scripts/observability/show-cycle-cost.sh"
+    [ -x "$scc" ] || scc="$EVOLVE_PROJECT_ROOT/scripts/observability/show-cycle-cost.sh"
+    if [ ! -x "$scc" ]; then
+        return 1
+    fi
+    local cost_json
+    cost_json=$(RUNS_DIR_OVERRIDE="${RUNS_DIR_OVERRIDE:-}" bash "$scc" "$cycle" --json 2>/dev/null || echo "")
+    [ -z "$cost_json" ] && return 1
+    local cost
+    cost=$(echo "$cost_json" | jq -r '.total.cost_usd // 0' 2>/dev/null || echo "0")
+    local threshold
+    threshold=$(echo "scale=2; $cap * $danger_pct / 100" | bc -l 2>/dev/null || echo "0")
+    if [ "$(echo "$cost >= $threshold" | bc -l 2>/dev/null)" = "1" ]; then
+        log "  quota-classify: cost=\$$cost >= threshold=\$$threshold (danger_pct=$danger_pct%)"
+        return 0
+    fi
+    return 1
+}
+
 # --- Helpers -----------------------------------------------------------------
 
 require_bin() {
@@ -713,8 +772,40 @@ ADVEOF
 
     if [ "$cli_exit" -ne 0 ]; then
         log "CLI exited non-zero: $cli_exit"
-        log "stderr tail: $(tail -5 "$stderr_log" 2>/dev/null || echo '<empty>')"
+        local _stderr_tail
+        _stderr_tail=$(tail -5 "$stderr_log" 2>/dev/null || echo '<empty>')
+        log "stderr tail: $_stderr_tail"
         write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier"
+
+        # v9.1.0 Cycle 3: reactive quota-likely classification.
+        # Signature for Claude Code subscription quota exhaustion
+        # (GitHub issue #29579): rc=1, empty/blank stderr, and the cycle
+        # has already done substantial work (cost ≥ 80% of cap).
+        #
+        # The outer Claude Code process consumes the rate-limit response;
+        # the nested `claude -p` subprocess dies silently. We can't query
+        # Anthropic's quota directly, but we CAN detect the signature.
+        # When it fires we write a checkpoint and signal the EXIT trap to
+        # preserve worktree + state for `--resume`.
+        if [ "${EVOLVE_CHECKPOINT_DISABLE:-0}" != "1" ] \
+                && [ "$cli_exit" = "1" ] \
+                && _quota_likely "$_stderr_tail" "$cycle"; then
+            log "QUOTA-LIKELY: rc=1 + empty stderr + cost in danger zone — classifying as quota-likely"
+            log "  writing checkpoint and signaling EXIT trap to preserve state"
+            local _csh="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
+            [ -f "$_csh" ] || _csh="$EVOLVE_PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
+            if bash "$_csh" checkpoint quota-likely 2>/dev/null; then
+                log "  checkpoint written; resume with: bash scripts/dispatch/evolve-loop-dispatch.sh --resume"
+            else
+                log "  WARN: checkpoint write failed; setting EVOLVE_CHECKPOINT_TRIGGERED=1 for EXIT trap"
+            fi
+            # Signal run-cycle.sh's EXIT trap that a checkpoint should be
+            # honored even if the explicit write failed (e.g., cycle-state
+            # was already cleared by a parallel cleanup).
+            export EVOLVE_CHECKPOINT_TRIGGERED=1
+        fi
+
+        unset _stderr_tail
         exit 1
     fi
 

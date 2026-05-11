@@ -45,7 +45,8 @@ expect_match() {
     local label="$1"
     local actual="$2"
     local pattern="$3"
-    if echo "$actual" | grep -qE "$pattern"; then
+    # Use bash =~ operator to avoid SIGPIPE races on echo|grep -q under pipefail.
+    if [[ "$actual" =~ $pattern ]]; then
         printf "  PASS: %s\n" "$label"
         PASS=$((PASS + 1))
     else
