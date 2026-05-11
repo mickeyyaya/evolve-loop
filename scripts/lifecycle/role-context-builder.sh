@@ -243,15 +243,10 @@ emit_artifact() {
     # the OS sandbox); this is the Layer-B fallback that protects against
     # a future caller passing an excluded path through here.
     # docs/private/ holds developer-only reference content and MUST NOT
-    # appear in any agent's prompt context. The legacy knowledge-base/ path
-    # is kept here during the v9.1.x doc consolidation (Commit A of the
-    # expand→move→re-link→contract ladder) and will be removed in Commit D
-    # once all files have moved. See docs/architecture/private-context-policy.md.
+    # appear in any agent's prompt context.
+    # See docs/architecture/private-context-policy.md for the full architecture.
     case "$path" in
         docs/private/*|./docs/private/*|*/docs/private/*)
-            return 0
-            ;;
-        knowledge-base/*|./knowledge-base/*|*/knowledge-base/*)
             return 0
             ;;
     esac

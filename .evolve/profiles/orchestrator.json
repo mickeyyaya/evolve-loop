@@ -221,7 +221,6 @@
       "README.md",
       "CLAUDE.md",
       ".evolve/ledger.tip",
-      "knowledge-base",
       "docs/private"
     ],
     "allow_network": true

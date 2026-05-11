@@ -14,11 +14,8 @@
 #      may honor it
 #   3. Future Claude Code versions may honor it
 #
-# docs/private/ is the agent-context-excluded folder. The legacy
-# knowledge-base/ path is kept during the v9.1.x doc consolidation
-# (Commit A of expand→move→re-link→contract) and removed in Commit D.
+# docs/private/ is the agent-context-excluded folder.
 #
 # See docs/architecture/private-context-policy.md for the full architecture.
 
 docs/private/ export-ignore
-knowledge-base/ export-ignore
