@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.0.5] - 2026-05-11
+
+Doc-closure release for the cycle→cost input migration. **No behavior
+change.** The dispatcher engine has supported both `--budget-usd N` and
+`--cycles N` since v8.60.0 (and cycle-11 added the `--budget-usd` alias
++ structured summary), but three surfaces still framed the skill as
+cycle-first: SKILL.md's Quick Start, the dispatcher's stale "v8.62
+will flip positional integer" deprecation message, and CLAUDE.md's
+migration-status documentation. v9.0.5 closes those gaps.
+
+### Background
+
+The cycle-11 invocation that drove this entire v9.0.x series literally
+parsed `/evolve-loop 3 continue to move to cost driven goal...` in
+cycle-mode because the bare positional integer still meant "3 cycles"
+— exactly the migration friction the user was asking us to fix. The
+engine had advanced; the docs had not.
+
+### Changed
+
+- **`skills/evolve-loop/SKILL.md` — Usage line and Quick Start.**
+  Usage now lists both flag forms (`/evolve-loop [--budget-usd N | --cycles N]
+  [strategy] [goal]`). Quick Start leads with **budget-first** framing:
+  `--budget-usd N` (or `--budget N`) is the recommended mode (predictable
+  costs); `--cycles N` is the alternative; bare positional integer is
+  documented as legacy with a deprecation warning.
+- **`scripts/dispatch/evolve-loop-dispatch.sh` — deprecation message
+  refreshed.** The previous text pointed at "v8.62 will flip positional
+  integer to DOLLARS" — but v8.62 was skipped when development jumped to
+  v9.0.0. The flip is now framed as a v10.0.0 candidate (breaking
+  change; warrants a major-version-bump signal). New wording:
+  > DEPRECATION: positional integer means cycles (since v8.60); v10.0.0
+  > candidate will consider flipping to dollars — migrate to --cycles N
+  > or --budget-usd N now to be flip-safe
+- **`CLAUDE.md` — Cycle→cost migration status table** added near the
+  existing "User-stated budget (v8.60.0+, Layer 1)" section. Surfaces
+  the four "✅ shipped" rows + the one "⚠️ still positional=cycles"
+  row, so future readers see the migration state at a glance.
+
+### What v9.0.5 does NOT do
+
+- Does not flip positional integer semantics. That belongs in v10.0.0
+  (breaking change — a user with `/evolve-loop 3` muscle-memory would
+  suddenly spend $3 instead of running 3 cycles).
+- Does not deprecate `--cycles`. Both flags remain co-equal.
+- Does not touch dispatcher *logic* — only the deprecation message text.
+
+### Verified
+
+- `scripts/tests/evolve-loop-dispatch-test.sh`: 57 tests / 71 sub-
+  assertions, all PASS. Test 49 (positional-integer DEPRECATION WARN
+  detection) still matches the new wording via its generic regex.
+- Smoke test confirmed: `VALIDATE_ONLY=1 bash evolve-loop-dispatch.sh 3
+  balanced "test"` now emits the new "v10.0.0 candidate" deprecation
+  message.
+
 ## [9.0.4] - 2026-05-11
 
 P2 of the v9.0.2 token-economics roadmap. Drives the **builder phase**

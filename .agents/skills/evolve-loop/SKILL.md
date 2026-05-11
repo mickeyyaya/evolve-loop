@@ -147,14 +147,29 @@ The following JSON block is the canonical state initialization for the evolve-lo
 }
 ```
 
-**Usage:** `/evolve-loop [cycles] [strategy] [goal]`
+**Usage:** `/evolve-loop [--budget-usd N | --cycles N] [strategy] [goal]`
+(legacy bare positional integer = cycles; deprecation WARN emitted —
+prefer `--budget-usd N` or `--cycles N` explicitly)
 
 ## Quick Start
 
-Parse `$ARGUMENTS`:
-- First number → `cycles` (default: 2)
-- `innovate|harden|repair|ultrathink` → `strategy` (default: `balanced`)
-- Remaining → `goal` (default: null = autonomous)
+Parse `$ARGUMENTS` (v9.0.5+ — budget-first guidance, both modes supported):
+
+- **`--budget-usd N`** (alias `--budget N`) → cost-driven mode: run cycles
+  until cumulative spend ≥ \$N, then stop with `stop_reason=budget`.
+  CYCLES becomes a safety upper bound (default 50). This is the
+  recommended mode — costs are predictable; cycle counts are not.
+- **`--cycles N`** → cycle-driven mode: run exactly N cycles regardless
+  of cost. `EVOLVE_BATCH_BUDGET_CAP` (default \$20) remains a hard system
+  ceiling.
+- **Strategy** (positional, after flags): `balanced` (default) | `innovate` |
+  `harden` | `repair` | `ultrathink` | `autoresearch`.
+- **Goal** (positional, after strategy): free-form text; quote it when it
+  contains apostrophes or shell metacharacters.
+- **Legacy bare integer** (`/evolve-loop 3 balanced "goal"`) still parses
+  as cycles in v9.0.x with a deprecation WARN. The v10.0.0 candidate
+  will consider flipping bare-positional to dollars; until then, use
+  the explicit flag to be flip-safe.
 
 | Strategy | Focus | Approach | Strictness |
 |----------|-------|----------|------------|

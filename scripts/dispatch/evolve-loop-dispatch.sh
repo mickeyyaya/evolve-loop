@@ -355,10 +355,12 @@ fi
 [ -n "$STRATEGY" ] || STRATEGY=balanced
 
 # v8.60.0 Layer 1: emit deprecation WARN when legacy positional integer was
-# used (no --cycles or --budget flag). v8.62 will flip positional integer to
-# dollars; users should migrate to --cycles N or --budget N for clarity.
+# used (no --cycles or --budget flag). v9.0.5: refreshed the deprecation
+# target — the original v8.62 flip milestone got skipped when development
+# jumped to v9.0.0. The flip is now a v10.0.0 candidate (breaking change;
+# warrants a major-version-bump signal).
 if [ "$LEGACY_POSITIONAL_USED" = "1" ]; then
-    log "DEPRECATION: positional integer is interpreted as cycles in v8.60-v8.61, will mean DOLLARS in v8.62 — migrate to --cycles N or --budget N"
+    log "DEPRECATION: positional integer means cycles (since v8.60); v10.0.0 candidate will consider flipping to dollars — migrate to --cycles N or --budget-usd N now to be flip-safe"
 fi
 
 # Validate.

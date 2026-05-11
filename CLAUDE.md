@@ -138,7 +138,17 @@ Per-cycle caps remain unlimited by default (preserving v8.26's friction-free rea
 
 The summary line emits `batch_total_cost=$X.XX / cap=$Y.YY` so post-run forensics is one grep away. Cycle telemetry that fails to produce `show-cycle-cost.sh` JSON contributes `$0` to the running total (best-effort accumulation; never blocks a legitimate cycle on a missing sidecar).
 
-**User-stated budget (v8.60.0+, Layer 1):** Pass `--budget-usd N` (or `--budget N`) to use dollar spend as the primary stop condition. The dispatcher runs cycles until cumulative cost ≥ $N, then exits with `stop_reason=budget`. `EVOLVE_BATCH_BUDGET_CAP` remains the hard system ceiling — if `--budget-usd 50` is passed but `EVOLVE_BATCH_BUDGET_CAP=10`, the effective cap is $10 (`stop_reason=batch_cap`). Positional integer (e.g., `/evolve-loop 3`) still means cycles in v8.60-v8.61; migrate to `--budget-usd N` or `--cycles N` for clarity.
+**User-stated budget (v8.60.0+, Layer 1):** Pass `--budget-usd N` (or `--budget N`) to use dollar spend as the primary stop condition. The dispatcher runs cycles until cumulative cost ≥ $N, then exits with `stop_reason=budget`. `EVOLVE_BATCH_BUDGET_CAP` remains the hard system ceiling — if `--budget-usd 50` is passed but `EVOLVE_BATCH_BUDGET_CAP=10`, the effective cap is $10 (`stop_reason=batch_cap`).
+
+**Cycle→cost migration status (v9.0.5):**
+
+| Surface | State |
+|---|---|
+| `--budget-usd N` / `--budget N` / `--cycles N` dispatcher flags | ✅ shipped v8.60.0 |
+| `stop_reason=budget` cumulative-cost tripwire | ✅ shipped v8.60.0 |
+| SKILL.md Quick Start budget-first framing | ✅ v9.0.5 |
+| SKILL.md `argument-hint` advertises both modes | ✅ shipped v8.60.0 |
+| Positional integer (bare `/evolve-loop 3 ...`) | ⚠️ still parses as **cycles** with deprecation WARN. v10.0.0 candidate will consider flipping to dollars (breaking change — warrants a major-version-bump signal). Prefer the explicit flag (`--cycles N` or `--budget-usd N`) to be flip-safe. |
 
 > For detailed usage examples and forward-compatibility notes, see [docs/release/release-archive.md](docs/release/release-archive.md).
 
