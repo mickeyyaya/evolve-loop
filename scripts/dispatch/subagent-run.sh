@@ -632,16 +632,97 @@ ADVEOF
     # a hard exit (operator opt-in). Guard is INFORMATIONAL — it cannot
     # know if the orchestrator legitimately needs a big prompt for this
     # role (Retrospective is the synthesizer; it sees everything).
+    #
+    # v9.1.0 Cycle 6: extended with autotrim mode (EVOLVE_CONTEXT_AUTOTRIM=1)
+    # and per-phase context-monitor.json sidecar.
     local _prompt_max="${EVOLVE_PROMPT_MAX_TOKENS:-30000}"
     local _prompt_bytes
     _prompt_bytes=$(wc -c < "$injected_prompt" | tr -d ' ')
     local _prompt_tokens=$((_prompt_bytes / 4))
+    local _cap_pct=0
+    if [ "$_prompt_max" -gt 0 ]; then
+        _cap_pct=$((_prompt_tokens * 100 / _prompt_max))
+    fi
+
+    # v9.1.0 Cycle 6: autotrim mode — when prompt exceeds the cap AND
+    # EVOLVE_CONTEXT_AUTOTRIM=1, truncate the prompt aggressively (preserve
+    # the head — instructions, role context, intent — and the tail — current
+    # task — while dropping the middle, which is typically low-priority
+    # ledger entries and instinct summaries). The trim keeps the prompt
+    # actionable while bounding token burn.
+    if [ "${EVOLVE_CONTEXT_AUTOTRIM:-0}" = "1" ] \
+            && [ "$_prompt_tokens" -gt "$_prompt_max" ]; then
+        local _keep_head_bytes=$((_prompt_max * 4 * 60 / 100))   # 60% from head
+        local _keep_tail_bytes=$((_prompt_max * 4 * 35 / 100))   # 35% from tail (5% reserved for marker)
+        local _trimmed="${injected_prompt}.trimmed"
+        {
+            head -c "$_keep_head_bytes" "$injected_prompt"
+            printf '\n\n[CONTEXT-AUTOTRIM v9.1.0: dropped %d bytes of mid-prompt context — original=%d tokens, cap=%d. Set EVOLVE_CONTEXT_AUTOTRIM=0 to disable.]\n\n' \
+                "$((_prompt_bytes - _keep_head_bytes - _keep_tail_bytes))" "$_prompt_tokens" "$_prompt_max"
+            tail -c "$_keep_tail_bytes" "$injected_prompt"
+        } > "$_trimmed"
+        mv -f "$_trimmed" "$injected_prompt"
+        # Re-measure after trim.
+        _prompt_bytes=$(wc -c < "$injected_prompt" | tr -d ' ')
+        _prompt_tokens=$((_prompt_bytes / 4))
+        _cap_pct=$((_prompt_tokens * 100 / _prompt_max))
+        echo "[subagent-run] AUTOTRIM: $agent prompt trimmed to ~$_prompt_tokens tokens (target=$_prompt_max, new cap_pct=${_cap_pct}%)" >&2
+        unset _trimmed _keep_head_bytes _keep_tail_bytes
+    fi
+
     if [ "$_prompt_tokens" -gt "$_prompt_max" ]; then
-        echo "[subagent-run] WARN: $agent prompt is ~$_prompt_tokens tokens (cap=$_prompt_max). Consider role-context-builder.sh for filtered context. Layer-B reference: agents/evolve-orchestrator.md#per-phase-prompt-context" >&2
+        echo "[subagent-run] WARN: $agent prompt is ~$_prompt_tokens tokens (cap=$_prompt_max). Consider role-context-builder.sh for filtered context, or EVOLVE_CONTEXT_AUTOTRIM=1. Layer-B reference: agents/evolve-orchestrator.md#per-phase-prompt-context" >&2
         if [ "${EVOLVE_PROMPT_BUDGET_ENFORCE:-0}" = "1" ]; then
             fail "EVOLVE_PROMPT_BUDGET_ENFORCE=1 + prompt over cap; aborting"
         fi
     fi
+
+    # v9.1.0 Cycle 6: per-phase context-monitor.json. Records the prompt
+    # token estimate + cap percentage so operators can `tail` or `watch`
+    # the cumulative cycle context usage during long runs.
+    if command -v jq >/dev/null 2>&1; then
+        local _monitor="$workspace/context-monitor.json"
+        local _now
+        _now=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u)
+        local _existing='{}'
+        [ -f "$_monitor" ] && _existing=$(cat "$_monitor" 2>/dev/null || echo '{}')
+        echo "$_existing" | jq -c \
+            --arg agent "$agent" \
+            --argjson cycle "$cycle" \
+            --arg ts "$_now" \
+            --argjson tokens "$_prompt_tokens" \
+            --argjson cap "$_prompt_max" \
+            --argjson cap_pct "$_cap_pct" \
+            '. as $existing
+             | (.cycle // $cycle) as $c
+             | (.phases // {}) as $phases
+             | {
+                 cycle: $c,
+                 lastUpdated: $ts,
+                 phases: ($phases + {($agent): {
+                     input_tokens: $tokens,
+                     cap_tokens: $cap,
+                     cap_pct: $cap_pct,
+                     measuredAt: $ts
+                 }}),
+                 cumulative_input_tokens: (
+                     ($phases + {($agent): {input_tokens: $tokens}})
+                     | to_entries | map(.value.input_tokens // 0) | add // 0
+                 ),
+                 cumulative_cap: ($cap * 4)
+             }
+             | . + {
+                 cumulative_pct: (
+                     if .cumulative_cap > 0
+                     then ((.cumulative_input_tokens * 100 / .cumulative_cap) | floor)
+                     else 0 end
+                 )
+             }' > "${_monitor}.tmp.$$" 2>/dev/null \
+             && mv -f "${_monitor}.tmp.$$" "$_monitor" \
+             || rm -f "${_monitor}.tmp.$$" 2>/dev/null
+        unset _monitor _existing _now
+    fi
+    unset _cap_pct
 
     local stdout_log="$workspace/${agent}-stdout.log"
     local stderr_log="$workspace/${agent}-stderr.log"
