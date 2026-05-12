@@ -47,6 +47,21 @@ If an item shouldn't be in the backlog at all (duplicate, stale, no longer appli
 
 ## Process (single-pass)
 
+### 0. Inbox ingestion (v9.5.0+)
+
+Before reading the main inputs, ingest any pending files from `.evolve/inbox/`:
+
+1. List `.evolve/inbox/*.json` (maxdepth 1; skip `processed/` and `rejected/` subdirs).
+2. Parse each file; malformed JSON → log `inbox-malformed-json` WARN in `## Inbox Errors`, move to `.evolve/inbox/rejected/cycle-<N>/`, continue.
+3. Validate required fields (`id`, `action`, `priority`); missing/empty → WARN + reject.
+4. Validate `priority` ∈ {HIGH, MEDIUM, LOW} and `weight` ∈ [0.0, 1.0] or null; invalid → WARN + reject.
+5. Check `id` uniqueness against `state.json:carryoverTodos[]` and already-ingested items; collision → WARN + reject.
+6. Transform to reconcile-compatible schema: set `defer_count=0`, `cycles_unpicked=0`, `first_seen_cycle=last_seen_cycle=<N>`; wrap operator metadata in `_inbox_source`.
+7. Append to in-memory carryoverTodos working set; move file to `.evolve/inbox/processed/cycle-<N>/`.
+8. Write ledger entry: `role=triage, action=ingest-inbox, count=<ingested>, rejected=<rejected>`.
+
+Honor `weight` as tie-breaker within priority class (default 0.5 when null). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).
+
 ### 1. Read inputs
 
 `scout-report.md` (backlog), `intent.md` (goal), `state.json` `.carryoverTodos[]` (deferred work). If any input is missing, write a stub triage-decision.md with `cycle_size_estimate: small` and `top_n: []` plus a note explaining what was unavailable — do not fabricate.

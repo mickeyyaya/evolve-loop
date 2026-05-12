@@ -150,6 +150,10 @@ jq -c '.carryoverTodos[]?' "$STATE" > "$EXISTING_FILE"
 # kept-todos at the end.
 KEPT_FILE=$(mktemp)
 : > "$KEPT_FILE"
+# _inbox_source fields (v9.5.0+ inbox-injection metadata) are preserved by the
+# jq '. + {field: value}' operations below — unknown fields pass through unchanged.
+# No logic change is needed; this comment declares the _inbox_source contract.
+# See: docs/architecture/inbox-injection-protocol.md
 WARN_IDS=()
 
 while IFS= read -r todo_json; do

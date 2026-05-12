@@ -36,6 +36,11 @@ node_modules/
 !.evolve/instincts/lessons/
 .evolve/instincts/lessons/*
 !.evolve/instincts/lessons/.keep
+# ... and except the inbox API directory. Operator-injected task files in the root
+# of inbox/ are tracked; processed/ and rejected/ are runtime subdirs (gitignored).
+!.evolve/inbox/
+.evolve/inbox/processed/
+.evolve/inbox/rejected/
 # ... and except the subagent-skills plugin directory. Loaded by Builder/Auditor
 # subagents via --plugin-dir to make review skills (code-review-simplify,
 # security-review-scored) resolvable under --setting-sources project. Manifest

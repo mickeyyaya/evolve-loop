@@ -365,6 +365,24 @@ Fan-out workers invoke `subagent-run.sh <role>-worker-<name>`. `cmd_run` strips 
 
 Run `bash scripts/tests/swarm-architecture-test.sh` to verify all three layers wire correctly (40 assertions covering plugin.json registrations, skill files, slash commands, persona files, profile parallel_subtasks, state machine, phase gate, aggregator merge modes, dispatch-parallel command, and end-to-end smoke test).
 
+## Operator APIs (v9.5.0+)
+
+### inject-task.sh — task injection into `.evolve/inbox/`
+
+Inject tasks into the carryoverTodos backlog without racing the dispatcher. Triage ingests at phase start of the next cycle.
+
+```bash
+bash scripts/utility/inject-task.sh \
+  --priority HIGH|MEDIUM|LOW \   # required
+  --action "task description" \  # required, non-empty
+  [--weight 0.85] \              # float in [0.0, 1.0]; tie-breaks within priority class
+  [--evidence-pointer "url"] \
+  [--note "context"] \
+  [--dry-run]
+```
+
+Exit codes: `0` success · `10` validation · `11` id collision · `12` filesystem. Cancel: `rm .evolve/inbox/<file>.json`. See [docs/architecture/inbox-injection-protocol.md](docs/architecture/inbox-injection-protocol.md).
+
 ## Evolve Loop Task Priority
 
 When selecting tasks for `/evolve-loop` cycles, follow this priority order:
