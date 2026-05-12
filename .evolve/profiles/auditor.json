@@ -137,7 +137,9 @@
     "--exclude-dynamic-system-prompt-sections",
     "--disable-slash-commands",
     "--setting-sources",
-    "project"
+    "project",
+    "--plugin-dir",
+    ".evolve/plugin"
   ],
   "parallel_subtasks": [
     {

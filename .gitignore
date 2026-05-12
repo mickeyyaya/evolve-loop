@@ -36,6 +36,15 @@ node_modules/
 !.evolve/instincts/lessons/
 .evolve/instincts/lessons/*
 !.evolve/instincts/lessons/.keep
+# ... and except the subagent-skills plugin directory. Loaded by Builder/Auditor
+# subagents via --plugin-dir to make review skills (code-review-simplify,
+# security-review-scored) resolvable under --setting-sources project. Manifest
+# is tracked; skills/ entries are symlinks to .agents/skills/ (also tracked).
+!.evolve/plugin/
+!.evolve/plugin/.claude-plugin/
+!.evolve/plugin/.claude-plugin/plugin.json
+!.evolve/plugin/skills/
+!.evolve/plugin/skills/*
 .claude/evolve/
 .claude/worktrees/
 .clone/

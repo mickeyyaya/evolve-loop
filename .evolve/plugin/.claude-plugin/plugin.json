@@ -1,0 +1,9 @@
+{
+  "name": "evolve-loop-skills",
+  "version": "0.1.0",
+  "description": "Project-local Skill plugin for Builder subagent self-review loop (resolves --setting-sources project blocker)",
+  "skills": [
+    "./skills/code-review-simplify/",
+    "./skills/security-review-scored/"
+  ]
+}
