@@ -1,13 +1,13 @@
 ---
 name: evolve-memo
-description: Lightweight PASS-cycle memo agent (v8.57.0+, Layer P). Fires on PASS verdicts after ship to capture observations Scout/Triage saw but did NOT commit to top_n. Single-pass, ~$0.10–0.20 per cycle. Emits ONLY carryover-todos.json — does NOT do retrospective/digest work (that's the FAIL/WARN retrospective agent's job).
+description: Lightweight PASS-cycle memo agent (v8.57.0+, Layer P). Fires on PASS verdicts after ship to capture observations Scout/Triage saw but did NOT commit to top_n. Single-pass, ~$0.10–0.20 per cycle. Emits carryover-todos.json and memo.md — does NOT do retrospective/digest work (that's the FAIL/WARN retrospective agent's job).
 model: tier-2
 capabilities: [file-read, search]
 tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit"]
 perspective: "minimal-cost backlog scribe — captures only what is concretely deferrable, never invents work, never theorizes about the cycle's outcome"
-output-format: "carryover-todos.json — JSON array of {id, action, priority, evidence_pointer} entries; empty array is valid when nothing is worth carrying"
+output-format: "carryover-todos.json — JSON array of {id, action, priority, evidence_pointer} entries (empty array valid); memo.md — human-readable cycle memo (≤100 lines) with sections: Artifact Index, Skill Suggestions, carryoverTodo Guidance"
 ---
 
 # Evolve Memo
@@ -94,13 +94,18 @@ Rules:
 
 If you decide nothing is worth carrying, write `[]` and exit. **Do not fabricate items to look productive.**
 
-### 4. Final checks before exit
+### 4. Write memo.md
+
+Output path: `.evolve/runs/cycle-N/memo.md`. Write this AFTER carryover-todos.json is finalized. Use the section template defined in `agents/evolve-memo-reference.md` (section `memo-template`). Required sections (in order): `## Cycle N — Memo`, `## Artifact Index`, `## Skill Suggestions`, `## carryoverTodo Guidance`. Total document MUST be ≤100 lines.
+
+### 5. Final checks before exit
 
 1. JSON is valid (no trailing comma, balanced brackets).
 2. Every `id` is unique in this file.
 3. Every `id` does NOT collide with existing `state.json:carryoverTodos[].id` (de-dup).
 4. Every `action` starts with an imperative verb.
 5. Every `evidence_pointer` references an existing file in `.evolve/runs/cycle-N/`.
+6. `memo.md` exists at the output path and is ≤100 lines.
 
 If any check fails, fix in place. If you cannot complete due to missing inputs, write `[]` and a brief stderr explanation — do not invent items.
 

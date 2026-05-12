@@ -76,7 +76,7 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
    ↓ verdict-driven branch:
 5a. PASS         →  advance ship orchestrator  →  ship.sh "<commit-msg>"
                     advance learn memo  (v8.57.0+ Layer P)
-                    subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json + memo.md handoff — see Layer-P Memo Phase Contract)
+                    subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json + memo.md cycle memo — see Layer-P Memo Phase Contract)
                     merge-lesson-into-state.sh $WORKSPACE  (writes new carryoverTodos with cycles_unpicked=0)
                     reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict PASS  (Layer D)
 5b. WARN (v8.35.0+) →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
@@ -117,9 +117,14 @@ If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stde
 
 ## Layer-P Memo Phase Contract (v9.4.0+)
 
-Layer-P runs on every PASS cycle immediately after `ship.sh` returns exit 0. The memo agent writes two artifacts to `$WORKSPACE`: `carryover-todos.json` (machine-readable, consumed by `reconcile-carryover-todos.sh`) and `memo.md` (the human-readable handoff document, at path `.evolve/runs/cycle-N/memo.md`). Both must be present before `merge-lesson-into-state.sh` is called — a missing `memo.md` causes exit code 2, the integrity-breach signal responsible for 13 consecutive `code-audit-warn` cycles. See `CONTEXT.md` for canonical definitions of "memo", "handoff", and "Layer-P".
+Layer-P runs on every PASS cycle immediately after `ship.sh` returns exit 0. The memo agent writes two artifacts to `$WORKSPACE`:
+- `carryover-todos.json` (machine-readable, consumed by `reconcile-carryover-todos.sh`)
+- `memo.md` (the human-readable cycle memo, at path `.evolve/runs/cycle-N/memo.md`)
 
-**memo.md requirements** (all six enforced before `merge-lesson-into-state.sh` proceeds):
+`merge-lesson-into-state.sh` reads `handoff-retrospective.json` — not the memo artifacts — and is independent of what the memo agent writes.
+The next cycle's orchestrator reads `memo.md` during calibrate to orient itself (see `CONTEXT.md` for canonical "memo" definition).
+
+**memo.md requirements** (quality gate enforced by orchestrator after `subagent-run.sh memo` returns):
 
 | Requirement | Rule |
 |---|---|
@@ -128,9 +133,10 @@ Layer-P runs on every PASS cycle immediately after `ship.sh` returns exit 0. The
 | Skill suggestions | MUST list 2–4 persona-action suggestions for the next cycle |
 | carryoverTodo guidance | MUST name which carryover IDs to prioritize next cycle and explain why |
 | Line cap | MUST be ≤100 lines |
-| Anti-goal | MUST NOT replace or paraphrase audit-report — memo is HANDOFF, not re-audit |
+| Anti-goal | MUST NOT replace or paraphrase audit-report — memo is a cycle memo, not a re-audit |
 
-After `subagent-run.sh memo` returns exit 0, verify `$WORKSPACE/memo.md` exists and is ≤100 lines before calling `merge-lesson-into-state.sh`. If absent, record `code-audit-warn` via `record-failure-to-state.sh` before continuing — do not silently skip.
+After `subagent-run.sh memo` returns exit 0, verify `$WORKSPACE/memo.md` exists and is ≤100 lines. If absent, record `code-audit-warn` via `record-failure-to-state.sh` before continuing — do not silently skip.
+Note: the merge script reads `handoff-retrospective.json` independently — this verification is a quality gate for the human-readable cycle memo, not a prerequisite for the merge script.
 
 For the full `memo.md` section template, see [agents/evolve-memo-reference.md](agents/evolve-memo-reference.md) — section `memo-template`.
 

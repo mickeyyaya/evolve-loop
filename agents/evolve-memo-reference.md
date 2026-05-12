@@ -1,21 +1,21 @@
 ---
 name: evolve-memo-reference
-description: Layer-3 on-demand reference for the memo phase (Layer-P). Defines the memo.md section template and the contract between the memo subagent, merge-lesson-into-state.sh, and the next cycle's orchestrator.
+description: Layer-3 on-demand reference for the Layer-P memo phase. Defines the section template and downstream-consumer contract for the memo subagent output.
 ---
 
 # Evolve Memo Reference
 
-> Layer-3 on-demand reference for the Layer-P memo phase. Read the Layer-P Memo Phase Contract section in `agents/evolve-orchestrator.md` first — come here only when you need the full `memo.md` section template or rationale. See `CONTEXT.md` for canonical definitions of "memo", "handoff", and "Layer-P".
+> Layer-3 on-demand reference for the Layer-P memo phase. Read the Layer-P Memo Phase Contract section in `agents/evolve-orchestrator.md` first — come here only when you need the full `memo.md` section template or rationale. See `CONTEXT.md` for canonical definitions of "memo", "cycle memo", and "Layer-P".
 
 ## memo-template
 
-`memo.md` is a handoff document, not a report. Its audience is the next cycle's orchestrator and Scout, not an auditor reviewing the current cycle. Every section listed below is required; the total document MUST be ≤100 lines.
+`memo.md` is a cycle memo, not a report. Its audience is the next cycle's orchestrator and Scout, not an auditor reviewing the current cycle. Every section listed below is required; the total document MUST be ≤100 lines.
 
 ### Required sections (in order)
 
 | Section heading | Content rule |
 |---|---|
-| `## Cycle N — Handoff` | State the cycle number and one sentence summarizing what shipped |
+| `## Cycle N — Memo` | State the cycle number and one sentence summarizing what shipped |
 | `## Artifact Index` | List each cycle report by relative path and SHA8; do NOT paraphrase or excerpt content |
 | `## Skill Suggestions` | List 2–4 persona-action suggestions for the next cycle, each naming a specific carryover ID and the recommended evolve-loop flag or persona mode |
 | `## carryoverTodo Guidance` | Name which carryover IDs to prioritize next cycle, state the sequencing rationale, and note any preconditions satisfied this cycle |
@@ -43,4 +43,6 @@ State the top-pick ID and its sequencing rationale in 2–4 sentences. If a prec
 
 ### Downstream consumers
 
-`merge-lesson-into-state.sh` reads `memo.md` to extract handoff context before writing carryoverTodos to `state.json`. If `memo.md` is absent, the script exits with code 2 — the integrity-breach signal. The next cycle's orchestrator reads `memo.md` during calibrate to orient itself without re-reading all prior reports.
+`merge-lesson-into-state.sh` reads `handoff-retrospective.json` to extract lesson context before writing instincts to `state.json`.
+`memo.md` is not a dependency of the merge script — the merge script exits 0 on absent `handoff-retrospective.json` (PASS cycles have no lesson to merge) and exits 2 only when a lesson YAML referenced in `handoff-retrospective.json` is missing from `$LESSONS_DIR`.
+The next cycle's orchestrator reads `memo.md` during calibrate to orient itself without re-reading all prior reports.
