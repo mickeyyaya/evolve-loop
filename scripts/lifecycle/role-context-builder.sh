@@ -360,7 +360,7 @@ emit_digest_summary() {
 # constraints, and premises that most phases don't need). Used by phases that
 # only need the raw goal + acceptance criteria summary.
 emit_intent_compact() {
-    if [ "${EVOLVE_CONTEXT_DIGEST:-0}" != "1" ] || ! _ensure_digest; then
+    if [ "${EVOLVE_CONTEXT_DIGEST:-1}" != "1" ] || ! _ensure_digest; then
         # Fallback: full file (legacy mode).
         emit_artifact "Intent" "$WORKSPACE/intent.md"
         return
@@ -395,7 +395,7 @@ EOF
 emit_state_summary() {
     # $1 = instinct limit (only honored in legacy mode)
     local limit="${1:-5}"
-    if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
+    if [ "${EVOLVE_CONTEXT_DIGEST:-1}" = "1" ]; then
         emit_digest_summary
     else
         emit_carryover_todos
@@ -420,7 +420,7 @@ emit_for_role() {
             # proposed_tasks section of scout-report — not gap analysis,
             # research, hypotheses. C3 reads context_anchors from profile JSON
             # if present; falls back to hardcoded default for backwards compat.
-            if [ "${EVOLVE_ANCHOR_EXTRACT:-0}" = "1" ]; then
+            if [ "${EVOLVE_ANCHOR_EXTRACT:-1}" = "1" ]; then
                 if ! emit_profile_context_anchors; then
                     emit_artifact_with_anchors "Scout backlog" "$WORKSPACE/scout-report.md" proposed_tasks
                 fi
@@ -428,7 +428,7 @@ emit_for_role() {
                 emit_artifact "Scout backlog" "$WORKSPACE/scout-report.md"
             fi
             # Triage primarily needs todos; instincts are lower priority.
-            if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
+            if [ "${EVOLVE_CONTEXT_DIGEST:-1}" = "1" ]; then
                 emit_digest_summary
             else
                 emit_carryover_todos
@@ -438,7 +438,7 @@ emit_for_role() {
             header_block
             emit_intent_compact
             emit_artifact "Scout report" "$WORKSPACE/scout-report.md"
-            if [ "${EVOLVE_CONTEXT_DIGEST:-0}" = "1" ]; then
+            if [ "${EVOLVE_CONTEXT_DIGEST:-1}" = "1" ]; then
                 emit_digest_summary
             else
                 emit_carryover_todos
@@ -470,7 +470,7 @@ emit_for_role() {
             # diff_summary + test_results sections of build-report (not the
             # full builder narrative) and only proposed_tasks + acceptance_criteria
             # of scout-report. Falls back to full file if anchors absent.
-            if [ "${EVOLVE_ANCHOR_EXTRACT:-0}" = "1" ]; then
+            if [ "${EVOLVE_ANCHOR_EXTRACT:-1}" = "1" ]; then
                 # v8.63.0 Cycle C3: prefer profile.context_anchors for the
                 # auditor's anchor list. If profile has no context_anchors,
                 # fall back to the hardcoded set (backwards-compat).

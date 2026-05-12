@@ -159,7 +159,7 @@ fi
 
 # --- Test 7: legacy mode (EVOLVE_ANCHOR_EXTRACT=0) reads full file ---------
 header "Test 7: legacy mode (EVOLVE_ANCHOR_EXTRACT=0) reads full scout-report"
-out=$(EVOLVE_PROJECT_ROOT="$TMP_ROOT" bash "$RCB" triage 99 "$TMP_ROOT/.evolve/runs/cycle-99" 2>/dev/null)
+out=$(EVOLVE_ANCHOR_EXTRACT=0 EVOLVE_PROJECT_ROOT="$TMP_ROOT" bash "$RCB" triage 99 "$TMP_ROOT/.evolve/runs/cycle-99" 2>/dev/null)
 # Should contain everything in the multi-anchor fixture.
 if echo "$out" | grep -q "Task 1: Foo" && echo "$out" | grep -q "Gap Analysis"; then
     pass "legacy mode reads full scout-report (no extraction)"
@@ -179,7 +179,8 @@ fi
 # --- Test 9: persona templates have ANCHOR markers --------------------------
 header "Test 9: persona templates have ANCHOR markers"
 markers_found=0
-for f in agents/evolve-scout.md agents/evolve-builder.md agents/evolve-auditor.md agents/evolve-retrospective.md; do
+# evolve-scout.md anchors moved to evolve-scout-reference.md (Layer-3 split, cycle 24)
+for f in agents/evolve-scout-reference.md agents/evolve-builder.md agents/evolve-auditor.md agents/evolve-retrospective.md; do
     if grep -q "<!-- ANCHOR:" "$REPO_ROOT/$f"; then
         markers_found=$((markers_found + 1))
     fi
@@ -193,9 +194,10 @@ fi
 # --- Test 10: specific expected anchors per role ----------------------------
 header "Test 10: each persona has its expected anchor names"
 declare -i ok=0
-grep -q "ANCHOR:proposed_tasks"       "$REPO_ROOT/agents/evolve-scout.md"         && ok=$((ok+1))
-grep -q "ANCHOR:acceptance_criteria"  "$REPO_ROOT/agents/evolve-scout.md"         && ok=$((ok+1))
-grep -q "ANCHOR:gap_analysis"         "$REPO_ROOT/agents/evolve-scout.md"         && ok=$((ok+1))
+# evolve-scout.md anchors moved to evolve-scout-reference.md (Layer-3 split, cycle 24)
+grep -q "ANCHOR:proposed_tasks"       "$REPO_ROOT/agents/evolve-scout-reference.md" && ok=$((ok+1))
+grep -q "ANCHOR:acceptance_criteria"  "$REPO_ROOT/agents/evolve-scout-reference.md" && ok=$((ok+1))
+grep -q "ANCHOR:gap_analysis"         "$REPO_ROOT/agents/evolve-scout-reference.md" && ok=$((ok+1))
 grep -q "ANCHOR:diff_summary"         "$REPO_ROOT/agents/evolve-builder.md"       && ok=$((ok+1))
 grep -q "ANCHOR:test_results"         "$REPO_ROOT/agents/evolve-builder.md"       && ok=$((ok+1))
 grep -q "ANCHOR:verdict"              "$REPO_ROOT/agents/evolve-auditor.md"       && ok=$((ok+1))

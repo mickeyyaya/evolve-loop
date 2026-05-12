@@ -268,13 +268,13 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 |------|-------|----------------|
 | P1 Scout turn cap (≤15) | DONE | `scout.json max_turns=15`; v9.0.3 |
 | P2 Builder turn cap (≤20 → actual 25) | DONE | `builder.json max_turns=25`; v9.0.4; update roadmap target to ≤25 |
-| P3 Triage right-sizing | PENDING | `EVOLVE_CONTEXT_DIGEST default=0`; triage gets full context |
+| P3 Triage right-sizing | DONE (cycle 24) | Context savings delivered via EVOLVE_CONTEXT_DIGEST=1 default-on; triage gets compact intent; 123-line persona already lean |
 | P4 Auditor anchor mode | DONE | `auditor.json:context_anchors` 4 anchors configured; v8.63.0 |
-| P5 Retrospective YAML template | PENDING | `lesson-template.yaml` absent from `skills/evolve-loop/` |
+| P5 Retrospective YAML template | DONE (cycle 24) | `lesson-template.yaml` created at `.agents/skills/evolve-loop/`; `evolve-retrospective.md` trimmed −19 lines |
 | P6 PSMAS phase-skip | PENDING | No implementation |
 | P7 TOON structured outputs | PENDING | No TSV template or parser |
 | P8 LLMLingua integration | PENDING | No integration; external dep |
-| P-NEW-1 Flags A–D default-on | OVERDUE | Both flags still `default=0`; promotion targets v8.63–v8.64 MISSED; cycle 25 candidate |
+| P-NEW-1 Flags A–D default-on | DONE (cycle 24) | `EVOLVE_CONTEXT_DIGEST` + `EVOLVE_ANCHOR_EXTRACT` promoted to `default=1` in `role-context-builder.sh`; v9.4.0 |
 | P-NEW-2 Auditor Sonnet right-sizing | PENDING | `auditor.json model_tier_default=opus`; precondition met v9.3.0 |
 | P-NEW-3 evolve-scout.md Layer-3 split | DONE (cycle 24) | `agents/evolve-scout-reference.md` created; `evolve-scout.md` trimmed 334→167 lines |
 | P-NEW-4 EVOLVE_REQUIRE_* consolidation | PENDING | `EVOLVE_REQUIRED_PHASES` not implemented |

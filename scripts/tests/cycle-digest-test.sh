@@ -230,7 +230,7 @@ header "Test 13 (Cycle B2): digest mode reduces scout context size"
 RCB="$REPO_ROOT/scripts/lifecycle/role-context-builder.sh"
 existing_cycle=$(ls "$REPO_ROOT/.evolve/runs/" 2>/dev/null | grep -E "^cycle-[0-9]+$" | grep -v "^cycle-[0-9]\{5,\}$" | head -1 | sed 's/cycle-//')
 if [ -n "$existing_cycle" ] && [ -d "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" ]; then
-    legacy_bytes=$(bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null | wc -c | tr -d ' ')
+    legacy_bytes=$(EVOLVE_CONTEXT_DIGEST=0 bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null | wc -c | tr -d ' ')
     digest_bytes=$(EVOLVE_CONTEXT_DIGEST=1 bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null | wc -c | tr -d ' ')
     if [ "$digest_bytes" -lt "$legacy_bytes" ]; then
         pct=$(( (legacy_bytes - digest_bytes) * 100 / legacy_bytes ))
@@ -261,7 +261,7 @@ fi
 # e.g. "compacted", "compaction", etc).
 header "Test 15 (Cycle B2): legacy mode preserves full intent.md cat"
 if [ -n "$existing_cycle" ]; then
-    out=$(bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null)
+    out=$(EVOLVE_CONTEXT_DIGEST=0 bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null)
     if echo "$out" | grep -q "^## Intent$" && ! echo "$out" | grep -qF "Intent (compact"; then
         pass "legacy mode emits full Intent (no compact-mode marker)"
     else

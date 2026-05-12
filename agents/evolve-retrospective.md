@@ -136,25 +136,7 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 
 Output path: `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml`. Use the schema below. **One YAML per root cause**, not per defect.
 
-```yaml
-- id: inst-LXXX
-  pattern: "kebab-case-pattern-name"
-  description: "Imperative-voice description of the failure pattern AND the corrective action. A future agent reading this in isolation should know what to check."
-  confidence: 0.85   # 0.5 for first observation, higher only if priorLessons confirm pattern
-  source: "cycle-N/<task-slug>"
-  type: "failure-lesson"
-  category: "episodic"
-  failureContext:
-    cycle: N
-    task: "<task-slug>"
-    errorCategory: "planning|tool-use|reasoning|context|integration"
-    failedStep: "scout|build|audit"
-    auditVerdict: "FAIL|WARN|SHIP_GATE_DENIED"
-    auditDefects: ["D1", "D2", "D3"]
-  preventiveAction: "Concrete, testable instruction. e.g., 'Future cycles touching command-string parsers MUST add unit tests for: bare-newline chains, pipe-to-shell, here-strings, and process substitution. Tokenize via shlex (Python) — bash case-statement matching is insufficient.'"
-  relatedInstincts: ["inst-LXXX-1", "inst-NNN"]   # cross-links; can be empty
-  contradicts: []   # IDs of prior instincts this lesson invalidates; can be empty
-```
+See [lesson-template.yaml](../skills/evolve-loop/lesson-template.yaml) for the full schema.
 
 ### 6. Write handoff JSON
 
