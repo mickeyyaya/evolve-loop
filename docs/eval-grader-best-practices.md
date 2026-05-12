@@ -125,6 +125,23 @@ awk '/^##[[:space:]]+Verdict/{f=1;next} f && NF{print tolower($0);exit}' \
     .evolve/runs/cycle-17/orchestrator-report.md | grep -qiE 'shipped'
 ```
 
+### Anti-pattern 4: Awk range where start-line self-collides with the stop-pattern
+
+```bash
+# BAD — self-collides: "## Self-Review" matches both /^## Self-Review/ and /^## [A-Z]/
+# because 'S' ∈ [A-Z]. Awk emits only the header line and stops immediately.
+# Section body (composite scores, convergence verdict) is never output.
+awk '/^## Self-Review/,/^## [A-Z]/' file.md | grep -q "content"
+
+# GOOD — named stop pattern that cannot match the start header
+awk '/^## Self-Review$/,/^## Eval/' file.md | grep -q "content"
+
+# GOOD — flag-state machine (bash 3.2 compatible, no range ambiguity)
+awk '/^## Self-Review$/{flag=1;next} flag && /^## /{flag=0} flag' file.md | grep -q "content"
+```
+
+Rule: when the section header matches `^## [A-Z]`, never use `^## [A-Z]` as the stop pattern in an awk range. Use a named stop pattern (`/^## NextSectionName$/`) or a flag-state machine.
+
 ---
 
 ## 6. Mutation Resistance Self-Test
@@ -164,4 +181,8 @@ awk '/role-name\)/{p=1} p && /\.json/{found=1} END{exit(!found)}' dispatch.sh
 
 # Count-based (better than pure grep-q — requires non-zero occurrences)
 grep -c "KEYWORD" script.sh | awk '{exit($1<1)}'
+
+# Section extraction with non-self-colliding stop (Level 3.5 — Anti-pattern 4 safe)
+# Use named stop pattern; NEVER use /^## [A-Z]/ when section header also matches [A-Z]
+awk '/^## SectionName$/,/^## NextSection/' file.md | grep -q "keyword"
 ```

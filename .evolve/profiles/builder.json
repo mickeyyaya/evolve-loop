@@ -17,7 +17,8 @@
     "Write",
     "MultiEdit",
     "NotebookEdit",
-    "Bash"
+    "Bash",
+    "Skill(code-review-simplify)"
   ],
   "disallowed_tools": [
     "Edit(.evolve/state.json)",

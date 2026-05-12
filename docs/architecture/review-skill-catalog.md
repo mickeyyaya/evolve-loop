@@ -36,10 +36,11 @@ For a skill to be usable in `EVOLVE_BUILDER_REVIEW_SKILLS`, it must satisfy all 
 | Skill | Source | Composite score? | Reads diff itself? | Single-writer safe? | Verdict |
 |-------|--------|-----------------|-------------------|---------------------|---------|
 | `code-review-simplify` | evolve-loop built-in | ✓ 0.0–1.0 (4 dimensions) | ✓ (adaptive HEAD/HEAD~1, post cycle-20 fix) | ✓ | **COMPATIBLE — primary default** |
+| `security-review-scored` | evolve-loop built-in (cycle 21) | ✓ 0.0–1.0 (security-focused) | ✓ (adaptive HEAD/HEAD~1) | ✓ | **COMPATIBLE — security specialist** |
 | `simplify` | system (Claude Code) | ✗ No numeric score | ✗ Action-based, applies fixes directly | ✓ | **INCOMPATIBLE — no parseable score** |
 | `review` | system (Claude Code) | ✗ No numeric score | ✗ PR-centric (`gh pr view`) | ✓ | **INCOMPATIBLE — PR context, not local diff** |
 | `refactor` | evolve-loop built-in | ✗ No numeric score | ✓ | ✗ Spawns parallel worktrees | **INCOMPATIBLE — violates single-writer** |
-| `security-review` | ECC installed | ✗ Checklist only | ✗ | ✓ | **INCOMPATIBLE without wrapper — future candidate** |
+| `security-review` | ECC installed | ✗ Checklist only | ✗ | ✓ | **INCOMPATIBLE without wrapper — superseded by security-review-scored** |
 | Custom skills | Operator-defined | Variable | Variable | Variable | See §5 |
 
 ---
@@ -153,5 +154,5 @@ To add a skill to the Builder self-review loop:
 
 | Skill | Wrapper approach | Value | Priority |
 |-------|-----------------|-------|----------|
-| `security-review` | Map checklist severity counts → composite: `1.0 - (critical×0.5 + high×0.2 + medium×0.05)` | High — catches auth/injection issues before Auditor | P-C21+ |
+| `security-review` | Map checklist severity counts → composite: `1.0 - (critical×0.5 + high×0.2 + medium×0.05)` | High — catches auth/injection issues before Auditor | **SHIPPED — cycle 21** (as `security-review-scored`) |
 | `simplify` (system) | Dry-run mode + extract finding count as score proxy | Medium — overlaps with `code-review-simplify` maintainability dimension | Low — unified skill already covers this |
