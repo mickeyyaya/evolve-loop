@@ -257,3 +257,45 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 8. LLMLingua 2026 / TokenMix: https://tokenmix.ai/blog/llmlingua-prompt-compression-2026
 9. Anthropic — Effective context engineering for AI agents (2025–2026): https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 10. Progressive Disclosure (MindStudio 2025): https://www.mindstudio.ai/blog/progressive-disclosure-ai-agents-context-management
+
+---
+
+## Status as of Cycle 24 (2026-05-12)
+
+> Audited by Scout from claude.sh defaults, profile JSONs, control-flags.md, git log.
+
+| Item | State | Evidence anchor |
+|------|-------|----------------|
+| P1 Scout turn cap (≤15) | DONE | `scout.json max_turns=15`; v9.0.3 |
+| P2 Builder turn cap (≤20 → actual 25) | DONE | `builder.json max_turns=25`; v9.0.4; update roadmap target to ≤25 |
+| P3 Triage right-sizing | PENDING | `EVOLVE_CONTEXT_DIGEST default=0`; triage gets full context |
+| P4 Auditor anchor mode | DONE | `auditor.json:context_anchors` 4 anchors configured; v8.63.0 |
+| P5 Retrospective YAML template | PENDING | `lesson-template.yaml` absent from `skills/evolve-loop/` |
+| P6 PSMAS phase-skip | PENDING | No implementation |
+| P7 TOON structured outputs | PENDING | No TSV template or parser |
+| P8 LLMLingua integration | PENDING | No integration; external dep |
+| P-NEW-1 Flags A–D default-on | OVERDUE | Both flags still `default=0`; promotion targets v8.63–v8.64 MISSED; cycle 25 candidate |
+| P-NEW-2 Auditor Sonnet right-sizing | PENDING | `auditor.json model_tier_default=opus`; precondition met v9.3.0 |
+| P-NEW-3 evolve-scout.md Layer-3 split | DONE (cycle 24) | `agents/evolve-scout-reference.md` created; `evolve-scout.md` trimmed 334→167 lines |
+| P-NEW-4 EVOLVE_REQUIRE_* consolidation | PENDING | `EVOLVE_REQUIRED_PHASES` not implemented |
+| P-NEW-5 Deprecated flag removal | BRIDGES-ACTIVE | 5 flags w/ bridges; removal target v8.61+ MISSED; cycle 26+ |
+| P-NEW-6 Tool-result clearing | PROPOSED | New from H2 research (cycle 24); profile field `context_clear_trigger_tokens`; cycle 26+ after P-NEW-1 |
+| P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
+
+---
+
+## 2026 Delta — Patterns Not Yet In P1–P8
+
+Research scan: 3 sources (Anthropic Claude Cookbook 2026, SmolAgents 2026, Redis/GetMaxim 2026). Conducted cycle 24.
+
+### Confirmed: P1–P8 + P-NEW remain canonical roster
+
+No paradigm shifts found. The field in 2026 has converged on the same layering evolve-loop already implements: context compaction (= P-NEW-1 EVOLVE_CONTEXT_DIGEST), selective context clearing (= EVOLVE_ANCHOR_EXTRACT), and memory/instinct persistence (= `state.json:instinctSummary[]`).
+
+### Net-new candidate: P-NEW-6 — Tool-result clearing
+
+Anthropic's 2026 production cookbook documents "tool-result clearing": surgically remove old `tool_result` blocks (keeping `tool_use`) at a configurable token threshold. In a baseline research agent example, this freed ~164K tokens (67% reduction) from re-fetchable file reads, keeping peak context at 173K vs 335K — critical for staying under 200K windows.
+
+**Relevance to evolve-loop:** Builder's multi-file-read phases accumulate large `tool_result` blocks in context. A profile field `context_clear_trigger_tokens: 30000` + `context_clear_keep_recent_tool_results: 4` could be added to `builder.json` (similar to auditor's `context_anchors` pattern). Expected saving: 20–40% Builder context reduction. Risk: Low (surgical, not destructive). Target: cycle 26+ after P-NEW-1 promotion.
+
+Source: https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools
