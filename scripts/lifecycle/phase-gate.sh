@@ -564,28 +564,7 @@ gate_build_to_audit() {
     # 4b. Builder isolation breach detector (v8.N, default OFF; see EVOLVE_BUILDER_ISOLATION_CHECK)
     _check_builder_isolation_breach
 
-    # 5. Optional code-simplifier advisory pass (EVOLVE_SIMPLIFY_ENABLED=1, default OFF)
-    # Runs AFTER builder exits — purely informational; does not affect audit decision.
-    if [ "${EVOLVE_SIMPLIFY_ENABLED:-0}" = "1" ]; then
-        if [ -f "scripts/lifecycle/builder-simplify-advisory.sh" ]; then
-            log "Running code-simplifier advisory pass (EVOLVE_SIMPLIFY_ENABLED=1)..."
-            bash scripts/lifecycle/builder-simplify-advisory.sh "$CYCLE" "$WORKSPACE" 2>/dev/null || true
-            log "OK: Code-simplifier pass complete (result in $WORKSPACE/code-simplifier-report.md)"
-        else
-            log "WARN: builder-simplify-advisory.sh not found; simplifier pass skipped"
-        fi
-    fi
-
-    # 6. Optional evolve-code-reviewer advisory lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1, default OFF)
-    # Runs AFTER builder exits, BEFORE primary Auditor starts. Sonnet tier vs. Auditor's Opus —
-    # model-family rotation reduces sycophancy risk. Advisory only; never blocks cycle.
-    if [ "${EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER:-0}" = "1" ]; then
-        log "Running evolve-code-reviewer advisory lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1)..."
-        subagent-run.sh code-reviewer "$CYCLE" "$WORKSPACE" 2>/dev/null || true
-        log "OK: Code-reviewer lens complete (result in $WORKSPACE/workers/code-reviewer.md)"
-    fi
-
-    # 7. Mutation testing on Builder-created eval files (v8.N cycle-19).
+    # 5. Mutation testing on Builder-created eval files (v8.N cycle-19).
     # Builder creates evals during the build phase; they appear as untracked at
     # gate_build_to_audit. Running mutate-eval.sh here catches tautological graders
     # before the Auditor writes its verdict. Threshold: 0.7 WARN-only.

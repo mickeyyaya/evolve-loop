@@ -86,10 +86,14 @@ See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume
 
 Cycle 15 ships a research deliverable (`docs/architecture/token-reduction-roadmap.md`, P1–P8+ roadmap)
 and a pilot opt-in advisory hook (`EVOLVE_AUDIT_ADVISORY_REVIEW=1`, default OFF) that invokes the
-existing `code-review-simplify` SKILL as a post-verdict observability pass. Subsequent cycles introduce
-code-simplifier (16), code-reviewer (17), and promote the highest-value roadmap items per the
-verify→default-on ladder. See [docs/architecture/token-reduction-roadmap.md](docs/architecture/token-reduction-roadmap.md)
-for P1–P8 details, expected savings (~48% = ~$3.20/cycle by Cycle 18), and per-cycle targets.
+existing `code-review-simplify` SKILL as a post-verdict observability pass. Cycle 20 refactor:
+the cycle-16 (`code-simplifier`) and cycle-17 (`evolve-code-reviewer`) advisory subagents were
+deleted and replaced with a pluggable Builder self-review skill loop — `EVOLVE_BUILDER_SELF_REVIEW=1`
+(default OFF) makes Builder invoke configured review skills via the Skill tool mid-build,
+revising until convergence before handoff to Auditor. Same-cycle feedback, zero orphan reports.
+Subsequent cycles promote the highest-value roadmap items per the verify→default-on ladder.
+See [docs/architecture/token-reduction-roadmap.md](docs/architecture/token-reduction-roadmap.md)
+for P1–P8 details, expected savings, and per-cycle targets.
 
 ## Three-Tier Strictness Model (v8.24.0+, refined v8.25.0)
 

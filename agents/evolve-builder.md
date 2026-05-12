@@ -185,13 +185,56 @@ playwright-not-available fallback. Loaded only when this step activates.
 
 If any check fails: fix immediately, document in build report Risks, re-run self-verify.
 
-**Optional Self-Review via code-review-simplify** (non-blocking, conditional):
+**Self-Review Skill Loop** (opt-in via `EVOLVE_BUILDER_SELF_REVIEW=1`, default OFF):
 
-If `scripts/utility/code-review-simplify.sh` exists, run it after self-verify
-passes. Read
-[agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
-section `optional-self-review` for the full procedure. If the script is
-missing or fails, skip silently — does NOT block the build.
+When the flag is set, after self-verify passes, run a convergence loop that invokes the configured review skill(s) against your diff and revises until clean OR iteration cap hit. Findings are summarized into `build-report.md` so the Auditor naturally sees them.
+
+| Var | Default | Purpose |
+|---|---|---|
+| `EVOLVE_BUILDER_SELF_REVIEW` | `0` | Master switch — when `1`, the loop runs after self-verify |
+| `EVOLVE_BUILDER_REVIEW_SKILLS` | `code-review-simplify` | Comma-separated skill names invoked in order each iteration |
+| `EVOLVE_BUILDER_REVIEW_MAX_ITERS` | `3` | Max convergence iterations before bailing with `iter-cap-hit` |
+| `EVOLVE_BUILDER_REVIEW_THRESHOLD` | `0.85` | Composite score threshold; ≥ THRESHOLD = clean |
+
+Convergence loop (pseudocode):
+
+```
+for iter in 1..MAX_ITERS:
+    all_clean = true
+    for skill in split(EVOLVE_BUILDER_REVIEW_SKILLS, ','):
+        invoke Skill tool with `skill` (the skill reads `git diff HEAD` itself)
+        parse: composite_score (0.0-1.0), severity_counts (HIGH/CRITICAL)
+        if composite_score >= THRESHOLD and HIGH+CRITICAL == 0:
+            continue                         # this skill is clean
+        else:
+            apply fixes to worktree (Edit/Write/MultiEdit per findings)
+            all_clean = false
+    if all_clean: break                       # converged
+record final state: converged | iter-cap-hit | error
+```
+
+Skill contract — any skill listed in `EVOLVE_BUILDER_REVIEW_SKILLS` must:
+- Read the current diff itself (`git diff HEAD` or the worktree)
+- Emit a composite score 0.0-1.0 AND severity-tagged findings (HIGH/CRITICAL flag the clean/dirty signal)
+- Return parseable output (markdown OR JSON; the skill defines its own format)
+
+Initial supported skill: `code-review-simplify`. Operators extend by appending: `EVOLVE_BUILDER_REVIEW_SKILLS=code-review-simplify,refactor`.
+
+`build-report.md` MUST include a `## Self-Review` section when the loop ran:
+
+```
+## Self-Review
+
+- Skills invoked: <comma list>
+- Iterations: <n>/<MAX_ITERS>
+- Per-skill final composite: <skill1>=0.92, <skill2>=0.88
+- HIGH/CRITICAL findings (final pass): <n>
+- Convergence verdict: converged | iter-cap-hit | error:<reason>
+```
+
+Default-OFF behavior: when `EVOLVE_BUILDER_SELF_REVIEW` is unset/`0`, skip the loop entirely. No `Self-Review` section. Cycle is byte-equivalent to pre-refactor.
+
+Turn-budget guidance: each iteration consumes ~3-5 turns (Skill invocation + parse + revisions). Profile's `max_turns: 25` accommodates 1-2 iteration convergence on typical diffs. For deliberately-stressful tasks, the orchestrator may raise `max_turns` via profile override.
 
 ### Step 6: Retry Protocol
 - If tests fail, analyze and try different approach

@@ -107,10 +107,10 @@ grep -q "FLAG" scripts/lifecycle/phase-gate.sh
 
 ```bash
 # BAD — this passes even if the flag exists but the dispatch body is commented out
-grep -q "EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER" scripts/lifecycle/phase-gate.sh
+grep -q "EVOLVE_AUDIT_ADVISORY_REVIEW" scripts/lifecycle/phase-gate.sh
 
 # GOOD — verifies the flag guards the actual dispatch call
-awk '/EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER.*==.*1/{p=1} p && /subagent-run.*code-reviewer/{found=1} END{exit(!found)}' scripts/lifecycle/phase-gate.sh
+awk '/EVOLVE_AUDIT_ADVISORY_REVIEW.*=.*"1"/{p=1} p && /audit-advisory-review.sh/{found=1} END{exit(!found)}' scripts/lifecycle/phase-gate.sh
 ```
 
 ### Anti-pattern 3: Fixture-based acceptance checks that don't match real artifact format

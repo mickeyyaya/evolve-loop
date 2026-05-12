@@ -1,6 +1,6 @@
 # Token-Reduction Roadmap (Cycles 15–19+)
 
-> **Status:** v9.1.1 baseline — Cycle 15 research deliverable. Cycle 16 shipped: `code-simplifier` agent profile + persona + `builder-simplify-advisory.sh` wired into `gate_build_to_audit` (`EVOLVE_SIMPLIFY_ENABLED=1`, default OFF). Cycle 17 shipped: `evolve-code-reviewer` persona + profile + `EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER` fan-out lens wired into `gate_build_to_audit` (Sonnet tier, sycophancy-break rotation, default OFF).
+> **Status:** v9.1.1 baseline — Cycle 15 research deliverable + opt-in audit-advisory hook. Cycles 16+17 originally shipped advisory subagents (`code-simplifier`, `evolve-code-reviewer`) but their reports were orphans — no downstream consumer. Cycle 20 refactor deleted both and replaced them with a Builder self-review skill loop (`EVOLVE_BUILDER_SELF_REVIEW=1`, default OFF) that invokes review skills mid-build via the Skill tool and converges before Auditor handoff. See "Cycle 20 Refactor" section below.
 > For context-floor history see [token-floor-history.md](token-floor-history.md).
 > For Cycle-11 cost forensics see [token-economics-2026.md](token-economics-2026.md).
 
@@ -159,7 +159,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Expected saving** | ~$0.80/cycle (−40% auditor cost on clean cycles; Opus→Sonnet) |
 | **LoC delta** | ~20 LoC in profile + eligibility check |
 | **Risk** | Medium (requires validation that Sonnet ADVERSARIAL_AUDIT quality matches Opus) |
-| **Target cycle** | 17+ (after code-reviewer Opus second-opinion wired per Cycle 17 plan) |
+| **Target cycle** | 21+ (after Builder self-review loop verified across multiple cycles — Builder's mid-build skill convergence reduces the residual defect rate Auditor faces, increasing Sonnet's adequacy) |
 | **Verification** | Compare audit quality on 5 Sonnet vs. 5 Opus cycles; no CRITICAL miss-rate increase |
 
 ### P-NEW-3 — evolve-scout.md Layer-3 extraction (Campaign D gap)
@@ -197,37 +197,31 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 ---
 
-## Cycle 16 Deliverable: code-simplifier Advisory Infrastructure
+## Cycle 20 Refactor: Builder Self-Review Skill Loop
 
-### P-C16 — code-simplifier opt-in advisory pass (EVOLVE_SIMPLIFY_ENABLED=1)
-
-| Field | Value |
-|-------|-------|
-| **Subsystem** | `.evolve/profiles/code-simplifier.json` + `agents/code-simplifier.md` + `scripts/lifecycle/builder-simplify-advisory.sh` + `phase-gate.sh gate_build_to_audit` hook |
-| **Expected saving** | Observability infrastructure — not a direct cost reduction. Enables Cycle 17+ promotion decisions by surfacing simplification opportunities per cycle. |
-| **LoC delta** | ~193 LoC (3 new files + 3 modified files) |
-| **Risk** | Low — advisory only; `EVOLVE_SIMPLIFY_ENABLED=0` default preserves byte-equivalence |
-| **Target cycle** | 16 (SHIPPED) |
-| **Verification** | `EVOLVE_SIMPLIFY_ENABLED=0` run produces no ledger entry for `code-simplifier`; `EVOLVE_SIMPLIFY_ENABLED=1` run produces `code-simplifier-report.md` with challenge token |
-
-**Notes:** Mirrors the Cycle 15 `EVOLVE_AUDIT_ADVISORY_REVIEW` pattern but invokes a Haiku subagent (not static shell script). Uses `subagent-run.sh code-simplifier` for ledger-tracked, profile-scoped execution at ≤$0.30/cycle. Validates Haiku-tier quality for Cycle 18 promotion decision.
-
----
-
-## Cycle 17 Deliverable: evolve-code-reviewer Auditor Fan-out Lens
-
-### P-C17 — evolve-code-reviewer opt-in sycophancy-break lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1)
+### P-C20 — replace cycles 16+17 advisory subagents with Builder Skill-tool convergence loop
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `.evolve/profiles/code-reviewer.json` + `agents/evolve-code-reviewer.md` + `phase-gate.sh gate_build_to_audit` inline trigger |
-| **Expected saving** | Observability + sycophancy break. Direct cost saving deferred to P-NEW-2 (Cycle 18+ Auditor right-sizing). |
-| **LoC delta** | ~232 net additions across 6 files (3 new + 3 modified) |
-| **Risk** | Low — advisory only; `EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=0` default preserves byte-equivalence |
-| **Target cycle** | 17 (SHIPPED) |
-| **Verification** | `jq .model_tier_default .evolve/profiles/code-reviewer.json` → `"sonnet"`; flag=1 cycle produces `workers/code-reviewer.md` with challenge token |
+| **Subsystem** | `agents/evolve-builder.md` Step 5 self-review loop spec; pluggable via `EVOLVE_BUILDER_REVIEW_SKILLS` env-var list (default `code-review-simplify`); invocation via `Skill` tool, no separate subagent profile |
+| **What it replaces** | Cycles 16 (`code-simplifier` profile/persona/`builder-simplify-advisory.sh`/`EVOLVE_SIMPLIFY_ENABLED` hook) and 17 (`code-reviewer` profile/persona/`EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER` fan-out hook) — both DELETED in this cycle |
+| **Expected saving** | Net-same or cheaper per-cycle (~$0.30-1.00 opt-in vs. ~$0.50-1.30 combined cycle-16+17 overhead). Primary win: eliminates orphan reports; same-cycle feedback closes the loop. |
+| **LoC delta** | ~436 LoC deleted (5 files) + ~60 LoC added (`evolve-builder.md`) = ~376 net subtraction across ~8 files |
+| **Risk** | Low — `EVOLVE_BUILDER_SELF_REVIEW=0` default preserves byte-equivalence. Sycophancy break primary defense (Builder Sonnet → Auditor Opus) untouched. |
+| **Target cycle** | 20 (SHIPPED — this cycle) |
+| **Verification** | `EVOLVE_BUILDER_SELF_REVIEW=0` cycle produces no `Self-Review` section in `build-report.md`; `EVOLVE_BUILDER_SELF_REVIEW=1` cycle produces section with convergence verdict + per-skill composite scores |
 
-**Notes:** Sonnet model tier (vs. Auditor's Opus) is the structural sycophancy-break mechanism. Combined with adversarial framing directive ("must find at least one HIGH defect or produce positive evidence"), this lens catches defects that same-model-judge patterns systematically miss. Inlined in `gate_build_to_audit` (no separate advisory shell script) to preserve the ≤6 file budget for the eval grader file.
+**Why this refactor.** Cycles 16+17 template-copied cycle-15's advisory pattern (skill invoked as a separate subagent around the Builder) but cycle 15's pattern advised an *already-bound* audit verdict — useful as observability. Cycles 16+17 instead advised mid-build work that Builder could still revise, but nothing wired their reports back to Builder. The reports (`code-simplifier-report.md`, `workers/code-reviewer.md`) became orphan forensic artifacts. The Skill primitive exists precisely so an agent can invoke a skill mid-task for self-review — moving the reviewers into Builder's own loop closes the feedback gap.
+
+**Pluggability.** `EVOLVE_BUILDER_REVIEW_SKILLS` is a comma-separated skill name list. Operators add review skills (`refactor`, `security-review`, custom) without touching evolve-loop source.
+
+**Env vars introduced (all default-OFF):**
+- `EVOLVE_BUILDER_SELF_REVIEW=0` — master switch
+- `EVOLVE_BUILDER_REVIEW_SKILLS=code-review-simplify` — invocation list
+- `EVOLVE_BUILDER_REVIEW_MAX_ITERS=3` — convergence cap
+- `EVOLVE_BUILDER_REVIEW_THRESHOLD=0.85` — clean/dirty threshold
+
+**Env vars removed:** `EVOLVE_SIMPLIFY_ENABLED`, `EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER`. (`EVOLVE_AUDIT_ADVISORY_REVIEW` from cycle 15 STAYS — operates post-verdict, a different lifecycle slot.)
 
 ---
 
