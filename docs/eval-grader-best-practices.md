@@ -33,7 +33,7 @@ Evolve-loop cycles 102–111 (reward-hacking class) were all rooted in this fail
 | 1 | Source-presence | `grep -q "FLAG" script.sh` | 10–30% | Only for existence checks (file must exist) |
 | 2 | Output-file check | `grep -q "result" output.log` | 40–60% | When you have a real output artifact |
 | 3 | Execution-based | `jq -e '.field == true' file.json` | 60–80% | Multi-field structural validation |
-| **3.5** | **Control-flow structural** | `awk '/FLAG.*==.*1/{p=1} p && /dispatch/{f=1} END{exit(!f)}' script.sh` | **65–80%** | **Default target for evolve-loop evals** |
+| **3.5** | **Control-flow structural** | `awk '/FLAG.*=.*"1"/{p=1} p && /dispatch/{f=1} END{exit(!f)}' script.sh` | **65–80%** | **Default target for evolve-loop evals** |
 | 4 | End-to-end behavioral | Phase-gate invocation with minimal workspace | 80–90% | Critical wiring checks only |
 
 **Target**: Level 3.5 or higher for every grader. Level 1 (`grep -q`) is acceptable only for file-existence checks where the whole assertion is "does this file exist."
@@ -54,7 +54,8 @@ Level 3.5 uses `awk` to verify that a flag **guards a non-trivial body** contain
 ### Template: flag guards dispatch call
 
 ```bash
-awk '/ENV_FLAG.*==.*1/{p=1} p && /dispatch-call/{found=1} END{exit(!found)}' path/to/script.sh
+# POSIX shell: use =.*"1" (not ==.*1 which is JS/bash-ism)
+awk '/ENV_FLAG.*=.*"1"/{p=1} p && /dispatch-call/{found=1} END{exit(!found)}' path/to/script.sh
 ```
 
 Replace `ENV_FLAG` with the exact env var name and `dispatch-call` with the function or binary name that should appear in the guarded body.
@@ -152,8 +153,8 @@ jq -e 'has("f1") and has("f2") and (.tier | test("^(a|b|c)$"))' file.json
 # Boolean invariants (Level 3)
 jq -e '.enabled == true and .read_only == true' file.json
 
-# Flag guards dispatch body (Level 3.5)
-awk '/ENV_FLAG.*==.*1/{p=1} p && /dispatch/{found=1} END{exit(!found)}' script.sh
+# Flag guards dispatch body (Level 3.5) — POSIX shell: use =.*"1"
+awk '/ENV_FLAG.*=.*"1"/{p=1} p && /dispatch/{found=1} END{exit(!found)}' script.sh
 
 # Keyword in correct section of markdown (Level 3.5)
 awk '/^#/{section=$0} /PHRASE/{if(section ~ /Target Section/){found=1}} END{exit(!found)}' file.md

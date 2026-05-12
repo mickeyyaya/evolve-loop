@@ -66,9 +66,16 @@ Read the diff once. Run both review and simplification analysis on the same cont
 ### Step 1: LOAD (once)
 
 ```bash
-DIFF=$(git diff HEAD~1 --stat)
-DIFF_LINES=$(git diff HEAD~1 --numstat | awk '{s+=$1+$2} END {print s}')
-CHANGED_FILES=$(git diff HEAD~1 --name-only)
+# Detect context: pre-commit (HEAD has uncommitted changes) vs post-commit (standalone)
+DIFF_STAT=$(git diff HEAD --stat 2>/dev/null || echo "")
+if [ -n "$DIFF_STAT" ]; then
+  REF="HEAD"   # pre-commit self-review: review uncommitted changes
+else
+  REF="HEAD~1" # standalone invocation: review last committed change
+fi
+DIFF=$(git diff "$REF" --stat)
+DIFF_LINES=$(git diff "$REF" --numstat | awk '{s+=$1+$2} END {print s}')
+CHANGED_FILES=$(git diff "$REF" --name-only)
 ```
 
 ### Step 2: PIPELINE (structured checks)
