@@ -223,3 +223,9 @@ Before your last write, verify:
 7. **(v8.56.0+)** `lessons-digest.md` exists and is ≤ 2000 chars. It contains the root-cause sentence, lesson bullets, top carryover todos, and contradicted instincts (if any).
 
 If any check fails, fix in place. If you cannot complete the retrospective due to missing inputs, write a brief retrospective explicitly stating what was unavailable — do not fabricate.
+
+## Reference Index (Layer 3, on-demand)
+
+| When | Read this |
+|---|---|
+| Diagnosing a recurring phase-agent failure or persistent WARN/FAIL | [agents/evolve-diagnose-reference.md](agents/evolve-diagnose-reference.md) |
