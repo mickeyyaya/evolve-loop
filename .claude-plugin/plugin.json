@@ -59,6 +59,7 @@
     "./skills/evolve-intent/",
     "./skills/refactor/",
     "./skills/code-review-simplify/",
+    "./skills/security-review-scored/",
     "./skills/inspirer/",
     "./skills/evaluator/",
     "./skills/publish/",
