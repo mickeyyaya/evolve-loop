@@ -76,7 +76,7 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
    ↓ verdict-driven branch:
 5a. PASS         →  advance ship orchestrator  →  ship.sh "<commit-msg>"
                     advance learn memo  (v8.57.0+ Layer P)
-                    subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json)
+                    subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json + memo.md handoff — see Layer-P Memo Phase Contract)
                     merge-lesson-into-state.sh $WORKSPACE  (writes new carryoverTodos with cycles_unpicked=0)
                     reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict PASS  (Layer D)
 5b. WARN (v8.35.0+) →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
@@ -114,6 +114,25 @@ TASK_PROMPT
 The helper emits a `## Intent`, `## Scout report`, etc. block — only the artifacts that role should see. Do NOT manually re-include `audit-report.md`, `retrospective-report.md`, or `failedApproaches[]` content in a Builder prompt; the kernel won't block you, but the role-context-builder is the canonical source-of-truth for what each role sees.
 
 If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stderr WARN — your job in that case is to *trim* before re-dispatching (e.g., by extracting only the relevant scout-report sections), not to silently ship an over-cap prompt.
+
+## Layer-P Memo Phase Contract (v9.4.0+)
+
+Layer-P runs on every PASS cycle immediately after `ship.sh` returns exit 0. The memo agent writes two artifacts to `$WORKSPACE`: `carryover-todos.json` (machine-readable, consumed by `reconcile-carryover-todos.sh`) and `memo.md` (the human-readable handoff document, at path `.evolve/runs/cycle-N/memo.md`). Both must be present before `merge-lesson-into-state.sh` is called — a missing `memo.md` causes exit code 2, the integrity-breach signal responsible for 13 consecutive `code-audit-warn` cycles. See `CONTEXT.md` for canonical definitions of "memo", "handoff", and "Layer-P".
+
+**memo.md requirements** (all six enforced before `merge-lesson-into-state.sh` proceeds):
+
+| Requirement | Rule |
+|---|---|
+| Output path | `$WORKSPACE/memo.md` (canonical path: `.evolve/runs/cycle-N/memo.md`) |
+| Artifact references | MUST cite scout-report, build-report, and audit-report by path and SHA; MUST NOT re-summarize their content |
+| Skill suggestions | MUST list 2–4 persona-action suggestions for the next cycle |
+| carryoverTodo guidance | MUST name which carryover IDs to prioritize next cycle and explain why |
+| Line cap | MUST be ≤100 lines |
+| Anti-goal | MUST NOT replace or paraphrase audit-report — memo is HANDOFF, not re-audit |
+
+After `subagent-run.sh memo` returns exit 0, verify `$WORKSPACE/memo.md` exists and is ≤100 lines before calling `merge-lesson-into-state.sh`. If absent, record `code-audit-warn` via `record-failure-to-state.sh` before continuing — do not silently skip.
+
+For the full `memo.md` section template, see [agents/evolve-memo-reference.md](agents/evolve-memo-reference.md) — section `memo-template`.
 
 ## Resume Mode (v9.1.0+)
 
@@ -252,3 +271,4 @@ requires them. v8.64.0 Campaign D Cycle D1 split.
 | Auditor questions why you follow adapter verbatim | [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) — section `failure-adapter-rationale` |
 | Want full rationale on why each operating principle is the way it is | [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) — section `operating-principles` |
 | Hitting unexpected stderr / non-zero from a kernel script | [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) — section `failure-modes-recovery` |
+| Need the full memo.md section template | [agents/evolve-memo-reference.md](agents/evolve-memo-reference.md) — section `memo-template` |
