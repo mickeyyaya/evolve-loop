@@ -299,3 +299,51 @@ Anthropic's 2026 production cookbook documents "tool-result clearing": surgicall
 **Relevance to evolve-loop:** Builder's multi-file-read phases accumulate large `tool_result` blocks in context. A profile field `context_clear_trigger_tokens: 30000` + `context_clear_keep_recent_tool_results: 4` could be added to `builder.json` (similar to auditor's `context_anchors` pattern). Expected saving: 20–40% Builder context reduction. Risk: Low (surgical, not destructive). Target: cycle 26+ after P-NEW-1 promotion.
 
 Source: https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools
+
+---
+
+## P-NEW-7 — SkillReducer-Style Layer-3 Split for Large Skill Files
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `skills/evolve-loop/phases.md`, `SKILL.md`, `online-researcher.md`, `benchmark-eval.md` |
+| **Expected saving** | $0.10–0.40/cycle: phases.md 28,911→~14KB = 16KB saved per load × 2+ loads/cycle ≈ 8,000 tokens × $3/MTok = $0.024/cycle minimum; scales 5–10× when EVOLVE_BUILDER_SELF_REVIEW becomes default-ON |
+| **LoC delta** | ~0 LoC code change; ~60 LoC moved to `skills/evolve-loop/reference/<name>-detail.md`; core bodies trimmed to <14KB each |
+| **Risk** | Low — read-only content reorganization; skill invocation path unchanged |
+| **Target cycle** | 24 (I1 shipped — `phases.md` split done) |
+| **Verification** | `wc -c .agents/skills/evolve-loop/phases.md` < 14000; `test -f skills/evolve-loop/reference/phases-detail.md` |
+| **Source** | SkillReducer (arXiv:2603.29919, March 2026) + addyosmani/agent-skills (GitHub, Oct 2025) |
+
+**Anti-gaming:** Moving content to reference sub-files doesn't change tool grants. Builder cannot self-mark PASS on "skill still works" — Auditor re-invokes and checks exit 0 independently.
+
+---
+
+## P-NEW-8 — AgentDiet-Style failedApproaches Classification Filtering
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/lifecycle/role-context-builder.sh` (builder + auditor role sections) |
+| **Expected saving** | $0.03–0.10/cycle: 14 failedApproaches entries (6,455 bytes) → Builder gets 0 relevant entries (all are `code-audit-warn`) → saves ~6KB Builder context per cycle |
+| **LoC delta** | ~25 LoC in `role-context-builder.sh` builder-role section: add `jq` filter `select(.classification | test("code-build-fail|code-quality"))` |
+| **Risk** | Low — filtering is idempotent; worst case Builder sees fewer failure examples (all existing ones are audit-domain anyway) |
+| **Target cycle** | 26+ |
+| **Verification** | `context-monitor.json` `builder.input_bytes` delta: assert reduction ≥ 2KB vs prior cycle |
+| **Source** | AgentDiet (arXiv:2509.23586, FSE 2026) — trajectory expired/useless content removal |
+
+**Anti-gaming:** Classification labels set by `record-failure-to-state.sh` (kernel script, not Builder). Auditor verifies: `jq '[.failedApproaches[] | .classification] | unique' .evolve/state.json` shows no new classification strings.
+
+---
+
+## P-NEW-9 — OpenHands-Style Orchestrator Phase-Report Summarization
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `agents/evolve-orchestrator.md` (phase-report reading protocol) |
+| **Expected saving** | $0.10–0.30/cycle: orchestrator reads scout-report (~15KB) + build-report (~20KB) + audit-report (~15KB) = 50KB accumulated. With 3-bullet summarization between phases: 50KB → ~10KB in orchestrator context. Direct saving: 40KB × (1/4 tokens/byte) × $3/MTok = $0.03/cycle plus ~40% fewer orchestrator turns |
+| **LoC delta** | ~40 LoC in orchestrator persona: add "phase-report reading → 3-bullet summary → pass summary to next phase" protocol section |
+| **Risk** | Medium — LLM-generated summaries could miss audit defect IDs needed for SHA verification. Mitigation: summary MUST include verbatim `## Verdict` line + SHA8 from each report |
+| **Target cycle** | 26+ (after P-NEW-7 verified) |
+| **Verification** | `context-monitor.json` `orchestrator.input_bytes` delta: assert reduction ≥ 10KB vs prior cycle; Auditor verifies SHA in orchestrator-report matches audit-report on-disk |
+| **Source** | OpenHands context condensation (arXiv:2511.03690, Nov 2025) — LLMSummarizingCondenser; quadratic→linear context scaling |
+
+**Anti-gaming:** Orchestrator could summarize away its own audit defects. Mitigation: SHA verification preserved in summary (auditor SHA is 8 chars, always fits). Auditor independently cross-checks SHA.

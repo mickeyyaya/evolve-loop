@@ -35,35 +35,9 @@ bash scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
 | State updates | `state.json` cycle number and mastery updated ONLY by the script |
 | Tamper detection | Eval checksums verified |
 
-The LLM retains all creative work — task selection, implementation, code review, instinct extraction. The script enforces *process*, the LLM does *substance*.
+v8.13.1 kernel hooks: **role-gate.sh** (denies writes outside phase allowlist), **phase-gate-precondition.sh** (denies out-of-order subagent calls), **ship-gate.sh** (denies direct git commit/push). For lifecycle integration code and bypass flags see [reference/phases-detail.md](reference/phases-detail.md#kernel-hooks).
 
-### v8.13.1: cycle-state.json + kernel hooks
-
-In addition to `phase-gate.sh` (which runs at transitions), v8.13.1 introduces continuous enforcement via three PreToolUse kernel hooks reading `.evolve/cycle-state.json`:
-
-- **`scripts/guards/role-gate.sh`** (Edit/Write matcher): denies file writes outside the active phase's path allowlist. Calibrate/research/discover → workspace only. Build → workspace + active worktree. Audit → audit-report + handoff. Ship → version-bump files. Learn → orchestrator-report + lessons + state.json.
-- **`scripts/guards/phase-gate-precondition.sh`** (Bash matcher, second hook after ship-gate): denies `subagent-run.sh` invocations that don't match the expected next agent given current phase.
-- **`scripts/guards/ship-gate.sh`** (Bash matcher, first hook): denies any git commit/push/gh release except via `scripts/lifecycle/ship.sh` (carried over from v8.13.0).
-
-Lifecycle integration:
-
-```bash
-# At cycle start (run-cycle.sh handles this automatically):
-bash scripts/lifecycle/cycle-state.sh init <cycle> <workspace>
-
-# At each phase transition (orchestrator advances; runner DOES NOT auto-advance):
-bash scripts/lifecycle/cycle-state.sh advance <new_phase> <agent> [worktree]
-
-# At cycle end:
-bash scripts/lifecycle/cycle-state.sh clear
-```
-
-When cycle-state.json is absent (no cycle in progress), all three hooks pass through transparently — they do not block ad-hoc work outside cycles.
-
-Bypasses (emergency only, logged WARN):
-- `EVOLVE_BYPASS_ROLE_GATE=1`
-- `EVOLVE_BYPASS_PHASE_GATE=1`
-- `EVOLVE_BYPASS_SHIP_GATE=1`
+---
 
 ## Phase 0: CALIBRATE (once per invocation)
 
@@ -71,30 +45,19 @@ Runs **once per `/evolve-loop` invocation**, not per cycle. Establishes a projec
 
 ### Session Resume Check (before calibration)
 
-On every invocation, check for a prior session-break handoff:
-
 ```bash
 HANDOFF_FILE=".evolve/workspace/handoff.md"
 if [ -f "$HANDOFF_FILE" ] && grep -q "Session Break Handoff" "$HANDOFF_FILE"; then
-  echo "Resuming from session break. Reading handoff..."
   # Parse: remaining cycles, strategy, goal, carry-forward context
-  # The handoff contains orchestrator reasoning that only existed in session memory
-  # Read the "Carry Forward" section — this is context not derivable from state.json
+  echo "Resuming from session break. Reading handoff..."
 fi
 ```
 
-Read the handoff to recover:
-- **Remaining cycles** (only source — not in state.json)
-- **Goal** (if user-provided, only in handoff)
-- **Carry Forward notes** (orchestrator observations from prior session)
-- **Task queue snapshot** (selected-but-incomplete tasks)
-- **Recent verdicts** (quick context without reading full ledger)
-
-After reading, the handoff has been consumed. The new session writes its own handoff at each cycle checkpoint.
+Read the handoff to recover: remaining cycles, goal, carry-forward notes, task queue snapshot, recent verdicts.
 
 ### Calibration
 
-For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-loop/phase0-calibrate.md).
+For detailed calibration instructions, see [phase0-calibrate.md](phase0-calibrate.md).
 
 | Step | Action |
 |------|--------|
@@ -106,82 +69,7 @@ For detailed calibration instructions, see [phase0-calibrate.md](skills/evolve-l
 
 ### Skill Inventory (once per session)
 
-Build a compact, deterministic inventory of every installed skill — project-local, user-global (`~/.claude/skills/`), and plugin cache (`~/.claude/plugins/cache/*/skills/`). This is done by a filesystem-scan script, NOT by LLM parsing of the system-reminder list, because the scripted scan is cheaper (zero tokens), more complete (every installed skill regardless of context window), and cached across sessions.
-
-| Step | Action |
-|------|--------|
-| Run script | `bash scripts/utility/setup-skill-inventory.sh` — idempotent, freshness-gated (1h cache) |
-| Skip check | Script exits early with cache-hit message if `.evolve/skill-inventory.json` is <1 hour old (pass `--force` to rebuild) |
-| Read output | Orchestrator reads `.evolve/skill-inventory.json` — already categorized, already sorted |
-| Pass to Scout | Extract subset of `categoryIndex` matching `projectContext.language`/`framework`/task types; pass as `skillCategories` in the Scout context block |
-
-**Output file:** `.evolve/skill-inventory.json` (schema matches the `state.json.skillInventory` shape below, plus a `skills` map keyed by name with `path`, `origin`, `referenceFiles`, and `categories` fields).
-
-**Scopes scanned** (precedence: project > user > plugin/extension — first-seen wins on name collision):
-
-| Scope | Path | Typical count |
-|---|---|---|
-| `project` | `./skills/**/SKILL.md` | 5-20 |
-| `user` | `~/.claude/skills/*/SKILL.md` or `~/.gemini/skills/*/SKILL.md` | 50-300 |
-| `plugin/extension` | `~/.claude/plugins/.../SKILL.md` or `~/.gemini/extensions/*/skills/*/SKILL.md` | 10-100 per plugin |
-
-IDE-specific mirror dirs (`.cursor/skills/`, `.kiro/skills/`, `.agents/skills/`) are **skipped** — only the canonical `skills/` directory of each plugin version is consumed.
-
-**Routing Categories:**
-
-| Category | Matches | Example Skills |
-|----------|---------|---------------|
-| `code-review` | code review, quality, patterns | `/code-review-simplify` (built-in), `code-review:code-review`, `pr-review-workflow` |
-| `testing` | TDD, test generation, coverage | `everything-claude-code:tdd`, `testing-patterns` |
-| `security` | security audit, vulnerability | `everything-claude-code:security-review`, `security-patterns-code-review` |
-| `language:<lang>` | language-specific patterns | `python-review-patterns`, `go-review-patterns`, `typescript-review-patterns` |
-| `framework:<fw>` | framework-specific | `everything-claude-code:django-patterns`, `everything-claude-code:springboot-patterns` |
-| `architecture` | design patterns, DDD | `architectural-patterns`, `domain-driven-design-patterns` |
-| `debugging` | debugging, investigation | `superpowers:systematic-debugging`, `gstack-investigate` |
-| `performance` | profiling, caching, optimization | `performance-anti-patterns`, `caching-strategies` |
-| `frontend` | UI, components, design | `frontend-design:frontend-design`, `everything-claude-code:frontend-patterns` |
-| `database` | SQL, ORM, migrations | `database-review-patterns`, `everything-claude-code:postgres-patterns` |
-| `agent-design` | agent patterns, orchestration | `agent-orchestration-patterns`, `agent-memory-patterns` |
-| `docs` | documentation, API docs | `code-documentation-patterns`, `review-api-contract` |
-| `infra` | CI/CD, containers, deployment | `cicd-pipeline-patterns`, `container-kubernetes-patterns` |
-| `refactoring` | refactor, code smells | `/refactor` (built-in), `detect-code-smells`, `refactoring-decision-matrix` |
-
-For skill precedence, conflict resolution, phase eligibility, and budget-aware depth routing, see [reference/skill-routing.md](reference/skill-routing.md).
-
-**Inventory schema (`.evolve/skill-inventory.json`, written by `scripts/utility/setup-skill-inventory.sh`):**
-
-```json
-{
-  "lastBuilt": "<ISO-8601>",
-  "totalSkills": 281,
-  "scopes": {
-    "project": 5,
-    "user": 226,
-    "plugin:ecc:ecc": 32,
-    "plugin:claude-plugins-official:superpowers": 14
-  },
-  "categoryIndex": {
-    "code-review": ["code-reviewer", "pr-review-workflow", ...],
-    "security": ["security-review", "security-patterns-code-review", ...],
-    "language:python": ["python-patterns", "python-review-patterns", "python-testing"],
-    "e2e": ["e2e-testing", "ui-demo", ...]
-  },
-  "skills": {
-    "e2e-testing": {
-      "name": "e2e-testing",
-      "description": "Playwright E2E testing patterns, Page Object...",
-      "origin": "user",
-      "path": "/Users/.../e2e-testing/SKILL.md",
-      "referenceFiles": ["references/playwright-config.md", ...],
-      "categories": ["testing", "e2e"]
-    }
-  }
-}
-```
-
-The full file runs ~50-200KB depending on installed plugins. The orchestrator does NOT pass it whole to agents — it reads the file, extracts the `categoryIndex` subset matching `projectContext.language`/`framework`/task-type signals, and passes only that slice to Scout as `skillCategories`. Individual `skills[<name>]` entries (including `path` and `referenceFiles`) are looked up on demand when Builder wants to open a specific skill's reference material.
-
-**Fallback behavior:** If `.evolve/skill-inventory.json` is missing (e.g., first-ever cycle, setup script not yet run), the orchestrator MUST invoke `bash scripts/utility/setup-skill-inventory.sh` before launching Scout. If the script fails (e.g., `python3` unavailable), fall back to the legacy LLM-parsing path and log a WARN to the ledger so the next session can retry.
+Run `bash scripts/utility/setup-skill-inventory.sh` (1h cache) to build `.evolve/skill-inventory.json`. Pass `categoryIndex` subset matching project language/framework/task-types to Scout as `skillCategories`. For routing categories table, JSON schema, scope precedence, and fallback behavior see [reference/phases-detail.md](reference/phases-detail.md#skill-inventory).
 
 ---
 
@@ -189,82 +77,30 @@ The full file runs ~50-200KB depending on installed plugins. The orchestrator do
 
 ### Rate Limit Recovery (wraps every agent dispatch)
 
-Track consecutive agent failures across all phases. After every agent dispatch (Scout, Builder, Auditor), check the return value for rate limit signals. See [policies.md § Rate Limit Recovery Protocol](reference/policies.md#rate-limit-recovery-protocol) for full detection logic.
-
 ```
-CONSECUTIVE_FAILURES=0
-
-# After each agent dispatch:
-check_rate_limit(agent_result):
-  if agent_result contains "rate limit|quota|overloaded|429|too many requests":
-    → execute Rate Limit Recovery Protocol
-  if agent_failed:
-    CONSECUTIVE_FAILURES += 1
-    if CONSECUTIVE_FAILURES >= 3:
-      → execute Rate Limit Recovery Protocol
-  else:
-    CONSECUTIVE_FAILURES = 0
+if agent_result contains "rate limit|quota|overloaded|429|too many requests":
+  → execute Rate Limit Recovery Protocol
+if CONSECUTIVE_FAILURES >= 3:
+  → execute Rate Limit Recovery Protocol
 ```
 
-**On rate limit detection:**
-1. Complete current phase (never break mid-phase)
-2. Write handoff using Session Break Handoff Template (cause: "API rate limit")
-3. Auto-schedule resume: try `/schedule` first (remote trigger at next hour), fall back to `/loop 5m`, fall back to manual resume instructions
-4. **STOP** — do not start next phase
+On detection: complete current phase, write handoff, auto-schedule resume (`/schedule` → `/loop 5m` → manual), then **STOP**. For full detection code block and 4-step protocol see [reference/phases-detail.md](reference/phases-detail.md#rate-limit-recovery).
 
 ### Context Window Budget Gate (MANDATORY — runs before anything else)
 
-Run `scripts/verification/context-budget.sh` before each cycle. This is a **per-cycle** gate — it checks "is there room for ONE more cycle?" not cumulative session usage. Each cycle is an independent plan-mode unit; auto-compaction reclaims context from older cycles between runs.
+Run `scripts/verification/context-budget.sh` before each cycle (bash block in [phases-detail.md](reference/phases-detail.md#context-budget-gate)).
 
-```bash
-CYCLES_THIS_SESSION=${CYCLES_THIS_SESSION:-0}
-BUDGET_JSON=$(bash scripts/verification/context-budget.sh "$CYCLE_NUMBER" "$CYCLES_THIS_SESSION" "$WORKSPACE_PATH" 2>/dev/null)
-BUDGET_EXIT=$?
-BUDGET_STATUS=$(echo "$BUDGET_JSON" | grep -o '"status": *"[^"]*"' | cut -d'"' -f4)
-REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *[0-9]*' | grep -o '[0-9]*$')
-```
-
-| Exit Code | Status | Trigger | Action |
-|-----------|--------|---------|--------|
-| 0 | **GREEN** | Cycles 1-9 | Continue — full per-cycle budget available |
-| 1 | **YELLOW** | Cycle 10+ or headroom tight | Force lean mode ON for this cycle. **Continue — YELLOW is NOT a stop signal.** |
-| 2 | **RED** | Cycle 30+ or headroom < one lean cycle | Write handoff checkpoint. Continue if `remainingCycles > 0`. Only STOP if RED triggers on **two consecutive cycle starts** — this confirms context is genuinely exhausted. |
-
-**On RED (first occurrence):** Write enriched `handoff.md` as a safety checkpoint. Then **continue immediately** — auto-compaction should free context. The handoff preserves state as insurance.
-
-**On RED (second consecutive):** STOP. Output resume command: `/evolve-loop <remaining> <strategy> <goal>`.
-
-**On YELLOW:** Set `leanMode = true` for this cycle only. Lean mode reduces agent prompt depth and file reads — it does NOT trigger a session break.
-
-Increment after each cycle completes: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
+| Exit | Status | Action |
+|------|--------|--------|
+| 0 | **GREEN** | Continue — full budget |
+| 1 | **YELLOW** | Force lean mode ON. **YELLOW is NOT a stop signal.** |
+| 2 | **RED** | Write handoff checkpoint. Only STOP if RED on **two consecutive** starts. |
 
 ### Phase 1: RESEARCH (every cycle)
 
-Proactive research loop. Runs inline by the orchestrator (no separate agent). Transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.
-
-For the full 6-step protocol (ORIENT → GAP ANALYSIS → DIVERGENCE → RESEARCH → CONCEPTUALIZE → EVALUATE → DECIDE), see [phase1-research.md](phase1-research.md).
-
-**Token budget:** 25K max. Skip when lean mode + no weaknesses + empty agenda. Phase gate: `bash scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
-
----
-
-### Eager Context Budget Estimation
-
-At cycle start, **after passing the context window gate**, estimate total context cost for this specific cycle. This enables proactive lean mode entry and Self-MoA decisions. (Research: OPENDEV [arXiv:2603.05344], Token Consumption Prediction [OpenReview:1bUeVB3fov].)
-
-| Task Type | Estimated Tokens |
-|-----------|-----------------|
-| S-task inline | ~5-10K |
-| S-task worktree | ~20-40K |
-| M-task worktree | ~40-80K |
-| M-task Self-MoA | ~80-160K (N x single) |
-| Orchestrator overhead | ~10-15K |
-
-If `estimatedCycleTokens > tokenBudget.perCycle * 0.8`: drop lowest-priority tasks, switch M-tasks to single-Builder, or activate lean mode immediately.
+Proactive research loop — full 6-step protocol in [phase1-research.md](phase1-research.md). **Token budget:** 25K max. Phase gate: `bash scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
 
 ### Lean Mode (cycle 10+ OR YELLOW from budget gate)
-
-Activated when `context-budget.sh` returns YELLOW (cycle 10+ or headroom tight) OR when estimated cycle tokens exceed 80% of per-cycle budget:
 
 | Optimization | Detail |
 |-------------|--------|
@@ -274,11 +110,9 @@ Activated when `context-budget.sh` returns YELLOW (cycle 10+ or headroom tight) 
 | Eval checksums | Compute once, verify from memory |
 | Benchmark delta | Skip for cycles where all tasks are S-complexity docs-only |
 
-Saves ~10-15K tokens per cycle (from ~35K to ~20K).
-
 ### AgentDiet Trajectory Compression
 
-Between phase transitions, compress accumulated context. (Research: AgentDiet [arXiv:2509.23586] — 40-60% input token savings.)
+Between phase transitions, compress accumulated context per AgentDiet [arXiv:2509.23586].
 
 | After Phase | Keep | Remove |
 |------------|------|--------|
@@ -291,58 +125,13 @@ Between phase transitions, compress accumulated context. (Research: AgentDiet [a
 
 ### Cycle Integrity Setup
 
-At cycle start, before any agent invocation, establish the integrity layer:
+1. **Challenge token:** `openssl rand -hex 8`; embed in every agent context block and ledger entry
+2. **Canary files:** plant `.integrity-canary` + `.integrity-canary-expected` in workspace; any access = anomaly
+3. **Adaptive strictness decay:** halve all `consecutiveClean` values in `auditorProfile` at each new invocation
+4. **Random full-audit flag:** `RANDOM_CHECK=$((RANDOM % 5))`; trigger `FORCE_FULL_AUDIT=true` when 0
+5. **Hash chain:** compute `PREV_HASH` from last ledger entry; every new entry must include `"prevHash":"<$PREV_HASH>"`
 
-1. **Generate challenge token:**
-   ```bash
-   CHALLENGE=$(openssl rand -hex 8 2>/dev/null || head -c 8 /dev/urandom | xxd -p)
-   ```
-   Pass to every agent in their context block. Each agent embeds it in workspace output and ledger entries. `scripts/observability/cycle-health-check.sh` verifies consistency.
-
-2. **Plant canary files:**
-   ```bash
-   CANARY_VALUE=$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | xxd -p)
-   echo "$CANARY_VALUE" > "$WORKSPACE_PATH/.integrity-canary"
-   echo "$CANARY_VALUE" > "$WORKSPACE_PATH/.integrity-canary-expected"
-
-   if [ ! -f ".evolve/evals/_canary-eval.md" ]; then
-     cat > ".evolve/evals/_canary-eval.md" << 'CANARY'
-   # Canary Eval (DO NOT REFERENCE)
-   This file monitors for eval system probing. Any access = anomaly.
-   ## Graders
-   - `echo "canary-sentinel-$(date +%s)"`
-   CANARY
-   fi
-   ```
-
-3. **Adaptive strictness decay** (cross-session — research: "Alignment Faking", Anthropic):
-   If first cycle of a new invocation, halve all `consecutiveClean` values in `auditorProfile`:
-   ```
-   for each taskType in auditorProfile:
-     auditorProfile[taskType].consecutiveClean = floor(consecutiveClean / 2)
-   ```
-
-4. **Random full-audit flag** (blind monitoring):
-   ```bash
-   RANDOM_CHECK=$((RANDOM % 5))  # 0-4
-   FORCE_FULL_AUDIT=false
-   if [ "$RANDOM_CHECK" -eq 0 ]; then
-     FORCE_FULL_AUDIT=true
-   fi
-   ```
-   Pass `forceFullAudit` in Auditor context. Do NOT log whether triggered.
-
-5. **Hash chain initialization** (tamper-evident ledger — research: SLSA transparency logs, in-toto):
-   ```bash
-   if command -v sha256sum &>/dev/null; then
-     PREV_HASH=$(tail -1 .evolve/ledger.jsonl 2>/dev/null | sha256sum | cut -d' ' -f1)
-   elif command -v shasum &>/dev/null; then
-     PREV_HASH=$(tail -1 .evolve/ledger.jsonl 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
-   else
-     PREV_HASH="unsupported"
-   fi
-   ```
-   Every ledger entry MUST include `"prevHash":"<$PREV_HASH>"`. After writing each entry, update `PREV_HASH` to the hash of the entry just written.
+For full code blocks see [reference/phases-detail.md](reference/phases-detail.md#cycle-integrity-setup).
 
 ### Atomic Cycle Number Allocation
 
@@ -354,9 +143,11 @@ At cycle start, before any agent invocation, establish the integrity layer:
 6. Use `claimedCycle` as this iteration's cycle number `N`
 7. Decrement `remainingCycles`
 
+---
+
 ### Phase 2: DISCOVER
 
-For the full Phase 2 protocol — convergence short-circuit, context pre-compute, prompt caching, Scout launch with full context schema, task claiming, eval quality check, and stagnation handling — see [phase2-discover.md](phase2-discover.md).
+For the full protocol — convergence short-circuit, context pre-compute, prompt caching, Scout launch, task claiming, eval quality check, stagnation handling — see [phase2-discover.md](phase2-discover.md).
 
 **Convergence short-circuit:** If `nothingToDoCount >= 2` and `discoveryVelocity.rolling3 == 0`, skip Scout and jump to Phase 5.
 
@@ -374,11 +165,10 @@ Based on the Context Engineering Maturity Model (arXiv:2603.09619), apply five c
 | **Economy** | Are we sending the minimum tokens needed? |
 | **Provenance** | Can we trace where each piece of context came from? |
 
-Log violations in build report under **Risks** and flag to Auditor.
 
 ### Per-Phase Context Selection Matrix
 
-Each agent receives ONLY the fields it needs (Anthropic's **Select** strategy).
+Each agent receives ONLY the fields it needs (Anthropic's **Select** strategy — saves ~3-5K tokens/invocation).
 
 | Field | Scout | Builder | Auditor | Operator |
 |-------|:-----:|:-------:|:-------:|:--------:|
@@ -398,22 +188,9 @@ Each agent receives ONLY the fields it needs (Anthropic's **Select** strategy).
 | `auditorProfile` | — | — | Y | — |
 | `recentLedger` | Y | — | Y | Y |
 
-Builder does NOT need stateJson, projectDigest, benchmarkWeaknesses, or recentNotes. Auditor does NOT need instinctSummary or budgetRemaining. Saves ~3-5K tokens per agent invocation.
-
 ### Inter-Phase Handoff Format
 
-Each phase writes `$WORKSPACE_PATH/handoff-<phase>.json` for the next phase.
-
-```json
-{
-  "phase": "<scout|builder|auditor|ship>",
-  "cycle": "<N>",
-  "findings": "<1-3 sentence summary>",
-  "decisions": ["<key decision 1>", "<key decision 2>"],
-  "files_modified": ["<path/to/file1>"],
-  "next_phase_context": { "<key>": "<value>" }
-}
-```
+Each phase writes `$WORKSPACE_PATH/handoff-<phase>.json` for the next phase. For full JSON schema see [reference/phases-detail.md](reference/phases-detail.md#inter-phase-handoff).
 
 | File | Written by | Read by | Key fields |
 |------|-----------|---------|------------|
@@ -434,12 +211,12 @@ bash scripts/lifecycle/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
 
 ### Phase 3: BUILD (loop per task)
 
-For detailed Phase 3 implementation, see [phase3-build.md](skills/evolve-loop/phase3-build.md).
+For detailed Phase 3 implementation, see [phase3-build.md](phase3-build.md).
 
 | Step | Detail |
 |------|--------|
 | Inline S-tasks | Execute first (per inst-007), commit sequentially |
-| Independent worktree tasks | Launch IN PARALLEL using multiple Agent tool calls in a single message (one per independent task, each with `isolation: "worktree"`). See phase3-build.md Dependency Partitioning Algorithm. |
+| Independent worktree tasks | Launch IN PARALLEL — one Agent call per task with `isolation: "worktree"`. See phase3-build.md Dependency Partitioning Algorithm. |
 | Dependent tasks | Build sequentially within groups per phase3-build.md conflict graph |
 | Isolation | Builder MUST use worktree isolation for coding projects |
 | Retries | Max 3 attempts per task; failures logged to state.json |
@@ -457,63 +234,19 @@ bash scripts/lifecycle/phase-gate.sh build-to-audit $CYCLE $WORKSPACE_PATH
 
 The Auditor reviews Builder changes **in the worktree**. Worktree tasks built in parallel during Phase 3 MUST also be audited in parallel.
 
-**Inline task audit:** Run eval graders before committing. If any grader fails, revert (`git checkout -- <files>`) and retry inline or escalate to Builder agent. Do NOT skip audit for inline tasks.
+**Inline task audit:** Run eval graders before committing. If any grader fails, revert and retry inline or escalate to Builder agent. Do NOT skip audit for inline tasks.
 
-**Eval checksum verification** (before launching Auditor):
-```bash
-sha256sum -c $WORKSPACE_PATH/eval-checksums.json
-```
-If any checksum fails → HALT: "Eval tamper detected."
+**Eval checksum verification:** `sha256sum -c $WORKSPACE_PATH/eval-checksums.json` — if any checksum fails → HALT: "Eval tamper detected."
 
-**Launch Auditor Agent** (model: tier-2 default, tier-1 for security-sensitive, tier-3 for clean builds):
-- **Subagent invocation (REQUIRED):** Run via the runner script. The Auditor profile (`.evolve/profiles/auditor.json`) is read-only at the filesystem level (no `Edit`/`Write` outside the audit-report path) and bash is restricted to test runners and integrity scripts — Auditor cannot commit, push, or modify state.
+**Launch Auditor Agent** via `scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"`. For full context JSON and model-tier selection logic see [reference/phases-detail.md](reference/phases-detail.md#phase-4-audit).
 
-  ```bash
-  cat agents/evolve-auditor.md context.json | \
-      MODEL_TIER_HINT="<resolved tier>" \
-      bash scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"
-  ```
+**Enhanced evaluation via `/evaluator`** (optional, `strategy == "harden"` or `forceFullAudit == true`): merge scores into `## Evaluator Scores`. Skip when lean mode or budget YELLOW/RED.
 
-  Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle only.
-
-- Prompt: Read `agents/evolve-auditor.md` and pass as prompt
-- Context:
-  ```json
-  {
-    "workspacePath": "<$WORKSPACE_PATH>",
-    "runId": "<$RUN_ID>",
-    "evalsPath": ".evolve/evals/",
-    "strategy": "<strategy>",
-    "auditorProfile": "<state.json auditorProfile object>",
-    "cycle": "<N>",
-    "buildReport": "<$WORKSPACE_PATH>/build-report.md",
-    "recentLedger": "<last 3 ledger entries>",
-    "challengeToken": "<$CHALLENGE>",
-    "forceFullAudit": "<$FORCE_FULL_AUDIT>",
-    "handoffFromBuilder": "<contents of handoff-builder.json>"
-  }
-  ```
-
-**Enhanced evaluation via `/evaluator` (optional):** When `strategy == "harden"` OR `forceFullAudit == true`, invoke `/evaluator --scope task --depth standard` for independent multi-dimensional assessment (6 dimensions with anti-gaming detection). Merge returned dimension scores into audit-report.md under `## Evaluator Scores`. Advisory only — supplements Auditor verdict, does not override. Skip when lean mode active or budget YELLOW/RED.
-
-After Auditor completes:
-- If `PASS-PENDING-EVAL` → proceed to eval gate (phase-gate runs `verify-eval.sh` as single source of truth)
-- If `PASS` (post-eval) → proceed to **Phase 5 Ship**: `git apply` worktree patch, commit, push.
-- If `WARN`, `FAIL`, or `SHIP_GATE_DENIED` → **drop the work, RECORD the failure, do NOT commit.** Lightweight failed-path:
-  1. `git diff HEAD > "$WORKSPACE_PATH/failed.patch"` (capture failed code state for forensic review).
-  2. `bash scripts/failure/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"` (append structured failure entry to `state.json.failedApproaches[]` — defects + verdict + audit-report SHA256 + git HEAD/tree state). Cost: 0 LLM calls, ~50ms.
-  3. `git worktree remove --force "$WORKTREE_DIR"` (discard the failed code).
-
-  The retrospective subagent is **NOT invoked per cycle.** It runs **separately, on demand or in batches** (e.g., weekly, or after N failures) — synthesizing cross-cycle patterns into failure-lesson YAMLs that feed into future `instinctSummary`. See [phase6-learn.md § 4c](phase6-learn.md) for the deferred-retrospective flow.
-- For Builder retries (within the cycle), see [phase3-build.md](skills/evolve-loop/phase3-build.md) (retry/cleanup). Retry budget is consumed at Builder; once retries are exhausted and Auditor still says FAIL/WARN, the failed-path recording above runs.
-- Phase-gate `audit-to-ship` promotes `PASS-PENDING-EVAL` → `PASS` only if `verify-eval.sh` passes
-- Auditor does NOT run eval graders directly — this eliminates redundant eval execution
+After Auditor completes: PASS → Phase 5 Ship; WARN/FAIL/SHIP_GATE_DENIED → drop work, record failure, discard worktree.
 
 ---
 
 ### Benchmark Delta Check & Pre-Ship Integrity Gate
-
-For detailed steps, see [phase3-build.md](skills/evolve-loop/phase3-build.md).
 
 | Check | Detail |
 |-------|--------|
@@ -527,11 +260,9 @@ bash scripts/lifecycle/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to SHIP. Exit 1 -> block. Exit 2 -> HALT for human.
 ```
 
-This is the **primary anti-cheating gate**: runs `verify-eval.sh` independently, runs `cycle-health-check.sh` (11 signals), verifies eval checksums.
-
 ### Phase 5: SHIP
 
-For detailed instructions, see [phase5-ship.md](skills/evolve-loop/phase5-ship.md).
+For detailed instructions, see [phase5-ship.md](phase5-ship.md).
 
 ```bash
 bash scripts/lifecycle/phase-gate.sh ship-to-learn $CYCLE $WORKSPACE_PATH
@@ -542,9 +273,13 @@ Verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does 
 
 ### Phase 6: LEARN
 
-For detailed instructions, see [phase6-learn.md](skills/evolve-loop/phase6-learn.md).
+For detailed instructions, see [phase6-learn.md](phase6-learn.md).
 
 ```bash
 bash scripts/lifecycle/phase-gate.sh cycle-complete $CYCLE $WORKSPACE_PATH
 ```
 Archives workspace, verifies all 3 reports exist, updates mastery ONLY if audit-report.md contains a genuine PASS verdict.
+
+---
+
+> For detailed phase-gate code blocks, Skill Inventory schema, Cycle Integrity Setup code, Rate Limit Recovery protocol, and Inter-Phase Handoff JSON schema, see [reference/phases-detail.md](reference/phases-detail.md).
