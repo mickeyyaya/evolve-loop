@@ -310,17 +310,26 @@ gate_discover_to_build() {
     fi
     log "OK: Eval checksums captured"
 
-    # 5. Mutation testing — verify NEW (git-untracked) eval files are rigorous.
-    # Runs only on evals the current cycle added (git ls-files --others), not all
-    # 100+ existing evals. Builder-created evals are caught at gate_build_to_audit.
+    # 5. Mutation testing — verify NEW eval files (created during this cycle) are rigorous.
+    # Scopes to files newer than $WORKSPACE/.cycle-start-marker (set by run-cycle.sh
+    # at cycle init). Pre-cycle-21 used `git ls-files --others --exclude-standard`,
+    # but .evolve/* is gitignored — that filter always returned empty (cycle-19 WARN).
+    # Removing --exclude-standard returns all 277 existing evals — also wrong.
+    # find -newer is precise: only files mtime > marker, i.e. created this cycle.
     # Threshold: 0.7 (WARN-only this rollout; escalate to FAIL after one verification cycle).
     # Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
     if [ -x "scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
-        local _new_evals _mutation_warnings
+        local _new_evals _mutation_warnings _marker
         _mutation_warnings=0
-        _new_evals=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" ls-files --others --exclude-standard "${EVOLVE_DIR}/evals/" 2>/dev/null | grep '\.md$' || true)
+        _marker="$WORKSPACE/.cycle-start-marker"
+        if [ ! -f "$_marker" ]; then
+            log "WARN: cycle-start marker missing ($_marker) — mutation gate cannot scope to new evals; skipping"
+            _new_evals=""
+        else
+            _new_evals=$(find "${EVOLVE_DIR}/evals" -name '*.md' -newer "$_marker" -type f 2>/dev/null || true)
+        fi
         if [ -z "$_new_evals" ]; then
-            log "OK: No new (untracked) eval files — mutation pre-flight skipped"
+            log "OK: No new eval files (newer than cycle-start) — mutation pre-flight skipped"
         else
             while IFS= read -r eval_file; do
                 [ -f "$eval_file" ] || continue
@@ -564,15 +573,22 @@ gate_build_to_audit() {
     # 4b. Builder isolation breach detector (v8.N, default OFF; see EVOLVE_BUILDER_ISOLATION_CHECK)
     _check_builder_isolation_breach
 
-    # 5. Mutation testing on Builder-created eval files (v8.N cycle-19).
-    # Builder creates evals during the build phase; they appear as untracked at
-    # gate_build_to_audit. Running mutate-eval.sh here catches tautological graders
-    # before the Auditor writes its verdict. Threshold: 0.7 WARN-only.
-    # Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
+    # 5. Mutation testing on Builder-created eval files (cycle-19 + cycle-21 fix).
+    # Same approach as gate_discover_to_build step 5: find -newer than the
+    # .cycle-start-marker that run-cycle.sh creates at cycle init. This catches
+    # both Scout-created and Builder-created evals; the redundancy with the
+    # discover-to-build pass is acceptable (typical cycle adds 0-2 evals).
+    # Threshold: 0.7 WARN-only. Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
     if [ -x "scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
-        local _new_build_evals _build_mut_warnings
+        local _new_build_evals _build_mut_warnings _b_marker
         _build_mut_warnings=0
-        _new_build_evals=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" ls-files --others --exclude-standard "${EVOLVE_DIR}/evals/" 2>/dev/null | grep '\.md$' || true)
+        _b_marker="$WORKSPACE/.cycle-start-marker"
+        if [ ! -f "$_b_marker" ]; then
+            log "WARN: cycle-start marker missing ($_b_marker) — build-to-audit mutation gate cannot scope to new evals; skipping"
+            _new_build_evals=""
+        else
+            _new_build_evals=$(find "${EVOLVE_DIR}/evals" -name '*.md' -newer "$_b_marker" -type f 2>/dev/null || true)
+        fi
         if [ -z "$_new_build_evals" ]; then
             log "OK: No new eval files from build — mutation check skipped"
         else

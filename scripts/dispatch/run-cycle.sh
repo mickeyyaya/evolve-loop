@@ -336,6 +336,13 @@ _archive_if_needed() {
 _archive_if_needed "$WORKSPACE" "$CYCLE"
 rm -rf "$WORKSPACE"
 mkdir -p "$WORKSPACE"
+# Sentinel marker for cycle-scoped eval detection (cycle 21 fix).
+# phase-gate.sh's mutation gate uses `find .evolve/evals -newer <marker>` to
+# scope mutation testing to files created during this cycle. Without this,
+# `git ls-files --others --exclude-standard` returned empty under .evolve/*
+# gitignore (cycle-19 WARN); removing --exclude-standard returned all 277
+# existing evals (rejected fix). The marker approach is precise and cheap.
+touch "$WORKSPACE/.cycle-start-marker"
 log "workspace=$WORKSPACE (cleared for fresh cycle-init)"
 
 # v8.29.0: register cleanup trap BEFORE cycle_state_init.
