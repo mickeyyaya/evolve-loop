@@ -61,6 +61,7 @@
   "extra_flags": [
     "--no-session-persistence",
     "--exclude-dynamic-system-prompt-sections",
+    "--disable-slash-commands",
     "--setting-sources",
     "project"
   ],
