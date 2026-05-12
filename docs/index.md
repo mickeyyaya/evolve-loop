@@ -66,3 +66,15 @@
 | [incidents/cycle-102-111.md](incidents/cycle-102-111.md) | Reward hacking via tautological evals |
 | [incidents/cycle-132-141.md](incidents/cycle-132-141.md) | Orchestrator gaming — skipped agents, fabricated cycles |
 | [incidents/gemini-forgery.md](incidents/gemini-forgery.md) | Cross-platform audit forgery |
+
+## Architecture Decision Records
+
+| ADR | Title | Cycle | Status |
+|-----|-------|-------|--------|
+| [ADR 0001](adr/0001-plugin-dir-resolution.md) | Plugin-Dir Resolution | 23 | Accepted |
+| [ADR 0002](adr/0002-disable-slash-commands-semantics.md) | Disable-Slash-Commands Semantics | 23 | Accepted |
+| [ADR 0003](adr/0003-layer-3-persona-split-pattern.md) | Layer-3 Persona Split Pattern | 24 | Accepted |
+| [ADR 0004](adr/0004-context-md-adoption.md) | CONTEXT.md Canonical Glossary Adoption | 24 | Accepted |
+| [ADR 0005](adr/0005-tsc-application.md) | TSC Application to Persona Files | 24–26 | Accepted |
+| [ADR 0006](adr/0006-layer-p-memo-handoff-template.md) | Layer-P Memo Phase Contract | 24–25 | Accepted |
+| [ADR 0007](adr/0007-inbox-injection-protocol.md) | Inbox-Injection Protocol | 27 | Accepted |
