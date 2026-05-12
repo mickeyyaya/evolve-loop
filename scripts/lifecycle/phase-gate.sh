@@ -310,32 +310,41 @@ gate_discover_to_build() {
     fi
     log "OK: Eval checksums captured"
 
-    # 5. Mutation testing — verify each eval actually catches behavioral defects.
-    # If an eval still passes after the source-under-test is mutated, the eval is
-    # tautological (cycles 102-111 reward-hacking class). First-rollout: WARN only.
-    # After one verification cycle, escalate to fail "..." to block the gate.
-    if [ -x "scripts/verification/mutate-eval.sh" ]; then
-        local mutation_warnings=0
-        for eval_file in "$EVOLVE_DIR/evals/"*.md; do
-            [ -f "$eval_file" ] || continue
-            local mut_out mut_rc
-            mut_out=$(bash scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.8 2>&1)
-            mut_rc=$?
-            case "$mut_rc" in
-                0) ;;  # rigorous, no action
-                1)
-                    log "WARN: $eval_file kill rate below 0.8 — Auditor must verify behavioral coverage"
-                    mutation_warnings=$((mutation_warnings + 1)) ;;
-                2)
-                    log "WARN: $eval_file mutation testing inconclusive (no inferable source files)" ;;
-                127)
-                    log "WARN: mutate-eval.sh missing required binary; skipping mutation pass" ;;
-            esac
-        done
-        if [ "$mutation_warnings" -gt 0 ]; then
-            log "MUTATION-WARN: $mutation_warnings eval(s) failed mutation testing this cycle (rollout: WARN-only)"
+    # 5. Mutation testing — verify NEW (git-untracked) eval files are rigorous.
+    # Runs only on evals the current cycle added (git ls-files --others), not all
+    # 100+ existing evals. Builder-created evals are caught at gate_build_to_audit.
+    # Threshold: 0.7 (WARN-only this rollout; escalate to FAIL after one verification cycle).
+    # Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
+    if [ -x "scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
+        local _new_evals _mutation_warnings
+        _mutation_warnings=0
+        _new_evals=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" ls-files --others --exclude-standard "${EVOLVE_DIR}/evals/" 2>/dev/null | grep '\.md$' || true)
+        if [ -z "$_new_evals" ]; then
+            log "OK: No new (untracked) eval files — mutation pre-flight skipped"
         else
-            log "OK: All evals passed mutation testing"
+            while IFS= read -r eval_file; do
+                [ -f "$eval_file" ] || continue
+                local mut_out mut_rc
+                mut_out=$(bash scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.7 2>&1)
+                mut_rc=$?
+                case "$mut_rc" in
+                    0) log "OK: $eval_file kill rate ≥ 0.7 — eval is rigorous" ;;
+                    1)
+                        log "WARN: $eval_file kill rate below 0.7 — Auditor must verify behavioral coverage (rollout: WARN-only)"
+                        _mutation_warnings=$((_mutation_warnings + 1)) ;;
+                    2)
+                        log "WARN: $eval_file mutation testing inconclusive (no inferable source files)" ;;
+                    127)
+                        log "WARN: mutate-eval.sh missing required binary; skipping mutation pass" ;;
+                esac
+            done <<EOF
+$_new_evals
+EOF
+            if [ "$_mutation_warnings" -gt 0 ]; then
+                log "MUTATION-WARN: $_mutation_warnings new eval(s) failed mutation testing (rollout: WARN-only)"
+            else
+                log "OK: All new evals passed mutation testing (kill rate ≥ 0.7)"
+            fi
         fi
     fi
 
@@ -574,6 +583,44 @@ gate_build_to_audit() {
         log "Running evolve-code-reviewer advisory lens (EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER=1)..."
         subagent-run.sh code-reviewer "$CYCLE" "$WORKSPACE" 2>/dev/null || true
         log "OK: Code-reviewer lens complete (result in $WORKSPACE/workers/code-reviewer.md)"
+    fi
+
+    # 7. Mutation testing on Builder-created eval files (v8.N cycle-19).
+    # Builder creates evals during the build phase; they appear as untracked at
+    # gate_build_to_audit. Running mutate-eval.sh here catches tautological graders
+    # before the Auditor writes its verdict. Threshold: 0.7 WARN-only.
+    # Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
+    if [ -x "scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
+        local _new_build_evals _build_mut_warnings
+        _build_mut_warnings=0
+        _new_build_evals=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" ls-files --others --exclude-standard "${EVOLVE_DIR}/evals/" 2>/dev/null | grep '\.md$' || true)
+        if [ -z "$_new_build_evals" ]; then
+            log "OK: No new eval files from build — mutation check skipped"
+        else
+            while IFS= read -r eval_file; do
+                [ -f "$eval_file" ] || continue
+                local b_mut_out b_mut_rc
+                b_mut_out=$(bash scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.7 2>&1)
+                b_mut_rc=$?
+                case "$b_mut_rc" in
+                    0) log "OK: $eval_file kill rate ≥ 0.7" ;;
+                    1)
+                        log "WARN: $eval_file kill rate below 0.7 — tautological grader risk (Auditor must flag)"
+                        _build_mut_warnings=$((_build_mut_warnings + 1)) ;;
+                    2)
+                        log "WARN: $eval_file mutation inconclusive (no inferable source files)" ;;
+                    127)
+                        log "WARN: mutate-eval.sh binary missing; build-to-audit mutation check skipped" ;;
+                esac
+            done <<EOF
+$_new_build_evals
+EOF
+            if [ "$_build_mut_warnings" -gt 0 ]; then
+                log "MUTATION-WARN: $_build_mut_warnings Builder eval(s) below 0.7 kill rate — Auditor see above"
+            else
+                log "OK: All Builder evals passed mutation testing (kill rate ≥ 0.7)"
+            fi
+        fi
     fi
 
     log "PASS: BUILD → AUDIT gate"

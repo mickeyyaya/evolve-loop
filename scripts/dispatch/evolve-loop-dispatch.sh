@@ -593,7 +593,8 @@ classify_cycle_failure() {
     # but no error markers — falling through to integrity-breach is a false positive.
     # Two-factor: SHIPPED verdict in report AND cycle commit present on main.
     if [ "${EVOLVE_HANG_CLASSIFIER:-0}" = "1" ]; then
-        if grep -qiE 'Verdict[[:space:]]*:[[:space:]]*(SHIPPED|SHIPPED-WITH-WARNINGS)' "$report" 2>/dev/null; then
+        if awk '/^##[[:space:]]+Verdict/{f=1;next} f && NF{print tolower($0);exit}' "$report" 2>/dev/null \
+                | grep -qiE 'shipped'; then
             local _git_commit
             _git_commit=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" log --oneline \
                 --grep="cycle $cycle" main 2>/dev/null | head -1 || true)
