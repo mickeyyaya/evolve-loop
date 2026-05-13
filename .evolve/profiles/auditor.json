@@ -197,5 +197,12 @@
     "build-report.md:diff_summary",
     "build-report.md:test_results"
   ],
-  "context_clear_trigger_tokens": 20000
+  "context_clear_trigger_tokens": 20000,
+  "output_contract": {
+    "schema": "schemas/handoff/audit-report.schema.json",
+    "expected_artifacts": [
+      "audit-report.md",
+      ".evolve/runs/cycle-N/handoff-auditor.json"
+    ]
+  }
 }

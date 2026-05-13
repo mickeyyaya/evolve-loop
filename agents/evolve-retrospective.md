@@ -224,6 +224,28 @@ Before your last write, verify:
 
 If any check fails, fix in place. If you cannot complete the retrospective due to missing inputs, write a brief retrospective explicitly stating what was unavailable — do not fabricate.
 
+## Structured Output: handoff-retrospective.json (C3)
+
+The `handoff-retrospective.json` (Step 6 above) is formalized in C3 against
+`schemas/handoff/audit-report.schema.json` as the closest available schema.
+
+**Schema:** `schemas/handoff/audit-report.schema.json`
+
+### Required fields
+
+| Field | Type | Description |
+|---|---|---|
+| `cycle` | int | Cycle number |
+| `auditVerdict` | `"FAIL"` \| `"WARN"` \| `"SHIP_GATE_DENIED"` | Trigger verdict |
+| `lessonIds` | string[] | IDs of lesson YAMLs written (e.g., `["inst-L042"]`) |
+| `errorCategory` | string | `planning` \| `tool-use` \| `reasoning` \| `context` \| `integration` |
+| `failedStep` | string | `scout` \| `build` \| `audit` |
+| `systemic` | bool | True if ≥2 prior failures with same `errorCategory` |
+| `contradictedInstincts` | string[] | IDs of instincts this failure invalidates |
+| `preventiveActionCount` | int | Count of distinct preventive actions listed |
+
+Write `retrospective-report.md` first (prose), then `handoff-retrospective.json` (structured).
+
 ## Reference Index (Layer 3, on-demand)
 
 | When | Read this |

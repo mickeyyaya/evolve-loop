@@ -146,5 +146,12 @@
     ],
     "allow_network": false
   },
-  "parallel_eligible": true
+  "parallel_eligible": true,
+  "output_contract": {
+    "schema": "schemas/handoff/audit-report.schema.json",
+    "expected_artifacts": [
+      "retrospective-report.md",
+      ".evolve/runs/cycle-N/handoff-retrospective.json"
+    ]
+  }
 }

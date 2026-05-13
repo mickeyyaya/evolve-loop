@@ -806,6 +806,23 @@ gate_audit_to_retrospective() {
     fi
     log "OK: Audit verdict is FAIL or WARN — retrospective phase appropriate"
 
+    # C3-handoff-schemas: validate handoff-auditor.json sidecar (WARN-only; C5 promotes to FAIL)
+    local _handoff_json="$WORKSPACE/handoff-auditor.json"
+    if [ ! -f "$_handoff_json" ]; then
+        log "WARN: handoff-auditor.json missing — auditor did not emit JSON sidecar (C3)"
+    else
+        if ! jq empty "$_handoff_json" 2>/dev/null; then
+            log "WARN: handoff-auditor.json is not valid JSON (C3)"
+        else
+            local _verdict_json; _verdict_json=$(jq -r '.verdict // empty' "$_handoff_json" 2>/dev/null)
+            if [ -z "$_verdict_json" ]; then
+                log "WARN: handoff-auditor.json missing required field 'verdict' (C3)"
+            else
+                log "OK: handoff-auditor.json present and valid (verdict=$_verdict_json)"
+            fi
+        fi
+    fi
+
     log "OK: AUDIT → RETROSPECTIVE gate passed"
 }
 

@@ -333,3 +333,53 @@ audit_bound_tree_sha: {TREE_SHA}
 ```json
 {"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"challenge":"<token>","prevHash":"<hash of previous ledger entry>","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
 ```
+
+## Structured Output: handoff-auditor.json (C3)
+
+In addition to `audit-report.md`, emit a JSON sidecar to `$WORKSPACE/handoff-auditor.json`
+(e.g., `.evolve/runs/cycle-N/handoff-auditor.json`). This lets downstream agents and gate
+scripts consume audit results programmatically without prose parsing.
+
+**Schema:** `schemas/handoff/audit-report.schema.json`
+
+### Required fields
+
+| Field | Type | Description |
+|---|---|---|
+| `cycle` | int | Cycle number |
+| `verdict` | `"PASS"` \| `"WARN"` \| `"FAIL"` | Must match prose verdict in audit-report.md |
+| `confidence` | float [0.0–1.0] | Confidence score from Anti-Bias Protocol |
+| `audit_bound_tree_sha` | string | Git tree SHA from Pre-Output step |
+| `cost_usd` | float | Approximate cost of this audit run |
+| `acceptance_criteria_results` | array | One object per acceptance criterion |
+| `acceptance_criteria_results[].ac_id` | string | e.g. `"A1"` |
+| `acceptance_criteria_results[].status` | `"PASS"` \| `"FAIL"` \| `"SKIP"` | — |
+| `acceptance_criteria_results[].evidence` | string | One-line executable evidence |
+| `anti_goal_violations` | array | Anti-goal violations found (empty array on PASS) |
+| `adversarial_checks` | array | One object per adversarial probe run |
+| `adversarial_checks[].check` | string | Check name |
+| `adversarial_checks[].result` | `"PASS"` \| `"FAIL"` \| `"WARN"` | — |
+
+### Minimal valid example
+
+```json
+{
+  "cycle": 39,
+  "verdict": "PASS",
+  "confidence": 0.92,
+  "audit_bound_tree_sha": "abc123def456...",
+  "cost_usd": 0.18,
+  "acceptance_criteria_results": [
+    {"ac_id": "A1", "status": "PASS", "evidence": "grep '## Structured Output' agents/evolve-auditor.md"}
+  ],
+  "anti_goal_violations": [],
+  "adversarial_checks": [
+    {"check": "challenge_token_present", "result": "PASS"}
+  ]
+}
+```
+
+**Emit-both rule:** Write `audit-report.md` first (prose, authoritative), then write
+`handoff-auditor.json` (structured sidecar). If the JSON write fails, continue — the
+prose report governs the verdict. The `gate_audit_to_retrospective` gate emits WARN
+(not FAIL) on a missing or invalid JSON sidecar (C3 posture; C5 will promote to FAIL).
