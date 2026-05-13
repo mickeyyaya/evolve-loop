@@ -122,14 +122,48 @@ wait "$OBSERVER_PID" 2>/dev/null
 
 Auto-shutdown via EOF-grace (default 10s of no log growth + at least one event seen). SIGUSR1 forces immediate shutdown. SIGTERM is allowed; observer exits gracefully without writing the final report.
 
-## Watchdog migration
+## Watchdog migration ladder (v9.4 → v9.7+)
 
-| Version | phase-watchdog | phase-observer |
+| Version | phase-watchdog | phase-observer | Operator action |
+|---|---|---|---|
+| v9.4.0 | runs unchanged; SIGTERMs on stall | runs alongside; emits INCIDENT but does NOT kill | None (shipped) |
+| v9.5.0 (this) | runs UNLESS `EVOLVE_OBSERVER_ENFORCE=1` | gains `--enforce` flag; with EVOLVE_OBSERVER_ENFORCE=1 spawned at cycle-scope (replacing watchdog) AND at phase-scope, both with kill authority | Opt in via `EVOLVE_OBSERVER_ENFORCE=1` to test |
+| v9.6.0 (candidate) | not spawned by run-cycle.sh | default `EVOLVE_OBSERVER_ENFORCE=1`; watchdog kept on disk but unused | None — observer is now default |
+| v9.7.0 (candidate) | DELETED | sole stall-protection mechanism | Remove `EVOLVE_INACTIVITY_*` env vars from any cron / CI configs |
+
+### v9.5.0 `--enforce` flag semantics
+
+When operator sets `EVOLVE_OBSERVER_ENFORCE=1`:
+- `run-cycle.sh` spawns `phase-observer.sh --enforce --scope=cycle` instead of `phase-watchdog.sh` (cycle-level safety net is now the observer)
+- `subagent-run.sh` passes `--enforce` to its existing phase-level observer spawn
+- On `INCIDENT(stuck)` or `INCIDENT(infinite_loop)`: observer writes `stall-progress.json`, calls `cycle-state.sh checkpoint stall-inactivity`, sends SIGTERM to target PGID, sleeps `EVOLVE_OBSERVER_GRACE_S` (default 10s), sends SIGKILL to survivors
+- WARN-severity rules (cost_anomaly, error_spike, throttled) never trigger kill — even in `--enforce` mode
+
+When `EVOLVE_OBSERVER_ENFORCE=0` (default in v9.5): identical to v9.4.0 advisory-only behavior. Observer emits observations; watchdog kills.
+
+### Cycle-scope vs phase-scope ruleset (v9.5+)
+
+| Rule | Phase-scope | Cycle-scope |
 |---|---|---|
-| v1 (this) | unchanged; still SIGTERMs on stall | runs alongside; emits INCIDENT(stuck) but does NOT kill |
-| v2 | removed | takes over kill-sequence + checkpoint via `--enforce` flag |
+| `stuck_no_output` | ✓ | ✓ |
+| `infinite_loop` | ✓ | ✗ (orchestrator doesn't loop on individual tool calls) |
+| `error_spike` | ✓ | ✗ |
+| `cost_anomaly` | ✓ | ✗ |
+| `throttled` | ✓ | ✗ |
 
-In v1, the observer's INCIDENT(stuck) and the watchdog's SIGTERM are independent. The observer's job is to inform the orchestrator; the watchdog remains the killer-of-last-resort.
+Cycle-scope observer is essentially "the watchdog with the unified envelope format" — same liveness signal source, same kill authority, same scope.
+
+### Legacy env-var bridge (v9.5)
+
+These watchdog env vars still work but emit `[phase-observer] DEPRECATED` warning to stderr. Removal target: v9.7+.
+
+| Legacy | Modern |
+|---|---|
+| `EVOLVE_INACTIVITY_THRESHOLD_S` | `EVOLVE_OBSERVER_STALL_S` |
+| `EVOLVE_INACTIVITY_POLL_S` | `EVOLVE_OBSERVER_POLL_S` |
+| `EVOLVE_INACTIVITY_GRACE_S` | `EVOLVE_OBSERVER_GRACE_S` |
+| `EVOLVE_INACTIVITY_WARN_PCT` | `EVOLVE_OBSERVER_WARN_PCT` |
+| `EVOLVE_INACTIVITY_DISABLE=1` | `EVOLVE_OBSERVER_ENABLED=0` |
 
 ## Tunables (env vars)
 

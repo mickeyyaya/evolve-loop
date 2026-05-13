@@ -127,8 +127,8 @@ CU=$(jq -r '.carryoverTodos[] | select(.id=="todo-6") | .cycles_unpicked' "$ROOT
 echo "$WARN_OUT" | grep -qi "WARN.*todo-6\|todo-6.*not.*seen" && pass "WARN emitted for unseen todo" || \
     fail "no WARN about unseen todo-6; got: $WARN_OUT"
 
-# --- Test 8: triage-decision.md top_n is treated as 'include' ------------
-header "Test 8: triage top_n is treated as 'include' (no scout decision needed)"
+# --- Test 8: triage-decision.md Top N — Included is treated as 'include' ----
+header "Test 8: triage Top N — Included is treated as 'include' (no scout decision needed)"
 TODOS='[{"id":"todo-7","action":"x","priority":"high","evidence_pointer":"y","defer_count":0,"first_seen_cycle":1,"last_seen_cycle":1,"cycles_unpicked":0}]'
 ROOT=$(make_repo_with_todos "$TODOS")
 WS="$ROOT/.evolve/runs/cycle-1"
@@ -137,14 +137,14 @@ cat > "$WS/triage-decision.md" <<'EOF'
 <!-- challenge-token: t -->
 # Triage Decision
 cycle_size_estimate: small
-## top_n
+## Top N — Included
 - todo-7: do the thing
-## deferred
-## dropped
+## Deferred
+## Dropped
 EOF
 EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict PASS >/dev/null 2>&1 || true
 LEN=$(jq -r '.carryoverTodos | length' "$ROOT/.evolve/state.json")
-[ "$LEN" = "0" ] && pass "todo-7 dropped (triage top_n + PASS)" || fail "expected 0, got $LEN"
+[ "$LEN" = "0" ] && pass "todo-7 dropped (triage Top N — Included + PASS)" || fail "expected 0, got $LEN"
 
 # --- Test 9: table-format triage top_n is treated as 'include' (c38-D fix) ---
 header "Test 9: table-format triage top_n drops todo on PASS (c38-D-triage-parse fix)"
@@ -174,6 +174,15 @@ EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict
 LEN=$(jq -r '.carryoverTodos | length' "$ROOT/.evolve/state.json")
 [ "$LEN" = "0" ] && pass "test-todo-1 dropped (table-format triage top_n + PASS)" \
     || fail "expected 0 todos, got $LEN (table-format triage parse may be broken)"
+# archive_reason must be "completed-pass" (not "max-cycles-unpicked-unseen" — the false-positive path)
+ARCHIVE9="$ROOT/.evolve/archive/lessons/carryover-todos-archive.jsonl"
+if [ -f "$ARCHIVE9" ]; then
+    AR=$(jq -r 'select(.id=="test-todo-1") | .archive_reason' "$ARCHIVE9" 2>/dev/null)
+    [ "$AR" = "completed-pass" ] && pass "test-todo-1 archive_reason=completed-pass (not unseen-fallback)" \
+        || fail "expected archive_reason=completed-pass, got '$AR'"
+else
+    fail "archive file missing — test-todo-1 was not archived at all"
+fi
 
 # --- Test 10: table-format triage deferred increments cycles_unpicked -------
 header "Test 10: table-format triage deferred increments cycles_unpicked"
@@ -199,10 +208,16 @@ cat > "$WS/triage-decision.md" <<'EOF'
 
 None.
 EOF
-EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict PASS >/dev/null 2>&1 || true
+LOG10=$(EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict PASS 2>&1 >/dev/null) || true
 CU=$(jq -r '.carryoverTodos[] | select(.id=="test-todo-2") | .cycles_unpicked' "$ROOT/.evolve/state.json")
 [ "$CU" = "1" ] && pass "test-todo-2 cycles_unpicked incremented to 1 (table-format defer)" \
     || fail "expected 1, got $CU"
+# Log must show DEFER path, not the unseen-fallback WARN path (closes false-positive gap from cycle 38)
+if echo "$LOG10" | grep -q "DEFER: test-todo-2"; then
+    pass "test-todo-2 routed via DEFER path (not unseen-fallback)"
+else
+    fail "expected DEFER log for test-todo-2; got: $LOG10"
+fi
 
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"

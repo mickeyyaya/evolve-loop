@@ -11,9 +11,16 @@
 # Exits gracefully on SIGUSR1 (parent signals "subagent has exited") or when
 # the stdout.log stops growing for OBSERVER_EOF_GRACE_S seconds.
 #
+# Flags (v9.5.0+):
+#   --enforce           Kill target PGID on INCIDENT-severity (stuck or
+#                       infinite_loop). Default OFF (advisory only); operators
+#                       opt in via EVOLVE_OBSERVER_ENFORCE=1.
+#   --scope=cycle|phase Default phase. Cycle-scope runs only stall_no_output
+#                       rule and is used by run-cycle.sh to replace the watchdog.
+#
 # Args (positional):
 #   $1 = workspace path (.evolve/runs/cycle-N)
-#   $2 = subagent PGID (informational; observer does not kill in v1)
+#   $2 = target PGID (informational in advisory mode; kill target in --enforce)
 #   $3 = cycle number
 #   $4 = phase name (research, build, etc.)
 #   $5 = agent name (scout, builder, etc.)
@@ -45,6 +52,52 @@ PHASE="${4:-}"
 AGENT="${5:-}"
 CYCLE_STATE="${6:-}"
 
+# v9.5.0: --enforce + --scope flag parsing (positional shift if present at start).
+ENFORCE_MODE=0
+SCOPE="phase"
+# Rewind: positionals were $1..$6 but flags may have been prepended.
+# Re-scan original argv for flags.
+for arg in "$@"; do
+    case "$arg" in
+        --enforce) ENFORCE_MODE=1 ;;
+        --scope=cycle)  SCOPE="cycle" ;;
+        --scope=phase)  SCOPE="phase" ;;
+        --scope=*)      echo "[phase-observer] unknown --scope value: $arg" >&2; exit 10 ;;
+    esac
+done
+# If --enforce or --scope were the FIRST args, the positional readers above
+# captured them as $1, $2, ... Need to shift past the flags.
+# Detect by checking if $1/$2 look like our flag patterns and re-resolve.
+if [ "${1:-}" = "--enforce" ] || [[ "${1:-}" == --scope=* ]]; then
+    # Shift one or two flags off the front and re-read positionals.
+    shift_count=0
+    while [ "${1:-}" = "--enforce" ] || [[ "${1:-}" == --scope=* ]]; do
+        shift
+        shift_count=$((shift_count + 1))
+    done
+    WORKSPACE="${1:-}"
+    SUBAGENT_PGID="${2:-}"
+    CYCLE="${3:-}"
+    PHASE="${4:-}"
+    AGENT="${5:-}"
+    CYCLE_STATE="${6:-}"
+fi
+
+# v9.5.0: bridge legacy phase-watchdog env vars with DEPRECATED WARN.
+_bridge_envvar() {
+    local legacy=$1 modern=$2
+    local legacy_val="${!legacy:-}"
+    local modern_val="${!modern:-}"
+    if [ -n "$legacy_val" ] && [ -z "$modern_val" ]; then
+        echo "[phase-observer] DEPRECATED: $legacy — use $modern. Bridging value: $legacy_val" >&2
+        export "$modern=$legacy_val"
+    fi
+}
+_bridge_envvar EVOLVE_INACTIVITY_THRESHOLD_S EVOLVE_OBSERVER_STALL_S
+_bridge_envvar EVOLVE_INACTIVITY_POLL_S      EVOLVE_OBSERVER_POLL_S
+_bridge_envvar EVOLVE_INACTIVITY_GRACE_S     EVOLVE_OBSERVER_GRACE_S
+_bridge_envvar EVOLVE_INACTIVITY_WARN_PCT    EVOLVE_OBSERVER_WARN_PCT
+
 [ -n "$WORKSPACE" ] && [ -n "$CYCLE" ] && [ -n "$PHASE" ] && [ -n "$AGENT" ] \
     || { echo "[phase-observer] usage: $0 <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]" >&2; exit 10; }
 [ -d "$WORKSPACE" ] || { echo "[phase-observer] workspace not a directory: $WORKSPACE" >&2; exit 10; }
@@ -61,6 +114,8 @@ source "$PLUGIN_ROOT/scripts/lib/observer-rules.sh"
 # ── Config ─────────────────────────────────────────────────────────────────
 POLL_S="${EVOLVE_OBSERVER_POLL_S:-5}"
 STALL_S="${EVOLVE_OBSERVER_STALL_S:-240}"
+GRACE_S="${EVOLVE_OBSERVER_GRACE_S:-10}"
+WARN_PCT="${EVOLVE_OBSERVER_WARN_PCT:-75}"
 LOOP_N="${EVOLVE_OBSERVER_LOOP_N:-6}"
 LOOP_WINDOW_S="${EVOLVE_OBSERVER_LOOP_WINDOW_S:-120}"
 ERROR_RATE="${EVOLVE_OBSERVER_ERROR_RATE:-0.3}"
@@ -238,13 +293,23 @@ run_rules() {
     local now verdict fired sev mt
     now=$(date +%s)
 
-    # Rule 1: stuck. Always check.
+    # Rule 1: stuck. Always check (applies to both phase-scope and cycle-scope).
     verdict=$(rule_stuck_no_output "$now" "$LAST_EVENT_TS" "$STALL_S")
     fired=$(echo "$verdict" | jq -r '.fired')
     if [ "$fired" = "true" ]; then
         sev=$(echo "$verdict" | jq -r '.severity')
         emit_observation "observation.incident" "$sev" \
             "$(echo "$verdict" | jq -c '{metric_type, evidence, suggested_action}')"
+        # v9.5.0: --enforce mode → kill on INCIDENT(stuck).
+        if [ "$ENFORCE_MODE" = "1" ] && [ "$sev" = "INCIDENT" ]; then
+            local idle=$((now - LAST_EVENT_TS))
+            fire_kill_sequence "stuck_no_output (idle=${idle}s threshold=${STALL_S}s)" "$idle"
+        fi
+    fi
+
+    # Cycle-scope: only the stuck rule. Phase-scope: continue with other rules.
+    if [ "$SCOPE" = "cycle" ]; then
+        return 0
     fi
 
     # Rule 2: infinite loop.
@@ -254,6 +319,10 @@ run_rules() {
         sev=$(echo "$verdict" | jq -r '.severity')
         emit_observation "observation.incident" "$sev" \
             "$(echo "$verdict" | jq -c '{metric_type, evidence, suggested_action}')"
+        # v9.5.0: --enforce mode → kill on INCIDENT(infinite_loop).
+        if [ "$ENFORCE_MODE" = "1" ] && [ "$sev" = "INCIDENT" ]; then
+            fire_kill_sequence "infinite_loop" 0
+        fi
     fi
 
     # Rule 3: error spike.
@@ -411,8 +480,66 @@ write_phase_end_report() {
     log "wrote $REPORT_FILE (verdict=$verdict events=$EVENT_COUNT incidents=$incident_count)"
 }
 
+# ── Kill sequence (v9.5.0: --enforce mode only) ────────────────────────────
+# Ported verbatim from phase-watchdog.sh:230-275. Invoked only on INCIDENT-
+# severity rule fires (stuck_no_output or infinite_loop) AND --enforce is set.
+# Same semantics as watchdog: write stall-progress.json + checkpoint cycle-state
+# + ignore TERM on self + SIGTERM PGID + grace + SIGKILL.
+fire_kill_sequence() {
+    local reason=$1
+    local idle_s=${2:-0}
+    local target_pgid="$SUBAGENT_PGID"
+    if [ -z "$target_pgid" ] || [ "$target_pgid" = "0" ]; then
+        log "ERROR: --enforce mode but target PGID is empty or 0; refusing to kill"
+        return 1
+    fi
+
+    log "ENFORCE: $reason — initiating kill sequence (pgid=$target_pgid grace=${GRACE_S}s)"
+
+    # a) Write stall-progress.json for backward compat with watchdog consumers.
+    local stall_file="$WORKSPACE/stall-progress.json"
+    local stall_json
+    stall_json=$(jq -nc \
+        --argjson idle "$idle_s" \
+        --argjson thresh "$STALL_S" \
+        --arg reason "$reason" \
+        --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg src "phase-observer" \
+        '{idle_s:$idle, threshold_s:$thresh, reason:$reason, source:$src, checkpoint_ts:$ts}')
+    printf '%s\n' "$stall_json" > "$stall_file.tmp.$$" && mv -f "$stall_file.tmp.$$" "$stall_file" 2>/dev/null
+    log "wrote $stall_file"
+
+    # b) Call cycle-state.sh checkpoint stall-inactivity (best-effort).
+    local cs_script="$PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
+    if [ -f "$cs_script" ]; then
+        EVOLVE_CYCLE_STATE_FILE="$CYCLE_STATE" \
+            bash "$cs_script" checkpoint stall-inactivity 2>/dev/null || true
+        log "checkpoint stall-inactivity requested (best-effort)"
+    fi
+
+    # c) Emit final phase-end report before the kill, so orchestrator sees it.
+    write_phase_end_report
+
+    # d) Ignore SIGTERM on self during kill sequence.
+    trap '' TERM
+
+    # e) SIGTERM to PGID.
+    log "sending SIGTERM to pgid $target_pgid"
+    kill -TERM -"$target_pgid" 2>/dev/null || true
+
+    # f) Grace period.
+    sleep "$GRACE_S"
+
+    # g) SIGKILL survivors.
+    log "sending SIGKILL to pgid $target_pgid (post-grace)"
+    kill -KILL -"$target_pgid" 2>/dev/null || true
+
+    log "kill sequence complete for pgid $target_pgid"
+    exit 0
+}
+
 # ── Main loop ──────────────────────────────────────────────────────────────
-log "started: cycle=$CYCLE phase=$PHASE agent=$AGENT workspace=$WORKSPACE poll=${POLL_S}s stall=${STALL_S}s"
+log "started: cycle=$CYCLE phase=$PHASE agent=$AGENT workspace=$WORKSPACE poll=${POLL_S}s stall=${STALL_S}s scope=$SCOPE enforce=$ENFORCE_MODE pgid=${SUBAGENT_PGID:-?}"
 log "watching $STDOUT_LOG (poll-based, byte-offset tracking)"
 
 emit_observation "observation.heartbeat" "INFO" \

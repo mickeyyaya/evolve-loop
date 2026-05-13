@@ -856,11 +856,17 @@ ADVEOF
     local OBSERVER_PID=""
     if [ "${EVOLVE_OBSERVER_ENABLED:-0}" = "1" ]; then
         local _observer_cycle_state="${EVOLVE_PROJECT_ROOT:-$PWD}/.evolve/cycle-state.json"
+        # v9.5.0: pass --enforce when EVOLVE_OBSERVER_ENFORCE=1; observer then
+        # has kill authority on INCIDENT(stuck) or INCIDENT(infinite_loop).
+        # Default OFF preserves v9.4.0 advisory-only behavior.
+        local _observer_args=()
+        [ "${EVOLVE_OBSERVER_ENFORCE:-0}" = "1" ] && _observer_args+=("--enforce")
         bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
+            "${_observer_args[@]}" \
             "$workspace" "$$" "$cycle" "$agent" "$agent" "$_observer_cycle_state" \
             >/dev/null 2>&1 &
         OBSERVER_PID=$!
-        log "phase-observer spawned (pid=$OBSERVER_PID agent=$agent)"
+        log "phase-observer spawned (pid=$OBSERVER_PID agent=$agent enforce=${EVOLVE_OBSERVER_ENFORCE:-0})"
     fi
 
     # v8.61.0 Cycle A2: pass AGENT to adapter so claude.sh can emit the

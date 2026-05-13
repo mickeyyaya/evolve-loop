@@ -36,7 +36,9 @@ Default consumer behavior: include in phase report's `summary.warns` array; verd
 
 ### INCIDENT
 
-Confirmed accident requiring action. The orchestrator should read `suggested_action.machine_readable` and follow the recommended action_type. Examples:
+Confirmed accident requiring action. The orchestrator should read `suggested_action.machine_readable` and follow the recommended action_type.
+
+**v9.5.0 update:** `INCIDENT`-severity observations are **kill-eligible** when the observer is running with `--enforce` (`EVOLVE_OBSERVER_ENFORCE=1`). Specifically `stuck_no_output` and `infinite_loop` rules — both INCIDENT severity — trigger the SIGTERM/grace/SIGKILL sequence inherited from `phase-watchdog.sh`. `WARN`-severity rules never trigger kill, even in `--enforce` mode. This preserves the principle that *observer informs; orchestrator/kernel acts* — but when the operator has explicitly authorized the observer to act on the most-confident rules, it does so atomically. Examples:
 - Phase stuck — no events for >= threshold seconds (`stuck`)
 - Infinite loop detected — same tool call N+ times in window (`infinite_loop`)
 - Integrity breach detected (`ledger_chain_broken`, future)

@@ -594,10 +594,22 @@ if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
     RUN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || echo "")
     if [ -n "$RUN_PGID" ] && [[ "$RUN_PGID" =~ ^[0-9]+$ ]]; then
         CYCLE_STATE_PATH_FOR_WD="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
-        bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-watchdog.sh" \
-            "$WORKSPACE" "$RUN_PGID" "$CYCLE" "$CYCLE_STATE_PATH_FOR_WD" &
-        WATCHDOG_PID=$!
-        log "watchdog spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_INACTIVITY_THRESHOLD_S:-240}s)"
+        # v9.5.0: when EVOLVE_OBSERVER_ENFORCE=1, replace the legacy watchdog
+        # with the phase-observer at --scope=cycle. Same kill semantics + the
+        # unified envelope format. Default 0 preserves v9.4.0 behavior.
+        if [ "${EVOLVE_OBSERVER_ENFORCE:-0}" = "1" ]; then
+            bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
+                --enforce --scope=cycle \
+                "$WORKSPACE" "$RUN_PGID" "$CYCLE" "orchestrator" "orchestrator" \
+                "$CYCLE_STATE_PATH_FOR_WD" &
+            WATCHDOG_PID=$!
+            log "phase-observer (cycle-scope, --enforce) spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_OBSERVER_STALL_S:-${EVOLVE_INACTIVITY_THRESHOLD_S:-240}}s)"
+        else
+            bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-watchdog.sh" \
+                "$WORKSPACE" "$RUN_PGID" "$CYCLE" "$CYCLE_STATE_PATH_FOR_WD" &
+            WATCHDOG_PID=$!
+            log "watchdog spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_INACTIVITY_THRESHOLD_S:-240}s)"
+        fi
     else
         log "WARN: could not determine PGID — watchdog not spawned"
     fi

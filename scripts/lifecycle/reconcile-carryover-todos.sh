@@ -79,9 +79,9 @@ TODO_COUNT=$(jq -r '(.carryoverTodos // []) | length' "$STATE" 2>/dev/null)
 
 # ---- Parse this cycle's signals ------------------------------------------
 # A carryoverTodo can appear in:
-#   1. triage-decision.md ## top_n         → "include"
-#   2. triage-decision.md ## deferred      → "defer"
-#   3. triage-decision.md ## dropped       → "drop"
+#   1. triage-decision.md ## Top N — Included → "include"
+#   2. triage-decision.md ## Deferred         → "defer"
+#   3. triage-decision.md ## Dropped          → "drop"
 #   4. scout-report.md ## Carryover Decisions  → include|defer|drop (Layer S)
 # The two sources can overlap; if BOTH disagree, triage wins (Triage is the
 # authoritative scope-controller when it ran).
@@ -108,7 +108,7 @@ parse_scout_decisions() {
     ' "$file"
 }
 
-# Triage section parser — items appear under ## top_n / ## deferred / ## dropped
+# Triage section parser — items appear under ## Top N — Included / ## Deferred / ## Dropped
 # Supports two formats:
 #   Bullet:  - <id>: some text
 #   Table:   | Rank | `<id>` | Priority | ...
@@ -145,9 +145,9 @@ parse_triage_section() {
 # Collate decisions (triage takes precedence when both sources disagree).
 {
     parse_scout_decisions "$WORKSPACE/scout-report.md"
-    parse_triage_section  "$WORKSPACE/triage-decision.md" "top_n"    "include"
-    parse_triage_section  "$WORKSPACE/triage-decision.md" "deferred" "defer"
-    parse_triage_section  "$WORKSPACE/triage-decision.md" "dropped"  "drop"
+    parse_triage_section  "$WORKSPACE/triage-decision.md" "Top N"    "include"
+    parse_triage_section  "$WORKSPACE/triage-decision.md" "Deferred" "defer"
+    parse_triage_section  "$WORKSPACE/triage-decision.md" "Dropped"  "drop"
 } | awk -F'\t' 'NF==2 && $1 != "" { decisions[$1] = $2 } END { for (k in decisions) print k "\t" decisions[k] }' \
     > "$DECISIONS_FILE"
 

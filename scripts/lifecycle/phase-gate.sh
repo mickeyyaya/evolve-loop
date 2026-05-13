@@ -357,7 +357,7 @@ EOF
         fi
     fi
 
-    # C2-handoff-schemas: soft WARN on scout-report schema violations (C4 promotes to FAIL)
+    # C2-handoff-schemas: scout-report schema violations fail the gate (C4 enforced)
     if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
         local _schema_out
         _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
@@ -366,7 +366,7 @@ EOF
         if [ -z "$_schema_out" ]; then
             log "OK: scout-report.md passes handoff schema (C2)"
         else
-            log "WARN: scout-report.md schema violations (C4 will promote to FAIL): $_schema_out"
+            fail "scout-report.md schema violations (C4 enforcement): $_schema_out"
         fi
     fi
 
@@ -631,7 +631,7 @@ EOF
         fi
     fi
 
-    # C2-handoff-schemas: soft WARN on build-report schema violations (C5 promotes to FAIL)
+    # C2-handoff-schemas: build-report schema violations fail the gate (C5 enforced)
     if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
         local _schema_out
         _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
@@ -639,7 +639,7 @@ EOF
         if [ -z "$_schema_out" ]; then
             log "OK: build-report.md passes handoff schema (C2)"
         else
-            log "WARN: build-report.md schema violations (C5 will promote to FAIL): $_schema_out"
+            fail "build-report.md schema violations (C5 enforcement): $_schema_out"
         fi
     fi
 
@@ -753,7 +753,7 @@ gate_audit_to_ship() {
         fi
     fi
 
-    # C2-handoff-schemas: soft WARN on audit-report schema violations (C5 promotes to FAIL)
+    # C2-handoff-schemas: audit-report schema violations fail the gate (C5 enforced)
     if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
         local _schema_out
         _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
@@ -761,7 +761,7 @@ gate_audit_to_ship() {
         if [ -z "$_schema_out" ]; then
             log "OK: audit-report.md passes handoff schema (C2)"
         else
-            log "WARN: audit-report.md schema violations (C5 will promote to FAIL): $_schema_out"
+            fail "audit-report.md schema violations (C5 enforcement): $_schema_out"
         fi
     fi
 
