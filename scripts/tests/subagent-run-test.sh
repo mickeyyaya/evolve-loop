@@ -245,6 +245,27 @@ fi
 cd "$REPO_ROOT" >/dev/null
 rm -rf "$TIER_REPO"
 
+# --- Test 12: --check-ctx-advisory fires when tokens > threshold, silent otherwise ---
+header "Test 12: --check-ctx-advisory advisory fires (tokens > threshold) and is silent (tokens <= threshold)"
+CTX_PROFILE="$TMPDIR_TEST/ctx-profile.json"
+printf '{"context_clear_trigger_tokens":1000}\n' > "$CTX_PROFILE"
+
+# Sub-check A: tokens above threshold → advisory emitted to stderr
+advisory_out=$(bash "$RUNNER" --check-ctx-advisory "$CTX_PROFILE" 1500 2>&1)
+if echo "$advisory_out" | grep -q "context_clear_trigger_tokens"; then
+    pass "advisory fires when tokens (1500) > threshold (1000)"
+else
+    fail "advisory did NOT fire when tokens (1500) > threshold (1000); got: '$advisory_out'"
+fi
+
+# Sub-check B: tokens at or below threshold → advisory silent
+advisory_silent=$(bash "$RUNNER" --check-ctx-advisory "$CTX_PROFILE" 500 2>&1)
+if echo "$advisory_silent" | grep -q "context_clear_trigger_tokens"; then
+    fail "advisory fired when tokens (500) <= threshold (1000); should be silent"
+else
+    pass "advisory is silent when tokens (500) <= threshold (1000)"
+fi
+
 # --- Summary -----------------------------------------------------------------
 rm -rf "$TMPDIR_TEST"
 echo

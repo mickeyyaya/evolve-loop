@@ -12,6 +12,7 @@
 #   bash scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace_path> [--prompt-file PATH]
 #   bash scripts/dispatch/subagent-run.sh --validate-profile <agent>
 #   bash scripts/dispatch/subagent-run.sh --check-token <artifact_path> <token>
+#   bash scripts/dispatch/subagent-run.sh --check-ctx-advisory <profile_json> <tokens>
 #
 # Arguments:
 #   <agent>           — one of: intent, scout, tdd-engineer, builder, auditor, inspirer, evaluator, retrospective, orchestrator, plan-reviewer, triage, memo
@@ -427,6 +428,20 @@ cmd_check_token() {
     log "OK: token present in $artifact"
 }
 
+cmd_check_ctx_advisory() {
+    local profile="${1:?usage: --check-ctx-advisory <profile_json> <tokens>}"
+    local tokens="${2:?usage: --check-ctx-advisory <profile_json> <tokens>}"
+    [ -f "$profile" ] || { echo "[subagent-run] WARN: profile not found: $profile" >&2; exit 0; }
+    if command -v jq >/dev/null 2>&1; then
+        local _threshold
+        _threshold=$(jq -r '.context_clear_trigger_tokens // empty' "$profile" 2>/dev/null || true)
+        if [ -n "$_threshold" ] && [ "$tokens" -gt "$_threshold" ]; then
+            echo "[subagent-run] INFO: test-agent context at ~${tokens} tokens; profile threshold=${_threshold} (context_clear_trigger_tokens). Agent should apply Tool-Result Hygiene before further tool calls." >&2
+        fi
+    fi
+    exit 0
+}
+
 cmd_run() {
     local agent="$1" cycle="$2" workspace="$3"
     # Accept canonical agent names AND fan-out worker names of the form
@@ -677,20 +692,6 @@ ADVEOF
         fi
     fi
 
-    # c45-P-NEW-6 (cycle 36): per-profile context_clear_trigger_tokens override.
-    # When the expanded profile declares this field, log an advisory if the
-    # current prompt already exceeds that threshold. The agent's Tool-Result
-    # Hygiene subsection instructs it to summarize pending results at threshold.
-    # This is INFORMATIONAL only — no hard exit. Threshold check is best-effort
-    # (empty/missing profile falls through silently).
-    if command -v jq >/dev/null 2>&1 && [ -f "${_profile_expanded:-}" ]; then
-        _ctx_clear_threshold=$(jq -r '.context_clear_trigger_tokens // empty' "$_profile_expanded" 2>/dev/null || true)
-        if [ -n "$_ctx_clear_threshold" ] && [ "$_prompt_tokens" -gt "$_ctx_clear_threshold" ]; then
-            echo "[subagent-run] INFO: $agent context at ~${_prompt_tokens} tokens; profile threshold=${_ctx_clear_threshold} (context_clear_trigger_tokens). Agent should apply Tool-Result Hygiene before further tool calls." >&2
-        fi
-        unset _ctx_clear_threshold
-    fi
-
     # v9.1.0 Cycle 6: per-phase context-monitor.json. Records the prompt
     # token estimate + cap percentage so operators can `tail` or `watch`
     # the cumulative cycle context usage during long runs.
@@ -807,6 +808,17 @@ ADVEOF
     fi
 
     record_phase prep_total_ms
+
+    # c45-P-NEW-6 (cycle 36, corrected cycle 37): per-profile context_clear_trigger_tokens.
+    # Must appear AFTER profile expansion (effective_profile is finalized above).
+    if command -v jq >/dev/null 2>&1 && [ -f "${effective_profile:-}" ]; then
+        local _ctx_clear_threshold
+        _ctx_clear_threshold=$(jq -r '.context_clear_trigger_tokens // empty' "$effective_profile" 2>/dev/null || true)
+        if [ -n "$_ctx_clear_threshold" ] && [ "$_prompt_tokens" -gt "$_ctx_clear_threshold" ]; then
+            echo "[subagent-run] INFO: $agent context at ~${_prompt_tokens} tokens; profile threshold=${_ctx_clear_threshold} (context_clear_trigger_tokens). Agent should apply Tool-Result Hygiene before further tool calls." >&2
+        fi
+        unset _ctx_clear_threshold
+    fi
 
     # v8.51.0: resolve adapter capability tier. Profile.cli is authoritative
     # (allows multi-LLM-per-phase via profile config). Fall back to "unknown"
@@ -1229,6 +1241,7 @@ Usage:
   subagent-run.sh dispatch-parallel <agent> <cycle> <workspace_path>
   subagent-run.sh --validate-profile <agent>
   subagent-run.sh --check-token <artifact_path> <token>
+  subagent-run.sh --check-ctx-advisory <profile_json> <tokens>
 
 Agents: intent | scout | tdd-engineer | builder | auditor | inspirer | evaluator | retrospective | orchestrator | plan-reviewer
 USAGE
@@ -1238,6 +1251,7 @@ USAGE
 case "$1" in
     --validate-profile) shift; cmd_validate_profile "$@" ;;
     --check-token) shift; cmd_check_token "$@" ;;
+    --check-ctx-advisory) shift; cmd_check_ctx_advisory "$@" ;;
     # v8.35.0: testability hook for adaptive auditor model selection.
     # Usage: --resolve-tier <agent> — prints the tier resolved for that agent
     # given current env (MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, etc.).

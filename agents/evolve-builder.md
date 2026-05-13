@@ -259,6 +259,8 @@ Record in `build-report.md` after self-verification:
 
 **Flag when:** graders failed first attempt, confidence < 0.7, security-sensitive/agent/skill files touched, or >2 retries.
 
+**Test result headline rule** (Lesson: cycle-36 D2): When any test failures exist (pre-existing or new), the headline MUST be `N pass / M fail (M pre-existing, not regression)` — NOT `N/N PASS`. The `N/N PASS` shorthand is valid only when `M == 0`. "Polished summary over raw truth" erodes audit trust.
+
 ### Step 8: Mailbox
 - Read `workspace/agent-mailbox.md` for builder/all messages; apply hints.
 - Post coordination messages after build.
