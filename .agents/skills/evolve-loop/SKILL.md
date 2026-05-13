@@ -4,7 +4,7 @@ description: Use when the user invokes /evolve-loop or asks to run autonomous im
 argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
 ---
 
-# Evolve Loop v9.5
+# Evolve Loop v10.0
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
