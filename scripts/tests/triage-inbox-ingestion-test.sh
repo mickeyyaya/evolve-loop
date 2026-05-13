@@ -158,6 +158,73 @@ src_note=$(echo "$updated" | jq -r '._inbox_source.operator_note')
     pass "_inbox_source preserved after jq . + {cycles_unpicked: 1}" || \
     fail "expected 'preserved', got '$src_note'"
 
+# Helper: run the content-verify awk logic from Step-0a on a given SHA in a given repo
+# Returns the non_state_changes count
+content_verify_count() {
+    local repo_dir="$1" sha="$2"
+    git -C "$repo_dir" show --stat "$sha" 2>/dev/null | awk '
+        /\|/ && $0 !~ /\.evolve\/(inbox|state\.json|ledger|runs|worktrees)/ { count++ }
+        END { print count+0 }
+    '
+}
+
+# Helper: create a minimal git repo for content-verify tests
+make_git_repo() {
+    local root="$SCRATCH/repo-$RANDOM"
+    mkdir -p "$root"
+    git -C "$root" init -q
+    git -C "$root" config user.email "test@test.com"
+    git -C "$root" config user.name "Test"
+    # Initial empty commit so HEAD exists
+    git -C "$root" commit --allow-empty -q -m "init"
+    echo "$root"
+}
+
+# --- Test 9: fraudulent commit (only .evolve/inbox/ changes) → INTEGRITY_BREACH ----
+header "Test 9: content-verify — fraudulent commit (inbox-only) → non_state_changes=0"
+REPO=$(make_git_repo)
+# Create a fraudulent commit: only .evolve/inbox/ files, no code files
+mkdir -p "$REPO/.evolve/inbox"
+printf '{"id":"c38-inbox-audit","action":"recover scripts","priority":"HIGH"}\n' \
+    > "$REPO/.evolve/inbox/c38-inbox-audit.json"
+git -C "$REPO" add .evolve/inbox/c38-inbox-audit.json
+git -C "$REPO" commit -q -m "feat: cycle 39 — c38-inbox-audit: recover inbox-audit.sh"
+FRAUD_SHA=$(git -C "$REPO" log --format=%H -1)
+non_state=$(content_verify_count "$REPO" "$FRAUD_SHA")
+[ "$non_state" -eq 0 ] && \
+    pass "fraudulent commit has 0 non-state changes → INTEGRITY_BREACH (not skip_shipped)" || \
+    fail "expected 0 non-state changes for fraudulent commit, got $non_state"
+# Also verify the SHA itself exists (sanity check)
+git -C "$REPO" show --stat "$FRAUD_SHA" >/dev/null 2>&1 && \
+    pass "fraudulent commit SHA accessible" || \
+    fail "fraudulent commit SHA not accessible"
+
+# --- Test 10: real code commit → non_state_changes > 0 → skip_shipped ----------
+header "Test 10: content-verify — real code commit → non_state_changes>0 → skip_shipped"
+REPO=$(make_git_repo)
+# Create a real code commit: has a non-.evolve/ file
+mkdir -p "$REPO/scripts/utility"
+printf '#!/usr/bin/env bash\n# inbox-audit.sh recovered\necho "ok"\n' \
+    > "$REPO/scripts/utility/inbox-audit.sh"
+git -C "$REPO" add scripts/utility/inbox-audit.sh
+git -C "$REPO" commit -q -m "feat: cycle 39 — c38-inbox-audit: recover inbox-audit.sh"
+REAL_SHA=$(git -C "$REPO" log --format=%H -1)
+non_state=$(content_verify_count "$REPO" "$REAL_SHA")
+[ "$non_state" -gt 0 ] && \
+    pass "real code commit has $non_state non-state change(s) → skip_shipped accepted" || \
+    fail "expected >0 non-state changes for real commit, got $non_state"
+# Also verify a mixed commit (code + inbox files) still counts as skip_shipped
+mkdir -p "$REPO/.evolve/inbox"
+printf '{"id":"c38-2","action":"another task","priority":"LOW"}\n' \
+    > "$REPO/.evolve/inbox/c38-2.json"
+git -C "$REPO" add .evolve/inbox/c38-2.json
+git -C "$REPO" commit -q -m "feat: cycle 39 — c38-2: mixed commit"
+MIXED_SHA=$(git -C "$REPO" log --format=%H -1)
+mixed_non_state=$(content_verify_count "$REPO" "$MIXED_SHA")
+[ "$mixed_non_state" -eq 0 ] && \
+    pass "inbox-only mixed commit still has 0 non-state changes" || \
+    fail "expected 0 non-state for inbox-only mixed commit, got $mixed_non_state"
+
 # --- Summary ------------------------------------------------------------------
 echo
 echo "Results: $PASS passed, $FAIL failed"

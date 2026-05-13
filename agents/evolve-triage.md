@@ -54,12 +54,25 @@ re-execution of already-shipped or already-rejected work. Run this BEFORE Step 0
 
 For each `.evolve/inbox/*.json` (maxdepth 1):
 
-1. **Git log check** (authoritative — the single source of truth):
+1. **Git log check with content-verification** (authoritative — the single source of truth):
    ```bash
-   git log --grep="^feat: cycle [0-9]\+ — ${id}\(:\| \)" --format=%H main 2>/dev/null | head -1
+   candidate_sha=$(git log --grep="^feat: cycle [0-9]\+ — ${id}\(:\| \)" --format=%H main 2>/dev/null | head -1)
    ```
-   Non-empty result → **skip-shipped**: do NOT ingest; record in `skip_shipped[]` with the SHA.
-   File stays in inbox/ until ship.sh promotes it to processed/ after the cycle commits.
+   If `candidate_sha` is non-empty, **verify content** before accepting as skip-shipped:
+   ```bash
+   non_state_changes=$(git show --stat "$candidate_sha" 2>/dev/null | awk '
+     /\|/ && $0 !~ /\.evolve\/(inbox|state\.json|ledger|runs|worktrees)/ { count++ }
+     END { print count+0 }
+   ')
+   ```
+   - If `non_state_changes > 0` → **skip-shipped**: genuine code commit; do NOT ingest;
+     record in `skip_shipped[]` with the SHA.
+     File stays in inbox/ until ship.sh promotes it to processed/ after the cycle commits.
+   - If `non_state_changes == 0` (all changes are state-mutation paths only) →
+     **INTEGRITY_BREACH**: commit subject claims the task but contains no code deliverables.
+     Record in `escalate_block[]` with `reason="fraudulent-commit:<candidate_sha>"`.
+     Do NOT claim as skip_shipped. Continue to next inbox file (do NOT ingest this cycle).
+   - If `candidate_sha` is empty → proceed to checks 2–4 normally.
 
 2. **Rejected dir check** (defense-in-depth):
    `find .evolve/inbox/rejected -name "*${id}*" 2>/dev/null | grep -q .`
