@@ -347,6 +347,105 @@ else
     fail "$T4_NAME" "${t4_fail_reasons## ; }"
 fi
 
+
+# ── Test 5 — v9.4.0: phase advance resets the watchdog baseline ──────────────
+# When a subagent finishes one phase and the orchestrator advances to the next,
+# cycle-state.json's `.phase` field changes. The watchdog must reset its
+# PHASE_START_TIME so that the next phase starts with a fresh clock — even if
+# zero new file mtimes happen in the first few seconds of the new phase.
+# Validates the operator's architectural request: monitor phase by phase,
+# reset the timer either on phase switching OR when logging updated.
+
+T5_NAME="phase advance resets baseline (no spurious FIRE on phase transition)"
+
+t5_workspace="${SCRATCH_BASE}/t5-workspace"
+mkdir -p "$t5_workspace"
+
+t5_project="${SCRATCH_BASE}/t5-project"
+mkdir -p "${t5_project}/.evolve"
+t5_state="${t5_project}/.evolve/cycle-state.json"
+
+# Start with phase=research. Touch a workspace log so idle_clock_started flips.
+cat > "$t5_state" <<JSON
+{"cycle_id":99,"phase":"research","active_agent":"scout","completed_phases":["calibrate"]}
+JSON
+echo "scout log seed" > "${t5_workspace}/scout-stdout.log"
+
+# Long-running stub. The watchdog should NOT kill it because we'll advance the
+# phase before the threshold elapses, restarting the baseline.
+set -m 2>/dev/null || true
+(
+    sleep 60
+) &
+T5_STUB_PID=$!
+set +m 2>/dev/null || true
+sleep 0.3
+T5_STUB_PGID=""
+if command -v ps >/dev/null 2>&1; then
+    T5_STUB_PGID=$(ps -o pgid= -p "$T5_STUB_PID" 2>/dev/null | tr -d ' ') || T5_STUB_PGID=""
+fi
+[ -z "$T5_STUB_PGID" ] && T5_STUB_PGID="$T5_STUB_PID"
+
+# Threshold=10s, poll=2s. We'll wait ~14s — long enough that a single phase
+# WITHOUT the reset would fire. Then advance to phase=build at T+7s, which
+# should reset PHASE_START_TIME so the watchdog stays quiet until T+17s
+# (= phase_start_time(T+7) + threshold(10) = T+17).
+EVOLVE_INACTIVITY_THRESHOLD_S=10 \
+    EVOLVE_INACTIVITY_POLL_S=2 \
+    EVOLVE_INACTIVITY_GRACE_S=3 \
+    EVOLVE_INACTIVITY_WARN_PCT=75 \
+    EVOLVE_INACTIVITY_DISABLE=0 \
+    EVOLVE_CYCLE_STATE_FILE="$t5_state" \
+    EVOLVE_PROJECT_ROOT="$t5_project" \
+    bash "$WATCHDOG" "$t5_workspace" "$T5_STUB_PGID" 99 "$t5_state" &
+T5_WATCHDOG_PID=$!
+
+# Wait 7s, then advance phase. Don't touch any other file — phase-advance
+# alone must be sufficient to reset the timer.
+sleep 7
+cat > "$t5_state" <<JSON
+{"cycle_id":99,"phase":"build","active_agent":"builder","completed_phases":["calibrate","research","triage"]}
+JSON
+
+# Wait another 7s (total elapsed: 14s). Under the OLD behavior the watchdog
+# would have fired at T+10. Under the NEW phase-aware behavior, the reset at
+# T+7 means we're only at "idle for 7s" relative to the new phase. No FIRE.
+sleep 7
+
+# Inspect: stall-progress.json must NOT exist (no fire), stub must be alive.
+t5_no_stall=1
+t5_stub_alive=1
+if [ -f "${t5_workspace}/stall-progress.json" ]; then
+    t5_no_stall=0
+fi
+if ! kill -0 "$T5_STUB_PID" 2>/dev/null; then
+    t5_stub_alive=0
+fi
+
+# Cleanup.
+if kill -0 "$T5_STUB_PID" 2>/dev/null; then
+    kill -TERM "$T5_STUB_PID" 2>/dev/null || true
+    wait "$T5_STUB_PID" 2>/dev/null || true
+fi
+if kill -0 "$T5_WATCHDOG_PID" 2>/dev/null; then
+    kill -TERM "$T5_WATCHDOG_PID" 2>/dev/null || true
+    wait "$T5_WATCHDOG_PID" 2>/dev/null || true
+fi
+
+t5_fail_reasons=""
+if [ "$t5_no_stall" = "0" ]; then
+    t5_fail_reasons="${t5_fail_reasons}; stall-progress.json created — phase advance did not reset baseline"
+fi
+if [ "$t5_stub_alive" = "0" ]; then
+    t5_fail_reasons="${t5_fail_reasons}; stub killed prematurely — false-positive SIGTERM"
+fi
+
+if [ -z "$t5_fail_reasons" ]; then
+    pass "$T5_NAME"
+else
+    fail "$T5_NAME" "${t5_fail_reasons## ; }"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 echo "---"

@@ -113,12 +113,41 @@ WARN_S=$(( THRESHOLD_S * WARN_PCT / 100 ))
 idle_clock_started=0   # set to 1 after first non-zero mtime observed
 warn_emitted=0         # set to 1 once WARN has been logged for this crossing
 
+# v9.4.0 — Phase-aware baseline (operator architectural request):
+#   The watchdog used to compute idle = now - max(watched_mtime). That had two
+#   defects: (a) stale mtimes from a prior run could fire instantly on resume
+#   (startup-grace bug); (b) a phase that produces zero file writes (e.g. an
+#   orchestrator turn that only reads files) appeared idle even when actively
+#   progressing. Both are fixed by tracking the current phase and resetting a
+#   PHASE_START_TIME each time cycle-state.json:phase changes. The effective
+#   idle baseline becomes max(best_mtime, PHASE_START_TIME) so either signal —
+#   a recent log write OR a recent phase advance — keeps the watchdog quiet.
+START_TIME=$(date +%s)
+LAST_PHASE=""
+PHASE_START_TIME="$START_TIME"
+
 while true; do
 
     # Gather newest mtime across workspace files and the cycle-state path.
     now=$(date +%s)
     best_mtime=0
     best_path=""
+
+    # v9.4.0: detect phase transitions and reset the phase baseline.
+    if [ -f "$CYCLE_STATE_PATH" ]; then
+        current_phase=$(jq -r '.phase // empty' "$CYCLE_STATE_PATH" 2>/dev/null || echo "")
+        if [ -n "$current_phase" ] && [ "$current_phase" != "$LAST_PHASE" ]; then
+            if [ -n "$LAST_PHASE" ]; then
+                _log "phase advance: '$LAST_PHASE' → '$current_phase' (resetting baseline to now)"
+            else
+                _log "phase observed: '$current_phase' (baseline anchored to start_time=$START_TIME)"
+            fi
+            PHASE_START_TIME="$now"
+            LAST_PHASE="$current_phase"
+            # Phase change → reset WARN flag too (a new phase deserves a fresh chance).
+            warn_emitted=0
+        fi
+    fi
 
     # Scan workspace globs.
     for glob_pat in \
@@ -159,7 +188,15 @@ while true; do
     fi
 
     if [ "$idle_clock_started" = "1" ] && [ "$best_mtime" -gt 0 ] 2>/dev/null; then
-        idle_s=$(( now - best_mtime ))
+        # v9.4.0: baseline is the LATER of (a) freshest watched-file mtime
+        # and (b) the current phase's start time. Either signal — log activity
+        # OR a recent phase advance — restarts the clock.
+        baseline="$best_mtime"
+        if [ "$PHASE_START_TIME" -gt "$baseline" ] 2>/dev/null; then
+            baseline="$PHASE_START_TIME"
+            best_path="<phase-start anchor (phase=$LAST_PHASE)>"
+        fi
+        idle_s=$(( now - baseline ))
         [ "$idle_s" -lt 0 ] && idle_s=0
 
         # WARN threshold crossing (emit only once per crossing).
