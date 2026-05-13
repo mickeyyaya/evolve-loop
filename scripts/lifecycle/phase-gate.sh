@@ -350,7 +350,13 @@ gate_discover_to_build() {
 $_new_evals
 EOF
             if [ "$_mutation_warnings" -gt 0 ]; then
-                log "MUTATION-WARN: $_mutation_warnings new eval(s) failed mutation testing (rollout: WARN-only)"
+                # v10.2.0: EVOLVE_MUTATION_GATE_STRICT=1 promotes WARN to FAIL.
+                if [ "${EVOLVE_MUTATION_GATE_STRICT:-0}" = "1" ]; then
+                    log "MUTATION-FAIL: $_mutation_warnings new eval(s) failed mutation testing — gate FAIL (EVOLVE_MUTATION_GATE_STRICT=1)"
+                    return 1
+                else
+                    log "MUTATION-WARN: $_mutation_warnings new eval(s) failed mutation testing (rollout: WARN-only; set EVOLVE_MUTATION_GATE_STRICT=1 to FAIL)"
+                fi
             else
                 log "OK: All new evals passed mutation testing (kill rate ≥ 0.7)"
             fi
@@ -624,7 +630,14 @@ gate_build_to_audit() {
 $_new_build_evals
 EOF
             if [ "$_build_mut_warnings" -gt 0 ]; then
-                log "MUTATION-WARN: $_build_mut_warnings Builder eval(s) below 0.7 kill rate — Auditor see above"
+                # v10.2.0: EVOLVE_MUTATION_GATE_STRICT=1 promotes build-to-audit
+                # mutation WARN to FAIL. Default OFF preserves WARN-only.
+                if [ "${EVOLVE_MUTATION_GATE_STRICT:-0}" = "1" ]; then
+                    log "MUTATION-FAIL: $_build_mut_warnings Builder eval(s) below 0.7 kill rate — gate FAIL (EVOLVE_MUTATION_GATE_STRICT=1)"
+                    return 1
+                else
+                    log "MUTATION-WARN: $_build_mut_warnings Builder eval(s) below 0.7 kill rate — Auditor see above (set EVOLVE_MUTATION_GATE_STRICT=1 to FAIL)"
+                fi
             else
                 log "OK: All Builder evals passed mutation testing (kill rate ≥ 0.7)"
             fi
