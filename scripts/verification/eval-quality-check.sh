@@ -27,6 +27,75 @@ LEVEL_3_COUNT=0  # GOOD: execution-based
 
 ISSUES=""
 
+SCORE_CAPS_FOUND=0
+SCORE_CAPS_FIRED=0
+SCORE_CAPS_CEILING="null"
+
+# check_score_caps FILE
+# Parses YAML frontmatter score_cap entries and evaluates evidence commands.
+# Emits JSON: {"caps_found":N,"caps_fired":N,"effective_ceiling":N|null}
+# Cap is opt-in: files without score_cap: frontmatter return null ceiling.
+check_score_caps() {
+  local FILE="$1"
+
+  # Extract YAML frontmatter (lines between first and second --- delimiters)
+  local FRONTMATTER
+  FRONTMATTER=$(awk 'BEGIN{n=0} /^---/{n++; if(n==2) exit; next} n==1{print}' "$FILE" 2>/dev/null || true)
+
+  # No frontmatter or no score_cap key: opt-in gate, skip silently
+  if [ -z "$FRONTMATTER" ] || ! printf '%s\n' "$FRONTMATTER" | grep -q "^score_cap:"; then
+    printf '{"caps_found":0,"caps_fired":0,"effective_ceiling":null}'
+    return 0
+  fi
+
+  # Extract (max_if_missing, evidence) TAB-separated pairs from the score_cap block.
+  # Stops when a non-indented top-level key is seen (end of block).
+  # max_if_missing MUST precede evidence within each cap entry.
+  local CAP_PAIRS
+  CAP_PAIRS=$(printf '%s\n' "$FRONTMATTER" | awk '
+    /^score_cap:/ { in_block=1; pending_max=""; next }
+    in_block && /^[a-zA-Z_]/ { in_block=0 }
+    in_block {
+      if ($0 ~ /max_if_missing:/) {
+        v=$0; sub(/.*max_if_missing:[[:space:]]*/, "", v)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        pending_max=v
+      }
+      if ($0 ~ /evidence:/ && pending_max != "") {
+        v=$0; sub(/.*evidence:[[:space:]]*/, "", v); gsub(/^"|"$/, "", v)
+        print pending_max "\t" v
+        pending_max=""
+      }
+    }
+  ' 2>/dev/null || true)
+
+  local caps_found=0
+  local caps_fired=0
+  local effective_ceiling=10
+  local clean_max
+
+  if [ -n "$CAP_PAIRS" ]; then
+    while IFS=$'\t' read -r cap_max cap_evidence; do
+      [ -z "$cap_evidence" ] && continue
+      caps_found=$((caps_found + 1))
+      clean_max=$(printf '%s' "$cap_max" | tr -d ' "')
+      # Nonzero exit means structural requirement is absent — cap fires
+      if ! sh -c "$cap_evidence" > /dev/null 2>&1; then
+        caps_fired=$((caps_fired + 1))
+        if [ -n "$clean_max" ] && [ "$clean_max" -lt "$effective_ceiling" ] 2>/dev/null; then
+          effective_ceiling="$clean_max"
+        fi
+      fi
+    done <<< "$CAP_PAIRS"
+  fi
+
+  local ceiling_out="null"
+  [ "$caps_fired" -gt 0 ] && ceiling_out="$effective_ceiling"
+
+  printf '{"caps_found":%d,"caps_fired":%d,"effective_ceiling":%s}' \
+    "$caps_found" "$caps_fired" "$ceiling_out"
+}
+
 check_eval_file() {
   local FILE="$1"
 
@@ -140,6 +209,27 @@ check_eval_file() {
     LEVEL_2_COUNT=$((LEVEL_2_COUNT + 1))
 
   done <<< "$COMMANDS"
+
+  # Score cap enforcement (Ghosh Pattern #2 — opt-in via YAML frontmatter)
+  local CAP_RESULT
+  CAP_RESULT=$(check_score_caps "$FILE")
+  local cap_found cap_fired cap_ceiling
+  cap_found=$(printf '%s' "$CAP_RESULT" | tr ',' '\n' | grep '"caps_found"' | tr -cd '0-9' || printf '0')
+  cap_fired=$(printf '%s' "$CAP_RESULT" | tr ',' '\n' | grep '"caps_fired"' | tr -cd '0-9' || printf '0')
+  cap_ceiling=$(printf '%s' "$CAP_RESULT" | tr ',' '\n' | grep '"effective_ceiling"' | sed 's/.*://' | tr -d ' }"' || printf 'null')
+  cap_found="${cap_found:-0}"
+  cap_fired="${cap_fired:-0}"
+  cap_ceiling="${cap_ceiling:-null}"
+  SCORE_CAPS_FOUND=$((SCORE_CAPS_FOUND + cap_found))
+  SCORE_CAPS_FIRED=$((SCORE_CAPS_FIRED + cap_fired))
+  if [ "$cap_fired" -gt 0 ] && [ "$cap_ceiling" != "null" ]; then
+    if [ "$SCORE_CAPS_CEILING" = "null" ]; then
+      SCORE_CAPS_CEILING="$cap_ceiling"
+    elif [ "$cap_ceiling" -lt "$SCORE_CAPS_CEILING" ] 2>/dev/null; then
+      SCORE_CAPS_CEILING="$cap_ceiling"
+    fi
+    ISSUES="${ISSUES}  INFO [score_cap]: Cap fires in ${FILE}: ceiling=${cap_ceiling}/10\n"
+  fi
 }
 
 # Process target (file or directory)
@@ -170,7 +260,8 @@ cat <<EOF
     elif [ "$TOTAL_COMMANDS" -eq 0 ]; then echo "WARN"
     else echo "OK"
     fi
-  )"
+  )",
+  "score_caps_ceiling": ${SCORE_CAPS_CEILING}
 }
 EOF
 

@@ -141,6 +141,14 @@ B2 is NEVER skipped — hallucination detection runs every cycle regardless of s
 - [ ] **Challenge Token:** Verify token in scout-report.md and build-report.md
 - If tampering, trivial evals, bypassed pipelines, or missing tokens detected = CRITICAL, automatic FAIL
 
+### D.score_cap_enforcement (Ghosh Pattern #2)
+- [ ] Run `bash scripts/verification/eval-quality-check.sh .evolve/evals/<task-slug>.md` and read `score_caps_ceiling` from the JSON output (if present in workspace or producible now)
+- [ ] For each fired cap: the final verdict score for that criterion is `min(your_score, cap.max_if_missing)` — caps are on the 1–10 integer scale
+- [ ] Caps override prose-quality reasoning — treat as a deterministic structural gate, not advisory
+- [ ] If `caps_fired > 0`, add to audit-report.md: `"Score cap(s) fired: <criterion>, ceiling=<N>/10"`
+- [ ] If `score_caps_ceiling` is absent or null, proceed with unadjusted verdict (cap is opt-in for existing evals — missing frontmatter is NOT a defect)
+- [ ] WARN (not FAIL) if a NEW eval created this cycle has no `score_cap:` frontmatter at all
+
 ### D.5 — E2E Grounding (UI/browser tasks only)
 
 **Activation:** run this check ONLY if the eval file at `.evolve/evals/<task-slug>.md` contains an `## E2E Graders` section OR the task touches UI/routing/forms/auth flows.
