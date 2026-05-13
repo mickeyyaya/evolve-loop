@@ -128,7 +128,19 @@ done
 declare -a CMD
 CMD=(claude -p --model "$RESOLVED_MODEL")
 CMD+=(--permission-mode "$PERMISSION_MODE")
-CMD+=(--output-format json)
+# v9.2.0: stream-json enables real-time stdout.log mtime updates so
+# phase-watchdog can detect genuine subagent activity instead of waiting
+# for the end-of-run blob. Fixes cycle-36-style watchdog false-positive
+# where Builder doing 15 min of API work produced zero workspace mtime
+# touches. --verbose is a CLI hard requirement when --print + stream-json
+# are combined (claude 2.1.140 rejects without it). Gated on EVOLVE_STREAM_JSON
+# (default 1) per the project's verify→default-on ladder; set to 0 to fall
+# back to the legacy single-blob format for one-cycle verification or rollback.
+if [ "${EVOLVE_STREAM_JSON:-1}" = "1" ]; then
+    CMD+=(--output-format stream-json --verbose)
+else
+    CMD+=(--output-format json)
+fi
 
 # v8.26.0: budget cap default-unlimited.
 #

@@ -179,6 +179,48 @@ else
     fail_ "footer missing TTL bucket breakdown: $out"
 fi
 
+# === Test 12: v9.2.0 — NDJSON stdout.log (stream-json format) is parsed correctly
+# When claude.sh uses --output-format=stream-json (the default since v9.2.0),
+# stdout.log is multi-line NDJSON: one event per line, with the final `result`
+# event carrying usage/cost. Ensure the new grep-based filter extracts the
+# correct event regardless of how many other events precede it.
+header "Test 12: v9.2.0 — multi-line NDJSON stdout.log → extracts result event"
+d=$(make_cycle 990); cleanup_dirs+=("$d")
+cat > "$d/.evolve/runs/cycle-990/scout-stdout.log" <<EOF
+{"type":"system","subtype":"init","session_id":"s-1","model":"sonnet"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"begin"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Read","input":{"file_path":"foo"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","content":"ok"}]}}
+{"type":"result","subtype":"success","total_cost_usd":0.42,"usage":{"input_tokens":10,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200,"output_tokens":50}}
+EOF
+set +u; out=$(RUNS_DIR_OVERRIDE="$d/.evolve/runs" bash "$SCRIPT" 990 --json 2>&1); set -u
+scout_cost=$(echo "$out" | jq -r '.phases[0].cost_usd // 0' 2>/dev/null || echo MISSING)
+if [ "$scout_cost" = "0.42" ]; then
+    pass "stream-json NDJSON → cost_usd=0.42 extracted from result event (despite 4 prior non-result lines)"
+else
+    fail_ "expected cost_usd=0.42; got scout_cost=$scout_cost; out=$out"
+fi
+
+# === Test 13: v9.2.0 — final non-result line in NDJSON does NOT confuse parser
+# Edge case: a stream where the LAST line is a system or error event (not result).
+# The old `tail -1` would grab that and report 0 cost; the new grep MUST find
+# the actual result event further back.
+header "Test 13: v9.2.0 — result event followed by trailing system event"
+d=$(make_cycle 991); cleanup_dirs+=("$d")
+cat > "$d/.evolve/runs/cycle-991/scout-stdout.log" <<EOF
+{"type":"system","subtype":"init","session_id":"s-2","model":"sonnet"}
+{"type":"result","subtype":"success","total_cost_usd":1.75,"usage":{"input_tokens":1,"cache_read_input_tokens":500,"cache_creation_input_tokens":100,"output_tokens":25}}
+{"type":"system","subtype":"shutdown"}
+EOF
+set +u; out=$(RUNS_DIR_OVERRIDE="$d/.evolve/runs" bash "$SCRIPT" 991 --json 2>&1); set -u
+scout_cost=$(echo "$out" | jq -r '.phases[0].cost_usd // 0' 2>/dev/null || echo MISSING)
+if [ "$scout_cost" = "1.75" ]; then
+    pass "result event found despite trailing non-result line — grep filter robust"
+else
+    fail_ "expected cost_usd=1.75; got scout_cost=$scout_cost; out=$out"
+fi
+
+
 echo
 echo "=========================================="
 echo "  Total tests: $TESTS_TOTAL"

@@ -97,9 +97,17 @@ TOTAL_INPUT=0
 
 for log in "${LOG_FILES[@]}"; do
     phase=$(basename "$log" | sed 's/-stdout\.log$//')
-    # Each log MAY have multiple JSON lines (claude -p emits one final JSON
-    # result per invocation; we want the LAST one which is the result-summary).
-    last_json=$(tail -1 "$log" 2>/dev/null)
+    # Each log MAY have multiple JSON lines. v9.2.0+: when claude is invoked
+    # with --output-format=stream-json (EVOLVE_STREAM_JSON=1, the default),
+    # stdout.log is NDJSON with one event per line — only the final `result`
+    # event carries usage/cost. Filter explicitly. Backward-compatible: the
+    # legacy single-blob JSON also matches `"type":"result"` so the same
+    # expression handles both formats.
+    last_json=$(grep '"type":"result"' "$log" 2>/dev/null | tail -1)
+    # Fallback when no result event present (malformed/truncated log).
+    # Downstream jq with `// 0` returns zeros — preserves legacy graceful
+    # handling for partial/non-JSON content.
+    [ -z "$last_json" ] && last_json=$(tail -1 "$log" 2>/dev/null)
     [ -n "$last_json" ] || continue
     # Parse fields, defaulting to 0 if absent.
     cost=$(echo "$last_json" | jq -r '.total_cost_usd // 0' 2>/dev/null || echo 0)

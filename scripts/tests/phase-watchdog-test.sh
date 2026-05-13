@@ -238,6 +238,115 @@ else
     fail "$T3_NAME" "${t3_fail_reasons## ; }"
 fi
 
+
+# ── Test 4 — v9.2.0: incremental stdout.log writes prevent FIRE ──────────────
+# This is the inverse of Test 3. When the subagent is genuinely working and
+# producing stream-json events (each event = one mtime touch on stdout.log),
+# the watchdog must NOT fire — even when the threshold has long elapsed since
+# the stub PROCESS started. Validates the architectural fix from v9.2.0 where
+# claude.sh emits --output-format=stream-json so stdout.log gets continuous
+# mtime updates throughout a phase.
+
+T4_NAME="incremental log writes prevent FIRE (stream-json liveness)"
+
+t4_workspace="${SCRATCH_BASE}/t4-workspace"
+mkdir -p "$t4_workspace"
+
+t4_project="${SCRATCH_BASE}/t4-project"
+mkdir -p "${t4_project}/.evolve"
+t4_state="${t4_project}/.evolve/cycle-state.json"
+printf '%s\n' "$CYCLE_STATE_JSON" > "$t4_state"
+
+# Start an "active subagent" simulator: touches stdout.log every 3s for 25s.
+# Threshold is 10s. If watchdog watched only end-of-run output, it would
+# fire at 10s. With incremental writes, the most-recent mtime stays within
+# 3s of `now`, so the FIRE condition never triggers.
+printf 'active subagent simulator: start\n' > "${t4_workspace}/active-stdout.log"
+
+set -m 2>/dev/null || true
+(
+    # Touch the log every 3 seconds for 25 seconds. Each touch updates mtime.
+    end_time=$(( $(date +%s) + 25 ))
+    while [ "$(date +%s)" -lt "$end_time" ]; do
+        printf '{"type":"event","seq":%d}\n' "$(date +%s)" >> "${t4_workspace}/active-stdout.log"
+        sleep 3
+    done
+) &
+ACTIVE_PID=$!
+set +m 2>/dev/null || true
+
+sleep 0.3
+ACTIVE_PGID=""
+if command -v ps >/dev/null 2>&1; then
+    ACTIVE_PGID=$(ps -o pgid= -p "$ACTIVE_PID" 2>/dev/null | tr -d ' ') || ACTIVE_PGID=""
+fi
+[ -z "$ACTIVE_PGID" ] && ACTIVE_PGID="$ACTIVE_PID"
+
+# Launch watchdog with 10s threshold. The watchdog should run the full 25s
+# without firing, because the simulator keeps stdout.log mtime fresh.
+EVOLVE_INACTIVITY_THRESHOLD_S=10 \
+    EVOLVE_INACTIVITY_POLL_S=2 \
+    EVOLVE_INACTIVITY_GRACE_S=3 \
+    EVOLVE_INACTIVITY_WARN_PCT=75 \
+    EVOLVE_INACTIVITY_DISABLE=0 \
+    EVOLVE_CYCLE_STATE_FILE="$t4_state" \
+    EVOLVE_PROJECT_ROOT="$t4_project" \
+    bash "$WATCHDOG" "$t4_workspace" "$ACTIVE_PGID" 99 "$t4_state" &
+WATCHDOG_PID=$!
+
+# Wait long enough that the watchdog would have fired (3x threshold) if it
+# were going to. The simulator runs for 25s; sleep 22s and then check.
+sleep 22
+
+# Did the watchdog fire? (Indicators: stall-progress.json + checkpoint).
+t4_no_stall_json=1
+t4_stub_alive=1
+t4_no_checkpoint=1
+
+if [ -f "${t4_workspace}/stall-progress.json" ]; then
+    t4_no_stall_json=0
+fi
+
+if ! kill -0 "$ACTIVE_PID" 2>/dev/null; then
+    # Note: the simulator naturally exits after 25s. If we're past that point,
+    # this isn't a failure. Allow up to 27s total elapsed.
+    elapsed=$(( $(date +%s) - $(stat -f %B "$t4_workspace" 2>/dev/null || echo 0) ))
+    if [ "$elapsed" -lt 25 ]; then
+        t4_stub_alive=0
+    fi
+fi
+
+if [ -f "$t4_state" ] && grep -q "stall-inactivity" "$t4_state" 2>/dev/null; then
+    t4_no_checkpoint=0
+fi
+
+# Cleanup.
+if kill -0 "$ACTIVE_PID" 2>/dev/null; then
+    kill -TERM "$ACTIVE_PID" 2>/dev/null || true
+    wait "$ACTIVE_PID" 2>/dev/null || true
+fi
+if kill -0 "$WATCHDOG_PID" 2>/dev/null; then
+    kill -TERM "$WATCHDOG_PID" 2>/dev/null || true
+    wait "$WATCHDOG_PID" 2>/dev/null || true
+fi
+
+t4_fail_reasons=""
+if [ "$t4_no_stall_json" = "0" ]; then
+    t4_fail_reasons="${t4_fail_reasons}; stall-progress.json was created (watchdog fired despite active writes)"
+fi
+if [ "$t4_stub_alive" = "0" ]; then
+    t4_fail_reasons="${t4_fail_reasons}; active simulator was killed by watchdog (false-positive SIGTERM)"
+fi
+if [ "$t4_no_checkpoint" = "0" ]; then
+    t4_fail_reasons="${t4_fail_reasons}; cycle-state.json shows stall-inactivity checkpoint (false fire)"
+fi
+
+if [ -z "$t4_fail_reasons" ]; then
+    pass "$T4_NAME"
+else
+    fail "$T4_NAME" "${t4_fail_reasons## ; }"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 echo "---"

@@ -380,6 +380,48 @@ else
     fail_ "out=$(echo "$out" | grep -E 'budget|max-budget|WARN' | head -3)"
 fi
 
+# === Test 20: v9.2.0 — EVOLVE_STREAM_JSON=1 (default) → stream-json + verbose =
+# The stream-json output format enables real-time stdout.log mtime updates
+# so phase-watchdog can detect genuine subagent activity. --verbose is a
+# CLI hard requirement when --print + stream-json combine.
+header "Test 20: v9.2.0 — EVOLVE_STREAM_JSON=1 → --output-format stream-json --verbose"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(run_adapter_unlimited "$p" EVOLVE_STREAM_JSON=1)
+if echo "$out" | grep -q -- "--output-format stream-json --verbose"; then
+    pass "EVOLVE_STREAM_JSON=1 injects --output-format stream-json --verbose"
+else
+    fail_ "out=$(echo "$out" | grep -E 'output-format|command=' | head -2)"
+fi
+
+# === Test 21: v9.2.0 — EVOLVE_STREAM_JSON=0 → legacy json (rollback path) ====
+# Operator escape hatch. Drops back to the single-blob format for one-cycle
+# verification or emergency rollback.
+header "Test 21: v9.2.0 — EVOLVE_STREAM_JSON=0 → legacy --output-format json"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(run_adapter_unlimited "$p" EVOLVE_STREAM_JSON=0)
+if echo "$out" | grep -q -- "--output-format json " \
+   && ! echo "$out" | grep -q -- "--output-format stream-json"; then
+    pass "EVOLVE_STREAM_JSON=0 falls back to legacy --output-format json"
+else
+    fail_ "out=$(echo "$out" | grep -E 'output-format|command=' | head -2)"
+fi
+
+# === Test 22: v9.2.0 — EVOLVE_STREAM_JSON unset → defaults to stream-json ===
+# Default-on per the project's verify→default-on ladder. Operators must
+# explicitly disable to fall back.
+header "Test 22: v9.2.0 — EVOLVE_STREAM_JSON unset → defaults to stream-json"
+p=$(make_profile 0.50); cleanup_files+=("$p")
+out=$(env -u EVOLVE_STREAM_JSON CYCLE=99 WORKSPACE_PATH=/tmp PROFILE_PATH="$p" \
+        RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
+        STDOUT_LOG=/dev/null STDERR_LOG=/dev/null \
+        ARTIFACT_PATH=/dev/null VALIDATE_ONLY=1 \
+        bash "$ADAPTER" 2>&1)
+if echo "$out" | grep -q -- "--output-format stream-json --verbose"; then
+    pass "default (unset) injects stream-json — verify→default-on posture"
+else
+    fail_ "out=$(echo "$out" | grep -E 'output-format|command=' | head -2)"
+fi
+
 # === Summary ==================================================================
 echo
 echo "=========================================="
