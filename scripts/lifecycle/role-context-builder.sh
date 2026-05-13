@@ -469,6 +469,18 @@ emit_for_role() {
             ;;
         builder)
             header_block
+            # c36: Cycle 35 Lesson 1 — emit worktree isolation reminder as
+            # the first visible block so Builder cannot miss it.
+            _wt_path=$(cycle-state.sh get active_worktree 2>/dev/null || true)
+            [ -z "$_wt_path" ] && _wt_path="<read cycle-state.json:active_worktree>"
+            cat <<WCONST
+
+## WORKTREE ISOLATION CONSTRAINT (MANDATORY — read this first)
+All file writes MUST target the per-cycle worktree: ${_wt_path}
+Writing to the project root is an isolation breach detected by ship.sh;
+the cycle commit will be declined and work will be orphaned.
+WCONST
+            unset _wt_path
             emit_intent_compact
             emit_artifact "Scout selected backlog" "$WORKSPACE/scout-report.md"
             # RED test file (TDD output) if present

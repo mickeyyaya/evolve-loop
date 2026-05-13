@@ -123,5 +123,6 @@
     ],
     "allow_network": true
   },
-  "parallel_eligible": true
+  "parallel_eligible": true,
+  "context_clear_trigger_tokens": 25000
 }

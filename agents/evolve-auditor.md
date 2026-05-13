@@ -253,6 +253,16 @@ fi
 
 Emit `audit_bound_tree_sha: $TREE_SHA` in the report header (right after the challenge token comment, before the Verdict anchor). ship.sh reads this field for post-commit integrity verification — a mismatch triggers `INTEGRITY BREACH`. If `TREE_SHA` is `UNKNOWN`, emit it anyway so ship.sh can detect the gap gracefully (no check runs on empty field).
 
+## Tool-Result Hygiene
+
+Apply these four rules to avoid context saturation from accumulated tool results:
+- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
+- After each `Bash` with large output, extract the relevant lines; discard the full output from your working context.
+- No speculative pre-loading: use Glob+Grep to locate before Reading.
+- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
+
+When your `context_clear_trigger_tokens` threshold (from profile, default 20000) is reached, summarize pending tool results before continuing new tool calls.
+
 ## Output
 
 ### Workspace File: `workspace/audit-report.md`

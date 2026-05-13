@@ -279,7 +279,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-3 evolve-scout.md Layer-3 split | DONE (cycle 24) | `agents/evolve-scout-reference.md` created; `evolve-scout.md` trimmed 334→167 lines |
 | P-NEW-4 EVOLVE_REQUIRE_* consolidation | PENDING | `EVOLVE_REQUIRED_PHASES` not implemented |
 | P-NEW-5 Deprecated flag removal | BRIDGES-ACTIVE | 5 flags w/ bridges; removal target v8.61+ MISSED; cycle 26+ |
-| P-NEW-6 Tool-result clearing | PROPOSED | New from H2 research (cycle 24); profile field `context_clear_trigger_tokens`; cycle 26+ after P-NEW-1 |
+| P-NEW-6 Tool-result clearing | IN-FLIGHT (cycle 36) | Profile field `context_clear_trigger_tokens` added to builder/scout/auditor; Tool-Result Hygiene subsection in 3 persona files; `subagent-run.sh` advisory log; `scripts/observability/tool-result-saturation.sh` NEW. Verification: `jq .context_clear_trigger_tokens .evolve/profiles/{builder,scout,auditor}.json` → non-null; grep "Tool-Result Hygiene" agents/evolve-{builder,scout,auditor}.md → matches; run `tool-result-saturation.sh --workspace .evolve/runs/cycle-N` → exit 0. |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---

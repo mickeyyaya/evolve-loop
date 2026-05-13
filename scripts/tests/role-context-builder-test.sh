@@ -112,6 +112,16 @@ else
     fail "no WARN about token cap; got: $WARN_OUT"
 fi
 
+# --- Test 10: Builder output contains WORKTREE ISOLATION CONSTRAINT ----------
+header "Test 10: builder context includes WORKTREE ISOLATION CONSTRAINT"
+ROOT2=$(make_repo)
+OUT10=$(EVOLVE_PROJECT_ROOT="$ROOT2" bash "$HELPER" builder 1 "$ROOT2/.evolve/runs/cycle-1" 2>/dev/null)
+if [[ "$OUT10" =~ "WORKTREE ISOLATION CONSTRAINT" ]]; then
+    pass "builder includes WORKTREE ISOLATION CONSTRAINT block"
+else
+    fail "builder missing WORKTREE ISOLATION CONSTRAINT block; got: $(echo "$OUT10" | head -5)"
+fi
+
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"
 echo

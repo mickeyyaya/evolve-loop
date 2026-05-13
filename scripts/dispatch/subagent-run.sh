@@ -677,6 +677,20 @@ ADVEOF
         fi
     fi
 
+    # c45-P-NEW-6 (cycle 36): per-profile context_clear_trigger_tokens override.
+    # When the expanded profile declares this field, log an advisory if the
+    # current prompt already exceeds that threshold. The agent's Tool-Result
+    # Hygiene subsection instructs it to summarize pending results at threshold.
+    # This is INFORMATIONAL only — no hard exit. Threshold check is best-effort
+    # (empty/missing profile falls through silently).
+    if command -v jq >/dev/null 2>&1 && [ -f "${_profile_expanded:-}" ]; then
+        _ctx_clear_threshold=$(jq -r '.context_clear_trigger_tokens // empty' "$_profile_expanded" 2>/dev/null || true)
+        if [ -n "$_ctx_clear_threshold" ] && [ "$_prompt_tokens" -gt "$_ctx_clear_threshold" ]; then
+            echo "[subagent-run] INFO: $agent context at ~${_prompt_tokens} tokens; profile threshold=${_ctx_clear_threshold} (context_clear_trigger_tokens). Agent should apply Tool-Result Hygiene before further tool calls." >&2
+        fi
+        unset _ctx_clear_threshold
+    fi
+
     # v9.1.0 Cycle 6: per-phase context-monitor.json. Records the prompt
     # token estimate + cap percentage so operators can `tail` or `watch`
     # the cumulative cycle context usage during long runs.

@@ -156,6 +156,16 @@ Write `workspace/project-digest.md`. See reference `project-digest-template` for
 - Add evaluated/deferred tasks to `state.json:evaluatedTasks`
 - Phase 1 manages research queries — Scout skips research state
 
+## Tool-Result Hygiene
+
+Apply these four rules to avoid context saturation from accumulated tool results:
+- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
+- After each `Bash` or `WebFetch` with large output, extract the relevant lines; discard the full output from your working context.
+- No speculative pre-loading: use Glob+Grep to locate before Reading.
+- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
+
+When your `context_clear_trigger_tokens` threshold (from profile, default 25000) is reached, summarize pending tool results before continuing new tool calls.
+
 ## Reference Index (Layer 3, on-demand)
 
 | When | Read this |

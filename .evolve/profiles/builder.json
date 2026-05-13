@@ -84,5 +84,6 @@
     ],
     "allow_network": true
   },
-  "parallel_eligible": false
+  "parallel_eligible": false,
+  "context_clear_trigger_tokens": 30000
 }

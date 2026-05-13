@@ -196,5 +196,6 @@
     "scout-report.md:acceptance_criteria",
     "build-report.md:diff_summary",
     "build-report.md:test_results"
-  ]
+  ],
+  "context_clear_trigger_tokens": 20000
 }
