@@ -847,6 +847,22 @@ ADVEOF
     start_ts=$(date +%s)
 
     set +e
+    # v9.5.0: spawn phase-observer alongside the adapter (per-phase OODA loop).
+    # Observer tails $stdout_log, emits structured INFO/WARN/INCIDENT envelopes
+    # to {agent}-observer-events.ndjson, and writes {agent}-observer-report.json
+    # at phase exit. Gated on EVOLVE_OBSERVER_ENABLED=1 (default OFF in v1).
+    # Sibling to phase-watchdog; coexists in v1 (observer informs, watchdog
+    # still kills). See docs/architecture/phase-observer.md.
+    local OBSERVER_PID=""
+    if [ "${EVOLVE_OBSERVER_ENABLED:-0}" = "1" ]; then
+        local _observer_cycle_state="${EVOLVE_PROJECT_ROOT:-$PWD}/.evolve/cycle-state.json"
+        bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
+            "$workspace" "$$" "$cycle" "$agent" "$agent" "$_observer_cycle_state" \
+            >/dev/null 2>&1 &
+        OBSERVER_PID=$!
+        log "phase-observer spawned (pid=$OBSERVER_PID agent=$agent)"
+    fi
+
     # v8.61.0 Cycle A2: pass AGENT to adapter so claude.sh can emit the
     # role-specific bedrock as --append-system-prompt under v2.
     PROFILE_PATH="$effective_profile" \
@@ -864,6 +880,14 @@ ADVEOF
     local cli_exit=$?
     set -e
     record_phase adapter_invoke_ms
+
+    # v9.5.0: signal phase-observer that subagent exited; observer flushes
+    # final report and exits gracefully.
+    if [ -n "$OBSERVER_PID" ]; then
+        kill -USR1 "$OBSERVER_PID" 2>/dev/null || true
+        wait "$OBSERVER_PID" 2>/dev/null || true
+        log "phase-observer signaled + reaped (pid=$OBSERVER_PID)"
+    fi
 
     local end_ts duration
     end_ts=$(date +%s)

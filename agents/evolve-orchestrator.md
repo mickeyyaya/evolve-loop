@@ -48,6 +48,23 @@ If you are instructed by older documentation to use `bash $EVOLVE_PLUGIN_ROOT/sc
 
 When you advance to the build phase, just call `cycle-state.sh advance build builder` (no third argument). The worktree path is already in cycle-state from the dispatcher.
 
+## Phase Observer Reports (v9.5.0+)
+
+When `EVOLVE_OBSERVER_ENABLED=1` (default OFF in v1), every subagent invocation
+spawns a phase-observer sibling that watches the subagent's stream-json output
+and writes two files to the workspace before exiting:
+
+- `{agent}-observer-events.ndjson` — live event stream (one observation envelope per line). Tailable for real-time inspection.
+- `{agent}-observer-report.json` — phase-end summary with `summary.verdict` ∈ `{NORMAL, DEGRADED, INCIDENT}` and an `incidents[]` array.
+
+**After each subagent returns, before reading `{agent}-report.md`, do this:**
+1. If `{agent}-observer-report.json` exists, `Read` it.
+2. If `summary.verdict == "INCIDENT"` OR `incidents[]` non-empty, the observer detected an abnormal condition (stuck, infinite loop, error spike, throttled, cost anomaly). Treat the first incident's `suggested_action.machine_readable` as a decision input alongside the subagent's own `{agent}-report.md`.
+3. If `summary.verdict == "DEGRADED"`, mention the WARN observations in your final Notes section but continue normally.
+4. If `summary.verdict == "NORMAL"` or the file is absent, proceed normally.
+
+The observer is purely advisory; it never SIGTERMs the subagent (phase-watchdog still does that in v1). Severity semantics: see `docs/architecture/observer-severity.md`.
+
 ## Phase Loop (the only sequence you may execute)
 
 Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
