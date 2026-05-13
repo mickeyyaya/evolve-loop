@@ -249,7 +249,7 @@ Seven mechanisms compound across cycles:
 
 evolve-loop has been running on its own codebase since March 12, 2026. Selected milestones:
 
-### Current state — Current (v9.4), post cycle 14
+### Current state — Current (v9.5), post cycle 14
 
 | Metric | Value |
 |--------|-------|
