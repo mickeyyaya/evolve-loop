@@ -109,6 +109,9 @@ parse_scout_decisions() {
 }
 
 # Triage section parser — items appear under ## top_n / ## deferred / ## dropped
+# Supports two formats:
+#   Bullet:  - <id>: some text
+#   Table:   | Rank | `<id>` | Priority | ...
 parse_triage_section() {
     local file="$1" section="$2" decision="$3"
     [ -f "$file" ] || return 0
@@ -119,7 +122,22 @@ parse_triage_section() {
             sub(/^- */, "")
             split($0, parts, ":")
             id = parts[1]; gsub(/^ +| +$/, "", id)
-            print id "\t" dec
+            if (id != "") print id "\t" dec
+        }
+        in_sec && /^\|[^|]+\|/ {
+            # Skip separator rows (|---|---) and header rows
+            if ($0 ~ /\|[[:space:]]*-+[[:space:]]*\|/) next
+            if ($0 ~ /\|[[:space:]]*(Rank|ID|Phase|Priority|Weight)[[:space:]]*\|/) next
+            n = split($0, cols, "|")
+            # Scan columns for first ID-like token (letter-start, alphanum+dash/underscore, >=3 chars)
+            # Strip backtick quoting used in markdown tables
+            for (i = 2; i <= n; i++) {
+                id = cols[i]; gsub(/^ +| +$|`/, "", id)
+                if (id ~ /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/) {
+                    print id "\t" dec
+                    break
+                }
+            }
         }
     ' "$file"
 }

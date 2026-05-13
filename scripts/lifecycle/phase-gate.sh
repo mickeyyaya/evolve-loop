@@ -357,6 +357,19 @@ EOF
         fi
     fi
 
+    # C2-handoff-schemas: soft WARN on scout-report schema violations (C4 promotes to FAIL)
+    if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
+        local _schema_out
+        _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
+            --artifact "$WORKSPACE/scout-report.md" --type scout \
+            --state "${STATE:-}" 2>&1) || true
+        if [ -z "$_schema_out" ]; then
+            log "OK: scout-report.md passes handoff schema (C2)"
+        else
+            log "WARN: scout-report.md schema violations (C4 will promote to FAIL): $_schema_out"
+        fi
+    fi
+
     log "PASS: DISCOVER → BUILD gate"
 }
 
@@ -618,6 +631,18 @@ EOF
         fi
     fi
 
+    # C2-handoff-schemas: soft WARN on build-report schema violations (C5 promotes to FAIL)
+    if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
+        local _schema_out
+        _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
+            --artifact "$WORKSPACE/build-report.md" --type build 2>&1) || true
+        if [ -z "$_schema_out" ]; then
+            log "OK: build-report.md passes handoff schema (C2)"
+        else
+            log "WARN: build-report.md schema violations (C5 will promote to FAIL): $_schema_out"
+        fi
+    fi
+
     log "PASS: BUILD → AUDIT gate"
 }
 
@@ -725,6 +750,18 @@ gate_audit_to_ship() {
             log "OK: Advisory pass complete (result in $WORKSPACE/audit-advisory-review.md)"
         else
             log "WARN: audit-advisory-review.sh not found; advisory pass skipped"
+        fi
+    fi
+
+    # C2-handoff-schemas: soft WARN on audit-report schema violations (C5 promotes to FAIL)
+    if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
+        local _schema_out
+        _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
+            --artifact "$WORKSPACE/audit-report.md" --type audit 2>&1) || true
+        if [ -z "$_schema_out" ]; then
+            log "OK: audit-report.md passes handoff schema (C2)"
+        else
+            log "WARN: audit-report.md schema violations (C5 will promote to FAIL): $_schema_out"
         fi
     fi
 

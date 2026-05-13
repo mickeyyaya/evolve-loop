@@ -1,0 +1,40 @@
+{
+  "$id": "evolve-loop://schemas/handoff/audit-report.schema.json",
+  "artifact_type": "audit-report",
+  "version": 1,
+  "description": "Structural contract for audit-report.md handoff artifacts (C2-handoff-schemas).",
+  "required_first_line": {
+    "pattern": "^<!-- challenge-token:",
+    "fail_message": "challenge token missing from line 1 — report may be a forgery"
+  },
+  "required_sections": [
+    {
+      "name": "artifacts_reviewed",
+      "patterns": [
+        "^## Artifacts Reviewed"
+      ],
+      "fail_message": "## Artifacts Reviewed missing — Auditor must list what was reviewed"
+    },
+    {
+      "name": "verdict",
+      "patterns": [
+        "^## Verdict"
+      ],
+      "fail_message": "## Verdict missing — Auditor must declare a verdict"
+    }
+  ],
+  "conditional_sections": [],
+  "required_content": [
+    {
+      "name": "verdict_value",
+      "pattern": "\\*\\*(PASS|WARN|FAIL)\\*\\*",
+      "fail_message": "verdict value **PASS**, **WARN**, or **FAIL** missing"
+    },
+    {
+      "name": "confidence_score",
+      "pattern": "Confidence: 0\\.[0-9]",
+      "fail_message": "Confidence score (e.g. 'Confidence: 0.90') missing"
+    }
+  ],
+  "min_words": 100
+}

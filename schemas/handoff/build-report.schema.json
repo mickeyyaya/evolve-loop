@@ -1,0 +1,44 @@
+{
+  "$id": "evolve-loop://schemas/handoff/build-report.schema.json",
+  "artifact_type": "build-report",
+  "version": 1,
+  "description": "Structural contract for build-report.md handoff artifacts (C2-handoff-schemas).",
+  "required_first_line": {
+    "pattern": "^<!-- challenge-token:",
+    "fail_message": "challenge token missing from line 1 — report may be a forgery"
+  },
+  "required_sections": [
+    {
+      "name": "diff_summary",
+      "patterns": [
+        "^## Changes",
+        "^<!-- ANCHOR:diff_summary -->"
+      ],
+      "fail_message": "## Changes (or ANCHOR:diff_summary) missing — Builder must document what changed"
+    },
+    {
+      "name": "test_results",
+      "patterns": [
+        "^## Self-Verification",
+        "^<!-- ANCHOR:test_results -->"
+      ],
+      "fail_message": "## Self-Verification (or ANCHOR:test_results) missing — Builder must report test outcomes"
+    },
+    {
+      "name": "quality_signals",
+      "patterns": [
+        "^## Quality Signals"
+      ],
+      "fail_message": "## Quality Signals missing — Builder must report quality signals"
+    }
+  ],
+  "conditional_sections": [],
+  "required_content": [
+    {
+      "name": "status_field",
+      "pattern": "\\*\\*Status:\\*\\*",
+      "fail_message": "**Status:** field missing — Builder must declare PASS or FAIL"
+    }
+  ],
+  "min_words": 100
+}

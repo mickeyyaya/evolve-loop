@@ -146,10 +146,68 @@ EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict
 LEN=$(jq -r '.carryoverTodos | length' "$ROOT/.evolve/state.json")
 [ "$LEN" = "0" ] && pass "todo-7 dropped (triage top_n + PASS)" || fail "expected 0, got $LEN"
 
+# --- Test 9: table-format triage top_n is treated as 'include' (c38-D fix) ---
+header "Test 9: table-format triage top_n drops todo on PASS (c38-D-triage-parse fix)"
+TODOS='[{"id":"test-todo-1","action":"x","priority":"high","evidence_pointer":"y","defer_count":0,"first_seen_cycle":1,"last_seen_cycle":1,"cycles_unpicked":2}]'
+ROOT=$(make_repo_with_todos "$TODOS")
+WS="$ROOT/.evolve/runs/cycle-1"
+cat > "$WS/triage-decision.md" <<'EOF'
+<!-- challenge-token: t -->
+# Triage Decision — Cycle 1
+
+## Top N — Included
+
+| Rank | ID | Priority | Weight | LoC Est | Rationale |
+|------|----|----------|--------|---------|-----------|
+| 1 | `test-todo-1` | HIGH | 0.92 | ~100 | Test fixture for table-format parsing |
+
+## Deferred
+
+| ID | Priority | Defer Reason | Target Cycle |
+|----|----------|--------------|--------------|
+
+## Dropped
+
+None.
+EOF
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict PASS >/dev/null 2>&1 || true
+LEN=$(jq -r '.carryoverTodos | length' "$ROOT/.evolve/state.json")
+[ "$LEN" = "0" ] && pass "test-todo-1 dropped (table-format triage top_n + PASS)" \
+    || fail "expected 0 todos, got $LEN (table-format triage parse may be broken)"
+
+# --- Test 10: table-format triage deferred increments cycles_unpicked -------
+header "Test 10: table-format triage deferred increments cycles_unpicked"
+TODOS='[{"id":"test-todo-2","action":"x","priority":"medium","evidence_pointer":"y","defer_count":0,"first_seen_cycle":1,"last_seen_cycle":1,"cycles_unpicked":0}]'
+ROOT=$(make_repo_with_todos "$TODOS")
+WS="$ROOT/.evolve/runs/cycle-1"
+cat > "$WS/triage-decision.md" <<'EOF'
+<!-- challenge-token: t -->
+# Triage Decision — Cycle 1
+
+## Top N — Included
+
+| Rank | ID | Priority |
+|------|----|----------|
+
+## Deferred
+
+| ID | Priority | Defer Reason | Target Cycle |
+|----|----------|--------------|--------------|
+| `test-todo-2` | MEDIUM | out of scope this cycle | 3 |
+
+## Dropped
+
+None.
+EOF
+EVOLVE_PROJECT_ROOT="$ROOT" bash "$HELPER" --cycle 2 --workspace "$WS" --verdict PASS >/dev/null 2>&1 || true
+CU=$(jq -r '.carryoverTodos[] | select(.id=="test-todo-2") | .cycles_unpicked' "$ROOT/.evolve/state.json")
+[ "$CU" = "1" ] && pass "test-todo-2 cycles_unpicked incremented to 1 (table-format defer)" \
+    || fail "expected 1, got $CU"
+
 # --- Summary ----------------------------------------------------------------
 rm -rf "$SCRATCH"
 echo
 echo "==========================================="
-echo "Results: $PASS passed, $FAIL failed"
+echo "$PASS pass / $FAIL fail"
 echo "==========================================="
 [ "$FAIL" -eq 0 ]
