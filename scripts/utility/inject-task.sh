@@ -12,7 +12,10 @@
 #     [--evidence-pointer "url"] \
 #     [--note "operator context"] \
 #     [--id custom-task-id] \
+#     [--injected-by operator|test|automation] \
 #     [--dry-run]
+#
+# --injected-by: who is injecting this task (default: operator)
 #
 # Exit codes:
 #   0   success
@@ -33,6 +36,7 @@ EVIDENCE_POINTER=""
 OPERATOR_NOTE=""
 TASK_ID=""
 DRY_RUN=0
+INJECTED_BY="operator"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -43,6 +47,8 @@ while [ $# -gt 0 ]; do
         --note)             OPERATOR_NOTE="$2";     shift 2 ;;
         --id)               TASK_ID="$2";           shift 2 ;;
         --dry-run)          DRY_RUN=1;              shift ;;
+        --injected-by)      INJECTED_BY="$2";       shift 2 ;;
+        --help)             awk '/^#!/{next} /^[^#]/{exit} /^#/{sub(/^# ?/,""); print}' "${BASH_SOURCE[0]}" >&2; exit 0 ;;
         --)                 shift; break ;;
         *) echo "ERROR: unknown argument: $1" >&2; exit 10 ;;
     esac
@@ -65,6 +71,11 @@ if [ -n "$WEIGHT" ]; then
         echo "ERROR: --weight must be a float in [0.0, 1.0]; got '$WEIGHT'" >&2; exit 10
     }
 fi
+
+case "$INJECTED_BY" in
+    operator|test|automation) ;;
+    *) echo "ERROR: --injected-by must be operator, test, or automation; got '$INJECTED_BY'" >&2; exit 10 ;;
+esac
 
 # Generate timestamp + random suffix
 NOW_ISO=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
@@ -109,7 +120,7 @@ if [ -n "$WEIGHT" ]; then
         --arg evidence_pointer "$EVIDENCE_POINTER" \
         --arg operator_note "$OPERATOR_NOTE" \
         --arg injected_at "$INJECTED_AT" \
-        --arg injected_by "operator" \
+        --arg injected_by "$INJECTED_BY" \
         '{id:$id,action:$action,priority:$priority,weight:$weight,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}')
 else
     TASK_JSON=$(jq -cn \
@@ -119,7 +130,7 @@ else
         --arg evidence_pointer "$EVIDENCE_POINTER" \
         --arg operator_note "$OPERATOR_NOTE" \
         --arg injected_at "$INJECTED_AT" \
-        --arg injected_by "operator" \
+        --arg injected_by "$INJECTED_BY" \
         '{id:$id,action:$action,priority:$priority,weight:null,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}')
 fi
 

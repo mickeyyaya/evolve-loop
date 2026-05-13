@@ -119,6 +119,20 @@ count=$(ls "$PROJ/.evolve/inbox/"*.json 2>/dev/null | wc -l | tr -d ' ')
 unique_ids=$(jq -r '.id' "$PROJ/.evolve/inbox/"*.json | sort -u | wc -l | tr -d ' ')
 [ "$unique_ids" -eq 5 ] && pass "5 unique ids" || fail "expected 5 unique ids, got $unique_ids"
 
+# --- Test 12: --injected-by test round-trips into JSON -----------------------
+header "Test 12: --injected-by test → injected_by=test in JSON"
+PROJ=$(make_project)
+EVOLVE_PROJECT_ROOT="$PROJ" bash "$CLI" --priority LOW --action "smoke" --injected-by test >/dev/null
+f=$(ls "$PROJ/.evolve/inbox/"*.json 2>/dev/null | head -1)
+ib=$(jq -r '.injected_by' "$f" 2>/dev/null)
+[ "$ib" = "test" ] && pass "--injected-by test round-trips into JSON" || fail "expected test, got '$ib'"
+
+# --- Test 13: --injected-by garbage → exit 10 --------------------------------
+header "Test 13: --injected-by garbage → exit 10 (validation)"
+PROJ=$(make_project)
+EVOLVE_PROJECT_ROOT="$PROJ" bash "$CLI" --priority LOW --action "smoke" --injected-by garbage >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 10 ] && pass "exit 10 on --injected-by garbage" || fail "expected exit 10, got $rc"
+
 # --- Summary ------------------------------------------------------------------
 echo
 echo "Results: $PASS passed, $FAIL failed"
