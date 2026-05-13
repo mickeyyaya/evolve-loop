@@ -25,6 +25,30 @@ If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve
 
 > For implementation details and version history (v8.21–v8.37), see [docs/operations/release-archive.md](docs/operations/release-archive.md).
 
+## Phase-B Observability (v10.5.0+)
+
+Activates the Phase-A scaffolding shipped in v10.4.0 by wiring it into the live dispatch pipeline. The Phase-A scripts (`tracker-writer.sh`, `append-phase-perf.sh`, `rollup-cycle-metrics.sh`, `dashboard.sh`, `prune-ephemeral.sh`) sat unused since they need a writer-side integration point. v10.5.0 provides exactly that — `subagent-run.sh` calls `tracker-writer` + `append-phase-perf` right after the phase artifact and timing/usage sidecars settle, and `run-cycle.sh` calls `rollup-cycle-metrics` at cycle end. The Stop hook in `.claude/settings.json` runs `prune-ephemeral.sh` at session end to honor the 7-day TTL on `.evolve/runs/*/.ephemeral/`.
+
+| Surface | Behavior when `EVOLVE_TRACKER_ENABLED=1` |
+|---|---|
+| `scripts/dispatch/subagent-run.sh` | After phase report + usage/timing sidecars are written, replays `<agent>-stdout.log` NDJSON through `tracker-writer.sh` (writes `trackers/PHASE-ID.ndjson` + `trace.md` + `metrics/PHASE.json`), then calls `append-phase-perf.sh` to add a "Performance & Cost" section to the phase report. Best-effort — failures log WARN but never fail the cycle. |
+| `scripts/dispatch/run-cycle.sh` | At cycle exit (including FAIL / STALL), calls `rollup-cycle-metrics.sh CYCLE` to emit `.ephemeral/metrics/cycle-metrics.json` (per-phase totals, model split, cache hit rate, hot spots). Runs even when the cycle fails — failed-cycle metrics are the most valuable diagnostic. |
+| `.claude/settings.json:hooks.Stop` | After every Claude Code session ends, runs `prune-ephemeral.sh --quiet` to apply the 7-day TTL on `.ephemeral/` and the 30-day TTL on `dispatch-logs/`. |
+| `scripts/observability/dashboard.sh` | New combined viewer: `bash scripts/observability/dashboard.sh` (active cycle), `--cycle=N`, `--watch[=interval]`, `--json`. Wraps `show-cycle-cost.sh` + `cycle-metrics.json` + `trace.md` tail. Read-only. |
+
+**Default OFF.** The flag follows the project's verify→default-on ladder (v8.55.0 idiom). Promotion path:
+
+| Version | `EVOLVE_TRACKER_ENABLED` default | Promotion criterion |
+|---|---|---|
+| v10.5.0 (this version) | `0` (opt-in) | Operators enable to validate the replay model under real cycles. |
+| v10.6+ candidate | `1` (default on) | After one verification cycle confirms no false-positive WARN in subagent-run + no per-cycle cost overhead > 1¢. |
+
+**Cost.** The replay model means there is no per-event live-stream overhead. `tracker-writer.sh` runs ONCE per phase after the claude subprocess exits, processing the already-captured `stdout.log` as plain NDJSON. Empirically: ≤ 200ms per phase replay, ≤ 50ms per `append-phase-perf` invocation, ≤ 500ms per cycle rollup. The Stop-hook prune is negligible (one `find -mtime` per scan).
+
+**Integration test.** `scripts/tests/tracker-integration-test.sh` exercises the full replay path with synthetic NDJSON fixtures: tracker artifacts produced, perf section appended idempotently, rollup totals correct, dashboard JSON well-formed, end-to-end pipeline composes (20/20 PASS as of v10.5.0).
+
+**Disabling for cost-sensitive runs.** Leave `EVOLVE_TRACKER_ENABLED` unset (or `=0`). The scaffolding scripts remain installed but unwired; all v10.0–v10.3 EGPS structural integrity is unchanged.
+
 ## Auto-Retrospective on FAIL/WARN (v8.45.0+)
 
 Reverses the pre-v8.45 "batched per v8.12.3" design where Retrospective never fired automatically — failures got recorded as raw `state.json:failedApproaches[]` entries (single-loop) but the structured lesson YAML (double-loop, per Argyris & Schon 1978) never got produced.

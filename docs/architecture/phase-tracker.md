@@ -173,10 +173,19 @@ Pruner uses `find -mtime +N` for bash 3.2 compat. Idempotent. `--dry-run` flag f
 
 ## Two-phase rollout
 
-| Phase | Surface | Lives In | Risk |
+| Phase | Status | Surface | Lives In |
 |---|---|---|---|
-| **A — additive** | All new scripts; works on existing data via replay mode | `scripts/observability/*.sh`, `scripts/tests/tracker-writer-test.sh`, this doc | None — no live pipeline change |
-| **B — wire live** | `claude.sh` flips `--output-format json` → `stream-json`; subagent-run.sh pipes through tracker-writer | `scripts/cli_adapters/claude.sh`, `scripts/dispatch/subagent-run.sh` | High — affects every subagent dispatch. Gate with `EVOLVE_TRACKER_ENABLED=1` (default OFF), follow project's verify→default-on ladder |
+| **A — additive** | shipped v10.4.0 | All new scripts; works on existing data via replay mode | `scripts/observability/*.sh`, `scripts/tests/tracker-writer-test.sh`, this doc |
+| **B — wire live** | shipped v10.5.0 (opt-in via `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `scripts/dispatch/subagent-run.sh`, `scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
+
+> **Note** — `claude.sh` already emits `--output-format stream-json --verbose` by default (since v9.2.0, gated by `EVOLVE_STREAM_JSON`, default ON). The original Phase-B plan called for flipping that flag; turned out it had already been flipped two minor versions earlier. v10.5.0 just wires the consumer side.
+
+**Promotion path** (v8.55.0 verify→default-on ladder):
+
+| Version | `EVOLVE_TRACKER_ENABLED` default | Criterion |
+|---|---|---|
+| v10.5.0 | `0` (opt-in) | Operators validate the replay model under real cycles |
+| v10.6+ candidate | `1` (default on) | One verification cycle confirms no WARN spam + no per-cycle overhead > 1¢ |
 
 ## File index
 

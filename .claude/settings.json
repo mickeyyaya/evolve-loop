@@ -35,6 +35,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/scripts/observability/prune-ephemeral.sh --quiet || true"
+          }
+        ]
+      }
     ]
   }
 }

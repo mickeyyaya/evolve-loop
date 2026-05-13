@@ -999,6 +999,30 @@ ADVEOF
         rm -f "$timing_log"
     fi
 
+    # v10.5.0: Phase-B observability — replay NDJSON stdout through
+    # tracker-writer and append "Performance & Cost" to the phase report.
+    # Gated by EVOLVE_TRACKER_ENABLED (default OFF, opt-in per the
+    # verify→default-on ladder documented in CLAUDE.md). Best-effort: any
+    # failure is logged but does not fail the cycle. The replay runs AFTER
+    # the usage + timing sidecars and the ledger entry are committed, so a
+    # tracker fault cannot corrupt the audit-binding chain.
+    if [ "${EVOLVE_TRACKER_ENABLED:-0}" = "1" ] && [ -s "$stdout_log" ]; then
+        local _inv_id="${agent}-c${cycle}-${challenge_token:0:12}"
+        local _tracker_sh="$EVOLVE_PLUGIN_ROOT/scripts/observability/tracker-writer.sh"
+        local _perf_sh="$EVOLVE_PLUGIN_ROOT/scripts/observability/append-phase-perf.sh"
+        if [ -x "$_tracker_sh" ]; then
+            cat "$stdout_log" | bash "$_tracker_sh" \
+                --cycle="$cycle" --phase="$agent" --invocation-id="$_inv_id" \
+                >/dev/null 2>"$workspace/${agent}-tracker.stderr.log" \
+                || log "WARN: tracker-writer replay rc=$? (non-fatal)"
+        fi
+        if [ -x "$_perf_sh" ] && [ -f "$artifact_path" ]; then
+            bash "$_perf_sh" "$cycle" "$agent" \
+                >/dev/null 2>"$workspace/${agent}-perf.stderr.log" \
+                || log "WARN: append-phase-perf rc=$? (non-fatal)"
+        fi
+    fi
+
     log "DONE: $agent cycle $cycle in ${duration}s, artifact at $artifact_path"
     exit 0
 }

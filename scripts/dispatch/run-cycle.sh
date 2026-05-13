@@ -685,4 +685,18 @@ else
     log "WARN: no orchestrator-report.md produced"
 fi
 
+# v10.5.0: Phase-B cycle-end rollup — aggregate per-phase sidecars into a
+# single cycle-metrics.json under .ephemeral/metrics/. Gated by
+# EVOLVE_TRACKER_ENABLED (default OFF). Best-effort: a rollup fault never
+# changes the cycle exit code. Runs even on FAIL/STALL exits because the
+# observability data for a failed cycle is the most valuable diagnostic.
+if [ "${EVOLVE_TRACKER_ENABLED:-0}" = "1" ]; then
+    ROLLUP_SH="$EVOLVE_PLUGIN_ROOT/scripts/observability/rollup-cycle-metrics.sh"
+    if [ -x "$ROLLUP_SH" ]; then
+        bash "$ROLLUP_SH" "$CYCLE" >/dev/null 2>>"$WORKSPACE/rollup.stderr.log" \
+            && log "OK: cycle-metrics rollup written" \
+            || log "WARN: cycle-metrics rollup rc=$? (non-fatal)"
+    fi
+fi
+
 exit "$rc"
