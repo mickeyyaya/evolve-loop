@@ -383,6 +383,52 @@ bash scripts/utility/inject-task.sh \
 
 Exit codes: `0` success · `10` validation · `11` id collision · `12` filesystem. Cancel: `rm .evolve/inbox/<file>.json`. See [docs/architecture/inbox-injection-protocol.md](docs/architecture/inbox-injection-protocol.md).
 
+## Execution-Grounded Process Supervision — EGPS (v10.0.0+)
+
+**BREAKING CHANGE in v10.0.0:** the verdict-bearing artifact moved from `audit-report.md` (prose `Verdict: PASS|WARN|FAIL` + confidence scalar) to `acs-verdict.json` (binary `verdict: PASS|FAIL` from predicate exit codes). The WARN level no longer exists; fluent-by-default WARN-ship behavior is removed. Full design: `docs/architecture/egps-v10.md`. Research: `knowledge-base/research/execution-grounded-process-supervision-2026.md`.
+
+**Why:** cycles 30–39 demonstrated indirect reward hacking via confidence-cliff calibration (verdicts cluster at 0.78–0.87, just at the WARN/PASS boundary, then ship anyway). Per Skalse et al. (NeurIPS 2022), no auditor-side patch can fix this — only changing the signal source from model claim to sandbox exit code does. Lilian Weng's 2024 survey covers 9 point-mitigations and explicitly concludes none works in isolation.
+
+### Predicate format
+
+Each acceptance criterion compiles to an executable bash script at `acs/cycle-N/{NNN}-{slug}.sh`. Exit 0 = GREEN (criterion met); non-zero = RED (criterion violated). Validators enforce banned patterns: grep-only verification, network calls, long sleeps, missing metadata headers.
+
+### Verdict computation
+
+`scripts/lifecycle/run-acs-suite.sh <cycle>` runs all `acs/cycle-N/*.sh` plus all `acs/regression-suite/cycle-*/*.sh` (every prior cycle's accumulated predicates), emits `acs-verdict.json`. Verdict = boolean AND of every predicate's exit code. Single RED predicate fails the cycle.
+
+### ship-gate enforcement
+
+`scripts/lifecycle/ship.sh` (cycle-class only) gates on `acs-verdict.json:red_count == 0`. Bypassed by `--class manual` and `--class release` (operator overrides). If `acs-verdict.json` is absent (cycles 1–39, or bootstrap), legacy fluent-posture audit-report.md verdict still applies.
+
+### Lifecycle integration
+
+```
+Builder writes acs/cycle-N/*.sh predicates → Auditor runs validate-predicate.sh + run-acs-suite.sh → ship-gate enforces red_count==0 → post-ship promote-acs-to-regression.sh moves predicates to regression-suite/ → next cycle must keep all GREEN
+```
+
+### Bootstrap (v10.0.0)
+
+The v10.0.0 release itself ships via `--class manual` (no predicates yet exist). Cycle 40+ produces the first `acs/cycle-N/` directory. Backfill of cycles 30–39 is **not** in v10.0.0 scope — it's optional v10.1 work. Persona updates (Builder/Auditor/Orchestrator) for predicate authorship are **v10.1**.
+
+### Banned patterns inside predicates
+
+Enforced by `scripts/verification/validate-predicate.sh`:
+- `grep -q "..." file; exit $?` as the only check — presence ≠ execution
+- `echo "PASS"; exit 0` with no work — tautology
+- `curl`, `wget`, `gh api/pr/release` — hermetic-determinism requirement
+- `sleep` ≥ 2 seconds — predicates must be fast
+- Writes outside `.evolve/runs/cycle-N/acs-output/`
+- Missing required metadata headers
+
+### EGPS env vars
+
+| Var | Default | Purpose |
+|---|---|---|
+| `EVOLVE_PROJECT_ROOT` | git root | Source of `acs/` base |
+| `EVOLVE_ACS_DIR_OVERRIDE` | unset | Override `acs/` base path (testing) |
+| `EVOLVE_MUTATION_GATE_STRICT` | `0` (v10.0); will flip to `1` in v10.2 | Promote mutation-gate from WARN to FAIL |
+
 ## Evolve Loop Task Priority
 
 When selecting tasks for `/evolve-loop` cycles, follow this priority order:

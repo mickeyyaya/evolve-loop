@@ -472,6 +472,26 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
         | awk '{print $NF}' | tr -d '[:space:]' || true)
     unset AUDIT_VERDICT_RAW
 
+    # v10.0.0: EGPS predicate-suite gate (cycle-class only).
+    # acs-verdict.json — produced by scripts/lifecycle/run-acs-suite.sh — IS the
+    # verdict-bearing artifact going forward. If present, its red_count==0
+    # requirement is the structural ship gate; this overrides the WARN-by-default
+    # fluent posture (no WARN ship loophole). If absent, fluent posture from
+    # audit-report.md still applies (bootstrap; cycles 1–39 have no predicates).
+    # See docs/architecture/egps-v10.md for the contract.
+    EGPS_VERDICT_FILE="$(dirname "$ARTIFACT_PATH")/acs-verdict.json"
+    if [ -f "$EGPS_VERDICT_FILE" ] && command -v jq >/dev/null 2>&1; then
+        _egps_red=$(jq -r '.red_count // 0' "$EGPS_VERDICT_FILE" 2>/dev/null)
+        _egps_verdict=$(jq -r '.verdict // empty' "$EGPS_VERDICT_FILE" 2>/dev/null)
+        _egps_total=$(jq -r '.predicate_suite.total // 0' "$EGPS_VERDICT_FILE" 2>/dev/null)
+        if [ "${_egps_red:-0}" != "0" ]; then
+            _egps_red_ids=$(jq -r '.red_ids | join(",")' "$EGPS_VERDICT_FILE" 2>/dev/null)
+            integrity_fail "EGPS predicate suite has $_egps_red RED predicate(s): $_egps_red_ids (acs-verdict.json verdict=$_egps_verdict total=$_egps_total)"
+        fi
+        log "OK: EGPS predicate suite verdict=$_egps_verdict (green=$(jq -r '.green_count' "$EGPS_VERDICT_FILE" 2>/dev/null) total=$_egps_total)"
+        unset _egps_red _egps_verdict _egps_total _egps_red_ids
+    fi
+
     # --- 5. Cycle binding: current state must match audited state -------------
 
     LEDGER_HEAD=$(echo "$LATEST_AUDIT" | jq -r '.git_head // empty')

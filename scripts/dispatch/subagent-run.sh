@@ -861,8 +861,9 @@ ADVEOF
         # Default OFF preserves v9.4.0 advisory-only behavior.
         local _observer_args=()
         [ "${EVOLVE_OBSERVER_ENFORCE:-0}" = "1" ] && _observer_args+=("--enforce")
+        # v10.0.0: bash 3.2 + set -u fix — empty array expansion needs the :+ guard.
         bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
-            "${_observer_args[@]}" \
+            ${_observer_args[@]:+"${_observer_args[@]}"} \
             "$workspace" "$$" "$cycle" "$agent" "$agent" "$_observer_cycle_state" \
             >/dev/null 2>&1 &
         OBSERVER_PID=$!

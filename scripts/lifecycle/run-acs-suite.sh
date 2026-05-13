@@ -127,8 +127,7 @@ for pred in "${predicates[@]}"; do
     [[ "$pred" == *"/regression-suite/"* ]] && is_regression="true"
 
     start_ms=$(date +%s)
-    pred_output=$(bash "$pred" 2>&1) || true
-    rc=$?
+    pred_output=$(bash "$pred" 2>&1); rc=$?
     end_ms=$(date +%s)
     duration_s=$((end_ms - start_ms))
     duration_ms=$((duration_s * 1000))
