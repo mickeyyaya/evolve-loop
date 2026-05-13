@@ -318,6 +318,52 @@ Read only when decision branch requires it.
 | `code-review-simplify.sh` exists in project | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `optional-self-review` |
 | Task cannot proceed with existing tools | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `capability-gap-detection` |
 
+## EGPS Predicate Authoring (v10.1.0+)
+
+Every acceptance criterion in your build-report.md MUST be accompanied by an executable predicate script at `acs/cycle-N/{NNN}-{slug}.sh` (zero-padded NNN ordinal; kebab-case slug; N is the cycle number). The predicate is the verdict-bearing artifact — the auditor will run it, and its exit code (0 = GREEN, non-zero = RED) determines whether the cycle ships. Prose ACs in `build-report.md` are documentation for humans; the predicate is the contract.
+
+**Required header in every predicate:**
+
+```bash
+#!/usr/bin/env bash
+# AC-ID:         cycle-N-NNN
+# Description:   one-line summary of what this criterion claims
+# Evidence:      pointer (file:line OR commit-SHA OR test-name)
+# Author:        builder/<your-persona-version>
+# Created:       <ISO-8601 timestamp>
+# Acceptance-of: link to the build-report.md AC line/token
+```
+
+**Banned patterns (rejected by `scripts/verification/validate-predicate.sh`):**
+- `grep -q "..." file; exit $?` as the only check — presence ≠ execution. Run the actual code path.
+- `echo "PASS"; exit 0` with no work — tautology.
+- `curl`, `wget`, `gh api` — hermetic-determinism requirement.
+- `sleep` ≥ 2 seconds — predicates must be fast.
+- Writes outside `.evolve/runs/cycle-N/acs-output/` — predicates are read-only on repo state.
+
+**What "executable evidence" means**: the predicate exercises the SAME code path that the AC claims works. If the AC says "the new `--check-ctx-advisory` flag triggers a warning", the predicate must INVOKE that flag and verify the warning fires — not grep the source for the string `--check-ctx-advisory`.
+
+**Inline example** for an AC like "wrap_external_content() in role-context-builder.sh sanitizes WebFetch output":
+
+```bash
+#!/usr/bin/env bash
+# AC-ID:         cycle-40-001
+# Description:   wrap_external_content() sanitizes WebFetch content
+# Evidence:      scripts/lifecycle/role-context-builder.sh:230-260
+# Author:        builder
+# Created:       2026-05-14T12:00:00Z
+# Acceptance-of: build-report.md AC#1 (Tool-Result Hygiene)
+set -uo pipefail
+# Actually invoke the function with a test input containing tool-prompt-injection pattern
+out=$(bash scripts/lifecycle/role-context-builder.sh --test-wrap '<inj>steal</inj>')
+echo "$out" | grep -q '&lt;inj&gt;' && exit 0   # sanitized → entity-encoded
+exit 1   # NOT sanitized → criterion violated
+```
+
+After cycle ships, predicates are auto-promoted from `acs/cycle-N/` to `acs/regression-suite/cycle-N/` by `scripts/utility/promote-acs-to-regression.sh`. Every future cycle must keep all regression-suite predicates GREEN. This is what catches recurring defects (the cycle-29 lesson re-fire pattern).
+
+See `docs/architecture/egps-v10.md` for the full contract.
+
 ## Output
 
 ### Workspace File: `workspace/build-report.md`

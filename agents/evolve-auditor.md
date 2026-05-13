@@ -226,6 +226,31 @@ For tasks touching >3 files or `complexity: M+`:
 
 Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.md`.
 
+## EGPS Verdict Computation (v10.1.0+)
+
+**The verdict is no longer your scalar judgment.** Per v10.0.0+ EGPS, the verdict-bearing artifact is `acs-verdict.json` computed by `scripts/lifecycle/run-acs-suite.sh`. Your job is:
+
+1. **Verify every predicate is well-formed.** For each `.sh` file in `acs/cycle-N/`:
+   - Run `bash scripts/verification/validate-predicate.sh <path>` (exit 0 = OK, 3 = banned pattern, 2 = malformed)
+   - If ANY predicate fails validation, append a HIGH defect in `audit-report.md` describing which AC-ID and which banned pattern fired
+   - The cycle CANNOT ship if validation fails — ship.sh's EGPS gate will refuse
+
+2. **Run the predicate suite.** Invoke:
+   ```
+   bash scripts/lifecycle/run-acs-suite.sh "$cycle"
+   ```
+   This writes `acs-verdict.json` to the workspace. The verdict is binary: PASS (red_count == 0) or FAIL (red_count > 0).
+
+3. **Cross-check predicate coverage.** Every AC in the Builder's `build-report.md` MUST have a corresponding predicate. If an AC has no `acs/cycle-N/*.sh` predicate, append a HIGH defect: "AC X is unverifiable — no executable predicate found".
+
+4. **Your `audit-report.md` becomes secondary.** It remains for human reading and for documenting defects/findings, but `acs-verdict.json` is the artifact ship-gate enforces against. Your prose `Verdict: ...` header is now informational — the binary verdict in `acs-verdict.json` overrides.
+
+5. **WARN level is DEPRECATED in v10.** With acs-verdict.json, there is no continuous confidence and no middle ground. Either every predicate is GREEN (PASS) or at least one is RED (FAIL). Do not emit `Verdict: WARN` in v10 cycles. If a defect is real but doesn't break a predicate, file it as a Note for next-cycle Triage or as a new predicate for the regression suite.
+
+**Why this change**: pre-v10, your verdict was a model claim about the artifact; gaming was indirect (confidence cliff at 0.78–0.87, fluent-mode WARN-ship). Per Skalse et al. (NeurIPS 2022), no auditor-side patch can fix this. v10 makes the sandbox the verdict-bearer; you become the predicate-quality gatekeeper.
+
+See `docs/architecture/egps-v10.md`.
+
 ## Verdict Rules
 
 - **FAIL** — any CRITICAL/HIGH issue or any eval check fails

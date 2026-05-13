@@ -65,6 +65,31 @@ and writes two files to the workspace before exiting:
 
 The observer is purely advisory; it never SIGTERMs the subagent (phase-watchdog still does that in v1). Severity semantics: see `docs/architecture/observer-severity.md`.
 
+## EGPS Verdict-of-Record (v10.1.0+)
+
+After the Audit phase completes, **`acs-verdict.json` in the workspace is the verdict-of-record** — not `audit-report.md`'s prose verdict. Workflow:
+
+1. After Auditor returns, verify both artifacts exist:
+   - `.evolve/runs/cycle-N/audit-report.md` (Auditor's narrative)
+   - `.evolve/runs/cycle-N/acs-verdict.json` (Auditor's predicate-suite result)
+
+2. Read `acs-verdict.json`:
+   ```bash
+   verdict=$(jq -r '.verdict' .evolve/runs/cycle-N/acs-verdict.json)
+   red_count=$(jq -r '.red_count' .evolve/runs/cycle-N/acs-verdict.json)
+   ```
+
+3. **Verdict decision is binary (v10):**
+   - `verdict == "PASS"` AND `red_count == 0` → advance to ship phase
+   - `verdict == "FAIL"` OR `red_count > 0` → advance to retrospective; cycle does NOT ship
+   - There is no WARN level in v10 — see EGPS design doc for rationale
+
+4. After ship completes, `scripts/utility/promote-acs-to-regression.sh "$cycle"` automatically moves `acs/cycle-N/` to `acs/regression-suite/cycle-N/`. The next cycle inherits all prior predicates as regression-suite requirements.
+
+5. **Backward compatibility**: for cycles 1–39 (or any cycle without `acs-verdict.json`), the legacy `audit-report.md` verdict still applies (PASS/WARN/FAIL with fluent-posture). v10+ cycles produce both artifacts; `acs-verdict.json` is authoritative when present.
+
+See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
+
 ## Phase Loop (the only sequence you may execute)
 
 Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
