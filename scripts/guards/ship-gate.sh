@@ -119,8 +119,35 @@ if [ -n "$TARGET_TOKEN" ]; then
     fi
 fi
 
-# If resolved equals ship.sh's canonical path, allow.
+# If resolved equals ship.sh's canonical path, run C1 pre-commit tree-SHA guard
+# then allow. Guard is skipped for --class manual/release (no cycle audit binding).
 if [ -n "$RESOLVED" ] && [ "$RESOLVED" = "$SHIP_SH" ]; then
+    _skip_guard=0
+    case "$COMMAND" in
+        *--class\ manual*|*--class\ release*) _skip_guard=1 ;;
+    esac
+    if [ "$_skip_guard" = "0" ]; then
+        _ledger="$REPO_ROOT/.evolve/ledger.jsonl"
+        _state="$REPO_ROOT/.evolve/cycle-state.json"
+        if [ -f "$_ledger" ] && [ -f "$_state" ] && command -v jq >/dev/null 2>&1; then
+            _audit_report=$(grep '"kind":"agent_subprocess"' "$_ledger" 2>/dev/null \
+                | jq -r 'select(.role=="auditor") | .artifact_path' 2>/dev/null \
+                | tail -1)
+            _worktree=$(jq -r '.active_worktree // empty' "$_state" 2>/dev/null || echo "")
+            if [ -n "$_audit_report" ] && [ -f "$_audit_report" ] && [ -n "$_worktree" ]; then
+                _audit_sha=$(grep -m1 'audit_bound_tree_sha:' "$_audit_report" \
+                    | awk '{print $NF}' | tr -d '[:space:]')
+                _wt_sha=$(git -C "$_worktree" rev-parse HEAD^{tree} 2>/dev/null || echo "")
+                if [ -n "$_audit_sha" ] && [ -n "$_wt_sha" ] && [ "$_audit_sha" != "$_wt_sha" ]; then
+                    log "DENY: C1 pre-commit tree-SHA mismatch: audit_bound=$_audit_sha worktree=$_wt_sha"
+                    echo "[ship-gate] DENY: INTEGRITY BREACH (pre-commit): audit-bound tree SHA $_audit_sha != worktree tree SHA $_wt_sha — worktree was modified after audit. Re-run Auditor." >&2
+                    exit 2
+                fi
+                log "C1 pre-commit tree-SHA guard: OK (audit=$_audit_sha wt=$_wt_sha)"
+            fi
+        fi
+    fi
+    unset _skip_guard _ledger _state _audit_report _worktree _audit_sha _wt_sha
     log "ALLOW: canonical ship.sh: ${COMMAND:0:80}"
     exit 0
 fi

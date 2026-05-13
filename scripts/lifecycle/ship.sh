@@ -465,6 +465,11 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
     else
         integrity_fail "audit-report.md declares no recognizable verdict (PASS/WARN/FAIL) — auditor output malformed"
     fi
+    # C1: extract audit_bound_tree_sha for post-commit verification
+    # `grep -m1` exits 1 on no-match; `|| true` prevents set -e from killing the script
+    # when the Auditor predates C1 and didn't emit the field (graceful absent → empty string).
+    AUDIT_BOUND_TREE_SHA=$(echo "$AUDIT_VERDICT_RAW" | grep -m1 'audit_bound_tree_sha:' \
+        | awk '{print $NF}' | tr -d '[:space:]' || true)
     unset AUDIT_VERDICT_RAW
 
     # --- 5. Cycle binding: current state must match audited state -------------
@@ -594,6 +599,7 @@ FOOTER
                 dry_log "git push origin $CURRENT_BRANCH"
                 dry_record "merge-ff:$cycle_branch->$CURRENT_BRANCH"
                 dry_record "push:$CURRENT_BRANCH"
+                dry_record "tree-sha-binding:audit=${AUDIT_BOUND_TREE_SHA:-none}"
                 log "  [DRY-RUN] would ff-merge + push $cycle_branch into $CURRENT_BRANCH"
             else
                 git merge --ff-only "$cycle_branch" \
@@ -602,6 +608,29 @@ FOOTER
                 git push origin "$CURRENT_BRANCH" \
                     || fail "git push failed; main is at $(git rev-parse HEAD)"
                 log "OK: pushed to origin/$CURRENT_BRANCH"
+                # C1: tree-SHA binding verification + ship-binding.json sidecar
+                TREE_SHA_COMMITTED=$(git rev-parse HEAD^{tree} 2>/dev/null || echo "")
+                if [ -n "$AUDIT_BOUND_TREE_SHA" ] && [ -n "$TREE_SHA_COMMITTED" ]; then
+                    if [ "$AUDIT_BOUND_TREE_SHA" != "$TREE_SHA_COMMITTED" ]; then
+                        integrity_fail "INTEGRITY BREACH: audit-bound tree SHA $AUDIT_BOUND_TREE_SHA != committed tree SHA $TREE_SHA_COMMITTED — worktree-to-main tree drift detected (see docs/incidents/cycle-31-c38-orphan.md)"
+                    fi
+                    log "OK: tree-SHA binding verified (audit=$AUDIT_BOUND_TREE_SHA committed=$TREE_SHA_COMMITTED)"
+                fi
+                _sb_cycle=$(jq -r '.cycle_id // empty' "$cycle_state_file" 2>/dev/null || echo "")
+                if [ -n "$_sb_cycle" ]; then
+                    _sb_path="$EVOLVE_PROJECT_ROOT/.evolve/runs/cycle-${_sb_cycle}/ship-binding.json"
+                    _sb_tmp="${_sb_path}.tmp.$$"
+                    jq -n \
+                        --arg audit "${AUDIT_BOUND_TREE_SHA:-}" \
+                        --arg committed "${TREE_SHA_COMMITTED:-}" \
+                        --arg commit "$(git rev-parse HEAD 2>/dev/null || echo '')" \
+                        --argjson cycle "${_sb_cycle}" \
+                        '{audit_bound_tree_sha:$audit, tree_sha_committed:$committed, commit_sha:$commit, cycle:$cycle}' \
+                        > "$_sb_tmp" 2>/dev/null \
+                        && mv -f "$_sb_tmp" "$_sb_path" \
+                        || log "WARN: could not write ship-binding.json"
+                fi
+                unset TREE_SHA_COMMITTED _sb_cycle _sb_path _sb_tmp
             fi
             WORKTREE_COMMIT_DONE=1
         fi

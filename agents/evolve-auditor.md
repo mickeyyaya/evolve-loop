@@ -230,12 +230,30 @@ Skip for S-complexity with <=3 file changes. See `docs/accuracy-self-correction.
 - Use consistent severity labels (`HIGH`/`MEDIUM`/`LOW`) and consistent ID prefixes (`H1`, `M1`, `L1`) so the retrospective can cite them unambiguously.
 - If you suspect a defect contradicts a prior instinct (`instinctSummary` entries with `type: failure-lesson` or `type: technique`), name the instinct ID. This propagates into the lesson's `contradicts` field and feeds the next `prune` cycle.
 
+## Pre-Output: Compute audit_bound_tree_sha (C1 — REQUIRED)
+
+Before writing audit-report.md, run:
+
+```bash
+WORKTREE=$(cycle-state.sh get active_worktree 2>/dev/null || echo "")
+if [ -n "$WORKTREE" ]; then
+    TREE_SHA=$(git -C "$WORKTREE" rev-parse HEAD^{tree} 2>/dev/null || echo "UNKNOWN")
+else
+    TREE_SHA=$(git rev-parse HEAD^{tree} 2>/dev/null || echo "UNKNOWN")
+fi
+```
+
+Emit `audit_bound_tree_sha: $TREE_SHA` in the report header (right after the challenge token comment, before the Verdict anchor). ship.sh reads this field for post-commit integrity verification — a mismatch triggers `INTEGRITY BREACH`. If `TREE_SHA` is `UNKNOWN`, emit it anyway so ship.sh can detect the gap gracefully (no check runs on empty field).
+
 ## Output
 
 ### Workspace File: `workspace/audit-report.md`
 
 ```markdown
+<!-- challenge-token: {token} -->
 # Cycle {N} Audit Report
+
+audit_bound_tree_sha: {TREE_SHA}
 
 <!-- ANCHOR:verdict -->
 ## Verdict: PASS / WARN / FAIL
