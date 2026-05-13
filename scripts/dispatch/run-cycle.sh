@@ -423,8 +423,17 @@ cleanup() {
             log "  → \`git restore .\` to discard, or commit/stash to keep"
         fi
     fi
+    # v9.5.1: stop the watchdog (if any) before clearing cycle-state.
+    if [ -n "${WATCHDOG_PID:-}" ]; then
+        kill -TERM "$WATCHDOG_PID" 2>/dev/null || true
+        wait "$WATCHDOG_PID" 2>/dev/null || true
+    fi
     bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
     log "cycle-state cleared (rc=$rc)"
+    # v9.5.1: handle watchdog-fired stall exit code.
+    if [ "$rc" -eq 140 ]; then
+        log "STALL-INACTIVITY: watchdog fired rc=140 — checkpoint written for --resume"
+    fi
     exit $rc
 }
 trap cleanup EXIT INT TERM
@@ -577,6 +586,23 @@ fi
 # worktree provisioning and orchestrator spawn should be added below this
 # anchor.
 
+# v9.5.1: activity-based phase watchdog. Spawned here (after worktree
+# provisioning, before orchestrator) so it covers all phase subagents from
+# the first token. Killed in cleanup() to avoid orphaned background processes.
+WATCHDOG_PID=""
+if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
+    RUN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || echo "")
+    if [ -n "$RUN_PGID" ] && [[ "$RUN_PGID" =~ ^[0-9]+$ ]]; then
+        CYCLE_STATE_PATH_FOR_WD="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
+        bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-watchdog.sh" \
+            "$WORKSPACE" "$RUN_PGID" "$CYCLE" "$CYCLE_STATE_PATH_FOR_WD" &
+        WATCHDOG_PID=$!
+        log "watchdog spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_INACTIVITY_THRESHOLD_S:-240}s)"
+    else
+        log "WARN: could not determine PGID — watchdog not spawned"
+    fi
+fi
+
 # v8.22.0: honor failure-adapter's set_env directive (e.g., auto-enable
 # EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 when prior infra-transient failures are
 # present and the dispatcher path didn't already set it).
@@ -635,6 +661,10 @@ set -e
 # ---- Summary ---------------------------------------------------------------
 
 log "orchestrator subagent exited rc=$rc"
+
+if [ "$rc" -eq 140 ]; then
+    log "STALL-INACTIVITY: watchdog fired during cycle $CYCLE — checkpoint written for --resume"
+fi
 
 if [ -f "$WORKSPACE/orchestrator-report.md" ]; then
     log "orchestrator report at: $WORKSPACE/orchestrator-report.md"

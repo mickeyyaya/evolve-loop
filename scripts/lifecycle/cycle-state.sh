@@ -446,17 +446,18 @@ cycle_state_compute_cycle_tier() {
 # pre-v9.1 readers ignore unknown fields via jq's `// empty`).
 #
 # Three triggers can fire a checkpoint (see docs/architecture/checkpoint-resume.md):
-#   - quota-likely      — phase exit 1 with empty stderr + cost ≥ 80% cap
-#   - batch-cap-near    — cumulative cost ≥ EVOLVE_CHECKPOINT_AT_PCT (default 95%)
+#   - quota-likely       — phase exit 1 with empty stderr + cost ≥ 80% cap
+#   - batch-cap-near     — cumulative cost ≥ EVOLVE_CHECKPOINT_AT_PCT (default 95%)
 #   - operator-requested — manual checkpoint via cycle-state.sh checkpoint manual
+#   - stall-inactivity   — watchdog detected zero mtime activity for THRESHOLD seconds
 #
 # The checkpoint preserves: current phase, completed_phases[], active_worktree,
 # cost-at-checkpoint, git HEAD at pause. The resume-cycle.sh script reads this
 # block to re-initialize a paused cycle from its last-good phase boundary.
 cycle_state_checkpoint() {
-    local reason="${1:?usage: checkpoint <reason>; reasons: quota-likely | batch-cap-near | operator-requested}"
+    local reason="${1:?usage: checkpoint <reason>; reasons: quota-likely | batch-cap-near | operator-requested | stall-inactivity}"
     case "$reason" in
-        quota-likely|batch-cap-near|operator-requested) ;;
+        quota-likely|batch-cap-near|operator-requested|stall-inactivity) ;;
         *) echo "[cycle-state] ERROR: invalid checkpoint reason '$reason'" >&2; return 1 ;;
     esac
     if ! cycle_state_exists; then
