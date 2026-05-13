@@ -176,17 +176,34 @@ step_audit_recent() {
     artifact_path=$(echo "$latest" | jq -r '.artifact_path // empty')
     [ -n "$artifact_path" ] || fail "ledger entry missing artifact_path"
     [ -f "$artifact_path" ] || fail "audit artifact missing on disk: $artifact_path"
-    # Match ship.sh's accepted formats so `**Verdict: PASS**`, `Verdict: **PASS**`,
-    # `Verdict: PASS`, AND heading form `## Verdict\n**PASS**` all qualify.
-    # The heading-form fix (commit 8ced03a) was applied to ship.sh; this aligns
-    # preflight with that contract.
-    if ! { grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*PASS([[:space:]]|$|\*)' "$artifact_path" \
-           || awk '
+    # v9.4.0: accept WARN or PASS to match the project's fluent-posture
+    # (CLAUDE.md "Verdict: WARN ships by default"; ship.sh --class manual /
+    # --class release both skip audit-binding entirely). Strict-PASS gate
+    # available via EVOLVE_RELEASE_STRICT_PASS=1 for high-stakes releases.
+    #
+    # Forms accepted: `**Verdict: PASS**`, `Verdict: **PASS**`, `Verdict: PASS`,
+    # AND heading form `## Verdict\n**PASS**` — same set for WARN.
+    local strict_pass="${EVOLVE_RELEASE_STRICT_PASS:-0}"
+    local accept_pattern='(PASS|WARN)'
+    [ "$strict_pass" = "1" ] && accept_pattern='PASS'
+    if ! { grep -qiE "Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*${accept_pattern}([[:space:]]|\$|\*)" "$artifact_path" \
+           || awk -v pat="$accept_pattern" '
                 /^#+[[:space:]]+([0-9]+\.[[:space:]]+)?Verdict[[:space:]]*$/ { saw=NR; next }
-                saw && (NR - saw) <= 5 && /\*\*PASS\*\*/ { found=1; exit }
+                saw && (NR - saw) <= 5 && match($0, "\\*\\*(" pat ")\\*\\*") { found=1; exit }
                 END { exit !found }
               ' "$artifact_path"; }; then
-        fail "most recent audit-report.md does not declare 'Verdict: PASS' ($artifact_path) — neither inline nor heading form"
+        if [ "$strict_pass" = "1" ]; then
+            fail "EVOLVE_RELEASE_STRICT_PASS=1 and most recent audit-report.md does not declare 'Verdict: PASS' ($artifact_path)"
+        else
+            fail "most recent audit-report.md does not declare 'Verdict: PASS' or 'Verdict: WARN' ($artifact_path)"
+        fi
+    fi
+    # If verdict is WARN (not PASS), emit an info log so the operator knows.
+    if grep -qiE 'Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*WARN' "$artifact_path" \
+       || awk '/^#+[[:space:]]+Verdict[[:space:]]*$/ { saw=NR; next }
+               saw && (NR - saw) <= 5 && /\*\*WARN\*\*/ { found=1; exit }
+               END { exit !found }' "$artifact_path"; then
+        log "INFO: most recent audit is WARN (fluent posture; ships by default). Set EVOLVE_RELEASE_STRICT_PASS=1 for strict-PASS gate."
     fi
     ts=$(echo "$latest" | jq -r '.ts // empty')
     [ -n "$ts" ] || fail "ledger entry missing ts"
