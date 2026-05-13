@@ -761,6 +761,16 @@ if [ "$RESET_FAILURES" = "1" ]; then
     unset PRUNE cls
 fi
 
+# v9.6.0: inbox crash-recovery — move any orphaned processing/cycle-X/ files
+# back to inbox/ for cycles that are no longer active. Idempotent and safe to
+# run on every dispatcher invocation. A SIGKILL between Triage's claim call and
+# ship.sh's promote call leaves files in processing/; this hook recovers them.
+if command -v inbox-mover.sh >/dev/null 2>&1; then
+    inbox-mover.sh recover-orphans 2>&1 | sed 's/^/[inbox-recover] /' >&2 || true
+else
+    log "INFO: inbox-mover.sh not on PATH — skipping recover-orphans (expected before c37 ships)"
+fi
+
 # --- Main loop -------------------------------------------------------------
 
 START_TS=$(date -u +%s)

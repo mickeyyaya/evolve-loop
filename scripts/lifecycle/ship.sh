@@ -716,6 +716,42 @@ elif [ "$SHIP_CLASS" = "cycle" ] && [ "$DRY_RUN" = "1" ]; then
     dry_record "state-bump:lastCycleNumber"
 fi
 
+# v9.6.0: inbox lifecycle — promote shipped inbox tasks to processed/ (c37).
+# Reads triage-decision.json from the current cycle's workspace and moves
+# top_n[] + skip_shipped[] files to .evolve/inbox/processed/cycle-N/.
+# mv failure logs WARN to ledger but NEVER blocks ship (Layer 1 idempotency
+# catches any residual on next cycle via git-log check in Triage Step 0a).
+if [ "$SHIP_CLASS" = "cycle" ] && [ "$DRY_RUN" = "0" ]; then
+    _inbox_cycle_id=""
+    _inbox_cs="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
+    [ -f "$_inbox_cs" ] && \
+        _inbox_cycle_id=$(jq -r '.cycle_id // empty' "$_inbox_cs" 2>/dev/null || true)
+    if [ -n "$_inbox_cycle_id" ]; then
+        _triage_json="$EVOLVE_PROJECT_ROOT/.evolve/runs/cycle-${_inbox_cycle_id}/triage-decision.json"
+        if [ -f "$_triage_json" ]; then
+            _commit_sha=$(git -C "$EVOLVE_PROJECT_ROOT" rev-parse --short=8 HEAD 2>/dev/null || echo "")
+            # Promote top_n[] (freshly shipped this cycle)
+            jq -r '.top_n[]?.id // empty' "$_triage_json" 2>/dev/null | while read -r tid; do
+                [ -n "$tid" ] || continue
+                inbox-mover.sh promote "$tid" processed "$_inbox_cycle_id" \
+                    --commit-sha "$_commit_sha" \
+                    2>&1 | sed 's/^/[ship-inbox] /' >&2 || true
+            done
+            # Promote skip_shipped[] (idempotency-matched; never re-execute)
+            jq -r '.skip_shipped[]?.task_id // empty' "$_triage_json" 2>/dev/null | while read -r tid; do
+                [ -n "$tid" ] || continue
+                inbox-mover.sh promote "$tid" processed "$_inbox_cycle_id" \
+                    --commit-sha "$_commit_sha" \
+                    2>&1 | sed 's/^/[ship-inbox] /' >&2 || true
+            done
+            log "OK: inbox lifecycle promote complete for cycle ${_inbox_cycle_id}"
+        else
+            log "INFO: no triage-decision.json for cycle ${_inbox_cycle_id} — inbox promote skipped"
+        fi
+    fi
+    unset _inbox_cycle_id _inbox_cs _triage_json _commit_sha
+fi
+
 # --- 8. Optional GitHub release (if EVOLVE_SHIP_RELEASE_NOTES set) -----------
 
 if [ -n "${EVOLVE_SHIP_RELEASE_NOTES:-}" ]; then

@@ -22,7 +22,11 @@
     "Bash(test:*)",
     "Bash(jq:*)",
     "Write(.evolve/runs/cycle-*/triage-decision.md)",
-    "Edit(.evolve/runs/cycle-*/triage-decision.md)"
+    "Edit(.evolve/runs/cycle-*/triage-decision.md)",
+    "Write(.evolve/runs/cycle-*/triage-decision.json)",
+    "Edit(.evolve/runs/cycle-*/triage-decision.json)",
+    "Bash(inbox-mover.sh:*)",
+    "Bash(inbox-mover.sh claim:*)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",
@@ -87,7 +91,8 @@
   "sandbox": {
     "enabled": true,
     "write_subpaths": [
-      ".evolve/runs/cycle-*"
+      ".evolve/runs/cycle-*",
+      ".evolve/inbox/processing"
     ],
     "read_only_repo": true,
     "deny_subpaths": [

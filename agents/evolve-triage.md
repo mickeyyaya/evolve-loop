@@ -47,17 +47,57 @@ If an item shouldn't be in the backlog at all (duplicate, stale, no longer appli
 
 ## Process (single-pass)
 
+### 0a. Idempotency skip-list (v9.6.0+)
+
+Before ingesting inbox files, check each against three sources of truth to prevent
+re-execution of already-shipped or already-rejected work. Run this BEFORE Step 0.
+
+For each `.evolve/inbox/*.json` (maxdepth 1):
+
+1. **Git log check** (authoritative — the single source of truth):
+   ```bash
+   git log --grep="^feat: cycle [0-9]\+ — ${id}\(:\| \)" --format=%H main 2>/dev/null | head -1
+   ```
+   Non-empty result → **skip-shipped**: do NOT ingest; record in `skip_shipped[]` with the SHA.
+   File stays in inbox/ until ship.sh promotes it to processed/ after the cycle commits.
+
+2. **Rejected dir check** (defense-in-depth):
+   `find .evolve/inbox/rejected -name "*${id}*" 2>/dev/null | grep -q .`
+   Match → **skip-rejected**: record in `skip_rejected[]`; proceed to next file.
+
+3. **Failure count check** (escalation guard):
+   Count `state.json:failedApproaches[]` entries where `.task_id == $id` AND
+   `.classification` matches `code-(build|audit)-fail`. Count ≥ 2 → **escalate-block**:
+   record in `escalate_block[]`; proceed to next file.
+
+4. **Claim the file** (atomic hand-off to this cycle):
+   `bash inbox-mover.sh claim "$id" "$CYCLE"`
+   If claim exits non-zero: log WARN in `## Inbox Errors`, skip this file (another
+   cycle may be processing it). If claim succeeds, proceed to Step 0 validation.
+
+Emit machine-readable arrays in the companion `triage-decision.json` (see Step 4):
+`skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`.
+
+Example `## Step 0a: Idempotency skip-list` section in triage-decision.md:
+
+```markdown
+## Step 0a: Idempotency skip-list
+| task_id | reason | evidence |
+|---|---|---|
+| c33-watchdog-mvp | skip-shipped | git sha a543105 |
+```
+
 ### 0. Inbox ingestion (v9.5.0+)
 
 Before reading the main inputs, ingest any pending files from `.evolve/inbox/`:
 
 1. List `.evolve/inbox/*.json` (maxdepth 1; skip `processed/` and `rejected/` subdirs).
-2. Parse each file; malformed JSON → log `inbox-malformed-json` WARN in `## Inbox Errors`, move to `.evolve/inbox/rejected/cycle-<N>/`, continue.
+2. Parse each file; malformed JSON → log `inbox-malformed-json` WARN in `## Inbox Errors`, reject.
 3. Validate required fields (`id`, `action`, `priority`); missing/empty → WARN + reject.
 4. Validate `priority` ∈ {HIGH, MEDIUM, LOW} and `weight` ∈ [0.0, 1.0] or null; invalid → WARN + reject.
 5. Check `id` uniqueness against `state.json:carryoverTodos[]` and already-ingested items; collision → WARN + reject.
 6. Transform to reconcile-compatible schema: set `defer_count=0`, `cycles_unpicked=0`, `first_seen_cycle=last_seen_cycle=<N>`; wrap operator metadata in `_inbox_source`.
-7. Append to in-memory carryoverTodos working set; move file to `.evolve/inbox/processed/cycle-<N>/`.
+7. Append to in-memory carryoverTodos working set. (File move is handled by Step 0a's claim call + ship.sh's post-commit promote — do NOT manually mv files here.)
 8. Write ledger entry: `role=triage, action=ingest-inbox, count=<ingested>, rejected=<rejected>`.
 
 Honor `weight` as tie-breaker within priority class (default 0.5 when null). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).
@@ -90,13 +130,22 @@ If something is `high` priority but `large` scope, route it to `dropped` with re
 
 ### 4. Write the decision
 
-Output path: `.evolve/runs/cycle-N/triage-decision.md`. Required structure (must include challenge token on first line):
+Output paths:
+- `.evolve/runs/cycle-N/triage-decision.md` — human-readable (challenge token on first line)
+- `.evolve/runs/cycle-N/triage-decision.json` — machine-readable (consumed by ship.sh post-commit hook)
+
+**triage-decision.md** required structure:
 
 ```markdown
 <!-- challenge-token: <token from runner> -->
 # Triage Decision — Cycle N
 
 cycle_size_estimate: small
+
+## Step 0a: Idempotency skip-list
+| task_id | reason | evidence |
+|---|---|---|
+| c33-watchdog-mvp | skip-shipped | git sha a543105 |
 
 ## top_n (commit to THIS cycle)
 - {id}: {action} — priority={H|M|L}, evidence={pointer}, source={scout|carryover}
@@ -117,6 +166,23 @@ cycle_size_estimate: small
 ## Rationale
 <2-4 sentences: why this scope, why this size, what tradeoffs>
 ```
+
+**triage-decision.json** required structure (v9.6.0+, consumed by ship.sh inbox-lifecycle hook):
+
+```json
+{
+  "cycle": <N>,
+  "top_n": [{"id": "<task_id>", "action": "..."}, ...],
+  "deferred": [{"id": "<task_id>"}],
+  "dropped": [{"id": "<task_id>", "reason": "..."}],
+  "skip_shipped": [{"task_id": "<id>", "git_sha": "<sha>"}],
+  "skip_rejected": [{"task_id": "<id>"}],
+  "escalate_block": [{"task_id": "<id>", "fail_count": <N>}]
+}
+```
+
+Emit this JSON file AFTER writing triage-decision.md. Use `Write` for the .json path.
+If triage-decision.json cannot be written, log a WARN — the .md is the canonical output.
 
 The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (key, colon, value, newline). The phase-gate fails on `large`.
 
