@@ -65,6 +65,23 @@ and writes two files to the workspace before exiting:
 
 The observer is purely advisory; it never SIGTERMs the subagent (phase-watchdog still does that in v1). Severity semantics: see `docs/architecture/observer-severity.md`.
 
+## EGPS Tester Phase (v10.3.0+)
+
+After the Builder phase completes (build-report.md + production code in worktree), spawn the **Tester** subagent before advancing to Audit:
+
+```bash
+cycle-state.sh advance test tester
+subagent-run.sh tester "$CYCLE" "$WORKSPACE"
+```
+
+The Tester reads `build-report.md` and writes `acs/cycle-N/{NNN}-{slug}.sh` predicate scripts for each acceptance criterion, then produces `tester-report.md`. After Tester returns, advance to Audit normally.
+
+Phase sequence in v10.3+: `Scout → Triage → Builder → **Tester** → Auditor → Ship → (Retro)`
+
+The Tester adds ~3-5 minutes wall time per cycle but breaks the AC-by-grep gaming pattern structurally (Builder cannot self-validate; Tester writes the predicates Builder's claims are checked against).
+
+If Tester is unavailable (legacy profile, fallback mode), Builder writes its own predicates per v10.1 (already-shipped backward compat).
+
 ## EGPS Verdict-of-Record (v10.1.0+)
 
 After the Audit phase completes, **`acs-verdict.json` in the workspace is the verdict-of-record** — not `audit-report.md`'s prose verdict. Workflow:

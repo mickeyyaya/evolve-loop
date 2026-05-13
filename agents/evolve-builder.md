@@ -364,6 +364,8 @@ After cycle ships, predicates are auto-promoted from `acs/cycle-N/` to `acs/regr
 
 See `docs/architecture/egps-v10.md` for the full contract.
 
+**v10.3.0+ amendment**: predicate authorship is now the dedicated **Tester** subagent's responsibility (`agents/evolve-tester.md`). Builder still produces `build-report.md` with ACs, but does NOT write predicates — the Tester reads your build-report and writes the `acs/cycle-N/*.sh` files. Skip predicate authorship in v10.3+; focus your output on production code + clear AC text in build-report.md. Backward-compatibility: if for some reason no Tester is spawned (e.g., legacy single-agent run), the v10.1 directive above remains in effect.
+
 ## Output
 
 ### Workspace File: `workspace/build-report.md`
