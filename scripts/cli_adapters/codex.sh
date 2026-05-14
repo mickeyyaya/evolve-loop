@@ -135,6 +135,13 @@ if [ "$PROBE_ONLY" = "1" ]; then
     exit 0
 fi
 
+# --- Mode: VALIDATE_ONLY (dry-run from cmd_validate_profile) -----------------
+if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
+    echo "[codex-adapter] VALIDATE_ONLY=1 — not executing" >&2
+    echo "[codex-adapter] resolved: cli=codex model=${RESOLVED_MODEL:-unset} source=${CLI_RESOLUTION_SOURCE:-unset} cap_budget_native=${CAP_BUDGET_NATIVE:-unset}" >&2
+    exit 0
+fi
+
 # --- Mode: run ---------------------------------------------------------------
 emit_test_seam_warnings
 if detect_claude >/dev/null 2>&1; then

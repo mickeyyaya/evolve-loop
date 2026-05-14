@@ -40,16 +40,23 @@ set -euo pipefail
 # resources; ledger and per-cycle artifacts are writable project state.
 __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/../lifecycle/resolve-roots.sh"
+
+PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/.evolve/profiles}"
+ADAPTERS_DIR="${EVOLVE_ADAPTERS_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/scripts/cli_adapters}"
+LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
+
+# REAL_ADAPTERS_DIR always points to the cli_adapters dir alongside this script.
+# Derived from BASH_SOURCE[0] so it follows the actual script being executed,
+# not EVOLVE_PLUGIN_ROOT (which may point to an older installed copy during dev).
+# Used for capability manifest lookups (*.capabilities.json) which must reflect
+# the real installed capabilities, not a test-seam sentinel dir.
+REAL_ADAPTERS_DIR="$__rr_self/../cli_adapters"
 unset __rr_self
 
 # Backwards-compat: many helper functions below still reference $REPO_ROOT.
 # Map it to PROJECT_ROOT (the writable side) for those callsites — read-only
 # resources (profiles, adapters, sibling scripts) explicitly use PLUGIN_ROOT.
 REPO_ROOT="$EVOLVE_PROJECT_ROOT"
-
-PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/.evolve/profiles}"
-ADAPTERS_DIR="$EVOLVE_PLUGIN_ROOT/scripts/cli_adapters"
-LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
 
 # v8.16.2: explicitly export runtime knobs so they reach the adapter through
 # any nested bash/sandbox-exec layer. Belt-and-suspenders for env propagation.
@@ -325,6 +332,9 @@ write_ledger_entry() {
     # Backward-compatible: defaults to "unknown" so pre-v8.51 entries (and tests
     # that call with 8 args) keep working. Existing readers ignore unknown fields.
     local quality_tier="${9:-unknown}"
+    # v10.X ADR-1: cli_resolution (10th arg) — JSON object string or empty.
+    # Backward-compatible: defaults to "" so existing call sites (8 or 9 args) work.
+    local cli_resolution="${10:-}"
     local artifact_sha=""
     if [ -f "$artifact_path" ]; then
         if command -v sha256sum >/dev/null 2>&1; then
@@ -362,13 +372,15 @@ write_ledger_entry() {
         --argjson entry_seq "$entry_seq" \
         --arg prev_hash "$prev_hash" \
         --arg quality_tier "$quality_tier" \
+        --arg cli_resolution "$cli_resolution" \
         '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_subprocess",
           model: $model, exit_code: $exit_code, duration_s: $duration_s,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
           challenge_token: $challenge_token,
           git_head: $git_head, tree_state_sha: $tree_state_sha,
           entry_seq: $entry_seq, prev_hash: $prev_hash,
-          quality_tier: $quality_tier}')
+          quality_tier: $quality_tier,
+          cli_resolution: (if ($cli_resolution == null or $cli_resolution == "") then null else ($cli_resolution | fromjson? // null) end)}')
     printf '%s\n' "$new_line" >> "$LEDGER"
     # v8.37.0: update tip with new entry's SHA256.
     local new_sha
@@ -406,17 +418,89 @@ cmd_validate_profile() {
     require_bin jq
     jq empty "$profile" || fail "profile is not valid JSON: $profile"
 
-    local cli
-    cli=$(jq -r '.cli' "$profile")
-    local adapter="$ADAPTERS_DIR/${cli}.sh"
+    # v10.X ADR-1: LLM router — honor EVOLVE_LLM_CONFIG_PATH in validate path.
+    local _vp_cfg="${EVOLVE_LLM_CONFIG_PATH:-${EVOLVE_PROJECT_ROOT}/.evolve/llm_config.json}"
+    local _vp_llm_json=""
+    local _vp_resolver="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/resolve-llm.sh"
+    [ -f "$_vp_resolver" ] || _vp_resolver="$EVOLVE_PROJECT_ROOT/scripts/dispatch/resolve-llm.sh"
+    _vp_llm_json=$(bash "$_vp_resolver" "$agent" "$_vp_cfg" 2>/dev/null) || _vp_llm_json=""
+    local vp_cli vp_cli_source vp_resolved_model
+    if [ -n "$_vp_llm_json" ]; then
+        vp_cli=$(printf '%s' "$_vp_llm_json" | jq -r '.cli // empty' 2>/dev/null) || vp_cli=""
+        vp_cli_source=$(printf '%s' "$_vp_llm_json" | jq -r '.source // "profile"' 2>/dev/null) || vp_cli_source="profile"
+        vp_resolved_model=$(printf '%s' "$_vp_llm_json" | jq -r '.model // empty' 2>/dev/null) || vp_resolved_model=""
+        if [ -z "$vp_cli" ] || [ "$vp_cli" = "null" ]; then
+            vp_cli=$(jq -r '.cli' "$profile")
+            vp_cli_source="profile"
+            vp_resolved_model=""
+        fi
+    else
+        vp_cli=$(jq -r '.cli' "$profile")
+        vp_cli_source="profile"
+        vp_resolved_model=""
+    fi
+    local adapter="$ADAPTERS_DIR/${vp_cli}.sh"
     [ -x "$adapter" ] || fail "adapter not executable: $adapter"
+
+    local _vp_model
+    if [ -n "${vp_resolved_model:-}" ] && [ "$vp_resolved_model" != "null" ]; then
+        _vp_model="$vp_resolved_model"
+    else
+        _vp_model=$(jq -r '.model_tier_default' "$profile")
+    fi
+    echo "[dispatch-resolve] cli=$vp_cli source=$vp_cli_source model=$_vp_model" >&2
+    log "cli_resolution: source=$vp_cli_source target_cli=$vp_cli"
+
+    # v10.X ADR-2: capability WARN emission for validate path.
+    local vp_cap_budget_native="true"
+    local vp_cap_permission_scoping="true"
+    local _vp_cap_manifest="$REAL_ADAPTERS_DIR/${vp_cli}.capabilities.json"
+    local _vp_cap_warns=""
+    if [ -f "$_vp_cap_manifest" ] && command -v jq >/dev/null 2>&1; then
+        vp_cap_budget_native=$(jq -r '.supports.budget_cap_native | if . == null then "true" else tostring end' "$_vp_cap_manifest" 2>/dev/null || echo "true")
+        vp_cap_permission_scoping=$(jq -r '.supports.permission_scoping | if . == null then "true" else tostring end' "$_vp_cap_manifest" 2>/dev/null || echo "true")
+        if [ "$vp_cap_budget_native" = "false" ]; then
+            echo "[adapter-cap] WARN cli=$vp_cli missing=budget_cap_native substitute=wall_clock_timeout" >&2
+            _vp_cap_warns="${_vp_cap_warns}cli=$vp_cli missing=budget_cap_native substitute=wall_clock_timeout|"
+        fi
+        if [ "$vp_cap_permission_scoping" = "false" ]; then
+            echo "[adapter-cap] WARN cli=$vp_cli missing=permission_scoping substitute=kernel_role_gate_only" >&2
+            _vp_cap_warns="${_vp_cap_warns}cli=$vp_cli missing=permission_scoping substitute=kernel_role_gate_only|"
+        fi
+    fi
+
+    # v10.X: write dispatch plan log for test seams.
+    if [ -n "${EVOLVE_DISPATCH_PLAN_LOG:-}" ]; then
+        local _vp_warns_json="[]"
+        if [ -n "$_vp_cap_warns" ]; then
+            _vp_warns_json="["
+            local _vp_first=1
+            local _vp_tmpw="$_vp_cap_warns"
+            local _vp_we=""
+            while [ -n "$_vp_tmpw" ]; do
+                _vp_we="${_vp_tmpw%%|*}"
+                _vp_tmpw="${_vp_tmpw#*|}"
+                if [ -n "$_vp_we" ]; then
+                    [ "$_vp_first" = "1" ] && _vp_first=0 || _vp_warns_json="${_vp_warns_json},"
+                    _vp_esc=$(printf '%s' "$_vp_we" | sed 's/"/\\"/g')
+                    _vp_warns_json="${_vp_warns_json}\"${_vp_esc}\""
+                fi
+            done
+            _vp_warns_json="${_vp_warns_json}]"
+        fi
+        local _vp_bud="true"; [ "$vp_cap_budget_native" = "false" ] && _vp_bud="false"
+        local _vp_perm="true"; [ "$vp_cap_permission_scoping" = "false" ] && _vp_perm="false"
+        printf '{"cli":"%s","model":"%s","cli_resolution_source":"%s","cap_budget_native":%s,"cap_permission_scoping":%s,"capability_warns":%s}\n' \
+            "$vp_cli" "$_vp_model" "$vp_cli_source" "$_vp_bud" "$_vp_perm" "$_vp_warns_json" \
+            > "$EVOLVE_DISPATCH_PLAN_LOG" 2>/dev/null || true
+    fi
 
     # Print resolved command via VALIDATE_ONLY=1 invocation.
     local tmp_prompt
     tmp_prompt=$(mktemp)
     echo "VALIDATE-ONLY DRY RUN" > "$tmp_prompt"
     PROFILE_PATH="$profile" \
-    RESOLVED_MODEL="$(jq -r '.model_tier_default' "$profile")" \
+    RESOLVED_MODEL="$_vp_model" \
     PROMPT_FILE="$tmp_prompt" \
     CYCLE="0" \
     WORKSPACE_PATH="$REPO_ROOT/.evolve/runs/cycle-0" \
@@ -424,6 +508,9 @@ cmd_validate_profile() {
     STDOUT_LOG="/dev/null" \
     STDERR_LOG="/dev/null" \
     ARTIFACT_PATH="$(resolve_artifact_path "$(jq -r '.output_artifact' "$profile")" 0)" \
+    RESOLVED_CLI="$vp_cli" \
+    CLI_RESOLUTION_SOURCE="$vp_cli_source" \
+    CAP_BUDGET_NATIVE="$vp_cap_budget_native" \
     VALIDATE_ONLY=1 \
     bash "$adapter"
     local rc=$?
@@ -498,8 +585,30 @@ cmd_run() {
     jq empty "$profile" || fail "profile is not valid JSON: $profile"
     record_phase profile_load_ms
 
-    local cli adapter
-    cli=$(jq -r '.cli' "$profile")
+    # v10.X ADR-1: LLM router — llm_config.json overrides profile cli + model.
+    # Resolution: llm_config.phases.<role> > llm_config._fallback > profile.cli
+    local _llm_cfg_path="${EVOLVE_LLM_CONFIG_PATH:-${EVOLVE_PROJECT_ROOT}/.evolve/llm_config.json}"
+    local _llm_json=""
+    local _resolver="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/resolve-llm.sh"
+    [ -f "$_resolver" ] || _resolver="$EVOLVE_PROJECT_ROOT/scripts/dispatch/resolve-llm.sh"
+    _llm_json=$(bash "$_resolver" "$agent_role" "$_llm_cfg_path" 2>/dev/null) || _llm_json=""
+    local cli cli_resolution_source cli_resolved_model
+    if [ -n "$_llm_json" ]; then
+        cli=$(printf '%s' "$_llm_json" | jq -r '.cli // empty' 2>/dev/null) || cli=""
+        cli_resolution_source=$(printf '%s' "$_llm_json" | jq -r '.source // "profile"' 2>/dev/null) || cli_resolution_source="profile"
+        cli_resolved_model=$(printf '%s' "$_llm_json" | jq -r '.model // empty' 2>/dev/null) || cli_resolved_model=""
+        if [ -z "$cli" ] || [ "$cli" = "null" ]; then
+            cli=$(jq -r '.cli' "$profile")
+            cli_resolution_source="profile"
+            cli_resolved_model=""
+        fi
+    else
+        cli=$(jq -r '.cli' "$profile")
+        cli_resolution_source="profile"
+        cli_resolved_model=""
+    fi
+    log "cli_resolution: source=$cli_resolution_source target_cli=$cli"
+    local adapter
     adapter="$ADAPTERS_DIR/${cli}.sh"
     [ -x "$adapter" ] || fail "adapter not executable: $adapter"
 
@@ -512,7 +621,12 @@ cmd_run() {
     fi
 
     local model
-    model=$(resolve_model_tier "$profile" "$cycle")
+    if [ -n "${cli_resolved_model:-}" ] && [ "$cli_resolved_model" != "null" ]; then
+        model="$cli_resolved_model"
+        log "model: source=llm_config value=$model (overrides profile model_tier_default)"
+    else
+        model=$(resolve_model_tier "$profile" "$cycle")
+    fi
     local artifact_template artifact_path
     if [ -n "$worker_name" ]; then
         # Workers write to <workspace>/workers/<full-agent>.md regardless of
@@ -857,6 +971,65 @@ ADVEOF
         fi
     fi
 
+    # v10.X ADR-2: structured WARN for degraded capabilities (supports.* booleans).
+    # Emits one parseable [adapter-cap] WARN line per missing capability and exports
+    # CAP_BUDGET_NATIVE so adapters can gate --max-budget-usd flag on it.
+    local cap_budget_native="true"
+    local cap_permission_scoping="true"
+    local _cap_manifest="$REAL_ADAPTERS_DIR/${cli}.capabilities.json"
+    local _cap_warns=""
+    if [ -f "$_cap_manifest" ] && command -v jq >/dev/null 2>&1; then
+        cap_budget_native=$(jq -r '.supports.budget_cap_native | if . == null then "true" else tostring end' "$_cap_manifest" 2>/dev/null || echo "true")
+        cap_permission_scoping=$(jq -r '.supports.permission_scoping | if . == null then "true" else tostring end' "$_cap_manifest" 2>/dev/null || echo "true")
+        if [ "$cap_budget_native" = "false" ]; then
+            echo "[adapter-cap] WARN cli=$cli missing=budget_cap_native substitute=wall_clock_timeout" >&2
+            _cap_warns="${_cap_warns}cli=$cli missing=budget_cap_native substitute=wall_clock_timeout|"
+        fi
+        if [ "$cap_permission_scoping" = "false" ]; then
+            echo "[adapter-cap] WARN cli=$cli missing=permission_scoping substitute=kernel_role_gate_only" >&2
+            _cap_warns="${_cap_warns}cli=$cli missing=permission_scoping substitute=kernel_role_gate_only|"
+        fi
+    fi
+    export CAP_BUDGET_NATIVE="$cap_budget_native"
+
+    # v10.X: write dispatch plan JSON for test seams (EVOLVE_DISPATCH_PLAN_LOG).
+    # Format: {cli, model, cli_resolution_source, cap_budget_native, cap_permission_scoping, capability_warns[]}
+    if [ -n "${EVOLVE_DISPATCH_PLAN_LOG:-}" ]; then
+        local _plan_warns_json="[]"
+        if [ -n "$_cap_warns" ]; then
+            _plan_warns_json="["
+            local _pw_first=1
+            local _pw_tmp="$_cap_warns"
+            local _pw_entry=""
+            while [ -n "$_pw_tmp" ]; do
+                _pw_entry="${_pw_tmp%%|*}"
+                _pw_tmp="${_pw_tmp#*|}"
+                if [ -n "$_pw_entry" ]; then
+                    [ "$_pw_first" = "1" ] && _pw_first=0 || _plan_warns_json="${_plan_warns_json},"
+                    _pw_esc=$(printf '%s' "$_pw_entry" | sed 's/"/\\"/g')
+                    _plan_warns_json="${_plan_warns_json}\"${_pw_esc}\""
+                fi
+            done
+            _plan_warns_json="${_plan_warns_json}]"
+        fi
+        local _dp_bud="true"; [ "$cap_budget_native" = "false" ] && _dp_bud="false"
+        local _dp_perm="true"; [ "$cap_permission_scoping" = "false" ] && _dp_perm="false"
+        printf '{"cli":"%s","model":"%s","cli_resolution_source":"%s","cap_budget_native":%s,"cap_permission_scoping":%s,"capability_warns":%s}\n' \
+            "$cli" "$model" "$cli_resolution_source" "$_dp_bud" "$_dp_perm" "$_plan_warns_json" \
+            > "$EVOLVE_DISPATCH_PLAN_LOG" 2>/dev/null || true
+    fi
+
+    # Build cli_resolution JSON once (used at both write_ledger_entry call sites).
+    local cli_resolution_json=""
+    if command -v jq >/dev/null 2>&1; then
+        cli_resolution_json=$(jq -nc \
+            --arg source "$cli_resolution_source" \
+            --arg target_cli "$cli" \
+            --arg model "$model" \
+            --arg mode "$quality_tier" \
+            '{source: $source, target_cli: $target_cli, model: $model, mode: $mode}') || cli_resolution_json=""
+    fi
+
     log "starting $agent (cycle $cycle, model $model, cli $cli, tier $quality_tier, token $challenge_token)"
     local start_ts
     start_ts=$(date +%s)
@@ -887,6 +1060,7 @@ ADVEOF
 
     # v8.61.0 Cycle A2: pass AGENT to adapter so claude.sh can emit the
     # role-specific bedrock as --append-system-prompt under v2.
+    # v10.X ADR-1/ADR-2: pass cli_resolution vars and capability flags to adapter.
     PROFILE_PATH="$effective_profile" \
     RESOLVED_MODEL="$model" \
     PROMPT_FILE="$injected_prompt" \
@@ -898,6 +1072,9 @@ ADVEOF
     STDERR_LOG="$stderr_log" \
     ARTIFACT_PATH="$artifact_path" \
     AGENT="$agent" \
+    RESOLVED_CLI="$cli" \
+    CLI_RESOLUTION_SOURCE="$cli_resolution_source" \
+    CAP_BUDGET_NATIVE="$cap_budget_native" \
     bash "$adapter"
     local cli_exit=$?
     set -e
@@ -928,7 +1105,7 @@ ADVEOF
         local _stderr_tail
         _stderr_tail=$(tail -5 "$stderr_log" 2>/dev/null || echo '<empty>')
         log "stderr tail: $_stderr_tail"
-        write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier"
+        write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier" "${cli_resolution_json:-}"
 
         # v9.1.0 Cycle 3: reactive quota-likely classification.
         # Signature for Claude Code subscription quota exhaustion
@@ -1026,7 +1203,7 @@ ADVEOF
         unset _actual_turns _max_turns_profile
     fi
 
-    write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier"
+    write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier" "${cli_resolution_json:-}"
     record_phase finalize_ms
 
     # Phase-timing sidecar: a per-phase ms breakdown that lets us identify

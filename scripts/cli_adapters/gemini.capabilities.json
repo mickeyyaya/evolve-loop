@@ -1,6 +1,14 @@
 {
   "adapter": "gemini",
-  "version": 1,
+  "version": 2,
+  "supports": {
+    "budget_cap_native": false,
+    "permission_scoping": false,
+    "sandbox_native": false,
+    "non_interactive_prompt": true,
+    "structured_logs": true,
+    "model_flag": true
+  },
   "capabilities": {
     "subprocess_isolation": {
       "modes": ["hybrid", "degraded"],

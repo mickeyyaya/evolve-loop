@@ -1,0 +1,42 @@
+{
+  "_comment": "evolve-loop LLM router config — copy to .evolve/llm_config.json and edit.",
+  "_comment2": "When absent, all phases use profile.cli (default: claude). Backward-compatible.",
+  "schema_version": 1,
+
+  "phases": {
+    "_comment": "Per-phase overrides. Keys are role names (scout, builder, auditor, triage, ...).",
+    "_comment2": "Each entry: { cli, model } where cli is one of: claude | gemini | codex",
+
+    "scout": {
+      "_comment": "Example: route Scout to Gemini for research-heavy phase.",
+      "provider": "google",
+      "cli": "gemini",
+      "model": "gemini-3-pro-preview"
+    },
+    "builder": {
+      "_comment": "Example: route Builder to Claude (default — same as omitting this entry).",
+      "provider": "anthropic",
+      "cli": "claude",
+      "model_tier": "sonnet"
+    },
+    "auditor": {
+      "_comment": "Example: use a specific model string instead of a tier alias.",
+      "provider": "anthropic",
+      "cli": "claude",
+      "model": "claude-opus-4-7"
+    }
+  },
+
+  "_fallback": {
+    "_comment": "Used for any phase not listed in phases.*.",
+    "provider": "anthropic",
+    "cli": "claude",
+    "model_tier": "sonnet"
+  },
+
+  "_global_overrides": {
+    "_comment": "Reserved for future global settings.",
+    "max_budget_usd_per_phase": null,
+    "force_strict_isolation": false
+  }
+}

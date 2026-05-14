@@ -151,6 +151,14 @@ if [ "$PROBE_ONLY" = "1" ]; then
     exit 0
 fi
 
+# --- Mode: VALIDATE_ONLY (dry-run from cmd_validate_profile) -----------------
+# Emit resolved env and exit 0 without invoking the real CLI.
+if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
+    echo "[gemini-adapter] VALIDATE_ONLY=1 — not executing" >&2
+    echo "[gemini-adapter] resolved: cli=gemini model=${RESOLVED_MODEL:-unset} source=${CLI_RESOLUTION_SOURCE:-unset} cap_budget_native=${CAP_BUDGET_NATIVE:-unset}" >&2
+    exit 0
+fi
+
 # --- Mode: run (decide HYBRID or DEGRADED) -----------------------------------
 emit_test_seam_warnings
 if detect_claude >/dev/null 2>&1; then

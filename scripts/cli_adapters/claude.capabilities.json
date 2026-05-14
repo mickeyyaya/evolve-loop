@@ -1,6 +1,14 @@
 {
   "adapter": "claude",
-  "version": 1,
+  "version": 2,
+  "supports": {
+    "budget_cap_native": true,
+    "permission_scoping": true,
+    "sandbox_native": true,
+    "non_interactive_prompt": true,
+    "structured_logs": true,
+    "model_flag": true
+  },
   "capabilities": {
     "subprocess_isolation": "full",
     "budget_cap": "full",
