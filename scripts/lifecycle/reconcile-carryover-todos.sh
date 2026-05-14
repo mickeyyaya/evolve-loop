@@ -75,8 +75,16 @@ log() { echo "[reconcile] $*" >&2; }
 command -v jq >/dev/null 2>&1 || { log "ERROR: jq required"; exit 1; }
 
 TODO_COUNT=$(jq -r '(.carryoverTodos // []) | length' "$STATE" 2>/dev/null)
-[ "${TODO_COUNT:-0}" -eq 0 ] && { log "no carryoverTodos to reconcile"; exit 0; }
+# Note: do NOT early-exit here even when TODO_COUNT=0. The abnormal-event
+# promotion section below must run regardless to capture new HIGH-priority todos.
+_SKIP_MAIN_LOOP=0
+[ "${TODO_COUNT:-0}" -eq 0 ] && { log "no existing carryoverTodos to reconcile (will still run promotions)"; _SKIP_MAIN_LOOP=1; }
 
+# TMP_STATE declared here so both main-loop and promotion section can use it.
+TMP_STATE=$(mktemp)
+trap 'rm -f "${DECISIONS_FILE:-}" "${TMP_STATE:-}" "${EXISTING_FILE:-}" "${KEPT_FILE:-}"' EXIT
+
+if [ "$_SKIP_MAIN_LOOP" -eq 0 ]; then
 # ---- Parse this cycle's signals ------------------------------------------
 # A carryoverTodo can appear in:
 #   1. triage-decision.md ## Top N — Included → "include"
@@ -88,7 +96,6 @@ TODO_COUNT=$(jq -r '(.carryoverTodos // []) | length' "$STATE" 2>/dev/null)
 
 # Build a flat decisions map: id → include|defer|drop
 DECISIONS_FILE=$(mktemp)
-trap 'rm -f "$DECISIONS_FILE"' EXIT
 
 # Scout's Carryover Decisions section parser. Format:
 #   - <id>: include|defer|drop, reason: <text>
@@ -155,9 +162,6 @@ DECISION_LINES=$(wc -l < "$DECISIONS_FILE" | tr -d ' ')
 log "parsed $DECISION_LINES decision(s) for cycle $CYCLE (verdict=$VERDICT, threshold=$MAX_UNPICKED)"
 
 # ---- Apply decisions to each carryoverTodo --------------------------------
-TMP_STATE=$(mktemp)
-trap 'rm -f "$DECISIONS_FILE" "$TMP_STATE"' EXIT
-
 mkdir -p "$ARCHIVE_DIR"
 
 # Snapshot existing todos to a stable input.
@@ -248,6 +252,44 @@ log "DONE: $TODO_COUNT → $NEW_COUNT carryoverTodos (cycle $CYCLE, verdict $VER
 
 if [ "${#WARN_IDS[@]}" -gt 0 ]; then
     log "WARN: ${#WARN_IDS[@]} todo(s) not mentioned by Scout or Triage: ${WARN_IDS[*]}"
+fi
+fi # end _SKIP_MAIN_LOOP guard
+
+# ── Promote abnormal-events.jsonl lessons to carryoverTodos[] (v46+) ──────────
+# When abnormal-events.jsonl is non-empty, each unique event_type becomes a
+# HIGH-priority carryoverTodo (if not already present) so the next cycle's
+# Scout/Triage can address the root cause. _inbox_source='abnormal-event:<type>'
+# tags these for downstream filtering.
+ABNORMAL_FILE="$WORKSPACE/abnormal-events.jsonl"
+if [ -s "$ABNORMAL_FILE" ]; then
+    PROMO_COUNT=0
+    while IFS= read -r _etype; do
+        [ -z "$_etype" ] && continue
+        _src="abnormal-event:${_etype}"
+        # Skip if already present (match on _inbox_source).
+        _exists=$(jq -r --arg src "$_src" \
+            '[.carryoverTodos[]? | select(._inbox_source == $src)] | length' \
+            "$STATE" 2>/dev/null || echo 0)
+        if [ "${_exists:-0}" -gt 0 ]; then
+            log "SKIP promote $src — already in carryoverTodos"
+            continue
+        fi
+        _id="abnormal-${_etype}-c${CYCLE}"
+        _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        _entry=$(jq -nc \
+            --arg id "$_id" --arg et "$_etype" --arg src "$_src" \
+            --argjson cyc "$CYCLE" --arg ts "$_ts" \
+            '{id: $id, action: ("Investigate and resolve abnormal event: " + $et),
+              priority: "HIGH", evidence_pointer: "abnormal-events.jsonl",
+              _inbox_source: $src, defer_count: 0,
+              first_seen_cycle: $cyc, last_seen_cycle: $cyc, cycles_unpicked: 0,
+              created_at: $ts}')
+        jq --argjson entry "$_entry" '.carryoverTodos += [$entry]' "$STATE" > "$TMP_STATE"
+        mv "$TMP_STATE" "$STATE"
+        log "PROMOTE abnormal-event: $_etype → carryoverTodos[] (id=$_id)"
+        PROMO_COUNT=$(( PROMO_COUNT + 1 ))
+    done < <(jq -r '.event_type // empty' "$ABNORMAL_FILE" 2>/dev/null | sort -u)
+    [ "$PROMO_COUNT" -gt 0 ] && log "Promoted $PROMO_COUNT abnormal-event type(s) to HIGH carryoverTodos"
 fi
 
 exit 0

@@ -126,5 +126,6 @@
     "allow_network": true
   },
   "parallel_eligible": true,
-  "context_clear_trigger_tokens": 25000
+  "context_clear_trigger_tokens": 25000,
+  "schema_filter_enabled": true
 }

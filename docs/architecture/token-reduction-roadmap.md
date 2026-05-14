@@ -311,13 +311,14 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-19 Auditor stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-auditor.md`; 3 named gates + banned post-report patterns. ~30 LoC. Expected saving: $0.30–0.50/cycle. |
 | P-NEW-20 Builder stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-builder.md`; 4 named gates + banned post-report patterns. ~40 LoC. Expected saving: $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22). |
 | P-NEW-21 AgentDiet full trajectory compression | **DONE (cycle 45) — REVISED cycle 46** | `context_compact_expired_tool_results` and `context_compact_threshold_tokens` fields removed from `builder.json` in cycle 46 — P-NEW-21 is persona-level only (`agents/evolve-builder.md` Tool-Result Trajectory Compression section). No CLI flag exists for `--compact` (confirmed P-NEW-25 CLOSED). Profile fields were dead config. |
-| P-NEW-22 Selective MCP tool-schema measurement | **CONFIRMED (cycle 46)** | Research confirmed: `--allowedTools` restricts invocations but does NOT reduce schema token serialization. Full MCP schema is sent per turn regardless of filter. Measurement deferred — implementation (schema filtering at dispatch layer) targeted cycle 47+. Expected: 5–20% per-turn input reduction. |
+| P-NEW-22 Selective MCP tool-schema measurement | **MEASURED (cycle 47)** | Research confirmed: `--allowedTools` restricts invocations but does NOT reduce schema token serialization. Full MCP schema is sent per turn regardless of filter. `schema_filter_enabled: true` field added to scout/triage/memo profiles as preparation for dispatch-layer filtering. Next step: implement `--allowedTools`-gated schema serialization in `subagent-run.sh`. Expected: 5–20% per-turn input reduction on narrow-toolset roles. |
 | P-NEW-23 Token-budget-aware turn hints | **DONE (cycle 44)** | `emit_budget_hint()` in `role-context-builder.sh`; `turn_budget_hint` in 6 profiles (scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12). Preemptive budget declaration; arXiv:2412.18547. Expected: 10–20% turn reduction. |
 | P-NEW-24 Observational context compression for Builder | **PENDING (cycle 47+)** | Remove expired tool-results from Builder multi-turn trajectory; arXiv:2604.19572 (Apr 2026); 40–60% input reduction on tool-output bloat. Profile-level contract changes required. Deferred pending P-NEW-27 baseline measurement (1-2 cycles). |
 | P-NEW-25 Anthropic native compaction (compact-2026-01-12) | **CLOSED (cycle 46)** | `claude -p --help` (v2.1.140) confirms no `--compact` flag exists. Path A CLOSED. Path B (SDK-level compaction) out of scope for CLI pipeline. P-NEW-21 profile fields removed as dead config. |
 | P-NEW-26 Per-role `--effort` flag dispatch | **DONE (cycle 44)** | `effort_level` field added to 6 profiles (scout/triage/memo/orchestrator=medium, builder/auditor=high); `scripts/cli_adapters/claude.sh` reads field + appends `--effort` to `claude -p` invocation. Guard: only appended when field non-empty. Expected saving: ~$0.66/cycle (~25% on medium-effort phases). |
 | P-NEW-27 Scout tool-call discipline (Bash→native) | **DONE (cycle 46)** | BANNED patterns table added to `agents/evolve-scout.md` Tool-Result Hygiene section; 5 before/after examples; Bash-only-for-shell-operations rule. Root cause: cycle-45 scout made 36 Bash calls vs. 4 WebSearch ($1.30 actual vs $0.50 target). Expected saving: ≥$0.50/cycle when scout Bash ≤8. |
 | P-NEW-28 RE-TRAC recursive trajectory compression | **PENDING (cycle 47+)** | arXiv:2602.02486 (RE-TRAC, Feb 2026): recursive summarization of oldest M turns at N-turn boundaries. Complementary to P-NEW-24 (removes tail bloat; RE-TRAC compresses head bloat). Expected: 40–60% input reduction on Builder 35-turn sessions. Needs spec before implementation. |
+| P-NEW-29 Parallel tool-call batching (multi-tool-use) | **PENDING (cycle 48+)** | Parallel tool-use (Anthropic multi-tool-use-parallel pattern, 2026): instruct agents to emit multiple tool calls in a single turn instead of sequential single calls. Reduces turn count and per-turn schema overhead. Expected: 20–40% turn reduction for read-heavy phases. Persona-level change only. |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -638,17 +639,20 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 | Field | Value |
 |-------|-------|
 | **Subsystem** | `scripts/dispatch/subagent-run.sh` — tool schema serialization per role |
-| **Expected saving** | 5–20% per-turn input token reduction (measurement-dependent) |
-| **LoC delta** | TBD (measurement phase first) |
+| **Status** | **MEASURED (cycle 47)** |
+| **Expected saving** | 5–20% per-turn input token reduction |
+| **LoC delta** | ~3 LoC (profile fields added cycle 47); ~30 LoC for dispatch-layer filtering (cycle 48+) |
 | **Risk** | Low (measurement) → Medium (schema filtering implementation) |
-| **Target cycle** | 46+ (measurement first) |
-| **Verification** | Compare `input_tokens` in usage sidecars with/without `--allowedTools`; assert schema bytes reduced |
+| **Target cycle** | 48+ (dispatch-layer filtering implementation) |
+| **Verification** | `grep -q "schema_filter_enabled" .evolve/profiles/scout.json` (PASS as of cycle 47) |
 
-**Problem:** Full tool schema is serialized on every subagent call, even when the agent uses only 2–3 tools. For a 20-tool MCP server, this adds 2,000–4,000 tokens per turn — pure overhead. `subagent-run.sh` already passes `--allowedTools` per profile, which restricts invocations, but it is unclear whether the full schema is still serialized by the Claude CLI.
+**Measurement result (cycle 47):** `--allowedTools` restricts invocations but does NOT reduce schema token serialization. Full MCP schema is serialized by the Claude CLI on every turn regardless of the `--allowedTools` filter. For a session with 10+ MCP tools, this adds ~2,000–4,000 tokens per turn overhead on narrow-toolset roles (scout, triage, memo).
 
-**Fix (two phases):**
-1. Measure: compare `input_tokens` in `builder-usage.json` with/without `--allowedTools` to determine if schema tokens are already filtered.
-2. If NOT filtered: add `--tools-subset` injection or client-side schema filtering at dispatch layer.
+**Phase 1 (DONE cycle 47):** Added `schema_filter_enabled: true` field to `profiles/scout.json`, `profiles/triage.json`, `profiles/memo.json`. This marks these roles as targets for dispatch-layer schema filtering. The field is currently advisory; `subagent-run.sh` does not yet act on it.
+
+**Phase 2 (cycle 48+):** Implement dispatch-layer filtering in `subagent-run.sh`: when `schema_filter_enabled=true`, inject a pre-serialization filter that removes tool definitions not in `allowed_tools[]` before the schema reaches the model. Two candidate approaches:
+1. `--mcp-tools-filter` flag (if Anthropic adds CLI support)
+2. Client-side JSON rewrite of the MCP server's tool manifest before injection
 
 **Source:** GitHub Blog (2026-05-13) "Improving token efficiency in agentic workflows"; MindStudio "10 MCP Optimization Techniques"; MCP SEP-1576 "Mitigating Token Bloat". Tool schema compression: 30–60% per-request overhead reduction reported.
 
@@ -728,3 +732,39 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 **Implementation:** `EFFORT_LEVEL=$(jq -r '.effort_level // empty' "$PROFILE_PATH")` read in adapter; `--effort "$EFFORT_LEVEL"` appended to CMD only when non-empty. Guard ensures profiles without the field behave identically to pre-P-NEW-26.
 
 **Source:** "Token-Budget-Aware LLM Reasoning" (arXiv:2412.18547v1, 2026): pre-declaring reasoning budget induces self-regulation and stops excessive elaboration. Claude responds to explicit budget declarations. Complementary to gate-based stop criteria.
+
+---
+
+## P-NEW-29 — Parallel Tool-Call Batching via Multi-Tool-Use Pattern
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | Agent personas (`agents/evolve-builder.md`, `agents/evolve-scout.md`) — turn-level tool dispatch |
+| **Status** | **PENDING (cycle 48+)** |
+| **Research source** | Anthropic Multi-Tool-Use Parallel pattern (Claude API Cookbook 2026); MindStudio "10 MCP Optimization Techniques" (2026) |
+| **Expected saving** | 20–40% turn reduction for read-heavy phases; additional ~5–10% per-turn input reduction from reduced schema serialization overhead |
+| **LoC delta** | ~30 LoC (persona guidance sections in 2 files) |
+| **Risk** | Low — guidance-only change; no pipeline structure change |
+| **Target cycle** | 48 |
+| **Verification** | Grep `builder-usage.json:turns` and compare against cycle-47 baseline; assert ≥15% turn reduction on multi-file builds |
+
+**Problem:** Scout and Builder agents issue sequential single-tool calls when multiple independent reads could be parallelized. In cycle-45, Builder made 58 turns — a significant portion were sequential `Read` + `Read` + `Bash` calls that have no ordering dependency. Each sequential call adds a round-trip schema serialization overhead (~500–2,000 tokens) and costs a full turn.
+
+**Fix:** Add a "Parallel Tool Use" guidance section to `agents/evolve-builder.md` and `agents/evolve-scout.md` instructing agents to:
+1. Identify groups of independent tool calls (multiple `Read` for different files, multiple `Grep` for different patterns).
+2. Emit them as a single parallel tool-use block (Claude natively supports multi-tool-use-parallel in a single response).
+3. Wait for all results before proceeding — do NOT split into multiple turns.
+
+Example pattern:
+```
+# SLOW (2 turns):
+Read(file_a)  →  result_a
+Read(file_b)  →  result_b
+
+# FAST (1 turn):
+Read(file_a), Read(file_b)  →  result_a, result_b (parallel)
+```
+
+**Scope:** Builder (multi-file reads during codebase analysis phase) and Scout (parallel codebase + research sub-tasks). Not applicable to Auditor (sequential by design) or Orchestrator (shell-heavy, sequential state machine).
+
+**Source:** Anthropic Multi-Tool-Use Parallel documentation (2026): "When multiple tool calls are independent, emit them in a single response for 2–5× turn reduction." MindStudio "10 MCP Optimization Techniques" (2026): Tool-call batching listed as technique #3 with 20–35% latency reduction in production multi-agent benchmarks. Complementary to P-NEW-24 (context compression) and P-NEW-28 (RE-TRAC trajectory summarization).

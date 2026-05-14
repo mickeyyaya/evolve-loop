@@ -115,6 +115,7 @@
     "allow_network": false
   },
   "parallel_eligible": false,
+  "schema_filter_enabled": true,
   "context_anchors": [
     "scout-report.md:proposed_tasks"
   ]

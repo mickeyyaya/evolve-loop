@@ -119,5 +119,6 @@
     ],
     "allow_network": false
   },
-  "parallel_eligible": false
+  "parallel_eligible": false,
+  "schema_filter_enabled": true
 }
