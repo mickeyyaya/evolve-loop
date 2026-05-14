@@ -130,6 +130,7 @@
   "max_budget_usd": 2.5,
   "max_turns": 40,
   "turn_budget_hint": 30,
+  "effort_level": "high",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/audit-report.md",
   "challenge_token_required": true,

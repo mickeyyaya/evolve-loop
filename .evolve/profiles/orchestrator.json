@@ -169,6 +169,7 @@
   "max_budget_usd": 1.0,
   "max_turns": 60,
   "turn_budget_hint": 45,
+  "effort_level": "medium",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/orchestrator-report.md",
   "challenge_token_required": true,

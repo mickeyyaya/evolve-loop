@@ -59,6 +59,7 @@ while IFS= read -r line; do [ -n "$line" ] && EXTRA_FLAGS_ARR+=("$line"); done <
 MAX_BUDGET=$(jq -r '.max_budget_usd' "$PROFILE_PATH")
 MAX_TURNS=$(jq -r '.max_turns' "$PROFILE_PATH")
 PERMISSION_MODE=$(jq -r '.permission_mode' "$PROFILE_PATH")
+EFFORT_LEVEL=$(jq -r '.effort_level // empty' "$PROFILE_PATH")
 
 # v8.13.5 token-opt: declarative task-mode budget tiers.
 # Profiles MAY define a budget_tiers map ({"research": 1.50, "deep": 2.50, ...}).
@@ -128,6 +129,12 @@ done
 declare -a CMD
 CMD=(claude -p --model "$RESOLVED_MODEL")
 CMD+=(--permission-mode "$PERMISSION_MODE")
+# P-NEW-26: per-role effort level (low/medium/high/xhigh/max). Only appended
+# when effort_level is non-empty in the profile — omitting the flag preserves
+# pre-P-NEW-26 behavior for roles without the field.
+if [ -n "${EFFORT_LEVEL:-}" ]; then
+    CMD+=(--effort "$EFFORT_LEVEL")
+fi
 # v9.2.0: stream-json enables real-time stdout.log mtime updates so
 # phase-watchdog can detect genuine subagent activity instead of waiting
 # for the end-of-run blob. Fixes cycle-36-style watchdog false-positive

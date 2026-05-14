@@ -315,6 +315,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-23 Token-budget-aware turn hints | **DONE (cycle 44)** | `emit_budget_hint()` in `role-context-builder.sh`; `turn_budget_hint` in 6 profiles (scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12). Preemptive budget declaration; arXiv:2412.18547. Expected: 10–20% turn reduction. |
 | P-NEW-24 Observational context compression for Builder | **PENDING (cycle 46+)** | Remove expired tool-results from Builder multi-turn trajectory; arXiv:2604.19572 (Apr 2026); 40–60% input reduction on tool-output bloat. Profile-level contract changes required. |
 | P-NEW-25 Anthropic native compaction (compact-2026-01-12) | **PENDING (cycle 45 investigation)** | Investigate `claude -p --compact` flag for Orchestrator/Builder long sessions; native compaction API (Jan 2026) offers 40–60% cost reduction with zero persona changes. Analogous to P-NEW-17 TTL investigation. |
+| P-NEW-26 Per-role `--effort` flag dispatch | **DONE (cycle 44)** | `effort_level` field added to 6 profiles (scout/triage/memo/orchestrator=medium, builder/auditor=high); `scripts/cli_adapters/claude.sh` reads field + appends `--effort` to `claude -p` invocation. Guard: only appended when field non-empty. Expected saving: ~$0.66/cycle (~25% on medium-effort phases). |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -702,5 +703,25 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 **Problem:** Orchestrator (48 turns / $1.68, cycle-43) and Builder (69 turns / $3.12, cycle-43) are the two highest-cost phases. Both run long sessions where context accumulates. Anthropic's compaction API (compact-2026-01-12) provides automatic context compaction for long-running agent sessions with 40–60% cost reduction and zero changes to persona prompts.
 
 **Investigation first (cycle 45):** Determine whether `claude -p` exposes a `--compact` flag (or equivalent env var). If Path A is open: wire `EVOLVE_COMPACTION=1` in dispatcher profiles for orchestrator and builder. If Path A is closed: explore SDK-level compaction as Path B.
+
+---
+
+## P-NEW-26 — Per-Role `--effort` Flag Dispatch
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/cli_adapters/claude.sh` + `.evolve/profiles/*.json` |
+| **Research source** | `claude -p --help` — `--effort <level>` flag (low/medium/high/xhigh/max) |
+| **Expected saving** | ~$0.66/cycle (~25% on medium-effort phases: scout $1.66 + triage $0.35 + memo $0.64 = $2.65 × 25%) |
+| **LoC delta** | ~10 LoC in claude.sh + 1 field per profile (6 profiles) |
+| **Risk** | Low — additive flag, omitted when field absent, preserves pre-P-NEW-26 behavior |
+| **Target cycle** | 44 (SHIPPED) |
+| **Verification** | `grep -q "\-\-effort" scripts/cli_adapters/claude.sh` + all 6 profiles have non-empty `effort_level` field |
+
+**Effort assignments:**
+- `medium`: scout (research/discovery), triage (JSON decision), memo (short summary), orchestrator (phase sequencing/shell)
+- `high`: builder (multi-file code changes), auditor (verification)
+
+**Implementation:** `EFFORT_LEVEL=$(jq -r '.effort_level // empty' "$PROFILE_PATH")` read in adapter; `--effort "$EFFORT_LEVEL"` appended to CMD only when non-empty. Guard ensures profiles without the field behave identically to pre-P-NEW-26.
 
 **Source:** "Token-Budget-Aware LLM Reasoning" (arXiv:2412.18547v1, 2026): pre-declaring reasoning budget induces self-regulation and stops excessive elaboration. Claude responds to explicit budget declarations. Complementary to gate-based stop criteria.
