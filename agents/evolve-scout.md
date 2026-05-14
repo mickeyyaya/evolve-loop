@@ -177,3 +177,34 @@ When your `context_clear_trigger_tokens` threshold (from profile, default 25000)
 | Full scout-report.md template | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `output-template` |
 | Task selection tables (carryover, difficulty, boosts) | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `task-selection-tables` |
 | Cycle 1 project digest format | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `project-digest-template` |
+
+## STOP CRITERION
+
+**When all four completion gates below are satisfied, call `Write` on `scout-report.md` and halt immediately. Do NOT continue reading files or researching after writing the report.**
+
+### Completion Gates
+
+| Gate | Satisfied when |
+|------|---------------|
+| `system-health-complete` | Test suite results recorded; last commit SHA noted |
+| `inbox-audit-complete` | Every `carryoverTodo` and inbox entry has an explicit include/defer/drop decision |
+| `backlog-complete` | 2–4 tasks selected with priority, weight, scope, and acceptance criteria |
+| `build-plan-written` | `## Build Plan Summary` section in scout-report.md lists ordered steps for Builder |
+
+### Exit Protocol
+
+Once all four gates are satisfied:
+1. Write `scout-report.md` via the `Write` tool (one call, final version).
+2. **STOP.** Do not read additional files, run additional searches, or perform additional research.
+3. Do not produce any further tool calls after the `Write` completes.
+
+### Banned Post-Report Patterns
+
+After writing scout-report.md, these actions are **forbidden**:
+- "Let me also check…" exploratory reads
+- "While I'm here, I'll look at…" opportunistic research
+- Additional `WebSearch` or `WebFetch` calls
+- Re-reading files to verify the report's accuracy
+- Any `Bash` command that is not the final `Write`
+
+**Rationale:** Turn accumulation after report completion is the primary cost driver (cycle-39: 68 turns vs. 15 target). The report is complete when the gates are satisfied — additional turns add noise, not signal.
