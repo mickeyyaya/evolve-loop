@@ -157,6 +157,7 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
                        merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?
                        if [ $MERGE_RC -eq 2 ]; then exit 2; fi  # INTEGRITY_FAIL: lesson YAML missing
                        [ $MERGE_RC -ne 0 ] && log "WARN: merge-lesson-into-state exit $MERGE_RC"
+                       gate_retrospective_to_complete  (v8.45.0+ gate — verifies lesson YAML landed in instincts/)
                        reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict WARN  (v8.57.0+)
 5c. FAIL         →  record-failure-to-state.sh $WORKSPACE FAIL  (no ship)
                        advance retrospective retrospective  (v8.45.0+; was "batched per v8.12.3" pre-v8.45)
@@ -164,6 +165,7 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
                        merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?
                        if [ $MERGE_RC -eq 2 ]; then exit 2; fi  # INTEGRITY_FAIL: lesson YAML missing
                        [ $MERGE_RC -ne 0 ] && log "WARN: merge-lesson-into-state exit $MERGE_RC"
+                       gate_retrospective_to_complete  (v8.45.0+ gate — verifies lesson YAML landed in instincts/)
                        reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict FAIL  (v8.57.0+)
 6. Write orchestrator-report.md → exit
 ```

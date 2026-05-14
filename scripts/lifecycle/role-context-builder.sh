@@ -392,6 +392,24 @@ emit_intent_compact() {
     echo
 }
 
+# v8.65.0 P-NEW-23: emit ## Budget advisory block if profile has turn_budget_hint.
+# Preemptive budget declaration induces self-regulation from turn 1 (arXiv:2412.18547).
+# No-op when turn_budget_hint is absent or jq unavailable.
+emit_budget_hint() {
+    local _prof_path
+    _prof_path=$(_resolve_profile_path "$ROLE")
+    [ -f "$_prof_path" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    local _budget
+    _budget=$(jq -r '.turn_budget_hint // empty' "$_prof_path" 2>/dev/null)
+    [ -n "$_budget" ] || return 0
+    cat <<BEOF
+
+## Budget
+Advisory turn budget for this phase: ~${_budget} turns. Prioritize breadth over depth; write your report as soon as completion gates are satisfied.
+BEOF
+}
+
 # Header common to all roles.
 header_block() {
     cat <<EOF
@@ -403,6 +421,7 @@ workspace: $WORKSPACE
 ---
 
 EOF
+    emit_budget_hint
 }
 
 # v8.62.0 Cycle B2: dispatch the carryover/instincts content via either the

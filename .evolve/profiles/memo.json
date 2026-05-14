@@ -82,6 +82,7 @@
   ],
   "max_budget_usd": 0.3,
   "max_turns": 10,
+  "turn_budget_hint": 8,
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/carryover-todos.json",
   "challenge_token_required": false,

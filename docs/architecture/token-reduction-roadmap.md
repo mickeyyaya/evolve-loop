@@ -312,7 +312,9 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-20 Builder stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-builder.md`; 4 named gates + banned post-report patterns. ~40 LoC. Expected saving: $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22). |
 | P-NEW-21 AgentDiet full trajectory compression | **PENDING (cycle 45+)** | Full expired-tool-result removal for Builder multi-turn read phases. Research: AgentDiet (FSE 2026, arXiv:2509.23586); 39.9–59.7% input token reduction. ~profile-level contract changes. Expected: 20–30% Builder cost reduction (~$0.25/cycle). |
 | P-NEW-22 Selective MCP tool-schema measurement | **PENDING (cycle 46+)** | Measure whether `--allowedTools` reduces serialized schema tokens in `claude -p`. If not, add schema filtering at dispatch layer. Research: GitHub Blog 2026-05-13, MindStudio, MCP SEP-1576. Expected: 5–20% per-turn input token reduction. Measurement-first. |
-| P-NEW-23 Token-budget-aware turn hints | **PENDING (cycle 45+)** | Inject `## Budget` block in `role-context-builder.sh` output: "~N turns remaining". Preemptive budget declaration induces self-regulation (arXiv:2412.18547). Expected: 10–20% additional turn reduction on top of stop-criterion. Target: after P-NEW-19/20 baseline established. |
+| P-NEW-23 Token-budget-aware turn hints | **DONE (cycle 44)** | `emit_budget_hint()` in `role-context-builder.sh`; `turn_budget_hint` in 6 profiles (scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12). Preemptive budget declaration; arXiv:2412.18547. Expected: 10–20% turn reduction. |
+| P-NEW-24 Observational context compression for Builder | **PENDING (cycle 46+)** | Remove expired tool-results from Builder multi-turn trajectory; arXiv:2604.19572 (Apr 2026); 40–60% input reduction on tool-output bloat. Profile-level contract changes required. |
+| P-NEW-25 Anthropic native compaction (compact-2026-01-12) | **PENDING (cycle 45 investigation)** | Investigate `claude -p --compact` flag for Orchestrator/Builder long sessions; native compaction API (Jan 2026) offers 40–60% cost reduction with zero persona changes. Analogous to P-NEW-17 TTL investigation. |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -650,22 +652,55 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 ## P-NEW-23 — Token-Budget-Aware Turn Hints via role-context-builder.sh
 
+**Status: DONE (cycle 44)**
+
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/lifecycle/role-context-builder.sh` — `## Budget` block injection |
+| **Subsystem** | `scripts/lifecycle/role-context-builder.sh` — `emit_budget_hint()` added to `header_block()` |
 | **Expected saving** | 10–20% additional turn reduction on top of stop-criterion |
-| **LoC delta** | ~10 LoC in `role-context-builder.sh` + per-role budget config in profiles |
+| **Actual LoC delta** | 16 LoC in `role-context-builder.sh` + 6 one-line profile edits |
 | **Risk** | Low — prompt-level only; no structural change |
-| **Target cycle** | 45+ (after P-NEW-19/20 baseline established) |
+| **Shipped cycle** | 44 |
 | **Verification** | Compare `turns` in usage sidecars with/without hint across 3 cycles; assert ≥10% reduction |
 
-**Problem:** Stop-criterion sections (P-NEW-10, P-NEW-16, P-NEW-19, P-NEW-20) are gate-based — they tell the agent when to stop *after* work is done. Budget hints are *preemptive*: injecting `remaining_budget: N turns` primes the agent to be concise from turn 1, preventing over-elaboration before gates are even reached.
+**Problem:** Stop-criterion sections (P-NEW-10, P-NEW-16, P-NEW-19, P-NEW-20) are gate-based — they tell the agent when to stop *after* work is done. Budget hints are *preemptive*: injecting a turn budget in the context primes the agent to be concise from turn 1, preventing over-elaboration before gates are even reached.
 
-**Fix:** `role-context-builder.sh` injects a `## Budget` block at the top of each role's context:
-```
-## Budget
-This phase has a budget of ~N turns. Prioritize breadth over depth; write report when completion gates are satisfied. Remaining: ~N turns.
-```
-Per-role budget N comes from profile field `turn_budget_hint` (Scout: 20, Builder: 20, Auditor: 25, Orchestrator: 20).
+**Implementation:** `emit_budget_hint()` in `role-context-builder.sh` reads `turn_budget_hint` from the role's profile JSON via `jq`. When set, it appends a `## Budget` block to `header_block()` output. Per-role advisory values: scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12 (all roughly 75–80% of `max_turns` to induce conservative self-regulation per arXiv:2412.18547).
+
+---
+
+## P-NEW-24 — Observational Context Compression for Builder
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | Builder multi-turn trajectory; expired tool-result removal |
+| **Research source** | arXiv:2604.19572 (Observational Context Compression, Apr 2026) |
+| **Expected saving** | 40–60% input token reduction on tool-output trajectory bloat |
+| **LoC delta** | Profile-level contract changes + subagent-run.sh trajectory filter |
+| **Risk** | Medium — requires tracking "expired" tool results without losing active state |
+| **Target cycle** | 46+ (after P-NEW-23 baseline established and measured) |
+| **Verification** | Compare Builder `input_tokens` per-turn in usage sidecars before/after; assert ≥30% reduction on multi-file builds |
+
+**Problem:** Builder multi-turn read phases accumulate tool results (Read, Grep, Bash) in the conversation trajectory. After a file is read and acted upon, its contents remain in the context forever — pure token waste. In cycle-43, Builder ran 69 turns at $3.12; a significant portion was repeated file-content in context.
+
+**Fix:** Automated identification and removal of tool-result entries that have already been summarized or acted upon (agent has moved past them in its reasoning chain). Analogous to AgentDiet (arXiv:2509.23586, FSE 2026) but targeting the observation layer rather than the action layer.
+
+---
+
+## P-NEW-25 — Anthropic Native Compaction via compact-2026-01-12 API
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/dispatch/subagent-run.sh` / `scripts/cli_adapters/claude.sh` — dispatcher flags |
+| **Research source** | Anthropic Compaction API (compact-2026-01-12, Jan 2026) |
+| **Expected saving** | 40–60% cost reduction on long Orchestrator/Builder sessions |
+| **LoC delta** | ~5 LoC in dispatcher (add `--compact` flag gated by `EVOLVE_COMPACTION=1`) |
+| **Risk** | Low (if flag exists) — native API, zero persona changes; investigation-gated |
+| **Target cycle** | 45 (investigation — analogous to P-NEW-17 TTL probe) |
+| **Verification** | 1. Probe `claude -p --help` for `--compact` flag (like P-NEW-17 probed `--cache-ttl`); 2. If exists, run one cycle with/without; compare cost |
+
+**Problem:** Orchestrator (48 turns / $1.68, cycle-43) and Builder (69 turns / $3.12, cycle-43) are the two highest-cost phases. Both run long sessions where context accumulates. Anthropic's compaction API (compact-2026-01-12) provides automatic context compaction for long-running agent sessions with 40–60% cost reduction and zero changes to persona prompts.
+
+**Investigation first (cycle 45):** Determine whether `claude -p` exposes a `--compact` flag (or equivalent env var). If Path A is open: wire `EVOLVE_COMPACTION=1` in dispatcher profiles for orchestrator and builder. If Path A is closed: explore SDK-level compaction as Path B.
 
 **Source:** "Token-Budget-Aware LLM Reasoning" (arXiv:2412.18547v1, 2026): pre-declaring reasoning budget induces self-regulation and stops excessive elaboration. Claude responds to explicit budget declarations. Complementary to gate-based stop criteria.

@@ -206,6 +206,89 @@ This dossier archives the primary research sources for evolve-loop's token-reduc
 
 ---
 
+## Source 11: Observational Context Compression — arXiv:2604.19572 (Apr 2026)
+
+**arXiv:** https://arxiv.org/abs/2604.19572
+
+**Date:** April 2026
+
+**Key findings:**
+- Identifies "expired" tool-result entries in multi-turn agent trajectories — outputs that have been summarized or acted upon and are now pure token waste
+- ~40–60% input token reduction on tool-output-heavy trajectories (multi-file Builder reads)
+- Operates at the trajectory layer: removes content, preserves agent state (no re-execution)
+- Compatible with frozen prompt prefixes (doesn't break cache boundaries)
+
+**Applicability to evolve-loop:**
+- Direct target: Builder multi-turn read phases (cycle-43: 69 turns, $3.12)
+- P-NEW-24 (cycle 46+): expired-tool-result removal for Builder; profile-level contract changes required
+
+---
+
+## Source 12: Token-Budget-Aware LLM Reasoning — arXiv:2412.18547 (2026)
+
+**arXiv:** https://arxiv.org/abs/2412.18547
+
+**Date:** 2026 (last revised)
+
+**Key findings:**
+- Preemptive budget declaration ("you have N turns") induces self-regulation from turn 1
+- 10–20% turn reduction vs. stop-criterion-only baselines on tool-use tasks
+- Most effective when budget is set to 75–85% of the hard max (conservative advisory value)
+- Effect is additive on top of gate-based stop-criteria (P-NEW-10, P-NEW-19, P-NEW-20)
+
+**Applicability to evolve-loop:**
+- P-NEW-23 (cycle 44, DONE): `emit_budget_hint()` in `role-context-builder.sh`; `turn_budget_hint` in 6 profiles
+- Conservative advisory values: scout:12/15, builder:20/25, auditor:30/40, orchestrator:45/60
+
+---
+
+## Source 13: Anthropic Compaction API — compact-2026-01-12 (Jan 2026)
+
+**Date:** January 2026
+
+**Key findings:**
+- Automatic context compaction for long-running `claude -p` sessions
+- 40–60% cost reduction reported on sessions > 20 turns
+- Zero changes to persona prompts required — purely dispatcher-layer opt-in
+- Analogous interface to existing `--cache-ttl` / `--max-budget-usd` flags
+
+**Applicability to evolve-loop:**
+- P-NEW-25 (cycle 45 investigation): probe `claude -p --help` for compaction flag
+- Primary targets: Orchestrator (48 turns, $1.68) and Builder (69 turns, $3.12) in cycle-43
+- Risk: unknown; investigation follows P-NEW-17 TTL research template
+
+---
+
+## Source 14: MCP Tool Schema Overhead Analysis — docs.bswen.com (Apr 2026)
+
+**URL:** https://docs.bswen.com/mcp-tool-schema-analysis
+
+**Date:** April 2026
+
+**Key findings:**
+- MCP tool schemas serialized in `claude -p` invocations account for 70–97% of system-prompt tokens in plugin-heavy configurations
+- Per-phase tool filtering via `--allowedTools` reduces schema serialization
+- Selective schema injection (only tools a phase uses) achieves 5–20% per-turn input reduction
+- P-NEW-22 research basis: measure `claude -p` schema serialization with/without `--allowedTools`
+
+**Applicability to evolve-loop:**
+- P-NEW-22 (cycle 46+): measurement-first approach — run one cycle with/without `--allowedTools` filtering; compare `input_tokens` in usage sidecars
+- Profiles already have per-role `allowed_tools` lists; question is whether they reduce *serialized* schema tokens
+
+---
+
+## Cycle-44 Research Summary
+
+> Added by Builder cycle 44 (2026-05-14). Sources 11–14 synthesized from online research by Scout cycle-44.
+
+**New roadmap items:** P-NEW-24 (observational context compression, arXiv:2604.19572) + P-NEW-25 (Anthropic native compaction, compact-2026-01-12). Both added to `docs/architecture/token-reduction-roadmap.md`.
+
+**P-NEW-23 SHIPPED (cycle 44):** `emit_budget_hint()` in `role-context-builder.sh` + `turn_budget_hint` in 6 profiles. Expected 10–20% turn reduction on top of stop-criteria.
+
+**Cycle-43 cost snapshot:** Total $8.40 (regression from $5.80). Root cause: Builder 69-turn bootstrap for P-NEW-20 stop-criterion shipment. P-NEW-19 auditor stop-criterion: 49→29 turns (−41%, working). Expected cycle-44 benefit from P-NEW-19/20 + P-NEW-23: ~$1.20–2.10/cycle reduction targeting $6.00–7.00/cycle.
+
+---
+
 ## Codebase Measurements (Cycle 15 fresh, v9.1.1)
 
 ### Persona file sizes (bytes)
