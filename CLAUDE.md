@@ -407,6 +407,46 @@ bash scripts/utility/inject-task.sh \
 
 Exit codes: `0` success · `10` validation · `11` id collision · `12` filesystem. Cancel: `rm .evolve/inbox/<file>.json`. See [docs/architecture/inbox-injection-protocol.md](docs/architecture/inbox-injection-protocol.md).
 
+## Shared Agent Values — state.json Schema Reference
+
+Canonical `state.json` top-level fields visible to all phase agents. New fields in v9.X.0+:
+
+### researchCache (v9.X.0+, opt-in via `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
+
+```json
+"researchCache": {
+  "version": 1,
+  "entries": {
+    "<fingerprint_sha256>": {
+      "task_id": "task-x-v1",
+      "fingerprint_sha": "<sha256>",
+      "research_path": ".evolve/research/by-task/<sha>.md",
+      "produced_at_cycle": 50,
+      "produced_at_ts": "ISO8601",
+      "scope_summary": "1-line description",
+      "hits": 0,
+      "last_hit_cycle": null,
+      "invalidated": false,
+      "invalidation_reason": null
+    }
+  }
+}
+```
+
+**carryoverTodos additive optional fields** (absence = legacy behavior):
+
+| Field | Type | Description |
+|---|---|---|
+| `research_pointer` | string | `.evolve/research/by-task/<fp>.md` — read this before researching |
+| `research_fingerprint` | string | sha256 over normalized action+criteria+files |
+| `research_cycle` | int | cycle that produced the cached research |
+
+**Cache hit decision** (Scout Step 4.5): HIT when `research_fingerprint` present + `researchCache.entries[fp]` exists + `invalidated==false` + `cycle - produced_at_cycle ≤ EVOLVE_RESEARCH_CACHE_MAX_AGE` (default 5) + cache file+sidecar exist + recomputed fp matches.
+
+**Utilities**: `scripts/utility/research-cache.sh check <task_id>` (exits 0=HIT/10=STALE/20=MISS/30=INVALIDATED/40=NO_ENTRY/50=DISABLED); `scripts/utility/task-fingerprint.sh`; `scripts/lifecycle/promote-research-cache.sh <cycle> <workspace>`.
+
+**Rollout**: v9.X.0 opt-in (`EVOLVE_RESEARCH_CACHE_ENABLED=1`). Default-off until verification confirms no false-positive HITs.
+
 ## Execution-Grounded Process Supervision — EGPS (v10.0.0+)
 
 **BREAKING CHANGE in v10.0.0:** the verdict-bearing artifact moved from `audit-report.md` (prose `Verdict: PASS|WARN|FAIL` + confidence scalar) to `acs-verdict.json` (binary `verdict: PASS|FAIL` from predicate exit codes). The WARN level no longer exists; fluent-by-default WARN-ship behavior is removed. Full design: `docs/architecture/egps-v10.md`. Research: `knowledge-base/research/execution-grounded-process-supervision-2026.md`.

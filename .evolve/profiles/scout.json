@@ -32,6 +32,8 @@
     "Write(.evolve/runs/cycle-*/scout-stdout.log)",
     "Write(.evolve/runs/cycle-*/workers/*)",
     "Write(.evolve/evals/cycle-*/*)",
+    "Bash(scripts/utility/research-cache.sh:*)",
+    "Bash(scripts/utility/task-fingerprint.sh:*)",
     "Edit(.evolve/runs/cycle-*/scout-report.md)",
     "Edit(.evolve/runs/cycle-*/handoff-scout.json)",
     "Edit(.evolve/runs/cycle-*/workers/*)"
