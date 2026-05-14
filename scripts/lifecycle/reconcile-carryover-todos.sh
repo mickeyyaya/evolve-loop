@@ -196,6 +196,16 @@ while IFS= read -r todo_json; do
                 log "DROP (PASS+include): $id → archive (completed)"
                 continue
             else
+                # On FAIL verdict, invalidate this task's research cache entry so
+                # the next cycle's Scout re-researches rather than serving stale results.
+                if [ "$VERDICT" = "FAIL" ]; then
+                    _fp=$(echo "$todo_json" | jq -r '.research_fingerprint // empty')
+                    if [ -n "$_fp" ]; then
+                        bash scripts/utility/research-cache.sh invalidate "$_fp" \
+                            --reason "audit-fail-cycle-$CYCLE" 2>/dev/null || true
+                        log "research-cache: invalidated fp=$_fp (audit-fail-cycle-$CYCLE)"
+                    fi
+                fi
                 echo "$todo_json" | jq -c '.cycles_unpicked = 0' >> "$KEPT_FILE"
                 log "RESET ($VERDICT+include): $id cycles_unpicked=0"
             fi
@@ -214,6 +224,13 @@ while IFS= read -r todo_json; do
             fi
             ;;
         drop)
+            # Invalidate research cache for this task when fingerprint present.
+            _fp=$(echo "$todo_json" | jq -r '.research_fingerprint // empty')
+            if [ -n "$_fp" ]; then
+                bash scripts/utility/research-cache.sh invalidate "$_fp" \
+                    --reason "dropped-cycle-$CYCLE" 2>/dev/null || true
+                log "research-cache: invalidated fp=$_fp (dropped-cycle-$CYCLE)"
+            fi
             echo "$todo_json" | jq -c --argjson cyc "$CYCLE" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
                 '. + {archived_at: $ts, archived_at_cycle: $cyc, archive_reason: "explicit-drop"}' \
                 >> "$ARCHIVE_FILE"
@@ -290,6 +307,17 @@ if [ -s "$ABNORMAL_FILE" ]; then
         PROMO_COUNT=$(( PROMO_COUNT + 1 ))
     done < <(jq -r '.event_type // empty' "$ABNORMAL_FILE" 2>/dev/null | sort -u)
     [ "$PROMO_COUNT" -gt 0 ] && log "Promoted $PROMO_COUNT abnormal-event type(s) to HIGH carryoverTodos"
+fi
+
+# ── Promote staged research cache entries on PASS cycles (Phase B) ────────────
+# On PASS verdict, move .evolve/runs/cycle-N/workers/research-cache-staging/
+# entries to canonical .evolve/research/by-task/ path. NOOP when
+# EVOLVE_RESEARCH_CACHE_ENABLED is unset (promote-research-cache.sh exits 0 cleanly).
+if [ "$VERDICT" = "PASS" ] && [ -n "$WORKSPACE" ]; then
+    promote_out=$(bash scripts/lifecycle/promote-research-cache.sh "$CYCLE" "$WORKSPACE" 2>&1) || true
+    while IFS= read -r _pline; do
+        [ -n "$_pline" ] && log "promote-cache: $_pline"
+    done <<< "$promote_out"
 fi
 
 exit 0

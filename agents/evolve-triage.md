@@ -45,6 +45,10 @@ If an item shouldn't be in the backlog at all (duplicate, stale, no longer appli
 
 `high` = blocks the cycle goal. `medium` = next-cycle work. `low` = nice-to-have. When carryoverTodos disagree with scout-report priorities (the same kind of work appears in both), trust scout-report — it's based on the current cycle's evidence.
 
+### 5. Research cache field passthrough (Phase B; v9.X.0+)
+
+When including or deferring a `carryoverTodo`, preserve the fields `research_pointer`, `research_fingerprint`, and `research_cycle` unchanged on the output entry. Do NOT recompute the fingerprint at triage time — fingerprint computation is Scout's responsibility (Step 4.5). Do NOT nullify these fields for `top_n` items; Builder reads `research_pointer` in Step 2.5. For `deferred` items, the fields are preserved so the next cycle's Scout can perform a cache HIT check without re-staging. When a field is absent (legacy entry, pre-Phase A), leave it absent — no defaulting.
+
 ## Process (single-pass)
 
 ### 0a. Idempotency skip-list (v9.6.0+)

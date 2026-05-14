@@ -71,11 +71,46 @@ Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for B
 
 [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) — dimension guidelines.
 
+### 4.5. Per-Task Research Cache Lookup (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
+
+For each `carryoverTodos[]` entry with a non-empty `action`, check whether Scout already cached research for this task fingerprint.
+
+```bash
+# Compute fingerprint
+fp=$(bash scripts/utility/task-fingerprint.sh --action "$action" \
+       [--criteria "$criteria"] [--files "$files_hint"])
+# Check cache (exit 50 = DISABLED when EVOLVE_RESEARCH_CACHE_ENABLED unset)
+bash scripts/utility/research-cache.sh check "$task_id"
+```
+
+Exit code handling:
+- **0 (HIT):** write `Research Pointer: .evolve/research/by-task/<fp>.md` into task block; SKIP re-research; log HIT in `## Research Cache` section.
+- **10 (STALE):** re-research needed; stage result (see Step 5.5).
+- **20 (MISS):** re-research needed; stage result.
+- **30 (INVALIDATED):** re-research needed; stage result; note invalidation reason.
+- **40 (NO_ENTRY):** re-research needed; stage result.
+- **50 (DISABLED):** NOOP; log `[research-cache] DISABLED` **once** per cycle (not per task). Skip this step entirely.
+
+Feature gate: when `EVOLVE_RESEARCH_CACHE_ENABLED` is unset, `research-cache.sh` exits 50. All paths NOOP. Do NOT attempt cache operations when disabled.
+
 ### 5. Read Research Brief (from Phase 1)
 
 Research runs in Phase 1 before Scout. Scout does NOT web-research.
 - Read `researchBrief` from context (`$WORKSPACE_PATH/research-brief.md`)
 - Use gap analysis and concept cards for task selection priorities
+
+### 5.5. Stage Per-Task Research to Cache Staging (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
+
+For each carryoverTodo that required re-research (STALE/MISS/INVALIDATED/NO_ENTRY from Step 4.5):
+
+1. Write research output to: `.evolve/runs/cycle-N/workers/research-cache-staging/<fp>.md`
+2. Write sidecar JSON: `.evolve/runs/cycle-N/workers/research-cache-staging/<fp>.json`
+   - Content: `{"task_id":"<id>","fingerprint":"<fp>","produced_at_ts":"<ISO8601>"}`
+3. Set `task.research_pointer` in task block to `".evolve/research/by-task/<fp>.md"` (the canonical path after `promote-research-cache.sh` promotes staging → canonical at cycle close).
+
+`promote-research-cache.sh` is called by `reconcile-carryover-todos.sh` on PASS verdict. Builder reads `task.research_pointer` when set (Step 2.5).
+
+When `EVOLVE_RESEARCH_CACHE_ENABLED` is unset: NOOP; no staging path written.
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
@@ -225,6 +260,7 @@ When your `context_clear_trigger_tokens` threshold (from profile, default 25000)
 | `inbox-audit-complete` | Every `carryoverTodo` and inbox entry has an explicit include/defer/drop decision |
 | `backlog-complete` | 2–4 tasks selected with priority, weight, scope, and acceptance criteria |
 | `build-plan-written` | `## Build Plan Summary` section in scout-report.md lists ordered steps for Builder |
+| `research-cache-section` | `## Research Cache` section present in scout-report.md; for each carryoverTodo, one of HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED noted; always required (when feature disabled, note DISABLED once) |
 
 ### Exit Protocol
 

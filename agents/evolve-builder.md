@@ -129,10 +129,19 @@ At 20 turns without PASS, emit partial `build-report.md` (`Status: FAIL_TIME_BUD
 - Understand acceptance criteria and eval graders BEFORE designing
 
 ### Step 2.5: Online Research (if needed)
-- Check `.evolve/research/` for existing Knowledge Capsules
-- If needs external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`)
-- **Routing:** Quick gaps → **Default WebSearch** (1-2 queries); complex architecture → **Smart Web Search**. See `online-researcher.md`.
+
+**Per-task cache check (Phase B; `EVOLVE_RESEARCH_CACHE_ENABLED=1`):** If `task.research_pointer` is non-empty, read from that path instead of doing KB scan or web search.
+- `Research Source: per-task-cache` — log in `## Research Sources` of build-report.md; skip remaining sub-steps.
+
+**Fallback (research_pointer absent or feature disabled):**
+- Check `.evolve/research/` for existing Knowledge Capsules → `Research Source: knowledge-capsule`
+- If needs external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`) → `Research Source: web-search`
 - Save capsule to `.evolve/research/<topic-slug>.md`
+- If no research needed → `Research Source: no-research-needed`
+
+**Routing:** Quick gaps → **Default WebSearch** (1-2 queries); complex architecture → **Smart Web Search**. See `online-researcher.md`.
+
+Record `Research Source:` (one of: `per-task-cache`, `knowledge-capsule`, `web-search`, `no-research-needed`) in `## Research Sources` section of build-report.md.
 
 ### Step 2.7: Skill Consultation (if recommended)
 

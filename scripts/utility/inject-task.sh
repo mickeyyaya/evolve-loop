@@ -37,19 +37,23 @@ OPERATOR_NOTE=""
 TASK_ID=""
 DRY_RUN=0
 INJECTED_BY="operator"
+RESEARCH_POINTER=""
+INVALIDATE_CACHE_FP=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --priority)         PRIORITY="$2";         shift 2 ;;
-        --action)           ACTION="$2";            shift 2 ;;
-        --weight)           WEIGHT="$2";            shift 2 ;;
-        --evidence-pointer) EVIDENCE_POINTER="$2";  shift 2 ;;
-        --note)             OPERATOR_NOTE="$2";     shift 2 ;;
-        --id)               TASK_ID="$2";           shift 2 ;;
-        --dry-run)          DRY_RUN=1;              shift ;;
-        --injected-by)      INJECTED_BY="$2";       shift 2 ;;
-        --help)             awk '/^#!/{next} /^[^#]/{exit} /^#/{sub(/^# ?/,""); print}' "${BASH_SOURCE[0]}" >&2; exit 0 ;;
-        --)                 shift; break ;;
+        --priority)          PRIORITY="$2";           shift 2 ;;
+        --action)            ACTION="$2";              shift 2 ;;
+        --weight)            WEIGHT="$2";              shift 2 ;;
+        --evidence-pointer)  EVIDENCE_POINTER="$2";   shift 2 ;;
+        --note)              OPERATOR_NOTE="$2";       shift 2 ;;
+        --id)                TASK_ID="$2";             shift 2 ;;
+        --dry-run)           DRY_RUN=1;                shift ;;
+        --injected-by)       INJECTED_BY="$2";         shift 2 ;;
+        --research-pointer)  RESEARCH_POINTER="$2";    shift 2 ;;
+        --invalidate-cache)  INVALIDATE_CACHE_FP="$2"; shift 2 ;;
+        --help)              awk '/^#!/{next} /^[^#]/{exit} /^#/{sub(/^# ?/,""); print}' "${BASH_SOURCE[0]}" >&2; exit 0 ;;
+        --)                  shift; break ;;
         *) echo "ERROR: unknown argument: $1" >&2; exit 10 ;;
     esac
 done
@@ -107,6 +111,13 @@ if [ -d "$INBOX_DIR" ]; then
     done
 fi
 
+# --invalidate-cache: emit a research_cache_invalidate event before injection.
+if [ -n "$INVALIDATE_CACHE_FP" ]; then
+    bash scripts/utility/research-cache.sh invalidate "$INVALIDATE_CACHE_FP" \
+        --reason "operator-inject-$(date -u +%Y%m%d)" 2>/dev/null || true
+    echo "[inject-task] research-cache: emitted invalidate event for fp=$INVALIDATE_CACHE_FP" >&2
+fi
+
 # Build JSON
 INJECTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 [ -z "$EVIDENCE_POINTER" ] && EVIDENCE_POINTER="inbox-injection://${INJECTED_AT}"
@@ -121,7 +132,9 @@ if [ -n "$WEIGHT" ]; then
         --arg operator_note "$OPERATOR_NOTE" \
         --arg injected_at "$INJECTED_AT" \
         --arg injected_by "$INJECTED_BY" \
-        '{id:$id,action:$action,priority:$priority,weight:$weight,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}')
+        --arg research_pointer "$RESEARCH_POINTER" \
+        '{id:$id,action:$action,priority:$priority,weight:$weight,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}
+         | if ($research_pointer | length) > 0 then . + {research_pointer: $research_pointer} else . end')
 else
     TASK_JSON=$(jq -cn \
         --arg id "$TASK_ID" \
@@ -131,7 +144,9 @@ else
         --arg operator_note "$OPERATOR_NOTE" \
         --arg injected_at "$INJECTED_AT" \
         --arg injected_by "$INJECTED_BY" \
-        '{id:$id,action:$action,priority:$priority,weight:null,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}')
+        --arg research_pointer "$RESEARCH_POINTER" \
+        '{id:$id,action:$action,priority:$priority,weight:null,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}
+         | if ($research_pointer | length) > 0 then . + {research_pointer: $research_pointer} else . end')
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
