@@ -667,14 +667,17 @@ ADVEOF
     # actionable while bounding token burn.
     if [ "${EVOLVE_CONTEXT_AUTOTRIM:-0}" = "1" ] \
             && [ "$_prompt_tokens" -gt "$_prompt_max" ]; then
-        local _keep_head_bytes=$((_prompt_max * 4 * 60 / 100))   # 60% from head
-        local _keep_tail_bytes=$((_prompt_max * 4 * 35 / 100))   # 35% from tail (5% reserved for marker)
+        # P-NEW-13: Line-boundary cut — avoids byte-truncation of JSON objects, file paths, function signatures.
+        local _total_lines
+        _total_lines=$(wc -l < "$injected_prompt" | tr -d ' ')
+        local _keep_head_lines=$((_prompt_max * 4 * 60 / 100 / 50))   # 60% from head, ~50 chars/line avg
+        local _keep_tail_lines=$((_prompt_max * 4 * 35 / 100 / 50))   # 35% from tail, ~50 chars/line avg
         local _trimmed="${injected_prompt}.trimmed"
         {
-            head -c "$_keep_head_bytes" "$injected_prompt"
-            printf '\n\n[CONTEXT-AUTOTRIM v9.1.0: dropped %d bytes of mid-prompt context — original=%d tokens, cap=%d. Set EVOLVE_CONTEXT_AUTOTRIM=0 to disable.]\n\n' \
-                "$((_prompt_bytes - _keep_head_bytes - _keep_tail_bytes))" "$_prompt_tokens" "$_prompt_max"
-            tail -c "$_keep_tail_bytes" "$injected_prompt"
+            head -n "$_keep_head_lines" "$injected_prompt"
+            printf '\n\n[CONTEXT-AUTOTRIM v9.1.0: dropped %d lines of mid-prompt context — original=%d tokens, cap=%d. Set EVOLVE_CONTEXT_AUTOTRIM=0 to disable.]\n\n' \
+                "$((_total_lines - _keep_head_lines - _keep_tail_lines))" "$_prompt_tokens" "$_prompt_max"
+            tail -n "$_keep_tail_lines" "$injected_prompt"
         } > "$_trimmed"
         mv -f "$_trimmed" "$injected_prompt"
         # Re-measure after trim.
@@ -682,7 +685,7 @@ ADVEOF
         _prompt_tokens=$((_prompt_bytes / 4))
         _cap_pct=$((_prompt_tokens * 100 / _prompt_max))
         echo "[subagent-run] AUTOTRIM: $agent prompt trimmed to ~$_prompt_tokens tokens (target=$_prompt_max, new cap_pct=${_cap_pct}%)" >&2
-        unset _trimmed _keep_head_bytes _keep_tail_bytes
+        unset _trimmed _keep_head_lines _keep_tail_lines _total_lines
     fi
 
     if [ "$_prompt_tokens" -gt "$_prompt_max" ]; then

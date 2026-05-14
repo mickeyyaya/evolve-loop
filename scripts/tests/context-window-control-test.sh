@@ -45,7 +45,7 @@ expect_match "AUTOTRIM log message" "$src" "AUTOTRIM:"
 expect_match "context-monitor.json write" "$src" "context-monitor.json"
 expect_match "cap_pct computed" "$src" "_cap_pct"
 expect_match "cumulative_input_tokens captured" "$src" "cumulative_input_tokens"
-expect_match "AUTOTRIM preserves head + tail" "$src" "_keep_head_bytes.*_keep_tail_bytes"
+expect_match "AUTOTRIM preserves head + tail" "$src" "_keep_head_lines.*_keep_tail_lines"
 
 echo
 echo "=== Test 2: autotrim algorithm — simulated in isolation ==="
@@ -57,13 +57,13 @@ yes "lorem ipsum dolor sit amet " | head -c 40000 > "$TMP/prompt.txt"
 prompt_bytes=$(wc -c < "$TMP/prompt.txt" | tr -d ' ')
 prompt_tokens=$((prompt_bytes / 4))
 prompt_max=2000
-_keep_head_bytes=$((prompt_max * 4 * 60 / 100))   # 60% from head
-_keep_tail_bytes=$((prompt_max * 4 * 35 / 100))   # 35% from tail
+_keep_head_lines=$((prompt_max * 4 * 60 / 100 / 50))   # 60% from head, ~50 chars/line avg
+_keep_tail_lines=$((prompt_max * 4 * 35 / 100 / 50))   # 35% from tail, ~50 chars/line avg
 trimmed="$TMP/prompt.trimmed"
 {
-    head -c "$_keep_head_bytes" "$TMP/prompt.txt"
+    head -n "$_keep_head_lines" "$TMP/prompt.txt"
     printf '\n\n[CONTEXT-AUTOTRIM]\n\n'
-    tail -c "$_keep_tail_bytes" "$TMP/prompt.txt"
+    tail -n "$_keep_tail_lines" "$TMP/prompt.txt"
 } > "$trimmed"
 trimmed_bytes=$(wc -c < "$trimmed" | tr -d ' ')
 trimmed_tokens=$((trimmed_bytes / 4))

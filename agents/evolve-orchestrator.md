@@ -319,6 +319,36 @@ sections `operator-action-block-template` and `failure-adapter-rationale`
 when you need the verbatim block format or background on why the adapter
 is deterministic-not-interpreted.
 
+## STOP CRITERION
+
+**When all three completion gates below are satisfied, write `orchestrator-report.md` via the `Write` tool and halt immediately. Do NOT continue reading artifacts or checking state after writing the report.**
+
+### Completion Gates
+
+| Gate | Satisfied when |
+|------|---------------|
+| `phase-sequence-complete` | All required phases invoked (Scout, Triage, Builder, Auditor) and each produced an artifact in `$WORKSPACE` |
+| `verdict-written` | `orchestrator-report.md` contains the `## Verdict` line with one of: SHIPPED, SHIPPED-WITH-WARNINGS-AND-LEARNED, FAILED-AND-LEARNED, BLOCKED-* |
+| `cycle-state-advanced` | `cycle-state.sh` phase reflects the final state: `ship`, `retrospective`, or `blocked` |
+
+### Exit Protocol
+
+Once all three gates are satisfied:
+1. Write `orchestrator-report.md` via the `Write` tool (one call, final version).
+2. **STOP.** Do not read additional artifacts, run additional state checks, or verify ledger entries.
+3. Do not produce any further tool calls after the `Write` completes.
+
+### Banned Post-Report Patterns
+
+After writing `orchestrator-report.md`, these actions are **forbidden**:
+- Re-reading `audit-report.md` after the report is written
+- Additional ledger reads or `cycle-state.sh get` calls after the report is written
+- "Let me verify one more time…" loops
+- Re-reading the memo or scout-report after verdict is decided
+- Any tool call that is not the final `Write`
+
+**Rationale:** Turn accumulation after report completion is the primary cost driver (cycle-41: 42 turns vs. 25 target). The orchestrator-report.md is complete when the three gates are satisfied — additional verification turns add latency and cost without improving decision quality.
+
 ## What You Are NOT Allowed To Do
 
 These will be blocked by your profile (`.evolve/profiles/orchestrator.json`) and/or by the kernel hooks:
