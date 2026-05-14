@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "_note": "v1: data-only. Orchestrator still uses narrative Phase Loop (cycle-55). Registry consumed by list-phase-order.sh helper. Cycle 56 wires orchestrator to read registry. Gate functions for tester phase deferred to cycle-56 (see ADR-4 Notes).",
+  "_note": "v1: data-only. Orchestrator reads registry (cycle-57). Registry consumed by list-phase-order.sh helper. Tester gate functions wired in cycle-57 (gate_build_to_tester + gate_tester_to_audit).",
   "phases": [
     {
       "name": "intent",
@@ -130,9 +130,9 @@
       "outputs": {
         "files": [".evolve/runs/cycle-{cycle}/tester-report.md"]
       },
-      "gate_in": null,
-      "gate_out": null,
-      "_v1_note": "Tester gate functions deferred to cycle 56 (gate_build_to_tester + gate_tester_to_audit). Predicate 020 skips gate validation when gate_in/gate_out is null.",
+      "gate_in": "gate_build_to_tester",
+      "gate_out": "gate_tester_to_audit",
+      "_v1_note": "Tester gate functions wired in cycle 57 (gate_build_to_tester + gate_tester_to_audit). Predicate 020 validates gate refs resolve to declared functions.",
       "parallel_eligible": false,
       "skippable_when_present": false
     },

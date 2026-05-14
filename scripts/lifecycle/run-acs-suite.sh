@@ -82,6 +82,15 @@ fi
 total_count=${#predicates[@]}
 regression_count=$((total_count - this_cycle_count))
 
+# H-1 advisory WARN (cycle-57): when this_cycle_count=0 but acs/cycle-N/ has .sh files,
+# something is wrong (EVOLVE_PROJECT_ROOT mismatch is the common cause). Non-fatal.
+if [ "$this_cycle_count" -eq 0 ] && [ -d "$CYCLE_DIR" ]; then
+    _h1_file_count=$(find "$CYCLE_DIR" -maxdepth 1 -name "*.sh" -type f 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${_h1_file_count:-0}" -gt 0 ]; then
+        echo "[run-acs-suite] WARN: this_cycle_count=0 but $CYCLE_DIR has $_h1_file_count .sh files — possible EVOLVE_PROJECT_ROOT mismatch (H-1 pattern). Check that EVOLVE_PROJECT_ROOT points to the correct project root." >&2
+    fi
+fi
+
 if [ "$total_count" -eq 0 ]; then
     # v10.0.0 bootstrap: when there are NO predicates at all (first cycle, no regression-suite),
     # produce an empty-PASS verdict. Subsequent cycles will accumulate.

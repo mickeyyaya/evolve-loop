@@ -487,6 +487,23 @@ Each acceptance criterion compiles to an executable bash script at `acs/cycle-N/
 Builder writes acs/cycle-N/*.sh predicates → Auditor runs validate-predicate.sh + run-acs-suite.sh → ship-gate enforces red_count==0 → post-ship promote-acs-to-regression.sh moves predicates to regression-suite/ → next cycle must keep all GREEN
 ```
 
+### EGPS Tester Phase (v10.3.0+)
+
+After the Builder phase completes, the **Tester** subagent writes `acs/cycle-N/{NNN}-{slug}.sh` predicate scripts for each acceptance criterion, then produces `tester-report.md`. This separates predicate authorship from production-code authorship (Builder cannot self-validate).
+
+**`EVOLVE_TEST_PHASE_ENABLED` gate (v10.6+, default=0):** The Tester phase is opt-in. When unset or `0`, skip the Tester subagent and fall back to the **v10.1 Builder-predicate path** — Builder writes `acs/cycle-N/*.sh` predicates itself. Set `EVOLVE_TEST_PHASE_ENABLED=1` to activate the Tester subagent.
+
+```bash
+# Orchestrator pattern for Tester phase:
+if [ "${EVOLVE_TEST_PHASE_ENABLED:-0}" = "1" ]; then
+    cycle-state.sh advance test tester
+    subagent-run.sh tester "$CYCLE" "$WORKSPACE"
+fi
+# When EVOLVE_TEST_PHASE_ENABLED=0: Builder writes its own predicates (v10.1 fallback)
+```
+
+**When Tester is skipped (fallback path):** The orchestrator MUST include a `## Tester Phase (unavailable)` block in `orchestrator-report.md` documenting: (1) the fallback path in use, (2) which predicates Builder wrote instead, and (3) why Tester was unavailable. This ensures audit traceability. See `agents/evolve-orchestrator.md` § EGPS Tester Phase for the full gate pattern and backward-compat details.
+
 ### Bootstrap (v10.0.0)
 
 The v10.0.0 release itself ships via `--class manual` (no predicates yet exist). Cycle 40+ produces the first `acs/cycle-N/` directory. Backfill of cycles 30–39 is **not** in v10.0.0 scope — it's optional v10.1 work. Persona updates (Builder/Auditor/Orchestrator) for predicate authorship are **v10.1**.

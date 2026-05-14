@@ -118,7 +118,49 @@ After the Audit phase completes, **`acs-verdict.json` in the workspace is the ve
 
 See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
 
+## Registry-driven dispatch (cycle 57+, primary path)
+
+When `EVOLVE_USE_PHASE_REGISTRY=1` (default), the phase sequence is driven by
+`docs/architecture/phase-registry.json` via `scripts/dispatch/list-phase-order.sh`.
+The calibrate step reads the registry order and dispatches each gate by name via
+`gate_run_by_name` (declared in `scripts/lifecycle/phase-gate.sh`).
+
+```bash
+# Calibrate: read phase order from registry
+phase_list=$(EVOLVE_USE_PHASE_REGISTRY=1 bash scripts/dispatch/list-phase-order.sh)
+
+# Dispatch loop (registry-driven):
+# For each phase in registry order: run gate_in → advance → subagent → gate_out
+while IFS= read -r phase_name; do
+    gate_in=$(jq -r --arg p "$phase_name" \
+        '.phases[] | select(.name==$p) | .gate_in // empty' \
+        docs/architecture/phase-registry.json 2>/dev/null || true)
+    [ -n "$gate_in" ] && gate_run_by_name "$gate_in" "$CYCLE" "$WORKSPACE"
+    cycle-state.sh advance "$phase_name" "$(jq -r --arg p "$phase_name" \
+        '.phases[] | select(.name==$p) | .role' docs/architecture/phase-registry.json)"
+    subagent-run.sh "$(jq -r --arg p "$phase_name" \
+        '.phases[] | select(.name==$p) | .role' docs/architecture/phase-registry.json)" \
+        "$CYCLE" "$WORKSPACE"
+    gate_out=$(jq -r --arg p "$phase_name" \
+        '.phases[] | select(.name==$p) | .gate_out // empty' \
+        docs/architecture/phase-registry.json 2>/dev/null || true)
+    [ -n "$gate_out" ] && gate_run_by_name "$gate_out" "$CYCLE" "$WORKSPACE"
+done <<EOF
+$phase_list
+EOF
+```
+
+Registry phase order (cycle 57): intent → scout → triage → plan-review → tdd → build → tester → audit → ship → retrospective → memo
+
+The verdict-driven branch (PASS/WARN/FAIL ship decision) remains explicit in
+the orchestrator — it is NOT encoded in the registry because it requires
+runtime verdict data. The registry governs phase order only.
+
+When `EVOLVE_USE_PHASE_REGISTRY=0`, fall back to the **Legacy Phase Loop** below.
+
 ## Phase Loop (the only sequence you may execute)
+
+*Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*
 
 Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
 

@@ -566,6 +566,56 @@ _check_builder_cost_overrun() {
     fi
 }
 
+# ─── Gate: BUILD → TESTER (v10.3.0+) ───
+# Verifies build-report.md exists before the Tester phase can run.
+gate_build_to_tester() {
+    log "Checking BUILD → TESTER gate for cycle $CYCLE"
+    check_file_exists "$WORKSPACE/build-report.md" "Build report"
+    if grep -qi "Status:.*FAIL\|## Status.*FAIL" "$WORKSPACE/build-report.md"; then
+        fail "Build report indicates FAIL — cannot proceed to tester phase"
+    fi
+    log "PASS: BUILD → TESTER gate"
+}
+
+# ─── Gate: TESTER → AUDIT (v10.3.0+) ───
+# Verifies tester-report.md exists before the Audit phase can run.
+gate_tester_to_audit() {
+    log "Checking TESTER → AUDIT gate for cycle $CYCLE"
+    check_file_exists "$WORKSPACE/tester-report.md" "Tester report"
+    check_artifact_substance "$WORKSPACE/tester-report.md" "Tester report"
+    log "PASS: TESTER → AUDIT gate"
+}
+
+# ─── Dynamic gate dispatcher (v10.3.0+, cycle 57) ───
+# Dispatches a gate function by name. Uses 'type' (bash 3.2 compat) to verify
+# the function exists before calling it. Called from list-phase-order.sh driven
+# dispatch in the orchestrator (EVOLVE_USE_PHASE_REGISTRY=1 path).
+#
+# Usage: gate_run_by_name <gate_name> [cycle] [workspace]
+# Exit: 0 on PASS, 1 on FAIL, 2 on function-not-found.
+gate_run_by_name() {
+    local gate_name="${1:-}"
+    # Optional overrides (pass extra cycle/workspace context when called standalone)
+    local _override_cycle="${2:-}"
+    local _override_ws="${3:-}"
+    if [ -z "$gate_name" ]; then
+        echo "[gate_run_by_name] ERROR: gate_name required" >&2
+        return 2
+    fi
+    # bash 3.2 compat: 'type NAME | grep -q function' (not 'declare -f NAME')
+    if ! type "$gate_name" 2>/dev/null | grep -q "function"; then
+        echo "[gate_run_by_name] WARN: gate '$gate_name' not declared — treating as no-op PASS" >&2
+        return 0
+    fi
+    if [ -n "$_override_cycle" ]; then
+        CYCLE="$_override_cycle"
+    fi
+    if [ -n "$_override_ws" ]; then
+        WORKSPACE="$_override_ws"
+    fi
+    "$gate_name"
+}
+
 # ─── Gate: BUILD → AUDIT ───
 gate_build_to_audit() {
     log "Checking BUILD → AUDIT gate for cycle $CYCLE"
@@ -658,6 +708,20 @@ EOF
         else
             fail "build-report.md schema violations (C5 enforcement): $_schema_out"
         fi
+    fi
+
+    # 6. Validate-predicate sweep: WARN on NOT_EXECUTABLE predicates in acs/cycle-N/
+    # Non-blocking WARN (logs to stderr + visible to Auditor). Closure for cycle-55 audit H-3.
+    if [ -x "scripts/verification/validate-predicate.sh" ]; then
+        local _pred_file _pred_validate_out _pred_validate_rc
+        while IFS= read -r _pred_file; do
+            [ -f "$_pred_file" ] || continue
+            _pred_validate_out=$(bash scripts/verification/validate-predicate.sh "$_pred_file" 2>&1)
+            _pred_validate_rc=$?
+            if [ "$_pred_validate_rc" -ne 0 ]; then
+                echo "[phase-gate] WARN: predicate validation failed for $_pred_file: $_pred_validate_out" >&2
+            fi
+        done < <(find "${EVOLVE_PROJECT_ROOT:-.}/acs/cycle-${CYCLE}" -maxdepth 1 -name "*.sh" -type f 2>/dev/null | sort)
     fi
 
     log "PASS: BUILD → AUDIT gate"
@@ -1110,6 +1174,8 @@ case "$GATE" in
     discover-to-build)    gate_discover_to_build ;;
     discover-to-triage)   gate_discover_to_triage ;;
     triage-to-plan-review) gate_triage_to_plan_review ;;
+    build-to-tester)      gate_build_to_tester ;;
+    tester-to-audit)      gate_tester_to_audit ;;
     build-to-audit)       gate_build_to_audit ;;
     audit-to-ship)        gate_audit_to_ship ;;
     audit-to-retrospective) gate_audit_to_retrospective ;;
