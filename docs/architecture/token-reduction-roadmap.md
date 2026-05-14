@@ -308,7 +308,11 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-16 Orchestrator stop-criterion | **DONE (cycle 42)** | `## STOP CRITERION` section added to `agents/evolve-orchestrator.md`; 3 named gates; targets 42→25 orchestrator turns (~$0.40/cycle). Commit 183406e. |
 | P-NEW-17 Explicit Cache TTL for cross-phase reuse | **INVESTIGATION-COMPLETE (cycle 43)** | Path A CLOSED: no `--cache-ttl` CLI flag. CRITICAL CORRECTION: Claude CLI uses 1h TTL (not 5m) per cycle-42 `ephemeral_1h_input_tokens` telemetry (`ephemeral_5m_input_tokens=0` for all phases). TTL concern is API SDK-specific, not CLI-specific. `claude -p` invocations already use 1h TTL. $2.00/cycle estimate was overstated for CLI path. True cross-phase reuse opportunity: shared system-prompt prefix via `EVOLVE_CACHE_PREFIX_V2` (addressed by P-NEW-18). |
 | P-NEW-18 EVOLVE_CACHE_PREFIX_V2 default-on | **DONE (cycle 43)** | Default changed from `:-0` to `:-1` in `scripts/dispatch/subagent-run.sh` and `scripts/cli_adapters/claude.sh`. `docs/architecture/control-flags.md` updated. Overdue since v8.62 target (shipped v10.6). Expected saving: $0.10–0.30/cycle. |
-| P-NEW-19 Auditor stop-criterion | **PENDING (cycle 44)** | Auditor ran 49 turns ($1.55) in cycle-42 vs 35 turns ($1.12) in cycle-41 (+40% regression). Root cause: no stop-criterion bounds turn count. Analogous to P-NEW-10 (Scout, DONE) and P-NEW-16 (Orchestrator, DONE). ~30 LoC in `agents/evolve-auditor.md`. Expected saving: $0.30–0.50/cycle. |
+| P-NEW-19 Auditor stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-auditor.md`; 3 named gates + banned post-report patterns. ~30 LoC. Expected saving: $0.30–0.50/cycle. |
+| P-NEW-20 Builder stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-builder.md`; 4 named gates + banned post-report patterns. ~40 LoC. Expected saving: $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22). |
+| P-NEW-21 AgentDiet full trajectory compression | **PENDING (cycle 45+)** | Full expired-tool-result removal for Builder multi-turn read phases. Research: AgentDiet (FSE 2026, arXiv:2509.23586); 39.9–59.7% input token reduction. ~profile-level contract changes. Expected: 20–30% Builder cost reduction (~$0.25/cycle). |
+| P-NEW-22 Selective MCP tool-schema measurement | **PENDING (cycle 46+)** | Measure whether `--allowedTools` reduces serialized schema tokens in `claude -p`. If not, add schema filtering at dispatch layer. Research: GitHub Blog 2026-05-13, MindStudio, MCP SEP-1576. Expected: 5–20% per-turn input token reduction. Measurement-first. |
+| P-NEW-23 Token-budget-aware turn hints | **PENDING (cycle 45+)** | Inject `## Budget` block in `role-context-builder.sh` output: "~N turns remaining". Preemptive budget declaration induces self-regulation (arXiv:2412.18547). Expected: 10–20% additional turn reduction on top of stop-criterion. Target: after P-NEW-19/20 baseline established. |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -570,14 +574,98 @@ See `knowledge-base/research/cache-ttl-march-2026-impact.md` for full research d
 | **Target cycle** | 44 |
 | **Verification** | `jq .turns .evolve/runs/cycle-N/auditor-usage.json`; assert ≤35 across 3 consecutive cycles |
 
-**Problem:** Cycle-42 auditor ran 49 turns ($1.55) vs cycle-41's 35 turns ($1.12). No turn-count bound exists for the auditor. Without explicit completion gates, auditor continues exploring defects and verifying predicates after its verdict is decided.
+**Status: DONE (cycle 43).** `## STOP CRITERION` section added to `agents/evolve-auditor.md` with 3 named completion gates (`predicates-run`, `verdict-decided`, `report-written`) and banned post-report patterns. ~30 LoC.
+
+**Problem:** Cycle-42 auditor ran 49 turns ($1.55) vs cycle-41's 35 turns ($1.12). No turn-count bound existed for the auditor. Without explicit completion gates, auditor continues exploring defects and verifying predicates after its verdict is decided.
 
 **Fix:** `## STOP CRITERION` section in `agents/evolve-auditor.md` (analogous to P-NEW-10 for Scout, P-NEW-16 for Orchestrator). Completion gates:
 - `predicates-run` — all `acs/cycle-N/*.sh` predicates executed (or noted absent)
 - `verdict-decided` — PASS/FAIL decision made from `acs-verdict.json` + predicate results
-- `defects-listed` — all defects enumerated (NONE if clean)
 - `report-written` — `audit-report.md` + `acs-verdict.json` written
 
 Banned post-report patterns: re-running predicates after verdict written, additional grep searches after report written, "let me also check…" loops.
 
 **Source:** Analogous to P-NEW-10 (Scout, $0.97/cycle actual) and P-NEW-16 (Orchestrator, $0.40/cycle expected). Same post-completion accumulation pattern at auditor cost.
+
+**Verification:** `jq .turns .evolve/runs/cycle-N/auditor-usage.json`; assert ≤35 across 3 consecutive cycles.
+
+## P-NEW-20 — Builder Stop-Criterion Persona Section
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `agents/evolve-builder.md` — `## STOP CRITERION` section |
+| **Expected saving** | $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22; analogous to P-NEW-10 Scout $0.97/cycle actual) |
+| **LoC delta** | ~40 LoC in `agents/evolve-builder.md` |
+| **Risk** | Low — prompt-level only; no structural change |
+| **Target cycle** | 43 |
+| **Verification** | `jq .turns .evolve/runs/cycle-N/builder-usage.json`; assert ≤25 across 3 consecutive cycles |
+
+**Status: DONE (cycle 43).** `## STOP CRITERION` section added to `agents/evolve-builder.md` with 4 named completion gates (`worktree-verified`, `implementation-complete`, `self-verify-passed`, `report-written`) and banned post-report patterns.
+
+**Problem:** `agents/evolve-builder.md` had zero STOP CRITERION / Completion Gates (431 lines, confirmed by grep). Builder ran 39 turns ($1.22) in cycle-43. Analogous gap to pre-P-NEW-10 Scout (68 turns) and pre-P-NEW-16 Orchestrator.
+
+**Source:** Same post-completion accumulation pattern. P-NEW-10 (Scout, DONE, $0.97/cycle actual), P-NEW-16 (Orchestrator, DONE). Builder is the highest-cost phase and the last one without a stop criterion.
+
+---
+
+## P-NEW-21 — AgentDiet Full Trajectory Compression for Builder
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | Builder profile + persona — expired tool-result removal during multi-turn read phases |
+| **Expected saving** | 20–30% Builder cost reduction (~$0.25/cycle) |
+| **LoC delta** | ~15 LoC (profile field + persona guidance) |
+| **Risk** | Medium — requires profile-level contract change; verify no loss of needed context |
+| **Target cycle** | 45+ |
+| **Verification** | Compare `builder-usage.json:input_tokens` across 3 cycles with/without; assert ≥15% reduction |
+
+**Problem:** P-NEW-8 (DONE cycle 40) applied AgentDiet-style filtering to `failedApproaches[]` only. Builder's multi-turn read phases accumulate large `tool_result` blocks (intermediate file reads) in context. These expired reads add input token overhead without contributing to the build decision.
+
+**Fix:** Profile field `context_compact_expired_tool_results: true` + builder persona guidance to summarize tool results after each Read and discard full content. The Tool-Result Hygiene section (P-NEW-6, DONE cycle 36) partially addresses this; AgentDiet extends to auto-compaction at the profile level.
+
+**Source:** AgentDiet (FSE 2026, arXiv:2509.23586v2): 39.9–59.7% input token reduction, 21.1–35.9% total cost reduction, no performance regression on SWE-bench. Full trajectory compression targets useless/redundant/expired tool results.
+
+---
+
+## P-NEW-22 — Selective MCP Tool-Schema Measurement and Reduction
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/dispatch/subagent-run.sh` — tool schema serialization per role |
+| **Expected saving** | 5–20% per-turn input token reduction (measurement-dependent) |
+| **LoC delta** | TBD (measurement phase first) |
+| **Risk** | Low (measurement) → Medium (schema filtering implementation) |
+| **Target cycle** | 46+ (measurement first) |
+| **Verification** | Compare `input_tokens` in usage sidecars with/without `--allowedTools`; assert schema bytes reduced |
+
+**Problem:** Full tool schema is serialized on every subagent call, even when the agent uses only 2–3 tools. For a 20-tool MCP server, this adds 2,000–4,000 tokens per turn — pure overhead. `subagent-run.sh` already passes `--allowedTools` per profile, which restricts invocations, but it is unclear whether the full schema is still serialized by the Claude CLI.
+
+**Fix (two phases):**
+1. Measure: compare `input_tokens` in `builder-usage.json` with/without `--allowedTools` to determine if schema tokens are already filtered.
+2. If NOT filtered: add `--tools-subset` injection or client-side schema filtering at dispatch layer.
+
+**Source:** GitHub Blog (2026-05-13) "Improving token efficiency in agentic workflows"; MindStudio "10 MCP Optimization Techniques"; MCP SEP-1576 "Mitigating Token Bloat". Tool schema compression: 30–60% per-request overhead reduction reported.
+
+---
+
+## P-NEW-23 — Token-Budget-Aware Turn Hints via role-context-builder.sh
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/lifecycle/role-context-builder.sh` — `## Budget` block injection |
+| **Expected saving** | 10–20% additional turn reduction on top of stop-criterion |
+| **LoC delta** | ~10 LoC in `role-context-builder.sh` + per-role budget config in profiles |
+| **Risk** | Low — prompt-level only; no structural change |
+| **Target cycle** | 45+ (after P-NEW-19/20 baseline established) |
+| **Verification** | Compare `turns` in usage sidecars with/without hint across 3 cycles; assert ≥10% reduction |
+
+**Problem:** Stop-criterion sections (P-NEW-10, P-NEW-16, P-NEW-19, P-NEW-20) are gate-based — they tell the agent when to stop *after* work is done. Budget hints are *preemptive*: injecting `remaining_budget: N turns` primes the agent to be concise from turn 1, preventing over-elaboration before gates are even reached.
+
+**Fix:** `role-context-builder.sh` injects a `## Budget` block at the top of each role's context:
+```
+## Budget
+This phase has a budget of ~N turns. Prioritize breadth over depth; write report when completion gates are satisfied. Remaining: ~N turns.
+```
+Per-role budget N comes from profile field `turn_budget_hint` (Scout: 20, Builder: 20, Auditor: 25, Orchestrator: 20).
+
+**Source:** "Token-Budget-Aware LLM Reasoning" (arXiv:2412.18547v1, 2026): pre-declaring reasoning budget induces self-regulation and stops excessive elaboration. Claude responds to explicit budget declarations. Complementary to gate-based stop criteria.

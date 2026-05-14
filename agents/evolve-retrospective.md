@@ -136,6 +136,12 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 
 Output path: `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml`. Use the schema below. **One YAML per root cause**, not per defect.
 
+**MUST-FIRST — verify on-disk before recording ID:** After writing each YAML file, confirm it exists on disk before adding its ID to `handoff-retrospective.json:lessonIds[]`. Use the Write tool, then verify:
+```bash
+test -f ".evolve/instincts/lessons/inst-LXXX-slug.yaml" || { echo "INTEGRITY_FAIL: YAML not on disk"; exit 2; }
+```
+If Write fails or the file is absent: do NOT add the ID to `lessonIds[]` — exit 2 (INTEGRITY_FAIL). A lessonId with no corresponding YAML causes `merge-lesson-into-state.sh` to exit 2, silently freezing `state.json:instinctSummary[]`.
+
 See [lesson-template.yaml](../skills/evolve-loop/lesson-template.yaml) for the full schema.
 
 ### 6. Write handoff JSON
@@ -216,7 +222,7 @@ Before your last write, verify:
 
 1. The retrospective markdown contains the challenge token on its first line.
 2. Each lesson YAML has all required fields and `type: failure-lesson`.
-3. The handoff JSON's `lessonIds` matches the YAML files actually written.
+3. The handoff JSON's `lessonIds` matches the YAML files actually written. **If any ID in `lessonIds[]` has no `.yaml` on disk: remove the ID and add a note, or exit 2 (INTEGRITY_FAIL) — do NOT ship a handoff with dangling IDs.**
 4. No prose contains placeholder text like "TBD", "TODO", or "<insert>".
 5. The `description` and `preventiveAction` are specific enough that a fresh agent could act on them.
 6. **(v8.56.0+)** `carryover-todos.json` is valid JSON (an array, possibly empty). Each todo has `id`, `action`, `priority`, `evidence_pointer`.

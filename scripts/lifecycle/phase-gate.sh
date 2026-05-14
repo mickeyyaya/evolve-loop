@@ -825,6 +825,48 @@ gate_audit_to_retrospective() {
     log "OK: AUDIT → RETROSPECTIVE gate passed"
 }
 
+# ─── Gate: RETROSPECTIVE → COMPLETE ───
+gate_retrospective_to_complete() {
+    log "Checking RETROSPECTIVE → COMPLETE gate for cycle $CYCLE"
+
+    check_file_exists "$WORKSPACE/retrospective-report.md" "Retrospective report"
+    check_file_fresh "$WORKSPACE/retrospective-report.md" "Retrospective report"
+    check_artifact_substance "$WORKSPACE/retrospective-report.md" "Retrospective report"
+    check_subagent_ledger_match "retrospective"
+
+    local _handoff="$WORKSPACE/handoff-retrospective.json"
+    check_file_exists "$_handoff" "handoff-retrospective.json"
+
+    if ! jq empty "$_handoff" 2>/dev/null; then
+        fail "handoff-retrospective.json is not valid JSON"
+    fi
+
+    # Verify lessonIds[] ↔ on-disk YAML 1:1 (INTEGRITY check — root cause of instinctSummary freeze)
+    local _lesson_ids
+    _lesson_ids=$(jq -r '.lessonIds[]? // empty' "$_handoff" 2>/dev/null)
+
+    local _missing=0
+    local _id
+    for _id in $_lesson_ids; do
+        local _found=0
+        for _f in "$EVOLVE_DIR/instincts/lessons/${_id}"*.yaml; do
+            [ -f "$_f" ] && _found=1 && break
+        done
+        if [ "$_found" -eq 0 ]; then
+            log "INTEGRITY_FAIL: lessonId '$_id' has no YAML at $EVOLVE_DIR/instincts/lessons/${_id}*.yaml"
+            _missing=$(( _missing + 1 ))
+        else
+            log "OK: lesson YAML exists for '$_id'"
+        fi
+    done
+
+    if [ "$_missing" -gt 0 ]; then
+        fail "INTEGRITY_FAIL: $_missing lesson YAML(s) in handoff-retrospective.json not found on disk — retrospective YAML write contract violated (see agents/evolve-retrospective.md Step 5)"
+    fi
+
+    log "OK: RETROSPECTIVE → COMPLETE gate passed (all lesson YAMLs verified on disk)"
+}
+
 # ─── Gate: SHIP → LEARN ───
 gate_ship_to_learn() {
     log "Checking SHIP → LEARN gate for cycle $CYCLE"
@@ -1039,6 +1081,7 @@ case "$GATE" in
     build-to-audit)       gate_build_to_audit ;;
     audit-to-ship)        gate_audit_to_ship ;;
     audit-to-retrospective) gate_audit_to_retrospective ;;
+    retrospective-to-complete) gate_retrospective_to_complete ;;
     ship-to-learn)        gate_ship_to_learn ;;
     cycle-complete)       gate_cycle_complete ;;
     *)                    fail "Unknown gate: $GATE" ;;

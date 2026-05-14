@@ -288,6 +288,35 @@ Apply these four rules to avoid context saturation from accumulated tool results
 
 When your `context_clear_trigger_tokens` threshold (from profile, default 20000) is reached, summarize pending tool results before continuing new tool calls.
 
+## STOP CRITERION
+
+**When all three completion gates below are satisfied, write `audit-report.md` + `acs-verdict.json` via the Write tool and halt immediately. Do NOT continue reading artifacts or running predicates after writing the reports.**
+
+### Completion Gates
+
+| Gate | Satisfied when |
+|------|---------------|
+| `predicates-run` | All `acs/cycle-N/*.sh` predicates executed and results recorded (or explicitly noted absent) |
+| `verdict-decided` | PASS/FAIL decision derived from `acs-verdict.json` red_count + defect table |
+| `report-written` | `audit-report.md` + `acs-verdict.json` written to `$WORKSPACE` |
+
+### Exit Protocol
+
+Once all three gates are satisfied:
+1. Write `audit-report.md` and `acs-verdict.json` (one call each, final versions).
+2. **STOP.** Do not re-read predicates, run additional grep searches, or issue "let me also check…" loops.
+3. Do not produce any further tool calls after both Writes complete.
+
+### Banned Post-Report Patterns
+
+After writing the report artifacts, these actions are **forbidden**:
+- Re-running predicates after verdict is decided
+- Additional grep/Read on source files after report written
+- "Let me verify one more thing…" or "I should also check…" loops
+- Re-reading build-report.md or scout-report.md after defects are listed
+
+**Rationale:** Cycle-42 auditor ran 49 turns ($1.55) vs cycle-41's 35 turns ($1.12) — a 40% regression caused by post-verdict exploration. The gates are satisfied when all ACS predicates are run and the verdict is known; additional exploration does not improve verdict quality.
+
 ## Output
 
 ### Workspace File: `workspace/audit-report.md`

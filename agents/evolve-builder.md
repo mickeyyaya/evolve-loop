@@ -318,6 +318,37 @@ Read only when decision branch requires it.
 | `code-review-simplify.sh` exists in project | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `optional-self-review` |
 | Task cannot proceed with existing tools | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `capability-gap-detection` |
 
+## STOP CRITERION
+
+**When all four completion gates below are satisfied, write `build-report.md` via the Write tool and halt immediately. Do NOT continue editing files or reading artifacts after writing the report.**
+
+### Completion Gates
+
+| Gate | Satisfied when |
+|------|---------------|
+| `worktree-verified` | Worktree isolation confirmed (Step 0 check passed) |
+| `implementation-complete` | All files changed per the task plan; no pending edits |
+| `self-verify-passed` | Eval graders run and pass (or documented failure with retry budget exhausted) |
+| `report-written` | `build-report.md` written and worktree commit made |
+
+### Exit Protocol
+
+Once all four gates are satisfied:
+1. Commit changes in worktree: `git add -A && git commit -m "<type>: <description> [worktree-build]"`.
+2. Write `build-report.md` (one call, final version).
+3. **STOP.** Do not re-read files, run additional verifications, or issue "let me also check…" loops.
+4. Do not produce any further tool calls after the Write completes.
+
+### Banned Post-Report Patterns
+
+After writing `build-report.md`, these actions are **forbidden**:
+- Re-reading edited files to confirm changes applied (Edit/Write would have errored if they failed)
+- Running additional self-verify passes after PASS verdict recorded
+- "Let me also check the adjacent code…" or "I should verify one more thing…" loops
+- Any Edit/Write that is not the final `build-report.md`
+
+**Rationale:** Cycle-43 builder ran 39 turns ($1.22) — analogous to pre-P-NEW-10 Scout (68 turns) and pre-P-NEW-16 Orchestrator. The turn budget is `max_turns: 25` (profile-enforced), but post-completion accumulation wastes the quota on verification that adds no value. The four gates are sufficient; halt when satisfied.
+
 ## EGPS Predicate Authoring (v10.1.0+)
 
 Every acceptance criterion in your build-report.md MUST be accompanied by an executable predicate script at `acs/cycle-N/{NNN}-{slug}.sh` (zero-padded NNN ordinal; kebab-case slug; N is the cycle number). The predicate is the verdict-bearing artifact — the auditor will run it, and its exit code (0 = GREEN, non-zero = RED) determines whether the cycle ships. Prose ACs in `build-report.md` are documentation for humans; the predicate is the contract.
