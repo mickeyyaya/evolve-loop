@@ -454,6 +454,22 @@ cycle_state_compute_cycle_tier() {
 # The checkpoint preserves: current phase, completed_phases[], active_worktree,
 # cost-at-checkpoint, git HEAD at pause. The resume-cycle.sh script reads this
 # block to re-initialize a paused cycle from its last-good phase boundary.
+#
+# v10.6.0 (auto-resume Layer 2): 4 additional fields are persisted when the
+# triggering env vars are present. Together they enable in-session auto-resume
+# via ScheduleWakeup (see docs/architecture/auto-resume.md):
+#   - quotaResetAt          ISO 8601 timestamp when the quota window resets
+#                           (from $EVOLVE_CHECKPOINT_QUOTA_RESET_AT, populated
+#                           by scripts/dispatch/estimate-quota-reset.sh)
+#   - quotaResetSource      "operator-override" | "parsed" | "default"
+#                           (from $EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE)
+#   - autoResumeAttempts    counter (starts at 0; bumped on each --resume entry;
+#                           reset to 0 after a successful post-resume phase)
+#   - autoResumeMaxAttempts cap (default 3; override via
+#                           $EVOLVE_AUTO_RESUME_MAX_ATTEMPTS)
+# Fields are always present in the schema. When the source env vars are absent
+# (e.g. checkpoint reason != "quota-likely"), quotaResetAt/Source are written as
+# empty strings — downstream `jq` queries should treat "" the same as missing.
 cycle_state_checkpoint() {
     local reason="${1:?usage: checkpoint <reason>; reasons: quota-likely | batch-cap-near | operator-requested | stall-inactivity}"
     case "$reason" in
@@ -472,6 +488,10 @@ cycle_state_checkpoint() {
     now=$(_iso_now)
     git_head=$(git -C "$EVOLVE_PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")
     local cost="${EVOLVE_CHECKPOINT_COST_USD:-0.00}"
+    # v10.6.0 auto-resume Layer 2 inputs (empty/default when not supplied).
+    local quota_reset_at="${EVOLVE_CHECKPOINT_QUOTA_RESET_AT:-}"
+    local quota_reset_source="${EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE:-}"
+    local max_attempts="${EVOLVE_AUTO_RESUME_MAX_ATTEMPTS:-3}"
     local current updated
     current=$(cat "$CYCLE_STATE_FILE")
     updated=$(echo "$current" | jq -c \
@@ -479,6 +499,9 @@ cycle_state_checkpoint() {
         --arg now "$now" \
         --arg git_head "$git_head" \
         --argjson cost "$cost" \
+        --arg quota_reset_at "$quota_reset_at" \
+        --arg quota_reset_source "$quota_reset_source" \
+        --argjson max_attempts "$max_attempts" \
         '. + {checkpoint: {
             enabled: true,
             reason: $reason,
@@ -487,10 +510,62 @@ cycle_state_checkpoint() {
             worktreePath: (.active_worktree // ""),
             completedPhases: (.completed_phases // []),
             gitHead: $git_head,
-            costAtCheckpoint: $cost
+            costAtCheckpoint: $cost,
+            quotaResetAt: $quota_reset_at,
+            quotaResetSource: $quota_reset_source,
+            autoResumeAttempts: (.checkpoint.autoResumeAttempts // 0),
+            autoResumeMaxAttempts: $max_attempts
         }}')
     _atomic_write "$updated"
-    echo "[cycle-state] CHECKPOINT written: reason=$reason resume_from_phase=$(echo "$updated" | jq -r '.checkpoint.resumeFromPhase')" >&2
+    echo "[cycle-state] CHECKPOINT written: reason=$reason resume_from_phase=$(echo "$updated" | jq -r '.checkpoint.resumeFromPhase') quota_reset_at=$quota_reset_at" >&2
+}
+
+# v10.6.0 auto-resume Layer 2: atomically increment checkpoint.autoResumeAttempts.
+# Called by the dispatcher each time /evolve-loop --resume picks up a paused
+# cycle to prevent infinite quota-resume-quota loops.
+#
+# Semantics: with autoResumeMaxAttempts=N, this function allows exactly N
+# successful increments (1, 2, ..., N — all returning rc=0). The (N+1)th
+# call refuses without mutating state and returns rc=2 ("exhausted"). The
+# dispatcher reads rc=2 as "abort the auto-resume loop and leave the marker
+# for operator intervention."
+cycle_state_bump_auto_resume_attempts() {
+    cycle_state_exists || return 1
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for bump-auto-resume-attempts" >&2
+        return 1
+    fi
+    local cur_attempts max
+    cur_attempts=$(jq -r '.checkpoint.autoResumeAttempts // 0' "$CYCLE_STATE_FILE")
+    max=$(jq -r '.checkpoint.autoResumeMaxAttempts // 3' "$CYCLE_STATE_FILE")
+    if [ "$cur_attempts" -ge "$max" ]; then
+        echo "[cycle-state] auto-resume EXHAUSTED: $cur_attempts/$max attempts already used" >&2
+        return 2
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(echo "$current" | jq -c \
+        '.checkpoint.autoResumeAttempts = ((.checkpoint.autoResumeAttempts // 0) + 1)')
+    _atomic_write "$updated"
+    local new_attempts=$((cur_attempts + 1))
+    echo "[cycle-state] auto-resume attempt $new_attempts/$max" >&2
+    return 0
+}
+
+# v10.6.0 auto-resume Layer 2: reset checkpoint.autoResumeAttempts to 0.
+# Called by resume-cycle.sh once the first post-resume phase reports success,
+# so a future quota hit on the same cycle gets a fresh retry budget.
+cycle_state_reset_auto_resume_attempts() {
+    cycle_state_exists || return 1
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for reset-auto-resume-attempts" >&2
+        return 1
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(echo "$current" | jq -c '.checkpoint.autoResumeAttempts = 0')
+    _atomic_write "$updated"
+    echo "[cycle-state] auto-resume attempts reset to 0" >&2
 }
 
 # v9.1.0: query whether the current cycle-state has an active checkpoint.
@@ -559,10 +634,12 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         is-checkpointed)         cycle_state_is_checkpointed && echo yes || { echo no; exit 1; } ;;
         resume-phase)            cycle_state_resume_phase ;;
         clear-checkpoint)        cycle_state_clear_checkpoint ;;
+        bump-auto-resume-attempts)   cycle_state_bump_auto_resume_attempts ;;
+        reset-auto-resume-attempts)  cycle_state_reset_auto_resume_attempts ;;
         get)                     cycle_state_get "$@" ;;
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|bump-auto-resume-attempts|reset-auto-resume-attempts|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

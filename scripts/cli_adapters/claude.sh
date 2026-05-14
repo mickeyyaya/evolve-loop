@@ -627,4 +627,25 @@ if [ "$EXIT_CODE" -ne 0 ] && [ -s "$STDERR_LOG" ]; then
     fi
 fi
 
+# v10.6.0 auto-resume Layer 1: capture Anthropic's "resets HH:MM(am|pm)"
+# rate-limit message from stderr if present. estimate-quota-reset.sh
+# (invoked by subagent-run.sh after _quota_likely fires) reads this file to
+# compute a precise wake-up time. Silent on no match — fallback handles the
+# common case where the outer Claude Code process intercepts the message at
+# the auth layer and the nested subprocess gets empty stderr.
+if [ -s "$STDERR_LOG" ]; then
+    _quota_hint=$(grep -ioE 'resets +[0-9]{1,2}:[0-9]{2} *(am|pm)' "$STDERR_LOG" 2>/dev/null | head -1)
+    if [ -n "$_quota_hint" ]; then
+        _hint_dir=$(dirname "$STDERR_LOG")
+        _hint_path="$_hint_dir/quota-reset-hint.txt"
+        _hint_tmp="$_hint_path.tmp.$$"
+        if printf '%s\n' "$_quota_hint" > "$_hint_tmp" 2>/dev/null && mv -f "$_hint_tmp" "$_hint_path" 2>/dev/null; then
+            echo "[claude-adapter] quota-reset hint captured: $_quota_hint -> $_hint_path" >&2
+        else
+            rm -f "$_hint_tmp" 2>/dev/null || true
+        fi
+    fi
+    unset _quota_hint _hint_dir _hint_path _hint_tmp
+fi
+
 exit "$EXIT_CODE"

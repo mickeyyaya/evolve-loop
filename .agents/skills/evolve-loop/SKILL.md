@@ -186,6 +186,54 @@ Parse `$ARGUMENTS` (v9.0.5+ — budget-first guidance, both modes supported):
 | `ultrathink` | Complex refactors | tier-1 forced | Strict + confidence |
 | `autoresearch` | Hypothesis testing | Fixed metrics, embraces failure | Divergent, unpenalized |
 
+## Quota Handling & Auto-Resume (v10.6.0+)
+
+When the dispatcher exits with `DISPATCH_RC=5` it emits a structured marker
+line:
+
+```
+QUOTA-PAUSE: cycle=N wake-at=ISO8601 source=X attempts=K/M
+```
+
+This is the Claude Code subscription quota wall: the cycle ran far enough
+to consume ≥80% of `EVOLVE_BATCH_BUDGET_CAP`, then a phase failed with
+empty stderr (the quota-likely signature). `subagent-run.sh` wrote a
+checkpoint and `cycle-state.json` carries the wake-at timestamp.
+
+**Auto-resume is always on.** When you (the model) see `DISPATCH_RC=5` /
+`QUOTA-PAUSE:` in dispatcher output, do this:
+
+1. **Parse** the `wake-at=ISO8601` value from the marker line.
+2. **Compute delay**: `delaySeconds = max(60, min(3600, wake_at_epoch - now_epoch + 60))`.
+   - Floor at 60s so a near-zero remaining window doesn't busy-loop.
+   - Cap at 3600s because `ScheduleWakeup` clamps to [60, 3600]; if the
+     window is longer, call ScheduleWakeup again on the next wake.
+3. **Call `ScheduleWakeup`** with that delay and `prompt="/evolve-loop --resume"`.
+   Provide a `reason` like `"waiting for quota reset at <wake-at>"`.
+4. On each wake, if `now < wake_at`, repeat steps 2–3 (chained wake-ups).
+5. When `now >= wake_at`, the prompt fires `/evolve-loop --resume` which
+   in turn invokes `scripts/dispatch/resume-cycle.sh` → it bumps the
+   `autoResumeAttempts` counter and re-runs the paused cycle from its
+   last clean phase boundary.
+6. The `autoResumeAttempts` cap (default 3, see `attempts=K/M` in the
+   marker) prevents infinite quota-resume-quota loops; once exhausted,
+   resume-cycle.sh exits rc=2 and leaves the marker for operator
+   intervention.
+
+**Operator interrupt window.** The QUOTA-PAUSE marker line includes the
+exact `wake-at=ISO8601` timestamp so the operator can Ctrl+C any pending
+ScheduleWakeup before it fires. There is no flag-based opt-out — the loud
+log is the intervention surface.
+
+**Fallback if `ScheduleWakeup` is unavailable.** If you cannot call
+`ScheduleWakeup` (e.g., the tool isn't loaded in this session's surface),
+log the QUOTA-PAUSE marker verbatim so the operator can resume manually:
+`bash scripts/dispatch/resume-cycle.sh`. Never silently swallow the
+DISPATCH_RC=5 signal.
+
+See `docs/architecture/auto-resume.md` for the full architectural
+contract and env-var reference.
+
 ## Architecture
 
 ```

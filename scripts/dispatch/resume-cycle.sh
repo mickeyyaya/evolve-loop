@@ -109,6 +109,30 @@ if [ -n "$WORKTREE" ] && [ "$WORKTREE" != "null" ] && [ ! -d "$WORKTREE" ]; then
     exit 1
 fi
 
+# --- Step 2b: auto-resume attempt cap (v10.6.0) ----------------------------
+#
+# Each /evolve-loop --resume invocation consumes one auto-resume attempt.
+# The cap (checkpoint.autoResumeMaxAttempts, default 3) prevents infinite
+# quota-resume-quota loops. If exhausted, refuse without running and leave
+# the checkpoint marker for operator intervention. The counter is preserved
+# across re-checkpoints (cycle_state_checkpoint copies the old value) so a
+# chain of 3 consecutive quota hits hits the cap correctly. On full success
+# the counter resets (Step 5b below).
+bash "$CYCLE_STATE_HELPER" bump-auto-resume-attempts
+bump_rc=$?
+if [ "$bump_rc" -ne 0 ]; then
+    if [ "$bump_rc" = "2" ]; then
+        log "AUTO-RESUME EXHAUSTED: this cycle has used its autoResumeMaxAttempts budget."
+        log "  the checkpoint remains intact. To override, increment the cap and re-invoke:"
+        log "    jq '.checkpoint.autoResumeMaxAttempts = 5' $STATE_FILE > $STATE_FILE.tmp && mv $STATE_FILE.tmp $STATE_FILE"
+        log "    bash scripts/dispatch/resume-cycle.sh"
+        log "  or inspect what's going wrong:"
+        log "    cat $STATE_FILE | jq .checkpoint"
+        exit 2
+    fi
+    fail "bump-auto-resume-attempts failed unexpectedly (rc=$bump_rc)"
+fi
+
 # --- Step 3: summary -------------------------------------------------------
 
 log "RESUME: cycle $CYCLE"
@@ -156,9 +180,18 @@ if [ "$rc" -ne 0 ]; then
     log "orchestrator subagent exited rc=$rc during resume"
     # If the resume itself crashed, the checkpoint block survives (run-cycle's
     # EXIT trap honors it) so a second --resume invocation can retry. The
-    # operator may need to investigate the root cause first.
+    # operator may need to investigate the root cause first. The
+    # autoResumeAttempts counter is NOT reset on failure — the cap accumulates.
     exit 3
 fi
+
+# --- Step 5b: full success — reset auto-resume budget for future cycles ----
+#
+# The cycle ran to completion (orchestrator cleared the checkpoint on the
+# terminal phase). If a fresh quota hit happens on a future cycle, it should
+# get a clean retry budget. Reset is best-effort: if cycle-state was already
+# cleared by the orchestrator, the helper exits non-zero and we ignore it.
+bash "$CYCLE_STATE_HELPER" reset-auto-resume-attempts 2>/dev/null || true
 
 log "RESUME: cycle $CYCLE completed successfully"
 exit 0

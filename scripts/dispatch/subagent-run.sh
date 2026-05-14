@@ -932,6 +932,24 @@ ADVEOF
             log "  writing checkpoint and signaling EXIT trap to preserve state"
             local _csh="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
             [ -f "$_csh" ] || _csh="$EVOLVE_PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
+            # v10.6.0 auto-resume Layer 1+2 glue: compute the estimated quota
+            # reset time and export it for cycle-state.sh checkpoint to persist
+            # in the checkpoint block. estimate-quota-reset.sh prefers
+            # EVOLVE_QUOTA_RESET_AT operator override > parsed hint file in the
+            # workspace > now + EVOLVE_QUOTA_RESET_HOURS fallback. Failure is
+            # non-fatal — we still write the checkpoint, just without timing.
+            local _eqr="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/estimate-quota-reset.sh"
+            [ -f "$_eqr" ] || _eqr="$EVOLVE_PROJECT_ROOT/scripts/dispatch/estimate-quota-reset.sh"
+            if [ -f "$_eqr" ]; then
+                local _eqr_out
+                _eqr_out=$(bash "$_eqr" "$workspace" 2>/dev/null) || _eqr_out=""
+                if [ -n "$_eqr_out" ]; then
+                    EVOLVE_CHECKPOINT_QUOTA_RESET_AT=$(printf '%s\n' "$_eqr_out" | sed -n '1p')
+                    EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE=$(printf '%s\n' "$_eqr_out" | sed -n '2p' | sed 's/^source=//')
+                    export EVOLVE_CHECKPOINT_QUOTA_RESET_AT EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE
+                    log "  quota-reset-estimate: at=$EVOLVE_CHECKPOINT_QUOTA_RESET_AT source=$EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE"
+                fi
+            fi
             if bash "$_csh" checkpoint quota-likely 2>/dev/null; then
                 log "  checkpoint written; resume with: bash scripts/dispatch/evolve-loop-dispatch.sh --resume"
             else

@@ -886,6 +886,31 @@ for ((i=1; i<=CYCLES; i++)); do
     rc=$?
 
     if [ "$rc" -ne 0 ]; then
+        # v10.6.0 auto-resume Layer 3: detect a fresh quota-likely checkpoint
+        # FIRST (before the recoverable-failure classifier). If the cycle
+        # paused because of a Claude Code subscription quota hit, emit a
+        # structured QUOTA-PAUSE marker and exit DISPATCH_RC=5 so the SKILL
+        # layer (and any wrapping /loop) can call ScheduleWakeup until the
+        # wake-at timestamp and re-invoke /evolve-loop --resume.
+        cycle_state_file="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
+        if [ -f "$cycle_state_file" ] && command -v jq >/dev/null 2>&1; then
+            cp_enabled=$(jq -r '.checkpoint.enabled // false' "$cycle_state_file" 2>/dev/null)
+            cp_reason=$(jq -r '.checkpoint.reason // ""' "$cycle_state_file" 2>/dev/null)
+            if [ "$cp_enabled" = "true" ] && [ "$cp_reason" = "quota-likely" ]; then
+                cp_cycle=$(jq -r '.cycle_id // .cycle // "?"' "$cycle_state_file" 2>/dev/null)
+                cp_wake=$(jq -r '.checkpoint.quotaResetAt // ""' "$cycle_state_file" 2>/dev/null)
+                cp_source=$(jq -r '.checkpoint.quotaResetSource // "unknown"' "$cycle_state_file" 2>/dev/null)
+                cp_attempts=$(jq -r '.checkpoint.autoResumeAttempts // 0' "$cycle_state_file" 2>/dev/null)
+                cp_max=$(jq -r '.checkpoint.autoResumeMaxAttempts // 3' "$cycle_state_file" 2>/dev/null)
+                log "QUOTA-PAUSE: cycle=$cp_cycle wake-at=$cp_wake source=$cp_source attempts=$cp_attempts/$cp_max"
+                log "  to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until $cp_wake then /evolve-loop --resume"
+                log "  to resume manually: bash scripts/dispatch/resume-cycle.sh"
+                DISPATCH_RC=5
+                STOP_REASON="quota-pause"
+                break
+            fi
+        fi
+
         # v8.30.0: classify before aborting — fluent-mode philosophy.
         #
         # Pre-v8.30.0: ANY non-zero exit from run-cycle.sh aborted the entire
@@ -1180,6 +1205,13 @@ elif [ "$DISPATCH_RC" = "2" ]; then
     log "  → inspect $LEDGER for the cycle in question; the orchestrator may"
     log "  → have invoked the in-process Agent tool, edited files inline, or"
     log "  → used an unauthorized escape hatch. Treat this as a CRITICAL finding."
+elif [ "$DISPATCH_RC" = "5" ]; then
+    log "QUOTA-PAUSE: batch paused on a Claude Code subscription quota hit (v10.6.0 auto-resume)"
+    log "  → the cycle's worktree + cycle-state.json are preserved on disk"
+    log "  → the SKILL layer (or wrapping /loop) should call ScheduleWakeup until the wake-at timestamp"
+    log "     emitted above (QUOTA-PAUSE: wake-at=...), then re-invoke /evolve-loop --resume"
+    log "  → to resume manually right now: bash scripts/dispatch/resume-cycle.sh"
+    log "  → to inspect: cat $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json | jq .checkpoint"
 else
     log "DONE-WITH-FAILURE: run-cycle.sh failed; see logs above"
 fi
