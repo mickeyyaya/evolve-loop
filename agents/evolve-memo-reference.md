@@ -41,6 +41,10 @@ State the top-pick ID and its sequencing rationale in 2–4 sentences. If a prec
 | New carryover entries not in carryover-todos.json | carryover-todos.json (via reconcile-carryover-todos.sh) |
 | Any section that causes total line count to exceed 100 | Split into next cycle's memo if needed |
 
+### Output discipline (v11.0)
+
+Write `memo.md` and `carryover-todos.json` in a single turn (two `Write` calls in one message). Do not issue any tool calls after both Writes complete.
+
 ### Downstream consumers
 
 `merge-lesson-into-state.sh` reads `handoff-retrospective.json` to extract lesson context before writing instincts to `state.json`.

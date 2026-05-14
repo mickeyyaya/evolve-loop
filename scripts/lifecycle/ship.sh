@@ -869,5 +869,18 @@ if [ "$DRY_RUN" = "1" ]; then
     exit 0
 fi
 
+# v11.0 T1: Auto-heal expected_ship_sha after any successful cycle push.
+# If ship.sh itself was included in the shipped commit, its on-disk SHA changed
+# after the ff-merge. Re-read and re-pin so the next cycle's ship-gate does not
+# integrity_fail on a legitimate self-update.
+if [ "$SHIP_CLASS" = "cycle" ]; then
+    _post_sha=$(SHA256 "${BASH_SOURCE[0]}")
+    if [ "$_post_sha" != "$ACTUAL_SHIP_SHA" ]; then
+        ACTUAL_SHIP_SHA="$_post_sha"
+        _repin_ship_sha "post-cycle self-update (ship.sh changed in this commit)"
+    fi
+    unset _post_sha
+fi
+
 log "DONE: shipped $CURRENT_BRANCH at $(git rev-parse HEAD)"
 exit 0

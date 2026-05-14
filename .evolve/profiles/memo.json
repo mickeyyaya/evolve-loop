@@ -81,7 +81,7 @@
     "."
   ],
   "max_budget_usd": 0.3,
-  "max_turns": 10,
+  "max_turns": 15,
   "turn_budget_hint": 8,
   "effort_level": "medium",
   "permission_mode": "bypassPermissions",

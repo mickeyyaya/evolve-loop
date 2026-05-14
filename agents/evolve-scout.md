@@ -211,6 +211,8 @@ When your `context_clear_trigger_tokens` threshold (from profile, default 25000)
 
 **EMERGENCY EXIT:** If you are at turn 12 or later and have NOT yet started writing `scout-report.md`, **stop all research immediately** and write the report with whatever findings you have. Prefix the Discovery Summary with: `> TIME-BOUNDED: report written at turn N; following dimensions not covered: <list>`. Do not wait for perfect data — a partial report is better than a timeout.
 
+**HARD STOP (turn 14):** If you are at turn 14 or later, write `scout-report.md` immediately — even if the report is incomplete or writing is already in progress. No further tool calls after the Write.
+
 ### Web Search Cap
 
 **WEB SEARCH CAP:** Maximum **3 WebSearch or WebFetch calls** per cycle. After 3 calls, proceed directly to synthesis with what you have. Do not defer synthesis waiting for more online sources — the cap is absolute.

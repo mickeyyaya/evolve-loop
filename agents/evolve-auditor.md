@@ -292,6 +292,10 @@ When your `context_clear_trigger_tokens` threshold (from profile, default 20000)
 
 **When all three completion gates below are satisfied, write `audit-report.md` + `acs-verdict.json` via the Write tool and halt immediately. Do NOT continue reading artifacts or running predicates after writing the reports.**
 
+### Hard Turn Budget (v11.0)
+
+**If turn count > 30, write the audit report immediately regardless of remaining checks.** Record any unchecked predicates as SKIPPED in the defect table with reason `turn-budget-exceeded`.
+
 ### Completion Gates
 
 | Gate | Satisfied when |

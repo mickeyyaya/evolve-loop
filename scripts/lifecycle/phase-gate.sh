@@ -474,6 +474,20 @@ gate_plan_review_to_tdd() {
     log "PASS: PLAN-REVIEW → TDD gate"
 }
 
+# ─── Abnormal event appender (v11.0) ───
+# Writes a structured event to $WORKSPACE/abnormal-events.jsonl.
+# Args: event_type, details, remediation_hint
+# Source phase is hard-coded as "phase-gate".
+_append_abnormal_event() {
+    local _et="$1" _det="$2" _rem="$3"
+    [ -d "${WORKSPACE:-}" ] || return 0
+    local _ts; _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local _det_esc; _det_esc=$(printf '%s' "$_det" | sed 's/"/\\"/g')
+    local _rem_esc; _rem_esc=$(printf '%s' "$_rem" | sed 's/"/\\"/g')
+    printf '{"event_type":"%s","timestamp":"%s","source_phase":"phase-gate","severity":"WARN","details":"%s","remediation_hint":"%s"}\n' \
+        "$_et" "$_ts" "$_det_esc" "$_rem_esc" >> "$WORKSPACE/abnormal-events.jsonl" 2>/dev/null || true
+}
+
 # ─── Builder isolation breach detector (v8.N) ───
 # Scans PROJECT_ROOT sensitive directories for files newer than the scout-report
 # (written before the build phase). Files newer than scout-report were written
@@ -507,6 +521,10 @@ _check_builder_isolation_breach() {
                 '{ts:$ts,cycle:$cycle,kind:"gate-observation",classification:"builder-isolation-breach",stray_files:$stray}')
             printf '%s\n' "$entry" >> "$LEDGER" 2>/dev/null || true
         fi
+        # v11.0 T3: Wire to abnormal-events.jsonl so retro pipeline sees breach events.
+        _append_abnormal_event "builder-isolation-breach" \
+            "Builder wrote to PROJECT_ROOT tracked files: $breach_output" \
+            "Ensure Builder edits only the per-cycle worktree, not PROJECT_ROOT directly"
         if [ "${EVOLVE_BUILDER_ISOLATION_STRICT:-1}" = "1" ]; then
             fail "Builder isolation breach: uncommitted tracked-file modifications on PROJECT_ROOT main branch during build phase (set EVOLVE_BUILDER_ISOLATION_STRICT=0 for warn-only)"
         fi
