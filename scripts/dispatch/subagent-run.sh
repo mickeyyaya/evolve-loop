@@ -59,6 +59,18 @@ log() { echo "[subagent-run] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
 integrity_fail() { log "INTEGRITY-FAIL: $*"; exit 2; }
 
+# abnormal-events.jsonl schema: {event_type, timestamp, source_phase, severity, details, remediation_hint}
+# Append a structured event to workspace/abnormal-events.jsonl (best-effort, never fails the pipeline).
+_append_abnormal_event() {
+    local _ws="$1" _et="$2" _sev="$3" _det="$4" _rem="$5"
+    [ -d "$_ws" ] || return 0
+    local _ts; _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local _det_esc; _det_esc=$(printf '%s' "$_det" | sed 's/"/\\"/g')
+    local _rem_esc; _rem_esc=$(printf '%s' "$_rem" | sed 's/"/\\"/g')
+    printf '{"event_type":"%s","timestamp":"%s","source_phase":"subagent-run","severity":"%s","details":"%s","remediation_hint":"%s"}\n' \
+        "$_et" "$_ts" "$_sev" "$_det_esc" "$_rem_esc" >> "$_ws/abnormal-events.jsonl" 2>/dev/null || true
+}
+
 # v9.1.0 Cycle 3: classify the current failure as quota-likely if it matches
 # the Claude Code subscription quota-exhaustion signature.
 #
@@ -964,6 +976,9 @@ ADVEOF
             export EVOLVE_CHECKPOINT_TRIGGERED=1
         fi
 
+        _append_abnormal_event "$workspace" "dispatch-error" "HIGH" \
+            "agent=$agent cycle=$cycle cli_exit=$cli_exit" \
+            "Check ${workspace}/${agent}-stderr.log; if quota-likely, resume with --resume flag"
         unset _stderr_tail
         exit 1
     fi

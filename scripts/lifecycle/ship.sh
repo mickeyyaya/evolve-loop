@@ -79,7 +79,18 @@ STATE="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
 
 log()           { echo "[ship] $*" >&2; }
 fail()          { log "FAIL: $*"; exit 1; }
-integrity_fail(){ log "INTEGRITY-FAIL: $*"; exit 2; }
+integrity_fail(){
+    log "INTEGRITY-FAIL: $*"
+    # append abnormal event when ARTIFACT_PATH is known (workspace = dirname ARTIFACT_PATH)
+    if [ -n "${ARTIFACT_PATH:-}" ]; then
+        local _ws; _ws="$(dirname "$ARTIFACT_PATH")"
+        local _ts; _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        local _det_esc; _det_esc=$(printf '%s' "$*" | sed 's/"/\\"/g')
+        printf '{"event_type":"ship-refused","timestamp":"%s","source_phase":"ship","severity":"HIGH","details":"%s","remediation_hint":"Review audit-report.md and re-run auditor if cycle state has changed"}\n' \
+            "$_ts" "$_det_esc" >> "$_ws/abnormal-events.jsonl" 2>/dev/null || true
+    fi
+    exit 2
+}
 
 # v8.50.0: --dry-run helpers. dry_log emits a "would" message; dry_skip is the
 # semantic guard at every git/gh mutation site. Read-only checks (audit-binding,

@@ -147,7 +147,9 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 5a. PASS         →  advance ship orchestrator  →  ship.sh "<commit-msg>"
                     advance learn memo  (v8.57.0+ Layer P)
                     subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json + memo.md cycle memo — see Layer-P Memo Phase Contract)
-                    merge-lesson-into-state.sh $WORKSPACE  (writes new carryoverTodos with cycles_unpicked=0)
+                    merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?
+                    if [ $MERGE_RC -eq 2 ]; then exit 2; fi  # INTEGRITY_FAIL: lesson YAML missing
+                    [ $MERGE_RC -ne 0 ] && log "WARN: merge-lesson-into-state exit $MERGE_RC"
                     reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict PASS  (Layer D)
 5b. WARN (v8.35.0+) →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
                        advance ship orchestrator  →  ship.sh "<commit-msg>"

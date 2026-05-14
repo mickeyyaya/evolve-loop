@@ -785,15 +785,29 @@ gate_audit_to_retrospective() {
     check_artifact_substance "$WORKSPACE/audit-report.md" "Audit report"
     check_subagent_ledger_match "auditor"
 
-    # Verdict must be FAIL or WARN (PASS uses gate_audit_to_ship)
+    # Verdict must be FAIL or WARN (PASS uses gate_audit_to_ship), UNLESS
+    # abnormal-events.jsonl is non-empty — PASS cycles with abnormal events
+    # must also run retrospective to capture structured lessons (v46+).
+    local _has_abnormal=0
+    if [ -s "$WORKSPACE/abnormal-events.jsonl" ]; then
+        _has_abnormal=1
+        log "INFO: abnormal-events.jsonl non-empty — allowing retro even on PASS verdict"
+    fi
     if grep -qiE "Verdict:[[:space:]]*\*?\*?[[:space:]]*PASS|## Verdict[[:space:]]*\*?\*?[[:space:]]*PASS" "$WORKSPACE/audit-report.md"; then
-        # PASS without FAIL/WARN — wrong gate, should be audit-to-ship
+        # PASS without FAIL/WARN — wrong gate unless abnormal events present
         if ! grep -qiE "Verdict:.*FAIL|Verdict:.*WARN|## Verdict.*FAIL|## Verdict.*WARN" "$WORKSPACE/audit-report.md"; then
-            fail "Audit verdict is PASS — use audit-to-ship gate, not audit-to-retrospective"
+            if [ "$_has_abnormal" -eq 0 ]; then
+                fail "Audit verdict is PASS — use audit-to-ship gate, not audit-to-retrospective (no abnormal events present)"
+            fi
+            # PASS + abnormal events: allow retro and set a WARN-class verdict marker
+            echo "PASS-WITH-ABNORMAL" > "$WORKSPACE/.cycle-verdict"
+            log "OK: PASS verdict with non-empty abnormal-events.jsonl — retrospective triggered"
+            log "OK: AUDIT → RETROSPECTIVE gate passed (abnormal-events-triggered)"
+            return 0
         fi
     fi
     if ! grep -qiE "Verdict:.*FAIL|Verdict:.*WARN|## Verdict.*FAIL|## Verdict.*WARN" "$WORKSPACE/audit-report.md"; then
-        fail "Audit verdict not FAIL or WARN — retrospective requires a failure-class verdict"
+        fail "Audit verdict not FAIL or WARN — retrospective requires a failure-class verdict (or non-empty abnormal-events.jsonl)"
     fi
     # v8.58.0 Layer E1: write .cycle-verdict so downstream gates know which
     # failure-class verdict was observed (FAIL vs WARN). Disambiguates so memo

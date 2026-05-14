@@ -38,6 +38,15 @@ DISABLE="${EVOLVE_INACTIVITY_DISABLE:-0}"
 _log() {
     printf '[phase-watchdog] %s\n' "$*" >&2
 }
+# abnormal-events.jsonl: append stall-detected event (best-effort).
+_append_abnormal_event() {
+    local _ws="$1" _det="$2"
+    [ -d "$_ws" ] || return 0
+    local _ts; _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local _det_esc; _det_esc=$(printf '%s' "$_det" | sed 's/"/\\"/g')
+    printf '{"event_type":"stall-detected","timestamp":"%s","source_phase":"phase-watchdog","severity":"HIGH","details":"%s","remediation_hint":"Check agent turn count; reduce scope or increase EVOLVE_INACTIVITY_THRESHOLD_S"}\n' \
+        "$_ts" "$_det_esc" >> "$_ws/abnormal-events.jsonl" 2>/dev/null || true
+}
 
 # Portable mtime: try BSD stat first (macOS), then GNU stat, fallback to 0.
 get_mtime() {
@@ -223,6 +232,7 @@ while true; do
             stall_tmp="${stall_file}.tmp.$$"
             printf '%s\n' "$stall_json" > "$stall_tmp" && mv -f "$stall_tmp" "$stall_file" || true
             _log "wrote stall-progress.json: $stall_file"
+            _append_abnormal_event "$WORKSPACE" "idle_s=${idle_s} threshold_s=${THRESHOLD_S} last_file=${best_path} cycle=${CYCLE}"
 
             # b) Run checkpoint via cycle-state.sh (best-effort).
             __wdog_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

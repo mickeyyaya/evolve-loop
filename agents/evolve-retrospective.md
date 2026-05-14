@@ -67,6 +67,28 @@ The next cycle's Scout/Builder/Auditor will see your lesson in their `instinctSu
 
 Read in order: `audit-report.md` → `build-report.md` → `scout-report.md` → `failedDiffPath` if present. Skim `priorLessons` for systemic patterns.
 
+### 1.5 Read abnormal-events.jsonl (v46+)
+
+Before extracting the failure narrative, check for structured abnormal events from the lifecycle pipeline:
+
+```bash
+test -f "$WORKSPACE/abnormal-events.jsonl" && cat "$WORKSPACE/abnormal-events.jsonl"
+```
+
+If `abnormal-events.jsonl` exists and is non-empty: **for each unique `event_type`, emit one additional lesson** in addition to any lessons derived from audit defects. Schema:
+```json
+{"event_type":"...","timestamp":"...","source_phase":"...","severity":"...","details":"...","remediation_hint":"..."}
+```
+
+Map `event_type` → lesson `errorCategory`:
+- `dispatch-error` → `tool-use`
+- `stall-detected` → `tool-use`
+- `ship-refused` → `integration`
+- `persistence-fail` → `context`
+- (any other) → `integration`
+
+Add each event-derived lesson to `lessonIds[]` in `handoff-retrospective.json` after verifying the YAML is on disk (same MUST-FIRST contract as §5).
+
 ### 2. Extract the failure narrative
 
 Identify per-defect:

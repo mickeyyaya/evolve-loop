@@ -41,6 +41,17 @@ LESSONS_DIR="$EVOLVE_PROJECT_ROOT/.evolve/instincts/lessons"
 
 log() { echo "[merge-lesson] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
+# Append a structured abnormal event to workspace/abnormal-events.jsonl (best-effort).
+# Schema: {event_type, timestamp, source_phase, severity, details, remediation_hint}
+_append_abnormal_event() {
+    local _ws="$1" _et="$2" _sev="$3" _det="$4" _rem="$5"
+    [ -d "$_ws" ] || return 0
+    local _ts; _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local _det_esc; _det_esc=$(printf '%s' "$_det" | sed 's/"/\\"/g')
+    local _rem_esc; _rem_esc=$(printf '%s' "$_rem" | sed 's/"/\\"/g')
+    printf '{"event_type":"%s","timestamp":"%s","source_phase":"merge-lesson","severity":"%s","details":"%s","remediation_hint":"%s"}\n' \
+        "$_et" "$_ts" "$_sev" "$_det_esc" "$_rem_esc" >> "$_ws/abnormal-events.jsonl" 2>/dev/null || true
+}
 
 [ $# -ge 1 ] || fail "usage: merge-lesson-into-state.sh <workspace_path>"
 
@@ -116,6 +127,9 @@ for id in "${LESSON_IDS[@]}"; do
         # Try exact-name fallback.
         if [ ! -f "$LESSONS_DIR/${id}.yaml" ]; then
             log "INTEGRITY-FAIL: lesson $id referenced in handoff but no file under $LESSONS_DIR"
+            _append_abnormal_event "$WORKSPACE" "persistence-fail" "HIGH" \
+                "lesson $id referenced in handoff but YAML missing at $LESSONS_DIR" \
+                "Retrospective must verify YAML on-disk before adding ID to lessonIds[] (see evolve-retrospective.md Step 5)"
             exit 2
         fi
     fi

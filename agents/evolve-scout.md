@@ -164,6 +164,20 @@ Apply these four rules to avoid context saturation from accumulated tool results
 - No speculative pre-loading: use Glob+Grep to locate before Reading.
 - Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
 
+### BANNED Patterns (P-NEW-27)
+
+Using `Bash` when a native tool would work is **BANNED**. Cycle-45 telemetry: 36 Bash calls vs. 4 WebSearch = $1.30 scout cost (target ≤$0.50). Use the mapping:
+
+| ❌ BANNED (Bash) | ✅ REQUIRED (native) |
+|---|---|
+| `Bash: cat file.sh \| head -50` | `Read(file.sh, limit=50)` |
+| `Bash: ls .evolve/profiles/` | `Glob("*.json", path=".evolve/profiles/")` |
+| `Bash: grep "pattern" file.md` | `Grep("pattern", glob="*.md")` |
+| `Bash: find . -name "*.sh"` | `Glob("**/*.sh")` |
+| `Bash: wc -l file` | `Read(file, limit=5)` to spot-check size |
+
+**Bash is ONLY permitted for:** shell-only operations (`jq`, `date`, `git log`, script execution), commands that mutate state, or multi-step pipelines with no native equivalent.
+
 When your `context_clear_trigger_tokens` threshold (from profile, default 25000) is reached, summarize pending tool results before continuing new tool calls.
 
 ## Reference Index (Layer 3, on-demand)
