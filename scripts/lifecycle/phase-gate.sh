@@ -480,36 +480,22 @@ gate_plan_review_to_tdd() {
 # during the build phase; if they land in sensitive PROJECT_ROOT dirs instead of
 # the worktree, it is a builder isolation breach.
 #
-# EVOLVE_BUILDER_ISOLATION_CHECK=1  — enable detection (default OFF)
-# EVOLVE_BUILDER_ISOLATION_STRICT=1 — fail the gate on breach (requires CHECK=1; default OFF)
+# EVOLVE_BUILDER_ISOLATION_CHECK=0  — set to 0 to disable detection (default ON)
+# EVOLVE_BUILDER_ISOLATION_STRICT=0 — set to 0 for warn-only mode (default ON: fail the gate)
 #
-# When both flags are at their defaults (0), this function returns immediately —
-# Tier-1 byte-equivalence: PASS-path artifacts are untouched.
+# Uses `git diff --quiet HEAD` against EVOLVE_PROJECT_ROOT to detect any
+# uncommitted tracked-file modifications during the build phase — covers ALL
+# paths, not just evals/instincts. Operator can set CHECK=0 to disable or
+# STRICT=0 for warn-only mode.
 _check_builder_isolation_breach() {
-    [ "${EVOLVE_BUILDER_ISOLATION_CHECK:-0}" = "1" ] || return 0
+    [ "${EVOLVE_BUILDER_ISOLATION_CHECK:-1}" = "1" ] || return 0
 
-    local ref_file="$WORKSPACE/scout-report.md"
-    if [ ! -f "$ref_file" ]; then
-        log "WARN[builder-isolation]: scout-report.md missing, skipping isolation check"
-        return 0
-    fi
+    local breach_output
+    breach_output=$(git -C "${EVOLVE_PROJECT_ROOT:-.}" diff HEAD --name-only 2>/dev/null || true)
 
-    local stray_found=0
-    local stray_list=""
-    local dir
-    for dir in "$EVOLVE_DIR/evals" "$EVOLVE_DIR/instincts"; do
-        [ -d "$dir" ] || continue
-        local found
-        found=$(find "$dir" -newer "$ref_file" -type f 2>/dev/null | head -20 | tr '\n' ' ' || true)
-        if [ -n "$found" ]; then
-            stray_list="${stray_list}${found}"
-            stray_found=1
-        fi
-    done
-
-    if [ "$stray_found" = "1" ]; then
-        log "WARN[builder-isolation-breach]: Builder wrote to PROJECT_ROOT sensitive paths during build phase:"
-        log "  Stray files: $stray_list"
+    if [ -n "$breach_output" ]; then
+        log "WARN[builder-isolation-breach]: Builder wrote to PROJECT_ROOT tracked files during build phase:"
+        log "  Modified: $breach_output"
         if command -v jq >/dev/null 2>&1 && [ -f "${LEDGER:-}" ]; then
             local ts
             ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -517,15 +503,15 @@ _check_builder_isolation_breach() {
             entry=$(jq -nc \
                 --arg ts "$ts" \
                 --argjson cycle "${CYCLE:-0}" \
-                --arg stray "$stray_list" \
+                --arg stray "$breach_output" \
                 '{ts:$ts,cycle:$cycle,kind:"gate-observation",classification:"builder-isolation-breach",stray_files:$stray}')
             printf '%s\n' "$entry" >> "$LEDGER" 2>/dev/null || true
         fi
-        if [ "${EVOLVE_BUILDER_ISOLATION_STRICT:-0}" = "1" ]; then
-            fail "Builder isolation breach: files written to PROJECT_ROOT sensitive paths (set EVOLVE_BUILDER_ISOLATION_STRICT=0 for warn-only)"
+        if [ "${EVOLVE_BUILDER_ISOLATION_STRICT:-1}" = "1" ]; then
+            fail "Builder isolation breach: uncommitted tracked-file modifications on PROJECT_ROOT main branch during build phase (set EVOLVE_BUILDER_ISOLATION_STRICT=0 for warn-only)"
         fi
     else
-        log "OK: No builder isolation breach detected in PROJECT_ROOT sensitive paths"
+        log "OK: No builder isolation breach detected (git diff HEAD is clean)"
     fi
 }
 
@@ -589,7 +575,7 @@ gate_build_to_audit() {
     # 4. Builder cost-overrun guard (v8.60+)
     _check_builder_cost_overrun
 
-    # 4b. Builder isolation breach detector (v8.N, default OFF; see EVOLVE_BUILDER_ISOLATION_CHECK)
+    # 4b. Builder isolation breach detector (v10.6+, default ON; set EVOLVE_BUILDER_ISOLATION_CHECK=0 to disable)
     _check_builder_isolation_breach
 
     # 5. Mutation testing on Builder-created eval files (cycle-19 + cycle-21 fix).

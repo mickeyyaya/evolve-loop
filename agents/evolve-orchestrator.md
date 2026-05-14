@@ -80,6 +80,17 @@ Phase sequence in v10.3+: `Scout → Triage → Builder → **Tester** → Audit
 
 The Tester adds ~3-5 minutes wall time per cycle but breaks the AC-by-grep gaming pattern structurally (Builder cannot self-validate; Tester writes the predicates Builder's claims are checked against).
 
+**`EVOLVE_TEST_PHASE_ENABLED` gate (v10.6+, default=0):** The Tester phase is opt-in. When the env var is unset or `0`, skip the `advance test tester` + `subagent-run.sh tester` invocation and fall back to the v10.1 Builder-predicate path (Builder writes `acs/cycle-N/*.sh` predicates itself). Set `EVOLVE_TEST_PHASE_ENABLED=1` to activate the Tester subagent. This gate exists because `tester.json` profile and `agents/evolve-tester.md` are present but the phase is not yet default-on; forcing it caused 241s watchdog kills when the subagent-run.sh allowlist was missing `tester`.
+
+```bash
+# Orchestrator pattern for Tester phase (only when EVOLVE_TEST_PHASE_ENABLED=1):
+if [ "${EVOLVE_TEST_PHASE_ENABLED:-0}" = "1" ]; then
+    cycle-state.sh advance test tester
+    subagent-run.sh tester "$CYCLE" "$WORKSPACE"
+fi
+# Otherwise: Builder writes its own acs/cycle-N/*.sh predicates (v10.1 fallback, always available)
+```
+
 If Tester is unavailable (legacy profile, fallback mode), Builder writes its own predicates per v10.1 (already-shipped backward compat).
 
 ## EGPS Verdict-of-Record (v10.1.0+)

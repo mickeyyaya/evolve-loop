@@ -268,7 +268,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 
 **Cycle-40 cost snapshot:** Scout $1.57 (40 turns) / Triage $0.37 / Builder $1.09 / Auditor $2.09 (Opus 4.7 — regression) / Retrospective $0.36. **Total: $5.48.** Auditor Opus regression (+$0.96 vs cycle-39 Sonnet $1.13) erased P-NEW-10 gains. Cumulative from cycle-11 $6.70 baseline: **>18% reduction achieved** (29% target not yet reached due to auditor regression).
 
-**Cycle-41 fixes shipped:** P-NEW-2 (auditor default Sonnet — expected to recover $0.97/cycle); `scout-stop-tighten` (emergency exit turn 12 + max-3 WebSearch cap — targets 40→≤20 turns, ~$0.50/cycle).
+**Cycle-41 fixes shipped:** P-NEW-2 (auditor default Sonnet — expected to recover $0.97/cycle); P-NEW-9 (orchestrator 3-bullet summarization, 50KB→10KB accumulated context); `scout-stop-tighten` (emergency exit turn 12 + max-3 WebSearch cap — targets 40→≤20 turns, ~$0.50/cycle). Builder worktree isolation enforcement promoted to default-ON (`EVOLVE_BUILDER_ISOLATION_CHECK=1` + `EVOLVE_BUILDER_ISOLATION_STRICT=1`) — cost-prevention: breach incidents cost ~$5.48/cycle in wasted retries (cycles 6, 40, 41); `git diff --quiet HEAD` replaces narrow evals/instincts directory scan. Tester allowlist added to `subagent-run.sh` — prevents 241s watchdog kills when orchestrator advances to test phase.
 
 **P-NEW-10 confirmed:** $0.97/cycle actual saving (cycle 39→40 delta). Target ≤20 turns still pending; cycle-41 scout ran 40 turns — further improvement on track.
 
@@ -289,14 +289,14 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P7 TOON structured outputs | PENDING | No TSV template or parser; benchmark updated to 40–65% (was 30–60%) |
 | P8 LLMLingua integration | PENDING | No integration; external dep |
 | P-NEW-1 Flags A–D default-on | DONE (cycle 24) | `EVOLVE_CONTEXT_DIGEST` + `EVOLVE_ANCHOR_EXTRACT` promoted to `default=1` in `role-context-builder.sh`; v9.4.0 |
-| P-NEW-2 Auditor Sonnet right-sizing | **IN-PROGRESS (cycle 41)** | `auditor.json:model_tier_default` changed to `sonnet`; `clean_build=opus` removed; `adversarial_audit=opus` added. Expected saving: $0.97/cycle. Verification: next cycle's `auditor-usage.json` model field. |
+| P-NEW-2 Auditor Sonnet right-sizing | **DONE (cycle 41)** | `auditor.json:model_tier_default` changed to `sonnet`; `clean_build=opus` removed; `adversarial_audit=opus` added. Shipped `bb4e52d`. Expected saving: $0.97/cycle. Verification: next cycle's `auditor-usage.json` model field confirms. |
 | P-NEW-3 evolve-scout.md Layer-3 split | DONE (cycle 24) | `agents/evolve-scout-reference.md` created; `evolve-scout.md` trimmed 334→167 lines |
 | P-NEW-4 EVOLVE_REQUIRE_* consolidation | PENDING | `EVOLVE_REQUIRED_PHASES` not implemented |
 | P-NEW-5 Deprecated flag removal | BRIDGES-ACTIVE | 5 flags w/ bridges; removal target v8.61+ MISSED; cycle 26+ |
 | P-NEW-6 Tool-result clearing | DONE (cycle 36) | Profile field `context_clear_trigger_tokens` added to builder/scout/auditor; Tool-Result Hygiene subsection in 3 persona files; `subagent-run.sh` advisory log; `scripts/observability/tool-result-saturation.sh` NEW. |
 | P-NEW-7 SkillReducer Layer-3 split | PARTIAL | `phases.md` split done; other skill files pending |
 | P-NEW-8 AgentDiet filtering | **DONE (cycle 40)** | `jq` filter in `role-context-builder.sh` builder section: `select(.classification \| test("code-build-fail\|code-quality"))`. FSE 2026 benchmark: 39.9–59.7% input token reduction. Next-cycle telemetry confirms. |
-| P-NEW-9 Orchestrator summarization | **IN-FLIGHT (cycle 41)** | `## Phase-Report Reading Protocol (P-NEW-9)` section added to `agents/evolve-orchestrator.md`; 3-bullet summary protocol (verdict + SHA + top defects); SHA preservation rule. Next-cycle telemetry confirms context reduction. |
+| P-NEW-9 Orchestrator summarization | **DONE (cycle 41)** | `## Phase-Report Reading Protocol (P-NEW-9)` section added to `agents/evolve-orchestrator.md`; 3-bullet summary protocol (verdict + SHA + top defects); SHA preservation rule. Shipped `2522dbc`. Expected reduction: orchestrator accumulated context 50KB→10KB (~$0.10–0.30/cycle). |
 | P-NEW-10 Scout stop-criterion | **DONE (cycle 40)** | `## STOP CRITERION` section added to `agents/evolve-scout.md`; 4 completion gates; banned post-report pattern list. **Cycle-40 actual saving: $0.97/cycle** (scout turns 68→40, cost $2.54→$1.57, −38%). Target ≤20 turns still pending (cycle-41 scout: 40 turns — progress confirmed). |
 | P-NEW-11 MCP Compaction | RESEARCH | Cycle 45+; new external API dependency |
 | P-NEW-12 RLM context folding | RESEARCH | Cycle 50+; paradigm-level; no prod deployments |
