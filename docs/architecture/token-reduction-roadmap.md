@@ -310,7 +310,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-18 EVOLVE_CACHE_PREFIX_V2 default-on | **DONE (cycle 43)** | Default changed from `:-0` to `:-1` in `scripts/dispatch/subagent-run.sh` and `scripts/cli_adapters/claude.sh`. `docs/architecture/control-flags.md` updated. Overdue since v8.62 target (shipped v10.6). Expected saving: $0.10–0.30/cycle. |
 | P-NEW-19 Auditor stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-auditor.md`; 3 named gates + banned post-report patterns. ~30 LoC. Expected saving: $0.30–0.50/cycle. |
 | P-NEW-20 Builder stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-builder.md`; 4 named gates + banned post-report patterns. ~40 LoC. Expected saving: $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22). |
-| P-NEW-21 AgentDiet full trajectory compression | **PENDING (cycle 45+)** | Full expired-tool-result removal for Builder multi-turn read phases. Research: AgentDiet (FSE 2026, arXiv:2509.23586); 39.9–59.7% input token reduction. ~profile-level contract changes. Expected: 20–30% Builder cost reduction (~$0.25/cycle). |
+| P-NEW-21 AgentDiet full trajectory compression | **DONE (cycle 45)** | `context_compact_expired_tool_results: true` + `context_compact_threshold_tokens: 3000` added to `builder.json`; "Tool-Result Trajectory Compression" section added to `agents/evolve-builder.md`. Expected: 20–30% Builder cost reduction; cycle-44 baseline 9.9M → target ≤5M cache_read_tokens. |
 | P-NEW-22 Selective MCP tool-schema measurement | **PENDING (cycle 46+)** | Measure whether `--allowedTools` reduces serialized schema tokens in `claude -p`. If not, add schema filtering at dispatch layer. Research: GitHub Blog 2026-05-13, MindStudio, MCP SEP-1576. Expected: 5–20% per-turn input token reduction. Measurement-first. |
 | P-NEW-23 Token-budget-aware turn hints | **DONE (cycle 44)** | `emit_budget_hint()` in `role-context-builder.sh`; `turn_budget_hint` in 6 profiles (scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12). Preemptive budget declaration; arXiv:2412.18547. Expected: 10–20% turn reduction. |
 | P-NEW-24 Observational context compression for Builder | **PENDING (cycle 46+)** | Remove expired tool-results from Builder multi-turn trajectory; arXiv:2604.19572 (Apr 2026); 40–60% input reduction on tool-output bloat. Profile-level contract changes required. |
@@ -616,11 +616,12 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 | Field | Value |
 |-------|-------|
 | **Subsystem** | Builder profile + persona — expired tool-result removal during multi-turn read phases |
-| **Expected saving** | 20–30% Builder cost reduction (~$0.25/cycle) |
-| **LoC delta** | ~15 LoC (profile field + persona guidance) |
-| **Risk** | Medium — requires profile-level contract change; verify no loss of needed context |
-| **Target cycle** | 45+ |
-| **Verification** | Compare `builder-usage.json:input_tokens` across 3 cycles with/without; assert ≥15% reduction |
+| **Status** | **DONE (cycle 45)** |
+| **Expected saving** | 20–30% Builder cost reduction; cache_read 9.9M → ≤5M tokens |
+| **LoC delta** | ~15 LoC (profile fields + persona section) |
+| **Risk** | Low — persona-level guidance + profile fields; no pipeline logic change |
+| **Shipped cycle** | 45 |
+| **Verification** | Compare `builder-usage.json:input_tokens` in cycle-46 vs cycle-44 baseline (expect ≥15% reduction) |
 
 **Problem:** P-NEW-8 (DONE cycle 40) applied AgentDiet-style filtering to `failedApproaches[]` only. Builder's multi-turn read phases accumulate large `tool_result` blocks (intermediate file reads) in context. These expired reads add input token overhead without contributing to the build decision.
 

@@ -308,6 +308,15 @@ Apply these four rules to avoid context saturation from accumulated tool results
 
 When your `context_clear_trigger_tokens` threshold (from profile, default 30000) is reached, summarize pending tool results before continuing new tool calls.
 
+### Tool-Result Trajectory Compression (P-NEW-21, AgentDiet)
+
+When you Read a file > 3000 tokens, immediately after processing it:
+1. Extract the 3–5 key facts you need (one line each).
+2. Note: "[Full content of `<filename>` discarded — key facts extracted above]"
+3. Do NOT re-read the file unless you need a different section.
+
+This prevents `cache_read_input_tokens` from compounding across turns. Source: AgentDiet (FSE 2026, arXiv:2509.23586) — 39.9–59.7% input token reduction, 21.1–35.9% total cost reduction on SWE-bench. Cycle-44 baseline: 9.9M cache_read_tokens; target with this rule: ≤ 5M.
+
 ## Reference Index (Layer 3, on-demand)
 
 Read only when decision branch requires it.
@@ -320,7 +329,7 @@ Read only when decision branch requires it.
 
 ## STOP CRITERION
 
-**When all four completion gates below are satisfied, write `build-report.md` via the Write tool and halt immediately. Do NOT continue editing files or reading artifacts after writing the report.**
+**When all five completion gates below are satisfied, write `build-report.md` via the Write tool and halt immediately. Do NOT continue editing files or reading artifacts after writing the report.**
 
 ### Completion Gates
 
@@ -330,6 +339,9 @@ Read only when decision branch requires it.
 | `implementation-complete` | All files changed per the task plan; no pending edits |
 | `self-verify-passed` | Eval graders run and pass (or documented failure with retry budget exhausted) |
 | `report-written` | `build-report.md` written and worktree commit made |
+| `turn-budget-respected` | Turn count ≤ 20 (simple task) or ≤ 30 (complex, with documented justification in report) |
+
+**Hard turn-count exit trigger:** If you are at or past turn 20, write `build-report.md` immediately. Document which ACs passed and note any remaining work. Do NOT wait for all gates to be satisfied past turn 20. The 25-turn budget is a hard ceiling — no exceptions. Pending work that did not complete within the budget is deferred, not a blocker for the report.
 
 ### Exit Protocol
 
@@ -347,7 +359,7 @@ After writing `build-report.md`, these actions are **forbidden**:
 - "Let me also check the adjacent code…" or "I should verify one more thing…" loops
 - Any Edit/Write that is not the final `build-report.md`
 
-**Rationale:** Cycle-43 builder ran 39 turns ($1.22) — analogous to pre-P-NEW-10 Scout (68 turns) and pre-P-NEW-16 Orchestrator. The turn budget is `max_turns: 25` (profile-enforced), but post-completion accumulation wastes the quota on verification that adds no value. The four gates are sufficient; halt when satisfied.
+**Rationale:** Cycle-44 builder ran 100 turns ($4.43) and cycle-43 ran 69 turns ($3.12) — 4.5× regression from cycle-41 baseline ($0.99, 34 turns). Root cause: no quantitative turn-count gate caused post-completion accumulation. The five gates are sufficient; halt when satisfied. The `turn-budget-respected` gate and the hard-exit trigger at turn 20 structurally enforce the ceiling; they prevent repeat of the cycle-44 pattern where `max_turns: 25` in the profile was advisory-only and the builder ignored it.
 
 ## EGPS Predicate Authoring (v10.1.0+)
 
