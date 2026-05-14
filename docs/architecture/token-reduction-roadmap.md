@@ -266,7 +266,9 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 
 > Audited by Scout cycle 41. Previous snapshot: cycle 40 (2026-05-14).
 
-**Cycle-40 cost baseline:** Scout $1.57 / triage / builder / auditor. Scout improved from 68→40 turns (−38% cost, $2.54→$1.57) via P-NEW-10 stop criterion. Cumulative progress from cycle-11 $6.70 baseline: **>29% reduction achieved**.
+**Cycle-40 cost snapshot:** Scout $1.57 (40 turns) / Triage $0.37 / Builder $1.09 / Auditor $2.09 (Opus 4.7 — regression) / Retrospective $0.36. **Total: $5.48.** Auditor Opus regression (+$0.96 vs cycle-39 Sonnet $1.13) erased P-NEW-10 gains. Cumulative from cycle-11 $6.70 baseline: **>18% reduction achieved** (29% target not yet reached due to auditor regression).
+
+**Cycle-41 fixes shipped:** P-NEW-2 (auditor default Sonnet — expected to recover $0.97/cycle); `scout-stop-tighten` (emergency exit turn 12 + max-3 WebSearch cap — targets 40→≤20 turns, ~$0.50/cycle).
 
 **P-NEW-10 confirmed:** $0.97/cycle actual saving (cycle 39→40 delta). Target ≤20 turns still pending; cycle-41 scout ran 40 turns — further improvement on track.
 
@@ -287,7 +289,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P7 TOON structured outputs | PENDING | No TSV template or parser; benchmark updated to 40–65% (was 30–60%) |
 | P8 LLMLingua integration | PENDING | No integration; external dep |
 | P-NEW-1 Flags A–D default-on | DONE (cycle 24) | `EVOLVE_CONTEXT_DIGEST` + `EVOLVE_ANCHOR_EXTRACT` promoted to `default=1` in `role-context-builder.sh`; v9.4.0 |
-| P-NEW-2 Auditor Sonnet right-sizing | UNVERIFIED | cycle-39 used Sonnet ($1.13); profile says Opus. Intentionality unconfirmed — see auditor model discrepancy note above. |
+| P-NEW-2 Auditor Sonnet right-sizing | **IN-PROGRESS (cycle 41)** | `auditor.json:model_tier_default` changed to `sonnet`; `clean_build=opus` removed; `adversarial_audit=opus` added. Expected saving: $0.97/cycle. Verification: next cycle's `auditor-usage.json` model field. |
 | P-NEW-3 evolve-scout.md Layer-3 split | DONE (cycle 24) | `agents/evolve-scout-reference.md` created; `evolve-scout.md` trimmed 334→167 lines |
 | P-NEW-4 EVOLVE_REQUIRE_* consolidation | PENDING | `EVOLVE_REQUIRED_PHASES` not implemented |
 | P-NEW-5 Deprecated flag removal | BRIDGES-ACTIVE | 5 flags w/ bridges; removal target v8.61+ MISSED; cycle 26+ |
@@ -434,3 +436,37 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 **Current gap:** `EVOLVE_CONTEXT_AUTOTRIM=1` uses head-60%/tail-35% truncation (byte-boundary cut) that can split file paths, function signatures, and JSON structures mid-token — triggering parse failures in Builder and requiring expensive re-read loops.
 
 **Validation:** arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) confirms static-content-first / dynamic-content-last as a cache-safety constraint. Semantic-unit preservation is the complementary compaction-safety constraint — both are required for safe multi-turn agent context management.
+
+---
+
+## P-NEW-14 — Agentic Plan Caching (APC)
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | Builder pre-build phase + `scripts/dispatch/subagent-run.sh` |
+| **Expected saving** | **76.42% cost reduction** on recurring task classes (GAIA benchmark: $69.02→$16.27/query, 0.61% accuracy drop) |
+| **LoC delta** | ~50 LoC: `builder-plan-cache.json` template store + lightweight similarity check in orchestrator pre-Builder |
+| **Risk** | Medium — false-positive plan reuse degrades build quality; requires similarity threshold tuning |
+| **Target cycle** | 46+ (post P-NEW-2 verification) |
+| **Verification** | Builder cost delta on recurring token-reduction task types; assert plan-reuse accuracy ≥99% (no incorrect ACs shipped) |
+
+**Source:** Agentic Plan Caching (arXiv:2506.14852, 2026) — cache structured plan templates from initial Builder reasoning; reuse across semantically similar task classes via lightweight similarity matching. Benchmark: 76.42% cost reduction on GAIA, 0.61% accuracy drop.
+
+**Applicability to evolve-loop:** Builder repeatedly solves similar task archetypes (profile edit, persona section add, roadmap update, ACS predicate write). Plan templates for these archetypes could save 5–8 planning turns per cycle on recognized task types.
+
+---
+
+## P-NEW-15 — Hierarchical Caching for Agentic Workflows
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/dispatch/subagent-run.sh` (MCP tool schema caching at dispatcher level) |
+| **Expected saving** | **50.31% cost reduction, 27.28% latency improvement** vs. no caching (MDPI 2026 benchmark) |
+| **LoC delta** | ~80 LoC in `subagent-run.sh`: workflow-level + tool-level cache with dependency-aware graph invalidation |
+| **Risk** | Medium — MCP spec compliance required; cache invalidation correctness critical |
+| **Target cycle** | 48+ |
+| **Verification** | MCP tool schema re-send count per cycle (assert 0 on cached invocations); latency delta in `*-timing.json` sidecars |
+
+**Source:** Hierarchical Caching for Agentic Workflows (MDPI 2026) — multi-level caching (workflow-level + tool-level) with dependency-aware graph invalidation. MCP tool schema re-sending is 30–50% of context waste in ≥40-tool workflows.
+
+**Applicability to evolve-loop:** evolve-loop uses strict MCP config per subagent (`--strict-mcp-config`); tool schemas are re-sent on each `subagent-run.sh` invocation. With ~6 subagents/cycle each receiving the same tool schema set, dispatcher-level caching could eliminate most of that redundancy.

@@ -2,10 +2,10 @@
   "name": "auditor",
   "role": "auditor",
   "cli": "claude",
-  "model_tier_default": "opus",
+  "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "security_sensitive": "opus",
-    "clean_build": "opus"
+    "adversarial_audit": "opus"
   },
   "allowed_tools": [
     "Bash(verify-eval.sh:*)",
