@@ -133,8 +133,10 @@ if [ -n "$WEIGHT" ]; then
         --arg injected_at "$INJECTED_AT" \
         --arg injected_by "$INJECTED_BY" \
         --arg research_pointer "$RESEARCH_POINTER" \
+        --arg invalidated_cache_fp "$INVALIDATE_CACHE_FP" \
         '{id:$id,action:$action,priority:$priority,weight:$weight,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}
-         | if ($research_pointer | length) > 0 then . + {research_pointer: $research_pointer} else . end')
+         | if ($research_pointer | length) > 0 then . + {research_pointer: $research_pointer} else . end
+         | if ($invalidated_cache_fp | length) > 0 then . + {invalidated_cache_fp: $invalidated_cache_fp} else . end')
 else
     TASK_JSON=$(jq -cn \
         --arg id "$TASK_ID" \
@@ -145,8 +147,10 @@ else
         --arg injected_at "$INJECTED_AT" \
         --arg injected_by "$INJECTED_BY" \
         --arg research_pointer "$RESEARCH_POINTER" \
+        --arg invalidated_cache_fp "$INVALIDATE_CACHE_FP" \
         '{id:$id,action:$action,priority:$priority,weight:null,evidence_pointer:$evidence_pointer,operator_note:$operator_note,injected_at:$injected_at,injected_by:$injected_by}
-         | if ($research_pointer | length) > 0 then . + {research_pointer: $research_pointer} else . end')
+         | if ($research_pointer | length) > 0 then . + {research_pointer: $research_pointer} else . end
+         | if ($invalidated_cache_fp | length) > 0 then . + {invalidated_cache_fp: $invalidated_cache_fp} else . end')
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
