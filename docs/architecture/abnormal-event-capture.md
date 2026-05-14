@@ -148,6 +148,20 @@ Check: Is `abnormal-events.jsonl` non-empty? (`wc -l $WORKSPACE/abnormal-events.
 
 Check: Did `reconcile-carryover-todos.sh` run? It only fires post-ship/post-retrospective via the orchestrator. Also verify the workspace path passed via `--workspace` matches the workspace that contains `abnormal-events.jsonl`.
 
+**Known pattern: `ship-refused` with tree-drift between two builder sub-rounds.**
+
+Symptom: `audit-bound tree SHA <X> != committed tree SHA <Y>` in ship.sh output. Classification: `abnormal-event: ship-refused`.
+
+Root cause: Builder ran two sub-rounds (e.g., first commit + second patch commit); the second commit changed the tree AFTER auditor already bound to the first commit's tree SHA. The cycle recovers correctly — ship.sh retries against the new HEAD, finds the audit binding acceptable (all same ACS predicates GREEN), and ships on the second attempt.
+
+Recovery procedure:
+1. Re-run `ship.sh "<commit-msg>"` — it re-reads the current tree SHA and re-evaluates audit binding.
+2. If the second attempt passes `acs-verdict.json` (all predicates still GREEN), ship succeeds.
+3. No structural fix is needed — the abnormal event pipeline captures the first refusal correctly; the carryoverTodo from `reconcile-carryover-todos.sh` is informational only.
+4. If ship.sh continues to refuse: verify the worktree branch matches `evolve/cycle-N` (`git branch` inside worktree) and that no unrelated commits landed between audit and ship.
+
+Verified: cycle 46 experienced this pattern and recovered successfully on the second ship attempt (commit 3ad9765).
+
 **Problem:** Duplicate carryoverTodos for the same event_type.
 
 The deduplication key is `_inbox_source='abnormal-event:<type>'`. If duplicates appear, check whether the field was stripped by an earlier version of `merge-lesson-into-state.sh` that did not preserve unknown fields.

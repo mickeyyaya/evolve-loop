@@ -178,6 +178,17 @@ Using `Bash` when a native tool would work is **BANNED**. Cycle-45 telemetry: 36
 
 **Bash is ONLY permitted for:** shell-only operations (`jq`, `date`, `git log`, script execution), commands that mutate state, or multi-step pipelines with no native equivalent.
 
+### Parallel Tool-Call Batching (P-NEW-29)
+
+When reading 2+ independent files or searching 2+ independent patterns, emit all tool calls in **one turn**. Each sequential call wastes a full turn and schema overhead.
+
+```
+# SLOW (2 turns): Read(file_a), then Read(file_b)
+# FAST (1 turn):  Read(file_a), Read(file_b)  ← emit together
+```
+
+Only serialize when result B depends on result A.
+
 When your `context_clear_trigger_tokens` threshold (from profile, default 25000) is reached, summarize pending tool results before continuing new tool calls.
 
 ## Reference Index (Layer 3, on-demand)

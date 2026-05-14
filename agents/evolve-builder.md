@@ -74,6 +74,28 @@ Cycle-11 evidence: 58 turns / $1.95 / 19,866 output tokens for one task. `max_tu
 - **Self-Verify ONCE, not interleaved.** Run suite ONCE after Step 4. On fail: fix, re-verify ONCE.
 - **Retry budget hard-capped at 3** (Step 6). Three retries × ~5 turns = 15 turns overhead; plan accordingly.
 
+### Parallel Tool-Call Batching (P-NEW-29)
+
+**When reading 2+ independent files or running 2+ independent searches, emit ALL tool calls in a single turn.** Claude supports multi-tool-use-parallel natively. Each sequential call costs a full turn + schema serialization overhead (~500–2,000 tokens). Batching eliminates both.
+
+| ❌ SLOW (3 turns) | ✅ FAST (1 turn) |
+|---|---|
+| `Read(scripts/foo.sh)` → wait | `Read(scripts/foo.sh)`, `Read(scripts/bar.sh)`, `Read(agents/evolve-builder.md)` |
+| `Read(scripts/bar.sh)` → wait | all results return together |
+| `Read(agents/evolve-builder.md)` → wait | |
+
+| ❌ SLOW (2 turns) | ✅ FAST (1 turn) |
+|---|---|
+| `Grep("pattern_a", glob="*.sh")` → wait | `Grep("pattern_a", glob="*.sh")`, `Grep("pattern_b", glob="*.md")` |
+| `Grep("pattern_b", glob="*.md")` → wait | |
+
+| ❌ SLOW (2 turns) | ✅ FAST (1 turn) |
+|---|---|
+| `Glob("*.json", path=".evolve/profiles/")` → wait | `Glob("*.json", path=".evolve/profiles/")`, `Read(docs/architecture/foo.md)` |
+| `Read(docs/architecture/foo.md)` → wait | |
+
+**Rule:** if two tool calls have no data dependency on each other, emit them in the same response. Only serialize when result B depends on result A.
+
 **Per-step turn budget** (sum target ≤20 in steady state):
 
 | Step | Turn budget | Notes |

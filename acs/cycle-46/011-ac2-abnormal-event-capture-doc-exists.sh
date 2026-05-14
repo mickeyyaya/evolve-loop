@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC2: docs/architecture/abnormal-event-capture.md exists and has >=200 chars
 # predicate: documentation file present and substantive
-# metadata: cycle=47 task=T1b ac=AC2 risk=low
+# metadata: cycle=46 task=T1b ac=AC2 risk=low
 
 set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

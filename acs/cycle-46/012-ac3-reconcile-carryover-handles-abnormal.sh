@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC3: reconcile-carryover-todos.sh contains abnormal-events.jsonl handling
 # predicate: grep for the promotion code in reconcile-carryover-todos.sh
-# metadata: cycle=47 task=T1c ac=AC3 risk=low
+# metadata: cycle=46 task=T1c ac=AC3 risk=low
 
 set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

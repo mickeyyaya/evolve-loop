@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC1: scripts/tests/abnormal-event-capture-test.sh exits 0
 # predicate: the abnormal-event capture test suite must pass cleanly
-# metadata: cycle=47 task=T1a ac=AC1 risk=low
+# metadata: cycle=46 task=T1a ac=AC1 risk=low
 
 set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

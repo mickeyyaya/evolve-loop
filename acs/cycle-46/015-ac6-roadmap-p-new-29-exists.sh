@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC6: token-reduction-roadmap.md contains P-NEW-29 entry
 # predicate: grep for P-NEW-29 in roadmap
-# metadata: cycle=47 task=T3b ac=AC6 risk=low
+# metadata: cycle=46 task=T3b ac=AC6 risk=low
 
 set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

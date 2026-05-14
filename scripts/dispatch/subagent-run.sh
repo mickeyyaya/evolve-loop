@@ -1009,6 +1009,23 @@ ADVEOF
         fi
     fi
 
+    # T2 / P-NEW-22 observability: turn-overrun detection.
+    # Compare num_turns from the usage sidecar against the profile's max_turns.
+    # Overruns are appended to abnormal-events.jsonl for dashboard visibility and
+    # carryover todo generation — they do NOT fail the cycle (best-effort).
+    if command -v jq >/dev/null 2>&1 && [ -s "$usage_sidecar" ]; then
+        local _actual_turns _max_turns_profile
+        _actual_turns=$(jq -r '.num_turns // 0' "$usage_sidecar" 2>/dev/null || echo "0")
+        _max_turns_profile=$(jq -r '.max_turns // 0' "$effective_profile" 2>/dev/null || echo "0")
+        if [ "$_max_turns_profile" -gt 0 ] && [ "$_actual_turns" -gt "$_max_turns_profile" ] 2>/dev/null; then
+            _append_abnormal_event "$workspace" "turn-overrun" "WARN" \
+                "agent=$agent actual_turns=$_actual_turns max_turns=$_max_turns_profile (${_actual_turns}x ceiling)" \
+                "Review ${agent}-report.md for scope; split task or tighten STOP CRITERION"
+            log "WARN: turn-overrun agent=$agent turns=$_actual_turns max=$_max_turns_profile"
+        fi
+        unset _actual_turns _max_turns_profile
+    fi
+
     write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier"
     record_phase finalize_ms
 

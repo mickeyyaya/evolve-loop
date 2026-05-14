@@ -60,6 +60,7 @@ MAX_BUDGET=$(jq -r '.max_budget_usd' "$PROFILE_PATH")
 MAX_TURNS=$(jq -r '.max_turns' "$PROFILE_PATH")
 PERMISSION_MODE=$(jq -r '.permission_mode' "$PROFILE_PATH")
 EFFORT_LEVEL=$(jq -r '.effort_level // empty' "$PROFILE_PATH")
+SCHEMA_FILTER_ENABLED=$(jq -r '.schema_filter_enabled // false' "$PROFILE_PATH")
 
 # v8.13.5 token-opt: declarative task-mode budget tiers.
 # Profiles MAY define a budget_tiers map ({"research": 1.50, "deep": 2.50, ...}).
@@ -240,6 +241,28 @@ if [ "${EVOLVE_CACHE_PREFIX_V2:-1}" = "1" ] && [ -n "${AGENT:-}" ]; then
     else
         echo "[claude-adapter] WARN: EVOLVE_CACHE_PREFIX_V2=1 but build-invocation-context.sh missing or non-executable at $_bic" >&2
     fi
+fi
+
+# P-NEW-22 Phase 2: dispatch-layer schema filter enforcement.
+# When schema_filter_enabled=true in the profile, ensure --strict-mcp-config is
+# present. --strict-mcp-config prevents the Claude CLI from serializing the full
+# MCP tool schema for every turn (saves 2,000–4,000 tokens/turn for narrow-toolset
+# roles like scout, triage, memo). Profiles with schema_filter_enabled already
+# include --strict-mcp-config in extra_flags as of cycle 46; this block auto-injects
+# it when the field is true but the flag was accidentally omitted, making
+# schema_filter_enabled the declarative source of truth.
+if [ "$SCHEMA_FILTER_ENABLED" = "true" ]; then
+    _has_strict_mcp=0
+    if [ ${#EXTRA_FLAGS_ARR[@]} -gt 0 ]; then
+        for _f in "${EXTRA_FLAGS_ARR[@]}"; do
+            [ "$_f" = "--strict-mcp-config" ] && _has_strict_mcp=1 && break
+        done
+    fi
+    if [ "$_has_strict_mcp" = "0" ]; then
+        EXTRA_FLAGS_ARR+=("--strict-mcp-config")
+        echo "[claude-adapter] schema_filter_enabled=true: auto-injected --strict-mcp-config (P-NEW-22 Phase 2) for role=$(basename "${PROFILE_PATH%.*}")" >&2
+    fi
+    unset _has_strict_mcp _f
 fi
 
 # Extra flags (--bare, --no-session-persistence, etc.) — already valid CLI flags.

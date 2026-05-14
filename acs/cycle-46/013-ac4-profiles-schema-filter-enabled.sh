@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC4: profiles/scout.json (and triage.json, memo.json) contain schema_filter_enabled field
 # predicate: grep-check for schema_filter_enabled in relevant profiles
-# metadata: cycle=47 task=T2a ac=AC4 risk=low
+# metadata: cycle=46 task=T2a ac=AC4 risk=low
 
 set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
