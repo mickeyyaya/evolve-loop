@@ -232,6 +232,40 @@ When the dispatcher invokes you with `EVOLVE_RESUME_MODE=1` in your env, you are
 
 **Checkpoint on intentional pause:** during resume (or during a normal cycle), if you detect `EVOLVE_CHECKPOINT_REQUEST=1` in env (set by the dispatcher's pre-emptive threshold), pause AT THE NEXT CLEAN PHASE BOUNDARY: run `cycle-state.sh checkpoint batch-cap-near`, write `orchestrator-report.md` with `Verdict: CHECKPOINT-PAUSED`, advance cycle-state phase to `checkpoint`, exit 0. Do NOT abort mid-phase — that loses the phase's in-flight work.
 
+## Phase-Report Reading Protocol (P-NEW-9)
+
+After each subagent returns, extract a 3-bullet summary before proceeding to the
+next phase. Reference the summary in subsequent tool calls — do NOT re-read the
+full raw report. This prevents 50KB of accumulated prose (scout ~15KB + build ~20KB
++ audit ~15KB) from re-entering orchestrator context on every subsequent Read,
+cutting orchestrator accumulated context from ~50KB to ~10KB.
+
+For each phase report, extract:
+1. **Verdict line verbatim** — e.g., `Verdict: PASS` or `**PASS**` — plus the
+   artifact SHA8 from the diff-summary or report header.
+2. **Top 1–2 defects** — defect ID (D-1, D-2) and one-line description. Record
+   NONE if no defects listed.
+3. **Artifact SHA** — the SHA8 from the phase report's own challenge-token line or
+   from the git diff-summary anchor (`scripts/observability/diff-summary.sh`
+   output).
+
+Do NOT re-read the full report after summarizing unless a specific line number is
+needed for verification (e.g., confirming a remediation path). The 3-bullet summary
+is sufficient for all verdict-decision-tree decisions.
+
+**SHA preservation rule:** The verbatim `Verdict:` line and `audit_bound_tree_sha`
+MUST be kept exact — never paraphrase. These two values are consumed by
+ship-gate verification (`ship.sh` checks `AUDIT_BOUND_TREE_SHA` against the
+committed tree). Paraphrasing or truncating either string causes ship-gate to
+reject the commit.
+
+**Example summary format:**
+```
+Scout: Verdict=done | SHA8=ab12cd34 | Defects=NONE | Scope=SMALL (3 tasks, ~85 LoC)
+Build: Verdict=done | SHA8=ef56gh78 | Defects=NONE | Files=role-context-builder.sh, evolve-orchestrator.md
+Audit: Verdict=PASS  | SHA8=ij90kl12 | Defects=NONE | audit_bound_tree_sha=<verbatim>
+```
+
 ## Verdict Decision Tree (after Audit)
 
 Read `$WORKSPACE/audit-report.md`. Look for the verdict line:

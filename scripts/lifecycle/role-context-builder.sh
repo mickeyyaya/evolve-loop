@@ -486,13 +486,13 @@ WCONST
             # RED test file (TDD output) if present
             emit_artifact "RED test (must turn GREEN)" "$WORKSPACE/red-test.md"
             # P-NEW-8: emit only build-domain failure context. Excludes code-audit-warn +
-            # unknown-classification entries (~61% noise). Builder benefits only from
-            # code-build-fail and code-quality entries (signals from its own failure domain).
+            # unknown-classification entries (~61% noise). Builder benefits from
+            # code-build-fail and code-audit-fail entries (signals from its own failure domain).
             if [ -f "$STATE" ] && command -v jq >/dev/null 2>&1; then
-                _bf_count=$(jq -r '.failedApproaches // [] | map(select(.classification | test("code-build-fail|code-quality"))) | length' "$STATE" 2>/dev/null || echo 0)
+                _bf_count=$(jq -r '.failedApproaches // [] | map(select(.classification | test("code-build-fail|code-audit-fail"))) | length' "$STATE" 2>/dev/null || echo 0)
                 if [ "$_bf_count" != "0" ] && [ "$_bf_count" != "null" ]; then
                     echo "## Recent build failures (build-domain only; audit-warn excluded)"
-                    jq -r '.failedApproaches[]? | select(.classification | test("code-build-fail|code-quality")) | "- [" + (.classification // "?") + "] " + (.summary // .action // "(no summary)")' "$STATE" 2>/dev/null
+                    jq -r '.failedApproaches[]? | select(.classification | test("code-build-fail|code-audit-fail")) | "- [" + (.classification // "?") + "] " + (.summary // .action // "(no summary)")' "$STATE" 2>/dev/null
                     echo
                 fi
                 unset _bf_count

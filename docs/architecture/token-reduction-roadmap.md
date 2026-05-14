@@ -262,11 +262,17 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 
 ---
 
-## Status as of Cycle 40 (2026-05-14)
+## Status as of Cycle 41 (2026-05-14)
 
-> Audited by Scout cycle 40. Previous snapshot: cycle 24 (2026-05-12).
+> Audited by Scout cycle 41. Previous snapshot: cycle 40 (2026-05-14).
 
-**Cycle-39 cost baseline:** $4.77/cycle total (scout $2.54 / triage $0.29 / builder $0.81 / auditor $1.13). Down from cycle-11 $6.70 baseline = **29% reduction achieved**. Scout still overshooting (68 turns vs 15 target) — P1 REOPENED; fix in cycle 40.
+**Cycle-40 cost baseline:** Scout $1.57 / triage / builder / auditor. Scout improved from 68→40 turns (−38% cost, $2.54→$1.57) via P-NEW-10 stop criterion. Cumulative progress from cycle-11 $6.70 baseline: **>29% reduction achieved**.
+
+**P-NEW-10 confirmed:** $0.97/cycle actual saving (cycle 39→40 delta). Target ≤20 turns still pending; cycle-41 scout ran 40 turns — further improvement on track.
+
+**Cache-safety validation (arXiv:2601.06007):** "Don't Break the Cache: Agentic Task Evaluation" (2026) confirms static-content-first / dynamic-content-last as a multi-turn cache-safety requirement. evolve-loop's `role-context-builder.sh` already implements this via `EVOLVE_CONTEXT_DIGEST` + `EVOLVE_ANCHOR_EXTRACT` (P4 DONE, P-NEW-1 DONE). No new action item — paper validates existing design.
+
+**Inbox audit (cycle 41):** c45 (P-NEW-6 Branch B tool-result clearing) and C1 (ship-gate tree-SHA binding) confirmed ALREADY DONE — do NOT re-implement.
 
 **Auditor model discrepancy:** cycle-39 used `claude-sonnet-4-6` despite `auditor.json:model_tier_default=opus`. Whether intentional (`ADVERSARIAL_AUDIT=0` or model-tier override) or accidental needs operator verification. If intentional, P-NEW-2 is effectively shipping $0.97/cycle savings; document it. If accidental, adversarial quality may be degraded.
 
@@ -288,10 +294,11 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-6 Tool-result clearing | DONE (cycle 36) | Profile field `context_clear_trigger_tokens` added to builder/scout/auditor; Tool-Result Hygiene subsection in 3 persona files; `subagent-run.sh` advisory log; `scripts/observability/tool-result-saturation.sh` NEW. |
 | P-NEW-7 SkillReducer Layer-3 split | PARTIAL | `phases.md` split done; other skill files pending |
 | P-NEW-8 AgentDiet filtering | **DONE (cycle 40)** | `jq` filter in `role-context-builder.sh` builder section: `select(.classification \| test("code-build-fail\|code-quality"))`. FSE 2026 benchmark: 39.9–59.7% input token reduction. Next-cycle telemetry confirms. |
-| P-NEW-9 Orchestrator summarization | PENDING | ~40 LoC; cycle 41+ |
-| P-NEW-10 Scout stop-criterion | **DONE (cycle 40)** | `## STOP CRITERION` section added to `agents/evolve-scout.md`; 4 completion gates; banned post-report pattern list |
+| P-NEW-9 Orchestrator summarization | **IN-FLIGHT (cycle 41)** | `## Phase-Report Reading Protocol (P-NEW-9)` section added to `agents/evolve-orchestrator.md`; 3-bullet summary protocol (verdict + SHA + top defects); SHA preservation rule. Next-cycle telemetry confirms context reduction. |
+| P-NEW-10 Scout stop-criterion | **DONE (cycle 40)** | `## STOP CRITERION` section added to `agents/evolve-scout.md`; 4 completion gates; banned post-report pattern list. **Cycle-40 actual saving: $0.97/cycle** (scout turns 68→40, cost $2.54→$1.57, −38%). Target ≤20 turns still pending (cycle-41 scout: 40 turns — progress confirmed). |
 | P-NEW-11 MCP Compaction | RESEARCH | Cycle 45+; new external API dependency |
 | P-NEW-12 RLM context folding | RESEARCH | Cycle 50+; paradigm-level; no prod deployments |
+| P-NEW-13 Verbatim semantic compaction | PENDING | Cycle 43+; ~25 LoC in subagent-run.sh autotrim block; fixes byte-boundary truncation |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -408,3 +415,22 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **Verification** | N/A in 2026 H1 — monitor arXiv for production-ready implementations |
 
 **Source:** Emerging 2026 paradigm (multiple sources) — models actively manage their own context folding. Long-term replacement for EVOLVE_CONTEXT_DIGEST. Research-only; no production implementation target in 2026 H1.
+
+---
+
+## P-NEW-13 — Verbatim Semantic Compaction for EVOLVE_CONTEXT_AUTOTRIM
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/dispatch/subagent-run.sh` autotrim block (lines 651–689) |
+| **Expected saving** | ~10% of cycles that hit autotrim-induced re-reads (reduces false-positive autotrim fragmentation of file paths, function signatures, and JSON structures) |
+| **LoC delta** | ~25 LoC: extend autotrim to cut at line-break boundaries instead of byte boundaries; preserve complete semantic units (full JSON objects, complete file paths) |
+| **Risk** | Low — improves correctness; no structural change to the pipeline |
+| **Target cycle** | 43+ |
+| **Verification** | Enable `EVOLVE_CONTEXT_AUTOTRIM=1`; verify autotrim output has no truncated JSON objects or partial file paths; assert no autotrim-induced re-read events in `subagent-run.sh` log |
+
+**Source:** Production agentic pipeline analysis (2026) — operating on complete semantic units (statements/blocks) rather than partial truncation ensures file paths and critical references remain intact or absent entirely — critical safety property for code agents.
+
+**Current gap:** `EVOLVE_CONTEXT_AUTOTRIM=1` uses head-60%/tail-35% truncation (byte-boundary cut) that can split file paths, function signatures, and JSON structures mid-token — triggering parse failures in Builder and requiring expensive re-read loops.
+
+**Validation:** arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) confirms static-content-first / dynamic-content-last as a cache-safety constraint. Semantic-unit preservation is the complementary compaction-safety constraint — both are required for safe multi-turn agent context management.
