@@ -195,7 +195,7 @@ fi
 # system prompt and INTO the first user message — claude's docs note this
 # "improves cross-user prompt-cache reuse" by keeping the system layer
 # free of per-invocation entropy.
-if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ] && [ -n "${AGENT:-}" ]; then
+if [ "${EVOLVE_CACHE_PREFIX_V2:-1}" = "1" ] && [ -n "${AGENT:-}" ]; then
     _bic="${EVOLVE_PLUGIN_ROOT:-}/scripts/dispatch/build-invocation-context.sh"
     if [ -x "$_bic" ]; then
         _bedrock_text=$(bash "$_bic" "$AGENT" 2>/dev/null || true)

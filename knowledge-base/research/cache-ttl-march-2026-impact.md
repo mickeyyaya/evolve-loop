@@ -1,6 +1,6 @@
 # Cache TTL March 2026 Impact on evolve-loop
 
-> **Status:** Research (cycle 42). Implementation investigation deferred to cycle 43.
+> **Status:** INVESTIGATION-COMPLETE (cycle 43). Path A CLOSED — no `--cache-ttl` CLI flag. CLI uses 1h TTL per telemetry. Concern is API SDK-specific, not CLI-specific.
 > **Roadmap item:** P-NEW-17 — `docs/architecture/token-reduction-roadmap.md`
 
 ## Summary
@@ -88,14 +88,57 @@ evolve-loop already implements static-content-first via `role-context-builder.sh
 
 ---
 
-## Investigation Checklist (cycle 43)
+## Cycle 43 Investigation Results
 
-- [ ] `claude --help | grep -iE 'cache|ttl'` — check CLI flag availability
-- [ ] Inspect `~/.claude/config.json` for TTL overrides
-- [ ] Test: measure cache TTL via API response metadata on a test invocation
-- [ ] Check if `ANTHROPIC_CACHE_TTL` or similar env var is honored
-- [ ] Document result in follow-up update to this file
-- [ ] If feasible: implement Path A in `scripts/dispatch/subagent-run.sh` and write ACS predicates
+**Investigation completed cycle 43 by Scout subagent using cycle-42 usage telemetry + CLI flag probe.**
+
+### Path A: CLOSED — No `--cache-ttl` CLI flag
+
+`claude --help | grep -i cache` confirms there is **no `--cache-ttl` flag** in the Claude CLI. The only cache-related flag is:
+
+```
+--exclude-dynamic-system-prompt-sections   Move per-machine sections (cwd, env info,
+                                           memory paths, git status) from the system
+                                           prompt into the first user message.
+                                           Improves cross-user prompt-cache reuse.
+                                           Only applies with the default system prompt
+                                           (ignored with --system-prompt). (default: false)
+```
+
+This flag is already present in all evolve-loop profiles (added in `EVOLVE_CACHE_PREFIX_V2`, v8.61.0). No TTL configuration flag is available via the CLI. Path A is definitively CLOSED.
+
+### Critical Correction: Claude CLI Uses 1-Hour TTL
+
+The cycle-42 KB dossier stated: "Anthropic silently changed prompt cache default TTL from 60 min → 5 min on 2026-03-06." This is **incorrect for the Claude CLI**.
+
+Cycle-42 usage telemetry (`*-usage.json`) shows:
+
+| Phase | `ephemeral_1h_input_tokens` | `ephemeral_5m_input_tokens` |
+|-------|----------------------------|----------------------------|
+| Scout | 93,512 | **0** |
+| Triage | 50,865 | **0** |
+| Builder | 68,771 | **0** |
+| Auditor | 96,395 | **0** |
+
+`ephemeral_5m_input_tokens = 0` across all phases. The Claude CLI creates prompt cache entries with **1-hour TTL**, not 5-minute TTL.
+
+**Revised implication:** The March 2026 TTL change is **API SDK-specific** (direct API calls with `cache_control: {"type": "ephemeral"}`). The `claude -p` subprocess invocations used by evolve-loop already use 1-hour TTL caching. The $2.00/cycle concern was overstated for the CLI path.
+
+**Cross-phase reuse feasibility:** With 1h TTL and sequential phases completing in ~22 min total wall time (scout 6.5 min + triage 1 min + builder 5.6 min + auditor 8.9 min), cross-phase cache reuse of the common system-prompt prefix is **theoretically possible** — phases complete well within the 1-hour window. The actual cross-phase miss driver is **different prompt content per phase**, not TTL.
+
+### Revised $2.00/cycle Estimate
+
+The original estimate assumed 5-min TTL caused all cache misses. With 1h TTL confirmed, the cache-creation costs per-phase are **expected** (first-invocation of each phase creates new cache entries). The $2.00/cycle "fixed overhead" is not waste — it's the cost of establishing fresh cache entries for each phase's unique context.
+
+True cross-phase reuse opportunity exists for the **common system-prompt prefix** (CLAUDE.md + rules + memory, ~55KB) if all phases can share the same stable system-prompt cache entry. This is now addressable via `EVOLVE_CACHE_PREFIX_V2` (static-first bedrock in system-prompt slot), not via TTL extension.
+
+### Updated Investigation Checklist
+
+- [x] `claude --help | grep -iE 'cache|ttl'` — No `--cache-ttl` flag found (Path A CLOSED)
+- [x] Inspect usage telemetry — CLI uses 1h TTL (`ephemeral_1h_input_tokens` non-zero, `ephemeral_5m_input_tokens` = 0)
+- [ ] API-level TTL test (skipped — not relevant for CLI path)
+- [ ] `ANTHROPIC_CACHE_TTL` env var check (skipped — CLI telemetry confirms 1h TTL already active)
+- [x] Documented in this file — DONE
 
 ---
 

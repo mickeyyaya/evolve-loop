@@ -564,7 +564,7 @@ EOF
         echo "--- END TASK PROMPT ---" >> "$1"
     }
 
-    if [ "${EVOLVE_CACHE_PREFIX_V2:-0}" = "1" ]; then
+    if [ "${EVOLVE_CACHE_PREFIX_V2:-1}" = "1" ]; then
         # --- v2 path: bedrock moves to --append-system-prompt at adapter ---
         # Cycle A2 (v8.61.0): the static role bedrock (build-invocation-context.sh)
         # now flows via claude.sh's --append-system-prompt flag. The system

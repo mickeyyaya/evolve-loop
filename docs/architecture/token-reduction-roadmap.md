@@ -262,9 +262,11 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 
 ---
 
-## Status as of Cycle 42 (2026-05-14)
+## Status as of Cycle 43 (2026-05-14)
 
-> Updated by Scout/Builder cycle 42. Previous snapshot: cycle 41 (2026-05-14).
+> Updated by Scout/Builder cycle 43. Previous snapshot: cycle 42 (2026-05-14).
+
+**Cycle-42 cost snapshot (VERIFIED):** Scout $1.24 (28 turns) / Triage $0.32 (5 turns) / Builder $1.06 (33 turns) / Auditor $1.55 (49 turns, Sonnet) / Orchestrator $1.15 (32 turns) / Memo $0.48 (14 turns). **Total: $5.80 (+11% regression vs cycle-41 $5.21).** Scout regression: 20→28 turns (+40%, from P-NEW-17 web search cost). Auditor regression: 35→49 turns (+40%, no stop-criterion — target of P-NEW-19). Memo improvement: 23→14 turns (−39%, P-NEW-16 STOP CRITERION working). Running shipped savings vs cycle-11 $6.70 baseline: ~$0.90/cycle.
 
 **Cycle-41 cost snapshot (VERIFIED):** Scout $0.83 (20 turns) / Triage $0.40 (8 turns) / Builder $0.99 (34 turns) / Auditor $1.12 (35 turns, Sonnet — P-NEW-2 ✓) / Orchestrator $1.08 (42 turns) / Memo $0.79 (23 turns). **Total: $5.21 (−22% from cycle-11 $6.70 baseline, −$0.27 vs cycle-40 $5.48).** P-NEW-2 Auditor Sonnet: $0.98/cycle actual saving. P-NEW-10 Scout: 68→20 turns. P-NEW-9 Orchestrator: 50KB→10KB accumulated context. Running shipped savings: ~$2.15/cycle.
 
@@ -304,7 +306,9 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-12 RLM context folding | RESEARCH | Cycle 50+; paradigm-level; no prod deployments |
 | P-NEW-13 Verbatim semantic compaction | **DONE (cycle 42)** | `subagent-run.sh` autotrim: `head -c`/`tail -c` → `head -n`/`tail -n` (line-boundary cut). ~25 LoC. Commit 183406e. |
 | P-NEW-16 Orchestrator stop-criterion | **DONE (cycle 42)** | `## STOP CRITERION` section added to `agents/evolve-orchestrator.md`; 3 named gates; targets 42→25 orchestrator turns (~$0.40/cycle). Commit 183406e. |
-| P-NEW-17 Explicit Cache TTL for cross-phase reuse | **RESEARCH (cycle 42)** | Cache TTL change 2026-03-06 (60 min → 5 min) eliminates cross-phase cache reuse. Investigation path: claude CLI `--cache-ttl` flag availability. Up to $2.00/cycle saving if feasible. Implementation cycle 43–44. |
+| P-NEW-17 Explicit Cache TTL for cross-phase reuse | **INVESTIGATION-COMPLETE (cycle 43)** | Path A CLOSED: no `--cache-ttl` CLI flag. CRITICAL CORRECTION: Claude CLI uses 1h TTL (not 5m) per cycle-42 `ephemeral_1h_input_tokens` telemetry (`ephemeral_5m_input_tokens=0` for all phases). TTL concern is API SDK-specific, not CLI-specific. `claude -p` invocations already use 1h TTL. $2.00/cycle estimate was overstated for CLI path. True cross-phase reuse opportunity: shared system-prompt prefix via `EVOLVE_CACHE_PREFIX_V2` (addressed by P-NEW-18). |
+| P-NEW-18 EVOLVE_CACHE_PREFIX_V2 default-on | **DONE (cycle 43)** | Default changed from `:-0` to `:-1` in `scripts/dispatch/subagent-run.sh` and `scripts/cli_adapters/claude.sh`. `docs/architecture/control-flags.md` updated. Overdue since v8.62 target (shipped v10.6). Expected saving: $0.10–0.30/cycle. |
+| P-NEW-19 Auditor stop-criterion | **PENDING (cycle 44)** | Auditor ran 49 turns ($1.55) in cycle-42 vs 35 turns ($1.12) in cycle-41 (+40% regression). Root cause: no stop-criterion bounds turn count. Analogous to P-NEW-10 (Scout, DONE) and P-NEW-16 (Orchestrator, DONE). ~30 LoC in `agents/evolve-auditor.md`. Expected saving: $0.30–0.50/cycle. |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -532,3 +536,48 @@ Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-crea
 **Source:** Anthropic TTL change 2026-03-06 (GitHub claude-code issue #56307); Anthropic SDK `cache_control.ttl` (SDK docs 2026); arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) — cache-safety constraints for multi-turn agents.
 
 See `knowledge-base/research/cache-ttl-march-2026-impact.md` for full research dossier.
+
+---
+
+## P-NEW-18 — EVOLVE_CACHE_PREFIX_V2 Promotion to Default-On
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/dispatch/subagent-run.sh` + `scripts/cli_adapters/claude.sh` + `docs/architecture/control-flags.md` |
+| **Expected saving** | $0.10–0.30/cycle (cleaner prompt structure; static bedrock cached in system-prompt slot rather than user-message position — better cache hit rate for role bedrock content) |
+| **LoC delta** | ~2 LoC code change (default value in two guards) + ~5 LoC docs update |
+| **Risk** | Low (deployed stable since v8.61.0; `--exclude-dynamic-system-prompt-sections` already in all profiles; 18+ versions of opt-in testing without known breakage) |
+| **Target cycle** | **DONE (cycle 43)** — overdue since v8.62 target (now v10.6) |
+| **Verification** | `grep 'EVOLVE_CACHE_PREFIX_V2:-1' scripts/dispatch/subagent-run.sh` exits 0; `grep 'EVOLVE_CACHE_PREFIX_V2:-1' scripts/cli_adapters/claude.sh` exits 0 |
+
+**What the promotion does:**
+- (Cycle A1) `subagent-run.sh` emits a compact `## INVOCATION CONTEXT` user prompt instead of the verbose v1 header
+- (Cycle A2) `claude.sh` attaches role-specific bedrock via `--append-system-prompt` (system-prompt slot is cached automatically; byte-stable per role across runs)
+- `--exclude-dynamic-system-prompt-sections` already flows through profiles' `extra_flags` in both v1 and v2
+
+**Promotion ladder satisfied:** default-off (v8.61) → verify (v8.61–v10.5.x, 18+ versions, no known breakage) → **default-on (v10.6, this cycle)**.
+
+---
+
+## P-NEW-19 — Auditor Stop-Criterion Persona Section
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `agents/evolve-auditor.md` — `## STOP CRITERION` section |
+| **Expected saving** | $0.30–0.50/cycle (auditor 49→~30 turns; cycle-42 auditor $1.55; 30/49 × $1.55 = ~$0.95 target, delta ~$0.50) |
+| **LoC delta** | ~30 LoC in `agents/evolve-auditor.md` |
+| **Risk** | Low — prompt-level only; no structural change |
+| **Target cycle** | 44 |
+| **Verification** | `jq .turns .evolve/runs/cycle-N/auditor-usage.json`; assert ≤35 across 3 consecutive cycles |
+
+**Problem:** Cycle-42 auditor ran 49 turns ($1.55) vs cycle-41's 35 turns ($1.12). No turn-count bound exists for the auditor. Without explicit completion gates, auditor continues exploring defects and verifying predicates after its verdict is decided.
+
+**Fix:** `## STOP CRITERION` section in `agents/evolve-auditor.md` (analogous to P-NEW-10 for Scout, P-NEW-16 for Orchestrator). Completion gates:
+- `predicates-run` — all `acs/cycle-N/*.sh` predicates executed (or noted absent)
+- `verdict-decided` — PASS/FAIL decision made from `acs-verdict.json` + predicate results
+- `defects-listed` — all defects enumerated (NONE if clean)
+- `report-written` — `audit-report.md` + `acs-verdict.json` written
+
+Banned post-report patterns: re-running predicates after verdict written, additional grep searches after report written, "let me also check…" loops.
+
+**Source:** Analogous to P-NEW-10 (Scout, $0.97/cycle actual) and P-NEW-16 (Orchestrator, $0.40/cycle expected). Same post-completion accumulation pattern at auditor cost.
