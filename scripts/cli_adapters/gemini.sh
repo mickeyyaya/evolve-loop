@@ -187,9 +187,13 @@ emit_native_test_seam_warnings
 # NATIVE mode: gemini binary present AND capabilities enable non_interactive_prompt.
 # Takes priority over HYBRID so operators with both binaries get true native execution.
 _GEMINI_NATIVE_CAP="false"
-if [ -f "$ADAPTER_DIR/gemini.capabilities.json" ] && command -v jq >/dev/null 2>&1; then
+_GEMINI_CAP_FILE="$ADAPTER_DIR/gemini.capabilities.json"
+if [ "${EVOLVE_TESTING:-0}" = "1" ] && [ -n "${EVOLVE_GEMINI_CAP_FILE:-}" ]; then
+    _GEMINI_CAP_FILE="$EVOLVE_GEMINI_CAP_FILE"
+fi
+if [ -f "$_GEMINI_CAP_FILE" ] && command -v jq >/dev/null 2>&1; then
     _GEMINI_NATIVE_CAP=$(jq -r '.supports.non_interactive_prompt | if . == null then "false" else tostring end' \
-        "$ADAPTER_DIR/gemini.capabilities.json" 2>/dev/null || echo "false")
+        "$_GEMINI_CAP_FILE" 2>/dev/null || echo "false")
 fi
 if [ "$_GEMINI_NATIVE_CAP" = "true" ]; then
     _GEMINI_BIN=$(detect_gemini_native 2>/dev/null) || _GEMINI_BIN=""

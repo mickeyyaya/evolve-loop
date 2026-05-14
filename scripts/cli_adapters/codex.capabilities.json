@@ -5,7 +5,7 @@
     "budget_cap_native": false,
     "permission_scoping": false,
     "sandbox_native": false,
-    "non_interactive_prompt": true,
+    "non_interactive_prompt": false,
     "structured_logs": true,
     "model_flag": true
   },

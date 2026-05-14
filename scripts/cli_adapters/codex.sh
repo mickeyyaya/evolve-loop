@@ -170,9 +170,13 @@ emit_native_test_seam_warnings
 # NATIVE mode: codex binary present AND capabilities enable non_interactive_prompt.
 # Takes priority over HYBRID so operators with both binaries get true native execution.
 _CODEX_NATIVE_CAP="false"
-if [ -f "$ADAPTER_DIR/codex.capabilities.json" ] && command -v jq >/dev/null 2>&1; then
+_CODEX_CAP_FILE="$ADAPTER_DIR/codex.capabilities.json"
+if [ "${EVOLVE_TESTING:-0}" = "1" ] && [ -n "${EVOLVE_CODEX_CAP_FILE:-}" ]; then
+    _CODEX_CAP_FILE="$EVOLVE_CODEX_CAP_FILE"
+fi
+if [ -f "$_CODEX_CAP_FILE" ] && command -v jq >/dev/null 2>&1; then
     _CODEX_NATIVE_CAP=$(jq -r '.supports.non_interactive_prompt | if . == null then "false" else tostring end' \
-        "$ADAPTER_DIR/codex.capabilities.json" 2>/dev/null || echo "false")
+        "$_CODEX_CAP_FILE" 2>/dev/null || echo "false")
 fi
 if [ "$_CODEX_NATIVE_CAP" = "true" ]; then
     _CODEX_BIN=$(detect_codex_native 2>/dev/null) || _CODEX_BIN=""
