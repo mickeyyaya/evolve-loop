@@ -495,6 +495,17 @@ cmd_validate_profile() {
             > "$EVOLVE_DISPATCH_PLAN_LOG" 2>/dev/null || true
     fi
 
+    # ADR-6: adapter_overrides — read per-adapter tool/flag overrides from profile.
+    local vp_ao_tools="" vp_ao_flags=""
+    if command -v jq >/dev/null 2>&1; then
+        local _vp_ao
+        _vp_ao=$(jq -r ".adapter_overrides.\"${vp_cli}\" // empty" "$profile" 2>/dev/null) || _vp_ao=""
+        if [ -n "$_vp_ao" ]; then
+            vp_ao_tools=$(printf '%s' "$_vp_ao" | jq -r '.tools // empty | if type == "array" then tojson else "" end' 2>/dev/null) || vp_ao_tools=""
+            vp_ao_flags=$(printf '%s' "$_vp_ao" | jq -r '.extra_flags // empty | if type == "array" then tojson else "" end' 2>/dev/null) || vp_ao_flags=""
+        fi
+    fi
+
     # Print resolved command via VALIDATE_ONLY=1 invocation.
     local tmp_prompt
     tmp_prompt=$(mktemp)
@@ -511,6 +522,8 @@ cmd_validate_profile() {
     RESOLVED_CLI="$vp_cli" \
     CLI_RESOLUTION_SOURCE="$vp_cli_source" \
     CAP_BUDGET_NATIVE="$vp_cap_budget_native" \
+    ADAPTER_TOOLS_OVERRIDE="${vp_ao_tools:-}" \
+    ADAPTER_EXTRA_FLAGS_OVERRIDE="${vp_ao_flags:-}" \
     VALIDATE_ONLY=1 \
     bash "$adapter"
     local rc=$?
@@ -992,6 +1005,17 @@ ADVEOF
     fi
     export CAP_BUDGET_NATIVE="$cap_budget_native"
 
+    # ADR-6: adapter_overrides — read per-adapter tool/flag overrides from profile.
+    local ao_tools="" ao_flags=""
+    if command -v jq >/dev/null 2>&1; then
+        local _ao_block
+        _ao_block=$(jq -r ".adapter_overrides.\"${cli}\" // empty" "$profile" 2>/dev/null) || _ao_block=""
+        if [ -n "$_ao_block" ]; then
+            ao_tools=$(printf '%s' "$_ao_block" | jq -r '.tools // empty | if type == "array" then tojson else "" end' 2>/dev/null) || ao_tools=""
+            ao_flags=$(printf '%s' "$_ao_block" | jq -r '.extra_flags // empty | if type == "array" then tojson else "" end' 2>/dev/null) || ao_flags=""
+        fi
+    fi
+
     # v10.X: write dispatch plan JSON for test seams (EVOLVE_DISPATCH_PLAN_LOG).
     # Format: {cli, model, cli_resolution_source, cap_budget_native, cap_permission_scoping, capability_warns[]}
     if [ -n "${EVOLVE_DISPATCH_PLAN_LOG:-}" ]; then
@@ -1061,6 +1085,7 @@ ADVEOF
     # v8.61.0 Cycle A2: pass AGENT to adapter so claude.sh can emit the
     # role-specific bedrock as --append-system-prompt under v2.
     # v10.X ADR-1/ADR-2: pass cli_resolution vars and capability flags to adapter.
+    # ADR-6: pass adapter_overrides tool/flag overrides to adapter.
     PROFILE_PATH="$effective_profile" \
     RESOLVED_MODEL="$model" \
     PROMPT_FILE="$injected_prompt" \
@@ -1075,6 +1100,8 @@ ADVEOF
     RESOLVED_CLI="$cli" \
     CLI_RESOLUTION_SOURCE="$cli_resolution_source" \
     CAP_BUDGET_NATIVE="$cap_budget_native" \
+    ADAPTER_TOOLS_OVERRIDE="${ao_tools:-}" \
+    ADAPTER_EXTRA_FLAGS_OVERRIDE="${ao_flags:-}" \
     bash "$adapter"
     local cli_exit=$?
     set -e

@@ -83,6 +83,27 @@ detect_claude() {
     command -v claude >/dev/null 2>&1
 }
 
+# NATIVE mode: invoke codex binary directly when available.
+# Test seam: EVOLVE_CODEX_BINARY overrides detection (gated by EVOLVE_TESTING=1).
+detect_codex_native() {
+    if [ "${EVOLVE_CODEX_BINARY+set}" = "set" ] && [ "${EVOLVE_TESTING:-0}" = "1" ]; then
+        if [ -z "$EVOLVE_CODEX_BINARY" ]; then return 1; fi
+        if [ -x "$EVOLVE_CODEX_BINARY" ]; then echo "$EVOLVE_CODEX_BINARY"; return 0; fi
+        return 1
+    fi
+    command -v codex >/dev/null 2>&1 || return 1
+    command -v codex
+}
+
+emit_native_test_seam_warnings() {
+    [ "${EVOLVE_CODEX_BINARY+set}" = "set" ] || return 0
+    if [ "${EVOLVE_TESTING:-0}" = "1" ]; then
+        echo "[codex-adapter] WARN: native test seam active (EVOLVE_CODEX_BINARY=${EVOLVE_CODEX_BINARY:-<empty>}); not for production" >&2
+    else
+        echo "[codex-adapter] WARN: EVOLVE_CODEX_BINARY set without EVOLVE_TESTING=1 — ignored." >&2
+    fi
+}
+
 print_missing_claude_error() {
     cat >&2 <<'MSGEOF'
 [codex-adapter] ERROR (exit 99): claude binary not found AND --require-full opted in
@@ -142,8 +163,25 @@ if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
     exit 0
 fi
 
-# --- Mode: run ---------------------------------------------------------------
+# --- Mode: run (decide NATIVE, HYBRID, or DEGRADED) -------------------------
 emit_test_seam_warnings
+emit_native_test_seam_warnings
+
+# NATIVE mode: codex binary present AND capabilities enable non_interactive_prompt.
+# Takes priority over HYBRID so operators with both binaries get true native execution.
+_CODEX_NATIVE_CAP="false"
+if [ -f "$ADAPTER_DIR/codex.capabilities.json" ] && command -v jq >/dev/null 2>&1; then
+    _CODEX_NATIVE_CAP=$(jq -r '.supports.non_interactive_prompt | if . == null then "false" else tostring end' \
+        "$ADAPTER_DIR/codex.capabilities.json" 2>/dev/null || echo "false")
+fi
+if [ "$_CODEX_NATIVE_CAP" = "true" ]; then
+    _CODEX_BIN=$(detect_codex_native 2>/dev/null) || _CODEX_BIN=""
+    if [ -n "$_CODEX_BIN" ] && [ -x "$_CODEX_BIN" ] && [ -n "${PROMPT_FILE:-}" ]; then
+        echo "[codex-adapter] NATIVE mode: invoking codex binary directly (cli_resolution=native)" >&2
+        exec "$_CODEX_BIN" < "$PROMPT_FILE"
+    fi
+fi
+
 if detect_claude >/dev/null 2>&1; then
     if [ ! -x "$CLAUDE_ADAPTER" ]; then
         echo "[codex-adapter] ERROR (exit 127): claude.sh adapter missing: $CLAUDE_ADAPTER" >&2

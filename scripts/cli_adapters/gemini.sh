@@ -91,6 +91,27 @@ detect_claude() {
     command -v claude >/dev/null 2>&1
 }
 
+# NATIVE mode: invoke gemini binary directly when available.
+# Test seam: EVOLVE_GEMINI_BINARY overrides detection (gated by EVOLVE_TESTING=1).
+detect_gemini_native() {
+    if [ "${EVOLVE_GEMINI_BINARY+set}" = "set" ] && [ "${EVOLVE_TESTING:-0}" = "1" ]; then
+        if [ -z "$EVOLVE_GEMINI_BINARY" ]; then return 1; fi
+        if [ -x "$EVOLVE_GEMINI_BINARY" ]; then echo "$EVOLVE_GEMINI_BINARY"; return 0; fi
+        return 1
+    fi
+    command -v gemini >/dev/null 2>&1 || return 1
+    command -v gemini
+}
+
+emit_native_test_seam_warnings() {
+    [ "${EVOLVE_GEMINI_BINARY+set}" = "set" ] || return 0
+    if [ "${EVOLVE_TESTING:-0}" = "1" ]; then
+        echo "[gemini-adapter] WARN: native test seam active (EVOLVE_GEMINI_BINARY=${EVOLVE_GEMINI_BINARY:-<empty>}); not for production" >&2
+    else
+        echo "[gemini-adapter] WARN: EVOLVE_GEMINI_BINARY set without EVOLVE_TESTING=1 — ignored." >&2
+    fi
+}
+
 print_missing_claude_error() {
     cat >&2 <<'MSGEOF'
 [gemini-adapter] ERROR (exit 99): claude binary not found AND --require-full opted in
@@ -159,8 +180,25 @@ if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
     exit 0
 fi
 
-# --- Mode: run (decide HYBRID or DEGRADED) -----------------------------------
+# --- Mode: run (decide NATIVE, HYBRID, or DEGRADED) -------------------------
 emit_test_seam_warnings
+emit_native_test_seam_warnings
+
+# NATIVE mode: gemini binary present AND capabilities enable non_interactive_prompt.
+# Takes priority over HYBRID so operators with both binaries get true native execution.
+_GEMINI_NATIVE_CAP="false"
+if [ -f "$ADAPTER_DIR/gemini.capabilities.json" ] && command -v jq >/dev/null 2>&1; then
+    _GEMINI_NATIVE_CAP=$(jq -r '.supports.non_interactive_prompt | if . == null then "false" else tostring end' \
+        "$ADAPTER_DIR/gemini.capabilities.json" 2>/dev/null || echo "false")
+fi
+if [ "$_GEMINI_NATIVE_CAP" = "true" ]; then
+    _GEMINI_BIN=$(detect_gemini_native 2>/dev/null) || _GEMINI_BIN=""
+    if [ -n "$_GEMINI_BIN" ] && [ -x "$_GEMINI_BIN" ] && [ -n "${PROMPT_FILE:-}" ]; then
+        echo "[gemini-adapter] NATIVE mode: invoking gemini binary directly (cli_resolution=native)" >&2
+        exec "$_GEMINI_BIN" < "$PROMPT_FILE"
+    fi
+fi
+
 if detect_claude >/dev/null 2>&1; then
     # HYBRID mode
     if [ ! -x "$CLAUDE_ADAPTER" ]; then
