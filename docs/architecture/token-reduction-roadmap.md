@@ -106,7 +106,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Target cycle** | 19+ |
 | **Verification** | A/B test: 5 cycles with skip-eligible tasks; assert auditor cost=0 on skipped cycles |
 
-**Source:** PSMAS — Phase-Scheduled Multi-Agent Systems (arXiv:2510.26585, 2025): **34.8%** mean token reduction via phase scheduling (updated 2026 continuous-control benchmark; was 27.3%); beats learned routing by 5.6pp. [[2]](#sources)
+**Source:** PSMAS — Phase-Scheduled Multi-Agent Systems for Token-Efficient Coordination (arXiv:2604.17400, April 2026): **27.3%** mean token reduction via phase scheduling (range 21.4–34.8%); beats learned routing. [[2]](#sources)
 
 ---
 
@@ -250,7 +250,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 <a name="sources"></a>
 
 1. Anthropic — How we built our multi-agent research system (2025–2026): https://www.anthropic.com/engineering/multi-agent-research-system
-2. PSMAS — Phase-Scheduled Multi-Agent Systems (arXiv:2510.26585, 2025): https://arxiv.org/abs/2510.26585
+2. PSMAS — Phase-Scheduled Multi-Agent Systems for Token-Efficient Coordination (arXiv:2604.17400, April 2026): https://arxiv.org/abs/2604.17400
 3. Zylos — AI Agent Context Compression Strategies (2026-02-28): https://zylos.ai/research/2026-02-28-ai-agent-context-compression-strategies
 4. SupervisorAgent — Obvious Works (2026): https://www.obviousworks.ch/en/token-optimization-saves-up-to-80-percent-llm-costs/
 5. Finout — Claude Opus 4.7 Pricing (2026): https://www.finout.io/blog/claude-opus-4.7-pricing-the-real-cost-story-behind-the-unchanged-price-tag
@@ -302,8 +302,9 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-10 Scout stop-criterion | **DONE (cycle 40)** | `## STOP CRITERION` section added to `agents/evolve-scout.md`; 4 completion gates; banned post-report pattern list. **Cycle-40 actual saving: $0.97/cycle** (scout turns 68→40, cost $2.54→$1.57, −38%). Target ≤20 turns still pending (cycle-41 scout: 40 turns — progress confirmed). |
 | P-NEW-11 MCP Compaction | RESEARCH | Cycle 45+; new external API dependency |
 | P-NEW-12 RLM context folding | RESEARCH | Cycle 50+; paradigm-level; no prod deployments |
-| P-NEW-13 Verbatim semantic compaction | **IN-FLIGHT (cycle 42)** | `subagent-run.sh` autotrim: `head -c`/`tail -c` → `head -n`/`tail -n` (line-boundary cut). ~25 LoC. |
-| P-NEW-16 Orchestrator stop-criterion | **IN-FLIGHT (cycle 42)** | `## STOP CRITERION` section added to `agents/evolve-orchestrator.md`; 3 named gates; targets 42→25 orchestrator turns (~$0.40/cycle). |
+| P-NEW-13 Verbatim semantic compaction | **DONE (cycle 42)** | `subagent-run.sh` autotrim: `head -c`/`tail -c` → `head -n`/`tail -n` (line-boundary cut). ~25 LoC. Commit 183406e. |
+| P-NEW-16 Orchestrator stop-criterion | **DONE (cycle 42)** | `## STOP CRITERION` section added to `agents/evolve-orchestrator.md`; 3 named gates; targets 42→25 orchestrator turns (~$0.40/cycle). Commit 183406e. |
+| P-NEW-17 Explicit Cache TTL for cross-phase reuse | **RESEARCH (cycle 42)** | Cache TTL change 2026-03-06 (60 min → 5 min) eliminates cross-phase cache reuse. Investigation path: claude CLI `--cache-ttl` flag availability. Up to $2.00/cycle saving if feasible. Implementation cycle 43–44. |
 | P-C20 Builder self-review skill loop | DONE | v9.2.0 + v9.3.0 --plugin-dir fix; `EVOLVE_BUILDER_SELF_REVIEW=0` intentional |
 
 ---
@@ -431,7 +432,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **Expected saving** | ~10% of cycles that hit autotrim-induced re-reads (reduces false-positive autotrim fragmentation of file paths, function signatures, and JSON structures) |
 | **LoC delta** | ~25 LoC: extend autotrim to cut at line-break boundaries instead of byte boundaries; preserve complete semantic units (full JSON objects, complete file paths) |
 | **Risk** | Low — improves correctness; no structural change to the pipeline |
-| **Target cycle** | 43+ |
+| **Target cycle** | **DONE (cycle 42)** — commit 183406e |
 | **Verification** | Enable `EVOLVE_CONTEXT_AUTOTRIM=1`; verify autotrim output has no truncated JSON objects or partial file paths; assert no autotrim-induced re-read events in `subagent-run.sh` log |
 
 **Source:** Production agentic pipeline analysis (2026) — operating on complete semantic units (statements/blocks) rather than partial truncation ensures file paths and critical references remain intact or absent entirely — critical safety property for code agents.
@@ -497,3 +498,37 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 Once all three gates satisfied: `Write` the report and halt. Banned post-report patterns enumerated (re-reading audit-report, additional ledger reads, "Let me verify one more time…" loops).
 
 **Source:** Analogous to P-NEW-10 (Scout stop-criterion, DONE cycle 40) which delivered $0.97/cycle actual saving (68→20 turns). Orchestrator exhibits the same post-completion accumulation pattern at lower base cost.
+
+---
+
+## P-NEW-17 — Explicit Cache TTL Configuration for Cross-Phase Reuse
+
+| Field | Value |
+|-------|-------|
+| **Subsystem** | `scripts/dispatch/subagent-run.sh` + claude CLI capability investigation |
+| **Expected saving** | Up to $2.00/cycle (eliminate per-phase cache-creation re-cost when cross-phase TTL > 5 min) |
+| **LoC delta** | TBD pending CLI capability investigation; estimated ~15 LoC if flag available |
+| **Risk** | Medium (depends on claude CLI exposing ttl configuration) |
+| **Target cycle** | 43 (investigation) → 44 (implementation if feasible) |
+
+**Problem:** Anthropic silently changed prompt cache TTL from 60 min → 5 min on 2026-03-06. For multi-agent pipelines where sequential phases span 10–30+ minutes total, this means every phase re-pays cache-creation costs (~$0.40–0.63/phase × 5 phases ≈ $2/cycle fixed overhead). Cross-phase cache reuse — which was theoretically possible under the 60-min TTL — is now structurally impossible.
+
+Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-creation is ~30% of per-phase cost. Eliminating cross-phase cache misses (restoring 1-hour TTL) could recover most of this.
+
+**Three mitigation paths:**
+
+| Path | Mechanism | Feasibility |
+|------|-----------|-------------|
+| A — CLI flag | Pass `--cache-ttl=3600` or equivalent to `claude -p` subagent invocation | Requires CLI support; investigate cycle 43 |
+| B — API migration | Document as prerequisite for API-based subagent dispatch (SDK exposes `"ttl": 3600` in `cache_control`) | Long-term; requires API auth + non-CLI dispatch |
+| C — Phase timing | Minimize inter-phase delays (orchestrator turn reduction via P-NEW-16; parallel-eligible phases) | Already in motion via P-NEW-9/P-NEW-10/P-NEW-16 |
+
+**Investigation tasks (cycle 43):**
+1. Run `claude --help | grep -i cache` to confirm if `--cache-ttl` flag exists in installed version
+2. Inspect `~/.claude/config.json` or equivalent for TTL overrides
+3. Test: invoke `claude -p` with explicit cache breakpoint and measure TTL via API metadata
+4. Document result in `knowledge-base/research/cache-ttl-march-2026-impact.md`
+
+**Source:** Anthropic TTL change 2026-03-06 (GitHub claude-code issue #56307); Anthropic SDK `cache_control.ttl` (SDK docs 2026); arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) — cache-safety constraints for multi-turn agents.
+
+See `knowledge-base/research/cache-ttl-march-2026-impact.md` for full research dossier.
