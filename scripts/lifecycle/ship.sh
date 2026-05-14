@@ -639,6 +639,25 @@ FOOTER
                 git push origin "$CURRENT_BRANCH" \
                     || fail "git push failed; main is at $(git rev-parse HEAD)"
                 log "OK: pushed to origin/$CURRENT_BRANCH"
+                # v10.x: Advance lastCycleNumber immediately after successful push, before
+                # post-push integrity check. Counter tracks "push succeeded", not "integrity
+                # verified". When integrity_fail fires below (e.g. tree-SHA mismatch from a
+                # prior backtick bug), the commit is already on remote — the counter must
+                # reflect that. Root cause of cycle-46 stuck-counter: integrity_fail at C1
+                # exited rc=2 before the advance block at line ~757 was reached.
+                _wt_state_file="$EVOLVE_PROJECT_ROOT/.evolve/state.json"
+                _wt_cycle_id=$(jq -r '.cycle_id // empty' "$cycle_state_file" 2>/dev/null || echo "")
+                if [ -f "$_wt_state_file" ] && [ -n "$_wt_cycle_id" ] && [ "$_wt_cycle_id" != "null" ]; then
+                    _wt_tmp="${_wt_state_file}.tmp.$$"
+                    if jq --argjson n "$_wt_cycle_id" '.lastCycleNumber = $n' "$_wt_state_file" > "$_wt_tmp" 2>/dev/null \
+                       && mv -f "$_wt_tmp" "$_wt_state_file"; then
+                        log "OK: advanced state.json:lastCycleNumber to $_wt_cycle_id (pre-integrity-check)"
+                    else
+                        rm -f "$_wt_tmp" 2>/dev/null
+                        log "WARN: could not advance lastCycleNumber pre-integrity-check (state.json write failed)"
+                    fi
+                fi
+                unset _wt_state_file _wt_cycle_id _wt_tmp
                 # C1: tree-SHA binding verification + ship-binding.json sidecar
                 TREE_SHA_COMMITTED=$(git rev-parse HEAD^{tree} 2>/dev/null || echo "")
                 if [ -n "$AUDIT_BOUND_TREE_SHA" ] && [ -n "$TREE_SHA_COMMITTED" ]; then
