@@ -6,6 +6,16 @@
 
 > This file is read by AI coding assistants. Platform equivalents: `CLAUDE.md` (Claude Code), `GEMINI.md` (Gemini CLI), `AGENTS.md` (generic). Content is platform-agnostic.
 
+## Task Initiation
+
+- Before starting exploration or implementation, confirm the direction with a brief plan (2-3 bullets) and wait for approval on multi-step or long-running tasks.
+- Never start exploring a codebase without first stating intent.
+
+## Output Discipline
+
+- Keep responses concise; default to summaries with file:line references rather than pasting large code blocks.
+- For investigations, write findings to a markdown file rather than into the chat to avoid token limits.
+
 ## Autonomous Execution
 
 If the user is in autonomous mode (bypass permissions / yolo mode / auto-approve), YOU MUST:
@@ -105,6 +115,12 @@ When a checkpoint fires: `run-cycle.sh`'s EXIT trap preserves worktree + cycle-s
 | `EVOLVE_PROMPT_MAX_TOKENS` | `30000` | Per-phase prompt cap (unchanged from v8.56) |
 
 See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md) and [docs/architecture/context-window-control.md](docs/architecture/context-window-control.md) for the full protocols.
+
+## Long-Running Background Jobs
+
+- Always verify a background dispatcher/evolve-loop process is healthy after launch (check exit codes, log tail) before declaring it running.
+- For multi-cycle runs, create an explicit checkpoint after each cycle so `resume` can recover from any cycle.
+- If a background job fails, surface the failure immediately rather than continuing to other tasks.
 
 ## Token-Reduction Campaign (Cycles 15–19+)
 
