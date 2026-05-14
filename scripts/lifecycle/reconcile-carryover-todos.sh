@@ -271,7 +271,7 @@ if [ -s "$ABNORMAL_FILE" ]; then
             '[.carryoverTodos[]? | select(._inbox_source == $src)] | length' \
             "$STATE" 2>/dev/null || echo 0)
         if [ "${_exists:-0}" -gt 0 ]; then
-            log "SKIP promote $src — already in carryoverTodos"
+            log "SKIP promote $_src — already in carryoverTodos"
             continue
         fi
         _id="abnormal-${_etype}-c${CYCLE}"

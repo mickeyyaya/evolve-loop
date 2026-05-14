@@ -968,6 +968,14 @@ for ((i=1; i<=CYCLES; i++)); do
     else
         ran_cycle=$((last_before + 1))
         log "NOTE: lastCycleNumber did not advance; verifying cycle $ran_cycle (likely WARN/FAIL audit verdict — that is acceptable, but pipeline must still have been complete)"
+        # Phase B abnormal-event: counter-non-advance (dispatch-layer observability).
+        _ws_na="$RUNS_DIR/cycle-${ran_cycle}"
+        if [ -d "$_ws_na" ]; then
+            _ts_na=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            printf '{"event_type":"counter-non-advance","timestamp":"%s","source_phase":"dispatch","severity":"WARN","details":"lastCycleNumber did not advance after cycle %s — audit verdict likely WARN or FAIL","remediation_hint":"Check orchestrator-report.md verdict; if FAIL run retrospective; if ship.sh failed inspect ship-gate logs"}\n' \
+                "$_ts_na" "$ran_cycle" >> "$_ws_na/abnormal-events.jsonl" 2>/dev/null || true
+        fi
+        unset _ws_na _ts_na
     fi
 
     # v8.33.0: per-cycle cost summary. Reuse show-cycle-cost.sh's --json mode

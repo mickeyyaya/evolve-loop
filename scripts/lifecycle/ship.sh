@@ -480,7 +480,7 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
     # `grep -m1` exits 1 on no-match; `|| true` prevents set -e from killing the script
     # when the Auditor predates C1 and didn't emit the field (graceful absent → empty string).
     AUDIT_BOUND_TREE_SHA=$(echo "$AUDIT_VERDICT_RAW" | grep -m1 'audit_bound_tree_sha:' \
-        | awk '{print $NF}' | tr -d '[:space:]' || true)
+        | awk '{print $NF}' | tr -d "[:space:]\`" || true)
     unset AUDIT_VERDICT_RAW
 
     # v10.0.0: EGPS predicate-suite gate (cycle-class only).

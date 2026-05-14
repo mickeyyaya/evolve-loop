@@ -678,4 +678,24 @@ if [ -s "$STDERR_LOG" ]; then
     unset _quota_hint _hint_dir _hint_path _hint_tmp
 fi
 
+# Phase B abnormal-event: cost-overrun (dispatch-layer observability).
+# When claude exits non-zero and the stdout log contains the budget-exceeded
+# stop_reason (error_max_budget_usd), emit a cost-overrun event to the workspace
+# abnormal-events.jsonl so the dashboard and reconcile-carryover-todos.sh can
+# surface it without operators needing to grep per-phase stdout logs.
+# Best-effort — never fails the pipeline.
+if [ "$EXIT_CODE" -ne 0 ] && [ -s "${STDOUT_LOG:-}" ]; then
+    if grep -q 'error_max_budget_usd\|max_budget_usd' "$STDOUT_LOG" 2>/dev/null; then
+        _ws_co="${WORKSPACE_PATH:-}"
+        if [ -d "$_ws_co" ]; then
+            _ts_co=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            _role_co=$(basename "${PROFILE_PATH%.*}" 2>/dev/null || echo "unknown")
+            printf '{"event_type":"cost-overrun","timestamp":"%s","source_phase":"claude-adapter","severity":"HIGH","details":"claude exited rc=%s with budget-exceeded signal for role %s (original_max_budget=%s)","remediation_hint":"Raise EVOLVE_MAX_BUDGET_USD or reduce prompt size for this role"}\n' \
+                "$_ts_co" "$EXIT_CODE" "$_role_co" "${ORIGINAL_MAX_BUDGET:-unknown}" \
+                >> "$_ws_co/abnormal-events.jsonl" 2>/dev/null || true
+        fi
+        unset _ws_co _ts_co _role_co
+    fi
+fi
+
 exit "$EXIT_CODE"
