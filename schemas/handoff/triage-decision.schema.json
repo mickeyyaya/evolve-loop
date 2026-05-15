@@ -1,0 +1,50 @@
+{
+  "$id": "evolve-loop://schemas/handoff/triage-decision.schema.json",
+  "artifact_type": "triage-decision",
+  "version": 1,
+  "description": "Structural contract for triage-decision.md handoff artifacts (C2-handoff-schemas). Triage selects/rejects inbox tasks and estimates cycle size before plan-review.",
+  "required_first_line": {
+    "pattern": "^<!-- challenge-token:",
+    "fail_message": "challenge token missing from line 1 — report may be a forgery"
+  },
+  "required_sections": [
+    {
+      "name": "selected_tasks",
+      "patterns": [
+        "^## Selected Tasks",
+        "^## Selected",
+        "^<!-- ANCHOR:selected_tasks -->"
+      ],
+      "fail_message": "## Selected Tasks (or ANCHOR:selected_tasks) missing — Triage must list which inbox items advance to Scout"
+    },
+    {
+      "name": "rejected_tasks",
+      "patterns": [
+        "^## Rejected Tasks",
+        "^## Skip-Shipped",
+        "^## Deferred",
+        "^<!-- ANCHOR:rejected_tasks -->"
+      ],
+      "fail_message": "## Rejected Tasks (or ANCHOR:rejected_tasks) missing — Triage must record deferred/skipped items"
+    },
+    {
+      "name": "cycle_size_estimate",
+      "patterns": [
+        "^## Cycle Size",
+        "^## Size Estimate",
+        "cycle_size_estimate",
+        "^<!-- ANCHOR:cycle_size_estimate -->"
+      ],
+      "fail_message": "## Cycle Size estimate missing — Triage must classify cycle as small|medium|large for plan-review gate"
+    }
+  ],
+  "conditional_sections": [],
+  "required_content": [
+    {
+      "name": "size_value",
+      "pattern": "(small|medium|large|XS|S|M|L|XL)",
+      "fail_message": "size value (small|medium|large|XS|S|M|L|XL) not found — Triage must declare cycle size to satisfy gate_triage_to_plan_review"
+    }
+  ],
+  "min_words": 50
+}

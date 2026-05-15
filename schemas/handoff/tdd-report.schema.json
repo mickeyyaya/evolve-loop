@@ -1,0 +1,48 @@
+{
+  "$id": "evolve-loop://schemas/handoff/tdd-report.schema.json",
+  "artifact_type": "tdd-report",
+  "version": 1,
+  "description": "Structural contract for tdd-report.md handoff artifacts (C2-handoff-schemas). The TDD phase writes failing tests for each acceptance criterion before Builder begins.",
+  "required_first_line": {
+    "pattern": "^<!-- challenge-token:",
+    "fail_message": "challenge token missing from line 1 — report may be a forgery"
+  },
+  "required_sections": [
+    {
+      "name": "tests_written",
+      "patterns": [
+        "^## Tests Written",
+        "^## Failing Tests",
+        "^<!-- ANCHOR:tests_written -->"
+      ],
+      "fail_message": "## Tests Written (or ANCHOR:tests_written) missing — TDD must enumerate the failing tests it authored"
+    },
+    {
+      "name": "ac_mapping",
+      "patterns": [
+        "^## AC Mapping",
+        "^## Acceptance Criteria Mapping",
+        "^<!-- ANCHOR:ac_mapping -->"
+      ],
+      "fail_message": "## AC Mapping (or ANCHOR:ac_mapping) missing — TDD must map each test to a Scout acceptance criterion"
+    },
+    {
+      "name": "red_state",
+      "patterns": [
+        "^## Red State",
+        "^## Initial Test Run",
+        "^<!-- ANCHOR:red_state -->"
+      ],
+      "fail_message": "## Red State (or ANCHOR:red_state) missing — TDD must confirm all new tests fail before Builder begins"
+    }
+  ],
+  "conditional_sections": [],
+  "required_content": [
+    {
+      "name": "red_count",
+      "pattern": "(RED|FAIL|fail|red)",
+      "fail_message": "no RED/FAIL marker found — TDD must show evidence the new tests start red"
+    }
+  ],
+  "min_words": 50
+}

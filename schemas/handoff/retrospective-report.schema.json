@@ -1,0 +1,49 @@
+{
+  "$id": "evolve-loop://schemas/handoff/retrospective-report.schema.json",
+  "artifact_type": "retrospective-report",
+  "version": 1,
+  "description": "Structural contract for retrospective-report.md handoff artifacts (C2-handoff-schemas). Retrospective fires on FAIL/WARN (v8.45.0+) and produces the structured lesson YAML.",
+  "required_first_line": {
+    "pattern": "^<!-- challenge-token:",
+    "fail_message": "challenge token missing from line 1 — report may be a forgery"
+  },
+  "required_sections": [
+    {
+      "name": "what_happened",
+      "patterns": [
+        "^## What Happened",
+        "^## Failure Summary",
+        "^<!-- ANCHOR:what_happened -->"
+      ],
+      "fail_message": "## What Happened (or ANCHOR:what_happened) missing — Retrospective must describe the failure mode"
+    },
+    {
+      "name": "root_cause",
+      "patterns": [
+        "^## Root Cause",
+        "^## Why",
+        "^<!-- ANCHOR:root_cause -->"
+      ],
+      "fail_message": "## Root Cause (or ANCHOR:root_cause) missing — Retrospective must extract the underlying cause, not just the symptom"
+    },
+    {
+      "name": "lesson",
+      "patterns": [
+        "^## Lesson",
+        "^## Lessons",
+        "^## Instinct",
+        "^<!-- ANCHOR:lesson -->"
+      ],
+      "fail_message": "## Lesson (or ANCHOR:lesson) missing — Retrospective must emit a reusable instinct/lesson"
+    }
+  ],
+  "conditional_sections": [],
+  "required_content": [
+    {
+      "name": "lesson_yaml_pointer",
+      "pattern": "(lessons/.+\\.yaml|instinct_id|lesson_id)",
+      "fail_message": "lesson YAML pointer or lesson_id missing — Retrospective must produce a structured artifact under .evolve/instincts/lessons/"
+    }
+  ],
+  "min_words": 50
+}

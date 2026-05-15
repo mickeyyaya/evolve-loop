@@ -1,0 +1,42 @@
+{
+  "$id": "evolve-loop://schemas/handoff/intent-report.schema.json",
+  "artifact_type": "intent-report",
+  "version": 1,
+  "description": "Structural contract for intent-report.md handoff artifacts (C2-handoff-schemas). The Intent phase captures user-stated goals + constraints before Scout begins.",
+  "required_first_line": {
+    "pattern": "^<!-- challenge-token:",
+    "fail_message": "challenge token missing from line 1 — report may be a forgery"
+  },
+  "required_sections": [
+    {
+      "name": "goal",
+      "patterns": [
+        "^## Goal",
+        "^## Intent",
+        "^<!-- ANCHOR:goal -->"
+      ],
+      "fail_message": "## Goal (or ANCHOR:goal) missing — Intent must state the user-facing goal in one sentence"
+    },
+    {
+      "name": "constraints",
+      "patterns": [
+        "^## Constraints",
+        "^## Non-Goals",
+        "^<!-- ANCHOR:constraints -->"
+      ],
+      "fail_message": "## Constraints (or ANCHOR:constraints) missing — Intent must enumerate scope limits and non-goals"
+    },
+    {
+      "name": "success_criteria",
+      "patterns": [
+        "^## Success Criteria",
+        "^## Definition of Done",
+        "^<!-- ANCHOR:success_criteria -->"
+      ],
+      "fail_message": "## Success Criteria (or ANCHOR:success_criteria) missing — Intent must declare measurable done-conditions"
+    }
+  ],
+  "conditional_sections": [],
+  "required_content": [],
+  "min_words": 50
+}
