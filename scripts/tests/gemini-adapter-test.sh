@@ -66,7 +66,7 @@ set +e
 PROFILE_PATH="$SCOUT_PROFILE" RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
     CYCLE=0 WORKSPACE_PATH=/tmp STDOUT_LOG=/tmp/x STDERR_LOG=/tmp/y \
     ARTIFACT_PATH=/tmp/z \
-    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" \
+    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" EVOLVE_GEMINI_BINARY="" \
     EVOLVE_GEMINI_REQUIRE_FULL=1 \
     bash "$ADAPTER" >/dev/null 2>&1
 rc=$?
@@ -95,7 +95,7 @@ set +e
 out=$(PROFILE_PATH=/dev/null RESOLVED_MODEL=sonnet PROMPT_FILE=/dev/null \
     CYCLE=0 WORKSPACE_PATH=/tmp STDOUT_LOG=/tmp/x STDERR_LOG=/tmp/y \
     ARTIFACT_PATH=/tmp/z \
-    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" \
+    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" EVOLVE_GEMINI_BINARY="" \
     EVOLVE_GEMINI_REQUIRE_FULL=1 \
     bash "$ADAPTER" 2>&1)
 set -e
@@ -125,7 +125,7 @@ if command -v claude >/dev/null 2>&1 && [ -f "$SCOUT_PROFILE" ]; then
     echo "test prompt" > "$tmpdir/prompt"
     stderr_log="$tmpdir/adapter-stderr.log"
     set +e
-    VALIDATE_ONLY=1 \
+    EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="/tmp/fake_claude.sh" EVOLVE_GEMINI_BINARY="" \
         PROFILE_PATH="$SCOUT_PROFILE" \
         RESOLVED_MODEL="sonnet" \
         PROMPT_FILE="$tmpdir/prompt" \

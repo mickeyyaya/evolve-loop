@@ -667,6 +667,7 @@ cmd_run() {
     if [ -n "${PROMPT_FILE_OVERRIDE:-}" ]; then
         [ -f "$PROMPT_FILE_OVERRIDE" ] || fail "PROMPT_FILE_OVERRIDE missing: $PROMPT_FILE_OVERRIDE"
         prompt_file="$PROMPT_FILE_OVERRIDE"
+        unset PROMPT_FILE_OVERRIDE
     elif [ ! -t 0 ]; then
         # stdin is piped — capture it
         prompt_file=$(mktemp)
