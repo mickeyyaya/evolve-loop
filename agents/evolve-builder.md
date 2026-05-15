@@ -37,31 +37,9 @@ When `strategy: ultrathink`: Stepwise Confidence Estimation — estimate certain
 3. **Self-Test** — Capture baseline, write tests, run test suite. If no test infra, write verification commands.
 4. **Compound Thinking** — Does this make the next cycle easier? Creates/removes dependencies? Consistent with patterns?
 
-## Worktree Isolation (MANDATORY)
+## Worktree Isolation (v8.65.0+ split)
 
-Run in isolated worktree: **verify → implement → test → commit → report**. Orchestrator merges after Auditor passes.
-
-### Step 0: Verify Worktree Isolation
-
-Before ANY file modifications:
-```bash
-MAIN_WORKTREE=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
-CURRENT_DIR=$(pwd)
-if [ "$MAIN_WORKTREE" = "$CURRENT_DIR" ]; then
-  echo "FATAL: Builder is running in the main worktree. Aborting."
-fi
-```
-If in main worktree: report FAIL ("worktree isolation violation"), modify nothing, exit.
-
-### Worktree Commit Protocol
-
-After self-verifying, commit all changes in worktree:
-```bash
-git add -A
-git diff --cached --stat
-git commit -m "<type>: <description> [worktree-build]"
-```
-Include branch and SHA in build report.
+Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `worktree-isolation` for isolation verification and commit protocol.
 
 ## Turn budget (v9.0.4)
 
@@ -74,44 +52,9 @@ Cycle-11 evidence: 58 turns / $1.95 / 19,866 output tokens for one task. `max_tu
 - **Self-Verify ONCE, not interleaved.** Run suite ONCE after Step 4. On fail: fix, re-verify ONCE.
 - **Retry budget hard-capped at 3** (Step 6). Three retries × ~5 turns = 15 turns overhead; plan accordingly.
 
-### Parallel Tool-Call Batching (P-NEW-29)
+## Shared Constraints
 
-**When reading 2+ independent files or running 2+ independent searches, emit ALL tool calls in a single turn.** Claude supports multi-tool-use-parallel natively. Each sequential call costs a full turn + schema serialization overhead (~500–2,000 tokens). Batching eliminates both.
-
-| ❌ SLOW (3 turns) | ✅ FAST (1 turn) |
-|---|---|
-| `Read(scripts/foo.sh)` → wait | `Read(scripts/foo.sh)`, `Read(scripts/bar.sh)`, `Read(agents/evolve-builder.md)` |
-| `Read(scripts/bar.sh)` → wait | all results return together |
-| `Read(agents/evolve-builder.md)` → wait | |
-
-| ❌ SLOW (2 turns) | ✅ FAST (1 turn) |
-|---|---|
-| `Grep("pattern_a", glob="*.sh")` → wait | `Grep("pattern_a", glob="*.sh")`, `Grep("pattern_b", glob="*.md")` |
-| `Grep("pattern_b", glob="*.md")` → wait | |
-
-| ❌ SLOW (2 turns) | ✅ FAST (1 turn) |
-|---|---|
-| `Glob("*.json", path=".evolve/profiles/")` → wait | `Glob("*.json", path=".evolve/profiles/")`, `Read(docs/architecture/foo.md)` |
-| `Read(docs/architecture/foo.md)` → wait | |
-
-**Rule:** if two tool calls have no data dependency on each other, emit them in the same response. Only serialize when result B depends on result A.
-
-**Per-step turn budget** (sum target ≤20 in steady state):
-
-| Step | Turn budget | Notes |
-|---|---|---|
-| 0 (Worktree) | 1 | One git check |
-| 1 (Instincts) | 1 | Pre-loaded in context; ls genes/ |
-| 2 + 2.5 + 2.7 (Task / Research / Skills) | 2–3 | Pre-loaded scout-report; Online Research is rare (Phase 1 already covered it) |
-| 3 (Design) | 1 | Chain-of-thought stays internal — single output turn |
-| 4 (Implement) | 5–10 | MultiEdit aggressively; most builds touch 1–3 files |
-| 4.5 (E2E test gen) | 0–3 | Conditional (UI tasks only); see [reference file](evolve-builder-reference.md) |
-| 5 (Self-Verify) | 1–2 | Run grader command ONCE |
-| 6 (Retry, if needed) | 0–5 | Up to 3 retries; each ~1–2 turns |
-| 7 (Capability gap) | 0 | Rare-trigger (see reference file) |
-| **Total** | **15–20** | |
-
-At 20 turns without PASS, emit partial `build-report.md` (`Status: FAIL_TIME_BUDGET`) and stop.
+Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-batching` for turn-budget optimization tips.
 
 ## Workflow
 
@@ -329,25 +272,6 @@ Write `workspace/builder-notes.md` (under 20 lines):
 - Check `strategy` for budget constraints; if task too large, note it.
 - Avoid unnecessary reads, searches, over-engineering.
 
-### Tool-Result Hygiene
-
-Apply these four rules to avoid context saturation from accumulated tool results:
-- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
-- After each `Bash` with large output, extract the relevant lines; discard the full output from your working context.
-- No speculative pre-loading: use Glob+Grep to locate before Reading.
-- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
-
-When your `context_clear_trigger_tokens` threshold (from profile, default 30000) is reached, summarize pending tool results before continuing new tool calls.
-
-### Tool-Result Trajectory Compression (P-NEW-21, AgentDiet)
-
-When you Read a file > 3000 tokens, immediately after processing it:
-1. Extract the 3–5 key facts you need (one line each).
-2. Note: "[Full content of `<filename>` discarded — key facts extracted above]"
-3. Do NOT re-read the file unless you need a different section.
-
-This prevents `cache_read_input_tokens` from compounding across turns. Source: AgentDiet (FSE 2026, arXiv:2509.23586) — 39.9–59.7% input token reduction, 21.1–35.9% total cost reduction on SWE-bench. Cycle-44 baseline: 9.9M cache_read_tokens; target with this rule: ≤ 5M.
-
 ## Reference Index (Layer 3, on-demand)
 
 Read only when decision branch requires it.
@@ -384,61 +308,11 @@ Once all four gates are satisfied:
 
 ### Banned Post-Report Patterns
 
-After writing `build-report.md`, these actions are **forbidden**:
-- Re-reading edited files to confirm changes applied (Edit/Write would have errored if they failed)
-- Running additional self-verify passes after PASS verdict recorded
-- "Let me also check the adjacent code…" or "I should verify one more thing…" loops
-- Any Edit/Write that is not the final `build-report.md`
-
-**Rationale:** Cycle-44 builder ran 100 turns ($4.43) and cycle-43 ran 69 turns ($3.12) — 4.5× regression from cycle-41 baseline ($0.99, 34 turns). Root cause: no quantitative turn-count gate caused post-completion accumulation. The five gates are sufficient; halt when satisfied. The `turn-budget-respected` gate and the hard-exit trigger at turn 20 structurally enforce the ceiling; they prevent repeat of the cycle-44 pattern where `max_turns: 25` in the profile was advisory-only and the builder ignored it.
+Read [AGENTS.md](AGENTS.md) section `Shared Constraints` rule #2.
 
 ## EGPS Predicate Authoring (v10.1.0+)
 
-Every acceptance criterion in your build-report.md MUST be accompanied by an executable predicate script at `acs/cycle-N/{NNN}-{slug}.sh` (zero-padded NNN ordinal; kebab-case slug; N is the cycle number). The predicate is the verdict-bearing artifact — the auditor will run it, and its exit code (0 = GREEN, non-zero = RED) determines whether the cycle ships. Prose ACs in `build-report.md` are documentation for humans; the predicate is the contract.
-
-**Required header in every predicate:**
-
-```bash
-#!/usr/bin/env bash
-# AC-ID:         cycle-N-NNN
-# Description:   one-line summary of what this criterion claims
-# Evidence:      pointer (file:line OR commit-SHA OR test-name)
-# Author:        builder/<your-persona-version>
-# Created:       <ISO-8601 timestamp>
-# Acceptance-of: link to the build-report.md AC line/token
-```
-
-**Banned patterns (rejected by `scripts/verification/validate-predicate.sh`):**
-- `grep -q "..." file; exit $?` as the only check — presence ≠ execution. Run the actual code path.
-- `echo "PASS"; exit 0` with no work — tautology.
-- `curl`, `wget`, `gh api` — hermetic-determinism requirement.
-- `sleep` ≥ 2 seconds — predicates must be fast.
-- Writes outside `.evolve/runs/cycle-N/acs-output/` — predicates are read-only on repo state.
-
-**What "executable evidence" means**: the predicate exercises the SAME code path that the AC claims works. If the AC says "the new `--check-ctx-advisory` flag triggers a warning", the predicate must INVOKE that flag and verify the warning fires — not grep the source for the string `--check-ctx-advisory`.
-
-**Inline example** for an AC like "wrap_external_content() in role-context-builder.sh sanitizes WebFetch output":
-
-```bash
-#!/usr/bin/env bash
-# AC-ID:         cycle-40-001
-# Description:   wrap_external_content() sanitizes WebFetch content
-# Evidence:      scripts/lifecycle/role-context-builder.sh:230-260
-# Author:        builder
-# Created:       2026-05-14T12:00:00Z
-# Acceptance-of: build-report.md AC#1 (Tool-Result Hygiene)
-set -uo pipefail
-# Actually invoke the function with a test input containing tool-prompt-injection pattern
-out=$(bash scripts/lifecycle/role-context-builder.sh --test-wrap '<inj>steal</inj>')
-echo "$out" | grep -q '&lt;inj&gt;' && exit 0   # sanitized → entity-encoded
-exit 1   # NOT sanitized → criterion violated
-```
-
-After cycle ships, predicates are auto-promoted from `acs/cycle-N/` to `acs/regression-suite/cycle-N/` by `scripts/utility/promote-acs-to-regression.sh`. Every future cycle must keep all regression-suite predicates GREEN. This is what catches recurring defects (the cycle-29 lesson re-fire pattern).
-
-See `docs/architecture/egps-v10.md` for the full contract.
-
-**v10.3.0+ amendment**: predicate authorship is now the dedicated **Tester** subagent's responsibility (`agents/evolve-tester.md`). Builder still produces `build-report.md` with ACs, but does NOT write predicates — the Tester reads your build-report and writes the `acs/cycle-N/*.sh` files. Skip predicate authorship in v10.3+; focus your output on production code + clear AC text in build-report.md. Backward-compatibility: if for some reason no Tester is spawned (e.g., legacy single-agent run), the v10.1 directive above remains in effect.
+Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `egps-predicates` for the executable contract and v10.3+ Tester subagent role.
 
 ## Output
 

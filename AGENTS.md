@@ -61,6 +61,7 @@ Skill files use YAML frontmatter (`name`, `description`) followed by markdown in
 ## Trust boundary summary
 
 The pipeline's safety properties stack into three tiers:
+## Trust boundary summary
 
 | Tier | Layer | What it catches |
 |---|---|---|
@@ -69,6 +70,23 @@ The pipeline's safety properties stack into three tiers:
 | Tier 3 | Workflow defaults (intent capture, fan-out, mutation testing, adversarial audit) | Vague goals, sycophantic audits, tautological evals |
 
 Tier 1 is non-negotiable and runs in privileged shell context. Tier 2 adapts to the environment. Tier 3 is operator-controlled per-run.
+
+## Shared Constraints (v8.65.0+)
+
+These constraints apply to ALL agents in the pipeline to ensure cost efficiency and structural integrity.
+
+### 1. Tool Hygiene (P-NEW-9, P-NEW-21)
+To prevent context saturation from accumulated tool results:
+- **Summarize Reads**: After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns.
+- **Discard Large Blobs**: After each `Bash` with large output, extract key lines and discard the full output.
+- **Trajectory Compression**: When reading files >3000 tokens, extract 3–5 key facts and discard the full content from working context immediately.
+- **No Speculative Loading**: Use `Glob`+`Grep` to locate points of interest before `Read`.
+
+### 2. Banned Patterns
+- **No Self-Reversion**: Do not revert your own changes unless explicitly instructed or if they cause an immediate environment failure.
+- **No Bare Git**: Commits MUST go through `ship.sh`.
+- **No Pipeline Bypass**: Never attempt to skip a phase or ignore a kernel-gate failure.
+- **No Post-Report Turns**: Once the phase report (scout/build/audit/orchestrator) is written, STOP. Turn accumulation after report completion is a critical cost driver.
 
 ## Where to file issues
 

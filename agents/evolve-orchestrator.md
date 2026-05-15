@@ -118,45 +118,9 @@ After the Audit phase completes, **`acs-verdict.json` in the workspace is the ve
 
 See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
 
-## Registry-driven dispatch (cycle 57+, primary path)
+## Registry-driven dispatch (v8.65.0+ split)
 
-When `EVOLVE_USE_PHASE_REGISTRY=1` (default), the phase sequence is driven by
-`docs/architecture/phase-registry.json` via `scripts/dispatch/list-phase-order.sh`.
-The calibrate step reads the registry order and dispatches each gate by name via
-`gate_run_by_name` (declared in `scripts/lifecycle/phase-gate.sh`).
-
-```bash
-# Calibrate: read phase order from registry
-phase_list=$(EVOLVE_USE_PHASE_REGISTRY=1 bash scripts/dispatch/list-phase-order.sh)
-
-# Dispatch loop (registry-driven):
-# For each phase in registry order: run gate_in → advance → subagent → gate_out
-while IFS= read -r phase_name; do
-    gate_in=$(jq -r --arg p "$phase_name" \
-        '.phases[] | select(.name==$p) | .gate_in // empty' \
-        docs/architecture/phase-registry.json 2>/dev/null || true)
-    [ -n "$gate_in" ] && gate_run_by_name "$gate_in" "$CYCLE" "$WORKSPACE"
-    cycle-state.sh advance "$phase_name" "$(jq -r --arg p "$phase_name" \
-        '.phases[] | select(.name==$p) | .role' docs/architecture/phase-registry.json)"
-    subagent-run.sh "$(jq -r --arg p "$phase_name" \
-        '.phases[] | select(.name==$p) | .role' docs/architecture/phase-registry.json)" \
-        "$CYCLE" "$WORKSPACE"
-    gate_out=$(jq -r --arg p "$phase_name" \
-        '.phases[] | select(.name==$p) | .gate_out // empty' \
-        docs/architecture/phase-registry.json 2>/dev/null || true)
-    [ -n "$gate_out" ] && gate_run_by_name "$gate_out" "$CYCLE" "$WORKSPACE"
-done <<EOF
-$phase_list
-EOF
-```
-
-Registry phase order (cycle 57): intent → scout → triage → plan-review → tdd → build → tester → audit → ship → retrospective → memo
-
-The verdict-driven branch (PASS/WARN/FAIL ship decision) remains explicit in
-the orchestrator — it is NOT encoded in the registry because it requires
-runtime verdict data. The registry governs phase order only.
-
-When `EVOLVE_USE_PHASE_REGISTRY=0`, fall back to the **Legacy Phase Loop** below.
+Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `registry-dispatch` for the full loop implementation and registry ordering logic.
 
 ## Phase Loop (the only sequence you may execute)
 
@@ -260,38 +224,9 @@ Note: the merge script reads `handoff-retrospective.json` independently — this
 
 For the full `memo.md` section template, see [agents/evolve-memo-reference.md](agents/evolve-memo-reference.md) — section `memo-template`.
 
-## Resume Mode (v9.1.0+)
+## Resume Mode (v8.65.0+ split)
 
-When the dispatcher invokes you with `EVOLVE_RESUME_MODE=1` in your env, you are picking up a previously-paused cycle. The pause was caused by one of:
-
-- **`quota-likely`** — A phase exited rc=1 with empty stderr while cost was in the 80% danger zone — the Claude Code subscription quota signature.
-- **`batch-cap-near`** — The dispatcher's batch budget crossed 95% (`EVOLVE_CHECKPOINT_AT_PCT`); the previous cycle's orchestrator wrote a checkpoint at a clean phase boundary instead of continuing.
-- **`operator-requested`** — Someone manually ran `cycle-state.sh checkpoint operator-requested`.
-
-**Three env vars carry the resume signal:**
-
-| Var | Content | What you do |
-|---|---|---|
-| `EVOLVE_RESUME_MODE` | `1` | Switch to resume-mode behavior (this section) instead of the normal Phase Loop |
-| `EVOLVE_RESUME_PHASE` | the phase to resume from (e.g., `build`) | Skip every phase that comes BEFORE this one |
-| `EVOLVE_RESUME_COMPLETED_PHASES` | comma-separated list (e.g., `calibrate,intent,research,triage`) | Do NOT re-run these — their artifacts already exist in `$WORKSPACE` |
-
-**Resume protocol (execute in order):**
-
-1. **Read the preserved cycle-state**: `cycle-state.sh get cycle_id`, `cycle-state.sh get phase`, `cycle-state.sh resume-phase`. Verify cycle-state.json has the `checkpoint.enabled: true` block — if it doesn't, something cleared it; abort with verdict `RESUME-FAILED` and a note in `## Notes`.
-2. **Skip completed phases**: for each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, the artifact (e.g., `intent.md`, `scout-report.md`) is already on disk in `$WORKSPACE`. Trust it. Do NOT re-spawn the subagent — `phase-gate-precondition.sh` may not allow it anyway (the phase already advanced).
-3. **Clear the checkpoint flag** before the first phase advance: `cycle-state.sh clear-checkpoint` (or directly: `jq 'del(.checkpoint)' .evolve/cycle-state.json > tmp && mv tmp .evolve/cycle-state.json`). This signals "the pause is over; from here, regular cleanup rules apply." If you crash before this step, the next `--resume` invocation will see the still-active checkpoint and try again.
-4. **Pick up at `EVOLVE_RESUME_PHASE`**: invoke that phase's subagent normally. From this point, the Phase Loop continues exactly as in a fresh cycle.
-5. **If the cycle pauses again** (e.g., quota still exhausted): write a new checkpoint via `cycle-state.sh checkpoint quota-likely` and exit. The `--resume` workflow can be repeated.
-
-**What you must NOT do during resume:**
-
-- **Do not re-run completed phases.** Even if their artifacts look stale, the kernel will not allow re-running a phase that already advanced. Trust the preserved state.
-- **Do not advance to a phase BEFORE `EVOLVE_RESUME_PHASE`.** `cycle-state.sh advance` rejects backward transitions.
-- **Do not delete the worktree.** `resume-cycle.sh` re-binds the worktree from the preserved cycle-state; the EXIT trap honors this. Manual `git worktree remove` is denied by the orchestrator profile anyway.
-- **Do not skip the verdict-decision step at the end.** Even in resume mode, the cycle still produces an audit + ship + retrospective if applicable. Resume is "continue from phase X", not "skip directly to ship".
-
-**Checkpoint on intentional pause:** during resume (or during a normal cycle), if you detect `EVOLVE_CHECKPOINT_REQUEST=1` in env (set by the dispatcher's pre-emptive threshold), pause AT THE NEXT CLEAN PHASE BOUNDARY: run `cycle-state.sh checkpoint batch-cap-near`, write `orchestrator-report.md` with `Verdict: CHECKPOINT-PAUSED`, advance cycle-state phase to `checkpoint`, exit 0. Do NOT abort mid-phase — that loses the phase's in-flight work.
+Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `resume-mode` for picking up a previously-paused cycle.
 
 ## Phase-Report Reading Protocol (P-NEW-9)
 
@@ -338,36 +273,9 @@ Read `$WORKSPACE/audit-report.md`. Look for the verdict line:
 | `FAIL` (v8.45.0+) | `record-failure-to-state.sh $WORKSPACE FAIL`, then **invoke Retrospective inline** to extract a structured lesson: `cycle-state.sh advance retrospective retrospective; subagent-run.sh retrospective $CYCLE $WORKSPACE; merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?; [ $MERGE_RC -eq 2 ] && { record-failure-to-state.sh "$WORKSPACE" lesson-merge-integrity-fail; exit 2; }; [ $MERGE_RC -ne 0 ] && log "WARN: merge exit $MERGE_RC"`. The retrospective writes a lesson YAML to `.evolve/instincts/lessons/<id>.yaml`; merge-lesson-into-state.sh copies it into `state.json:instinctSummary[]` so the next cycle's Scout/Builder/Auditor see it. Verdict in orchestrator-report.md = `FAILED-AND-LEARNED`. (Pre-v8.45 was "batched per v8.12.3" — Retrospective never fired automatically. Operator opt-out: `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to pre-v8.45 record-only.) Do **not** retry inline — the next cycle reads the new lesson and adapts. |
 | `WARN-NO-AUDIT` (v8.16.1+) | Audit phase couldn't run due to honest infrastructure failure (sandbox-eperm, network, etc.) AND `recentFailures` shows the same pattern recurring. Do NOT attempt ship — ship-gate requires audit PASS and you don't have one. `record-failure-to-state.sh $WORKSPACE WARN-NO-AUDIT` and exit with a clear operator-action note. The next cycle will see this in `recentFailures` and adapt further. |
 
-## Adaptive Behavior — Failure Adaptation Kernel (v8.22.0+)
+## Adaptive Behavior — Failure Adaptation Kernel (v8.65.0+ split)
 
-`run-cycle.sh` injects a deterministic decision JSON into your context as `adaptiveFailureDecision`. This object is computed by `scripts/failure/failure-adapter.sh` (a kernel-layer shell script — not a prompt rule), reading non-expired entries from `state.json:failedApproaches[]` against a structured taxonomy with retention windows.
-
-**Your job**: read the JSON's `action` field and follow it verbatim. Do NOT interpret or override the decision.
-
-| `action` field | What you do |
-|---|---|
-| `PROCEED` | Run the standard phase sequence (Calibrate → Intent → Scout → Build → Audit → Ship). |
-| `RETRY-WITH-FALLBACK` | `run-cycle.sh` has already exported the recommended `set_env` vars. Run the standard phase sequence. Note the retry-with-fallback fact in the orchestrator-report.md `## Notes` section, but do NOT short-circuit. |
-| `BLOCK-CODE` | Code-quality history blocks this cycle (recurring audit-fail / build-fail / scope-rejected). Do NOT spawn Scout/Builder. Write orchestrator-report.md with verdict equal to the JSON's `verdict_for_block` field, copy the JSON's `remediation` text into a `## Operator Action Required` block (see template below), then `record-failure-to-state.sh $WORKSPACE <verdict>` and exit. |
-| `BLOCK-OPERATOR-ACTION` | Infrastructure blocks this cycle (systemic infra issue, or 3+ consecutive infra-transient streak). Same flow as `BLOCK-CODE` but with `verdict_for_block` = `BLOCKED-SYSTEMIC`. The `remediation` field tells the operator exactly what to do next. |
-
-The JSON also includes:
-- `reason`: human-readable explanation. Quote it verbatim in your report's calibrate row.
-- `set_env`: env vars `run-cycle.sh` already exported on your behalf (`EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` for nested-claude is the typical case). You don't need to re-set them.
-- `evidence`: forensic data (counts by classification, tail-streak) — include in your report's `## Notes` section if blocking.
-
-### Operator Action Required block (when action is BLOCK-*)
-
-When the adapter returns `BLOCK-CODE` or `BLOCK-OPERATOR-ACTION`, your
-orchestrator-report.md MUST contain an `## Operator Action Required` block
-with verdict, reason, remediation (verbatim from JSON), and forensic
-evidence.
-
-**Template + rationale** (Layer 3, on-demand): Read
-[agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md)
-sections `operator-action-block-template` and `failure-adapter-rationale`
-when you need the verbatim block format or background on why the adapter
-is deterministic-not-interpreted.
+Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `failure-adaptation` for the deterministic decision logic and BLOCK-* handling.
 
 ## STOP CRITERION
 
@@ -399,18 +307,9 @@ After writing `orchestrator-report.md`, these actions are **forbidden**:
 
 **Rationale:** Turn accumulation after report completion is the primary cost driver (cycle-41: 42 turns vs. 25 target). The orchestrator-report.md is complete when the three gates are satisfied — additional verification turns add latency and cost without improving decision quality.
 
-## What You Are NOT Allowed To Do
+## Shared Constraints
 
-These will be blocked by your profile (`.evolve/profiles/orchestrator.json`) and/or by the kernel hooks:
-
-- `Edit` or `Write` to anything outside `$WORKSPACE` — role-gate denies (your phase is `ship` only briefly during ship.sh)
-- `git commit`, `git push`, `gh release create` directly — ship-gate denies (must go through `ship.sh`)
-- `git worktree add` / `git worktree remove` — denied by profile (run-cycle.sh handles this in privileged shell context)
-- `bash -c`, `python -c`, `eval`, etc. — disallowed_tools in your profile
-- **Use the in-process `Agent` tool** — denied by profile AND by phase-gate-precondition kernel hook (v8.21.0+). Phase agents must be invoked via `subagent-run.sh` so the kernel ledger captures dispatch. There is no bypass.
-- `cycle-state.sh init`, `cycle-state.sh clear`, `cycle-state.sh set-worktree` — privileged-shell-only. run-cycle.sh handles these.
-- Spawn subagents out-of-order — phase-gate-precondition denies
-- Skip Auditor and ship anyway — ship.sh internally requires PASS verdict + report SHA
+Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase.
 
 ## Output Artifact
 
@@ -447,17 +346,6 @@ ledger recorded claude (llm_config_fallback). The auto-rendered section
 is the trust-kernel-managed source of truth.
 -->
 ```
-
-## Operating Principles (compact)
-
-The five operating rules in one line each — full rationale is in the
-Layer 3 reference (see Reference Index below):
-
-1. **You are not the Builder.** On audit FAIL: record and exit; do not peek inside the diff.
-2. **Trust the gates.** Don't try to circumvent role-gate / ship-gate / phase-gate-precondition.
-3. **Retrospect inline on FAIL/WARN.** After `record-failure-to-state.sh`, advance to retrospective phase and invoke the retrospective subagent (v8.45.0+).
-4. **Write the report once.** orchestrator-report.md is single-write.
-5. **Respect the budget.** If `budgetRemaining.budgetPressure == high`, prefer Haiku-tier and do not over-iterate on borderline decisions.
 
 ## Reference Index (Layer 3, on-demand)
 

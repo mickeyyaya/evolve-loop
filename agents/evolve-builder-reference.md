@@ -68,6 +68,57 @@ If the build cannot proceed with what's available:
 Loaded when `scripts/utility/code-review-simplify.sh` exists in the project.
 Optional — non-blocking. If the script is missing or failing, skip silently.
 
+---
+
+## Section: worktree-isolation
+
+Loaded for Step 0 verification. Builder runs in an isolated git worktree provisioned by `run-cycle.sh`.
+
+```bash
+MAIN_WORKTREE=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
+CURRENT_DIR=$(pwd)
+if [ "$MAIN_WORKTREE" = "$CURRENT_DIR" ]; then
+  echo "FATAL: Builder is running in the main worktree. Aborting."
+fi
+```
+
+**Worktree Commit Protocol**: After self-verifying, commit all changes in worktree:
+`git add -A && git commit -m "<type>: <description> [worktree-build]"`
+
+---
+
+## Section: tool-batching
+
+Loaded for turn-budget optimization. Batch independent tool calls to save turns.
+
+| ❌ SLOW (3 turns) | ✅ FAST (1 turn) |
+|---|---|
+| `Read(scripts/foo.sh)` → wait | `Read(scripts/foo.sh)`, `Read(scripts/bar.sh)`, `Read(agents/evolve-builder.md)` |
+| `Read(scripts/bar.sh)` → wait | all results return together |
+
+Rule: if two tool calls have no data dependency on each other, emit them in the same response.
+
+---
+
+## Section: egps-predicates
+
+Loaded for EGPS Predicate Authoring (v10.1.0+).
+
+Every AC in `build-report.md` MUST have an executable predicate at `acs/cycle-N/{NNN}-{slug}.sh`.
+
+**Required header**:
+```bash
+#!/usr/bin/env bash
+# AC-ID:         cycle-N-NNN
+# Description:   one-line summary
+# Evidence:      pointer (file:line OR commit-SHA)
+# Author:        builder
+# Created:       <ISO-8601>
+# Acceptance-of: build-report.md AC line reference
+```
+
+Banned: `grep -q` as only check, `exit 0` no-op, `curl`, `sleep` > 2s.
+
 After Step 5 self-verify passes, optionally run the lightweight pipeline
 layer on the changes:
 

@@ -167,6 +167,13 @@ emit_artifact_with_anchors() {
             _emit_artifact_anchored "$label" "$path" "$a"
         done
     else
+        # v8.65.0 P-NEW-24: Warn on missing anchors for critical reports.
+        # Encourages modular report authoring and prevents context leakage.
+        case "$(basename "$path")" in
+            scout-report.md|build-report.md|audit-report.md)
+                echo "[role-context-builder] WARN: modular artifact '$path' lacks ANCHOR markers. Falling back to full-file extraction (high token cost)." >&2
+                ;;
+        esac
         # Backwards-compat: pre-v8.63 artifacts lack anchors. Emit the full
         # file ONCE (legacy behavior). Operators can audit the workspace if
         # they expected an anchored artifact and see the legacy fallback.

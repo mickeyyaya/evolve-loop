@@ -114,3 +114,51 @@ a kernel script. In healthy cycles, none of these are encountered.
 
 The system is designed so mistakes are loud and recoverable. Lean into the
 constraints rather than fighting them.
+
+---
+
+## Section: registry-dispatch
+
+Loaded when `EVOLVE_USE_PHASE_REGISTRY=1` (default). The phase sequence is driven by `docs/architecture/phase-registry.json`.
+
+```bash
+# Calibrate: read phase order from registry
+phase_list=$(EVOLVE_USE_PHASE_REGISTRY=1 bash scripts/dispatch/list-phase-order.sh)
+
+# Dispatch loop (registry-driven):
+while IFS= read -r phase_name; do
+    gate_in=$(jq -r --arg p "$phase_name" '.phases[] | select(.name==$p) | .gate_in // empty' docs/architecture/phase-registry.json 2>/dev/null || true)
+    [ -n "$gate_in" ] && gate_run_by_name "$gate_in" "$CYCLE" "$WORKSPACE"
+    cycle-state.sh advance "$phase_name" "$(jq -r --arg p "$phase_name" '.phases[] | select(.name==$p) | .role' docs/architecture/phase-registry.json)"
+    subagent-run.sh "$(jq -r --arg p "$phase_name" '.phases[] | select(.name==$p) | .role' docs/architecture/phase-registry.json)" "$CYCLE" "$WORKSPACE"
+    gate_out=$(jq -r --arg p "$phase_name" '.phases[] | select(.name==$p) | .gate_out // empty' docs/architecture/phase-registry.json 2>/dev/null || true)
+    [ -n "$gate_out" ] && gate_run_by_name "$gate_out" "$CYCLE" "$WORKSPACE"
+done <<EOF
+$phase_list
+EOF
+```
+
+---
+
+## Section: resume-mode
+
+Loaded when `EVOLVE_RESUME_MODE=1`. Protocol for picking up a paused cycle.
+
+1. **Read state**: `cycle-state.sh get cycle_id`, `cycle-state.sh get phase`, `cycle-state.sh resume-phase`.
+2. **Skip completed**: For each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, trust existing artifacts.
+3. **Clear checkpoint**: `cycle-state.sh clear-checkpoint`.
+4. **Pick up**: Invoke `EVOLVE_RESUME_PHASE` subagent normally.
+5. **Re-pause**: If `quota-likely` or `batch-cap-near`, write new checkpoint.
+
+---
+
+## Section: failure-adaptation
+
+Loaded for the Failure Adaptation Kernel (v8.22.0+).
+
+| `action` field | What you do |
+|---|---|
+| `PROCEED` | Run standard phase sequence. |
+| `RETRY-WITH-FALLBACK` | Run standard sequence with exported `set_env`. |
+| `BLOCK-CODE` | Do NOT spawn Scout/Builder. Write report with `verdict_for_block`. |
+| `BLOCK-OPERATOR-ACTION` | Infrastructure block. Write report with `BLOCKED-SYSTEMIC`. |
