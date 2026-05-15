@@ -254,6 +254,17 @@ Cycle 61 was a real failed cycle (running gemini-3.1-pro-preview for Scout+Build
 
 Pattern: structural fixes (Tier 1) catch the integrity-class bugs deterministically; quality-class bugs need Tier 3 defenses added incrementally as new gaming patterns emerge. The framework is honest that it learns by failing.
 
+### Known Open Structural Gaps (as of v10.7.0)
+
+Cycle 64's gemini re-test exposed two NEW failure classes that the current framework catches only via audit verdict, not structurally. Both warrant dedicated Tier 1 fixes:
+
+| Gap | What's missing | Why current defenses don't catch it pre-emptively |
+|---|---|---|
+| **B8 — Builder-exit commit-presence** | No phase-gate asserting `git status --porcelain` is empty in the worktree before audit | Builder persona text instructs `git add && git commit`; profile permits the commands; cycle-24 instinct names the failure. All three are Tier 3 (text/permission/instinct). Gemini-3.1-pro-preview cycle 64 ignored all three. |
+| **B9 — EGPS predicate-presence** | No phase-gate asserting `acs/cycle-N/*.sh` files exist before audit | ADR-7 requires Builder to write predicates; auditor flags absence as a defect but doesn't BLOCK. |
+
+Both gaps are filed for future-cycle fixes. The pattern is: when a Tier 3 (text-instruction) defense is observed to fail consistently for a model, promote to Tier 1 (phase-gate enforcement) — independent of model behavior. See [`../incidents/cycle-61.md`](../incidents/cycle-61.md) §"Future Structural Fixes" for the fix plans.
+
 See [`../incidents/cycle-61.md`](../incidents/cycle-61.md) for the full forensic report.
 
 ---

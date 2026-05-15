@@ -102,6 +102,32 @@ This bug was NOT in the original list (B1-B6) — surfaced only during the postm
 | B6 | Step 6 | `scripts/observability/render-cli-resolution.sh` (new) + phase-gate cycle-complete wire-up |
 | B7 | — | **Addressed by manually fixing state.json:lastCycleNumber=61 in this cycle's commit.** Structural fix deferred (warrants its own future investigation of why worktree state doesn't merge back to project root). |
 
+## Resolution Status
+
+_Section originally produced by Gemini-3.1-pro-preview Builder in cycle 64 (re-test of cycle-61's gemini routing experiment). The edit was correct but Gemini did not run `git add`/`git commit`, so the section is merged manually here. See "Future Structural Fixes" below for the B8/B9 follow-ups this gap surfaced._
+
+- B0=57cbd4c
+- B1=781ae83
+- B2=a9d8356
+- B3=DISSOLVED (no commit needed)
+- B4=7a9f356
+- B5=ab0d5a7
+- B6=abcd076+e810df7
+- B7=a28e9e5
+
+## Future Structural Fixes (Open as of v10.7.0)
+
+Cycle 64's gemini re-test exposed two NEW classes of failure that the current framework catches only post-hoc (audit verdict) rather than pre-emptively (phase-gate enforcement). Both warrant dedicated structural fixes in future cycles.
+
+| Bug | Severity | Description | Proposed fix |
+|---|---|---|---|
+| **B8** | HIGH | **Builder-exit commit-presence gate missing.** Builder's persona explicitly instructs `git add -A && git commit -m "..."` (lines 56-64, 377-383 of `agents/evolve-builder.md`). Builder profile permits these commands. Despite both, Gemini-3.1-pro-preview Builder in cycle 64 made the file edit correctly but never invoked `git add`/`git commit`. The cycle-24 instinct (`cycle-24-builder-uncommitted-worktree-edit.yaml`, confidence 0.97) names this exact failure mode. No phase-gate currently enforces it. | Add to `scripts/lifecycle/phase-gate.sh:gate_build_to_audit`: a check that `git -C "$WORKTREE_PATH" status --porcelain` returns empty, OR fails the build-to-audit transition. Catches any model (Gemini or Claude on a bad day) that skips the commit. WARN-mode default-on initially per the v8.55 rollout ladder. |
+| **B9** | MEDIUM | **EGPS predicate-presence gate missing.** ADR-7 requires Builder to write `acs/cycle-N/*.sh` predicates for each acceptance criterion. Cycle 64's Gemini Builder wrote ZERO predicate files; the auditor noted this as DEFECT-2 but the cycle still proceeded to verdict computation (which fell back to legacy audit-report.md prose verdict). | Add to `scripts/lifecycle/phase-gate.sh:gate_build_to_audit`: a check that `[ -d "$WORKTREE_PATH/acs/cycle-$CYCLE" ] && [ "$(find ... -name '*.sh' \| wc -l)" -gt 0 ]`. Mirrors B8's pattern. Forces EGPS predicate authorship structurally rather than relying on Builder persona compliance. |
+
+Both fixes are Tier 1 (phase-gate hooks) and would close the gap between "Builder persona instructs X" and "Builder does X." They make the framework's protocol compliance independent of model behavior — closing the cycle 64 demonstrated gap between Claude's reliable instruction-following and Gemini's optimization-toward-visible-deliverable.
+
+**Filing as carryover for cycle 65+:** see `state.json:carryoverTodos[]` after this commit lands.
+
 ## Operator Lessons
 
 1. **The orchestrator-report is not source of truth.** When narrative claims conflict with file-level evidence (git reflog, ledger, file mtimes), trust the evidence. B3's "permission escape" mystery dissolved once we checked `state.json:lastUpdated`.
