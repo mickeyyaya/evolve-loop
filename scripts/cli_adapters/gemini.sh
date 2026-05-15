@@ -198,8 +198,101 @@ fi
 if [ "$_GEMINI_NATIVE_CAP" = "true" ]; then
     _GEMINI_BIN=$(detect_gemini_native 2>/dev/null) || _GEMINI_BIN=""
     if [ -n "$_GEMINI_BIN" ] && [ -x "$_GEMINI_BIN" ] && [ -n "${PROMPT_FILE:-}" ]; then
-        echo "[gemini-adapter] NATIVE mode: invoking gemini binary directly (cli_resolution=native)" >&2
-        exec "$_GEMINI_BIN" < "$PROMPT_FILE"
+        : "${PROFILE_PATH:?gemini-native: PROFILE_PATH unset}"
+        : "${RESOLVED_MODEL:?gemini-native: RESOLVED_MODEL unset}"
+        : "${STDOUT_LOG:?gemini-native: STDOUT_LOG unset}"
+        : "${STDERR_LOG:?gemini-native: STDERR_LOG unset}"
+
+        echo "[gemini-adapter] NATIVE mode: invoking gemini binary directly (cli_resolution=native, model=$RESOLVED_MODEL)" >&2
+
+        _g_argv=("$_GEMINI_BIN" -p "$(cat "$PROMPT_FILE")" -m "$RESOLVED_MODEL" \
+                 --output-format json --approval-mode yolo --skip-trust)
+
+        if [ -n "${WORKSPACE_PATH:-}" ] && [ -d "$WORKSPACE_PATH" ]; then
+            _g_argv+=(--include-directories "$WORKSPACE_PATH")
+        fi
+        if [ -n "${WORKTREE_PATH:-}" ] && [ -d "$WORKTREE_PATH" ]; then
+            _g_argv+=(--include-directories "$WORKTREE_PATH")
+        fi
+
+        _g_start_ms=$(($(date +%s%N 2>/dev/null || python3 -c 'import time;print(int(time.time()*1e9))')/1000000))
+        _g_raw="${WORKSPACE_PATH:-/tmp}/${AGENT:-phase}-gemini-raw.json"
+        "${_g_argv[@]}" >"$_g_raw" 2>"$STDERR_LOG"
+        _g_rc=$?
+        _g_end_ms=$(($(date +%s%N 2>/dev/null || python3 -c 'import time;print(int(time.time()*1e9))')/1000000))
+        _g_dur_ms=$((_g_end_ms - _g_start_ms))
+
+        if [ ! -s "$_g_raw" ]; then
+            echo "[gemini-adapter] ERROR: gemini produced no stdout (rc=$_g_rc, dur=${_g_dur_ms}ms)" >&2
+            : > "$STDOUT_LOG"
+            exit "${_g_rc:-1}"
+        fi
+
+        # Translate gemini stats → claude-style usage envelope.
+        # Pricing for gemini-3.1-pro-preview: $2/M input, $12/M output (<=200k ctx).
+        # Source: https://devtk.ai/en/models/gemini-3-1-pro/ (verified 2026-05-15).
+        # Note: cache_read_input_tokens billed at full rate here; gemini's actual
+        # cache pricing is lower, so cost is slightly over-estimated.
+        _g_in_price=$(awk 'BEGIN{print 2.0/1000000.0}')
+        _g_out_price=$(awk 'BEGIN{print 12.0/1000000.0}')
+
+        _claude_envelope=$(jq -c \
+            --arg model "$RESOLVED_MODEL" \
+            --argjson in_price "$_g_in_price" \
+            --argjson out_price "$_g_out_price" \
+            --argjson dur "$_g_dur_ms" '
+            (.stats.models | to_entries[0].value.tokens) as $t |
+            ($t.input // 0) as $itok |
+            ($t.candidates // 0) as $otok |
+            ($t.cached // 0) as $ctok |
+            ($itok * $in_price + $otok * $out_price) as $cost |
+            {
+                duration_ms: $dur,
+                num_turns: 1,
+                total_cost_usd: $cost,
+                gemini_error: (.error // null),
+                usage: {
+                    input_tokens: $itok,
+                    output_tokens: $otok,
+                    cache_read_input_tokens: $ctok,
+                    cache_creation_input_tokens: 0,
+                    thinking_tokens: ($t.thoughts // 0),
+                    tool_tokens: ($t.tool // 0)
+                },
+                modelUsage: {
+                    ($model): {
+                        inputTokens: $itok,
+                        outputTokens: $otok,
+                        cacheReadInputTokens: $ctok,
+                        cacheCreationInputTokens: 0,
+                        webSearchRequests: 0,
+                        costUSD: $cost,
+                        contextWindow: 2000000,
+                        maxOutputTokens: 65536
+                    }
+                }
+            }' "$_g_raw" 2>/dev/null)
+
+        if [ -z "$_claude_envelope" ]; then
+            echo "[gemini-adapter] WARN: failed to translate gemini JSON; emitting zero-cost stub" >&2
+            _claude_envelope=$(jq -nc --arg model "$RESOLVED_MODEL" --argjson dur "$_g_dur_ms" '{
+                duration_ms: $dur, num_turns: 1, total_cost_usd: 0,
+                gemini_translate_error: true,
+                usage: {input_tokens:0, output_tokens:0, cache_read_input_tokens:0, cache_creation_input_tokens:0},
+                modelUsage: {($model): {inputTokens:0, outputTokens:0, cacheReadInputTokens:0, cacheCreationInputTokens:0, webSearchRequests:0, costUSD:0, contextWindow:2000000, maxOutputTokens:65536}}
+            }')
+        fi
+
+        # STDOUT_LOG = (a) raw response text + (b) claude-style usage envelope as
+        # the LAST line. subagent-run.sh greps for `"usage"` and takes tail -1.
+        {
+            jq -r '.response // ""' "$_g_raw" 2>/dev/null || cat "$_g_raw"
+            echo
+            echo "$_claude_envelope"
+        } > "$STDOUT_LOG"
+
+        echo "[gemini-adapter] NATIVE done: rc=$_g_rc dur=${_g_dur_ms}ms cost=\$$(echo "$_claude_envelope" | jq -r '.total_cost_usd')" >&2
+        exit "$_g_rc"
     fi
 fi
 
