@@ -563,9 +563,25 @@ classify_cycle_failure() {
         return
     fi
     # Infrastructure markers (recoverable, often deterministic).
-    if grep -qiE 'INFRASTRUCTURE FAILURE|sandbox-exec.*Operation not permitted|sandbox_apply.*permitted|EPERM|rate.?limit|429.*Too Many|connection.refused|ETIMEDOUT|operation timed out' "$report"; then
+    # v10.x: scan orchestrator-report AND per-role *-stdout.log / *-stderr.log.
+    # Cycle 61 exposed that memo's API 529s landed in memo-stdout.log, which the
+    # prior orchestrator-report-only scan missed, mis-classifying the cycle as
+    # INTEGRITY-BREACH. See docs/incidents/cycle-61.md §B5.
+    local _infra_pat='INFRASTRUCTURE FAILURE|sandbox-exec.*Operation not permitted|sandbox_apply.*permitted|EPERM|rate.?limit|429.*Too Many|529.*Overloaded|connection.refused|ETIMEDOUT|operation timed out'
+    if grep -qiE "$_infra_pat" "$report"; then
         echo "infrastructure"
         return
+    fi
+    local _cycle_dir="$RUNS_DIR/cycle-${cycle}"
+    if [ -d "$_cycle_dir" ]; then
+        local _log
+        for _log in "$_cycle_dir"/*-stdout.log "$_cycle_dir"/*-stderr.log; do
+            [ -f "$_log" ] || continue
+            if grep -qiE "$_infra_pat" "$_log" 2>/dev/null; then
+                echo "infrastructure"
+                return
+            fi
+        done
     fi
     # v8.27.0: ship-gate rejected an audit-PASS cycle. Tested BEFORE audit-fail
     # because a SHIP_GATE_DENIED report can also mention the verdict in passing,
