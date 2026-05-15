@@ -90,7 +90,24 @@ else
     # 128 — we don't want that noise in the orchestrator's stream.
     __rr_git_top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     if [ -n "$__rr_git_top" ] && [ -d "$__rr_git_top" ]; then
-        EVOLVE_PROJECT_ROOT="$__rr_git_top"
+        # B7 fix (cycle 63; see docs/incidents/cycle-61.md §B7): inside a git
+        # worktree, `--show-toplevel` returns the WORKTREE path, not the main
+        # repo root. That caused ship.sh to write state.json:lastCycleNumber to
+        # the worktree's ephemeral state.json (which is deleted on cleanup),
+        # leaving the project-root state.json stuck at the pre-cycle value.
+        # Detect via `.git` being a file (worktree marker) vs a directory, and
+        # resolve the main repo root via --git-common-dir.
+        if [ -f "$__rr_git_top/.git" ]; then
+            __rr_common_dir="$(git -C "$__rr_git_top" rev-parse --git-common-dir 2>/dev/null || true)"
+            if [ -n "$__rr_common_dir" ]; then
+                EVOLVE_PROJECT_ROOT="$(cd "$__rr_git_top" && cd "$__rr_common_dir/.." && pwd)"
+            else
+                EVOLVE_PROJECT_ROOT="$__rr_git_top"
+            fi
+            unset __rr_common_dir
+        else
+            EVOLVE_PROJECT_ROOT="$__rr_git_top"
+        fi
     else
         # Final fallback: cwd. Resolve to absolute via cd-pwd (handles relative
         # cwd from sub-shells correctly).
