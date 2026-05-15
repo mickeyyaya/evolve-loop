@@ -398,19 +398,19 @@ cleanup() {
     # Runs in cleanup so it fires on PASS, FAIL, and checkpoint paths alike.
     # Pre-cycle-63 wire-up sat in gate_cycle_complete (which the dispatcher
     # never calls — dead code path).
-    if [ -f "$WORKSPACE_PATH/orchestrator-report.md" ] && \
+    if [ -f "$WORKSPACE/orchestrator-report.md" ] && \
        [ -x "$EVOLVE_PROJECT_ROOT/scripts/observability/render-cli-resolution.sh" ]; then
         local _cli_section
         _cli_section=$(bash "$EVOLVE_PROJECT_ROOT/scripts/observability/render-cli-resolution.sh" "$CYCLE" 2>/dev/null || true)
         if [ -n "$_cli_section" ]; then
-            local _orep_tmp="$WORKSPACE_PATH/orchestrator-report.md.tmp.$$"
+            local _orep_tmp="$WORKSPACE/orchestrator-report.md.tmp.$$"
             awk '
                 /^## CLI Resolution/ { skip=1; next }
                 skip && /^## / && !/^## CLI Resolution/ { skip=0 }
                 !skip { print }
-            ' "$WORKSPACE_PATH/orchestrator-report.md" > "$_orep_tmp"
+            ' "$WORKSPACE/orchestrator-report.md" > "$_orep_tmp"
             printf '\n%s\n' "$_cli_section" >> "$_orep_tmp"
-            mv -f "$_orep_tmp" "$WORKSPACE_PATH/orchestrator-report.md" 2>/dev/null || rm -f "$_orep_tmp"
+            mv -f "$_orep_tmp" "$WORKSPACE/orchestrator-report.md" 2>/dev/null || rm -f "$_orep_tmp"
             log "appended ## CLI Resolution section to orchestrator-report.md"
         fi
     fi

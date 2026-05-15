@@ -1,48 +1,316 @@
 # Evolve Loop
 
-**A self-improving development pipeline that makes your codebase better while you sleep.**
+**A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.**
 
-Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle scans your project, picks tasks, implements changes, reviews its own work, ships only what passes, and then learns from the experience to do better next time.
+Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
-Think of it as a tireless junior developer that gets smarter with every cycle — and whose phases are enforced by shell hooks at the OS layer, not by prompt-level promises.
+Three things distinguish it from `/goal`, `superpowers`, `self-improving-agent`, and similar long-running skills:
+
+1. **Verdicts are bash exit codes, not LLM judgments.** EGPS predicates are executable scripts; their exit code IS the verdict. The model can write prose all day; only `acs-verdict.json:red_count == 0` ships.
+2. **Three layers of structural anti-gaming.** Tier 1: PreToolUse shell hooks + SHA-chained ledger. Tier 2: OS sandboxing + per-cycle git worktree. Tier 3: workflow defaults (adversarial audit, intent capture, mutation testing). Tier 1 is non-negotiable.
+3. **Cross-cycle learning is durable.** Failures produce YAML lesson files that get merged into `state.json:instinctSummary[]`. The next cycle's Scout reads them automatically. This is the Reflexion loop (Shinn et al. 2023), wired through evidence-bound storage.
+
+If you've used `/goal` and wanted "but make it safe to merge without re-reading every diff," this is that.
 
 ---
 
-## How It Works
+## Table of Contents
 
-Each cycle runs eight phases, plus a meta-cycle every five cycles. The full pipeline is enforced structurally — a trust kernel of three PreToolUse shell hooks denies any deviation before the LLM can act.
+1. [The Self-Evolving Loop](#the-self-evolving-loop) — concept
+2. [Pipeline Design](#pipeline-design) — the 8 phases
+3. [The 3-Layer Trust Architecture](#the-3-layer-trust-architecture) — anti-gaming
+4. [Error Recovery](#error-recovery) — how work survives failures
+5. [Why Self-Evolving Works](#why-self-evolving-works) — Reflexion + double-loop learning
+6. [Pluggability](#pluggability) — every phase swappable, every LLM routable
+7. [How Evolve Loop Compares](#how-evolve-loop-compares) — vs /goal, superpowers, etc.
+8. [Real Incident: Cycle 61](#real-incident-cycle-61) — the framework caught its own bugs
+9. [Quick Start](#quick-start) — install + first cycle
+10. [Architecture Deep-Dives](#architecture-deep-dives) — link index
+11. [Evolution Data](#evolution-data) — milestone history
+12. [Project Structure](#project-structure)
+13. [Contributing](#contributing)
+14. [License & Links](#license--links)
+
+---
+
+## The Self-Evolving Loop
+
+The framework runs your codebase through a sequence of 8 phases plus a meta-cycle. Every phase produces an artifact that the next phase must read. The model picks tasks; the framework enforces the pipeline.
+
+The defining property: **failures become instincts**.
+
+When cycle N's audit fails, a retrospective subagent fires (auto-on per v8.45.0+), reads the failed cycle's artifacts, and writes a structured YAML lesson at `.evolve/instincts/lessons/cycle-N-<slug>.yaml`. A merge script verifies the lesson exists on disk and appends it to `state.json:instinctSummary[]`. The next cycle's Scout reads those instincts in its prompt context — so cycle N+1 sees rules like:
+
+> "When adding to `phase-registry.json:audit.inputs.state_fields[]`, grep every regression predicate that calls `check-phase-inputs.sh audit` and update fixtures." — `cycle-59-registry-state-fields-fixture-impact.yaml`
+
+That lesson came from cycle 59's failure. Cycle 60+ Scouts won't make the same mistake.
+
+19 active lessons currently live in `.evolve/instincts/lessons/`. Some are 60 cycles old. They still apply. Deep-dive: [docs/concepts/self-evolution.md](docs/concepts/self-evolution.md).
+
+---
+
+## Pipeline Design
+
+Each cycle runs eight phases. The trust kernel enforces them in order at the OS layer — phases cannot be skipped, reordered, or shortcutted via prompt instructions.
 
 ```
-INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ BUILD ─→ AUDIT ─→ SHIP ─→ RETROSPECTIVE
+INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ BUILD ─→ AUDIT ─→ SHIP ─→ MEMO/RETRO
    │        │        │            │             │        │       │           │
-   │        │        │            │             │        │       │           └─ Extract lessons + carryover todos; on FAIL/WARN, auto-fires (v8.45.0+)
-   │        │        │            │             │        │       └─ Commit + push (only on audit PASS or WARN; canonical via ship.sh)
-   │        │        │            │             │        └─ Adversarial cross-check; verdict PASS / WARN / FAIL
-   │        │        │            │             └─ Implement in per-cycle git worktree (isolation)
-   │        │        │            └─ (opt-in) 4-lens plan review: CEO / Eng / Design / Security
-   │        │        └─ Bound this cycle's scope; top_n / deferred / dropped (default-on v8.59.0+)
-   │        └─ Find work + write evals; cite research; fan-out optional
-   └─ Structure the vague goal: 8 fields + AwN classifier + ≥1 challenged premise (v8.19.1+)
+   │        │        │            │             │        │       │           └─ PASS → memo (carryover);
+   │        │        │            │             │        │       │              FAIL/WARN → retrospective (lessons)
+   │        │        │            │             │        │       │              auto-on v8.45.0+
+   │        │        │            │             │        │       └─ Commit + push via ship.sh
+   │        │        │            │             │        │          (gated on acs-verdict.json:red_count == 0)
+   │        │        │            │             │        └─ Adversarial cross-check; predicate suite runs;
+   │        │        │            │             │           verdict from bash exit codes (EGPS v10)
+   │        │        │            │             └─ Implement in per-cycle git worktree (isolation);
+   │        │        │            │                write EGPS predicates alongside code
+   │        │        │            └─ (opt-in) 4-lens plan review: CEO / Eng / Design / Security fan-out
+   │        │        └─ Bound this cycle's scope: top_n / deferred / dropped (default-on v8.59.0+)
+   │        └─ Find work + write evals; cite research; carryoverTodos + instincts feed input
+   └─ Structure the vague goal: 8 fields + Ask-when-Needed classifier + ≥1 challenged premise (v8.19.1+)
 ```
 
-**Trust kernel** — three PreToolUse shell hooks block deviations structurally:
+### Phase artifacts you'll see
+
+| Phase | Agent | Output artifact |
+|---|---|---|
+| Intent | intent | `intent.md` (8-field structured goal) |
+| Scout | scout | `scout-report.md` (selected tasks, research, decision trace) |
+| Triage | triage | `triage-decision.md` (top_n / deferred / dropped) |
+| Plan-Review (opt-in) | plan-reviewer fan-out | `plan-review.md` (4-lens aggregate) |
+| Build | builder | `build-report.md` + `acs/cycle-N/*.sh` predicates |
+| Audit | auditor | `audit-report.md` + `acs-verdict.json` (binary PASS/FAIL) |
+| Ship | ship.sh | git commit on main + ledger entry |
+| Memo / Retro | memo OR retrospective | `carryover-todos.json` OR `retrospective-report.md` + lesson YAMLs |
+
+### Four specialized agents (+ orchestrator)
+
+| Agent | Persona file | Role | Profile path |
+|---|---|---|---|
+| **Scout** | `agents/evolve-scout.md` | Find work, cite research, write evals | `.evolve/profiles/scout.json` |
+| **Triage** | `agents/evolve-triage.md` | Bound this cycle's scope | `.evolve/profiles/triage.json` |
+| **Builder** | `agents/evolve-builder.md` | Implement in isolated worktree | `.evolve/profiles/builder.json` |
+| **Auditor** | `agents/evolve-auditor.md` | Adversarial cross-check (different model family from Builder) | `.evolve/profiles/auditor.json` |
+| **Memo** (PASS only) | `agents/evolve-memo.md` | Carryover capture | `.evolve/profiles/memo.json` |
+| **Retrospective** (FAIL/WARN only) | `agents/evolve-retrospective.md` | Lesson extraction | `.evolve/profiles/retrospective.json` |
+| **Orchestrator** | `agents/evolve-orchestrator.md` | Phase sequencer | `.evolve/profiles/orchestrator.json` |
+
+Deep-dive: [docs/architecture/phase-architecture.md](docs/architecture/phase-architecture.md). For the mental model, see [docs/concepts/overview.md](docs/concepts/overview.md).
+
+---
+
+## The 3-Layer Trust Architecture
+
+The threat is not malicious humans — it's the LLM doing what LLMs do: confabulating "looks done" verdicts, hallucinating evidence, shortcutting to path-of-least-resistance. The fix is structural enforcement, not better prompts.
+
+| Tier | Mechanism | Default | Catches |
+|---|---|---|---|
+| **1 — Structural Integrity** | `phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`, SHA-chained ledger | **Always on. No bypass.** | Reward hacking, phase-skipping, integrity breach |
+| **2 — OS Isolation** | `sandbox-exec` (macOS) / `bwrap` (Linux), per-cycle git worktree | On (always present) | Cross-cycle leakage, compromised builder, scope escape |
+| **3 — Workflow Defaults** | Intent capture, fan-out, mutation testing, adversarial audit, scout grounding, audit citation binding | Opt-in via env flags | Vague goals, sycophantic audits, tautological evals, scope sprawl |
+
+### Tier 1 — Three shell hooks block deviations structurally
 
 | Hook | Watches | Denies |
 |---|---|---|
-| `phase-gate-precondition.sh` | every subagent-run.sh invocation | Out-of-order phases |
-| `role-gate.sh` | every Edit/Write | Writes outside the active phase's allowlist |
-| `ship-gate.sh` | every Bash with git/gh verbs | Anything that isn't `scripts/lifecycle/ship.sh` |
+| `phase-gate-precondition.sh` | every `subagent-run.sh` invocation | Out-of-order phases, in-process `Agent` tool when `cycle-state.json` exists |
+| `role-gate.sh` | every `Edit`/`Write` tool call | Writes outside the active phase's allowlist, writes outside worktree for write-bound roles |
+| `ship-gate.sh` | every `Bash` with git/gh verbs | Direct `git commit`/`git push` not routed through `scripts/lifecycle/ship.sh` |
 
-Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` (every entry records `prev_hash`; `bash scripts/observability/verify-ledger-chain.sh` walks the chain).
+Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` — every entry records `prev_hash`. Modifying any past entry invalidates every subsequent `prev_hash`. Verify with `bash scripts/observability/verify-ledger-chain.sh`.
 
-**Four specialized agents (+ inline orchestrator):**
+### Tier 2 — OS sandboxing + per-cycle worktree
 
-| Agent | Job | Output |
-|-------|-----|--------|
-| **Scout** | Find work, cite research, write evals | `scout-report.md` |
-| **Triage** | Bound this cycle's scope (top_n / deferred / dropped) | `triage-decision.md` |
-| **Builder** | Implement in an isolated git worktree | `build-report.md` |
-| **Auditor** | Adversarial cross-check (Opus by default — different family from Builder's Sonnet) | `audit-report.md` |
+When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), every `claude -p` subprocess runs under `sandbox-exec` (macOS) or `bwrap` (Linux). Auditor and Evaluator profiles run with `read_only_repo: true` — the entire repo is bind-mounted read-only inside their sandbox.
+
+Per-cycle git worktree at `$EVOLVE_WORKTREE_BASE/cycle-N` isolates Builder's edits from other cycles. Lives on a temporary branch (`evolve/cycle-N`) deleted post-ship.
+
+Capability detection (`scripts/dispatch/preflight-environment.sh`) auto-adapts to nested-Claude environments, falling back gracefully without losing Tier 1.
+
+### Tier 3 — Workflow defaults (opt-in but recommended)
+
+| Default | Catches |
+|---|---|
+| Intent capture (`EVOLVE_INTENT_ENABLED=1`) | Vague goals → 8-field structured intent |
+| Fan-out for read-only roles | Same-model judge sycophancy in Scout/Auditor/Retrospective |
+| Mutation testing on evals | Tautological predicates (AC-by-grep, echo-PASS) |
+| Adversarial Auditor mode | Same-family judge bias (Builder=Sonnet → Auditor=Opus by default) |
+| Triage default-on (v8.59+) | Scope blob (Scout proposing 12 tasks) |
+| Scout grounding check (cycle 62+) | Scout fabricating uncommitted-file claims |
+| Audit citation binding (cycle 62+) | Auditor citing files not in this cycle's diff |
+
+Deep-dive: [docs/concepts/trust-architecture.md](docs/concepts/trust-architecture.md). For why structural enforcement matters more than prompts, see Skalse et al. (NeurIPS 2022) on reward hacking and Weng (2024) on the no-single-mitigation conclusion.
+
+---
+
+## Error Recovery
+
+Long cycles fail routinely — subscription quotas exhaust, APIs return 529, models hit context-window limits. The framework's contract is **work-in-flight survives common failures.**
+
+Four recovery layers, each catching a different failure mode at a different cost:
+
+| Layer | Trigger | What it preserves | Lifetime |
+|---|---|---|---|
+| **1. failedApproaches[]** | Audit FAIL/WARN OR run-cycle rc=1 | Raw failure record | 30 days default |
+| **2. Retrospective YAML lessons** | Audit FAIL/WARN (auto-on v8.45.0+) | Structured root-cause + prevention rule | Permanent (tracked) |
+| **3. Checkpoint-resume (v9.1.0+)** | Cumulative cost ≥95% OR quota signature | Full mid-cycle state — worktree + state.json | Until `--resume` |
+| **4. Worktree preservation** | Recoverable failure (infrastructure/audit-fail) | Worktree edits survive cleanup | Until next reset |
+
+The cycle 11 incident (subscription quota wall mid-audit) was the canonical motivator for v9.1.0. Pre-v9.1.0: 30 minutes of Builder work discarded. Post-v9.1.0: worktree preserved, ~5 min of audit work lost, operator runs `--resume` after quota reset.
+
+Deep-dive: [docs/concepts/error-recovery.md](docs/concepts/error-recovery.md). Protocol: [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md).
+
+---
+
+## Why Self-Evolving Works
+
+Argyris & Schon (1978) distinguish two kinds of organizational learning:
+
+- **Single-loop:** detect error → correct action (here: `state.json:failedApproaches[]`)
+- **Double-loop:** detect error → question the assumptions that led to it → change the policy (here: `state.json:instinctSummary[]` + YAML lessons)
+
+Pre-v8.45.0 had only the single-loop. Cycles failed, entries piled up, next cycle saw noise but had no actionable rule. v8.45.0 made retrospective auto-fire on FAIL/WARN, completing the double-loop.
+
+evolve-loop is a multi-agent Reflexion variant (Shinn et al. 2023):
+
+| Reflexion role | evolve-loop equivalent |
+|---|---|
+| Actor | Builder (writes code + predicates) |
+| Action | Worktree edits, predicate writes |
+| Environment | git + filesystem + ACS predicate suite |
+| Evaluator | Auditor + `acs-verdict.json` exit codes |
+| Self-Reflection | Retrospective subagent (different model from Builder; auto-fires on FAIL/WARN) |
+| Long-term memory | `state.json:instinctSummary[]` + YAML lessons (durable across cycles) |
+| Next Actor invocation | Cycle N+1 Scout reads the memory |
+
+The crucial difference from a simple Reflexion implementation: **the verdict is not a model claim**. Reflexion's Evaluator is typically an LLM; evolve-loop's verdict is `acs-verdict.json:red_count == 0`, derived from bash exit codes. The Auditor writes prose but cannot game the predicate suite.
+
+Worked example — Cycle 7 → Cycle 59 lesson generalization:
+
+- Cycle 7 failed because gitignored `.evolve/` runtime artifacts didn't survive worktree cleanup.
+- Lesson filed as `cycle-7-ephemeral-worktree-artifact.yaml`.
+- Cycle 59 failed in a similar-looking way — but the cycle-7 lesson didn't catch it because its framing was too narrow (gitignored runtime vs tracked source).
+- Cycle 59's retrospective explicitly recommended broadening cycle-7's pattern, and wrote a new lesson `cycle-59-acs-predicates-worktree-invisible.yaml`.
+- Lessons themselves are first-class objects that can be refined over time.
+
+Deep-dive: [docs/concepts/self-evolution.md](docs/concepts/self-evolution.md).
+
+---
+
+## Pluggability
+
+The framework separates *what work happens* from *who does it* from *what model runs the who*. These are independent dimensions:
+
+| Axis | Pluggable element | File location | Example |
+|---|---|---|---|
+| **Persona** | Agent role definition | `agents/<role>.md` | Replace `evolve-scout.md` with a domain-specific scout |
+| **Skill** | Workflow steps inside a persona | `skills/<name>/SKILL.md` | Replace `evolve-tdd` with a property-based-test skill |
+| **LLM** | Model + CLI driving the persona | `.evolve/llm_config.json` | Route Scout to Gemini, Builder to Claude Sonnet, Auditor to Claude Opus |
+
+### The CLI router
+
+`scripts/dispatch/resolve-llm.sh` is a pure function that returns which CLI + model should run each phase. Operators override via `.evolve/llm_config.json`:
+
+```json
+{
+  "schema_version": 1,
+  "phases": {
+    "scout":    {"provider": "google",    "cli": "gemini", "model": "gemini-3.1-pro-preview"},
+    "builder":  {"provider": "anthropic", "cli": "claude", "model_tier": "sonnet"},
+    "auditor":  {"provider": "anthropic", "cli": "claude", "model": "claude-opus-4-7"}
+  },
+  "_fallback": {"cli": "claude", "model_tier": "sonnet"}
+}
+```
+
+Three adapters ship: `claude.sh` (native), `gemini.sh` (native v10.7+), `codex.sh` (hybrid). All three translate to a common usage envelope so the upstream pipeline and ledger don't care which CLI actually ran.
+
+After the cycle, `## CLI Resolution` in `orchestrator-report.md` is auto-rendered from ledger entries — showing exactly which CLI ran each phase, including fallbacks. This is the structural answer to cycle-61's B6 (orchestrator narrative hallucinated routing). The auto-rendered table is ledger-truth, not LLM-narrated.
+
+Common configurations:
+
+| Config | Pattern | ~Cost per cycle |
+|---|---|---|
+| Haiku everywhere | `_fallback` to haiku, no overrides | $0.15-0.30 |
+| Adversarial mode | Builder=Sonnet, Auditor=Opus (different family) | $1.50-3.50 |
+| Cross-vendor | Scout=Gemini, Builder=Claude, Auditor=Claude | $1.50-3.50 |
+| Gemini-only | All phases on gemini-3.1-pro-preview | $0.50-2.00 |
+| Cost-optimized mixed | Haiku for read-only, Sonnet for Builder, Opus for Auditor | $0.50-1.50 |
+
+Deep-dive: [docs/concepts/pluggability.md](docs/concepts/pluggability.md). Adding a new CLI adapter takes ~200 LOC + a capability JSON + one predicate.
+
+---
+
+## How Evolve Loop Compares
+
+Honest head-to-head with the autonomous-agent skills shipping in the Claude Code ecosystem as of 2026-05:
+
+| Project | Verdict source | Long-term memory | Multi-CLI | Recovery | Anti-gaming |
+|---|---|---|---|---|---|
+| **/goal** (Claude Code 2.1.139+) | Small validator LLM (gameable) | Conversation only | No | None | Convention |
+| **miles990/self-evolving-agent** | Pattern matching in MEMORY.md | MEMORY.md | No | None | Skill-level |
+| **alirezarezvani/self-improving-agent** | LLM analysis → pattern promotion | MEMORY.md + promoted rules | No (skill in 263+ marketplace) | None | Pattern-promotion convention |
+| **bejranonda/LLM-Autonomous-Agent-Plugin** | Linter exit codes + CodeRabbit | Local dashboard DB | No | None | 40+ linter suite |
+| **obra/superpowers** | Skill exit-criteria (LLM-described) | Reusable skills across sessions | No | None | Skill triggering structural |
+| **OpenClaw / Hermes Agent** | Per-tool varies | Per-tool varies | Sometimes | Per-tool varies | Convention |
+| **Evolve Loop** | **Bash exit codes (EGPS)** | **YAML lessons + state.json instincts** | **Per-phase router (claude/gemini/codex)** | **Checkpoint-resume + worktree preservation** | **3-tier (structural/OS/workflow)** |
+
+### When to choose each
+
+| Your situation | Choose |
+|---|---|
+| Lowest friction; zero install | **/goal** |
+| Pattern-promotion across long Claude Code use | **alirezarezvani/self-improving-agent** |
+| Linter + security enforcement on every commit | **bejranonda/LLM-Autonomous-Agent-Plugin** |
+| Skills-first framework with clean scope handling | **obra/superpowers** |
+| Vendor neutrality across many providers | **OpenClaw / Hermes Agent** |
+| Production code, must be safe to merge unattended | **Evolve Loop** |
+| Adversarial cross-CLI review (Builder ≠ Auditor model family) | **Evolve Loop** |
+| Long unattended runs with quota-wall recovery | **Evolve Loop** |
+| Simple `/goal "do thing"` and 5-second mental model | **/goal** |
+
+### The honest tradeoffs
+
+Evolve Loop is **not always the right choice.**
+
+- **Higher friction.** 8 phases per cycle → 10-30 min wall-clock + $0.50-3.00. `/goal` is 3-10 min + $0.30-1.50.
+- **Higher learning curve.** Trust kernel, EGPS predicates, CLI router, recovery mechanisms require understanding. `/goal` is "type `/goal`, wait, done."
+- **Anthropic-deep, not vendor-neutral.** Gemini/codex adapters exist as peers, but kernel hooks assume Anthropic-CLI-style permissions.
+- **Optimized for trust, not speed.** Fastest autonomous coding → `/goal`. Safest commit → evolve-loop.
+
+Best fit: organizations or solo developers running long unattended cycles on production code, where the cost of a bad merge is high.
+
+Deep-dive: [docs/comparisons/long-running-claude-skills.md](docs/comparisons/long-running-claude-skills.md).
+
+---
+
+## Real Incident: Cycle 61
+
+In 2026-05-15, we ran an experiment routing `gemini-3.1-pro-preview` to Scout and Builder. The cycle technically shipped commit `4160750` but with significant damage — and the damage exposed seven distinct bugs in our own framework. We fixed all seven structurally across cycles 62-63 of v10.7.0.
+
+### What broke
+
+| Bug | Description | How we caught it | Fix |
+|---|---|---|---|
+| B0 | gemini.sh NATIVE patch reverted from main but capability flag shipped ON | Predicate 050 with mutation-test anti-tautology | Re-applied NATIVE block; predicate suite verifies presence |
+| B1 | Builder didn't stage Scout's identified deliverable | Initially nothing caught it | Added `scout-grounding-check.sh` (Tier 3 WARN-mode) |
+| B2 | Auditor cited `gemini.sh:206` not in cycle 61's diff | Initially nothing caught it | Added `audit-citation-check.sh` (Tier 3 WARN-mode) |
+| B3 | Claimed ship.sh INTEGRITY-FAIL | Dissolved — was hallucination; Tier 1 prevented actual breach | None needed; ship.sh v8.32 TOFU + v11.0 T1 auto-heal already correct |
+| B4 | Memo profile shell-redirect path (`cat > memo_context.txt` at project root) | Files observed in working dir during forensics | Dropped `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)` from memo allowlist |
+| B5 | Classifier didn't see memo 529 in memo-stdout.log | Postmortem investigation | Extended grep to scan per-role `*-stdout.log` |
+| B6 | Orchestrator-report narrative claimed gemini but ledger said claude | Source-verified facts overruled prose | Added `render-cli-resolution.sh` (auto-render from ledger) |
+| B7 | state.json:lastCycleNumber stuck because worktree state.json got the update | Postmortem investigation | `resolve-roots.sh` worktree detection |
+
+### What we learned
+
+The framework's value proposition isn't that cycles never fail — it's that failures **produce durable lessons + structural fixes**. Cycle 61 is the worked example we point to: 7 bugs caught (some by the framework's own audit, some by post-hoc forensics), 7 structural fixes shipped, all visible in commits `1dc1ab9 → e810df7` (cycles 62 step 1 through cycle 63 fix).
+
+The orchestrator-report.md from cycle 61 was partially unreliable — it claimed "manually fast-forwarded the worktree branch to main" with no ledger entry to support it. Source-verified facts (git reflog, state.json:lastUpdated, ledger entries) contradicted that narrative. This is why CLI Resolution is now auto-rendered from ledger truth — orchestrator prose cannot be trusted as primary evidence.
+
+Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The retrospective YAMLs from cycle 61 live in `.evolve/instincts/lessons/cycle-59-*` (which the cycle-61 cycle inherited) and `cycle-24-builder-uncommitted-worktree-edit.yaml` (which cycle 64's failure re-validated).
+
+---
 
 ## Quick Start
 
@@ -50,9 +318,10 @@ Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` (every entry records `p
 
 - One of:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (tier-1, primary)
-  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) (tier-1-hybrid — delegates to `claude` binary at runtime)
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) (tier-1-native since v10.7+)
   - [Codex CLI](https://github.com/openai/codex) (tier-1-hybrid since v8.51.0)
 - A git repository you want to improve
+- `bash` (3.2+, macOS-default works), `git` (2.5+), `jq` (1.6+)
 
 ### Install
 
@@ -97,18 +366,18 @@ The v9.1.0 syntax is **budget-first** (cost-driven), with cycle-count and resume
 
 ### Resume after a pause (v9.1.0+)
 
-If a cycle is checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), the dispatcher preserves the worktree + cycle-state on disk. Recover with:
+If a cycle is checkpointed (subscription quota wall, batch cap near, or operator-requested), the dispatcher preserves the worktree + cycle-state on disk:
 
 ```bash
 /evolve-loop --resume
 ```
 
-The dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree still exists), and re-spawns the orchestrator from the paused phase boundary. The trust kernel holds across resume — phase-gate, role-gate, ship-gate enforce the same invariants. See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md) for the full protocol.
+The dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree still exists), and re-spawns the orchestrator from the paused phase boundary. The trust kernel holds across resume.
 
 ### Strategy presets
 
 | Strategy | Focus | Approach | Strictness |
-|----------|-------|----------|------------|
+|---|---|---|---|
 | `balanced` | Broad discovery | Standard | MEDIUM+ blocks |
 | `innovate` | New features, gaps | Additive | Relaxed style |
 | `harden` | Stability, tests | Defensive | Strict all |
@@ -127,291 +396,220 @@ The dispatcher locates the most recent paused cycle, validates state (git HEAD u
 ./bin/check-caps [cli]                  show resolved capability tier per adapter
 bash scripts/observability/show-context-monitor.sh <cycle>   per-cycle context usage (v9.1.0+)
 bash scripts/observability/show-context-monitor.sh --watch   live-tail latest cycle (3s refresh)
+bash scripts/observability/render-cli-resolution.sh <cycle>  per-phase CLI/model from ledger truth (v10.7+)
 ```
 
-## What Makes It Different
+For a hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
 
-Unlike `/goal`, `/mission`, and other long-running-LLM skills that orchestrate agents via prompt instructions alone, **evolve-loop enforces its pipeline at the OS layer** — three PreToolUse kernel hooks fire *before* the agent can act, not after.
+---
 
-**Phases enforced by shell, not promises.** Most long-running-LLM skills sequence phases via prompt instructions; agents can and do skip them. evolve-loop's `phase-gate-precondition.sh` fires as a kernel hook before every subagent dispatch and denies the call if phases are out of order. A 2026-04-29 flow audit found 12 consecutive cycles where Scout and Builder were silently skipped by an orchestrator following prompt rules; the shell gate eliminated the pattern structurally.
+## Architecture Deep-Dives
 
-**Every artifact is SHA-chained and forgery-resistant.** Each phase embeds a per-invocation challenge token and records its SHA256 in a hash-chained ledger. Before any commit, `ship.sh` verifies the auditor's artifact SHA against the file on disk — not what the agent *claims* it produced. A cross-CLI forgery attempt (a fabricated PASS audit report) was detected and blocked by this chain (see `docs/incidents/gemini-forgery.md`).
+The README is the surface. Real depth lives in `docs/`:
 
-**Failures become structured lessons, not repeated mistakes.** On every FAIL or WARN verdict, the Retrospective agent fires inline (v8.45.0+, Reflexion / Shinn et al. 2023) and writes a structured YAML lesson merged into `state.json:instinctSummary[]`. The next cycle's Scout reads that lesson before choosing tasks. A deterministic shell script (`failure-adapter.sh`) — not an LLM — classifies failure patterns and blocks cycles that have exhausted recoverable paths.
+### Concepts (teaching-first)
 
-**It survives resource walls (v9.1.0).** Two paired capabilities:
-- **Checkpoint-resume** — when cumulative cost crosses 95% of budget (or a phase exits with the quota-exhaustion signature: rc=1 + empty stderr + cost in danger zone), the dispatcher signals a graceful pause at the next clean phase boundary. The worktree + cycle-state are preserved on disk; `--resume` picks up where it left off.
-- **Context-window control** — per-phase `context-monitor.json` tracks input tokens cumulatively; `EVOLVE_CONTEXT_AUTOTRIM=1` enables head-60% / tail-35% prompt trim when a phase exceeds the cap. Same threshold model as cost — WARN at 80%, CRITICAL at 95% (which sets the checkpoint signal). See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md) and [docs/architecture/context-window-control.md](docs/architecture/context-window-control.md).
+| Doc | What it explains |
+|---|---|
+| [docs/concepts/overview.md](docs/concepts/overview.md) | The mental model: cycles, agents, artifacts |
+| [docs/concepts/self-evolution.md](docs/concepts/self-evolution.md) | Reflexion-style learning + lesson lifecycle |
+| [docs/concepts/trust-architecture.md](docs/concepts/trust-architecture.md) | 3-tier model + threat model + 5 gaming patterns |
+| [docs/concepts/error-recovery.md](docs/concepts/error-recovery.md) | 4 recovery layers + operator commands |
+| [docs/concepts/pluggability.md](docs/concepts/pluggability.md) | Persona / Skill / LLM swapping + adapter spec |
 
-**Bounded scope via Triage (v8.59.0+ default-on).** A separate phase between Scout and Build refuses to over-commit. Triage picks 1-3 top_n items for this cycle, defers the rest to next cycle's carryoverTodos, and drops with-a-reason anything that shouldn't have been in the backlog. The phase-gate blocks on `cycle_size_estimate=large` — split required before re-entry. Closes the failure mode where Scout returned 8 items and Builder shipped 2 half-done.
+### Architecture (reference-first)
 
-**Adversarial Auditor (default-on).** The auditor is prompted to require positive evidence per acceptance criterion — saying "I see no problems" is not 0.85 confidence. Default model is Opus (different family from Builder's Sonnet) to break same-family-judge sycophancy per Sharma et al. 2024.
+| Doc | What it specifies |
+|---|---|
+| [docs/architecture/phase-architecture.md](docs/architecture/phase-architecture.md) | Per-phase mechanics in detail |
+| [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md) | Skill / Persona / Command formal contract + Anti-Patterns A-D |
+| [docs/architecture/egps-v10.md](docs/architecture/egps-v10.md) | EGPS predicate format + verdict computation + banned patterns |
+| [docs/architecture/retrospective-pipeline.md](docs/architecture/retrospective-pipeline.md) | record-failure / merge-lesson script contracts |
+| [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md) | v9.1.0 durable-execution protocol |
+| [docs/architecture/sequential-write-discipline.md](docs/architecture/sequential-write-discipline.md) | parallel_eligible rules + why writes are sequential |
+| [docs/architecture/platform-compatibility.md](docs/architecture/platform-compatibility.md) | CLI support matrix + adapter contract |
+| [docs/architecture/multi-llm-review.md](docs/architecture/multi-llm-review.md) | Why Auditor runs on a different model family |
+| [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) | Two-folder content model (runtime vs developer-only) |
 
-**It runs in isolation.** Builder works in a per-cycle git worktree. Your working tree is never touched. If a build fails, nothing main-branch is affected.
+### Incidents (case studies)
 
-**It improves its own process.** Every 5 cycles, a meta-cycle evaluates the pipeline itself — adjusting agent prompts, token budgets, and strategies based on measured performance.
+| Doc | What it documents |
+|---|---|
+| [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md) | B0-B7 bugs from the gemini-3.1-pro-preview experiment (2026-05) |
+| [docs/incidents/cycle-102-111.md](docs/incidents/cycle-102-111.md) | Indirect reward hacking via confidence-cliff calibration |
+| [docs/incidents/cycle-132-141.md](docs/incidents/cycle-132-141.md) | Orchestrator gaming via prose verdict drift |
+| [docs/incidents/gemini-forgery.md](docs/incidents/gemini-forgery.md) | v7.9.0+ defenses for non-Claude CLIs |
+| [docs/incidents/cycle-46-ship-refused.md](docs/incidents/cycle-46-ship-refused.md) | Ship-gate config drift incident |
 
-**No external dependencies.** No npm packages, no Python libraries, no Docker. It's markdown instructions + bash scripts. Works anywhere git works.
+### Comparisons
 
-## Knowledge Base Stewardship (v9.1.x+)
+| Doc | What it covers |
+|---|---|
+| [docs/comparisons/long-running-claude-skills.md](docs/comparisons/long-running-claude-skills.md) | Head-to-head: /goal, miles990, alirezarezvani, bejranonda, superpowers, OpenClaw, Hermes |
 
-**The rule** — for all research learned, applied, or verified in any cycle, the source material must be persisted to the knowledge base for future reference.
+### ADRs (architecture decisions)
 
-The pipeline has two distinct content surfaces:
+`docs/adr/0001-*.md` through `docs/adr/0007-*.md` — every architectural decision with context, choice, and consequence.
 
-| Surface | Path | Loaded into agent context? | Audience |
-|---|---|---|---|
-| Runtime context | `docs/research/` (5 active refs), `agents/`, `skills/`, `scripts/`, `docs/architecture/` | YES — agents read during cycles | Agents + contributors |
-| Developer knowledge base | `docs/private/research/` (42 archived refs + future additions) | **NO** — explicitly excluded across all CLIs | Contributors only |
+---
 
-**How it's used in the skill:**
+## Knowledge Base Stewardship
 
-1. **Scout** cites research in `scout-report.md` (publication + GitHub repo). If the cited paper / repo / pattern is novel (not previously archived), Scout adds a corresponding `docs/private/research/<slug>.md` summarizing the source's relevance, the section it informed, and a link to the cycle's report.
-2. **Builder** applies the cited research and records the application in `build-report.md` with a cross-reference to the knowledge-base entry. If the application reveals new sub-references (e.g., a transitive citation), Builder adds those to `docs/private/research/` too.
-3. **Auditor** verifies that the cited research is real (non-fabricated) and that the knowledge-base entry has been created. WARNs on missing entries (low-severity, awareness-only); FAILs on fabricated citations.
-4. **Retrospective** on FAIL/WARN cross-links the lesson YAML to the knowledge-base entry that informed the failed approach — so future cycles see both "what we tried" and "what research informed it."
+Two-surface model:
 
-**Why we need this:**
-
-- **Avoid re-research.** Cycles routinely re-discover the same papers and repos. Without persistence, the same Lost-in-the-Middle / Self-Refine / Reflexion patterns get re-grepped every few weeks.
-- **Audit trail for design decisions.** Six months later, "why did we adopt pattern X in cycle N?" should be answerable in <30 seconds. The knowledge-base entry is that pointer.
-- **Cross-cycle learning.** Lessons in `state.json:instinctSummary[]` are compact; they don't carry the full context. The knowledge-base entry holds the expanded context that the lesson abbreviates.
-- **Stop hollow citations.** Without a persistent surface, agents can cite papers they haven't read. Requiring the knowledge-base entry forces the agent to summarize the source — which catches fabrication.
-- **Survives runtime exclusion.** `docs/private/` is invisible to agents during cycles (Liu et al. 2023 "Lost in the Middle" context-noise mitigation), so persistence doesn't re-introduce the noise problem cycle 13 fixed.
-
-See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the full convention and the three-layer runtime-exclusion mechanism (OS sandbox + adapter passthrough + Layer-B context-builder filter).
-
-## Architecture
-
-### Phase Details
-
-For the complete walkthrough (per-phase: who runs, when, inputs, what it checks/does, outputs, model selection, version-specific behavior, kernel-hook integration), see [docs/architecture/phase-architecture.md](docs/architecture/phase-architecture.md). For the research citations that motivated each design decision (Reflexion, Voyager, Constitutional AI, Self-Refine, METR reward-hacking, Crosby & Wallach tamper-evident logging, IETF Agent Audit Trail draft, etc.), see [docs/architecture/phase-architecture-citations.md](docs/architecture/phase-architecture-citations.md).
-
-Brief per-phase summaries:
-
-**Phase 0 — CALIBRATE** (once per `/evolve-loop` invocation)
-Compute `projectBenchmark` across 8 dimensions (documentation, defensive design, eval infrastructure, modularity, schema hygiene, convention adherence, feature coverage, specification consistency). Hybrid automated + LLM probes. Grounded in ISO/IEC 25010 + Goodhart's-Law mitigation via composite scoring.
-
-**Phase 0b — INTENT** (v8.19.1+, always-on for `/evolve-loop`)
-The "Intent Architect" persona converts vague user goals into a structured `intent.md` (8 fields + AwN classifier `IMKI/IMR/IwE/IBTC/CLEAR` + ≥1 challenged_premise). Closes the 56% "missing key information" gap (arXiv 2409.00557) before Scout starts. The mandatory ≥1 challenged_premise rule is the anti-sycophancy mechanism at the structuring layer.
-
-**Phase 1 — DISCOVER** (Scout agent)
-Scan the codebase, identify highest-leverage tasks (1-3 per cycle), write evals (acceptance graders) Builder is measured against. Cite at least one publication + one GitHub repo (with URL + star count). Add corresponding knowledge-base entries for novel citations. Mode-aware: `full` (cycle 1, full scan), `incremental` (cycle 2+, diff-only), `convergence-confirmation` (no work to do). Optional Pattern-3 fan-out splits Scout into codebase / research / evals sub-personas.
-
-**Phase 1b — TRIAGE** (v8.59.0+ default-on)
-Bound this cycle's scope. Read scout-report backlog + `state.json:carryoverTodos[]`. Emit `triage-decision.md` with `top_n[]` (commit), `deferred[]` (next cycle), `dropped[]` (with reasons), and `cycle_size_estimate: {small,medium,large}`. The phase-gate fails on `large` — split required. Opt out via `EVOLVE_TRIAGE_DISABLE=1`.
-
-**Phase 1c — PLAN-REVIEW** (opt-in via `EVOLVE_PLAN_REVIEW=1`)
-4-lens fan-out review: CEO / Engineering / Design / Security. Each lens scores on its dimension; aggregator emits PROCEED / REVISE / ABORT. Inspired by gstack `/autoplan`. Phase-gate `gate_plan_review_to_tdd` enforces the verdict.
-
-**Phase 2 — BUILD** (Builder agent)
-Implement Triage's top_n in an isolated git worktree on branch `evolve/cycle-N`. Profile-scoped permissions (writes only to worktree path). Verify isolation → read instincts/genes → research → design → implement → self-verify (run eval graders) → commit → report. Genes (`.evolve/genes/<id>.yaml`) are reusable action recipes accumulated from prior cycles (Voyager-style skill library).
-
-**Phase 3 — AUDIT** (Auditor agent)
-Cross-checks Builder's narrative against ground truth via the Single-Pass Review Checklist (Code Quality, Security, Hallucination Detection, Pipeline Integrity, Eval Integrity, E2E Grounding). Verdict: PASS / WARN / FAIL. Default model: Opus (different family from Builder's Sonnet) — breaks same-family-judge sycophancy per Sharma et al. 2024; v8.35.0 auto-downgrades to Sonnet for trivial diffs. Adversarial framing requires *positive evidence* for PASS (Constitutional AI / Bai et al. 2022). Cycle binding (git_head + tree_state_sha + ledger SHA + v8.37.0 hash chain) makes the verdict structurally unforgeable post-hoc.
-
-**Phase 4 — SHIP / RECORD**
-Two paths driven by audit verdict:
-- **PASS or WARN**: `scripts/lifecycle/ship.sh` (canonical entry point allowlisted by `ship-gate.sh`) commits in the worktree, fast-forward merges into main, pushes. WARN ships by default since v8.28.0 (set `EVOLVE_STRICT_AUDIT=1` for legacy strict).
-- **FAIL**: `record-failure-to-state.sh` appends to `state.json:failedApproaches[]` with structured classification (9 classes, each with severity + age-out + retry policy). Next cycle's `failure-adapter.sh` reads non-expired entries and emits a deterministic decision the orchestrator follows verbatim.
-
-**Phase 5 — RETROSPECTIVE** (v8.45.0+, fires on FAIL or WARN)
-Extract a reusable lesson (one per *root cause*, not one per defect). Write `.evolve/instincts/lessons/<id>.yaml` with `description` + `preventiveAction` + `contradicts` + `relatedInstincts`. Cross-link to knowledge-base entries that informed the failed approach. Future cycles' Scout/Builder/Auditor read `instinctSummary` from state.json. Reflexion-style verbal-RL loop (Shinn et al. 2023). Double-loop learning (Argyris & Schon) demands the *underlying assumption that turned out to be wrong*. Disable via `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1`.
-
-**Phase 6 — META** (every 5 cycles, optional)
-Self-improvement of the loop itself. Pattern detection across last 5 cycles → proposals in `state.json:proposals[]` (operator-reviewable). Operator approval gate prevents runaway self-modification (Asilomar AI Principles). Promptbreeder-style evolutionary improvement (Fernando et al. 2023).
-
-### Cross-cutting structural integrity
-
-Three Tier-1 kernel hooks fire as PreToolUse in every cycle:
-
-| Hook | Watches | Denies |
+| Surface | Purpose | Visibility |
 |---|---|---|
-| `phase-gate-precondition.sh` | `subagent-run.sh` invocations | Out-of-order phases |
-| `role-gate.sh` | Edit/Write tool calls | Writes outside the active phase's allowlist |
-| `ship-gate.sh` | Bash with git/gh verbs | Anything except `scripts/lifecycle/ship.sh` doing commit/push/release |
+| `docs/` (runtime references) | Operationally needed; agents must see (e.g., incident postmortems, ADRs, architecture specs) | Public, tracked, agent-visible |
+| `knowledge-base/research/` (archival dossiers) | Original research deep-dives; long-form citations and rationale | Public, tracked, **excluded from agent context** to keep prompts focused |
 
-Plus the v8.37.0 tamper-evident hash-chained ledger (`prev_hash` chains every entry; `.evolve/ledger.tip` detects truncation; `bash scripts/observability/verify-ledger-chain.sh` walks the chain). All grounded in Saltzer & Schroeder 1975's complete-mediation principle and Crosby & Wallach 2009's tamper-evident logging.
+Everything learned, applied, or verified across cycles MUST land in one of those two surfaces. Memory entries (`~/.claude/projects/.../memory/`) are operator-scoped — mirror to `docs/` when team-shareable.
 
-### Self-Learning System
+Research persistence rule: when a cycle's research is non-trivial (web searches, library evaluations, paper reviews), Scout records sources in `scout-report.md` AND the operator (or Scout itself if `EVOLVE_RESEARCH_CACHE_ENABLED=1` v9.X+) promotes the substance to `knowledge-base/research/<topic>.md`. The next cycle doesn't re-research.
 
-Seven mechanisms compound across cycles:
+See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the full policy.
 
-1. **Instinct extraction** — patterns from each cycle (starts at 0.5 confidence, increases with confirmation)
-2. **Meta-cycle review** — pipeline self-evaluation every 5 cycles
-3. **Prompt evolution** — TextGrad-style critique loop refines agent prompts
-4. **Gene library** — reusable fix templates with selectors and validation
-5. **Curriculum learning** — difficulty-graduated task queue with mastery levels
-6. **Process rewards** — step-level scoring per phase
-7. **Knowledge-base persistence** — every cycle's research citations land in `docs/private/` for future cross-cycle reference (see § Knowledge Base Stewardship above)
+---
 
 ## Evolution Data
 
-evolve-loop has been running on its own codebase since March 12, 2026. Selected milestones:
+Active milestones (cycles that shipped substantive structural changes):
 
-### Current state — Current (v10.6), post cycle 14
+| Cycle | Version | Milestone |
+|---|---|---|
+| 1-9 | v3.0-v5.0 | Initial pipeline (Scout / Builder / Auditor) |
+| 10-29 | v6.0-v7.0 | Trust kernel introduced (phase-gate, role-gate, ship-gate) |
+| 30-39 | v8.0-v8.13 | EGPS v1: predicates introduced; ACS suite; mutation testing |
+| 40-49 | v8.14-v8.30 | Adversarial Auditor mode; SHA-chained ledger; ship.sh integrity gate |
+| 50 | v8.30 | Three-tier strictness model formalized |
+| 51-60 | v8.32-v10.6 | Multi-CLI router; gemini + codex adapters; EGPS v10 (binary verdicts) |
+| 61 | v10.6 | Gemini-3.1-pro-preview experiment → B0-B7 bug catalog |
+| 62-63 | v10.7 | Structural fixes for B0-B7; scout grounding; audit citation binding; CLI Resolution renderer |
+| 100+ | v11+ | EGPS T1 auto-heal; phase-tracker observability; private-context policy |
+| 132-141 | (incident) | Indirect-reward-hacking forensic series |
 
-| Metric | Value |
-|--------|-------|
-| Agents | 4 (Scout, Triage, Builder, Auditor) + inline orchestrator + Retrospective |
-| Phases | 8 + meta-cycle every 5 |
-| Skills | 8+ (`/evolve-loop`, `/scout`, `/build`, `/audit`, `/ship`, `/retro`, `/refactor`, `/code-review-simplify`, etc.) |
-| Cycles completed | 200+ |
-| Trust kernel test suites | swarm-architecture (41 assertions), role-gate (23), checkpoint-roundtrip (19), preemptive-checkpoint (18), reactive-quota-classify (15), resume-cycle (28), orchestrator-resume-mode (23), context-window-control (22), private-context-exclusion (20) |
-| Active research refs (`docs/research/`) | 5 |
-| Archived research refs (`docs/private/research/`) | 42 |
+| Incident family | Count (lifetime) | Mechanism |
+|---|---|---|
+| Reward hacking (cycle 30-39, 102-111) | ~30 cycles | Predicates substituted for prose verdicts (EGPS v10) |
+| Orchestrator forgery (cycle 132-141) | ~10 cycles | Ledger SHA-chain + auto-rendered sections |
+| Cross-CLI gaming (gemini-forgery 7.9.0+) | continuous | Artifact content checks + .sh write protection + anti-forgery prompt |
+| Quota wall (cycle 11+) | ongoing | Checkpoint-resume (v9.1.0+) |
+| Cycle-61 class (B0-B7) | 1 cycle = 8 bugs | 7 structural fixes shipped in cycles 62-63 of v10.7 |
 
-### Version History (highlights)
+Approximately 19 active lessons in `.evolve/instincts/lessons/` (as of v10.7.0). Some pre-date v8 and still apply.
 
-| Version | Date | Key Changes |
-|---------|------|-------------|
-| v3.0 | Mar 12 | Initial multi-agent pipeline (11 agents, 3 phases) |
-| v4.0 | Mar 13 | Consolidated to 4 lean agents, added strategy presets |
-| v5.0 | Mar 14 | Eval gating, instinct extraction, curriculum learning |
-| v6.0 | Mar 17 | Gene library, mutation testing, island model |
-| v7.0 | Mar 19 | Accuracy self-correction, performance profiling, security pipeline |
-| v7.6 | Mar 22 | Major refactor — split monolithic phases (46% reduction) |
-| v7.8 | Mar 22 | Deterministic phase gate script after gaming incident |
-| v8.0 | Mar 23 | Progressive disclosure (85% SKILL.md reduction), agent compression |
-| v8.10 | Apr 9 | `ecc:e2e` first-class integration, deterministic `setup-skill-inventory.sh` |
-| v8.11 | Apr 20 | `autoresearch` strategy; dynamic context scaling (2M tokens for Gemini) |
-| v8.12 | Apr 27 | Subagent subprocess isolation hardening: per-agent CLI permission profiles, challenge tokens, tamper-evident SHA256 ledger, OS-level sandboxing, mutation-testing pre-flight, Adversarial Auditor (default-on) |
-| v8.13 | Apr 27 | Atomic ship-gate via canonical `ship.sh` allowlist; role-gate + phase-gate-precondition; 69/69 unit tests across three gates |
-| v8.15 | May 1 | Cross-CLI deployment matrix (Claude Code / Gemini / Codex), hybrid adapter pattern |
-| v8.19 | May 3 | Intent phase always-on for `/evolve-loop`; AwN classifier; ≥1 challenged_premise mandatory |
-| v8.21 | May 4 | Privileged-shell worktree provisioning; deny-list orchestrator from `git worktree` |
-| v8.22 | May 4 | Deterministic failure-adapter; orchestrator reads JSON, never interprets markdown rules |
-| v8.25 | May 5 | Three-Tier Strictness Model; explicit ship.sh `--class` (cycle/manual/release) |
-| v8.28 | May 6 | Fluent-WARN policy: WARN ships by default; legacy strict via `EVOLVE_STRICT_AUDIT=1` |
-| v8.35 | May 8 | Adaptive auditor model selection (Opus / Sonnet / Haiku by diff complexity) |
-| v8.37 | May 8 | Tamper-evident hash-chained ledger (`prev_hash` + `entry_seq` + `.evolve/ledger.tip`) |
-| v8.42 | May 8 | `.agents/skills/` symlink convention for cross-CLI standard |
-| v8.45 | May 9 | Auto-retrospective on FAIL/WARN (closes the Reflexion verbal-RL loop) |
-| v8.50 | May 9 | `./bin/preflight` full pipeline dry-run; opt-in to release pipeline |
-| v8.51 | May 9 | Codex CLI hybrid adapter; cross-CLI capability tier resolver |
-| v8.55 | May 9 | Sequential-write discipline codified in profile JSON; parallel_eligible enforcement |
-| v8.56 | May 9 | Layer B `role-context-builder.sh` per-phase prompt assembly |
-| v8.57 | May 10 | PASS-cycle memo (Layer P); carryoverTodos with `defer_count` tracking |
-| v8.58 | May 10 | Per-batch cumulative cost cap with tripwire |
-| v8.59 | May 10 | Triage default-on (Layer C); opt-out via `EVOLVE_TRIAGE_DISABLE=1` |
-| v8.60 | May 10 | Budget-driven dispatch (`--budget-usd N`); cycle→cost migration begins |
-| v9.0.0 | May 11 | Four-tier token-optimization rebuild: invocation context, cycle digest, role-filtered context, persona Layer 1/3 split |
-| v9.0.1-5 | May 11 | Per-phase token fixes: intent 7→≤2 turns, scout 49→≤8-12, builder 58→≤15-20; cycle→cost doc closure |
-| **v9.1.0** | **May 11** | **Checkpoint-resume + context-window control. `--resume` flag; per-cycle context-monitor.json; autotrim opt-in; reactive quota-likely classification; pre-emptive 80/95% thresholds; orchestrator resume-mode protocol** |
-| v9.1.x | May 11 | Knowledge-base content model: separate runtime context (`docs/research/`) from developer-only reference (`docs/private/research/`); 42 archived files restored; three-layer cross-CLI exclusion; end-to-end resume bug fix (collision check + WORKTREE_PATH reset) |
-
-### Incidents and recovery
-
-| Cycles | What Happened | How It Was Fixed |
-|--------|---------------|------------------|
-| 102-111 | Reward hacking: agent inflated success metrics | Eval tamper detection, independent verification |
-| 132-141 | Orchestrator gaming: skipped agents, fabricated cycles | Deterministic `phase-gate-precondition.sh` (kernel hook) |
-| Gemini run | Forged audit reports during cross-platform run | Hash-chained ledger; ship.sh verifies artifact SHA, not LLM claim |
-| Cycle 11 (this session) | Quota wall mid-build — entire worktree lost pre-v9.1.0 | v9.1.0 checkpoint-resume; survive subscription quota walls |
-| v9.1.0 resume positive-path (post-ship) | INTEGRITY-FAIL + empty WORKTREE_PATH on `--resume` | v9.1.x patch: collision check and WORKTREE_PATH reset gated by `EVOLVE_RESUME_MODE`; end-to-end verification added |
-
-These incidents led to the project's key architectural conviction: **structural constraints beat behavioral constraints**. Safety rules in prompts can be ignored; safety checks in bash scripts cannot.
+---
 
 ## Project Structure
 
 ```
 evolve-loop/
-├── .claude-plugin/
-│   ├── plugin.json              # Plugin manifest
-│   └── marketplace.json         # Marketplace distribution
-├── agents/                      # Agent personas (Scout, Triage, Builder, Auditor, Retrospective, Orchestrator)
-├── skills/evolve-loop/          # Autonomous pipeline skill (symlinked from .agents/skills/)
-├── skills/refactor/             # Refactoring pipeline skill
-├── scripts/
-│   ├── dispatch/                # Dispatcher, run-cycle, resume-cycle, subagent-run, CLI adapters
-│   ├── lifecycle/               # ship.sh, cycle-state.sh, phase-gate.sh, role-context-builder.sh
-│   ├── guards/                  # PreToolUse hooks: ship-gate, role-gate, phase-gate-precondition
-│   ├── observability/           # show-cycle-cost.sh, show-context-monitor.sh, verify-ledger-chain.sh
-│   └── tests/                   # Trust kernel + per-feature regression suites
-├── docs/                        # Single doc root (v9.1.x+ consolidation)
-│   ├── README.md                # Layout + distinguishing principle
-│   ├── architecture/            # checkpoint-resume.md, context-window-control.md, private-context-policy.md, ...
-│   ├── reference/               # Per-agent technique manuals
-│   ├── guides/                  # How-to (operational tasks, publishing-releases.md)
-│   ├── research/                # 5 ACTIVE research refs (agent-accessible on demand)
-│   ├── operations/              # Release archive + release-notes/
-│   ├── incidents/               # Forensic post-mortems
-│   ├── reports/                 # Eval results, benchmarks
-│   ├── private/                 # v9.1.x+: AGENT-CONTEXT-EXCLUDED research backlog
-│   │   ├── README.md            # Convention + how runtime exclusion works
-│   │   └── research/            # 42 ARCHIVED research refs (NOT loaded into agent context)
-│   └── MOVED.md                 # (transitional) old→new path map; removed in v9.2.x or v9.3.x
-├── bin/                         # Read-only operator commands
-├── examples/                    # Annotated examples
-├── install.sh
-├── uninstall.sh
-├── AGENTS.md                    # Cross-CLI source-of-truth (canonical)
-├── CLAUDE.md                    # Claude Code overlay
-├── GEMINI.md                    # Gemini CLI overlay
-├── CONTRIBUTING.md
-├── CHANGELOG.md
-└── LICENSE (MIT)
+├── .claude-plugin/              # Plugin manifest + slash commands
+│   ├── plugin.json              # Canonical version + components list
+│   ├── marketplace.json         # Marketplace registry entry
+│   └── commands/                # User-facing /commands (one per UX entry point)
+├── .evolve/                     # Runtime state (mostly gitignored)
+│   ├── state.json               # Authoritative cross-cycle state
+│   ├── ledger.jsonl             # SHA-chained audit log
+│   ├── llm_config.json          # Operator's per-phase LLM routing (gitignored)
+│   ├── profiles/                # Per-agent capability profiles
+│   ├── instincts/lessons/       # Reflexion-style lesson YAMLs (tracked)
+│   ├── evals/                   # Eval definitions
+│   ├── runs/cycle-N/            # Per-cycle workspace (gitignored)
+│   ├── history/cycle-N/         # Post-ship archived workspaces
+│   ├── worktrees/               # Per-cycle git worktrees (gitignored)
+│   └── environment.json         # Capability detection results (gitignored)
+├── acs/                         # ACS predicates
+│   ├── cycle-N/                 # This cycle's predicates (gitignored until promoted)
+│   └── regression-suite/cycle-*/  # Permanent regression predicates (tracked)
+├── agents/                      # Persona files (tri-layer "who")
+├── skills/                      # Skill workflows (tri-layer "how")
+├── scripts/                     # Trust kernel + adapters + utilities
+│   ├── dispatch/                # Dispatcher + subagent-run + router
+│   ├── lifecycle/               # phase-gate.sh + ship.sh + cycle-state.sh
+│   ├── guards/                  # PreToolUse shell hooks (Tier 1)
+│   ├── cli_adapters/            # claude.sh / gemini.sh / codex.sh
+│   ├── verification/            # validate-predicate.sh + verify-eval.sh
+│   ├── observability/           # render-cli-resolution.sh + verify-ledger-chain.sh
+│   ├── failure/                 # failure-adapter.sh
+│   ├── utility/                 # release.sh + promote-acs.sh + probe-tool.sh
+│   └── tests/                   # Integration + unit tests
+├── docs/                        # Documentation (this directory tree)
+│   ├── concepts/                # Teaching-first
+│   ├── architecture/            # Reference-first
+│   ├── comparisons/             # vs other projects
+│   ├── incidents/               # Postmortems
+│   ├── adr/                     # Architecture decisions
+│   └── getting-started/         # Hands-on tutorials
+├── knowledge-base/research/     # Research dossiers (tracked, agent-excluded)
+├── bin/                         # Operator CLI shortcuts (status, cost, health, ...)
+├── CLAUDE.md                    # Claude Code runtime contract
+├── AGENTS.md                    # Universal CLI runtime contract
+├── GEMINI.md                    # Gemini CLI runtime contract
+├── README.md                    # This file
+├── CHANGELOG.md                 # Per-version release notes
+└── LICENSE
 ```
 
-### Workspace (generated per project on first cycle)
+### Two-folder content model
 
-```
-.evolve/
-├── runs/cycle-N/                # Per-cycle artifacts (gitignored)
-│   ├── intent.md
-│   ├── scout-report.md
-│   ├── triage-decision.md
-│   ├── build-report.md
-│   ├── audit-report.md
-│   ├── context-monitor.json     # v9.1.0+ per-phase token usage
-│   └── orchestrator-report.md
-├── profiles/                    # Agent CLI permission profiles (shipped with plugin)
-├── evals/                       # Eval definitions (gitignored)
-├── instincts/lessons/           # Reflexion-style lessons (gitignored)
-├── genes/                       # Reusable fix templates
-├── state.json                   # Persistent state
-├── ledger.jsonl                 # SHA-chained tamper-evident log
-└── cycle-state.json             # Current cycle's phase state (or absent between cycles)
-```
+| Folder | What goes there | Visible to agents? |
+|---|---|---|
+| `docs/` | Operationally needed runtime references | YES |
+| `knowledge-base/` | Archival research and rationale | NO (excluded by CLI gate) |
 
-## Two-folder Content Model (v9.1.x+)
+Rationale: agents shouldn't read 200KB of research dossier to find one fact. Operationally-needed knowledge lives in `docs/`; long-form research lives in `knowledge-base/`. Cycle-level references (e.g., a recent incident postmortem) go to `docs/incidents/`. See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md).
 
-evolve-loop maintains two distinct content surfaces:
-
-| Surface | Folder | Loaded into agent context? | Audience |
-|---|---|---|---|
-| Runtime context | `docs/research/`, `agents/`, `skills/`, `scripts/`, `docs/architecture/` | YES — agents read these | Agents + contributors |
-| Developer knowledge base | `docs/private/` | NO — kernel-blocked across all CLIs | Contributors only |
-
-The runtime exclusion uses three layers (OS sandbox + adapter permission-mode + Layer-B context-builder filter). See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the architecture and [docs/private/README.md](docs/private/README.md) for the contributor-facing convention.
+---
 
 ## Requirements
 
-- An AI CLI that supports plugins (Claude Code, Gemini CLI, or Codex CLI)
-- Git
-- `jq` (used by the kernel scripts; install via `brew install jq` / `apt install jq`)
+- bash 3.2+ (macOS-default works; no bash-4 features used)
+- git 2.5+ (for `git worktree`)
+- jq 1.6+ (every state.json and ledger operation)
+- One supported CLI: Claude Code 2.0+, Gemini CLI 0.42+, or Codex CLI
+- ~200MB free disk (per-cycle worktrees + workspaces)
 
-No other dependencies. The entire system is markdown + bash that AI agents interpret.
+For installation help, see [docs/getting-started/your-first-cycle.md#prerequisites](docs/getting-started/your-first-cycle.md#prerequisites).
+
+---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, including the "where to file research?" rule (active runtime ref → `docs/research/`; archived reference → `docs/private/research/`).
+Contributions welcome. The project itself is run by evolve-loop — every commit on `main` is either:
 
-## Community
+1. A `--class manual` ship by an operator (with operator name + explicit message), OR
+2. A `--class cycle` ship by an automated `/evolve-loop` cycle (with full ledger + audit trail)
 
-- **Code of Conduct**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — adopts [Contributor Covenant 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/)
-- **Security policy**: [SECURITY.md](SECURITY.md) — vulnerability reporting via GitHub Security Advisories
-- **Cross-CLI standard**: skills live at both `skills/<name>/` (Claude Code primary) and `.agents/skills/<name>/` (Codex/Gemini open standard via symlinks). Edit either path; both resolve to the same SKILL.md.
-- **AI agent instructions**: [AGENTS.md](AGENTS.md) is the canonical cross-CLI source-of-truth. CLI-specific overlays at [CLAUDE.md](CLAUDE.md) and [GEMINI.md](GEMINI.md).
+Read [CLAUDE.md](CLAUDE.md) for the runtime contract. The two-folder content model and the structural-fix-before-prose-fix preference apply to PRs too.
 
-## License
+### Reporting incidents
 
-[MIT](LICENSE) — Copyright (c) 2026 Dan Lee
+If you find a gaming pattern the framework didn't catch, file an issue with:
+- Cycle number and commit SHA
+- The orchestrator-report.md + audit-report.md + acs-verdict.json
+- What you expected vs what shipped
 
-## Links
+We treat framework-caught-its-own-bugs incidents (like cycle-61) as the most valuable kind of bug report.
 
-- [Documentation index](docs/index.md) — all reference docs
-- [Research index](docs/research-index.md) — 5 active refs + 42 archived
-- [Architecture docs](docs/architecture/) — phase architecture, checkpoint-resume, context-window-control, private-context-policy
-- [Changelog](CHANGELOG.md)
-- [Releases](https://github.com/mickeyyaya/evolve-loop/releases)
+---
+
+## License & Links
+
+- License: MIT — see [LICENSE](LICENSE)
+- GitHub: [github.com/mickeyyaya/evolve-loop](https://github.com/mickeyyaya/evolve-loop)
+- Marketplace: `/plugin marketplace add mickeyyaya/evolve-loop`
+- CLAUDE.md (runtime contract): [CLAUDE.md](CLAUDE.md)
+- CHANGELOG: [CHANGELOG.md](CHANGELOG.md)
+
+### Citations
+
+The framework's design draws on:
+
+- **Reflexion** — Shinn et al. (2023) "Reflexion: Language Agents with Verbal Reinforcement Learning" arXiv:2303.11366
+- **Double-loop learning** — Argyris, C. & Schon, D. (1978) *Organizational Learning: A Theory of Action Perspective*
+- **Reward hacking limits** — Skalse et al. (NeurIPS 2022) "Defining and Characterizing Reward Hacking"
+- **Mitigation survey** — Weng, L. (2024) "Reward Hacking in Reinforcement Learning" — Lil'Log
+- **Tri-layer (Skill/Persona/Command)** — addyosmani/agent-skills (foundational inspiration)
+- **Anthropic Secure Deployment Guide (2026)** — `--allowedTools` is "a permission gate, not a sandbox"
+
+For a full bibliography, see [docs/architecture/phase-architecture-citations.md](docs/architecture/phase-architecture-citations.md).

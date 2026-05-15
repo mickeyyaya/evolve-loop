@@ -11,17 +11,39 @@ there. Everything else lives below.
 ```
 docs/
 ├── README.md                  ← you are here
-├── getting-started.md         ← (planned) new-user onramp tutorial
+├── concepts/                  ← TEACHING-FIRST primers (v10.7+) — start here as new reader
+│   ├── overview.md            ← what evolve-loop is (mental model)
+│   ├── self-evolution.md      ← Reflexion-style cross-cycle learning
+│   ├── trust-architecture.md  ← 3-tier anti-gaming
+│   ├── error-recovery.md      ← 4 layers of failure handling
+│   └── pluggability.md        ← Persona / Skill / LLM swapping
+├── comparisons/               ← head-to-head with other long-running skills
+│   └── long-running-claude-skills.md  ← vs /goal, superpowers, OpenClaw, etc.
+├── getting-started/           ← hands-on tutorials
+│   └── your-first-cycle.md    ← run end-to-end in ~15 min
 ├── guides/                    ← how-to (operational tasks)
 ├── reference/                 ← per-agent technique manuals
-├── architecture/              ← cross-role system design (explanation)
+├── architecture/              ← cross-role system design (reference)
 ├── research/                  ← agent-readable research records (load on demand)
 ├── operations/                ← release process, ops history
-├── incidents/                 ← forensic post-mortems
+├── incidents/                 ← forensic post-mortems (incl. cycle-61 v10.7 case study)
 ├── reports/                   ← eval results, benchmarks
+├── adr/                       ← architecture decision records
 ├── private/                   ← AGENT-CONTEXT EXCLUDED (kernel-blocked)
 └── MOVED.md                   ← (transitional) old→new path index for v9.1.x refactor
 ```
+
+## Starting points by audience
+
+| If you are... | Read in this order |
+|---|---|
+| **A new reader curious about the project** | [concepts/overview.md](concepts/overview.md) → [concepts/self-evolution.md](concepts/self-evolution.md) → [concepts/trust-architecture.md](concepts/trust-architecture.md) |
+| **Comparing evolve-loop to /goal / superpowers / etc.** | [comparisons/long-running-claude-skills.md](comparisons/long-running-claude-skills.md) |
+| **About to run your first cycle** | [getting-started/your-first-cycle.md](getting-started/your-first-cycle.md) |
+| **Reviewing the architecture as an engineer/security reviewer** | [concepts/trust-architecture.md](concepts/trust-architecture.md) → [architecture/egps-v10.md](architecture/egps-v10.md) → [architecture/phase-architecture.md](architecture/phase-architecture.md) |
+| **Mixing LLMs across phases for cost/quality** | [concepts/pluggability.md](concepts/pluggability.md) |
+| **Recovering from a failed cycle** | [concepts/error-recovery.md](concepts/error-recovery.md) → [architecture/checkpoint-resume.md](architecture/checkpoint-resume.md) |
+| **Understanding what changed in v10.7** | [incidents/cycle-61.md](incidents/cycle-61.md) (B0-B7 fixes) + [CHANGELOG.md](../CHANGELOG.md) |
 
 ## Distinguishing principle
 
