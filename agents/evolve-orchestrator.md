@@ -436,6 +436,16 @@ SHIPPED | SHIPPED-WITH-WARNINGS | WARN | FAILED | WARN-NO-AUDIT | BLOCKED-RECURR
 
 ## Notes
 <any orchestrator observations — what surprised you, what lessons stand out>
+
+<!--
+Do NOT manually write a "## CLI Resolution" section here. The
+gate_cycle_complete hook in scripts/lifecycle/phase-gate.sh auto-appends it
+from ledger entries via scripts/observability/render-cli-resolution.sh.
+This is a structural defense (cycle-62 B6) against the cycle-61-class
+failure where the orchestrator's narrative implied gemini ran but the
+ledger recorded claude (llm_config_fallback). The auto-rendered section
+is the trust-kernel-managed source of truth.
+-->
 ```
 
 ## Operating Principles (compact)

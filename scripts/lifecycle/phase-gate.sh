@@ -1086,6 +1086,28 @@ gate_cycle_complete() {
     check_file_exists "$WORKSPACE/build-report.md" "Build report"
     check_file_exists "$WORKSPACE/audit-report.md" "Audit report"
 
+    # 1b. CLI Resolution auto-render (cycle-62 B6 fix; see docs/incidents/cycle-61.md).
+    # Append/replace the `## CLI Resolution` section in orchestrator-report.md
+    # from ledger truth. Orchestrator persona is instructed NOT to write this
+    # section itself — preventing the unverifiable-narrative class of bug.
+    if [ -x "scripts/observability/render-cli-resolution.sh" ] && \
+       [ -f "$WORKSPACE/orchestrator-report.md" ]; then
+        local _cli_section
+        _cli_section=$(bash scripts/observability/render-cli-resolution.sh "$CYCLE" 2>/dev/null || true)
+        if [ -n "$_cli_section" ]; then
+            # Strip any existing ## CLI Resolution section, then append the fresh one.
+            local _tmp="$WORKSPACE/orchestrator-report.md.tmp.$$"
+            awk '
+                /^## CLI Resolution/ { skip=1; next }
+                skip && /^## / && !/^## CLI Resolution/ { skip=0 }
+                !skip { print }
+            ' "$WORKSPACE/orchestrator-report.md" > "$_tmp"
+            printf '\n%s\n' "$_cli_section" >> "$_tmp"
+            mv -f "$_tmp" "$WORKSPACE/orchestrator-report.md"
+            log "OK: appended/refreshed ## CLI Resolution section in orchestrator-report.md"
+        fi
+    fi
+
     # 2. Archive workspace to history
     local history_dir="$EVOLVE_DIR/history/cycle-$CYCLE"
     mkdir -p "$history_dir"
