@@ -281,6 +281,23 @@ gate_discover_to_build() {
         fi
     fi
 
+    # 1d. Scout grounding check (cycle-62 B1 fix; see docs/incidents/cycle-61.md).
+    # Verifies scout-report.md's Key Findings rows that cite paths with
+    # quantitative or status claims actually correspond to real git state.
+    # WARN-mode default-on: an ungrounded claim logs WARN but does NOT fail the
+    # gate. Promote to fail after one verification cycle confirms no false-
+    # positives. Opt out with EVOLVE_SCOUT_GROUNDING_DISABLE=1.
+    if [ "${EVOLVE_SCOUT_GROUNDING_DISABLE:-0}" != "1" ] && [ -x "scripts/lifecycle/scout-grounding-check.sh" ]; then
+        local _grounding_rc=0
+        bash scripts/lifecycle/scout-grounding-check.sh "$WORKSPACE/scout-report.md" > "$WORKSPACE/scout-grounding.log" 2>&1 || _grounding_rc=$?
+        if [ "$_grounding_rc" = "0" ]; then
+            log "OK: scout grounding check passed"
+        else
+            log "WARN: scout grounding check found ungrounded claim(s) — see $WORKSPACE/scout-grounding.log"
+            log "  → set EVOLVE_SCOUT_GROUNDING_DISABLE=1 to suppress; promote-to-fail in next rollout step"
+        fi
+    fi
+
     # 2. At least one eval definition must exist
     local eval_count
     eval_count=$(ls "$EVOLVE_DIR/evals/"*.md 2>/dev/null | wc -l | tr -d ' ')
