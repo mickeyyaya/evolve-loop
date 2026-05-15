@@ -776,6 +776,40 @@ gate_audit_to_ship() {
     echo "PASS" > "$WORKSPACE/.cycle-verdict"
     log "OK: Audit verdict is PASS"
 
+    # 2b. Audit citation binding (cycle-62 B2 fix; see docs/incidents/cycle-61.md).
+    # Verifies path:line citations in audit-report.md correspond to files in
+    # the cycle's diff scope. WARN-mode default-on (opt-out via
+    # EVOLVE_AUDIT_CITATION_DISABLE=1). Cycle 61's audit cited gemini.sh:206
+    # which existed in HEAD but wasn't in cycle 61's commit — exactly the
+    # class of scope creep this check catches.
+    if [ "${EVOLVE_AUDIT_CITATION_DISABLE:-0}" != "1" ] && [ -x "scripts/lifecycle/audit-citation-check.sh" ]; then
+        # Compute the cycle's effective diff scope: any file in any state of
+        # being part of this cycle's work (staged, working-tree-modified, or
+        # already committed to the cycle's branch).
+        local _cycle_scope
+        _cycle_scope=$(
+            {
+                git diff --name-only main..HEAD 2>/dev/null
+                git diff --name-only --cached HEAD 2>/dev/null
+                git diff --name-only HEAD 2>/dev/null
+                git status --porcelain 2>/dev/null | awk '{print $NF}'
+            } | sort -u | grep -v '^$' | tr '\n' ',' | sed 's/,$//'
+        )
+        local _audit_cit_rc=0
+        if [ -n "$_cycle_scope" ]; then
+            bash scripts/lifecycle/audit-citation-check.sh "$WORKSPACE/audit-report.md" \
+                --diff-files "$_cycle_scope" > "$WORKSPACE/audit-citation.log" 2>&1 || _audit_cit_rc=$?
+            if [ "$_audit_cit_rc" = "0" ]; then
+                log "OK: audit citation check passed (all path:line citations in cycle scope)"
+            else
+                log "WARN: audit-report.md cites file:line outside cycle diff scope — see $WORKSPACE/audit-citation.log"
+                log "  → set EVOLVE_AUDIT_CITATION_DISABLE=1 to suppress; promote-to-fail in next rollout step"
+            fi
+        else
+            log "OK: empty cycle scope (no diff yet) — citation check vacuous"
+        fi
+    fi
+
     # 3. Independent eval verification (CRITICAL — this is the main anti-cheating gate)
     if [ -f "scripts/verification/verify-eval.sh" ]; then
         log "Running independent eval verification..."
