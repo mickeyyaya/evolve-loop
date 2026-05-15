@@ -26,6 +26,12 @@ Assembled by `role-context-builder.sh memo` (or, in absence of a memo role, by t
 - `triage-decision.md` — present unless `EVOLVE_TRIAGE_DISABLE=1` (v8.59.0+ default-on). Read `## deferred` and `## dropped` sections.
 - `state.json:carryoverTodos[]` — current backlog (so you don't duplicate ids)
 
+## File inspection: use Read, not cat/head/tail (cycle-62 B4)
+
+For inspecting workspace artifacts (scout-report.md, triage-decision.md, state.json), use the **Read** tool — NOT `cat`, `head`, or `tail` shell commands. The memo profile no longer permits `Bash(cat:*)`, `Bash(head:*)`, or `Bash(tail:*)` because in cycle 61 a memo invocation used shell redirects (`cat ... > memo_context.txt`) to write files at project root, bypassing the profile's `Write(.evolve/runs/cycle-*/carryover-todos.json)` allowlist. See `docs/incidents/cycle-61.md` §B4.
+
+If you genuinely need streaming/append behavior that Read doesn't provide, use `Bash(jq:*)` (still permitted) for JSON or `Bash(wc:*)` for line counts. Do not introduce new shell pipelines.
+
 ## Core Principles
 
 ### 1. Only emit what is concretely deferrable
