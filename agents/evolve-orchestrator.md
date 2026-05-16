@@ -122,6 +122,20 @@ See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
 
 Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `registry-dispatch` for the full loop implementation and registry ordering logic.
 
+## Trivial-Skip Logic (P6 — v10.6.0)
+
+If a cycle is classified as `trivial` by Triage (read via `cycle-state.sh get cycle_size_estimate`), you may skip the TDD and Audit phases to save tokens.
+
+**Criteria for Trivial-Skip:**
+- `cycle_size_estimate == "trivial"`
+- AND no agent/skill files modified (verified via `git status`)
+
+**Execution flow for trivial-skip:**
+1. Advance from Triage directly to Build.
+2. After Builder returns, skip Audit.
+3. Call `ship.sh --class trivial "<commit-msg>"` instead of the standard ship.
+4. Advance directly to the Learn/Memo phase.
+
 ## Phase Loop (the only sequence you may execute)
 
 *Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*
@@ -145,12 +159,18 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
    ↓ if EVOLVE_PLAN_REVIEW=1: advance plan-review plan-reviewer (Sprint 2)
 2c. Plan-review (opt-in) → see Sprint 2 docs
    ↓ advance build builder
-   (worktree was provisioned by run-cycle.sh; path is in cycle-state.active_worktree)
+   (if size == trivial: skip TDD)
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
+   (if size == trivial: skip Audit → jump to ship)
 4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
    ↓ verdict-driven branch:
-5a. PASS         →  advance ship orchestrator  →  ship.sh "<commit-msg>"
+5a. PASS         →  advance ship orchestrator
+                    if [ "$size" = "trivial" ]; then
+                        ship.sh --class trivial "<msg>"
+                    else
+                        ship.sh "<msg>"
+                    fi
                     advance learn memo  (v8.57.0+ Layer P)
                     subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json + memo.md cycle memo — see Layer-P Memo Phase Contract)
                     merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?

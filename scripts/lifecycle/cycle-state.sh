@@ -613,6 +613,30 @@ cycle_state_clear_checkpoint() {
     echo "[cycle-state] checkpoint block cleared" >&2
 }
 
+# v10.6.0 Layer L1: record the cycle size estimate from Triage.
+# Allowed: trivial | small | medium | large.
+# Used by orchestrator for phase-skipping (trivial-skip).
+cycle_state_set_estimate() {
+    local estimate="${1:?estimate required (trivial|small|medium|large)}"
+    case "$estimate" in
+        trivial|small|medium|large) ;;
+        *) echo "[cycle-state] ERROR: invalid estimate '$estimate'" >&2; return 1 ;;
+    esac
+    if ! cycle_state_exists; then
+        echo "[cycle-state] ERROR: cannot set-estimate — state file missing" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for set-estimate" >&2
+        return 1
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(echo "$current" | jq -c --arg e "$estimate" '.cycle_size_estimate = $e')
+    _atomic_write "$updated"
+    echo "[cycle-state] estimate set to: $estimate" >&2
+}
+
 # CLI dispatcher: only fires when this file is executed directly.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     cmd="${1:-}"
@@ -622,6 +646,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         advance)                 cycle_state_advance "$@" ;;
         set-agent)               cycle_state_set_agent "$@" ;;
         set-worktree)            cycle_state_set_worktree "$@" ;;
+        set-estimate)            cycle_state_set_estimate "$@" ;;
         prune-expired-failures)  cycle_state_prune_expired_failures "$@" ;;
         set-parallel-workers)    cycle_state_set_parallel_workers "$@" ;;
         clear-parallel-workers)  cycle_state_clear_parallel_workers ;;
@@ -640,6 +665,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|bump-auto-resume-attempts|reset-auto-resume-attempts|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-estimate|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|bump-auto-resume-attempts|reset-auto-resume-attempts|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

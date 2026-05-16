@@ -73,25 +73,7 @@ Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for B
 
 ### 4.5. Per-Task Research Cache Lookup (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
 
-For each `carryoverTodos[]` entry with a non-empty `action`, check whether Scout already cached research for this task fingerprint.
-
-```bash
-# Compute fingerprint
-fp=$(bash scripts/utility/task-fingerprint.sh --action "$action" \
-       [--criteria "$criteria"] [--files "$files_hint"])
-# Check cache (exit 50 = DISABLED when EVOLVE_RESEARCH_CACHE_ENABLED unset)
-bash scripts/utility/research-cache.sh check "$task_id"
-```
-
-Exit code handling:
-- **0 (HIT):** write `Research Pointer: .evolve/research/by-task/<fp>.md` into task block; SKIP re-research; log HIT in `## Research Cache` section.
-- **10 (STALE):** re-research needed; stage result (see Step 5.5).
-- **20 (MISS):** re-research needed; stage result.
-- **30 (INVALIDATED):** re-research needed; stage result; note invalidation reason.
-- **40 (NO_ENTRY):** re-research needed; stage result.
-- **50 (DISABLED):** NOOP; log `[research-cache] DISABLED` **once** per cycle (not per task). Skip this step entirely.
-
-Feature gate: when `EVOLVE_RESEARCH_CACHE_ENABLED` is unset, `research-cache.sh` exits 50. All paths NOOP. Do NOT attempt cache operations when disabled.
+See reference `research-cache-protocol`.
 
 ### 5. Read Research Brief (from Phase 1)
 
@@ -101,27 +83,11 @@ Research runs in Phase 1 before Scout. Scout does NOT web-research.
 
 ### 5.5. Stage Per-Task Research to Cache Staging (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
 
-For each carryoverTodo that required re-research (STALE/MISS/INVALIDATED/NO_ENTRY from Step 4.5):
-
-1. Write research output to: `.evolve/runs/cycle-N/workers/research-cache-staging/<fp>.md`
-2. Write sidecar JSON: `.evolve/runs/cycle-N/workers/research-cache-staging/<fp>.json`
-   - Content: `{"task_id":"<id>","fingerprint":"<fp>","produced_at_ts":"<ISO8601>"}`
-3. Set `task.research_pointer` in task block to `".evolve/research/by-task/<fp>.md"` (the canonical path after `promote-research-cache.sh` promotes staging → canonical at cycle close).
-
-`promote-research-cache.sh` is called by `reconcile-carryover-todos.sh` on PASS verdict. Builder reads `task.research_pointer` when set (Step 2.5).
-
-When `EVOLVE_RESEARCH_CACHE_ENABLED` is unset: NOOP; no staging path written.
+See reference `research-cache-protocol`.
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
-Generate 1-3 standard + 1-2 beyond-ask hypotheses. Details: [docs/reference/scout-techniques.md](docs/reference/scout-techniques.md).
-
-**Standard hypotheses** — improvements from codebase patterns, research, cross-cycle trends (architecture, cross-cutting, ecosystem).
-
-**Beyond-the-Ask hypotheses** — provocation lenses from `researchBrief → Beyond-the-Ask Provocations`:
-1. Read 2 selected lenses from `researchBrief`
-2. Apply each lens's provocation question to codebase findings
-3. Generate 1 hypothesis per lens, tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
+Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-generation-detail`.
 
 ### 7. Task Selection (primary output)
 
@@ -193,38 +159,16 @@ Write `workspace/project-digest.md`. See reference `project-digest-template` for
 
 ## Tool-Result Hygiene
 
-Apply these four rules to avoid context saturation from accumulated tool results:
-- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
-- After each `Bash` or `WebFetch` with large output, extract the relevant lines; discard the full output from your working context.
-- No speculative pre-loading: use Glob+Grep to locate before Reading.
-- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
+Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rules`.
 
 ### BANNED Patterns (P-NEW-27)
 
-Using `Bash` when a native tool would work is **BANNED**. Cycle-45 telemetry: 36 Bash calls vs. 4 WebSearch = $1.30 scout cost (target ≤$0.50). Use the mapping:
+Using `Bash` when a native tool would work is **BANNED**. See reference `tool-hygiene-rules` for the mapping and examples.
 
-| ❌ BANNED (Bash) | ✅ REQUIRED (native) |
-|---|---|
-| `Bash: cat file.sh \| head -50` | `Read(file.sh, limit=50)` |
-| `Bash: ls .evolve/profiles/` | `Glob("*.json", path=".evolve/profiles/")` |
-| `Bash: grep "pattern" file.md` | `Grep("pattern", glob="*.md")` |
-| `Bash: find . -name "*.sh"` | `Glob("**/*.sh")` |
-| `Bash: wc -l file` | `Read(file, limit=5)` to spot-check size |
-
-**Bash is ONLY permitted for:** shell-only operations (`jq`, `date`, `git log`, script execution), commands that mutate state, or multi-step pipelines with no native equivalent.
 
 ### Parallel Tool-Call Batching (P-NEW-29)
 
-When reading 2+ independent files or searching 2+ independent patterns, emit all tool calls in **one turn**. Each sequential call wastes a full turn and schema overhead.
-
-```
-# SLOW (2 turns): Read(file_a), then Read(file_b)
-# FAST (1 turn):  Read(file_a), Read(file_b)  ← emit together
-```
-
-Only serialize when result B depends on result A.
-
-When your `context_clear_trigger_tokens` threshold (from profile, default 25000) is reached, summarize pending tool results before continuing new tool calls.
+Emit independent tool calls in **one turn**. See reference `tool-hygiene-rules`.
 
 ## Reference Index (Layer 3, on-demand)
 

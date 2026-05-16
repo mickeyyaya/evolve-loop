@@ -139,11 +139,14 @@ If something is `high` priority but `large` scope, route it to `dropped` with re
 
 | Size | Heuristic |
 |---|---|
+| `trivial` | Documentation only, typo fix, or < 20 LOC. Skip Audit eligible. |
 | `small` | 1–2 items, single-file edits, < 100 LOC total |
 | `medium` | 2–3 items, multi-file but coherent, 100–400 LOC |
 | `large` | Anything else — split required; phase-gate will block |
 
 `large` is intentionally a blocker. The operator must split (manually update scout-report or re-run scout with narrower goal) before re-entering Triage.
+
+**The size you write to `triage-decision.md` is automatically mirrored into `cycle-state.json:cycle_size_estimate` by the kernel** (`phase-gate.sh:gate_triage_to_plan_review`). Do NOT call `cycle-state.sh set-estimate` yourself — Triage is a pure-output phase and lacks the permission. The orchestrator reads the mirrored value via `cycle-state.sh get cycle_size_estimate` for routing decisions (e.g., trivial-skip).
 
 ### 4. Write the decision
 

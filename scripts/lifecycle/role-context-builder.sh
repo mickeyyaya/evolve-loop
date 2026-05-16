@@ -508,7 +508,15 @@ the cycle commit will be declined and work will be orphaned.
 WCONST
             unset _wt_path
             emit_intent_compact
-            emit_artifact "Scout selected backlog" "$WORKSPACE/scout-report.md"
+            # v8.63.0 Cycle C2/C3: under anchor mode, builder only needs the
+            # proposed_tasks and acceptance_criteria section of scout-report.
+            if [ "${EVOLVE_ANCHOR_EXTRACT:-1}" = "1" ]; then
+                if ! emit_profile_context_anchors; then
+                    emit_artifact_with_anchors "Scout selected backlog" "$WORKSPACE/scout-report.md" proposed_tasks acceptance_criteria
+                fi
+            else
+                emit_artifact "Scout selected backlog" "$WORKSPACE/scout-report.md"
+            fi
             # RED test file (TDD output) if present
             emit_artifact "RED test (must turn GREEN)" "$WORKSPACE/red-test.md"
             # P-NEW-8: emit only build-domain failure context. Excludes code-audit-warn +

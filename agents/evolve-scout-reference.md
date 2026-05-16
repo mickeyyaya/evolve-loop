@@ -16,9 +16,13 @@
 - [Section: eval-format-template](#section-eval-format-template)
 - [Section: output-template](#section-output-template)
 - [Section: project-digest-template](#section-project-digest-template)
+- [Section: research-cache-protocol](#section-research-cache-protocol)
+- [Section: tool-hygiene-rules](#section-tool-hygiene-rules)
+- [Section: hypothesis-generation-detail](#section-hypothesis-generation-detail)
 
 ---
 
+<!-- ANCHOR:turn-budget-rationale -->
 ## Section: turn-budget-rationale
 
 Loaded when turn budget is exceeded or needs debugging. Background reading; not needed during healthy cycles.
@@ -35,6 +39,7 @@ The v9.0.3 fix bounds scout's exploration scope structurally:
 
 ---
 
+<!-- ANCHOR:mode-discovery-detail -->
 ## Section: mode-discovery-detail
 
 Loaded for first-cycle (full mode) or convergence-confirmation mode. Not needed for standard incremental cycles.
@@ -61,6 +66,7 @@ Loaded for first-cycle (full mode) or convergence-confirmation mode. Not needed 
 
 ---
 
+<!-- ANCHOR:task-selection-tables -->
 ## Section: task-selection-tables
 
 Loaded when writing carryoverTodo decisions, mapping research to implementation, or computing difficulty graduation. Not needed when carryoverTodos[] is empty and no difficulty-gating applies.
@@ -107,6 +113,7 @@ When research is performed, tasks MUST target existing project files for modific
 
 ---
 
+<!-- ANCHOR:eval-integrity-rules -->
 ## Section: eval-integrity-rules
 
 Loaded when writing eval definitions. Not needed if carryoverTodos already specify complete evals.
@@ -142,6 +149,7 @@ Scout writes only the eval graders; Builder generates the actual `.spec.ts`.
 
 ---
 
+<!-- ANCHOR:eval-format-template -->
 ## Section: eval-format-template
 
 Loaded when writing eval definitions for `.evolve/evals/<task-slug>.md`.
@@ -167,6 +175,7 @@ Default to `[code]`. `[model]` only for subjective quality — max 2 per eval. `
 
 ---
 
+<!-- ANCHOR:output-template -->
 ## Section: output-template
 
 Loaded when writing scout-report.md. Not needed when the common-path report structure is already familiar.
@@ -190,14 +199,20 @@ Loaded when writing scout-report.md. Not needed when the common-path report stru
 - <query>: <key finding> (source: <url>)
 
 ## Research → Implementation Map
-| Finding | Source | Target File(s) | Change Description |
+```tsv
+Finding	Source	Target File(s)	Change Description
+```
 
 <!-- ANCHOR:gap_analysis -->
 ## Hypotheses
-| # | Hypothesis | Evidence | Testable By | Category | Confidence | Source |
+```tsv
+#	Hypothesis	Evidence	Testable By	Category	Confidence	Source
+```
 
 ## Beyond-the-Ask Hypotheses
-| # | Lens | Provocation | Hypothesis | Confidence | Source |
+```tsv
+#	Lens	Provocation	Hypothesis	Confidence	Source
+```
 
 <!-- ANCHOR:proposed_tasks -->
 ## Selected Tasks
@@ -247,6 +262,7 @@ Loaded when writing scout-report.md. Not needed when the common-path report stru
 
 ---
 
+<!-- ANCHOR:project-digest-template -->
 ## Section: project-digest-template
 
 Loaded on cycle 1 (full mode) only. Not needed for incremental cycles.
@@ -268,3 +284,100 @@ Write `workspace/project-digest.md`:
 ````
 
 See [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md#hotspot-detection-method) for hotspot detection.
+
+---
+
+<!-- ANCHOR:research-cache-protocol -->
+## Section: research-cache-protocol
+
+Loaded for Step 4.5 and 5.5 cache operations.
+
+### Lookup Protocol (Step 4.5)
+
+For each `carryoverTodos[]` entry with a non-empty `action`, check whether Scout already cached research for this task fingerprint.
+
+```bash
+# Compute fingerprint
+fp=$(bash scripts/utility/task-fingerprint.sh --action "$action" \
+       [--criteria "$criteria"] [--files "$files_hint"])
+# Check cache (exit 50 = DISABLED when EVOLVE_RESEARCH_CACHE_ENABLED unset)
+bash scripts/utility/research-cache.sh check "$task_id"
+```
+
+Exit code handling:
+- **0 (HIT):** write `Research Pointer: .evolve/research/by-task/<fp>.md` into task block; SKIP re-research; log HIT in `## Research Cache` section.
+- **10 (STALE):** re-research needed; stage result (see Step 5.5).
+- **20 (MISS):** re-research needed; stage result.
+- **30 (INVALIDATED):** re-research needed; stage result; note invalidation reason.
+- **40 (NO_ENTRY):** re-research needed; stage result.
+- **50 (DISABLED):** NOOP; log `[research-cache] DISABLED` **once** per cycle (not per task). Skip this step entirely.
+
+### Staging Protocol (Step 5.5)
+
+For each carryoverTodo that required re-research:
+
+1. Write research output to: `.evolve/runs/cycle-N/workers/research-cache-staging/<fp>.md`
+2. Write sidecar JSON: `.evolve/runs/cycle-N/workers/research-cache-staging/<fp>.json`
+   - Content: `{"task_id":"<id>","fingerprint":"<fp>","produced_at_ts":"<ISO8601>"}`
+3. Set `task.research_pointer` in task block to `".evolve/research/by-task/<fp>.md"`.
+
+---
+
+<!-- ANCHOR:tool-hygiene-rules -->
+## Section: tool-hygiene-rules
+
+Loaded for Tool-Result Hygiene enforcement.
+
+### General Hygiene
+
+Apply these four rules to avoid context saturation:
+- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
+- After each `Bash` or `WebFetch` with large output, extract the relevant lines; discard the full output from your working context.
+- No speculative pre-loading: use Glob+Grep to locate before Reading.
+- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
+
+### BANNED Patterns (P-NEW-27)
+
+Using `Bash` when a native tool would work is **BANNED**. Use the mapping:
+
+| ❌ BANNED (Bash) | ✅ REQUIRED (native) |
+|---|---|
+| `Bash: cat file.sh \| head -50` | `Read(file.sh, limit=50)` |
+| `Bash: ls .evolve/profiles/` | `Glob("*.json", path=".evolve/profiles/")` |
+| `Bash: grep "pattern" file.md` | `Grep("pattern", glob="*.md")` |
+| `Bash: find . -name "*.sh"` | `Glob("**/*.sh")` |
+| `Bash: wc -l file` | `Read(file, limit=5)` to spot-check size |
+
+**Bash is ONLY permitted for:** shell-only operations (`jq`, `date`, `git log`, script execution), commands that mutate state, or multi-step pipelines with no native equivalent.
+
+### Parallel Tool-Call Batching (P-NEW-29)
+
+When reading 2+ independent files or searching 2+ independent patterns, emit all tool calls in **one turn**.
+
+```
+# SLOW (2 turns): Read(file_a), then Read(file_b)
+# FAST (1 turn):  Read(file_a), Read(file_b)  ← emit together
+```
+
+Only serialize when result B depends on result A.
+
+When your `context_clear_trigger_tokens` threshold is reached, summarize pending tool results before continuing new tool calls.
+
+---
+
+<!-- ANCHOR:hypothesis-generation-detail -->
+## Section: hypothesis-generation-detail
+
+Loaded for Step 6.
+
+### Standard Hypotheses
+
+Improvements from codebase patterns, research, cross-cycle trends (architecture, cross-cutting, ecosystem).
+
+### Beyond-the-Ask Hypotheses
+
+Provocation lenses from `researchBrief → Beyond-the-Ask Provocations`:
+1. Read 2 selected lenses from `researchBrief`
+2. Apply each lens's provocation question to codebase findings
+3. Generate 1 hypothesis per lens, tagged `"source": "beyond-ask"`, `"lens": "<lens-name>"`
+

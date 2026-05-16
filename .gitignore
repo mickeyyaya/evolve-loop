@@ -55,3 +55,11 @@ node_modules/
 .clone/
 .ruff_cache/
 *.pyc
+
+# Cycle 65 incident: prevent stderr-redirected warnings from being committed.
+# role-context-builder.sh anchor-validation can emit a stderr WARN that
+# Orchestrator captures as `warn.txt` at repo root. ship.sh `git add -A`
+# would then sweep it into the cycle commit (causes audit-bound tree-SHA
+# drift; see docs/incidents/cycle-65-warn-txt.md if/when authored).
+/warn.txt
+*.warn

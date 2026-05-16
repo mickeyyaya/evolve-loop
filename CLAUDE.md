@@ -277,7 +277,7 @@ This project's shell scripts target **bash 3.2** (macOS default) for portability
 - `set -uo pipefail` (NOT `set -e` for orchestrator scripts that need to capture sub-script exit codes — `set -e` interacts badly with `if !cmd; then; rc=$?` patterns where `rc` ends up 0)
 - Atomic writes via mv-of-temp: `printf ... > "${file}.tmp.$$" && mv -f "${file}.tmp.$$" "$file"`
 - `git diff HEAD` to capture tree-state SHAs (untracked files don't count — match the audit-binding model)
-- Since v8.42.0, `skills/<name>/` directories are **symlinks** to `../.agents/skills/<name>/`. Git tracks content changes at the `.agents/` canonical path — this is expected. Auditors verifying SKILL.md edits should diff `git diff HEAD -- .agents/skills/evolve-loop/SKILL.md`, not the symlink path.
+- `skills/<name>/` is the **canonical** location (real directories); `.agents/skills/<name>/` are symlinks → `../../skills/<name>/` for cross-CLI compatibility (Codex/Gemini auto-discovery via the `.agents/` standard). The original v8.42 layout was reversed; the current direction (skills/ canonical) was settled in the v10.7.x refactor. Git tracks content changes at the `skills/` canonical path. Auditors verifying SKILL.md edits should diff `git diff HEAD -- skills/evolve-loop/SKILL.md`; the `.agents/skills/` path resolves to the same inode.
 
 ### SSE / streaming endpoints (when you encounter them):
 

@@ -17,6 +17,7 @@
 #
 # Usage:
 #   bash scripts/lifecycle/ship.sh "<commit-message>"                   # default --class cycle
+#   bash scripts/lifecycle/ship.sh --class trivial "<commit-message>"   # skip-audit (kernel-verified)
 #   bash scripts/lifecycle/ship.sh --class manual "<commit-message>"    # interactive confirm
 #   bash scripts/lifecycle/ship.sh --class release "<commit-message>"   # release-pipeline only
 #   bash scripts/lifecycle/ship.sh --dry-run "<msg>"                    # simulate, no mutations
@@ -30,6 +31,9 @@
 #   cycle    (default) — Audit-bound. Most recent Auditor entry must be PASS,
 #                        SHAs must match, HEAD/tree must be cycle-bound. This
 #                        is the integrity-critical path used by /evolve-loop.
+#   trivial  (v10.6.0) — Trivial-skip path. Bypasses audit verification.
+#                        Requires cycle_size_estimate="trivial" in cycle-state.json.
+#                        Used for documentation and minor maintenance.
 #   manual   — Operator-driven commit (manual feature work, hot-fix). Skips
 #              audit verification but REQUIRES interactive y/N confirmation
 #              after printing `git diff --cached --stat`. Refuses if stdin is
@@ -147,7 +151,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --class)
             shift
-            [ $# -ge 1 ] || fail "--class requires a value (cycle|manual|release)"
+            [ $# -ge 1 ] || fail "--class requires a value (cycle|manual|release|trivial)"
             SHIP_CLASS="$1"
             shift
             ;;
@@ -173,11 +177,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -n "$COMMIT_MSG" ] || fail "usage: ship.sh [--class cycle|manual|release] <commit-message>"
+[ -n "$COMMIT_MSG" ] || fail "usage: ship.sh [--class cycle|manual|release|trivial] <commit-message>"
 
 case "$SHIP_CLASS" in
-    cycle|manual|release) ;;
-    *) fail "invalid --class '$SHIP_CLASS' (must be: cycle|manual|release)" ;;
+    cycle|manual|release|trivial) ;;
+    *) fail "invalid --class '$SHIP_CLASS' (must be: cycle|manual|release|trivial)" ;;
 esac
 
 # v8.25.0: Translate legacy EVOLVE_BYPASS_SHIP_VERIFY=1 to --class manual with
@@ -304,6 +308,38 @@ case "$SHIP_CLASS" in
         log "class: cycle (audit-bound)"
         CLASS_PROVENANCE="cycle (audit-verified)"
         ;;
+    trivial)
+        log "class: trivial (skip-audit eligible)"
+        # Verify that cycle-state reflects trivial size (kernel-mirrored from
+        # triage-decision.md by phase-gate gate_triage_to_plan_review).
+        # Dual-root: scripts live under PLUGIN_ROOT, state under PROJECT_ROOT;
+        # cycle-state.sh resolves the writable side internally.
+        _cs_script="${EVOLVE_PLUGIN_ROOT:-$REPO_ROOT}/scripts/lifecycle/cycle-state.sh"
+        _est=$(bash "$_cs_script" get cycle_size_estimate 2>/dev/null || echo "")
+        if [ "$_est" != "trivial" ]; then
+            integrity_fail "ship --class trivial requires cycle_size_estimate='trivial' in cycle-state.json (got: '$_est')"
+        fi
+        # v10.6.0 Tier-1 enforcement: structurally verify the diff doesn't touch
+        # pipeline-critical files. The orchestrator persona's "no agent/skill
+        # files modified" criterion is operator-judgment; this kernel-layer
+        # check catches LLM mis-classification or sycophancy that would
+        # otherwise bypass the v10.0.0 EGPS predicate gate. Per CLAUDE.md
+        # "Three-Tier Strictness Model", Tier 1 (structural integrity) is
+        # non-negotiable and cannot adapt — these paths require audit.
+        _critical_paths=$( {
+            git diff --cached --name-only 2>/dev/null
+            git diff --name-only 2>/dev/null
+            git ls-files --others --exclude-standard 2>/dev/null
+        } | sort -u | grep -E '^(agents/|\.agents/|skills/|scripts/lifecycle/|scripts/guards/|scripts/dispatch/|\.evolve/profiles/|\.claude-plugin/)' || true)
+        if [ -n "$_critical_paths" ]; then
+            _critical_sample=$(printf '%s\n' "$_critical_paths" | head -3 | tr '\n' ',' | sed 's/,$//')
+            _critical_count=$(printf '%s\n' "$_critical_paths" | wc -l | tr -d ' ')
+            integrity_fail "ship --class trivial cannot touch pipeline-critical files ($_critical_count touched: $_critical_sample). Tier-1 strictness: agent personas, skills, kernel scripts, profiles, and plugin manifest require full audit. Use --class cycle (full audit) or --class manual (operator-confirmed)."
+        fi
+        log "  → audit verification skipped: cycle is classified as trivial"
+        log "  → kernel verified: 0 pipeline-critical paths touched"
+        CLASS_PROVENANCE="trivial (skip-audit, kernel-verified)"
+        ;;
     manual)
         log "class: manual (operator-driven)"
         # Stage everything first so `git diff --cached --stat` reflects what
@@ -356,7 +392,7 @@ case "$SHIP_CLASS" in
 esac
 log "provenance: $CLASS_PROVENANCE"
 
-# Audit-binding only runs for cycle class; manual/release skip to section 7.
+# Audit-binding only runs for cycle class; manual/release/trivial skip to section 7.
 if [ "$SHIP_CLASS" = "cycle" ]; then
     # --- 3. Locate the most recent Auditor ledger entry --------------------------
 

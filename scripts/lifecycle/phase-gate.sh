@@ -434,7 +434,7 @@ gate_triage_to_plan_review() {
     local size
     size=$(awk '/^cycle_size_estimate:/ { gsub(/^[^:]*:[[:space:]]*/, ""); gsub(/[[:space:]].*/, ""); print tolower($0); exit }' "$WORKSPACE/triage-decision.md")
     case "$size" in
-        small|medium)
+        trivial|small|medium)
             log "OK: cycle_size_estimate=$size"
             ;;
         large)
@@ -444,9 +444,26 @@ gate_triage_to_plan_review() {
             fail "triage-decision.md missing 'cycle_size_estimate:' line"
             ;;
         *)
-            fail "Unrecognized cycle_size_estimate: '$size' (expected small|medium|large)"
+            fail "Unrecognized cycle_size_estimate: '$size' (expected trivial|small|medium|large)"
             ;;
     esac
+
+    # v10.6.0 kernel-mirror: persist the size from the persona-authored decision
+    # file into cycle-state.json so downstream readers (orchestrator, ship.sh)
+    # see a single canonical value. Done here in privileged shell context to
+    # avoid widening any agent's allowlist (Triage stays a pure-output phase).
+    # Dual-root convention (memory: feedback_dual_root_pattern): scripts live
+    # under EVOLVE_PLUGIN_ROOT (read side); cycle-state.json under
+    # EVOLVE_PROJECT_ROOT (write side). cycle-state.sh resolves the writable
+    # side internally via the same resolve-roots.sh helper.
+    # Best-effort: failures log a WARN but do not block the gate, since the
+    # decision file remains authoritative and the orchestrator can re-derive.
+    local _cs_script="${EVOLVE_PLUGIN_ROOT:-$EVOLVE_PROJECT_ROOT}/scripts/lifecycle/cycle-state.sh"
+    if [ -f "$_cs_script" ]; then
+        if ! bash "$_cs_script" set-estimate "$size" >/dev/null 2>&1; then
+            log "WARN: failed to mirror cycle_size_estimate=$size into cycle-state.json (orchestrator must re-derive from triage-decision.md)"
+        fi
+    fi
 
     log "PASS: TRIAGE → PLAN-REVIEW gate"
 }

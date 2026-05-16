@@ -73,18 +73,7 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 
 ### Step 2.5: Online Research (if needed)
 
-**Per-task cache check (Phase B; `EVOLVE_RESEARCH_CACHE_ENABLED=1`):** If `task.research_pointer` is non-empty, read from that path instead of doing KB scan or web search.
-- `Research Source: per-task-cache` — log in `## Research Sources` of build-report.md; skip remaining sub-steps.
-
-**Fallback (research_pointer absent or feature disabled):**
-- Check `.evolve/research/` for existing Knowledge Capsules → `Research Source: knowledge-capsule`
-- If needs external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`) → `Research Source: web-search`
-- Save capsule to `.evolve/research/<topic-slug>.md`
-- If no research needed → `Research Source: no-research-needed`
-
-**Routing:** Quick gaps → **Default WebSearch** (1-2 queries); complex architecture → **Smart Web Search**. See `online-researcher.md`.
-
-Record `Research Source:` (one of: `per-task-cache`, `knowledge-capsule`, `web-search`, `no-research-needed`) in `## Research Sources` section of build-report.md.
+See reference `build-research-protocol`.
 
 ### Step 2.7: Skill Consultation (if recommended)
 
@@ -96,6 +85,31 @@ If `task.recommendedSkills` non-empty, consult skills before Step 3.
 | **supplementary** | Only if Step 3 reveals gap the skill covers | Invoke on demand. Skip if applied instinct covers pattern. |
 
 **Invocation:** `Skill tool: skill="<skill-name>"`
+
+### Tool-Result Hygiene (P-NEW-6)
+
+Apply these four rules to avoid context saturation from accumulated tool results:
+- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
+- After each `Bash` or `WebFetch` with large output, extract the relevant lines; discard the full output from your working context.
+- No speculative pre-loading: use Glob+Grep to locate before Reading.
+- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
+
+### Tool-Result Trajectory Compression (P-NEW-21)
+
+During multi-turn file reading phases, you will accumulate "expired" tool results in your trajectory. An expired tool result is one where you have already read the file, extracted what you need, and moved on.
+- **Rule:** Actively prune your reasoning context. Do not output or repeat the contents of old tool results in your thought process.
+- **Rule:** When the `context_clear_trigger_tokens` threshold is hit, you MUST emit a summary turn that condenses all pending context and state, dropping file contents, before issuing the next tool call.
+
+### Parallel Tool-Call Batching (P-NEW-29)
+
+When reading 2+ independent files or searching 2+ independent patterns, emit all tool calls in **one turn**. Each sequential call wastes a full turn and schema overhead.
+
+```
+# SLOW (2 turns): Read(file_a), then Read(file_b)
+# FAST (1 turn):  Read(file_a), Read(file_b)  ← emit together
+```
+
+Only serialize when result B depends on result A.
 
 **Budget rules** (see [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) § Token-Budget Depth Routing):
 - **Low (GREEN):** ≤3 skills (1 primary + 2 supplementary).
@@ -153,33 +167,7 @@ On fail: fix, document in Risks, re-verify.
 
 **Self-Review Skill Loop** (opt-in, default OFF):
 
-When set: invoke configured skills against diff, revise until clean or cap hit. Findings in `build-report.md`.
-
-| Var | Default | Purpose |
-|---|---|---|
-| `EVOLVE_BUILDER_SELF_REVIEW` | `0` | Master switch — when `1`, loop runs after self-verify |
-| `EVOLVE_BUILDER_REVIEW_SKILLS` | `code-review-simplify` | Comma-separated skill names invoked in order each iteration |
-| `EVOLVE_BUILDER_REVIEW_MAX_ITERS` | `3` | Max convergence iterations before bailing with `iter-cap-hit` |
-| `EVOLVE_BUILDER_REVIEW_THRESHOLD` | `0.85` | Composite score threshold; ≥ THRESHOLD = clean |
-
-Convergence loop (pseudocode):
-
-```
-for iter in 1..MAX_ITERS:
-    all_clean = true
-    for skill in split(EVOLVE_BUILDER_REVIEW_SKILLS, ','):
-        invoke Skill tool with `skill` (the skill reads `git diff HEAD` itself)
-        parse: composite_score (0.0-1.0), severity_counts (HIGH/CRITICAL)
-        if composite_score >= THRESHOLD and HIGH+CRITICAL == 0:
-            continue                         # this skill is clean
-        else:
-            apply fixes to worktree (Edit/Write/MultiEdit per findings)
-            all_clean = false
-    if all_clean: break                       # converged
-record final state: converged | iter-cap-hit | error
-```
-
-Skill contract: read diff; emit composite score 0.0-1.0 + severity (HIGH/CRITICAL); parseable output. Default: `code-review-simplify`; extend via `EVOLVE_BUILDER_REVIEW_SKILLS=code-review-simplify,refactor`.
+When set: invoke configured skills against diff, revise until clean or cap hit. See reference `self-review-loop-detail` for pseudocode and variables.
 
 `build-report.md` MUST include `## Self-Review` when loop ran:
 
@@ -241,16 +229,7 @@ Record in `build-report.md` after self-verification:
 
 ### Step 8.5: Discovery Scan
 
-Scan adjacent code; record ≥1 discovery per build:
-
-| Category | What to Look For |
-|----------|-----------------|
-| `latent-bug` | Bugs in adjacent code from current change |
-| `inconsistency` | Pattern/convention mismatches across related files |
-| `simplification-opportunity` | Code that could be simplified or deduplicated |
-| `missing-test` | Untested paths/edge cases in touched code |
-| `architecture-smell` | Coupling, layering violations, abstraction leaks |
-| `performance-opportunity` | Inefficient patterns spotted during implementation |
+Scan adjacent code; record ≥1 discovery per build. See reference `discovery-scan-guidelines` for categories.
 
 Feed Learn phase Pipeline; cite files, line ranges.
 
@@ -335,32 +314,37 @@ Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) se
 - **Files changed:** <N>
 
 ## Build Steps
-| # | Step | Confidence | Notes |
-|---|------|-----------|-------|
-| 1 | <step> | <0.0-1.0> | <reasoning> |
+```tsv
+#	Step	Confidence	Notes
+1	<step>	<0.0-1.0>	<reasoning>
+```
 
 <!-- ANCHOR:diff_summary -->
 ## Changes
-| Action | File | Description |
-|--------|------|-------------|
-| MODIFY | path/to/file | <what changed> |
+```tsv
+Action	File	Description
+MODIFY	path/to/file	<what changed>
+```
 
 <!-- ANCHOR:test_results -->
 ## Self-Verification
-| Check | Result |
-|-------|--------|
-| <eval grader 1> | PASS / FAIL |
+```tsv
+Check	Result
+<eval grader 1>	PASS / FAIL
+```
 
 ## E2E Verification
 <!-- Include ONLY when task triggered Step 4.5. Omit entirely for non-UI tasks. -->
-| Test File | Command | Status | Report |
-|-----------|---------|--------|--------|
-| `tests/e2e/<slug>.spec.ts` | `npx playwright test tests/e2e/<slug>.spec.ts` | PASS / FAIL / SKIPPED | `playwright-report/index.html` |
+```tsv
+Test File	Command	Status	Report
+tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwright-report/index.html
+```
 
 ## Discoveries
-| # | Category | Finding | Severity | Target Files | Proposed Action | Confidence |
-|---|----------|---------|----------|-------------|-----------------|------------|
-| 1 | <category> | <finding> | low/medium/high | <files> | <action> | <0.0-1.0> |
+```tsv
+#	Category	Finding	Severity	Target Files	Proposed Action	Confidence
+1	<category>	<finding>	low/medium/high	<files>	<action>	<0.0-1.0>
+```
 
 ## Risks
 - <risk> — **confidence: high|medium|low** (cite why)

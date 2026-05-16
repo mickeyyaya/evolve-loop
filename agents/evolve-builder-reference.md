@@ -132,3 +132,64 @@ bash scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
 - Include self-review score summary in build-report.md under
   `## Self-Review`.
 - Missing or failing script does NOT block the build.
+
+---
+
+<!-- ANCHOR:build-research-protocol -->
+## Section: build-research-protocol
+
+Loaded for Step 2.5.
+
+**Per-task cache check (Phase B; `EVOLVE_RESEARCH_CACHE_ENABLED=1`):** If `task.research_pointer` is non-empty, read from that path instead of doing KB scan or web search.
+- `Research Source: per-task-cache` — log in `## Research Sources` of build-report.md; skip remaining sub-steps.
+
+**Fallback (research_pointer absent or feature disabled):**
+- Check `.evolve/research/` for existing Knowledge Capsules → `Research Source: knowledge-capsule`
+- If needs external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`) → `Research Source: web-search`
+- Save capsule to `.evolve/research/<topic-slug>.md`
+- If no research needed → `Research Source: no-research-needed`
+
+**Routing:** Quick gaps → **Default WebSearch** (1-2 queries); complex architecture → **Smart Web Search**. See `online-researcher.md`.
+
+---
+
+<!-- ANCHOR:self-review-loop-detail -->
+## Section: self-review-loop-detail
+
+Loaded for Step 5 convergence loop.
+
+Convergence loop (pseudocode):
+
+```
+for iter in 1..MAX_ITERS:
+    all_clean = true
+    for skill in split(EVOLVE_BUILDER_REVIEW_SKILLS, ','):
+        invoke Skill tool with `skill` (the skill reads `git diff HEAD` itself)
+        parse: composite_score (0.0-1.0), severity_counts (HIGH/CRITICAL)
+        if composite_score >= THRESHOLD and HIGH+CRITICAL == 0:
+            continue                         # this skill is clean
+        else:
+            apply fixes to worktree (Edit/Write/MultiEdit per findings)
+            all_clean = false
+    if all_clean: break                       # converged
+record final state: converged | iter-cap-hit | error
+```
+
+Skill contract: read diff; emit composite score 0.0-1.0 + severity (HIGH/CRITICAL); parseable output. Default: `code-review-simplify`; extend via `EVOLVE_BUILDER_REVIEW_SKILLS=code-review-simplify,refactor`.
+
+---
+
+<!-- ANCHOR:discovery-scan-guidelines -->
+## Section: discovery-scan-guidelines
+
+Loaded for Step 8.5. Record ≥1 discovery per build:
+
+| Category | What to Look For |
+|----------|-----------------|
+| `latent-bug` | Bugs in adjacent code from current change |
+| `inconsistency` | Pattern/convention mismatches across related files |
+| `simplification-opportunity` | Code that could be simplified or deduplicated |
+| `missing-test` | Untested paths/edge cases in touched code |
+| `architecture-smell` | Coupling, layering violations, abstraction leaks |
+| `performance-opportunity` | Inefficient patterns spotted during implementation |
+

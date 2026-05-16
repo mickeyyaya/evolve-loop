@@ -179,50 +179,57 @@ audit_bound_tree_sha: {TREE_SHA}
 ## Verdict: PASS / WARN / FAIL
 
 ## Code Quality
-| Check | Status | Details |
-|-------|--------|---------|
-| Matches acceptance criteria | PASS/FAIL | <detail> |
-| Follows existing patterns | PASS/FAIL | <detail> |
-| No unnecessary complexity | PASS/WARN | <detail> |
+```tsv
+Check	Status	Details
+Matches ACs	PASS/FAIL	<detail>
+Patterns	PASS/FAIL	<detail>
+Complexity	PASS/WARN	<detail>
+```
 
 ## Security
-| Check | Status | Details |
-|-------|--------|---------|
-| No hardcoded secrets | PASS/FAIL | <detail> |
-| No injection vectors | PASS/FAIL | <detail> |
+```tsv
+Check	Status	Details
+No secrets	PASS/FAIL	<detail>
+No injection	PASS/FAIL	<detail>
+```
 
 ## Hallucination Detection
-| Check | Status | Details |
-|-------|--------|---------|
-| Import verification | PASS/WARN | <detail> |
-| API signature verification | PASS/WARN | <detail> |
+```tsv
+Check	Status	Details
+Imports	PASS/WARN	<detail>
+Signatures	PASS/WARN	<detail>
+```
 
 ## Pipeline Integrity
-| Check | Status | Details |
-|-------|--------|---------|
-| Agent structure intact | PASS/FAIL | <detail> |
-| Cross-references valid | PASS/FAIL | <detail> |
+```tsv
+Check	Status	Details
+Structure	PASS/FAIL	<detail>
+Cross-refs	PASS/FAIL	<detail>
+```
 
 ## Eval Results
-| Check | Command | Result |
-|-------|---------|--------|
-| <grader> | `<command>` | PASS/FAIL |
+```tsv
+Check	Command	Result
+<grader>	<command>	PASS/FAIL
+```
 
 ## E2E Grounding (D.5)
 <!-- Include ONLY for UI tasks; otherwise write "N/A (non-UI task)" -->
-| Check | Status | Details |
-|-------|--------|---------|
-| Test file committed | PASS/FAIL | `tests/e2e/<slug>.spec.ts` |
-| Selectors grounded | PASS/FAIL | <N> locators verified against source |
-| No skipped/only tests | PASS/FAIL | — |
-| Artifacts produced | PASS/FAIL | `playwright-report/index.html` |
-| Build-report E2E Verification | PASS/FAIL | — |
+```tsv
+Check	Status	Details
+Committed	PASS/FAIL	tests/e2e/<slug>.spec.ts
+Selectors	PASS/FAIL	<N> locators verified
+No skip/only	PASS/FAIL	—
+Artifacts	PASS/FAIL	playwright-report/index.html
+E2E Verify	PASS/FAIL	—
+```
 
 <!-- ANCHOR:defects -->
 ## Issues
-| Severity | Description | File | Line |
-|----------|-------------|------|------|
-| HIGH | <issue> | <file> | <line> |
+```tsv
+Severity	Description	File	Line
+HIGH	<issue>	<file>	<line>
+```
 
 ## Self-Evolution Assessment
 - **Blast radius:** low/medium/high

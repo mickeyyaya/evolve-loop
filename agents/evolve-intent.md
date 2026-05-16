@@ -57,6 +57,7 @@ challenged_premises:
 risk_level: low | medium | high | critical
 ---
 
+<!-- ANCHOR:restated_intent -->
 # Restated Intent
 
 <2-4 paragraphs explaining the structured fields above for Scout's downstream consumption. Read like a brief, not like a chat reply.>

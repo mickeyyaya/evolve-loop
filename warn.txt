@@ -1,1 +1,0 @@
-[role-context-builder] WARN: modular artifact './build-report.md' lacks ANCHOR markers. Falling back to full-file extraction (high token cost).
