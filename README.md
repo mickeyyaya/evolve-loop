@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.**
+**Current (v10.8)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
@@ -496,6 +496,15 @@ Active milestones (cycles that shipped substantive structural changes):
 | Cycle-61 class (B0-B7) | 1 cycle = 8 bugs | 7 structural fixes shipped in cycles 62-63 of v10.7 |
 
 Approximately 19 active lessons in `.evolve/instincts/lessons/` (as of v10.7.0). Some pre-date v8 and still apply.
+
+### Release history (recent)
+
+| Version | Date | Headline |
+|---------|------|----------|
+| v10.7 | May 13 | Cycle 61-63 structural fixes (B0-B7); Gemini-merged content; docs overhaul |
+| v10.8 | May 16 | Activate v10.6.0 trivial-skip path; v8.63.0 anchor-mode context-builder; skills/ canonical (symlink direction flip); GEMINI.md sync |
+
+Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
