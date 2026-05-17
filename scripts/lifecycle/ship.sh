@@ -655,6 +655,16 @@ FOOTER
                     dry_record "worktree-commit:$cycle_branch"
                     log "  [DRY-RUN] would commit in worktree on $cycle_branch"
                 else
+                    # v10.10.0 Layer 1 (ADR-0012): commit-prefix → diff coherence gate.
+                    # Worktree path — pass --repo-dir so gate inspects worktree-staged files (closes the cwd
+                    # defect identified in cycle 75 audit of Cycle A).
+                    _prefix_gate="$REPO_ROOT/scripts/guards/commit-prefix-gate.sh"
+                    if [ -x "$_prefix_gate" ]; then
+                        SHIP_CLASS="$SHIP_CLASS" bash "$_prefix_gate" \
+                            --msg "$WORKTREE_COMMIT_MSG" --repo-dir "$active_worktree" \
+                            || fail "commit-prefix-gate rejected worktree commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual"
+                    fi
+                    unset _prefix_gate
                     git -C "$active_worktree" -c commit.gpgsign=false commit -m "$WORKTREE_COMMIT_MSG" \
                         || fail "git commit in worktree failed"
                     log "  OK: committed in worktree on $cycle_branch"
@@ -790,6 +800,15 @@ if [ "$WORKTREE_COMMIT_DONE" = "0" ]; then
         dry_record "push:$CURRENT_BRANCH"
         log "[DRY-RUN] would commit + push to $CURRENT_BRANCH"
     else
+        # v10.10.0 Layer 1 (ADR-0012): commit-prefix → diff coherence gate. Main path: gate inspects
+        # current-cwd staged files (REPO_ROOT). No --repo-dir needed.
+        _prefix_gate="$REPO_ROOT/scripts/guards/commit-prefix-gate.sh"
+        if [ -x "$_prefix_gate" ]; then
+            SHIP_CLASS="$SHIP_CLASS" bash "$_prefix_gate" \
+                --msg "$COMMIT_MSG" \
+                || fail "commit-prefix-gate rejected main-path commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual"
+        fi
+        unset _prefix_gate
         # Commit. Use array form to avoid arg injection.
         COMMIT_ARGS=(commit -m "$COMMIT_MSG")
         git "${COMMIT_ARGS[@]}"

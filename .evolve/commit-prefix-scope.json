@@ -1,0 +1,111 @@
+{
+  "_comment": "Layer 1 of Reward-Hacking Defense System (ADR-0012). Maps commit-message prefixes to required/forbidden diff path scopes. The commit-prefix-gate.sh PreToolUse hook rejects commits where the prefix doesn't match the diff.",
+  "_authoritative_as_of": "2026-05-18",
+  "schema_version": 1,
+  "prefixes": {
+    "docs": {
+      "required_paths": ["docs/**", "README.md", "CHANGELOG.md", "**/*.md"],
+      "diff_must_be_subset": true,
+      "description": "Documentation only — diff must be entirely under doc paths"
+    },
+    "feat(guards)": {
+      "required_paths": [
+        "scripts/guards/**",
+        "scripts/dispatch/*-gate.sh",
+        "scripts/dispatch/*-precondition.sh",
+        "scripts/lifecycle/ship.sh",
+        ".evolve/commit-prefix-scope.json",
+        "acs/regression-suite/**",
+        "acs/cycle-*/**"
+      ],
+      "description": "Kernel guards, their integration in ship.sh, manifests, and regression predicates"
+    },
+    "feat(routing)": {
+      "required_paths": [
+        "scripts/routing/**",
+        ".evolve/profiles/**.json",
+        "agents/evolve-*.md",
+        "scripts/dispatch/resolve-llm.sh"
+      ],
+      "description": "Adaptive model routing changes (ADR adaptive routing)"
+    },
+    "feat(token-opt)": {
+      "required_paths": [
+        "scripts/lifecycle/role-context-builder.sh",
+        "agents/evolve-*.md",
+        ".evolve/profiles/**.json",
+        "scripts/routing/tier-map.json"
+      ],
+      "forbidden_only_paths": [
+        "docs/**",
+        ".evolve/instincts/lessons/**",
+        "acs/**"
+      ],
+      "description": "Token optimization. Must touch at least one required_path AND must not be ENTIRELY under forbidden_only_paths"
+    },
+    "feat(audit)": {
+      "required_paths": [
+        "agents/evolve-auditor.md",
+        "scripts/verification/**",
+        "docs/architecture/audit-constitution.md"
+      ],
+      "description": "Audit-layer changes (Layer 4 constitutional audit, Layer 5 verdict-elevation)"
+    },
+    "feat(posthoc)": {
+      "required_paths": [
+        "agents/evolve-builder.md",
+        "agents/evolve-auditor.md",
+        "docs/architecture/posthoc-schema.md"
+      ],
+      "description": "POSTHOC sentinel pattern (Layer 3 generalized)"
+    },
+    "feat(falsification)": {
+      "required_paths": [
+        "agents/evolve-auditor.md",
+        "agents/evolve-scout.md",
+        "agents/evolve-builder.md",
+        "scripts/lifecycle/carryover-todos-merger.sh"
+      ],
+      "description": "Hypothesis-falsification carryover (Layer 2)"
+    },
+    "fix(role-gate)": {
+      "required_paths": ["scripts/guards/role-gate.sh"],
+      "description": "role-gate.sh fix"
+    },
+    "fix(ship-gate)": {
+      "required_paths": ["scripts/guards/ship-gate.sh", "scripts/lifecycle/ship.sh"],
+      "description": "ship-gate or ship.sh fix"
+    },
+    "fix(prefix-gate)": {
+      "required_paths": ["scripts/guards/commit-prefix-gate.sh", ".evolve/commit-prefix-scope.json"],
+      "description": "Layer 1 prefix-gate fix"
+    },
+    "fix": {
+      "any_path": true,
+      "description": "Generic bugfix — gate is permissive (Layer 4 audit-constitution still applies)"
+    },
+    "refactor": {
+      "any_path": true,
+      "description": "Generic refactor — gate is permissive"
+    },
+    "chore": {
+      "any_path": true,
+      "description": "Generic maintenance — gate is permissive"
+    },
+    "release": {
+      "required_paths": [
+        ".claude-plugin/**",
+        "CHANGELOG.md",
+        "README.md",
+        "skills/evolve-loop/SKILL.md",
+        ".agents/skills/evolve-loop/SKILL.md"
+      ],
+      "description": "Version-bump release (per scripts/release-pipeline.sh)"
+    },
+    "test": {
+      "required_paths": ["scripts/tests/**", "acs/**", "**/*-test.sh", "**/*.test.*"],
+      "description": "Test-only changes"
+    }
+  },
+  "_unknown_prefix_behavior": "pass-through (rc=0). Unknown prefixes are not blocked — operators can add new prefix types to this manifest as needed. Layer 4's audit-constitution still applies regardless."
+}

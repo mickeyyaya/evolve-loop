@@ -50,6 +50,11 @@ node_modules/
 !.evolve/plugin/.claude-plugin/plugin.json
 !.evolve/plugin/skills/
 !.evolve/plugin/skills/*
+# ... and except the Layer 1 (ADR-0012) commit-prefix manifest. Defines what
+# commit prefixes (docs:, feat(guards):, etc.) require which diff paths.
+# Operator-extensible but ships with sensible defaults; must be tracked so the
+# scripts/guards/commit-prefix-gate.sh hook applies consistently across clones.
+!.evolve/commit-prefix-scope.json
 .claude/evolve/
 .claude/worktrees/
 .clone/
