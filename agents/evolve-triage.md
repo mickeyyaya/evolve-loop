@@ -156,8 +156,11 @@ Output paths:
 
 **triage-decision.md** required structure:
 
+The triage-decision.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `scripts/tests/anchor-extract-test.sh` can locate the decision region.
+
 ```markdown
 <!-- challenge-token: <token from runner> -->
+<!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle N
 
 cycle_size_estimate: small

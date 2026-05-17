@@ -156,7 +156,11 @@ If you write a predicate the Builder could have written, you're not doing your j
 
 After writing all predicates and validating them, emit `tester-report.md`:
 
+The first line of tester-report.md MUST be a `<!-- ANCHOR:tester_summary -->` marker so downstream phases (auditor, retrospective) and `scripts/tests/anchor-extract-test.sh` can locate the summary region.
+
 ```markdown
+<!-- challenge-token: <token from runner> -->
+<!-- ANCHOR:tester_summary -->
 # Tester Report — Cycle N
 
 ## Predicates Authored

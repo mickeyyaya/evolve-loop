@@ -203,10 +203,13 @@ grep -q "ANCHOR:test_results"         "$REPO_ROOT/agents/evolve-builder.md"     
 grep -q "ANCHOR:verdict"              "$REPO_ROOT/agents/evolve-auditor.md"       && ok=$((ok+1))
 grep -q "ANCHOR:defects"              "$REPO_ROOT/agents/evolve-auditor.md"       && ok=$((ok+1))
 grep -q "ANCHOR:lessons"              "$REPO_ROOT/agents/evolve-retrospective.md" && ok=$((ok+1))
-if [ "$ok" = "8" ]; then
-    pass "all 8 expected anchor names present in templates"
+# Cycle 67 (TASK-1b): extend anchor enforcement to tester + triage report templates
+grep -q "ANCHOR:tester_summary"       "$REPO_ROOT/agents/evolve-tester.md"        && ok=$((ok+1))
+grep -q "ANCHOR:triage_decision"      "$REPO_ROOT/agents/evolve-triage.md"        && ok=$((ok+1))
+if [ "$ok" = "10" ]; then
+    pass "all 10 expected anchor names present in templates"
 else
-    fail_ "expected 8 anchors, got $ok"
+    fail_ "expected 10 anchors, got $ok"
 fi
 
 # --- Test 11 (Cycle C3): profile JSONs declare context_anchors --------------
