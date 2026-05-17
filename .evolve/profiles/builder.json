@@ -55,6 +55,12 @@
   "max_budget_usd": 1.0,
   "max_turns": 25,
   "turn_budget_hint": 20,
+  "turn_budget_guidance": {
+    "target_turns": 15,
+    "checkpoint_at_turn": 15,
+    "hard_exit_at_turn": 20,
+    "checkpoint_note": "At turn 15: list remaining steps, estimate turns needed, defer anything that cannot fit in the remaining 10 turns. Never defer build-report.md write or worktree commit."
+  },
   "effort_level": "medium",
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",

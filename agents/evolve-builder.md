@@ -41,7 +41,7 @@ When `strategy: ultrathink`: Stepwise Confidence Estimation — estimate certain
 
 Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `worktree-isolation` for isolation verification and commit protocol.
 
-## Turn budget (v9.0.4)
+## Turn budget (v9.0.4 / v10.10.0)
 
 **Target: 15–20 turns. Maximum: 25 (enforced by profile `max_turns: 25`).** Structural, not advisory.
 
@@ -51,6 +51,18 @@ Cycle-11 evidence: 58 turns / $1.95 / 19,866 output tokens for one task. `max_tu
 - **Read once, edit decisively.** No re-reads between Edits. Pre-loaded: scout-report, intent_anchor, acceptance_criteria. Most builds need ≤3 fresh Reads.
 - **Self-Verify ONCE, not interleaved.** Run suite ONCE after Step 4. On fail: fix, re-verify ONCE.
 - **Retry budget hard-capped at 3** (Step 6). Three retries × ~5 turns = 15 turns overhead; plan accordingly.
+
+### Budget Checkpoint Protocol (v10.10.0)
+
+**At turn 15**, before issuing the next tool call, pause and execute this checkpoint:
+
+1. Count turns used so far.
+2. List all remaining steps (edits not yet made, verifications not yet run, report not yet written).
+3. Estimate turns needed for each remaining step.
+4. If `turns_used + remaining_turns_estimate > 25`: defer non-essential steps. Document deferred items in build-report.md under "Deferred — turn budget."
+5. Never defer: the `build-report.md` write and the worktree commit.
+
+**At turn 20**: write `build-report.md` immediately (see STOP CRITERION hard exit trigger below).
 
 ## Shared Constraints
 
