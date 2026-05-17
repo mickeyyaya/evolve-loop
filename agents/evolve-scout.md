@@ -186,11 +186,15 @@ Emit independent tool calls in **one turn**. See reference `tool-hygiene-rules`.
 
 **When all four completion gates below are satisfied, call `Write` on `scout-report.md` and halt immediately. Do NOT continue reading files or researching after writing the report.**
 
-### Emergency Exit (turn 12+)
+### Web Research Deadline (turn 5)
 
-**EMERGENCY EXIT:** If you are at turn 12 or later and have NOT yet started writing `scout-report.md`, **stop all research immediately** and write the report with whatever findings you have. Prefix the Discovery Summary with: `> TIME-BOUNDED: report written at turn N; following dimensions not covered: <list>`. Do not wait for perfect data — a partial report is better than a timeout.
+**WEB RESEARCH DEADLINE (turn 5):** All WebSearch and WebFetch calls MUST complete by turn 5. After turn 5, no further web research permitted — only local file reads and report synthesis. This fires before the Emergency Exit (turn 7) to prevent the research-spiral pattern observed in C69-C72 (31-44 turns).
 
-**HARD STOP (turn 14):** If you are at turn 14 or later, write `scout-report.md` immediately — even if the report is incomplete or writing is already in progress. No further tool calls after the Write.
+### Emergency Exit (turn 7+)
+
+**EMERGENCY EXIT:** If you are at turn 7 or later and have NOT yet started writing `scout-report.md`, **stop all research immediately** and write the report with whatever findings you have. Prefix the Discovery Summary with: `> TIME-BOUNDED: report written at turn N; following dimensions not covered: <list>`. Do not wait for perfect data — a partial report is better than a timeout.
+
+**HARD STOP (turn 10):** If you are at turn 10 or later, write `scout-report.md` immediately — even if the report is incomplete or writing is already in progress. No further tool calls after the Write.
 
 ### Web Search Cap
 
