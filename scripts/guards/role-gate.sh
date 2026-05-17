@@ -263,6 +263,12 @@ allow_for_phase() {
                 "$REPO_ROOT/.evolve/instincts/lessons/*.yaml" \
                 "$REPO_ROOT/.evolve/state.json"
             ;;
+        retrospective)
+            match_any "$path" \
+                "$ws/retrospective-report.md" \
+                "$REPO_ROOT/.evolve/instincts/lessons/*.yaml" \
+                "$REPO_ROOT/.evolve/state.json"
+            ;;
         *)
             return 1
             ;;
