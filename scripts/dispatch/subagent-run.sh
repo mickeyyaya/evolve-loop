@@ -1224,7 +1224,7 @@ ADVEOF
         _max_turns_profile=$(jq -r '.max_turns // 0' "$effective_profile" 2>/dev/null || echo "0")
         if [ "$_max_turns_profile" -gt 0 ] && [ "$_actual_turns" -gt "$_max_turns_profile" ] 2>/dev/null; then
             _append_abnormal_event "$workspace" "turn-overrun" "WARN" \
-                "agent=$agent actual_turns=$_actual_turns max_turns=$_max_turns_profile (${_actual_turns}x ceiling)" \
+                "agent=$agent actual_turns=$_actual_turns max_turns=$_max_turns_profile (turns=${_actual_turns} vs ceiling=${_max_turns_profile})" \
                 "Review ${agent}-report.md for scope; split task or tighten STOP CRITERION"
             log "WARN: turn-overrun agent=$agent turns=$_actual_turns max=$_max_turns_profile"
         fi

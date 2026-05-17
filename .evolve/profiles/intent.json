@@ -60,7 +60,7 @@
     "heavy_rules": 0.6,
     "minimal": 0.15
   },
-  "max_turns": 4,
+  "max_turns": 10,
   "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/intent.md",
   "challenge_token_required": true,
