@@ -57,6 +57,13 @@ challenged_premises:
 risk_level: low | medium | high | critical
 ---
 
+<!-- ANCHOR:acceptance_criteria -->
+## Acceptance Criteria
+
+(Anchor-scoped section for auditor context injection. Mirrors `acceptance_checks:` above in markdown format.)
+
+{List each acceptance_check as: `- **<check>** — verified by: <how_verified>`}
+
 <!-- ANCHOR:restated_intent -->
 # Restated Intent
 

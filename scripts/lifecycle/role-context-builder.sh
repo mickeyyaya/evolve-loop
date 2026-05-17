@@ -535,10 +535,10 @@ WCONST
             # in either mode (it's the writer; concentration on diff matters).
             ;;
         auditor)
-            # Auditor needs the FULL intent for deep acceptance-criteria checks
-            # — not a compact summary. Always emit full file.
+            # v10.9.1 P4: anchor-scope intent.md to acceptance_criteria only.
+            # Falls back to full file when anchor is absent (pre-P4 intent.md).
             header_block
-            emit_artifact "Intent (acceptance criteria)" "$WORKSPACE/intent.md"
+            emit_artifact_with_anchors "Intent (acceptance criteria)" "$WORKSPACE/intent.md" acceptance_criteria
             # v8.63.0 Cycle C2/C3: under anchor mode, auditor reads only the
             # diff_summary + test_results sections of build-report (not the
             # full builder narrative) and only proposed_tasks + acceptance_criteria
