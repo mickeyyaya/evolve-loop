@@ -85,5 +85,13 @@
     ],
     "allow_network": false
   },
-  "parallel_eligible": true
+  "parallel_eligible": true,
+  "model_tier_envelope": {
+    "min": "fast",
+    "default": "fast",
+    "max": "balanced"
+  },
+  "allowed_clis": [
+    "all"
+  ]
 }

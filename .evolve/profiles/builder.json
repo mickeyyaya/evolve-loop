@@ -91,5 +91,15 @@
   "context_anchors": [
     "scout-report.md:proposed_tasks",
     "scout-report.md:acceptance_criteria"
-  ]
+  ],
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "deep"
+  },
+  "cross_family_with": "auditor",
+  "allowed_clis": [
+    "claude"
+  ],
+  "_note": "Restricted to claude until Phase 4 — Gemini/Codex/Grok adapters need sandbox + permission scoping + budget cap parity. Builder is safety-critical (writes code in worktree)."
 }

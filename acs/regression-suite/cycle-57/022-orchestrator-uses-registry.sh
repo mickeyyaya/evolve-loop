@@ -24,6 +24,7 @@ set -uo pipefail
 # falling back to EVOLVE_PROJECT_ROOT / git root (for standalone runs).
 REPO_ROOT="${WORKTREE_PATH:-${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}"
 ORCHESTRATOR_MD="$REPO_ROOT/agents/evolve-orchestrator.md"
+ORCHESTRATOR_REF="$REPO_ROOT/agents/evolve-orchestrator-reference.md"
 PHASE_GATE_SH="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
 LIST_HELPER="$REPO_ROOT/scripts/dispatch/list-phase-order.sh"
 
@@ -34,24 +35,29 @@ for _f in "$ORCHESTRATOR_MD" "$PHASE_GATE_SH" "$LIST_HELPER"; do
     fi
 done
 
+# v10.7 persona refactor: registry-dispatch section moved to evolve-orchestrator-reference.md.
+# Predicate accepts either layout — checks main persona OR its reference sibling.
+ORCH_TARGETS=("$ORCHESTRATOR_MD")
+[ -f "$ORCHESTRATOR_REF" ] && ORCH_TARGETS+=("$ORCHESTRATOR_REF")
+
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 rc=0
 
-# ── AC1: orchestrator.md references list-phase-order.sh ──────────────────────
-if grep -q "list-phase-order.sh" "$ORCHESTRATOR_MD"; then
-    echo "GREEN AC1: orchestrator.md references list-phase-order.sh"
+# ── AC1: orchestrator.md references list-phase-order.sh (may live in reference) ───
+if grep -qF "list-phase-order.sh" "${ORCH_TARGETS[@]}"; then
+    echo "GREEN AC1: orchestrator.md / orchestrator-reference.md references list-phase-order.sh"
 else
-    echo "RED AC1: orchestrator.md does not reference list-phase-order.sh — registry-dispatch section missing"
+    echo "RED AC1: list-phase-order.sh not referenced in evolve-orchestrator.md OR evolve-orchestrator-reference.md — registry-dispatch section missing"
     rc=1
 fi
 
-# ── AC2: orchestrator.md references gate_run_by_name ─────────────────────────
-if grep -q "gate_run_by_name" "$ORCHESTRATOR_MD"; then
-    echo "GREEN AC2: orchestrator.md references gate_run_by_name"
+# ── AC2: orchestrator.md references gate_run_by_name (may live in reference) ──────
+if grep -qF "gate_run_by_name" "${ORCH_TARGETS[@]}"; then
+    echo "GREEN AC2: orchestrator.md / orchestrator-reference.md references gate_run_by_name"
 else
-    echo "RED AC2: orchestrator.md does not reference gate_run_by_name — registry-dispatch section missing or incomplete"
+    echo "RED AC2: gate_run_by_name not referenced in evolve-orchestrator.md OR evolve-orchestrator-reference.md — registry-dispatch section missing or incomplete"
     rc=1
 fi
 

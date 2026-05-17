@@ -229,5 +229,13 @@
     ],
     "allow_network": true
   },
-  "parallel_eligible": false
+  "parallel_eligible": false,
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "balanced"
+  },
+  "allowed_clis": [
+    "all"
+  ]
 }

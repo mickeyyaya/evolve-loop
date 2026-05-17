@@ -92,5 +92,13 @@
     ],
     "allow_network": false
   },
-  "parallel_eligible": false
+  "parallel_eligible": false,
+  "model_tier_envelope": {
+    "min": "deep",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_clis": [
+    "all"
+  ]
 }

@@ -34,6 +34,28 @@ Prior failures are recorded in `state.json:failedApproaches[]` with structured c
 ### 8. Cost adaptation (v8.35.0+)
 The auditor profile defaults to Opus, but `scripts/utility/diff-complexity.sh` auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
 
+## 12 Core agent rules
+
+Behavioral rules every agent must follow regardless of CLI. Where the kernel hooks above catch *structural* breaches, these catch *judgment* breaches. In bypass-permissions / autonomous mode, rule 4 ("stop and ask") is overridden — make the reasonable call and continue. All other rules apply unconditionally.
+
+### Karpathy foundations (1–4): think before acting
+
+1. **Think before coding.** Do not assume or over-engineer. State assumptions explicitly. Push back when a requested approach is wrong — propose the alternative.
+2. **Push for simplicity.** If a simpler approach exists, propose it. Three similar lines beat a premature abstraction. Don't design for hypothetical future requirements.
+3. **No silent changes.** When instructions admit multiple interpretations or the codebase offers multiple patterns, surface both and pick one explicitly with a one-line reason. Never guess silently.
+4. **Surface ambiguity.** If something is unclear or context is missing, stop and ask. (Overridden in bypass-permissions mode: make the reasonable call and continue — the user will redirect.)
+
+### Mnilax extensions (5–12): multi-step agent discipline
+
+5. **Reserve judgment tasks for AI.** Use LLM cycles for qualitative work — summarizing, categorizing, drafting, designing. Deterministic work (retries, error codes, state transitions, hashing) goes in shell scripts. evolve-loop already enforces this: `phase-gate.sh`, `ship.sh`, `failure-adapter.sh` are deterministic shell; Scout/Builder/Auditor are LLM.
+6. **Strict token budgeting.** Stay within configured caps (`EVOLVE_MAX_BUDGET_USD`, `--budget-usd N`, `EVOLVE_BATCH_BUDGET_CAP` default $20). When approaching budget, summarize state to a markdown file and stop the phase rather than letting it auto-resume. See [docs/architecture/checkpoint-resume.md](docs/architecture/checkpoint-resume.md).
+7. **Address conflicting patterns.** If two patterns conflict in scope (e.g., bash 3.2 vs bash 4 features; `skills/` canonical vs `.agents/skills/` canonical), do not mix them. Pick one, document the reason in the commit body, and tag the other for cleanup.
+8. **Read first.** Before importing from or calling into a module, `Read` it and list its real exports. Do not invent function names from context. Builder agents shipping code against imagined APIs is the recurring failure mode this rule prevents.
+9. **Write meaningful tests.** Tests verify *intent*, not surface behavior. Predicates that pass with `echo PASS; exit 0` or `grep -q presence` are rejected by `validate-predicate.sh` (EGPS v10.0+). Same principle applies to unit tests: a passing test that doesn't probe the behavior change is a no-op.
+10. **Use checkpoints.** For multi-phase work, summarize what was done and what remains after every phase. evolve-loop encodes this in `cycle-state.sh checkpoint` + `phase report` artifacts. If you cannot clearly describe current status in 3 bullets, stop — you have lost the plot.
+11. **Follow existing conventions.** Match the codebase even if you disagree. Specifics: shell scripts target bash 3.2 (no `declare -A`, no `mapfile`, no `${var^^}`); use `printf > tmp && mv` for atomic writes; commits go through `ship.sh`; `Bash() patterns` use simple `*` (not gitignore globstar); kernel scripts source `resolve-roots.sh` and split `PLUGIN_ROOT` (reads) from `PROJECT_ROOT` (writes).
+12. **Fail loudly.** Do not silently skip steps, swallow errors, or report success when work was incomplete. A "migration complete" claim that secretly skipped 3 files is the failure mode this rule prevents. Format for completion claims: `bash scripts/<suite>.sh — N/N PASS, no regression`.
+
 ## Per-CLI runtime details
 
 This file covers the universal contract. CLI-specific runtime details live in companion files:

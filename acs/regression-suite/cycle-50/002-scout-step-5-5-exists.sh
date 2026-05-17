@@ -18,11 +18,16 @@ set -uo pipefail
 
 REPO_ROOT="${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 SCOUT="$REPO_ROOT/agents/evolve-scout.md"
+SCOUT_REF="$REPO_ROOT/agents/evolve-scout-reference.md"
 [ -f "$SCOUT" ] || { echo "RED: $SCOUT not found"; exit 1; }
+# v10.7 persona refactor: verbose details moved to evolve-scout-reference.md.
+# Predicate accepts either layout — checks main persona OR its reference sibling.
+SCOUT_TARGETS=("$SCOUT")
+[ -f "$SCOUT_REF" ] && SCOUT_TARGETS+=("$SCOUT_REF")
 
 rc=0
 
-# AC1: Step 5.5 header is present
+# AC1: Step 5.5 header is present (still required in main persona — scout reads it eagerly)
 if ! grep -q "### 5\.5\." "$SCOUT"; then
     echo "RED AC1: '### 5.5.' header not found in evolve-scout.md (Step 5.5 Stage Research missing)"
     rc=1
@@ -30,12 +35,12 @@ else
     echo "GREEN AC1: Step 5.5 header found in evolve-scout.md"
 fi
 
-# AC2: research-cache-staging worker path referenced
-if ! grep -q "research-cache-staging" "$SCOUT"; then
-    echo "RED AC2: 'research-cache-staging' path not found in evolve-scout.md (cache staging worker dir missing)"
+# AC2: research-cache-staging worker path referenced (may live in reference file post-v10.7 refactor)
+if ! grep -qF "research-cache-staging" "${SCOUT_TARGETS[@]}"; then
+    echo "RED AC2: 'research-cache-staging' path not found in evolve-scout.md OR evolve-scout-reference.md (cache staging worker dir missing)"
     rc=1
 else
-    echo "GREEN AC2: research-cache-staging worker path referenced in evolve-scout.md"
+    echo "GREEN AC2: research-cache-staging worker path referenced in evolve-scout.md / evolve-scout-reference.md"
 fi
 
 exit $rc

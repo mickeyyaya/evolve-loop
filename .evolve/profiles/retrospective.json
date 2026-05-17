@@ -153,5 +153,13 @@
       "retrospective-report.md",
       ".evolve/runs/cycle-N/handoff-retrospective.json"
     ]
-  }
+  },
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_clis": [
+    "all"
+  ]
 }

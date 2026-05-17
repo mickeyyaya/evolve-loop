@@ -18,24 +18,29 @@ set -uo pipefail
 
 REPO_ROOT="${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 BUILDER="$REPO_ROOT/agents/evolve-builder.md"
+BUILDER_REF="$REPO_ROOT/agents/evolve-builder-reference.md"
 [ -f "$BUILDER" ] || { echo "RED: $BUILDER not found"; exit 1; }
+# v10.7 persona refactor: verbose details moved to evolve-builder-reference.md.
+# Predicate accepts either layout — checks main persona OR its reference sibling.
+BUILDER_TARGETS=("$BUILDER")
+[ -f "$BUILDER_REF" ] && BUILDER_TARGETS+=("$BUILDER_REF")
 
 rc=0
 
-# AC1: research_pointer field referenced in builder step 2.5 area
-if ! grep -q "research_pointer" "$BUILDER"; then
-    echo "RED AC1: 'research_pointer' field not found in evolve-builder.md (cache integration missing)"
+# AC1: research_pointer field referenced in builder step 2.5 area (may live in reference file)
+if ! grep -qF "research_pointer" "${BUILDER_TARGETS[@]}"; then
+    echo "RED AC1: 'research_pointer' field not found in evolve-builder.md OR evolve-builder-reference.md (cache integration missing)"
     rc=1
 else
-    echo "GREEN AC1: research_pointer referenced in evolve-builder.md"
+    echo "GREEN AC1: research_pointer referenced in evolve-builder.md / evolve-builder-reference.md"
 fi
 
-# AC2: Research Source: per-task-cache label is present
-if ! grep -q "Research Source: per-task-cache" "$BUILDER"; then
-    echo "RED AC2: 'Research Source: per-task-cache' not found in evolve-builder.md (cache source label missing)"
+# AC2: Research Source: per-task-cache label is present (may live in reference file)
+if ! grep -qF "Research Source: per-task-cache" "${BUILDER_TARGETS[@]}"; then
+    echo "RED AC2: 'Research Source: per-task-cache' not found in evolve-builder.md OR evolve-builder-reference.md (cache source label missing)"
     rc=1
 else
-    echo "GREEN AC2: 'Research Source: per-task-cache' found in evolve-builder.md"
+    echo "GREEN AC2: 'Research Source: per-task-cache' found in evolve-builder.md / evolve-builder-reference.md"
 fi
 
 exit $rc

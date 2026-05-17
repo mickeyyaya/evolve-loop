@@ -100,5 +100,14 @@
     "allow_network": true
   },
   "parallel_eligible": false,
-  "context_clear_trigger_tokens": 30000
+  "context_clear_trigger_tokens": 30000,
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "balanced"
+  },
+  "allowed_clis": [
+    "claude"
+  ],
+  "_note": "Restricted to claude — same safety reasoning as builder."
 }

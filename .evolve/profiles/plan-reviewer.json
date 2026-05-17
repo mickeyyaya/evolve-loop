@@ -125,5 +125,13 @@
   "context_anchors": [
     "scout-report.md:proposed_tasks",
     "scout-report.md:gap_analysis"
+  ],
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_clis": [
+    "all"
   ]
 }

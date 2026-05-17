@@ -100,5 +100,14 @@
   "parallel_eligible": false,
   "context_anchors": [
     "scout-report.md:acceptance_criteria"
-  ]
+  ],
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_clis": [
+    "claude"
+  ],
+  "_note": "Restricted to claude — RED-phase test writing is safety-critical."
 }
