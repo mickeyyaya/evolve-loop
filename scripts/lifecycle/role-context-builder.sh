@@ -410,11 +410,7 @@ emit_budget_hint() {
     local _budget
     _budget=$(jq -r '.turn_budget_hint // empty' "$_prof_path" 2>/dev/null)
     [ -n "$_budget" ] || return 0
-    cat <<BEOF
-
-## Budget
-Advisory turn budget for this phase: ~${_budget} turns. Prioritize breadth over depth; write your report as soon as completion gates are satisfied.
-BEOF
+    printf '\n**Budget:** ~%s turns. Prioritize breadth; write report when gates satisfied.\n\n' "$_budget"
 }
 
 # Header common to all roles.
@@ -499,13 +495,7 @@ emit_for_role() {
             # the first visible block so Builder cannot miss it.
             _wt_path=$(cycle-state.sh get active_worktree 2>/dev/null || true)
             [ -z "$_wt_path" ] && _wt_path="<read cycle-state.json:active_worktree>"
-            cat <<WCONST
-
-## WORKTREE ISOLATION CONSTRAINT (MANDATORY — read this first)
-All file writes MUST target the per-cycle worktree: ${_wt_path}
-Writing to the project root is an isolation breach detected by ship.sh;
-the cycle commit will be declined and work will be orphaned.
-WCONST
+            printf '\n**WORKTREE:** all writes → %s (ship.sh rejects root writes; cycle orphaned)\n\n' "$_wt_path"
             unset _wt_path
             emit_intent_compact
             # v8.63.0 Cycle C2/C3: under anchor mode, builder only needs the

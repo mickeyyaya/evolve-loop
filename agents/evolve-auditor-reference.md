@@ -174,4 +174,25 @@ HIGH	<issue>	<file>	<line>
 ### Ledger Entry
 ```json
 {"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"challenge":"<token>","prevHash":"<hash of previous ledger entry>","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
+
+---
+
+## Section: hypothesis-falsification-example
+
+Example `falsifiable_claims[]` entry for `handoff-auditor.json`:
+
+```json
+{
+  "falsifiable_claims": [
+    {
+      "id": "C70-P2-turn-budget",
+      "hypothesis": "advisory turn-budget will reduce builder turns to <=20",
+      "verification_artifact": ".evolve/runs/cycle-{NEXT}/builder-usage.json",
+      "verification_field": "num_turns",
+      "predicted_value": "<=20",
+      "tolerance_pct": 10,
+      "consequence_if_falsified": "escalate to programmatic kill (Case A); mark advisory as INERT with re_attempt_by_cycle"
+    }
+  ]
+}
 ```
