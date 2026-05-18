@@ -373,3 +373,40 @@ tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwrigh
 ```json
 {"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL","challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
 ```
+
+## POSTHOC enforcement (v10.10.0 Layer 3, ADR-0012)
+
+**You are FORBIDDEN from self-quoting these 8 truthable metrics in `build-report.md`** (canonical list at [docs/architecture/posthoc-schema.md](../docs/architecture/posthoc-schema.md)):
+
+| Metric | Ground-truth artifact |
+|---|---|
+| `total_cost_usd` | `<role>-usage.json` |
+| `num_turns` | `<role>-usage.json` |
+| `duration_ms` | `<role>-timing.json` |
+| `input_tokens` | `<role>-usage.json` |
+| `output_tokens` | `<role>-usage.json` |
+| `cache_read_input_tokens` | `<role>-usage.json` |
+| `files_changed` | `git show <sha> --numstat` |
+| `lines_added` / `lines_removed` | `git show <sha> --numstat` |
+
+Plus all **AC-existence claims** ("file X exists" or "command Y exits 0").
+
+**Required format** in build-report.md:
+
+```markdown
+| num_turns | pending <!-- POSTHOC: jq '.num_turns' .evolve/runs/cycle-N/builder-usage.json --> |
+| docs/architecture/foo.md exists | pending <!-- POSTHOC: test -f docs/architecture/foo.md && echo OK || echo MISSING --> |
+```
+
+The Auditor will execute every POSTHOC command and substitute the ground-truth value. **Authored-prose `# exit 0` text after a `test -f` command is forbidden** — that pattern is what cycle 75 fabricated and was caught FAIL@0.99 confidence.
+
+### INERT marker discipline (v10.10.0 Layer 3)
+
+If you mark a piece of work `INERT` (acknowledging it doesn't yet fully function — e.g. P2 advisory turn-budget in cycle 72), you MUST include `re_attempt_by_cycle: N` where N ≤ current_cycle + 5. INERT without a re-attempt deadline is treated as permanent abandonment and violates the constitutional audit checklist (Layer 4 P5).
+
+Example:
+```markdown
+> **INERT cycle 76** — re_attempt_by_cycle: 81 — Advisory turn-budget cannot constrain
+> the implementer that writes the telemetry. Case A (programmatic kill) blocked by no
+> --max-turns flag in claude -p. Re-attempt when claude CLI exposes a turn limit.
+```

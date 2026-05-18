@@ -246,3 +246,17 @@ HIGH	<issue>	<file>	<line>
 ## Structured Output: handoff-auditor.json (C3)
 
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `handoff-json` for the structured sidecar schema and required fields.
+
+## POSTHOC verification (v10.10.0 Layer 3, ADR-0012)
+
+For each criterion in the build-report:
+
+1. **Detect truthable metrics** — if the build-report quotes any of the 8 metrics in [docs/architecture/posthoc-schema.md](../docs/architecture/posthoc-schema.md), they MUST appear as `pending <!-- POSTHOC: <command> -->` not as bare values. If a known-truthable metric is bare-quoted, **refuse PASS** and emit a `posthoc-violation` defect (HIGH severity).
+
+2. **Execute every POSTHOC command** — for each `<!-- POSTHOC: <cmd> -->` sentinel in the build-report, run `<cmd>` and capture the output. Substitute the ground-truth value in your audit-report.md so reviewers can verify provenance. Quote the actual exit codes verbatim — never author-prose `# exit 0` text.
+
+3. **AC-existence verification** — for any AC of the form "file X exists" or "command Y returns exit 0", you MUST run the literal command and quote its actual output. **Authored-prose verification text is forbidden.** Cycle 75 demonstrated this failure: Builder wrote `test -f /path # exit 0` for files that didn't exist; Auditor caught it at 0.99 confidence by *running* the test.
+
+4. **Compare ground-truth to Builder's narrative** — if Builder's prose claims (e.g. "reduced cost by 10%") contradict POSTHOC ground-truth values (e.g. actual delta is +23%), emit `claim-discrepancy` defect (HIGH). This is the cycle 71 pattern.
+
+5. **INERT marker compliance** — if build-report contains an INERT marker, verify it carries `re_attempt_by_cycle: N` with N ≤ current_cycle + 5. INERT without a re-attempt deadline is a P5 constitutional violation (Layer 4) — emit `inert-no-deadline` defect.
