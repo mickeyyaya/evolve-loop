@@ -1229,6 +1229,26 @@ gate_calibrate_to_intent() {
 gate_intent_to_research() {
     log "Gate: INTENT → RESEARCH (cycle $CYCLE)"
     local intent_file="$WORKSPACE/intent.md"
+    local delta_file="$WORKSPACE/intent-delta.md"
+
+    # v10.8.0: delta-mode acceptance. When EVOLVE_INTENT_DELTA=1, accept either:
+    #   (a) intent-delta.md containing [intent-unchanged] → pass immediately
+    #   (b) intent-delta.md with patch format → pass (structural checks on merged intent.md below)
+    # Full-mode: existing validation logic unchanged.
+    if [ "${EVOLVE_INTENT_DELTA:-0}" = "1" ]; then
+        if [ -f "$delta_file" ]; then
+            local delta_head
+            delta_head=$(head -1 "$delta_file" 2>/dev/null | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+            if [ "$delta_head" = "[intent-unchanged]" ]; then
+                log "OK: intent-delta.md contains [intent-unchanged] marker — delta-mode pass"
+                return 0
+            fi
+            log "INFO: intent-delta.md present with patch content — will validate merged intent.md"
+            # Fall through: after merge, intent.md should exist for structural checks.
+        fi
+        # If delta file absent, fall through to standard intent.md check below.
+    fi
+
     [ -f "$intent_file" ] || fail "intent.md missing at $intent_file — intent persona did not produce artifact"
 
     # Extract YAML frontmatter (between first two --- lines)

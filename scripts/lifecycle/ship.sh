@@ -34,6 +34,7 @@
 #   trivial  (v10.6.0) — Trivial-skip path. Bypasses audit verification.
 #                        Requires cycle_size_estimate="trivial" in cycle-state.json.
 #                        Used for documentation and minor maintenance.
+#                        Remediation if blank: bash scripts/lifecycle/cycle-state.sh set cycle_size_estimate trivial
 #   manual   — Operator-driven commit (manual feature work, hot-fix). Skips
 #              audit verification but REQUIRES interactive y/N confirmation
 #              after printing `git diff --cached --stat`. Refuses if stdin is

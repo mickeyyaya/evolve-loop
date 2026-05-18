@@ -241,6 +241,7 @@ build_context() {
         echo "projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts go here)"
         echo "intentRequired: ${EVOLVE_REQUIRE_INTENT:-0} (v8.19.0+: when 1, run intent persona before scout; cycle-state.intent_required is the authoritative source)"
         echo "intentArtifactPath: $workspace/intent.md (only present if intent persona has run)"
+        echo "intentDeltaMode: ${EVOLVE_INTENT_DELTA:-0} (v10.8.0+: when 1, intent-batch-resolve.sh computes INTENT_MODE=full|delta before intent phase)"
         echo
 
         # Adaptive failure decision: always include (even empty-ish) — orchestrator
@@ -737,6 +738,33 @@ PROMPT_FILE="$WORKSPACE/orchestrator-prompt.md"
 
 log "prompt written to $PROMPT_FILE ($(wc -l < "$PROMPT_FILE") lines)"
 
+# ---- Incremental intent pre-resolve (v10.8.0) ------------------------------
+#
+# When EVOLVE_INTENT_DELTA=1, compute INTENT_MODE/BATCH_ID/GOAL_HASH before
+# the orchestrator spawns so the intent persona receives them in its env.
+# When EVOLVE_INTENT_DELTA=0 (default): skip entirely — existing flow unchanged.
+if [ "${EVOLVE_INTENT_DELTA:-0}" = "1" ]; then
+    _ibr="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/intent-batch-resolve.sh"
+    if [ -x "$_ibr" ]; then
+        _ibr_out=$(bash "$_ibr" "${GOAL:-}" 2>/dev/null || echo "INTENT_MODE=full")
+        # Eval the output to export INTENT_MODE, BATCH_ID, GOAL_HASH into env.
+        # Output is shell-safe (only alphanumeric keys + = + hex values).
+        while IFS='=' read -r _k _v; do
+            case "$_k" in
+                INTENT_MODE|BATCH_ID|GOAL_HASH)
+                    export "${_k}=${_v}"
+                    log "intent-batch-resolve: $_k=$_v"
+                    ;;
+            esac
+        done <<< "$_ibr_out"
+        unset _ibr_out _k _v
+    else
+        log "WARN: EVOLVE_INTENT_DELTA=1 but intent-batch-resolve.sh not found at $_ibr"
+        export INTENT_MODE=full
+    fi
+    unset _ibr
+fi
+
 # ---- Dry-run? --------------------------------------------------------------
 
 if [ "$DRY_RUN" = "1" ]; then
@@ -776,6 +804,21 @@ set +e
 PROMPT_FILE_OVERRIDE="$PROMPT_FILE" bash "$SUBAGENT_RUN" orchestrator "$CYCLE" "$WORKSPACE"
 rc=$?
 set -e
+
+# ---- Post-intent merge (v10.8.0) -------------------------------------------
+#
+# When EVOLVE_INTENT_DELTA=1 and the intent phase produced intent-delta.md,
+# run intent-merge-patches.sh to materialize the merged intent.md.
+# Best-effort: a merge failure does not change the orchestrator exit code.
+if [ "${EVOLVE_INTENT_DELTA:-0}" = "1" ] && [ -f "$WORKSPACE/intent-delta.md" ]; then
+    _imp="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/intent-merge-patches.sh"
+    if [ -x "$_imp" ]; then
+        bash "$_imp" "$WORKSPACE/intent.md" "$WORKSPACE/intent-delta.md" 2>/dev/null \
+            && log "intent-merge-patches: merged delta into $WORKSPACE/intent.md" \
+            || log "WARN: intent-merge-patches.sh exited non-zero (non-fatal)"
+    fi
+    unset _imp
+fi
 
 # ---- Summary ---------------------------------------------------------------
 

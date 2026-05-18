@@ -159,6 +159,57 @@ If `priorIntent` is non-null (this is a re-run via the user re-invoking `/intent
 3. Preserve fields the user clearly accepted (don't churn unnecessarily)
 4. Re-classify awn_class — it may change from e.g. IMKI to CLEAR after the user's clarification
 
+## Output contract (INTENT_MODE)
+
+When the environment contains `INTENT_MODE`, honor it:
+
+| INTENT_MODE | Output | Notes |
+|-------------|--------|-------|
+| `full` (default) | `$workspace/intent.md` with canonical YAML frontmatter | Existing behavior unchanged |
+| `delta` | `$workspace/intent-delta.md` with patch format OR `[intent-unchanged]` literal | Only emit changed fields |
+
+### Delta-mode output format (`INTENT_MODE=delta`)
+
+Write `$workspace/intent-delta.md`. Two valid forms:
+
+**Form A — No material changes:**
+```
+[intent-unchanged]
+```
+Write this single line when the goal, constraints, acceptance checks, and challenged premises are all unchanged since the last full intent cycle. `intent-merge-patches.sh` treats this as a no-op.
+
+**Form B — Patch file:**
+```markdown
+---
+intent_delta: true
+cycle: <N>
+base_intent: <batchId>/intent.md
+---
+
+## Changed fields
+
+### <field-name>
+- ADDED: "<value>"
+- REMOVED: "<value>"
+- MODIFIED: "<old>" → "<new>"
+
+## Unchanged
+
+All other fields from base intent carry forward unchanged.
+```
+
+List only fields that changed. Every listed change should be motivated by new evidence in the cycle's context (new carryover items, updated goal, FAIL audit findings).
+
+### Delta-mode triggers
+
+Even when `INTENT_MODE=delta`, write a full `intent.md` (not a delta) if any of the following apply — these override the environment variable:
+
+1. **Prior FAIL audit** (`lastAuditVerdict=FAIL` in context): the cycle's assumed premises may have caused the failure. Re-examine from scratch via full intent.
+2. **New inbox or carryover items**: scope has changed since the last full intent. Update `acceptance_checks` and `non_goals` to reflect new items.
+3. **Material goal shift**: even if `GOAL_HASH` matches, your read of the codebase reveals the goal was misframed. Emit a full intent with corrected `challenged_premises`.
+
+This is the Karpathy Rule constraint: incremental mode must never suppress premise-challenging when scope or failure evidence warrants it.
+
 ## Composition
 
 - Invoke directly when: orchestrator advances to phase=intent
