@@ -99,63 +99,8 @@ If a cycle is classified as `trivial` by Triage (read via `cycle-state.sh get cy
 
 *Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*
 
-Execute phases strictly in this order. After each agent finishes, the runner does not auto-advance cycle-state — **you** advance it via `cycle-state.sh advance <new_phase> <agent>` before invoking the next agent.
-
-```
-1. Calibrate (read state, decide strategy)
-   ↓ if cycle-state.intent_required==true: advance intent intent
-1b. Intent (only when intent_required) → subagent-run.sh intent $CYCLE $WORKSPACE
-   ↓ advance research scout
-2. Research / Discover  →  subagent-run.sh scout $CYCLE $WORKSPACE
-   ↓ unless EVOLVE_TRIAGE_DISABLE=1: advance triage triage
-2b. Triage (default-on; opt-out via EVOLVE_TRIAGE_DISABLE=1)
-       → subagent-run.sh triage $CYCLE $WORKSPACE
-       Reads scout-report + state.json:carryoverTodos[]; emits triage-decision.md
-       with top_n[]/deferred[]/dropped[]/cycle_size_estimate. phase-gate
-       (`triage-to-plan-review`) blocks on cycle_size_estimate=large (split required).
-       phase-gate (`discover-to-build`) emits a soft WARN if Triage was skipped
-       without explicit EVOLVE_TRIAGE_DISABLE=1 (first-rollout: WARN, not FAIL).
-   ↓ if EVOLVE_PLAN_REVIEW=1: advance plan-review plan-reviewer (Sprint 2)
-2c. Plan-review (opt-in) → see Sprint 2 docs
-   ↓ advance build builder
-   (if size == trivial: skip TDD)
-3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
-   ↓ advance audit auditor
-   (if size == trivial: skip Audit → jump to ship)
-4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
-   ↓ verdict-driven branch:
-5a. PASS         →  advance ship orchestrator
-                    if [ "$size" = "trivial" ]; then
-                        ship.sh --class trivial "<msg>"
-                    else
-                        ship.sh "<msg>"
-                    fi
-                    advance learn memo
-                    subagent-run.sh memo $CYCLE $WORKSPACE  (PASS-cycle memo emits carryover-todos.json + memo.md cycle memo — see Layer-P Memo Phase Contract)
-                    merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?
-                    if [ $MERGE_RC -eq 2 ]; then record-failure-to-state.sh "$WORKSPACE" lesson-merge-integrity-fail; exit 2; fi  # INTEGRITY_FAIL: lesson YAML missing
-                    [ $MERGE_RC -ne 0 ] && log "WARN: merge-lesson-into-state exit $MERGE_RC"
-                    reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict PASS  (Layer D)
-5b. WARN →  record-failure-to-state.sh $WORKSPACE WARN  (low-severity awareness)
-                       advance ship orchestrator  →  ship.sh "<commit-msg>"
-                       (ship.sh accepts WARN per v8.28.0 fluent-by-default policy)
-                       advance retrospective retrospective
-                       subagent-run.sh retrospective $CYCLE $WORKSPACE
-                       merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?
-                       if [ $MERGE_RC -eq 2 ]; then record-failure-to-state.sh "$WORKSPACE" lesson-merge-integrity-fail; exit 2; fi  # INTEGRITY_FAIL: lesson YAML missing
-                       [ $MERGE_RC -ne 0 ] && log "WARN: merge-lesson-into-state exit $MERGE_RC"
-                       gate_retrospective_to_complete  (gate — verifies lesson YAML landed in instincts/)
-                       reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict WARN
-5c. FAIL         →  record-failure-to-state.sh $WORKSPACE FAIL  (no ship)
-                       advance retrospective retrospective
-                       subagent-run.sh retrospective $CYCLE $WORKSPACE
-                       merge-lesson-into-state.sh $WORKSPACE; MERGE_RC=$?
-                       if [ $MERGE_RC -eq 2 ]; then record-failure-to-state.sh "$WORKSPACE" lesson-merge-integrity-fail; exit 2; fi  # INTEGRITY_FAIL: lesson YAML missing
-                       [ $MERGE_RC -ne 0 ] && log "WARN: merge-lesson-into-state exit $MERGE_RC"
-                       gate_retrospective_to_complete  (gate — verifies lesson YAML landed in instincts/)
-                       reconcile-carryover-todos.sh --cycle $CYCLE --workspace $WORKSPACE --verdict FAIL
-6. Write orchestrator-report.md → exit
-```
+For the complete legacy phase sequence (5a PASS / 5b WARN / 5c FAIL / 6 Report),
+see [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
 
 **phase-gate-precondition.sh enforces this sequence at the kernel layer.** If you try to invoke `subagent-run.sh builder` while phase=calibrate, the hook denies the call. There is no way around it short of `EVOLVE_BYPASS_PHASE_GATE=1` — and bypassing is a CRITICAL violation per CLAUDE.md.
 
