@@ -160,3 +160,9 @@ Remove the fabricated `hermes proxy start` command and clarify:
 - `scripts/cli_adapters/claude.sh:129-139`: `EVOLVE_ANTHROPIC_BASE_URL` implementation
 - `scripts/dispatch/subagent-run.sh:65-75`: proxy passthrough and WARN logic
 - evolve-loop commit `b2197be`: origin of `EVOLVE_ANTHROPIC_BASE_URL` feature
+
+---
+
+## Cycle 83: Verified Doctor Implementation
+
+Cycle 83 shipped `scripts/utility/doctor-subscription-auth.sh`: a bash-3.2-safe auth-mode detector that identifies one of four verdicts (`CUSTOM_PROXY`, `API_KEY`, `SUBSCRIPTION_OAUTH`, `MISCONFIGURED`) without `jq` or `declare -A`. Detection uses `grep -o` for JSON extraction from `~/.claude/.credentials.json`. The script is testable via `EVOLVE_DOCTOR_CRED_FILE_OVERRIDE`. An advisory `subscription-auth-mode` event is appended to `abnormal-events.jsonl` once per dispatch run via a new block in `subagent-run.sh` (after the June-15 WARN block, gated by `_EVOLVE_AUTH_MODE_LOGGED`). The hermes fabrication finding from this dossier stands: `hermes proxy start` does not exist; no update needed.

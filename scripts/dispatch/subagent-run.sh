@@ -76,6 +76,28 @@ if [ "$_today" \> "2025-06-14" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${E
 fi
 unset _today
 
+# v10.15.0: subscription-auth-mode advisory event. Emitted once per dispatch
+# run (gated by _EVOLVE_AUTH_MODE_LOGGED) to abnormal-events.jsonl so the
+# hash-chain of ledger.jsonl is not disturbed. Advisory only — never fails.
+if [ -z "${_EVOLVE_AUTH_MODE_LOGGED:-}" ]; then
+    _EVOLVE_AUTH_MODE_LOGGED=1
+    export _EVOLVE_AUTH_MODE_LOGGED
+    _doctor="${EVOLVE_PLUGIN_ROOT:-$EVOLVE_PROJECT_ROOT}/scripts/utility/doctor-subscription-auth.sh"
+    if [ -f "$_doctor" ]; then
+        _auth_json=$(bash "$_doctor" --json 2>/dev/null || echo '{"mode":"unknown","notes":"doctor failed"}')
+        _auth_mode=$(printf '%s' "$_auth_json" | grep -o '"mode":"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "unknown")
+        _auth_notes=$(printf '%s' "$_auth_json" | grep -o '"notes":"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "")
+        _auth_ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        _ws_dir="${WORKSPACE_PATH:-}"
+        _ae_target="${_ws_dir:+$_ws_dir/abnormal-events.jsonl}"
+        _ae_target="${_ae_target:-$EVOLVE_PROJECT_ROOT/.evolve/abnormal-events.jsonl}"
+        printf '{"event_type":"subscription-auth-mode","ts":"%s","cycle":%s,"mode":"%s","notes":"%s"}\n' \
+            "$_auth_ts" "${CYCLE:-0}" "$_auth_mode" "$_auth_notes" >> "$_ae_target" 2>/dev/null || true
+        unset _auth_json _auth_mode _auth_notes _auth_ts _ws_dir _ae_target
+    fi
+    unset _doctor
+fi
+
 log() { echo "[subagent-run] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
 integrity_fail() { log "INTEGRITY-FAIL: $*"; exit 2; }

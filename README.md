@@ -403,6 +403,23 @@ For a hands-on walkthrough of your first cycle: [docs/getting-started/your-first
 
 ---
 
+## Auth modes
+
+Evolve-loop supports four authentication modes, detected in priority order:
+
+| Mode | Condition | Notes |
+|---|---|---|
+| `CUSTOM_PROXY` | `EVOLVE_ANTHROPIC_BASE_URL` or `ANTHROPIC_BASE_URL` is set | Routes all `claude -p` calls through your endpoint; must speak `POST /v1/messages` |
+| `API_KEY` | `ANTHROPIC_API_KEY` is set | Deducts from Anthropic API credits per call |
+| `SUBSCRIPTION_OAUTH` | `~/.claude/.credentials.json` has a valid OAuth token | Uses Claude Code subscription auth — no extra config needed |
+| `MISCONFIGURED` | None of the above | Run `claude login` or set `ANTHROPIC_API_KEY` |
+
+`EVOLVE_ANTHROPIC_BASE_URL` is proxy-agnostic — it works with LiteLLM, corporate gateways, or any endpoint that speaks the Anthropic Messages API. It is **not** required for subscription auth.
+
+To detect your active auth mode: `bash scripts/utility/doctor-subscription-auth.sh`
+
+---
+
 ## Architecture Deep-Dives
 
 The README is the surface. Real depth lives in `docs/`:
