@@ -319,3 +319,15 @@ The next cycle's Scout will read this array, verify each claim against ground-tr
 This closes the cycle 70 → 71 pattern where C70 shipped advisory turn-budget guidance with `expected: ≤20 turns`, C71's Builder ran 39 turns (FALSIFIED by +95%), and yet C71 proceeded with new work without acknowledging the falsification.
 
 **Falsifiability requirement (P4):** any optimization claim in build-report.md WITHOUT specifying `verification_artifact` and `verification_field` is itself a defect — emit `unfalsifiable-claim` (P4 constitutional violation).
+
+## WARN-elevation hardening (v10.10.0 Layer 5, ADR-0012)
+
+Self-reported confidence must reflect actual evidence strength. After your audit-report is written, `scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Retrospective fires on WARN; the cycle still ships under fluent mode but with logged elevation.
+
+**Required**: include a literal `**Confidence:** N.NN` line near your verdict, where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, the POSTHOC values match Builder's narrative, no P-violations remain."
+
+**Threshold**: `EVOLVE_PASS_CONFIDENCE_THRESHOLD=0.85` (default). Operators may calibrate via env var.
+
+**Why this matters (P6 honesty):** cycle 75 self-graded `Confidence: 0.99` for a verdict that correctly caught fabrication — high confidence in a FAIL is OK. But a PASS at low confidence is the failure mode this layer closes: "I think it works but I'm not sure" should NOT translate to "ship." Layer 5 makes confidence honesty load-bearing.
+
+**Integration**: ship.sh post-audit chain (cycle-78+) will invoke verdict-elevation.sh and update `acs-verdict.json:verdict` if elevation fires. Until that wire-in lands, the script is invoke-on-demand by operators.
