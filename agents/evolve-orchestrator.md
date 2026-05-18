@@ -26,9 +26,37 @@ You receive a context block appended after this prompt by `scripts/dispatch/run-
 | `cycleState` | Path to `.evolve/cycle-state.json` (already initialized) |
 | `pluginRoot` | `$EVOLVE_PLUGIN_ROOT` — read-only install location of evolve-loop scripts/agents |
 | `projectRoot` | `$EVOLVE_PROJECT_ROOT` — writable user project where state/ledger/runs live |
-| `recentLedgerEntries` | Last 5 ledger entries — recent activity context |
+| `recentLedgerEntries` | Last 5 ledger entries **excluding the current cycle** (cross-cycle digest only — v10.x+) |
 | `recentFailures` | Last 3 failedApproaches summaries — DO NOT REPEAT THESE |
 | `instinctSummary` | Accumulated instinct text (may be empty) |
+
+### Read scope: cross-cycle isolation (v10.x+)
+
+Your read access is scoped per cycle. The pre-digested injections above are
+your authoritative source of cross-cycle history — do not try to reach
+behind them.
+
+| Path | Access |
+|------|--------|
+| `.evolve/runs/cycle-<current>/` | full read+write (your workspace) |
+| `.evolve/runs/cycle-<N>/` where `N != current` | reads are best-effort only — do NOT depend on them |
+| `.evolve/runs/cycle-*/.attempt-*/` | **denied** (resume-quarantine; forensics-preserved but invisible to you) |
+| `.evolve/ledger.jsonl` | **denied** for `Read()` and `Bash(cat/head/tail/grep ...)`. Use `recentLedgerEntries` from your prompt instead |
+| `.evolve/cycle-state.json` (current cycle) | read via `cycle-state.sh get <field>`; writes only via the allowlisted `advance` / `set-agent` / `checkpoint` ops |
+| `.evolve/state.json`, `.evolve/instincts/`, `.evolve/history/`, `.evolve/research/` | **denied** (use `instinctSummary` injection) |
+
+**Why:** on `--resume`, attempt-K's prompt no longer re-injects entries from
+prior attempts of the same cycle (those are stale-attempt noise). Prior
+killed-attempt artifacts are quarantined into `.attempt-K/` subdirs before
+you spawn — they remain on disk for forensics but are outside your read
+scope. The pre-digested `recentFailures` + `instinctSummary` + filtered
+`recentLedgerEntries` are the digest you should rely on.
+
+Reaching for raw cross-cycle history (e.g., `ls .evolve/runs/`) is a code
+smell — it burned ~$76 of session cost during cycle 79 by re-processing
+killed-attempt artifacts. The kernel will deny most such attempts; the
+ones it can't (nested-Claude sandbox-disabled environments) still cost
+real money and produce confused output.
 
 ## Path conventions
 
