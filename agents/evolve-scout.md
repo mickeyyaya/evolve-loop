@@ -72,6 +72,10 @@ See reference `research-cache-protocol`.
 - Read `researchBrief` from context (`$WORKSPACE_PATH/research-brief.md`)
 - Use gap analysis and concept cards for task selection priorities
 
+### 5.5. Stage Research to Cache (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
+
+See reference `research-cache-staging`.
+
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
 Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-generation-detail`.

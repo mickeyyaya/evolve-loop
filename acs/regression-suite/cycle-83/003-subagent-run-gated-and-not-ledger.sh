@@ -2,7 +2,7 @@
 # AC3: subagent-run.sh advisory event is gated by _EVOLVE_AUTH_MODE_LOGGED
 #      and writes to abnormal-events.jsonl (NOT ledger.jsonl).
 set -uo pipefail
-ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 F="$ROOT/scripts/dispatch/subagent-run.sh"
 [ -f "$F" ] || { echo "RED AC3: $F missing"; exit 1; }
 

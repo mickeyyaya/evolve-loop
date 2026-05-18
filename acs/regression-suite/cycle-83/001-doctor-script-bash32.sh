@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC1: doctor-subscription-auth.sh exists and is bash-3.2 safe.
 set -uo pipefail
-ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 SCRIPT="$ROOT/scripts/utility/doctor-subscription-auth.sh"
 [ -f "$SCRIPT" ] || { echo "RED AC1: $SCRIPT missing"; exit 1; }
 if grep -nE 'declare -A|mapfile|readarray|sed -i '\'''\''|date -d|\$\{[a-zA-Z_]+\^\^\}|\$\{[a-zA-Z_]+,,\}' "$SCRIPT" >/dev/null; then

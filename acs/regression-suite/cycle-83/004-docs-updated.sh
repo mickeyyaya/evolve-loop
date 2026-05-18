@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AC4: README.md has Auth modes section and CLAUDE.md has doctor pointer.
 set -uo pipefail
-ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 
 # README Auth modes table with 4 mode names
 README="$ROOT/README.md"

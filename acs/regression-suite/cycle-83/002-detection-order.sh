@@ -2,7 +2,7 @@
 # AC2: Detection order is CUSTOM_PROXY > API_KEY > SUBSCRIPTION_OAUTH > MISCONFIGURED.
 # Verify by setting overlapping env and checking priority.
 set -uo pipefail
-ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+ROOT="${WORKTREE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 SCRIPT="$ROOT/scripts/utility/doctor-subscription-auth.sh"
 
 extract_mode() {
