@@ -463,6 +463,17 @@ cleanup() {
         kill -TERM "$WATCHDOG_PID" 2>/dev/null || true
         wait "$WATCHDOG_PID" 2>/dev/null || true
     fi
+    # Per-cycle resource release (per ~/.claude/plans/linked-meandering-lobster.md Step 4+6):
+    # On any terminal exit (SHIP, FAIL, watchdog-kill, quota-pause that didn't
+    # checkpoint), invoke cycle-release.sh for auditable release: emits a final
+    # ledger entry `role:release`, ensures cycle-state is cleared, and preserves
+    # the workspace dir for forensics. Guarded so this is a no-op until Step 6
+    # of the plan creates the script.
+    local _release_script="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-release.sh"
+    if [ -x "$_release_script" ]; then
+        bash "$_release_script" "$CYCLE" "$rc" 2>/dev/null \
+            || log "WARN: cycle-release.sh exited non-zero (rc=$?)"
+    fi
     bash "$CYCLE_STATE_HELPER" clear 2>/dev/null || true
     log "cycle-state cleared (rc=$rc)"
     # v9.5.1: handle watchdog-fired stall exit code.
@@ -495,6 +506,67 @@ if [ "${EVOLVE_RESUME_MODE:-0}" = "1" ]; then
     CYCLE="$RESUMED_CYCLE"
     WORKSPACE=".evolve/runs/cycle-$CYCLE"
     log "RESUME-MODE: cycle=$CYCLE workspace=$WORKSPACE resume_phase=${EVOLVE_RESUME_PHASE:-?}"
+
+    # Resume-quarantine (per ~/.claude/plans/linked-meandering-lobster.md Step 4):
+    # Move any artifacts written by the prior killed attempt into
+    # $WORKSPACE/.attempt-K/ so the resumed orchestrator sees a clean workspace.
+    # K = checkpoint.autoResumeAttempts (or count of existing .attempt-* dirs if
+    # the field is missing). Skip if the workspace is already clean (empty or
+    # only contains the start-marker).
+    #
+    # The orchestrator profile denies reads of .attempt-* (Step 2), so the
+    # quarantined artifacts remain on disk for forensics but invisible to the
+    # resumed orchestrator's read scope.
+    resume_quarantine_artifacts() {
+        local ws_abs="$EVOLVE_PROJECT_ROOT/$WORKSPACE"
+        [ -d "$ws_abs" ] || return 0
+        # Skip if quarantine is explicitly disabled (test/recovery escape hatch).
+        if [ "${EVOLVE_QUARANTINE_PRIOR_ATTEMPT:-1}" = "0" ]; then
+            log "RESUME-QUARANTINE: skipped (EVOLVE_QUARANTINE_PRIOR_ATTEMPT=0)"
+            return 0
+        fi
+        # Determine K.
+        local k=""
+        if command -v jq >/dev/null 2>&1; then
+            k=$(jq -r '.checkpoint.autoResumeAttempts // 0' \
+                "$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json" 2>/dev/null)
+        fi
+        # Bash 3.2-compatible numeric check.
+        if [ -z "$k" ] || ! [[ "$k" =~ ^[0-9]+$ ]]; then
+            k=0
+        fi
+        # If K=0 (first resume), use 1; otherwise stay at K to mark the
+        # attempt that JUST failed.
+        [ "$k" = "0" ] && k=1
+        # If the target attempt-K dir is already populated, bump until free.
+        while [ -d "$ws_abs/.attempt-$k" ]; do
+            k=$((k + 1))
+        done
+        local attempt_dir="$ws_abs/.attempt-$k"
+        # Count movable entries (exclude .attempt-* dirs and our marker).
+        local moved=0
+        local entry
+        for entry in "$ws_abs"/*; do
+            [ -e "$entry" ] || continue
+            case "$(basename "$entry")" in
+                .attempt-*|.cycle-start-marker) continue ;;
+            esac
+            if [ "$moved" = "0" ]; then
+                mkdir -p "$attempt_dir" 2>/dev/null || {
+                    log "WARN: RESUME-QUARANTINE could not mkdir $attempt_dir; skipping"
+                    return 0
+                }
+            fi
+            mv "$entry" "$attempt_dir/" 2>/dev/null && moved=$((moved + 1))
+        done
+        if [ "$moved" -gt 0 ]; then
+            log "RESUME-QUARANTINE: moved $moved prior-attempt artifact(s) to .attempt-$k/"
+        else
+            log "RESUME-QUARANTINE: workspace already clean (nothing to quarantine)"
+            rmdir "$attempt_dir" 2>/dev/null || true
+        fi
+    }
+    resume_quarantine_artifacts
     # Pull the preserved worktree path back into env so the orchestrator can
     # find it. Mark as NOT-provisioned-by-this-process so the EXIT trap won't
     # try to clean up something it didn't create (resume-cycle.sh owns the
