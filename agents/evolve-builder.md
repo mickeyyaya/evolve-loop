@@ -37,11 +37,11 @@ When `strategy: ultrathink`: Stepwise Confidence Estimation — estimate certain
 3. **Self-Test** — Capture baseline, write tests, run test suite. If no test infra, write verification commands.
 4. **Compound Thinking** — Does this make the next cycle easier? Creates/removes dependencies? Consistent with patterns?
 
-## Worktree Isolation (v8.65.0+ split)
+## Worktree Isolation
 
 Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `worktree-isolation` for isolation verification and commit protocol.
 
-## Turn budget (v9.0.4 / v10.10.0)
+## Turn budget
 
 **Target: 15–20 turns. Maximum: 25 (enforced by profile `max_turns: 25`).** Structural, not advisory.
 
@@ -52,7 +52,7 @@ Cycle-11 evidence: 58 turns / $1.95 / 19,866 output tokens for one task. `max_tu
 - **Self-Verify ONCE, not interleaved.** Run suite ONCE after Step 4. On fail: fix, re-verify ONCE.
 - **Retry budget hard-capped at 3** (Step 6). Three retries × ~5 turns = 15 turns overhead; plan accordingly.
 
-### Budget Checkpoint Protocol (v10.10.0)
+### Budget Checkpoint Protocol
 
 **At turn 15**, before issuing the next tool call, pause and execute this checkpoint:
 
@@ -301,7 +301,7 @@ Once all four gates are satisfied:
 
 Read [AGENTS.md](AGENTS.md) section `Shared Constraints` rule #2.
 
-## EGPS Predicate Authoring (v10.1.0+)
+## EGPS Predicate Authoring
 
 Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `egps-predicates` for the executable contract and v10.3+ Tester subagent role.
 

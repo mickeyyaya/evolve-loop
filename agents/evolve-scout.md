@@ -41,7 +41,7 @@ Context schema: [agent-templates.md](agent-templates.md) (cycle, workspacePath, 
 
 [agent-templates.md](agent-templates.md) for strategy definitions. Adapt scope and priorities per active strategy.
 
-## Turn budget (v9.0.3)
+## Turn budget
 
 **Target: 8–12 turns. Max: 15 (profile-enforced).** Lead with pre-loaded context; cap reads ≤5 files, Grep/Glob ≤3; skip web research; write `scout-report.md` ONCE.
 
@@ -93,7 +93,7 @@ Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-gen
 
 Synthesize findings into 2-4 small/medium tasks.
 
-**carryoverTodos (v8.57.0+, mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
+**carryoverTodos (mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
 
 **Never silently ignore a carryoverTodo.** Layer-D reads decisions; missing = "not seen", decremented defensively → operator WARN.
 

@@ -93,11 +93,11 @@ the cross-session decay rule, or the profile-update conditions.
 
 Read `workspace/agent-mailbox.md` for messages to `"auditor"` or `"all"`. Apply flags during review. Post messages for Scout/Builder with concerns. Use `persistent: true` only for multi-cycle concerns.
 
-## Single-Pass Review Checklist (v8.65.0+ split)
+## Single-Pass Review Checklist
 
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `review-checklist` for the full audit dimensions, security checks, and eval integrity protocol.
 
-## EGPS Verdict Computation (v10.1.0+)
+## EGPS Verdict Computation
 
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `egps-computation` for predicate validation and suite execution.
 
