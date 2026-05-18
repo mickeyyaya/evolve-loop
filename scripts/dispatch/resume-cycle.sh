@@ -133,6 +133,56 @@ if [ "$bump_rc" -ne 0 ]; then
     fail "bump-auto-resume-attempts failed unexpectedly (rc=$bump_rc)"
 fi
 
+# --- Step 2c: resume-quarantine prior-attempt artifacts --------------------
+#
+# Per ~/.claude/plans/linked-meandering-lobster.md Step 5: move any artifacts
+# the killed attempt wrote into .evolve/runs/cycle-N/.attempt-K/ so the
+# resumed orchestrator sees a clean workspace. K = checkpoint.autoResumeAttempts
+# (post-bump from Step 2b). Defense-in-depth alongside run-cycle.sh's own
+# quarantine call (Step 4): whichever runs first moves the artifacts; the
+# other finds the workspace already clean.
+#
+# The orchestrator profile (Step 2) denies reads of .attempt-* paths, so the
+# quarantined artifacts persist on disk for forensics but stay outside the
+# resumed orchestrator's read scope.
+#
+# Skip via EVOLVE_QUARANTINE_PRIOR_ATTEMPT=0 for tests/manual recovery.
+if [ "${EVOLVE_QUARANTINE_PRIOR_ATTEMPT:-1}" != "0" ]; then
+    WORKSPACE_ABS="$EVOLVE_PROJECT_ROOT/.evolve/runs/cycle-$CYCLE"
+    if [ -d "$WORKSPACE_ABS" ]; then
+        # K from autoResumeAttempts (post-bump above).
+        K=$(jq -r '.checkpoint.autoResumeAttempts // 0' "$STATE_FILE" 2>/dev/null)
+        if [ -z "$K" ] || ! [[ "$K" =~ ^[0-9]+$ ]]; then
+            K=1
+        fi
+        # If target .attempt-K/ already exists, bump until free.
+        while [ -d "$WORKSPACE_ABS/.attempt-$K" ]; do
+            K=$((K + 1))
+        done
+        ATTEMPT_DIR="$WORKSPACE_ABS/.attempt-$K"
+        MOVED=0
+        for ENTRY in "$WORKSPACE_ABS"/*; do
+            [ -e "$ENTRY" ] || continue
+            case "$(basename "$ENTRY")" in
+                .attempt-*|.cycle-start-marker) continue ;;
+            esac
+            if [ "$MOVED" = "0" ]; then
+                mkdir -p "$ATTEMPT_DIR" 2>/dev/null || {
+                    log "WARN: resume-quarantine could not mkdir $ATTEMPT_DIR; skipping"
+                    break
+                }
+            fi
+            mv "$ENTRY" "$ATTEMPT_DIR/" 2>/dev/null && MOVED=$((MOVED + 1))
+        done
+        if [ "$MOVED" -gt 0 ]; then
+            log "RESUME-QUARANTINE: moved $MOVED prior-attempt artifact(s) to .attempt-$K/"
+        else
+            rmdir "$ATTEMPT_DIR" 2>/dev/null || true
+        fi
+        unset WORKSPACE_ABS K ATTEMPT_DIR MOVED ENTRY
+    fi
+fi
+
 # --- Step 3: summary -------------------------------------------------------
 
 log "RESUME: cycle $CYCLE"
