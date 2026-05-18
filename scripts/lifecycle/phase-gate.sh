@@ -45,7 +45,7 @@ STATE="$EVOLVE_DIR/state.json"
 # Timestamp for freshness check (files must be < 10 minutes old)
 FRESHNESS_THRESHOLD=600
 
-log() { echo "[phase-gate:$GATE] $1"; }
+log() { echo "[phase-gate:$GATE] $1" >&2; }
 fail() { log "FAIL: $1"; exit 1; }
 anomaly() { log "ANOMALY: $1"; exit 2; }
 
