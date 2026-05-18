@@ -678,15 +678,18 @@ cmd_run() {
 
     # Build the prompt that the LLM will see. Two ordering modes:
     #
-    # v1 (default — EVOLVE_CACHE_PREFIX_V2=0): legacy ordering with dynamic
-    # data (challenge_token, artifact_path) injected at the TOP. Backwards
-    # compatible; preserved unchanged from v8.60-and-earlier behavior.
+    # v2 (DEFAULT since cycle 43 / v10.6 — EVOLVE_CACHE_PREFIX_V2=1): static-
+    # first / dynamic-last ordering recommended by Anthropic for prompt-cache
+    # reuse. The shared prelude (mandatory output contract, permission scope,
+    # trust boundary reminders + role-specific operating notes) comes from
+    # build-invocation-context.sh and flows via --append-system-prompt;
+    # personas DO NOT duplicate it. The user prompt is just a small
+    # INVOCATION CONTEXT block + the task envelope.
     #
-    # v2 (opt-in — EVOLVE_CACHE_PREFIX_V2=1): static-first / dynamic-last
-    # ordering recommended by Anthropic for prompt-cache reuse. The static
-    # bedrock comes from build-invocation-context.sh (byte-identical for
-    # same role across runs); dynamic data lives in a small INVOCATION
-    # CONTEXT block at the bottom. v8.61.0 Layer 1 (Campaign A — Tier 1).
+    # v1 (legacy opt-in — EVOLVE_CACHE_PREFIX_V2=0): inlines the prelude at
+    # the TOP of the user prompt with dynamic data (challenge_token,
+    # artifact_path) interleaved. Preserved for backwards compatibility with
+    # v8.60-and-earlier callers; never auto-selected.
     local injected_prompt
     injected_prompt=$(mktemp)
 

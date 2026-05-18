@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # build-invocation-context.sh — emit the static bedrock prefix for a subagent.
 #
-# v8.61.0 Layer 1 (Campaign A — Tier 1 cache layer).
+# CANONICAL SHARED PRELUDE. The output of this script IS the trust-boundary
+# boilerplate (mandatory output contract, permission scope, trust boundary
+# reminders + role-specific operating notes) that every phase-agent
+# invocation receives. Personas (agents/evolve-*.md) DO NOT duplicate this
+# content — they extend it with role-specific workflow, output templates,
+# and reference indexes.
+#
+# v8.61.0 Layer 1 (Campaign A — Tier 1 cache layer). v2-cache-prefix
+# (EVOLVE_CACHE_PREFIX_V2=1) routes this content via --append-system-prompt;
+# v1 legacy fallback inlines it at the top of the user prompt.
 #
 # Output to stdout is byte-identical for the same role across every invocation
 # (no timestamps, no random salts, no environment data). When this content is
