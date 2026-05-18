@@ -72,7 +72,7 @@ REPO_ROOT="$EVOLVE_PROJECT_ROOT"
 # deduction. Warn once when neither an API key nor a subscription proxy is configured.
 _today=$(date -u +"%Y-%m-%d")
 if [ "$_today" \> "2025-06-14" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${EVOLVE_ANTHROPIC_BASE_URL:-}" ] && [ -z "${ANTHROPIC_BASE_URL:-}" ]; then
-    echo "[subagent-run] WARN: after June 15 2025, claude -p deducts from API credits; set EVOLVE_ANTHROPIC_BASE_URL to a subscription proxy (e.g., hermes proxy start) to avoid charges" >&2
+    echo "[subagent-run] WARN: after June 15 2025, claude -p deducts from API credits unless subscription auth (~/.claude.json) is active; set EVOLVE_ANTHROPIC_BASE_URL to a custom endpoint if needed" >&2
 fi
 unset _today
 
