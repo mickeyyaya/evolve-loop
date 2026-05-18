@@ -108,17 +108,7 @@ Three rules: summarize after Read, prune expired results from your trajectory, a
 - **High (RED):** Skip all except forced `/evaluator` at `--depth quick`.
 - External invocation ~2-5K tokens; `/code-review-simplify` pipeline ~5K. Skip if guidance in applied instinct.
 
-**Record in build-report.md:**
-
-```markdown
-## Skills Invoked
-| Skill | Priority | Outcome | Useful? |
-|-------|----------|---------|---------|
-| `everything-claude-code:security-review` | primary | Guided input validation approach | yes |
-| `python-review-patterns` | supplementary | Skipped — instinct covered pattern | skipped |
-```
-
-**Ledger entry:** `"skillsInvoked": [{"name": "<skill>", "useful": true|false|"skipped"}]` in `data`.
+Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
 
 ### Step 3: Design (chain-of-thought required)
 Enumerate reasoning explicitly:
@@ -214,18 +204,7 @@ Scan adjacent code; record ≥1 discovery per build. See reference `discovery-sc
 Feed Learn phase Pipeline; cite files, line ranges.
 
 ### Step 9: Retrospective
-Write `workspace/builder-notes.md` (under 20 lines):
-
-```markdown
-# Builder Notes — Cycle {N}
-## Task: <slug>
-### File Fragility
-- <file>: <observation about brittleness, coupling, blast radius>
-### Approach Surprises
-- <unexpected findings>
-### Recommendations for Scout
-- <sizing/scoping suggestions, areas to avoid>
-```
+Write `workspace/builder-notes.md` (≤20 lines) covering: file-fragility, approach-surprises, scout-recommendations. Template: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `builder-notes-template`.
 
 ### Token Budget Awareness
 - Check `strategy` for budget constraints; if task too large, note it.
@@ -344,37 +323,4 @@ tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwrigh
 
 ## POSTHOC enforcement (v10.10.0 Layer 3, ADR-0012)
 
-**You are FORBIDDEN from self-quoting these 8 truthable metrics in `build-report.md`** (canonical list at [docs/architecture/posthoc-schema.md](../docs/architecture/posthoc-schema.md)):
-
-| Metric | Ground-truth artifact |
-|---|---|
-| `total_cost_usd` | `<role>-usage.json` |
-| `num_turns` | `<role>-usage.json` |
-| `duration_ms` | `<role>-timing.json` |
-| `input_tokens` | `<role>-usage.json` |
-| `output_tokens` | `<role>-usage.json` |
-| `cache_read_input_tokens` | `<role>-usage.json` |
-| `files_changed` | `git show <sha> --numstat` |
-| `lines_added` / `lines_removed` | `git show <sha> --numstat` |
-
-Plus all **AC-existence claims** ("file X exists" or "command Y exits 0").
-
-**Required format** in build-report.md:
-
-```markdown
-| num_turns | pending <!-- POSTHOC: jq '.num_turns' .evolve/runs/cycle-N/builder-usage.json --> |
-| docs/architecture/foo.md exists | pending <!-- POSTHOC: test -f docs/architecture/foo.md && echo OK || echo MISSING --> |
-```
-
-The Auditor will execute every POSTHOC command and substitute the ground-truth value. **Authored-prose `# exit 0` text after a `test -f` command is forbidden** — that pattern is what cycle 75 fabricated and was caught FAIL@0.99 confidence.
-
-### INERT marker discipline (v10.10.0 Layer 3)
-
-If you mark a piece of work `INERT` (acknowledging it doesn't yet fully function — e.g. P2 advisory turn-budget in cycle 72), you MUST include `re_attempt_by_cycle: N` where N ≤ current_cycle + 5. INERT without a re-attempt deadline is treated as permanent abandonment and violates the constitutional audit checklist (Layer 4 P5).
-
-Example:
-```markdown
-> **INERT cycle 76** — re_attempt_by_cycle: 81 — Advisory turn-budget cannot constrain
-> the implementer that writes the telemetry. Case A (programmatic kill) blocked by no
-> --max-turns flag in claude -p. Re-attempt when claude CLI exposes a turn limit.
-```
+Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache tokens, files changed, lines added/removed) or AC-existence claims in `build-report.md`. Use `pending <!-- POSTHOC: <cmd> -->` placeholders. INERT marks MUST include `re_attempt_by_cycle: N` where N ≤ current_cycle + 5. Full metric list, format spec, and INERT example: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `posthoc-enforcement`.
