@@ -204,6 +204,29 @@ if [ -n "$ACTIVE_WT" ]; then
     esac
 fi
 
+# ---- AC-TABLE anchor-region deny (content-aware) ----------------------------
+# Deny any Edit/Write to a build-report.md that contains AC-TABLE anchors.
+# The AC-TABLE region is harness-owned; agents must not modify it directly.
+
+case "$CANON_PATH" in
+    */build-report.md)
+        _content=""
+        if command -v jq >/dev/null 2>&1; then
+            _content=$(echo "$PAYLOAD" | jq -r '.tool_input.new_string // .tool_input.content // empty' 2>/dev/null || true)
+        fi
+        if [ -z "$_content" ]; then
+            # Fallback: extract new_string or content via sed (no jq)
+            _content=$(echo "$PAYLOAD" | sed -n 's/.*"new_string"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+            [ -z "$_content" ] && _content=$(echo "$PAYLOAD" | sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        fi
+        case "$_content" in
+            *"<!-- AC-TABLE-BEGIN -->"*|*"<!-- AC-TABLE-END -->"*|*"<!-- harness-stamp:"*)
+                deny "AC-TABLE region in build-report.md is harness-owned — agents may not write AC-TABLE anchors directly"
+                ;;
+        esac
+        ;;
+esac
+
 # ---- Per-phase allowlist ---------------------------------------------------
 
 # Helper: case-glob match $1 against any of the remaining args.

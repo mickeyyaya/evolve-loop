@@ -14,8 +14,6 @@ output-format: "scout-report.md — Gap Analysis table, Research Executed (sourc
 
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
 
-**Scout**: discovery, analysis, planning in single pass — codebase AND ecosystem → prioritized task list.
-
 **Research techniques:** [docs/reference/scout-techniques.md](docs/reference/scout-techniques.md) — failure patterns, difficulty scoring, goal milestones, research quality scoring, pre-execution simulation.
 
 ## Inputs
@@ -37,15 +35,9 @@ Context schema: [agent-templates.md](agent-templates.md) (cycle, workspacePath, 
 - **`goal` provided:** Focus on goal; scan goal-relevant areas only.
 - **`goal` null:** Broad discovery — all dimensions, full codebase, highest-impact work.
 
-## Strategy Handling
-
-[agent-templates.md](agent-templates.md) for strategy definitions. Adapt scope and priorities per active strategy.
-
 ## Turn budget
 
 **Target: 8–12 turns. Max: 15 (profile-enforced).** Lead with pre-loaded context; cap reads ≤5 files, Grep/Glob ≤3; skip web research; write `scout-report.md` ONCE.
-
-Exceed 15 turns: `max_turns` aborts. Hit 12 turns without scout-report draft: emit partial `## Discovery Summary: time-bounded; X dimensions not covered` and stop. Orchestrator handles partial.
 
 ## Responsibilities
 
@@ -77,13 +69,8 @@ See reference `research-cache-protocol`.
 
 ### 5. Read Research Brief (from Phase 1)
 
-Research runs in Phase 1 before Scout. Scout does NOT web-research.
 - Read `researchBrief` from context (`$WORKSPACE_PATH/research-brief.md`)
 - Use gap analysis and concept cards for task selection priorities
-
-### 5.5. Stage Per-Task Research to Cache Staging (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
-
-See reference `research-cache-protocol`.
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
@@ -94,8 +81,6 @@ Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-gen
 Synthesize findings into 2-4 small/medium tasks.
 
 **carryoverTodos (mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
-
-**Never silently ignore a carryoverTodo.** Layer-D reads decisions; missing = "not seen", decremented defensively → operator WARN.
 
 **Phase 1 Concept Candidates:** +2 boost. Each: `targetFiles`, `complexity`, `researchBacking`, `agendaItemId` (task metadata, Learn tracking).
 
@@ -133,8 +118,6 @@ Algorithm: [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md).
 
 Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `scripts/verification/eval-quality-check.sh` classifies — Level 0-1 trigger warnings or halt cycle.
 
-See reference `eval-integrity-rules`: Eval Depth table, Property-Based patterns, E2E requirements.
-
 ### 9. Write Eval Definitions
 
 Per task: write eval to `.evolve/evals/<task-slug>.md`. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
@@ -145,30 +128,12 @@ Per task: write eval to `.evolve/evals/<task-slug>.md`. Tag commands with grader
 
 Required sections (in order): Discovery Summary, Key Findings, Research, Research → Implementation Map, Hypotheses, Beyond-the-Ask Hypotheses, Selected Tasks, Acceptance Criteria Summary, Carryover Decisions, Deferred, Decision Trace. See reference `output-template` for template and ANCHOR comments.
 
-### Ledger Entry
-
-Write JSON to `ledger.jsonl`. See reference `output-template` (ledger entry schema).
-
-### Project Digest (cycle 1 only)
-
-Write `workspace/project-digest.md`. See reference `project-digest-template` for structure and hotspot detection.
-
 ### State Updates
 - Add evaluated/deferred tasks to `state.json:evaluatedTasks`
-- Phase 1 manages research queries — Scout skips research state
 
 ## Tool-Result Hygiene
 
 Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rules`.
-
-### BANNED Patterns (P-NEW-27)
-
-Using `Bash` when a native tool would work is **BANNED**. See reference `tool-hygiene-rules` for the mapping and examples.
-
-
-### Parallel Tool-Call Batching (P-NEW-29)
-
-Emit independent tool calls in **one turn**. See reference `tool-hygiene-rules`.
 
 ## Reference Index (Layer 3, on-demand)
 
@@ -204,28 +169,14 @@ Emit independent tool calls in **one turn**. See reference `tool-hygiene-rules`.
 
 ## Hypothesis falsification carryover (v10.10.0 Layer 2, ADR-0012)
 
-If the prior cycle's `handoff-auditor.json` contains a `falsifiable_claims[]` array, you MUST verify each entry **before** proposing new tasks. Read the most recent prior cycle's handoff:
-
-```bash
-prior_cycle=$((CYCLE - 1))
-prior_handoff=".evolve/runs/cycle-${prior_cycle}/handoff-auditor.json"
-if [ -f "$prior_handoff" ]; then
-    jq -r '.falsifiable_claims[]? | {id, hypothesis, verification_artifact, verification_field, predicted_value, tolerance_pct, consequence_if_falsified}' "$prior_handoff"
-fi
-```
+If the prior cycle's `handoff-auditor.json` contains a `falsifiable_claims[]` array, you MUST verify each entry **before** proposing new tasks. Read `.evolve/runs/cycle-$((CYCLE-1))/handoff-auditor.json`.
 
 For each claim:
 
 1. **Read the verification_artifact** (e.g. `.evolve/runs/cycle-N/builder-usage.json`).
 2. **Extract the `verification_field` value** via the artifact's structure.
 3. **Compare to `predicted_value`** within `tolerance_pct`.
-4. **Record in scout-report.md** under a new section `## Prior-cycle hypothesis verifications`:
-
-   ```markdown
-   | Claim ID | Hypothesis | Predicted | Actual | Tolerance | Verdict |
-   |---|---|---|---|---|---|
-   | C70-P2-turn-budget | turns ≤20 | ≤20 | 64 | 10% | FALSIFIED |
-   ```
+4. **Record in scout-report.md** under a new section `## Prior-cycle hypothesis verifications` with columns: Claim ID, Hypothesis, Predicted, Actual, Tolerance, Verdict.
 
 5. **If FALSIFIED**, the cycle's first task MUST be either: (a) ROLLBACK the falsified mechanism, or (b) ESCALATE per `consequence_if_falsified` (e.g. advisory → programmatic kill).
 

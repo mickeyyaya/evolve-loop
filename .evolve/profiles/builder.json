@@ -47,7 +47,9 @@
     "Bash(eval:*)",
     "Bash(awk:*)",
     "Bash(unlink:*)",
-    "Bash(ln:*)"
+    "Bash(ln:*)",
+    "Edit(.evolve/runs/*/build-report.md:AC-TABLE)",
+    "Write(.evolve/runs/*/build-report.md:AC-TABLE)"
   ],
   "add_dir": [
     "{worktree_path}"

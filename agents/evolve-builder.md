@@ -159,6 +159,10 @@ Check `strategy` for budget constraints; if task too large, note it. Avoid unnec
 | `code-review-simplify.sh` exists in project | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `optional-self-review` |
 | Task cannot proceed with existing tools | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `capability-gap-detection` |
 
+## AC-TABLE Region (harness-owned)
+
+The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by `scripts/lifecycle/build-report-ac-verify.sh` at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
+
 ## STOP CRITERION
 
 **When all five completion gates below are satisfied, write `build-report.md` via the Write tool and halt immediately. Do NOT continue editing files or reading artifacts after writing the report.**

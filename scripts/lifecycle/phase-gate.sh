@@ -758,6 +758,29 @@ EOF
         done < <(find "${EVOLVE_PROJECT_ROOT:-.}/acs/cycle-${CYCLE}" -maxdepth 1 -name "*.sh" -type f 2>/dev/null | sort)
     fi
 
+    # 7. AC-TABLE harness: run acceptance-check predicates and embed table in build-report.md
+    # Fixes producer-is-verifier defect that failed cycles 70, 71, 74, 75, 79.
+    local _harness _intent
+    _harness=""
+    if [ -n "${EVOLVE_PLUGIN_ROOT:-}" ] && [ -x "${EVOLVE_PLUGIN_ROOT}/scripts/lifecycle/build-report-ac-verify.sh" ]; then
+        _harness="${EVOLVE_PLUGIN_ROOT}/scripts/lifecycle/build-report-ac-verify.sh"
+    elif [ -x "${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/scripts/lifecycle/build-report-ac-verify.sh" ]; then
+        _harness="${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/scripts/lifecycle/build-report-ac-verify.sh"
+    fi
+    _intent="$WORKSPACE/intent.md"
+    if [ -n "$_harness" ]; then
+        bash "$_harness" "$_intent" "$WORKSPACE/build-report.md" || fail "AC-TABLE harness failed — one or more acceptance checks did not pass"
+        if ! grep -q "<!-- AC-TABLE-BEGIN -->" "$WORKSPACE/build-report.md" 2>/dev/null; then
+            fail "AC-TABLE-BEGIN anchor missing from build-report.md after harness run"
+        fi
+        if ! grep -q "<!-- AC-TABLE-END -->" "$WORKSPACE/build-report.md" 2>/dev/null; then
+            fail "AC-TABLE-END anchor missing from build-report.md after harness run"
+        fi
+        log "OK: AC-TABLE anchors verified in build-report.md"
+    else
+        log "WARN: build-report-ac-verify.sh not found — skipping AC-TABLE (install harness to enable)"
+    fi
+
     log "PASS: BUILD → AUDIT gate"
 }
 
