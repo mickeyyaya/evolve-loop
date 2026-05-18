@@ -40,7 +40,13 @@ expect_match() {
 }
 
 echo "=== Test 1: orchestrator persona has Resume Mode section ==="
-src=$(cat "$ORCHESTRATOR_MD")
+# v10.x: Resume Mode content was cold-moved from agents/evolve-orchestrator.md
+# into agents/evolve-orchestrator-reference.md during the v8.34.0+ token-
+# optimization passes (Stage 6-10b). The persona keeps a one-line pointer;
+# the canonical content lives in the reference doc. Grep both so the assertion
+# is satisfied wherever the marker resides.
+ORCHESTRATOR_REF_MD="$PROJECT_ROOT/agents/evolve-orchestrator-reference.md"
+src=$(cat "$ORCHESTRATOR_MD" "$ORCHESTRATOR_REF_MD" 2>/dev/null)
 expect_match "## Resume Mode header" "$src" "## Resume Mode"
 expect_match "documents EVOLVE_RESUME_MODE" "$src" "EVOLVE_RESUME_MODE"
 expect_match "documents EVOLVE_RESUME_PHASE" "$src" "EVOLVE_RESUME_PHASE"

@@ -144,11 +144,15 @@ EOF
 
 Loaded when `EVOLVE_RESUME_MODE=1`. Protocol for picking up a paused cycle.
 
+Three pause causes: `quota-likely`, `batch-cap-near`, `operator-requested` — the orchestrator emits the `CHECKPOINT-PAUSED` verdict for each.
+
+### Resume protocol
+
 1. **Read state**: `cycle-state.sh get cycle_id`, `cycle-state.sh get phase`, `cycle-state.sh resume-phase`.
-2. **Skip completed**: For each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, trust existing artifacts.
-3. **Clear checkpoint**: `cycle-state.sh clear-checkpoint`.
+2. **Skip completed**: For each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, trust existing artifacts. Do not re-run completed phases — re-running burns tokens and may stomp valid output.
+3. **Clear checkpoint**: `cycle-state.sh clear-checkpoint` once you resume forward progress.
 4. **Pick up**: Invoke `EVOLVE_RESUME_PHASE` subagent normally.
-5. **Re-pause**: If `quota-likely` or `batch-cap-near`, write new checkpoint.
+5. **Re-pause**: If `quota-likely` or `batch-cap-near` or if `EVOLVE_CHECKPOINT_REQUEST=1` is set (intentional operator pause), write new checkpoint and emit `CHECKPOINT-PAUSED`.
 
 ---
 
