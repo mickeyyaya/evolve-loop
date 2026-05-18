@@ -93,3 +93,85 @@ Loaded for Structured Output: handoff-auditor.json (C3).
 
 Emit JSON sidecar to `$WORKSPACE/handoff-auditor.json`.
 Required: `cycle`, `verdict`, `confidence`, `audit_bound_tree_sha`, `acceptance_criteria_results`, `adversarial_checks`.
+
+---
+
+## Section: output-template
+
+Loaded when the auditor writes `workspace/audit-report.md` and the `Ledger Entry` after the verdict is decided.
+
+### Workspace File: `workspace/audit-report.md`
+
+```markdown
+<!-- challenge-token: {token} -->
+# Cycle {N} Audit Report
+
+audit_bound_tree_sha: {TREE_SHA}
+
+<!-- ANCHOR:verdict -->
+## Verdict: PASS / WARN / FAIL
+
+## Code Quality
+```tsv
+Check	Status	Details
+Matches ACs	PASS/FAIL	<detail>
+Patterns	PASS/FAIL	<detail>
+Complexity	PASS/WARN	<detail>
+```
+
+## Security
+```tsv
+Check	Status	Details
+No secrets	PASS/FAIL	<detail>
+No injection	PASS/FAIL	<detail>
+```
+
+## Hallucination Detection
+```tsv
+Check	Status	Details
+Imports	PASS/WARN	<detail>
+Signatures	PASS/WARN	<detail>
+```
+
+## Pipeline Integrity
+```tsv
+Check	Status	Details
+Structure	PASS/FAIL	<detail>
+Cross-refs	PASS/FAIL	<detail>
+```
+
+## Eval Results
+```tsv
+Check	Command	Result
+<grader>	<command>	PASS/FAIL
+```
+
+## E2E Grounding (D.5)
+<!-- Include ONLY for UI tasks; otherwise write "N/A (non-UI task)" -->
+```tsv
+Check	Status	Details
+Committed	PASS/FAIL	tests/e2e/<slug>.spec.ts
+Selectors	PASS/FAIL	<N> locators verified
+No skip/only	PASS/FAIL	—
+Artifacts	PASS/FAIL	playwright-report/index.html
+E2E Verify	PASS/FAIL	—
+```
+
+<!-- ANCHOR:defects -->
+## Issues
+```tsv
+Severity	Description	File	Line
+HIGH	<issue>	<file>	<line>
+```
+
+## Self-Evolution Assessment
+- **Blast radius:** low/medium/high
+- **Reversibility:** easy/moderate/hard
+- **Convergence:** advancing/neutral/thrashing
+- **Compound effect:** beneficial/neutral/harmful
+```
+
+### Ledger Entry
+```json
+{"ts":"<ISO-8601>","cycle":<N>,"role":"auditor","type":"audit","data":{"verdict":"PASS|WARN|FAIL","confidence":<0.0-1.0>,"challenge":"<token>","prevHash":"<hash of previous ledger entry>","issues":{"critical":<N>,"high":<N>,"medium":<N>,"low":<N>},"evalChecks":{"total":<N>,"passed":<N>,"failed":<N>},"blastRadius":"low|medium|high"}}
+```
