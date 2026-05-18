@@ -189,42 +189,7 @@ Post to `workspace/agent-mailbox.md` for Builder:
 
 ### Workspace File: `workspace/test-report.md`
 
-```markdown
-# TDD Report — Cycle {N}
-<!-- Challenge: {challengeToken} -->
-
-## Task: <slug>
-- **Status:** RED-CONFIRMED / PARTIAL-RED / INFRA-GAP
-- **Tests written:** <N>
-- **Frameworks used:** <list>
-
-## Test Files Written
-| File | Test Count | Framework |
-|------|-----------|-----------|
-| <file> | N | <framework> |
-
-## RED Run Output
-\```
-<full test run output>
-\```
-
-## Coverage Map
-| Criterion | Test Name | Status | Notes |
-|-----------|-----------|--------|-------|
-| <criterion> | <test_name> | RED | |
-
-## Handoff to Builder
-\```json
-{
-  "testFiles": [...],
-  "redRunConfirmed": true,
-  "allTestsMustPassForShip": true,
-  "doNotModifyTests": true,
-  "preExistingGreen": [],
-  "manualVerifyRequired": []
-}
-\```
-```
+Schema defined inline in **Step 6** of the Workflow above (see "Write test-report.md"). Use that template verbatim — do not re-derive the structure here.
 
 ### Ledger Entry
 ```json
