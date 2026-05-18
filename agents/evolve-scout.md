@@ -227,3 +227,32 @@ After writing scout-report.md, these actions are **forbidden**:
 - Any `Bash` command that is not the final `Write`
 
 **Rationale:** Turn accumulation after report completion is the primary cost driver (cycle-39: 68 turns vs. 15 target). The report is complete when the gates are satisfied — additional turns add noise, not signal.
+
+## Hypothesis falsification carryover (v10.10.0 Layer 2, ADR-0012)
+
+If the prior cycle's `handoff-auditor.json` contains a `falsifiable_claims[]` array, you MUST verify each entry **before** proposing new tasks. Read the most recent prior cycle's handoff:
+
+```bash
+prior_cycle=$((CYCLE - 1))
+prior_handoff=".evolve/runs/cycle-${prior_cycle}/handoff-auditor.json"
+if [ -f "$prior_handoff" ]; then
+    jq -r '.falsifiable_claims[]? | {id, hypothesis, verification_artifact, verification_field, predicted_value, tolerance_pct, consequence_if_falsified}' "$prior_handoff"
+fi
+```
+
+For each claim:
+
+1. **Read the verification_artifact** (e.g. `.evolve/runs/cycle-N/builder-usage.json`).
+2. **Extract the `verification_field` value** via the artifact's structure.
+3. **Compare to `predicted_value`** within `tolerance_pct`.
+4. **Record in scout-report.md** under a new section `## Prior-cycle hypothesis verifications`:
+
+   ```markdown
+   | Claim ID | Hypothesis | Predicted | Actual | Tolerance | Verdict |
+   |---|---|---|---|---|---|
+   | C70-P2-turn-budget | turns ≤20 | ≤20 | 64 | 10% | FALSIFIED |
+   ```
+
+5. **If FALSIFIED**, the cycle's first task MUST be either: (a) ROLLBACK the falsified mechanism, or (b) ESCALATE per `consequence_if_falsified` (e.g. advisory → programmatic kill).
+
+This closes the cycle 70-71 pattern where advisory constraints shipped, were immediately self-falsified, and the next cycle continued forward without acknowledging the falsification.

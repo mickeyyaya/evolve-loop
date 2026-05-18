@@ -293,3 +293,29 @@ Each audit criterion in `audit-report.md` MUST cite at least one of 8 principles
 Missing citations → `principle-citation-missing` defect (HIGH).
 
 **Why this matters:** the cycle 70-72-75 mislabeling pattern shipped because audit verdicts were prose-grounded ("looks good") rather than principle-grounded ("AC-1 satisfies P1 via artifact X"). Citation discipline forces evidence-based reasoning over vibe-based.
+
+## Hypothesis falsification emission (v10.10.0 Layer 2, ADR-0012)
+
+When the build-report contains a falsifiable hypothesis (phrasings like "will reduce X by Y%", "expected to reduce", "should improve", "predicted") about a future-cycle metric, you MUST emit a `falsifiable_claims[]` entry in `handoff-auditor.json`:
+
+```json
+{
+  "falsifiable_claims": [
+    {
+      "id": "C70-P2-turn-budget",
+      "hypothesis": "advisory turn-budget will reduce builder turns to <=20",
+      "verification_artifact": ".evolve/runs/cycle-{NEXT}/builder-usage.json",
+      "verification_field": "num_turns",
+      "predicted_value": "<=20",
+      "tolerance_pct": 10,
+      "consequence_if_falsified": "escalate to programmatic kill (Case A); mark advisory as INERT with re_attempt_by_cycle"
+    }
+  ]
+}
+```
+
+The next cycle's Scout will read this array, verify each claim against ground-truth, and record falsifications in scout-report. Falsified claims become HIGH-priority carryover-todos that the cycle MUST address before new work.
+
+This closes the cycle 70 → 71 pattern where C70 shipped advisory turn-budget guidance with `expected: ≤20 turns`, C71's Builder ran 39 turns (FALSIFIED by +95%), and yet C71 proceeded with new work without acknowledging the falsification.
+
+**Falsifiability requirement (P4):** any optimization claim in build-report.md WITHOUT specifying `verification_artifact` and `verification_field` is itself a defect — emit `unfalsifiable-claim` (P4 constitutional violation).
