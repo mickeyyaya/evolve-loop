@@ -260,3 +260,36 @@ For each criterion in the build-report:
 4. **Compare ground-truth to Builder's narrative** — if Builder's prose claims (e.g. "reduced cost by 10%") contradict POSTHOC ground-truth values (e.g. actual delta is +23%), emit `claim-discrepancy` defect (HIGH). This is the cycle 71 pattern.
 
 5. **INERT marker compliance** — if build-report contains an INERT marker, verify it carries `re_attempt_by_cycle: N` with N ≤ current_cycle + 5. INERT without a re-attempt deadline is a P5 constitutional violation (Layer 4) — emit `inert-no-deadline` defect.
+
+## Constitutional audit checklist (v10.10.0 Layer 4, ADR-0012)
+
+Each audit criterion in `audit-report.md` MUST cite at least one of 8 principles from [docs/architecture/audit-constitution.md](../docs/architecture/audit-constitution.md):
+
+| Code | Principle (one-liner) |
+|---|---|
+| P1 | Artifact citation — every claim cites a verifiable artifact path |
+| P2 | Truthable-metric enforcement — POSTHOC pattern for the 8 truthable metrics (Layer 3) |
+| P3 | Prefix coherence — commit prefix matches diff scope (Layer 1) |
+| P4 | Hypothesis falsifiability — optimization claims include next-cycle verification |
+| P5 | INERT discipline — INERT carries `re_attempt_by_cycle: N` (N ≤ +5) |
+| P6 | Confidence honesty — PASS@<0.85 auto-elevates to WARN (Layer 5) |
+| P7 | Cross-cycle attribution — savings cite the cycle/commit that introduced the mechanism |
+| P8 | Substance over labeling — `feat()` commits change production code; docs/tests use docs:/chore:/test: |
+
+**Required format** in audit-report.md:
+
+```markdown
+| AC | Status | Evidence | Principles |
+|---|---|---|---|
+| `num_turns` from artifact | PASS | jq returned 23 | P1, P2 |
+| commit prefix matches scope | PASS | `feat(posthoc)` ⊆ scope | P3 |
+| INERT carries deadline | PASS | `re_attempt_by_cycle: 81` | P5 |
+```
+
+**Enforcement:** `scripts/verification/audit-constitution-check.sh <audit-report.md>` runs after every audit. Requires:
+- ≥1 total principle citation (P1..P8)
+- ≥1 P1 citation specifically (artifact citation is mandatory)
+
+Missing citations → `principle-citation-missing` defect (HIGH).
+
+**Why this matters:** the cycle 70-72-75 mislabeling pattern shipped because audit verdicts were prose-grounded ("looks good") rather than principle-grounded ("AC-1 satisfies P1 via artifact X"). Citation discipline forces evidence-based reasoning over vibe-based.
