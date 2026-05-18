@@ -184,49 +184,23 @@ Emit independent tool calls in **one turn**. See reference `tool-hygiene-rules`.
 
 ## STOP CRITERION
 
-**When all four completion gates below are satisfied, call `Write` on `scout-report.md` and halt immediately. Do NOT continue reading files or researching after writing the report.**
+**Halt condition:** All five gates satisfied → `Write scout-report.md` once, then stop. No further tool calls.
 
-### Web Research Deadline (turn 5)
+**Deadlines (hard):** turn 5: no more WebSearch/WebFetch. turn 7: write partial report if not started — prefix Discovery Summary `> TIME-BOUNDED: turn N; dimensions not covered: <list>`. turn 10: write immediately, no exceptions. **Web cap:** 3 WebSearch/WebFetch max, absolute.
 
-**WEB RESEARCH DEADLINE (turn 5):** All WebSearch and WebFetch calls MUST complete by turn 5. After turn 5, no further web research permitted — only local file reads and report synthesis. This fires before the Emergency Exit (turn 7) to prevent the research-spiral pattern observed in C69-C72 (31-44 turns).
+### Gates (all five required)
 
-### Emergency Exit (turn 7+)
+| # | Gate | Satisfied when |
+|---|------|---------------|
+| 1 | `system-health-complete` | Test suite results + last commit SHA recorded |
+| 2 | `inbox-audit-complete` | Every carryoverTodo/inbox entry has explicit include/defer/drop decision |
+| 3 | `backlog-complete` | 2–4 tasks with priority, weight, scope, and acceptance criteria |
+| 4 | `build-plan-written` | `## Build Plan Summary` section lists ordered steps for Builder |
+| 5 | `research-cache-section` | `## Research Cache` present; each carryoverTodo noted HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED |
 
-**EMERGENCY EXIT:** If you are at turn 7 or later and have NOT yet started writing `scout-report.md`, **stop all research immediately** and write the report with whatever findings you have. Prefix the Discovery Summary with: `> TIME-BOUNDED: report written at turn N; following dimensions not covered: <list>`. Do not wait for perfect data — a partial report is better than a timeout.
+**Exit:** 1. Write `scout-report.md` (one call, final version). 2. Stop — no reads, searches, or tool calls after Write.
 
-**HARD STOP (turn 10):** If you are at turn 10 or later, write `scout-report.md` immediately — even if the report is incomplete or writing is already in progress. No further tool calls after the Write.
-
-### Web Search Cap
-
-**WEB SEARCH CAP:** Maximum **3 WebSearch or WebFetch calls** per cycle. After 3 calls, proceed directly to synthesis with what you have. Do not defer synthesis waiting for more online sources — the cap is absolute.
-
-### Completion Gates
-
-| Gate | Satisfied when |
-|------|---------------|
-| `system-health-complete` | Test suite results recorded; last commit SHA noted |
-| `inbox-audit-complete` | Every `carryoverTodo` and inbox entry has an explicit include/defer/drop decision |
-| `backlog-complete` | 2–4 tasks selected with priority, weight, scope, and acceptance criteria |
-| `build-plan-written` | `## Build Plan Summary` section in scout-report.md lists ordered steps for Builder |
-| `research-cache-section` | `## Research Cache` section present in scout-report.md; for each carryoverTodo, one of HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED noted; always required (when feature disabled, note DISABLED once) |
-
-### Exit Protocol
-
-Once all four gates are satisfied:
-1. Write `scout-report.md` via the `Write` tool (one call, final version).
-2. **STOP.** Do not read additional files, run additional searches, or perform additional research.
-3. Do not produce any further tool calls after the `Write` completes.
-
-### Banned Post-Report Patterns
-
-After writing scout-report.md, these actions are **forbidden**:
-- "Let me also check…" exploratory reads
-- "While I'm here, I'll look at…" opportunistic research
-- Additional `WebSearch` or `WebFetch` calls
-- Re-reading files to verify the report's accuracy
-- Any `Bash` command that is not the final `Write`
-
-**Rationale:** Turn accumulation after report completion is the primary cost driver (cycle-39: 68 turns vs. 15 target). The report is complete when the gates are satisfied — additional turns add noise, not signal.
+**Banned post-report:** "Let me also check…" reads, additional WebSearch/WebFetch, re-reads, opportunistic Bash. Rationale: turn accumulation is primary cost driver (cycle-39: 68 turns vs. 15 target).
 
 ## Hypothesis falsification carryover (v10.10.0 Layer 2, ADR-0012)
 
