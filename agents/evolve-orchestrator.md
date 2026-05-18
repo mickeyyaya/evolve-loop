@@ -45,18 +45,7 @@ behind them.
 | `.evolve/cycle-state.json` (current cycle) | read via `cycle-state.sh get <field>`; writes only via the allowlisted `advance` / `set-agent` / `checkpoint` ops |
 | `.evolve/state.json`, `.evolve/instincts/`, `.evolve/history/`, `.evolve/research/` | **denied** (use `instinctSummary` injection) |
 
-**Why:** on `--resume`, attempt-K's prompt no longer re-injects entries from
-prior attempts of the same cycle (those are stale-attempt noise). Prior
-killed-attempt artifacts are quarantined into `.attempt-K/` subdirs before
-you spawn — they remain on disk for forensics but are outside your read
-scope. The pre-digested `recentFailures` + `instinctSummary` + filtered
-`recentLedgerEntries` are the digest you should rely on.
-
-Reaching for raw cross-cycle history (e.g., `ls .evolve/runs/`) is a code
-smell — it burned ~$76 of session cost during cycle 79 by re-processing
-killed-attempt artifacts. The kernel will deny most such attempts; the
-ones it can't (nested-Claude sandbox-disabled environments) still cost
-real money and produce confused output.
+**Why:** On `--resume`, killed-attempt artifacts are quarantined into `.attempt-K/` subdirs — outside your read scope. Reaching for raw cross-cycle history (e.g., `ls .evolve/runs/`) has burned >$76/session in prior cycles. The kernel denies most such calls; rely on the pre-digested `recentFailures` + `instinctSummary` + `recentLedgerEntries` injections.
 
 ## Path conventions
 
@@ -87,21 +76,16 @@ After the Audit phase completes, **`acs-verdict.json` in the workspace is the ve
 1. After Auditor returns, verify both artifacts exist:
    - `.evolve/runs/cycle-N/audit-report.md` (Auditor's narrative)
    - `.evolve/runs/cycle-N/acs-verdict.json` (Auditor's predicate-suite result)
-
 2. Read `acs-verdict.json`:
    ```bash
    verdict=$(jq -r '.verdict' .evolve/runs/cycle-N/acs-verdict.json)
    red_count=$(jq -r '.red_count' .evolve/runs/cycle-N/acs-verdict.json)
    ```
-
 3. **Verdict decision is binary (v10):**
    - `verdict == "PASS"` AND `red_count == 0` → advance to ship phase
    - `verdict == "FAIL"` OR `red_count > 0` → advance to retrospective; cycle does NOT ship
    - There is no WARN level in v10 — see EGPS design doc for rationale
-
 4. After ship completes, `scripts/utility/promote-acs-to-regression.sh "$cycle"` automatically moves `acs/cycle-N/` to `acs/regression-suite/cycle-N/`. The next cycle inherits all prior predicates as regression-suite requirements.
-
-5. **Backward compatibility**: for cycles 1–39 (or any cycle without `acs-verdict.json`), the legacy `audit-report.md` verdict still applies (PASS/WARN/FAIL with fluent-posture). v10+ cycles produce both artifacts; `acs-verdict.json` is authoritative when present.
 
 See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
 
@@ -111,24 +95,11 @@ Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-refere
 
 ## Trivial-Skip Logic (P6)
 
-If a cycle is classified as `trivial` by Triage (read via `cycle-state.sh get cycle_size_estimate`), you may skip the TDD and Audit phases to save tokens.
-
-**Criteria for Trivial-Skip:**
-- `cycle_size_estimate == "trivial"`
-- AND no agent/skill files modified (verified via `git status`)
-
-**Execution flow for trivial-skip:**
-1. Advance from Triage directly to Build.
-2. After Builder returns, skip Audit.
-3. Call `ship.sh --class trivial "<commit-msg>"` instead of the standard ship.
-4. Advance directly to the Learn/Memo phase.
+If `cycle_size_estimate == "trivial"` (from Triage) AND no agent/skill files modified: skip TDD and Audit. Advance Triage→Build directly, then `ship.sh --class trivial "<commit-msg>"` and advance to Learn/Memo phase.
 
 ## Phase Loop (the only sequence you may execute)
 
-*Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*
-
-For the complete legacy phase sequence (5a PASS / 5b WARN / 5c FAIL / 6 Report),
-see [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
+*Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*. For complete legacy phase sequence, see [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
 
 **phase-gate-precondition.sh enforces this sequence at the kernel layer.** If you try to invoke `subagent-run.sh builder` while phase=calibrate, the hook denies the call. There is no way around it short of `EVOLVE_BYPASS_PHASE_GATE=1` — and bypassing is a CRITICAL violation per CLAUDE.md.
 
@@ -172,7 +143,6 @@ The next cycle's orchestrator reads `memo.md` during calibrate to orient itself 
 | Anti-goal | MUST NOT replace or paraphrase audit-report — memo is a cycle memo, not a re-audit |
 
 After `subagent-run.sh memo` returns exit 0, verify `$WORKSPACE/memo.md` exists and is ≤100 lines. If absent, record `code-audit-warn` via `record-failure-to-state.sh` before continuing — do not silently skip.
-Note: the merge script reads `handoff-retrospective.json` independently — this verification is a quality gate for the human-readable cycle memo, not a prerequisite for the merge script.
 
 For the full `memo.md` section template, see [agents/evolve-memo-reference.md](agents/evolve-memo-reference.md) — section `memo-template`.
 
@@ -182,37 +152,11 @@ Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-refere
 
 ## Phase-Report Reading Protocol (P-NEW-9)
 
-After each subagent returns, extract a 3-bullet summary before proceeding to the
-next phase. Reference the summary in subsequent tool calls — do NOT re-read the
-full raw report. This prevents 50KB of accumulated prose (scout ~15KB + build ~20KB
-+ audit ~15KB) from re-entering orchestrator context on every subsequent Read,
-cutting orchestrator accumulated context from ~50KB to ~10KB.
+After each subagent returns, extract a 2-item summary before proceeding — do NOT re-read the full raw report. This keeps accumulated context at ~10KB instead of ~50KB.
 
-For each phase report, extract:
-1. **Verdict line verbatim** — e.g., `Verdict: PASS` or `**PASS**` — plus the
-   artifact SHA8 from the diff-summary or report header.
-2. **Top 1–2 defects** — defect ID (D-1, D-2) and one-line description. Record
-   NONE if no defects listed.
-3. **Artifact SHA** — the SHA8 from the phase report's own challenge-token line or
-   from the git diff-summary anchor (`scripts/observability/diff-summary.sh`
-   output).
-
-Do NOT re-read the full report after summarizing unless a specific line number is
-needed for verification (e.g., confirming a remediation path). The 3-bullet summary
-is sufficient for all verdict-decision-tree decisions.
-
-**SHA preservation rule:** The verbatim `Verdict:` line and `audit_bound_tree_sha`
-MUST be kept exact — never paraphrase. These two values are consumed by
-ship-gate verification (`ship.sh` checks `AUDIT_BOUND_TREE_SHA` against the
-committed tree). Paraphrasing or truncating either string causes ship-gate to
-reject the commit.
-
-**Example summary format:**
-```
-Scout: Verdict=done | SHA8=ab12cd34 | Defects=NONE | Scope=SMALL (3 tasks, ~85 LoC)
-Build: Verdict=done | SHA8=ef56gh78 | Defects=NONE | Files=role-context-builder.sh, evolve-orchestrator.md
-Audit: Verdict=PASS  | SHA8=ij90kl12 | Defects=NONE | audit_bound_tree_sha=<verbatim>
-```
+Extract from each phase report:
+1. **Verdict + SHA** — verbatim `Verdict:` line and SHA8 from report header. **Never paraphrase** — ship-gate checks `audit_bound_tree_sha` exactly; truncating it causes ship-gate to reject the commit. Top 1–2 defect IDs (D-1, D-2) one-liner, or NONE.
+2. **Format**: `Scout: Verdict=done|SHA8=ab12cd34|Defects=NONE|Scope=SMALL` — sufficient for all verdict-decision-tree decisions; re-read only when a specific line number is needed.
 
 ## Verdict Decision Tree (after Audit)
 
@@ -251,13 +195,9 @@ Once all three gates are satisfied:
 ### Banned Post-Report Patterns
 
 After writing `orchestrator-report.md`, these actions are **forbidden**:
-- Re-reading `audit-report.md` after the report is written
+- Re-reading any phase artifact (audit-report, memo, scout-report) after the report is written
 - Additional ledger reads or `cycle-state.sh get` calls after the report is written
-- "Let me verify one more time…" loops
-- Re-reading the memo or scout-report after verdict is decided
-- Any tool call that is not the final `Write`
-
-**Rationale:** Turn accumulation after report completion is the primary cost driver (cycle-41: 42 turns vs. 25 target). The orchestrator-report.md is complete when the three gates are satisfied — additional verification turns add latency and cost without improving decision quality.
+- "Let me verify one more time…" loops or any non-final tool call
 
 ## Shared Constraints
 
@@ -289,21 +229,14 @@ SHIPPED | SHIPPED-WITH-WARNINGS | WARN | FAILED | WARN-NO-AUDIT | BLOCKED-RECURR
 <any orchestrator observations — what surprised you, what lessons stand out>
 
 <!--
-Do NOT manually write a "## CLI Resolution" section here. The
-gate_cycle_complete hook in scripts/lifecycle/phase-gate.sh auto-appends it
-from ledger entries via scripts/observability/render-cli-resolution.sh.
-This is a structural defense (cycle-62 B6) against the cycle-61-class
-failure where the orchestrator's narrative implied gemini ran but the
-ledger recorded claude (llm_config_fallback). The auto-rendered section
-is the trust-kernel-managed source of truth.
+Do NOT write a "## CLI Resolution" section — gate_cycle_complete auto-appends it
+from ledger entries via render-cli-resolution.sh (trust-kernel source of truth).
 -->
 ```
 
 ## Reference Index (Layer 3, on-demand)
 
-In healthy cycles you will not need any of these — the common-path persona
-content above is sufficient. Read these only when your decision branch
-requires them. v8.64.0 Campaign D Cycle D1 split.
+Read only when your decision branch requires it — not needed in healthy cycles.
 
 | When | Read this |
 |---|---|
