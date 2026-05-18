@@ -169,13 +169,41 @@ step_audit_recent() {
     # in v8.14.0: (1) role not agent, (2) ts not timestamp, (3) markdown-bold
     # PASS verdict (`**Verdict: PASS**`) is the common auditor output but the
     # old regex `^Verdict:` rejected it.
-    local latest
-    latest=$(grep '"role":"auditor"' "$LEDGER" 2>/dev/null | tail -1 || true)
-    [ -n "$latest" ] || fail "no auditor entry in ledger"
-    local artifact_path now ts age
-    artifact_path=$(echo "$latest" | jq -r '.artifact_path // empty')
-    [ -n "$artifact_path" ] || fail "ledger entry missing artifact_path"
-    [ -f "$artifact_path" ] || fail "audit artifact missing on disk: $artifact_path"
+    # v10.13.0: walk auditor entries from newest to oldest, falling through
+    # phantom entries (ledger entry exists but artifact was cleaned up — e.g.,
+    # killed cycle where the audit-report.md was lost before reaching disk).
+    # The first auditor entry with an on-disk artifact is the candidate.
+    # Phantom entries are common when a cycle dies mid-build/mid-audit and the
+    # workspace dir is later overwritten by a resume attempt.
+    local latest artifact_path now ts age phantom_count=0 candidate
+    # Build reverse-ordered list (bash 3.2 compatible — no tac, no `tail -r` on
+    # all platforms; use awk to reverse). Then iterate in reverse.
+    local auditor_entries_rev
+    auditor_entries_rev=$(grep '"role":"auditor"' "$LEDGER" 2>/dev/null \
+        | awk '{a[NR]=$0} END {for (i=NR; i>=1; i--) print a[i]}')
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        artifact_path=$(echo "$candidate" | jq -r '.artifact_path // empty')
+        if [ -z "$artifact_path" ]; then
+            phantom_count=$((phantom_count + 1))
+            continue
+        fi
+        if [ -f "$artifact_path" ]; then
+            latest="$candidate"
+            break
+        fi
+        phantom_count=$((phantom_count + 1))
+    done <<< "$auditor_entries_rev"
+    if [ -z "${latest:-}" ]; then
+        if [ "$phantom_count" -gt 0 ]; then
+            fail "all $phantom_count auditor entries point at missing artifacts (cleaned up?). Run a fresh cycle to produce a new audit-report.md."
+        else
+            fail "no auditor entry in ledger"
+        fi
+    fi
+    if [ "$phantom_count" -gt 0 ]; then
+        log "WARN: skipped $phantom_count phantom auditor entry/entries (artifact missing on disk). Using most-recent VALID entry."
+    fi
     # v9.4.0: accept WARN or PASS to match the project's fluent-posture
     # (CLAUDE.md "Verdict: WARN ships by default"; ship.sh --class manual /
     # --class release both skip audit-binding entirely). Strict-PASS gate
