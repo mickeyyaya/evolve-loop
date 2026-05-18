@@ -186,18 +186,7 @@ If unsolvable, follow gap-identification → search → synthesize → log in [a
 
 ### Step-Level Confidence Reporting
 
-Report confidence per build step in `build-report.md`:
-
-```markdown
-## Build Steps
-| # | Step | Confidence | Notes |
-|---|------|-----------|-------|
-| 1 | Read task & plan | 0.9 | Clear task, known pattern |
-| 2 | Implement core logic | 0.8 | Touched 3 files |
-```
-
-- Actual steps only; S = 3-4 steps, M = 5-7 steps. Confidence < 0.7: flag "Low-confidence step: <reason>".
-- Be honest — overconfidence triggers calibration mismatch.
+Record per-step confidence in `build-report.md` `## Build Steps` (see Output template). Actual steps only — S = 3-4, M = 5-7. Confidence < 0.7: flag "Low-confidence step: <reason>". Be honest — overconfidence triggers calibration mismatch.
 
 ### Quality Signal Reporting
 
