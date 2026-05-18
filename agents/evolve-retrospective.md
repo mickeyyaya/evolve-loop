@@ -208,27 +208,7 @@ If there are no action items worth carrying forward (rare on FAIL/WARN cycles), 
 
 ### 8. Write the digest (v8.56.0+)
 
-Output path: `.evolve/runs/cycle-N/lessons-digest.md`. A compressed (≤ 500 token) markdown summary that the next cycle's role-context-builder loads in place of the full lesson detail. Format:
-
-```markdown
-# Cycle N Retrospective Digest
-
-## Root cause (1 sentence)
-<the underlying assumption that turned out to be wrong>
-
-## Lessons (one bullet per lesson)
-- **inst-LXXX** (errorCategory): <pattern> — <what to check>
-- ...
-
-## Carryover TODOs (top 3 by priority)
-- [high] todo-<slug>: <action> (evidence: <pointer>)
-- ...
-
-## Contradicted instincts
-- <inst-NNN>: <why> (recommend confidence -X.X)
-```
-
-Keep this file under 500 tokens (≈ 2000 chars). The detail YAMLs in `.evolve/instincts/lessons/` remain the long-form audit trail; the digest is the "elevator pitch" agents read first.
+Output path: `.evolve/runs/cycle-N/lessons-digest.md`. Write a compressed (≤ 500 token / ≤ 2000 chars) markdown summary loaded by the next cycle's role-context-builder. See [evolve-retrospective-reference.md — Section: digest-format-template](evolve-retrospective-reference.md#section-digest-format-template) for the format template.
 
 ## Out of scope
 
@@ -252,30 +232,10 @@ Before your last write, verify:
 
 If any check fails, fix in place. If you cannot complete the retrospective due to missing inputs, write a brief retrospective explicitly stating what was unavailable — do not fabricate.
 
-## Structured Output: handoff-retrospective.json (C3)
-
-The `handoff-retrospective.json` (Step 6 above) is formalized in C3 against
-`schemas/handoff/audit-report.schema.json` as the closest available schema.
-
-**Schema:** `schemas/handoff/audit-report.schema.json`
-
-### Required fields
-
-| Field | Type | Description |
-|---|---|---|
-| `cycle` | int | Cycle number |
-| `auditVerdict` | `"FAIL"` \| `"WARN"` \| `"SHIP_GATE_DENIED"` | Trigger verdict |
-| `lessonIds` | string[] | IDs of lesson YAMLs written (e.g., `["inst-L042"]`) |
-| `errorCategory` | string | `planning` \| `tool-use` \| `reasoning` \| `context` \| `integration` |
-| `failedStep` | string | `scout` \| `build` \| `audit` |
-| `systemic` | bool | True if ≥2 prior failures with same `errorCategory` |
-| `contradictedInstincts` | string[] | IDs of instincts this failure invalidates |
-| `preventiveActionCount` | int | Count of distinct preventive actions listed |
-
-Write `retrospective-report.md` first (prose), then `handoff-retrospective.json` (structured).
-
 ## Reference Index (Layer 3, on-demand)
 
 | When | Read this |
 |---|---|
+| Digest format template for `lessons-digest.md` | [evolve-retrospective-reference.md § digest-format-template](evolve-retrospective-reference.md#section-digest-format-template) |
+| `handoff-retrospective.json` schema field reference | [evolve-retrospective-reference.md § handoff-schema](evolve-retrospective-reference.md#section-handoff-schema) |
 | Diagnosing a recurring phase-agent failure or persistent WARN/FAIL | [agents/evolve-diagnose-reference.md](agents/evolve-diagnose-reference.md) |
