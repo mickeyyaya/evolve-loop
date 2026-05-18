@@ -170,10 +170,23 @@ fi
 build_context() {
     local cycle="$1" workspace="$2" goal="$3"
 
-    # Ledger tail (last 5 entries) — gives orchestrator awareness of recent activity.
+    # Ledger tail — gives orchestrator awareness of recent activity.
+    #
+    # Same-cycle filter (per ~/.claude/plans/linked-meandering-lobster.md Step 3):
+    # On --resume, attempt-K's prompt would otherwise re-inject entries from
+    # attempt-1..K-1 (same .cycle), which is just stale-attempt noise. We drop
+    # entries where .cycle == $current and take the last 5 cross-cycle entries.
+    # If jq is unavailable or filter fails, fall through to plain tail -5 so
+    # the loop never blocks on a digest-build failure.
     local ledger_tail=""
     if [ -f "$LEDGER" ]; then
-        ledger_tail=$(tail -5 "$LEDGER" 2>/dev/null || echo "")
+        if command -v jq >/dev/null 2>&1 && [[ "$cycle" =~ ^[0-9]+$ ]]; then
+            ledger_tail=$(jq -c --argjson cur "$cycle" \
+                'select(.cycle != $cur)' "$LEDGER" 2>/dev/null | tail -5 || echo "")
+        fi
+        if [ -z "$ledger_tail" ]; then
+            ledger_tail=$(tail -5 "$LEDGER" 2>/dev/null || echo "")
+        fi
     fi
 
     # Instinct summary — accumulated lessons from prior cycles.
