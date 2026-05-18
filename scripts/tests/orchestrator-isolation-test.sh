@@ -4,19 +4,30 @@
 #
 # Plan reference: ~/.claude/plans/linked-meandering-lobster.md
 #
-# Verifies the four-point isolation contract:
-#   1. orchestrator profile denies reads of .evolve/ledger.jsonl
-#   2. orchestrator profile denies reads of historical .evolve/runs/cycle-* dirs
-#      (with a runtime carve-out for the current cycle — see Step 2)
-#   3. orchestrator profile denies reads of resume-quarantine .attempt-* dirs
+# Verifies the per-cycle isolation contract.
+#
+# Architectural note on enforcement layers (refined in Step 2 implementation):
+#   - .evolve/ledger.jsonl cannot be in sandbox.deny_subpaths because it's in
+#     write_subpaths (orchestrator's child subagent-run.sh appends ledger
+#     entries from inside the sandbox; denying writes breaks the loop).
+#     Read denial therefore lives at the Claude Code tool-perm layer
+#     (disallowed_tools: Read(...) + Bash(cat/head/tail/grep ...) patterns).
+#   - .evolve/runs/cycle-* cannot be broadly denied at the write layer either
+#     (current-cycle workspace must be writable). The .attempt-* quarantine
+#     paths can — they're never legitimate write targets.
+#   - Historical-cycle-dir read denial (other than .attempt-*) is DEFERRED:
+#     it requires narrowing allowed_tools from Read (unrestricted) to explicit
+#     current-cycle-only patterns + verifying CC allow-override-deny semantics.
+#     Tracked in docs/architecture/cycle-isolation.md (Step 8).
+#
+# Contract verified:
+#   1. .evolve/ledger.jsonl reads denied via disallowed_tools
+#   2. .evolve/runs/cycle-*/.attempt-* reads denied via disallowed_tools
+#   3. .evolve/runs/cycle-*/.attempt-* writes denied via sandbox.deny_subpaths
 #   4. build-invocation-context.sh filters same-cycle ledger entries
 #   5. resume-cycle.sh moves prior-attempt artifacts into .attempt-K/ before
 #      re-spawning orchestrator
 #   6. cycle-release.sh exists and is invoked from run-cycle.sh's EXIT trap
-#
-# Profile-static checks (Tests 1-4) introspect orchestrator.json with jq —
-# no subagent spawn needed. The other tests grep the relevant scripts for
-# marker tokens that the implementation must include.
 #
 # Usage: bash scripts/tests/orchestrator-isolation-test.sh
 # Exit 0 = all asserts pass; exit 1 = at least one failure.
@@ -51,39 +62,62 @@ else
     pass "profile readable, jq available"
 fi
 
-# --- Test 2: ledger.jsonl is in deny_subpaths --------------------------------
-header "Test 2: .evolve/ledger.jsonl is denied for orchestrator reads"
-if jq -e '.sandbox.deny_subpaths | index(".evolve/ledger.jsonl")' "$PROFILE" >/dev/null 2>&1; then
-    pass ".evolve/ledger.jsonl present in deny_subpaths"
+# --- Test 2: ledger.jsonl reads denied via tool-perm layer -------------------
+header "Test 2: .evolve/ledger.jsonl reads denied (disallowed_tools)"
+# Read tool deny + at least one Bash cat/head/tail/grep deny pattern.
+read_deny="0"
+bash_deny="0"
+if jq -e '.disallowed_tools | index("Read(.evolve/ledger.jsonl)")' "$PROFILE" >/dev/null 2>&1; then
+    read_deny="1"
+fi
+while IFS= read -r entry; do
+    [ -z "$entry" ] && continue
+    case "$entry" in
+        "Bash(cat .evolve/ledger.jsonl"*|\
+        "Bash(head .evolve/ledger.jsonl"*|\
+        "Bash(tail .evolve/ledger.jsonl"*|\
+        "Bash(grep:* .evolve/ledger.jsonl"*)
+            bash_deny="1"; break ;;
+    esac
+done < <(jq -r '.disallowed_tools[]?' "$PROFILE" 2>/dev/null)
+if [ "$read_deny" = "1" ] && [ "$bash_deny" = "1" ]; then
+    pass ".evolve/ledger.jsonl denied via Read() + Bash() patterns"
+elif [ "$read_deny" = "1" ]; then
+    fail_ "Read(.evolve/ledger.jsonl) denied but Bash cat/head/tail/grep paths NOT denied"
+    echo "    Fix: add \"Bash(cat .evolve/ledger.jsonl*)\" + head/tail/grep variants to disallowed_tools"
+elif [ "$bash_deny" = "1" ]; then
+    fail_ "Bash ledger paths denied but Read(.evolve/ledger.jsonl) NOT denied"
+    echo "    Fix: add \"Read(.evolve/ledger.jsonl)\" to disallowed_tools"
 else
-    fail_ ".evolve/ledger.jsonl missing from deny_subpaths — orchestrator can Read/cat raw ledger"
-    echo "    Fix: add \".evolve/ledger.jsonl\" to .sandbox.deny_subpaths in $PROFILE"
+    fail_ "neither Read(.evolve/ledger.jsonl) nor Bash ledger paths in disallowed_tools"
+    echo "    Fix: add \"Read(.evolve/ledger.jsonl)\" + \"Bash(cat .evolve/ledger.jsonl*)\" etc."
 fi
 
-# --- Test 3: historical .evolve/runs is denied --------------------------------
-header "Test 3: historical .evolve/runs entries are denied"
-# Accept either pattern:
-#   - ".evolve/runs"           (whole tree denied; current cycle write_subpaths
-#                                glob acts as the carve-out)
-#   - ".evolve/runs/cycle-*"   (literal glob denying every cycle dir; current
-#                                cycle still writable via write_subpaths)
-runs_denied="0"
-if jq -e '.sandbox.deny_subpaths | index(".evolve/runs")' "$PROFILE" >/dev/null 2>&1; then
-    runs_denied="1"
-fi
-if jq -e '.sandbox.deny_subpaths | index(".evolve/runs/cycle-*")' "$PROFILE" >/dev/null 2>&1; then
-    runs_denied="1"
-fi
-if [ "$runs_denied" = "1" ]; then
-    pass "historical .evolve/runs reads denied (cross-cycle isolation enforced)"
+# --- Test 3: resume-quarantine reads denied via tool-perm --------------------
+header "Test 3: .evolve/runs/cycle-*/.attempt-* reads denied (disallowed_tools)"
+q_read_deny="0"
+q_bash_deny="0"
+while IFS= read -r entry; do
+    [ -z "$entry" ] && continue
+    case "$entry" in
+        "Read(.evolve/runs/cycle-"*".attempt-"*) q_read_deny="1" ;;
+        "Bash(cat .evolve/runs/cycle-"*".attempt-"*) q_bash_deny="1" ;;
+        "Bash(head .evolve/runs/cycle-"*".attempt-"*) q_bash_deny="1" ;;
+        "Bash(tail .evolve/runs/cycle-"*".attempt-"*) q_bash_deny="1" ;;
+        "Bash(ls .evolve/runs/cycle-"*".attempt-"*) q_bash_deny="1" ;;
+    esac
+done < <(jq -r '.disallowed_tools[]?' "$PROFILE" 2>/dev/null)
+if [ "$q_read_deny" = "1" ] && [ "$q_bash_deny" = "1" ]; then
+    pass "quarantine .attempt-* reads denied via Read() + Bash() patterns"
 else
-    fail_ "historical .evolve/runs entries are NOT in deny_subpaths"
-    echo "    Fix: add \".evolve/runs\" to .sandbox.deny_subpaths (current cycle"
-    echo "         is carved out via .sandbox.write_subpaths \".evolve/runs/cycle-*\")"
+    fail_ "quarantine .attempt-* reads not fully denied (read=$q_read_deny bash=$q_bash_deny)"
+    echo "    Fix: ensure both \"Read(.evolve/runs/cycle-*/.attempt-*/**)\""
+    echo "         and \"Bash(cat .evolve/runs/cycle-*/.attempt-*/**)\" (plus"
+    echo "         head/tail/ls variants) are in disallowed_tools"
 fi
 
-# --- Test 4: resume-quarantine attempt dirs are denied ------------------------
-header "Test 4: .evolve/runs/cycle-*/.attempt-* (resume quarantine) is denied"
+# --- Test 4: resume-quarantine writes denied via sandbox.deny_subpaths --------
+header "Test 4: .evolve/runs/cycle-*/.attempt-* writes denied (deny_subpaths)"
 attempt_denied="0"
 while IFS= read -r entry; do
     [ -z "$entry" ] && continue
@@ -92,10 +126,10 @@ while IFS= read -r entry; do
     esac
 done < <(jq -r '.sandbox.deny_subpaths[]?' "$PROFILE" 2>/dev/null)
 if [ "$attempt_denied" = "1" ]; then
-    pass "resume quarantine path present in deny_subpaths"
+    pass "resume quarantine write path present in sandbox.deny_subpaths"
 else
-    fail_ "no .attempt-* deny entry found — orchestrator could opportunistically Read prior-attempt artifacts on resume"
-    echo "    Fix: add \".evolve/runs/cycle-*/.attempt-*\" (or equivalent) to .sandbox.deny_subpaths"
+    fail_ "no .attempt-* deny entry in sandbox.deny_subpaths"
+    echo "    Fix: add \".evolve/runs/cycle-*/.attempt-*\" to .sandbox.deny_subpaths"
 fi
 
 # --- Test 5: build-invocation-context.sh filters same-cycle ledger entries ---
