@@ -115,6 +115,7 @@ Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/pub
 ## References
 
 - [AGENTS.md](AGENTS.md) — cross-CLI invariants + 12 Core Agent Rules
+- [docs/architecture/portable-core.md](docs/architecture/portable-core.md) — minimal-core file list for vendoring evolve-loop into another project
 - [docs/operations/release-archive.md](docs/operations/release-archive.md) — version-specific narrative (v8.13 – v10.5)
 - [docs/architecture/](docs/architecture/) — per-feature design docs (egps-v10, checkpoint-resume, tri-layer, sequential-write-discipline, platform-compatibility, phase-tracker, …)
 - [docs/operations/release-notes/](docs/operations/release-notes/index.md) — per-version index
