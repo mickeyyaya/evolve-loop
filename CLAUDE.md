@@ -85,6 +85,7 @@ Defaults reflect production posture as of v10.8.0. Detail docs linked per row.
 | Worktree base | `EVOLVE_WORKTREE_BASE` | auto | Resolved by `preflight-environment.sh`: `.evolve/worktrees/` > `$TMPDIR/evolve-loop/<hash>`. Never auto-enable `EVOLVE_SKIP_WORKTREE=1` (operator-only emergency hatch). |
 | Inner sandbox | `EVOLVE_INNER_SANDBOX` | auto | `false` when nested-Claude detected; force-enable/disable with `1`/`0`. `EVOLVE_FORCE_INNER_SANDBOX` deprecated. |
 | Research cache | `EVOLVE_RESEARCH_CACHE_ENABLED` | `0` (opt-in) | Adds `state.json:researchCache.entries[<sha>]`. Cache hit when fingerprint matches + `cycle - produced_at_cycle ≤ EVOLVE_RESEARCH_CACHE_MAX_AGE` (default 5). |
+| Subscription proxy | `EVOLVE_ANTHROPIC_BASE_URL` | unset | When set, exported as `ANTHROPIC_BASE_URL` before every `claude -p` invocation. Routes API billing through a subscription proxy instead of API credits. **Required after June 15 2025** if no `ANTHROPIC_API_KEY`. Setup: `hermes proxy start` then `export EVOLVE_ANTHROPIC_BASE_URL=http://127.0.0.1:8645/v1`. |
 
 ## Ship classes (`scripts/lifecycle/ship.sh --class <X>`)
 

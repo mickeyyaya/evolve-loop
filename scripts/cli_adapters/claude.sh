@@ -126,6 +126,18 @@ for i in "${!ADD_DIRS_ARR[@]}"; do
     fi
 done
 
+# v10.14.2: subscription proxy routing — EVOLVE_ANTHROPIC_BASE_URL passthrough.
+# When set, exports ANTHROPIC_BASE_URL so every claude -p invocation routes
+# through the local proxy (e.g., hermes-agent) which injects OAuth subscription
+# credentials. Required after June 15 2025 billing change where claude -p
+# transitions from subscription-included to API-credit deduction.
+# ANTHROPIC_API_KEY flow is unaffected — when proxy is active, the proxy strips
+# any placeholder key and injects the OAuth token regardless of --bare flag state.
+if [ -n "${EVOLVE_ANTHROPIC_BASE_URL:-}" ]; then
+    export ANTHROPIC_BASE_URL="$EVOLVE_ANTHROPIC_BASE_URL"
+    echo "[claude-adapter] proxy mode: ANTHROPIC_BASE_URL=$ANTHROPIC_BASE_URL" >&2
+fi
+
 # --- Build command -----------------------------------------------------------
 declare -a CMD
 CMD=(claude -p --model "$RESOLVED_MODEL")

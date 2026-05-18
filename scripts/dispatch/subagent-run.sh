@@ -62,6 +62,20 @@ REPO_ROOT="$EVOLVE_PROJECT_ROOT"
 # any nested bash/sandbox-exec layer. Belt-and-suspenders for env propagation.
 [ -n "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ] && export EVOLVE_SANDBOX_FALLBACK_ON_EPERM
 
+# v10.14.2: subscription proxy routing. When EVOLVE_ANTHROPIC_BASE_URL is set,
+# propagate it so claude-adapter.sh can export ANTHROPIC_BASE_URL before each
+# claude -p invocation. Belt-and-suspenders for env propagation through subshells.
+[ -n "${EVOLVE_ANTHROPIC_BASE_URL:-}" ] && export EVOLVE_ANTHROPIC_BASE_URL
+
+# v10.14.2: billing-change preflight warning (June 15 2025).
+# After 2025-06-15, claude -p transitions from subscription-included to API-credit
+# deduction. Warn once when neither an API key nor a subscription proxy is configured.
+_today=$(date -u +"%Y-%m-%d")
+if [ "$_today" \> "2025-06-14" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${EVOLVE_ANTHROPIC_BASE_URL:-}" ] && [ -z "${ANTHROPIC_BASE_URL:-}" ]; then
+    echo "[subagent-run] WARN: after June 15 2025, claude -p deducts from API credits; set EVOLVE_ANTHROPIC_BASE_URL to a subscription proxy (e.g., hermes proxy start) to avoid charges" >&2
+fi
+unset _today
+
 log() { echo "[subagent-run] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
 integrity_fail() { log "INTEGRITY-FAIL: $*"; exit 2; }
