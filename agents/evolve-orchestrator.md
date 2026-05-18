@@ -46,48 +46,11 @@ When you advance to the build phase, just call `cycle-state.sh advance build bui
 
 ## Phase Observer Reports
 
-When `EVOLVE_OBSERVER_ENABLED=1` (default OFF in v1), every subagent invocation
-spawns a phase-observer sibling that watches the subagent's stream-json output
-and writes two files to the workspace before exiting:
+When `EVOLVE_OBSERVER_ENABLED=1` (default OFF), each subagent spawns a phase-observer sibling that writes `{agent}-observer-events.ndjson` + `{agent}-observer-report.json` with verdict ∈ `{NORMAL, DEGRADED, INCIDENT}`. Read the report before `{agent}-report.md` and treat `INCIDENT` as a decision input. Full protocol: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `phase-observer`.
 
-- `{agent}-observer-events.ndjson` — live event stream (one observation envelope per line). Tailable for real-time inspection.
-- `{agent}-observer-report.json` — phase-end summary with `summary.verdict` ∈ `{NORMAL, DEGRADED, INCIDENT}` and an `incidents[]` array.
+## EGPS Tester Phase
 
-**After each subagent returns, before reading `{agent}-report.md`, do this:**
-1. If `{agent}-observer-report.json` exists, `Read` it.
-2. If `summary.verdict == "INCIDENT"` OR `incidents[]` non-empty, the observer detected an abnormal condition (stuck, infinite loop, error spike, throttled, cost anomaly). Treat the first incident's `suggested_action.machine_readable` as a decision input alongside the subagent's own `{agent}-report.md`.
-3. If `summary.verdict == "DEGRADED"`, mention the WARN observations in your final Notes section but continue normally.
-4. If `summary.verdict == "NORMAL"` or the file is absent, proceed normally.
-
-The observer is purely advisory; it never SIGTERMs the subagent (phase-watchdog still does that in v1). Severity semantics: see `docs/architecture/observer-severity.md`.
-
-## EGPS Tester Phase (v10.3.0+)
-
-After the Builder phase completes (build-report.md + production code in worktree), spawn the **Tester** subagent before advancing to Audit:
-
-```bash
-cycle-state.sh advance test tester
-subagent-run.sh tester "$CYCLE" "$WORKSPACE"
-```
-
-The Tester reads `build-report.md` and writes `acs/cycle-N/{NNN}-{slug}.sh` predicate scripts for each acceptance criterion, then produces `tester-report.md`. After Tester returns, advance to Audit normally.
-
-Phase sequence in v10.3+: `Scout → Triage → Builder → **Tester** → Auditor → Ship → (Retro)`
-
-The Tester adds ~3-5 minutes wall time per cycle but breaks the AC-by-grep gaming pattern structurally (Builder cannot self-validate; Tester writes the predicates Builder's claims are checked against).
-
-**`EVOLVE_TEST_PHASE_ENABLED` gate (v10.6+, default=0):** The Tester phase is opt-in. When the env var is unset or `0`, skip the `advance test tester` + `subagent-run.sh tester` invocation and fall back to the v10.1 Builder-predicate path (Builder writes `acs/cycle-N/*.sh` predicates itself). Set `EVOLVE_TEST_PHASE_ENABLED=1` to activate the Tester subagent. This gate exists because `tester.json` profile and `agents/evolve-tester.md` are present but the phase is not yet default-on; forcing it caused 241s watchdog kills when the subagent-run.sh allowlist was missing `tester`.
-
-```bash
-# Orchestrator pattern for Tester phase (only when EVOLVE_TEST_PHASE_ENABLED=1):
-if [ "${EVOLVE_TEST_PHASE_ENABLED:-0}" = "1" ]; then
-    cycle-state.sh advance test tester
-    subagent-run.sh tester "$CYCLE" "$WORKSPACE"
-fi
-# Otherwise: Builder writes its own acs/cycle-N/*.sh predicates (v10.1 fallback, always available)
-```
-
-If Tester is unavailable (legacy profile, fallback mode), Builder writes its own predicates per v10.1 (already-shipped backward compat).
+Opt-in via `EVOLVE_TEST_PHASE_ENABLED=1` (default 0). When enabled, advance to `test tester` after Builder and run `subagent-run.sh tester` before Audit; otherwise Builder writes its own `acs/cycle-N/*.sh` predicates (v10.1 fallback). Full protocol + gate rationale: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `egps-tester-phase`.
 
 ## EGPS Verdict-of-Record (v10.1.0+)
 

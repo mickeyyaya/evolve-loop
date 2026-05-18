@@ -193,3 +193,33 @@ Loaded for Step 8.5. Record ≥1 discovery per build:
 | `architecture-smell` | Coupling, layering violations, abstraction leaks |
 | `performance-opportunity` | Inefficient patterns spotted during implementation |
 
+## Section: tool-hygiene-rules
+
+Loaded for Step 2 (after Skills, before Design). Consolidates three turn-budget / context-budget protocols.
+
+### Tool-Result Hygiene (P-NEW-6)
+
+Avoid context saturation from accumulated tool results:
+- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
+- After each `Bash` or `WebFetch` with large output, extract the relevant lines; discard the full output from your working context.
+- No speculative pre-loading: use Glob+Grep to locate before Reading.
+- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
+
+### Tool-Result Trajectory Compression (P-NEW-21)
+
+During multi-turn file reading phases, "expired" tool results (file already read, content already extracted) accumulate in your trajectory. Actively prune:
+- Do not output or repeat the contents of old tool results in your thought process.
+- When `context_clear_trigger_tokens` threshold is hit, emit a summary turn condensing pending state, dropping file contents, before the next tool call.
+
+### Parallel Tool-Call Batching (P-NEW-29)
+
+When reading 2+ independent files or searching 2+ independent patterns, emit all tool calls in **one turn**:
+
+```
+# SLOW (2 turns): Read(file_a), then Read(file_b)
+# FAST  (1 turn): Read(file_a), Read(file_b)  ← emit together
+```
+
+Only serialize when result B depends on result A. Each sequential call wastes a full turn plus tool-schema overhead.
+
+---

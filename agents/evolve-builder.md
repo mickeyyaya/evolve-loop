@@ -98,30 +98,9 @@ If `task.recommendedSkills` non-empty, consult skills before Step 3.
 
 **Invocation:** `Skill tool: skill="<skill-name>"`
 
-### Tool-Result Hygiene (P-NEW-6)
+### Tool-Result Hygiene & Batching (P-NEW-6, P-NEW-21, P-NEW-29)
 
-Apply these four rules to avoid context saturation from accumulated tool results:
-- After each `Read`, summarize the content in 2-3 lines; reference the summary in subsequent turns, not the raw file.
-- After each `Bash` or `WebFetch` with large output, extract the relevant lines; discard the full output from your working context.
-- No speculative pre-loading: use Glob+Grep to locate before Reading.
-- Line-range Reads for large files (>200 lines): `Read(file, offset=N, limit=50)`.
-
-### Tool-Result Trajectory Compression (P-NEW-21)
-
-During multi-turn file reading phases, you will accumulate "expired" tool results in your trajectory. An expired tool result is one where you have already read the file, extracted what you need, and moved on.
-- **Rule:** Actively prune your reasoning context. Do not output or repeat the contents of old tool results in your thought process.
-- **Rule:** When the `context_clear_trigger_tokens` threshold is hit, you MUST emit a summary turn that condenses all pending context and state, dropping file contents, before issuing the next tool call.
-
-### Parallel Tool-Call Batching (P-NEW-29)
-
-When reading 2+ independent files or searching 2+ independent patterns, emit all tool calls in **one turn**. Each sequential call wastes a full turn and schema overhead.
-
-```
-# SLOW (2 turns): Read(file_a), then Read(file_b)
-# FAST (1 turn):  Read(file_a), Read(file_b)  ← emit together
-```
-
-Only serialize when result B depends on result A.
+Three rules: summarize after Read, prune expired results from your trajectory, and emit independent tool calls in one turn. Full guidance + examples: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
 
 **Budget rules** (see [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) § Token-Budget Depth Routing):
 - **Low (GREEN):** ≤3 skills (1 primary + 2 supplementary).
