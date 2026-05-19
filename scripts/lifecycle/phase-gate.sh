@@ -10,7 +10,7 @@
 # Usage: bash scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
 #
 # Gates:
-#   research-to-discover — Verify Phase 1 ran, research-brief exists
+#   intent-to-discover  — Verify intent.md valid; direct transition (cycle-88+)
 #   discover-to-build   — Verify Scout ran, eval definitions exist
 #   build-to-audit      — Verify Builder ran, build-report exists
 #   audit-to-ship       — Verify Auditor ran, eval graders pass independently
@@ -209,33 +209,6 @@ check_no_forgery_scripts() {
     if [ -n "$new_scripts" ]; then
         log "WARN: New shell scripts created during cycle: $new_scripts — review for forgery"
     fi
-}
-
-# ─── Gate: RESEARCH → DISCOVER ───
-gate_research_to_discover() {
-    log "Checking RESEARCH → DISCOVER gate for cycle $CYCLE"
-
-    # 1. Research brief must exist and be fresh
-    check_file_exists "$WORKSPACE/research-brief.md" "Research brief"
-    check_file_fresh "$WORKSPACE/research-brief.md" "Research brief"
-
-    # 2. Research brief must have substantive content (not just headers)
-    local brief_words
-    brief_words=$(wc -w < "$WORKSPACE/research-brief.md" | tr -d ' ')
-    if [ "$brief_words" -lt 30 ]; then
-        fail "Research brief has only $brief_words words (min 30)"
-    fi
-
-    # 3. Research agenda must have been updated (check state.json)
-    if [ -f "$STATE" ]; then
-        local has_agenda
-        has_agenda=$(grep -c '"researchAgenda"' "$STATE" 2>/dev/null || echo "0")
-        if [ "$has_agenda" -eq 0 ]; then
-            log "WARN: No researchAgenda in state.json — may be first cycle"
-        fi
-    fi
-
-    log "PASS: RESEARCH → DISCOVER gate"
 }
 
 # ─── Gate: DISCOVER → BUILD ───
@@ -1213,7 +1186,7 @@ print('Mastery RESET: audit did not PASS')
 # Fires only when cycle-state.intent_required==true (set at cycle init from
 # EVOLVE_REQUIRE_INTENT env). Always passes structurally — its job is to
 # *acknowledge* that the cycle is on the intent-enabled path. The real
-# verification happens at gate_intent_to_research below.
+# verification happens at gate_intent_to_discover below.
 gate_calibrate_to_intent() {
     log "Gate: CALIBRATE → INTENT (cycle $CYCLE)"
     local cycle_state="${EVOLVE_CYCLE_STATE_FILE:-$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json}"
@@ -1234,7 +1207,7 @@ gate_calibrate_to_intent() {
     log "OK: cycle is intent-enabled (intent_required=true)"
 }
 
-# ─── Gate: INTENT → RESEARCH (v8.19.0, opt-in) ───
+# ─── Gate: INTENT → DISCOVER (v8.19.0, renamed cycle-88) ───
 #
 # Verifies the structured intent.md the intent persona produced is sound:
 #   - Exists in workspace
@@ -1244,8 +1217,8 @@ gate_calibrate_to_intent() {
 #   - Latest intent ledger entry SHA matches the on-disk file (no tampering)
 #
 # This is purely structural — no human approval needed. Autonomy is preserved.
-gate_intent_to_research() {
-    log "Gate: INTENT → RESEARCH (cycle $CYCLE)"
+gate_intent_to_discover() {
+    log "Gate: INTENT → DISCOVER (cycle $CYCLE)"
     local intent_file="$WORKSPACE/intent.md"
     local delta_file="$WORKSPACE/intent-delta.md"
 
@@ -1320,8 +1293,9 @@ gate_intent_to_research() {
 # ─── Dispatch ───
 case "$GATE" in
     calibrate-to-intent)  gate_calibrate_to_intent ;;
-    intent-to-research)   gate_intent_to_research ;;
-    research-to-discover) gate_research_to_discover ;;
+    intent-to-discover)   gate_intent_to_discover ;;
+    intent-to-research)   echo "ERROR: gate 'intent-to-research' retired in cycle-88. Use 'intent-to-discover'." >&2; exit 2 ;;
+    research-to-discover) echo "ERROR: gate 'research-to-discover' retired in cycle-88. Use 'intent-to-discover'." >&2; exit 2 ;;
     discover-to-build)    gate_discover_to_build ;;
     discover-to-triage)   gate_discover_to_triage ;;
     triage-to-plan-review) gate_triage_to_plan_review ;;

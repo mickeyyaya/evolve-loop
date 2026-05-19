@@ -27,7 +27,6 @@ Context schema: [agent-templates.md](agent-templates.md) (cycle, workspacePath, 
 - `changedFiles`: files changed since last cycle
 - `recentNotes`: last 5 entries, notes.md
 - `builderNotes`: `workspace/builder-notes.md` last cycle (empty if none)
-- `conceptCandidates`: Phase 1 concept cards (KEPT, +2 boost)
 - `goal`: user-specified goal (string|null)
 
 ## Goal Handling
@@ -37,7 +36,7 @@ Context schema: [agent-templates.md](agent-templates.md) (cycle, workspacePath, 
 
 ## Turn budget
 
-**Target: 8–12 turns. Max: 15 (profile-enforced).** Lead with pre-loaded context; cap reads ≤5 files, Grep/Glob ≤3; skip web research; write `scout-report.md` ONCE.
+**Target: 8–12 turns. Max: 15 (profile-enforced).** Use turns 1–2 for inline upfront research (WebSearch ≤3, WebFetch ≤5, kb-search ≤20 per profile quota); then codebase analysis; write `scout-report.md` ONCE.
 
 ## Responsibilities
 
@@ -63,18 +62,14 @@ Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for B
 
 [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) — dimension guidelines.
 
-### 4.5. Per-Task Research Cache Lookup (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
+### 5. Inline Upfront Research (Scout owns it)
 
-See reference `research-cache-protocol`.
+On turns 1–2, before codebase reads, use your research tools within quota:
+- **kb-search first:** `scripts/research/kb-search.sh "<query>"` (quota: 20 calls). Use if KB hits ≥ 3 on-point results.
+- **WebSearch escalation:** Only if KB sparse (< 3 relevant hits) or clearly outdated. Quota: 3 calls.
+- **WebFetch:** For primary docs/changelogs when WebSearch surfaces a highly relevant URL. Quota: 5 calls.
 
-### 5. Read Research Brief (from Phase 1)
-
-- Read `researchBrief` from context (`$WORKSPACE_PATH/research-brief.md`)
-- Use gap analysis and concept cards for task selection priorities
-
-### 5.5. Stage Research to Cache (Phase B; gate: `EVOLVE_RESEARCH_CACHE_ENABLED=1`)
-
-See reference `research-cache-staging`.
+Research findings feed directly into task selection. You generate the signal yourself — no pre-written brief to read.
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
@@ -85,8 +80,6 @@ Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-gen
 Synthesize findings into 2-4 small/medium tasks.
 
 **carryoverTodos (mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
-
-**Phase 1 Concept Candidates:** +2 boost. Each: `targetFiles`, `complexity`, `researchBacking`, `agendaItemId` (task metadata, Learn tracking).
 
 **Proposal Pipeline:** `state.json.proposals`, **+1 priority boost**. Proposals >5 cycles auto-archived by Learn.
 

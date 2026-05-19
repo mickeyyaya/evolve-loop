@@ -254,7 +254,7 @@ Write `$WORKSPACE/orchestrator-report.md` (your only allowed Edit/Write target o
 ## Phase Outcomes
 | Phase | Agent | Outcome | Artifact SHA |
 |-------|-------|---------|--------------|
-| research | scout | done | <sha> |
+| discover | scout | done | <sha> |
 | build | builder | done | <sha> |
 | audit | auditor | PASS | <sha> |
 | ship  | (ship.sh) | committed @<commit-sha> | — |

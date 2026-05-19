@@ -15,7 +15,7 @@
         "files": [".evolve/runs/cycle-{cycle}/intent.md"]
       },
       "gate_in": "gate_calibrate_to_intent",
-      "gate_out": "gate_intent_to_research",
+      "gate_out": "gate_intent_to_discover",
       "parallel_eligible": false,
       "skippable_when_present": true
     },
@@ -33,7 +33,7 @@
           ".evolve/runs/cycle-{cycle}/handoff-scout.json"
         ]
       },
-      "gate_in": "gate_research_to_discover",
+      "gate_in": "gate_intent_to_discover",
       "gate_out": "gate_discover_to_triage",
       "parallel_eligible": true,
       "skippable_when_present": false
