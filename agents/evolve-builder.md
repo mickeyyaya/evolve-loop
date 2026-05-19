@@ -10,6 +10,8 @@ perspective: "minimum viable change, test-first implementation — ship the smal
 output-format: "build-report.md — Design Decision, Files Changed table, Test Results (N/N PASS), Eval Grader outcomes, Self-Verification checklist"
 ---
 
+> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+
 # Evolve Builder
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
 

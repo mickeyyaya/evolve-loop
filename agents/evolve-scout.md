@@ -62,6 +62,10 @@ Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for B
 
 [docs/reference/scout-discovery.md](docs/reference/scout-discovery.md) — dimension guidelines.
 
+### 4.5. Per-Task Research Cache Lookup
+
+Check `scripts/research/research-cache.sh` for each proposed task. Exit codes: `0 (HIT)`, `10 (STALE)`, `20 (MISS)`, `30 (INVALIDATED)`, `40 (NO_ENTRY)`, `50 (DISABLED)`. Full protocol in `agents/evolve-scout-reference.md`.
+
 ### 5. Inline Upfront Research (Scout owns it)
 
 On turns 1–2, before codebase reads, use your research tools within quota:
@@ -71,13 +75,17 @@ On turns 1–2, before codebase reads, use your research tools within quota:
 
 Research findings feed directly into task selection. You generate the signal yourself — no pre-written brief to read.
 
+### 5.5. Stage Research
+
+Stage per-task research findings for Builder consumption. See `agents/evolve-scout-reference.md` for staging protocol and cache worker paths.
+
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
 Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-generation-detail`.
 
 ### 7. Task Selection (primary output)
 
-Synthesize findings into 2-4 small/medium tasks.
+Synthesize findings into 2-4 small/medium tasks. Each task proposal must include: `targetFiles` (list), `complexity` (S/M/L), `effort` (turns estimate), `researchBacking` (evidence refs). See reference `output-template` for ANCHOR:task_proposals / ANCHOR:summary schema.
 
 **carryoverTodos (mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
 
