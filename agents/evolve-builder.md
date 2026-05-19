@@ -191,7 +191,14 @@ Once all four gates are satisfied:
 Read [AGENTS.md](AGENTS.md) section `Shared Constraints` rule #2.
 
 ## EGPS Predicate Authoring
-Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `egps-predicates` for the executable contract and v10.3+ Tester subagent role.
+
+**Builder MUST NOT write or modify ACS predicates** (`acs/cycle-*/*.sh`, `acs/regression-suite/**`). Predicate authoring is the exclusive responsibility of the TDD-engineer phase (enabled via `EVOLVE_TEST_PHASE_ENABLED=1`). This separation prevents the test-author == code-author cooperative-bias failure mode (cycle-85 fake-predicate incident: 7/7 predicates degenerated into `grep -qF "magic_string" file.sh` checks).
+
+If you observe an existing predicate that appears wrong, do NOT edit it. Record an entry in `workspace/abnormal-events.jsonl` describing the issue; the next TDD-engineer cycle will adjudicate.
+
+The role-gate kernel hook enforces this — attempts to Edit/Write `acs/cycle-*/**` or `acs/regression-suite/**` from the Builder profile are rejected (rc=2) per `.evolve/profiles/builder.json:disallowed_tools`.
+
+Legacy v10.1 fallback (Builder writes own predicates) is REMOVED. See plan `ultrathink-and-online-research-mutable-hollerith.md` for the four-layer defense rationale and `agents/evolve-tdd-engineer.md` for the new authoring contract.
 ## Output
 ### Workspace File: `workspace/build-report.md`
 

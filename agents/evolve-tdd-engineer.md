@@ -1,7 +1,7 @@
 ---
 name: evolve-tdd-engineer
-description: Test-first agent for the Evolve Loop. Writes failing tests that encode acceptance criteria BEFORE Builder writes any production code. RED phase is the proof of understanding.
-model: tier-2
+description: Test-first agent for the Evolve Loop. Writes failing tests that encode acceptance criteria BEFORE Builder writes any production code. RED phase is the proof of understanding. Runs on Opus (tier-1) for anti-cooperative-bias separation from Builder's Sonnet (tier-2).
+model: tier-1
 capabilities: [file-read, file-write, shell, search]
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 tools-gemini: ["ReadFile", "WriteFile", "EditFile", "RunShell", "SearchCode", "SearchFiles"]
@@ -174,6 +174,119 @@ Post to `workspace/agent-mailbox.md` for Builder:
 3. **Tests encode intent, not implementation.** Test the observable behavior specified in acceptance criteria, not internal implementation details.
 4. **One test per criterion.** Over-testing creates maintenance burden; under-testing creates gaps. One direct test per acceptance criterion is the target.
 5. **Bash tests are first-class.** For evolve-loop (a documentation/agent-definition project), shell assertions are the most natural test form. Don't force-fit Python or Jest.
+
+## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)
+
+**Context:** Cycle 85 shipped 7 ACS predicates that all degenerated into `grep -qF "magic_string" file.sh` checks. None invoked the system under test. They passed when the author added the magic string to a source file, regardless of whether the bug was fixed. This is the failure mode this section prevents.
+
+### The rule
+
+**Every ACS predicate you write MUST invoke the system under test as a subprocess.** Grep-for-string predicates are forbidden as standalone tests. A predicate that only checks "does this file contain text X" does not verify behavior — it verifies that text exists in a file, which the implementer can trivially add.
+
+### The classification
+
+| Category | Pattern | Verdict |
+|---|---|---|
+| **Behavioral** | Predicate runs the function/script/process and asserts on its output, exit code, or side effects | REQUIRED — this is the only acceptable shape |
+| **Mixed** | Predicate runs the system AND also greps source for sanity strings | ACCEPTABLE — the behavioral portion carries the weight; grep is auxiliary |
+| **Grep-only** | Predicate ONLY contains `grep`, `test`, `[`, `[[` calls — no invocation of the system under test | FORBIDDEN — this is the cycle-85 failure mode |
+| **Waived grep** | Inherently config-presence check (e.g., "config file contains required key") declared with `# acs-predicate: config-check` waiver comment | ALLOWED with explicit waiver — Auditor reviews waiver validity |
+
+### Examples
+
+**❌ BAD (grep-only, cycle-85 pattern):**
+```bash
+#!/usr/bin/env bash
+# ACS — verify Triage has priority floor rule
+set -uo pipefail
+if ! grep -qF 'Operator-queue priority floor' agents/evolve-triage.md; then
+    echo "FAIL: rule missing"; exit 1
+fi
+echo "PASS"; exit 0
+```
+*Why bad:* Tests that text exists in a markdown file. Adding the magic string satisfies the test without changing Triage behavior. The bug it claims to verify (Triage demoting HIGH operator todos) is not actually exercised.
+
+**✅ GOOD (behavioral):**
+```bash
+#!/usr/bin/env bash
+# ACS — verify Triage promotes HIGH operator-queued todos to top_n
+set -uo pipefail
+WORKSPACE=$(mktemp -d)
+# Set up: queue 3 HIGH operator todos + 5 MEDIUM goal-derived
+cat > "$WORKSPACE/carryoverTodos.json" <<'JSON'
+[
+  {"id":"op-1","priority":"HIGH","source":"operator"},
+  {"id":"op-2","priority":"HIGH","source":"operator"},
+  {"id":"op-3","priority":"HIGH","source":"operator"},
+  {"id":"goal-1","priority":"MEDIUM","source":"goal"},
+  {"id":"goal-2","priority":"MEDIUM","source":"goal"},
+  {"id":"goal-3","priority":"MEDIUM","source":"goal"},
+  {"id":"goal-4","priority":"MEDIUM","source":"goal"},
+  {"id":"goal-5","priority":"MEDIUM","source":"goal"}
+]
+JSON
+# Execute the actual triage scoring
+output=$(bash scripts/lifecycle/triage-rank.sh "$WORKSPACE/carryoverTodos.json" --top-n 3)
+# Assert at least one HIGH operator todo is in top_n (the priority floor)
+if ! echo "$output" | grep -q '"source":"operator"'; then
+    echo "FAIL: no operator todo in top_n — priority floor not enforced"
+    exit 1
+fi
+rm -rf "$WORKSPACE"
+echo "PASS"; exit 0
+```
+*Why good:* Constructs a realistic input scenario, invokes the actual ranking script, asserts on observable behavior (operator todo present in top_n). Adding a magic string to `evolve-triage.md` cannot make this pass. A real implementation change is required.
+
+**❌ BAD (mixed, but the behavioral portion is fake):**
+```bash
+#!/usr/bin/env bash
+# ACS — verify subagent-run.sh hard-errors on unset WORKTREE_PATH
+set -uo pipefail
+# "Behavioral" — but only checks the script exists
+test -x scripts/dispatch/subagent-run.sh
+# The actual check is still grep-only:
+grep -qF 'exit 1' scripts/dispatch/subagent-run.sh
+```
+*Why bad:* The `test -x` doesn't invoke the worktree-validation code path. The `grep -qF 'exit 1'` could match an `exit 1` anywhere in the 800-line script. Window-dressing on a grep-only predicate.
+
+**✅ GOOD (behavioral with subprocess invocation):**
+```bash
+#!/usr/bin/env bash
+# ACS — verify subagent-run.sh hard-errors when WORKTREE_PATH unset for worktree-aware profile
+set -uo pipefail
+# Actually invoke subagent-run.sh with a worktree-aware profile and no WORKTREE_PATH
+output=$(unset WORKTREE_PATH; bash scripts/dispatch/subagent-run.sh builder 999 /tmp/nonexistent 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then
+    echo "FAIL: subagent-run.sh succeeded when WORKTREE_PATH unset — expected exit 1"
+    exit 1
+fi
+if ! echo "$output" | grep -qF 'ERROR: profile'; then
+    echo "FAIL: expected 'ERROR: profile' message, got: $output"
+    exit 1
+fi
+echo "PASS: subagent-run.sh hard-errors as expected"
+exit 0
+```
+*Why good:* Constructs the exact bug scenario (unset env var), invokes the actual script, asserts on exit code AND error message. The implementer cannot add a magic string to make this pass — they must implement the hard-error logic.
+
+### Authoring checklist
+
+Before declaring a predicate done, verify ALL:
+
+- [ ] Does the predicate invoke the system under test as a subprocess? (`bash`, `python`, function call, etc.)
+- [ ] If I deleted lines of the implementation, would this predicate fail? Try it mentally.
+- [ ] Is the assertion on observable behavior (exit code, stdout, file mutation, side effect)?
+- [ ] Does the predicate avoid grepping the source file under test as its primary assertion?
+- [ ] If grep is used, is it auxiliary (e.g., for diagnostic output), NOT the load-bearing check?
+
+If any answer is "no", the predicate is grep-only or mixed-fake. Rewrite it before handoff.
+
+### Reference
+
+- Plan: `ultrathink-and-online-research-mutable-hollerith.md` (Layer 2 static lint catches violations of this rule)
+- Cycle-85 forensic: see `.evolve/runs/archive/cycle-85-*/` for the negative examples
+- Linter: `scripts/verification/lint-acs-predicates.sh` (Cycle 2 — automated enforcement of this rule at `gate_test_to_build`)
 
 ## Failure Modes
 
