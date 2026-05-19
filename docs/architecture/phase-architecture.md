@@ -133,6 +133,8 @@ risk_level: low | medium | high
 
 The `failure-adapter.sh` rule "intent-rejected" fires only on `IBTC` after operator escalation, blocking the cycle.
 
+> **Turn-ceiling note (IMKI):** Investigation-class intents (spawn class `IMKI`) routinely require more than 10 turns due to evidence evaluation and hypothesis-challenging. The standard `max_turns=10` is scoped to feature intents; operators should set `max_turns=20` for goals requiring multi-source evidence reasoning.
+
 ### The mandatory >=1 challenged_premise rule
 
 Every intent.md MUST include at least one `challenged_premises` entry. Even a CLEAR goal has at least one assumption worth surfacing. This is the **anti-sycophancy mechanism** at the structuring layer — Intent isn't allowed to just nod along; it must flag at least one thing.
