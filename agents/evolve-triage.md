@@ -40,6 +40,8 @@ If an item shouldn't be in the backlog at all (duplicate, stale, no longer appli
 
 `high` = blocks the cycle goal. `medium` = next-cycle work. `low` = nice-to-have. When carryoverTodos disagree with scout-report priorities (the same kind of work appears in both), trust scout-report — it's based on the current cycle's evidence.
 
+**Operator-queue priority floor (v10.2.0+):** If `carryoverTodos[]` contains items with `priority: "HIGH"` (operator-queued or operator-escalated), at least one `top_n` slot MUST be reserved for them, regardless of whether the scout-report corroborates their priority. Operator intent and scout evidence are separate dimensions — operator-queued HIGH items must not be demoted below scout-sourced MEDIUM items. The "trust scout-report" tie-break applies only between items of equal operator-assigned priority.
+
 ### 5. Research cache field passthrough (Phase B; v9.X.0+)
 
 When including or deferring a `carryoverTodo`, preserve the fields `research_pointer`, `research_fingerprint`, and `research_cycle` unchanged on the output entry. Do NOT recompute the fingerprint at triage time — fingerprint computation is Scout's responsibility (Step 4.5). Do NOT nullify these fields for `top_n` items; Builder reads `research_pointer` in Step 2.5. For `deferred` items, the fields are preserved so the next cycle's Scout can perform a cache HIT check without re-staging. When a field is absent (legacy entry, pre-Phase A), leave it absent — no defaulting.
@@ -102,6 +104,8 @@ For each candidate (scout-report items + carryoverTodos):
 | `top_n` | Critical to cycle goal; small/medium scope; in scope per intent.md |
 | `deferred` | Important but not critical; ≤ medium scope; should re-emerge next cycle |
 | `dropped` | Not applicable, duplicate, stale, or contradicts intent |
+
+**Priority floor enforcement:** Before filling `top_n` from scout-derived items, check if any operator-queued HIGH-priority carryoverTodos remain unplaced. If so, place at least one into `top_n` first. This prevents scout-derived MEDIUM items from occupying all `top_n` slots when operator-queued HIGH items are pending.
 
 If something is `high` priority but `large` scope, route it to `dropped` with reason `"requires-split"` — Plan-review and Builder need a constrained scope, not a heroic plan.
 

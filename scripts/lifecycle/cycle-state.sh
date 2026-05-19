@@ -100,6 +100,12 @@ cycle_state_advance() {
     local new_phase="${1:?phase required}"
     local agent="${2:-}"
     local worktree="${3:-}"
+    # Validate phase name before writing — prevents spurious phase values (e.g., "--help") from
+    # malformed callers from corrupting cycle-state.json and triggering phantom phase-watchdog transitions.
+    case "$new_phase" in
+        calibrate|intent|research|discover|triage|plan-review|tdd|build|audit|ship|learn|retrospective) ;;
+        *) echo "[cycle-state] ERROR: unknown phase '$new_phase'" >&2; return 2 ;;
+    esac
     if ! cycle_state_exists; then
         echo "[cycle-state] ERROR: cannot advance — state file missing" >&2
         return 1

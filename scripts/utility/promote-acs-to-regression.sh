@@ -44,8 +44,14 @@ SRC="${EVOLVE_ACS_DIR_OVERRIDE:-$PROJECT_ROOT/acs}/cycle-$CYCLE"
 DST="${EVOLVE_ACS_DIR_OVERRIDE:-$PROJECT_ROOT/acs}/regression-suite/cycle-$CYCLE"
 
 if [ ! -d "$SRC" ]; then
-    echo "[promote-acs] no predicates to promote (source $SRC absent)"
-    exit 1
+    # Fallback: check workspace-relative path (builder may write predicates there)
+    WORKSPACE_SRC="$PROJECT_ROOT/.evolve/runs/cycle-$CYCLE/acs/cycle-$CYCLE"
+    if [ -d "$WORKSPACE_SRC" ]; then
+        SRC="$WORKSPACE_SRC"
+    else
+        echo "[promote-acs] no predicates to promote (source $SRC absent; also checked $WORKSPACE_SRC)"
+        exit 1
+    fi
 fi
 
 count=$(find "$SRC" -maxdepth 1 -name "*.sh" -type f 2>/dev/null | wc -l | tr -d ' ')

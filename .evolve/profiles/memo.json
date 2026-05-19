@@ -13,7 +13,9 @@
     "Bash(test:*)",
     "Bash(jq:*)",
     "Write(.evolve/runs/cycle-*/carryover-todos.json)",
-    "Edit(.evolve/runs/cycle-*/carryover-todos.json)"
+    "Edit(.evolve/runs/cycle-*/carryover-todos.json)",
+    "Write(.evolve/runs/cycle-*/memo.md)",
+    "Edit(.evolve/runs/cycle-*/memo.md)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",

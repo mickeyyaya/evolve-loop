@@ -146,6 +146,28 @@ After `subagent-run.sh memo` returns exit 0, verify `$WORKSPACE/memo.md` exists 
 
 For the full `memo.md` section template, see [agents/evolve-memo-reference.md](agents/evolve-memo-reference.md) — section `memo-template`.
 
+## Closure-Mode Detection (v10.3.0+)
+
+At cycle start (calibrate phase), before dispatching Scout, check whether prior phases are already complete:
+
+```bash
+completed=$(cycle-state.sh get completed_phases 2>/dev/null || echo "[]")
+```
+
+If `completed_phases` already contains **both** `"build"` and `"audit"` (e.g., `["build","audit"]` or a superset), the prior cycle attempt already completed all implementation work. **Skip directly to ship phase** — do NOT re-run Scout, Builder, or Auditor.
+
+```bash
+# Example closure-mode check (jq):
+if echo "$completed" | jq -e '(index("build") != null) and (index("audit") != null)' >/dev/null 2>&1; then
+    # Closure cycle: advance directly to ship
+    cycle-state.sh advance ship
+    ship.sh "<prior commit message from audit-report>"
+    # then proceed to memo/learn phase as normal
+fi
+```
+
+**Rationale:** Without this check, closure cycles (re-runs where prior attempt completed all work) consume the full 60-turn orchestrator budget re-running Scout → Builder → Auditor unnecessarily. This burned 114 turns in cycle-84.
+
 ## Resume Mode
 
 Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `resume-mode` for picking up a previously-paused cycle.

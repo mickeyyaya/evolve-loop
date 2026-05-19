@@ -974,8 +974,11 @@ ADVEOF
         # instead of the worktree → builder Edits hit --add-dir EPERM).
         profile_worktree_aware="1"
         if [ -z "${WORKTREE_PATH:-}" ]; then
-            log "WARN: profile $profile contains {worktree_path} but WORKTREE_PATH is unset"
-            # fall through — adapter will fail loudly with its own check
+            # Hard error: worktree-aware profile requires WORKTREE_PATH.
+            # run-cycle.sh must call cycle-state.sh set-worktree before dispatching builder.
+            # Fallthrough would leave {worktree_path} unexpanded → builder writes to main tree, bypassing isolation.
+            log "ERROR: profile $profile contains {worktree_path} but WORKTREE_PATH is unset — cannot expand profile; ensure cycle-state.sh set-worktree is called before builder dispatch"
+            exit 1
         else
             local expanded_profile="$workspace/${agent}-profile-expanded.json"
             if jq --arg wp "$WORKTREE_PATH" \
@@ -1252,6 +1255,27 @@ ADVEOF
             }' > "$usage_sidecar" 2>/dev/null || rm -f "$usage_sidecar"
         fi
     fi
+
+    # Fix 6 (cycle-85): accumulate per-invocation cost into state.json:currentBatch.cycleAccruedCostUSD.
+    # claude -p emits total_cost_usd in its final JSON line (already captured in usage_sidecar).
+    # The batch-cap check in evolve-loop-dispatch.sh should read from this field for accurate subagent accounting.
+    # Note: when claude -p runs as a nested subprocess, its token cost is billed to the parent session —
+    # accumulating here gives per-cycle visibility without relying on the host session meter.
+    local _state_json_path="${EVOLVE_PROJECT_ROOT:-$PWD}/.evolve/state.json"
+    if command -v jq >/dev/null 2>&1 && [ -s "$usage_sidecar" ] && [ -f "$_state_json_path" ]; then
+        local _invocation_cost
+        _invocation_cost=$(jq -r '.total_cost_usd // 0' "$usage_sidecar" 2>/dev/null || echo "0")
+        if [ -n "$_invocation_cost" ] && [ "$_invocation_cost" != "0" ] && [ "$_invocation_cost" != "null" ]; then
+            local _state_tmp="${_state_json_path}.tmp.$$"
+            jq -c --arg cost "$_invocation_cost" \
+                '.currentBatch.cycleAccruedCostUSD = ((.currentBatch.cycleAccruedCostUSD // 0) + ($cost | tonumber))' \
+                "$_state_json_path" > "$_state_tmp" 2>/dev/null \
+                && mv -f "$_state_tmp" "$_state_json_path" 2>/dev/null \
+                || rm -f "$_state_tmp" 2>/dev/null
+            log "cost-attribution: agent=$agent invocation_cost=\$$_invocation_cost accumulated to state.json:currentBatch.cycleAccruedCostUSD"
+        fi
+    fi
+    unset _state_json_path
 
     # T2 / P-NEW-22 observability: turn-overrun detection.
     # Compare num_turns from the usage sidecar against the profile's max_turns.
