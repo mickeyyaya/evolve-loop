@@ -2,7 +2,7 @@
 # Predicate: phase-gate.sh gate_discover_to_build fails (hard) at kill_rate < 0.7
 # Behavioral: counts occurrences of the fail-gate activation pattern, verifies >= 1
 set -uo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 GATE_FILE="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
 [ -f "$GATE_FILE" ] || { echo "MISSING: $GATE_FILE" >&2; exit 1; }
 # Count lines with fail-gate default (EVOLVE_MUTATION_GATE_STRICT:-1) in gate_discover_to_build

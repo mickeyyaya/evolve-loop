@@ -2,7 +2,7 @@
 # Predicate: mutate-eval.sh grep_only_check returns rc=2 for grep-only input
 # Behavioral: creates a fixture grep-only file and invokes mutate-eval.sh on it
 set -uo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MUTATE="$REPO_ROOT/scripts/verification/mutate-eval.sh"
 # Create a minimal grep-only eval fixture in a temp file
 TMP_EVAL=$(mktemp /tmp/test-mutate-eval-XXXX.md)

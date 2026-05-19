@@ -2,7 +2,7 @@
 # Predicate: test-lint-acs-predicates.sh passes (7 FAIL fixtures fail, 2 PASS fixtures pass)
 # Behavioral: invokes the actual test suite subprocess and checks exit code + pass count
 set -uo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TEST_SCRIPT="$REPO_ROOT/tests/verification/test-lint-acs-predicates.sh"
 [ -x "$TEST_SCRIPT" ] || chmod +x "$TEST_SCRIPT"
 output=$(bash "$TEST_SCRIPT" 2>&1)
