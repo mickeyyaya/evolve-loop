@@ -34,6 +34,12 @@ Prior failures are recorded in `state.json:failedApproaches[]` with structured c
 ### 8. Cost adaptation (v8.35.0+)
 The auditor profile defaults to Opus, but `scripts/utility/diff-complexity.sh` auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
 
+### 9. Knowledge Stewardship Rule (Day-One)
+
+> **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. Place runtime references in `docs/research/`, archival dossiers in `knowledge-base/research/`. **Never delete; always archive.** When superseding a doc, MOVE it to `knowledge-base/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
+
+Enforced by `scripts/hooks/doc-deletion-guard.sh` (PreToolUse kernel hook, cycle-90): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: `EVOLVE_ALLOW_DOC_DELETE=1` (logged; emergency only).
+
 ## 12 Core agent rules
 
 Behavioral rules every agent must follow regardless of CLI. Where the kernel hooks above catch *structural* breaches, these catch *judgment* breaches. In bypass-permissions / autonomous mode, rule 4 ("stop and ask") is overridden — make the reasonable call and continue. All other rules apply unconditionally.
