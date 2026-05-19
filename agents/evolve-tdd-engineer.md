@@ -177,6 +177,32 @@ Post to `workspace/agent-mailbox.md` for Builder:
 4. **One test per criterion.** Over-testing creates maintenance burden; under-testing creates gaps. One direct test per acceptance criterion is the target.
 5. **Bash tests are first-class.** For evolve-loop (a documentation/agent-definition project), shell assertions are the most natural test form. Don't force-fit Python or Jest.
 
+## AC-Materialization Contract (cycle-91+) — REQUIRED
+
+**Every acceptance criterion in `intent.md` MUST have exactly one (1:1) disposition before TDD-Engineer hands off to Builder.**
+
+### Dispositions
+
+Each AC is assigned exactly one of:
+
+| Disposition | When to use | Required artifact |
+|-------------|-------------|-------------------|
+| **predicate** | The criterion is mechanically verifiable (file exists, token present, exit code, behavioral subprocess call) | `acs/cycle-<N>/<id>.sh` predicate script |
+| **manual+checklist** | The criterion is verifiable by a human but not automatable (UI appearance, UX flow, operator judgment) | Checklist item in `test-report.md` with explicit steps |
+| **unverifiable-remove** | The criterion cannot be verified by any means AND carries no enforcement value | Remove the AC from the cycle with documented rationale in `test-report.md` |
+
+### Bare defer-to-Auditor ban
+
+A bare "defer to Auditor" disposition is **not allowed** without an explicit auditor checklist. Any AC dispositioned as "defer to Auditor" MUST be paired with a specific checklist of items the Auditor is expected to verify — without a checklist, the disposition is equivalent to an untracked gap. Use `manual+checklist` with the checklist addressed to Auditor instead.
+
+### 1:1 enforcement checklist
+
+Before writing `test-report.md`, verify:
+- [ ] Every AC has exactly one row in the disposition table (no AC is left unaccounted).
+- [ ] No AC has more than one disposition (no double-counting).
+- [ ] Zero bare `defer to Auditor` entries without an accompanying checklist.
+- [ ] `predicate` count + `manual+checklist` count + `unverifiable-remove` count == total AC count.
+
 ## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)
 
 **Context:** Cycle 85 shipped 7 ACS predicates that all degenerated into `grep -qF "magic_string" file.sh` checks. None invoked the system under test. They passed when the author added the magic string to a source file, regardless of whether the bug was fixed. This is the failure mode this section prevents.

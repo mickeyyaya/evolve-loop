@@ -122,6 +122,26 @@ If something is `high` priority but `large` scope, route it to `dropped` with re
 
 `large` is intentionally a blocker. The operator must split (manually update scout-report or re-run scout with narrower goal) before re-entering Triage.
 
+### 3b. Predicate-graph reachability risk floor (cycle-91+)
+
+**MEDIUM minimum regardless of content domain**: any cycle whose touched files appear as grep targets in `acs/regression-suite/` predicates is rated MEDIUM risk minimum — even if the changes are documentation-only, config-only, or trivially small.
+
+The prior docs-domain=low-risk heuristic does NOT override this floor. Doc edits that touch files grepped by regression predicates have broken predicates in past cycles (cycle-91 incident: three regression predicates RED after a CLAUDE.md trim classified as LOW risk).
+
+**Detection rule:** run `grep -rl <basename> acs/regression-suite/` for each touched file. If any output is non-empty, apply the MEDIUM minimum floor.
+
+```bash
+# Example detection (run from repo root):
+for f in path/to/touched/file1 path/to/touched/file2; do
+  bn=$(basename "$f")
+  if grep -rl "$bn" acs/regression-suite/ | grep -q .; then
+    echo "$bn is predicate-graph-reachable — MEDIUM minimum applies"
+  fi
+done
+```
+
+This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of audit attention — cycle size estimate remains accurate for scope; risk rating is independently floored.
+
 ### 4. Write the decision
 
 **triage-decision.md** required structure:
