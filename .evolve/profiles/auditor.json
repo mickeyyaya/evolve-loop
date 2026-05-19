@@ -73,7 +73,10 @@
     "Edit(.evolve/runs/cycle-*/handoff-auditor.json)",
     "Edit(.evolve/runs/cycle-*/workers/*)",
     "Bash(run-acs-suite.sh:*)",
-    "Bash(validate-predicate.sh:*)"
+    "Bash(validate-predicate.sh:*)",
+    "WebSearch",
+    "WebFetch",
+    "Bash(scripts/research/kb-search.sh:*)"
   ],
   "disallowed_tools": [
     "Edit(skills/**)",
@@ -212,5 +215,10 @@
   "allowed_clis": [
     "all"
   ],
-  "_note": "Cross-family with builder. allowed_clis=all makes the invariant always satisfiable when ≥2 CLI families are installed."
+  "_note": "Cross-family with builder. allowed_clis=all makes the invariant always satisfiable when ≥2 CLI families are installed.",
+  "research_quota": {
+    "web_search": 3,
+    "web_fetch": 5,
+    "kb_search": 20
+  }
 }

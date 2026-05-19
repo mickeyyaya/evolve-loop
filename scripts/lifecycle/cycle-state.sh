@@ -643,6 +643,40 @@ cycle_state_set_estimate() {
     echo "[cycle-state] estimate set to: $estimate" >&2
 }
 
+# v10.16.0 Cycle A: per-agent research usage counters.
+# Shape: cycle-state.json:research_usage[agent][bucket] = N
+# Buckets: web_search, web_fetch, kb_search
+# Called by research-quota-gate.sh hook and run-cycle.sh (reset at cycle start).
+
+cycle_state_research_usage_incr() {
+    local agent="${1:?agent required}"
+    local bucket="${2:?bucket required}"
+    cycle_state_exists || return 0
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for research-usage-incr" >&2
+        return 1
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(printf '%s' "$current" | jq -c --arg a "$agent" --arg b "$bucket" \
+        '.research_usage = ((.research_usage // {})
+          | .[$a] = ((.[$a] // {})
+            | .[$b] = ((.[$b] // 0) + 1)))')
+    _atomic_write "$updated"
+}
+
+cycle_state_research_usage_reset() {
+    cycle_state_exists || return 0
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[cycle-state] ERROR: jq required for research-usage-reset" >&2
+        return 1
+    fi
+    local current updated
+    current=$(cat "$CYCLE_STATE_FILE")
+    updated=$(printf '%s' "$current" | jq -c '.research_usage = {}')
+    _atomic_write "$updated"
+}
+
 # CLI dispatcher: only fires when this file is executed directly.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     cmd="${1:-}"
@@ -667,10 +701,12 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         clear-checkpoint)        cycle_state_clear_checkpoint ;;
         bump-auto-resume-attempts)   cycle_state_bump_auto_resume_attempts ;;
         reset-auto-resume-attempts)  cycle_state_reset_auto_resume_attempts ;;
+        research-usage-incr)     cycle_state_research_usage_incr "$@" ;;
+        research-usage-reset)    cycle_state_research_usage_reset ;;
         get)                     cycle_state_get "$@" ;;
         exists)                  cycle_state_exists && echo yes || { echo no; exit 1; } ;;
         dump)                    cycle_state_dump ;;
         path)                    cycle_state_path ;;
-        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-estimate|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|bump-auto-resume-attempts|reset-auto-resume-attempts|get|exists|dump|path}" >&2; exit 2 ;;
+        *)                       echo "usage: cycle-state.sh {init|advance|set-agent|set-worktree|set-estimate|set-parallel-workers|clear-parallel-workers|init-workers|set-worker-status|prune-expired-failures|clear|record-quality-tier|compute-cycle-tier|checkpoint|is-checkpointed|resume-phase|clear-checkpoint|bump-auto-resume-attempts|reset-auto-resume-attempts|research-usage-incr|research-usage-reset|get|exists|dump|path}" >&2; exit 2 ;;
     esac
 fi

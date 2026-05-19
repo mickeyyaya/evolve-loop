@@ -587,6 +587,9 @@ if [ "$SKIP_NORMAL_INIT" = "0" ]; then
     bash "$CYCLE_STATE_HELPER" init "$CYCLE" ".evolve/runs/cycle-$CYCLE" \
         || fail "cycle_state_init failed"
     log "cycle-state.json initialized at phase=calibrate"
+    # v10.16.0: reset per-cycle research-usage counters so each cycle starts
+    # with a clean quota slate (research-as-tool-c1 Cycle A foundation).
+    bash "$CYCLE_STATE_HELPER" research-usage-reset 2>/dev/null || true
 fi
 
 # v8.21.0: privileged-shell worktree provisioning — closes the trust-boundary

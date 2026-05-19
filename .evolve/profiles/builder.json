@@ -19,7 +19,10 @@
     "NotebookEdit",
     "Bash",
     "Skill(code-review-simplify)",
-    "Skill(security-review-scored)"
+    "Skill(security-review-scored)",
+    "WebSearch",
+    "WebFetch",
+    "Bash(scripts/research/kb-search.sh:*)"
   ],
   "disallowed_tools": [
     "Edit(.evolve/state.json)",
@@ -115,5 +118,10 @@
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude until Phase 4 — Gemini/Codex/Grok adapters need sandbox + permission scoping + budget cap parity. Builder is safety-critical (writes code in worktree)."
+  "_note": "Restricted to claude until Phase 4 — Gemini/Codex/Grok adapters need sandbox + permission scoping + budget cap parity. Builder is safety-critical (writes code in worktree).",
+  "research_quota": {
+    "web_search": 3,
+    "web_fetch": 5,
+    "kb_search": 20
+  }
 }
