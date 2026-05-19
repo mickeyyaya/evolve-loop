@@ -22,7 +22,12 @@ set -uo pipefail
 
 CYCLE="${CYCLE:-57}"
 WORKSPACE="${WORKSPACE:-${EVOLVE_PROJECT_ROOT:-.}/.evolve/runs/cycle-${CYCLE}}"
-REPO_ROOT="${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+# Use WORKTREE_PATH (where cycle code changes live) when available, falling
+# back to EVOLVE_PROJECT_ROOT / git root for standalone post-ship runs.
+# Matches the precedence pattern in 022-orchestrator-uses-registry.sh:25.
+# Without WORKTREE_PATH precedence, this predicate fires a false positive
+# pre-ship — predicates live in $WORKTREE/acs/cycle-N/ until ship.sh commits.
+REPO_ROOT="${WORKTREE_PATH:-${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}"
 
 ACS_VERDICT="$WORKSPACE/acs-verdict.json"
 CYCLE_ACS_DIR="$REPO_ROOT/acs/cycle-${CYCLE}"
