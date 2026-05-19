@@ -29,6 +29,37 @@
 
 set -uo pipefail   # No -e: we expect some commands to fail
 
+# --- grep_only_check: skip trivially-tautological predicates -----------------
+# If the eval file's commands match the GREP_ONLY pattern (last meaningful
+# non-comment line is `grep -q` AND < 3 meaningful lines total), mutation
+# testing cannot produce meaningful kill rates — the predicate will always
+# pass any string-present/absent mutation. Skip with rc=2 (DECLINE).
+grep_only_check() {
+    local pred_file="$1"
+    [ -f "$pred_file" ] || return 0
+
+    # Strip shebang, comments, blank lines to get meaningful lines
+    local meaningful_lines
+    meaningful_lines=$(grep -v '^\s*#' "$pred_file" 2>/dev/null | grep -v '^\s*$' | grep -v '^#!' || true)
+
+    local line_count
+    line_count=$(echo "$meaningful_lines" | grep -c '.' 2>/dev/null || true)
+    line_count=$(echo "$line_count" | tr -d ' \n')
+    line_count="${line_count:-0}"
+
+    # Heuristic: < 3 meaningful lines AND last line is grep -q (any variant)
+    if [ "$line_count" -lt 3 ]; then
+        local last_line
+        last_line=$(echo "$meaningful_lines" | tail -1)
+        if echo "$last_line" | grep -qE 'grep\s+.*-[a-zA-Z]*q[a-zA-Z]*'; then
+            echo "SKIP_REASON=grep_only"
+            return 2
+        fi
+    fi
+
+    return 0
+}
+
 # --- Argument parsing --------------------------------------------------------
 THRESHOLD=0.8
 MUTATIONS_PER_FILE=3
@@ -55,6 +86,17 @@ done
 
 [ -n "$EVAL_FILE" ] || { echo "[mutate-eval] usage: mutate-eval.sh <eval-file>" >&2; exit 2; }
 [ -f "$EVAL_FILE" ] || { echo "[mutate-eval] eval file not found: $EVAL_FILE" >&2; exit 2; }
+
+# --- Pre-flight: skip grep-only predicates -----------------------------------
+# Mutation testing cannot produce meaningful kill rates for grep-only eval
+# files — any string-present check will always pass. DECLINE with rc=2.
+_grep_only_out=$(grep_only_check "$EVAL_FILE")
+_grep_only_rc=$?
+if [ "$_grep_only_rc" -eq 2 ]; then
+    echo "[mutate-eval] DECLINE: $EVAL_FILE — grep-only predicate (mutation testing cannot kill string-presence checks)"
+    echo "$_grep_only_out"
+    exit 2
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VERIFY_EVAL="$REPO_ROOT/scripts/verification/verify-eval.sh"

@@ -367,12 +367,15 @@ gate_discover_to_build() {
 $_new_evals
 EOF
             if [ "$_mutation_warnings" -gt 0 ]; then
-                # v10.2.0: EVOLVE_MUTATION_GATE_STRICT=1 promotes WARN to FAIL.
-                if [ "${EVOLVE_MUTATION_GATE_STRICT:-0}" = "1" ]; then
-                    log "MUTATION-FAIL: $_mutation_warnings new eval(s) failed mutation testing — gate FAIL (EVOLVE_MUTATION_GATE_STRICT=1)"
+                # v10.9.0 (cycle-86): promoted to hard fail-gate at kill_rate < 0.7.
+                # Prior WARN-only rollout (v10.2.0 EVOLVE_MUTATION_GATE_STRICT=1) is
+                # now the default. One verification cycle confirmed no false-positives.
+                # Opt-out: EVOLVE_MUTATION_GATE_STRICT=0 reverts to WARN behavior.
+                if [ "${EVOLVE_MUTATION_GATE_STRICT:-1}" != "0" ]; then
+                    log "MUTATION-FAIL: $_mutation_warnings new eval(s) kill rate < 0.7 — gate FAIL (predicate-quality Layer 4, cycle-86)"
                     return 1
                 else
-                    log "MUTATION-WARN: $_mutation_warnings new eval(s) failed mutation testing (rollout: WARN-only; set EVOLVE_MUTATION_GATE_STRICT=1 to FAIL)"
+                    log "MUTATION-WARN: $_mutation_warnings new eval(s) kill rate < 0.7 — WARN-only (EVOLVE_MUTATION_GATE_STRICT=0)"
                 fi
             else
                 log "OK: All new evals passed mutation testing (kill rate ≥ 0.7)"
@@ -742,6 +745,21 @@ EOF
         else
             fail "build-report.md schema violations (C5 enforcement): $_schema_out"
         fi
+    fi
+
+    # 5b. grep-only predicate linter (predicate-quality Layer 2, cycle-86)
+    # Blocks gate if any acs/cycle-N predicates are trivially-tautological (grep-only).
+    # Evaluates behavioral vs. grep-only classification for every predicate written
+    # during this build. FAIL-gate: grep-only predicates block audit phase.
+    if [ -x "scripts/verification/lint-acs-predicates.sh" ]; then
+        local _lint_acs_rc
+        _lint_acs_rc=0
+        bash scripts/verification/lint-acs-predicates.sh --predicates-dir "${EVOLVE_PROJECT_ROOT:-.}/acs/cycle-${CYCLE}" 2>&1 || _lint_acs_rc=$?
+        if [ "$_lint_acs_rc" -ne 0 ]; then
+            log "FAIL gate_build_to_audit: grep-only predicates detected in acs/cycle-${CYCLE} — run with --explain for details"
+            return 1
+        fi
+        log "OK: no grep-only predicates in acs/cycle-${CYCLE}"
     fi
 
     # 6. Validate-predicate sweep: WARN on NOT_EXECUTABLE predicates in acs/cycle-N/

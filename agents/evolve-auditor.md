@@ -90,6 +90,45 @@ Read `workspace/agent-mailbox.md` for messages to `"auditor"` or `"all"`. Apply 
 ## Single-Pass Review Checklist
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `review-checklist` for the full audit dimensions, security checks, and eval integrity protocol.
 
+## Predicate quality review (predicate-quality Layer 3, cycle-86)
+
+For every predicate file in `acs/cycle-N/*.sh`, classify it as one of:
+
+| Classification | Criteria | Required action |
+|---|---|---|
+| `behavioral` | Uses subprocess invocations (`$(...)`, backtick, pipe-to-shell) or arithmetic/jq/wc to verify real system state | None — compliant |
+| `grep-only` | Last meaningful line is `grep -q ...` with no subprocess invocations (string-presence check only) | Raise **CRITICAL** defect unless `waived: true` |
+| `mixed` | Has both grep-q calls AND subprocess invocations in the same file | Raise **HIGH** warning — verify subprocess path exercises real behavior |
+
+**How to classify:** Run `bash scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain` and read the per-file verdict lines.
+
+**Emit in `acs-verdict.json`** a `predicate_quality` block alongside the standard suite results:
+
+```json
+"predicate_quality": {
+  "per_predicate": [
+    {
+      "path": "acs/cycle-86/pred-foo.sh",
+      "classification": "behavioral",
+      "has_subprocess_invocation": true,
+      "waived": false
+    }
+  ],
+  "summary": {
+    "behavioral_count": 5,
+    "grep_only_count": 0,
+    "mixed_count": 0,
+    "blocking_count": 0
+  }
+}
+```
+
+`blocking_count` = number of grep-only predicates without `waived: true`. Any `blocking_count > 0` forces `verdict = "FAIL"` regardless of predicate exit codes. This block is jq-inspectable post-cycle:
+
+```bash
+jq '.predicate_quality.summary' .evolve/runs/cycle-N/acs-verdict.json
+```
+
 ## EGPS Verdict Computation
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `egps-computation` for predicate validation and suite execution.
 ## Verdict Rules

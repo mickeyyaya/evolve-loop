@@ -69,7 +69,7 @@ Defaults reflect production posture as of v10.8.0. Detail docs linked per row.
 | Subsystem | Env var | Default | Effect / reference |
 |---|---|---|---|
 | EGPS gate | `acs-verdict.json` | enforced | Cycle ships only if `red_count == 0`. WARN level removed in v10.0.0. See [docs/architecture/egps-v10.md](docs/architecture/egps-v10.md). |
-| EGPS Tester | `EVOLVE_TEST_PHASE_ENABLED` | `0` (opt-in) | When `1`, Tester subagent writes predicates after Builder. When `0`, Builder writes own predicates (v10.1 fallback). |
+| EGPS Tester | `EVOLVE_TEST_PHASE_ENABLED` | `1` (default-on) | When `1`, TDD-Engineer writes behavioral predicates before Builder; Tester validates after. When `0`, Builder writes own predicates (v10.1 fallback, degrades quality). Flipped default in cycle-86 (predicate-quality Layer 4). |
 | Phase-B observability | `EVOLVE_TRACKER_ENABLED` | `0` (opt-in) | When `1`, replays NDJSON via `tracker-writer.sh` post-phase. v10.6+ candidate flips to default-on. See [docs/architecture/phase-tracker.md](docs/architecture/phase-tracker.md). |
 | Triage phase | `EVOLVE_TRIAGE_DISABLE` | `0` (Triage on) | Runs Layer C Triage on every cycle. Soft WARN if skipped without override. |
 | Auto-retrospective | `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` | `0` (on) | FAIL/WARN cycles auto-run retrospective + merge-lesson. Cost ~$0.30-0.50/cycle. |

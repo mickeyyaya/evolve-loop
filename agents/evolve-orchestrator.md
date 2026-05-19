@@ -65,9 +65,24 @@ When you advance to the build phase, just call `cycle-state.sh advance build bui
 
 When `EVOLVE_OBSERVER_ENABLED=1` (default OFF), each subagent spawns a phase-observer sibling that writes `{agent}-observer-events.ndjson` + `{agent}-observer-report.json` with verdict ∈ `{NORMAL, DEGRADED, INCIDENT}`. Read the report before `{agent}-report.md` and treat `INCIDENT` as a decision input. Full protocol: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `phase-observer`.
 
-## EGPS Tester Phase
+## EGPS Tester Phase (default-on as of cycle-86)
 
-Opt-in via `EVOLVE_TEST_PHASE_ENABLED=1` (default 0). When enabled, advance to `test tester` after Builder and run `subagent-run.sh tester` before Audit; otherwise Builder writes its own `acs/cycle-N/*.sh` predicates (v10.1 fallback). Full protocol + gate rationale: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `egps-tester-phase`.
+`EVOLVE_TEST_PHASE_ENABLED` defaults to `1` as of cycle-86 (predicate-quality Layer 4). The phase flow **always includes TDD between Triage and Build**:
+
+```
+Scout → Triage → TDD-Engineer → Builder → Auditor → Ship
+```
+
+When `EVOLVE_TEST_PHASE_ENABLED=1` (default):
+1. After Triage: `cycle-state.sh advance test tdd-engineer`
+2. Run: `subagent-run.sh tdd-engineer $CYCLE $WORKSPACE`
+3. TDD-Engineer writes `acs/cycle-N/*.sh` behavioral predicates BEFORE Builder runs.
+4. Builder implements to make those predicates pass.
+5. After Builder: Tester validates Builder's predicates with lint + mutation checks.
+
+When `EVOLVE_TEST_PHASE_ENABLED=0` (opt-out): Builder writes its own predicates (v10.1 fallback). This degrades predicate quality — avoid unless debugging.
+
+Full protocol + gate rationale: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `egps-tester-phase`.
 
 ## EGPS Verdict-of-Record (v10.1.0+)
 
