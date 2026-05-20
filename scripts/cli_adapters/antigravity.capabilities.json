@@ -1,0 +1,47 @@
+{
+  "adapter": "antigravity",
+  "version": 1,
+  "supports": {
+    "budget_cap_native": false,
+    "permission_scoping": false,
+    "sandbox_native": false,
+    "non_interactive_prompt": true,
+    "structured_logs": false,
+    "model_flag": false
+  },
+  "capabilities": {
+    "subprocess_isolation": {
+      "modes": ["hybrid", "degraded"],
+      "default": "degraded",
+      "warning": "claude binary not on PATH; running in same-session degraded mode. Subagents will execute in the calling agy session rather than isolated subprocesses. Pipeline kernel hooks (role-gate, ship-gate, phase-gate-precondition) still apply."
+    },
+    "budget_cap": {
+      "modes": ["hybrid", "none"],
+      "default": "none",
+      "warning": "no native budget cap on agy CLI; consider EVOLVE_RUN_TIMEOUT for an external bound. cost_blind:true is intentional for this infrastructure cycle — rollout cycle must add billing tap or turn-cap."
+    },
+    "sandbox": {
+      "modes": ["hybrid", "none"],
+      "default": "none"
+    },
+    "profile_permissions": {
+      "modes": ["hybrid", "none"],
+      "default": "none",
+      "warning": "agy CLI has no profile-permission flags; subagents have access to whatever tools the calling agy session permits. Mitigation: pipeline kernel hooks and post-hoc artifact verification."
+    },
+    "challenge_token": {
+      "modes": ["hybrid", "degraded"],
+      "default": "degraded",
+      "warning": "challenge token verified post-hoc on artifact rather than embedded in subprocess profile"
+    }
+  },
+  "probes": [
+    {
+      "check": "agy_on_path",
+      "if_true_mode": "hybrid",
+      "if_false_mode": "degraded",
+      "applies_to": ["subprocess_isolation", "budget_cap", "sandbox", "profile_permissions", "challenge_token"]
+    }
+  ],
+  "notes": "Antigravity CLI (agy) supports non-interactive prompt mode via `agy -p` and `--dangerously-skip-permissions`. agy emits plain text only — no JSON envelope; the adapter appends a hardcoded zero-cost envelope (cost_blind:true) as the last line of STDOUT_LOG. HYBRID mode (when claude is on PATH) inherits all capabilities from claude.sh via subprocess isolation. DEGRADED mode (no agy, no claude) runs the pipeline in same-session execution; HYBRID vs DEGRADED distinction is meaningful for agy because HYBRID provides subprocess isolation, not just output quality. cost_blind:true is intentional for this infrastructure cycle — a rollout cycle must add a billing tap or turn-cap. See docs/architecture/platform-compatibility.md."
+}

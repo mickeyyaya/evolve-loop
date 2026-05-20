@@ -7,7 +7,7 @@
 # this script at activation; it can be called from any shell, no env required.
 #
 # Usage:
-#   bash scripts/dispatch/detect-cli.sh           # prints one of: claude, gemini, codex, unknown
+#   bash scripts/dispatch/detect-cli.sh           # prints one of: claude, gemini, codex, antigravity, unknown
 #   bash scripts/dispatch/detect-cli.sh --json    # prints {"cli":"...","reason":"..."}
 #   EVOLVE_PLATFORM=gemini bash scripts/dispatch/detect-cli.sh
 #       # operator override; honoured verbatim if non-empty
@@ -17,7 +17,8 @@
 #   2. CLAUDE_CODE_INTERACTIVE / CLAUDE_CODE_SESSION_ID → claude
 #   3. GEMINI_CLI / GEMINI_API_KEY → gemini   (only if claude probes failed)
 #   4. CODEX_HOME / CODEX_API_KEY → codex
-#   5. unknown
+#   5. command -v agy             → antigravity
+#   6. unknown
 
 set -uo pipefail
 
@@ -47,6 +48,9 @@ elif [ -n "${GEMINI_CLI:-}" ] || [ -n "${GEMINI_API_KEY:-}" ]; then
 elif [ -n "${CODEX_HOME:-}" ] || [ -n "${CODEX_API_KEY:-}" ]; then
     cli="codex"
     reason="CODEX_* env detected"
+elif command -v agy >/dev/null 2>&1; then
+    cli="antigravity"
+    reason="agy binary on PATH detected"
 fi
 
 if [ "$EMIT_JSON" = "1" ]; then

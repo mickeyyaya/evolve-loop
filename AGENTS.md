@@ -72,13 +72,15 @@ This file covers the universal contract. CLI-specific runtime details live in co
 
 - **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. Tier-1-hybrid: skill activates from Gemini, runtime delegates to `claude` binary via `scripts/cli_adapters/gemini.sh`.
 
+- **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. NATIVE mode (`agy -p`) available when agy binary on PATH; HYBRID when claude on PATH; DEGRADED otherwise. Adapter at `scripts/cli_adapters/agy.sh`; cross-name resolver maps `antigravity → agy` in `subagent-run.sh`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/evolve-loop/reference/agy-runtime.md). Capability tier: `./bin/check-caps antigravity`.
+
 - **Generic / unsupported CLI**: see [skills/evolve-loop/reference/generic-runtime.md](skills/evolve-loop/reference/generic-runtime.md). Tool name translation tables at `skills/evolve-loop/reference/<platform>-tools.md`.
 
 ## Discovery contract for AI agents reading this file
 
 If you are an AI agent activating in this repository:
 
-1. **Identify your CLI**: Claude Code, Codex, Gemini, or other.
+1. **Identify your CLI**: Claude Code, Codex, Gemini, Antigravity (agy), or other.
 2. **Read your CLI-specific overlay**: CLAUDE.md, GEMINI.md, or `docs/architecture/platform-compatibility.md`.
 3. **Read this AGENTS.md** in full — the cross-CLI invariants apply to you.
 4. **Discover available skills**: scan `.agents/skills/*/SKILL.md` (cross-CLI standard) or `skills/*/SKILL.md` (Claude Code primary).

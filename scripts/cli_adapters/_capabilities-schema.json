@@ -10,7 +10,7 @@
     "adapter": {
       "type": "string",
       "description": "Adapter name (matches scripts/cli_adapters/<name>.sh)",
-      "enum": ["claude", "gemini", "codex"]
+      "enum": ["claude", "gemini", "codex", "antigravity"]
     },
     "version": {
       "type": "integer",

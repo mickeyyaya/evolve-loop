@@ -499,6 +499,8 @@ cmd_validate_profile() {
         vp_cli_source="profile"
         vp_resolved_model=""
     fi
+    # Cross-name resolver: cli=antigravity → adapter file agy.sh
+    [ "${vp_cli:-}" = "antigravity" ] && vp_cli="agy"
     local adapter="$ADAPTERS_DIR/${vp_cli}.sh"
     [ -x "$adapter" ] || fail "adapter not executable: $adapter"
 
@@ -688,6 +690,8 @@ cmd_run() {
         cli_resolved_model=""
     fi
     log "cli_resolution: source=$cli_resolution_source target_cli=$cli"
+    # Cross-name resolver: cli=antigravity → adapter file agy.sh
+    [ "${cli:-}" = "antigravity" ] && cli="agy"
     local adapter
     adapter="$ADAPTERS_DIR/${cli}.sh"
     [ -x "$adapter" ] || fail "adapter not executable: $adapter"

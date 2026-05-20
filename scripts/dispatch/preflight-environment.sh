@@ -325,6 +325,7 @@ which_or_null() { command -v "$1" 2>/dev/null || echo ""; }
 PATH_CLAUDE=$(which_or_null claude)
 PATH_GEMINI=$(which_or_null gemini)
 PATH_CODEX=$(which_or_null codex)
+PATH_AGY=$(which_or_null agy)
 PATH_JQ=$(which_or_null jq)
 PATH_GIT=$(which_or_null git)
 
@@ -413,6 +414,7 @@ PROFILE_JSON=$(jq -n \
     --arg path_claude      "$PATH_CLAUDE" \
     --arg path_gemini      "$PATH_GEMINI" \
     --arg path_codex       "$PATH_CODEX" \
+    --arg path_agy         "$PATH_AGY" \
     --arg path_jq          "$PATH_JQ" \
     --arg path_git         "$PATH_GIT" \
     --arg auto_eperm       "$AUTO_FALLBACK_ON_EPERM" \
@@ -447,11 +449,12 @@ PROFILE_JSON=$(jq -n \
             state_dir:                    $state_dir
         },
         cli_binaries: {
-            claude: (if $path_claude == "" then null else $path_claude end),
-            gemini: (if $path_gemini == "" then null else $path_gemini end),
-            codex:  (if $path_codex  == "" then null else $path_codex  end),
-            jq:     (if $path_jq     == "" then null else $path_jq     end),
-            git:    (if $path_git    == "" then null else $path_git    end)
+            claude:       (if $path_claude == "" then null else $path_claude end),
+            gemini:       (if $path_gemini == "" then null else $path_gemini end),
+            codex:        (if $path_codex  == "" then null else $path_codex  end),
+            agy:          (if $path_agy    == "" then null else $path_agy    end),
+            jq:           (if $path_jq     == "" then null else $path_jq     end),
+            git:          (if $path_git    == "" then null else $path_git    end)
         },
         auto_config: {
             EVOLVE_SANDBOX_FALLBACK_ON_EPERM: $auto_eperm,

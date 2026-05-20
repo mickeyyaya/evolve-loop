@@ -23,6 +23,7 @@ Pipeline behavior is deterministic per-tier:
 | **Claude Code** | `full` | `full` | n/a (native) | Reference runtime. `claude -p` per subagent + profile permissions + sandbox-exec/bwrap + native budget cap. |
 | **Gemini CLI** | depends on env | `hybrid` (full caps via delegation) | `degraded` (same-session) | v8.51.0+: graceful degradation. Pre-v8.51 exit-99 behavior preserved via `--require-full` opt-in. |
 | **Codex CLI** | depends on env | `hybrid` (full caps via delegation) | `degraded` (same-session) | v8.51.0+: hybrid like Gemini. Pre-v8.51 was tier-3 stub. |
+| **Antigravity CLI (agy)** | depends on env | `hybrid` (full caps via delegation) | `degraded` (same-session) | v10.19.0+: NATIVE mode (`agy -p`) available when agy binary on PATH; cost_blind:true (rollout cycle must add billing tap). |
 | **Copilot / others** | `none` | (no adapter) | (no adapter) | Skill content surface portable; runtime adapter unimplemented. |
 
 Run `./bin/check-caps <adapter>` (or just `./bin/check-caps` to auto-detect) to see your environment's resolved capability tier before running cycles.
@@ -87,6 +88,27 @@ To enforce hybrid-only:
 EVOLVE_CODEX_REQUIRE_FULL=1 bash scripts/cli_adapters/codex.sh
 ```
 
+### Antigravity CLI / agy (native or hybrid or degraded — v10.19.0+)
+
+```bash
+agy --version
+# Optional: install Claude CLI for hybrid mode (full caps)
+claude --version
+
+./bin/check-caps antigravity
+# NATIVE (agy on PATH):          quality_tier: hybrid (agy subprocess, cost_blind)
+# HYBRID (claude on PATH):       quality_tier: hybrid (full caps via claude.sh)
+# DEGRADED (neither):            quality_tier: degraded (same-session)
+```
+
+To enforce NATIVE/HYBRID-only (exit-99 if neither binary found):
+```bash
+EVOLVE_AGY_REQUIRE_FULL=1 bash scripts/cli_adapters/agy.sh
+# or pass --require-full
+```
+
+Note: in NATIVE mode, cost is reported as `cost_blind:true` (zero attribution). A rollout cycle must add a billing tap or turn-cap before cost tracking is accurate. See [reference/agy-runtime.md](../../skills/evolve-loop/reference/agy-runtime.md).
+
 ### Other CLIs (`none` — skill content only)
 
 You can read SKILL.md and the phase docs from any CLI. To run cycles, implement an adapter at `scripts/cli_adapters/<your-cli>.sh` mirroring `gemini.sh`'s pattern + ship a `<your-cli>.capabilities.json` manifest. See [Adapter contract](#adapter-contract) below.
@@ -128,7 +150,8 @@ The skill auto-detects which CLI it's running under via `scripts/dispatch/detect
 1. `CLAUDE_CODE_INTERACTIVE` set → `claude`
 2. `GEMINI_CLI` or `GEMINI_API_KEY` set → `gemini`
 3. `CODEX_*` env vars → `codex`
-4. Otherwise → `unknown`
+4. `agy` binary on PATH → `antigravity`
+5. Otherwise → `unknown`
 
 Override with `EVOLVE_PLATFORM=<cli>`.
 
@@ -144,6 +167,6 @@ Operators who require strict hybrid for production (budget caps, subprocess isol
 
 - [capability-schema.md](capability-schema.md) — adapter capability manifest schema + authoring guide for new CLIs
 - [reference/platform-detect.md](../../skills/evolve-loop/reference/platform-detect.md) — env-var probe table consulted at skill activation
-- [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md) — per-platform tool name maps
-- [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
+- [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md), [agy-tools.md](../../skills/evolve-loop/reference/agy-tools.md) — per-platform tool name maps
+- [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [agy-runtime.md](../../skills/evolve-loop/reference/agy-runtime.md), [generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
 - [docs/incidents/gemini-forgery.md](../incidents/gemini-forgery.md) — why structural defenses are pipeline-level, not adapter-level

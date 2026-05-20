@@ -104,6 +104,14 @@ probe_claude_on_path() {
     command -v claude >/dev/null 2>&1
 }
 
+probe_agy_on_path() {
+    if [ "${EVOLVE_TESTING:-0}" = "1" ] && [ "${EVOLVE_AGY_BINARY+set}" = "set" ]; then
+        if [ -z "${EVOLVE_AGY_BINARY:-}" ]; then return 1; fi
+        [ -x "${EVOLVE_AGY_BINARY:-}" ] && return 0 || return 1
+    fi
+    command -v agy >/dev/null 2>&1
+}
+
 probe_sandbox_exec_available() {
     [ "$(uname -s)" = "Darwin" ] && command -v sandbox-exec >/dev/null 2>&1
 }
@@ -116,6 +124,7 @@ run_probe() {
     local check="$1"
     case "$check" in
         claude_on_path)            probe_claude_on_path ;;
+        agy_on_path)               probe_agy_on_path ;;
         sandbox_exec_available)    probe_sandbox_exec_available ;;
         bwrap_available)           probe_bwrap_available ;;
         *) return 2 ;;  # unknown probe

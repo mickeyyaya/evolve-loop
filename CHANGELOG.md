@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- feat(cycle-101): antigravity CLI adapter (agy.sh) — 4th peer CLI; zero-cost stub envelope; NATIVE/HYBRID/DEGRADED tri-mode; cross-name resolution antigravity→agy in subagent-run.sh; deferred cost attribution (cost_blind:true, rollout cycle must add billing tap or turn-cap)
 - add `*-observer-events.ndjson` glob to `phase-watchdog.sh` fallback scanning path
 - mark `EVOLVE_INACTIVITY_THRESHOLD_S` DEPRECATED; bridge via `EVOLVE_OBSERVER_STALL_S`
 - add `EVOLVE_OBSERVER_ENFORCE` and `EVOLVE_OBSERVER_STALL_S` rows to CLAUDE.md env-var table
