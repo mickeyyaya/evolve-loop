@@ -669,6 +669,25 @@ FOOTER
                     git -C "$active_worktree" -c commit.gpgsign=false commit -m "$WORKTREE_COMMIT_MSG" \
                         || fail "git commit in worktree failed"
                     log "  OK: committed in worktree on $cycle_branch"
+                    # v10.15.0 Cycle A (trust-kernel hardening — cycle-93 breach fix):
+                    # Verify worktree-commit tree-SHA matches audit_bound_tree_sha
+                    # BEFORE ff-merge advances main. Pre-v10.15.0 this check ran
+                    # post-push — so a fabricated build report (cycle-93 commit
+                    # 838f8ac) could ff-merge onto main with no rollback path.
+                    # Now: verify first, rollback worktree on mismatch via
+                    # `git reset --soft HEAD~1` (keeps changes staged for
+                    # operator triage), then integrity_fail.
+                    # See knowledge-base/research/cycle-93-trust-kernel-breach-2026-05-20.md.
+                    _wt_tree_sha=$(git -C "$active_worktree" rev-parse HEAD^{tree} 2>/dev/null || echo "")
+                    if [ -n "$AUDIT_BOUND_TREE_SHA" ] && [ -n "$_wt_tree_sha" ]; then
+                        if [ "$AUDIT_BOUND_TREE_SHA" != "$_wt_tree_sha" ]; then
+                            git -C "$active_worktree" reset --soft HEAD~1 2>/dev/null || true
+                            unset _wt_tree_sha WORKTREE_COMMIT_MSG diff_files diff_stat file_count diff_footer
+                            integrity_fail "INTEGRITY BREACH (pre-merge): audit-bound tree SHA $AUDIT_BOUND_TREE_SHA != worktree-commit tree SHA — refused to ff-merge; worktree rolled back to staged state for operator triage"
+                        fi
+                        log "  OK: pre-merge tree-SHA binding verified (audit=$AUDIT_BOUND_TREE_SHA worktree=$_wt_tree_sha)"
+                    fi
+                    unset _wt_tree_sha
                 fi
                 unset WORKTREE_COMMIT_MSG diff_files diff_stat file_count diff_footer
             fi

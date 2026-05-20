@@ -145,6 +145,40 @@ if [ -n "$RESOLVED" ] && [ "$RESOLVED" = "$SHIP_SH" ]; then
                 fi
                 log "C1 pre-commit tree-SHA guard: OK (audit=$_audit_sha wt=$_wt_sha)"
             fi
+            # v10.15.0 Cycle A (trust-kernel hardening — cycle-93 breach fix):
+            # Builder commit-SHA self-attestation check. If build-report.md
+            # declares a `Commit:` field, it MUST equal the worktree HEAD.
+            # Cycle-93 breach: Builder hit turn-overrun, sourced Commit: from
+            # intent.md (literal) rather than $(git rev-parse HEAD), and the
+            # fabricated SHA referenced a commit that didn't yet exist.
+            # Conditional: absence of the field is allowed (most pre-cycle-93
+            # build-reports don't have it). Presence + mismatch = DENY.
+            _build_report=$(grep '"kind":"agent_subprocess"' "$_ledger" 2>/dev/null \
+                | jq -r 'select(.role=="builder") | .artifact_path' 2>/dev/null \
+                | tail -1)
+            if [ -n "$_build_report" ] && [ -f "$_build_report" ] && [ -n "$_worktree" ]; then
+                _build_commit=$(grep -m1 -iE '\*?\*?Commit:?\*?\*?[[:space:]]*`?[0-9a-f]{7,40}`?' "$_build_report" 2>/dev/null \
+                    | grep -oE '[0-9a-f]{7,40}' | head -1)
+                if [ -n "$_build_commit" ]; then
+                    _wt_commit=$(git -C "$_worktree" rev-parse HEAD 2>/dev/null || echo "")
+                    if [ -n "$_wt_commit" ]; then
+                        # Tolerate short SHA: assert wt_commit starts with build_commit.
+                        case "$_wt_commit" in
+                            "$_build_commit"*)
+                                log "C1 builder commit-SHA self-attestation: OK (build=$_build_commit wt=$_wt_commit)"
+                                ;;
+                            *)
+                                log "DENY: builder commit-SHA mismatch: build-report=$_build_commit worktree=$_wt_commit"
+                                echo "[ship-gate] DENY: INTEGRITY BREACH (commit-SHA): build-report.md declares Commit: $_build_commit but worktree HEAD is $_wt_commit — fabricated build-report (cycle-93 breach mode). Re-run Builder against actual worktree HEAD." >&2
+                                exit 2
+                                ;;
+                        esac
+                    fi
+                    unset _wt_commit
+                fi
+                unset _build_commit
+            fi
+            unset _build_report
         fi
     fi
     unset _skip_guard _ledger _state _audit_report _worktree _audit_sha _wt_sha
