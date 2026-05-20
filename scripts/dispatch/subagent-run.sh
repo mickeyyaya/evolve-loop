@@ -371,6 +371,9 @@ write_ledger_entry() {
     # v10.X ADR-1: cli_resolution (10th arg) — JSON object string or empty.
     # Backward-compatible: defaults to "" so existing call sites (8 or 9 args) work.
     local cli_resolution="${10:-}"
+    # cycle-94 P1: kind (11th arg) — ledger entry kind override.
+    # Backward-compatible: defaults to "agent_subprocess" preserving prior behavior.
+    local kind="${11:-agent_subprocess}"
     local artifact_sha=""
     if [ -f "$artifact_path" ]; then
         if command -v sha256sum >/dev/null 2>&1; then
@@ -409,7 +412,8 @@ write_ledger_entry() {
         --arg prev_hash "$prev_hash" \
         --arg quality_tier "$quality_tier" \
         --arg cli_resolution "$cli_resolution" \
-        '{ts: $ts, cycle: $cycle, role: $agent, kind: "agent_subprocess",
+        --arg kind "$kind" \
+        '{ts: $ts, cycle: $cycle, role: $agent, kind: $kind,
           model: $model, exit_code: $exit_code, duration_s: $duration_s,
           artifact_path: $artifact_path, artifact_sha256: $artifact_sha256,
           challenge_token: $challenge_token,
@@ -605,6 +609,13 @@ cmd_run() {
     [[ "$agent_role" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent|triage|memo|tester)$ ]] || fail "unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
+
+    # cycle-94 P1: fast-fail consecutive structural-failure detector.
+    # Two consecutive exits (exit_code!=0 AND duration<threshold) indicate the
+    # dispatch environment is broken (sandbox EPERM, binary missing, auth error).
+    # A third invocation would produce the same result at additional cost.
+    FAST_FAIL_THRESHOLD_S=5
+    FAST_FAIL_MAX_CONSECUTIVE=2
 
     # Phase timing instrumentation (bash 3.2 compatible — macOS default shell
     # lacks associative arrays). Each phase boundary records elapsed ms to a
@@ -1177,6 +1188,33 @@ ADVEOF
         log "stderr tail: $_stderr_tail"
         write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier" "${cli_resolution_json:-}"
 
+        # cycle-94 P1: fast-fail consecutive structural-failure detector.
+        # Trigger: cli_exit != 0 AND duration < FAST_FAIL_THRESHOLD_S.
+        # Fast exits (<5s) that are non-zero indicate structural dispatch failure
+        # (sandbox EPERM, binary missing, auth error), not transient errors.
+        # After FAST_FAIL_MAX_CONSECUTIVE consecutive such exits, emit a
+        # retry_exhausted_fastfail ledger entry and exit immediately — the
+        # orchestrator MUST NOT retry inline (see STOP CRITERION in evolve-orchestrator.md).
+        local _ff_state="$workspace/.fast-fail-counter"
+        if [ "$cli_exit" -ne 0 ] && [ "$duration" -lt "$FAST_FAIL_THRESHOLD_S" ]; then
+            local _ff_count=0
+            [ -f "$_ff_state" ] && _ff_count=$(cat "$_ff_state" 2>/dev/null || echo 0)
+            _ff_count=$((_ff_count + 1))
+            printf '%s\n' "$_ff_count" > "$_ff_state"
+            log "fast-fail: $agent exited $cli_exit in ${duration}s (<${FAST_FAIL_THRESHOLD_S}s), consecutive=$_ff_count/$FAST_FAIL_MAX_CONSECUTIVE"
+            if [ "$_ff_count" -ge "$FAST_FAIL_MAX_CONSECUTIVE" ]; then
+                log "FAST-FAIL after $FAST_FAIL_MAX_CONSECUTIVE consecutive structural exits for $ROLE (final exit $cli_exit) — stop criterion: do NOT retry"
+                write_ledger_entry "$cycle" "$agent" "$model" "$cli_exit" "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier" "${cli_resolution_json:-}" "retry_exhausted_fastfail"
+                _append_abnormal_event "$workspace" "fast-fail" "HIGH" \
+                    "agent=$agent consecutive_fast_exits=$_ff_count threshold=${FAST_FAIL_THRESHOLD_S}s exit=$cli_exit" \
+                    "Structural dispatch failure — orchestrator must record BLOCKED-FAST-FAIL, not retry"
+                exit 1
+            fi
+        else
+            rm -f "$_ff_state" 2>/dev/null || true
+        fi
+        unset _ff_state
+
         # v9.1.0 Cycle 3: reactive quota-likely classification.
         # Signature for Claude Code subscription quota exhaustion
         # (GitHub issue #29579): rc=1, empty/blank stderr, and the cycle
@@ -1292,6 +1330,18 @@ ADVEOF
             log "WARN: turn-overrun agent=$agent turns=$_actual_turns max=$_max_turns_profile"
         fi
         unset _actual_turns _max_turns_profile
+    fi
+
+    # L2: stream-json operator visibility — per-invocation cost summary on stderr.
+    # Reads num_turns and total_cost_usd from usage_sidecar to emit a single
+    # operator-visible line without touching captured stdout (claude -p JSON stream).
+    if command -v jq >/dev/null 2>&1 && [ -s "$usage_sidecar" ]; then
+        local _l2_turns _l2_cost _l2_max
+        _l2_turns=$(jq -r '.num_turns // 0' "$usage_sidecar" 2>/dev/null || echo "0")
+        _l2_cost=$(jq -r '.total_cost_usd // 0' "$usage_sidecar" 2>/dev/null || echo "0")
+        _l2_max=$(jq -r '.max_turns // "?"' "$effective_profile" 2>/dev/null || echo "?")
+        echo "[$agent] turn $_l2_turns/$_l2_max \$$_l2_cost" >&2
+        unset _l2_turns _l2_cost _l2_max
     fi
 
     write_ledger_entry "$cycle" "$agent" "$model" 0 "$duration" "$artifact_path" "$challenge_token" "$git_state_at_start" "$quality_tier" "${cli_resolution_json:-}"

@@ -229,6 +229,16 @@ Once all three gates are satisfied:
 2. **STOP.** Do not read additional artifacts, run additional state checks, or verify ledger entries.
 3. Do not produce any further tool calls after the `Write` completes.
 
+### Fast-Fail Abort (do NOT retry inline)
+
+If the ledger contains a `retry_exhausted_fastfail` entry for any phase agent in the current cycle, the runner has already exhausted structural-failure retries. **Do NOT invoke `subagent-run.sh` for that phase again.** Instead:
+
+1. `record-failure-to-state.sh $WORKSPACE BLOCKED-FAST-FAIL`
+2. Write `orchestrator-report.md` with verdict `BLOCKED-FAST-FAIL`.
+3. **STOP** — do not attempt retry, fallback dispatch, or inline Agent calls.
+
+Rationale: consecutive fast exits (<5s, exit≠0) indicate sandbox EPERM, missing binary, or auth failure. Retrying produces the same result at additional cost; the orchestrator is not the right actor to fix structural dispatch errors.
+
 ### Banned Post-Report Patterns
 
 After writing `orchestrator-report.md`, these actions are **forbidden**:

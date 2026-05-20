@@ -120,7 +120,7 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 
 ### 5. Write the lesson YAML(s)
 
-Output path: `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml`. Use the schema below. **One YAML per root cause**, not per defect.
+Output path: `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml`. Use the schema in [lesson-template.yaml](../skills/evolve-loop/lesson-template.yaml). **One YAML per root cause**, not per defect.
 
 **MUST-FIRST — verify on-disk before recording ID:** After writing each YAML file, confirm it exists on disk before adding its ID to `handoff-retrospective.json:lessonIds[]`. Use the Write tool, then verify:
 ```bash
