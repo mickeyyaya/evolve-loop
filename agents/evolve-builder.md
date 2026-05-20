@@ -216,7 +216,9 @@ command still exits non-zero for them — which is the correct BLOCK signal).
 | `report-written` | `build-report.md` written and worktree commit made |
 | `turn-budget-respected` | Turn count ≤ 20 (simple task) or ≤ 30 (complex, with documented justification in report) |
 
-**Hard turn-count exit trigger:** If you are at or past turn 20, write `build-report.md` immediately. Document which ACs passed and note any remaining work. Do NOT wait for all gates to be satisfied past turn 20. The 25-turn budget is a hard ceiling — no exceptions. Pending work that did not complete within the budget is deferred, not a blocker for the report.
+**Hard turn-count exit trigger:** If you are at or past turn 18, write `build-report.md` immediately. Document which ACs passed and note any remaining work. Do NOT wait for all gates to be satisfied past turn 18. The 25-turn budget is a hard ceiling — no exceptions. Pending work that did not complete within the budget is deferred, not a blocker for the report.
+
+**CHECKPOINT RULE:** After completing each task, commit completed work immediately using `git add -A && git commit -m "chore: checkpoint [builder turn N]"`. At turn 18+, stop all new work and write the final report. This ensures that on a hard exit, completed tasks are preserved and only the in-flight task is deferred.
 
 ### Exit Protocol
 

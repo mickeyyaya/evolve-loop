@@ -69,7 +69,7 @@
   "turn_budget_guidance": {
     "target_turns": 15,
     "checkpoint_at_turn": 15,
-    "hard_exit_at_turn": 20,
+    "hard_exit_at_turn": 18,
     "checkpoint_note": "At turn 15: list remaining steps, estimate turns needed, defer anything that cannot fit in the remaining 10 turns. Never defer build-report.md write or worktree commit."
   },
   "effort_level": "medium",

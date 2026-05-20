@@ -1146,7 +1146,7 @@ gate_cycle_complete() {
     log "OK: Workspace archived to $history_dir"
 
     # 3. Update mastery ONLY if audit genuinely passed
-    if grep -qi "Verdict:.*PASS" "$WORKSPACE/audit-report.md" 2>/dev/null; then
+    if grep -A1 "^## Verdict" "$WORKSPACE/audit-report.md" 2>/dev/null | grep -qi "^\*\*PASS\*\*"; then
         python3 -c "
 import json
 with open('$STATE') as f:
