@@ -161,20 +161,30 @@ if [ -n "$RESOLVED" ] && [ "$RESOLVED" = "$SHIP_SH" ]; then
                     | grep -oE '[0-9a-f]{7,40}' | head -1)
                 if [ -n "$_build_commit" ]; then
                     _wt_commit=$(git -C "$_worktree" rev-parse HEAD 2>/dev/null || echo "")
-                    if [ -n "$_wt_commit" ]; then
-                        # Tolerate short SHA: assert wt_commit starts with build_commit.
-                        case "$_wt_commit" in
-                            "$_build_commit"*)
-                                log "C1 builder commit-SHA self-attestation: OK (build=$_build_commit wt=$_wt_commit)"
-                                ;;
-                            *)
-                                log "DENY: builder commit-SHA mismatch: build-report=$_build_commit worktree=$_wt_commit"
-                                echo "[ship-gate] DENY: INTEGRITY BREACH (commit-SHA): build-report.md declares Commit: $_build_commit but worktree HEAD is $_wt_commit — fabricated build-report (cycle-93 breach mode). Re-run Builder against actual worktree HEAD." >&2
-                                exit 2
-                                ;;
-                        esac
+                    # Resolve build_commit via `git rev-parse` to get the full
+                    # 40-char SHA AND reject ambiguous prefixes (rev-parse exits
+                    # non-zero if the short SHA matches multiple objects). This
+                    # fixes Finding 4 from code-review: prefix-match `case` was
+                    # ambiguous under adversarial input — a Builder could emit
+                    # a 7-char prefix that matched the real worktree HEAD by
+                    # collision rather than by reference. rev-parse is the
+                    # canonical resolver for both short→full normalization and
+                    # ambiguity detection.
+                    _build_commit_full=$(git -C "$_worktree" rev-parse --verify "$_build_commit" 2>/dev/null || echo "")
+                    if [ -n "$_wt_commit" ] && [ -n "$_build_commit_full" ]; then
+                        if [ "$_wt_commit" = "$_build_commit_full" ]; then
+                            log "C1 builder commit-SHA self-attestation: OK (build=$_build_commit resolved=$_build_commit_full wt=$_wt_commit)"
+                        else
+                            log "DENY: builder commit-SHA mismatch: build-report=$_build_commit resolved=$_build_commit_full worktree=$_wt_commit"
+                            echo "[ship-gate] DENY: INTEGRITY BREACH (commit-SHA): build-report.md declares Commit: $_build_commit (resolves to $_build_commit_full) but worktree HEAD is $_wt_commit — fabricated build-report (cycle-93 breach mode). Re-run Builder against actual worktree HEAD." >&2
+                            exit 2
+                        fi
+                    elif [ -n "$_wt_commit" ] && [ -z "$_build_commit_full" ]; then
+                        log "DENY: builder commit-SHA unresolvable: build-report=$_build_commit could not be resolved by git rev-parse (ambiguous prefix or unknown object)"
+                        echo "[ship-gate] DENY: INTEGRITY BREACH (commit-SHA): build-report.md declares Commit: $_build_commit but git rev-parse cannot resolve it — ambiguous prefix or fabricated SHA (cycle-93 breach mode). Re-run Builder against actual worktree HEAD." >&2
+                        exit 2
                     fi
-                    unset _wt_commit
+                    unset _wt_commit _build_commit_full
                 fi
                 unset _build_commit
             fi
