@@ -17,6 +17,10 @@ node_modules/
 # Smart Web Search cache (per-project, generated at runtime)
 .smart-search-cache/
 
+# Antigravity CLI (agy) per-project tracking — runtime state, created when agy
+# touches the project. Symlinks into ~/.gemini/config/projects/<UUID>.json.
+.antigravitycli/
+
 # Evolve Loop runtime state (generated per-project, not part of the plugin)
 # Ignore every direct child of .evolve/ ...
 # v8.21.0+: per-cycle git worktrees live at .evolve/worktrees/cycle-N — also
