@@ -108,6 +108,27 @@ See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
 
 Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `registry-dispatch` for the full loop implementation and registry ordering logic.
 
+## PSMAS Phase-Skip (P3, opt-in)
+
+When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-decision.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
+
+1. Emits a `kind:phase_skipped` ledger entry for that phase before advancing past it:
+   ```json
+   {"kind":"phase_skipped","cycle":<N>,"role":"<phase>","reason":"triage_phase_skip","psmas_flag":1}
+   ```
+2. Records the phase in `cycle-state.json:completed_phases[]` so `--resume` does not re-execute it.
+3. Advances directly to the next eligible phase in the canonical sequence.
+
+**Precedence rule (multi-writer safety):** `adaptiveFailureDecision.skip_phases[]` (from the failure adapter) takes precedence over `triage.phase_skip[]`. Triage's `phase_skip[]` is **additive**: it may request skips that the adapter did not request, but it cannot override a non-skip from the adapter. The effective merge rule is:
+
+```
+effective_skips = union(adapter.skip_phases[], triage.phase_skip[])
+```
+
+Applied only when `EVOLVE_PSMAS_SKIP=1`. When the flag is unset/`0`, use only `adapter.skip_phases[]` (no change from pre-P3 behavior).
+
+**Resume-safe:** A `kind:phase_skipped` ledger entry for phase X means `--resume` must treat X as already completed and must not re-execute it.
+
 ## Trivial-Skip Logic (P6)
 
 If `cycle_size_estimate == "trivial"` (from Triage) AND no agent/skill files modified: skip TDD and Audit. Advance Triage→Build directly, then `ship.sh --class trivial "<commit-msg>"` and advance to Learn/Memo phase.

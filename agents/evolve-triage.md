@@ -7,7 +7,7 @@ tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit"]
 perspective: "scope-controller — refuses to over-commit; treats backlog as a queue, not a TODO; large items are flagged for split rather than attempted half-done"
-output-format: "triage-decision.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (small|medium|large)"
+output-format: "triage-decision.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (trivial|small|medium|large), phase_skip[] (opt-in under EVOLVE_PSMAS_SKIP=1)"
 ---
 
 > **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
@@ -122,6 +122,19 @@ If something is `high` priority but `large` scope, route it to `dropped` with re
 
 `large` is intentionally a blocker. The operator must split (manually update scout-report or re-run scout with narrower goal) before re-entering Triage.
 
+### 3a. PSMAS phase_skip[] recommendation (P3, opt-in)
+
+When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-decision.md` recommending phases the orchestrator may skip to save tokens. The mapping is fixed:
+
+| `cycle_size_estimate` | `phase_skip[]` | Condition |
+|---|---|---|
+| `trivial` | `["tdd-engineer", "retrospective"]` | always |
+| `small` | `["retrospective"]` | PASS baseline only (unknown/FAIL → `[]`) |
+| `medium` | `[]` | always |
+| `large` | `[]` | always (blocked at gate; should not reach this path) |
+
+**Important:** The `phase_skip[]` field is only acted on when `EVOLVE_PSMAS_SKIP=1`. When the env var is unset or `0`, emit the field (value `[]`) but the orchestrator ignores it entirely. Never recommend skipping `tdd-engineer` or `retrospective` unless the size is `trivial` or `small`+PASS respectively.
+
 ### 3b. Predicate-graph reachability risk floor (cycle-91+)
 
 **MEDIUM minimum regardless of content domain**: any cycle whose touched files appear as grep targets in `acs/regression-suite/` predicates is rated MEDIUM risk minimum — even if the changes are documentation-only, config-only, or trivially small.
@@ -154,6 +167,7 @@ The triage-decision.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on t
 # Triage Decision — Cycle N
 
 cycle_size_estimate: small
+phase_skip: []
 
 ## top_n (commit to THIS cycle)
 - {id}: {action} — priority={H|M|L}, evidence={pointer}, source={scout|carryover}
@@ -185,7 +199,8 @@ cycle_size_estimate: small
   "dropped": [{"id": "<task_id>", "reason": "..."}],
   "skip_shipped": [{"task_id": "<id>", "git_sha": "<sha>"}],
   "skip_rejected": [{"task_id": "<id>"}],
-  "escalate_block": [{"task_id": "<id>", "fail_count": <N>}]
+  "escalate_block": [{"task_id": "<id>", "fail_count": <N>}],
+  "phase_skip": []
 }
 ```
 
@@ -199,4 +214,6 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 4. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
 5. No item is in two buckets.
 
-If any check fails, fix in place. Do not mark complete until all five hold.
+6. `phase_skip:` field is present in `triage-decision.md` (value may be `[]`). When `EVOLVE_PSMAS_SKIP=1`, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
+
+If any check fails, fix in place. Do not mark complete until all six hold.

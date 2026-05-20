@@ -444,6 +444,70 @@ gate_triage_to_plan_review() {
     log "PASS: TRIAGE → PLAN-REVIEW gate"
 }
 
+# ─── Gate: TRIAGE → BUILD (PSMAS skip tdd-engineer, P3 opt-in) ───
+# Valid only when EVOLVE_PSMAS_SKIP=1 AND triage emitted phase_skip[]=["tdd-engineer",...].
+# Rejects the transition if the flag is not set (default-off guarantee).
+gate_triage_to_build() {
+    log "Checking TRIAGE → BUILD (PSMAS skip) gate for cycle $CYCLE"
+
+    if [ "${EVOLVE_PSMAS_SKIP:-0}" != "1" ]; then
+        fail "TRIAGE → BUILD (skip tdd-engineer) requires EVOLVE_PSMAS_SKIP=1 — flag not set"
+    fi
+
+    check_file_exists "$WORKSPACE/triage-decision.md" "Triage decision"
+    check_file_fresh "$WORKSPACE/triage-decision.md" "Triage decision"
+
+    if ! grep -q '"role":"triage"' "$LEDGER" 2>/dev/null; then
+        fail "No triage ledger entry for cycle $CYCLE"
+    fi
+
+    # Verify the ledger contains a kind:phase_skipped entry for tdd-engineer
+    if command -v jq >/dev/null 2>&1; then
+        local skip_entry
+        skip_entry=$(grep '"kind":"phase_skipped"' "$LEDGER" 2>/dev/null \
+            | jq -c --argjson cycle "$CYCLE" \
+              'select(.cycle == $cycle and .role == "tdd-engineer")' 2>/dev/null \
+            | head -1)
+        if [ -z "$skip_entry" ]; then
+            fail "PSMAS skip: ledger missing kind:phase_skipped for role:tdd-engineer in cycle $CYCLE"
+        fi
+    fi
+
+    log "PASS: TRIAGE → BUILD (PSMAS skip tdd-engineer)"
+}
+
+# ─── Gate: AUDIT → COMPLETE (PSMAS skip retrospective, P3 opt-in) ───
+# Valid only when EVOLVE_PSMAS_SKIP=1 AND triage emitted phase_skip[]=["retrospective",...].
+# Rejects the transition if the flag is not set (default-off guarantee).
+gate_audit_to_complete() {
+    log "Checking AUDIT → COMPLETE (PSMAS skip retrospective) gate for cycle $CYCLE"
+
+    if [ "${EVOLVE_PSMAS_SKIP:-0}" != "1" ]; then
+        fail "AUDIT → COMPLETE (skip retrospective) requires EVOLVE_PSMAS_SKIP=1 — flag not set"
+    fi
+
+    check_file_exists "$WORKSPACE/audit-report.md" "Audit report"
+    check_file_fresh "$WORKSPACE/audit-report.md" "Audit report"
+
+    if ! grep -q '"role":"auditor"' "$LEDGER" 2>/dev/null; then
+        fail "No auditor ledger entry for cycle $CYCLE"
+    fi
+
+    # Verify the ledger contains a kind:phase_skipped entry for retrospective
+    if command -v jq >/dev/null 2>&1; then
+        local skip_entry
+        skip_entry=$(grep '"kind":"phase_skipped"' "$LEDGER" 2>/dev/null \
+            | jq -c --argjson cycle "$CYCLE" \
+              'select(.cycle == $cycle and .role == "retrospective")' 2>/dev/null \
+            | head -1)
+        if [ -z "$skip_entry" ]; then
+            fail "PSMAS skip: ledger missing kind:phase_skipped for role:retrospective in cycle $CYCLE"
+        fi
+    fi
+
+    log "PASS: AUDIT → COMPLETE (PSMAS skip retrospective)"
+}
+
 # ─── Gate: PLAN-REVIEW → TDD (Sprint 2) ───
 # Requires plan-review.md fresh + substantive + verdict != ABORT.
 # Verdict semantics:
@@ -1299,6 +1363,16 @@ case "$GATE" in
     discover-to-build)    gate_discover_to_build ;;
     discover-to-triage)   gate_discover_to_triage ;;
     triage-to-plan-review) gate_triage_to_plan_review ;;
+    triage-to-build)
+        # PSMAS P3 opt-in: EVOLVE_PSMAS_SKIP=1 required
+        [ "${EVOLVE_PSMAS_SKIP:-0}" = "1" ] || fail "triage-to-build requires EVOLVE_PSMAS_SKIP=1"
+        gate_triage_to_build
+        ;;
+    audit-to-complete)
+        # PSMAS P3 opt-in: EVOLVE_PSMAS_SKIP=1 required
+        [ "${EVOLVE_PSMAS_SKIP:-0}" = "1" ] || fail "audit-to-complete requires EVOLVE_PSMAS_SKIP=1"
+        gate_audit_to_complete
+        ;;
     build-to-tester)      gate_build_to_tester ;;
     tester-to-audit)      gate_tester_to_audit ;;
     build-to-audit)       gate_build_to_audit ;;
