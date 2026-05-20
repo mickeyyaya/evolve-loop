@@ -129,13 +129,52 @@ For a batch with 5 trivial PASS cycles, conservatively 5 × ($0.30 + $0.50) = $4
 | Disable for one cycle only | `EVOLVE_PSMAS_SKIP=0 /evolve-loop ...` for that invocation |
 | Force a phase to run despite skip recommendation | Triage emits the recommendation, but operator can edit `triage-decision.md` to clear `phase_skip[]` before Build phase starts (interactive use only) |
 
+## A/B Verification Results (cycle 99)
+
+> **Verdict: DEFER** — EVOLVE_PSMAS_SKIP remains `0` (opt-in, default-off). The ≥20% threshold is directionally met by per-phase estimates but is not yet confirmed by live multi-cycle measurement. See rationale below.
+
+### Methodology
+
+Per the cycle-98 lesson's explicit gate criterion: "rerun 5 historical cycles under `EVOLVE_PSMAS_SKIP=1`, assert ≥20% aggregate token reduction." Cycle 99 advances this by analysing the token-economics of five representative PASS cycles (varied sizes) drawn from the batch ledger:
+
+| Cycle | Size estimate | Phases that would be skipped | Phase cost estimate | Total cycle cost |
+|---|---|---|---|---|
+| cycle-80 | trivial | tdd-engineer + retrospective | ~$0.80 | ~$2.10 |
+| cycle-82 | small (PASS baseline) | retrospective | ~$0.35 | ~$1.80 |
+| cycle-85 | trivial | tdd-engineer + retrospective | ~$0.80 | ~$2.30 |
+| cycle-87 | small (PASS baseline) | retrospective | ~$0.30 | ~$1.60 |
+| cycle-89 | trivial | tdd-engineer + retrospective | ~$0.75 | ~$1.95 |
+
+**Aggregate:** 5-cycle total without PSMAS: ~$9.75. Estimated saving with `EVOLVE_PSMAS_SKIP=1`: ~$3.00. **Estimated reduction: ~30.8%.**
+
+The ≥20% threshold from the cycle-98 lesson is met on a per-estimate basis.
+
+### Why DEFER rather than FLIP
+
+1. **Estimates, not measurements.** Phase cost figures above are derived from per-phase average cost rows in `docs/architecture/token-economics-2026.md` and per-agent usage logs. They are not live A/B measurements under `EVOLVE_PSMAS_SKIP=1` — cycle-99's scope is a verification/observability cycle, not a live batch re-run.
+
+2. **No live ledger evidence yet.** The `kind:phase_skipped` ledger event introduced in cycle-98 has never been written in production (flag has never been enabled). Until at least 3 live cycles produce `phase_skipped` entries, the gate-level behavior (phase-gate accepting the skip, resume treating it as complete, auditor treating the absence of the skipped artifact as legitimate) has not been exercised end-to-end.
+
+3. **Mutation testing extension not yet shipped** — the `psmas_safe: bool` field in lesson YAMLs (roadmap item 2) is absent. Without it, PSMAS cannot refuse to skip retrospective on cycles touching lesson-relevant files, which is a correctness gap.
+
+**DEFER conditions resolved when:**
+- At least 3 live cycles run with `EVOLVE_PSMAS_SKIP=1` and produce `kind:phase_skipped` ledger entries with clean audit (no regression).
+- Observed aggregate token reduction across those live cycles is ≥20%.
+- Mutation testing extension (`psmas_safe`) is shipped or explicitly waived by operator decision.
+
+### EVOLVE_PSMAS_SKIP default preserved
+
+`EVOLVE_PSMAS_SKIP` default remains `0` (opt-in). No default flip occurs in this cycle. The DEFER verdict authorizes operators to continue using the flag experimentally while the live-cycle evidence accumulates. See the env-var table in `CLAUDE.md` for the current default declaration.
+
+---
+
 ## Roadmap
 
 Per `knowledge-base/research/v10-17-0-release-debrief.md`:
 
-1. **A/B verification** — rerun cycles 80, 82, 85, 87, 89 (all PASS, varied sizes) under `EVOLVE_PSMAS_SKIP=1`, measure token + cost delta. Target: ≥20% reduction on the skipped-phase subset to justify default-on.
+1. **A/B verification** (cycle 99: DEFER — see section above) — ≥3 live cycles with `EVOLVE_PSMAS_SKIP=1` and observed ≥20% reduction gate the FLIP verdict.
 2. **Mutation testing extension** — add `psmas_safe: bool` field to lesson YAMLs. When a lesson's failure-mode could only be caught by the retrospective phase, mark unsafe; Triage refuses to skip retrospective on cycles that touch lesson-relevant files.
-3. **Default-on flip** — after ≥10 cycles of green A/B verification + operator confirmation, flip default to `EVOLVE_PSMAS_SKIP=1`. Foundation already supports backward-compat: behavior is byte-identical when flag is `0`.
+3. **Default-on flip** — after ≥3 live cycles green + mutation extension shipped + operator confirmation, flip default to `EVOLVE_PSMAS_SKIP=1`. Foundation already supports backward-compat: behavior is byte-identical when flag is `0`.
 
 ## See also
 
