@@ -162,7 +162,8 @@ while true; do
     for glob_pat in \
         "$WORKSPACE/*.log" \
         "$WORKSPACE/*.md" \
-        "$WORKSPACE/*.json"; do
+        "$WORKSPACE/*.json" \
+        "$WORKSPACE/*-observer-events.ndjson"; do
         result=$(_scan_glob "$glob_pat")
         m="${result%% *}"
         p="${result#* }"

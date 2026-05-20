@@ -720,10 +720,10 @@ if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
     RUN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || echo "")
     if [ -n "$RUN_PGID" ] && [[ "$RUN_PGID" =~ ^[0-9]+$ ]]; then
         CYCLE_STATE_PATH_FOR_WD="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
-        # v9.5.0: when EVOLVE_OBSERVER_ENFORCE=1, replace the legacy watchdog
-        # with the phase-observer at --scope=cycle. Same kill semantics + the
-        # unified envelope format. Default 0 preserves v9.4.0 behavior.
-        if [ "${EVOLVE_OBSERVER_ENFORCE:-0}" = "1" ]; then
+        # v10.18.0: EVOLVE_OBSERVER_ENFORCE=1 is now the default — phase-observer
+        # replaces legacy watchdog as the cycle-scope stall detector. Override
+        # with EVOLVE_OBSERVER_ENFORCE=0 to fall back (deprecated, emits WARN).
+        if [ "${EVOLVE_OBSERVER_ENFORCE:-1}" = "1" ]; then
             bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
                 --enforce --scope=cycle \
                 "$WORKSPACE" "$RUN_PGID" "$CYCLE" "orchestrator" "orchestrator" \
@@ -731,6 +731,7 @@ if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
             WATCHDOG_PID=$!
             log "phase-observer (cycle-scope, --enforce) spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_OBSERVER_STALL_S:-${EVOLVE_INACTIVITY_THRESHOLD_S:-600}}s)"
         else
+            log "WARN: EVOLVE_OBSERVER_ENFORCE=0 is deprecated; phase-watchdog replaces phase-observer for this cycle. Remove override to use the default."
             bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-watchdog.sh" \
                 "$WORKSPACE" "$RUN_PGID" "$CYCLE" "$CYCLE_STATE_PATH_FOR_WD" &
             WATCHDOG_PID=$!

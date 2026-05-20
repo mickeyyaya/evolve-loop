@@ -84,6 +84,8 @@ Defaults reflect production posture as of v10.8.0. Detail docs linked per row.
 | Context autotrim | `EVOLVE_CONTEXT_AUTOTRIM` | `0` (opt-in) | Head-60%/tail-35% prompt trim above `EVOLVE_PROMPT_MAX_TOKENS=30000`. See [docs/architecture/context-window-control.md](docs/architecture/context-window-control.md). |
 | Worktree base | `EVOLVE_WORKTREE_BASE` | auto | Resolved by `preflight-environment.sh`: `.evolve/worktrees/` > `$TMPDIR/evolve-loop/<hash>`. Never auto-enable `EVOLVE_SKIP_WORKTREE=1` (operator-only emergency hatch). |
 | Inner sandbox | `EVOLVE_INNER_SANDBOX` | auto | `false` when nested-Claude detected; force-enable/disable with `1`/`0`. `EVOLVE_FORCE_INNER_SANDBOX` deprecated. |
+| Stall detector | `EVOLVE_OBSERVER_ENFORCE` | `1` (default-on since v10.18.0) | When `1`, phase-observer replaces phase-watchdog as cycle-scope stall detector. `0` opts back to watchdog (deprecated, emits WARN). See [docs/architecture/phase-observer.md](docs/architecture/phase-observer.md). |
+| Stall threshold | `EVOLVE_OBSERVER_STALL_S` | `600` | Primary stall threshold for phase-observer. Bridges from `EVOLVE_INACTIVITY_THRESHOLD_S` (DEPRECATED). |
 <!-- Shared Agent Values: researchCache schema uses research_fingerprint + research-cache.sh utility -->
 | Research cache | `EVOLVE_RESEARCH_CACHE_ENABLED` | `0` (opt-in) | Adds `state.json:researchCache.entries[<sha>]`. Cache hit when fingerprint matches + `cycle - produced_at_cycle ≤ EVOLVE_RESEARCH_CACHE_MAX_AGE` (default 5). |
 | Research tool | `EVOLVE_ALLOW_DEEP_RESEARCH` | `0` | When `1`, lifts per-agent quota cap; records `deep_overrides` counter. Does not disable hook telemetry. See [docs/architecture/research-tool.md](docs/architecture/research-tool.md). |

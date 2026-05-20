@@ -1,6 +1,6 @@
 # Cycle 94→98: Watchdog Post-Memo SIGTERM + Recovery Dance
 
-> **Status:** Open — short-term mitigation shipped (threshold raised 240→600s), long-term structural fix (heartbeat-touch) not yet shipped
+> **Status: RESOLVED (v10.18.0)** — default flipped to `EVOLVE_OBSERVER_ENFORCE=1` (cycle 100). Phase-watchdog retained as DEPRECATED opt-out for one release window.
 > **Severity:** MEDIUM (operator overhead, no integrity breach; real work shipped in every observed case)
 > **Date range:** 2026-05-19 → 2026-05-20 (v10.16.0 → v10.17.0 batch)
 > **Forensic dossiers:** [`watchdog-post-memo-sigterm-pattern`](../../knowledge-base/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md), [`acs-promote-recovery-dance`](../../knowledge-base/research/acs-promote-recovery-dance-2026-05-20.md), [`dual-root-plugin-pattern-bite`](../../knowledge-base/research/dual-root-plugin-pattern-bite-2026-05-20.md)
@@ -32,6 +32,7 @@ This is **not a reward-hacking class incident** (no integrity invariant was viol
 | ~18:35 | 98 | watchdog SIGTERM at idle=915s (threshold=900s, +2%) | — |
 | ~18:50 | 98 | Operator manual recovery | `6461884` |
 | ~10:57 (2026-05-21) | — | v10.17.0 release-pipeline.sh runs; marketplace sync closes the dual-root window | `6505fd3` |
+| 2026-05-21 | 99 | watchdog post-memo SIGTERM recurred (turn-overrun event during PSMAS A/B verify); cycle work shipped before SIGTERM; manual recovery via `chore(cycle-99): promote ACS predicates` | `6c5248b` |
 
 ## Root cause
 
@@ -109,6 +110,12 @@ done
 3. **For dispatcher-script changes, ship via `release-pipeline.sh` not raw push.** The dual-root pattern means project-repo edits don't reach the plugin install without marketplace sync. Use `release-pipeline.sh X.Y.Z` to close the loop.
 
 4. **Run `/clear` before starting a new batch.** Per CLAUDE.md v10.8.0+ note: `claude -p` subagent invocations bill to the parent OAuth session, not the batch budget meter. The batch cap (`EVOLVE_BATCH_BUDGET_CAP`) won't catch session-level spend across batches.
+
+## Resolution (cycle-100)
+
+Default flipped to `EVOLVE_OBSERVER_ENFORCE=1` in v10.18.0 (cycle 100). Phase-observer's event-based detection does not have the post-memo file-mtime failure mode. Phase-watchdog is retained for one release window as a DEPRECATED opt-out via `EVOLVE_OBSERVER_ENFORCE=0` (emits WARN).
+
+**Status: RESOLVED (v10.18.0)**
 
 ## Cross-references
 

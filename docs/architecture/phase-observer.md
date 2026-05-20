@@ -2,7 +2,7 @@
 
 > The observer is spawned at every phase start, monitors the subagent through its entire phase, and notifies the orchestrator at the end (and during, on incident). Implements layers 1-3 (collect → digest → translate) of the operator-specified observability architecture; layer 4 (execute) is the orchestrator itself. Sibling to `phase-watchdog.sh`; coexists in v1, subsumes in v2.
 >
-> **Known limitation (open, v10.17.0):** the file-mtime activity heuristic miscounts the orchestrator's post-memo LLM finalization as idle. See [`docs/incidents/cycle-94-98-watchdog-overfiring.md`](../incidents/cycle-94-98-watchdog-overfiring.md) and pattern dossier [`knowledge-base/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md`](../../knowledge-base/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md). Heartbeat-touch fix queued.
+> **Default detector since v10.18.0 (cycle 100):** `EVOLVE_OBSERVER_ENFORCE=1` is now the run-cycle.sh default. Phase-watchdog (`phase-watchdog.sh`) is retained for one-release opt-out via `EVOLVE_OBSERVER_ENFORCE=0` (emits deprecation WARN). See [`docs/incidents/cycle-94-98-watchdog-overfiring.md`](../incidents/cycle-94-98-watchdog-overfiring.md) for migration motivation.
 
 ## Why
 
