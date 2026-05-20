@@ -1,6 +1,7 @@
 {
   "name": "orchestrator",
   "role": "orchestrator",
+  "context_mode": "digest",
   "cli": "claude",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {

@@ -197,6 +197,58 @@ _resolve_profile_path() {
     echo "${profiles_dir}/${mapped}.json"
 }
 
+# v10.10.0 Cycle-97 L1: read profile.context_mode and configure EVOLVE_CONTEXT_DIGEST
+# before role assembly. Profile-sourced digest mode yields to explicit env-var.
+# FAIL-path promotion: when profile set digest AND state.json's last failedApproach
+# is code-audit-fail or code-build-fail, force full mode so the orchestrator gets
+# complete defect context for remediation routing. Fail-open (keep digest) when
+# jq is unavailable or state.json is unreadable.
+_load_profile_context_mode() {
+    command -v jq >/dev/null 2>&1 || return 0
+
+    # Derive the profiles dir from this script's own location so it always
+    # resolves to the correct repo/worktree regardless of the inherited
+    # EVOLVE_PLUGIN_ROOT value (which may point to a plugin install path
+    # when EVOLVE_RESOLVE_ROOTS_LOADED is inherited from a parent process).
+    local _lpcm_self_dir
+    _lpcm_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local _lpcm_profiles_dir="${EVOLVE_PROFILES_DIR_OVERRIDE:-${_lpcm_self_dir}/../../.evolve/profiles}"
+
+    local _lpcm_mapped="$ROLE"
+    case "$ROLE" in
+        plan_review) _lpcm_mapped="plan-reviewer" ;;
+        tdd)         _lpcm_mapped="tdd-engineer" ;;
+    esac
+    local _lpcm_profile="${_lpcm_profiles_dir}/${_lpcm_mapped}.json"
+    [ -f "$_lpcm_profile" ] || return 0
+
+    local _lpcm_cm
+    _lpcm_cm=$(jq -r '.context_mode // empty' "$_lpcm_profile" 2>/dev/null)
+    [ "$_lpcm_cm" = "digest" ] || return 0
+
+    # Env-var precedence: ${var+set} is defined in bash 3.2 and distinguishes
+    # unset from set-to-empty without bash 4+ features.
+    if [ -n "${EVOLVE_CONTEXT_DIGEST+set}" ]; then
+        return 0
+    fi
+
+    # Check state.json for a recent FAIL signal. Only the last entry matters —
+    # a subsequent PASS cycle should restore digest mode.
+    if [ -f "$STATE" ]; then
+        local _lpcm_last
+        _lpcm_last=$(jq -r '(.failedApproaches // [])[-1].classification // ""' "$STATE" 2>/dev/null || echo "")
+        case "$_lpcm_last" in
+            code-audit-fail|code-build-fail)
+                EVOLVE_CONTEXT_DIGEST=0
+                return 0
+                ;;
+        esac
+    fi
+
+    EVOLVE_CONTEXT_DIGEST=1
+    EVOLVE_CONTEXT_DIGEST_FROM_PROFILE=1
+}
+
 # v8.63.0 Cycle C3: emit anchored sections defined in profile.context_anchors.
 # Format: "filename:anchor_name" strings. Groups anchors by file so each
 # file is checked once via file_has_anchors().
@@ -443,6 +495,14 @@ emit_state_summary() {
 # ---- Per-role assembly -----------------------------------------------------
 emit_for_role() {
     case "$ROLE" in
+        orchestrator)
+            # v10.10.0 Cycle-97 L1: orchestrator role context — state summary
+            # (digest or full depending on EVOLVE_CONTEXT_DIGEST set by
+            # _load_profile_context_mode) plus compact intent for cycle routing.
+            header_block
+            emit_intent_compact
+            emit_state_summary 5
+            ;;
         scout)
             header_block
             # Scout needs the goal + acceptance — compact intent suffices in digest mode.
@@ -568,6 +628,10 @@ emit_for_role() {
             ;;
     esac
 }
+
+# v10.10.0 Cycle-97 L1: configure EVOLVE_CONTEXT_DIGEST from profile before
+# role assembly so digest/full mode is set correctly for all emit_* calls.
+_load_profile_context_mode
 
 # Capture output to a tmp file so we can measure size for the cap guard,
 # THEN emit. (Streaming would bypass the guard.)
