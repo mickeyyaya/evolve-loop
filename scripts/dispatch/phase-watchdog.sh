@@ -16,7 +16,7 @@
 #   <cycle_state_path>  — absolute path to cycle-state.json
 #
 # Env vars (with defaults):
-#   EVOLVE_INACTIVITY_THRESHOLD_S   — stall threshold in seconds (default: 240)
+#   EVOLVE_INACTIVITY_THRESHOLD_S   — stall threshold in seconds (default: 600)
 #   EVOLVE_INACTIVITY_POLL_S        — poll interval in seconds (default: 15)
 #   EVOLVE_INACTIVITY_WARN_PCT      — warn threshold as % of threshold (default: 75)
 #   EVOLVE_INACTIVITY_GRACE_S       — grace period between TERM and KILL (default: 10)
@@ -29,7 +29,7 @@
 
 set -uo pipefail
 
-THRESHOLD_S="${EVOLVE_INACTIVITY_THRESHOLD_S:-240}"
+THRESHOLD_S="${EVOLVE_INACTIVITY_THRESHOLD_S:-600}"
 POLL_S="${EVOLVE_INACTIVITY_POLL_S:-15}"
 WARN_PCT="${EVOLVE_INACTIVITY_WARN_PCT:-75}"
 GRACE_S="${EVOLVE_INACTIVITY_GRACE_S:-10}"

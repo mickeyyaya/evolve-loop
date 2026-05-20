@@ -28,7 +28,7 @@
 #
 # Env vars (all optional with sensible defaults):
 #   EVOLVE_OBSERVER_POLL_S=5                  poll interval (seconds)
-#   EVOLVE_OBSERVER_STALL_S=240               stuck-no-output threshold
+#   EVOLVE_OBSERVER_STALL_S=600               stuck-no-output threshold
 #   EVOLVE_OBSERVER_LOOP_N=6                  infinite-loop repeat count
 #   EVOLVE_OBSERVER_LOOP_WINDOW_S=120         infinite-loop rolling window
 #   EVOLVE_OBSERVER_ERROR_RATE=0.3            error-spike threshold (decimal)
@@ -113,7 +113,7 @@ source "$PLUGIN_ROOT/scripts/lib/observer-rules.sh"
 
 # ── Config ─────────────────────────────────────────────────────────────────
 POLL_S="${EVOLVE_OBSERVER_POLL_S:-5}"
-STALL_S="${EVOLVE_OBSERVER_STALL_S:-240}"
+STALL_S="${EVOLVE_OBSERVER_STALL_S:-600}"
 GRACE_S="${EVOLVE_OBSERVER_GRACE_S:-10}"
 WARN_PCT="${EVOLVE_OBSERVER_WARN_PCT:-75}"
 LOOP_N="${EVOLVE_OBSERVER_LOOP_N:-6}"

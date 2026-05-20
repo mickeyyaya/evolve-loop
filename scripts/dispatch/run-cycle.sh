@@ -729,12 +729,12 @@ if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
                 "$WORKSPACE" "$RUN_PGID" "$CYCLE" "orchestrator" "orchestrator" \
                 "$CYCLE_STATE_PATH_FOR_WD" &
             WATCHDOG_PID=$!
-            log "phase-observer (cycle-scope, --enforce) spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_OBSERVER_STALL_S:-${EVOLVE_INACTIVITY_THRESHOLD_S:-240}}s)"
+            log "phase-observer (cycle-scope, --enforce) spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_OBSERVER_STALL_S:-${EVOLVE_INACTIVITY_THRESHOLD_S:-600}}s)"
         else
             bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-watchdog.sh" \
                 "$WORKSPACE" "$RUN_PGID" "$CYCLE" "$CYCLE_STATE_PATH_FOR_WD" &
             WATCHDOG_PID=$!
-            log "watchdog spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_INACTIVITY_THRESHOLD_S:-240}s)"
+            log "watchdog spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_INACTIVITY_THRESHOLD_S:-600}s)"
         fi
     else
         log "WARN: could not determine PGID — watchdog not spawned"
