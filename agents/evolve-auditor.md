@@ -10,6 +10,8 @@ perspective: "adversarial reviewer seeking failure modes — assumes the Builder
 output-format: "audit-report.md — Verdict (PASS|WARN|FAIL), Defect Table (severity × finding × recommendation), Eval Gate result, Pipeline Integrity check"
 ---
 
+> **Model selection note (cycle-95 P2):** Your model tier is mastery-gated by `subagent-run.sh`. When `state.json:mastery.consecutiveSuccesses >= 1` you run on Sonnet (steady-state); when it is 0 or missing you run on Opus (recovery-audit floor). This is intentional — the first audit after a failed cycle always uses the stronger model regardless of diff complexity.
+
 > **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Auditor

@@ -205,32 +205,52 @@ resolve_model_tier() {
     # profile default (kill switch for paranoid runs / CI sweeps).
     local agent_role
     agent_role=$(jq -r '.role // .name // ""' "$profile_path")
-    if [ "$agent_role" = "auditor" ] && [ "${EVOLVE_DIFF_COMPLEXITY_DISABLE:-0}" != "1" ]; then
+    if [ "$agent_role" = "auditor" ]; then
         if [ -n "${EVOLVE_AUDITOR_TIER_OVERRIDE:-}" ]; then
             echo "$EVOLVE_AUDITOR_TIER_OVERRIDE"
             return
         fi
-        # Plugin-install dual-root: diff-complexity.sh lives next to this
-        # script, not under the user's project. Use script-relative lookup.
-        local diff_complexity_script
-        diff_complexity_script="$(dirname "${BASH_SOURCE[0]}")/../utility/diff-complexity.sh"
-        if [ -x "$diff_complexity_script" ] && command -v jq >/dev/null 2>&1; then
-            local tier
-            # Use --cached against the worktree if WORKTREE_PATH is set
-            # (Builder's per-cycle worktree); otherwise fall back to HEAD diff
-            # in the current dir. The diff complexity computation tolerates
-            # missing/empty diffs gracefully.
-            tier=$(cd "${WORKTREE_PATH:-$REPO_ROOT}" 2>/dev/null && \
-                bash "$diff_complexity_script" 2>/dev/null | jq -r '.tier // "complex"' 2>/dev/null \
-                || echo "complex")
-            case "$tier" in
-                trivial)
-                    # Cheap, fast model — Sonnet covers ≤3 files / ≤100 lines easily.
-                    echo "sonnet"; return ;;
-                standard|complex|*)
-                    # Fall through to profile default (opus for auditor).
-                    : ;;
-            esac
+        # cycle-95 P2: mastery gate — Opus is the recovery-audit floor when
+        # consecutiveSuccesses < 1 (first audit after a FAIL); Sonnet is
+        # steady-state after a clean streak. This gate takes precedence over
+        # diff-complexity so a trivial first-recovery diff still runs on Opus.
+        # Reads .evolve/state.json via grep (bash 3.2 compat; no jq required).
+        # Missing field is treated as zero — safe default = opus.
+        local _mastery_state
+        _mastery_state="${EVOLVE_PROJECT_ROOT:-${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}/.evolve/state.json"
+        local _streak=0
+        if [ -f "$_mastery_state" ]; then
+            _streak=$(grep -o '"consecutiveSuccesses":[0-9]*' "$_mastery_state" 2>/dev/null \
+                | grep -o '[0-9]*$' | head -1 || echo 0)
+        fi
+        if [ "${_streak:-0}" -lt 1 ] 2>/dev/null; then
+            echo "opus"; return
+        fi
+        # streak >= 1: fall through to diff-complexity (when enabled) or profile
+        # default (sonnet). Both paths correctly land on sonnet for steady-state.
+        if [ "${EVOLVE_DIFF_COMPLEXITY_DISABLE:-0}" != "1" ]; then
+            # Plugin-install dual-root: diff-complexity.sh lives next to this
+            # script, not under the user's project. Use script-relative lookup.
+            local diff_complexity_script
+            diff_complexity_script="$(dirname "${BASH_SOURCE[0]}")/../utility/diff-complexity.sh"
+            if [ -x "$diff_complexity_script" ] && command -v jq >/dev/null 2>&1; then
+                local tier
+                # Use --cached against the worktree if WORKTREE_PATH is set
+                # (Builder's per-cycle worktree); otherwise fall back to HEAD diff
+                # in the current dir. The diff complexity computation tolerates
+                # missing/empty diffs gracefully.
+                tier=$(cd "${WORKTREE_PATH:-$REPO_ROOT}" 2>/dev/null && \
+                    bash "$diff_complexity_script" 2>/dev/null | jq -r '.tier // "complex"' 2>/dev/null \
+                    || echo "complex")
+                case "$tier" in
+                    trivial)
+                        # Cheap, fast model — Sonnet covers ≤3 files / ≤100 lines easily.
+                        echo "sonnet"; return ;;
+                    standard|complex|*)
+                        # Fall through to profile default (sonnet for auditor at streak>=1).
+                        : ;;
+                esac
+            fi
         fi
     fi
     # Default tier for now; per-cycle override logic can be added here as the
@@ -1195,6 +1215,17 @@ ADVEOF
         # After FAST_FAIL_MAX_CONSECUTIVE consecutive such exits, emit a
         # retry_exhausted_fastfail ledger entry and exit immediately — the
         # orchestrator MUST NOT retry inline (see STOP CRITERION in evolve-orchestrator.md).
+        #
+        # SCOPE (O-1, cycle-95): this counter is per-workspace and resets each
+        # cycle — the file lives inside the per-cycle workspace dir, which is
+        # recreated by run-cycle.sh on every new cycle invocation. It detects
+        # structural dispatch failure within a single cycle invocation, not
+        # cross-cycle aggregation (which would be a different concern entirely).
+        # state.json:fastFailCounters is RESERVED and currently unused —
+        # cross-cycle persistence is intentionally not used here because fast-fail
+        # is scoped to a single-cycle invocation; persisting counts across cycles
+        # would conflate unrelated structural failures. See O-1 carryover decision
+        # in cycle-95 for full rationale.
         local _ff_state="$workspace/.fast-fail-counter"
         if [ "$cli_exit" -ne 0 ] && [ "$duration" -lt "$FAST_FAIL_THRESHOLD_S" ]; then
             local _ff_count=0
