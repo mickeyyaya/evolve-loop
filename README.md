@@ -54,22 +54,28 @@ That lesson came from cycle 59's failure. Cycle 60+ Scouts won't make the same m
 Each cycle runs eight phases. The trust kernel enforces them in order at the OS layer — phases cannot be skipped, reordered, or shortcutted via prompt instructions.
 
 ```
-INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ BUILD ─→ AUDIT ─→ SHIP ─→ MEMO/RETRO
-   │        │        │            │             │        │       │           │
-   │        │        │            │             │        │       │           └─ PASS → memo (carryover);
-   │        │        │            │             │        │       │              FAIL/WARN → retrospective (lessons)
-   │        │        │            │             │        │       │              auto-on v8.45.0+
-   │        │        │            │             │        │       └─ Commit + push via ship.sh
-   │        │        │            │             │        │          (gated on acs-verdict.json:red_count == 0)
-   │        │        │            │             │        └─ Adversarial cross-check; predicate suite runs;
-   │        │        │            │             │           verdict from bash exit codes (EGPS v10)
-   │        │        │            │             └─ Implement in per-cycle git worktree (isolation);
-   │        │        │            │                write EGPS predicates alongside code
+INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD ─→ AUDIT ─→ SHIP ─→ MEMO/RETRO
+   │        │        │            │             │        │        │       │           │
+   │        │        │            │             │        │        │       │           └─ PASS → memo (carryover);
+   │        │        │            │             │        │        │       │              FAIL/WARN → retrospective (lessons)
+   │        │        │            │             │        │        │       │              auto-on v8.45.0+
+   │        │        │            │             │        │        │       └─ Commit + push via ship.sh
+   │        │        │            │             │        │        │          (gated on acs-verdict.json:red_count == 0)
+   │        │        │            │             │        │        └─ Adversarial cross-check; predicate suite runs;
+   │        │        │            │             │        │           verdict from bash exit codes (EGPS v10)
+   │        │        │            │             │        └─ Implement in per-cycle git worktree (isolation);
+   │        │        │            │             │           write EGPS predicates alongside code
+   │        │        │            │             └─ TDD-engineer writes RED predicates BEFORE Builder writes code
+   │        │        │            │                (separates predicate author from implementer; default-on v10.6+)
    │        │        │            └─ (opt-in) 4-lens plan review: CEO / Eng / Design / Security fan-out
-   │        │        └─ Bound this cycle's scope: top_n / deferred / dropped (default-on v8.59.0+)
-   │        └─ Find work + write evals; cite research; carryoverTodos + instincts feed input
+   │        │        └─ Bound this cycle's scope: top_n / deferred / dropped (default-on v8.59.0+);
+   │        │           emits phase_skip[] for PSMAS opt-in (v10.17+)
+   │        └─ Find work + write evals; cite research; carryoverTodos + instincts feed input;
+   │           KB-first directive (v10.9.0+ cycle 87-89): kb-search.sh before WebSearch
    └─ Structure the vague goal: 8 fields + Ask-when-Needed classifier + ≥1 challenged premise (v8.19.1+)
 ```
+
+**Opt-in shortcuts (default-off, v10.17+):** PSMAS phase-skip — when `EVOLVE_PSMAS_SKIP=1`, Triage may recommend skipping `tdd-engineer` (trivial cycles) or `retrospective` (small PASS cycles) to save tokens. The skip leaves a ledger entry so `--resume` and audit-binding both see it as deliberate. See [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md).
 
 ### Phase artifacts you'll see
 
@@ -230,13 +236,17 @@ After the cycle, `## CLI Resolution` in `orchestrator-report.md` is auto-rendere
 
 Common configurations:
 
-| Config | Pattern | ~Cost per cycle |
-|---|---|---|
-| Haiku everywhere | `_fallback` to haiku, no overrides | $0.15-0.30 |
-| Adversarial mode | Builder=Sonnet, Auditor=Opus (different family) | $1.50-3.50 |
-| Cross-vendor | Scout=Gemini, Builder=Claude, Auditor=Claude | $1.50-3.50 |
-| Gemini-only | All phases on gemini-3.1-pro-preview | $0.50-2.00 |
-| Cost-optimized mixed | Haiku for read-only, Sonnet for Builder, Opus for Auditor | $0.50-1.50 |
+| Config | Pattern | ~Cost per cycle | Source |
+|---|---|---|---|
+| Haiku everywhere | `_fallback` to haiku, no overrides | $0.15-0.30 | extrapolated |
+| Adversarial mode (default) | Builder=Sonnet, Auditor=Opus (different family) | $5.94-7.40 | cycles 94-98 actuals |
+| Cross-vendor | Scout=Gemini, Builder=Claude, Auditor=Claude | $1.50-3.50 | extrapolated |
+| Gemini-only | All phases on gemini-3.1-pro-preview | $0.50-2.00 | cycle 61 historic |
+| Cost-optimized mixed | Haiku read-only, Sonnet Builder, Opus Auditor | $0.50-1.50 | extrapolated |
+
+Real per-cycle cost data from the v10.17.0 batch (5 consecutive adversarial-mode cycles): cycle 94 $6.85, cycle 96 $7.40, cycle 98 $5.94 — full breakdown in [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md) §2. Per-phase token attribution: [docs/architecture/token-economics-2026.md](docs/architecture/token-economics-2026.md).
+
+Per-agent context tuning (v10.10.0+): each phase profile declares `context_mode: "digest" | "full"`. Orchestrator runs `digest` by default (~6 K tokens saved per cycle); Builder/Auditor run `full` for evidence access. FAIL-path auto-promotes digest → full to prevent under-feeding recovery. See [docs/architecture/orchestrator-context-modes.md](docs/architecture/orchestrator-context-modes.md).
 
 Deep-dive: [docs/concepts/pluggability.md](docs/concepts/pluggability.md). Adding a new CLI adapter takes ~200 LOC + a capability JSON + one predicate.
 
@@ -244,7 +254,7 @@ Deep-dive: [docs/concepts/pluggability.md](docs/concepts/pluggability.md). Addin
 
 ## How Evolve Loop Compares
 
-Honest head-to-head with the autonomous-agent skills shipping in the Claude Code ecosystem as of 2026-05:
+Honest head-to-head with the autonomous-agent skills shipping in the Claude Code ecosystem as of 2026-05-20 (v10.17). Sources: each project's README + marketplace entry as of that date. We re-audit this table each minor release; if you find it stale, please file an issue.
 
 | Project | Verdict source | Long-term memory | Multi-CLI | Recovery | Anti-gaming |
 |---|---|---|---|---|---|
@@ -274,7 +284,7 @@ Honest head-to-head with the autonomous-agent skills shipping in the Claude Code
 
 Evolve Loop is **not always the right choice.**
 
-- **Higher friction.** 8 phases per cycle → 10-30 min wall-clock + $0.50-3.00. `/goal` is 3-10 min + $0.30-1.50.
+- **Higher friction.** 8 phases per cycle → 15-30 min wall-clock + $5-8 in adversarial mode (cycles 94-98 actuals; haiku-only is $0.15-0.30). `/goal` is 3-10 min + $0.30-1.50.
 - **Higher learning curve.** Trust kernel, EGPS predicates, CLI router, recovery mechanisms require understanding. `/goal` is "type `/goal`, wait, done."
 - **Anthropic-deep, not vendor-neutral.** Gemini/codex adapters exist as peers, but kernel hooks assume Anthropic-CLI-style permissions.
 - **Optimized for trust, not speed.** Fastest autonomous coding → `/goal`. Safest commit → evolve-loop.
@@ -309,6 +319,14 @@ The framework's value proposition isn't that cycles never fail — it's that fai
 The orchestrator-report.md from cycle 61 was partially unreliable — it claimed "manually fast-forwarded the worktree branch to main" with no ledger entry to support it. Source-verified facts (git reflog, state.json:lastUpdated, ledger entries) contradicted that narrative. This is why CLI Resolution is now auto-rendered from ledger truth — orchestrator prose cannot be trusted as primary evidence.
 
 Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The retrospective YAMLs from cycle 61 live in `.evolve/instincts/lessons/cycle-59-*` (which the cycle-61 cycle inherited) and `cycle-24-builder-uncommitted-worktree-edit.yaml` (which cycle 64's failure re-validated).
+
+### Two more recent case studies
+
+**Cycle 93 — trust-kernel breach (2026-05-20).** A worktree commit reached `main` before the post-audit ship-gate could verify it, exposing a 3-minute ordering window in the kernel. We shipped commit-SHA self-attestation and pre-merge tree-SHA verify within hours (commits `cce9eb3` + `eff8a6c`, v10.16.0). Forensic dossier: [knowledge-base/research/cycle-93-trust-kernel-breach-2026-05-20.md](knowledge-base/research/cycle-93-trust-kernel-breach-2026-05-20.md).
+
+**Cycle 96 — autonomous goal divergence (2026-05-20).** Triage chose to ship "builder turn-18 STOP CRITERION + mastery" instead of the operator-stated P4+L1 plan. The triage system's autonomous re-prioritization was vindicated: P4 turned out to be already-shipped, so the deviation saved a wasted cycle. This is documented system behavior — operator goal text is input #5 of 5, not a directive. See [knowledge-base/research/triage-autonomous-goal-divergence-cycle-96.md](knowledge-base/research/triage-autonomous-goal-divergence-cycle-96.md) for the priority-source ordering.
+
+**Cycles 94-98 — watchdog post-memo SIGTERM pattern (2026-05-19→20).** Five consecutive cycles fired SIGTERM during post-memo orchestrator finalization, regardless of threshold tuning (240→600→900s all over-fired by 1-4%). Real work shipped in every case; only learn-phase output was lost. Short-term mitigation (raise default to 600s) shipped; long-term fix (heartbeat-touch) queued. See [docs/incidents/cycle-94-98-watchdog-overfiring.md](docs/incidents/cycle-94-98-watchdog-overfiring.md) for the timeline and detector analysis. This is the canonical example of "the framework caught its own architectural debt" — we now know file-mtime is the wrong proxy for LLM-reasoning phases.
 
 ---
 
@@ -446,17 +464,25 @@ The README is the surface. Real depth lives in `docs/`:
 | [docs/architecture/sequential-write-discipline.md](docs/architecture/sequential-write-discipline.md) | parallel_eligible rules + why writes are sequential |
 | [docs/architecture/platform-compatibility.md](docs/architecture/platform-compatibility.md) | CLI support matrix + adapter contract |
 | [docs/architecture/multi-llm-review.md](docs/architecture/multi-llm-review.md) | Why Auditor runs on a different model family |
+| [docs/architecture/orchestrator-context-modes.md](docs/architecture/orchestrator-context-modes.md) | `context_mode` profile field; digest vs full + FAIL-path promotion (v10.10+) |
+| [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md) | Opt-in phase-skip foundation (v10.17+); precedence rule + ledger contract |
+| [docs/architecture/research-tool.md](docs/architecture/research-tool.md) | KB-first directive + research quota hook (v10.9 cycle 87-89) |
+| [docs/architecture/token-economics-2026.md](docs/architecture/token-economics-2026.md) | P1-P8 token-reduction roadmap with per-phase cost attribution |
+| [docs/architecture/acs-predicate-quality-gate.md](docs/architecture/acs-predicate-quality-gate.md) | Predicate-quality four-layer defense (cycles 80-86) |
 | [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) | Two-folder content model (runtime vs developer-only) |
+| [knowledge-base/README.md](knowledge-base/README.md) | Archival research bucket policy + promotion criteria |
 
 ### Incidents (case studies)
 
 | Doc | What it documents |
 |---|---|
-| [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md) | B0-B7 bugs from the gemini-3.1-pro-preview experiment (2026-05) |
+| [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md) | B0-B7 bugs from the gemini-3.1-pro-preview experiment (2026-05-15) |
+| [docs/incidents/cycle-94-98-watchdog-overfiring.md](docs/incidents/cycle-94-98-watchdog-overfiring.md) | Watchdog post-memo SIGTERM cascade across v10.17.0 batch (2026-05-20); 5 cycles, 30-45 min operator overhead |
 | [docs/incidents/cycle-102-111.md](docs/incidents/cycle-102-111.md) | Indirect reward hacking via confidence-cliff calibration |
 | [docs/incidents/cycle-132-141.md](docs/incidents/cycle-132-141.md) | Orchestrator gaming via prose verdict drift |
 | [docs/incidents/gemini-forgery.md](docs/incidents/gemini-forgery.md) | v7.9.0+ defenses for non-Claude CLIs |
 | [docs/incidents/cycle-46-ship-refused.md](docs/incidents/cycle-46-ship-refused.md) | Ship-gate config drift incident |
+| [knowledge-base/research/cycle-93-trust-kernel-breach-2026-05-20.md](knowledge-base/research/cycle-93-trust-kernel-breach-2026-05-20.md) | Trust-kernel ordering breach + same-day structural fix (v10.16.0) |
 
 ### Comparisons
 
@@ -501,27 +527,44 @@ Active milestones (cycles that shipped substantive structural changes):
 | 51-60 | v8.32-v10.6 | Multi-CLI router; gemini + codex adapters; EGPS v10 (binary verdicts) |
 | 61 | v10.6 | Gemini-3.1-pro-preview experiment → B0-B7 bug catalog |
 | 62-63 | v10.7 | Structural fixes for B0-B7; scout grounding; audit citation binding; CLI Resolution renderer |
+| 75 | v10.9 | Reward-hacking defense system Phase 0 (ADR-0012 5-layer hardening) |
+| 75-78 | v10.10-v10.11 | Token-opt cold-move staging (move stable persona content to reference docs, -27% LoC on hot prompts) |
+| 80-86 | v10.13-v10.15 | EGPS predicate-quality four-layer defense (grep-only linter, Auditor review section, mutation fail-gate, TDD-engineer default-on) |
+| 87-89 | v10.14-v10.15 | Research-as-tool architecture: KB-first directive, research-quota-gate hook, KB-first widening across 6 personas |
+| 90-93 | v10.15-v10.16 | Doc-deletion-guard hook, Knowledge Stewardship Rule, trust-kernel hardening (cycle 93 incident → tree-SHA verify + commit-SHA self-attestation) |
+| 94-98 | v10.17 | Token-economics roadmap batch: P1 fast-fail retry, P2 auditor mastery gate, L1 orchestrator digest-by-default, P3 PSMAS phase-skip foundation |
 | 100+ | v11+ | EGPS T1 auto-heal; phase-tracker observability; private-context policy |
 | 132-141 | (incident) | Indirect-reward-hacking forensic series |
 
-| Incident family | Count (lifetime) | Mechanism |
+| Incident family | Count (lifetime) | Mechanism + Structural fix |
 |---|---|---|
-| Reward hacking (cycle 30-39, 102-111) | ~30 cycles | Predicates substituted for prose verdicts (EGPS v10) |
+| Reward hacking (cycle 30-39, 102-111) | ~30 cycles | Predicates substituted for prose verdicts (EGPS v10); 5-layer defense (ADR-0012) |
 | Orchestrator forgery (cycle 132-141) | ~10 cycles | Ledger SHA-chain + auto-rendered sections |
 | Cross-CLI gaming (gemini-forgery 7.9.0+) | continuous | Artifact content checks + .sh write protection + anti-forgery prompt |
 | Quota wall (cycle 11+) | ongoing | Checkpoint-resume (v9.1.0+) |
 | Cycle-61 class (B0-B7) | 1 cycle = 8 bugs | 7 structural fixes shipped in cycles 62-63 of v10.7 |
+| Trust-kernel ordering breach (cycle 93) | 1 cycle = 1 bug | Pre-merge tree-SHA verify + commit-SHA self-attestation (v10.16.0) |
+| Watchdog post-memo SIGTERM (cycle 94-98) | 5 consecutive cycles | Heartbeat-touch (queued); short-term threshold raise shipped |
 
-Approximately 19 active lessons in `.evolve/instincts/lessons/` (as of v10.7.0). Some pre-date v8 and still apply.
+**61 lessons** in `.evolve/instincts/lessons/` as of v10.17 (2026-05-20). ~24 loaded into `state.json:instinctSummary[]` per cycle (deduplicated + decayed). Some pre-date v8 and still apply — `cycle-7-ephemeral-worktree-artifact.yaml` was authored 90+ cycles ago and still fires in Scout's prompt context.
 
 ### Release history (recent)
 
 | Version | Date | Headline |
 |---------|------|----------|
-| v10.7 | May 13 | Cycle 61-63 structural fixes (B0-B7); Gemini-merged content; docs overhaul |
-| v10.8 | May 16 | Activate v10.6.0 trivial-skip path; v8.63.0 anchor-mode context-builder; skills/ canonical (symlink direction flip); GEMINI.md sync |
+| v10.7 | 2026-05-13 | Cycle 61-63 structural fixes (B0-B7); Gemini-merged content; docs overhaul |
+| v10.8 | 2026-05-16 | v10.6.0 trivial-skip activated; v8.63.0 anchor-mode context-builder; skills/ canonical (symlink flip) |
+| v10.9 | 2026-05-17 | Reward-hacking defense system (ADR-0012); 5-layer hardening |
+| v10.10 | 2026-05-17 | Token-opt Stage 2-9 cold-move staging |
+| v10.11 | 2026-05-18 | Stage 10b Scout STOP CRITERION densification |
+| v10.12 | 2026-05-18 | Cycle-isolation; orchestrator profile tightening |
+| v10.13 | 2026-05-18 | Predicate-quality four-layer defense (cycle 80) |
+| v10.14 | 2026-05-19 | Auditor + Builder persona trimming; subscription-auth doctor; proxy-agnostic `EVOLVE_ANTHROPIC_BASE_URL` |
+| v10.15 | 2026-05-19 | Research-as-tool full stack (cycle 87-89); doc-stewardship hooks |
+| v10.16 | 2026-05-20 | Trust-kernel hardening (cycle 93); pre-merge tree-SHA verify |
+| v10.17 | 2026-05-20 | Token-economics roadmap batch (cycles 94-98): P1 + P2 + L1 + P3 foundation |
 
-Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md).
+Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md). Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
 
 ---
 

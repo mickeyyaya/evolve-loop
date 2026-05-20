@@ -83,6 +83,12 @@ evolve-loop has two flavors of agent doc access:
 on-demand access. See `private/README.md` and `architecture/private-context-policy.md` for the
 mechanism.
 
+`knowledge-base/research/` (sibling to `docs/`) is the **archival** counterpart: research dossiers
+that informed design decisions but are too voluminous to load into agent context. It's NOT
+kernel-blocked (operators and `kb-search.sh` can read it) but it IS excluded from default
+auto-loading. See [`knowledge-base/README.md`](../knowledge-base/README.md) for the bucket policy
+and promotion criteria.
+
 ## Where each old path went
 
 If you have a bookmark or external link to an older doc path, see [`MOVED.md`](MOVED.md) for the

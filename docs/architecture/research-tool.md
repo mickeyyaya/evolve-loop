@@ -25,6 +25,8 @@ Three cycle milestones delivered this subsystem:
 - **Cycle 88 (Phase B):** Retired the Phase-1 dispatch path, added `gate_intent_to_discover`, wired Scout with inline research using the new plumbing.
 - **Cycle 89 (Phase C):** Widened KB-first access to 6 non-Scout personas, published this ADR, and surfaced 4 env vars in CLAUDE.md.
 
+Implementation dossier: [`knowledge-base/research/research-as-tool-implementation-cycles-87-89.md`](../../knowledge-base/research/research-as-tool-implementation-cycles-87-89.md).
+
 ---
 
 ## KB-First Directive
