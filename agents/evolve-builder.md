@@ -180,6 +180,28 @@ printf 'path/to/file1\npath/to/file2\n' | bash scripts/lifecycle/run-regression-
 
 The verbatim output line from `run-regression-suite-slice.sh` MUST appear in the final `build-report.md`. This requirement is enforced by predicate `acs/cycle-91/006-build-report-slice-attestation.sh`.
 
+## Pre-handoff Git Tracking Attestation (cycle-93+)
+
+After the regression slice passes, Builder MUST verify every file delivered in
+this cycle is tracked by git — not merely present on disk:
+
+```bash
+git ls-files --error-unmatch agents/AGENTS.md
+git ls-files --error-unmatch scripts/AGENTS.md
+git ls-files --error-unmatch .evolve/profiles/AGENTS.md
+# … one invocation per delivered file path
+```
+
+**If any `git ls-files --error-unmatch` exits non-zero: BLOCK.** Do not write
+`build-report.md`. A file that passes `[ -f ]` in the worktree but is
+gitignored will be silently dropped at ship — this is the cycle-92 defect mode.
+`git ls-files --error-unmatch` catches gitignored files; bare `[ -f ]` does not.
+
+Run this attestation after `git add` so newly created files are staged and
+therefore visible to `git ls-files`. Unstaged new files are NOT returned by
+`git ls-files --error-unmatch` (they are untracked, not ignored, but the
+command still exits non-zero for them — which is the correct BLOCK signal).
+
 ## STOP CRITERION
 
 **When all five completion gates below are satisfied, write `build-report.md` via the Write tool and halt immediately. Do NOT continue editing files or reading artifacts after writing the report.**

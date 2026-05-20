@@ -131,6 +131,21 @@ done
 [ -f "$ORCHESTRATOR_PROMPT" ] || fail "missing $ORCHESTRATOR_PROMPT"
 command -v jq >/dev/null 2>&1 || fail "jq is required"
 
+# ---- Dirty-base guard (cycle-93) -------------------------------------------
+# Abort if the project root has uncommitted state. A dirty worktree base means
+# the operator has local changes that could be masked or overwritten by the
+# cycle's worktree provisioning. This is an OPERATOR-ACTION: commit, stash, or
+# discard changes before running a cycle.
+if command -v git >/dev/null 2>&1; then
+    _dirty_base=$(git -C "$EVOLVE_PROJECT_ROOT" status --porcelain 2>/dev/null || true)
+    if [ -n "$_dirty_base" ]; then
+        log "OPERATOR-ACTION: aborting — worktree base has uncommitted state (git status --porcelain is non-empty). Commit, stash, or discard these changes before starting a cycle:"
+        echo "$_dirty_base" | head -20 >&2
+        exit 1
+    fi
+    unset _dirty_base
+fi
+
 # ---- Resolve cycle ID ------------------------------------------------------
 
 if [ -z "$CYCLE" ]; then

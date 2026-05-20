@@ -298,6 +298,32 @@ exit 0
 ```
 *Why good:* Constructs the exact bug scenario (unset env var), invokes the actual script, asserts on exit code AND error message. The implementer cannot add a magic string to make this pass — they must implement the hard-error logic.
 
+### File-existence dual-check rule (cycle-93+)
+
+File-existence predicates MUST combine two checks. Using `[ -f "$PATH" ]` alone
+is insufficient — a gitignored file passes `[ -f ]` in the worktree but will be
+silently dropped at ship (cycle-92 defect mode).
+
+**Required dual-check pattern:**
+
+```bash
+# Check 1: disk presence
+[ -f "$path" ] || { echo "RED: $path missing on disk" >&2; exit 1; }
+
+# Check 2: git tracking — catches gitignored worktree files
+git ls-files --error-unmatch "$path" >/dev/null 2>&1 \
+  || { echo "RED: $path untracked — may be gitignored" >&2; exit 1; }
+```
+
+Both checks are required. A predicate that only tests `[ -f ]` is not behavioral
+for file-tracking purposes — it verifies disk presence, not git tracking. The
+`git ls-files --error-unmatch` check is the load-bearing guard against gitignore
+silencing.
+
+Run both checks after `git add` so newly staged files are visible to
+`git ls-files`. Unstaged new files exit non-zero (untracked), which is the
+correct RED signal at pre-implementation baseline (RED phase).
+
 ### Authoring checklist
 
 Before declaring a predicate done, verify ALL:
