@@ -84,6 +84,7 @@
 |------|--------|---------|
 | `EVOLVE_TRIAGE_DISABLE` | ACTIVE | Opt-out of triage default-on (v8.59+) |
 | `EVOLVE_TRIAGE_TOP_N` | ACTIVE | Override triage top_n selection count |
+| `EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL` | ACTIVE (v10.19) | Opt A: auto-skip Triage when 3 conditions hold (≤1 scout task AND empty carryoverTodos AND predicate-dependency-check.sh exit 0). Default on (=1); opt-out with =0. Writes a stub `triage-decision.{md,json}` with `auto_skip: true` so downstream phases see consistent inputs. |
 | `EVOLVE_TRIAGE_ENABLED` | DEAD | v8.56–v8.58 opt-in; replaced by `EVOLVE_TRIAGE_DISABLE`; removed from docs |
 
 ## Fan-out Cluster (intentionally separate — do not consolidate per-phase flags)
