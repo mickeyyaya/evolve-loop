@@ -92,7 +92,7 @@
 |------|--------|---------|
 | `EVOLVE_FANOUT_ENABLED` | ACTIVE | Master switch for fan-out |
 | `EVOLVE_FANOUT_SCOUT` | ACTIVE | Enable fan-out for scout phase |
-| `EVOLVE_FANOUT_AUDITOR` | ACTIVE | Enable fan-out for auditor phase |
+| `EVOLVE_FANOUT_AUDITOR` | ACTIVE (wired v10.19) | Enable fan-out for auditor phase (orchestrator picks `dispatch-parallel auditor`; reads `auditor.json:parallel_subtasks[]`) |
 | `EVOLVE_FANOUT_RETROSPECTIVE` | ACTIVE | Enable fan-out for retrospective phase |
 | `EVOLVE_FANOUT_CONCURRENCY` | ACTIVE | Max parallel workers in flight (default 2) |
 | `EVOLVE_FANOUT_TIMEOUT` | ACTIVE | Per-worker timeout in fanout |

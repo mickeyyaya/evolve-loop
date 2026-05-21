@@ -332,9 +332,9 @@ ship.sh parses verdict via regex: accepts `Verdict: PASS|WARN|FAIL` (case-insens
 
 The runner prepends an "ADVERSARIAL AUDIT MODE" framing requiring positive evidence for PASS verdicts. Auditor model defaults to Opus (different family from Builder's Sonnet) to break same-model-judge sycophancy. Disable only with `ADVERSARIAL_AUDIT=0`.
 
-### Pattern-3 fan-out (v8.23.0+, opt-in)
+### Pattern-3 fan-out (v8.23.0 dispatcher, v10.19.0 wired, opt-in)
 
-When `EVOLVE_FANOUT_AUDITOR=1`, audit fans into 4 sub-auditors:
+When `EVOLVE_FANOUT_AUDITOR=1`, the orchestrator dispatches the audit phase as `subagent-run.sh dispatch-parallel auditor <cycle> <workspace>` instead of the single-shot `subagent-run.sh auditor ...`. `cmd_dispatch_parallel` reads `auditor.json:parallel_subtasks[]` and fans audit into 4 sub-auditors that run in parallel via `fanout-dispatch.sh`:
 
 | Sub-auditor | Focus |
 |---|---|
@@ -343,7 +343,11 @@ When `EVOLVE_FANOUT_AUDITOR=1`, audit fans into 4 sub-auditors:
 | `audit-regression` | Full `run-all-regression-tests.sh` |
 | `audit-build-quality` | Lock-file integrity, no committed secrets, no large binaries |
 
-Aggregator's rule: ANY FAIL -> aggregate FAIL.
+Each sub-auditor writes its worker artifact to `$WORKSPACE/workers/auditor-<focus>.md`. `aggregator.sh` merges them into the canonical `audit-report.md`. Aggregator's rule: **ANY FAIL → aggregate FAIL** (see `scripts/dispatch/aggregator.sh:93-117`).
+
+The dispatcher mechanic (`cmd_dispatch_parallel`) and the profile (`auditor.json:parallel_subtasks`) have shipped since v8.23.0; the **orchestrator persona consumed the flag starting v10.19.0** (prior to this, flipping `EVOLVE_FANOUT_AUDITOR=1` was a no-op because no caller invoked the parallel path). The kernel guard (`scripts/guards/phase-gate-precondition.sh`) parses the `dispatch-parallel <agent>` form so phase-sequence enforcement still applies — see `phase-gate-precondition-test.sh` tests 23–25.
+
+Default remains off (`EVOLVE_FANOUT_AUDITOR=0`). A follow-up cycle will flip the default after ≥5 cycles of soak on the new path, with a diff-complexity-based auto-on trigger (using `scripts/utility/diff-complexity.sh` `tier=complex` or any security path).
 
 ### Cycle binding — Auditor's structural anchor role
 

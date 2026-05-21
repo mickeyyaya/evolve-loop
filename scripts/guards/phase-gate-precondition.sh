@@ -133,14 +133,24 @@ case "$TRIMMED" in
         ;;
 esac
 
-# Extract the agent argument (first positional after subagent-run.sh).
+# Extract the agent argument (first positional after subagent-run.sh, OR
+# second positional if the first is the `dispatch-parallel` subcommand).
 # Use awk to split on whitespace robustly.
 REQUESTED_AGENT=$(echo "$TRIMMED" | awk '
     {
         for (i = 1; i <= NF; i++) {
             if ($i ~ /subagent-run\.sh$/) {
                 if (i + 1 <= NF) {
-                    print $(i+1)
+                    # If the first positional is dispatch-parallel, the real
+                    # agent role is in the NEXT positional. Strip optional
+                    # surrounding quotes before comparing.
+                    next_arg = $(i+1)
+                    gsub(/^["'"'"']|["'"'"']$/, "", next_arg)
+                    if (next_arg == "dispatch-parallel" && (i + 2) <= NF) {
+                        print $(i+2)
+                    } else {
+                        print $(i+1)
+                    }
                 }
                 exit
             }

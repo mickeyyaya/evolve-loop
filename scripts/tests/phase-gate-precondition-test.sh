@@ -205,6 +205,32 @@ set_state retrospective retrospective
 expect_allow "retrospective→retrospective (re-spawn or continuation)" \
     '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh retrospective 99000 .evolve/runs/cycle-99000"}}'
 
+# === Test 23: phase=build + dispatch-parallel auditor → ALLOW =================
+# v10.19+: the orchestrator may invoke `subagent-run.sh dispatch-parallel auditor`
+# when EVOLVE_FANOUT_AUDITOR=1. The guard must parse the second positional
+# (auditor) for the phase-sequence check, NOT the literal `dispatch-parallel`.
+header "Test 23: build + dispatch-parallel auditor → ALLOW (fan-out audit)"
+set_state build builder
+expect_allow "build→dispatch-parallel auditor" \
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh dispatch-parallel auditor 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 24: phase=calibrate + dispatch-parallel auditor → DENY ==============
+# Same fan-out invocation but during the wrong phase: must be denied so an
+# attacker / hallucinating LLM can't sneak past phase ordering via the
+# dispatch-parallel verb.
+header "Test 24: calibrate + dispatch-parallel auditor → DENY (out of order)"
+set_state calibrate ""
+expect_deny "calibrate→dispatch-parallel auditor" \
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh dispatch-parallel auditor 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 25: phase=build + dispatch-parallel scout → DENY ====================
+# Confirms the parser reads the SECOND positional (scout), not the literal
+# `dispatch-parallel`. Scout-during-build is backwards motion.
+header "Test 25: build + dispatch-parallel scout → DENY (backwards via fan-out)"
+set_state build builder
+expect_deny "build→dispatch-parallel scout" \
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh dispatch-parallel scout 99000 .evolve/runs/cycle-99000"}}'
+
 # === Summary =================================================================
 echo
 echo "=========================================="
