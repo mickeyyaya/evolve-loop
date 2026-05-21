@@ -79,7 +79,7 @@
     "research": 1.5,
     "deep": 2.5
   },
-  "max_turns": 30,
+  "max_turns": 42,
   "turn_budget_hint": 12,
   "stop_criterion": "For multi-stream breadth-first audits: enumerate each stream sequentially and stop each stream once sufficient evidence is captured to propose a task. Do NOT exhaustively read every referenced file. If a stream (e.g. adaptive-routing phases) has a complete spec doc, read the spec summary only — do not recurse into all referenced architecture docs. Target: 1–2 reads per stream, 3–4 reads for the primary stream with a complete spec. Stop and write the report once all streams are enumerated and at least one task proposal is ready.",
   "effort_level": "medium",

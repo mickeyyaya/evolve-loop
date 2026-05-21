@@ -64,7 +64,7 @@
     "{worktree_path}"
   ],
   "max_budget_usd": 1.0,
-  "max_turns": 25,
+  "max_turns": 36,
   "turn_budget_hint": 20,
   "turn_budget_guidance": {
     "target_turns": 15,
