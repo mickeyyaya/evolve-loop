@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**Current (v10.17)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v10.18)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
@@ -563,6 +563,7 @@ Active milestones (cycles that shipped substantive structural changes):
 | v10.15 | 2026-05-19 | Research-as-tool full stack (cycle 87-89); doc-stewardship hooks |
 | v10.16 | 2026-05-20 | Trust-kernel hardening (cycle 93); pre-merge tree-SHA verify |
 | v10.17 | 2026-05-20 | Token-economics roadmap batch (cycles 94-98): P1 + P2 + L1 + P3 foundation |
+| v10.18 | May 21 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md). Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
 
