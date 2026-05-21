@@ -14,6 +14,15 @@
 # Test seam: BRIDGE_AGY_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_agy_tmux() {
+  # v0.2: permission_mode is a claude-only feature; reject early to avoid
+  # silently ignoring an operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[agy-tmux] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[agy-tmux] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[agy-tmux] Agy exposes only --dangerously-skip-permissions; use --allow-bypass + omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[agy-tmux] safety gate: --allow-bypass is required" >&2
     return $EC_SAFETY_GATE

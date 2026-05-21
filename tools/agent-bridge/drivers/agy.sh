@@ -13,6 +13,16 @@
 # Test seam: BRIDGE_AGY_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_agy() {
+  # v0.2: permission_mode is a claude-only feature (claude --permission-mode).
+  # Agy has only --dangerously-skip-permissions, no plan-mode equivalent.
+  # Fail loudly rather than silently ignore the operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[agy] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[agy] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[agy] Agy exposes only --dangerously-skip-permissions; use --allow-bypass + omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   local agy_bin
   if [[ -n "${BRIDGE_AGY_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     agy_bin="$BRIDGE_AGY_BINARY"

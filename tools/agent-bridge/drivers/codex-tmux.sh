@@ -15,6 +15,15 @@
 # Test seam: BRIDGE_CODEX_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_codex_tmux() {
+  # v0.2: permission_mode is a claude-only feature; reject early to avoid
+  # silently ignoring an operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[codex-tmux] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[codex-tmux] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[codex-tmux] For codex, use --sandbox <mode> via the prompt or omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[codex-tmux] safety gate: --allow-bypass is required (running interactive codex with bypass-like semantics)" >&2
     return $EC_SAFETY_GATE

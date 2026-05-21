@@ -15,6 +15,17 @@
 # Test seam: BRIDGE_CODEX_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_codex() {
+  # v0.2: permission_mode is a claude-only feature (claude --permission-mode).
+  # Codex has its own permission model (--sandbox <MODE>, -c sandbox_permissions=[...])
+  # but no plan-mode equivalent. Fail loudly rather than silently ignore an
+  # operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[codex] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[codex] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[codex] For codex, use --sandbox <mode> via the prompt or omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   local codex_bin
   if [[ -n "${BRIDGE_CODEX_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     codex_bin="$BRIDGE_CODEX_BINARY"
