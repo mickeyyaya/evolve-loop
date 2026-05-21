@@ -27,13 +27,27 @@ Exit codes: see each adapter file's header.
 
 ---
 
-## Optional `bridge` integration (claude-tmux only)
+## Optional `bridge` integration (4 adapters: claude / claude-tmux / codex / agy)
 
 ### What is bridge?
 
-`bridge` is a multi-CLI tmux-driven AI agent bridge — a separate, user-installable CLI that wraps Claude / Codex / Antigravity CLIs behind a uniform interface. Its **value-add for claude-tmux specifically** is a more battle-tested implementation of the same prototype: better REPL prompt detection, auto-respond fallback for permission prompts, billing-snapshot verification, and a stable JSON-over-stdout contract for skill consumers.
+`bridge` is a multi-CLI tmux-driven AI agent bridge — a separate, user-installable CLI that wraps Claude / Codex / Antigravity CLIs behind a uniform interface. Its **value-add** is a battle-tested implementation: better REPL prompt detection for tmux variants, auto-respond fallback for permission prompts, billing-snapshot verification, stable JSON-over-stdout contract for skill consumers, and a single CLI surface across 3 different vendor CLIs.
 
 Bridge source is **not** distributed in this repository. It is the operator's responsibility to install.
+
+### Per-adapter mapping
+
+| evolve-loop adapter | Bridge CLI | Default-on? |
+|---|---|---|
+| `scripts/cli_adapters/claude.sh` | `claude-p` (headless `claude -p`) | ✓ |
+| `scripts/cli_adapters/claude-tmux.sh` | `claude-tmux` (interactive via tmux) | ✓ |
+| `scripts/cli_adapters/codex.sh` | `codex` (`codex exec`) | ✓ |
+| `scripts/cli_adapters/agy.sh` | `agy` (`agy -p`) | ✓ |
+| `scripts/cli_adapters/gemini.sh` | *no bridge support* | n/a (always native) |
+
+When the gate fires in any of the 4 supported adapters, control transfers to bridge via `exec`. Bridge picks up the standard env vars (PROFILE_PATH, RESOLVED_MODEL, PROMPT_FILE, WORKSPACE_PATH, STDOUT_LOG, STDERR_LOG, ARTIFACT_PATH, CYCLE, WORKTREE_PATH, AGENT) from its env-var fallback contract.
+
+**Behavioral note for `codex.sh` and `agy.sh`**: the existing native paths in these two adapters use a HYBRID-delegate-to-claude pattern (i.e., they run claude when claude is installed, not the actual codex/agy binary). With bridge default-on, these adapters now run the *real* codex / agy CLIs. To restore the old HYBRID-to-claude behavior, set `EVOLVE_USE_BRIDGE=0`.
 
 ### Activation (default-on)
 
@@ -115,11 +129,15 @@ The gate refuses to delegate if `bridge --json version | jq -r .schema_version` 
 | Bridge runs but returns non-zero | The `exec` propagates bridge's exit code. **Cycle fails the same way as a native adapter failure would.** |
 | Operator forgot to install `claude` (the underlying CLI) | Both native and bridge paths fail. Bridge surfaces a clearer error via `bridge --json doctor`. |
 
-### Why claude-tmux only?
+### Why these 4 adapters?
 
-Of evolve-loop's 5 adapter scripts (`claude`, `claude-tmux`, `codex`, `agy`, `gemini`), only `claude-tmux` has both the highest value-add from bridge (subscription billing path) AND the most complex underlying behavior that bridge already implements (tmux driving + auto-respond). The other adapters are simpler and the native path is fine.
+All 4 are CLIs that bridge has a verified driver for (claude-p, claude-tmux, codex, agy). Each native adapter today has either:
+  - Significant native complexity that bridge re-implements with better guarantees (`claude-tmux`), OR
+  - A HYBRID-degrade pattern (the codex/agy adapters historically delegate to claude when their underlying binary isn't recognized — bridge gives them real CLI drivers).
 
-Future work may extend delegation to `codex` and `agy` — those are bridge-supported but lower-priority. `claude.sh` (headless) and `gemini.sh` are out of scope: claude.sh's evolve-loop-specific budgeting features aren't yet in bridge; gemini isn't a bridge backend.
+`gemini.sh` is excluded because bridge does not yet support gemini as a backend. The native gemini adapter runs unchanged regardless of `EVOLVE_USE_BRIDGE`.
+
+Operators who want bit-for-bit reproducibility of the historical (native) behavior should set `EVOLVE_USE_BRIDGE=0` once per shell or CI run.
 
 ---
 

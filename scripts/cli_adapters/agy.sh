@@ -44,6 +44,32 @@
 
 set -uo pipefail
 
+# --- Optional bridge delegation (DEFAULT-ON) --------------------------------
+# When `bridge` is installed AND reports schema_version=1, this adapter
+# delegates to `bridge launch --cli=agy`. Bridge picks up
+# PROFILE_PATH, RESOLVED_MODEL, PROMPT_FILE, etc. from env automatically
+# (its env-var fallback contract).
+#
+# Default: ENABLED. Force-disable with `EVOLVE_USE_BRIDGE=0` (e.g., for CI
+# bit-for-bit reproducibility, or to debug the native adapter path).
+#
+# If bridge is NOT installed, or schema mismatches, the existing native
+# adapter runs unchanged. Zero regression for users who don't install bridge.
+#
+# Bridge is a user-installable, optional dependency. See
+# docs/architecture/cli-adapters.md for installation instructions.
+if [[ "${EVOLVE_USE_BRIDGE:-1}" != "0" ]] && command -v bridge >/dev/null 2>&1; then
+  _bridge_schema=$(bridge --json version 2>/dev/null | jq -r '.schema_version' 2>/dev/null || echo "")
+  if [[ "$_bridge_schema" == "1" ]]; then
+    echo "[agy] delegating to bridge launch --cli=agy (default; set EVOLVE_USE_BRIDGE=0 to disable)" >&2
+    exec bridge launch --cli=agy
+  else
+    echo "[agy] WARN: bridge installed but schema_version='$_bridge_schema' (expected 1); falling back to native adapter" >&2
+  fi
+  unset _bridge_schema
+fi
+
+
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 CLAUDE_ADAPTER="$ADAPTER_DIR/claude.sh"
