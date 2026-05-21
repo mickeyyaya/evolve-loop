@@ -49,20 +49,25 @@ When the gate fires in any of the 4 supported adapters, control transfers to bri
 
 **Behavioral note for `codex.sh` and `agy.sh`**: the existing native paths in these two adapters use a HYBRID-delegate-to-claude pattern (i.e., they run claude when claude is installed, not the actual codex/agy binary). With bridge default-on, these adapters now run the *real* codex / agy CLIs. To restore the old HYBRID-to-claude behavior, set `EVOLVE_USE_BRIDGE=0`.
 
-### Activation (default-on)
+### Activation (default-on with per-CLI auto-fallback)
 
-As of this commit, the integration is **default-on** when bridge is installed. The gate at the top of `scripts/cli_adapters/claude-tmux.sh` delegates to bridge when:
+The integration is **default-on** when bridge is installed AND supports the specific CLI being dispatched. The gate at the top of each adapter delegates to bridge when ALL of these hold:
 
 1. `EVOLVE_USE_BRIDGE` is unset OR set to anything other than `"0"` (default).
-2. `bridge` is on PATH AND `bridge --json version` reports `schema_version=1`.
+2. `bridge` is on PATH.
+3. `bridge --json version` reports `schema_version=1`.
+4. `bridge --json probe --cli=<NAME>` reports `tier != "none"` (i.e., bridge has a manifest entry for this CLI AND the underlying binary is on PATH).
 
-To **force-disable** (e.g., to debug the native prototype path, or for bit-for-bit reproducibility in CI):
+If ANY of those is false, the gate falls back to the **native adapter** quietly — no error to the operator. This means:
+- An evolve-loop installation without bridge → runs native adapters (unchanged behavior)
+- An evolve-loop installation with bridge but missing the underlying CLI binary (e.g., `claude` not installed) → falls back to native, which surfaces a clearer error
+- An evolve-loop installation with bridge for some CLIs but not others → uses bridge for the supported ones, native for the rest
+
+To **force-disable bridge across the board** (e.g., to debug the native path, or for bit-for-bit reproducibility in CI):
 
 ```bash
 export EVOLVE_USE_BRIDGE=0
 ```
-
-When either gate condition is false, the existing prototype adapter runs unchanged. There is no regression for users who don't install bridge — the gate quietly falls through.
 
 ### Why default-on?
 
@@ -125,9 +130,11 @@ The gate refuses to delegate if `bridge --json version | jq -r .schema_version` 
 |---|---|
 | `bridge` not on PATH (regardless of env) | Gate silently falls through to native adapter. |
 | `bridge --json version` exits non-zero | Gate WARNs and falls through. |
-| Bridge schema mismatch | Gate WARNs (`schema_version='X' (expected 1)`) and falls through. |
-| Bridge runs but returns non-zero | The `exec` propagates bridge's exit code. **Cycle fails the same way as a native adapter failure would.** |
-| Operator forgot to install `claude` (the underlying CLI) | Both native and bridge paths fail. Bridge surfaces a clearer error via `bridge --json doctor`. |
+| Bridge schema mismatch (≠ `"1"`) | Gate WARNs (`schema_version='X' (expected 1)`) and falls through. |
+| Bridge can't handle this CLI (manifest missing) | Gate WARNs (`tier=none (manifest missing or binary not on PATH)`) and falls through. |
+| Underlying CLI binary missing (e.g., `claude` not on PATH) | Gate WARNs (`tier=none`) and falls through. Native adapter would also fail, but its error message is more familiar. |
+| Bridge runs but returns non-zero | The `exec` propagates bridge's exit code. Cycle fails the same way as a native adapter failure would. |
+| `EVOLVE_USE_BRIDGE=0` set | Gate doesn't fire. Native adapter runs as before. |
 
 ### Why these 4 adapters?
 

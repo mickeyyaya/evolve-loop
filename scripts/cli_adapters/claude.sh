@@ -38,12 +38,21 @@ set -euo pipefail
 if [[ "${EVOLVE_USE_BRIDGE:-1}" != "0" ]] && command -v bridge >/dev/null 2>&1; then
   _bridge_schema=$(bridge --json version 2>/dev/null | jq -r '.schema_version' 2>/dev/null || echo "")
   if [[ "$_bridge_schema" == "1" ]]; then
-    echo "[claude] delegating to bridge launch --cli=claude-p (default; set EVOLVE_USE_BRIDGE=0 to disable)" >&2
-    exec bridge launch --cli=claude-p
+    # Per-CLI support probe — does bridge actually have a working driver for
+    # this CLI on this host? tier=none means manifest missing OR underlying
+    # binary not on PATH. In either case, exec'ing bridge would fail; fall
+    # through to the native adapter which may handle it differently.
+    _bridge_tier=$(bridge --json probe --cli=claude-p 2>/dev/null | jq -r '.results[0].tier // "none"' 2>/dev/null || echo "none")
+    if [[ "$_bridge_tier" != "none" && "$_bridge_tier" != "null" ]]; then
+      echo "[claude] delegating to bridge launch --cli=claude-p (tier=$_bridge_tier; default-on; EVOLVE_USE_BRIDGE=0 to disable)" >&2
+      exec bridge launch --cli=claude-p
+    else
+      echo "[claude] WARN: bridge installed but cli=claude-p tier=$_bridge_tier (manifest missing or binary not on PATH); falling back to native adapter" >&2
+    fi
   else
     echo "[claude] WARN: bridge installed but schema_version='$_bridge_schema' (expected 1); falling back to native adapter" >&2
   fi
-  unset _bridge_schema
+  unset _bridge_schema _bridge_tier
 fi
 
 

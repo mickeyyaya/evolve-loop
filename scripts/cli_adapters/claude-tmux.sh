@@ -54,15 +54,21 @@ set -uo pipefail
 if [[ "${EVOLVE_USE_BRIDGE:-1}" != "0" ]] && command -v bridge >/dev/null 2>&1; then
   _bridge_schema=$(bridge --json version 2>/dev/null | jq -r '.schema_version' 2>/dev/null || echo "")
   if [[ "$_bridge_schema" == "1" ]]; then
-    echo "[claude-tmux] delegating to bridge launch --cli=claude-tmux (default; set EVOLVE_USE_BRIDGE=0 to disable)" >&2
-    # Bridge requires --allow-bypass to acknowledge --dangerously-skip-permissions
-    # use, which this adapter has always set. VALIDATE_ONLY env passes through
-    # via bridge's --validate-only flag (also env-fallback aware).
-    exec bridge launch --cli=claude-tmux --allow-bypass
+    # Per-CLI support probe — does bridge actually have a working driver for
+    # this CLI on this host? tier=none means manifest missing OR underlying
+    # binary not on PATH. In either case, exec'ing bridge would fail; fall
+    # through to the native adapter which may handle it differently.
+    _bridge_tier=$(bridge --json probe --cli=claude-tmux 2>/dev/null | jq -r '.results[0].tier // "none"' 2>/dev/null || echo "none")
+    if [[ "$_bridge_tier" != "none" && "$_bridge_tier" != "null" ]]; then
+      echo "[claude-tmux] delegating to bridge launch --cli=claude-tmux (tier=$_bridge_tier; default-on; EVOLVE_USE_BRIDGE=0 to disable)" >&2
+      exec bridge launch --cli=claude-tmux --allow-bypass
+    else
+      echo "[claude-tmux] WARN: bridge installed but cli=claude-tmux tier=$_bridge_tier (manifest missing or binary not on PATH); falling back to native adapter" >&2
+    fi
   else
     echo "[claude-tmux] WARN: bridge installed but schema_version='$_bridge_schema' (expected 1); falling back to native adapter" >&2
   fi
-  unset _bridge_schema
+  unset _bridge_schema _bridge_tier
 fi
 
 # --- Mandatory env -----------------------------------------------------------
