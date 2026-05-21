@@ -1,0 +1,12 @@
+{
+  "adapter": "claude-tmux",
+  "version": 1,
+  "capabilities": {
+    "subprocess_isolation": "hybrid",
+    "budget_cap": "none",
+    "sandbox": "degraded",
+    "profile_permissions": "hybrid",
+    "challenge_token": "full"
+  },
+  "notes": "PROTOTYPE adapter. Drives interactive `claude` (no -p) via tmux to preserve subscription billing post-2026-06-15 (when `claude -p` moves to the Agent SDK credit pool). Known schema violation: `adapter` enum in _capabilities-schema.json does not yet include 'claude-tmux'; this manifest is informational and not validated against the schema during the probe. Capability tier rationale: subprocess_isolation=hybrid because tmux provides PTY isolation but no role-gate at the CLI invocation layer; budget_cap=none because interactive `claude` has no --max-budget-usd equivalent; sandbox=degraded because tmux+claude is not wrapped in sandbox-exec; profile_permissions=hybrid because --dangerously-skip-permissions is used in the prototype (production would use --tools whitelist); challenge_token=full because the agent inside the REPL writes the artifact with its own Write tool, preserving the existing trust mechanism unchanged. See docs/research/tmux-claude-driver-prototype.md for verification results."
+}

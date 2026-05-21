@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# bin/bridge — entrypoint for the multi-CLI tmux-driven AI agent bridge
+
+set -uo pipefail
+
+readonly BRIDGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BRIDGE_ROOT="$(cd "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
+readonly BRIDGE_LIB_DIR="${BRIDGE_ROOT}/lib"
+readonly BRIDGE_VERSION_FILE="${BRIDGE_ROOT}/VERSION"
+export BRIDGE_LIB_DIR
+
+readonly EC_OK=0
+readonly EC_SAFETY_GATE=2
+readonly EC_COST_LEAK=3
+readonly EC_BAD_FLAGS=10
+readonly EC_REPL_BOOT_TIMEOUT=80
+readonly EC_ARTIFACT_TIMEOUT=81
+readonly EC_UNKNOWN_PROMPT=85
+readonly EC_RESPOND_LOOP_GUARD=86
+readonly EC_REQUIRE_FULL_UNMET=99
+readonly EC_MISSING_BINARY=127
+
+. "${BRIDGE_LIB_DIR}/profile.sh"
+. "${BRIDGE_LIB_DIR}/manifest-loader.sh"
+. "${BRIDGE_LIB_DIR}/probe.sh"
+
+cmd_version() {
+  if [[ -r "$BRIDGE_VERSION_FILE" ]]; then
+    cat "$BRIDGE_VERSION_FILE"
+    return 0
+  fi
+  echo "unknown" >&2
+  return 1
+}
+
+cmd_help() {
+  cat <<'HELP'
+bridge — multi-CLI tmux-driven AI agent bridge
+
+Subcommands:
+  launch    Run a subagent invocation through the chosen CLI
+  probe     Detect available CLIs and capability tiers (JSON)
+  validate  Dry-run: parse profile, print resolved config, exit 0
+  report    Re-print structured summary for a past workspace
+  version   Print the bridge version
+  help      Print this help
+
+Exit codes:
+  0    success
+  2    safety-gate (e.g., bypass guard not acknowledged)
+  3    cost-leak (env-var leak: ANTHROPIC_API_KEY, etc.)
+  10   bad flags or missing required arg
+  80   REPL boot timeout
+  81   artifact never appeared
+  85   unknown interactive prompt (escalation report written)
+  86   auto-respond loop guard tripped
+  99   --require-full set and full tier not available
+  127  required external binary missing
+
+Run 'bridge launch --help' or 'bridge probe --help' for subcommand flags.
+HELP
+}
+
+cmd_launch_help() {
+  cat <<'LAUNCH_HELP'
+bridge launch — run a subagent invocation through the chosen CLI
+
+Required flags:
+  --cli=NAME             claude-p | claude-tmux  (v2: codex | agy)
+  --profile=PATH         Absolute path to agent profile JSON
+  --model=MODEL          haiku | sonnet | opus | auto (auto reads from profile)
+  --prompt-file=PATH     Absolute path to prompt text
+  --workspace=DIR        Absolute path to output directory
+  --stdout-log=PATH      Where to write LLM stdout
+  --stderr-log=PATH      Where to write diagnostics
+  --artifact=PATH        Expected artifact path
+
+Optional flags:
+  --cycle=N              Cycle number for logging (default: 0)
+  --worktree=DIR         Git worktree path if any
+  --agent=NAME           Agent role label (default: probe)
+  --require-full         Exit 99 if full tier not available
+  --validate-only        Dry-run: parse + print resolved config, exit 0
+  --allow-bypass         Acknowledge --dangerously-skip-permissions use (claude-tmux)
+LAUNCH_HELP
+}
+
+cmd_launch() {
+  if [[ $# -eq 0 ]]; then
+    echo "[bridge] launch: missing required flags. Run 'bridge launch --help'." >&2
+    return $EC_BAD_FLAGS
+  fi
+  local cli="" profile="" model="" prompt_file="" workspace=""
+  local stdout_log="" stderr_log="" artifact=""
+  local cycle="0" worktree="" agent="probe"
+  local validate_only=0 require_full=0 allow_bypass=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --cli=*)         cli="${1#--cli=}" ;;
+      --cli)           [[ $# -ge 2 ]] || { echo "[bridge] --cli requires a value" >&2; return $EC_BAD_FLAGS; }; cli="$2"; shift ;;
+      --profile=*)     profile="${1#--profile=}" ;;
+      --profile)       [[ $# -ge 2 ]] || { echo "[bridge] --profile requires a value" >&2; return $EC_BAD_FLAGS; }; profile="$2"; shift ;;
+      --model=*)       model="${1#--model=}" ;;
+      --model)         [[ $# -ge 2 ]] || { echo "[bridge] --model requires a value" >&2; return $EC_BAD_FLAGS; }; model="$2"; shift ;;
+      --prompt-file=*) prompt_file="${1#--prompt-file=}" ;;
+      --prompt-file)   [[ $# -ge 2 ]] || { echo "[bridge] --prompt-file requires a value" >&2; return $EC_BAD_FLAGS; }; prompt_file="$2"; shift ;;
+      --workspace=*)   workspace="${1#--workspace=}" ;;
+      --workspace)     [[ $# -ge 2 ]] || { echo "[bridge] --workspace requires a value" >&2; return $EC_BAD_FLAGS; }; workspace="$2"; shift ;;
+      --stdout-log=*)  stdout_log="${1#--stdout-log=}" ;;
+      --stdout-log)    [[ $# -ge 2 ]] || { echo "[bridge] --stdout-log requires a value" >&2; return $EC_BAD_FLAGS; }; stdout_log="$2"; shift ;;
+      --stderr-log=*)  stderr_log="${1#--stderr-log=}" ;;
+      --stderr-log)    [[ $# -ge 2 ]] || { echo "[bridge] --stderr-log requires a value" >&2; return $EC_BAD_FLAGS; }; stderr_log="$2"; shift ;;
+      --artifact=*)    artifact="${1#--artifact=}" ;;
+      --artifact)      [[ $# -ge 2 ]] || { echo "[bridge] --artifact requires a value" >&2; return $EC_BAD_FLAGS; }; artifact="$2"; shift ;;
+      --cycle=*)       cycle="${1#--cycle=}" ;;
+      --cycle)         [[ $# -ge 2 ]] || { echo "[bridge] --cycle requires a value" >&2; return $EC_BAD_FLAGS; }; cycle="$2"; shift ;;
+      --worktree=*)    worktree="${1#--worktree=}" ;;
+      --worktree)      [[ $# -ge 2 ]] || { echo "[bridge] --worktree requires a value" >&2; return $EC_BAD_FLAGS; }; worktree="$2"; shift ;;
+      --agent=*)       agent="${1#--agent=}" ;;
+      --agent)         [[ $# -ge 2 ]] || { echo "[bridge] --agent requires a value" >&2; return $EC_BAD_FLAGS; }; agent="$2"; shift ;;
+      --validate-only) validate_only=1 ;;
+      --require-full)  require_full=1 ;;
+      --allow-bypass)  allow_bypass=1 ;;
+      --help|-h)       cmd_launch_help; return $EC_OK ;;
+      --)              shift; break ;;
+      *)               echo "[bridge] launch: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
+    esac
+    shift
+  done
+
+  local missing=()
+  [[ -z "$cli" ]]         && missing+=("--cli")
+  [[ -z "$profile" ]]     && missing+=("--profile")
+  [[ -z "$model" ]]       && missing+=("--model")
+  [[ -z "$prompt_file" ]] && missing+=("--prompt-file")
+  [[ -z "$workspace" ]]   && missing+=("--workspace")
+  [[ -z "$stdout_log" ]]  && missing+=("--stdout-log")
+  [[ -z "$stderr_log" ]]  && missing+=("--stderr-log")
+  [[ -z "$artifact" ]]    && missing+=("--artifact")
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "[bridge] launch: missing required flag(s): ${missing[*]}" >&2
+    return $EC_BAD_FLAGS
+  fi
+
+  if ! profile_load "$profile"; then
+    return $EC_BAD_FLAGS
+  fi
+
+  local effective_model="$model"
+  if [[ "$model" == "auto" ]]; then
+    [[ -z "$bridge_profile_model" ]] && { echo "[bridge] --model=auto but profile.model is empty" >&2; return $EC_BAD_FLAGS; }
+    effective_model="$bridge_profile_model"
+  fi
+
+  if [[ "$validate_only" -eq 1 ]]; then
+    cat <<RESOLVED
+[bridge] validate-only — resolved config:
+  cli            = $cli
+  profile        = $profile
+  profile.name   = $bridge_profile_name
+  profile.model  = $bridge_profile_model
+  model          = $effective_model
+  prompt         = $prompt_file
+  workspace      = $workspace
+  stdout-log     = $stdout_log
+  stderr-log     = $stderr_log
+  artifact       = $artifact
+  cycle          = $cycle
+  worktree       = $worktree
+  agent          = $agent
+  allowed_tools  = $bridge_profile_allowed_tools_csv
+  auto_respond:
+    destructive_ops = $bridge_profile_auto_respond_destructive_ops
+    timeout_s       = $bridge_profile_auto_respond_timeout_s
+  prompt_overrides = $bridge_profile_prompt_overrides_count entries
+  require-full   = $require_full
+  allow-bypass   = $allow_bypass
+RESOLVED
+    return $EC_OK
+  fi
+
+  echo "[bridge] launch: driver dispatch not yet implemented (P5)" >&2
+  return $EC_OK
+}
+
+cmd_probe() {
+  local filter=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --cli=*) filter="${1#--cli=}" ;;
+      --cli)   [[ $# -ge 2 ]] || { echo "[bridge] probe --cli requires a value" >&2; return $EC_BAD_FLAGS; }; filter="$2"; shift ;;
+      --help|-h)
+        cat <<'PROBE_HELP'
+bridge probe — detect available CLIs and capability tiers (JSON)
+
+Usage:
+  bridge probe                  # all known CLIs
+  bridge probe --cli=NAME       # single CLI
+PROBE_HELP
+        return $EC_OK ;;
+      *) echo "[bridge] probe: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
+    esac
+    shift
+  done
+  probe_all "$filter"
+}
+
+cmd_validate() {
+  echo "[bridge] validate: not yet implemented (P11)" >&2
+  return $EC_OK
+}
+
+cmd_report() {
+  echo "[bridge] report: not yet implemented (P11)" >&2
+  return $EC_OK
+}
+
+main() {
+  if [[ $# -eq 0 ]]; then
+    echo "[bridge] no subcommand given. Run 'bridge help'." >&2
+    return $EC_BAD_FLAGS
+  fi
+  local sub="$1"; shift
+  case "$sub" in
+    launch)            cmd_launch "$@" ;;
+    probe)             cmd_probe "$@" ;;
+    validate)          cmd_validate "$@" ;;
+    report)            cmd_report "$@" ;;
+    version|-v|--version) cmd_version ;;
+    help|-h|--help)    cmd_help ;;
+    *)
+      echo "[bridge] unknown subcommand: $sub. Run 'bridge help'." >&2
+      return $EC_BAD_FLAGS
+      ;;
+  esac
+}
+
+main "$@"
+exit $?

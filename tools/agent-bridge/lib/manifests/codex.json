@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "cli": "codex",
+  "binary": "codex",
+  "stub": true,
+  "default_tier": "none",
+  "note": "v2 placeholder — driver returns exit 99 in v1"
+}
