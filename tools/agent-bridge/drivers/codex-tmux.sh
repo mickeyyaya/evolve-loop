@@ -118,12 +118,18 @@ drv_launch_codex_tmux() {
   fi
 
   # Deliver prompt
-  tmux load-buffer -t "$session" "$resolved_prompt_file"
-  tmux paste-buffer -t "$session"
-  sleep 1
-  tmux send-keys -t "$session" Enter
   local prompt_bytes
   prompt_bytes=$(wc -c < "$resolved_prompt_file" | tr -d ' ')
+  if [[ "$(bridge_human_active 2>/dev/null || echo 0)" == "1" ]]; then
+    echo "[codex-tmux] human-input mode: boot pause + paste-with-review" >&2
+    human_boot_pause
+    human_paste_with_review "$session" "$resolved_prompt_file"
+  else
+    tmux load-buffer -t "$session" "$resolved_prompt_file"
+    tmux paste-buffer -t "$session"
+    sleep 1
+    tmux send-keys -t "$session" Enter
+  fi
   echo "[codex-tmux] prompt delivered (${prompt_bytes} bytes)" >&2
 
   # Wait for artifact, with auto-respond fallback

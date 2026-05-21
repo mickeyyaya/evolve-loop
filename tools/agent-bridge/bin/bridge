@@ -318,7 +318,12 @@ RESOLVED
     _bridge_dry_run "$cli" "$profile" "$effective_model" "$prompt_file" \
       "$workspace" "$stdout_log" "$stderr_log" "$artifact" \
       "$cycle" "$agent"
-    return $?
+    local dry_rc=$?
+    if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+      bridge_report_with_exists "$workspace" "$(basename "$artifact")" 2>/dev/null \
+        | jq -c . 2>/dev/null || true
+    fi
+    return $dry_rc
   fi
 
   # --require-full check
@@ -344,7 +349,21 @@ RESOLVED
     echo "[bridge] driver $driver_script does not define $fn_name" >&2
     return $EC_BAD_FLAGS
   fi
+
+  set +e
   $fn_name
+  local launch_rc=$?
+  set -e
+
+  # --json mode: emit a one-line JSON summary on stdout (same schema as
+  # `bridge report`). Emits even on failure paths so a skill can parse the
+  # workspace state regardless of rc.
+  if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+    bridge_report_with_exists "$workspace" "$(basename "$artifact")" 2>/dev/null \
+      | jq -c . 2>/dev/null || true
+  fi
+
+  return $launch_rc
 }
 
 cmd_probe() {
@@ -461,7 +480,24 @@ ADD_RULE_HELP
   [[ -z "$policy" ]] && policy=$([[ -n "$response" ]] && echo "auto_respond" || echo "escalate")
   [[ -z "$name" ]] && name="${cli//-/_}_rule_$(date +%s)"
 
-  manifest_append_rule "${BRIDGE_LIB_DIR}/manifests/${cli}.json" "$name" "$regex" "$response" "$policy" "$note"
+  local manifest_path="${BRIDGE_LIB_DIR}/manifests/${cli}.json"
+  set +e
+  manifest_append_rule "$manifest_path" "$name" "$regex" "$response" "$policy" "$note"
+  local rc=$?
+  set -e
+
+  if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+    local status_str
+    case "$rc" in
+      0) status_str="appended" ;;
+      2) status_str="duplicate" ;;
+      *) status_str="failed" ;;
+    esac
+    jq -n --arg status "$status_str" --arg name "$name" --arg manifest "$manifest_path" \
+      --arg policy "$policy" --argjson rc "$rc" \
+      '{status: $status, name: $name, manifest: $manifest, policy: $policy, rc: $rc}'
+  fi
+  return $rc
 }
 
 

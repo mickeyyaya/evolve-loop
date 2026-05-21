@@ -125,7 +125,12 @@ auto_respond_tick() {
       # use human_send_keys_csv (Gaussian inter-key delays); else fall back
       # to instant bulk send-keys.
       if [[ "$(bridge_human_active 2>/dev/null || echo 0)" == "1" ]]; then
-        human_reading_pause "$pane"
+        # F4: scope the reading-pause to the last 5 lines of the pane
+        # (the relevant prompt area), not the entire scrollback. Long panes
+        # would otherwise produce 30+ second pauses for a quick auto-respond.
+        local scoped_pane
+        scoped_pane=$(echo "$pane" | tail -5)
+        human_reading_pause "$scoped_pane"
         human_send_keys_csv "$session" "$keys_csv"
       else
         local saved_ifs="$IFS"

@@ -42,7 +42,7 @@ for arg in "$@"; do
 done
 
 case "$selected_suite" in
-  all|unit|integration|billing) ;;
+  all|all-fast|unit|integration|billing|contract|skill|concurrency|security) ;;
   *)
     echo "[run-tests] bad --suite (want: all|unit|integration|billing): $selected_suite" >&2
     exit 10
@@ -88,13 +88,27 @@ case "$selected_suite" in
   all)
     run_suite unit
     run_suite integration
+    run_suite contract
+    run_suite skill
+    run_suite concurrency
+    run_suite security
     if [[ "${BRIDGE_BILLING_TESTS:-0}" == "1" ]]; then
       run_suite billing
     else
       echo "[run-tests] billing suite skipped (set BRIDGE_BILLING_TESTS=1 to enable)"
     fi
     ;;
-  unit|integration)
+  all-fast)
+    # everything except billing (LIVE-gated integration tests skip themselves
+    # via BRIDGE_RUN_LIVE_LLM gates inside their own setup() blocks).
+    run_suite unit
+    run_suite integration
+    run_suite contract
+    run_suite skill
+    run_suite concurrency
+    run_suite security
+    ;;
+  unit|integration|contract|skill|concurrency|security)
     run_suite "$selected_suite"
     ;;
   billing)
