@@ -59,8 +59,8 @@ run_dryrun() {
   grep -q 'model: haiku' "$ARTIFACT"
 }
 
-@test "T-dryrun.7 — --dry-run works for each CLI (claude-p, claude-tmux, codex, agy)" {
-  for cli in claude-p claude-tmux codex agy; do
+@test "T-dryrun.7 — --dry-run works for each CLI (all 6 backends)" {
+  for cli in claude-p claude-tmux codex codex-tmux agy agy-tmux; do
     rm -f "$ARTIFACT" "$STDOUT_LOG" "$STDERR_LOG"
     run run_dryrun "$cli"
     [ "$status" -eq 0 ]
