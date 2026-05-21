@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Optional `bridge` integration in `claude-tmux` adapter** — opt-in via `EVOLVE_USE_BRIDGE=1`. When the operator sets that env var AND has `bridge` (an external, user-installable CLI) on PATH with `schema_version=1`, the adapter delegates to `bridge launch --cli=claude-tmux --allow-bypass`. Otherwise the existing prototype adapter runs unchanged — zero regression. See [`docs/architecture/cli-adapters.md`](docs/architecture/cli-adapters.md) for the integration spec, install steps, failure modes, and force-disable knob (`EVOLVE_USE_BRIDGE=0`). Bridge source is not distributed in this repository.
+
 ### Changed
 
 - flip `EVOLVE_OBSERVER_ENFORCE` default `0→1` — phase-observer is now the cycle-scope stall detector (`run-cycle.sh`)
