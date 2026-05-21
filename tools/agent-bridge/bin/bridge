@@ -3,8 +3,19 @@
 
 set -uo pipefail
 
-readonly BRIDGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BRIDGE_ROOT="$(cd "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
+# Resolve the script's REAL location even when invoked via symlink
+# (e.g., $HOME/.local/bin/bridge → tools/agent-bridge/bin/bridge).
+# Bash 3.2-portable: walk the symlink chain manually since macOS's `readlink`
+# lacks -f and `realpath` is not always available.
+_bridge_src="${BASH_SOURCE[0]}"
+while [[ -L "$_bridge_src" ]]; do
+  _bridge_dir="$(cd -P "$(dirname "$_bridge_src")" && pwd)"
+  _bridge_src="$(readlink "$_bridge_src")"
+  [[ "$_bridge_src" != /* ]] && _bridge_src="$_bridge_dir/$_bridge_src"
+done
+readonly BRIDGE_SCRIPT_DIR="$(cd -P "$(dirname "$_bridge_src")" && pwd)"
+readonly BRIDGE_ROOT="$(cd -P "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
+unset _bridge_src _bridge_dir
 : "${BRIDGE_LIB_DIR:=${BRIDGE_ROOT}/lib}"
 readonly BRIDGE_LIB_DIR
 readonly BRIDGE_DRIVERS_DIR="${BRIDGE_ROOT}/drivers"

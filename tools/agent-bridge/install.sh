@@ -5,13 +5,15 @@
 #   bash install.sh              # install
 #   bash install.sh --uninstall  # remove the symlink
 #   bash install.sh --dry-run    # print actions, do not touch FS
+#   bash install.sh --check      # verify install is functional (for CI / docs)
 #
 # Exit codes:
-#   0  success
+#   0  success / install OK / check passed
 #   1  --uninstall succeeded
 #   10 bad flags
 #   20 source binary missing (bin/bridge not found)
 #   21 target dir not writable
+#   22 --check failed (see stderr for details)
 
 set -uo pipefail
 
@@ -27,8 +29,9 @@ for arg in "$@"; do
   case "$arg" in
     --uninstall) mode="uninstall" ;;
     --dry-run)   dry_run=1 ;;
+    --check)     mode="check" ;;
     -h|--help)
-      sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -75,6 +78,36 @@ case "$mode" in
       exit 1
     fi
     echo "[install] nothing to remove ($TARGET not a symlink)"
+    ;;
+  check)
+    # Verify the install is functional. Exit 0 if healthy; non-zero with
+    # diagnostic message otherwise. Useful for evolve-loop\'s integration
+    # docs to recommend ("run `bash install.sh --check` to verify").
+    ok=1
+    if [[ ! -L "$TARGET" ]]; then
+      echo "[install:check] FAIL: $TARGET is not a symlink (run \`bash install.sh\`)" >&2
+      ok=0
+    elif [[ "$(readlink "$TARGET")" != "$SRC" ]]; then
+      echo "[install:check] FAIL: $TARGET points to $(readlink "$TARGET") (expected $SRC)" >&2
+      ok=0
+    fi
+    if ! command -v bridge >/dev/null 2>&1; then
+      echo "[install:check] FAIL: 'bridge' not on PATH (is $TARGET_DIR in your PATH?)" >&2
+      ok=0
+    fi
+    if ! version_str=$(bridge --json version 2>/dev/null); then
+      echo "[install:check] FAIL: 'bridge --json version' did not run cleanly" >&2
+      ok=0
+    elif ! schema=$(echo "$version_str" | command -v jq >/dev/null && echo "$version_str" | jq -r '.schema_version' 2>/dev/null); then
+      echo "[install:check] WARN: jq not available; can't verify schema_version" >&2
+    elif [[ "$schema" != "1" ]]; then
+      echo "[install:check] WARN: schema_version=$schema (this evolve-loop expects 1)" >&2
+    fi
+    if [[ $ok -eq 1 ]]; then
+      echo "[install:check] OK: bridge installed at $TARGET (schema_version=${schema:-?})"
+      exit 0
+    fi
+    exit 22
     ;;
 esac
 
