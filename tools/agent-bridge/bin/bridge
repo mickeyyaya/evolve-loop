@@ -6,8 +6,9 @@ set -uo pipefail
 readonly BRIDGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly BRIDGE_ROOT="$(cd "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
 readonly BRIDGE_LIB_DIR="${BRIDGE_ROOT}/lib"
+readonly BRIDGE_DRIVERS_DIR="${BRIDGE_ROOT}/drivers"
 readonly BRIDGE_VERSION_FILE="${BRIDGE_ROOT}/VERSION"
-export BRIDGE_LIB_DIR
+export BRIDGE_LIB_DIR BRIDGE_DRIVERS_DIR
 
 readonly EC_OK=0
 readonly EC_SAFETY_GATE=2
@@ -146,6 +147,12 @@ cmd_launch() {
     return $EC_BAD_FLAGS
   fi
 
+  # Verify prompt file readable
+  if [[ ! -r "$prompt_file" ]]; then
+    echo "[bridge] launch: prompt file not readable: $prompt_file" >&2
+    return $EC_BAD_FLAGS
+  fi
+
   local effective_model="$model"
   if [[ "$model" == "auto" ]]; then
     [[ -z "$bridge_profile_model" ]] && { echo "[bridge] --model=auto but profile.model is empty" >&2; return $EC_BAD_FLAGS; }
@@ -179,8 +186,30 @@ RESOLVED
     return $EC_OK
   fi
 
-  echo "[bridge] launch: driver dispatch not yet implemented (P5)" >&2
-  return $EC_OK
+  # Optional --require-full check
+  if [[ "$require_full" -eq 1 ]]; then
+    local tier
+    tier="$(probe_resolve_tier "$cli")"
+    if [[ "$tier" != "full" && "$tier" != "hybrid" ]]; then
+      echo "[bridge] --require-full set; cli=$cli tier=$tier (need full or hybrid)" >&2
+      return $EC_REQUIRE_FULL_UNMET
+    fi
+  fi
+
+  # Driver dispatch
+  local driver_script="${BRIDGE_DRIVERS_DIR}/${cli}.sh"
+  if [[ ! -f "$driver_script" ]]; then
+    echo "[bridge] no driver for cli=$cli (looked at $driver_script)" >&2
+    return $EC_BAD_FLAGS
+  fi
+  # shellcheck disable=SC1090
+  . "$driver_script"
+  local fn_name="drv_launch_${cli//-/_}"
+  if ! type "$fn_name" >/dev/null 2>&1; then
+    echo "[bridge] driver $driver_script does not define $fn_name" >&2
+    return $EC_BAD_FLAGS
+  fi
+  $fn_name
 }
 
 cmd_probe() {
