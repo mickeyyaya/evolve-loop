@@ -120,6 +120,13 @@ Optional:
                                           In plan mode (claude-tmux driver), --dangerously-skip-permissions
                                           is replaced (not augmented) — plan mode disables writes by
                                           design, so --allow-bypass is NOT required when permission-mode=plan.
+  --stream-output     | BRIDGE_STREAM_OUTPUT=1
+                                          (v0.3+) claude-p only: append --output-format=stream-json
+                                          --include-partial-messages --verbose so claude emits realtime
+                                          JSONL events to stdout. Solves phase-observer false-positive
+                                          stall kills on long orchestrator sessions. Other drivers log
+                                          a NOTE that the flag is no-op. Precedence: flag > env > profile.
+                                          Use --no-stream-output to explicitly disable when env/profile sets it.
 
 Flags always win when both flag and env var are set.
 
@@ -226,6 +233,13 @@ cmd_launch() {
   # Empty = use profile.permission_mode (or driver default if neither set).
   # Valid: plan | default | acceptEdits | bypassPermissions | auto | dontAsk
   local permission_mode="${BRIDGE_PERMISSION_MODE:-}"
+  # v0.3: --stream-output (boolean flag) — claude-p only. When effective true,
+  # appends --output-format=stream-json --include-partial-messages so claude
+  # emits realtime JSONL events to stdout. Solves phase-observer false-positive
+  # stall kills on long orchestrator sessions where claude -p's default text
+  # output stays silent until the final response.
+  # Empty string here means "honor env/profile" (which default to false).
+  local stream_output="${BRIDGE_STREAM_OUTPUT:-}"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -258,6 +272,8 @@ cmd_launch() {
       --human-input)   human_input=1 ;;
       --permission-mode=*) permission_mode="${1#--permission-mode=}" ;;
       --permission-mode)   [[ $# -ge 2 ]] || { echo "[bridge] --permission-mode requires a value" >&2; return $EC_BAD_FLAGS; }; permission_mode="$2"; shift ;;
+      --stream-output)     stream_output=true ;;
+      --no-stream-output)  stream_output=false ;;
       --help|-h)       cmd_launch_help; return $EC_OK ;;
       --)              shift; break ;;
       *)               echo "[bridge] launch: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
@@ -343,6 +359,24 @@ cmd_launch() {
   esac
   export effective_permission_mode
 
+  # v0.3: Resolve effective stream_output (boolean): CLI flag > env > profile > false.
+  # Normalize various truthy/falsy inputs to canonical "true" | "false" strings
+  # so drivers can do plain `[[ "$x" == "true" ]]` checks.
+  local effective_stream_output="$stream_output"
+  if [[ -z "$effective_stream_output" ]]; then
+    # No flag set; fall through to profile default (which itself defaults to "false").
+    effective_stream_output="${bridge_profile_stream_output:-false}"
+  fi
+  case "$effective_stream_output" in
+    true|1|yes|on)   effective_stream_output=true ;;
+    false|0|no|off|"") effective_stream_output=false ;;
+    *)
+      echo "[bridge] invalid --stream-output value: '$effective_stream_output' — must be boolean (true|false|1|0|yes|no|on|off)" >&2
+      return $EC_BAD_FLAGS
+      ;;
+  esac
+  export effective_stream_output
+
   # --validate-only: print resolved config and exit
   if [[ "$validate_only" -eq 1 ]]; then
     cat <<RESOLVED
@@ -362,6 +396,7 @@ cmd_launch() {
   agent          = $agent
   allowed_tools  = $bridge_profile_allowed_tools_csv
   permission-mode = ${effective_permission_mode:-(driver default)}
+  stream-output  = $effective_stream_output
   auto_respond:
     destructive_ops = $bridge_profile_auto_respond_destructive_ops
     timeout_s       = $bridge_profile_auto_respond_timeout_s

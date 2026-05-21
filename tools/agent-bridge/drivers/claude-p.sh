@@ -59,6 +59,17 @@ drv_launch_claude_p() {
     claude_args+=(--permission-mode "$effective_permission_mode")
   fi
 
+  # v0.3: stream-output — when enabled, append claude streaming flags so
+  # the parent's stdout log gets continuous JSONL writes. This solves the
+  # phase-observer false-positive stall kill (parent text output stays
+  # silent until final response, exceeding the 600s observer threshold
+  # for long orchestrator sessions that dispatch subagents).
+  # --verbose is required by claude when combining --output-format=stream-json
+  # with --print (-p); omitting it produces a runtime error.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    claude_args+=(--output-format stream-json --include-partial-messages --verbose)
+  fi
+
   # Allowed-tools from profile: bash 3.2-safe array split on comma.
   if [[ -n "${bridge_profile_allowed_tools_csv:-}" ]]; then
     local saved_ifs="$IFS"

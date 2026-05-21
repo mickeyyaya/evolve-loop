@@ -24,6 +24,12 @@ drv_launch_codex_tmux() {
     return $EC_BAD_FLAGS
   fi
 
+  # v0.3: stream_output is a no-op on codex-tmux — codex has no streaming
+  # output flag. Log a note (not a hard reject) so operators know.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[codex-tmux] NOTE: stream_output=true is not supported on this CLI — no-op (codex has no streaming output flag)" >&2
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[codex-tmux] safety gate: --allow-bypass is required (running interactive codex with bypass-like semantics)" >&2
     return $EC_SAFETY_GATE

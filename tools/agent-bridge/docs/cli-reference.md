@@ -63,6 +63,7 @@ bridge launch \
 | `--validate-only` | off | Dry-run: parse + print resolved config, exit 0 (no driver call) |
 | `--allow-bypass` | off | Acknowledge `--dangerously-skip-permissions` use (claude-tmux requires this UNLESS `--permission-mode` is set) |
 | `--permission-mode=MODE` | unset | Pass through to `claude --permission-mode MODE`. Valid: `plan` \| `default` \| `acceptEdits` \| `bypassPermissions` \| `auto` \| `dontAsk`. Precedence: CLI flag > `BRIDGE_PERMISSION_MODE` env > `profile.permission_mode`. In plan mode the claude-tmux driver replaces `--dangerously-skip-permissions` with `--permission-mode plan` (the bypass acknowledgment is NOT required because plan mode disables writes by design). |
+| `--stream-output` / `--no-stream-output` | off | (v0.3+) **claude-p only**: append `--output-format=stream-json --include-partial-messages --verbose` so claude emits realtime JSONL events to stdout instead of buffering text-format output until the final response. Solves phase-observer false-positive stall kills on long orchestrator sessions (default text output stays silent → observer kills the cycle at its 600s threshold). Other drivers log a NOTE that the flag is no-op (`claude-tmux` already streams via tmux scrollback; `codex` / `agy` have no streaming flag equivalent). Precedence: CLI flag > `BRIDGE_STREAM_OUTPUT=1` env > `profile.stream_output` (boolean). |
 
 ### Prompt-file substitutions
 

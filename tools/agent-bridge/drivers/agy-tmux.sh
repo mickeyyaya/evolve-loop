@@ -23,6 +23,12 @@ drv_launch_agy_tmux() {
     return $EC_BAD_FLAGS
   fi
 
+  # v0.3: stream_output is a no-op on agy-tmux — agy CLI has no streaming
+  # output flag. Log a note (not a hard reject) so operators know.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[agy-tmux] NOTE: stream_output=true is not supported on this CLI — no-op (agy has no streaming output flag)" >&2
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[agy-tmux] safety gate: --allow-bypass is required" >&2
     return $EC_SAFETY_GATE

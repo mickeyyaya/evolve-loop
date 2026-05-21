@@ -26,6 +26,14 @@ drv_launch_codex() {
     return $EC_BAD_FLAGS
   fi
 
+  # v0.3: stream_output is a no-op on codex — the codex CLI does not expose
+  # a realtime streaming output format equivalent to claude's --output-format=stream-json.
+  # Log a note (not a hard reject) so operators know their stream_output config
+  # has no effect here, but the cycle can still proceed.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[codex] NOTE: stream_output=true is not supported on this CLI — no-op (codex has no streaming output flag)" >&2
+  fi
+
   local codex_bin
   if [[ -n "${BRIDGE_CODEX_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     codex_bin="$BRIDGE_CODEX_BINARY"

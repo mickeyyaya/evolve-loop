@@ -37,6 +37,14 @@ BYPASS_MSG
     return $EC_SAFETY_GATE
   fi
 
+  # v0.3: stream_output is a no-op on this driver — tmux scrollback already
+  # streams continuously, so the phase-observer sees byte writes naturally.
+  # Log a note so operators aren't surprised when their stream_output config
+  # has no visible effect here.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[claude-tmux] NOTE: stream_output=true is no-op for this driver — tmux scrollback already streams to stdout-log" >&2
+  fi
+
   # --- Preflight ------------------------------------------------------------
   command -v tmux   >/dev/null 2>&1 || { echo "[claude-tmux] tmux missing"   >&2; return $EC_MISSING_BINARY; }
   command -v claude >/dev/null 2>&1 || { echo "[claude-tmux] claude missing" >&2; return $EC_MISSING_BINARY; }
