@@ -121,14 +121,21 @@ auto_respond_tick() {
       ;;
     1)
       local keys_csv="${action#send:}"
-      # Split comma-separated key names → individual tmux send-keys args
-      local saved_ifs="$IFS"
-      IFS=','
-      local key_arr=()
-      read -ra key_arr <<<"$keys_csv"
-      IFS="$saved_ifs"
-      if [[ ${#key_arr[@]} -gt 0 ]]; then
-        tmux send-keys -t "$session" "${key_arr[@]}"
+      # Reading-pause + key delivery. When human-input mode is opt-in active,
+      # use human_send_keys_csv (Gaussian inter-key delays); else fall back
+      # to instant bulk send-keys.
+      if [[ "$(bridge_human_active 2>/dev/null || echo 0)" == "1" ]]; then
+        human_reading_pause "$pane"
+        human_send_keys_csv "$session" "$keys_csv"
+      else
+        local saved_ifs="$IFS"
+        IFS=','
+        local key_arr=()
+        read -ra key_arr <<<"$keys_csv"
+        IFS="$saved_ifs"
+        if [[ ${#key_arr[@]} -gt 0 ]]; then
+          tmux send-keys -t "$session" "${key_arr[@]}"
+        fi
       fi
       echo "[auto-respond] sent keys: $keys_csv" >&2
       return 1

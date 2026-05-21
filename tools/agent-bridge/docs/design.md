@@ -235,12 +235,37 @@ Per-invocation policy. The schema (v1):
 
 ---
 
-## 8. Non-goals
+## 8. Non-goals (and one explicit opt-in)
+
+**Non-goals (default behavior):**
 
 - Detection-evasion (header injection, fingerprint scrubbing, billing-id mutation)
 - Multi-turn dialog driving (single-turn round-trip in v1)
 - Persistent-session optimization (every `bridge launch` is fresh)
-- v2 CLIs (codex, agy) — drivers are stubs returning 99
+
+**Explicit opt-in mode (added 2026-05-21): `--human-input`**
+
+Bridge's tmux drivers default to instant paste-buffer delivery and instant
+send-keys responses. That's "robot-shaped": zero inter-event delay, no review
+pauses. For futureproofing against potential automation-detection
+heuristics in 3p CLIs, bridge ships a behavioral-plausibility mode that
+adds Gaussian-distributed timing variance, paste-with-review pauses, and
+reading-time pauses.
+
+This mode is **strict opt-in via two gates that must BOTH be true**:
+
+1. Host-level env: `BRIDGE_HUMAN_SIMULATION=1`
+2. Per-invocation flag: `bridge launch --human-input`
+
+Default for both: OFF. Existing instant-paste behavior is unchanged.
+
+**Operator responsibility**: each CLI provider has its own ToS. By enabling
+`--human-input` the operator acknowledges per-CLI policy responsibility. Bridge
+itself takes no position on whether using it complies with any specific
+provider's ToS — that determination is the operator's.
+
+Library: `lib/human-input.sh` (tuning knobs documented in the file header).
+Tests: `tests/unit/human-input.bats`.
 
 ---
 

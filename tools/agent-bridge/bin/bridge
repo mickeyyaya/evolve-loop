@@ -30,6 +30,7 @@ readonly EC_MISSING_BINARY=127
 . "${BRIDGE_LIB_DIR}/report.sh"
 . "${BRIDGE_LIB_DIR}/doctor.sh"
 . "${BRIDGE_LIB_DIR}/selftest.sh"
+. "${BRIDGE_LIB_DIR}/human-input.sh"
 
 cmd_version() {
   local ver="unknown"
@@ -201,6 +202,7 @@ cmd_launch() {
   local require_full="${BRIDGE_REQUIRE_FULL:-0}"
   local allow_bypass="${BRIDGE_ALLOW_BYPASS:-0}"
   local dry_run="${BRIDGE_DRY_RUN:-0}"
+  local human_input="${BRIDGE_HUMAN_INPUT_FLAG:-0}"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -230,6 +232,7 @@ cmd_launch() {
       --dry-run)       dry_run=1 ;;
       --require-full)  require_full=1 ;;
       --allow-bypass)  allow_bypass=1 ;;
+      --human-input)   human_input=1 ;;
       --help|-h)       cmd_launch_help; return $EC_OK ;;
       --)              shift; break ;;
       *)               echo "[bridge] launch: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
@@ -255,6 +258,16 @@ cmd_launch() {
   if ! profile_load "$profile"; then
     return $EC_BAD_FLAGS
   fi
+
+  # --human-input gate: requires host-level BRIDGE_HUMAN_SIMULATION=1 env opt-in.
+  # Two-gate design (see docs/design.md §8 and lib/human-input.sh header).
+  if [[ "$human_input" -eq 1 ]] && [[ "${BRIDGE_HUMAN_SIMULATION:-0}" != "1" ]]; then
+    echo "[bridge] --human-input requires BRIDGE_HUMAN_SIMULATION=1 host opt-in" >&2
+    echo "[bridge] See docs/design.md §8 for the policy framing + per-CLI ToS responsibility." >&2
+    return $EC_SAFETY_GATE
+  fi
+  # Export so the driver and lib/human-input.sh see it
+  export human_input
 
   if [[ ! -r "$prompt_file" ]]; then
     echo "[bridge] launch: prompt file not readable: $prompt_file" >&2
@@ -295,6 +308,7 @@ cmd_launch() {
   require-full   = $require_full
   allow-bypass   = $allow_bypass
   dry-run        = $dry_run
+  human-input    = $human_input
 RESOLVED
     return $EC_OK
   fi
