@@ -230,3 +230,68 @@ _kill_leaked_sessions() {
   [ "$status" -eq 0 ]
   [ -f "$ARTIFACT" ]
 }
+
+# ============================================================================
+# Coverage extension: untested claude-tmux truth-table combos + tmux-flavored
+# back-compat for non-claude drivers
+# ============================================================================
+
+@test "T-permmode-drv.11 — claude-tmux: --allow-bypass + NO permission_mode → cmd has --dangerously-skip-permissions" {
+  # Branch CT3 + CC2: the pre-v0.2 path. With --allow-bypass and NO
+  # permission_mode, the safety gate passes AND the claude command keeps
+  # the old --dangerously-skip-permissions flag (NOT --permission-mode).
+  local prof="$WS/profile.json"
+  _profile "$prof"  # no permission_mode
+  run _run_launch claude-tmux "$prof" --allow-bypass
+  [[ "$output" != *"safety gate: --allow-bypass is required"* ]]
+  [[ "$output" == *"--dangerously-skip-permissions"* ]]
+  [[ "$output" != *"--permission-mode"* ]]
+}
+
+@test "T-permmode-drv.12 — claude-tmux: --allow-bypass + permission_mode=plan → plan wins, NO bypass" {
+  # Branch CT4: BOTH --allow-bypass passed AND permission_mode set.
+  # permission_mode takes precedence (driver swaps OUT bypass, not adds).
+  local prof="$WS/profile.json"
+  _profile "$prof" "plan"
+  run _run_launch claude-tmux "$prof" --allow-bypass
+  [[ "$output" == *"--permission-mode plan"* ]]
+  # The launch log line must NOT contain --dangerously-skip-permissions —
+  # plan mode is semantically incompatible with bypass.
+  [[ "$output" != *"[claude-tmux] launching: claude"*"--dangerously-skip-permissions"* ]]
+}
+
+@test "T-permmode-drv.13 — back-compat: codex-tmux without permission_mode + --allow-bypass works" {
+  # Branch D4: codex-tmux back-compat. With NO permission_mode, the
+  # rejection guard doesn't fire and the driver proceeds to its existing
+  # --allow-bypass safety gate (which passes with --allow-bypass).
+  local prof="$WS/profile.json"
+  _profile "$prof"
+  run _run_launch codex-tmux "$prof" --allow-bypass
+  # The permission_mode rejection MUST NOT fire (the bug we just fixed)
+  [[ "$output" != *"[codex-tmux] permission_mode"* ]]
+  # The existing safety gate ALSO MUST NOT fire
+  [[ "$output" != *"safety gate: --allow-bypass is required"* ]]
+}
+
+@test "T-permmode-drv.14 — back-compat: agy-tmux without permission_mode + --allow-bypass works" {
+  # Branch D8: agy-tmux back-compat (mirror of T-permmode-drv.13)
+  local prof="$WS/profile.json"
+  _profile "$prof"
+  run _run_launch agy-tmux "$prof" --allow-bypass
+  [[ "$output" != *"[agy-tmux] permission_mode"* ]]
+  [[ "$output" != *"safety gate: --allow-bypass is required"* ]]
+}
+
+@test "T-permmode-drv.15 — claude-p: non-plan permission_mode (acceptEdits) reaches binary" {
+  # Confirms pass-through works for ALL valid modes, not just plan.
+  local prof="$WS/profile.json"
+  _profile "$prof"
+  run _run_launch claude-p "$prof" --permission-mode=acceptEdits
+  [ "$status" -eq 0 ]
+  grep -Fxq -- '--permission-mode' "$ARGS_FILE"
+  local line_no
+  line_no=$(grep -nFx -- '--permission-mode' "$ARGS_FILE" | head -1 | cut -d: -f1)
+  local next_arg
+  next_arg=$(sed -n "$((line_no + 1))p" "$ARGS_FILE")
+  [ "$next_arg" = "acceptEdits" ]
+}
