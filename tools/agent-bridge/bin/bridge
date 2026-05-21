@@ -46,9 +46,9 @@ Subcommands:
   probe     Detect available CLIs and capability tiers (JSON)
   validate  Dry-run: parse profile, print resolved config, exit 0
   report    Re-print structured summary for a past workspace
+  add-rule  Append a new interactive_prompts rule to a CLI manifest
   version   Print the bridge version
   help      Print this help
-  add-rule  Append a new interactive_prompts rule to a CLI manifest
 
 Exit codes:
   0    success
@@ -70,35 +70,128 @@ cmd_launch_help() {
   cat <<'LAUNCH_HELP'
 bridge launch — run a subagent invocation through the chosen CLI
 
-Required flags:
-  --cli=NAME             claude-p | claude-tmux  (v2: codex | agy)
-  --profile=PATH         Absolute path to agent profile JSON
-  --model=MODEL          haiku | sonnet | opus | auto (auto reads from profile)
-  --prompt-file=PATH     Absolute path to prompt text
-  --workspace=DIR        Absolute path to output directory
-  --stdout-log=PATH      Where to write LLM stdout
-  --stderr-log=PATH      Where to write diagnostics
-  --artifact=PATH        Expected artifact path
+Required (flag OR env var equivalent):
+  --cli=NAME          | BRIDGE_CLI         claude-p | claude-tmux | codex | agy
+  --profile=PATH      | PROFILE_PATH       Absolute path to agent profile JSON
+  --model=MODEL       | RESOLVED_MODEL     haiku|sonnet|opus|auto|gpt-*|gemini-*
+  --prompt-file=PATH  | PROMPT_FILE        Absolute path to prompt text
+  --workspace=DIR     | WORKSPACE_PATH     Absolute path to output dir
+  --stdout-log=PATH   | STDOUT_LOG         Where to write LLM stdout
+  --stderr-log=PATH   | STDERR_LOG         Where to write diagnostics
+  --artifact=PATH     | ARTIFACT_PATH      Expected artifact path
 
-Optional flags:
-  --cycle=N              Cycle number for logging (default: 0)
-  --worktree=DIR         Git worktree path if any
-  --agent=NAME           Agent role label (default: probe)
-  --require-full         Exit 99 if full tier not available
-  --validate-only        Dry-run: parse + print resolved config, exit 0
-  --allow-bypass         Acknowledge --dangerously-skip-permissions use (claude-tmux)
+Optional:
+  --cycle=N           | CYCLE              Cycle number for logging (default: 0)
+  --worktree=DIR      | WORKTREE_PATH      Git worktree path if any
+  --agent=NAME        | AGENT              Agent role label (default: probe)
+  --require-full      | BRIDGE_REQUIRE_FULL=1
+                                          Exit 99 if full tier not available
+  --validate-only     | VALIDATE_ONLY=1   Dry-run: parse + print resolved config
+  --dry-run           | BRIDGE_DRY_RUN=1  Produce mock outputs (no LLM call); rc=0
+  --allow-bypass      | BRIDGE_ALLOW_BYPASS=1
+                                          Acknowledge --dangerously-skip-permissions
+
+Flags always win when both flag and env var are set.
+
+The contract mirrors the evolve-loop scripts/cli_adapters/*.sh adapter interface,
+so bridge is a friction-free drop-in: a caller exporting PROFILE_PATH etc. can
+invoke `bridge launch --cli=NAME` with no other flags.
 LAUNCH_HELP
 }
 
-cmd_launch() {
-  if [[ $# -eq 0 ]]; then
-    echo "[bridge] launch: missing required flags. Run 'bridge launch --help'." >&2
-    return $EC_BAD_FLAGS
+# Helper: write the dry-run mock outputs and return 0
+_bridge_dry_run() {
+  local cli="$1" profile="$2" model="$3" prompt_file="$4" workspace="$5"
+  local stdout_log="$6" stderr_log="$7" artifact="$8"
+  local cycle="$9" agent="${10}"
+
+  mkdir -p "$workspace" "$(dirname "$stdout_log")" "$(dirname "$stderr_log")" "$(dirname "$artifact")"
+
+  # Resolve challenge token (so dry-run output matches the real path's invariant)
+  local prompt_content
+  prompt_content="$(cat "$prompt_file" 2>/dev/null || echo "(prompt file unreadable)")"
+  local challenge_token=""
+  if [[ "$prompt_content" == *'$CHALLENGE_TOKEN'* ]]; then
+    challenge_token="$(openssl rand -hex 8 2>/dev/null || echo "drytoken")"
+    echo "$challenge_token" > "$workspace/challenge-token.txt"
   fi
-  local cli="" profile="" model="" prompt_file="" workspace=""
-  local stdout_log="" stderr_log="" artifact=""
-  local cycle="0" worktree="" agent="probe"
-  local validate_only=0 require_full=0 allow_bypass=0
+
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  local prompt_bytes
+  prompt_bytes=$(wc -c < "$prompt_file" 2>/dev/null | tr -d ' ')
+
+  # Mock stdout-log — what the real CLI would have printed
+  cat > "$stdout_log" <<DRYSTDOUT
+[bridge dry-run] mock stdout — no LLM invoked
+cli=$cli model=$model cycle=$cycle agent=$agent
+prompt_bytes=$prompt_bytes
+artifact=$artifact
+DRYSTDOUT
+
+  # Mock stderr-log — bridge's own trace
+  cat > "$stderr_log" <<DRYSTDERR
+[bridge dry-run] $now
+[bridge dry-run] would have invoked cli=$cli driver=drivers/${cli}.sh
+[bridge dry-run] model=$model profile.name=$bridge_profile_name
+[bridge dry-run] allowed_tools=$bridge_profile_allowed_tools_csv
+[bridge dry-run] prompt_bytes=$prompt_bytes
+[bridge dry-run] artifact=$artifact
+[bridge dry-run] NO real call made; rc=0
+DRYSTDERR
+
+  # Mock artifact — the phase agent's expected output shape, with the
+  # challenge token so artifact-verification passes if it checks for one.
+  cat > "$artifact" <<DRYARTIFACT
+<!-- challenge-token: ${challenge_token:-no-token} -->
+<!-- bridge-dry-run: ${now} -->
+# bridge dry-run — synthetic phase agent output
+
+This artifact was produced by \`bridge launch --dry-run\`. It satisfies the
+phase agent's artifact-path contract without invoking any LLM.
+
+## Resolved config
+
+- cli: $cli
+- model: $model
+- profile.name: $bridge_profile_name
+- profile.allowed_tools: $bridge_profile_allowed_tools_csv
+- cycle: $cycle
+- agent: $agent
+- prompt_bytes: $prompt_bytes
+- artifact_path: $artifact
+- timestamp: $now
+
+## Mock content
+
+DRY-RUN-OK — no LLM was called.
+
+To execute against a real LLM, remove the \`--dry-run\` flag (or unset
+\`BRIDGE_DRY_RUN\`).
+DRYARTIFACT
+
+  echo "[bridge] dry-run complete: artifact=$artifact stdout_log=$stdout_log" >&2
+  return $EC_OK
+}
+
+cmd_launch() {
+  # Initialize from env vars (env values are fallbacks; flags override below)
+  local cli="${BRIDGE_CLI:-}"
+  local profile="${PROFILE_PATH:-}"
+  local model="${RESOLVED_MODEL:-}"
+  local prompt_file="${PROMPT_FILE:-}"
+  local workspace="${WORKSPACE_PATH:-}"
+  local stdout_log="${STDOUT_LOG:-}"
+  local stderr_log="${STDERR_LOG:-}"
+  local artifact="${ARTIFACT_PATH:-}"
+  local cycle="${CYCLE:-0}"
+  local worktree="${WORKTREE_PATH:-}"
+  local agent="${AGENT:-probe}"
+  local validate_only="${VALIDATE_ONLY:-0}"
+  local require_full="${BRIDGE_REQUIRE_FULL:-0}"
+  local allow_bypass="${BRIDGE_ALLOW_BYPASS:-0}"
+  local dry_run="${BRIDGE_DRY_RUN:-0}"
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --cli=*)         cli="${1#--cli=}" ;;
@@ -124,6 +217,7 @@ cmd_launch() {
       --agent=*)       agent="${1#--agent=}" ;;
       --agent)         [[ $# -ge 2 ]] || { echo "[bridge] --agent requires a value" >&2; return $EC_BAD_FLAGS; }; agent="$2"; shift ;;
       --validate-only) validate_only=1 ;;
+      --dry-run)       dry_run=1 ;;
       --require-full)  require_full=1 ;;
       --allow-bypass)  allow_bypass=1 ;;
       --help|-h)       cmd_launch_help; return $EC_OK ;;
@@ -133,17 +227,18 @@ cmd_launch() {
     shift
   done
 
+  # Validate required (after flag-vs-env merge)
   local missing=()
-  [[ -z "$cli" ]]         && missing+=("--cli")
-  [[ -z "$profile" ]]     && missing+=("--profile")
-  [[ -z "$model" ]]       && missing+=("--model")
-  [[ -z "$prompt_file" ]] && missing+=("--prompt-file")
-  [[ -z "$workspace" ]]   && missing+=("--workspace")
-  [[ -z "$stdout_log" ]]  && missing+=("--stdout-log")
-  [[ -z "$stderr_log" ]]  && missing+=("--stderr-log")
-  [[ -z "$artifact" ]]    && missing+=("--artifact")
+  [[ -z "$cli" ]]         && missing+=("--cli/BRIDGE_CLI")
+  [[ -z "$profile" ]]     && missing+=("--profile/PROFILE_PATH")
+  [[ -z "$model" ]]       && missing+=("--model/RESOLVED_MODEL")
+  [[ -z "$prompt_file" ]] && missing+=("--prompt-file/PROMPT_FILE")
+  [[ -z "$workspace" ]]   && missing+=("--workspace/WORKSPACE_PATH")
+  [[ -z "$stdout_log" ]]  && missing+=("--stdout-log/STDOUT_LOG")
+  [[ -z "$stderr_log" ]]  && missing+=("--stderr-log/STDERR_LOG")
+  [[ -z "$artifact" ]]    && missing+=("--artifact/ARTIFACT_PATH")
   if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "[bridge] launch: missing required flag(s): ${missing[*]}" >&2
+    echo "[bridge] launch: missing required (flag or env): ${missing[*]}" >&2
     return $EC_BAD_FLAGS
   fi
 
@@ -151,7 +246,6 @@ cmd_launch() {
     return $EC_BAD_FLAGS
   fi
 
-  # Verify prompt file readable
   if [[ ! -r "$prompt_file" ]]; then
     echo "[bridge] launch: prompt file not readable: $prompt_file" >&2
     return $EC_BAD_FLAGS
@@ -159,10 +253,14 @@ cmd_launch() {
 
   local effective_model="$model"
   if [[ "$model" == "auto" ]]; then
-    [[ -z "$bridge_profile_model" ]] && { echo "[bridge] --model=auto but profile.model is empty" >&2; return $EC_BAD_FLAGS; }
-    effective_model="$bridge_profile_model"
+    if [[ -n "$bridge_profile_model" ]]; then
+      effective_model="$bridge_profile_model"
+    else
+      effective_model="auto"  # driver decides default
+    fi
   fi
 
+  # --validate-only: print resolved config and exit
   if [[ "$validate_only" -eq 1 ]]; then
     cat <<RESOLVED
 [bridge] validate-only — resolved config:
@@ -186,11 +284,20 @@ cmd_launch() {
   prompt_overrides = $bridge_profile_prompt_overrides_count entries
   require-full   = $require_full
   allow-bypass   = $allow_bypass
+  dry-run        = $dry_run
 RESOLVED
     return $EC_OK
   fi
 
-  # Optional --require-full check
+  # --dry-run: produce mock outputs, no driver dispatch
+  if [[ "$dry_run" -eq 1 ]]; then
+    _bridge_dry_run "$cli" "$profile" "$effective_model" "$prompt_file" \
+      "$workspace" "$stdout_log" "$stderr_log" "$artifact" \
+      "$cycle" "$agent"
+    return $?
+  fi
+
+  # --require-full check
   if [[ "$require_full" -eq 1 ]]; then
     local tier
     tier="$(probe_resolve_tier "$cli")"
@@ -239,7 +346,7 @@ PROBE_HELP
 }
 
 cmd_validate() {
-  echo "[bridge] validate: not yet implemented (P11)" >&2
+  echo "[bridge] validate: pass --validate-only to launch for now" >&2
   return $EC_OK
 }
 
@@ -248,9 +355,8 @@ cmd_report() {
   return $EC_OK
 }
 
-
 cmd_add_rule() {
-  local escalation="" regex="" response="" policy="escalate" name="" note="" cli=""
+  local escalation="" regex="" response="" policy="" name="" note="" cli=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --escalation=*) escalation="${1#--escalation=}" ;;
@@ -270,24 +376,8 @@ cmd_add_rule() {
       --help|-h)
         cat <<'ADD_RULE_HELP'
 bridge add-rule — append an interactive_prompts entry to a CLI manifest
-
-Two invocation modes:
-
-  1. From an escalation report (recommended):
-     bridge add-rule --escalation=PATH --regex=R --response=KEYS [--policy=auto_respond]
-     Reads CLI + suggested fields from the report; you supply the regex and keys.
-
-  2. Direct (--cli is required if --escalation is not given):
-     bridge add-rule --cli=NAME --name=N --regex=R --response=KEYS --policy=auto_respond
-
-Flags:
-  --escalation=PATH    workspace/escalation-report.json from a failed run
-  --cli=NAME           target CLI (auto-detected from --escalation if not given)
-  --name=N             rule name (auto-generated from timestamp if not given)
-  --regex=R            extended-regex pattern to match against the pane
-  --response=KEYS      comma-separated tmux key names ("y,Enter", "Enter", "3,Enter")
-  --policy=P           auto_respond | escalate (default: escalate when --response empty)
-  --note=TEXT          human-readable note for the rule
+Use --escalation=PATH to ingest a workspace/escalation-report.json, or pass
+--cli=NAME directly. See docs/cli-reference.md for full flag table.
 ADD_RULE_HELP
         return $EC_OK
         ;;
@@ -297,33 +387,18 @@ ADD_RULE_HELP
   done
 
   if [[ -n "$escalation" ]]; then
-    if [[ ! -f "$escalation" ]]; then
-      echo "[bridge] add-rule: escalation report not found: $escalation" >&2
-      return $EC_BAD_FLAGS
-    fi
-    if ! jq -e . "$escalation" >/dev/null 2>&1; then
-      echo "[bridge] add-rule: escalation report is not valid JSON: $escalation" >&2
-      return $EC_BAD_FLAGS
-    fi
+    [[ -f "$escalation" ]] || { echo "[bridge] add-rule: escalation report not found: $escalation" >&2; return $EC_BAD_FLAGS; }
+    jq -e . "$escalation" >/dev/null 2>&1 || { echo "[bridge] add-rule: invalid JSON: $escalation" >&2; return $EC_BAD_FLAGS; }
     [[ -z "$cli" ]] && cli="$(jq -r '.cli // ""' "$escalation")"
     [[ -z "$note" ]] && note="Added from escalation $(basename "$escalation") on $(date -u +%Y-%m-%d)"
   fi
 
   [[ -z "$cli" ]]   && { echo "[bridge] add-rule: --cli is required (or use --escalation)" >&2; return $EC_BAD_FLAGS; }
   [[ -z "$regex" ]] && { echo "[bridge] add-rule: --regex is required" >&2; return $EC_BAD_FLAGS; }
+  [[ -z "$policy" ]] && policy=$([[ -n "$response" ]] && echo "auto_respond" || echo "escalate")
+  [[ -z "$name" ]] && name="${cli//-/_}_rule_$(date +%s)"
 
-  # Default policy: escalate when no response_keys, auto_respond otherwise
-  if [[ -z "$policy" ]]; then
-    policy=$([[ -n "$response" ]] && echo "auto_respond" || echo "escalate")
-  fi
-
-  # Default name: <cli>_rule_<timestamp>
-  if [[ -z "$name" ]]; then
-    name="${cli//-/_}_rule_$(date +%s)"
-  fi
-
-  local manifest="${BRIDGE_LIB_DIR}/manifests/${cli}.json"
-  manifest_append_rule "$manifest" "$name" "$regex" "$response" "$policy" "$note"
+  manifest_append_rule "${BRIDGE_LIB_DIR}/manifests/${cli}.json" "$name" "$regex" "$response" "$policy" "$note"
 }
 
 main() {

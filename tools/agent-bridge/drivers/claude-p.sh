@@ -11,10 +11,14 @@
 # bridge_profile_* from profile_load.
 
 drv_launch_claude_p() {
-  # Required: claude binary
-  if ! command -v claude >/dev/null 2>&1; then
-    echo "[claude-p] claude binary not on PATH" >&2
-    return $EC_MISSING_BINARY
+  # Required: claude binary (with BRIDGE_CLAUDE_BINARY test seam)
+  local claude_bin
+  if [[ -n "${BRIDGE_CLAUDE_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
+    claude_bin="$BRIDGE_CLAUDE_BINARY"
+    [[ -x "$claude_bin" ]] || { echo "[claude-p] BRIDGE_CLAUDE_BINARY not executable: $claude_bin" >&2; return $EC_MISSING_BINARY; }
+  else
+    command -v claude >/dev/null 2>&1 || { echo "[claude-p] claude binary not on PATH" >&2; return $EC_MISSING_BINARY; }
+    claude_bin="$(command -v claude)"
   fi
 
   # Cost-leak guard: bridge expects subscription auth. If ANTHROPIC_API_KEY
@@ -67,7 +71,7 @@ drv_launch_claude_p() {
   echo "[claude-p] invoking: claude -p <prompt> --model $effective_model --allowedTools ${bridge_profile_allowed_tools_csv:-}" >&2
 
   set +e
-  claude "${claude_args[@]}" > "$stdout_log" 2> "$stderr_log"
+  "$claude_bin" "${claude_args[@]}" > "$stdout_log" 2> "$stderr_log"
   local rc=$?
   set -e
 

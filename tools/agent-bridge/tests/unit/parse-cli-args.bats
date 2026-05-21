@@ -14,6 +14,19 @@ setup() {
   STDERR_LOG="${WS}/stderr.log"
   ARTIFACT="${WS}/artifact.md"
   export BRIDGE_BIN FIXTURE_DIR PROFILE PROMPT WS STDOUT_LOG STDERR_LOG ARTIFACT
+  # Unset bridge env-var fallback names so T2 strictly tests flag-only validation
+  unset BRIDGE_CLI PROFILE_PATH RESOLVED_MODEL PROMPT_FILE WORKSPACE_PATH
+  unset BRIDGE_DRY_RUN BRIDGE_REQUIRE_FULL BRIDGE_ALLOW_BYPASS VALIDATE_ONLY
+  unset CYCLE WORKTREE_PATH AGENT
+  unset ARTIFACT_PATH
+  # NB: STDOUT_LOG/STDERR_LOG above are local-to-test bats vars, not bridge env vars
+  # But bridge cmd_launch DOES read them as fallback. Unset them too:
+  local saved_stdout_log="$STDOUT_LOG"
+  local saved_stderr_log="$STDERR_LOG"
+  unset STDOUT_LOG STDERR_LOG
+  STDOUT_LOG="$saved_stdout_log"
+  STDERR_LOG="$saved_stderr_log"
+  # Now STDOUT_LOG and STDERR_LOG are bats-local vars, not exported
 }
 
 teardown() {

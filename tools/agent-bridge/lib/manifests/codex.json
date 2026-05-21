@@ -2,7 +2,20 @@
   "schema_version": 1,
   "cli": "codex",
   "binary": "codex",
-  "stub": true,
-  "default_tier": "none",
-  "note": "v2 placeholder — driver returns exit 99 in v1"
+  "binary_min_version": "0.13.0",
+  "default_tier": "full",
+  "tier_dependencies": {
+    "full": ["codex"]
+  },
+  "prompt_marker": null,
+  "default_model": "",
+  "default_args": [],
+  "interactive_prompts": [],
+  "stub": false,
+  "tier_aliases": {
+    "haiku":  "gpt-5.4-mini",
+    "sonnet": "gpt-5.4",
+    "opus":   "gpt-5.5"
+  },
+  "note": "default_model empty: codex picks the model compatible with active auth. tier_aliases map Claude tiers to codex equivalents (verified working with ChatGPT-account auth 2026-05-21)."
 }

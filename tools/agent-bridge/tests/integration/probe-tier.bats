@@ -44,18 +44,38 @@ setup() {
   [ "$tier" = "hybrid" ]
 }
 
-@test "T5.6 — bridge probe marks codex with stub=true" {
+@test "T5.6 — bridge probe lists codex with stub=false (promoted)" {
   run "$BRIDGE_BIN" probe
   [ "$status" -eq 0 ]
   stub=$(echo "$output" | jq -r '.results[] | select(.cli=="codex") | .stub')
-  [ "$stub" = "true" ]
+  [ "$stub" = "false" ]
 }
 
-@test "T5.7 — bridge probe marks agy with stub=true" {
+@test "T5.6b — bridge probe codex tier=full when codex binary present" {
+  if ! command -v codex >/dev/null 2>&1; then
+    skip "codex binary not on PATH"
+  fi
+  run "$BRIDGE_BIN" probe
+  [ "$status" -eq 0 ]
+  tier=$(echo "$output" | jq -r '.results[] | select(.cli=="codex") | .tier')
+  [ "$tier" = "full" ]
+}
+
+@test "T5.7 — bridge probe lists agy with stub=false (promoted)" {
   run "$BRIDGE_BIN" probe
   [ "$status" -eq 0 ]
   stub=$(echo "$output" | jq -r '.results[] | select(.cli=="agy") | .stub')
-  [ "$stub" = "true" ]
+  [ "$stub" = "false" ]
+}
+
+@test "T5.7b — bridge probe agy tier=full when agy binary present" {
+  if ! command -v agy >/dev/null 2>&1; then
+    skip "agy binary not on PATH"
+  fi
+  run "$BRIDGE_BIN" probe
+  [ "$status" -eq 0 ]
+  tier=$(echo "$output" | jq -r '.results[] | select(.cli=="agy") | .tier')
+  [ "$tier" = "full" ]
 }
 
 @test "T5.8 — bridge probe --cli=claude-p returns single-CLI result" {

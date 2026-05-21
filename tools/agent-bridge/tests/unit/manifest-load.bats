@@ -29,14 +29,18 @@ setup() {
   [ "$bridge_manifest_interactive_prompts_count" -gt 0 ]
 }
 
-@test "T4.5 — manifest codex marked stub=true (v2 deferred)" {
+@test "T4.5 — manifest codex NOT stub (promoted from v2 to v1 on 2026-05-21)" {
   manifest_load codex
-  [ "$bridge_manifest_stub" = "true" ]
+  [ "$bridge_manifest_stub" = "false" ]
+  [ "$bridge_manifest_cli" = "codex" ]
+  [ "$bridge_manifest_binary" = "codex" ]
 }
 
-@test "T4.6 — manifest agy marked stub=true (v2 deferred)" {
+@test "T4.6 — manifest agy NOT stub (promoted from v2 to v1 on 2026-05-21)" {
   manifest_load agy
-  [ "$bridge_manifest_stub" = "true" ]
+  [ "$bridge_manifest_stub" = "false" ]
+  [ "$bridge_manifest_cli" = "agy" ]
+  [ "$bridge_manifest_binary" = "agy" ]
 }
 
 @test "T4.7 — unknown cli → manifest_load returns 1" {

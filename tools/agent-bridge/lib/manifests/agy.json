@@ -2,7 +2,20 @@
   "schema_version": 1,
   "cli": "agy",
   "binary": "agy",
-  "stub": true,
-  "default_tier": "none",
-  "note": "v2 placeholder — driver returns exit 99 in v1"
+  "binary_min_version": "1.0.0",
+  "default_tier": "full",
+  "tier_dependencies": {
+    "full": ["agy"]
+  },
+  "prompt_marker": null,
+  "default_model": "gemini-3.5-flash",
+  "default_args": ["--dangerously-skip-permissions"],
+  "interactive_prompts": [],
+  "stub": false,
+  "tier_aliases": {
+    "haiku":  "gemini-3.5-flash",
+    "sonnet": "gemini-3.5-flash",
+    "opus":   "gemini-3.5-flash"
+  },
+  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy CLI exposes no model selection flag (-c is --continue, not --config). Per operator directive 2026-05-21: all Claude tier aliases map to agy's default (gemini-3.5-flash). Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
 }
