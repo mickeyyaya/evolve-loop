@@ -273,6 +273,23 @@ cmd_launch() {
     echo "[bridge] launch: prompt file not readable: $prompt_file" >&2
     return $EC_BAD_FLAGS
   fi
+  # F5: empty-prompt guard — silently sending empty input would hang the agent
+  # at the 300s artifact timeout. Fail fast with a clear message.
+  if [[ ! -s "$prompt_file" ]]; then
+    echo "[bridge] launch: prompt file is empty: $prompt_file" >&2
+    echo "[bridge] (an empty prompt would hang the agent at the artifact timeout)" >&2
+    return $EC_BAD_FLAGS
+  fi
+  # F6: workspace-reuse warning — caller may have passed a stale workspace.
+  # Fires BEFORE validate-only/dry-run checks so the operator is warned
+  # regardless of how the launch resolves.
+  if [[ -d "$workspace" ]] && { [[ -f "$workspace/artifact.md" ]] || [[ -f "$workspace/escalation-report.json" ]]; }; then
+    local stale=()
+    [[ -f "$workspace/artifact.md" ]] && stale+=("artifact.md")
+    [[ -f "$workspace/escalation-report.json" ]] && stale+=("escalation-report.json")
+    echo "[bridge] WARN: workspace contains stale files from a prior run: ${stale[*]}" >&2
+    echo "[bridge] (proceeding; files will be overwritten by this launch)" >&2
+  fi
 
   local effective_model="$model"
   if [[ "$model" == "auto" ]]; then
