@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Optional `bridge` integration in `claude-tmux` adapter** — opt-in via `EVOLVE_USE_BRIDGE=1`. When the operator sets that env var AND has `bridge` (an external, user-installable CLI) on PATH with `schema_version=1`, the adapter delegates to `bridge launch --cli=claude-tmux --allow-bypass`. Otherwise the existing prototype adapter runs unchanged — zero regression. See [`docs/architecture/cli-adapters.md`](docs/architecture/cli-adapters.md) for the integration spec, install steps, failure modes, and force-disable knob (`EVOLVE_USE_BRIDGE=0`). Bridge source is not distributed in this repository.
+- **`bridge` integration in `claude-tmux` adapter, default-on when installed.** When `bridge` (an external, user-installable CLI) is on PATH AND reports `schema_version=1`, the adapter delegates to `bridge launch --cli=claude-tmux --allow-bypass`. Bridge picks up `PROFILE_PATH`, `RESOLVED_MODEL`, `PROMPT_FILE`, etc. from env automatically. When bridge isn't installed or schema mismatches, the existing prototype adapter runs unchanged — zero regression for users who don't install bridge. Force-disable with `EVOLVE_USE_BRIDGE=0` (recommended for CI bit-for-bit reproducibility). See [`docs/architecture/cli-adapters.md`](docs/architecture/cli-adapters.md) for the integration spec, install steps, and failure modes. Bridge source is not distributed in this repository.
 
 ### Changed
 

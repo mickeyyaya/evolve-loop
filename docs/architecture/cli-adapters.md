@@ -35,18 +35,24 @@ Exit codes: see each adapter file's header.
 
 Bridge source is **not** distributed in this repository. It is the operator's responsibility to install.
 
-### Activation gates (both required)
+### Activation (default-on)
 
-The gate at the top of `scripts/cli_adapters/claude-tmux.sh` fires ONLY when **both** are true:
+As of this commit, the integration is **default-on** when bridge is installed. The gate at the top of `scripts/cli_adapters/claude-tmux.sh` delegates to bridge when:
 
-1. `EVOLVE_USE_BRIDGE=1` is set in the environment.
+1. `EVOLVE_USE_BRIDGE` is unset OR set to anything other than `"0"` (default).
 2. `bridge` is on PATH AND `bridge --json version` reports `schema_version=1`.
 
-When either condition is false, the existing prototype adapter runs unchanged. There is no regression for users who don't install bridge or don't opt in.
+To **force-disable** (e.g., to debug the native prototype path, or for bit-for-bit reproducibility in CI):
 
-### Why opt-in (and not auto-on)?
+```bash
+export EVOLVE_USE_BRIDGE=0
+```
 
-Safer rollout. The native prototype adapter is well-understood and stable; bridge is an additional surface that we want operators to consciously activate. To upgrade gradually, you enable `EVOLVE_USE_BRIDGE=1` in your shell or CI environment for a single cycle, verify it behaves as expected, then keep or disable.
+When either gate condition is false, the existing prototype adapter runs unchanged. There is no regression for users who don't install bridge — the gate quietly falls through.
+
+### Why default-on?
+
+The integration was opt-in for the first iteration to validate it works without breaking native users. After end-to-end verification (bridge installed + EVOLVE_USE_BRIDGE=1 + Haiku probe → subscription-billed cycle ran cleanly), the default flipped to ON: any user who has bothered to install bridge wants the integration to take effect. Operators who specifically prefer the native prototype set `EVOLVE_USE_BRIDGE=0`.
 
 ### Installing bridge
 
@@ -71,22 +77,29 @@ To uninstall:
 bash tools/agent-bridge/install.sh --uninstall
 ```
 
-### Enabling for a session
+### Default-on activation
+
+Once bridge is installed, the integration is active by default. No env var setting needed:
 
 ```bash
-export EVOLVE_USE_BRIDGE=1
-# now `claude-tmux` adapter invocations delegate to:
-# bridge launch --cli=claude-tmux --allow-bypass
-# (bridge picks up PROFILE_PATH, RESOLVED_MODEL, PROMPT_FILE, etc. from env)
+# Just run as normal:
+bash scripts/dispatch/subagent-run.sh ...
+# claude-tmux adapter delegates to bridge automatically
 ```
 
-### Force-disable (CI guardrail)
+You'll see this log line on stderr when the gate fires:
+
+```
+[claude-tmux] delegating to bridge launch --cli=claude-tmux (default; set EVOLVE_USE_BRIDGE=0 to disable)
+```
+
+### Force-disable (CI guardrail or debugging native)
 
 ```bash
-export EVOLVE_USE_BRIDGE=0   # or simply unset; default is "off"
+export EVOLVE_USE_BRIDGE=0
 ```
 
-This is recommended for CI configurations that need bit-for-bit reproducibility — even if bridge happens to be installed on the runner, the native adapter is used.
+This is recommended for CI configurations that need bit-for-bit reproducibility — even if bridge happens to be installed on the runner, the native adapter is used. Also useful when debugging the prototype adapter's behavior in isolation.
 
 ### Schema-version compatibility
 
@@ -96,7 +109,7 @@ The gate refuses to delegate if `bridge --json version | jq -r .schema_version` 
 
 | Scenario | What happens |
 |---|---|
-| `bridge` not on PATH, `EVOLVE_USE_BRIDGE=1` | Gate silently falls through to native adapter. |
+| `bridge` not on PATH (regardless of env) | Gate silently falls through to native adapter. |
 | `bridge --json version` exits non-zero | Gate WARNs and falls through. |
 | Bridge schema mismatch | Gate WARNs (`schema_version='X' (expected 1)`) and falls through. |
 | Bridge runs but returns non-zero | The `exec` propagates bridge's exit code. **Cycle fails the same way as a native adapter failure would.** |
