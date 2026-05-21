@@ -34,6 +34,34 @@
 
 set -uo pipefail
 
+# --- Optional bridge delegation ---------------------------------------------
+# When the operator opts in (EVOLVE_USE_BRIDGE=1) AND `bridge` is installed
+# and reports schema_version=1, delegate this adapter's responsibility to
+# `bridge launch --cli=claude-tmux`. Bridge picks up PROFILE_PATH,
+# RESOLVED_MODEL, PROMPT_FILE, etc. from env automatically (its env-var
+# fallback contract — see bridge's tests/unit/envvar-fallback.bats).
+#
+# If any of the three conditions is false, this block falls through and
+# the existing prototype adapter runs unchanged. Zero regression for users
+# who don't install bridge.
+#
+# Bridge is a user-installable, optional dependency. See docs/architecture/
+# cli-adapters.md for installation instructions. The bridge source itself
+# is NOT distributed in this repo.
+if [[ "${EVOLVE_USE_BRIDGE:-0}" == "1" ]] && command -v bridge >/dev/null 2>&1; then
+  _bridge_schema=$(bridge --json version 2>/dev/null | jq -r '.schema_version' 2>/dev/null || echo "")
+  if [[ "$_bridge_schema" == "1" ]]; then
+    echo "[claude-tmux] delegating to bridge launch --cli=claude-tmux (EVOLVE_USE_BRIDGE=1)" >&2
+    # Bridge requires --allow-bypass to acknowledge --dangerously-skip-permissions
+    # use, which this adapter has always set. VALIDATE_ONLY env passes through
+    # via bridge's --validate-only flag (also env-fallback aware).
+    exec bridge launch --cli=claude-tmux --allow-bypass
+  else
+    echo "[claude-tmux] WARN: EVOLVE_USE_BRIDGE=1 but bridge schema_version='$_bridge_schema' (expected 1); falling back to native adapter" >&2
+  fi
+  unset _bridge_schema
+fi
+
 # --- Mandatory env -----------------------------------------------------------
 : "${PROFILE_PATH:?claude-tmux.sh: PROFILE_PATH unset}"
 : "${RESOLVED_MODEL:?claude-tmux.sh: RESOLVED_MODEL unset}"
