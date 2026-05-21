@@ -39,29 +39,27 @@ bash install.sh --uninstall
 **Dependencies**: `bash` 3.2+, `jq`, `tmux`, `openssl`, an active Claude CLI (`claude --version` ≥ 2.1.x).
 On macOS, billing-verification also uses the system `security` keychain probe — no extra install needed.
 
-### Using bridge from evolve-loop (optional integration)
+### Using bridge from evolve-loop (default-on integration)
 
-`evolve-loop` (the parent repo) calls `bridge` as a system command when both
-of these are true:
+`evolve-loop` (the parent repo) calls `bridge` as a system command **by default
+when bridge is installed**. The `claude-tmux` adapter in evolve-loop checks for:
 
 1. `bridge` is on PATH (this install completes that)
-2. `EVOLVE_USE_BRIDGE=1` is set in the environment
+2. `bridge --json version` reports `schema_version=1`
+3. `EVOLVE_USE_BRIDGE` is unset OR set to anything other than `"0"`
 
-When either condition is false, evolve-loop's existing native adapters run
-unchanged — zero regression. See `docs/architecture/cli-adapters.md` in
-evolve-loop for the integration spec.
+When all 3 are true, evolve-loop delegates `claude-tmux` invocations to
+`bridge launch --cli=claude-tmux --allow-bypass`. Otherwise, the existing
+native adapter runs unchanged — zero regression. See
+`docs/architecture/cli-adapters.md` in evolve-loop for the full integration spec.
 
-To enable for your evolve-loop session:
+No env-var setting is needed once bridge is installed. The default is **on**.
 
-```bash
-export EVOLVE_USE_BRIDGE=1
-# now evolve-loop's claude-tmux adapter delegates to: bridge launch --cli=claude-tmux ...
-```
-
-To force-disable (e.g., in CI):
+To force-disable (e.g., for CI bit-for-bit reproducibility, or to debug the
+native prototype path):
 
 ```bash
-export EVOLVE_USE_BRIDGE=0   # or simply unset; default is "off"
+export EVOLVE_USE_BRIDGE=0
 ```
 
 ---
