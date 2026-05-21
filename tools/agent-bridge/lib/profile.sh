@@ -11,6 +11,8 @@
 #     "name": string                  (required)
 #     "model": "haiku" | ...           (optional; used when --model=auto)
 #     "allowed_tools": [string, ...]   (default [])
+#     "permission_mode": "plan" | "default" | "acceptEdits" | "bypassPermissions" | "auto" | "dontAsk"
+#                                      (optional; default "" = let driver/CLI decide)
 #     "auto_respond": {
 #       "destructive_ops": bool        (default false)
 #       "timeout_s": int               (default 600)
@@ -22,6 +24,7 @@
 #   bridge_profile_name
 #   bridge_profile_model
 #   bridge_profile_allowed_tools_csv
+#   bridge_profile_permission_mode
 #   bridge_profile_auto_respond_destructive_ops
 #   bridge_profile_auto_respond_timeout_s
 #   bridge_profile_prompt_overrides_count
@@ -53,6 +56,7 @@ profile_load() {
   bridge_profile_name="$(jq -r '.name // ""' "$path")"
   bridge_profile_model="$(jq -r '.model // ""' "$path")"
   bridge_profile_allowed_tools_csv="$(jq -r '.allowed_tools // [] | join(",")' "$path")"
+  bridge_profile_permission_mode="$(jq -r '.permission_mode // ""' "$path")"
   bridge_profile_auto_respond_destructive_ops="$(jq -r '.auto_respond.destructive_ops // false' "$path")"
   bridge_profile_auto_respond_timeout_s="$(jq -r '.auto_respond.timeout_s // 600' "$path")"
   bridge_profile_prompt_overrides_count="$(jq -r '.prompt_overrides // [] | length' "$path")"
@@ -62,7 +66,19 @@ profile_load() {
     return 1
   fi
 
+  # Validate permission_mode against claude CLI's accepted choices when set.
+  # Empty string means "let driver/CLI decide" (back-compat with v1 profiles).
+  case "$bridge_profile_permission_mode" in
+    ""|plan|default|acceptEdits|bypassPermissions|auto|dontAsk) ;;
+    *)
+      echo "[bridge:profile] invalid permission_mode '$bridge_profile_permission_mode' (in $path)" >&2
+      echo "[bridge:profile] valid: plan, default, acceptEdits, bypassPermissions, auto, dontAsk" >&2
+      return 1
+      ;;
+  esac
+
   export bridge_profile_name bridge_profile_model bridge_profile_allowed_tools_csv \
+         bridge_profile_permission_mode \
          bridge_profile_auto_respond_destructive_ops \
          bridge_profile_auto_respond_timeout_s \
          bridge_profile_prompt_overrides_count
@@ -76,10 +92,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     exit 10
   fi
   profile_load "$1" || exit $?
-  printf 'name=%s\nmodel=%s\nallowed_tools=%s\nauto_respond.destructive_ops=%s\nauto_respond.timeout_s=%s\nprompt_overrides_count=%s\n' \
+  printf 'name=%s\nmodel=%s\nallowed_tools=%s\npermission_mode=%s\nauto_respond.destructive_ops=%s\nauto_respond.timeout_s=%s\nprompt_overrides_count=%s\n' \
     "$bridge_profile_name" \
     "$bridge_profile_model" \
     "$bridge_profile_allowed_tools_csv" \
+    "$bridge_profile_permission_mode" \
     "$bridge_profile_auto_respond_destructive_ops" \
     "$bridge_profile_auto_respond_timeout_s" \
     "$bridge_profile_prompt_overrides_count"

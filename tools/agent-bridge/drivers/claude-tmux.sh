@@ -14,13 +14,22 @@
 
 drv_launch_claude_tmux() {
   # --- Bridge safety gate ---------------------------------------------------
-  if [[ "$allow_bypass" -ne 1 ]]; then
+  # v0.2: relax the gate when operator passed an explicit --permission-mode.
+  # An explicit non-empty permission_mode means the operator has already
+  # chosen the permission posture (plan, acceptEdits, default, etc.) and
+  # --dangerously-skip-permissions is NOT used in those paths.
+  # Only require --allow-bypass when the driver would fall back to
+  # --dangerously-skip-permissions (i.e., when permission_mode is unset).
+  if [[ "$allow_bypass" -ne 1 ]] && [[ -z "${effective_permission_mode:-}" ]]; then
     cat >&2 <<'BYPASS_MSG'
 [claude-tmux] safety gate: --allow-bypass is required.
 
 This driver runs claude with --dangerously-skip-permissions inside tmux
 to avoid blocking on common permission dialogs. The operator must
 explicitly acknowledge this by passing --allow-bypass.
+
+Alternative: pass --permission-mode=<mode> (plan, acceptEdits, default,
+etc.) to skip the bypass and use claude's native permission system instead.
 
 Auto-respond fallback (lib/auto-respond.sh) handles edge cases that
 escape the bypass; see docs/design.md.
@@ -92,7 +101,18 @@ BYPASS_MSG
   tmux send-keys -t "$session" "cd $working_dir" Enter
   sleep 1
 
-  local claude_cmd="claude --model $effective_model --dangerously-skip-permissions"
+  # v0.2: prefer explicit --permission-mode over --dangerously-skip-permissions.
+  # The two are semantically overlapping (bypassPermissions ≈ dangerously-skip),
+  # but plan mode in particular is incompatible — plan mode disables Edit/Write
+  # tools entirely, so combining with dangerously-skip yields ambiguous behavior.
+  # When permission_mode is set, drop the bypass flag entirely and let claude
+  # use its native permission machinery.
+  local claude_cmd
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    claude_cmd="claude --model $effective_model --permission-mode $effective_permission_mode"
+  else
+    claude_cmd="claude --model $effective_model --dangerously-skip-permissions"
+  fi
   tmux send-keys -t "$session" "$claude_cmd" Enter
   echo "[claude-tmux] launching: $claude_cmd" >&2
 

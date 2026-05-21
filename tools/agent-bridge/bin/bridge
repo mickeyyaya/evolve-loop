@@ -112,6 +112,14 @@ Optional:
   --dry-run           | BRIDGE_DRY_RUN=1  Produce mock outputs (no LLM call); rc=0
   --allow-bypass      | BRIDGE_ALLOW_BYPASS=1
                                           Acknowledge --dangerously-skip-permissions
+  --permission-mode=M | BRIDGE_PERMISSION_MODE=M
+                                          Pass through to `claude --permission-mode M`.
+                                          Valid: plan | default | acceptEdits |
+                                          bypassPermissions | auto | dontAsk.
+                                          Precedence: CLI flag > env var > profile.permission_mode.
+                                          In plan mode (claude-tmux driver), --dangerously-skip-permissions
+                                          is replaced (not augmented) — plan mode disables writes by
+                                          design, so --allow-bypass is NOT required when permission-mode=plan.
 
 Flags always win when both flag and env var are set.
 
@@ -214,6 +222,10 @@ cmd_launch() {
   local allow_bypass="${BRIDGE_ALLOW_BYPASS:-0}"
   local dry_run="${BRIDGE_DRY_RUN:-0}"
   local human_input="${BRIDGE_HUMAN_INPUT_FLAG:-0}"
+  # v0.2: --permission-mode for claude --permission-mode pass-through.
+  # Empty = use profile.permission_mode (or driver default if neither set).
+  # Valid: plan | default | acceptEdits | bypassPermissions | auto | dontAsk
+  local permission_mode="${BRIDGE_PERMISSION_MODE:-}"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -244,6 +256,8 @@ cmd_launch() {
       --require-full)  require_full=1 ;;
       --allow-bypass)  allow_bypass=1 ;;
       --human-input)   human_input=1 ;;
+      --permission-mode=*) permission_mode="${1#--permission-mode=}" ;;
+      --permission-mode)   [[ $# -ge 2 ]] || { echo "[bridge] --permission-mode requires a value" >&2; return $EC_BAD_FLAGS; }; permission_mode="$2"; shift ;;
       --help|-h)       cmd_launch_help; return $EC_OK ;;
       --)              shift; break ;;
       *)               echo "[bridge] launch: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
@@ -311,6 +325,24 @@ cmd_launch() {
     fi
   fi
 
+  # Resolve effective permission_mode: CLI flag > env var > profile field.
+  # Empty string means "driver picks its native default" (back-compat).
+  local effective_permission_mode="$permission_mode"
+  if [[ -z "$effective_permission_mode" ]] && [[ -n "${bridge_profile_permission_mode:-}" ]]; then
+    effective_permission_mode="$bridge_profile_permission_mode"
+  fi
+  # Re-validate at the resolution point: an operator-passed --permission-mode
+  # bypasses profile_load's validation, so we check here too.
+  case "$effective_permission_mode" in
+    ""|plan|default|acceptEdits|bypassPermissions|auto|dontAsk) ;;
+    *)
+      echo "[bridge] invalid --permission-mode value: '$effective_permission_mode'" >&2
+      echo "[bridge] valid: plan, default, acceptEdits, bypassPermissions, auto, dontAsk" >&2
+      return $EC_BAD_FLAGS
+      ;;
+  esac
+  export effective_permission_mode
+
   # --validate-only: print resolved config and exit
   if [[ "$validate_only" -eq 1 ]]; then
     cat <<RESOLVED
@@ -329,6 +361,7 @@ cmd_launch() {
   worktree       = $worktree
   agent          = $agent
   allowed_tools  = $bridge_profile_allowed_tools_csv
+  permission-mode = ${effective_permission_mode:-(driver default)}
   auto_respond:
     destructive_ops = $bridge_profile_auto_respond_destructive_ops
     timeout_s       = $bridge_profile_auto_respond_timeout_s

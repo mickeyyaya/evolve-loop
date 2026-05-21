@@ -53,6 +53,12 @@ drv_launch_claude_p() {
   claude_args+=(-p "$prompt_content")
   claude_args+=(--model "$effective_model")
 
+  # v0.2: permission-mode pass-through. Driver layer is unopinionated;
+  # validation already happened in bin/bridge cmd_launch.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    claude_args+=(--permission-mode "$effective_permission_mode")
+  fi
+
   # Allowed-tools from profile: bash 3.2-safe array split on comma.
   if [[ -n "${bridge_profile_allowed_tools_csv:-}" ]]; then
     local saved_ifs="$IFS"
@@ -66,8 +72,8 @@ drv_launch_claude_p() {
     fi
   fi
 
-  echo "[claude-p] cycle=$cycle agent=$agent model=$effective_model artifact=$artifact" >&2
-  echo "[claude-p] invoking: claude -p <prompt> --model $effective_model --allowedTools ${bridge_profile_allowed_tools_csv:-}" >&2
+  echo "[claude-p] cycle=$cycle agent=$agent model=$effective_model artifact=$artifact permission_mode=${effective_permission_mode:-(default)}" >&2
+  echo "[claude-p] invoking: claude -p <prompt> --model $effective_model ${effective_permission_mode:+--permission-mode $effective_permission_mode} --allowedTools ${bridge_profile_allowed_tools_csv:-}" >&2
 
   set +e
   "$claude_bin" "${claude_args[@]}" > "$stdout_log" 2> "$stderr_log"

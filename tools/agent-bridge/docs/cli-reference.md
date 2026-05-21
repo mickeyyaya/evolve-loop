@@ -35,7 +35,8 @@ bridge launch \
   --stderr-log=PATH \
   --artifact=PATH \
   [--cycle=N] [--worktree=DIR] [--agent=NAME] \
-  [--require-full] [--validate-only] [--allow-bypass]
+  [--require-full] [--validate-only] [--allow-bypass] \
+  [--permission-mode=MODE]
 ```
 
 ### Required flags
@@ -60,7 +61,8 @@ bridge launch \
 | `--agent=NAME` | `probe` | Agent role label |
 | `--require-full` | off | Exit 99 if CLI doesn't reach `full` or `hybrid` tier |
 | `--validate-only` | off | Dry-run: parse + print resolved config, exit 0 (no driver call) |
-| `--allow-bypass` | off | Acknowledge `--dangerously-skip-permissions` use (claude-tmux requires this) |
+| `--allow-bypass` | off | Acknowledge `--dangerously-skip-permissions` use (claude-tmux requires this UNLESS `--permission-mode` is set) |
+| `--permission-mode=MODE` | unset | Pass through to `claude --permission-mode MODE`. Valid: `plan` \| `default` \| `acceptEdits` \| `bypassPermissions` \| `auto` \| `dontAsk`. Precedence: CLI flag > `BRIDGE_PERMISSION_MODE` env > `profile.permission_mode`. In plan mode the claude-tmux driver replaces `--dangerously-skip-permissions` with `--permission-mode plan` (the bypass acknowledgment is NOT required because plan mode disables writes by design). |
 
 ### Prompt-file substitutions
 
