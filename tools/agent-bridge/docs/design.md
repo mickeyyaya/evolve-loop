@@ -12,11 +12,11 @@ After **2026-06-15**, Anthropic split Claude subscription quota from programmati
 - `claude -p <prompt>` (headless): bills the **programmatic credit pool** (full API rates)
 - Interactive `claude` (REPL): bills the **subscription quota** (free until you hit the rate limit)
 
-For agent orchestrators (evolve-loop, gstack, custom pipelines) that use Claude in tight inner loops, the post-cutover cost difference is significant: typical Max-20x = $200/mo subscription vs $5+/cycle on API rates.
+For agent orchestrators that drive Claude in tight inner loops, the post-cutover cost difference is significant: typical Max-20x = $200/mo subscription vs $5+/cycle on API rates.
 
 `bridge` keeps the subscription path open by **driving the interactive REPL via tmux**: any caller can request "run this prompt, write this artifact" and bridge translates that into REPL keystrokes, polling, and artifact verification — invisible to the caller.
 
-The original prototype (`docs/research/tmux-claude-driver-prototype.md` in the parent repo) verified the billing path works on Claude Max-5x. This sub-project productionizes the prototype.
+A prior prototype verified the billing path works on Claude Max-5x; this sub-project productionizes it.
 
 ---
 
@@ -260,4 +260,4 @@ Per-invocation policy. The schema (v1):
 - `README.md` — install & quick example
 - `docs/cli-reference.md` — full CLI surface
 - `docs/adding-a-driver.md` — how to support a new CLI
-- Prototype validation: parent repo `docs/research/tmux-claude-driver-prototype.md`
+

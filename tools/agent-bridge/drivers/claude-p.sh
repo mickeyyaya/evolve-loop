@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # drivers/claude-p.sh — driver for headless `claude -p` invocation
 #
-# Vendored-from-spirit of evolve-loop's scripts/cli_adapters/claude.sh
-# (~700 lines), trimmed of orchestrator-specific budgeting and policy.
-# The bridge sub-project keeps the surface minimal; consumers wanting
-# full evolve-loop budgeting use the original adapter.
+# Headless `claude -p` driver. Trimmed to the bridge contract; orchestrator-
+# specific budgeting and policy stay out of this codebase.
+# See docs/design.md §3.1 for the full driver contract.
 #
 # Contract: sourced by bin/bridge. Defines drv_launch_claude_p which
 # operates on local vars from cmd_launch's scope and exported

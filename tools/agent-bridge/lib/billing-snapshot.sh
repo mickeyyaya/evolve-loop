@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # lib/billing-snapshot.sh — snapshot ~/.claude state pre/post-call, compare for billing-path verdict
 #
-# Vendored from evolve-loop's scripts/utility/verify-subscription-billing.sh.
-# Trimmed of evolve-loop env-var coupling. Generic-CLI-aware via $ANTHROPIC_*.
+# Snapshot ~/.claude state pre/post-call to verify subscription billing.
+# Generic across CLIs via $ANTHROPIC_* / $OPENAI_* env-leak checks.
 #
 # Two layers:
 #   bridge_billing_snapshot — write a JSON snapshot of ~/.claude state + env

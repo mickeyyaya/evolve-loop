@@ -103,5 +103,5 @@ See `docs/adding-a-driver.md`. The contract: a `drivers/<cli>.sh` script with st
 ## References
 
 - Plan: `~/.claude/plans/great-finding-ultrathink-to-reflective-platypus.md` (read-only design doc)
-- Prototype validation: parent repo `docs/research/tmux-claude-driver-prototype.md`
+- Motivation and prototype validation: see `docs/design.md` §1
 - Anthropic 2026-06-15 billing-split: https://the-decoder.com/claude-subscriptions-get-separate-budgets-for-programmatic-use-billed-at-full-api-prices/

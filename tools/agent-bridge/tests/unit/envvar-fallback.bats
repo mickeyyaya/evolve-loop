@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # T-envvars — bridge launch accepts env vars as fallback for required flags
-# (drop-in for evolve-loop adapter contract)
+# (drop-in for the common cli_adapter env-var contract)
 
 setup() {
   BRIDGE_BIN="${BATS_TEST_DIRNAME}/../../bin/bridge"
@@ -79,7 +79,7 @@ teardown() {
   [[ "$output" == *"missing required"* ]]
 }
 
-@test "T-envvars.6 — evolve-loop adapter contract: full env contract works" {
+@test "T-envvars.6 — cli_adapter env contract: full set of env vars works" {
   # Matches scripts/cli_adapters/claude.sh:24-30 contract verbatim
   export PROFILE_PATH="${FIXTURE_DIR}/synth-profile.json"
   export RESOLVED_MODEL=haiku

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # drivers/claude-tmux.sh — driver for interactive `claude` driven via tmux
 #
-# Vendored from evolve-loop's prototype (docs/research/tmux-claude-driver-prototype.md).
+# Interactive `claude` via tmux. Subscription-preserving (Claude Max, OAuth).
 # Bridge contract: sourced by bin/bridge; reads cmd_launch's local vars +
 # bridge_profile_* + bridge_manifest_*.
 #

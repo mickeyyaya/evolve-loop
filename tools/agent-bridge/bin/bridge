@@ -28,14 +28,21 @@ readonly EC_MISSING_BINARY=127
 . "${BRIDGE_LIB_DIR}/auto-respond.sh"
 . "${BRIDGE_LIB_DIR}/manifest-patcher.sh"
 . "${BRIDGE_LIB_DIR}/report.sh"
+. "${BRIDGE_LIB_DIR}/doctor.sh"
+. "${BRIDGE_LIB_DIR}/selftest.sh"
 
 cmd_version() {
+  local ver="unknown"
   if [[ -r "$BRIDGE_VERSION_FILE" ]]; then
-    cat "$BRIDGE_VERSION_FILE"
-    return 0
+    ver=$(cat "$BRIDGE_VERSION_FILE")
   fi
-  echo "unknown" >&2
-  return 1
+  if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+    jq -n --arg v "$ver" '{version: $v, schema_version: 1}'
+  else
+    echo "$ver"
+  fi
+  [[ "$ver" == "unknown" ]] && return 1
+  return 0
 }
 
 cmd_help() {
@@ -48,6 +55,8 @@ Subcommands:
   validate  Dry-run: parse profile, print resolved config, exit 0
   report    Re-print structured summary for a past workspace
   add-rule  Append a new interactive_prompts rule to a CLI manifest
+  doctor    Pre-flight auth + binary check (JSON: bridge --json doctor)
+  selftest  Run the bats test suite (CLI-driven contract verification)
   version   Print the bridge version
   help      Print this help
 
@@ -94,7 +103,7 @@ Optional:
 
 Flags always win when both flag and env var are set.
 
-The contract mirrors the evolve-loop scripts/cli_adapters/*.sh adapter interface,
+The contract mirrors a common cli_adapter env-var convention,
 so bridge is a friction-free drop-in: a caller exporting PROFILE_PATH etc. can
 invoke `bridge launch --cli=NAME` with no other flags.
 LAUNCH_HELP
@@ -441,7 +450,30 @@ ADD_RULE_HELP
   manifest_append_rule "${BRIDGE_LIB_DIR}/manifests/${cli}.json" "$name" "$regex" "$response" "$policy" "$note"
 }
 
+
+cmd_doctor() {
+  bridge_doctor "$@"
+}
+
+
+cmd_selftest() {
+  bridge_selftest "$@"
+}
+
 main() {
+  # Top-level flags parsed BEFORE the subcommand. Currently: --json.
+  # Subcommands inspect $BRIDGE_JSON to switch output format.
+  local json_mode=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json_mode=1; shift ;;
+      --)     shift; break ;;
+      --*)    break ;;
+      *)      break ;;
+    esac
+  done
+  export BRIDGE_JSON="$json_mode"
+
   if [[ $# -eq 0 ]]; then
     echo "[bridge] no subcommand given. Run 'bridge help'." >&2
     return $EC_BAD_FLAGS
@@ -453,6 +485,8 @@ main() {
     validate)          cmd_validate "$@" ;;
     report)            cmd_report "$@" ;;
     add-rule)          cmd_add_rule "$@" ;;
+    doctor)            cmd_doctor "$@" ;;
+    selftest)          cmd_selftest "$@" ;;
     version|-v|--version) cmd_version ;;
     help|-h|--help)    cmd_help ;;
     *)
