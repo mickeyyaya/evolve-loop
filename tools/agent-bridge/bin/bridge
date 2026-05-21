@@ -27,6 +27,7 @@ readonly EC_MISSING_BINARY=127
 . "${BRIDGE_LIB_DIR}/probe.sh"
 . "${BRIDGE_LIB_DIR}/auto-respond.sh"
 . "${BRIDGE_LIB_DIR}/manifest-patcher.sh"
+. "${BRIDGE_LIB_DIR}/report.sh"
 
 cmd_version() {
   if [[ -r "$BRIDGE_VERSION_FILE" ]]; then
@@ -351,8 +352,47 @@ cmd_validate() {
 }
 
 cmd_report() {
-  echo "[bridge] report: not yet implemented (P11)" >&2
-  return $EC_OK
+  local workspace="" artifact_name="artifact.md"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --workspace=*)     workspace="${1#--workspace=}" ;;
+      --workspace)       [[ $# -ge 2 ]] || { echo "[bridge] report --workspace requires a value" >&2; return $EC_BAD_FLAGS; }; workspace="$2"; shift ;;
+      --artifact-name=*) artifact_name="${1#--artifact-name=}" ;;
+      --artifact-name)   [[ $# -ge 2 ]] || { echo "[bridge] report --artifact-name requires a value" >&2; return $EC_BAD_FLAGS; }; artifact_name="$2"; shift ;;
+      --help|-h)
+        cat <<'REPORT_HELP'
+bridge report — emit JSON summary of a past workspace
+
+Usage:
+  bridge report --workspace=PATH [--artifact-name=NAME]
+
+Required:
+  --workspace=PATH    Directory written by a prior `bridge launch`
+
+Optional:
+  --artifact-name=N   Artifact filename inside the workspace (default: artifact.md)
+
+Output: a JSON object on stdout describing:
+  - workspace path + scan timestamp
+  - artifact: { path, exists, size_bytes, has_challenge_token }
+  - challenge_token (if challenge-token.txt was written)
+  - logs: stdout_log / stderr_log / tmux_scrollback / resolved_prompt (each: { path, exists, size_bytes })
+  - escalation_report: { path, exists } (auto-respond bail trail)
+  - auto_respond_counts: { path, exists }
+  - billing_snapshots: [{ path, label, ts }, ...]
+  - verdict: complete | escalated | incomplete | incomplete-token-mismatch | unknown
+REPORT_HELP
+        return $EC_OK
+        ;;
+      *) echo "[bridge] report: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
+    esac
+    shift
+  done
+
+  [[ -z "$workspace" ]] && { echo "[bridge] report: --workspace required" >&2; return $EC_BAD_FLAGS; }
+  [[ ! -d "$workspace" ]] && { echo "[bridge] report: workspace not a directory: $workspace" >&2; return $EC_BAD_FLAGS; }
+
+  bridge_report_with_exists "$workspace" "$artifact_name"
 }
 
 cmd_add_rule() {
