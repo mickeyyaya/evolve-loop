@@ -5,7 +5,8 @@ set -uo pipefail
 
 readonly BRIDGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly BRIDGE_ROOT="$(cd "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
-readonly BRIDGE_LIB_DIR="${BRIDGE_ROOT}/lib"
+: "${BRIDGE_LIB_DIR:=${BRIDGE_ROOT}/lib}"
+readonly BRIDGE_LIB_DIR
 readonly BRIDGE_DRIVERS_DIR="${BRIDGE_ROOT}/drivers"
 readonly BRIDGE_VERSION_FILE="${BRIDGE_ROOT}/VERSION"
 export BRIDGE_LIB_DIR BRIDGE_DRIVERS_DIR
@@ -24,6 +25,8 @@ readonly EC_MISSING_BINARY=127
 . "${BRIDGE_LIB_DIR}/profile.sh"
 . "${BRIDGE_LIB_DIR}/manifest-loader.sh"
 . "${BRIDGE_LIB_DIR}/probe.sh"
+. "${BRIDGE_LIB_DIR}/auto-respond.sh"
+. "${BRIDGE_LIB_DIR}/manifest-patcher.sh"
 
 cmd_version() {
   if [[ -r "$BRIDGE_VERSION_FILE" ]]; then
@@ -45,6 +48,7 @@ Subcommands:
   report    Re-print structured summary for a past workspace
   version   Print the bridge version
   help      Print this help
+  add-rule  Append a new interactive_prompts rule to a CLI manifest
 
 Exit codes:
   0    success
@@ -244,6 +248,84 @@ cmd_report() {
   return $EC_OK
 }
 
+
+cmd_add_rule() {
+  local escalation="" regex="" response="" policy="escalate" name="" note="" cli=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --escalation=*) escalation="${1#--escalation=}" ;;
+      --escalation)   [[ $# -ge 2 ]] || { echo "[bridge] --escalation requires a value" >&2; return $EC_BAD_FLAGS; }; escalation="$2"; shift ;;
+      --regex=*)      regex="${1#--regex=}" ;;
+      --regex)        [[ $# -ge 2 ]] || { echo "[bridge] --regex requires a value" >&2; return $EC_BAD_FLAGS; }; regex="$2"; shift ;;
+      --response=*)   response="${1#--response=}" ;;
+      --response)     [[ $# -ge 2 ]] || { echo "[bridge] --response requires a value" >&2; return $EC_BAD_FLAGS; }; response="$2"; shift ;;
+      --policy=*)     policy="${1#--policy=}" ;;
+      --policy)       [[ $# -ge 2 ]] || { echo "[bridge] --policy requires a value" >&2; return $EC_BAD_FLAGS; }; policy="$2"; shift ;;
+      --name=*)       name="${1#--name=}" ;;
+      --name)         [[ $# -ge 2 ]] || { echo "[bridge] --name requires a value" >&2; return $EC_BAD_FLAGS; }; name="$2"; shift ;;
+      --note=*)       note="${1#--note=}" ;;
+      --note)         [[ $# -ge 2 ]] || { echo "[bridge] --note requires a value" >&2; return $EC_BAD_FLAGS; }; note="$2"; shift ;;
+      --cli=*)        cli="${1#--cli=}" ;;
+      --cli)          [[ $# -ge 2 ]] || { echo "[bridge] --cli requires a value" >&2; return $EC_BAD_FLAGS; }; cli="$2"; shift ;;
+      --help|-h)
+        cat <<'ADD_RULE_HELP'
+bridge add-rule — append an interactive_prompts entry to a CLI manifest
+
+Two invocation modes:
+
+  1. From an escalation report (recommended):
+     bridge add-rule --escalation=PATH --regex=R --response=KEYS [--policy=auto_respond]
+     Reads CLI + suggested fields from the report; you supply the regex and keys.
+
+  2. Direct (--cli is required if --escalation is not given):
+     bridge add-rule --cli=NAME --name=N --regex=R --response=KEYS --policy=auto_respond
+
+Flags:
+  --escalation=PATH    workspace/escalation-report.json from a failed run
+  --cli=NAME           target CLI (auto-detected from --escalation if not given)
+  --name=N             rule name (auto-generated from timestamp if not given)
+  --regex=R            extended-regex pattern to match against the pane
+  --response=KEYS      comma-separated tmux key names ("y,Enter", "Enter", "3,Enter")
+  --policy=P           auto_respond | escalate (default: escalate when --response empty)
+  --note=TEXT          human-readable note for the rule
+ADD_RULE_HELP
+        return $EC_OK
+        ;;
+      *) echo "[bridge] add-rule: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
+    esac
+    shift
+  done
+
+  if [[ -n "$escalation" ]]; then
+    if [[ ! -f "$escalation" ]]; then
+      echo "[bridge] add-rule: escalation report not found: $escalation" >&2
+      return $EC_BAD_FLAGS
+    fi
+    if ! jq -e . "$escalation" >/dev/null 2>&1; then
+      echo "[bridge] add-rule: escalation report is not valid JSON: $escalation" >&2
+      return $EC_BAD_FLAGS
+    fi
+    [[ -z "$cli" ]] && cli="$(jq -r '.cli // ""' "$escalation")"
+    [[ -z "$note" ]] && note="Added from escalation $(basename "$escalation") on $(date -u +%Y-%m-%d)"
+  fi
+
+  [[ -z "$cli" ]]   && { echo "[bridge] add-rule: --cli is required (or use --escalation)" >&2; return $EC_BAD_FLAGS; }
+  [[ -z "$regex" ]] && { echo "[bridge] add-rule: --regex is required" >&2; return $EC_BAD_FLAGS; }
+
+  # Default policy: escalate when no response_keys, auto_respond otherwise
+  if [[ -z "$policy" ]]; then
+    policy=$([[ -n "$response" ]] && echo "auto_respond" || echo "escalate")
+  fi
+
+  # Default name: <cli>_rule_<timestamp>
+  if [[ -z "$name" ]]; then
+    name="${cli//-/_}_rule_$(date +%s)"
+  fi
+
+  local manifest="${BRIDGE_LIB_DIR}/manifests/${cli}.json"
+  manifest_append_rule "$manifest" "$name" "$regex" "$response" "$policy" "$note"
+}
+
 main() {
   if [[ $# -eq 0 ]]; then
     echo "[bridge] no subcommand given. Run 'bridge help'." >&2
@@ -255,6 +337,7 @@ main() {
     probe)             cmd_probe "$@" ;;
     validate)          cmd_validate "$@" ;;
     report)            cmd_report "$@" ;;
+    add-rule)          cmd_add_rule "$@" ;;
     version|-v|--version) cmd_version ;;
     help|-h|--help)    cmd_help ;;
     *)

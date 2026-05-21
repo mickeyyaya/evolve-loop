@@ -1,66 +1,67 @@
 #!/usr/bin/env bash
 # drivers/claude-tmux.sh — driver for interactive `claude` driven via tmux
 #
-# Vendored from evolve-loop's scripts/cli_adapters/claude-tmux.sh (PROTOTYPE,
-# GO-verified 2026-05-21 — see docs/research/tmux-claude-driver-prototype.md
-# in the parent repo). Trimmed of EVOLVE_TMUX_PROTOTYPE_ALLOW_BYPASS gate
-# (bridge uses its own --allow-bypass flag); cost-leak guards retained;
-# REPL-detection fix retained.
+# Vendored from evolve-loop's prototype (docs/research/tmux-claude-driver-prototype.md).
+# Bridge contract: sourced by bin/bridge; reads cmd_launch's local vars +
+# bridge_profile_* + bridge_manifest_*.
 #
-# Contract: sourced by bin/bridge; reads cmd_launch's local vars +
-# bridge_profile_* + bridge_manifest_*. Honors $allow_bypass (--allow-bypass)
-# as the bridge-level safety gate.
-#
-# Auto-respond fallback (P6.5) will hook into the wait-artifact loop:
-# the manifest's interactive_prompts[] declares regex→response patterns the
-# loop can fire when an unexpected prompt appears mid-run.
+# Auto-respond fallback (P6.5):
+#   --dangerously-skip-permissions covers permission prompts (the common case).
+#   auto_respond_tick polls the tmux pane between artifact checks and fires
+#   manifest interactive_prompts[] rules for edge-case prompts that escape
+#   the bypass (auth-recheck, rate-limit, terminal-resize, etc.).
+#   Unknown prompts → escalation-report.json + rc=85.
 
 drv_launch_claude_tmux() {
-  # --- Bridge safety gate: --allow-bypass must be set ------------------------
+  # --- Bridge safety gate ---------------------------------------------------
   if [[ "$allow_bypass" -ne 1 ]]; then
     cat >&2 <<'BYPASS_MSG'
 [claude-tmux] safety gate: --allow-bypass is required.
 
 This driver runs claude with --dangerously-skip-permissions inside tmux
-to avoid blocking on permission dialogs. The operator must explicitly
-acknowledge this by passing --allow-bypass (or env BRIDGE_ALLOW_BYPASS=1).
+to avoid blocking on common permission dialogs. The operator must
+explicitly acknowledge this by passing --allow-bypass.
 
-If you want permission prompts handled programmatically without bypass,
-that path is P6.5 (lib/auto-respond.sh) — not yet wired in v0.1.0.
+Auto-respond fallback (lib/auto-respond.sh) handles edge cases that
+escape the bypass; see docs/design.md.
 BYPASS_MSG
     return $EC_SAFETY_GATE
   fi
 
-  # --- Preflight binary checks -----------------------------------------------
+  # --- Preflight ------------------------------------------------------------
   command -v tmux   >/dev/null 2>&1 || { echo "[claude-tmux] tmux missing"   >&2; return $EC_MISSING_BINARY; }
   command -v claude >/dev/null 2>&1 || { echo "[claude-tmux] claude missing" >&2; return $EC_MISSING_BINARY; }
   command -v jq     >/dev/null 2>&1 || { echo "[claude-tmux] jq missing"     >&2; return $EC_MISSING_BINARY; }
 
-  # --- Cost-leak guards (refuse if env would route to API or a proxy) --------
+  # --- Cost-leak guards -----------------------------------------------------
   if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "[claude-tmux] ANTHROPIC_API_KEY is set — would bill API path, not subscription; abort" >&2
+    echo "[claude-tmux] ANTHROPIC_API_KEY is set — would bill API path; abort" >&2
     return $EC_COST_LEAK
   fi
   if [[ -n "${ANTHROPIC_BASE_URL:-}" ]] && [[ "${BRIDGE_ALLOW_ANTHROPIC_BASE_URL:-0}" != "1" ]]; then
-    echo "[claude-tmux] ANTHROPIC_BASE_URL is set — proxy mode would invalidate the billing test; abort" >&2
+    echo "[claude-tmux] ANTHROPIC_BASE_URL set without BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1; abort" >&2
     return $EC_COST_LEAK
   fi
   if [[ -n "${EVOLVE_ANTHROPIC_BASE_URL:-}" ]]; then
-    echo "[claude-tmux] EVOLVE_ANTHROPIC_BASE_URL is set — proxy mode would invalidate the billing test; abort" >&2
+    echo "[claude-tmux] EVOLVE_ANTHROPIC_BASE_URL set — proxy mode; abort" >&2
     return $EC_COST_LEAK
   fi
 
-  # --- Resolve working directory ---------------------------------------------
+  # --- Load manifest for prompt_marker + interactive_prompts ---------------
+  if ! manifest_load "claude-tmux"; then
+    echo "[claude-tmux] failed to load manifest" >&2
+    return $EC_BAD_FLAGS
+  fi
+
   local working_dir="${worktree:-$PWD}"
   if [[ ! -d "$working_dir" ]]; then
     echo "[claude-tmux] working dir does not exist: $working_dir" >&2
     return $EC_BAD_FLAGS
   fi
 
-  # --- Prepare workspace -----------------------------------------------------
   mkdir -p "$workspace" "$(dirname "$stdout_log")" "$(dirname "$stderr_log")" "$(dirname "$artifact")"
 
-  # --- Substitute placeholders in the prompt ---------------------------------
+  # --- Resolve prompt placeholders ------------------------------------------
   local resolved_prompt_file="$workspace/resolved-prompt.txt"
   local prompt_content
   prompt_content="$(cat "$prompt_file")"
@@ -73,7 +74,6 @@ BYPASS_MSG
   prompt_content="${prompt_content//\$ARTIFACT_PATH/$artifact}"
   echo "$prompt_content" > "$resolved_prompt_file"
 
-  # --- Build session name ----------------------------------------------------
   local agent_label="${agent:-probe}"
   local session="evolve-bridge-c${cycle}-${agent_label}-pid$$-$(date +%s)"
   session="${session:0:64}"
@@ -81,26 +81,22 @@ BYPASS_MSG
 
   echo "[claude-tmux] session=$session model=$effective_model workdir=$working_dir" >&2
 
-  # --- Trap cleanup ----------------------------------------------------------
+  # --- Cleanup trap ---------------------------------------------------------
   _bridge_tmux_session="$session"
   _bridge_tmux_scrollback="$scrollback_file"
   trap '_bridge_tmux_cleanup' EXIT INT TERM
 
-  # --- Spawn tmux session ----------------------------------------------------
+  # --- Spawn tmux + launch claude ------------------------------------------
   tmux new-session -d -s "$session" -x 220 -y 80
   sleep 1
-  echo "[claude-tmux] tmux session started" >&2
-
   tmux send-keys -t "$session" "cd $working_dir" Enter
   sleep 1
 
-  # --- Launch claude interactively (NO -p) -----------------------------------
   local claude_cmd="claude --model $effective_model --dangerously-skip-permissions"
   tmux send-keys -t "$session" "$claude_cmd" Enter
   echo "[claude-tmux] launching: $claude_cmd" >&2
 
-  # --- Wait for REPL prompt --------------------------------------------------
-  # Prototype found: search FULL pane for ❯ (mid-pane render — tail -N misses it)
+  # --- Wait for REPL prompt -------------------------------------------------
   local prompt_marker="${bridge_manifest_prompt_marker:-❯}"
   local repl_boot_timeout=60
   local elapsed=0
@@ -121,7 +117,7 @@ BYPASS_MSG
     return $EC_REPL_BOOT_TIMEOUT
   fi
 
-  # --- Deliver prompt via tmux buffer ----------------------------------------
+  # --- Deliver prompt -------------------------------------------------------
   tmux load-buffer -t "$session" "$resolved_prompt_file"
   tmux paste-buffer -t "$session"
   sleep 1
@@ -130,9 +126,7 @@ BYPASS_MSG
   prompt_bytes=$(wc -c < "$resolved_prompt_file" | tr -d ' ')
   echo "[claude-tmux] prompt delivered (${prompt_bytes} bytes)" >&2
 
-  # --- Wait for artifact -----------------------------------------------------
-  # P6.5 hook point: BRIDGE_AUTO_RESPOND_ENABLED=1 would poll the pane between
-  # artifact checks and fire interactive_prompts[] rules. For P6 we just wait.
+  # --- Wait for artifact, with auto-respond fallback ------------------------
   local artifact_wait_timeout=300
   elapsed=0
   local artifact_seen=0
@@ -144,21 +138,40 @@ BYPASS_MSG
       echo "[claude-tmux] artifact appeared after ${elapsed}s: $artifact" >&2
       break
     fi
-    # P6.5 will insert: bridge_auto_respond_tick "$session" || ...
+
+    # Auto-respond fallback (P6.5): handle edge prompts that escape bypass
+    auto_respond_tick "$session"
+    local ar_rc=$?
+    case "$ar_rc" in
+      0|1)
+        # 0=noop, 1=responded — keep polling
+        ;;
+      85)
+        echo "[claude-tmux] auto-respond escalation; abandoning run" >&2
+        return $EC_UNKNOWN_PROMPT
+        ;;
+      86)
+        echo "[claude-tmux] auto-respond loop guard tripped; abandoning run" >&2
+        return $EC_RESPOND_LOOP_GUARD
+        ;;
+    esac
   done
   if [ $artifact_seen -eq 0 ]; then
     echo "[claude-tmux] FAIL: artifact never appeared at $artifact after ${artifact_wait_timeout}s" >&2
+    # Write an escalation report on plain timeout too — operator can review the pane
+    local final_pane
+    final_pane=$(tmux capture-pane -p -S -10000 -t "$session" 2>/dev/null || echo "")
+    auto_respond_write_escalation_report "$workspace" "$final_pane" "artifact_timeout" "$session" "timeout"
     return $EC_ARTIFACT_TIMEOUT
   fi
 
-  # --- Capture scrollback ----------------------------------------------------
+  # --- Capture scrollback ---------------------------------------------------
   local raw
   raw=$(tmux capture-pane -p -S -10000 -t "$session" 2>/dev/null || echo "")
   echo "$raw" > "$stderr_log"
   echo "$raw" | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g' > "$stdout_log"
-  echo "[claude-tmux] scrollback captured: stdout=$stdout_log stderr=$stderr_log" >&2
+  echo "[claude-tmux] scrollback captured" >&2
 
-  # --- Graceful REPL exit ----------------------------------------------------
   tmux send-keys -t "$session" "/exit" Enter
   sleep 2
 
@@ -166,7 +179,6 @@ BYPASS_MSG
   return 0
 }
 
-# Cleanup helper used by the trap inside drv_launch_claude_tmux.
 _bridge_tmux_cleanup() {
   local rc=$?
   if [[ -n "${_bridge_tmux_session:-}" ]]; then

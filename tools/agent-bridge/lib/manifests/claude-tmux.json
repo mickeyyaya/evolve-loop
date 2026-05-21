@@ -30,16 +30,16 @@
     {
       "name": "model_deprecation_continue",
       "regex": "model is deprecated.*[Cc]ontinue",
-      "response_keys": "y\n",
+      "response_keys": "y,Enter",
       "policy": "auto_respond",
-      "note": "Common edge case Anthropic shows on Sonnet 3 → 4 rollover"
+      "note": "Common edge case on model rollover; comma-separated key names"
     },
     {
       "name": "terminal_resize_redraw",
       "regex": "Terminal too small.*resize",
-      "response_keys": "\n",
+      "response_keys": "Enter",
       "policy": "auto_respond",
-      "note": "Cosmetic; just press enter"
+      "note": "Cosmetic redraw prompt; just press Enter"
     }
   ]
 }
