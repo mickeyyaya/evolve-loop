@@ -2,8 +2,6 @@ package ledger
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
@@ -58,7 +56,7 @@ func TestAppend_ChainsToPrior(t *testing.T) {
 	_ = l.Append(context.Background(), core.LedgerEntry{Role: "scout", Cycle: 1})
 	first, _ := os.ReadFile(filepath.Join(dir, "ledger.jsonl"))
 	firstLine := strings.TrimRight(string(first), "\n")
-	wantPrev := sha256Hex(firstLine)
+	wantPrev := sha256Hex([]byte(firstLine))
 
 	if err := l.Append(context.Background(), core.LedgerEntry{Role: "build", Cycle: 1}); err != nil {
 		t.Fatalf("append 2nd: %v", err)
@@ -208,6 +206,175 @@ func TestVerify_PropertyRapid(t *testing.T) {
 	})
 }
 
+func TestAppend_MarshalError(t *testing.T) {
+	l, _ := newLedger(t)
+	withHooks(ledgerHooks{
+		marshal: func(any) ([]byte, error) { return nil, errors.New("forced marshal fail") },
+	}, func() {
+		if err := l.Append(context.Background(), core.LedgerEntry{Role: "x"}); err == nil {
+			t.Fatal("expected marshal error")
+		}
+	})
+}
+
+func TestAppend_OpenError(t *testing.T) {
+	l, _ := newLedger(t)
+	withHooks(ledgerHooks{
+		openF: func(string, int, os.FileMode) (*os.File, error) { return nil, errors.New("forced open fail") },
+	}, func() {
+		if err := l.Append(context.Background(), core.LedgerEntry{Role: "x"}); err == nil {
+			t.Fatal("expected open error")
+		}
+	})
+}
+
+func TestAppend_WriteError(t *testing.T) {
+	l, _ := newLedger(t)
+	withHooks(ledgerHooks{
+		write: func(*os.File, []byte) (int, error) { return 0, errors.New("forced write fail") },
+	}, func() {
+		if err := l.Append(context.Background(), core.LedgerEntry{Role: "x"}); err == nil {
+			t.Fatal("expected write error")
+		}
+	})
+}
+
+func TestAppend_CloseError(t *testing.T) {
+	l, _ := newLedger(t)
+	withHooks(ledgerHooks{
+		closeF: func(*os.File) error { return errors.New("forced close fail") },
+	}, func() {
+		if err := l.Append(context.Background(), core.LedgerEntry{Role: "x"}); err == nil {
+			t.Fatal("expected close error")
+		}
+	})
+}
+
+func TestAppend_TipWriteError(t *testing.T) {
+	l, _ := newLedger(t)
+	withHooks(ledgerHooks{
+		writeF: func(string, []byte, os.FileMode) error { return errors.New("forced tip write fail") },
+	}, func() {
+		if err := l.Append(context.Background(), core.LedgerEntry{Role: "x"}); err == nil {
+			t.Fatal("expected tip write error")
+		}
+	})
+}
+
+func TestVerify_ReadError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses permission bits")
+	}
+	l, dir := newLedger(t)
+	_ = l.Append(context.Background(), core.LedgerEntry{Role: "x", Cycle: 1})
+	path := filepath.Join(dir, "ledger.jsonl")
+	_ = os.Chmod(path, 0o000)
+	t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+	if err := l.Verify(context.Background()); err == nil {
+		t.Fatal("expected verify read error")
+	}
+}
+
+func TestVerify_UnmarshalError(t *testing.T) {
+	l, dir := newLedger(t)
+	_ = l.Append(context.Background(), core.LedgerEntry{Role: "x", Cycle: 1})
+	path := filepath.Join(dir, "ledger.jsonl")
+	_ = os.WriteFile(path, []byte("not json\n"), 0o644)
+	if err := l.Verify(context.Background()); !errors.Is(err, core.ErrLedgerChainBroken) {
+		t.Errorf("expected ErrLedgerChainBroken, got %v", err)
+	}
+}
+
+func TestIter_ReadError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses permission bits")
+	}
+	l, dir := newLedger(t)
+	_ = l.Append(context.Background(), core.LedgerEntry{Role: "x", Cycle: 1})
+	path := filepath.Join(dir, "ledger.jsonl")
+	_ = os.Chmod(path, 0o000)
+	t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+	if _, err := l.Iter(context.Background()); err == nil {
+		t.Fatal("expected iter read error")
+	}
+}
+
+func TestIter_NextUnmarshalError(t *testing.T) {
+	l, dir := newLedger(t)
+	_ = os.WriteFile(filepath.Join(dir, "ledger.jsonl"), []byte("not json\n"), 0o644)
+	it, err := l.Iter(context.Background())
+	if err != nil {
+		t.Fatalf("iter: %v", err)
+	}
+	defer it.Close()
+	if _, _, err := it.Next(); err == nil {
+		t.Fatal("expected unmarshal error")
+	}
+}
+
+func TestReadTip_MalformedNoColon(t *testing.T) {
+	l, dir := newLedger(t)
+	_ = os.WriteFile(filepath.Join(dir, "ledger.tip"), []byte("missing-colon"), 0o644)
+	if _, _, err := l.readTip(); err == nil {
+		t.Fatal("expected malformed-tip error")
+	}
+}
+
+func TestReadTip_NonNumericSeq(t *testing.T) {
+	l, dir := newLedger(t)
+	_ = os.WriteFile(filepath.Join(dir, "ledger.tip"), []byte("abc:def"), 0o644)
+	if _, _, err := l.readTip(); err == nil {
+		t.Fatal("expected non-numeric seq error")
+	}
+}
+
+func TestReadTip_ReadError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses permission bits")
+	}
+	l, dir := newLedger(t)
+	_ = os.WriteFile(filepath.Join(dir, "ledger.tip"), []byte("0:" + strings.Repeat("0", 64)), 0o000)
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "ledger.tip"), 0o644) })
+	if _, _, err := l.readTip(); err == nil {
+		t.Fatal("expected read tip error")
+	}
+}
+
+func TestSplitLines_EmptyInput(t *testing.T) {
+	got := splitLines(nil)
+	if len(got) != 0 {
+		t.Errorf("splitLines(nil)=%v, want empty", got)
+	}
+}
+
+func TestSplitLines_TrailingNewline(t *testing.T) {
+	got := splitLines([]byte("a\nb\n"))
+	if len(got) != 2 || string(got[0]) != "a" || string(got[1]) != "b" {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestSplitLines_NoTrailingNewline(t *testing.T) {
+	got := splitLines([]byte("a\nb"))
+	if len(got) != 2 || string(got[0]) != "a" || string(got[1]) != "b" {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestSplitTip_NoColon(t *testing.T) {
+	got := splitTip("nocolon")
+	if len(got) != 1 || got[0] != "nocolon" {
+		t.Errorf("got %v, want single element", got)
+	}
+}
+
+func TestSplitTip_StripsTrailingNewline(t *testing.T) {
+	got := splitTip("0:abc\n")
+	if len(got) != 2 || got[0] != "0" || got[1] != "abc" {
+		t.Errorf("got %v", got)
+	}
+}
+
 // Auto-detect duplicate prev_hash anomaly.
 func TestVerify_DuplicatePrevHash(t *testing.T) {
 	l, dir := newLedger(t)
@@ -228,7 +395,3 @@ func TestVerify_DuplicatePrevHash(t *testing.T) {
 	}
 }
 
-func sha256Hex(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(sum[:])
-}
