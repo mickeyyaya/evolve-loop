@@ -358,6 +358,95 @@ func TestLaunch_EnvForwarding(t *testing.T) {
 	}
 }
 
+// TestNew_DefaultBinaryAndRunner — empty binary/runner produce a
+// usable adapter that falls back to "bridge" on PATH + execRunner.
+func TestNew_DefaultBinaryAndRunner(t *testing.T) {
+	a := New("", nil)
+	if a == nil {
+		t.Fatal("New(\"\", nil)=nil")
+	}
+	if a.binary != "bridge" {
+		t.Errorf("default binary=%q, want 'bridge'", a.binary)
+	}
+}
+
+// TestNewDefault_ResolvesProjectPath — wires the conventional
+// tools/agent-bridge/bin/bridge path.
+func TestNewDefault_ResolvesProjectPath(t *testing.T) {
+	a := NewDefault("/repo")
+	want := "/repo/tools/agent-bridge/bin/bridge"
+	if a.binary != want {
+		t.Errorf("binary=%q, want %q", a.binary, want)
+	}
+}
+
+// TestExecRunner_ExitsWithCode — uses /usr/bin/false (exit 1) to drive
+// the exec.ExitError branch of execRunner. POSIX universal.
+func TestExecRunner_ExitsWithCode(t *testing.T) {
+	if _, err := os.Stat("/usr/bin/false"); err != nil {
+		t.Skip("/usr/bin/false not available")
+	}
+	var buf bytes.Buffer
+	code, err := execRunner(context.Background(), "/usr/bin/false", nil, os.Environ(), nil, &buf, &buf)
+	if err != nil {
+		t.Errorf("execRunner /usr/bin/false: err=%v, want nil (ExitError mapped to exitCode)", err)
+	}
+	if code != 1 {
+		t.Errorf("exitCode=%d, want 1", code)
+	}
+}
+
+// TestExecRunner_BinaryMissing — non-existent binary → err non-nil.
+func TestExecRunner_BinaryMissing(t *testing.T) {
+	var buf bytes.Buffer
+	_, err := execRunner(context.Background(), "/no/such/binary/xyz", nil, os.Environ(), nil, &buf, &buf)
+	if err == nil {
+		t.Error("execRunner with missing binary: want error")
+	}
+}
+
+// TestLaunch_WorkspaceMkdirFails — when Workspace path can't be
+// created (parent is a file), Launch reports the error.
+func TestLaunch_WorkspaceMkdirFails(t *testing.T) {
+	tmp := t.TempDir()
+	parent := filepath.Join(tmp, "blocker")
+	if err := os.WriteFile(parent, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ws := filepath.Join(parent, "child") // parent is a file, child can't be mkdir'd
+	artifact := filepath.Join(ws, "a.md")
+	adapter := New("/bridge", (&fakeCmd{}).runner())
+	_, err := adapter.Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-p", Profile: "/p", Model: "auto",
+		Prompt: "x", Workspace: ws, ArtifactPath: artifact, Agent: "x",
+	})
+	if err == nil {
+		t.Error("Launch with un-creatable workspace: want error")
+	}
+}
+
+// TestTruncate_LongString — direct test of truncate helper to hit the
+// > n branch.
+func TestTruncate_LongString(t *testing.T) {
+	got := truncate("abcdefghij", 5)
+	if got != "abcde…" {
+		t.Errorf("truncate=%q, want abcde…", got)
+	}
+	if got := truncate("abc", 5); got != "abc" {
+		t.Errorf("truncate short=%q, want abc", got)
+	}
+}
+
+// TestNonEmpty_BothBranches — direct test of nonEmpty helper.
+func TestNonEmpty_BothBranches(t *testing.T) {
+	if got := nonEmpty("", "fb"); got != "fb" {
+		t.Errorf("nonEmpty(\"\")=%q, want fb", got)
+	}
+	if got := nonEmpty("real", "fb"); got != "real" {
+		t.Errorf("nonEmpty(real)=%q, want real", got)
+	}
+}
+
 // silenceUnused — keep io.Writer import in case future tests want it.
 var _ io.Writer = io.Discard
 var _ bytes.Buffer
