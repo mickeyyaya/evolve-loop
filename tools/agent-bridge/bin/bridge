@@ -128,6 +128,15 @@ Optional:
                                           a NOTE that the flag is no-op. Precedence: flag > env > profile.
                                           Use --no-stream-output to explicitly disable when env/profile sets it.
 
+Session lifecycle (v0.4+):
+  Every launch creates a fresh context-window session (claude-p/codex/agy: new
+  single-shot process; *-tmux: new uniquely-named tmux session). Trap-based
+  cleanup kills tmux sessions on normal EXIT, INT, and TERM. SIGKILL/OOM
+  cannot be trapped and DOES leak sessions — the orphan-sweep on each new
+  launch finds dead-pid `evolve-bridge-*` sessions and kills them. Opt-out:
+  BRIDGE_NO_ORPHAN_CLEANUP=1 (only if you have a long-running session whose
+  bridge parent was killed but you want to keep the tmux for manual access).
+
 Flags always win when both flag and env var are set.
 
 The contract mirrors a common cli_adapter env-var convention,
@@ -430,6 +439,35 @@ RESOLVED
       echo "[bridge] --require-full set; cli=$cli tier=$tier (need full or hybrid)" >&2
       return $EC_REQUIRE_FULL_UNMET
     fi
+  fi
+
+  # v0.4: orphan tmux-session sweep. Bridge tmux drivers (claude-tmux,
+  # codex-tmux, agy-tmux) create sessions named
+  #   evolve-bridge-(c\d+|codex|agy)-...-pid<N>-<timestamp>
+  # On normal exit/INT/TERM the driver's trap kills the session. But SIGKILL,
+  # OOM-kill, kernel-panic etc. cannot be trapped — they leak sessions.
+  # This sweep finds orphan sessions (owner pid no longer alive) and kills them
+  # before the new launch creates more, preventing accumulation.
+  # Opt-out: BRIDGE_NO_ORPHAN_CLEANUP=1
+  if [[ "${BRIDGE_NO_ORPHAN_CLEANUP:-0}" != "1" ]] && command -v tmux >/dev/null 2>&1; then
+    local _orphan_ses _orphan_pid _orphan_killed=0
+    while IFS= read -r _orphan_ses; do
+      [[ -z "$_orphan_ses" ]] && continue
+      # Parse pid from "<...>-pid<N>-<ts>" suffix
+      _orphan_pid="${_orphan_ses##*-pid}"
+      _orphan_pid="${_orphan_pid%%-*}"
+      if [[ "$_orphan_pid" =~ ^[0-9]+$ ]]; then
+        if ! kill -0 "$_orphan_pid" 2>/dev/null; then
+          echo "[bridge] orphan-sweep: killing tmux session '$_orphan_ses' (owner pid $_orphan_pid is dead)" >&2
+          tmux kill-session -t "$_orphan_ses" 2>/dev/null || true
+          _orphan_killed=$((_orphan_killed + 1))
+        fi
+      fi
+    done < <(tmux ls 2>/dev/null | awk -F: '/^evolve-bridge-/ { print $1 }')
+    if [[ "$_orphan_killed" -gt 0 ]]; then
+      echo "[bridge] orphan-sweep: killed $_orphan_killed leaked session(s)" >&2
+    fi
+    unset _orphan_ses _orphan_pid _orphan_killed
   fi
 
   # Driver dispatch
