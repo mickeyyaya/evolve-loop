@@ -37,7 +37,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RELEASE_DIR="$REPO_ROOT/legacy/scripts/release"
 JOURNAL_DIR="$REPO_ROOT/.evolve/release-journal"
 

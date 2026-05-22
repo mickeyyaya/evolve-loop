@@ -29,7 +29,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GO_BIN="${EVOLVE_GO_BIN:-$REPO_ROOT/go/bin/evolve}"
 SIMULATOR="$REPO_ROOT/legacy/scripts/dispatch/cycle-simulator.sh"
 REPORT="${PARITY_REPORT:-$REPO_ROOT/parity-audit-report.md}"
