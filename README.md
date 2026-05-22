@@ -1,6 +1,8 @@
 # Evolve Loop
 
-**Current (v10.18)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v11.0.0)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+
+> **v11.0.0** introduces a Go binary as the primary runtime alongside the bash scripts. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the upgrade path and `EVOLVE_USE_LEGACY_BASH=1` rollback hatch. Bash continues to work unchanged.
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
@@ -350,7 +352,17 @@ Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The r
 /plugin install evolve-loop@evolve-loop
 ```
 
-**Option B: Manual**
+**Option B: Plugin + Go binary (v11.0.0+, faster structural paths)**
+
+```bash
+/plugin marketplace add mickeyyaya/evolve-loop
+/plugin install evolve-loop@evolve-loop
+cd go && make build   # produces ./go/bin/evolve
+```
+
+Set `EVOLVE_GO_BIN=$(pwd)/go/bin/evolve` (or drop the binary on `PATH`). The plugin manifest declares the binary as `tier-1` primary; bash remains as the fallback when the binary is absent or `EVOLVE_USE_LEGACY_BASH=1` is set.
+
+**Option C: Manual**
 
 ```bash
 git clone https://github.com/mickeyyaya/evolve-loop.git

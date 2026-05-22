@@ -6,6 +6,8 @@
 
 A self-evolving development pipeline that orchestrates 4 specialized agents (Scout, Builder, Auditor, Orchestrator) through 6 lean phases per cycle (Calibrate → Intent → Scout → Build → Audit → Ship → Learn). Tier-1 kernel hooks enforce phase ordering, role-scoped write paths, atomic ship semantics, ledger SHA verification, and v8.37+ tamper-evident hash-chained recording.
 
+> **v11.0.0 runtime note:** A Go binary (`go/bin/evolve`) is the primary runtime entrypoint as of v11.0.0. The bash scripts under `scripts/` continue to work and are the authoritative reference. Agents may invoke either. Set `EVOLVE_USE_LEGACY_BASH=1` to force the bash path. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
+
 ## Cross-CLI invariants (the universal rules)
 
 These rules apply regardless of which CLI you are running under. They are STRUCTURAL — enforced by kernel hooks, not by prompt instructions.

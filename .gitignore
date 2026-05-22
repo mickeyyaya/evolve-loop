@@ -73,3 +73,4 @@ node_modules/
 # drift; see docs/incidents/cycle-65-warn-txt.md if/when authored).
 /warn.txt
 *.warn
+parity-audit-report.md
