@@ -127,6 +127,14 @@ Optional:
                                           stall kills on long orchestrator sessions. Other drivers log
                                           a NOTE that the flag is no-op. Precedence: flag > env > profile.
                                           Use --no-stream-output to explicitly disable when env/profile sets it.
+  --session-name=NAME | BRIDGE_SESSION_NAME=NAME
+                                          (v0.5+) *-tmux drivers only: use STABLE tmux session name
+                                          `evolve-bridge-named-<NAME>`. Sessions persist across exits
+                                          (trap doesn't kill), are EXEMPT from orphan-sweep, and
+                                          auto-resume on next launch (claude REPL context preserved).
+                                          Cleanup: `bridge sessions kill NAME` (or `tmux kill-session
+                                          -t evolve-bridge-named-NAME`). Valid chars: [a-zA-Z0-9._-]+,
+                                          max 32 chars. Non-tmux drivers log a NOTE that it's no-op.
 
 Session lifecycle (v0.4+):
   Every launch creates a fresh context-window session (claude-p/codex/agy: new
@@ -249,6 +257,12 @@ cmd_launch() {
   # output stays silent until the final response.
   # Empty string here means "honor env/profile" (which default to false).
   local stream_output="${BRIDGE_STREAM_OUTPUT:-}"
+  # v0.5: --session-name=NAME — *-tmux drivers only. Uses STABLE tmux session
+  # name `evolve-bridge-named-<NAME>` instead of pid-and-timestamp. Named
+  # sessions persist across bridge exits (trap doesn't kill), are EXEMPT
+  # from orphan-sweep, and auto-resume on next launch (claude REPL context
+  # preserved). Cleanup via `bridge sessions kill NAME`.
+  local session_name="${BRIDGE_SESSION_NAME:-}"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -283,6 +297,8 @@ cmd_launch() {
       --permission-mode)   [[ $# -ge 2 ]] || { echo "[bridge] --permission-mode requires a value" >&2; return $EC_BAD_FLAGS; }; permission_mode="$2"; shift ;;
       --stream-output)     stream_output=true ;;
       --no-stream-output)  stream_output=false ;;
+      --session-name=*)    session_name="${1#--session-name=}" ;;
+      --session-name)      [[ $# -ge 2 ]] || { echo "[bridge] --session-name requires a value" >&2; return $EC_BAD_FLAGS; }; session_name="$2"; shift ;;
       --help|-h)       cmd_launch_help; return $EC_OK ;;
       --)              shift; break ;;
       *)               echo "[bridge] launch: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
@@ -386,6 +402,25 @@ cmd_launch() {
   esac
   export effective_stream_output
 
+  # v0.5: Resolve effective session_name: CLI flag > env > profile > "".
+  # Re-validate at the resolution point: an operator-passed --session-name
+  # bypasses profile_load's validation, so we check here too.
+  local effective_session_name="$session_name"
+  if [[ -z "$effective_session_name" ]] && [[ -n "${bridge_profile_session_name:-}" ]]; then
+    effective_session_name="$bridge_profile_session_name"
+  fi
+  if [[ -n "$effective_session_name" ]]; then
+    if [[ ${#effective_session_name} -gt 32 ]]; then
+      echo "[bridge] invalid --session-name (length ${#effective_session_name} > 32 chars)" >&2
+      return $EC_BAD_FLAGS
+    fi
+    if [[ ! "$effective_session_name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+      echo "[bridge] invalid --session-name '$effective_session_name' — must match [a-zA-Z0-9._-]+ (no shell metachars)" >&2
+      return $EC_BAD_FLAGS
+    fi
+  fi
+  export effective_session_name
+
   # --validate-only: print resolved config and exit
   if [[ "$validate_only" -eq 1 ]]; then
     cat <<RESOLVED
@@ -406,6 +441,7 @@ cmd_launch() {
   allowed_tools  = $bridge_profile_allowed_tools_csv
   permission-mode = ${effective_permission_mode:-(driver default)}
   stream-output  = $effective_stream_output
+  session-name   = ${effective_session_name:-(auto-generated, ephemeral)}
   auto_respond:
     destructive_ops = $bridge_profile_auto_respond_destructive_ops
     timeout_s       = $bridge_profile_auto_respond_timeout_s
@@ -453,6 +489,11 @@ RESOLVED
     local _orphan_ses _orphan_pid _orphan_killed=0
     while IFS= read -r _orphan_ses; do
       [[ -z "$_orphan_ses" ]] && continue
+      # v0.5: EXEMPT named sessions (evolve-bridge-named-*) from sweep —
+      # they're stable identifiers operators rely on for resume.
+      case "$_orphan_ses" in
+        evolve-bridge-named-*) continue ;;
+      esac
       # Parse pid from "<...>-pid<N>-<ts>" suffix
       _orphan_pid="${_orphan_ses##*-pid}"
       _orphan_pid="${_orphan_pid%%-*}"

@@ -20,6 +20,15 @@
 #                                      stall kills on long orchestrator sessions where
 #                                      claude -p's default text output stays silent until
 #                                      the final response. Other drivers log a no-op note.
+#     "session_name": string           (optional; default ""; v0.5+)
+#                                      *-tmux drivers only. Uses STABLE tmux session name
+#                                      `evolve-bridge-named-<session_name>` instead of the
+#                                      auto-generated pid-and-timestamp form. Named sessions
+#                                      persist across bridge process exits (trap doesn't kill),
+#                                      are EXEMPT from orphan-sweep, and AUTO-RESUME on the
+#                                      next launch — claude REPL context is preserved.
+#                                      Explicit cleanup via `bridge sessions kill <name>`.
+#                                      Valid chars: [a-zA-Z0-9._-]+, max 32 chars.
 #     "auto_respond": {
 #       "destructive_ops": bool        (default false)
 #       "timeout_s": int               (default 600)
@@ -33,6 +42,7 @@
 #   bridge_profile_allowed_tools_csv
 #   bridge_profile_permission_mode
 #   bridge_profile_stream_output                 ("true" | "false")
+#   bridge_profile_session_name                  (string; default "")
 #   bridge_profile_auto_respond_destructive_ops
 #   bridge_profile_auto_respond_timeout_s
 #   bridge_profile_prompt_overrides_count
@@ -66,6 +76,7 @@ profile_load() {
   bridge_profile_allowed_tools_csv="$(jq -r '.allowed_tools // [] | join(",")' "$path")"
   bridge_profile_permission_mode="$(jq -r '.permission_mode // ""' "$path")"
   bridge_profile_stream_output="$(jq -r '.stream_output // false | tostring' "$path")"
+  bridge_profile_session_name="$(jq -r '.session_name // ""' "$path")"
   bridge_profile_auto_respond_destructive_ops="$(jq -r '.auto_respond.destructive_ops // false' "$path")"
   bridge_profile_auto_respond_timeout_s="$(jq -r '.auto_respond.timeout_s // 600' "$path")"
   bridge_profile_prompt_overrides_count="$(jq -r '.prompt_overrides // [] | length' "$path")"
@@ -98,9 +109,23 @@ profile_load() {
       ;;
   esac
 
+  # v0.5: Validate session_name. Empty is valid (default). When set, must match
+  # [a-zA-Z0-9._-]+ (safe for tmux session names, no shell metachars), max 32 chars.
+  if [[ -n "$bridge_profile_session_name" ]]; then
+    if [[ ${#bridge_profile_session_name} -gt 32 ]]; then
+      echo "[bridge:profile] invalid session_name (in $path) — max 32 chars (got ${#bridge_profile_session_name})" >&2
+      return 1
+    fi
+    if [[ ! "$bridge_profile_session_name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+      echo "[bridge:profile] invalid session_name '$bridge_profile_session_name' (in $path) — must match [a-zA-Z0-9._-]+ (no shell metachars)" >&2
+      return 1
+    fi
+  fi
+
   export bridge_profile_name bridge_profile_model bridge_profile_allowed_tools_csv \
          bridge_profile_permission_mode \
          bridge_profile_stream_output \
+         bridge_profile_session_name \
          bridge_profile_auto_respond_destructive_ops \
          bridge_profile_auto_respond_timeout_s \
          bridge_profile_prompt_overrides_count
@@ -114,12 +139,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     exit 10
   fi
   profile_load "$1" || exit $?
-  printf 'name=%s\nmodel=%s\nallowed_tools=%s\npermission_mode=%s\nstream_output=%s\nauto_respond.destructive_ops=%s\nauto_respond.timeout_s=%s\nprompt_overrides_count=%s\n' \
+  printf 'name=%s\nmodel=%s\nallowed_tools=%s\npermission_mode=%s\nstream_output=%s\nsession_name=%s\nauto_respond.destructive_ops=%s\nauto_respond.timeout_s=%s\nprompt_overrides_count=%s\n' \
     "$bridge_profile_name" \
     "$bridge_profile_model" \
     "$bridge_profile_allowed_tools_csv" \
     "$bridge_profile_permission_mode" \
     "$bridge_profile_stream_output" \
+    "$bridge_profile_session_name" \
     "$bridge_profile_auto_respond_destructive_ops" \
     "$bridge_profile_auto_respond_timeout_s" \
     "$bridge_profile_prompt_overrides_count"
