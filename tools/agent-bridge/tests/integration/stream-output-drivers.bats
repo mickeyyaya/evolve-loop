@@ -164,3 +164,94 @@ _kill_leaked_sessions() {
   [ -f "$ARTIFACT" ]
   [[ "$output" != *"stream_output"* ]]
 }
+
+# ============================================================================
+# Simulate-builder-action — end-to-end verification that v0.3 streaming
+# actually solves the phase-observer stall problem.
+#
+# Scenario: a long-running claude session (mimicking builder/orchestrator)
+# emits JSONL events incrementally. We verify the parent's stdout_log grows
+# DURING execution (not all at the end), which is what the phase-observer
+# needs to see to avoid false-positive stall kills.
+#
+# T-stream-drv.8: streaming=ON → incremental writes (the fix).
+# T-stream-drv.9: streaming=OFF → empty until end (proves the original gap).
+# ============================================================================
+
+@test "T-stream-drv.8 — claude-p + stream_output=true + JSONL fake → stdout_log grows incrementally during execution" {
+  export BRIDGE_CLAUDE_BINARY="$FAKES_DIR/fake-claude-streaming.sh"
+  export BRIDGE_FAKE_STREAM_EVENTS=6
+  export BRIDGE_FAKE_STREAM_DELAY_S=0.5
+
+  local prof="$WS/profile.json"
+  _profile "$prof" "true"
+
+  "$BRIDGE_BIN" launch \
+    --cli=claude-p --profile="$prof" --model=auto \
+    --prompt-file="$PROMPT" --workspace="$WS" \
+    --stdout-log="$STDOUT_LOG" --stderr-log="$STDERR_LOG" \
+    --artifact="$ARTIFACT" &
+  local bridge_pid=$!
+
+  sleep 1
+  local size_t1
+  size_t1=$(stat -f%z "$STDOUT_LOG" 2>/dev/null || stat -c%s "$STDOUT_LOG" 2>/dev/null || echo 0)
+  sleep 1
+  local size_t2
+  size_t2=$(stat -f%z "$STDOUT_LOG" 2>/dev/null || stat -c%s "$STDOUT_LOG" 2>/dev/null || echo 0)
+
+  wait "$bridge_pid"
+  local final_rc=$?
+  local size_final
+  size_final=$(stat -f%z "$STDOUT_LOG" 2>/dev/null || stat -c%s "$STDOUT_LOG" 2>/dev/null || echo 0)
+
+  echo "size_t1=$size_t1 size_t2=$size_t2 size_final=$size_final rc=$final_rc" >&3
+
+  [ "$final_rc" -eq 0 ]
+  # By t=1s, stdout_log has SOME content (at least 1-2 events emitted)
+  [ "$size_t1" -gt 0 ]
+  # By t=2s, stdout_log has MORE content (incremental writes happened)
+  [ "$size_t2" -gt "$size_t1" ]
+  # Final size is >= mid-execution size
+  [ "$size_final" -ge "$size_t2" ]
+  # stdout_log contains JSONL events
+  grep -q '"type":"message_delta"' "$STDOUT_LOG"
+  grep -q '"type":"message_stop"' "$STDOUT_LOG"
+}
+
+@test "T-stream-drv.9 — claude-p + stream_output UNSET + same fake → stdout_log stays empty until end (proves the gap)" {
+  export BRIDGE_CLAUDE_BINARY="$FAKES_DIR/fake-claude-streaming.sh"
+  export BRIDGE_FAKE_STREAM_EVENTS=6
+  export BRIDGE_FAKE_STREAM_DELAY_S=0.5
+
+  local prof="$WS/profile.json"
+  _profile "$prof"  # no stream_output
+
+  "$BRIDGE_BIN" launch \
+    --cli=claude-p --profile="$prof" --model=auto \
+    --prompt-file="$PROMPT" --workspace="$WS" \
+    --stdout-log="$STDOUT_LOG" --stderr-log="$STDERR_LOG" \
+    --artifact="$ARTIFACT" &
+  local bridge_pid=$!
+
+  sleep 1
+  local size_t1
+  size_t1=$(stat -f%z "$STDOUT_LOG" 2>/dev/null || stat -c%s "$STDOUT_LOG" 2>/dev/null || echo 0)
+  sleep 1
+  local size_t2
+  size_t2=$(stat -f%z "$STDOUT_LOG" 2>/dev/null || stat -c%s "$STDOUT_LOG" 2>/dev/null || echo 0)
+
+  wait "$bridge_pid"
+  local final_rc=$?
+  local size_final
+  size_final=$(stat -f%z "$STDOUT_LOG" 2>/dev/null || stat -c%s "$STDOUT_LOG" 2>/dev/null || echo 0)
+
+  echo "[non-streaming] size_t1=$size_t1 size_t2=$size_t2 size_final=$size_final rc=$final_rc" >&3
+
+  [ "$final_rc" -eq 0 ]
+  # During execution stdout_log stays EMPTY (the bug the observer trips on)
+  [ "$size_t1" -eq 0 ]
+  [ "$size_t2" -eq 0 ]
+  # Final size > 0 (output written at end)
+  [ "$size_final" -gt 0 ]
+}
