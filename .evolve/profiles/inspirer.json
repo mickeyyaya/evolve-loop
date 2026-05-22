@@ -89,5 +89,6 @@
   },
   "allowed_clis": [
     "all"
-  ]
+  ],
+  "stream_output": true
 }
