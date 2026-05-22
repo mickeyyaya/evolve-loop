@@ -294,6 +294,171 @@ func TestNewFromDir_EmptyDir(t *testing.T) {
 	}
 }
 
+// TestZeroLoader_AgentReadsErrNotExist — explicit zero-loader contract.
+func TestZeroLoader_AgentReadsErrNotExist(t *testing.T) {
+	l := NewFromFS(nil)
+	_, err := l.Agent("any")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("err=%v, want fs.ErrNotExist on zero loader", err)
+	}
+}
+
+// TestZeroLoader_AgentsAndSkills — listing on zero loader yields nil.
+func TestZeroLoader_AgentsAndSkills(t *testing.T) {
+	l := NewFromFS(nil)
+	if got, err := l.Agents(); err != nil || got != nil {
+		t.Errorf("Agents()=%v,%v; want nil,nil", got, err)
+	}
+	if got, err := l.Skills(); err != nil || got != nil {
+		t.Errorf("Skills()=%v,%v; want nil,nil", got, err)
+	}
+}
+
+// TestAgents_SkipsDirsAndNonMD — agents/ directory may contain nested
+// dirs or non-md files (e.g., AGENTS.md is fine; .DS_Store / reference
+// subdirs should be ignored).
+func TestAgents_SkipsDirsAndNonMD(t *testing.T) {
+	fsys := fstest.MapFS{
+		"agents/foo.md":          &fstest.MapFile{Data: []byte("---\nname: foo\n---\nb")},
+		"agents/subdir/x.md":     &fstest.MapFile{Data: []byte("ignored")}, // creates subdir entry
+		"agents/.DS_Store":       &fstest.MapFile{Data: []byte("junk")},
+		"agents/notes.txt":       &fstest.MapFile{Data: []byte("not md")},
+	}
+	got, err := NewFromFS(fsys).Agents()
+	if err != nil {
+		t.Fatalf("Agents: %v", err)
+	}
+	if !reflect.DeepEqual(got, []string{"foo"}) {
+		t.Errorf("Agents()=%v, want [foo]", got)
+	}
+}
+
+// TestSkills_SkipsFileEntries — entries in skills/ that are plain
+// files (not dirs) must be skipped.
+func TestSkills_SkipsFileEntries(t *testing.T) {
+	fsys := fstest.MapFS{
+		"skills/README.md":          &fstest.MapFile{Data: []byte("not a skill")},
+		"skills/real/SKILL.md":      &fstest.MapFile{Data: []byte("---\nname: real\n---\nb")},
+	}
+	got, err := NewFromFS(fsys).Skills()
+	if err != nil {
+		t.Fatalf("Skills: %v", err)
+	}
+	if !reflect.DeepEqual(got, []string{"real"}) {
+		t.Errorf("Skills()=%v, want [real]", got)
+	}
+}
+
+// TestAgent_ParseErrorSurfacesAtLoad — load() must wrap ParseFrontmatter
+// errors with file context so operator logs are diagnosable.
+func TestAgent_ParseErrorSurfacesAtLoad(t *testing.T) {
+	fsys := fstest.MapFS{
+		"agents/bad.md": &fstest.MapFile{Data: []byte("---\nname: bad\n(missing close fence)\n")},
+	}
+	_, err := NewFromFS(fsys).Agent("bad")
+	if err == nil {
+		t.Fatal("want parse error")
+	}
+	if !contains(err.Error(), "parse") {
+		t.Errorf("err=%v missing 'parse' context", err)
+	}
+}
+
+// TestParseFrontmatter_LineWithoutColonIsSkipped — guards the parser
+// against bare keys (e.g., comment-likes without `#`).
+func TestParseFrontmatter_LineWithoutColonIsSkipped(t *testing.T) {
+	raw := "---\nname: foo\nbarewordnocolon\ndescription: bar\n---\nbody"
+	fm, _, err := ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if fm["name"] != "foo" || fm["description"] != "bar" {
+		t.Errorf("fm=%v, want name=foo description=bar", fm)
+	}
+	if _, present := fm["barewordnocolon"]; present {
+		t.Errorf("bareword line created key: %v", fm)
+	}
+}
+
+// TestParseFrontmatter_EmptyKey — ": value" with no key must be skipped.
+func TestParseFrontmatter_EmptyKey(t *testing.T) {
+	raw := "---\nname: foo\n: orphan\n---\nbody"
+	fm, _, err := ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if _, present := fm[""]; present {
+		t.Errorf("empty key recorded: %v", fm)
+	}
+}
+
+// TestParseValue_EmptyValue — "key:" with no value yields empty string,
+// not a panic.
+func TestParseValue_EmptyValue(t *testing.T) {
+	raw := "---\nkey:\n---\nbody"
+	fm, _, err := ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if fm["key"] != "" {
+		t.Errorf("key=%v, want empty string", fm["key"])
+	}
+}
+
+// TestParseFrontmatter_CRLFLines — Windows line endings shouldn't
+// derail the parser (e.g., when a user edits a .md in a text editor
+// that emits CRLF).
+func TestParseFrontmatter_CRLFLines(t *testing.T) {
+	raw := "---\r\nname: foo\r\n---\r\nbody"
+	fm, _, err := ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if fm["name"] != "foo" {
+		t.Errorf("name=%v, want foo (CRLF tolerated)", fm["name"])
+	}
+}
+
+// TestSmoke_RealAgentFiles — load every agent under repo agents/ via
+// NewFromDir and assert each has a name. Skipped if the dir is absent
+// (CI fixtures may not include it). This is the safety net the
+// projecthash live-bash test plays for hash equivalence: a real-data
+// smoke that catches parser regression against actual production files.
+func TestSmoke_RealAgentFiles(t *testing.T) {
+	root := "../../../" // go/internal/prompts → repo root
+	if _, err := os.Stat(filepath.Join(root, "agents")); err != nil {
+		t.Skipf("repo agents/ not reachable from test dir: %v", err)
+	}
+	l := NewFromDir(root)
+	agents, err := l.Agents()
+	if err != nil {
+		t.Fatalf("Agents: %v", err)
+	}
+	if len(agents) == 0 {
+		t.Fatal("expected at least one real agent file")
+	}
+	// Repo convention: *-reference.md, AGENTS.md, and agent-templates.md
+	// are supplementary docs without frontmatter. Only the canonical
+	// agent personas (e.g., evolve-scout, evolve-builder) carry the
+	// `name:` field that subagent dispatch keys on.
+	skipNoFM := func(n string) bool {
+		return contains(n, "-reference") || contains(n, "AGENTS") || contains(n, "agent-templates")
+	}
+	for _, name := range agents {
+		p, err := l.Agent(name)
+		if err != nil {
+			t.Errorf("Agent(%s): %v", name, err)
+			continue
+		}
+		if skipNoFM(name) {
+			continue
+		}
+		if p.Frontmatter == nil {
+			t.Errorf("Agent(%s): no frontmatter; expected a `name:` field", name)
+		}
+	}
+}
+
 // Helpers ------------------------------------------------------------
 
 func writeFile(t *testing.T, root, rel, content string) error {
