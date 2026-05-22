@@ -140,6 +140,33 @@ func TestQuota_KbSearchViaBash(t *testing.T) {
 	}
 }
 
+func TestQuota_UnknownAgentFallback(t *testing.T) {
+	g := NewQuota(QuotaConfig{WebSearch: 1})
+	// No agent provided → counted under "unknown".
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "WebSearch",
+		ToolInput: map[string]any{},
+	})
+	if !dec.Allow {
+		t.Fatal("first call denied")
+	}
+	dec = g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "WebSearch",
+		ToolInput: map[string]any{},
+	})
+	if dec.Allow {
+		t.Error("second call must deny (unknown agent cap=1)")
+	}
+}
+
+func TestQuota_DefaultCapsUsedWhenZero(t *testing.T) {
+	// Construct with all zeros → defaults kick in (ws=3, fetch=5, kb=20).
+	g := NewQuota(QuotaConfig{})
+	if g.cfg.WebSearch != 3 || g.cfg.WebFetch != 5 || g.cfg.KbSearch != 20 {
+		t.Errorf("defaults not applied: %+v", g.cfg)
+	}
+}
+
 func TestQuota_RegularBashPasses(t *testing.T) {
 	g := NewQuota(QuotaConfig{KbSearch: 0})
 	dec := g.Decide(context.Background(), core.GuardInput{

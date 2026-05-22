@@ -1,0 +1,49 @@
+package guards
+
+import (
+	"context"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+)
+
+// Phase blocks the Agent tool when a cycle is in progress (cycle-state.json
+// has a non-empty cycle_id). Port of the phase-gate-precondition.sh
+// agent-tool-during-cycle rule (one of several rules in the original;
+// the rest land in Phase 2).
+type Phase struct {
+	storage core.Storage
+}
+
+func NewPhase(s core.Storage) *Phase { return &Phase{storage: s} }
+
+func (p *Phase) Name() string { return "phase" }
+
+func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecision {
+	if envBypass("EVOLVE_BYPASS_PHASE_GATE") {
+		return core.GuardDecision{Allow: true}
+	}
+	if in.ToolName != "Agent" {
+		return core.GuardDecision{Allow: true}
+	}
+	if p.storage == nil {
+		return core.GuardDecision{
+			Allow:  false,
+			Reason: "phase guard: storage not configured; refusing Agent invocation by default",
+		}
+	}
+	cs, err := p.storage.ReadCycleState(ctx)
+	if err != nil {
+		return core.GuardDecision{
+			Allow:  false,
+			Reason: "phase guard: cycle-state read failed: " + err.Error(),
+		}
+	}
+	if cs.CycleID != 0 {
+		return core.GuardDecision{
+			Allow: false,
+			Reason: "Agent tool denied during cycle " +
+				cs.Phase + " (use scripts/dispatch/subagent-run.sh); EVOLVE_BYPASS_PHASE_GATE=1 to override",
+		}
+	}
+	return core.GuardDecision{Allow: true}
+}

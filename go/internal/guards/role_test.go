@@ -154,6 +154,53 @@ func TestRole_NilStorageDenies(t *testing.T) {
 	}
 }
 
+func TestRole_ReadCycleStateErrorDenies(t *testing.T) {
+	s, _ := setupStorageNoCS(t)
+	g := NewRole(erroringStorage{s})
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Edit",
+		ToolInput: map[string]any{"file_path": "/foo"},
+	})
+	if dec.Allow {
+		t.Error("read error must deny")
+	}
+}
+
+func TestIsUnderDir_EmptyDir(t *testing.T) {
+	if isUnderDir("/foo", "") {
+		t.Error("empty dir must report false")
+	}
+}
+
+func TestIsUnderDir_SamePath(t *testing.T) {
+	if !isUnderDir("/foo", "/foo") {
+		t.Error("same path must report true")
+	}
+}
+
+func TestIsUnderDir_OutsidePath(t *testing.T) {
+	if isUnderDir("/other/file", "/dir") {
+		t.Error("/other/file under /dir must report false")
+	}
+}
+
+func TestRole_BuildPhaseNoWorktree_DeniesNonWorkspace(t *testing.T) {
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID:       1,
+		Phase:         "build",
+		ActiveWorktree: "",
+		WorkspacePath: "/tmp/wt/.evolve/runs/cycle-1",
+	})
+	g := NewRole(s)
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Edit",
+		ToolInput: map[string]any{"file_path": "/some/random.go"},
+	})
+	if dec.Allow {
+		t.Error("build phase without worktree must deny non-workspace writes")
+	}
+}
+
 func TestRole_MissingFilePathAllows(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
 	g := NewRole(s)

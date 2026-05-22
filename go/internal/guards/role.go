@@ -1,0 +1,94 @@
+package guards
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+)
+
+// Role enforces per-phase write allowlists for Edit/Write tools.
+// Phase-1 subset of scripts/guards/role-gate.sh rules:
+//   - build:        workspace_path + active_worktree
+//   - audit:        workspace_path only (audit-*.{md,json} go there)
+//   - learn/retrospective: workspace_path + .evolve/lessons/**
+//   - other phases: workspace_path only
+//   - Always-safe:  /tmp/**, $HOME/.claude/**
+type Role struct {
+	storage core.Storage
+}
+
+func NewRole(s core.Storage) *Role { return &Role{storage: s} }
+
+func (r *Role) Name() string { return "role" }
+
+func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecision {
+	if envBypass("EVOLVE_BYPASS_ROLE_GATE") {
+		return core.GuardDecision{Allow: true}
+	}
+	if in.ToolName != "Edit" && in.ToolName != "Write" {
+		return core.GuardDecision{Allow: true}
+	}
+	path := strField(in, "file_path")
+	if path == "" {
+		return core.GuardDecision{Allow: true}
+	}
+	if isAlwaysSafe(path) {
+		return core.GuardDecision{Allow: true}
+	}
+	if r.storage == nil {
+		return core.GuardDecision{
+			Allow:  false,
+			Reason: "role guard: storage not configured; refusing Edit/Write by default",
+		}
+	}
+	cs, err := r.storage.ReadCycleState(ctx)
+	if err != nil {
+		return core.GuardDecision{Allow: false, Reason: "role guard: cycle-state read failed: " + err.Error()}
+	}
+	// Outside an active cycle, allow.
+	if cs.CycleID == 0 {
+		return core.GuardDecision{Allow: true}
+	}
+	if isUnderDir(path, cs.WorkspacePath) {
+		return core.GuardDecision{Allow: true}
+	}
+	if cs.Phase == "build" && cs.ActiveWorktree != "" && isUnderDir(path, cs.ActiveWorktree) {
+		return core.GuardDecision{Allow: true}
+	}
+	return core.GuardDecision{
+		Allow: false,
+		Reason: "role guard: phase=" + cs.Phase + " may not write outside workspace " +
+			cs.WorkspacePath + " (path=" + path + "); EVOLVE_BYPASS_ROLE_GATE=1 to override",
+	}
+}
+
+func isAlwaysSafe(path string) bool {
+	abs := path
+	if !filepath.IsAbs(path) {
+		// Don't try to resolve relative paths — be conservative.
+	}
+	if strings.HasPrefix(abs, "/tmp/") || abs == "/tmp" {
+		return true
+	}
+	if h := os.Getenv("HOME"); h != "" && strings.HasPrefix(abs, filepath.Join(h, ".claude")+"/") {
+		return true
+	}
+	return false
+}
+
+func isUnderDir(path, dir string) bool {
+	if dir == "" {
+		return false
+	}
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+	if rel == "." || rel == "" {
+		return true
+	}
+	return !strings.HasPrefix(rel, "..")
+}

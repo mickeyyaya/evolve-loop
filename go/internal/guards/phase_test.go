@@ -2,6 +2,7 @@ package guards
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,6 +85,22 @@ func TestPhase_NonAgentToolsPass(t *testing.T) {
 		if !dec.Allow {
 			t.Errorf("tool=%s denied: %s", tool, dec.Reason)
 		}
+	}
+}
+
+// erroringStorage wraps a real storage but injects ReadCycleState errors.
+type erroringStorage struct{ core.Storage }
+
+func (e erroringStorage) ReadCycleState(_ context.Context) (core.CycleState, error) {
+	return core.CycleState{}, errors.New("forced read fail")
+}
+
+func TestPhase_ReadCycleStateErrorDenies(t *testing.T) {
+	s, _ := setupStorageNoCS(t)
+	g := NewPhase(erroringStorage{s})
+	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
+	if dec.Allow {
+		t.Error("read error must deny by default")
 	}
 }
 

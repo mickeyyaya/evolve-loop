@@ -106,6 +106,17 @@ func TestShip_AllowsNonShipBash(t *testing.T) {
 	}
 }
 
+func TestShip_MissingCommandAllows(t *testing.T) {
+	g := NewShip()
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{},
+	})
+	if !dec.Allow {
+		t.Errorf("missing command must allow: %s", dec.Reason)
+	}
+}
+
 func TestShip_NonBashToolPassesThrough(t *testing.T) {
 	g := NewShip()
 	for _, tool := range []string{"Edit", "Write", "Read"} {
