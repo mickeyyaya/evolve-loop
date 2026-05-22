@@ -131,14 +131,24 @@ type LedgerEntry struct {
 	Extra           map[string]any `json:"-"`
 }
 
-// BridgeRequest is the input to Bridge.Launch.
+// BridgeRequest is the input to Bridge.Launch. Field shape mirrors the
+// flag surface of `tools/agent-bridge/bin/bridge launch`. The adapter
+// writes Prompt to a file under Workspace before invoking the bridge
+// subprocess (callers don't manage tmp-file lifecycle).
 type BridgeRequest struct {
-	CLI       string            `json:"cli"`        // claude-tmux | claude | gemini | agy
-	Profile   string            `json:"profile"`    // .evolve/profiles/<name>.json key
-	Prompt    string            `json:"prompt"`
-	Env       map[string]string `json:"env,omitempty"`
-	Workspace string            `json:"workspace"`
-	Worktree  string            `json:"worktree,omitempty"`
+	CLI          string            `json:"cli"`            // claude-p | claude-tmux | codex | agy
+	Profile      string            `json:"profile"`        // absolute path to .evolve/profiles/<name>.json
+	Model        string            `json:"model"`          // haiku | sonnet | opus | auto | gpt-* | gemini-*
+	Prompt       string            `json:"prompt"`         // prompt body; adapter materializes as a file
+	Workspace    string            `json:"workspace"`      // absolute path; bridge writes outputs here
+	Worktree     string            `json:"worktree,omitempty"`
+	StdoutLog    string            `json:"stdout_log,omitempty"`
+	StderrLog    string            `json:"stderr_log,omitempty"`
+	ArtifactPath string            `json:"artifact_path,omitempty"` // adapter requires non-empty
+	Agent        string            `json:"agent,omitempty"`         // role label
+	Cycle        int               `json:"cycle,omitempty"`
+	Env          map[string]string `json:"env,omitempty"`
+	ExtraFlags   []string          `json:"extra_flags,omitempty"` // pass-through to bridge
 }
 
 // BridgeResponse is the bridge's JSON-parsed reply.
