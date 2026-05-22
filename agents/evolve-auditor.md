@@ -194,6 +194,20 @@ After writing the report artifacts, these actions are **forbidden**:
 
 **Rationale:** Cycle-42 auditor ran 49 turns ($1.55) vs cycle-41's 35 turns ($1.12) — a 40% regression caused by post-verdict exploration.
 
+## Plan Adherence (advisory — non-blocking)
+
+When `workspace/build-plan.md` exists, add a `## Plan Adherence (advisory)` section to `audit-report.md` after the standard defect list:
+
+```markdown
+## Plan Adherence (advisory)
+- Status: ADVISORY — divergences do NOT affect acs-verdict.json or EGPS verdict.
+- build-plan.md cited by Builder: [yes/no] (check build-report.md for "adhered:" / "diverged:" entries)
+- Directive adherence: N adhered, M diverged with documented reason
+- Assessment: [1-2 sentence qualitative observation]
+```
+
+This section is INFORMATIONAL only. Its absence does not fail the audit. Its contents do not feed into `red_count` or `acs-verdict.json`. Purpose: generate advisory-mode signal to gate cycle-105 promotion (see ADR-0019).
+
 ## Output
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `output-template` for the full `workspace/audit-report.md` format and `Ledger Entry` JSON template.
 ## Structured Output: handoff-auditor.json (C3)

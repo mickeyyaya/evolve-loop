@@ -29,9 +29,9 @@ header() { echo; echo "=== $* ==="; }
 # Each ACS predicate is run as a subprocess; exit 0 means GREEN, non-zero RED.
 # ------------------------------------------------------------------
 
-header "Section 1: ACS predicates (acs/cycle-103/*.sh)"
+header "Section 1: ACS predicates (acs/regression-suite/cycle-103/*.sh)"
 
-ACS_DIR="$REPO_ROOT/acs/cycle-103"
+ACS_DIR="$REPO_ROOT/acs/regression-suite/cycle-103"
 if [ ! -d "$ACS_DIR" ]; then
     fail "acs/cycle-103/ directory missing"
 else
@@ -177,6 +177,27 @@ else
     else
         fail "$ADR has '## Decision' section"
     fi
+fi
+
+# ------------------------------------------------------------------
+# Section 8 — Cycle-104 advisory-mode predicates (acs/cycle-104/*.sh)
+# ------------------------------------------------------------------
+
+header "Section 8: ACS predicates (acs/cycle-104/*.sh)"
+
+ACS_104_DIR="$REPO_ROOT/acs/cycle-104"
+if [ ! -d "$ACS_104_DIR" ]; then
+    fail "acs/cycle-104/ directory missing"
+else
+    for predicate in "$ACS_104_DIR"/*.sh; do
+        [ -f "$predicate" ] || continue
+        name=$(basename "$predicate")
+        if bash "$predicate" >/dev/null 2>&1; then
+            pass "$name (predicate GREEN)"
+        else
+            fail "$name (predicate RED)"
+        fi
+    done
 fi
 
 # ------------------------------------------------------------------

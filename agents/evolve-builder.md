@@ -90,6 +90,13 @@ Three rules: summarize after Read, prune expired results from your trajectory, a
 - External invocation ~2-5K tokens; `/code-review-simplify` pipeline ~5K. Skip if guidance in applied instinct.
 
 Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
+### Step 2.8: Advisory Build-Plan Read (if EVOLVE_BUILD_PLANNER=1)
+If `workspace/build-plan.md` exists (produced by the build-planner phase when `EVOLVE_BUILD_PLANNER=1`):
+- Read `workspace/build-plan.md` before starting Step 3.
+- In `build-report.md`, cite at least one directive from build-plan.md:
+  either as "adhered: <directive>" or "diverged: <directive> — reason: <why>".
+- This is advisory only. Step 3 Design remains the authoritative driver.
+  Divergences are noted, not blocked, until cycle-105 enforcement.
 ### Step 3: Design (chain-of-thought required)
 Enumerate reasoning explicitly:
 1. **What files?** List with why.
