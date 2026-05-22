@@ -1,0 +1,182 @@
+// Package build implements the GREEN code-writer phase as a
+// core.PhaseRunner. Build reads team-context.md (RED contract) and
+// writes code until the RED tests turn GREEN.
+//
+// Cost guard:
+//
+//   - EVOLVE_BUILDER_COST_THRESHOLD (default 2.00 USD) is the soft cap.
+//   - Cost > threshold + EVOLVE_BUILDER_COST_GUARD_STRICT=1 → FAIL.
+//   - Cost > threshold + advisory (default) → PASS + diagnostic.
+//
+// Verdict mapping:
+//
+//   - "## Files Modified" missing or empty artifact → FAIL.
+//   - Cost overrun in strict mode → FAIL.
+//   - All other GREEN paths → PASS (possibly with cost diagnostic).
+package build
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+)
+
+const (
+	phaseName             = string(core.PhaseBuild)
+	defaultCostThresholdUSD = 2.00
+)
+
+type Config struct {
+	Bridge  core.Bridge
+	Prompts *prompts.Loader
+	NowFn   func() time.Time
+}
+
+type Phase struct {
+	bridge  core.Bridge
+	prompts *prompts.Loader
+	nowFn   func() time.Time
+}
+
+func New(c Config) *Phase {
+	nowFn := c.NowFn
+	if nowFn == nil {
+		nowFn = time.Now
+	}
+	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn}
+}
+
+func (p *Phase) Name() string { return phaseName }
+
+func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	start := p.nowFn()
+	if p.bridge == nil {
+		return core.PhaseResponse{}, fmt.Errorf("build: bridge required")
+	}
+	if p.prompts == nil {
+		return core.PhaseResponse{}, fmt.Errorf("build: prompts loader required")
+	}
+
+	agent, err := p.prompts.Agent("evolve-builder")
+	if err != nil {
+		return core.PhaseResponse{}, fmt.Errorf("build: load agent: %w", err)
+	}
+
+	prompt := composePrompt(agent.Body, req)
+	artifactPath := filepath.Join(req.Workspace, "build-report.md")
+	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "build.json")
+
+	cli := req.Env["EVOLVE_CLI"]
+	if cli == "" {
+		cli = "claude-p"
+	}
+	model := req.Env["EVOLVE_BUILD_MODEL"]
+	if model == "" {
+		model = "auto"
+	}
+
+	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
+		CLI:          cli,
+		Profile:      profilePath,
+		Model:        model,
+		Prompt:       prompt,
+		Workspace:    req.Workspace,
+		Worktree:     req.Worktree,
+		ArtifactPath: artifactPath,
+		Agent:        "build",
+		Cycle:        req.Cycle,
+		Env:          req.Env,
+	})
+	durationMS := p.nowFn().Sub(start).Milliseconds()
+
+	if bridgeErr != nil {
+		return core.PhaseResponse{
+			Phase:        phaseName,
+			Verdict:      core.VerdictFAIL,
+			ArtifactsDir: req.Workspace,
+			CostUSD:      bres.CostUSD,
+			Tokens:       bres.Tokens,
+			DurationMS:   durationMS,
+			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
+		}, fmt.Errorf("build: bridge: %w", bridgeErr)
+	}
+
+	content := bres.Stdout
+	if content == "" {
+		if b, err := os.ReadFile(artifactPath); err == nil {
+			content = string(b)
+		}
+	}
+
+	verdict := classify(content)
+	var diags []core.Diagnostic
+
+	// Cost-overrun check: advisory by default, hard FAIL under strict mode.
+	threshold := parseFloatOrDefault(req.Env["EVOLVE_BUILDER_COST_THRESHOLD"], defaultCostThresholdUSD)
+	if bres.CostUSD > threshold {
+		msg := fmt.Sprintf("builder cost %.2f exceeded threshold %.2f", bres.CostUSD, threshold)
+		severity := "warning"
+		if req.Env["EVOLVE_BUILDER_COST_GUARD_STRICT"] == "1" {
+			severity = "error"
+			verdict = core.VerdictFAIL
+		}
+		diags = append(diags, core.Diagnostic{Severity: severity, Message: msg})
+	}
+
+	return core.PhaseResponse{
+		Phase:        phaseName,
+		Verdict:      verdict,
+		ArtifactsDir: req.Workspace,
+		NextPhase:    string(core.PhaseAudit),
+		CostUSD:      bres.CostUSD,
+		Tokens:       bres.Tokens,
+		DurationMS:   durationMS,
+		Diagnostics:  diags,
+	}, nil
+}
+
+func composePrompt(body string, req core.PhaseRequest) string {
+	var b strings.Builder
+	b.WriteString(body)
+	b.WriteString("\n\n## Cycle Context\n")
+	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
+	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
+	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
+	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	if req.Worktree != "" {
+		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
+	}
+	return b.String()
+}
+
+func classify(content string) string {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return core.VerdictFAIL
+	}
+	if !strings.Contains(trimmed, "## Files Modified") {
+		return core.VerdictFAIL
+	}
+	return core.VerdictPASS
+}
+
+// parseFloatOrDefault returns d for empty or malformed input. Malformed
+// values fall back silently to preserve the operator's ability to set
+// EVOLVE_BUILDER_COST_THRESHOLD=auto without breaking the pipeline.
+func parseFloatOrDefault(s string, d float64) float64 {
+	if s == "" {
+		return d
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return d
+	}
+	return v
+}
