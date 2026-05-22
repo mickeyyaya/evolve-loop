@@ -18,6 +18,11 @@ var (
 	builtAt = ""
 )
 
+// readBuildInfo is a testable seam over runtime/debug.ReadBuildInfo.
+// Tests swap this to inject synthetic BuildInfo payloads (e.g. with
+// vcs.revision/vcs.time entries) that wouldn't appear under `go test`.
+var readBuildInfo = func() (*debug.BuildInfo, bool) { return debug.ReadBuildInfo() }
+
 // Get returns a human-readable build identity.
 //
 // Preference order:
@@ -25,9 +30,14 @@ var (
 //  2. runtime/debug.BuildInfo VCS revision (go install path).
 //  3. The literal "dev" / "unknown" (go run / go test path).
 func Get() string {
-	v, c, b := version, commit, builtAt
-	if v == "" || c == "" {
-		if info, ok := debug.ReadBuildInfo(); ok {
+	return composeVersion(version, commit, builtAt, readBuildInfo)
+}
+
+// composeVersion is the pure composer — separated from package-level
+// state so tests can drive all branches deterministically.
+func composeVersion(v, c, b string, readBI func() (*debug.BuildInfo, bool)) string {
+	if v == "" || c == "" || b == "" {
+		if info, ok := readBI(); ok {
 			if v == "" {
 				v = info.Main.Version
 			}

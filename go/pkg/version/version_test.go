@@ -2,6 +2,7 @@ package version
 
 import (
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -97,6 +98,103 @@ func TestGetReturnsShapedString(t *testing.T) {
 	}
 	if !strings.Contains(s, "(") || !strings.Contains(s, ")") {
 		t.Errorf("Get()=%q must contain parenthesised metadata", s)
+	}
+}
+
+// Drive the ldflag-injection branch of Get() by mutating the package
+// vars (lowercase so accessible within the package test).
+func TestGet_HonorsLdflagInjectedValues(t *testing.T) {
+	saveV, saveC, saveB := version, commit, builtAt
+	t.Cleanup(func() { version, commit, builtAt = saveV, saveC, saveB })
+
+	version = "v1.0.0"
+	commit = "abcdef0123456789"
+	builtAt = "2026-05-22T07:00:00Z"
+	got := Get()
+	want := "evolve v1.0.0 (abcdef012345, built 2026-05-22T07:00:00Z)"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// Drive the BuildInfo fallback branch by clearing ldflag vars; under
+// `go test` BuildInfo.Main.Version is "(devel)".
+func TestGet_BuildInfoFallback(t *testing.T) {
+	saveV, saveC, saveB := version, commit, builtAt
+	t.Cleanup(func() { version, commit, builtAt = saveV, saveC, saveB })
+
+	version = ""
+	commit = ""
+	builtAt = ""
+	got := Get()
+	// Just assert the BuildInfo path produced something shaped sensibly.
+	if got == "" || !strings.HasPrefix(got, "evolve ") {
+		t.Errorf("BuildInfo fallback got %q", got)
+	}
+}
+
+// composeVersion exhaustive cases — drives every BuildInfo branch
+// with injected synthetic payloads.
+func TestComposeVersion_BuildInfoBranches(t *testing.T) {
+	mkBI := func(mainVer, rev, vcsTime string) func() (*debug.BuildInfo, bool) {
+		return func() (*debug.BuildInfo, bool) {
+			info := &debug.BuildInfo{Main: debug.Module{Version: mainVer}}
+			if rev != "" {
+				info.Settings = append(info.Settings, debug.BuildSetting{Key: "vcs.revision", Value: rev})
+			}
+			if vcsTime != "" {
+				info.Settings = append(info.Settings, debug.BuildSetting{Key: "vcs.time", Value: vcsTime})
+			}
+			return info, true
+		}
+	}
+	cases := []struct {
+		name              string
+		v, c, b           string
+		bi                func() (*debug.BuildInfo, bool)
+		wantSubstrings    []string
+	}{
+		{
+			name:           "all_empty_buildinfo_full",
+			bi:             mkBI("v2.0.0", "abcdef0123456789", "2026-05-22T07:00:00Z"),
+			wantSubstrings: []string{"v2.0.0", "abcdef012345", "2026-05-22T07:00:00Z"},
+		},
+		{
+			name:           "ldflag_version_buildinfo_commit",
+			v:              "v1.5.0",
+			bi:             mkBI("(ignored)", "deadbeefcafe", ""),
+			wantSubstrings: []string{"v1.5.0", "deadbeefcafe"},
+		},
+		{
+			name:           "buildinfo_unavailable_falls_back",
+			bi:             func() (*debug.BuildInfo, bool) { return nil, false },
+			wantSubstrings: []string{"dev", "unknown"},
+		},
+		{
+			name:           "ldflag_complete_skips_buildinfo",
+			v:              "v3.0.0",
+			c:              "abcdef0123456",
+			b:              "2026-01-01T00:00:00Z",
+			bi:             func() (*debug.BuildInfo, bool) { t.Fatal("BuildInfo must not be read"); return nil, false },
+			wantSubstrings: []string{"v3.0.0", "abcdef012345", "2026-01-01"},
+		},
+		{
+			name:           "missing_only_builtAt_uses_buildinfo_time",
+			v:              "v4.0.0",
+			c:              "012345abcdef",
+			bi:             mkBI("(ignored)", "(ignored)", "2026-12-31T23:59:59Z"),
+			wantSubstrings: []string{"v4.0.0", "012345abcdef", "2026-12-31T23:59:59Z"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := composeVersion(tc.v, tc.c, tc.b, tc.bi)
+			for _, want := range tc.wantSubstrings {
+				if !strings.Contains(got, want) {
+					t.Errorf("got %q missing %q", got, want)
+				}
+			}
+		})
 	}
 }
 

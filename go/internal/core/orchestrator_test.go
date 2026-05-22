@@ -14,21 +14,31 @@ import (
 // --- fakes ---
 
 type fakeStorage struct {
-	state           State
-	cycleState      CycleState
-	cycleStateLog   []CycleState
-	stateLog        []State
-	lockHeld        bool
-	lockCount       int
-	mu              sync.Mutex
-	lockErr         error
-	failOnWriteCS   bool
+	state              State
+	cycleState         CycleState
+	cycleStateLog      []CycleState
+	stateLog           []State
+	lockHeld           bool
+	lockCount          int
+	mu                 sync.Mutex
+	lockErr            error
+	failOnWriteCS      bool
+	failOnReadState    bool
+	failOnWriteState   bool
+	writeCSFailAt      int // 0 = never; N = N-th write
+	writeCSCalls       int
 }
 
 func (f *fakeStorage) ReadState(_ context.Context) (State, error) {
+	if f.failOnReadState {
+		return State{}, errors.New("forced ReadState fail")
+	}
 	return f.state, nil
 }
 func (f *fakeStorage) WriteState(_ context.Context, s State) error {
+	if f.failOnWriteState {
+		return errors.New("forced WriteState fail")
+	}
 	f.stateLog = append(f.stateLog, s)
 	f.state = s
 	return nil
@@ -37,8 +47,12 @@ func (f *fakeStorage) ReadCycleState(_ context.Context) (CycleState, error) {
 	return f.cycleState, nil
 }
 func (f *fakeStorage) WriteCycleState(_ context.Context, cs CycleState) error {
+	f.writeCSCalls++
 	if f.failOnWriteCS {
 		return errors.New("write CS forced fail")
+	}
+	if f.writeCSFailAt > 0 && f.writeCSCalls == f.writeCSFailAt {
+		return errors.New("write CS forced fail at N")
 	}
 	f.cycleState = cs
 	// Deep enough copy for the slice — the orchestrator may keep mutating.
@@ -67,13 +81,17 @@ func (f *fakeStorage) AcquireLock(_ context.Context) (func() error, error) {
 }
 
 type fakeLedger struct {
-	entries []LedgerEntry
-	mu      sync.Mutex
+	entries     []LedgerEntry
+	mu          sync.Mutex
+	failOnAppend bool
 }
 
 func (f *fakeLedger) Append(_ context.Context, e LedgerEntry) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.failOnAppend {
+		return errors.New("forced ledger append fail")
+	}
 	f.entries = append(f.entries, e)
 	return nil
 }
@@ -243,6 +261,109 @@ func TestOrchestrator_AdvancesLastCycleNumber(t *testing.T) {
 	}
 	if st.state.LastCycleNumber != 42 {
 		t.Errorf("lastCycleNumber=%d, want 42", st.state.LastCycleNumber)
+	}
+}
+
+func TestOrchestrator_ReadStateError(t *testing.T) {
+	st := &fakeStorage{failOnReadState: true}
+	led := &fakeLedger{}
+	o := NewOrchestrator(st, led, buildRunners(nil))
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("ReadState error must propagate")
+	}
+}
+
+func TestOrchestrator_InitialWriteCycleStateError(t *testing.T) {
+	st := &fakeStorage{failOnWriteCS: true}
+	led := &fakeLedger{}
+	o := NewOrchestrator(st, led, buildRunners(nil))
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("initial WriteCycleState error must propagate")
+	}
+}
+
+func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
+	// Fail on the 2nd write (after init). The orchestrator writes
+	// pre-phase and post-phase, so this fails before scout's run.
+	st := &fakeStorage{writeCSFailAt: 2}
+	led := &fakeLedger{}
+	o := NewOrchestrator(st, led, buildRunners(nil))
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("mid-phase WriteCycleState error must propagate")
+	}
+}
+
+func TestOrchestrator_WriteCycleStatePostPhaseError(t *testing.T) {
+	// Init=1, pre-scout=2, post-scout=3 → fail at 3.
+	st := &fakeStorage{writeCSFailAt: 3}
+	led := &fakeLedger{}
+	o := NewOrchestrator(st, led, buildRunners(nil))
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("post-phase WriteCycleState error must propagate")
+	}
+}
+
+func TestOrchestrator_LedgerAppendError(t *testing.T) {
+	st := &fakeStorage{}
+	led := &fakeLedger{failOnAppend: true}
+	o := NewOrchestrator(st, led, buildRunners(nil))
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("ledger append error must propagate")
+	}
+}
+
+func TestOrchestrator_FinalWriteStateError(t *testing.T) {
+	st := &fakeStorage{failOnWriteState: true}
+	led := &fakeLedger{}
+	o := NewOrchestrator(st, led, buildRunners(nil))
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("final WriteState error must propagate")
+	}
+}
+
+// A runner that returns an error from Run.
+type erroringRunner struct{ name string }
+
+func (e *erroringRunner) Name() string { return e.name }
+func (e *erroringRunner) Run(context.Context, PhaseRequest) (PhaseResponse, error) {
+	return PhaseResponse{}, errors.New("runner forced fail")
+}
+
+func TestOrchestrator_RunnerErrorPropagates(t *testing.T) {
+	st := &fakeStorage{}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &erroringRunner{name: "scout"}
+	o := NewOrchestrator(st, led, runners)
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("runner error must propagate")
+	}
+}
+
+// A runner that returns a non-canonical verdict.
+type badVerdictRunner struct{ name string }
+
+func (b *badVerdictRunner) Name() string { return b.name }
+func (b *badVerdictRunner) Run(context.Context, PhaseRequest) (PhaseResponse, error) {
+	return PhaseResponse{Phase: b.name, Verdict: "bogus"}, nil
+}
+
+func TestOrchestrator_NonCanonicalVerdictRejected(t *testing.T) {
+	st := &fakeStorage{}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &badVerdictRunner{name: "scout"}
+	o := NewOrchestrator(st, led, runners)
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatal("non-canonical verdict must be rejected")
 	}
 }
 

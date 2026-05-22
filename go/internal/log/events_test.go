@@ -241,6 +241,53 @@ func TestEmitPhase_NoExtraFields(t *testing.T) {
 	}
 }
 
+func TestEmitAbnormal_OpenFileError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses permission bits")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "abnormal-events.jsonl")
+	// Pre-create as 0o000 so OpenFile O_APPEND can't open it.
+	if err := os.WriteFile(path, []byte{}, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+
+	w := NewSidecarWriter(path)
+	defer w.Close()
+	if err := w.EmitAbnormal(Event{EventType: "x"}); err == nil {
+		t.Fatal("expected open error on 0o000 sidecar")
+	}
+}
+
+func TestEmitAbnormal_MarshalError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "abnormal-events.jsonl")
+	w := NewSidecarWriter(path)
+	defer w.Close()
+	// channels cannot marshal — drives marshalSorted's error branch.
+	if err := w.EmitAbnormal(Event{
+		EventType: "x",
+		Fields:    map[string]any{"chan": make(chan int)},
+	}); err == nil {
+		t.Fatal("expected marshal error on un-marshalable field")
+	}
+}
+
+func TestEmitAbnormal_MkdirParentError(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Sidecar path under a regular file — mkdir parent fails.
+	w := NewSidecarWriter(filepath.Join(blocker, "child", "abnormal.jsonl"))
+	defer w.Close()
+	if err := w.EmitAbnormal(Event{EventType: "x"}); err == nil {
+		t.Fatal("expected mkdir error under a regular-file path")
+	}
+}
+
 func TestEmitAbnormal_FieldsCannotOverrideCanonical(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "abnormal-events.jsonl")
