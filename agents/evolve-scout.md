@@ -186,3 +186,7 @@ For each claim:
 5. **If FALSIFIED**, the cycle's first task MUST be either: (a) ROLLBACK the falsified mechanism, or (b) ESCALATE per `consequence_if_falsified` (e.g. advisory → programmatic kill).
 
 This closes the cycle 70-71 pattern where advisory constraints shipped, were immediately self-falsified, and the next cycle continued forward without acknowledging the falsification.
+
+## Reflection Authoring (v10.20.0+)
+
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `scout-report.md`'s `## Reflection` section and `scout-reflection.yaml` sidecar. Scout-specific friction commonly maps to `research-quota`, `ambiguous-input` (task selection rubric), or `tool-batching` (search batch sizing). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

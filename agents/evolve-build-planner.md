@@ -67,5 +67,9 @@ Append a constraint checklist at the end of `build-plan.md`:
 ## Ledger Entry
 
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"build-planner","type":"build-plan","data":{"task":"<slug>","fileTargets":<N>,"challenge":"<challengeToken>","prevHash":"<hash>"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"build-planner","type":"build-plan","data":{"task":"<slug>","fileTargets":<N>,"challenge":"<challengeToken>","prevHash":"<hash>","reflection_emitted":<true|false>}}
 ```
+
+## Reflection Authoring (v10.20.0+)
+
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `build-plan.md`'s `## Reflection` section and `build-planner-reflection.yaml` sidecar. Build-Planner-specific friction commonly maps to `ambiguous-input` (Scout AC drift requiring large plan-vs-actual diff in advisory mode). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

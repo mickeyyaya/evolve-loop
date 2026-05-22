@@ -318,3 +318,9 @@ tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwrigh
 ## POSTHOC enforcement (v10.10.0 Layer 3, ADR-0012)
 
 Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache tokens, files changed, lines added/removed) or AC-existence claims in `build-report.md`. Use `pending <!-- POSTHOC: <cmd> -->` placeholders. INERT marks MUST include `re_attempt_by_cycle: N` where N ≤ current_cycle + 5. Full metric list, format spec, and INERT example: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `posthoc-enforcement`.
+
+## Reflection Authoring (v10.20.0+)
+
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `build-report.md`'s `## Reflection` section and `build-reflection.yaml` sidecar. Builder-specific friction commonly maps to `tool-error`, `profile-restriction`, `cost-guard threshold breach`, or `ambiguous-input` (AC ambiguity from TDD).
+
+**Distinct from `EVOLVE_BUILDER_SELF_REVIEW`:** that env-var controls a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`). Skip the reflection only if `EVOLVE_REFLECTION_JOURNAL=0`.

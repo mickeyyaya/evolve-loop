@@ -62,3 +62,7 @@ Do NOT invoke from another persona. Plan-reviewer is itself the orchestration la
 - `skills/evolve-plan-review/SKILL.md` — workflow detail
 - `.evolve/profiles/plan-reviewer.json` — lens prompt templates
 - `docs/architecture/tri-layer.md` — composition rules
+
+## Reflection Authoring (v10.20.0+)
+
+Before posting your aggregated verdict's ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `plan-review.md`'s `## Reflection` section and `plan-review-reflection.yaml` sidecar. Each lens (CEO/Eng/Design/Security) may emit a 1-bullet reflection-fragment which the aggregator merges. Plan-Review-specific friction commonly maps to `ambiguous-input` (lens disagreement, missing rubric for verdict aggregation). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

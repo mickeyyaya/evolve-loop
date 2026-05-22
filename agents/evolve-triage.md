@@ -217,3 +217,7 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 6. `phase_skip:` field is present in `triage-decision.md` (value may be `[]`). When `EVOLVE_PSMAS_SKIP=1`, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
 
 If any check fails, fix in place. Do not mark complete until all six hold.
+
+## Reflection Authoring (v10.20.0+)
+
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `triage-decision.md`'s `## Reflection` section and `triage-reflection.yaml` sidecar. Triage-specific friction commonly maps to `ambiguous-input` (top_n vs deferred boundary unclear) or `context-saturation` (large inbox). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

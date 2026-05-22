@@ -360,5 +360,9 @@ Schema defined inline in **Step 6** of the Workflow above (see "Write test-repor
 
 ### Ledger Entry
 ```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"tdd-engineer","type":"test-contract","data":{"task":"<slug>","testFiles":<N>,"redConfirmed":true,"criteriaCount":<N>,"challenge":"<challengeToken>","prevHash":"<hash>"}}
+{"ts":"<ISO-8601>","cycle":<N>,"role":"tdd-engineer","type":"test-contract","data":{"task":"<slug>","testFiles":<N>,"redConfirmed":true,"criteriaCount":<N>,"challenge":"<challengeToken>","prevHash":"<hash>","reflection_emitted":<true|false>}}
 ```
+
+## Reflection Authoring (v10.20.0+)
+
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `test-report.md`'s `## Reflection` section and `tdd-reflection.yaml` sidecar. TDD-specific friction commonly maps to `ambiguous-input` (untestable acceptance criteria from Scout) or `tool-error` (predicate-runner flakiness). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
