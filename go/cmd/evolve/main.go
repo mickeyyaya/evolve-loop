@@ -1,11 +1,12 @@
 // Package main is the evolve CLI entrypoint.
 //
-// Phase 1 subcommands: version (this file), doctor, guard, ledger, acs.
+// Phase 1 subcommands: version, doctor, guard, ledger, acs.
 // Phase 2: loop, cycle, worktree, phase.
 package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
@@ -18,26 +19,43 @@ Usage:
 
 Commands:
   version    Print build version and exit
-  doctor     Probe environment (Phase 1 task #17)
-  guard      Run a trust-kernel guard (Phase 1 tasks #13-14)
-  ledger     Verify or tail the ledger (Phase 1 task #17)
-  acs        Run ACS predicates for a cycle (Phase 1 tasks #16-17)
+  doctor     Probe environment ( doctor probe <tool> [--json] [--quiet] )
+  guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
+              Guards: ship | phase | role | docdelete | quota | chain
+  ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
+  acs        Run ACS predicates    ( acs run --cycle N <pkg> [--json=false] )
 
-Phase 1 build — many subcommands still wired in subsequent tasks.
+Phase 1 build — orchestrator + phase impls land in Phase 2.
 `
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprint(os.Stderr, usage)
-		os.Exit(2)
+// dispatch is the top-level subcommand router. Extracted so tests can
+// drive it without invoking os.Exit. Returns the process exit code.
+func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) < 1 {
+		fmt.Fprint(stderr, usage)
+		return 2
 	}
-	switch os.Args[1] {
+	switch args[0] {
 	case "version", "--version", "-v":
-		fmt.Println(version.Get())
+		fmt.Fprintln(stdout, version.Get())
+		return 0
 	case "help", "--help", "-h":
-		fmt.Print(usage)
+		fmt.Fprint(stdout, usage)
+		return 0
+	case "doctor":
+		return runDoctor(args[1:], stdin, stdout, stderr)
+	case "guard":
+		return runGuard(args[1:], stdin, stdout, stderr)
+	case "ledger":
+		return runLedger(args[1:], stdin, stdout, stderr)
+	case "acs":
+		return runACS(args[1:], stdin, stdout, stderr)
 	default:
-		fmt.Fprintf(os.Stderr, "evolve: unknown command %q\n\n%s", os.Args[1], usage)
-		os.Exit(2)
+		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
+		return 2
 	}
+}
+
+func main() {
+	os.Exit(dispatch(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }

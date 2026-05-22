@@ -1,0 +1,77 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
+)
+
+// runACS implements `evolve acs <subcommand>`. Subcommands:
+//
+//	run --cycle N <pkg>   execute go test -json on <pkg>, write
+//	                       <evolve-dir>/runs/cycle-N/acs-verdict.json
+func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) < 1 {
+		fmt.Fprintln(stderr, "evolve acs: missing subcommand (try: run)")
+		return 10
+	}
+	switch args[0] {
+	case "run":
+		return runACSRun(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "evolve acs: unknown subcommand %q\n", args[0])
+		return 10
+	}
+}
+
+func runACSRun(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve acs run", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var (
+		cycle     int
+		evolveDir string
+		writeJSON bool
+	)
+	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
+	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.BoolVar(&writeJSON, "json", true, "write acs-verdict.json (default true)")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if cycle <= 0 {
+		fmt.Fprintln(stderr, "evolve acs run: --cycle is required (must be >0)")
+		return 10
+	}
+	if fs.NArg() != 1 {
+		fmt.Fprintln(stderr, "evolve acs run: usage: evolve acs run --cycle N <pkg>")
+		return 10
+	}
+	pkg := fs.Arg(0)
+	v, err := acsrunner.Run(context.Background(), cycle, pkg)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve acs run: %v\n", err)
+		// Still emit the partial verdict if we have one.
+	}
+	buf, mErr := json.MarshalIndent(v, "", "  ")
+	if mErr != nil {
+		fmt.Fprintf(stderr, "evolve acs run: marshal: %v\n", mErr)
+		return 1
+	}
+	fmt.Fprintf(stdout, "%s\n", buf)
+	if writeJSON {
+		dst, wErr := acsrunner.WriteVerdict(evolveDir, v)
+		if wErr != nil {
+			fmt.Fprintf(stderr, "evolve acs run: write verdict: %v\n", wErr)
+			return 1
+		}
+		fmt.Fprintf(stderr, "[acs] verdict written to %s (red=%d/%d)\n", dst, v.RedCount, v.Total)
+	}
+	if v.RedCount > 0 {
+		return 2
+	}
+	return 0
+}
