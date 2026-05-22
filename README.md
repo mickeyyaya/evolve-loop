@@ -1,8 +1,8 @@
 # Evolve Loop
 
-**Current (v11.1)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v11.2)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
-> **v11.0.0** introduces a Go binary as the primary runtime alongside the bash scripts. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the upgrade path and `EVOLVE_USE_LEGACY_BASH=1` rollback hatch. Bash continues to work unchanged.
+> **v11.2.0 breaking change**: the `scripts/` symlink has been removed. Operator integrations that hardcode `scripts/...` paths must update to `legacy/scripts/...`. Go binary remains the primary runtime; bash continues to work from `legacy/scripts/`. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 

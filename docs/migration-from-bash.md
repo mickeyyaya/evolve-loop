@@ -103,9 +103,9 @@ with `cycle-state.json` and the failing log line attached.
 
 | Version | Change | Status |
 |---|---|---|
-| v11.0.0 | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place. | SHIPPED |
-| v11.1.0 (this release) | `legacy/scripts/` → `legacy/scripts/` physical move. `legacy/scripts/` is a symlink to `legacy/scripts/`. All existing references work via the symlink. | SHIPPED |
-| v11.2.0 | Symlink removed at `legacy/scripts/`. Requires every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/) updated to `legacy/scripts/...` first. Operator integrations that hardcode `legacy/scripts/...` will break. | DEFERRED — needs broader reference cleanup |
+| v11.0.0 | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place at `scripts/`. | SHIPPED |
+| v11.1.0 | `scripts/` → `legacy/scripts/` physical move. `scripts/` became a backcompat symlink → `legacy/scripts/`. All existing references worked via the symlink. | SHIPPED |
+| v11.2.0 (this release) | `scripts/` symlink REMOVED. Every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/, Go source) now uses `legacy/scripts/...` directly. **Breaking change for operator integrations that hardcode `scripts/...` — they must update to `legacy/scripts/...`.** | SHIPPED |
 | v12.0.0 | Bash scripts removed entirely. Go-only. | DEFERRED — needs Go orchestrator feature parity (currently shells out to bash for `ship.sh`, etc.) |
 
 ## See also
