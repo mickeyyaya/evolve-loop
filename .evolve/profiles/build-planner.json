@@ -1,0 +1,45 @@
+{
+  "name": "build-planner",
+  "role": "build-planner",
+  "cli": "claude",
+  "model_tier_default": "opus",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Write",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Bash(git push:*)",
+    "Bash(git config:*)"
+  ],
+  "max_budget_usd": 0.30,
+  "max_turns": 10,
+  "permission_mode": "bypassPermissions",
+  "output_artifact": "build-plan.md",
+  "challenge_token_required": true,
+  "isolation": "worktree",
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      "{worktree_path}",
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": false,
+    "deny_subpaths": [
+      ".git",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "_note": "Opt C build-planner phase (cycle-103). Shadow mode default — EVOLVE_BUILD_PLANNER=0. max_turns=10 and max_budget_usd=0.30 enforce a lightweight planning-only session."
+}

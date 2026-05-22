@@ -231,6 +231,32 @@ set_state build builder
 expect_deny "build→dispatch-parallel scout" \
     '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh dispatch-parallel scout 99000 .evolve/runs/cycle-99000"}}'
 
+# === Test 26 (cycle-103): phase=intent + agent=build-planner → DENY ===========
+# Cycle 103 (Opt C shadow) requires 'build-planner' in the recognized-agents
+# case. This test proves recognition by formulating an *out-of-phase* dispatch:
+# the intent phase's EXPECTED set is {intent, orchestrator}, which excludes
+# build-planner. If build-planner is recognized, the gate DENIES (rc=2). If
+# build-planner is NOT recognized, the gate falls through the `*)` arm and
+# ALLOWS (rc=0). Therefore: expect_deny is RED now (fallback-ALLOW returns 0)
+# and GREEN only after Builder adds build-planner to the recognized-agents
+# case AND the intent phase keeps its restricted EXPECTED set.
+header "Test 26: intent + build-planner agent → DENY (proves recognition, not fallback)"
+set_state intent intent
+expect_deny "intent→build-planner (recognized but out-of-phase)" \
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh build-planner 99000 .evolve/runs/cycle-99000"}}'
+
+# === Test 27 (cycle-103): phase=build-planner is a valid recognized phase =====
+# When cycle-state.phase=build-planner, the guard must NOT treat it as malformed.
+# The precondition checks the (phase, agent) pair against a phase-specific
+# expected-agent list. A missing build-planner entry in that list would either
+# DENY all dispatches from this phase or fall through silently. RED expectation:
+# until Builder adds build-planner to the phase-allowlist, dispatches will fail
+# the expected-agent check.
+header "Test 27: phase=build-planner + agent=builder → ALLOW (forward motion)"
+set_state build-planner build-planner
+expect_allow "build-planner→builder" \
+    '{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh builder 99000 .evolve/runs/cycle-99000"}}'
+
 # === Summary =================================================================
 echo
 echo "=========================================="

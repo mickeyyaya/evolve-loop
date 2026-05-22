@@ -92,7 +92,28 @@
         "files": [".evolve/runs/cycle-{cycle}/tdd-contract.md"]
       },
       "gate_in": "gate_plan_review_to_tdd",
-      "gate_out": "gate_discover_to_build",
+      "gate_out": "gate_tdd_to_build_planner",
+      "parallel_eligible": false,
+      "skippable_when_present": false
+    },
+    {
+      "name": "build-planner",
+      "role": "build-planner",
+      "optional": true,
+      "enable_var": "EVOLVE_BUILD_PLANNER",
+      "inputs": {
+        "files": [
+          ".evolve/runs/cycle-{cycle}/scout-report.md",
+          ".evolve/runs/cycle-{cycle}/test-report.md"
+        ],
+        "state_fields": []
+      },
+      "outputs": {
+        "files": [".evolve/runs/cycle-{cycle}/build-plan.md"]
+      },
+      "gate_in": "gate_tdd_to_build_planner",
+      "gate_out": "gate_build_planner_to_build",
+      "_note": "Opt C cycle-103 (shadow). EVOLVE_BUILD_PLANNER=0 default — no persona runs until cycle-104.",
       "parallel_eligible": false,
       "skippable_when_present": false
     },
@@ -113,7 +134,7 @@
           ".evolve/runs/cycle-{cycle}/handoff-build.json"
         ]
       },
-      "gate_in": "gate_discover_to_build",
+      "gate_in": "gate_build_planner_to_build",
       "gate_out": "gate_build_to_audit",
       "parallel_eligible": false,
       "skippable_when_present": false

@@ -257,6 +257,14 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 2c. Plan-review (opt-in) → see Sprint 2 docs
    ↓ advance build builder
    (if size == trivial: skip TDD)
+2d. Build-planner (opt-in) →
+                          if [ "${EVOLVE_BUILD_PLANNER:-0}" = "1" ]; then
+                              advance build-planner build-planner
+                              subagent-run.sh build-planner $CYCLE $WORKSPACE
+                              phase-gate.sh build-planner-to-build $CYCLE $WORKSPACE
+                          fi
+   (EVOLVE_BUILD_PLANNER=0 by default — shadow mode. Set to 1 to activate advisory mode.
+    Revert path: EVOLVE_BUILD_PLANNER=0. See ADR-0019 for 3-cycle rollout: shadow→advisory→enforce.)
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
    (if size == trivial: skip Audit → jump to ship)

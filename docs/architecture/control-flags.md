@@ -48,6 +48,7 @@
 | `EVOLVE_BATCH_BUDGET_CAP` | ACTIVE | Cumulative batch budget ceiling (default $20, v8.58+) |
 | `EVOLVE_BATCH_BUDGET_DISABLE` | ACTIVE | Disable batch budget tripwire |
 | `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD` | ACTIVE | Per-fanout-worker budget cap |
+| `EVOLVE_BUILD_PLANNER` | ACTIVE (wired v10.19; default off) | Opt C build-planner phase. `0` = shadow (no-op, default); `1` = advisory (build-plan.md produced, Builder reads it); enforce mode in cycle-105 (Builder Step 3 removed). 3-cycle rollout: shadow→advisory→enforce. Revert: `EVOLVE_BUILD_PLANNER=0`. See ADR-0019. |
 | `EVOLVE_BUILDER_COST_THRESHOLD` | ACTIVE | Builder cost-overrun guard threshold (default $2.00; v8.60+) |
 | `EVOLVE_BUILDER_COST_GUARD_STRICT` | ACTIVE | Make builder cost-overrun a hard gate failure (default off; v8.60+) |
 

@@ -628,7 +628,7 @@ cmd_run() {
         agent_role="${BASH_REMATCH[1]}"
         worker_name="${BASH_REMATCH[2]}"
     fi
-    [[ "$agent_role" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent|triage|memo|tester)$ ]] || fail "unknown agent: $agent"
+    [[ "$agent_role" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent|triage|memo|tester|build-planner)$ ]] || fail "unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "workspace dir does not exist: $workspace"
 
@@ -1451,7 +1451,7 @@ cmd_dispatch_parallel() {
     local cycle="${2:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
     local workspace="${3:?usage: dispatch-parallel <agent> <cycle> <workspace>}"
 
-    [[ "$agent" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent|triage|memo|tester)$ ]] \
+    [[ "$agent" =~ ^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent|triage|memo|tester|build-planner)$ ]] \
         || fail "dispatch-parallel: unknown agent: $agent"
     [[ "$cycle" =~ ^[0-9]+$ ]] || fail "dispatch-parallel: cycle must be integer: $cycle"
     [ -d "$workspace" ] || fail "dispatch-parallel: workspace dir missing: $workspace"

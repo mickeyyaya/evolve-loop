@@ -640,6 +640,38 @@ _check_builder_cost_overrun() {
     fi
 }
 
+# ─── Gate: TDD → BUILD-PLANNER (Opt C, cycle-103) ───
+# Soft gate: when EVOLVE_BUILD_PLANNER=0 (default shadow mode), this is a
+# no-op pass-through. When EVOLVE_BUILD_PLANNER=1, verifies test-report.md
+# exists before build-planner runs.
+gate_tdd_to_build_planner() {
+    log "Checking TDD → BUILD-PLANNER gate for cycle $CYCLE"
+    if [ "${EVOLVE_BUILD_PLANNER:-0}" = "0" ]; then
+        log "OK: EVOLVE_BUILD_PLANNER=0 (shadow mode) — build-planner phase skipped"
+        log "PASS: TDD → BUILD-PLANNER gate (shadow no-op)"
+        return 0
+    fi
+    check_file_exists "$WORKSPACE/test-report.md" "TDD test report"
+    check_artifact_substance "$WORKSPACE/test-report.md" "TDD test report"
+    log "PASS: TDD → BUILD-PLANNER gate"
+}
+
+# ─── Gate: BUILD-PLANNER → BUILD (Opt C, cycle-103) ───
+# Soft gate: when EVOLVE_BUILD_PLANNER=0 (default shadow mode), this is a
+# no-op pass-through. When EVOLVE_BUILD_PLANNER=1, verifies build-plan.md
+# exists before Builder runs.
+gate_build_planner_to_build() {
+    log "Checking BUILD-PLANNER → BUILD gate for cycle $CYCLE"
+    if [ "${EVOLVE_BUILD_PLANNER:-0}" = "0" ]; then
+        log "OK: EVOLVE_BUILD_PLANNER=0 (shadow mode) — build-plan.md not required"
+        log "PASS: BUILD-PLANNER → BUILD gate (shadow no-op)"
+        return 0
+    fi
+    check_file_exists "$WORKSPACE/build-plan.md" "Build plan"
+    check_artifact_substance "$WORKSPACE/build-plan.md" "Build plan"
+    log "PASS: BUILD-PLANNER → BUILD gate"
+}
+
 # ─── Gate: BUILD → TESTER (v10.3.0+) ───
 # Verifies build-report.md exists before the Tester phase can run.
 gate_build_to_tester() {
@@ -1373,6 +1405,8 @@ case "$GATE" in
         [ "${EVOLVE_PSMAS_SKIP:-0}" = "1" ] || fail "audit-to-complete requires EVOLVE_PSMAS_SKIP=1"
         gate_audit_to_complete
         ;;
+    tdd-to-build-planner) gate_tdd_to_build_planner ;;
+    build-planner-to-build) gate_build_planner_to_build ;;
     build-to-tester)      gate_build_to_tester ;;
     tester-to-audit)      gate_tester_to_audit ;;
     build-to-audit)       gate_build_to_audit ;;

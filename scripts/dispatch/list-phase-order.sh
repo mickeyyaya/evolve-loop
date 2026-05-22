@@ -36,6 +36,7 @@ emit_hardcoded_order() {
         triage \
         plan-review \
         tdd \
+        build-planner \
         build \
         tester \
         audit \
