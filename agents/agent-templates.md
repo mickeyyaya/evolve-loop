@@ -146,23 +146,135 @@ Agent-specific `data` fields are defined in each agent file's Ledger Entry secti
 
 ---
 
+## Reflection Journal Schema
+
+Every phase agent (Intent, Scout, Triage, Plan-Review, Build-Planner, TDD-Engineer, Tester, Builder, Auditor) appends a bounded `## Reflection` section to its report **and** writes a machine-readable `<phase>-reflection.yaml` sidecar. The learn phase consumes both surfaces: humans read the markdown, the reflector persona aggregates the YAML.
+
+Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1` at v10.20.0, opt-out via `0`). See [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md) for design rationale and rollout ladder.
+
+### When to emit
+
+Append the reflection **after** the phase's primary deliverable is complete (after `build-report.md`, `audit-report.md`, etc. have been written) but **before** posting the completion ledger entry. Use the same Write call sequence as the rest of the report — never delegate to a parallel sub-agent (single-writer invariant).
+
+### Markdown section (operator-facing, ≤ 350 tokens)
+
+Appended to the phase's primary report:
+
+```markdown
+## Reflection
+<!-- reflection-version: 1 -->
+<!-- BEGIN reflection -->
+
+### What slowed this phase (required)
+- Concrete bullet citing artifact path or tracker event. Empty only if `phase_smooth: true` asserted in the YAML companion AND backed by phase-tracker numbers.
+
+### Pipeline friction received from upstream (required)
+- Friction this phase received from a prior phase. Cite upstream artifact + anchor.
+
+### Suggested improvement for next cycle (required, ≥1)
+- Imperative voice. MUST cite positive evidence (artifact, log line, ledger entry).
+
+### Self-acknowledged blind spots (optional)
+- "I did not verify X because Y" — max one bullet.
+
+### Reflection confidence (required)
+- `confidence: 0.0–1.0` — grounded in artifacts, not vibes.
+
+<!-- END reflection -->
+```
+
+The `<!-- BEGIN reflection -->` / `<!-- END reflection -->` anchors enable idempotent replacement on re-run (same pattern as `append-phase-perf.sh`).
+
+### YAML sidecar (machine-readable)
+
+Written to `$WORKSPACE/<phase>-reflection.yaml`. Flat, jq-greppable, ~30 lines.
+
+```yaml
+schema_version: 1
+cycle: <N>
+phase: <scout|tdd|build|audit|...>
+agent: <evolve-scout|evolve-builder|...>
+phase_smooth: <true|false>
+slowdowns:
+  - category: <slowdown-category>          # see enum below
+    evidence: "<file-path>:line=<N>"       # required when category present
+    severity: <low|medium|high>
+friction_received_from:
+  - upstream_phase: <phase-name>
+    issue: "<short description>"
+    evidence: "<file-path>#<anchor>"
+suggested_improvements:
+  - action: "<imperative-voice action>"    # e.g., "Bump kb-search quota to 30"
+    target_file: "<path-to-file-to-change>"
+    evidence_pointer: "<artifact-citation>"
+    priority: <low|medium|high>
+blind_spots:
+  - "<one-line acknowledgement>"           # optional
+reflection_confidence: <0.0-1.0>
+phase_tracker_refs:                        # MUST come from .ephemeral/metrics/<phase>.json
+  latency_ms: <int>
+  cost_usd: <float>
+  turns: <int>
+```
+
+### Slowdown category enum (closed set)
+
+| Category | Use when |
+|----------|----------|
+| `research-quota` | A research/search tool refused calls due to quota |
+| `tool-error` | A tool returned an error that required a workaround |
+| `context-saturation` | Approaching token/turn cap forced abbreviated output |
+| `ambiguous-input` | Upstream artifact was ambiguous and required interpretation |
+| `tool-batching` | Too many serial tool calls that could have been parallelized |
+| `profile-restriction` | Permission profile blocked an action that turned out necessary |
+| `other` | None of the above — REQUIRES a free-form note in `evidence` |
+
+Cross-cycle aggregation tallies by these categories; using `other` undermines the rollup, so reach for it only when nothing else fits.
+
+### Anti-sycophancy rule (verbatim)
+
+Include this directive in every phase agent's reflection authoring instructions:
+
+> A reflection is NOT a status report. "Phase went smoothly" is only acceptable when `phase_smooth: true` is asserted AND `phase_tracker_refs` shows no over-budget signal (cost ≤ baseline × 1.1, turns ≤ profile max). Otherwise you MUST cite at least one slowdown with artifact evidence. Affirmation without evidence is a `reflection-sycophancy` defect the Auditor flags MEDIUM (advisory, non-blocking).
+
+### Reusing phase-tracker data
+
+The `phase_tracker_refs` block MUST be read from `.evolve/runs/cycle-<N>/.ephemeral/metrics/<phase>.json` (already produced by `scripts/observability/rollup-cycle-metrics.sh`). Do not recompute timing or cost — single source of truth.
+
+### Aggregation surface
+
+- **Per-cycle:** the new `evolve-reflector` agent reads every `<phase>-reflection.yaml` in the cycle dir and emits `learn/reflector-synthesis.md`.
+- **Cross-cycle:** the reflector calls `scripts/observability/aggregate-reflections.sh --window 5` for a 5-cycle rollup (slowdown categories tallied, upstream friction sources, recurring suggestions).
+- **Operator view:** `scripts/observability/dashboard.sh` displays a one-line "Recent reflection hot-spots" summary sourced from the aggregator's `--format=json` mode.
+
+---
+
 ## Pipeline Agents
 
-The full evolve-loop pipeline and the agent responsible for each phase:
+The full evolve-loop pipeline and the agent responsible for each phase. **Note (v10.20.0+):** the Learn phase is formally an umbrella containing the reflector + retrospective (FAIL/WARN) + memo (PASS); all three consume the per-phase reflection YAMLs.
 
 | Phase | Agent | File | Output Artifact |
 |-------|-------|------|-----------------|
 | Calibrate | Orchestrator | `evolve-orchestrator.md` | cycle-state.json |
-| Research / Discover | Scout | `evolve-scout.md` | `scout-report.md` |
-| Test Contract (TDD) | TDD Engineer | `evolve-tdd-engineer.md` | `test-report.md` |
-| Build | Builder | `evolve-builder.md` | `build-report.md` |
-| Audit | Auditor | `evolve-auditor.md` | `audit-report.md` |
+| Intent (opt-in) | Intent | `evolve-intent.md` | `intent.md` + `intent-reflection.yaml` |
+| Research / Discover | Scout | `evolve-scout.md` | `scout-report.md` + `scout-reflection.yaml` |
+| Triage | Triage | `evolve-triage.md` | `triage-decision.md` + `triage-reflection.yaml` |
+| Plan Review (opt-in) | Plan Reviewer | `plan-reviewer.md` | `plan-review.md` + `plan-review-reflection.yaml` |
+| Build Planner (rollout) | Build Planner | `evolve-build-planner.md` | `build-plan.md` + `build-planner-reflection.yaml` |
+| Test Contract (TDD) | TDD Engineer | `evolve-tdd-engineer.md` | `test-report.md` + `tdd-reflection.yaml` |
+| EGPS Tester | Tester | `evolve-tester.md` | `tester-report.md` + `tester-reflection.yaml` |
+| Build | Builder | `evolve-builder.md` | `build-report.md` + `build-reflection.yaml` |
+| Audit | Auditor | `evolve-auditor.md` | `audit-report.md` + `audit-reflection.yaml` |
 | Ship | Orchestrator / ship.sh | `evolve-orchestrator.md` | commit SHA |
-| Learn | Retrospective | `evolve-retrospective.md` | instinct entries |
+| Learn — Reflector | Reflector | `evolve-reflector.md` | `learn/reflector-synthesis.md` |
+| Learn — Retrospective (FAIL/WARN) | Retrospective | `evolve-retrospective.md` | `retrospective-report.md` + lesson YAMLs |
+| Learn — Memo (PASS) | Memo | `evolve-memo.md` | `memo.md` + carryoverTodos |
 
 **TDD Engineer contract:** Runs after Scout selects a task and before Builder implements. Writes failing tests that encode acceptance criteria (RED phase). Builder must make those tests pass without modifying them. See [evolve-tdd-engineer.md](evolve-tdd-engineer.md) for the full workflow.
 
 **Phase sequence enforcement:** `phase-gate-precondition.sh` blocks out-of-order agent invocations. The TDD engineer phase (`tdd`) must be advanced via `cycle-state.sh advance tdd tdd-engineer` before Builder can be invoked.
+
+**Learn phase invocation:** `scripts/lifecycle/run-cycle.sh` invokes the reflector after Ship completes, then dispatches retrospective (FAIL/WARN) or memo (PASS) based on the audit verdict. The reflector runs on every cycle regardless of verdict.
 
 ---
 
