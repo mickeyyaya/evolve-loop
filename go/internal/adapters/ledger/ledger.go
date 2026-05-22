@@ -129,11 +129,17 @@ func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
 // zero-init, checks tip equals SHA256 of the last line, and flags any
 // duplicate prev_hash anomalies. Returns core.ErrLedgerChainBroken on
 // any inconsistency.
+//
+// Soft-start boundary (port of verify-ledger-chain.sh): pre-v8.37
+// entries have no prev_hash field at all. They are not retro-validated
+// but their SHA is still computed so the first v8.37+ entry can chain
+// from the last pre-v8.37 line. If the entire file is pre-v8.37 the
+// tip file is optional.
 func (l *FileLedger) Verify(_ context.Context) error {
 	raw, err := os.ReadFile(l.ledgerPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil // bootstrap state — no entries yet
+			return nil
 		}
 		return fmt.Errorf("ledger read: %w", err)
 	}
@@ -145,26 +151,39 @@ func (l *FileLedger) Verify(_ context.Context) error {
 	var lastSeq int
 	var lastSha string
 	seenPrev := map[string]struct{}{}
+	sawV837 := false
 	for i, line := range lines {
-		var e core.LedgerEntry
-		if err := json.Unmarshal(line, &e); err != nil {
+		hasPrev, e, err := decodeLedgerLine(line)
+		if err != nil {
 			return fmt.Errorf("%w: line %d unmarshal: %v", core.ErrLedgerChainBroken, i, err)
 		}
-		expected := ZeroSeed
-		if i > 0 {
-			expected = lastSha
+		if hasPrev {
+			expected := ZeroSeed
+			if sawV837 {
+				expected = lastSha // chain from previous v8.37 line
+			} else if lastSha != "" {
+				// First v8.37 entry following pre-v8.37 entries: must
+				// chain from the last pre-v8.37 line's SHA.
+				expected = lastSha
+			}
+			if e.PrevHash != expected {
+				return fmt.Errorf("%w: line %d prev_hash mismatch (have %s want %s)", core.ErrLedgerChainBroken, i, e.PrevHash, expected)
+			}
+			if _, dup := seenPrev[e.PrevHash]; dup && sawV837 {
+				return fmt.Errorf("%w: line %d duplicate prev_hash (concurrent fan-out anomaly)", core.ErrLedgerChainBroken, i)
+			}
+			seenPrev[e.PrevHash] = struct{}{}
+			lastSeq = e.EntrySeq
+			sawV837 = true
 		}
-		if e.PrevHash != expected {
-			return fmt.Errorf("%w: line %d prev_hash mismatch (have %s want %s)", core.ErrLedgerChainBroken, i, e.PrevHash, expected)
-		}
-		if _, dup := seenPrev[e.PrevHash]; dup && i > 0 {
-			return fmt.Errorf("%w: line %d duplicate prev_hash (concurrent fan-out anomaly)", core.ErrLedgerChainBroken, i)
-		}
-		seenPrev[e.PrevHash] = struct{}{}
-		lastSeq = e.EntrySeq
+		// Always compute the line SHA for the next iteration's chain check.
 		lastSha = sha256Hex(line)
 	}
 
+	// If no v8.37 entries exist, tip file is optional.
+	if !sawV837 {
+		return nil
+	}
 	tip, err := os.ReadFile(l.tipPath)
 	if err != nil {
 		return fmt.Errorf("%w: tip read: %v", core.ErrLedgerChainBroken, err)
@@ -174,6 +193,20 @@ func (l *FileLedger) Verify(_ context.Context) error {
 		return fmt.Errorf("%w: tip mismatch (have %q want %q)", core.ErrLedgerChainBroken, tip, wantTip)
 	}
 	return nil
+}
+
+// decodeLedgerLine parses one JSONL line and returns whether prev_hash
+// was present as a JSON key (distinct from being present with value "").
+func decodeLedgerLine(line []byte) (hasPrevHash bool, e core.LedgerEntry, err error) {
+	if err = json.Unmarshal(line, &e); err != nil {
+		return false, e, err
+	}
+	var raw map[string]json.RawMessage
+	if err = json.Unmarshal(line, &raw); err != nil {
+		return false, e, err
+	}
+	_, hasPrevHash = raw["prev_hash"]
+	return hasPrevHash, e, nil
 }
 
 // Iter returns a LedgerIterator yielding entries in append order.
