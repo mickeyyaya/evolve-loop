@@ -14,19 +14,19 @@ import (
 // --- fakes ---
 
 type fakeStorage struct {
-	state              State
-	cycleState         CycleState
-	cycleStateLog      []CycleState
-	stateLog           []State
-	lockHeld           bool
-	lockCount          int
-	mu                 sync.Mutex
-	lockErr            error
-	failOnWriteCS      bool
-	failOnReadState    bool
-	failOnWriteState   bool
-	writeCSFailAt      int // 0 = never; N = N-th write
-	writeCSCalls       int
+	state            State
+	cycleState       CycleState
+	cycleStateLog    []CycleState
+	stateLog         []State
+	lockHeld         bool
+	lockCount        int
+	mu               sync.Mutex
+	lockErr          error
+	failOnWriteCS    bool
+	failOnReadState  bool
+	failOnWriteState bool
+	writeCSFailAt    int // 0 = never; N = N-th write
+	writeCSCalls     int
 }
 
 func (f *fakeStorage) ReadState(_ context.Context) (State, error) {
@@ -81,8 +81,8 @@ func (f *fakeStorage) AcquireLock(_ context.Context) (func() error, error) {
 }
 
 type fakeLedger struct {
-	entries     []LedgerEntry
-	mu          sync.Mutex
+	entries      []LedgerEntry
+	mu           sync.Mutex
 	failOnAppend bool
 }
 
@@ -175,6 +175,68 @@ func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 		}
 		if e.Cycle != 10 {
 			t.Errorf("ledger[%d].cycle=%d, want 10", i, e.Cycle)
+		}
+	}
+}
+
+// CycleRequest.Env must reach every PhaseRequest.Env. Phases consult
+// req.Env["EVOLVE_CLI"] and req.Env["EVOLVE_*_MODEL"] for CLI/model
+// selection; without this passthrough every cycle is silently hardcoded
+// to claude-p + default model.
+func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	o := NewOrchestrator(st, led, runners)
+
+	envIn := map[string]string{
+		"EVOLVE_CLI":         "codex",
+		"EVOLVE_SCOUT_MODEL": "auto",
+		"EVOLVE_BUILD_MODEL": "sonnet",
+	}
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: "/tmp/p",
+		GoalHash:    "g",
+		Env:         envIn,
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	// Every fakeRunner should have seen these env vars.
+	for _, p := range []Phase{PhaseScout, PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip} {
+		fr := runners[p].(*fakeRunner)
+		if fr.calls == 0 {
+			t.Errorf("phase %s never ran", p)
+			continue
+		}
+		got := fr.requests[0].Env
+		if got["EVOLVE_CLI"] != "codex" {
+			t.Errorf("phase %s: req.Env[EVOLVE_CLI]=%q, want codex", p, got["EVOLVE_CLI"])
+		}
+		if got["EVOLVE_BUILD_MODEL"] != "sonnet" {
+			t.Errorf("phase %s: req.Env[EVOLVE_BUILD_MODEL]=%q, want sonnet", p, got["EVOLVE_BUILD_MODEL"])
+		}
+	}
+}
+
+// Mutating the operator's Env map post-RunCycle must not retroactively
+// change what phases saw — the orchestrator must copy the map.
+func TestOrchestrator_CycleEnv_IsCopied(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	o := NewOrchestrator(st, led, runners)
+
+	envIn := map[string]string{"EVOLVE_CLI": "codex"}
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", Env: envIn})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	envIn["EVOLVE_CLI"] = "MUTATED"
+	for _, p := range []Phase{PhaseScout, PhaseBuild} {
+		fr := runners[p].(*fakeRunner)
+		if got := fr.requests[0].Env["EVOLVE_CLI"]; got != "codex" {
+			t.Errorf("phase %s: req.Env[EVOLVE_CLI]=%q, want codex (operator mutation must not propagate)", p, got)
 		}
 	}
 }

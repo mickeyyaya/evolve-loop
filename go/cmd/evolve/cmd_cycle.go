@@ -10,7 +10,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -75,6 +77,10 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 			MaxUSD:      budgetUSD,
 			BatchCapUSD: batchCapUSD,
 		},
+		Env: filterEvolveEnv(os.Environ()),
+		Context: map[string]string{
+			"commit_message": fmt.Sprintf("evolve-cycle: goal=%s", goalHash),
+		},
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
@@ -88,6 +94,26 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// filterEvolveEnv extracts the EVOLVE_* and BRIDGE_* slice of the
+// process environment into a flat map. Phases consult these for CLI
+// selection (EVOLVE_CLI), model overrides (EVOLVE_*_MODEL), and ship
+// behaviour (EVOLVE_SHIP_SCRIPT). BRIDGE_TESTING / BRIDGE_*_BINARY are
+// also propagated so test invocations can swap CLI binaries.
+func filterEvolveEnv(environ []string) map[string]string {
+	out := map[string]string{}
+	for _, kv := range environ {
+		eq := strings.IndexByte(kv, '=')
+		if eq <= 0 {
+			continue
+		}
+		k := kv[:eq]
+		if strings.HasPrefix(k, "EVOLVE_") || strings.HasPrefix(k, "BRIDGE_") {
+			out[k] = kv[eq+1:]
+		}
+	}
+	return out
+}
+
 // wireOrchestrator returns an orchestrator wired with production
 // adapters: filesystem-backed storage + ledger, default bridge, all
 // 8 phase runners. Extracted for cmd_loop reuse.
@@ -96,14 +122,14 @@ func wireOrchestrator(projectRoot, evolveDir string) *core.Orchestrator {
 	prm := newPromptsLoader(projectRoot)
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent:  intent.New(intent.Config{Bridge: br, Prompts: prm}),
-		core.PhaseScout:   scout.New(scout.Config{Bridge: br, Prompts: prm}),
-		core.PhaseTriage:  triage.New(triage.Config{Bridge: br, Prompts: prm}),
-		core.PhaseTDD:     tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
-		core.PhaseBuild:   build.New(build.Config{Bridge: br, Prompts: prm}),
-		core.PhaseAudit:   audit.New(audit.Config{Bridge: br, Prompts: prm}),
-		core.PhaseShip:    ship.NewWithDefaultRunner(),
-		core.PhaseRetro:   retro.New(retro.Config{Bridge: br, Prompts: prm}),
+		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
+		core.PhaseScout:  scout.New(scout.Config{Bridge: br, Prompts: prm}),
+		core.PhaseTriage: triage.New(triage.Config{Bridge: br, Prompts: prm}),
+		core.PhaseTDD:    tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
+		core.PhaseBuild:  build.New(build.Config{Bridge: br, Prompts: prm}),
+		core.PhaseAudit:  audit.New(audit.Config{Bridge: br, Prompts: prm}),
+		core.PhaseShip:   ship.NewWithDefaultRunner(),
+		core.PhaseRetro:  retro.New(retro.Config{Bridge: br, Prompts: prm}),
 	}
 
 	st := storage.New(evolveDir)

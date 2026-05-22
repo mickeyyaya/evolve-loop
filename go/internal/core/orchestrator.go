@@ -11,6 +11,16 @@ type CycleRequest struct {
 	ProjectRoot string
 	GoalHash    string
 	Budget      BudgetEnvelope
+	// Env is propagated to every PhaseRequest.Env that runs in this
+	// cycle. Phases consult it for CLI/model selection
+	// (EVOLVE_CLI, EVOLVE_<PHASE>_MODEL, …). The orchestrator copies the
+	// map so post-RunCycle operator mutation does not affect in-flight
+	// or completed runs.
+	Env map[string]string
+	// Context seeds the PhaseRequest.Context every phase receives. Ship
+	// requires Context["commit_message"]; Scout reads
+	// Context["strategy"]. Copied like Env.
+	Context map[string]string
 }
 
 // CycleResult summarises what RunCycle did.
@@ -74,6 +84,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
 	}
 
+	// One snapshot per cycle — operator mutation post-call must not
+	// retroactively change what phases saw.
+	envSnap := make(map[string]string, len(req.Env))
+	for k, v := range req.Env {
+		envSnap[k] = v
+	}
+	ctxSnap := make(map[string]string, len(req.Context))
+	for k, v := range req.Context {
+		ctxSnap[k] = v
+	}
+
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
 	current := PhaseStart
 	lastVerdict := VerdictPASS
@@ -108,6 +129,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			GoalHash:      req.GoalHash,
 			Budget:        req.Budget,
 			PreviousPhase: string(current),
+			Env:           envSnap,
+			Context:       ctxSnap,
 		})
 		if err != nil {
 			return result, fmt.Errorf("phase %s: %w", next, err)
