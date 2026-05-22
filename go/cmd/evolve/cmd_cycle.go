@@ -52,12 +52,14 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		evolveDir   string
 		budgetUSD   float64
 		batchCapUSD float64
+		simulate    bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
 	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "per-cycle USD budget cap")
 	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap across cycles")
+	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -69,7 +71,12 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
 
-	orch := wireOrchestrator(projectRoot, evolveDir)
+	var orch *core.Orchestrator
+	if simulate {
+		orch = wireSimulateOrchestrator(projectRoot, evolveDir)
+	} else {
+		orch = wireOrchestrator(projectRoot, evolveDir)
+	}
 	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    goalHash,

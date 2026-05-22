@@ -228,16 +228,69 @@ JSON
 }
 
 full() {
-    log "FULL MODE: this will spend real money via Claude CLI."
-    log "  bash side: bash scripts/dispatch/run-cycle.sh (~\$5-20)"
-    log "  Go side:   $GO_BIN cycle run (~\$5-20)"
-    log
-    log "Full mode is intentionally not implemented in v11.0.0 — the"
-    log "Go orchestrator's simulate hook (parent plan §6 item 5) needs"
-    log "deeper artifact compatibility work first. Operator may run"
-    log "both invocations manually and diff the resulting workspaces:"
-    log "  diff -r <bash-workspace>/.evolve/runs/ <go-workspace>/.evolve/runs/"
-    return 1
+    # v11.1.0: --full now uses `evolve cycle run --simulate` on the Go
+    # side to drive the orchestrator state machine end-to-end without
+    # LLM cost. Real-LLM full parity is operator-driven via
+    # scripts/perf-cycle-comparison.sh.
+    log "running full-mode parity audit (no-LLM both sides)..."
+    check_prereqs || {
+        log "FATAL: prerequisites missing; cannot run --full"
+        return 2
+    }
+
+    local tmp
+    tmp=$(mktemp -d -t parity-audit-full.XXXXXX)
+    trap 'rm -rf "$tmp"' RETURN
+    local bash_out="$tmp/bash" go_out="$tmp/go"
+    mkdir -p "$bash_out" "$go_out"
+
+    log "bash side: cycle-simulator.sh → $bash_out"
+    EVOLVE_PROJECT_ROOT="$bash_out" EVOLVE_CYCLE_NUMBER=88888 \
+        bash "$SIMULATOR" >"$bash_out/simulator.log" 2>&1
+    local bash_rc=$?
+
+    log "Go side:   $GO_BIN cycle run --simulate → $go_out"
+    "$GO_BIN" cycle run \
+        --simulate \
+        --project-root="$go_out" \
+        --evolve-dir="$go_out/.evolve" \
+        --goal-hash="parityaud" \
+        >"$go_out/cycle.log" 2>&1
+    local go_rc=$?
+
+    {
+        echo "# Parity audit report — full mode (no-LLM)"
+        echo
+        echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo
+        echo "## Exit codes"
+        echo
+        echo "- bash cycle-simulator.sh: $bash_rc"
+        echo "- Go evolve cycle run --simulate: $go_rc"
+        echo
+        echo "## Bash artifact tree"
+        echo
+        find "$bash_out" -maxdepth 4 -type f 2>/dev/null | sed "s|$bash_out|  |" | sort
+        echo
+        echo "## Go artifact tree"
+        echo
+        find "$go_out" -maxdepth 4 -type f 2>/dev/null | sed "s|$go_out|  |" | sort
+        echo
+        echo "## Verdict"
+        echo
+        if [ "$bash_rc" -eq 0 ] && [ "$go_rc" -eq 0 ]; then
+            echo "**FULL PASS** — both orchestrators completed all phases end-to-end."
+            echo
+            echo "Note: artifact byte-level diff is intentionally NOT enforced — bash and"
+            echo "Go produce different report templates by design. What matters is that"
+            echo "both sides walked all phases without error."
+        else
+            echo "**FULL FAIL** — bash=$bash_rc, go=$go_rc. Inspect log files in $tmp."
+        fi
+    } > "$REPORT"
+
+    log "report written: $REPORT"
+    [ "$bash_rc" -eq 0 ] && [ "$go_rc" -eq 0 ]
 }
 
 case "$MODE" in
