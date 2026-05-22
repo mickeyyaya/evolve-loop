@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**Current (v11.0.0)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v11.0)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 > **v11.0.0** introduces a Go binary as the primary runtime alongside the bash scripts. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the upgrade path and `EVOLVE_USE_LEGACY_BASH=1` rollback hatch. Bash continues to work unchanged.
 
