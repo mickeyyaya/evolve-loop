@@ -82,6 +82,17 @@ func TestChain_DeniesOnAnyVerifyError(t *testing.T) {
 	}
 }
 
+func TestChain_NilLedgerDenies(t *testing.T) {
+	g := NewChain(nil)
+	dec := g.Decide(context.Background(), core.GuardInput{})
+	if dec.Allow {
+		t.Error("nil ledger must deny")
+	}
+	if dec.Reason == "" {
+		t.Error("denied without reason")
+	}
+}
+
 func TestChain_AllowsEmptyLedger(t *testing.T) {
 	l, _ := setupLedger(t)
 	g := NewChain(l)
