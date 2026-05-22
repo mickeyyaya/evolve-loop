@@ -225,6 +225,61 @@ func TestAllOf_ShortCircuit(t *testing.T) {
 	}
 }
 
+func TestFileMatchesRegex_MissingFile(t *testing.T) {
+	ft := &fakeT{}
+	if FileMatchesRegex(ft, "/no/such/file", ".*") {
+		t.Error("missing file must report false")
+	}
+}
+
+func TestJSONFieldEquals_MissingFile(t *testing.T) {
+	ft := &fakeT{}
+	if JSONFieldEquals(ft, "/no/such/file", "a", "v") {
+		t.Error("missing file must report false")
+	}
+}
+
+func TestJSONFieldEquals_EmptyDotPath(t *testing.T) {
+	// Empty dotPath returns whole doc; comparing to a map of any won't
+	// equal via ==, so this should mismatch with non-nil want.
+	dir := t.TempDir()
+	p := filepath.Join(dir, "s.json")
+	_ = os.WriteFile(p, []byte(`{"a":1}`), 0o644)
+	ft := &fakeT{}
+	// Comparing the whole map via Go == will panic on map — guard?
+	// Actually a map is not == comparable in Go. The helper must not
+	// panic on this; instead it should report false via the != check.
+	// To avoid a comparison panic at runtime, the impl must handle it.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("panicked on empty dotPath: %v", r)
+		}
+	}()
+	if JSONFieldEquals(ft, p, "", "anything") {
+		t.Error("empty dotPath returning whole doc should mismatch primitive want")
+	}
+}
+
+func TestNavigateDotPath_EmptyPath(t *testing.T) {
+	got, ok := navigateDotPath(map[string]any{"a": 1}, "")
+	if !ok {
+		t.Error("empty path must succeed")
+	}
+	if _, isMap := got.(map[string]any); !isMap {
+		t.Errorf("got %T, want map", got)
+	}
+}
+
+func TestSubprocessOutput_StderrCaptured(t *testing.T) {
+	_, stderr, _, err := SubprocessOutput("sh", "-c", "echo err 1>&2; exit 0")
+	if err != nil {
+		t.Errorf("err=%v", err)
+	}
+	if stderr != "err\n" {
+		t.Errorf("stderr=%q", stderr)
+	}
+}
+
 func TestSetupTempProject_StructureCreated(t *testing.T) {
 	dir := SetupTempProject(t)
 	if _, err := os.Stat(filepath.Join(dir, ".evolve")); err != nil {
