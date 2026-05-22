@@ -101,12 +101,12 @@ with `cycle-state.json` and the failing log line attached.
 
 ## Deprecation schedule
 
-| Version | Change |
-|---|---|
-| v11.0.0 (this release) | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place. |
-| v11.1.0 | `scripts/` → `legacy/scripts/` physical move. Symlinks at old paths for compat. |
-| v11.2.0 | Symlinks removed. `EVOLVE_USE_LEGACY_BASH=1` continues to work (paths resolved via `legacy/`). |
-| v12.0.0 | Bash scripts removed entirely. Go-only. (~6 months minimum from v11.0.0.) |
+| Version | Change | Status |
+|---|---|---|
+| v11.0.0 | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place. | SHIPPED |
+| v11.1.0 (this release) | `scripts/` → `legacy/scripts/` physical move. `scripts/` is a symlink to `legacy/scripts/`. All existing references work via the symlink. | SHIPPED |
+| v11.2.0 | Symlink removed at `scripts/`. Requires every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/) updated to `legacy/scripts/...` first. Operator integrations that hardcode `scripts/...` will break. | DEFERRED — needs broader reference cleanup |
+| v12.0.0 | Bash scripts removed entirely. Go-only. | DEFERRED — needs Go orchestrator feature parity (currently shells out to bash for `ship.sh`, etc.) |
 
 ## See also
 
