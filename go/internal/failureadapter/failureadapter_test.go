@@ -352,6 +352,148 @@ func TestDecide_DefaultClock(t *testing.T) {
 	}
 }
 
+// TestDecide_InfraSystemic_FluentAwareness — fluent path through rule 2.
+func TestDecide_InfraSystemic_FluentAwareness(t *testing.T) {
+	now := fixedTime()
+	entries := []Entry{
+		{Cycle: 5, Classification: InfraSystemic, RecordedAt: iso(now), ExpiresAt: iso(now.Add(7 * 24 * time.Hour)), Summary: "host broken"},
+	}
+	d := Decide(entries, Options{Now: now, Strict: false})
+	if d.Action != ActionProceed {
+		t.Errorf("Action=%q fluent, want PROCEED", d.Action)
+	}
+	if !containsStr(d.Reason, "would-have-blocked: BLOCK-OPERATOR-ACTION") {
+		t.Errorf("Reason=%q missing fluent infra-systemic awareness", d.Reason)
+	}
+}
+
+// TestDecide_InfraSystemic_NoSummary — exercises the "(no summary)"
+// fallback when the matching entry has empty Summary. bash:259.
+func TestDecide_InfraSystemic_NoSummary(t *testing.T) {
+	now := fixedTime()
+	entries := []Entry{
+		{Cycle: 5, Classification: InfraSystemic, RecordedAt: iso(now), ExpiresAt: iso(now.Add(7 * 24 * time.Hour))}, // no Summary
+	}
+	d := Decide(entries, Options{Now: now, Strict: true})
+	if !containsStr(d.Reason, "(no summary)") {
+		t.Errorf("Reason=%q missing '(no summary)' fallback", d.Reason)
+	}
+}
+
+// TestDecide_LongSummaryTruncatedAt200 — bash `| head -c 200` truncates
+// the summary to 200 bytes. The Go port replicates this for log parity.
+func TestDecide_LongSummaryTruncatedAt200(t *testing.T) {
+	now := fixedTime()
+	// Use 'Z' — no surrounding word in the bash reason template contains it.
+	longSummary := ""
+	for i := 0; i < 300; i++ {
+		longSummary += "Z"
+	}
+	entries := []Entry{
+		{Cycle: 5, Classification: InfraSystemic, RecordedAt: iso(now), ExpiresAt: iso(now.Add(7 * 24 * time.Hour)), Summary: longSummary},
+	}
+	d := Decide(entries, Options{Now: now, Strict: true})
+	count := 0
+	for i := range d.Reason {
+		if d.Reason[i] == 'Z' {
+			count++
+		}
+	}
+	if count != 200 {
+		t.Errorf("summary in Reason has %d 'Z' chars, want 200 (bash head -c 200)", count)
+	}
+}
+
+// TestDecide_TwoAuditFail_Fluent — rule 3 fluent awareness path.
+func TestDecide_TwoAuditFail_Fluent(t *testing.T) {
+	now := fixedTime()
+	exp := iso(now.Add(7 * 24 * time.Hour))
+	entries := []Entry{
+		{Cycle: 32, Classification: CodeAuditFail, RecordedAt: iso(now), ExpiresAt: exp},
+		{Cycle: 33, Classification: CodeAuditFail, RecordedAt: iso(now), ExpiresAt: exp},
+	}
+	d := Decide(entries, Options{Now: now, Strict: false})
+	if d.Action != ActionProceed {
+		t.Errorf("Action=%q, want PROCEED fluent", d.Action)
+	}
+	if !containsStr(d.Reason, "code-audit-fail") {
+		t.Errorf("Reason=%q missing audit-fail awareness", d.Reason)
+	}
+}
+
+// TestDecide_TwoBuildFail_Fluent — rule 4 fluent awareness path.
+func TestDecide_TwoBuildFail_Fluent(t *testing.T) {
+	now := fixedTime()
+	exp := iso(now.Add(7 * 24 * time.Hour))
+	entries := []Entry{
+		{Cycle: 10, Classification: CodeBuildFail, RecordedAt: iso(now), ExpiresAt: exp},
+		{Cycle: 11, Classification: CodeBuildFail, RecordedAt: iso(now), ExpiresAt: exp},
+	}
+	d := Decide(entries, Options{Now: now, Strict: false})
+	if d.Action != ActionProceed {
+		t.Errorf("Action=%q, want PROCEED fluent", d.Action)
+	}
+	if !containsStr(d.Reason, "code-build-fail") {
+		t.Errorf("Reason=%q missing build-fail awareness", d.Reason)
+	}
+}
+
+// TestDecide_InfraTailStreak_Fluent — rule 5 fluent awareness path.
+func TestDecide_InfraTailStreak_Fluent(t *testing.T) {
+	now := fixedTime()
+	exp := iso(now.Add(12 * time.Hour))
+	entries := []Entry{
+		{Cycle: 1, Classification: InfraTransient, RecordedAt: iso(now.Add(-3 * time.Hour)), ExpiresAt: exp},
+		{Cycle: 2, Classification: InfraTransient, RecordedAt: iso(now.Add(-2 * time.Hour)), ExpiresAt: exp},
+		{Cycle: 3, Classification: InfraTransient, RecordedAt: iso(now.Add(-1 * time.Hour)), ExpiresAt: exp},
+	}
+	d := Decide(entries, Options{Now: now, Strict: false})
+	if d.Action != ActionProceed {
+		t.Errorf("Action=%q, want PROCEED fluent", d.Action)
+	}
+	if !containsStr(d.Reason, "consecutive infrastructure-transient") {
+		t.Errorf("Reason=%q missing tail-streak awareness", d.Reason)
+	}
+}
+
+// TestIsNonExpired_UnparseableExpiresAt_KeptAsLive — bash try-catch on
+// fromdateiso8601 falls back to ($now + 1) → entry kept.
+func TestIsNonExpired_UnparseableExpiresAt_KeptAsLive(t *testing.T) {
+	now := fixedTime()
+	entries := []Entry{
+		{Cycle: 1, Classification: CodeAuditFail, RecordedAt: iso(now), ExpiresAt: "not-a-date"},
+	}
+	d := Decide(entries, Options{Now: now})
+	if d.Evidence.NonExpiredCount != 1 {
+		t.Errorf("NonExpiredCount=%d, want 1 (unparseable expiresAt → kept)", d.Evidence.NonExpiredCount)
+	}
+}
+
+// TestIsNonExpired_UnparseableRecordedAt_NoExpiresAt_Drops — bash falls
+// back to recordedAt=0 + 1d, which is before now → entry dropped.
+func TestIsNonExpired_UnparseableRecordedAt_NoExpiresAt_Drops(t *testing.T) {
+	now := fixedTime()
+	entries := []Entry{
+		{Cycle: 1, Classification: CodeAuditFail, RecordedAt: "bogus"},
+	}
+	d := Decide(entries, Options{Now: now})
+	if d.Evidence.NonExpiredCount != 0 {
+		t.Errorf("NonExpiredCount=%d, want 0 (unparseable recordedAt → dropped)", d.Evidence.NonExpiredCount)
+	}
+}
+
+// TestLastSummaryOf_NoMatch_ReturnsEmpty — direct test of the helper
+// for the empty-class branch (used when distinctCyclesByClass returns 0
+// but the caller of lastSummaryOf needs the empty-string sentinel).
+func TestLastSummaryOf_NoMatch_ReturnsEmpty(t *testing.T) {
+	entries := []Entry{
+		{Cycle: 1, Classification: CodeAuditFail, Summary: "x"},
+	}
+	if got := lastSummaryOf(entries, InfraSystemic); got != "" {
+		t.Errorf("lastSummaryOf=%q, want empty", got)
+	}
+}
+
 // containsStr — small helper since strings.Contains would import
 // strings just for tests; inlined for clarity (and matches the
 // projecthash_test convention of self-contained tests).
