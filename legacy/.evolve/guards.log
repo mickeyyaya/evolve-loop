@@ -1,0 +1,56 @@
+[2026-05-22T21:42:35Z] [ship-gate] no-payload (manual invocation?); ALLOW
+[2026-05-22T21:42:35Z] [ship-gate] ALLOW: non-ship command: ls -la
+[2026-05-22T21:42:35Z] [ship-gate] ALLOW: canonical ship.sh: bash scripts/lifecycle/ship.sh "feat: x"
+[2026-05-22T21:42:35Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: git commit -m foo
+[2026-05-22T21:42:35Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: git push origin main
+[2026-05-22T21:42:35Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: cd subdir && git commit -m foo
+[2026-05-22T21:42:35Z] [ship-gate] ALLOW: non-ship command: cat > x.md <<EOF
+Docs about git commit usage.
+EOF
+[2026-05-22T21:42:36Z] [ship-gate] ALLOW: non-ship command: grep "git commit" docs/
+[2026-05-22T21:42:36Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: gh release create v1.0
+[2026-05-22T21:42:36Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: echo foo | git commit -m foo
+[2026-05-22T21:42:36Z] [ship-gate] WARN: EVOLVE_BYPASS_SHIP_GATE=1 — bypassing for: git commit -m foo
+[2026-05-22T21:42:36Z] [ship-gate] ALLOW: non-ship command: git status --short
+[2026-05-22T21:42:36Z] [ship-gate] ALLOW: non-ship command: git log --oneline -3
+[2026-05-22T21:42:36Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: (git commit -m foo)
+[2026-05-22T21:42:36Z] [ship-gate] DENY: ship-class command outside scripts/lifecycle/ship.sh: git status
+git commit -m foo
+[2026-05-22T21:42:36Z] [ship-gate] extracted inner shell snippet from bash: git commit -m bypass
+[2026-05-22T21:42:36Z] [ship-gate] DENY: bash with ship-class inner command: bash -c "git commit -m bypass"
+[2026-05-22T21:42:36Z] [ship-gate] extracted inner shell snippet from sh: git commit -m bypass
+[2026-05-22T21:42:36Z] [ship-gate] DENY: sh with ship-class inner command: sh -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from eval: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: eval with ship-class inner command: eval "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from bash: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: bash with ship-class inner command: bash -c 'git commit -m bypass'
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from bash: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: bash with ship-class inner command: bash -x -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from bash: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: bash with ship-class inner command: bash --norc -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from bash: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: bash with ship-class inner command: bash -ec "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from /bin/bash: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: /bin/bash with ship-class inner command: /bin/bash --rcfile /dev/null -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from /usr/bin/env: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: /usr/bin/env with ship-class inner command: /usr/bin/env bash -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from env: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: env with ship-class inner command: env bash -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from /usr/local/bin/bash: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: /usr/local/bin/bash with ship-class inner command: /usr/local/bin/bash -c "git commit -m bypass"
+[2026-05-22T21:42:37Z] [ship-gate] extracted inner shell snippet from /opt/homebrew/bin/zsh: git commit -m bypass
+[2026-05-22T21:42:37Z] [ship-gate] DENY: /opt/homebrew/bin/zsh with ship-class inner command: /opt/homebrew/bin/zsh -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from bash: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: bash with ship-class inner command: bash -- -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from nice: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: nice with ship-class inner command: nice bash -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from nohup: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: nohup with ship-class inner command: nohup bash -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from time: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: time with ship-class inner command: time bash -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from xargs: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: xargs with ship-class inner command: xargs -I{} bash -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from timeout: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: timeout with ship-class inner command: timeout 10 bash -c "git commit -m bypass"
+[2026-05-22T21:42:38Z] [ship-gate] extracted inner shell snippet from stdbuf: git commit -m bypass
+[2026-05-22T21:42:38Z] [ship-gate] DENY: stdbuf with ship-class inner command: stdbuf -o0 bash -c "git commit -m bypass"

@@ -132,29 +132,36 @@ func TestC93_004_TddPredicateTemplateLsFiles(t *testing.T) {
 // The five cycle-92 deliverables exist, are tracked, meet line minimums.
 func TestC93_005_Cycle92DeliverablesExistAndTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
+	// v11.1.0 drift: scripts/ moved to legacy/scripts/ with a symlink at
+	// the old path. The file resolves through the symlink for os.Stat but
+	// git tracks it at the new path. Accept either location.
 	tuples := []struct {
-		path     string
+		paths    []string // first match wins; both must exist on disk if path
 		minLines int
 	}{
-		{"agents/AGENTS.md", 30},
-		{"scripts/AGENTS.md", 30},
-		{"acs/AGENTS.md", 30},
-		{".evolve/profiles/AGENTS.md", 30},
-		{"docs/CODEBASE-MAP.md", 20},
+		{[]string{"agents/AGENTS.md"}, 30},
+		{[]string{"scripts/AGENTS.md", "legacy/scripts/AGENTS.md"}, 30},
+		{[]string{"acs/AGENTS.md"}, 30},
+		{[]string{".evolve/profiles/AGENTS.md"}, 30},
+		{[]string{"docs/CODEBASE-MAP.md"}, 20},
 	}
 	for _, tup := range tuples {
-		abs := filepath.Join(root, tup.path)
-		if _, err := os.Stat(abs); err != nil {
-			t.Errorf("MISSING: %s", tup.path)
+		var resolved string
+		for _, p := range tup.paths {
+			abs := filepath.Join(root, p)
+			if _, err := os.Stat(abs); err == nil && gitTracked(root, p) {
+				resolved = p
+				break
+			}
+		}
+		if resolved == "" {
+			t.Errorf("MISSING-OR-UNTRACKED: tried %v", tup.paths)
 			continue
 		}
-		if !gitTracked(root, tup.path) {
-			t.Errorf("UNTRACKED: %s", tup.path)
-			continue
-		}
+		abs := filepath.Join(root, resolved)
 		raw, err := os.ReadFile(abs)
 		if err != nil {
-			t.Errorf("READ-ERR: %s: %v", tup.path, err)
+			t.Errorf("READ-ERR: %s: %v", resolved, err)
 			continue
 		}
 		nonblank := 0
@@ -164,7 +171,7 @@ func TestC93_005_Cycle92DeliverablesExistAndTracked(t *testing.T) {
 			}
 		}
 		if nonblank < tup.minLines {
-			t.Errorf("THIN: %s (%d non-blank lines, need >=%d)", tup.path, nonblank, tup.minLines)
+			t.Errorf("THIN: %s (%d non-blank lines, need >=%d)", resolved, nonblank, tup.minLines)
 		}
 	}
 }
