@@ -1,0 +1,37 @@
+{
+  "cycle": 104,
+  "total": 5,
+  "red_count": 0,
+  "predicates": [
+    {
+      "name": "TestC104_001_OrchestratorDefaultAdvisory",
+      "verdict": "PASS",
+      "duration_ms": 20,
+      "output": "=== RUN   TestC104_001_OrchestratorDefaultAdvisory\n--- PASS: TestC104_001_OrchestratorDefaultAdvisory (0.02s)\n"
+    },
+    {
+      "name": "TestC104_002_BuilderStep3Preserved",
+      "verdict": "PASS",
+      "duration_ms": 10,
+      "output": "=== RUN   TestC104_002_BuilderStep3Preserved\n--- PASS: TestC104_002_BuilderStep3Preserved (0.01s)\n"
+    },
+    {
+      "name": "TestC104_003_BuilderAdvisoryReadStep",
+      "verdict": "PASS",
+      "duration_ms": 10,
+      "output": "=== RUN   TestC104_003_BuilderAdvisoryReadStep\n--- PASS: TestC104_003_BuilderAdvisoryReadStep (0.01s)\n"
+    },
+    {
+      "name": "TestC104_004_AuditorPlanAdherenceAdvisory",
+      "verdict": "PASS",
+      "duration_ms": 10,
+      "output": "=== RUN   TestC104_004_AuditorPlanAdherenceAdvisory\n--- PASS: TestC104_004_AuditorPlanAdherenceAdvisory (0.01s)\n"
+    },
+    {
+      "name": "TestC104_005_ControlFlagsAdvisoryDefaultOn",
+      "verdict": "PASS",
+      "duration_ms": 10,
+      "output": "=== RUN   TestC104_005_ControlFlagsAdvisoryDefaultOn\n--- PASS: TestC104_005_ControlFlagsAdvisoryDefaultOn (0.01s)\n"
+    }
+  ]
+}
