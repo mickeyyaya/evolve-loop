@@ -189,6 +189,52 @@ verify_state_checksum() {
     fi
 }
 
+# Check for the presence of a per-phase reflection.yaml (Reflection Journal v10.20.0+).
+#
+# Advisory stage (v10.20): emits WARN to log only; never blocks.
+# Enforce stage (v10.21+, target): set EVOLVE_REFLECTION_JOURNAL_ENFORCE=1
+#   to convert WARN into fail().
+#
+# Usage: check_reflection_artifact <phase>     # e.g., scout, build, audit
+# Returns: 0 always in advisory mode; 1 if missing and enforce mode enabled.
+check_reflection_artifact() {
+    local phase="${1:?check_reflection_artifact: phase name required}"
+    local artifact="$WORKSPACE/${phase}-reflection.yaml"
+    local enforce="${EVOLVE_REFLECTION_JOURNAL_ENFORCE:-0}"
+
+    # Honor the feature opt-out: when journal is disabled, no check at all.
+    if [ "${EVOLVE_REFLECTION_JOURNAL:-1}" = "0" ]; then
+        return 0
+    fi
+
+    if [ ! -f "$artifact" ]; then
+        if [ "$enforce" = "1" ]; then
+            fail "Reflection Journal: ${phase}-reflection.yaml missing at $artifact (enforce stage)"
+        fi
+        log "WARN: Reflection Journal: ${phase}-reflection.yaml missing at $artifact (advisory; v10.21+ will enforce)"
+        return 0
+    fi
+
+    # Minimal schema sanity: required keys present.
+    local required="schema_version cycle phase agent phase_smooth suggested_improvements reflection_confidence phase_tracker_refs"
+    local missing_keys=""
+    for k in $required; do
+        if ! grep -qE "^${k}:" "$artifact" 2>/dev/null; then
+            missing_keys="${missing_keys} ${k}"
+        fi
+    done
+    if [ -n "$missing_keys" ]; then
+        if [ "$enforce" = "1" ]; then
+            fail "Reflection Journal: ${phase}-reflection.yaml missing required keys:${missing_keys} (enforce stage)"
+        fi
+        log "WARN: Reflection Journal: ${phase}-reflection.yaml missing required keys:${missing_keys} (advisory)"
+        return 0
+    fi
+
+    log "OK: Reflection Journal: ${phase}-reflection.yaml present and schema-valid"
+    return 0
+}
+
 # Check for forgery script artifacts in the workspace
 check_no_forgery_scripts() {
     local forgery_scripts
@@ -1152,6 +1198,16 @@ gate_ship_to_learn() {
         fail "Git working tree is dirty after ship — changes not committed"
     fi
     log "OK: Git working tree is clean"
+
+    # 1.5. Reflection Journal (v10.20.0+, advisory): check the reflector synthesis
+    # was produced. If absent, WARN-only — never block ship. Enforce in v10.21.
+    if [ "${EVOLVE_REFLECTION_JOURNAL:-1}" = "1" ]; then
+        if [ ! -f "$WORKSPACE/learn/reflector-synthesis.md" ]; then
+            log "WARN: learn/reflector-synthesis.md missing — reflector did not run (advisory; v10.21+ will enforce)"
+        else
+            log "OK: learn/reflector-synthesis.md present"
+        fi
+    fi
 
     # v8.58.0 Layer E2: PASS-cycle memo enforcement. The v8.57 contract said
     # PASS cycles MUST emit carryover-todos.json via the memo subagent so the

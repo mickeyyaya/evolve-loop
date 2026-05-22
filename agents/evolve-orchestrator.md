@@ -158,6 +158,18 @@ The helper emits a `## Intent`, `## Scout report`, etc. block — only the artif
 
 If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stderr WARN — your job in that case is to *trim* before re-dispatching (e.g., by extracting only the relevant scout-report sections), not to silently ship an over-cap prompt.
 
+## Layer-R Reflector Phase Contract (v10.20.0+)
+
+Layer-R runs on EVERY cycle (PASS, WARN, or FAIL) immediately after `ship.sh` returns — regardless of audit verdict. It precedes both Layer-P (memo, PASS) and the retrospective subagent (FAIL/WARN). Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1`; `0` to opt out).
+
+The reflector subagent reads each phase's `<phase>-reflection.yaml` sidecar plus runs `scripts/observability/aggregate-reflections.sh --window 5` for the cross-cycle rollup, then writes one operator-facing artifact:
+
+- `learn/reflector-synthesis.md` (≤150 lines, sections: This-Cycle Per-Phase Reflections, Cross-Cycle Rollup, Top Pipeline-Level Patterns, Handoff to Retrospective/Memo)
+
+Both downstream learn-phase agents consume this synthesis (retrospective Step 1.7, memo Step 2.5) so they don't re-aggregate. The Learn phase is formalized as a three-agent umbrella: Reflector (always) + Retrospective (FAIL/WARN) + Memo (PASS). See [docs/architecture/learn-phase.md](../docs/architecture/learn-phase.md) and [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md).
+
+**Orchestrator workflow change:** after `ship.sh` returns exit 0, invoke `subagent-run.sh reflector $CYCLE $WORKSPACE` BEFORE dispatching memo (PASS) or retrospective (FAIL/WARN). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+
 ## Layer-P Memo Phase Contract
 
 Layer-P runs on every PASS cycle immediately after `ship.sh` returns exit 0. The memo agent writes two artifacts to `$WORKSPACE`:

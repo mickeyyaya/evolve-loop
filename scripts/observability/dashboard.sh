@@ -190,6 +190,22 @@ render_human() {
         render_section "Phase reports" "$headline"
     fi
 
+    # ---- Reflection hot-spots (Reflection Journal v10.20.0+) ----
+    # Surfaces top-3 slowdown categories across the last 5 cycles.
+    # No-op when aggregator finds zero reflections (advisory rollout).
+    local agg_script="$REPO_ROOT/scripts/observability/aggregate-reflections.sh"
+    if [ -x "$agg_script" ] && command -v jq >/dev/null 2>&1; then
+        local agg_json hotspots
+        agg_json=$("$agg_script" --window 5 --format=json 2>/dev/null || echo "")
+        if [ -n "$agg_json" ]; then
+            hotspots=$(printf '%s' "$agg_json" \
+                | jq -r '.slowdown_categories[:3] | map("\(.category) (\(.cycles)/5)") | join(", ")' 2>/dev/null)
+            if [ -n "$hotspots" ] && [ "$hotspots" != "null" ] && [ "$hotspots" != "" ]; then
+                render_section "Reflection hot-spots (last 5 cycles)" "  $hotspots"
+            fi
+        fi
+    fi
+
     echo ""
 }
 
