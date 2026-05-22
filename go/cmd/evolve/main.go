@@ -24,8 +24,11 @@ Commands:
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
   acs        Run ACS predicates    ( acs run --cycle N <pkg> [--json=false] )
-
-Phase 1 build — orchestrator + phase impls land in Phase 2.
+  phase      Run a single phase in-process; PhaseRequest on stdin,
+              PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
+  cycle      Run one full cycle through the orchestrator ( cycle run --goal-hash X )
+  worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
+  loop       Drive the cycle dispatcher loop ( loop --max-cycles N --budget-usd X )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -50,6 +53,14 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLedger(args[1:], stdin, stdout, stderr)
 	case "acs":
 		return runACS(args[1:], stdin, stdout, stderr)
+	case "phase":
+		return runPhase(args[1:], stdin, stdout, stderr)
+	case "cycle":
+		return runCycle(args[1:], stdin, stdout, stderr)
+	case "worktree":
+		return runWorktree(args[1:], stdin, stdout, stderr)
+	case "loop":
+		return runLoop(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2

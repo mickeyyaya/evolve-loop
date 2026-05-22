@@ -1,0 +1,112 @@
+// `evolve cycle run` drives one cycle through the orchestrator. Wires
+// storage + ledger adapters with all 8 phase runners (intent through
+// retro). Subcommand surface stays small; the orchestrator owns the
+// phase sequencing.
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
+)
+
+// runCycle implements `evolve cycle <subcommand>`. Subcommands: run.
+func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) < 1 {
+		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run)")
+		return 10
+	}
+	switch args[0] {
+	case "run":
+		return runCycleRun(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "evolve cycle: unknown subcommand %q\n", args[0])
+		return 10
+	}
+}
+
+func runCycleRun(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve cycle run", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var (
+		projectRoot string
+		goalHash    string
+		evolveDir   string
+		budgetUSD   float64
+		batchCapUSD float64
+	)
+	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
+	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
+	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
+	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "per-cycle USD budget cap")
+	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap across cycles")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if goalHash == "" {
+		fmt.Fprintln(stderr, "evolve cycle run: --goal-hash is required")
+		return 10
+	}
+	if evolveDir == "" {
+		evolveDir = filepath.Join(projectRoot, ".evolve")
+	}
+
+	orch := wireOrchestrator(projectRoot, evolveDir)
+	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    goalHash,
+		Budget: core.BudgetEnvelope{
+			MaxUSD:      budgetUSD,
+			BatchCapUSD: batchCapUSD,
+		},
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
+		return 1
+	}
+	buf, _ := json.MarshalIndent(result, "", "  ")
+	fmt.Fprintln(stdout, string(buf))
+	if result.FinalVerdict == core.VerdictFAIL {
+		return 2
+	}
+	return 0
+}
+
+// wireOrchestrator returns an orchestrator wired with production
+// adapters: filesystem-backed storage + ledger, default bridge, all
+// 8 phase runners. Extracted for cmd_loop reuse.
+func wireOrchestrator(projectRoot, evolveDir string) *core.Orchestrator {
+	br := bridge.NewDefault(projectRoot)
+	prm := newPromptsLoader(projectRoot)
+
+	runners := map[core.Phase]core.PhaseRunner{
+		core.PhaseIntent:  intent.New(intent.Config{Bridge: br, Prompts: prm}),
+		core.PhaseScout:   scout.New(scout.Config{Bridge: br, Prompts: prm}),
+		core.PhaseTriage:  triage.New(triage.Config{Bridge: br, Prompts: prm}),
+		core.PhaseTDD:     tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
+		core.PhaseBuild:   build.New(build.Config{Bridge: br, Prompts: prm}),
+		core.PhaseAudit:   audit.New(audit.Config{Bridge: br, Prompts: prm}),
+		core.PhaseShip:    ship.NewWithDefaultRunner(),
+		core.PhaseRetro:   retro.New(retro.Config{Bridge: br, Prompts: prm}),
+	}
+
+	st := storage.New(evolveDir)
+	ld := ledger.New(evolveDir)
+	return core.NewOrchestrator(st, ld, runners)
+}
