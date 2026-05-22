@@ -200,3 +200,72 @@ func TestEvent_EventTypeRequired(t *testing.T) {
 		t.Fatal("EmitAbnormal with empty event_type must error")
 	}
 }
+
+func TestParseLevel(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"debug", "DEBUG"},
+		{"DEBUG", "DEBUG"},
+		{"info", "INFO"},
+		{"warn", "WARN"},
+		{"warning", "WARN"},
+		{"ERROR", "ERROR"},
+		{"err", "ERROR"},
+		{"", "INFO"},
+		{"nonsense", "INFO"},
+		{"  debug  ", "DEBUG"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			if got := parseLevel(tc.in).String(); got != tc.want {
+				t.Errorf("parseLevel(%q)=%s, want %s", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestEmitPhase_NilLoggerIsNoOp(t *testing.T) {
+	// Should not panic.
+	EmitPhase(nil, "scout", "started", nil)
+}
+
+func TestEmitPhase_NoExtraFields(t *testing.T) {
+	var buf strings.Builder
+	logger := NewJSONLogger(&buf, "info")
+	EmitPhase(logger, "audit", "completed", nil)
+	out := buf.String()
+	if !strings.Contains(out, `"phase":"audit"`) || !strings.Contains(out, `"event":"completed"`) {
+		t.Errorf("missing phase/event in: %s", out)
+	}
+}
+
+func TestEmitAbnormal_FieldsCannotOverrideCanonical(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "abnormal-events.jsonl")
+	w := NewSidecarWriter(path)
+	defer w.Close()
+
+	if err := w.EmitAbnormal(Event{
+		EventType: "real",
+		Fields: map[string]any{
+			"event_type": "FORGED",
+			"timestamp":  "1970-01-01T00:00:00Z",
+			"safe":       "kept",
+		},
+	}); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	raw, _ := os.ReadFile(path)
+	line := string(raw)
+	if strings.Contains(line, `"event_type":"FORGED"`) {
+		t.Errorf("Fields managed to override event_type: %s", line)
+	}
+	if strings.Contains(line, `1970-01-01`) {
+		t.Errorf("Fields managed to override timestamp: %s", line)
+	}
+	if !strings.Contains(line, `"safe":"kept"`) {
+		t.Errorf("non-canonical field lost: %s", line)
+	}
+}
