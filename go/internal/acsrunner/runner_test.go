@@ -1,7 +1,12 @@
 package acsrunner
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -130,6 +135,204 @@ func TestVerdict_JSONShape(t *testing.T) {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("missing %q in: %s", want, raw)
 		}
+	}
+}
+
+func TestWriteVerdict_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	v := Verdict{
+		Cycle:    7,
+		Total:    2,
+		RedCount: 0,
+		Predicates: []Predicate{
+			{Name: "TestA", Verdict: "PASS", DurationMS: 5},
+			{Name: "TestB", Verdict: "PASS", DurationMS: 6},
+		},
+	}
+	dst, err := WriteVerdict(dir, v)
+	if err != nil {
+		t.Fatalf("WriteVerdict: %v", err)
+	}
+	if !strings.HasSuffix(dst, "/runs/cycle-7/acs-verdict.json") {
+		t.Errorf("dst path unexpected: %s", dst)
+	}
+	raw, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	var got Verdict
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Cycle != 7 || got.Total != 2 || len(got.Predicates) != 2 {
+		t.Errorf("round-trip lost: %+v", got)
+	}
+}
+
+func TestWriteVerdict_AtomicNoTmpLeftovers(t *testing.T) {
+	dir := t.TempDir()
+	v := Verdict{Cycle: 9}
+	_, err := WriteVerdict(dir, v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(filepath.Join(dir, "runs", "cycle-9"))
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("leftover tmp: %s", e.Name())
+		}
+	}
+}
+
+func TestWriteVerdict_MkdirError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses permissions")
+	}
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := WriteVerdict(blocker, Verdict{Cycle: 1})
+	if err == nil {
+		t.Fatal("expected mkdir error")
+	}
+}
+
+func TestWriteVerdict_MarshalError(t *testing.T) {
+	dir := t.TempDir()
+	withWriteHooks(writeHooks{
+		marshal: func(any) ([]byte, error) { return nil, errors.New("forced marshal fail") },
+	}, func() {
+		_, err := WriteVerdict(dir, Verdict{Cycle: 1})
+		if err == nil {
+			t.Fatal("expected marshal error")
+		}
+	})
+}
+
+func TestWriteVerdict_WriteError(t *testing.T) {
+	dir := t.TempDir()
+	withWriteHooks(writeHooks{
+		write: func(*os.File, []byte) (int, error) { return 0, errors.New("forced write fail") },
+	}, func() {
+		_, err := WriteVerdict(dir, Verdict{Cycle: 1})
+		if err == nil {
+			t.Fatal("expected write error")
+		}
+	})
+}
+
+func TestWriteVerdict_CloseError(t *testing.T) {
+	dir := t.TempDir()
+	withWriteHooks(writeHooks{
+		closeF: func(*os.File) error { return errors.New("forced close fail") },
+	}, func() {
+		_, err := WriteVerdict(dir, Verdict{Cycle: 1})
+		if err == nil {
+			t.Fatal("expected close error")
+		}
+	})
+}
+
+func TestWriteVerdict_RenameError(t *testing.T) {
+	dir := t.TempDir()
+	withWriteHooks(writeHooks{
+		rename: func(_, _ string) error { return errors.New("forced rename fail") },
+	}, func() {
+		_, err := WriteVerdict(dir, Verdict{Cycle: 1})
+		if err == nil {
+			t.Fatal("expected rename error")
+		}
+	})
+}
+
+func TestRun_EmptyPackageNoTests(t *testing.T) {
+	// Create a throwaway module with no test files; go test should
+	// exit 0 with zero tests emitted, exercising Run's happy path
+	// without actually executing any user-supplied test code.
+	mod := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module example.test\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mod, "x.go"), []byte("package x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// We need to cd into the module so go test resolves it. Use a
+	// subshell-equivalent — exec.Cmd.Dir.
+	cwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(cwd) }()
+	if err := os.Chdir(mod); err != nil {
+		t.Fatal(err)
+	}
+	v, err := Run(context.Background(), 1, "./...")
+	if err != nil {
+		t.Fatalf("Run on empty pkg: %v", err)
+	}
+	if v.Total != 0 {
+		t.Errorf("empty package total=%d, want 0", v.Total)
+	}
+}
+
+func TestRun_CompileFailureBubblesUp(t *testing.T) {
+	mod := t.TempDir()
+	_ = os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module example.test\n\ngo 1.23\n"), 0o644)
+	// Intentionally broken test file — go test will fail with no
+	// tests reported, so red_count stays 0 and Run must surface a
+	// non-nil error.
+	_ = os.WriteFile(filepath.Join(mod, "broken_test.go"), []byte("package x\nfunc TestBroken(t Bogus) {}\n"), 0o644)
+	cwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(cwd) }()
+	_ = os.Chdir(mod)
+	_, err := Run(context.Background(), 1, "./...")
+	if err == nil {
+		t.Error("expected compile-failure error")
+	}
+}
+
+type closingReader struct{ *strings.Reader }
+
+func (c *closingReader) Close() error { return nil }
+
+func TestRun_CommanderStartError(t *testing.T) {
+	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+		return nil, nil, errors.New("forced start fail")
+	}, func() {
+		_, err := Run(context.Background(), 1, "./...")
+		if err == nil {
+			t.Fatal("expected start error")
+		}
+	})
+}
+
+func TestRun_CommanderInjectsPassFail(t *testing.T) {
+	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+		body := `{"Action":"run","Package":"p","Test":"TestA"}
+{"Action":"pass","Package":"p","Test":"TestA","Elapsed":0.001}
+{"Action":"run","Package":"p","Test":"TestB"}
+{"Action":"fail","Package":"p","Test":"TestB","Elapsed":0.002}
+`
+		return &closingReader{strings.NewReader(body)}, func() error { return errors.New("exit 1 simulated") }, nil
+	}, func() {
+		v, err := Run(context.Background(), 42, "./...")
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if v.RedCount != 1 || v.Total != 2 || v.Cycle != 42 {
+			t.Errorf("bad verdict: %+v", v)
+		}
+	})
+}
+
+func TestRun_NonExistentPackageErrors(t *testing.T) {
+	mod := t.TempDir()
+	_ = os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module example.test\n\ngo 1.23\n"), 0o644)
+	cwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(cwd) }()
+	_ = os.Chdir(mod)
+	_, err := Run(context.Background(), 1, "./doesnotexist/...")
+	if err == nil {
+		t.Error("expected error for missing pkg")
 	}
 }
 
