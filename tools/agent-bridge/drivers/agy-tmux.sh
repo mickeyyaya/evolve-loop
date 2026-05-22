@@ -29,6 +29,13 @@ drv_launch_agy_tmux() {
     echo "[agy-tmux] NOTE: stream_output=true is not supported on this CLI — no-op (agy has no streaming output flag)" >&2
   fi
 
+  # v0.5: named-session/resume support is currently claude-tmux-only.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[agy-tmux] --session-name='$effective_session_name' is not supported on this CLI in v0.5" >&2
+    echo "[agy-tmux] Only claude-tmux supports named/resumable sessions; use --cli=claude-tmux or omit --session-name." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[agy-tmux] safety gate: --allow-bypass is required" >&2
     return $EC_SAFETY_GATE

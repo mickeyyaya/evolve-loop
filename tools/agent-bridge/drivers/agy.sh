@@ -30,6 +30,11 @@ drv_launch_agy() {
     echo "[agy] NOTE: stream_output=true is not supported on this CLI — no-op (agy has no streaming output flag)" >&2
   fi
 
+  # v0.5: agy is single-shot — --session-name has no semantic effect here.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[agy] NOTE: --session-name='$effective_session_name' is no-op for this driver (single-shot process). Use --cli=claude-tmux for named/resumable sessions." >&2
+  fi
+
   local agy_bin
   if [[ -n "${BRIDGE_AGY_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     agy_bin="$BRIDGE_AGY_BINARY"

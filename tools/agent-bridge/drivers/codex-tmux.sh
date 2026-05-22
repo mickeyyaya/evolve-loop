@@ -30,6 +30,14 @@ drv_launch_codex_tmux() {
     echo "[codex-tmux] NOTE: stream_output=true is not supported on this CLI — no-op (codex has no streaming output flag)" >&2
   fi
 
+  # v0.5: named-session/resume support is currently claude-tmux-only.
+  # Reject loudly rather than silently ignore the operator's intent.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[codex-tmux] --session-name='$effective_session_name' is not supported on this CLI in v0.5" >&2
+    echo "[codex-tmux] Only claude-tmux supports named/resumable sessions; use --cli=claude-tmux or omit --session-name." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[codex-tmux] safety gate: --allow-bypass is required (running interactive codex with bypass-like semantics)" >&2
     return $EC_SAFETY_GATE

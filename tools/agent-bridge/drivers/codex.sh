@@ -34,6 +34,11 @@ drv_launch_codex() {
     echo "[codex] NOTE: stream_output=true is not supported on this CLI — no-op (codex has no streaming output flag)" >&2
   fi
 
+  # v0.5: codex is single-shot — --session-name has no semantic effect here.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[codex] NOTE: --session-name='$effective_session_name' is no-op for this driver (single-shot process). Use --cli=claude-tmux for named/resumable sessions." >&2
+  fi
+
   local codex_bin
   if [[ -n "${BRIDGE_CODEX_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     codex_bin="$BRIDGE_CODEX_BINARY"

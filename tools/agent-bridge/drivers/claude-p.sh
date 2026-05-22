@@ -70,6 +70,14 @@ drv_launch_claude_p() {
     claude_args+=(--output-format stream-json --include-partial-messages --verbose)
   fi
 
+  # v0.5: claude-p is single-shot (no persistent session), so --session-name
+  # has no semantic application here. Log a NOTE so operators understand
+  # their config is no-op for this driver. Use --cli=claude-tmux for
+  # named/resumable sessions.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[claude-p] NOTE: --session-name='$effective_session_name' is no-op for this driver (single-shot process, no persistent session). Use --cli=claude-tmux for named/resumable sessions." >&2
+  fi
+
   # Allowed-tools from profile: bash 3.2-safe array split on comma.
   if [[ -n "${bridge_profile_allowed_tools_csv:-}" ]]; then
     local saved_ifs="$IFS"

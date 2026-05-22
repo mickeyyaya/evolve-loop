@@ -92,7 +92,20 @@ BYPASS_MSG
   echo "$prompt_content" > "$resolved_prompt_file"
 
   local agent_label="${agent:-probe}"
-  local session="evolve-bridge-c${cycle}-${agent_label}-pid$$-$(date +%s)"
+  # v0.5: STABLE session name when --session-name is set (resume-eligible);
+  # otherwise the auto-generated pid+timestamp form (ephemeral, auto-cleanup).
+  local session named_session_exists=0
+  if [[ -n "${effective_session_name:-}" ]]; then
+    session="evolve-bridge-named-${effective_session_name}"
+    if tmux has-session -t "$session" 2>/dev/null; then
+      named_session_exists=1
+      echo "[claude-tmux] RESUME: reattaching to existing named session '$session' — claude REPL context preserved" >&2
+    else
+      echo "[claude-tmux] CREATE-NAMED: new named session '$session' (will persist on exit for resume)" >&2
+    fi
+  else
+    session="evolve-bridge-c${cycle}-${agent_label}-pid$$-$(date +%s)"
+  fi
   session="${session:0:64}"
   local scrollback_file="$workspace/tmux-final-scrollback.txt"
 
@@ -101,13 +114,23 @@ BYPASS_MSG
   # --- Cleanup trap ---------------------------------------------------------
   _bridge_tmux_session="$session"
   _bridge_tmux_scrollback="$scrollback_file"
+  # v0.5: named sessions persist on exit (skip kill, preserve REPL for resume)
+  if [[ -n "${effective_session_name:-}" ]]; then
+    _bridge_tmux_skip_kill=1
+  else
+    _bridge_tmux_skip_kill=0
+  fi
   trap '_bridge_tmux_cleanup' EXIT INT TERM
 
-  # --- Spawn tmux + launch claude ------------------------------------------
-  tmux new-session -d -s "$session" -x 220 -y 80
-  sleep 1
-  tmux send-keys -t "$session" "cd $working_dir" Enter
-  sleep 1
+  # --- Spawn tmux + launch claude (skip when resuming named session) -------
+  if [[ "$named_session_exists" != "1" ]]; then
+    tmux new-session -d -s "$session" -x 220 -y 80
+    sleep 1
+    tmux send-keys -t "$session" "cd $working_dir" Enter
+    sleep 1
+  else
+    echo "[claude-tmux] RESUME: skipping tmux new-session + cd + claude launch (REPL already running)" >&2
+  fi
 
   # v0.2: prefer explicit --permission-mode over --dangerously-skip-permissions.
   # The two are semantically overlapping (bypassPermissions ≈ dangerously-skip),
@@ -121,28 +144,35 @@ BYPASS_MSG
   else
     claude_cmd="claude --model $effective_model --dangerously-skip-permissions"
   fi
-  tmux send-keys -t "$session" "$claude_cmd" Enter
-  echo "[claude-tmux] launching: $claude_cmd" >&2
 
-  # --- Wait for REPL prompt -------------------------------------------------
-  local prompt_marker="${bridge_manifest_prompt_marker:-❯}"
-  local repl_boot_timeout=60
-  local elapsed=0
-  local prompt_seen=0
-  while [ $elapsed -lt $repl_boot_timeout ]; do
-    sleep 1
-    elapsed=$((elapsed + 1))
-    local pane
-    pane=$(tmux capture-pane -p -t "$session" 2>/dev/null || echo "")
-    if echo "$pane" | grep -qF "$prompt_marker"; then
-      prompt_seen=1
-      echo "[claude-tmux] REPL prompt ($prompt_marker) detected after ${elapsed}s" >&2
-      break
+  # v0.5: skip the claude launch + REPL-boot wait when resuming a named
+  # session (REPL is already running from the prior bridge launch).
+  if [[ "$named_session_exists" != "1" ]]; then
+    tmux send-keys -t "$session" "$claude_cmd" Enter
+    echo "[claude-tmux] launching: $claude_cmd" >&2
+
+    # --- Wait for REPL prompt -----------------------------------------------
+    local prompt_marker="${bridge_manifest_prompt_marker:-❯}"
+    local repl_boot_timeout=60
+    local elapsed=0
+    local prompt_seen=0
+    while [ $elapsed -lt $repl_boot_timeout ]; do
+      sleep 1
+      elapsed=$((elapsed + 1))
+      local pane
+      pane=$(tmux capture-pane -p -t "$session" 2>/dev/null || echo "")
+      if echo "$pane" | grep -qF "$prompt_marker"; then
+        prompt_seen=1
+        echo "[claude-tmux] REPL prompt ($prompt_marker) detected after ${elapsed}s" >&2
+        break
+      fi
+    done
+    if [ $prompt_seen -eq 0 ]; then
+      echo "[claude-tmux] FAIL: REPL prompt never appeared after ${repl_boot_timeout}s" >&2
+      return $EC_REPL_BOOT_TIMEOUT
     fi
-  done
-  if [ $prompt_seen -eq 0 ]; then
-    echo "[claude-tmux] FAIL: REPL prompt never appeared after ${repl_boot_timeout}s" >&2
-    return $EC_REPL_BOOT_TIMEOUT
+  else
+    echo "[claude-tmux] RESUME: REPL already running — proceeding directly to prompt delivery" >&2
   fi
 
   # --- Deliver prompt -------------------------------------------------------
@@ -206,8 +236,13 @@ BYPASS_MSG
   echo "$raw" | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g' > "$stdout_log"
   echo "[claude-tmux] scrollback captured" >&2
 
-  tmux send-keys -t "$session" "/exit" Enter
-  sleep 2
+  # v0.5: skip /exit for named sessions — keep claude REPL alive for resume.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[claude-tmux] RESUME-PRESERVE: skipping /exit; claude REPL stays running for next launch" >&2
+  else
+    tmux send-keys -t "$session" "/exit" Enter
+    sleep 2
+  fi
 
   echo "[claude-tmux] DONE: artifact-only verdict = SUCCESS" >&2
   return 0
@@ -219,8 +254,13 @@ _bridge_tmux_cleanup() {
     if tmux has-session -t "$_bridge_tmux_session" 2>/dev/null; then
       tmux capture-pane -p -S -10000 -t "$_bridge_tmux_session" \
         > "${_bridge_tmux_scrollback:-/dev/null}" 2>/dev/null || true
-      tmux kill-session -t "$_bridge_tmux_session" 2>/dev/null || true
-      echo "[claude-tmux] session killed: $_bridge_tmux_session (rc=$rc)" >&2
+      # v0.5: named sessions persist for resume — skip kill when _bridge_tmux_skip_kill=1
+      if [[ "${_bridge_tmux_skip_kill:-0}" == "1" ]]; then
+        echo "[claude-tmux] session PRESERVED for resume: $_bridge_tmux_session (rc=$rc)" >&2
+      else
+        tmux kill-session -t "$_bridge_tmux_session" 2>/dev/null || true
+        echo "[claude-tmux] session killed: $_bridge_tmux_session (rc=$rc)" >&2
+      fi
     fi
     _bridge_tmux_session=""
   fi
