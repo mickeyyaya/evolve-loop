@@ -286,3 +286,98 @@ func TestSetupTempProject_StructureCreated(t *testing.T) {
 		t.Errorf("missing .evolve: %v", err)
 	}
 }
+
+// RepoRoot ------------------------------------------------------------
+func TestRepoRoot_InsideGitRepo(t *testing.T) {
+	// We're executing inside the evolve-loop git repo; expect a non-empty
+	// path that the current file lives under.
+	root := RepoRoot(t)
+	if root == "" {
+		t.Fatalf("RepoRoot returned empty path")
+	}
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+		// The repo's go.mod lives at go/go.mod, so check that instead.
+		if _, err2 := os.Stat(filepath.Join(root, "go", "go.mod")); err2 != nil {
+			t.Errorf("RepoRoot=%q has neither go.mod nor go/go.mod", root)
+		}
+	}
+}
+
+// FileContainsAny -----------------------------------------------------
+func TestFileContainsAny_Hit(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("alpha beta gamma"), 0o644)
+	if !FileContainsAny(p, "delta", "beta") {
+		t.Error("expected hit on second variant")
+	}
+}
+
+func TestFileContainsAny_Miss(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("alpha"), 0o644)
+	if FileContainsAny(p, "beta", "gamma") {
+		t.Error("expected miss")
+	}
+}
+
+func TestFileContainsAny_MissingFile(t *testing.T) {
+	if FileContainsAny("/no/such/file", "anything") {
+		t.Error("missing file must return false")
+	}
+}
+
+// CountOccurrencesAny -------------------------------------------------
+func TestCountOccurrencesAny_LineCount(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	body := "predicates-run\nverdict-decided\nreport-written\nunrelated\n"
+	_ = os.WriteFile(p, []byte(body), 0o644)
+	got := CountOccurrencesAny(p, "predicates-run", "verdict-decided", "report-written", "defects-listed")
+	if got != 3 {
+		t.Errorf("got %d, want 3", got)
+	}
+}
+
+func TestCountOccurrencesAny_OneVariantPerLine(t *testing.T) {
+	// A line matching two variants should count only once.
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("alpha and beta together\n"), 0o644)
+	got := CountOccurrencesAny(p, "alpha", "beta")
+	if got != 1 {
+		t.Errorf("got %d, want 1 (break after first hit)", got)
+	}
+}
+
+func TestCountOccurrencesAny_MissingFile(t *testing.T) {
+	if CountOccurrencesAny("/no/such/file", "x") != 0 {
+		t.Error("missing file must return 0")
+	}
+}
+
+// LineContainsAll -----------------------------------------------------
+func TestLineContainsAll_Hit(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("| P-NEW-20 | Builder stop-criterion | DONE |\n"), 0o644)
+	if !LineContainsAll(p, "P-NEW-20", "DONE") {
+		t.Error("expected hit on table row")
+	}
+}
+
+func TestLineContainsAll_Miss_DifferentLines(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("P-NEW-20\nDONE\n"), 0o644)
+	if LineContainsAll(p, "P-NEW-20", "DONE") {
+		t.Error("two needles on different lines must not match")
+	}
+}
+
+func TestLineContainsAll_MissingFile(t *testing.T) {
+	if LineContainsAll("/no/such/file", "x") {
+		t.Error("missing file must return false")
+	}
+}

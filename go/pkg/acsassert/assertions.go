@@ -199,3 +199,76 @@ func SetupTempProject(t *testing.T) string {
 	}
 	return dir
 }
+
+// RepoRoot resolves the repository root via `git rev-parse --show-toplevel`.
+// Skips the test when not inside a git work tree — predicate suites can
+// then run cleanly on bare exports without false failures. Shared across
+// every acs/cycle*/ test package.
+func RepoRoot(t *testing.T) string {
+	t.Helper()
+	stdout, _, code, err := SubprocessOutput("git", "rev-parse", "--show-toplevel")
+	if err != nil || code != 0 {
+		t.Skipf("not in a git work tree: code=%d err=%v", code, err)
+	}
+	return strings.TrimSpace(stdout)
+}
+
+// FileContainsAny reports whether path's content contains at least one of
+// the substring variants. Returns false if the file is missing or no
+// variant matches. Pure boolean (no TB) so callers control failure mode.
+func FileContainsAny(path string, variants ...string) bool {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	s := string(raw)
+	for _, v := range variants {
+		if strings.Contains(s, v) {
+			return true
+		}
+	}
+	return false
+}
+
+// CountOccurrencesAny returns the count of lines in path that match any
+// of the given substring variants. Used by "at least N named gates"
+// predicates. Returns 0 if the file is missing.
+func CountOccurrencesAny(path string, variants ...string) int {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, line := range strings.Split(string(raw), "\n") {
+		for _, v := range variants {
+			if strings.Contains(line, v) {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
+// LineContainsAll reports whether at least one line of path contains
+// every substring in needles. Useful for table-row predicates like
+// "row containing `P-NEW-20` AND `DONE`".
+func LineContainsAll(path string, needles ...string) bool {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		hit := true
+		for _, n := range needles {
+			if !strings.Contains(line, n) {
+				hit = false
+				break
+			}
+		}
+		if hit {
+			return true
+		}
+	}
+	return false
+}

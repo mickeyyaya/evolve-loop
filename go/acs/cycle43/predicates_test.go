@@ -11,59 +11,18 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// repoRoot resolves the repository root by shelling to
-// `git rev-parse --show-toplevel`. Skips the test when not in a git work
-// tree — keeps the suite green on bare exports.
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	stdout, _, code, err := acsassert.SubprocessOutput("git", "rev-parse", "--show-toplevel")
-	if err != nil || code != 0 {
-		t.Skipf("not in a git work tree: code=%d err=%v", code, err)
-	}
-	return strings.TrimSpace(stdout)
-}
-
-// fileContainsAny reports whether path contains at least one of the
-// substring variants. Returns true on first hit, false if file missing
-// or no variant matches.
-func fileContainsAny(path string, variants ...string) bool {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	s := string(b)
-	for _, v := range variants {
-		if strings.Contains(s, v) {
-			return true
-		}
-	}
-	return false
-}
-
-// countOccurrencesAny returns the count of lines that match any of the
-// given substring variants. Used to verify "at least N completion
-// gates" predicates.
+// Local aliases keep the cycle-43 tests reading the same as before,
+// while the implementation lives in pkg/acsassert (shared by all cycle
+// packages — see Phase 3 task #15).
+func repoRoot(t *testing.T) string                       { return acsassert.RepoRoot(t) }
+func fileContainsAny(path string, variants ...string) bool { return acsassert.FileContainsAny(path, variants...) }
 func countOccurrencesAny(path string, variants ...string) int {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return 0
-	}
-	count := 0
-	for _, line := range strings.Split(string(b), "\n") {
-		for _, v := range variants {
-			if strings.Contains(line, v) {
-				count++
-				break
-			}
-		}
-	}
-	return count
+	return acsassert.CountOccurrencesAny(path, variants...)
 }
 
 // TestC43_001_PNew17InvestigationComplete ports cycle-43/001-p-new-17.
