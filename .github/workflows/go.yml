@@ -1,0 +1,73 @@
+name: go
+
+on:
+  push:
+    branches: [main, go-rewrite-phase-1]
+    paths:
+      - 'go/**'
+      - '.github/workflows/go.yml'
+  pull_request:
+    paths:
+      - 'go/**'
+      - '.github/workflows/go.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build + test (Go)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go: ['1.23']
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: go/go.sum
+      - run: go mod download
+      - name: vet + fmt
+        run: |
+          go vet ./...
+          diff_out=$(gofmt -d -s .)
+          if [ -n "$diff_out" ]; then
+            echo "$diff_out"
+            echo "FAIL: gofmt diff" >&2
+            exit 1
+          fi
+      - name: build
+        run: make build
+      - name: test (race + cover)
+        run: |
+          go test -race -count=1 -coverprofile=coverage.txt ./...
+          go tool cover -func=coverage.txt
+      - name: coverage gate (>=85% per internal/* package)
+        run: |
+          fail=0
+          while IFS=$'\t' read -r pkg pct; do
+            case "$pkg" in
+              *internal/*|*/pkg/acsassert*|*/pkg/version*)
+                num=${pct%.*}
+                if [ "$num" -lt 85 ]; then
+                  echo "::warning::coverage gate: $pkg at $pct (<85%)"
+                  fail=1
+                fi
+                ;;
+            esac
+          done < <(go tool cover -func=coverage.txt | awk '/total:/ {next} {print $1"\t"$3}' | sed 's/%//')
+          # Phase 1 build: warning-only until task #17 lands all packages.
+          # Gate flips to hard fail once orchestrator phases (Phase 2) settle.
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ matrix.os }}
+          path: |
+            go/coverage.txt
