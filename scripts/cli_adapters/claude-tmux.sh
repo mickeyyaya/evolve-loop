@@ -2,9 +2,10 @@
 #
 # claude-tmux.sh — PROTOTYPE adapter driving interactive `claude` via tmux.
 #
-# Purpose: a one-shot test of whether interactive `claude` driven from tmux
-# bills to subscription quota instead of the post-2026-06-15 Agent SDK
-# credit pool. NOT production-ready. NOT integrated into the pipeline.
+# Purpose: an experimental adapter that drives the interactive `claude` REPL
+# (no `-p`) through tmux. Uses whatever authentication mode the operator
+# has configured for their claude installation. NOT production-ready.
+# NOT integrated into the pipeline.
 #
 # Inputs (env, contract matches scripts/cli_adapters/claude.sh:24-30):
 #   PROFILE_PATH        Absolute path to agent profile JSON
@@ -20,13 +21,13 @@
 #
 # Hard-coded safety gates:
 #   EVOLVE_TMUX_PROTOTYPE_ALLOW_BYPASS=1 must be set or adapter refuses
-#   ANTHROPIC_API_KEY must be unset (would invalidate the billing test)
+#   ANTHROPIC_API_KEY must be unset (would create an ambiguous credential path)
 #   ANTHROPIC_BASE_URL / EVOLVE_ANTHROPIC_BASE_URL must be unset (proxy mode)
 #
 # Exit codes:
 #   0    adapter ran, artifact appeared
 #   2    prototype safety gate not set
-#   3    environment looks like API or proxy mode (would invalidate test)
+#   3    environment looks like an override credential path (ambiguous)
 #   80   REPL boot timeout (60s)
 #   81   artifact never appeared within 5 min
 #   127  required binary not found
@@ -92,17 +93,17 @@ if [ "${EVOLVE_TMUX_PROTOTYPE_ALLOW_BYPASS:-0}" != "1" ]; then
     exit 2
 fi
 
-# --- Cost-leak guards (refuse if env would route to API or a proxy) ----------
+# --- Credential-isolation guards (refuse if env contains conflicting credentials) -----
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "[claude-tmux] ANTHROPIC_API_KEY is set — would bill to API, not subscription; abort" >&2
+    echo "[claude-tmux] ANTHROPIC_API_KEY is set — would create an ambiguous credential path; abort" >&2
     exit 3
 fi
 if [ -n "${ANTHROPIC_BASE_URL:-}" ]; then
-    echo "[claude-tmux] ANTHROPIC_BASE_URL is set — proxy mode would invalidate the billing test; abort" >&2
+    echo "[claude-tmux] ANTHROPIC_BASE_URL is set — proxy mode would create an ambiguous credential path; abort" >&2
     exit 3
 fi
 if [ -n "${EVOLVE_ANTHROPIC_BASE_URL:-}" ]; then
-    echo "[claude-tmux] EVOLVE_ANTHROPIC_BASE_URL is set — proxy mode would invalidate the billing test; abort" >&2
+    echo "[claude-tmux] EVOLVE_ANTHROPIC_BASE_URL is set — proxy mode would create an ambiguous credential path; abort" >&2
     exit 3
 fi
 

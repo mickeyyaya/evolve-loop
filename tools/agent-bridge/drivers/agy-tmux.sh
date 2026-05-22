@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # drivers/agy-tmux.sh — driver for interactive `agy` (TUI) driven via tmux
 #
-# Preserves Antigravity subscription billing (Google AI Pro OAuth) by driving
-# the agy interactive REPL via tmux instead of the headless `-p` mode.
+# Drives the agy interactive REPL via tmux instead of the headless `-p` mode,
+# using whatever authentication mode the operator configured for agy.
 #
 # agy-specific quirks (probed 2026-05-21):
 #  - REPL ready marker: "? for shortcuts" (the status footer text)

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# verify-subscription-billing.sh — snapshot ~/.claude state pre/post-call,
-# diff to infer billing mode for the tmux-claude prototype.
+# verify-subscription-billing.sh — snapshot credential-resolution state pre/post-call,
+# diff to detect credential-isolation drift across the tmux-claude prototype call.
 #
 # Subcommands:
 #   snapshot <SNAP_DIR> <LABEL>          → writes JSON snapshot, prints its path
 #   compare  <BEFORE.json> <AFTER.json>  → prints PASS/FAIL/INCONCLUSIVE
 #
 # Exit codes (compare):
-#   0  PASS         — strong or weak signal of subscription billing
-#   1  FAIL         — env var leak (API_KEY or BASE_URL was set during call)
+#   0  PASS         — credential-resolution stayed consistent and isolated
+#   1  FAIL         — credential isolation broken (override env var set mid-call)
 #   2  INCONCLUSIVE — no evidence either way (re-run with screenshots)
 #
 

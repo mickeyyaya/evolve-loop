@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# doctor-subscription-auth.sh — Detect active auth mode for evolve-loop.
+# doctor-subscription-auth.sh — Detect which credential path evolve-loop will use.
+#
+# Vendor-agnostic: just inspects which credential signals are present in the
+# operator's environment and reports the resolution order. Does not opine
+# on which mode the operator should choose — that is configured at the CLI
+# installation level, not here.
 #
 # Auth mode detection order (first match wins):
 #   1. EVOLVE_ANTHROPIC_BASE_URL or ANTHROPIC_BASE_URL set → CUSTOM_PROXY

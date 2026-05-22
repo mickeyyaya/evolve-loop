@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# lib/billing-snapshot.sh — snapshot ~/.claude state pre/post-call, compare for billing-path verdict
+# lib/billing-snapshot.sh — snapshot credential-resolution state pre/post-call, compare for auth-path consistency
 #
-# Snapshot ~/.claude state pre/post-call to verify subscription billing.
-# Generic across CLIs via $ANTHROPIC_* / $OPENAI_* env-leak checks.
+# Snapshot credential-resolution state (env vars, config files, keychain entries)
+# pre/post-call to confirm the authentication path stayed consistent.
+#
+# Use case: defense against subtle environment changes that could route a
+# call through an unintended credential — env-var leaks, proxy injection,
+# credential rotation mid-session. Operator hygiene, vendor-agnostic.
+# Generic across CLIs via $ANTHROPIC_* / $OPENAI_* / $GEMINI_* / $GOOGLE_* env checks.
 #
 # Two layers:
-#   bridge_billing_snapshot — write a JSON snapshot of ~/.claude state + env
+#   bridge_billing_snapshot — write a JSON snapshot of credential-resolution state
 #   bridge_billing_compare  — diff two snapshots, emit PASS/FAIL/INCONCLUSIVE
 #
 # Both layers callable as:
@@ -18,8 +23,8 @@
 #   bridge_billing_compare BEFORE AFTER
 #
 # Exit codes (compare):
-#   0  PASS         — strong or weak signal of subscription billing
-#   1  FAIL         — cost-leak: ANTHROPIC_API_KEY or proxy URL set
+#   0  PASS         — credential-resolution stayed consistent and isolated
+#   1  FAIL         — credential isolation broken (override env var set mid-session)
 #   2  INCONCLUSIVE — no clear evidence either way (operator must check console)
 
 bridge_billing_snapshot() {
@@ -119,7 +124,7 @@ bridge_billing_compare() {
     return 2
   fi
 
-  echo "=== billing-mode verdict ==="
+  echo "=== credential-isolation verdict ==="
   echo "BEFORE: $before"
   echo "AFTER:  $after"
   echo ""
@@ -129,7 +134,7 @@ bridge_billing_compare() {
   api_after=$(jq -r '.anthropic_api_key_in_env' "$after")
   if [[ "$api_after" == "yes" ]]; then
     echo "VERDICT: FAIL — ANTHROPIC_API_KEY was set during the call"
-    echo "         The call would have billed API account, not subscription."
+         The call routed through an override credential path instead of the CLI default.
     return 1
   fi
 

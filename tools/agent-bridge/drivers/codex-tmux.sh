@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # drivers/codex-tmux.sh — driver for interactive `codex` (TUI) driven via tmux
 #
-# Purpose: keep codex on ChatGPT-account subscription billing by driving its
-# interactive REPL (NOT `codex exec`). Mirrors claude-tmux's architecture.
+# Purpose: drive codex via its interactive REPL (NOT `codex exec`),
+# preserving whatever authentication mode the operator configured for
+# their codex installation. Mirrors claude-tmux's architecture.
 #
 # Notable codex-specific quirks (probed 2026-05-21):
 #  - REPL marker: `›` (U+203A single right-pointing angle quotation mark)
@@ -55,7 +56,7 @@ drv_launch_codex_tmux() {
   command -v jq   >/dev/null 2>&1 || { echo "[codex-tmux] jq missing"   >&2; return $EC_MISSING_BINARY; }
 
   if [[ -n "${OPENAI_API_KEY:-}" ]] && [[ "${BRIDGE_ALLOW_OPENAI_API_KEY:-0}" != "1" ]]; then
-    echo "[codex-tmux] cost-leak guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1" >&2
+    echo "[codex-tmux] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1" >&2
     return $EC_COST_LEAK
   fi
 

@@ -49,7 +49,7 @@ drv_launch_codex() {
   fi
 
   if [[ -n "${OPENAI_API_KEY:-}" ]] && [[ "${BRIDGE_ALLOW_OPENAI_API_KEY:-0}" != "1" ]]; then
-    echo "[codex] cost-leak guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1" >&2
+    echo "[codex] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1" >&2
     return $EC_COST_LEAK
   fi
 

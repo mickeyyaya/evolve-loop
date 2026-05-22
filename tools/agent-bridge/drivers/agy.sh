@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# drivers/agy.sh — driver for Antigravity CLI (agy, Gemini-backed, OAuth-authed)
+# drivers/agy.sh — driver for Antigravity CLI (agy, Gemini-backed)
 #
 # Promoted from v2 stub on 2026-05-21.
 #
-# Auth: agy is OAuth-authed (subscription path). Per user note 2026-05-21,
-# GEMINI_API_KEY / GOOGLE_API_KEY in env are NOT used by agy — those would
-# only matter for a direct Google API call. Bridge does not gate on them.
+# Auth: agy authenticates via whatever method the operator has configured.
+# Per user note 2026-05-21, GEMINI_API_KEY / GOOGLE_API_KEY in env are
+# not used by agy directly. Bridge does not gate on them.
 #
 # Model: agy does NOT expose model selection via CLI flag (-c is --continue).
 # All tier aliases (haiku/sonnet/opus/auto) map to agy's default (gemini-3.5-flash).
@@ -44,8 +44,8 @@ drv_launch_agy() {
     agy_bin="$(command -v agy)"
   fi
 
-  # No env-var cost-leak guard: agy is OAuth-authed; GEMINI/GOOGLE keys are
-  # not on agy's billing path. Per user clarification 2026-05-21.
+  # No env-var credential-isolation guard for agy: those env vars are not
+  # on agy's authentication path. Per user clarification 2026-05-21.
 
   mkdir -p "$workspace" "$(dirname "$stdout_log")" "$(dirname "$stderr_log")" "$(dirname "$artifact")"
 

@@ -164,8 +164,8 @@ done
 # v10.14.2: custom endpoint routing — EVOLVE_ANTHROPIC_BASE_URL passthrough.
 # When set, exports ANTHROPIC_BASE_URL so every claude -p invocation routes
 # through a custom proxy implementing the Anthropic Messages API format
-# (e.g., LiteLLM, corporate gateway). NOT required for subscription auth —
-# claude -p handles ~/.claude.json OAuth natively when ANTHROPIC_API_KEY is unset.
+# (e.g., LiteLLM, corporate gateway). NOT required when the operator's claude
+# installation handles its own authentication via ~/.claude.json natively.
 if [ -n "${EVOLVE_ANTHROPIC_BASE_URL:-}" ]; then
     export ANTHROPIC_BASE_URL="$EVOLVE_ANTHROPIC_BASE_URL"
     echo "[claude-adapter] proxy mode: ANTHROPIC_BASE_URL=$ANTHROPIC_BASE_URL" >&2
@@ -311,9 +311,9 @@ if [ "$SCHEMA_FILTER_ENABLED" = "true" ]; then
 fi
 
 # Extra flags (--bare, --no-session-persistence, etc.) — already valid CLI flags.
-# CAVEAT: `--bare` makes claude refuse to read OAuth/keychain credentials,
+# CAVEAT: `--bare` makes claude refuse to read its default credential sources,
 # requiring ANTHROPIC_API_KEY in the env. Most Claude Code users authenticate
-# via OAuth (no env var). Dropping --bare for those users so the subagent can
+# via the default credential path (no env var). Dropping --bare for those users so the subagent can
 # authenticate. The remaining isolation flags (--no-session-persistence,
 # --strict-mcp-config, --exclude-dynamic-system-prompt-sections) still apply.
 # Override with EVOLVE_FORCE_BARE=1 if you do have ANTHROPIC_API_KEY set.

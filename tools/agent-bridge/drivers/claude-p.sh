@@ -20,15 +20,18 @@ drv_launch_claude_p() {
     claude_bin="$(command -v claude)"
   fi
 
-  # Cost-leak guard: bridge expects subscription auth. If ANTHROPIC_API_KEY
-  # is set, that overrides OAuth and bills the API path — fail loudly.
+  # Credential-isolation guard: refuse to run when two authentication paths
+  # are simultaneously configured. The operator's CLI installation already
+  # has an authentication mode; the bridge does not override that choice.
+  # When ANTHROPIC_API_KEY is set, it would take precedence over the CLI's
+  # default configuration — fail loudly so the operator confirms intent.
   if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "[claude-p] cost-leak guard: ANTHROPIC_API_KEY is set; refusing to run (would bill API path, not subscription)" >&2
+    echo "[claude-p] credential-isolation guard: ANTHROPIC_API_KEY is set; refusing to run to avoid an ambiguous credential path" >&2
     echo "[claude-p] unset the variable, or use a different shell, then retry." >&2
     return $EC_COST_LEAK
   fi
   if [[ -n "${ANTHROPIC_BASE_URL:-}" ]] && [[ "${BRIDGE_ALLOW_ANTHROPIC_BASE_URL:-0}" != "1" ]]; then
-    echo "[claude-p] cost-leak guard: ANTHROPIC_BASE_URL set without BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1" >&2
+    echo "[claude-p] credential-isolation guard: ANTHROPIC_BASE_URL set without BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1" >&2
     return $EC_COST_LEAK
   fi
 

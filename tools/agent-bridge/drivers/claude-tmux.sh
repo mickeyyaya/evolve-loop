@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # drivers/claude-tmux.sh — driver for interactive `claude` driven via tmux
 #
-# Interactive `claude` via tmux. Subscription-preserving (Claude Max, OAuth).
+# Interactive `claude` via tmux. Uses the operator's existing CLI configuration.
 # Bridge contract: sourced by bin/bridge; reads cmd_launch's local vars +
 # bridge_profile_* + bridge_manifest_*.
 #
@@ -52,7 +52,7 @@ BYPASS_MSG
 
   # --- Cost-leak guards -----------------------------------------------------
   if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "[claude-tmux] ANTHROPIC_API_KEY is set — would bill API path; abort" >&2
+    echo "[claude-tmux] ANTHROPIC_API_KEY is set — would create an ambiguous credential path; abort" >&2
     return $EC_COST_LEAK
   fi
   if [[ -n "${ANTHROPIC_BASE_URL:-}" ]] && [[ "${BRIDGE_ALLOW_ANTHROPIC_BASE_URL:-0}" != "1" ]]; then
