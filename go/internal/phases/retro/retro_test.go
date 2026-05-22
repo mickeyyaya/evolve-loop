@@ -248,3 +248,25 @@ func TestName(t *testing.T) {
 		t.Errorf("Name=%q, want retro", p.Name())
 	}
 }
+
+// TestHasFailureLesson_NonexistentWorkspace_False exercises the
+// os.ReadDir error path: when the workspace doesn't exist, the helper
+// returns false (and the run path treats that as no-lesson-written).
+func TestHasFailureLesson_NonexistentWorkspace_False(t *testing.T) {
+	got := hasFailureLesson("/path/that/does/not/exist/at/all")
+	if got {
+		t.Errorf("hasFailureLesson on missing dir = true, want false")
+	}
+}
+
+// TestHasFailureLesson_IgnoresDirectoriesAndOtherFiles verifies the
+// helper skips directories and non-matching filenames.
+func TestHasFailureLesson_IgnoresDirectoriesAndOtherFiles(t *testing.T) {
+	ws := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(ws, "failure-lesson-subdir"), 0o755)
+	_ = os.WriteFile(filepath.Join(ws, "lesson.txt"), []byte("x"), 0o644)
+	_ = os.WriteFile(filepath.Join(ws, "failure-lesson"), []byte("x"), 0o644) // no .yaml
+	if hasFailureLesson(ws) {
+		t.Errorf("returned true with no matching .yaml; want false")
+	}
+}
