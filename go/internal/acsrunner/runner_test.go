@@ -305,6 +305,48 @@ func TestRun_CommanderStartError(t *testing.T) {
 	})
 }
 
+// scanErrReader returns a single oversize line so bufio.Scanner's
+// internal MaxScanTokenSize trips and surfaces a scan error — drives
+// ParseTestJSON's scanner.Err() return branch.
+type scanErrReader struct{ b []byte; off int }
+
+func (s *scanErrReader) Read(p []byte) (int, error) {
+	if s.off >= len(s.b) {
+		return 0, io.EOF
+	}
+	n := copy(p, s.b[s.off:])
+	s.off += n
+	return n, nil
+}
+func (s *scanErrReader) Close() error { return nil }
+
+func TestParseTestJSON_ScannerError(t *testing.T) {
+	// 2MB single line — exceeds the 1MB scanner buffer max.
+	big := make([]byte, 2*1024*1024)
+	for i := range big {
+		big[i] = 'x'
+	}
+	_, err := ParseTestJSON(&scanErrReader{b: big}, 0)
+	if err == nil {
+		t.Fatal("expected scanner buffer overflow error")
+	}
+}
+
+func TestRun_ParseErrorPropagates(t *testing.T) {
+	big := make([]byte, 2*1024*1024)
+	for i := range big {
+		big[i] = 'x'
+	}
+	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+		return &scanErrReader{b: big}, func() error { return nil }, nil
+	}, func() {
+		_, err := Run(context.Background(), 0, "./...")
+		if err == nil {
+			t.Fatal("expected parse error to propagate")
+		}
+	})
+}
+
 func TestRun_CommanderInjectsPassFail(t *testing.T) {
 	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
 		body := `{"Action":"run","Package":"p","Test":"TestA"}
