@@ -242,3 +242,50 @@ func TestName(t *testing.T) {
 		t.Errorf("Name=%q, want ship", p.Name())
 	}
 }
+
+// TestExecRunner_Success drives the production CmdRunner against
+// /bin/true (exit 0). Locked to POSIX paths; tests skip on Windows
+// (we don't ship Windows per parent plan §7).
+func TestExecRunner_Success(t *testing.T) {
+	if _, err := os.Stat("/bin/true"); err != nil {
+		t.Skip("no /bin/true")
+	}
+	var stdout, stderr io.Writer = io.Discard, io.Discard
+	code, err := execRunner(context.Background(), "/bin/true", nil, nil, "", nil, stdout, stderr)
+	if err != nil {
+		t.Fatalf("execRunner: %v", err)
+	}
+	if code != 0 {
+		t.Errorf("exit=%d, want 0", code)
+	}
+}
+
+func TestExecRunner_NonZeroExit(t *testing.T) {
+	if _, err := os.Stat("/bin/false"); err != nil {
+		t.Skip("no /bin/false")
+	}
+	code, err := execRunner(context.Background(), "/bin/false", nil, nil, "", nil, io.Discard, io.Discard)
+	if err != nil {
+		t.Errorf("err=%v, want nil (exit-status mapped to code)", err)
+	}
+	if code == 0 {
+		t.Errorf("exit=%d, want non-zero", code)
+	}
+}
+
+func TestExecRunner_NotFound(t *testing.T) {
+	_, err := execRunner(context.Background(), "/no/such/binary/ever", nil, nil, "", nil, io.Discard, io.Discard)
+	if err == nil {
+		t.Errorf("err=nil, want non-nil for missing binary")
+	}
+}
+
+func TestNewWithDefaultRunner_HasRunner(t *testing.T) {
+	p := NewWithDefaultRunner()
+	if p == nil {
+		t.Fatal("NewWithDefaultRunner returned nil")
+	}
+	if p.runner == nil {
+		t.Errorf("runner field is nil; want execRunner")
+	}
+}
