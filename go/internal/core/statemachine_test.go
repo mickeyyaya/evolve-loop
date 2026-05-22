@@ -85,6 +85,13 @@ func TestStateMachine_Next(t *testing.T) {
 		{"ship_pass_ends", PhaseShip, VerdictPASS, PhaseEnd, false},
 		{"end_terminal", PhaseEnd, VerdictPASS, "", true},
 		{"invalid_phase", Phase("nonsense"), VerdictPASS, "", true},
+		{"start_advances_to_scout", PhaseStart, VerdictPASS, PhaseScout, false},
+		{"intent_advances_to_scout", PhaseIntent, VerdictPASS, PhaseScout, false},
+		{"triage_advances_to_tdd", PhaseTriage, VerdictPASS, PhaseTDD, false},
+		{"tdd_advances_to_build", PhaseTDD, VerdictPASS, PhaseBuild, false},
+		{"retro_defaults_to_end", PhaseRetro, VerdictPASS, PhaseEnd, false},
+		{"audit_unknown_verdict_errors", PhaseAudit, VerdictSKIPPED, "", true},
+		{"audit_garbage_verdict_errors", PhaseAudit, "garbage", "", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,6 +109,16 @@ func TestStateMachine_Next(t *testing.T) {
 func TestPhase_String(t *testing.T) {
 	if PhaseScout.String() != "scout" {
 		t.Errorf("Phase.String wrong: %s", PhaseScout.String())
+	}
+}
+
+func TestStateMachine_CanTransition_InvalidPhase(t *testing.T) {
+	sm := NewStateMachine()
+	if sm.CanTransition(Phase("garbage"), PhaseScout) {
+		t.Error("invalid from accepted")
+	}
+	if sm.CanTransition(PhaseScout, Phase("garbage")) {
+		t.Error("invalid to accepted")
 	}
 }
 
