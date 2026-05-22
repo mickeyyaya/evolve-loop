@@ -1,0 +1,69 @@
+# goreleaser config for the evolve-loop Go binary.
+#
+# Run locally: goreleaser release --snapshot --clean
+# Run in CI:   goreleaser release --clean (with a v* git tag pushed)
+#
+# Mirrors the matrix produced by `go/Makefile`'s dist-* targets and the
+# `binaries[].artifacts` entries in .claude-plugin/plugin.json. If you
+# add or remove a (GOOS, GOARCH) pair, update both.
+#
+# Why CGO_ENABLED=0: same reason as the Makefile — evolve-loop's Go
+# tree has no cgo and disabling cgo strips the glibc-version surface
+# on linux, producing fully static binaries.
+version: 2
+
+project_name: evolve
+
+before:
+  hooks:
+    - cd go && go mod tidy
+    - cd go && go test -race -count=1 ./...
+
+builds:
+  - id: evolve
+    main: ./cmd/evolve
+    dir: go
+    binary: evolve
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.version={{.Version}}
+      - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.commit={{.ShortCommit}}
+      - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.builtAt={{.Date}}
+
+archives:
+  - id: evolve
+    name_template: 'evolve_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+    formats: [ 'tar.gz' ]
+    format_overrides:
+      - goos: windows
+        formats: [ 'zip' ]
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}'
+
+changelog:
+  disable: true  # release-pipeline.sh already maintains CHANGELOG.md
+
+release:
+  github:
+    owner: mickeyyaya
+    name: evolve-loop
+  draft: false
+  prerelease: auto

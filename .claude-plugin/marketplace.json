@@ -36,6 +36,19 @@
         },
         "see_also": "docs/platform-compatibility.md"
       },
+      "binaries": [
+        {
+          "name": "evolve",
+          "description": "Go orchestrator binary (optional accelerator) — hosts phase runners and serves the phaseproto wire protocol for cross-CLI subprocess agents.",
+          "artifacts": {
+            "darwin-amd64": "go/bin/dist/evolve-darwin-amd64",
+            "darwin-arm64": "go/bin/dist/evolve-darwin-arm64",
+            "linux-amd64": "go/bin/dist/evolve-linux-amd64",
+            "linux-arm64": "go/bin/dist/evolve-linux-arm64"
+          },
+          "tier": "tier-2-optional"
+        }
+      ],
       "strict": false
     }
   ]

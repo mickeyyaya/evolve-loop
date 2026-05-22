@@ -24,8 +24,10 @@ Commands:
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
   acs        Run ACS predicates    ( acs run --cycle N <pkg> [--json=false] )
-  phase      Run a single phase in-process; PhaseRequest on stdin,
-              PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
+  phase        Run a single phase in-process; PhaseRequest on stdin,
+                PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
+  serve-phase  Envelope-framed phase subprocess (phaseproto wire); the binary
+                end of phaseproto.SubprocessRunner ( serve-phase <name> )
   cycle      Run one full cycle through the orchestrator ( cycle run --goal-hash X )
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N --budget-usd X )
@@ -55,6 +57,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runACS(args[1:], stdin, stdout, stderr)
 	case "phase":
 		return runPhase(args[1:], stdin, stdout, stderr)
+	case "serve-phase":
+		return runServePhase(args[1:], stdin, stdout, stderr)
 	case "cycle":
 		return runCycle(args[1:], stdin, stdout, stderr)
 	case "worktree":

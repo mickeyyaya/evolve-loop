@@ -75,5 +75,23 @@
     "./.claude-plugin/commands/retro.md",
     "./.claude-plugin/commands/loop.md",
     "./.claude-plugin/commands/intent.md"
+  ],
+  "binaries": [
+    {
+      "name": "evolve",
+      "description": "Go orchestrator binary. Hosts in-process phase runners and serves the phaseproto wire protocol (`evolve serve-phase <name>`) for cross-CLI subprocess agents.",
+      "module": "./go",
+      "package": "./cmd/evolve",
+      "source_build": "cd go && make build",
+      "cross_compile": "cd go && make dist",
+      "artifacts": {
+        "darwin-amd64": "go/bin/dist/evolve-darwin-amd64",
+        "darwin-arm64": "go/bin/dist/evolve-darwin-arm64",
+        "linux-amd64": "go/bin/dist/evolve-linux-amd64",
+        "linux-arm64": "go/bin/dist/evolve-linux-arm64"
+      },
+      "tier": "tier-2-optional",
+      "tier_note": "Optional accelerator. The plugin remains fully functional via shell scripts when the Go binary is absent."
+    }
   ]
 }
