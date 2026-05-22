@@ -78,6 +78,18 @@ For each scout-deferred or triage-deferred item:
 - **From triage `## deferred`**: explicit triage decision; almost always emit.
 - **From scout `## Carryover Decisions: defer`**: existing carryoverTodo flagged for re-defer; SKIP (reconcile will update the existing entry's cycles_unpicked counter — emitting again would create a duplicate).
 
+### 2.5 Read reflector synthesis (v10.20.0+)
+
+```bash
+test -f "$WORKSPACE/learn/reflector-synthesis.md" && cat "$WORKSPACE/learn/reflector-synthesis.md"
+```
+
+The Learn-phase reflector runs before you and aggregates per-phase reflections. On PASS cycles, the value comes from each phase's `suggested_improvements[]` — concrete, imperative-voice actions with `target_file` and `evidence_pointer` already filled in. These are PRIME carryoverTodo candidates.
+
+Rule: any `suggested_improvements[].action` with `priority: medium` or `priority: high` from the synthesis is eligible. Apply your normal Step 2 deferrability filter (concrete action verb, named target, real reason). If eligible, emit as a carryoverTodo with `id: todo-reflect-<short-slug>` and `evidence_pointer: learn/reflector-synthesis.md#<phase>`.
+
+Do NOT duplicate items already in `state.json:carryoverTodos[]`. Do NOT propose lessons or process changes (that's retrospective's job — and retrospective doesn't run on PASS, so suggested improvements from reflections become deferred work, not durable instincts).
+
 ### 3. Write the carryover-todos.json
 
 Output path: `.evolve/runs/cycle-N/carryover-todos.json`. JSON array. **Empty `[]` is valid.**

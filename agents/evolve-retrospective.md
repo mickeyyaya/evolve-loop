@@ -67,6 +67,19 @@ Map `event_type` → lesson `errorCategory`:
 - `persistence-fail` → `context`
 - (any other) → `integration`
 
+### 1.7 Read reflector synthesis (v10.20.0+)
+
+```bash
+test -f "$WORKSPACE/learn/reflector-synthesis.md" && cat "$WORKSPACE/learn/reflector-synthesis.md"
+```
+
+The Learn-phase reflector runs before you and aggregates per-phase reflections + cross-cycle patterns. Read the full synthesis. Two sections matter most:
+
+- **"This-Cycle Per-Phase Reflections"** — each phase's self-reported friction; weight HIGH-confidence (≥0.5) entries into your root-cause analysis. A phase that called out `category: research-quota` with `evidence: <log:line>` is providing first-person testimony you should cite, not duplicate.
+- **"Top Pipeline-Level Patterns"** — categories with ≥3/5 cycles affected are SYSTEMIC candidates. If your audit's root cause matches a pattern here, flag `systemic: true` in the resulting lesson YAML's `pattern` field — this is the bridge between per-cycle retrospection and durable instinct extraction.
+
+Do NOT re-aggregate the reflections (the reflector already did that). Do NOT modify any `<phase>-reflection.yaml` (immutable inputs). Reference the synthesis path in your retrospective-report.md's "Research" section so future-self can trace the citation.
+
 ### 2. Extract the failure narrative
 
 Identify per-defect:
