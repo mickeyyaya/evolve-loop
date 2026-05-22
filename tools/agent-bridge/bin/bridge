@@ -3,8 +3,19 @@
 
 set -uo pipefail
 
-readonly BRIDGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BRIDGE_ROOT="$(cd "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
+# Resolve the script's REAL location even when invoked via symlink
+# (e.g., $HOME/.local/bin/bridge → tools/agent-bridge/bin/bridge).
+# Bash 3.2-portable: walk the symlink chain manually since macOS's `readlink`
+# lacks -f and `realpath` is not always available.
+_bridge_src="${BASH_SOURCE[0]}"
+while [[ -L "$_bridge_src" ]]; do
+  _bridge_dir="$(cd -P "$(dirname "$_bridge_src")" && pwd)"
+  _bridge_src="$(readlink "$_bridge_src")"
+  [[ "$_bridge_src" != /* ]] && _bridge_src="$_bridge_dir/$_bridge_src"
+done
+readonly BRIDGE_SCRIPT_DIR="$(cd -P "$(dirname "$_bridge_src")" && pwd)"
+readonly BRIDGE_ROOT="$(cd -P "${BRIDGE_SCRIPT_DIR}/.." && pwd)"
+unset _bridge_src _bridge_dir
 : "${BRIDGE_LIB_DIR:=${BRIDGE_ROOT}/lib}"
 readonly BRIDGE_LIB_DIR
 readonly BRIDGE_DRIVERS_DIR="${BRIDGE_ROOT}/drivers"
@@ -30,6 +41,7 @@ readonly EC_MISSING_BINARY=127
 . "${BRIDGE_LIB_DIR}/report.sh"
 . "${BRIDGE_LIB_DIR}/doctor.sh"
 . "${BRIDGE_LIB_DIR}/selftest.sh"
+. "${BRIDGE_LIB_DIR}/human-input.sh"
 
 cmd_version() {
   local ver="unknown"
@@ -100,6 +112,38 @@ Optional:
   --dry-run           | BRIDGE_DRY_RUN=1  Produce mock outputs (no LLM call); rc=0
   --allow-bypass      | BRIDGE_ALLOW_BYPASS=1
                                           Acknowledge --dangerously-skip-permissions
+  --permission-mode=M | BRIDGE_PERMISSION_MODE=M
+                                          Pass through to `claude --permission-mode M`.
+                                          Valid: plan | default | acceptEdits |
+                                          bypassPermissions | auto | dontAsk.
+                                          Precedence: CLI flag > env var > profile.permission_mode.
+                                          In plan mode (claude-tmux driver), --dangerously-skip-permissions
+                                          is replaced (not augmented) — plan mode disables writes by
+                                          design, so --allow-bypass is NOT required when permission-mode=plan.
+  --stream-output     | BRIDGE_STREAM_OUTPUT=1
+                                          (v0.3+) claude-p only: append --output-format=stream-json
+                                          --include-partial-messages --verbose so claude emits realtime
+                                          JSONL events to stdout. Solves phase-observer false-positive
+                                          stall kills on long orchestrator sessions. Other drivers log
+                                          a NOTE that the flag is no-op. Precedence: flag > env > profile.
+                                          Use --no-stream-output to explicitly disable when env/profile sets it.
+  --session-name=NAME | BRIDGE_SESSION_NAME=NAME
+                                          (v0.5+) *-tmux drivers only: use STABLE tmux session name
+                                          `evolve-bridge-named-<NAME>`. Sessions persist across exits
+                                          (trap doesn't kill), are EXEMPT from orphan-sweep, and
+                                          auto-resume on next launch (claude REPL context preserved).
+                                          Cleanup: `bridge sessions kill NAME` (or `tmux kill-session
+                                          -t evolve-bridge-named-NAME`). Valid chars: [a-zA-Z0-9._-]+,
+                                          max 32 chars. Non-tmux drivers log a NOTE that it's no-op.
+
+Session lifecycle (v0.4+):
+  Every launch creates a fresh context-window session (claude-p/codex/agy: new
+  single-shot process; *-tmux: new uniquely-named tmux session). Trap-based
+  cleanup kills tmux sessions on normal EXIT, INT, and TERM. SIGKILL/OOM
+  cannot be trapped and DOES leak sessions — the orphan-sweep on each new
+  launch finds dead-pid `evolve-bridge-*` sessions and kills them. Opt-out:
+  BRIDGE_NO_ORPHAN_CLEANUP=1 (only if you have a long-running session whose
+  bridge parent was killed but you want to keep the tmux for manual access).
 
 Flags always win when both flag and env var are set.
 
@@ -201,6 +245,24 @@ cmd_launch() {
   local require_full="${BRIDGE_REQUIRE_FULL:-0}"
   local allow_bypass="${BRIDGE_ALLOW_BYPASS:-0}"
   local dry_run="${BRIDGE_DRY_RUN:-0}"
+  local human_input="${BRIDGE_HUMAN_INPUT_FLAG:-0}"
+  # v0.2: --permission-mode for claude --permission-mode pass-through.
+  # Empty = use profile.permission_mode (or driver default if neither set).
+  # Valid: plan | default | acceptEdits | bypassPermissions | auto | dontAsk
+  local permission_mode="${BRIDGE_PERMISSION_MODE:-}"
+  # v0.3: --stream-output (boolean flag) — claude-p only. When effective true,
+  # appends --output-format=stream-json --include-partial-messages so claude
+  # emits realtime JSONL events to stdout. Solves phase-observer false-positive
+  # stall kills on long orchestrator sessions where claude -p's default text
+  # output stays silent until the final response.
+  # Empty string here means "honor env/profile" (which default to false).
+  local stream_output="${BRIDGE_STREAM_OUTPUT:-}"
+  # v0.5: --session-name=NAME — *-tmux drivers only. Uses STABLE tmux session
+  # name `evolve-bridge-named-<NAME>` instead of pid-and-timestamp. Named
+  # sessions persist across bridge exits (trap doesn't kill), are EXEMPT
+  # from orphan-sweep, and auto-resume on next launch (claude REPL context
+  # preserved). Cleanup via `bridge sessions kill NAME`.
+  local session_name="${BRIDGE_SESSION_NAME:-}"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -230,6 +292,13 @@ cmd_launch() {
       --dry-run)       dry_run=1 ;;
       --require-full)  require_full=1 ;;
       --allow-bypass)  allow_bypass=1 ;;
+      --human-input)   human_input=1 ;;
+      --permission-mode=*) permission_mode="${1#--permission-mode=}" ;;
+      --permission-mode)   [[ $# -ge 2 ]] || { echo "[bridge] --permission-mode requires a value" >&2; return $EC_BAD_FLAGS; }; permission_mode="$2"; shift ;;
+      --stream-output)     stream_output=true ;;
+      --no-stream-output)  stream_output=false ;;
+      --session-name=*)    session_name="${1#--session-name=}" ;;
+      --session-name)      [[ $# -ge 2 ]] || { echo "[bridge] --session-name requires a value" >&2; return $EC_BAD_FLAGS; }; session_name="$2"; shift ;;
       --help|-h)       cmd_launch_help; return $EC_OK ;;
       --)              shift; break ;;
       *)               echo "[bridge] launch: unknown flag: $1" >&2; return $EC_BAD_FLAGS ;;
@@ -256,9 +325,36 @@ cmd_launch() {
     return $EC_BAD_FLAGS
   fi
 
+  # --human-input gate: requires host-level BRIDGE_HUMAN_SIMULATION=1 env opt-in.
+  # Two-gate design (see docs/design.md §8 and lib/human-input.sh header).
+  if [[ "$human_input" -eq 1 ]] && [[ "${BRIDGE_HUMAN_SIMULATION:-0}" != "1" ]]; then
+    echo "[bridge] --human-input requires BRIDGE_HUMAN_SIMULATION=1 host opt-in" >&2
+    echo "[bridge] See docs/design.md §8 for the policy framing + per-CLI ToS responsibility." >&2
+    return $EC_SAFETY_GATE
+  fi
+  # Export so the driver and lib/human-input.sh see it
+  export human_input
+
   if [[ ! -r "$prompt_file" ]]; then
     echo "[bridge] launch: prompt file not readable: $prompt_file" >&2
     return $EC_BAD_FLAGS
+  fi
+  # F5: empty-prompt guard — silently sending empty input would hang the agent
+  # at the 300s artifact timeout. Fail fast with a clear message.
+  if [[ ! -s "$prompt_file" ]]; then
+    echo "[bridge] launch: prompt file is empty: $prompt_file" >&2
+    echo "[bridge] (an empty prompt would hang the agent at the artifact timeout)" >&2
+    return $EC_BAD_FLAGS
+  fi
+  # F6: workspace-reuse warning — caller may have passed a stale workspace.
+  # Fires BEFORE validate-only/dry-run checks so the operator is warned
+  # regardless of how the launch resolves.
+  if [[ -d "$workspace" ]] && { [[ -f "$workspace/artifact.md" ]] || [[ -f "$workspace/escalation-report.json" ]]; }; then
+    local stale=()
+    [[ -f "$workspace/artifact.md" ]] && stale+=("artifact.md")
+    [[ -f "$workspace/escalation-report.json" ]] && stale+=("escalation-report.json")
+    echo "[bridge] WARN: workspace contains stale files from a prior run: ${stale[*]}" >&2
+    echo "[bridge] (proceeding; files will be overwritten by this launch)" >&2
   fi
 
   local effective_model="$model"
@@ -269,6 +365,61 @@ cmd_launch() {
       effective_model="auto"  # driver decides default
     fi
   fi
+
+  # Resolve effective permission_mode: CLI flag > env var > profile field.
+  # Empty string means "driver picks its native default" (back-compat).
+  local effective_permission_mode="$permission_mode"
+  if [[ -z "$effective_permission_mode" ]] && [[ -n "${bridge_profile_permission_mode:-}" ]]; then
+    effective_permission_mode="$bridge_profile_permission_mode"
+  fi
+  # Re-validate at the resolution point: an operator-passed --permission-mode
+  # bypasses profile_load's validation, so we check here too.
+  case "$effective_permission_mode" in
+    ""|plan|default|acceptEdits|bypassPermissions|auto|dontAsk) ;;
+    *)
+      echo "[bridge] invalid --permission-mode value: '$effective_permission_mode'" >&2
+      echo "[bridge] valid: plan, default, acceptEdits, bypassPermissions, auto, dontAsk" >&2
+      return $EC_BAD_FLAGS
+      ;;
+  esac
+  export effective_permission_mode
+
+  # v0.3: Resolve effective stream_output (boolean): CLI flag > env > profile > false.
+  # Normalize various truthy/falsy inputs to canonical "true" | "false" strings
+  # so drivers can do plain `[[ "$x" == "true" ]]` checks.
+  local effective_stream_output="$stream_output"
+  if [[ -z "$effective_stream_output" ]]; then
+    # No flag set; fall through to profile default (which itself defaults to "false").
+    effective_stream_output="${bridge_profile_stream_output:-false}"
+  fi
+  case "$effective_stream_output" in
+    true|1|yes|on)   effective_stream_output=true ;;
+    false|0|no|off|"") effective_stream_output=false ;;
+    *)
+      echo "[bridge] invalid --stream-output value: '$effective_stream_output' — must be boolean (true|false|1|0|yes|no|on|off)" >&2
+      return $EC_BAD_FLAGS
+      ;;
+  esac
+  export effective_stream_output
+
+  # v0.5: Resolve effective session_name: CLI flag > env > profile > "".
+  # Re-validate at the resolution point: an operator-passed --session-name
+  # bypasses profile_load's validation, so we check here too.
+  local effective_session_name="$session_name"
+  if [[ -z "$effective_session_name" ]] && [[ -n "${bridge_profile_session_name:-}" ]]; then
+    effective_session_name="$bridge_profile_session_name"
+  fi
+  if [[ -n "$effective_session_name" ]]; then
+    if [[ ${#effective_session_name} -gt 32 ]]; then
+      echo "[bridge] invalid --session-name (length ${#effective_session_name} > 32 chars)" >&2
+      return $EC_BAD_FLAGS
+    fi
+    if [[ ! "$effective_session_name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+      echo "[bridge] invalid --session-name '$effective_session_name' — must match [a-zA-Z0-9._-]+ (no shell metachars)" >&2
+      return $EC_BAD_FLAGS
+    fi
+  fi
+  export effective_session_name
 
   # --validate-only: print resolved config and exit
   if [[ "$validate_only" -eq 1 ]]; then
@@ -288,6 +439,9 @@ cmd_launch() {
   worktree       = $worktree
   agent          = $agent
   allowed_tools  = $bridge_profile_allowed_tools_csv
+  permission-mode = ${effective_permission_mode:-(driver default)}
+  stream-output  = $effective_stream_output
+  session-name   = ${effective_session_name:-(auto-generated, ephemeral)}
   auto_respond:
     destructive_ops = $bridge_profile_auto_respond_destructive_ops
     timeout_s       = $bridge_profile_auto_respond_timeout_s
@@ -295,6 +449,7 @@ cmd_launch() {
   require-full   = $require_full
   allow-bypass   = $allow_bypass
   dry-run        = $dry_run
+  human-input    = $human_input
 RESOLVED
     return $EC_OK
   fi
@@ -304,7 +459,12 @@ RESOLVED
     _bridge_dry_run "$cli" "$profile" "$effective_model" "$prompt_file" \
       "$workspace" "$stdout_log" "$stderr_log" "$artifact" \
       "$cycle" "$agent"
-    return $?
+    local dry_rc=$?
+    if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+      bridge_report_with_exists "$workspace" "$(basename "$artifact")" 2>/dev/null \
+        | jq -c . 2>/dev/null || true
+    fi
+    return $dry_rc
   fi
 
   # --require-full check
@@ -315,6 +475,40 @@ RESOLVED
       echo "[bridge] --require-full set; cli=$cli tier=$tier (need full or hybrid)" >&2
       return $EC_REQUIRE_FULL_UNMET
     fi
+  fi
+
+  # v0.4: orphan tmux-session sweep. Bridge tmux drivers (claude-tmux,
+  # codex-tmux, agy-tmux) create sessions named
+  #   evolve-bridge-(c\d+|codex|agy)-...-pid<N>-<timestamp>
+  # On normal exit/INT/TERM the driver's trap kills the session. But SIGKILL,
+  # OOM-kill, kernel-panic etc. cannot be trapped — they leak sessions.
+  # This sweep finds orphan sessions (owner pid no longer alive) and kills them
+  # before the new launch creates more, preventing accumulation.
+  # Opt-out: BRIDGE_NO_ORPHAN_CLEANUP=1
+  if [[ "${BRIDGE_NO_ORPHAN_CLEANUP:-0}" != "1" ]] && command -v tmux >/dev/null 2>&1; then
+    local _orphan_ses _orphan_pid _orphan_killed=0
+    while IFS= read -r _orphan_ses; do
+      [[ -z "$_orphan_ses" ]] && continue
+      # v0.5: EXEMPT named sessions (evolve-bridge-named-*) from sweep —
+      # they're stable identifiers operators rely on for resume.
+      case "$_orphan_ses" in
+        evolve-bridge-named-*) continue ;;
+      esac
+      # Parse pid from "<...>-pid<N>-<ts>" suffix
+      _orphan_pid="${_orphan_ses##*-pid}"
+      _orphan_pid="${_orphan_pid%%-*}"
+      if [[ "$_orphan_pid" =~ ^[0-9]+$ ]]; then
+        if ! kill -0 "$_orphan_pid" 2>/dev/null; then
+          echo "[bridge] orphan-sweep: killing tmux session '$_orphan_ses' (owner pid $_orphan_pid is dead)" >&2
+          tmux kill-session -t "$_orphan_ses" 2>/dev/null || true
+          _orphan_killed=$((_orphan_killed + 1))
+        fi
+      fi
+    done < <(tmux ls 2>/dev/null | awk -F: '/^evolve-bridge-/ { print $1 }')
+    if [[ "$_orphan_killed" -gt 0 ]]; then
+      echo "[bridge] orphan-sweep: killed $_orphan_killed leaked session(s)" >&2
+    fi
+    unset _orphan_ses _orphan_pid _orphan_killed
   fi
 
   # Driver dispatch
@@ -330,7 +524,21 @@ RESOLVED
     echo "[bridge] driver $driver_script does not define $fn_name" >&2
     return $EC_BAD_FLAGS
   fi
+
+  set +e
   $fn_name
+  local launch_rc=$?
+  set -e
+
+  # --json mode: emit a one-line JSON summary on stdout (same schema as
+  # `bridge report`). Emits even on failure paths so a skill can parse the
+  # workspace state regardless of rc.
+  if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+    bridge_report_with_exists "$workspace" "$(basename "$artifact")" 2>/dev/null \
+      | jq -c . 2>/dev/null || true
+  fi
+
+  return $launch_rc
 }
 
 cmd_probe() {
@@ -447,7 +655,24 @@ ADD_RULE_HELP
   [[ -z "$policy" ]] && policy=$([[ -n "$response" ]] && echo "auto_respond" || echo "escalate")
   [[ -z "$name" ]] && name="${cli//-/_}_rule_$(date +%s)"
 
-  manifest_append_rule "${BRIDGE_LIB_DIR}/manifests/${cli}.json" "$name" "$regex" "$response" "$policy" "$note"
+  local manifest_path="${BRIDGE_LIB_DIR}/manifests/${cli}.json"
+  set +e
+  manifest_append_rule "$manifest_path" "$name" "$regex" "$response" "$policy" "$note"
+  local rc=$?
+  set -e
+
+  if [[ "${BRIDGE_JSON:-0}" == "1" ]]; then
+    local status_str
+    case "$rc" in
+      0) status_str="appended" ;;
+      2) status_str="duplicate" ;;
+      *) status_str="failed" ;;
+    esac
+    jq -n --arg status "$status_str" --arg name "$name" --arg manifest "$manifest_path" \
+      --arg policy "$policy" --argjson rc "$rc" \
+      '{status: $status, name: $name, manifest: $manifest, policy: $policy, rc: $rc}'
+  fi
+  return $rc
 }
 
 

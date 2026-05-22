@@ -14,6 +14,28 @@
 # Test seam: BRIDGE_AGY_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_agy_tmux() {
+  # v0.2: permission_mode is a claude-only feature; reject early to avoid
+  # silently ignoring an operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[agy-tmux] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[agy-tmux] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[agy-tmux] Agy exposes only --dangerously-skip-permissions; use --allow-bypass + omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
+  # v0.3: stream_output is a no-op on agy-tmux — agy CLI has no streaming
+  # output flag. Log a note (not a hard reject) so operators know.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[agy-tmux] NOTE: stream_output=true is not supported on this CLI — no-op (agy has no streaming output flag)" >&2
+  fi
+
+  # v0.5: named-session/resume support is currently claude-tmux-only.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[agy-tmux] --session-name='$effective_session_name' is not supported on this CLI in v0.5" >&2
+    echo "[agy-tmux] Only claude-tmux supports named/resumable sessions; use --cli=claude-tmux or omit --session-name." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[agy-tmux] safety gate: --allow-bypass is required" >&2
     return $EC_SAFETY_GATE
@@ -99,12 +121,18 @@ drv_launch_agy_tmux() {
   fi
 
   # Deliver prompt
-  tmux load-buffer -t "$session" "$resolved_prompt_file"
-  tmux paste-buffer -t "$session"
-  sleep 1
-  tmux send-keys -t "$session" Enter
   local prompt_bytes
   prompt_bytes=$(wc -c < "$resolved_prompt_file" | tr -d ' ')
+  if [[ "$(bridge_human_active 2>/dev/null || echo 0)" == "1" ]]; then
+    echo "[agy-tmux] human-input mode: boot pause + paste-with-review" >&2
+    human_boot_pause
+    human_paste_with_review "$session" "$resolved_prompt_file"
+  else
+    tmux load-buffer -t "$session" "$resolved_prompt_file"
+    tmux paste-buffer -t "$session"
+    sleep 1
+    tmux send-keys -t "$session" Enter
+  fi
   echo "[agy-tmux] prompt delivered (${prompt_bytes} bytes)" >&2
 
   # Wait for artifact

@@ -15,6 +15,30 @@
 # Test seam: BRIDGE_CODEX_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_codex() {
+  # v0.2: permission_mode is a claude-only feature (claude --permission-mode).
+  # Codex has its own permission model (--sandbox <MODE>, -c sandbox_permissions=[...])
+  # but no plan-mode equivalent. Fail loudly rather than silently ignore an
+  # operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[codex] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[codex] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[codex] For codex, use --sandbox <mode> via the prompt or omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
+  # v0.3: stream_output is a no-op on codex — the codex CLI does not expose
+  # a realtime streaming output format equivalent to claude's --output-format=stream-json.
+  # Log a note (not a hard reject) so operators know their stream_output config
+  # has no effect here, but the cycle can still proceed.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[codex] NOTE: stream_output=true is not supported on this CLI — no-op (codex has no streaming output flag)" >&2
+  fi
+
+  # v0.5: codex is single-shot — --session-name has no semantic effect here.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[codex] NOTE: --session-name='$effective_session_name' is no-op for this driver (single-shot process). Use --cli=claude-tmux for named/resumable sessions." >&2
+  fi
+
   local codex_bin
   if [[ -n "${BRIDGE_CODEX_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     codex_bin="$BRIDGE_CODEX_BINARY"

@@ -27,8 +27,8 @@ bridge_selftest() {
   done
 
   case "$suite" in
-    all|unit|integration|billing) ;;
-    *) echo "[selftest] bad --suite (want: all|unit|integration|billing): $suite" >&2; return 10 ;;
+    all|all-fast|unit|integration|billing|contract|skill|concurrency|security) ;;
+    *) echo "[selftest] bad --suite (want: all|all-fast|unit|integration|billing|contract|skill|concurrency|security): $suite" >&2; return 10 ;;
   esac
 
   if ! command -v bats >/dev/null 2>&1; then

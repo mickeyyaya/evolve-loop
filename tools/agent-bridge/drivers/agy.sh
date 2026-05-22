@@ -13,6 +13,28 @@
 # Test seam: BRIDGE_AGY_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_agy() {
+  # v0.2: permission_mode is a claude-only feature (claude --permission-mode).
+  # Agy has only --dangerously-skip-permissions, no plan-mode equivalent.
+  # Fail loudly rather than silently ignore the operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[agy] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[agy] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[agy] Agy exposes only --dangerously-skip-permissions; use --allow-bypass + omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
+  # v0.3: stream_output is a no-op on agy — agy CLI has no streaming output
+  # equivalent to claude --output-format=stream-json. Log a note (not a hard
+  # reject) so operators know their stream_output config has no effect here.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[agy] NOTE: stream_output=true is not supported on this CLI — no-op (agy has no streaming output flag)" >&2
+  fi
+
+  # v0.5: agy is single-shot — --session-name has no semantic effect here.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[agy] NOTE: --session-name='$effective_session_name' is no-op for this driver (single-shot process). Use --cli=claude-tmux for named/resumable sessions." >&2
+  fi
+
   local agy_bin
   if [[ -n "${BRIDGE_AGY_BINARY:-}" ]] && [[ "${BRIDGE_TESTING:-0}" == "1" ]]; then
     agy_bin="$BRIDGE_AGY_BINARY"

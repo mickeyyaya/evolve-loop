@@ -19,12 +19,48 @@ See `docs/design.md` for the full rationale.
 ## Install
 
 ```bash
-bash install.sh                  # symlinks bin/bridge → $HOME/.local/bin/bridge
-which bridge && bridge version   # smoke
+bash install.sh                       # symlinks bin/bridge → $HOME/.local/bin/bridge
+bash install.sh --check               # verify install (symlink + PATH + schema_version=1)
+which bridge && bridge --json version # smoke
 ```
 
-Dependencies: `bash` 3.2+, `jq`, `tmux`, `openssl`, an active Claude CLI (`claude --version` ≥ 2.1.x).
-macOS billing-verification additionally uses `security` (keychain) — no install needed.
+Make sure `$HOME/.local/bin` is on your `$PATH`. If not, add to your shell rc:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+To uninstall:
+
+```bash
+bash install.sh --uninstall
+```
+
+**Dependencies**: `bash` 3.2+, `jq`, `tmux`, `openssl`, an active Claude CLI (`claude --version` ≥ 2.1.x).
+On macOS, billing-verification also uses the system `security` keychain probe — no extra install needed.
+
+### Using bridge from evolve-loop (default-on integration)
+
+`evolve-loop` (the parent repo) calls `bridge` as a system command **by default
+when bridge is installed**. The `claude-tmux` adapter in evolve-loop checks for:
+
+1. `bridge` is on PATH (this install completes that)
+2. `bridge --json version` reports `schema_version=1`
+3. `EVOLVE_USE_BRIDGE` is unset OR set to anything other than `"0"`
+
+When all 3 are true, evolve-loop delegates `claude-tmux` invocations to
+`bridge launch --cli=claude-tmux --allow-bypass`. Otherwise, the existing
+native adapter runs unchanged — zero regression. See
+`docs/architecture/cli-adapters.md` in evolve-loop for the full integration spec.
+
+No env-var setting is needed once bridge is installed. The default is **on**.
+
+To force-disable (e.g., for CI bit-for-bit reproducibility, or to debug the
+native prototype path):
+
+```bash
+export EVOLVE_USE_BRIDGE=0
+```
 
 ---
 

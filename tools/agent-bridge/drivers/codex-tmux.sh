@@ -15,6 +15,29 @@
 # Test seam: BRIDGE_CODEX_BINARY (gated by BRIDGE_TESTING=1).
 
 drv_launch_codex_tmux() {
+  # v0.2: permission_mode is a claude-only feature; reject early to avoid
+  # silently ignoring an operator's safety-mode declaration.
+  if [[ -n "${effective_permission_mode:-}" ]]; then
+    echo "[codex-tmux] permission_mode='$effective_permission_mode' is not supported on this CLI" >&2
+    echo "[codex-tmux] Only claude-p and claude-tmux drivers support --permission-mode." >&2
+    echo "[codex-tmux] For codex, use --sandbox <mode> via the prompt or omit permission_mode." >&2
+    return $EC_BAD_FLAGS
+  fi
+
+  # v0.3: stream_output is a no-op on codex-tmux — codex has no streaming
+  # output flag. Log a note (not a hard reject) so operators know.
+  if [[ "${effective_stream_output:-false}" == "true" ]]; then
+    echo "[codex-tmux] NOTE: stream_output=true is not supported on this CLI — no-op (codex has no streaming output flag)" >&2
+  fi
+
+  # v0.5: named-session/resume support is currently claude-tmux-only.
+  # Reject loudly rather than silently ignore the operator's intent.
+  if [[ -n "${effective_session_name:-}" ]]; then
+    echo "[codex-tmux] --session-name='$effective_session_name' is not supported on this CLI in v0.5" >&2
+    echo "[codex-tmux] Only claude-tmux supports named/resumable sessions; use --cli=claude-tmux or omit --session-name." >&2
+    return $EC_BAD_FLAGS
+  fi
+
   if [[ "$allow_bypass" -ne 1 ]]; then
     echo "[codex-tmux] safety gate: --allow-bypass is required (running interactive codex with bypass-like semantics)" >&2
     return $EC_SAFETY_GATE
@@ -118,12 +141,18 @@ drv_launch_codex_tmux() {
   fi
 
   # Deliver prompt
-  tmux load-buffer -t "$session" "$resolved_prompt_file"
-  tmux paste-buffer -t "$session"
-  sleep 1
-  tmux send-keys -t "$session" Enter
   local prompt_bytes
   prompt_bytes=$(wc -c < "$resolved_prompt_file" | tr -d ' ')
+  if [[ "$(bridge_human_active 2>/dev/null || echo 0)" == "1" ]]; then
+    echo "[codex-tmux] human-input mode: boot pause + paste-with-review" >&2
+    human_boot_pause
+    human_paste_with_review "$session" "$resolved_prompt_file"
+  else
+    tmux load-buffer -t "$session" "$resolved_prompt_file"
+    tmux paste-buffer -t "$session"
+    sleep 1
+    tmux send-keys -t "$session" Enter
+  fi
   echo "[codex-tmux] prompt delivered (${prompt_bytes} bytes)" >&2
 
   # Wait for artifact, with auto-respond fallback
