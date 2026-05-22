@@ -18,8 +18,8 @@
 # beyond Python.
 #
 # Usage:
-#   bash scripts/verification/mutate-eval.sh <eval-file.md> [--threshold 0.8] [--mutations 3]
-#   bash scripts/verification/mutate-eval.sh --version
+#   bash legacy/scripts/verification/mutate-eval.sh <eval-file.md> [--threshold 0.8] [--mutations 3]
+#   bash legacy/scripts/verification/mutate-eval.sh --version
 #
 # Exit codes:
 #   0 — eval is rigorous (kill rate ≥ threshold)
@@ -98,8 +98,8 @@ if [ "$_grep_only_rc" -eq 2 ]; then
     exit 2
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VERIFY_EVAL="$REPO_ROOT/scripts/verification/verify-eval.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+VERIFY_EVAL="$REPO_ROOT/legacy/scripts/verification/verify-eval.sh"
 
 [ -x "$VERIFY_EVAL" ] || { echo "[mutate-eval] verify-eval.sh missing or not executable" >&2; exit 127; }
 

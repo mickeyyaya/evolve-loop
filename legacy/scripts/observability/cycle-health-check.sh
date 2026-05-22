@@ -1,7 +1,7 @@
 #!/bin/bash
 # cycle-health-check.sh — Deterministic health fingerprint for any evolve-loop cycle
 #
-# Usage: bash scripts/observability/cycle-health-check.sh <cycle-number> <workspace-path>
+# Usage: bash legacy/scripts/observability/cycle-health-check.sh <cycle-number> <workspace-path>
 #
 # Produces a structured JSON report with per-signal PASS/WARN/ANOMALY status.
 # This script is READ-ONLY — it examines artifacts and reports anomalies, never blocks.

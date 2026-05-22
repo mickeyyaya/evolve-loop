@@ -80,9 +80,9 @@ fi
 
 
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$ADAPTER_DIR/../../.." && pwd)"
 CLAUDE_ADAPTER="$ADAPTER_DIR/claude.sh"
-PROBE_TOOL="$REPO_ROOT/scripts/utility/probe-tool.sh"
+PROBE_TOOL="$REPO_ROOT/legacy/scripts/utility/probe-tool.sh"
 CAP_CHECK="$ADAPTER_DIR/_capability-check.sh"
 
 REQUIRE_FULL="${EVOLVE_CODEX_REQUIRE_FULL:-0}"

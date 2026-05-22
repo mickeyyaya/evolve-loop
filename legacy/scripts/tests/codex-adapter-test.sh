@@ -11,8 +11,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTER="$REPO_ROOT/scripts/cli_adapters/codex.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ADAPTER="$REPO_ROOT/legacy/scripts/cli_adapters/codex.sh"
 SCOUT_PROFILE="$REPO_ROOT/.evolve/profiles/scout.json"
 
 PASS=0; FAIL=0
@@ -175,7 +175,7 @@ fi
 
 # === Test 10: codex.capabilities.json manifest is referenced ================
 header "Test 10: codex.capabilities.json present + valid"
-MANIFEST="$REPO_ROOT/scripts/cli_adapters/codex.capabilities.json"
+MANIFEST="$REPO_ROOT/legacy/scripts/cli_adapters/codex.capabilities.json"
 if [ -f "$MANIFEST" ] && jq empty "$MANIFEST" 2>/dev/null; then
     adapter_name=$(jq -r '.adapter' "$MANIFEST")
     if [ "$adapter_name" = "codex" ]; then
@@ -189,7 +189,7 @@ fi
 
 # === Test 11: claude.sh delegation target exists ============================
 header "Test 11: claude.sh adapter present (delegation target)"
-CLAUDE_SH="$REPO_ROOT/scripts/cli_adapters/claude.sh"
+CLAUDE_SH="$REPO_ROOT/legacy/scripts/cli_adapters/claude.sh"
 if [ -x "$CLAUDE_SH" ] || [ -f "$CLAUDE_SH" ]; then
     pass "claude.sh exists"
 else

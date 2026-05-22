@@ -5,7 +5,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 
 TESTER_PERSONA="$PROJECT_ROOT/agents/evolve-tester.md"
 TESTER_PROFILE="$PROJECT_ROOT/.evolve/profiles/tester.json"
@@ -34,10 +34,10 @@ name=$(jq -r '.name' "$TESTER_PROFILE")
 # Should allow validate-predicate + run-acs-suite
 jq -e '.allowed_tools[] | select(test("validate-predicate"))' "$TESTER_PROFILE" >/dev/null \
     && pass "allows validate-predicate.sh" || fail "validate-predicate not in allowed_tools"
-# Should disallow Write to scripts/dispatch (production code paths)
-jq -e '.disallowed_tools[] | select(test("scripts/dispatch"))' "$TESTER_PROFILE" >/dev/null \
-    && pass "disallows production code writes (scripts/dispatch/**)" \
-    || fail "no disallow for scripts/dispatch — Tester could write production code"
+# Should disallow Write to legacy/scripts/dispatch (production code paths)
+jq -e '.disallowed_tools[] | select(test("legacy/scripts/dispatch"))' "$TESTER_PROFILE" >/dev/null \
+    && pass "disallows production code writes (legacy/scripts/dispatch/**)" \
+    || fail "no disallow for legacy/scripts/dispatch — Tester could write production code"
 jq -e '.disallowed_tools[] | select(test("agents/"))' "$TESTER_PROFILE" >/dev/null \
     && pass "disallows agents/** edits" || fail "Tester can edit personas"
 

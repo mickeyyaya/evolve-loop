@@ -6,8 +6,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/observability/measure-context-tokens.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/observability/measure-context-tokens.sh"
 
 PASS=0
 FAIL=0

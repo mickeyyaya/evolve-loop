@@ -12,8 +12,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-POLL="$REPO_ROOT/scripts/release/marketplace-poll.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+POLL="$REPO_ROOT/legacy/scripts/release/marketplace-poll.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -38,15 +38,15 @@ EOF
 make_fake_repo() {
     local d
     d=$(mktemp -d -t mkpoll-repo.XXXXXX)
-    mkdir -p "$d/scripts/release" "$d/scripts/utility"
-    cp "$POLL" "$d/scripts/release/marketplace-poll.sh"
-    chmod +x "$d/scripts/release/marketplace-poll.sh"
-    cat > "$d/scripts/utility/release.sh" <<'EOF'
+    mkdir -p "$d/legacy/scripts/release" "$d/legacy/scripts/utility"
+    cp "$POLL" "$d/legacy/scripts/release/marketplace-poll.sh"
+    chmod +x "$d/legacy/scripts/release/marketplace-poll.sh"
+    cat > "$d/legacy/scripts/utility/release.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "[fake-release.sh] $@" >&2
 exit 0
 EOF
-    chmod +x "$d/scripts/utility/release.sh"
+    chmod +x "$d/legacy/scripts/utility/release.sh"
     echo "$d"
 }
 
@@ -58,7 +58,7 @@ header "Test 1: match on first poll → exit 0"
 m=$(make_marketplace "1.2.3"); cleanup_dirs+=("$m")
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 5 --poll-interval-s 1 2>&1)
 rc=$?
 set -e
@@ -76,7 +76,7 @@ r=$(make_fake_repo); cleanup_dirs+=("$r")
 ( sleep 2; echo '{"name":"evolve-loop","version":"1.2.3"}' > "$m/.claude-plugin/plugin.json" ) &
 bg_pid=$!
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 10 --poll-interval-s 1 2>&1)
 rc=$?
 wait $bg_pid 2>/dev/null
@@ -94,7 +94,7 @@ r=$(make_fake_repo); cleanup_dirs+=("$r")
 # Marketplace stays at 0.9.0; we want 1.2.3; max_wait=4s, interval=1s.
 start=$(date -u +%s)
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 4 --poll-interval-s 1 2>&1)
 rc=$?
 set -e
@@ -109,7 +109,7 @@ fi
 header "Test 4: missing marketplace dir → exit 2"
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.0.0 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.0.0 \
     --marketplace-dir "/tmp/does-not-exist-mkpoll-$$" --max-wait-s 2 --poll-interval-s 1 2>&1)
 rc=$?
 set -e
@@ -127,19 +127,19 @@ fi
 header "Test 5: cache-refresh ordering — release.sh invoked AFTER convergence"
 m=$(make_marketplace "1.2.3"); cleanup_dirs+=("$m")
 r=$(mktemp -d -t mkpoll-repo.XXXXXX); cleanup_dirs+=("$r")
-mkdir -p "$r/scripts/release" "$r/scripts/utility" "$r/scripts/lifecycle"
-cp "$POLL" "$r/scripts/release/marketplace-poll.sh"
-chmod +x "$r/scripts/release/marketplace-poll.sh"
+mkdir -p "$r/legacy/scripts/release" "$r/legacy/scripts/utility" "$r/legacy/scripts/lifecycle"
+cp "$POLL" "$r/legacy/scripts/release/marketplace-poll.sh"
+chmod +x "$r/legacy/scripts/release/marketplace-poll.sh"
 # Fake release.sh that records the version arg it was called with.
 SENTINEL="$r/release-sh-called.log"
-cat > "$r/scripts/utility/release.sh" <<EOF
+cat > "$r/legacy/scripts/utility/release.sh" <<EOF
 #!/usr/bin/env bash
 echo "called with: \$*" >> "$SENTINEL"
 exit 0
 EOF
-chmod +x "$r/scripts/utility/release.sh"
+chmod +x "$r/legacy/scripts/utility/release.sh"
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 5 --poll-interval-s 1 2>&1)
 rc=$?
 set -e
@@ -161,7 +161,7 @@ mkdir -p "$m/.claude-plugin"
 # No plugin.json file at all.
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.0.0 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.0.0 \
     --marketplace-dir "$m" --max-wait-s 2 --poll-interval-s 1 2>&1)
 rc=$?
 set -e
@@ -176,14 +176,14 @@ header "Test 7: --dry-run prints intent, exits 0, makes no calls"
 m=$(make_marketplace "0.9.0"); cleanup_dirs+=("$m")
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 SENTINEL="$r/release-sh-called.log"
-cat > "$r/scripts/utility/release.sh" <<EOF
+cat > "$r/legacy/scripts/utility/release.sh" <<EOF
 #!/usr/bin/env bash
 echo "DRY-RUN-LEAK: \$*" >> "$SENTINEL"
 exit 1
 EOF
-chmod +x "$r/scripts/utility/release.sh"
+chmod +x "$r/legacy/scripts/utility/release.sh"
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 60 --poll-interval-s 1 --dry-run 2>&1)
 rc=$?
 set -e
@@ -197,7 +197,7 @@ fi
 header "Test 8: --max-wait-s non-integer → exit 10"
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.0.0 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.0.0 \
     --max-wait-s abc --poll-interval-s 1 2>&1)
 rc=$?
 set -e
@@ -211,7 +211,7 @@ fi
 header "Test 9: non-semver target → exit 2"
 r=$(make_fake_repo); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" "garbage" --max-wait-s 2 2>&1)
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" "garbage" --max-wait-s 2 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "2" ]; then
@@ -224,16 +224,16 @@ fi
 header "Test 10: release.sh exits non-zero → poll exits 2"
 m=$(make_marketplace "1.2.3"); cleanup_dirs+=("$m")
 r=$(mktemp -d -t mkpoll-repo.XXXXXX); cleanup_dirs+=("$r")
-mkdir -p "$r/scripts/release" "$r/scripts/utility" "$r/scripts/lifecycle"
-cp "$POLL" "$r/scripts/release/marketplace-poll.sh"
-chmod +x "$r/scripts/release/marketplace-poll.sh"
-cat > "$r/scripts/utility/release.sh" <<'EOF'
+mkdir -p "$r/legacy/scripts/release" "$r/legacy/scripts/utility" "$r/legacy/scripts/lifecycle"
+cp "$POLL" "$r/legacy/scripts/release/marketplace-poll.sh"
+chmod +x "$r/legacy/scripts/release/marketplace-poll.sh"
+cat > "$r/legacy/scripts/utility/release.sh" <<'EOF'
 #!/usr/bin/env bash
 exit 7
 EOF
-chmod +x "$r/scripts/utility/release.sh"
+chmod +x "$r/legacy/scripts/utility/release.sh"
 set +e
-out=$(bash "$r/scripts/release/marketplace-poll.sh" 1.2.3 \
+out=$(bash "$r/legacy/scripts/release/marketplace-poll.sh" 1.2.3 \
     --marketplace-dir "$m" --max-wait-s 5 --poll-interval-s 1 2>&1)
 rc=$?
 set -e

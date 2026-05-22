@@ -83,7 +83,7 @@ _cap() {
 }
 
 # Extract intent_anchor: prefer raw goal from intent.md. The intent file
-# uses YAML-like frontmatter with `goal: |` blocks (see scripts/lifecycle/
+# uses YAML-like frontmatter with `goal: |` blocks (see legacy/scripts/lifecycle/
 # intent-test.sh fixtures); fall back to markdown ## Goal header form, then
 # scout-report's first non-blank line.
 _extract_intent_anchor() {

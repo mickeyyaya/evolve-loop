@@ -9,7 +9,7 @@
 # per-publish journal that rollback.sh can read.
 #
 # Usage:
-#   bash scripts/release-pipeline.sh <target-version> \
+#   bash legacy/scripts/release-pipeline.sh <target-version> \
 #       [--dry-run]              # simulate, no mutations anywhere
 #       [--no-rollback]          # don't auto-rollback on post-push failure
 #       [--skip-tests]           # skip preflight gate-test execution (hot fixes)
@@ -38,7 +38,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RELEASE_DIR="$REPO_ROOT/scripts/release"
+RELEASE_DIR="$REPO_ROOT/legacy/scripts/release"
 JOURNAL_DIR="$REPO_ROOT/.evolve/release-journal"
 
 PREFLIGHT="$RELEASE_DIR/preflight.sh"
@@ -46,8 +46,8 @@ CHANGELOG_GEN="$RELEASE_DIR/changelog-gen.sh"
 VERSION_BUMP="$RELEASE_DIR/version-bump.sh"
 MARKETPLACE_POLL="$RELEASE_DIR/marketplace-poll.sh"
 ROLLBACK="$RELEASE_DIR/rollback.sh"
-RELEASE_SH="$REPO_ROOT/scripts/utility/release.sh"
-SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
+RELEASE_SH="$REPO_ROOT/legacy/scripts/utility/release.sh"
+SHIP_SH="$REPO_ROOT/legacy/scripts/lifecycle/ship.sh"
 
 log()  { echo "[release-pipeline] $*" >&2; }
 fail() { log "FAIL: $*"; exit 1; }
@@ -188,7 +188,7 @@ init_journal
 
 if [ "$REQUIRE_PREFLIGHT" = "1" ]; then
     log "step: full-dry-run preflight (--require-preflight)"
-    fdr="$REPO_ROOT/scripts/release/full-dry-run.sh"
+    fdr="$REPO_ROOT/legacy/scripts/release/full-dry-run.sh"
     if [ ! -x "$fdr" ]; then
         log "FAIL: $fdr missing or not executable"
         exit 1

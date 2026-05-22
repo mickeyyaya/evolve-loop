@@ -17,7 +17,7 @@
 # (broader) permissions to do the merge.
 #
 # Usage:
-#   bash scripts/failure/merge-lesson-into-state.sh <workspace_path>
+#   bash legacy/scripts/failure/merge-lesson-into-state.sh <workspace_path>
 #
 # Exit codes:
 #   0  — merge complete (or no-op if no handoff JSON)
@@ -27,7 +27,7 @@
 set -uo pipefail
 
 # v8.18.0: dual-root — state, ledger, and lessons are writable artifacts under
-# the user's project. Distinct from the plugin's read-only scripts/agents.
+# the user's project. Distinct from the plugin's read-only legacy/scripts/agents.
 __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/../lifecycle/resolve-roots.sh"
 unset __rr_self
@@ -451,7 +451,7 @@ IMPEOF
                   '{state: $state, verdict: $verdict, cycle: $cycle, lesson_id: $lesson_id, opened_at: $opened, actioned_at: null, action_refs: []}' \
                   > "$INV_DIR/status.json"
             log "OK: investigation dir created at $INV_DIR"
-            INDEX_SCRIPT="$EVOLVE_PLUGIN_ROOT/scripts/failure/index-investigations.sh"
+            INDEX_SCRIPT="$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/index-investigations.sh"
             [ -x "$INDEX_SCRIPT" ] && bash "$INDEX_SCRIPT" >/dev/null 2>&1 || \
                 log "WARN: index-investigations.sh not refreshed"
             ;;

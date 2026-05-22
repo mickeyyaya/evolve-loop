@@ -4,7 +4,7 @@
 #
 # Polls the local marketplace checkout (the path Claude Code reads at session
 # startup) until the plugin.json there matches the target version, OR until
-# the deadline. On success, re-invokes scripts/utility/release.sh <target> to refresh
+# the deadline. On success, re-invokes legacy/scripts/utility/release.sh <target> to refresh
 # `installed_plugins.json` — this is the **cache-refresh ordering bug fix**:
 # the original release.sh pulled marketplace AND checked version in one pass,
 # which fails if the pull happens before origin/main has the new commit. By
@@ -12,7 +12,7 @@
 # already true.
 #
 # Usage:
-#   bash scripts/release/marketplace-poll.sh <target-version> \
+#   bash legacy/scripts/release/marketplace-poll.sh <target-version> \
 #       [--max-wait-s 300] [--poll-interval-s 15] \
 #       [--marketplace-dir <path>] [--dry-run]
 #
@@ -27,7 +27,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 log()  { echo "[marketplace-poll] $*" >&2; }
 fail() { log "FAIL: $*"; exit 2; }
@@ -87,7 +87,7 @@ pull_marketplace() {
 if [ "$DRY_RUN" = "1" ]; then
     log "DRY-RUN: would poll $MARKETPLACE_DIR for version=$TARGET"
     log "DRY-RUN: max_wait=${MAX_WAIT_S}s poll_interval=${POLL_INTERVAL_S}s"
-    log "DRY-RUN: on success would invoke 'bash scripts/utility/release.sh $TARGET'"
+    log "DRY-RUN: on success would invoke 'bash legacy/scripts/utility/release.sh $TARGET'"
     exit 0
 fi
 
@@ -136,9 +136,9 @@ done
 # closed structurally.
 
 log "running release.sh $TARGET to refresh installed_plugins.json..."
-if ! bash "$REPO_ROOT/scripts/utility/release.sh" "$TARGET" >/dev/null 2>&1; then
+if ! bash "$REPO_ROOT/legacy/scripts/utility/release.sh" "$TARGET" >/dev/null 2>&1; then
     log "WARN: release.sh exited non-zero — manually verify installed_plugins.json"
-    log "  bash scripts/utility/release.sh $TARGET"
+    log "  bash legacy/scripts/utility/release.sh $TARGET"
     exit 2
 fi
 

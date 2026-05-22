@@ -6,8 +6,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/utility/run-all-regression-tests.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/utility/run-all-regression-tests.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -23,23 +23,23 @@ make_stub_repo() {
     local good="$1" bad="$2"
     local d
     d=$(mktemp -d -t runall-test.XXXXXX)
-    mkdir -p "$d/scripts/utility"
+    mkdir -p "$d/legacy/scripts/utility"
     local i=0
     for ((i=0; i<good; i++)); do
-        cat > "$d/scripts/stub-good-$i.sh" <<'EOF'
+        cat > "$d/legacy/scripts/stub-good-$i.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "ok"
 exit 0
 EOF
-        chmod +x "$d/scripts/stub-good-$i.sh"
+        chmod +x "$d/legacy/scripts/stub-good-$i.sh"
     done
     for ((i=0; i<bad; i++)); do
-        cat > "$d/scripts/stub-bad-$i.sh" <<'EOF'
+        cat > "$d/legacy/scripts/stub-bad-$i.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "FAIL: stub bad" >&2
 exit 1
 EOF
-        chmod +x "$d/scripts/stub-bad-$i.sh"
+        chmod +x "$d/legacy/scripts/stub-bad-$i.sh"
     done
     echo "$d"
 }
@@ -48,8 +48,8 @@ EOF
 build_suites_str() {
     local good="$1" bad="$2"
     local list=""
-    for ((i=0; i<good; i++)); do list+="scripts/stub-good-$i.sh "; done
-    for ((i=0; i<bad; i++)); do list+="scripts/stub-bad-$i.sh "; done
+    for ((i=0; i<good; i++)); do list+="legacy/scripts/stub-good-$i.sh "; done
+    for ((i=0; i<bad; i++)); do list+="legacy/scripts/stub-bad-$i.sh "; done
     echo "$list"
 }
 
@@ -57,9 +57,9 @@ build_suites_str() {
 # We need to copy run-all itself into the stub.
 run_with_stubs() {
     local repo="$1"; shift
-    cp "$SCRIPT" "$repo/scripts/utility/run-all-regression-tests.sh"
-    chmod +x "$repo/scripts/utility/run-all-regression-tests.sh"
-    bash "$repo/scripts/utility/run-all-regression-tests.sh" "$@"
+    cp "$SCRIPT" "$repo/legacy/scripts/utility/run-all-regression-tests.sh"
+    chmod +x "$repo/legacy/scripts/utility/run-all-regression-tests.sh"
+    bash "$repo/legacy/scripts/utility/run-all-regression-tests.sh" "$@"
 }
 
 # === Test 1: all stubs pass → rc=0 ===========================================
@@ -127,7 +127,7 @@ fi
 # === Test 7: SUITES_OVERRIDE with single suite ==============================
 header "Test 7: SUITES_OVERRIDE with 1 suite → only that one runs"
 d=$(make_stub_repo 1 0); cleanup_dirs+=("$d")
-set +e; out=$(SUITES_OVERRIDE="scripts/stub-good-0.sh" run_with_stubs "$d" 2>&1); rc=$?; set -e
+set +e; out=$(SUITES_OVERRIDE="legacy/scripts/stub-good-0.sh" run_with_stubs "$d" 2>&1); rc=$?; set -e
 if [ "$rc" = "0" ] && echo "$out" | grep -q "Total: 1  Passed: 1"; then
     pass "single-suite override"
 else

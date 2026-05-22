@@ -31,7 +31,7 @@
 #
 # A "groundable" Key Findings row is one that:
 #   - Has a `## Key Findings` heading (we look only in that section)
-#   - Contains a backtick-quoted path: `scripts/foo.sh`, `acs/some/dir/`
+#   - Contains a backtick-quoted path: `legacy/scripts/foo.sh`, `acs/some/dir/`
 #   - Contains a quantitative or status claim: `+N lines`, `untracked`,
 #     `Untracked`, `modified`, `flipped`, `new file`, `Working tree`
 #

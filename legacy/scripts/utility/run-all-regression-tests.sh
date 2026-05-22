@@ -3,16 +3,16 @@
 # run-all-regression-tests.sh — Single-command runner for all regression suites (v8.13.6).
 #
 # v8.13.5 audit identified that the auditor profile's allowlist permits each
-# individual `Bash(bash scripts/<test>.sh:*)` entry but NOT compositions like
+# individual `Bash(bash legacy/scripts/<test>.sh:*)` entry but NOT compositions like
 # `bash a.sh & bash b.sh & wait` (parallel) or `for s in ...; do bash $s.sh; done`
 # (loop). Auditors trying to run the full regression matrix had to either
 # allowlist 12 distinct entries OR find another mechanism. This helper is that
 # mechanism: ONE allowlisted command runs them all.
 #
 # Usage:
-#   bash scripts/utility/run-all-regression-tests.sh                # sequential
-#   bash scripts/utility/run-all-regression-tests.sh --parallel     # parallel via &+wait
-#   bash scripts/utility/run-all-regression-tests.sh --json         # machine-readable summary
+#   bash legacy/scripts/utility/run-all-regression-tests.sh                # sequential
+#   bash legacy/scripts/utility/run-all-regression-tests.sh --parallel     # parallel via &+wait
+#   bash legacy/scripts/utility/run-all-regression-tests.sh --json         # machine-readable summary
 #
 # Exit codes:
 #   0 — every listed suite reports zero failures
@@ -21,7 +21,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 PARALLEL=0
 JSON=0
@@ -47,51 +47,51 @@ if [ -n "${SUITES_OVERRIDE:-}" ]; then
     for s in $SUITES_OVERRIDE; do SUITES+=("$s"); done
 else
     SUITES=(
-        "scripts/tests/claude-adapter-test.sh"
-        "scripts/tests/codex-adapter-test.sh"
-        "scripts/tests/gemini-adapter-test.sh"
-        "scripts/tests/evolve-loop-dispatch-test.sh"
-        "scripts/tests/probe-tool-test.sh"
-        "scripts/tests/postedit-validate-test.sh"
-        "scripts/tests/cycle-state-test.sh"
-        "scripts/tests/resolve-roots-test.sh"
-        "scripts/tests/intent-test.sh"
-        "scripts/tests/orchestrator-sandbox-coverage-test.sh"
-        "scripts/tests/role-gate-test.sh"
-        "scripts/tests/phase-gate-precondition-test.sh"
-        "scripts/tests/guards-test.sh"
-        "scripts/release/preflight-test.sh"
-        "scripts/release/changelog-gen-test.sh"
-        "scripts/release/marketplace-poll-test.sh"
-        "scripts/release/rollback-test.sh"
-        "scripts/tests/release-pipeline-test.sh"
-        "scripts/tests/ship-integration-test.sh"
-        "scripts/tests/ship-dry-run-test.sh"
-        "scripts/tests/cycle-simulate-test.sh"
-        "scripts/tests/full-dry-run-test.sh"
-        "scripts/tests/skill-doc-paths-test.sh"
-        "scripts/tests/cli-capability-test.sh"
-        "scripts/tests/cli-degradation-test.sh"
-        "scripts/tests/cross-cli-parity-test.sh"
-        "scripts/tests/multi-cli-cycle-test.sh"
-        "scripts/tests/cycle-quality-tier-test.sh"
-        "scripts/tests/cross-cli-consensus-test.sh"
-        "scripts/tests/consensus-dispatch-test.sh"
-        "scripts/tests/parallelization-discipline-test.sh"
-        "scripts/tests/show-cycle-cost-test.sh"
-        "scripts/tests/merge-lesson-test.sh"
-        "scripts/tests/subagent-run-test.sh"
-        "scripts/tests/run-all-regression-tests-test.sh"
-        "scripts/tests/fanout-dispatch-test.sh"
-        "scripts/tests/aggregator-test.sh"
-        "scripts/tests/dispatch-parallel-test.sh"
-        "scripts/tests/swarm-architecture-test.sh"
-        "scripts/tests/failure-adapter-test.sh"
-        "scripts/tests/state-prune-test.sh"
-        "scripts/tests/preflight-environment-test.sh"
-        "scripts/tests/diff-complexity-test.sh"
-        "scripts/tests/run-cycle-worktree-test.sh"
-        "scripts/tests/verify-ledger-chain-test.sh"
+        "legacy/scripts/tests/claude-adapter-test.sh"
+        "legacy/scripts/tests/codex-adapter-test.sh"
+        "legacy/scripts/tests/gemini-adapter-test.sh"
+        "legacy/scripts/tests/evolve-loop-dispatch-test.sh"
+        "legacy/scripts/tests/probe-tool-test.sh"
+        "legacy/scripts/tests/postedit-validate-test.sh"
+        "legacy/scripts/tests/cycle-state-test.sh"
+        "legacy/scripts/tests/resolve-roots-test.sh"
+        "legacy/scripts/tests/intent-test.sh"
+        "legacy/scripts/tests/orchestrator-sandbox-coverage-test.sh"
+        "legacy/scripts/tests/role-gate-test.sh"
+        "legacy/scripts/tests/phase-gate-precondition-test.sh"
+        "legacy/scripts/tests/guards-test.sh"
+        "legacy/scripts/release/preflight-test.sh"
+        "legacy/scripts/release/changelog-gen-test.sh"
+        "legacy/scripts/release/marketplace-poll-test.sh"
+        "legacy/scripts/release/rollback-test.sh"
+        "legacy/scripts/tests/release-pipeline-test.sh"
+        "legacy/scripts/tests/ship-integration-test.sh"
+        "legacy/scripts/tests/ship-dry-run-test.sh"
+        "legacy/scripts/tests/cycle-simulate-test.sh"
+        "legacy/scripts/tests/full-dry-run-test.sh"
+        "legacy/scripts/tests/skill-doc-paths-test.sh"
+        "legacy/scripts/tests/cli-capability-test.sh"
+        "legacy/scripts/tests/cli-degradation-test.sh"
+        "legacy/scripts/tests/cross-cli-parity-test.sh"
+        "legacy/scripts/tests/multi-cli-cycle-test.sh"
+        "legacy/scripts/tests/cycle-quality-tier-test.sh"
+        "legacy/scripts/tests/cross-cli-consensus-test.sh"
+        "legacy/scripts/tests/consensus-dispatch-test.sh"
+        "legacy/scripts/tests/parallelization-discipline-test.sh"
+        "legacy/scripts/tests/show-cycle-cost-test.sh"
+        "legacy/scripts/tests/merge-lesson-test.sh"
+        "legacy/scripts/tests/subagent-run-test.sh"
+        "legacy/scripts/tests/run-all-regression-tests-test.sh"
+        "legacy/scripts/tests/fanout-dispatch-test.sh"
+        "legacy/scripts/tests/aggregator-test.sh"
+        "legacy/scripts/tests/dispatch-parallel-test.sh"
+        "legacy/scripts/tests/swarm-architecture-test.sh"
+        "legacy/scripts/tests/failure-adapter-test.sh"
+        "legacy/scripts/tests/state-prune-test.sh"
+        "legacy/scripts/tests/preflight-environment-test.sh"
+        "legacy/scripts/tests/diff-complexity-test.sh"
+        "legacy/scripts/tests/run-cycle-worktree-test.sh"
+        "legacy/scripts/tests/verify-ledger-chain-test.sh"
     )
 fi
 

@@ -6,8 +6,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/lifecycle/build-cycle-digest.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/lifecycle/build-cycle-digest.sh"
 
 PASS=0
 FAIL=0
@@ -227,7 +227,7 @@ fi
 # Use a real-cycle workspace if available; check that digest mode produces
 # a smaller scout context than legacy mode (the canonical Cycle B2 win).
 header "Test 13 (Cycle B2): digest mode reduces scout context size"
-RCB="$REPO_ROOT/scripts/lifecycle/role-context-builder.sh"
+RCB="$REPO_ROOT/legacy/scripts/lifecycle/role-context-builder.sh"
 existing_cycle=$(ls "$REPO_ROOT/.evolve/runs/" 2>/dev/null | grep -E "^cycle-[0-9]+$" | grep -v "^cycle-[0-9]\{5,\}$" | head -1 | sed 's/cycle-//')
 if [ -n "$existing_cycle" ] && [ -d "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" ]; then
     legacy_bytes=$(EVOLVE_CONTEXT_DIGEST=0 bash "$RCB" scout "$existing_cycle" "$REPO_ROOT/.evolve/runs/cycle-$existing_cycle" 2>/dev/null | wc -c | tr -d ' ')

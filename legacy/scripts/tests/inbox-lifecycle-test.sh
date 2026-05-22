@@ -5,8 +5,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MOVER="$REPO_ROOT/scripts/utility/inbox-mover.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+MOVER="$REPO_ROOT/legacy/scripts/utility/inbox-mover.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0; FAIL=0

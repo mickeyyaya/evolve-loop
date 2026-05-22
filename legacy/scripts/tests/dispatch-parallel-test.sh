@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # dispatch-parallel-test.sh — Unit tests for the dispatch-parallel command
-# in scripts/dispatch/subagent-run.sh.
+# in legacy/scripts/dispatch/subagent-run.sh.
 #
 # dispatch-parallel reads the parent agent's profile.parallel_subtasks array
 # and runs each subtask as a parallel worker via fanout-dispatch.sh, then
@@ -24,8 +24,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 
 PASS=0
 FAIL=0

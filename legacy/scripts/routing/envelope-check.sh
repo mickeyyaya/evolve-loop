@@ -1,7 +1,7 @@
 #!/bin/bash
 # envelope-check.sh — Validate a (cli, tier) pair against a profile's envelope.
 #
-# Target path: scripts/routing/envelope-check.sh
+# Target path: legacy/scripts/routing/envelope-check.sh
 # Bash 3.2 compatible. No declare -A, no mapfile, no GNU-only flags.
 #
 # Usage:
@@ -36,8 +36,8 @@ tier_rank() {
 find_tier_map() {
   local candidates=(
     "${EVOLVE_TIER_MAP_PATH:-}"
-    "${EVOLVE_PROJECT_ROOT:-.}/scripts/routing/tier-map.json"
-    "scripts/routing/tier-map.json"
+    "${EVOLVE_PROJECT_ROOT:-.}/legacy/scripts/routing/tier-map.json"
+    "legacy/scripts/routing/tier-map.json"
   )
   for c in "${candidates[@]}"; do
     [[ -n "$c" && -f "$c" ]] && { echo "$c"; return 0; }

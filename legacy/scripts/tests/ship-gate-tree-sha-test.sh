@@ -3,14 +3,14 @@
 # and fleet-wide breach detection in detect-tree-sha-breach.sh.
 #
 # Tests create isolated temp git repos; they never touch the real repo.
-# Run: bash scripts/tests/ship-gate-tree-sha-test.sh
+# Run: bash legacy/scripts/tests/ship-gate-tree-sha-test.sh
 # Pass: N/N PASS printed and exit 0.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
-DETECT_SH="$REPO_ROOT/scripts/observability/detect-tree-sha-breach.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SHIP_SH="$REPO_ROOT/legacy/scripts/lifecycle/ship.sh"
+DETECT_SH="$REPO_ROOT/legacy/scripts/observability/detect-tree-sha-breach.sh"
 
 PASS=0
 FAIL=0

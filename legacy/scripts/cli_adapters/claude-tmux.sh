@@ -7,7 +7,7 @@
 # has configured for their claude installation. NOT production-ready.
 # NOT integrated into the pipeline.
 #
-# Inputs (env, contract matches scripts/cli_adapters/claude.sh:24-30):
+# Inputs (env, contract matches legacy/scripts/cli_adapters/claude.sh:24-30):
 #   PROFILE_PATH        Absolute path to agent profile JSON
 #   RESOLVED_MODEL      Model tier: haiku / sonnet / opus
 #   PROMPT_FILE         Path to injected prompt

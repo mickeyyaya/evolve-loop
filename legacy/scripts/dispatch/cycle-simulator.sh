@@ -5,7 +5,7 @@
 # Walks every phase of an /evolve-loop cycle (intent → research → build →
 # audit → ship → retrospective), writing deterministic artifacts and
 # appending tamper-evident ledger entries WITHOUT making any LLM API calls.
-# The ship phase invokes scripts/lifecycle/ship.sh --dry-run.
+# The ship phase invokes legacy/scripts/lifecycle/ship.sh --dry-run.
 #
 # What this validates:
 #   - cycle-state.json advances correctly through every phase
@@ -21,7 +21,7 @@
 #   - Real Auditor judgment (verdict is hardcoded PASS)
 #
 # Usage:
-#   bash scripts/dispatch/cycle-simulator.sh <cycle> <workspace>
+#   bash legacy/scripts/dispatch/cycle-simulator.sh <cycle> <workspace>
 #
 # Exit codes:
 #   0  — every phase completed and ledger chain intact
@@ -41,8 +41,8 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 unset __rr_self
 
 LEDGER="$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl"
-CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
-SHIP_SH="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/ship.sh"
+CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+SHIP_SH="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/ship.sh"
 
 log() { echo "[simulator] $*" >&2; }
 
@@ -258,7 +258,7 @@ log "  ✓ retrospective → wrote retrospective-report.md, ledger entry"
 
 # Final integrity check: walk the chain.
 log "verifying ledger chain post-simulation..."
-if bash "$EVOLVE_PLUGIN_ROOT/scripts/observability/verify-ledger-chain.sh" >/dev/null 2>&1; then
+if bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability/verify-ledger-chain.sh" >/dev/null 2>&1; then
     log "OK: ledger chain intact"
 else
     log "WARN: ledger chain verification flagged anomalies (may be pre-existing; simulator did not break it)"

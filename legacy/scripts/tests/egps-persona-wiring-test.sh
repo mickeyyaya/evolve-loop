@@ -9,7 +9,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 AGENTS="$PROJECT_ROOT/agents"
 
 PASS=0; FAIL=0; TOTAL=0

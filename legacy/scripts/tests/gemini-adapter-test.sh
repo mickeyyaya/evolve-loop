@@ -3,19 +3,19 @@
 # gemini-adapter-test.sh — Contract tests for the hybrid Gemini adapter.
 #
 # v8.15.0+: gemini.sh is no longer a stub. It is a hybrid shim that delegates
-# to scripts/cli_adapters/claude.sh after probing for the claude binary. These
+# to legacy/scripts/cli_adapters/claude.sh after probing for the claude binary. These
 # tests exercise both code paths (claude available; claude forced missing via
 # EVOLVE_GEMINI_CLAUDE_PATH=""). When the local machine doesn't have claude
 # installed, the "delegation" tests skip cleanly with a PASS — they verify
 # behaviour rather than environment.
 #
-# Usage: bash scripts/gemini-adapter-test.sh
+# Usage: bash legacy/scripts/gemini-adapter-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTER="$REPO_ROOT/scripts/cli_adapters/gemini.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ADAPTER="$REPO_ROOT/legacy/scripts/cli_adapters/gemini.sh"
 SCOUT_PROFILE="$REPO_ROOT/.evolve/profiles/scout.json"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
@@ -164,7 +164,7 @@ fi
 
 # --- Test 8: claude.sh adapter still present (sanity for delegation target) -
 header "Test 8: claude.sh delegation target exists"
-CLAUDE_SH="$REPO_ROOT/scripts/cli_adapters/claude.sh"
+CLAUDE_SH="$REPO_ROOT/legacy/scripts/cli_adapters/claude.sh"
 if [ -x "$CLAUDE_SH" ] || [ -f "$CLAUDE_SH" ]; then
     pass "claude.sh exists (delegation will resolve)"
 else

@@ -17,7 +17,7 @@
 #   This is well within the 1M window regardless of how many cycles completed.
 #
 # Usage:
-#   bash scripts/verification/context-budget.sh <cycle_number> <cycles_completed_this_session> [workspace_path]
+#   bash legacy/scripts/verification/context-budget.sh <cycle_number> <cycles_completed_this_session> [workspace_path]
 #
 # Exit codes:
 #   0 = GREEN  — room for a normal cycle, continue

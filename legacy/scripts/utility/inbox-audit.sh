@@ -2,7 +2,7 @@
 # inbox-audit.sh — Operator audit of .evolve/inbox/ lifecycle state (v9.6.1+, c38)
 #
 # Usage:
-#   bash scripts/utility/inbox-audit.sh [--json] [--help]
+#   bash legacy/scripts/utility/inbox-audit.sh [--json] [--help]
 #
 # Shows all inbox files by state (queued/in-flight/processed/rejected/pending-retry)
 # with git-log proof for processed entries.
@@ -17,7 +17,7 @@
 set -uo pipefail
 
 __self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$__self_dir/../.." && pwd)"
+REPO_ROOT="$(cd "$__self_dir/../../.." && pwd)"
 PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || echo "$REPO_ROOT")}"
 INBOX_DIR="$PROJECT_ROOT/.evolve/inbox"
 

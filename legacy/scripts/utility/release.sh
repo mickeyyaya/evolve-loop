@@ -3,8 +3,8 @@
 # Run before committing a version bump to ensure all files are in sync.
 #
 # Usage:
-#   ./scripts/utility/release.sh           # check current state
-#   ./scripts/utility/release.sh 8.4.0     # check + verify all files match 8.4.0
+#   ./legacy/scripts/utility/release.sh           # check current state
+#   ./legacy/scripts/utility/release.sh 8.4.0     # check + verify all files match 8.4.0
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -12,7 +12,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TARGET_VERSION="${1:-}"
 ERRORS=0
 

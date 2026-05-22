@@ -6,13 +6,13 @@
 # EVOLVE_STATE_FILE_OVERRIDE. Covers all modes: classification, age, cycle,
 # all (refuse without --yes), dry-run preview, no-state-file edge case.
 #
-# Usage: bash scripts/state-prune-test.sh
+# Usage: bash legacy/scripts/state-prune-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/failure/state-prune.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/failure/state-prune.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

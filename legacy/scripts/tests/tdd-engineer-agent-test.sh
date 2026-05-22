@@ -8,24 +8,24 @@
 #   2. Frontmatter contains required `perspective:` and `output-format:` per
 #      agents/agent-templates.md schema (cycle-16 persona-field convention)
 #   3. .evolve/profiles/tdd-engineer.json exists and validates as JSON
-#   4. scripts/dispatch/subagent-run.sh agent regex (line ~202) accepts `tdd-engineer`
-#   5. scripts/guards/phase-gate-precondition.sh has a `tdd)` case allowing
+#   4. legacy/scripts/dispatch/subagent-run.sh agent regex (line ~202) accepts `tdd-engineer`
+#   5. legacy/scripts/guards/phase-gate-precondition.sh has a `tdd)` case allowing
 #      `tdd-engineer` (new phase between `discover` and `build`)
 #   6. agents/agent-templates.md mentions "TDD Engineer" or "tdd-engineer"
 #      in its agent-roster documentation
 #
 # This is a pure static test — no subagent invocations, no LLM cost.
 #
-# Usage: bash scripts/tdd-engineer-agent-test.sh
+# Usage: bash legacy/scripts/tdd-engineer-agent-test.sh
 # Exit:  0 if all assertions pass; non-zero if any fail.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 AGENT_FILE="$REPO_ROOT/agents/evolve-tdd-engineer.md"
 PROFILE_FILE="$REPO_ROOT/.evolve/profiles/tdd-engineer.json"
-SUBAGENT_RUN="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
-PHASE_GATE="$REPO_ROOT/scripts/guards/phase-gate-precondition.sh"
+SUBAGENT_RUN="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
+PHASE_GATE="$REPO_ROOT/legacy/scripts/guards/phase-gate-precondition.sh"
 TEMPLATES="$REPO_ROOT/agents/agent-templates.md"
 
 PASS=0

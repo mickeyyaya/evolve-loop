@@ -14,11 +14,11 @@
 # stale admin entries. If anyone refactors run-cycle.sh and accidentally drops
 # the prune, this test catches the regression.
 #
-# Usage: bash scripts/run-cycle-worktree-test.sh
+# Usage: bash legacy/scripts/run-cycle-worktree-test.sh
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCRATCH=$(mktemp -d -t "run-cycle-worktree-XXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -192,7 +192,7 @@ cd "$REPO_ROOT" >/dev/null
 # Static assertion that the v8.36.0 fix is present in the script. This catches
 # the case where someone refactors run-cycle.sh and accidentally drops the prune.
 header "Test 5: run-cycle.sh contains v8.36.0 prune in pre-flight cleanup"
-if grep -q "v8.36.0: prune stale worktree admin entries" "$REPO_ROOT/scripts/dispatch/run-cycle.sh"; then
+if grep -q "v8.36.0: prune stale worktree admin entries" "$REPO_ROOT/legacy/scripts/dispatch/run-cycle.sh"; then
     pass "v8.36.0 prune fix is present in run-cycle.sh"
 else
     fail_ "v8.36.0 prune fix is MISSING from run-cycle.sh — regression!"

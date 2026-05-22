@@ -9,7 +9,7 @@
 # Source priority (highest first):
 #   1. EVOLVE_QUOTA_RESET_AT env var — operator-supplied ISO 8601 override
 #   2. Hint file at $WORKSPACE/quota-reset-hint.txt — Anthropic's "resets HH:MMam"
-#      message captured by the Layer-1 stderr filter in scripts/cli_adapters/claude.sh
+#      message captured by the Layer-1 stderr filter in legacy/scripts/cli_adapters/claude.sh
 #   3. Fallback: now + EVOLVE_QUOTA_RESET_HOURS (default 5h25min — Anthropic Pro/Max
 #      window of 5h plus 25min jitter buffer)
 #

@@ -1,7 +1,7 @@
 #!/bin/bash
 # verify-eval.sh — Independent eval re-execution
 #
-# Usage: bash scripts/verification/verify-eval.sh <eval-file.md> [workspace-path]
+# Usage: bash legacy/scripts/verification/verify-eval.sh <eval-file.md> [workspace-path]
 #
 # Re-runs every eval command from an eval definition file and compares results
 # to the Auditor's claimed outcomes. This script operates independently of the

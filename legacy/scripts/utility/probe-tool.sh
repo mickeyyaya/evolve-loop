@@ -9,9 +9,9 @@
 # operator can see the diagnostic trail.
 #
 # Usage:
-#   bash scripts/utility/probe-tool.sh <tool>          # exit 0 if found, 1 if not
-#   bash scripts/utility/probe-tool.sh <tool> --quiet  # same, no stdout (for scripting)
-#   bash scripts/utility/probe-tool.sh <tool> --json   # emit JSON: {"tool":"...","found":true,"path":"..."}
+#   bash legacy/scripts/utility/probe-tool.sh <tool>          # exit 0 if found, 1 if not
+#   bash legacy/scripts/utility/probe-tool.sh <tool> --quiet  # same, no stdout (for scripting)
+#   bash legacy/scripts/utility/probe-tool.sh <tool> --json   # emit JSON: {"tool":"...","found":true,"path":"..."}
 #
 # Probe order (first match wins):
 #   1. command -v $tool          (PATH lookup, the canonical bash check)

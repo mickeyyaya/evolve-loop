@@ -10,7 +10,7 @@
 # Expected total: $5-15 depending on CLI verbosity and goal complexity.
 #
 # Usage:
-#     bash scripts/perf-cycle-comparison.sh [--dry-run] [--goal "GOAL"]
+#     bash legacy/scripts/perf-cycle-comparison.sh [--dry-run] [--goal "GOAL"]
 #
 # Output: perf-cycle-comparison-report.md
 #
@@ -24,7 +24,7 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GO_BIN="${EVOLVE_GO_BIN:-$REPO_ROOT/go/bin/evolve}"
-RUN_CYCLE="$REPO_ROOT/scripts/dispatch/run-cycle.sh"
+RUN_CYCLE="$REPO_ROOT/legacy/scripts/dispatch/run-cycle.sh"
 REPORT="${PERF_REPORT:-$REPO_ROOT/perf-cycle-comparison-report.md}"
 BUDGET="${PERF_BUDGET:-5}"
 GOAL="perf-comparison fixture cycle"

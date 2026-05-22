@@ -1,8 +1,8 @@
 #!/bin/bash
 # eval-quality-check.sh — Deterministic eval rigor classifier
 #
-# Usage: bash scripts/verification/eval-quality-check.sh <eval-file.md>
-#        bash scripts/verification/eval-quality-check.sh .evolve/evals/   (checks all evals in directory)
+# Usage: bash legacy/scripts/verification/eval-quality-check.sh <eval-file.md>
+#        bash legacy/scripts/verification/eval-quality-check.sh .evolve/evals/   (checks all evals in directory)
 #
 # Classifies eval commands by rigor level:
 #   Level 0 (ANOMALY): echo, exit 0, true, no-op — automatic cycle halt

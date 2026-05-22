@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# team-context-test.sh — Unit tests for scripts/utility/team-context.sh.
+# team-context-test.sh — Unit tests for legacy/scripts/utility/team-context.sh.
 #
 # The team-context bus is a human-readable shared handoff document at
 # .evolve/runs/cycle-N/team-context.md. Every pipeline agent appends a
@@ -20,13 +20,13 @@
 # Tests use a per-test temp workspace so the real .evolve/runs/ tree is
 # never touched.
 #
-# Usage: bash scripts/team-context-test.sh
+# Usage: bash legacy/scripts/team-context-test.sh
 # Exit:  0 if all assertions pass; non-zero on any failure.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/utility/team-context.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/utility/team-context.sh"
 
 PASS=0
 FAIL=0
@@ -42,7 +42,7 @@ fresh_workspace() {
 }
 
 # --- Test 1: script exists ---------------------------------------------------
-header "Test 1: scripts/utility/team-context.sh exists"
+header "Test 1: legacy/scripts/utility/team-context.sh exists"
 if [ -f "$SCRIPT" ]; then
     pass "$SCRIPT present"
 else

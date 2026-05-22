@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# claude-adapter-test.sh — Unit tests for scripts/cli_adapters/claude.sh.
+# claude-adapter-test.sh — Unit tests for legacy/scripts/cli_adapters/claude.sh.
 #
 # v8.13.4: introduced primarily to cover the EVOLVE_MAX_BUDGET_USD override
 # path. As more adapter behaviors gain dedicated tests, they belong here too.
 #
-# Usage: bash scripts/claude-adapter-test.sh
+# Usage: bash legacy/scripts/claude-adapter-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTER="$REPO_ROOT/scripts/cli_adapters/claude.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ADAPTER="$REPO_ROOT/legacy/scripts/cli_adapters/claude.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

@@ -12,8 +12,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PG="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PG="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
 SCRATCH=$(mktemp -d -t memo-enforcement.XXXXXX)
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -64,7 +64,7 @@ $( [ "$verdict" = "PASS" ] && echo "None — diff in src/widget.js + src/types.t
    || echo "MEDIUM-1: src/widget.js validator may not handle null deep-merge case correctly" )
 
 ## Coverage
-- Files audited: src/widget.js, src/types.ts, scripts/run-tests.sh
+- Files audited: src/widget.js, src/types.ts, legacy/scripts/run-tests.sh
 - Lines reviewed: 47 lines of diff
 EOF
 

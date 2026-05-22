@@ -5,7 +5,7 @@
 # Pre-C1 cycles have no sidecar — omitted from output (see docs/incidents/cycle-31-c38-orphan.md).
 #
 # Usage:
-#   bash scripts/observability/detect-tree-sha-breach.sh [--json]
+#   bash legacy/scripts/observability/detect-tree-sha-breach.sh [--json]
 #
 # Exit codes:
 #   0 — no breaches detected (or no sidecar files found)
@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RUNS_DIR="$REPO_ROOT/.evolve/runs"
 JSON_OUT=0
 [ "${1:-}" = "--json" ] && JSON_OUT=1

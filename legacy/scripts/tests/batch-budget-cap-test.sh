@@ -10,8 +10,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DISPATCHER="$REPO_ROOT/scripts/dispatch/evolve-loop-dispatch.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+DISPATCHER="$REPO_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
 SCRATCH=$(mktemp -d -t batch-budget-test.XXXXXX)
 trap 'rm -rf "$SCRATCH"' EXIT
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # apply-envelope-additions.sh — Atomically merge envelope additions into all profiles.
 #
-# Target path: scripts/routing/apply-envelope-additions.sh (intended for one-shot Phase 1 application)
+# Target path: legacy/scripts/routing/apply-envelope-additions.sh (intended for one-shot Phase 1 application)
 # Bash 3.2 compatible.
 #
 # Reads: profile-envelope-additions.json (manifest of additions per phase)

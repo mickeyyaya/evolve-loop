@@ -8,11 +8,11 @@
 # has been capturing since v8.12.x.
 #
 # Usage:
-#   bash scripts/observability/show-cycle-cost.sh <cycle>          # human-readable table
-#   bash scripts/observability/show-cycle-cost.sh <cycle> --json   # machine-readable
+#   bash legacy/scripts/observability/show-cycle-cost.sh <cycle>          # human-readable table
+#   bash legacy/scripts/observability/show-cycle-cost.sh <cycle> --json   # machine-readable
 #
 # Example:
-#   $ bash scripts/observability/show-cycle-cost.sh 8210
+#   $ bash legacy/scripts/observability/show-cycle-cost.sh 8210
 #   ╭───────────────────────────────────────────────────────────────╮
 #   │ Cycle 8210 cost breakdown                                     │
 #   ├─────────────┬──────────┬──────────────┬──────────┬───────────┤
@@ -35,7 +35,7 @@ set -uo pipefail
 # works in plugin-install scenarios where the script's directory is the plugin
 # cache (read-only) and cycle data lives under the user's project. Also accept
 # RUNS_DIR_OVERRIDE for tests that want a fully-isolated workspace.
-PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 
 CYCLE=""
 JSON=0

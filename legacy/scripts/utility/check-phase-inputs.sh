@@ -3,7 +3,7 @@
 # check-phase-inputs.sh — Verify all declared inputs for a phase are present.
 #
 # Usage:
-#   bash scripts/utility/check-phase-inputs.sh <phase> <cycle>
+#   bash legacy/scripts/utility/check-phase-inputs.sh <phase> <cycle>
 #
 # Exit codes:
 #   0  — all declared inputs present

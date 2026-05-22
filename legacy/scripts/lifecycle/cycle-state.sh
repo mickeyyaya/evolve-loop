@@ -24,19 +24,19 @@
 #   - cycle_state_get: prints a single field's value (used by hooks).
 #
 # Usage as library (sourced):
-#   source scripts/lifecycle/cycle-state.sh
+#   source legacy/scripts/lifecycle/cycle-state.sh
 #   cycle_state_init 8135 .evolve/runs/cycle-8135
 #   cycle_state_advance build builder /tmp/wt-foo
 #   cycle_state_get phase
 #   cycle_state_clear
 #
 # Usage as CLI (when invoked directly with subcommand):
-#   bash scripts/lifecycle/cycle-state.sh init 8135 .evolve/runs/cycle-8135
-#   bash scripts/lifecycle/cycle-state.sh advance build builder /tmp/wt-foo
-#   bash scripts/lifecycle/cycle-state.sh get phase
-#   bash scripts/lifecycle/cycle-state.sh clear
-#   bash scripts/lifecycle/cycle-state.sh exists
-#   bash scripts/lifecycle/cycle-state.sh dump
+#   bash legacy/scripts/lifecycle/cycle-state.sh init 8135 .evolve/runs/cycle-8135
+#   bash legacy/scripts/lifecycle/cycle-state.sh advance build builder /tmp/wt-foo
+#   bash legacy/scripts/lifecycle/cycle-state.sh get phase
+#   bash legacy/scripts/lifecycle/cycle-state.sh clear
+#   bash legacy/scripts/lifecycle/cycle-state.sh exists
+#   bash legacy/scripts/lifecycle/cycle-state.sh dump
 
 set -uo pipefail
 
@@ -466,7 +466,7 @@ cycle_state_compute_cycle_tier() {
 # via ScheduleWakeup (see docs/architecture/auto-resume.md):
 #   - quotaResetAt          ISO 8601 timestamp when the quota window resets
 #                           (from $EVOLVE_CHECKPOINT_QUOTA_RESET_AT, populated
-#                           by scripts/dispatch/estimate-quota-reset.sh)
+#                           by legacy/scripts/dispatch/estimate-quota-reset.sh)
 #   - quotaResetSource      "operator-override" | "parsed" | "default"
 #                           (from $EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE)
 #   - autoResumeAttempts    counter (starts at 0; bumped on each --resume entry;

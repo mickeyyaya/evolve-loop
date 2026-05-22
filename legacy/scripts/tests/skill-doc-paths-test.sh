@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# skill-doc-paths-test.sh — Guard against pre-v8.47 stale `scripts/<name>.sh`
+# skill-doc-paths-test.sh — Guard against pre-v8.47 stale `legacy/scripts/<name>.sh`
 # references in skills/, .agents/skills/, .claude-plugin/commands/, and docs/.
 #
 # Why this test exists:
-# v8.47.0 reorganized scripts/ into thematic subdirs (dispatch/, lifecycle/,
+# v8.47.0 reorganized legacy/scripts/ into thematic subdirs (dispatch/, lifecycle/,
 # failure/, observability/, verification/, utility/). The patcher excluded
 # skills/ and .agents/skills/ because those are operator-facing surface,
 # expected to be hand-curated. Result: SKILL.md's STRICT MODE one-liner
 # referenced the OLD path, breaking `/evolve-loop` slash command invocation
 # with rc=127 (find returned no match).
 #
-# This test grep's for any `scripts/<bare-name>.sh` reference in the
+# This test grep's for any `legacy/scripts/<bare-name>.sh` reference in the
 # operator-facing surfaces and FAILS if it finds one. Prevents the regression
 # from coming back the next time someone moves a script.
 #
@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 PASS=0
 FAIL=0
@@ -45,7 +45,7 @@ release.sh
 "
 
 # Surfaces to audit. These are operator-facing or activation-path documents
-# where a stale `scripts/<bare-name>.sh` reference will produce an actual
+# where a stale `legacy/scripts/<bare-name>.sh` reference will produce an actual
 # breakage at runtime.
 SURFACES=(
     "skills"
@@ -54,14 +54,14 @@ SURFACES=(
 )
 
 # === Test 1: no stale refs in skills/, .agents/skills/, .claude-plugin/commands/
-header "Test 1: no stale 'scripts/<bare-name>.sh' references in operator-facing surfaces"
+header "Test 1: no stale 'legacy/scripts/<bare-name>.sh' references in operator-facing surfaces"
 total_stale=0
 stale_lines=""
 for surf in "${SURFACES[@]}"; do
     surf_path="$REPO_ROOT/$surf"
     [ -d "$surf_path" ] || continue
     for name in $MOVED_NAMES; do
-        matches=$(grep -rEn "(^|[^/])scripts/${name}([^/]|$)" "$surf_path" --include="*.md" --include="*.sh" 2>/dev/null || true)
+        matches=$(grep -rEn "(^|[^/])legacy/scripts/${name}([^/]|$)" "$surf_path" --include="*.md" --include="*.sh" 2>/dev/null || true)
         if [ -n "$matches" ]; then
             stale_lines="$stale_lines
 $matches"
@@ -76,35 +76,35 @@ else
     echo "$stale_lines" | head -10
 fi
 
-# === Test 2: SKILL.md's find expression points at scripts/dispatch/ ===========
-header "Test 2: SKILL.md STRICT MODE find expression uses scripts/dispatch/"
+# === Test 2: SKILL.md's find expression points at legacy/scripts/dispatch/ ===========
+header "Test 2: SKILL.md STRICT MODE find expression uses legacy/scripts/dispatch/"
 SKILL="$REPO_ROOT/skills/evolve-loop/SKILL.md"
 if [ ! -f "$SKILL" ]; then
     fail_ "SKILL.md not found at $SKILL"
-elif grep -q "marketplaces/evolve-loop/scripts/dispatch/evolve-loop-dispatch.sh" "$SKILL" \
-   && grep -q "cache/evolve-loop/evolve-loop/.*/scripts/dispatch/evolve-loop-dispatch.sh" "$SKILL"; then
-    pass "find expression matches both marketplace and cache install paths under scripts/dispatch/"
+elif grep -q "marketplaces/evolve-loop/legacy/scripts/dispatch/evolve-loop-dispatch.sh" "$SKILL" \
+   && grep -q "cache/evolve-loop/evolve-loop/.*/legacy/scripts/dispatch/evolve-loop-dispatch.sh" "$SKILL"; then
+    pass "find expression matches both marketplace and cache install paths under legacy/scripts/dispatch/"
 else
-    fail_ "SKILL.md find expression missing scripts/dispatch/ — operators will hit rc=127 on /evolve-loop"
+    fail_ "SKILL.md find expression missing legacy/scripts/dispatch/ — operators will hit rc=127 on /evolve-loop"
 fi
 
-# === Test 3: ship-gate.sh allowlists scripts/lifecycle/ship.sh =================
-header "Test 3: ship-gate.sh allowlists scripts/lifecycle/ship.sh"
-SHIP_GATE="$REPO_ROOT/scripts/guards/ship-gate.sh"
-if [ -f "$SHIP_GATE" ] && grep -q "scripts/lifecycle/ship.sh" "$SHIP_GATE"; then
-    pass "ship-gate.sh references scripts/lifecycle/ship.sh"
+# === Test 3: ship-gate.sh allowlists legacy/scripts/lifecycle/ship.sh =================
+header "Test 3: ship-gate.sh allowlists legacy/scripts/lifecycle/ship.sh"
+SHIP_GATE="$REPO_ROOT/legacy/scripts/guards/ship-gate.sh"
+if [ -f "$SHIP_GATE" ] && grep -q "legacy/scripts/lifecycle/ship.sh" "$SHIP_GATE"; then
+    pass "ship-gate.sh references legacy/scripts/lifecycle/ship.sh"
 else
-    fail_ "ship-gate.sh missing or doesn't reference scripts/lifecycle/ship.sh"
+    fail_ "ship-gate.sh missing or doesn't reference legacy/scripts/lifecycle/ship.sh"
 fi
 
 # === Test 4: evolve-loop-dispatch.sh PATH includes all 6 v8.47 subdirs ========
 header "Test 4: evolve-loop-dispatch.sh exports PATH with all v8.47 subdirs"
-DISPATCH="$REPO_ROOT/scripts/dispatch/evolve-loop-dispatch.sh"
+DISPATCH="$REPO_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
 all_present=1
 for sub in dispatch lifecycle failure observability verification utility; do
-    if ! grep -q "scripts/$sub" "$DISPATCH" 2>/dev/null; then
+    if ! grep -q "legacy/scripts/$sub" "$DISPATCH" 2>/dev/null; then
         all_present=0
-        echo "    missing PATH entry: scripts/$sub" >&2
+        echo "    missing PATH entry: legacy/scripts/$sub" >&2
     fi
 done
 if [ "$all_present" = "1" ]; then

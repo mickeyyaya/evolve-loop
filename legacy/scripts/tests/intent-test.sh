@@ -12,7 +12,7 @@
 # Tests use temp state files (EVOLVE_CYCLE_STATE_FILE) and temp ledgers so
 # the real .evolve/* tree is never touched.
 #
-# Usage: bash scripts/intent-test.sh
+# Usage: bash legacy/scripts/intent-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
@@ -20,10 +20,10 @@ set -uo pipefail
 unset EVOLVE_BYPASS_PHASE_GATE
 unset EVOLVE_REQUIRE_INTENT
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CYCLE_STATE="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
-PHASE_GATE="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
-PRECONDITION="$REPO_ROOT/scripts/guards/phase-gate-precondition.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CYCLE_STATE="$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+PHASE_GATE="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
+PRECONDITION="$REPO_ROOT/legacy/scripts/guards/phase-gate-precondition.sh"
 
 TEST_DIR=$(mktemp -d -t intent-test.XXXXXX)
 TEST_STATE="$TEST_DIR/cycle-state.json"
@@ -215,7 +215,7 @@ header "Test 10: precondition denies scout when intent_required=true and no inte
 reset_state
 EVOLVE_REQUIRE_INTENT=1 bash "$CYCLE_STATE" init 99 ".evolve/runs/cycle-99" >/dev/null 2>&1
 # Initial phase=calibrate, intent_required=true, no intent ledger entry yet
-payload='{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+payload='{"tool_input":{"command":"bash legacy/scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 set +e
 echo "$payload" | bash "$PRECONDITION" >/dev/null 2>&1
 rc=$?
@@ -231,7 +231,7 @@ bash "$CYCLE_STATE" advance intent intent >/dev/null 2>&1
 bash "$CYCLE_STATE" advance research scout >/dev/null 2>&1
 write_valid_intent "$TEST_WORKSPACE/intent.md"
 write_intent_ledger 99 "$TEST_WORKSPACE/intent.md"
-payload='{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+payload='{"tool_input":{"command":"bash legacy/scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 set +e
 echo "$payload" | bash "$PRECONDITION" >/dev/null 2>&1
 rc=$?
@@ -243,7 +243,7 @@ header "Test 12: default flow (intent_required=false) — scout allowed at calib
 reset_state
 unset EVOLVE_REQUIRE_INTENT
 bash "$CYCLE_STATE" init 99 ".evolve/runs/cycle-99" >/dev/null 2>&1
-payload='{"tool_input":{"command":"bash scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
+payload='{"tool_input":{"command":"bash legacy/scripts/dispatch/subagent-run.sh scout 99 .evolve/runs/cycle-99"}}'
 set +e
 echo "$payload" | bash "$PRECONDITION" >/dev/null 2>&1
 rc=$?
@@ -300,15 +300,15 @@ fi
 
 # === Test 18: SKILL.md dispatcher path is cwd-independent (v8.20.2+) ==========
 # The slash-command agent's cwd is the user's project, NOT the plugin install.
-# A relative `bash scripts/dispatch/evolve-loop-dispatch.sh` will fail with rc=127. The
+# A relative `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh` will fail with rc=127. The
 # SKILL.md must use an absolute or find-based path that resolves regardless of
 # cwd. Without this, the v8.18.0 boundary class returns from the dead.
 header "Test 18: SKILL.md dispatcher invocation is cwd-independent (v8.20.2+)"
-# Negative: fail if SKILL.md uses bare relative `bash scripts/dispatch/evolve-loop-dispatch.sh`.
-# Allow it inside `\$EVOLVE_PLUGIN_ROOT/scripts/...` form (different concept).
-# Search for the bad pattern: 'bash scripts/' with no $-prefix or $HOME or
+# Negative: fail if SKILL.md uses bare relative `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh`.
+# Allow it inside `\$EVOLVE_PLUGIN_ROOT/legacy/scripts/...` form (different concept).
+# Search for the bad pattern: 'bash legacy/scripts/' with no $-prefix or $HOME or
 # $(...) command substitution before it.
-bad_relative=$(grep -E '^[A-Z_=0-9 ]*bash[[:space:]]+scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" | grep -vE '^[[:space:]]*#|^[[:space:]]*>' || true)
+bad_relative=$(grep -E '^[A-Z_=0-9 ]*bash[[:space:]]+legacy/scripts/evolve-loop-dispatch\.sh' "$SKILL_FILE" | grep -vE '^[[:space:]]*#|^[[:space:]]*>' || true)
 if [ -z "$bad_relative" ]; then
     pass 'no bare-relative bash dispatcher invocation in SKILL.md (cwd-independent)'
 else
@@ -324,8 +324,8 @@ fi
 
 # === Test 16: orchestrator profile uses bare-name patterns (v8.20.0+) =========
 # The v8.20.0 PATH-based architecture requires kernel-script invocations to be
-# bare names (cycle-state.sh advance) — NOT path-prefixed (bash scripts/...,
-# bash **/scripts/..., bash /*/.claude/plugins/...). This test fails loudly
+# bare names (cycle-state.sh advance) — NOT path-prefixed (bash legacy/scripts/...,
+# bash **/legacy/scripts/..., bash /*/.claude/plugins/...). This test fails loudly
 # if any of the 4 path-prefixed pattern forms re-appear in orchestrator.json.
 #
 # Why this matters: v8.18.x → v8.19.5 shipped 5 patches in 48 hours each adding
@@ -337,16 +337,16 @@ ORCH_PROFILE="$REPO_ROOT/.evolve/profiles/orchestrator.json"
 [ -f "$ORCH_PROFILE" ] || fail_ "orchestrator profile not at $ORCH_PROFILE"
 # Look for any of the 4 known fragile pattern forms applied to kernel-script
 # invocations. Match patterns like:
-#   Bash(bash scripts/...
-#   Bash(bash **/scripts/...
-#   Bash(bash /*/.claude/plugins/marketplaces/*/scripts/...
-#   Bash(bash /*/.claude/plugins/cache/*/*/*/scripts/...
+#   Bash(bash legacy/scripts/...
+#   Bash(bash **/legacy/scripts/...
+#   Bash(bash /*/.claude/plugins/marketplaces/*/legacy/scripts/...
+#   Bash(bash /*/.claude/plugins/cache/*/*/*/legacy/scripts/...
 # Use jq to extract ONLY the actual list entries (skip _design_notes which
 # may legitimately reference old patterns as historical documentation).
 fragile_count=0
 if command -v jq >/dev/null 2>&1; then
     fragile_count=$(jq -r '(.allowed_tools // []) + (.disallowed_tools // []) | .[]' "$ORCH_PROFILE" \
-        | grep -cE 'Bash\(bash (scripts/|\*\*/scripts/|/\*/\.claude/plugins/(marketplaces|cache))' || true)
+        | grep -cE 'Bash\(bash (legacy/scripts/|\*\*/legacy/scripts/|/\*/\.claude/plugins/(marketplaces|cache))' || true)
 fi
 if [ "$fragile_count" = "0" ]; then
     pass "no path-prefixed kernel-script patterns in allowlists (architecture preserved)"

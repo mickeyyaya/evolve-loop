@@ -5,13 +5,13 @@
 # Each test sets up a temp git repo with controlled commit messages, runs
 # changelog-gen.sh, and asserts on the produced output.
 #
-# Usage: bash scripts/release/changelog-gen-test.sh
+# Usage: bash legacy/scripts/release/changelog-gen-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GEN="$REPO_ROOT/scripts/release/changelog-gen.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+GEN="$REPO_ROOT/legacy/scripts/release/changelog-gen.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -41,10 +41,10 @@ run_gen() {
     # Args: <repo> <from> <to> <version> [extra flags...]
     local repo="$1"; shift
     # Copy the script into the temp repo so REPO_ROOT resolves correctly.
-    mkdir -p "$repo/scripts/release"
-    cp "$GEN" "$repo/scripts/release/changelog-gen.sh"
-    chmod +x "$repo/scripts/release/changelog-gen.sh"
-    (cd "$repo" && bash "$repo/scripts/release/changelog-gen.sh" "$@" 2>&1)
+    mkdir -p "$repo/legacy/scripts/release"
+    cp "$GEN" "$repo/legacy/scripts/release/changelog-gen.sh"
+    chmod +x "$repo/legacy/scripts/release/changelog-gen.sh"
+    (cd "$repo" && bash "$repo/legacy/scripts/release/changelog-gen.sh" "$@" 2>&1)
 }
 
 cleanup_repos=()

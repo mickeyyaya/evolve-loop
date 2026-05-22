@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
 # acs-suite-test.sh — Tests for EGPS v10.0.0 predicate suite infrastructure:
-#   - scripts/lib/acs-schema.sh
-#   - scripts/verification/validate-predicate.sh
-#   - scripts/lifecycle/run-acs-suite.sh
-#   - scripts/utility/promote-acs-to-regression.sh
+#   - legacy/scripts/lib/acs-schema.sh
+#   - legacy/scripts/verification/validate-predicate.sh
+#   - legacy/scripts/lifecycle/run-acs-suite.sh
+#   - legacy/scripts/utility/promote-acs-to-regression.sh
 #
-# Convention: "bash scripts/tests/acs-suite-test.sh — N/N PASS"
+# Convention: "bash legacy/scripts/tests/acs-suite-test.sh — N/N PASS"
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 
-SCHEMA="$PROJECT_ROOT/scripts/lib/acs-schema.sh"
-VALIDATE="$PROJECT_ROOT/scripts/verification/validate-predicate.sh"
-RUNNER="$PROJECT_ROOT/scripts/lifecycle/run-acs-suite.sh"
-PROMOTE="$PROJECT_ROOT/scripts/utility/promote-acs-to-regression.sh"
+SCHEMA="$PROJECT_ROOT/legacy/scripts/lib/acs-schema.sh"
+VALIDATE="$PROJECT_ROOT/legacy/scripts/verification/validate-predicate.sh"
+RUNNER="$PROJECT_ROOT/legacy/scripts/lifecycle/run-acs-suite.sh"
+PROMOTE="$PROJECT_ROOT/legacy/scripts/utility/promote-acs-to-regression.sh"
 
 PASS=0; FAIL=0; TOTAL=0
 pass() { PASS=$((PASS+1)); TOTAL=$((TOTAL+1)); echo "  PASS: $1"; }

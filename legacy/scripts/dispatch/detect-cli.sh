@@ -7,9 +7,9 @@
 # this script at activation; it can be called from any shell, no env required.
 #
 # Usage:
-#   bash scripts/dispatch/detect-cli.sh           # prints one of: claude, gemini, codex, antigravity, unknown
-#   bash scripts/dispatch/detect-cli.sh --json    # prints {"cli":"...","reason":"..."}
-#   EVOLVE_PLATFORM=gemini bash scripts/dispatch/detect-cli.sh
+#   bash legacy/scripts/dispatch/detect-cli.sh           # prints one of: claude, gemini, codex, antigravity, unknown
+#   bash legacy/scripts/dispatch/detect-cli.sh --json    # prints {"cli":"...","reason":"..."}
+#   EVOLVE_PLATFORM=gemini bash legacy/scripts/dispatch/detect-cli.sh
 #       # operator override; honoured verbatim if non-empty
 #
 # Probe order (priority high → low):

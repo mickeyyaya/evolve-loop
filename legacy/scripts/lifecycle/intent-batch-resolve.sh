@@ -14,8 +14,8 @@
 # Exit 0 always. On errors, outputs INTENT_MODE=full (safe default).
 #
 # Usage:
-#   bash scripts/lifecycle/intent-batch-resolve.sh [<goal-text>]
-#   bash scripts/lifecycle/intent-batch-resolve.sh --help
+#   bash legacy/scripts/lifecycle/intent-batch-resolve.sh [<goal-text>]
+#   bash legacy/scripts/lifecycle/intent-batch-resolve.sh --help
 
 set -uo pipefail
 
@@ -33,8 +33,8 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 intent-batch-resolve.sh — Compute INTENT_MODE, BATCH_ID, and GOAL_HASH
 
 Usage:
-  bash scripts/lifecycle/intent-batch-resolve.sh [<goal-text>]
-  bash scripts/lifecycle/intent-batch-resolve.sh --help
+  bash legacy/scripts/lifecycle/intent-batch-resolve.sh [<goal-text>]
+  bash legacy/scripts/lifecycle/intent-batch-resolve.sh --help
 
 Arguments:
   <goal-text>  Optional. If omitted, reads goal from stdin or workspace intent.md.

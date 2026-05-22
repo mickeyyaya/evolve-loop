@@ -6,9 +6,9 @@
 #
 # Pre-v8.18.0, every kernel script computed:
 #
-#   REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+#   REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 #
-# and used REPO_ROOT for BOTH read paths (scripts/, agents/, .evolve/profiles/)
+# and used REPO_ROOT for BOTH read paths (legacy/scripts/, agents/, .evolve/profiles/)
 # AND write paths (.evolve/state.json, .evolve/ledger.jsonl, .evolve/runs/).
 # That works in development (cwd == repo). It breaks under the Claude Code
 # plugin install pattern:
@@ -19,7 +19,7 @@
 #   - Writes to ~/.claude/ are blocked as a sensitive path
 #
 # Symptom: orchestrator subagent fails to write orchestrator-report.md or run
-# scripts/lifecycle/cycle-state.sh. The 2026-05-03 boundary incident exposed this.
+# legacy/scripts/lifecycle/cycle-state.sh. The 2026-05-03 boundary incident exposed this.
 #
 # THE FIX
 #
@@ -50,7 +50,7 @@
 #   _self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #   . "$_self/resolve-roots.sh"
 #   # Now use:
-#   #   $EVOLVE_PLUGIN_ROOT/scripts/foo.sh   (read-only)
+#   #   $EVOLVE_PLUGIN_ROOT/legacy/scripts/foo.sh   (read-only)
 #   #   $EVOLVE_PROJECT_ROOT/.evolve/state.json  (writable)
 #
 # bash 3.2 compatible. No associative arrays. No GNU-only date/sed.
@@ -72,8 +72,27 @@ fi
 # BASH_SOURCE[0] is the path to *this* script (resolve-roots.sh) regardless of
 # who sourced it. dirname/.. gives the install root.
 __rr_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EVOLVE_PLUGIN_ROOT="$(cd "$__rr_self_dir/../.." && pwd)"
-unset __rr_self_dir
+# v11.2.0: scripts moved to legacy/scripts/, so naive `../..` would land at
+# `legacy/` not the repo root. Walk up until we find `.claude-plugin/` (the
+# canonical "this is the plugin root" marker), with a hard ceiling of 6 levels
+# to avoid infinite loops on broken installs.
+__rr_probe="$__rr_self_dir"
+__rr_levels=0
+while [ "$__rr_levels" -lt 6 ] && [ ! -d "$__rr_probe/.claude-plugin" ]; do
+    __rr_probe="$(dirname "$__rr_probe")"
+    __rr_levels=$((__rr_levels + 1))
+    if [ "$__rr_probe" = "/" ]; then
+        break
+    fi
+done
+if [ -d "$__rr_probe/.claude-plugin" ]; then
+    EVOLVE_PLUGIN_ROOT="$__rr_probe"
+else
+    # Fall back to pre-v11.2.0 behavior (../..) for installs that didn't
+    # include .claude-plugin/ — e.g., partial copies in test workspaces.
+    EVOLVE_PLUGIN_ROOT="$(cd "$__rr_self_dir/../../.." && pwd)"
+fi
+unset __rr_self_dir __rr_probe __rr_levels
 
 # --- EVOLVE_PROJECT_ROOT — env override, then git toplevel, then $PWD --------
 if [ -n "${EVOLVE_PROJECT_ROOT:-}" ]; then

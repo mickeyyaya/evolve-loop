@@ -2,14 +2,14 @@
 # v10.6.0: tests for the three-layer auto-resume mechanism.
 #
 # Verifies:
-#   Layer 1 — scripts/dispatch/estimate-quota-reset.sh
+#   Layer 1 — legacy/scripts/dispatch/estimate-quota-reset.sh
 #     - fallback (now + default 5h25min)
 #     - EVOLVE_QUOTA_RESET_AT operator override
 #     - parsed hint file (HH:MM am/pm)
 #     - hint with already-passed time → next-day rollover
 #     - garbage hint → fallback
 #     - EVOLVE_QUOTA_RESET_HOURS custom offset
-#   Layer 2 — scripts/lifecycle/cycle-state.sh checkpoint schema
+#   Layer 2 — legacy/scripts/lifecycle/cycle-state.sh checkpoint schema
 #     - 4 new fields (quotaResetAt, quotaResetSource, autoResumeAttempts,
 #                    autoResumeMaxAttempts) present after checkpoint
 #     - default values when env vars absent
@@ -17,7 +17,7 @@
 #     - bump-auto-resume-attempts: N successes + (N+1)th refused (rc=2)
 #     - reset-auto-resume-attempts: zeros counter
 #     - re-checkpoint preserves prior autoResumeAttempts (cap accumulates)
-#   Layer 3 — scripts/dispatch/evolve-loop-dispatch.sh static checks
+#   Layer 3 — legacy/scripts/dispatch/evolve-loop-dispatch.sh static checks
 #     - DISPATCH_RC=5 branch exists
 #     - QUOTA-PAUSE marker emit line exists
 #     - cycle-state quota-likely detection block exists
@@ -28,12 +28,12 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 cd "$PROJECT_ROOT" || { echo "FAIL: cannot cd to project root"; exit 1; }
 
-ESTIMATE="$PROJECT_ROOT/scripts/dispatch/estimate-quota-reset.sh"
-CYCLE_STATE="$PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
-DISPATCH="$PROJECT_ROOT/scripts/dispatch/evolve-loop-dispatch.sh"
+ESTIMATE="$PROJECT_ROOT/legacy/scripts/dispatch/estimate-quota-reset.sh"
+CYCLE_STATE="$PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+DISPATCH="$PROJECT_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
 
 PASS=0
 FAIL=0

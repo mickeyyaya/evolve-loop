@@ -22,7 +22,7 @@
 #      kernel.
 #
 # This file is meant to be SOURCED, not executed:
-#   . "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-classifications.sh"
+#   . "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-classifications.sh"
 #
 # Public API:
 #   failure_age_out_seconds <classification>

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# guards-test.sh — Unit tests for scripts/guards/ship-gate.sh.
+# guards-test.sh — Unit tests for legacy/scripts/guards/ship-gate.sh.
 #
 # v8.13.0 reframes the gate from "parse arbitrary bash for ship verbs"
 # (the v8.12.x approach that lost arms races in cycles 8121, 8122) to
-# "allowlist exactly one canonical path: scripts/lifecycle/ship.sh". These tests
+# "allowlist exactly one canonical path: legacy/scripts/lifecycle/ship.sh". These tests
 # exercise the gate's decision logic under realistic JSON payloads.
 #
-# Tests do NOT exercise scripts/lifecycle/ship.sh's internal audit verification
+# Tests do NOT exercise legacy/scripts/lifecycle/ship.sh's internal audit verification
 # (that's covered by ship-integration-test.sh which uses temp git repos).
 #
-# Usage: bash scripts/guards-test.sh
+# Usage: bash legacy/scripts/guards-test.sh
 #
 # Exit 0 = all tests pass; non-zero = failures.
 
@@ -18,8 +18,8 @@ set -uo pipefail
 
 unset EVOLVE_BYPASS_SHIP_GATE
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GATE="$REPO_ROOT/scripts/guards/ship-gate.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+GATE="$REPO_ROOT/legacy/scripts/guards/ship-gate.sh"
 
 # Build literal "git commit" / "git push" tokens via concatenation so this
 # test script's own command string (which Claude Code's Bash tool sees during
@@ -82,9 +82,9 @@ set +e; echo "" | bash "$GATE" >/dev/null 2>&1; rc=$?; set -e
 header "Test 2: non-ship command (ls -la) allowed"
 expect_allow "ls -la passthrough" '{"tool_input":{"command":"ls -la"}}'
 
-# --- Test 3: bash scripts/lifecycle/ship.sh "msg" allowed (canonical path) -------------
-header "Test 3: bash scripts/lifecycle/ship.sh canonical path allowed"
-expect_allow "bash scripts/lifecycle/ship.sh allowed" '{"tool_input":{"command":"bash scripts/lifecycle/ship.sh \"feat: x\""}}'
+# --- Test 3: bash legacy/scripts/lifecycle/ship.sh "msg" allowed (canonical path) -------------
+header "Test 3: bash legacy/scripts/lifecycle/ship.sh canonical path allowed"
+expect_allow "bash legacy/scripts/lifecycle/ship.sh allowed" '{"tool_input":{"command":"bash legacy/scripts/lifecycle/ship.sh \"feat: x\""}}'
 
 # --- Test 4: raw git commit denied ------------------------------------------
 header "Test 4: raw $GC denied"

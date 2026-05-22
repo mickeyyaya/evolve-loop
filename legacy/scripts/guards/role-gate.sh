@@ -34,7 +34,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 GUARDS_LOG="$REPO_ROOT/.evolve/guards.log"
 CYCLE_STATE_FILE="${EVOLVE_CYCLE_STATE_FILE:-$REPO_ROOT/.evolve/cycle-state.json}"
 

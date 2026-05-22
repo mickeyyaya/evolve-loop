@@ -5,7 +5,7 @@
 # Triage ingests inbox files at phase start of the next cycle.
 #
 # Usage:
-#   bash scripts/utility/inject-task.sh \
+#   bash legacy/scripts/utility/inject-task.sh \
 #     --priority HIGH \
 #     --action "Fix the X issue" \
 #     [--weight 0.85] \
@@ -26,7 +26,7 @@
 set -uo pipefail
 
 __self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$__self_dir/../.." && pwd)"
+REPO_ROOT="$(cd "$__self_dir/../../.." && pwd)"
 PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}"
 
 PRIORITY=""
@@ -113,7 +113,7 @@ fi
 
 # --invalidate-cache: emit a research_cache_invalidate event before injection.
 if [ -n "$INVALIDATE_CACHE_FP" ]; then
-    bash scripts/utility/research-cache.sh invalidate "$INVALIDATE_CACHE_FP" \
+    bash legacy/scripts/utility/research-cache.sh invalidate "$INVALIDATE_CACHE_FP" \
         --reason "operator-inject-$(date -u +%Y%m%d)" 2>/dev/null || true
     echo "[inject-task] research-cache: emitted invalidate event for fp=$INVALIDATE_CACHE_FP" >&2
 fi

@@ -11,8 +11,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RUN_CYCLE="$REPO_ROOT/scripts/dispatch/run-cycle.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+RUN_CYCLE="$REPO_ROOT/legacy/scripts/dispatch/run-cycle.sh"
 SCRATCH=$(mktemp -d -t workspace-archive.XXXXXX)
 trap 'rm -rf "$SCRATCH"' EXIT
 

@@ -11,9 +11,9 @@
 # instrumentation. Safe to run retroactively on any historical cycle.
 #
 # Usage:
-#   bash scripts/observability/rollup-cycle-metrics.sh <cycle>
-#   bash scripts/observability/rollup-cycle-metrics.sh <cycle> --stdout      # print to stdout instead of writing file
-#   bash scripts/observability/rollup-cycle-metrics.sh <cycle> --baseline=5  # include last-N-cycles baseline (default 0)
+#   bash legacy/scripts/observability/rollup-cycle-metrics.sh <cycle>
+#   bash legacy/scripts/observability/rollup-cycle-metrics.sh <cycle> --stdout      # print to stdout instead of writing file
+#   bash legacy/scripts/observability/rollup-cycle-metrics.sh <cycle> --baseline=5  # include last-N-cycles baseline (default 0)
 #
 # Exit codes:
 #   0 — rollup produced

@@ -6,10 +6,10 @@
 # Feature is gated by EVOLVE_RESEARCH_CACHE_ENABLED=1 (default OFF).
 #
 # Usage:
-#   bash scripts/utility/research-cache.sh check <task_id>
-#   bash scripts/utility/research-cache.sh invalidate <fp> [--reason TEXT]
-#   bash scripts/utility/research-cache.sh list [--task <task_id>]
-#   bash scripts/utility/research-cache.sh gc [--dry-run]
+#   bash legacy/scripts/utility/research-cache.sh check <task_id>
+#   bash legacy/scripts/utility/research-cache.sh invalidate <fp> [--reason TEXT]
+#   bash legacy/scripts/utility/research-cache.sh list [--task <task_id>]
+#   bash legacy/scripts/utility/research-cache.sh gc [--dry-run]
 #
 # Exit codes for 'check':
 #   0  = HIT         — valid entry, not expired, files match
@@ -30,7 +30,7 @@ __self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$__self_dir/../lifecycle/resolve-roots.sh" ]; then
     . "$__self_dir/../lifecycle/resolve-roots.sh" 2>/dev/null || true
 fi
-PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$__self_dir/../.." && pwd)}"
+PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$__self_dir/../../.." && pwd)}"
 STATE_JSON="$PROJECT_ROOT/.evolve/state.json"
 CACHE_BASE="$PROJECT_ROOT/.evolve/research/by-task"
 ARCHIVE_LOG="$PROJECT_ROOT/.evolve/archive/lessons/research-cache-archive.jsonl"

@@ -4,9 +4,9 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CYCLE_STATE="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
-SUBAGENT_RUN="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CYCLE_STATE="$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+SUBAGENT_RUN="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 
 PASS=0
 FAIL=0

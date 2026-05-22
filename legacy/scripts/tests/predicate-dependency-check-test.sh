@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # predicate-dependency-check-test.sh — Unit tests for the Opt A (v10.19.0)
-# scripts/utility/predicate-dependency-check.sh helper.
+# legacy/scripts/utility/predicate-dependency-check.sh helper.
 #
 # Tests cover:
 #   1. Missing scout-report.md → exit 2 (infra error)
@@ -17,8 +17,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/utility/predicate-dependency-check.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/utility/predicate-dependency-check.sh"
 SCRATCH=$(mktemp -d -t "predicate-dep-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 

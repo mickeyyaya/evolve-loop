@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # probe-proxy.sh — verify EVOLVE_ANTHROPIC_BASE_URL endpoint is reachable.
-# Usage: bash scripts/utility/probe-proxy.sh [URL]
+# Usage: bash legacy/scripts/utility/probe-proxy.sh [URL]
 # If URL omitted, reads EVOLVE_ANTHROPIC_BASE_URL from environment.
 # Exit 0 = reachable, exit 1 = not configured, exit 2 = unreachable.
 

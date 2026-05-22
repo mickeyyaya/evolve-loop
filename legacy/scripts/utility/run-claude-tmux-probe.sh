@@ -7,7 +7,7 @@
 # token, runs the billing-mode comparison. Prints an overall GO / NO-GO.
 #
 # Usage:
-#   bash scripts/utility/run-claude-tmux-probe.sh [MODEL]
+#   bash legacy/scripts/utility/run-claude-tmux-probe.sh [MODEL]
 #
 # MODEL defaults to "haiku" (cheapest). Use "sonnet" or "opus" to test other tiers.
 #
@@ -18,9 +18,9 @@
 
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTER="$REPO/scripts/cli_adapters/claude-tmux.sh"
-VERIFIER="$REPO/scripts/utility/verify-subscription-billing.sh"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ADAPTER="$REPO/legacy/scripts/cli_adapters/claude-tmux.sh"
+VERIFIER="$REPO/legacy/scripts/utility/verify-subscription-billing.sh"
 
 MODEL="${1:-haiku}"
 

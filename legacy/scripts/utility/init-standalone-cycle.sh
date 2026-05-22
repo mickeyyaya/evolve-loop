@@ -3,7 +3,7 @@
 # init-standalone-cycle.sh — Bootstrap a cycle for single-phase execution.
 #
 # Usage:
-#   bash scripts/utility/init-standalone-cycle.sh \
+#   bash legacy/scripts/utility/init-standalone-cycle.sh \
 #     --cycle N \
 #     --phase <registry-phase-name> \
 #     [--workspace PATH] \

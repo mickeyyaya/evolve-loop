@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # consensus-dispatch-test.sh — Tests for v8.54.0 cross-CLI consensus auditor
-# dispatch (scripts/dispatch/consensus-dispatch.sh).
+# dispatch (legacy/scripts/dispatch/consensus-dispatch.sh).
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DISPATCH="$REPO_ROOT/scripts/dispatch/consensus-dispatch.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+DISPATCH="$REPO_ROOT/legacy/scripts/dispatch/consensus-dispatch.sh"
 AUDITOR_PROFILE="$REPO_ROOT/.evolve/profiles/auditor.json"
 
 PASS=0

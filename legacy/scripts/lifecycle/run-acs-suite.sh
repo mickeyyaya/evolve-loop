@@ -16,9 +16,9 @@
 #   - Regression-suite predicates count as REGRESSIONS when they fail
 #
 # Usage:
-#   bash scripts/lifecycle/run-acs-suite.sh <cycle>                    # default output to workspace
-#   bash scripts/lifecycle/run-acs-suite.sh <cycle> --json              # print verdict to stdout
-#   bash scripts/lifecycle/run-acs-suite.sh <cycle> --acs-dir <path>    # override acs/ base
+#   bash legacy/scripts/lifecycle/run-acs-suite.sh <cycle>                    # default output to workspace
+#   bash legacy/scripts/lifecycle/run-acs-suite.sh <cycle> --json              # print verdict to stdout
+#   bash legacy/scripts/lifecycle/run-acs-suite.sh <cycle> --acs-dir <path>    # override acs/ base
 #
 # Exit codes:
 #   0  — all predicates GREEN (verdict PASS)
@@ -32,7 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 if [ -f "$SCRIPT_DIR/../lib/acs-schema.sh" ]; then
     source "$SCRIPT_DIR/../lib/acs-schema.sh"
 else
-    echo "[run-acs-suite] cannot locate scripts/lib/acs-schema.sh" >&2
+    echo "[run-acs-suite] cannot locate legacy/scripts/lib/acs-schema.sh" >&2
     exit 1
 fi
 

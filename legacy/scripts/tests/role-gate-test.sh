@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
-# role-gate-test.sh — Unit tests for scripts/guards/role-gate.sh (v8.13.1).
+# role-gate-test.sh — Unit tests for legacy/scripts/guards/role-gate.sh (v8.13.1).
 #
 # Tests exercise: cycle-state present + path inside/outside allowlist,
 # cycle-state absent (transparent passthrough), bypass env, per-phase
 # allowlists (calibrate/research/discover/build/audit/ship/learn), and
 # always-safe paths (/tmp, /var/folders, $HOME/.claude/).
 #
-# Usage: bash scripts/role-gate-test.sh
+# Usage: bash legacy/scripts/role-gate-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
 unset EVOLVE_BYPASS_ROLE_GATE
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GATE="$REPO_ROOT/scripts/guards/role-gate.sh"
-HELPER="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+GATE="$REPO_ROOT/legacy/scripts/guards/role-gate.sh"
+HELPER="$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
 
 # Use an isolated cycle-state file so this test never collides with a real cycle
 # in progress. The gate honors EVOLVE_CYCLE_STATE_FILE.
@@ -79,7 +79,7 @@ set_state() {
 # === Test 1: no cycle-state → ALLOW (transparent) =============================
 header "Test 1: no cycle-state → ALLOW (transparent passthrough)"
 rm -f "$TEST_STATE"
-expect_allow "any path with no cycle" "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}"
+expect_allow "any path with no cycle" "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/legacy/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}"
 
 # === Test 2: workspace path always allowed ====================================
 header "Test 2: workspace path always allowed regardless of phase"
@@ -97,7 +97,7 @@ expect_allow "build phase + worktree" \
 header "Test 4: build phase + outside scope → DENY"
 set_state build builder "/tmp/wt-builder-99000"
 expect_deny "build phase + repo source file" \
-    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}"
+    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/legacy/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}"
 
 # === Test 5: discover phase + outside workspace → DENY ========================
 header "Test 5: discover phase + outside workspace → DENY"
@@ -132,8 +132,8 @@ expect_allow "ship + CHANGELOG.md" \
 # === Test 10: ship phase + arbitrary source file → DENY =======================
 header "Test 10: ship phase + arbitrary source file → DENY"
 set_state ship orchestrator ""
-expect_deny "ship + scripts/foo.sh" \
-    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/scripts/foo.sh\"},\"cwd\":\"$REPO_ROOT\"}"
+expect_deny "ship + legacy/scripts/foo.sh" \
+    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/legacy/scripts/foo.sh\"},\"cwd\":\"$REPO_ROOT\"}"
 
 # === Test 11: learn phase + lessons yaml → ALLOW ==============================
 header "Test 11: learn phase + .evolve/instincts/lessons/inst-L1.yaml → ALLOW"
@@ -169,7 +169,7 @@ expect_allow "audit + ~/.claude/projects/foo.json" \
 header "Test 16: EVOLVE_BYPASS_ROLE_GATE=1 → ALLOW even when would deny"
 set_state build builder "/tmp/wt-99000"
 expect_allow "bypass + outside scope" \
-    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}" \
+    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/legacy/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}" \
     "EVOLVE_BYPASS_ROLE_GATE=1"
 
 # === Test 17: missing file_path → ALLOW (passthrough) =========================
@@ -181,7 +181,7 @@ expect_allow "missing file_path" '{"tool_input":{"command":"ls"}}'
 header "Test 18: malformed cycle-state.json → ALLOW (fail-open with WARN)"
 echo '{"phase":"","workspace_path":""}' > "$TEST_STATE"
 expect_allow "malformed state" \
-    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}"
+    "{\"tool_input\":{\"file_path\":\"$REPO_ROOT/legacy/scripts/evil.sh\"},\"cwd\":\"$REPO_ROOT\"}"
 
 # === Test 19: relative file_path resolved against cwd =========================
 header "Test 19: relative file_path resolved against payload cwd"

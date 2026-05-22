@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/hooks/doc-deletion-guard.sh — PreToolUse kernel hook (v1.0, cycle-90)
+# legacy/scripts/hooks/doc-deletion-guard.sh — PreToolUse kernel hook (v1.0, cycle-90)
 #
 # Enforces the Knowledge Stewardship Rule (AGENTS.md §13 / Plan §5D):
 #   docs/** and knowledge-base/** content must NEVER be deleted — only archived.
@@ -20,7 +20,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+REPO_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 GUARDS_LOG="${EVOLVE_GUARDS_LOG:-$REPO_ROOT/.evolve/guards.log}"
 
 mkdir -p "$(dirname "$GUARDS_LOG")" 2>/dev/null || true

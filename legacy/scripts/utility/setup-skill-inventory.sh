@@ -8,7 +8,7 @@
 # skills/evolve-loop/phases.md § "Skill Inventory").
 #
 # Usage:
-#   bash scripts/utility/setup-skill-inventory.sh [--force] [--quiet]
+#   bash legacy/scripts/utility/setup-skill-inventory.sh [--force] [--quiet]
 #
 # Exit codes:
 #   0 = inventory written (or cache hit, still fresh)

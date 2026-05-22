@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# diff-complexity-test.sh — Unit tests for scripts/utility/diff-complexity.sh.
+# diff-complexity-test.sh — Unit tests for legacy/scripts/utility/diff-complexity.sh.
 #
 # Tests cover the three tier rules + edge cases:
 #   1. trivial: ≤3 files AND ≤100 lines AND no security paths
@@ -13,12 +13,12 @@
 # kernel hook (running in the test parent) doesn't block our throwaway
 # git commits.
 #
-# Usage: bash scripts/diff-complexity-test.sh
+# Usage: bash legacy/scripts/diff-complexity-test.sh
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/utility/diff-complexity.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/utility/diff-complexity.sh"
 SCRATCH=$(mktemp -d -t "diff-complexity-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 

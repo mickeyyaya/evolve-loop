@@ -7,7 +7,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCRATCH=$(mktemp -d)
 
 PASS=0
@@ -43,10 +43,10 @@ PERSONA="$REPO_ROOT/agents/evolve-triage.md"
 # --- Test 3: cycle-state.sh accepts 'triage' phase --------------------------
 header "Test 3: cycle-state.sh advance triage works"
 sf="$SCRATCH/cs-test.json"
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" init 1 /tmp/wt >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance research scout >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance discover scout >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance triage triage >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" init 1 /tmp/wt >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance research scout >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance discover scout >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance triage triage >/dev/null 2>&1
 PHASE=$(jq -r '.phase' "$sf" 2>/dev/null)
 [ "$PHASE" = "triage" ] && pass "phase advanced to triage" || fail "expected phase=triage, got '$PHASE'"
 COMPLETED=$(jq -r '.completed_phases | join(",")' "$sf")
@@ -55,7 +55,7 @@ echo "$COMPLETED" | grep -q "discover" && pass "discover recorded as completed" 
 
 # Continue to plan-review — verifies triage is recognized as a known phase
 # (so the completed-phase dedup logic runs through it without errors)
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance plan-review plan-reviewer >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance plan-review plan-reviewer >/dev/null 2>&1
 COMPLETED=$(jq -r '.completed_phases | join(",")' "$sf")
 echo "$COMPLETED" | grep -q "triage" && pass "triage recorded as completed (known phase)" || \
     fail "triage NOT in completed_phases (means it's not in the \$known list)"
@@ -64,31 +64,31 @@ echo "$COMPLETED" | grep -q "triage" && pass "triage recorded as completed (know
 header "Test 4: phase-gate-precondition.sh recognizes triage agent + phase"
 # Simulate a Bash hook invocation requesting the triage agent during phase=discover
 sf2="$SCRATCH/cs-pgp.json"
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" init 2 /tmp/wt2 >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance research scout >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance discover scout >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" init 2 /tmp/wt2 >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance research scout >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance discover scout >/dev/null 2>&1
 
 # Build a tool_input JSON that requests triage via subagent-run.sh
-HOOK_INPUT=$(jq -nc --arg cmd "bash scripts/dispatch/subagent-run.sh triage 2 /tmp/ws" \
+HOOK_INPUT=$(jq -nc --arg cmd "bash legacy/scripts/dispatch/subagent-run.sh triage 2 /tmp/ws" \
     '{tool_name:"Bash",tool_input:{command:$cmd}}')
 # Override CYCLE_STATE_FILE the hook reads
-RC=$(echo "$HOOK_INPUT" | EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/guards/phase-gate-precondition.sh" >/dev/null 2>&1; echo $?)
+RC=$(echo "$HOOK_INPUT" | EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/guards/phase-gate-precondition.sh" >/dev/null 2>&1; echo $?)
 [ "$RC" = "0" ] && pass "phase-gate-precondition ALLOWs triage during phase=discover" || \
     fail "phase-gate-precondition REJECTED triage (rc=$RC); expected ALLOW"
 
 # Negative case: requesting triage during phase=audit must be DENIED
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance triage triage >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance plan-review plan-reviewer >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance tdd tdd-engineer >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance build builder >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance audit auditor >/dev/null 2>&1
-RC=$(echo "$HOOK_INPUT" | EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/scripts/guards/phase-gate-precondition.sh" >/dev/null 2>&1; echo $?)
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance triage triage >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance plan-review plan-reviewer >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance tdd tdd-engineer >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance build builder >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance audit auditor >/dev/null 2>&1
+RC=$(echo "$HOOK_INPUT" | EVOLVE_CYCLE_STATE_FILE="$sf2" bash "$REPO_ROOT/legacy/scripts/guards/phase-gate-precondition.sh" >/dev/null 2>&1; echo $?)
 [ "$RC" != "0" ] && pass "phase-gate-precondition DENIES triage during phase=audit" || \
     fail "phase-gate-precondition ALLOWED triage during phase=audit; expected DENY"
 
 # --- Test 5: phase-gate.sh has triage gate functions ------------------------
 header "Test 5: phase-gate.sh exposes discover-to-triage and triage-to-plan-review"
-PG="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
+PG="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
 grep -q "discover-to-triage)" "$PG" && pass "discover-to-triage gate registered" || \
     fail "discover-to-triage gate missing from dispatch"
 grep -q "triage-to-plan-review)" "$PG" && pass "triage-to-plan-review gate registered" || \

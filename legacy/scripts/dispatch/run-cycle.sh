@@ -3,7 +3,7 @@
 # run-cycle.sh — Convenience driver for the Evolve Loop (v8.13.1).
 #
 # Initializes per-cycle runtime state (.evolve/cycle-state.json) and spawns
-# the orchestrator subagent (scripts/dispatch/subagent-run.sh orchestrator ...). The
+# the orchestrator subagent (legacy/scripts/dispatch/subagent-run.sh orchestrator ...). The
 # orchestrator's profile (.evolve/profiles/orchestrator.json) restricts what
 # it can do — combined with role-gate.sh (path-allowlist on Edit/Write) and
 # phase-gate-precondition.sh (sequence-allowlist on subagent invocations),
@@ -11,17 +11,17 @@
 # LLM cooperation.
 #
 # Usage:
-#   bash scripts/dispatch/run-cycle.sh [GOAL]
-#   bash scripts/dispatch/run-cycle.sh --cycle 8200 [GOAL]
-#   bash scripts/dispatch/run-cycle.sh --dry-run   # print what would happen without spawning
-#   bash scripts/dispatch/run-cycle.sh --simulate  # walk every phase via cycle-simulator.sh (no LLM)
+#   bash legacy/scripts/dispatch/run-cycle.sh [GOAL]
+#   bash legacy/scripts/dispatch/run-cycle.sh --cycle 8200 [GOAL]
+#   bash legacy/scripts/dispatch/run-cycle.sh --dry-run   # print what would happen without spawning
+#   bash legacy/scripts/dispatch/run-cycle.sh --simulate  # walk every phase via cycle-simulator.sh (no LLM)
 #
 # Lifecycle:
 #   1. Resolve cycle ID (next-after-state OR explicit --cycle).
 #   2. Create workspace .evolve/runs/cycle-N/.
 #   3. cycle_state_init → cycle-state.json with phase=calibrate.
 #   4. Build context block (instinct summary, ledger tail, failed approaches).
-#   5. Spawn orchestrator: bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE.
+#   5. Spawn orchestrator: bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE.
 #   6. On exit (PASS or FAIL), clear cycle-state.json and print summary.
 #
 # IMPORTANT — what this script does NOT do:
@@ -29,7 +29,7 @@
 #     orchestrator subagent (in agents/evolve-orchestrator.md). The runner
 #     only writes the initial state file and spawns the orchestrator.
 #   - It does NOT write to source code. role-gate.sh blocks that during cycles.
-#   - It does NOT commit/push. Only scripts/lifecycle/ship.sh can (ship-gate enforces).
+#   - It does NOT commit/push. Only legacy/scripts/lifecycle/ship.sh can (ship-gate enforces).
 #
 # Exit codes:
 #   0   — orchestrator completed (verdict in orchestrator-report.md)
@@ -56,7 +56,7 @@ set -uo pipefail
 [ -n "${EVOLVE_CHECKPOINT_AT_PCT:-}" ] && export EVOLVE_CHECKPOINT_AT_PCT
 [ -n "${EVOLVE_CHECKPOINT_WARN_AT_PCT:-}" ] && export EVOLVE_CHECKPOINT_WARN_AT_PCT
 
-# v8.18.0: dual-root resolution. PLUGIN_ROOT for read-only scripts/agents,
+# v8.18.0: dual-root resolution. PLUGIN_ROOT for read-only legacy/scripts/agents,
 # PROJECT_ROOT for writable state/ledger/runs/instincts. See resolve-roots.sh.
 __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/../lifecycle/resolve-roots.sh"
@@ -64,18 +64,18 @@ unset __rr_self
 
 # v8.20.0: Prepend the plugin's scripts dir (and release/ subdir) to PATH so
 # kernel scripts are findable by bare name from subagent subprocesses. This
-# eliminates the install-layout-fragile `bash $EVOLVE_PLUGIN_ROOT/scripts/foo.sh`
+# eliminates the install-layout-fragile `bash $EVOLVE_PLUGIN_ROOT/legacy/scripts/foo.sh`
 # invocation pattern that required 4 path-variant allowlist entries per script
 # (relative + ** glob + marketplace + cache absolute) — 140 patterns total in
 # orchestrator.json. With PATH set, orchestrator invokes `cycle-state.sh advance`
 # (bare name) and the allowlist needs ONE pattern: Bash(cycle-state.sh advance:*).
 # Works in dev (cwd=repo), marketplace, cache, and any future install layout.
 # Inherits to claude -p subprocess via standard env propagation.
-export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/scripts/release:$PATH"
+export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/legacy/scripts/release:$PATH"
 
 # Read-only resources from the plugin install
-CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
-SUBAGENT_RUN="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/subagent-run.sh"
+CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+SUBAGENT_RUN="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 ORCHESTRATOR_PROMPT="$EVOLVE_PLUGIN_ROOT/agents/evolve-orchestrator.md"
 
 # Writable artifacts under the user's project (or evolve-loop repo in dev mode)
@@ -176,7 +176,7 @@ WORKSPACE="$EVOLVE_PROJECT_ROOT/.evolve/runs/cycle-$CYCLE"
 if [ "${EVOLVE_RESUME_MODE:-0}" != "1" ]; then
     if bash "$CYCLE_STATE_HELPER" exists >/dev/null 2>&1; then
         existing=$(bash "$CYCLE_STATE_HELPER" get cycle_id || true)
-        integrity_fail "cycle-state.json already exists for cycle $existing — refusing to clobber. Run: bash scripts/lifecycle/cycle-state.sh clear"
+        integrity_fail "cycle-state.json already exists for cycle $existing — refusing to clobber. Run: bash legacy/scripts/lifecycle/cycle-state.sh clear"
     fi
 fi
 
@@ -216,8 +216,8 @@ build_context() {
     # from non-expired failedApproaches and emits a structured JSON object.
     # The orchestrator reads this JSON and follows the action verbatim.
     local adapter_decision=""
-    if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-adapter.sh" ]; then
-        adapter_decision=$(bash "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-adapter.sh" decide --state "$STATE_FILE" 2>/dev/null || echo '')
+    if [ -x "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-adapter.sh" ]; then
+        adapter_decision=$(bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-adapter.sh" decide --state "$STATE_FILE" 2>/dev/null || echo '')
     fi
 
     # Read-side defense-in-depth: filter failedApproaches by expiresAt before
@@ -252,7 +252,7 @@ build_context() {
         echo "workspace: $workspace"
         echo "goal: ${goal:-<unspecified — pick from CLAUDE.md priorities>}"
         echo "cycleState: $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json (already initialized to phase=calibrate)"
-        echo "pluginRoot: $EVOLVE_PLUGIN_ROOT (read-only — scripts/, agents/, profiles/ live here)"
+        echo "pluginRoot: $EVOLVE_PLUGIN_ROOT (read-only — legacy/scripts/, agents/, profiles/ live here)"
         echo "projectRoot: $EVOLVE_PROJECT_ROOT (writable — state, ledger, runs, instincts go here)"
         echo "intentRequired: ${EVOLVE_REQUIRE_INTENT:-0} (v8.19.0+: when 1, run intent persona before scout; cycle-state.intent_required is the authoritative source)"
         echo "intentArtifactPath: $workspace/intent.md (only present if intent persona has run)"
@@ -298,9 +298,9 @@ build_context() {
 # claude (defense-in-depth). The adapter's set_env covers the case where the
 # dispatcher path was skipped (direct run-cycle.sh invocation, tests, etc.).
 honor_adapter_set_env() {
-    [ -x "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-adapter.sh" ] || return 0
+    [ -x "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-adapter.sh" ] || return 0
     local decision
-    decision=$(bash "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-adapter.sh" decide --state "$STATE_FILE" 2>/dev/null || echo '')
+    decision=$(bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-adapter.sh" decide --state "$STATE_FILE" 2>/dev/null || echo '')
     [ -n "$decision" ] || return 0
     if command -v jq >/dev/null 2>&1; then
         # Iterate set_env keys and export each.
@@ -428,9 +428,9 @@ cleanup() {
     # Pre-cycle-63 wire-up sat in gate_cycle_complete (which the dispatcher
     # never calls — dead code path).
     if [ -f "$WORKSPACE/orchestrator-report.md" ] && \
-       [ -x "$EVOLVE_PROJECT_ROOT/scripts/observability/render-cli-resolution.sh" ]; then
+       [ -x "$EVOLVE_PROJECT_ROOT/legacy/scripts/observability/render-cli-resolution.sh" ]; then
         local _cli_section
-        _cli_section=$(bash "$EVOLVE_PROJECT_ROOT/scripts/observability/render-cli-resolution.sh" "$CYCLE" 2>/dev/null || true)
+        _cli_section=$(bash "$EVOLVE_PROJECT_ROOT/legacy/scripts/observability/render-cli-resolution.sh" "$CYCLE" 2>/dev/null || true)
         if [ -n "$_cli_section" ]; then
             local _orep_tmp="$WORKSPACE/orchestrator-report.md.tmp.$$"
             awk '
@@ -485,7 +485,7 @@ cleanup() {
     # ledger entry `role:release`, ensures cycle-state is cleared, and preserves
     # the workspace dir for forensics. Guarded so this is a no-op until Step 6
     # of the plan creates the script.
-    local _release_script="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-release.sh"
+    local _release_script="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-release.sh"
     if [ -x "$_release_script" ]; then
         bash "$_release_script" "$CYCLE" "$rc" 2>/dev/null \
             || log "WARN: cycle-release.sh exited non-zero (rc=$?)"
@@ -724,7 +724,7 @@ if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
         # replaces legacy watchdog as the cycle-scope stall detector. Override
         # with EVOLVE_OBSERVER_ENFORCE=0 to fall back (deprecated, emits WARN).
         if [ "${EVOLVE_OBSERVER_ENFORCE:-1}" = "1" ]; then
-            bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
+            bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/phase-observer.sh" \
                 --enforce --scope=cycle \
                 "$WORKSPACE" "$RUN_PGID" "$CYCLE" "orchestrator" "orchestrator" \
                 "$CYCLE_STATE_PATH_FOR_WD" &
@@ -732,7 +732,7 @@ if [ "${EVOLVE_INACTIVITY_DISABLE:-0}" != "1" ]; then
             log "phase-observer (cycle-scope, --enforce) spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_OBSERVER_STALL_S:-${EVOLVE_INACTIVITY_THRESHOLD_S:-600}}s)"
         else
             log "WARN: EVOLVE_OBSERVER_ENFORCE=0 is deprecated; phase-watchdog replaces phase-observer for this cycle. Remove override to use the default."
-            bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-watchdog.sh" \
+            bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/phase-watchdog.sh" \
                 "$WORKSPACE" "$RUN_PGID" "$CYCLE" "$CYCLE_STATE_PATH_FOR_WD" &
             WATCHDOG_PID=$!
             log "watchdog spawned (pid=$WATCHDOG_PID pgid=$RUN_PGID threshold=${EVOLVE_INACTIVITY_THRESHOLD_S:-600}s)"
@@ -763,7 +763,7 @@ log "prompt written to $PROMPT_FILE ($(wc -l < "$PROMPT_FILE") lines)"
 # the orchestrator spawns so the intent persona receives them in its env.
 # When EVOLVE_INTENT_DELTA=0 (default): skip entirely — existing flow unchanged.
 if [ "${EVOLVE_INTENT_DELTA:-0}" = "1" ]; then
-    _ibr="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/intent-batch-resolve.sh"
+    _ibr="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/intent-batch-resolve.sh"
     if [ -x "$_ibr" ]; then
         _ibr_out=$(bash "$_ibr" "${GOAL:-}" 2>/dev/null || echo "INTENT_MODE=full")
         # Eval the output to export INTENT_MODE, BATCH_ID, GOAL_HASH into env.
@@ -788,7 +788,7 @@ fi
 
 if [ "$DRY_RUN" = "1" ]; then
     log "DRY RUN — would spawn:"
-    log "  PROMPT_FILE_OVERRIDE=$PROMPT_FILE bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE"
+    log "  PROMPT_FILE_OVERRIDE=$PROMPT_FILE bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE"
     log "cycle-state snapshot before EXIT trap clears it:"
     bash "$CYCLE_STATE_HELPER" dump | jq . >&2 || true
     # v8.21.0: let the EXIT trap fire naturally — it tears down both the
@@ -804,7 +804,7 @@ fi
 # calls. This validates the cycle plumbing end-to-end without spending tokens.
 
 if [ "$SIMULATE" = "1" ]; then
-    SIMULATOR="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/cycle-simulator.sh"
+    SIMULATOR="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/cycle-simulator.sh"
     [ -f "$SIMULATOR" ] || fail "missing $SIMULATOR (cycle-simulator.sh)"
     log "simulate mode: invoking cycle-simulator.sh (no LLM)"
     set +e
@@ -830,7 +830,7 @@ set -e
 # run intent-merge-patches.sh to materialize the merged intent.md.
 # Best-effort: a merge failure does not change the orchestrator exit code.
 if [ "${EVOLVE_INTENT_DELTA:-0}" = "1" ] && [ -f "$WORKSPACE/intent-delta.md" ]; then
-    _imp="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/intent-merge-patches.sh"
+    _imp="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/intent-merge-patches.sh"
     if [ -x "$_imp" ]; then
         bash "$_imp" "$WORKSPACE/intent.md" "$WORKSPACE/intent-delta.md" 2>/dev/null \
             && log "intent-merge-patches: merged delta into $WORKSPACE/intent.md" \
@@ -860,7 +860,7 @@ fi
 # changes the cycle exit code. Runs even on FAIL/STALL exits because the
 # observability data for a failed cycle is the most valuable diagnostic.
 if [ "${EVOLVE_TRACKER_ENABLED:-0}" = "1" ]; then
-    ROLLUP_SH="$EVOLVE_PLUGIN_ROOT/scripts/observability/rollup-cycle-metrics.sh"
+    ROLLUP_SH="$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability/rollup-cycle-metrics.sh"
     if [ -x "$ROLLUP_SH" ]; then
         bash "$ROLLUP_SH" "$CYCLE" >/dev/null 2>>"$WORKSPACE/rollup.stderr.log" \
             && log "OK: cycle-metrics rollup written" \

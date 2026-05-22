@@ -9,14 +9,14 @@
 # code, EVERY assertion in this file must FAIL. After Builder ships, EVERY
 # assertion must PASS.
 #
-# Usage: bash scripts/tests/build-planner-wire-test.sh
+# Usage: bash legacy/scripts/tests/build-planner-wire-test.sh
 # Exit 0 = all pass; non-zero = failures.
 #
 # Bash 3.2 compatible. No GNU-only flags.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$REPO_ROOT" || { echo "FATAL: cd to repo root failed" >&2; exit 1; }
 
 PASS=0; FAIL=0; TOTAL=0
@@ -103,9 +103,9 @@ fi
 # Invokes the actual script under both REGISTRY flag values (not grep).
 # ------------------------------------------------------------------
 
-header "Section 4: scripts/dispatch/list-phase-order.sh behavioral"
+header "Section 4: legacy/scripts/dispatch/list-phase-order.sh behavioral"
 
-LPO="scripts/dispatch/list-phase-order.sh"
+LPO="legacy/scripts/dispatch/list-phase-order.sh"
 if [ ! -f "$LPO" ]; then
     fail "$LPO exists"
 else
@@ -124,9 +124,9 @@ fi
 # Invokes the script; the FAILURE REASON must not be "unknown agent".
 # ------------------------------------------------------------------
 
-header "Section 5: scripts/dispatch/subagent-run.sh behavioral"
+header "Section 5: legacy/scripts/dispatch/subagent-run.sh behavioral"
 
-SUBAGENT="scripts/dispatch/subagent-run.sh"
+SUBAGENT="legacy/scripts/dispatch/subagent-run.sh"
 if [ ! -f "$SUBAGENT" ]; then
     fail "$SUBAGENT exists"
 else
@@ -143,9 +143,9 @@ fi
 # Section 6 — phase-gate.sh behavioral: dispatch case recognizes new gates.
 # ------------------------------------------------------------------
 
-header "Section 6: scripts/lifecycle/phase-gate.sh behavioral"
+header "Section 6: legacy/scripts/lifecycle/phase-gate.sh behavioral"
 
-PHASE_GATE="scripts/lifecycle/phase-gate.sh"
+PHASE_GATE="legacy/scripts/lifecycle/phase-gate.sh"
 if [ ! -f "$PHASE_GATE" ]; then
     fail "$PHASE_GATE exists"
 else

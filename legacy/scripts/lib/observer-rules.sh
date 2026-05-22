@@ -12,7 +12,7 @@
 # All thresholds env-var-tunable. Bash 3.2 compatible — no associative arrays.
 #
 # Usage (from phase-observer.sh):
-#   source "$EVOLVE_PLUGIN_ROOT/scripts/lib/observer-rules.sh"
+#   source "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lib/observer-rules.sh"
 #   verdict=$(rule_stuck_no_output "$now" "$last_event_ts" "$STALL_THRESHOLD_S")
 #   if [ "$(echo "$verdict" | jq -r '.fired')" = "true" ]; then
 #       emit_observation "$verdict"

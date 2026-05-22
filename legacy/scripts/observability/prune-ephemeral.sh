@@ -10,9 +10,9 @@
 #   .evolve/ledger.jsonl                → never pruned (append-only, tamper-evident)
 #
 # Usage:
-#   bash scripts/observability/prune-ephemeral.sh           # apply
-#   bash scripts/observability/prune-ephemeral.sh --dry-run # show what would be removed
-#   bash scripts/observability/prune-ephemeral.sh --quiet   # silent unless something pruned
+#   bash legacy/scripts/observability/prune-ephemeral.sh           # apply
+#   bash legacy/scripts/observability/prune-ephemeral.sh --dry-run # show what would be removed
+#   bash legacy/scripts/observability/prune-ephemeral.sh --quiet   # silent unless something pruned
 #
 # Idempotent. Safe to run repeatedly. Safe to run while a cycle is in progress
 # (recently-modified files are protected by the mtime filter).

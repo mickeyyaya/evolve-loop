@@ -2,13 +2,13 @@
 #
 # probe-tool-test.sh — Unit tests for probe-tool.sh.
 #
-# Usage: bash scripts/probe-tool-test.sh
+# Usage: bash legacy/scripts/probe-tool-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROBE="$REPO_ROOT/scripts/utility/probe-tool.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PROBE="$REPO_ROOT/legacy/scripts/utility/probe-tool.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

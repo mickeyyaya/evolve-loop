@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# inject-task-test.sh — CLI validation tests for scripts/utility/inject-task.sh (v9.5.0+).
+# inject-task-test.sh — CLI validation tests for legacy/scripts/utility/inject-task.sh (v9.5.0+).
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CLI="$REPO_ROOT/scripts/utility/inject-task.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CLI="$REPO_ROOT/legacy/scripts/utility/inject-task.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0; FAIL=0

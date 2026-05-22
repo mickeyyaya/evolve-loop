@@ -4,7 +4,7 @@
 # in both advisory and enforce stages.
 #
 # Schema reference: agents/agent-templates.md → Reflection Journal Schema
-# Phase-gate function: scripts/lifecycle/phase-gate.sh → check_reflection_artifact
+# Phase-gate function: legacy/scripts/lifecycle/phase-gate.sh → check_reflection_artifact
 #
 # Tests:
 #   T1. Advisory + missing YAML → returns 0 (WARN only, no block)
@@ -14,15 +14,15 @@
 #   T5. Enforce + valid YAML → returns 0 (OK)
 #   T6. EVOLVE_REFLECTION_JOURNAL=0 + missing YAML → returns 0 (feature off, no check)
 #
-# Usage: bash scripts/tests/phase-gate-reflection-test.sh
+# Usage: bash legacy/scripts/tests/phase-gate-reflection-test.sh
 # Exit:  0 if all PASS; non-zero otherwise.
 #
 # bash 3.2 compatible.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PHASE_GATE="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PHASE_GATE="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
 
 if [ ! -f "$PHASE_GATE" ]; then
     echo "FAIL: phase-gate.sh not found at $PHASE_GATE"

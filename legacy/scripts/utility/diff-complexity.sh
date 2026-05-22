@@ -9,9 +9,9 @@
 # security-sensitive diffs where the deeper reasoning matters.
 #
 # Usage:
-#   bash scripts/utility/diff-complexity.sh [<git-diff-args>]
+#   bash legacy/scripts/utility/diff-complexity.sh [<git-diff-args>]
 #   # OR with explicit base:
-#   bash scripts/utility/diff-complexity.sh --base main
+#   bash legacy/scripts/utility/diff-complexity.sh --base main
 #
 # Default: `git diff HEAD` (uncommitted changes from last commit). When the
 # Builder is in a per-cycle worktree on branch `evolve/cycle-N`, the cycle

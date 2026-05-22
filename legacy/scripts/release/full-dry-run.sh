@@ -4,19 +4,19 @@
 #
 # Runs three sub-suites in sequence and reports a single PASS/FAIL summary:
 #
-#   1. Regression — scripts/utility/run-all-regression-tests.sh (35 suites, ~30s)
-#   2. Cycle simulate — scripts/dispatch/run-cycle.sh --simulate (~5s, no LLM)
-#   3. Release pipeline dry-run — scripts/release-pipeline.sh <next> --dry-run (~5s)
+#   1. Regression — legacy/scripts/utility/run-all-regression-tests.sh (35 suites, ~30s)
+#   2. Cycle simulate — legacy/scripts/dispatch/run-cycle.sh --simulate (~5s, no LLM)
+#   3. Release pipeline dry-run — legacy/scripts/release-pipeline.sh <next> --dry-run (~5s)
 #
 # Used by:
 #   - bin/preflight (operator entry)
-#   - scripts/release-pipeline.sh --require-preflight (opt-in pre-flight gate)
+#   - legacy/scripts/release-pipeline.sh --require-preflight (opt-in pre-flight gate)
 #
 # Usage:
-#   bash scripts/release/full-dry-run.sh                     # use auto-bumped version
-#   bash scripts/release/full-dry-run.sh --version X.Y.Z     # use explicit version
-#   bash scripts/release/full-dry-run.sh --skip <suite>      # repeatable: regression, simulate, release
-#   bash scripts/release/full-dry-run.sh --json              # machine-readable summary
+#   bash legacy/scripts/release/full-dry-run.sh                     # use auto-bumped version
+#   bash legacy/scripts/release/full-dry-run.sh --version X.Y.Z     # use explicit version
+#   bash legacy/scripts/release/full-dry-run.sh --skip <suite>      # repeatable: regression, simulate, release
+#   bash legacy/scripts/release/full-dry-run.sh --json              # machine-readable summary
 #
 # Exit codes:
 #   0  — all sub-suites pass
@@ -25,7 +25,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 JSON=0
 SKIPS=""
@@ -96,7 +96,7 @@ if skipped regression; then
     REG_RC=-1; REG_OUT="<skipped>"
 else
     [ "$JSON" = "0" ] && echo "[preflight] (1/3) running regression suite..."
-    res=$(run_suite regression "bash $REPO_ROOT/scripts/utility/run-all-regression-tests.sh")
+    res=$(run_suite regression "bash $REPO_ROOT/legacy/scripts/utility/run-all-regression-tests.sh")
     REG_RC=$(echo "$res" | awk -F'|' '{print $1}')
     REG_ELAPSED=$(echo "$res" | awk -F'|' '{print $2}')
     REG_OUT=$(echo "$res" | awk -F'|' '{print $3}')
@@ -111,14 +111,14 @@ else
     # the scripts the simulator actually invokes; everything else is read from
     # the original plugin root.
     SIM_TEMP=$(mktemp -d -t "preflight-sim.XXXXXX")
-    mkdir -p "$SIM_TEMP/scripts/dispatch" "$SIM_TEMP/scripts/lifecycle" \
-             "$SIM_TEMP/scripts/observability" "$SIM_TEMP/.evolve/runs"
-    cp "$REPO_ROOT/scripts/dispatch/cycle-simulator.sh"        "$SIM_TEMP/scripts/dispatch/"
-    cp "$REPO_ROOT/scripts/lifecycle/resolve-roots.sh"          "$SIM_TEMP/scripts/lifecycle/"
-    cp "$REPO_ROOT/scripts/lifecycle/cycle-state.sh"            "$SIM_TEMP/scripts/lifecycle/"
-    cp "$REPO_ROOT/scripts/lifecycle/ship.sh"                   "$SIM_TEMP/scripts/lifecycle/"
-    cp "$REPO_ROOT/scripts/lifecycle/phase-gate.sh"             "$SIM_TEMP/scripts/lifecycle/"
-    cp "$REPO_ROOT/scripts/observability/verify-ledger-chain.sh" "$SIM_TEMP/scripts/observability/"
+    mkdir -p "$SIM_TEMP/legacy/scripts/dispatch" "$SIM_TEMP/legacy/scripts/lifecycle" \
+             "$SIM_TEMP/legacy/scripts/observability" "$SIM_TEMP/.evolve/runs"
+    cp "$REPO_ROOT/legacy/scripts/dispatch/cycle-simulator.sh"        "$SIM_TEMP/legacy/scripts/dispatch/"
+    cp "$REPO_ROOT/legacy/scripts/lifecycle/resolve-roots.sh"          "$SIM_TEMP/legacy/scripts/lifecycle/"
+    cp "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh"            "$SIM_TEMP/legacy/scripts/lifecycle/"
+    cp "$REPO_ROOT/legacy/scripts/lifecycle/ship.sh"                   "$SIM_TEMP/legacy/scripts/lifecycle/"
+    cp "$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"             "$SIM_TEMP/legacy/scripts/lifecycle/"
+    cp "$REPO_ROOT/legacy/scripts/observability/verify-ledger-chain.sh" "$SIM_TEMP/legacy/scripts/observability/"
     chmod +x "$SIM_TEMP/scripts"/*/*.sh
     : > "$SIM_TEMP/.evolve/ledger.jsonl"
     echo '{}' > "$SIM_TEMP/.evolve/state.json"
@@ -134,9 +134,9 @@ else
         git -c commit.gpgsign=false commit -q -m "preflight initial"
     ) >/dev/null 2>&1
     SIM_CYCLE=$((90000 + RANDOM % 100))
-    EVOLVE_PROJECT_ROOT="$SIM_TEMP" bash "$SIM_TEMP/scripts/lifecycle/cycle-state.sh" \
+    EVOLVE_PROJECT_ROOT="$SIM_TEMP" bash "$SIM_TEMP/legacy/scripts/lifecycle/cycle-state.sh" \
         init "$SIM_CYCLE" ".evolve/runs/cycle-$SIM_CYCLE" >/dev/null 2>&1
-    res=$(run_suite simulate "EVOLVE_PROJECT_ROOT=$SIM_TEMP bash $SIM_TEMP/scripts/dispatch/cycle-simulator.sh $SIM_CYCLE .evolve/runs/cycle-$SIM_CYCLE")
+    res=$(run_suite simulate "EVOLVE_PROJECT_ROOT=$SIM_TEMP bash $SIM_TEMP/legacy/scripts/dispatch/cycle-simulator.sh $SIM_CYCLE .evolve/runs/cycle-$SIM_CYCLE")
     SIM_RC=$(echo "$res" | awk -F'|' '{print $1}')
     SIM_ELAPSED=$(echo "$res" | awk -F'|' '{print $2}')
     SIM_OUT=$(echo "$res" | awk -F'|' '{print $3}')
@@ -147,7 +147,7 @@ if skipped release; then
     REL_RC=-1; REL_OUT="<skipped>"
 else
     [ "$JSON" = "0" ] && echo "[preflight] (3/3) running release-pipeline dry-run for v$VERSION..."
-    res=$(run_suite release "bash $REPO_ROOT/scripts/release-pipeline.sh $VERSION --dry-run")
+    res=$(run_suite release "bash $REPO_ROOT/legacy/scripts/release-pipeline.sh $VERSION --dry-run")
     REL_RC=$(echo "$res" | awk -F'|' '{print $1}')
     REL_ELAPSED=$(echo "$res" | awk -F'|' '{print $2}')
     REL_OUT=$(echo "$res" | awk -F'|' '{print $3}')

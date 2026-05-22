@@ -6,7 +6,7 @@
 # Each test exits non-zero on assertion failure; the runner accumulates a
 # pass/fail count and exits accordingly.
 #
-# Convention: "bash scripts/tests/tracker-writer-test.sh — N/N PASS"
+# Convention: "bash legacy/scripts/tests/tracker-writer-test.sh — N/N PASS"
 
 set -uo pipefail
 

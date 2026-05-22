@@ -1,7 +1,7 @@
 #!/bin/bash
 # decide-cycle-routing.sh — Deterministic per-cycle model routing decision.
 #
-# Target path: scripts/routing/decide-cycle-routing.sh
+# Target path: legacy/scripts/routing/decide-cycle-routing.sh
 # Bash 3.2 compatible. Reads intent.md + state.json + recent retros.
 # Writes cycle-routing.json constrained by profile envelopes.
 #
@@ -206,7 +206,7 @@ pick_cli_for_phase() {
 }
 
 map_cli_to_family() {
-  local map_path="${EVOLVE_PROJECT_ROOT:-.}/scripts/routing/tier-map.json"
+  local map_path="${EVOLVE_PROJECT_ROOT:-.}/legacy/scripts/routing/tier-map.json"
   if [[ -f "$map_path" ]]; then
     jq -r --arg cli "$1" '.families[$cli] // "unknown"' "$map_path"
   else

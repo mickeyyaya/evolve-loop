@@ -10,7 +10,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCRATCH=$(mktemp -d)
 
 PASS=0
@@ -61,7 +61,7 @@ fi
 
 # --- Test 4: phase-gate-precondition recognizes 'memo' agent --------------
 header "Test 4: phase-gate-precondition.sh recognizes memo agent"
-PGP="$REPO_ROOT/scripts/guards/phase-gate-precondition.sh"
+PGP="$REPO_ROOT/legacy/scripts/guards/phase-gate-precondition.sh"
 grep -qE 'memo\)|\|memo\)|memo$|memo\|' "$PGP" && pass "memo in recognized agents list" || \
     fail "memo NOT in phase-gate-precondition recognized agents"
 grep -q 'memo-worker-\*' "$PGP" && pass "memo-worker-* recognized" || \
@@ -70,14 +70,14 @@ grep -q 'memo-worker-\*' "$PGP" && pass "memo-worker-* recognized" || \
 # --- Test 5: phase-gate-precondition allows memo during phase=learn -------
 header "Test 5: memo allowed during phase=learn (PASS path)"
 sf="$SCRATCH/cs-learn.json"
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" init 1 /tmp/wt >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance research scout >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance discover scout >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance build builder >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance audit auditor >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance ship orchestrator >/dev/null 2>&1
-EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/scripts/lifecycle/cycle-state.sh" advance learn memo >/dev/null 2>&1
-HOOK_INPUT=$(jq -nc --arg cmd "bash scripts/dispatch/subagent-run.sh memo 1 /tmp/ws" \
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" init 1 /tmp/wt >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance research scout >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance discover scout >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance build builder >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance audit auditor >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance ship orchestrator >/dev/null 2>&1
+EVOLVE_CYCLE_STATE_FILE="$sf" bash "$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh" advance learn memo >/dev/null 2>&1
+HOOK_INPUT=$(jq -nc --arg cmd "bash legacy/scripts/dispatch/subagent-run.sh memo 1 /tmp/ws" \
     '{tool_name:"Bash",tool_input:{command:$cmd}}')
 RC=$(echo "$HOOK_INPUT" | EVOLVE_CYCLE_STATE_FILE="$sf" bash "$PGP" >/dev/null 2>&1; echo $?)
 [ "$RC" = "0" ] && pass "phase-gate ALLOWs memo during phase=learn" || \

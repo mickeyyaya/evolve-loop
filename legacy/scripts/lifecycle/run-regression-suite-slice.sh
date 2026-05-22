@@ -12,10 +12,10 @@
 #
 # USAGE:
 #   # via stdin (primary contract):
-#   printf 'CLAUDE.md\nagents/evolve-builder.md\n' | bash scripts/lifecycle/run-regression-suite-slice.sh
+#   printf 'CLAUDE.md\nagents/evolve-builder.md\n' | bash legacy/scripts/lifecycle/run-regression-suite-slice.sh
 #
 #   # via argv (alternative contract):
-#   bash scripts/lifecycle/run-regression-suite-slice.sh CLAUDE.md agents/evolve-builder.md
+#   bash legacy/scripts/lifecycle/run-regression-suite-slice.sh CLAUDE.md agents/evolve-builder.md
 #
 # OUTPUT:
 #   Final stdout line: "N/N PASS" or "N/M FAIL <space-separated-ids>"

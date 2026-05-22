@@ -6,7 +6,7 @@
 # step runs. Fails fast with a clear message; never modifies anything.
 #
 # Usage:
-#   bash scripts/release/preflight.sh <target-version> [--dry-run] [--skip-tests]
+#   bash legacy/scripts/release/preflight.sh <target-version> [--dry-run] [--skip-tests]
 #
 # Checks (in order — first failure is fatal):
 #   1. Working tree clean (no unstaged or staged modifications).
@@ -29,7 +29,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 LEDGER="$REPO_ROOT/.evolve/ledger.jsonl"
 MAX_AUDIT_AGE_S=$((7 * 24 * 3600))
@@ -261,10 +261,10 @@ step_gate_tests() {
         return 0
     fi
     local suites=(
-        "scripts/tests/guards-test.sh"
-        "scripts/tests/ship-integration-test.sh"
-        "scripts/tests/role-gate-test.sh"
-        "scripts/tests/phase-gate-precondition-test.sh"
+        "legacy/scripts/tests/guards-test.sh"
+        "legacy/scripts/tests/ship-integration-test.sh"
+        "legacy/scripts/tests/role-gate-test.sh"
+        "legacy/scripts/tests/phase-gate-precondition-test.sh"
     )
     local s
     for s in "${suites[@]}"; do

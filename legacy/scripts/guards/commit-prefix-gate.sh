@@ -40,7 +40,7 @@ set -uo pipefail
 # ── Configuration ───────────────────────────────────────────────────────────
 GATE_NAME="commit-prefix-gate"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 DEFAULT_MANIFEST="$REPO_ROOT/.evolve/commit-prefix-scope.json"
 GUARDS_LOG="$REPO_ROOT/.evolve/guards.log"
 

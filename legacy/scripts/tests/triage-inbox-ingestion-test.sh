@@ -5,8 +5,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CLI="$REPO_ROOT/scripts/utility/inject-task.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CLI="$REPO_ROOT/legacy/scripts/utility/inject-task.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0; FAIL=0
@@ -203,10 +203,10 @@ git -C "$REPO" show --stat "$FRAUD_SHA" >/dev/null 2>&1 && \
 header "Test 10: content-verify — real code commit → non_state_changes>0 → skip_shipped"
 REPO=$(make_git_repo)
 # Create a real code commit: has a non-.evolve/ file
-mkdir -p "$REPO/scripts/utility"
+mkdir -p "$REPO/legacy/scripts/utility"
 printf '#!/usr/bin/env bash\n# inbox-audit.sh recovered\necho "ok"\n' \
-    > "$REPO/scripts/utility/inbox-audit.sh"
-git -C "$REPO" add scripts/utility/inbox-audit.sh
+    > "$REPO/legacy/scripts/utility/inbox-audit.sh"
+git -C "$REPO" add legacy/scripts/utility/inbox-audit.sh
 git -C "$REPO" commit -q -m "feat: cycle 39 — c38-inbox-audit: recover inbox-audit.sh"
 REAL_SHA=$(git -C "$REPO" log --format=%H -1)
 non_state=$(content_verify_count "$REPO" "$REAL_SHA")

@@ -34,7 +34,7 @@ LEDGER="${EVOLVE_LEDGER:-${EVOLVE_PROJECT_ROOT:-.}/.evolve/ledger.jsonl}"
 
 echo "## CLI Resolution"
 echo
-echo "_Auto-rendered from \`.evolve/ledger.jsonl\` by \`scripts/observability/render-cli-resolution.sh ${CYCLE}\`. Do NOT edit manually._"
+echo "_Auto-rendered from \`.evolve/ledger.jsonl\` by \`legacy/scripts/observability/render-cli-resolution.sh ${CYCLE}\`. Do NOT edit manually._"
 echo
 
 if [ ! -f "$LEDGER" ]; then

@@ -11,8 +11,8 @@
 # enforced by the next cycle's run-acs-suite.sh scanning acs/regression-suite/.
 #
 # Usage:
-#   bash scripts/utility/promote-acs-to-regression.sh <cycle>
-#   bash scripts/utility/promote-acs-to-regression.sh <cycle> --dry-run
+#   bash legacy/scripts/utility/promote-acs-to-regression.sh <cycle>
+#   bash legacy/scripts/utility/promote-acs-to-regression.sh <cycle> --dry-run
 #
 # Exit codes:
 #   0 — promoted (or no-op when already promoted)

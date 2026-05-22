@@ -13,7 +13,7 @@
 # `--resume` and pick up the paused cycle from its last clean phase boundary.
 #
 # Usage:
-#   bash scripts/dispatch/resume-cycle.sh
+#   bash legacy/scripts/dispatch/resume-cycle.sh
 #
 # What it does (in order):
 #   1. Locate the live checkpoint: $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json
@@ -47,10 +47,10 @@ fail() { log "FAIL: $*"; exit 1; }
 command -v jq >/dev/null 2>&1 || { log "missing jq"; exit 127; }
 
 STATE_FILE="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
-CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
-[ -f "$CYCLE_STATE_HELPER" ] || CYCLE_STATE_HELPER="$EVOLVE_PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
-RUN_CYCLE="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/run-cycle.sh"
-[ -f "$RUN_CYCLE" ] || RUN_CYCLE="$EVOLVE_PROJECT_ROOT/scripts/dispatch/run-cycle.sh"
+CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+[ -f "$CYCLE_STATE_HELPER" ] || CYCLE_STATE_HELPER="$EVOLVE_PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+RUN_CYCLE="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/run-cycle.sh"
+[ -f "$RUN_CYCLE" ] || RUN_CYCLE="$EVOLVE_PROJECT_ROOT/legacy/scripts/dispatch/run-cycle.sh"
 
 # --- Step 1: locate checkpoint ---------------------------------------------
 
@@ -125,7 +125,7 @@ if [ "$bump_rc" -ne 0 ]; then
         log "AUTO-RESUME EXHAUSTED: this cycle has used its autoResumeMaxAttempts budget."
         log "  the checkpoint remains intact. To override, increment the cap and re-invoke:"
         log "    jq '.checkpoint.autoResumeMaxAttempts = 5' $STATE_FILE > $STATE_FILE.tmp && mv $STATE_FILE.tmp $STATE_FILE"
-        log "    bash scripts/dispatch/resume-cycle.sh"
+        log "    bash legacy/scripts/dispatch/resume-cycle.sh"
         log "  or inspect what's going wrong:"
         log "    cat $STATE_FILE | jq .checkpoint"
         exit 2

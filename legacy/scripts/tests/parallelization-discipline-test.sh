@@ -16,9 +16,9 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PROFILES_DIR="$REPO_ROOT/.evolve/profiles"
-SUBAGENT_RUN="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
+SUBAGENT_RUN="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 
 PASS=0
 FAIL=0

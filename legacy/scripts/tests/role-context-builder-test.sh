@@ -6,8 +6,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HELPER="$REPO_ROOT/scripts/lifecycle/role-context-builder.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+HELPER="$REPO_ROOT/legacy/scripts/lifecycle/role-context-builder.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0

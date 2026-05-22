@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
 # reconcile-carryover-todos-test.sh — v8.57.0 Layer D smoke tests.
-# Verifies scripts/lifecycle/reconcile-carryover-todos.sh correctly
+# Verifies legacy/scripts/lifecycle/reconcile-carryover-todos.sh correctly
 # updates cycles_unpicked per cycle and archives at threshold.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HELPER="$REPO_ROOT/scripts/lifecycle/reconcile-carryover-todos.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+HELPER="$REPO_ROOT/legacy/scripts/lifecycle/reconcile-carryover-todos.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0

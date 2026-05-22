@@ -11,9 +11,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
-SUBAGENT_RUN="$PROJECT_ROOT/scripts/dispatch/subagent-run.sh"
-MONITOR_SH="$PROJECT_ROOT/scripts/observability/show-context-monitor.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
+SUBAGENT_RUN="$PROJECT_ROOT/legacy/scripts/dispatch/subagent-run.sh"
+MONITOR_SH="$PROJECT_ROOT/legacy/scripts/observability/show-context-monitor.sh"
 
 PASS=0
 FAIL=0

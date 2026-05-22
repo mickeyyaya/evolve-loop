@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# cycle-simulate-test.sh — Tests for scripts/dispatch/cycle-simulator.sh and
-# scripts/dispatch/run-cycle.sh --simulate (v8.50.0).
+# cycle-simulate-test.sh — Tests for legacy/scripts/dispatch/cycle-simulator.sh and
+# legacy/scripts/dispatch/run-cycle.sh --simulate (v8.50.0).
 #
 # Each test creates a fresh temp project repo, copies the necessary scripts +
 # resolve-roots.sh + cycle-state.sh in, and exercises the simulator path.
@@ -23,14 +23,14 @@ set -uo pipefail
 unset EVOLVE_PROJECT_ROOT EVOLVE_PLUGIN_ROOT EVOLVE_RESOLVE_ROOTS_LOADED
 unset EVOLVE_BYPASS_SHIP_VERIFY EVOLVE_SHIP_RELEASE_NOTES
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SIMULATOR="$REPO_ROOT/scripts/dispatch/cycle-simulator.sh"
-RUN_CYCLE="$REPO_ROOT/scripts/dispatch/run-cycle.sh"
-RESOLVE_ROOTS="$REPO_ROOT/scripts/lifecycle/resolve-roots.sh"
-CYCLE_STATE="$REPO_ROOT/scripts/lifecycle/cycle-state.sh"
-SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
-PHASE_GATE="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
-VERIFY_CHAIN="$REPO_ROOT/scripts/observability/verify-ledger-chain.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SIMULATOR="$REPO_ROOT/legacy/scripts/dispatch/cycle-simulator.sh"
+RUN_CYCLE="$REPO_ROOT/legacy/scripts/dispatch/run-cycle.sh"
+RESOLVE_ROOTS="$REPO_ROOT/legacy/scripts/lifecycle/resolve-roots.sh"
+CYCLE_STATE="$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+SHIP_SH="$REPO_ROOT/legacy/scripts/lifecycle/ship.sh"
+PHASE_GATE="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
+VERIFY_CHAIN="$REPO_ROOT/legacy/scripts/observability/verify-ledger-chain.sh"
 SCRATCH=$(mktemp -d -t "cycle-sim-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -44,13 +44,13 @@ header() { echo; echo "=== $* ==="; }
 # Returns the repo path.
 make_project() {
     local proj="$SCRATCH/proj-$RANDOM"
-    mkdir -p "$proj/scripts/dispatch" "$proj/scripts/lifecycle" "$proj/scripts/observability" "$proj/.evolve/runs"
-    cp "$SIMULATOR"      "$proj/scripts/dispatch/cycle-simulator.sh"
-    cp "$RESOLVE_ROOTS"  "$proj/scripts/lifecycle/resolve-roots.sh"
-    cp "$CYCLE_STATE"    "$proj/scripts/lifecycle/cycle-state.sh"
-    cp "$SHIP_SH"        "$proj/scripts/lifecycle/ship.sh"
-    cp "$PHASE_GATE"     "$proj/scripts/lifecycle/phase-gate.sh"
-    cp "$VERIFY_CHAIN"   "$proj/scripts/observability/verify-ledger-chain.sh"
+    mkdir -p "$proj/legacy/scripts/dispatch" "$proj/legacy/scripts/lifecycle" "$proj/legacy/scripts/observability" "$proj/.evolve/runs"
+    cp "$SIMULATOR"      "$proj/legacy/scripts/dispatch/cycle-simulator.sh"
+    cp "$RESOLVE_ROOTS"  "$proj/legacy/scripts/lifecycle/resolve-roots.sh"
+    cp "$CYCLE_STATE"    "$proj/legacy/scripts/lifecycle/cycle-state.sh"
+    cp "$SHIP_SH"        "$proj/legacy/scripts/lifecycle/ship.sh"
+    cp "$PHASE_GATE"     "$proj/legacy/scripts/lifecycle/phase-gate.sh"
+    cp "$VERIFY_CHAIN"   "$proj/legacy/scripts/observability/verify-ledger-chain.sh"
     chmod +x "$proj/scripts"/*/*.sh
     : > "$proj/.evolve/ledger.jsonl"
     echo '{}' > "$proj/.evolve/state.json"
@@ -75,7 +75,7 @@ EOF
 init_cycle_state() {
     local proj="$1" cycle="$2"
     EVOLVE_PROJECT_ROOT="$proj" \
-        bash "$proj/scripts/lifecycle/cycle-state.sh" init "$cycle" ".evolve/runs/cycle-$cycle" >/dev/null 2>&1
+        bash "$proj/legacy/scripts/lifecycle/cycle-state.sh" init "$cycle" ".evolve/runs/cycle-$cycle" >/dev/null 2>&1
 }
 
 # === Test 1: simulator advances through every phase ============================
@@ -84,7 +84,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9001
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9001 ".evolve/runs/cycle-9001" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9001 ".evolve/runs/cycle-9001" >/tmp/sim-out 2>&1
 RC=$?
 set -e
 WS="$PROJ/.evolve/runs/cycle-9001"
@@ -106,7 +106,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9002
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9002 ".evolve/runs/cycle-9002" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9002 ".evolve/runs/cycle-9002" >/tmp/sim-out 2>&1
 set -e
 WS="$PROJ/.evolve/runs/cycle-9002"
 all_have_token=1
@@ -126,7 +126,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9003
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9003 ".evolve/runs/cycle-9003" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9003 ".evolve/runs/cycle-9003" >/tmp/sim-out 2>&1
 set -e
 ENTRIES=$(wc -l < "$PROJ/.evolve/ledger.jsonl" | tr -d ' ')
 SIM_ENTRIES=$(grep -c '"simulated":true' "$PROJ/.evolve/ledger.jsonl" 2>/dev/null || echo 0)
@@ -143,7 +143,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9004
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9004 ".evolve/runs/cycle-9004" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9004 ".evolve/runs/cycle-9004" >/tmp/sim-out 2>&1
 set -e
 TIP="$PROJ/.evolve/ledger.tip"
 if [ -f "$TIP" ]; then
@@ -170,8 +170,8 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9005
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9005 ".evolve/runs/cycle-9005" >/tmp/sim-out 2>&1
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/observability/verify-ledger-chain.sh >/tmp/verify-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9005 ".evolve/runs/cycle-9005" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/observability/verify-ledger-chain.sh >/tmp/verify-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ]; then
@@ -187,7 +187,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9006
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9006 ".evolve/runs/cycle-9006" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9006 ".evolve/runs/cycle-9006" >/tmp/sim-out 2>&1
 set -e
 FINAL=$(jq -r '.phase' "$PROJ/.evolve/cycle-state.json" 2>/dev/null)
 if [ "$FINAL" = "retrospective" ]; then
@@ -204,7 +204,7 @@ init_cycle_state "$PROJ" 9007
 cd "$PROJ"
 COMMITS_BEFORE=$(git -C "$PROJ" log --oneline 2>/dev/null | wc -l | tr -d ' ')
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9007 ".evolve/runs/cycle-9007" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9007 ".evolve/runs/cycle-9007" >/tmp/sim-out 2>&1
 set -e
 COMMITS_AFTER=$(git -C "$PROJ" log --oneline 2>/dev/null | wc -l | tr -d ' ')
 if [ "$COMMITS_BEFORE" = "$COMMITS_AFTER" ]; then
@@ -220,7 +220,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9008
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9008 ".evolve/runs/cycle-9008" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9008 ".evolve/runs/cycle-9008" >/tmp/sim-out 2>&1
 set -e
 preview=$(ls -1 "$PROJ/.evolve/release-journal/dry-run-"*.json 2>/dev/null | head -1)
 # Note: ship.sh may rc=2 in simulator context if audit-binding fails, but it
@@ -238,7 +238,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9009
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9009 ".evolve/runs/cycle-9009" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9009 ".evolve/runs/cycle-9009" >/tmp/sim-out 2>&1
 set -e
 REPORT="$PROJ/.evolve/runs/cycle-9009/simulator-report.md"
 if [ -f "$REPORT" ] && grep -q "All 6 phases advanced" "$REPORT"; then
@@ -256,7 +256,7 @@ PROJ=$(make_project)
 init_cycle_state "$PROJ" 9010
 cd "$PROJ"
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9010 ".evolve/runs/cycle-9010" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9010 ".evolve/runs/cycle-9010" >/tmp/sim-out 2>&1
 set -e
 preview=$(ls -1 "$PROJ/.evolve/release-journal/dry-run-"*.json 2>/dev/null | head -1)
 if [ -n "$preview" ] && jq empty "$preview" 2>/dev/null; then
@@ -277,10 +277,10 @@ cd "$REPO_ROOT"
 # delegates to cycle-simulator.sh).
 header "Test 11: run-cycle.sh --simulate end-to-end"
 PROJ=$(make_project)
-mkdir -p "$PROJ/scripts/lifecycle" "$PROJ/scripts/dispatch" "$PROJ/scripts/failure" "$PROJ/scripts/observability" "$PROJ/agents"
-cp "$RUN_CYCLE" "$PROJ/scripts/dispatch/run-cycle.sh"
-cp "$REPO_ROOT/scripts/dispatch/subagent-run.sh" "$PROJ/scripts/dispatch/subagent-run.sh"
-cp "$REPO_ROOT/scripts/failure/failure-adapter.sh" "$PROJ/scripts/failure/failure-adapter.sh" 2>/dev/null || true
+mkdir -p "$PROJ/legacy/scripts/lifecycle" "$PROJ/legacy/scripts/dispatch" "$PROJ/legacy/scripts/failure" "$PROJ/legacy/scripts/observability" "$PROJ/agents"
+cp "$RUN_CYCLE" "$PROJ/legacy/scripts/dispatch/run-cycle.sh"
+cp "$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh" "$PROJ/legacy/scripts/dispatch/subagent-run.sh"
+cp "$REPO_ROOT/legacy/scripts/failure/failure-adapter.sh" "$PROJ/legacy/scripts/failure/failure-adapter.sh" 2>/dev/null || true
 # orchestrator-prompt — minimal stub
 echo "# orchestrator (stub)" > "$PROJ/agents/evolve-orchestrator.md"
 # Required for prompt build path
@@ -290,7 +290,7 @@ set +e
 # Disable worktree provisioning (simulator does not need a worktree;
 # `--simulate` only walks state + ledger).
 EVOLVE_PROJECT_ROOT="$PROJ" EVOLVE_PLUGIN_ROOT="$PROJ" EVOLVE_SKIP_WORKTREE=1 \
-    bash scripts/dispatch/run-cycle.sh --cycle 9011 --simulate "test goal" >/tmp/sim-out 2>&1
+    bash legacy/scripts/dispatch/run-cycle.sh --cycle 9011 --simulate "test goal" >/tmp/sim-out 2>&1
 RC=$?
 set -e
 WS="$PROJ/.evolve/runs/cycle-9011"
@@ -309,7 +309,7 @@ init_cycle_state "$PROJ" 9012
 cd "$PROJ"
 START=$(date +%s)
 set +e
-EVOLVE_PROJECT_ROOT="$PROJ" bash scripts/dispatch/cycle-simulator.sh 9012 ".evolve/runs/cycle-9012" >/tmp/sim-out 2>&1
+EVOLVE_PROJECT_ROOT="$PROJ" bash legacy/scripts/dispatch/cycle-simulator.sh 9012 ".evolve/runs/cycle-9012" >/tmp/sim-out 2>&1
 set -e
 END=$(date +%s)
 DUR=$((END - START))

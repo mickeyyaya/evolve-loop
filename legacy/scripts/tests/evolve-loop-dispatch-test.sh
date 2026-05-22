@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# evolve-loop-dispatch-test.sh — Unit tests for scripts/dispatch/evolve-loop-dispatch.sh.
+# evolve-loop-dispatch-test.sh — Unit tests for legacy/scripts/dispatch/evolve-loop-dispatch.sh.
 #
 # Tests three concerns:
 #   1. Argument parsing — cycles + strategy + goal positional ordering and defaults
@@ -13,12 +13,12 @@
 # inject mock run-cycle.sh + synthetic ledger.jsonl files. No real cycles
 # spawned, no Claude API calls.
 #
-# Usage: bash scripts/evolve-loop-dispatch-test.sh
+# Usage: bash legacy/scripts/evolve-loop-dispatch-test.sh
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DISPATCH="$REPO_ROOT/scripts/dispatch/evolve-loop-dispatch.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+DISPATCH="$REPO_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

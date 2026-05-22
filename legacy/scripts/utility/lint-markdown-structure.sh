@@ -6,7 +6,7 @@
 # imperative voice heuristic for H2 headings.
 #
 # Exit: always 0 (WARN-only, no gate integration this cycle).
-# Usage: bash scripts/utility/lint-markdown-structure.sh <path> [<path>...]
+# Usage: bash legacy/scripts/utility/lint-markdown-structure.sh <path> [<path>...]
 #   paths may be .md files or directories (recursed for *.md)
 
 set -uo pipefail
@@ -93,7 +93,7 @@ collect_files() {
 }
 
 if [ $# -eq 0 ]; then
-    echo "Usage: bash scripts/utility/lint-markdown-structure.sh <path> [<path>...]" >&2
+    echo "Usage: bash legacy/scripts/utility/lint-markdown-structure.sh <path> [<path>...]" >&2
     exit 0
 fi
 

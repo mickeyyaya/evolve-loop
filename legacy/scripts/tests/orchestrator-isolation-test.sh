@@ -29,21 +29,21 @@
 #      re-spawning orchestrator
 #   6. cycle-release.sh exists and is invoked from run-cycle.sh's EXIT trap
 #
-# Usage: bash scripts/tests/orchestrator-isolation-test.sh
+# Usage: bash legacy/scripts/tests/orchestrator-isolation-test.sh
 # Exit 0 = all asserts pass; exit 1 = at least one failure.
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 PROFILE="$PROJECT_ROOT/.evolve/profiles/orchestrator.json"
 # Note: the plan named build-invocation-context.sh as the recentLedgerEntries
 # site, but the actual injection lives in run-cycle.sh:build_context().
 # build-invocation-context.sh is the static bedrock prefix (no dynamic data).
-INVOCATION_CTX="$PROJECT_ROOT/scripts/dispatch/run-cycle.sh"
-RESUME_CYCLE="$PROJECT_ROOT/scripts/dispatch/resume-cycle.sh"
-RUN_CYCLE="$PROJECT_ROOT/scripts/dispatch/run-cycle.sh"
-CYCLE_RELEASE="$PROJECT_ROOT/scripts/lifecycle/cycle-release.sh"
+INVOCATION_CTX="$PROJECT_ROOT/legacy/scripts/dispatch/run-cycle.sh"
+RESUME_CYCLE="$PROJECT_ROOT/legacy/scripts/dispatch/resume-cycle.sh"
+RUN_CYCLE="$PROJECT_ROOT/legacy/scripts/dispatch/run-cycle.sh"
+CYCLE_RELEASE="$PROJECT_ROOT/legacy/scripts/lifecycle/cycle-release.sh"
 
 PASS=0
 FAIL=0

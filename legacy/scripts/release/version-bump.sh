@@ -20,7 +20,7 @@
 # without any writes (and reports which files would have been touched).
 #
 # Usage:
-#   bash scripts/release/version-bump.sh <target-version> [--dry-run]
+#   bash legacy/scripts/release/version-bump.sh <target-version> [--dry-run]
 #
 # Output (stdout, JSON):
 #   {"target":"<version>","modified":["plugin.json","marketplace.json",...]}
@@ -32,7 +32,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 MARKETPLACE_JSON="$REPO_ROOT/.claude-plugin/marketplace.json"
 SKILL_MD="$REPO_ROOT/skills/evolve-loop/SKILL.md"

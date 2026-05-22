@@ -13,14 +13,14 @@
 set -uo pipefail
 
 # Locate project root deterministically. The test file lives at
-# scripts/tests/checkpoint-roundtrip-test.sh, so the project root is two
+# legacy/scripts/tests/checkpoint-roundtrip-test.sh, so the project root is two
 # levels up. realpath -P resolves symlinks (the plugin install path).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 cd "$PROJECT_ROOT" || { echo "FAIL: cannot cd to project root"; exit 1; }
 
-CYCLE_STATE="$PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
-RUN_CYCLE="$PROJECT_ROOT/scripts/dispatch/run-cycle.sh"
+CYCLE_STATE="$PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+RUN_CYCLE="$PROJECT_ROOT/legacy/scripts/dispatch/run-cycle.sh"
 
 PASS=0
 FAIL=0

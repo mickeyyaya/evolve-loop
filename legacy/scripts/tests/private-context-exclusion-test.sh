@@ -16,9 +16,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 PROFILES_DIR="$PROJECT_ROOT/.evolve/profiles"
-ROLE_CTX_BUILDER="$PROJECT_ROOT/scripts/lifecycle/role-context-builder.sh"
+ROLE_CTX_BUILDER="$PROJECT_ROOT/legacy/scripts/lifecycle/role-context-builder.sh"
 GITATTRIBUTES="$PROJECT_ROOT/.gitattributes"
 
 PASS=0

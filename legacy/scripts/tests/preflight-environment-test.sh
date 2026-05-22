@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# preflight-environment-test.sh — Unit tests for scripts/dispatch/preflight-environment.sh.
+# preflight-environment-test.sh — Unit tests for legacy/scripts/dispatch/preflight-environment.sh.
 #
 # Tests:
 #   1. Default invocation emits valid JSON (jq parseable, schema_version=2)
@@ -17,8 +17,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PREFLIGHT="$REPO_ROOT/scripts/dispatch/preflight-environment.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PREFLIGHT="$REPO_ROOT/legacy/scripts/dispatch/preflight-environment.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

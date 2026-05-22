@@ -7,8 +7,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RCB="$REPO_ROOT/scripts/lifecycle/role-context-builder.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+RCB="$REPO_ROOT/legacy/scripts/lifecycle/role-context-builder.sh"
 
 PASS=0
 FAIL=0

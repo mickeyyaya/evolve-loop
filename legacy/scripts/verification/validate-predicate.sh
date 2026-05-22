@@ -13,9 +13,9 @@
 #   - Correct filename format (NNN-slug.sh)
 #
 # Usage:
-#   bash scripts/verification/validate-predicate.sh <predicate-file>
-#   bash scripts/verification/validate-predicate.sh --json <predicate-file>
-#   bash scripts/verification/validate-predicate.sh --all <predicate-dir>
+#   bash legacy/scripts/verification/validate-predicate.sh <predicate-file>
+#   bash legacy/scripts/verification/validate-predicate.sh --json <predicate-file>
+#   bash legacy/scripts/verification/validate-predicate.sh --all <predicate-dir>
 #
 # Exit codes:
 #   0  — predicate passes lint
@@ -25,13 +25,13 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# Resolve scripts/lib/ — works whether invoked directly or via EVOLVE_PLUGIN_ROOT.
+# Resolve legacy/scripts/lib/ — works whether invoked directly or via EVOLVE_PLUGIN_ROOT.
 if [ -f "$SCRIPT_DIR/../lib/acs-schema.sh" ]; then
     source "$SCRIPT_DIR/../lib/acs-schema.sh"
-elif [ -f "${EVOLVE_PLUGIN_ROOT:-/dev/null}/scripts/lib/acs-schema.sh" ]; then
-    source "$EVOLVE_PLUGIN_ROOT/scripts/lib/acs-schema.sh"
+elif [ -f "${EVOLVE_PLUGIN_ROOT:-/dev/null}/legacy/scripts/lib/acs-schema.sh" ]; then
+    source "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lib/acs-schema.sh"
 else
-    echo "[validate-predicate] cannot locate scripts/lib/acs-schema.sh" >&2
+    echo "[validate-predicate] cannot locate legacy/scripts/lib/acs-schema.sh" >&2
     exit 1
 fi
 

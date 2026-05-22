@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# scripts/research/kb-search.sh — Local knowledge-base search.
+# legacy/scripts/research/kb-search.sh — Local knowledge-base search.
 #
 # Uses ripgrep (rg) if available, falls back to grep -rE.
 # Output: file:line:context hits, capped at 2048 bytes.
 #
 # Usage:
-#   bash scripts/research/kb-search.sh <pattern>
+#   bash legacy/scripts/research/kb-search.sh <pattern>
 #
 # Env:
 #   EVOLVE_KB_SEARCH_PATHS — colon-separated KB roots (default: knowledge-base/research/)
@@ -20,7 +20,7 @@ fi
 
 # Resolve default KB root relative to this script's repo root
 __self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$__self_dir/../.." && pwd)"
+REPO_ROOT="$(cd "$__self_dir/../../.." && pwd)"
 DEFAULT_KB="$REPO_ROOT/knowledge-base/research"
 
 # Split EVOLVE_KB_SEARCH_PATHS by ':' (bash 3.2 compatible via set --)

@@ -11,14 +11,14 @@
 #   - **cache-refresh ordering bug regression test** (Test 9)
 #   - **stale-version regression test** (Test 10) — pipeline triggers rollback
 #
-# Usage: bash scripts/release-pipeline-test.sh
+# Usage: bash legacy/scripts/release-pipeline-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PIPE="$REPO_ROOT/scripts/release-pipeline.sh"
-RELEASE_DIR_REAL="$REPO_ROOT/scripts/release"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PIPE="$REPO_ROOT/legacy/scripts/release-pipeline.sh"
+RELEASE_DIR_REAL="$REPO_ROOT/legacy/scripts/release"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -31,7 +31,7 @@ header() { echo; echo "=== $* ==="; TESTS_TOTAL=$((TESTS_TOTAL + 1)); }
 # - the real release-pipeline.sh
 # - stub ship.sh that records its calls
 # - stub release.sh that records its calls
-# - stub scripts/guards-test.sh etc. (--skip-tests will bypass them anyway)
+# - stub legacy/scripts/guards-test.sh etc. (--skip-tests will bypass them anyway)
 # - .claude-plugin/plugin.json at <init_version>
 # - a fake marketplace dir at <marketplace_init_version>
 # - an audit ledger entry with PASS verdict
@@ -46,34 +46,34 @@ make_stub_repo() {
         git config user.email t@t.t
         git config user.name t
 
-        mkdir -p scripts/release scripts/guards scripts/utility scripts/lifecycle .claude-plugin .evolve/runs/cycle-99
-        cp "$RELEASE_DIR_REAL/preflight.sh"        scripts/release/
-        cp "$RELEASE_DIR_REAL/changelog-gen.sh"    scripts/release/
-        cp "$RELEASE_DIR_REAL/version-bump.sh"     scripts/release/
-        cp "$RELEASE_DIR_REAL/marketplace-poll.sh" scripts/release/
-        cp "$RELEASE_DIR_REAL/rollback.sh"         scripts/release/
-        cp "$PIPE" scripts/release-pipeline.sh
-        chmod +x scripts/release/*.sh scripts/release-pipeline.sh
+        mkdir -p legacy/scripts/release legacy/scripts/guards legacy/scripts/utility legacy/scripts/lifecycle .claude-plugin .evolve/runs/cycle-99
+        cp "$RELEASE_DIR_REAL/preflight.sh"        legacy/scripts/release/
+        cp "$RELEASE_DIR_REAL/changelog-gen.sh"    legacy/scripts/release/
+        cp "$RELEASE_DIR_REAL/version-bump.sh"     legacy/scripts/release/
+        cp "$RELEASE_DIR_REAL/marketplace-poll.sh" legacy/scripts/release/
+        cp "$RELEASE_DIR_REAL/rollback.sh"         legacy/scripts/release/
+        cp "$PIPE" legacy/scripts/release-pipeline.sh
+        chmod +x legacy/scripts/release/*.sh legacy/scripts/release-pipeline.sh
 
         # Stub guards-test suites — preflight runs them unless --skip-tests.
         for s in guards-test.sh ship-integration-test.sh role-gate-test.sh phase-gate-precondition-test.sh; do
-            echo '#!/usr/bin/env bash' > "scripts/$s"
-            echo 'exit 0' >> "scripts/$s"
-            chmod +x "scripts/$s"
+            echo '#!/usr/bin/env bash' > "legacy/scripts/$s"
+            echo 'exit 0' >> "legacy/scripts/$s"
+            chmod +x "legacy/scripts/$s"
         done
 
         # Stubs write their call log to a path OUTSIDE the repo (so git revert
         # in rollback tests doesn't remove the log when reverting a commit).
         # Test passes the path in via $TEST_CALLS_LOG env var.
-        cat > scripts/utility/release.sh <<'EOF'
+        cat > legacy/scripts/utility/release.sh <<'EOF'
 #!/usr/bin/env bash
 log_path="${TEST_CALLS_LOG:-$(dirname "$0")/.calls.log}"
 echo "release.sh:$@" >> "$log_path"
 exit 0
 EOF
-        chmod +x scripts/utility/release.sh
+        chmod +x legacy/scripts/utility/release.sh
 
-        cat > scripts/lifecycle/ship.sh <<'EOF'
+        cat > legacy/scripts/lifecycle/ship.sh <<'EOF'
 #!/usr/bin/env bash
 log_path="${TEST_CALLS_LOG:-$(dirname "$0")/.calls.log}"
 echo "ship.sh:BYPASS=${EVOLVE_BYPASS_SHIP_VERIFY:-0}:NOTES=${EVOLVE_SHIP_RELEASE_NOTES:+yes}:$@" >> "$log_path"
@@ -81,7 +81,7 @@ git add -A 2>/dev/null
 git c""ommit -q -m "$1" --allow-empty 2>/dev/null || true
 exit 0
 EOF
-        chmod +x scripts/lifecycle/ship.sh
+        chmod +x legacy/scripts/lifecycle/ship.sh
 
         cat > .claude-plugin/plugin.json <<EOF
 {"name":"x","version":"${init_version}"}
@@ -167,7 +167,7 @@ run_pipeline() {
     (cd "$repo" && \
         EVOLVE_MARKETPLACE_DIR="$repo/.marketplace" \
         TEST_CALLS_LOG="$calls_log" \
-        bash "$repo/scripts/release-pipeline.sh" "$@" 2>&1)
+        bash "$repo/legacy/scripts/release-pipeline.sh" "$@" 2>&1)
 }
 
 # Read the calls log for a given repo.

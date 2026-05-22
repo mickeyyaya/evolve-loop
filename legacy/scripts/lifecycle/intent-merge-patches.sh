@@ -8,7 +8,7 @@
 #   - Writes the merged result atomically via tmp + mv
 #
 # Usage:
-#   bash scripts/lifecycle/intent-merge-patches.sh [<intent-file>] [<delta-file>]
+#   bash legacy/scripts/lifecycle/intent-merge-patches.sh [<intent-file>] [<delta-file>]
 #
 # Defaults:
 #   intent-file  $WORKSPACE/intent.md

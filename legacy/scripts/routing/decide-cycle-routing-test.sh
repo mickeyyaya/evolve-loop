@@ -1,7 +1,7 @@
 #!/bin/bash
 # decide-cycle-routing-test.sh — Test harness for decide-cycle-routing.sh.
 #
-# Target path: scripts/routing/decide-cycle-routing-test.sh
+# Target path: legacy/scripts/routing/decide-cycle-routing-test.sh
 # Bash 3.2 compatible.
 #
 # Runs 6 canned scenarios and asserts cycle-routing.json output matches expectations.

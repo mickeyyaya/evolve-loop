@@ -9,8 +9,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
-PG="$PROJECT_ROOT/scripts/lifecycle/phase-gate.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
+PG="$PROJECT_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
 
 PASS=0; FAIL=0; TOTAL=0
 pass() { PASS=$((PASS+1)); TOTAL=$((TOTAL+1)); echo "  PASS: $1"; }

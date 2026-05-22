@@ -16,11 +16,11 @@
 # "is this script the entry point?".
 #
 # Usage:
-#   bash scripts/lifecycle/ship.sh "<commit-message>"                   # default --class cycle
-#   bash scripts/lifecycle/ship.sh --class trivial "<commit-message>"   # skip-audit (kernel-verified)
-#   bash scripts/lifecycle/ship.sh --class manual "<commit-message>"    # interactive confirm
-#   bash scripts/lifecycle/ship.sh --class release "<commit-message>"   # release-pipeline only
-#   bash scripts/lifecycle/ship.sh --dry-run "<msg>"                    # simulate, no mutations
+#   bash legacy/scripts/lifecycle/ship.sh "<commit-message>"                   # default --class cycle
+#   bash legacy/scripts/lifecycle/ship.sh --class trivial "<commit-message>"   # skip-audit (kernel-verified)
+#   bash legacy/scripts/lifecycle/ship.sh --class manual "<commit-message>"    # interactive confirm
+#   bash legacy/scripts/lifecycle/ship.sh --class release "<commit-message>"   # release-pipeline only
+#   bash legacy/scripts/lifecycle/ship.sh --dry-run "<msg>"                    # simulate, no mutations
 #
 # --dry-run (v8.50.0+): runs all read-only checks (audit binding, TOFU SHA,
 #   sequence) but skips git commit, git push, and gh release create. Writes a
@@ -34,14 +34,14 @@
 #   trivial  (v10.6.0) — Trivial-skip path. Bypasses audit verification.
 #                        Requires cycle_size_estimate="trivial" in cycle-state.json.
 #                        Used for documentation and minor maintenance.
-#                        Remediation if blank: bash scripts/lifecycle/cycle-state.sh set cycle_size_estimate trivial
+#                        Remediation if blank: bash legacy/scripts/lifecycle/cycle-state.sh set cycle_size_estimate trivial
 #   manual   — Operator-driven commit (manual feature work, hot-fix). Skips
 #              audit verification but REQUIRES interactive y/N confirmation
 #              after printing `git diff --cached --stat`. Refuses if stdin is
 #              not a tty (an LLM agent cannot answer the prompt — that's the
 #              boundary). Replaces the EVOLVE_BYPASS_SHIP_VERIFY=1 escape
 #              hatch with an auditable lifecycle.
-#   release  — Internal use by scripts/release-pipeline.sh. Skips audit
+#   release  — Internal use by legacy/scripts/release-pipeline.sh. Skips audit
 #              verification because version-bump.sh mutates files
 #              post-audit. Logs RELEASE class loudly. NOT for general use.
 #
@@ -186,13 +186,13 @@ case "$SHIP_CLASS" in
 esac
 
 # v8.25.0: Translate legacy EVOLVE_BYPASS_SHIP_VERIFY=1 to --class manual with
-# auto-confirm. This is the deprecation bridge: existing scripts/cron jobs
+# auto-confirm. This is the deprecation bridge: existing legacy/scripts/cron jobs
 # using the env var continue to work but emit a one-time warning.
 if [ "${EVOLVE_BYPASS_SHIP_VERIFY:-0}" = "1" ]; then
     if [ "$SHIP_CLASS" = "cycle" ]; then
         log "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1 is deprecated in v8.25.0+"
-        log "  → Migrate to: bash scripts/lifecycle/ship.sh --class manual \"<msg>\""
-        log "  → Or for CI:  EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/lifecycle/ship.sh --class manual \"<msg>\""
+        log "  → Migrate to: bash legacy/scripts/lifecycle/ship.sh --class manual \"<msg>\""
+        log "  → Or for CI:  EVOLVE_SHIP_AUTO_CONFIRM=1 bash legacy/scripts/lifecycle/ship.sh --class manual \"<msg>\""
         log "  → Treating this invocation as: --class manual + EVOLVE_SHIP_AUTO_CONFIRM=1"
         SHIP_CLASS="manual"
         export EVOLVE_SHIP_AUTO_CONFIRM=1
@@ -315,7 +315,7 @@ case "$SHIP_CLASS" in
         # triage-decision.md by phase-gate gate_triage_to_plan_review).
         # Dual-root: scripts live under PLUGIN_ROOT, state under PROJECT_ROOT;
         # cycle-state.sh resolves the writable side internally.
-        _cs_script="${EVOLVE_PLUGIN_ROOT:-$REPO_ROOT}/scripts/lifecycle/cycle-state.sh"
+        _cs_script="${EVOLVE_PLUGIN_ROOT:-$REPO_ROOT}/legacy/scripts/lifecycle/cycle-state.sh"
         _est=$(bash "$_cs_script" get cycle_size_estimate 2>/dev/null || echo "")
         if [ "$_est" != "trivial" ]; then
             integrity_fail "ship --class trivial requires cycle_size_estimate='trivial' in cycle-state.json (got: '$_est')"
@@ -331,7 +331,7 @@ case "$SHIP_CLASS" in
             git diff --cached --name-only 2>/dev/null
             git diff --name-only 2>/dev/null
             git ls-files --others --exclude-standard 2>/dev/null
-        } | sort -u | grep -E '^(agents/|\.agents/|skills/|scripts/lifecycle/|scripts/guards/|scripts/dispatch/|\.evolve/profiles/|\.claude-plugin/)' || true)
+        } | sort -u | grep -E '^(agents/|\.agents/|skills/|legacy/scripts/lifecycle/|legacy/scripts/guards/|legacy/scripts/dispatch/|\.evolve/profiles/|\.claude-plugin/)' || true)
         if [ -n "$_critical_paths" ]; then
             _critical_sample=$(printf '%s\n' "$_critical_paths" | head -3 | tr '\n' ',' | sed 's/,$//')
             _critical_count=$(printf '%s\n' "$_critical_paths" | wc -l | tr -d ' ')
@@ -387,7 +387,7 @@ case "$SHIP_CLASS" in
     release)
         log "class: release (pipeline-internal)"
         log "  → audit verification skipped: version-bump.sh mutates files post-audit"
-        log "  → this commit must be created by scripts/release-pipeline.sh only"
+        log "  → this commit must be created by legacy/scripts/release-pipeline.sh only"
         CLASS_PROVENANCE="release (pipeline-generated)"
         ;;
 esac
@@ -521,7 +521,7 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
     unset AUDIT_VERDICT_RAW
 
     # v10.0.0: EGPS predicate-suite gate (cycle-class only).
-    # acs-verdict.json — produced by scripts/lifecycle/run-acs-suite.sh — IS the
+    # acs-verdict.json — produced by legacy/scripts/lifecycle/run-acs-suite.sh — IS the
     # verdict-bearing artifact going forward. If present, its red_count==0
     # requirement is the structural ship gate; this overrides the WARN-by-default
     # fluent posture (no WARN ship loophole). If absent, fluent posture from
@@ -578,7 +578,7 @@ fi
 # --- 7. Atomic ship: stage + commit + push (+ optional release) -------------
 #
 # All git operations happen inside this single Bash invocation, so the
-# orchestrator session sees one allowed bash call (bash scripts/lifecycle/ship.sh ...)
+# orchestrator session sees one allowed bash call (bash legacy/scripts/lifecycle/ship.sh ...)
 # and the inner git operations don't fire the gate individually. Solves the
 # v8.12.x D6 workflow regression.
 
@@ -624,7 +624,7 @@ if [ "$SHIP_CLASS" = "cycle" ]; then
                         dirty_count=$(printf '%s\n' "$main_dirty" | wc -l | tr -d ' ')
                         log "WARN: worktree clean BUT main working tree has $dirty_count modified/untracked files (possible Builder isolation breach):"
                         printf '%s\n' "$main_dirty" | head -10 >&2
-                        log "WARN: investigate before next cycle — see scripts/guards/role-gate.sh and recent .evolve/guards.log DENY entries"
+                        log "WARN: investigate before next cycle — see legacy/scripts/guards/role-gate.sh and recent .evolve/guards.log DENY entries"
                     fi
                     log "no changes in worktree AND branch not ahead of $CURRENT_BRANCH; exiting cleanly"
                     write_dry_run_preview "no-changes-no-ahead"
@@ -659,7 +659,7 @@ FOOTER
                     # v10.10.0 Layer 1 (ADR-0012): commit-prefix → diff coherence gate.
                     # Worktree path — pass --repo-dir so gate inspects worktree-staged files (closes the cwd
                     # defect identified in cycle 75 audit of Cycle A).
-                    _prefix_gate="$REPO_ROOT/scripts/guards/commit-prefix-gate.sh"
+                    _prefix_gate="$REPO_ROOT/legacy/scripts/guards/commit-prefix-gate.sh"
                     if [ -x "$_prefix_gate" ]; then
                         SHIP_CLASS="$SHIP_CLASS" bash "$_prefix_gate" \
                             --msg "$WORKTREE_COMMIT_MSG" --repo-dir "$active_worktree" \
@@ -822,7 +822,7 @@ if [ "$WORKTREE_COMMIT_DONE" = "0" ]; then
     else
         # v10.10.0 Layer 1 (ADR-0012): commit-prefix → diff coherence gate. Main path: gate inspects
         # current-cwd staged files (REPO_ROOT). No --repo-dir needed.
-        _prefix_gate="$REPO_ROOT/scripts/guards/commit-prefix-gate.sh"
+        _prefix_gate="$REPO_ROOT/legacy/scripts/guards/commit-prefix-gate.sh"
         if [ -x "$_prefix_gate" ]; then
             SHIP_CLASS="$SHIP_CLASS" bash "$_prefix_gate" \
                 --msg "$COMMIT_MSG" \

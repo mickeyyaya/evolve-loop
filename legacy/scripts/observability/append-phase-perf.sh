@@ -8,10 +8,10 @@
 # replaces an existing section instead of duplicating.
 #
 # Usage:
-#   bash scripts/observability/append-phase-perf.sh <cycle> <phase>
-#   bash scripts/observability/append-phase-perf.sh <cycle> <phase> --baseline=5
-#   bash scripts/observability/append-phase-perf.sh <cycle> <phase> --stdout    # print, don't modify
-#   bash scripts/observability/append-phase-perf.sh <cycle> <phase> --dry-run   # show what would change
+#   bash legacy/scripts/observability/append-phase-perf.sh <cycle> <phase>
+#   bash legacy/scripts/observability/append-phase-perf.sh <cycle> <phase> --baseline=5
+#   bash legacy/scripts/observability/append-phase-perf.sh <cycle> <phase> --stdout    # print, don't modify
+#   bash legacy/scripts/observability/append-phase-perf.sh <cycle> <phase> --dry-run   # show what would change
 #
 # Exit codes:
 #   0 — section appended (or printed)

@@ -2,7 +2,7 @@
 # inbox-reconcile.sh — Manual recovery escape hatches for .evolve/inbox/ (v9.6.1+, c38)
 #
 # Usage:
-#   bash scripts/utility/inbox-reconcile.sh [--recover-all-orphans] \
+#   bash legacy/scripts/utility/inbox-reconcile.sh [--recover-all-orphans] \
 #     [--force-skip-shipped <task_id>] [--help]
 #
 # Flags:
@@ -16,7 +16,7 @@
 set -uo pipefail
 
 __self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$__self_dir/../.." && pwd)"
+REPO_ROOT="$(cd "$__self_dir/../../.." && pwd)"
 PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || echo "$REPO_ROOT")}"
 
 MOVER="${__self_dir}/inbox-mover.sh"

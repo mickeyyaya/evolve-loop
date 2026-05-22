@@ -15,8 +15,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTER_DIR="$REPO_ROOT/scripts/cli_adapters"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ADAPTER_DIR="$REPO_ROOT/legacy/scripts/cli_adapters"
 SCOUT_PROFILE="$REPO_ROOT/.evolve/profiles/scout.json"
 
 PASS=0; FAIL=0

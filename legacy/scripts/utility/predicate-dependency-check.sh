@@ -18,7 +18,7 @@
 # not) are forbidden.
 #
 # Usage:
-#   bash scripts/utility/predicate-dependency-check.sh <cycle> <workspace>
+#   bash legacy/scripts/utility/predicate-dependency-check.sh <cycle> <workspace>
 #
 # Inputs:
 #   <workspace>/scout-report.md — parsed for backtick-quoted file paths
@@ -77,7 +77,7 @@ fi
 
 # For each basename, check if any acs/regression-suite/**/*.sh script
 # references it (basename-level grep, matching the heuristic used by
-# scripts/lifecycle/run-regression-suite-slice.sh).
+# legacy/scripts/lifecycle/run-regression-suite-slice.sh).
 deps=""
 while IFS= read -r bn; do
     [ -z "$bn" ] && continue

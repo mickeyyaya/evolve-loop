@@ -9,7 +9,7 @@
 #   --dry-run    Report what would happen + prerequisite status. No
 #                processes spawned, no money spent. Safe for CI.
 #
-#   --simulate   Run bash side via scripts/dispatch/cycle-simulator.sh
+#   --simulate   Run bash side via legacy/scripts/dispatch/cycle-simulator.sh
 #                (no LLM) and Go side via individual `evolve phase`
 #                invocations with stub PhaseRequests. Compares the
 #                produced artifact tree shapes. Safe for CI.
@@ -31,7 +31,7 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GO_BIN="${EVOLVE_GO_BIN:-$REPO_ROOT/go/bin/evolve}"
-SIMULATOR="$REPO_ROOT/scripts/dispatch/cycle-simulator.sh"
+SIMULATOR="$REPO_ROOT/legacy/scripts/dispatch/cycle-simulator.sh"
 REPORT="${PARITY_REPORT:-$REPO_ROOT/parity-audit-report.md}"
 
 MODE="dry-run"
@@ -41,7 +41,7 @@ usage() {
 parity-audit.sh — bash vs Go orchestrator parity check (Phase 4 task #18)
 
 Usage:
-    bash scripts/parity-audit.sh [--dry-run | --simulate | --full] [--help]
+    bash legacy/scripts/parity-audit.sh [--dry-run | --simulate | --full] [--help]
 
 Modes:
     --dry-run    (default) Report prerequisites + planned actions. No spawns.
@@ -115,7 +115,7 @@ Simulator: $SIMULATOR
 Report:    $REPORT
 
 What would happen in --simulate mode:
-  bash side: bash scripts/dispatch/cycle-simulator.sh
+  bash side: bash legacy/scripts/dispatch/cycle-simulator.sh
              -> writes .evolve/runs/cycle-N/{scout,build,audit,ship}-report.md
              -> appends ledger entries (no LLM)
   Go side:   for phase in intent scout triage tdd build audit ship retro; do
@@ -125,7 +125,7 @@ What would happen in --simulate mode:
              -> proves the Go binary is callable end-to-end
 
 What would happen in --full mode:
-  bash side: bash scripts/dispatch/run-cycle.sh "parity-audit fixture"
+  bash side: bash legacy/scripts/dispatch/run-cycle.sh "parity-audit fixture"
              (spends real money — ~\$5-20)
   Go side:   $GO_BIN cycle run --goal-hash <hash>
              (spends real money — ~\$5-20)
@@ -231,7 +231,7 @@ full() {
     # v11.1.0: --full now uses `evolve cycle run --simulate` on the Go
     # side to drive the orchestrator state machine end-to-end without
     # LLM cost. Real-LLM full parity is operator-driven via
-    # scripts/perf-cycle-comparison.sh.
+    # legacy/scripts/perf-cycle-comparison.sh.
     log "running full-mode parity audit (no-LLM both sides)..."
     check_prereqs || {
         log "FATAL: prerequisites missing; cannot run --full"

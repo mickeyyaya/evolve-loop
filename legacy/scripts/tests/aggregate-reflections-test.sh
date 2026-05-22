@@ -22,15 +22,15 @@
 #   T6. --phase scout filter restricts to scout reflections only
 #   T7. --window 2 picks up only most recent 2 cycles
 #
-# Usage: bash scripts/tests/aggregate-reflections-test.sh
+# Usage: bash legacy/scripts/tests/aggregate-reflections-test.sh
 # Exit:  0 if all PASS; non-zero otherwise.
 #
 # bash 3.2 compatible.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-AGGREGATOR="$REPO_ROOT/scripts/observability/aggregate-reflections.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+AGGREGATOR="$REPO_ROOT/legacy/scripts/observability/aggregate-reflections.sh"
 
 if [ ! -x "$AGGREGATOR" ]; then
     echo "FAIL: aggregator not executable at $AGGREGATOR"
@@ -188,7 +188,7 @@ slowdowns:
     severity: medium
 suggested_improvements:
   - action: "Add retry logic to subprocess wrapper"
-    target_file: "scripts/dispatch/subagent-run.sh"
+    target_file: "legacy/scripts/dispatch/subagent-run.sh"
     evidence_pointer: "builder-stderr.log:line=99"
     priority: medium
 reflection_confidence: 0.75
@@ -259,7 +259,7 @@ slowdowns:
     severity: high
 suggested_improvements:
   - action: "Increase subprocess timeout to 600s"
-    target_file: "scripts/dispatch/subagent-run.sh"
+    target_file: "legacy/scripts/dispatch/subagent-run.sh"
     evidence_pointer: "builder-stderr.log:line=200"
     priority: high
 reflection_confidence: 0.8

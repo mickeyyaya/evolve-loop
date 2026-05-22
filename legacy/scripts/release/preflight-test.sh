@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# preflight-test.sh — Unit tests for scripts/release/preflight.sh.
+# preflight-test.sh — Unit tests for legacy/scripts/release/preflight.sh.
 #
 # Each test sets up an isolated temp repo (or runs against the real repo with
 # --dry-run / --skip-tests) so the tests don't mutate the caller's state.
 #
-# Usage: bash scripts/release/preflight-test.sh
+# Usage: bash legacy/scripts/release/preflight-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PREFLIGHT="$REPO_ROOT/scripts/release/preflight.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PREFLIGHT="$REPO_ROOT/legacy/scripts/release/preflight.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -60,17 +60,17 @@ run_in() {
     # Override REPO_ROOT by symlink trick: the script computes its own root.
     # Instead invoke from the repo dir and let the script use its own derivation.
     # But preflight derives REPO_ROOT from BASH_SOURCE — we must symlink the script in.
-    local script_dir="$repo/scripts/release"
+    local script_dir="$repo/legacy/scripts/release"
     mkdir -p "$script_dir"
     cp "$PREFLIGHT" "$script_dir/preflight.sh"
     # Also copy gate-test suites so step 5 can find them (we'll usually --skip-tests).
     mkdir -p "$repo/scripts"
     for s in guards-test.sh ship-integration-test.sh role-gate-test.sh phase-gate-precondition-test.sh; do
-        echo '#!/usr/bin/env bash' > "$repo/scripts/$s"
-        echo 'exit 0' >> "$repo/scripts/$s"
-        chmod +x "$repo/scripts/$s"
+        echo '#!/usr/bin/env bash' > "$repo/legacy/scripts/$s"
+        echo 'exit 0' >> "$repo/legacy/scripts/$s"
+        chmod +x "$repo/legacy/scripts/$s"
     done
-    bash "$repo/scripts/release/preflight.sh" "$@" 2>&1
+    bash "$repo/legacy/scripts/release/preflight.sh" "$@" 2>&1
 }
 
 cleanup_repos=()
@@ -134,8 +134,8 @@ set +e; out=$(run_in "$r" 1.0.1 --skip-tests); rc=$?; set -e
 header "Test 9: --dry-run prints would-do, exits 0"
 r=$(make_repo "1.0.0"); cleanup_repos+=("$r")
 # Remove the test scripts entirely — dry-run should still pass.
-rm -f "$r/scripts/guards-test.sh" "$r/scripts/ship-integration-test.sh" \
-      "$r/scripts/role-gate-test.sh" "$r/scripts/phase-gate-precondition-test.sh"
+rm -f "$r/legacy/scripts/guards-test.sh" "$r/legacy/scripts/ship-integration-test.sh" \
+      "$r/legacy/scripts/role-gate-test.sh" "$r/legacy/scripts/phase-gate-precondition-test.sh"
 set +e; out=$(run_in "$r" 1.0.1 --dry-run); rc=$?; set -e
 if [ "$rc" = "0" ] && echo "$out" | grep -q "DRY-RUN"; then
     pass "dry-run honored (rc=0, mentions DRY-RUN)"
@@ -146,19 +146,19 @@ fi
 # === Test 10: --skip-tests bypasses step 5 only ===============================
 header "Test 10: --skip-tests still runs steps 1-4"
 r=$(make_repo "1.0.0"); cleanup_repos+=("$r")
-# First call to run_in primes scripts/ with passing test scripts, then we
+# First call to run_in primes legacy/scripts/ with passing test scripts, then we
 # overwrite them with failing variants. With --skip-tests, preflight should
 # still pass overall (because step 5 is skipped, not because the scripts pass).
 mkdir -p "$r/scripts"
 for s in guards-test.sh ship-integration-test.sh role-gate-test.sh phase-gate-precondition-test.sh; do
-    echo '#!/usr/bin/env bash' > "$r/scripts/$s"
-    echo 'exit 1' >> "$r/scripts/$s"
-    chmod +x "$r/scripts/$s"
+    echo '#!/usr/bin/env bash' > "$r/legacy/scripts/$s"
+    echo 'exit 1' >> "$r/legacy/scripts/$s"
+    chmod +x "$r/legacy/scripts/$s"
 done
 # Manually set up release/ dir without the run_in helper (which would overwrite our exit-1 scripts).
-mkdir -p "$r/scripts/release"
-cp "$PREFLIGHT" "$r/scripts/release/preflight.sh"
-set +e; out=$(bash "$r/scripts/release/preflight.sh" 1.0.1 --skip-tests 2>&1); rc=$?; set -e
+mkdir -p "$r/legacy/scripts/release"
+cp "$PREFLIGHT" "$r/legacy/scripts/release/preflight.sh"
+set +e; out=$(bash "$r/legacy/scripts/release/preflight.sh" 1.0.1 --skip-tests 2>&1); rc=$?; set -e
 [ "$rc" = "0" ] && pass "skip-tests bypasses gate suites (rc=0)" || fail_ "rc=$rc out=$out"
 
 # === Summary ==================================================================

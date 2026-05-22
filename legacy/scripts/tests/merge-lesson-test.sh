@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# merge-lesson-test.sh — Smoke tests for scripts/failure/merge-lesson-into-state.sh.
+# merge-lesson-test.sh — Smoke tests for legacy/scripts/failure/merge-lesson-into-state.sh.
 # Validates the orchestrator's post-retrospective state-merge logic.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HELPER="$REPO_ROOT/scripts/failure/merge-lesson-into-state.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+HELPER="$REPO_ROOT/legacy/scripts/failure/merge-lesson-into-state.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0
@@ -21,8 +21,8 @@ make_repo() {
     mkdir -p "$root/.evolve/instincts/lessons" "$root/scripts"
     echo '{"instinctSummary": [], "failedApproaches": []}' > "$root/.evolve/state.json"
     : > "$root/.evolve/ledger.jsonl"
-    cp "$HELPER" "$root/scripts/failure/merge-lesson-into-state.sh"
-    chmod +x "$root/scripts/failure/merge-lesson-into-state.sh"
+    cp "$HELPER" "$root/legacy/scripts/failure/merge-lesson-into-state.sh"
+    chmod +x "$root/legacy/scripts/failure/merge-lesson-into-state.sh"
     echo "$root"
 }
 

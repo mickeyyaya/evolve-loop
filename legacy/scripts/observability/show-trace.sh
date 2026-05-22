@@ -8,11 +8,11 @@
 # synthesized summary built from existing *-stdout.log + *-usage.json.
 #
 # Usage:
-#   bash scripts/observability/show-trace.sh                       # active cycle
-#   bash scripts/observability/show-trace.sh --cycle=36
-#   bash scripts/observability/show-trace.sh --cycle=36 --phase=scout
-#   bash scripts/observability/show-trace.sh --cycle=36 --watch    # tail -F
-#   bash scripts/observability/show-trace.sh --cycle=36 --summary  # synthesized fallback
+#   bash legacy/scripts/observability/show-trace.sh                       # active cycle
+#   bash legacy/scripts/observability/show-trace.sh --cycle=36
+#   bash legacy/scripts/observability/show-trace.sh --cycle=36 --phase=scout
+#   bash legacy/scripts/observability/show-trace.sh --cycle=36 --watch    # tail -F
+#   bash legacy/scripts/observability/show-trace.sh --cycle=36 --summary  # synthesized fallback
 
 set -uo pipefail
 

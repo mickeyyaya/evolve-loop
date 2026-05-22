@@ -3,9 +3,9 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-AUDIT="$REPO_ROOT/scripts/utility/inbox-audit.sh"
-RECONCILE="$REPO_ROOT/scripts/utility/inbox-reconcile.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+AUDIT="$REPO_ROOT/legacy/scripts/utility/inbox-audit.sh"
+RECONCILE="$REPO_ROOT/legacy/scripts/utility/inbox-reconcile.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0; FAIL=0

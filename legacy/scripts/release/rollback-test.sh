@@ -6,13 +6,13 @@
 # a network. The dry-run path exercises journal parsing, status tracking,
 # ledger append, and the overall control flow.
 #
-# Usage: bash scripts/release/rollback-test.sh
+# Usage: bash legacy/scripts/release/rollback-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ROLLBACK="$REPO_ROOT/scripts/release/rollback.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROLLBACK="$REPO_ROOT/legacy/scripts/release/rollback.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -24,16 +24,16 @@ make_repo_with_journal() {
     local journal_json="$1"
     local d
     d=$(mktemp -d -t rollback-test.XXXXXX)
-    mkdir -p "$d/scripts/release" "$d/scripts/lifecycle" "$d/scripts/utility" "$d/.evolve"
-    cp "$ROLLBACK" "$d/scripts/release/rollback.sh"
-    chmod +x "$d/scripts/release/rollback.sh"
+    mkdir -p "$d/legacy/scripts/release" "$d/legacy/scripts/lifecycle" "$d/legacy/scripts/utility" "$d/.evolve"
+    cp "$ROLLBACK" "$d/legacy/scripts/release/rollback.sh"
+    chmod +x "$d/legacy/scripts/release/rollback.sh"
     # Provide a stub ship.sh — the script may reference it.
-    cat > "$d/scripts/lifecycle/ship.sh" <<'EOF'
+    cat > "$d/legacy/scripts/lifecycle/ship.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "[stub-ship.sh] $*" >&2
 exit 0
 EOF
-    chmod +x "$d/scripts/lifecycle/ship.sh"
+    chmod +x "$d/legacy/scripts/lifecycle/ship.sh"
     if [ -n "$journal_json" ]; then
         printf '%s\n' "$journal_json" > "$d/.evolve/journal.json"
     fi
@@ -57,7 +57,7 @@ JOURNAL_FULL='{
 header "Test 1: dry-run with full journal → exit 0, dry_run=true in ledger"
 r=$(make_repo_with_journal "$JOURNAL_FULL"); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --dry-run 2>&1)
+out=$(bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --dry-run 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "0" ] && echo "$out" | grep -q "DRY-RUN"; then
@@ -70,7 +70,7 @@ fi
 header "Test 2: journal missing 'tag' → exit 2"
 r=$(make_repo_with_journal '{"version":"1.0.0","commit_sha":"abc","branch":"main"}'); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --dry-run 2>&1)
+out=$(bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --dry-run 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "2" ] && echo "$out" | grep -q "missing 'tag'"; then
@@ -83,7 +83,7 @@ fi
 header "Test 3: journal file does not exist → exit 2"
 r=$(make_repo_with_journal ""); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/rollback.sh" "$r/.evolve/missing.json" --dry-run 2>&1)
+out=$(bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/missing.json" --dry-run 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "2" ] && echo "$out" | grep -qi "journal not found"; then
@@ -99,7 +99,7 @@ r=$(make_repo_with_journal "$JOURNAL_FULL"); cleanup_dirs+=("$r")
 # attempt-and-skip because there's no remote. We expect a partial outcome but
 # the ledger entry should still capture the reason.
 set +e
-out=$(cd "$r" && bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "audit fail probe" 2>&1)
+out=$(cd "$r" && bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "audit fail probe" 2>&1)
 rc=$?
 set -e
 if [ -f "$r/.evolve/release-rollbacks.jsonl" ] \
@@ -113,7 +113,7 @@ fi
 header "Test 5: --dry-run leaves no ledger file"
 r=$(make_repo_with_journal "$JOURNAL_FULL"); cleanup_dirs+=("$r")
 set +e
-bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --dry-run >/dev/null 2>&1
+bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --dry-run >/dev/null 2>&1
 rc=$?
 set -e
 if [ "$rc" = "0" ] && [ ! -f "$r/.evolve/release-rollbacks.jsonl" ]; then
@@ -126,7 +126,7 @@ fi
 header "Test 6: no journal arg → exit 10"
 r=$(make_repo_with_journal ""); cleanup_dirs+=("$r")
 set +e
-out=$(bash "$r/scripts/release/rollback.sh" --dry-run 2>&1)
+out=$(bash "$r/legacy/scripts/release/rollback.sh" --dry-run 2>&1)
 rc=$?
 set -e
 if [ "$rc" = "10" ]; then
@@ -139,7 +139,7 @@ fi
 header "Test 7: ledger entry has version, tag, commit_sha, reason, step statuses"
 r=$(make_repo_with_journal "$JOURNAL_FULL"); cleanup_dirs+=("$r")
 set +e
-(cd "$r" && bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "structural test" 2>&1) >/dev/null
+(cd "$r" && bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "structural test" 2>&1) >/dev/null
 set -e
 if [ -f "$r/.evolve/release-rollbacks.jsonl" ]; then
     entry=$(tail -1 "$r/.evolve/release-rollbacks.jsonl")
@@ -165,12 +165,12 @@ fi
 header "Test 8: ship.sh receives EVOLVE_BYPASS_SHIP_VERIFY=1"
 r=$(make_repo_with_journal "$JOURNAL_FULL"); cleanup_dirs+=("$r")
 # Override the stub ship.sh with one that records the env var.
-cat > "$r/scripts/lifecycle/ship.sh" <<'EOF'
+cat > "$r/legacy/scripts/lifecycle/ship.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "BYPASS=$EVOLVE_BYPASS_SHIP_VERIFY MSG=$*" >> "$0.calls.log"
 exit 0
 EOF
-chmod +x "$r/scripts/lifecycle/ship.sh"
+chmod +x "$r/legacy/scripts/lifecycle/ship.sh"
 # Initialize git in the repo so revert can run. Skip if revert fails (no commits).
 ( cd "$r" && git init -q -b main && git config user.email t@t.t && git config user.name t \
   && echo init > x.txt && git add . && git c""ommit -q -m "init commit" \
@@ -179,12 +179,12 @@ sha=$(cd "$r" && git rev-parse HEAD)
 # Update journal commit_sha to a real one so revert can target it.
 echo "{\"version\":\"1.2.3\",\"tag\":\"v1.2.3\",\"commit_sha\":\"$sha\",\"branch\":\"main\"}" > "$r/.evolve/journal.json"
 set +e
-(cd "$r" && bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "bypass test" 2>&1) >/dev/null
+(cd "$r" && bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "bypass test" 2>&1) >/dev/null
 set -e
-if [ -f "$r/scripts/lifecycle/ship.sh.calls.log" ] && grep -q "BYPASS=1" "$r/scripts/lifecycle/ship.sh.calls.log"; then
+if [ -f "$r/legacy/scripts/lifecycle/ship.sh.calls.log" ] && grep -q "BYPASS=1" "$r/legacy/scripts/lifecycle/ship.sh.calls.log"; then
     pass "ship.sh invoked with BYPASS_SHIP_VERIFY=1"
 else
-    fail_ "calls log: $([ -f "$r/scripts/lifecycle/ship.sh.calls.log" ] && cat "$r/scripts/lifecycle/ship.sh.calls.log" || echo '<missing>')"
+    fail_ "calls log: $([ -f "$r/legacy/scripts/lifecycle/ship.sh.calls.log" ] && cat "$r/legacy/scripts/lifecycle/ship.sh.calls.log" || echo '<missing>')"
 fi
 
 # === Test 9 (MEDIUM-1 regression): partial rollback exits 1 ==================
@@ -219,7 +219,7 @@ chmod +x "$r/bin/gh"
 echo "{\"version\":\"1.2.3\",\"tag\":\"v1.2.3\",\"commit_sha\":\"$sha\",\"branch\":\"main\"}" > "$r/.evolve/journal.json"
 # Pre-empt step 2 (remote tag delete): no remote → ls-remote returns empty → step 2 = not-present.
 set +e
-out=$(cd "$r" && PATH="$r/bin:$PATH" bash "$r/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "MEDIUM-1 regression" 2>&1)
+out=$(cd "$r" && PATH="$r/bin:$PATH" bash "$r/legacy/scripts/release/rollback.sh" "$r/.evolve/journal.json" --reason "MEDIUM-1 regression" 2>&1)
 rc=$?
 set -e
 # step1 should be "failed" (gh release delete returned 7 after gh release view succeeded).

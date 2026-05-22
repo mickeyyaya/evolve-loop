@@ -40,10 +40,10 @@
 #
 # USAGE
 #
-#   bash scripts/dispatch/preflight-environment.sh              # probe + emit JSON to stdout
-#   bash scripts/dispatch/preflight-environment.sh --write      # also persist to .evolve/environment.json
-#   bash scripts/dispatch/preflight-environment.sh --summary    # print human-readable summary instead of JSON
-#   bash scripts/dispatch/preflight-environment.sh --help
+#   bash legacy/scripts/dispatch/preflight-environment.sh              # probe + emit JSON to stdout
+#   bash legacy/scripts/dispatch/preflight-environment.sh --write      # also persist to .evolve/environment.json
+#   bash legacy/scripts/dispatch/preflight-environment.sh --summary    # print human-readable summary instead of JSON
+#   bash legacy/scripts/dispatch/preflight-environment.sh --help
 #
 # ENV
 #
@@ -160,8 +160,8 @@ HOST_OS_VERSION=$(uname -r 2>/dev/null || echo "unknown")
 HOST_SHELL=$(basename "${SHELL:-/bin/sh}")
 
 # Nested-Claude detection (delegate to canonical script).
-if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/detect-nested-claude.sh" ]; then
-    NESTED_RESULT=$(bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/detect-nested-claude.sh" 2>/dev/null || echo "standalone")
+if [ -x "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/detect-nested-claude.sh" ]; then
+    NESTED_RESULT=$(bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/detect-nested-claude.sh" 2>/dev/null || echo "standalone")
 else
     NESTED_RESULT=standalone
 fi

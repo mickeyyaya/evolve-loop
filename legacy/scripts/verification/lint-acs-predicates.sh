@@ -9,7 +9,7 @@
 #              or uses arithmetic/jq/awk/wc to verify actual system state.
 #
 # Usage:
-#   bash scripts/verification/lint-acs-predicates.sh [--explain] [--predicates-dir DIR]
+#   bash legacy/scripts/verification/lint-acs-predicates.sh [--explain] [--predicates-dir DIR]
 #
 # Exit codes:
 #   0 = all predicates are behavioral (PASS)
@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 # Collect predicate files
 PRED_FILES=""

@@ -17,10 +17,10 @@
 # follows it verbatim — no longer interpreting markdown rules.
 #
 # Usage:
-#   bash scripts/failure/failure-adapter.sh decide --cycle <N> --workspace <path>
+#   bash legacy/scripts/failure/failure-adapter.sh decide --cycle <N> --workspace <path>
 #       Compute the action for the given cycle. Emits JSON to stdout.
 #
-#   bash scripts/failure/failure-adapter.sh decide --state <path>
+#   bash legacy/scripts/failure/failure-adapter.sh decide --state <path>
 #       Test mode: read failedApproaches from a custom state.json path.
 #
 # Output (stdout): JSON with these fields:
@@ -94,7 +94,7 @@ fi
 
 # Auto-prune expired entries before reading. This makes the decision robust
 # to stale state without requiring a separate manual prune step.
-bash "$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh" prune-expired-failures "$STATE_PATH" 2>/dev/null || true
+bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh" prune-expired-failures "$STATE_PATH" 2>/dev/null || true
 
 # ---- Compute features from non-expired entries ----------------------------
 
@@ -260,7 +260,7 @@ if [ "$SYSTEMIC_COUNT" -gt 0 ]; then
         | head -c 200)
     emit_or_advise "BLOCK-OPERATOR-ACTION" \
         "$SYSTEMIC_COUNT non-expired infrastructure-systemic failure(s); last summary: $last_systemic_summary" \
-        "Investigate the systemic infrastructure issue (tooling, host, claude-cli). Use scripts/failure/state-prune.sh --classification infrastructure-systemic after fixing." \
+        "Investigate the systemic infrastructure issue (tooling, host, claude-cli). Use legacy/scripts/failure/state-prune.sh --classification infrastructure-systemic after fixing." \
         "BLOCKED-SYSTEMIC"
 fi
 
@@ -268,7 +268,7 @@ fi
 if [ "$CODE_AUDIT_FAIL_COUNT" -ge 2 ]; then
     emit_or_advise "BLOCK-CODE" \
         "$CODE_AUDIT_FAIL_COUNT non-expired code-audit-fail entries (within 30d retention)" \
-        "Auditor has rejected code N times. Pick a materially different task or prune via scripts/failure/state-prune.sh --classification code-audit-fail after addressing root cause." \
+        "Auditor has rejected code N times. Pick a materially different task or prune via legacy/scripts/failure/state-prune.sh --classification code-audit-fail after addressing root cause." \
         "BLOCKED-RECURRING-AUDIT-FAIL"
 fi
 
@@ -276,7 +276,7 @@ fi
 if [ "$CODE_BUILD_FAIL_COUNT" -ge 2 ]; then
     emit_or_advise "BLOCK-CODE" \
         "$CODE_BUILD_FAIL_COUNT non-expired code-build-fail entries (within 30d retention)" \
-        "Builder has failed to compile/test N times. Pick a materially different task or prune via scripts/failure/state-prune.sh --classification code-build-fail." \
+        "Builder has failed to compile/test N times. Pick a materially different task or prune via legacy/scripts/failure/state-prune.sh --classification code-build-fail." \
         "BLOCKED-RECURRING-BUILD-FAIL"
 fi
 
@@ -284,7 +284,7 @@ fi
 if [ "$INFRA_TAIL_STREAK" -ge 3 ]; then
     emit_or_advise "BLOCK-OPERATOR-ACTION" \
         "$INFRA_TAIL_STREAK consecutive infrastructure-transient failures despite EPERM-fallback." \
-        "Either: (1) run /evolve-loop from a non-sandboxed terminal, OR (2) run scripts/failure/state-prune.sh --classification infrastructure-transient after confirming the underlying issue is resolved, OR (3) file an issue with cycle ledger entry." \
+        "Either: (1) run /evolve-loop from a non-sandboxed terminal, OR (2) run legacy/scripts/failure/state-prune.sh --classification infrastructure-transient after confirming the underlying issue is resolved, OR (3) file an issue with cycle ledger entry." \
         "BLOCKED-SYSTEMIC"
 fi
 

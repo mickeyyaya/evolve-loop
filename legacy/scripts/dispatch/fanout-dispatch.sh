@@ -103,8 +103,8 @@ case "$PER_WORKER_BUDGET_USD" in ''|*[!0-9.]*) PER_WORKER_BUDGET_USD="0.20" ;; e
 # Resolve cycle-state.sh location for worker-status writes (Task D).
 # Set by EVOLVE_PLUGIN_ROOT or fall back to sibling lookup.
 CYCLE_STATE_HELPER=""
-if [ -n "${EVOLVE_PLUGIN_ROOT:-}" ] && [ -x "$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh" ]; then
-    CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
+if [ -n "${EVOLVE_PLUGIN_ROOT:-}" ] && [ -x "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh" ]; then
+    CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
 elif [ -x "$(dirname "${BASH_SOURCE[0]}")/cycle-state.sh" ]; then
     CYCLE_STATE_HELPER="$(dirname "${BASH_SOURCE[0]}")/cycle-state.sh"
 fi

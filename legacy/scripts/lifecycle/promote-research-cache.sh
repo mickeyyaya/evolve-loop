@@ -17,8 +17,8 @@
 # Idempotent: skips already-promoted entries.
 #
 # Usage:
-#   bash scripts/lifecycle/promote-research-cache.sh <cycle> <workspace_path>
-#   bash scripts/lifecycle/promote-research-cache.sh <cycle> <workspace_path> --dry-run
+#   bash legacy/scripts/lifecycle/promote-research-cache.sh <cycle> <workspace_path>
+#   bash legacy/scripts/lifecycle/promote-research-cache.sh <cycle> <workspace_path> --dry-run
 #
 # Exit codes:
 #   0  — success (or no-op)
@@ -30,7 +30,7 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$__rr_self/resolve-roots.sh" ]; then
     . "$__rr_self/resolve-roots.sh" 2>/dev/null || true
 fi
-PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$__rr_self/../.." && pwd)}"
+PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(cd "$__rr_self/../../.." && pwd)}"
 REPO_ROOT="$PROJECT_ROOT"
 
 CYCLE=""

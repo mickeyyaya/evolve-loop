@@ -7,7 +7,7 @@
 # external JSON Schema validator required).
 #
 # Usage:
-#   bash scripts/tests/validate-handoff-artifact.sh \
+#   bash legacy/scripts/tests/validate-handoff-artifact.sh \
 #       --artifact <PATH>          # path to markdown artifact
 #       --type scout|build|audit   # artifact type selects schema file
 #       [--state <state.json>]     # required for conditional_sections checks

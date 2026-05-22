@@ -6,13 +6,13 @@
 # content-addressable (git tree-object SHA) rather than the SHA-256 of empty
 # string (the pre-fix bug: `git diff HEAD` after a builder commit is always empty).
 #
-# Usage: bash scripts/tests/record-failure-test.sh
+# Usage: bash legacy/scripts/tests/record-failure-test.sh
 # Exit 0 = all pass; non-zero = failures.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/failure/record-failure-to-state.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/failure/record-failure-to-state.sh"
 
 EMPTY_STRING_SHA="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 

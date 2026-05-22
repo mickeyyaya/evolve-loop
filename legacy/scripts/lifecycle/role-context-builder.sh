@@ -11,7 +11,7 @@
 # This helper assembles a role-appropriate context block. Orchestrators
 # call it instead of dumping every artifact in every prompt:
 #
-#   bash scripts/lifecycle/role-context-builder.sh <role> <cycle> <workspace_path>
+#   bash legacy/scripts/lifecycle/role-context-builder.sh <role> <cycle> <workspace_path>
 #
 # Output: markdown context block on stdout. Orchestrator pipes/concatenates
 # this with its task-specific instructions before invoking subagent-run.sh.
@@ -41,10 +41,10 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     EVOLVE_PROJECT_ROOT="${EVOLVE_PROJECT_ROOT:-$(pwd)}"
 }
 # v8.62.0 Cycle B2: ensure PLUGIN_ROOT is set so digest-mode can lazy-build
-# via $EVOLVE_PLUGIN_ROOT/scripts/lifecycle/build-cycle-digest.sh. Derive
+# via $EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/build-cycle-digest.sh. Derive
 # from this script's directory if resolve-roots.sh didn't set it.
 if [ -z "${EVOLVE_PLUGIN_ROOT:-}" ]; then
-    EVOLVE_PLUGIN_ROOT="$(cd "$__rr_self/../.." && pwd)"
+    EVOLVE_PLUGIN_ROOT="$(cd "$__rr_self/../../.." && pwd)"
 fi
 unset __rr_self
 
@@ -383,7 +383,7 @@ emit_instincts() {
 _ensure_digest() {
     local digest_path="$WORKSPACE/cycle-digest.json"
     if [ ! -f "$digest_path" ]; then
-        local writer="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/build-cycle-digest.sh"
+        local writer="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/build-cycle-digest.sh"
         if [ -x "$writer" ]; then
             bash "$writer" "$CYCLE" "$WORKSPACE" >/dev/null 2>&1 || return 1
         else

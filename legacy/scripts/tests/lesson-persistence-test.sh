@@ -10,7 +10,7 @@
 #   4. All on-disk lesson YAMLs are represented in state.json:instinctSummary[]
 #
 # Usage:
-#   bash scripts/tests/lesson-persistence-test.sh
+#   bash legacy/scripts/tests/lesson-persistence-test.sh
 #
 # Exit codes:
 #   0 — all tests PASS
@@ -22,7 +22,7 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/../lifecycle/resolve-roots.sh"
 unset __rr_self
 
-BACKFILL="$EVOLVE_PLUGIN_ROOT/scripts/utility/backfill-lessons.sh"
+BACKFILL="$EVOLVE_PLUGIN_ROOT/legacy/scripts/utility/backfill-lessons.sh"
 STATE="${EVOLVE_STATE_FILE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
 LESSONS_DIR="$EVOLVE_PROJECT_ROOT/.evolve/instincts/lessons"
 

@@ -22,9 +22,9 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SUBAGENT_RUN="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
-COMPOSE_SH="$REPO_ROOT/scripts/cli_adapters/_capability-compose.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SUBAGENT_RUN="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
+COMPOSE_SH="$REPO_ROOT/legacy/scripts/cli_adapters/_capability-compose.sh"
 
 PASS=0
 FAIL=0
@@ -46,7 +46,7 @@ fi
 if [ -f "$COMPOSE_SH" ]; then
     pass "_capability-compose.sh present"
 else
-    fail_ "_capability-compose.sh missing — create scripts/cli_adapters/_capability-compose.sh"
+    fail_ "_capability-compose.sh missing — create legacy/scripts/cli_adapters/_capability-compose.sh"
 fi
 
 # --- Temp profiles setup -----------------------------------------------------

@@ -20,7 +20,7 @@
 # (gitignored under .evolve/*).
 #
 # Usage:
-#   bash scripts/lifecycle/reconcile-carryover-todos.sh \
+#   bash legacy/scripts/lifecycle/reconcile-carryover-todos.sh \
 #       --cycle <N> --workspace <path> --verdict <PASS|WARN|FAIL>
 #
 # Env:
@@ -201,7 +201,7 @@ while IFS= read -r todo_json; do
                 if [ "$VERDICT" = "FAIL" ]; then
                     _fp=$(echo "$todo_json" | jq -r '.research_fingerprint // empty')
                     if [ -n "$_fp" ]; then
-                        bash scripts/utility/research-cache.sh invalidate "$_fp" \
+                        bash legacy/scripts/utility/research-cache.sh invalidate "$_fp" \
                             --reason "audit-fail-cycle-$CYCLE" 2>/dev/null || true
                         log "research-cache: invalidated fp=$_fp (audit-fail-cycle-$CYCLE)"
                     fi
@@ -227,7 +227,7 @@ while IFS= read -r todo_json; do
             # Invalidate research cache for this task when fingerprint present.
             _fp=$(echo "$todo_json" | jq -r '.research_fingerprint // empty')
             if [ -n "$_fp" ]; then
-                bash scripts/utility/research-cache.sh invalidate "$_fp" \
+                bash legacy/scripts/utility/research-cache.sh invalidate "$_fp" \
                     --reason "dropped-cycle-$CYCLE" 2>/dev/null || true
                 log "research-cache: invalidated fp=$_fp (dropped-cycle-$CYCLE)"
             fi
@@ -314,7 +314,7 @@ fi
 # entries to canonical .evolve/research/by-task/ path. NOOP when
 # EVOLVE_RESEARCH_CACHE_ENABLED is unset (promote-research-cache.sh exits 0 cleanly).
 if [ "$VERDICT" = "PASS" ] && [ -n "$WORKSPACE" ]; then
-    promote_out=$(bash scripts/lifecycle/promote-research-cache.sh "$CYCLE" "$WORKSPACE" 2>&1) || true
+    promote_out=$(bash legacy/scripts/lifecycle/promote-research-cache.sh "$CYCLE" "$WORKSPACE" 2>&1) || true
     while IFS= read -r _pline; do
         [ -n "$_pline" ] && log "promote-cache: $_pline"
     done <<< "$promote_out"

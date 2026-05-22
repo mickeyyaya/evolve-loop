@@ -13,7 +13,7 @@
 # This is the equivalent of "log first, analyze later" for failures.
 #
 # Usage:
-#   bash scripts/failure/record-failure-to-state.sh <workspace_path> <verdict>
+#   bash legacy/scripts/failure/record-failure-to-state.sh <workspace_path> <verdict>
 #
 #   workspace_path — .evolve/runs/cycle-N/ containing audit-report.md
 #   verdict        — FAIL | WARN | SHIP_GATE_DENIED
@@ -158,7 +158,7 @@ NOW_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # v8.22.0: source classification helpers and derive structured classification
 # + expiresAt from the verdict. Backward-compat: existing readers that look at
 # `verdict` still see it; new readers (failure-adapter.sh) use `classification`.
-. "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-classifications.sh"
+. "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-classifications.sh"
 CLASSIFICATION=$(failure_normalize_legacy "$VERDICT")
 EXPIRES_AT=$(failure_compute_expires_at "$CLASSIFICATION" "$NOW_TS")
 
@@ -193,6 +193,6 @@ mv "$TMP" "$STATE"
 
 DEFECT_COUNT=$(echo "$DEFECTS_JSON" | jq 'length')
 log "OK: recorded $VERDICT (classification=$CLASSIFICATION, expires=$EXPIRES_AT) for cycle $CYCLE ($DEFECT_COUNT defects)"
-log "to retrospect later: bash scripts/dispatch/subagent-run.sh retrospective <cycle> <workspace> on this entry"
+log "to retrospect later: bash legacy/scripts/dispatch/subagent-run.sh retrospective <cycle> <workspace> on this entry"
 
 exit 0

@@ -11,7 +11,7 @@
 # It serves as the reading layer for cycle 56's registry-driven dispatch.
 #
 # Usage:
-#   bash scripts/dispatch/list-phase-order.sh
+#   bash legacy/scripts/dispatch/list-phase-order.sh
 #
 # Env vars:
 #   EVOLVE_USE_PHASE_REGISTRY  Default "1". Set "0" to always use hardcoded order.

@@ -12,12 +12,12 @@
 # operator review post-cycle. Does NOT mutate state.
 #
 # Usage:
-#   bash scripts/observability/dashboard.sh                  # active cycle
-#   bash scripts/observability/dashboard.sh --cycle=42
-#   bash scripts/observability/dashboard.sh --watch          # refresh every 5s
-#   bash scripts/observability/dashboard.sh --watch=2        # refresh every 2s
-#   bash scripts/observability/dashboard.sh --json           # machine-readable summary
-#   bash scripts/observability/dashboard.sh --trace-lines=40 # tail N lines (default 20)
+#   bash legacy/scripts/observability/dashboard.sh                  # active cycle
+#   bash legacy/scripts/observability/dashboard.sh --cycle=42
+#   bash legacy/scripts/observability/dashboard.sh --watch          # refresh every 5s
+#   bash legacy/scripts/observability/dashboard.sh --watch=2        # refresh every 2s
+#   bash legacy/scripts/observability/dashboard.sh --json           # machine-readable summary
+#   bash legacy/scripts/observability/dashboard.sh --trace-lines=40 # tail N lines (default 20)
 #
 # Exit codes:
 #   0  — at least one signal rendered
@@ -193,7 +193,7 @@ render_human() {
     # ---- Reflection hot-spots (Reflection Journal v10.20.0+) ----
     # Surfaces top-3 slowdown categories across the last 5 cycles.
     # No-op when aggregator finds zero reflections (advisory rollout).
-    local agg_script="$REPO_ROOT/scripts/observability/aggregate-reflections.sh"
+    local agg_script="$REPO_ROOT/legacy/scripts/observability/aggregate-reflections.sh"
     if [ -x "$agg_script" ] && command -v jq >/dev/null 2>&1; then
         local agg_json hotspots
         agg_json=$("$agg_script" --window 5 --format=json 2>/dev/null || echo "")

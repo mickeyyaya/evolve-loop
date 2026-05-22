@@ -21,13 +21,13 @@
 # automatic age-out behavior.
 #
 # Usage:
-#   bash scripts/failure/state-prune.sh --classification <name> [--dry-run]
+#   bash legacy/scripts/failure/state-prune.sh --classification <name> [--dry-run]
 #       Remove all entries with that classification.
-#   bash scripts/failure/state-prune.sh --age <duration>     [--dry-run]
+#   bash legacy/scripts/failure/state-prune.sh --age <duration>     [--dry-run]
 #       Remove entries older than <duration> (e.g., 7d, 12h, 30m).
-#   bash scripts/failure/state-prune.sh --cycle <number>     [--dry-run]
+#   bash legacy/scripts/failure/state-prune.sh --cycle <number>     [--dry-run]
 #       Remove the entry for that cycle id.
-#   bash scripts/failure/state-prune.sh --all                [--dry-run]
+#   bash legacy/scripts/failure/state-prune.sh --all                [--dry-run]
 #       Wipe failedApproaches entirely. Requires confirmation unless --yes.
 #
 # Output: JSON to stdout summarizing the operation:

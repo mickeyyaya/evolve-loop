@@ -14,8 +14,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTERS="$REPO_ROOT/scripts/cli_adapters"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ADAPTERS="$REPO_ROOT/legacy/scripts/cli_adapters"
 CAP_CHECK="$ADAPTERS/_capability-check.sh"
 SCHEMA="$ADAPTERS/_capabilities-schema.json"
 CHECK_CAPS_BIN="$REPO_ROOT/bin/check-caps"

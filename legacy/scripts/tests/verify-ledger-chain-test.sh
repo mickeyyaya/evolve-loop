@@ -9,12 +9,12 @@
 # Each test creates a tmp dir; uses --ledger flag to point verifier at the
 # synthesized file. Never touches the real .evolve/ledger.jsonl.
 #
-# Usage: bash scripts/verify-ledger-chain-test.sh
+# Usage: bash legacy/scripts/verify-ledger-chain-test.sh
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/observability/verify-ledger-chain.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/legacy/scripts/observability/verify-ledger-chain.sh"
 SCRATCH=$(mktemp -d -t "verify-ledger-XXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 

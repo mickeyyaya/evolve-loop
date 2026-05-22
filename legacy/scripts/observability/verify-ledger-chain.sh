@@ -21,10 +21,10 @@
 #   - Brand-new ledger (zero entries) — exits 0 with "nothing to verify".
 #
 # Usage:
-#   bash scripts/observability/verify-ledger-chain.sh                # human-readable
-#   bash scripts/observability/verify-ledger-chain.sh --json         # machine-readable
-#   bash scripts/observability/verify-ledger-chain.sh --quiet        # exit-code only (CI)
-#   bash scripts/observability/verify-ledger-chain.sh --ledger PATH  # alternate ledger
+#   bash legacy/scripts/observability/verify-ledger-chain.sh                # human-readable
+#   bash legacy/scripts/observability/verify-ledger-chain.sh --json         # machine-readable
+#   bash legacy/scripts/observability/verify-ledger-chain.sh --quiet        # exit-code only (CI)
+#   bash legacy/scripts/observability/verify-ledger-chain.sh --ledger PATH  # alternate ledger
 #
 # Exit codes:
 #   0 — chain intact, tip matches (or ledger is empty)
@@ -34,7 +34,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEFAULT_LEDGER="${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/.evolve/ledger.jsonl"
 
 LEDGER="$DEFAULT_LEDGER"

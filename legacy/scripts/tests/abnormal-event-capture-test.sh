@@ -8,7 +8,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -79,12 +79,12 @@ cat > "$WS5/audit-report.md" <<'EOF'
 
 | ID | Criterion | Result |
 |----|-----------|--------|
-| AC1 | scripts/tests/stub-test.sh exits 0 | GREEN |
+| AC1 | legacy/scripts/tests/stub-test.sh exits 0 | GREEN |
 | AC2 | docs/architecture/stub.md exists | GREEN |
 
 ## Findings
 
-All acceptance criteria verified against agents/evolve-builder.md and scripts/lifecycle/reconcile-carryover-todos.sh.
+All acceptance criteria verified against agents/evolve-builder.md and legacy/scripts/lifecycle/reconcile-carryover-todos.sh.
 No defects found. The build produced changes to .evolve/profiles/scout.json and docs/architecture/token-reduction-roadmap.md.
 Tests passed: 6/6. No regressions in acs/regression-suite.
 
@@ -108,7 +108,7 @@ printf '{"kind":"agent_subprocess","cycle":99,"role":"auditor","exit_code":0,"ar
     "$_sha" "$WS5/audit-report.md" > "$SCRATCH/ws5-proj/.evolve/ledger.jsonl"
 GATE_RC=0
 EVOLVE_PROJECT_ROOT="$SCRATCH/ws5-proj" \
-    bash "$REPO_ROOT/scripts/lifecycle/phase-gate.sh" audit-to-retrospective 99 "$WS5" 2>/dev/null || GATE_RC=$?
+    bash "$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh" audit-to-retrospective 99 "$WS5" 2>/dev/null || GATE_RC=$?
 [ "$GATE_RC" -eq 0 ] && pass "gate audit-to-retrospective passes on PASS+abnormal events" \
     || fail "gate audit-to-retrospective rejected PASS+abnormal (rc=$GATE_RC)"
 [ -f "$WS5/.cycle-verdict" ] && VERD=$(cat "$WS5/.cycle-verdict") || VERD=""
@@ -125,7 +125,7 @@ cat > "$WS6/audit-report.md" <<'EOF'
 # Audit Report — Cycle 99
 
 All acceptance criteria checked. No abnormal events detected during cycle execution.
-Verified scripts/lifecycle/reconcile-carryover-todos.sh and .evolve/profiles/scout.json changes.
+Verified legacy/scripts/lifecycle/reconcile-carryover-todos.sh and .evolve/profiles/scout.json changes.
 No regression failures. Build changes look correct.
 
 ## Verdict
@@ -137,7 +137,7 @@ cp "$SCRATCH/ws5-proj/.evolve/cycle-state.json" "$SCRATCH/ws6-proj/.evolve/cycle
 cp "$SCRATCH/ws5-proj/.evolve/ledger.jsonl" "$SCRATCH/ws6-proj/.evolve/ledger.jsonl"
 GATE6_RC=0
 EVOLVE_PROJECT_ROOT="$SCRATCH/ws6-proj" \
-    bash "$REPO_ROOT/scripts/lifecycle/phase-gate.sh" audit-to-retrospective 99 "$WS6" 2>/dev/null || GATE6_RC=$?
+    bash "$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh" audit-to-retrospective 99 "$WS6" 2>/dev/null || GATE6_RC=$?
 [ "$GATE6_RC" -ne 0 ] && pass "gate correctly blocks PASS without abnormal events" \
     || fail "gate should have blocked PASS without abnormal events"
 
@@ -161,7 +161,7 @@ cp "$WS7/abnormal-events.jsonl" "$ROOT7/.evolve/runs/cycle-1/abnormal-events.jso
 # scout-report and triage-decision (minimal, no carryover decisions)
 echo "# Scout" > "$WS7/scout-report.md"
 echo "# Triage" > "$WS7/triage-decision.md"
-EVOLVE_PROJECT_ROOT="$ROOT7" bash "$REPO_ROOT/scripts/lifecycle/reconcile-carryover-todos.sh" \
+EVOLVE_PROJECT_ROOT="$ROOT7" bash "$REPO_ROOT/legacy/scripts/lifecycle/reconcile-carryover-todos.sh" \
     --cycle 1 --workspace "$WS7" --verdict PASS >/dev/null 2>&1
 TODO_LEN=$(jq -r '.carryoverTodos | length' "$ROOT7/.evolve/state.json" 2>/dev/null)
 [ "$TODO_LEN" -ge 2 ] && pass "abnormal events promoted to carryoverTodos (got $TODO_LEN)" \

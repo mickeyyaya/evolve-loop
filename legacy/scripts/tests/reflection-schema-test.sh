@@ -18,15 +18,15 @@
 #   T4. Multiple slowdown categories → each appears in rollup
 #   T5. friction_received_from → pair appears in rollup
 #
-# Usage: bash scripts/tests/reflection-schema-test.sh
+# Usage: bash legacy/scripts/tests/reflection-schema-test.sh
 # Exit:  0 if all assertions pass; non-zero otherwise.
 #
 # bash 3.2 compatible.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-AGGREGATOR="$REPO_ROOT/scripts/observability/aggregate-reflections.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+AGGREGATOR="$REPO_ROOT/legacy/scripts/observability/aggregate-reflections.sh"
 SCHEMA_DOC="$REPO_ROOT/agents/reflection-journal-schema.md"
 TEMPLATES="$REPO_ROOT/agents/agent-templates.md"
 

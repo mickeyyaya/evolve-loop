@@ -7,7 +7,7 @@
 # that phase. Zero side effects. Safe to source from subagent-run.sh.
 #
 # Usage:
-#   bash scripts/dispatch/resolve-llm.sh <role> [config_path]
+#   bash legacy/scripts/dispatch/resolve-llm.sh <role> [config_path]
 #
 #   role        — profile name (e.g., "scout", "builder", "auditor")
 #   config_path — path to llm_config.json; defaults to .evolve/llm_config.json

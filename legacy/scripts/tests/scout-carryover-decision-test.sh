@@ -10,9 +10,9 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCRATCH=$(mktemp -d)
-PG="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
+PG="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
 SCOUT_PERSONA="$REPO_ROOT/agents/evolve-scout.md"
 
 PASS=0

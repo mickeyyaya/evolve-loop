@@ -6,8 +6,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VALIDATOR="$REPO_ROOT/scripts/tests/validate-handoff-artifact.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+VALIDATOR="$REPO_ROOT/legacy/scripts/tests/validate-handoff-artifact.sh"
 SCRATCH=$(mktemp -d)
 
 PASS=0

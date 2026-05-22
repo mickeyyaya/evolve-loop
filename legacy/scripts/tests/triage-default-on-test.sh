@@ -7,7 +7,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 PASS=0
 FAIL=0
@@ -40,7 +40,7 @@ fi
 
 # --- Test 3: phase-gate emits WARN when Triage skipped without opt-out ---
 header "Test 3: gate_discover_to_build emits Layer T WARN"
-PG="$REPO_ROOT/scripts/lifecycle/phase-gate.sh"
+PG="$REPO_ROOT/legacy/scripts/lifecycle/phase-gate.sh"
 if grep -qE "Triage default-on.*v8.59|EVOLVE_TRIAGE_DISABLE.*triage-decision\.md" "$PG"; then
     pass "Layer T WARN block present in gate_discover_to_build"
 else

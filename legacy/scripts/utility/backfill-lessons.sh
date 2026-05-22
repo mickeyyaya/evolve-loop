@@ -15,7 +15,7 @@
 #      Also updates instinctCount.
 #
 # Usage:
-#   bash scripts/utility/backfill-lessons.sh [--dry-run] [--cycle N]
+#   bash legacy/scripts/utility/backfill-lessons.sh [--dry-run] [--cycle N]
 #
 # Options:
 #   --dry-run   Print what would change; do not modify files.

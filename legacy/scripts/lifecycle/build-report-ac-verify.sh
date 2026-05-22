@@ -5,7 +5,7 @@
 # Reads acceptance_checks: from intent.md, runs acs/cycle-N/ predicate scripts,
 # and writes a tamper-evident AC-TABLE region into build-report.md atomically.
 #
-# Usage: bash scripts/lifecycle/build-report-ac-verify.sh <intent.md> <build-report.md>
+# Usage: bash legacy/scripts/lifecycle/build-report-ac-verify.sh <intent.md> <build-report.md>
 #
 # Output region in build-report.md:
 #   <!-- AC-TABLE-BEGIN -->
@@ -32,7 +32,7 @@ log() { echo "[ac-verify] $*" >&2; }
 # ---- Locate acs directory ---------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Infer cycle from build-report path or workspace name
 CYCLE=""

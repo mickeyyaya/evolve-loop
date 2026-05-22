@@ -15,8 +15,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
-SUBAGENT_RUN="$PROJECT_ROOT/scripts/dispatch/subagent-run.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
+SUBAGENT_RUN="$PROJECT_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 
 PASS=0
 FAIL=0
@@ -96,8 +96,8 @@ echo "=== Test 4: empty stderr + high cost → returns true ==="
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT INT TERM
 
-mkdir -p "$TMPDIR_TEST/scripts/observability"
-SCC_MOCK="$TMPDIR_TEST/scripts/observability/show-cycle-cost.sh"
+mkdir -p "$TMPDIR_TEST/legacy/scripts/observability"
+SCC_MOCK="$TMPDIR_TEST/legacy/scripts/observability/show-cycle-cost.sh"
 cat > "$SCC_MOCK" <<'EOF'
 #!/bin/bash
 echo '{"total":{"cost_usd":18.50}}'

@@ -8,10 +8,10 @@
 #
 # Usage (stdin JSON):
 #   echo '{"action":"Fix X","acceptance_criteria":"Y","target_files":"a.sh"}' \
-#     | bash scripts/utility/task-fingerprint.sh
+#     | bash legacy/scripts/utility/task-fingerprint.sh
 #
 # Usage (flags):
-#   bash scripts/utility/task-fingerprint.sh \
+#   bash legacy/scripts/utility/task-fingerprint.sh \
 #     --action "Fix X" \
 #     [--criteria "acceptance criteria text"] \
 #     [--files "a.sh b.sh c.sh"]

@@ -2,17 +2,17 @@
 #
 # _capability-check.sh — Resolve a CLI adapter's capability manifest at runtime.
 #
-# Reads scripts/cli_adapters/<adapter>.capabilities.json + runs declared probes,
+# Reads legacy/scripts/cli_adapters/<adapter>.capabilities.json + runs declared probes,
 # emits a resolved capability map per dimension. Output is JSON — machine-
 # readable for subagent-run.sh consumption and for bin/check-caps display.
 #
 # v8.51.0+
 #
 # Usage:
-#   bash scripts/cli_adapters/_capability-check.sh <adapter>             # JSON to stdout
-#   bash scripts/cli_adapters/_capability-check.sh <adapter> --human     # human-readable table
-#   bash scripts/cli_adapters/_capability-check.sh <adapter> --probe-only # just emit probe results
-#   bash scripts/cli_adapters/_capability-check.sh --list-adapters       # discover available manifests
+#   bash legacy/scripts/cli_adapters/_capability-check.sh <adapter>             # JSON to stdout
+#   bash legacy/scripts/cli_adapters/_capability-check.sh <adapter> --human     # human-readable table
+#   bash legacy/scripts/cli_adapters/_capability-check.sh <adapter> --probe-only # just emit probe results
+#   bash legacy/scripts/cli_adapters/_capability-check.sh --list-adapters       # discover available manifests
 #
 # Output JSON shape (default):
 #   {

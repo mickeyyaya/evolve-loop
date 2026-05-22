@@ -1,5 +1,5 @@
 // Tests for the ship phase. Ship is script-driven (no LLM) — it shells
-// to scripts/lifecycle/ship.sh, the canonical atomic commit-and-push
+// to legacy/scripts/lifecycle/ship.sh, the canonical atomic commit-and-push
 // shipper. Tests inject a fake CmdRunner to avoid spawning subprocesses.
 package ship
 
@@ -94,9 +94,9 @@ func TestRun_HappyPath_PASS(t *testing.T) {
 		t.Errorf("DurationMS=%d, want 250", resp.DurationMS)
 	}
 	// Inspect captured args.
-	if !strings.HasSuffix(fc.gotName, "scripts/lifecycle/ship.sh") &&
+	if !strings.HasSuffix(fc.gotName, "legacy/scripts/lifecycle/ship.sh") &&
 		!strings.HasSuffix(fc.gotName, "ship.sh") {
-		t.Errorf("invoked %q, want scripts/lifecycle/ship.sh", fc.gotName)
+		t.Errorf("invoked %q, want legacy/scripts/lifecycle/ship.sh", fc.gotName)
 	}
 	wantArgs := []string{"--class", "cycle", "feat: rate limit /login"}
 	if len(fc.gotArgs) != len(wantArgs) {

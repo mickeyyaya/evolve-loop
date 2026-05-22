@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/hooks/research-quota-gate.sh — PreToolUse research quota gate.
+# legacy/scripts/hooks/research-quota-gate.sh — PreToolUse research quota gate.
 #
 # Counts research-tool calls per agent and denies over-quota invocations.
 # Cycle A foundation (research-as-tool-c1).

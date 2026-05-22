@@ -11,9 +11,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
-DISPATCH="$PROJECT_ROOT/scripts/dispatch/evolve-loop-dispatch.sh"
-RUN_CYCLE="$PROJECT_ROOT/scripts/dispatch/run-cycle.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
+DISPATCH="$PROJECT_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
+RUN_CYCLE="$PROJECT_ROOT/legacy/scripts/dispatch/run-cycle.sh"
 
 PASS=0
 FAIL=0

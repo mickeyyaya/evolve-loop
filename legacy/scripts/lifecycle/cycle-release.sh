@@ -36,7 +36,7 @@
 #   6. Clear .evolve/cycle-state.json (cycle-state.sh clear).
 #
 # Usage:
-#   bash scripts/lifecycle/cycle-release.sh <cycle> <run_exit_code>
+#   bash legacy/scripts/lifecycle/cycle-release.sh <cycle> <run_exit_code>
 #
 # Arguments:
 #   cycle           — cycle number (integer). Required for the ledger entry.
@@ -70,8 +70,8 @@ fi
 
 LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
 STATE_FILE="$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json"
-CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
-[ -f "$CYCLE_STATE_HELPER" ] || CYCLE_STATE_HELPER="$EVOLVE_PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
+CYCLE_STATE_HELPER="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+[ -f "$CYCLE_STATE_HELPER" ] || CYCLE_STATE_HELPER="$EVOLVE_PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
 
 # --- Step 1: skip release if checkpointed ----------------------------------
 #

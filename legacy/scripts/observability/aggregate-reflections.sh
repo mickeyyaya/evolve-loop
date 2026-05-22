@@ -10,11 +10,11 @@
 # Design doc:       docs/architecture/reflection-journal.md
 #
 # Usage:
-#   bash scripts/observability/aggregate-reflections.sh                    # default --window 5, human format
-#   bash scripts/observability/aggregate-reflections.sh --window 10
-#   bash scripts/observability/aggregate-reflections.sh --phase scout      # filter by phase
-#   bash scripts/observability/aggregate-reflections.sh --format=json      # emit JSON for dashboard.sh
-#   bash scripts/observability/aggregate-reflections.sh --runs-dir <path>  # override .evolve/runs/ (testing)
+#   bash legacy/scripts/observability/aggregate-reflections.sh                    # default --window 5, human format
+#   bash legacy/scripts/observability/aggregate-reflections.sh --window 10
+#   bash legacy/scripts/observability/aggregate-reflections.sh --phase scout      # filter by phase
+#   bash legacy/scripts/observability/aggregate-reflections.sh --format=json      # emit JSON for dashboard.sh
+#   bash legacy/scripts/observability/aggregate-reflections.sh --runs-dir <path>  # override .evolve/runs/ (testing)
 #
 # Exit codes:
 #   0 — rollup produced
@@ -58,7 +58,7 @@ esac
 # Resolve runs dir
 if [ -z "$RUNS_DIR" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
     RUNS_DIR="$REPO_ROOT/.evolve/runs"
 fi
 

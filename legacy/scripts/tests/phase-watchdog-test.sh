@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# phase-watchdog-test.sh — Tests for scripts/dispatch/phase-watchdog.sh
+# phase-watchdog-test.sh — Tests for legacy/scripts/dispatch/phase-watchdog.sh
 #
 # Tests:
 #   1. Disable flag: EVOLVE_INACTIVITY_DISABLE=1 causes immediate rc=0 exit
@@ -9,7 +9,7 @@
 #      writes stall-progress.json, and checkpoints cycle-state.json
 #
 # Usage:
-#   bash scripts/tests/phase-watchdog-test.sh
+#   bash legacy/scripts/tests/phase-watchdog-test.sh
 #
 # Exit codes:
 #   0 — all tests passed

@@ -9,10 +9,10 @@
 # directly.
 #
 # Usage:
-#   bash scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace_path> [--prompt-file PATH]
-#   bash scripts/dispatch/subagent-run.sh --validate-profile <agent>
-#   bash scripts/dispatch/subagent-run.sh --check-token <artifact_path> <token>
-#   bash scripts/dispatch/subagent-run.sh --check-ctx-advisory <profile_json> <tokens>
+#   bash legacy/scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace_path> [--prompt-file PATH]
+#   bash legacy/scripts/dispatch/subagent-run.sh --validate-profile <agent>
+#   bash legacy/scripts/dispatch/subagent-run.sh --check-token <artifact_path> <token>
+#   bash legacy/scripts/dispatch/subagent-run.sh --check-ctx-advisory <profile_json> <tokens>
 #
 # Arguments:
 #   <agent>           — one of: intent, scout, tdd-engineer, builder, auditor, inspirer, evaluator, retrospective, orchestrator, plan-reviewer, triage, memo, tester
@@ -42,7 +42,7 @@ __rr_self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$__rr_self/../lifecycle/resolve-roots.sh"
 
 PROFILES_DIR="${EVOLVE_PROFILES_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/.evolve/profiles}"
-ADAPTERS_DIR="${EVOLVE_ADAPTERS_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/scripts/cli_adapters}"
+ADAPTERS_DIR="${EVOLVE_ADAPTERS_DIR_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/legacy/scripts/cli_adapters}"
 LEDGER="${EVOLVE_LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
 
 # REAL_ADAPTERS_DIR always points to the cli_adapters dir alongside this script.
@@ -82,7 +82,7 @@ unset _today
 if [ -z "${_EVOLVE_AUTH_MODE_LOGGED:-}" ]; then
     _EVOLVE_AUTH_MODE_LOGGED=1
     export _EVOLVE_AUTH_MODE_LOGGED
-    _doctor="${EVOLVE_PLUGIN_ROOT:-$EVOLVE_PROJECT_ROOT}/scripts/utility/doctor-subscription-auth.sh"
+    _doctor="${EVOLVE_PLUGIN_ROOT:-$EVOLVE_PROJECT_ROOT}/legacy/scripts/utility/doctor-subscription-auth.sh"
     if [ -f "$_doctor" ]; then
         _auth_json=$(bash "$_doctor" --json 2>/dev/null || echo '{"mode":"unknown","notes":"doctor failed"}')
         _auth_mode=$(printf '%s' "$_auth_json" | grep -o '"mode":"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "unknown")
@@ -154,8 +154,8 @@ _quota_likely() {
         # No bc → can't do the correlation check; conservatively return false.
         return 1
     fi
-    local scc="$EVOLVE_PLUGIN_ROOT/scripts/observability/show-cycle-cost.sh"
-    [ -x "$scc" ] || scc="$EVOLVE_PROJECT_ROOT/scripts/observability/show-cycle-cost.sh"
+    local scc="$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability/show-cycle-cost.sh"
+    [ -x "$scc" ] || scc="$EVOLVE_PROJECT_ROOT/legacy/scripts/observability/show-cycle-cost.sh"
     if [ ! -x "$scc" ]; then
         return 1
     fi
@@ -337,7 +337,7 @@ _write_cache_prefix() {
 #
 # Each new ledger entry's prev_hash is the SHA256 of the previous entry's
 # full JSON line. Modifying any historical entry breaks the chain at the
-# next entry, detectable by scripts/observability/verify-ledger-chain.sh. After write,
+# next entry, detectable by legacy/scripts/observability/verify-ledger-chain.sh. After write,
 # the new entry's SHA256 is recorded to .evolve/ledger.tip atomically;
 # the tip detects truncation that the chain alone cannot catch.
 #
@@ -481,8 +481,8 @@ cmd_validate_profile() {
     # v10.X ADR-1: LLM router — honor EVOLVE_LLM_CONFIG_PATH in validate path.
     local _vp_cfg="${EVOLVE_LLM_CONFIG_PATH:-${EVOLVE_PROJECT_ROOT}/.evolve/llm_config.json}"
     local _vp_llm_json=""
-    local _vp_resolver="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/resolve-llm.sh"
-    [ -f "$_vp_resolver" ] || _vp_resolver="$EVOLVE_PROJECT_ROOT/scripts/dispatch/resolve-llm.sh"
+    local _vp_resolver="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/resolve-llm.sh"
+    [ -f "$_vp_resolver" ] || _vp_resolver="$EVOLVE_PROJECT_ROOT/legacy/scripts/dispatch/resolve-llm.sh"
     _vp_llm_json=$(bash "$_vp_resolver" "$agent" "$_vp_cfg" 2>/dev/null) || _vp_llm_json=""
     local vp_cli vp_cli_source vp_resolved_model
     if [ -n "$_vp_llm_json" ]; then
@@ -671,8 +671,8 @@ cmd_run() {
     # Resolution: llm_config.phases.<role> > llm_config._fallback > profile.cli
     local _llm_cfg_path="${EVOLVE_LLM_CONFIG_PATH:-${EVOLVE_PROJECT_ROOT}/.evolve/llm_config.json}"
     local _llm_json=""
-    local _resolver="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/resolve-llm.sh"
-    [ -f "$_resolver" ] || _resolver="$EVOLVE_PROJECT_ROOT/scripts/dispatch/resolve-llm.sh"
+    local _resolver="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/resolve-llm.sh"
+    [ -f "$_resolver" ] || _resolver="$EVOLVE_PROJECT_ROOT/legacy/scripts/dispatch/resolve-llm.sh"
     _llm_json=$(bash "$_resolver" "$agent_role" "$_llm_cfg_path" 2>/dev/null) || _llm_json=""
     local cli cli_resolution_source cli_resolved_model
     if [ -n "$_llm_json" ]; then
@@ -788,7 +788,7 @@ EOF
         # Verify the bedrock script exists; the adapter will WARN-only if it
         # actually fails to invoke, but failing fast here surfaces config bugs
         # earlier than runtime.
-        local _bic_script="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/build-invocation-context.sh"
+        local _bic_script="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/build-invocation-context.sh"
         if [ ! -x "$_bic_script" ]; then
             fail "EVOLVE_CACHE_PREFIX_V2=1 but build-invocation-context.sh missing or non-executable at $_bic_script"
         fi
@@ -977,7 +977,7 @@ ADVEOF
     # already set (manual test, legacy caller), respect it. Otherwise read the
     # canonical path that run-cycle.sh wrote via `cycle-state.sh set-worktree`.
     if [ -z "${WORKTREE_PATH:-}" ]; then
-        WORKTREE_PATH=$("$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh" get active_worktree 2>/dev/null || true)
+        WORKTREE_PATH=$("$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh" get active_worktree 2>/dev/null || true)
         if [ -n "$WORKTREE_PATH" ]; then
             log "WORKTREE_PATH derived from cycle-state.json: $WORKTREE_PATH"
         fi
@@ -1152,7 +1152,7 @@ ADVEOF
         local _observer_args=()
         [ "${EVOLVE_OBSERVER_ENFORCE:-0}" = "1" ] && _observer_args+=("--enforce")
         # v10.0.0: bash 3.2 + set -u fix — empty array expansion needs the :+ guard.
-        bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
+        bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/phase-observer.sh" \
             ${_observer_args[@]:+"${_observer_args[@]}"} \
             "$workspace" "$$" "$cycle" "$agent" "$agent" "$_observer_cycle_state" \
             >/dev/null 2>&1 &
@@ -1265,16 +1265,16 @@ ADVEOF
                 && _quota_likely "$_stderr_tail" "$cycle"; then
             log "QUOTA-LIKELY: rc=1 + empty stderr + cost in danger zone — classifying as quota-likely"
             log "  writing checkpoint and signaling EXIT trap to preserve state"
-            local _csh="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
-            [ -f "$_csh" ] || _csh="$EVOLVE_PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
+            local _csh="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
+            [ -f "$_csh" ] || _csh="$EVOLVE_PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
             # v10.6.0 auto-resume Layer 1+2 glue: compute the estimated quota
             # reset time and export it for cycle-state.sh checkpoint to persist
             # in the checkpoint block. estimate-quota-reset.sh prefers
             # EVOLVE_QUOTA_RESET_AT operator override > parsed hint file in the
             # workspace > now + EVOLVE_QUOTA_RESET_HOURS fallback. Failure is
             # non-fatal — we still write the checkpoint, just without timing.
-            local _eqr="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/estimate-quota-reset.sh"
-            [ -f "$_eqr" ] || _eqr="$EVOLVE_PROJECT_ROOT/scripts/dispatch/estimate-quota-reset.sh"
+            local _eqr="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/estimate-quota-reset.sh"
+            [ -f "$_eqr" ] || _eqr="$EVOLVE_PROJECT_ROOT/legacy/scripts/dispatch/estimate-quota-reset.sh"
             if [ -f "$_eqr" ]; then
                 local _eqr_out
                 _eqr_out=$(bash "$_eqr" "$workspace" 2>/dev/null) || _eqr_out=""
@@ -1286,7 +1286,7 @@ ADVEOF
                 fi
             fi
             if bash "$_csh" checkpoint quota-likely 2>/dev/null; then
-                log "  checkpoint written; resume with: bash scripts/dispatch/evolve-loop-dispatch.sh --resume"
+                log "  checkpoint written; resume with: bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume"
             else
                 log "  WARN: checkpoint write failed; setting EVOLVE_CHECKPOINT_TRIGGERED=1 for EXIT trap"
             fi
@@ -1414,8 +1414,8 @@ ADVEOF
     # tracker fault cannot corrupt the audit-binding chain.
     if [ "${EVOLVE_TRACKER_ENABLED:-0}" = "1" ] && [ -s "$stdout_log" ]; then
         local _inv_id="${agent}-c${cycle}-${challenge_token:0:12}"
-        local _tracker_sh="$EVOLVE_PLUGIN_ROOT/scripts/observability/tracker-writer.sh"
-        local _perf_sh="$EVOLVE_PLUGIN_ROOT/scripts/observability/append-phase-perf.sh"
+        local _tracker_sh="$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability/tracker-writer.sh"
+        local _perf_sh="$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability/append-phase-perf.sh"
         if [ -x "$_tracker_sh" ]; then
             cat "$stdout_log" | bash "$_tracker_sh" \
                 --cycle="$cycle" --phase="$agent" --invocation-id="$_inv_id" \
@@ -1492,7 +1492,7 @@ cmd_dispatch_parallel() {
     # ledger entry. All fan-out workers share the same profile (and cli), so
     # one tier represents the whole fan-out.
     local fanout_quality_tier="unknown"
-    local _cap_check="$EVOLVE_PLUGIN_ROOT/scripts/cli_adapters/_capability-check.sh"
+    local _cap_check="$EVOLVE_PLUGIN_ROOT/legacy/scripts/cli_adapters/_capability-check.sh"
     local _fanout_cli
     _fanout_cli=$(jq -r '.cli // "claude"' "$profile" 2>/dev/null)
     if [ -x "$_cap_check" ] && [ -n "$_fanout_cli" ]; then
@@ -1589,7 +1589,7 @@ cmd_dispatch_parallel() {
     # each to running → done/failed as they execute.
     if [ "${EVOLVE_FANOUT_TRACK_WORKERS:-1}" = "1" ] && [ -f "$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json" ]; then
         # shellcheck disable=SC2086
-        bash "$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh" init-workers "$agent" $task_d_worker_names 2>/dev/null || true
+        bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh" init-workers "$agent" $task_d_worker_names 2>/dev/null || true
     fi
 
     # Run workers in parallel.
@@ -1598,7 +1598,7 @@ cmd_dispatch_parallel() {
     local fanout_args=()
     [ -n "$cache_prefix_file" ] && fanout_args+=(--cache-prefix-file "$cache_prefix_file")
     fanout_args+=("$commands_tsv" "$results_tsv")
-    bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/fanout-dispatch.sh" "${fanout_args[@]}" || fanout_rc=$?
+    bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/fanout-dispatch.sh" "${fanout_args[@]}" || fanout_rc=$?
 
     if [ "$fanout_rc" -ne 0 ]; then
         log "dispatch-parallel: fanout-dispatch returned non-zero (rc=$fanout_rc); per-worker exit codes:"
@@ -1616,7 +1616,7 @@ cmd_dispatch_parallel() {
     # Aggregate worker artifacts into canonical phase artifact.
     local agg_rc=0
     # shellcheck disable=SC2086
-    bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/aggregator.sh" "$merge_phase" "$agg_path" $worker_artifacts || agg_rc=$?
+    bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/aggregator.sh" "$merge_phase" "$agg_path" $worker_artifacts || agg_rc=$?
 
     # Write parent ledger entry regardless of agg_rc (record outcome).
     _write_fanout_ledger_entry "$cycle" "$agent" "$parent_token" "$git_state_at_start" \

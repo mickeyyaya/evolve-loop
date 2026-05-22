@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# parity-audit-test.sh — Unit tests for scripts/parity-audit.sh.
+# parity-audit-test.sh — Unit tests for legacy/scripts/parity-audit.sh.
 #
 # Tests the dry-run and simulate paths only — neither spends real money.
 # The full-mode (real-cycle) path is operator-driven and not unit-tested here.
 #
-# Usage: bash scripts/tests/parity-audit-test.sh
+# Usage: bash legacy/scripts/tests/parity-audit-test.sh
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PARITY="$REPO_ROOT/scripts/parity-audit.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+PARITY="$REPO_ROOT/legacy/scripts/parity-audit.sh"
 
 PASS=0; FAIL=0; TESTS_TOTAL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }

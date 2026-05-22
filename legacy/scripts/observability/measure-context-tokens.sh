@@ -24,7 +24,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CYCLE="${1:-}"
 JSON_OUTPUT=0
 [ "${2:-}" = "--json" ] && JSON_OUTPUT=1
@@ -40,7 +40,7 @@ if [ ! -d "$WORKSPACE" ]; then
     exit 1
 fi
 
-BIC="$REPO_ROOT/scripts/dispatch/build-invocation-context.sh"
+BIC="$REPO_ROOT/legacy/scripts/dispatch/build-invocation-context.sh"
 
 # Compute bytes + token estimate for a file (returns "0 0" if missing).
 _size() {

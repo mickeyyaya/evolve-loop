@@ -192,7 +192,7 @@ func AllOf(tb TB, predicates ...func(TB) bool) bool {
 func SetupTempProject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, sub := range []string{".evolve", ".evolve/runs", "docs", "scripts/lifecycle"} {
+	for _, sub := range []string{".evolve", ".evolve/runs", "docs", "legacy/scripts/lifecycle"} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
 			t.Fatalf("SetupTempProject mkdir %s: %v", sub, err)
 		}

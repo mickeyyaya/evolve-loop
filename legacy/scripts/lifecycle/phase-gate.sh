@@ -7,7 +7,7 @@
 # The orchestrator (LLM) cannot skip this script because it's invoked by
 # the host environment, not by the LLM itself.
 #
-# Usage: bash scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
+# Usage: bash legacy/scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
 #
 # Gates:
 #   intent-to-discover  — Verify intent.md valid; direct transition (cycle-88+)
@@ -24,7 +24,7 @@
 #
 # IMPORTANT: This script is the trust boundary. The LLM orchestrator
 # should NOT be able to modify this script during a cycle. If the Builder
-# modifies files in scripts/, the Auditor flags it as CRITICAL.
+# modifies files in legacy/scripts/, the Auditor flags it as CRITICAL.
 
 set -euo pipefail
 
@@ -87,7 +87,7 @@ check_ledger_role() {
 }
 
 # Verify subagent-run.sh ledger entries match on-disk artifacts.
-# When subagents are invoked via scripts/dispatch/subagent-run.sh, each invocation appends
+# When subagents are invoked via legacy/scripts/dispatch/subagent-run.sh, each invocation appends
 # an "agent_subprocess" ledger entry containing the SHA256 of the artifact at
 # write time. This check verifies the artifact has not been mutated between the
 # subagent's exit and the phase gate. Catches the "wrote artifact then mutated"
@@ -246,11 +246,11 @@ check_no_forgery_scripts() {
     # Check for new .sh files created during this cycle (LLM should not write scripts)
     local new_scripts
     new_scripts=$(find . -maxdepth 3 -name '*.sh' -newer "$WORKSPACE/.state-checksum" 2>/dev/null \
-        | grep -v 'scripts/lifecycle/phase-gate.sh' \
-        | grep -v 'scripts/observability/cycle-health-check.sh' \
-        | grep -v 'scripts/verification/verify-eval.sh' \
-        | grep -v 'scripts/verification/eval-quality-check.sh' \
-        | grep -v 'scripts/utility/setup-skill-inventory.sh' \
+        | grep -v 'legacy/scripts/lifecycle/phase-gate.sh' \
+        | grep -v 'legacy/scripts/observability/cycle-health-check.sh' \
+        | grep -v 'legacy/scripts/verification/verify-eval.sh' \
+        | grep -v 'legacy/scripts/verification/eval-quality-check.sh' \
+        | grep -v 'legacy/scripts/utility/setup-skill-inventory.sh' \
         | head -5 || true)
     if [ -n "$new_scripts" ]; then
         log "WARN: New shell scripts created during cycle: $new_scripts — review for forgery"
@@ -306,9 +306,9 @@ gate_discover_to_build() {
     # WARN-mode default-on: an ungrounded claim logs WARN but does NOT fail the
     # gate. Promote to fail after one verification cycle confirms no false-
     # positives. Opt out with EVOLVE_SCOUT_GROUNDING_DISABLE=1.
-    if [ "${EVOLVE_SCOUT_GROUNDING_DISABLE:-0}" != "1" ] && [ -x "scripts/lifecycle/scout-grounding-check.sh" ]; then
+    if [ "${EVOLVE_SCOUT_GROUNDING_DISABLE:-0}" != "1" ] && [ -x "legacy/scripts/lifecycle/scout-grounding-check.sh" ]; then
         local _grounding_rc=0
-        bash scripts/lifecycle/scout-grounding-check.sh "$WORKSPACE/scout-report.md" > "$WORKSPACE/scout-grounding.log" 2>&1 || _grounding_rc=$?
+        bash legacy/scripts/lifecycle/scout-grounding-check.sh "$WORKSPACE/scout-report.md" > "$WORKSPACE/scout-grounding.log" 2>&1 || _grounding_rc=$?
         if [ "$_grounding_rc" = "0" ]; then
             log "OK: scout grounding check passed"
         else
@@ -324,10 +324,10 @@ gate_discover_to_build() {
     log "OK: $eval_count eval definition(s) found"
 
     # 3. Run eval quality check on new evals
-    if [ -f "scripts/verification/eval-quality-check.sh" ]; then
+    if [ -f "legacy/scripts/verification/eval-quality-check.sh" ]; then
         for eval_file in "$EVOLVE_DIR/evals/"*.md; do
             local result
-            result=$(bash scripts/verification/eval-quality-check.sh "$eval_file" 2>&1) || {
+            result=$(bash legacy/scripts/verification/eval-quality-check.sh "$eval_file" 2>&1) || {
                 local exit_code=$?
                 if [ "$exit_code" -eq 2 ]; then
                     anomaly "Level 0 eval commands in $eval_file — possible specification gaming"
@@ -354,7 +354,7 @@ gate_discover_to_build() {
     # find -newer is precise: only files mtime > marker, i.e. created this cycle.
     # Threshold: 0.7 (WARN-only this rollout; escalate to FAIL after one verification cycle).
     # Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
-    if [ -x "scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
+    if [ -x "legacy/scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
         local _new_evals _mutation_warnings _marker
         _mutation_warnings=0
         _marker="$WORKSPACE/.cycle-start-marker"
@@ -370,7 +370,7 @@ gate_discover_to_build() {
             while IFS= read -r eval_file; do
                 [ -f "$eval_file" ] || continue
                 local mut_out mut_rc
-                mut_out=$(bash scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.7 2>&1)
+                mut_out=$(bash legacy/scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.7 2>&1)
                 mut_rc=$?
                 case "$mut_rc" in
                     0) log "OK: $eval_file kill rate ≥ 0.7 — eval is rigorous" ;;
@@ -403,9 +403,9 @@ EOF
     fi
 
     # C2-handoff-schemas: scout-report schema violations fail the gate (C4 enforced)
-    if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
+    if [ -x "legacy/scripts/tests/validate-handoff-artifact.sh" ]; then
         local _schema_out
-        _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
+        _schema_out=$(bash legacy/scripts/tests/validate-handoff-artifact.sh \
             --artifact "$WORKSPACE/scout-report.md" --type scout \
             --state "${STATE:-}" 2>&1) || true
         if [ -z "$_schema_out" ]; then
@@ -480,7 +480,7 @@ gate_triage_to_plan_review() {
     # side internally via the same resolve-roots.sh helper.
     # Best-effort: failures log a WARN but do not block the gate, since the
     # decision file remains authoritative and the orchestrator can re-derive.
-    local _cs_script="${EVOLVE_PLUGIN_ROOT:-$EVOLVE_PROJECT_ROOT}/scripts/lifecycle/cycle-state.sh"
+    local _cs_script="${EVOLVE_PLUGIN_ROOT:-$EVOLVE_PROJECT_ROOT}/legacy/scripts/lifecycle/cycle-state.sh"
     if [ -f "$_cs_script" ]; then
         if ! bash "$_cs_script" set-estimate "$size" >/dev/null 2>&1; then
             log "WARN: failed to mirror cycle_size_estimate=$size into cycle-state.json (orchestrator must re-derive from triage-decision.md)"
@@ -804,7 +804,7 @@ gate_build_to_audit() {
     # both Scout-created and Builder-created evals; the redundancy with the
     # discover-to-build pass is acceptable (typical cycle adds 0-2 evals).
     # Threshold: 0.7 WARN-only. Opt-out: EVOLVE_MUTATION_CHECK_DISABLE=1.
-    if [ -x "scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
+    if [ -x "legacy/scripts/verification/mutate-eval.sh" ] && [ "${EVOLVE_MUTATION_CHECK_DISABLE:-0}" != "1" ]; then
         local _new_build_evals _build_mut_warnings _b_marker
         _build_mut_warnings=0
         _b_marker="$WORKSPACE/.cycle-start-marker"
@@ -820,7 +820,7 @@ gate_build_to_audit() {
             while IFS= read -r eval_file; do
                 [ -f "$eval_file" ] || continue
                 local b_mut_out b_mut_rc
-                b_mut_out=$(bash scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.7 2>&1)
+                b_mut_out=$(bash legacy/scripts/verification/mutate-eval.sh "$eval_file" --threshold 0.7 2>&1)
                 b_mut_rc=$?
                 case "$b_mut_rc" in
                     0) log "OK: $eval_file kill rate ≥ 0.7" ;;
@@ -851,9 +851,9 @@ EOF
     fi
 
     # C2-handoff-schemas: build-report schema violations fail the gate (C5 enforced)
-    if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
+    if [ -x "legacy/scripts/tests/validate-handoff-artifact.sh" ]; then
         local _schema_out
-        _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
+        _schema_out=$(bash legacy/scripts/tests/validate-handoff-artifact.sh \
             --artifact "$WORKSPACE/build-report.md" --type build 2>&1) || true
         if [ -z "$_schema_out" ]; then
             log "OK: build-report.md passes handoff schema (C2)"
@@ -866,10 +866,10 @@ EOF
     # Blocks gate if any acs/cycle-N predicates are trivially-tautological (grep-only).
     # Evaluates behavioral vs. grep-only classification for every predicate written
     # during this build. FAIL-gate: grep-only predicates block audit phase.
-    if [ -x "scripts/verification/lint-acs-predicates.sh" ]; then
+    if [ -x "legacy/scripts/verification/lint-acs-predicates.sh" ]; then
         local _lint_acs_rc
         _lint_acs_rc=0
-        bash scripts/verification/lint-acs-predicates.sh --predicates-dir "${EVOLVE_PROJECT_ROOT:-.}/acs/cycle-${CYCLE}" 2>&1 || _lint_acs_rc=$?
+        bash legacy/scripts/verification/lint-acs-predicates.sh --predicates-dir "${EVOLVE_PROJECT_ROOT:-.}/acs/cycle-${CYCLE}" 2>&1 || _lint_acs_rc=$?
         if [ "$_lint_acs_rc" -ne 0 ]; then
             log "FAIL gate_build_to_audit: grep-only predicates detected in acs/cycle-${CYCLE} — run with --explain for details"
             return 1
@@ -879,11 +879,11 @@ EOF
 
     # 6. Validate-predicate sweep: WARN on NOT_EXECUTABLE predicates in acs/cycle-N/
     # Non-blocking WARN (logs to stderr + visible to Auditor). Closure for cycle-55 audit H-3.
-    if [ -x "scripts/verification/validate-predicate.sh" ]; then
+    if [ -x "legacy/scripts/verification/validate-predicate.sh" ]; then
         local _pred_file _pred_validate_out _pred_validate_rc
         while IFS= read -r _pred_file; do
             [ -f "$_pred_file" ] || continue
-            _pred_validate_out=$(bash scripts/verification/validate-predicate.sh "$_pred_file" 2>&1)
+            _pred_validate_out=$(bash legacy/scripts/verification/validate-predicate.sh "$_pred_file" 2>&1)
             _pred_validate_rc=$?
             if [ "$_pred_validate_rc" -ne 0 ]; then
                 echo "[phase-gate] WARN: predicate validation failed for $_pred_file: $_pred_validate_out" >&2
@@ -895,10 +895,10 @@ EOF
     # Fixes producer-is-verifier defect that failed cycles 70, 71, 74, 75, 79.
     local _harness _intent
     _harness=""
-    if [ -n "${EVOLVE_PLUGIN_ROOT:-}" ] && [ -x "${EVOLVE_PLUGIN_ROOT}/scripts/lifecycle/build-report-ac-verify.sh" ]; then
-        _harness="${EVOLVE_PLUGIN_ROOT}/scripts/lifecycle/build-report-ac-verify.sh"
-    elif [ -x "${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/scripts/lifecycle/build-report-ac-verify.sh" ]; then
-        _harness="${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/scripts/lifecycle/build-report-ac-verify.sh"
+    if [ -n "${EVOLVE_PLUGIN_ROOT:-}" ] && [ -x "${EVOLVE_PLUGIN_ROOT}/legacy/scripts/lifecycle/build-report-ac-verify.sh" ]; then
+        _harness="${EVOLVE_PLUGIN_ROOT}/legacy/scripts/lifecycle/build-report-ac-verify.sh"
+    elif [ -x "${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/legacy/scripts/lifecycle/build-report-ac-verify.sh" ]; then
+        _harness="${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}/legacy/scripts/lifecycle/build-report-ac-verify.sh"
     fi
     _intent="$WORKSPACE/intent.md"
     if [ -n "$_harness" ]; then
@@ -955,7 +955,7 @@ gate_audit_to_ship() {
     # EVOLVE_AUDIT_CITATION_DISABLE=1). Cycle 61's audit cited gemini.sh:206
     # which existed in HEAD but wasn't in cycle 61's commit — exactly the
     # class of scope creep this check catches.
-    if [ "${EVOLVE_AUDIT_CITATION_DISABLE:-0}" != "1" ] && [ -x "scripts/lifecycle/audit-citation-check.sh" ]; then
+    if [ "${EVOLVE_AUDIT_CITATION_DISABLE:-0}" != "1" ] && [ -x "legacy/scripts/lifecycle/audit-citation-check.sh" ]; then
         # Compute the cycle's effective diff scope: any file in any state of
         # being part of this cycle's work (staged, working-tree-modified, or
         # already committed to the cycle's branch).
@@ -970,7 +970,7 @@ gate_audit_to_ship() {
         )
         local _audit_cit_rc=0
         if [ -n "$_cycle_scope" ]; then
-            bash scripts/lifecycle/audit-citation-check.sh "$WORKSPACE/audit-report.md" \
+            bash legacy/scripts/lifecycle/audit-citation-check.sh "$WORKSPACE/audit-report.md" \
                 --diff-files "$_cycle_scope" > "$WORKSPACE/audit-citation.log" 2>&1 || _audit_cit_rc=$?
             if [ "$_audit_cit_rc" = "0" ]; then
                 log "OK: audit citation check passed (all path:line citations in cycle scope)"
@@ -984,10 +984,10 @@ gate_audit_to_ship() {
     fi
 
     # 3. Independent eval verification (CRITICAL — this is the main anti-cheating gate)
-    if [ -f "scripts/verification/verify-eval.sh" ]; then
+    if [ -f "legacy/scripts/verification/verify-eval.sh" ]; then
         log "Running independent eval verification..."
         local verify_result
-        verify_result=$(bash scripts/verification/verify-eval.sh "$EVOLVE_DIR/evals" "$WORKSPACE" 2>&1) || {
+        verify_result=$(bash legacy/scripts/verification/verify-eval.sh "$EVOLVE_DIR/evals" "$WORKSPACE" 2>&1) || {
             local exit_code=$?
             fail "Independent eval verification FAILED (exit $exit_code): $verify_result"
         }
@@ -997,10 +997,10 @@ gate_audit_to_ship() {
     fi
 
     # 4. Cycle health check (11-signal fingerprint)
-    if [ -f "scripts/observability/cycle-health-check.sh" ]; then
+    if [ -f "legacy/scripts/observability/cycle-health-check.sh" ]; then
         log "Running cycle health check..."
         local health_result
-        health_result=$(bash scripts/observability/cycle-health-check.sh "$CYCLE" "$WORKSPACE" "$EVOLVE_DIR" 2>&1) || {
+        health_result=$(bash legacy/scripts/observability/cycle-health-check.sh "$CYCLE" "$WORKSPACE" "$EVOLVE_DIR" 2>&1) || {
             local exit_code=$?
             if [ "$exit_code" -eq 2 ]; then
                 anomaly "Health check detected ANOMALY: $health_result"
@@ -1049,9 +1049,9 @@ gate_audit_to_ship() {
     # 6. Optional advisory code-review pass (EVOLVE_AUDIT_ADVISORY_REVIEW=1, default OFF)
     # Runs AFTER verdict is bound — purely informational; does not affect ship decision.
     if [ "${EVOLVE_AUDIT_ADVISORY_REVIEW:-0}" = "1" ]; then
-        if [ -f "scripts/lifecycle/audit-advisory-review.sh" ]; then
+        if [ -f "legacy/scripts/lifecycle/audit-advisory-review.sh" ]; then
             log "Running advisory code-review pass (EVOLVE_AUDIT_ADVISORY_REVIEW=1)..."
-            bash scripts/lifecycle/audit-advisory-review.sh "$CYCLE" "$WORKSPACE" 2>/dev/null || true
+            bash legacy/scripts/lifecycle/audit-advisory-review.sh "$CYCLE" "$WORKSPACE" 2>/dev/null || true
             log "OK: Advisory pass complete (result in $WORKSPACE/audit-advisory-review.md)"
         else
             log "WARN: audit-advisory-review.sh not found; advisory pass skipped"
@@ -1059,9 +1059,9 @@ gate_audit_to_ship() {
     fi
 
     # C2-handoff-schemas: audit-report schema violations fail the gate (C5 enforced)
-    if [ -x "scripts/tests/validate-handoff-artifact.sh" ]; then
+    if [ -x "legacy/scripts/tests/validate-handoff-artifact.sh" ]; then
         local _schema_out
-        _schema_out=$(bash scripts/tests/validate-handoff-artifact.sh \
+        _schema_out=$(bash legacy/scripts/tests/validate-handoff-artifact.sh \
             --artifact "$WORKSPACE/audit-report.md" --type audit 2>&1) || true
         if [ -z "$_schema_out" ]; then
             log "OK: audit-report.md passes handoff schema (C2)"
@@ -1273,10 +1273,10 @@ gate_cycle_complete() {
     # Append/replace the `## CLI Resolution` section in orchestrator-report.md
     # from ledger truth. Orchestrator persona is instructed NOT to write this
     # section itself — preventing the unverifiable-narrative class of bug.
-    if [ -x "scripts/observability/render-cli-resolution.sh" ] && \
+    if [ -x "legacy/scripts/observability/render-cli-resolution.sh" ] && \
        [ -f "$WORKSPACE/orchestrator-report.md" ]; then
         local _cli_section
-        _cli_section=$(bash scripts/observability/render-cli-resolution.sh "$CYCLE" 2>/dev/null || true)
+        _cli_section=$(bash legacy/scripts/observability/render-cli-resolution.sh "$CYCLE" 2>/dev/null || true)
         if [ -n "$_cli_section" ]; then
             # Strip any existing ## CLI Resolution section, then append the fresh one.
             local _tmp="$WORKSPACE/orchestrator-report.md.tmp.$$"

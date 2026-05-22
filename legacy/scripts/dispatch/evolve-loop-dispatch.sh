@@ -19,7 +19,7 @@
 # skill executes EXACTLY ONE bash command: this script. The dispatcher then:
 #
 #   1. Parses cycles + strategy + goal from positional args.
-#   2. Loops `bash scripts/dispatch/run-cycle.sh "<goal>"` once per cycle.
+#   2. Loops `bash legacy/scripts/dispatch/run-cycle.sh "<goal>"` once per cycle.
 #   3. After each cycle, asserts the ledger contains a fresh
 #      agent_subprocess entry for scout, builder, AND auditor.
 #   4. If any cycle is missing entries, halts the batch with a loud error.
@@ -33,9 +33,9 @@
 #
 # USAGE
 #
-#   bash scripts/dispatch/evolve-loop-dispatch.sh [CYCLES] [STRATEGY] [GOAL...]
-#   bash scripts/dispatch/evolve-loop-dispatch.sh --dry-run [args...]
-#   bash scripts/dispatch/evolve-loop-dispatch.sh --help
+#   bash legacy/scripts/dispatch/evolve-loop-dispatch.sh [CYCLES] [STRATEGY] [GOAL...]
+#   bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --dry-run [args...]
+#   bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --help
 #
 # ARGS
 #
@@ -95,10 +95,10 @@ unset __rr_self
 # so subagents can invoke kernel scripts by bare name. Eliminates the
 # install-layout-fragile path-pattern enumeration in orchestrator/auditor
 # allowlists. Inherits to claude -p subprocess via env propagation.
-export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/scripts/dispatch:$EVOLVE_PLUGIN_ROOT/scripts/lifecycle:$EVOLVE_PLUGIN_ROOT/scripts/failure:$EVOLVE_PLUGIN_ROOT/scripts/observability:$EVOLVE_PLUGIN_ROOT/scripts/verification:$EVOLVE_PLUGIN_ROOT/scripts/utility:$EVOLVE_PLUGIN_ROOT/scripts/release:$EVOLVE_PLUGIN_ROOT/scripts/tests:$PATH"
+export PATH="$EVOLVE_PLUGIN_ROOT/scripts:$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch:$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle:$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure:$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability:$EVOLVE_PLUGIN_ROOT/legacy/scripts/verification:$EVOLVE_PLUGIN_ROOT/legacy/scripts/utility:$EVOLVE_PLUGIN_ROOT/legacy/scripts/release:$EVOLVE_PLUGIN_ROOT/legacy/scripts/tests:$PATH"
 
 # Read-only: run-cycle.sh ships with the plugin
-RUN_CYCLE="${RUN_CYCLE_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/scripts/dispatch/run-cycle.sh}"
+RUN_CYCLE="${RUN_CYCLE_OVERRIDE:-$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/run-cycle.sh}"
 # Writable: ledger, state, runs/ live in the user's project (or evolve-loop in dev)
 LEDGER="${LEDGER_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/ledger.jsonl}"
 STATE_FILE="${STATE_OVERRIDE:-$EVOLVE_PROJECT_ROOT/.evolve/state.json}"
@@ -141,7 +141,7 @@ case "$EVOLVE_PROJECT_ROOT" in
         log "BAD-ARG: cwd is a plugin install directory ($EVOLVE_PROJECT_ROOT)"
         log "         Plugin installs are not valid project workspaces."
         log "         FIX: cd to your actual project, then run /evolve-loop"
-        log "         Or:  EVOLVE_PROJECT_ROOT=/path/to/project bash <plugin>/scripts/dispatch/evolve-loop-dispatch.sh ..."
+        log "         Or:  EVOLVE_PROJECT_ROOT=/path/to/project bash <plugin>/legacy/scripts/dispatch/evolve-loop-dispatch.sh ..."
         exit 10
         ;;
 esac
@@ -149,7 +149,7 @@ esac
 # --- v8.25.0: capability-detection pre-flight -------------------------------
 #
 # Replaces the prior nested-Claude auto-detection block (v8.22.0/v8.24.0).
-# Runs scripts/dispatch/preflight-environment.sh which probes the host once and emits
+# Runs legacy/scripts/dispatch/preflight-environment.sh which probes the host once and emits
 # a structured JSON capability profile. The dispatcher reads auto_config and
 # applies the flags it recommends, with operator override via direct edit
 # of $EVOLVE_PROJECT_ROOT/.evolve/environment.json.
@@ -167,7 +167,7 @@ esac
 #      respects the operator's choice and does NOT overwrite from the profile.
 #   2. Otherwise the profile's auto_config wins.
 #   3. Power-users can edit .evolve/environment.json:auto_config directly.
-PREFLIGHT_SCRIPT="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/preflight-environment.sh"
+PREFLIGHT_SCRIPT="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/preflight-environment.sh"
 if [ -x "$PREFLIGHT_SCRIPT" ]; then
     PROFILE_JSON=$(bash "$PREFLIGHT_SCRIPT" --write 2>/dev/null || echo "")
     if [ -n "$PROFILE_JSON" ]; then
@@ -227,8 +227,8 @@ if [ -x "$PREFLIGHT_SCRIPT" ]; then
         # Legacy fallback: when preflight script is broken, set sandbox-fallback
         # only and pick a TMPDIR worktree base inline so cycles can still run.
         # This path is rare (only fires if jq is missing or preflight crashes).
-        if [ -x "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/detect-nested-claude.sh" ] && \
-           [ "$(bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/detect-nested-claude.sh")" = "nested" ]; then
+        if [ -x "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/detect-nested-claude.sh" ] && \
+           [ "$(bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/detect-nested-claude.sh")" = "nested" ]; then
             [ -z "${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-}" ] && export EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1
             if [ -z "${EVOLVE_WORKTREE_BASE:-}" ] && [ -n "${TMPDIR:-}" ]; then
                 fallback_hash=$(printf '%s' "$EVOLVE_PROJECT_ROOT" | shasum -a 256 2>/dev/null | head -c 8 || echo "default")
@@ -651,7 +651,7 @@ record_failed_approach() {
     # the structured taxonomy. expiresAt is computed per-classification so the
     # orchestrator's recentFailures lookback (and failure-adapter.sh) can
     # filter out aged-out entries automatically.
-    . "$EVOLVE_PLUGIN_ROOT/scripts/failure/failure-classifications.sh"
+    . "$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/failure-classifications.sh"
     local classification
     classification=$(failure_normalize_legacy "$raw_classification")
 
@@ -738,7 +738,7 @@ read_last_cycle() {
 #
 # Operator opt-out: EVOLVE_AUTO_PRUNE=0 disables this pre-cycle prune.
 if [ "${EVOLVE_AUTO_PRUNE:-1}" = "1" ] && [ -z "${RUN_CYCLE_OVERRIDE:-}" ] && [ -f "$STATE_FILE" ]; then
-    CSH="$EVOLVE_PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
+    CSH="$EVOLVE_PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
     if [ -x "$CSH" ]; then
         bash "$CSH" prune-expired-failures "$STATE_FILE" 2>&1 | sed 's/^/[auto-prune] /' >&2 \
             || true   # non-fatal — cosmetic cleanup
@@ -758,7 +758,7 @@ fi
 # is auditable in the log. Pre-existing kernel rules continue to enforce
 # anti-gaming on the actual code work this cycle does.
 if [ "$RESET_FAILURES" = "1" ]; then
-    PRUNE="$EVOLVE_PLUGIN_ROOT/scripts/failure/state-prune.sh"
+    PRUNE="$EVOLVE_PLUGIN_ROOT/legacy/scripts/failure/state-prune.sh"
     if [ -x "$PRUNE" ]; then
         log "--reset: pruning infrastructure-{systemic,transient} + ship-gate-config from $STATE_FILE"
         log "  → operator-driven recovery; DO NOT use to mask repeating real systemic failures"
@@ -842,7 +842,7 @@ STOP_REASON=""
 # that one resume cycle completes, control returns here and the normal
 # batch loop runs the remaining cycles (subject to budget caps).
 if [ "$RESUME_MODE" = "1" ]; then
-    RESUME_SCRIPT="$EVOLVE_PLUGIN_ROOT/scripts/dispatch/resume-cycle.sh"
+    RESUME_SCRIPT="$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/resume-cycle.sh"
     if [ ! -f "$RESUME_SCRIPT" ]; then
         log "FAIL: --resume requested but resume-cycle.sh not found at $RESUME_SCRIPT"
         DISPATCH_RC=1
@@ -920,7 +920,7 @@ for ((i=1; i<=CYCLES; i++)); do
                 cp_max=$(jq -r '.checkpoint.autoResumeMaxAttempts // 3' "$cycle_state_file" 2>/dev/null)
                 log "QUOTA-PAUSE: cycle=$cp_cycle wake-at=$cp_wake source=$cp_source attempts=$cp_attempts/$cp_max"
                 log "  to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until $cp_wake then /evolve-loop --resume"
-                log "  to resume manually: bash scripts/dispatch/resume-cycle.sh"
+                log "  to resume manually: bash legacy/scripts/dispatch/resume-cycle.sh"
                 DISPATCH_RC=5
                 STOP_REASON="quota-pause"
                 break
@@ -1004,7 +1004,7 @@ for ((i=1; i<=CYCLES; i++)); do
     # Field path note: show-cycle-cost.sh's --json output nests totals under
     # `.total.{cost_usd,cache_read_input_tokens,cache_creation_input_tokens,input_tokens}`.
     # All field accesses use `// 0` defaults so missing fields don't break jq.
-    SCC="$EVOLVE_PLUGIN_ROOT/scripts/observability/show-cycle-cost.sh"
+    SCC="$EVOLVE_PLUGIN_ROOT/legacy/scripts/observability/show-cycle-cost.sh"
     if [ -x "$SCC" ] && [ -d "$RUNS_DIR/cycle-${ran_cycle}" ]; then
         # Pass RUNS_DIR through so show-cycle-cost.sh finds the workspace even
         # in test isolation (RUNS_DIR_OVERRIDE) or plugin-install (project_root
@@ -1064,7 +1064,7 @@ for ((i=1; i<=CYCLES; i++)); do
         if [ "$_pct" -ge "$CHECKPOINT_AT_PCT" ] && [ "${EVOLVE_CHECKPOINT_REQUEST:-0}" != "1" ]; then
             log "BATCH-BUDGET CRITICAL: cumulative \$${BATCH_TOTAL_COST} (${_pct}%) >= ${CHECKPOINT_AT_PCT}% — signaling next cycle to checkpoint at phase boundary"
             log "  next cycle's orchestrator will receive EVOLVE_CHECKPOINT_REQUEST=1 in its invocation context"
-            log "  to resume after this batch ends: bash scripts/dispatch/evolve-loop-dispatch.sh --resume"
+            log "  to resume after this batch ends: bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume"
             export EVOLVE_CHECKPOINT_REQUEST=1
             export EVOLVE_CHECKPOINT_REASON="batch-cap-near"
         elif [ "$_pct" -ge "$CHECKPOINT_WARN_AT_PCT" ]; then
@@ -1234,7 +1234,7 @@ elif [ "$DISPATCH_RC" = "5" ]; then
     log "  → the cycle's worktree + cycle-state.json are preserved on disk"
     log "  → the SKILL layer (or wrapping /loop) should call ScheduleWakeup until the wake-at timestamp"
     log "     emitted above (QUOTA-PAUSE: wake-at=...), then re-invoke /evolve-loop --resume"
-    log "  → to resume manually right now: bash scripts/dispatch/resume-cycle.sh"
+    log "  → to resume manually right now: bash legacy/scripts/dispatch/resume-cycle.sh"
     log "  → to inspect: cat $EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json | jq .checkpoint"
 else
     log "DONE-WITH-FAILURE: run-cycle.sh failed; see logs above"

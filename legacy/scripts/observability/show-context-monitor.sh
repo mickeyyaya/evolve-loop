@@ -12,14 +12,14 @@
 # this script tabulates the data for human consumption.
 #
 # Usage:
-#   bash scripts/observability/show-context-monitor.sh <cycle>
+#   bash legacy/scripts/observability/show-context-monitor.sh <cycle>
 #       Tabulate per-phase input tokens for the given cycle.
 #
-#   bash scripts/observability/show-context-monitor.sh --watch
+#   bash legacy/scripts/observability/show-context-monitor.sh --watch
 #       Live-tail the most recent cycle (re-reads context-monitor.json
 #       every 3 seconds).
 #
-#   bash scripts/observability/show-context-monitor.sh --json <cycle>
+#   bash legacy/scripts/observability/show-context-monitor.sh --json <cycle>
 #       Emit the raw JSON for scripting.
 
 set -uo pipefail

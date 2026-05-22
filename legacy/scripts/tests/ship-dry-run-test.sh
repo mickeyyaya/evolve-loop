@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ship-dry-run-test.sh — Tests for scripts/lifecycle/ship.sh --dry-run (v8.50.0).
+# ship-dry-run-test.sh — Tests for legacy/scripts/lifecycle/ship.sh --dry-run (v8.50.0).
 #
 # Verifies the dry-run path:
 #   - Exits 0 with no git mutations (HEAD unchanged, no commits, no pushes).
@@ -19,9 +19,9 @@ unset EVOLVE_BYPASS_SHIP_VERIFY
 unset EVOLVE_SHIP_RELEASE_NOTES
 unset EVOLVE_PROJECT_ROOT EVOLVE_PLUGIN_ROOT EVOLVE_RESOLVE_ROOTS_LOADED
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SHIP_SH="$REPO_ROOT/scripts/lifecycle/ship.sh"
-RESOLVE_ROOTS_SH="$REPO_ROOT/scripts/lifecycle/resolve-roots.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SHIP_SH="$REPO_ROOT/legacy/scripts/lifecycle/ship.sh"
+RESOLVE_ROOTS_SH="$REPO_ROOT/legacy/scripts/lifecycle/resolve-roots.sh"
 SCRATCH=$(mktemp -d -t "ship-dryrun-XXXXXX")
 trap 'rm -rf "$SCRATCH"' EXIT
 
@@ -40,10 +40,10 @@ sha256() {
 # test file self-contained.
 make_repo() {
     local repo="$SCRATCH/repo-$RANDOM"
-    mkdir -p "$repo/scripts/lifecycle" "$repo/.evolve/runs/cycle-1"
-    cp "$SHIP_SH" "$repo/scripts/lifecycle/ship.sh"
-    chmod +x "$repo/scripts/lifecycle/ship.sh"
-    cp "$RESOLVE_ROOTS_SH" "$repo/scripts/lifecycle/resolve-roots.sh"
+    mkdir -p "$repo/legacy/scripts/lifecycle" "$repo/.evolve/runs/cycle-1"
+    cp "$SHIP_SH" "$repo/legacy/scripts/lifecycle/ship.sh"
+    chmod +x "$repo/legacy/scripts/lifecycle/ship.sh"
+    cp "$RESOLVE_ROOTS_SH" "$repo/legacy/scripts/lifecycle/resolve-roots.sh"
     cat > "$repo/.gitignore" <<EOF
 .evolve/
 EOF
@@ -102,7 +102,7 @@ echo "dry-run change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 HEAD_BEFORE=$(git rev-parse HEAD)
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "feat: test dry-run" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: test dry-run" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 HEAD_AFTER=$(git rev-parse HEAD)
@@ -120,7 +120,7 @@ cd "$REPO"
 echo "log change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "feat: log test" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: log test" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ] && grep -q "DRY-RUN" /tmp/ship-dry-out && grep -q "DRY-RUN DONE" /tmp/ship-dry-out; then
@@ -137,7 +137,7 @@ cd "$REPO"
 echo "preview change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "feat: preview test" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: preview test" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 preview=$(ls -1 "$REPO/.evolve/release-journal/dry-run-"*.json 2>/dev/null | head -1)
@@ -164,7 +164,7 @@ cd "$REPO"
 echo "no audit" >> fixture.txt
 # Intentionally do NOT seed_audit — ledger is empty
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "should refuse" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "should refuse" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "2" ]; then
@@ -181,7 +181,7 @@ cd "$REPO"
 echo "manual change" >> fixture.txt
 HEAD_BEFORE=$(git rev-parse HEAD)
 set +e
-EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/lifecycle/ship.sh --dry-run --class manual "feat: manual dry" >/tmp/ship-dry-out 2>&1
+EVOLVE_SHIP_AUTO_CONFIRM=1 bash legacy/scripts/lifecycle/ship.sh --dry-run --class manual "feat: manual dry" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 HEAD_AFTER=$(git rev-parse HEAD)
@@ -199,7 +199,7 @@ cd "$REPO"
 echo "release change" >> fixture.txt
 HEAD_BEFORE=$(git rev-parse HEAD)
 set +e
-bash scripts/lifecycle/ship.sh --dry-run --class release "release: v999.0.0" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run --class release "release: v999.0.0" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 HEAD_AFTER=$(git rev-parse HEAD)
@@ -223,7 +223,7 @@ echo '{"lastCycleNumber":1}' > .evolve/state.json
 echo "state-bump change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "feat: state-bump" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: state-bump" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 LAST=$(jq -r '.lastCycleNumber' .evolve/state.json)
@@ -241,7 +241,7 @@ cd "$REPO"
 echo "ops change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "feat: ops" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: ops" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 preview=$(ls -1 "$REPO/.evolve/release-journal/dry-run-"*.json 2>/dev/null | head -1)
@@ -269,7 +269,7 @@ echo "release-notes change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 set +e
 EVOLVE_SHIP_RELEASE_NOTES="test release notes" \
-    bash scripts/lifecycle/ship.sh --dry-run "feat: notes" >/tmp/ship-dry-out 2>&1
+    bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: notes" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 preview=$(ls -1 "$REPO/.evolve/release-journal/dry-run-"*.json 2>/dev/null | head -1)
@@ -293,7 +293,7 @@ cd "$REPO"
 echo "no remote change" >> fixture.txt
 seed_audit "$REPO" "PASS"
 set +e
-bash scripts/lifecycle/ship.sh --dry-run "feat: no remote" >/tmp/ship-dry-out 2>&1
+bash legacy/scripts/lifecycle/ship.sh --dry-run "feat: no remote" >/tmp/ship-dry-out 2>&1
 RC=$?
 set -e
 if [ "$RC" = "0" ]; then

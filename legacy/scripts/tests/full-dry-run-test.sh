@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# full-dry-run-test.sh — Tests for scripts/release/full-dry-run.sh and the
+# full-dry-run-test.sh — Tests for legacy/scripts/release/full-dry-run.sh and the
 # release-pipeline.sh --require-preflight integration (v8.50.0).
 #
 # These tests focus on the harness's structural behavior (skip flags, JSON
@@ -13,10 +13,10 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HARNESS="$REPO_ROOT/scripts/release/full-dry-run.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+HARNESS="$REPO_ROOT/legacy/scripts/release/full-dry-run.sh"
 PREFLIGHT_BIN="$REPO_ROOT/bin/preflight"
-RELEASE_PIPE="$REPO_ROOT/scripts/release-pipeline.sh"
+RELEASE_PIPE="$REPO_ROOT/legacy/scripts/release-pipeline.sh"
 
 PASS=0
 FAIL=0

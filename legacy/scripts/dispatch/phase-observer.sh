@@ -108,8 +108,8 @@ command -v jq >/dev/null 2>&1 || { echo "[phase-observer] jq required" >&2; exit
 # ── Locate plugin root + source libraries ──────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PLUGIN_ROOT="${EVOLVE_PLUGIN_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd -P)}"
-source "$PLUGIN_ROOT/scripts/lib/severity.sh"
-source "$PLUGIN_ROOT/scripts/lib/observer-rules.sh"
+source "$PLUGIN_ROOT/legacy/scripts/lib/severity.sh"
+source "$PLUGIN_ROOT/legacy/scripts/lib/observer-rules.sh"
 
 # ── Config ─────────────────────────────────────────────────────────────────
 POLL_S="${EVOLVE_OBSERVER_POLL_S:-5}"
@@ -510,7 +510,7 @@ fire_kill_sequence() {
     log "wrote $stall_file"
 
     # b) Call cycle-state.sh checkpoint stall-inactivity (best-effort).
-    local cs_script="$PLUGIN_ROOT/scripts/lifecycle/cycle-state.sh"
+    local cs_script="$PLUGIN_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
     if [ -f "$cs_script" ]; then
         EVOLVE_CYCLE_STATE_FILE="$CYCLE_STATE" \
             bash "$cs_script" checkpoint stall-inactivity 2>/dev/null || true

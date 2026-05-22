@@ -24,12 +24,12 @@
 # the orchestrator profile's classification lists, and fails loud if any
 # on-disk entry is unclassified.
 #
-# Usage: bash scripts/orchestrator-sandbox-coverage-test.sh
+# Usage: bash legacy/scripts/orchestrator-sandbox-coverage-test.sh
 # Exit 0 = every entry classified; exit 1 = drift detected.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PROFILE="$REPO_ROOT/.evolve/profiles/orchestrator.json"
 EVOLVE_DIR="${EVOLVE_DIR_OVERRIDE:-$REPO_ROOT/.evolve}"
 

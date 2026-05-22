@@ -4,7 +4,7 @@
 # per-phase metrics. Phase-B scaffolding: this script is wired into the
 # dispatch pipeline only when EVOLVE_TRACKER_ENABLED=1 and claude.sh is
 # updated to emit --output-format stream-json. In Phase A it is exercised
-# by scripts/tests/tracker-writer-test.sh against synthetic fixtures.
+# by legacy/scripts/tests/tracker-writer-test.sh against synthetic fixtures.
 #
 # Reads one JSON event per stdin line. Events that fail JSON parse are
 # logged to stderr and dropped (the tracker should never crash a live

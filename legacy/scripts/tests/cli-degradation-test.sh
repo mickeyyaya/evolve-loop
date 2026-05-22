@@ -19,11 +19,11 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GEMINI="$REPO_ROOT/scripts/cli_adapters/gemini.sh"
-CODEX="$REPO_ROOT/scripts/cli_adapters/codex.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+GEMINI="$REPO_ROOT/legacy/scripts/cli_adapters/gemini.sh"
+CODEX="$REPO_ROOT/legacy/scripts/cli_adapters/codex.sh"
 SCOUT_PROFILE="$REPO_ROOT/.evolve/profiles/scout.json"
-SHIP_GATE="$REPO_ROOT/scripts/guards/ship-gate.sh"
+SHIP_GATE="$REPO_ROOT/legacy/scripts/guards/ship-gate.sh"
 
 PASS=0; FAIL=0
 pass()   { echo "  PASS: $*"; PASS=$((PASS + 1)); }
@@ -181,7 +181,7 @@ fi
 # accepts a 9th quality_tier arg. The full integration would require a real
 # cycle which is too heavy for unit tests; we verify the contract via grep.
 header "Test 8: subagent-run.sh write_ledger_entry signature includes quality_tier"
-RUNNER="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
+RUNNER="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 if grep -q 'local quality_tier="${9:-unknown}"' "$RUNNER"; then
     pass "write_ledger_entry accepts quality_tier as 9th arg"
 else
@@ -198,7 +198,7 @@ fi
 
 # === Test 10: capability-check resolves degraded for both gemini AND codex ==
 header "Test 10: capability-check returns degraded tier for both gemini + codex when claude missing"
-CAP_CHECK="$REPO_ROOT/scripts/cli_adapters/_capability-check.sh"
+CAP_CHECK="$REPO_ROOT/legacy/scripts/cli_adapters/_capability-check.sh"
 gemini_tier=$(EVOLVE_TESTING=1 EVOLVE_GEMINI_CLAUDE_PATH="" bash "$CAP_CHECK" gemini 2>/dev/null | jq -r '.quality_tier')
 codex_tier=$(EVOLVE_TESTING=1 EVOLVE_CODEX_CLAUDE_PATH="" bash "$CAP_CHECK" codex 2>/dev/null | jq -r '.quality_tier')
 if [ "$gemini_tier" = "none" ] || [ "$gemini_tier" = "degraded" ]; then

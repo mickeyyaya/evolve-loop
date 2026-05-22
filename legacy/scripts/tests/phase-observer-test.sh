@@ -14,8 +14,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
-OBSERVER="$PLUGIN_ROOT/scripts/dispatch/phase-observer.sh"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
+OBSERVER="$PLUGIN_ROOT/legacy/scripts/dispatch/phase-observer.sh"
 [ -f "$OBSERVER" ] || { echo "FATAL: $OBSERVER not found" >&2; exit 1; }
 
 PASS=0; FAIL=0; TOTAL=0

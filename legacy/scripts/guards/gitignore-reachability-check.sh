@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-Builder-handoff gate: verify that deliverable paths are reachable (not gitignored).
 #
-# Usage: bash scripts/guards/gitignore-reachability-check.sh <path> [<path>...]
+# Usage: bash legacy/scripts/guards/gitignore-reachability-check.sh <path> [<path>...]
 #
 # Exits 0  — all paths pass (git would accept them; none are gitignored).
 # Exits 1  — at least one path is gitignored; names offender on stderr.

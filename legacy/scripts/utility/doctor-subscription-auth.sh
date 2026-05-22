@@ -13,9 +13,9 @@
 #   4. Otherwise → MISCONFIGURED
 #
 # Usage:
-#   bash scripts/utility/doctor-subscription-auth.sh
-#   bash scripts/utility/doctor-subscription-auth.sh --json
-#   bash scripts/utility/doctor-subscription-auth.sh --help
+#   bash legacy/scripts/utility/doctor-subscription-auth.sh
+#   bash legacy/scripts/utility/doctor-subscription-auth.sh --json
+#   bash legacy/scripts/utility/doctor-subscription-auth.sh --help
 #
 # Exit code: always 0 (advisory only)
 
@@ -23,7 +23,7 @@ set -uo pipefail
 
 _usage() {
     cat >&2 <<'EOF'
-Usage: bash scripts/utility/doctor-subscription-auth.sh [--json] [--help]
+Usage: bash legacy/scripts/utility/doctor-subscription-auth.sh [--json] [--help]
 
 Flags:
   --json    Emit {"mode":"...","notes":"..."} on stdout

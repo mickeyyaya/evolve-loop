@@ -5,12 +5,12 @@
 # Prints content between "## TLDR" and the next "## " heading to stdout.
 # Exit 0 if found, 1 if not found.
 #
-# Usage: bash scripts/utility/extract-tldr.sh <path/to/file.md>
+# Usage: bash legacy/scripts/utility/extract-tldr.sh <path/to/file.md>
 
 set -uo pipefail
 
 if [ $# -eq 0 ]; then
-    echo "Usage: bash scripts/utility/extract-tldr.sh <path/to/file.md>" >&2
+    echo "Usage: bash legacy/scripts/utility/extract-tldr.sh <path/to/file.md>" >&2
     exit 1
 fi
 

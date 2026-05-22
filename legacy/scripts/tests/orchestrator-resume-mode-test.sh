@@ -11,9 +11,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 ORCHESTRATOR_MD="$PROJECT_ROOT/agents/evolve-orchestrator.md"
-CYCLE_STATE_HELPER="$PROJECT_ROOT/scripts/lifecycle/cycle-state.sh"
+CYCLE_STATE_HELPER="$PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
 ORCH_PROFILE="$PROJECT_ROOT/.evolve/profiles/orchestrator.json"
 
 PASS=0

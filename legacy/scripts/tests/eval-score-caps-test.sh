@@ -7,7 +7,7 @@ set -uo pipefail
 
 PASS=0
 FAIL=0
-SCRIPT="scripts/verification/eval-quality-check.sh"
+SCRIPT="legacy/scripts/verification/eval-quality-check.sh"
 
 check() {
   local desc="$1" result="$2"
@@ -34,7 +34,7 @@ score_cap:
 
 ## Code Graders
 
-- `grep -c "score_cap" scripts/verification/eval-quality-check.sh | awk '{exit ($1 < 1)}'`
+- `grep -c "score_cap" legacy/scripts/verification/eval-quality-check.sh | awk '{exit ($1 < 1)}'`
 EVALEOF
 
 OUTPUT=$(bash "$SCRIPT" "$TF" 2>/dev/null || true)
@@ -66,7 +66,7 @@ score_cap:
 
 ## Code Graders
 
-- `grep -c "score_cap" scripts/verification/eval-quality-check.sh | awk '{exit ($1 < 1)}'`
+- `grep -c "score_cap" legacy/scripts/verification/eval-quality-check.sh | awk '{exit ($1 < 1)}'`
 EVALEOF
 
 OUTPUT2=$(bash "$SCRIPT" "$TF2" 2>/dev/null || true)
@@ -78,7 +78,7 @@ check "score_caps_ceiling:null when evidence exits 0 (no cap fires)" "$?"
 
 # T5: file with no frontmatter returns null ceiling
 TF3=$(mktemp /tmp/eval-score-cap-test-XXXXXX.md)
-printf '# Eval: no frontmatter\n\n## Code Graders\n\n- `grep -q "x" scripts/verification/eval-quality-check.sh`\n' > "$TF3"
+printf '# Eval: no frontmatter\n\n## Code Graders\n\n- `grep -q "x" legacy/scripts/verification/eval-quality-check.sh`\n' > "$TF3"
 OUTPUT3=$(bash "$SCRIPT" "$TF3" 2>/dev/null || true)
 rm -f "$TF3"
 

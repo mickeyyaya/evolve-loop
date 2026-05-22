@@ -8,8 +8,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-AGG="$REPO_ROOT/scripts/dispatch/aggregator.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+AGG="$REPO_ROOT/legacy/scripts/dispatch/aggregator.sh"
 
 PASS=0
 FAIL=0

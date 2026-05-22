@@ -7,7 +7,7 @@
 # threshold comparisons in shell without parsing strings.
 #
 # Usage (source from another script):
-#   source "$EVOLVE_PLUGIN_ROOT/scripts/lib/severity.sh"
+#   source "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lib/severity.sh"
 #   if severity_gte "$obs_severity" WARN; then echo "warn-or-worse"; fi
 #
 # Decision matrix for the orchestrator:

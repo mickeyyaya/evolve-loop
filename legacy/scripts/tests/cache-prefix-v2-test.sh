@@ -19,13 +19,13 @@
 #  11. EVOLVE_CACHE_PREFIX_V2 default is 0 (legacy behavior preserved).
 #  12. build-invocation-context.sh is referenced by subagent-run.sh.
 #
-# Usage: bash scripts/tests/cache-prefix-v2-test.sh
+# Usage: bash legacy/scripts/tests/cache-prefix-v2-test.sh
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BIC="$REPO_ROOT/scripts/dispatch/build-invocation-context.sh"
-RUNNER="$REPO_ROOT/scripts/dispatch/subagent-run.sh"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+BIC="$REPO_ROOT/legacy/scripts/dispatch/build-invocation-context.sh"
+RUNNER="$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh"
 
 PASS=0
 FAIL=0
@@ -165,7 +165,7 @@ fi
 
 # --- Test 13: claude.sh adapter has v2 system-prompt block (Cycle A2) --------
 header "Test 13 (Cycle A2): claude.sh has v2 system-prompt block"
-ADAPTER="$REPO_ROOT/scripts/cli_adapters/claude.sh"
+ADAPTER="$REPO_ROOT/legacy/scripts/cli_adapters/claude.sh"
 if grep -q "EVOLVE_CACHE_PREFIX_V2:-0" "$ADAPTER" \
    && grep -q -- "--append-system-prompt" "$ADAPTER" \
    && grep -q "build-invocation-context.sh" "$ADAPTER"; then

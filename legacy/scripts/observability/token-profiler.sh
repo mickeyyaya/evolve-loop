@@ -6,7 +6,7 @@
 # --compare: Compare current measurements against saved baseline, show delta
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 BASELINE_FILE="$REPO_ROOT/.evolve/token-baseline.json"
 JSON_OUTPUT=false
 SAVE_BASELINE=false
@@ -60,8 +60,8 @@ for agent_file in "$REPO_ROOT"/agents/*.md; do
 done
 
 # Scan scripts
-for script_file in "$REPO_ROOT"/scripts/*.sh; do
-  [[ -f "$script_file" ]] && add_entry "script" "scripts/$(basename "$script_file")"
+for script_file in "$REPO_ROOT"/legacy/scripts/*.sh; do
+  [[ -f "$script_file" ]] && add_entry "script" "legacy/scripts/$(basename "$script_file")"
 done
 
 # Sort entries by token count (descending)

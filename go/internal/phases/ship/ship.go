@@ -1,6 +1,6 @@
 // Package ship implements the script-driven commit-and-push phase as a
 // core.PhaseRunner. Unlike the LLM phases, ship does not call a Bridge;
-// it shells to scripts/lifecycle/ship.sh — the canonical atomic shipper
+// it shells to legacy/scripts/lifecycle/ship.sh — the canonical atomic shipper
 // the v8.13.0 ship-gate hook allowlists for git commit / git push /
 // gh release create operations.
 //
@@ -24,7 +24,7 @@ import (
 
 const (
 	phaseName         = string(core.PhaseShip)
-	defaultShipScript = "scripts/lifecycle/ship.sh"
+	defaultShipScript = "legacy/scripts/lifecycle/ship.sh"
 )
 
 // CmdRunner is the subprocess injection seam. Tests override it; the
