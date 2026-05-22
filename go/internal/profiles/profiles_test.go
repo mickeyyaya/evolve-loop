@@ -263,6 +263,32 @@ func TestSmoke_RealProfiles(t *testing.T) {
 	}
 }
 
+// TestList_SkipsSubdirectories — fs.ReadDir surfaces subdirs; the
+// loader must skip them (the .evolve/profiles/ tree contains an
+// AGENTS.md sibling — and could contain subdirs in future).
+func TestList_SkipsSubdirectories(t *testing.T) {
+	fsys := fstest.MapFS{
+		"good.json":         &fstest.MapFile{Data: []byte(minimalProfile)},
+		"subdir/inner.json": &fstest.MapFile{Data: []byte(minimalProfile)}, // creates subdir entry
+	}
+	names, err := NewFromFS(fsys).List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if !reflect.DeepEqual(names, []string{"good"}) {
+		t.Errorf("List()=%v, want [good] (subdir excluded)", names)
+	}
+}
+
+// TestList_ZeroLoader_ReturnsNil — explicit contract for the
+// nil-fs case (parallel to TestZeroLoader_GetReturnsErrNotExist).
+func TestList_ZeroLoader_ReturnsNil(t *testing.T) {
+	names, err := NewFromFS(nil).List()
+	if err != nil || names != nil {
+		t.Errorf("List()=%v,%v; want nil,nil", names, err)
+	}
+}
+
 // containsBytes — local helper (no strings import in test file).
 func containsBytes(haystack, needle []byte) bool {
 	for i := 0; i+len(needle) <= len(haystack); i++ {
