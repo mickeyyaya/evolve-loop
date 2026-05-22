@@ -218,6 +218,56 @@ func TestNewSubprocess_NilRunnerUsesExec(t *testing.T) {
 	}
 }
 
+// TestSubprocess_LongStderrTruncated — error message must be bounded.
+// 400-char tail is what fits comfortably in operator logs.
+func TestSubprocess_LongStderrTruncated(t *testing.T) {
+	big := strings.Repeat("E", 1000)
+	sc := &scriptedCmd{exitCode: 1, stderr: big}
+	r := NewSubprocess("scout", "/x", sc.runner())
+	_, err := r.Run(context.Background(), core.PhaseRequest{})
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if len(err.Error()) > 800 {
+		t.Errorf("err message too long: %d chars", len(err.Error()))
+	}
+	if !strings.Contains(err.Error(), "…") {
+		t.Errorf("err missing truncation marker: %v", err)
+	}
+}
+
+// TestExecRunner_ExitsWithCode — drives execRunner's ExitError branch.
+func TestExecRunner_ExitsWithCode(t *testing.T) {
+	// /usr/bin/false: exits 1 with no output, POSIX universal.
+	code, err := execRunner(context.Background(), "/usr/bin/false", nil, nil, io.Discard, io.Discard)
+	if err != nil {
+		t.Errorf("execRunner /usr/bin/false: err=%v, want nil", err)
+	}
+	if code != 1 {
+		t.Errorf("exitCode=%d, want 1", code)
+	}
+}
+
+// TestExecRunner_BinaryMissing — non-existent binary → err non-nil.
+func TestExecRunner_BinaryMissing(t *testing.T) {
+	_, err := execRunner(context.Background(), "/no/such/binary/zzz", nil, nil, io.Discard, io.Discard)
+	if err == nil {
+		t.Error("execRunner with missing binary: want error")
+	}
+}
+
+// TestExecRunner_Success — drive the (return 0, nil) happy-path
+// branch with /usr/bin/true (POSIX universal exit-0 no-op).
+func TestExecRunner_Success(t *testing.T) {
+	code, err := execRunner(context.Background(), "/usr/bin/true", nil, nil, io.Discard, io.Discard)
+	if err != nil {
+		t.Errorf("execRunner /usr/bin/true: err=%v", err)
+	}
+	if code != 0 {
+		t.Errorf("exitCode=%d, want 0", code)
+	}
+}
+
 // TestSubprocess_ContextCancel — canceled ctx propagates.
 func TestSubprocess_ContextCancel(t *testing.T) {
 	runner := func(ctx context.Context, name string, args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
