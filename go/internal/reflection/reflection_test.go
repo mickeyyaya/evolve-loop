@@ -295,6 +295,127 @@ func TestReadFile_NotFound(t *testing.T) {
 	}
 }
 
+// TestParse_AbsentSlowdownsNormalized — when slowdowns field is
+// absent in the YAML (vs explicitly []), the parser must normalize
+// to a non-nil empty slice. The aggregator depends on this distinction
+// when emitting empty `slowdown_categories: []`.
+func TestParse_AbsentSlowdownsNormalized(t *testing.T) {
+	src := `schema_version: 1
+cycle: 1
+phase: x
+agent: a
+phase_smooth: true
+reflection_confidence: 0.9
+phase_tracker_refs:
+  latency_ms: 0
+  cost_usd: 0
+  turns: 0
+`
+	r, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if r.Slowdowns == nil {
+		t.Error("Slowdowns=nil after absent-field parse; want []Slowdown{}")
+	}
+	if len(r.Slowdowns) != 0 {
+		t.Errorf("Slowdowns=%v, want empty", r.Slowdowns)
+	}
+}
+
+// TestWrite_RenameFailure_RemovesTmp — when rename fails (e.g.,
+// destination becomes a directory), tmp file must be cleaned up.
+// Simulating rename failure: create a directory at the destination
+// path so os.Rename(file → directory) refuses on macOS/Linux.
+func TestWrite_RenameFailure_RemovesTmp(t *testing.T) {
+	tmp := t.TempDir()
+	dest := filepath.Join(tmp, "block-reflection.yaml")
+	// Make dest a non-empty directory so rename can't replace it
+	// (POSIX: rename(file, dir) fails when dir is non-empty or
+	// when the dest is a directory and src is a file).
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dest, "filler"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &Reflection{
+		SchemaVersion: 1, Cycle: 1, Phase: "x", Agent: "a", PhaseSmooth: true,
+		Slowdowns: []Slowdown{}, ReflectionConfidence: 0.5,
+	}
+	if err := Write(dest, r); err == nil {
+		t.Error("Write into existing non-empty dir: want error")
+	}
+	// Tmp must not linger.
+	if _, err := os.Stat(dest + ".tmp"); !os.IsNotExist(err) {
+		t.Errorf("tmp file lingered at %s", dest+".tmp")
+	}
+}
+
+// TestValidate_NilReceiver — defensive: r.Validate on nil pointer
+// must return an error, not panic.
+func TestValidate_NilReceiver(t *testing.T) {
+	var r *Reflection
+	if err := r.Validate(); err == nil {
+		t.Error("Validate(nil): want error")
+	}
+}
+
+// TestValidate_ZeroOrNegativeCycle — cycle must be positive.
+func TestValidate_ZeroOrNegativeCycle(t *testing.T) {
+	r, _ := Parse([]byte(canonicalYAML))
+	r.Cycle = 0
+	if err := r.Validate(); err == nil {
+		t.Error("Validate(cycle=0): want error")
+	}
+}
+
+// TestValidate_EmptyPhase — phase required.
+func TestValidate_EmptyPhase(t *testing.T) {
+	r, _ := Parse([]byte(canonicalYAML))
+	r.Phase = ""
+	if err := r.Validate(); err == nil {
+		t.Error("Validate(phase=\"\"): want error")
+	}
+}
+
+// TestValidate_EmptyAgent — agent required.
+func TestValidate_EmptyAgent(t *testing.T) {
+	r, _ := Parse([]byte(canonicalYAML))
+	r.Agent = ""
+	if err := r.Validate(); err == nil {
+		t.Error("Validate(agent=\"\"): want error")
+	}
+}
+
+// TestWrite_RefusesInvalid — Write Validates before serializing.
+// A malformed sidecar is worse than no sidecar (phase-gate.sh would
+// pass an invalid file as "present", masking the producer bug).
+func TestWrite_RefusesInvalid(t *testing.T) {
+	tmp := t.TempDir()
+	out := filepath.Join(tmp, "bad-reflection.yaml")
+	bad := &Reflection{SchemaVersion: 1, Phase: "x", Agent: "a", Slowdowns: []Slowdown{}, ReflectionConfidence: 0.5} // cycle=0
+	if err := Write(out, bad); err == nil {
+		t.Error("Write(invalid): want error, got nil")
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Errorf("invalid Reflection should leave no file at %s", out)
+	}
+}
+
+// TestWrite_NonexistentDir — tmp-file path goes through a missing
+// parent dir; the write must fail (os.WriteFile error path).
+func TestWrite_NonexistentDir(t *testing.T) {
+	r := &Reflection{
+		SchemaVersion: 1, Cycle: 1, Phase: "x", Agent: "a", PhaseSmooth: true,
+		Slowdowns: []Slowdown{}, ReflectionConfidence: 0.5,
+	}
+	err := Write("/no/such/dir/reflection.yaml", r)
+	if err == nil {
+		t.Error("Write to missing dir: want error")
+	}
+}
+
 // TestAcceptedByAggregator — the aggregator filter is confidence > 0.5
 // (per reflection-schema-test.sh T2: 0.2 is skipped, 0.8 is counted).
 // Expose a predicate matching the bash threshold so callers don't
