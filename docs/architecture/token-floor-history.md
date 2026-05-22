@@ -7,9 +7,9 @@ this codebase).
 
 The measurement methodology and the harness:
 
-- `scripts/observability/measure-context-tokens.sh <cycle> [--json]`
+- `legacy/scripts/observability/measure-context-tokens.sh <cycle> [--json]`
   (added in Campaign A Cycle A3)
-- `bash scripts/lifecycle/role-context-builder.sh <role> <cycle> <workspace>`
+- `bash legacy/scripts/lifecycle/role-context-builder.sh <role> <cycle> <workspace>`
   invoked per phase to produce the actual context shipped to the LLM
 
 ## Baseline (pre-v9.0.0, cycle-10 fixture)
@@ -80,15 +80,15 @@ via `Read`.
 
 ```bash
 # Per-phase baseline (legacy)
-bash scripts/lifecycle/role-context-builder.sh scout 10 .evolve/runs/cycle-10 | wc -c
+bash legacy/scripts/lifecycle/role-context-builder.sh scout 10 .evolve/runs/cycle-10 | wc -c
 # Digest mode (Campaign B+)
-EVOLVE_CONTEXT_DIGEST=1 bash scripts/lifecycle/role-context-builder.sh scout 10 .evolve/runs/cycle-10 | wc -c
+EVOLVE_CONTEXT_DIGEST=1 bash legacy/scripts/lifecycle/role-context-builder.sh scout 10 .evolve/runs/cycle-10 | wc -c
 # Digest + anchor mode (Campaign B + Campaign C)
-EVOLVE_CONTEXT_DIGEST=1 EVOLVE_ANCHOR_EXTRACT=1 bash scripts/lifecycle/role-context-builder.sh scout 10 .evolve/runs/cycle-10 | wc -c
+EVOLVE_CONTEXT_DIGEST=1 EVOLVE_ANCHOR_EXTRACT=1 bash legacy/scripts/lifecycle/role-context-builder.sh scout 10 .evolve/runs/cycle-10 | wc -c
 
 # Full per-cycle measurement
-bash scripts/observability/measure-context-tokens.sh 10
-bash scripts/observability/measure-context-tokens.sh 10 --json
+bash legacy/scripts/observability/measure-context-tokens.sh 10
+bash legacy/scripts/observability/measure-context-tokens.sh 10 --json
 ```
 
 ## Promotion ladder for the new flags

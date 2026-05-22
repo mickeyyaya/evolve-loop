@@ -12,8 +12,8 @@
 The evolve-loop phase order is currently encoded in three separate places:
 
 1. **`agents/evolve-orchestrator.md`** — narrative Phase Loop section (human-readable prose)
-2. **`scripts/lifecycle/phase-gate.sh`** — 13 gate functions enforcing phase transitions
-3. **`scripts/dispatch/run-cycle.sh`** — hardcoded phase dispatch sequence
+2. **`legacy/scripts/lifecycle/phase-gate.sh`** — 13 gate functions enforcing phase transitions
+3. **`legacy/scripts/dispatch/run-cycle.sh`** — hardcoded phase dispatch sequence
 
 Adding, removing, or reordering phases requires coordinated edits across all three locations. There is no machine-readable source of truth for:
 - The canonical phase order
@@ -30,7 +30,7 @@ This fragmentation is the root cause of the v8.55 fan-out incident where `parall
 Create `docs/architecture/phase-registry.json` as the **declarative phase order and I/O contract authority**.
 
 In **cycle 55** (this ADR), the registry is **data-only**:
-- A new helper `scripts/dispatch/list-phase-order.sh` reads it and emits phase names
+- A new helper `legacy/scripts/dispatch/list-phase-order.sh` reads it and emits phase names
 - The orchestrator and run-cycle.sh still use their hardcoded sequences
 - No behavior changes to any running cycle
 
@@ -95,10 +95,10 @@ In **cycle 56**, the orchestrator and run-cycle.sh will be updated to consume th
 | Component | Change | Cycle |
 |-----------|--------|-------|
 | `docs/architecture/phase-registry.json` | **NEW** — declarative phase order + I/O contracts | 55 (this ADR) |
-| `scripts/dispatch/list-phase-order.sh` | **NEW** — reads registry, emits phase names | 55 (this ADR) |
+| `legacy/scripts/dispatch/list-phase-order.sh` | **NEW** — reads registry, emits phase names | 55 (this ADR) |
 | `agents/evolve-orchestrator.md` | Registry-driven Phase Loop rewrite | 56 |
-| `scripts/lifecycle/phase-gate.sh` | `gate_run_by_name` dispatcher + tester gate functions | 56 |
-| `scripts/dispatch/run-cycle.sh` | Read registry for phase sequence | 56 |
+| `legacy/scripts/lifecycle/phase-gate.sh` | `gate_run_by_name` dispatcher + tester gate functions | 56 |
+| `legacy/scripts/dispatch/run-cycle.sh` | Read registry for phase sequence | 56 |
 | Phase contracts (`docs/architecture/phase-contracts/<phase>.md`) | Per-phase contract documents | 57–58 |
 
 ---

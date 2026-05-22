@@ -2,7 +2,7 @@
 
 > **Directory purpose**: Each `evolve-<role>.md` file defines a named agent
 > persona — its perspective, workflow, output contract, and behavioral rules.
-> Personas are loaded by `scripts/dispatch/subagent-run.sh` as the system prompt
+> Personas are loaded by `legacy/scripts/dispatch/subagent-run.sh` as the system prompt
 > for a `claude -p` subprocess. This file documents the conventions every persona
 > author must follow.
 
@@ -95,4 +95,4 @@ grep -E '^output-format:' agents/evolve-<role>.md
 - `AGENTS.md` (repo root) — cross-CLI invariants + 12 Core Agent Rules
 - `.evolve/profiles/AGENTS.md` — permission profile JSON schema docs
 - `agent-templates.md` — shared boilerplate fragments
-- `scripts/dispatch/subagent-run.sh` — persona loading + challenge token injection
+- `legacy/scripts/dispatch/subagent-run.sh` — persona loading + challenge token injection

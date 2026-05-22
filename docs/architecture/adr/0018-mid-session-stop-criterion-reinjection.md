@@ -30,7 +30,7 @@ At 57 turns (cycle-86 Builder), this produces ~30–60% degradation in adherence
 
 For agents with `max_turns > 8`, inject a compressed re-statement of the STOP CRITERION at turn `ceil(max_turns * 0.7)` as a mid-session anchor.
 
-**Implementation target:** `scripts/dispatch/subagent-run.sh`
+**Implementation target:** `legacy/scripts/dispatch/subagent-run.sh`
 
 **Mechanism:** Turn-count-aware prompt re-injection strategy. At the 70% turn threshold, a one-paragraph STOP CRITERION summary (~100 tokens) is appended to the running prompt, counteracting the attenuation effect before it becomes critical. This converts the current "fail loudly at the ceiling" pattern into a "warn before the ceiling, enforce at the ceiling" approach.
 

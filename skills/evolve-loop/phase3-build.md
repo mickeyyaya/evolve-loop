@@ -125,7 +125,7 @@ rm -rf "$COPY_DIR"
 ## Builder Agent Launch
 
 Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry >= 2; tier-2 if strategy == "repair"; tier-2 otherwise; **isolation: worktree required**):
-- **Subagent invocation (REQUIRED):** Run via the runner script with `WORKTREE_PATH` set. The runner enforces the Builder profile (`.evolve/profiles/builder.json`) which blocks writes to `skills/`, `agents/`, `scripts/`, `.claude-plugin/`, and `.evolve/state.json` at the CLI permission layer — a hard guarantee, not a post-hoc audit check.
+- **Subagent invocation (REQUIRED):** Run via the runner script with `WORKTREE_PATH` set. The runner enforces the Builder profile (`.evolve/profiles/builder.json`) which blocks writes to `skills/`, `agents/`, `legacy/scripts/`, `.claude-plugin/`, and `.evolve/state.json` at the CLI permission layer — a hard guarantee, not a post-hoc audit check.
 
   ```bash
   # Worktree must be created BEFORE invoking the runner.
@@ -135,7 +135,7 @@ Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1
   cat agents/evolve-builder.md context.json | \
       WORKTREE_PATH="$WORKTREE_DIR" \
       MODEL_TIER_HINT="<resolved tier>" \
-      bash scripts/dispatch/subagent-run.sh builder "$CYCLE" "$WORKSPACE_PATH"
+      bash legacy/scripts/dispatch/subagent-run.sh builder "$CYCLE" "$WORKSPACE_PATH"
 
   # After exit:
   cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
@@ -308,13 +308,13 @@ Run deterministic health check and independent eval verification before Phase 4.
 
 1. **Independent eval re-execution:**
    ```bash
-   bash scripts/verification/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
+   bash legacy/scripts/verification/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
    ```
    If exit != 0 → HALT: "Independent eval verification failed."
 
 2. **Cycle health fingerprint:**
    ```bash
-   bash scripts/observability/cycle-health-check.sh $N $WORKSPACE_PATH
+   bash legacy/scripts/observability/cycle-health-check.sh $N $WORKSPACE_PATH
    ```
    Checks 11 signals (ledger completeness, timestamps, artifacts, checksums, challenge tokens, velocity, substance, canaries, hash chain). Any ANOMALY = halt.
 

@@ -81,7 +81,7 @@ Added a remediation hint to the `--class trivial` entry in the usage header (L34
 
 ```
 # Remediation: if cycle_size_estimate is blank, run:
-#   bash scripts/lifecycle/cycle-state.sh set cycle_size_estimate trivial
+#   bash legacy/scripts/lifecycle/cycle-state.sh set cycle_size_estimate trivial
 ```
 
 No runtime behavior change. The hard-fail on blank `cycle_size_estimate` is intentional (contract enforcement). The fix improves discoverability of the remediation path.
@@ -109,9 +109,9 @@ When `cycle_size_estimate` is blank and `--class trivial` is passed, auto-popula
 
 ## References
 
-- `scripts/lifecycle/ship.sh` — L319 (trivial class precondition check), L86-97 (integrity_fail + abnormal event write)
-- `scripts/lifecycle/phase-gate.sh` — `gate_discover_to_triage` L464 (cycle_size_estimate mirror)
-- `scripts/lifecycle/cycle-state.sh` — `set` subcommand for manual field override
+- `legacy/scripts/lifecycle/ship.sh` — L319 (trivial class precondition check), L86-97 (integrity_fail + abnormal event write)
+- `legacy/scripts/lifecycle/phase-gate.sh` — `gate_discover_to_triage` L464 (cycle_size_estimate mirror)
+- `legacy/scripts/lifecycle/cycle-state.sh` — `set` subcommand for manual field override
 - `docs/architecture/` — ship-gate architecture (v8.13.0 audit-binding contract)
 - `CHANGELOG.md` — v10.6.0 (`--class trivial` introduction)
 - Abnormal events log: `.evolve/runs/cycle-82/abnormal-events.jsonl`

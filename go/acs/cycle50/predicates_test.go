@@ -87,7 +87,7 @@ func TestC50_005_TriagePassthroughAllThreeFields(t *testing.T) {
 // TestC50_006_ReconcileInvalidateOnDrop ports cycle-50/006.
 func TestC50_006_ReconcileInvalidateOnDrop(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	rec := filepath.Join(root, "scripts", "lifecycle", "reconcile-carryover-todos.sh")
+	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
 	if !acsassert.FileExists(t, rec) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-50-006")
 	}
@@ -101,7 +101,7 @@ func TestC50_006_ReconcileInvalidateOnDrop(t *testing.T) {
 // TestC50_007_ReconcilePromoteOnPass ports cycle-50/007.
 func TestC50_007_ReconcilePromoteOnPass(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	rec := filepath.Join(root, "scripts", "lifecycle", "reconcile-carryover-todos.sh")
+	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
 	if !acsassert.FileExists(t, rec) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-50-007")
 	}
@@ -120,7 +120,7 @@ func TestC50_007_ReconcilePromoteOnPass(t *testing.T) {
 // for runtime behavior.
 func TestC50_008_InjectTaskResearchPointerFlag(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	inj := filepath.Join(root, "scripts", "utility", "inject-task.sh")
+	inj := filepath.Join(root, "legacy", "scripts", "utility", "inject-task.sh")
 	if !acsassert.FileExists(t, inj) {
 		t.Skip("inject-task.sh missing — skip cycle-50-008")
 	}

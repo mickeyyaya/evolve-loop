@@ -70,7 +70,7 @@ Watches every `subagent-run.sh` invocation.
 Watches every `Edit`/`Write` tool call.
 
 **Denies:**
-- Writes outside the active phase's allowlist (e.g., Scout trying to write code under `scripts/`)
+- Writes outside the active phase's allowlist (e.g., Scout trying to write code under `legacy/scripts/`)
 - Writes outside the active worktree for write-bound roles (Builder)
 - Writes to gitignored/dangerous paths (`.git/`, `/etc/`, etc.)
 
@@ -83,14 +83,14 @@ The cycle-64 gemini re-test demonstrated this hook in action — the failed Buil
 Watches every `Bash` call with git/gh verbs.
 
 **Denies:**
-- Direct `git commit` / `git push` not routed through `scripts/lifecycle/ship.sh`
+- Direct `git commit` / `git push` not routed through `legacy/scripts/lifecycle/ship.sh`
 - Force-pushes (`git push --force`)
 - Branch operations outside the cycle's worktree
 - `gh release create` / `gh pr merge` outside the release pipeline
 
 **Verdict source:** Argv pattern matching + ship.sh's audit-binding check (audit's recorded `git_head` + `tree_state_sha` must match current `HEAD`).
 
-### Hook 4: Ledger SHA-chain (`scripts/observability/verify-ledger-chain.sh`)
+### Hook 4: Ledger SHA-chain (`legacy/scripts/observability/verify-ledger-chain.sh`)
 
 Not a PreToolUse hook but enforces Tier 1's audit-trail invariant.
 
@@ -108,7 +108,7 @@ Every `.evolve/ledger.jsonl` entry records:
 
 `prev_hash` chains entries: tampering with any past entry invalidates every subsequent `prev_hash`. The verification script walks the chain.
 
-`scripts/lifecycle/phase-gate.sh check_subagent_ledger_match <role>` verifies that the on-disk artifact's SHA256 matches the ledger's recorded SHA — so a Builder cannot rewrite its own report after audit.
+`legacy/scripts/lifecycle/phase-gate.sh check_subagent_ledger_match <role>` verifies that the on-disk artifact's SHA256 matches the ledger's recorded SHA — so a Builder cannot rewrite its own report after audit.
 
 ---
 
@@ -138,7 +138,7 @@ Each cycle runs in a fresh git worktree at `$EVOLVE_WORKTREE_BASE/cycle-N` (or `
 
 ### Adaptive Capability Detection
 
-`scripts/dispatch/preflight-environment.sh` emits `.evolve/environment.json` describing the current sandbox/worktree/CLI capabilities. The dispatcher reads `auto_config` and picks the right mode:
+`legacy/scripts/dispatch/preflight-environment.sh` emits `.evolve/environment.json` describing the current sandbox/worktree/CLI capabilities. The dispatcher reads `auto_config` and picks the right mode:
 
 | Field | Values | Decision rule |
 |---|---|---|
@@ -179,7 +179,7 @@ Single-writer roles (Builder, Intent, Orchestrator, TDD-engineer) are **structur
 
 ### Mutation Testing (`EVOLVE_MUTATE_EVAL_STRICT=1` rollout)
 
-`scripts/verification/mutate-eval.sh` runs every new eval definition through K mutations (flip the expected output, remove the assertion, etc.). If kill rate < 0.8, the eval is flagged tautological and the discover-to-build gate WARN-blocks (FAIL after rollout).
+`legacy/scripts/verification/mutate-eval.sh` runs every new eval definition through K mutations (flip the expected output, remove the assertion, etc.). If kill rate < 0.8, the eval is flagged tautological and the discover-to-build gate WARN-blocks (FAIL after rollout).
 
 ### Adversarial Auditor (default ON)
 
@@ -193,7 +193,7 @@ After Scout's free-for-all backlog, Triage bounds the cycle to `top_n[]` + `defe
 
 ### Scout Grounding Check (cycle 62 step 4)
 
-WARN-mode default-on. Verifies Scout's `## Key Findings` claims (path + quantitative claim) against `git status --porcelain` and `git diff --stat HEAD`. Catches Scout-level hallucinations like "scripts/foo.sh +90 lines" when the file is unchanged.
+WARN-mode default-on. Verifies Scout's `## Key Findings` claims (path + quantitative claim) against `git status --porcelain` and `git diff --stat HEAD`. Catches Scout-level hallucinations like "legacy/scripts/foo.sh +90 lines" when the file is unchanged.
 
 ### Audit Citation Binding (cycle 62 step 5)
 

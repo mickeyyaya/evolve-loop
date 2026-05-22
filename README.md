@@ -124,9 +124,9 @@ The threat is not malicious humans — it's the LLM doing what LLMs do: confabul
 |---|---|---|
 | `phase-gate-precondition.sh` | every `subagent-run.sh` invocation | Out-of-order phases, in-process `Agent` tool when `cycle-state.json` exists |
 | `role-gate.sh` | every `Edit`/`Write` tool call | Writes outside the active phase's allowlist, writes outside worktree for write-bound roles |
-| `ship-gate.sh` | every `Bash` with git/gh verbs | Direct `git commit`/`git push` not routed through `scripts/lifecycle/ship.sh` |
+| `ship-gate.sh` | every `Bash` with git/gh verbs | Direct `git commit`/`git push` not routed through `legacy/scripts/lifecycle/ship.sh` |
 
-Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` — every entry records `prev_hash`. Modifying any past entry invalidates every subsequent `prev_hash`. Verify with `bash scripts/observability/verify-ledger-chain.sh`.
+Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` — every entry records `prev_hash`. Modifying any past entry invalidates every subsequent `prev_hash`. Verify with `bash legacy/scripts/observability/verify-ledger-chain.sh`.
 
 ### Tier 2 — OS sandboxing + per-cycle worktree
 
@@ -134,7 +134,7 @@ When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), every `claude -p` 
 
 Per-cycle git worktree at `$EVOLVE_WORKTREE_BASE/cycle-N` isolates Builder's edits from other cycles. Lives on a temporary branch (`evolve/cycle-N`) deleted post-ship.
 
-Capability detection (`scripts/dispatch/preflight-environment.sh`) auto-adapts to nested-Claude environments, falling back gracefully without losing Tier 1.
+Capability detection (`legacy/scripts/dispatch/preflight-environment.sh`) auto-adapts to nested-Claude environments, falling back gracefully without losing Tier 1.
 
 ### Tier 3 — Workflow defaults (opt-in but recommended)
 
@@ -218,7 +218,7 @@ The framework separates *what work happens* from *who does it* from *what model 
 
 ### The CLI router
 
-`scripts/dispatch/resolve-llm.sh` is a pure function that returns which CLI + model should run each phase. Operators override via `.evolve/llm_config.json`:
+`legacy/scripts/dispatch/resolve-llm.sh` is a pure function that returns which CLI + model should run each phase. Operators override via `.evolve/llm_config.json`:
 
 ```json
 {
@@ -424,9 +424,9 @@ The dispatcher locates the most recent paused cycle, validates state (git HEAD u
 ./bin/verify-chain                      tamper-evident ledger chain check
 ./bin/preflight                         full pipeline dry-run (regression + simulate + release-pipeline dry-run)
 ./bin/check-caps [cli]                  show resolved capability tier per adapter
-bash scripts/observability/show-context-monitor.sh <cycle>   per-cycle context usage (v9.1.0+)
-bash scripts/observability/show-context-monitor.sh --watch   live-tail latest cycle (3s refresh)
-bash scripts/observability/render-cli-resolution.sh <cycle>  per-phase CLI/model from ledger truth (v10.7+)
+bash legacy/scripts/observability/show-context-monitor.sh <cycle>   per-cycle context usage (v9.1.0+)
+bash legacy/scripts/observability/show-context-monitor.sh --watch   live-tail latest cycle (3s refresh)
+bash legacy/scripts/observability/render-cli-resolution.sh <cycle>  per-phase CLI/model from ledger truth (v10.7+)
 ```
 
 For a hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
@@ -446,7 +446,7 @@ Evolve-loop supports four authentication modes, detected in priority order:
 
 `EVOLVE_ANTHROPIC_BASE_URL` is proxy-agnostic — it works with LiteLLM, corporate gateways, or any endpoint that speaks the Anthropic Messages API. It is **not** required for subscription auth.
 
-To detect your active auth mode: `bash scripts/utility/doctor-subscription-auth.sh`
+To detect your active auth mode: `bash legacy/scripts/utility/doctor-subscription-auth.sh`
 
 ---
 
@@ -605,7 +605,7 @@ evolve-loop/
 │   └── regression-suite/cycle-*/  # Permanent regression predicates (tracked)
 ├── agents/                      # Persona files (tri-layer "who")
 ├── skills/                      # Skill workflows (tri-layer "how")
-├── scripts/                     # Trust kernel + adapters + utilities
+├── legacy/scripts/                     # Trust kernel + adapters + utilities
 │   ├── dispatch/                # Dispatcher + subagent-run + router
 │   ├── lifecycle/               # phase-gate.sh + ship.sh + cycle-state.sh
 │   ├── guards/                  # PreToolUse shell hooks (Tier 1)

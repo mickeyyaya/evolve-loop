@@ -37,7 +37,7 @@ run-cycle.sh  (privileged shell)
 orchestrator-report.md -> cycle-state cleared -> ledger entry written
 ```
 
-Each transition between phases passes through `scripts/guards/phase-gate-precondition.sh`, which reads `cycle-state.json` and refuses subagent dispatches that violate the Scout to Builder to Auditor sequence. Each subagent invocation is wrapped by `subagent-run.sh` which:
+Each transition between phases passes through `legacy/scripts/guards/phase-gate-precondition.sh`, which reads `cycle-state.json` and refuses subagent dispatches that violate the Scout to Builder to Auditor sequence. Each subagent invocation is wrapped by `subagent-run.sh` which:
 
 1. Reads the phase agent's profile (`.evolve/profiles/<role>.json`)
 2. Resolves model (default tier from profile, with v8.35.0 adaptive downgrade for trivial diffs)
@@ -203,7 +203,7 @@ The CLI argv's strategy keyword shapes Scout's discovery scope:
    - **Regression Evals**: full test suite must pass
    - **E2E Graders** (UI tasks): Playwright assertions
    - **LLM Graders**: subjective rubric scored by Auditor
-5. **Mutation-testing pre-flight** (v8.20+): runs `scripts/verification/mutate-eval.sh` against new evals; kill rate < 0.8 -> flagged as tautological
+5. **Mutation-testing pre-flight** (v8.20+): runs `legacy/scripts/verification/mutate-eval.sh` against new evals; kill rate < 0.8 -> flagged as tautological
 
 ### Pattern-3 fan-out (v8.23+, opt-in)
 
@@ -343,11 +343,11 @@ When `EVOLVE_FANOUT_AUDITOR=1`, the orchestrator dispatches the audit phase as `
 | `audit-regression` | Full `run-all-regression-tests.sh` |
 | `audit-build-quality` | Lock-file integrity, no committed secrets, no large binaries |
 
-Each sub-auditor writes its worker artifact to `$WORKSPACE/workers/auditor-<focus>.md`. `aggregator.sh` merges them into the canonical `audit-report.md`. Aggregator's rule: **ANY FAIL → aggregate FAIL** (see `scripts/dispatch/aggregator.sh:93-117`).
+Each sub-auditor writes its worker artifact to `$WORKSPACE/workers/auditor-<focus>.md`. `aggregator.sh` merges them into the canonical `audit-report.md`. Aggregator's rule: **ANY FAIL → aggregate FAIL** (see `legacy/scripts/dispatch/aggregator.sh:93-117`).
 
-The dispatcher mechanic (`cmd_dispatch_parallel`) and the profile (`auditor.json:parallel_subtasks`) have shipped since v8.23.0; the **orchestrator persona consumed the flag starting v10.19.0** (prior to this, flipping `EVOLVE_FANOUT_AUDITOR=1` was a no-op because no caller invoked the parallel path). The kernel guard (`scripts/guards/phase-gate-precondition.sh`) parses the `dispatch-parallel <agent>` form so phase-sequence enforcement still applies — see `phase-gate-precondition-test.sh` tests 23–25.
+The dispatcher mechanic (`cmd_dispatch_parallel`) and the profile (`auditor.json:parallel_subtasks`) have shipped since v8.23.0; the **orchestrator persona consumed the flag starting v10.19.0** (prior to this, flipping `EVOLVE_FANOUT_AUDITOR=1` was a no-op because no caller invoked the parallel path). The kernel guard (`legacy/scripts/guards/phase-gate-precondition.sh`) parses the `dispatch-parallel <agent>` form so phase-sequence enforcement still applies — see `phase-gate-precondition-test.sh` tests 23–25.
 
-Default remains off (`EVOLVE_FANOUT_AUDITOR=0`). A follow-up cycle will flip the default after ≥5 cycles of soak on the new path, with a diff-complexity-based auto-on trigger (using `scripts/utility/diff-complexity.sh` `tier=complex` or any security path).
+Default remains off (`EVOLVE_FANOUT_AUDITOR=0`). A follow-up cycle will flip the default after ≥5 cycles of soak on the new path, with a diff-complexity-based auto-on trigger (using `legacy/scripts/utility/diff-complexity.sh` `tier=complex` or any security path).
 
 ### Cycle binding — Auditor's structural anchor role
 
@@ -392,7 +392,7 @@ $0.40-2.50/cycle. v8.35.0 adaptive tiering brings trivial-diff audits to ~$0.50;
 
 ### 5a. PASS or WARN -> ship.sh
 
-**Script**: `scripts/lifecycle/ship.sh` — privileged shell, NOT a subagent. Allowlisted as the canonical entry point by `ship-gate.sh`.
+**Script**: `legacy/scripts/lifecycle/ship.sh` — privileged shell, NOT a subagent. Allowlisted as the canonical entry point by `ship-gate.sh`.
 **Invoked by**: Orchestrator with `ship.sh "<commit-message>"`.
 
 #### ship.sh flow (v8.43.0)
@@ -421,12 +421,12 @@ $0.40-2.50/cycle. v8.35.0 adaptive tiering brings trivial-diff audits to ~$0.50;
 
 ### 5b. FAIL -> record-failure + retrospective
 
-**Script**: `scripts/failure/record-failure-to-state.sh` (privileged shell).
+**Script**: `legacy/scripts/failure/record-failure-to-state.sh` (privileged shell).
 **Invoked by**: Orchestrator with `record-failure-to-state.sh $WORKSPACE FAIL`.
 
 The script appends to `state.json:failedApproaches[]` with the cycle's verdict + classification + expiresAt + audit binding.
 
-The classification taxonomy (`scripts/failure/failure-classifications.sh`):
+The classification taxonomy (`legacy/scripts/failure/failure-classifications.sh`):
 
 | Classification | Severity | Age-out | Retry policy |
 |---|---|---|---|
@@ -541,7 +541,7 @@ Status lifecycle:
 | `closed` | Investigated and decided no action needed (intentional WARN, environmental fluke) |
 | `implemented` | Improvements actioned. `action_refs[]` lists commit SHAs / PR numbers |
 
-The `INDEX.md` at the directory root is auto-regenerated by `scripts/failure/index-investigations.sh` after each merge. Operator workflow:
+The `INDEX.md` at the directory root is auto-regenerated by `legacy/scripts/failure/index-investigations.sh` after each merge. Operator workflow:
 
 1. Read INDEX.md to see open investigations
 2. Open the dir, read investigation.md + evidence/ + improvements.md
@@ -592,7 +592,7 @@ Three PreToolUse hooks fire at every transition:
 |---|---|---|
 | `phase-gate-precondition.sh` | Bash with `subagent-run.sh` | Out-of-order phases |
 | `role-gate.sh` | Edit/Write tool calls | Writes outside the active phase's allowlist |
-| `ship-gate.sh` | Bash with git/gh verbs | Anything except `scripts/lifecycle/ship.sh` doing commit/push/release |
+| `ship-gate.sh` | Bash with git/gh verbs | Anything except `legacy/scripts/lifecycle/ship.sh` doing commit/push/release |
 
 These cannot be bypassed during normal operation. Emergency overrides (`EVOLVE_BYPASS_*`) log loudly and are considered CRITICAL violations per CLAUDE.md.
 
@@ -619,7 +619,7 @@ Every phase's subagent invocation records to `.evolve/ledger.jsonl`:
 }
 ```
 
-`prev_hash` chains entries; modifying entry N breaks every entry after. `.evolve/ledger.tip` records the latest entry's full SHA — truncation detection. `bash scripts/observability/verify-ledger-chain.sh` walks the chain and reports breaks (rc=1) or truncation (rc=2).
+`prev_hash` chains entries; modifying entry N breaks every entry after. `.evolve/ledger.tip` records the latest entry's full SHA — truncation detection. `bash legacy/scripts/observability/verify-ledger-chain.sh` walks the chain and reports breaks (rc=1) or truncation (rc=2).
 
 ### Cycle binding (v8.13.0)
 
@@ -631,10 +631,10 @@ These pin the agent's understanding to a specific code state. ship.sh refuses to
 
 ### Failure adaptation (v8.22.0+, fluent v8.28.0+)
 
-`scripts/failure/failure-adapter.sh` reads `state.json:failedApproaches[]` and emits a deterministic decision JSON:
+`legacy/scripts/failure/failure-adapter.sh` reads `state.json:failedApproaches[]` and emits a deterministic decision JSON:
 
 ```bash
-bash scripts/failure/failure-adapter.sh decide --state .evolve/state.json
+bash legacy/scripts/failure/failure-adapter.sh decide --state .evolve/state.json
 # {"action": "PROCEED|RETRY-WITH-FALLBACK|BLOCK-CODE|BLOCK-OPERATOR-ACTION",
 #  "reason": "...", "set_env": {...}, "verdict_for_block": "..."}
 ```
@@ -645,7 +645,7 @@ The orchestrator follows the action verbatim. Pre-v8.22 this was a markdown rule
 
 - v8.33.0: cache-friendly prompt order (agent persona prepended verbatim -> hits Anthropic prompt cache, 0.1x cost on subsequent reads in same 5-min TTL window)
 - v8.33.0: conditional context blocks (skip empty `recentLedgerEntries`, `recentFailures`, `instinctSummary` headers)
-- v8.35.0: adaptive auditor model selection via `scripts/utility/diff-complexity.sh` — Sonnet for trivial diffs, Opus for complex/security
+- v8.35.0: adaptive auditor model selection via `legacy/scripts/utility/diff-complexity.sh` — Sonnet for trivial diffs, Opus for complex/security
 
 ### Three-Tier Strictness Model (v8.24.0+)
 

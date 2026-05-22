@@ -31,7 +31,7 @@
 
 > **The multi-LLM swarm design is architecturally sound but operationally unverified and incomplete as of v8.51.0.**
 
-The dispatch plumbing works — `subagent-run.sh` reads `profile.cli` and routes to the correct adapter (`scripts/cli_adapters/{claude,gemini,codex}.sh`). The capability tier model (full/hybrid/degraded/none) is principled and correct. Kernel guarantees (Tier-1 hooks: role-gate, ship-gate, phase-gate-precondition, ledger SHA chain) are CLI-independent and robust.
+The dispatch plumbing works — `subagent-run.sh` reads `profile.cli` and routes to the correct adapter (`legacy/scripts/cli_adapters/{claude,gemini,codex}.sh`). The capability tier model (full/hybrid/degraded/none) is principled and correct. Kernel guarantees (Tier-1 hooks: role-gate, ship-gate, phase-gate-precondition, ledger SHA chain) are CLI-independent and robust.
 
 What was missing:
 
@@ -154,7 +154,7 @@ This review focuses on Axis A.
 
 **Evidence (pre-cycle)**: `swarm-architecture-test.sh` (232 lines) had zero mixed-CLI dispatch tests. The multi-CLI dispatch routing was an untested hypothesis.
 
-**Fix shipped**: `scripts/tests/multi-cli-cycle-test.sh`
+**Fix shipped**: `legacy/scripts/tests/multi-cli-cycle-test.sh`
 
 - 13 assertions covering scout→gemini, builder→claude, auditor→codex routing
 - Verifies negative cases (gemini does not leak to claude-adapter)
@@ -163,7 +163,7 @@ This review focuses on Axis A.
 - No real LLM invocations — uses `VALIDATE_ONLY=1` + `EVOLVE_TESTING=1` test seams
 - Bash 3.2 compatible
 
-Run: `bash scripts/tests/multi-cli-cycle-test.sh`
+Run: `bash legacy/scripts/tests/multi-cli-cycle-test.sh`
 Expected: `13 PASS, 0 FAIL`
 
 ---
@@ -174,12 +174,12 @@ Expected: `13 PASS, 0 FAIL`
 
 **Evidence (pre-cycle)**: The "lowest tier wins" rule was stated in `platform-compatibility.md` and implemented WITHIN `_capability-check.sh` for per-adapter dimension aggregation. No `_capability-compose.sh` existed for cross-adapter/cross-phase composition.
 
-**Fix shipped**: `scripts/cli_adapters/_capability-compose.sh`
+**Fix shipped**: `legacy/scripts/cli_adapters/_capability-compose.sh`
 
 ```bash
-bash scripts/cli_adapters/_capability-compose.sh full hybrid degraded  # → degraded
-bash scripts/cli_adapters/_capability-compose.sh full hybrid           # → hybrid
-bash scripts/cli_adapters/_capability-compose.sh full                  # → full
+bash legacy/scripts/cli_adapters/_capability-compose.sh full hybrid degraded  # → degraded
+bash legacy/scripts/cli_adapters/_capability-compose.sh full hybrid           # → hybrid
+bash legacy/scripts/cli_adapters/_capability-compose.sh full                  # → full
 ```
 
 Bash 3.2 compatible. Mirrors the `mode_rank` / `rank_to_mode` pattern already in `_capability-check.sh`.
@@ -222,13 +222,13 @@ Bash 3.2 compatible. Mirrors the `mode_rank` / `rank_to_mode` pattern already in
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| Multi-CLI dispatch test | `scripts/tests/multi-cli-cycle-test.sh` | Regression gate for GAP-5: proves routing works |
-| Capability composition script | `scripts/cli_adapters/_capability-compose.sh` | Closes GAP-6: min-tier aggregation across phases |
+| Multi-CLI dispatch test | `legacy/scripts/tests/multi-cli-cycle-test.sh` | Regression gate for GAP-5: proves routing works |
+| Capability composition script | `legacy/scripts/cli_adapters/_capability-compose.sh` | Closes GAP-6: min-tier aggregation across phases |
 | This architecture review | `docs/architecture/multi-llm-review.md` | Closes GAP-2 partially: manual procedure documented |
 
 Test run evidence:
 ```
-bash scripts/tests/multi-cli-cycle-test.sh
+bash legacy/scripts/tests/multi-cli-cycle-test.sh
 Results: 13 PASS, 0 FAIL
 PASS — multi-CLI dispatch routing verified
 ```
@@ -292,14 +292,14 @@ mv .evolve/profiles/scout.json.tmp .evolve/profiles/scout.json
 **Step 3**: Validate the profile resolves to the expected adapter.
 
 ```bash
-bash scripts/dispatch/subagent-run.sh --validate-profile scout
+bash legacy/scripts/dispatch/subagent-run.sh --validate-profile scout
 # Expected stderr: [gemini-adapter] ...
 ```
 
 **Step 4**: Optionally probe the capability tier.
 
 ```bash
-bash scripts/cli_adapters/_capability-check.sh gemini --human
+bash legacy/scripts/cli_adapters/_capability-check.sh gemini --human
 # Adapter: gemini
 # Quality tier: hybrid  (if claude on PATH)
 #            or degraded (if no claude)
@@ -308,7 +308,7 @@ bash scripts/cli_adapters/_capability-check.sh gemini --human
 **Step 5**: For a multi-CLI cycle, compose the expected cycle quality tier.
 
 ```bash
-bash scripts/cli_adapters/_capability-compose.sh hybrid full hybrid
+bash legacy/scripts/cli_adapters/_capability-compose.sh hybrid full hybrid
 # Output: hybrid
 ```
 
@@ -379,14 +379,14 @@ Three opt-in surfaces:
 /evolve-loop --consensus-audit 1 polish "audit hardening"
 
 # Env var form (CI-friendly, persistent across multiple dispatches)
-EVOLVE_CONSENSUS_AUDIT=1 bash scripts/dispatch/evolve-loop-dispatch.sh 1 polish "..."
+EVOLVE_CONSENSUS_AUDIT=1 bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 polish "..."
 
 # Profile-side persistence (always-on for this auditor profile)
 jq '.consensus.enabled = true' .evolve/profiles/auditor.json > .evolve/profiles/auditor.json.tmp     && mv .evolve/profiles/auditor.json.tmp .evolve/profiles/auditor.json
 ```
 
 When enabled:
-- Orchestrator dispatches the audit phase via `scripts/dispatch/consensus-dispatch.sh` instead of `subagent-run.sh dispatch-parallel auditor`
+- Orchestrator dispatches the audit phase via `legacy/scripts/dispatch/consensus-dispatch.sh` instead of `subagent-run.sh dispatch-parallel auditor`
 - Each `cli_voters` entry runs the full audit prompt under that CLI (parallel via `fanout-dispatch.sh`)
 - Per-voter artifacts at `.evolve/runs/cycle-N/consensus-workers/<cli>-audit.md`
 - Aggregated verdict at `.evolve/runs/cycle-N/audit-report.md` (replaces what standard auditor would produce)
@@ -420,12 +420,12 @@ Neither of these incidents is fully solved by consensus auditing alone — kerne
 | Source | Relevant section |
 |---|---|
 | `docs/architecture/platform-compatibility.md` | Capability model definition; per-CLI tier table; v8.52.0 roadmap |
-| `scripts/dispatch/subagent-run.sh:590` | Profile.cli authoritative dispatch |
-| `scripts/cli_adapters/_capability-check.sh` | Per-adapter capability resolution; quality_tier aggregation |
-| `scripts/cli_adapters/_capability-compose.sh` | Cross-phase tier composition (new this cycle) |
-| `scripts/tests/multi-cli-cycle-test.sh` | Mixed-CLI dispatch regression gate (new this cycle) |
-| `scripts/dispatch/subagent-run.sh:872` | `_write_fanout_ledger_entry` (lacks quality_tier — GAP-3) |
-| `scripts/tests/swarm-architecture-test.sh` | Tri-layer wiring tests (does not cover mixed-CLI dispatch) |
+| `legacy/scripts/dispatch/subagent-run.sh:590` | Profile.cli authoritative dispatch |
+| `legacy/scripts/cli_adapters/_capability-check.sh` | Per-adapter capability resolution; quality_tier aggregation |
+| `legacy/scripts/cli_adapters/_capability-compose.sh` | Cross-phase tier composition (new this cycle) |
+| `legacy/scripts/tests/multi-cli-cycle-test.sh` | Mixed-CLI dispatch regression gate (new this cycle) |
+| `legacy/scripts/dispatch/subagent-run.sh:872` | `_write_fanout_ledger_entry` (lacks quality_tier — GAP-3) |
+| `legacy/scripts/tests/swarm-architecture-test.sh` | Tri-layer wiring tests (does not cover mixed-CLI dispatch) |
 | `docs/incidents/gemini-forgery.md` | Why Tier-1 defenses operate at pipeline layer, not adapter layer |
 | `docs/architecture/tri-layer.md` | Orchestration pattern taxonomy (Patterns 1-5) |
 | `.evolve/profiles/*.json` | All profiles — confirmed 100% `"cli": "claude"` pre-cycle |

@@ -82,7 +82,7 @@ Schema files live at `schemas/handoff/<type>-report.schema.json`.
 ## Lint Script Interface
 
 ```bash
-bash scripts/tests/validate-handoff-artifact.sh \
+bash legacy/scripts/tests/validate-handoff-artifact.sh \
     --artifact <PATH>          # markdown artifact to validate
     --type scout|build|audit   # selects schema file
     [--state <state.json>]     # required for conditional_sections evaluation
@@ -107,7 +107,7 @@ Added as soft WARNs (not FAILs) in three gates — C4/C5 promote to FAIL:
 | `build-to-audit` | `build-report.md` | `gate_build_to_audit` |
 | `audit-to-ship` | `audit-report.md` | `gate_audit_to_ship` |
 
-Each integration is guarded with `[ -x "scripts/tests/validate-handoff-artifact.sh" ]` for backward compatibility: if the script is absent, the gate continues without error.
+Each integration is guarded with `[ -x "legacy/scripts/tests/validate-handoff-artifact.sh" ]` for backward compatibility: if the script is absent, the gate continues without error.
 
 **Why soft WARN in C2**: Promoting immediately to FAIL would block cycles on the first rollout cycle where agents haven't been updated to produce the new required sections. The WARN→FAIL promotion ladder (v8.55 pattern) lets one verification cycle confirm correctness before enforcing.
 

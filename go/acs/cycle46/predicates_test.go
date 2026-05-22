@@ -11,7 +11,7 @@ import (
 // TestC46_001_AbnormalEventsOnIntegrityFail ports cycle-46/001.
 func TestC46_001_AbnormalEventsOnIntegrityFail(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	script := filepath.Join(root, "scripts", "failure", "merge-lesson-into-state.sh")
+	script := filepath.Join(root, "legacy", "scripts", "failure", "merge-lesson-into-state.sh")
 	if !acsassert.FileExists(t, script) {
 		t.Skip("merge-lesson-into-state.sh missing — skip cycle-46-001")
 	}
@@ -33,7 +33,7 @@ func TestC46_001_AbnormalEventsOnIntegrityFail(t *testing.T) {
 // predicate is authoritative for in-function co-location.
 func TestC46_002_GateRetrospectiveToCompleteExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gate := filepath.Join(root, "scripts", "lifecycle", "phase-gate.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
 	if !acsassert.FileContainsAny(gate, "gate_retrospective_to_complete()") {
 		t.Skip("gate_retrospective_to_complete() absent — skip cycle-46-002")
 	}
@@ -86,7 +86,7 @@ func TestC46_004_OrchestratorMergeRcAllPaths(t *testing.T) {
 // enforce co-location), but it preserves the regression-prevention signal.
 func TestC46_005_GateAuditToRetroAbnormalEvents(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gate := filepath.Join(root, "scripts", "lifecycle", "phase-gate.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
 	if !acsassert.FileContainsAny(gate, "gate_audit_to_retrospective()") {
 		t.Skip("gate_audit_to_retrospective() absent — skip cycle-46-005")
 	}
@@ -165,7 +165,7 @@ func TestC46_009_RoadmapPNew25Closed(t *testing.T) {
 // to match the parent plan's "presence, not execution" pattern.
 func TestC46_010_AbnormalEventTestExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	test := filepath.Join(root, "scripts", "tests", "abnormal-event-capture-test.sh")
+	test := filepath.Join(root, "legacy", "scripts", "tests", "abnormal-event-capture-test.sh")
 	if !acsassert.FileExists(t, test) {
 		t.Skip("abnormal-event-capture-test.sh missing — skip cycle-46-010")
 	}
@@ -188,7 +188,7 @@ func TestC46_011_AbnormalEventCaptureDocExists(t *testing.T) {
 // TestC46_012_ReconcileCarryoverHandlesAbnormal ports cycle-46/012.
 func TestC46_012_ReconcileCarryoverHandlesAbnormal(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	script := filepath.Join(root, "scripts", "lifecycle", "reconcile-carryover-todos.sh")
+	script := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
 	if !acsassert.FileExists(t, script) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-46-012")
 	}

@@ -34,7 +34,7 @@
 | `cmd/evolve` | 79.5% | dispatch smoke tests for version / help / doctor / guard / ledger / acs subcommands (excluded from gate) |
 | `acs/cycle42` | 100% | 4 file-grep predicates against `docs/architecture/token-reduction-roadmap.md` + KB dossier |
 | `acs/cycle104` | 100% | 5 file-grep + regex + line-position invariants against `agents/*.md` and `docs/architecture/control-flags.md` |
-| `acs/cycle53` | (no statements) | 3 integration tests shelling to `scripts/dispatch/subagent-run.sh --validate-profile` with sentinel adapters and dispatch-plan JSON checks |
+| `acs/cycle53` | (no statements) | 3 integration tests shelling to `legacy/scripts/dispatch/subagent-run.sh --validate-profile` with sentinel adapters and dispatch-plan JSON checks |
 
 12 of the 12 bash predicates in `acs/cycle-{42,53,104}/*.sh` are ported. Both bash and Go counterparts coexist (parent §4 Phase 4 cutover discipline).
 
@@ -86,7 +86,7 @@ For every guard:
 - A test that exercises the env-var bypass to keep that branch covered.
 
 Per-guard specifics:
-- **ship**: canonical script path (`scripts/lifecycle/ship.sh`) allowlists every ship-verb (`git commit`, `git push`, `gh release create|edit`).
+- **ship**: canonical script path (`legacy/scripts/lifecycle/ship.sh`) allowlists every ship-verb (`git commit`, `git push`, `gh release create|edit`).
 - **phase**: denies the `Agent` tool when `cycle-state.json:cycle_id != 0`; allows otherwise.
 - **role**: per-phase write allowlist (build: workspace + worktree; audit: workspace only); always-safe paths (`/tmp/`, `$HOME/.claude/`).
 - **docdelete**: blocks `rm` against `docs/` or `knowledge-base/`; blocks `mv` from `docs/` unless dest is `knowledge-base/research/archived-YYYY-MM-DD/`.
@@ -115,7 +115,7 @@ Per-guard specifics:
 
 Each `acs/cycleN/predicates_test.go` asserts the same invariants as the corresponding `acs/cycle-N/*.sh` predicate. The test name encodes the AC-ID (`TestC42_003_PNew13Done`, `TestC104_001_OrchestratorDefaultAdvisory`, …) so a verdict mismatch between bash and Go is immediately traceable.
 
-Predicates that need subprocess scaffolding (cycle-53) shell to `scripts/dispatch/subagent-run.sh --validate-profile` with the same `EVOLVE_TESTING=1` + sentinel-adapter pattern the bash predicates use. Anti-tautology checks (e.g. claude has no `[adapter-cap] WARN`) are preserved in the Go ports.
+Predicates that need subprocess scaffolding (cycle-53) shell to `legacy/scripts/dispatch/subagent-run.sh --validate-profile` with the same `EVOLVE_TESTING=1` + sentinel-adapter pattern the bash predicates use. Anti-tautology checks (e.g. claude has no `[adapter-cap] WARN`) are preserved in the Go ports.
 
 ---
 
@@ -129,7 +129,7 @@ go:    go test ./acs/cycle104/... -run TestC104_001_OrchestratorDefaultAdvisory
        evolve acs run --cycle 104 ./acs/cycle104/...
 ```
 
-Any divergence between the two verdicts is an integrity bug. The retrospective hook (`scripts/observability/replay-egps.sh`) currently consumes the bash verdicts; once cycle 105+ rewires it to consume `evolve acs run`'s output, the bash files can be removed package-by-package.
+Any divergence between the two verdicts is an integrity bug. The retrospective hook (`legacy/scripts/observability/replay-egps.sh`) currently consumes the bash verdicts; once cycle 105+ rewires it to consume `evolve acs run`'s output, the bash files can be removed package-by-package.
 
 ---
 
@@ -163,7 +163,7 @@ Steps 1-4 are non-negotiable per CLAUDE.md "Verification before claiming done". 
 | Finding | Status |
 |---|---|
 | **Soft-start boundary** | `ledger.Verify` now matches bash semantics — pre-v8.37 entries (no `prev_hash` field) are skipped from chain validation but their SHA still anchors the first v8.37+ entry. Added in cycle ending 2026-05-22 (`decodeLedgerLine` + raw map key check). |
-| **Live ledger has 18 chain breaks** | Both `bash scripts/observability/verify-ledger-chain.sh` AND `evolve ledger verify --evolve-dir .evolve` report 18 chain breaks on the live `.evolve/ledger.jsonl` (1846 entries, first break at entry_seq=0 in cycle 25). This is operational (likely concurrent fan-out anomalies from earlier cycles), not a port bug. Tracked separately. |
+| **Live ledger has 18 chain breaks** | Both `bash legacy/scripts/observability/verify-ledger-chain.sh` AND `evolve ledger verify --evolve-dir .evolve` report 18 chain breaks on the live `.evolve/ledger.jsonl` (1846 entries, first break at entry_seq=0 in cycle 25). This is operational (likely concurrent fan-out anomalies from earlier cycles), not a port bug. Tracked separately. |
 | **Verification step §6.5 not yet satisfiable** | Parent plan §6 item 5 — "`evolve ledger verify` returns exit 0 on the live repo ledger" — is blocked on the operational finding above. The verifier itself is correct (proved by `TestVerify_SoftBoundary_*` table). |
 
 ---

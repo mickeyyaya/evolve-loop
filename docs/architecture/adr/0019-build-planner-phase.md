@@ -44,10 +44,10 @@ Introduce a `build-planner` phase between TDD and Build:
 
 **Edited files:**
 - `docs/architecture/phase-registry.json` — build-planner entry between tdd and build; `tdd.gate_out` → `gate_tdd_to_build_planner`
-- `scripts/dispatch/list-phase-order.sh` — `build-planner` inserted in `emit_hardcoded_order()`
-- `scripts/dispatch/subagent-run.sh` — `build-planner` added to both allowlist regexes
-- `scripts/guards/phase-gate-precondition.sh` — `build-planner` recognized; `build-planner` phase arm added
-- `scripts/lifecycle/phase-gate.sh` — `gate_tdd_to_build_planner()` and `gate_build_planner_to_build()` declared and wired
+- `legacy/scripts/dispatch/list-phase-order.sh` — `build-planner` inserted in `emit_hardcoded_order()`
+- `legacy/scripts/dispatch/subagent-run.sh` — `build-planner` added to both allowlist regexes
+- `legacy/scripts/guards/phase-gate-precondition.sh` — `build-planner` recognized; `build-planner` phase arm added
+- `legacy/scripts/lifecycle/phase-gate.sh` — `gate_tdd_to_build_planner()` and `gate_build_planner_to_build()` declared and wired
 - `agents/evolve-orchestrator-reference.md` — conditional step using `${EVOLVE_BUILD_PLANNER:-0}`
 
 **Enable flag:** `EVOLVE_BUILD_PLANNER` — default `0` (shadow). Set `1` to activate.

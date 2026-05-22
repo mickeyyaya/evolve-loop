@@ -111,7 +111,7 @@ The orchestrator's directive is one line: "after each phase, read `{phase}-obser
 Spawned by `run-cycle.sh` immediately before the subagent — same pattern as `phase-watchdog.sh`:
 
 ```bash
-bash "$EVOLVE_PLUGIN_ROOT/scripts/dispatch/phase-observer.sh" \
+bash "$EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/phase-observer.sh" \
     "$workspace" "$RUN_PGID" "$cycle" "$phase" "$agent" "$cycle_state_file" &
 OBSERVER_PID=$!
 
@@ -197,7 +197,7 @@ jq '.summary, {incidents: (.incidents | length)}' .evolve/runs/cycle-38/builder-
 **Tune for a noisy phase** (e.g., long Memo phases):
 ```bash
 EVOLVE_OBSERVER_STALL_S=600 EVOLVE_OBSERVER_ENABLED=1 \
-    bash scripts/dispatch/evolve-loop-dispatch.sh --resume
+    bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
 ```
 
 **Disable temporarily**:
@@ -207,7 +207,7 @@ EVOLVE_OBSERVER_ENABLED=0   # observer not spawned; watchdog still active
 
 ## Verification & tests
 
-- Unit tests for rules: `scripts/tests/phase-observer-test.sh` — 6 fixture scenarios, 20 assertions
+- Unit tests for rules: `legacy/scripts/tests/phase-observer-test.sh` — 6 fixture scenarios, 20 assertions
 - Live smoke: run any cycle with `EVOLVE_OBSERVER_ENABLED=1`; tail the events file
 - Integration: orchestrator-report.md should reference `observer-report.json` consumption after the v1 rollout
 

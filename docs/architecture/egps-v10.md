@@ -29,7 +29,7 @@ Every acceptance criterion compiles to an executable bash script at `acs/cycle-N
 # Acceptance-of: link back to the build-report.md AC line/token
 
 # Run the actual code path being claimed. NOT grep-on-source.
-output=$(bash scripts/my-feature.sh --test-mode)
+output=$(bash legacy/scripts/my-feature.sh --test-mode)
 [ "$output" = "expected" ] && exit 0
 exit 1
 ```
@@ -38,7 +38,7 @@ exit 1
 
 ## Banned patterns inside predicates
 
-Enforced by `scripts/verification/validate-predicate.sh`:
+Enforced by `legacy/scripts/verification/validate-predicate.sh`:
 
 1. `grep -q "..." somefile; exit $?` as the only check — presence ≠ execution
 2. `echo "PASS"; exit 0` with no real work — tautology
@@ -49,7 +49,7 @@ Enforced by `scripts/verification/validate-predicate.sh`:
 
 ## Verdict computation
 
-`scripts/lifecycle/run-acs-suite.sh <cycle>` runs:
+`legacy/scripts/lifecycle/run-acs-suite.sh <cycle>` runs:
 - All `acs/cycle-N/*.sh` (this cycle's predicates)
 - All `acs/regression-suite/cycle-*/*.sh` (every prior cycle's accumulated predicates)
 
@@ -74,7 +74,7 @@ Output: `acs-verdict.json` with schema:
 
 ## ship-gate integration
 
-`scripts/lifecycle/ship.sh` (cycle-class commits only) gates on `acs-verdict.json`:
+`legacy/scripts/lifecycle/ship.sh` (cycle-class commits only) gates on `acs-verdict.json`:
 
 1. If file present AND `red_count > 0` → ship-gate FAILS with `integrity_fail`
 2. If file present AND `red_count == 0` → ship proceeds, log `OK: EGPS predicate suite verdict=PASS`
@@ -121,12 +121,12 @@ Cycles 41+ accumulate the regression suite organically. Backfill of cycles 30–
 
 | File | Role |
 |---|---|
-| `scripts/lib/acs-schema.sh` | Shared constants (banned patterns, exit codes, JSON schema) |
-| `scripts/verification/validate-predicate.sh` | Lint predicates for banned patterns |
-| `scripts/lifecycle/run-acs-suite.sh` | Run predicates, emit acs-verdict.json |
-| `scripts/utility/promote-acs-to-regression.sh` | Post-ship: move predicates to regression-suite/ |
-| `scripts/tests/acs-suite-test.sh` | 24 assertions covering schema, validator, runner, promotion |
-| `scripts/lifecycle/ship.sh` | Gates on acs-verdict.json (v10.0.0 addition) |
+| `legacy/scripts/lib/acs-schema.sh` | Shared constants (banned patterns, exit codes, JSON schema) |
+| `legacy/scripts/verification/validate-predicate.sh` | Lint predicates for banned patterns |
+| `legacy/scripts/lifecycle/run-acs-suite.sh` | Run predicates, emit acs-verdict.json |
+| `legacy/scripts/utility/promote-acs-to-regression.sh` | Post-ship: move predicates to regression-suite/ |
+| `legacy/scripts/tests/acs-suite-test.sh` | 24 assertions covering schema, validator, runner, promotion |
+| `legacy/scripts/lifecycle/ship.sh` | Gates on acs-verdict.json (v10.0.0 addition) |
 
 ## Out of scope (deferred to follow-on minor releases)
 

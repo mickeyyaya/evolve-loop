@@ -107,7 +107,7 @@ func TestC43_003_PNew18And19Exist(t *testing.T) {
 // TestC43_003b_PhaseGateRetroComplete ports the phase-gate-retro variant.
 func TestC43_003b_PhaseGateRetroComplete(t *testing.T) {
 	root := repoRoot(t)
-	file := filepath.Join(root, "scripts", "lifecycle", "phase-gate.sh")
+	file := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
 	if !acsassert.FileExists(t, file) {
 		t.Skip("phase-gate.sh missing — skip cycle-43-003b")
 	}
@@ -145,8 +145,8 @@ func TestC43_004_AuditorStopCriterion(t *testing.T) {
 // TestC43_004b_CachePrefixV2DefaultOn ports the cache-prefix variant.
 func TestC43_004b_CachePrefixV2DefaultOn(t *testing.T) {
 	root := repoRoot(t)
-	subagent := filepath.Join(root, "scripts", "dispatch", "subagent-run.sh")
-	claudeSh := filepath.Join(root, "scripts", "cli_adapters", "claude.sh")
+	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
+	claudeSh := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
 	flagsDoc := filepath.Join(root, "docs", "architecture", "control-flags.md")
 	if !acsassert.FileExists(t, subagent) || !acsassert.FileExists(t, claudeSh) {
 		t.Skip("subagent-run.sh or claude.sh missing — skip cycle-43-004b")

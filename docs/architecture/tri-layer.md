@@ -65,10 +65,10 @@ The trust kernel operates at **script layer**, *below* skills/personas/commands:
 │  Skills (skills/*/SKILL.md)                        │  WORKFLOWS
 ├────────────────────────────────────────────────────┤
 │  Trust Kernel:                                     │  PROTECTED
-│   - scripts/dispatch/subagent-run.sh (only LLM entry)       │
-│   - scripts/lifecycle/phase-gate.sh (artifact verifier)      │
-│   - scripts/guards/phase-gate-precondition.sh      │
-│   - scripts/lifecycle/ship.sh (atomic ship)                  │
+│   - legacy/scripts/dispatch/subagent-run.sh (only LLM entry)       │
+│   - legacy/scripts/lifecycle/phase-gate.sh (artifact verifier)      │
+│   - legacy/scripts/guards/phase-gate-precondition.sh      │
+│   - legacy/scripts/lifecycle/ship.sh (atomic ship)                  │
 │   - OS sandbox (sandbox-exec / bwrap)              │
 │   - SHA256 ledger binding                          │
 └────────────────────────────────────────────────────┘

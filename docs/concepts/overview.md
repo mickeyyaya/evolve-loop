@@ -36,12 +36,12 @@ A cycle is one pass through 8 phases (plus a meta-cycle every 5 cycles). Every p
 | 5 | **Plan-Review** (opt-in) | 4-lens CEO/Eng/Design/Security review of the plan | `plan-review.md` |
 | 6 | **Build** | Implement in an isolated git worktree; write EGPS predicates | `build-report.md`, `acs/cycle-N/*.sh` |
 | 7 | **Audit** | Adversarial cross-check; run ACS predicate suite; emit verdict JSON | `audit-report.md`, `acs-verdict.json` |
-| 8 | **Ship** | If `red_count==0`, commit + push via `scripts/lifecycle/ship.sh` | git commit on `main` |
+| 8 | **Ship** | If `red_count==0`, commit + push via `legacy/scripts/lifecycle/ship.sh` | git commit on `main` |
 | 9 | **Memo / Retro** | PASS → memo (carryover capture); FAIL/WARN → retrospective (lesson extraction) | `carryover-todos.json` OR `retrospective-report.md` + `lessons/<id>.yaml` |
 
 Then `gate_cycle_complete` archives the workspace to `.evolve/history/cycle-N/`.
 
-The 8 phases are mandatory in order. Every phase change is recorded in `cycle-state.json` via the kernel-managed helper `scripts/lifecycle/cycle-state.sh advance <phase> <agent>`. Skipping a phase or running them out of order is structurally blocked by `phase-gate-precondition.sh` (PreToolUse hook).
+The 8 phases are mandatory in order. Every phase change is recorded in `cycle-state.json` via the kernel-managed helper `legacy/scripts/lifecycle/cycle-state.sh advance <phase> <agent>`. Skipping a phase or running them out of order is structurally blocked by `phase-gate-precondition.sh` (PreToolUse hook).
 
 ---
 

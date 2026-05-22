@@ -29,7 +29,7 @@ A separate anomaly during the same 24-hour window: 26 `subscription-auth-mode MI
 - `.evolve/instincts/lessons/cycle-95-auditor-mastery-gate.yaml` — describes cycle-95 deliverables: subagent-run.sh +75/-22 lines (mastery gate), `agents/evolve-auditor.md` +2 lines (preamble note), ACS predicates for both features
 - `.evolve/abnormal-events.jsonl` (project-root) — 26 MISCONFIGURED events confirmed at `cycle: 0`
 - Prior incident: `docs/operations/incidents/turn-overrun-c69.md` — Scout overrun (3× ceiling) resolved by `stop_criterion` in `scout.json`; Builder marginal overrun (1 turn) accepted as calibration variance
-- `scripts/dispatch/subagent-run.sh` — turn counter is derived from Claude Code's reported `num_turns`; counter is NOT reset between retries within a phase invocation
+- `legacy/scripts/dispatch/subagent-run.sh` — turn counter is derived from Claude Code's reported `num_turns`; counter is NOT reset between retries within a phase invocation
 
 ### What cycle-95 delivered
 
@@ -56,7 +56,7 @@ The stall at turn ~35 (idle_s=250 > threshold_s=240) is consistent with the Buil
 
 ### Third event: ship-refused (independent, not caused by overrun)
 
-The HEAD-mismatch ship refusal (audited=89f2d08c, current=ad07d259) occurred ~1.5 hours after the turn-overrun. This indicates the orchestrator made additional commits after the Auditor completed its binding (most likely a memo phase or a manual operator edit). This is a known race condition documented in `scripts/lifecycle/ship.sh` — audit binding captures HEAD at audit time; if HEAD advances before `ship.sh` runs, ship is refused. The turn-overrun is not a contributing cause.
+The HEAD-mismatch ship refusal (audited=89f2d08c, current=ad07d259) occurred ~1.5 hours after the turn-overrun. This indicates the orchestrator made additional commits after the Auditor completed its binding (most likely a memo phase or a manual operator edit). This is a known race condition documented in `legacy/scripts/lifecycle/ship.sh` — audit binding captures HEAD at audit time; if HEAD advances before `ship.sh` runs, ship is refused. The turn-overrun is not a contributing cause.
 
 ### MISCONFIGURED auth events: environmental, not causal
 
@@ -102,5 +102,5 @@ Carryover item `abnormal-turn-overrun-c95` (HIGH priority, deferred cycles 96 an
 - Cycle-96 fix (turn-18 stop criterion): `.evolve/instincts/lessons/cycle-96-builder-turn-18-stop.yaml`
 - Prior turn-overrun precedent (cycle-69): `docs/operations/incidents/turn-overrun-c69.md`
 - Builder turn-budget guidance: `.evolve/profiles/builder.json:turn_budget_guidance`
-- Ship-gate HEAD-mismatch behavior: `scripts/lifecycle/ship.sh` (ship-binding invariant)
+- Ship-gate HEAD-mismatch behavior: `legacy/scripts/lifecycle/ship.sh` (ship-binding invariant)
 - Carryover record: `.evolve/runs/cycle-95/carryover-todos.json` (`abnormal-turn-overrun-c95`, HIGH)

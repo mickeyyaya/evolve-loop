@@ -16,7 +16,7 @@ Every phase agent surfaces a bounded reflection on its own execution so the Lear
 
 ## Workflow (3 steps, before posting your completion ledger entry)
 
-1. **Read your phase-tracker metrics** from `.evolve/runs/cycle-<N>/.ephemeral/metrics/<phase>.json` (already produced by `scripts/observability/rollup-cycle-metrics.sh`). Extract `latency_ms`, `cost_usd`, `turns` — these populate your reflection's `phase_tracker_refs` block. Do NOT recompute these numbers.
+1. **Read your phase-tracker metrics** from `.evolve/runs/cycle-<N>/.ephemeral/metrics/<phase>.json` (already produced by `legacy/scripts/observability/rollup-cycle-metrics.sh`). Extract `latency_ms`, `cost_usd`, `turns` — these populate your reflection's `phase_tracker_refs` block. Do NOT recompute these numbers.
 
 2. **Write `$WORKSPACE/<phase>-reflection.yaml`** following the YAML schema in agent-templates.md → Reflection Journal Schema. Required keys: `schema_version: 1`, `cycle`, `phase`, `agent`, `phase_smooth`, `suggested_improvements[]` (≥1), `reflection_confidence` (0.0-1.0), `phase_tracker_refs{}`. Optional: `slowdowns[]`, `friction_received_from[]`, `blind_spots[]`. Keep the file ≤30 lines.
 
@@ -68,8 +68,8 @@ When you post your completion ledger entry, add one field:
 
 - Schema canonical: [agent-templates.md](agent-templates.md) → Reflection Journal Schema
 - Reflector persona (consumes reflections): [evolve-reflector.md](evolve-reflector.md)
-- Aggregator: [../scripts/observability/aggregate-reflections.sh](../scripts/observability/aggregate-reflections.sh)
+- Aggregator: [../legacy/scripts/observability/aggregate-reflections.sh](../legacy/scripts/observability/aggregate-reflections.sh)
 - Design doc: [../docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md)
 - Learn-phase formalization: [../docs/architecture/learn-phase.md](../docs/architecture/learn-phase.md)
 - Auditor enforcement (MEDIUM defect): [evolve-auditor.md](evolve-auditor.md) (task #7)
-- Phase-gate enforcement (v10.21+): [../scripts/lifecycle/phase-gate.sh](../scripts/lifecycle/phase-gate.sh) (task #8)
+- Phase-gate enforcement (v10.21+): [../legacy/scripts/lifecycle/phase-gate.sh](../legacy/scripts/lifecycle/phase-gate.sh) (task #8)

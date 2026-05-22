@@ -26,9 +26,9 @@ Three defense-in-depth layers, kernel-first:
 
 | Layer | Mechanism | Scope |
 |---|---|---|
-| **L1 — OS sandbox** | Agent profile `sandbox.deny_subpaths` includes `docs/private`. The CLI adapter (`scripts/cli_adapters/<cli>.sh`) compiles this into `sandbox-exec` / `bwrap` rules; the OS blocks `read()`/`stat()` syscalls against denied paths. | All CLIs (Claude Code, Gemini CLI, Codex CLI) |
+| **L1 — OS sandbox** | Agent profile `sandbox.deny_subpaths` includes `docs/private`. The CLI adapter (`legacy/scripts/cli_adapters/<cli>.sh`) compiles this into `sandbox-exec` / `bwrap` rules; the OS blocks `read()`/`stat()` syscalls against denied paths. | All CLIs (Claude Code, Gemini CLI, Codex CLI) |
 | **L2 — Adapter passthrough** | The same `deny_subpaths` is honored by `claude.sh`'s permission-mode plumbing. Even if the OS sandbox falls back (e.g., nested-sandbox EPERM), Claude Code's own permission system rejects reads against denied paths. | Claude Code primary; CLI-specific |
-| **L3 — Layer-B context filter** | `scripts/lifecycle/role-context-builder.sh:emit_artifact()` early-returns for any `docs/private/*` path. Even if some future code accidentally tries to inject a private file into an agent's prompt, this filter no-ops the call. | All CLIs (cross-CLI Layer B) |
+| **L3 — Layer-B context filter** | `legacy/scripts/lifecycle/role-context-builder.sh:emit_artifact()` early-returns for any `docs/private/*` path. Even if some future code accidentally tries to inject a private file into an agent's prompt, this filter no-ops the call. | All CLIs (cross-CLI Layer B) |
 
 ## What's where
 

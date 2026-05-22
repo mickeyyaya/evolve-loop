@@ -18,13 +18,13 @@ v8.13.1 lifecycle integration code blocks:
 
 ```bash
 # At cycle start (run-cycle.sh handles this automatically):
-bash scripts/lifecycle/cycle-state.sh init <cycle> <workspace>
+bash legacy/scripts/lifecycle/cycle-state.sh init <cycle> <workspace>
 
 # At each phase transition (orchestrator advances; runner DOES NOT auto-advance):
-bash scripts/lifecycle/cycle-state.sh advance <new_phase> <agent> [worktree]
+bash legacy/scripts/lifecycle/cycle-state.sh advance <new_phase> <agent> [worktree]
 
 # At cycle end:
-bash scripts/lifecycle/cycle-state.sh clear
+bash legacy/scripts/lifecycle/cycle-state.sh clear
 ```
 
 Bypasses (emergency only, logged WARN):
@@ -97,7 +97,7 @@ For skill precedence, conflict resolution, phase eligibility, and budget-aware d
 }
 ```
 
-**Fallback:** If `.evolve/skill-inventory.json` missing, invoke `bash scripts/utility/setup-skill-inventory.sh` before launching Scout. If the script fails, fall back to legacy LLM-parsing and log WARN to ledger.
+**Fallback:** If `.evolve/skill-inventory.json` missing, invoke `bash legacy/scripts/utility/setup-skill-inventory.sh` before launching Scout. If the script fails, fall back to legacy LLM-parsing and log WARN to ledger.
 
 ---
 
@@ -134,7 +134,7 @@ Full bash invocation:
 
 ```bash
 CYCLES_THIS_SESSION=${CYCLES_THIS_SESSION:-0}
-BUDGET_JSON=$(bash scripts/verification/context-budget.sh "$CYCLE_NUMBER" "$CYCLES_THIS_SESSION" "$WORKSPACE_PATH" 2>/dev/null)
+BUDGET_JSON=$(bash legacy/scripts/verification/context-budget.sh "$CYCLE_NUMBER" "$CYCLES_THIS_SESSION" "$WORKSPACE_PATH" 2>/dev/null)
 BUDGET_EXIT=$?
 BUDGET_STATUS=$(echo "$BUDGET_JSON" | grep -o '"status": *"[^"]*"' | cut -d'"' -f4)
 REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *[0-9]*' | grep -o '[0-9]*$')
@@ -232,7 +232,7 @@ JSON schema for `$WORKSPACE_PATH/handoff-<phase>.json`:
 ```bash
 cat agents/evolve-auditor.md context.json | \
     MODEL_TIER_HINT="<resolved tier>" \
-    bash scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"
+    bash legacy/scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"
 ```
 
 ### Context JSON
@@ -259,5 +259,5 @@ cat agents/evolve-auditor.md context.json | \
 - If `PASS` (post-eval) → proceed to Phase 5 Ship: `git apply` worktree patch, commit, push
 - If `WARN`, `FAIL`, or `SHIP_GATE_DENIED`:
   1. `git diff HEAD > "$WORKSPACE_PATH/failed.patch"` (capture failed code state)
-  2. `bash scripts/failure/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"`
+  2. `bash legacy/scripts/failure/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"`
   3. `git worktree remove --force "$WORKTREE_DIR"`

@@ -16,24 +16,24 @@ When operating in autonomous mode, AGENTS.md Rule 4 ("stop and ask") is overridd
 
 1. **Continue all cycles without pausing.** Never output "should I continue?" between cycles. Complete every requested cycle end-to-end.
 2. **Run the FULL pipeline every cycle.** Launch Scout, Builder, Auditor for every cycle. No inline edits skipping agents, no batch-claiming multiple cycles. Each cycle must produce `scout-report.md`, `build-report.md`, `audit-report.md`.
-3. **Run `phase-gate.sh` at every transition.** `scripts/lifecycle/phase-gate.sh` is non-negotiable in bypass mode.
+3. **Run `phase-gate.sh` at every transition.** `legacy/scripts/lifecycle/phase-gate.sh` is non-negotiable in bypass mode.
 4. **Never fabricate cycles.** Every cycle number must correspond to real Scout → Build → Audit → Ship → Learn execution. Claiming a number without doing the work is a CRITICAL violation.
-5. **Phase agents MUST be invoked via `scripts/dispatch/subagent-run.sh`.** In-process `Agent` is denied by `orchestrator.json:disallowed_tools` AND by `phase-gate-precondition.sh` whenever `cycle-state.json` exists. No bypass. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/`, generates a challenge token, and writes a tamper-evident ledger entry.
-6. **OS-level sandboxing wraps every claude subprocess.** When `EVOLVE_SANDBOX=1`, runner wraps `claude -p` in `sandbox-exec` (macOS) / `bwrap` (Linux). `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` is REQUIRED for nested-claude (auto-enabled by `scripts/dispatch/evolve-loop-dispatch.sh` via `detect-nested-claude.sh`). Auditor/Evaluator profiles run `read_only_repo: true`.
-7. **Mutation testing pre-flight on every eval.** `gate_discover_to_build` runs `scripts/verification/mutate-eval.sh` against each new eval. Kill rate < 0.8 flags the eval as tautological. Promotion path: WARN-only → fail-gate after one verification cycle.
+5. **Phase agents MUST be invoked via `legacy/scripts/dispatch/subagent-run.sh`.** In-process `Agent` is denied by `orchestrator.json:disallowed_tools` AND by `phase-gate-precondition.sh` whenever `cycle-state.json` exists. No bypass. The runner enforces per-agent CLI permission profiles in `.evolve/profiles/`, generates a challenge token, and writes a tamper-evident ledger entry.
+6. **OS-level sandboxing wraps every claude subprocess.** When `EVOLVE_SANDBOX=1`, runner wraps `claude -p` in `sandbox-exec` (macOS) / `bwrap` (Linux). `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` is REQUIRED for nested-claude (auto-enabled by `legacy/scripts/dispatch/evolve-loop-dispatch.sh` via `detect-nested-claude.sh`). Auditor/Evaluator profiles run `read_only_repo: true`.
+7. **Mutation testing pre-flight on every eval.** `gate_discover_to_build` runs `legacy/scripts/verification/mutate-eval.sh` against each new eval. Kill rate < 0.8 flags the eval as tautological. Promotion path: WARN-only → fail-gate after one verification cycle.
 8. **Adversarial Auditor mode is default-on.** Runner prepends "ADVERSARIAL AUDIT MODE" framing requiring positive evidence for PASS. Auditor defaults to Opus (different family from Builder's Sonnet) to break same-model-judge sycophancy. Disable only with `ADVERSARIAL_AUDIT=0`.
 
 **The rule is: maximum velocity, zero shortcuts.** Go fast by being efficient, not by skipping steps.
 
-**Runtime constraints.** Per-cycle git worktrees provisioned by `run-cycle.sh` (recorded in `cycle-state.json:active_worktree`). Orchestrator and phase agents MAY NOT call `git worktree add/remove` (denied by profiles). Failure-adapter (`scripts/failure/failure-adapter.sh`) computes deterministic PROCEED/RETRY/BLOCK from `state.json:failedApproaches[]` — orchestrator follows verbatim. Ledger hash-chain via `prev_hash` + `entry_seq`; verify with `bash scripts/observability/verify-ledger-chain.sh`. `ship.sh` advances `state.json:lastCycleNumber` after successful ship.
+**Runtime constraints.** Per-cycle git worktrees provisioned by `run-cycle.sh` (recorded in `cycle-state.json:active_worktree`). Orchestrator and phase agents MAY NOT call `git worktree add/remove` (denied by profiles). Failure-adapter (`legacy/scripts/failure/failure-adapter.sh`) computes deterministic PROCEED/RETRY/BLOCK from `state.json:failedApproaches[]` — orchestrator follows verbatim. Ledger hash-chain via `prev_hash` + `entry_seq`; verify with `bash legacy/scripts/observability/verify-ledger-chain.sh`. `ship.sh` advances `state.json:lastCycleNumber` after successful ship.
 
 ## Verification before claiming done
 
 These three are AGENTS.md Rules 8 + 12 applied to Claude Code workflows. Apply ALL before reporting complete:
 
-1. **Probe before declaring a CLI unavailable.** Run `bash scripts/utility/probe-tool.sh <tool>` (canonical helper) or `command -v <tool> || which <tool> || ls /usr/local/bin/<tool> ~/.local/bin/<tool>`. List what you checked. The `/insights` audit caught "no `gws` command" claims when `gws` was at `~/.local/bin/`.
+1. **Probe before declaring a CLI unavailable.** Run `bash legacy/scripts/utility/probe-tool.sh <tool>` (canonical helper) or `command -v <tool> || which <tool> || ls /usr/local/bin/<tool> ~/.local/bin/<tool>`. List what you checked. The `/insights` audit caught "no `gws` command" claims when `gws` was at `~/.local/bin/`.
 2. **Read actual exports.** Before importing/calling from `module X`, `Read` X and list real exports. Caught the Builder-against-imagined-API failure mode that required full rewrites.
-3. **Run tests and report counts.** Format: `bash scripts/<suite>.sh — N/N PASS, no regression`. "Tests pass" without numbers is unverified. If no test infra exists, say so explicitly rather than skipping the check.
+3. **Run tests and report counts.** Format: `bash legacy/scripts/<suite>.sh — N/N PASS, no regression`. "Tests pass" without numbers is unverified. If no test infra exists, say so explicitly rather than skipping the check.
 
 ## Shell & environment conventions
 
@@ -93,24 +93,24 @@ Defaults reflect production posture as of v10.8.0. Detail docs linked per row.
 | Research tool | `EVOLVE_ALLOW_DEEP_RESEARCH` | `0` | When `1`, lifts per-agent quota cap; records `deep_overrides` counter. Does not disable hook telemetry. See [docs/architecture/research-tool.md](docs/architecture/research-tool.md). |
 | Research tool | `EVOLVE_RESEARCH_QUOTA_SOFT` | *(planned)* | Soft quota: allows over-quota web calls but emits WARN in guards.log. Not yet implemented in `research-quota-gate.sh` as of cycle-89. |
 | Research tool | `EVOLVE_RESEARCH_HOOK_DISABLED` | `0` | When `1`, `research-quota-gate.sh` is a no-op but counters still increment (telemetry-only mode). |
-| Research tool | `EVOLVE_KB_SEARCH_PATHS` | `knowledge-base/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated root paths for `scripts/research/kb-search.sh`. |
-| Subscription proxy | `EVOLVE_ANTHROPIC_BASE_URL` | unset | When set, exported as `ANTHROPIC_BASE_URL` before every `claude -p` invocation. **Proxy-agnostic**: target must speak Anthropic Messages API format (`POST /v1/messages`). **Not required for subscription auth** — `claude -p` reads `~/.claude.json` OAuth credentials natively. Use only for custom endpoints (LiteLLM, corporate gateway). Example: `export EVOLVE_ANTHROPIC_BASE_URL=http://127.0.0.1:4000/v1` (LiteLLM default). Note: `hermes proxy start` does not exist in hermes-agent; do not use it. See `knowledge-base/research/hermes-agent-proxy-integration.md`. Run `bash scripts/utility/doctor-subscription-auth.sh` to detect your active auth mode. |
+| Research tool | `EVOLVE_KB_SEARCH_PATHS` | `knowledge-base/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated root paths for `legacy/scripts/research/kb-search.sh`. |
+| Subscription proxy | `EVOLVE_ANTHROPIC_BASE_URL` | unset | When set, exported as `ANTHROPIC_BASE_URL` before every `claude -p` invocation. **Proxy-agnostic**: target must speak Anthropic Messages API format (`POST /v1/messages`). **Not required for subscription auth** — `claude -p` reads `~/.claude.json` OAuth credentials natively. Use only for custom endpoints (LiteLLM, corporate gateway). Example: `export EVOLVE_ANTHROPIC_BASE_URL=http://127.0.0.1:4000/v1` (LiteLLM default). Note: `hermes proxy start` does not exist in hermes-agent; do not use it. See `knowledge-base/research/hermes-agent-proxy-integration.md`. Run `bash legacy/scripts/utility/doctor-subscription-auth.sh` to detect your active auth mode. |
 | Incremental intent | `EVOLVE_INTENT_DELTA` | `0` (opt-in) | When `1`, `intent-batch-resolve.sh` runs before the intent phase to compute `INTENT_MODE=full\|delta` by comparing `GOAL_HASH` against `state.json:currentBatch.goalHash`. In delta mode, the intent persona emits `intent-delta.md` (patch) or `[intent-unchanged]` instead of a full `intent.md`; `gate_intent_to_research` accepts both. Requires `EVOLVE_REQUIRE_INTENT=1`. See [docs/architecture/incremental-intent.md](docs/architecture/incremental-intent.md). |
 | Antigravity adapter — require-full | `EVOLVE_AGY_REQUIRE_FULL` | `0` | When `1`, `agy.sh` exits 99 if neither `agy` nor `claude` binary is found (same opt-in as `EVOLVE_GEMINI_REQUIRE_FULL`). Default: graceful degradation. |
 | Antigravity adapter — binary override | `EVOLVE_AGY_BINARY` | unset | Testing seam: override the `agy` binary path. Honoured only when `EVOLVE_TESTING=1`. Used by ACS predicates to force NATIVE/DEGRADED mode in tests. |
-| Go-vs-bash dispatch | `EVOLVE_USE_LEGACY_BASH` | `0` (Go primary, v11.0.0+) | When `0` (default), the Go binary at `EVOLVE_GO_BIN` (or `go/bin/evolve`) is the primary entrypoint for `evolve cycle run`, `evolve doctor`, `evolve guard`, `evolve ledger`, `evolve acs`. When `1`, falls back to `scripts/dispatch/evolve-loop-dispatch.sh` and the bash predicates verbatim. Rollback hatch for v11.x; bash scripts remain functional in-place until v11.2.0. See [docs/migration-from-bash.md](docs/migration-from-bash.md). |
+| Go-vs-bash dispatch | `EVOLVE_USE_LEGACY_BASH` | `0` (Go primary, v11.0.0+) | When `0` (default), the Go binary at `EVOLVE_GO_BIN` (or `go/bin/evolve`) is the primary entrypoint for `evolve cycle run`, `evolve doctor`, `evolve guard`, `evolve ledger`, `evolve acs`. When `1`, falls back to `legacy/scripts/dispatch/evolve-loop-dispatch.sh` and the bash predicates verbatim. Rollback hatch for v11.x; bash scripts remain functional in-place until v11.2.0. See [docs/migration-from-bash.md](docs/migration-from-bash.md). |
 | Go binary path override | `EVOLVE_GO_BIN` | unset | Path to the Go binary. When unset, dispatchers look for `<project_root>/go/bin/evolve`. Set to the cross-compiled artifact path (e.g. `<HOME>/.local/bin/evolve-darwin-arm64`) for system-wide install. |
-| Bash script location | n/a | `legacy/scripts/` (v11.1.0+) | Bash scripts physically live at `legacy/scripts/`. `scripts/` is a backcompat symlink. All `scripts/...` references in hooks, agents, docs continue to resolve. New code SHOULD reference `legacy/scripts/...` directly. |
+| Bash script location | n/a | `legacy/scripts/` (v11.1.0+) | Bash scripts physically live at `legacy/scripts/`. `legacy/scripts/` is a backcompat symlink. All `legacy/scripts/...` references in hooks, agents, docs continue to resolve. New code SHOULD reference `legacy/scripts/...` directly. |
 
 > **Session cost isolation (v10.8.0+):** `claude -p` subagent invocations bill to the OAuth session that launched the dispatcher (the parent Claude Code session), not the batch budget meter. To isolate `/evolve-loop` costs from your prior session context, run `/clear` before starting a new evolve-loop batch. The batch meter (`state.json:currentBatch.cycleAccruedCostUSD`) tracks per-cycle accumulation but cannot capture OAuth session charges.
 
-## Ship classes (`scripts/lifecycle/ship.sh --class <X>`)
+## Ship classes (`legacy/scripts/lifecycle/ship.sh --class <X>`)
 
 | Class | Use case | Verification |
 |---|---|---|
 | `cycle` (default) | `/evolve-loop` cycle commits | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 |
 | `manual` | Operator-driven manual commits | Skips audit; interactive y/N. CI mode: `EVOLVE_SHIP_AUTO_CONFIRM=1`. |
-| `release` | `scripts/release-pipeline.sh` only | Skips audit (version-bump.sh mutates files post-audit); logs RELEASE class loudly |
+| `release` | `legacy/scripts/release-pipeline.sh` only | Skips audit (version-bump.sh mutates files post-audit); logs RELEASE class loudly |
 
 Bare `git push origin main` is denied by ship-gate (v8.13.0+). `EVOLVE_BYPASS_SHIP_VERIFY=1` is a permanent compatibility bridge but emits deprecation WARN — prefer `--class manual`.
 
@@ -119,14 +119,14 @@ Bare `git push origin main` is denied by ship-gate (v8.13.0+). `EVOLVE_BYPASS_SH
 "publish" ≠ "push". Use the self-healing pipeline:
 
 ```bash
-bash scripts/release-pipeline.sh X.Y.Z              # full publish
-bash scripts/release-pipeline.sh X.Y.Z --dry-run    # simulate
-bash scripts/release-pipeline.sh X.Y.Z --skip-tests # hot-fix (CI-pre-verified)
+bash legacy/scripts/release-pipeline.sh X.Y.Z              # full publish
+bash legacy/scripts/release-pipeline.sh X.Y.Z --dry-run    # simulate
+bash legacy/scripts/release-pipeline.sh X.Y.Z --skip-tests # hot-fix (CI-pre-verified)
 ```
 
 Pipeline lifecycle: pre-flight → version bump → auto-changelog (conventional commits) → consistency check → atomic ship via `ship.sh` → marketplace propagation polling (5 min) → cache refresh → auto-rollback on post-push failure.
 
-Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/evolve-loop/SKILL.md` (heading), `README.md`, `CHANGELOG.md`. `scripts/utility/release.sh` is a standalone consistency verifier.
+Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/evolve-loop/SKILL.md` (heading), `README.md`, `CHANGELOG.md`. `legacy/scripts/utility/release.sh` is a standalone consistency verifier.
 
 Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/publishing-releases.md](docs/guides/publishing-releases.md).
 

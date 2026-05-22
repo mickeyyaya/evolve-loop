@@ -21,7 +21,7 @@ This problem is documented in the architecture redesign plan (§ADR-5, `/Users/d
 
 Two new utility scripts make every phase reliably standalone-invocable:
 
-### `scripts/utility/init-standalone-cycle.sh`
+### `legacy/scripts/utility/init-standalone-cycle.sh`
 
 Bootstraps a cycle for single-phase execution. Creates:
 - `$EVOLVE_PROJECT_ROOT/.evolve/cycle-state.json` with the correct `phase` and `active_agent` for the target phase
@@ -36,7 +36,7 @@ Behavior:
 - Warns (stderr) about missing inputs but exits 0 — input gating is `check-phase-inputs.sh`'s job
 - Atomic writes via `mv -f tmp.$$ target` throughout
 
-### `scripts/utility/check-phase-inputs.sh`
+### `legacy/scripts/utility/check-phase-inputs.sh`
 
 Verifies all declared inputs for a phase are present. Reads `phase-registry.json` `inputs.files[]` and `inputs.state_fields[]` for the requested phase, then checks each:
 - Required files: checks for existence at `$EVOLVE_PROJECT_ROOT/<path>` with `{cycle}` substituted
@@ -111,8 +111,8 @@ Registry is resolved in this order: `$EVOLVE_PROJECT_ROOT/docs/architecture/phas
 
 ## Implementation References
 
-- `scripts/utility/init-standalone-cycle.sh` — bootstrap utility
-- `scripts/utility/check-phase-inputs.sh` — input verification utility
+- `legacy/scripts/utility/init-standalone-cycle.sh` — bootstrap utility
+- `legacy/scripts/utility/check-phase-inputs.sh` — input verification utility
 - `docs/architecture/phase-registry.json` — I/O contract declarations (ADR-4)
 - `acs/cycle-58/023-check-phase-inputs-detects-missing.sh` — predicate verifying check-phase-inputs behavior
 - `acs/cycle-58/024-scout-runs-standalone.sh` — predicate verifying init for scout phase

@@ -13,30 +13,30 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ detects platform = codex, reads reference/codex-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓ (Codex calls its shell-execution tool)
 
 Dispatcher loops once per cycle:
-  bash scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 
 run-cycle.sh spawns the orchestrator subagent via:
-  bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
+  bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
 
   ↓
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "codex"  (set by Codex CLI users via env or profile override)
-  → reads scripts/cli_adapters/codex.capabilities.json
-  → dispatches to scripts/cli_adapters/codex.sh
+  → reads legacy/scripts/cli_adapters/codex.capabilities.json
+  → dispatches to legacy/scripts/cli_adapters/codex.sh
 
   ↓
 
 codex.sh (HYBRID + DEGRADED, v8.51.0+):
   1. Probes for `claude` binary on PATH
-  2. If found (HYBRID):    delegates to scripts/cli_adapters/claude.sh
+  2. If found (HYBRID):    delegates to legacy/scripts/cli_adapters/claude.sh
                             → full caps via Claude subprocess isolation
   3. If missing (DEGRADED): same-session execution, pipeline still runs
                             → calling LLM (Codex) writes artifacts directly
@@ -47,7 +47,7 @@ codex.sh (HYBRID + DEGRADED, v8.51.0+):
 
 ## v8.51 capability model
 
-Codex's adapter declares modes per dimension via `scripts/cli_adapters/codex.capabilities.json`:
+Codex's adapter declares modes per dimension via `legacy/scripts/cli_adapters/codex.capabilities.json`:
 
 | Capability | Hybrid (claude on PATH) | Degraded (no claude) | Quality impact when degraded |
 |---|---|---|---|
@@ -101,11 +101,11 @@ command -v codex
 #   DEGRADED: Quality tier: degraded or none + per-capability warnings
 
 # 3. Smoke-test detection
-bash scripts/dispatch/detect-cli.sh
+bash legacy/scripts/dispatch/detect-cli.sh
 # Expected: prints "codex" if you're in a Codex session
 
 # 4. Run the contract test
-bash scripts/tests/codex-adapter-test.sh
+bash legacy/scripts/tests/codex-adapter-test.sh
 # Expected: green (11 tests)
 ```
 

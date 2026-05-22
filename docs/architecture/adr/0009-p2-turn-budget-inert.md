@@ -23,7 +23,7 @@ The protocol is advisory-only — the implementer (Builder) both receives the gu
 
 C71 retrospective §7(3) mandates: "C72 intent MUST address the P2 carryover by either (a) Case A escalation (programmatic kill in subagent-run.sh) or (b) marking P2 INERT."
 
-`claude -p` has no `--max-turns` CLI flag (confirmed via `claude -p --help`; only `--max-budget-usd` exists). The existing adapter note at `scripts/cli_adapters/claude.sh` line 524 already acknowledges: `max-turns=$MAX_TURNS (advisory; not enforced by claude flag)`. A real-time watchdog (Case A) would require 80–120 lines of bash-3.2-compatible stdout-monitoring code + a new test harness — high regression risk to trust-kernel scripts for a single-cycle window.
+`claude -p` has no `--max-turns` CLI flag (confirmed via `claude -p --help`; only `--max-budget-usd` exists). The existing adapter note at `legacy/scripts/cli_adapters/claude.sh` line 524 already acknowledges: `max-turns=$MAX_TURNS (advisory; not enforced by claude flag)`. A real-time watchdog (Case A) would require 80–120 lines of bash-3.2-compatible stdout-monitoring code + a new test harness — high regression risk to trust-kernel scripts for a single-cycle window.
 
 ---
 

@@ -12,7 +12,7 @@ import (
 // gemini.sh has the _GEMINI_NATIVE_CAP gate keyed on non_interactive_prompt.
 func TestC55_011_CapabilityGateBlocksNativeGemini(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gemini := filepath.Join(root, "scripts", "cli_adapters", "gemini.sh")
+	gemini := filepath.Join(root, "legacy", "scripts", "cli_adapters", "gemini.sh")
 	if !acsassert.FileExists(t, gemini) {
 		t.Skip("gemini.sh missing — skip cycle-55-011")
 	}
@@ -26,7 +26,7 @@ func TestC55_011_CapabilityGateBlocksNativeGemini(t *testing.T) {
 // TestC55_012_CapabilityGateBlocksNativeCodex ports cycle-55/012 (wiring-only).
 func TestC55_012_CapabilityGateBlocksNativeCodex(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	codex := filepath.Join(root, "scripts", "cli_adapters", "codex.sh")
+	codex := filepath.Join(root, "legacy", "scripts", "cli_adapters", "codex.sh")
 	if !acsassert.FileExists(t, codex) {
 		t.Skip("codex.sh missing — skip cycle-55-012")
 	}
@@ -60,7 +60,7 @@ func TestC55_020_PhaseRegistryExistsAndValidates(t *testing.T) {
 	// AC6: gate refs resolve — we approximate by checking that phase-gate.sh
 	// exists and contains at least one gate_ function. Full resolution
 	// requires jq + cross-file analysis; the bash predicate is authoritative.
-	gate := filepath.Join(root, "scripts", "lifecycle", "phase-gate.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
 	if !acsassert.FileExists(t, gate) {
 		t.Skip("phase-gate.sh missing — skip cycle-55-020 (gate-ref check)")
 	}
@@ -73,7 +73,7 @@ func TestC55_020_PhaseRegistryExistsAndValidates(t *testing.T) {
 // list-phase-order.sh exists + handles EVOLVE_USE_PHASE_REGISTRY env.
 func TestC55_021_OrchestratorReadsRegistryNotNarrative(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	helper := filepath.Join(root, "scripts", "dispatch", "list-phase-order.sh")
+	helper := filepath.Join(root, "legacy", "scripts", "dispatch", "list-phase-order.sh")
 	if !acsassert.FileExists(t, helper) {
 		t.Skip("list-phase-order.sh missing — skip cycle-55-021")
 	}

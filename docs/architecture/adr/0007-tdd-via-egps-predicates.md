@@ -3,8 +3,8 @@
 **Status:** Accepted  
 **Date:** 2026-05-15  
 **Cycle:** 60 (documenting methodology shipped across cycles 40–60)  
-**Implemented in:** `acs/cycle-N/*.sh`, `scripts/verification/validate-predicate.sh`,
-                    `scripts/lifecycle/run-acs-suite.sh`
+**Implemented in:** `acs/cycle-N/*.sh`, `legacy/scripts/verification/validate-predicate.sh`,
+                    `legacy/scripts/lifecycle/run-acs-suite.sh`
 
 ---
 
@@ -49,8 +49,8 @@ Formalize RED-first predicate authorship as the standard EGPS development discip
 ## References
 
 - EGPS design: `docs/architecture/egps-v10.md`
-- Predicate validator: `scripts/verification/validate-predicate.sh`
-- Suite runner: `scripts/lifecycle/run-acs-suite.sh`
-- Mutation tester: `scripts/verification/mutate-eval.sh`
+- Predicate validator: `legacy/scripts/verification/validate-predicate.sh`
+- Suite runner: `legacy/scripts/lifecycle/run-acs-suite.sh`
+- Mutation tester: `legacy/scripts/verification/mutate-eval.sh`
 - ADR-1: LLM router (`resolve-llm.sh`) — example of predicate-driven development
 - Incidents that motivated EGPS: `docs/incidents/` (cycles 102–111 confidence-cliff)

@@ -74,7 +74,7 @@ When lesson YAML blocks exist only in prose within `retrospective-report.md`
 (pre-v8.45 retrospectives, or gate-bypass incidents), run:
 
 ```bash
-bash scripts/utility/backfill-lessons.sh [--dry-run] [--cycle N]
+bash legacy/scripts/utility/backfill-lessons.sh [--dry-run] [--cycle N]
 ```
 
 This script:
@@ -86,7 +86,7 @@ The backfill is idempotent — running it multiple times produces the same resul
 Verify coverage with:
 
 ```bash
-bash scripts/tests/lesson-persistence-test.sh
+bash legacy/scripts/tests/lesson-persistence-test.sh
 ```
 
 ## Known Issues

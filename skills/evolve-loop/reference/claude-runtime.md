@@ -11,23 +11,23 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ via .claude-plugin/plugin.json → skills/evolve-loop/SKILL.md
 
 Skill activates → STRICT MODE: execute exactly one Bash command:
-  bash scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓
 
 Dispatcher loops once per cycle:
-  bash scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 
 run-cycle.sh spawns the orchestrator subagent:
-  bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
+  bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
 
   ↓
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "claude"
-  → dispatches to scripts/cli_adapters/claude.sh
+  → dispatches to legacy/scripts/cli_adapters/claude.sh
 
   ↓
 
@@ -46,7 +46,7 @@ each via the same subagent-run.sh path with their own profile.
 |---|---|---|
 | `claude` binary on PATH | yes | The runtime engine. Verify with `command -v claude`. |
 | `ANTHROPIC_API_KEY` | when running outside a logged-in Claude session | Auth for `claude -p`. The `--bare` flag in profiles strips other auth sources. |
-| `CLAUDE_CODE_INTERACTIVE` | set automatically by Claude Code | Used by `scripts/dispatch/detect-cli.sh` to identify the platform. |
+| `CLAUDE_CODE_INTERACTIVE` | set automatically by Claude Code | Used by `legacy/scripts/dispatch/detect-cli.sh` to identify the platform. |
 
 Optional but recommended:
 
@@ -62,9 +62,9 @@ Three PreToolUse kernel hooks fire on Claude Code:
 
 | Hook | Job |
 |---|---|
-| `scripts/hooks/ship-gate.sh` | Only `scripts/lifecycle/ship.sh` may execute git commit/push/gh release |
-| `scripts/hooks/role-gate.sh` | Edit/Write must match the active phase's path allowlist |
-| `scripts/hooks/phase-gate-precondition.sh` | `subagent-run.sh` invocations must follow Scout → Builder → Auditor sequence per `.evolve/cycle-state.json` |
+| `legacy/scripts/hooks/ship-gate.sh` | Only `legacy/scripts/lifecycle/ship.sh` may execute git commit/push/gh release |
+| `legacy/scripts/hooks/role-gate.sh` | Edit/Write must match the active phase's path allowlist |
+| `legacy/scripts/hooks/phase-gate-precondition.sh` | `subagent-run.sh` invocations must follow Scout → Builder → Auditor sequence per `.evolve/cycle-state.json` |
 
 These hooks are configured in `.claude-plugin/plugin.json`. They are the structural enforcement of the trust boundary — the orchestrator cannot edit source directly, cannot push without going through `ship.sh`, and cannot skip phases.
 

@@ -149,13 +149,13 @@ After `intent-merge-patches.sh` runs, the workspace `intent.md` is a symlink to 
 
 **Before intent phase:**
 ```bash
-eval "$(bash scripts/lifecycle/intent-batch-resolve.sh "$WORKSPACE/intent.md")"
+eval "$(bash legacy/scripts/lifecycle/intent-batch-resolve.sh "$WORKSPACE/intent.md")"
 export INTENT_MODE BATCH_ID GOAL_HASH
 ```
 
 **After intent phase:**
 ```bash
-bash scripts/lifecycle/intent-merge-patches.sh "$WORKSPACE/intent.md" "$WORKSPACE/intent-delta.md"
+bash legacy/scripts/lifecycle/intent-merge-patches.sh "$WORKSPACE/intent.md" "$WORKSPACE/intent-delta.md"
 # Set up symlink: workspace/intent.md → .evolve/batch/<batchId>/intent.md
 ```
 
@@ -203,9 +203,9 @@ This constraint is enforced in `intent-batch-resolve.sh` by reading `state.json:
 ## References
 
 - `docs/architecture/intent-phase.md` — base intent phase design (read first to avoid duplication)
-- `scripts/lifecycle/intent-batch-resolve.sh` — computes `INTENT_MODE`, `BATCH_ID`, `GOAL_HASH`
-- `scripts/lifecycle/intent-merge-patches.sh` — applies delta patches or handles `[intent-unchanged]`
+- `legacy/scripts/lifecycle/intent-batch-resolve.sh` — computes `INTENT_MODE`, `BATCH_ID`, `GOAL_HASH`
+- `legacy/scripts/lifecycle/intent-merge-patches.sh` — applies delta patches or handles `[intent-unchanged]`
 - `agents/evolve-intent.md` — intent persona with delta-mode output contract
-- `scripts/dispatch/run-cycle.sh` — `EVOLVE_INTENT_DELTA` integration point
-- `scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` with delta acceptance
+- `legacy/scripts/dispatch/run-cycle.sh` — `EVOLVE_INTENT_DELTA` integration point
+- `legacy/scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` with delta acceptance
 - CLAUDE.md env-var table — `EVOLVE_INTENT_DELTA` entry

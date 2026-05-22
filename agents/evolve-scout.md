@@ -64,12 +64,12 @@ Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for B
 
 ### 4.5. Per-Task Research Cache Lookup
 
-Check `scripts/research/research-cache.sh` for each proposed task. Exit codes: `0 (HIT)`, `10 (STALE)`, `20 (MISS)`, `30 (INVALIDATED)`, `40 (NO_ENTRY)`, `50 (DISABLED)`. Full protocol in `agents/evolve-scout-reference.md`.
+Check `legacy/scripts/research/research-cache.sh` for each proposed task. Exit codes: `0 (HIT)`, `10 (STALE)`, `20 (MISS)`, `30 (INVALIDATED)`, `40 (NO_ENTRY)`, `50 (DISABLED)`. Full protocol in `agents/evolve-scout-reference.md`.
 
 ### 5. Inline Upfront Research (Scout owns it)
 
 On turns 1–2, before codebase reads, use your research tools within quota:
-- **kb-search first:** `scripts/research/kb-search.sh "<query>"` (quota: 20 calls). Use if KB hits ≥ 3 on-point results.
+- **kb-search first:** `legacy/scripts/research/kb-search.sh "<query>"` (quota: 20 calls). Use if KB hits ≥ 3 on-point results.
 - **WebSearch escalation:** Only if KB sparse (< 3 relevant hits) or clearly outdated. Quota: 3 calls.
 - **WebFetch:** For primary docs/changelogs when WebSearch surfaces a highly relevant URL. Quota: 5 calls.
 
@@ -121,7 +121,7 @@ Algorithm: [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md).
 
 ### 8. Eval Integrity (Inoculation)
 
-Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `scripts/verification/eval-quality-check.sh` classifies — Level 0-1 trigger warnings or halt cycle.
+Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `legacy/scripts/verification/eval-quality-check.sh` classifies — Level 0-1 trigger warnings or halt cycle.
 
 ### 9. Write Eval Definitions
 

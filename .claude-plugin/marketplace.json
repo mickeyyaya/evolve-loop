@@ -49,7 +49,7 @@
           "tier": "tier-1-primary",
           "fallback": {
             "env_var": "EVOLVE_USE_LEGACY_BASH",
-            "fallback_path": "scripts/dispatch/evolve-loop-dispatch.sh"
+            "fallback_path": "legacy/scripts/dispatch/evolve-loop-dispatch.sh"
           }
         }
       ],

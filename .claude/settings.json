@@ -1,5 +1,5 @@
 {
-  "_comment": "Project-scoped settings shipped with the evolve-loop plugin. Three PreToolUse hooks enforce structural trust boundaries: (1) ship-gate.sh on Bash — only scripts/lifecycle/ship.sh can perform ship-class git/gh ops (v8.13.0). (2) phase-gate-precondition.sh on Bash — subagent-run.sh invocations must follow Scout→Builder→Auditor sequence (v8.13.1). (3) role-gate.sh on Edit|Write — files can only be modified by the active phase's agent within its allowlisted paths (v8.13.1). All three gates honor an emergency bypass env var; routine bypassing is a CLAUDE.md violation. v8.13.3 adds a PostToolUse hook on Edit|Write that syntax-checks the modified file by extension (.json → jq empty, .sh → bash -n, .py → python3 -m py_compile); never blocks (PostToolUse can't), only emits WARN to LLM stderr. v10.16.0 adds research-quota-gate.sh on WebSearch|WebFetch|Bash — counts research-tool calls per agent and denies over-quota invocations (Cycle A of research-as-tool plan). v10.17.0 (cycle-90) adds doc-deletion-guard.sh on Bash — blocks rm/mv targeting docs/** or knowledge-base/** without canonical archival mv; operator escape: EVOLVE_ALLOW_DOC_DELETE=1.",
+  "_comment": "Project-scoped settings shipped with the evolve-loop plugin. Three PreToolUse hooks enforce structural trust boundaries: (1) ship-gate.sh on Bash — only legacy/scripts/lifecycle/ship.sh can perform ship-class git/gh ops (v8.13.0). (2) phase-gate-precondition.sh on Bash — subagent-run.sh invocations must follow Scout→Builder→Auditor sequence (v8.13.1). (3) role-gate.sh on Edit|Write — files can only be modified by the active phase's agent within its allowlisted paths (v8.13.1). All three gates honor an emergency bypass env var; routine bypassing is a CLAUDE.md violation. v8.13.3 adds a PostToolUse hook on Edit|Write that syntax-checks the modified file by extension (.json → jq empty, .sh → bash -n, .py → python3 -m py_compile); never blocks (PostToolUse can't), only emits WARN to LLM stderr. v10.16.0 adds research-quota-gate.sh on WebSearch|WebFetch|Bash — counts research-tool calls per agent and denies over-quota invocations (Cycle A of research-as-tool plan). v10.17.0 (cycle-90) adds doc-deletion-guard.sh on Bash — blocks rm/mv targeting docs/** or knowledge-base/** without canonical archival mv; operator escape: EVOLVE_ALLOW_DOC_DELETE=1.",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,11 +7,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/guards/ship-gate.sh"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/ship-gate.sh"
           },
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/guards/phase-gate-precondition.sh"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/phase-gate-precondition.sh"
           }
         ]
       },
@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/guards/role-gate.sh"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/role-gate.sh"
           }
         ]
       },
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/hooks/research-quota-gate.sh"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/hooks/research-quota-gate.sh"
           }
         ]
       },
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/hooks/doc-deletion-guard.sh"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/hooks/doc-deletion-guard.sh"
           }
         ]
       }
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/verification/postedit-validate.sh"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/verification/postedit-validate.sh"
           }
         ]
       }
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/observability/prune-ephemeral.sh --quiet || true"
+            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/observability/prune-ephemeral.sh --quiet || true"
           }
         ]
       }

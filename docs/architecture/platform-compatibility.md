@@ -6,7 +6,7 @@
 
 evolve-loop's pipeline is **CLI-independent**. The cycle state machine, kernel gates (role-gate, ship-gate, phase-gate-precondition, ledger SHA chain), and ship logic are pure shell + jq — they fire identically regardless of which CLI invokes the pipeline.
 
-What varies per-CLI is the **adapter layer**: how subagent prompts are dispatched, whether subprocess isolation is available, whether budget caps can be enforced natively, etc. Each adapter ships a **capability manifest** (`scripts/cli_adapters/<cli>.capabilities.json`) declaring which guarantees it can structurally provide.
+What varies per-CLI is the **adapter layer**: how subagent prompts are dispatched, whether subprocess isolation is available, whether budget caps can be enforced natively, etc. Each adapter ships a **capability manifest** (`legacy/scripts/cli_adapters/<cli>.capabilities.json`) declaring which guarantees it can structurally provide.
 
 Pipeline behavior is deterministic per-tier:
 - **`full`** — adapter provides all expected guarantees natively (e.g., Claude Code).
@@ -68,7 +68,7 @@ claude --version
 
 To enforce hybrid-only and exit-99 if claude is missing:
 ```bash
-EVOLVE_GEMINI_REQUIRE_FULL=1 bash scripts/cli_adapters/gemini.sh
+EVOLVE_GEMINI_REQUIRE_FULL=1 bash legacy/scripts/cli_adapters/gemini.sh
 # or pass --require-full
 ```
 
@@ -85,7 +85,7 @@ claude --version
 
 To enforce hybrid-only:
 ```bash
-EVOLVE_CODEX_REQUIRE_FULL=1 bash scripts/cli_adapters/codex.sh
+EVOLVE_CODEX_REQUIRE_FULL=1 bash legacy/scripts/cli_adapters/codex.sh
 ```
 
 ### Antigravity CLI / agy (native or hybrid or degraded — v10.19.0+)
@@ -103,7 +103,7 @@ claude --version
 
 To enforce NATIVE/HYBRID-only (exit-99 if neither binary found):
 ```bash
-EVOLVE_AGY_REQUIRE_FULL=1 bash scripts/cli_adapters/agy.sh
+EVOLVE_AGY_REQUIRE_FULL=1 bash legacy/scripts/cli_adapters/agy.sh
 # or pass --require-full
 ```
 
@@ -111,11 +111,11 @@ Note: in NATIVE mode, cost is reported as `cost_blind:true` (zero attribution). 
 
 ### Other CLIs (`none` — skill content only)
 
-You can read SKILL.md and the phase docs from any CLI. To run cycles, implement an adapter at `scripts/cli_adapters/<your-cli>.sh` mirroring `gemini.sh`'s pattern + ship a `<your-cli>.capabilities.json` manifest. See [Adapter contract](#adapter-contract) below.
+You can read SKILL.md and the phase docs from any CLI. To run cycles, implement an adapter at `legacy/scripts/cli_adapters/<your-cli>.sh` mirroring `gemini.sh`'s pattern + ship a `<your-cli>.capabilities.json` manifest. See [Adapter contract](#adapter-contract) below.
 
 ## Adapter contract
 
-Every adapter at `scripts/cli_adapters/<cli>.sh` is invoked by `subagent-run.sh` with these env vars:
+Every adapter at `legacy/scripts/cli_adapters/<cli>.sh` is invoked by `subagent-run.sh` with these env vars:
 
 | Var | Purpose |
 |---|---|
@@ -137,7 +137,7 @@ The adapter must:
 4. Exit 0 on success; non-zero only on adapter-level failures (the pipeline distinguishes adapter exit codes from artifact-verification failures).
 5. Ship a `<cli>.capabilities.json` manifest declaring resolved capabilities.
 
-See `scripts/cli_adapters/claude.sh` for the canonical full-caps reference, `gemini.sh` for the hybrid+degraded pattern.
+See `legacy/scripts/cli_adapters/claude.sh` for the canonical full-caps reference, `gemini.sh` for the hybrid+degraded pattern.
 
 ## Multi-LLM-per-phase (v8.52.0 roadmap)
 
@@ -145,7 +145,7 @@ Each phase profile (`scout.json`, `builder.json`, `auditor.json`, `intent.json`,
 
 ## Detection
 
-The skill auto-detects which CLI it's running under via `scripts/dispatch/detect-cli.sh`:
+The skill auto-detects which CLI it's running under via `legacy/scripts/dispatch/detect-cli.sh`:
 
 1. `CLAUDE_CODE_INTERACTIVE` set → `claude`
 2. `GEMINI_CLI` or `GEMINI_API_KEY` set → `gemini`

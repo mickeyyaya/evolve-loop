@@ -19,10 +19,10 @@
 
 ## Mandatory Phase Gate Verification
 
-Run `scripts/lifecycle/phase-gate.sh` at every phase transition. This deterministic bash script verifies artifacts exist, agents ran, and integrity checks pass. The orchestrator cannot skip it — it is the trust boundary between LLM judgment and structural enforcement.
+Run `legacy/scripts/lifecycle/phase-gate.sh` at every phase transition. This deterministic bash script verifies artifacts exist, agents ran, and integrity checks pass. The orchestrator cannot skip it — it is the trust boundary between LLM judgment and structural enforcement.
 
 ```bash
-bash scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
+bash legacy/scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
 # Gates: discover-to-build, build-to-audit, audit-to-ship, ship-to-learn, cycle-complete
 # Exit 0 = proceed, Exit 1 = block, Exit 2 = halt (present to human)
 ```
@@ -69,7 +69,7 @@ For detailed calibration instructions, see [phase0-calibrate.md](phase0-calibrat
 
 ### Skill Inventory (once per session)
 
-Run `bash scripts/utility/setup-skill-inventory.sh` (1h cache) to build `.evolve/skill-inventory.json`. Pass `categoryIndex` subset matching project language/framework/task-types to Scout as `skillCategories`. For routing categories table, JSON schema, scope precedence, and fallback behavior see [reference/phases-detail.md](reference/phases-detail.md#skill-inventory).
+Run `bash legacy/scripts/utility/setup-skill-inventory.sh` (1h cache) to build `.evolve/skill-inventory.json`. Pass `categoryIndex` subset matching project language/framework/task-types to Scout as `skillCategories`. For routing categories table, JSON schema, scope precedence, and fallback behavior see [reference/phases-detail.md](reference/phases-detail.md#skill-inventory).
 
 ---
 
@@ -88,7 +88,7 @@ On detection: complete current phase, write handoff, auto-schedule resume (`/sch
 
 ### Context Window Budget Gate (MANDATORY — runs before anything else)
 
-Run `scripts/verification/context-budget.sh` before each cycle (bash block in [phases-detail.md](reference/phases-detail.md#context-budget-gate)).
+Run `legacy/scripts/verification/context-budget.sh` before each cycle (bash block in [phases-detail.md](reference/phases-detail.md#context-budget-gate)).
 
 | Exit | Status | Action |
 |------|--------|--------|
@@ -98,7 +98,7 @@ Run `scripts/verification/context-budget.sh` before each cycle (bash block in [p
 
 ### Phase 1: RESEARCH (every cycle)
 
-Proactive research loop — full 6-step protocol in [phase1-research.md](phase1-research.md). **Token budget:** 25K max. Phase gate: `bash scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
+Proactive research loop — full 6-step protocol in [phase1-research.md](phase1-research.md). **Token budget:** 25K max. Phase gate: `bash legacy/scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
 
 ### Lean Mode (cycle 10+ OR YELLOW from budget gate)
 
@@ -205,7 +205,7 @@ If handoff file absent or malformed, fall back to full report (e.g., `scout-repo
 ### Phase Boundary: DISCOVER -> BUILD
 
 ```bash
-bash scripts/lifecycle/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
+bash legacy/scripts/lifecycle/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to BUILD. Any other exit -> HALT.
 ```
 
@@ -226,7 +226,7 @@ For detailed Phase 3 implementation, see [phase3-build.md](phase3-build.md).
 ### Phase Boundary: BUILD -> AUDIT
 
 ```bash
-bash scripts/lifecycle/phase-gate.sh build-to-audit $CYCLE $WORKSPACE_PATH
+bash legacy/scripts/lifecycle/phase-gate.sh build-to-audit $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to AUDIT. Any other exit -> HALT.
 ```
 
@@ -238,7 +238,7 @@ The Auditor reviews Builder changes **in the worktree**. Worktree tasks built in
 
 **Eval checksum verification:** `sha256sum -c $WORKSPACE_PATH/eval-checksums.json` — if any checksum fails → HALT: "Eval tamper detected."
 
-**Launch Auditor Agent** via `scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"`. For full context JSON and model-tier selection logic see [reference/phases-detail.md](reference/phases-detail.md#phase-4-audit).
+**Launch Auditor Agent** via `legacy/scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"`. For full context JSON and model-tier selection logic see [reference/phases-detail.md](reference/phases-detail.md#phase-4-audit).
 
 **Enhanced evaluation via `/evaluator`** (optional, `strategy == "harden"` or `forceFullAudit == true`): merge scores into `## Evaluator Scores`. Skip when lean mode or budget YELLOW/RED.
 
@@ -256,7 +256,7 @@ After Auditor completes: PASS → Phase 5 Ship; WARN/FAIL/SHIP_GATE_DENIED → d
 | Proceed | Only if both health check and eval verification pass |
 
 ```bash
-bash scripts/lifecycle/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
+bash legacy/scripts/lifecycle/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
 # Exit 0 -> proceed to SHIP. Exit 1 -> block. Exit 2 -> HALT for human.
 ```
 
@@ -265,7 +265,7 @@ bash scripts/lifecycle/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
 For detailed instructions, see [phase5-ship.md](phase5-ship.md).
 
 ```bash
-bash scripts/lifecycle/phase-gate.sh ship-to-learn $CYCLE $WORKSPACE_PATH
+bash legacy/scripts/lifecycle/phase-gate.sh ship-to-learn $CYCLE $WORKSPACE_PATH
 ```
 Verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does this, not the LLM).
 
@@ -276,7 +276,7 @@ Verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does 
 For detailed instructions, see [phase6-learn.md](phase6-learn.md).
 
 ```bash
-bash scripts/lifecycle/phase-gate.sh cycle-complete $CYCLE $WORKSPACE_PATH
+bash legacy/scripts/lifecycle/phase-gate.sh cycle-complete $CYCLE $WORKSPACE_PATH
 ```
 Archives workspace, verifies all 3 reports exist, updates mastery ONLY if audit-report.md contains a genuine PASS verdict.
 

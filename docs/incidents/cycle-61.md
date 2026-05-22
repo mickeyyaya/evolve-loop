@@ -35,13 +35,13 @@ These facts overrule any conflicting narrative in `.evolve/runs/cycle-61/orchest
 
 | Claim | Verification | Result |
 |---|---|---|
-| ship.sh was NOT modified between cycle 61 commit time and now | `git log --oneline scripts/lifecycle/ship.sh` last touch: `bc8ec09` (cycle 48) | ✓ stable |
+| ship.sh was NOT modified between cycle 61 commit time and now | `git log --oneline legacy/scripts/lifecycle/ship.sh` last touch: `bc8ec09` (cycle 48) | ✓ stable |
 | Cycle 61 shipped via standard Fast-forward merge | `git reflog --date=iso main`: `4160750 main@{2026-05-15 08:32:46 +0800}: merge evolve/cycle-61: Fast-forward` | ✓ no anomaly |
 | Project-root state.json was NOT touched during cycle 61 | `state.json:lastUpdated=2026-05-15T00:06:43Z` matches my pre-launch edit time | ✓ confirmed |
 | Ledger has NO `integrity_fail`/`state_mutation`/`classification` entries for cycle 61 | `jq 'select(.cycle==61 and .kind in ("integrity_fail", ...))' .evolve/ledger.jsonl` returns nothing | ✓ no recorded mutations |
 | Builder/Auditor/Triage actually ran on Claude, not Gemini | Per-role ledger entries show `target_cli=claude, model=sonnet, source=llm_config_fallback` | ✓ confirmed |
-| Auditor's cited `gemini.sh:206` exists in HEAD | `git show HEAD:scripts/cli_adapters/gemini.sh \| sed -n '206p'` returns the NATIVE-mode echo line | ✓ exists |
-| `gemini.sh` was NOT in cycle 61's diff | `git show 4160750 -- scripts/cli_adapters/gemini.sh` is empty | ✓ confirmed |
+| Auditor's cited `gemini.sh:206` exists in HEAD | `git show HEAD:legacy/scripts/cli_adapters/gemini.sh \| sed -n '206p'` returns the NATIVE-mode echo line | ✓ exists |
+| `gemini.sh` was NOT in cycle 61's diff | `git show 4160750 -- legacy/scripts/cli_adapters/gemini.sh` is empty | ✓ confirmed |
 
 ## Root Cause Analysis
 
@@ -75,7 +75,7 @@ Memo's allowed_tools include `Bash(cat:*)`, `Bash(tail:*)`, `Bash(head:*)`, `Bas
 
 ### B5 — Classifier doesn't scan per-role logs
 
-`scripts/dispatch/evolve-loop-dispatch.sh:558-621` (`classify_cycle_failure`) only greps `orchestrator-report.md` for infrastructure markers (`429`, `503`, `rate.limit`, `EPERM`). Memo's API 529s landed in `memo-stdout.log`, NOT in `orchestrator-report.md`. The classifier fell through to coarse `integrity-breach` when memo failed with a recoverable infra error.
+`legacy/scripts/dispatch/evolve-loop-dispatch.sh:558-621` (`classify_cycle_failure`) only greps `orchestrator-report.md` for infrastructure markers (`429`, `503`, `rate.limit`, `EPERM`). Memo's API 529s landed in `memo-stdout.log`, NOT in `orchestrator-report.md`. The classifier fell through to coarse `integrity-breach` when memo failed with a recoverable infra error.
 
 ### B6 — Orchestrator-report doesn't disclose CLI fallback events
 
@@ -93,13 +93,13 @@ This bug was NOT in the original list (B1-B6) — surfaced only during the postm
 
 | Bug | Step | Fix Location |
 |---|---|---|
-| B0 | Step 2 | `scripts/cli_adapters/gemini.sh:198-204` — re-apply NATIVE block |
-| B1 | Step 4 | `scripts/lifecycle/scout-grounding-check.sh` (new) + phase-gate.sh wire-up |
-| B2 | Step 5 | `scripts/lifecycle/audit-citation-check.sh` (new) + phase-gate.sh wire-up |
+| B0 | Step 2 | `legacy/scripts/cli_adapters/gemini.sh:198-204` — re-apply NATIVE block |
+| B1 | Step 4 | `legacy/scripts/lifecycle/scout-grounding-check.sh` (new) + phase-gate.sh wire-up |
+| B2 | Step 5 | `legacy/scripts/lifecycle/audit-citation-check.sh` (new) + phase-gate.sh wire-up |
 | B3 | — | NO FIX. ship.sh v8.32 TOFU already handles. |
 | B4 | Step 7 | `.evolve/profiles/memo.json` — drop `Bash(cat:*)`, `Bash(tail:*)`, `Bash(head:*)` |
-| B5 | Step 3 | `scripts/dispatch/evolve-loop-dispatch.sh:565-569` — extend infra grep to per-role `*-stdout.log`, `*-stderr.log` |
-| B6 | Step 6 | `scripts/observability/render-cli-resolution.sh` (new) + phase-gate cycle-complete wire-up |
+| B5 | Step 3 | `legacy/scripts/dispatch/evolve-loop-dispatch.sh:565-569` — extend infra grep to per-role `*-stdout.log`, `*-stderr.log` |
+| B6 | Step 6 | `legacy/scripts/observability/render-cli-resolution.sh` (new) + phase-gate cycle-complete wire-up |
 | B7 | — | **Addressed by manually fixing state.json:lastCycleNumber=61 in this cycle's commit.** Structural fix deferred (warrants its own future investigation of why worktree state doesn't merge back to project root). |
 
 ## Resolution Status
@@ -121,8 +121,8 @@ Cycle 64's gemini re-test exposed two NEW classes of failure that the current fr
 
 | Bug | Severity | Description | Proposed fix |
 |---|---|---|---|
-| **B8** | HIGH | **Builder-exit commit-presence gate missing.** Builder's persona explicitly instructs `git add -A && git commit -m "..."` (lines 56-64, 377-383 of `agents/evolve-builder.md`). Builder profile permits these commands. Despite both, Gemini-3.1-pro-preview Builder in cycle 64 made the file edit correctly but never invoked `git add`/`git commit`. The cycle-24 instinct (`cycle-24-builder-uncommitted-worktree-edit.yaml`, confidence 0.97) names this exact failure mode. No phase-gate currently enforces it. | Add to `scripts/lifecycle/phase-gate.sh:gate_build_to_audit`: a check that `git -C "$WORKTREE_PATH" status --porcelain` returns empty, OR fails the build-to-audit transition. Catches any model (Gemini or Claude on a bad day) that skips the commit. WARN-mode default-on initially per the v8.55 rollout ladder. |
-| **B9** | MEDIUM | **EGPS predicate-presence gate missing.** ADR-7 requires Builder to write `acs/cycle-N/*.sh` predicates for each acceptance criterion. Cycle 64's Gemini Builder wrote ZERO predicate files; the auditor noted this as DEFECT-2 but the cycle still proceeded to verdict computation (which fell back to legacy audit-report.md prose verdict). | Add to `scripts/lifecycle/phase-gate.sh:gate_build_to_audit`: a check that `[ -d "$WORKTREE_PATH/acs/cycle-$CYCLE" ] && [ "$(find ... -name '*.sh' \| wc -l)" -gt 0 ]`. Mirrors B8's pattern. Forces EGPS predicate authorship structurally rather than relying on Builder persona compliance. |
+| **B8** | HIGH | **Builder-exit commit-presence gate missing.** Builder's persona explicitly instructs `git add -A && git commit -m "..."` (lines 56-64, 377-383 of `agents/evolve-builder.md`). Builder profile permits these commands. Despite both, Gemini-3.1-pro-preview Builder in cycle 64 made the file edit correctly but never invoked `git add`/`git commit`. The cycle-24 instinct (`cycle-24-builder-uncommitted-worktree-edit.yaml`, confidence 0.97) names this exact failure mode. No phase-gate currently enforces it. | Add to `legacy/scripts/lifecycle/phase-gate.sh:gate_build_to_audit`: a check that `git -C "$WORKTREE_PATH" status --porcelain` returns empty, OR fails the build-to-audit transition. Catches any model (Gemini or Claude on a bad day) that skips the commit. WARN-mode default-on initially per the v8.55 rollout ladder. |
+| **B9** | MEDIUM | **EGPS predicate-presence gate missing.** ADR-7 requires Builder to write `acs/cycle-N/*.sh` predicates for each acceptance criterion. Cycle 64's Gemini Builder wrote ZERO predicate files; the auditor noted this as DEFECT-2 but the cycle still proceeded to verdict computation (which fell back to legacy audit-report.md prose verdict). | Add to `legacy/scripts/lifecycle/phase-gate.sh:gate_build_to_audit`: a check that `[ -d "$WORKTREE_PATH/acs/cycle-$CYCLE" ] && [ "$(find ... -name '*.sh' \| wc -l)" -gt 0 ]`. Mirrors B8's pattern. Forces EGPS predicate authorship structurally rather than relying on Builder persona compliance. |
 
 Both fixes are Tier 1 (phase-gate hooks) and would close the gap between "Builder persona instructs X" and "Builder does X." They make the framework's protocol compliance independent of model behavior — closing the cycle 64 demonstrated gap between Claude's reliable instruction-following and Gemini's optimization-toward-visible-deliverable.
 
@@ -142,4 +142,4 @@ Both fixes are Tier 1 (phase-gate hooks) and would close the gap between "Builde
 - Workspace: `.evolve/runs/cycle-61/` (orchestrator-stdout.log, audit-report.md, build-report.md, scout-report.md, memo-stdout.log)
 - Predicate 040 (mixed-CLI routing): `acs/regression-suite/cycle-60/040-e2e-mixed-cli-cycle.sh`
 - Related incident: `docs/incidents/gemini-forgery.md` (cycle 7.9.0+ defenses)
-- ship.sh integrity logic: `scripts/lifecycle/ship.sh:220-287` (v8.32 TOFU), `:872-883` (v11.0 T1 auto-heal)
+- ship.sh integrity logic: `legacy/scripts/lifecycle/ship.sh:220-287` (v8.32 TOFU), `:872-883` (v11.0 T1 auto-heal)

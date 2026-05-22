@@ -18,7 +18,7 @@
 
 ## Overview
 
-The research-as-tool subsystem governs how evolve-loop agents use knowledge retrieval during a cycle. The guiding principle is **KB-first**: agents must consult the local knowledge base (`scripts/research/kb-search.sh`) before escalating to live web search tools (`WebSearch`, `WebFetch`). This keeps costs low, avoids rate limits on Scout-heavy cycles, and keeps research results reproducible from cached KB content.
+The research-as-tool subsystem governs how evolve-loop agents use knowledge retrieval during a cycle. The guiding principle is **KB-first**: agents must consult the local knowledge base (`legacy/scripts/research/kb-search.sh`) before escalating to live web search tools (`WebSearch`, `WebFetch`). This keeps costs low, avoids rate limits on Scout-heavy cycles, and keeps research results reproducible from cached KB content.
 
 Three cycle milestones delivered this subsystem:
 - **Cycle 87 (Phase A):** Added `research-quota-gate.sh` hook, `kb-search.sh` utility, and widened 7 agent profiles with `research_quota` fields and allowed-tool entries.
@@ -32,7 +32,7 @@ Implementation dossier: [`knowledge-base/research/research-as-tool-implementatio
 ## KB-First Directive
 
 > **Research quota rule (canonical text — single source, referenced from persona files):**
-> Try `scripts/research/kb-search.sh` first; escalate to WebSearch only if KB hits are sparse (< 3 results) or evidently outdated. When escalating, log the query and the KB hit count that triggered the escalation. Combine KB results with web results rather than discarding KB findings.
+> Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only if KB hits are sparse (< 3 results) or evidently outdated. When escalating, log the query and the KB hit count that triggered the escalation. Combine KB results with web results rather than discarding KB findings.
 
 All 6 non-Scout persona files (`evolve-intent.md`, `evolve-triage.md`, `evolve-tdd-engineer.md`, `evolve-builder.md`, `evolve-auditor.md`, `evolve-retrospective.md`) carry a one-line pointer here. Verification: `grep -rl "kb-search.sh first" agents/` must return ≥ 6 paths.
 
@@ -55,7 +55,7 @@ All 6 non-Scout persona files (`evolve-intent.md`, `evolve-triage.md`, `evolve-t
 
 ## Hook Contract
 
-File: `scripts/hooks/research-quota-gate.sh`
+File: `legacy/scripts/hooks/research-quota-gate.sh`
 
 The hook is a `PreToolUse` gate that intercepts `WebSearch` and `WebFetch` calls.
 
@@ -94,7 +94,7 @@ Each agent profile (`.evolve/profiles/<agent>.json`) includes:
 }
 ```
 
-`allowed_tools` includes `"WebSearch"`, `"WebFetch"`, and `"Bash(scripts/research/kb-search.sh:*)"`.
+`allowed_tools` includes `"WebSearch"`, `"WebFetch"`, and `"Bash(legacy/scripts/research/kb-search.sh:*)"`.
 
 ### Dual-entry note (verified-intentional)
 
@@ -117,7 +117,7 @@ Several profiles retain `"WebSearch"` and `"WebFetch"` in both `allowed_tools` a
 
 | Cycle | Phase | Deliverable |
 |-------|-------|-------------|
-| 87 | A — Foundation | `scripts/hooks/research-quota-gate.sh`, `scripts/research/kb-search.sh`, 7 profile `research_quota` fields added |
+| 87 | A — Foundation | `legacy/scripts/hooks/research-quota-gate.sh`, `legacy/scripts/research/kb-search.sh`, 7 profile `research_quota` fields added |
 | 88 | B — Scout migrate | `gate_intent_to_discover` gate, Scout inline-research wiring, Phase-1 dispatch retired |
 | 89 | C — Access widening | KB-first directive added to 6 non-Scout personas, this ADR published, 4 env vars surfaced in CLAUDE.md, `docs/research/online-researcher-patterns.md` created |
 
@@ -125,8 +125,8 @@ Several profiles retain `"WebSearch"` and `"WebFetch"` in both `allowed_tools` a
 
 ## Cross-References
 
-- Hook implementation: [`scripts/hooks/research-quota-gate.sh`](../../scripts/hooks/research-quota-gate.sh)
-- KB search utility: [`scripts/research/kb-search.sh`](../../scripts/research/kb-search.sh)
+- Hook implementation: [`legacy/scripts/hooks/research-quota-gate.sh`](../../legacy/scripts/hooks/research-quota-gate.sh)
+- KB search utility: [`legacy/scripts/research/kb-search.sh`](../../legacy/scripts/research/kb-search.sh)
 - Query patterns reference: [`docs/research/online-researcher-patterns.md`](../research/online-researcher-patterns.md)
 - Scout persona (inline-research wiring): [`agents/evolve-scout.md`](../../agents/evolve-scout.md)
 - Profile directory: [`.evolve/profiles/`](../../.evolve/profiles/)

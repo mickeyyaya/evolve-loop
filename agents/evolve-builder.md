@@ -10,7 +10,7 @@ perspective: "minimum viable change, test-first implementation — ship the smal
 output-format: "build-report.md — Design Decision, Files Changed table, Test Results (N/N PASS), Eval Grader outcomes, Self-Verification checklist"
 ---
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Builder
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
@@ -105,7 +105,7 @@ Enumerate reasoning explicitly:
 4. **Simpler way?** Reject ≥1 alternative.
 5. **Evidence:** Cite source.
 ### Integrity Notice (Inoculation)
-Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a known failure mode. Implement per acceptance criteria's **spirit**. Detection: `scripts/observability/cycle-health-check.sh`, `scripts/verification/verify-eval.sh`.
+Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a known failure mode. Implement per acceptance criteria's **spirit**. Detection: `legacy/scripts/observability/cycle-health-check.sh`, `legacy/scripts/verification/verify-eval.sh`.
 ### Step 4: Implement
 - Make changes — small and focused
 - Follow existing code patterns and conventions
@@ -170,15 +170,15 @@ Check `strategy` for budget constraints; if task too large, note it. Avoid unnec
 
 ## AC-TABLE Region (harness-owned)
 
-The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by `scripts/lifecycle/build-report-ac-verify.sh` at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
+The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by `legacy/scripts/lifecycle/build-report-ac-verify.sh` at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
 
 ## Pre-handoff Regression Slice (cycle-91+)
 
-**Before writing build-report.md**, Builder MUST run `scripts/lifecycle/run-regression-suite-slice.sh` with the set of files touched in this cycle. Include the script's verbatim PASS/FAIL output line in `build-report.md` under a `## Regression Slice` or `## Pre-handoff Slice` section.
+**Before writing build-report.md**, Builder MUST run `legacy/scripts/lifecycle/run-regression-suite-slice.sh` with the set of files touched in this cycle. Include the script's verbatim PASS/FAIL output line in `build-report.md` under a `## Regression Slice` or `## Pre-handoff Slice` section.
 
 ```bash
 # Example: pipe touched-file paths via stdin
-printf 'path/to/file1\npath/to/file2\n' | bash scripts/lifecycle/run-regression-suite-slice.sh
+printf 'path/to/file1\npath/to/file2\n' | bash legacy/scripts/lifecycle/run-regression-suite-slice.sh
 ```
 
 - **Exit 0 / `N/N PASS`**: proceed to write build-report.md.
@@ -194,7 +194,7 @@ this cycle is tracked by git — not merely present on disk:
 
 ```bash
 git ls-files --error-unmatch agents/AGENTS.md
-git ls-files --error-unmatch scripts/AGENTS.md
+git ls-files --error-unmatch legacy/scripts/AGENTS.md
 git ls-files --error-unmatch .evolve/profiles/AGENTS.md
 # … one invocation per delivered file path
 ```

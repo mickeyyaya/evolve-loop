@@ -140,7 +140,7 @@ func TestC93_005_Cycle92DeliverablesExistAndTracked(t *testing.T) {
 		minLines int
 	}{
 		{[]string{"agents/AGENTS.md"}, 30},
-		{[]string{"scripts/AGENTS.md", "legacy/scripts/AGENTS.md"}, 30},
+		{[]string{"legacy/scripts/AGENTS.md", "legacy/scripts/AGENTS.md"}, 30},
 		{[]string{"acs/AGENTS.md"}, 30},
 		{[]string{".evolve/profiles/AGENTS.md"}, 30},
 		{[]string{"docs/CODEBASE-MAP.md"}, 20},

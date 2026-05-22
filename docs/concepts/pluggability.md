@@ -85,20 +85,20 @@ This is the axis that distinguishes evolve-loop from single-vendor agent framewo
 
 ### The router script
 
-`scripts/dispatch/resolve-llm.sh <role> [config_path]` is a pure function:
+`legacy/scripts/dispatch/resolve-llm.sh <role> [config_path]` is a pure function:
 
 ```bash
-$ bash scripts/dispatch/resolve-llm.sh scout
+$ bash legacy/scripts/dispatch/resolve-llm.sh scout
 {"cli":"gemini","model":"gemini-3.1-pro-preview","source":"llm_config"}
 
-$ bash scripts/dispatch/resolve-llm.sh builder
+$ bash legacy/scripts/dispatch/resolve-llm.sh builder
 {"cli":"claude","model_tier":"sonnet","source":"llm_config_fallback"}
 
-$ bash scripts/dispatch/resolve-llm.sh auditor
+$ bash legacy/scripts/dispatch/resolve-llm.sh auditor
 {"cli":"claude","model_tier":"sonnet","source":"profile"}
 ```
 
-`subagent-run.sh` calls this before every phase dispatch and uses the result to pick the right adapter (`scripts/cli_adapters/claude.sh`, `gemini.sh`, or `codex.sh`).
+`subagent-run.sh` calls this before every phase dispatch and uses the result to pick the right adapter (`legacy/scripts/cli_adapters/claude.sh`, `gemini.sh`, or `codex.sh`).
 
 ### The config file
 
@@ -126,7 +126,7 @@ $ bash scripts/dispatch/resolve-llm.sh auditor
 
 ### Adapters
 
-Three adapters ship today, each in `scripts/cli_adapters/`:
+Three adapters ship today, each in `legacy/scripts/cli_adapters/`:
 
 | Adapter | Mode | What it does |
 |---|---|---|
@@ -243,7 +243,7 @@ After a cycle, the auto-rendered `## CLI Resolution` section in `orchestrator-re
 ```
 ## CLI Resolution
 
-_Auto-rendered from `.evolve/ledger.jsonl` by `scripts/observability/render-cli-resolution.sh 62`. Do NOT edit manually._
+_Auto-rendered from `.evolve/ledger.jsonl` by `legacy/scripts/observability/render-cli-resolution.sh 62`. Do NOT edit manually._
 
 | Phase | Actual CLI | Actual Model | Source | Mode |
 |-------|------------|--------------|--------|------|
@@ -260,7 +260,7 @@ This is generated from `state.json:ledger` entries — not from operator config 
 Render manually post-hoc:
 
 ```bash
-bash scripts/observability/render-cli-resolution.sh <cycle>
+bash legacy/scripts/observability/render-cli-resolution.sh <cycle>
 ```
 
 ---
@@ -269,8 +269,8 @@ bash scripts/observability/render-cli-resolution.sh <cycle>
 
 To support a new CLI (e.g., a hypothetical `mistral-cli`):
 
-1. Create `scripts/cli_adapters/mistral.sh` matching the existing adapter contract (env vars in / translated usage envelope out)
-2. Create `scripts/cli_adapters/mistral.capabilities.json` describing what the CLI supports:
+1. Create `legacy/scripts/cli_adapters/mistral.sh` matching the existing adapter contract (env vars in / translated usage envelope out)
+2. Create `legacy/scripts/cli_adapters/mistral.capabilities.json` describing what the CLI supports:
    ```json
    {
      "adapter": "mistral",
@@ -284,8 +284,8 @@ To support a new CLI (e.g., a hypothetical `mistral-cli`):
      }
    }
    ```
-3. Add `"mistral"` as a valid `cli` value in `scripts/dispatch/resolve-llm.sh` allowlist
-4. Add a test in `scripts/tests/mistral-adapter-test.sh`
+3. Add `"mistral"` as a valid `cli` value in `legacy/scripts/dispatch/resolve-llm.sh` allowlist
+4. Add a test in `legacy/scripts/tests/mistral-adapter-test.sh`
 5. Write a predicate at `acs/cycle-N/NNN-mistral-native-mode.sh` proving the adapter invokes the binary correctly
 
 This is exactly the path the v8.32-v10.7 Gemini support followed. The router doesn't care which CLIs are registered — it only enforces the contract.

@@ -20,19 +20,19 @@ Acceptance criteria predicate scripts, organized by cycle and regression suite.
 `acs/regression-suite/` holds promoted permanent regression predicates.
 See `acs/AGENTS.md` for predicate quality rules.
 
-### `scripts/`
+### `legacy/scripts/`
 
 All pipeline shell scripts. Subdirectories by function:
 `dispatch/` (subagent spawning), `lifecycle/` (phase transitions),
 `guards/` (kernel hooks), `failure/` (failure adaptation),
 `observability/` (ledger/metrics), `verification/` (eval quality gates),
 `research/` (KB search), `utility/` (shared helpers).
-See `scripts/AGENTS.md` for bash 3.2 compliance rules.
+See `legacy/scripts/AGENTS.md` for bash 3.2 compliance rules.
 
 ### `skills/`
 
 Claude Code plugin skills. Each skill lives at `skills/<name>/SKILL.md` with
-optional `scripts/`, `references/`, and `assets/` subdirectories.
+optional `legacy/scripts/`, `references/`, and `assets/` subdirectories.
 `.agents/skills/<name>/` entries are symlinks to `../../skills/<name>/`
 for cross-CLI auto-discovery. Git tracks content at the canonical path.
 
@@ -48,7 +48,7 @@ and agent-context-eligible. Never delete — archive to `knowledge-base/`.
 
 Long-form archival dossiers excluded from agent context by `.gitignore` scope.
 Subdirectories: `knowledge-base/research/` (deep research), `knowledge-base/research/archived-YYYY-MM-DD/`
-(superseded docs). Use `scripts/research/kb-search.sh` to query.
+(superseded docs). Use `legacy/scripts/research/kb-search.sh` to query.
 
 ### `.evolve/`
 
@@ -72,7 +72,7 @@ Defines the `/evolve-loop` skill entry point, permissions, and plugin metadata.
 ### `bin/`
 
 User-facing CLI entry points and capability-check scripts (`check-caps`).
-Thin wrappers that delegate to `scripts/dispatch/`.
+Thin wrappers that delegate to `legacy/scripts/dispatch/`.
 
 ### `tests/`
 

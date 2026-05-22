@@ -1,6 +1,6 @@
 # Codex CLI Tool Names
 
-> Translation map for Claude Code tool names → Codex CLI (formerly OpenAI Codex CLI). Codex runtime support in evolve-loop is currently a stub (`scripts/cli_adapters/codex.sh` exits 99). This file exists for content-portability only.
+> Translation map for Claude Code tool names → Codex CLI (formerly OpenAI Codex CLI). Codex runtime support in evolve-loop is currently a stub (`legacy/scripts/cli_adapters/codex.sh` exits 99). This file exists for content-portability only.
 
 ## Direct equivalents
 
@@ -27,7 +27,7 @@
 
 ## Runtime status in evolve-loop
 
-`scripts/cli_adapters/codex.sh` is a deliberate stub that exits 99. `scripts/codex-adapter-test.sh` pins this status so it cannot be silently bypassed. Implementing real codex support requires:
+`legacy/scripts/cli_adapters/codex.sh` is a deliberate stub that exits 99. `legacy/scripts/codex-adapter-test.sh` pins this status so it cannot be silently bypassed. Implementing real codex support requires:
 
 1. Mapping evolve-loop profile fields (`allowed_tools[]`, `disallowed_tools[]`, `max_budget_usd`, `permission_mode`, `add_dir`, `extra_flags`) to the Codex CLI flag surface.
 2. Either providing an external budget cap (since `--max-budget-usd` doesn't exist) or accepting unbounded-cost runs.

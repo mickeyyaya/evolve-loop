@@ -98,10 +98,10 @@ Layer 1 is kernel-only (bash + jq), no LLM in path, deterministic. The scope man
 {
   "docs": { "required_paths": ["docs/**", "README.md", "CHANGELOG.md"], "diff_must_be_subset": true },
   "feat(token-opt)": {
-    "required_paths": ["scripts/lifecycle/role-context-builder.sh", "agents/evolve-*.md", "scripts/routing/tier-map.json"],
+    "required_paths": ["legacy/scripts/lifecycle/role-context-builder.sh", "agents/evolve-*.md", "legacy/scripts/routing/tier-map.json"],
     "forbidden_only_paths": ["docs/**", ".evolve/instincts/lessons/**", "acs/**"]
   },
-  "fix(role-gate)": { "required_paths": ["scripts/guards/role-gate.sh"] }
+  "fix(role-gate)": { "required_paths": ["legacy/scripts/guards/role-gate.sh"] }
 }
 ```
 

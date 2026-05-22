@@ -6,43 +6,43 @@
 
 A self-evolving development pipeline that orchestrates 4 specialized agents (Scout, Builder, Auditor, Orchestrator) through 6 lean phases per cycle (Calibrate → Intent → Scout → Build → Audit → Ship → Learn). Tier-1 kernel hooks enforce phase ordering, role-scoped write paths, atomic ship semantics, ledger SHA verification, and v8.37+ tamper-evident hash-chained recording.
 
-> **v11.0.0 runtime note:** A Go binary (`go/bin/evolve`) is the primary runtime entrypoint as of v11.0.0. The bash scripts under `scripts/` continue to work and are the authoritative reference. Agents may invoke either. Set `EVOLVE_USE_LEGACY_BASH=1` to force the bash path. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
+> **v11.0.0 runtime note:** A Go binary (`go/bin/evolve`) is the primary runtime entrypoint as of v11.0.0. The bash scripts under `legacy/scripts/` continue to work and are the authoritative reference. Agents may invoke either. Set `EVOLVE_USE_LEGACY_BASH=1` to force the bash path. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
 >
-> **v11.1.0 layout note:** `scripts/` is now a symlink to `legacy/scripts/`. The physical location is `legacy/scripts/`; all existing references via `scripts/...` resolve through the symlink. New code SHOULD reference `legacy/scripts/...` directly so the symlink can be removed in a future release.
+> **v11.1.0 layout note:** `legacy/scripts/` is now a symlink to `legacy/scripts/`. The physical location is `legacy/scripts/`; all existing references via `legacy/scripts/...` resolve through the symlink. New code SHOULD reference `legacy/scripts/...` directly so the symlink can be removed in a future release.
 
 ## Cross-CLI invariants (the universal rules)
 
 These rules apply regardless of which CLI you are running under. They are STRUCTURAL — enforced by kernel hooks, not by prompt instructions.
 
 ### 1. Pipeline ordering is non-negotiable
-Phases run Scout → Builder → Auditor → Ship/Record in that exact order. The phase-gate kernel hook (`scripts/guards/phase-gate-precondition.sh`) denies any subagent invocation that violates the sequence. There is no bypass short of an emergency operator override (`EVOLVE_BYPASS_PHASE_GATE=1`) which is logged loudly and considered a CRITICAL violation.
+Phases run Scout → Builder → Auditor → Ship/Record in that exact order. The phase-gate kernel hook (`legacy/scripts/guards/phase-gate-precondition.sh`) denies any subagent invocation that violates the sequence. There is no bypass short of an emergency operator override (`EVOLVE_BYPASS_PHASE_GATE=1`) which is logged loudly and considered a CRITICAL violation.
 
 ### 2. Subagents are spawned via `subagent-run.sh`, never via in-process tool calls
-Every phase agent is spawned by `bash scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace>`. This is enforced by the kernel hook. The in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex) is **denied during a cycle**. Reason: in-process subagents bypass profile-scoped permissions and the tamper-evident ledger.
+Every phase agent is spawned by `bash legacy/scripts/dispatch/subagent-run.sh <agent> <cycle> <workspace>`. This is enforced by the kernel hook. The in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex) is **denied during a cycle**. Reason: in-process subagents bypass profile-scoped permissions and the tamper-evident ledger.
 
-### 3. Commits go through `scripts/lifecycle/ship.sh`, never bare `git commit / git push`
-The ship-gate kernel hook (`scripts/guards/ship-gate.sh`) denies bare git commit/push/gh release create. The only canonical entry point is `scripts/lifecycle/ship.sh`. ship.sh enforces audit verification, cycle binding (HEAD + tree_state_sha match), and v8.32+ version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or `EVOLVE_BYPASS_SHIP_GATE=1` (emergency).
+### 3. Commits go through `legacy/scripts/lifecycle/ship.sh`, never bare `git commit / git push`
+The ship-gate kernel hook (`legacy/scripts/guards/ship-gate.sh`) denies bare git commit/push/gh release create. The only canonical entry point is `legacy/scripts/lifecycle/ship.sh`. ship.sh enforces audit verification, cycle binding (HEAD + tree_state_sha match), and v8.32+ version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or `EVOLVE_BYPASS_SHIP_GATE=1` (emergency).
 
 ### 4. Builder writes only inside its worktree
-Each cycle gets a per-cycle git worktree (provisioned by `run-cycle.sh`, recorded in `cycle-state.json:active_worktree`). Builder's profile (`.evolve/profiles/builder.json`) restricts Edit/Write to the worktree path. The role-gate kernel hook (`scripts/guards/role-gate.sh`) denies edits outside that boundary. v8.31+ closed the Bash-redirect leak by adding interpreter-execution Bash denials.
+Each cycle gets a per-cycle git worktree (provisioned by `run-cycle.sh`, recorded in `cycle-state.json:active_worktree`). Builder's profile (`.evolve/profiles/builder.json`) restricts Edit/Write to the worktree path. The role-gate kernel hook (`legacy/scripts/guards/role-gate.sh`) denies edits outside that boundary. v8.31+ closed the Bash-redirect leak by adding interpreter-execution Bash denials.
 
 ### 5. Audits are PASS/WARN/FAIL — and WARN ships by default
 Auditor writes `audit-report.md` with one of three verdicts. PASS ships. **WARN ships** (v8.28.0+ fluent-by-default; orchestrator persona aligned in v8.35.0). FAIL blocks. Operator opts back to legacy strict-on-WARN via `EVOLVE_STRICT_AUDIT=1`. The fluency policy is encoded in ship.sh; the orchestrator persona invokes ship.sh in both PASS and WARN paths.
 
 ### 6. The ledger is tamper-evident (v8.37.0+)
-`.evolve/ledger.jsonl` records every subagent invocation with cycle binding, challenge token, artifact SHA, **prev_hash**, and **entry_seq**. Each new entry's prev_hash is the SHA256 of the previous entry's full JSON line. `.evolve/ledger.tip` records the latest entry's SHA atomically — truncation detection. Run `bash scripts/observability/verify-ledger-chain.sh` to confirm history integrity. Modifying any historical entry breaks the chain at the next entry.
+`.evolve/ledger.jsonl` records every subagent invocation with cycle binding, challenge token, artifact SHA, **prev_hash**, and **entry_seq**. Each new entry's prev_hash is the SHA256 of the previous entry's full JSON line. `.evolve/ledger.tip` records the latest entry's SHA atomically — truncation detection. Run `bash legacy/scripts/observability/verify-ledger-chain.sh` to confirm history integrity. Modifying any historical entry breaks the chain at the next entry.
 
 ### 7. Failure adaptation is fluent-by-default (v8.28.0+)
-Prior failures are recorded in `state.json:failedApproaches[]` with structured classifications (infrastructure-transient, code-audit-fail, code-audit-warn, etc.). The failure-adapter (`scripts/failure/failure-adapter.sh`) returns deterministic decisions; the orchestrator follows them verbatim. Default mode is fluent (would-have-blocked rules emit awareness, not BLOCK). Strict mode (`EVOLVE_STRICT_FAILURES=1`) restores legacy block-on-recurring behavior.
+Prior failures are recorded in `state.json:failedApproaches[]` with structured classifications (infrastructure-transient, code-audit-fail, code-audit-warn, etc.). The failure-adapter (`legacy/scripts/failure/failure-adapter.sh`) returns deterministic decisions; the orchestrator follows them verbatim. Default mode is fluent (would-have-blocked rules emit awareness, not BLOCK). Strict mode (`EVOLVE_STRICT_FAILURES=1`) restores legacy block-on-recurring behavior.
 
 ### 8. Cost adaptation (v8.35.0+)
-The auditor profile defaults to Opus, but `scripts/utility/diff-complexity.sh` auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
+The auditor profile defaults to Opus, but `legacy/scripts/utility/diff-complexity.sh` auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
 
 ### 9. Knowledge Stewardship Rule (Day-One)
 
 > **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. Place runtime references in `docs/research/`, archival dossiers in `knowledge-base/research/`. **Never delete; always archive.** When superseding a doc, MOVE it to `knowledge-base/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
 
-Enforced by `scripts/hooks/doc-deletion-guard.sh` (PreToolUse kernel hook, cycle-90): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: `EVOLVE_ALLOW_DOC_DELETE=1` (logged; emergency only).
+Enforced by `legacy/scripts/hooks/doc-deletion-guard.sh` (PreToolUse kernel hook, cycle-90): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: `EVOLVE_ALLOW_DOC_DELETE=1` (logged; emergency only).
 
 ## 12 Core agent rules
 
@@ -64,7 +64,7 @@ Behavioral rules every agent must follow regardless of CLI. Where the kernel hoo
 9. **Write meaningful tests.** Tests verify *intent*, not surface behavior. Predicates that pass with `echo PASS; exit 0` or `grep -q presence` are rejected by `validate-predicate.sh` (EGPS v10.0+). Same principle applies to unit tests: a passing test that doesn't probe the behavior change is a no-op.
 10. **Use checkpoints.** For multi-phase work, summarize what was done and what remains after every phase. evolve-loop encodes this in `cycle-state.sh checkpoint` + `phase report` artifacts. If you cannot clearly describe current status in 3 bullets, stop — you have lost the plot.
 11. **Follow existing conventions.** Match the codebase even if you disagree. Specifics: shell scripts target bash 3.2 (no `declare -A`, no `mapfile`, no `${var^^}`); use `printf > tmp && mv` for atomic writes; commits go through `ship.sh`; `Bash() patterns` use simple `*` (not gitignore globstar); kernel scripts source `resolve-roots.sh` and split `PLUGIN_ROOT` (reads) from `PROJECT_ROOT` (writes).
-12. **Fail loudly.** Do not silently skip steps, swallow errors, or report success when work was incomplete. A "migration complete" claim that secretly skipped 3 files is the failure mode this rule prevents. Format for completion claims: `bash scripts/<suite>.sh — N/N PASS, no regression`.
+12. **Fail loudly.** Do not silently skip steps, swallow errors, or report success when work was incomplete. A "migration complete" claim that secretly skipped 3 files is the failure mode this rule prevents. Format for completion claims: `bash legacy/scripts/<suite>.sh — N/N PASS, no regression`.
 
 ## Per-CLI runtime details
 
@@ -72,11 +72,11 @@ This file covers the universal contract. CLI-specific runtime details live in co
 
 - **Claude Code**: see [CLAUDE.md](CLAUDE.md). Tier-1 production. Skills at `skills/<name>/SKILL.md`, plugin manifest at `.claude-plugin/plugin.json`. Slash commands at `.claude-plugin/commands/`. Kernel hooks fire as PreToolUse hooks per `.claude/settings.json`.
 
-- **Codex CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md` (this directory exists as symlinks to `skills/<name>/`). Codex reads this AGENTS.md as its canonical config. Tier-1 hybrid since v8.51.0: `scripts/cli_adapters/codex.sh` delegates to `claude.sh` when `claude` is on PATH (full caps), or runs in same-session DEGRADED mode otherwise (pipeline still completes; reduced isolation). Capability tier visible via `./bin/check-caps codex`.
+- **Codex CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md` (this directory exists as symlinks to `skills/<name>/`). Codex reads this AGENTS.md as its canonical config. Tier-1 hybrid since v8.51.0: `legacy/scripts/cli_adapters/codex.sh` delegates to `claude.sh` when `claude` is on PATH (full caps), or runs in same-session DEGRADED mode otherwise (pipeline still completes; reduced isolation). Capability tier visible via `./bin/check-caps codex`.
 
-- **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. Tier-1-hybrid: skill activates from Gemini, runtime delegates to `claude` binary via `scripts/cli_adapters/gemini.sh`.
+- **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. Tier-1-hybrid: skill activates from Gemini, runtime delegates to `claude` binary via `legacy/scripts/cli_adapters/gemini.sh`.
 
-- **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. NATIVE mode (`agy -p`) available when agy binary on PATH; HYBRID when claude on PATH; DEGRADED otherwise. Adapter at `scripts/cli_adapters/agy.sh`; cross-name resolver maps `antigravity → agy` in `subagent-run.sh`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/evolve-loop/reference/agy-runtime.md). Capability tier: `./bin/check-caps antigravity`.
+- **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. NATIVE mode (`agy -p`) available when agy binary on PATH; HYBRID when claude on PATH; DEGRADED otherwise. Adapter at `legacy/scripts/cli_adapters/agy.sh`; cross-name resolver maps `antigravity → agy` in `subagent-run.sh`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/evolve-loop/reference/agy-runtime.md). Capability tier: `./bin/check-caps antigravity`.
 
 - **Generic / unsupported CLI**: see [skills/evolve-loop/reference/generic-runtime.md](skills/evolve-loop/reference/generic-runtime.md). Tool name translation tables at `skills/evolve-loop/reference/<platform>-tools.md`.
 
@@ -90,7 +90,7 @@ If you are an AI agent activating in this repository:
 4. **Discover available skills**: scan `.agents/skills/*/SKILL.md` (cross-CLI standard) or `skills/*/SKILL.md` (Claude Code primary).
 5. **Discover available agents**: scan `agents/*.md`.
 
-Skill files use YAML frontmatter (`name`, `description`) followed by markdown instructions. Skills include subdirectories (`scripts/`, `references/`, `assets/`) for resources used during execution.
+Skill files use YAML frontmatter (`name`, `description`) followed by markdown instructions. Skills include subdirectories (`legacy/scripts/`, `references/`, `assets/`) for resources used during execution.
 
 ## Trust boundary summary
 

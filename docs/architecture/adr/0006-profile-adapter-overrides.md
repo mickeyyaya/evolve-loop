@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-05-15  
 **Cycle:** 54  
-**Implemented in:** `scripts/dispatch/subagent-run.sh` (cmd_validate_profile, cmd_run)
+**Implemented in:** `legacy/scripts/dispatch/subagent-run.sh` (cmd_validate_profile, cmd_run)
 
 ---
 

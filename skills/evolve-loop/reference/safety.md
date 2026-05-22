@@ -9,7 +9,7 @@ description: Reference doc.
 
 ## Phase Gate Script
 
-`scripts/lifecycle/phase-gate.sh` is the trust boundary. Runs at every phase transition — the LLM cannot skip it.
+`legacy/scripts/lifecycle/phase-gate.sh` is the trust boundary. Runs at every phase transition — the LLM cannot skip it.
 
 | Controls | Owner |
 |----------|-------|
@@ -18,7 +18,7 @@ description: Reference doc.
 
 ## Eval Tamper Detection
 
-- Builder MUST NOT modify `skills/`, `agents/`, `scripts/`, `.claude-plugin/`
+- Builder MUST NOT modify `skills/`, `agents/`, `legacy/scripts/`, `.claude-plugin/`
 - Eval checksums captured by phase gate after DISCOVER, verified before AUDIT
 - Weakened eval criteria → CRITICAL severity, automatic FAIL
 
@@ -37,7 +37,7 @@ description: Reference doc.
 | 9 | Complexity creep | S >30 lines, M >80 lines → break down or simplify |
 | 10 | Orchestrator gaming | Never skip agents, fabricate cycles, or inflate mastery |
 | 11 | Artifact forgery | Never write fake reports, `git commit --allow-empty`, or modify state.json directly |
-| 12 | The "Grep Trap" / Hallucinated Features | Never accept tautological `grep` evals for logic tasks; modifying documentation without modifying executable code (`scripts/`) is forbidden for capability tasks |
+| 12 | The "Grep Trap" / Hallucinated Features | Never accept tautological `grep` evals for logic tasks; modifying documentation without modifying executable code (`legacy/scripts/`) is forbidden for capability tasks |
 
 ## Known Incidents
 

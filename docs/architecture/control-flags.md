@@ -1,7 +1,7 @@
 # Control Flags Reference — `EVOLVE_*`
 
 > **86 distinct flags** as of 2026-05-10. See cluster annotations for consolidation targets in cycles 8–10.
-> Canonical source: `grep -rohE 'EVOLVE_[A-Z_]+' scripts/ agents/ skills/ | sort -u`
+> Canonical source: `grep -rohE 'EVOLVE_[A-Z_]+' legacy/scripts/ agents/ skills/ | sort -u`
 
 ## Status Key
 

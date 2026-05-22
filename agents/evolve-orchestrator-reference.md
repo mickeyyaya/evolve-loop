@@ -58,7 +58,7 @@ v8.22's adapter:
 - Scores code and infrastructure failures separately (no "any-kind"
   conflation that obscures root cause).
 - Returns the action JSON deterministically — same input → same output.
-- Is unit-tested via `scripts/failure-adapter-test.sh`.
+- Is unit-tested via `legacy/scripts/failure-adapter-test.sh`.
 
 If you find yourself wanting to override the adapter's verdict, that's a sign
 the decision rules need updating (file an issue) — NOT a sign to bypass the
@@ -123,7 +123,7 @@ Loaded when `EVOLVE_USE_PHASE_REGISTRY=1` (default). The phase sequence is drive
 
 ```bash
 # Calibrate: read phase order from registry
-phase_list=$(EVOLVE_USE_PHASE_REGISTRY=1 bash scripts/dispatch/list-phase-order.sh)
+phase_list=$(EVOLVE_USE_PHASE_REGISTRY=1 bash legacy/scripts/dispatch/list-phase-order.sh)
 
 # Dispatch loop (registry-driven):
 while IFS= read -r phase_name; do

@@ -37,7 +37,7 @@ Per-cycle adaptive routing that:
    allowed_clis: [...]
    cross_family_with: "<other-phase>"
 
-2. DETERMINISTIC DECISION    (scripts/routing/decide-cycle-routing.sh)
+2. DETERMINISTIC DECISION    (legacy/scripts/routing/decide-cycle-routing.sh)
    Reads: intent.md + state.json + retro lessons
    Writes: .evolve/runs/cycle-N/cycle-routing.json
 
@@ -45,12 +45,12 @@ Per-cycle adaptive routing that:
    May shift ONE phase UP by ONE tier, in-envelope, logged
    Cannot shift DOWN (conservative bias)
 
-4. TRUST KERNEL ENFORCEMENT  (scripts/routing/envelope-check.sh)
+4. TRUST KERNEL ENFORCEMENT  (legacy/scripts/routing/envelope-check.sh)
    Validates: (cli, tier) ∈ profile.envelope
    Validates: builder.cli.family ≠ auditor.cli.family
    Out-of-envelope → rc=2
 
-5. CLI TIER TRANSLATION      (scripts/routing/tier-map.json)
+5. CLI TIER TRANSLATION      (legacy/scripts/routing/tier-map.json)
    deep / balanced / fast → concrete model per CLI
 ```
 

@@ -39,7 +39,7 @@ This research evaluated whether `claude-tmux` could be operated as a structured 
 
 ## Verdict on the three operator concerns
 
-**Credential isolation**: PASS. The prototype adapter (`scripts/cli_adapters/claude-tmux.sh`) refuses to run when `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, or `EVOLVE_ANTHROPIC_BASE_URL` are set in the environment (any of these would introduce an ambiguous credential path). The guard fires before the tmux session is even created.
+**Credential isolation**: PASS. The prototype adapter (`legacy/scripts/cli_adapters/claude-tmux.sh`) refuses to run when `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, or `EVOLVE_ANTHROPIC_BASE_URL` are set in the environment (any of these would introduce an ambiguous credential path). The guard fires before the tmux session is even created.
 
 **Observability**: PASS. The tmux driver captures the REPL scrollback to `stdout.log` and `stderr.log`. After ANSI-stripping, the scrollback contains the operator-visible activity log of the session.
 
@@ -87,14 +87,14 @@ The prototype reached PASS on its three operator-defined concerns, but the broad
 - Driving an interactive REPL through tmux introduces fragility (ANSI escape sequence parsing, prompt-detection brittleness, terminal resize quirks) that the headless mode avoids.
 - The operational complexity cost-benefit was unfavorable given that `claude-p` met the use case.
 
-The driver code (`scripts/cli_adapters/claude-tmux.sh` and `tools/agent-bridge/drivers/claude-tmux.sh`) remains in the codebase as a prototype reference, gated behind `EVOLVE_TMUX_PROTOTYPE_ALLOW_BYPASS=1`. The credential-isolation utility is in active use across drivers.
+The driver code (`legacy/scripts/cli_adapters/claude-tmux.sh` and `tools/agent-bridge/drivers/claude-tmux.sh`) remains in the codebase as a prototype reference, gated behind `EVOLVE_TMUX_PROTOTYPE_ALLOW_BYPASS=1`. The credential-isolation utility is in active use across drivers.
 
 ---
 
 ## Related files
 
-- Prototype adapter: `scripts/cli_adapters/claude-tmux.sh`
+- Prototype adapter: `legacy/scripts/cli_adapters/claude-tmux.sh`
 - Bridge tmux driver: `tools/agent-bridge/drivers/claude-tmux.sh`
 - Credential-isolation snapshot lib: `tools/agent-bridge/lib/billing-snapshot.sh`
-- Snapshot CLI: `scripts/utility/verify-subscription-billing.sh` (historical name; functionally a credential-isolation verifier)
+- Snapshot CLI: `legacy/scripts/utility/verify-subscription-billing.sh` (historical name; functionally a credential-isolation verifier)
 

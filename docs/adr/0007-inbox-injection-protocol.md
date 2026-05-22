@@ -21,7 +21,7 @@ Three constraints shaped the design:
 
 Use a file-based inbox directory (`.evolve/inbox/`) with Triage ingestion at phase start.
 
-Operators write task files via `scripts/utility/inject-task.sh`. Triage validates, transforms to reconcile-compatible schema, and ingests at the start of its phase. Processed files are archived to `processed/cycle-N/`; rejected files to `rejected/cycle-N/`.
+Operators write task files via `legacy/scripts/utility/inject-task.sh`. Triage validates, transforms to reconcile-compatible schema, and ingests at the start of its phase. Processed files are archived to `processed/cycle-N/`; rejected files to `rejected/cycle-N/`.
 
 ## Consequences
 
@@ -47,9 +47,9 @@ Operators write task files via `scripts/utility/inject-task.sh`. Triage validate
 
 ## Implementation
 
-- `scripts/utility/inject-task.sh` — CLI: validate schema, atomic write to inbox
+- `legacy/scripts/utility/inject-task.sh` — CLI: validate schema, atomic write to inbox
 - `agents/evolve-triage.md` — Step 0: inbox ingestion before top_n logic
 - `agents/evolve-triage-reference.md` — algorithm + schema reference (Layer-3)
 - `docs/architecture/inbox-injection-protocol.md` — operator-facing protocol doc
-- `scripts/tests/inject-task-test.sh` — CLI validation test coverage
-- `scripts/tests/triage-inbox-ingestion-test.sh` — schema + ingestion structure tests
+- `legacy/scripts/tests/inject-task-test.sh` — CLI validation test coverage
+- `legacy/scripts/tests/triage-inbox-ingestion-test.sh` — schema + ingestion structure tests

@@ -90,10 +90,10 @@ EXIT trap to preserve state.
 ```bash
 /evolve-loop --resume
 # or
-bash scripts/dispatch/evolve-loop-dispatch.sh --resume
+bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
 ```
 
-Calls `scripts/dispatch/resume-cycle.sh` which:
+Calls `legacy/scripts/dispatch/resume-cycle.sh` which:
 
 1. Locates the live checkpoint via `cycle-state.sh is-checkpointed`.
 2. Validates: git HEAD unchanged since pause, worktree directory exists,
@@ -127,7 +127,7 @@ Defined in `agents/evolve-orchestrator.md#resume-mode`:
 |---|---|---|
 | `quota-likely` | Cycle 3 reactive | `subagent-run.sh` detects rc=1 + empty stderr + cost in danger zone after phase failure |
 | `batch-cap-near` | Cycle 2 pre-emptive | Dispatcher's cumulative cost ≥ 95% of cap; signals next cycle to checkpoint at clean phase boundary |
-| `operator-requested` | Manual | `bash scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
+| `operator-requested` | Manual | `bash legacy/scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
 
 ## What gets preserved during checkpoint
 
@@ -241,10 +241,10 @@ The trust kernel is preserved across the checkpoint-resume protocol:
   handles context-budget exhaustion the same way checkpoint-resume handles
   cost-budget exhaustion.
 - `agents/evolve-orchestrator.md` — orchestrator persona resume-mode section.
-- `scripts/dispatch/resume-cycle.sh` — script implementation.
-- `scripts/tests/checkpoint-roundtrip-test.sh` — round-trip test of the
+- `legacy/scripts/dispatch/resume-cycle.sh` — script implementation.
+- `legacy/scripts/tests/checkpoint-roundtrip-test.sh` — round-trip test of the
   checkpoint write primitives (19 assertions).
-- `scripts/tests/resume-cycle-test.sh` — validation of resume-cycle.sh
+- `legacy/scripts/tests/resume-cycle-test.sh` — validation of resume-cycle.sh
   (26 assertions).
 
 ## Research references

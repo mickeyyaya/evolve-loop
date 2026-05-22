@@ -34,7 +34,7 @@ func repoRoot(t *testing.T) string {
 
 func subagentRunPath(t *testing.T) string {
 	t.Helper()
-	p := filepath.Join(repoRoot(t), "scripts", "dispatch", "subagent-run.sh")
+	p := filepath.Join(repoRoot(t), "legacy", "scripts", "dispatch", "subagent-run.sh")
 	if _, err := os.Stat(p); err != nil {
 		t.Skipf("subagent-run.sh missing: %v", err)
 	}

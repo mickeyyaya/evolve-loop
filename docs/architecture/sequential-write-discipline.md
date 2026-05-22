@@ -87,7 +87,7 @@ The `_parallel_eligible_reason` is documentation — not consumed by code. It ex
 
 ## Dispatch-Time Enforcement
 
-`scripts/dispatch/subagent-run.sh:cmd_dispatch_parallel()` reads the field at the top of the function and structurally rejects any agent missing the opt-in:
+`legacy/scripts/dispatch/subagent-run.sh:cmd_dispatch_parallel()` reads the field at the top of the function and structurally rejects any agent missing the opt-in:
 
 ```bash
 local parallel_eligible
@@ -100,13 +100,13 @@ fi
 
 This is **default-deny**: a profile that lacks the field is rejected. Third-party plugins extending evolve-loop with their own profiles must opt in explicitly. The error message tells them what is missing and how to fix it.
 
-Coverage: `scripts/tests/parallelization-discipline-test.sh` (12 tests) hardcodes the canonical taxonomy and asserts the dispatcher rejects ineligible roles. If a future commit accidentally flips `builder.parallel_eligible: true`, the suite fails loudly.
+Coverage: `legacy/scripts/tests/parallelization-discipline-test.sh` (12 tests) hardcodes the canonical taxonomy and asserts the dispatcher rejects ineligible roles. If a future commit accidentally flips `builder.parallel_eligible: true`, the suite fails loudly.
 
 ---
 
 ## The Concurrency Cap
 
-`scripts/dispatch/fanout-dispatch.sh:73` resolves the cap via:
+`legacy/scripts/dispatch/fanout-dispatch.sh:73` resolves the cap via:
 
 ```bash
 CONCURRENCY="${EVOLVE_FANOUT_CONCURRENCY:-2}"   # default 2 since v8.55
@@ -154,7 +154,7 @@ For default values (concurrency=2, per_worker_budget=$0.20):
 This is a deliberately tight ceiling. The implementation conditionally injects the cap into each worker's environment as `EVOLVE_MAX_BUDGET_USD` only when the operator hasn't set one externally:
 
 ```bash
-# scripts/dispatch/fanout-dispatch.sh:_run_worker()
+# legacy/scripts/dispatch/fanout-dispatch.sh:_run_worker()
 if [ -z "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
     export EVOLVE_MAX_BUDGET_USD="$PER_WORKER_BUDGET_USD"
 fi
@@ -189,7 +189,7 @@ After v8.55.0 ships, run one verification cycle:
 
 ```bash
 # Baseline: sequential (default)
-bash scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
+bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
 
 # Fan-out enabled with tight budget
 EVOLVE_FANOUT_ENABLED=1 \
@@ -197,7 +197,7 @@ EVOLVE_FANOUT_SCOUT=1 \
 EVOLVE_FANOUT_AUDITOR=1 \
 EVOLVE_FANOUT_RETROSPECTIVE=1 \
 EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.10 \
-bash scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
+bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
 
 # Capture cost from .evolve/runs/cycle-N/<agent>-usage.json
 # Append findings to CHANGELOG.md under v8.55.0
@@ -223,7 +223,7 @@ When introducing a new agent profile under `.evolve/profiles/<role>.json`:
 
 1. **Declare `parallel_eligible` explicitly.** Default-deny means missing field → rejected at dispatch.
 2. **If `true`, add `_parallel_eligible_reason`** explaining how the role satisfies the (a)/(b)/(c) clauses.
-3. **If `true`, add the role to the canonical taxonomy** in `scripts/tests/parallelization-discipline-test.sh` so the test asserts your declaration is intentional.
+3. **If `true`, add the role to the canonical taxonomy** in `legacy/scripts/tests/parallelization-discipline-test.sh` so the test asserts your declaration is intentional.
 4. **Audit the role's prompt and tools.** If it can `git commit`, write to `state.json`, or modify a Builder-owned file, the answer is `false`.
 5. **Document the role in this file's [Role Taxonomy](#role-taxonomy) table.**
 
@@ -247,7 +247,7 @@ The discipline rule defends *correctness*. The concurrency cap defends *operabil
 - [tri-layer.md](tri-layer.md) — Skill / Persona / Command separation; Pattern 3 fan-out + the 5 endorsed orchestration patterns.
 - [phase-architecture.md](phase-architecture.md) — Cycle phase ordering and the trust kernel.
 - [multi-llm-review.md](multi-llm-review.md) — Cross-CLI consensus framework (v8.53/v8.54) that fan-out enables.
-- `scripts/dispatch/fanout-dispatch.sh` — FIFO semaphore implementation.
-- `scripts/dispatch/subagent-run.sh:cmd_dispatch_parallel()` — Profile-side enforcement check.
-- `scripts/tests/parallelization-discipline-test.sh` — Regression suite hardcoding the taxonomy.
-- `scripts/tests/fanout-dispatch-test.sh` — Concurrency-cap behavior tests (default, override, edge cases).
+- `legacy/scripts/dispatch/fanout-dispatch.sh` — FIFO semaphore implementation.
+- `legacy/scripts/dispatch/subagent-run.sh:cmd_dispatch_parallel()` — Profile-side enforcement check.
+- `legacy/scripts/tests/parallelization-discipline-test.sh` — Regression suite hardcoding the taxonomy.
+- `legacy/scripts/tests/fanout-dispatch-test.sh` — Concurrency-cap behavior tests (default, override, edge cases).

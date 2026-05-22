@@ -15,7 +15,7 @@
 | ~11:25 | Operator injects c40–c44 inbox JSON files into `.evolve/inbox/` (between audit and ship). |
 | ~11:26 | Auditor verifies worktree (entry_seq 899). Verdict: PASS (0.92 confidence). |
 | ~11:31 | `ship.sh --class cycle` runs from project root. |
-| ~11:31 | `git merge --ff-only evolve/cycle-31` **blocked**: main working tree has pre-existing uncommitted modifications to `scripts/utility/inject-task.sh` and `scripts/tests/inject-task-test.sh` — the same files `332ac9d` modifies. Git refuses: "Your local changes would be overwritten." |
+| ~11:31 | `git merge --ff-only evolve/cycle-31` **blocked**: main working tree has pre-existing uncommitted modifications to `legacy/scripts/utility/inject-task.sh` and `legacy/scripts/tests/inject-task-test.sh` — the same files `332ac9d` modifies. Git refuses: "Your local changes would be overwritten." |
 | ~11:31 | Orchestrator attempts `git stash` to unblock. After stash, ship.sh detects new untracked inbox JSON files → integrity check fails. |
 | ~11:31 | Fallback: orchestrator invokes `ship.sh --class manual` (equivalent to `EVOLVE_BYPASS_SHIP_VERIFY=1`). |
 | ~11:31 | Fallback `git add -A` runs in **project root** (not worktree). At this point project root contains: inbox JSONs (untracked/staged) but NOT the c38 code (exists only in the worktree commit `332ac9d`). |
@@ -30,9 +30,9 @@
 ### Net State After Breach
 
 - `HEAD` on `main`: commit `55d1dc5` — 11 inbox JSON files, zero c38 code files.
-- Working tree: `M scripts/utility/inject-task.sh` and `M scripts/tests/inject-task-test.sh` — **partial** c38 changes (Tests 12–13 only; `--injected-by` flag; missing Tests 14–17, `--force`, git-log collision).
-- `scripts/utility/inbox-audit.sh` → **ABSENT** from project root.
-- `scripts/utility/inbox-reconcile.sh` → **ABSENT** from project root.
+- Working tree: `M legacy/scripts/utility/inject-task.sh` and `M legacy/scripts/tests/inject-task-test.sh` — **partial** c38 changes (Tests 12–13 only; `--injected-by` flag; missing Tests 14–17, `--force`, git-log collision).
+- `legacy/scripts/utility/inbox-audit.sh` → **ABSENT** from project root.
+- `legacy/scripts/utility/inbox-reconcile.sh` → **ABSENT** from project root.
 - `state.json:lastCycleNumber` = `30` (never advanced).
 - Orphaned good commit `332ac9d` **intact** in git object store — dangling, unreachable from main.
 
@@ -74,10 +74,10 @@ Date:   Wed May 13 11:25:52 2026 +0800
 
     feat: cycle 31 — c38-inbox-audit-and-collision: inbox-audit.sh NEW + ...
 
- scripts/tests/inject-task-test.sh  |  71 +++++++++++++++++++++
- scripts/utility/inbox-audit.sh     | 152 +++++++++++++++++++++++++++++++++++++
- scripts/utility/inbox-reconcile.sh |  62 +++++++++++++++++++++
- scripts/utility/inject-task.sh     |  63 +++++++++++++--
+ legacy/scripts/tests/inject-task-test.sh  |  71 +++++++++++++++++++++
+ legacy/scripts/utility/inbox-audit.sh     | 152 +++++++++++++++++++++++++++++++++++++
+ legacy/scripts/utility/inbox-reconcile.sh |  62 +++++++++++++++++++++
+ legacy/scripts/utility/inject-task.sh     |  63 +++++++++++++--
  4 files changed, 339 insertions(+), 9 deletions(-)
 ```
 
@@ -174,14 +174,14 @@ mv .evolve/state.json.tmp.$$ .evolve/state.json
 ```bash
 # 1. Checkout the 4 c38 files from the good commit
 git checkout 332ac9d -- \
-    scripts/utility/inbox-audit.sh \
-    scripts/utility/inbox-reconcile.sh \
-    scripts/utility/inject-task.sh \
-    scripts/tests/inject-task-test.sh
+    legacy/scripts/utility/inbox-audit.sh \
+    legacy/scripts/utility/inbox-reconcile.sh \
+    legacy/scripts/utility/inject-task.sh \
+    legacy/scripts/tests/inject-task-test.sh
 
 # 2. Stage and ship
-git add scripts/utility/inbox-audit.sh scripts/utility/inbox-reconcile.sh \
-        scripts/utility/inject-task.sh scripts/tests/inject-task-test.sh
+git add legacy/scripts/utility/inbox-audit.sh legacy/scripts/utility/inbox-reconcile.sh \
+        legacy/scripts/utility/inject-task.sh legacy/scripts/tests/inject-task-test.sh
 EVOLVE_SHIP_AUTO_CONFIRM=1 ship.sh --class manual \
   "feat: cycle 31 — c38: restore orphaned files from commit 332ac9d (4 files, 339 insertions)"
 
@@ -205,19 +205,19 @@ mv .evolve/state.json.tmp.$$ .evolve/state.json
 
 `ship.sh --class cycle` must check `git -C $PROJECT_ROOT diff --quiet HEAD` (or equivalent) **before** attempting `git merge --ff-only`. If main's working tree is dirty for any files in the merge branch, fail with a clear message: "Main working tree has uncommitted changes to files modified by this cycle branch. Stash or commit them before shipping." This prevents the silent ff-merge block that triggered the cascade.
 
-**Target:** C1 task (`user-1778645962-3dea8ccb`); implement in `scripts/lifecycle/ship.sh`.
+**Target:** C1 task (`user-1778645962-3dea8ccb`); implement in `legacy/scripts/lifecycle/ship.sh`.
 
 ### Lesson 2: No `--class manual` fallback inside automated cycle ship
 
 `ship.sh --class cycle` must NOT fall back to `--class manual` under any error condition. The audit-bound tree-SHA check is safety-critical for cycle ships. If ff-merge blocks, fail the phase with a non-zero exit code and actionable diagnostic. Let the orchestrator record the failure and invoke the retrospective; do not auto-degrade to an unverified commit path.
 
-**Target:** C1 task; implement in `scripts/lifecycle/ship.sh` and `ship-gate`.
+**Target:** C1 task; implement in `legacy/scripts/lifecycle/ship.sh` and `ship-gate`.
 
 ### Lesson 3: Commit body "Actual diff" must be generated from `git show --stat HEAD`, not from build-report
 
 The v8.34.0+ commit body templates its "Files modified" section from `build-report.md:## Files Changed`. This means a miscommit can carry a truthful-looking body that contradicts the actual tree. Ship.sh should generate the commit body's diff section by running `git show --stat HEAD` **after** the commit, and embed the actual output — not the pre-commit build-report manifest.
 
-**Target:** C1 task or follow-up; implement in `scripts/lifecycle/ship.sh`.
+**Target:** C1 task or follow-up; implement in `legacy/scripts/lifecycle/ship.sh`.
 
 ### Lesson 4: Triage Step-0a must content-verify, not keyword-match
 
@@ -243,7 +243,7 @@ function verify_shipped(task_id, expected_files[]):
     return INTEGRITY_BREACH(candidates=candidates, missing=expected_files)
 ```
 
-Expected files for c38: `[scripts/utility/inbox-audit.sh, scripts/utility/inbox-reconcile.sh]`. These are NEW file deliverables extractable from the inbox JSON `action` field (grep for filename patterns with `.sh` extension).
+Expected files for c38: `[legacy/scripts/utility/inbox-audit.sh, legacy/scripts/utility/inbox-reconcile.sh]`. These are NEW file deliverables extractable from the inbox JSON `action` field (grep for filename patterns with `.sh` extension).
 
 **Target:** c37 hardening (to be scoped in a future cycle after C1 ships).
 

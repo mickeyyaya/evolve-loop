@@ -65,7 +65,7 @@ If the build cannot proceed with what's available:
 
 ## Section: optional-self-review
 
-Loaded when `scripts/utility/code-review-simplify.sh` exists in the project.
+Loaded when `legacy/scripts/utility/code-review-simplify.sh` exists in the project.
 Optional — non-blocking. If the script is missing or failing, skip silently.
 
 ---
@@ -93,8 +93,8 @@ Loaded for turn-budget optimization. Batch independent tool calls to save turns.
 
 | ❌ SLOW (3 turns) | ✅ FAST (1 turn) |
 |---|---|
-| `Read(scripts/foo.sh)` → wait | `Read(scripts/foo.sh)`, `Read(scripts/bar.sh)`, `Read(agents/evolve-builder.md)` |
-| `Read(scripts/bar.sh)` → wait | all results return together |
+| `Read(legacy/scripts/foo.sh)` → wait | `Read(legacy/scripts/foo.sh)`, `Read(legacy/scripts/bar.sh)`, `Read(agents/evolve-builder.md)` |
+| `Read(legacy/scripts/bar.sh)` → wait | all results return together |
 
 Rule: if two tool calls have no data dependency on each other, emit them in the same response.
 
@@ -123,7 +123,7 @@ After Step 5 self-verify passes, optionally run the lightweight pipeline
 layer on the changes:
 
 ```bash
-bash scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
+bash legacy/scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
 ```
 
 - If maintainability findings are reported, apply simplifications before

@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-05-15  
 **Cycle:** 54  
-**Implemented in:** `scripts/cli_adapters/gemini.sh`, `scripts/cli_adapters/codex.sh`
+**Implemented in:** `legacy/scripts/cli_adapters/gemini.sh`, `legacy/scripts/cli_adapters/codex.sh`
 
 ---
 
@@ -41,10 +41,10 @@ Both adapters support a `EVOLVE_*_BINARY` test seam (gated by `EVOLVE_TESTING=1`
 
 ```bash
 # gemini.sh
-EVOLVE_TESTING=1 EVOLVE_GEMINI_BINARY=/path/to/mock bash scripts/cli_adapters/gemini.sh
+EVOLVE_TESTING=1 EVOLVE_GEMINI_BINARY=/path/to/mock bash legacy/scripts/cli_adapters/gemini.sh
 
 # codex.sh
-EVOLVE_TESTING=1 EVOLVE_CODEX_BINARY=/path/to/mock bash scripts/cli_adapters/codex.sh
+EVOLVE_TESTING=1 EVOLVE_CODEX_BINARY=/path/to/mock bash legacy/scripts/cli_adapters/codex.sh
 ```
 
 Setting the env var to empty (`EVOLVE_GEMINI_BINARY=""`) explicitly simulates "no binary found" — the test seam returns 1 from `detect_gemini_native()`.

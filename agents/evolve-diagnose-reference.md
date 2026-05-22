@@ -130,7 +130,7 @@ echo "exit: $?"
 2. Re-run the reproduction case — confirm the failure is gone.
 3. Run targeted tests:
    ```bash
-   bash scripts/tests/<relevant-suite>.sh
+   bash legacy/scripts/tests/<relevant-suite>.sh
    ```
 4. Remove ALL `[DEBUG-XXXX]` instrumentation:
    ```bash
@@ -220,7 +220,7 @@ echo "[DEBUG-XXXX] CLAUDECODE=${CLAUDECODE:-unset}"
 sandbox-exec -n "allow default" echo "sandbox-ok" 2>&1 | sed "s/^/[DEBUG-XXXX] /"
 ```
 
-**Fix check**: Set `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` and re-run. `scripts/dispatch/detect-nested-claude.sh`
+**Fix check**: Set `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` and re-run. `legacy/scripts/dispatch/detect-nested-claude.sh`
 should also auto-set this when `CLAUDECODE` env var is present.
 
 ---

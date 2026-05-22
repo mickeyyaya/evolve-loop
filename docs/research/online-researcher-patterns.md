@@ -63,7 +63,7 @@ Apply these rules when merging multiple WebSearch results with KB hits.
 Before issuing any WebSearch or WebFetch call, run:
 
 ```bash
-bash scripts/research/kb-search.sh "<your query pattern>"
+bash legacy/scripts/research/kb-search.sh "<your query pattern>"
 ```
 
 Escalate only when KB hits < 3 or evidently outdated. Full directive and quota table: [docs/architecture/research-tool.md#kb-first-directive](../architecture/research-tool.md#kb-first-directive).

@@ -11,7 +11,7 @@ import (
 // TestC48_001_ExpectedShipShaAutoUpdate ports cycle-48/001.
 func TestC48_001_ExpectedShipShaAutoUpdate(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	ship := filepath.Join(root, "scripts", "lifecycle", "ship.sh")
+	ship := filepath.Join(root, "legacy", "scripts", "lifecycle", "ship.sh")
 	if !acsassert.FileExists(t, ship) {
 		t.Skip("ship.sh missing — skip cycle-48-001")
 	}
@@ -47,7 +47,7 @@ func TestC48_003_AuditorStopCriterionHardGate(t *testing.T) {
 // TestC48_004_IsolationBreachWiresJsonl ports cycle-48/004.
 func TestC48_004_IsolationBreachWiresJsonl(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gate := filepath.Join(root, "scripts", "lifecycle", "phase-gate.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
 	if !acsassert.FileExists(t, gate) {
 		t.Skip("phase-gate.sh missing — skip cycle-48-004")
 	}

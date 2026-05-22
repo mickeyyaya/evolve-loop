@@ -13,31 +13,31 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ detects platform = antigravity, reads reference/agy-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓ (agy calls run_shell_command)
 
 Dispatcher loops once per cycle:
-  bash scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 
 run-cycle.sh spawns the orchestrator subagent via:
-  bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
+  bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
 
   ↓
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "antigravity"  (set by agy CLI users via env or profile override)
   → cross-name resolver maps antigravity → agy
-  → dispatches to scripts/cli_adapters/agy.sh
+  → dispatches to legacy/scripts/cli_adapters/agy.sh
 
   ↓
 
 agy.sh (three-mode adapter):
   NATIVE  (agy on PATH): invokes `agy -p <prompt> --dangerously-skip-permissions [--add-dir ...]`
            Captures plain-text stdout; appends zero-cost envelope as last STDOUT_LOG line.
-  HYBRID  (claude on PATH, no agy): delegates to scripts/cli_adapters/claude.sh
+  HYBRID  (claude on PATH, no agy): delegates to legacy/scripts/cli_adapters/claude.sh
            Full subprocess isolation + profile permissions + budget cap.
   DEGRADED (neither): emits stub JSON to STDOUT_LOG; same-session execution.
 ```
@@ -95,19 +95,19 @@ This is additive only — existing claude/gemini/codex paths are unaffected.
 command -v agy
 
 # 2. Confirm agy.sh resolves correctly (validate-only mode)
-VALIDATE_ONLY=1 bash scripts/cli_adapters/agy.sh
+VALIDATE_ONLY=1 bash legacy/scripts/cli_adapters/agy.sh
 # Expected: exit 0, log line "[agy-adapter] VALIDATE_ONLY=1 — not executing"
 
 # 3. Probe mode (check tier)
-bash scripts/cli_adapters/agy.sh --probe
+bash legacy/scripts/cli_adapters/agy.sh --probe
 # Expected: "[agy-adapter] PROBE OK: agy binary present; resolved tier=..."
 
 # 4. Smoke-test detection
-bash scripts/dispatch/detect-cli.sh
+bash legacy/scripts/dispatch/detect-cli.sh
 # Expected: prints "antigravity" if agy is on PATH and no CLAUDE_CODE_*/GEMINI_*/CODEX_* env set
 
 # 5. Capability check
-bash scripts/cli_adapters/_capability-check.sh antigravity --human
+bash legacy/scripts/cli_adapters/_capability-check.sh antigravity --human
 ```
 
 ## See also

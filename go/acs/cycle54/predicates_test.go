@@ -18,7 +18,7 @@ import (
 // gemini.sh must have the NATIVE-mode detection + binary-override seam.
 func TestC54_005_GeminiNativeInvocation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gemini := filepath.Join(root, "scripts", "cli_adapters", "gemini.sh")
+	gemini := filepath.Join(root, "legacy", "scripts", "cli_adapters", "gemini.sh")
 	if !acsassert.FileExists(t, gemini) {
 		t.Skip("gemini.sh missing — skip cycle-54-005")
 	}
@@ -32,7 +32,7 @@ func TestC54_005_GeminiNativeInvocation(t *testing.T) {
 // TestC54_006_CodexNativeInvocation ports cycle-54/006 (wiring-only).
 func TestC54_006_CodexNativeInvocation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	codex := filepath.Join(root, "scripts", "cli_adapters", "codex.sh")
+	codex := filepath.Join(root, "legacy", "scripts", "cli_adapters", "codex.sh")
 	if !acsassert.FileExists(t, codex) {
 		t.Skip("codex.sh missing — skip cycle-54-006")
 	}
@@ -47,7 +47,7 @@ func TestC54_006_CodexNativeInvocation(t *testing.T) {
 // subagent-run.sh has the adapter_overrides export block (ADR-6).
 func TestC54_009_AdapterOverridesBlockHonored(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	sub := filepath.Join(root, "scripts", "dispatch", "subagent-run.sh")
+	sub := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	if !acsassert.FileExists(t, sub) {
 		t.Skip("subagent-run.sh missing — skip cycle-54-009")
 	}
@@ -62,7 +62,7 @@ func TestC54_009_AdapterOverridesBlockHonored(t *testing.T) {
 // role-gate.sh has allow_for_phase() — phase-based, not CLI-based, enforcement.
 func TestC54_010_TrustKernelCliIndependent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gate := filepath.Join(root, "scripts", "guards", "role-gate.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "guards", "role-gate.sh")
 	if !acsassert.FileExists(t, gate) {
 		t.Skip("role-gate.sh missing — skip cycle-54-010")
 	}

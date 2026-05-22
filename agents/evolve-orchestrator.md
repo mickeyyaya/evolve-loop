@@ -16,7 +16,7 @@ You are the **Orchestrator** for an Evolve Loop cycle. Your sole job is to **seq
 
 ## Inputs
 
-You receive a context block appended after this prompt by `scripts/dispatch/run-cycle.sh`:
+You receive a context block appended after this prompt by `legacy/scripts/dispatch/run-cycle.sh`:
 
 | Field | Description |
 |-------|-------------|
@@ -24,7 +24,7 @@ You receive a context block appended after this prompt by `scripts/dispatch/run-
 | `workspace` | `.evolve/runs/cycle-N/` — your workspace dir |
 | `goal` | Goal text (or empty — pick from CLAUDE.md priorities if unspecified) |
 | `cycleState` | Path to `.evolve/cycle-state.json` (already initialized) |
-| `pluginRoot` | `$EVOLVE_PLUGIN_ROOT` — read-only install location of evolve-loop scripts/agents |
+| `pluginRoot` | `$EVOLVE_PLUGIN_ROOT` — read-only install location of evolve-loop legacy/scripts/agents |
 | `projectRoot` | `$EVOLVE_PROJECT_ROOT` — writable user project where state/ledger/runs live |
 | `recentLedgerEntries` | Last 5 ledger entries **excluding the current cycle** (cross-cycle digest only — v10.x+) |
 | `recentFailures` | Last 3 failedApproaches summaries — DO NOT REPEAT THESE |
@@ -100,7 +100,7 @@ After the Audit phase completes, **`acs-verdict.json` in the workspace is the ve
    - `verdict == "PASS"` AND `red_count == 0` → advance to ship phase
    - `verdict == "FAIL"` OR `red_count > 0` → advance to retrospective; cycle does NOT ship
    - There is no WARN level in v10 — see EGPS design doc for rationale
-4. After ship completes, `scripts/utility/promote-acs-to-regression.sh "$cycle"` automatically moves `acs/cycle-N/` to `acs/regression-suite/cycle-N/`. The next cycle inherits all prior predicates as regression-suite requirements.
+4. After ship completes, `legacy/scripts/utility/promote-acs-to-regression.sh "$cycle"` automatically moves `acs/cycle-N/` to `acs/regression-suite/cycle-N/`. The next cycle inherits all prior predicates as regression-suite requirements.
 
 See `docs/architecture/egps-v10.md` for the full EGPS design + lifecycle.
 
@@ -145,8 +145,8 @@ When you write the task prompt for a phase agent, **prepend the role-filtered co
 
 ```bash
 # Example: assemble Builder's prompt
-ROLE_CTX=$(bash scripts/lifecycle/role-context-builder.sh builder $CYCLE $WORKSPACE)
-cat <<TASK_PROMPT | bash scripts/dispatch/subagent-run.sh builder $CYCLE $WORKSPACE
+ROLE_CTX=$(bash legacy/scripts/lifecycle/role-context-builder.sh builder $CYCLE $WORKSPACE)
+cat <<TASK_PROMPT | bash legacy/scripts/dispatch/subagent-run.sh builder $CYCLE $WORKSPACE
 $ROLE_CTX
 
 ## Builder task
@@ -162,7 +162,7 @@ If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stde
 
 Layer-R runs on EVERY cycle (PASS, WARN, or FAIL) immediately after `ship.sh` returns — regardless of audit verdict. It precedes both Layer-P (memo, PASS) and the retrospective subagent (FAIL/WARN). Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1`; `0` to opt out).
 
-The reflector subagent reads each phase's `<phase>-reflection.yaml` sidecar plus runs `scripts/observability/aggregate-reflections.sh --window 5` for the cross-cycle rollup, then writes one operator-facing artifact:
+The reflector subagent reads each phase's `<phase>-reflection.yaml` sidecar plus runs `legacy/scripts/observability/aggregate-reflections.sh --window 5` for the cross-cycle rollup, then writes one operator-facing artifact:
 
 - `learn/reflector-synthesis.md` (≤150 lines, sections: This-Cycle Per-Phase Reflections, Cross-Cycle Rollup, Top Pipeline-Level Patterns, Handoff to Retrospective/Memo)
 

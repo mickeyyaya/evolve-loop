@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-05-17  
 **Cycle:** 71  
-**Implemented in:** `scripts/guards/role-gate.sh`, `acs/cycle-71/001-role-gate-retrospective.sh`
+**Implemented in:** `legacy/scripts/guards/role-gate.sh`, `acs/cycle-71/001-role-gate-retrospective.sh`
 
 ---
 

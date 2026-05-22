@@ -84,7 +84,7 @@ else
 fi
 ```
 
-The shell script backing layer (`scripts/utility/code-review-simplify.sh`) already supported `REF="${1:-HEAD~1}"` override — the SKILL.md AI layer now uses the same adaptive logic.
+The shell script backing layer (`legacy/scripts/utility/code-review-simplify.sh`) already supported `REF="${1:-HEAD~1}"` override — the SKILL.md AI layer now uses the same adaptive logic.
 
 ---
 

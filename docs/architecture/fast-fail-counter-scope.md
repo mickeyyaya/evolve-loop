@@ -1,6 +1,6 @@
 # Fast-Fail Counter Scope
 
-> Architecture doc for cycle-94 P1 retry fast-fail (O-1). Documents the per-agent vs per-workspace counter semantics added to `scripts/dispatch/subagent-run.sh` and `agents/evolve-orchestrator.md` in commit `d24b403` (v10.17.0).
+> Architecture doc for cycle-94 P1 retry fast-fail (O-1). Documents the per-agent vs per-workspace counter semantics added to `legacy/scripts/dispatch/subagent-run.sh` and `agents/evolve-orchestrator.md` in commit `d24b403` (v10.17.0).
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Prevent the cycle pipeline from burning cost retrying structurally-dead phase-ag
 
 ## Mechanics
 
-`scripts/dispatch/subagent-run.sh` tracks per-agent retry counts in `state.json:retryCounters[<role>]`. The schema:
+`legacy/scripts/dispatch/subagent-run.sh` tracks per-agent retry counts in `state.json:retryCounters[<role>]`. The schema:
 
 ```json
 {
@@ -81,7 +81,7 @@ The cycle-93 case wouldn't trigger fast-fail (durations were 214/341/471s, all >
 ## References
 
 - Shipped in commit `d24b403` (cycle-94, v10.17.0)
-- Implementation: `scripts/dispatch/subagent-run.sh` lines 363-425 (write_ledger_entry callsite + counter update)
+- Implementation: `legacy/scripts/dispatch/subagent-run.sh` lines 363-425 (write_ledger_entry callsite + counter update)
 - Persona update: `agents/evolve-orchestrator.md` (STOP CRITERION extension paragraph)
 - ACS predicates: `acs/regression-suite/cycle-94/002-fast-fail-counter-logic.sh`, `acs/regression-suite/cycle-94/003-orchestrator-fast-fail-stop-criterion.sh`
 - Lesson YAML: `.evolve/instincts/lessons/cycle-94-retry-fast-fail-pattern.yaml`

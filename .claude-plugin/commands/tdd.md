@@ -15,7 +15,7 @@ Run the TDD-engineer phase against the current cycle. Writes failing tests that 
 ## Execution
 
 ```bash
-bash scripts/dispatch/subagent-run.sh tdd-engineer <cycle> <workspace>
+bash legacy/scripts/dispatch/subagent-run.sh tdd-engineer <cycle> <workspace>
 ```
 
 ## Output

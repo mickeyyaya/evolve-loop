@@ -13,7 +13,7 @@ import (
 // resolve-roots.sh script has the --git-common-dir handling.
 func TestC63_056_ResolveRootsWorktree(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	resolve := filepath.Join(root, "scripts", "lifecycle", "resolve-roots.sh")
+	resolve := filepath.Join(root, "legacy", "scripts", "lifecycle", "resolve-roots.sh")
 	if !acsassert.FileExists(t, resolve) {
 		t.Skip("resolve-roots.sh missing — skip cycle-63-056")
 	}

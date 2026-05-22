@@ -78,14 +78,14 @@ jq '.version' .evolve/plugin/.claude-plugin/plugin.json
 Before running a cycle, sanity-check that the kernel hooks are wired:
 
 ```bash
-ls .claude/settings.json   # Expect: hooks block referencing scripts/guards/*.sh
-bash scripts/utility/release.sh
+ls .claude/settings.json   # Expect: hooks block referencing legacy/scripts/guards/*.sh
+bash legacy/scripts/utility/release.sh
 # Expect: PASSED: All version references are consistent.
 
-bash scripts/dispatch/detect-cli.sh
+bash legacy/scripts/dispatch/detect-cli.sh
 # Expect: claude (or gemini/codex if those are your default)
 
-ls scripts/guards/
+ls legacy/scripts/guards/
 # Expect: phase-gate-precondition.sh, role-gate.sh, ship-gate.sh, ...
 ```
 
@@ -126,7 +126,7 @@ Pick a small, contained goal for your first cycle. Avoid sweeping refactors. Goo
 
 | Good first goals | Why |
 |---|---|
-| "Add a `--dry-run` flag to `scripts/foo.sh`" | Single file, clear acceptance |
+| "Add a `--dry-run` flag to `legacy/scripts/foo.sh`" | Single file, clear acceptance |
 | "Document the `bar()` function in `lib/baz.py`" | Doc-only; no test infra needed |
 | "Fix the typo in README.md line 42" | Trivial; verifies the pipeline runs |
 | "Add unit tests for the `parseConfig()` function" | Small but real |
@@ -141,14 +141,14 @@ Pick a small, contained goal for your first cycle. Avoid sweeping refactors. Goo
 Run:
 
 ```bash
-bash scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3 \
-  "Add a --dry-run flag to scripts/foo.sh that prints the planned operation without executing it."
+bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3 \
+  "Add a --dry-run flag to legacy/scripts/foo.sh that prints the planned operation without executing it."
 ```
 
 Or, if you're inside Claude Code:
 
 ```
-/evolve-loop --cycles 1 --budget-usd 3 "Add a --dry-run flag to scripts/foo.sh..."
+/evolve-loop --cycles 1 --budget-usd 3 "Add a --dry-run flag to legacy/scripts/foo.sh..."
 ```
 
 The dispatcher launches the orchestrator subprocess. You'll see streaming output for ~10-20 minutes.
@@ -300,7 +300,7 @@ grep -F '"cycle":N' .evolve/ledger.jsonl | jq -c '{role, kind, model, exit_code,
 Each entry's `prev_hash` chains to the previous one. Verify the chain is intact:
 
 ```bash
-bash scripts/observability/verify-ledger-chain.sh
+bash legacy/scripts/observability/verify-ledger-chain.sh
 # Expect: ledger chain verified, N entries
 ```
 
@@ -313,7 +313,7 @@ This is what makes evolve-loop "tamper-evident" — modifying any past entry inv
 Run another cycle:
 
 ```bash
-bash scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3
+bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3
 ```
 
 Note: no goal argument. The orchestrator picks from `state.json:carryoverTodos[]` (if cycle 1 left any) and from `state.json:instinctSummary[]` (lessons learned so far).
@@ -328,7 +328,7 @@ For deeper understanding of cross-cycle learning, see [self-evolution.md](../con
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `ship-gate DENY` on a manual git command | Hook is enforcing — direct git commit forbidden | Use `bash scripts/lifecycle/ship.sh --class manual "<msg>"` |
+| `ship-gate DENY` on a manual git command | Hook is enforcing — direct git commit forbidden | Use `bash legacy/scripts/lifecycle/ship.sh --class manual "<msg>"` |
 | `claude binary not found` | Claude Code CLI not in PATH | `which claude` to verify; install per claude.com/code |
 | `sandbox-exec: Operation not permitted` | Nested-Claude environment (running `/evolve-loop` from inside Claude Code) | Auto-detected; check `.evolve/environment.json:auto_config.inner_sandbox=false` is set |
 | `INTEGRITY-FAIL: expected_ship_sha mismatch` | Out-of-date pin after a ship.sh update | Delete `.evolve/state.json:expected_ship_sha` and re-run; v8.32+ auto-rotates |
@@ -336,7 +336,7 @@ For deeper understanding of cross-cycle learning, see [self-evolution.md](../con
 | `state.json:lastCycleNumber` not advancing | Worktree-state-not-syncing (B7) | Fixed in v10.7.0+; if older, run `jq '.lastCycleNumber += 1 \| .' state.json > tmp && mv tmp state.json` |
 | Audit FAIL but you think the code is correct | EGPS predicates are stricter than prose verdicts; read `audit-report.md` for cited `path:line` evidence | Trust the predicates; adjust the code or refine the predicate definition |
 | Memo phase API 529 | Anthropic rate-limit during memo | Classified as `infrastructure` (recoverable); next run retries |
-| `role-gate DENY: phase=retrospective ...` | Stuck cycle-state from prior failed run | `bash scripts/lifecycle/cycle-state.sh clear` |
+| `role-gate DENY: phase=retrospective ...` | Stuck cycle-state from prior failed run | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
 | `BATCH-BUDGET CRITICAL: cumulative ... >= 95%` | About to exhaust cost cap | Either: increase `--budget-usd`, OR let next cycle checkpoint via v9.1.0 mechanism |
 
 ---

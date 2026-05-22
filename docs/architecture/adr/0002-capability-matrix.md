@@ -10,7 +10,7 @@
 
 ## Context
 
-`scripts/dispatch/subagent-run.sh` constructs the flag set passed to each CLI adapter
+`legacy/scripts/dispatch/subagent-run.sh` constructs the flag set passed to each CLI adapter
 (budget cap, sandbox, permission scoping). Before v10.X, it assumed every adapter
 supported the same set of flags. This caused silent failures when routing to `gemini` or
 `codex`: subagent-run.sh would pass `--max-budget-usd` to an adapter that would silently
@@ -123,14 +123,14 @@ continue to work unchanged.
 
 | File | Change |
 |---|---|
-| `scripts/cli_adapters/claude.capabilities.json` | Added `supports.*` block, `version` 1→2 |
-| `scripts/cli_adapters/gemini.capabilities.json` | Added `supports.*` block, `version` 1→2 |
-| `scripts/cli_adapters/codex.capabilities.json` | Added `supports.*` block, `version` 1→2 |
-| `scripts/dispatch/subagent-run.sh` lines ~889–940 | Added capability WARN emission, `EVOLVE_DISPATCH_PLAN_LOG`, `cli_resolution_json` |
-| `scripts/dispatch/subagent-run.sh` `cmd_validate_profile` | Same WARNs in validate path |
-| `scripts/dispatch/subagent-run.sh` `write_ledger_entry` | 10th arg `cli_resolution` |
-| `scripts/cli_adapters/gemini.sh` | Added `VALIDATE_ONLY=1` early exit |
-| `scripts/cli_adapters/codex.sh` | Added `VALIDATE_ONLY=1` early exit |
+| `legacy/scripts/cli_adapters/claude.capabilities.json` | Added `supports.*` block, `version` 1→2 |
+| `legacy/scripts/cli_adapters/gemini.capabilities.json` | Added `supports.*` block, `version` 1→2 |
+| `legacy/scripts/cli_adapters/codex.capabilities.json` | Added `supports.*` block, `version` 1→2 |
+| `legacy/scripts/dispatch/subagent-run.sh` lines ~889–940 | Added capability WARN emission, `EVOLVE_DISPATCH_PLAN_LOG`, `cli_resolution_json` |
+| `legacy/scripts/dispatch/subagent-run.sh` `cmd_validate_profile` | Same WARNs in validate path |
+| `legacy/scripts/dispatch/subagent-run.sh` `write_ledger_entry` | 10th arg `cli_resolution` |
+| `legacy/scripts/cli_adapters/gemini.sh` | Added `VALIDATE_ONLY=1` early exit |
+| `legacy/scripts/cli_adapters/codex.sh` | Added `VALIDATE_ONLY=1` early exit |
 
 ---
 

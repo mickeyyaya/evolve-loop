@@ -19,9 +19,9 @@ The ledger (`.evolve/ledger.jsonl`) records every subagent invocation with cycle
 
 **Pipeline impact: zero.** The `prev_hash` and `entry_seq` fields are additive. Existing readers all use jq's `// empty` pattern — unknown fields are ignored.
 
-**Verifier:** `bash scripts/observability/verify-ledger-chain.sh` — exit 0 = chain intact, 1 = chain break, 2 = tip mismatch.
+**Verifier:** `bash legacy/scripts/observability/verify-ledger-chain.sh` — exit 0 = chain intact, 1 = chain break, 2 = tip mismatch.
 
-**Three writers updated:** `scripts/dispatch/subagent-run.sh:write_ledger_entry()`, `scripts/dispatch/subagent-run.sh:_write_fanout_ledger_entry()`, `scripts/failure/merge-lesson-into-state.sh`.
+**Three writers updated:** `legacy/scripts/dispatch/subagent-run.sh:write_ledger_entry()`, `legacy/scripts/dispatch/subagent-run.sh:_write_fanout_ledger_entry()`, `legacy/scripts/failure/merge-lesson-into-state.sh`.
 
 **Pre-v8.37 entries** (no `prev_hash` field) are tolerated as a boundary; the first v8.37+ entry chains from the last pre-v8.37 entry's SHA.
 
@@ -33,9 +33,9 @@ The ledger (`.evolve/ledger.jsonl`) records every subagent invocation with cycle
 
 The fix: `git worktree prune` removes admin entries for worktrees whose directories no longer exist. Active worktrees (whose dirs still exist) are NOT touched, so concurrent cycles are safe.
 
-Two locations got the fix: pre-flight cleanup (`scripts/dispatch/run-cycle.sh:~382`, primary fix) and the `cleanup()` EXIT trap (`scripts/dispatch/run-cycle.sh:~298`, defensive).
+Two locations got the fix: pre-flight cleanup (`legacy/scripts/dispatch/run-cycle.sh:~382`, primary fix) and the `cleanup()` EXIT trap (`legacy/scripts/dispatch/run-cycle.sh:~298`, defensive).
 
-Test: `scripts/run-cycle-worktree-test.sh` (8 assertions).
+Test: `legacy/scripts/run-cycle-worktree-test.sh` (8 assertions).
 
 ---
 
@@ -52,7 +52,7 @@ Test: `scripts/run-cycle-worktree-test.sh` (8 assertions).
 
 **Fix 2 — New `code-audit-warn` classification:** severity=low, age_out=86400 (1d), retry=yes. `failure_normalize_legacy "WARN" → code-audit-warn` (was `code-audit-fail`).
 
-**Fix 3 — Adaptive auditor model selection** via `scripts/utility/diff-complexity.sh`:
+**Fix 3 — Adaptive auditor model selection** via `legacy/scripts/utility/diff-complexity.sh`:
 - **trivial** (≤3 files AND ≤100 lines AND no security paths) → Sonnet
 - **complex** (>10 files OR >500 lines OR security path regex) → Opus (default)
 - **standard** → Opus (conservative)
@@ -128,11 +128,11 @@ Operator helpers: `cycle-state.sh init-workers <agent> <name>...`, `cycle-state.
 Promotes failure adaptation from a prompt rule to a deterministic kernel function:
 
 ```bash
-bash scripts/failure/failure-adapter.sh decide --state .evolve/state.json
+bash legacy/scripts/failure/failure-adapter.sh decide --state .evolve/state.json
 # emits JSON: {action, reason, remediation, set_env, skip_phases, verdict_for_block, evidence}
 ```
 
-**Structured taxonomy** (7 classifications in `scripts/failure/failure-classifications.sh`):
+**Structured taxonomy** (7 classifications in `legacy/scripts/failure/failure-classifications.sh`):
 
 | Classification | Age-out | Severity |
 |---|---|---|
@@ -153,13 +153,13 @@ bash scripts/failure/failure-adapter.sh decide --state .evolve/state.json
 6. 1+ `infrastructure-transient` → `RETRY-WITH-FALLBACK`
 7. otherwise → `PROCEED`
 
-**Operator utilities:** `bash scripts/failure/state-prune.sh --classification <name>`, `--age 7d`, `--cycle <N>`, `--all --yes`.
+**Operator utilities:** `bash legacy/scripts/failure/state-prune.sh --classification <name>`, `--age 7d`, `--cycle <N>`, `--all --yes`.
 
 ---
 
 ## v8.21.0 — Worktree Provisioning Contract
 
-Per-cycle git worktrees are provisioned by `scripts/dispatch/run-cycle.sh` at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` on branch `evolve/cycle-N`. The path is recorded in `cycle-state.json:active_worktree`, exported as `WORKTREE_PATH`, and torn down via the EXIT trap.
+Per-cycle git worktrees are provisioned by `legacy/scripts/dispatch/run-cycle.sh` at `$EVOLVE_PROJECT_ROOT/.evolve/worktrees/cycle-N` on branch `evolve/cycle-N`. The path is recorded in `cycle-state.json:active_worktree`, exported as `WORKTREE_PATH`, and torn down via the EXIT trap.
 
 **Trust-boundary invariant:** the orchestrator and all phase agents may NOT call `git worktree add` or `git worktree remove`. Both are denied in `orchestrator.json` and in every phase profile that has a deny list.
 
@@ -195,11 +195,11 @@ v8.32.0 pins BOTH SHA AND plugin version:
 
 ## v8.31.0 — Builder Write-Leak Fix
 
-The Builder profile previously had `Edit(scripts/**)` in `disallowed_tools` AND bare `Bash` in `allowed_tools`, forcing Builder to use Bash for script edits. Bare Bash has no path gating. With v8.25.1 disabling inner `sandbox-exec` in nested-Claude, nothing prevented Builder from writing to main repo.
+The Builder profile previously had `Edit(legacy/scripts/**)` in `disallowed_tools` AND bare `Bash` in `allowed_tools`, forcing Builder to use Bash for script edits. Bare Bash has no path gating. With v8.25.1 disabling inner `sandbox-exec` in nested-Claude, nothing prevented Builder from writing to main repo.
 
 **Cycle-25 evidence:** 5 files modified in main repo's working tree despite `active_worktree=/var/folders/.../cycle-25`.
 
-**Fix:** Remove redundant `Edit(scripts/**)` denials from Builder's `disallowed_tools` (path gating is enforced by `role-gate.sh`); add interpreter-execution Bash denials: `perl`, `ruby`, `python3 -c`, `node -e`, `sh -c`, `bash -c`, `zsh -c`, `env`, `exec`, `eval`, `awk`, `unlink`, `ln`.
+**Fix:** Remove redundant `Edit(legacy/scripts/**)` denials from Builder's `disallowed_tools` (path gating is enforced by `role-gate.sh`); add interpreter-execution Bash denials: `perl`, `ruby`, `python3 -c`, `node -e`, `sh -c`, `bash -c`, `zsh -c`, `env`, `exec`, `eval`, `awk`, `unlink`, `ln`.
 
 ---
 
@@ -235,7 +235,7 @@ Operating principle: reduce friction is top priority; preventing structural fake
 
 **Fix 2 — `ship-gate-config` classification.** Cycles where audit declared PASS but ship-gate refused are now classified as `ship-gate-config` (1d age-out, low severity, retry-yes), NOT `infrastructure-systemic`.
 
-**Fix 3 — `--reset` flag.** `bash scripts/dispatch/evolve-loop-dispatch.sh --reset [N] [strategy] [goal]` runs `state-prune.sh` against `infrastructure-{systemic,transient}` + `ship-gate-config` entries before the cycle loop.
+**Fix 3 — `--reset` flag.** `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --reset [N] [strategy] [goal]` runs `state-prune.sh` against `infrastructure-{systemic,transient}` + `ship-gate-config` entries before the cycle loop.
 
 ---
 
@@ -260,7 +260,7 @@ v8.26.0 sets `--max-budget-usd` to `999999` (effectively unlimited) by default. 
 ### v8.13.4: per-invocation override
 
 ```bash
-EVOLVE_MAX_BUDGET_USD=1.50 bash scripts/dispatch/subagent-run.sh scout <cycle> <workspace>
+EVOLVE_MAX_BUDGET_USD=1.50 bash legacy/scripts/dispatch/subagent-run.sh scout <cycle> <workspace>
 ```
 
 The adapter logs the override loudly. Empty/malformed values → WARN + profile fallback. Negative values → rejected.
@@ -285,7 +285,7 @@ Declare named tiers in the profile:
 Then select via `EVOLVE_TASK_MODE`:
 
 ```bash
-EVOLVE_TASK_MODE=research bash scripts/dispatch/subagent-run.sh scout <cycle> <workspace>
+EVOLVE_TASK_MODE=research bash legacy/scripts/dispatch/subagent-run.sh scout <cycle> <workspace>
 ```
 
 Adapter logs: `[claude-adapter] task-mode tier: research → $1.50 (was 0.50 from profile scout.json)`. The Scout profile (`.evolve/profiles/scout.json`) ships with `default` / `research` / `deep` tiers as the canonical example.
@@ -365,7 +365,7 @@ Full env-var reference and protocol: `docs/architecture/checkpoint-resume.md`, `
 Inject tasks into `.evolve/inbox/` for next-cycle Triage ingestion without racing the dispatcher. Full spec: `docs/architecture/inbox-injection-protocol.md`.
 
 ```bash
-bash scripts/utility/inject-task.sh \
+bash legacy/scripts/utility/inject-task.sh \
   --priority HIGH|MEDIUM|LOW --action "task description" \
   [--weight 0.85] [--evidence-pointer "url"] [--note "context"] [--dry-run]
 ```
@@ -380,7 +380,7 @@ Opt-in via `EVOLVE_RESEARCH_CACHE_ENABLED=1`. Adds `researchCache.entries[<sha>]
 
 Cache-hit decision (Scout Step 4.5): HIT when fingerprint present + entry exists + not invalidated + within `EVOLVE_RESEARCH_CACHE_MAX_AGE` (default 5 cycles) + files exist + recomputed fp matches.
 
-Utilities: `scripts/utility/research-cache.sh check <task_id>` (exits 0=HIT, 10=STALE, 20=MISS, 30=INVALIDATED, 40=NO_ENTRY, 50=DISABLED); `task-fingerprint.sh`; `promote-research-cache.sh <cycle> <workspace>`.
+Utilities: `legacy/scripts/utility/research-cache.sh check <task_id>` (exits 0=HIT, 10=STALE, 20=MISS, 30=INVALIDATED, 40=NO_ENTRY, 50=DISABLED); `task-fingerprint.sh`; `promote-research-cache.sh <cycle> <workspace>`.
 
 ---
 
@@ -390,7 +390,7 @@ Utilities: `scripts/utility/research-cache.sh check <task_id>` (exits 0=HIT, 10=
 
 **Why:** cycles 30–39 demonstrated indirect reward hacking via confidence-cliff calibration (verdicts cluster at 0.78–0.87, just at WARN/PASS boundary, then ship anyway). Per Skalse et al. (NeurIPS 2022), no auditor-side patch can fix this — only changing signal source from model claim to sandbox exit code does.
 
-Banned patterns inside predicates (enforced by `scripts/verification/validate-predicate.sh`):
+Banned patterns inside predicates (enforced by `legacy/scripts/verification/validate-predicate.sh`):
 - `grep -q "..." file; exit $?` as only check — presence ≠ execution
 - `echo "PASS"; exit 0` with no work — tautology
 - `curl`, `wget`, `gh api/pr/release` — hermetic-determinism requirement
@@ -420,6 +420,6 @@ Activates Phase-A scaffolding (v10.4.0) by wiring it into the live dispatch pipe
 
 Replay model: zero per-event live-stream overhead. Empirically ≤ 200ms per phase, ≤ 500ms per cycle rollup.
 
-Combined viewer: `bash scripts/observability/dashboard.sh` (active cycle), `--cycle=N`, `--watch[=interval]`, `--json`. Wraps `show-cycle-cost.sh` + `cycle-metrics.json` + `trace.md` tail. Read-only.
+Combined viewer: `bash legacy/scripts/observability/dashboard.sh` (active cycle), `--cycle=N`, `--watch[=interval]`, `--json`. Wraps `show-cycle-cost.sh` + `cycle-metrics.json` + `trace.md` tail. Read-only.
 
 Full architecture: `docs/architecture/phase-tracker.md`.

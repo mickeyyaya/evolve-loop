@@ -36,7 +36,7 @@ This is **not a reward-hacking class incident** (no integrity invariant was viol
 
 ## Root cause
 
-The watchdog (`scripts/dispatch/phase-watchdog.sh`) polls file mtimes within the cycle workspace every `EVOLVE_INACTIVITY_POLL_S=15` seconds. If the most-recent mtime is older than `EVOLVE_INACTIVITY_THRESHOLD_S`, it fires `SIGTERM` on the process group.
+The watchdog (`legacy/scripts/dispatch/phase-watchdog.sh`) polls file mtimes within the cycle workspace every `EVOLVE_INACTIVITY_POLL_S=15` seconds. If the most-recent mtime is older than `EVOLVE_INACTIVITY_THRESHOLD_S`, it fires `SIGTERM` on the process group.
 
 This proxy — *file write activity* as a stand-in for *agent activity* — fails for the orchestrator's post-memo finalization phase:
 
@@ -69,9 +69,9 @@ The operator's recovery script (5 invocations during the batch):
 
 ```bash
 git add acs/cycle-N/ acs/regression-suite/cycle-N/
-EVOLVE_SHIP_AUTO_CONFIRM=1 bash scripts/lifecycle/ship.sh --class manual \
+EVOLVE_SHIP_AUTO_CONFIRM=1 bash legacy/scripts/lifecycle/ship.sh --class manual \
   "chore(cycle-N): promote ACS predicates to regression-suite"
-bash scripts/lifecycle/cycle-state.sh clear
+bash legacy/scripts/lifecycle/cycle-state.sh clear
 git worktree remove --force <cycle worktree>
 git branch -D evolve/cycle-N
 ```

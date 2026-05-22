@@ -41,7 +41,7 @@ The orchestrator is a per-cycle subprocess. It MAY:
 | `.evolve/runs/cycle-<current>/` | full read+write (its workspace) |
 | `.evolve/cycle-state.json` | read via `cycle-state.sh get`; writes via the four allowlisted ops (`advance`, `set-agent`, `checkpoint`, `clear-checkpoint`) |
 | `.evolve/ledger.jsonl` | **write-only** (via the child `subagent-run.sh` appending phase-agent entries) — reads denied |
-| `scripts/**`, `agents/**`, `skills/**` | reads allowed (the persona may need to read its own contract); writes denied |
+| `legacy/scripts/**`, `agents/**`, `skills/**` | reads allowed (the persona may need to read its own contract); writes denied |
 | Prompt-injected digest fields (`recentLedgerEntries`, `recentFailures`, `instinctSummary`, `adaptiveFailureDecision`) | the **authoritative** source of cross-cycle history |
 
 The orchestrator MAY NOT:
@@ -88,7 +88,7 @@ is disabled (`EVOLVE_INNER_SANDBOX=0`). This is the load-bearing layer.
 
 ### Layer 2: OS sandbox (`sandbox.deny_subpaths`)
 
-`scripts/cli_adapters/claude.sh:494-506` emits `(deny file-write* ...)`
+`legacy/scripts/cli_adapters/claude.sh:494-506` emits `(deny file-write* ...)`
 sandbox-exec rules for each `deny_subpaths` entry. **This layer denies
 writes only — `file-read*` access remains unrestricted across the repo.**
 
@@ -135,8 +135,8 @@ dir already exists. The `.cycle-start-marker` file (used by the
 `git-worktree-status` baseline) is preserved through quarantine.
 
 **Defense-in-depth:** quarantine logic lives in BOTH
-`scripts/dispatch/resume-cycle.sh` (Step 5) AND
-`scripts/dispatch/run-cycle.sh` (Step 4, in the `EVOLVE_RESUME_MODE=1`
+`legacy/scripts/dispatch/resume-cycle.sh` (Step 5) AND
+`legacy/scripts/dispatch/run-cycle.sh` (Step 4, in the `EVOLVE_RESUME_MODE=1`
 block). Whichever runs first moves the artifacts; the second finds an
 already-clean workspace and noops. This covers the case where
 `run-cycle.sh` is invoked directly with `EVOLVE_RESUME_MODE=1` (test
@@ -149,7 +149,7 @@ the killed attempt's state directly.
 
 ## Same-cycle ledger entry filter
 
-`scripts/dispatch/run-cycle.sh:build_context()` constructs the
+`legacy/scripts/dispatch/run-cycle.sh:build_context()` constructs the
 `recentLedgerEntries` digest. On resume, attempts 1..K-1 of the SAME
 cycle would otherwise pollute attempt-K's prompt with stale-attempt
 entries. The filter:
@@ -164,7 +164,7 @@ Fallback to plain `tail -5` if jq is unavailable or `$cycle` non-numeric.
 
 ## Per-cycle release (`cycle-release.sh`)
 
-`scripts/lifecycle/cycle-release.sh` is the canonical per-cycle release
+`legacy/scripts/lifecycle/cycle-release.sh` is the canonical per-cycle release
 script. Called from `run-cycle.sh`'s `cleanup()` trap on non-checkpointed
 terminal exits; also callable standalone by an operator for manual
 release after an emergency abort.
@@ -192,7 +192,7 @@ so the ledger entry records what triggered the release.
 ## Verification
 
 The contract is enforced by
-`scripts/tests/orchestrator-isolation-test.sh` — a profile-static check
+`legacy/scripts/tests/orchestrator-isolation-test.sh` — a profile-static check
 suite covering all 8 assertions:
 
 | # | Test | Enforcement layer |
@@ -203,10 +203,10 @@ suite covering all 8 assertions:
 | 4 | `.attempt-*` writes denied | Layer 2 (`sandbox.deny_subpaths`) |
 | 5 | Same-cycle ledger filter | `run-cycle.sh:build_context()` |
 | 6 | `resume-cycle.sh` quarantine | `resume-cycle.sh` Step 2c |
-| 7a | `cycle-release.sh` exists and executable | `scripts/lifecycle/` |
+| 7a | `cycle-release.sh` exists and executable | `legacy/scripts/lifecycle/` |
 | 7b | `run-cycle.sh` invokes `cycle-release.sh` | `cleanup()` trap wiring |
 
-Run `bash scripts/tests/orchestrator-isolation-test.sh` after any change
+Run `bash legacy/scripts/tests/orchestrator-isolation-test.sh` after any change
 to the orchestrator profile, the resume path, or the ledger digest
 pipeline.
 
@@ -227,5 +227,5 @@ pipeline.
 
 - Plan: `~/.claude/plans/linked-meandering-lobster.md`
 - Profile: `.evolve/profiles/orchestrator.json`
-- Verification: `scripts/tests/orchestrator-isolation-test.sh`
+- Verification: `legacy/scripts/tests/orchestrator-isolation-test.sh`
 - Related ADRs: [checkpoint-resume.md](checkpoint-resume.md), [auto-resume.md](auto-resume.md), [sequential-write-discipline.md](sequential-write-discipline.md)

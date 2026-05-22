@@ -1,6 +1,6 @@
 # Migration: bash → Go (v11.0.0 cutover)
 
-> **Status:** v11.0.0 introduces the Go binary as the **primary** runtime entrypoint. The bash scripts under `scripts/` continue to work and remain on disk. Set `EVOLVE_USE_LEGACY_BASH=1` to opt back into the bash-first dispatch.
+> **Status:** v11.0.0 introduces the Go binary as the **primary** runtime entrypoint. The bash scripts under `legacy/scripts/` continue to work and remain on disk. Set `EVOLVE_USE_LEGACY_BASH=1` to opt back into the bash-first dispatch.
 >
 > **Audience:** Operators upgrading from v10.x. New users should read [README.md](../README.md) first.
 
@@ -10,7 +10,7 @@
 |---|---|
 | Do I have to migrate now? | No. v11.0.0 keeps bash fully functional. The Go binary is the new default but not the only path. |
 | Will my existing cycle state break? | No. `.evolve/state.json`, `cycle-state.json`, `ledger.jsonl`, and `instincts/*.yaml` use identical schemas in both runtimes. |
-| Will my custom hooks break? | No. `.claude/settings.json` hook commands continue to invoke the same `scripts/guards/*.sh` files at the same paths. |
+| Will my custom hooks break? | No. `.claude/settings.json` hook commands continue to invoke the same `legacy/scripts/guards/*.sh` files at the same paths. |
 | Will the bash scripts be removed? | Not in v11.0.0. Physical relocation to `legacy/scripts/` is scheduled for v11.1.0 with a deprecation window. |
 | What if Go misbehaves? | Set `EVOLVE_USE_LEGACY_BASH=1` to force the bash-first dispatch. This is the rollback hatch. |
 
@@ -22,11 +22,11 @@
 | `evolve cycle run` | Did not exist | Drives one full cycle through 8 phases in-process |
 | `evolve phase <name>` | Did not exist | Subprocess phase runner (raw JSON) |
 | `evolve serve-phase <name>` | Did not exist | Envelope-framed phase runner (`phaseproto` wire) |
-| `evolve doctor probe <tool>` | `scripts/utility/probe-tool.sh` | Same logic, better exit codes + JSON output |
-| `evolve guard <name>` | `scripts/guards/*.sh` | Same predicates, in-process |
-| `evolve ledger verify` | `scripts/observability/verify-ledger-chain.sh` | Same logic, faster |
+| `evolve doctor probe <tool>` | `legacy/scripts/utility/probe-tool.sh` | Same logic, better exit codes + JSON output |
+| `evolve guard <name>` | `legacy/scripts/guards/*.sh` | Same predicates, in-process |
+| `evolve ledger verify` | `legacy/scripts/observability/verify-ledger-chain.sh` | Same logic, faster |
 | `evolve acs run --cycle N <pkg>` | `bash acs/cycle-N/*.sh` | Go test runner for ported predicates |
-| `evolve loop` | `scripts/dispatch/evolve-loop-dispatch.sh` | Same dispatch semantics, native |
+| `evolve loop` | `legacy/scripts/dispatch/evolve-loop-dispatch.sh` | Same dispatch semantics, native |
 
 ## Install the Go binary
 
@@ -60,12 +60,12 @@ The Go orchestrator was built to produce **byte-identical** artifacts for the sa
 Verify on your own fixtures:
 
 ```bash
-bash scripts/parity-audit.sh --dry-run    # report-only, no spend
-bash scripts/parity-audit.sh --simulate   # no-LLM smoke check
-bash scripts/parity-audit.sh --full       # one real cycle each side (~$10-40)
+bash legacy/scripts/parity-audit.sh --dry-run    # report-only, no spend
+bash legacy/scripts/parity-audit.sh --simulate   # no-LLM smoke check
+bash legacy/scripts/parity-audit.sh --full       # one real cycle each side (~$10-40)
 ```
 
-See [scripts/parity-audit.sh](../scripts/parity-audit.sh) for the diff list.
+See [legacy/scripts/parity-audit.sh](../legacy/scripts/parity-audit.sh) for the diff list.
 
 ## Performance baseline
 
@@ -87,7 +87,7 @@ If a Go-side bug bites you mid-cycle:
 
 ```bash
 # Force the bash dispatch for one invocation
-EVOLVE_USE_LEGACY_BASH=1 bash scripts/dispatch/evolve-loop-dispatch.sh
+EVOLVE_USE_LEGACY_BASH=1 bash legacy/scripts/dispatch/evolve-loop-dispatch.sh
 
 # Or persist for a session
 export EVOLVE_USE_LEGACY_BASH=1
@@ -104,13 +104,13 @@ with `cycle-state.json` and the failing log line attached.
 | Version | Change | Status |
 |---|---|---|
 | v11.0.0 | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place. | SHIPPED |
-| v11.1.0 (this release) | `scripts/` → `legacy/scripts/` physical move. `scripts/` is a symlink to `legacy/scripts/`. All existing references work via the symlink. | SHIPPED |
-| v11.2.0 | Symlink removed at `scripts/`. Requires every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/) updated to `legacy/scripts/...` first. Operator integrations that hardcode `scripts/...` will break. | DEFERRED — needs broader reference cleanup |
+| v11.1.0 (this release) | `legacy/scripts/` → `legacy/scripts/` physical move. `legacy/scripts/` is a symlink to `legacy/scripts/`. All existing references work via the symlink. | SHIPPED |
+| v11.2.0 | Symlink removed at `legacy/scripts/`. Requires every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/) updated to `legacy/scripts/...` first. Operator integrations that hardcode `legacy/scripts/...` will break. | DEFERRED — needs broader reference cleanup |
 | v12.0.0 | Bash scripts removed entirely. Go-only. | DEFERRED — needs Go orchestrator feature parity (currently shells out to bash for `ship.sh`, etc.) |
 
 ## See also
 
 - [docs/architecture/portable-core.md](architecture/portable-core.md) — what to vendor when adopting evolve-loop into another project
-- [scripts/parity-audit.sh](../scripts/parity-audit.sh) — bash/Go diff harness
+- [legacy/scripts/parity-audit.sh](../legacy/scripts/parity-audit.sh) — bash/Go diff harness
 - [go/README.md](../go/README.md) — Go-side build, layout, and contribution notes
 - [CHANGELOG.md](../CHANGELOG.md) — full v10.x → v11.0.0 changelog

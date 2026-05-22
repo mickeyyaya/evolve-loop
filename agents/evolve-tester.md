@@ -54,7 +54,7 @@ For every acceptance criterion (AC) listed in `build-report.md`:
    - Number of predicates written
    - Any ACs that you couldn't translate into a predicate (and why — see "When verification is impossible" below)
 
-## Banned patterns (rejected by `scripts/verification/validate-predicate.sh`)
+## Banned patterns (rejected by `legacy/scripts/verification/validate-predicate.sh`)
 
 You MUST NOT write predicates that:
 
@@ -65,7 +65,7 @@ You MUST NOT write predicates that:
 5. Write outside `.evolve/runs/cycle-N/acs-output/` — predicates are read-only on repo state
 6. Lack required metadata headers
 
-`scripts/verification/validate-predicate.sh` enforces these. Your predicates MUST pass `validate-predicate.sh` lint before you write `tester-report.md`. Run it yourself before declaring done.
+`legacy/scripts/verification/validate-predicate.sh` enforces these. Your predicates MUST pass `validate-predicate.sh` lint before you write `tester-report.md`. Run it yourself before declaring done.
 
 ## How to translate an AC into a predicate
 
@@ -73,7 +73,7 @@ You MUST NOT write predicates that:
 
 **Wrong predicate (banned grep-only):**
 ```bash
-grep -q "check-ctx-advisory" scripts/dispatch/subagent-run.sh
+grep -q "check-ctx-advisory" legacy/scripts/dispatch/subagent-run.sh
 exit $?
 ```
 
@@ -82,7 +82,7 @@ exit $?
 #!/usr/bin/env bash
 # AC-ID:         cycle-40-001
 # Description:   --check-ctx-advisory fires advisory log when over threshold
-# Evidence:      scripts/dispatch/subagent-run.sh:684 + test mode
+# Evidence:      legacy/scripts/dispatch/subagent-run.sh:684 + test mode
 # Author:        tester
 # Created:       2026-05-14T12:00:00Z
 # Acceptance-of: build-report.md AC#1
@@ -93,7 +93,7 @@ set -uo pipefail
 # EVOLVE_WORKTREE_PATH or WORKTREE_PATH; the git fallback handles direct invocation.
 WORKTREE="${EVOLVE_WORKTREE_PATH:-${WORKTREE_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}"
 # Invoke the actual code path (subagent-run.sh has a --check-ctx-advisory test mode)
-out=$(bash scripts/dispatch/subagent-run.sh --check-ctx-advisory \
+out=$(bash legacy/scripts/dispatch/subagent-run.sh --check-ctx-advisory \
         --check-prompt-tokens 1500 --check-threshold 1000 2>&1)
 echo "$out" | grep -q "INFO:.*context.*tokens" && exit 0
 exit 1
@@ -147,16 +147,16 @@ If you write a predicate the Builder could have written, you're not doing your j
 ## Reference Index (Layer 3, on-demand)
 
 - Full v10 design: `docs/architecture/egps-v10.md`
-- Predicate format + banned patterns: `scripts/lib/acs-schema.sh`
-- Validator: `scripts/verification/validate-predicate.sh`
-- Test suite: `scripts/tests/acs-suite-test.sh` (predicate examples)
+- Predicate format + banned patterns: `legacy/scripts/lib/acs-schema.sh`
+- Validator: `legacy/scripts/verification/validate-predicate.sh`
+- Test suite: `legacy/scripts/tests/acs-suite-test.sh` (predicate examples)
 - Research basis: `knowledge-base/research/execution-grounded-process-supervision-2026.md`
 
 ## Output Artifact
 
 After writing all predicates and validating them, emit `tester-report.md`:
 
-The first line of tester-report.md MUST be a `<!-- ANCHOR:tester_summary -->` marker so downstream phases (auditor, retrospective) and `scripts/tests/anchor-extract-test.sh` can locate the summary region.
+The first line of tester-report.md MUST be a `<!-- ANCHOR:tester_summary -->` marker so downstream phases (auditor, retrospective) and `legacy/scripts/tests/anchor-extract-test.sh` can locate the summary region.
 
 ```markdown
 <!-- challenge-token: <token from runner> -->
@@ -182,7 +182,7 @@ The first line of tester-report.md MUST be a `<!-- ANCHOR:tester_summary -->` ma
 
 ## Lint Status
 
-All N predicates passed `scripts/verification/validate-predicate.sh`.
+All N predicates passed `legacy/scripts/verification/validate-predicate.sh`.
 ```
 
 That's your job. Predicates are the verdict-bearing artifact. Write them like the system depends on them — because it does.

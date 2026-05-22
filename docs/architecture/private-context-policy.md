@@ -21,7 +21,7 @@ old→new mapping.
 
 | Class | Purpose | Loaded into agent context? | Ships in /plugin install? |
 |---|---|---|---|
-| **Runtime context** (`agents/`, `scripts/`, `skills/`, `docs/architecture/`, `docs/reference/`, `docs/research/` keepers) | Code, contracts, in-cycle reference | YES — agents read these during cycles | YES |
+| **Runtime context** (`agents/`, `legacy/scripts/`, `skills/`, `docs/architecture/`, `docs/reference/`, `docs/research/` keepers) | Code, contracts, in-cycle reference | YES — agents read these during cycles | YES |
 | **Agent-context-excluded reference** (`docs/private/`) | Long-form research, archived design refs | NO — agents never see these during cycles | NO (best-effort) — repo-only, contributor-visible |
 
 > **Naming note:** `docs/private/` is **public-readable on GitHub** — the
@@ -57,7 +57,7 @@ Kernel-first, defense-in-depth, cross-CLI.
 
 Each agent profile (`.evolve/profiles/{scout,auditor,orchestrator}.json`)
 includes `docs/private` in `sandbox.deny_subpaths`. The per-CLI adapter
-(`scripts/cli_adapters/<cli>.sh`) compiles these into OS sandbox rules:
+(`legacy/scripts/cli_adapters/<cli>.sh`) compiles these into OS sandbox rules:
 
 - macOS: `sandbox-exec` profile denies `file-read` and `file-read-data` against
   denied paths
@@ -79,7 +79,7 @@ deny rule fires at the CLI's permission gate before any tool invocation.
 
 ### L3 — Layer-B context-builder filter (cross-CLI safety net)
 
-`scripts/lifecycle/role-context-builder.sh:emit_artifact()` early-returns for
+`legacy/scripts/lifecycle/role-context-builder.sh:emit_artifact()` early-returns for
 any path matching `docs/private/*` / `./docs/private/*` / `*/docs/private/*`.
 Even if a future code change attempts to inject a private file into an agent's
 prompt context, this filter no-ops the call.
@@ -89,7 +89,7 @@ assembler used by Claude Code, Gemini CLI, and Codex CLI adapters.
 
 ### Verification
 
-`scripts/tests/private-context-exclusion-test.sh` asserts:
+`legacy/scripts/tests/private-context-exclusion-test.sh` asserts:
 
 1. Each of scout/auditor/orchestrator profile has `docs/private` in
    `sandbox.deny_subpaths`
@@ -142,7 +142,7 @@ done
 ```
 
 The restoration is byte-identical — verified by `diff` against `35b31c4^` in
-`scripts/tests/private-context-exclusion-test.sh` Test 6.
+`legacy/scripts/tests/private-context-exclusion-test.sh` Test 6.
 
 ## Future considerations
 
@@ -163,5 +163,5 @@ The restoration is byte-identical — verified by `diff` against `35b31c4^` in
 - [`docs/MOVED.md`](../MOVED.md) — old→new path map for the v9.1.x consolidation
 - `agents/evolve-scout.md`, `agents/evolve-auditor.md`, `agents/evolve-orchestrator.md` —
   the persona docs whose profiles include the deny_subpaths entry
-- `scripts/lifecycle/role-context-builder.sh` — L3 filter implementation
-- `scripts/tests/private-context-exclusion-test.sh` — verification harness
+- `legacy/scripts/lifecycle/role-context-builder.sh` — L3 filter implementation
+- `legacy/scripts/tests/private-context-exclusion-test.sh` — verification harness

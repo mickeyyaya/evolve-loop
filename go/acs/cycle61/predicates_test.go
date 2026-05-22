@@ -13,8 +13,8 @@ import (
 // has the native-invocation log line.
 func TestC61_043_GeminiNativeMode(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	cap := filepath.Join(root, "scripts", "cli_adapters", "gemini.capabilities.json")
-	sh := filepath.Join(root, "scripts", "cli_adapters", "gemini.sh")
+	cap := filepath.Join(root, "legacy", "scripts", "cli_adapters", "gemini.capabilities.json")
+	sh := filepath.Join(root, "legacy", "scripts", "cli_adapters", "gemini.sh")
 	if !acsassert.FileExists(t, cap) {
 		t.Skip("gemini.capabilities.json missing — skip cycle-61-043")
 	}

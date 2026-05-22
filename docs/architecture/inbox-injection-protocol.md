@@ -16,7 +16,7 @@ Direct writes to `state.json:carryoverTodos[]` race the orchestrator (the reconc
 ## CLI
 
 ```bash
-bash scripts/utility/inject-task.sh \
+bash legacy/scripts/utility/inject-task.sh \
   --priority HIGH|MEDIUM|LOW \    # required
   --action "task description" \   # required, non-empty
   [--weight 0.85] \               # float in [0.0, 1.0]; tie-breaks within priority class

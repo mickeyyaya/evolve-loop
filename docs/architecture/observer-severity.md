@@ -60,13 +60,13 @@ The orchestrator's decision matrix is symmetric: NORMAL = continue silently, DEG
 
 ## Implementation reference
 
-- Canonical bash library: `scripts/lib/severity.sh`
+- Canonical bash library: `legacy/scripts/lib/severity.sh`
 - Constants: `SEVERITY_INFO=10`, `SEVERITY_WARN=20`, `SEVERITY_INCIDENT=30`
 - Helpers: `severity_name_to_int`, `severity_int_to_name`, `severity_gte`
 
 Example usage in any observer-class script:
 ```bash
-source "$EVOLVE_PLUGIN_ROOT/scripts/lib/severity.sh"
+source "$EVOLVE_PLUGIN_ROOT/legacy/scripts/lib/severity.sh"
 if severity_gte "$current_sev" WARN; then
     echo "warn-or-worse — flag for operator"
 fi

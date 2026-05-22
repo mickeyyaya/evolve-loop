@@ -2,7 +2,7 @@
 
 > **Status:** Active (cycle 76, manual Layer 4 ship)
 > **Layer:** 4 of 5 in [ADR-0012 Reward-Hacking Defense System](adr/0012-commit-claim-coherence.md)
-> **Enforced by:** `scripts/verification/audit-constitution-check.sh` (post-audit, pre-ship)
+> **Enforced by:** `legacy/scripts/verification/audit-constitution-check.sh` (post-audit, pre-ship)
 
 ## Why a constitution
 
@@ -30,7 +30,7 @@ Numeric claims with a ground-truth artifact MUST be `pending` + POSTHOC sentinel
 
 ### P3 — Prefix coherence (Layer 1)
 
-Commit prefix matches diff scope per [.evolve/commit-prefix-scope.json](../../.evolve/commit-prefix-scope.json). The `scripts/guards/commit-prefix-gate.sh` hook catches violations at ship time; Auditor confirms.
+Commit prefix matches diff scope per [.evolve/commit-prefix-scope.json](../../.evolve/commit-prefix-scope.json). The `legacy/scripts/guards/commit-prefix-gate.sh` hook catches violations at ship time; Auditor confirms.
 
 **Example PASS:** *"Commit prefix `feat(posthoc):` and diff under {agents/evolve-builder.md, agents/evolve-auditor.md, docs/architecture/posthoc-schema.md} match scope manifest (P3)."*
 
@@ -74,7 +74,7 @@ In `audit-report.md`, each criterion's verdict line includes principle codes in 
 | INERT marker on P2 | PASS | `re_attempt_by_cycle: 81` cited | P5 |
 ```
 
-The `scripts/verification/audit-constitution-check.sh` script verifies:
+The `legacy/scripts/verification/audit-constitution-check.sh` script verifies:
 
 1. Every criterion has at least one principle citation.
 2. Top-level criteria (the PASS-blocking ones) cite at least P1.
@@ -88,7 +88,7 @@ The constitution is a **citation requirement**, not a verdict requirement. The A
 
 ```bash
 # After each audit-report.md is written, run:
-bash scripts/verification/audit-constitution-check.sh .evolve/runs/cycle-N/audit-report.md
+bash legacy/scripts/verification/audit-constitution-check.sh .evolve/runs/cycle-N/audit-report.md
 # Exit 0 = adequate citation coverage
 # Exit 2 = missing citations; defect emitted
 ```
@@ -96,7 +96,7 @@ bash scripts/verification/audit-constitution-check.sh .evolve/runs/cycle-N/audit
 ## References
 
 - ADR-0012 (parent): [adr/0012-commit-claim-coherence.md](adr/0012-commit-claim-coherence.md)
-- Layer 1 (commit-prefix gate): [scripts/guards/commit-prefix-gate.sh](../../scripts/guards/commit-prefix-gate.sh)
+- Layer 1 (commit-prefix gate): [legacy/scripts/guards/commit-prefix-gate.sh](../../legacy/scripts/guards/commit-prefix-gate.sh)
 - Layer 3 (POSTHOC schema): [posthoc-schema.md](posthoc-schema.md)
 - Layer 5 (verdict-elevation, pending): TBD by cycle E
 - Constitutional AI inspiration: <https://www.anthropic.com/research/constitutional-ai-harmlessness-from-ai-feedback>

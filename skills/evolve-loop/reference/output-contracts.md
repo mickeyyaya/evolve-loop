@@ -12,7 +12,7 @@
 | 4 | TDD | `agents/evolve-tdd-engineer.md` | `tdd-report.md` | `schemas/handoff/tdd-report.schema.json` | Tests Written · AC Mapping · Red State |
 | 5 | Build | `agents/evolve-builder.md` | `build-report.md` | `schemas/handoff/build-report.schema.json` | Changes · Self-Verification · Quality Signals |
 | 6 | Audit | `agents/evolve-auditor.md` | `audit-report.md` | `schemas/handoff/audit-report.schema.json` | Artifacts Reviewed · Verdict (with PASS/WARN/FAIL value) |
-| 7 | Ship | `scripts/lifecycle/ship.sh` (no persona — script) | `ship-report.md` | `schemas/handoff/ship-report.schema.json` | Commit · Tree SHA Binding · Ledger Entry |
+| 7 | Ship | `legacy/scripts/lifecycle/ship.sh` (no persona — script) | `ship-report.md` | `schemas/handoff/ship-report.schema.json` | Commit · Tree SHA Binding · Ledger Entry |
 | 8 | Retrospective | `agents/evolve-retrospective.md` | `retrospective-report.md` | `schemas/handoff/retrospective-report.schema.json` | What Happened · Root Cause · Lesson (with lesson YAML pointer) |
 
 ## Schema format (recap)
@@ -30,7 +30,7 @@ Schemas are bash-native / jq-readable JSON. **Not** JSON Schema v2020-12 — tha
 ## Invocation
 
 ```bash
-bash scripts/tests/validate-handoff-artifact.sh \
+bash legacy/scripts/tests/validate-handoff-artifact.sh \
     --artifact .evolve/runs/cycle-N/build-report.md \
     --type build \
     [--state .evolve/state.json]   # required for conditional_sections

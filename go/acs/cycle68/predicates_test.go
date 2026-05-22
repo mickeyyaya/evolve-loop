@@ -26,7 +26,7 @@ func TestC68_001_IntentMaxTurnsRaised(t *testing.T) {
 // TestC68_002_OverrunLogFormat ports cycle-68/002.
 func TestC68_002_OverrunLogFormat(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	script := filepath.Join(root, "scripts", "dispatch", "subagent-run.sh")
+	script := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	if !acsassert.FileExists(t, script) {
 		t.Skip("subagent-run.sh missing — skip cycle-68-002")
 	}

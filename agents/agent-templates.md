@@ -239,13 +239,13 @@ Include this directive in every phase agent's reflection authoring instructions:
 
 ### Reusing phase-tracker data
 
-The `phase_tracker_refs` block MUST be read from `.evolve/runs/cycle-<N>/.ephemeral/metrics/<phase>.json` (already produced by `scripts/observability/rollup-cycle-metrics.sh`). Do not recompute timing or cost — single source of truth.
+The `phase_tracker_refs` block MUST be read from `.evolve/runs/cycle-<N>/.ephemeral/metrics/<phase>.json` (already produced by `legacy/scripts/observability/rollup-cycle-metrics.sh`). Do not recompute timing or cost — single source of truth.
 
 ### Aggregation surface
 
 - **Per-cycle:** the new `evolve-reflector` agent reads every `<phase>-reflection.yaml` in the cycle dir and emits `learn/reflector-synthesis.md`.
-- **Cross-cycle:** the reflector calls `scripts/observability/aggregate-reflections.sh --window 5` for a 5-cycle rollup (slowdown categories tallied, upstream friction sources, recurring suggestions).
-- **Operator view:** `scripts/observability/dashboard.sh` displays a one-line "Recent reflection hot-spots" summary sourced from the aggregator's `--format=json` mode.
+- **Cross-cycle:** the reflector calls `legacy/scripts/observability/aggregate-reflections.sh --window 5` for a 5-cycle rollup (slowdown categories tallied, upstream friction sources, recurring suggestions).
+- **Operator view:** `legacy/scripts/observability/dashboard.sh` displays a one-line "Recent reflection hot-spots" summary sourced from the aggregator's `--format=json` mode.
 
 ---
 
@@ -274,7 +274,7 @@ The full evolve-loop pipeline and the agent responsible for each phase. **Note (
 
 **Phase sequence enforcement:** `phase-gate-precondition.sh` blocks out-of-order agent invocations. The TDD engineer phase (`tdd`) must be advanced via `cycle-state.sh advance tdd tdd-engineer` before Builder can be invoked.
 
-**Learn phase invocation:** `scripts/lifecycle/run-cycle.sh` invokes the reflector after Ship completes, then dispatches retrospective (FAIL/WARN) or memo (PASS) based on the audit verdict. The reflector runs on every cycle regardless of verdict.
+**Learn phase invocation:** `legacy/scripts/lifecycle/run-cycle.sh` invokes the reflector after Ship completes, then dispatches retrospective (FAIL/WARN) or memo (PASS) based on the audit verdict. The reflector runs on every cycle regardless of verdict.
 
 ---
 
@@ -295,11 +295,11 @@ A human-readable shared narrative document at `.evolve/runs/cycle-N/team-context
 ### Protocol
 
 - **On start:** Read `.evolve/runs/cycle-<N>/team-context.md` in its entirety. Other agents' sections are your context — do not duplicate their work.
-- **On completion:** Append your section via `bash scripts/utility/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
-- **Verification:** `bash scripts/utility/team-context.sh verify <cycle> <workspace> --require scout,tdd-engineer,builder,auditor` exits non-zero if any required section is empty (still `_pending_`).
+- **On completion:** Append your section via `bash legacy/scripts/utility/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
+- **Verification:** `bash legacy/scripts/utility/team-context.sh verify <cycle> <workspace> --require scout,tdd-engineer,builder,auditor` exits non-zero if any required section is empty (still `_pending_`).
 
 ### Phase-gate hook (opt-in)
 
 When `EVOLVE_REQUIRE_TEAM_CONTEXT=1` is exported in the dispatcher environment, `phase-gate-precondition.sh` blocks Builder invocations until both Scout's and TDD-Engineer's sections are populated in the bus. Default off for backward compatibility with cycles that predate the bus.
 
-See [scripts/utility/team-context.sh](../scripts/utility/team-context.sh) for the implementation.
+See [legacy/scripts/utility/team-context.sh](../legacy/scripts/utility/team-context.sh) for the implementation.

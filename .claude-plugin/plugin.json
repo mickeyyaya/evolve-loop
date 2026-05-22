@@ -18,7 +18,7 @@
     },
     "tier_notes": {
       "tier-1": "Production. Both skill content and runtime tested.",
-      "tier-1-hybrid": "Skill activates via Gemini CLI; runtime delegates to claude binary via scripts/cli_adapters/gemini.sh. Requires Claude CLI installed.",
+      "tier-1-hybrid": "Skill activates via Gemini CLI; runtime delegates to claude binary via legacy/scripts/cli_adapters/gemini.sh. Requires Claude CLI installed.",
       "tier-3-stub": "Adapter exits 99. Skill content is portable; runtime not implemented.",
       "tier-4-skill-text-only": "Documentation portable; no tested runtime adapter."
     },
@@ -91,10 +91,10 @@
         "linux-arm64": "go/bin/dist/evolve-linux-arm64"
       },
       "tier": "tier-1-primary",
-      "tier_note": "Primary runtime as of v11.0.0. Bash scripts under scripts/ remain the authoritative reference and continue to work when the binary is absent. Set EVOLVE_USE_LEGACY_BASH=1 to force the bash dispatch.",
+      "tier_note": "Primary runtime as of v11.0.0. Bash scripts under legacy/scripts/ remain the authoritative reference and continue to work when the binary is absent. Set EVOLVE_USE_LEGACY_BASH=1 to force the bash dispatch.",
       "fallback": {
         "env_var": "EVOLVE_USE_LEGACY_BASH",
-        "fallback_path": "scripts/dispatch/evolve-loop-dispatch.sh",
+        "fallback_path": "legacy/scripts/dispatch/evolve-loop-dispatch.sh",
         "see_also": "docs/migration-from-bash.md"
       }
     }

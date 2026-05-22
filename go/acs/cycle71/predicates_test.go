@@ -11,7 +11,7 @@ import (
 // TestC71_001_RoleGateRetrospective ports cycle-71/001.
 func TestC71_001_RoleGateRetrospective(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	gate := filepath.Join(root, "scripts", "guards", "role-gate.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "guards", "role-gate.sh")
 	if !acsassert.FileExists(t, gate) {
 		t.Skip("role-gate.sh missing — skip cycle-71-001")
 	}

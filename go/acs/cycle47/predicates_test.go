@@ -25,7 +25,7 @@ func indexOf(raw []byte, needle string) int {
 // ship.sh must strip backticks from audit_bound_tree_sha extraction.
 func TestC47_ShipBacktickStripping(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	ship := filepath.Join(root, "scripts", "lifecycle", "ship.sh")
+	ship := filepath.Join(root, "legacy", "scripts", "lifecycle", "ship.sh")
 	if !acsassert.FileExists(t, ship) {
 		t.Skip("ship.sh missing — skip cycle-47-001-backtick")
 	}
@@ -40,7 +40,7 @@ func TestC47_ShipBacktickStripping(t *testing.T) {
 // TestC47_SchemaFilterAdapterEnforcement ports 001-t1-schema-filter-adapter-enforcement.sh.
 func TestC47_SchemaFilterAdapterEnforcement(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	target := filepath.Join(root, "scripts", "cli_adapters", "claude.sh")
+	target := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
 	if !acsassert.FileExists(t, target) {
 		t.Skip("claude.sh missing — skip cycle-47-001-schema")
 	}
@@ -54,7 +54,7 @@ func TestC47_SchemaFilterAdapterEnforcement(t *testing.T) {
 // TestC47_ReconcileSrcUnbound ports 002-reconcile-src-unbound.sh.
 func TestC47_ReconcileSrcUnbound(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	rec := filepath.Join(root, "scripts", "lifecycle", "reconcile-carryover-todos.sh")
+	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
 	if !acsassert.FileExists(t, rec) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-47-002")
 	}
@@ -70,7 +70,7 @@ func TestC47_ReconcileSrcUnbound(t *testing.T) {
 // TestC47_TurnOverrunObservability ports 002-t2-turn-overrun-observability.sh.
 func TestC47_TurnOverrunObservability(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	target := filepath.Join(root, "scripts", "dispatch", "subagent-run.sh")
+	target := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	if !acsassert.FileExists(t, target) {
 		t.Skip("subagent-run.sh missing — skip cycle-47-002-turn")
 	}
@@ -84,7 +84,7 @@ func TestC47_TurnOverrunObservability(t *testing.T) {
 // TestC47_DispatchCounterNonAdvanceEvent ports 003-dispatch-counter-non-advance.sh.
 func TestC47_DispatchCounterNonAdvanceEvent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	dispatch := filepath.Join(root, "scripts", "dispatch", "evolve-loop-dispatch.sh")
+	dispatch := filepath.Join(root, "legacy", "scripts", "dispatch", "evolve-loop-dispatch.sh")
 	if !acsassert.FileExists(t, dispatch) {
 		t.Skip("evolve-loop-dispatch.sh missing — skip cycle-47-003")
 	}
@@ -114,7 +114,7 @@ func TestC47_ParallelBatchingBuilder(t *testing.T) {
 // guard pattern; bash predicate authoritative for colocation.
 func TestC47_ClaudeAdapterCostOverrunEvent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	target := filepath.Join(root, "scripts", "cli_adapters", "claude.sh")
+	target := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
 	if !acsassert.FileContainsAny(target, "cost-overrun") {
 		t.Skip("cost-overrun marker absent — source evolved past cycle-47-004")
 	}
@@ -204,7 +204,7 @@ func TestC47_ShipRefusedDocExists(t *testing.T) {
 // directly and comparing byte offsets.
 func TestC47_LastCycleCounterAdvance(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	ship := filepath.Join(root, "scripts", "lifecycle", "ship.sh")
+	ship := filepath.Join(root, "legacy", "scripts", "lifecycle", "ship.sh")
 	if !acsassert.FileContainsAny(ship, "advanced state.json:lastCycleNumber") {
 		t.Skip("advance marker absent — source evolved past cycle-47-009")
 	}

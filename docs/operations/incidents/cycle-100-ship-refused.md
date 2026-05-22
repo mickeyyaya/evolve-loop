@@ -26,9 +26,9 @@ Cycle-100 ultimately did NOT ship from these events. Cycle-101 shipped successfu
 ### Evidence examined
 
 - `.evolve/runs/cycle-100/abnormal-events.jsonl` — three ship-refused entries
-- `scripts/lifecycle/ship.sh` — SHA verification logic, ledger check logic, TTY check
+- `legacy/scripts/lifecycle/ship.sh` — SHA verification logic, ledger check logic, TTY check
 - `state.json:expected_ship_sha` — value `e7dab80f…`
-- `shasum -a 256 scripts/lifecycle/ship.sh` (post-cycle-101) — `e7dab80f…` (now matches expected)
+- `shasum -a 256 legacy/scripts/lifecycle/ship.sh` (post-cycle-101) — `e7dab80f…` (now matches expected)
 - `state.json:carryoverTodos` — `abnormal-ship-refused-c100` was absent; only recorded in cycle-101's local `carryover-todos.json`
 - `docs/operations/incidents/cycle-82-ship-refused.md` — prior ship-refused incident documenting the ledger-race pattern
 
@@ -72,7 +72,7 @@ No code fix this cycle (scope constraint). Operational mitigation: retry ship af
 
 ### Root Cause 2 (SHA drift)
 
-Self-healed at cycle-101. Cycle-102 verifies the current SHA matches `expected_ship_sha`. Future prevention: Builder worktrees should not modify `scripts/lifecycle/ship.sh` as a side-effect of feature work; if chmod tests require touching lifecycle scripts, restore them before the build phase ends.
+Self-healed at cycle-101. Cycle-102 verifies the current SHA matches `expected_ship_sha`. Future prevention: Builder worktrees should not modify `legacy/scripts/lifecycle/ship.sh` as a side-effect of feature work; if chmod tests require touching lifecycle scripts, restore them before the build phase ends.
 
 ### Root Cause 3 (TTY)
 
@@ -86,7 +86,7 @@ Operational fix: when running ship in a CI or non-TTY context, always set `EVOLV
 |---|---|
 | Multiple concurrent ship-refused events at the same timestamp cluster indicate compounded root causes — each must be triaged independently | Ship-refusal triage playbook |
 | The auditor ledger race is a known recurring pattern; each recurrence should be documented and counted — the fix will be prioritized when count exceeds 3 incidents | `docs/operations/incidents/` audit history |
-| ship.sh SHA drift is recoverable — check `shasum -a 256 scripts/lifecycle/ship.sh` vs `state.json:expected_ship_sha` before diagnosing deeper | `scripts/lifecycle/ship.sh` runbook |
+| ship.sh SHA drift is recoverable — check `shasum -a 256 legacy/scripts/lifecycle/ship.sh` vs `state.json:expected_ship_sha` before diagnosing deeper | `legacy/scripts/lifecycle/ship.sh` runbook |
 | EVOLVE_SHIP_AUTO_CONFIRM=1 must be set for all non-interactive ship invocations; `--class manual` is not safe for pipeline use without it | CLAUDE.md env-var table (already documented) |
 | Carryover items not propagated to `state.json:carryoverTodos` are invisible to the failure-adapter; ensure memo agents write back to state, not only to local cycle files | Memo agent write-back discipline |
 
@@ -96,7 +96,7 @@ Operational fix: when running ship in a CI or non-TTY context, always set `EVOLV
 
 - Primary evidence: `.evolve/runs/cycle-100/abnormal-events.jsonl`
 - SHA verification: `state.json:expected_ship_sha = e7dab80f`, confirmed healed at cycle-101
-- Ship-gate logic: `scripts/lifecycle/ship.sh` (self-integrity check, ledger check, TTY check)
+- Ship-gate logic: `legacy/scripts/lifecycle/ship.sh` (self-integrity check, ledger check, TTY check)
 - Prior ship-refused precedent: `docs/operations/incidents/cycle-82-ship-refused.md`
 - CLAUDE.md env-var table: `EVOLVE_SHIP_AUTO_CONFIRM`, `--class manual` documentation
 - Cycle-101 ship commit (confirms SHA healed): git log `6369ccf`

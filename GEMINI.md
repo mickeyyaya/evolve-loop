@@ -15,7 +15,7 @@ To invoke the primary skill: `/evolve-loop` (registered via the plugin's slash-c
 `.claude-plugin/plugin.json:compatibility.tiers` declares `gemini-cli: tier-1-hybrid`:
 
 - **Skill content** is portable. The same SKILL.md works in Gemini CLI and Claude Code.
-- **Runtime execution** delegates to the `claude` binary via `scripts/cli_adapters/gemini.sh`. Gemini CLI lacks non-interactive prompt mode (`gemini -p`), `--max-budget-usd`, and subagent dispatch primitives that the kernel hooks require for structural enforcement. The hybrid adapter routes runtime work to `claude -p` while Gemini hosts the skill activation.
+- **Runtime execution** delegates to the `claude` binary via `legacy/scripts/cli_adapters/gemini.sh`. Gemini CLI lacks non-interactive prompt mode (`gemini -p`), `--max-budget-usd`, and subagent dispatch primitives that the kernel hooks require for structural enforcement. The hybrid adapter routes runtime work to `claude -p` while Gemini hosts the skill activation.
 
 You need `claude` installed and authenticated for the runtime path. If only `gemini` is available, only skill text is usable — no autonomous cycle execution.
 
@@ -41,7 +41,7 @@ The 8 cross-CLI invariants and 12 Core Agent Rules in [AGENTS.md](AGENTS.md) app
 
 - Pipeline ordering: Scout → Builder → Auditor → Ship
 - Subagents via `subagent-run.sh`, never `activate_skill`-as-subagent
-- Commits via `scripts/lifecycle/ship.sh`, never bare git
+- Commits via `legacy/scripts/lifecycle/ship.sh`, never bare git
 - Builder writes inside its worktree only
 - EGPS v10.0+: `acs-verdict.json:red_count == 0` gates ship
 - Ledger tamper-evidence (v8.37.0+) — `verify-ledger-chain.sh` works identically

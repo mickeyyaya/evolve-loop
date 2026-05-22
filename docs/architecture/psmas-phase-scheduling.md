@@ -2,7 +2,7 @@
 
 > **Status:** Foundation shipped v10.17.0 (cycle 98), **opt-in default-off**
 > **Audience:** Operators experimenting with cycle-level token savings; persona authors
-> **Source:** `agents/evolve-triage.md:125-205`, `agents/evolve-orchestrator.md:111-130`, `scripts/lifecycle/phase-gate.sh:447-508,1367-1373`
+> **Source:** `agents/evolve-triage.md:125-205`, `agents/evolve-orchestrator.md:111-130`, `legacy/scripts/lifecycle/phase-gate.sh:447-508,1367-1373`
 
 ## TL;DR
 
@@ -63,7 +63,7 @@ For each phase name in `triage.phase_skip[]`, the orchestrator:
 
 Two systems can request skips:
 
-- **`adaptiveFailureDecision.skip_phases[]`** — from `scripts/failure/failure-adapter.sh` (deterministic, derived from `state.json:failedApproaches[]`)
+- **`adaptiveFailureDecision.skip_phases[]`** — from `legacy/scripts/failure/failure-adapter.sh` (deterministic, derived from `state.json:failedApproaches[]`)
 - **`triage.phase_skip[]`** — from Triage (judgment-based, derived from cycle size + verdict baseline)
 
 The Triage `phase_skip[]` is **additive**: it may request skips the adapter did not request, but it **cannot override** a non-skip from the adapter. Merge rule:
@@ -76,7 +76,7 @@ Applied only when `EVOLVE_PSMAS_SKIP=1`. When the flag is unset or `0`, the orch
 
 ### Gate enforcement
 
-`scripts/lifecycle/phase-gate.sh:447-508` adds two skip-aware gates:
+`legacy/scripts/lifecycle/phase-gate.sh:447-508` adds two skip-aware gates:
 
 | Gate | Skip target | Required precondition |
 |---|---|---|
@@ -89,7 +89,7 @@ Both gates fail loudly (exit non-zero) when the flag is set without a matching l
 
 A `kind:phase_skipped` entry for phase X in cycle N means `--resume` of cycle N MUST treat X as already completed. Without this discipline, a session interruption mid-cycle would re-execute the skipped phase on resume, defeating the savings.
 
-Implementation: `cycle-state.json:completed_phases[]` is populated when the ledger entry is written. The resume path (`scripts/lifecycle/resume-cycle.sh`) reads `completed_phases[]` before deciding which phase to dispatch next.
+Implementation: `cycle-state.json:completed_phases[]` is populated when the ledger entry is written. The resume path (`legacy/scripts/lifecycle/resume-cycle.sh`) reads `completed_phases[]` before deciding which phase to dispatch next.
 
 ## Audit-binding considerations
 

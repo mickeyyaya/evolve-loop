@@ -13,7 +13,7 @@ import (
 // (input list may be data-driven via phase-registry now).
 func TestC58_023_CheckPhaseInputsDetectsMissing(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	script := filepath.Join(root, "scripts", "utility", "check-phase-inputs.sh")
+	script := filepath.Join(root, "legacy", "scripts", "utility", "check-phase-inputs.sh")
 	if !acsassert.FileContainsAny(script) {
 		t.Skip("check-phase-inputs.sh missing — skip cycle-58-023")
 	}
@@ -26,8 +26,8 @@ func TestC58_023_CheckPhaseInputsDetectsMissing(t *testing.T) {
 // init-standalone-cycle.sh exists + handles scout phase init.
 func TestC58_024_ScoutRunsStandalone(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	initScript := filepath.Join(root, "scripts", "utility", "init-standalone-cycle.sh")
-	subagent := filepath.Join(root, "scripts", "dispatch", "subagent-run.sh")
+	initScript := filepath.Join(root, "legacy", "scripts", "utility", "init-standalone-cycle.sh")
+	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	for _, f := range []string{initScript, subagent} {
 		if !acsassert.FileExists(t, f) {
 			t.Skipf("required file missing — skip cycle-58-024: %s", f)
@@ -45,8 +45,8 @@ func TestC58_024_ScoutRunsStandalone(t *testing.T) {
 // (likely data-driven via registry).
 func TestC58_025_AuditStandaloneBuilderArtifacts(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	initScript := filepath.Join(root, "scripts", "utility", "init-standalone-cycle.sh")
-	checkInputs := filepath.Join(root, "scripts", "utility", "check-phase-inputs.sh")
+	initScript := filepath.Join(root, "legacy", "scripts", "utility", "init-standalone-cycle.sh")
+	checkInputs := filepath.Join(root, "legacy", "scripts", "utility", "check-phase-inputs.sh")
 	if !acsassert.FileContainsAny(initScript, "audit") {
 		t.Skip("audit marker absent in init-standalone-cycle.sh — source evolved")
 	}

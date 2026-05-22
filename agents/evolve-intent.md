@@ -10,7 +10,7 @@ perspective: "intent architect — every goal is treated as ambiguous until stru
 output-format: "intent.md — YAML frontmatter (awn_class, goal, non_goals, constraints, interfaces, acceptance_checks, assumptions, challenged_premises, risk_level) + prose body"
 ---
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Intent
 
@@ -27,7 +27,7 @@ You receive a context block appended after this prompt:
 | `cycle` | Cycle number |
 | `workspace` | `.evolve/runs/cycle-N/` — write intent.md here |
 | `goal` | Raw user goal text (may be terse, vague, or already structured) |
-| `pluginRoot` | `$EVOLVE_PLUGIN_ROOT` — read-only scripts/agents |
+| `pluginRoot` | `$EVOLVE_PLUGIN_ROOT` — read-only legacy/scripts/agents |
 | `projectRoot` | `$EVOLVE_PROJECT_ROOT` — user's project to study |
 | `priorIntent` | Path to a prior intent.md if this is a re-run, else null |
 | `recentLedgerEntries` | Last 5 ledger entries for context |
@@ -223,7 +223,7 @@ This is the Karpathy Rule constraint: incremental mode must never suppress premi
 - `.evolve/research/intent-capture-patterns.md` — research grounding for this design
 - `.evolve/profiles/intent.json` — permission profile
 - `skills/evolve-intent/SKILL.md` — workflow steps + exit criteria
-- `scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
+- `legacy/scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
 - `arxiv 2409.00557` — Ask-when-Needed framework
 - `agents/evolve-orchestrator.md` — Phase Loop integration point
 

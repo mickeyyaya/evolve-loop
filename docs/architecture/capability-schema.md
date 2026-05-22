@@ -15,9 +15,9 @@ Pre-v8.51, each adapter's behavior was hardcoded — Gemini hard-failed if Claud
 
 | File | Purpose |
 |---|---|
-| `scripts/cli_adapters/_capabilities-schema.json` | JSON Schema (Draft 2020-12) defining the manifest structure |
-| `scripts/cli_adapters/_capability-check.sh` | Resolver: reads a manifest + runs probes, emits resolved tier per dimension |
-| `scripts/cli_adapters/<cli>.capabilities.json` | One manifest per adapter (claude / gemini / codex; add a row for any new CLI) |
+| `legacy/scripts/cli_adapters/_capabilities-schema.json` | JSON Schema (Draft 2020-12) defining the manifest structure |
+| `legacy/scripts/cli_adapters/_capability-check.sh` | Resolver: reads a manifest + runs probes, emits resolved tier per dimension |
+| `legacy/scripts/cli_adapters/<cli>.capabilities.json` | One manifest per adapter (claude / gemini / codex; add a row for any new CLI) |
 | `bin/check-caps` | Operator entry point — wraps `_capability-check.sh` |
 
 ## Schema overview
@@ -120,14 +120,14 @@ Adding a new probe: extend `_capability-check.sh:run_probe()` with a new case br
 
 To add a 4th CLI (e.g., `copilot`):
 
-1. Write `scripts/cli_adapters/copilot.sh` mirroring `gemini.sh`'s pattern (HYBRID delegation when claude binary present, DEGRADED same-session otherwise).
-2. Write `scripts/cli_adapters/copilot.capabilities.json` declaring its capabilities. Validate against the schema:
+1. Write `legacy/scripts/cli_adapters/copilot.sh` mirroring `gemini.sh`'s pattern (HYBRID delegation when claude binary present, DEGRADED same-session otherwise).
+2. Write `legacy/scripts/cli_adapters/copilot.capabilities.json` declaring its capabilities. Validate against the schema:
    ```bash
-   jq empty scripts/cli_adapters/copilot.capabilities.json
+   jq empty legacy/scripts/cli_adapters/copilot.capabilities.json
    ```
 3. Add `copilot` to the adapter enum in `_capabilities-schema.json:properties.adapter.enum`.
-4. Add tests at `scripts/tests/copilot-adapter-test.sh` mirroring `codex-adapter-test.sh`.
-5. Register the test in `scripts/utility/run-all-regression-tests.sh:SUITES`.
+4. Add tests at `legacy/scripts/tests/copilot-adapter-test.sh` mirroring `codex-adapter-test.sh`.
+5. Register the test in `legacy/scripts/utility/run-all-regression-tests.sh:SUITES`.
 6. Document at `skills/evolve-loop/reference/copilot-runtime.md` and `copilot-tools.md`.
 7. Run `./bin/preflight` to validate end-to-end.
 

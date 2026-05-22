@@ -14,7 +14,7 @@ Pre-cycle-38, the only enforced contract on a phase artifact was the challenge t
 - Builder reports without `## Quality Signals` shipped because no automated lint ran.
 - Cross-phase changes broke handoffs without any deterministic signal — failures surfaced cycles later as reward-hacking forensics.
 
-Cycle 38 introduced `schemas/handoff/{scout,build,audit}-report.schema.json` and `scripts/tests/validate-handoff-artifact.sh` as the first three phase contracts. Cycle 63 closes the gap by adding the remaining five.
+Cycle 38 introduced `schemas/handoff/{scout,build,audit}-report.schema.json` and `legacy/scripts/tests/validate-handoff-artifact.sh` as the first three phase contracts. Cycle 63 closes the gap by adding the remaining five.
 
 ## Decision
 
@@ -39,7 +39,7 @@ Each schema is a **bash-native / jq-readable JSON** file (no external JSON Schem
 - `required_content[]` — regex patterns that must appear somewhere in the artifact
 - `min_words` — soft floor against empty handoffs
 
-Validation runs via `bash scripts/tests/validate-handoff-artifact.sh --artifact <path> --type <phase>`. Exit 0 = PASS, 1 = FAIL with named violations, 2 = ERROR.
+Validation runs via `bash legacy/scripts/tests/validate-handoff-artifact.sh --artifact <path> --type <phase>`. Exit 0 = PASS, 1 = FAIL with named violations, 2 = ERROR.
 
 ## Consequences
 
@@ -59,5 +59,5 @@ Validation runs via `bash scripts/tests/validate-handoff-artifact.sh --artifact 
 
 - Source contract: `schemas/handoff/*.schema.json` (8 files)
 - Reference table: [`.agents/skills/evolve-loop/reference/output-contracts.md`](../../.agents/skills/evolve-loop/reference/output-contracts.md)
-- Validator: `scripts/tests/validate-handoff-artifact.sh`
+- Validator: `legacy/scripts/tests/validate-handoff-artifact.sh`
 - Predecessor ADR: [ADR 0006](0006-layer-p-memo-handoff-template.md)

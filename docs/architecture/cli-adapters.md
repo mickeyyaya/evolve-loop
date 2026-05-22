@@ -1,14 +1,14 @@
 # CLI adapters — native + optional bridge delegation
 
-> **Audience**: operators considering enabling bridge for evolve-loop, contributors editing `scripts/cli_adapters/*.sh`, anyone debugging why a subagent didn't behave as expected.
+> **Audience**: operators considering enabling bridge for evolve-loop, contributors editing `legacy/scripts/cli_adapters/*.sh`, anyone debugging why a subagent didn't behave as expected.
 
-evolve-loop's `scripts/dispatch/subagent-run.sh` dispatches each cycle phase to a per-CLI adapter under `scripts/cli_adapters/`. The contract is well-defined: 8 mandatory env vars + a standard exit-code matrix. As of v10.18.0, **claude-tmux** has an **optional** delegation path to an external CLI called `bridge` — installed separately by the operator. All other adapters (`claude.sh`, `codex.sh`, `agy.sh`, `gemini.sh`) are unchanged.
+evolve-loop's `legacy/scripts/dispatch/subagent-run.sh` dispatches each cycle phase to a per-CLI adapter under `legacy/scripts/cli_adapters/`. The contract is well-defined: 8 mandatory env vars + a standard exit-code matrix. As of v10.18.0, **claude-tmux** has an **optional** delegation path to an external CLI called `bridge` — installed separately by the operator. All other adapters (`claude.sh`, `codex.sh`, `agy.sh`, `gemini.sh`) are unchanged.
 
 ---
 
 ## The adapter contract (unchanged)
 
-Every `scripts/cli_adapters/${CLI}.sh` accepts the following env vars from `subagent-run.sh`:
+Every `legacy/scripts/cli_adapters/${CLI}.sh` accepts the following env vars from `subagent-run.sh`:
 
 | Env var | Meaning |
 |---|---|
@@ -39,11 +39,11 @@ Bridge source is **not** distributed in this repository. It is the operator's re
 
 | evolve-loop adapter | Bridge CLI | Default-on? |
 |---|---|---|
-| `scripts/cli_adapters/claude.sh` | `claude-p` (headless `claude -p`) | ✓ |
-| `scripts/cli_adapters/claude-tmux.sh` | `claude-tmux` (interactive via tmux) | ✓ |
-| `scripts/cli_adapters/codex.sh` | `codex` (`codex exec`) | ✓ |
-| `scripts/cli_adapters/agy.sh` | `agy` (`agy -p`) | ✓ |
-| `scripts/cli_adapters/gemini.sh` | *no bridge support* | n/a (always native) |
+| `legacy/scripts/cli_adapters/claude.sh` | `claude-p` (headless `claude -p`) | ✓ |
+| `legacy/scripts/cli_adapters/claude-tmux.sh` | `claude-tmux` (interactive via tmux) | ✓ |
+| `legacy/scripts/cli_adapters/codex.sh` | `codex` (`codex exec`) | ✓ |
+| `legacy/scripts/cli_adapters/agy.sh` | `agy` (`agy -p`) | ✓ |
+| `legacy/scripts/cli_adapters/gemini.sh` | *no bridge support* | n/a (always native) |
 
 When the gate fires in any of the 4 supported adapters, control transfers to bridge via `exec`. Bridge picks up the standard env vars (PROFILE_PATH, RESOLVED_MODEL, PROMPT_FILE, WORKSPACE_PATH, STDOUT_LOG, STDERR_LOG, ARTIFACT_PATH, CYCLE, WORKTREE_PATH, AGENT) from its env-var fallback contract.
 
@@ -102,7 +102,7 @@ Once bridge is installed, the integration is active by default. No env var setti
 
 ```bash
 # Just run as normal:
-bash scripts/dispatch/subagent-run.sh ...
+bash legacy/scripts/dispatch/subagent-run.sh ...
 # claude-tmux adapter delegates to bridge automatically
 ```
 
@@ -157,11 +157,11 @@ To verify the integration on your host:
 bash tools/agent-bridge/install.sh --check && echo "bridge OK"
 
 # 2. Run a probe cycle WITHOUT bridge enabled — should use native adapter.
-EVOLVE_USE_BRIDGE=0 bash scripts/cli_adapters/claude-tmux.sh   # expect: prototype path
+EVOLVE_USE_BRIDGE=0 bash legacy/scripts/cli_adapters/claude-tmux.sh   # expect: prototype path
 # (will fail without env vars; check the error mentions PROFILE_PATH, not bridge)
 
 # 3. Same call WITH bridge enabled — should delegate.
-EVOLVE_USE_BRIDGE=1 bash scripts/cli_adapters/claude-tmux.sh   # expect: "[claude-tmux] delegating to bridge ..."
+EVOLVE_USE_BRIDGE=1 bash legacy/scripts/cli_adapters/claude-tmux.sh   # expect: "[claude-tmux] delegating to bridge ..."
 ```
 
 Both invocations fail rc-nonzero in this contrived example (env vars missing); the point of the smoke is the **stderr log line** which tells you which path ran.
@@ -172,6 +172,6 @@ For a real cycle, set the 8 mandatory env vars and run via `subagent-run.sh` nor
 
 ## References
 
-- `scripts/cli_adapters/claude-tmux.sh` — the prototype adapter + the new gate (top ~30 lines)
-- `scripts/dispatch/subagent-run.sh` — the upstream caller (unchanged)
+- `legacy/scripts/cli_adapters/claude-tmux.sh` — the prototype adapter + the new gate (top ~30 lines)
+- `legacy/scripts/dispatch/subagent-run.sh` — the upstream caller (unchanged)
 - Bridge source + design — separate; not in this repository

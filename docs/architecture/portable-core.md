@@ -47,10 +47,10 @@ Trust-kernel enforcement. These wire into the harness's `PreToolUse` / `Stop` ho
 
 | File | Role |
 |---|---|
-| `scripts/guards/phase-gate-precondition.sh` | Denies cross-phase tool calls before predecessor artifact exists |
-| `scripts/guards/role-gate.sh` | Denies tool calls outside the active role's profile |
-| `scripts/guards/ship-gate.sh` | Denies `git push origin main` unless audit-bound + verdict PASS |
-| `scripts/guards/commit-prefix-gate.sh` | Denies commits whose prefix scope doesn't match changed paths |
+| `legacy/scripts/guards/phase-gate-precondition.sh` | Denies cross-phase tool calls before predecessor artifact exists |
+| `legacy/scripts/guards/role-gate.sh` | Denies tool calls outside the active role's profile |
+| `legacy/scripts/guards/ship-gate.sh` | Denies `git push origin main` unless audit-bound + verdict PASS |
+| `legacy/scripts/guards/commit-prefix-gate.sh` | Denies commits whose prefix scope doesn't match changed paths |
 
 ### Lifecycle scripts (5 files)
 
@@ -58,11 +58,11 @@ Per-cycle state machine.
 
 | File | Role |
 |---|---|
-| `scripts/lifecycle/ship.sh` | Atomic commit + push with ledger entry + audit-binding |
-| `scripts/lifecycle/phase-gate.sh` | Phase-transition state machine (calibrate → research → … → learn) |
-| `scripts/lifecycle/cycle-state.sh` | Reads/writes `.evolve/cycle-state.json` |
-| `scripts/lifecycle/resolve-roots.sh` | Dual-root resolution (`PLUGIN_ROOT` for reads, `PROJECT_ROOT` for writes) |
-| `scripts/lifecycle/role-context-builder.sh` | Role-filtered prompt context assembly (Layer B) |
+| `legacy/scripts/lifecycle/ship.sh` | Atomic commit + push with ledger entry + audit-binding |
+| `legacy/scripts/lifecycle/phase-gate.sh` | Phase-transition state machine (calibrate → research → … → learn) |
+| `legacy/scripts/lifecycle/cycle-state.sh` | Reads/writes `.evolve/cycle-state.json` |
+| `legacy/scripts/lifecycle/resolve-roots.sh` | Dual-root resolution (`PLUGIN_ROOT` for reads, `PROJECT_ROOT` for writes) |
+| `legacy/scripts/lifecycle/role-context-builder.sh` | Role-filtered prompt context assembly (Layer B) |
 
 ### Dispatch scripts (7 files)
 
@@ -70,13 +70,13 @@ Subagent spawn + CLI adaptation.
 
 | File | Role |
 |---|---|
-| `scripts/dispatch/subagent-run.sh` | The ONLY path through which personas may be spawned |
-| `scripts/dispatch/run-cycle.sh` | Provisions per-cycle worktree, spawns orchestrator subagent |
-| `scripts/dispatch/build-invocation-context.sh` | Canonical shared prelude (trust-boundary boilerplate + role notes) |
-| `scripts/dispatch/resolve-llm.sh` | LLM/CLI selection from `.evolve/llm_config.json` + envelope |
-| `scripts/dispatch/preflight-environment.sh` | Resolves `EVOLVE_WORKTREE_BASE`, sandbox availability |
-| `scripts/dispatch/detect-cli.sh` | Identifies the active CLI (claude / gemini / codex / …) |
-| `scripts/dispatch/detect-nested-claude.sh` | Auto-disables inner sandbox when nested |
+| `legacy/scripts/dispatch/subagent-run.sh` | The ONLY path through which personas may be spawned |
+| `legacy/scripts/dispatch/run-cycle.sh` | Provisions per-cycle worktree, spawns orchestrator subagent |
+| `legacy/scripts/dispatch/build-invocation-context.sh` | Canonical shared prelude (trust-boundary boilerplate + role notes) |
+| `legacy/scripts/dispatch/resolve-llm.sh` | LLM/CLI selection from `.evolve/llm_config.json` + envelope |
+| `legacy/scripts/dispatch/preflight-environment.sh` | Resolves `EVOLVE_WORKTREE_BASE`, sandbox availability |
+| `legacy/scripts/dispatch/detect-cli.sh` | Identifies the active CLI (claude / gemini / codex / …) |
+| `legacy/scripts/dispatch/detect-nested-claude.sh` | Auto-disables inner sandbox when nested |
 
 ### Verification scripts (3 files)
 
@@ -84,9 +84,9 @@ Audit-time integrity checks.
 
 | File | Role |
 |---|---|
-| `scripts/verification/audit-constitution-check.sh` | Layer 4 constitutional checklist (P1-P6) |
-| `scripts/verification/verdict-elevation.sh` | Layer 5 WARN→FAIL elevation on rule violations |
-| `scripts/verification/validate-predicate.sh` | EGPS predicate executability + safety check |
+| `legacy/scripts/verification/audit-constitution-check.sh` | Layer 4 constitutional checklist (P1-P6) |
+| `legacy/scripts/verification/verdict-elevation.sh` | Layer 5 WARN→FAIL elevation on rule violations |
+| `legacy/scripts/verification/validate-predicate.sh` | EGPS predicate executability + safety check |
 
 ### Observability (2 files)
 
@@ -94,8 +94,8 @@ Tamper detection + cycle health.
 
 | File | Role |
 |---|---|
-| `scripts/observability/verify-ledger-chain.sh` | Validates SHA-chain integrity (`prev_hash` + `entry_seq`) |
-| `scripts/observability/cycle-health-check.sh` | Detects reward-hacking / fabricated cycles |
+| `legacy/scripts/observability/verify-ledger-chain.sh` | Validates SHA-chain integrity (`prev_hash` + `entry_seq`) |
+| `legacy/scripts/observability/cycle-health-check.sh` | Detects reward-hacking / fabricated cycles |
 
 ### Profiles (6 files)
 
@@ -148,9 +148,9 @@ Layers that compose on top of the core but are not load-bearing for the basic Sc
 | EGPS Tester | `agents/evolve-tester.md`, `.evolve/profiles/tester.json` | When you need an independent predicate-author separate from Builder (anti-gaming) |
 | Inspirer | `agents/evolve-inspirer.md`, `.evolve/profiles/inspirer.json` | When you want a "diff-aware reflection" persona between Scout and Builder |
 | Evaluator | `agents/evolve-evaluator.md`, `.evolve/profiles/evaluator.json` | When you want a same-cycle counter-Auditor for cross-checking |
-| Phase observer | `scripts/dispatch/phase-observer.sh`, `scripts/dispatch/phase-watchdog.sh` | When you need real-time stuck-loop detection during a cycle (gated by `EVOLVE_OBSERVER_ENABLED=1`) |
-| Fan-out | `scripts/dispatch/fanout-dispatch.sh`, `aggregator.sh` | When read-only phases (Scout, Auditor) benefit from parallel sub-personas |
-| Checkpoint/resume | `scripts/dispatch/resume-cycle.sh`, checkpoint-related hooks | When cycles routinely exceed 95% budget and partial work loss is unacceptable |
+| Phase observer | `legacy/scripts/dispatch/phase-observer.sh`, `legacy/scripts/dispatch/phase-watchdog.sh` | When you need real-time stuck-loop detection during a cycle (gated by `EVOLVE_OBSERVER_ENABLED=1`) |
+| Fan-out | `legacy/scripts/dispatch/fanout-dispatch.sh`, `aggregator.sh` | When read-only phases (Scout, Auditor) benefit from parallel sub-personas |
+| Checkpoint/resume | `legacy/scripts/dispatch/resume-cycle.sh`, checkpoint-related hooks | When cycles routinely exceed 95% budget and partial work loss is unacceptable |
 
 ## Trust kernel invariants
 
@@ -173,7 +173,7 @@ Each invariant maps to a script in the minimal core. Removing the script removes
 
 To wire the minimal core into a new project:
 
-1. **Copy the 36 files** preserving the relative directory layout (`scripts/guards/`, `scripts/lifecycle/`, `scripts/dispatch/`, `scripts/verification/`, `scripts/observability/`, `.evolve/profiles/`, `agents/`, plus the 3 config files).
+1. **Copy the 36 files** preserving the relative directory layout (`legacy/scripts/guards/`, `legacy/scripts/lifecycle/`, `legacy/scripts/dispatch/`, `legacy/scripts/verification/`, `legacy/scripts/observability/`, `.evolve/profiles/`, `agents/`, plus the 3 config files).
 
 2. **Add `AGENTS.md` to the project root** with the cross-CLI invariants + 12 Core Agent Rules.
 
@@ -185,10 +185,10 @@ To wire the minimal core into a new project:
    {
      "hooks": {
        "PreToolUse": [
-         { "matcher": "Bash|Edit|Write", "command": "bash scripts/guards/phase-gate-precondition.sh" },
-         { "matcher": "Bash|Edit|Write", "command": "bash scripts/guards/role-gate.sh" },
-         { "matcher": "Bash", "command": "bash scripts/guards/ship-gate.sh" },
-         { "matcher": "Bash", "command": "bash scripts/guards/commit-prefix-gate.sh" }
+         { "matcher": "Bash|Edit|Write", "command": "bash legacy/scripts/guards/phase-gate-precondition.sh" },
+         { "matcher": "Bash|Edit|Write", "command": "bash legacy/scripts/guards/role-gate.sh" },
+         { "matcher": "Bash", "command": "bash legacy/scripts/guards/ship-gate.sh" },
+         { "matcher": "Bash", "command": "bash legacy/scripts/guards/commit-prefix-gate.sh" }
        ]
      }
    }
@@ -207,7 +207,7 @@ To wire the minimal core into a new project:
 5. **Smoke test** by running one cycle with `EVOLVE_BATCH_BUDGET_CAP=2.00` to cap cost:
 
    ```bash
-   bash scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 balanced "add a no-op task to verify wiring"
+   bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 balanced "add a no-op task to verify wiring"
    ```
 
    Expect: `scout-report.md` → `build-report.md` → `audit-report.md` → `orchestrator-report.md` in `.evolve/runs/cycle-1/`, plus one commit on `main`.
@@ -222,7 +222,7 @@ To wire the minimal core into a new project:
    git commit -m "bogus: this won't pass"
 
    # Should be denied by phase-gate-precondition (phase=calibrate, cannot reach build):
-   bash scripts/dispatch/subagent-run.sh builder 1 .evolve/runs/cycle-1
+   bash legacy/scripts/dispatch/subagent-run.sh builder 1 .evolve/runs/cycle-1
    ```
 
 If all three deny correctly, the kernel is wired. If any allow, the invariant is broken.
@@ -245,7 +245,7 @@ The core is internally consistent at the level of a single release. If you vendo
 Verify alignment after vendoring:
 
 ```bash
-grep -h '^# Version:' scripts/{guards,lifecycle,dispatch,verification,observability}/*.sh | sort -u
+grep -h '^# Version:' legacy/scripts/{guards,lifecycle,dispatch,verification,observability}/*.sh | sort -u
 ```
 
 All scripts in the same vendored snapshot should report the same version line. Mismatches indicate partial vendor.

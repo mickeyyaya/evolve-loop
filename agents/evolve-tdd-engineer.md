@@ -10,7 +10,7 @@ perspective: "test-first sentinel — writes failing tests before any implementa
 output-format: "test-report.md — test files written, RED run output, coverage gap analysis, handoff contract for Builder"
 ---
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve TDD Engineer
 
@@ -57,7 +57,7 @@ Read `workspace/scout-report.md`. Extract:
 # Detect available test runners
 ls tests/ test/ spec/ __tests__/ 2>/dev/null || echo "no test dir found"
 command -v pytest python3 node jest bash 2>/dev/null
-ls Makefile scripts/*.sh scripts/test* 2>/dev/null
+ls Makefile legacy/scripts/*.sh legacy/scripts/test* 2>/dev/null
 ```
 
 If no test infrastructure exists: write shell-based assertion scripts in `tests/` (bash assertions are valid tests). Document the gap in `test-report.md`.
@@ -254,7 +254,7 @@ cat > "$WORKSPACE/carryoverTodos.json" <<'JSON'
 ]
 JSON
 # Execute the actual triage scoring
-output=$(bash scripts/lifecycle/triage-rank.sh "$WORKSPACE/carryoverTodos.json" --top-n 3)
+output=$(bash legacy/scripts/lifecycle/triage-rank.sh "$WORKSPACE/carryoverTodos.json" --top-n 3)
 # Assert at least one HIGH operator todo is in top_n (the priority floor)
 if ! echo "$output" | grep -q '"source":"operator"'; then
     echo "FAIL: no operator todo in top_n — priority floor not enforced"
@@ -271,9 +271,9 @@ echo "PASS"; exit 0
 # ACS — verify subagent-run.sh hard-errors on unset WORKTREE_PATH
 set -uo pipefail
 # "Behavioral" — but only checks the script exists
-test -x scripts/dispatch/subagent-run.sh
+test -x legacy/scripts/dispatch/subagent-run.sh
 # The actual check is still grep-only:
-grep -qF 'exit 1' scripts/dispatch/subagent-run.sh
+grep -qF 'exit 1' legacy/scripts/dispatch/subagent-run.sh
 ```
 *Why bad:* The `test -x` doesn't invoke the worktree-validation code path. The `grep -qF 'exit 1'` could match an `exit 1` anywhere in the 800-line script. Window-dressing on a grep-only predicate.
 
@@ -283,7 +283,7 @@ grep -qF 'exit 1' scripts/dispatch/subagent-run.sh
 # ACS — verify subagent-run.sh hard-errors when WORKTREE_PATH unset for worktree-aware profile
 set -uo pipefail
 # Actually invoke subagent-run.sh with a worktree-aware profile and no WORKTREE_PATH
-output=$(unset WORKTREE_PATH; bash scripts/dispatch/subagent-run.sh builder 999 /tmp/nonexistent 2>&1)
+output=$(unset WORKTREE_PATH; bash legacy/scripts/dispatch/subagent-run.sh builder 999 /tmp/nonexistent 2>&1)
 rc=$?
 if [ "$rc" -eq 0 ]; then
     echo "FAIL: subagent-run.sh succeeded when WORKTREE_PATH unset — expected exit 1"
@@ -340,7 +340,7 @@ If any answer is "no", the predicate is grep-only or mixed-fake. Rewrite it befo
 
 - Plan: `ultrathink-and-online-research-mutable-hollerith.md` (Layer 2 static lint catches violations of this rule)
 - Cycle-85 forensic: see `.evolve/runs/archive/cycle-85-*/` for the negative examples
-- Linter: `scripts/verification/lint-acs-predicates.sh` (Cycle 2 — automated enforcement of this rule at `gate_test_to_build`)
+- Linter: `legacy/scripts/verification/lint-acs-predicates.sh` (Cycle 2 — automated enforcement of this rule at `gate_test_to_build`)
 
 ## Failure Modes
 

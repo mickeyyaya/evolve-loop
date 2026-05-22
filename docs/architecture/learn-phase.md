@@ -80,7 +80,7 @@ The `carryover-todos.json` ownership is verdict-conditional: retrospective owns 
 | What's the pipeline-level pattern over the last 5 cycles? | Same file → "Cross-Cycle Rollup" + "Top Pipeline-Level Patterns" |
 | What lessons were extracted from this cycle (FAIL/WARN only)? | `.evolve/runs/cycle-N/retrospective-report.md` + `.evolve/instincts/lessons/*.yaml` |
 | What's deferred to next cycle? | `.evolve/runs/cycle-N/carryover-todos.json` |
-| Recurring hot-spots at a glance? | `bash scripts/observability/dashboard.sh` → "Recent reflection hot-spots" line |
+| Recurring hot-spots at a glance? | `bash legacy/scripts/observability/dashboard.sh` → "Recent reflection hot-spots" line |
 
 ## Cross-references
 

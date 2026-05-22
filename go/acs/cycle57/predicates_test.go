@@ -14,8 +14,8 @@ import (
 func TestC57_022_OrchestratorUsesRegistry(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	orch := filepath.Join(root, "agents", "evolve-orchestrator.md")
-	gate := filepath.Join(root, "scripts", "lifecycle", "phase-gate.sh")
-	helper := filepath.Join(root, "scripts", "dispatch", "list-phase-order.sh")
+	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
+	helper := filepath.Join(root, "legacy", "scripts", "dispatch", "list-phase-order.sh")
 	_ = gate
 	_ = helper
 	if !acsassert.FileContainsAny(orch, "list-phase-order.sh", "gate_run_by_name") {

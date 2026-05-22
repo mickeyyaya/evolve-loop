@@ -201,7 +201,7 @@ selecting tasks, planning the build, or estimating risk:
 
 Scout's `## Carryover Decisions` section in `scout-report.md` may explicitly cite these instincts when deciding to defer a task ("instinct cycle-24-... warns this would recur — deferring until we add a structural commit-check").
 
-The prompt building is in `scripts/dispatch/role-context-builder.sh`. Token cost per cycle for the instinct section is bounded — long-lived instincts that haven't fired recently get demoted out of the visible list to keep Scout's context focused.
+The prompt building is in `legacy/scripts/dispatch/role-context-builder.sh`. Token cost per cycle for the instinct section is bounded — long-lived instincts that haven't fired recently get demoted out of the visible list to keep Scout's context focused.
 
 ---
 

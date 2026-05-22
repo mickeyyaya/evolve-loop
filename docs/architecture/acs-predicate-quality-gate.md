@@ -28,7 +28,7 @@ always passes if the string is present, regardless of whether the implementation
 
 ### Layer 2 — Static Linter (`predicate-quality-c2-linter`)
 
-**Script:** `scripts/verification/lint-acs-predicates.sh`
+**Script:** `legacy/scripts/verification/lint-acs-predicates.sh`
 
 **Classification rules:**
 
@@ -37,12 +37,12 @@ always passes if the string is present, regardless of whether the implementation
 | `BEHAVIORAL` | Uses subprocess invocations (`$(...)`, backtick) or arithmetic/jq/awk/wc |
 | `GREP_ONLY` | `grep -q` calls with no subprocess invocations (count > 0, subprocess_count == 0) |
 
-**Gate hook:** `gate_build_to_audit` in `scripts/lifecycle/phase-gate.sh` runs the linter on every predicate in `acs/cycle-N/`. Any GREP_ONLY predicate **blocks the gate** (exit 1). Opt-out not available — this is a hard gate.
+**Gate hook:** `gate_build_to_audit` in `legacy/scripts/lifecycle/phase-gate.sh` runs the linter on every predicate in `acs/cycle-N/`. Any GREP_ONLY predicate **blocks the gate** (exit 1). Opt-out not available — this is a hard gate.
 
 **Usage:**
 ```bash
 # Classify predicates with explanation
-bash scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain
+bash legacy/scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain
 
 # Exit codes: 0 = all behavioral, 1 = grep-only detected
 ```
@@ -118,10 +118,10 @@ gate_discover_to_build (next cycle): mutation gate FAIL at kill_rate < 0.7
 
 ## References
 
-- `scripts/verification/lint-acs-predicates.sh` — Layer 2 linter
+- `legacy/scripts/verification/lint-acs-predicates.sh` — Layer 2 linter
 - `tests/verification/test-lint-acs-predicates.sh` — Layer 2 test suite
-- `scripts/verification/mutate-eval.sh` — mutation testing (grep_only_check pre-flight)
-- `scripts/lifecycle/phase-gate.sh` — gate_build_to_audit, gate_discover_to_build
+- `legacy/scripts/verification/mutate-eval.sh` — mutation testing (grep_only_check pre-flight)
+- `legacy/scripts/lifecycle/phase-gate.sh` — gate_build_to_audit, gate_discover_to_build
 - `agents/evolve-auditor.md` — Predicate quality review section (Layer 3)
 - `agents/evolve-orchestrator.md` — EGPS Tester Phase section (Layer 4)
 - `.evolve/profiles/tdd-engineer.json` — Layer 1 author separation

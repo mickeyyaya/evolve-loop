@@ -45,7 +45,7 @@ Each line in `abnormal-events.jsonl` is a JSON object:
 
 ## Detector Table
 
-Detectors are implemented in `scripts/dispatch/subagent-run.sh` via the `_append_abnormal_event()` function.
+Detectors are implemented in `legacy/scripts/dispatch/subagent-run.sh` via the `_append_abnormal_event()` function.
 
 | event_type | Severity | Trigger Condition | Remediation Hint |
 |------------|----------|-------------------|------------------|
@@ -84,7 +84,7 @@ reconcile-carryover-todos.sh
 
 ## Reconcile-Carryover Promotion Contract
 
-`scripts/lifecycle/reconcile-carryover-todos.sh` reads `$WORKSPACE/abnormal-events.jsonl` after normal carryover processing.
+`legacy/scripts/lifecycle/reconcile-carryover-todos.sh` reads `$WORKSPACE/abnormal-events.jsonl` after normal carryover processing.
 
 **Promotion rules:**
 1. Parse all unique `event_type` values from the JSONL file.

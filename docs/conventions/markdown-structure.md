@@ -5,7 +5,7 @@ metadata:
   type: convention
 ---
 
-> **Canonical markdown schema** — every reference, architecture, skill, and agent doc in this project follows this schema. Tools: `scripts/utility/lint-markdown-structure.sh` (WARN linter), `scripts/utility/extract-tldr.sh` (TLDR extractor).
+> **Canonical markdown schema** — every reference, architecture, skill, and agent doc in this project follows this schema. Tools: `legacy/scripts/utility/lint-markdown-structure.sh` (WARN linter), `legacy/scripts/utility/extract-tldr.sh` (TLDR extractor).
 
 ## TLDR
 
@@ -212,13 +212,13 @@ metadata:
 Run the WARN-only linter against a directory or file list:
 
 ```bash
-bash scripts/utility/lint-markdown-structure.sh <path> [<path>...]
+bash legacy/scripts/utility/lint-markdown-structure.sh <path> [<path>...]
 ```
 
 Extract the TLDR of any compliant file:
 
 ```bash
-bash scripts/utility/extract-tldr.sh <path/to/file.md>
+bash legacy/scripts/utility/extract-tldr.sh <path/to/file.md>
 ```
 
 Exit codes: 0 = found, 1 = not found.
@@ -229,7 +229,7 @@ The linter always exits 0 (WARN-only). No gate integration this cycle.
 
 ## References
 
-- `scripts/utility/lint-markdown-structure.sh` — WARN-only linter
-- `scripts/utility/extract-tldr.sh` — TLDR extractor
+- `legacy/scripts/utility/lint-markdown-structure.sh` — WARN-only linter
+- `legacy/scripts/utility/extract-tldr.sh` — TLDR extractor
 - `tests/markdown-structure-test.sh` — unit test suite
 - [[feedback_skill_file_structure]] — operator memory entry that motivated this convention

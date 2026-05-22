@@ -17,7 +17,7 @@ import (
 // role-context-builder.sh wires emit_budget_hint into header_block().
 func TestC44_001_PNew23BudgetBlockInjected(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	file := filepath.Join(root, "scripts", "lifecycle", "role-context-builder.sh")
+	file := filepath.Join(root, "legacy", "scripts", "lifecycle", "role-context-builder.sh")
 	if !acsassert.FileExists(t, file) {
 		t.Skip("role-context-builder.sh missing — skip cycle-44-001")
 	}
@@ -117,7 +117,7 @@ func TestC44_005_D1RetroGateWired(t *testing.T) {
 // claude.sh dispatches --effort and reads effort_level from profile.
 func TestC44_006_PNew26EffortFlagWired(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	file := filepath.Join(root, "scripts", "cli_adapters", "claude.sh")
+	file := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
 	if !acsassert.FileExists(t, file) {
 		t.Skip("claude.sh missing — skip cycle-44-006")
 	}
@@ -149,7 +149,7 @@ func TestC44_007_PNew26ProfileFields(t *testing.T) {
 // scripts/utility/backfill-lessons.sh exists and is executable.
 func TestC44_008_BackfillScriptExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	file := filepath.Join(root, "scripts", "utility", "backfill-lessons.sh")
+	file := filepath.Join(root, "legacy", "scripts", "utility", "backfill-lessons.sh")
 	if !acsassert.FileExists(t, file) {
 		t.Skip("backfill-lessons.sh missing — skip cycle-44-008")
 	}

@@ -85,7 +85,7 @@ Level 4 invokes the actual kernel script being tested with a minimal contrived s
 ### Example: phase-gate invocable (dry-run path)
 
 ```bash
-phase-gate.sh --version 2>/dev/null || grep -q "phase-gate" scripts/lifecycle/phase-gate.sh
+phase-gate.sh --version 2>/dev/null || grep -q "phase-gate" legacy/scripts/lifecycle/phase-gate.sh
 ```
 
 For a real end-to-end check, construct a minimal `$WORKSPACE` with a synthetic artifact and invoke the gate function. This requires a test fixture and is expensive — use only when Level 3.5 is insufficient.
@@ -98,20 +98,20 @@ For a real end-to-end check, construct a minimal `$WORKSPACE` with a synthetic a
 
 ```bash
 # BAD — non-portable, fails in worktrees and CI
-grep -q "FLAG" /Users/alice/ai/claude/evolve-loop/scripts/lifecycle/phase-gate.sh
+grep -q "FLAG" /Users/alice/ai/claude/evolve-loop/legacy/scripts/lifecycle/phase-gate.sh
 
 # GOOD — relative, works everywhere
-grep -q "FLAG" scripts/lifecycle/phase-gate.sh
+grep -q "FLAG" legacy/scripts/lifecycle/phase-gate.sh
 ```
 
 ### Anti-pattern 2: Pure source-presence for behavioral claims
 
 ```bash
 # BAD — this passes even if the flag exists but the dispatch body is commented out
-grep -q "EVOLVE_AUDIT_ADVISORY_REVIEW" scripts/lifecycle/phase-gate.sh
+grep -q "EVOLVE_AUDIT_ADVISORY_REVIEW" legacy/scripts/lifecycle/phase-gate.sh
 
 # GOOD — verifies the flag guards the actual dispatch call
-awk '/EVOLVE_AUDIT_ADVISORY_REVIEW.*=.*"1"/{p=1} p && /audit-advisory-review.sh/{found=1} END{exit(!found)}' scripts/lifecycle/phase-gate.sh
+awk '/EVOLVE_AUDIT_ADVISORY_REVIEW.*=.*"1"/{p=1} p && /audit-advisory-review.sh/{found=1} END{exit(!found)}' legacy/scripts/lifecycle/phase-gate.sh
 ```
 
 ### Anti-pattern 3: Fixture-based acceptance checks that don't match real artifact format
@@ -149,7 +149,7 @@ Rule: when the section header matches `^## [A-Z]`, never use `^## [A-Z]` as the 
 Before submitting an eval, run `mutate-eval.sh` against it:
 
 ```bash
-bash scripts/verification/mutate-eval.sh .evolve/evals/your-eval.md --threshold 0.7
+bash legacy/scripts/verification/mutate-eval.sh .evolve/evals/your-eval.md --threshold 0.7
 ```
 
 Exit 0 = kill rate ≥ 0.7 (gate passes). Exit 1 = tautological (gate warns). Exit 2 = anomaly.

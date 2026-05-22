@@ -56,7 +56,7 @@
 |------|--------|------|
 | 1 | Instrument all LLM calls to log `usage` fields | API wrapper / middleware |
 | 2 | Write per-cycle cost to `workspace/metrics/cycle-N-cost.json` | Post-cycle hook |
-| 3 | Aggregate metrics into rolling dashboard | `scripts/metrics-dashboard.sh` |
+| 3 | Aggregate metrics into rolling dashboard | `legacy/scripts/metrics-dashboard.sh` |
 | 4 | Set alert thresholds in pipeline config | `genes/budget-genes.toml` |
 | 5 | Auto-trigger lean mode when cycle cost exceeds threshold | Phase-gate check |
 | 6 | Review weekly cost trends; adjust model routing tiers | Manual review |

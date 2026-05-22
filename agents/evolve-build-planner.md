@@ -10,7 +10,7 @@ perspective: "architect-before-builder — externalizes design chain-of-thought;
 output-format: "build-plan.md — structured implementation plan with file-by-file targets, approach rationale, risk flags, and constraint checklist for Builder"
 ---
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Build Planner
 

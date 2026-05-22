@@ -2,7 +2,7 @@
 
 > **Status:** Stable since v10.10.0 (cycle 97)
 > **Audience:** Operators tuning per-phase context size; persona authors adding new agents
-> **Source:** `scripts/lifecycle/role-context-builder.sh:200-250`, `.evolve/profiles/*.json:context_mode`
+> **Source:** `legacy/scripts/lifecycle/role-context-builder.sh:200-250`, `.evolve/profiles/*.json:context_mode`
 
 ## TL;DR
 
@@ -66,7 +66,7 @@ The fail-open is deliberate: if the loader cannot determine intent, emit the lar
 
 ### Digest payload
 
-When `EVOLVE_CONTEXT_DIGEST=1`, instead of dumping raw state arrays, the builder emits a single block sourced from `.evolve/runs/cycle-N/digest.md` (lazy-built via `scripts/lifecycle/build-cycle-digest.sh` if absent). The digest is a pre-compressed ~500-800 token summary of:
+When `EVOLVE_CONTEXT_DIGEST=1`, instead of dumping raw state arrays, the builder emits a single block sourced from `.evolve/runs/cycle-N/digest.md` (lazy-built via `legacy/scripts/lifecycle/build-cycle-digest.sh` if absent). The digest is a pre-compressed ~500-800 token summary of:
 
 - Cycle direction (intent goal + AwN classification)
 - Top 3 carryover items (not full backlog)

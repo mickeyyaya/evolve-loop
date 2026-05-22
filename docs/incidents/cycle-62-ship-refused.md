@@ -37,5 +37,5 @@ If a similar ship-refused pattern recurs in a cycle whose Builder *did* commit, 
 - Source events: `.evolve/runs/cycle-62/abnormal-events.jsonl` (ship-refused stream)
 - Auto-retrospective entry: `.evolve/instincts/lessons/cycle-62-*.yaml`
 - Audit-binding rationale: [ADR 0007 — Inbox Injection Protocol](../adr/0007-inbox-injection-protocol.md) (related — ship-gate SHA pin is documented in `docs/architecture/sequential-write-discipline.md`)
-- Ship-gate source: `scripts/lifecycle/ship.sh` (search `AUDIT_BOUND_TREE_SHA`)
+- Ship-gate source: `legacy/scripts/lifecycle/ship.sh` (search `AUDIT_BOUND_TREE_SHA`)
 - Cycle 63 Scout report: `.evolve/runs/cycle-63/scout-report.md` § Carryover Decisions

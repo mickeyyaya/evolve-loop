@@ -1,6 +1,6 @@
 ---
 name: verify-release
-description: Use when the user invokes /verify-release or asks to check whether a release has propagated, whether the marketplace is up to date, or whether installed plugins reflect the latest version. Wraps scripts/release/marketplace-poll.sh for standalone post-publish verification.
+description: Use when the user invokes /verify-release or asks to check whether a release has propagated, whether the marketplace is up to date, or whether installed plugins reflect the latest version. Wraps legacy/scripts/release/marketplace-poll.sh for standalone post-publish verification.
 argument-hint: "<target-version> [--max-wait-s 60] [--marketplace-dir <path>]"
 ---
 
@@ -10,12 +10,12 @@ argument-hint: "<target-version> [--max-wait-s 60] [--marketplace-dir <path>]"
 
 ## What this skill does
 
-Polls `~/.claude/plugins/marketplaces/evolve-loop/.claude-plugin/plugin.json` against the target version. On match, runs `scripts/utility/release.sh <target>` to refresh the installed-plugins registry — closing the cache-refresh ordering bug structurally (release.sh only runs after convergence is confirmed).
+Polls `~/.claude/plugins/marketplaces/evolve-loop/.claude-plugin/plugin.json` against the target version. On match, runs `legacy/scripts/utility/release.sh <target>` to refresh the installed-plugins registry — closing the cache-refresh ordering bug structurally (release.sh only runs after convergence is confirmed).
 
 The slash command translates to:
 
 ```bash
-bash scripts/release/marketplace-poll.sh <args>
+bash legacy/scripts/release/marketplace-poll.sh <args>
 ```
 
 ## Invocation
@@ -29,7 +29,7 @@ bash scripts/release/marketplace-poll.sh <args>
 
 ## When to use this skill
 
-- **After a manual ship** that didn't go through `/publish` (e.g., hot fix via `bash scripts/lifecycle/ship.sh`). The marketplace doesn't auto-pull; this verifies it caught up.
+- **After a manual ship** that didn't go through `/publish` (e.g., hot fix via `bash legacy/scripts/lifecycle/ship.sh`). The marketplace doesn't auto-pull; this verifies it caught up.
 - **Diagnosing stale-plugin reports.** If a user says "I'm running v8.13.2 but the marketplace shows v8.13.1," run `/verify-release 8.13.2` to force a marketplace pull and registry refresh.
 - **After a `git push origin main`** that bypassed the ship-gate (e.g., merging a feature branch back to main with `EVOLVE_BYPASS_SHIP_GATE=1`).
 
@@ -49,7 +49,7 @@ bash scripts/release/marketplace-poll.sh <args>
 
 ## Implementation note
 
-Thin discoverability wrapper around `scripts/release/marketplace-poll.sh`. All flag semantics match the underlying script verbatim.
+Thin discoverability wrapper around `legacy/scripts/release/marketplace-poll.sh`. All flag semantics match the underlying script verbatim.
 
 ## Related
 

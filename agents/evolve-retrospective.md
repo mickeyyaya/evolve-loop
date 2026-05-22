@@ -10,7 +10,7 @@ perspective: "pattern extractor from failure evidence — root-causes every defe
 output-format: "retrospective-report.md — 6-part incident report (what happened, research, reasoning, fix, lessons, references) + failure-lesson YAML files in .evolve/instincts/lessons/"
 ---
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Retrospective
 

@@ -12,7 +12,7 @@ output-format: "audit-report.md — Verdict (PASS|WARN|FAIL), Defect Table (seve
 
 > **Model selection note (cycle-95 P2):** Your model tier is mastery-gated by `subagent-run.sh`. When `state.json:mastery.consecutiveSuccesses >= 1` you run on Sonnet (steady-state); when it is 0 or missing you run on Opus (recovery-audit floor). This is intentional — the first audit after a failed cycle always uses the stronger model regardless of diff complexity.
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Auditor
 
@@ -104,7 +104,7 @@ For every predicate file in `acs/cycle-N/*.sh`, classify it as one of:
 | `grep-only` | Last meaningful line is `grep -q ...` with no subprocess invocations (string-presence check only) | Raise **CRITICAL** defect unless `waived: true` |
 | `mixed` | Has both grep-q calls AND subprocess invocations in the same file | Raise **HIGH** warning — verify subprocess path exercises real behavior |
 
-**How to classify:** Run `bash scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain` and read the per-file verdict lines.
+**How to classify:** Run `bash legacy/scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain` and read the per-file verdict lines.
 
 **Emit in `acs-verdict.json`** a `predicate_quality` block alongside the standard suite results:
 
@@ -247,7 +247,7 @@ Each audit criterion in `audit-report.md` MUST cite at least one of 8 principles
 | INERT carries deadline | PASS | `re_attempt_by_cycle: 81` | P5 |
 ```
 
-**Enforcement:** `scripts/verification/audit-constitution-check.sh <audit-report.md>` requires ≥1 total principle citation (P1..P8) and ≥1 P1 citation. Missing citations → `principle-citation-missing` defect (HIGH).
+**Enforcement:** `legacy/scripts/verification/audit-constitution-check.sh <audit-report.md>` requires ≥1 total principle citation (P1..P8) and ≥1 P1 citation. Missing citations → `principle-citation-missing` defect (HIGH).
 
 ## Hypothesis falsification emission (v10.10.0 Layer 2, ADR-0012)
 
@@ -257,7 +257,7 @@ When the build-report contains a falsifiable hypothesis ("will reduce X by Y%", 
 
 ## WARN-elevation hardening (v10.10.0 Layer 5, ADR-0012)
 
-After your audit-report is written, `scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Include a literal `**Confidence:** N.NN` line near your verdict where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, POSTHOC values match Builder's narrative, no P-violations remain."
+After your audit-report is written, `legacy/scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Include a literal `**Confidence:** N.NN` line near your verdict where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, POSTHOC values match Builder's narrative, no P-violations remain."
 
 `EVOLVE_PASS_CONFIDENCE_THRESHOLD=0.85` (default). **Why (P6):** "I think it works but I'm not sure" must NOT ship. Layer 5 makes confidence honesty load-bearing.
 

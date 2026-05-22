@@ -51,6 +51,6 @@ The `plan-reviewer` persona uses `parallel_subtasks` (see `.evolve/profiles/plan
 ## Reference
 
 - `.evolve/profiles/plan-reviewer.json` for lens prompt templates
-- `scripts/dispatch/aggregator.sh` plan-review merge mode
-- `scripts/lifecycle/phase-gate.sh:gate_plan_review_to_tdd`
+- `legacy/scripts/dispatch/aggregator.sh` plan-review merge mode
+- `legacy/scripts/lifecycle/phase-gate.sh:gate_plan_review_to_tdd`
 - `docs/architecture/tri-layer.md` (anti-patterns)

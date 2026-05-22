@@ -9,7 +9,7 @@
 
 ## Context
 
-Every one of the 13 phase profiles in `.evolve/profiles/*.json` declares `"cli": "claude"`. The dispatch seam at `scripts/dispatch/subagent-run.sh` reads `profile.cli` and routes to `scripts/cli_adapters/${cli}.sh`, but there is no way for an operator to say "Scout uses gemini-3-pro-preview, Builder uses gpt-5.5, Auditor uses claude-opus-4-7" without editing production profile files — which encode permission policy, not LLM choice.
+Every one of the 13 phase profiles in `.evolve/profiles/*.json` declares `"cli": "claude"`. The dispatch seam at `legacy/scripts/dispatch/subagent-run.sh` reads `profile.cli` and routes to `legacy/scripts/cli_adapters/${cli}.sh`, but there is no way for an operator to say "Scout uses gemini-3-pro-preview, Builder uses gpt-5.5, Auditor uses claude-opus-4-7" without editing production profile files — which encode permission policy, not LLM choice.
 
 These two concerns are conflated: **permission policy** (which tools are allowed, sandbox settings, budget caps) and **LLM selection** (which CLI and model to use for a phase).
 
@@ -19,7 +19,7 @@ These two concerns are conflated: **permission policy** (which tools are allowed
 
 Create `.evolve/llm_config.json` as the authoritative LLM-selection file for evolve-loop. Keep `.evolve/profiles/<role>.json` for permission and sandbox policy. When `subagent-run.sh` resolves a phase, it consults `llm_config.json` FIRST for CLI+model selection; if absent, it falls back to the profile's `cli` and `model_tier_default`.
 
-The lookup is implemented by `scripts/dispatch/resolve-llm.sh` — a pure function sourced by `subagent-run.sh`.
+The lookup is implemented by `legacy/scripts/dispatch/resolve-llm.sh` — a pure function sourced by `subagent-run.sh`.
 
 ### Schema v1
 
@@ -69,9 +69,9 @@ A reference template ships at `.evolve/llm_config.example.json`.
 
 | File | Change | Cycle |
 |---|---|---|
-| `scripts/dispatch/resolve-llm.sh` | New — LLM resolver pure function | 52 (this ADR) |
+| `legacy/scripts/dispatch/resolve-llm.sh` | New — LLM resolver pure function | 52 (this ADR) |
 | `.evolve/llm_config.example.json` | New — reference template | 52 (this ADR) |
-| `scripts/dispatch/subagent-run.sh:501-503` | Insert `resolve-llm.sh` call before adapter selection | **53** (deferred) |
+| `legacy/scripts/dispatch/subagent-run.sh:501-503` | Insert `resolve-llm.sh` call before adapter selection | **53** (deferred) |
 
 ---
 

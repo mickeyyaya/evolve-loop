@@ -65,7 +65,7 @@ Learn phase (every cycle, post-Ship):
                               patterns for lesson YAMLs
 
 Operator-facing rollup:
-  scripts/observability/dashboard.sh reads aggregator --format=json
+  legacy/scripts/observability/dashboard.sh reads aggregator --format=json
   → "Recent reflection hot-spots: top-3 categories" line
 ```
 
@@ -102,8 +102,8 @@ These three combined are calibrated, not draconian: a phase that genuinely runs 
 - Schema: [agents/agent-templates.md](../../agents/agent-templates.md) → Reflection Journal Schema
 - Reflector persona: [agents/evolve-reflector.md](../../agents/evolve-reflector.md)
 - Reflector profile: `.evolve/profiles/reflector.json`
-- Aggregator: [scripts/observability/aggregate-reflections.sh](../../scripts/observability/aggregate-reflections.sh)
-- Tests: [scripts/tests/reflection-schema-test.sh](../../scripts/tests/reflection-schema-test.sh), [scripts/tests/aggregate-reflections-test.sh](../../scripts/tests/aggregate-reflections-test.sh)
+- Aggregator: [legacy/scripts/observability/aggregate-reflections.sh](../../legacy/scripts/observability/aggregate-reflections.sh)
+- Tests: [legacy/scripts/tests/reflection-schema-test.sh](../../legacy/scripts/tests/reflection-schema-test.sh), [legacy/scripts/tests/aggregate-reflections-test.sh](../../legacy/scripts/tests/aggregate-reflections-test.sh)
 - Learn-phase formalization: [learn-phase.md](learn-phase.md)
 - Phase-tracker integration: [phase-tracker.md](phase-tracker.md)
 - Existing retrospective contract: [retrospective-pipeline.md](retrospective-pipeline.md)

@@ -61,7 +61,7 @@ And then there is one *non-agent* bucket:
 
 - **`private/`** — research backlog, exploratory notes. Public-readable on GitHub but
   **structurally excluded from agent context** at three defense layers (OS sandbox,
-  CLI permission gate, kernel filter in `scripts/lifecycle/role-context-builder.sh`).
+  CLI permission gate, kernel filter in `legacy/scripts/lifecycle/role-context-builder.sh`).
   "Private" here means "private from the agent's reasoning context", not "secret from humans".
 
 The single bright line: **`docs/private/*` is the only path agents cannot read.** Everything
@@ -71,7 +71,7 @@ else under `docs/` is fair game when an agent has reason to look.
 
 evolve-loop has two flavors of agent doc access:
 
-1. **Auto-loaded by `scripts/lifecycle/role-context-builder.sh`** — a small set of per-phase
+1. **Auto-loaded by `legacy/scripts/lifecycle/role-context-builder.sh`** — a small set of per-phase
    artifacts (intent.md, scout-report.md, build-report.md, etc.) and the role's persona file.
    These are bundled into every prompt for that phase.
 

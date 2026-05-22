@@ -99,7 +99,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `agents/evolve-orchestrator.md` + `agents/evolve-triage.md` + `scripts/lifecycle/phase-gate.sh` |
+| **Subsystem** | `agents/evolve-orchestrator.md` + `agents/evolve-triage.md` + `legacy/scripts/lifecycle/phase-gate.sh` |
 | **Expected saving** | Up to $2.10/cycle on skip-eligible cycles (Auditor cost = 0) |
 | **LoC delta** | ~80 LoC in orchestrator persona skip-branch + triage `cycle_size_estimate=skip` path |
 | **Risk** | High (new orchestration branch) |
@@ -114,7 +114,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `agents/evolve-auditor.md` + `agents/evolve-triage.md` + `scripts/observability/verify-eval.sh` |
+| **Subsystem** | `agents/evolve-auditor.md` + `agents/evolve-triage.md` + `legacy/scripts/observability/verify-eval.sh` |
 | **Expected saving** | ~$0.10/cycle (40–65% structured-output token reduction vs JSON per TOON 2026 benchmark suite; was 30–60%) |
 | **LoC delta** | ~50 LoC: audit-report TSV template + triage-decision template + parser |
 | **Risk** | Medium |
@@ -129,7 +129,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | Pre-processor on role-context-builder.sh output + `scripts/dispatch/subagent-run.sh` |
+| **Subsystem** | Pre-processor on role-context-builder.sh output + `legacy/scripts/dispatch/subagent-run.sh` |
 | **Expected saving** | TBD (20× theoretical; ~10–30% realistic for evolve-loop prose given existing caching) |
 | **LoC delta** | High (~200 LoC + external dependency) |
 | **Risk** | High |
@@ -179,7 +179,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/run-cycle.sh` + `scripts/dispatch/subagent-run.sh` |
+| **Subsystem** | `legacy/scripts/dispatch/run-cycle.sh` + `legacy/scripts/dispatch/subagent-run.sh` |
 | **Expected saving** | Operator ergonomics (2 active flags → 1; reduces documentation surface) |
 | **LoC delta** | ~30 LoC + backward-compat bridge |
 | **Risk** | Low |
@@ -190,7 +190,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/claude.sh`, `scripts/lifecycle/ship.sh`, `scripts/failure/failure-adapter.sh` |
+| **Subsystem** | `legacy/scripts/dispatch/claude.sh`, `legacy/scripts/lifecycle/ship.sh`, `legacy/scripts/failure/failure-adapter.sh` |
 | **Expected saving** | Shell overhead reduction + dead-code removal |
 | **LoC delta** | ~50 LoC removed (bridge code for FORCE_INNER_SANDBOX, BUDGET_CAP, STRICT_FAILURES, DISPATCH_STOP_ON_FAIL, DISPATCH_VERIFY) |
 | **Risk** | Low (bridges emit stderr WARN; removal is planned; operators warned) |
@@ -311,7 +311,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-3 evolve-scout.md Layer-3 split | DONE (cycle 24) | `agents/evolve-scout-reference.md` created; `evolve-scout.md` trimmed 334→167 lines |
 | P-NEW-4 EVOLVE_REQUIRE_* consolidation | PENDING | `EVOLVE_REQUIRED_PHASES` not implemented |
 | P-NEW-5 Deprecated flag removal | BRIDGES-ACTIVE | 5 flags w/ bridges; removal target v8.61+ MISSED; cycle 26+ |
-| P-NEW-6 Tool-result clearing | DONE (cycle 36) | Profile field `context_clear_trigger_tokens` added to builder/scout/auditor; Tool-Result Hygiene subsection in 3 persona files; `subagent-run.sh` advisory log; `scripts/observability/tool-result-saturation.sh` NEW. |
+| P-NEW-6 Tool-result clearing | DONE (cycle 36) | Profile field `context_clear_trigger_tokens` added to builder/scout/auditor; Tool-Result Hygiene subsection in 3 persona files; `subagent-run.sh` advisory log; `legacy/scripts/observability/tool-result-saturation.sh` NEW. |
 | P-NEW-7 SkillReducer Layer-3 split | PARTIAL | `phases.md` split done; other skill files pending |
 | P-NEW-8 AgentDiet filtering | **DONE (cycle 40)** | `jq` filter in `role-context-builder.sh` builder section: `select(.classification \| test("code-build-fail\|code-quality"))`. FSE 2026 benchmark: 39.9–59.7% input token reduction. Next-cycle telemetry confirms. |
 | P-NEW-9 Orchestrator summarization | **DONE (cycle 41)** | `## Phase-Report Reading Protocol (P-NEW-9)` section added to `agents/evolve-orchestrator.md`; 3-bullet summary protocol (verdict + SHA + top defects); SHA preservation rule. Shipped `2522dbc`. Expected reduction: orchestrator accumulated context 50KB→10KB (~$0.10–0.30/cycle). |
@@ -321,7 +321,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-13 Verbatim semantic compaction | **DONE (cycle 42)** | `subagent-run.sh` autotrim: `head -c`/`tail -c` → `head -n`/`tail -n` (line-boundary cut). ~25 LoC. Commit 183406e. |
 | P-NEW-16 Orchestrator stop-criterion | **DONE (cycle 42)** | `## STOP CRITERION` section added to `agents/evolve-orchestrator.md`; 3 named gates; targets 42→25 orchestrator turns (~$0.40/cycle). Commit 183406e. |
 | P-NEW-17 Explicit Cache TTL for cross-phase reuse | **INVESTIGATION-COMPLETE (cycle 43)** | Path A CLOSED: no `--cache-ttl` CLI flag. CRITICAL CORRECTION: Claude CLI uses 1h TTL (not 5m) per cycle-42 `ephemeral_1h_input_tokens` telemetry (`ephemeral_5m_input_tokens=0` for all phases). TTL concern is API SDK-specific, not CLI-specific. `claude -p` invocations already use 1h TTL. $2.00/cycle estimate was overstated for CLI path. True cross-phase reuse opportunity: shared system-prompt prefix via `EVOLVE_CACHE_PREFIX_V2` (addressed by P-NEW-18). |
-| P-NEW-18 EVOLVE_CACHE_PREFIX_V2 default-on | **DONE (cycle 43)** | Default changed from `:-0` to `:-1` in `scripts/dispatch/subagent-run.sh` and `scripts/cli_adapters/claude.sh`. `docs/architecture/control-flags.md` updated. Overdue since v8.62 target (shipped v10.6). Expected saving: $0.10–0.30/cycle. |
+| P-NEW-18 EVOLVE_CACHE_PREFIX_V2 default-on | **DONE (cycle 43)** | Default changed from `:-0` to `:-1` in `legacy/scripts/dispatch/subagent-run.sh` and `legacy/scripts/cli_adapters/claude.sh`. `docs/architecture/control-flags.md` updated. Overdue since v8.62 target (shipped v10.6). Expected saving: $0.10–0.30/cycle. |
 | P-NEW-19 Auditor stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-auditor.md`; 3 named gates + banned post-report patterns. ~30 LoC. Expected saving: $0.30–0.50/cycle. |
 | P-NEW-20 Builder stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-builder.md`; 4 named gates + banned post-report patterns. ~40 LoC. Expected saving: $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22). |
 | P-NEW-21 AgentDiet full trajectory compression | **DONE (cycle 45) — REVISED cycle 46** | `context_compact_expired_tool_results` and `context_compact_threshold_tokens` fields removed from `builder.json` in cycle 46 — P-NEW-21 is persona-level only (`agents/evolve-builder.md` Tool-Result Trajectory Compression section). No CLI flag exists for `--compact` (confirmed P-NEW-25 CLOSED). Profile fields were dead config. |
@@ -329,7 +329,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-23 Token-budget-aware turn hints | **DONE (cycle 44)** | `emit_budget_hint()` in `role-context-builder.sh`; `turn_budget_hint` in 6 profiles (scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12). Preemptive budget declaration; arXiv:2412.18547. Expected: 10–20% turn reduction. |
 | P-NEW-24 Observational context compression for Builder | **PENDING (cycle 47+)** | Remove expired tool-results from Builder multi-turn trajectory; arXiv:2604.19572 (Apr 2026); 40–60% input reduction on tool-output bloat. Profile-level contract changes required. Deferred pending P-NEW-27 baseline measurement (1-2 cycles). |
 | P-NEW-25 Anthropic native compaction (compact-2026-01-12) | **CLOSED (cycle 46)** | `claude -p --help` (v2.1.140) confirms no `--compact` flag exists. Path A CLOSED. Path B (SDK-level compaction) out of scope for CLI pipeline. P-NEW-21 profile fields removed as dead config. |
-| P-NEW-26 Per-role `--effort` flag dispatch | **DONE (cycle 44)** | `effort_level` field added to 6 profiles (scout/triage/memo/orchestrator=medium, builder/auditor=high); `scripts/cli_adapters/claude.sh` reads field + appends `--effort` to `claude -p` invocation. Guard: only appended when field non-empty. Expected saving: ~$0.66/cycle (~25% on medium-effort phases). |
+| P-NEW-26 Per-role `--effort` flag dispatch | **DONE (cycle 44)** | `effort_level` field added to 6 profiles (scout/triage/memo/orchestrator=medium, builder/auditor=high); `legacy/scripts/cli_adapters/claude.sh` reads field + appends `--effort` to `claude -p` invocation. Guard: only appended when field non-empty. Expected saving: ~$0.66/cycle (~25% on medium-effort phases). |
 | P-NEW-27 Scout tool-call discipline (Bash→native) | **DONE (cycle 46)** | BANNED patterns table added to `agents/evolve-scout.md` Tool-Result Hygiene section; 5 before/after examples; Bash-only-for-shell-operations rule. Root cause: cycle-45 scout made 36 Bash calls vs. 4 WebSearch ($1.30 actual vs $0.50 target). Expected saving: ≥$0.50/cycle when scout Bash ≤8. |
 | P-NEW-28 RE-TRAC recursive trajectory compression | **PENDING (cycle 47+)** | arXiv:2602.02486 (RE-TRAC, Feb 2026): recursive summarization of oldest M turns at N-turn boundaries. Complementary to P-NEW-24 (removes tail bloat; RE-TRAC compresses head bloat). Expected: 40–60% input reduction on Builder 35-turn sessions. Needs spec before implementation. |
 | P-NEW-29 Parallel tool-call batching (multi-tool-use) | **DONE (cycle 47)** | "Parallel Tool-Call Batching" section with 3 before/after examples added to `agents/evolve-builder.md` (Turn budget section) and `agents/evolve-scout.md` (BANNED patterns section). Rule: emit independent tool calls in a single turn. Expected: 20–40% turn reduction for read-heavy phases. |
@@ -376,7 +376,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/lifecycle/role-context-builder.sh` (builder + auditor role sections) |
+| **Subsystem** | `legacy/scripts/lifecycle/role-context-builder.sh` (builder + auditor role sections) |
 | **Expected saving** | $0.03–0.10/cycle; **FSE 2026 paper benchmark: 39.9–59.7% input token reduction, 21.1–35.9% cost reduction** (AgentDiet continuous-control benchmark). Evolve-loop projection: ~6KB Builder context reduction by filtering 14/23 non-expired entries (code-audit-warn + unknown-classification). |
 | **LoC delta** | ~14 LoC in `role-context-builder.sh` builder-role section: add `jq` filter `select(.classification \| test("code-build-fail\|code-quality"))` |
 | **Risk** | Low — filtering is idempotent; worst case Builder sees fewer failure examples (all existing ones are audit-domain anyway) |
@@ -427,7 +427,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | Phase artifact pipeline; replaces bash preprocessing in `scripts/dispatch/subagent-run.sh` |
+| **Subsystem** | Phase artifact pipeline; replaces bash preprocessing in `legacy/scripts/dispatch/subagent-run.sh` |
 | **Expected saving** | TBD — runtime-native compaction replaces current bash preprocessing (EVOLVE_CONTEXT_DIGEST). Potential 30–50% context reduction on accumulated cross-phase artifacts. |
 | **LoC delta** | High (~100+ LoC + new external API dependency) |
 | **Risk** | Medium-High (new external API dependency; requires architectural evaluation) |
@@ -457,7 +457,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/subagent-run.sh` autotrim block (lines 651–689) |
+| **Subsystem** | `legacy/scripts/dispatch/subagent-run.sh` autotrim block (lines 651–689) |
 | **Expected saving** | ~10% of cycles that hit autotrim-induced re-reads (reduces false-positive autotrim fragmentation of file paths, function signatures, and JSON structures) |
 | **LoC delta** | ~25 LoC: extend autotrim to cut at line-break boundaries instead of byte boundaries; preserve complete semantic units (full JSON objects, complete file paths) |
 | **Risk** | Low — improves correctness; no structural change to the pipeline |
@@ -476,7 +476,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | Builder pre-build phase + `scripts/dispatch/subagent-run.sh` |
+| **Subsystem** | Builder pre-build phase + `legacy/scripts/dispatch/subagent-run.sh` |
 | **Expected saving** | **76.42% cost reduction** on recurring task classes (GAIA benchmark: $69.02→$16.27/query, 0.61% accuracy drop) |
 | **LoC delta** | ~50 LoC: `builder-plan-cache.json` template store + lightweight similarity check in orchestrator pre-Builder |
 | **Risk** | Medium — false-positive plan reuse degrades build quality; requires similarity threshold tuning |
@@ -493,7 +493,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/subagent-run.sh` (MCP tool schema caching at dispatcher level) |
+| **Subsystem** | `legacy/scripts/dispatch/subagent-run.sh` (MCP tool schema caching at dispatcher level) |
 | **Expected saving** | **50.31% cost reduction, 27.28% latency improvement** vs. no caching (MDPI 2026 benchmark) |
 | **LoC delta** | ~80 LoC in `subagent-run.sh`: workflow-level + tool-level cache with dependency-aware graph invalidation |
 | **Risk** | Medium — MCP spec compliance required; cache invalidation correctness critical |
@@ -534,7 +534,7 @@ Once all three gates satisfied: `Write` the report and halt. Banned post-report 
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/subagent-run.sh` + claude CLI capability investigation |
+| **Subsystem** | `legacy/scripts/dispatch/subagent-run.sh` + claude CLI capability investigation |
 | **Expected saving** | Up to $2.00/cycle (eliminate per-phase cache-creation re-cost when cross-phase TTL > 5 min) |
 | **LoC delta** | TBD pending CLI capability investigation; estimated ~15 LoC if flag available |
 | **Risk** | Medium (depends on claude CLI exposing ttl configuration) |
@@ -568,12 +568,12 @@ See `knowledge-base/research/cache-ttl-march-2026-impact.md` for full research d
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/subagent-run.sh` + `scripts/cli_adapters/claude.sh` + `docs/architecture/control-flags.md` |
+| **Subsystem** | `legacy/scripts/dispatch/subagent-run.sh` + `legacy/scripts/cli_adapters/claude.sh` + `docs/architecture/control-flags.md` |
 | **Expected saving** | $0.10–0.30/cycle (cleaner prompt structure; static bedrock cached in system-prompt slot rather than user-message position — better cache hit rate for role bedrock content) |
 | **LoC delta** | ~2 LoC code change (default value in two guards) + ~5 LoC docs update |
 | **Risk** | Low (deployed stable since v8.61.0; `--exclude-dynamic-system-prompt-sections` already in all profiles; 18+ versions of opt-in testing without known breakage) |
 | **Target cycle** | **DONE (cycle 43)** — overdue since v8.62 target (now v10.6) |
-| **Verification** | `grep 'EVOLVE_CACHE_PREFIX_V2:-1' scripts/dispatch/subagent-run.sh` exits 0; `grep 'EVOLVE_CACHE_PREFIX_V2:-1' scripts/cli_adapters/claude.sh` exits 0 |
+| **Verification** | `grep 'EVOLVE_CACHE_PREFIX_V2:-1' legacy/scripts/dispatch/subagent-run.sh` exits 0; `grep 'EVOLVE_CACHE_PREFIX_V2:-1' legacy/scripts/cli_adapters/claude.sh` exits 0 |
 
 **What the promotion does:**
 - (Cycle A1) `subagent-run.sh` emits a compact `## INVOCATION CONTEXT` user prompt instead of the verbose v1 header
@@ -653,19 +653,19 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/cli_adapters/claude.sh` — dispatch-layer schema filter enforcement |
+| **Subsystem** | `legacy/scripts/cli_adapters/claude.sh` — dispatch-layer schema filter enforcement |
 | **Status** | **DONE (cycle 47)** |
 | **Expected saving** | 5–20% per-turn input token reduction for scout/triage/memo |
 | **LoC delta** | ~3 LoC (profile fields added cycle 46); ~23 LoC adapter enforcement (cycle 47) |
 | **Risk** | Low |
 | **Shipped cycle** | 47 |
-| **Verification** | `grep -q "schema_filter_enabled" .evolve/profiles/scout.json` AND `grep -q "SCHEMA_FILTER_ENABLED" scripts/cli_adapters/claude.sh` |
+| **Verification** | `grep -q "schema_filter_enabled" .evolve/profiles/scout.json` AND `grep -q "SCHEMA_FILTER_ENABLED" legacy/scripts/cli_adapters/claude.sh` |
 
 **Measurement result (cycle 46):** `--allowedTools` restricts invocations but does NOT reduce schema token serialization. Full MCP schema is serialized by the Claude CLI on every turn regardless of the `--allowedTools` filter. For a session with 10+ MCP tools, this adds ~2,000–4,000 tokens per turn overhead on narrow-toolset roles (scout, triage, memo).
 
 **Phase 1 (DONE cycle 46):** Added `schema_filter_enabled: true` field to `profiles/scout.json`, `profiles/triage.json`, `profiles/memo.json`. This marks these roles as targets for dispatch-layer schema filtering.
 
-**Phase 2 (DONE cycle 47):** `scripts/cli_adapters/claude.sh` reads `schema_filter_enabled` from the profile. When `true`, adapter checks whether `--strict-mcp-config` is already in `EXTRA_FLAGS_ARR`; if not, auto-injects it. This makes `schema_filter_enabled: true` the declarative source of truth — the adapter enforces it structurally rather than relying on each profile to manually include the flag in `extra_flags`. All three target profiles already had `--strict-mcp-config` in their extra_flags; the adapter now guarantees it for any future profile that sets `schema_filter_enabled: true`.
+**Phase 2 (DONE cycle 47):** `legacy/scripts/cli_adapters/claude.sh` reads `schema_filter_enabled` from the profile. When `true`, adapter checks whether `--strict-mcp-config` is already in `EXTRA_FLAGS_ARR`; if not, auto-injects it. This makes `schema_filter_enabled: true` the declarative source of truth — the adapter enforces it structurally rather than relying on each profile to manually include the flag in `extra_flags`. All three target profiles already had `--strict-mcp-config` in their extra_flags; the adapter now guarantees it for any future profile that sets `schema_filter_enabled: true`.
 
 **Source:** GitHub Blog (2026-05-13) "Improving token efficiency in agentic workflows"; MindStudio "10 MCP Optimization Techniques"; MCP SEP-1576 "Mitigating Token Bloat". Tool schema compression: 30–60% per-request overhead reduction reported.
 
@@ -677,7 +677,7 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/lifecycle/role-context-builder.sh` — `emit_budget_hint()` added to `header_block()` |
+| **Subsystem** | `legacy/scripts/lifecycle/role-context-builder.sh` — `emit_budget_hint()` added to `header_block()` |
 | **Expected saving** | 10–20% additional turn reduction on top of stop-criterion |
 | **Actual LoC delta** | 16 LoC in `role-context-builder.sh` + 6 one-line profile edits |
 | **Risk** | Low — prompt-level only; no structural change |
@@ -712,7 +712,7 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/dispatch/subagent-run.sh` / `scripts/cli_adapters/claude.sh` — dispatcher flags |
+| **Subsystem** | `legacy/scripts/dispatch/subagent-run.sh` / `legacy/scripts/cli_adapters/claude.sh` — dispatcher flags |
 | **Research source** | Anthropic Compaction API (compact-2026-01-12, Jan 2026) |
 | **Expected saving** | 40–60% cost reduction on long Orchestrator/Builder sessions |
 | **LoC delta** | ~5 LoC in dispatcher (add `--compact` flag gated by `EVOLVE_COMPACTION=1`) |
@@ -730,13 +730,13 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `scripts/cli_adapters/claude.sh` + `.evolve/profiles/*.json` |
+| **Subsystem** | `legacy/scripts/cli_adapters/claude.sh` + `.evolve/profiles/*.json` |
 | **Research source** | `claude -p --help` — `--effort <level>` flag (low/medium/high/xhigh/max) |
 | **Expected saving** | ~$0.66/cycle (~25% on medium-effort phases: scout $1.66 + triage $0.35 + memo $0.64 = $2.65 × 25%) |
 | **LoC delta** | ~10 LoC in claude.sh + 1 field per profile (6 profiles) |
 | **Risk** | Low — additive flag, omitted when field absent, preserves pre-P-NEW-26 behavior |
 | **Target cycle** | 44 (SHIPPED) |
-| **Verification** | `grep -q "\-\-effort" scripts/cli_adapters/claude.sh` + all 6 profiles have non-empty `effort_level` field |
+| **Verification** | `grep -q "\-\-effort" legacy/scripts/cli_adapters/claude.sh` + all 6 profiles have non-empty `effort_level` field |
 
 **Effort assignments:**
 - `medium`: scout (research/discovery), triage (JSON decision), memo (short summary), orchestrator (phase sequencing/shell)

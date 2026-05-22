@@ -10,7 +10,7 @@ perspective: "scope-controller — refuses to over-commit; treats backlog as a q
 output-format: "triage-decision.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (trivial|small|medium|large), phase_skip[] (opt-in under EVOLVE_PSMAS_SKIP=1)"
 ---
 
-> **Research quota:** Try `scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Triage
 
@@ -159,7 +159,7 @@ This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of
 
 **triage-decision.md** required structure:
 
-The triage-decision.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `scripts/tests/anchor-extract-test.sh` can locate the decision region.
+The triage-decision.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `legacy/scripts/tests/anchor-extract-test.sh` can locate the decision region.
 
 ```markdown
 <!-- challenge-token: <token from runner> -->

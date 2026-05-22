@@ -73,7 +73,7 @@ Cost: a single jq-update to state.json. Lifetime: 30 days default (operator can 
 | 3+ in last 30d | RETRY (try same task with adjusted approach) |
 | 3+ AND `systemic: true` | BLOCK (refuse this task class until operator intervenes) |
 
-The decision is computed by `scripts/failure/failure-adapter.sh decide` — orchestrator reads its output and follows verbatim.
+The decision is computed by `legacy/scripts/failure/failure-adapter.sh decide` — orchestrator reads its output and follows verbatim.
 
 ---
 
@@ -116,7 +116,7 @@ When a cycle is *about* to fail mid-flight (cost spike, quota signature) OR has 
 }
 ```
 
-`run-cycle.sh`'s EXIT trap reads this block: if present, it SKIPs worktree removal, branch deletion, and cycle-state clear. The next operator invocation of `bash scripts/dispatch/evolve-loop-dispatch.sh --resume` picks up at the paused phase.
+`run-cycle.sh`'s EXIT trap reads this block: if present, it SKIPs worktree removal, branch deletion, and cycle-state clear. The next operator invocation of `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` picks up at the paused phase.
 
 ### Three triggers (v9.1.0+):
 
@@ -124,7 +124,7 @@ When a cycle is *about* to fail mid-flight (cost spike, quota signature) OR has 
 |---|---|---|
 | **Reactive** | 3 | `subagent-run.sh` classifies non-zero exit + empty stderr + ≥80% cost as quota-likely → writes checkpoint |
 | **Pre-emptive** | 2 | Dispatcher tracks `BATCH_TOTAL_COST`; at ≥95% (`EVOLVE_CHECKPOINT_AT_PCT`) exports `EVOLVE_CHECKPOINT_REQUEST=1` for the next cycle's orchestrator |
-| **Operator-requested** | manual | `bash scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
+| **Operator-requested** | manual | `bash legacy/scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
 
 ### Env vars (v9.1.0+):
 
@@ -144,7 +144,7 @@ See [`../architecture/checkpoint-resume.md`](../architecture/checkpoint-resume.m
 
 If the cycle exited with rc≠0 but no checkpoint fired (e.g., a deterministic Build error rather than a quota signature), the worktree may still survive — depending on whether the dispatcher classified the failure as `recoverable` or not.
 
-Classifier categories (from `scripts/dispatch/evolve-loop-dispatch.sh:classify_cycle_failure`):
+Classifier categories (from `legacy/scripts/dispatch/evolve-loop-dispatch.sh:classify_cycle_failure`):
 
 | Classification | What it means | Worktree preserved? |
 |---|---|---|
@@ -206,14 +206,14 @@ When something goes wrong, these are the canonical commands:
 
 | Situation | Command |
 |---|---|
-| Resume a checkpointed cycle | `bash scripts/dispatch/evolve-loop-dispatch.sh --resume` |
-| Manually checkpoint a hung cycle | `bash scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
-| Clear a stuck cycle-state | `bash scripts/lifecycle/cycle-state.sh clear` |
+| Resume a checkpointed cycle | `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` |
+| Manually checkpoint a hung cycle | `bash legacy/scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
+| Clear a stuck cycle-state | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
 | Inspect what failed | `tail -50 .evolve/runs/cycle-N/orchestrator-stdout.log` |
-| Verify ledger isn't tampered | `bash scripts/observability/verify-ledger-chain.sh` |
-| Reset everything (nuclear) | `bash scripts/dispatch/evolve-loop-dispatch.sh --reset` |
-| Re-render CLI Resolution post-hoc | `bash scripts/observability/render-cli-resolution.sh <cycle>` |
-| Promote unshipped predicates to regression-suite | `bash scripts/utility/promote-acs-to-regression.sh <cycle>` |
+| Verify ledger isn't tampered | `bash legacy/scripts/observability/verify-ledger-chain.sh` |
+| Reset everything (nuclear) | `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --reset` |
+| Re-render CLI Resolution post-hoc | `bash legacy/scripts/observability/render-cli-resolution.sh <cycle>` |
+| Promote unshipped predicates to regression-suite | `bash legacy/scripts/utility/promote-acs-to-regression.sh <cycle>` |
 
 The `--reset` does NOT touch Tier 1 hooks — they remain enforcing. Only Tier 3 workflow state is cleared.
 

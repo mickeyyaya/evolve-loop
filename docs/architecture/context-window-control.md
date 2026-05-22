@@ -66,7 +66,7 @@ phase invocation:
 ### 3. Operator observability
 
 ```bash
-$ bash scripts/observability/show-context-monitor.sh 14
+$ bash legacy/scripts/observability/show-context-monitor.sh 14
 
 Cycle 14 context-monitor:
   last updated: 2026-05-11T16:42:00Z
@@ -151,6 +151,6 @@ behavior as if cost had hit first.
   and ROI-ordered optimization roadmap.
 - `docs/architecture/token-floor-history.md` — campaign-by-campaign
   static-context floor measurements.
-- `scripts/observability/show-context-monitor.sh` — operator-facing tool.
-- `scripts/tests/context-window-control-test.sh` — 22-assertion test
+- `legacy/scripts/observability/show-context-monitor.sh` — operator-facing tool.
+- `legacy/scripts/tests/context-window-control-test.sh` — 22-assertion test
   suite covering autotrim algorithm, monitor JSON, and operator tool.

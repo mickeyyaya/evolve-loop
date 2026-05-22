@@ -1,6 +1,6 @@
 # Phase Tracker & Latency-Cost Observability
 
-> Canonical design for real-time subagent visibility, per-phase latency/cost analysis, and ephemeral-data lifecycle. Reference for all `scripts/observability/` tooling that produces or consumes per-cycle metrics. Layered on top of existing `*-stdout.log`, `*-usage.json`, `*-timing.json` sidecars (see `scripts/dispatch/subagent-run.sh:880-950`) — does **not** replace them.
+> Canonical design for real-time subagent visibility, per-phase latency/cost analysis, and ephemeral-data lifecycle. Reference for all `legacy/scripts/observability/` tooling that produces or consumes per-cycle metrics. Layered on top of existing `*-stdout.log`, `*-usage.json`, `*-timing.json` sidecars (see `legacy/scripts/dispatch/subagent-run.sh:880-950`) — does **not** replace them.
 
 ## Table of contents
 
@@ -27,7 +27,7 @@
 
 ## Data sources
 
-The tracker reuses the existing capture path. The pipeline (`scripts/dispatch/subagent-run.sh:880-950`) already writes three artifacts per subagent invocation:
+The tracker reuses the existing capture path. The pipeline (`legacy/scripts/dispatch/subagent-run.sh:880-950`) already writes three artifacts per subagent invocation:
 
 | Artifact | Producer | Today | Phase B |
 |---|---|---|---|
@@ -175,8 +175,8 @@ Pruner uses `find -mtime +N` for bash 3.2 compat. Idempotent. `--dry-run` flag f
 
 | Phase | Status | Surface | Lives In |
 |---|---|---|---|
-| **A — additive** | shipped v10.4.0 | All new scripts; works on existing data via replay mode | `scripts/observability/*.sh`, `scripts/tests/tracker-writer-test.sh`, this doc |
-| **B — wire live** | shipped v10.5.0 (opt-in via `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `scripts/dispatch/subagent-run.sh`, `scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
+| **A — additive** | shipped v10.4.0 | All new scripts; works on existing data via replay mode | `legacy/scripts/observability/*.sh`, `legacy/scripts/tests/tracker-writer-test.sh`, this doc |
+| **B — wire live** | shipped v10.5.0 (opt-in via `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `legacy/scripts/dispatch/subagent-run.sh`, `legacy/scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
 
 > **Note** — `claude.sh` already emits `--output-format stream-json --verbose` by default (since v9.2.0, gated by `EVOLVE_STREAM_JSON`, default ON). The original Phase-B plan called for flipping that flag; turned out it had already been flipped two minor versions earlier. v10.5.0 just wires the consumer side.
 
@@ -191,22 +191,22 @@ Pruner uses `find -mtime +N` for bash 3.2 compat. Idempotent. `--dry-run` flag f
 
 | File | Role |
 |---|---|
-| `scripts/observability/tracker-writer.sh` | stdin NDJSON → `.ephemeral/trackers/*.ndjson` + `.ephemeral/trace.md` + tally |
-| `scripts/observability/rollup-cycle-metrics.sh` | per-phase sidecars → `.ephemeral/metrics/cycle-metrics.json` |
-| `scripts/observability/append-phase-perf.sh` | phase report + sidecars + baseline → "Performance & Cost" appendix |
-| `scripts/observability/show-trace.sh` | `trace.md` pretty-printer with `--watch`, `--cycle`, `--phase` flags |
-| `scripts/observability/prune-ephemeral.sh` | 7-day TTL pruner |
-| `scripts/tests/tracker-writer-test.sh` | synthetic NDJSON fixtures + assertions |
+| `legacy/scripts/observability/tracker-writer.sh` | stdin NDJSON → `.ephemeral/trackers/*.ndjson` + `.ephemeral/trace.md` + tally |
+| `legacy/scripts/observability/rollup-cycle-metrics.sh` | per-phase sidecars → `.ephemeral/metrics/cycle-metrics.json` |
+| `legacy/scripts/observability/append-phase-perf.sh` | phase report + sidecars + baseline → "Performance & Cost" appendix |
+| `legacy/scripts/observability/show-trace.sh` | `trace.md` pretty-printer with `--watch`, `--cycle`, `--phase` flags |
+| `legacy/scripts/observability/prune-ephemeral.sh` | 7-day TTL pruner |
+| `legacy/scripts/tests/tracker-writer-test.sh` | synthetic NDJSON fixtures + assertions |
 | `docs/architecture/phase-tracker.md` | this doc |
 
 ## Related infrastructure
 
 | Existing | What it does | Relationship to tracker |
 |---|---|---|
-| `scripts/observability/show-cycle-cost.sh` | Per-phase cost table from `*-stdout.log` | Complementary — same data source, different view |
-| `scripts/observability/show-context-monitor.sh` | Context window utilization tracking | Different concern (memory pressure, not time/cost) |
-| `scripts/observability/verify-ledger-chain.sh` | Tamper-evident integrity check | Different concern (integrity, not performance) |
-| `scripts/dispatch/subagent-run.sh:880-950` | Writes `*-stdout.log`, `*-usage.json`, `*-timing.json` | Source data for everything in this design |
+| `legacy/scripts/observability/show-cycle-cost.sh` | Per-phase cost table from `*-stdout.log` | Complementary — same data source, different view |
+| `legacy/scripts/observability/show-context-monitor.sh` | Context window utilization tracking | Different concern (memory pressure, not time/cost) |
+| `legacy/scripts/observability/verify-ledger-chain.sh` | Tamper-evident integrity check | Different concern (integrity, not performance) |
+| `legacy/scripts/dispatch/subagent-run.sh:880-950` | Writes `*-stdout.log`, `*-usage.json`, `*-timing.json` | Source data for everything in this design |
 
 ## Bash 3.2 compatibility
 

@@ -13,29 +13,29 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ detects platform = gemini, reads reference/gemini-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓ (Gemini calls run_shell_command)
 
 Dispatcher loops once per cycle:
-  bash scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 
 run-cycle.sh spawns the orchestrator subagent via:
-  bash scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
+  bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
 
   ↓
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "gemini"  (set by Gemini CLI users via env or profile override)
-  → dispatches to scripts/cli_adapters/gemini.sh
+  → dispatches to legacy/scripts/cli_adapters/gemini.sh
 
   ↓
 
 gemini.sh (HYBRID SHIM):
   1. Probes for `claude` binary on PATH
-  2. If found: delegates to scripts/cli_adapters/claude.sh
+  2. If found: delegates to legacy/scripts/cli_adapters/claude.sh
      (Claude binary becomes the actual runtime engine)
   3. If not found: exits 99 with "install Claude CLI" message
 
@@ -76,15 +76,15 @@ The hybrid shim keeps the entire Claude-Code trust boundary intact: every Builde
 command -v gemini && command -v claude
 
 # 2. Confirm gemini.sh delegates correctly (validate-only mode)
-VALIDATE_ONLY=1 bash scripts/cli_adapters/gemini.sh
+VALIDATE_ONLY=1 bash legacy/scripts/cli_adapters/gemini.sh
 # Expected: exit 0, log line "[gemini-adapter] hybrid-mode: delegating to claude.sh"
 
 # 3. Smoke-test detection
-bash scripts/dispatch/detect-cli.sh
+bash legacy/scripts/dispatch/detect-cli.sh
 # Expected: prints "gemini" if you're in a Gemini session
 
 # 4. Run the contract test
-bash scripts/gemini-adapter-test.sh
+bash legacy/scripts/gemini-adapter-test.sh
 # Expected: green
 ```
 

@@ -6,7 +6,7 @@
 
 ## Inbox JSON Schema
 
-Files written by `scripts/utility/inject-task.sh` to `.evolve/inbox/<ts>-<rand>.json`:
+Files written by `legacy/scripts/utility/inject-task.sh` to `.evolve/inbox/<ts>-<rand>.json`:
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
