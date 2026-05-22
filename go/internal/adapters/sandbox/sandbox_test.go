@@ -5,6 +5,7 @@
 package sandbox
 
 import (
+	"context"
 	"runtime"
 	"strings"
 	"testing"
@@ -231,6 +232,198 @@ func TestProbe_BinaryPathPopulated(t *testing.T) {
 		t.Errorf("Available=true but BinaryPath empty: %+v", pr)
 	}
 }
+
+// TestProbeFor_LinuxWithBwrap — probe linux branch with mocked LookPath.
+func TestProbeFor_LinuxWithBwrap(t *testing.T) {
+	look := func(name string) (string, error) {
+		if name == "bwrap" {
+			return "/usr/bin/bwrap", nil
+		}
+		return "", fakeNotFound(name)
+	}
+	pr := probeFor("linux", look)
+	if !pr.Available || pr.BinaryPath != "/usr/bin/bwrap" {
+		t.Errorf("linux+bwrap: %+v", pr)
+	}
+}
+
+// TestProbeFor_LinuxNoBwrap — probe linux branch when bwrap missing.
+func TestProbeFor_LinuxNoBwrap(t *testing.T) {
+	look := func(name string) (string, error) { return "", fakeNotFound(name) }
+	pr := probeFor("linux", look)
+	if pr.Available {
+		t.Error("Available=true when bwrap absent")
+	}
+	if !strings.Contains(pr.Reason, "bwrap") {
+		t.Errorf("Reason=%q missing 'bwrap'", pr.Reason)
+	}
+}
+
+// TestProbeFor_DarwinNoSandboxExec — degraded macOS.
+func TestProbeFor_DarwinNoSandboxExec(t *testing.T) {
+	look := func(string) (string, error) { return "", fakeNotFound("missing") }
+	pr := probeFor("darwin", look)
+	if pr.Available {
+		t.Error("Available=true with no sandbox-exec")
+	}
+}
+
+// TestProbeFor_UnsupportedOS — windows/freebsd/etc. yield no impl.
+func TestProbeFor_UnsupportedOS(t *testing.T) {
+	pr := probeFor("windows", func(string) (string, error) { return "", nil })
+	if pr.Available {
+		t.Error("Available=true on unsupported OS")
+	}
+	if !strings.Contains(pr.Reason, "windows") {
+		t.Errorf("Reason=%q missing GOOS", pr.Reason)
+	}
+}
+
+// TestGenerateSBPL_EmptyHomeDirSkipsHomeRules — when HomeDir is unset
+// (no operator HOME context), the HOME-keyed rules are skipped entirely.
+func TestGenerateSBPL_EmptyHomeDirSkipsHomeRules(t *testing.T) {
+	cfg := canonicalConfig()
+	cfg.HomeDir = ""
+	out := GenerateSBPL(cfg)
+	if strings.Contains(out, ".claude") {
+		t.Errorf("HomeDir empty but SBPL has .claude rule: %s", excerpt(out, ".claude"))
+	}
+}
+
+// TestGenerateSBPL_EmptyWritePathSkipped — entries that are "" must be
+// silently dropped (defensive against caller bugs).
+func TestGenerateSBPL_EmptyWritePathSkipped(t *testing.T) {
+	cfg := canonicalConfig()
+	cfg.WritePaths = []string{"", "/repo/.evolve/runs", ""}
+	out := GenerateSBPL(cfg)
+	// Empty rule would render as `(allow file-write* (subpath ""))` — verify absent.
+	if strings.Contains(out, `(subpath "")`) {
+		t.Errorf("empty write path leaked into SBPL: %s", excerpt(out, "subpath \"\""))
+	}
+}
+
+// TestGenerateSBPL_EmptyDenyPathSkipped — same defense for deny paths.
+func TestGenerateSBPL_EmptyDenyPathSkipped(t *testing.T) {
+	cfg := canonicalConfig()
+	cfg.DenyPaths = []string{"", "/repo/.git"}
+	out := GenerateSBPL(cfg)
+	if strings.Contains(out, `(deny file-write* (subpath ""))`) {
+		t.Error("empty deny path leaked")
+	}
+	if !strings.Contains(out, `(deny file-write* (subpath "/repo/.git"))`) {
+		t.Error("real deny path missing")
+	}
+}
+
+// TestGenerateBwrapArgv_EmptyHomeAndRepo — defensive: empty paths
+// don't emit malformed bind args.
+func TestGenerateBwrapArgv_EmptyHomeAndRepo(t *testing.T) {
+	cfg := Config{AllowNetwork: true}
+	args := GenerateBwrapArgv(cfg, []string{"true"})
+	// No --bind with empty src/dst pairs.
+	for i, a := range args {
+		if a == "--bind" || a == "--ro-bind" {
+			// Next two args must be non-empty.
+			if i+2 >= len(args) || args[i+1] == "" || args[i+2] == "" {
+				t.Errorf("bind/ro-bind with empty path at idx=%d: %v", i, args)
+			}
+		}
+	}
+}
+
+// TestGenerateBwrapArgv_GlobInWritePathWidens — same parity as SBPL.
+func TestGenerateBwrapArgv_GlobInWritePathWidens(t *testing.T) {
+	cfg := canonicalConfig()
+	cfg.WritePaths = []string{"/repo/.evolve/runs/cycle-*"}
+	args := GenerateBwrapArgv(cfg, []string{"true"})
+	mustContainArg(t, args, "--bind", "/repo/.evolve/runs", "/repo/.evolve/runs")
+}
+
+// TestNewAndExec_Unwrapped — when sandbox binary is absent (or OS
+// unsupported), Exec falls back to plain exec and logs a NOTE.
+// Uses /usr/bin/true (universal POSIX no-op).
+func TestNewAndExec_Unwrapped(t *testing.T) {
+	s := &Sandbox{
+		probe: ProbeResult{OS: "unsupported", Available: false, Reason: "test stub"},
+		cfg:   canonicalConfig(),
+	}
+	var stderr strings.Builder
+	err := s.Exec(context.Background(), []string{"/usr/bin/true"}, nil, nil, &stderr)
+	if err != nil {
+		t.Errorf("Exec(/usr/bin/true): %v", err)
+	}
+	if !strings.Contains(stderr.String(), "NOTE") {
+		t.Errorf("expected stderr NOTE about unwrapped exec, got %q", stderr.String())
+	}
+}
+
+// TestExec_EmptyArgvFails — explicit error contract.
+func TestExec_EmptyArgvFails(t *testing.T) {
+	s := New(canonicalConfig())
+	err := s.Exec(context.Background(), nil, nil, nil, nil)
+	if err == nil {
+		t.Error("Exec(nil argv): want error")
+	}
+}
+
+// TestNew_BindsProbeAtConstruction — calling New once must capture the
+// probe result; subsequent calls return the same Sandbox config.
+func TestNew_BindsProbeAtConstruction(t *testing.T) {
+	cfg := canonicalConfig()
+	s := New(cfg)
+	if s == nil {
+		t.Fatal("New=nil")
+	}
+	if s.cfg.RepoRoot != cfg.RepoRoot {
+		t.Errorf("cfg not stored: %+v", s.cfg)
+	}
+	if s.probe.OS != runtime.GOOS {
+		t.Errorf("probe.OS=%q, want runtime.GOOS=%q", s.probe.OS, runtime.GOOS)
+	}
+}
+
+// TestExec_DarwinSandboxExec — on darwin with sandbox-exec available,
+// Exec actually wraps the inner command. /usr/bin/true returns 0 with
+// no file I/O, so even a minimal SBPL grants enough.
+func TestExec_DarwinSandboxExec(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-only")
+	}
+	pr := Probe()
+	if !pr.Available {
+		t.Skip("sandbox-exec not available on this host")
+	}
+	s := New(canonicalConfig())
+	var stderr strings.Builder
+	err := s.Exec(context.Background(), []string{"/usr/bin/true"}, nil, nil, &stderr)
+	if err != nil {
+		t.Errorf("Exec /usr/bin/true under sandbox-exec: %v (stderr: %s)", err, stderr.String())
+	}
+}
+
+// TestExec_LinuxBwrap — on linux with bwrap available; skipped on
+// darwin. The shape is symmetric with the darwin test.
+func TestExec_LinuxBwrap(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("linux-only")
+	}
+	pr := Probe()
+	if !pr.Available {
+		t.Skip("bwrap not available")
+	}
+	s := New(canonicalConfig())
+	err := s.Exec(context.Background(), []string{"/bin/true"}, nil, nil, nil)
+	if err != nil {
+		t.Errorf("Exec /bin/true under bwrap: %v", err)
+	}
+}
+
+// fakeNotFound — minimal os.ErrNotExist-shaped error used by mocked
+// LookPath callbacks.
+type fakeNotFoundErr struct{ name string }
+
+func (e fakeNotFoundErr) Error() string { return "not found: " + e.name }
+func fakeNotFound(name string) error    { return fakeNotFoundErr{name} }
 
 // Helpers ------------------------------------------------------------
 
