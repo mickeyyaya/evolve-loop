@@ -125,6 +125,24 @@ func filterEvolveEnv(environ []string) map[string]string {
 // adapters: filesystem-backed storage + ledger, default bridge, all
 // 8 phase runners. Extracted for cmd_loop reuse.
 func wireOrchestrator(projectRoot, evolveDir string) *core.Orchestrator {
+	d := wireOrchestratorDeps(projectRoot, evolveDir)
+	return d.Orchestrator
+}
+
+// orchDeps is the wired bundle when callers need access to the storage
+// and ledger handles in addition to the orchestrator (cmd_loop uses
+// the ledger handle for post-cycle verification).
+type orchDeps struct {
+	Storage      core.Storage
+	Ledger       core.Ledger
+	Orchestrator *core.Orchestrator
+}
+
+// wireOrchestratorDeps mirrors wireOrchestrator but returns the
+// underlying storage + ledger so callers can run cross-cutting
+// queries (verify the ledger, read state.json) without re-instantiating
+// the adapters and risking divergence in the evolveDir resolution.
+func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	br := bridge.NewDefault(projectRoot)
 	prm := newPromptsLoader(projectRoot)
 
@@ -141,5 +159,9 @@ func wireOrchestrator(projectRoot, evolveDir string) *core.Orchestrator {
 
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir)
-	return core.NewOrchestrator(st, ld, runners)
+	return orchDeps{
+		Storage:      st,
+		Ledger:       ld,
+		Orchestrator: core.NewOrchestrator(st, ld, runners),
+	}
 }

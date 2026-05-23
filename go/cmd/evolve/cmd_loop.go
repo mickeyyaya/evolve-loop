@@ -17,11 +17,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 )
 
 // validStrategies mirrors the bash whitelist at
@@ -70,7 +74,8 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 
-	orch := wireOrchestrator(cfg.ProjectRoot, cfg.EvolveDir)
+	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir)
+	orch := deps.Orchestrator
 
 	// Strategy + bypass-env propagation. Subagents read EVOLVE_STRATEGY
 	// to select their prompt variant; Scout also reads Context["strategy"].
@@ -140,7 +145,20 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	policy := resolveDispatchPolicy(stderr)
+	threshold := resolveCircuitBreakerThreshold()
+
+	// Circuit-breaker state. PREV_RAN_CYCLE tracks the cycle number
+	// returned by the most-recent RunCycle; SAME_CYCLE_STREAK counts
+	// consecutive identical values. Trips at threshold.
+	prevRanCycle := -1
+	sameCycleStreak := 0
+
 	for i := 0; i < cfg.MaxCycles; i++ {
+		// Snapshot state.LastCycleNumber so we can detect
+		// counter-non-advance after RunCycle returns.
+		lastBefore, _ := readLastCycleNumber(context.Background(), deps.Storage)
+
 		req := core.CycleRequest{
 			ProjectRoot: cfg.ProjectRoot,
 			GoalHash:    cfg.GoalHash,
@@ -158,6 +176,87 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "evolve loop: cycle %d: %v\n", result.Cycle, err)
 			break
 		}
+
+		// Resolve ran_cycle the same way bash does: prefer the
+		// post-RunCycle state.LastCycleNumber when it advanced; fall
+		// back to lastBefore+1 otherwise (and emit counter-non-advance).
+		lastAfter, _ := readLastCycleNumber(context.Background(), deps.Storage)
+		ranCycle := result.Cycle
+		workspace := cycleWorkspace(cfg.ProjectRoot, ranCycle)
+
+		if lastAfter <= lastBefore {
+			// The counter didn't advance — record an abnormal event in
+			// the cycle workspace if it exists. (Workspace may be
+			// absent on early-cycle errors; emit is best-effort.)
+			if dirExists(workspace) {
+				w := dispatchevents.NewWriter(workspace)
+				_ = w.EmitCounterNonAdvance(ranCycle)
+			}
+			fmt.Fprintf(stderr, "[loop] NOTE: lastCycleNumber did not advance after cycle %d — verdict likely WARN/FAIL\n", ranCycle)
+		}
+
+		// Same-cycle circuit breaker (D4). Bash trips this when
+		// run-cycle.sh fails to register a cycle but the dispatcher
+		// keeps iterating — the same ran_cycle value comes back over
+		// and over. After `threshold` consecutive hits, abort the batch.
+		var tripped bool
+		prevRanCycle, sameCycleStreak, tripped = updateBreaker(prevRanCycle, sameCycleStreak, ranCycle, threshold)
+		if tripped {
+			fmt.Fprintf(stderr, "[loop] ABORT: same cycle number (%d) reported %d consecutive times (threshold=%d) — dispatcher deadlocked\n", ranCycle, sameCycleStreak, threshold)
+			if dirExists(workspace) {
+				w := dispatchevents.NewWriter(workspace)
+				_ = w.EmitCircuitBreakerTripped(ranCycle, sameCycleStreak, threshold)
+			}
+			lr.StopReason = "circuit_breaker"
+			buf, _ := json.MarshalIndent(lr, "", "  ")
+			fmt.Fprintln(stdout, string(buf))
+			return 1
+		}
+
+		// Verify + classify pipeline (D1 + D2 wired together). Skipped
+		// when EVOLVE_DISPATCH_POLICY=off. On verify-fail in `verify`
+		// mode, classify + emit event + continue (recoverable classes)
+		// or break (integrity-breach). On `stop` mode, any verify-fail
+		// halts the batch.
+		if policy != dispatchPolicyOff {
+			vc := ledgerverify.LoadVerifyContext(workspace, cfg.EvolveDir)
+			vr, vErr := ledgerverify.VerifyCycle(context.Background(), deps.Ledger, ranCycle, ledgerverify.Options{
+				IntentRequired: vc.IntentRequired,
+				CycleVerdict:   vc.CycleVerdict,
+			})
+			if vErr != nil {
+				fmt.Fprintf(stderr, "[loop] verify cycle %d: %v\n", ranCycle, vErr)
+			} else if !vr.OK {
+				// Emit verify-failed event + classify the failure.
+				var emitter *dispatchevents.Writer
+				if dirExists(workspace) {
+					emitter = dispatchevents.NewWriter(workspace)
+					_ = emitter.EmitVerifyFailed(ranCycle, vr.Missing)
+				}
+				class := cycleclassify.Classify(workspace)
+				if emitter != nil {
+					_ = emitter.EmitClassification(ranCycle, string(class.Class))
+				}
+				fmt.Fprintf(stderr, "[loop] cycle %d incomplete: missing %v classification=%s\n", ranCycle, vr.Missing, class.Class)
+
+				if policy == dispatchPolicyStop {
+					lr.StopReason = "verify_failed_stop"
+					buf, _ := json.MarshalIndent(lr, "", "  ")
+					fmt.Fprintln(stdout, string(buf))
+					return 2
+				}
+				// policy == verify: STOP only on integrity-breach;
+				// recoverable classes continue the loop. The
+				// failedApproaches state.json record lands in M5.
+				if class.Class == cycleclassify.ClassIntegrityBreach {
+					lr.StopReason = "integrity_breach"
+					buf, _ := json.MarshalIndent(lr, "", "  ")
+					fmt.Fprintln(stdout, string(buf))
+					return 2
+				}
+			}
+		}
+
 		if result.FinalVerdict == core.VerdictFAIL {
 			lr.StopReason = "fail"
 			break
@@ -170,6 +269,125 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	return 0
+}
+
+// wireOrchestratorDepsFn is the test seam for runLoop. Tests
+// substitute a stub that returns a fake orchestrator + in-memory
+// storage/ledger so the M4 pipeline can be exercised end-to-end
+// without spawning real LLM subagents.
+var wireOrchestratorDepsFn = wireOrchestratorDeps
+
+// dispatchPolicy enumerates EVOLVE_DISPATCH_POLICY values.
+type dispatchPolicy int
+
+const (
+	dispatchPolicyVerify dispatchPolicy = iota // default — verify + continue on recoverable, STOP on breach
+	dispatchPolicyOff                           // skip ledger pipeline verification entirely (LEGACY)
+	dispatchPolicyStop                          // verify + STOP on any failure (legacy fail-fast)
+)
+
+const (
+	defaultCircuitBreakerThreshold = 5
+)
+
+// resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and bridges the
+// deprecated EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL
+// flags, mirroring the bash precedence at
+// legacy/scripts/dispatch/evolve-loop-dispatch.sh:1130-1148.
+//
+// Precedence: EVOLVE_DISPATCH_POLICY wins. If unset, STOP_ON_FAIL=1
+// maps to dispatchPolicyStop and VERIFY=0 maps to dispatchPolicyOff
+// (STOP_ON_FAIL wins on conflict because it's the more restrictive).
+func resolveDispatchPolicy(stderr io.Writer) dispatchPolicy {
+	if p := os.Getenv("EVOLVE_DISPATCH_POLICY"); p != "" {
+		switch p {
+		case "off":
+			return dispatchPolicyOff
+		case "stop":
+			return dispatchPolicyStop
+		case "verify":
+			return dispatchPolicyVerify
+		default:
+			fmt.Fprintf(stderr, "[loop] WARN: unknown EVOLVE_DISPATCH_POLICY=%q — defaulting to verify\n", p)
+			return dispatchPolicyVerify
+		}
+	}
+	legacyStop := os.Getenv("EVOLVE_DISPATCH_STOP_ON_FAIL") == "1"
+	legacyVerify := os.Getenv("EVOLVE_DISPATCH_VERIFY") == "0"
+	if legacyStop {
+		fmt.Fprintln(stderr, "[loop] WARN: EVOLVE_DISPATCH_STOP_ON_FAIL is deprecated; use EVOLVE_DISPATCH_POLICY=stop")
+		return dispatchPolicyStop
+	}
+	if legacyVerify {
+		fmt.Fprintln(stderr, "[loop] WARN: EVOLVE_DISPATCH_VERIFY=0 is deprecated; use EVOLVE_DISPATCH_POLICY=off")
+		return dispatchPolicyOff
+	}
+	return dispatchPolicyVerify
+}
+
+// resolveCircuitBreakerThreshold reads EVOLVE_DISPATCH_REPEAT_THRESHOLD
+// (default 5). Values <= 0 fall back to the default — preventing an
+// accidentally-zero env var from instantly tripping the breaker.
+func resolveCircuitBreakerThreshold() int {
+	v := os.Getenv("EVOLVE_DISPATCH_REPEAT_THRESHOLD")
+	if v == "" {
+		return defaultCircuitBreakerThreshold
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return defaultCircuitBreakerThreshold
+	}
+	return n
+}
+
+// readLastCycleNumber returns state.LastCycleNumber, or 0 on any error
+// (missing state.json is fine — first cycle starts at 1).
+func readLastCycleNumber(ctx context.Context, st core.Storage) (int, error) {
+	state, err := st.ReadState(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return state.LastCycleNumber, nil
+}
+
+// cycleWorkspace returns .evolve/runs/cycle-<N>/ for verify/classify.
+// Path matches the bash dispatcher's RUNS_DIR + cycle-state.json
+// WorkspacePath construction.
+func cycleWorkspace(projectRoot string, cycle int) string {
+	return filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
+}
+
+// updateBreaker is the pure step function of the same-cycle circuit
+// breaker. Returns the new (prev, streak, tripped) tuple given the
+// current ran_cycle.
+//
+// Algorithm (port of legacy/scripts/dispatch/evolve-loop-dispatch.sh:1110-1128):
+//
+//	if ranCycle == prev: streak++
+//	else: prev = ranCycle, streak = 1
+//	tripped = streak >= threshold
+//
+// Extracted from runLoop so the algorithm is unit-testable without
+// gaming the orchestrator's LastCycleNumber bookkeeping.
+func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak int, tripped bool) {
+	if ranCycle == prev {
+		streak++
+	} else {
+		streak = 1
+		prev = ranCycle
+	}
+	return prev, streak, streak >= threshold
+}
+
+// dirExists is a tiny helper for the best-effort emit path. Returns
+// true only when the path resolves to an existing directory; broken
+// symlinks or files of the same name return false.
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
 
 // parseLoopArgs parses `evolve loop` arguments per the v11.5.0 M1 CLI
