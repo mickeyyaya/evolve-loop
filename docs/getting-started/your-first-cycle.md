@@ -141,7 +141,7 @@ Pick a small, contained goal for your first cycle. Avoid sweeping refactors. Goo
 Run:
 
 ```bash
-bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3 \
+bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3 \
   "Add a --dry-run flag to legacy/scripts/foo.sh that prints the planned operation without executing it."
 ```
 
@@ -313,7 +313,7 @@ This is what makes evolve-loop "tamper-evident" — modifying any past entry inv
 Run another cycle:
 
 ```bash
-bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3
+bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3
 ```
 
 Note: no goal argument. The orchestrator picks from `state.json:carryoverTodos[]` (if cycle 1 left any) and from `state.json:instinctSummary[]` (lessons learned so far).

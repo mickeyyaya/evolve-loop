@@ -636,7 +636,7 @@ if [ "$SANDBOX_USE" = "1" ]; then
                 echo "[claude-adapter] HINT: nested sandbox-exec is forbidden by Darwin 25.4+. To unblock:" >&2
                 echo "  - From inside Claude Code: dispatcher auto-enables fallback (v8.22.0+)." >&2
                 echo "  - From terminal: this should not happen; file an issue if it does." >&2
-                echo "  - Manual override: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash legacy/scripts/dispatch/evolve-loop-dispatch.sh ..." >&2
+                echo "  - Manual override: EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 EVOLVE_USE_LEGACY_BASH=1 evolve loop ... (archived bash dispatcher path)" >&2
             fi
         fi
     elif command -v bwrap >/dev/null 2>&1; then

@@ -197,7 +197,7 @@ jq '.summary, {incidents: (.incidents | length)}' .evolve/runs/cycle-38/builder-
 **Tune for a noisy phase** (e.g., long Memo phases):
 ```bash
 EVOLVE_OBSERVER_STALL_S=600 EVOLVE_OBSERVER_ENABLED=1 \
-    bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
+    bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
 ```
 
 **Disable temporarily**:

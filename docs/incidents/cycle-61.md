@@ -75,7 +75,7 @@ Memo's allowed_tools include `Bash(cat:*)`, `Bash(tail:*)`, `Bash(head:*)`, `Bas
 
 ### B5 — Classifier doesn't scan per-role logs
 
-`legacy/scripts/dispatch/evolve-loop-dispatch.sh:558-621` (`classify_cycle_failure`) only greps `orchestrator-report.md` for infrastructure markers (`429`, `503`, `rate.limit`, `EPERM`). Memo's API 529s landed in `memo-stdout.log`, NOT in `orchestrator-report.md`. The classifier fell through to coarse `integrity-breach` when memo failed with a recoverable infra error.
+`archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:558-621` (`classify_cycle_failure`) only greps `orchestrator-report.md` for infrastructure markers (`429`, `503`, `rate.limit`, `EPERM`). Memo's API 529s landed in `memo-stdout.log`, NOT in `orchestrator-report.md`. The classifier fell through to coarse `integrity-breach` when memo failed with a recoverable infra error.
 
 ### B6 — Orchestrator-report doesn't disclose CLI fallback events
 
@@ -98,7 +98,7 @@ This bug was NOT in the original list (B1-B6) — surfaced only during the postm
 | B2 | Step 5 | `legacy/scripts/lifecycle/audit-citation-check.sh` (new) + phase-gate.sh wire-up |
 | B3 | — | NO FIX. ship.sh v8.32 TOFU already handles. |
 | B4 | Step 7 | `.evolve/profiles/memo.json` — drop `Bash(cat:*)`, `Bash(tail:*)`, `Bash(head:*)` |
-| B5 | Step 3 | `legacy/scripts/dispatch/evolve-loop-dispatch.sh:565-569` — extend infra grep to per-role `*-stdout.log`, `*-stderr.log` |
+| B5 | Step 3 | `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:565-569` — extend infra grep to per-role `*-stdout.log`, `*-stderr.log` |
 | B6 | Step 6 | `legacy/scripts/observability/render-cli-resolution.sh` (new) + phase-gate cycle-complete wire-up |
 | B7 | — | **Addressed by manually fixing state.json:lastCycleNumber=61 in this cycle's commit.** Structural fix deferred (warrants its own future investigation of why worktree state doesn't merge back to project root). |
 

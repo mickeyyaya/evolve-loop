@@ -5,7 +5,7 @@
 # Runs three sub-suites in sequence and reports a single PASS/FAIL summary:
 #
 #   1. Regression — legacy/scripts/utility/run-all-regression-tests.sh (35 suites, ~30s)
-#   2. Cycle simulate — legacy/scripts/dispatch/run-cycle.sh --simulate (~5s, no LLM)
+#   2. Cycle simulate — archive/legacy/scripts/dispatch/run-cycle.sh --simulate (~5s, no LLM)
 #   3. Release pipeline dry-run — legacy/scripts/release-pipeline.sh <next> --dry-run (~5s)
 #
 # Used by:

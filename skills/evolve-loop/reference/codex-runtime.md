@@ -13,12 +13,12 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ detects platform = codex, reads reference/codex-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓ (Codex calls its shell-execution tool)
 
 Dispatcher loops once per cycle:
-  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash archive/legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 

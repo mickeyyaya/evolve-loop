@@ -71,7 +71,7 @@ Subagent spawn + CLI adaptation.
 | File | Role |
 |---|---|
 | `legacy/scripts/dispatch/subagent-run.sh` | The ONLY path through which personas may be spawned |
-| `legacy/scripts/dispatch/run-cycle.sh` | Provisions per-cycle worktree, spawns orchestrator subagent |
+| `archive/legacy/scripts/dispatch/run-cycle.sh` | Provisions per-cycle worktree, spawns orchestrator subagent |
 | `legacy/scripts/dispatch/build-invocation-context.sh` | Canonical shared prelude (trust-boundary boilerplate + role notes) |
 | `legacy/scripts/dispatch/resolve-llm.sh` | LLM/CLI selection from `.evolve/llm_config.json` + envelope |
 | `legacy/scripts/dispatch/preflight-environment.sh` | Resolves `EVOLVE_WORKTREE_BASE`, sandbox availability |
@@ -150,7 +150,7 @@ Layers that compose on top of the core but are not load-bearing for the basic Sc
 | Evaluator | `agents/evolve-evaluator.md`, `.evolve/profiles/evaluator.json` | When you want a same-cycle counter-Auditor for cross-checking |
 | Phase observer | `legacy/scripts/dispatch/phase-observer.sh`, `legacy/scripts/dispatch/phase-watchdog.sh` | When you need real-time stuck-loop detection during a cycle (gated by `EVOLVE_OBSERVER_ENABLED=1`) |
 | Fan-out | `legacy/scripts/dispatch/fanout-dispatch.sh`, `aggregator.sh` | When read-only phases (Scout, Auditor) benefit from parallel sub-personas |
-| Checkpoint/resume | `legacy/scripts/dispatch/resume-cycle.sh`, checkpoint-related hooks | When cycles routinely exceed 95% budget and partial work loss is unacceptable |
+| Checkpoint/resume | `archive/legacy/scripts/dispatch/resume-cycle.sh`, checkpoint-related hooks | When cycles routinely exceed 95% budget and partial work loss is unacceptable |
 
 ## Trust kernel invariants
 
@@ -207,7 +207,7 @@ To wire the minimal core into a new project:
 5. **Smoke test** by running one cycle with `EVOLVE_BATCH_BUDGET_CAP=2.00` to cap cost:
 
    ```bash
-   bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 balanced "add a no-op task to verify wiring"
+   bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 balanced "add a no-op task to verify wiring"
    ```
 
    Expect: `scout-report.md` → `build-report.md` → `audit-report.md` → `orchestrator-report.md` in `.evolve/runs/cycle-1/`, plus one commit on `main`.

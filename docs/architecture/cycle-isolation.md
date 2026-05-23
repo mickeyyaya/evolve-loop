@@ -135,8 +135,8 @@ dir already exists. The `.cycle-start-marker` file (used by the
 `git-worktree-status` baseline) is preserved through quarantine.
 
 **Defense-in-depth:** quarantine logic lives in BOTH
-`legacy/scripts/dispatch/resume-cycle.sh` (Step 5) AND
-`legacy/scripts/dispatch/run-cycle.sh` (Step 4, in the `EVOLVE_RESUME_MODE=1`
+`archive/legacy/scripts/dispatch/resume-cycle.sh` (Step 5) AND
+`archive/legacy/scripts/dispatch/run-cycle.sh` (Step 4, in the `EVOLVE_RESUME_MODE=1`
 block). Whichever runs first moves the artifacts; the second finds an
 already-clean workspace and noops. This covers the case where
 `run-cycle.sh` is invoked directly with `EVOLVE_RESUME_MODE=1` (test
@@ -149,7 +149,7 @@ the killed attempt's state directly.
 
 ## Same-cycle ledger entry filter
 
-`legacy/scripts/dispatch/run-cycle.sh:build_context()` constructs the
+`archive/legacy/scripts/dispatch/run-cycle.sh:build_context()` constructs the
 `recentLedgerEntries` digest. On resume, attempts 1..K-1 of the SAME
 cycle would otherwise pollute attempt-K's prompt with stale-attempt
 entries. The filter:

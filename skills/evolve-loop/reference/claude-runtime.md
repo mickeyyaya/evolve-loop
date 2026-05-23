@@ -11,12 +11,12 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ via .claude-plugin/plugin.json → skills/evolve-loop/SKILL.md
 
 Skill activates → STRICT MODE: execute exactly one Bash command:
-  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓
 
 Dispatcher loops once per cycle:
-  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash archive/legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 

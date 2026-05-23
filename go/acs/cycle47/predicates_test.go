@@ -82,9 +82,10 @@ func TestC47_TurnOverrunObservability(t *testing.T) {
 }
 
 // TestC47_DispatchCounterNonAdvanceEvent ports 003-dispatch-counter-non-advance.sh.
+// Path updated for v11.5.0 M6: dispatcher archived to archive/legacy/scripts/dispatch/.
 func TestC47_DispatchCounterNonAdvanceEvent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	dispatch := filepath.Join(root, "legacy", "scripts", "dispatch", "evolve-loop-dispatch.sh")
+	dispatch := filepath.Join(root, "archive", "legacy", "scripts", "dispatch", "evolve-loop-dispatch.sh")
 	if !acsassert.FileExists(t, dispatch) {
 		t.Skip("evolve-loop-dispatch.sh missing — skip cycle-47-003")
 	}

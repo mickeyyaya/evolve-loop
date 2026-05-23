@@ -176,7 +176,7 @@ Pruner uses `find -mtime +N` for bash 3.2 compat. Idempotent. `--dry-run` flag f
 | Phase | Status | Surface | Lives In |
 |---|---|---|---|
 | **A — additive** | shipped v10.4.0 | All new scripts; works on existing data via replay mode | `legacy/scripts/observability/*.sh`, `legacy/scripts/tests/tracker-writer-test.sh`, this doc |
-| **B — wire live** | shipped v10.5.0 (opt-in via `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `legacy/scripts/dispatch/subagent-run.sh`, `legacy/scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
+| **B — wire live** | shipped v10.5.0 (opt-in via `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `legacy/scripts/dispatch/subagent-run.sh`, `archive/legacy/scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
 
 > **Note** — `claude.sh` already emits `--output-format stream-json --verbose` by default (since v9.2.0, gated by `EVOLVE_STREAM_JSON`, default ON). The original Phase-B plan called for flipping that flag; turned out it had already been flipped two minor versions earlier. v10.5.0 just wires the consumer side.
 

@@ -13,7 +13,7 @@ The evolve-loop phase order is currently encoded in three separate places:
 
 1. **`agents/evolve-orchestrator.md`** — narrative Phase Loop section (human-readable prose)
 2. **`legacy/scripts/lifecycle/phase-gate.sh`** — 13 gate functions enforcing phase transitions
-3. **`legacy/scripts/dispatch/run-cycle.sh`** — hardcoded phase dispatch sequence
+3. **`archive/legacy/scripts/dispatch/run-cycle.sh`** — hardcoded phase dispatch sequence
 
 Adding, removing, or reordering phases requires coordinated edits across all three locations. There is no machine-readable source of truth for:
 - The canonical phase order
@@ -98,7 +98,7 @@ In **cycle 56**, the orchestrator and run-cycle.sh will be updated to consume th
 | `legacy/scripts/dispatch/list-phase-order.sh` | **NEW** — reads registry, emits phase names | 55 (this ADR) |
 | `agents/evolve-orchestrator.md` | Registry-driven Phase Loop rewrite | 56 |
 | `legacy/scripts/lifecycle/phase-gate.sh` | `gate_run_by_name` dispatcher + tester gate functions | 56 |
-| `legacy/scripts/dispatch/run-cycle.sh` | Read registry for phase sequence | 56 |
+| `archive/legacy/scripts/dispatch/run-cycle.sh` | Read registry for phase sequence | 56 |
 | Phase contracts (`docs/architecture/phase-contracts/<phase>.md`) | Per-phase contract documents | 57–58 |
 
 ---

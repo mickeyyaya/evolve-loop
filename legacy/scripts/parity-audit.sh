@@ -125,7 +125,7 @@ What would happen in --simulate mode:
              -> proves the Go binary is callable end-to-end
 
 What would happen in --full mode:
-  bash side: bash legacy/scripts/dispatch/run-cycle.sh "parity-audit fixture"
+  bash side: bash archive/legacy/scripts/dispatch/run-cycle.sh "parity-audit fixture"
              (spends real money — ~\$5-20)
   Go side:   $GO_BIN cycle run --goal-hash <hash>
              (spends real money — ~\$5-20)

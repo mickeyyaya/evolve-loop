@@ -13,12 +13,12 @@ User: /evolve-loop 5 polish improve dispatcher
   ↓ detects platform = gemini, reads reference/gemini-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
 
   ↓ (Gemini calls run_shell_command)
 
 Dispatcher loops once per cycle:
-  bash legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
+  bash archive/legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
 
   ↓
 

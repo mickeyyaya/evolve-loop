@@ -14,7 +14,7 @@
 # These tests do NOT execute the live `claude` CLI — they exercise the runner
 # and adapter logic up to and including --validate-profile (which short-circuits
 # before claude runs). End-to-end CLI invocation is covered by the smoke tests
-# in legacy/scripts/dispatch/run-cycle.sh / phase-gate.sh integration runs.
+# in archive/legacy/scripts/dispatch/run-cycle.sh / phase-gate.sh integration runs.
 #
 # Usage: bash legacy/scripts/subagent-run-test.sh
 

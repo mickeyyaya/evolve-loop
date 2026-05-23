@@ -1,5 +1,5 @@
 // Package cycleclassify ports classify_cycle_failure from
-// legacy/scripts/dispatch/evolve-loop-dispatch.sh:548-637. Given a
+// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:548-637. Given a
 // cycle workspace it inspects orchestrator-report.md plus per-role
 // *-stdout.log/*-stderr.log files and returns one of five canonical
 // classifications. The result feeds the failure-adapter (M3) and

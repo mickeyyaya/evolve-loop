@@ -206,6 +206,6 @@ This constraint is enforced in `intent-batch-resolve.sh` by reading `state.json:
 - `legacy/scripts/lifecycle/intent-batch-resolve.sh` — computes `INTENT_MODE`, `BATCH_ID`, `GOAL_HASH`
 - `legacy/scripts/lifecycle/intent-merge-patches.sh` — applies delta patches or handles `[intent-unchanged]`
 - `agents/evolve-intent.md` — intent persona with delta-mode output contract
-- `legacy/scripts/dispatch/run-cycle.sh` — `EVOLVE_INTENT_DELTA` integration point
+- `archive/legacy/scripts/dispatch/run-cycle.sh` — `EVOLVE_INTENT_DELTA` integration point
 - `legacy/scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` with delta acceptance
 - CLAUDE.md env-var table — `EVOLVE_INTENT_DELTA` entry

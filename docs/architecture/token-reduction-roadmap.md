@@ -179,7 +179,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `legacy/scripts/dispatch/run-cycle.sh` + `legacy/scripts/dispatch/subagent-run.sh` |
+| **Subsystem** | `archive/legacy/scripts/dispatch/run-cycle.sh` + `legacy/scripts/dispatch/subagent-run.sh` |
 | **Expected saving** | Operator ergonomics (2 active flags → 1; reduces documentation surface) |
 | **LoC delta** | ~30 LoC + backward-compat bridge |
 | **Risk** | Low |

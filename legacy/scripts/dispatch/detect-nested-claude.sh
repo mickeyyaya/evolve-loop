@@ -12,7 +12,7 @@
 #
 # This script provides the canonical detection: returns "nested" if any
 # Claude Code parent-env signal is present, "standalone" otherwise. The
-# dispatcher (legacy/scripts/dispatch/evolve-loop-dispatch.sh) reads this at startup and
+# dispatcher (archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh) reads this at startup and
 # auto-enables BOTH:
 #   - EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 (since v8.22.0) — handles the
 #     sandbox-exec startup EPERM (rc=71, Point A in three-tier model)

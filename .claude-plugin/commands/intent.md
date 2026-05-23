@@ -27,7 +27,7 @@ In autonomous mode (orchestrator-driven), this fires automatically when `cycle-s
 ## Enabling autonomous use
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 bash $EVOLVE_PLUGIN_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 balanced "your goal"
+EVOLVE_REQUIRE_INTENT=1 bash $EVOLVE_PLUGIN_ROOT/archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 balanced "your goal"
 ```
 
 The flag is captured at cycle init and stored in `cycle-state.intent_required`, so mid-stream env flips do not break in-flight cycles.

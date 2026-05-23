@@ -3,12 +3,12 @@
 // it completes or trips the batch cap (matches v8.34.0+ bash
 // dispatcher behavior).
 //
-// v11.5.0 M1: CLI surface extended to mirror legacy/scripts/dispatch/
-// evolve-loop-dispatch.sh — positional args ([CYCLES] [STRATEGY]
-// [GOAL...]), --goal-text (computes hash via goalhash.Compute),
-// --strategy, --resume (flag plumbing only; protocol lands in M3),
-// --dry-run, --reset, --consensus-audit. Existing --goal-hash callers
-// continue to work unchanged.
+// v11.5.0 M1–M6: CLI surface mirrors the now-archived bash dispatcher
+// at archive/archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh — positional
+// args ([CYCLES] [STRATEGY] [GOAL...]), --goal-text (computes hash via
+// goalhash.Compute), --strategy, --resume, --dry-run, --reset,
+// --consensus-audit. Existing --goal-hash callers continue to work
+// unchanged. EVOLVE_USE_LEGACY_BASH=1 exec's the archived bash path.
 package main
 
 import (
@@ -19,8 +19,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -33,7 +35,7 @@ import (
 )
 
 // validStrategies mirrors the bash whitelist at
-// legacy/scripts/dispatch/evolve-loop-dispatch.sh:294-298.
+// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:294-298.
 var validStrategies = map[string]struct{}{
 	"balanced":     {},
 	"innovate":     {},
@@ -76,6 +78,17 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}, "", "  ")
 		fmt.Fprintln(stdout, string(buf))
 		return 0
+	}
+
+	// M6 rollback hatch (v11.5.0+): when EVOLVE_USE_LEGACY_BASH=1, exec
+	// the archived bash dispatcher with the original argv. Documented
+	// in CLAUDE.md env-var table. The archived path is
+	// archive/archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh under the
+	// project root. exec semantics replace this process so the parent
+	// shell sees the bash exit code directly — same as v11.0–v11.4
+	// behavior where this env shelled to the live legacy path.
+	if os.Getenv("EVOLVE_USE_LEGACY_BASH") == "1" {
+		return execLegacyBash(cfg.ProjectRoot, args, stderr)
 	}
 
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir)
@@ -364,6 +377,50 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // without spawning real LLM subagents.
 var wireOrchestratorDepsFn = wireOrchestratorDeps
 
+// legacyDispatcherPath resolves the archived bash dispatcher under
+// projectRoot. Defaults to archive/legacy/scripts/dispatch/
+// evolve-loop-dispatch.sh; tests can override via execLegacyBashFn.
+func legacyDispatcherPath(projectRoot string) string {
+	return filepath.Join(projectRoot, "archive", "legacy", "scripts", "dispatch", "evolve-loop-dispatch.sh")
+}
+
+// execLegacyBashFn is the test seam for the rollback hatch. Production
+// is execLegacyBashReal which syscall.Exec replaces the current process
+// with the bash dispatcher; tests substitute a stub that records the
+// call without actually exec'ing.
+var execLegacyBashFn = execLegacyBashReal
+
+// execLegacyBash is the rollback hatch — re-runs the original argv
+// through the archived bash dispatcher when EVOLVE_USE_LEGACY_BASH=1.
+// The Go process is replaced by bash via syscall.Exec so exit codes
+// + signal handling stay identical to the v10.x behavior.
+func execLegacyBash(projectRoot string, args []string, stderr io.Writer) int {
+	return execLegacyBashFn(projectRoot, args, stderr)
+}
+
+func execLegacyBashReal(projectRoot string, args []string, stderr io.Writer) int {
+	dispatcher := legacyDispatcherPath(projectRoot)
+	if _, err := os.Stat(dispatcher); err != nil {
+		fmt.Fprintf(stderr, "evolve loop: EVOLVE_USE_LEGACY_BASH=1 but %s not found: %v\n", dispatcher, err)
+		return 1
+	}
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve loop: EVOLVE_USE_LEGACY_BASH=1 but bash not on PATH: %v\n", err)
+		return 1
+	}
+	// argv0=bash, argv1=dispatcher, argv2... = original loop args.
+	bashArgs := append([]string{"bash", dispatcher}, args...)
+	fmt.Fprintf(stderr, "[loop] EVOLVE_USE_LEGACY_BASH=1 → exec %s\n", dispatcher)
+	// syscall.Exec replaces the current process — only returns on error.
+	if err := syscall.Exec(bashPath, bashArgs, os.Environ()); err != nil {
+		fmt.Fprintf(stderr, "evolve loop: exec legacy bash: %v\n", err)
+		return 1
+	}
+	// Unreachable on success.
+	return 0
+}
+
 // dispatchPolicy enumerates EVOLVE_DISPATCH_POLICY values.
 type dispatchPolicy int
 
@@ -412,7 +469,7 @@ func parsePctEnv(name string, def int) int {
 // resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and bridges the
 // deprecated EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL
 // flags, mirroring the bash precedence at
-// legacy/scripts/dispatch/evolve-loop-dispatch.sh:1130-1148.
+// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:1130-1148.
 //
 // Precedence: EVOLVE_DISPATCH_POLICY wins. If unset, STOP_ON_FAIL=1
 // maps to dispatchPolicyStop and VERIFY=0 maps to dispatchPolicyOff
@@ -480,7 +537,7 @@ func cycleWorkspace(projectRoot string, cycle int) string {
 // breaker. Returns the new (prev, streak, tripped) tuple given the
 // current ran_cycle.
 //
-// Algorithm (port of legacy/scripts/dispatch/evolve-loop-dispatch.sh:1110-1128):
+// Algorithm (port of archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:1110-1128):
 //
 //	if ranCycle == prev: streak++
 //	else: prev = ranCycle, streak = 1
@@ -521,7 +578,7 @@ func dirExists(path string) bool {
 //	--strategy takes priority over positional [STRATEGY]
 //
 // Positional parsing matches the bash dispatcher heuristic at
-// legacy/scripts/dispatch/evolve-loop-dispatch.sh:325-349:
+// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:325-349:
 //
 //	first numeric token (if any) → CYCLES
 //	next token if matching strategy whitelist → STRATEGY

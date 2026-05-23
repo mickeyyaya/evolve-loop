@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # cycle-simulate-test.sh — Tests for legacy/scripts/dispatch/cycle-simulator.sh and
-# legacy/scripts/dispatch/run-cycle.sh --simulate (v8.50.0).
+# archive/legacy/scripts/dispatch/run-cycle.sh --simulate (v8.50.0).
 #
 # Each test creates a fresh temp project repo, copies the necessary scripts +
 # resolve-roots.sh + cycle-state.sh in, and exercises the simulator path.
@@ -25,7 +25,7 @@ unset EVOLVE_BYPASS_SHIP_VERIFY EVOLVE_SHIP_RELEASE_NOTES
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SIMULATOR="$REPO_ROOT/legacy/scripts/dispatch/cycle-simulator.sh"
-RUN_CYCLE="$REPO_ROOT/legacy/scripts/dispatch/run-cycle.sh"
+RUN_CYCLE="$REPO_ROOT/archive/legacy/scripts/dispatch/run-cycle.sh"
 RESOLVE_ROOTS="$REPO_ROOT/legacy/scripts/lifecycle/resolve-roots.sh"
 CYCLE_STATE="$REPO_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
 SHIP_SH="$REPO_ROOT/legacy/scripts/lifecycle/ship.sh"
@@ -278,7 +278,7 @@ cd "$REPO_ROOT"
 header "Test 11: run-cycle.sh --simulate end-to-end"
 PROJ=$(make_project)
 mkdir -p "$PROJ/legacy/scripts/lifecycle" "$PROJ/legacy/scripts/dispatch" "$PROJ/legacy/scripts/failure" "$PROJ/legacy/scripts/observability" "$PROJ/agents"
-cp "$RUN_CYCLE" "$PROJ/legacy/scripts/dispatch/run-cycle.sh"
+cp "$RUN_CYCLE" "$PROJ/archive/legacy/scripts/dispatch/run-cycle.sh"
 cp "$REPO_ROOT/legacy/scripts/dispatch/subagent-run.sh" "$PROJ/legacy/scripts/dispatch/subagent-run.sh"
 cp "$REPO_ROOT/legacy/scripts/failure/failure-adapter.sh" "$PROJ/legacy/scripts/failure/failure-adapter.sh" 2>/dev/null || true
 # orchestrator-prompt — minimal stub
@@ -290,7 +290,7 @@ set +e
 # Disable worktree provisioning (simulator does not need a worktree;
 # `--simulate` only walks state + ledger).
 EVOLVE_PROJECT_ROOT="$PROJ" EVOLVE_PLUGIN_ROOT="$PROJ" EVOLVE_SKIP_WORKTREE=1 \
-    bash legacy/scripts/dispatch/run-cycle.sh --cycle 9011 --simulate "test goal" >/tmp/sim-out 2>&1
+    bash archive/legacy/scripts/dispatch/run-cycle.sh --cycle 9011 --simulate "test goal" >/tmp/sim-out 2>&1
 RC=$?
 set -e
 WS="$PROJ/.evolve/runs/cycle-9011"

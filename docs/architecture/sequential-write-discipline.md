@@ -189,7 +189,7 @@ After v8.55.0 ships, run one verification cycle:
 
 ```bash
 # Baseline: sequential (default)
-bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
+bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
 
 # Fan-out enabled with tight budget
 EVOLVE_FANOUT_ENABLED=1 \
@@ -197,7 +197,7 @@ EVOLVE_FANOUT_SCOUT=1 \
 EVOLVE_FANOUT_AUDITOR=1 \
 EVOLVE_FANOUT_RETROSPECTIVE=1 \
 EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.10 \
-bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
+bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 balanced "trivial verification goal"
 
 # Capture cost from .evolve/runs/cycle-N/<agent>-usage.json
 # Append findings to CHANGELOG.md under v8.55.0

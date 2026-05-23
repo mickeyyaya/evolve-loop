@@ -26,7 +26,7 @@
 | `evolve guard <name>` | `legacy/scripts/guards/*.sh` | Same predicates, in-process |
 | `evolve ledger verify` | `legacy/scripts/observability/verify-ledger-chain.sh` | Same logic, faster |
 | `evolve acs run --cycle N <pkg>` | `bash acs/cycle-N/*.sh` | Go test runner for ported predicates |
-| `evolve loop` | `legacy/scripts/dispatch/evolve-loop-dispatch.sh` | Same dispatch semantics, native |
+| `evolve loop` | `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` | Same dispatch semantics, native |
 
 ## Install the Go binary
 
@@ -86,15 +86,17 @@ latency in both runtimes; structural overhead is the win.
 If a Go-side bug bites you mid-cycle:
 
 ```bash
-# Force the bash dispatch for one invocation
-EVOLVE_USE_LEGACY_BASH=1 bash legacy/scripts/dispatch/evolve-loop-dispatch.sh
+# Force the bash dispatch for one invocation (v11.5.0+: archived path)
+EVOLVE_USE_LEGACY_BASH=1 evolve loop <args>
 
 # Or persist for a session
 export EVOLVE_USE_LEGACY_BASH=1
 ```
 
-`EVOLVE_USE_LEGACY_BASH=1` reverts to v10.x behaviour — the bash scripts
-remain canonical. The Go binary is not consulted.
+`EVOLVE_USE_LEGACY_BASH=1` reverts to v10.x behaviour — `evolve loop`
+exec's to `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`
+(archived in v11.5.0 M6 via `git mv`; full history preserved). The
+native Go dispatch path is not consulted.
 
 Report the issue at <https://github.com/mickeyyaya/evolve-loop/issues>
 with `cycle-state.json` and the failing log line attached.
@@ -106,7 +108,10 @@ with `cycle-state.json` and the failing log line attached.
 | v11.0.0 | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place at `scripts/`. | SHIPPED |
 | v11.1.0 | `scripts/` → `legacy/scripts/` physical move. `scripts/` became a backcompat symlink → `legacy/scripts/`. All existing references worked via the symlink. | SHIPPED |
 | v11.2.0 | `scripts/` symlink REMOVED. Every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/, Go source) now uses `legacy/scripts/...` directly. **Breaking change for operator integrations that hardcode `scripts/...` — they must update to `legacy/scripts/...`.** | SHIPPED |
-| v11.3.0 (this release) | Native Go ship phase (`go/internal/phases/ship/{native,verify,audit,gitops,postship,statefile,dryrun}.go`) replaces the shell-out to `legacy/scripts/lifecycle/ship.sh` for cycle commits. Routed via `EVOLVE_NATIVE_SHIP=1` (default). Set `EVOLVE_NATIVE_SHIP=0` to revert to the bash shell-out (rollback path through v11.x). New CLI: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. 23-test parity gate (`go/internal/phases/ship/native_test.go`) mirrors `legacy/scripts/tests/ship-integration-test.sh`. | SHIPPED |
+| v11.3.0 | Native Go ship phase (`go/internal/phases/ship/{native,verify,audit,gitops,postship,statefile,dryrun}.go`) replaces the shell-out to `legacy/scripts/lifecycle/ship.sh` for cycle commits. Routed via `EVOLVE_NATIVE_SHIP=1` (default). Set `EVOLVE_NATIVE_SHIP=0` to revert to the bash shell-out (rollback path through v11.x). New CLI: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. 23-test parity gate (`go/internal/phases/ship/native_test.go`) mirrors `legacy/scripts/tests/ship-integration-test.sh`. | SHIPPED |
+| v11.4.0 | Native Go guards: PreToolUse hooks call `evolve guard <name>` via the hardened shim at `legacy/scripts/guards/evolve-guard-dispatch.sh`. Bash guard scripts remain at `legacy/scripts/guards/` as the fallback when binary is stale/missing. | SHIPPED |
+| v11.5.0 M1–M5 | Native Go cycle + loop dispatch: `evolve cycle run` + `evolve loop` cover the full M1–M5 surface (CLI flags, subagent runner, failure-adapter, resume, verify/classify/observer/breaker, cost accumulation + failedApproaches lifecycle). | SHIPPED |
+| v11.5.0 M6 (this release) | Skill switch + bash dispatcher archive. `skills/evolve-loop/SKILL.md` now invokes `evolve loop` directly. `legacy/scripts/dispatch/{evolve-loop-dispatch,run-cycle,resume-cycle}.sh` moved to `archive/legacy/scripts/dispatch/` via `git mv` (history preserved). `EVOLVE_USE_LEGACY_BASH=1` exec's the archived dispatcher as the rollback hatch. Other dispatch utilities (`subagent-run.sh`, `phase-observer.sh`, etc.) remain in `legacy/scripts/dispatch/` — still called by phase runners. | SHIPPED |
 | v12.0.0 | Bash scripts removed entirely. Go-only. | DEFERRED — see [v12.0.0-roadmap.md](v12.0.0-roadmap.md) for the v11.4.0→v11.7.0 sub-release sequence (guards, EGPS predicates, dispatch, release-pipeline). |
 
 ## See also

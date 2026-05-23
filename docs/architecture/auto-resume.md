@@ -169,7 +169,7 @@ cat .evolve/cycle-state.json | jq .checkpoint
 # Option A: increment the cap and try again
 jq '.checkpoint.autoResumeMaxAttempts = 10' .evolve/cycle-state.json \
    > .evolve/cycle-state.json.tmp && mv .evolve/cycle-state.json.tmp .evolve/cycle-state.json
-bash legacy/scripts/dispatch/resume-cycle.sh
+bash archive/legacy/scripts/dispatch/resume-cycle.sh
 
 # Option B: abandon the cycle (worktree is preserved; you can salvage edits manually)
 bash legacy/scripts/lifecycle/cycle-state.sh clear-checkpoint
@@ -190,7 +190,7 @@ because:
 - The in-session ScheduleWakeup path covers the dominant use case (an
   operator queueing a long run before leaving the terminal open).
 - If Claude Code is closed mid-wait, the worktree + cycle-state are
-  preserved; the user can manually `bash legacy/scripts/dispatch/resume-cycle.sh`
+  preserved; the user can manually `bash archive/legacy/scripts/dispatch/resume-cycle.sh`
   on the next session without losing work.
 
 Layer 4 can ship later as a purely-additive feature; the Layer 1–3 design
@@ -216,7 +216,7 @@ rate-limit window with a 25min jitter buffer.
 | HEAD drifted while paused (e.g., hot-fix committed on main) | Existing v9.1.0 guard at `resume-cycle.sh:85-100` refuses to resume unless `EVOLVE_RESUME_ALLOW_HEAD_MOVED=1`. Auto-resume never sets that env var. |
 | Cost spiral | `EVOLVE_BATCH_BUDGET_CAP` (default $20) is enforced by the dispatcher regardless of auto-resume. Cumulative spend never exceeds it. |
 | Anthropic changes the "resets HH:MMam" message format | Falls back to default `now + EVOLVE_QUOTA_RESET_HOURS`. `EVOLVE_QUOTA_RESET_AT` lets the operator hard-code the right time. |
-| `ScheduleWakeup` tool not loaded in the session | SKILL.md fallback: log the `QUOTA-PAUSE wake-at=ISO` marker verbatim and require manual `bash legacy/scripts/dispatch/resume-cycle.sh`. Never silently swallow `DISPATCH_RC=5`. |
+| `ScheduleWakeup` tool not loaded in the session | SKILL.md fallback: log the `QUOTA-PAUSE wake-at=ISO` marker verbatim and require manual `bash archive/legacy/scripts/dispatch/resume-cycle.sh`. Never silently swallow `DISPATCH_RC=5`. |
 | User closes Claude Code mid-wait | Cycle stays preserved on disk. Manual `--resume` from a future session picks it up. (Layer 4 would close this gap but is out of scope.) |
 
 ## Verification
@@ -239,7 +239,7 @@ EVOLVE_QUOTA_RESET_HOURS=0.05 /evolve-loop --budget-usd 5 "smoke test"
 - `legacy/scripts/dispatch/estimate-quota-reset.sh` — Layer 1 ETA helper
 - `legacy/scripts/cli_adapters/claude.sh:628+` — Layer 1 stderr scraper
 - `legacy/scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint` — Layer 2 schema
-- `legacy/scripts/dispatch/evolve-loop-dispatch.sh` — Layer 3 DISPATCH_RC=5 path
+- `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — Layer 3 DISPATCH_RC=5 path
 - `.agents/skills/evolve-loop/SKILL.md` — Layer 3 SKILL handler
 - `docs/architecture/checkpoint-resume.md` — v9.1.0 baseline this builds on
 - `knowledge-base/research/auto-resume-design.md` — research dossier

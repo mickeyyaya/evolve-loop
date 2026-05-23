@@ -6,7 +6,7 @@
 
 You can read SKILL.md, the phase docs (`phases.md`, `phase0-calibrate.md`, etc.), and the reference files. The information is platform-neutral.
 
-You can invoke `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh ...` directly if your CLI has shell access. The dispatcher itself is platform-neutral — it loops over `run-cycle.sh` and verifies ledger entries. It does not require a specific CLI to be the caller.
+You can invoke `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh ...` directly if your CLI has shell access. The dispatcher itself is platform-neutral — it loops over `run-cycle.sh` and verifies ledger entries. It does not require a specific CLI to be the caller.
 
 ## What does NOT work
 

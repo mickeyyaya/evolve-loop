@@ -379,7 +379,7 @@ Three opt-in surfaces:
 /evolve-loop --consensus-audit 1 polish "audit hardening"
 
 # Env var form (CI-friendly, persistent across multiple dispatches)
-EVOLVE_CONSENSUS_AUDIT=1 bash legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 polish "..."
+EVOLVE_CONSENSUS_AUDIT=1 bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 polish "..."
 
 # Profile-side persistence (always-on for this auditor profile)
 jq '.consensus.enabled = true' .evolve/profiles/auditor.json > .evolve/profiles/auditor.json.tmp     && mv .evolve/profiles/auditor.json.tmp .evolve/profiles/auditor.json

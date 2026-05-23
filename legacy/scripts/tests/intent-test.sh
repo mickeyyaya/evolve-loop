@@ -300,11 +300,11 @@ fi
 
 # === Test 18: SKILL.md dispatcher path is cwd-independent (v8.20.2+) ==========
 # The slash-command agent's cwd is the user's project, NOT the plugin install.
-# A relative `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh` will fail with rc=127. The
+# A relative `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` will fail with rc=127. The
 # SKILL.md must use an absolute or find-based path that resolves regardless of
 # cwd. Without this, the v8.18.0 boundary class returns from the dead.
 header "Test 18: SKILL.md dispatcher invocation is cwd-independent (v8.20.2+)"
-# Negative: fail if SKILL.md uses bare relative `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh`.
+# Negative: fail if SKILL.md uses bare relative `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`.
 # Allow it inside `\$EVOLVE_PLUGIN_ROOT/legacy/scripts/...` form (different concept).
 # Search for the bad pattern: 'bash legacy/scripts/' with no $-prefix or $HOME or
 # $(...) command substitution before it.

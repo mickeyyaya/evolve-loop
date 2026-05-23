@@ -90,10 +90,10 @@ EXIT trap to preserve state.
 ```bash
 /evolve-loop --resume
 # or
-bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
+bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
 ```
 
-Calls `legacy/scripts/dispatch/resume-cycle.sh` which:
+Calls `archive/legacy/scripts/dispatch/resume-cycle.sh` which:
 
 1. Locates the live checkpoint via `cycle-state.sh is-checkpointed`.
 2. Validates: git HEAD unchanged since pause, worktree directory exists,
@@ -241,7 +241,7 @@ The trust kernel is preserved across the checkpoint-resume protocol:
   handles context-budget exhaustion the same way checkpoint-resume handles
   cost-budget exhaustion.
 - `agents/evolve-orchestrator.md` — orchestrator persona resume-mode section.
-- `legacy/scripts/dispatch/resume-cycle.sh` — script implementation.
+- `archive/legacy/scripts/dispatch/resume-cycle.sh` — script implementation.
 - `legacy/scripts/tests/checkpoint-roundtrip-test.sh` — round-trip test of the
   checkpoint write primitives (19 assertions).
 - `legacy/scripts/tests/resume-cycle-test.sh` — validation of resume-cycle.sh

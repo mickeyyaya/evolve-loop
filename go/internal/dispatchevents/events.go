@@ -1,7 +1,7 @@
 // Package dispatchevents writes abnormal-events.jsonl entries from the
 // dispatcher level — counter-non-advance, same-cycle-streak, verify
 // failures, classifier verdicts. Port of the inline JSONL emission at
-// legacy/scripts/dispatch/evolve-loop-dispatch.sh:983-993 plus the
+// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:983-993 plus the
 // post-classifier records added in cycle-61 follow-ups.
 //
 // Distinct from internal/adapters/observer/, which watches per-phase

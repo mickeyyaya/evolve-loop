@@ -1286,7 +1286,7 @@ ADVEOF
                 fi
             fi
             if bash "$_csh" checkpoint quota-likely 2>/dev/null; then
-                log "  checkpoint written; resume with: bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume"
+                log "  checkpoint written; resume with: bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume"
             else
                 log "  WARN: checkpoint write failed; setting EVOLVE_CHECKPOINT_TRIGGERED=1 for EXIT trap"
             fi

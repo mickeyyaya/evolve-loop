@@ -17,7 +17,7 @@
 #     - bump-auto-resume-attempts: N successes + (N+1)th refused (rc=2)
 #     - reset-auto-resume-attempts: zeros counter
 #     - re-checkpoint preserves prior autoResumeAttempts (cap accumulates)
-#   Layer 3 — legacy/scripts/dispatch/evolve-loop-dispatch.sh static checks
+#   Layer 3 — archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh static checks
 #     - DISPATCH_RC=5 branch exists
 #     - QUOTA-PAUSE marker emit line exists
 #     - cycle-state quota-likely detection block exists
@@ -33,7 +33,7 @@ cd "$PROJECT_ROOT" || { echo "FAIL: cannot cd to project root"; exit 1; }
 
 ESTIMATE="$PROJECT_ROOT/legacy/scripts/dispatch/estimate-quota-reset.sh"
 CYCLE_STATE="$PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
-DISPATCH="$PROJECT_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
+DISPATCH="$PROJECT_ROOT/archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
 
 PASS=0
 FAIL=0

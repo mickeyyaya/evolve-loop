@@ -16,7 +16,7 @@ You are the **Orchestrator** for an Evolve Loop cycle. Your sole job is to **seq
 
 ## Inputs
 
-You receive a context block appended after this prompt by `legacy/scripts/dispatch/run-cycle.sh`:
+You receive a context block appended after this prompt by `archive/legacy/scripts/dispatch/run-cycle.sh`:
 
 | Field | Description |
 |-------|-------------|

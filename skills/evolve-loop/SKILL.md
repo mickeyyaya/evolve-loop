@@ -4,7 +4,7 @@ description: Use when the user invokes /evolve-loop or asks to run autonomous im
 argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
 ---
 
-# Evolve Loop v11.3
+# Evolve Loop v11.5
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
 
@@ -14,39 +14,44 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 
 > **What this does in one paragraph:** Each `/evolve-loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `ship.sh` commits only what passes. A trust kernel of three shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) enforces phase order and artifact integrity at the OS layer, not the prompt layer — so the pipeline's safety properties hold even in autonomous / bypass-permissions mode. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
 
-## STRICT MODE — Read this first (v8.13.7+)
+## STRICT MODE — Read this first (v11.5.0+)
 
-When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command. **Your cwd is the user's project directory, NOT the plugin install** — relative paths like `bash legacy/scripts/...` will fail with rc=127. Use this exact one-liner which resolves the dispatcher's absolute path regardless of install layout:
+When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `$EVOLVE_GO_BIN` (operator override) or `<plugin_root>/go/bin/evolve` (default). **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 bash "$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/legacy/scripts/dispatch/evolve-loop-dispatch.sh' -o -path '*/cache/evolve-loop/evolve-loop/*/legacy/scripts/dispatch/evolve-loop-dispatch.sh' \) -type f 2>/dev/null | sort | tail -1)" <args>
+EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 "${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
 ```
 
-The `find` expression locates the dispatcher in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install if both exist (cache install dirs sort by version since the dir name is the version number). The `bash "$(...)"` invocation is **one** command from the shell's perspective — the substitution happens before bash runs.
+The `find` expression locates the Go binary in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install. The whole `"${EVOLVE_GO_BIN:-$(find ...)}"` expression is **one** shell argument from bash's perspective.
 
-**Quote `<args>` correctly (v8.30.0).** When `<args>` contains an apostrophe (e.g., `doesn't`, `won't`, `it's`), the shell tokenizer breaks because `'` opens an unmatched quoted string. Always wrap the goal portion in double quotes:
+**Quote `<args>` correctly.** When `<args>` contains an apostrophe (e.g., `doesn't`, `won't`, `it's`), the shell tokenizer breaks because `'` opens an unmatched quoted string. Always wrap the goal portion in double quotes:
 
 ```bash
 # CYCLES STRATEGY then a SINGLE double-quoted goal:
-... bash "$(find ...)" 3 balanced "make UI more elegant; user said it doesn't work"
+... loop 3 balanced "make UI more elegant; user said it doesn't work"
 
 # Or just CYCLES + double-quoted goal (strategy defaults to balanced):
-... bash "$(find ...)" 5 "the goal isn't trivial — needs research"
+... loop 5 "the goal isn't trivial — needs research"
+
+# Or use the explicit --goal-text flag:
+... loop --cycles 3 --strategy balanced --goal-text "make UI more elegant"
 ```
 
-Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args — the shell parses `doesn't` as `doesn` + opening-`'t` and waits for a closing single-quote that never comes.
+Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args.
 
-**Budget-driven dispatch (v8.60.0+):** Pass `--budget-usd N` (or `--budget N`) to run cycles until cumulative cost ≥ $N, rather than a fixed count. Example: `... bash "$(find ...)" --budget-usd 5 "improve test coverage"`. The cycle count becomes a safety upper bound (default 50). Passing both `--budget-usd N --cycles M` stops at whichever comes first.
+**Budget-driven dispatch:** Pass `--budget-usd N` (or `--budget N`) to run cycles until cumulative cost ≥ $N, rather than a fixed count. Example: `... loop --budget-usd 5 "improve test coverage"`. The cycle count becomes a safety upper bound (default 50). Passing both `--budget-usd N --cycles M` stops at whichever comes first.
 
-**Resume after pause (v9.1.0+):** If a cycle was checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), recover with `--resume`:
+**Resume after pause:** If a cycle was checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), recover with `--resume`:
 ```bash
-... bash "$(find ...)" --resume
+... loop --resume
 ```
-The dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree exists), and re-spawns the orchestrator from the paused phase boundary. Trust kernel is preserved — phase-gate, role-gate, ship-gate enforce the same invariants during resume. See [docs/architecture/checkpoint-resume.md](../../docs/architecture/checkpoint-resume.md) for the full protocol.
+The native dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree exists), and re-runs the orchestrator from the paused phase boundary. Trust kernel is preserved — phase-gate, role-gate, ship-gate enforce the same invariants during resume. See [docs/architecture/checkpoint-resume.md](../../docs/architecture/checkpoint-resume.md) for the full protocol.
 
-**DO NOT** invent paths like `<plugin_root>/skills/evolve-loop/legacy/scripts/...` — the dispatcher is at `<plugin_root>/legacy/scripts/`, NOT under `skills/`. The skill (this file) and the dispatcher live in sibling directories under the plugin root.
+**Rollback hatch (v11.5.0+):** If the native dispatcher misbehaves, `EVOLVE_USE_LEGACY_BASH=1` exec's to the archived bash dispatcher at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`. Same argv, same exit codes. Only the dispatch path differs.
 
-…and then read its summary. Nothing else. The dispatcher loops `run-cycle.sh` once per cycle and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
+**DO NOT** invent paths like `<plugin_root>/skills/evolve-loop/go/bin/...` — the binary lives at `<plugin_root>/go/bin/evolve`, NOT under `skills/`. The skill (this file) and the binary live in sibling directories under the plugin root.
+
+…and then read the binary's summary. Nothing else. The dispatcher loops one cycle per iteration and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
 **Why `EVOLVE_REQUIRE_INTENT=1`** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
 
@@ -57,28 +62,28 @@ The dispatcher locates the most recent paused cycle, validates state (git HEAD u
 **You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
 - Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
 - Invoke Edit, Write, or Bash (or `replace`/`write_file`/`run_shell_command` on Gemini, etc.) for any task other than the dispatcher itself (and reading its output).
-- Invoke the in-process Agent / Task / `activate_skill`-as-subagent dispatch to run Scout/Builder/Auditor. Phase agents are spawned by `subagent-run.sh` from inside `run-cycle.sh`. They are profile-restricted; the in-process subagent dispatch is not.
+- Invoke the in-process Agent / Task / `activate_skill`-as-subagent dispatch to run Scout/Builder/Auditor. Phase agents are spawned by `legacy/scripts/dispatch/subagent-run.sh` from inside the native `evolve cycle run` orchestrator. They are profile-restricted; the in-process subagent dispatch is not.
 - "Help out" by editing files between cycles. Builder edits files inside its worktree, gated by `role-gate.sh`. You are not Builder.
 
-**Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries — meaning Scout and Builder were either skipped or run via the in-process Agent tool that bypasses the kernel hooks (`role-gate`, `phase-gate-precondition`, `ship-gate`). The dispatcher closes that gap structurally: every cycle goes through `run-cycle.sh`, which spawns the orchestrator subagent under `.evolve/profiles/orchestrator.json` (Edit/Write/git ops blocked at the kernel layer); that orchestrator then invokes Scout, Builder, Auditor via `subagent-run.sh` (sequence enforced by `phase-gate-precondition.sh`).
+**Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries — meaning Scout and Builder were either skipped or run via the in-process Agent tool that bypasses the kernel hooks (`role-gate`, `phase-gate-precondition`, `ship-gate`). The dispatcher closes that gap structurally: every cycle goes through `evolve cycle run` (or `evolve loop` for batches), which spawns the orchestrator subagent under `.evolve/profiles/orchestrator.json` (Edit/Write/git ops blocked at the kernel layer); that orchestrator then invokes Scout, Builder, Auditor via `subagent-run.sh` (sequence enforced by `phase-gate-precondition.sh`).
 
 **Reading the summary correctly:**
 
 | Dispatcher exit | Meaning | Your follow-up |
 |---|---|---|
 | `0` | All cycles ran AND ledger verified clean | Report the summary; that's it |
-| `1` | A `run-cycle.sh` invocation failed | Surface the specific cycle's stderr and stop — do NOT retry inline |
+| `1` | A cycle invocation failed (e.g., subagent crash, state.json unwritable) | Surface the specific cycle's stderr and stop — do NOT retry inline |
 | `2` | INTEGRITY BREACH: orchestrator silently skipped Scout/Builder/Auditor (no orchestrator-report.md, or report doesn't disclose the gap) — CRITICAL | Quote the exact ledger counts to the user; recommend inspecting `.evolve/runs/cycle-N/` to investigate; STOP |
 | `3` | Batch completed with one or more recoverable failures (infrastructure / audit-fail / build-fail). Failure modes recorded to `state.json:failedApproaches[]` for the next dispatch's orchestrator to read and adapt | Report which cycles had which classification; surface state.json:failedApproaches summary; offer to re-run with the same goal so subsequent cycles can adapt |
 | `10` | Bad arguments | Re-prompt with valid args |
 
 **Dispatch policy (`EVOLVE_DISPATCH_POLICY`):** See [docs/architecture/control-flags.md](docs/architecture/control-flags.md) § `EVOLVE_DISPATCH_POLICY` for flag details (`off` / `verify` / `stop`; default: `verify`).
 
-The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `run-cycle.sh` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
+The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `evolve cycle run` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
 
 ---
 
-> **v8.13.1**: trust boundary now enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `legacy/scripts/lifecycle/ship.sh` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `bash legacy/scripts/dispatch/run-cycle.sh [GOAL]` — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
+> **v8.13.1 (trust boundary, still authoritative)**: enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `legacy/scripts/lifecycle/ship.sh` OR `evolve ship` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches) — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
 
 > **v8.13.2**: self-healing release pipeline. For version-bump releases, prefer `bash legacy/scripts/release-pipeline.sh <version>` over direct `ship.sh`. The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `ship.sh`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
@@ -212,12 +217,12 @@ checkpoint and `cycle-state.json` carries the wake-at timestamp.
    Provide a `reason` like `"waiting for quota reset at <wake-at>"`.
 4. On each wake, if `now < wake_at`, repeat steps 2–3 (chained wake-ups).
 5. When `now >= wake_at`, the prompt fires `/evolve-loop --resume` which
-   in turn invokes `legacy/scripts/dispatch/resume-cycle.sh` → it bumps the
+   in turn invokes the native `evolve loop --resume` path → it bumps the
    `autoResumeAttempts` counter and re-runs the paused cycle from its
    last clean phase boundary.
 6. The `autoResumeAttempts` cap (default 3, see `attempts=K/M` in the
    marker) prevents infinite quota-resume-quota loops; once exhausted,
-   resume-cycle.sh exits rc=2 and leaves the marker for operator
+   `evolve loop --resume` exits rc=2 and leaves the marker for operator
    intervention.
 
 **Operator interrupt window.** The QUOTA-PAUSE marker line includes the
@@ -228,8 +233,7 @@ log is the intervention surface.
 **Fallback if `ScheduleWakeup` is unavailable.** If you cannot call
 `ScheduleWakeup` (e.g., the tool isn't loaded in this session's surface),
 log the QUOTA-PAUSE marker verbatim so the operator can resume manually:
-`bash legacy/scripts/dispatch/resume-cycle.sh`. Never silently swallow the
-DISPATCH_RC=5 signal.
+`evolve loop --resume`. Never silently swallow the DISPATCH_RC=5 signal.
 
 See `docs/architecture/auto-resume.md` for the full architectural
 contract and env-var reference.
@@ -263,18 +267,18 @@ For each cycle:
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
 
-### v8.13.1 alternative: declarative cycle driver
+### Declarative cycle driver (v11.5.0+: native Go)
 
-Instead of running the loop from inside this skill's prompt, you may invoke `bash legacy/scripts/dispatch/run-cycle.sh [GOAL]`. The driver:
+Instead of running the loop from inside this skill's prompt, the native binary's `evolve cycle run` subcommand drives a single cycle end-to-end:
 
 1. Picks the next cycle number (or accepts `--cycle N`).
 2. Initializes `.evolve/cycle-state.json` with `phase=calibrate`.
-3. Spawns the orchestrator subagent (`bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE`) under the orchestrator profile (Edit/Write/git ops blocked at the kernel hook layer).
+3. Spawns the orchestrator subagent (via the Go subagent runner under `.evolve/profiles/orchestrator.json`; Edit/Write/git ops still blocked at the kernel hook layer — hooks are unchanged).
 4. Clears cycle-state on exit.
 
-The orchestrator subagent (`agents/evolve-orchestrator.md`) calls `bash legacy/scripts/lifecycle/cycle-state.sh advance <phase> <agent>` between phases; `phase-gate-precondition.sh` reads cycle-state to validate that the next subagent invocation matches the expected order.
+The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases via the native state machine; `phase-gate-precondition.sh` (still in `legacy/scripts/guards/`) reads cycle-state to validate that the next subagent invocation matches the expected order.
 
-Use this when you want every gate active (recommended for autonomous cycles). Use the in-line skill loop when you need tighter control or are debugging.
+Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for autonomous runs. Pre-v11.5.0 operators who depend on the bash dispatch path can set `EVOLVE_USE_LEGACY_BASH=1` to exec the archived dispatcher at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`.
 
 ## Agents
 

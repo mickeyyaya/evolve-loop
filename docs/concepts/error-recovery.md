@@ -116,7 +116,7 @@ When a cycle is *about* to fail mid-flight (cost spike, quota signature) OR has 
 }
 ```
 
-`run-cycle.sh`'s EXIT trap reads this block: if present, it SKIPs worktree removal, branch deletion, and cycle-state clear. The next operator invocation of `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` picks up at the paused phase.
+`run-cycle.sh`'s EXIT trap reads this block: if present, it SKIPs worktree removal, branch deletion, and cycle-state clear. The next operator invocation of `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` picks up at the paused phase.
 
 ### Three triggers (v9.1.0+):
 
@@ -144,7 +144,7 @@ See [`../architecture/checkpoint-resume.md`](../architecture/checkpoint-resume.m
 
 If the cycle exited with rc≠0 but no checkpoint fired (e.g., a deterministic Build error rather than a quota signature), the worktree may still survive — depending on whether the dispatcher classified the failure as `recoverable` or not.
 
-Classifier categories (from `legacy/scripts/dispatch/evolve-loop-dispatch.sh:classify_cycle_failure`):
+Classifier categories (from `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:classify_cycle_failure`):
 
 | Classification | What it means | Worktree preserved? |
 |---|---|---|
@@ -206,12 +206,12 @@ When something goes wrong, these are the canonical commands:
 
 | Situation | Command |
 |---|---|
-| Resume a checkpointed cycle | `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` |
+| Resume a checkpointed cycle | `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` |
 | Manually checkpoint a hung cycle | `bash legacy/scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
 | Clear a stuck cycle-state | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
 | Inspect what failed | `tail -50 .evolve/runs/cycle-N/orchestrator-stdout.log` |
 | Verify ledger isn't tampered | `bash legacy/scripts/observability/verify-ledger-chain.sh` |
-| Reset everything (nuclear) | `bash legacy/scripts/dispatch/evolve-loop-dispatch.sh --reset` |
+| Reset everything (nuclear) | `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --reset` |
 | Re-render CLI Resolution post-hoc | `bash legacy/scripts/observability/render-cli-resolution.sh <cycle>` |
 | Promote unshipped predicates to regression-suite | `bash legacy/scripts/utility/promote-acs-to-regression.sh <cycle>` |
 

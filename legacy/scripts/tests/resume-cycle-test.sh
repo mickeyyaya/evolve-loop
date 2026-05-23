@@ -2,9 +2,9 @@
 # v9.1.0 Cycle 4: resume-cycle.sh validation tests.
 #
 # This exercises the structural correctness of:
-#   - legacy/scripts/dispatch/resume-cycle.sh — locator, validator, dispatcher
-#   - legacy/scripts/dispatch/evolve-loop-dispatch.sh — --resume flag parsing
-#   - legacy/scripts/dispatch/run-cycle.sh — RESUME-MODE branches
+#   - archive/legacy/scripts/dispatch/resume-cycle.sh — locator, validator, dispatcher
+#   - archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh — --resume flag parsing
+#   - archive/legacy/scripts/dispatch/run-cycle.sh — RESUME-MODE branches
 #
 # We can't run an actual end-to-end resume in CI (requires the claude binary
 # and a working sub-shell), but we DO verify:
@@ -18,9 +18,9 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
-RESUME_CYCLE="$PROJECT_ROOT/legacy/scripts/dispatch/resume-cycle.sh"
-DISPATCH="$PROJECT_ROOT/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
-RUN_CYCLE="$PROJECT_ROOT/legacy/scripts/dispatch/run-cycle.sh"
+RESUME_CYCLE="$PROJECT_ROOT/archive/legacy/scripts/dispatch/resume-cycle.sh"
+DISPATCH="$PROJECT_ROOT/archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh"
+RUN_CYCLE="$PROJECT_ROOT/archive/legacy/scripts/dispatch/run-cycle.sh"
 CYCLE_STATE_HELPER="$PROJECT_ROOT/legacy/scripts/lifecycle/cycle-state.sh"
 
 PASS=0
