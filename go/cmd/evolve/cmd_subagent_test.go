@@ -246,6 +246,43 @@ func TestRunSubagent_ResolveTier_ErrorPaths(t *testing.T) {
 	}
 }
 
+func TestRunSubagent_ValidateProfile_ArgMismatch(t *testing.T) {
+	_, errOut, rc := runCLI("validate-profile")
+	if rc != 2 {
+		t.Errorf("rc=%d, want 2", rc)
+	}
+	if !strings.Contains(errOut, "expected <agent>") {
+		t.Errorf("stderr: %q", errOut)
+	}
+}
+
+func TestRunSubagent_ValidateProfile_Help(t *testing.T) {
+	out, _, rc := runCLI("validate-profile", "-h")
+	if rc != 0 {
+		t.Errorf("rc=%d", rc)
+	}
+	if !strings.Contains(out, "Usage") || !strings.Contains(out, "EVOLVE_PROFILES_DIR_OVERRIDE") {
+		t.Errorf("help missing env vars: %q", out)
+	}
+}
+
+func TestRunSubagent_ValidateProfile_MissingProfileFails(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("EVOLVE_PROFILES_DIR_OVERRIDE", tmp)
+	t.Setenv("EVOLVE_ADAPTERS_DIR_OVERRIDE", tmp)
+	t.Setenv("EVOLVE_DISPATCH_PLAN_LOG", "")
+	t.Setenv("EVOLVE_LLM_CONFIG_PATH", filepath.Join(tmp, "absent.json"))
+	t.Setenv("EVOLVE_PROJECT_ROOT", tmp)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", tmp)
+	_, errOut, rc := runCLI("validate-profile", "no-such-agent")
+	if rc != 1 {
+		t.Errorf("rc=%d, want 1", rc)
+	}
+	if !strings.Contains(errOut, "FAIL:") || !strings.Contains(errOut, "profile not found") {
+		t.Errorf("stderr: %q", errOut)
+	}
+}
+
 func TestEnvOrCwd_FallsBackToCwd(t *testing.T) {
 	t.Setenv("X_NEVER_SET_99", "")
 	got := envOrCwd("X_NEVER_SET_99")

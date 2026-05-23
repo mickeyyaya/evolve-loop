@@ -49,7 +49,8 @@ Dispatch helpers (Phase 3a + 3b ports):
   preflight-environment     Probe host capabilities, emit JSON profile
   phase-observer            Tail stream-json + stall detection + reports
   subagent                  Subagent helpers (cache-prefix, resolve-tier,
-                              check-token, check-ctx-advisory)
+                              check-token, check-ctx-advisory,
+                              validate-profile)
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can

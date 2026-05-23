@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
@@ -24,6 +26,13 @@ Subcommands:
   check-ctx-advisory Emit token-budget advisory when over profile threshold
                      ( check-ctx-advisory <profile_json> <tokens> )
                      Always exits 0; advisory printed to stderr.
+  validate-profile   Validate agent profile JSON + adapter capabilities +
+                     dispatch plan log; runs adapter with VALIDATE_ONLY=1
+                     ( validate-profile <agent> )
+                     Honors EVOLVE_PROFILES_DIR_OVERRIDE,
+                     EVOLVE_ADAPTERS_DIR_OVERRIDE,
+                     EVOLVE_DISPATCH_PLAN_LOG,
+                     EVOLVE_LLM_CONFIG_PATH.
 `
 
 // runSubagent dispatches the `evolve subagent <subcommand>` family. Mirrors
@@ -49,6 +58,8 @@ func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runSubagentCheckToken(args[1:], stdout, stderr)
 	case "check-ctx-advisory":
 		return runSubagentCheckCtxAdvisory(args[1:], stdout, stderr)
+	case "validate-profile":
+		return runSubagentValidateProfile(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve subagent: unknown subcommand %q\n\n%s", args[0], subagentUsage)
 		return 2
@@ -216,6 +227,75 @@ func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
 	if res.Emit {
 		fmt.Fprintf(stderr, "[subagent-run] INFO: %s\n", res.Message)
 	}
+	return 0
+}
+
+func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile <agent>")
+			fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE,")
+			fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG, EVOLVE_LLM_CONFIG_PATH")
+			return 0
+		}
+	}
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "evolve subagent validate-profile: expected <agent>")
+		return 2
+	}
+	agent := args[0]
+
+	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
+	if pluginRoot == "" {
+		pluginRoot = projectRoot
+	}
+
+	profilesDir := os.Getenv("EVOLVE_PROFILES_DIR_OVERRIDE")
+	if profilesDir == "" {
+		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
+	}
+	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
+	if adaptersDir == "" {
+		adaptersDir = filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	}
+	// CapabilityDir mirrors bash REAL_ADAPTERS_DIR: script-relative, never
+	// honors EVOLVE_ADAPTERS_DIR_OVERRIDE. Resolves to the plugin install
+	// path so capability manifests reflect actual installed capabilities,
+	// not a test-seam sentinel dir.
+	capabilityDir := filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+
+	llmConfigPath := os.Getenv("EVOLVE_LLM_CONFIG_PATH")
+	if llmConfigPath == "" {
+		llmConfigPath = filepath.Join(projectRoot, ".evolve", "llm_config.json")
+	}
+
+	res, err := subagent.ValidateProfile(context.Background(),
+		subagent.ValidateProfileRequest{
+			Agent:           agent,
+			ProfilesDir:     profilesDir,
+			AdaptersDir:     adaptersDir,
+			CapabilityDir:   capabilityDir,
+			ProjectRoot:     projectRoot,
+			WorktreePath:    os.Getenv("WORKTREE_PATH"),
+			LLMConfigPath:   llmConfigPath,
+			DispatchPlanLog: os.Getenv("EVOLVE_DISPATCH_PLAN_LOG"),
+		},
+		subagent.ValidateProfileOptions{},
+	)
+	if err != nil {
+		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
+		return 1
+	}
+	// Mirror bash stderr lines (cli_resolution + dispatch-resolve + profile valid).
+	fmt.Fprintf(stderr, "[dispatch-resolve] cli=%s source=%s model=%s\n",
+		res.CLI, res.CLIResolutionSrc, res.Model)
+	fmt.Fprintf(stderr, "[subagent-run] cli_resolution: source=%s target_cli=%s\n",
+		res.CLIResolutionSrc, res.CLI)
+	for _, w := range res.Warns {
+		fmt.Fprintln(stderr, w)
+	}
+	fmt.Fprintf(stderr, "[subagent-run] profile valid: %s\n", agent)
 	return 0
 }
 
