@@ -921,3 +921,11 @@
 [2026-05-23T14:45:38Z] [phase-gate-pre] ALLOW
 [2026-05-23T14:45:38Z] [research-quota-gate] ALLOW
 [2026-05-23T14:45:38Z] [doc-deletion-guard] ALLOW
+[2026-05-23T14:48:06Z] [phase-gate-pre] ALLOW
+[2026-05-23T14:48:06Z] [doc-deletion-guard] ALLOW
+[2026-05-23T14:48:06Z] [ship-gate] ALLOW
+[2026-05-23T14:48:06Z] [research-quota-gate] ALLOW
+[2026-05-23T14:48:20Z] [ship-gate] ALLOW
+[2026-05-23T14:48:20Z] [research-quota-gate] ALLOW
+[2026-05-23T14:48:20Z] [phase-gate-pre] ALLOW
+[2026-05-23T14:48:20Z] [doc-deletion-guard] ALLOW
