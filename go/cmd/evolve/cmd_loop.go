@@ -94,8 +94,51 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		StopReason string             `json:"stop_reason"`
 		Cycles     []core.CycleResult `json:"cycles"`
 		TotalCost  float64            `json:"total_cost_usd"`
+		Resumed    bool               `json:"resumed,omitempty"`
 	}
 	lr := loopResult{StopReason: "max_cycles"}
+
+	// --resume short-circuits the loop: load the checkpoint, run one
+	// cycle from the paused phase, then exit. M3 protocol.
+	if cfg.Resume {
+		lr.Resumed = true
+		rp, err := core.LoadResumeState(context.Background(), cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{})
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
+			lr.StopReason = "error"
+			buf, _ := json.MarshalIndent(lr, "", "  ")
+			fmt.Fprintln(stdout, string(buf))
+			return 2
+		}
+		fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f\n",
+			rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause)
+		req := core.CycleRequest{
+			ProjectRoot: cfg.ProjectRoot,
+			GoalHash:    cfg.GoalHash,
+			Budget: core.BudgetEnvelope{
+				MaxUSD:      cfg.BudgetUSD,
+				BatchCapUSD: cfg.BatchCapUSD,
+			},
+			Env:     cycleEnv,
+			Context: cycleCtx,
+		}
+		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
+		lr.Cycles = append(lr.Cycles, result)
+		if err != nil {
+			lr.StopReason = "error"
+			fmt.Fprintf(stderr, "evolve loop: resume cycle %d: %v\n", result.Cycle, err)
+		} else if result.FinalVerdict == core.VerdictFAIL {
+			lr.StopReason = "fail"
+		} else {
+			lr.StopReason = "resumed_complete"
+		}
+		buf, _ := json.MarshalIndent(lr, "", "  ")
+		fmt.Fprintln(stdout, string(buf))
+		if lr.StopReason == "error" || lr.StopReason == "fail" {
+			return 2
+		}
+		return 0
+	}
 
 	for i := 0; i < cfg.MaxCycles; i++ {
 		req := core.CycleRequest{

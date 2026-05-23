@@ -47,7 +47,7 @@ func TestStateJSON_RoundTrip(t *testing.T) {
 		Version:         18,
 		CurrentBatch:    core.BatchAccrual{CycleAccruedCostUSD: 3.21, GoalHash: "abc"},
 		FailedAt: []core.FailedRecord{
-			{Cycle: 100, Verdict: "FAIL", SHA256: "deadbeef"},
+			{Cycle: 100, Verdict: "FAIL", AuditReportSHA256: "deadbeef"},
 		},
 		CarryoverTodos: []core.CarryoverTodo{
 			{ID: "todo-1", Action: "investigate", Priority: "P1"},
@@ -66,7 +66,7 @@ func TestStateJSON_RoundTrip(t *testing.T) {
 	if out.CurrentBatch.CycleAccruedCostUSD != 3.21 {
 		t.Errorf("currentBatch lost: %+v", out.CurrentBatch)
 	}
-	if len(out.FailedAt) != 1 || out.FailedAt[0].SHA256 != "deadbeef" {
+	if len(out.FailedAt) != 1 || out.FailedAt[0].AuditReportSHA256 != "deadbeef" {
 		t.Errorf("failedAt lost: %+v", out.FailedAt)
 	}
 	if len(out.CarryoverTodos) != 1 || out.CarryoverTodos[0].Priority != "P1" {

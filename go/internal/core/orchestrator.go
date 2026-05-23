@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 )
 
 // CycleRequest is the operator-facing input to RunCycle.
@@ -25,9 +27,12 @@ type CycleRequest struct {
 
 // CycleResult summarises what RunCycle did.
 type CycleResult struct {
-	Cycle        int
-	FinalVerdict string
-	PhasesRun    []Phase
+	Cycle         int
+	FinalVerdict  string
+	PhasesRun     []Phase
+	// RetroDecision is the failure-adapter's verdict on the retro branch,
+	// populated only when retro ran. Format: "<action>: <reason>".
+	RetroDecision string
 }
 
 // Orchestrator drives one cycle through the state machine, calling a
@@ -105,14 +110,22 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
 	current := PhaseStart
 	lastVerdict := VerdictPASS
+	// scheduledNext, when non-empty, overrides the state machine for
+	// the next iteration. Set by the retro branch to inject the
+	// failure-adapter's decision.
+	var scheduledNext Phase
 
 	// Bounded loop guards against any transition-table cycle bug.
 	for safety := 0; safety < 32; safety++ {
 		var next Phase
-		if current == PhaseStart {
+		switch {
+		case scheduledNext != "":
+			next = scheduledNext
+			scheduledNext = ""
+		case current == PhaseStart:
 			// First edge is gated by intent_required, not by verdict.
 			next = o.sm.NextFromStart(cs.IntentRequired)
-		} else {
+		default:
 			n, err := o.sm.Next(current, lastVerdict)
 			if err != nil {
 				return result, fmt.Errorf("transition from %s: %w", current, err)
@@ -173,11 +186,23 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		current = next
 		lastVerdict = resp.Verdict
 
-		// Retro can branch to either ship (recovered), tdd (retry), or
-		// end (block). The Phase 1 skeleton defaults to ending after
-		// retro; Phase 2 wires the failure-adapter for the real branch.
+		// Retro is the one phase whose successor isn't verdict-driven;
+		// the failure-adapter consults cycle history (state.FailedAt) and
+		// the retro verdict to pick {ship | tdd | end}. Set scheduledNext
+		// so the next loop iteration runs the chosen phase.
 		if current == PhaseRetro {
-			break
+			branch, extraEnv, reason := o.decideAfterRetro(resp.Verdict, state.FailedAt)
+			for k, v := range extraEnv {
+				envSnap[k] = v
+			}
+			result.RetroDecision = reason
+			if branch == PhaseEnd {
+				break
+			}
+			if !o.sm.CanTransition(PhaseRetro, branch) {
+				return result, fmt.Errorf("retro→%s not allowed by state machine", branch)
+			}
+			scheduledNext = branch
 		}
 	}
 
@@ -186,4 +211,57 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		return result, fmt.Errorf("write state: %w", err)
 	}
 	return result, nil
+}
+
+// decideAfterRetro consults the failure-adapter over cycle history
+// (state.failedApproaches) to pick the post-retro branch.
+//
+// Mapping (retro verdict × failureadapter action → next phase):
+//   - retro PASS               → ship   (retrospective recovered the cycle)
+//   - retro FAIL/WARN + BLOCK-* → end    (cycle history forbids further work)
+//   - retro FAIL/WARN + RETRY  → tdd    (retry from earlier phase w/ fallback env)
+//   - retro FAIL/WARN + PROCEED → end   (no recovery, no block — exit cleanly)
+//
+// Returned reason is "<action>: <failureadapter reason>" for the
+// CycleResult.RetroDecision audit field.
+func (o *Orchestrator) decideAfterRetro(retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string) {
+	// retro PASS → ship; no failureadapter consultation.
+	if retroVerdict == VerdictPASS {
+		return PhaseShip, nil, "retro-recovered: ship"
+	}
+	entries := entriesFromRecords(history)
+	dec := failureadapter.Decide(entries, failureadapter.Options{Now: o.now()})
+	switch dec.Action {
+	case failureadapter.ActionRetryWithFallback:
+		return PhaseTDD, dec.SetEnv, "retry-with-fallback: " + dec.Reason
+	case failureadapter.ActionBlockCode, failureadapter.ActionBlockOperatorAction:
+		return PhaseEnd, nil, string(dec.Action) + ": " + dec.Reason
+	default: // ActionProceed
+		return PhaseEnd, dec.SetEnv, "proceed: " + dec.Reason
+	}
+}
+
+// entriesFromRecords converts FailedRecord values into failureadapter.Entry.
+// Inlined here (rather than exposed from failureadapter) to avoid a
+// circular import between core and failureadapter.
+func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
+	out := make([]failureadapter.Entry, len(records))
+	for i, r := range records {
+		out[i] = failureadapter.Entry{
+			TS:                r.TS,
+			Cycle:             r.Cycle,
+			Verdict:           r.Verdict,
+			Classification:    failureadapter.Classification(r.Classification),
+			RecordedAt:        r.RecordedAt,
+			ExpiresAt:         r.ExpiresAt,
+			AuditReportPath:   r.AuditReportPath,
+			AuditReportSHA256: r.AuditReportSHA256,
+			GitHead:           r.GitHead,
+			TreeStateSHA:      r.TreeStateSHA,
+			Defects:           r.Defects,
+			Retrospected:      r.Retrospected,
+			Summary:           r.Summary,
+		}
+	}
+	return out
 }

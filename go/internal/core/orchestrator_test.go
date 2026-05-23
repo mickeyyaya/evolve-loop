@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -545,5 +546,122 @@ func TestStateMachine_NextFromStart(t *testing.T) {
 	}
 	if got := sm.NextFromStart(true); got != PhaseIntent {
 		t.Errorf("NextFromStart(true)=%s, want intent", got)
+	}
+}
+
+// --- failure-adapter retro branching (M3) ---
+
+// Retro PASS short-circuits to ship — failureadapter not consulted.
+func TestOrchestrator_RetroPASS_RoutesToShip(t *testing.T) {
+	st := &fakeStorage{state: State{
+		LastCycleNumber: 0,
+		FailedAt: []FailedRecord{
+			// Even with prior failures, retro PASS overrides and ships.
+			{Cycle: 1, Verdict: "FAIL", Classification: "code-build-fail"},
+			{Cycle: 2, Verdict: "FAIL", Classification: "code-build-fail"},
+		},
+	}}
+	led := &fakeLedger{}
+	runners := buildRunners(map[Phase]string{
+		PhaseAudit: VerdictFAIL, // force audit→retro path
+		PhaseRetro: VerdictPASS,
+	})
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	// After retro PASS, ship should have run.
+	wantTail := []Phase{PhaseAudit, PhaseRetro, PhaseShip}
+	got := res.PhasesRun
+	if len(got) < len(wantTail) {
+		t.Fatalf("not enough phases: %v", got)
+	}
+	tail := got[len(got)-len(wantTail):]
+	for i, p := range wantTail {
+		if tail[i] != p {
+			t.Errorf("tail[%d]=%s, want %s; full=%v", i, tail[i], p, got)
+		}
+	}
+	if res.RetroDecision != "retro-recovered: ship" {
+		t.Errorf("RetroDecision=%q, want retro-recovered: ship", res.RetroDecision)
+	}
+}
+
+// Retro FAIL + clean failedApproaches → PROCEED → end (no ship, no retry).
+func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(map[Phase]string{
+		PhaseAudit: VerdictFAIL,
+		PhaseRetro: VerdictFAIL,
+	})
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	// Retro is the last phase — no ship, no second tdd.
+	last := res.PhasesRun[len(res.PhasesRun)-1]
+	if last != PhaseRetro {
+		t.Errorf("last phase=%s, want retro", last)
+	}
+	if !strings.HasPrefix(res.RetroDecision, "proceed:") {
+		t.Errorf("RetroDecision=%q, want proceed: prefix", res.RetroDecision)
+	}
+}
+
+// Retro FAIL + 2 distinct code-audit-fail records → BLOCK-CODE (strict)
+// or PROCEED awareness (fluent default). Default fluent mode → end.
+func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
+	st := &fakeStorage{state: State{
+		LastCycleNumber: 5,
+		FailedAt: []FailedRecord{
+			{Cycle: 3, Verdict: "FAIL", Classification: "code-audit-fail", RecordedAt: "2099-01-01T00:00:00Z"},
+			{Cycle: 4, Verdict: "FAIL", Classification: "code-audit-fail", RecordedAt: "2099-01-01T00:00:00Z"},
+		},
+	}}
+	led := &fakeLedger{}
+	runners := buildRunners(map[Phase]string{
+		PhaseAudit: VerdictFAIL,
+		PhaseRetro: VerdictFAIL,
+	})
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	// Fluent mode default → PROCEED with awareness → end.
+	last := res.PhasesRun[len(res.PhasesRun)-1]
+	if last != PhaseRetro {
+		t.Errorf("last phase=%s, want retro (fluent proceed→end)", last)
+	}
+	if !strings.HasPrefix(res.RetroDecision, "proceed:") {
+		t.Errorf("RetroDecision=%q, want proceed: prefix", res.RetroDecision)
+	}
+}
+
+// entriesFromRecords sanity: classification + retrospected fields survive
+// the cross-package projection.
+func TestEntriesFromRecords_PreservesClassification(t *testing.T) {
+	records := []FailedRecord{
+		{Cycle: 1, Verdict: "FAIL", Classification: "code-build-fail", Retrospected: true},
+		{Cycle: 2, Verdict: "FAIL", Classification: "infrastructure-transient", RecordedAt: "2026-05-23T00:00:00Z"},
+	}
+	entries := entriesFromRecords(records)
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+	if string(entries[0].Classification) != "code-build-fail" {
+		t.Errorf("entries[0].Classification=%q", entries[0].Classification)
+	}
+	if !entries[0].Retrospected {
+		t.Errorf("retrospected lost")
+	}
+	if entries[1].RecordedAt != "2026-05-23T00:00:00Z" {
+		t.Errorf("recordedAt lost")
 	}
 }

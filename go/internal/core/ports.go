@@ -74,16 +74,25 @@ type BatchAccrual struct {
 	GoalHash            string  `json:"goalHash,omitempty"`
 }
 
-// FailedRecord captures a non-PASS cycle outcome (for failure suppression).
+// FailedRecord captures a non-PASS cycle outcome — what the bash side
+// writes into state.json:failedApproaches[]. JSON tags use camelCase to
+// match the on-disk shape (see legacy/scripts/dispatch/subagent-run.sh +
+// failure-classifications.sh). The Classification + ExpiresAt fields are
+// consumed by failureadapter to decide RETRY/BLOCK/PROCEED.
 type FailedRecord struct {
-	Cycle           int      `json:"cycle"`
-	Verdict         string   `json:"verdict"`
-	AuditReportPath string   `json:"auditReportPath"`
-	SHA256          string   `json:"sha256"`
-	GitHEAD         string   `json:"git_head"`
-	TreeStateSHA    string   `json:"treeStateSha"`
-	Defects         []string `json:"defects,omitempty"`
-	Retrospected    bool     `json:"retrospected"`
+	TS                string   `json:"ts,omitempty"`
+	Cycle             int      `json:"cycle"`
+	Verdict           string   `json:"verdict"`
+	Classification    string   `json:"classification,omitempty"`
+	RecordedAt        string   `json:"recordedAt,omitempty"`
+	ExpiresAt         string   `json:"expiresAt,omitempty"`
+	AuditReportPath   string   `json:"auditReportPath,omitempty"`
+	AuditReportSHA256 string   `json:"auditReportSha256,omitempty"`
+	GitHead           string   `json:"gitHead,omitempty"`
+	TreeStateSHA      string   `json:"treeStateSha,omitempty"`
+	Defects           []string `json:"defects,omitempty"`
+	Retrospected      bool     `json:"retrospected"`
+	Summary           string   `json:"summary,omitempty"`
 }
 
 // CarryoverTodo is operator-queued work surfaced cycle-to-cycle.
