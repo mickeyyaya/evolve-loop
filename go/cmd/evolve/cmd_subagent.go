@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
@@ -39,6 +40,14 @@ Subcommands:
                      Prompt read from stdin (or PROMPT_FILE_OVERRIDE).
                      Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT,
                      EVOLVE_CACHE_PREFIX_V2, LEGACY_AGENT_DISPATCH.
+  dispatch-parallel  Fan-out N workers per profile.parallel_subtasks[],
+                     run via fanoutdispatch + aggregator merge.
+                     ( dispatch-parallel <agent> <cycle> <workspace_path> )
+                     Refuses if profile.parallel_eligible != true.
+                     Honors EVOLVE_FANOUT_CONCURRENCY,
+                     EVOLVE_FANOUT_PER_WORKER_BUDGET_USD,
+                     EVOLVE_FANOUT_CACHE_PREFIX,
+                     EVOLVE_FANOUT_TEST_EXECUTOR.
 `
 
 // runSubagent dispatches the `evolve subagent <subcommand>` family. Mirrors
@@ -68,6 +77,8 @@ func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runSubagentValidateProfile(args[1:], stdout, stderr)
 	case "run":
 		return runSubagentRun(args[1:], stdout, stderr)
+	case "dispatch-parallel":
+		return runSubagentDispatchParallel(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve subagent: unknown subcommand %q\n\n%s", args[0], subagentUsage)
 		return 2
@@ -412,6 +423,93 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	default:
 		return 1
 	}
+}
+
+func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			fmt.Fprintln(stdout, "Usage: evolve subagent dispatch-parallel <agent> <cycle> <workspace_path>")
+			fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY, EVOLVE_FANOUT_PER_WORKER_BUDGET_USD,")
+			fmt.Fprintln(stdout, "     EVOLVE_FANOUT_CACHE_PREFIX, EVOLVE_FANOUT_TRACK_WORKERS,")
+			fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TEST_EXECUTOR, WORKTREE_PATH")
+			return 0
+		}
+	}
+	if len(args) != 3 {
+		fmt.Fprintln(stderr, "evolve subagent dispatch-parallel: expected <agent> <cycle> <workspace>")
+		return 2
+	}
+	agent := args[0]
+	cycle, err := strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve subagent dispatch-parallel: cycle must be integer: %v\n", err)
+		return 2
+	}
+	workspace := args[2]
+
+	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
+	if pluginRoot == "" {
+		pluginRoot = projectRoot
+	}
+	profilesDir := os.Getenv("EVOLVE_PROFILES_DIR_OVERRIDE")
+	if profilesDir == "" {
+		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
+	}
+	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
+	if adaptersDir == "" {
+		adaptersDir = filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	}
+	capabilityDir := filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	ledgerPath := os.Getenv("EVOLVE_LEDGER_OVERRIDE")
+	if ledgerPath == "" {
+		ledgerPath = filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
+	}
+
+	concurrency := 2
+	if v := os.Getenv("EVOLVE_FANOUT_CONCURRENCY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			concurrency = n
+		}
+	}
+	perWorkerBudget := os.Getenv("EVOLVE_FANOUT_PER_WORKER_BUDGET_USD")
+	if perWorkerBudget == "" {
+		perWorkerBudget = "0.20"
+	}
+
+	res, err := subagent.DispatchParallel(context.Background(), subagent.DispatchParallelRequest{
+		Agent:              agent,
+		Cycle:              cycle,
+		WorkspacePath:      workspace,
+		ProfilesDir:        profilesDir,
+		AdaptersDir:        adaptersDir,
+		CapabilityDir:      capabilityDir,
+		ProjectRoot:        projectRoot,
+		PluginRoot:         pluginRoot,
+		LedgerPath:         ledgerPath,
+		WorktreePath:       os.Getenv("WORKTREE_PATH"),
+		Concurrency:        concurrency,
+		PerWorkerBudgetUSD: perWorkerBudget,
+		CachePrefixEnabled: os.Getenv("EVOLVE_FANOUT_CACHE_PREFIX") != "0",
+		TrackWorkers:       os.Getenv("EVOLVE_FANOUT_TRACK_WORKERS") != "0",
+		TestExecutor:       os.Getenv("EVOLVE_FANOUT_TEST_EXECUTOR"),
+	}, subagent.DispatchParallelOptions{})
+	if err != nil {
+		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
+		// parallel_eligible refusal → exit 2 to match bash semantics
+		if strings.Contains(err.Error(), "not parallel_eligible") {
+			return 2
+		}
+		return 1
+	}
+	fmt.Fprintf(stderr,
+		"[dispatch-parallel] DONE agent=%s cycle=%d workers=%d fanout_rc=%d agg_rc=%d aggregate=%s tier=%s\n",
+		agent, cycle, res.WorkerCount, res.FanoutExitCode, res.AggregatorExit, res.AggregatePath, res.QualityTier,
+	)
+	if res.FanoutExitCode != 0 || res.AggregatorExit != 0 {
+		return 1
+	}
+	return 0
 }
 
 func nextArg(args []string, i int) string {
