@@ -61,6 +61,11 @@ type loopConfig struct {
 	Reset           bool    `json:"reset,omitempty"`
 	ConsensusAudit  bool    `json:"consensus_audit,omitempty"`
 	DryRun          bool    `json:"dry_run,omitempty"`
+	// BudgetDriven is true when --budget-usd (or --budget alias) is
+	// passed with a finite positive value. In budget mode, MaxCycles
+	// becomes a safety upper bound (default EVOLVE_BUDGET_MAX_CYCLES=50)
+	// and the loop stops when cumulative cost ≥ BudgetUSD with
+	// stop_reason=budget rc=0 (mirrors bash v8.60.0 contract).
 	BudgetDriven    bool    `json:"budget_driven,omitempty"`
 }
 
@@ -105,6 +110,27 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[loop] auto-prune: %v\n", err)
 		} else if pr.Removed > 0 {
 			fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired failedApproaches (%d→%d)\n", pr.Removed, pr.Before, pr.After)
+		}
+	}
+
+	// Gap #5: --reset operator unblock. Prunes the three classifications
+	// that accumulate when infra/config issues bricked prior batches:
+	// infrastructure-systemic (host-broken / 7d retention), infrastructure
+	// -transient (network blips / 1d retention), ship-gate-config (audit
+	// PASS but ship-gate refused / 1d retention). Bash dispatcher source:
+	// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:749-790.
+	// Operator-driven; logs loudly so the choice is auditable.
+	if cfg.Reset {
+		statePath := filepath.Join(cfg.EvolveDir, "state.json")
+		resetClasses := []failurelog.Classification{
+			failurelog.InfrastructureSystemic,
+			failurelog.InfrastructureTransient,
+			failurelog.ShipGateConfig,
+		}
+		if pr, err := failurelog.PruneByClassification(statePath, resetClasses); err != nil {
+			fmt.Fprintf(stderr, "[loop] --reset: %v\n", err)
+		} else if pr.Removed > 0 {
+			fmt.Fprintf(stderr, "[loop] --reset: pruned %d failedApproaches (infrastructure-{systemic,transient} + ship-gate-config) (%d→%d)\n", pr.Removed, pr.Before, pr.After)
 		}
 	}
 
@@ -236,22 +262,80 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// to batch total, then check against batch cap. WARN at
 		// warnPct, set EVOLVE_CHECKPOINT_REQUEST=1 for the next cycle
 		// at criticalPct. Missing-workspace / no-logs is non-fatal.
-		if cs, err := cyclecost.SummarizeCycle(workspace, ranCycle); err == nil {
-			lr.TotalCost += cs.Total.CostUSD
-			fmt.Fprintf(stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f / cap $%.2f)\n",
-				ranCycle, cs.Total.CostUSD, lr.TotalCost, cfg.BatchCapUSD)
-		}
-		if cfg.BatchCapUSD > 0 {
-			pct := (lr.TotalCost / cfg.BatchCapUSD) * 100
-			if pct >= float64(criticalPct) && cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] != "1" {
-				fmt.Fprintf(stderr, "[loop] BATCH-BUDGET CRITICAL: cumulative $%.2f (%.0f%%) >= %d%% — signaling next cycle to checkpoint at phase boundary\n",
-					lr.TotalCost, pct, criticalPct)
-				cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] = "1"
-				cycleEnv["EVOLVE_CHECKPOINT_REASON"] = "batch-cap-near"
-			} else if pct >= float64(warnPct) {
-				fmt.Fprintf(stderr, "[loop] BATCH-BUDGET WARN: cumulative $%.2f (%.0f%%) >= %d%% — consider operator review\n",
-					lr.TotalCost, pct, warnPct)
+		// Gap #7: EVOLVE_BATCH_BUDGET_DISABLE=1 skips ALL cost tracking
+		// (parity with bash dispatcher). EVOLVE_CHECKPOINT_DISABLE=1
+		// skips the threshold WARN/CRITICAL but keeps cost accounting.
+		batchBudgetDisabled := os.Getenv("EVOLVE_BATCH_BUDGET_DISABLE") == "1"
+		checkpointDisabled := os.Getenv("EVOLVE_CHECKPOINT_DISABLE") == "1"
+		if !batchBudgetDisabled {
+			if cs, err := cyclecost.SummarizeCycle(workspace, ranCycle); err == nil {
+				lr.TotalCost += cs.Total.CostUSD
+				fmt.Fprintf(stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f / cap $%.2f)\n",
+					ranCycle, cs.Total.CostUSD, lr.TotalCost, cfg.BatchCapUSD)
 			}
+			if cfg.BatchCapUSD > 0 && !checkpointDisabled {
+				pct := (lr.TotalCost / cfg.BatchCapUSD) * 100
+				if pct >= float64(criticalPct) && cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] != "1" {
+					fmt.Fprintf(stderr, "[loop] BATCH-BUDGET CRITICAL: cumulative $%.2f (%.0f%%) >= %d%% — signaling next cycle to checkpoint at phase boundary\n",
+						lr.TotalCost, pct, criticalPct)
+					cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] = "1"
+					cycleEnv["EVOLVE_CHECKPOINT_REASON"] = "batch-cap-near"
+				} else if pct >= float64(warnPct) {
+					fmt.Fprintf(stderr, "[loop] BATCH-BUDGET WARN: cumulative $%.2f (%.0f%%) >= %d%% — consider operator review\n",
+						lr.TotalCost, pct, warnPct)
+				}
+			}
+		}
+
+		// Gap #3: QUOTA-PAUSE detection. After each cycle, read
+		// cycle-state.json:checkpoint. If enabled=true AND reason==
+		// "quota-likely", emit the structured marker line + rc=5 + break.
+		// Tested BEFORE budget-cap + verify so quota wall takes priority
+		// over downstream checks. Source: bash dispatcher lines 907-930.
+		if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
+			fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d\n",
+				qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
+			fmt.Fprintln(stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evolve-loop --resume")
+			fmt.Fprintln(stderr, "[loop]   to resume manually: evolve loop --resume")
+			lr.StopReason = "quota-pause"
+			buf, _ := json.MarshalIndent(lr, "", "  ")
+			fmt.Fprintln(stdout, string(buf))
+			return 5
+		}
+
+		// Gap #2: rc=4 emission on batch_cap overrun (cycles-mode only).
+		// In budget mode hitting cap IS the success signal (handled
+		// below). In cycles-mode it's a backstop the operator must
+		// raise explicitly. Skipped under BATCH_BUDGET_DISABLE.
+		if !batchBudgetDisabled && cfg.BatchCapUSD > 0 && lr.TotalCost > cfg.BatchCapUSD {
+			if cfg.BudgetDriven {
+				// Gap #4: budget-driven success.
+				fmt.Fprintf(stderr, "[loop] BUDGET-EXHAUSTED: cumulative $%.2f >= budget $%.2f (after cycle %d)\n",
+					lr.TotalCost, cfg.BudgetUSD, ranCycle)
+				lr.StopReason = "budget"
+				buf, _ := json.MarshalIndent(lr, "", "  ")
+				fmt.Fprintln(stdout, string(buf))
+				return 0
+			}
+			fmt.Fprintf(stderr, "[loop] BATCH-BUDGET-EXCEEDED: cumulative $%.2f > cap $%.2f (after cycle %d)\n",
+				lr.TotalCost, cfg.BatchCapUSD, ranCycle)
+			fmt.Fprintln(stderr, "[loop]   override: EVOLVE_BATCH_BUDGET_DISABLE=1 or --batch-cap-usd <higher>")
+			lr.StopReason = "batch_cap"
+			buf, _ := json.MarshalIndent(lr, "", "  ")
+			fmt.Fprintln(stdout, string(buf))
+			return 4
+		}
+
+		// Gap #4: budget-driven mode stop condition. In budget mode,
+		// loop stops when cumulative cost meets/exceeds the requested
+		// budget (success signal). cycles becomes a safety cap only.
+		if cfg.BudgetDriven && lr.TotalCost >= cfg.BudgetUSD {
+			fmt.Fprintf(stderr, "[loop] BUDGET-DRIVEN COMPLETE: cumulative $%.2f >= budget $%.2f (after cycle %d)\n",
+				lr.TotalCost, cfg.BudgetUSD, ranCycle)
+			lr.StopReason = "budget"
+			buf, _ := json.MarshalIndent(lr, "", "  ")
+			fmt.Fprintln(stdout, string(buf))
+			return 0
 		}
 
 		// Same-cycle circuit breaker (D4). Bash trips this when
@@ -466,6 +550,20 @@ func parsePctEnv(name string, def int) int {
 	return n
 }
 
+// parseIntEnv reads a positive integer env var. Unparseable / ≤0 values
+// fall back to the default. Used by --budget-mode safety-cap resolution.
+func parseIntEnv(name string, def int) int {
+	v := os.Getenv(name)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
+}
+
 // resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and bridges the
 // deprecated EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL
 // flags, mirroring the bash precedence at
@@ -555,6 +653,74 @@ func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak in
 	return prev, streak, streak >= threshold
 }
 
+// quotaPause is the parsed cycle-state.json checkpoint block when the
+// dispatcher detects a Claude Code subscription quota wall.
+type quotaPause struct {
+	Cycle       int
+	WakeAt      string
+	Source      string
+	Attempts    int
+	MaxAttempts int
+}
+
+// detectQuotaPause reads <evolveDir>/cycle-state.json and returns a
+// populated quotaPause when checkpoint.enabled==true AND
+// checkpoint.reason=="quota-likely". The bash dispatcher's analog at
+// lines 907-930 uses jq; the Go side uses map[string]any for the same
+// schema-flexible read.
+//
+// Returns (zero, false) on any failure path (missing file, malformed
+// JSON, wrong reason, or checkpoint disabled) — quota-pause is an
+// opt-in signal, not an error condition.
+func detectQuotaPause(evolveDir string) (quotaPause, bool) {
+	path := filepath.Join(evolveDir, "cycle-state.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return quotaPause{}, false
+	}
+	var blob map[string]any
+	if err := json.Unmarshal(raw, &blob); err != nil {
+		return quotaPause{}, false
+	}
+	cp, ok := blob["checkpoint"].(map[string]any)
+	if !ok {
+		return quotaPause{}, false
+	}
+	enabled, _ := cp["enabled"].(bool)
+	if !enabled {
+		return quotaPause{}, false
+	}
+	reason, _ := cp["reason"].(string)
+	if reason != "quota-likely" {
+		return quotaPause{}, false
+	}
+	qp := quotaPause{
+		MaxAttempts: 3, // default per bash dispatcher (autoResumeMaxAttempts // 3)
+	}
+	// cycle_id has float64 dynamic type from JSON. Fall back to
+	// blob["cycle"] (top-level) if cycle_id absent.
+	if v, ok := blob["cycle_id"].(float64); ok {
+		qp.Cycle = int(v)
+	} else if v, ok := blob["cycle"].(float64); ok {
+		qp.Cycle = int(v)
+	}
+	if v, ok := cp["quotaResetAt"].(string); ok {
+		qp.WakeAt = v
+	}
+	if v, ok := cp["quotaResetSource"].(string); ok {
+		qp.Source = v
+	} else {
+		qp.Source = "unknown"
+	}
+	if v, ok := cp["autoResumeAttempts"].(float64); ok {
+		qp.Attempts = int(v)
+	}
+	if v, ok := cp["autoResumeMaxAttempts"].(float64); ok {
+		qp.MaxAttempts = int(v)
+	}
+	return qp, true
+}
+
 // dirExists is a tiny helper for the best-effort emit path. Returns
 // true only when the path resolves to an existing directory; broken
 // symlinks or files of the same name return false.
@@ -609,8 +775,11 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.StringVar(&strategy, "strategy", "", "balanced|innovate|harden|repair|ultrathink|autoresearch (default: balanced)")
 	fs.IntVar(&maxCyclesFlag, "max-cycles", 0, "maximum cycles to run (default 1; aliased by --cycles)")
 	fs.IntVar(&cyclesFlag, "cycles", 0, "alias for --max-cycles")
-	fs.Float64Var(&budgetUSD, "budget-usd", 0, "per-cycle USD budget cap (default 999999)")
-	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap (trips with non-zero exit)")
+	fs.Float64Var(&budgetUSD, "budget-usd", 0, "budget-driven mode dollar cap (alias: --budget); stops loop at this cumulative cost with rc=0")
+	// --budget is the bash-dispatcher alias for --budget-usd (v8.60.0+).
+	// Pass-through to the same variable; whichever is set last wins.
+	fs.Float64Var(&budgetUSD, "budget", 0, "alias for --budget-usd")
+	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap (trips with rc=4 in cycles-mode)")
 	fs.BoolVar(&resume, "resume", false, "locate and resume most-recent checkpointed cycle (protocol lands in M3)")
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
@@ -620,10 +789,31 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, 10
 	}
 
+	// --budget-usd / --budget numeric validation (Go flag package allows
+	// negative floats; bash dispatcher rejects them).
+	if budgetUSD < 0 {
+		fmt.Fprintf(stderr, "evolve loop: --budget-usd must be a positive number (got: %g)\n", budgetUSD)
+		return loopConfig{}, 10
+	}
+
 	// Parse positional args: [CYCLES] [STRATEGY] [GOAL...]
 	posCycles, posStrategy, posGoal := parsePositional(fs.Args())
 
+	// Gap #7: legacy positional-integer deprecation WARN. Mirrors the
+	// bash dispatcher's v8.60.0+ message — operators relying on bare
+	// `/evolve-loop 3 ...` get nudged toward `--cycles 3` / `--budget-usd N`.
+	if posCycles > 0 && cyclesFlag == 0 && maxCyclesFlag == 0 && budgetUSD == 0 {
+		fmt.Fprintf(stderr, "evolve loop: WARN: bare positional integer (%d) parsed as --cycles; prefer explicit --cycles N or --budget-usd N (deprecated since v8.60.0)\n", posCycles)
+	}
+
 	// Resolve cycles: explicit flag > positional > default
+	// Default depends on mode: cycles-mode = 1, budget-mode safety cap = 50
+	// (or EVOLVE_BUDGET_MAX_CYCLES override).
+	budgetMode := budgetUSD > 0
+	defaultCycles := 1
+	if budgetMode {
+		defaultCycles = parseIntEnv("EVOLVE_BUDGET_MAX_CYCLES", 50)
+	}
 	resolvedCycles := 0
 	switch {
 	case cyclesFlag > 0:
@@ -633,7 +823,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	case posCycles > 0:
 		resolvedCycles = posCycles
 	default:
-		resolvedCycles = 1
+		resolvedCycles = defaultCycles
 	}
 
 	// Resolve strategy: explicit flag > positional > default
@@ -665,12 +855,15 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, 10
 	}
 
-	// Resolve budget: default 999999 (effectively no per-cycle cap).
+	// Resolve budget. budgetMode (computed above) is the source of
+	// truth — anything >0 is budget-driven. When unset, sentinel
+	// 999999 is used internally as "no cap" so the loop runs
+	// MaxCycles cycles regardless of cost.
 	resolvedBudget := budgetUSD
 	if resolvedBudget == 0 {
 		resolvedBudget = 999999
 	}
-	budgetDriven := budgetUSD > 0 && budgetUSD < 999999
+	budgetDriven := budgetMode
 
 	// Resolve evolve-dir.
 	if evolveDir == "" {

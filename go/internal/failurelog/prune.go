@@ -85,6 +85,72 @@ func PruneExpired(statePath string, now time.Time) (PruneResult, error) {
 	return result, nil
 }
 
+// PruneByClassification removes failedApproaches entries whose
+// classification matches any of `classes`. Used by the --reset operator
+// path to unblock recurring infrastructure-systemic / -transient /
+// ship-gate-config accumulations. Mirrors bash dispatcher's
+// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:749-790.
+//
+// Returns a PruneResult summary. No-op (rc=0, removed=0) when statePath
+// missing OR no failedApproaches present OR no matches. Entries with no
+// classification field are kept (true legacy records — operator must
+// edit state.json directly to drop those).
+func PruneByClassification(statePath string, classes []Classification) (PruneResult, error) {
+	if len(classes) == 0 {
+		return PruneResult{}, nil
+	}
+	target := make(map[Classification]struct{}, len(classes))
+	for _, c := range classes {
+		target[c] = struct{}{}
+	}
+
+	raw, err := os.ReadFile(statePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return PruneResult{}, nil
+		}
+		return PruneResult{}, fmt.Errorf("failurelog: read state: %w", err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return PruneResult{}, fmt.Errorf("failurelog: parse state: %w", err)
+	}
+
+	entries, _ := state["failedApproaches"].([]any)
+	if len(entries) == 0 {
+		return PruneResult{}, nil
+	}
+
+	before := len(entries)
+	kept := make([]any, 0, before)
+	for _, e := range entries {
+		m, ok := e.(map[string]any)
+		if !ok {
+			kept = append(kept, e) // non-object: keep
+			continue
+		}
+		cls, _ := m["classification"].(string)
+		if cls == "" {
+			kept = append(kept, m) // no classification: keep
+			continue
+		}
+		if _, hit := target[Classification(cls)]; hit {
+			continue // drop
+		}
+		kept = append(kept, m)
+	}
+	state["failedApproaches"] = kept
+
+	result := PruneResult{Before: before, After: len(kept), Removed: before - len(kept)}
+	if result.Removed == 0 {
+		return result, nil
+	}
+	if err := atomicWriteJSON(statePath, state); err != nil {
+		return PruneResult{}, fmt.Errorf("failurelog: prune-by-class write: %w", err)
+	}
+	return result, nil
+}
+
 // isExpired returns true when entry's expiresAt < now OR the legacy
 // fallback (recordedAt + LegacyEffectiveTTL < now) applies. Entries
 // with neither timestamp return false — they're true legacy records

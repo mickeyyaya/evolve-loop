@@ -13,10 +13,14 @@
 package cycleclassify
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 // Classification is the typed verdict the classifier returns. The
@@ -40,6 +44,11 @@ const (
 	// ClassIntegrityBreach — report missing or unclassifiable. Treat as
 	// STOP: this is the kernel breach signal (silent skip).
 	ClassIntegrityBreach Classification = "integrity-breach"
+	// ClassExitTransportHang — orchestrator finished (SHIPPED verdict +
+	// commit on main) but the parent process hung post-artifact. Set
+	// only when EVOLVE_HANG_CLASSIFIER=1. 1h retention (vs 7d for
+	// integrity-breach) because the underlying cycle succeeded.
+	ClassExitTransportHang Classification = "exit-transport-hang"
 )
 
 // Patterns are pre-compiled at package init. Each regex is the
@@ -118,8 +127,84 @@ func Classify(workspace string) Result {
 	if m := reBuildFail.Find(reportData); m != nil {
 		return Result{Class: ClassBuildFail, Marker: string(m), Source: "orchestrator-report.md"}
 	}
+	// Gap #6: EVOLVE_HANG_CLASSIFIER=1 two-factor reclassification.
+	// When the orchestrator wrote SHIPPED verdict + a matching cycle
+	// commit exists on main, the cycle actually succeeded — the parent
+	// just hung post-artifact. Reclassify as exit-transport-hang so the
+	// failure adapter doesn't treat this as a 7d-retention breach.
+	// Source: archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:611-634.
+	if os.Getenv("EVOLVE_HANG_CLASSIFIER") == "1" {
+		if cls, ok := detectHangShipped(workspace, reportData); ok {
+			return cls
+		}
+	}
 	// Report exists but no pattern matched → breach.
 	return Result{Class: ClassIntegrityBreach}
+}
+
+// detectHangShipped checks the two-factor invariant for
+// exit-transport-hang reclassification:
+//
+//  1. orchestrator-report.md's first non-empty line after "## Verdict"
+//     contains "shipped" (case-insensitive)
+//  2. `git log --grep="cycle N" main` finds a matching commit
+//
+// Both must hold. The cycle number is parsed from the workspace path
+// suffix (cycle-N).
+//
+// `git` subprocess is launched via gitLogFn seam so tests can stub.
+func detectHangShipped(workspace string, reportData []byte) (Result, bool) {
+	// (1) first-line-after-Verdict contains "shipped"
+	if !shippedAfterVerdict(reportData) {
+		return Result{}, false
+	}
+	// (2) git log finds a commit matching "cycle N" on main
+	base := filepath.Base(workspace)
+	cycleNum := strings.TrimPrefix(base, "cycle-")
+	if cycleNum == "" || cycleNum == base {
+		return Result{}, false
+	}
+	if !gitLogFn(cycleNum) {
+		return Result{}, false
+	}
+	return Result{
+		Class:  ClassExitTransportHang,
+		Marker: fmt.Sprintf("SHIPPED verdict + commit for cycle %s on main", cycleNum),
+		Source: "orchestrator-report.md + git log",
+	}, true
+}
+
+// shippedAfterVerdict returns true when the first non-empty line
+// AFTER "## Verdict" in reportData contains "shipped" (case-insensitive).
+func shippedAfterVerdict(reportData []byte) bool {
+	lines := bytes.Split(reportData, []byte("\n"))
+	capturing := false
+	for _, line := range lines {
+		if !capturing {
+			if bytes.HasPrefix(bytes.TrimSpace(line), []byte("## Verdict")) ||
+				bytes.HasPrefix(bytes.TrimSpace(line), []byte("##Verdict")) {
+				capturing = true
+			}
+			continue
+		}
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		return bytes.Contains(bytes.ToLower(line), []byte("shipped"))
+	}
+	return false
+}
+
+// gitLogFn is a test seam — production runs `git -C . log --grep="cycle N" main`
+// and reports whether any matching commit exists. Tests substitute a
+// stub to drive the branch without spinning up a fixture repo.
+var gitLogFn = func(cycleNum string) bool {
+	cmd := exec.Command("git", "log", "--grep=cycle "+cycleNum, "--format=%H", "main")
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return len(bytes.TrimSpace(out)) > 0
 }
 
 // globFn is a test seam for the filepath.Glob error branch. A literal
