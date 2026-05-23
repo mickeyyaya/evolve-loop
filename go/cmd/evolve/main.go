@@ -46,6 +46,8 @@ Dispatch helpers (Phase 3a + 3b ports):
   phase-watchdog            Activity-based stall watchdog
   aggregator                Merge fan-out worker artifacts
   fanout-dispatch           Bounded-concurrency parallel dispatcher
+  preflight-environment     Probe host capabilities, emit JSON profile
+  phase-observer            Tail stream-json + stall detection + reports
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -104,6 +106,10 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runAggregator(args[1:], stdin, stdout, stderr)
 	case "fanout-dispatch":
 		return runFanoutDispatch(args[1:], stdin, stdout, stderr)
+	case "preflight-environment":
+		return runPreflight(args[1:], stdin, stdout, stderr)
+	case "phase-observer":
+		return runPhaseObserver(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2

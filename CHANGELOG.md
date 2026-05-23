@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [11.6.1] - 2026-05-23
+
+### Added
+
+- **Phase 3c partial — 2 of 3 XL dispatch scripts ported to Go.**
+- `evolve preflight-environment [--json|--summary|--write]` (package `internal/preflight`, 87.7% coverage) — single capability-detection probe with schema v3 output: host (os/version/shell), claude_code (nested), sandbox (sandbox-exec/bwrap capability + reasoning), filesystem (writability probes), cli_binaries (claude/gemini/codex/agy/jq/git paths), auto_config (worktree base selection by priority order, inner_sandbox decision, EVOLVE_SANDBOX_FALLBACK_ON_EPERM derivation).
+- `evolve phase-observer [--enforce] [--scope=cycle|phase] <ws> <pgid> <cycle> <phase> <agent>` (package `internal/phaseobserver`, 87.6% coverage) — primary stall-detection observer (v10.18.0+ default). Tails stream-json stdout.log, parses assistant/user/result/rate_limit_event types, maintains in-memory state (event_count, tool_call_count, error_count, cumulative_cost, cache tokens), runs stall detection every poll, emits NDJSON events to `<agent>-observer-events.ndjson`, writes final report to `<agent>-observer-report.json` on SIGUSR1 / EOF grace expiry. SCOPE NOTE: the 4 secondary detection rules (infinite_loop, error_spike, cost_anomaly, rate_limit) are stubbed — operators needing the full rule engine should keep `EVOLVE_OBSERVER_ENFORCE=0` to fall back to bash until the rule-engine port lands in v11.7.
+
+### Remaining for v12
+
+- **Phase 3c: subagent-run.sh** (90KB) — the trust-kernel dispatcher. Token generation + role-gate + ledger writing + sandbox wrapping + prompt construction + response parsing. Genuinely multi-session work; planned v11.7.
+- **Phase 4: native release CLI** (replaces release-pipeline.sh + version-bump.sh + changelog-gen.sh).
+- **Phase 5: v12.0.0 flag day** (rm -rf legacy/ after consumer migration audit).
+
 ## [11.6.0] - 2026-05-23
 
 ### Added
