@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [11.6.0] - 2026-05-23
+
+### Added
+
+- **Phase 3b complete** — all 4 medium dispatch scripts ported to Go.
+- `evolve cycle-simulator <cycle> <workspace>` (package `internal/cyclesimulator`, 80.6% coverage) — no-LLM cycle-plumbing simulator that walks every phase, writes deterministic artifacts, and appends ledger entries with byte-stable key order (load-bearing for SHA chain verification).
+- `evolve phase-watchdog <ws> <pgid> <cycle> <state>` (package `internal/phasewatchdog`, 90.8% coverage) — activity-based stall detector with v9.4.0 phase-aware baseline. Native Go signal handling via `syscall.Kill(-pgid, SIGTERM/SIGKILL)`.
+- `evolve aggregator <phase> <out> <workers...>` (package `internal/aggregator`, 95.6% coverage) — pure-shell merge replacement for all 5 modes: concat (scout), verdict (audit), lessons (retrospective dedup), plan-review (multi-lens score), cross-cli-vote (MAJORITY-PASS with FAIL-VETO).
+- `evolve fanout-dispatch [--cache-prefix-file=PATH] <cmds> <results>` (package `internal/fanoutdispatch`, 82.5% coverage) — bounded-concurrency parallel worker dispatcher using goroutines + semaphore channel + per-worker `context.WithTimeout`. Supports optional consensus-cancel polling (EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1).
+
+### Status
+
+- Phase 3a + 3b complete (7+4=11 dispatch scripts native Go).
+- Remaining for v12 flag day: Phase 3c (preflight-environment, phase-observer, subagent-run — 3 XL scripts), Phase 4 (release CLI), consumer migration audit.
+
 ## [11.5.10] - 2026-05-23
 
 ### Added

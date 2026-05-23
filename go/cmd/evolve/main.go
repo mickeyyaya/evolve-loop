@@ -34,7 +34,7 @@ Commands:
   ship       Atomic commit + push (native; v11.3.0)
               ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )
 
-Dispatch helpers (Phase 3a ports):
+Dispatch helpers (Phase 3a + 3b ports):
   detect-cli                Identify which AI CLI is driving the skill
   detect-nested-claude      Detect nested claude -p execution
   phase-order               List phases from phase-registry.json
@@ -42,6 +42,10 @@ Dispatch helpers (Phase 3a ports):
   build-invocation-context  Emit subagent bedrock prefix for a role
   resolve-llm               Route phase role → cli + model JSON
   consensus-dispatch        Cross-CLI consensus auditor (env-driven)
+  cycle-simulator           No-LLM cycle plumbing simulator
+  phase-watchdog            Activity-based stall watchdog
+  aggregator                Merge fan-out worker artifacts
+  fanout-dispatch           Bounded-concurrency parallel dispatcher
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -92,6 +96,14 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runResolveLLM(args[1:], stdin, stdout, stderr)
 	case "consensus-dispatch":
 		return runConsensusDispatch(args[1:], stdin, stdout, stderr)
+	case "cycle-simulator":
+		return runCycleSimulator(args[1:], stdin, stdout, stderr)
+	case "phase-watchdog":
+		return runPhaseWatchdog(args[1:], stdin, stdout, stderr)
+	case "aggregator":
+		return runAggregator(args[1:], stdin, stdout, stderr)
+	case "fanout-dispatch":
+		return runFanoutDispatch(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
