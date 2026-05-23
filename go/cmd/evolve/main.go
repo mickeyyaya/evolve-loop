@@ -50,7 +50,9 @@ Dispatch helpers (Phase 3a + 3b ports):
   phase-observer            Tail stream-json + stall detection + reports
   subagent                  Subagent helpers (cache-prefix, resolve-tier,
                               check-token, check-ctx-advisory,
-                              validate-profile)
+                              validate-profile, run, dispatch-parallel)
+  changelog-gen             Generate Keep-a-Changelog entry from git log
+                              ( changelog-gen <from-ref> <to-ref> <version> [--dry-run] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -115,6 +117,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runPhaseObserver(args[1:], stdin, stdout, stderr)
 	case "subagent":
 		return runSubagent(args[1:], stdin, stdout, stderr)
+	case "changelog-gen":
+		return runChangelogGen(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
