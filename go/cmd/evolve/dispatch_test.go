@@ -88,13 +88,15 @@ func TestDispatch_WorktreeRoutesToRunWorktree(t *testing.T) {
 }
 
 func TestDispatch_LoopRoutesToRunLoop(t *testing.T) {
-	// loop with no args still reaches runLoop which then errors on missing --goal-hash.
+	// loop with no args still reaches runLoop which then errors on
+	// missing goal (v11.5.0 M1: accepts --goal-hash, --goal-text,
+	// positional goal, or --resume; error wording reflects the menu).
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"loop"}, nil, &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("want 10, got %d", code)
 	}
-	if !strings.Contains(stderr.String(), "--goal-hash is required") {
+	if !strings.Contains(stderr.String(), "a goal is required") {
 		t.Errorf("stderr=%q", stderr.String())
 	}
 }
