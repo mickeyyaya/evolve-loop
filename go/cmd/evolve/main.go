@@ -53,6 +53,8 @@ Dispatch helpers (Phase 3a + 3b ports):
                               validate-profile, run, dispatch-parallel)
   changelog-gen             Generate Keep-a-Changelog entry from git log
                               ( changelog-gen <from-ref> <to-ref> <version> [--dry-run] )
+  version-bump              Atomic version bump across plugin/marketplace/
+                              SKILL.md/README.md ( version-bump <version> [--dry-run] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -119,6 +121,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runSubagent(args[1:], stdin, stdout, stderr)
 	case "changelog-gen":
 		return runChangelogGen(args[1:], stdin, stdout, stderr)
+	case "version-bump":
+		return runVersionBump(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
