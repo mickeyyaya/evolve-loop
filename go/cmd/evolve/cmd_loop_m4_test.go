@@ -356,10 +356,12 @@ func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
 	report := "Build status: FAIL — tests RED\n"
 	rc, _, stderr := runM4Loop(t, projectRoot, evolveDir, args, storage, ledger, nil, report, "", 1)
 
-	// rc=0 because: only 1 cycle requested; classifier said build-fail
-	// (recoverable); policy=verify continues but no more cycles.
-	if rc != 0 {
-		t.Fatalf("rc=%d want 0 (recoverable continue); stderr=%q", rc, stderr)
+	// rc=3 (M5+): classifier said build-fail (recoverable). policy=verify
+	// continues the loop, records the failure to state.json (or WARNs if
+	// missing), increments RecoverableFailures, and returns rc=3 at batch
+	// end — bash dispatcher parity (DISPATCH_RC=3 = DONE-WITH-RECOVERABLE-FAILURES).
+	if rc != 3 {
+		t.Fatalf("rc=%d want 3 (recoverable continue → DONE-WITH-RECOVERABLE-FAILURES); stderr=%q", rc, stderr)
 	}
 	// abnormal-events.jsonl in the workspace must have verify-failed +
 	// classification events.

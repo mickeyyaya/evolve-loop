@@ -1,0 +1,208 @@
+// Package cyclecost ports show-cycle-cost.sh --json into Go. Walks
+// <workspace>/*-stdout.log files (NDJSON or single-blob JSON), extracts
+// the last `"type":"result"` event from each, and sums cost + token
+// counts into a per-phase + per-cycle summary.
+//
+// Used by cmd_loop after each cycle to update batchTotalCost +
+// trigger checkpoint thresholds (80% WARN, 95% set
+// EVOLVE_CHECKPOINT_REQUEST=1 for the next cycle).
+//
+// Format compatibility (mirrors show-cycle-cost.sh:106-110):
+//
+//   - claude -p with --output-format=stream-json (v9.2.0+ default):
+//     each line is one JSON event; pick the LAST `"type":"result"`.
+//   - legacy single-blob JSON: the file is one giant JSON object,
+//     and the same `"type":"result"` matcher applies because the
+//     blob is also marked.
+//   - malformed/truncated log: fall back to the LAST line (jq's
+//     `// 0` default keeps the sums sane).
+//
+// Zero-cost paths are not errors. A missing workspace IS an error
+// — caller already failed to enter the cycle, summing zero would
+// mask the bug.
+package cyclecost
+
+import (
+	"bufio"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
+// PhaseCost captures one phase's contribution. Field names mirror the
+// JSON shape show-cycle-cost.sh --json emits, so downstream tooling
+// that already grep'd the bash output keeps working byte-for-byte.
+type PhaseCost struct {
+	Phase                       string  `json:"phase,omitempty"`
+	CostUSD                     float64 `json:"cost_usd"`
+	CacheReadInputTokens        int64   `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens    int64   `json:"cache_creation_input_tokens"`
+	OutputTokens                int64   `json:"output_tokens"`
+	InputTokens                 int64   `json:"input_tokens"`
+}
+
+// Summary is the per-cycle aggregate. Fits the bash --json shape so a
+// future Go-callable wrapper can swap show-cycle-cost.sh without
+// downstream changes.
+type Summary struct {
+	Cycle  int         `json:"cycle"`
+	Phases []PhaseCost `json:"phases"`
+	Total  PhaseCost   `json:"total"`
+}
+
+// ErrNoLogs is returned when the workspace exists but has no
+// *-stdout.log files. Distinguishes from ErrNoWorkspace (cycle never
+// reached any phase) — both are cost=$0 but the cause is different.
+var ErrNoLogs = errors.New("cyclecost: no *-stdout.log files in workspace")
+
+// ErrNoWorkspace is returned when the workspace dir doesn't exist.
+var ErrNoWorkspace = errors.New("cyclecost: workspace does not exist")
+
+// globFn is a test seam — production calls filepath.Glob directly,
+// but with literal patterns Glob cannot fail in practice. Tests swap
+// this to drive the defensive error path.
+var globFn = filepath.Glob
+
+// maxScannerBufBytes controls the per-line read buffer cap. Production
+// uses 16MB to accommodate huge stream-json events. Tests can lower
+// this to drive the scanner.Err() (bufio.ErrTooLong) branch without
+// writing a 17MB fixture.
+var maxScannerBufBytes = 1 << 24 // 16MB
+
+// SummarizeCycle walks the workspace, sums per-phase costs, returns
+// a Summary. Cycle is just metadata — used only for the returned
+// Summary.Cycle field.
+//
+// Returns ErrNoLogs / ErrNoWorkspace for empty / missing inputs so
+// callers can distinguish "cycle ran but produced no telemetry"
+// (e.g., orchestrator crashed before any phase) from "cycle ran
+// fine and just cost nothing" (unlikely but possible with a fully-
+// cached repeat invocation).
+func SummarizeCycle(workspace string, cycle int) (Summary, error) {
+	info, err := os.Stat(workspace)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return Summary{Cycle: cycle}, ErrNoWorkspace
+		}
+		return Summary{Cycle: cycle}, fmt.Errorf("stat workspace: %w", err)
+	}
+	if !info.IsDir() {
+		return Summary{Cycle: cycle}, ErrNoWorkspace
+	}
+
+	logs, err := globFn(filepath.Join(workspace, "*-stdout.log"))
+	if err != nil {
+		return Summary{Cycle: cycle}, fmt.Errorf("glob: %w", err)
+	}
+	if len(logs) == 0 {
+		return Summary{Cycle: cycle}, ErrNoLogs
+	}
+	sort.Strings(logs) // deterministic phase order across runs
+
+	summary := Summary{Cycle: cycle}
+	for _, log := range logs {
+		pc, ok := parsePhaseLog(log)
+		if !ok {
+			continue
+		}
+		summary.Phases = append(summary.Phases, pc)
+		summary.Total.CostUSD += pc.CostUSD
+		summary.Total.CacheReadInputTokens += pc.CacheReadInputTokens
+		summary.Total.CacheCreationInputTokens += pc.CacheCreationInputTokens
+		summary.Total.OutputTokens += pc.OutputTokens
+		summary.Total.InputTokens += pc.InputTokens
+	}
+	return summary, nil
+}
+
+// resultEvent matches the subset of the claude --output-format=stream-json
+// "result" event that show-cycle-cost.sh's jq filter extracts.
+type resultEvent struct {
+	Type          string `json:"type"`
+	TotalCostUSD  float64 `json:"total_cost_usd"`
+	Usage         struct {
+		CacheReadInputTokens     int64 `json:"cache_read_input_tokens"`
+		CacheCreationInputTokens int64 `json:"cache_creation_input_tokens"`
+		OutputTokens             int64 `json:"output_tokens"`
+		InputTokens              int64 `json:"input_tokens"`
+	} `json:"usage"`
+}
+
+// parsePhaseLog reads one *-stdout.log, picks the last `"type":"result"`
+// event, and returns the parsed phase cost. Returns ok=false when no
+// usable event found (matches the bash `[ -z "$last_json" ] && continue`).
+//
+// Phase name is derived by stripping `-stdout.log` from the basename:
+//   `scout-stdout.log` → `scout`
+//   `subagent.scout.parallel-worker-1-stdout.log` → `subagent.scout.parallel-worker-1`
+func parsePhaseLog(logPath string) (PhaseCost, bool) {
+	f, err := os.Open(logPath)
+	if err != nil {
+		return PhaseCost{}, false
+	}
+	defer func() { _ = f.Close() }()
+
+	phase := strings.TrimSuffix(filepath.Base(logPath), "-stdout.log")
+	pc := PhaseCost{Phase: phase}
+
+	// Walk every line; remember the LAST one that decodes as a result
+	// event. If no result event is found, fall back to the last
+	// non-empty line (matches the bash `tail -1` fallback when the
+	// grep for `"type":"result"` finds nothing).
+	scanner := bufio.NewScanner(f)
+	// Allow long lines — stream-json events can be huge (cache stats
+	// embed deeply nested objects).
+	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
+
+	var lastResult resultEvent
+	var lastResultOk bool
+	var lastLine string
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		lastLine = line
+		// Cheap pre-check: only parse lines that mention "result".
+		// Saves ~80% of JSON parse work for stream-json logs that emit
+		// dozens of intermediate events per result.
+		if !strings.Contains(line, `"type":"result"`) {
+			continue
+		}
+		var ev resultEvent
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			continue
+		}
+		if ev.Type == "result" {
+			lastResult = ev
+			lastResultOk = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return PhaseCost{}, false
+	}
+
+	if !lastResultOk {
+		// Fallback: try parsing the very last non-empty line as a
+		// legacy single-blob JSON. Matches the bash tail -1 fallback.
+		if lastLine == "" {
+			return PhaseCost{}, false
+		}
+		var ev resultEvent
+		if err := json.Unmarshal([]byte(lastLine), &ev); err != nil {
+			return PhaseCost{}, false
+		}
+		lastResult = ev
+	}
+
+	pc.CostUSD = lastResult.TotalCostUSD
+	pc.CacheReadInputTokens = lastResult.Usage.CacheReadInputTokens
+	pc.CacheCreationInputTokens = lastResult.Usage.CacheCreationInputTokens
+	pc.OutputTokens = lastResult.Usage.OutputTokens
+	pc.InputTokens = lastResult.Usage.InputTokens
+	return pc, true
+}

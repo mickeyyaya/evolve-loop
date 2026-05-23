@@ -14,16 +14,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 )
@@ -77,6 +81,20 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir)
 	orch := deps.Orchestrator
 
+	// E2: auto-prune expired failedApproaches at dispatcher start.
+	// Opt-out via EVOLVE_AUTO_PRUNE=0. Non-fatal on error — pruning
+	// is cosmetic (the failure-adapter already filters expired entries
+	// at read time). Pruning AFTER LoadResumeState so a stale resume
+	// pointer doesn't get culled mid-resume.
+	if os.Getenv("EVOLVE_AUTO_PRUNE") != "0" {
+		statePath := filepath.Join(cfg.EvolveDir, "state.json")
+		if pr, err := failurelog.PruneExpired(statePath, time.Now().UTC()); err != nil {
+			fmt.Fprintf(stderr, "[loop] auto-prune: %v\n", err)
+		} else if pr.Removed > 0 {
+			fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired failedApproaches (%d→%d)\n", pr.Removed, pr.Before, pr.After)
+		}
+	}
+
 	// Strategy + bypass-env propagation. Subagents read EVOLVE_STRATEGY
 	// to select their prompt variant; Scout also reads Context["strategy"].
 	cycleEnv := map[string]string{
@@ -96,12 +114,17 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	type loopResult struct {
-		StopReason string             `json:"stop_reason"`
-		Cycles     []core.CycleResult `json:"cycles"`
-		TotalCost  float64            `json:"total_cost_usd"`
-		Resumed    bool               `json:"resumed,omitempty"`
+		StopReason          string             `json:"stop_reason"`
+		Cycles              []core.CycleResult `json:"cycles"`
+		TotalCost           float64            `json:"total_cost_usd"`
+		Resumed             bool               `json:"resumed,omitempty"`
+		RecoverableFailures int                `json:"recoverable_failures,omitempty"`
 	}
 	lr := loopResult{StopReason: "max_cycles"}
+
+	// Pre-emptive checkpoint thresholds. WARN at warnPct (default 80),
+	// signal next-cycle to checkpoint at criticalPct (default 95).
+	warnPct, criticalPct := resolveCheckpointThresholds()
 
 	// --resume short-circuits the loop: load the checkpoint, run one
 	// cycle from the paused phase, then exit. M3 protocol.
@@ -195,6 +218,29 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[loop] NOTE: lastCycleNumber did not advance after cycle %d — verdict likely WARN/FAIL\n", ranCycle)
 		}
 
+		// C3: cost accumulation + checkpoint thresholds. Sum the
+		// cycle's per-phase costs from <workspace>/*-stdout.log, add
+		// to batch total, then check against batch cap. WARN at
+		// warnPct, set EVOLVE_CHECKPOINT_REQUEST=1 for the next cycle
+		// at criticalPct. Missing-workspace / no-logs is non-fatal.
+		if cs, err := cyclecost.SummarizeCycle(workspace, ranCycle); err == nil {
+			lr.TotalCost += cs.Total.CostUSD
+			fmt.Fprintf(stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f / cap $%.2f)\n",
+				ranCycle, cs.Total.CostUSD, lr.TotalCost, cfg.BatchCapUSD)
+		}
+		if cfg.BatchCapUSD > 0 {
+			pct := (lr.TotalCost / cfg.BatchCapUSD) * 100
+			if pct >= float64(criticalPct) && cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] != "1" {
+				fmt.Fprintf(stderr, "[loop] BATCH-BUDGET CRITICAL: cumulative $%.2f (%.0f%%) >= %d%% — signaling next cycle to checkpoint at phase boundary\n",
+					lr.TotalCost, pct, criticalPct)
+				cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] = "1"
+				cycleEnv["EVOLVE_CHECKPOINT_REASON"] = "batch-cap-near"
+			} else if pct >= float64(warnPct) {
+				fmt.Fprintf(stderr, "[loop] BATCH-BUDGET WARN: cumulative $%.2f (%.0f%%) >= %d%% — consider operator review\n",
+					lr.TotalCost, pct, warnPct)
+			}
+		}
+
 		// Same-cycle circuit breaker (D4). Bash trips this when
 		// run-cycle.sh fails to register a cycle but the dispatcher
 		// keeps iterating — the same ran_cycle value comes back over
@@ -246,14 +292,48 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					return 2
 				}
 				// policy == verify: STOP only on integrity-breach;
-				// recoverable classes continue the loop. The
-				// failedApproaches state.json record lands in M5.
+				// recoverable classes continue the loop.
 				if class.Class == cycleclassify.ClassIntegrityBreach {
 					lr.StopReason = "integrity_breach"
 					buf, _ := json.MarshalIndent(lr, "", "  ")
 					fmt.Fprintln(stdout, string(buf))
 					return 2
 				}
+				// E1: persist the recoverable failure to
+				// state.json:failedApproaches so the next cycle's
+				// orchestrator can read history + adapt. Atomic-write
+				// failure (state.json unwritable) escalates to a hard
+				// halt — the bash equivalent at line 1172-1178 treats
+				// this as a silent-deadlock case and aborts. Match the
+				// bash exit code 1 (dispatcher infrastructure issue).
+				statePath := filepath.Join(cfg.EvolveDir, "state.json")
+				runsParent := filepath.Join(cfg.ProjectRoot, ".evolve", "runs")
+				_, recordErr := failurelog.Record(statePath, runsParent, failurelog.RecordRequest{
+					Cycle:          ranCycle,
+					Classification: string(class.Class),
+					ReportPath:     filepath.Join(workspace, "orchestrator-report.md"),
+					Now:            time.Now().UTC(),
+				})
+				if recordErr != nil {
+					if errors.Is(recordErr, failurelog.ErrStateMissing) {
+						// Soft WARN: state.json wasn't initialized by
+						// pre-flight. Bash equivalent at line 647-648
+						// logs and continues. Treat as recoverable.
+						fmt.Fprintf(stderr, "[loop] WARN: state.json missing — cannot persist failed approach for cycle %d\n", ranCycle)
+					} else {
+						// Hard halt: state.json exists but write
+						// failed (EPERM / disk full / parse error).
+						// Matches bash line 1172-1178: silent-deadlock
+						// case, abort with rc=1.
+						fmt.Fprintf(stderr, "[loop] ABORT: state.json unwritable mid-batch (cycle %d): %v\n", ranCycle, recordErr)
+						lr.StopReason = "state_unwritable"
+						buf, _ := json.MarshalIndent(lr, "", "  ")
+						fmt.Fprintln(stdout, string(buf))
+						return 1
+					}
+				}
+				lr.RecoverableFailures++
+				fmt.Fprintf(stderr, "[loop] RECOVERABLE-FAILURE recorded: cycle=%d classification=%s\n", ranCycle, class.Class)
 			}
 		}
 
@@ -267,6 +347,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, string(buf))
 	if lr.StopReason == "error" || lr.StopReason == "fail" {
 		return 2
+	}
+	// E1 exit-code contract: when any cycle in the batch hit a
+	// recoverable failure (verify-fail + classify → recoverable),
+	// signal rc=3 so CI sees "batch completed but with infra/audit/
+	// build issues". Matches bash dispatcher's DISPATCH_RC=3.
+	if lr.RecoverableFailures > 0 {
+		return 3
 	}
 	return 0
 }
@@ -288,7 +375,39 @@ const (
 
 const (
 	defaultCircuitBreakerThreshold = 5
+	defaultCheckpointWarnPct       = 80
+	defaultCheckpointCriticalPct   = 95
 )
+
+// resolveCheckpointThresholds reads EVOLVE_CHECKPOINT_WARN_AT_PCT and
+// EVOLVE_CHECKPOINT_AT_PCT, defaulting to 80 and 95 respectively.
+// Invalid / out-of-range values (≤0, >100, or warn ≥ critical) fall
+// back to defaults — mirrors the bash dispatcher's lenient parsing at
+// lines 1057-1075.
+func resolveCheckpointThresholds() (warn, critical int) {
+	warn = parsePctEnv("EVOLVE_CHECKPOINT_WARN_AT_PCT", defaultCheckpointWarnPct)
+	critical = parsePctEnv("EVOLVE_CHECKPOINT_AT_PCT", defaultCheckpointCriticalPct)
+	// Sanity: warn must be below critical, otherwise neither fires
+	// meaningfully. Snap back to defaults if operator inverted them.
+	if warn <= 0 || critical <= 0 || warn >= critical || critical > 100 {
+		return defaultCheckpointWarnPct, defaultCheckpointCriticalPct
+	}
+	return warn, critical
+}
+
+// parsePctEnv reads an int env var, clamping to [1,100]. Out-of-range
+// or unparseable values return the supplied default.
+func parsePctEnv(name string, def int) int {
+	v := os.Getenv(name)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 || n > 100 {
+		return def
+	}
+	return n
+}
 
 // resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and bridges the
 // deprecated EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL
