@@ -115,6 +115,10 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 		"EVOLVE_CLI="+cfg.CLI,
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_SHIP_SCRIPT="+shipScript,
+		// v11.3.0: pin the legacy shell-out path. EVOLVE_SHIP_SCRIPT only
+		// takes effect when the dispatcher routes to bash; the fake-cli
+		// e2e harness depends on the script substitution.
+		"EVOLVE_NATIVE_SHIP=0",
 		// Disable the strict audit promotion so the WARN→FAIL bump doesn't
 		// surprise us; the fake emits a clean PASS verdict anyway.
 		"EVOLVE_STRICT_AUDIT=0",

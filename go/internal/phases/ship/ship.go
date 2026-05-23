@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -68,6 +69,12 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 			DurationMS:   p.nowFn().Sub(start).Milliseconds(),
 			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: err.Error()}},
 		}, err
+	}
+
+	// v11.3.0: dispatch to native Go ship by default. EVOLVE_NATIVE_SHIP=0
+	// reverts to the legacy bash shell-out (rollback path).
+	if useNativeShip(req.Env) {
+		return p.runNative(ctx, req, msg, start)
 	}
 
 	script := req.Env["EVOLVE_SHIP_SCRIPT"]
@@ -141,4 +148,64 @@ func execRunner(ctx context.Context, name string, args, env []string, cwd string
 // wiring that uses exec.CommandContext.
 func NewWithDefaultRunner() *Phase {
 	return New(Config{Runner: execRunner})
+}
+
+// useNativeShip returns true when the native Go path should be used.
+// Default in v11.3.0: native. Override with EVOLVE_NATIVE_SHIP=0 to fall
+// back to the legacy bash shell-out (rollback path through v11.x).
+// EVOLVE_NATIVE_SHIP=1 (or unset/anything-else) → native.
+func useNativeShip(env map[string]string) bool {
+	if v, ok := env["EVOLVE_NATIVE_SHIP"]; ok {
+		return v != "0"
+	}
+	if v := os.Getenv("EVOLVE_NATIVE_SHIP"); v == "0" {
+		return false
+	}
+	return true
+}
+
+// runNative dispatches to the native Go ship implementation. Translates
+// PhaseRequest → Options, then RunResult → PhaseResponse.
+func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string, start time.Time) (core.PhaseResponse, error) {
+	opts := Options{
+		Class:         ClassCycle, // PhaseRunner only invokes for cycle commits
+		CommitMessage: msg,
+		ProjectRoot:   req.ProjectRoot,
+		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
+		Env:           req.Env,
+		Runner:        execRunner,
+	}
+	res, err := Run(ctx, opts)
+	durationMS := p.nowFn().Sub(start).Milliseconds()
+
+	if err != nil {
+		verdict := core.VerdictFAIL
+		return core.PhaseResponse{
+			Phase:        phaseName,
+			Verdict:      verdict,
+			ArtifactsDir: req.Workspace,
+			DurationMS:   durationMS,
+			Diagnostics: []core.Diagnostic{
+				{Severity: "error", Message: err.Error()},
+			},
+		}, fmt.Errorf("ship: native: %w", err)
+	}
+	if res.ExitCode != ExitOK {
+		return core.PhaseResponse{
+			Phase:        phaseName,
+			Verdict:      core.VerdictFAIL,
+			ArtifactsDir: req.Workspace,
+			DurationMS:   durationMS,
+			Diagnostics: []core.Diagnostic{
+				{Severity: "error", Message: strings.Join(res.Logs, "\n")},
+			},
+		}, fmt.Errorf("ship: native exit=%d", res.ExitCode)
+	}
+	return core.PhaseResponse{
+		Phase:        phaseName,
+		Verdict:      core.VerdictPASS,
+		ArtifactsDir: req.Workspace,
+		NextPhase:    string(core.PhaseRetro),
+		DurationMS:   durationMS,
+	}, nil
 }

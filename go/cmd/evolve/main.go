@@ -31,6 +31,8 @@ Commands:
   cycle      Run one full cycle through the orchestrator ( cycle run --goal-hash X )
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N --budget-usd X )
+  ship       Atomic commit + push (native; v11.3.0)
+              ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -65,6 +67,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runWorktree(args[1:], stdin, stdout, stderr)
 	case "loop":
 		return runLoop(args[1:], stdin, stdout, stderr)
+	case "ship":
+		return runShipCmd(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2

@@ -105,8 +105,9 @@ with `cycle-state.json` and the failing log line attached.
 |---|---|---|
 | v11.0.0 | Go binary tier-1 primary in plugin manifest. Bash scripts unchanged in place at `scripts/`. | SHIPPED |
 | v11.1.0 | `scripts/` → `legacy/scripts/` physical move. `scripts/` became a backcompat symlink → `legacy/scripts/`. All existing references worked via the symlink. | SHIPPED |
-| v11.2.0 (this release) | `scripts/` symlink REMOVED. Every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/, Go source) now uses `legacy/scripts/...` directly. **Breaking change for operator integrations that hardcode `scripts/...` — they must update to `legacy/scripts/...`.** | SHIPPED |
-| v12.0.0 | Bash scripts removed entirely. Go-only. | DEFERRED — needs Go orchestrator feature parity (currently shells out to bash for `ship.sh`, etc.) |
+| v11.2.0 | `scripts/` symlink REMOVED. Every in-repo reference (CLAUDE.md, AGENTS.md, hooks, agents/, skills/, docs/, Go source) now uses `legacy/scripts/...` directly. **Breaking change for operator integrations that hardcode `scripts/...` — they must update to `legacy/scripts/...`.** | SHIPPED |
+| v11.3.0 (this release) | Native Go ship phase (`go/internal/phases/ship/{native,verify,audit,gitops,postship,statefile,dryrun}.go`) replaces the shell-out to `legacy/scripts/lifecycle/ship.sh` for cycle commits. Routed via `EVOLVE_NATIVE_SHIP=1` (default). Set `EVOLVE_NATIVE_SHIP=0` to revert to the bash shell-out (rollback path through v11.x). New CLI: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. 23-test parity gate (`go/internal/phases/ship/native_test.go`) mirrors `legacy/scripts/tests/ship-integration-test.sh`. | SHIPPED |
+| v12.0.0 | Bash scripts removed entirely. Go-only. | DEFERRED — see [v12.0.0-roadmap.md](v12.0.0-roadmap.md) for the v11.4.0→v11.7.0 sub-release sequence (guards, EGPS predicates, dispatch, release-pipeline). |
 
 ## See also
 

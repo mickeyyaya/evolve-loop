@@ -1,6 +1,7 @@
-// Tests for the ship phase. Ship is script-driven (no LLM) — it shells
-// to legacy/scripts/lifecycle/ship.sh, the canonical atomic commit-and-push
-// shipper. Tests inject a fake CmdRunner to avoid spawning subprocesses.
+// Tests for the ship phase. These tests cover the LEGACY shell-out path
+// (EVOLVE_NATIVE_SHIP=0). The v11.3.0 native Go path is exercised by
+// native_test.go. The legacy path tests inject a fake CmdRunner to
+// avoid spawning subprocesses.
 package ship
 
 import (
@@ -79,6 +80,7 @@ func TestRun_HappyPath_PASS(t *testing.T) {
 		ProjectRoot: "/tmp/proj",
 		Workspace:   ws,
 		Context:     map[string]string{"commit_message": "feat: rate limit /login"},
+		Env:         map[string]string{"EVOLVE_NATIVE_SHIP": "0"},
 	}
 	resp, err := phase.Run(context.Background(), req)
 	if err != nil {
@@ -122,6 +124,7 @@ func TestRun_ShipScriptFails_FAIL(t *testing.T) {
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
 		Context: map[string]string{"commit_message": "x"},
+		Env:     map[string]string{"EVOLVE_NATIVE_SHIP": "0"},
 	})
 	if err == nil {
 		t.Fatal("err=nil, want non-nil for exit=2")
@@ -141,6 +144,7 @@ func TestRun_RunnerError_FAIL(t *testing.T) {
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
 		Context: map[string]string{"commit_message": "x"},
+		Env:     map[string]string{"EVOLVE_NATIVE_SHIP": "0"},
 	})
 	if !errors.Is(err, runErr) {
 		t.Errorf("err=%v, want runErr", err)
@@ -185,7 +189,10 @@ func TestRun_AlternateShipScript_HonorsEnvOverride(t *testing.T) {
 		Cycle: 1, ProjectRoot: "/p",
 		Workspace: t.TempDir(),
 		Context:   map[string]string{"commit_message": "x"},
-		Env:       map[string]string{"EVOLVE_SHIP_SCRIPT": "/custom/ship.sh"},
+		Env: map[string]string{
+			"EVOLVE_NATIVE_SHIP": "0",
+			"EVOLVE_SHIP_SCRIPT": "/custom/ship.sh",
+		},
 	})
 	if fc.gotName != "/custom/ship.sh" {
 		t.Errorf("name=%q, want /custom/ship.sh", fc.gotName)
@@ -200,7 +207,8 @@ func TestRun_EnvBypassPropagated(t *testing.T) {
 		Workspace: t.TempDir(),
 		Context:   map[string]string{"commit_message": "x"},
 		Env: map[string]string{
-			"EVOLVE_SHIP_AUTO_CONFIRM": "1",
+			"EVOLVE_NATIVE_SHIP":        "0",
+			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
 			"EVOLVE_BYPASS_PREFIX_GATE": "1",
 		},
 	})
@@ -230,6 +238,7 @@ func TestRun_ShipReportArtifactSurfaces(t *testing.T) {
 		ProjectRoot: "/p",
 		Workspace:   ws,
 		Context:     map[string]string{"commit_message": "x"},
+		Env:         map[string]string{"EVOLVE_NATIVE_SHIP": "0"},
 	})
 	if resp.ArtifactsDir != ws {
 		t.Errorf("ArtifactsDir=%q, want %q", resp.ArtifactsDir, ws)
