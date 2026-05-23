@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**Current (v11.2)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v11.3)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 > **v11.2.0 breaking change**: the `scripts/` symlink has been removed. Operator integrations that hardcode `scripts/...` paths must update to `legacy/scripts/...`. Go binary remains the primary runtime; bash continues to work from `legacy/scripts/`. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
 
