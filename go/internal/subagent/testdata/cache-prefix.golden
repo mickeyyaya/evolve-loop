@@ -1,0 +1,28 @@
+<!-- cache-prefix v8.23.0 — shared across sibling fan-out workers -->
+<!-- agent=scout cycle=42 workspace=/ws/cycle-42 -->
+
+# Shared Context for Cycle 42 — scout phase
+
+## Cycle Goal
+
+improve dispatch reliability
+
+## Cycle-State Summary
+
+phase=scout active_agent=scout completed_phases=[intent]
+
+## Trust Boundary Reminders
+
+- Personas cannot spawn personas (Claude Code structural enforcement)
+- Builder is excluded from fan-out (single-writer-per-worktree invariant)
+- Aggregate artifact is the only thing phase-gate validates
+- Worker artifacts are written under the workspace, not into source tree
+- Each fan-out worker is independent — no cross-worker writes
+
+## Output Format
+
+Write your worker artifact to the path passed in $EVOLVE_FANOUT_WORKER_ARTIFACT
+or the standard $WORKSPACE/workers/<agent>-<worker>.md location. The aggregator
+will merge sibling worker outputs into the canonical phase artifact.
+
+<!-- end cache-prefix -->
