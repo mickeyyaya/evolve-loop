@@ -41,6 +41,6 @@ func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision 
 	}
 	return core.GuardDecision{
 		Allow: false,
-		Reason: "ship-class command must invoke scripts/lifecycle/ship.sh; set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies",
+		Reason: "ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies",
 	}
 }
