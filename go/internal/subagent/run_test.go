@@ -1,0 +1,607 @@
+package subagent
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+)
+
+// runHappyOpts returns a RunOptions blob where every seam is configured
+// for a successful path. Tests override one or two seams at a time.
+func runHappyOpts(t *testing.T) RunOptions {
+	t.Helper()
+	clock := fixedClock(t, "2026-05-23T17:00:00Z")
+	return RunOptions{
+		ReadProfile: func(string) (string, error) {
+			return `{"role":"scout","cli":"claude","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/scout.md"}`, nil
+		},
+		ResolveLLM: func(string, string) (resolvellm.Result, error) {
+			return resolvellm.Result{CLI: "claude", ModelTier: "sonnet", Source: "llm_config"}, nil
+		},
+		InspectCapability: func(string, string) (capability.Inspection, error) {
+			return capability.Inspection{
+				Manifest: capability.Manifest{BudgetNative: true, PermissionScoping: true},
+			}, nil
+		},
+		ResolveModelTier: func(ResolveModelTierRequest, ResolveModelTierOptions) (string, error) {
+			return "sonnet", nil
+		},
+		AdapterExists: func(string) bool { return true },
+		ExecAdapter: func(_ context.Context, _ string, env map[string]string) (int, error) {
+			// Materialize a valid artifact so verify passes.
+			path := env["ARTIFACT_PATH"]
+			if path == "" {
+				return 1, nil
+			}
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return 1, err
+			}
+			body := "<!-- challenge-token: " + env["CHALLENGE_TOKEN"] + " -->\nbody\n"
+			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+				return 1, err
+			}
+			now := clock()
+			_ = os.Chtimes(path, now, now)
+			return 0, nil
+		},
+		WriteFile: os.WriteFile,
+		GitState: func(context.Context, string) (string, string, error) {
+			return "abc123", "def456", nil
+		},
+		StatMTime: defaultStatMTime,
+		ReadFile:  os.ReadFile,
+		HashFile:  defaultHashFile,
+		Now:       clock,
+		Rand: func(b []byte) (int, error) {
+			// Deterministic token — fill with 0xaa.
+			for i := range b {
+				b[i] = 0xaa
+			}
+			return len(b), nil
+		},
+	}
+}
+
+func TestRunCmd_HappyPath(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatalf("mkdir ws: %v", err)
+	}
+	opts := runHappyOpts(t)
+	res, err := Run(context.Background(), RunRequest{
+		Agent:           "scout",
+		Cycle:           5,
+		WorkspacePath:   ws,
+		ProfilesDir:     "/p",
+		AdaptersDir:     "/a",
+		ProjectRoot:     tmp,
+		PluginRoot:      tmp,
+		PromptReader:    strings.NewReader("Do the thing.\n"),
+		CachePrefixV2:   true,
+		AdversarialAudit: true,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if res.Verdict != VerdictPASS {
+		t.Errorf("verdict=%s, want PASS", res.Verdict)
+	}
+	if res.CLI != "claude" || res.Model != "sonnet" {
+		t.Errorf("CLI=%s Model=%s", res.CLI, res.Model)
+	}
+	if res.ChallengeToken == "" || res.ArtifactPath == "" {
+		t.Errorf("token/artifact path not populated")
+	}
+}
+
+func TestRun_NilPromptReaderFails(t *testing.T) {
+	_, err := Run(context.Background(), RunRequest{}, RunOptions{})
+	if err == nil || !strings.Contains(err.Error(), "PromptReader required") {
+		t.Errorf("expected PromptReader required, got %v", err)
+	}
+}
+
+func TestRun_UnknownAgent(t *testing.T) {
+	tmp := t.TempDir()
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "not-a-real-agent",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, runHappyOpts(t))
+	if err == nil || !strings.Contains(err.Error(), "unknown agent") {
+		t.Errorf("expected unknown-agent error, got %v", err)
+	}
+}
+
+func TestRun_NegativeCycle(t *testing.T) {
+	tmp := t.TempDir()
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         -1,
+		WorkspacePath: tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, runHappyOpts(t))
+	if err == nil || !strings.Contains(err.Error(), "cycle must be >= 0") {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+func TestRun_MissingWorkspaceDir(t *testing.T) {
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: "/non/existent",
+		PromptReader:  strings.NewReader("hi"),
+	}, runHappyOpts(t))
+	if err == nil || !strings.Contains(err.Error(), "workspace dir") {
+		t.Errorf("expected workspace error, got %v", err)
+	}
+}
+
+func TestRun_ProfileNotFound(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ReadProfile = func(string) (string, error) { return "", os.ErrNotExist }
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "profile not found") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestRun_WorkerNameRoute(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	// Capture artifact path inside ExecAdapter so we can assert worker route.
+	var capturedArtifact string
+	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
+		capturedArtifact = env["ARTIFACT_PATH"]
+		path := env["ARTIFACT_PATH"]
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return 1, err
+		}
+		body := "<!-- challenge-token: " + env["CHALLENGE_TOKEN"] + " -->\nbody\n"
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			return 1, err
+		}
+		now := opts.Now()
+		_ = os.Chtimes(path, now, now)
+		return 0, nil
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "scout-worker-codebase",
+		Cycle:         3,
+		WorkspacePath: tmp,
+		ProjectRoot:   tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	want := filepath.Join(tmp, "workers", "scout-worker-codebase.md")
+	if capturedArtifact != want {
+		t.Errorf("worker artifact path=%s, want %s", capturedArtifact, want)
+	}
+}
+
+func TestRun_AntigravityRemappedToAgy(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+		return resolvellm.Result{CLI: "antigravity", ModelTier: "sonnet", Source: "llm_config"}, nil
+	}
+	res, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		ProjectRoot:   tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if res.CLI != "agy" {
+		t.Errorf("expected agy remap, got %s", res.CLI)
+	}
+}
+
+func TestRun_LegacyDispatchEscapeHatch(t *testing.T) {
+	tmp := t.TempDir()
+	res, err := Run(context.Background(), RunRequest{
+		Agent:               "scout",
+		Cycle:               0,
+		WorkspacePath:       tmp,
+		ProjectRoot:         tmp,
+		PromptReader:        strings.NewReader("hi"),
+		LegacyAgentDispatch: true,
+	}, runHappyOpts(t))
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !res.LegacyDispatch || res.Verdict != VerdictFAIL {
+		t.Errorf("expected LegacyDispatch+FAIL verdict, got %+v", res)
+	}
+}
+
+func TestRun_AdapterMissing(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.AdapterExists = func(string) bool { return false }
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "adapter not executable") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestRun_AdversarialAuditFramingFiresForAuditor(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ReadProfile = func(string) (string, error) {
+		return `{"role":"auditor","cli":"claude","model_tier_default":"opus","output_artifact":".evolve/runs/cycle-{cycle}/audit.md"}`, nil
+	}
+	var capturedPrompt string
+	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
+		body, _ := os.ReadFile(env["PROMPT_FILE"])
+		capturedPrompt = string(body)
+		path := env["ARTIFACT_PATH"]
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		artifactBody := "<!-- challenge-token: " + env["CHALLENGE_TOKEN"] + " -->\nbody\n"
+		_ = os.WriteFile(path, []byte(artifactBody), 0o644)
+		now := opts.Now()
+		_ = os.Chtimes(path, now, now)
+		return 0, nil
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent:            "auditor",
+		Cycle:            5,
+		WorkspacePath:    tmp,
+		ProjectRoot:      tmp,
+		PromptReader:     strings.NewReader("audit body"),
+		AdversarialAudit: true,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !strings.Contains(capturedPrompt, "ADVERSARIAL AUDIT MODE") {
+		t.Errorf("auditor prompt missing adversarial framing")
+	}
+}
+
+func TestRun_AdversarialAuditDisabledNotFires(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ReadProfile = func(string) (string, error) {
+		return `{"role":"auditor","cli":"claude","model_tier_default":"opus","output_artifact":".evolve/runs/cycle-{cycle}/audit.md"}`, nil
+	}
+	var capturedPrompt string
+	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
+		body, _ := os.ReadFile(env["PROMPT_FILE"])
+		capturedPrompt = string(body)
+		path := env["ARTIFACT_PATH"]
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		artifactBody := "<!-- challenge-token: " + env["CHALLENGE_TOKEN"] + " -->\n"
+		_ = os.WriteFile(path, []byte(artifactBody), 0o644)
+		now := opts.Now()
+		_ = os.Chtimes(path, now, now)
+		return 0, nil
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent:            "auditor",
+		Cycle:            5,
+		WorkspacePath:    tmp,
+		ProjectRoot:      tmp,
+		PromptReader:     strings.NewReader("audit body"),
+		AdversarialAudit: false,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if strings.Contains(capturedPrompt, "ADVERSARIAL AUDIT MODE") {
+		t.Errorf("adversarial framing should be suppressed when disabled")
+	}
+}
+
+func TestRun_AdapterNonZeroExitFailsVerdict(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
+		path := env["ARTIFACT_PATH"]
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		body := "<!-- challenge-token: " + env["CHALLENGE_TOKEN"] + " -->\n"
+		_ = os.WriteFile(path, []byte(body), 0o644)
+		now := opts.Now()
+		_ = os.Chtimes(path, now, now)
+		return 5, nil
+	}
+	res, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		ProjectRoot:   tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if res.Verdict != VerdictFAIL {
+		t.Errorf("verdict=%s, want FAIL", res.Verdict)
+	}
+	if res.ExitCode != 5 {
+		t.Errorf("ExitCode=%d", res.ExitCode)
+	}
+}
+
+func TestRun_MissingArtifactIsIntegrityFail(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ExecAdapter = func(_ context.Context, _ string, _ map[string]string) (int, error) {
+		// Write no artifact.
+		return 0, nil
+	}
+	res, _ := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		ProjectRoot:   tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if res.Verdict != VerdictIntegrityFail {
+		t.Errorf("verdict=%s, want INTEGRITY_FAIL", res.Verdict)
+	}
+}
+
+func TestRun_TokenAbsentIsIntegrityFail(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
+		path := env["ARTIFACT_PATH"]
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		_ = os.WriteFile(path, []byte("body without token\n"), 0o644)
+		now := opts.Now()
+		_ = os.Chtimes(path, now, now)
+		return 0, nil
+	}
+	res, _ := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         0,
+		WorkspacePath: tmp,
+		ProjectRoot:   tmp,
+		PromptReader:  strings.NewReader("hi"),
+	}, opts)
+	if res.Verdict != VerdictIntegrityFail {
+		t.Errorf("verdict=%s, want INTEGRITY_FAIL", res.Verdict)
+	}
+}
+
+func TestRun_LedgerEntryWritten(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	opts := runHappyOpts(t)
+	_, err := Run(context.Background(), RunRequest{
+		Agent:         "scout",
+		Cycle:         7,
+		WorkspacePath: tmp,
+		ProjectRoot:   tmp,
+		PromptReader:  strings.NewReader("hi"),
+		LedgerPath:    ledger,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	body, err := os.ReadFile(ledger)
+	if err != nil {
+		t.Fatalf("read ledger: %v", err)
+	}
+	if !strings.Contains(string(body), `"kind":"agent_subprocess"`) {
+		t.Errorf("ledger missing kind: %s", body)
+	}
+	if !strings.Contains(string(body), `"cycle":7`) {
+		t.Errorf("ledger missing cycle: %s", body)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "ledger.tip")); err != nil {
+		t.Errorf("tip not written: %v", err)
+	}
+}
+
+func TestParseAgentName(t *testing.T) {
+	tests := []struct {
+		in, role, worker string
+	}{
+		{"scout", "scout", ""},
+		{"auditor", "auditor", ""},
+		{"scout-worker-codebase", "scout", "codebase"},
+		{"tdd-engineer-worker-unit-tests", "tdd-engineer", "unit-tests"},
+		{"weird_name", "weird_name", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			role, worker := parseAgentName(tc.in)
+			if role != tc.role || worker != tc.worker {
+				t.Errorf("got (%q,%q), want (%q,%q)", role, worker, tc.role, tc.worker)
+			}
+		})
+	}
+}
+
+func TestAssembleV2Prompt(t *testing.T) {
+	got := assembleV2Prompt("scout", 5, "/ws", "/art.md", "tok", "scout.json", "body line\n")
+	for _, want := range []string{
+		"## INVOCATION CONTEXT",
+		"- Agent: scout",
+		"- Cycle: 5",
+		"- Workspace: /ws",
+		"- Artifact path: /art.md",
+		"- Challenge token: tok",
+		"- Profile: scout.json",
+		"--- BEGIN TASK PROMPT ---",
+		"body line",
+		"--- END TASK PROMPT ---",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestAssembleV2Prompt_AddsTrailingNewlineIfMissing(t *testing.T) {
+	got := assembleV2Prompt("x", 0, "/ws", "/a.md", "t", "x.json", "no trailing nl")
+	if !strings.Contains(got, "no trailing nl\n--- END TASK PROMPT ---") {
+		t.Errorf("expected forced trailing newline, got:\n%s", got)
+	}
+}
+
+func TestAdversarialAuditFraming(t *testing.T) {
+	got := adversarialAuditFraming()
+	for _, w := range []string{"ADVERSARIAL AUDIT MODE", "NO_DEFECT_FOUND", "0.85", "absence of evidence"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("missing %q", w)
+		}
+	}
+}
+
+func TestClassifyArtifact_StatErrIsIntegrityFail(t *testing.T) {
+	opts := RunOptions{
+		StatMTime: func(string) (time.Time, error) { return time.Time{}, errors.New("missing") },
+		ReadFile:  os.ReadFile,
+		Now:       time.Now,
+	}
+	if v := classifyArtifact(opts, "/nope", "tok", 0, nil); v != VerdictIntegrityFail {
+		t.Errorf("got %s, want INTEGRITY_FAIL", v)
+	}
+}
+
+func TestClassifyArtifact_StaleArtifactIsIntegrityFail(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "stale.md")
+	_ = os.WriteFile(path, []byte("body with tok"), 0o644)
+	old := time.Now().Add(-10 * time.Minute)
+	_ = os.Chtimes(path, old, old)
+	opts := RunOptions{
+		StatMTime: defaultStatMTime,
+		ReadFile:  os.ReadFile,
+		Now:       time.Now,
+	}
+	if v := classifyArtifact(opts, path, "tok", 0, nil); v != VerdictIntegrityFail {
+		t.Errorf("got %s, want INTEGRITY_FAIL", v)
+	}
+}
+
+func TestClassifyArtifact_EmptyBodyIsIntegrityFail(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "empty.md")
+	_ = os.WriteFile(path, []byte{}, 0o644)
+	opts := RunOptions{StatMTime: defaultStatMTime, ReadFile: os.ReadFile, Now: time.Now}
+	if v := classifyArtifact(opts, path, "tok", 0, nil); v != VerdictIntegrityFail {
+		t.Errorf("got %s, want INTEGRITY_FAIL", v)
+	}
+}
+
+func TestClassifyArtifact_ReadErrIntegrityFail(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root cannot mask read")
+	}
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "sealed.md")
+	_ = os.WriteFile(path, []byte("body with tok"), 0o600)
+	_ = os.Chmod(path, 0o000)
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	opts := RunOptions{StatMTime: defaultStatMTime, ReadFile: os.ReadFile, Now: time.Now}
+	if v := classifyArtifact(opts, path, "tok", 0, nil); v != VerdictIntegrityFail {
+		t.Errorf("got %s, want INTEGRITY_FAIL", v)
+	}
+}
+
+func TestCapabilityTier(t *testing.T) {
+	tests := []struct {
+		bn, ps bool
+		want   string
+	}{
+		{true, true, "full"},
+		{false, false, "degraded"},
+		{true, false, "hybrid"},
+		{false, true, "hybrid"},
+	}
+	for _, tc := range tests {
+		got := capabilityTier(capability.Manifest{BudgetNative: tc.bn, PermissionScoping: tc.ps})
+		if got != tc.want {
+			t.Errorf("(%v,%v) → %s, want %s", tc.bn, tc.ps, got, tc.want)
+		}
+	}
+}
+
+func TestGenerateRunToken_Length(t *testing.T) {
+	tok, err := generateRunToken(func(b []byte) (int, error) {
+		for i := range b {
+			b[i] = byte(i)
+		}
+		return len(b), nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if len(tok) != ChallengeTokenBytes*2 {
+		t.Errorf("token len=%d, want %d", len(tok), ChallengeTokenBytes*2)
+	}
+}
+
+func TestGenerateRunToken_RandErrPropagates(t *testing.T) {
+	_, err := generateRunToken(func([]byte) (int, error) { return 0, errors.New("boom") })
+	if err == nil {
+		t.Errorf("expected error")
+	}
+}
+
+func TestGenerateRunToken_PartialReadIsError(t *testing.T) {
+	_, err := generateRunToken(func(b []byte) (int, error) { return 1, nil })
+	if err == nil || !strings.Contains(err.Error(), "rand returned") {
+		t.Errorf("expected partial-read error, got %v", err)
+	}
+}
+
+func TestWriteSubprocessLedger_FieldOrderPreserved(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	clock := fixedClock(t, "2026-05-23T17:00:00Z")
+	err := writeSubprocessLedger(ledger, subprocessLedger{
+		Cycle: 9, Role: "scout", Model: "sonnet",
+		ExitCode: 0, DurationS: "12",
+		ArtifactPath: "/a.md", ArtifactSHA256: "deadbeef",
+		ChallengeToken: "tok",
+		GitHEAD:        "hhhh", TreeStateSHA: "tttt",
+		QualityTier: "full",
+	}, clock)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	body, _ := os.ReadFile(ledger)
+	// Field order: ts, cycle, role, kind, model, exit_code, ...
+	idx := func(s string) int { return bytes.Index(body, []byte(s)) }
+	order := []string{`"ts"`, `"cycle"`, `"role"`, `"kind"`, `"model"`, `"exit_code"`, `"artifact_path"`, `"entry_seq"`, `"prev_hash"`}
+	for i := 1; i < len(order); i++ {
+		if idx(order[i-1]) >= idx(order[i]) {
+			t.Errorf("field order violation: %s appears before/at %s", order[i], order[i-1])
+		}
+	}
+	if !bytes.Contains(body, []byte(`"cli_resolution":null`)) {
+		t.Errorf("cli_resolution should be null literal: %s", body)
+	}
+}

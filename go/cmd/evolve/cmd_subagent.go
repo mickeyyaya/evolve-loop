@@ -33,6 +33,12 @@ Subcommands:
                      EVOLVE_ADAPTERS_DIR_OVERRIDE,
                      EVOLVE_DISPATCH_PLAN_LOG,
                      EVOLVE_LLM_CONFIG_PATH.
+  run                Execute one phase agent end-to-end (v2 cache-prefix
+                     prompt + adapter exec + verify + ledger).
+                     ( run <agent> <cycle> <workspace_path> )
+                     Prompt read from stdin (or PROMPT_FILE_OVERRIDE).
+                     Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT,
+                     EVOLVE_CACHE_PREFIX_V2, LEGACY_AGENT_DISPATCH.
 `
 
 // runSubagent dispatches the `evolve subagent <subcommand>` family. Mirrors
@@ -60,6 +66,8 @@ func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runSubagentCheckCtxAdvisory(args[1:], stdout, stderr)
 	case "validate-profile":
 		return runSubagentValidateProfile(args[1:], stdout, stderr)
+	case "run":
+		return runSubagentRun(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve subagent: unknown subcommand %q\n\n%s", args[0], subagentUsage)
 		return 2
@@ -297,6 +305,113 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "[subagent-run] profile valid: %s\n", agent)
 	return 0
+}
+
+func runSubagentRun(args []string, stdout, stderr io.Writer) int {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
+			fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
+			fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, ADVERSARIAL_AUDIT,")
+			fmt.Fprintln(stdout, "     EVOLVE_CACHE_PREFIX_V2, EVOLVE_DIFF_COMPLEXITY_DISABLE,")
+			fmt.Fprintln(stdout, "     LEGACY_AGENT_DISPATCH, WORKTREE_PATH")
+			return 0
+		}
+	}
+	if len(args) != 3 {
+		fmt.Fprintln(stderr, "evolve subagent run: expected <agent> <cycle> <workspace>")
+		return 2
+	}
+	agent := args[0]
+	cycle, err := strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve subagent run: cycle must be integer: %v\n", err)
+		return 2
+	}
+	workspace := args[2]
+
+	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
+	if pluginRoot == "" {
+		pluginRoot = projectRoot
+	}
+	profilesDir := os.Getenv("EVOLVE_PROFILES_DIR_OVERRIDE")
+	if profilesDir == "" {
+		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
+	}
+	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
+	if adaptersDir == "" {
+		adaptersDir = filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	}
+	capabilityDir := filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	llmConfigPath := os.Getenv("EVOLVE_LLM_CONFIG_PATH")
+	if llmConfigPath == "" {
+		llmConfigPath = filepath.Join(projectRoot, ".evolve", "llm_config.json")
+	}
+	ledgerPath := os.Getenv("EVOLVE_LEDGER_OVERRIDE")
+	if ledgerPath == "" {
+		ledgerPath = filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
+	}
+
+	var promptReader io.Reader
+	if override := os.Getenv("PROMPT_FILE_OVERRIDE"); override != "" {
+		f, err := os.Open(override)
+		if err != nil {
+			fmt.Fprintf(stderr, "[subagent-run] FAIL: PROMPT_FILE_OVERRIDE missing: %s\n", override)
+			return 1
+		}
+		defer f.Close()
+		promptReader = f
+	} else {
+		// Read from stdin.
+		promptReader = os.Stdin
+	}
+
+	cachePrefixV2 := os.Getenv("EVOLVE_CACHE_PREFIX_V2") != "0"
+	adversarialAudit := os.Getenv("ADVERSARIAL_AUDIT") != "0"
+
+	res, err := subagent.Run(context.Background(), subagent.RunRequest{
+		Agent:                  agent,
+		Cycle:                  cycle,
+		WorkspacePath:          workspace,
+		ProfilesDir:            profilesDir,
+		AdaptersDir:            adaptersDir,
+		CapabilityDir:          capabilityDir,
+		ProjectRoot:            projectRoot,
+		PluginRoot:             pluginRoot,
+		WorktreePath:           os.Getenv("WORKTREE_PATH"),
+		LLMConfigPath:          llmConfigPath,
+		LedgerPath:             ledgerPath,
+		PromptReader:           promptReader,
+		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
+		AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
+		DiffComplexityDisabled: os.Getenv("EVOLVE_DIFF_COMPLEXITY_DISABLE") == "1",
+		CachePrefixV2:          cachePrefixV2,
+		AdversarialAudit:       adversarialAudit,
+		LegacyAgentDispatch:    os.Getenv("LEGACY_AGENT_DISPATCH") == "1",
+	}, subagent.RunOptions{})
+	if err != nil {
+		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
+		return 1
+	}
+	if res.LegacyDispatch {
+		fmt.Fprintln(stderr, "[subagent-run] LEGACY_AGENT_DISPATCH=1 — orchestrator should fall back to in-process Agent tool")
+		fmt.Fprintln(stdout, "LEGACY_DISPATCH")
+		return 1
+	}
+	for _, w := range res.Warns {
+		fmt.Fprintln(stderr, w)
+	}
+	fmt.Fprintf(stderr, "[subagent-run] verdict=%s agent=%s cycle=%d artifact=%s exit=%d duration_ms=%d\n",
+		res.Verdict, agent, cycle, res.ArtifactPath, res.ExitCode, res.DurationMS)
+	switch res.Verdict {
+	case subagent.VerdictPASS:
+		return 0
+	case subagent.VerdictIntegrityFail:
+		return 2
+	default:
+		return 1
+	}
 }
 
 func nextArg(args []string, i int) string {
