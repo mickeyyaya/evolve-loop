@@ -122,15 +122,22 @@ func Classify(workspace string) Result {
 	return Result{Class: ClassIntegrityBreach}
 }
 
+// globFn is a test seam for the filepath.Glob error branch. A literal
+// pattern like "*-stdout.log" cannot fail under filepath.Glob in
+// practice, but tests can swap globFn to drive the defensive error
+// path that real-world Glob implementations might surface on exotic
+// filesystems.
+var globFn = filepath.Glob
+
 // listLogs returns sorted *-stdout.log + *-stderr.log paths in
 // workspace. Stable order makes Classify deterministic when the same
 // pattern hits two logs.
 func listLogs(workspace string) ([]string, error) {
-	stdoutMatches, err := filepath.Glob(filepath.Join(workspace, "*-stdout.log"))
+	stdoutMatches, err := globFn(filepath.Join(workspace, "*-stdout.log"))
 	if err != nil {
 		return nil, err
 	}
-	stderrMatches, err := filepath.Glob(filepath.Join(workspace, "*-stderr.log"))
+	stderrMatches, err := globFn(filepath.Join(workspace, "*-stderr.log"))
 	if err != nil {
 		return nil, err
 	}

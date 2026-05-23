@@ -84,6 +84,16 @@ func NewWriter(workspace string) *Writer {
 	}
 }
 
+// marshalFn + writeFn are test seams for the marshal-error and
+// write-error branches. Production paths use json.Marshal +
+// (*os.File).Write directly; tests replace these to drive the rare
+// error paths (disk full, malformed Event) without contriving them on
+// a real filesystem.
+var (
+	marshalFn = json.Marshal
+	writeFn   = func(f *os.File, b []byte) (int, error) { return f.Write(b) }
+)
+
 // Emit serializes e and appends it to abnormal-events.jsonl. Timestamp
 // is filled in automatically if zero. Returns an error only on
 // marshal/I/O failures; bash equivalent uses `|| true` to swallow these
@@ -98,7 +108,7 @@ func (w *Writer) Emit(e Event) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	line, err := json.Marshal(e)
+	line, err := marshalFn(e)
 	if err != nil {
 		return fmt.Errorf("dispatchevents marshal: %w", err)
 	}
@@ -107,7 +117,7 @@ func (w *Writer) Emit(e Event) error {
 		return fmt.Errorf("dispatchevents open: %w", err)
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.Write(append(line, '\n')); err != nil {
+	if _, err := writeFn(f, append(line, '\n')); err != nil {
 		return fmt.Errorf("dispatchevents write: %w", err)
 	}
 	return nil
