@@ -426,18 +426,55 @@ func TestResolveArtifactPath(t *testing.T) {
 func TestComposePrompt(t *testing.T) {
 	out := composePrompt("the task", "deadbeefcafef00d", "/tmp/art.md", "builder", 5)
 	for _, want := range []string{
+		"## INVOCATION CONTEXT ##",
 		"Agent: builder",
 		"Cycle: 5",
 		"Challenge token: deadbeefcafef00d",
 		"Artifact path: /tmp/art.md",
-		"--- BEGIN TASK PROMPT ---",
+		"## BEGIN TASK PROMPT ##",
 		"the task",
-		"--- END TASK PROMPT ---",
+		"## END TASK PROMPT ##",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("prompt missing %q\n---\n%s\n---", want, out)
 		}
 	}
+}
+
+// TestComposePrompt_NoLeadingDashes is the v11.5.2 regression guard:
+// the prompt must NEVER start with `--`. claude CLI 2.1.149's flag
+// parser rejects any prompt value whose first argv-character is `-`,
+// and the bridge driver passes the prompt as `-p "$content"`. A
+// leading `--` would be reparsed as a flag.
+func TestComposePrompt_NoLeadingDashes(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"plain body", "the task"},
+		{"body starting with dash", "--some-body"}, // body content is fine; only prefix matters
+		{"empty body", ""},
+		{"multiline body", "line1\nline2"},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			out := composePrompt(tc.body, "abc123", "/tmp/x.md", "scout", 1)
+			if strings.HasPrefix(out, "--") {
+				t.Fatalf("composePrompt must not start with `--`; got %q…", out[:min(len(out), 40)])
+			}
+			if strings.HasPrefix(out, "-") {
+				t.Fatalf("composePrompt must not start with `-`; got %q…", out[:min(len(out), 40)])
+			}
+		})
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func TestGenerateToken_LengthAndAlphabet(t *testing.T) {

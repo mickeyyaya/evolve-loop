@@ -110,7 +110,7 @@ func TestE2E_M4PipelineAgainstLiveLedger(t *testing.T) {
 	// leading `--`). Avoids the known claude-CLI bug where a prompt
 	// value starting with `--` confuses the flag parser. The Go
 	// subagent.Runner currently composes prompts that start with
-	// "--- INVOCATION CONTEXT ---" and trips this — that's tracked
+	// "## INVOCATION CONTEXT ##" and v11.5.2+ uses that non-dash form so
 	// separately as a composePrompt fix (out of M4 scope).
 	br := bridge.New(bridgeBin, nil)
 	ld := ledger.New(evolveDir)

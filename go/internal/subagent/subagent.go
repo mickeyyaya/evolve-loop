@@ -378,10 +378,19 @@ func resolveArtifactPath(template string, cycle int, projectRoot string) string 
 
 // composePrompt prepends the CHALLENGE TOKEN context block to the user
 // prompt. Order matches subagent-run.sh:803-818 — token first, artifact
-// path second, then "--- BEGIN TASK PROMPT ---" body.
+// path second, then the task prompt body.
+//
+// v11.5.2 fix: section markers use `## ... ##` not `--- ... ---`.
+// claude CLI 2.1.149's flag parser rejects any prompt value whose first
+// argv-character is `-` ("unknown option" error), and the bridge
+// driver passes the composed prompt as `-p "$prompt_content"` — so a
+// leading `--` prefix tripped the parser. Switching to `## ... ##`
+// keeps the visual section-marker convention while avoiding the
+// flag-parser collision. The fix is structural: any future prompt
+// content the runner prepends must not start with `--`.
 func composePrompt(body, token, artifactPath, agent string, cycle int) string {
 	var b strings.Builder
-	b.WriteString("--- INVOCATION CONTEXT ---\n")
+	b.WriteString("## INVOCATION CONTEXT ##\n")
 	fmt.Fprintf(&b, "Agent: %s\n", agent)
 	fmt.Fprintf(&b, "Cycle: %d\n", cycle)
 	fmt.Fprintf(&b, "Challenge token: %s\n", token)
@@ -390,12 +399,12 @@ func composePrompt(body, token, artifactPath, agent string, cycle int) string {
 	b.WriteString("Your output artifact MUST be written to the artifact path above.\n")
 	b.WriteString("The first line of that file MUST contain the challenge token.\n")
 	fmt.Fprintf(&b, "(Suggested header: \"<!-- challenge-token: %s -->\")\n", token)
-	b.WriteString("\n--- BEGIN TASK PROMPT ---\n")
+	b.WriteString("\n## BEGIN TASK PROMPT ##\n")
 	b.WriteString(body)
 	if !strings.HasSuffix(body, "\n") {
 		b.WriteString("\n")
 	}
-	b.WriteString("--- END TASK PROMPT ---\n")
+	b.WriteString("## END TASK PROMPT ##\n")
 	return b.String()
 }
 
