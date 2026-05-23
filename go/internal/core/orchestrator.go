@@ -73,12 +73,19 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	cycle := state.LastCycleNumber + 1
 
 	startedAt := o.now().UTC().Format(time.RFC3339)
+	// IntentRequired is the gate for the start→intent vs start→scout
+	// edge. Source priority: explicit Context["intent_required"]=="true"
+	// from the caller > env EVOLVE_REQUIRE_INTENT=="1" > false. This
+	// mirrors the bash dispatcher's check at run-cycle.sh:build_context.
+	intentRequired := req.Context["intent_required"] == "true" ||
+		req.Env["EVOLVE_REQUIRE_INTENT"] == "1"
 	cs := CycleState{
 		CycleID:        cycle,
 		Phase:          string(PhaseStart),
 		StartedAt:      startedAt,
 		PhaseStartedAt: startedAt,
 		WorkspacePath:  fmt.Sprintf("%s/.evolve/runs/cycle-%d", req.ProjectRoot, cycle),
+		IntentRequired: intentRequired,
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
@@ -101,9 +108,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 
 	// Bounded loop guards against any transition-table cycle bug.
 	for safety := 0; safety < 32; safety++ {
-		next, err := o.sm.Next(current, lastVerdict)
-		if err != nil {
-			return result, fmt.Errorf("transition from %s: %w", current, err)
+		var next Phase
+		if current == PhaseStart {
+			// First edge is gated by intent_required, not by verdict.
+			next = o.sm.NextFromStart(cs.IntentRequired)
+		} else {
+			n, err := o.sm.Next(current, lastVerdict)
+			if err != nil {
+				return result, fmt.Errorf("transition from %s: %w", current, err)
+			}
+			next = n
 		}
 		if next == PhaseEnd {
 			break

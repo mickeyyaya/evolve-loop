@@ -451,3 +451,99 @@ func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
 		}
 	}
 }
+
+// --- intent-gate tests (M2 wiring) ---
+
+// When intent is not required, the first phase to run is Scout — the
+// historical default. Verified by the happy-path test above; this one
+// just asserts that PhaseIntent did NOT execute and that the runner
+// registered for intent was never invoked.
+func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	intent := runners[PhaseIntent].(*fakeRunner)
+	if intent.calls != 0 {
+		t.Errorf("intent ran %d times; expected 0 when intent_required=false", intent.calls)
+	}
+	if len(res.PhasesRun) == 0 || res.PhasesRun[0] != PhaseScout {
+		t.Errorf("phases[0]=%v, want scout", res.PhasesRun)
+	}
+	// CycleState should record intent_required=false for downstream
+	// consumers (resume / classifier).
+	if st.cycleState.IntentRequired {
+		t.Errorf("CycleState.IntentRequired=true, want false")
+	}
+}
+
+// EVOLVE_REQUIRE_INTENT=1 in CycleRequest.Env triggers the intent phase
+// before Scout. CycleState.IntentRequired is persisted so resume +
+// downstream consumers can read it.
+func TestOrchestrator_IntentGate_EnvVarRunsIntentFirst(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: "/tmp/p",
+		Env:         map[string]string{"EVOLVE_REQUIRE_INTENT": "1"},
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	intent := runners[PhaseIntent].(*fakeRunner)
+	if intent.calls != 1 {
+		t.Fatalf("intent ran %d times; expected 1", intent.calls)
+	}
+	want := []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip}
+	if len(res.PhasesRun) != len(want) {
+		t.Fatalf("phases=%v, want %v", res.PhasesRun, want)
+	}
+	for i, p := range want {
+		if res.PhasesRun[i] != p {
+			t.Errorf("phase[%d]=%s, want %s", i, res.PhasesRun[i], p)
+		}
+	}
+	if !st.cycleState.IntentRequired {
+		t.Errorf("CycleState.IntentRequired=false, want true")
+	}
+}
+
+// Context["intent_required"]="true" is the explicit caller-side knob;
+// it should also trigger intent regardless of env. Source priority is
+// Context > Env in the orchestrator.
+func TestOrchestrator_IntentGate_ContextOverrideRunsIntent(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	o := NewOrchestrator(st, led, runners)
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: "/tmp/p",
+		Context:     map[string]string{"intent_required": "true"},
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	intent := runners[PhaseIntent].(*fakeRunner)
+	if intent.calls != 1 {
+		t.Errorf("intent ran %d times; expected 1 from Context override", intent.calls)
+	}
+}
+
+func TestStateMachine_NextFromStart(t *testing.T) {
+	sm := NewStateMachine()
+	if got := sm.NextFromStart(false); got != PhaseScout {
+		t.Errorf("NextFromStart(false)=%s, want scout", got)
+	}
+	if got := sm.NextFromStart(true); got != PhaseIntent {
+		t.Errorf("NextFromStart(true)=%s, want intent", got)
+	}
+}

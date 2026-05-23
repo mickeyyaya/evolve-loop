@@ -50,6 +50,17 @@ func (sm *StateMachine) CanTransition(from, to Phase) bool {
 	return sm.allowed[from][to]
 }
 
+// NextFromStart returns the first phase to run, gated by intent
+// requirement. The state machine encodes two legal start edges
+// (start→intent and start→scout); this helper picks between them so
+// callers don't need to thread cycle-state through Next().
+func (sm *StateMachine) NextFromStart(intentRequired bool) Phase {
+	if intentRequired {
+		return PhaseIntent
+	}
+	return PhaseScout
+}
+
 // Next returns the verdict-driven successor of current. It only encodes
 // the simplest deterministic rules — the failure-adapter is consulted
 // by the orchestrator for the retro→{tdd, ship, end} branch.
