@@ -75,6 +75,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runDetectNested(args[1:], stdin, stdout, stderr)
 	case "phase-order":
 		return runPhaseOrder(args[1:], stdin, stdout, stderr)
+	case "estimate-quota-reset":
+		return runQuotaReset(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
