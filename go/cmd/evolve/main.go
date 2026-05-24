@@ -59,6 +59,10 @@ Dispatch helpers (Phase 3a + 3b ports):
                               ( marketplace-poll <version> [--max-wait-s N]
                                 [--poll-interval-s N] [--marketplace-dir DIR]
                                 [--dry-run] )
+  release-preflight         Pre-publish 5-step gate (clean tree, branch,
+                              semver bump, recent audit PASS, gate tests)
+                              ( release-preflight <version> [--dry-run]
+                                [--skip-tests] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -129,6 +133,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runVersionBump(args[1:], stdin, stdout, stderr)
 	case "marketplace-poll":
 		return runMarketplacePoll(args[1:], stdin, stdout, stderr)
+	case "release-preflight":
+		return runReleasePreflight(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
