@@ -484,15 +484,13 @@ func defaultVersionBump(repoRoot, target string, dryRun bool) error {
 	return runVersionBumpLib(repoRoot, target, dryRun)
 }
 
-// defaultReleaseSh shells out to legacy/scripts/utility/release.sh.
+// defaultReleaseSh calls the releaseconsistency Go library directly
+// (v11.8.2+; prior versions shelled out to legacy/scripts/utility/release.sh).
+// The cache-refresh half of the bash release.sh is intentionally not
+// reproduced here — that's environment-specific and removed entirely in
+// v12.0.0; the in-pipeline cache flow is handled by marketplace-poll.
 func defaultReleaseSh(repoRoot, target string) error {
-	script := filepath.Join(repoRoot, "legacy", "scripts", "utility", "release.sh")
-	cmd := exec.Command("bash", script, target)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("release.sh: %v (output: %s)", err, strings.TrimSpace(string(out)))
-	}
-	return nil
+	return runReleaseConsistencyLib(repoRoot, target)
 }
 
 // defaultShip shells out to legacy/scripts/lifecycle/ship.sh --class release.

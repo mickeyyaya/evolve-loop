@@ -122,8 +122,11 @@ func DefaultPull(dir string) error {
 	return nil
 }
 
-// DefaultReleaseSh is the production ReleaseSh implementation: shells out
-// to <repoRoot>/legacy/scripts/utility/release.sh <target>.
+// DefaultReleaseSh delegates to the bash release.sh for now to preserve
+// the cache-refresh side-effects (marketplace pull + installed_plugins.json
+// registry update). The pure-consistency-check half has been ported to
+// go/internal/releaseconsistency, but the cache-refresh is environment-
+// specific and removed entirely in v12.0.0.
 func DefaultReleaseSh(repoRoot, target string) error {
 	script := filepath.Join(repoRoot, "legacy", "scripts", "utility", "release.sh")
 	cmd := exec.Command("bash", script, target)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
 	"github.com/mickeyyaya/evolve-loop/go/internal/marketplacepoll"
+	"github.com/mickeyyaya/evolve-loop/go/internal/releaseconsistency"
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasepreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/rollback"
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
@@ -82,6 +83,16 @@ func runMarketplacePollLib(repoRoot, target string, maxWait time.Duration) error
 		PollInterval:   15 * time.Second,
 		RepoRoot:       repoRoot,
 		Stderr:         os.Stderr,
+	})
+	return err
+}
+
+// runReleaseConsistencyLib invokes the releaseconsistency library directly.
+func runReleaseConsistencyLib(repoRoot, target string) error {
+	_, err := releaseconsistency.Run(releaseconsistency.Options{
+		ProjectRoot: repoRoot,
+		Target:      target,
+		Stderr:      os.Stderr,
 	})
 	return err
 }

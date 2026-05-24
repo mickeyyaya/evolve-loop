@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 )
 
 // atomicShip is the single entry point for "do the actual git work."
@@ -353,28 +355,20 @@ func buildDiffFooterAtDir(ctx context.Context, opts *Options, cwd string) (strin
 	return footer, nil
 }
 
-// runCommitPrefixGate is a best-effort shellout to commit-prefix-gate.sh
-// when present. Missing or non-executable is silently skipped (matches
-// `if [ -x ... ]`).
+// runCommitPrefixGate calls the commitprefixgate Go library directly
+// (v11.8.2+; prior versions shelled out to legacy/scripts/guards/
+// commit-prefix-gate.sh). Missing manifest is silently passed through by
+// the library (matches the bash "pass-through when not provisioned" rule).
 func runCommitPrefixGate(ctx context.Context, opts *Options, msg, repoDir string) error {
-	gatePath := filepath.Join(opts.ProjectRoot, "legacy", "scripts", "guards", "commit-prefix-gate.sh")
-	fi, err := os.Stat(gatePath)
-	if err != nil || fi.Mode()&0o111 == 0 {
-		return nil // missing or non-executable — skip
-	}
-	args := []string{gatePath, "--msg", msg}
-	if repoDir != opts.ProjectRoot {
-		args = append(args, "--repo-dir", repoDir)
-	}
-	env := append(os.Environ(), fmt.Sprintf("SHIP_CLASS=%s", opts.Class))
-	exit, err := opts.Runner(ctx, "bash", args, env, opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
-	if err != nil {
-		return err
-	}
-	if exit != 0 {
-		return fmt.Errorf("commit-prefix-gate exit=%d", exit)
-	}
-	return nil
+	_, err := commitprefixgate.Run(commitprefixgate.Options{
+		CommitMsg: msg,
+		RepoDir:   repoDir,
+		Mode:      commitprefixgate.ModeStaged,
+		Stderr:    opts.Stderr,
+		BypassEnv: os.Getenv("EVOLVE_BYPASS_PREFIX_GATE"),
+		ShipClass: string(opts.Class),
+	})
+	return err
 }
 
 // maybeCreateRelease runs `gh release create v<VERSION>` when

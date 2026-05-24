@@ -79,6 +79,13 @@ Dispatch helpers (Phase 3a + 3b ports):
                               | inbox-mover promote <task_id> <new_state>
                                 [<cycle>] [--commit-sha <sha>]
                               | inbox-mover recover-orphans )
+  commit-prefix-gate        Conventional-commits prefix vs diff-scope check
+                              ( commit-prefix-gate --msg "<msg>"
+                                [--repo-dir <path>] [--staged | --diff-ref <ref>]
+                                [--manifest <path>] )
+  release-consistency       Verify version markers (plugin.json,
+                              marketplace.json, SKILL.md, README, CHANGELOG)
+                              ( release-consistency [target-version] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -161,6 +168,10 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runPostEditValidate(args[1:], stdin, stdout, stderr)
 	case "inbox-mover":
 		return runInboxMover(args[1:], stdin, stdout, stderr)
+	case "commit-prefix-gate":
+		return runCommitPrefixGate(args[1:], stdin, stdout, stderr)
+	case "release-consistency":
+		return runReleaseConsistency(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
