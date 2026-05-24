@@ -129,7 +129,12 @@ func TestLaunch_ArgvShape(t *testing.T) {
 // TestLaunch_PromptMaterializedAsFile — the prompt body must be
 // written to a file under Workspace before the subprocess runs;
 // --prompt-file=<path> appears in argv.
+//
+// As of v12.1 the bridge prepends a deterministic interactive-policy
+// block (default recommended_or_first); this test asserts the body
+// is present alongside the prefix, not bit-for-bit equality.
 func TestLaunch_PromptMaterializedAsFile(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyEscalate)
 	ws := t.TempDir()
 	artifact := filepath.Join(ws, "a.md")
 	_ = os.WriteFile(artifact, []byte("x"), 0o644)
@@ -154,7 +159,7 @@ func TestLaunch_PromptMaterializedAsFile(t *testing.T) {
 	if promptFlag == "" {
 		t.Fatalf("argv missing --prompt-file: %v", fc.gotArgs)
 	}
-	// The prompt file must exist and contain the body.
+	// With escalate policy the file must equal the body exactly.
 	b, err := os.ReadFile(promptFlag)
 	if err != nil {
 		t.Fatalf("read prompt file: %v", err)
@@ -444,6 +449,217 @@ func TestNonEmpty_BothBranches(t *testing.T) {
 	}
 	if got := nonEmpty("real", "fb"); got != "real" {
 		t.Errorf("nonEmpty(real)=%q, want real", got)
+	}
+}
+
+// --- v12.1 Capability 3: interactive-policy injection tests ---
+
+// readPromptFile pulls the materialized prompt file from a recorded
+// argv slice. Returns the file contents and a cleanup-friendly error.
+func readPromptFile(t *testing.T, args []string) string {
+	t.Helper()
+	for _, a := range args {
+		if strings.HasPrefix(a, "--prompt-file=") {
+			path := strings.TrimPrefix(a, "--prompt-file=")
+			b, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read prompt file: %v", err)
+			}
+			return string(b)
+		}
+	}
+	t.Fatalf("argv missing --prompt-file: %v", args)
+	return ""
+}
+
+// runOnce launches the adapter against a fakeCmd that captures argv and
+// returns the prompt-file contents.
+func runOnce(t *testing.T, agent, prompt string, env map[string]string) string {
+	t.Helper()
+	ws := t.TempDir()
+	artifact := filepath.Join(ws, "out.md")
+	_ = os.WriteFile(artifact, []byte("ok"), 0o644)
+	fc := &fakeCmd{exitCode: 0}
+	adapter := New("/bridge", fc.runner())
+	_, err := adapter.Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-p", Profile: "/p", Model: "auto",
+		Prompt: prompt, Workspace: ws, ArtifactPath: artifact, Agent: agent,
+		Env: env,
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	return readPromptFile(t, fc.gotArgs)
+}
+
+// TestLaunch_DefaultPolicy_InjectsRecommendedOrFirstPrefix — with no
+// EVOLVE_INTERACTIVE_POLICY env set, the prompt file is prefixed with
+// the recommended-or-first policy block. Default-on autonomy posture.
+func TestLaunch_DefaultPolicy_InjectsRecommendedOrFirstPrefix(t *testing.T) {
+	// Explicitly clear both global and per-agent overrides so the
+	// test is hermetic against an inherited operator shell.
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", "")
+	t.Setenv("EVOLVE_SCOUT_INTERACTIVE_POLICY", "")
+	body := runOnce(t, "scout", "scout prompt body", nil)
+	if !strings.HasPrefix(body, "## Subagent Interactive Policy (recommended_or_first)") {
+		t.Errorf("prompt missing recommended-or-first prefix; got first 80 chars: %q", truncate(body, 80))
+	}
+	if !strings.Contains(body, "scout prompt body") {
+		t.Errorf("prompt missing original body after prefix")
+	}
+}
+
+// TestLaunch_NoPolicyPrefix_WhenEscalateExplicit — operator opts out of
+// auto-resolution; legacy fail-loud behavior is preserved.
+func TestLaunch_NoPolicyPrefix_WhenEscalateExplicit(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyEscalate)
+	body := runOnce(t, "builder", "builder body", nil)
+	if strings.Contains(body, "Subagent Interactive Policy") {
+		t.Errorf("escalate policy must not inject a block; got first 120 chars: %q", truncate(body, 120))
+	}
+	if body != "builder body" {
+		t.Errorf("body=%q, want %q (no prefix, no suffix)", body, "builder body")
+	}
+}
+
+// TestLaunch_AutoYesPolicy_InjectsAlternatePrefix — auto_yes injects
+// the binary-prompt variant of the policy block.
+func TestLaunch_AutoYesPolicy_InjectsAlternatePrefix(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
+	body := runOnce(t, "auditor", "auditor body", nil)
+	if !strings.HasPrefix(body, "## Subagent Interactive Policy (auto_yes)") {
+		t.Errorf("auto_yes policy must inject auto_yes block; got first 80 chars: %q", truncate(body, 80))
+	}
+	if !strings.Contains(body, "auditor body") {
+		t.Errorf("prompt missing original body after prefix")
+	}
+}
+
+// TestResolvePolicy_PrecedenceOrder — per-agent reqEnv beats process
+// env which beats global env which beats default.
+func TestResolvePolicy_PrecedenceOrder(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
+	t.Setenv("EVOLVE_SCOUT_INTERACTIVE_POLICY", PolicyEscalate)
+
+	// per-agent process env beats global process env
+	if got := resolvePolicy("scout", nil); got != PolicyEscalate {
+		t.Errorf("per-agent env should win: got=%q want=%q", got, PolicyEscalate)
+	}
+	// per-agent reqEnv beats per-agent process env
+	if got := resolvePolicy("scout", map[string]string{
+		"EVOLVE_SCOUT_INTERACTIVE_POLICY": PolicyRecommendedOrFirst,
+	}); got != PolicyRecommendedOrFirst {
+		t.Errorf("reqEnv per-agent should win: got=%q want=%q", got, PolicyRecommendedOrFirst)
+	}
+	// global reqEnv beats global process env when per-agent absent
+	if got := resolvePolicy("builder", map[string]string{
+		"EVOLVE_INTERACTIVE_POLICY": PolicyRecommendedOrFirst,
+	}); got != PolicyRecommendedOrFirst {
+		t.Errorf("reqEnv global should win: got=%q want=%q", got, PolicyRecommendedOrFirst)
+	}
+	// fall through to global process env when no overrides
+	if got := resolvePolicy("builder", nil); got != PolicyAutoYes {
+		t.Errorf("global env should be used: got=%q want=%q", got, PolicyAutoYes)
+	}
+}
+
+// TestResolvePolicy_DefaultWhenAllUnset — empty env returns the
+// default policy.
+func TestResolvePolicy_DefaultWhenAllUnset(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", "")
+	t.Setenv("EVOLVE_BUILDER_INTERACTIVE_POLICY", "")
+	if got := resolvePolicy("builder", nil); got != PolicyRecommendedOrFirst {
+		t.Errorf("default policy got=%q want=%q", got, PolicyRecommendedOrFirst)
+	}
+}
+
+// TestResolvePolicy_EmptyAgent_FallsThroughToGlobal — when agent name
+// is empty, per-agent lookup is skipped entirely.
+func TestResolvePolicy_EmptyAgent_FallsThroughToGlobal(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
+	if got := resolvePolicy("", nil); got != PolicyAutoYes {
+		t.Errorf("empty agent should fall through to global: got=%q want=%q", got, PolicyAutoYes)
+	}
+}
+
+// TestPerAgentPolicyEnv_HyphenToUnderscore — hyphenated agent names
+// like "tdd-engineer" map to underscored env keys.
+func TestPerAgentPolicyEnv_HyphenToUnderscore(t *testing.T) {
+	cases := map[string]string{
+		"scout":         "EVOLVE_SCOUT_INTERACTIVE_POLICY",
+		"builder":       "EVOLVE_BUILDER_INTERACTIVE_POLICY",
+		"tdd-engineer":  "EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY",
+		"plan-reviewer": "EVOLVE_PLAN_REVIEWER_INTERACTIVE_POLICY",
+	}
+	for agent, want := range cases {
+		if got := perAgentPolicyEnv(agent); got != want {
+			t.Errorf("perAgentPolicyEnv(%q)=%q, want %q", agent, got, want)
+		}
+	}
+}
+
+// TestInjectPolicyPrefix_UnknownValueDefaultsToRecommendedOrFirst — a
+// typo in EVOLVE_INTERACTIVE_POLICY should NOT break autonomy: the
+// bridge silently falls back to recommended-or-first.
+func TestInjectPolicyPrefix_UnknownValueDefaultsToRecommendedOrFirst(t *testing.T) {
+	got := injectPolicyPrefix("body", "no-such-policy")
+	if !strings.HasPrefix(got, "## Subagent Interactive Policy (recommended_or_first)") {
+		t.Errorf("unknown policy should default to recommended_or_first; got first 80 chars: %q", truncate(got, 80))
+	}
+}
+
+// TestInjectPolicyPrefix_EscalateReturnsBodyUnchanged — direct unit
+// test of the helper to confirm zero-allocation pass-through for
+// operators who opt out.
+func TestInjectPolicyPrefix_EscalateReturnsBodyUnchanged(t *testing.T) {
+	if got := injectPolicyPrefix("body", PolicyEscalate); got != "body" {
+		t.Errorf("escalate should pass through unchanged; got=%q", got)
+	}
+}
+
+// TestLaunch_PerAgentEnvOverrides_GlobalDefault — operator pins the
+// scout agent to escalate while every other agent stays on the default
+// recommended_or_first. Validates the per-agent override seam end-to-end.
+func TestLaunch_PerAgentEnvOverrides_GlobalDefault(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", "")
+	t.Setenv("EVOLVE_SCOUT_INTERACTIVE_POLICY", PolicyEscalate)
+
+	scoutBody := runOnce(t, "scout", "scout body", nil)
+	if scoutBody != "scout body" {
+		t.Errorf("scout per-agent escalate not honored; got %q", truncate(scoutBody, 120))
+	}
+
+	builderBody := runOnce(t, "builder", "builder body", nil)
+	if !strings.HasPrefix(builderBody, "## Subagent Interactive Policy (recommended_or_first)") {
+		t.Errorf("builder should still get default block; got first 80 chars: %q", truncate(builderBody, 80))
+	}
+}
+
+// TestLaunch_ReqEnvOverridesProcessEnv — req.Env beats os.Getenv. This
+// lets the orchestrator pin a policy for a single phase without
+// mutating its own environment.
+func TestLaunch_ReqEnvOverridesProcessEnv(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
+	body := runOnce(t, "builder", "builder body", map[string]string{
+		"EVOLVE_INTERACTIVE_POLICY": PolicyEscalate,
+	})
+	if body != "builder body" {
+		t.Errorf("reqEnv should override process env; got %q", truncate(body, 120))
+	}
+}
+
+// TestLaunch_PolicyBlockStableAcrossRuns — two launches of the same
+// agent with the same policy produce byte-identical prefixes (cache
+// stability, per the v12.1 plan's prompt-cache constraint).
+func TestLaunch_PolicyBlockStableAcrossRuns(t *testing.T) {
+	t.Setenv("EVOLVE_INTERACTIVE_POLICY", "")
+	body1 := runOnce(t, "scout", "x", nil)
+	body2 := runOnce(t, "scout", "y", nil)
+	prefix1 := strings.TrimSuffix(body1, "x")
+	prefix2 := strings.TrimSuffix(body2, "y")
+	if prefix1 != prefix2 {
+		t.Errorf("policy prefix is not stable across runs (cache invalidation risk)\n  run1: %q\n  run2: %q",
+			truncate(prefix1, 100), truncate(prefix2, 100))
 	}
 }
 

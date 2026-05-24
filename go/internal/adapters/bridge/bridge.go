@@ -20,9 +20,44 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
+
+// Interactive policy values for EVOLVE_INTERACTIVE_POLICY and the
+// per-agent override EVOLVE_<AGENT>_INTERACTIVE_POLICY. The bridge
+// prepends a deterministic policy block to the prompt body so phase
+// agents self-resolve interactive prompts (AskUserQuestion, y/N) without
+// blocking the autonomous loop. See docs/architecture/plan-mode-dispatch.md
+// (v12.1) for the design rationale.
+const (
+	PolicyRecommendedOrFirst = "recommended_or_first"
+	PolicyEscalate           = "escalate"
+	PolicyAutoYes            = "auto_yes"
+)
+
+// policyBlockRecommendedOrFirst is the prompt prefix injected when the
+// effective policy is recommended_or_first. Kept short to stay well
+// under the 200-token cache-prefix budget called out in the v12.1 plan.
+const policyBlockRecommendedOrFirst = "## Subagent Interactive Policy (recommended_or_first)\n\n" +
+	"If you would invoke AskUserQuestion or any equivalent interactive prompt, instead\n" +
+	"auto-resolve as follows:\n" +
+	"- Pick the option labeled \"(Recommended)\" if present.\n" +
+	"- Otherwise pick the first listed option.\n" +
+	"- Record the resolution in your output as: `Auto-picked: <choice> (policy: recommended-or-first)`.\n" +
+	"- Never block on operator input; the loop is autonomous.\n\n---\n\n"
+
+// policyBlockAutoYes is the prompt prefix injected when the effective
+// policy is auto_yes. For multi-option prompts the agent falls back to
+// the recommended-or-first rule.
+const policyBlockAutoYes = "## Subagent Interactive Policy (auto_yes)\n\n" +
+	"For any binary yes/no prompt that would otherwise block, choose \"yes\" and note\n" +
+	"the resolution in your output as: `Auto-picked: yes (policy: auto_yes)`.\n" +
+	"For multi-option prompts, defer to recommended-or-first:\n" +
+	"- Pick the option labeled \"(Recommended)\" if present.\n" +
+	"- Otherwise pick the first listed option.\n" +
+	"Never block on operator input; the loop is autonomous.\n\n---\n\n"
 
 // CmdRunner is the seam for injecting subprocess behavior. The default
 // impl (execRunner) calls exec.CommandContext; tests provide a fake.
@@ -75,7 +110,8 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		return core.BridgeResponse{}, fmt.Errorf("bridge: ensure workspace: %w", err)
 	}
 	promptFile := filepath.Join(req.Workspace, fmt.Sprintf("%s-prompt.txt", nonEmpty(req.Agent, "agent")))
-	if err := os.WriteFile(promptFile, []byte(req.Prompt), 0o644); err != nil {
+	prompt := injectPolicyPrefix(req.Prompt, resolvePolicy(req.Agent, req.Env))
+	if err := os.WriteFile(promptFile, []byte(prompt), 0o644); err != nil {
 		return core.BridgeResponse{}, fmt.Errorf("bridge: write prompt: %w", err)
 	}
 	// 2. Derive missing log paths.
@@ -188,6 +224,58 @@ func nonEmpty(s, fallback string) string {
 		return fallback
 	}
 	return s
+}
+
+// resolvePolicy returns the effective interactive policy for the given
+// agent. Precedence: per-agent override (reqEnv > process env) > global
+// env > default (PolicyRecommendedOrFirst).
+//
+// reqEnv is the per-request env map (BridgeRequest.Env). It takes
+// precedence over the parent process env so the orchestrator can pin a
+// policy for a specific phase without mutating its own environment.
+func resolvePolicy(agent string, reqEnv map[string]string) string {
+	if agent != "" {
+		perAgentKey := perAgentPolicyEnv(agent)
+		if v, ok := reqEnv[perAgentKey]; ok && v != "" {
+			return v
+		}
+		if v := os.Getenv(perAgentKey); v != "" {
+			return v
+		}
+	}
+	if v, ok := reqEnv["EVOLVE_INTERACTIVE_POLICY"]; ok && v != "" {
+		return v
+	}
+	if v := os.Getenv("EVOLVE_INTERACTIVE_POLICY"); v != "" {
+		return v
+	}
+	return PolicyRecommendedOrFirst
+}
+
+// perAgentPolicyEnv maps an agent name to the per-agent override env
+// key: "scout" → "EVOLVE_SCOUT_INTERACTIVE_POLICY"; hyphens become
+// underscores so "tdd-engineer" → "EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY".
+func perAgentPolicyEnv(agent string) string {
+	upper := strings.ReplaceAll(strings.ToUpper(agent), "-", "_")
+	return "EVOLVE_" + upper + "_INTERACTIVE_POLICY"
+}
+
+// injectPolicyPrefix prepends the policy block to the prompt body based
+// on the resolved policy. Returns the original prompt unchanged when
+// policy is "escalate" (operator opted out of auto-resolution).
+// Unknown values fall through to recommended_or_first so a typo in env
+// configuration cannot break the autonomy posture.
+func injectPolicyPrefix(prompt, policy string) string {
+	switch policy {
+	case PolicyEscalate:
+		return prompt
+	case PolicyAutoYes:
+		return policyBlockAutoYes + prompt
+	case PolicyRecommendedOrFirst:
+		return policyBlockRecommendedOrFirst + prompt
+	default:
+		return policyBlockRecommendedOrFirst + prompt
+	}
 }
 
 func truncate(s string, n int) string {
