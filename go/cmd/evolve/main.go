@@ -55,6 +55,10 @@ Dispatch helpers (Phase 3a + 3b ports):
                               ( changelog-gen <from-ref> <to-ref> <version> [--dry-run] )
   version-bump              Atomic version bump across plugin/marketplace/
                               SKILL.md/README.md ( version-bump <version> [--dry-run] )
+  marketplace-poll          Post-publish marketplace propagation verifier
+                              ( marketplace-poll <version> [--max-wait-s N]
+                                [--poll-interval-s N] [--marketplace-dir DIR]
+                                [--dry-run] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -123,6 +127,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runChangelogGen(args[1:], stdin, stdout, stderr)
 	case "version-bump":
 		return runVersionBump(args[1:], stdin, stdout, stderr)
+	case "marketplace-poll":
+		return runMarketplacePoll(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
