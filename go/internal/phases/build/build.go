@@ -25,11 +25,12 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 const (
-	phaseName             = string(core.PhaseBuild)
+	phaseName               = string(core.PhaseBuild)
 	defaultCostThresholdUSD = 2.00
 )
 
@@ -71,7 +72,8 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 
 	prompt := composePrompt(agent.Body, req)
 	artifactPath := filepath.Join(req.Workspace, "build-report.md")
-	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "build.json")
+	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
+	profilePath := filepath.Join(profileDir, "build.json")
 
 	cli := req.Env["EVOLVE_CLI"]
 	if cli == "" {
@@ -81,6 +83,8 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	if model == "" {
 		model = "auto"
 	}
+
+	extraFlags := resolveExtraFlags(profileDir, "build", req.Env["EVOLVE_BUILD_PERMISSION_MODE"])
 
 	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
@@ -93,6 +97,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Agent:        "build",
 		Cycle:        req.Cycle,
 		Env:          req.Env,
+		ExtraFlags:   extraFlags,
 	})
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 
@@ -179,4 +184,35 @@ func parseFloatOrDefault(s string, d float64) float64 {
 		return d
 	}
 	return v
+}
+
+// resolveExtraFlags assembles the BridgeRequest.ExtraFlags slice by
+// reading the profile JSON from profileDir/<name>.json and appending
+// --permission-mode <envPermissionMode> when the operator set the per-
+// phase override. Precedence for permission mode: env > profile > unset.
+//
+// Missing or malformed profile is non-fatal: returns just the env-driven
+// permission-mode flag (if set) or nil. This matches the bridge layer's
+// best-effort posture — the profile is a hint, not a requirement.
+//
+// v12.1 Capability 1 (plan-mode dispatch). See CLAUDE.md "Current
+// behavior" table for EVOLVE_BUILD_PERMISSION_MODE semantics.
+func resolveExtraFlags(profileDir, profileName, envPermissionMode string) []string {
+	var profileFlags []string
+	var profilePermissionMode string
+	if loader := profiles.NewFromDir(profileDir); loader != nil {
+		if prof, err := loader.Get(profileName); err == nil {
+			profileFlags = prof.ExtraFlags
+			profilePermissionMode = prof.PermissionMode
+		}
+	}
+	permissionMode := envPermissionMode
+	if permissionMode == "" {
+		permissionMode = profilePermissionMode
+	}
+	out := append([]string(nil), profileFlags...)
+	if permissionMode != "" {
+		out = append(out, "--permission-mode", permissionMode)
+	}
+	return out
 }
