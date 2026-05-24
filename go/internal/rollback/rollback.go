@@ -341,20 +341,17 @@ func defaultRevertAndShip(repoRoot, commitSHA, reason, version string) string {
 		return "failed"
 	}
 	msg := fmt.Sprintf("revert: %s [rollback of v%s]", reason, version)
-	// v11.8.3+: prefer native evolve ship; fall back to bash ship.sh.
+	// v12.0.0+: native evolve ship required (no bash fallback). Revert
+	// commit is local-only if the binary is unavailable.
 	binPath := resolveEvolveBinForRollback(repoRoot)
-	var cmd *exec.Cmd
-	if binPath != "" {
-		cmd = exec.Command(binPath, "ship", "--class", "manual", msg)
-		cmd.Env = append(os.Environ(),
-			"EVOLVE_BYPASS_SHIP_VERIFY=1",
-			"EVOLVE_SHIP_AUTO_CONFIRM=1",
-		)
-	} else {
-		shipScript := filepath.Join(repoRoot, "legacy", "scripts", "lifecycle", "ship.sh")
-		cmd = exec.Command("bash", shipScript, msg)
-		cmd.Env = append(os.Environ(), "EVOLVE_BYPASS_SHIP_VERIFY=1")
+	if binPath == "" {
+		return "local-only"
 	}
+	cmd := exec.Command(binPath, "ship", "--class", "manual", msg)
+	cmd.Env = append(os.Environ(),
+		"EVOLVE_BYPASS_SHIP_VERIFY=1",
+		"EVOLVE_SHIP_AUTO_CONFIRM=1",
+	)
 	if err := cmd.Run(); err != nil {
 		return "local-only"
 	}

@@ -67,6 +67,9 @@ func envBoolDefault(k string, dflt bool) bool {
 	return v == "1" || v == "true"
 }
 
+// locateCycleStateHelper returns the path to the bash cycle-state helper
+// if present. In v12.0.0+ legacy/ is removed so this returns empty,
+// signalling callers to use their native Go path.
 func locateCycleStateHelper() string {
 	if pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT"); pluginRoot != "" {
 		p := pluginRoot + "/legacy/scripts/lifecycle/cycle-state.sh"

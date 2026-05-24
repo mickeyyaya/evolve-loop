@@ -501,23 +501,16 @@ func defaultReleaseSh(repoRoot, target string) error {
 func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	binPath := resolveEvolveBin(repoRoot)
 	if binPath == "" {
-		// Last-resort fallback: bash ship.sh (kept for emergency operation
-		// when the Go binary is unavailable, e.g. mid-rebuild).
-		script := filepath.Join(repoRoot, "legacy", "scripts", "lifecycle", "ship.sh")
-		cmd := exec.Command("bash", script, "--class", "release", msg)
-		cmd.Env = append(os.Environ(), "EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return "", fmt.Errorf("ship.sh (fallback): %v (output: %s)", err, strings.TrimSpace(string(out)))
-		}
-	} else {
-		cmd := exec.Command(binPath, "ship", "--class", "release", msg)
-		cmd.Env = append(os.Environ(),
-			"EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes,
-			"EVOLVE_SHIP_AUTO_CONFIRM=1", // releasepipeline is non-interactive
-		)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return "", fmt.Errorf("evolve ship: %v (output: %s)", err, strings.TrimSpace(string(out)))
-		}
+		return "", fmt.Errorf("evolve binary not found (set EVOLVE_GO_BIN or place at %s/go/bin/evolve); v12.0.0+ requires the native binary",
+			repoRoot)
+	}
+	cmd := exec.Command(binPath, "ship", "--class", "release", msg)
+	cmd.Env = append(os.Environ(),
+		"EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes,
+		"EVOLVE_SHIP_AUTO_CONFIRM=1", // releasepipeline is non-interactive
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("evolve ship: %v (output: %s)", err, strings.TrimSpace(string(out)))
 	}
 	headOut, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {

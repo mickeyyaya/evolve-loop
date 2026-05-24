@@ -7,11 +7,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard ship --evolve-dir $CLAUDE_PROJECT_DIR/.evolve 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/evolve-guard-dispatch.sh ship-gate"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard ship --evolve-dir $CLAUDE_PROJECT_DIR/.evolve"
           },
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard phase --evolve-dir $CLAUDE_PROJECT_DIR/.evolve 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/evolve-guard-dispatch.sh phase-gate-precondition"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard phase --evolve-dir $CLAUDE_PROJECT_DIR/.evolve"
           }
         ]
       },
@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard role --evolve-dir $CLAUDE_PROJECT_DIR/.evolve 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/evolve-guard-dispatch.sh role-gate"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard role --evolve-dir $CLAUDE_PROJECT_DIR/.evolve"
           }
         ]
       },
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard quota --evolve-dir $CLAUDE_PROJECT_DIR/.evolve 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/evolve-guard-dispatch.sh research-quota-gate"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard quota --evolve-dir $CLAUDE_PROJECT_DIR/.evolve"
           }
         ]
       },
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard docdelete --evolve-dir $CLAUDE_PROJECT_DIR/.evolve 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/guards/evolve-guard-dispatch.sh doc-deletion-guard"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve guard docdelete --evolve-dir $CLAUDE_PROJECT_DIR/.evolve"
           }
         ]
       }
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve postedit-validate 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/verification/postedit-validate.sh"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve postedit-validate"
           }
         ]
       }
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "($CLAUDE_PROJECT_DIR/go/bin/evolve prune-ephemeral --quiet 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/observability/prune-ephemeral.sh --quiet) || true"
+            "command": "$CLAUDE_PROJECT_DIR/go/bin/evolve prune-ephemeral --quiet || true"
           }
         ]
       }

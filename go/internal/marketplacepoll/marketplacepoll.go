@@ -122,13 +122,18 @@ func DefaultPull(dir string) error {
 	return nil
 }
 
-// DefaultReleaseSh delegates to the bash release.sh for now to preserve
-// the cache-refresh side-effects (marketplace pull + installed_plugins.json
-// registry update). The pure-consistency-check half has been ported to
-// go/internal/releaseconsistency, but the cache-refresh is environment-
-// specific and removed entirely in v12.0.0.
+// DefaultReleaseSh runs the bash release.sh if still present (cache-refresh
+// side-effects: marketplace pull + installed_plugins.json registry update).
+// In v12.0.0 the bash script is removed; this becomes a graceful no-op that
+// logs the skip but never errors. The pure-consistency-check half is
+// already covered by go/internal/releaseconsistency.
 func DefaultReleaseSh(repoRoot, target string) error {
 	script := filepath.Join(repoRoot, "legacy", "scripts", "utility", "release.sh")
+	if _, err := os.Stat(script); err != nil {
+		// v12.0.0+: legacy/scripts/utility/release.sh removed. Skip cache
+		// refresh; consistency is already covered by releaseconsistency.
+		return nil
+	}
 	cmd := exec.Command("bash", script, target)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

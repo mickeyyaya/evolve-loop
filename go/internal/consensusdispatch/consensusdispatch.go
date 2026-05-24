@@ -159,10 +159,9 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 		return ExitRuntimeErr
 	}
 
-	// ── shell-out to fanout-dispatch.sh ──
-	fanout := filepath.Join(in.DispatchDir, "fanout-dispatch.sh")
+	// ── shell-out to fanout-dispatch (native binary preferred; bash fallback) ──
 	logf("dispatching %d parallel cross-CLI workers...", workerCount)
-	cmd := exec.Command("bash", fanout, commandsTSV, resultsTSV)
+	cmd := resolveBashOrNative(in.DispatchDir, "fanout-dispatch", []string{commandsTSV, resultsTSV})
 	cmd.Stdout = stderr
 	cmd.Stderr = stderr
 	cmd.Env = os.Environ()
@@ -185,12 +184,11 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 		return ExitRuntimeErr
 	}
 
-	// ── shell-out to aggregator.sh cross-cli-vote ──
-	agg := filepath.Join(in.DispatchDir, "aggregator.sh")
+	// ── shell-out to aggregator (native binary preferred; bash fallback) ──
 	aggOutput := filepath.Join(in.WorkspacePath, "audit-report.md")
 	logf("aggregating via cross-cli-vote...")
-	aggArgs := append([]string{agg, "cross-cli-vote", aggOutput}, workerArtifacts...)
-	aggCmd := exec.Command("bash", aggArgs...)
+	aggSubArgs := append([]string{"cross-cli-vote", aggOutput}, workerArtifacts...)
+	aggCmd := resolveBashOrNative(in.DispatchDir, "aggregator", aggSubArgs)
 	aggCmd.Stdout = stderr
 	aggCmd.Stderr = stderr
 	aggCmd.Env = os.Environ()
