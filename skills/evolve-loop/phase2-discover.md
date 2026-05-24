@@ -6,6 +6,8 @@ description: Phase 2 Discovery logic.
 # Phase 2: DISCOVER
 
 > Read this file when launching the Scout agent for codebase discovery, gap analysis, and task selection.
+>
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
 
 ## Convergence Short-Circuit (check BEFORE launching Scout)
 

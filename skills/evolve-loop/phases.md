@@ -1,4 +1,6 @@
 > Read this file when orchestrating the full evolve-loop cycle. Covers phase gate verification, cycle setup, and all phase transitions (DISCOVER through LEARN).
+>
+> **v12.0.0 status note:** The `legacy/scripts/...` paths referenced below were removed in the v12 flag day. The native Go orchestrator (`go/bin/evolve cycle run`) handles phase transitions, subagent dispatch, gate verification, and state writes in-process. Trust-kernel guards run as `evolve guard <name>` PreToolUse hooks. Treat the bash snippets below as descriptions of the contract each subsystem enforces — not as commands to invoke.
 
 ## Contents
 - [Mandatory Phase Gate Verification](#mandatory-phase-gate-verification) — deterministic trust boundary at every transition
@@ -19,12 +21,12 @@
 
 ## Mandatory Phase Gate Verification
 
-Run `legacy/scripts/lifecycle/phase-gate.sh` at every phase transition. This deterministic bash script verifies artifacts exist, agents ran, and integrity checks pass. The orchestrator cannot skip it — it is the trust boundary between LLM judgment and structural enforcement.
+Phase transitions are enforced by the native Go orchestrator state machine plus the `evolve guard phase` PreToolUse hook. The hook verifies artifact presence, agent invocation order, and integrity checks — the orchestrator cannot skip it. This is the trust boundary between LLM judgment and structural enforcement.
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh <gate> <cycle> <workspace_path>
-# Gates: discover-to-build, build-to-audit, audit-to-ship, ship-to-learn, cycle-complete
-# Exit 0 = proceed, Exit 1 = block, Exit 2 = halt (present to human)
+```text
+# Gate semantics enforced in-process by core.Orchestrator + the `evolve guard phase` kernel hook:
+# discover-to-build, build-to-audit, audit-to-ship, ship-to-learn, cycle-complete
+# Exit 0 = proceed, Exit 2 = block (per Claude Code hook protocol)
 ```
 
 | Enforcement | Detail |

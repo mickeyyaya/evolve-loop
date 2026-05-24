@@ -1,4 +1,6 @@
 > Read this file when orchestrating Phase 6 (LEARN). Covers workspace archival, instinct extraction and graduation, memory consolidation, operator check, and context management.
+>
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
 
 ## Contents
 - [Workspace Archival](#phase-6-learn-orchestrator-inline--operator) — copy workspace to history

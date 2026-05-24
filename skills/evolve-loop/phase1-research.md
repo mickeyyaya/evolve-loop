@@ -6,6 +6,8 @@ description: Phase 1 Research logic.
 # Phase 1: RESEARCH
 
 > Read this file at the start of every cycle. Proactive research loop that transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.
+>
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
 
 Runs inline by the orchestrator (no separate agent).
 

@@ -14,6 +14,8 @@ output-format: "scout-report.md — Gap Analysis table, Research Executed (sourc
 
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
 
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Phase control and research-cache lookups are now in-process (Go orchestrator + state.json:researchCache). Treat bash snippets as contracts; do not invoke them directly.
+
 **Research techniques:** [docs/reference/scout-techniques.md](docs/reference/scout-techniques.md) — failure patterns, difficulty scoring, goal milestones, research quality scoring, pre-execution simulation.
 
 ## Inputs
@@ -69,7 +71,7 @@ Check `legacy/scripts/research/research-cache.sh` for each proposed task. Exit c
 ### 5. Inline Upfront Research (Scout owns it)
 
 On turns 1–2, before codebase reads, use your research tools within quota:
-- **kb-search first:** `legacy/scripts/research/kb-search.sh "<query>"` (quota: 20 calls). Use if KB hits ≥ 3 on-point results.
+- **kb-search first:** `Grep "<query>"` on `knowledge-base/research/` and `.evolve/instincts/lessons/` (quota: 20 reads). Use if KB hits ≥ 3 on-point results.
 - **WebSearch escalation:** Only if KB sparse (< 3 relevant hits) or clearly outdated. Quota: 3 calls.
 - **WebFetch:** For primary docs/changelogs when WebSearch surfaces a highly relevant URL. Quota: 5 calls.
 

@@ -12,6 +12,8 @@ output-format: "orchestrator-report.md — Goal, Phase Outcomes table (phase × 
 
 # Evolve Orchestrator
 
+> **v12.0.0 status:** In the native Go path (`go/bin/evolve cycle run`), this prompt is NOT loaded — the in-process `core.Orchestrator` (`go/internal/core/`) sequences phases directly via Go `PhaseRunner` implementations. This file remains the canonical reference for the orchestrator role under the archived bash dispatcher (`EVOLVE_USE_LEGACY_BASH=1` → `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`) but the `legacy/scripts/...` helper scripts it invokes were removed in the v12 flag day. Use this file as a contract/architecture reference, not as live runtime instructions.
+
 You are the **Orchestrator** for an Evolve Loop cycle. Your sole job is to **sequence phases and make verdict-driven decisions** — Scout → (Inspirer) → Builder → Auditor → Ship or Retrospective. You **do not** write source code, commit, or push. Those operations are reserved for Builder (in worktree), ship.sh, and the retrospective subagent respectively. Kernel-layer hooks (role-gate, ship-gate, phase-gate-precondition) will block you if you try.
 
 ## Inputs

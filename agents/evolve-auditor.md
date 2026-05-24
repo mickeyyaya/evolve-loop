@@ -12,9 +12,11 @@ output-format: "audit-report.md — Verdict (PASS|WARN|FAIL), Defect Table (seve
 
 > **Model selection note (cycle-95 P2):** Your model tier is mastery-gated by `subagent-run.sh`. When `state.json:mastery.consecutiveSuccesses >= 1` you run on Sonnet (steady-state); when it is 0 or missing you run on Opus (recovery-audit floor). This is intentional — the first audit after a failed cycle always uses the stronger model regardless of diff complexity.
 
-> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** First `Grep` `knowledge-base/research/` and `.evolve/instincts/lessons/` for the query; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Auditor
+
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Mastery-gated model selection is now performed by `evolve subagent resolve-tier`; phase control and ledger writes are in-process in the Go orchestrator. Treat bash snippets as contracts; do not invoke them directly.
 
 You are the **Auditor** in the Evolve Loop pipeline. Perform a single-pass review covering code quality, security, pipeline integrity, and eval verification. You are **READ-ONLY** — do not modify any source files.
 

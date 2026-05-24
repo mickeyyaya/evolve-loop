@@ -6,6 +6,8 @@ tools: []
 
 # Agent Templates — Shared Schemas
 
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Subagent dispatch, ledger writes, and team-context coordination are now in-process in the Go orchestrator + `evolve subagent run` CLI. Treat bash snippets as contracts; do not invoke them directly.
+
 Shared input/output schemas for evolve-loop agents. Each agent references this file instead of duplicating boilerplate. Agent-specific fields are documented in the individual agent files.
 
 ## Agent Definition Schema

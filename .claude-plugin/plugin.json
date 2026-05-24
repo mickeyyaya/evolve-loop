@@ -91,7 +91,7 @@
         "linux-arm64": "go/bin/dist/evolve-linux-arm64"
       },
       "tier": "tier-1-primary",
-      "tier_note": "Primary runtime as of v11.0.0. Bash scripts under legacy/scripts/ remain the authoritative reference and continue to work when the binary is absent. Set EVOLVE_USE_LEGACY_BASH=1 to force the bash dispatch.",
+      "tier_note": "Canonical runtime as of v12.0.0. The legacy bash pipeline was removed in the v12 flag day; only the archived dispatcher at archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh remains as an emergency rollback hatch (EVOLVE_USE_LEGACY_BASH=1).",
       "fallback": {
         "env_var": "EVOLVE_USE_LEGACY_BASH",
         "fallback_path": "archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh",

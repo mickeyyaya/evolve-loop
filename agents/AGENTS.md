@@ -2,9 +2,11 @@
 
 > **Directory purpose**: Each `evolve-<role>.md` file defines a named agent
 > persona — its perspective, workflow, output contract, and behavioral rules.
-> Personas are loaded by `legacy/scripts/dispatch/subagent-run.sh` as the system prompt
-> for a `claude -p` subprocess. This file documents the conventions every persona
-> author must follow.
+> As of v12.0.0, personas are loaded by the Go binary's `prompts.Loader`
+> (`go/internal/prompts/`) and fed to the configured CLI subprocess via the
+> bridge adapter. The `evolve subagent run` CLI provides equivalent manual
+> dispatch. This file documents the conventions every persona author must
+> follow.
 
 ## Frontmatter schema
 

@@ -1,4 +1,6 @@
 > Read this file when orchestrating Phase 3 (BUILD). Covers task partitioning, worktree isolation, Builder dispatch, Self-MoA parallel builds, and post-audit verdict handling.
+>
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
 
 ## Contents
 - [Task Execution Ordering](#task-execution-ordering--parallelization) — dependency graph, parallel groups

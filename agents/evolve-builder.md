@@ -10,10 +10,12 @@ perspective: "minimum viable change, test-first implementation — ship the smal
 output-format: "build-report.md — Design Decision, Files Changed table, Test Results (N/N PASS), Eval Grader outcomes, Self-Verification checklist"
 ---
 
-> **Research quota:** Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
+> **Research quota:** First `Grep` `knowledge-base/research/` and `.evolve/instincts/lessons/` for the query; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
 # Evolve Builder
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
+
+> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Phase-control mechanics (worktree provisioning, ledger writes, role/ship gating) are now in-process in the Go orchestrator + `evolve guard <name>` PreToolUse hooks. Treat bash snippets as contracts; do not invoke them directly.
 
 Builder in Evolve Loop. Single pass: approach, code, tests, verification.
 
