@@ -35,7 +35,7 @@ func runConsensusDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) 
 	if projectRoot == "" {
 		projectRoot, _ = os.Getwd()
 	}
-	in.AdaptersDir = filepath.Join(projectRoot, "legacy", "scripts", "cli_adapters")
+	in.AdaptersDir = filepath.Join(projectRoot, "adapters")
 	in.DispatchDir = filepath.Join(projectRoot, "legacy", "scripts", "dispatch")
 
 	return consensusdispatch.Run(in, stdout, stderr)

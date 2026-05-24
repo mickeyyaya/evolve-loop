@@ -276,13 +276,13 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	}
 	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
 	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+		adaptersDir = filepath.Join(pluginRoot, "adapters")
 	}
 	// CapabilityDir mirrors bash REAL_ADAPTERS_DIR: script-relative, never
 	// honors EVOLVE_ADAPTERS_DIR_OVERRIDE. Resolves to the plugin install
 	// path so capability manifests reflect actual installed capabilities,
 	// not a test-seam sentinel dir.
-	capabilityDir := filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	capabilityDir := filepath.Join(pluginRoot, "adapters")
 
 	llmConfigPath := os.Getenv("EVOLVE_LLM_CONFIG_PATH")
 	if llmConfigPath == "" {
@@ -352,9 +352,9 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	}
 	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
 	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+		adaptersDir = filepath.Join(pluginRoot, "adapters")
 	}
-	capabilityDir := filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	capabilityDir := filepath.Join(pluginRoot, "adapters")
 	llmConfigPath := os.Getenv("EVOLVE_LLM_CONFIG_PATH")
 	if llmConfigPath == "" {
 		llmConfigPath = filepath.Join(projectRoot, ".evolve", "llm_config.json")
@@ -458,9 +458,9 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	}
 	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
 	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+		adaptersDir = filepath.Join(pluginRoot, "adapters")
 	}
-	capabilityDir := filepath.Join(pluginRoot, "legacy", "scripts", "cli_adapters")
+	capabilityDir := filepath.Join(pluginRoot, "adapters")
 	ledgerPath := os.Getenv("EVOLVE_LEDGER_OVERRIDE")
 	if ledgerPath == "" {
 		ledgerPath = filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
