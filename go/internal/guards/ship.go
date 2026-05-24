@@ -19,6 +19,13 @@ func (s *Ship) Name() string { return "ship" }
 var (
 	shipVerbRe   = regexp.MustCompile(`\b(git[ \t]+commit|git[ \t]+push|gh[ \t]+release[ \t]+(create|edit))\b`)
 	shipScriptRe = regexp.MustCompile(`scripts/lifecycle/ship\.sh(?:[ \t]|$)`)
+	// nativeShipRe matches the native Go CLI invocations:
+	//   evolve ship
+	//   go/bin/evolve ship
+	//   /abs/path/to/evolve ship
+	// Token boundary on the left (word boundary or path separator) prevents
+	// false positives like "devolve ship".
+	nativeShipRe = regexp.MustCompile(`(^|[ \t/])evolve[ \t]+ship\b`)
 )
 
 func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
@@ -32,11 +39,17 @@ func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision 
 	if cmd == "" {
 		return core.GuardDecision{Allow: true}
 	}
-	if !shipVerbRe.MatchString(cmd) {
+	// v11.8.3+: strip heredoc bodies before the verb regex so commit
+	// message bodies that legitimately mention `git push` / `git commit`
+	// (e.g. describing what a script does) don't trip the gate. Mirrors
+	// the awk pre-processor in legacy/scripts/guards/ship-gate.sh.
+	stripped := stripHeredocs(cmd)
+	if !shipVerbRe.MatchString(stripped) {
 		return core.GuardDecision{Allow: true}
 	}
-	// Verb present — require the canonical script path.
-	if shipScriptRe.MatchString(cmd) {
+	// Verb present — require the canonical script path OR the native
+	// `evolve ship` CLI (v11.3.0+).
+	if shipScriptRe.MatchString(cmd) || nativeShipRe.MatchString(cmd) {
 		return core.GuardDecision{Allow: true}
 	}
 	return core.GuardDecision{

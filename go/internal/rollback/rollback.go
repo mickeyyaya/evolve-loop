@@ -341,11 +341,40 @@ func defaultRevertAndShip(repoRoot, commitSHA, reason, version string) string {
 		return "failed"
 	}
 	msg := fmt.Sprintf("revert: %s [rollback of v%s]", reason, version)
-	shipScript := filepath.Join(repoRoot, "legacy", "scripts", "lifecycle", "ship.sh")
-	cmd := exec.Command("bash", shipScript, msg)
-	cmd.Env = append(os.Environ(), "EVOLVE_BYPASS_SHIP_VERIFY=1")
+	// v11.8.3+: prefer native evolve ship; fall back to bash ship.sh.
+	binPath := resolveEvolveBinForRollback(repoRoot)
+	var cmd *exec.Cmd
+	if binPath != "" {
+		cmd = exec.Command(binPath, "ship", "--class", "manual", msg)
+		cmd.Env = append(os.Environ(),
+			"EVOLVE_BYPASS_SHIP_VERIFY=1",
+			"EVOLVE_SHIP_AUTO_CONFIRM=1",
+		)
+	} else {
+		shipScript := filepath.Join(repoRoot, "legacy", "scripts", "lifecycle", "ship.sh")
+		cmd = exec.Command("bash", shipScript, msg)
+		cmd.Env = append(os.Environ(), "EVOLVE_BYPASS_SHIP_VERIFY=1")
+	}
 	if err := cmd.Run(); err != nil {
 		return "local-only"
 	}
 	return "reverted"
+}
+
+// resolveEvolveBinForRollback locates the native evolve binary for rollback's
+// revert-and-ship flow. Mirrors releasepipeline.resolveEvolveBin.
+func resolveEvolveBinForRollback(repoRoot string) string {
+	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" {
+		if info, err := os.Stat(p); err == nil && info.Mode()&0o111 != 0 {
+			return p
+		}
+	}
+	candidate := filepath.Join(repoRoot, "go", "bin", "evolve")
+	if info, err := os.Stat(candidate); err == nil && info.Mode()&0o111 != 0 {
+		return candidate
+	}
+	if found, err := exec.LookPath("evolve"); err == nil {
+		return found
+	}
+	return ""
 }

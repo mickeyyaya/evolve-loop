@@ -493,20 +493,55 @@ func defaultReleaseSh(repoRoot, target string) error {
 	return runReleaseConsistencyLib(repoRoot, target)
 }
 
-// defaultShip shells out to legacy/scripts/lifecycle/ship.sh --class release.
+// defaultShip invokes the native evolve binary's ship subcommand
+// (v11.8.3+; prior versions shelled out to legacy/scripts/lifecycle/ship.sh).
+// Resolves the binary path via EVOLVE_GO_BIN, then <repoRoot>/go/bin/evolve,
+// then `evolve` on PATH; falls back to bash ship.sh only if all three fail.
 // Returns the new HEAD SHA after the commit lands.
 func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
-	script := filepath.Join(repoRoot, "legacy", "scripts", "lifecycle", "ship.sh")
-	cmd := exec.Command("bash", script, "--class", "release", msg)
-	cmd.Env = append(os.Environ(), "EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("ship.sh: %v (output: %s)", err, strings.TrimSpace(string(out)))
+	binPath := resolveEvolveBin(repoRoot)
+	if binPath == "" {
+		// Last-resort fallback: bash ship.sh (kept for emergency operation
+		// when the Go binary is unavailable, e.g. mid-rebuild).
+		script := filepath.Join(repoRoot, "legacy", "scripts", "lifecycle", "ship.sh")
+		cmd := exec.Command("bash", script, "--class", "release", msg)
+		cmd.Env = append(os.Environ(), "EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("ship.sh (fallback): %v (output: %s)", err, strings.TrimSpace(string(out)))
+		}
+	} else {
+		cmd := exec.Command(binPath, "ship", "--class", "release", msg)
+		cmd.Env = append(os.Environ(),
+			"EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes,
+			"EVOLVE_SHIP_AUTO_CONFIRM=1", // releasepipeline is non-interactive
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("evolve ship: %v (output: %s)", err, strings.TrimSpace(string(out)))
+		}
 	}
 	headOut, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(headOut)), nil
+}
+
+// resolveEvolveBin returns a path to the native evolve binary, or "" if
+// none is callable.
+func resolveEvolveBin(repoRoot string) string {
+	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" {
+		if info, err := os.Stat(p); err == nil && info.Mode()&0o111 != 0 {
+			return p
+		}
+	}
+	candidate := filepath.Join(repoRoot, "go", "bin", "evolve")
+	if info, err := os.Stat(candidate); err == nil && info.Mode()&0o111 != 0 {
+		return candidate
+	}
+	if found, err := exec.LookPath("evolve"); err == nil {
+		return found
+	}
+	return ""
 }
 
 // defaultMarketplacePoll calls marketplacepoll.Run with the default
