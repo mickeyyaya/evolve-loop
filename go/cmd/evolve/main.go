@@ -66,6 +66,10 @@ Dispatch helpers (Phase 3a + 3b ports):
   rollback                  Auto-revert a failed release using a journal
                               ( rollback <journal.json> [--reason "..."]
                                 [--dry-run] )
+  release                   Self-healing release pipeline orchestrator
+                              ( release <version> [--dry-run] [--no-rollback]
+                                [--skip-tests] [--require-preflight]
+                                [--max-poll-wait-s N] [--from-tag <tag>] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -140,6 +144,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runReleasePreflight(args[1:], stdin, stdout, stderr)
 	case "rollback":
 		return runRollback(args[1:], stdin, stdout, stderr)
+	case "release", "release-pipeline":
+		return runReleasePipeline(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
