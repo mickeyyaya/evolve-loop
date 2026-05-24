@@ -347,101 +347,10 @@ func TestRun_NoProfile_EnvAloneStillWires(t *testing.T) {
 	}
 }
 
-// TestResolveExtraFlags_DirectUnit — direct table-driven test of the
-// helper to lock down the precedence rules and the empty-input branch.
-func TestResolveExtraFlags_DirectUnit(t *testing.T) {
-	cases := []struct {
-		name     string
-		setup    func(t *testing.T) string // returns profileDir
-		envMode  string
-		wantFlag bool   // whether --permission-mode appears
-		wantMode string // expected mode value when wantFlag=true
-	}{
-		{
-			name:     "no-profile-no-env-empty",
-			setup:    func(t *testing.T) string { return t.TempDir() },
-			envMode:  "",
-			wantFlag: false,
-		},
-		{
-			name: "profile-mode-only",
-			setup: func(t *testing.T) string {
-				d := t.TempDir()
-				_ = os.WriteFile(filepath.Join(d, "build.json"), []byte(`{"permission_mode":"acceptEdits"}`), 0o644)
-				return d
-			},
-			envMode:  "",
-			wantFlag: true,
-			wantMode: "acceptEdits",
-		},
-		{
-			name:     "env-mode-only",
-			setup:    func(t *testing.T) string { return t.TempDir() },
-			envMode:  "plan",
-			wantFlag: true,
-			wantMode: "plan",
-		},
-		{
-			name: "env-beats-profile",
-			setup: func(t *testing.T) string {
-				d := t.TempDir()
-				_ = os.WriteFile(filepath.Join(d, "build.json"), []byte(`{"permission_mode":"acceptEdits"}`), 0o644)
-				return d
-			},
-			envMode:  "plan",
-			wantFlag: true,
-			wantMode: "plan",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			dir := c.setup(t)
-			got := resolveExtraFlags(dir, "build", c.envMode)
-			joined := strings.Join(got, " ")
-			if c.wantFlag {
-				if !strings.Contains(joined, "--permission-mode "+c.wantMode) {
-					t.Errorf("want flag --permission-mode %s; got %v", c.wantMode, got)
-				}
-			} else if strings.Contains(joined, "--permission-mode") {
-				t.Errorf("did not want --permission-mode flag; got %v", got)
-			}
-		})
-	}
-}
-
-// TestResolveExtraFlags_ProfileFlagsAlwaysIncluded — extra_flags from
-// the profile pass through regardless of permission_mode setting.
-func TestResolveExtraFlags_ProfileFlagsAlwaysIncluded(t *testing.T) {
-	d := t.TempDir()
-	_ = os.WriteFile(filepath.Join(d, "build.json"),
-		[]byte(`{"extra_flags":["--require-full","--print"]}`), 0o644)
-	got := resolveExtraFlags(d, "build", "")
-	for _, want := range []string{"--require-full", "--print"} {
-		found := false
-		for _, f := range got {
-			if f == want {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("ExtraFlags missing %q from profile; got %v", want, got)
-		}
-	}
-}
-
-// TestResolveExtraFlags_MalformedProfileNonFatal — broken JSON in the
-// profile must not crash; helper returns env-driven flags (if any) or
-// nil. Protects fresh-cluster bootstrap from a corrupted profile file.
-func TestResolveExtraFlags_MalformedProfileNonFatal(t *testing.T) {
-	d := t.TempDir()
-	_ = os.WriteFile(filepath.Join(d, "build.json"), []byte("not-json"), 0o644)
-	got := resolveExtraFlags(d, "build", "plan")
-	joined := strings.Join(got, " ")
-	if !strings.Contains(joined, "--permission-mode plan") {
-		t.Errorf("env mode should still propagate over malformed profile; got %v", got)
-	}
-}
+// Direct unit tests for the resolver moved to
+// internal/phaseflags/phaseflags_test.go when the helper was extracted
+// in v12.1.0 second slice. The phase-runner-level integration tests
+// above (TestRun_*) still exercise the resolver end-to-end through Run.
 
 func TestRun_MissingBridge_ReturnsError(t *testing.T) {
 	phase := New(Config{Prompts: fakePromptsFS("body")})

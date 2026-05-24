@@ -4,8 +4,8 @@
 //
 //  3. Locate most recent Auditor ledger entry (kind=agent_subprocess, role=auditor)
 //  4. Verify exit_code ∈ {0,1}, artifact exists, SHA matches
-//  4b. Parse Verdict from artifact: PASS/WARN/FAIL with dual-detection
-//  4c. EGPS predicate suite gate: acs-verdict.json:red_count == 0
+//     4b. Parse Verdict from artifact: PASS/WARN/FAIL with dual-detection
+//     4c. EGPS predicate suite gate: acs-verdict.json:red_count == 0
 //  5. Cycle binding: current git HEAD + tree must match ledger entry
 //  6. Freshness: artifact age < 7 days
 package ship

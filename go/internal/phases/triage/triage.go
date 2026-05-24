@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -72,7 +73,8 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 
 	prompt := composePrompt(agent.Body, req)
 	artifactPath := filepath.Join(req.Workspace, "triage-report.md")
-	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "triage.json")
+	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
+	profilePath := filepath.Join(profileDir, "triage.json")
 
 	cli := req.Env["EVOLVE_CLI"]
 	if cli == "" {
@@ -82,6 +84,8 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	if model == "" {
 		model = "auto"
 	}
+
+	extraFlags := phaseflags.For("triage").Resolve(profileDir, req.Env)
 
 	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
@@ -94,6 +98,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Agent:        "triage",
 		Cycle:        req.Cycle,
 		Env:          req.Env,
+		ExtraFlags:   extraFlags,
 	})
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 

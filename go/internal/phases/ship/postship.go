@@ -191,4 +191,3 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] TOFU: post-cycle self-update (ship binary changed in this commit) — pinned ship binary SHA + plugin version='%s'", pluginVer))
 	return nil
 }
-

@@ -180,7 +180,7 @@ func TestRun_BridgeError_FAIL(t *testing.T) {
 func TestRun_MissingBridge_ReturnsError(t *testing.T) {
 	phase := New(Config{Prompts: fakePromptsFS("body")})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1,
+		Cycle:   1,
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
 	if err == nil || !strings.Contains(err.Error(), "bridge required") {
@@ -191,7 +191,7 @@ func TestRun_MissingBridge_ReturnsError(t *testing.T) {
 func TestRun_MissingPrompts_ReturnsError(t *testing.T) {
 	phase := New(Config{Bridge: &fakeBridge{}})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1,
+		Cycle:   1,
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
 	if err == nil || !strings.Contains(err.Error(), "prompts loader required") {
@@ -202,7 +202,7 @@ func TestRun_MissingPrompts_ReturnsError(t *testing.T) {
 func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	phase := New(Config{Bridge: &fakeBridge{}, Prompts: prompts.NewFromFS(fstest.MapFS{})})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1,
+		Cycle:   1,
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
 	if err == nil {

@@ -50,10 +50,10 @@ func (c Class) IsValid() bool {
 type ExitCode int
 
 const (
-	ExitOK          ExitCode = 0
-	ExitFailure     ExitCode = 1
-	ExitIntegrity   ExitCode = 2
-	ExitMissingBin  ExitCode = 127
+	ExitOK         ExitCode = 0
+	ExitFailure    ExitCode = 1
+	ExitIntegrity  ExitCode = 2
+	ExitMissingBin ExitCode = 127
 )
 
 // Options captures every external knob ship.sh exposes. Tests construct
@@ -114,12 +114,12 @@ type Now struct {
 // RunResult is the structured outcome. CLI wrappers translate this to
 // process exit code; the PhaseRunner adapter translates to core.Verdict.
 type RunResult struct {
-	ExitCode    ExitCode
-	CommitSHA   string
-	ClassUsed   Class
-	Provenance  string
-	Logs        []string // human-readable [ship] log lines
-	DryRunPath  string   // non-empty when DryRun=1 and journal was written
+	ExitCode   ExitCode
+	CommitSHA  string
+	ClassUsed  Class
+	Provenance string
+	Logs       []string // human-readable [ship] log lines
+	DryRunPath string   // non-empty when DryRun=1 and journal was written
 }
 
 // Run executes the ship lifecycle end-to-end. Caller-supplied opts drive

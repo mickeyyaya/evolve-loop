@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -84,7 +84,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		model = "auto"
 	}
 
-	extraFlags := resolveExtraFlags(profileDir, "build", req.Env["EVOLVE_BUILD_PERMISSION_MODE"])
+	extraFlags := phaseflags.For("build").Resolve(profileDir, req.Env)
 
 	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
@@ -184,35 +184,4 @@ func parseFloatOrDefault(s string, d float64) float64 {
 		return d
 	}
 	return v
-}
-
-// resolveExtraFlags assembles the BridgeRequest.ExtraFlags slice by
-// reading the profile JSON from profileDir/<name>.json and appending
-// --permission-mode <envPermissionMode> when the operator set the per-
-// phase override. Precedence for permission mode: env > profile > unset.
-//
-// Missing or malformed profile is non-fatal: returns just the env-driven
-// permission-mode flag (if set) or nil. This matches the bridge layer's
-// best-effort posture — the profile is a hint, not a requirement.
-//
-// v12.1 Capability 1 (plan-mode dispatch). See CLAUDE.md "Current
-// behavior" table for EVOLVE_BUILD_PERMISSION_MODE semantics.
-func resolveExtraFlags(profileDir, profileName, envPermissionMode string) []string {
-	var profileFlags []string
-	var profilePermissionMode string
-	if loader := profiles.NewFromDir(profileDir); loader != nil {
-		if prof, err := loader.Get(profileName); err == nil {
-			profileFlags = prof.ExtraFlags
-			profilePermissionMode = prof.PermissionMode
-		}
-	}
-	permissionMode := envPermissionMode
-	if permissionMode == "" {
-		permissionMode = profilePermissionMode
-	}
-	out := append([]string(nil), profileFlags...)
-	if permissionMode != "" {
-		out = append(out, "--permission-mode", permissionMode)
-	}
-	return out
 }

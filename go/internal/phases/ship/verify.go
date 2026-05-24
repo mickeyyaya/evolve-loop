@@ -41,14 +41,14 @@ func sha256File(path string) (string, error) {
 //
 // Five branches:
 //
-//	1. no expected_ship_sha           → first run; pin both fields
-//	2. expected matches actual:
-//	   - no expected_ship_version     → schema migration; pin version
-//	   - expected_ship_version set    → clean pass
-//	3. expected != actual:
-//	   - no expected_ship_version     → legacy SHA-only pin; migrate (re-pin)
-//	   - expected_ship_version != current → plugin update; re-pin
-//	   - same version, different SHA  → INTEGRITY-FAIL (real tampering)
+//  1. no expected_ship_sha           → first run; pin both fields
+//  2. expected matches actual:
+//     - no expected_ship_version     → schema migration; pin version
+//     - expected_ship_version set    → clean pass
+//  3. expected != actual:
+//     - no expected_ship_version     → legacy SHA-only pin; migrate (re-pin)
+//     - expected_ship_version != current → plugin update; re-pin
+//     - same version, different SHA  → INTEGRITY-FAIL (real tampering)
 //
 // The state.json mutation preserves every other field (map-based).
 func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
@@ -237,8 +237,8 @@ func isTerminal(r io.Reader) bool {
 
 // verifyTrivial implements --class trivial:
 //
-//	1. cycle-state.json:cycle_size_estimate must equal "trivial"
-//	2. No pipeline-critical paths in the staged/working diff
+//  1. cycle-state.json:cycle_size_estimate must equal "trivial"
+//  2. No pipeline-critical paths in the staged/working diff
 //
 // Pipeline-critical paths (cannot bypass audit):
 //
