@@ -72,6 +72,13 @@ Dispatch helpers (Phase 3a + 3b ports):
                                 [--max-poll-wait-s N] [--from-tag <tag>] )
   prune-ephemeral           TTL retention for .ephemeral/ + dispatch-logs
                               ( prune-ephemeral [--dry-run] [--quiet] )
+  postedit-validate         PostToolUse validator (reads payload on stdin)
+                              ( postedit-validate )
+  inbox-mover               Inbox lifecycle ops (claim/promote/recover-orphans)
+                              ( inbox-mover claim <task_id> <cycle>
+                              | inbox-mover promote <task_id> <new_state>
+                                [<cycle>] [--commit-sha <sha>]
+                              | inbox-mover recover-orphans )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -150,6 +157,10 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runReleasePipeline(args[1:], stdin, stdout, stderr)
 	case "prune-ephemeral":
 		return runPruneEphemeral(args[1:], stdin, stdout, stderr)
+	case "postedit-validate":
+		return runPostEditValidate(args[1:], stdin, stdout, stderr)
+	case "inbox-mover":
+		return runInboxMover(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 // postShip runs the side-effects that follow a successful commit+push.
@@ -70,13 +72,11 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 	return nil
 }
 
-// promoteInbox shells out to legacy/scripts/lifecycle/inbox-mover.sh to move shipped
-// inbox tasks to processed/. Best-effort: mv failures log WARN and don't
-// block ship (Layer 1 idempotency catches residual in next cycle's Triage).
-//
-// This is the one place we intentionally keep a shell-out — inbox-mover.sh
-// has its own state machine that's not part of the v11.3.0 native-ship
-// scope. v11.4.0 or later may port it.
+// promoteInbox calls the inboxmover Go library directly (v11.8.1+; prior
+// versions shelled out to legacy/scripts/lifecycle/inbox-mover.sh). Moves
+// shipped inbox tasks to processed/. Best-effort: failures log WARN and
+// don't block ship (Layer 1 idempotency catches residual in next cycle's
+// Triage).
 func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
 	csMap, err := readStateMap(csPath)
@@ -92,12 +92,6 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] INFO: no triage-decision.json for cycle %d — inbox promote skipped", cid))
 		return nil
 	}
-	moverPath := filepath.Join(opts.ProjectRoot, "legacy", "scripts", "lifecycle", "inbox-mover.sh")
-	fi, err := os.Stat(moverPath)
-	if err != nil || fi.Mode()&0o111 == 0 {
-		// inbox-mover.sh not installed — older repo layout, skip.
-		return nil
-	}
 	// Promote top_n[] + skip_shipped[] — read IDs from triage-decision.json.
 	body, err := os.ReadFile(triagePath)
 	if err != nil {
@@ -111,12 +105,15 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	if len(res.CommitSHA) >= 8 {
 		commitShort = res.CommitSHA[:8]
 	}
+	mvOpts := inboxmover.Options{
+		ProjectRoot: opts.ProjectRoot,
+		Stderr:      opts.Stderr,
+	}
 	for _, id := range ids {
-		args := []string{moverPath, "promote", id, "processed", fmt.Sprintf("%d", cid)}
-		if commitShort != "" {
-			args = append(args, "--commit-sha", commitShort)
-		}
-		_, _ = opts.Runner(ctx, "bash", args, os.Environ(), opts.ProjectRoot, nil, opts.Stderr, opts.Stderr)
+		_, _ = inboxmover.Promote(mvOpts, id, "processed", inboxmover.PromoteOpts{
+			Cycle:     fmt.Sprintf("%d", cid),
+			CommitSHA: commitShort,
+		})
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle promote complete for cycle %d", cid))
 	return nil
