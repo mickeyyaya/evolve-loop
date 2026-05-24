@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**Current (v11.7)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v11.8)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 > **v11.2.0 breaking change**: the `scripts/` symlink has been removed. Operator integrations that hardcode `scripts/...` paths must update to `legacy/scripts/...`. Go binary remains the primary runtime; bash continues to work from `legacy/scripts/`. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
 
@@ -577,6 +577,7 @@ Active milestones (cycles that shipped substantive structural changes):
 | v10.17 | 2026-05-20 | Token-economics roadmap batch (cycles 94-98): P1 + P2 + L1 + P3 foundation |
 | v10.18 | May 21 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v11.7 | May 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v11.8 | May 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md). Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
 

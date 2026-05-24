@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/legacy/scripts/observability/prune-ephemeral.sh --quiet || true"
+            "command": "($CLAUDE_PROJECT_DIR/go/bin/evolve prune-ephemeral --quiet 2>/dev/null || bash $CLAUDE_PROJECT_DIR/legacy/scripts/observability/prune-ephemeral.sh --quiet) || true"
           }
         ]
       }

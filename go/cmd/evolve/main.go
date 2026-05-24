@@ -70,6 +70,8 @@ Dispatch helpers (Phase 3a + 3b ports):
                               ( release <version> [--dry-run] [--no-rollback]
                                 [--skip-tests] [--require-preflight]
                                 [--max-poll-wait-s N] [--from-tag <tag>] )
+  prune-ephemeral           TTL retention for .ephemeral/ + dispatch-logs
+                              ( prune-ephemeral [--dry-run] [--quiet] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
@@ -146,6 +148,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runRollback(args[1:], stdin, stdout, stderr)
 	case "release", "release-pipeline":
 		return runReleasePipeline(args[1:], stdin, stdout, stderr)
+	case "prune-ephemeral":
+		return runPruneEphemeral(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
