@@ -1,11 +1,11 @@
 // Package build implements the GREEN code-writer phase. The phase
 // boilerplate (profile lookup, prompt composition, bridge dispatch,
-// artifact reading, response packaging) lives in
-// internal/phases/runner; this file only encodes the build-specific
-// variation points: agent name, artifact filename, prompt context,
-// classification rules, and the cost-overrun guard.
+// artifact reading, response packaging) lives in internal/phases/runner;
+// the cost-overrun guard lives in runner.CostGuardDecorator; this file
+// only encodes the build-specific variation points: agent name,
+// artifact filename, prompt context, and classification rules.
 //
-// Cost guard:
+// Cost guard (applied via runner.CostGuardDecorator):
 //
 //   - EVOLVE_BUILDER_COST_THRESHOLD (default 2.00 USD) is the soft cap.
 //   - Cost > threshold + EVOLVE_BUILDER_COST_GUARD_STRICT=1 → FAIL.
@@ -14,16 +14,12 @@
 // Verdict mapping (the artifact body classifier):
 //
 //   - "## Files Modified" missing or empty artifact → FAIL.
-//   - All other GREEN paths → PASS (possibly with cost diagnostic).
-//
-// The cost-overrun check will move out of this file into a shared
-// CostGuardDecorator in Phase 2.5 commit 3 so other phases can opt in
-// uniformly. For now it lives inline in Classify.
+//   - All other GREEN paths → PASS (possibly with cost diagnostic from
+//     the decorator).
 package build
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -34,7 +30,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-const defaultCostThresholdUSD = 2.00
+const (
+	thresholdEnvKey         = "EVOLVE_BUILDER_COST_THRESHOLD"
+	strictEnvKey            = "EVOLVE_BUILDER_COST_GUARD_STRICT"
+	defaultCostThresholdUSD = 2.00
+)
 
 // hooks implements runner.Hooks for the build phase.
 type hooks struct{}
@@ -58,21 +58,8 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-func (hooks) Classify(artifact string, req core.PhaseRequest, bres core.BridgeResponse) (string, []core.Diagnostic, string) {
-	verdict := classifyArtifact(artifact)
-	var diags []core.Diagnostic
-
-	threshold := parseFloatOrDefault(req.Env["EVOLVE_BUILDER_COST_THRESHOLD"], defaultCostThresholdUSD)
-	if bres.CostUSD > threshold {
-		msg := fmt.Sprintf("builder cost %.2f exceeded threshold %.2f", bres.CostUSD, threshold)
-		severity := "warning"
-		if req.Env["EVOLVE_BUILDER_COST_GUARD_STRICT"] == "1" {
-			severity = "error"
-			verdict = core.VerdictFAIL
-		}
-		diags = append(diags, core.Diagnostic{Severity: severity, Message: msg})
-	}
-	return verdict, diags, string(core.PhaseAudit)
+func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
+	return classifyArtifact(artifact), nil, string(core.PhaseAudit)
 }
 
 func classifyArtifact(content string) string {
@@ -86,20 +73,6 @@ func classifyArtifact(content string) string {
 	return core.VerdictPASS
 }
 
-// parseFloatOrDefault returns d for empty or malformed input. Malformed
-// values fall back silently to preserve the operator's ability to set
-// EVOLVE_BUILDER_COST_THRESHOLD=auto without breaking the pipeline.
-func parseFloatOrDefault(s string, d float64) float64 {
-	if s == "" {
-		return d
-	}
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return d
-	}
-	return v
-}
-
 // Config is the public constructor envelope. Preserved so callers
 // outside the registry path (tests, programmatic embedding) keep
 // working unchanged after the BaseRunner migration.
@@ -109,27 +82,30 @@ type Config struct {
 	NowFn   func() time.Time
 }
 
-// Phase wraps a runner.BaseRunner so callers still get a concrete
-// *Phase return from New (preserves the public API).
-type Phase struct{ *runner.BaseRunner }
+// Phase wraps a core.PhaseRunner so callers still get a concrete
+// *Phase return from New (preserves the public API). The runner is
+// constructed as BaseRunner wrapped in a CostGuardDecorator — build
+// phase opts into the cross-cutting cost-overrun check uniformly with
+// any future phase that wants the same guard.
+type Phase struct{ core.PhaseRunner }
 
-// New constructs the build phase. The Hooks impl is internal; callers
-// only know about Config.
+// New constructs the build phase. Wires BaseRunner + CostGuardDecorator.
 func New(c Config) *Phase {
-	return &Phase{
-		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{},
-			Bridge:  c.Bridge,
-			Prompts: c.Prompts,
-			NowFn:   c.NowFn,
-		}),
-	}
+	base := runner.New(runner.Options{
+		Hooks:   hooks{},
+		Bridge:  c.Bridge,
+		Prompts: c.Prompts,
+		NowFn:   c.NowFn,
+	})
+	guarded := runner.WithCostGuard(base, runner.CostGuardOptions{
+		ThresholdEnvKey:     thresholdEnvKey,
+		StrictEnvKey:        strictEnvKey,
+		DefaultThresholdUSD: defaultCostThresholdUSD,
+	})
+	return &Phase{PhaseRunner: guarded}
 }
 
-// init registers the build phase factory at package load time. The
-// dispatcher (cmd_phase.go, cmd_compose.go) looks up phases by name
-// without an explicit switch — adding a phase is a new package + 1
-// init() line, no edit to the dispatch table.
+// init registers the build phase factory at package load time.
 func init() {
 	registry.Register(string(core.PhaseBuild), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
