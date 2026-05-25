@@ -1,7 +1,7 @@
 {
   "name": "triage",
   "role": "triage",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "allowed_tools": [
     "Read",

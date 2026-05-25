@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // fakeHooks is a minimal Hooks impl that records calls and returns
@@ -474,5 +475,37 @@ func TestRun_CLIResolutionPrecedence(t *testing.T) {
 				t.Errorf("CLI=%q, want %q", got, tc.wantCLI)
 			}
 		})
+	}
+}
+
+func TestRunnerAutoModel_ResolvesConcreteModel(t *testing.T) {
+	const wantModel = "claude-opus-4-7-20251001"
+	hooks := &fakeHooks{
+		phase: "audit", agent: "evolve-auditor",
+		model: "auto", verdict: core.VerdictPASS,
+	}
+	fb := &fakeBridge{writeArtifact: "PASS"}
+	stubCalled := false
+	r := New(Options{
+		Hooks:   hooks,
+		Bridge:  fb,
+		Prompts: fakePromptsFS("evolve-auditor", "body"),
+		ResolveLLM: func(phase string, opts resolvellm.Options) (resolvellm.Result, error) {
+			stubCalled = true
+			return resolvellm.Result{Model: wantModel, CLI: "claude-p"}, nil
+		},
+	})
+	_, err := r.Run(context.Background(), core.PhaseRequest{
+		ProjectRoot: t.TempDir(),
+		Workspace:   t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !stubCalled {
+		t.Error("ResolveLLM seam was not called for auto model")
+	}
+	if fb.gotReq.Model != wantModel {
+		t.Errorf("BridgeRequest.Model=%q, want %q", fb.gotReq.Model, wantModel)
 	}
 }

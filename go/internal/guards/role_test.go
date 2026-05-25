@@ -212,3 +212,30 @@ func TestRole_MissingFilePathAllows(t *testing.T) {
 		t.Errorf("missing file_path must allow, got: %s", dec.Reason)
 	}
 }
+
+func TestRoleGuard_RelativeWorkspacePath(t *testing.T) {
+	abs, err := filepath.Abs("./.evolve/runs/cycle-107")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID:       107,
+		Phase:         "scout",
+		WorkspacePath: "./.evolve/runs/cycle-107",
+	})
+	g := NewRole(s)
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Write",
+		ToolInput: map[string]any{"file_path": filepath.Join(abs, "scout-report.md")},
+	})
+	if !dec.Allow {
+		t.Errorf("relative workspace_path: abs write must allow: %s", dec.Reason)
+	}
+	dec = g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Write",
+		ToolInput: map[string]any{"file_path": "/etc/hosts"},
+	})
+	if dec.Allow {
+		t.Error("write outside workspace must deny")
+	}
+}

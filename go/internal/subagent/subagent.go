@@ -193,7 +193,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		cli = prof.CLI
 	}
 	if cli == "" {
-		cli = "claude-p"
+		cli = "claude-tmux"
 	}
 	model := req.Model
 	if model == "" {

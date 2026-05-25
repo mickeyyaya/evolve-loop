@@ -1,7 +1,7 @@
 {
   "name": "intent",
   "role": "intent",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "opus",
   "model_tier_overrides": {
     "vague_goal": "opus",

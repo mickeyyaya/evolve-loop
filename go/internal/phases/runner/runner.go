@@ -90,19 +90,23 @@ type Skipper interface {
 // Options is the BaseRunner constructor envelope. Bridge and Prompts
 // are required; NowFn defaults to time.Now.
 type Options struct {
-	Hooks   Hooks
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	NowFn   func() time.Time
+	Hooks     Hooks
+	Bridge    core.Bridge
+	Prompts   *prompts.Loader
+	NowFn     func() time.Time
+	// ResolveLLM is the seam for resolving the "auto" model sentinel.
+	// When nil, defaults to resolvellm.Resolve.
+	ResolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
 // phase via New(); use it as a core.PhaseRunner.
 type BaseRunner struct {
-	hooks   Hooks
-	bridge  core.Bridge
-	prompts *prompts.Loader
-	nowFn   func() time.Time
+	hooks      Hooks
+	bridge     core.Bridge
+	prompts    *prompts.Loader
+	nowFn      func() time.Time
+	resolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -115,11 +119,16 @@ func New(opts Options) *BaseRunner {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
+	resolveLLM := opts.ResolveLLM
+	if resolveLLM == nil {
+		resolveLLM = resolvellm.Resolve
+	}
 	return &BaseRunner{
-		hooks:   opts.Hooks,
-		bridge:  opts.Bridge,
-		prompts: opts.Prompts,
-		nowFn:   nowFn,
+		hooks:      opts.Hooks,
+		bridge:     opts.Bridge,
+		prompts:    opts.Prompts,
+		nowFn:      nowFn,
+		resolveLLM: resolveLLM,
 	}
 }
 
@@ -204,7 +213,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			profileModelTier = prof.ModelTierDefault
 		}
 	}
-	cli := envchain.Resolve("EVOLVE_CLI", req.Env, profileCLI, "claude-p")
+	cli := envchain.Resolve("EVOLVE_CLI", req.Env, profileCLI, "claude-tmux")
 	cliSource := "default"
 	switch {
 	case req.Env["EVOLVE_CLI"] != "" || os.Getenv("EVOLVE_CLI") != "":
@@ -230,7 +239,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// before bridge dispatch. Source: cycle 106 (2026-05-25) integration
 	// smoke that uncovered the v12.1.0 missing wire.
 	if model == "auto" {
-		if res, err := resolvellm.Resolve(phase, resolvellm.Options{}); err == nil {
+		if res, err := b.resolveLLM(phase, resolvellm.Options{}); err == nil {
 			switch {
 			case res.Model != "":
 				model = res.Model

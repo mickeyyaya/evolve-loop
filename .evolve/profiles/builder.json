@@ -1,7 +1,7 @@
 {
   "name": "builder",
   "role": "builder",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "ultrathink_strategy": "opus",

@@ -1,7 +1,7 @@
 {
   "name": "plan-reviewer",
   "role": "plan-reviewer",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "high_ambiguity": "opus",

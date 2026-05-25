@@ -27,6 +27,7 @@ node_modules/
 # implicitly ignored by this rule. Worktrees are created by run-cycle.sh
 # and removed via its EXIT trap; they should never appear in commits.
 .evolve/*
+**/.evolve/
 # ... except the agent permission profiles, which ship with the plugin and are
 # required by scripts/subagent-run.sh for least-privilege subagent invocation.
 !.evolve/profiles/

@@ -88,7 +88,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 
 	cli := req.Env["EVOLVE_CLI"]
 	if cli == "" {
-		cli = "claude-p"
+		cli = "claude-tmux"
 	}
 	model := req.Env["EVOLVE_RETRO_MODEL"]
 	if model == "" {

@@ -83,6 +83,11 @@ func isUnderDir(path, dir string) bool {
 	if dir == "" {
 		return false
 	}
+	if !filepath.IsAbs(dir) {
+		if abs, err := filepath.Abs(dir); err == nil {
+			dir = abs
+		}
+	}
 	rel, err := filepath.Rel(dir, path)
 	if err != nil {
 		return false

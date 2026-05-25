@@ -1,7 +1,7 @@
 {
   "name": "build-planner",
   "role": "build-planner",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "opus",
   "allowed_tools": [
     "Read",
@@ -18,7 +18,7 @@
     "Bash(git push:*)",
     "Bash(git config:*)"
   ],
-  "max_budget_usd": 0.30,
+  "max_budget_usd": 0.3,
   "max_turns": 10,
   "permission_mode": "bypassPermissions",
   "output_artifact": "build-plan.md",

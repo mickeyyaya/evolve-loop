@@ -1,7 +1,7 @@
 {
   "name": "auditor",
   "role": "auditor",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "security_sensitive": "opus",

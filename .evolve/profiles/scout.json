@@ -1,7 +1,7 @@
 {
   "name": "scout",
   "role": "scout",
-  "cli": "claude",
+  "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "cycle_1_or_low_goal": "opus",

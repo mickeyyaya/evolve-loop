@@ -196,3 +196,7 @@
 [2026-05-25T08:13:19Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
 [2026-05-25T08:14:28Z] [ship-gate] ALLOW
 [2026-05-25T08:14:28Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T08:23:21Z] [ship-gate] ALLOW
+[2026-05-25T08:23:21Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T08:23:27Z] [ship-gate] ALLOW
+[2026-05-25T08:23:27Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
