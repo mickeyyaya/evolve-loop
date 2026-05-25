@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
 const usage = `evolve — autonomous improvement loop (Go port)
@@ -106,102 +104,20 @@ v12.1 utilities + composition:
 
 // dispatch is the top-level subcommand router. Extracted so tests can
 // drive it without invoking os.Exit. Returns the process exit code.
+//
+// As of PR-4, the 91-line switch was replaced by a table lookup
+// against `commands` defined in registry.go. Adding a subcommand is
+// now a one-line registry entry instead of a switch case + import.
 func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprint(stderr, usage)
 		return 2
 	}
-	switch args[0] {
-	case "version", "--version", "-v":
-		fmt.Fprintln(stdout, version.Get())
-		return 0
-	case "help", "--help", "-h":
-		fmt.Fprint(stdout, usage)
-		return 0
-	case "doctor":
-		return runDoctor(args[1:], stdin, stdout, stderr)
-	case "guard":
-		return runGuard(args[1:], stdin, stdout, stderr)
-	case "ledger":
-		return runLedger(args[1:], stdin, stdout, stderr)
-	case "acs":
-		return runACS(args[1:], stdin, stdout, stderr)
-	case "phase":
-		return runPhase(args[1:], stdin, stdout, stderr)
-	case "serve-phase":
-		return runServePhase(args[1:], stdin, stdout, stderr)
-	case "cycle":
-		return runCycle(args[1:], stdin, stdout, stderr)
-	case "worktree":
-		return runWorktree(args[1:], stdin, stdout, stderr)
-	case "loop":
-		return runLoop(args[1:], stdin, stdout, stderr)
-	case "ship":
-		return runShipCmd(args[1:], stdin, stdout, stderr)
-	case "detect-cli":
-		return runDetectCLI(args[1:], stdin, stdout, stderr)
-	case "detect-nested-claude":
-		return runDetectNested(args[1:], stdin, stdout, stderr)
-	case "phase-order":
-		return runPhaseOrder(args[1:], stdin, stdout, stderr)
-	case "estimate-quota-reset":
-		return runQuotaReset(args[1:], stdin, stdout, stderr)
-	case "build-invocation-context":
-		return runBedrock(args[1:], stdin, stdout, stderr)
-	case "resolve-llm":
-		return runResolveLLM(args[1:], stdin, stdout, stderr)
-	case "consensus-dispatch":
-		return runConsensusDispatch(args[1:], stdin, stdout, stderr)
-	case "cycle-simulator":
-		return runCycleSimulator(args[1:], stdin, stdout, stderr)
-	case "phase-watchdog":
-		return runPhaseWatchdog(args[1:], stdin, stdout, stderr)
-	case "aggregator":
-		return runAggregator(args[1:], stdin, stdout, stderr)
-	case "fanout-dispatch":
-		return runFanoutDispatch(args[1:], stdin, stdout, stderr)
-	case "preflight-environment":
-		return runPreflight(args[1:], stdin, stdout, stderr)
-	case "phase-observer":
-		return runPhaseObserver(args[1:], stdin, stdout, stderr)
-	case "subagent":
-		return runSubagent(args[1:], stdin, stdout, stderr)
-	case "changelog-gen":
-		return runChangelogGen(args[1:], stdin, stdout, stderr)
-	case "version-bump":
-		return runVersionBump(args[1:], stdin, stdout, stderr)
-	case "marketplace-poll":
-		return runMarketplacePoll(args[1:], stdin, stdout, stderr)
-	case "release-preflight":
-		return runReleasePreflight(args[1:], stdin, stdout, stderr)
-	case "rollback":
-		return runRollback(args[1:], stdin, stdout, stderr)
-	case "release", "release-pipeline":
-		return runReleasePipeline(args[1:], stdin, stdout, stderr)
-	case "prune-ephemeral":
-		return runPruneEphemeral(args[1:], stdin, stdout, stderr)
-	case "postedit-validate":
-		return runPostEditValidate(args[1:], stdin, stdout, stderr)
-	case "inbox-mover":
-		return runInboxMover(args[1:], stdin, stdout, stderr)
-	case "commit-prefix-gate":
-		return runCommitPrefixGate(args[1:], stdin, stdout, stderr)
-	case "release-consistency":
-		return runReleaseConsistency(args[1:], stdin, stdout, stderr)
-	case "skill-inventory":
-		return runSkillInventory(args[1:], stdin, stdout, stderr)
-	case "eval":
-		return runEval(args[1:], stdin, stdout, stderr)
-	case "cycle-health":
-		return runCycleHealth(args[1:], stdin, stdout, stderr)
-	case "plan-and-execute":
-		return runPlanAndExecute(args[1:], stdin, stdout, stderr)
-	case "compose":
-		return runCompose(args[1:], stdin, stdout, stderr)
-	default:
-		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
-		return 2
+	if cmd := lookupCommand(args[0]); cmd != nil {
+		return cmd.Run(args[1:], stdin, stdout, stderr)
 	}
+	fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
+	return 2
 }
 
 func main() {
