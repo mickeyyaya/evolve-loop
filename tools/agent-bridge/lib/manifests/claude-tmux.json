@@ -40,13 +40,9 @@
       "response_keys": "Enter",
       "policy": "auto_respond",
       "note": "Cosmetic redraw prompt; just press Enter"
-    },
-    {
-      "name": "fact_forcing_gate",
-      "regex": "Fact-Forcing Gate|present these facts|investigate before",
-      "response_keys": "60",
-      "policy": "extend_timeout",
-      "note": "ECC gateguard hook (gateguard-fact-force.js) demands the LLM articulate facts before writing. Adds 10-20s per Write. Instead of editing 3rd-party code, bridge recognizes the pattern and extends artifact-poll deadline by 60s. response_keys field carries the seconds to add."
     }
-  ]
+  ],
+  "_notes_on_removed_patterns": {
+    "fact_forcing_gate": "REMOVED v12.1.5 after live-smoke forensics (workspace bridge-t7-G3mPzn). The ECC gateguard PreToolUse hook fires once per Write attempt and Claude recovers natively — it presents the 4 requested facts and retries the Write. Neither extend_timeout nor auto_respond is appropriate: extend_timeout doesn't help (Claude isn't slow, it's just sequencing tool calls), and auto_respond stacks identical messages at the prompt every poll-tick because the gate error remains visible in pane scrollback, interfering with Claude's own recovery. The correct bridge behavior is no rule — let Claude handle the hook natively. Re-introduce only with dedupe logic that suppresses re-fires within a single agent turn (v12.1.6+ design)."
+  }
 }

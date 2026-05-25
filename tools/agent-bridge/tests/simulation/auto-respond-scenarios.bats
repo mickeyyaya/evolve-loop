@@ -7,7 +7,8 @@
 #
 # Coverage matrix (printed to stderr after run):
 #   claude-tmux: auth_recheck, rate_limit, model_deprecation_continue,
-#                terminal_resize_redraw, fact_forcing_gate (5 patterns)
+#                terminal_resize_redraw (4 active patterns) +
+#                fact_forcing_gate (REMOVED v12.1.5; expects noop)
 #   codex-tmux:  trust_prompt, auth_recheck, rate_limit (3 patterns)
 #   agy:         auth_recheck, rate_limit, quota_exhausted, permission_prompt (4)
 #   agy-tmux:    trust_prompt, auth_recheck, rate_limit, quota_exhausted,
@@ -62,8 +63,11 @@ assert_decision() {
   assert_decision claude-tmux terminal_resize_redraw 1 "send:Enter"
 }
 
-@test "SIM[claude-tmux] fact_forcing_gate → extend:60" {
-  assert_decision claude-tmux fact_forcing_gate 2 "extend:60"
+@test "SIM[claude-tmux] fact_forcing_gate → noop (rule removed v12.1.5)" {
+  # v12.1.5: rule REMOVED. See manifests/claude-tmux.json::_notes_on_removed_patterns
+  # and tests/unit/auto-respond.bats::T13.10 for the live-smoke forensics that
+  # justified removal. Bridge stays out of Claude's native gateguard recovery.
+  assert_decision claude-tmux fact_forcing_gate 0 "noop"
 }
 
 # --- codex-tmux ----------------------------------------------------------
@@ -126,6 +130,6 @@ assert_decision() {
   # Always-pass test that emits the coverage summary on stderr so operators
   # see the matrix at-a-glance after bats output. Counts derived from this
   # file's @test blocks above; update when adding rows.
-  echo "[coverage] claude-tmux 5/5, codex-tmux 3/3, agy 4/4, agy-tmux 5/5 (total 17/17)" >&2
+  echo "[coverage] claude-tmux 5/5 (4 active + 1 noop-for-removed), codex-tmux 3/3, agy 4/4, agy-tmux 5/5 (total 17/17)" >&2
   true
 }

@@ -91,18 +91,23 @@ Writing artifact..."
   jq -e '.suggested_rule_template != null' "$WS/escalation-report.json"
 }
 
-@test "T13.10 — fact_forcing_gate (Fact-Forcing Gate) → extend:60 rc=2" {
+@test "T13.10 — fact_forcing_gate text in pane → noop rc=0 (rule removed; claude recovers natively)" {
+  # v12.1.5: the fact_forcing_gate rule was REMOVED after live-smoke forensics
+  # showed that Claude handles the ECC gateguard hook natively (presents facts,
+  # retries Write). A bridge auto-respond rule actively interferes by stacking
+  # identical messages at the prompt every poll-tick. The bridge stays out of
+  # the way. See manifests/claude-tmux.json::_notes_on_removed_patterns.
   pane="◇ Fact-Forcing Gate: please present these facts before writing"
   run auto_respond_decide "$pane" "$bridge_manifest_path" "$WS"
-  [ "$status" -eq 2 ]
-  [ "$output" = "extend:60" ]
+  [ "$status" -eq 0 ]
+  [ "$output" = "noop" ]
 }
 
-@test "T13.11 — fact_forcing_gate alt regex (investigate before) → extend:60 rc=2" {
+@test "T13.11 — fact_forcing_gate alt regex (investigate before) → noop rc=0 (rule removed)" {
   pane="The hook requires you to investigate before writing any file."
   run auto_respond_decide "$pane" "$bridge_manifest_path" "$WS"
-  [ "$status" -eq 2 ]
-  [ "$output" = "extend:60" ]
+  [ "$status" -eq 0 ]
+  [ "$output" = "noop" ]
 }
 
 @test "T13.12 — extend_timeout with non-integer keys → escalates" {
