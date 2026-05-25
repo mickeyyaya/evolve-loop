@@ -12,7 +12,7 @@ argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
 
 Tool and command names in this file use **Claude Code conventions** (`Read`, `Bash`, `Skill`, `Agent`, etc.). If you are running this skill from a different CLI (Gemini, Codex, generic), read [reference/platform-detect.md](reference/platform-detect.md) FIRST — it tells you which translation overlay to load (`reference/<platform>-tools.md` for tool names, `reference/<platform>-runtime.md` for invocation patterns). As of v12.0.0 the runtime is the Go binary (`go/bin/evolve`); cross-CLI subagent execution is handled by `evolve subagent run` and the `evolve serve-phase <name>` phaseproto wire. See [docs/platform-compatibility.md](../../docs/platform-compatibility.md) for the support matrix.
 
-> **v12.0.0 status note for all readers:** Many lines below still reference `bash legacy/scripts/...` paths. Those scripts were removed in the v12 flag day; the Go binary (`go/bin/evolve`) is the only runtime. References below are kept as historical context describing what each subsystem does — the native Go orchestrator handles all phase transitions, subagent dispatch, ship gating, and state writes in-process. Do not attempt to invoke the bash paths directly; they no longer exist.
+> **v12.1 status:** All command examples in this skill use the native `evolve <subcommand>` CLI. The legacy bash dispatcher remains archived at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` as the operator-only `EVOLVE_USE_LEGACY_BASH=1` rollback hatch — not for general use.
 
 > **What this does in one paragraph:** Each `/evolve-loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `ship.sh` commits only what passes. A trust kernel of three shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) enforces phase order and artifact integrity at the OS layer, not the prompt layer — so the pipeline's safety properties hold even in autonomous / bypass-permissions mode. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
 
@@ -64,7 +64,7 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 **You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
 - Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
 - Invoke Edit, Write, or Bash (or `replace`/`write_file`/`run_shell_command` on Gemini, etc.) for any task other than the dispatcher itself (and reading its output).
-- Invoke the in-process Agent / Task / `activate_skill`-as-subagent dispatch to run Scout/Builder/Auditor. Phase agents are spawned by `legacy/scripts/dispatch/subagent-run.sh` from inside the native `evolve cycle run` orchestrator. They are profile-restricted; the in-process subagent dispatch is not.
+- Invoke the in-process Agent / Task / `activate_skill`-as-subagent dispatch to run Scout/Builder/Auditor. Phase agents are spawned by `evolve subagent run` from inside the native `evolve cycle run` orchestrator. They are profile-restricted; the in-process subagent dispatch is not.
 - "Help out" by editing files between cycles. Builder edits files inside its worktree, gated by `role-gate.sh`. You are not Builder.
 
 **Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries — meaning Scout and Builder were either skipped or run via the in-process Agent tool that bypasses the kernel hooks (`role-gate`, `phase-gate-precondition`, `ship-gate`). The dispatcher closes that gap structurally: every cycle goes through `evolve cycle run` (or `evolve loop` for batches), which spawns the orchestrator subagent under `.evolve/profiles/orchestrator.json` (Edit/Write/git ops blocked at the kernel layer); that orchestrator then invokes Scout, Builder, Auditor via `subagent-run.sh` (sequence enforced by `phase-gate-precondition.sh`).
@@ -85,7 +85,7 @@ The rest of this file (architecture, model routing, phase docs) is reference mat
 
 ---
 
-> **v8.13.1 (trust boundary, still authoritative)**: enforced by THREE PreToolUse kernel hooks: `ship-gate.sh` (only `legacy/scripts/lifecycle/ship.sh` OR `evolve ship` can perform git commit/push/gh release), `role-gate.sh` (Edit/Write must match the active phase's path allowlist), `phase-gate-precondition.sh` (`subagent-run.sh` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches) — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration (this skill's prompt-driven loop) remains supported but the hooks apply equally to it.
+> **Trust boundary (v8.13.1, v12.1-updated)**: enforced by THREE PreToolUse kernel hooks running as native Go: `evolve guard ship` (only `evolve ship` can perform git commit/push/gh release), `evolve guard role` (Edit/Write must match the active phase's path allowlist), `evolve guard phase` (`evolve subagent run` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches) — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration remains supported but the hooks apply equally to it.
 
 > **v8.13.2 / v12.0.0**: self-healing release pipeline. For version-bump releases use `evolve release <version>` (native Go). The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `evolve ship`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
@@ -253,7 +253,7 @@ Phase 2b: TRIAGE ─── [Triage] top_n scope decision    → agents/evolve-tr
                      (v8.56.0+ Layer C, opt-in via EVOLVE_TRIAGE_ENABLED=1)
 Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
 Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
-Phase 5:   SHIP ────── publish via release-pipeline.sh   → phase5-ship.md (or legacy/scripts/lifecycle/ship.sh for non-release commits)
+Phase 5:   SHIP ────── publish via `evolve release` (or `evolve ship` for non-release commits) → phase5-ship.md
 Phase 6:   LEARN ───── instinct extraction + feedback   → phase6-learn.md
 Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-meta.md
 ```
@@ -278,7 +278,7 @@ Instead of running the loop from inside this skill's prompt, the native binary's
 3. Spawns the orchestrator subagent (via the Go subagent runner under `.evolve/profiles/orchestrator.json`; Edit/Write/git ops still blocked at the kernel hook layer — hooks are unchanged).
 4. Clears cycle-state on exit.
 
-The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases via the native state machine; `phase-gate-precondition.sh` (still in `legacy/scripts/guards/`) reads cycle-state to validate that the next subagent invocation matches the expected order.
+The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases via the native state machine; the `evolve guard phase` PreToolUse hook reads cycle-state to validate that the next subagent invocation matches the expected order.
 
 Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for autonomous runs. Pre-v11.5.0 operators who depend on the bash dispatch path can set `EVOLVE_USE_LEGACY_BASH=1` to exec the archived dispatcher at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`.
 

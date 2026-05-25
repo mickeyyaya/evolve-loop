@@ -1,6 +1,6 @@
 > Read this file when orchestrating Phase 3 (BUILD). Covers task partitioning, worktree isolation, Builder dispatch, Self-MoA parallel builds, and post-audit verdict handling.
 >
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
+> All command examples in this file use the native `evolve <subcommand>` CLI (v12.1+).
 
 ## Contents
 - [Task Execution Ordering](#task-execution-ordering--parallelization) — dependency graph, parallel groups
@@ -127,17 +127,15 @@ rm -rf "$COPY_DIR"
 ## Builder Agent Launch
 
 Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1 if strategy == "ultrathink" OR M-complexity + 5+ files OR audit retry >= 2; tier-2 if strategy == "repair"; tier-2 otherwise; **isolation: worktree required**):
-- **Subagent invocation (REQUIRED):** Run via the runner script with `WORKTREE_PATH` set. The runner enforces the Builder profile (`.evolve/profiles/builder.json`) which blocks writes to `skills/`, `agents/`, `legacy/scripts/`, `.claude-plugin/`, and `.evolve/state.json` at the CLI permission layer — a hard guarantee, not a post-hoc audit check.
+- **Subagent invocation (REQUIRED):** Run via `evolve subagent run --role builder` with `WORKTREE_PATH` set. The runner enforces the Builder profile (`.evolve/profiles/builder.json`) which blocks writes to `skills/`, `agents/`, `.claude-plugin/`, and `.evolve/state.json` at the CLI permission layer — a hard guarantee, not a post-hoc audit check.
 
   ```bash
   # Worktree must be created BEFORE invoking the runner.
   WORKTREE_DIR=$(mktemp -d)/evolve-build-cycle-${CYCLE}-${TASK_SLUG}
   git worktree add "$WORKTREE_DIR" HEAD
 
-  cat agents/evolve-builder.md context.json | \
-      WORKTREE_PATH="$WORKTREE_DIR" \
-      MODEL_TIER_HINT="<resolved tier>" \
-      bash legacy/scripts/dispatch/subagent-run.sh builder "$CYCLE" "$WORKSPACE_PATH"
+  WORKTREE_PATH="$WORKTREE_DIR" evolve subagent run \
+      --role builder --cycle "$CYCLE" --workspace "$WORKSPACE_PATH"
 
   # After exit:
   cd "$WORKTREE_DIR" && git diff HEAD > /tmp/builder.patch
@@ -148,9 +146,9 @@ Launch **Builder Agent** (model: tier-3 if S-complexity + plan cache hit; tier-1
   - Exit 0 = build report written and verified.
   - Exit 1/2 = same semantics as Scout. Read `${WORKSPACE_PATH}/builder-stderr.log`.
 
-  **Parallel independent tasks:** Launch multiple `subagent-run.sh builder` invocations in parallel (one per worktree). Each gets its own challenge token and ledger entry. Do NOT share worktrees.
+  **Parallel independent tasks:** Launch multiple `evolve subagent run --role builder` invocations in parallel (one per worktree). Each gets its own challenge token and ledger entry. Do NOT share worktrees.
 
-  Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle only — see CLAUDE.md.
+  The orchestrator (`evolve cycle run`) handles the spawn-per-task fanout automatically; the explicit form above is for manual one-off dispatch.
 
 - Prompt: Read `agents/evolve-builder.md` and pass as prompt
 - Context:
@@ -310,15 +308,15 @@ Run deterministic health check and independent eval verification before Phase 4.
 
 1. **Independent eval re-execution:**
    ```bash
-   bash legacy/scripts/verification/verify-eval.sh .evolve/evals/<task-slug>.md $WORKSPACE_PATH
+   evolve eval verify .evolve/evals/<task-slug>.md $WORKSPACE_PATH
    ```
    If exit != 0 → HALT: "Independent eval verification failed."
 
 2. **Cycle health fingerprint:**
    ```bash
-   bash legacy/scripts/observability/cycle-health-check.sh $N $WORKSPACE_PATH
+   evolve cycle-health $N $WORKSPACE_PATH
    ```
-   Checks 11 signals (ledger completeness, timestamps, artifacts, checksums, challenge tokens, velocity, substance, canaries, hash chain). Any ANOMALY = halt.
+   Checks 11 signals (ledger completeness, timestamps, artifacts, checksums, challenge tokens, velocity, substance, canaries, hash chain, duplicate ledger, cost envelope). Any fatal ANOMALY = halt; warnings are advisory.
 
 3. **Log phase transition:**
    ```json

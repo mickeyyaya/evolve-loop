@@ -1,6 +1,6 @@
 > Read this file when orchestrating Phase 6 (LEARN). Covers workspace archival, instinct extraction and graduation, memory consolidation, operator check, and context management.
 >
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
+> All command examples in this file use the native `evolve <subcommand>` CLI (v12.1+).
 
 ## Contents
 - [Workspace Archival](#phase-6-learn-orchestrator-inline--operator) — copy workspace to history
@@ -90,14 +90,17 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
    # Capture the failed code state for forensic review (before discarding worktree).
    git diff HEAD > "$WORKSPACE_PATH/failed.patch"
 
-   # Record the failure into state.json.failedApproaches[].
-   bash legacy/scripts/failure/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"  # FAIL | WARN | SHIP_GATE_DENIED
+   # Failure recording is absorbed into the in-process retro phase
+   # runner (internal/phases/retro/). When the previous phase emits
+   # FAIL or WARN, retro.Run extracts the defect list from audit-report.md,
+   # captures cycle/HEAD/tree-state, and appends to state.json.failedApproaches[].
+   # No separate shell script is invoked.
 
    # Discard the failed worktree.
    git worktree remove --force "$WORKTREE_DIR"
    ```
 
-   Total cost: 0 LLM calls, ~50ms of shell. The `record-failure-to-state.sh` helper extracts the audit's defect list (severity + title) from `audit-report.md`, captures the cycle number / git HEAD / tree state SHA / audit-report SHA256, and appends a structured entry to `state.json.failedApproaches[]` with `retrospected: false`.
+   Total cost: 0 LLM calls, ~50ms of in-process Go. The retro runner extracts the audit's defect list (severity + title) from `audit-report.md`, captures the cycle number / git HEAD / tree state SHA / audit-report SHA256, and appends a structured entry to `state.json.failedApproaches[]` with `retrospected: false`.
 
    **Schema of each failedApproaches entry:**
 
@@ -129,7 +132,7 @@ Orchestrator inline + operator. Meta-cycle self-improvement is in [phase7-meta.m
    # entries). The subagent synthesizes cross-cycle patterns into one or more
    # failure-lesson YAMLs — useful precisely BECAUSE patterns emerge across
    # multiple failures, not from a single cycle.
-   bash legacy/scripts/dispatch/subagent-run.sh retrospective <next-cycle-id> <workspace>
+   evolve subagent run --role retrospective --cycle <next-cycle-id> --workspace <workspace>
 
    # After the subagent writes its lessons, mark the batch as retrospected.
    # (The orchestrator/operator does this; the subagent profile cannot mutate

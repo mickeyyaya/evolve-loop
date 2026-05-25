@@ -1,6 +1,6 @@
 > Read this file when orchestrating the full evolve-loop cycle. Covers phase gate verification, cycle setup, and all phase transitions (DISCOVER through LEARN).
 >
-> **v12.0.0 status note:** The `legacy/scripts/...` paths referenced below were removed in the v12 flag day. The native Go orchestrator (`go/bin/evolve cycle run`) handles phase transitions, subagent dispatch, gate verification, and state writes in-process. Trust-kernel guards run as `evolve guard <name>` PreToolUse hooks. Treat the bash snippets below as descriptions of the contract each subsystem enforces — not as commands to invoke.
+> All command examples in this file use the native `evolve <subcommand>` CLI (v12.1+). Phase transitions, subagent dispatch, gate verification, and state writes happen in-process; trust-kernel guards run as `evolve guard <name>` PreToolUse hooks.
 
 ## Contents
 - [Mandatory Phase Gate Verification](#mandatory-phase-gate-verification) — deterministic trust boundary at every transition
@@ -71,7 +71,7 @@ For detailed calibration instructions, see [phase0-calibrate.md](phase0-calibrat
 
 ### Skill Inventory (once per session)
 
-Run `bash legacy/scripts/utility/setup-skill-inventory.sh` (1h cache) to build `.evolve/skill-inventory.json`. Pass `categoryIndex` subset matching project language/framework/task-types to Scout as `skillCategories`. For routing categories table, JSON schema, scope precedence, and fallback behavior see [reference/phases-detail.md](reference/phases-detail.md#skill-inventory).
+Run `evolve skill-inventory build` (1h cache; `--force` to rebuild) to populate `.evolve/skill-inventory.json`. Pass `categoryIndex` subset matching project language/framework/task-types to Scout as `skillCategories`. For routing categories table, JSON schema, scope precedence, and fallback behavior see [reference/phases-detail.md](reference/phases-detail.md#skill-inventory).
 
 ---
 
@@ -90,7 +90,7 @@ On detection: complete current phase, write handoff, auto-schedule resume (`/sch
 
 ### Context Window Budget Gate (MANDATORY — runs before anything else)
 
-Run `legacy/scripts/verification/context-budget.sh` before each cycle (bash block in [phases-detail.md](reference/phases-detail.md#context-budget-gate)).
+The context-budget check is absorbed into the in-process orchestrator's pre-flight (`go/internal/preflight/`). Operators don't invoke a separate command; the orchestrator emits a WARN if cumulative context usage exceeds the per-cycle ceiling.
 
 | Exit | Status | Action |
 |------|--------|--------|
@@ -100,7 +100,7 @@ Run `legacy/scripts/verification/context-budget.sh` before each cycle (bash bloc
 
 ### Phase 1: RESEARCH (every cycle)
 
-Proactive research loop — full 6-step protocol in [phase1-research.md](phase1-research.md). **Token budget:** 25K max. Phase gate: `bash legacy/scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
+Proactive research loop — full 6-step protocol in [phase1-research.md](phase1-research.md). **Token budget:** 25K max. Phase gate: in-process Go orchestrator + `evolve guard phase` PreToolUse hook enforce the research→discover transition automatically; operators do not invoke a separate gate command.
 
 ### Lean Mode (cycle 10+ OR YELLOW from budget gate)
 
@@ -206,10 +206,7 @@ If handoff file absent or malformed, fall back to full report (e.g., `scout-repo
 
 ### Phase Boundary: DISCOVER -> BUILD
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
-# Exit 0 -> proceed to BUILD. Any other exit -> HALT.
-```
+Enforced in-process by `core.Orchestrator` and the `evolve guard phase` PreToolUse hook. The orchestrator validates discover-phase artifacts (scout-report.md, triage-report.md) and only emits the build phase request when all checks pass. Operators do not invoke a separate phase-gate command; the kernel hook blocks Edit/Write outside the active phase's path allowlist.
 
 ### Phase 3: BUILD (loop per task)
 
@@ -227,10 +224,7 @@ For detailed Phase 3 implementation, see [phase3-build.md](phase3-build.md).
 
 ### Phase Boundary: BUILD -> AUDIT
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh build-to-audit $CYCLE $WORKSPACE_PATH
-# Exit 0 -> proceed to AUDIT. Any other exit -> HALT.
-```
+Enforced in-process by `core.Orchestrator` + `evolve guard phase`. The orchestrator confirms build-report.md exists with a "## Files Modified" section before emitting the audit phase request. Builder cost overrun is detected by `runner.CostGuardDecorator` (EVOLVE_BUILDER_COST_THRESHOLD, default 2.00 USD).
 
 ### Phase 4: AUDIT (Parallel)
 
@@ -240,7 +234,7 @@ The Auditor reviews Builder changes **in the worktree**. Worktree tasks built in
 
 **Eval checksum verification:** `sha256sum -c $WORKSPACE_PATH/eval-checksums.json` — if any checksum fails → HALT: "Eval tamper detected."
 
-**Launch Auditor Agent** via `legacy/scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"`. For full context JSON and model-tier selection logic see [reference/phases-detail.md](reference/phases-detail.md#phase-4-audit).
+**Launch Auditor Agent** via `evolve subagent run --role auditor --cycle "$CYCLE" --workspace "$WORKSPACE_PATH"` (the Go orchestrator does this automatically inside `evolve cycle run`; the explicit form is for manual one-off runs). For full context JSON and model-tier selection logic see [reference/phases-detail.md](reference/phases-detail.md#phase-4-audit).
 
 **Enhanced evaluation via `/evaluator`** (optional, `strategy == "harden"` or `forceFullAudit == true`): merge scores into `## Evaluator Scores`. Skip when lean mode or budget YELLOW/RED.
 
@@ -254,22 +248,16 @@ After Auditor completes: PASS → Phase 5 Ship; WARN/FAIL/SHIP_GATE_DENIED → d
 |-------|--------|
 | Exemptions | Skip for `repair` strategy, first 3 cycles, or `meta`/`infrastructure` tasks |
 | Regression | Any dimension -3 or more blocks shipping; 1 retry, then drop |
-| Pre-ship gate | `verify-eval.sh` + `cycle-health-check.sh` run independently of all agents |
+| Pre-ship gate | `evolve eval verify <eval.md> <workspace>` + `evolve cycle-health <N> <workspace>` run independently of all agents |
 | Proceed | Only if both health check and eval verification pass |
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh audit-to-ship $CYCLE $WORKSPACE_PATH
-# Exit 0 -> proceed to SHIP. Exit 1 -> block. Exit 2 -> HALT for human.
-```
+The audit→ship transition is enforced by the in-process orchestrator + the `evolve guard ship` PreToolUse hook. The hook denies `git commit` / `git push` / `gh release create` unless they originate from `evolve ship` (which itself verifies a recent PASS audit, the EGPS gate, and the audit-binding SHA).
 
 ### Phase 5: SHIP
 
 For detailed instructions, see [phase5-ship.md](phase5-ship.md).
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh ship-to-learn $CYCLE $WORKSPACE_PATH
-```
-Verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does this, not the LLM).
+The ship→learn transition is in-process: `evolve ship` itself updates `state.json.lastCycleNumber` atomically after the commit lands on `main`. The orchestrator then emits the retro phase request.
 
 ---
 
@@ -277,10 +265,7 @@ Verifies git is clean and updates `state.json.lastCycleNumber` (the SCRIPT does 
 
 For detailed instructions, see [phase6-learn.md](phase6-learn.md).
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh cycle-complete $CYCLE $WORKSPACE_PATH
-```
-Archives workspace, verifies all 3 reports exist, updates mastery ONLY if audit-report.md contains a genuine PASS verdict.
+The cycle-complete transition is in-process: the orchestrator archives the workspace, verifies the three required reports exist via `cyclehealth.checkWorkspaceArtifacts`, and updates the mastery counter ONLY when audit-report.md contained a genuine PASS verdict (parsed by `audit.extractAuditVerdict`).
 
 ---
 

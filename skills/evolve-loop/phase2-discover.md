@@ -7,7 +7,7 @@ description: Phase 2 Discovery logic.
 
 > Read this file when launching the Scout agent for codebase discovery, gap analysis, and task selection.
 >
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
+> All command examples in this file use the native `evolve <subcommand>` CLI (v12.1+).
 
 ## Convergence Short-Circuit (check BEFORE launching Scout)
 
@@ -64,19 +64,19 @@ Model selection: tier-1 if cycle 1 or goal-directed cycle <= 2; tier-3 if cycle 
 - **Subagent invocation (REQUIRED):** Run via the runner script. Do NOT use the in-process `Agent` tool in production cycles. The runner enforces per-agent CLI permission profiles (`.evolve/profiles/scout.json`), generates a challenge token, and writes a tamper-evident ledger entry.
 
   ```bash
-  # Build the prompt by appending agents/evolve-scout.md and the JSON context block
-  # below into a temporary file, then pipe via stdin:
-  cat agents/evolve-scout.md context.json | \
-      MODEL_TIER_HINT="<resolved tier>" \
-      bash legacy/scripts/dispatch/subagent-run.sh scout "$CYCLE" "$WORKSPACE_PATH"
+  # The orchestrator does this automatically inside `evolve cycle run`.
+  # The explicit form (for manual dispatch / debugging) is:
+  evolve subagent run --role scout --cycle "$CYCLE" --workspace "$WORKSPACE_PATH"
   ```
 
   - Exit 0 = scout report written and verified (challenge token present, fresh).
   - Exit 1 = runtime failure — read `${WORKSPACE_PATH}/scout-stderr.log`.
   - Exit 2 = integrity failure — artifact missing, stale, or forged.
 
-  Legacy fallback: set `LEGACY_AGENT_DISPATCH=1` to skip subprocess and use the
-  in-process `Agent` tool. Permitted for one A/B cycle only — see CLAUDE.md.
+  Phase agents are dispatched by `core.Orchestrator` via the `bridge` adapter
+  (which spawns the configured CLI: `claude -p`, `gemini`, `codex`, or `agy`).
+  The kernel still enforces per-agent CLI permission profiles in
+  `.evolve/profiles/` and writes tamper-evident ledger entries.
 
 - Prompt: Read `agents/evolve-scout.md` and pass as prompt
 - Context:
@@ -143,7 +143,7 @@ Run on THIS cycle's eval files only:
 
 ```bash
 for TASK_SLUG in <task slugs from scout-report>; do
-  bash legacy/scripts/verification/eval-quality-check.sh .evolve/evals/${TASK_SLUG}.md
+  evolve eval quality-check .evolve/evals/${TASK_SLUG}.md
   EVAL_QUALITY_EXIT=$?
   if [ "$EVAL_QUALITY_EXIT" -eq 2 ]; then
     echo "HALT: Level 0 (no-op) commands in ${TASK_SLUG}. Scout must rewrite evals."
@@ -163,11 +163,8 @@ sha256sum .evolve/evals/*.md > $WORKSPACE_PATH/eval-checksums.json
 
 **If no tasks selected:** increment `stagnation.nothingToDoCount`. If >= 3 → STOP: "Project has converged." Otherwise → skip to Phase 5.
 
-**Stagnation detection:** Handled by `legacy/scripts/observability/cycle-health-check.sh` (deterministic). Scout reads stagnation findings from `$WORKSPACE/cycle-health.json` if present. Orchestrator HALTs if 3+ stagnation patterns active.
+**Stagnation detection:** Handled by `evolve cycle-health <N> <workspace>` (deterministic 11-signal integrity check). Scout reads stagnation findings from `$WORKSPACE/cycle-health.json` if present. Orchestrator HALTs if any fatal anomaly fires.
 
 ## Phase Boundary: DISCOVER → BUILD
 
-```bash
-bash legacy/scripts/lifecycle/phase-gate.sh discover-to-build $CYCLE $WORKSPACE_PATH
-# Exit 0 -> proceed to BUILD. Any other exit -> HALT.
-```
+Enforced in-process by `core.Orchestrator` + `evolve guard phase` PreToolUse hook. The hook denies Edit/Write outside the active phase's path allowlist; the orchestrator only emits the build phase request after triage-report.md and scout-report.md are both validated.

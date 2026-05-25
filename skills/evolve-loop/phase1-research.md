@@ -7,7 +7,7 @@ description: Phase 1 Research logic.
 
 > Read this file at the start of every cycle. Proactive research loop that transforms evaluation signals into research questions, generates Concept Cards, and filters them through the Research Ledger.
 >
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime.
+> All command examples in this file use the native `evolve <subcommand>` CLI (v12.1+).
 
 Runs inline by the orchestrator (no separate agent).
 
@@ -123,4 +123,4 @@ Pass `conceptCandidates[]` (KEPT concepts only) to Scout context.
 
 Update `state.json`: `researchAgenda` items, `capsuleIndex`, `diversityTracker.lastResearchedDimensions`.
 
-**Phase gate:** `bash legacy/scripts/lifecycle/phase-gate.sh research-to-discover $CYCLE $WORKSPACE_PATH`
+**Phase gate:** in-process — the Go orchestrator validates research artifacts and emits the discover phase request automatically. The `evolve guard phase` PreToolUse hook prevents out-of-order writes at the OS layer.
