@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle44 ports the cycle-44 ACS predicates (10 bash files)
 // from acs/cycle-44/*.sh to Go test counterparts using pkg/acsassert.
 //

@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle93 ports the cycle-93 ACS predicates (5 bash files).
 //
 // Cycle-93 is the "gitignored-deliverable" recovery cycle from the

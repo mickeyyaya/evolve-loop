@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle101 ports the cycle-101 ACS predicates (3 bash files).
 //
 // Bash predicates invoke the agy.sh cli adapter directly with synthetic

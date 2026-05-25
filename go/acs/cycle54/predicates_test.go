@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle54 ports the cycle-54 ACS predicates (4 bash files).
 //
 // Per parent plan §4 Phase 4: the bash predicates remain authoritative

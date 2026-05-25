@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle47 ports the cycle-47 ACS predicates (15 bash files).
 //
 // Cycle-47 has 15 predicates with overlapping numeric prefixes

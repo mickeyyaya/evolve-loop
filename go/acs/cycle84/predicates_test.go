@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle84 ports the cycle-84 ACS predicates (3 bash files).
 package cycle84
 

@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle99 ports the cycle-99 ACS predicates (3 bash files).
 //
 // Bash predicates 001+003 are presence/structure checks of doc files

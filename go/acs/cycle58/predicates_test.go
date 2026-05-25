@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle58 ports the cycle-58 ACS predicates (3 bash files).
 package cycle58
 

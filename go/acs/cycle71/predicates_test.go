@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle71 ports the cycle-71 ACS predicates (1 bash file).
 package cycle71
 

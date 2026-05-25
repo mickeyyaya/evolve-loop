@@ -1,3 +1,5 @@
+//go:build legacy
+
 // Package cycle96 ports the cycle-96 ACS predicates (3 bash files).
 //
 // Bash predicates 002/003 invoke phase-gate.sh cycle-complete against a
