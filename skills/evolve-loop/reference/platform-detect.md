@@ -16,14 +16,14 @@
 
 ## Helper script
 
-If you have shell access, the canonical detection happens in `legacy/scripts/dispatch/detect-cli.sh`:
+If you have shell access, the canonical detection lives in the native Go binary:
 
 ```bash
-bash legacy/scripts/dispatch/detect-cli.sh        # prints one of: claude, gemini, codex, unknown
-EVOLVE_PLATFORM=gemini bash legacy/scripts/dispatch/detect-cli.sh   # honours the override; prints: gemini
+evolve detect-cli                        # prints one of: claude, gemini, codex, unknown
+EVOLVE_PLATFORM=gemini evolve detect-cli # honours the override; prints: gemini
 ```
 
-This script is platform-neutral — any CLI that can run bash can call it.
+This subcommand is platform-neutral — any CLI that can run the binary can call it.
 
 ## Why detect at skill entry
 

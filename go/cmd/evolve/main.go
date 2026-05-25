@@ -86,6 +86,22 @@ Dispatch helpers (Phase 3a + 3b ports):
   release-consistency       Verify version markers (plugin.json,
                               marketplace.json, SKILL.md, README, CHANGELOG)
                               ( release-consistency [target-version] )
+
+v12.1 utilities + composition:
+  skill-inventory           Build .evolve/skill-inventory.json from
+                              skills/*/SKILL.md ( skill-inventory build
+                              [--ttl 1h] [--force] )
+  eval                      Eval-quality + verify subcommands
+                              ( eval quality-check <eval.md>
+                              | eval verify <eval.md> <workspace> )
+  cycle-health              11-signal cycle integrity fingerprint
+                              ( cycle-health <cycle-N> <workspace> )
+  plan-and-execute          Two-pass dispatch: plan mode → execute mode
+                              ( plan-and-execute [--plan-output PATH]
+                              [--skip-execute] <phase> )
+  compose                   Ad-hoc phase composition bypassing the
+                              state machine ( compose --phases <p1,p2,...>
+                              [--ship-anyway] [--dry-run] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can
