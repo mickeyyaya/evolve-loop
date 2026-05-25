@@ -104,3 +104,69 @@
 [2026-05-24T03:23:31Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
 [2026-05-24T03:29:01Z] [ship-gate] ALLOW
 [2026-05-24T03:29:01Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T02:44:27Z] [ship-gate] ALLOW
+[2026-05-25T02:44:27Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T02:46:06Z] [ship-gate] ALLOW
+[2026-05-25T02:46:06Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:07:35Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:07:35Z] [research-quota-gate] ALLOW
+[2026-05-25T03:07:35Z] [ship-gate] ALLOW
+[2026-05-25T03:07:35Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:07:43Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:07:43Z] [research-quota-gate] ALLOW
+[2026-05-25T03:07:43Z] [ship-gate] ALLOW
+[2026-05-25T03:07:43Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:07:45Z] [ship-gate] ALLOW
+[2026-05-25T03:07:45Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:07:58Z] [ship-gate] ALLOW
+[2026-05-25T03:07:58Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:09:49Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:09:49Z] [ship-gate] ALLOW
+[2026-05-25T03:09:49Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:09:49Z] [research-quota-gate] ALLOW
+[2026-05-25T03:09:57Z] [ship-gate] ALLOW
+[2026-05-25T03:09:57Z] [research-quota-gate] ALLOW
+[2026-05-25T03:09:57Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:09:57Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:11:01Z] [role-gate] ALLOW
+[2026-05-25T03:11:43Z] [role-gate] ALLOW
+[2026-05-25T03:11:52Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:11:52Z] [research-quota-gate] ALLOW
+[2026-05-25T03:11:52Z] [ship-gate] ALLOW
+[2026-05-25T03:11:52Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:12:16Z] [ship-gate] ALLOW
+[2026-05-25T03:12:16Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:12:56Z] [ship-gate] ALLOW
+[2026-05-25T03:12:56Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:12:58Z] [ship-gate] ALLOW
+[2026-05-25T03:12:58Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:15:45Z] [ship-gate] ALLOW
+[2026-05-25T03:15:45Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:15:45Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:15:45Z] [research-quota-gate] ALLOW
+[2026-05-25T03:16:06Z] [research-quota-gate] ALLOW
+[2026-05-25T03:16:06Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:16:06Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:16:06Z] [ship-gate] ALLOW
+[2026-05-25T03:16:52Z] [research-quota-gate] ALLOW
+[2026-05-25T03:16:52Z] [ship-gate] ALLOW
+[2026-05-25T03:16:52Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:16:52Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:17:12Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:17:12Z] [doc-deletion-guard] ALLOW
+[2026-05-25T03:17:12Z] [ship-gate] ALLOW
+[2026-05-25T03:17:12Z] [research-quota-gate] ALLOW
+[2026-05-25T03:17:16Z] [ship-gate] ALLOW
+[2026-05-25T03:17:16Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:18:31Z] [ship-gate] ALLOW
+[2026-05-25T03:18:31Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:26:45Z] [ship-gate] ALLOW
+[2026-05-25T03:26:45Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:27:25Z] [ship-gate] ALLOW
+[2026-05-25T03:27:25Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:29:14Z] [ship-gate] ALLOW
+[2026-05-25T03:29:14Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:31:16Z] [ship-gate] ALLOW
+[2026-05-25T03:31:16Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies
+[2026-05-25T03:44:29Z] [ship-gate] ALLOW
+[2026-05-25T03:44:29Z] [ship-gate] DENY: ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies

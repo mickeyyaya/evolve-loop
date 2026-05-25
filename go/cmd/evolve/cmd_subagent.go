@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
@@ -265,40 +265,17 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	}
 	agent := args[0]
 
-	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
-	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
-	if pluginRoot == "" {
-		pluginRoot = projectRoot
-	}
-
-	profilesDir := os.Getenv("EVOLVE_PROFILES_DIR_OVERRIDE")
-	if profilesDir == "" {
-		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
-	}
-	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
-	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "adapters")
-	}
-	// CapabilityDir mirrors bash REAL_ADAPTERS_DIR: script-relative, never
-	// honors EVOLVE_ADAPTERS_DIR_OVERRIDE. Resolves to the plugin install
-	// path so capability manifests reflect actual installed capabilities,
-	// not a test-seam sentinel dir.
-	capabilityDir := filepath.Join(pluginRoot, "adapters")
-
-	llmConfigPath := os.Getenv("EVOLVE_LLM_CONFIG_PATH")
-	if llmConfigPath == "" {
-		llmConfigPath = filepath.Join(projectRoot, ".evolve", "llm_config.json")
-	}
+	layout := paths.ResolveFromEnv()
 
 	res, err := subagent.ValidateProfile(context.Background(),
 		subagent.ValidateProfileRequest{
 			Agent:           agent,
-			ProfilesDir:     profilesDir,
-			AdaptersDir:     adaptersDir,
-			CapabilityDir:   capabilityDir,
-			ProjectRoot:     projectRoot,
+			ProfilesDir:     layout.ProfilesDir,
+			AdaptersDir:     layout.AdaptersDir,
+			CapabilityDir:   layout.CapabilityDir,
+			ProjectRoot:     layout.ProjectRoot,
 			WorktreePath:    os.Getenv("WORKTREE_PATH"),
-			LLMConfigPath:   llmConfigPath,
+			LLMConfigPath:   layout.LLMConfigFile,
 			DispatchPlanLog: os.Getenv("EVOLVE_DISPATCH_PLAN_LOG"),
 		},
 		subagent.ValidateProfileOptions{},
@@ -342,28 +319,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	}
 	workspace := args[2]
 
-	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
-	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
-	if pluginRoot == "" {
-		pluginRoot = projectRoot
-	}
-	profilesDir := os.Getenv("EVOLVE_PROFILES_DIR_OVERRIDE")
-	if profilesDir == "" {
-		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
-	}
-	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
-	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "adapters")
-	}
-	capabilityDir := filepath.Join(pluginRoot, "adapters")
-	llmConfigPath := os.Getenv("EVOLVE_LLM_CONFIG_PATH")
-	if llmConfigPath == "" {
-		llmConfigPath = filepath.Join(projectRoot, ".evolve", "llm_config.json")
-	}
-	ledgerPath := os.Getenv("EVOLVE_LEDGER_OVERRIDE")
-	if ledgerPath == "" {
-		ledgerPath = filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
-	}
+	layout := paths.ResolveFromEnv()
 
 	var promptReader io.Reader
 	if override := os.Getenv("PROMPT_FILE_OVERRIDE"); override != "" {
@@ -386,14 +342,14 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		Agent:                  agent,
 		Cycle:                  cycle,
 		WorkspacePath:          workspace,
-		ProfilesDir:            profilesDir,
-		AdaptersDir:            adaptersDir,
-		CapabilityDir:          capabilityDir,
-		ProjectRoot:            projectRoot,
-		PluginRoot:             pluginRoot,
+		ProfilesDir:            layout.ProfilesDir,
+		AdaptersDir:            layout.AdaptersDir,
+		CapabilityDir:          layout.CapabilityDir,
+		ProjectRoot:            layout.ProjectRoot,
+		PluginRoot:             layout.PluginRoot,
 		WorktreePath:           os.Getenv("WORKTREE_PATH"),
-		LLMConfigPath:          llmConfigPath,
-		LedgerPath:             ledgerPath,
+		LLMConfigPath:          layout.LLMConfigFile,
+		LedgerPath:             layout.LedgerFile,
 		PromptReader:           promptReader,
 		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
 		AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
@@ -448,24 +404,7 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	}
 	workspace := args[2]
 
-	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
-	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
-	if pluginRoot == "" {
-		pluginRoot = projectRoot
-	}
-	profilesDir := os.Getenv("EVOLVE_PROFILES_DIR_OVERRIDE")
-	if profilesDir == "" {
-		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
-	}
-	adaptersDir := os.Getenv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
-	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "adapters")
-	}
-	capabilityDir := filepath.Join(pluginRoot, "adapters")
-	ledgerPath := os.Getenv("EVOLVE_LEDGER_OVERRIDE")
-	if ledgerPath == "" {
-		ledgerPath = filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
-	}
+	layout := paths.ResolveFromEnv()
 
 	concurrency := 2
 	if v := os.Getenv("EVOLVE_FANOUT_CONCURRENCY"); v != "" {
@@ -482,12 +421,12 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 		Agent:              agent,
 		Cycle:              cycle,
 		WorkspacePath:      workspace,
-		ProfilesDir:        profilesDir,
-		AdaptersDir:        adaptersDir,
-		CapabilityDir:      capabilityDir,
-		ProjectRoot:        projectRoot,
-		PluginRoot:         pluginRoot,
-		LedgerPath:         ledgerPath,
+		ProfilesDir:        layout.ProfilesDir,
+		AdaptersDir:        layout.AdaptersDir,
+		CapabilityDir:      layout.CapabilityDir,
+		ProjectRoot:        layout.ProjectRoot,
+		PluginRoot:         layout.PluginRoot,
+		LedgerPath:         layout.LedgerFile,
 		WorktreePath:       os.Getenv("WORKTREE_PATH"),
 		Concurrency:        concurrency,
 		PerWorkerBudgetUSD: perWorkerBudget,
