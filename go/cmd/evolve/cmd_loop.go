@@ -65,8 +65,18 @@ type loopResult struct {
 // emit writes lr to w as the canonical pretty-JSON dispatcher output.
 // JSON format byte-identical to the previous inline marshaling — tests
 // asserting on stop_reason / total_cost_usd / etc. continue to pass.
+//
+// Today loopResult only holds string/float64/bool/int/[]CycleResult,
+// so MarshalIndent cannot fail. If a future field (channel, func,
+// unencodable interface) breaks that, emit a structured error envelope
+// instead of a silent empty line so the failure is observable —
+// dispatchers and `evolve loop` consumers grep stop_reason.
 func (lr loopResult) emit(w io.Writer) {
-	buf, _ := json.MarshalIndent(lr, "", "  ")
+	buf, err := json.MarshalIndent(lr, "", "  ")
+	if err != nil {
+		fmt.Fprintf(w, `{"stop_reason":"marshal_error","error":%q}`+"\n", err.Error())
+		return
+	}
 	fmt.Fprintln(w, string(buf))
 }
 

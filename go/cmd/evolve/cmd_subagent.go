@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
@@ -202,12 +203,9 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 }
 
 func runSubagentCheckToken(args []string, stdout, stderr io.Writer) int {
-	// Strip any single -h/--help so positional parsing is uniform.
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Fprintln(stdout, "Usage: evolve subagent check-token <artifact_path> <token>")
-			return 0
-		}
+	if cmdutil.HasHelp(args) {
+		fmt.Fprintln(stdout, "Usage: evolve subagent check-token <artifact_path> <token>")
+		return 0
 	}
 	if len(args) != 2 {
 		fmt.Fprintln(stderr, "evolve subagent check-token: expected <artifact_path> <token>")
@@ -223,11 +221,9 @@ func runSubagentCheckToken(args []string, stdout, stderr io.Writer) int {
 }
 
 func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Fprintln(stdout, "Usage: evolve subagent check-ctx-advisory <profile_json> <tokens>")
-			return 0
-		}
+	if cmdutil.HasHelp(args) {
+		fmt.Fprintln(stdout, "Usage: evolve subagent check-ctx-advisory <profile_json> <tokens>")
+		return 0
 	}
 	if len(args) != 2 {
 		fmt.Fprintln(stderr, "evolve subagent check-ctx-advisory: expected <profile_json> <tokens>")
@@ -251,13 +247,11 @@ func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
 }
 
 func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile <agent>")
-			fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE,")
-			fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG, EVOLVE_LLM_CONFIG_PATH")
-			return 0
-		}
+	if cmdutil.HasHelp(args) {
+		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile <agent>")
+		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE,")
+		fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG, EVOLVE_LLM_CONFIG_PATH")
+		return 0
 	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "evolve subagent validate-profile: expected <agent>")
@@ -297,15 +291,13 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 }
 
 func runSubagentRun(args []string, stdout, stderr io.Writer) int {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
-			fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
-			fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, ADVERSARIAL_AUDIT,")
-			fmt.Fprintln(stdout, "     EVOLVE_CACHE_PREFIX_V2, EVOLVE_DIFF_COMPLEXITY_DISABLE,")
-			fmt.Fprintln(stdout, "     LEGACY_AGENT_DISPATCH, WORKTREE_PATH")
-			return 0
-		}
+	if cmdutil.HasHelp(args) {
+		fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
+		fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
+		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, ADVERSARIAL_AUDIT,")
+		fmt.Fprintln(stdout, "     EVOLVE_CACHE_PREFIX_V2, EVOLVE_DIFF_COMPLEXITY_DISABLE,")
+		fmt.Fprintln(stdout, "     LEGACY_AGENT_DISPATCH, WORKTREE_PATH")
+		return 0
 	}
 	if len(args) != 3 {
 		fmt.Fprintln(stderr, "evolve subagent run: expected <agent> <cycle> <workspace>")
@@ -383,14 +375,12 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 }
 
 func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Fprintln(stdout, "Usage: evolve subagent dispatch-parallel <agent> <cycle> <workspace_path>")
-			fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY, EVOLVE_FANOUT_PER_WORKER_BUDGET_USD,")
-			fmt.Fprintln(stdout, "     EVOLVE_FANOUT_CACHE_PREFIX, EVOLVE_FANOUT_TRACK_WORKERS,")
-			fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TEST_EXECUTOR, WORKTREE_PATH")
-			return 0
-		}
+	if cmdutil.HasHelp(args) {
+		fmt.Fprintln(stdout, "Usage: evolve subagent dispatch-parallel <agent> <cycle> <workspace_path>")
+		fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY, EVOLVE_FANOUT_PER_WORKER_BUDGET_USD,")
+		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_CACHE_PREFIX, EVOLVE_FANOUT_TRACK_WORKERS,")
+		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TEST_EXECUTOR, WORKTREE_PATH")
+		return 0
 	}
 	if len(args) != 3 {
 		fmt.Fprintln(stderr, "evolve subagent dispatch-parallel: expected <agent> <cycle> <workspace>")

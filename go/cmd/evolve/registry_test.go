@@ -36,6 +36,19 @@ func TestRegistry_RunNotNil(t *testing.T) {
 	}
 }
 
+// TestRegistry_SummaryNonEmpty guards against the Summary field
+// silently going stale. The field is not yet rendered to users, but
+// keeping it populated means a future short-listing feature can light
+// up without a per-entry audit. Without this test, the field is dead
+// weight (per YAGNI) — with it, the field has a contract.
+func TestRegistry_SummaryNonEmpty(t *testing.T) {
+	for _, c := range commands {
+		if c.Summary == "" {
+			t.Errorf("command %q has empty Summary", c.Name)
+		}
+	}
+}
+
 // TestRegistry_LookupResolvesAliases is the core invariant: every
 // declared alias must route to the same row as the canonical name.
 func TestRegistry_LookupResolvesAliases(t *testing.T) {
