@@ -17,8 +17,7 @@
 package phaseflags
 
 import (
-	"strings"
-
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -40,10 +39,10 @@ func (p Phase) Name() string { return p.name }
 // PermissionModeEnvKey returns the per-phase env-var key that overrides
 // profile.permission_mode, e.g. EVOLVE_BUILD_PERMISSION_MODE for
 // phase "build" and EVOLVE_TDD_ENGINEER_PERMISSION_MODE for
-// phase "tdd-engineer".
+// phase "tdd-engineer". Delegates to envchain.PhaseEnvKey so the
+// transformation rule lives in one place.
 func (p Phase) PermissionModeEnvKey() string {
-	upper := strings.ReplaceAll(strings.ToUpper(p.name), "-", "_")
-	return "EVOLVE_" + upper + "_PERMISSION_MODE"
+	return envchain.PhaseEnvKey(p.name, "PERMISSION_MODE")
 }
 
 // Resolve assembles BridgeRequest.ExtraFlags. It reads
@@ -63,10 +62,7 @@ func (p Phase) Resolve(profileDir string, reqEnv map[string]string) []string {
 			profileMode = prof.PermissionMode
 		}
 	}
-	mode := reqEnv[p.PermissionModeEnvKey()]
-	if mode == "" {
-		mode = profileMode
-	}
+	mode := envchain.Resolve(p.PermissionModeEnvKey(), reqEnv, profileMode, "")
 	out := append([]string(nil), profileFlags...)
 	if mode != "" {
 		out = append(out, "--permission-mode", mode)

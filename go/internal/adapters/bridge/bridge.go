@@ -20,9 +20,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
 // Interactive policy values for EVOLVE_INTERACTIVE_POLICY and the
@@ -227,37 +227,33 @@ func nonEmpty(s, fallback string) string {
 }
 
 // resolvePolicy returns the effective interactive policy for the given
-// agent. Precedence: per-agent override (reqEnv > process env) > global
-// env > default (PolicyRecommendedOrFirst).
+// agent. The lookup chain is two layered envchain.Resolve calls — the
+// per-agent override layer first, then the global EVOLVE_INTERACTIVE_POLICY
+// layer — so the precedence semantics live in envchain and stay
+// aligned with phaseflags and any future per-phase env knob.
 //
-// reqEnv is the per-request env map (BridgeRequest.Env). It takes
-// precedence over the parent process env so the orchestrator can pin a
-// policy for a specific phase without mutating its own environment.
+// Effective precedence:
+//
+//  1. reqEnv[EVOLVE_<AGENT>_INTERACTIVE_POLICY]
+//  2. os.Getenv(EVOLVE_<AGENT>_INTERACTIVE_POLICY)
+//  3. reqEnv[EVOLVE_INTERACTIVE_POLICY]
+//  4. os.Getenv(EVOLVE_INTERACTIVE_POLICY)
+//  5. PolicyRecommendedOrFirst (default-on autonomy posture)
 func resolvePolicy(agent string, reqEnv map[string]string) string {
 	if agent != "" {
-		perAgentKey := perAgentPolicyEnv(agent)
-		if v, ok := reqEnv[perAgentKey]; ok && v != "" {
-			return v
-		}
-		if v := os.Getenv(perAgentKey); v != "" {
+		if v := envchain.Resolve(perAgentPolicyEnv(agent), reqEnv, "", ""); v != "" {
 			return v
 		}
 	}
-	if v, ok := reqEnv["EVOLVE_INTERACTIVE_POLICY"]; ok && v != "" {
-		return v
-	}
-	if v := os.Getenv("EVOLVE_INTERACTIVE_POLICY"); v != "" {
-		return v
-	}
-	return PolicyRecommendedOrFirst
+	return envchain.Resolve("EVOLVE_INTERACTIVE_POLICY", reqEnv, "", PolicyRecommendedOrFirst)
 }
 
 // perAgentPolicyEnv maps an agent name to the per-agent override env
 // key: "scout" → "EVOLVE_SCOUT_INTERACTIVE_POLICY"; hyphens become
 // underscores so "tdd-engineer" → "EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY".
+// Delegates to envchain.PhaseEnvKey so the naming rule lives in one place.
 func perAgentPolicyEnv(agent string) string {
-	upper := strings.ReplaceAll(strings.ToUpper(agent), "-", "_")
-	return "EVOLVE_" + upper + "_INTERACTIVE_POLICY"
+	return envchain.PhaseEnvKey(agent, "INTERACTIVE_POLICY")
 }
 
 // injectPolicyPrefix prepends the policy block to the prompt body based
