@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -43,6 +44,30 @@ var validStrategies = map[string]struct{}{
 	"repair":       {},
 	"ultrathink":   {},
 	"autoresearch": {},
+}
+
+// loopResult is the per-invocation dispatcher output. Marshaled to
+// stdout as pretty JSON at every exit point — tests grep its
+// stop_reason field to assert the loop took the right path.
+//
+// Lifted to file scope (was previously a local type inside runLoop)
+// so the .emit() helper can be a method, killing the 11 repeated
+// `buf, _ := json.MarshalIndent(lr, "", "  "); fmt.Fprintln(...)`
+// pattern that obscured the loop body.
+type loopResult struct {
+	StopReason          string             `json:"stop_reason"`
+	Cycles              []core.CycleResult `json:"cycles"`
+	TotalCost           float64            `json:"total_cost_usd"`
+	Resumed             bool               `json:"resumed,omitempty"`
+	RecoverableFailures int                `json:"recoverable_failures,omitempty"`
+}
+
+// emit writes lr to w as the canonical pretty-JSON dispatcher output.
+// JSON format byte-identical to the previous inline marshaling — tests
+// asserting on stop_reason / total_cost_usd / etc. continue to pass.
+func (lr loopResult) emit(w io.Writer) {
+	buf, _ := json.MarshalIndent(lr, "", "  ")
+	fmt.Fprintln(w, string(buf))
 }
 
 // loopConfig is the resolved invocation. Extracted so --dry-run and
@@ -152,13 +177,6 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		"strategy": cfg.Strategy,
 	}
 
-	type loopResult struct {
-		StopReason          string             `json:"stop_reason"`
-		Cycles              []core.CycleResult `json:"cycles"`
-		TotalCost           float64            `json:"total_cost_usd"`
-		Resumed             bool               `json:"resumed,omitempty"`
-		RecoverableFailures int                `json:"recoverable_failures,omitempty"`
-	}
 	lr := loopResult{StopReason: "max_cycles"}
 
 	// Pre-emptive checkpoint thresholds. WARN at warnPct (default 80),
@@ -173,8 +191,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
 			lr.StopReason = "error"
-			buf, _ := json.MarshalIndent(lr, "", "  ")
-			fmt.Fprintln(stdout, string(buf))
+			lr.emit(stdout)
 			return 2
 		}
 		fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f\n",
@@ -199,8 +216,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		} else {
 			lr.StopReason = "resumed_complete"
 		}
-		buf, _ := json.MarshalIndent(lr, "", "  ")
-		fmt.Fprintln(stdout, string(buf))
+		lr.emit(stdout)
 		if lr.StopReason == "error" || lr.StopReason == "fail" {
 			return 2
 		}
@@ -298,8 +314,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evolve-loop --resume")
 			fmt.Fprintln(stderr, "[loop]   to resume manually: evolve loop --resume")
 			lr.StopReason = "quota-pause"
-			buf, _ := json.MarshalIndent(lr, "", "  ")
-			fmt.Fprintln(stdout, string(buf))
+			lr.emit(stdout)
 			return 5
 		}
 
@@ -313,16 +328,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "[loop] BUDGET-EXHAUSTED: cumulative $%.2f >= budget $%.2f (after cycle %d)\n",
 					lr.TotalCost, cfg.BudgetUSD, ranCycle)
 				lr.StopReason = "budget"
-				buf, _ := json.MarshalIndent(lr, "", "  ")
-				fmt.Fprintln(stdout, string(buf))
+				lr.emit(stdout)
 				return 0
 			}
 			fmt.Fprintf(stderr, "[loop] BATCH-BUDGET-EXCEEDED: cumulative $%.2f > cap $%.2f (after cycle %d)\n",
 				lr.TotalCost, cfg.BatchCapUSD, ranCycle)
 			fmt.Fprintln(stderr, "[loop]   override: EVOLVE_BATCH_BUDGET_DISABLE=1 or --batch-cap-usd <higher>")
 			lr.StopReason = "batch_cap"
-			buf, _ := json.MarshalIndent(lr, "", "  ")
-			fmt.Fprintln(stdout, string(buf))
+			lr.emit(stdout)
 			return 4
 		}
 
@@ -333,8 +346,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[loop] BUDGET-DRIVEN COMPLETE: cumulative $%.2f >= budget $%.2f (after cycle %d)\n",
 				lr.TotalCost, cfg.BudgetUSD, ranCycle)
 			lr.StopReason = "budget"
-			buf, _ := json.MarshalIndent(lr, "", "  ")
-			fmt.Fprintln(stdout, string(buf))
+			lr.emit(stdout)
 			return 0
 		}
 
@@ -351,8 +363,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				_ = w.EmitCircuitBreakerTripped(ranCycle, sameCycleStreak, threshold)
 			}
 			lr.StopReason = "circuit_breaker"
-			buf, _ := json.MarshalIndent(lr, "", "  ")
-			fmt.Fprintln(stdout, string(buf))
+			lr.emit(stdout)
 			return 1
 		}
 
@@ -384,16 +395,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 				if policy == dispatchPolicyStop {
 					lr.StopReason = "verify_failed_stop"
-					buf, _ := json.MarshalIndent(lr, "", "  ")
-					fmt.Fprintln(stdout, string(buf))
+					lr.emit(stdout)
 					return 2
 				}
 				// policy == verify: STOP only on integrity-breach;
 				// recoverable classes continue the loop.
 				if class.Class == cycleclassify.ClassIntegrityBreach {
 					lr.StopReason = "integrity_breach"
-					buf, _ := json.MarshalIndent(lr, "", "  ")
-					fmt.Fprintln(stdout, string(buf))
+					lr.emit(stdout)
 					return 2
 				}
 				// E1: persist the recoverable failure to
@@ -424,8 +433,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 						// case, abort with rc=1.
 						fmt.Fprintf(stderr, "[loop] ABORT: state.json unwritable mid-batch (cycle %d): %v\n", ranCycle, recordErr)
 						lr.StopReason = "state_unwritable"
-						buf, _ := json.MarshalIndent(lr, "", "  ")
-						fmt.Fprintln(stdout, string(buf))
+						lr.emit(stdout)
 						return 1
 					}
 				}
@@ -440,8 +448,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	buf, _ := json.MarshalIndent(lr, "", "  ")
-	fmt.Fprintln(stdout, string(buf))
+	lr.emit(stdout)
 	if lr.StopReason == "error" || lr.StopReason == "fail" {
 		return 2
 	}
@@ -917,19 +924,9 @@ func parsePositional(args []string) (cycles int, strategy string, goal string) {
 	return
 }
 
-// joinArgs joins args with a single space, preserving inner quoting
-// the way bash would when the operator quoted the goal in the original
-// CLI invocation. Empty slice → empty string.
+// joinArgs joins args with a single space. Empty slice → empty string.
+// Preserves inner quoting the way bash does when the operator quotes
+// a multi-word goal in the original CLI invocation.
 func joinArgs(args []string) string {
-	if len(args) == 0 {
-		return ""
-	}
-	if len(args) == 1 {
-		return args[0]
-	}
-	out := args[0]
-	for _, a := range args[1:] {
-		out += " " + a
-	}
-	return out
+	return strings.Join(args, " ")
 }

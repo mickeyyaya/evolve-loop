@@ -1662,3 +1662,7 @@
 [2026-05-25T03:44:49Z] [phase-gate-pre] ALLOW
 [2026-05-25T03:44:49Z] [ship-gate] ALLOW
 [2026-05-25T03:44:49Z] [research-quota-gate] ALLOW
+[2026-05-25T03:46:12Z] [phase-gate-pre] ALLOW
+[2026-05-25T03:46:12Z] [ship-gate] ALLOW
+[2026-05-25T03:46:12Z] [research-quota-gate] ALLOW
+[2026-05-25T03:46:12Z] [doc-deletion-guard] ALLOW
