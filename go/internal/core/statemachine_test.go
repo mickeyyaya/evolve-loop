@@ -6,10 +6,11 @@ import (
 
 // Phase transition graph encoded by NewStateMachine:
 //
-//	(start)  → intent? → scout → triage → tdd → build → audit
-//	                                                      ├─ ship  (PASS / WARN per EGPS)
-//	                                                      └─ retro → ship (recovered) | end (BLOCK)
-//	                                                      └─ retro → tdd (RETRY)
+//	(start)  → intent? → scout → triage → tdd → build-planner → build → audit
+//	                                                                      ├─ ship  (PASS / WARN per EGPS)
+//	                                                                      └─ retro → ship (recovered) | end (BLOCK)
+//	                                                                      └─ retro → tdd (RETRY)
+//	build-planner is skipped (SKIPPED verdict) when EVOLVE_BUILD_PLANNER != "1".
 //
 // The transition table is the source of truth; tests validate every
 // edge listed in §2 of the parent plan + the failure-adapter PROCEED/
@@ -25,7 +26,9 @@ func TestStateMachine_CanTransition_Allowed(t *testing.T) {
 		{PhaseScout, PhaseTriage},
 		{PhaseScout, PhaseTDD}, // triage may be skipped (EVOLVE_TRIAGE_DISABLE)
 		{PhaseTriage, PhaseTDD},
-		{PhaseTDD, PhaseBuild},
+		{PhaseTDD, PhaseBuildPlanner},
+		{PhaseTDD, PhaseBuild}, // direct edge kept for skip-through CanTransition checks
+		{PhaseBuildPlanner, PhaseBuild},
 		{PhaseBuild, PhaseAudit},
 		{PhaseAudit, PhaseShip},
 		{PhaseAudit, PhaseRetro},
@@ -88,7 +91,9 @@ func TestStateMachine_Next(t *testing.T) {
 		{"start_advances_to_scout", PhaseStart, VerdictPASS, PhaseScout, false},
 		{"intent_advances_to_scout", PhaseIntent, VerdictPASS, PhaseScout, false},
 		{"triage_advances_to_tdd", PhaseTriage, VerdictPASS, PhaseTDD, false},
-		{"tdd_advances_to_build", PhaseTDD, VerdictPASS, PhaseBuild, false},
+		{"tdd_advances_to_build_planner", PhaseTDD, VerdictPASS, PhaseBuildPlanner, false},
+		{"build_planner_advances_to_build", PhaseBuildPlanner, VerdictPASS, PhaseBuild, false},
+		{"build_planner_skipped_still_advances", PhaseBuildPlanner, VerdictSKIPPED, PhaseBuild, false},
 		{"retro_defaults_to_end", PhaseRetro, VerdictPASS, PhaseEnd, false},
 		{"audit_unknown_verdict_errors", PhaseAudit, VerdictSKIPPED, "", true},
 		{"audit_garbage_verdict_errors", PhaseAudit, "garbage", "", true},
@@ -124,7 +129,7 @@ func TestStateMachine_CanTransition_InvalidPhase(t *testing.T) {
 
 func TestPhase_IsValid(t *testing.T) {
 	for _, p := range []Phase{PhaseStart, PhaseIntent, PhaseScout, PhaseTriage,
-		PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseEnd} {
+		PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseEnd} {
 		if !p.IsValid() {
 			t.Errorf("Phase(%s).IsValid() = false; want true", p)
 		}

@@ -128,7 +128,7 @@ func (f *fakeRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, er
 func buildRunners(verdicts map[Phase]string) map[Phase]PhaseRunner {
 	out := map[Phase]PhaseRunner{}
 	phases := []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD,
-		PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro}
+		PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro}
 	for _, p := range phases {
 		out[p] = &fakeRunner{name: string(p), verdict: verdicts[p]}
 	}
@@ -156,7 +156,7 @@ func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 	if res.FinalVerdict != VerdictPASS {
 		t.Errorf("verdict=%s, want PASS", res.FinalVerdict)
 	}
-	want := []Phase{PhaseScout, PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip}
+	want := []Phase{PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip}
 	if got := res.PhasesRun; len(got) != len(want) {
 		t.Fatalf("phases=%v, want %v", got, want)
 	} else {
@@ -204,7 +204,7 @@ func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	// Every fakeRunner should have seen these env vars.
-	for _, p := range []Phase{PhaseScout, PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip} {
+	for _, p := range []Phase{PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip} {
 		fr := runners[p].(*fakeRunner)
 		if fr.calls == 0 {
 			t.Errorf("phase %s never ran", p)
@@ -442,7 +442,7 @@ func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
 	}
 	// Final cycle-state should list every phase that ran.
 	final := st.cycleState
-	wantPhases := []string{"scout", "triage", "tdd", "build", "audit", "ship"}
+	wantPhases := []string{"scout", "triage", "tdd", "build-planner", "build", "audit", "ship"}
 	if len(final.CompletedPhases) != len(wantPhases) {
 		t.Fatalf("completed=%v, want %v", final.CompletedPhases, wantPhases)
 	}
@@ -503,7 +503,7 @@ func TestOrchestrator_IntentGate_EnvVarRunsIntentFirst(t *testing.T) {
 	if intent.calls != 1 {
 		t.Fatalf("intent ran %d times; expected 1", intent.calls)
 	}
-	want := []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip}
+	want := []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip}
 	if len(res.PhasesRun) != len(want) {
 		t.Fatalf("phases=%v, want %v", res.PhasesRun, want)
 	}

@@ -270,14 +270,21 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 		t.Fatalf("symlink agent-bridge: %v", err)
 	}
 
-	// Stub profiles. Names match what the Go phase code constructs in
-	// each phase's runner — Go uses `audit.json` / `build.json` / `tdd.json`
-	// rather than the bash-era `auditor.json` / `builder.json` / `tdd-engineer.json`.
+	// Stub profiles. Names match what the Go phase runner constructs:
+	// strings.TrimPrefix(AgentPromptName, "evolve-") → AGENT-named, not
+	// phase-named. This aligns with the production .evolve/profiles/
+	// layout (tdd-engineer.json, builder.json, auditor.json,
+	// retrospective.json) AND with CLAUDE.md's documented env-var
+	// convention (EVOLVE_TDD_ENGINEER_PERMISSION_MODE, etc.).
+	//
+	// Source: cycle 106 (2026-05-25) integration smoke caught the
+	// mismatch when the runner looked for `tdd.json` and prod only had
+	// `tdd-engineer.json`.
 	profilesDir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(profilesDir, 0o755); err != nil {
 		t.Fatalf("mkdir profiles: %v", err)
 	}
-	for _, name := range []string{"intent", "scout", "triage", "tdd", "build", "audit", "retrospective"} {
+	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {
 		path := filepath.Join(profilesDir, name+".json")
 		body := fmt.Sprintf(`{"name":%q,"role":%q,"cli":"claude","model_tier_default":"sonnet","allowed_tools":["Read","Write","Bash"]}`, name, name)
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {

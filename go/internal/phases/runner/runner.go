@@ -24,12 +24,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // Hooks captures the per-phase variation points BaseRunner delegates
@@ -170,12 +172,46 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	prompt := b.hooks.ComposePrompt(agent.Body, req)
 	artifactPath := filepath.Join(req.Workspace, b.hooks.ArtifactFilename(req))
 	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
-	profilePath := filepath.Join(profileDir, phase+".json")
+	// Profile JSON files use the AGENT name (e.g., tdd-engineer.json,
+	// builder.json, auditor.json, retrospective.json) — NOT the phase
+	// name (tdd, build, audit, retro). The convention is "strip the
+	// 'evolve-' prefix from AgentPromptName". Source: cycle 106
+	// (2026-05-25) integration smoke where phase=tdd looked for
+	// `.evolve/profiles/tdd.json` (which doesn't exist) instead of
+	// `.evolve/profiles/tdd-engineer.json` (which does). Also matches
+	// CLAUDE.md's `EVOLVE_<AGENT>_<KEY>` env-var convention so the
+	// phaseflags env-key generation aligns with the documented
+	// `EVOLVE_TDD_ENGINEER_PERMISSION_MODE` (not `EVOLVE_TDD_*`).
+	profileName := strings.TrimPrefix(b.hooks.AgentPromptName(), "evolve-")
+	profilePath := filepath.Join(profileDir, profileName+".json")
 
 	cli := envchain.Resolve("EVOLVE_CLI", req.Env, "", "claude-p")
 	modelKey := envchain.PhaseEnvKey(phase, "MODEL")
 	model := envchain.Resolve(modelKey, req.Env, "", b.hooks.DefaultModel())
-	extraFlags := phaseflags.For(phase).Resolve(profileDir, req.Env)
+	// Resolve the "auto" sentinel through llm_config.json + profile chain.
+	// Hooks.DefaultModel returns "auto" for most phases as a signal that
+	// the resolver should pick a concrete model based on phase role +
+	// llm_config tier mapping. claude -p rejects "auto" with HTTP 404
+	// ("There's an issue with the selected model (auto). It may not exist
+	// or you may not have access to it."), so the resolution MUST happen
+	// before bridge dispatch. Source: cycle 106 (2026-05-25) integration
+	// smoke that uncovered the v12.1.0 missing wire.
+	if model == "auto" {
+		if res, err := resolvellm.Resolve(phase, resolvellm.Options{}); err == nil {
+			switch {
+			case res.Model != "":
+				model = res.Model
+			case res.ModelTier != "":
+				model = res.ModelTier
+			}
+		}
+	}
+	// phaseflags.For takes the AGENT name (profileName) so that:
+	// (a) profile JSON lookup matches the file on disk, and
+	// (b) per-phase env-var keys match CLAUDE.md's documented
+	//     EVOLVE_<AGENT_UPPER>_<KEY> convention (e.g.,
+	//     EVOLVE_TDD_ENGINEER_PERMISSION_MODE, not EVOLVE_TDD_*).
+	extraFlags := phaseflags.For(profileName).Resolve(profileDir, req.Env)
 
 	bres, bridgeErr := b.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,

@@ -7,16 +7,17 @@ import "context"
 type Phase string
 
 const (
-	PhaseStart  Phase = "start"
-	PhaseIntent Phase = "intent"
-	PhaseScout  Phase = "scout"
-	PhaseTriage Phase = "triage"
-	PhaseTDD    Phase = "tdd"
-	PhaseBuild  Phase = "build"
-	PhaseAudit  Phase = "audit"
-	PhaseShip   Phase = "ship"
-	PhaseRetro  Phase = "retro"
-	PhaseEnd    Phase = "end"
+	PhaseStart        Phase = "start"
+	PhaseIntent       Phase = "intent"
+	PhaseScout        Phase = "scout"
+	PhaseTriage       Phase = "triage"
+	PhaseTDD          Phase = "tdd"
+	PhaseBuildPlanner Phase = "build-planner"
+	PhaseBuild        Phase = "build"
+	PhaseAudit        Phase = "audit"
+	PhaseShip         Phase = "ship"
+	PhaseRetro        Phase = "retro"
+	PhaseEnd          Phase = "end"
 )
 
 // String implements fmt.Stringer.
@@ -26,7 +27,7 @@ func (p Phase) String() string { return string(p) }
 func (p Phase) IsValid() bool {
 	switch p {
 	case PhaseStart, PhaseIntent, PhaseScout, PhaseTriage,
-		PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseEnd:
+		PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseEnd:
 		return true
 	}
 	return false

@@ -12,7 +12,7 @@ import "fmt"
 //	        └─→ scout
 //	scout ──┬─→ triage ──→ tdd
 //	        └─→ tdd                  (when EVOLVE_TRIAGE_DISABLE=1)
-//	tdd → build → audit
+//	tdd → build-planner → build → audit   (build-planner is skipped when EVOLVE_BUILD_PLANNER≠1)
 //	audit ──┬─→ ship    (PASS or WARN — EGPS v10 accepts WARN as soft-pass)
 //	        └─→ retro
 //	retro ──┬─→ tdd     (RETRY per failure-adapter)
@@ -28,16 +28,17 @@ type StateMachine struct {
 // transition table.
 func NewStateMachine() *StateMachine {
 	a := map[Phase]map[Phase]bool{
-		PhaseStart:  {PhaseIntent: true, PhaseScout: true},
-		PhaseIntent: {PhaseScout: true},
-		PhaseScout:  {PhaseTriage: true, PhaseTDD: true},
-		PhaseTriage: {PhaseTDD: true},
-		PhaseTDD:    {PhaseBuild: true},
-		PhaseBuild:  {PhaseAudit: true},
-		PhaseAudit:  {PhaseShip: true, PhaseRetro: true},
-		PhaseRetro:  {PhaseShip: true, PhaseTDD: true, PhaseEnd: true},
-		PhaseShip:   {PhaseEnd: true},
-		PhaseEnd:    {},
+		PhaseStart:        {PhaseIntent: true, PhaseScout: true},
+		PhaseIntent:       {PhaseScout: true},
+		PhaseScout:        {PhaseTriage: true, PhaseTDD: true},
+		PhaseTriage:       {PhaseTDD: true},
+		PhaseTDD:          {PhaseBuildPlanner: true, PhaseBuild: true},
+		PhaseBuildPlanner: {PhaseBuild: true},
+		PhaseBuild:        {PhaseAudit: true},
+		PhaseAudit:        {PhaseShip: true, PhaseRetro: true},
+		PhaseRetro:        {PhaseShip: true, PhaseTDD: true, PhaseEnd: true},
+		PhaseShip:         {PhaseEnd: true},
+		PhaseEnd:          {},
 	}
 	return &StateMachine{allowed: a}
 }
@@ -78,6 +79,8 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 	case PhaseTriage:
 		return PhaseTDD, nil
 	case PhaseTDD:
+		return PhaseBuildPlanner, nil
+	case PhaseBuildPlanner:
 		return PhaseBuild, nil
 	case PhaseBuild:
 		return PhaseAudit, nil

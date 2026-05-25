@@ -144,7 +144,19 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)
 	}
-	args = append(args, req.ExtraFlags...)
+	// ExtraFlags are inner-CLI flags (--bare, --no-session-persistence,
+	// --strict-mcp-config, --exclude-dynamic-system-prompt-sections,
+	// --permission-mode, ...) coming from profile.extra_flags +
+	// phaseflags.Resolve. Bridge's launch parser uses a strict allowlist
+	// and treats unknown flags as fatal, so unguarded pass-through aborts
+	// with `unknown flag: --bare`. The bridge supports `--` as a pass-
+	// through separator (see bin/bridge: `--) shift; break ;;`) which
+	// forwards everything after it to the inner CLI invocation. Inserting
+	// it here is the structural fix.
+	if len(req.ExtraFlags) > 0 {
+		args = append(args, "--")
+		args = append(args, req.ExtraFlags...)
+	}
 
 	// 4. Build env (KEY=VALUE; inherit parent env + override with req.Env).
 	env := os.Environ()

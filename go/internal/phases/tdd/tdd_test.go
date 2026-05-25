@@ -107,7 +107,7 @@ Add rate limiter to /login
 	if fb.gotReq.Worktree != "/tmp/proj/wt" {
 		t.Errorf("Worktree=%q, want /tmp/proj/wt", fb.gotReq.Worktree)
 	}
-	wantProfile := filepath.Join("/tmp/proj", ".evolve", "profiles", "tdd.json")
+	wantProfile := filepath.Join("/tmp/proj", ".evolve", "profiles", "tdd-engineer.json")
 	if fb.gotReq.Profile != wantProfile {
 		t.Errorf("Profile=%q, want %q", fb.gotReq.Profile, wantProfile)
 	}
@@ -225,7 +225,7 @@ func writeTddProfile(t *testing.T, contents string) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir profiles: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "tdd.json"), []byte(contents), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "tdd-engineer.json"), []byte(contents), 0o644); err != nil {
 		t.Fatalf("write profile: %v", err)
 	}
 	return root
@@ -249,7 +249,7 @@ func TestRun_PopulatesExtraFlagsFromProfile(t *testing.T) {
 	}
 }
 
-// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_TDD_PERMISSION_MODE
+// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_TDD_ENGINEER_PERMISSION_MODE
 // in req.Env beats the profile's permission_mode.
 func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 	root := writeTddProfile(t, `{"permission_mode":"acceptEdits"}`)
@@ -257,7 +257,7 @@ func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	_, _ = phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_TDD_PERMISSION_MODE": "plan"},
+		Env: map[string]string{"EVOLVE_TDD_ENGINEER_PERMISSION_MODE": "plan"},
 	})
 	got := strings.Join(fb.gotReq.ExtraFlags, " ")
 	if !strings.Contains(got, "--permission-mode plan") {

@@ -126,6 +126,115 @@ func TestLaunch_ArgvShape(t *testing.T) {
 	}
 }
 
+// TestLaunch_ExtraFlagsPassthroughSeparator pins the `--` separator
+// that v12.1.0 was missing: bridge's launch parser uses a strict
+// allowlist and rejects unknown flags fatally, so inner-CLI flags
+// like --bare / --strict-mcp-config / --no-session-persistence
+// (sourced from .evolve/profiles/<phase>.json:extra_flags) must
+// arrive after `--` to be forwarded to the inner CLI rather than
+// parsed by bridge.
+//
+// Production regression caught in cycle 106 (2026-05-25):
+//
+//	[bridge] launch: unknown flag: --bare
+//
+// — bridge tried to parse extra_flags as its own and aborted with
+// EC_BAD_FLAGS=10. Without this test the next refactor could silently
+// drop the separator again.
+func TestLaunch_ExtraFlagsPassthroughSeparator(t *testing.T) {
+	ws := t.TempDir()
+	artifact := filepath.Join(ws, "out.md")
+	_ = os.WriteFile(artifact, []byte("ok"), 0o644)
+	fc := &fakeCmd{exitCode: 0}
+	runner := fc.runner()
+
+	adapter := New("/usr/local/bin/bridge", runner)
+	_, err := adapter.Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-p", Profile: "/p.json", Model: "sonnet",
+		Prompt: "x", Workspace: ws, ArtifactPath: artifact,
+		Agent: "scout", Cycle: 106,
+		ExtraFlags: []string{
+			"--bare",
+			"--no-session-persistence",
+			"--strict-mcp-config",
+			"--exclude-dynamic-system-prompt-sections",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	// The argv MUST contain `--` exactly once, BEFORE the first
+	// inner-CLI flag, after all bridge-native flags.
+	args := fc.gotArgs
+	sepIdx := -1
+	for i, a := range args {
+		if a == "--" {
+			sepIdx = i
+			break
+		}
+	}
+	if sepIdx == -1 {
+		t.Fatalf("argv missing `--` separator before ExtraFlags: %v", args)
+	}
+	// All bridge-native flags must appear BEFORE the separator.
+	bridgeNative := []string{"launch", "--cli=claude-p", "--profile=/p.json",
+		"--model=sonnet", "--artifact=" + artifact, "--cycle=106",
+		"--agent=scout"}
+	for _, want := range bridgeNative {
+		found := -1
+		for i := 0; i < sepIdx; i++ {
+			if args[i] == want || strings.HasPrefix(args[i], want+"=") {
+				found = i
+				break
+			}
+		}
+		if found == -1 {
+			t.Errorf("bridge-native flag %q missing before separator (idx %d): %v",
+				want, sepIdx, args)
+		}
+	}
+	// All ExtraFlags must appear AFTER the separator, in original order.
+	want := []string{"--bare", "--no-session-persistence",
+		"--strict-mcp-config", "--exclude-dynamic-system-prompt-sections"}
+	got := args[sepIdx+1:]
+	if len(got) != len(want) {
+		t.Fatalf("post-separator argv mismatch: got %v, want %v", got, want)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("post-separator[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
+// TestLaunch_NoExtraFlagsNoSeparator — when ExtraFlags is empty/nil,
+// the bare `--` separator MUST NOT appear (it would confuse the inner
+// CLI with no flags to forward).
+func TestLaunch_NoExtraFlagsNoSeparator(t *testing.T) {
+	ws := t.TempDir()
+	artifact := filepath.Join(ws, "out.md")
+	_ = os.WriteFile(artifact, []byte("ok"), 0o644)
+	fc := &fakeCmd{exitCode: 0}
+	runner := fc.runner()
+
+	adapter := New("/usr/local/bin/bridge", runner)
+	_, err := adapter.Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-p", Profile: "/p.json", Model: "sonnet",
+		Prompt: "x", Workspace: ws, ArtifactPath: artifact,
+		Agent: "scout", Cycle: 106,
+		// ExtraFlags omitted
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	for _, a := range fc.gotArgs {
+		if a == "--" {
+			t.Errorf("argv contains stray `--` separator with empty ExtraFlags: %v",
+				fc.gotArgs)
+		}
+	}
+}
+
 // TestLaunch_PromptMaterializedAsFile — the prompt body must be
 // written to a file under Workspace before the subprocess runs;
 // --prompt-file=<path> appears in argv.

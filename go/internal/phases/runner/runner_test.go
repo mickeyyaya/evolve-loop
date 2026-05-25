@@ -378,13 +378,18 @@ func TestRun_SkipperReturnsFalse_BridgeStillRuns(t *testing.T) {
 // TestRun_ExtraFlagsFromProfile — phaseflags integration: when the
 // profile has permission_mode set, --permission-mode appears in
 // BridgeRequest.ExtraFlags.
+//
+// Profile filename uses the AGENT name (e.g., builder.json for the
+// build phase whose agent is "evolve-builder"), NOT the phase name.
+// Convention: TrimPrefix(AgentPromptName, "evolve-"). Pinned here so
+// any future change to the lookup convention has to update this test.
 func TestRun_ExtraFlagsFromProfile(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "build.json"),
+	if err := os.WriteFile(filepath.Join(dir, "builder.json"),
 		[]byte(`{"permission_mode":"plan","extra_flags":["--require-full"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}

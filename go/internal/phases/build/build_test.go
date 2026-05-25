@@ -229,7 +229,7 @@ func writeProfile(t *testing.T, contents string) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir profiles: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "build.json"), []byte(contents), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "builder.json"), []byte(contents), 0o644); err != nil {
 		t.Fatalf("write profile: %v", err)
 	}
 	return root
@@ -261,7 +261,7 @@ func TestRun_PopulatesExtraFlagsFromProfile(t *testing.T) {
 	}
 }
 
-// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_BUILD_PERMISSION_MODE
+// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_BUILDER_PERMISSION_MODE
 // in req.Env beats the profile's permission_mode. The plan calls out
 // this precedence explicitly (Capability 1 design).
 func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
@@ -274,7 +274,7 @@ func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILD_PERMISSION_MODE": "plan"},
+		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "plan"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -336,7 +336,7 @@ func TestRun_NoProfile_EnvAloneStillWires(t *testing.T) {
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILD_PERMISSION_MODE": "plan"},
+		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "plan"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

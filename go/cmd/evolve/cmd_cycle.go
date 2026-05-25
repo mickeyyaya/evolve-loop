@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/buildplanner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
@@ -147,14 +148,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	prm := newPromptsLoader(projectRoot)
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
-		core.PhaseScout:  scout.New(scout.Config{Bridge: br, Prompts: prm}),
-		core.PhaseTriage: triage.New(triage.Config{Bridge: br, Prompts: prm}),
-		core.PhaseTDD:    tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
-		core.PhaseBuild:  build.New(build.Config{Bridge: br, Prompts: prm}),
-		core.PhaseAudit:  audit.New(audit.Config{Bridge: br, Prompts: prm}),
-		core.PhaseShip:   ship.NewWithDefaultRunner(),
-		core.PhaseRetro:  retro.New(retro.Config{Bridge: br, Prompts: prm}),
+		core.PhaseIntent:       intent.New(intent.Config{Bridge: br, Prompts: prm}),
+		core.PhaseScout:        scout.New(scout.Config{Bridge: br, Prompts: prm}),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm}),
+		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
+		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
+		core.PhaseBuild:        build.New(build.Config{Bridge: br, Prompts: prm}),
+		core.PhaseAudit:        audit.New(audit.Config{Bridge: br, Prompts: prm}),
+		core.PhaseShip:         ship.NewWithDefaultRunner(),
+		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
 	}
 
 	st := storage.New(evolveDir)

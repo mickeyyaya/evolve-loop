@@ -283,7 +283,7 @@ func writeAuditProfile(t *testing.T, contents string) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir profiles: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "audit.json"), []byte(contents), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "auditor.json"), []byte(contents), 0o644); err != nil {
 		t.Fatalf("write profile: %v", err)
 	}
 	return root
@@ -307,7 +307,7 @@ func TestRun_PopulatesExtraFlagsFromProfile(t *testing.T) {
 	}
 }
 
-// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_AUDIT_PERMISSION_MODE
+// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_AUDITOR_PERMISSION_MODE
 // in req.Env beats the profile's permission_mode.
 func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 	root := writeAuditProfile(t, `{"permission_mode":"acceptEdits"}`)
@@ -315,7 +315,7 @@ func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	_, _ = phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_AUDIT_PERMISSION_MODE": "plan"},
+		Env: map[string]string{"EVOLVE_AUDITOR_PERMISSION_MODE": "plan"},
 	})
 	got := strings.Join(fb.gotReq.ExtraFlags, " ")
 	if !strings.Contains(got, "--permission-mode plan") {
