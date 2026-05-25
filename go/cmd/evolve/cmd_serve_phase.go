@@ -21,18 +21,19 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
 func runServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve serve-phase: missing phase name (intent|scout|triage|tdd|build|audit|ship|retro)")
+		fmt.Fprintf(stderr, "evolve serve-phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10
 	}
 	name := strings.ToLower(args[0])
-	factory, ok := phaseFactories[name]
+	factory, ok := registry.For(name)
 	if !ok {
-		fmt.Fprintf(stderr, "evolve serve-phase: unknown phase %q\n", name)
+		fmt.Fprintf(stderr, "evolve serve-phase: unknown phase %q (known: %s)\n", name, strings.Join(registry.Names(), ", "))
 		return 10
 	}
 

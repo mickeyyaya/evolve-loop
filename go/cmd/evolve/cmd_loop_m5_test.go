@@ -270,13 +270,13 @@ func TestRunLoop_M5_CheckpointThresholdCRITICAL(t *testing.T) {
 // logic when env values are out of range.
 func TestResolveCheckpointThresholds(t *testing.T) {
 	tests := []struct {
-		warn, critical string
+		warn, critical         string
 		wantWarn, wantCritical int
 	}{
 		{"", "", defaultCheckpointWarnPct, defaultCheckpointCriticalPct},
 		{"70", "90", 70, 90},
-		{"50", "50", defaultCheckpointWarnPct, defaultCheckpointCriticalPct}, // warn >= critical
-		{"-1", "95", defaultCheckpointWarnPct, defaultCheckpointCriticalPct}, // warn out of range
+		{"50", "50", defaultCheckpointWarnPct, defaultCheckpointCriticalPct},  // warn >= critical
+		{"-1", "95", defaultCheckpointWarnPct, defaultCheckpointCriticalPct},  // warn out of range
 		{"80", "150", defaultCheckpointWarnPct, defaultCheckpointCriticalPct}, // critical > 100
 		{"abc", "95", defaultCheckpointWarnPct, defaultCheckpointCriticalPct}, // unparseable
 	}

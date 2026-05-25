@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
 // stubPhase is a minimal PhaseRunner used to drive cmd_phase tests
@@ -25,16 +26,34 @@ func (s *stubPhase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 	return s.resp, s.err
 }
 
+// snapshotRegistry captures every currently-registered phase and
+// returns a restore func that re-establishes them. Tests that want a
+// controlled (one-phase) registry pair this with ResetForTesting +
+// Register inside the test body.
+func snapshotRegistry(t *testing.T) func() {
+	t.Helper()
+	names := registry.Names()
+	snap := make(map[string]registry.Factory, len(names))
+	for _, n := range names {
+		f, _ := registry.For(n)
+		snap[n] = f
+	}
+	return func() {
+		registry.ResetForTesting()
+		for n, f := range snap {
+			registry.Register(n, f)
+		}
+	}
+}
+
 func TestRunPhase_DispatchesToFactory(t *testing.T) {
 	stub := &stubPhase{resp: core.PhaseResponse{
 		Phase:   "intent",
 		Verdict: core.VerdictPASS,
 	}}
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return stub },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	req := core.PhaseRequest{Cycle: 7, ProjectRoot: "/p", Workspace: "/w"}
 	reqJSON, _ := json.Marshal(req)
@@ -80,11 +99,9 @@ func TestRunPhase_UnknownPhase(t *testing.T) {
 }
 
 func TestRunPhase_MalformedJSON(t *testing.T) {
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} })
 
 	var stdout, stderr bytes.Buffer
 	code := runPhase([]string{"intent"}, strings.NewReader("not-json"), &stdout, &stderr)
@@ -98,11 +115,9 @@ func TestRunPhase_RunnerErrorExits1(t *testing.T) {
 		resp: core.PhaseResponse{Phase: "intent", Verdict: core.VerdictFAIL},
 		err:  errors.New("oops"),
 	}
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return stub },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	req := core.PhaseRequest{Cycle: 1}
 	rJSON, _ := json.Marshal(req)
@@ -118,16 +133,16 @@ func TestRunPhase_RunnerErrorExits1(t *testing.T) {
 	}
 }
 
-// Regression: a real phase factory entry must exist for every phase
-// constant. Catches missed phase additions.
+// Regression: a real phase factory entry must exist in the registry
+// for every phase constant. Catches missed phase additions.
 func TestPhaseFactoriesCoverAllPhases(t *testing.T) {
 	want := []core.Phase{
 		core.PhaseIntent, core.PhaseScout, core.PhaseTriage, core.PhaseTDD,
 		core.PhaseBuild, core.PhaseAudit, core.PhaseShip, core.PhaseRetro,
 	}
 	for _, p := range want {
-		if _, ok := phaseFactories[string(p)]; !ok {
-			t.Errorf("phaseFactories missing %q", p)
+		if _, ok := registry.For(string(p)); !ok {
+			t.Errorf("registry missing %q", p)
 		}
 	}
 }

@@ -486,10 +486,10 @@ func TestRunLoop_VerifyOK_NoEvents(t *testing.T) {
 func TestUpdateBreaker(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name                  string
+		name                              string
 		prev, streak, ranCycle, threshold int
-		wantPrev, wantStreak  int
-		wantTrip              bool
+		wantPrev, wantStreak              int
+		wantTrip                          bool
 	}{
 		{"first call", -1, 0, 1, 5, 1, 1, false},
 		{"same cycle increments streak", 1, 1, 1, 5, 1, 2, false},

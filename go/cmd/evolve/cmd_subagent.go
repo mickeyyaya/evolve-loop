@@ -52,10 +52,11 @@ Subcommands:
 
 // runSubagent dispatches the `evolve subagent <subcommand>` family. Mirrors
 // the cmd_* subroutines in legacy/scripts/dispatch/subagent-run.sh:
-//   --check-token        → check-token   (cmd_check_token, subagent-run.sh:597)
-//   --check-ctx-advisory → check-ctx-advisory (cmd_check_ctx_advisory:605)
-//   (new)                → cache-prefix  (_write_cache_prefix:292)
-//   (new)                → resolve-tier  (resolve_model_tier:189)
+//
+//	--check-token        → check-token   (cmd_check_token, subagent-run.sh:597)
+//	--check-ctx-advisory → check-ctx-advisory (cmd_check_ctx_advisory:605)
+//	(new)                → cache-prefix  (_write_cache_prefix:292)
+//	(new)                → resolve-tier  (resolve_model_tier:189)
 func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprint(stderr, subagentUsage)

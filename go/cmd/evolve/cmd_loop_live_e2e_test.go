@@ -59,11 +59,11 @@ func minimalProfileJSON(artifact string) []byte {
 		// commonly-allowed companion. permission_mode=acceptEdits
 		// avoids the interactive write-confirmation prompt that would
 		// otherwise hang the headless `claude -p` invocation.
-		"allowed_tools":      []string{"Bash", "Write", "Edit"},
-		"output_artifact":    artifact,
-		"max_turns":          3,
-		"parallel_eligible":  false,
-		"permission_mode":    "acceptEdits",
+		"allowed_tools":     []string{"Bash", "Write", "Edit"},
+		"output_artifact":   artifact,
+		"max_turns":         3,
+		"parallel_eligible": false,
+		"permission_mode":   "acceptEdits",
 	}
 	b, _ := json.MarshalIndent(p, "", "  ")
 	return b

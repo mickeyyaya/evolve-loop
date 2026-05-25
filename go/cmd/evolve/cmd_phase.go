@@ -23,40 +23,39 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+
+	// Blank imports drive the init()-time registry.Register calls for
+	// every built-in phase. Adding a new phase = new package + import
+	// line here; no edit to a dispatch switch (OCP).
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 )
 
-// phaseFactories resolves phase name → core.PhaseRunner constructor.
-// Indexed for testability; cmd_phase_test patches it in.
-var phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-	string(core.PhaseIntent):  newIntent,
-	string(core.PhaseScout):   newScout,
-	string(core.PhaseTriage):  newTriage,
-	string(core.PhaseTDD):     newTDD,
-	string(core.PhaseBuild):   newBuild,
-	string(core.PhaseAudit):   newAudit,
-	string(core.PhaseShip):    newShip,
-	string(core.PhaseRetro):   newRetro,
+// Ship and retro are not yet migrated to the registry — they keep
+// manual factory wiring here until Phase 2.5 commit 2 follow-up.
+func init() {
+	registry.Register(string(core.PhaseShip), newShip)
+	registry.Register(string(core.PhaseRetro), newRetro)
 }
 
 // runPhase implements `evolve phase <name>`.
 func runPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve phase: missing phase name (intent|scout|triage|tdd|build|audit|ship|retro)")
+		fmt.Fprintf(stderr, "evolve phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10
 	}
 	name := strings.ToLower(args[0])
-	factory, ok := phaseFactories[name]
+	factory, ok := registry.For(name)
 	if !ok {
-		fmt.Fprintf(stderr, "evolve phase: unknown phase %q\n", name)
+		fmt.Fprintf(stderr, "evolve phase: unknown phase %q (known: %s)\n", name, strings.Join(registry.Names(), ", "))
 		return 10
 	}
 
@@ -96,45 +95,16 @@ func newPromptsLoader(projectRoot string) *prompts.Loader {
 	return prompts.NewFromDir(projectRoot)
 }
 
-func newIntent(req core.PhaseRequest) core.PhaseRunner {
-	return intent.New(intent.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
-	})
-}
-func newScout(req core.PhaseRequest) core.PhaseRunner {
-	return scout.New(scout.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
-	})
-}
-func newTriage(req core.PhaseRequest) core.PhaseRunner {
-	return triage.New(triage.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
-	})
-}
-func newTDD(req core.PhaseRequest) core.PhaseRunner {
-	return tdd.New(tdd.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
-	})
-}
-func newBuild(req core.PhaseRequest) core.PhaseRunner {
-	return build.New(build.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
-	})
-}
-func newAudit(req core.PhaseRequest) core.PhaseRunner {
-	return audit.New(audit.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
-	})
-}
+// Most phase factories (intent/scout/triage/tdd/build/audit) self-
+// register in their package init() and don't appear here. Ship and
+// retro keep manual factories because their construction shape differs
+// (ship has no bridge/prompts; retro is bridge-dispatching but predates
+// the BaseRunner migration).
+
 func newShip(_ core.PhaseRequest) core.PhaseRunner {
 	return ship.NewWithDefaultRunner()
 }
+
 func newRetro(req core.PhaseRequest) core.PhaseRunner {
 	return retro.New(retro.Config{
 		Bridge:  bridge.NewDefault(req.ProjectRoot),

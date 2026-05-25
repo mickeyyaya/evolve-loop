@@ -35,7 +35,8 @@ type fakeHooks struct {
 
 func (h *fakeHooks) PhaseName() string       { return h.phase }
 func (h *fakeHooks) AgentPromptName() string { return h.agent }
-func (h *fakeHooks) ArtifactFilename() string {
+func (h *fakeHooks) ArtifactFilename(req core.PhaseRequest) string {
+	_ = req // unused in fake; real hooks may vary by request
 	if h.artifact == "" {
 		return h.phase + "-report.md"
 	}
@@ -300,6 +301,77 @@ func TestRun_ArtifactPathDerivedFromHooks(t *testing.T) {
 	want := filepath.Join(ws, "custom.md")
 	if fb.gotReq.ArtifactPath != want {
 		t.Errorf("ArtifactPath=%q, want %q", fb.gotReq.ArtifactPath, want)
+	}
+}
+
+// skippingHooks is a fakeHooks that also implements Skipper. Used to
+// verify the optional-interface path of BaseRunner.
+type skippingHooks struct {
+	fakeHooks
+	skip       bool
+	skipReason string
+}
+
+func (s *skippingHooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
+	if !s.skip {
+		return false, "", "", nil
+	}
+	return true, core.VerdictSKIPPED, "next", []core.Diagnostic{{Severity: "info", Message: s.skipReason}}
+}
+
+// TestRun_SkipperSkipsBeforeBridge — when a Hooks also implements
+// Skipper and returns skipped=true, BaseRunner short-circuits without
+// touching the bridge or prompts. The returned response carries the
+// supplied verdict, nextPhase, and diagnostics.
+func TestRun_SkipperSkipsBeforeBridge(t *testing.T) {
+	h := &skippingHooks{
+		fakeHooks:  fakeHooks{phase: "triage", agent: "evolve-triage", model: "auto"},
+		skip:       true,
+		skipReason: "disabled via EVOLVE_X",
+	}
+	fb := &fakeBridge{}
+	r := New(Options{Hooks: h, Bridge: fb, Prompts: fakePromptsFS("evolve-triage", "x")})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictSKIPPED {
+		t.Errorf("Verdict=%q, want SKIPPED", resp.Verdict)
+	}
+	if resp.NextPhase != "next" {
+		t.Errorf("NextPhase=%q, want next", resp.NextPhase)
+	}
+	if fb.gotReq.Agent != "" {
+		t.Errorf("Bridge was called despite skip; gotReq.Agent=%q", fb.gotReq.Agent)
+	}
+	if h.classifyCalls != 0 {
+		t.Errorf("Classify was called despite skip; count=%d", h.classifyCalls)
+	}
+	if len(resp.Diagnostics) != 1 || resp.Diagnostics[0].Message != "disabled via EVOLVE_X" {
+		t.Errorf("Diagnostics not propagated; got %v", resp.Diagnostics)
+	}
+}
+
+// TestRun_SkipperReturnsFalse_BridgeStillRuns — Skipper.ShouldSkip
+// returning false must NOT short-circuit; normal dispatch proceeds.
+func TestRun_SkipperReturnsFalse_BridgeStillRuns(t *testing.T) {
+	h := &skippingHooks{
+		fakeHooks: fakeHooks{phase: "triage", agent: "evolve-triage", model: "auto", verdict: core.VerdictPASS},
+		skip:      false,
+	}
+	fb := &fakeBridge{writeArtifact: "x"}
+	r := New(Options{Hooks: h, Bridge: fb, Prompts: fakePromptsFS("evolve-triage", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fb.gotReq.Agent != "triage" {
+		t.Errorf("Bridge not called; gotReq.Agent=%q", fb.gotReq.Agent)
+	}
+	if h.classifyCalls != 1 {
+		t.Errorf("Classify count=%d, want 1", h.classifyCalls)
 	}
 }
 

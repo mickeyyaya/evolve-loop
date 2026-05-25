@@ -49,24 +49,24 @@ var validStrategies = map[string]struct{}{
 // tests can inspect what would be done without invoking the
 // orchestrator.
 type loopConfig struct {
-	ProjectRoot     string  `json:"project_root"`
-	EvolveDir       string  `json:"evolve_dir"`
-	GoalHash        string  `json:"goal_hash"`
-	GoalText        string  `json:"goal_text,omitempty"`
-	Strategy        string  `json:"strategy"`
-	MaxCycles       int     `json:"max_cycles"`
-	BudgetUSD       float64 `json:"budget_usd"`
-	BatchCapUSD     float64 `json:"batch_cap_usd"`
-	Resume          bool    `json:"resume,omitempty"`
-	Reset           bool    `json:"reset,omitempty"`
-	ConsensusAudit  bool    `json:"consensus_audit,omitempty"`
-	DryRun          bool    `json:"dry_run,omitempty"`
+	ProjectRoot    string  `json:"project_root"`
+	EvolveDir      string  `json:"evolve_dir"`
+	GoalHash       string  `json:"goal_hash"`
+	GoalText       string  `json:"goal_text,omitempty"`
+	Strategy       string  `json:"strategy"`
+	MaxCycles      int     `json:"max_cycles"`
+	BudgetUSD      float64 `json:"budget_usd"`
+	BatchCapUSD    float64 `json:"batch_cap_usd"`
+	Resume         bool    `json:"resume,omitempty"`
+	Reset          bool    `json:"reset,omitempty"`
+	ConsensusAudit bool    `json:"consensus_audit,omitempty"`
+	DryRun         bool    `json:"dry_run,omitempty"`
 	// BudgetDriven is true when --budget-usd (or --budget alias) is
 	// passed with a finite positive value. In budget mode, MaxCycles
 	// becomes a safety upper bound (default EVOLVE_BUDGET_MAX_CYCLES=50)
 	// and the loop stops when cumulative cost ≥ BudgetUSD with
 	// stop_reason=budget rc=0 (mirrors bash v8.60.0 contract).
-	BudgetDriven    bool    `json:"budget_driven,omitempty"`
+	BudgetDriven bool `json:"budget_driven,omitempty"`
 }
 
 // runLoop implements `evolve loop`.
@@ -510,8 +510,8 @@ type dispatchPolicy int
 
 const (
 	dispatchPolicyVerify dispatchPolicy = iota // default — verify + continue on recoverable, STOP on breach
-	dispatchPolicyOff                           // skip ledger pipeline verification entirely (LEGACY)
-	dispatchPolicyStop                          // verify + STOP on any failure (legacy fail-fast)
+	dispatchPolicyOff                          // skip ledger pipeline verification entirely (LEGACY)
+	dispatchPolicyStop                         // verify + STOP on any failure (legacy fail-fast)
 )
 
 const (
@@ -754,19 +754,19 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.SetOutput(stderr)
 
 	var (
-		projectRoot     string
-		evolveDir       string
-		goalHash        string
-		goalText        string
-		strategy        string
-		maxCyclesFlag   int
-		cyclesFlag      int
-		budgetUSD       float64
-		batchCapUSD     float64
-		resume          bool
-		dryRun          bool
-		reset           bool
-		consensusAudit  bool
+		projectRoot    string
+		evolveDir      string
+		goalHash       string
+		goalText       string
+		strategy       string
+		maxCyclesFlag  int
+		cyclesFlag     int
+		budgetUSD      float64
+		batchCapUSD    float64
+		resume         bool
+		dryRun         bool
+		reset          bool
+		consensusAudit bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")

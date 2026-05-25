@@ -59,6 +59,18 @@ func NewFromDir(dir string) *Loader {
 	return &Loader{fs: os.DirFS(dir)}
 }
 
+// NewForProject is the canonical loader-resolution helper for phase
+// registrations: honors the EVOLVE_PROMPTS_DIR dev override, otherwise
+// loads from the project root (where agents/ and skills/ live in the
+// repo layout). Replaces the duplicated `newPromptsLoader` helper that
+// previously lived in cmd_phase.go.
+func NewForProject(projectRoot string) *Loader {
+	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
+		return NewFromDir(d)
+	}
+	return NewFromDir(projectRoot)
+}
+
 // Agent reads agents/<name>.md and parses its frontmatter.
 func (l *Loader) Agent(name string) (Prompt, error) {
 	return l.load(path.Join("agents", name+".md"), name)

@@ -149,4 +149,3 @@ func buildGuard(name, evolveDir string) (core.Guard, error) {
 		return nil, fmt.Errorf("unknown guard %q (known: ship phase role docdelete quota chain)", name)
 	}
 }
-

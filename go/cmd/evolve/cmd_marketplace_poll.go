@@ -22,11 +22,11 @@ import (
 //	10 — invalid arguments
 func runMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
-		target           string
-		maxWaitS         = 300
-		pollIntervalS    = 15
-		marketplaceDir   = os.Getenv("EVOLVE_MARKETPLACE_DIR")
-		dryRun           bool
+		target         string
+		maxWaitS       = 300
+		pollIntervalS  = 15
+		marketplaceDir = os.Getenv("EVOLVE_MARKETPLACE_DIR")
+		dryRun         bool
 	)
 	if marketplaceDir == "" {
 		if home, err := os.UserHomeDir(); err == nil {

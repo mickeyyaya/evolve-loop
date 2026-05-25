@@ -48,9 +48,10 @@ type Hooks interface {
 	AgentPromptName() string
 
 	// ArtifactFilename returns the artifact the agent is contracted to
-	// produce, joined with req.Workspace (e.g., "build-report.md",
-	// "scout-report.md").
-	ArtifactFilename() string
+	// produce, joined with req.Workspace. Takes req so phases can vary
+	// the filename per-request (e.g., intent's delta mode chooses
+	// "intent-delta.md" instead of "intent.md").
+	ArtifactFilename(req core.PhaseRequest) string
 
 	// DefaultModel returns the model identifier to use when
 	// EVOLVE_<PHASE>_MODEL is unset. Most phases use "auto"; audit
@@ -68,6 +69,19 @@ type Hooks interface {
 	// before calling Classify; this method only runs on the success
 	// branch.
 	Classify(artifact string, req core.PhaseRequest, bres core.BridgeResponse) (verdict string, diagnostics []core.Diagnostic, nextPhase string)
+}
+
+// Skipper is an optional Hooks extension. When a Hooks implementation
+// also satisfies Skipper, BaseRunner consults ShouldSkip before any
+// bridge call. If skipped is true, BaseRunner returns a SKIPPED
+// PhaseResponse with the supplied verdict and nextPhase and never
+// touches the bridge. Used by triage (EVOLVE_TRIAGE_DISABLE), tdd
+// (EVOLVE_TEST_PHASE_ENABLED=0), and retro (previous verdict guard).
+//
+// Why optional? Most phases never skip. Forcing every Hooks impl to
+// implement a no-op ShouldSkip violates ISP (interface-segregation).
+type Skipper interface {
+	ShouldSkip(req core.PhaseRequest) (skipped bool, verdict, nextPhase string, diags []core.Diagnostic)
 }
 
 // Options is the BaseRunner constructor envelope. Bridge and Prompts
@@ -133,13 +147,28 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		return core.PhaseResponse{}, fmt.Errorf("%s: prompts loader required", phase)
 	}
 
+	// Optional pre-bridge skip predicate. ISP: only phases that opt
+	// into Skipper get consulted; the rest skip this branch entirely.
+	if skipper, ok := b.hooks.(Skipper); ok {
+		if skipped, verdict, nextPhase, diags := skipper.ShouldSkip(req); skipped {
+			return core.PhaseResponse{
+				Phase:        phase,
+				Verdict:      verdict,
+				ArtifactsDir: req.Workspace,
+				NextPhase:    nextPhase,
+				DurationMS:   b.nowFn().Sub(start).Milliseconds(),
+				Diagnostics:  diags,
+			}, nil
+		}
+	}
+
 	agent, err := b.prompts.Agent(b.hooks.AgentPromptName())
 	if err != nil {
 		return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w", phase, err)
 	}
 
 	prompt := b.hooks.ComposePrompt(agent.Body, req)
-	artifactPath := filepath.Join(req.Workspace, b.hooks.ArtifactFilename())
+	artifactPath := filepath.Join(req.Workspace, b.hooks.ArtifactFilename(req))
 	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
 	profilePath := filepath.Join(profileDir, phase+".json")
 

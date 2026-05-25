@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
@@ -44,11 +45,9 @@ func TestRunServePhase_HappyPath(t *testing.T) {
 		Phase:   "intent",
 		Verdict: core.VerdictPASS,
 	}}
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return stub },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	req := core.PhaseRequest{Cycle: 11, ProjectRoot: "/p", Workspace: "/w"}
 	stdin := bytes.NewReader(envelopeStdin(t, req))
@@ -105,11 +104,9 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 		resp: core.PhaseResponse{Phase: "intent", Verdict: core.VerdictFAIL},
 		err:  errors.New("intent boom"),
 	}
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return stub },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 1}))
 	var stdout, stderr bytes.Buffer
@@ -134,11 +131,9 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 }
 
 func TestRunServePhase_MalformedEnvelopeExits1(t *testing.T) {
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} })
 
 	var stdout, stderr bytes.Buffer
 	code := runServePhase([]string{"intent"}, strings.NewReader("not-an-envelope\n"), &stdout, &stderr)
@@ -153,11 +148,9 @@ func TestRunServePhase_MalformedEnvelopeExits1(t *testing.T) {
 // Confirms the dispatcher routes "serve-phase" to runServePhase.
 func TestDispatch_RoutesServePhase(t *testing.T) {
 	stub := &stubPhase{resp: core.PhaseResponse{Phase: "scout", Verdict: core.VerdictPASS}}
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"scout": func(req core.PhaseRequest) core.PhaseRunner { return stub },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("scout", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 2}))
 	var stdout, stderr bytes.Buffer
@@ -186,11 +179,9 @@ func (s *ctxCapturingPhase) Run(ctx context.Context, req core.PhaseRequest) (cor
 
 func TestRunServePhase_PlumbsContext(t *testing.T) {
 	stub := &ctxCapturingPhase{stubPhase: stubPhase{resp: core.PhaseResponse{Phase: "intent", Verdict: core.VerdictPASS}}}
-	prev := phaseFactories
-	phaseFactories = map[string]func(req core.PhaseRequest) core.PhaseRunner{
-		"intent": func(req core.PhaseRequest) core.PhaseRunner { return stub },
-	}
-	defer func() { phaseFactories = prev }()
+	defer snapshotRegistry(t)()
+	registry.ResetForTesting()
+	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 1}))
 	var stdout, stderr bytes.Buffer

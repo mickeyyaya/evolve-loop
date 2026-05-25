@@ -1,6 +1,9 @@
-// Package build implements the GREEN code-writer phase as a
-// core.PhaseRunner. Build reads team-context.md (RED contract) and
-// writes code until the RED tests turn GREEN.
+// Package build implements the GREEN code-writer phase. The phase
+// boilerplate (profile lookup, prompt composition, bridge dispatch,
+// artifact reading, response packaging) lives in
+// internal/phases/runner; this file only encodes the build-specific
+// variation points: agent name, artifact filename, prompt context,
+// classification rules, and the cost-overrun guard.
 //
 // Cost guard:
 //
@@ -8,146 +11,40 @@
 //   - Cost > threshold + EVOLVE_BUILDER_COST_GUARD_STRICT=1 → FAIL.
 //   - Cost > threshold + advisory (default) → PASS + diagnostic.
 //
-// Verdict mapping:
+// Verdict mapping (the artifact body classifier):
 //
 //   - "## Files Modified" missing or empty artifact → FAIL.
-//   - Cost overrun in strict mode → FAIL.
 //   - All other GREEN paths → PASS (possibly with cost diagnostic).
+//
+// The cost-overrun check will move out of this file into a shared
+// CostGuardDecorator in Phase 2.5 commit 3 so other phases can opt in
+// uniformly. For now it lives inline in Classify.
 package build
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-const (
-	phaseName               = string(core.PhaseBuild)
-	defaultCostThresholdUSD = 2.00
-)
+const defaultCostThresholdUSD = 2.00
 
-type Config struct {
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	NowFn   func() time.Time
-}
+// hooks implements runner.Hooks for the build phase.
+type hooks struct{}
 
-type Phase struct {
-	bridge  core.Bridge
-	prompts *prompts.Loader
-	nowFn   func() time.Time
-}
+func (hooks) PhaseName() string                           { return string(core.PhaseBuild) }
+func (hooks) AgentPromptName() string                     { return "evolve-builder" }
+func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "build-report.md" }
+func (hooks) DefaultModel() string                        { return "auto" }
 
-func New(c Config) *Phase {
-	nowFn := c.NowFn
-	if nowFn == nil {
-		nowFn = time.Now
-	}
-	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn}
-}
-
-func (p *Phase) Name() string { return phaseName }
-
-func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	start := p.nowFn()
-	if p.bridge == nil {
-		return core.PhaseResponse{}, fmt.Errorf("build: bridge required")
-	}
-	if p.prompts == nil {
-		return core.PhaseResponse{}, fmt.Errorf("build: prompts loader required")
-	}
-
-	agent, err := p.prompts.Agent("evolve-builder")
-	if err != nil {
-		return core.PhaseResponse{}, fmt.Errorf("build: load agent: %w", err)
-	}
-
-	prompt := composePrompt(agent.Body, req)
-	artifactPath := filepath.Join(req.Workspace, "build-report.md")
-	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
-	profilePath := filepath.Join(profileDir, "build.json")
-
-	cli := req.Env["EVOLVE_CLI"]
-	if cli == "" {
-		cli = "claude-p"
-	}
-	model := req.Env["EVOLVE_BUILD_MODEL"]
-	if model == "" {
-		model = "auto"
-	}
-
-	extraFlags := phaseflags.For("build").Resolve(profileDir, req.Env)
-
-	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
-		CLI:          cli,
-		Profile:      profilePath,
-		Model:        model,
-		Prompt:       prompt,
-		Workspace:    req.Workspace,
-		Worktree:     req.Worktree,
-		ArtifactPath: artifactPath,
-		Agent:        "build",
-		Cycle:        req.Cycle,
-		Env:          req.Env,
-		ExtraFlags:   extraFlags,
-	})
-	durationMS := p.nowFn().Sub(start).Milliseconds()
-
-	if bridgeErr != nil {
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			CostUSD:      bres.CostUSD,
-			Tokens:       bres.Tokens,
-			DurationMS:   durationMS,
-			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
-		}, fmt.Errorf("build: bridge: %w", bridgeErr)
-	}
-
-	content := bres.Stdout
-	if content == "" {
-		if b, err := os.ReadFile(artifactPath); err == nil {
-			content = string(b)
-		}
-	}
-
-	verdict := classify(content)
-	var diags []core.Diagnostic
-
-	// Cost-overrun check: advisory by default, hard FAIL under strict mode.
-	threshold := parseFloatOrDefault(req.Env["EVOLVE_BUILDER_COST_THRESHOLD"], defaultCostThresholdUSD)
-	if bres.CostUSD > threshold {
-		msg := fmt.Sprintf("builder cost %.2f exceeded threshold %.2f", bres.CostUSD, threshold)
-		severity := "warning"
-		if req.Env["EVOLVE_BUILDER_COST_GUARD_STRICT"] == "1" {
-			severity = "error"
-			verdict = core.VerdictFAIL
-		}
-		diags = append(diags, core.Diagnostic{Severity: severity, Message: msg})
-	}
-
-	return core.PhaseResponse{
-		Phase:        phaseName,
-		Verdict:      verdict,
-		ArtifactsDir: req.Workspace,
-		NextPhase:    string(core.PhaseAudit),
-		CostUSD:      bres.CostUSD,
-		Tokens:       bres.Tokens,
-		DurationMS:   durationMS,
-		Diagnostics:  diags,
-	}, nil
-}
-
-func composePrompt(body string, req core.PhaseRequest) string {
+func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(body)
 	b.WriteString("\n\n## Cycle Context\n")
@@ -161,7 +58,24 @@ func composePrompt(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-func classify(content string) string {
+func (hooks) Classify(artifact string, req core.PhaseRequest, bres core.BridgeResponse) (string, []core.Diagnostic, string) {
+	verdict := classifyArtifact(artifact)
+	var diags []core.Diagnostic
+
+	threshold := parseFloatOrDefault(req.Env["EVOLVE_BUILDER_COST_THRESHOLD"], defaultCostThresholdUSD)
+	if bres.CostUSD > threshold {
+		msg := fmt.Sprintf("builder cost %.2f exceeded threshold %.2f", bres.CostUSD, threshold)
+		severity := "warning"
+		if req.Env["EVOLVE_BUILDER_COST_GUARD_STRICT"] == "1" {
+			severity = "error"
+			verdict = core.VerdictFAIL
+		}
+		diags = append(diags, core.Diagnostic{Severity: severity, Message: msg})
+	}
+	return verdict, diags, string(core.PhaseAudit)
+}
+
+func classifyArtifact(content string) string {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return core.VerdictFAIL
@@ -184,4 +98,43 @@ func parseFloatOrDefault(s string, d float64) float64 {
 		return d
 	}
 	return v
+}
+
+// Config is the public constructor envelope. Preserved so callers
+// outside the registry path (tests, programmatic embedding) keep
+// working unchanged after the BaseRunner migration.
+type Config struct {
+	Bridge  core.Bridge
+	Prompts *prompts.Loader
+	NowFn   func() time.Time
+}
+
+// Phase wraps a runner.BaseRunner so callers still get a concrete
+// *Phase return from New (preserves the public API).
+type Phase struct{ *runner.BaseRunner }
+
+// New constructs the build phase. The Hooks impl is internal; callers
+// only know about Config.
+func New(c Config) *Phase {
+	return &Phase{
+		BaseRunner: runner.New(runner.Options{
+			Hooks:   hooks{},
+			Bridge:  c.Bridge,
+			Prompts: c.Prompts,
+			NowFn:   c.NowFn,
+		}),
+	}
+}
+
+// init registers the build phase factory at package load time. The
+// dispatcher (cmd_phase.go, cmd_compose.go) looks up phases by name
+// without an explicit switch — adding a phase is a new package + 1
+// init() line, no edit to the dispatch table.
+func init() {
+	registry.Register(string(core.PhaseBuild), func(req core.PhaseRequest) core.PhaseRunner {
+		return New(Config{
+			Bridge:  bridge.NewDefault(req.ProjectRoot),
+			Prompts: prompts.NewForProject(req.ProjectRoot),
+		})
+	})
 }
