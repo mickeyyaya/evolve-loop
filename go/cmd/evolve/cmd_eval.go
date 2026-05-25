@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verifyeval"
 )
 
 // runEval implements `evolve eval <subcommand>`. Subcommands:
@@ -64,9 +65,39 @@ func runEvalQualityCheck(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-// runEvalVerify is implemented in cmd_verify_eval.go (Phase 2A port 3).
-// Defined here so cmd_eval.go can reference it before that file lands.
+// runEvalVerify implements `evolve eval verify <eval.md> <workspace>`.
+// Exit codes:
+//   - 0 verdict PASS, 1 verdict FAIL, 10 bad args, 1 internal error.
 func runEvalVerify(args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "evolve eval verify: not yet implemented (Phase 2A port 3)")
-	return 99
+	fs := flag.NewFlagSet("eval verify", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	rest := fs.Args()
+	if len(rest) < 2 {
+		fmt.Fprintln(stderr, "evolve eval verify: missing <eval.md> <workspace>")
+		return 10
+	}
+	res, err := verifyeval.Verify(verifyeval.Options{Path: rest[0], Workspace: rest[1]})
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve eval verify: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "[eval verify] %s (workspace=%s)\n", res.Path, rest[1])
+	for _, c := range res.Commands {
+		mark := "PASS"
+		if !c.Passed {
+			mark = "FAIL"
+		}
+		fmt.Fprintf(stdout, "  [%s] %s\n", mark, c.Command)
+		if c.Reason != "" {
+			fmt.Fprintf(stdout, "        reason: %s\n", c.Reason)
+		}
+	}
+	fmt.Fprintf(stdout, "[eval verify] verdict: %s\n", res.Verdict)
+	if res.Verdict == "PASS" {
+		return 0
+	}
+	return 1
 }
