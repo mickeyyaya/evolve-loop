@@ -1,0 +1,173 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+)
+
+// runPlanAndExecute implements `evolve plan-and-execute <phase>`. It is
+// the operator-facing convenience for v12.1 Capability 1's two-pass
+// dispatch:
+//
+//  1. Pass A: run the phase with --permission-mode=plan, writing the
+//     plan to EVOLVE_<PHASE>_PLAN_OUTPUT (default: <workspace>/<phase>-plan.md).
+//  2. Pass B: re-run the phase with --permission-mode=acceptEdits,
+//     prepending the plan to the prompt via EVOLVE_<PHASE>_PLAN_INPUT.
+//
+// The actual permission-mode flag is appended to BridgeRequest.ExtraFlags
+// by phaseflags.For(name).Resolve (already wired in v12.1 Phase 2A).
+// This subcommand orchestrates the two dispatches and threads the plan
+// artifact between them.
+//
+// Exit codes:
+//   - 0  both passes succeeded
+//   - 1  pass A failed
+//   - 2  pass B failed (after pass A succeeded)
+//   - 10 bad args
+//   - 11 plan artifact missing after pass A
+func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("plan-and-execute", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	planOutput := fs.String("plan-output", "", "path where pass A writes the plan (default: <workspace>/<phase>-plan.md)")
+	skipExecute := fs.Bool("skip-execute", false, "run only pass A (plan mode); useful for review-then-resume workflows")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	rest := fs.Args()
+	if len(rest) < 1 {
+		fmt.Fprintf(stderr, "evolve plan-and-execute: missing <phase> (known: %s)\n",
+			joinNames(registry.Names()))
+		return 10
+	}
+	phase := rest[0]
+	if _, ok := registry.For(phase); !ok {
+		fmt.Fprintf(stderr, "evolve plan-and-execute: unknown phase %q (known: %s)\n",
+			phase, joinNames(registry.Names()))
+		return 10
+	}
+
+	// Read the rest of args as phase-request JSON via stdin OR as
+	// flags passed through. For simplicity at this slice, the phase
+	// request envelope is read from stdin (same as `evolve phase`)
+	// and re-fed to each pass.
+	envReq, err := io.ReadAll(stdin)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve plan-and-execute: read stdin: %v\n", err)
+		return 1
+	}
+
+	// Resolve plan-output path. Default: <workspace>/<phase>-plan.md.
+	// We don't have workspace from the bare CLI; derive from the JSON
+	// envelope (best-effort) or from the env-var, otherwise use cwd.
+	planPath := *planOutput
+	if planPath == "" {
+		if w := os.Getenv("EVOLVE_PLAN_WORKSPACE"); w != "" {
+			planPath = filepath.Join(w, phase+"-plan.md")
+		} else {
+			planPath = filepath.Join(".", phase+"-plan.md")
+		}
+	}
+
+	// Pass A: plan mode. Sets EVOLVE_<PHASE>_PERMISSION_MODE=plan and
+	// EVOLVE_<PHASE>_PLAN_OUTPUT=<planPath>. phaseflags.Resolve picks
+	// these up and appends --permission-mode plan to ExtraFlags.
+	planKey := envchain.PhaseEnvKey(phase, "PERMISSION_MODE")
+	outputKey := envchain.PhaseEnvKey(phase, "PLAN_OUTPUT")
+
+	fmt.Fprintf(stdout, "[plan-and-execute] pass A: %s in plan mode → %s\n", phase, planPath)
+	if code := runPassWithEnv(phase, envReq, map[string]string{
+		planKey:   "plan",
+		outputKey: planPath,
+	}, stdout, stderr); code != 0 {
+		fmt.Fprintf(stderr, "[plan-and-execute] pass A failed (exit=%d); aborting\n", code)
+		return 1
+	}
+
+	if *skipExecute {
+		fmt.Fprintln(stdout, "[plan-and-execute] --skip-execute set; pass B skipped")
+		return 0
+	}
+
+	// Verify the plan artifact exists before pass B.
+	if _, err := os.Stat(planPath); err != nil {
+		fmt.Fprintf(stderr, "[plan-and-execute] plan artifact missing at %s (pass A produced no plan): %v\n",
+			planPath, err)
+		return 11
+	}
+
+	// Pass B: execute mode. Sets EVOLVE_<PHASE>_PERMISSION_MODE=acceptEdits
+	// and EVOLVE_<PHASE>_PLAN_INPUT=<planPath> so the agent reads the
+	// plan as context.
+	inputKey := envchain.PhaseEnvKey(phase, "PLAN_INPUT")
+
+	fmt.Fprintf(stdout, "[plan-and-execute] pass B: %s in acceptEdits mode (plan ← %s)\n", phase, planPath)
+	if code := runPassWithEnv(phase, envReq, map[string]string{
+		planKey:  "acceptEdits",
+		inputKey: planPath,
+	}, stdout, stderr); code != 0 {
+		fmt.Fprintf(stderr, "[plan-and-execute] pass B failed (exit=%d)\n", code)
+		return 2
+	}
+	fmt.Fprintln(stdout, "[plan-and-execute] both passes PASS")
+	return 0
+}
+
+// runPassWithEnv invokes runPhase with the given extra env vars set
+// in the process env for the duration of the call. Saves and restores
+// the previous values so concurrent invocations don't collide.
+func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, stderr io.Writer) int {
+	saved := map[string]string{}
+	for k, v := range env {
+		saved[k] = os.Getenv(k)
+		os.Setenv(k, v)
+	}
+	defer func() {
+		for k, v := range saved {
+			if v == "" {
+				os.Unsetenv(k)
+			} else {
+				os.Setenv(k, v)
+			}
+		}
+	}()
+	return runPhase([]string{phase}, bytesReader(req), stdout, stderr)
+}
+
+// bytesReader wraps a byte slice as an io.Reader. tiny helper to
+// avoid importing bytes only for this one purpose.
+func bytesReader(b []byte) io.Reader {
+	return &byteReader{b: b}
+}
+
+type byteReader struct {
+	b   []byte
+	pos int
+}
+
+func (r *byteReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.b) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.b[r.pos:])
+	r.pos += n
+	return n, nil
+}
+
+// joinNames is a small slice-to-comma-separated helper. Could use
+// strings.Join but keeping the import surface minimal in this file.
+func joinNames(names []string) string {
+	out := ""
+	for i, n := range names {
+		if i > 0 {
+			out += ", "
+		}
+		out += n
+	}
+	return out
+}

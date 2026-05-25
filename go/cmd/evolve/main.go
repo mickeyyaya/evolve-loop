@@ -178,6 +178,8 @@ func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runEval(args[1:], stdin, stdout, stderr)
 	case "cycle-health":
 		return runCycleHealth(args[1:], stdin, stdout, stderr)
+	case "plan-and-execute":
+		return runPlanAndExecute(args[1:], stdin, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
 		return 2
