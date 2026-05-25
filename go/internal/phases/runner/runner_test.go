@@ -407,3 +407,72 @@ func TestRun_ExtraFlagsFromProfile(t *testing.T) {
 		}
 	}
 }
+
+// TestRun_CLIResolutionPrecedence pins the precedence chain:
+//
+//	EVOLVE_CLI env var > profile.cli field > "claude-p" default
+//
+// Before this fix the runner only read EVOLVE_CLI and defaulted to
+// claude-p, silently ignoring profile.cli. Operators who edited a
+// phase profile to `"cli": "codex"` got claude-p anyway, and the
+// dispatch log gave no hint why.
+//
+// Source: cycle 107 (2026-05-25) attempted-codex smoke that ran
+// against claude-sonnet-4-6 despite cli=codex in every profile.
+func TestRun_CLIResolutionPrecedence(t *testing.T) {
+	mkProfile := func(t *testing.T, cli string) string {
+		t.Helper()
+		root := t.TempDir()
+		dir := filepath.Join(root, ".evolve", "profiles")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		body := `{"cli":"` + cli + `","model_tier_default":"sonnet"}`
+		if err := os.WriteFile(filepath.Join(dir, "scout.json"),
+			[]byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return root
+	}
+	runOne := func(t *testing.T, profileCLI string, envOverride map[string]string) string {
+		t.Helper()
+		root := mkProfile(t, profileCLI)
+		hooks := &fakeHooks{phase: "scout", agent: "evolve-scout",
+			model: "sonnet", verdict: core.VerdictPASS}
+		fb := &fakeBridge{writeArtifact: "x"}
+		r := New(Options{Hooks: hooks, Bridge: fb,
+			Prompts: fakePromptsFS("evolve-scout", "x")})
+		_, err := r.Run(context.Background(), core.PhaseRequest{
+			ProjectRoot: root, Workspace: t.TempDir(), Env: envOverride,
+		})
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		return fb.gotReq.CLI
+	}
+
+	cases := []struct {
+		name       string
+		profileCLI string
+		envCLI     string
+		wantCLI    string
+	}{
+		{"profile_codex_no_env", "codex", "", "codex"},
+		{"profile_agy_no_env", "agy", "", "agy"},
+		{"env_wins_over_profile", "codex", "claude-tmux", "claude-tmux"},
+		{"empty_profile_default", "", "", "claude-p"},
+		{"env_overrides_empty_profile", "", "codex", "codex"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env := map[string]string(nil)
+			if tc.envCLI != "" {
+				env = map[string]string{"EVOLVE_CLI": tc.envCLI}
+			}
+			got := runOne(t, tc.profileCLI, env)
+			if got != tc.wantCLI {
+				t.Errorf("CLI=%q, want %q", got, tc.wantCLI)
+			}
+		})
+	}
+}

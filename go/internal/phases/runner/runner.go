@@ -30,6 +30,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
@@ -185,9 +186,41 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	profileName := strings.TrimPrefix(b.hooks.AgentPromptName(), "evolve-")
 	profilePath := filepath.Join(profileDir, profileName+".json")
 
-	cli := envchain.Resolve("EVOLVE_CLI", req.Env, "", "claude-p")
+	// CLI resolution chain: EVOLVE_CLI env var > profile.cli > default
+	// "claude-p". Before this fix the runner only consulted EVOLVE_CLI
+	// and defaulted to claude-p regardless of profile.cli, which meant
+	// operators editing .evolve/profiles/<agent>.json:cli to switch a
+	// phase to codex or agy had no effect — the runner silently
+	// dispatched to claude-p anyway.
+	// Source: cycle 107 (2026-05-25) attempted-codex smoke that
+	// produced claude-sonnet-4-6 output despite cli=codex in every
+	// profile. Operator misread "delegation" because the resolved CLI
+	// wasn't logged.
+	profileCLI := ""
+	profileModelTier := ""
+	if loader := profiles.NewFromDir(profileDir); loader != nil {
+		if prof, err := loader.Get(profileName); err == nil {
+			profileCLI = prof.CLI
+			profileModelTier = prof.ModelTierDefault
+		}
+	}
+	cli := envchain.Resolve("EVOLVE_CLI", req.Env, profileCLI, "claude-p")
+	cliSource := "default"
+	switch {
+	case req.Env["EVOLVE_CLI"] != "" || os.Getenv("EVOLVE_CLI") != "":
+		cliSource = "env(EVOLVE_CLI)"
+	case profileCLI != "":
+		cliSource = "profile." + profileName + ".cli"
+	}
+	// Disambiguating dispatch log: tells observers which CLI is actually
+	// being invoked and why. Without this an output stream that says
+	// `model: claude-sonnet-4-6` could be misread as "codex delegating
+	// to claude" when the actual cause is "runner ignored profile.cli".
+	fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
+		phase, profileName, cli, cliSource, profilePath)
+
 	modelKey := envchain.PhaseEnvKey(phase, "MODEL")
-	model := envchain.Resolve(modelKey, req.Env, "", b.hooks.DefaultModel())
+	model := envchain.Resolve(modelKey, req.Env, profileModelTier, b.hooks.DefaultModel())
 	// Resolve the "auto" sentinel through llm_config.json + profile chain.
 	// Hooks.DefaultModel returns "auto" for most phases as a signal that
 	// the resolver should pick a concrete model based on phase role +
