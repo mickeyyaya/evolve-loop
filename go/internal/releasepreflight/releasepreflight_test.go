@@ -247,6 +247,59 @@ func TestRun_SkipTests(t *testing.T) {
 	}
 }
 
+// === Advisory simulation step (v12.1.5) =====================================
+// Table-driven: covers skip, dry-run, pass, fail-but-advisory. Asserts that
+// no path returns ErrCheckFailed (advisory) and that SimulationAdvisoryOK
+// is nil/true/false as appropriate. Verifies StepsPassed stays 5.
+func TestRun_SimulationAdvisory(t *testing.T) {
+	cases := []struct {
+		name        string
+		skipTests   bool
+		dryRun      bool
+		simErr      error
+		wantSimOK   *bool   // nil = skipped; true = pass; false = warn
+		wantLogHas  string  // substring expected on stderr
+	}{
+		{name: "skip-tests skips advisory", skipTests: true, wantSimOK: nil, wantLogHas: "skipped (--skip-tests)"},
+		{name: "dry-run skips advisory", dryRun: true, wantSimOK: nil, wantLogHas: "skipped (dry-run)"},
+		{name: "happy path → true", simErr: nil, wantSimOK: ptrBool(true), wantLogHas: "auto-respond simulation suite passed"},
+		{name: "bats failure → advisory warn, no error", simErr: errors.New("bats failed"), wantSimOK: ptrBool(false), wantLogHas: "advisory in v12.1.5"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := makeRepo(t, "1.0.0")
+			var buf bytes.Buffer
+			opts := stubOpts(r, "1.0.1")
+			opts.SkipTests = tc.skipTests
+			opts.DryRun = tc.dryRun
+			opts.Stderr = &buf
+			opts.SimulationRunner = func(string) error { return tc.simErr }
+
+			res, err := Run(opts)
+			if err != nil {
+				t.Fatalf("Run err = %v\nlog=%s", err, buf.String())
+			}
+			if res.StepsPassed != 5 {
+				t.Errorf("StepsPassed = %d, want 5 (advisory must not count)", res.StepsPassed)
+			}
+			gotPtr := res.SimulationAdvisoryOK
+			switch {
+			case tc.wantSimOK == nil && gotPtr != nil:
+				t.Errorf("SimulationAdvisoryOK = %v, want nil", *gotPtr)
+			case tc.wantSimOK != nil && gotPtr == nil:
+				t.Errorf("SimulationAdvisoryOK = nil, want %v", *tc.wantSimOK)
+			case tc.wantSimOK != nil && gotPtr != nil && *gotPtr != *tc.wantSimOK:
+				t.Errorf("SimulationAdvisoryOK = %v, want %v", *gotPtr, *tc.wantSimOK)
+			}
+			if tc.wantLogHas != "" && !strings.Contains(buf.String(), tc.wantLogHas) {
+				t.Errorf("log missing %q\nlog=%s", tc.wantLogHas, buf.String())
+			}
+		})
+	}
+}
+
+func ptrBool(b bool) *bool { return &b }
+
 // === Phantom-entry handling: walks past entries with missing artifacts ======
 func TestRun_PhantomEntries(t *testing.T) {
 	r := makeRepo(t, "1.0.0")

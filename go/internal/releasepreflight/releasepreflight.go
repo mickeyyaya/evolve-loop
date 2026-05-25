@@ -65,6 +65,7 @@ type Options struct {
 	GitClean         func(repoRoot string) (bool, error) // step 1
 	CurrentBranch    func(repoRoot string) (string, error) // step 2
 	GateTestRunner   func(repoRoot string, suite string) error // step 5
+	SimulationRunner func(repoRoot string) error // advisory step (post-step-5)
 }
 
 // Result captures what happened; populated even on failure for diagnostics.
@@ -77,6 +78,12 @@ type Result struct {
 	AuditAge        time.Duration
 	PhantomEntries  int
 	GateTestsPassed int
+
+	// SimulationAdvisoryOK records the outcome of the post-step-5 advisory
+	// auto-respond simulation suite run (v12.1.5+). nil = skipped (DryRun or
+	// SkipTests); &true = passed; &false = failed-but-advisory (logged as
+	// WARN but does not block release). Promotes to hard requirement in v12.2.0.
+	SimulationAdvisoryOK *bool
 }
 
 // Default gate-test suites (in run order). Tests can override Options.SkipTests
@@ -169,6 +176,29 @@ func defaultGateTestRunner(repoRoot string, suite string) error {
 	cmd := exec.Command("bash", filepath.Join(repoRoot, suite))
 	if err := cmd.Run(); err != nil {
 		return err
+	}
+	return nil
+}
+
+// defaultSimulationRunner runs the auto-respond simulation bats suite. Used by
+// the advisory step (v12.1.5+) that guards against manifest/policy regressions
+// in tools/agent-bridge/lib/manifests/*.json and lib/auto-respond.sh.
+//
+// Returns an error if bats is missing, the suite is missing, or any case fails.
+// The caller logs the error as WARN — this is advisory in v12.1.5 and becomes
+// blocking in v12.2.0.
+func defaultSimulationRunner(repoRoot string) error {
+	bats := os.Getenv("EVOLVE_BATS_BIN")
+	if bats == "" {
+		bats = "bats"
+	}
+	suite := filepath.Join(repoRoot, "tools", "agent-bridge", "tests", "simulation", "auto-respond-scenarios.bats")
+	if _, err := os.Stat(suite); err != nil {
+		return fmt.Errorf("simulation suite not found at %s: %w", suite, err)
+	}
+	cmd := exec.Command(bats, suite)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("bats run failed: %w", err)
 	}
 	return nil
 }
@@ -311,6 +341,30 @@ func Run(opts Options) (Result, error) {
 		}
 		logf("OK: all %d gate-test suites green", len(DefaultGateTestSuites))
 		res.StepsPassed++
+	}
+
+	// Advisory step (v12.1.5+): auto-respond simulation suite. Does NOT count
+	// toward StepsPassed/StepsTotal and never returns ErrCheckFailed; logged
+	// as WARN on failure. Promotes to a required step in v12.2.0.
+	if opts.SkipTests {
+		logf("advisory: auto-respond simulation suite — skipped (--skip-tests)")
+	} else if opts.DryRun {
+		logf("advisory: auto-respond simulation suite — skipped (dry-run)")
+	} else {
+		simRunner := opts.SimulationRunner
+		if simRunner == nil {
+			simRunner = defaultSimulationRunner
+		}
+		logf("advisory: running auto-respond simulation suite...")
+		if err := simRunner(opts.RepoRoot); err != nil {
+			f := false
+			res.SimulationAdvisoryOK = &f
+			logf("WARN: auto-respond simulation suite failed (advisory in v12.1.5; required in v12.2.0): %v", err)
+		} else {
+			t := true
+			res.SimulationAdvisoryOK = &t
+			logf("OK: auto-respond simulation suite passed")
+		}
 	}
 
 	dryRunSuffix := ""

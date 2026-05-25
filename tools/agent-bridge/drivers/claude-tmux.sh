@@ -204,11 +204,22 @@ BYPASS_MSG
     fi
 
     # Auto-respond fallback (P6.5): handle edge prompts that escape bypass
-    auto_respond_tick "$session"
-    local ar_rc=$?
+    local ar_action ar_rc
+    ar_action=$(auto_respond_tick "$session")
+    ar_rc=$?
     case "$ar_rc" in
       0|1)
         # 0=noop, 1=responded — keep polling
+        ;;
+      2)
+        # extend_timeout: 3rd-party hook (e.g., ECC gateguard fact-force) is
+        # making the LLM busy doing legitimate slow work. Bump artifact-poll
+        # deadline instead of declaring timeout.
+        local extend_secs="${ar_action#extend:}"
+        if [[ "$extend_secs" =~ ^[0-9]+$ ]]; then
+          artifact_wait_timeout=$((artifact_wait_timeout + extend_secs))
+          echo "[claude-tmux] artifact-poll deadline extended +${extend_secs}s → ${artifact_wait_timeout}s" >&2
+        fi
         ;;
       85)
         echo "[claude-tmux] auto-respond escalation; abandoning run" >&2

@@ -40,6 +40,13 @@
       "response_keys": "Enter",
       "policy": "auto_respond",
       "note": "Cosmetic redraw prompt; just press Enter"
+    },
+    {
+      "name": "fact_forcing_gate",
+      "regex": "Fact-Forcing Gate|present these facts|investigate before",
+      "response_keys": "60",
+      "policy": "extend_timeout",
+      "note": "ECC gateguard hook (gateguard-fact-force.js) demands the LLM articulate facts before writing. Adds 10-20s per Write. Instead of editing 3rd-party code, bridge recognizes the pattern and extends artifact-poll deadline by 60s. response_keys field carries the seconds to add."
     }
   ]
 }

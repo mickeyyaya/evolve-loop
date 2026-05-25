@@ -90,3 +90,39 @@ Writing artifact..."
   jq -e '.pattern_name == "rate_limit"' "$WS/escalation-report.json"
   jq -e '.suggested_rule_template != null' "$WS/escalation-report.json"
 }
+
+@test "T13.10 — fact_forcing_gate (Fact-Forcing Gate) → extend:60 rc=2" {
+  pane="◇ Fact-Forcing Gate: please present these facts before writing"
+  run auto_respond_decide "$pane" "$bridge_manifest_path" "$WS"
+  [ "$status" -eq 2 ]
+  [ "$output" = "extend:60" ]
+}
+
+@test "T13.11 — fact_forcing_gate alt regex (investigate before) → extend:60 rc=2" {
+  pane="The hook requires you to investigate before writing any file."
+  run auto_respond_decide "$pane" "$bridge_manifest_path" "$WS"
+  [ "$status" -eq 2 ]
+  [ "$output" = "extend:60" ]
+}
+
+@test "T13.12 — extend_timeout with non-integer keys → escalates" {
+  # Synthesize a manifest with a malformed extend_timeout (response_keys not integer).
+  local bad_manifest="$WS/bad-extend.json"
+  cat > "$bad_manifest" <<EOF
+{
+  "schema_version": 1,
+  "cli": "synthetic",
+  "interactive_prompts": [
+    {
+      "name": "bad_extend",
+      "regex": "TRIGGER",
+      "response_keys": "not-a-number",
+      "policy": "extend_timeout"
+    }
+  ]
+}
+EOF
+  run auto_respond_decide "TRIGGER stuck here" "$bad_manifest" "$WS"
+  [ "$status" -eq 85 ]
+  [ "$output" = "escalate:bad_extend" ]
+}

@@ -39,9 +39,13 @@ bridge_add_rule() {
     --policy=auto_respond \
     --note='unit test'
   [ "$status" -eq 0 ]
-  # Verify the entry is in the manifest
+  # Verify the entry is in the manifest. Count = baseline patterns in the
+  # claude-tmux manifest + 1 (the rule just added). Use a relative assertion
+  # so adding/removing baseline patterns in lib/manifests/claude-tmux.json
+  # doesn't break this test.
   count_after=$(jq -r '.interactive_prompts | length' "$TEST_LIB_DIR/manifests/claude-tmux.json")
-  [ "$count_after" -eq 5 ]
+  baseline=$(jq -r '.interactive_prompts | length' "${BATS_TEST_DIRNAME}/../../lib/manifests/claude-tmux.json")
+  [ "$count_after" -eq $((baseline + 1)) ]
   names=$(jq -r '.interactive_prompts[].name' "$TEST_LIB_DIR/manifests/claude-tmux.json" | tr '\n' ' ')
   [[ "$names" == *"test_rule_1"* ]]
 }

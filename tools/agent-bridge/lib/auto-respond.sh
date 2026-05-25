@@ -22,8 +22,15 @@
 # Action tokens / return codes:
 #   "noop"                rc=0   — nothing matched; caller continues loop
 #   "send:<csv-keys>"     rc=1   — caller should tmux send-keys
+#   "extend:<seconds>"    rc=2   — caller should bump artifact-poll deadline by N seconds
 #   "escalate:<name>"     rc=85  — known pattern with policy=escalate
 #   "loop_guard:<name>"   rc=86  — same pattern matched >5× this session
+#
+# extend_timeout policy semantics:
+#   manifests using policy="extend_timeout" overload response_keys to carry
+#   the integer seconds value (e.g., "60"). This avoids a new schema field
+#   for a low-frequency case. If a second extend_timeout pattern appears,
+#   migrate to a dedicated extend_seconds field.
 #
 # Bash 3.2-safe: no assoc arrays. Counts kept in workspace/auto-respond-counts.csv.
 
@@ -98,6 +105,15 @@ auto_respond_decide() {
       echo "send:$matched_keys"
       return 1
       ;;
+    extend_timeout)
+      # response_keys field carries the integer seconds value
+      if [[ -z "$matched_keys" || "$matched_keys" == "null" || ! "$matched_keys" =~ ^[0-9]+$ ]]; then
+        echo "escalate:$matched_name"
+        return 85
+      fi
+      echo "extend:$matched_keys"
+      return 2
+      ;;
     escalate|*)
       echo "escalate:$matched_name"
       return 85
@@ -144,6 +160,15 @@ auto_respond_tick() {
       fi
       echo "[auto-respond] sent keys: $keys_csv" >&2
       return 1
+      ;;
+    2)
+      # extend_timeout: emit the action token unchanged so caller can parse
+      # the seconds value. No tmux side-effect — just a signal to bump
+      # the artifact-poll deadline.
+      local extend_secs="${action#extend:}"
+      echo "[auto-respond] extend_timeout signal: +${extend_secs}s" >&2
+      echo "$action"
+      return 2
       ;;
     85)
       auto_respond_write_escalation_report "$workspace" "$pane" "${action#escalate:}" "$session"

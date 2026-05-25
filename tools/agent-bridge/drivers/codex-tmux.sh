@@ -168,10 +168,18 @@ drv_launch_codex_tmux() {
       echo "[codex-tmux] artifact appeared after ${elapsed}s: $artifact" >&2
       break
     fi
-    auto_respond_tick "$session"
-    local ar_rc=$?
+    local ar_action ar_rc
+    ar_action=$(auto_respond_tick "$session")
+    ar_rc=$?
     case "$ar_rc" in
       0|1) ;;
+      2)
+        local extend_secs="${ar_action#extend:}"
+        if [[ "$extend_secs" =~ ^[0-9]+$ ]]; then
+          artifact_wait_timeout=$((artifact_wait_timeout + extend_secs))
+          echo "[codex-tmux] artifact-poll deadline extended +${extend_secs}s → ${artifact_wait_timeout}s" >&2
+        fi
+        ;;
       85) echo "[codex-tmux] auto-respond escalation" >&2; return $EC_UNKNOWN_PROMPT ;;
       86) echo "[codex-tmux] auto-respond loop guard" >&2; return $EC_RESPOND_LOOP_GUARD ;;
     esac
