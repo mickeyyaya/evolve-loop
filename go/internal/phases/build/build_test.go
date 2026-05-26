@@ -235,81 +235,6 @@ func writeProfile(t *testing.T, contents string) string {
 	return root
 }
 
-// TestRun_PopulatesExtraFlagsFromProfile — profile carries extra_flags
-// and permission_mode; both must surface in the BridgeRequest the
-// phase hands to the bridge.
-func TestRun_PopulatesExtraFlagsFromProfile(t *testing.T) {
-	root := writeProfile(t, `{
-		"agent": "build",
-		"extra_flags": ["--require-full"],
-		"permission_mode": "acceptEdits"
-	}`)
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{writeArtifact: body}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	for _, want := range []string{"--require-full", "--permission-mode", "acceptEdits"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("ExtraFlags missing %q; got %v", want, fb.gotReq.ExtraFlags)
-		}
-	}
-}
-
-// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_BUILDER_PERMISSION_MODE
-// in req.Env beats the profile's permission_mode. The plan calls out
-// this precedence explicitly (Capability 1 design).
-func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
-	root := writeProfile(t, `{
-		"agent": "build",
-		"permission_mode": "acceptEdits"
-	}`)
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{writeArtifact: body}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "plan"},
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	if !strings.Contains(got, "--permission-mode plan") {
-		t.Errorf("env override not honored; got %v", fb.gotReq.ExtraFlags)
-	}
-	if strings.Contains(got, "acceptEdits") {
-		t.Errorf("profile value should be overridden, not appended; got %v", fb.gotReq.ExtraFlags)
-	}
-}
-
-// TestRun_ProfilePermissionModeOnly — env unset, profile sets mode.
-// Profile value wins.
-func TestRun_ProfilePermissionModeOnly(t *testing.T) {
-	root := writeProfile(t, `{
-		"agent": "build",
-		"permission_mode": "default"
-	}`)
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{writeArtifact: body}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	if !strings.Contains(got, "--permission-mode default") {
-		t.Errorf("profile permission_mode not propagated; got %v", fb.gotReq.ExtraFlags)
-	}
-}
-
 // TestRun_NoProfile_EmptyExtraFlags — missing profile is non-fatal;
 // ExtraFlags stays nil/empty. Regression guard against breaking the
 // build phase on fresh projects with no .evolve/profiles/.
@@ -341,9 +266,8 @@ func TestRun_NoProfile_EnvAloneStillWires(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	if !strings.Contains(got, "--permission-mode plan") {
-		t.Errorf("env-only permission mode not propagated; got %v", fb.gotReq.ExtraFlags)
+	if fb.gotReq.PermissionMode != "plan" {
+		t.Errorf("env-only permission mode not propagated; got %q", fb.gotReq.PermissionMode)
 	}
 }
 

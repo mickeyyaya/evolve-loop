@@ -30,7 +30,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -275,25 +274,26 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			}
 		}
 	}
-	// phaseflags.For takes the AGENT name (profileName) so that:
-	// (a) profile JSON lookup matches the file on disk, and
-	// (b) per-phase env-var keys match CLAUDE.md's documented
-	//     EVOLVE_<AGENT_UPPER>_<KEY> convention (e.g.,
-	//     EVOLVE_TDD_ENGINEER_PERMISSION_MODE, not EVOLVE_TDD_*).
-	extraFlags := phaseflags.For(profileName).Resolve(profileDir, req.Env)
+	// Per-phase permission-mode override: EVOLVE_<AGENT>_PERMISSION_MODE,
+	// resolved here with the AGENT name (profileName) so the env key matches
+	// CLAUDE.md's convention (EVOLVE_TDD_ENGINEER_PERMISSION_MODE, not
+	// EVOLVE_TDD_*). Passed as typed config — the bridge realizes it per-CLI
+	// via the LaunchIntent (no raw --permission-mode leak into non-claude
+	// launch commands). Empty = profile/realizer default (bypass).
+	permissionMode := envchain.Resolve(envchain.PhaseEnvKey(profileName, "PERMISSION_MODE"), req.Env, "", "")
 
 	bres, bridgeErr := b.bridge.Launch(ctx, core.BridgeRequest{
-		CLI:          cli,
-		Profile:      profilePath,
-		Model:        model,
-		Prompt:       prompt,
-		Workspace:    req.Workspace,
-		Worktree:     req.Worktree,
-		ArtifactPath: artifactPath,
-		Agent:        phase,
-		Cycle:        req.Cycle,
-		Env:          req.Env,
-		ExtraFlags:   extraFlags,
+		CLI:            cli,
+		Profile:        profilePath,
+		Model:          model,
+		Prompt:         prompt,
+		Workspace:      req.Workspace,
+		Worktree:       req.Worktree,
+		ArtifactPath:   artifactPath,
+		Agent:          phase,
+		Cycle:          req.Cycle,
+		Env:            req.Env,
+		PermissionMode: permissionMode,
 	})
 	durationMS := b.nowFn().Sub(start).Milliseconds()
 

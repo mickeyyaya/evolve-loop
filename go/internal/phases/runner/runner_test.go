@@ -454,36 +454,41 @@ func TestRun_SkipperReturnsFalse_BridgeStillRuns(t *testing.T) {
 	}
 }
 
-// TestRun_ExtraFlagsFromProfile — phaseflags integration: when the
-// profile has permission_mode set, --permission-mode appears in
-// BridgeRequest.ExtraFlags.
+// TestRun_PermissionModeOverride — the per-phase permission override
+// (EVOLVE_<AGENT>_PERMISSION_MODE) is resolved with the AGENT name and
+// passed as typed BridgeRequest.PermissionMode, NOT as a raw flag in
+// ExtraFlags (so it never leaks into a non-claude launch command — the
+// bridge realizes it per-CLI via the LaunchIntent).
 //
-// Profile filename uses the AGENT name (e.g., builder.json for the
-// build phase whose agent is "evolve-builder"), NOT the phase name.
-// Convention: TrimPrefix(AgentPromptName, "evolve-"). Pinned here so
-// any future change to the lookup convention has to update this test.
-func TestRun_ExtraFlagsFromProfile(t *testing.T) {
+// Profile filename uses the AGENT name (builder.json for the build phase
+// whose agent is "evolve-builder"), NOT the phase name. Convention:
+// TrimPrefix(AgentPromptName, "evolve-"). The env key follows the same
+// AGENT convention: EVOLVE_BUILDER_PERMISSION_MODE.
+func TestRun_PermissionModeOverride(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "builder.json"),
-		[]byte(`{"permission_mode":"plan","extra_flags":["--require-full"]}`), 0o644); err != nil {
+		[]byte(`{"name":"builder","cli":"claude-tmux"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
 	r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x")})
-	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+	_, err := r.Run(context.Background(), core.PhaseRequest{
+		ProjectRoot: root, Workspace: t.TempDir(),
+		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "plan"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	for _, want := range []string{"--require-full", "--permission-mode", "plan"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("ExtraFlags missing %q; got %v", want, fb.gotReq.ExtraFlags)
-		}
+	if fb.gotReq.PermissionMode != "plan" {
+		t.Errorf("PermissionMode = %q, want \"plan\" (from EVOLVE_BUILDER_PERMISSION_MODE)", fb.gotReq.PermissionMode)
+	}
+	if len(fb.gotReq.ExtraFlags) != 0 {
+		t.Errorf("ExtraFlags should be empty (permission is typed config, not a raw flag); got %v", fb.gotReq.ExtraFlags)
 	}
 }
 

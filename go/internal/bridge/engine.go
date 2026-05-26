@@ -219,6 +219,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)
 	}
+	// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
+	// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
+	// into a non-claude launch command.
+	if req.PermissionMode != "" {
+		args = append(args, "--permission-mode="+req.PermissionMode)
+	}
 	// The in-process entry is the autonomous runner's trusted path: it is the
 	// bypass authority, so it enables --allow-bypass for the tmux safety gates
 	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`

@@ -20,10 +20,10 @@ import (
 //  2. Pass B: re-run the phase with --permission-mode=acceptEdits,
 //     prepending the plan to the prompt via EVOLVE_<PHASE>_PLAN_INPUT.
 //
-// The actual permission-mode flag is appended to BridgeRequest.ExtraFlags
-// by phaseflags.For(name).Resolve (already wired in v12.1 Phase 2A).
-// This subcommand orchestrates the two dispatches and threads the plan
-// artifact between them.
+// Each pass sets EVOLVE_<PHASE>_PERMISSION_MODE; the phase runner resolves
+// it into the typed BridgeRequest.PermissionMode, which the bridge realizes
+// per-CLI via the LaunchIntent. This subcommand orchestrates the two
+// dispatches and threads the plan artifact between them.
 //
 // Exit codes:
 //   - 0  both passes succeeded
@@ -75,8 +75,8 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	}
 
 	// Pass A: plan mode. Sets EVOLVE_<PHASE>_PERMISSION_MODE=plan and
-	// EVOLVE_<PHASE>_PLAN_OUTPUT=<planPath>. phaseflags.Resolve picks
-	// these up and appends --permission-mode plan to ExtraFlags.
+	// EVOLVE_<PHASE>_PLAN_OUTPUT=<planPath>. The runner resolves the
+	// permission mode into BridgeRequest.PermissionMode (realized per-CLI).
 	planKey := envchain.PhaseEnvKey(phase, "PERMISSION_MODE")
 	outputKey := envchain.PhaseEnvKey(phase, "PLAN_OUTPUT")
 

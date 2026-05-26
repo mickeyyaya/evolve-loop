@@ -14,7 +14,7 @@
   "default_args": ["--dangerously-skip-permissions"],
   "tier_aliases": {},
   "params": {
-    "permission":     { "channel": "flag", "values": { "bypass": ["--dangerously-skip-permissions"], "plan": ["--permission-mode", "plan"] } },
+    "permission":     { "channel": "flag", "values": { "bypass": ["--dangerously-skip-permissions"], "plan": ["--permission-mode", "plan"], "acceptEdits": ["--permission-mode", "acceptEdits"], "default": ["--permission-mode", "default"], "dontAsk": ["--permission-mode", "dontAsk"], "auto": ["--permission-mode", "auto"] } },
     "model_tier":     { "channel": "flag", "flag": "--model", "from": "tier_alias" },
     "settings_scope": { "channel": "flag", "values": { "project": ["--setting-sources", "project"] } },
     "session_mode":   { "channel": "controller" },

@@ -40,7 +40,6 @@ type Profile struct {
 	ResearchQuota      map[string]int     `json:"research_quota,omitempty"`
 	Sandbox            *SandboxConfig     `json:"sandbox,omitempty"`
 	EffortLevel        string             `json:"effort_level,omitempty"`
-	ExtraFlags         []string           `json:"extra_flags,omitempty"`
 	AddDir             []string           `json:"add_dir,omitempty"`
 	PermissionMode     string             `json:"permission_mode,omitempty"`
 	StreamOutput       bool               `json:"stream_output,omitempty"`
