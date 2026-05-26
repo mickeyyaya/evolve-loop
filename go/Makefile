@@ -58,11 +58,11 @@ $(DIST_DIR)/evolve-%:
 dist-clean: ## Remove cross-compiled artifacts
 	rm -rf $(DIST_DIR)
 
-test: ## Run unit + adapter tests with race detector
-	$(GO) test -race -count=1 -cover $(PKG)
+test: ## Run unit + adapter tests with race detector (excludes per-cycle acs/)
+	$(GO) test -race -count=1 -cover $$($(GO) list ./... | grep -v '/acs/')
 
 cover: ## Per-package coverage report; fails if any package <85%
-	@$(GO) test -race -count=1 -coverprofile=coverage.txt $(PKG)
+	@$(GO) test -race -count=1 -coverprofile=coverage.txt $$($(GO) list ./... | grep -v '/acs/')
 	@$(GO) tool cover -func=coverage.txt | tee coverage.func.txt
 	@$(GO) tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage HTML: coverage.html"

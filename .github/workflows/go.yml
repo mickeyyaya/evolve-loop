@@ -46,7 +46,10 @@ jobs:
         run: make build
       - name: test (race + cover)
         run: |
-          go test -race -count=1 -coverprofile=coverage.txt ./...
+          # Exclude acs/ — per-cycle ACS predicate evals that read runtime
+          # artifacts (.evolve/runs/cycle-N/...) absent in CI; they run in the
+          # live cycle context, not the unit gate (matches the Makefile).
+          go test -race -count=1 -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
           go tool cover -func=coverage.txt
       - name: coverage gate (>=85% per internal/* package)
         run: |

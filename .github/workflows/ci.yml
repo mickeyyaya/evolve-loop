@@ -50,6 +50,10 @@ jobs:
       - name: Verify agent frontmatter has required fields
         run: |
           for agent in agents/evolve-*.md; do
+            # *-reference.md are Layer-3 on-demand reference docs loaded BY an
+            # agent, not dispatchable agents — they intentionally have no
+            # frontmatter, so skip them in this agent-frontmatter check.
+            case "$agent" in *-reference.md) continue ;; esac
             if ! head -1 "$agent" | grep -q "^---$"; then
               echo "FAIL: $agent missing YAML frontmatter"
               exit 1
