@@ -87,7 +87,6 @@
   "challenge_token_required": false,
   "extra_flags_by_cli": {
     "claude-tmux": [
-      "--bare",
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
       "--disable-slash-commands",
