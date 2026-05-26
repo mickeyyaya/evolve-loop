@@ -103,6 +103,37 @@ func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
 	}
 }
 
+// TestBuildCycleContext_PropagatesGoalText is the regression test for
+// the cycle-108 silent-drop bug #3: --goal-text "..." flag value must
+// land in CycleRequest.Context["goal"] so the Intent persona can
+// structure intent.md around the operator's actual goal rather than
+// inferring from leftover workspace artifacts.
+func TestBuildCycleContext_PropagatesGoalText(t *testing.T) {
+	cfg := loopConfig{
+		Strategy: "ultrathink",
+		GoalText: "auto-review pipeline for non-stop autonomy",
+	}
+	got := buildCycleContext(cfg)
+	if got["goal"] != "auto-review pipeline for non-stop autonomy" {
+		t.Errorf("goal not propagated; got %q", got["goal"])
+	}
+	if got["strategy"] != "ultrathink" {
+		t.Errorf("strategy not propagated; got %q", got["strategy"])
+	}
+}
+
+func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
+	// When --goal-text was not passed (operator used --goal-hash or
+	// resume), the "goal" key must NOT appear in Context — phases
+	// check for empty and skip the prompt-line, but defensive: keep
+	// the map minimal.
+	cfg := loopConfig{Strategy: "balanced"} // no GoalText
+	got := buildCycleContext(cfg)
+	if _, present := got["goal"]; present {
+		t.Errorf("empty GoalText must not add 'goal' key; got %v", got)
+	}
+}
+
 // TestBuildCycleEnv_BroadDocumentedFlagsSurface spot-checks several
 // documented EVOLVE_* flags from CLAUDE.md (intent, sandbox, triage,
 // build-planner, stdout-filter) to lock in the propagation contract.

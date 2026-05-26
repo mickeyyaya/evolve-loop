@@ -49,6 +49,14 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
 	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	// The persona's template instructs it to "parse the user's goal" —
+	// that requires the actual TEXT, not just the hash. When the
+	// operator passes --goal-text "...", the dispatcher routes it
+	// through Context["goal"] so intent.md gets structured around the
+	// real goal instead of inferred from leftover workspace artifacts.
+	if g := req.Context["goal"]; g != "" {
+		fmt.Fprintf(&b, "- goal: %s\n", g)
+	}
 	if isDeltaMode(req) {
 		b.WriteString("- mode: delta (emit intent-delta.md or [intent-unchanged] stub if goal_hash matches state.json:currentBatch.goalHash)\n")
 	} else {

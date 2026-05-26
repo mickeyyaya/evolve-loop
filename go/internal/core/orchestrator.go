@@ -71,6 +71,39 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	}
 }
 
+// archivePollutedWorkspace renames <workspace>/ to
+// <workspace>.polluted-<UTCnano>/ when it exists and is non-empty.
+// Returns nil for the empty-or-missing case (the cycle just runs in a
+// fresh directory). Returns the underlying error only when stat/rename
+// actually fails. Tests inject a deterministic clock via now.
+func archivePollutedWorkspace(workspace string, now func() time.Time) error {
+	info, err := os.Stat(workspace)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("stat workspace: %w", err)
+	}
+	if !info.IsDir() {
+		return nil
+	}
+	entries, err := os.ReadDir(workspace)
+	if err != nil {
+		return fmt.Errorf("readdir workspace: %w", err)
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+	stamp := now().UTC().Format("20060102T150405.000000000")
+	archived := workspace + ".polluted-" + stamp
+	if err := os.Rename(workspace, archived); err != nil {
+		return fmt.Errorf("rename to %s: %w", archived, err)
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] archived polluted workspace: %s -> %s (%d files)\n",
+		workspace, archived, len(entries))
+	return nil
+}
+
 // defaultGitHEAD runs `git rev-parse HEAD` in cwd.
 // Returns empty string on error AND emits a one-line WARN to stderr so
 // operators see the degraded-mode signal that yields SKIPPED_UNKNOWN.
@@ -131,6 +164,23 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		PhaseStartedAt: startedAt,
 		WorkspacePath:  fmt.Sprintf("%s/.evolve/runs/cycle-%d", req.ProjectRoot, cycle),
 		IntentRequired: intentRequired,
+	}
+	// Guard against workspace pollution from a prior killed attempt at
+	// the same cycle number. If `<workspace>/` exists and has files,
+	// rename to `<workspace>.polluted-<UTCnano>/` BEFORE any phase runs.
+	// Without this, leftover scout-report.md / build-report.md from the
+	// killed attempt cause Scout to short-circuit (read pre-existing
+	// artifacts in seconds instead of redoing discovery) and steer
+	// downstream phases via the OLD task selection.
+	// Source incident: cycle-108 meta-loop attempts 1-4 (2026-05-26).
+	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that
+	// pre-seed workspace files to simulate phase state.
+	if req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"] != "1" && os.Getenv("EVOLVE_DISABLE_WORKSPACE_GUARD") != "1" {
+		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
+			// Best-effort: WARN but don't block the cycle; the failure
+			// mode it prevents is bad-data steering, not safety.
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN workspace archive failed: %v\n", err)
+		}
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)

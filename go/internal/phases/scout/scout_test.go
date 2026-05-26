@@ -286,3 +286,37 @@ func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 		t.Errorf("profile value should be overridden, not appended; got %v", fb.gotReq.ExtraFlags)
 	}
 }
+
+// TestComposePrompt_InjectsGoalTextFromContext (cycle-108 bug #3): the
+// dispatcher routes --goal-text into Context["goal"]; Scout's prompt
+// must surface it so Scout treats the operator's goal as a constraint
+// when choosing between backlog work and the meta-goal.
+func TestComposePrompt_InjectsGoalTextFromContext(t *testing.T) {
+	h := hooks{}
+	req := core.PhaseRequest{
+		Cycle:       108,
+		GoalHash:    "abc",
+		ProjectRoot: "/p",
+		Workspace:   "/p/.evolve/runs/cycle-108",
+		Context: map[string]string{
+			"strategy": "ultrathink",
+			"goal":     "review the pipeline for self-healing",
+		},
+	}
+	got := h.ComposePrompt("BODY", req)
+	if !strings.Contains(got, "- goal: review the pipeline for self-healing") {
+		t.Errorf("expected goal text line in scout prompt, got: %q", got)
+	}
+	if !strings.Contains(got, "- strategy: ultrathink") {
+		t.Errorf("strategy still expected: %q", got)
+	}
+}
+
+func TestComposePrompt_OmitsGoalLineWhenContextEmpty(t *testing.T) {
+	h := hooks{}
+	req := core.PhaseRequest{Cycle: 1, GoalHash: "x", ProjectRoot: "/p", Workspace: "/w"}
+	got := h.ComposePrompt("BODY", req)
+	if strings.Contains(got, "- goal:") {
+		t.Errorf("no goal in Context should omit the line; got: %q", got)
+	}
+}

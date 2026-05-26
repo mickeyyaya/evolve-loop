@@ -347,3 +347,37 @@ func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
 		t.Errorf("profile value should be overridden, not appended; got %v", fb.gotReq.ExtraFlags)
 	}
 }
+
+// TestComposePrompt_InjectsGoalTextFromContext is the regression test
+// for cycle-108 bug #3. When the operator passed --goal-text "foo",
+// the dispatcher routes it through Context["goal"]; the intent
+// persona's prompt MUST surface it in the Cycle Context block so the
+// persona structures intent.md around the real goal rather than
+// inferring from workspace leftovers.
+func TestComposePrompt_InjectsGoalTextFromContext(t *testing.T) {
+	h := hooks{}
+	req := core.PhaseRequest{
+		Cycle:       108,
+		GoalHash:    "abc123",
+		ProjectRoot: "/p",
+		Workspace:   "/p/.evolve/runs/cycle-108",
+		Context:     map[string]string{"goal": "auto-review pipeline for non-stop autonomy"},
+	}
+	got := h.ComposePrompt("BODY", req)
+	if !strings.Contains(got, "- goal: auto-review pipeline for non-stop autonomy") {
+		t.Errorf("expected goal text line in prompt, got: %q", got)
+	}
+}
+
+func TestComposePrompt_OmitsGoalLineWhenContextEmpty(t *testing.T) {
+	h := hooks{}
+	req := core.PhaseRequest{Cycle: 1, GoalHash: "x", ProjectRoot: "/p", Workspace: "/w"}
+	got := h.ComposePrompt("BODY", req)
+	if strings.Contains(got, "- goal:") {
+		t.Errorf("no goal in Context should omit the line; got: %q", got)
+	}
+	// Other context still emitted (cycle, goal_hash, project_root, workspace, mode).
+	if !strings.Contains(got, "- cycle: 1") {
+		t.Errorf("cycle line missing: %q", got)
+	}
+}
