@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
@@ -69,10 +70,17 @@ const policyBlockAutoYes = "## Subagent Interactive Policy (auto_yes)\n\n" +
 type CmdRunner func(ctx context.Context, name string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (exitCode int, err error)
 
-// Adapter is the core.Bridge implementation.
+// Adapter is the core.Bridge implementation. It shells to the bash
+// tools/agent-bridge by default; when EVOLVE_BRIDGE_GO is enabled it
+// routes to the in-process native-Go bridge.Engine instead
+// (engineFactory), the M7 cutover seam. The default is bash until
+// shadow-parity is signed off — see docs (bridge-go-port).
 type Adapter struct {
 	binary string
 	runner CmdRunner
+	// engineFactory builds the in-process core.Bridge for the
+	// EVOLVE_BRIDGE_GO path. Defaulted in New; overridable in tests.
+	engineFactory func(env map[string]string) core.Bridge
 }
 
 // New constructs an Adapter using the given bridge binary path and
@@ -86,7 +94,13 @@ func New(binary string, runner CmdRunner) *Adapter {
 	if runner == nil {
 		runner = execRunner
 	}
-	return &Adapter{binary: binary, runner: runner}
+	return &Adapter{
+		binary: binary,
+		runner: runner,
+		engineFactory: func(env map[string]string) core.Bridge {
+			return gobridge.NewEngine(gobridge.Deps{Env: env})
+		},
+	}
 }
 
 // NewDefault constructs an Adapter with the conventional binary path
@@ -104,6 +118,15 @@ func NewDefault(projectRoot string) *Adapter {
 func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	if err := validate(req); err != nil {
 		return core.BridgeResponse{}, err
+	}
+	// M7 cutover: route to the in-process Go bridge when EVOLVE_BRIDGE_GO
+	// is enabled. Policy injection stays here (the adapter's job); the
+	// Engine materializes the prompt + reads the artifact, matching the
+	// bash path below.
+	if gobridge.EnabledFromEnv(req.Env) && a.engineFactory != nil {
+		inproc := req
+		inproc.Prompt = injectPolicyPrefix(req.Prompt, resolvePolicy(req.Agent, req.Env))
+		return a.engineFactory(req.Env).Launch(ctx, inproc)
 	}
 	// 1. Materialize prompt to a file under Workspace.
 	if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
@@ -188,6 +211,10 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 // Probe shells `bridge probe` and parses the {os, results: [...]} JSON
 // into a core.BridgeProbe.
 func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {
+	// M7 cutover: in-process probe when EVOLVE_BRIDGE_GO is enabled.
+	if gobridge.EnabledFromEnv(nil) && a.engineFactory != nil {
+		return a.engineFactory(nil).Probe(ctx)
+	}
 	var stdoutBuf, stderrBuf bytes.Buffer
 	exitCode, err := a.runner(ctx, a.binary, []string{"probe"}, os.Environ(), nil, &stdoutBuf, &stderrBuf)
 	if err != nil {
