@@ -24,6 +24,24 @@ type ParamSpec struct {
 	Values   map[string][]string `json:"values,omitempty"`   // enum intent value → flag tokens
 }
 
+// RealizeFor loads the embedded manifest for cli and realizes intent against
+// it. A missing/unreadable manifest realizes to an empty Realization — the
+// same no-op philosophy as an absent param: a launch is never aborted by the
+// realizer itself (the driver separately validates the CLI/binary).
+//
+// CAVEAT for the launch-path wiring (next slice): an empty Realization is
+// indistinguishable from "manifest missing" here, so a typo'd CLI name would
+// realize to zero flags rather than error. The caller MUST validate the CLI
+// (e.g. via the driver registry / LoadManifest) before trusting an empty
+// realization — do not infer "no flags needed" from an empty result.
+func RealizeFor(cli string, intent LaunchIntent) Realization {
+	m, err := LoadManifest(cli)
+	if err != nil {
+		return Realization{}
+	}
+	return Realize(m, intent)
+}
+
 // Realize maps a LaunchIntent onto a CLI's Realization using m.Params. Any
 // intent field whose param is absent from the manifest (or marked noop) emits
 // nothing — the property that makes a foreign/unsupported parameter unable to

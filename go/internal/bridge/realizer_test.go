@@ -33,8 +33,8 @@ func codexTmuxManifest() Manifest {
 		CLI: "codex-tmux", Binary: "codex",
 		TierAliases: map[string]string{"haiku": "gpt-5.4-mini", "sonnet": "gpt-5.4", "opus": "gpt-5.5"},
 		Params: map[string]ParamSpec{
-			"model_tier":     {Channel: "repl", Template: "/model {alias}", From: "tier_alias"},
-			"permission":     {Channel: "controller"}, // codex has no bypass flag; trust handled by the auto-responder
+			"model_tier":     {Channel: "flag", Flag: "-m", From: "tier_alias"}, // matches the real codex-tmux manifest + `codex -m` driver
+			"permission":     {Channel: "controller"},                          // codex has no bypass flag; trust handled by the auto-responder
 			"settings_scope": {Channel: "noop"},
 			"session_mode":   {Channel: "controller"},
 		},
@@ -93,18 +93,38 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 		}
 	})
 
-	t.Run("codex-tmux: model via post-boot REPL injection, permission via controller", func(t *testing.T) {
+	t.Run("codex-tmux: model via -m launch flag (tier_alias), permission via controller", func(t *testing.T) {
 		got := Realize(codexTmuxManifest(), intent)
-		if len(got.LaunchFlags) != 0 {
-			t.Fatalf("codex defines no launch flags here; got %v", got.LaunchFlags)
+		if !reflect.DeepEqual(got.LaunchFlags, []string{"-m", "gpt-5.4"}) {
+			t.Fatalf("LaunchFlags = %v, want [-m gpt-5.4] (tier_alias sonnet→gpt-5.4)", got.LaunchFlags)
 		}
-		if !reflect.DeepEqual(got.REPLInput, []string{"/model gpt-5.4"}) {
-			t.Fatalf("REPLInput = %v, want [/model gpt-5.4] (tier_alias sonnet→gpt-5.4 injected post-boot)", got.REPLInput)
+		if len(got.REPLInput) != 0 {
+			t.Fatalf("REPLInput = %v, want none (codex model is a launch flag, not REPL)", got.REPLInput)
 		}
 		if !got.Ephemeral {
 			t.Fatal("ephemeral controller hint expected")
 		}
 	})
+}
+
+// TestRealize_REPLChannel covers the post-boot REPL-injection channel — a
+// supported engine capability for CLIs whose model can only be set in-session.
+// No production manifest uses it today (every tmux CLI's model is a launch flag
+// or a no-op), so it's pinned here with a synthetic manifest so the channel
+// stays covered and documented as reserved.
+func TestRealize_REPLChannel(t *testing.T) {
+	m := Manifest{
+		CLI:         "hypo-tmux",
+		TierAliases: map[string]string{"sonnet": "model-x"},
+		Params:      map[string]ParamSpec{"model_tier": {Channel: "repl", Template: "/model {alias}", From: "tier_alias"}},
+	}
+	got := Realize(m, LaunchIntent{ModelTier: "sonnet"})
+	if !reflect.DeepEqual(got.REPLInput, []string{"/model model-x"}) {
+		t.Fatalf("REPLInput = %v, want [/model model-x]", got.REPLInput)
+	}
+	if len(got.LaunchFlags) != 0 {
+		t.Fatalf("repl channel must emit no launch flags; got %v", got.LaunchFlags)
+	}
 }
 
 func TestRealize_NamedSessionMode(t *testing.T) {

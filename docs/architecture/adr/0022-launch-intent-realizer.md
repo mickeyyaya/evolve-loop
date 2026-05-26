@@ -110,6 +110,13 @@ agy `model_tier` → `{"channel":"noop"}` (no model selector). codex `model_tier
   than fire-and-forget — otherwise a slow `/model` re-render races the prompt paste.
 - **Headless drivers:** realize the same intent to argv only (no REPL/controller channels); the
   `repl`/`controller` channels are no-ops there.
+- **De-dup `default_args` vs realized flags:** a manifest's `default_args` (e.g. claude's
+  `--dangerously-skip-permissions`) and the realized `permission=bypass` flag are the SAME flag from
+  two sources. The wiring must apply ONE — drop `default_args` for the realized launch (the realizer
+  is the single source of launch flags) or dedup — never emit both.
+- **RealizeFor empty-result caveat:** an empty `Realization` is indistinguishable from a missing
+  manifest. Validate the CLI (driver registry / LoadManifest) before trusting an empty result;
+  don't infer "no flags needed" from emptiness (a typo'd CLI would launch bare).
 
 ## Acceptance
 

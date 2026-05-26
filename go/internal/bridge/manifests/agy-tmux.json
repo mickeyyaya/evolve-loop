@@ -12,6 +12,12 @@
   "prompt_marker": "? for shortcuts",
   "default_model": "gemini-3.5-flash",
   "default_args": ["--dangerously-skip-permissions"],
+  "params": {
+    "model_tier":     { "channel": "noop" },
+    "permission":     { "channel": "flag", "values": { "bypass": ["--dangerously-skip-permissions"] } },
+    "settings_scope": { "channel": "noop" },
+    "session_mode":   { "channel": "controller" }
+  },
   "interactive_prompts": [
     {
       "name": "trust_prompt",

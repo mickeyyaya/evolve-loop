@@ -12,6 +12,12 @@
   "prompt_marker": "›",
   "default_model": "",
   "default_args": [],
+  "params": {
+    "model_tier":     { "channel": "flag", "flag": "-m", "from": "tier_alias" },
+    "permission":     { "channel": "controller" },
+    "settings_scope": { "channel": "noop" },
+    "session_mode":   { "channel": "controller" }
+  },
   "interactive_prompts": [
     {
       "name": "trust_prompt",
