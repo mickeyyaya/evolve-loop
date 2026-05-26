@@ -31,6 +31,8 @@ Commands:
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N --budget-usd X )
   ship       Atomic commit + push (native; v11.3.0)
               ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )
+  bridge     Native-Go multi-CLI agent bridge
+              ( bridge launch --cli=NAME ... | bridge probe | bridge version )
 
 Dispatch helpers (Phase 3a + 3b ports):
   detect-cli                Identify which AI CLI is driving the skill
