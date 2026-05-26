@@ -26,6 +26,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
 const (
@@ -55,6 +57,8 @@ type Config struct {
 
 	PollS          int
 	StallS         int
+	NudgeS         int    // soft-stall nudge threshold; 0 = disabled (opt-in)
+	NudgeBody      string // text appended to the agent inbox on soft stall
 	LoopN          int
 	LoopWindowS    int
 	ErrorRate      float64
@@ -87,6 +91,7 @@ type Observer struct {
 	cumulativeCost float64
 	cacheReadTok   int
 	cacheCreateTok int
+	nudged         bool
 	incidents      []map[string]any
 	loopHistory    []loopEntry
 	rateLimitHist  []time.Time
@@ -126,6 +131,11 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 	}
 	if cfg.StallS == 0 {
 		cfg.StallS = 600
+	}
+	// NudgeS is opt-in: 0 leaves the soft-stall nudge disabled. NudgeBody
+	// gets a default only when nudging is enabled.
+	if cfg.NudgeS > 0 && cfg.NudgeBody == "" {
+		cfg.NudgeBody = "You appear stalled. Summarize your current state, then either continue or finalize your artifact."
 	}
 	if cfg.LoopN == 0 {
 		cfg.LoopN = 6
@@ -230,6 +240,23 @@ OUTER:
 			// run stall rule
 			if obs.cfg.Scope == ScopeCycle || obs.cfg.Scope == ScopePhase {
 				stall := cfg.Now().Sub(obs.lastEventTS).Seconds()
+				// Soft-stall nudge (once) before the hard SIGTERM: append a
+				// nudge envelope a draining *-tmux driver can inject to prompt
+				// the agent to continue or finalize. Opt-in (NudgeS > 0).
+				if cfg.NudgeS > 0 && int(stall) >= cfg.NudgeS && !obs.nudged {
+					obs.nudged = true
+					if err := inbox.Append(cfg.Workspace, cfg.Agent, inbox.Envelope{
+						Kind:   inbox.KindNudge,
+						Body:   cfg.NudgeBody,
+						Source: "observer",
+					}, cfg.Now); err != nil {
+						logf("WARN soft-stall nudge append failed: %v", err)
+					}
+					obs.emit(eventsPath, "soft_stall_nudge", "WARN", map[string]any{
+						"idle_s":      int(stall),
+						"threshold_s": cfg.NudgeS,
+					})
+				}
 				if int(stall) >= cfg.StallS {
 					obs.emit(eventsPath, "stuck_no_output", "INCIDENT", map[string]any{
 						"idle_s":      int(stall),

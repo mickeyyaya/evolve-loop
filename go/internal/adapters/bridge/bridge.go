@@ -87,7 +87,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		return core.BridgeResponse{}, err
 	}
 	inproc := req
-	inproc.Prompt = injectPolicyPrefix(req.Prompt, resolvePolicy(req.Agent, req.Env))
+	inproc.Prompt = injectRulesPrefix(injectPolicyPrefix(req.Prompt, resolvePolicy(req.Agent, req.Env)), req.SystemPrompt)
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
 }
 
@@ -154,4 +154,16 @@ func injectPolicyPrefix(prompt, policy string) string {
 	default: // PolicyRecommendedOrFirst and unknown values both inject the default block
 		return policyBlockRecommendedOrFirst + prompt
 	}
+}
+
+// injectRulesPrefix prepends a "## Rules" block carrying the per-agent
+// launch-time system prompt (facet B). Empty rules pass through unchanged.
+// Applied at the same seam as injectPolicyPrefix so it is CLI-agnostic —
+// headless and tmux drivers alike — and sidesteps launchCmdLine's lack of
+// shell-quoting (a multi-line system prompt never touches the launch argv).
+func injectRulesPrefix(prompt, rules string) string {
+	if rules == "" {
+		return prompt
+	}
+	return "## Rules\n\n" + rules + "\n\n---\n\n" + prompt
 }
