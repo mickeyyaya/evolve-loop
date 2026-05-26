@@ -34,6 +34,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/systemprompt"
 )
 
 // Hooks captures the per-phase variation points BaseRunner delegates
@@ -281,6 +282,9 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// via the LaunchIntent (no raw --permission-mode leak into non-claude
 	// launch commands). Empty = profile/realizer default (bypass).
 	permissionMode := envchain.Resolve(envchain.PhaseEnvKey(profileName, "PERMISSION_MODE"), req.Env, "", "")
+	// Facet B: resolve the per-agent launch-time system prompt / rules
+	// (profileName keys both the profile lookup and the EVOLVE_<AGENT>_* env).
+	sysPrompt := systemprompt.Resolve(profileName, profileDir, req.Env)
 
 	bres, bridgeErr := b.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:            cli,
@@ -294,6 +298,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		Cycle:          req.Cycle,
 		Env:            req.Env,
 		PermissionMode: permissionMode,
+		SystemPrompt:   sysPrompt,
 	})
 	durationMS := b.nowFn().Sub(start).Milliseconds()
 

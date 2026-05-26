@@ -45,6 +45,12 @@ type Profile struct {
 	StreamOutput       bool               `json:"stream_output,omitempty"`
 	StopCriterion      string             `json:"stop_criterion,omitempty"`
 	TurnBudgetHint     int                `json:"turn_budget_hint,omitempty"`
+	// SystemPrompt / SystemPromptFile carry per-agent system-level rules
+	// prepended to the prompt at launch (facet B). SystemPromptFile is read
+	// relative to the profile dir when not absolute; SystemPrompt wins if both
+	// are set.
+	SystemPrompt     string `json:"system_prompt,omitempty"`
+	SystemPromptFile string `json:"system_prompt_file,omitempty"`
 	// Raw retains the on-disk bytes for callers needing un-modeled
 	// fields (e.g., parallel_subtasks, context_anchors). Populated by
 	// the loader; not part of the JSON schema.

@@ -257,6 +257,9 @@ type BridgeRequest struct {
 	// passed as typed config, NOT a raw flag, so it never leaks into a
 	// non-claude launch command. Empty = profile/realizer default (bypass).
 	PermissionMode string `json:"permission_mode,omitempty"`
+	// SystemPrompt is the per-agent launch-time rules block prepended to the
+	// prompt body (facet B). Resolved by the runner via systemprompt.Resolve.
+	SystemPrompt string `json:"system_prompt,omitempty"`
 }
 
 // BridgeResponse is the bridge's JSON-parsed reply.
