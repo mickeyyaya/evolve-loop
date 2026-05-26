@@ -170,6 +170,37 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 		return code
 
+	case "billing":
+		if len(rest) == 0 {
+			fmt.Fprintln(stderr, "Usage: evolve bridge billing snapshot DIR LABEL | compare BEFORE AFTER")
+			return 10
+		}
+		switch rest[0] {
+		case "snapshot":
+			if len(rest) < 3 {
+				fmt.Fprintln(stderr, "Usage: evolve bridge billing snapshot DIR LABEL")
+				return 10
+			}
+			p, err := eng.BillingSnapshot(rest[1], rest[2])
+			if err != nil {
+				fmt.Fprintf(stderr, "evolve bridge billing: %v\n", err)
+				return 10
+			}
+			fmt.Fprintln(stdout, p)
+			return 0
+		case "compare":
+			if len(rest) < 3 {
+				fmt.Fprintln(stderr, "Usage: evolve bridge billing compare BEFORE AFTER")
+				return 10
+			}
+			verdict, code := bridge.BillingCompare(rest[1], rest[2])
+			fmt.Fprintln(stdout, verdict)
+			return code
+		default:
+			fmt.Fprintf(stderr, "evolve bridge billing: unknown subcommand %q\n", rest[0])
+			return 10
+		}
+
 	case "version", "-v", "--version":
 		fmt.Fprintln(stdout, version.Get())
 		return 0

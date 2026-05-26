@@ -99,3 +99,27 @@ func TestRunBridge_Doctor(t *testing.T) {
 		t.Fatalf("doctor --help exit = %d, want 0", c)
 	}
 }
+
+func TestRunBridge_Billing(t *testing.T) {
+	dir := t.TempDir()
+	var out, errb bytes.Buffer
+	if code := runBridge([]string{"billing", "snapshot", dir, "pre"}, nil, &out, &errb); code != 0 {
+		t.Fatalf("billing snapshot exit = %d; stderr=%q", code, errb.String())
+	}
+	snap := strings.TrimSpace(out.String())
+	if !strings.Contains(snap, "snap-pre-") {
+		t.Fatalf("snapshot path = %q", snap)
+	}
+	// compare a snapshot against itself → a valid verdict code (0/1/2).
+	var out2 bytes.Buffer
+	if c := runBridge([]string{"billing", "compare", snap, snap}, nil, &out2, &errb); c < 0 || c > 2 {
+		t.Fatalf("billing compare exit = %d, want 0/1/2", c)
+	}
+	// usage / arity errors → 10
+	for _, args := range [][]string{{"billing"}, {"billing", "snapshot"}, {"billing", "compare"}, {"billing", "bogus"}} {
+		var o bytes.Buffer
+		if c := runBridge(args, nil, &o, &errb); c != 10 {
+			t.Fatalf("billing %v exit = %d, want 10", args, c)
+		}
+	}
+}
