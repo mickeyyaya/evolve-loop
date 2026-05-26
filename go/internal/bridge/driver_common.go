@@ -134,3 +134,81 @@ func isDir(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()
 }
+
+// artifactReady reports whether the phase artifact is present and non-empty.
+// It accepts the canonical cfg.Artifact path and, as a tolerance for agent
+// doc-compliance variance, a single fallback: <workspace>/workspace/<basename>.
+// Some agents read the "workspace/" prefix in the agent docs as a literal
+// subdir under their cwd rather than the workspace directory, writing
+// <workspace>/workspace/<file>; the driver only polls the canonical path, so
+// that write caused the cycle-108 ExitArtifactTimeout. When the artifact is
+// found in the fallback location it is relocated to the canonical path (the
+// single source of truth that downstream phases read), and relocatedFrom
+// returns the fallback path so the caller can log the normalization. Empty
+// files never count (matching fileNonEmpty / the bash `[[ -s ]]` test).
+// See docs/architecture/adr/0024-conditional-ship-gate-floor-and-phase-advisor.md.
+func artifactReady(cfg *Config) (ready bool, relocatedFrom string) {
+	if fileNonEmpty(cfg.Artifact) {
+		return true, ""
+	}
+	fallback := filepath.Join(cfg.Workspace, "workspace", filepath.Base(cfg.Artifact))
+	if fallback != cfg.Artifact && fileNonEmpty(fallback) {
+		if err := relocateFile(fallback, cfg.Artifact); err == nil {
+			return true, fallback
+		}
+	}
+	return false, ""
+}
+
+// relocateFile moves src to dst, creating dst's parent directory. It tries an
+// atomic rename first and falls back to copy+remove when rename fails (e.g. a
+// cross-device move). Used by artifactReady to canonicalize a non-canonical
+// artifact write.
+func relocateFile(src, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("relocate: mkdir dst dir: %w", err)
+	}
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("relocate: read src: %w", err)
+	}
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		return fmt.Errorf("relocate: write dst: %w", err)
+	}
+	_ = os.Remove(src)
+	return nil
+}
+
+// listWorkspaceFiles returns "relpath (N bytes)" lines for every regular file
+// under ws (recursing one workspace/ level deep). Used to make an
+// artifact-wait timeout self-diagnosing: instead of only reporting the path
+// that did NOT appear, the driver lists what the agent actually wrote so an
+// operator can see a misplaced artifact at a glance. Best-effort: a walk error
+// yields a single diagnostic line rather than failing the caller.
+func listWorkspaceFiles(ws string) []string {
+	var out []string
+	err := filepath.Walk(ws, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries; keep walking
+		}
+		if info.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(ws, path)
+		if relErr != nil {
+			rel = path
+		}
+		out = append(out, fmt.Sprintf("%s (%d bytes)", rel, info.Size()))
+		return nil
+	})
+	if err != nil {
+		return []string{fmt.Sprintf("(walk error: %v)", err)}
+	}
+	if len(out) == 0 {
+		return []string{"(workspace is empty)"}
+	}
+	return out
+}
