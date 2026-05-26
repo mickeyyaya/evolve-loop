@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "cli": "codex-tmux",
+  "binary": "codex",
+  "binary_min_version": "0.13.0",
+  "default_tier": "hybrid",
+  "tier_dependencies": {
+    "full":     ["codex", "tmux"],
+    "hybrid":   ["codex", "tmux"],
+    "degraded": ["codex"]
+  },
+  "prompt_marker": "›",
+  "default_model": "",
+  "default_args": [],
+  "params": {
+    "model_tier":     { "channel": "flag", "flag": "-m", "from": "tier_alias" },
+    "permission":     { "channel": "controller" },
+    "settings_scope": { "channel": "noop" },
+    "session_mode":   { "channel": "controller" }
+  },
+  "interactive_prompts": [
+    {
+      "name": "trust_prompt",
+      "regex": "Do you trust the contents of this directory|Trust this directory",
+      "response_keys": "1,Enter",
+      "policy": "auto_respond",
+      "note": "codex asks to trust dir on first launch; '1' = yes/trust"
+    },
+    {
+      "name": "auth_recheck",
+      "regex": "Please log in|sign in to ChatGPT|Authentication required",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Bridge cannot complete OAuth; escalate"
+    },
+    {
+      "name": "rate_limit",
+      "regex": "rate.?limit|too many requests|429|quota exceeded",
+      "response_keys": null,
+      "policy": "escalate"
+    }
+  ],
+  "stub": false,
+  "tier_aliases": {
+    "haiku":  "gpt-5.4-mini",
+    "sonnet": "gpt-5.4",
+    "opus":   "gpt-5.5"
+  },
+  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same tier_aliases as the codex-headless driver."
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "cli": "agy-tmux",
+  "binary": "agy",
+  "binary_min_version": "1.0.0",
+  "default_tier": "hybrid",
+  "tier_dependencies": {
+    "full":     ["agy", "tmux"],
+    "hybrid":   ["agy", "tmux"],
+    "degraded": ["agy"]
+  },
+  "prompt_marker": "? for shortcuts",
+  "default_model": "gemini-3.5-flash",
+  "default_args": ["--dangerously-skip-permissions"],
+  "params": {
+    "model_tier":     { "channel": "noop" },
+    "permission":     { "channel": "flag", "values": { "bypass": ["--dangerously-skip-permissions"] } },
+    "settings_scope": { "channel": "noop" },
+    "session_mode":   { "channel": "controller" }
+  },
+  "interactive_prompts": [
+    {
+      "name": "trust_prompt",
+      "regex": "Do you trust the contents of this project|Antigravity CLI requires permission",
+      "response_keys": "Enter",
+      "policy": "auto_respond",
+      "note": "agy asks to trust dir on first launch; default selection is 'Yes, I trust this folder'"
+    },
+    {
+      "name": "auth_recheck",
+      "regex": "Please log in|Authentication required|Login expired",
+      "response_keys": null,
+      "policy": "escalate"
+    },
+    {
+      "name": "rate_limit",
+      "regex": "rate.?limit|too many requests|429|RESOURCE_EXHAUSTED",
+      "response_keys": null,
+      "policy": "escalate"
+    },
+    {
+      "name": "quota_exhausted",
+      "regex": "quota.*exceed|daily limit|monthly limit|free.tier limit",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Distinguishable from transient rate-limit; usually requires plan upgrade"
+    },
+    {
+      "name": "permission_prompt",
+      "regex": "Allow .*\\?|Grant permission|Approve action",
+      "response_keys": "y,Enter",
+      "policy": "auto_respond",
+      "note": "Belt-and-suspenders alongside --dangerously-skip-permissions; harmless if bypass already accepted it"
+    }
+  ],
+  "stub": false,
+  "tier_aliases": {
+    "haiku":  "gemini-3.5-flash",
+    "sonnet": "gemini-3.5-flash",
+    "opus":   "gemini-3.5-flash"
+  },
+  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text — unique to the idle state. agy has no CLI model selector."
+}

@@ -81,20 +81,19 @@
   },
   "max_turns": 42,
   "turn_budget_hint": 12,
-  "stop_criterion": "For multi-stream breadth-first audits: enumerate each stream sequentially and stop each stream once sufficient evidence is captured to propose a task. Do NOT exhaustively read every referenced file. If a stream (e.g. adaptive-routing phases) has a complete spec doc, read the spec summary only — do not recurse into all referenced architecture docs. Target: 1–2 reads per stream, 3–4 reads for the primary stream with a complete spec. Stop and write the report once all streams are enumerated and at least one task proposal is ready.",
+  "stop_criterion": "For multi-stream breadth-first audits: enumerate each stream sequentially and stop each stream once sufficient evidence is captured to propose a task. Do NOT exhaustively read every referenced file. If a stream (e.g. adaptive-routing phases) has a complete spec doc, read the spec summary only \u2014 do not recurse into all referenced architecture docs. Target: 1\u20132 reads per stream, 3\u20134 reads for the primary stream with a complete spec. Stop and write the report once all streams are enumerated and at least one task proposal is ready.",
   "effort_level": "medium",
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/scout-report.md",
   "challenge_token_required": true,
-  "extra_flags": [
-    "--bare",
-    "--no-session-persistence",
-    "--strict-mcp-config",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
   "parallel_subtasks": [
     {
       "name": "codebase",

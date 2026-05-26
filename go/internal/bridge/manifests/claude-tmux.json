@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "cli": "claude-tmux",
+  "binary": "claude",
+  "binary_min_version": "2.1.0",
+  "default_tier": "hybrid",
+  "tier_dependencies": {
+    "full":     ["claude", "tmux"],
+    "hybrid":   ["claude", "tmux"],
+    "degraded": ["claude"]
+  },
+  "prompt_marker": "❯",
+  "default_model": "haiku",
+  "default_args": ["--dangerously-skip-permissions"],
+  "tier_aliases": {},
+  "params": {
+    "permission":     { "channel": "flag", "values": { "bypass": ["--dangerously-skip-permissions"], "plan": ["--permission-mode", "plan"] } },
+    "model_tier":     { "channel": "flag", "flag": "--model", "from": "tier_alias" },
+    "settings_scope": { "channel": "flag", "values": { "project": ["--setting-sources", "project"] } },
+    "session_mode":   { "channel": "controller" },
+    "allowed_tools":  { "channel": "flag", "flag": "--allowedTools" }
+  },
+  "interactive_prompts": [
+    {
+      "name": "askuserquestion_multiselect",
+      "regex": "(?s)\\[ \\].*Enter to select",
+      "response_keys": "Enter,Right,Enter",
+      "policy": "auto_respond",
+      "note": "claude AskUserQuestion multiSelect: '[ ]' checkboxes + the 'Enter to select' menu footer. Verified 2026-05-26: Enter toggles the highlighted checkbox, Right moves to the Submit tab, Enter submits → recommended_or_first (keystrokes are PACED — see autoRespondInterKeyPause). Requires BOTH a '[ ]' checkbox AND the menu footer so a bare markdown checklist in agent output ('1. [ ] do thing') does NOT false-match, and so the rule keeps matching after the first checkbox toggles (other rows stay '[ ]') — enabling a retry if the first submit misses. MUST precede askuserquestion_select: a multi-select pane also contains that footer, so the checkbox rule must win (first-match). --dangerously-skip-permissions does NOT suppress this (a question is not a permission)."
+    },
+    {
+      "name": "askuserquestion_select",
+      "regex": "Enter to select.*navigate",
+      "response_keys": "Enter",
+      "policy": "auto_respond",
+      "note": "claude AskUserQuestion single-select: first option pre-highlighted ('❯ 1.'); footer 'Enter to select · ↑/↓ to navigate · Esc to cancel'. Verified 2026-05-26: a single Enter selects the highlighted first option = recommended_or_first. Layer-2 net behind the prompt-prefix interactive policy (Layer 1)."
+    },
+    {
+      "name": "auth_recheck",
+      "regex": "Please log in|Authentication required|Login expired",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Bridge cannot complete OAuth; escalate to operator"
+    },
+    {
+      "name": "rate_limit",
+      "regex": "rate.?limit|too many requests|429",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Operator decides retry vs abandon"
+    },
+    {
+      "name": "model_deprecation_continue",
+      "regex": "model is deprecated.*[Cc]ontinue",
+      "response_keys": "y,Enter",
+      "policy": "auto_respond",
+      "note": "Common edge case on model rollover; comma-separated key names"
+    },
+    {
+      "name": "terminal_resize_redraw",
+      "regex": "Terminal too small.*resize",
+      "response_keys": "Enter",
+      "policy": "auto_respond",
+      "note": "Cosmetic redraw prompt; just press Enter"
+    }
+  ],
+  "_notes_on_removed_patterns": {
+    "fact_forcing_gate": "REMOVED v12.1.5 after live-smoke forensics (workspace bridge-t7-G3mPzn). The ECC gateguard PreToolUse hook fires once per Write attempt and Claude recovers natively — it presents the 4 requested facts and retries the Write. Neither extend_timeout nor auto_respond is appropriate: extend_timeout doesn't help (Claude isn't slow, it's just sequencing tool calls), and auto_respond stacks identical messages at the prompt every poll-tick because the gate error remains visible in pane scrollback, interfering with Claude's own recovery. The correct bridge behavior is no rule — let Claude handle the hook natively. Re-introduce only with dedupe logic that suppresses re-fires within a single agent turn (v12.1.6+ design)."
+  }
+}

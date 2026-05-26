@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "cli": "agy",
+  "binary": "agy",
+  "binary_min_version": "1.0.0",
+  "default_tier": "full",
+  "tier_dependencies": {
+    "full": ["agy"]
+  },
+  "prompt_marker": null,
+  "default_model": "gemini-3.5-flash",
+  "default_args": ["--dangerously-skip-permissions"],
+  "interactive_prompts": [
+    {
+      "name": "auth_recheck",
+      "regex": "Authentication required|Please log in|Sign in to (Antigravity|Google|Gemini)|Login expired",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Bridge cannot complete OAuth/Google login; escalate to operator"
+    },
+    {
+      "name": "rate_limit",
+      "regex": "rate.?limit|too many requests|429|RESOURCE_EXHAUSTED",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Operator decides retry vs abandon"
+    },
+    {
+      "name": "quota_exhausted",
+      "regex": "quota.*exceed|daily limit|monthly limit|free.tier limit",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Distinguishable from transient rate-limit; usually requires plan upgrade"
+    },
+    {
+      "name": "permission_prompt",
+      "regex": "Allow .*\\?|Grant permission|Approve action",
+      "response_keys": "y,Enter",
+      "policy": "auto_respond",
+      "note": "Belt-and-suspenders alongside --dangerously-skip-permissions; harmless if bypass already accepted it"
+    }
+  ],
+  "stub": false,
+  "tier_aliases": {
+    "haiku":  "gemini-3.5-flash",
+    "sonnet": "gemini-3.5-flash",
+    "opus":   "gemini-3.5-flash"
+  },
+  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy CLI exposes no model selection flag (-c is --continue, not --config). Per operator directive 2026-05-21: all Claude tier aliases map to agy's default (gemini-3.5-flash). Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
+}

@@ -55,6 +55,7 @@ var commands = []subcommand{
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
+	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
 
 	// Phase 3a + 3b dispatch helpers (ported from bash).
 	{Name: "detect-cli", Summary: "Identify driving AI CLI", Run: runDetectCLI},

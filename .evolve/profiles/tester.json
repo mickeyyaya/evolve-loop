@@ -69,19 +69,19 @@
   ],
   "max_budget_usd": 0.5,
   "max_turns": 25,
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",
-  "extra_flags": [
-    "--no-session-persistence",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project",
-    "--plugin-dir",
-    ".evolve/plugin"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project",
+      "--plugin-dir",
+      ".evolve/plugin"
+    ]
+  },
   "sandbox": {
     "enabled": true,
     "write_subpaths": [
@@ -109,6 +109,6 @@
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude — same safety reasoning as builder.",
+  "_note": "Restricted to claude \u2014 same safety reasoning as builder.",
   "stream_output": true
 }

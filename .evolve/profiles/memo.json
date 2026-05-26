@@ -83,18 +83,17 @@
   "max_turns": 15,
   "turn_budget_hint": 8,
   "effort_level": "medium",
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/carryover-todos.json",
   "challenge_token_required": false,
-  "extra_flags": [
-    "--bare",
-    "--no-session-persistence",
-    "--strict-mcp-config",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
   "sandbox": {
     "enabled": true,
     "write_subpaths": [
