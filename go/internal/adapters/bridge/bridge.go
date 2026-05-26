@@ -11,6 +11,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -74,8 +75,7 @@ func New() *Adapter {
 // for call-site stability (every phase passes req.ProjectRoot) and is
 // reserved for future project-root-relative manifest resolution; the
 // Engine currently resolves paths from the request, so it is unused here.
-func NewDefault(projectRoot string) *Adapter {
-	_ = projectRoot
+func NewDefault(projectRoot string) *Adapter { //nolint:unparam // projectRoot reserved for call-site stability
 	return New()
 }
 
@@ -99,23 +99,16 @@ func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {
 func validate(req core.BridgeRequest) error {
 	switch "" {
 	case req.CLI:
-		return errBridge("CLI required")
+		return errors.New("bridge: CLI required")
 	case req.Profile:
-		return errBridge("Profile required")
+		return errors.New("bridge: Profile required")
 	case req.Workspace:
-		return errBridge("Workspace required")
+		return errors.New("bridge: Workspace required")
 	case req.ArtifactPath:
-		return errBridge("ArtifactPath required")
+		return errors.New("bridge: ArtifactPath required")
 	}
 	return nil
 }
-
-// errBridge builds the "bridge: <msg>" errors the validate gate returns.
-func errBridge(msg string) error { return &bridgeError{msg} }
-
-type bridgeError struct{ msg string }
-
-func (e *bridgeError) Error() string { return "bridge: " + e.msg }
 
 // resolvePolicy returns the effective interactive policy for the given
 // agent. The lookup chain is two layered envchain.Resolve calls — the

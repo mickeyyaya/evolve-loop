@@ -19,6 +19,10 @@ import (
 // the e2e harness can drive the full cycle path without a live CLI.
 // Outside testing the default name is always used, so a stray override in
 // a production environment can never redirect a real launch.
+//
+// defaultName must be a base binary name (claude|codex|agy) — NOT a driver
+// alias like "claude-tmux" — so the derived env key (BRIDGE_<UPPER>_BINARY)
+// is a valid shell variable. All six drivers pass the base name.
 func resolveBinary(deps Deps, defaultName string) string {
 	if v, _ := lookupEnv(deps, "BRIDGE_TESTING"); v != "1" {
 		return defaultName
