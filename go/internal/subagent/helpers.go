@@ -17,10 +17,10 @@ import (
 // to workspace/abnormal-events.jsonl. Best-effort; missing workspace dir is
 // a no-op (matches bash `[ -d "$_ws" ] || return 0`).
 type AbnormalEvent struct {
-	EventType        string
-	Severity         string
-	Details          string
-	RemediationHint  string
+	EventType       string
+	Severity        string
+	Details         string
+	RemediationHint string
 	// SourcePhase is fixed to "subagent-run" in bash. Exposed here so callers
 	// who run from a different phase scope can override (e.g. fanout aggregator).
 	SourcePhase string
@@ -85,9 +85,10 @@ type QuotaLikelyOptions struct {
 // Mirrors _quota_likely at subagent-run.sh:139.
 //
 // Returns true iff:
-//   (1) stderr tail is empty/whitespace/"<empty>"
-//   (2) DangerPct < 100 (100 disables heuristic)
-//   (3) CostLookup succeeds and currentCost >= cap * danger_pct / 100
+//
+//	(1) stderr tail is empty/whitespace/"<empty>"
+//	(2) DangerPct < 100 (100 disables heuristic)
+//	(3) CostLookup succeeds and currentCost >= cap * danger_pct / 100
 //
 // DangerPct=0 makes condition (3) trivially true (every empty-stderr fail
 // classifies — useful under low-budget runs).
@@ -119,16 +120,16 @@ func QuotaLikely(req QuotaLikelyRequest, opts QuotaLikelyOptions) bool {
 // FanoutLedgerEntry is the typed input to WriteFanoutLedgerEntry. Mirrors
 // the args of bash _write_fanout_ledger_entry at subagent-run.sh:1635.
 type FanoutLedgerEntry struct {
-	Cycle           int
-	Agent           string
-	ChallengeToken  string
-	GitHEAD         string
-	TreeStateSHA    string
-	WorkerNames     []string // space-separated in bash; we use a typed slice
-	WorkerCount     int
-	ExitCode        int
-	AggregatePath   string // may be empty when no aggregate produced
-	QualityTier     string // default "unknown"
+	Cycle          int
+	Agent          string
+	ChallengeToken string
+	GitHEAD        string
+	TreeStateSHA   string
+	WorkerNames    []string // space-separated in bash; we use a typed slice
+	WorkerCount    int
+	ExitCode       int
+	AggregatePath  string // may be empty when no aggregate produced
+	QualityTier    string // default "unknown"
 }
 
 // WriteFanoutLedgerEntry appends a single `kind: "agent_fanout"` entry to

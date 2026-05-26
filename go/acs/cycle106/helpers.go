@@ -14,7 +14,7 @@ import (
 // minStorage is a minimal in-memory Storage stub for orchestrator tests.
 type minStorage struct{ cs core.CycleState }
 
-func (s *minStorage) ReadState(_ context.Context) (core.State, error) { return core.State{}, nil }
+func (s *minStorage) ReadState(_ context.Context) (core.State, error)  { return core.State{}, nil }
 func (s *minStorage) WriteState(_ context.Context, _ core.State) error { return nil }
 func (s *minStorage) ReadCycleState(_ context.Context) (core.CycleState, error) {
 	return s.cs, nil

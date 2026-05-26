@@ -64,11 +64,11 @@ type Observer interface {
 // Full field set is round-tripped through encoding/json by the storage
 // adapter; this struct exposes only the orchestrator-load-bearing fields.
 type State struct {
-	LastUpdated     string         `json:"lastUpdated"`
-	LastCycleNumber int            `json:"lastCycleNumber"`
-	Version         int            `json:"version"`
-	CurrentBatch    BatchAccrual   `json:"currentBatch"`
-	FailedAt        []FailedRecord `json:"failedApproaches,omitempty"`
+	LastUpdated     string          `json:"lastUpdated"`
+	LastCycleNumber int             `json:"lastCycleNumber"`
+	Version         int             `json:"version"`
+	CurrentBatch    BatchAccrual    `json:"currentBatch"`
+	FailedAt        []FailedRecord  `json:"failedApproaches,omitempty"`
 	CarryoverTodos  []CarryoverTodo `json:"carryoverTodos,omitempty"`
 }
 
@@ -101,24 +101,24 @@ type FailedRecord struct {
 
 // CarryoverTodo is operator-queued work surfaced cycle-to-cycle.
 type CarryoverTodo struct {
-	ID               string `json:"id"`
-	Action           string `json:"action"`
-	Priority         string `json:"priority"`
-	FirstSeenCycle   int    `json:"first_seen_cycle"`
-	CyclesUnpicked   int    `json:"cycles_unpicked"`
+	ID             string `json:"id"`
+	Action         string `json:"action"`
+	Priority       string `json:"priority"`
+	FirstSeenCycle int    `json:"first_seen_cycle"`
+	CyclesUnpicked int    `json:"cycles_unpicked"`
 }
 
 // CycleState mirrors .evolve/cycle-state.json (transient per-cycle).
 type CycleState struct {
-	CycleID          int      `json:"cycle_id"`
-	Phase            string   `json:"phase"`
-	StartedAt        string   `json:"started_at"`
-	PhaseStartedAt   string   `json:"phase_started_at"`
-	ActiveAgent      string   `json:"active_agent,omitempty"`
-	ActiveWorktree   string   `json:"active_worktree,omitempty"`
-	CompletedPhases  []string `json:"completed_phases,omitempty"`
-	WorkspacePath    string   `json:"workspace_path"`
-	IntentRequired   bool     `json:"intent_required"`
+	CycleID         int      `json:"cycle_id"`
+	Phase           string   `json:"phase"`
+	StartedAt       string   `json:"started_at"`
+	PhaseStartedAt  string   `json:"phase_started_at"`
+	ActiveAgent     string   `json:"active_agent,omitempty"`
+	ActiveWorktree  string   `json:"active_worktree,omitempty"`
+	CompletedPhases []string `json:"completed_phases,omitempty"`
+	WorkspacePath   string   `json:"workspace_path"`
+	IntentRequired  bool     `json:"intent_required"`
 }
 
 // LedgerEntry is one .jsonl line in .evolve/ledger.jsonl.
@@ -151,23 +151,23 @@ type LedgerEntry struct {
 // json.RawMessage so the custom unmarshaler can route int vs string
 // without recursing back into LedgerEntry.UnmarshalJSON.
 type ledgerEntryWire struct {
-	TS              string          `json:"ts,omitempty"`
-	Cycle           json.RawMessage `json:"cycle,omitempty"`
-	CycleLabel      string          `json:"cycle_label,omitempty"`
-	Role            string          `json:"role,omitempty"`
-	Kind            string          `json:"kind,omitempty"`
-	Model           string          `json:"model,omitempty"`
-	ExitCode        int             `json:"exit_code,omitempty"`
-	DurationS       string          `json:"duration_s,omitempty"`
-	ArtifactPath    string          `json:"artifact_path,omitempty"`
-	ArtifactSHA256  string          `json:"artifact_sha256,omitempty"`
-	ChallengeToken  string          `json:"challenge_token,omitempty"`
-	GitHEAD         string          `json:"git_head,omitempty"`
-	TreeStateSHA    string          `json:"tree_state_sha,omitempty"`
-	EntrySeq        int             `json:"entry_seq,omitempty"`
-	PrevHash        string          `json:"prev_hash,omitempty"`
-	WorkerCount     int             `json:"worker_count,omitempty"`
-	Workers         []string        `json:"workers,omitempty"`
+	TS             string          `json:"ts,omitempty"`
+	Cycle          json.RawMessage `json:"cycle,omitempty"`
+	CycleLabel     string          `json:"cycle_label,omitempty"`
+	Role           string          `json:"role,omitempty"`
+	Kind           string          `json:"kind,omitempty"`
+	Model          string          `json:"model,omitempty"`
+	ExitCode       int             `json:"exit_code,omitempty"`
+	DurationS      string          `json:"duration_s,omitempty"`
+	ArtifactPath   string          `json:"artifact_path,omitempty"`
+	ArtifactSHA256 string          `json:"artifact_sha256,omitempty"`
+	ChallengeToken string          `json:"challenge_token,omitempty"`
+	GitHEAD        string          `json:"git_head,omitempty"`
+	TreeStateSHA   string          `json:"tree_state_sha,omitempty"`
+	EntrySeq       int             `json:"entry_seq,omitempty"`
+	PrevHash       string          `json:"prev_hash,omitempty"`
+	WorkerCount    int             `json:"worker_count,omitempty"`
+	Workers        []string        `json:"workers,omitempty"`
 }
 
 // UnmarshalJSON accepts cycle as int, whole-number float, or string.
@@ -238,11 +238,11 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 // writes Prompt to a file under Workspace before invoking the bridge
 // subprocess (callers don't manage tmp-file lifecycle).
 type BridgeRequest struct {
-	CLI          string            `json:"cli"`            // claude-p | claude-tmux | codex | agy
-	Profile      string            `json:"profile"`        // absolute path to .evolve/profiles/<name>.json
-	Model        string            `json:"model"`          // haiku | sonnet | opus | auto | gpt-* | gemini-*
-	Prompt       string            `json:"prompt"`         // prompt body; adapter materializes as a file
-	Workspace    string            `json:"workspace"`      // absolute path; bridge writes outputs here
+	CLI          string            `json:"cli"`       // claude-p | claude-tmux | codex | agy
+	Profile      string            `json:"profile"`   // absolute path to .evolve/profiles/<name>.json
+	Model        string            `json:"model"`     // haiku | sonnet | opus | auto | gpt-* | gemini-*
+	Prompt       string            `json:"prompt"`    // prompt body; adapter materializes as a file
+	Workspace    string            `json:"workspace"` // absolute path; bridge writes outputs here
 	Worktree     string            `json:"worktree,omitempty"`
 	StdoutLog    string            `json:"stdout_log,omitempty"`
 	StderrLog    string            `json:"stderr_log,omitempty"`
@@ -255,12 +255,12 @@ type BridgeRequest struct {
 
 // BridgeResponse is the bridge's JSON-parsed reply.
 type BridgeResponse struct {
-	ExitCode    int        `json:"exit_code"`
-	Stdout      string     `json:"stdout"`
-	Stderr      string     `json:"stderr"`
-	CostUSD     float64    `json:"cost_usd"`
-	Tokens      TokenUsage `json:"tokens"`
-	DurationMS  int64      `json:"duration_ms"`
+	ExitCode   int        `json:"exit_code"`
+	Stdout     string     `json:"stdout"`
+	Stderr     string     `json:"stderr"`
+	CostUSD    float64    `json:"cost_usd"`
+	Tokens     TokenUsage `json:"tokens"`
+	DurationMS int64      `json:"duration_ms"`
 }
 
 // BridgeProbe is what bridge reports about its environment + CLIs.
@@ -278,10 +278,10 @@ type SandboxProfile struct {
 
 // GuardInput is the typed input to a guard's Decide() method.
 type GuardInput struct {
-	ToolName     string         // "Bash" | "Edit" | "Write" | "Agent" | "WebSearch" | …
-	ToolInput    map[string]any // raw stdin JSON tool_input
-	CWD          string
-	CycleStatePath string       // optional; defaults to <CWD>/.evolve/cycle-state.json
+	ToolName       string         // "Bash" | "Edit" | "Write" | "Agent" | "WebSearch" | …
+	ToolInput      map[string]any // raw stdin JSON tool_input
+	CWD            string
+	CycleStatePath string // optional; defaults to <CWD>/.evolve/cycle-state.json
 }
 
 // GuardDecision is what a guard returns. Allow=true → exit 0; Allow=false → exit 2.

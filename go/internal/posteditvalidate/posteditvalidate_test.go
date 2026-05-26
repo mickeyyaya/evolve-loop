@@ -163,10 +163,10 @@ func TestRun_PyError(t *testing.T) {
 	var buf bytes.Buffer
 	vPy := func(string) (bool, string) { return false, "SyntaxError" }
 	res := Run(Options{
-		Payload:    payload(p),
+		Payload:     payload(p),
 		ProjectRoot: d,
-		LLMStderr:  &buf,
-		ValidatePy: vPy,
+		LLMStderr:   &buf,
+		ValidatePy:  vPy,
 	})
 	if res.Kind != "py" || res.OK {
 		t.Errorf("res = %+v", res)

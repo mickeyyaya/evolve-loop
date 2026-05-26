@@ -225,8 +225,8 @@ func TestWriteAndRead_RoundTrip(t *testing.T) {
 
 	in := &Reflection{
 		SchemaVersion: 1, Cycle: 7, Phase: "build", Agent: "evolve-builder",
-		PhaseSmooth: false,
-		Slowdowns:   []Slowdown{{Category: "tool-batching", Evidence: "stdout.log:1", Severity: "high"}},
+		PhaseSmooth:          false,
+		Slowdowns:            []Slowdown{{Category: "tool-batching", Evidence: "stdout.log:1", Severity: "high"}},
 		ReflectionConfidence: 0.7,
 		PhaseTrackerRefs:     PhaseTrackerRefs{LatencyMS: 1, CostUSD: 0.1, Turns: 5},
 	}

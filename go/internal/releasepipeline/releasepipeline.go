@@ -8,14 +8,14 @@
 //
 // Lifecycle (each step is a no-op when DryRun):
 //
-//	0. (optional) full-dry-run preflight        [legacy bash; only when RequirePreflight]
-//	1. release preflight (5 gates)              [Go: releasepreflight.Run]
-//	2. changelog-gen                            [Go: changeloggen.Run]
-//	3. version-bump                             [Go: versionbump.Run]
-//	4. release.sh consistency check             [bash: legacy/scripts/utility/release.sh]
-//	5. ship.sh --class release                  [bash: legacy/scripts/lifecycle/ship.sh]
-//	6. marketplace-poll                         [Go: marketplacepoll.Run]
-//	   on failure → auto-rollback               [Go: rollback.Run]
+//  0. (optional) full-dry-run preflight        [legacy bash; only when RequirePreflight]
+//  1. release preflight (5 gates)              [Go: releasepreflight.Run]
+//  2. changelog-gen                            [Go: changeloggen.Run]
+//  3. version-bump                             [Go: versionbump.Run]
+//  4. release.sh consistency check             [bash: legacy/scripts/utility/release.sh]
+//  5. ship.sh --class release                  [bash: legacy/scripts/lifecycle/ship.sh]
+//  6. marketplace-poll                         [Go: marketplacepoll.Run]
+//     on failure → auto-rollback               [Go: rollback.Run]
 //
 // Journal: .evolve/release-journal/<version>-<ts>.json — one file per attempt.
 // rollback.Run reads it to know what to undo.
@@ -61,9 +61,9 @@ type Steps struct {
 	// FullDryRunPreflight runs when RequirePreflight is true (step 0).
 	FullDryRunPreflight func(repoRoot, target string) error
 
-	Preflight     func(repoRoot, target string, dryRun, skipTests bool) error
-	ChangelogGen  func(repoRoot, fromRef, toRef, target string, dryRun bool) error
-	VersionBump   func(repoRoot, target string, dryRun bool) error
+	Preflight    func(repoRoot, target string, dryRun, skipTests bool) error
+	ChangelogGen func(repoRoot, fromRef, toRef, target string, dryRun bool) error
+	VersionBump  func(repoRoot, target string, dryRun bool) error
 	// RebuildBinary runs `go build -o go/evolve ./cmd/evolve` (from
 	// <RepoRoot>/go) so the binary tracked at go/evolve is in sync with
 	// the version-bumped source. Without this step, `evolve release X.Y.Z`
@@ -81,16 +81,16 @@ type Steps struct {
 
 // Options drives a Run() invocation.
 type Options struct {
-	Target            string
-	RepoRoot          string
-	DryRun            bool
-	NoRollback        bool
-	SkipTests         bool
-	RequirePreflight  bool
-	MaxPollWait       time.Duration
-	FromTag           string // optional; auto-derived from `git describe --tags --abbrev=0` if empty
-	JournalDir        string // defaulted to <RepoRoot>/.evolve/release-journal
-	Stderr            io.Writer
+	Target           string
+	RepoRoot         string
+	DryRun           bool
+	NoRollback       bool
+	SkipTests        bool
+	RequirePreflight bool
+	MaxPollWait      time.Duration
+	FromTag          string // optional; auto-derived from `git describe --tags --abbrev=0` if empty
+	JournalDir       string // defaulted to <RepoRoot>/.evolve/release-journal
+	Stderr           io.Writer
 
 	Now   func() time.Time
 	Steps Steps

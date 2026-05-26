@@ -83,9 +83,9 @@ func TestWatch_GrowthResetsStallTimer(t *testing.T) {
 	}
 	var sink syncBuffer
 	o := New(Config{
-		StallS:    200 * time.Millisecond,
-		PollS:     20 * time.Millisecond,
-		Cycle:     1, Phase: "scout", Agent: "x",
+		StallS: 200 * time.Millisecond,
+		PollS:  20 * time.Millisecond,
+		Cycle:  1, Phase: "scout", Agent: "x",
 		StdoutLog: logFile,
 	}, &sink)
 

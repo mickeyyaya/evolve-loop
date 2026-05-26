@@ -22,7 +22,7 @@ func TestC100_001_ObserverEnforceDefaultOn(t *testing.T) {
 		return
 	}
 	// Must be default-on (`1`)
-	if !acsassert.FileMatchesRegex(t, claudeMd, `EVOLVE_OBSERVER_ENFORCE.*` + "`" + `1` + "`") {
+	if !acsassert.FileMatchesRegex(t, claudeMd, `EVOLVE_OBSERVER_ENFORCE.*`+"`"+`1`+"`") {
 		t.Logf("CLAUDE.md: EVOLVE_OBSERVER_ENFORCE may not be default-on")
 	}
 }

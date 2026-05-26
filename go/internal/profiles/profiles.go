@@ -27,9 +27,9 @@ type Profile struct {
 	Role               string             `json:"role"`
 	CLI                string             `json:"cli"`
 	AllowedCLIs        []string           `json:"allowed_clis,omitempty"`
-	ModelTierDefault   string              `json:"model_tier_default"`
-	ModelTierEnvelope  *ModelTierEnvelope  `json:"model_tier_envelope,omitempty"`
-	ModelTierOverrides map[string]string   `json:"model_tier_overrides,omitempty"`
+	ModelTierDefault   string             `json:"model_tier_default"`
+	ModelTierEnvelope  *ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
+	ModelTierOverrides map[string]string  `json:"model_tier_overrides,omitempty"`
 	AllowedTools       []string           `json:"allowed_tools,omitempty"`
 	DisallowedTools    []string           `json:"disallowed_tools,omitempty"`
 	MaxTurns           int                `json:"max_turns,omitempty"`

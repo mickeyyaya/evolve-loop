@@ -68,7 +68,7 @@ func TestPruneByClassification_KeepsLegacyAndNonObject(t *testing.T) {
 	state := map[string]any{
 		"failedApproaches": []any{
 			map[string]any{"cycle": float64(1)}, // no classification — keep
-			"just-a-string",                      // non-object — keep
+			"just-a-string",                     // non-object — keep
 			map[string]any{"cycle": float64(2), "classification": "infrastructure-systemic"}, // match — drop
 		},
 	}

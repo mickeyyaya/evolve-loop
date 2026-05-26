@@ -186,10 +186,10 @@ func TestIsUnderDir_OutsidePath(t *testing.T) {
 
 func TestRole_BuildPhaseNoWorktree_DeniesNonWorkspace(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{
-		CycleID:       1,
-		Phase:         "build",
+		CycleID:        1,
+		Phase:          "build",
 		ActiveWorktree: "",
-		WorkspacePath: "/tmp/wt/.evolve/runs/cycle-1",
+		WorkspacePath:  "/tmp/wt/.evolve/runs/cycle-1",
 	})
 	g := NewRole(s)
 	dec := g.Decide(context.Background(), core.GuardInput{

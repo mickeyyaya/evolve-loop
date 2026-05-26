@@ -243,9 +243,9 @@ func TestEmit_AppendsToEventsFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	o := &Observer{
-		cfg:          Config{Now: time.Now, Cycle: 5, Phase: "audit", Agent: "auditor"},
-		traceID:      "trace-x",
-		lastEventTS:  time.Now(),
+		cfg:         Config{Now: time.Now, Cycle: 5, Phase: "audit", Agent: "auditor"},
+		traceID:     "trace-x",
+		lastEventTS: time.Now(),
 	}
 	o.cfg.Now = func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }
 	events := filepath.Join(dir, "events.ndjson")

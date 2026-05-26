@@ -78,15 +78,15 @@ func TestRunCmd_HappyPath(t *testing.T) {
 	}
 	opts := runHappyOpts(t)
 	res, err := Run(context.Background(), RunRequest{
-		Agent:           "scout",
-		Cycle:           5,
-		WorkspacePath:   ws,
-		ProfilesDir:     "/p",
-		AdaptersDir:     "/a",
-		ProjectRoot:     tmp,
-		PluginRoot:      tmp,
-		PromptReader:    strings.NewReader("Do the thing.\n"),
-		CachePrefixV2:   true,
+		Agent:            "scout",
+		Cycle:            5,
+		WorkspacePath:    ws,
+		ProfilesDir:      "/p",
+		AdaptersDir:      "/a",
+		ProjectRoot:      tmp,
+		PluginRoot:       tmp,
+		PromptReader:     strings.NewReader("Do the thing.\n"),
+		CachePrefixV2:    true,
 		AdversarialAudit: true,
 	}, opts)
 	if err != nil {

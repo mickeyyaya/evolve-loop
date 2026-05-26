@@ -225,9 +225,9 @@ func Probe(opts Options) Profile {
 		Host: Host{
 			OS: osType, OSVersion: osVersion, Shell: shell,
 		},
-		ClaudeCode: ClaudeCode{Nested: nested, ClaudecodeEnv: claudecodePtr},
-		Sandbox:    sandbox,
-		Filesystem: fs,
+		ClaudeCode:  ClaudeCode{Nested: nested, ClaudecodeEnv: claudecodePtr},
+		Sandbox:     sandbox,
+		Filesystem:  fs,
 		CLIBinaries: bins,
 		AutoConfig: AutoConfig{
 			SandboxFallbackOnEPERM: autoEPERM,

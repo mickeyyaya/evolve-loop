@@ -71,17 +71,17 @@ type RunOptions struct {
 // RunResult carries everything cmd_run printed + the side effects.
 // Verdict is one of VerdictPASS / VerdictFAIL / VerdictIntegrityFail.
 type RunResult struct {
-	Verdict         string
-	CLI             string
-	Model           string
-	ArtifactPath    string
-	ArtifactSHA256  string
-	ChallengeToken  string
-	ExitCode        int
-	DurationMS      int64
-	Warns           []string
-	LegacyDispatch  bool   // true ⇒ LEGACY_DISPATCH escape hatch fired
-	Stderr          string // collected adapter stderr for caller logging
+	Verdict        string
+	CLI            string
+	Model          string
+	ArtifactPath   string
+	ArtifactSHA256 string
+	ChallengeToken string
+	ExitCode       int
+	DurationMS     int64
+	Warns          []string
+	LegacyDispatch bool   // true ⇒ LEGACY_DISPATCH escape hatch fired
+	Stderr         string // collected adapter stderr for caller logging
 }
 
 // workerNameRE matches fan-out worker names: <role>-worker-<subtask>.

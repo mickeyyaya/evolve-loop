@@ -93,8 +93,8 @@ func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
-		"EVOLVE_NO_EQUALS",       // no '='
-		"=EVOLVE_NAMELESS",       // empty name
+		"EVOLVE_NO_EQUALS", // no '='
+		"=EVOLVE_NAMELESS", // empty name
 		"EVOLVE_REQUIRE_INTENT=1",
 	}
 	got := buildCycleEnv(cfg, osEnv)

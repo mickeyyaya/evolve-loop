@@ -30,10 +30,10 @@ func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	mustWriteState(t, filepath.Join(evolve, "state.json"), map[string]any{
-		"lastCycleNumber":      float64(5),
-		"expected_ship_sha":    "deadbeef",
+		"lastCycleNumber":       float64(5),
+		"expected_ship_sha":     "deadbeef",
 		"expected_ship_version": "12.2.2",
-		"currentBatch":         map[string]any{"goalHash": "abc123"},
+		"currentBatch":          map[string]any{"goalHash": "abc123"},
 	})
 	mustWriteState(t, filepath.Join(evolve, "cycle-state.json"), map[string]any{
 		"cycle_id": float64(8),

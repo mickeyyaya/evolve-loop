@@ -25,10 +25,10 @@ type ResolveModelTierRequest struct {
 	Cycle       int    // current cycle (reserved for future tier rules)
 
 	// Env overrides — empty string means "unset".
-	ModelTierHint            string // MODEL_TIER_HINT — wins over everything
-	AuditorTierOverride      string // EVOLVE_AUDITOR_TIER_OVERRIDE — wins inside auditor branch
-	DiffComplexityDisabled   bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
-	WorktreePath             string // WORKTREE_PATH — passed to DiffComplexity callable
+	ModelTierHint          string // MODEL_TIER_HINT — wins over everything
+	AuditorTierOverride    string // EVOLVE_AUDITOR_TIER_OVERRIDE — wins inside auditor branch
+	DiffComplexityDisabled bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
+	WorktreePath           string // WORKTREE_PATH — passed to DiffComplexity callable
 
 	// ProjectRoot is where .evolve/state.json lives (mastery streak source).
 	ProjectRoot string
@@ -53,14 +53,14 @@ type ResolveModelTierOptions struct {
 // ResolveModelTier mirrors resolve_model_tier in
 // legacy/scripts/dispatch/subagent-run.sh (lines 189–261). Precedence:
 //
-//   1. MODEL_TIER_HINT wins for every agent.
-//   2. For auditor only:
-//        a. EVOLVE_AUDITOR_TIER_OVERRIDE wins inside auditor.
-//        b. consecutiveSuccesses < 1 (from .evolve/state.json) ⇒ opus.
-//        c. EVOLVE_DIFF_COMPLEXITY_DISABLE != "1" AND DiffComplexity returns
-//           "trivial" ⇒ sonnet.
-//        d. Otherwise fall through to profile.model_tier_default.
-//   3. For non-auditor agents: profile.model_tier_default.
+//  1. MODEL_TIER_HINT wins for every agent.
+//  2. For auditor only:
+//     a. EVOLVE_AUDITOR_TIER_OVERRIDE wins inside auditor.
+//     b. consecutiveSuccesses < 1 (from .evolve/state.json) ⇒ opus.
+//     c. EVOLVE_DIFF_COMPLEXITY_DISABLE != "1" AND DiffComplexity returns
+//     "trivial" ⇒ sonnet.
+//     d. Otherwise fall through to profile.model_tier_default.
+//  3. For non-auditor agents: profile.model_tier_default.
 //
 // Returns (tier, err). err is non-nil only when the profile is unreadable or
 // the JSON shape is missing model_tier_default — bash treats those as fail.

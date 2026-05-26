@@ -253,12 +253,12 @@ func TestRun_SkipTests(t *testing.T) {
 // is nil/true/false as appropriate. Verifies StepsPassed stays 5.
 func TestRun_SimulationAdvisory(t *testing.T) {
 	cases := []struct {
-		name        string
-		skipTests   bool
-		dryRun      bool
-		simErr      error
-		wantSimOK   *bool   // nil = skipped; true = pass; false = warn
-		wantLogHas  string  // substring expected on stderr
+		name       string
+		skipTests  bool
+		dryRun     bool
+		simErr     error
+		wantSimOK  *bool  // nil = skipped; true = pass; false = warn
+		wantLogHas string // substring expected on stderr
 	}{
 		{name: "skip-tests skips advisory", skipTests: true, wantSimOK: nil, wantLogHas: "skipped (--skip-tests)"},
 		{name: "dry-run skips advisory", dryRun: true, wantSimOK: nil, wantLogHas: "skipped (dry-run)"},
@@ -402,11 +402,11 @@ func TestRun_NoRepoRoot(t *testing.T) {
 
 func TestParseSemver(t *testing.T) {
 	cases := []struct {
-		in        string
-		major     int
-		minor     int
-		patch     int
-		want      bool
+		in    string
+		major int
+		minor int
+		patch int
+		want  bool
 	}{
 		{"1.2.3", 1, 2, 3, true},
 		{"11.7.2", 11, 7, 2, true},

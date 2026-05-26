@@ -18,20 +18,20 @@ import (
 
 func benchEntry(seq int) core.LedgerEntry {
 	return core.LedgerEntry{
-		TS:              "2026-05-23T04:30:00Z",
-		Cycle:           seq,
-		Role:            "auditor",
-		Kind:            "phase-complete",
-		Model:           "claude-opus-4-7",
-		ExitCode:        0,
-		DurationS:       "12.345",
-		ArtifactPath:    "/path/to/artifact",
-		ArtifactSHA256:  "abcdef1234567890",
-		ChallengeToken:  "ct-abc123",
-		GitHEAD:         "deadbeef",
-		TreeStateSHA:    "treesha123",
-		WorkerCount:     1,
-		Workers:         []string{"worker-0"},
+		TS:             "2026-05-23T04:30:00Z",
+		Cycle:          seq,
+		Role:           "auditor",
+		Kind:           "phase-complete",
+		Model:          "claude-opus-4-7",
+		ExitCode:       0,
+		DurationS:      "12.345",
+		ArtifactPath:   "/path/to/artifact",
+		ArtifactSHA256: "abcdef1234567890",
+		ChallengeToken: "ct-abc123",
+		GitHEAD:        "deadbeef",
+		TreeStateSHA:   "treesha123",
+		WorkerCount:    1,
+		Workers:        []string{"worker-0"},
 	}
 }
 

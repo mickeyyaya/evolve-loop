@@ -226,9 +226,9 @@ func Decide(entries []Entry, opts Options) Decision {
 	if n := ev.ByClass[string(InfraTransient)]; n > 0 {
 		if opts.Strict {
 			return Decision{
-				Action: ActionRetryWithFallback,
-				Reason: fmt.Sprintf("%d prior infrastructure-transient (within 1d retention); attempting with EPERM fallback enabled", n),
-				SetEnv: map[string]string{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "1"},
+				Action:   ActionRetryWithFallback,
+				Reason:   fmt.Sprintf("%d prior infrastructure-transient (within 1d retention); attempting with EPERM fallback enabled", n),
+				SetEnv:   map[string]string{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "1"},
 				Evidence: ev,
 			}
 		}

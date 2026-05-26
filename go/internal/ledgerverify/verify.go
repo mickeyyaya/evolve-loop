@@ -49,13 +49,13 @@ type Options struct {
 // contains (exit_code==0 entries only). Missing names the roles whose
 // count came back zero against the resolved requirement set.
 type Result struct {
-	Scout    int      `json:"scout"`
-	Builder  int      `json:"builder"`
-	Auditor  int      `json:"auditor"`
-	Intent   int      `json:"intent"`
-	Memo     int      `json:"memo"`
-	Missing  []string `json:"missing,omitempty"`
-	OK       bool     `json:"ok"`
+	Scout   int      `json:"scout"`
+	Builder int      `json:"builder"`
+	Auditor int      `json:"auditor"`
+	Intent  int      `json:"intent"`
+	Memo    int      `json:"memo"`
+	Missing []string `json:"missing,omitempty"`
+	OK      bool     `json:"ok"`
 	// Required snapshots the role set Options resolved to. Useful for
 	// diagnostics and for the cmd_loop log line that mirrors the bash
 	// `log "ledger: cycle=$cycle scout=$s builder=$b ..."`.

@@ -35,7 +35,7 @@ func TestProcess_FailedWriteLeavesNoCleanFile(t *testing.T) {
 	// — exercises the create-temp error branch.
 	ws := t.TempDir()
 	rawPath := filepath.Join(ws, "scout-stdout.log")
-	if err := os.WriteFile(rawPath, []byte(`{"type":"result","total_cost_usd":1}` + "\n"), 0o644); err != nil {
+	if err := os.WriteFile(rawPath, []byte(`{"type":"result","total_cost_usd":1}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write raw: %v", err)
 	}
 	// Make workspace unwritable to force os.CreateTemp to fail.

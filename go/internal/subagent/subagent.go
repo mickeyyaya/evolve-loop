@@ -63,22 +63,22 @@ type Request struct {
 // Result captures everything Run() observed. The LedgerEntry is the
 // exact line that was appended (so callers can inspect entry_seq etc.).
 type Result struct {
-	Verdict        string   // PASS | FAIL | INTEGRITY_FAIL
-	ArtifactPath   string   // resolved absolute path
-	ArtifactSHA256 string   // sha256 of artifact bytes (empty if missing)
-	ChallengeToken string   // 16-hex token embedded in prompt + artifact
-	CostUSD        float64  // from bridge response
-	DurationMS     int64    // wall-clock duration including bridge launch
-	ExitCode       int      // CLI exit code as reported by bridge
+	Verdict        string  // PASS | FAIL | INTEGRITY_FAIL
+	ArtifactPath   string  // resolved absolute path
+	ArtifactSHA256 string  // sha256 of artifact bytes (empty if missing)
+	ChallengeToken string  // 16-hex token embedded in prompt + artifact
+	CostUSD        float64 // from bridge response
+	DurationMS     int64   // wall-clock duration including bridge launch
+	ExitCode       int     // CLI exit code as reported by bridge
 	LedgerEntry    core.LedgerEntry
 	Diagnostics    []core.Diagnostic
 }
 
 // Verdict constants returned by Run.
 const (
-	VerdictPASS           = "PASS"
-	VerdictFAIL           = "FAIL"
-	VerdictIntegrityFail  = "INTEGRITY_FAIL"
+	VerdictPASS          = "PASS"
+	VerdictFAIL          = "FAIL"
+	VerdictIntegrityFail = "INTEGRITY_FAIL"
 )
 
 // ArtifactMaxAge mirrors verify_artifact() at subagent-run.sh:451 — the

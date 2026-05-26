@@ -20,8 +20,8 @@ import (
 // but ignored. The two booleans default to true when absent (matches bash
 // `if . == null then "true" else tostring`).
 type Manifest struct {
-	BudgetNative       bool
-	PermissionScoping  bool
+	BudgetNative      bool
+	PermissionScoping bool
 }
 
 // Inspection is the output of Inspect: parsed manifest + the ordered list of

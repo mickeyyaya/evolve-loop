@@ -240,15 +240,15 @@ func TestReadChainLink_ChainHashCorrect(t *testing.T) {
 func TestJSONCompact_StableKeyOrder(t *testing.T) {
 	t.Parallel()
 	m := map[string]any{
-		"role":       "scout",
-		"ts":         "2026-01-01T00:00:00Z",
-		"cycle":      1,
-		"kind":       "agent_subprocess",
-		"prev_hash":  "abc",
-		"entry_seq":  0,
-		"simulated":  true,
-		"exit_code":  0,
-		"unknown":    "skipped",
+		"role":      "scout",
+		"ts":        "2026-01-01T00:00:00Z",
+		"cycle":     1,
+		"kind":      "agent_subprocess",
+		"prev_hash": "abc",
+		"entry_seq": 0,
+		"simulated": true,
+		"exit_code": 0,
+		"unknown":   "skipped",
 	}
 	got, err := jsonCompact(m)
 	if err != nil {
