@@ -5,9 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
+
+// bridgeManifestDir is the writable manifest-override directory consulted
+// before the embedded set: EVOLVE_BRIDGE_MANIFEST_DIR, else
+// .evolve/bridge-manifests. `bridge add-rule` writes here; LoadManifest
+// reads here first so operator-added rules take effect.
+func bridgeManifestDir() string {
+	if d := os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR"); d != "" {
+		return d
+	}
+	return filepath.Join(".evolve", "bridge-manifests")
+}
 
 // manifests/*.json are the per-CLI capability manifests (ported verbatim
 // from tools/agent-bridge/lib/manifests/). Embedding them makes the Go
@@ -57,6 +70,10 @@ type Manifest struct {
 func LoadManifest(cli string) (Manifest, error) {
 	if cli == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: empty cli name")
+	}
+	// Operator override (from `bridge add-rule`) wins over the embedded set.
+	if data, err := os.ReadFile(filepath.Join(bridgeManifestDir(), cli+".json")); err == nil {
+		return parseManifest(cli, data)
 	}
 	data, err := manifestFS.ReadFile("manifests/" + cli + ".json")
 	if err != nil {

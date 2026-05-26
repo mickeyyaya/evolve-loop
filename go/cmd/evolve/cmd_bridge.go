@@ -97,6 +97,52 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve bridge validate: pass --validate-only to `bridge launch` to dry-validate config")
 		return 0
 
+	case "add-rule":
+		var cli, regex, keys, policy, name, note string
+		for _, a := range rest {
+			switch {
+			case strings.HasPrefix(a, "--cli="):
+				cli = strings.TrimPrefix(a, "--cli=")
+			case strings.HasPrefix(a, "--regex="):
+				regex = strings.TrimPrefix(a, "--regex=")
+			case strings.HasPrefix(a, "--response="):
+				keys = strings.TrimPrefix(a, "--response=")
+			case strings.HasPrefix(a, "--policy="):
+				policy = strings.TrimPrefix(a, "--policy=")
+			case strings.HasPrefix(a, "--name="):
+				name = strings.TrimPrefix(a, "--name=")
+			case strings.HasPrefix(a, "--note="):
+				note = strings.TrimPrefix(a, "--note=")
+			case a == "--help" || a == "-h":
+				fmt.Fprintln(stdout, "Usage: evolve bridge add-rule --cli=NAME --regex=R [--response=KEYS] [--policy=auto_respond|escalate] [--name=N] [--note=...]")
+				return 0
+			}
+		}
+		if cli == "" || regex == "" {
+			fmt.Fprintln(stderr, "evolve bridge add-rule: --cli and --regex are required")
+			return 10
+		}
+		if policy == "" {
+			if keys != "" {
+				policy = "auto_respond"
+			} else {
+				policy = "escalate"
+			}
+		}
+		if name == "" {
+			name = fmt.Sprintf("%s_rule_%d", strings.ReplaceAll(cli, "-", "_"), time.Now().Unix())
+		}
+		if note == "" {
+			note = "Added by evolve bridge add-rule"
+		}
+		path, err := bridge.AddRule(cli, bridge.ManifestPrompt{Name: name, Regex: regex, ResponseKeys: keys, Policy: policy, Note: note})
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve bridge add-rule: %v\n", err)
+			return 10
+		}
+		fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
+		return 0
+
 	case "version", "-v", "--version":
 		fmt.Fprintln(stdout, version.Get())
 		return 0

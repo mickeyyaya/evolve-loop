@@ -63,3 +63,19 @@ func TestRunBridge_LaunchMissingRequiredFlags(t *testing.T) {
 		t.Fatalf("stderr should report missing required flags; got %q", errb.String())
 	}
 }
+
+func TestRunBridge_AddRule(t *testing.T) {
+	t.Setenv("EVOLVE_BRIDGE_MANIFEST_DIR", t.TempDir())
+	var out, errb bytes.Buffer
+	if code := runBridge([]string{"add-rule", "--cli=claude-p", "--regex=FOO", "--response=y,Enter"}, nil, &out, &errb); code != 0 {
+		t.Fatalf("add-rule exit = %d, want 0; stderr=%q", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "appended rule") {
+		t.Fatalf("add-rule should confirm; got %q", out.String())
+	}
+	// missing --regex → exit 10
+	var out2, errb2 bytes.Buffer
+	if code := runBridge([]string{"add-rule", "--cli=claude-p"}, nil, &out2, &errb2); code != 10 {
+		t.Fatalf("add-rule missing regex exit = %d, want 10", code)
+	}
+}
