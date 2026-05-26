@@ -75,12 +75,17 @@ func (t execTmux) CapturePane(ctx context.Context, session string, scrollback in
 }
 
 func (t execTmux) LoadBuffer(ctx context.Context, session, file string) error {
-	_, err := t.run(ctx, "load-buffer", file)
+	// Name the buffer after the session (via -b) so concurrent launches on the
+	// shared tmux server each have their own buffer and cannot cross-paste.
+	// Single-launch behavior is identical to the old global-buffer approach.
+	_, err := t.run(ctx, "load-buffer", "-b", session, file)
 	return err
 }
 
 func (t execTmux) PasteBuffer(ctx context.Context, session string) error {
-	_, err := t.run(ctx, "paste-buffer", "-t", session)
+	// -b selects this session's named buffer; -d deletes it after pasting so
+	// the server's buffer table doesn't accumulate one entry per launch.
+	_, err := t.run(ctx, "paste-buffer", "-b", session, "-t", session, "-d")
 	return err
 }
 
