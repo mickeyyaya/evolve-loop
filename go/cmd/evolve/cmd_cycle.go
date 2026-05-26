@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
@@ -27,6 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // runCycle implements `evolve cycle <subcommand>`. Subcommands: run.
@@ -161,9 +163,26 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir)
+
+	// Composition root: the SOLE reader of routing env+config. config.Load
+	// maps the central registry + contained env overrides into one immutable
+	// RoutingConfig; router.Select picks the brain once. Default
+	// dynamic_routing=0 (Stage:Off) ⇒ NewOrchestrator behaves exactly as
+	// before. A nil proposer means DynamicLLM degrades to the deterministic
+	// StaticPreset (the bridge-backed Proposer is a tracked follow-on).
+	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
+	cfg, warnings := config.Load(registryPath, filterEvolveEnv(os.Environ()))
+	for _, w := range warnings {
+		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
+	}
+	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
+	// routing_mode=llm; otherwise it falls back to the deterministic
+	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
+	strategy := router.Select(cfg, core.NewRoutingProposer(br))
+
 	return orchDeps{
 		Storage:      st,
 		Ledger:       ld,
-		Orchestrator: core.NewOrchestrator(st, ld, runners),
+		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithRouting(cfg, strategy)),
 	}
 }

@@ -1,0 +1,177 @@
+package router
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// Digest is the observe→digest boundary: the ONLY code that knows the on-disk
+// handoff JSON shapes. It reads the handoff artifact of each completed phase
+// from workspace and folds the objective fields into RoutingSignals.
+//
+// Fail-open contract: a missing or unparseable artifact yields Present:false
+// and zero-value signals — a corrupt handoff must never FORCE an optional phase.
+// A role's signals are marked Present only when its phase is in `completed` AND
+// a real artifact exists on disk (artifact-backed, so the kernel's spine gate
+// cannot be satisfied by a fabricated completed-list alone).
+//
+// Naming tolerance: build/builder and audit/auditor handoff filenames coexist
+// across cycle ages; Digest tries each candidate in order.
+func Digest(workspace string, completed []string) (RoutingSignals, error) {
+	var sig RoutingSignals
+	done := toSet(completed)
+
+	if done["scout"] {
+		if raw, ok := readFirst(workspace, "handoff-scout.json"); ok {
+			sig.Scout = extractScout(raw)
+		}
+	}
+	if done["triage"] {
+		if raw, ok := readFirst(workspace, "handoff-triage.json"); ok {
+			sig.Triage = extractTriage(raw)
+		}
+	}
+	if done["build"] {
+		if raw, ok := readFirst(workspace, "handoff-build.json", "handoff-builder.json"); ok {
+			sig.Build = extractBuild(raw)
+		}
+	}
+	if done["audit"] {
+		if raw, ok := readFirst(workspace, "handoff-audit.json", "handoff-auditor.json"); ok {
+			sig.Audit = extractAudit(raw)
+		}
+	}
+	return sig, nil
+}
+
+func toSet(xs []string) map[string]bool {
+	m := make(map[string]bool, len(xs))
+	for _, x := range xs {
+		m[x] = true
+	}
+	return m
+}
+
+// readFirst returns the bytes of the first existing candidate file in dir.
+func readFirst(dir string, candidates ...string) ([]byte, bool) {
+	for _, name := range candidates {
+		if raw, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
+			return raw, true
+		}
+	}
+	return nil, false
+}
+
+func extractScout(raw []byte) ScoutSignals {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return ScoutSignals{}
+	}
+	s := ScoutSignals{Present: true}
+	_ = json.Unmarshal(top["cycle_size_estimate"], &s.CycleSizeEstimate)
+	_ = json.Unmarshal(top["carryover_count"], &s.CarryoverCount)
+	for k := range top {
+		// itemN_* blocks measure scope breadth (cycle-56: item1_..item6_).
+		if strings.HasPrefix(k, "item") && hasDigitAfterPrefix(k, "item") {
+			s.ItemCount++
+		}
+	}
+	return s
+}
+
+// hasDigitAfterPrefix reports whether the rune right after prefix is a digit,
+// so "item3_foo" counts but "items" or "itemize" does not.
+func hasDigitAfterPrefix(s, prefix string) bool {
+	if len(s) <= len(prefix) {
+		return false
+	}
+	c := s[len(prefix)]
+	return c >= '0' && c <= '9'
+}
+
+func extractTriage(raw []byte) TriageSignals {
+	var d struct {
+		CycleSize    string   `json:"cycle_size"`
+		CycleSizeEst string   `json:"cycle_size_estimate"`
+		PhaseSkip    []string `json:"phase_skip"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return TriageSignals{}
+	}
+	size := d.CycleSize
+	if size == "" {
+		size = d.CycleSizeEst
+	}
+	return TriageSignals{CycleSize: size, PhaseSkip: d.PhaseSkip, Present: true}
+}
+
+func extractBuild(raw []byte) BuildSignals {
+	var d struct {
+		Verdict   string `json:"verdict"`
+		ACSResult struct {
+			Green      int `json:"green"`
+			Red        int `json:"red"`
+			Total      int `json:"total"`
+			ThisCycle  int `json:"this_cycle"`
+			Regression int `json:"regression"`
+		} `json:"acs_result"`
+		Thrusts []struct {
+			Severity      string   `json:"severity"`
+			FilesModified []string `json:"files_modified"`
+			FilesNew      []string `json:"files_new"`
+		} `json:"thrusts"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return BuildSignals{}
+	}
+	b := BuildSignals{
+		Verdict:       d.Verdict,
+		ACSGreen:      d.ACSResult.Green,
+		ACSRed:        d.ACSResult.Red,
+		ACSTotal:      d.ACSResult.Total,
+		ACSThisCycle:  d.ACSResult.ThisCycle,
+		ACSRegression: d.ACSResult.Regression,
+		Present:       true,
+	}
+	files := map[string]bool{}
+	for _, th := range d.Thrusts {
+		if sev := ParseSeverity(th.Severity); sev > b.SeverityMax {
+			b.SeverityMax = sev
+		}
+		for _, f := range th.FilesModified {
+			files[f] = true
+		}
+		for _, f := range th.FilesNew {
+			files[f] = true
+		}
+	}
+	b.FilesTouched = len(files)
+	return b
+}
+
+func extractAudit(raw []byte) AuditSignals {
+	var d struct {
+		Verdict    string  `json:"verdict"`
+		Confidence float64 `json:"confidence"`
+		RedCount   int     `json:"red_count"`
+		Defects    []struct {
+			Severity string `json:"severity"`
+		} `json:"defects"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return AuditSignals{}
+	}
+	a := AuditSignals{
+		Verdict:           d.Verdict,
+		Confidence:        d.Confidence,
+		RedCount:          d.RedCount,
+		DefectsBySeverity: map[Severity]int{},
+		Present:           true,
+	}
+	for _, df := range d.Defects {
+		a.DefectsBySeverity[ParseSeverity(df.Severity)]++
+	}
+	return a
+}

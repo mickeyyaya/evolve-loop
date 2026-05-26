@@ -34,7 +34,7 @@ func codexTmuxManifest() Manifest {
 		TierAliases: map[string]string{"haiku": "gpt-5.4-mini", "sonnet": "gpt-5.4", "opus": "gpt-5.5"},
 		Params: map[string]ParamSpec{
 			"model_tier":     {Channel: "flag", Flag: "-m", From: "tier_alias"}, // matches the real codex-tmux manifest + `codex -m` driver
-			"permission":     {Channel: "controller"},                          // codex has no bypass flag; trust handled by the auto-responder
+			"permission":     {Channel: "controller"},                           // codex has no bypass flag; trust handled by the auto-responder
 			"settings_scope": {Channel: "noop"},
 			"session_mode":   {Channel: "controller"},
 		},

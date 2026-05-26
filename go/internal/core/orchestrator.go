@@ -2,13 +2,19 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // CycleRequest is the operator-facing input to RunCycle.
@@ -57,18 +63,50 @@ type Orchestrator struct {
 	// Errors are swallowed and treated as "no movement detected" — the
 	// outcome calculator falls back to SKIPPED_UNKNOWN.
 	gitHEAD func() (string, error)
+
+	// cfg + strategy drive dynamic phase routing ("model proposes, kernel
+	// disposes"). The zero value (Stage:Off, StaticPreset) reproduces the
+	// legacy static-state-machine behavior byte-for-byte: routing is
+	// computed only when the composition root opts in via WithRouting with
+	// a non-Off stage. The orchestrator never reads a routing flag itself —
+	// config.Load (the composition root) is the sole env/file reader.
+	cfg      config.RoutingConfig
+	strategy router.RoutingStrategy
 }
 
-// NewOrchestrator wires the orchestrator with its dependencies.
-func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner) *Orchestrator {
-	return &Orchestrator{
-		storage: storage,
-		ledger:  ledger,
-		runners: runners,
-		sm:      NewStateMachine(),
-		now:     time.Now,
-		gitHEAD: defaultGitHEAD,
+// Option customizes an Orchestrator at construction (functional-options DI).
+// Absent any option, the orchestrator runs in legacy Stage:Off mode.
+type Option func(*Orchestrator)
+
+// WithRouting injects the loaded routing config + the strategy selected once
+// at the composition root. A nil strategy is ignored so the StaticPreset
+// default stands; the orchestrator depends only on the RoutingStrategy
+// interface, never on a mode conditional.
+func WithRouting(cfg config.RoutingConfig, strategy router.RoutingStrategy) Option {
+	return func(o *Orchestrator) {
+		o.cfg = cfg
+		if strategy != nil {
+			o.strategy = strategy
+		}
 	}
+}
+
+// NewOrchestrator wires the orchestrator with its dependencies. Routing stays
+// off unless a WithRouting option supplies an enabled-stage config.
+func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
+	o := &Orchestrator{
+		storage:  storage,
+		ledger:   ledger,
+		runners:  runners,
+		sm:       NewStateMachine(),
+		now:      time.Now,
+		gitHEAD:  defaultGitHEAD,
+		strategy: router.StaticPreset{},
+	}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
 }
 
 // archivePollutedWorkspace renames <workspace>/ to
@@ -207,6 +245,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// the next iteration. Set by the retro branch to inject the
 	// failure-adapter's decision.
 	var scheduledNext Phase
+	// routingSeq names the per-cycle routing-decision artifacts
+	// (routing-decision-<seq>.json). Incremented only when routing runs.
+	routingSeq := 0
 
 	// Bounded loop guards against any transition-table cycle bug.
 	for safety := 0; safety < 32; safety++ {
@@ -225,6 +266,60 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			}
 			next = n
 		}
+
+		// Dynamic routing (shadow → advisory → enforce). Stage:Off — the
+		// default — leaves the static state machine fully in control: no
+		// digest, no ledger entry, byte-identical to legacy. When enabled,
+		// digest the completed handoffs, ask the Strategy for a decision,
+		// record it forensically, and — only in Enforce — let the clamped
+		// decision override the static successor, re-validated against the
+		// legality oracle (CanTransition) AND the artifact-backed spine gate
+		// (SpineSatisfiedUpTo). Retro keeps its failure-adapter shim
+		// (decideAfterRetro) while routing is bedded in, so enforce never
+		// overrides the retro branch.
+		if o.cfg.Stage != config.StageOff {
+			routingSeq++
+			signals, _ := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
+			dec := o.strategy.Decide(router.RouteInput{
+				Current:         string(current),
+				Verdict:         lastVerdict,
+				Signals:         signals,
+				History:         entriesFromRecords(state.FailedAt),
+				Cfg:             o.cfg,
+				BudgetRemaining: req.Budget.MaxUSD,
+				Completed:       cs.CompletedPhases,
+				Strict:          envSnap["EVOLVE_STRICT_AUDIT"] == "1",
+				Now:             o.now(),
+				// Proposer context (DynamicLLM only; ignored by pure Route).
+				Workspace:   cs.WorkspacePath,
+				ProjectRoot: req.ProjectRoot,
+				Cycle:       cycle,
+				Env:         envSnap,
+			})
+			if o.cfg.Stage >= config.StageEnforce && current != PhaseRetro {
+				if forced, ok := o.enforceNext(current, next, signals, dec); ok {
+					next = forced
+				}
+				// Full spine-integrity check on the SELECTED next (static OR
+				// override). Fail-open: a missing mandatory-predecessor handoff
+				// is a loud WARN recorded in the decision, never a block —
+				// Digest is fail-open, so an absent artifact may be a read miss
+				// rather than a real gap, and false-blocking a real cycle is
+				// worse than surfacing the signal. The override path already
+				// declines (blocks) divergent edges that fail this check; here
+				// we additionally surface it for the trusted static edge.
+				if next != PhaseEnd && !o.sm.SpineSatisfiedUpTo(next, signals, o.cfg) {
+					dec.Clamps = append(dec.Clamps, router.Clamp{
+						Rule:     "spine-unsatisfied-warn",
+						Proposed: string(next),
+						Forced:   string(next),
+					})
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN spine not satisfied for next=%s (a mandatory predecessor's handoff artifact is missing); proceeding fail-open\n", next)
+				}
+			}
+			o.recordRoutingDecision(ctx, cycle, cs, routingSeq, dec)
+		}
+
 		if next == PhaseEnd {
 			break
 		}
@@ -335,6 +430,84 @@ func (o *Orchestrator) decideAfterRetro(retroVerdict string, history []FailedRec
 	default: // ActionProceed
 		return PhaseEnd, dec.SetEnv, "proceed: " + dec.Reason
 	}
+}
+
+// recordRoutingDecision marshals the RouterDecision to
+// <workspace>/routing-decision-<seq>.json and appends a hash-bound
+// routing_decision ledger entry, plus one phase_skipped entry per declined
+// optional phase (preserving the PSMAS resume/audit-binding contract).
+//
+// Best-effort: a marshal/write/append failure WARNs and is swallowed —
+// routing forensics must never abort a cycle. Called only when Stage != Off,
+// so the legacy path appends nothing new.
+func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs CycleState, seq int, dec router.RouterDecision) {
+	ts := o.now().UTC().Format(time.RFC3339)
+	artifactPath := filepath.Join(cs.WorkspacePath, fmt.Sprintf("routing-decision-%d.json", seq))
+	sha := ""
+	if buf, err := json.MarshalIndent(dec, "", "  "); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing-decision marshal: %v\n", err)
+		artifactPath = ""
+	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing-decision mkdir: %v\n", err)
+		artifactPath = ""
+	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing-decision write: %v\n", err)
+		artifactPath = ""
+	} else {
+		sum := sha256.Sum256(buf)
+		sha = hex.EncodeToString(sum[:])
+	}
+
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "routing_decision",
+		ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing_decision ledger append: %v\n", err)
+	}
+	for _, sp := range dec.SkipPhases {
+		if err := o.ledger.Append(ctx, LedgerEntry{
+			TS: ts, Cycle: cycle, Role: sp, Kind: "phase_skipped", ExitCode: 0,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
+		}
+	}
+}
+
+// enforceNext maps the router's proposed NextPhase back to a core.Phase and
+// returns it ONLY if it differs from the static successor AND survives both
+// kernel gates: a legal edge (CanTransition) and the artifact-backed spine
+// gate (SpineSatisfiedUpTo). Otherwise the static successor stands. This is
+// the non-bypassable "kernel disposes" floor for Enforce mode — neither
+// Strategy can reach Ship without a real PASS/WARN audit artifact.
+func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision) (Phase, bool) {
+	cand := phaseFromRouter(dec.NextPhase)
+	if cand == "" || cand == staticNext {
+		return staticNext, false
+	}
+	if !o.sm.CanTransition(current, cand) {
+		return staticNext, false
+	}
+	if !o.sm.SpineSatisfiedUpTo(cand, sig, o.cfg) {
+		return staticNext, false
+	}
+	return cand, true
+}
+
+// phaseFromRouter denormalizes a router phase string back to a core.Phase.
+// The router speaks canonical "retrospective"/"end"; core uses "retro"/
+// PhaseEnd. An unknown string yields "" so enforceNext declines it.
+func phaseFromRouter(s string) Phase {
+	switch s {
+	case "retrospective":
+		return PhaseRetro
+	case router.PhaseEnd: // "end" — same string as core.PhaseEnd
+		return PhaseEnd
+	}
+	p := Phase(s)
+	if !p.IsValid() {
+		return ""
+	}
+	return p
 }
 
 // entriesFromRecords converts FailedRecord values into failureadapter.Entry.

@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 type hooks struct{}
@@ -31,11 +32,15 @@ func (hooks) AgentPromptName() string                     { return "evolve-tdd-e
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "team-context.md" }
 func (hooks) DefaultModel() string                        { return "auto" }
 
+// ShouldSkip delegates to the central PhasePolicy (config.Load is the sole
+// reader of EVOLVE_TEST_PHASE_ENABLED). Legacy posture preserved: tdd runs
+// unless the flag disables it. From Stage:Enforce up, the conditional-pin
+// (cycle_size != trivial) makes tdd un-disablable by flag.
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if req.Env["EVOLVE_TEST_PHASE_ENABLED"] == "0" {
-		return true, core.VerdictSKIPPED, string(core.PhaseBuild), nil
+	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTDD)) {
+		return false, "", "", nil
 	}
-	return false, "", "", nil
+	return true, core.VerdictSKIPPED, string(core.PhaseBuild), nil
 }
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
