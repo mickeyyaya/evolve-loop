@@ -86,16 +86,18 @@ type autoResponder struct {
 	cli       string
 	counts    map[string]int
 	deps      Deps
+	human     bool // when true, deliver keys with human-input cadence
 }
 
 // newAutoResponder builds the responder from the CLI's embedded manifest.
 // A missing/unreadable manifest yields an empty rule set (tick → noop).
-func newAutoResponder(cli, workspace string, deps Deps) *autoResponder {
+// human engages the keystroke-plausibility send path.
+func newAutoResponder(cli, workspace string, deps Deps, human bool) *autoResponder {
 	var prompts []ManifestPrompt
 	if m, err := LoadManifest(cli); err == nil {
 		prompts = m.InteractivePrompts
 	}
-	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps}
+	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
@@ -106,9 +108,14 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	switch rc {
 	case 1:
 		keysCSV := strings.TrimPrefix(action, "send:")
-		keys, enter := parseSendKeysCSV(keysCSV)
-		_ = ar.deps.Tmux.SendKeys(ctx, session, keys, enter)
-		fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s\n", keysCSV)
+		if ar.human {
+			humanReadingPause(ar.deps, pane)
+			humanSendKeysCSV(ctx, ar.deps, session, keysCSV)
+		} else {
+			keys, enter := parseSendKeysCSV(keysCSV)
+			_ = ar.deps.Tmux.SendKeys(ctx, session, keys, enter)
+			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s\n", keysCSV)
+		}
 		return "", 1
 	case 2:
 		fmt.Fprintf(ar.deps.Stderr, "[auto-respond] extend_timeout signal: %s\n", action)

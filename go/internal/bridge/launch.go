@@ -60,6 +60,16 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		return ExitBadFlags
 	}
 
+	// --human-input two-gate: the per-invocation flag also requires the
+	// BRIDGE_HUMAN_SIMULATION=1 host opt-in (the keystroke-plausibility
+	// layer is double-gated OFF by default).
+	if raw.humanInput {
+		if v, _ := lookupEnv(e.deps, "BRIDGE_HUMAN_SIMULATION"); v != "1" {
+			fmt.Fprintln(stderr, "[bridge] --human-input requires BRIDGE_HUMAN_SIMULATION=1 host opt-in")
+			return ExitSafetyGate
+		}
+	}
+
 	// Resolve effective model: "auto" defers to the profile's model when set.
 	effectiveModel := raw.model
 	if effectiveModel == "auto" && prof.Model != "" {

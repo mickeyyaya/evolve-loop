@@ -91,7 +91,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named)
 
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
-	ar := newAutoResponder(lp.name, cfg.Workspace, deps)
+	human := humanActive(deps, cfg.HumanInput)
+	ar := newAutoResponder(lp.name, cfg.Workspace, deps, human)
 
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
@@ -131,12 +132,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		}
 	}
 
-	// --- Deliver the prompt via the paste buffer.
-	// TODO(human-input slice): paste-with-review keystroke timing when active.
-	_ = deps.Tmux.LoadBuffer(ctx, lp.session, resolvedPromptFile)
-	_ = deps.Tmux.PasteBuffer(ctx, lp.session)
-	deps.Sleep(time.Second)
-	_ = deps.Tmux.SendKeys(ctx, lp.session, "", true) // Enter
+	// --- Deliver the prompt via the paste buffer (human-input cadence when engaged).
+	if human {
+		humanBootPause(deps)
+		humanPasteWithReview(ctx, deps, lp.session, resolvedPromptFile)
+	} else {
+		_ = deps.Tmux.LoadBuffer(ctx, lp.session, resolvedPromptFile)
+		_ = deps.Tmux.PasteBuffer(ctx, lp.session)
+		deps.Sleep(time.Second)
+		_ = deps.Tmux.SendKeys(ctx, lp.session, "", true) // Enter
+	}
 	fmt.Fprintf(deps.Stderr, "%s prompt delivered\n", pfx)
 
 	// --- Wait for the artifact, ticking the auto-respond fallback.
