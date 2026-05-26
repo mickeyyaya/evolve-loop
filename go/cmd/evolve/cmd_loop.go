@@ -169,20 +169,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	// Strategy + bypass-env propagation. Subagents read EVOLVE_STRATEGY
-	// to select their prompt variant; Scout also reads Context["strategy"].
-	cycleEnv := map[string]string{
-		"EVOLVE_STRATEGY": cfg.Strategy,
-	}
-	if cfg.ConsensusAudit {
-		cycleEnv["EVOLVE_CONSENSUS_AUDIT"] = "1"
-	}
-	if cfg.Resume {
-		cycleEnv["EVOLVE_RESUME"] = "1"
-	}
-	if cfg.Reset {
-		cycleEnv["EVOLVE_RESET"] = "1"
-	}
+	// Build per-cycle env map by propagating EVOLVE_* OS env vars then
+	// applying dispatcher-derived overrides. Pre-this-fix, only an
+	// allowlist of 4 keys made it through, which silently dropped
+	// EVOLVE_REQUIRE_INTENT, EVOLVE_SANDBOX_FALLBACK_ON_EPERM, and every
+	// other operator-facing flag the CLAUDE.md env-var table documents
+	// (source incident: cycle-108 meta-loop ran with intent_required=false
+	// despite EVOLVE_REQUIRE_INTENT=1 set in the operator's shell).
+	cycleEnv := buildCycleEnv(cfg, os.Environ())
 	cycleCtx := map[string]string{
 		"strategy": cfg.Strategy,
 	}
@@ -939,4 +933,45 @@ func parsePositional(args []string) (cycles int, strategy string, goal string) {
 // a multi-word goal in the original CLI invocation.
 func joinArgs(args []string) string {
 	return strings.Join(args, " ")
+}
+
+// buildCycleEnv returns the env map handed to every cycle in this
+// dispatcher invocation. Construction order is intentional:
+//
+//  1. Copy every EVOLVE_* var from osEnv. This is how operator-set
+//     flags (REQUIRE_INTENT, SANDBOX_FALLBACK_ON_EPERM, TRIAGE_DISABLE,
+//     BUILD_PLANNER, STDOUT_FILTER, …) reach the orchestrator + every
+//     downstream subagent.
+//  2. Apply dispatcher-derived overrides (Strategy, ConsensusAudit,
+//     Resume, Reset). CLI-derived choices win over env so an operator
+//     passing `--strategy harden` overrides EVOLVE_STRATEGY=balanced.
+//
+// Non-EVOLVE_* vars are intentionally skipped — only this prefix is
+// part of the documented operator surface. The orchestrator reads from
+// the returned map, never from os.Environ directly, so callers that
+// inject env explicitly (tests, in-process embedders) get the same path.
+func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
+	out := make(map[string]string, 16)
+	for _, kv := range osEnv {
+		if !strings.HasPrefix(kv, "EVOLVE_") {
+			continue
+		}
+		eq := strings.IndexByte(kv, '=')
+		if eq <= 0 {
+			continue
+		}
+		out[kv[:eq]] = kv[eq+1:]
+	}
+	// Dispatcher-derived overrides — CLI > env.
+	out["EVOLVE_STRATEGY"] = cfg.Strategy
+	if cfg.ConsensusAudit {
+		out["EVOLVE_CONSENSUS_AUDIT"] = "1"
+	}
+	if cfg.Resume {
+		out["EVOLVE_RESUME"] = "1"
+	}
+	if cfg.Reset {
+		out["EVOLVE_RESET"] = "1"
+	}
+	return out
 }
