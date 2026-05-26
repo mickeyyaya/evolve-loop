@@ -358,7 +358,7 @@ func TestRun_GateTestFailure(t *testing.T) {
 	opts := stubOpts(r, "1.0.1")
 	opts.SkipTests = false
 	opts.GateTestRunner = func(_, suite string) error {
-		if strings.Contains(suite, "ship-integration") {
+		if strings.Contains(suite, "phases/ship") {
 			return errors.New("simulated failure")
 		}
 		return nil
@@ -367,8 +367,45 @@ func TestRun_GateTestFailure(t *testing.T) {
 	if !errors.Is(err, ErrCheckFailed) {
 		t.Fatalf("err = %v, want ErrCheckFailed", err)
 	}
-	if !strings.Contains(err.Error(), "ship-integration") {
-		t.Errorf("err = %v, want contains 'ship-integration'", err)
+	if !strings.Contains(err.Error(), "phases/ship") {
+		t.Errorf("err = %v, want contains 'phases/ship'", err)
+	}
+}
+
+// TestDefaultGateTestSuites_AreGoPackages guards against regressing to the
+// deleted legacy/scripts/tests/*.sh paths: v12 removed the bash suites, so the
+// preflight gate must run Go test packages (./internal/...), not dead shells.
+func TestDefaultGateTestSuites_AreGoPackages(t *testing.T) {
+	if len(DefaultGateTestSuites) == 0 {
+		t.Fatal("no gate-test suites configured")
+	}
+	for _, s := range DefaultGateTestSuites {
+		if strings.HasSuffix(s, ".sh") {
+			t.Errorf("gate-test suite %q is a (deleted) bash path — must be a Go package pattern", s)
+		}
+		if !strings.HasPrefix(s, "./") {
+			t.Errorf("gate-test suite %q is not a relative Go package pattern", s)
+		}
+	}
+}
+
+// TestStripBypassEnv ensures the gate-test runner drops the ship/role-gate
+// bypass vars so the guard DENY-tests stay hermetic regardless of the
+// operator's session env (e.g. a dev's settings.local.json sets them).
+func TestStripBypassEnv(t *testing.T) {
+	in := []string{"PATH=/bin", "EVOLVE_BYPASS_SHIP_GATE=1", "HOME=/h", "EVOLVE_BYPASS_ROLE_GATE=1", "FOO=bar"}
+	got := stripBypassEnv(in)
+	if len(got) != 3 {
+		t.Fatalf("len=%d want 3: %v", len(got), got)
+	}
+	keep := map[string]bool{"PATH=/bin": true, "HOME=/h": true, "FOO=bar": true}
+	for _, kv := range got {
+		if strings.HasPrefix(kv, "EVOLVE_BYPASS_") {
+			t.Errorf("bypass var survived: %s", kv)
+		}
+		if !keep[kv] {
+			t.Errorf("unexpected entry: %s", kv)
+		}
 	}
 }
 
