@@ -1,7 +1,7 @@
 {
   "name": "auditor",
   "role": "auditor",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "security_sensitive": "opus",
@@ -128,24 +128,24 @@
   "max_turns": 40,
   "turn_budget_hint": 30,
   "effort_level": "high",
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/audit-report.md",
   "challenge_token_required": true,
-  "extra_flags": [
-    "--bare",
-    "--no-session-persistence",
-    "--strict-mcp-config",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project",
-    "--plugin-dir",
-    ".evolve/plugin"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--bare",
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project",
+      "--plugin-dir",
+      ".evolve/plugin"
+    ]
+  },
   "parallel_subtasks": [
     {
       "name": "eval-replay",
-      "prompt_template": "You are auditor-eval-replay for cycle {cycle}. Re-run every eval in .evolve/evals/cycle-*/ via scripts/verify-eval.sh and report PASS/FAIL per eval. The first content line of your report MUST be 'Verdict: PASS' (all evals pass) or 'Verdict: FAIL' (any eval fails). Body lists each eval and its outcome. DO NOT do lint or regression work — those are other workers."
+      "prompt_template": "You are auditor-eval-replay for cycle {cycle}. Re-run every eval in .evolve/evals/cycle-*/ via scripts/verify-eval.sh and report PASS/FAIL per eval. The first content line of your report MUST be 'Verdict: PASS' (all evals pass) or 'Verdict: FAIL' (any eval fails). Body lists each eval and its outcome. DO NOT do lint or regression work \u2014 those are other workers."
     },
     {
       "name": "lint",
@@ -153,7 +153,7 @@
     },
     {
       "name": "regression",
-      "prompt_template": "You are auditor-regression for cycle {cycle}. Run scripts/run-all-regression-tests.sh and parse the JSON output. First content line: 'Verdict: PASS' (zero failures) or 'Verdict: FAIL' (any failures, even pre-existing — Builder is responsible for not regressing further). Body summarizes total/passed/failed counts and lists any new failures vs. baseline."
+      "prompt_template": "You are auditor-regression for cycle {cycle}. Run scripts/run-all-regression-tests.sh and parse the JSON output. First content line: 'Verdict: PASS' (zero failures) or 'Verdict: FAIL' (any failures, even pre-existing \u2014 Builder is responsible for not regressing further). Body summarizes total/passed/failed counts and lists any new failures vs. baseline."
     },
     {
       "name": "build-quality",
@@ -215,7 +215,7 @@
   "allowed_clis": [
     "all"
   ],
-  "_note": "Cross-family with builder. allowed_clis=all makes the invariant always satisfiable when ≥2 CLI families are installed.",
+  "_note": "Cross-family with builder. allowed_clis=all makes the invariant always satisfiable when \u22652 CLI families are installed.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,

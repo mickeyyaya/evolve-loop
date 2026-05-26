@@ -190,18 +190,18 @@
   "max_turns": 60,
   "turn_budget_hint": 45,
   "effort_level": "medium",
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/orchestrator-report.md",
   "challenge_token_required": true,
-  "extra_flags": [
-    "--bare",
-    "--no-session-persistence",
-    "--strict-mcp-config",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--bare",
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
   "sandbox": {
     "enabled": true,
     "write_subpaths": [

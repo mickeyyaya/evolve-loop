@@ -17,6 +17,12 @@ type Profile struct {
 	PermissionMode string
 	StreamOutput   bool
 	SessionName    string
+	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch (ADR-0022). Flags
+	// are keyed by the CLI they belong to ("claude-tmux": [...]) and realized
+	// ONLY for the matching CLI, so a claude-origin profile switched to
+	// agy/codex realizes none of claude's argv. Replaces the flat extra_flags
+	// that forwarded one CLI's vocabulary verbatim to every CLI.
+	ExtraFlagsByCLI map[string][]string
 }
 
 // validPermissionModes mirrors the claude --permission-mode choice set
@@ -40,12 +46,13 @@ var sessionNameRE = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 // non-boolean JSON value surfaces as an unmarshal error (the bash side
 // rejects non-bool stream_output too); absent → nil → default false.
 type profileWire struct {
-	Name           string   `json:"name"`
-	Model          string   `json:"model"`
-	AllowedTools   []string `json:"allowed_tools"`
-	PermissionMode string   `json:"permission_mode"`
-	StreamOutput   *bool    `json:"stream_output"`
-	SessionName    string   `json:"session_name"`
+	Name            string              `json:"name"`
+	Model           string              `json:"model"`
+	AllowedTools    []string            `json:"allowed_tools"`
+	PermissionMode  string              `json:"permission_mode"`
+	StreamOutput    *bool               `json:"stream_output"`
+	SessionName     string              `json:"session_name"`
+	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
 // LoadProfile reads and validates an agent profile JSON, returning the
@@ -87,11 +94,12 @@ func LoadProfile(path string) (Profile, error) {
 	}
 
 	p := Profile{
-		Name:           w.Name,
-		Model:          w.Model,
-		AllowedTools:   w.AllowedTools,
-		PermissionMode: w.PermissionMode,
-		SessionName:    w.SessionName,
+		Name:            w.Name,
+		Model:           w.Model,
+		AllowedTools:    w.AllowedTools,
+		PermissionMode:  w.PermissionMode,
+		SessionName:     w.SessionName,
+		ExtraFlagsByCLI: w.ExtraFlagsByCLI,
 	}
 	if w.StreamOutput != nil {
 		p.StreamOutput = *w.StreamOutput

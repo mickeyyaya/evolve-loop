@@ -24,6 +24,23 @@ type ParamSpec struct {
 	Values   map[string][]string `json:"values,omitempty"`   // enum intent value → flag tokens
 }
 
+// permissionIntent maps a profile's claude-style permission_mode string onto
+// the high-level LaunchIntent.Permission the Realizer understands. An empty
+// permission_mode means "bypass" — matching the *-tmux drivers' historical
+// default (claude/agy launch with --dangerously-skip-permissions when no mode
+// is set). "bypassPermissions" is the explicit spelling of the same posture;
+// every other claude mode (plan, acceptEdits, …) passes through verbatim and
+// realizes per the CLI's manifest (claude maps bypass+plan; agy bypass only;
+// codex none — its trust posture is handled by the auto-responder).
+func permissionIntent(permissionMode string) string {
+	switch permissionMode {
+	case "", "bypassPermissions":
+		return "bypass"
+	default:
+		return permissionMode
+	}
+}
+
 // RealizeFor loads the embedded manifest for cli and realizes intent against
 // it. A missing/unreadable manifest realizes to an empty Realization — the
 // same no-op philosophy as an absent param: a launch is never aborted by the

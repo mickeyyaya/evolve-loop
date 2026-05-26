@@ -19,11 +19,14 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-agy-")
 
+	// Launch flags come from the per-CLI Realization (ADR-0022): agy realizes
+	// permission=bypass → --dangerously-skip-permissions; model tier is a no-op
+	// (agy has no -m flag) and claude-keyed raw flags realize to nothing.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "agy-tmux",
 		session:        session,
 		named:          named,
-		launchCmd:      "agy --dangerously-skip-permissions",
+		launchCmd:      launchCmdLine("agy", cfg.Realization.LaunchFlags),
 		promptMarker:   "? for shortcuts",
 		bootScrollback: 200, // alt-screen
 		bootIntervalS:  2,

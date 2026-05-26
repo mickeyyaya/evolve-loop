@@ -1,7 +1,7 @@
 {
   "name": "builder",
   "role": "builder",
-  "cli": "claude-tmux",
+  "cli": "agy-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "ultrathink_strategy": "opus",
@@ -73,19 +73,19 @@
     "checkpoint_note": "At turn 15: list remaining steps, estimate turns needed, defer anything that cannot fit in the remaining 10 turns. Never defer build-report.md write or worktree commit."
   },
   "effort_level": "medium",
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",
-  "extra_flags": [
-    "--no-session-persistence",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project",
-    "--plugin-dir",
-    ".evolve/plugin"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project",
+      "--plugin-dir",
+      ".evolve/plugin"
+    ]
+  },
   "sandbox": {
     "enabled": true,
     "write_subpaths": [
@@ -118,7 +118,7 @@
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude until Phase 4 — Gemini/Codex/Grok adapters need sandbox + permission scoping + budget cap parity. Builder is safety-critical (writes code in worktree).",
+  "_note": "Restricted to claude until Phase 4 \u2014 Gemini/Codex/Grok adapters need sandbox + permission scoping + budget cap parity. Builder is safety-critical (writes code in worktree).",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,

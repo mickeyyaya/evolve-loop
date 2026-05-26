@@ -50,6 +50,16 @@ type tmuxLaunch struct {
 	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
 }
 
+// launchCmdLine joins an inner-CLI binary with its realized launch flags
+// (ADR-0022) into the single REPL launch command line. The flags are the
+// per-CLI Realization, so the line carries only argv this CLI understands.
+func launchCmdLine(binary string, flags []string) string {
+	if len(flags) == 0 {
+		return binary
+	}
+	return binary + " " + strings.Join(flags, " ")
+}
+
 // runTmuxREPL drives the shared interactive-REPL flow and returns a bridge
 // exit code. Preconditions (gate, cost guards, model/session resolution)
 // are the driver's responsibility before calling this.

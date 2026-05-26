@@ -122,3 +122,44 @@ agy `model_tier` → `{"channel":"noop"}` (no model selector). codex `model_tier
 
 `EVOLVE_BRIDGE_GO=1 evolve loop` with builder→agy-tmux / auditor→codex-tmux / rest→claude-tmux boots
 every phase (no EC80) and the cycle progresses; bridge packages stay at 100% coverage, `-race` clean.
+
+## Phase 2b — wiring shipped (tmux drivers)
+
+The three `*-tmux` drivers now build `launchCmd` as `<binary> + Realization.LaunchFlags`
+(`launchCmdLine`); the inline model/permission construction is gone. `LaunchArgs` builds the
+`LaunchIntent` from the profile (`ModelTier`=effective model, `Permission`=`permissionIntent(permMode)`,
+`RawByCLI`=`profile.extra_flags_by_cli`, `SessionMode`) and stores `RealizeFor(cli, intent)` on
+`Config.Realization`. Profiles migrated: flat `extra_flags` → `extra_flags_by_cli["claude-tmux"]`
+(dropping the print-only `--no-session-persistence`), and `permission_mode` dropped (the bypass posture
+is the realized default). builder.json(agy-tmux)/auditor.json(codex-tmux) keep their claude flags under
+the `claude-tmux` key intentionally — `RawByCLI[agy/codex]` is nil, so a future switch back to claude
+re-activates them without re-editing. Acceptance test: `realizer_wiring_test.go`
+(`TestRealizerWiring_NoCrossCLILeak`) proves builder→agy = `agy --dangerously-skip-permissions`,
+auditor→codex = `codex -m gpt-5.4`, scout→claude = full claude flags, zero cross-CLI leak.
+
+### Two design shifts (recorded, not silent)
+
+- **Bypass authority moved to the engine boundary.** `engine.Launch` (the programmatic runner entry,
+  not human `evolve bridge launch`) unconditionally appends `--allow-bypass`. With `permission_mode`
+  dropped from profiles, `cfg.PermissionMode` is `""`, so the tmux safety gates would otherwise block
+  every in-process launch. The per-profile `permission_mode:bypassPermissions` opt-in is replaced by an
+  always-on grant at the trusted-orchestrator boundary. Headless drivers ignore `AllowBypass` — no effect.
+- **`permissionIntent("")` → `"bypass"`.** An empty `permission_mode` realizes to bypass, faithful to
+  the drivers' prior default (`--dangerously-skip-permissions` when no mode set). claude-tmux/agy-tmux
+  emit the bypass flag; codex is a controller no-op. A non-empty mode (e.g. `plan`) passes through and
+  realizes per-manifest (claude maps bypass+plan).
+
+### Phase 2c follow-ups (NOT in this slice)
+
+- **Headless drivers do not yet consume `Realization`.** claude-p/codex/agy(headless) still build argv
+  inline and read `Config.ExtraFlags`. Since `phaseflags.Resolve` reads the flat `extra_flags` (now empty
+  on migrated profiles), a profile dispatched to **claude-p via the runner** would not receive its
+  `extra_flags_by_cli["claude-p"]` flags. Currently benign: all 15 profiles use `*-tmux` CLIs, so no
+  runner launch hits a headless driver. Unifying headless onto the Realization (and adding `claude-p`
+  keys where needed) completes "unify headless+tmux".
+- **Env-override permission-mode leak.** `EVOLVE_<PHASE>_PERMISSION_MODE` flows through
+  `phaseflags.Resolve` into `Config.ExtraFlags` as a raw `--permission-mode` flag (not via the intent),
+  so for a codex/agy phase it would reach the inner CLI and fail. Pre-existing; route the override
+  through `LaunchIntent.Permission` in Phase 2c.
+- **Dead flat `extra_flags` path.** `profiles.Profile.ExtraFlags` + the `phaseflags` read are now inert
+  for migrated profiles; remove when headless unification lands.

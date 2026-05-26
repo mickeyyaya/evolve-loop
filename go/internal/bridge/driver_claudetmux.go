@@ -44,21 +44,18 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-")
 
-	// permission_mode swaps OUT --dangerously-skip-permissions (plan mode
-	// in particular is incompatible with bypass).
-	var claudeCmd string
-	if cfg.PermissionMode != "" {
-		claudeCmd = fmt.Sprintf("claude --model %s --permission-mode %s", cfg.Model, cfg.PermissionMode)
-	} else {
-		claudeCmd = fmt.Sprintf("claude --model %s --dangerously-skip-permissions", cfg.Model)
-	}
+	// Launch flags come from the per-CLI Realization (ADR-0022): model,
+	// permission (plan → --permission-mode plan; bypass → --dangerously-skip-
+	// permissions), and any claude-keyed raw flags. The Realizer is the single
+	// owner, so the flag set never leaks claude argv into agy/codex.
+	launchCmd := launchCmdLine("claude", cfg.Realization.LaunchFlags)
 
 	// TODO(manifest slice): prompt marker from the claude-tmux manifest; default ❯.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "claude-tmux",
 		session:        session,
 		named:          named,
-		launchCmd:      claudeCmd,
+		launchCmd:      launchCmd,
 		promptMarker:   tmuxPromptMarkerDefault,
 		bootScrollback: 0, // claude renders to the visible pane
 		bootIntervalS:  1,

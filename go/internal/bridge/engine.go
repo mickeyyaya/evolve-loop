@@ -131,7 +131,13 @@ type Config struct {
 	HumanInput     bool
 	RequireFull    bool
 	AllowedTools   []string // from profile.allowed_tools
-	ExtraFlags     []string // forwarded to the inner CLI after `--`
+	ExtraFlags     []string // forwarded to the inner CLI after `--` (direct passthrough)
+	// Realization is the per-CLI launch realization (ADR-0022): the model,
+	// permission, and raw flags this CLI actually understands, resolved from a
+	// LaunchIntent against the CLI's manifest. The *-tmux drivers build their
+	// launch command from Realization.LaunchFlags rather than constructing
+	// model/permission flags inline, so one CLI's argv never leaks into another.
+	Realization Realization
 	// ArtifactTimeoutS overrides the *-tmux artifact-wait deadline (seconds);
 	// 0 → tmuxArtifactTimeoutS (300). A per-launch control for callers that
 	// want a tighter ceiling than the default — e.g. fast agents, or a probe
@@ -213,6 +219,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)
 	}
+	// The in-process entry is the autonomous runner's trusted path: it is the
+	// bypass authority, so it enables --allow-bypass for the tmux safety gates
+	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`
+	// use, not for the programmatic orchestrator). Harmless for headless
+	// drivers, which do not consult AllowBypass.
+	args = append(args, "--allow-bypass")
 	if len(req.ExtraFlags) > 0 {
 		args = append(args, "--")
 		args = append(args, req.ExtraFlags...)

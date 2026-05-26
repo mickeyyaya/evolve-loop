@@ -10,7 +10,7 @@
     "s_complex_with_cache": "opus"
   },
   "cross_family_with": "builder",
-  "_model_family_rationale": "Opus tier-1 fixed (no downgrade) — anti-cooperative-bias separation from Builder's Sonnet. The strongest model is the adversarial test author, structurally inverting LLM cooperative bias. Parallels existing Auditor convention (Opus reviewing Sonnet). Decision recorded in plan: ultrathink-and-online-research-mutable-hollerith.md Resolved Decision #5.",
+  "_model_family_rationale": "Opus tier-1 fixed (no downgrade) \u2014 anti-cooperative-bias separation from Builder's Sonnet. The strongest model is the adversarial test author, structurally inverting LLM cooperative bias. Parallels existing Auditor convention (Opus reviewing Sonnet). Decision recorded in plan: ultrathink-and-online-research-mutable-hollerith.md Resolved Decision #5.",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -70,17 +70,17 @@
   ],
   "max_budget_usd": 1.5,
   "max_turns": 60,
-  "permission_mode": "bypassPermissions",
   "output_artifact": ".evolve/runs/cycle-{cycle}/test-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",
-  "extra_flags": [
-    "--no-session-persistence",
-    "--exclude-dynamic-system-prompt-sections",
-    "--disable-slash-commands",
-    "--setting-sources",
-    "project"
-  ],
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
   "sandbox": {
     "enabled": true,
     "write_subpaths": [
@@ -115,7 +115,7 @@
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude — RED-phase test writing is safety-critical.",
+  "_note": "Restricted to claude \u2014 RED-phase test writing is safety-critical.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,

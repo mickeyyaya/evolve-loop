@@ -119,6 +119,23 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		cycle, _ = strconv.Atoi(raw.cycle) // non-numeric → 0, matching bash's permissive default
 	}
 
+	// Realize the launch intent against this CLI's manifest (ADR-0022). The
+	// *-tmux drivers build their launch command from this rather than
+	// constructing model/permission flags inline, so a claude-origin profile's
+	// raw flags realize only for the matching CLI (RawByCLI[agy/codex] = nil).
+	// permMode is still carried on Config for the safety gates and the headless
+	// claude-p driver; the realizer is what the tmux launch command consumes.
+	sessionMode := "ephemeral"
+	if sessionName != "" {
+		sessionMode = "named:" + sessionName
+	}
+	intent := LaunchIntent{
+		ModelTier:   effectiveModel,
+		Permission:  permissionIntent(permMode),
+		SessionMode: sessionMode,
+		RawByCLI:    prof.ExtraFlagsByCLI,
+	}
+
 	cfg := Config{
 		CLI:            raw.cli,
 		Profile:        raw.profile,
@@ -139,6 +156,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		RequireFull:    raw.requireFull,
 		AllowedTools:   prof.AllowedTools,
 		ExtraFlags:     raw.extra,
+		Realization:    RealizeFor(raw.cli, intent),
 	}
 
 	// Non-dispatch modes (bin/bridge order: validate-only → dry-run →

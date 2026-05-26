@@ -27,12 +27,11 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-codex-")
 
-	// Launch codex interactively; -m only for a real codex model name
-	// (reusing the headless codex driver's mapping — DRY).
-	launchCmd := "codex"
-	if resolved := mapCodexModel(cfg.Model); isCodexModelName(resolved) {
-		launchCmd = "codex -m " + resolved
-	}
+	// Launch flags come from the per-CLI Realization (ADR-0022): codex resolves
+	// the model tier via its manifest tier_aliases (sonnet → gpt-5.4) and emits
+	// it as -m; permission is a controller no-op (trust handled by the
+	// auto-responder). No claude argv reaches codex.
+	launchCmd := launchCmdLine("codex", cfg.Realization.LaunchFlags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "codex-tmux",
