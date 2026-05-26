@@ -16,11 +16,11 @@ import (
 
 // fakePhase implements core.PhaseRunner — used as the in-process default.
 type fakePhase struct {
-	name    string
-	gotReq  core.PhaseRequest
-	resp    core.PhaseResponse
-	err     error
-	runs    int
+	name   string
+	gotReq core.PhaseRequest
+	resp   core.PhaseResponse
+	err    error
+	runs   int
 }
 
 func (f *fakePhase) Name() string { return f.name }

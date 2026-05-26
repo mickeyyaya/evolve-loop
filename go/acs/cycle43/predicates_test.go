@@ -21,8 +21,10 @@ import (
 // Local aliases keep the cycle-43 tests reading the same as before,
 // while the implementation lives in pkg/acsassert (shared by all cycle
 // packages — see Phase 3 task #15).
-func repoRoot(t *testing.T) string                       { return acsassert.RepoRoot(t) }
-func fileContainsAny(path string, variants ...string) bool { return acsassert.FileContainsAny(path, variants...) }
+func repoRoot(t *testing.T) string { return acsassert.RepoRoot(t) }
+func fileContainsAny(path string, variants ...string) bool {
+	return acsassert.FileContainsAny(path, variants...)
+}
 func countOccurrencesAny(path string, variants ...string) int {
 	return acsassert.CountOccurrencesAny(path, variants...)
 }

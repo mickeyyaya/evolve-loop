@@ -24,10 +24,11 @@ import (
 )
 
 // Exit code contract (matches consensus-dispatch.sh):
-//   0  — PASS or WARN consensus
-//   1  — FAIL (aggregator returned 1)
-//   2  — runtime error (insufficient voters, missing inputs)
-//  10  — profile validation error
+//
+//	 0  — PASS or WARN consensus
+//	 1  — FAIL (aggregator returned 1)
+//	 2  — runtime error (insufficient voters, missing inputs)
+//	10  — profile validation error
 const (
 	ExitOK            = 0
 	ExitConsensusFAIL = 1

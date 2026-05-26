@@ -29,14 +29,14 @@ import (
 
 // Options drives a Run() invocation.
 type Options struct {
-	ProjectRoot         string        // required
-	RunsDir             string        // optional override; defaults to <ProjectRoot>/.evolve/runs
-	DispatchLogsDir     string        // optional override; defaults to <ProjectRoot>/.evolve/dispatch-logs
-	TrackerTTL          time.Duration // default 7d
-	DispatchLogTTL      time.Duration // default 30d
-	DryRun              bool
-	Quiet               bool
-	Stderr              io.Writer
+	ProjectRoot     string        // required
+	RunsDir         string        // optional override; defaults to <ProjectRoot>/.evolve/runs
+	DispatchLogsDir string        // optional override; defaults to <ProjectRoot>/.evolve/dispatch-logs
+	TrackerTTL      time.Duration // default 7d
+	DispatchLogTTL  time.Duration // default 30d
+	DryRun          bool
+	Quiet           bool
+	Stderr          io.Writer
 
 	Now func() time.Time
 }

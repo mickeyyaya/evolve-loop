@@ -276,7 +276,7 @@ func TestRun_PartialRollback_LocalOnly(t *testing.T) {
 func TestRun_SkippedStatuses_StillSuccess(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
 	steps := Steps{
-		GhDeleteRelease: func(string) string { return "skipped" },     // no gh
+		GhDeleteRelease: func(string) string { return "skipped" }, // no gh
 		DeleteRemoteTag: func(string, string) string { return "not-present" },
 		RevertAndShip:   func(string, string, string, string) string { return "reverted" },
 	}

@@ -23,25 +23,26 @@ import (
 // Config is the runtime configuration for the watchdog. All durations are
 // in seconds. Defaults are applied when zero values are provided.
 type Config struct {
-	Workspace       string        // required
-	TargetPGID      int           // required > 0
-	Cycle           int           // required > 0
-	CycleStatePath  string        // required
-	ProjectRoot     string        // optional, enables ledger.jsonl mtime tracking
-	ThresholdS      int           // default 600
-	PollS           int           // default 15
-	WarnPct         int           // default 75
-	GraceS          int           // default 10
-	Disabled        bool          // EVOLVE_INACTIVITY_DISABLE=1
-	Now             func() time.Time
-	Sleep           func(d time.Duration)
-	KillPgrp        func(pgid int, sig syscall.Signal) error
-	StopAfter       int           // testing seam: stop loop after N iterations (0 = unlimited)
+	Workspace      string // required
+	TargetPGID     int    // required > 0
+	Cycle          int    // required > 0
+	CycleStatePath string // required
+	ProjectRoot    string // optional, enables ledger.jsonl mtime tracking
+	ThresholdS     int    // default 600
+	PollS          int    // default 15
+	WarnPct        int    // default 75
+	GraceS         int    // default 10
+	Disabled       bool   // EVOLVE_INACTIVITY_DISABLE=1
+	Now            func() time.Time
+	Sleep          func(d time.Duration)
+	KillPgrp       func(pgid int, sig syscall.Signal) error
+	StopAfter      int // testing seam: stop loop after N iterations (0 = unlimited)
 }
 
 // Exit codes:
-//   0 — fired completed kill sequence OR watchdog disabled
-//   1 — invalid arguments / workspace missing
+//
+//	0 — fired completed kill sequence OR watchdog disabled
+//	1 — invalid arguments / workspace missing
 const (
 	ExitOK         = 0
 	ExitInvalidArg = 1
@@ -286,12 +287,12 @@ func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 		now = time.Now
 	}
 	entry := map[string]any{
-		"event_type":        "stall-detected",
-		"timestamp":         now().UTC().Format("2006-01-02T15:04:05Z"),
-		"source_phase":      "phase-watchdog",
-		"severity":          "HIGH",
-		"details":           details,
-		"remediation_hint":  "Check agent turn count; reduce scope or increase EVOLVE_INACTIVITY_THRESHOLD_S",
+		"event_type":       "stall-detected",
+		"timestamp":        now().UTC().Format("2006-01-02T15:04:05Z"),
+		"source_phase":     "phase-watchdog",
+		"severity":         "HIGH",
+		"details":          details,
+		"remediation_hint": "Check agent turn count; reduce scope or increase EVOLVE_INACTIVITY_THRESHOLD_S",
 	}
 	b, err := json.Marshal(entry)
 	if err != nil {

@@ -12,10 +12,10 @@ import (
 //
 // Resolution order:
 //
-//	1. <EVOLVE_GO_BIN> if set + executable
-//	2. <repo>/go/bin/evolve relative to dispatchDir's ancestor
-//	3. `evolve` on PATH
-//	4. bash <dispatchDir>/<subcmd>.sh (legacy fallback; absent in v12.0.0)
+//  1. <EVOLVE_GO_BIN> if set + executable
+//  2. <repo>/go/bin/evolve relative to dispatchDir's ancestor
+//  3. `evolve` on PATH
+//  4. bash <dispatchDir>/<subcmd>.sh (legacy fallback; absent in v12.0.0)
 //
 // v11.9.x → v12.0.0 transition: the bash fallback exists only while
 // legacy/scripts/dispatch/ is present. In v12.0.0 the fallback is a no-op

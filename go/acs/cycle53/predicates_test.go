@@ -100,10 +100,10 @@ func scaffold(t *testing.T, cli, model, sentinelScript string) (envVars map[stri
 	}
 	planLog = filepath.Join(tmp, "dispatch-plan.json")
 	return map[string]string{
-		"EVOLVE_GEMINI_CLAUDE_PATH":      "",
-		"EVOLVE_LLM_CONFIG_PATH":         cfg,
-		"EVOLVE_ADAPTERS_DIR_OVERRIDE":   adaptersDir,
-		"EVOLVE_DISPATCH_PLAN_LOG":       planLog,
+		"EVOLVE_GEMINI_CLAUDE_PATH":    "",
+		"EVOLVE_LLM_CONFIG_PATH":       cfg,
+		"EVOLVE_ADAPTERS_DIR_OVERRIDE": adaptersDir,
+		"EVOLVE_DISPATCH_PLAN_LOG":     planLog,
 	}, planLog
 }
 

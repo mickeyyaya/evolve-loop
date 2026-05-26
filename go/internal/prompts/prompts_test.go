@@ -47,11 +47,11 @@ The body.
 // exercised without touching the real .md files.
 func fixtureFS() fstest.MapFS {
 	return fstest.MapFS{
-		"agents/evolve-scout.md":         &fstest.MapFile{Data: []byte(sampleAgent)},
-		"agents/evolve-builder.md":       &fstest.MapFile{Data: []byte("---\nname: evolve-builder\ndescription: builder\n---\nBody.")},
-		"skills/evolve-loop/SKILL.md":    &fstest.MapFile{Data: []byte(sampleSkill)},
-		"skills/santa-loop/SKILL.md":     &fstest.MapFile{Data: []byte("---\nname: santa-loop\ndescription: santa\n---\nBody.")},
-		"skills/empty/notSkillFile.md":   &fstest.MapFile{Data: []byte("ignored")}, // must not appear in Skills()
+		"agents/evolve-scout.md":       &fstest.MapFile{Data: []byte(sampleAgent)},
+		"agents/evolve-builder.md":     &fstest.MapFile{Data: []byte("---\nname: evolve-builder\ndescription: builder\n---\nBody.")},
+		"skills/evolve-loop/SKILL.md":  &fstest.MapFile{Data: []byte(sampleSkill)},
+		"skills/santa-loop/SKILL.md":   &fstest.MapFile{Data: []byte("---\nname: santa-loop\ndescription: santa\n---\nBody.")},
+		"skills/empty/notSkillFile.md": &fstest.MapFile{Data: []byte("ignored")}, // must not appear in Skills()
 	}
 }
 
@@ -319,10 +319,10 @@ func TestZeroLoader_AgentsAndSkills(t *testing.T) {
 // subdirs should be ignored).
 func TestAgents_SkipsDirsAndNonMD(t *testing.T) {
 	fsys := fstest.MapFS{
-		"agents/foo.md":          &fstest.MapFile{Data: []byte("---\nname: foo\n---\nb")},
-		"agents/subdir/x.md":     &fstest.MapFile{Data: []byte("ignored")}, // creates subdir entry
-		"agents/.DS_Store":       &fstest.MapFile{Data: []byte("junk")},
-		"agents/notes.txt":       &fstest.MapFile{Data: []byte("not md")},
+		"agents/foo.md":      &fstest.MapFile{Data: []byte("---\nname: foo\n---\nb")},
+		"agents/subdir/x.md": &fstest.MapFile{Data: []byte("ignored")}, // creates subdir entry
+		"agents/.DS_Store":   &fstest.MapFile{Data: []byte("junk")},
+		"agents/notes.txt":   &fstest.MapFile{Data: []byte("not md")},
 	}
 	got, err := NewFromFS(fsys).Agents()
 	if err != nil {
@@ -337,8 +337,8 @@ func TestAgents_SkipsDirsAndNonMD(t *testing.T) {
 // files (not dirs) must be skipped.
 func TestSkills_SkipsFileEntries(t *testing.T) {
 	fsys := fstest.MapFS{
-		"skills/README.md":          &fstest.MapFile{Data: []byte("not a skill")},
-		"skills/real/SKILL.md":      &fstest.MapFile{Data: []byte("---\nname: real\n---\nb")},
+		"skills/README.md":     &fstest.MapFile{Data: []byte("not a skill")},
+		"skills/real/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: real\n---\nb")},
 	}
 	got, err := NewFromFS(fsys).Skills()
 	if err != nil {

@@ -21,7 +21,7 @@ import (
 type Result struct {
 	Tool    string   `json:"tool"`
 	Found   bool     `json:"found"`
-	Path    string   `json:"-"`              // serialized via custom JSON to allow null
+	Path    string   `json:"-"`                // serialized via custom JSON to allow null
 	Method  string   `json:"method,omitempty"` // "path" (LookPath) | "fallback" (explicit dirs)
 	Checked []string `json:"checked"`
 }

@@ -31,9 +31,10 @@ import (
 )
 
 // Exit codes (matches cycle-simulator.sh):
-//   0 — every phase completed and ledger chain intact
-//   1 — runtime failure
-//   2 — phase-gate refused a transition
+//
+//	0 — every phase completed and ledger chain intact
+//	1 — runtime failure
+//	2 — phase-gate refused a transition
 const (
 	ExitOK         = 0
 	ExitRuntimeErr = 1
@@ -298,21 +299,21 @@ func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, pr
 	}
 
 	entry := map[string]any{
-		"ts":               now().UTC().Format("2006-01-02T15:04:05Z"),
-		"cycle":            cycle,
-		"role":             role,
-		"kind":             "agent_subprocess",
-		"model":            "simulator",
-		"exit_code":        0,
-		"duration_s":       "0",
-		"artifact_path":    artifactPath,
-		"artifact_sha256":  artifactSHA,
-		"challenge_token":  token,
-		"git_head":         gitHEAD,
-		"tree_state_sha":   treeStateSHA,
-		"entry_seq":        entrySeq,
-		"prev_hash":        prevHash,
-		"simulated":        true,
+		"ts":              now().UTC().Format("2006-01-02T15:04:05Z"),
+		"cycle":           cycle,
+		"role":            role,
+		"kind":            "agent_subprocess",
+		"model":           "simulator",
+		"exit_code":       0,
+		"duration_s":      "0",
+		"artifact_path":   artifactPath,
+		"artifact_sha256": artifactSHA,
+		"challenge_token": token,
+		"git_head":        gitHEAD,
+		"tree_state_sha":  treeStateSHA,
+		"entry_seq":       entrySeq,
+		"prev_hash":       prevHash,
+		"simulated":       true,
 	}
 	line, err := jsonCompact(entry)
 	if err != nil {

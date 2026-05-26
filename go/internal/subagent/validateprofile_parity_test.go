@@ -19,7 +19,8 @@ import (
 // dependencies skips it.
 //
 // To run locally:
-//   EVOLVE_BASH_PARITY=1 go test -run BashParity ./internal/subagent/
+//
+//	EVOLVE_BASH_PARITY=1 go test -run BashParity ./internal/subagent/
 //
 // The test seeds a fixture profile + LLM config that pin every variable
 // to a known value, so the only thing that can differ between bash + Go

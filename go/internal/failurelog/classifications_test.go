@@ -58,14 +58,14 @@ func TestAgeOutSeconds(t *testing.T) {
 		c    Classification
 		want int64
 	}{
-		{InfrastructureTransient, 86400},     // 1d
-		{InfrastructureSystemic, 604800},     // 7d
+		{InfrastructureTransient, 86400}, // 1d
+		{InfrastructureSystemic, 604800}, // 7d
 		{IntentMalformed, 86400},
-		{IntentRejected, 999999999},          // never
-		{CodeBuildFail, 2592000},             // 30d
+		{IntentRejected, 999999999}, // never
+		{CodeBuildFail, 2592000},    // 30d
 		{CodeAuditFail, 2592000},
-		{CodeAuditWarn, 86400},               // v8.35
-		{ShipGateConfig, 86400},              // v8.27
+		{CodeAuditWarn, 86400},  // v8.35
+		{ShipGateConfig, 86400}, // v8.27
 		{HumanAbort, 3600},
 		{ExitTransportHang, 3600},
 		{IntegrityBreach, 604800},

@@ -128,17 +128,25 @@ func Run(opts Options) (Result, error) {
 		check       func() Check
 	}{
 		{".claude-plugin/plugin.json", "plugin.json version",
-			func() Check { return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/plugin.json", "plugin.json version", target) }},
+			func() Check {
+				return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/plugin.json", "plugin.json version", target)
+			}},
 		{".claude-plugin/marketplace.json", "marketplace.json version",
-			func() Check { return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/marketplace.json", "marketplace.json version", target) }},
+			func() Check {
+				return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/marketplace.json", "marketplace.json version", target)
+			}},
 		{"skills/evolve-loop/SKILL.md", "SKILL.md heading (major.minor)",
 			func() Check { return checkSkillHeading(opts.ProjectRoot, res.MajorMinor) }},
 		{"README.md", "README.md current version table",
 			func() Check { return checkReadmeCurrent(opts.ProjectRoot, res.MajorMinor) }},
 		{"CHANGELOG.md", fmt.Sprintf("CHANGELOG.md entry for %s", target),
-			func() Check { return checkContains(opts.ProjectRoot, "CHANGELOG.md", "["+target+"]", fmt.Sprintf("CHANGELOG.md entry for %s", target)) }},
+			func() Check {
+				return checkContains(opts.ProjectRoot, "CHANGELOG.md", "["+target+"]", fmt.Sprintf("CHANGELOG.md entry for %s", target))
+			}},
 		{"README.md", fmt.Sprintf("README.md version history row for v%s", res.MajorMinor),
-			func() Check { return checkContains(opts.ProjectRoot, "README.md", "v"+res.MajorMinor, fmt.Sprintf("README.md version history row for v%s", res.MajorMinor)) }},
+			func() Check {
+				return checkContains(opts.ProjectRoot, "README.md", "v"+res.MajorMinor, fmt.Sprintf("README.md version history row for v%s", res.MajorMinor))
+			}},
 	}
 
 	contentMarkerStart := 4 // index 4 = CHANGELOG; 5 = README history

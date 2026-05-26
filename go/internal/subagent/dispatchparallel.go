@@ -18,23 +18,23 @@ import (
 // DispatchParallelRequest captures every input cmd_dispatch_parallel reads.
 // Mirrors bash signature `dispatch-parallel <agent> <cycle> <workspace>`.
 type DispatchParallelRequest struct {
-	Agent          string
-	Cycle          int
-	WorkspacePath  string
-	ProfilesDir    string
-	AdaptersDir    string
-	CapabilityDir  string
-	ProjectRoot    string
-	PluginRoot     string
-	LedgerPath     string
+	Agent         string
+	Cycle         int
+	WorkspacePath string
+	ProfilesDir   string
+	AdaptersDir   string
+	CapabilityDir string
+	ProjectRoot   string
+	PluginRoot    string
+	LedgerPath    string
 
 	// Env tunables (passed through to fanoutdispatch).
-	Concurrency           int    // EVOLVE_FANOUT_CONCURRENCY (default 2)
-	PerWorkerBudgetUSD    string // EVOLVE_FANOUT_PER_WORKER_BUDGET_USD (default "0.20")
-	CachePrefixEnabled    bool   // EVOLVE_FANOUT_CACHE_PREFIX (default true)
-	TrackWorkers          bool   // EVOLVE_FANOUT_TRACK_WORKERS (default true)
-	TestExecutor          string // EVOLVE_FANOUT_TEST_EXECUTOR — bypass LLM
-	WorktreePath          string
+	Concurrency        int    // EVOLVE_FANOUT_CONCURRENCY (default 2)
+	PerWorkerBudgetUSD string // EVOLVE_FANOUT_PER_WORKER_BUDGET_USD (default "0.20")
+	CachePrefixEnabled bool   // EVOLVE_FANOUT_CACHE_PREFIX (default true)
+	TrackWorkers       bool   // EVOLVE_FANOUT_TRACK_WORKERS (default true)
+	TestExecutor       string // EVOLVE_FANOUT_TEST_EXECUTOR — bypass LLM
+	WorktreePath       string
 }
 
 // DispatchParallelOptions injects seams. Production wires defaults.
@@ -52,13 +52,13 @@ type DispatchParallelOptions struct {
 
 // DispatchParallelResult records the outcome of one dispatch.
 type DispatchParallelResult struct {
-	AggregatePath    string
-	WorkerCount      int
-	WorkerNames      []string
-	FanoutExitCode   int
-	AggregatorExit   int
-	QualityTier      string
-	ParentToken      string
+	AggregatePath  string
+	WorkerCount    int
+	WorkerNames    []string
+	FanoutExitCode int
+	AggregatorExit int
+	QualityTier    string
+	ParentToken    string
 }
 
 // DispatchParallel ports cmd_dispatch_parallel from

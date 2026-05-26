@@ -151,10 +151,10 @@ func TestVerifyCycle_NonSubprocessKindIgnored(t *testing.T) {
 func TestVerifyCycle_IntentRequired(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		intent  bool
-		entries []core.LedgerEntry
-		wantOK  bool
+		name     string
+		intent   bool
+		entries  []core.LedgerEntry
+		wantOK   bool
 		wantMiss []string
 	}{
 		{
@@ -219,10 +219,10 @@ func TestVerifyCycle_MemoOnPASS(t *testing.T) {
 		entry(1, "auditor", "agent_subprocess", 0),
 	}
 	tests := []struct {
-		name    string
-		verdict string
+		name     string
+		verdict  string
 		withMemo bool
-		wantOK  bool
+		wantOK   bool
 	}{
 		{"PASS + memo present → OK", "PASS", true, true},
 		{"PASS + memo missing → NOT OK", "PASS", false, false},

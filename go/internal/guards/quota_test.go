@@ -27,7 +27,7 @@ func TestQuota_DefaultCapDeniesOverlimit(t *testing.T) {
 	g := NewQuota(QuotaConfig{}) // defaults: ws=3
 	for i := 0; i < 3; i++ {
 		dec := g.Decide(context.Background(), core.GuardInput{
-			ToolName: "WebSearch",
+			ToolName:  "WebSearch",
 			ToolInput: map[string]any{"agent": "scout"},
 		})
 		if !dec.Allow {

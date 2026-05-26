@@ -30,9 +30,9 @@ type CycleRequest struct {
 
 // CycleResult summarises what RunCycle did.
 type CycleResult struct {
-	Cycle         int
-	FinalVerdict  string
-	PhasesRun     []Phase
+	Cycle        int
+	FinalVerdict string
+	PhasesRun    []Phase
 	// RetroDecision is the failure-adapter's verdict on the retro branch,
 	// populated only when retro ran. Format: "<action>: <reason>".
 	RetroDecision string

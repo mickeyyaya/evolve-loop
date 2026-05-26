@@ -116,11 +116,11 @@ func TestInspectBytes_OnlyOneSupportDegraded(t *testing.T) {
 
 func TestExtractBool_EdgeCases(t *testing.T) {
 	tests := []struct {
-		name   string
-		body   string
-		field  string
-		def    bool
-		want   bool
+		name  string
+		body  string
+		field string
+		def   bool
+		want  bool
 	}{
 		{"no supports block", `{}`, "x", true, true},
 		{"supports without field", `{"supports":{"other":true}}`, "x", false, false},

@@ -333,7 +333,7 @@ func TestReadTip_ReadError(t *testing.T) {
 		t.Skip("root bypasses permission bits")
 	}
 	l, dir := newLedger(t)
-	_ = os.WriteFile(filepath.Join(dir, "ledger.tip"), []byte("0:" + strings.Repeat("0", 64)), 0o000)
+	_ = os.WriteFile(filepath.Join(dir, "ledger.tip"), []byte("0:"+strings.Repeat("0", 64)), 0o000)
 	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "ledger.tip"), 0o644) })
 	if _, _, err := l.readTip(); err == nil {
 		t.Fatal("expected read tip error")
@@ -394,4 +394,3 @@ func TestVerify_DuplicatePrevHash(t *testing.T) {
 		t.Errorf("Verify duplicate prev_hash: err=%v, want ErrLedgerChainBroken", err)
 	}
 }
-

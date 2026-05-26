@@ -6,10 +6,10 @@
 //
 // Resolution order for each field, highest priority first:
 //
-//   1. The corresponding EVOLVE_*_OVERRIDE env var, if set.
-//   2. A path derived from PluginRoot (profiles, adapters, capability)
-//      or ProjectRoot (state, ledger, llm_config).
-//   3. cwd when env is empty (ProjectRoot only).
+//  1. The corresponding EVOLVE_*_OVERRIDE env var, if set.
+//  2. A path derived from PluginRoot (profiles, adapters, capability)
+//     or ProjectRoot (state, ledger, llm_config).
+//  3. cwd when env is empty (ProjectRoot only).
 //
 // CapabilityDir is intentionally NEVER honored by
 // EVOLVE_ADAPTERS_DIR_OVERRIDE — it mirrors the bash REAL_ADAPTERS_DIR

@@ -308,7 +308,10 @@ func TestRun_CommanderStartError(t *testing.T) {
 // scanErrReader returns a single oversize line so bufio.Scanner's
 // internal MaxScanTokenSize trips and surfaces a scan error — drives
 // ParseTestJSON's scanner.Err() return branch.
-type scanErrReader struct{ b []byte; off int }
+type scanErrReader struct {
+	b   []byte
+	off int
+}
 
 func (s *scanErrReader) Read(p []byte) (int, error) {
 	if s.off >= len(s.b) {

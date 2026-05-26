@@ -44,46 +44,46 @@ const (
 
 // Config wires the observer.
 type Config struct {
-	Workspace     string
-	SubagentPGID  int
-	Cycle         int
-	Phase         string
-	Agent         string
-	CycleState    string
-	Scope         Scope
-	Enforce       bool
+	Workspace    string
+	SubagentPGID int
+	Cycle        int
+	Phase        string
+	Agent        string
+	CycleState   string
+	Scope        Scope
+	Enforce      bool
 
-	PollS           int
-	StallS          int
-	LoopN           int
-	LoopWindowS     int
-	ErrorRate       float64
-	CostSigma       float64
-	ThrottleN       int
-	EOFGraceS       int
-	HeartbeatEvery  int
+	PollS          int
+	StallS         int
+	LoopN          int
+	LoopWindowS    int
+	ErrorRate      float64
+	CostSigma      float64
+	ThrottleN      int
+	EOFGraceS      int
+	HeartbeatEvery int
 
 	// Testing seams.
-	Now          func() time.Time
-	KillPgrp     func(pgid int, sig syscall.Signal) error
-	ShutdownSig  <-chan struct{} // SIGUSR1-equivalent
-	StopAfterMS  int             // testing: force shutdown after this many ms
+	Now         func() time.Time
+	KillPgrp    func(pgid int, sig syscall.Signal) error
+	ShutdownSig <-chan struct{} // SIGUSR1-equivalent
+	StopAfterMS int             // testing: force shutdown after this many ms
 }
 
 // Observer holds runtime state.
 type Observer struct {
 	cfg Config
 
-	traceID       string
-	startedAt     time.Time
-	startedAtISO  string
-	lastEventTS   time.Time
-	lastByteOff   int64
-	eventCount    int
-	toolCallCount int
-	errorCount    int
-	toolResultCnt int
-	rateLimitCnt  int
+	traceID        string
+	startedAt      time.Time
+	startedAtISO   string
+	lastEventTS    time.Time
+	lastByteOff    int64
+	eventCount     int
+	toolCallCount  int
+	errorCount     int
+	toolResultCnt  int
+	rateLimitCnt   int
 	cumulativeCost float64
 	cacheReadTok   int
 	cacheCreateTok int
@@ -162,11 +162,11 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 
 	now := cfg.Now()
 	obs := &Observer{
-		cfg:           cfg,
-		traceID:       fmt.Sprintf("cycle-%d-%s-%d", cfg.Cycle, cfg.Phase, now.Unix()),
-		startedAt:     now,
-		startedAtISO:  now.UTC().Format("2006-01-02T15:04:05Z"),
-		lastEventTS:   now,
+		cfg:          cfg,
+		traceID:      fmt.Sprintf("cycle-%d-%s-%d", cfg.Cycle, cfg.Phase, now.Unix()),
+		startedAt:    now,
+		startedAtISO: now.UTC().Format("2006-01-02T15:04:05Z"),
+		lastEventTS:  now,
 	}
 
 	eventsPath := filepath.Join(cfg.Workspace, cfg.Agent+"-observer-events.ndjson")
@@ -177,10 +177,10 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 
 	// Emit start event.
 	obs.emit(eventsPath, "observer_started", "INFO", map[string]any{
-		"scope":     string(cfg.Scope),
-		"enforce":   cfg.Enforce,
-		"stall_s":   cfg.StallS,
-		"poll_s":    cfg.PollS,
+		"scope":   string(cfg.Scope),
+		"enforce": cfg.Enforce,
+		"stall_s": cfg.StallS,
+		"poll_s":  cfg.PollS,
 	})
 
 	// Poll loop.
@@ -375,11 +375,11 @@ func (o *Observer) emit(eventsPath, eventType, severity string, data map[string]
 		"ts":             now.UTC().Format("2006-01-02T15:04:05Z"),
 		"trace_id":       o.traceID,
 		"source": map[string]any{
-			"component":      "phase-observer",
-			"cycle":          o.cfg.Cycle,
-			"phase":          o.cfg.Phase,
-			"agent":          o.cfg.Agent,
-			"observer_pid":   os.Getpid(),
+			"component":    "phase-observer",
+			"cycle":        o.cfg.Cycle,
+			"phase":        o.cfg.Phase,
+			"agent":        o.cfg.Agent,
+			"observer_pid": os.Getpid(),
 		},
 		"type":     eventType,
 		"severity": severity,
@@ -409,24 +409,24 @@ func (o *Observer) writeReport(reportPath string) error {
 	defer o.mu.Unlock()
 	now := o.cfg.Now()
 	report := map[string]any{
-		"schema_version":   "1.0",
-		"trace_id":         o.traceID,
-		"started_at":       o.startedAtISO,
-		"finished_at":      now.UTC().Format("2006-01-02T15:04:05Z"),
-		"duration_s":       int(now.Sub(o.startedAt).Seconds()),
-		"cycle":            o.cfg.Cycle,
-		"phase":            o.cfg.Phase,
-		"agent":            o.cfg.Agent,
-		"event_count":      o.eventCount,
-		"tool_call_count":  o.toolCallCount,
-		"tool_result_count": o.toolResultCnt,
-		"error_count":      o.errorCount,
-		"rate_limit_count": o.rateLimitCnt,
-		"cumulative_cost":  o.cumulativeCost,
-		"cache_read_tokens":      o.cacheReadTok,
-		"cache_creation_tokens":  o.cacheCreateTok,
-		"incident_count":   len(o.incidents),
-		"incidents":        o.incidents,
+		"schema_version":        "1.0",
+		"trace_id":              o.traceID,
+		"started_at":            o.startedAtISO,
+		"finished_at":           now.UTC().Format("2006-01-02T15:04:05Z"),
+		"duration_s":            int(now.Sub(o.startedAt).Seconds()),
+		"cycle":                 o.cfg.Cycle,
+		"phase":                 o.cfg.Phase,
+		"agent":                 o.cfg.Agent,
+		"event_count":           o.eventCount,
+		"tool_call_count":       o.toolCallCount,
+		"tool_result_count":     o.toolResultCnt,
+		"error_count":           o.errorCount,
+		"rate_limit_count":      o.rateLimitCnt,
+		"cumulative_cost":       o.cumulativeCost,
+		"cache_read_tokens":     o.cacheReadTok,
+		"cache_creation_tokens": o.cacheCreateTok,
+		"incident_count":        len(o.incidents),
+		"incidents":             o.incidents,
 	}
 	b, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {

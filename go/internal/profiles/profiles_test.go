@@ -49,10 +49,10 @@ const minimalProfile = `{"name": "tiny", "role": "tiny", "cli": "claude", "model
 
 func fixtureFS() fstest.MapFS {
 	return fstest.MapFS{
-		"scout.json":   &fstest.MapFile{Data: []byte(sampleProfile)},
-		"tiny.json":    &fstest.MapFile{Data: []byte(minimalProfile)},
-		"AGENTS.md":    &fstest.MapFile{Data: []byte("non-JSON")}, // must NOT appear in List
-		"README.txt":   &fstest.MapFile{Data: []byte("ignored")},
+		"scout.json": &fstest.MapFile{Data: []byte(sampleProfile)},
+		"tiny.json":  &fstest.MapFile{Data: []byte(minimalProfile)},
+		"AGENTS.md":  &fstest.MapFile{Data: []byte("non-JSON")}, // must NOT appear in List
+		"README.txt": &fstest.MapFile{Data: []byte("ignored")},
 	}
 }
 

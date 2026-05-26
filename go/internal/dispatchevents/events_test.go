@@ -179,8 +179,8 @@ func TestEmitVerifyFailed_Helper(t *testing.T) {
 func TestEmitClassification_SeverityByClass(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		class    string
-		wantSev  Severity
+		class   string
+		wantSev Severity
 	}{
 		{"infrastructure", SeverityInfo},
 		{"audit-fail", SeverityInfo},

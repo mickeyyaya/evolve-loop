@@ -61,10 +61,10 @@ const (
 type RetryPolicy string
 
 const (
-	RetryYes          RetryPolicy = "yes"
-	RetryNeedsOp      RetryPolicy = "needs-operator"
-	RetryNo           RetryPolicy = "no"
-	RetryUnknown      RetryPolicy = "unknown"
+	RetryYes     RetryPolicy = "yes"
+	RetryNeedsOp RetryPolicy = "needs-operator"
+	RetryNo      RetryPolicy = "no"
+	RetryUnknown RetryPolicy = "unknown"
 )
 
 // AgeOutSeconds returns the retention window for a classification.
@@ -226,4 +226,3 @@ func KnownClassifications() []Classification {
 		IntegrityBreach,
 	}
 }
-

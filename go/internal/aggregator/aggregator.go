@@ -27,9 +27,10 @@ import (
 )
 
 // Exit codes (matches aggregator.sh):
-//   0 — merge succeeded (audit PASS/WARN, plan-review PROCEED/REVISE, etc.)
-//   1 — audit FAIL, plan-review ABORT, or cross-cli FAIL
-//   2 — usage error / input file missing / unknown phase
+//
+//	0 — merge succeeded (audit PASS/WARN, plan-review PROCEED/REVISE, etc.)
+//	1 — audit FAIL, plan-review ABORT, or cross-cli FAIL
+//	2 — usage error / input file missing / unknown phase
 const (
 	ExitOK         = 0
 	ExitVerdictBad = 1

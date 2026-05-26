@@ -47,9 +47,9 @@ type Options struct {
 
 // Result describes what happened (mostly for tests + observability).
 type Result struct {
-	Kind       string // "skip" | "json" | "sh" | "py" | "noop" | "bypass"
-	FilePath   string
-	OK         bool
+	Kind        string // "skip" | "json" | "sh" | "py" | "noop" | "bypass"
+	FilePath    string
+	OK          bool
 	WarnEmitted bool
 }
 

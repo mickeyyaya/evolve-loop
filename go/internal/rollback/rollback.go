@@ -38,7 +38,7 @@ import (
 
 // Sentinel errors.
 var (
-	ErrJournalNotFound = errors.New("rollback: journal not found")
+	ErrJournalNotFound  = errors.New("rollback: journal not found")
 	ErrJournalMalformed = errors.New("rollback: journal malformed")
 	ErrPartial          = errors.New("rollback: partial — at least one step failed")
 )
@@ -46,12 +46,12 @@ var (
 // Journal is the per-publish record written by release-pipeline.sh and read
 // here. Fields with empty values are treated as malformed.
 type Journal struct {
-	Version    string `json:"version"`
-	Tag        string `json:"tag"`
-	CommitSHA  string `json:"commit_sha"`
-	Branch     string `json:"branch"`
-	ReleaseURL string `json:"release_url,omitempty"`
-	StartedAt  string `json:"started_at,omitempty"`
+	Version     string `json:"version"`
+	Tag         string `json:"tag"`
+	CommitSHA   string `json:"commit_sha"`
+	Branch      string `json:"branch"`
+	ReleaseURL  string `json:"release_url,omitempty"`
+	StartedAt   string `json:"started_at,omitempty"`
 	CompletedAt string `json:"completed_at,omitempty"`
 }
 
@@ -149,9 +149,9 @@ func ReadJournal(path string) (Journal, error) {
 // DefaultSteps wires the production gh/git/ship.sh implementations.
 func DefaultSteps() Steps {
 	return Steps{
-		GhDeleteRelease:  defaultGhDeleteRelease,
-		DeleteRemoteTag:  defaultDeleteRemoteTag,
-		RevertAndShip:    defaultRevertAndShip,
+		GhDeleteRelease: defaultGhDeleteRelease,
+		DeleteRemoteTag: defaultDeleteRemoteTag,
+		RevertAndShip:   defaultRevertAndShip,
 	}
 }
 

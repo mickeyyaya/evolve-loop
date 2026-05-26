@@ -28,9 +28,10 @@ import (
 )
 
 // Exit codes:
-//   0 — every worker exited 0
-//   1 — one or more workers had non-zero exit codes
-//   2 — bad arguments / setup failure
+//
+//	0 — every worker exited 0
+//	1 — one or more workers had non-zero exit codes
+//	2 — bad arguments / setup failure
 const (
 	ExitOK         = 0
 	ExitWorkerFail = 1

@@ -7,7 +7,9 @@ import (
 )
 
 // Goldens captured from:
-//   printf '%s' "$INPUT" | shasum -a 256 | head -c 8
+//
+//	printf '%s' "$INPUT" | shasum -a 256 | head -c 8
+//
 // on macOS (the canonical preflight-environment.sh path; sha256sum on
 // Linux produces the same bytes for the same input).
 //

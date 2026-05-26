@@ -59,15 +59,15 @@ type Options struct {
 
 // LedgerEntry is the NDJSON line written for each lifecycle transition.
 type LedgerEntry struct {
-	TS      string `json:"ts"`
-	Class   string `json:"class"`
-	Action  string `json:"action"`
-	TaskID  string `json:"task_id"`
-	From    string `json:"from"`
-	To      string `json:"to"`
-	Cycle   *int   `json:"cycle"`   // null when empty
-	GitSHA  *string `json:"git_sha"` // null when empty
-	Reason  string `json:"reason"`
+	TS     string  `json:"ts"`
+	Class  string  `json:"class"`
+	Action string  `json:"action"`
+	TaskID string  `json:"task_id"`
+	From   string  `json:"from"`
+	To     string  `json:"to"`
+	Cycle  *int    `json:"cycle"`   // null when empty
+	GitSHA *string `json:"git_sha"` // null when empty
+	Reason string  `json:"reason"`
 }
 
 // resolveOpts populates defaults derived from ProjectRoot.

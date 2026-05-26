@@ -149,10 +149,10 @@ func TestComposeVersion_BuildInfoBranches(t *testing.T) {
 		}
 	}
 	cases := []struct {
-		name              string
-		v, c, b           string
-		bi                func() (*debug.BuildInfo, bool)
-		wantSubstrings    []string
+		name           string
+		v, c, b        string
+		bi             func() (*debug.BuildInfo, bool)
+		wantSubstrings []string
 	}{
 		{
 			name:           "all_empty_buildinfo_full",

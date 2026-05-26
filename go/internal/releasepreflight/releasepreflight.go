@@ -62,10 +62,10 @@ type Options struct {
 
 	// Seams.
 	Now              func() time.Time
-	GitClean         func(repoRoot string) (bool, error) // step 1
-	CurrentBranch    func(repoRoot string) (string, error) // step 2
+	GitClean         func(repoRoot string) (bool, error)       // step 1
+	CurrentBranch    func(repoRoot string) (string, error)     // step 2
 	GateTestRunner   func(repoRoot string, suite string) error // step 5
-	SimulationRunner func(repoRoot string) error // advisory step (post-step-5)
+	SimulationRunner func(repoRoot string) error               // advisory step (post-step-5)
 }
 
 // Result captures what happened; populated even on failure for diagnostics.

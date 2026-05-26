@@ -36,11 +36,11 @@ const (
 type EventType string
 
 const (
-	EventCounterNonAdvance    EventType = "counter-non-advance"
-	EventSameCycleStreak      EventType = "same-cycle-streak"
+	EventCounterNonAdvance     EventType = "counter-non-advance"
+	EventSameCycleStreak       EventType = "same-cycle-streak"
 	EventCircuitBreakerTripped EventType = "circuit-breaker-tripped"
-	EventVerifyFailed         EventType = "verify-failed"
-	EventClassification       EventType = "classification"
+	EventVerifyFailed          EventType = "verify-failed"
+	EventClassification        EventType = "classification"
 )
 
 // Event is one line in abnormal-events.jsonl.
@@ -50,12 +50,12 @@ const (
 // sub-system (always "dispatch" for this writer); RemediationHint is a
 // short operator-readable suggestion.
 type Event struct {
-	EventType        EventType `json:"event_type"`
-	Timestamp        string    `json:"timestamp"`
-	SourcePhase      string    `json:"source_phase"`
-	Severity         Severity  `json:"severity"`
-	Details          string    `json:"details"`
-	RemediationHint  string    `json:"remediation_hint,omitempty"`
+	EventType       EventType `json:"event_type"`
+	Timestamp       string    `json:"timestamp"`
+	SourcePhase     string    `json:"source_phase"`
+	Severity        Severity  `json:"severity"`
+	Details         string    `json:"details"`
+	RemediationHint string    `json:"remediation_hint,omitempty"`
 	// Cycle is the cycle number the event applies to. Useful in
 	// post-hoc grep beyond what the workspace path already encodes.
 	Cycle int `json:"cycle,omitempty"`
@@ -141,10 +141,10 @@ func (w *Writer) EmitCounterNonAdvance(cycle int) error {
 // `missing` lists the roles whose ledger entries were absent.
 func (w *Writer) EmitVerifyFailed(cycle int, missing []string) error {
 	return w.Emit(Event{
-		EventType: EventVerifyFailed,
-		Severity:  SeverityError,
-		Cycle:     cycle,
-		Details:   fmt.Sprintf("cycle %d pipeline incomplete: missing %v", cycle, missing),
+		EventType:       EventVerifyFailed,
+		Severity:        SeverityError,
+		Cycle:           cycle,
+		Details:         fmt.Sprintf("cycle %d pipeline incomplete: missing %v", cycle, missing),
 		RemediationHint: "Inspect orchestrator-report.md for the phase that aborted; check per-role stdout/stderr logs",
 	})
 }
@@ -170,10 +170,10 @@ func (w *Writer) EmitClassification(cycle int, classification string) error {
 // streak is the consecutive same-cycle count that crossed threshold.
 func (w *Writer) EmitCircuitBreakerTripped(cycle, streak, threshold int) error {
 	return w.Emit(Event{
-		EventType: EventCircuitBreakerTripped,
-		Severity:  SeverityError,
-		Cycle:     cycle,
-		Details:   fmt.Sprintf("same cycle number %d reported %d consecutive times (threshold=%d) — dispatcher deadlocked", cycle, streak, threshold),
+		EventType:       EventCircuitBreakerTripped,
+		Severity:        SeverityError,
+		Cycle:           cycle,
+		Details:         fmt.Sprintf("same cycle number %d reported %d consecutive times (threshold=%d) — dispatcher deadlocked", cycle, streak, threshold),
 		RemediationHint: "Set EVOLVE_SKIP_WORKTREE=1 or raise EVOLVE_DISPATCH_REPEAT_THRESHOLD; inspect cycle workspace orchestrator-report.md",
 	})
 }

@@ -8,9 +8,10 @@ package detectnested
 
 // Detect returns "nested" if any Claude Code env-var beacon is present,
 // "standalone" otherwise. Signals (any one match → nested):
-//   CLAUDECODE
-//   CLAUDE_CODE_ENTRYPOINT
-//   CLAUDE_CODE_EXECPATH
+//
+//	CLAUDECODE
+//	CLAUDE_CODE_ENTRYPOINT
+//	CLAUDE_CODE_EXECPATH
 //
 // The env reader can be overridden via opts.Env for tests; defaults to
 // the real os.Getenv.

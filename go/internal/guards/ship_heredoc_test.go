@@ -19,8 +19,8 @@ func TestStripHeredocs(t *testing.T) {
 		mustContain    []string
 	}{
 		{
-			name: "no heredoc returns input unchanged",
-			in:   "echo hello world",
+			name:        "no heredoc returns input unchanged",
+			in:          "echo hello world",
 			mustContain: []string{"echo hello world"},
 		},
 		{
@@ -121,7 +121,7 @@ The script does:
 EOF
 )"`
 	in := core.GuardInput{
-		ToolName: "Bash",
+		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": body},
 	}
 	dec := s.Decide(context.Background(), in)
@@ -134,7 +134,7 @@ EOF
 func TestShip_Decide_BareGitPush_Denied(t *testing.T) {
 	s := NewShip()
 	in := core.GuardInput{
-		ToolName: "Bash",
+		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "git push origin main"},
 	}
 	dec := s.Decide(context.Background(), in)
@@ -154,7 +154,7 @@ func TestShip_Decide_NativeEvolveShip_Allowed(t *testing.T) {
 	}
 	for _, c := range cases {
 		in := core.GuardInput{
-			ToolName: "Bash",
+			ToolName:  "Bash",
 			ToolInput: map[string]any{"command": c},
 		}
 		dec := s.Decide(context.Background(), in)

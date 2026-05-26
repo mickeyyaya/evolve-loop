@@ -60,7 +60,7 @@ type Options struct {
 	ShipClass string // SHIP_CLASS
 
 	// Seams for testing.
-	Now        func() time.Time
+	Now          func() time.Time
 	GetDiffPaths func(repoDir string, mode Mode, diffRef string) ([]string, error)
 }
 
@@ -81,10 +81,10 @@ type PrefixManifest struct {
 
 // PrefixRule is one prefix's scope declaration.
 type PrefixRule struct {
-	AnyPath           bool     `json:"any_path"`
-	RequiredPaths     []string `json:"required_paths"`
+	AnyPath            bool     `json:"any_path"`
+	RequiredPaths      []string `json:"required_paths"`
 	ForbiddenOnlyPaths []string `json:"forbidden_only_paths"`
-	DiffMustBeSubset  bool     `json:"diff_must_be_subset"`
+	DiffMustBeSubset   bool     `json:"diff_must_be_subset"`
 }
 
 // prefixRE matches conventional-commits prefix: type[(scope)][!]:
@@ -297,10 +297,10 @@ func Run(opts Options) (Result, error) {
 // matchPath reproduces bash case-statement glob semantics + the bash port's
 // three matching strategies:
 //
-//	1. direct glob (`*` matches anything including `/`)
-//	2. `**` collapsed to `*` and retried
-//	3. `prefix/**` matches `prefix/...anything`
-//	4. `**/suffix` matches `...anything/suffix` or just `suffix`
+//  1. direct glob (`*` matches anything including `/`)
+//  2. `**` collapsed to `*` and retried
+//  3. `prefix/**` matches `prefix/...anything`
+//  4. `**/suffix` matches `...anything/suffix` or just `suffix`
 func matchPath(pattern, path string) bool {
 	if globMatch(pattern, path) {
 		return true

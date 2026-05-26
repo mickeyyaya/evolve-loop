@@ -40,9 +40,9 @@ func TestCheckEGPSGate_MissingFile(t *testing.T) {
 // returns nil and appends a confirmation log line.
 func TestCheckEGPSGate_RedCountZero(t *testing.T) {
 	path := writeACSVerdict(t, map[string]any{
-		"red_count":   0,
-		"green_count": 12,
-		"verdict":     "PASS",
+		"red_count":       0,
+		"green_count":     12,
+		"verdict":         "PASS",
 		"predicate_suite": map[string]any{"total": 12},
 	})
 	res := &RunResult{}

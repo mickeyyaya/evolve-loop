@@ -18,11 +18,11 @@ import (
 // --- Test doubles ----------------------------------------------------
 
 type fakeBridge struct {
-	mu        sync.Mutex
-	calls     []core.BridgeRequest
-	response  core.BridgeResponse
-	err       error
-	onLaunch  func(core.BridgeRequest) error // optional pre-launch hook
+	mu       sync.Mutex
+	calls    []core.BridgeRequest
+	response core.BridgeResponse
+	err      error
+	onLaunch func(core.BridgeRequest) error // optional pre-launch hook
 }
 
 func (f *fakeBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -58,8 +58,10 @@ func (f *fakeLedger) Append(_ context.Context, e core.LedgerEntry) error {
 	return nil
 }
 
-func (f *fakeLedger) Verify(_ context.Context) error                   { return nil }
-func (f *fakeLedger) Iter(_ context.Context) (core.LedgerIterator, error) { return nil, errors.New("not impl") }
+func (f *fakeLedger) Verify(_ context.Context) error { return nil }
+func (f *fakeLedger) Iter(_ context.Context) (core.LedgerIterator, error) {
+	return nil, errors.New("not impl")
+}
 
 // --- Helpers ---------------------------------------------------------
 

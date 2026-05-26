@@ -66,18 +66,18 @@ type ValidateProfileResult struct {
 // AdapterOverrides mirrors profile.adapter_overrides.<cli> — the tool +
 // extra-flag arrays the adapter receives via env vars.
 type AdapterOverrides struct {
-	ToolsJSON     string // raw JSON array string, "" when absent
+	ToolsJSON      string // raw JSON array string, "" when absent
 	ExtraFlagsJSON string // raw JSON array string, "" when absent
 }
 
 // ValidateProfile runs the full validate pipeline:
-//   1. Profile load + JSON validate.
-//   2. resolvellm.Resolve → cli + model + source. "antigravity" → "agy".
-//   3. Adapter existence check.
-//   4. capability.Inspect → warns + manifest.
-//   5. adapter_overrides extraction from profile.
-//   6. Optional EVOLVE_DISPATCH_PLAN_LOG emission.
-//   7. VALIDATE_ONLY=1 adapter exec.
+//  1. Profile load + JSON validate.
+//  2. resolvellm.Resolve → cli + model + source. "antigravity" → "agy".
+//  3. Adapter existence check.
+//  4. capability.Inspect → warns + manifest.
+//  5. adapter_overrides extraction from profile.
+//  6. Optional EVOLVE_DISPATCH_PLAN_LOG emission.
+//  7. VALIDATE_ONLY=1 adapter exec.
 //
 // Returns the full result + nil on success. Returns (result-so-far, error)
 // when any step fails — caller can inspect partial result for debugging.
@@ -234,10 +234,12 @@ func capBoolEnv(v bool) string {
 
 // adapterOverridesRE captures `"adapter_overrides":{ ... }` and inside that
 // the entry for the resolved cli. Bash uses jq:
-//   .adapter_overrides."${vp_cli}" | .tools / .extra_flags | tojson
+//
+//	.adapter_overrides."${vp_cli}" | .tools / .extra_flags | tojson
+//
 // We rebuild with a narrower regex pair.
 var (
-	toolsArrayRE     = regexp.MustCompile(`"tools"\s*:\s*(\[[^\]]*\])`)
+	toolsArrayRE      = regexp.MustCompile(`"tools"\s*:\s*(\[[^\]]*\])`)
 	extraFlagsArrayRE = regexp.MustCompile(`"extra_flags"\s*:\s*(\[[^\]]*\])`)
 )
 
