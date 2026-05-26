@@ -92,13 +92,21 @@ func (c *Classifier) Stderr(raw []byte) []Envelope {
 		return nil
 	}
 	if marker := detectInfraMarker(line); marker != "" {
-		return []Envelope{c.newEnvelope(KindInfraFailure, SeverityIncident, map[string]any{
-			"marker":  marker,
-			"source":  "stderr",
-			"excerpt": truncateInline(line, 400),
-		})}
+		return []Envelope{c.infraEnvelope(marker, "stderr", line)}
 	}
 	return nil
+}
+
+// infraEnvelope builds the canonical infra_failure envelope for a marker
+// hit, tagging the channel it surfaced on ("stdout" | "stderr"). Shared by
+// Stderr and classifyPlain so both channels carry an identical wire shape —
+// cycleclassify filters kind==infra_failure regardless of source (ADR-0020).
+func (c *Classifier) infraEnvelope(marker, source, line string) Envelope {
+	return c.newEnvelope(KindInfraFailure, SeverityIncident, map[string]any{
+		"marker":  marker,
+		"source":  source,
+		"excerpt": truncateInline(line, 400),
+	})
 }
 
 // FlushProgress emits one coalesced progress envelope when stream_event
@@ -318,6 +326,12 @@ func (c *Classifier) formatSystem(raw []byte) []Envelope {
 func (c *Classifier) classifyPlain(line string) []Envelope {
 	if isNoise(line) {
 		return nil
+	}
+	// Plaintext infra markers (CLI error lines, tmux scrollback) surface as
+	// infra_failure, symmetric with Stderr — the legacy cycleclassify
+	// scanned *-stdout.log too (cycle-61 memo-stdout.log 529).
+	if marker := detectInfraMarker(line); marker != "" {
+		return []Envelope{c.infraEnvelope(marker, "stdout", line)}
 	}
 	return []Envelope{c.newEnvelope(KindAssistantText, SeverityInfo, map[string]any{"text": line})}
 }

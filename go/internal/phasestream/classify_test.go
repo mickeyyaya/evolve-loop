@@ -177,6 +177,41 @@ func TestClassifier_Stderr_InfraFailureMarkers(t *testing.T) {
 	}
 }
 
+// TestClassifier_Plaintext_InfraMarkerSurfaces guards the parity contract
+// for cycleclassify's hard-switch to the events stream (ADR-0020 task 4):
+// the legacy classifier scanned *-stdout.log too, so infra markers that
+// land on STDOUT (the cycle-61 memo-stdout.log 529) must surface as
+// infra_failure, symmetric with Stderr(). Without this, the events-only
+// filter would silently miss stdout-borne infra.
+func TestClassifier_Plaintext_InfraMarkerSurfaces(t *testing.T) {
+	cases := []struct {
+		name, line, marker string
+	}{
+		{"api_529", "API Error 529 Overloaded — retrying", "api_529"},
+		{"api_429", "got 429 Too Many Requests from anthropic", "api_429"},
+		{"eperm", "sandbox-exec: deny Operation not permitted", "eperm"},
+		{"timeout", "phase exit: operation timed out", "timeout"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newTestClassifier()
+			out := c.Line([]byte(tc.line))
+			if len(out) != 1 || out[0].Kind != KindInfraFailure {
+				t.Fatalf("want 1 infra_failure from stdout, got %#v", out)
+			}
+			if out[0].Data["marker"] != tc.marker {
+				t.Errorf("marker: want %q got %v", tc.marker, out[0].Data["marker"])
+			}
+			if out[0].Data["source"] != "stdout" {
+				t.Errorf("source: want stdout got %v", out[0].Data["source"])
+			}
+			if out[0].Severity != SeverityIncident {
+				t.Errorf("infra_failure must be INCIDENT")
+			}
+		})
+	}
+}
+
 func TestClassifier_UnknownType_NotDropped(t *testing.T) {
 	c := newTestClassifier()
 	out := c.Line([]byte(`{"type":"brand_new_event","payload":42}`))
