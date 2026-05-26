@@ -1,6 +1,11 @@
 # ADR 0020 — Unified phase event stream (live normalizer)
 
-Status: PROPOSED (2026-05-26) · Supersedes the post-phase-only role of `internal/logfilter` (v12.2 WIP)
+Status: ACCEPTED (2026-05-26) · Supersedes the post-phase-only machine role of `internal/logfilter` (`.clean.txt` human render retained)
+
+> **Implemented** on branch `worktree-phasestream-normalizer` (tasks 1–5, commits e43873a → 34f162a). Go-pipeline notes vs the original proposal below:
+> - **Post-phase, not live tail.** The Go `bridge.Launch` is synchronous and both machine consumers (cyclecost, cycleclassify) read strictly post-phase, so the producer is `phasestream.Produce` (batch, called from `phases/runner` after `bridge.Launch`), not a live-tailing goroutine. `Normalizer.Poll`/`Run` remain for a future live call site.
+> - **Observer merge is a no-op in Go.** The live observer (stall→pgid-kill) was never wired in the Go pipeline — `phaseobserver` is bash-spawned (`subagent-run.sh`), `adapters/observer` + `core.Observer` are dormant scaffolding. So "retire the separate observer spawn" required no Go change; the dormant packages are left untouched (the bash path still exec's `evolve phase-observer`).
+> - **Producer runs before the bridge-error guard** so a phase that fails on a timeout/429/529 still emits events for cycleclassify to classify the infra failure.
 
 ## Context
 
@@ -143,13 +148,13 @@ Each keys off the unified stream instead of raw. Env vars unchanged.
 
 ## Cutover sequence (full collapse — one PR, gated by parity tests)
 
-1. **[DONE]** New `internal/phasestream` — envelope types + taxonomy + marker vocabulary + classifier (ports `logfilter/streamjson.go` + `plaintext.go` to emit envelopes, not text). 11 unit + 2 live tests.
-2. Live normalizer — single tail of stdout+stderr (reuse `phaseobserver.tail`), classify → single-writer sink; merge observer detection rules in.
-3. Repoint **cyclecost** → glob `*-events.ndjson`, last `kind==result`. `Summary` JSON shape FROZEN.
-4. Repoint **cycleclassify** → glob `*-events.ndjson` filter `kind==infra_failure`; keep `orchestrator-report.md` scan for ship-gate/audit/build (report-derived, not stdout).
-5. Wire normalizer into `runner.go`; retire post-phase logfilter text-only role (keep optional `.clean.txt` render).
-6. Retire `<agent>-observer-events.ndjson` (folded into unified file); delete raw-parse paths in cyclecost/cycleclassify.
-7. **Parity tests** (gate, no runtime fallback): golden cycle logs in `testdata/` → assert cyclecost cost identical, cycleclassify verdict identical, observer stall fires identically vs the current raw-parse implementations.
+1. **[DONE @ e43873a]** New `internal/phasestream` — envelope types + taxonomy + marker vocabulary + classifier (ports `logfilter/streamjson.go` + `plaintext.go` to emit envelopes, not text). 11 unit + 2 live tests.
+2. **[DONE @ 5777b16]** Live normalizer `Poll` core — single tail of stdout+stderr (reuse `phaseobserver.tail`), classify → single-writer sink, stall rule. (`Run` ticker-loop deferred — no live call site in the synchronous-bridge Go runner.)
+3. **[DONE @ 8502654]** Repoint **cyclecost** → glob `*-events.ndjson`, last `kind==result`. `Summary` JSON shape FROZEN.
+4. **[DONE @ a25ff10]** Repoint **cycleclassify** → glob `*-events.ndjson` filter `kind==infra_failure`; keep `orchestrator-report.md` scan for ship-gate/audit/build. (Also added symmetric stdout infra detection to `classifyPlain` so stdout-borne markers — cycle-61 — survive the cutover.)
+5. **[DONE @ 34f162a]** Wire `phasestream.Produce` (post-phase batch) into `runner.go` via the `EventsProducer` seam; retire the post-phase logfilter machine role (keep optional `.clean.txt` render). Runs before the bridge-error guard.
+6. **[DONE]** Raw-parse paths deleted in cyclecost/cycleclassify (tasks 3/4 — events-only, no fallback). `<agent>-observer-events.ndjson` retirement is N/A in the Go pipeline (observer dormant — bash-only).
+7. **[DONE @ 34f162a]** **Parity tests** (gate, no runtime fallback): `TestSummarizeCycle_ParityViaProduce` (cost identical) + `TestClassify_ParityViaProduce` (infra verdict identical) drive a real raw log through the actual `Produce` path. (Observer-stall parity N/A — dormant in Go.)
 
 ## Out of scope
 
