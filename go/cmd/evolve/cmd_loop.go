@@ -177,9 +177,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// (source incident: cycle-108 meta-loop ran with intent_required=false
 	// despite EVOLVE_REQUIRE_INTENT=1 set in the operator's shell).
 	cycleEnv := buildCycleEnv(cfg, os.Environ())
-	cycleCtx := map[string]string{
-		"strategy": cfg.Strategy,
-	}
+	cycleCtx := buildCycleContext(cfg)
 
 	lr := loopResult{StopReason: "max_cycles"}
 
@@ -933,6 +931,29 @@ func parsePositional(args []string) (cycles int, strategy string, goal string) {
 // a multi-word goal in the original CLI invocation.
 func joinArgs(args []string) string {
 	return strings.Join(args, " ")
+}
+
+// buildCycleContext returns the Context map handed to every cycle.
+// Phase agents read it via PhaseRequest.Context: Scout for strategy,
+// Intent for the canonical goal text (used to structure intent.md
+// before Scout sees it).
+//
+// Pre-this-fix, only "strategy" was passed — `cfg.GoalText` was
+// converted to a hash at parse time and the text discarded. Intent
+// persona had no way to see the operator's goal, so intent.md was
+// being structured around whatever leftover Scout artifacts happened
+// to be in the workspace. Source incident: cycle-108 meta-loop where
+// the user's "non-stop autonomy + /goal comparison" goal-text was
+// dropped and intent.md got structured around the prior cycle's
+// untested-package backlog work instead.
+func buildCycleContext(cfg loopConfig) map[string]string {
+	out := map[string]string{
+		"strategy": cfg.Strategy,
+	}
+	if cfg.GoalText != "" {
+		out["goal"] = cfg.GoalText
+	}
+	return out
 }
 
 // buildCycleEnv returns the env map handed to every cycle in this

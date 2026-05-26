@@ -64,10 +64,19 @@ type Steps struct {
 	Preflight     func(repoRoot, target string, dryRun, skipTests bool) error
 	ChangelogGen  func(repoRoot, fromRef, toRef, target string, dryRun bool) error
 	VersionBump   func(repoRoot, target string, dryRun bool) error
-	ReleaseSh     func(repoRoot, target string) error // consistency check
-	Ship          func(repoRoot, msg, releaseNotes string) (newSHA string, err error)
+	// RebuildBinary runs `go build -o go/evolve ./cmd/evolve` (from
+	// <RepoRoot>/go) so the binary tracked at go/evolve is in sync with
+	// the version-bumped source. Without this step, `evolve release X.Y.Z`
+	// ships source but leaves the marketplace binary frozen at the
+	// previous build. Source incident: v12.2.1 shipped source 2026-05-26
+	// but marketplace binary stayed at v12.1.1 (2026-05-25). The Ship
+	// step's `git add -A` then picks up the rebuilt binary as part of
+	// the release commit.
+	RebuildBinary   func(repoRoot string, dryRun bool) error
+	ReleaseSh       func(repoRoot, target string) error // consistency check
+	Ship            func(repoRoot, msg, releaseNotes string) (newSHA string, err error)
 	MarketplacePoll func(repoRoot, target string, maxWait time.Duration) error
-	Rollback      func(repoRoot, journalPath, reason string) error
+	Rollback        func(repoRoot, journalPath, reason string) error
 }
 
 // Options drives a Run() invocation.
@@ -128,6 +137,7 @@ func DefaultSteps() Steps {
 		Preflight:           defaultPreflight,
 		ChangelogGen:        defaultChangelogGen,
 		VersionBump:         defaultVersionBump,
+		RebuildBinary:       defaultRebuildBinary,
 		ReleaseSh:           defaultReleaseSh,
 		Ship:                defaultShip,
 		MarketplacePoll:     defaultMarketplacePoll,
@@ -182,6 +192,9 @@ func Run(opts Options) (Result, error) {
 	}
 	if steps.ChangelogGen == nil {
 		steps.ChangelogGen = d.ChangelogGen
+	}
+	if steps.RebuildBinary == nil {
+		steps.RebuildBinary = d.RebuildBinary
 	}
 	if steps.VersionBump == nil {
 		steps.VersionBump = d.VersionBump
@@ -253,6 +266,24 @@ func Run(opts Options) (Result, error) {
 	}
 	appendStep(journal, journalPath, "version-bump", "ok", "", now())
 	res.StepsCompleted = append(res.StepsCompleted, "version-bump")
+
+	// Step 3.5: rebuild-binary. Rebuilds go/evolve from the version-bumped
+	// source so the marketplace binary is in sync with plugin.json:version
+	// after this release. Without this step, operators install the new
+	// plugin version but run the previous build. Best-effort in dry-run.
+	if opts.DryRun {
+		logf("step: rebuild-binary (DRY-RUN — would run `go build -o go/evolve ./cmd/evolve` from <RepoRoot>/go)")
+		appendStep(journal, journalPath, "rebuild-binary", "skipped-dry-run", "", now())
+	} else {
+		logf("step: rebuild-binary")
+		if err := steps.RebuildBinary(opts.RepoRoot, false); err != nil {
+			appendStep(journal, journalPath, "rebuild-binary", "fail", err.Error(), now())
+			res.StepsFailed = append(res.StepsFailed, "rebuild-binary")
+			return res, fmt.Errorf("%w: rebuild-binary: %v", ErrPrePublishFailed, err)
+		}
+		appendStep(journal, journalPath, "rebuild-binary", "ok", "", now())
+		res.StepsCompleted = append(res.StepsCompleted, "rebuild-binary")
+	}
 
 	// Step 4: release.sh consistency check (skipped in dry-run).
 	if opts.DryRun {
@@ -482,6 +513,34 @@ func defaultChangelogGen(repoRoot, fromRef, toRef, target string, dryRun bool) e
 // defaultVersionBump calls versionbump.Run.
 func defaultVersionBump(repoRoot, target string, dryRun bool) error {
 	return runVersionBumpLib(repoRoot, target, dryRun)
+}
+
+// defaultRebuildBinary runs `go build -o go/evolve ./cmd/evolve` from
+// <repoRoot>/go. The output path go/evolve is the marketplace-tracked
+// binary location (matches the find-expression in skills/evolve-loop/SKILL.md).
+// Returns nil for dryRun (the orchestration layer also skips, but defense
+// in depth in case it's called directly). Test seam: callers in tests
+// can pass a fake function via Steps.RebuildBinary.
+func defaultRebuildBinary(repoRoot string, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+	if _, err := exec.LookPath("go"); err != nil {
+		return fmt.Errorf("go toolchain not on PATH: %w", err)
+	}
+	cmd := exec.Command("go", "build", "-o", "evolve", "./cmd/evolve")
+	cmd.Dir = filepath.Join(repoRoot, "go")
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("go build: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+	}
+	// Sanity check that the binary actually exists where we asked.
+	binPath := filepath.Join(repoRoot, "go", "evolve")
+	if _, err := os.Stat(binPath); err != nil {
+		return fmt.Errorf("post-build stat %s: %w", binPath, err)
+	}
+	return nil
 }
 
 // defaultReleaseSh calls the releaseconsistency Go library directly

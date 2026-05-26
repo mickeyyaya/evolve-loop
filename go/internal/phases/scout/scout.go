@@ -47,6 +47,13 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if s := req.Context["strategy"]; s != "" {
 		fmt.Fprintf(&b, "- strategy: %s\n", s)
 	}
+	// Goal text propagates via Context["goal"] when the operator
+	// passed --goal-text. Scout reads it as a CONSTRAINT — its
+	// backlog-vs-goal selection should treat the goal as canonical.
+	// (Pre-fix, Scout had only the hash and read backlog regardless.)
+	if g := req.Context["goal"]; g != "" {
+		fmt.Fprintf(&b, "- goal: %s\n", g)
+	}
 	return b.String()
 }
 
