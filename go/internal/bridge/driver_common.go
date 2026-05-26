@@ -90,3 +90,16 @@ func lookupEnv(deps Deps, key string) (string, bool) {
 	}
 	return os.LookupEnv(key)
 }
+
+// fileNonEmpty reports whether path exists and has size > 0 (the bash
+// `[[ -s "$f" ]]` artifact-presence test).
+func fileNonEmpty(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Size() > 0
+}
+
+// isDir reports whether path is an existing directory.
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
+}

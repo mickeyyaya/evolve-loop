@@ -56,6 +56,13 @@ type Deps struct {
 	// driverEnv. Injected in tests for a controlled env without touching
 	// the global process env. Default os.LookupEnv.
 	LookupEnv func(key string) (string, bool)
+	// Tmux drives interactive REPLs for the *-tmux drivers. Default
+	// execTmux (shells to tmux); tests inject a scriptable fake.
+	Tmux TmuxController
+	// Sleep paces the *-tmux REPL-boot and artifact-wait poll loops.
+	// Default time.Sleep; tests inject a no-op so the loops iterate
+	// instantly (the loop bound is an iteration counter, not wall clock).
+	Sleep func(time.Duration)
 }
 
 // withDefaults returns a copy of d with any zero-value seam replaced by
@@ -79,6 +86,12 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.LookupEnv == nil {
 		d.LookupEnv = os.LookupEnv
+	}
+	if d.Tmux == nil {
+		d.Tmux = execTmux{}
+	}
+	if d.Sleep == nil {
+		d.Sleep = time.Sleep
 	}
 	return d
 }
