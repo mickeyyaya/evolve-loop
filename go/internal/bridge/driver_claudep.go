@@ -13,8 +13,22 @@ type claudePDriver struct{}
 func (claudePDriver) Name() string { return "claude-p" }
 
 func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
-	// TODO(credential-isolation slice): port the ANTHROPIC_API_KEY /
-	// ANTHROPIC_BASE_URL cost-leak guards (EC_COST_LEAK) with their own tests.
+	// Credential-isolation guards (drivers/claude-p.sh): refuse to run when
+	// an ambient auth path would override the CLI's configured one. The
+	// in-process inner CLI inherits these via driverEnv, so an ambient leak
+	// is real — fail loudly (EC_COST_LEAK) so the operator confirms intent.
+	if v, ok := lookupEnv(deps, "ANTHROPIC_API_KEY"); ok && v != "" {
+		fmt.Fprintln(deps.Stderr, "[claude-p] credential-isolation guard: ANTHROPIC_API_KEY is set; refusing to run to avoid an ambiguous credential path")
+		fmt.Fprintln(deps.Stderr, "[claude-p] unset the variable, or use a different shell, then retry.")
+		return ExitCostLeak, nil
+	}
+	if v, ok := lookupEnv(deps, "ANTHROPIC_BASE_URL"); ok && v != "" {
+		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_ANTHROPIC_BASE_URL"); allow != "1" {
+			fmt.Fprintln(deps.Stderr, "[claude-p] credential-isolation guard: ANTHROPIC_BASE_URL set without BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1")
+			return ExitCostLeak, nil
+		}
+	}
+
 	prompt, err := preparePrompt(cfg, deps)
 	if err != nil {
 		return ExitBadFlags, err

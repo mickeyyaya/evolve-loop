@@ -80,3 +80,13 @@ func orDefault(s, def string) string {
 	}
 	return s
 }
+
+// lookupEnv resolves key via the Deps seam, falling back to os.LookupEnv
+// when no seam was injected (defensive — LaunchArgs always passes a
+// defaulted Deps). Used by the credential-isolation guards.
+func lookupEnv(deps Deps, key string) (string, bool) {
+	if deps.LookupEnv != nil {
+		return deps.LookupEnv(key)
+	}
+	return os.LookupEnv(key)
+}

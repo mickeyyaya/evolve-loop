@@ -1,7 +1,6 @@
 package bridge
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"os"
@@ -145,14 +144,13 @@ func (fx launchFixture) args(cli string, extra ...string) []string {
 	return append(base, extra...)
 }
 
-// run drives Engine.LaunchArgs with the fake runner and returns the exit
-// code + captured stderr.
+// run drives Engine.LaunchArgs with the fake runner and an EMPTY env
+// lookup, so the credential-isolation guards never fire from ambient
+// process env — keeping these tests deterministic on any machine. Tests
+// that exercise the guards use runLookup (driver_credentials_test.go).
 func run(t *testing.T, fr *fakeRunner, args []string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{Runner: fr.runner()})
-	var stdout, stderr bytes.Buffer
-	code := eng.LaunchArgs(context.Background(), args, nil, &stdout, &stderr)
-	return code, stderr.String()
+	return runLookup(t, fr, args, nil)
 }
 
 // --- mock-cli-drivers.bats parity -----------------------------------------

@@ -50,6 +50,12 @@ type Deps struct {
 	// writers. Default os.Stdout / os.Stderr.
 	Stdout io.Writer
 	Stderr io.Writer
+	// LookupEnv resolves an environment variable, like os.LookupEnv. The
+	// credential-isolation guards consult it to detect a key (e.g.
+	// ANTHROPIC_API_KEY) that the in-process inner CLI would inherit via
+	// driverEnv. Injected in tests for a controlled env without touching
+	// the global process env. Default os.LookupEnv.
+	LookupEnv func(key string) (string, bool)
 }
 
 // withDefaults returns a copy of d with any zero-value seam replaced by
@@ -70,6 +76,9 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.Stderr == nil {
 		d.Stderr = os.Stderr
+	}
+	if d.LookupEnv == nil {
+		d.LookupEnv = os.LookupEnv
 	}
 	return d
 }

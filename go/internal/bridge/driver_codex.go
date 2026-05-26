@@ -28,7 +28,15 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	if cfg.SessionName != "" {
 		fmt.Fprintf(deps.Stderr, "[codex] NOTE: --session-name='%s' is no-op for this driver (single-shot process).\n", cfg.SessionName)
 	}
-	// TODO(credential-isolation slice): OPENAI_API_KEY cost-leak guard.
+	// Credential-isolation guard (drivers/codex.sh): an ambient
+	// OPENAI_API_KEY would be inherited by the in-process inner CLI.
+	if v, ok := lookupEnv(deps, "OPENAI_API_KEY"); ok && v != "" {
+		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); allow != "1" {
+			fmt.Fprintln(deps.Stderr, "[codex] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1")
+			return ExitCostLeak, nil
+		}
+	}
+
 	prompt, err := preparePrompt(cfg, deps)
 	if err != nil {
 		return ExitBadFlags, err
