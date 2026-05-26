@@ -1,7 +1,0 @@
-{
-  "name": "synth-empty-tools",
-  "model": "haiku",
-  "allowed_tools": [],
-  "auto_respond": {"destructive_ops": false, "timeout_s": 300},
-  "prompt_overrides": []
-}

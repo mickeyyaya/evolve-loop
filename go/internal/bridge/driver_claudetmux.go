@@ -48,7 +48,7 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 	// permission (plan → --permission-mode plan; bypass → --dangerously-skip-
 	// permissions), and any claude-keyed raw flags. The Realizer is the single
 	// owner, so the flag set never leaks claude argv into agy/codex.
-	launchCmd := launchCmdLine("claude", cfg.Realization.LaunchFlags)
+	launchCmd := launchCmdLine(resolveBinary(deps, "claude"), cfg.Realization.LaunchFlags)
 
 	// TODO(manifest slice): prompt marker from the claude-tmux manifest; default ❯.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{

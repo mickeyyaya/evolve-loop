@@ -26,7 +26,7 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 		name:           "agy-tmux",
 		session:        session,
 		named:          named,
-		launchCmd:      launchCmdLine("agy", cfg.Realization.LaunchFlags),
+		launchCmd:      launchCmdLine(resolveBinary(deps, "agy"), cfg.Realization.LaunchFlags),
 		promptMarker:   "? for shortcuts",
 		bootScrollback: 200, // alt-screen
 		bootIntervalS:  2,

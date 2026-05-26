@@ -242,23 +242,6 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	return resp, fmt.Errorf("bridge: launch exit=%d", code)
 }
 
-// EnabledFromEnv reports whether the in-process Go bridge should be used
-// instead of the bash subprocess. Reads EVOLVE_BRIDGE_GO from the
-// request-local overlay first, then the process env. Default off — the
-// adapter keeps shelling to bash until M7 flips the default.
-func EnabledFromEnv(env map[string]string) bool {
-	v, ok := env["EVOLVE_BRIDGE_GO"]
-	if !ok || v == "" {
-		v = os.Getenv("EVOLVE_BRIDGE_GO")
-	}
-	switch v {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
-}
-
 // randRead is the entropy source for defaultChallengeToken — a package
 // var so tests can exercise the (otherwise unreachable) read-error path.
 var randRead = rand.Read

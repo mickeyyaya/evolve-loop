@@ -132,19 +132,6 @@ func TestDecideAutoRespond_ExtraBranches(t *testing.T) {
 	}
 }
 
-func TestEnabledFromEnv(t *testing.T) {
-	for v, want := range map[string]bool{"1": true, "true": true, "yes": true, "on": true, "0": false, "": false, "nope": false} {
-		if got := EnabledFromEnv(map[string]string{"EVOLVE_BRIDGE_GO": v}); got != want {
-			t.Fatalf("EnabledFromEnv(%q) = %v, want %v", v, got, want)
-		}
-	}
-	// process-env fallback when reqEnv has no key
-	t.Setenv("EVOLVE_BRIDGE_GO", "1")
-	if !EnabledFromEnv(nil) {
-		t.Fatal("EnabledFromEnv should read process env when reqEnv lacks the key")
-	}
-}
-
 func TestDefaultChallengeToken(t *testing.T) {
 	tok, err := defaultChallengeToken()
 	if err != nil {

@@ -62,7 +62,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	defer closeFn()
 
 	// codex reads the prompt on stdin.
-	rc, err := deps.Runner(ctx, "codex", args, driverEnv(deps), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, resolveBinary(deps, "codex"), args, driverEnv(deps), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[codex] %w", err)
 	}

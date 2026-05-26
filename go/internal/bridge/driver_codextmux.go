@@ -31,7 +31,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	// the model tier via its manifest tier_aliases (sonnet → gpt-5.4) and emits
 	// it as -m; permission is a controller no-op (trust handled by the
 	// auto-responder). No claude argv reaches codex.
-	launchCmd := launchCmdLine("codex", cfg.Realization.LaunchFlags)
+	launchCmd := launchCmdLine(resolveBinary(deps, "codex"), cfg.Realization.LaunchFlags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "codex-tmux",
