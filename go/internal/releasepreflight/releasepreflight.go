@@ -10,8 +10,9 @@
 //     current plugin.json version.
 //  4. Auditor ledger has a recent (<7 days) PASS (or WARN, fluent posture)
 //     verdict for HEAD with an on-disk artifact-report.md.
-//  5. All four gate-test suites pass: guards-test, ship-integration-test,
-//     role-gate-test, phase-gate-precondition-test.
+//  5. Trust-boundary gate-test packages pass: ./internal/guards/... (ship,
+//     role, phase gates) and ./internal/phases/ship/... (native ship matrix).
+//     Replaces the deleted legacy/scripts/tests/*.sh bash suites (v12).
 //
 // Exit codes (cmd layer maps from sentinel errors):
 //
@@ -86,13 +87,16 @@ type Result struct {
 	SimulationAdvisoryOK *bool
 }
 
-// Default gate-test suites (in run order). Tests can override Options.SkipTests
-// to bypass entirely; per-suite seam injection happens via GateTestRunner.
+// DefaultGateTestSuites are the trust-boundary Go test packages run as the
+// pre-publish gate (in run order). v12 deleted the legacy/scripts/tests/*.sh
+// suites; these Go packages are their equivalents — internal/guards covers the
+// ship/role/phase gates (the old guards-test, role-gate-test,
+// phase-gate-precondition-test), and internal/phases/ship covers the native
+// ship integration matrix (the old ship-integration-test). Tests override the
+// GateTestRunner seam to bypass actual execution.
 var DefaultGateTestSuites = []string{
-	"legacy/scripts/tests/guards-test.sh",
-	"legacy/scripts/tests/ship-integration-test.sh",
-	"legacy/scripts/tests/role-gate-test.sh",
-	"legacy/scripts/tests/phase-gate-precondition-test.sh",
+	"./internal/guards/...",
+	"./internal/phases/ship/...",
 }
 
 // IsSemver matches X.Y.Z[+pre] (numeric components; optional +pre/-pre suffix
@@ -171,13 +175,32 @@ func defaultCurrentBranch(repoRoot string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// defaultGateTestRunner runs `bash <repoRoot>/<suite>`.
+// defaultGateTestRunner runs `go test <suite>` from the Go module at
+// <repoRoot>/go. The ship/role-gate bypass vars are stripped from the child
+// env so the guard DENY-tests stay hermetic even when an operator's session
+// (e.g. a dev's settings.local.json) sets them — otherwise a bypass would flip
+// a DENY assertion and silently weaken the pre-publish gate.
 func defaultGateTestRunner(repoRoot string, suite string) error {
-	cmd := exec.Command("bash", filepath.Join(repoRoot, suite))
-	if err := cmd.Run(); err != nil {
-		return err
+	cmd := exec.Command("go", "test", "-count=1", suite)
+	cmd.Dir = filepath.Join(repoRoot, "go")
+	cmd.Env = stripBypassEnv(os.Environ())
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("go test %s: %w\n%s", suite, err, out)
 	}
 	return nil
+}
+
+// stripBypassEnv returns env without the EVOLVE_BYPASS_* gate-bypass vars, so a
+// child `go test` of the guard suites evaluates the real DENY behavior.
+func stripBypassEnv(env []string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "EVOLVE_BYPASS_") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 // defaultSimulationRunner runs the auto-respond simulation bats suite. Used by
