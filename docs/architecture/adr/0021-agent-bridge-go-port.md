@@ -33,16 +33,18 @@ same CLI surface, same behavior, refactored onto clean patterns, fully unit-test
 
 **Coverage:** `internal/bridge` and `adapters/bridge` are each 100.0% of statements (`go test -race`).
 
-## Deliberately deferred (low-value / niche)
+Auxiliary modules also ported (100% covered): `add-rule` (manifest-patcher, with a writable
+override-dir layer since manifests are `go:embed`), `doctor` (binary + file-based auth + env-warnings
++ optional deep probe), `human-input` (keystroke-plausibility cadence, double-gated OFF as in bash),
+and `billing-snapshot` (credential-isolation snapshot + compare).
 
-| Module | Why deferred |
+## Documented simplifications (not 1:1 with bash)
+
+| Item | Simplification |
 |---|---|
-| `human-input.sh` (keystroke-timing plausibility) | Only active with `BRIDGE_HUMAN_SIMULATION=1` (host opt-in, rare); plausibility-only, no functional effect on artifacts. |
-| `billing-snapshot.sh` (cost snapshots) | Cost-tracking telemetry, not on the cycle critical path. |
+| `doctor` / `billing` auth detection | File + env signals only; the macOS **Keychain** + `claude usage` + statsig branches are platform/exec-specific and not portably testable. The credentials-file fallback covers the common case. |
 | `bridge selftest` | Replaced by `go test ./internal/bridge/...`. |
-| macOS Keychain auth probe in `doctor` | Platform-specific + not portably testable; the file-based fallback covers the common case. |
-
-These remain in bash until ported; the Go bridge degrades gracefully without them (YAGNI).
+| `human-input` timing | Delays go through the `Sleep` seam (Gaussian magnitude is cosmetic); behavior/artifact identical to the default path. |
 
 ## GATED — production cutover (requires human sign-off, NOT autonomous)
 
