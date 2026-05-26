@@ -43,6 +43,13 @@ type Deps struct {
 	// Env is the request-local environment overlay consulted ahead of
 	// os.Getenv (via envchain). nil is treated as empty.
 	Env map[string]string
+	// Stdout/Stderr are the bridge's own diagnostic streams (NOT the
+	// inner CLI's stdout/stderr — a driver redirects those to the log
+	// files named in Config). Drivers write their `[driver] ...` notes
+	// here. LaunchArgs overrides these per-call with the caller's
+	// writers. Default os.Stdout / os.Stderr.
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // withDefaults returns a copy of d with any zero-value seam replaced by
@@ -57,6 +64,12 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.NewChallengeToken == nil {
 		d.NewChallengeToken = defaultChallengeToken
+	}
+	if d.Stdout == nil {
+		d.Stdout = os.Stdout
+	}
+	if d.Stderr == nil {
+		d.Stderr = os.Stderr
 	}
 	return d
 }
@@ -84,6 +97,7 @@ type Config struct {
 	AllowBypass    bool
 	HumanInput     bool
 	RequireFull    bool
+	AllowedTools   []string // from profile.allowed_tools
 	ExtraFlags     []string // forwarded to the inner CLI after `--`
 }
 
