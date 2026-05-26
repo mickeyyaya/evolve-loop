@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // topNHeadingRE locates the "## top_n" section heading.
@@ -41,11 +42,15 @@ func (hooks) AgentPromptName() string                     { return "evolve-triag
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "triage-report.md" }
 func (hooks) DefaultModel() string                        { return "auto" }
 
+// ShouldSkip delegates the enable/skip decision to the central PhasePolicy
+// (config.Load is the sole reader of EVOLVE_TRIAGE_DISABLE), instead of
+// reading the env flag literal here. Legacy posture preserved: triage runs
+// unless disabled.
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if req.Env["EVOLVE_TRIAGE_DISABLE"] == "1" {
-		return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
+	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
+		return false, "", "", nil
 	}
-	return false, "", "", nil
+	return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
 }
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {

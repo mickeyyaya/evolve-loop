@@ -51,6 +51,7 @@
       "optional": true,
       "enable_var": "EVOLVE_TRIAGE_DISABLE",
       "enable_var_inverted": true,
+      "enabled": "on",
       "inputs": {
         "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
         "state_fields": ["carryoverTodos"]
@@ -87,7 +88,9 @@
       "name": "tdd",
       "role": "tdd-engineer",
       "optional": true,
-      "enable_var": "EVOLVE_TDD_PHASE",
+      "enable_var": "EVOLVE_TEST_PHASE_ENABLED",
+      "enabled": "on",
+      "_v3_note": "enable_var corrected EVOLVE_TDD_PHASE -> EVOLVE_TEST_PHASE_ENABLED (the flag the tdd phase actually reads). tdd is conditional-mandatory (cycle_size!=trivial) in config.conditional_mandatory; enabled:on is the legacy floor honored in Stage:Off.",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
@@ -108,6 +111,7 @@
       "role": "build-planner",
       "optional": true,
       "enable_var": "EVOLVE_BUILD_PLANNER",
+      "enabled": "off",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",

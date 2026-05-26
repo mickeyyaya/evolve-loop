@@ -175,7 +175,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	for _, w := range warnings {
 		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
 	}
-	strategy := router.Select(cfg, nil)
+	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
+	// routing_mode=llm; otherwise it falls back to the deterministic
+	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
+	strategy := router.Select(cfg, core.NewRoutingProposer(br))
 
 	return orchDeps{
 		Storage:      st,

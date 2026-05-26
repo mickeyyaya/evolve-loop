@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // Config is the build-planner phase configuration.
@@ -52,10 +53,11 @@ func (p *Phase) BaseRunner() *runner.BaseRunner {
 	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts})
 }
 
-// ShouldSkip implements runner.Skipper. Returns true (SKIPPED) whenever
-// EVOLVE_BUILD_PLANNER is unset or not "1" (shadow-mode default).
+// ShouldSkip implements runner.Skipper. Delegates to the central PhasePolicy
+// (config.Load is the sole reader of EVOLVE_BUILD_PLANNER). Legacy posture
+// preserved: build-planner is opt-in — skipped unless the flag enables it.
 func (p *Phase) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if req.Env["EVOLVE_BUILD_PLANNER"] == "1" {
+	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseBuildPlanner)) {
 		return false, "", "", nil
 	}
 	return true, core.VerdictSKIPPED, string(core.PhaseBuild), nil

@@ -33,6 +33,14 @@ type RouteInput struct {
 	Completed       []string // phases already done this cycle
 	Strict          bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
 	Now             time.Time
+
+	// Proposer context — populated by the orchestrator, consumed ONLY by a
+	// DynamicLLM Proposer (which needs to dispatch a bridge call). The pure
+	// Route() function ignores these, so determinism is preserved.
+	Workspace   string
+	ProjectRoot string
+	Cycle       int
+	Env         map[string]string
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.

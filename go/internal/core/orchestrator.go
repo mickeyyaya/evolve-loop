@@ -290,13 +290,34 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				Completed:       cs.CompletedPhases,
 				Strict:          envSnap["EVOLVE_STRICT_AUDIT"] == "1",
 				Now:             o.now(),
+				// Proposer context (DynamicLLM only; ignored by pure Route).
+				Workspace:   cs.WorkspacePath,
+				ProjectRoot: req.ProjectRoot,
+				Cycle:       cycle,
+				Env:         envSnap,
 			})
-			o.recordRoutingDecision(ctx, cycle, cs, routingSeq, dec)
 			if o.cfg.Stage >= config.StageEnforce && current != PhaseRetro {
 				if forced, ok := o.enforceNext(current, next, signals, dec); ok {
 					next = forced
 				}
+				// Full spine-integrity check on the SELECTED next (static OR
+				// override). Fail-open: a missing mandatory-predecessor handoff
+				// is a loud WARN recorded in the decision, never a block —
+				// Digest is fail-open, so an absent artifact may be a read miss
+				// rather than a real gap, and false-blocking a real cycle is
+				// worse than surfacing the signal. The override path already
+				// declines (blocks) divergent edges that fail this check; here
+				// we additionally surface it for the trusted static edge.
+				if next != PhaseEnd && !o.sm.SpineSatisfiedUpTo(next, signals, o.cfg) {
+					dec.Clamps = append(dec.Clamps, router.Clamp{
+						Rule:     "spine-unsatisfied-warn",
+						Proposed: string(next),
+						Forced:   string(next),
+					})
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN spine not satisfied for next=%s (a mandatory predecessor's handoff artifact is missing); proceeding fail-open\n", next)
+				}
 			}
+			o.recordRoutingDecision(ctx, cycle, cs, routingSeq, dec)
 		}
 
 		if next == PhaseEnd {

@@ -217,3 +217,46 @@ func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
 		}
 	}
 }
+
+// Full static-path spine-gating (Enforce): when a mandatory predecessor's
+// handoff is absent, every transition records a fail-open spine-unsatisfied-warn
+// — the integrity signal fires WITHOUT blocking the cycle. Only handoff-scout is
+// seeded, so the build→audit and audit→ship transitions warn.
+func TestOrchestrator_Enforce_SpineUnsatisfied_WarnsButProceeds(t *testing.T) {
+	projectRoot := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+
+	cycle := 1
+	ws := seedWorkspace(t, projectRoot, cycle, map[string]string{
+		"handoff-scout.json": `{"cycle_size_estimate":"medium"}`, // non-trivial ⇒ full spine runs
+	})
+
+	o := NewOrchestrator(st, led, runners, WithRouting(shadowCfg(config.StageEnforce), router.StaticPreset{}))
+	res, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    "g",
+		Budget:      BudgetEnvelope{MaxUSD: 100},
+		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	// Fail-open: the cycle still reaches ship despite missing build/audit handoffs.
+	if len(res.PhasesRun) == 0 || res.PhasesRun[len(res.PhasesRun)-1] != PhaseShip {
+		t.Fatalf("phases=%v, want to reach ship (fail-open, not blocked)", res.PhasesRun)
+	}
+	// The spine-unsatisfied integrity signal was recorded.
+	warned := false
+	for _, d := range readRoutingDecisions(t, ws) {
+		for _, c := range d.Clamps {
+			if c.Rule == "spine-unsatisfied-warn" {
+				warned = true
+			}
+		}
+	}
+	if !warned {
+		t.Error("expected a spine-unsatisfied-warn clamp when build/audit handoffs are absent")
+	}
+}

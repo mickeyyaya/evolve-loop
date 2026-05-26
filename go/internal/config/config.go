@@ -125,10 +125,17 @@ type legacyFlag struct {
 }
 
 var legacyFlags = map[string]legacyFlag{
-	"EVOLVE_REQUIRE_INTENT":             {"intent", EnableOn, EnableContent},
-	"EVOLVE_TRIAGE_DISABLE":             {"triage", EnableOff, EnableContent},
-	"EVOLVE_PLAN_REVIEW":                {"plan-review", EnableOn, EnableOff},
-	"EVOLVE_TDD_PHASE":                  {"tdd", EnableOn, EnableOff},
+	"EVOLVE_REQUIRE_INTENT": {"intent", EnableOn, EnableContent},
+	// EVOLVE_TRIAGE_DISABLE: =1 disables triage; =0 explicitly enables it
+	// (legacy default is on, so =0 must map to On, NOT Content — Content with
+	// no trigger would wrongly skip).
+	"EVOLVE_TRIAGE_DISABLE": {"triage", EnableOff, EnableOn},
+	"EVOLVE_PLAN_REVIEW":    {"plan-review", EnableOn, EnableOff},
+	// EVOLVE_TEST_PHASE_ENABLED is the real runtime flag the tdd phase reads
+	// (=1 on, =0 off); the registry's enable_var metadata historically said
+	// EVOLVE_TDD_PHASE, which never matched the phase code. config.Load is now
+	// the single interpreter, so it binds the flag the phase actually honors.
+	"EVOLVE_TEST_PHASE_ENABLED":         {"tdd", EnableOn, EnableOff},
 	"EVOLVE_BUILD_PLANNER":              {"build-planner", EnableOn, EnableOff},
 	"EVOLVE_DISABLE_AUTO_RETROSPECTIVE": {"retrospective", EnableOff, EnableContent},
 }
@@ -177,8 +184,16 @@ func defaults() RoutingConfig {
 		Mandatory:     []string{"scout", "build", "audit", "ship"},
 		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions: 4,
-		PhaseEnable:   map[string]Enable{},
-		Triggers:      map[string]RoutingBlock{},
+		// Legacy phase-enable defaults, so PhasePolicy reproduces pre-routing
+		// behavior even when the registry file is absent (e.g. tests): triage
+		// and tdd run by default; build-planner is opt-in (shadow). These are
+		// the floor the registry `enabled` field and env flags override.
+		PhaseEnable: map[string]Enable{
+			"triage":        EnableOn,
+			"tdd":           EnableOn,
+			"build-planner": EnableOff,
+		},
+		Triggers: map[string]RoutingBlock{},
 	}
 }
 

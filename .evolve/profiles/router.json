@@ -1,0 +1,91 @@
+{
+  "name": "router",
+  "role": "router",
+  "cli": "claude-tmux",
+  "model_tier_default": "fast",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(test:*)",
+    "Write(.evolve/runs/cycle-*/routing-proposal.json)",
+    "Edit(.evolve/runs/cycle-*/routing-proposal.json)"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git worktree:*)",
+    "Bash(gh:*)",
+    "Bash(rm:*)",
+    "Bash(mv:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "Bash(npm:*)",
+    "Bash(pip:*)",
+    "Bash(brew:*)",
+    "WebFetch",
+    "WebSearch",
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)"
+  ],
+  "add_dir": ["."],
+  "max_budget_usd": 0.1,
+  "max_turns": 6,
+  "turn_budget_hint": 3,
+  "effort_level": "low",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/routing-proposal.json",
+  "challenge_token_required": false,
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [".evolve/runs/cycle-*"],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      "skills",
+      "agents",
+      "scripts",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles"
+    ],
+    "allow_network": false
+  },
+  "parallel_eligible": false,
+  "schema_filter_enabled": true,
+  "model_tier_envelope": {
+    "min": "fast",
+    "default": "fast",
+    "max": "balanced"
+  },
+  "allowed_clis": ["all"],
+  "stream_output": true,
+  "_note": "v3 (dynamic routing): the DynamicLLM router brain. Read-only, fast, low-budget advisory phase. Emits routing-proposal.json {next_phase, insert_phases, justification}. Output is ADVISORY — router.Route clamps it to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit). Only invoked at Stage>=Shadow with routing_mode=llm."
+}
