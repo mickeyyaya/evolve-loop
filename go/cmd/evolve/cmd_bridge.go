@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
@@ -25,6 +26,10 @@ Subcommands:
               [--worktree=DIR] [--permission-mode=M] [--allow-bypass]
               [--stream-output] [--session-name=NAME] [-- <inner-cli flags>] )
   probe     Detect available CLIs + capability tiers (JSON)
+  send      Queue a live command for an already-running agent
+            ( bridge send --workspace=DIR --agent=NAME
+              [--kind=command|interrupt|nudge|system_rule] [--source=cli]
+              <body...> )
   version   Print the bridge/evolve version
   help      Print this help
 
@@ -141,6 +146,45 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return 10
 		}
 		fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
+		return 0
+
+	case "send":
+		ws, agent, kind, source := "", "", "command", "cli"
+		var body []string
+		for _, a := range rest {
+			switch {
+			case strings.HasPrefix(a, "--workspace="):
+				ws = strings.TrimPrefix(a, "--workspace=")
+			case strings.HasPrefix(a, "--agent="):
+				agent = strings.TrimPrefix(a, "--agent=")
+			case strings.HasPrefix(a, "--kind="):
+				kind = strings.TrimPrefix(a, "--kind=")
+			case strings.HasPrefix(a, "--source="):
+				source = strings.TrimPrefix(a, "--source=")
+			case a == "--help" || a == "-h":
+				fmt.Fprintln(stdout, "Usage: evolve bridge send --workspace=DIR --agent=NAME [--kind=command|interrupt|nudge|system_rule] [--source=cli] <body...>")
+				return 0
+			case strings.HasPrefix(a, "--"):
+				fmt.Fprintf(stderr, "evolve bridge send: unknown flag %q\n", a)
+				return 10
+			default:
+				body = append(body, a)
+			}
+		}
+		if ws == "" || agent == "" || len(body) == 0 {
+			fmt.Fprintln(stderr, "evolve bridge send: --workspace, --agent, and a body are required")
+			return 10
+		}
+		if !inbox.Kind(kind).Valid() {
+			fmt.Fprintf(stderr, "evolve bridge send: invalid --kind %q (command|interrupt|nudge|system_rule)\n", kind)
+			return 10
+		}
+		env := inbox.Envelope{Kind: inbox.Kind(kind), Body: strings.Join(body, " "), Source: source}
+		if err := inbox.Append(ws, agent, env, time.Now); err != nil {
+			fmt.Fprintf(stderr, "evolve bridge send: %v\n", err)
+			return 10
+		}
+		fmt.Fprintf(stdout, "queued %s envelope to %s\n", kind, inbox.Path(ws, agent))
 		return 0
 
 	case "doctor":
