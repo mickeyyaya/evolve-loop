@@ -72,11 +72,11 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 	extraByCLI := map[string][]string{"claude-tmux": claudeRaw}
 
 	cases := []struct {
-		cli      string
-		binary   string
-		marker   string
-		want     string   // exact launch command line
-		absent   []string // flags that must NOT appear (cross-CLI leak)
+		cli    string
+		binary string
+		marker string
+		want   string   // exact launch command line
+		absent []string // flags that must NOT appear (cross-CLI leak)
 	}{
 		{
 			cli:    "claude-tmux",

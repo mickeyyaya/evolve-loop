@@ -19,8 +19,8 @@ type FakeStorage struct {
 	cs    core.CycleState
 }
 
-func (f *FakeStorage) ReadState(context.Context) (core.State, error)      { return f.state, nil }
-func (f *FakeStorage) WriteState(_ context.Context, s core.State) error   { f.state = s; return nil }
+func (f *FakeStorage) ReadState(context.Context) (core.State, error)           { return f.state, nil }
+func (f *FakeStorage) WriteState(_ context.Context, s core.State) error        { f.state = s; return nil }
 func (f *FakeStorage) ReadCycleState(context.Context) (core.CycleState, error) { return f.cs, nil }
 func (f *FakeStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
 	f.cs = cs

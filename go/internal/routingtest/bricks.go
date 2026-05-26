@@ -42,8 +42,8 @@ func Shadow() Brick   { return func(s *ScenarioSpec) { s.Stage = config.StageSha
 func Advisory() Brick { return func(s *ScenarioSpec) { s.Stage = config.StageAdvisory } }
 func Enforce() Brick  { return func(s *ScenarioSpec) { s.Stage = config.StageEnforce } }
 
-func Budget(v float64) Brick  { return func(s *ScenarioSpec) { s.BudgetUSD = v } }
-func MaxInserts(n int) Brick  { return func(s *ScenarioSpec) { s.MaxInsertions = n } }
+func Budget(v float64) Brick      { return func(s *ScenarioSpec) { s.BudgetUSD = v } }
+func MaxInserts(n int) Brick      { return func(s *ScenarioSpec) { s.MaxInsertions = n } }
 func Mandatory(p ...string) Brick { return func(s *ScenarioSpec) { s.Mandatory = p } }
 
 // SeverityTrigger swaps the tester insert trigger to build.severity_max>=HIGH
@@ -79,7 +79,10 @@ func GreenBuild() Brick {
 
 // Severity sets the build's max thrust severity (marks build present).
 func Severity(sev string) Brick {
-	return func(s *ScenarioSpec) { s.Signals.SeverityMax = sev; s.Signals.BuildVerdict = orPASS(s.Signals.BuildVerdict) }
+	return func(s *ScenarioSpec) {
+		s.Signals.SeverityMax = sev
+		s.Signals.BuildVerdict = orPASS(s.Signals.BuildVerdict)
+	}
 }
 
 // AuditIs marks the audit present with the given verdict.
@@ -93,8 +96,12 @@ func TriageOff() Brick {
 func PhaseEnabled(phase string, e config.Enable) Brick {
 	return func(s *ScenarioSpec) { ensureEnable(s); s.Enable[phase] = e }
 }
-func IntentRequired() Brick { return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_REQUIRE_INTENT"] = "1" } }
-func StrictAudit() Brick    { return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_STRICT_AUDIT"] = "1" } }
+func IntentRequired() Brick {
+	return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_REQUIRE_INTENT"] = "1" }
+}
+func StrictAudit() Brick {
+	return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_STRICT_AUDIT"] = "1" }
+}
 
 // SeedFailure appends n non-expired failedApproaches records (retro arc input).
 func SeedFailure(classification string, n int) Brick {
@@ -139,22 +146,28 @@ func AgentError(atPhase string) Brick {
 
 // --- expectations ---
 
-func ExpectNext(p string) Brick     { return func(s *ScenarioSpec) { s.Expect.NextPhase = p } }
+func ExpectNext(p string) Brick       { return func(s *ScenarioSpec) { s.Expect.NextPhase = p } }
 func ExpectInserts(p ...string) Brick { return func(s *ScenarioSpec) { s.Expect.Inserts = p } }
 func ExpectSkips(p ...string) Brick   { return func(s *ScenarioSpec) { s.Expect.Skips = p } }
-func ExpectClamp(rules ...string) Brick { return func(s *ScenarioSpec) { s.Expect.Clamps = append(s.Expect.Clamps, rules...) } }
-func ExpectReason(r string) Brick     { return func(s *ScenarioSpec) { s.Expect.Reason = r } }
+func ExpectClamp(rules ...string) Brick {
+	return func(s *ScenarioSpec) { s.Expect.Clamps = append(s.Expect.Clamps, rules...) }
+}
+func ExpectReason(r string) Brick { return func(s *ScenarioSpec) { s.Expect.Reason = r } }
 
 func ExpectPhases(p ...core.Phase) Brick { return func(s *ScenarioSpec) { s.Expect.PhaseSequence = p } }
-func ExpectAbsent(p ...core.Phase) Brick { return func(s *ScenarioSpec) { s.Expect.PhasesAbsent = append(s.Expect.PhasesAbsent, p...) } }
+func ExpectAbsent(p ...core.Phase) Brick {
+	return func(s *ScenarioSpec) { s.Expect.PhasesAbsent = append(s.Expect.PhasesAbsent, p...) }
+}
 func ExpectDecisionInsert(p ...string) Brick {
 	return func(s *ScenarioSpec) { s.Expect.DecisionInserts = append(s.Expect.DecisionInserts, p...) }
 }
 func ExpectDecisionClamp(rule ...string) Brick {
 	return func(s *ScenarioSpec) { s.Expect.DecisionClamps = append(s.Expect.DecisionClamps, rule...) }
 }
-func ExpectRoutingLedger(min int) Brick { return func(s *ScenarioSpec) { s.Expect.RoutingLedgerMin = min } }
-func ExpectRetro(prefix string) Brick   { return func(s *ScenarioSpec) { s.Expect.RetroPrefix = prefix } }
+func ExpectRoutingLedger(min int) Brick {
+	return func(s *ScenarioSpec) { s.Expect.RoutingLedgerMin = min }
+}
+func ExpectRetro(prefix string) Brick { return func(s *ScenarioSpec) { s.Expect.RetroPrefix = prefix } }
 func ExpectInvariants(names ...string) Brick {
 	return func(s *ScenarioSpec) { s.Expect.Invariants = append(s.Expect.Invariants, names...) }
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/buildplanner"
@@ -29,6 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // runCycle implements `evolve cycle <subcommand>`. Subcommands: run.

@@ -114,12 +114,12 @@ type ExpectSpec struct {
 	Reason    string
 
 	// FullOrchestrator expectations.
-	PhaseSequence   []core.Phase // exact PhasesRun (when non-nil)
-	PhasesAbsent    []core.Phase // these must NOT appear in PhasesRun
-	DecisionInserts []string     // some logged routing decision proposed these inserts
-	DecisionClamps  []string     // some logged routing decision carries these clamps
-	RoutingLedgerMin int         // ≥ this many routing_decision ledger entries
-	RetroPrefix      string      // CycleResult.RetroDecision has this prefix
+	PhaseSequence    []core.Phase // exact PhasesRun (when non-nil)
+	PhasesAbsent     []core.Phase // these must NOT appear in PhasesRun
+	DecisionInserts  []string     // some logged routing decision proposed these inserts
+	DecisionClamps   []string     // some logged routing decision carries these clamps
+	RoutingLedgerMin int          // ≥ this many routing_decision ledger entries
+	RetroPrefix      string       // CycleResult.RetroDecision has this prefix
 
 	// Both surfaces.
 	Invariants []string // names resolved in invariants.go
