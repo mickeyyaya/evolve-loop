@@ -37,14 +37,6 @@ func makeWorktreeScenario(t *testing.T) (string, string) {
 	return repo, wt
 }
 
-// wtFaultRunner returns a CmdRunner that fails for the given git subcommand
-// (matched on the first non-flag token after "-C"/"-c" skips, same as
-// faultRunner) while delegating everything else to execRunner.
-// It is identical to faultRunner but documented separately for clarity.
-func wtFaultRunner(failKey string, exit int, failErr error) CmdRunner {
-	return faultRunner(failKey, exit, failErr)
-}
-
 // --- gitops.go:153-154: worktree git add -A runner error -------------------
 
 func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
@@ -57,7 +49,7 @@ func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: worktree add fail",
 		ProjectRoot:   repo,
-		Runner:        wtFaultRunner("git add", 1, nil),
+		Runner:        faultRunner("git add", 1, nil),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,
 	}
@@ -114,7 +106,7 @@ func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: rev-list fail",
 		ProjectRoot:   repo,
-		Runner:        wtFaultRunner("git rev-list", 1, errors.New("rev-list injected")),
+		Runner:        faultRunner("git rev-list", 1, errors.New("rev-list injected")),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,
 	}
@@ -164,7 +156,7 @@ func TestShipFromWorktree_FFMergeFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: ff-merge fail",
 		ProjectRoot:   repo,
-		Runner:        wtFaultRunner("git merge", 1, nil),
+		Runner:        faultRunner("git merge", 1, nil),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,
 	}
@@ -183,7 +175,7 @@ func TestShipFromWorktree_PushFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: push fail",
 		ProjectRoot:   repo,
-		Runner:        wtFaultRunner("git push", 1, nil),
+		Runner:        faultRunner("git push", 1, nil),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,
 	}
@@ -215,24 +207,6 @@ func TestWriteShipBinding_ReadStateMapError_ReturnsError(t *testing.T) {
 	}
 }
 
-// --- gitops.go:287-289: writeShipBinding no cycle_id ----------------------
-
-func TestWriteShipBinding_NoCycleID_ReturnsError(t *testing.T) {
-	repo := makeRepo(t)
-
-	// Write cycle-state.json without a cycle_id field.
-	csDir := filepath.Join(repo, ".evolve")
-	if err := os.MkdirAll(csDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	mustWrite(t, filepath.Join(csDir, "cycle-state.json"), `{"active_worktree":"/tmp/wt"}`)
-
-	opts := &Options{ProjectRoot: repo}
-	err := writeShipBinding(opts, "abc123tree", "abc123sha")
-	if err == nil || !strings.Contains(err.Error(), "no cycle_id") {
-		t.Fatalf("want 'no cycle_id' error, got %v", err)
-	}
-}
-
 // Note: writeShipBinding MkdirAll failure (gitops.go:291-293) is already
 // covered by TestWriteShipBinding_MkdirFails_ReturnsError in coverage_final_test.go.
+// TestWriteShipBinding_NoCycleID_Errors (no cycle_id) is in misc_gaps_test.go.

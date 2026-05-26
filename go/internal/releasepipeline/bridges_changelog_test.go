@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -80,7 +81,7 @@ func TestRunChangelogGenLib_InvalidSemver(t *testing.T) {
 	if err == nil {
 		t.Fatal("runChangelogGenLib with invalid semver: want error, got nil")
 	}
-	if !containsStr(err.Error(), "not semver") {
+	if !strings.Contains(err.Error(), "not semver") {
 		t.Errorf("error = %q, want mention of 'not semver'", err.Error())
 	}
 }
@@ -140,7 +141,7 @@ func TestRunChangelogGenLib_LiveWrite(t *testing.T) {
 	if readErr != nil {
 		t.Fatalf("CHANGELOG.md not created: %v", readErr)
 	}
-	if !containsStr(string(body), "[2.0.0]") {
+	if !strings.Contains(string(body), "[2.0.0]") {
 		t.Errorf("CHANGELOG.md does not contain [2.0.0] entry:\n%s", string(body))
 	}
 }

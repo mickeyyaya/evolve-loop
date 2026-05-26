@@ -235,14 +235,15 @@ func TestShipDirect_CommitPrefixGateRejects_Errors(t *testing.T) {
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "staged.txt"), "staged change\n")
 
-	// Write a restrictive manifest — "feat:" prefix required.
-	// The commit message "chore: bad prefix" will not match "feat:" only.
-	manifest := `{"allowed_prefixes":["feat:"],"strict":true}`
+	// Real manifest schema (prefixes map): a "docs:" commit must touch docs/.
+	// The only staged path is staged.txt (outside docs/), so the gate raises a
+	// scope violation, which shipDirect surfaces as a commit-prefix-gate error.
+	manifest := `{"prefixes":{"docs":{"required_paths":["docs/"]}}}`
 	mustWrite(t, filepath.Join(repo, ".evolve", "commit-prefix-scope.json"), manifest)
 
 	opts := &Options{
 		Class:         ClassCycle,
-		CommitMessage: "chore: this prefix is not allowed",
+		CommitMessage: "docs: touches the wrong paths",
 		ProjectRoot:   repo,
 		Runner:        execRunner,
 		Stdin:         strings.NewReader(""),
@@ -250,26 +251,25 @@ func TestShipDirect_CommitPrefixGateRejects_Errors(t *testing.T) {
 		Stderr:        io.Discard,
 	}
 	err := shipDirect(context.Background(), opts, &RunResult{}, "main")
-	// Gate passes through if manifest format is not recognized; accept either outcome.
-	// When it does reject, the error must mention commit-prefix-gate.
-	if err != nil && !strings.Contains(err.Error(), "commit-prefix-gate") &&
-		!strings.Contains(err.Error(), "git push") {
-		t.Errorf("unexpected error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "commit-prefix-gate") {
+		t.Fatalf("want commit-prefix-gate rejection, got %v", err)
 	}
 }
 
-// --- shipFromWorktree: runCommitPrefixGate error (gitops.go:186) -----------
+// --- shipFromWorktree: runCommitPrefixGate rejection (gitops.go:186) --------
 
 func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 
-	// Write a restrictive manifest.
-	manifest := `{"allowed_prefixes":["feat:"],"strict":true}`
-	mustWrite(t, filepath.Join(repo, ".evolve", "commit-prefix-scope.json"), manifest)
+	// The gate uses RepoDir=worktree, so the manifest lives in wt/.evolve/.
+	// makeWorktreeScenario stages wt-change.txt (outside docs/), so a "docs:"
+	// commit violates required_paths → the gate rejects pre-merge.
+	manifest := `{"prefixes":{"docs":{"required_paths":["docs/"]}}}`
+	mustWrite(t, filepath.Join(wt, ".evolve", "commit-prefix-scope.json"), manifest)
 
 	opts := &Options{
 		Class:         ClassCycle,
-		CommitMessage: "chore: this prefix is not allowed",
+		CommitMessage: "docs: touches the wrong paths",
 		ProjectRoot:   repo,
 		Runner:        execRunner,
 		Stdin:         strings.NewReader(""),
@@ -277,11 +277,8 @@ func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
 		Stderr:        io.Discard,
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
-	// Accept nil (gate passes through) or commit-prefix-gate error.
-	if err != nil && !strings.Contains(err.Error(), "commit-prefix-gate") &&
-		!strings.Contains(err.Error(), "ff-merge") &&
-		!strings.Contains(err.Error(), "git push") {
-		t.Errorf("unexpected error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "commit-prefix-gate") {
+		t.Fatalf("want commit-prefix-gate rejection, got %v", err)
 	}
 }
 
@@ -294,7 +291,7 @@ func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: commit fail",
 		ProjectRoot:   repo,
-		Runner:        wtFaultRunner("git commit", 1, nil),
+		Runner:        faultRunner("git commit", 1, nil),
 		Stdin:         strings.NewReader(""),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,

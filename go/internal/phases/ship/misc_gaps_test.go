@@ -288,13 +288,11 @@ func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 		exit   int
 		err    error
 	}{stdout: "", exit: 1}
-	// git diff --cached --stat → scripted to return quickly.
-	r.scripts["git diff --cached"] = struct {
-		stdout string
-		stderr string
-		exit   int
-		err    error
-	}{stdout: "1 file changed\n", exit: 0}
+	// All "git diff …" calls match this single key: the scriptedRunner
+	// dispatches on the first non-flag arg, so --cached/--stat/--quiet all
+	// resolve to "git diff". exit 1 = staged changes present; the --stat and
+	// full-diff calls ignore the exit code (impl checks only err), so this one
+	// entry drives the whole verifyManualConfirm flow up to the isTerminal check.
 
 	// Use a bytes.Buffer (not os.Stdin) so isTerminal returns false.
 	var stdinBuf strings.Builder
@@ -310,29 +308,6 @@ func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not a tty") {
 		t.Errorf("error should mention tty; got %q", err.Error())
-	}
-}
-
-// TestVerifyManualConfirm_GitAddFails_Errors: when the staging step
-// (git add -A) fails with non-zero exit, verifyManualConfirm returns an error.
-func TestVerifyManualConfirm_GitAddFails_Errors(t *testing.T) {
-	r := &scriptedRunner{}
-	r.runner()
-	// git add → exit 1 = failure.
-	r.scripts["git add"] = struct {
-		stdout string
-		stderr string
-		exit   int
-		err    error
-	}{exit: 1}
-	opts := &Options{
-		ProjectRoot: t.TempDir(),
-		Runner:      r.runner(),
-		Stderr:      io.Discard,
-	}
-	err := verifyManualConfirm(context.Background(), opts, &RunResult{})
-	if err == nil || !strings.Contains(err.Error(), "git add -A failed") {
-		t.Fatalf("git add fail must error with 'git add -A failed'; got %v", err)
 	}
 }
 

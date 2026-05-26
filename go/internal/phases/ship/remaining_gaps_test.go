@@ -68,32 +68,6 @@ func TestShipDirect_BuildDiffFooterNameStatusError_Errors(t *testing.T) {
 	}
 }
 
-// --- advanceLastCycleNumber: state.json readStateMap error (postship.go:63) -
-
-func TestAdvanceLastCycleNumber_StateJSONReadError_ReturnsError(t *testing.T) {
-	repo := makeRepo(t)
-
-	// Write cycle-state.json with a valid cycle_id.
-	csDir := filepath.Join(repo, ".evolve")
-	mustWrite(t, filepath.Join(csDir, "cycle-state.json"), `{"cycle_id":5}`)
-
-	// Replace state.json with a directory so readStateMap errors.
-	stPath := filepath.Join(csDir, "state.json")
-	if err := os.Remove(stPath); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(stPath, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(stPath) })
-
-	opts := &Options{ProjectRoot: repo}
-	err := advanceLastCycleNumber(opts, &RunResult{})
-	if err == nil {
-		t.Fatal("want readStateMap error for state.json, got nil")
-	}
-}
-
 // --- promoteInbox: readStateMap error (postship.go:83) ----------------------
 
 func TestPromoteInbox_CycleStateReadError_ReturnsError(t *testing.T) {

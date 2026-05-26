@@ -118,17 +118,19 @@ func TestRun_NilStepsGetDefaultsWired(t *testing.T) {
 		Steps:       Steps{}, // all three funcs are nil → wired to defaults
 		DryRun:      false,
 	})
-	// The run MUST NOT panic. The exact error depends on whether gh/git/evolve
-	// exist in PATH; we just verify no panic and that the result fields are set.
-	_ = err
-	if res.ReleaseDelete == "" {
-		t.Error("ReleaseDelete should be non-empty after default step runs")
+	// With PATH neutered and a non-git repo, the wired defaults must reach
+	// definite terminal outcomes — not just any non-empty string. git revert
+	// in a non-git dir fails, so Revert="failed" and Run returns ErrPartial.
+	if !errors.Is(err, ErrPartial) {
+		t.Errorf("revert fails in non-git dir → want ErrPartial, got %v", err)
 	}
-	if res.TagDelete == "" {
-		t.Error("TagDelete should be non-empty after default step runs")
+	if res.Revert != "failed" {
+		t.Errorf("Revert: want %q, got %q", "failed", res.Revert)
 	}
-	if res.Revert == "" {
-		t.Error("Revert should be non-empty after default step runs")
+	// gh/git-tag defaults still resolve to a terminal outcome (not blank).
+	if res.ReleaseDelete == "" || res.TagDelete == "" {
+		t.Errorf("default steps must set terminal outcomes: ReleaseDelete=%q TagDelete=%q",
+			res.ReleaseDelete, res.TagDelete)
 	}
 }
 

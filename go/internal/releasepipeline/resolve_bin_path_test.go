@@ -3,6 +3,7 @@ package releasepipeline
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -38,7 +39,7 @@ func TestDefaultRebuildBinary_NonDryRun_GoNotOnPath(t *testing.T) {
 	if err == nil {
 		t.Fatal("defaultRebuildBinary with no go on PATH: want error, got nil")
 	}
-	if !containsStr(err.Error(), "go toolchain") {
+	if !strings.Contains(err.Error(), "go toolchain") {
 		t.Errorf("error = %q, want mention of 'go toolchain'", err.Error())
 	}
 }

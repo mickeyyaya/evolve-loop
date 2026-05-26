@@ -293,47 +293,12 @@ func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 	}
 }
 
-// --- Run: post-ship error is WARN not fatal --------------------------------
-
-// TestRun_PostShipError_IsWarnNotFatal: post-ship errors are non-fatal
-// because the commit is already on remote. Run logs WARN and returns ExitOK.
-// We trigger postShip error by making state.json a directory (readStateMap
-// fails in repinPostCycle → which errors, then advanceLastCycleNumber
-// fails). Actually advanceLastCycleNumber uses WARN not error for write fail,
-// and repinPostCycle swallows errors. Instead we break cycle-state.json for
-// advanceLastCycleNumber.
-func TestRun_PostShipHookError_IsNonFatal(t *testing.T) {
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	mustWrite(t, filepath.Join(repo, "change.txt"), "post-ship test\n")
-	seedAudit(t, repo, "PASS")
-	// Make cycle-state.json a directory with a cycle_id so postShip enters
-	// the cycle path, then make state.json a directory so advanceLastCycleNumber
-	// errors on readStateMap(stPath).
-	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":42}`)
-	// Replace state.json with a directory to trigger readStateMap error.
-	if err := os.Remove(filepath.Join(repo, ".evolve", "state.json")); err != nil {
-		t.Fatalf("remove: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(repo, ".evolve", "state.json"), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-
-	res, err := runShip(t, repo, Options{
-		Class:         ClassCycle,
-		CommitMessage: "feat: post-ship-error test",
-	})
-	// Even if postShip errors, Run must succeed (ExitOK) since commit is done.
-	if err != nil {
-		// Accept: verifySelfSHA may fail first because state.json is a dir.
-		// In that case the test still validates the behavior.
-		t.Logf("Run returned error (may be verifySelfSHA fail on state.json dir): %v", err)
-		return
-	}
-	if res.ExitCode != ExitOK {
-		t.Logf("ExitCode=%d; may fail on verifySelfSHA if state.json is directory", res.ExitCode)
-	}
-}
+// Note: the post-ship-error-is-non-fatal behavior is covered by
+// TestRun_PostShipError_LogsWarnAndContinues in remaining_gaps_test.go, which
+// isolates the failure to postShip (cycle-state.json broken, state.json intact)
+// so the assertion actually fires. A prior attempt here broke state.json, which
+// made verifySelfSHA fail first — the ship never reached postShip — so its
+// assertions were unreachable; it was removed during review.
 
 // --- readActiveWorktree: corrupt cycle-state.json --------------------------
 

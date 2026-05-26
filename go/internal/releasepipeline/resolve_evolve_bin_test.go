@@ -3,6 +3,7 @@ package releasepipeline
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -141,7 +142,7 @@ func TestDefaultFullDryRunPreflight_ScriptMissing(t *testing.T) {
 		t.Fatalf("defaultFullDryRunPreflight with missing script: want error, got nil")
 	}
 	// Error message must identify the missing script path.
-	if !containsStr(err.Error(), "full-dry-run.sh") {
+	if !strings.Contains(err.Error(), "full-dry-run.sh") {
 		t.Errorf("error = %q, want mention of full-dry-run.sh", err.Error())
 	}
 }
@@ -163,7 +164,7 @@ func TestDefaultFullDryRunPreflight_ScriptNotExecutable(t *testing.T) {
 	if err == nil {
 		t.Fatalf("defaultFullDryRunPreflight with non-executable script: want error, got nil")
 	}
-	if !containsStr(err.Error(), "not executable") {
+	if !strings.Contains(err.Error(), "not executable") {
 		t.Errorf("error = %q, want 'not executable'", err.Error())
 	}
 }
@@ -186,21 +187,7 @@ func TestDefaultFullDryRunPreflight_ScriptFails(t *testing.T) {
 	if err == nil {
 		t.Fatalf("defaultFullDryRunPreflight with failing script: want error, got nil")
 	}
-	if !containsStr(err.Error(), "preflight-failed") {
+	if !strings.Contains(err.Error(), "preflight-failed") {
 		t.Errorf("error = %q, want mention of script output 'preflight-failed'", err.Error())
 	}
-}
-
-// containsStr is a local helper (same logic as strings.Contains but avoids
-// import if already imported — keep as private func).
-func containsStr(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
-		func() bool {
-			for i := 0; i <= len(s)-len(sub); i++ {
-				if s[i:i+len(sub)] == sub {
-					return true
-				}
-			}
-			return false
-		}())
 }

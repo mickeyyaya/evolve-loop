@@ -68,11 +68,12 @@ func TestRun_NilFullDryRunPreflightNotCalled(t *testing.T) {
 // if not, it falls through to resolveInitCommit. Either way the pipeline must
 // still complete without error (the resolved fromTag may be a SHA or a tag).
 func TestRun_FromTagAutoResolved_ValidRepo(t *testing.T) {
-	// We use the actual repo root which has real tags.
+	// Hermetic repo with a v0.0.1 tag — deterministic across branches/CI
+	// (the live workspace's tag set drifts as releases are cut).
 	res, err := Run(Options{
 		Target:      "99.0.0",
-		RepoRoot:    findRepoRoot(t),
-		FromTag:     "", // force auto-resolution
+		RepoRoot:    makeHermeticGitRepo(t),
+		FromTag:     "", // force auto-resolution → resolves v0.0.1
 		MaxPollWait: time.Second,
 		Steps:       allOkSteps(),
 		Now:         fixedNow(t),

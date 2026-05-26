@@ -2,6 +2,7 @@ package releasepipeline
 
 import (
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -19,7 +20,7 @@ func TestDefaultRebuildBinary_NonDryRun_BadSourceDir(t *testing.T) {
 	if err == nil {
 		t.Fatal("defaultRebuildBinary with empty source dir: want error, got nil")
 	}
-	if !containsStr(err.Error(), "go build") {
+	if !strings.Contains(err.Error(), "go build") {
 		t.Errorf("error = %q, want mention of 'go build'", err.Error())
 	}
 }
