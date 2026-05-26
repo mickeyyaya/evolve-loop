@@ -3,6 +3,7 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -20,6 +21,7 @@ import (
 type fakeTmux struct {
 	existing   map[string]bool
 	sentKeys   []string // recorded SendKeys (keys only)
+	sentSeq    []string // recorded SendKeys as "keys|enter", preserving order
 	paneSeq    []string // CapturePane returns, consumed in order; last value repeats
 	paneIdx    int
 	newSessErr error // when set, NewSession fails (covers the spawn-error path)
@@ -38,8 +40,9 @@ func (f *fakeTmux) NewSession(_ context.Context, name string, _, _ int) error {
 	return nil
 }
 
-func (f *fakeTmux) SendKeys(_ context.Context, _, keys string, _ bool) error {
+func (f *fakeTmux) SendKeys(_ context.Context, _, keys string, enter bool) error {
 	f.sentKeys = append(f.sentKeys, keys)
+	f.sentSeq = append(f.sentSeq, fmt.Sprintf("%s|%v", keys, enter))
 	return nil
 }
 

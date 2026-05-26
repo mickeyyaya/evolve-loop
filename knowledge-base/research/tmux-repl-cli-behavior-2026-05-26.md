@@ -9,6 +9,7 @@
 ## TOC
 - [Why this exists](#why-this-exists)
 - [Captured facts (per CLI)](#captured-facts-per-cli)
+- [Interactive option menus (AskUserQuestion) — auto-reply ground truth](#interactive-option-menus-askuserquestion--auto-reply-ground-truth)
 - [Corrections to driver assumptions](#corrections-to-driver-assumptions)
 - [Bridge contract this validates](#bridge-contract-this-validates)
 - [Reproduce](#reproduce)
@@ -79,6 +80,60 @@ and the scrollback capture (`capture-pane -p -S -200`) at the same tick — i.e.
   driver sets `tickDuringBoot=true` so the auto-responder sends `Enter`. Observed
   live in a bridge launch (`[auto-respond] sent keys: Enter`) though not in this
   bare-tmux capture — treat it as **intermittent**, so keep `tickDuringBoot`.
+
+## Interactive option menus (AskUserQuestion) — auto-reply ground truth
+
+Captured 2026-05-26 (claude v2.1.150, Haiku). **`--dangerously-skip-permissions`
+does NOT suppress `AskUserQuestion` menus** — a question is not a permission, so the
+bridge's `*-tmux` REPL blocks indefinitely on one unless the auto-responder answers it.
+This is the dominant real hang in autonomous loops. Both verified keystrokes below
+were confirmed live (menu cleared, `⏺ User answered Claude's questions`, REPL returned
+to `❯` idle).
+
+### Single-select
+```
+ ☐ Preference
+What's your favorite?
+❯ 1. Alpha
+     Option 1
+  2. Beta
+  3. Gamma
+  4. Type something.
+  5. Chat about this
+Enter to select · ↑/↓ to navigate · Esc to cancel
+```
+- First option is pre-highlighted (`❯ 1.`). **Verified: a single `Enter` selects it**
+  → `→ Alpha`. That is exactly `recommended_or_first` (AskUserQuestion convention puts
+  the recommended option first).
+- Distinguishing marker: footer `Enter to select · … to navigate`. NO `[ ]` checkboxes.
+
+### Multi-select (multiSelect:true)
+```
+←  ☐ Toppings  ✔ Submit  →
+Which toppings would you like?
+❯ 1. [ ] Cheese
+  2. [ ] Mushroom
+  3. [ ] Onion
+  4. [ ] Type something
+Enter to select · ↑/↓ to navigate · Esc to cancel
+```
+- Checkboxes (`[ ]`) + a `✔ Submit` tab reached with the `→` (Right) arrow. The footer
+  is the SAME as single-select, so the **distinguisher is the `❯ 1. [ ]` checkbox**.
+- **Verified: `Enter, Right, Enter`** (toggle first checkbox → Right to the Submit tab →
+  Enter to submit) → `→ Cheese`, REPL advanced. A bare `Enter` only toggles a checkbox;
+  it does NOT submit — the multi-keystroke sequence is load-bearing.
+
+### Encoded rules (manifests/claude-tmux.json, order matters — first match wins)
+| Name | Regex (matches) | `response_keys` | Why |
+|---|---|---|---|
+| `askuserquestion_multiselect` | `(?s)\[ \].*Enter to select` (a `[ ]` checkbox AND the footer) | `Enter,Right,Enter` (PACED) | Listed FIRST: multi panes also contain the footer, so the checkbox rule must win. Requires both a checkbox and the footer so (a) a markdown checklist in agent output (`1. [ ] …`) does not false-match, and (b) the rule keeps matching after the first checkbox toggles (other rows stay `[ ]`) for a retry. Keystrokes are paced ~500ms apart — a zero-gap burst intermittently fails to submit. |
+| `askuserquestion_select` | `Enter to select.*navigate` (footer) | `Enter` | Single-select fall-through (no checkbox). |
+
+The `Enter,Right,Enter` sequence requires the **ordered** key sender (`sendKeySequence`),
+not the legacy `parseSendKeysCSV` collapse (which folds every `Enter` into one trailing
+Enter and would submit with nothing selected). Layer 1 (the prompt-prefix interactive
+policy) normally stops the agent from asking at all; these rules are the Layer-2 safety
+net for when it asks anyway.
 
 ## Corrections to driver assumptions
 

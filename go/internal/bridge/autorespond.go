@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // autorespond.go — the fallback prompt-detection engine for interactive
@@ -112,8 +113,7 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 			humanReadingPause(ar.deps, pane)
 			humanSendKeysCSV(ctx, ar.deps, session, keysCSV)
 		} else {
-			keys, enter := parseSendKeysCSV(keysCSV)
-			_ = ar.deps.Tmux.SendKeys(ctx, session, keys, enter)
+			sendKeySequence(ctx, ar.deps, session, keysCSV)
 			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s\n", keysCSV)
 		}
 		return "", 1
@@ -131,21 +131,42 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	}
 }
 
-// parseSendKeysCSV maps a comma-separated tmux key list to the
-// (keys, enter) form of TmuxController.SendKeys. A trailing "Enter" token
-// becomes enter=true; the remaining tokens join with spaces (the manifest
-// patterns are single-key + Enter: "y,Enter", "Enter", "3,Enter").
-func parseSendKeysCSV(csv string) (keys string, enter bool) {
-	toks := strings.Split(csv, ",")
-	var keyToks []string
-	for _, tk := range toks {
-		if tk == "Enter" {
-			enter = true
-			continue
+// autoRespondInterKeyPause spaces out the keystrokes of a multi-step response
+// so the inner CLI's TUI gets a render frame between them. claude's multi-
+// select navigation (toggle → Right to Submit → Enter) is unreliable when the
+// three keys arrive as one rapid burst — the cursor move lands before the
+// toggle has re-rendered — but reliable once paced. Verified 2026-05-26: a
+// zero-gap burst intermittently failed to submit; a 500 ms gap submitted on
+// every run. The pause is delivered via Deps.Sleep, so the deterministic tests
+// (no-op / scaled Sleep) stay fast and only a real launch waits.
+const autoRespondInterKeyPause = 500 * time.Millisecond
+
+// sendKeySequence sends each comma-separated key token to the REPL as its own
+// keystroke, in order, pausing between them — so a multi-step response like
+// "Enter,Right,Enter" (claude's multi-select: toggle the highlighted checkbox
+// → Right to the Submit tab → Enter to submit) arrives as three distinct,
+// paced keypresses instead of being collapsed or bursted. An "Enter" token
+// sends a bare Enter; any other non-empty token sends that tmux key/text with
+// no trailing Enter.
+//
+// The old parseSendKeysCSV collapsed every Enter into a single trailing Enter,
+// which would submit a multi-select with nothing selected.
+func sendKeySequence(ctx context.Context, deps Deps, session, csv string) {
+	first := true
+	for _, tok := range strings.Split(csv, ",") {
+		if tok == "" {
+			continue // empty token (e.g. "y,,Enter") → no keystroke
 		}
-		keyToks = append(keyToks, tk)
+		if !first {
+			deps.Sleep(autoRespondInterKeyPause)
+		}
+		if tok == "Enter" {
+			_ = deps.Tmux.SendKeys(ctx, session, "", true)
+		} else {
+			_ = deps.Tmux.SendKeys(ctx, session, tok, false)
+		}
+		first = false
 	}
-	return strings.Join(keyToks, " "), enter
 }
 
 // writeEscalation writes escalation-report.json from the final pane, the

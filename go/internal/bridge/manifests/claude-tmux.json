@@ -14,6 +14,20 @@
   "default_args": ["--dangerously-skip-permissions"],
   "interactive_prompts": [
     {
+      "name": "askuserquestion_multiselect",
+      "regex": "(?s)\\[ \\].*Enter to select",
+      "response_keys": "Enter,Right,Enter",
+      "policy": "auto_respond",
+      "note": "claude AskUserQuestion multiSelect: '[ ]' checkboxes + the 'Enter to select' menu footer. Verified 2026-05-26: Enter toggles the highlighted checkbox, Right moves to the Submit tab, Enter submits → recommended_or_first (keystrokes are PACED — see autoRespondInterKeyPause). Requires BOTH a '[ ]' checkbox AND the menu footer so a bare markdown checklist in agent output ('1. [ ] do thing') does NOT false-match, and so the rule keeps matching after the first checkbox toggles (other rows stay '[ ]') — enabling a retry if the first submit misses. MUST precede askuserquestion_select: a multi-select pane also contains that footer, so the checkbox rule must win (first-match). --dangerously-skip-permissions does NOT suppress this (a question is not a permission)."
+    },
+    {
+      "name": "askuserquestion_select",
+      "regex": "Enter to select.*navigate",
+      "response_keys": "Enter",
+      "policy": "auto_respond",
+      "note": "claude AskUserQuestion single-select: first option pre-highlighted ('❯ 1.'); footer 'Enter to select · ↑/↓ to navigate · Esc to cancel'. Verified 2026-05-26: a single Enter selects the highlighted first option = recommended_or_first. Layer-2 net behind the prompt-prefix interactive policy (Layer 1)."
+    },
+    {
       "name": "auth_recheck",
       "regex": "Please log in|Authentication required|Login expired",
       "response_keys": null,

@@ -132,6 +132,11 @@ type Config struct {
 	RequireFull    bool
 	AllowedTools   []string // from profile.allowed_tools
 	ExtraFlags     []string // forwarded to the inner CLI after `--`
+	// ArtifactTimeoutS overrides the *-tmux artifact-wait deadline (seconds);
+	// 0 → tmuxArtifactTimeoutS (300). A per-launch control for callers that
+	// want a tighter ceiling than the default — e.g. fast agents, or a probe
+	// that should fail quickly rather than wait the full five minutes.
+	ArtifactTimeoutS int
 }
 
 // Engine is the core.Bridge implementation and the Template Method host:

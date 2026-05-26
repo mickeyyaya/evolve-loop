@@ -1,9 +1,12 @@
 package bridge
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 // autorespond_test.go — pure decision truth table + key-CSV parsing +
@@ -50,21 +53,32 @@ func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 	}
 }
 
-func TestParseSendKeysCSV(t *testing.T) {
+func TestSendKeySequence(t *testing.T) {
+	// Each token becomes its own ordered keystroke ("keys|enter"). The
+	// multi-keystroke case is the load-bearing one: claude's multi-select
+	// needs Enter (toggle) → Right (to Submit) → Enter (submit) as three
+	// distinct presses, which the old (keys,enter) collapse could not express.
 	cases := []struct {
-		csv, keys string
-		enter     bool
+		name, csv string
+		want      []string
 	}{
-		{"y,Enter", "y", true},
-		{"Enter", "", true},
-		{"3,Enter", "3", true},
-		{"y", "y", false},
+		{"single key + enter", "y,Enter", []string{"y|false", "|true"}},
+		{"bare enter", "Enter", []string{"|true"}},
+		{"digit + enter", "3,Enter", []string{"3|false", "|true"}},
+		{"key only, no enter", "y", []string{"y|false"}},
+		{"multi-keystroke sequence", "Enter,Right,Enter", []string{"|true", "Right|false", "|true"}},
+		{"empty tokens skipped", "y,,Enter", []string{"y|false", "|true"}},
 	}
 	for _, tc := range cases {
-		k, e := parseSendKeysCSV(tc.csv)
-		if k != tc.keys || e != tc.enter {
-			t.Fatalf("parseSendKeysCSV(%q) = (%q,%v), want (%q,%v)", tc.csv, k, e, tc.keys, tc.enter)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &fakeTmux{}
+			// no-op Sleep so the inter-key pacing doesn't slow the unit test.
+			deps := Deps{Tmux: rec, Sleep: func(time.Duration) {}}.withDefaults()
+			sendKeySequence(context.Background(), deps, "s", tc.csv)
+			if strings.Join(rec.sentSeq, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("sendKeySequence(%q) = %v, want %v", tc.csv, rec.sentSeq, tc.want)
+			}
+		})
 	}
 }
 

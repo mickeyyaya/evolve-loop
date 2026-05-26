@@ -146,6 +146,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	// --- Wait for the artifact, ticking the auto-respond fallback.
 	deadline := tmuxArtifactTimeoutS
+	if cfg.ArtifactTimeoutS > 0 {
+		deadline = cfg.ArtifactTimeoutS
+	}
 	artifactSeen := false
 	for elapsed := 0; elapsed < deadline; elapsed += 2 {
 		deps.Sleep(2 * time.Second)

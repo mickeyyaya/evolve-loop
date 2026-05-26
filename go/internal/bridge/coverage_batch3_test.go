@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 )
 
 // coverage_batch3_test.go — error-injection + note branches: driver
@@ -84,7 +85,9 @@ func TestCodexTmux_StreamOutputNote(t *testing.T) {
 
 func TestAutoResponder_Tick(t *testing.T) {
 	mkAR := func(prompts []ManifestPrompt, tmux *fakeTmux) *autoResponder {
-		deps := Deps{Tmux: tmux, Stderr: io.Discard}
+		// no-op Sleep: the auto_respond path now paces multi-keystroke sends
+		// via deps.Sleep (production sets it via withDefaults).
+		deps := Deps{Tmux: tmux, Stderr: io.Discard, Sleep: func(time.Duration) {}}
 		return &autoResponder{prompts: prompts, workspace: t.TempDir(), cli: "x", counts: map[string]int{}, deps: deps}
 	}
 	// extend_timeout → ("extend:N", 2)
