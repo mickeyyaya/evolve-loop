@@ -97,8 +97,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		deps.Sleep(time.Second)
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "cd "+workingDir, true)
 		deps.Sleep(time.Second)
-		_ = deps.Tmux.SendKeys(ctx, lp.session, lp.launchCmd, true)
-		fmt.Fprintf(deps.Stderr, "%s launching: %s\n", pfx, lp.launchCmd)
+		launchCmd := lp.launchCmd
+		if len(cfg.ExtraFlags) > 0 {
+			launchCmd += " " + strings.Join(cfg.ExtraFlags, " ")
+		}
+		_ = deps.Tmux.SendKeys(ctx, lp.session, launchCmd, true)
+		fmt.Fprintf(deps.Stderr, "%s launching: %s\n", pfx, launchCmd)
 
 		interval := lp.bootIntervalS
 		if interval <= 0 {

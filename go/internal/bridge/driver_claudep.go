@@ -50,6 +50,9 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 		args = append(args, "--allowedTools")
 		args = append(args, cfg.AllowedTools...)
 	}
+	// Inner-CLI pass-through flags (the bash `--` separator): --bare,
+	// --strict-mcp-config, --setting-sources, etc. from the adapter.
+	args = append(args, cfg.ExtraFlags...)
 
 	fmt.Fprintf(deps.Stderr, "[claude-p] cycle=%d agent=%s model=%s artifact=%s permission_mode=%s\n",
 		cfg.Cycle, cfg.Agent, cfg.Model, cfg.Artifact, orDefault(cfg.PermissionMode, "(default)"))

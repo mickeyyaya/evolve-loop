@@ -53,6 +53,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	default:
 		fmt.Fprintf(deps.Stderr, "[codex] WARN: unrecognized model '%s' — omitting -m\n", resolved)
 	}
+	args = append(args, cfg.ExtraFlags...) // inner-CLI pass-through
 
 	stdoutF, stderrF, closeFn, err := openDriverLogs(cfg)
 	if err != nil {

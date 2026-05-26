@@ -1,13 +1,17 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -143,12 +147,80 @@ func NewEngine(deps Deps) *Engine {
 // EVOLVE_BRIDGE_GO cutover (M7) only flips on once the stubs are gone.
 var errNotImplemented = errors.New("bridge: not implemented (M0 scaffold)")
 
-// Launch satisfies core.Bridge. M0 stub — the real pipeline lands in
-// M2 (engine flow) + M3–M5 (drivers).
+// Launch satisfies core.Bridge: the in-process entry the M7 adapter
+// cutover routes to. It maps a BridgeRequest onto the LaunchArgs pipeline
+// (materializing req.Prompt to a file, mirroring the bash bridge's
+// --prompt-file contract), then reads the artifact into the response on
+// success — matching the existing subprocess adapter's behavior so the
+// cutover is a drop-in.
 func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
-	_ = ctx
-	_ = req
-	return core.BridgeResponse{}, errNotImplemented
+	switch "" {
+	case req.CLI:
+		return core.BridgeResponse{}, errors.New("bridge: CLI required")
+	case req.Profile:
+		return core.BridgeResponse{}, errors.New("bridge: Profile required")
+	case req.Workspace:
+		return core.BridgeResponse{}, errors.New("bridge: Workspace required")
+	case req.ArtifactPath:
+		return core.BridgeResponse{}, errors.New("bridge: ArtifactPath required")
+	}
+	if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+		return core.BridgeResponse{}, fmt.Errorf("bridge: ensure workspace: %w", err)
+	}
+	agent := req.Agent
+	if agent == "" {
+		agent = "agent"
+	}
+	promptFile := filepath.Join(req.Workspace, agent+"-prompt.txt")
+	if err := os.WriteFile(promptFile, []byte(req.Prompt), 0o644); err != nil {
+		return core.BridgeResponse{}, fmt.Errorf("bridge: write prompt: %w", err)
+	}
+	stdoutLog := req.StdoutLog
+	if stdoutLog == "" {
+		stdoutLog = filepath.Join(req.Workspace, agent+"-stdout.log")
+	}
+	stderrLog := req.StderrLog
+	if stderrLog == "" {
+		stderrLog = filepath.Join(req.Workspace, agent+"-stderr.log")
+	}
+	model := req.Model
+	if model == "" {
+		model = "auto"
+	}
+	args := []string{
+		"--cli=" + req.CLI,
+		"--profile=" + req.Profile,
+		"--model=" + model,
+		"--prompt-file=" + promptFile,
+		"--workspace=" + req.Workspace,
+		"--stdout-log=" + stdoutLog,
+		"--stderr-log=" + stderrLog,
+		"--artifact=" + req.ArtifactPath,
+	}
+	if req.Cycle > 0 {
+		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
+	}
+	if req.Agent != "" {
+		args = append(args, "--agent="+req.Agent)
+	}
+	if req.Worktree != "" {
+		args = append(args, "--worktree="+req.Worktree)
+	}
+	if len(req.ExtraFlags) > 0 {
+		args = append(args, "--")
+		args = append(args, req.ExtraFlags...)
+	}
+
+	var stderrBuf bytes.Buffer
+	code := e.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
+	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String()}
+	if code == ExitOK {
+		if b, err := os.ReadFile(req.ArtifactPath); err == nil {
+			resp.Stdout = string(b)
+		}
+		return resp, nil
+	}
+	return resp, fmt.Errorf("bridge: launch exit=%d", code)
 }
 
 // Probe satisfies core.Bridge. M0 stub — real CLI/tier detection lands
