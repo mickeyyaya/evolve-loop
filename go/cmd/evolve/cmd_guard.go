@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
@@ -80,6 +81,15 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 10
 	}
 	name := fs.Arg(0)
+	// Read-only enumeration subcommand, distinct from the kernel-hook
+	// guards (ship/phase/role/…). Doesn't take stdin, doesn't emit
+	// allow/deny — just lists pending audit failures so an operator can
+	// triage them (issue surfaced by cycle-107 retro: "16 non-expired
+	// code-audit-fail entries (within 30d retention)" with no way to see
+	// which entries).
+	if name == "list-audit-fails" {
+		return runListAuditFails(fs.Args()[1:], evolveDir, stdout, stderr)
+	}
 	in, err := readGuardInput(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard %s: stdin parse: %v\n", name, err)
@@ -129,6 +139,92 @@ func readGuardInput(r io.Reader) (core.GuardInput, error) {
 	in.ToolInput = raw.ToolInput
 	in.CWD = raw.CWD
 	return in, nil
+}
+
+// runListAuditFails enumerates the non-expired code-audit-fail entries
+// from .evolve/state.json:failedApproaches[]. Flag surface:
+//
+//	--json   emit JSON array instead of the human table
+//
+// Exit code 0 even when zero entries match (an empty list is a valid
+// answer, not an error).
+func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve guard list-audit-fails", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var asJSON bool
+	// Re-accept --evolve-dir here so it works whether the operator puts
+	// it before or after the subcommand name. Default to the parent
+	// runGuard's already-resolved value.
+	fs.StringVar(&evolveDir, "evolve-dir", evolveDir, "path to .evolve/ state directory")
+	fs.BoolVar(&asJSON, "json", false, "emit JSON array instead of human-readable table")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+
+	statePath := filepath.Join(evolveDir, "state.json")
+	raw, err := os.ReadFile(statePath)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve guard list-audit-fails: read %s: %v\n", statePath, err)
+		return 1
+	}
+	var st core.State
+	if err := json.Unmarshal(raw, &st); err != nil {
+		fmt.Fprintf(stderr, "evolve guard list-audit-fails: parse %s: %v\n", statePath, err)
+		return 1
+	}
+
+	// Convert state.FailedAt ([]core.FailedRecord) → []failureadapter.Entry
+	// so we can reuse the canonical retention filter. Field names match
+	// byte-for-byte across the two structs (both mirror state.json).
+	entries := make([]failureadapter.Entry, 0, len(st.FailedAt))
+	for _, r := range st.FailedAt {
+		entries = append(entries, failureadapter.Entry{
+			TS:                r.TS,
+			Cycle:             r.Cycle,
+			Verdict:           r.Verdict,
+			Classification:    failureadapter.Classification(r.Classification),
+			RecordedAt:        r.RecordedAt,
+			ExpiresAt:         r.ExpiresAt,
+			AuditReportPath:   r.AuditReportPath,
+			AuditReportSHA256: r.AuditReportSHA256,
+			GitHead:           r.GitHead,
+			TreeStateSHA:      r.TreeStateSHA,
+			Defects:           r.Defects,
+			Retrospected:      r.Retrospected,
+			Summary:           r.Summary,
+		})
+	}
+	pending := failureadapter.ListPendingByClass(entries, failureadapter.CodeAuditFail, time.Now())
+
+	if asJSON {
+		buf, mErr := json.MarshalIndent(pending, "", "  ")
+		if mErr != nil {
+			fmt.Fprintf(stderr, "evolve guard list-audit-fails: marshal: %v\n", mErr)
+			return 1
+		}
+		fmt.Fprintf(stdout, "%s\n", buf)
+		return 0
+	}
+
+	fmt.Fprintf(stdout, "%-6s | %-20s | %-7s | %-12s | %s\n", "cycle", "recorded_at", "verdict", "tree_state", "summary")
+	fmt.Fprintln(stdout, "-------+----------------------+---------+--------------+--------")
+	for _, e := range pending {
+		summary := e.Summary
+		if len(summary) > 80 {
+			summary = summary[:77] + "..."
+		}
+		ts := e.RecordedAt
+		if ts == "" {
+			ts = e.TS
+		}
+		tree := e.TreeStateSHA
+		if len(tree) > 12 {
+			tree = tree[:12]
+		}
+		fmt.Fprintf(stdout, "%-6d | %-20s | %-7s | %-12s | %s\n", e.Cycle, ts, e.Verdict, tree, summary)
+	}
+	fmt.Fprintf(stdout, "\n(%d pending code-audit-fail entries within 30d retention)\n", len(pending))
+	return 0
 }
 
 func buildGuard(name, evolveDir string) (core.Guard, error) {

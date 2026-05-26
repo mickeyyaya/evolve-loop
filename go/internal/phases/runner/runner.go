@@ -29,11 +29,13 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
+
 
 // Hooks captures the per-phase variation points BaseRunner delegates
 // to. Implementations are typically small value types embedded in each
@@ -97,16 +99,21 @@ type Options struct {
 	// ResolveLLM is the seam for resolving the "auto" model sentinel.
 	// When nil, defaults to resolvellm.Resolve.
 	ResolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	// StdoutFilter is the seam for the post-phase .clean.txt writer.
+	// When nil, defaults to logfilter.Process. Per-instance field (not a
+	// package global) keeps t.Parallel() tests race-free.
+	StdoutFilter func(workspace, phase string) error
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
 // phase via New(); use it as a core.PhaseRunner.
 type BaseRunner struct {
-	hooks      Hooks
-	bridge     core.Bridge
-	prompts    *prompts.Loader
-	nowFn      func() time.Time
-	resolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	hooks        Hooks
+	bridge       core.Bridge
+	prompts      *prompts.Loader
+	nowFn        func() time.Time
+	resolveLLM   func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	stdoutFilter func(workspace, phase string) error
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -123,12 +130,17 @@ func New(opts Options) *BaseRunner {
 	if resolveLLM == nil {
 		resolveLLM = resolvellm.Resolve
 	}
+	stdoutFilter := opts.StdoutFilter
+	if stdoutFilter == nil {
+		stdoutFilter = logfilter.Process
+	}
 	return &BaseRunner{
-		hooks:      opts.Hooks,
-		bridge:     opts.Bridge,
-		prompts:    opts.Prompts,
-		nowFn:      nowFn,
-		resolveLLM: resolveLLM,
+		hooks:        opts.Hooks,
+		bridge:       opts.Bridge,
+		prompts:      opts.Prompts,
+		nowFn:        nowFn,
+		resolveLLM:   resolveLLM,
+		stdoutFilter: stdoutFilter,
 	}
 }
 
@@ -286,6 +298,17 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if artifact == "" {
 		if data, readErr := os.ReadFile(artifactPath); readErr == nil {
 			artifact = string(data)
+		}
+	}
+
+	// Best-effort: write the <phase>-stdout.clean.txt companion next to
+	// the raw log. Default-on; set EVOLVE_STDOUT_FILTER=off to skip.
+	// Filter failures NEVER block the phase — they WARN and continue,
+	// because the raw log remains the forensic source of truth and
+	// cyclecost / phaseobserver still read it directly.
+	if envchain.Resolve("EVOLVE_STDOUT_FILTER", req.Env, "", "on") != "off" {
+		if err := b.stdoutFilter(req.Workspace, phase); err != nil {
+			fmt.Fprintf(os.Stderr, "[runner] WARN stdout filter phase=%s: %v\n", phase, err)
 		}
 	}
 

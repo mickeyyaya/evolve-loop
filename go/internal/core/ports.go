@@ -1,8 +1,12 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 )
 
 // Storage reads and writes the .evolve/ filesystem state surface:
@@ -117,27 +121,116 @@ type CycleState struct {
 	IntentRequired   bool     `json:"intent_required"`
 }
 
-// LedgerEntry is one .jsonl line; fields match the v8.37+ shape
-// observed in .evolve/ledger.jsonl. Extra fields per kind are carried
-// in Extra so future agent kinds don't require schema migration.
+// LedgerEntry is one .jsonl line in .evolve/ledger.jsonl.
+//
+// The cycle field has a custom unmarshaler that accepts int (canonical)
+// or string (legacy manual entries, e.g. "manual-release-v10.16.0").
+// On-disk bytes are never rewritten — doing so would cascade SHA256
+// hash-chain breaks through every subsequent entry.
 type LedgerEntry struct {
-	TS              string         `json:"ts"`
-	Cycle           int            `json:"cycle"`
-	Role            string         `json:"role"`
-	Kind            string         `json:"kind"`
-	Model           string         `json:"model,omitempty"`
-	ExitCode        int            `json:"exit_code"`
-	DurationS       string         `json:"duration_s,omitempty"`
-	ArtifactPath    string         `json:"artifact_path,omitempty"`
-	ArtifactSHA256  string         `json:"artifact_sha256,omitempty"`
-	ChallengeToken  string         `json:"challenge_token,omitempty"`
-	GitHEAD         string         `json:"git_head,omitempty"`
-	TreeStateSHA    string         `json:"tree_state_sha,omitempty"`
-	EntrySeq        int            `json:"entry_seq"`
-	PrevHash        string         `json:"prev_hash"`
-	WorkerCount     int            `json:"worker_count,omitempty"`
-	Workers         []string       `json:"workers,omitempty"`
-	Extra           map[string]any `json:"-"`
+	TS             string   `json:"ts"`
+	Cycle          int      `json:"cycle"`
+	CycleLabel     string   `json:"cycle_label,omitempty"`
+	Role           string   `json:"role"`
+	Kind           string   `json:"kind"`
+	Model          string   `json:"model,omitempty"`
+	ExitCode       int      `json:"exit_code"`
+	DurationS      string   `json:"duration_s,omitempty"`
+	ArtifactPath   string   `json:"artifact_path,omitempty"`
+	ArtifactSHA256 string   `json:"artifact_sha256,omitempty"`
+	ChallengeToken string   `json:"challenge_token,omitempty"`
+	GitHEAD        string   `json:"git_head,omitempty"`
+	TreeStateSHA   string   `json:"tree_state_sha,omitempty"`
+	EntrySeq       int      `json:"entry_seq"`
+	PrevHash       string   `json:"prev_hash"`
+	WorkerCount    int      `json:"worker_count,omitempty"`
+	Workers        []string `json:"workers,omitempty"`
+}
+
+// ledgerEntryWire is the JSON-facing twin of LedgerEntry. Cycle is a
+// json.RawMessage so the custom unmarshaler can route int vs string
+// without recursing back into LedgerEntry.UnmarshalJSON.
+type ledgerEntryWire struct {
+	TS              string          `json:"ts,omitempty"`
+	Cycle           json.RawMessage `json:"cycle,omitempty"`
+	CycleLabel      string          `json:"cycle_label,omitempty"`
+	Role            string          `json:"role,omitempty"`
+	Kind            string          `json:"kind,omitempty"`
+	Model           string          `json:"model,omitempty"`
+	ExitCode        int             `json:"exit_code,omitempty"`
+	DurationS       string          `json:"duration_s,omitempty"`
+	ArtifactPath    string          `json:"artifact_path,omitempty"`
+	ArtifactSHA256  string          `json:"artifact_sha256,omitempty"`
+	ChallengeToken  string          `json:"challenge_token,omitempty"`
+	GitHEAD         string          `json:"git_head,omitempty"`
+	TreeStateSHA    string          `json:"tree_state_sha,omitempty"`
+	EntrySeq        int             `json:"entry_seq,omitempty"`
+	PrevHash        string          `json:"prev_hash,omitempty"`
+	WorkerCount     int             `json:"worker_count,omitempty"`
+	Workers         []string        `json:"workers,omitempty"`
+}
+
+// UnmarshalJSON accepts cycle as int, whole-number float, or string.
+// String form goes to CycleLabel; fractional floats, objects, and arrays error out.
+func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
+	var wire ledgerEntryWire
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	e.TS = wire.TS
+	e.CycleLabel = wire.CycleLabel
+	e.Role = wire.Role
+	e.Kind = wire.Kind
+	e.Model = wire.Model
+	e.ExitCode = wire.ExitCode
+	e.DurationS = wire.DurationS
+	e.ArtifactPath = wire.ArtifactPath
+	e.ArtifactSHA256 = wire.ArtifactSHA256
+	e.ChallengeToken = wire.ChallengeToken
+	e.GitHEAD = wire.GitHEAD
+	e.TreeStateSHA = wire.TreeStateSHA
+	e.EntrySeq = wire.EntrySeq
+	e.PrevHash = wire.PrevHash
+	e.WorkerCount = wire.WorkerCount
+	e.Workers = wire.Workers
+
+	// Route the cycle field: int → Cycle, string → CycleLabel.
+	if len(wire.Cycle) == 0 {
+		return nil
+	}
+	trimmed := bytes.TrimSpace(wire.Cycle)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	switch trimmed[0] {
+	case '"':
+		var s string
+		if err := json.Unmarshal(trimmed, &s); err != nil {
+			return fmt.Errorf("ledger cycle: %w", err)
+		}
+		e.CycleLabel = s
+		e.Cycle = 0
+	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		// Numeric — accept whole-number floats too. Range-check explicitly
+		// against int32 bounds (instead of MaxInt) so behaviour is
+		// identical on 32-bit and 64-bit targets — cycle numbers > 2^31
+		// would never realistically appear, but a silent truncation on a
+		// 32-bit builder would be a surprise.
+		var n float64
+		if err := json.Unmarshal(trimmed, &n); err != nil {
+			return fmt.Errorf("ledger cycle: %w", err)
+		}
+		if n != float64(int64(n)) {
+			return fmt.Errorf("ledger cycle: fractional value %v not allowed", n)
+		}
+		if n < math.MinInt32 || n > math.MaxInt32 {
+			return fmt.Errorf("ledger cycle: value %v out of range", n)
+		}
+		e.Cycle = int(n)
+	default:
+		return fmt.Errorf("ledger cycle: unsupported JSON value %q", trimmed)
+	}
+	return nil
 }
 
 // BridgeRequest is the input to Bridge.Launch. Field shape mirrors the

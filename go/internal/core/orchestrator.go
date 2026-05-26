@@ -3,6 +3,9 @@ package core
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
@@ -47,6 +50,13 @@ type Orchestrator struct {
 	runners map[Phase]PhaseRunner
 	sm      *StateMachine
 	now     func() time.Time
+	// gitHEAD returns the current git HEAD SHA. Called once at cycle
+	// start and once before finalizing the verdict so the orchestrator
+	// can detect whether anything got committed during the cycle (e.g.
+	// when the build phase invokes `evolve ship --class manual` inline).
+	// Errors are swallowed and treated as "no movement detected" — the
+	// outcome calculator falls back to SKIPPED_UNKNOWN.
+	gitHEAD func() (string, error)
 }
 
 // NewOrchestrator wires the orchestrator with its dependencies.
@@ -57,7 +67,37 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		runners: runners,
 		sm:      NewStateMachine(),
 		now:     time.Now,
+		gitHEAD: defaultGitHEAD,
 	}
+}
+
+// defaultGitHEAD runs `git rev-parse HEAD` in cwd.
+// Returns empty string on error AND emits a one-line WARN to stderr so
+// operators see the degraded-mode signal that yields SKIPPED_UNKNOWN.
+// finalizeOutcome treats equal strings as no movement.
+func defaultGitHEAD() (string, error) {
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN git HEAD probe failed (cycle outcome labels degraded): %v\n", err)
+		return "", nil
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// finalizeOutcome translates SKIPPED into a more specific CycleOutcome label
+// using HEAD movement and retro text as signals. PASS/FAIL/WARN pass through.
+func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD, postHEAD string) string {
+	if lastPhaseVerdict != VerdictSKIPPED {
+		return lastPhaseVerdict
+	}
+	// HEAD moved → something shipped inline (build calling `evolve ship --class manual`).
+	if preHEAD != "" && postHEAD != "" && preHEAD != postHEAD {
+		return CycleOutcomeShippedViaBuild
+	}
+	if strings.Contains(retroDecision, "would-have-blocked") {
+		return CycleOutcomeSkippedAuditAdvisory
+	}
+	return CycleOutcomeSkippedUnknown
 }
 
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
@@ -106,6 +146,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	for k, v := range req.Context {
 		ctxSnap[k] = v
 	}
+
+	// Capture HEAD before any phase so finalizeOutcome can detect mid-cycle commits.
+	preCycleHEAD, _ := o.gitHEAD()
 
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
 	current := PhaseStart
@@ -205,6 +248,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			scheduledNext = branch
 		}
 	}
+
+	postCycleHEAD, _ := o.gitHEAD()
+	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
 
 	state.LastCycleNumber = cycle
 	if err := o.storage.WriteState(ctx, state); err != nil {
