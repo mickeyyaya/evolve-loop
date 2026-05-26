@@ -203,25 +203,23 @@ func stripBypassEnv(env []string) []string {
 	return out
 }
 
-// defaultSimulationRunner runs the auto-respond simulation bats suite. Used by
-// the advisory step (v12.1.5+) that guards against manifest/policy regressions
-// in tools/agent-bridge/lib/manifests/*.json and lib/auto-respond.sh.
+// defaultSimulationRunner runs the auto-respond regression coverage that
+// guards against manifest/policy regressions. The bash bats simulation suite
+// (tools/agent-bridge/tests/simulation) was removed in the v12 Go-bridge
+// cutover; the equivalent coverage now lives in the Go bridge package's
+// auto-respond + manifest tests, which this runs via `go test`.
 //
-// Returns an error if bats is missing, the suite is missing, or any case fails.
-// The caller logs the error as WARN — this is advisory in v12.1.5 and becomes
-// blocking in v12.2.0.
+// Returns an error if `go` is missing or any auto-respond test fails. The
+// caller logs the error as WARN — advisory in v12.1.5, blocking in v12.2.0.
 func defaultSimulationRunner(repoRoot string) error {
-	bats := os.Getenv("EVOLVE_BATS_BIN")
-	if bats == "" {
-		bats = "bats"
+	goBin := os.Getenv("EVOLVE_GO_BIN_TEST")
+	if goBin == "" {
+		goBin = "go"
 	}
-	suite := filepath.Join(repoRoot, "tools", "agent-bridge", "tests", "simulation", "auto-respond-scenarios.bats")
-	if _, err := os.Stat(suite); err != nil {
-		return fmt.Errorf("simulation suite not found at %s: %w", suite, err)
-	}
-	cmd := exec.Command(bats, suite)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("bats run failed: %w", err)
+	cmd := exec.Command(goBin, "test", "./internal/bridge/", "-run", "AutoRespond|SendKeySequence|RealizeFor")
+	cmd.Dir = filepath.Join(repoRoot, "go")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("auto-respond regression tests failed: %w (output: %s)", err, out)
 	}
 	return nil
 }
