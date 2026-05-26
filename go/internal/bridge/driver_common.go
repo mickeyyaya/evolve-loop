@@ -47,18 +47,27 @@ func preparePrompt(cfg *Config, deps Deps) (string, error) {
 	return content, nil
 }
 
+// ensureDirs creates the workspace + log + artifact parent directories.
+// Shared by openDriverLogs (headless drivers) and runTmuxREPL.
+func ensureDirs(cfg *Config) error {
+	for _, d := range []string{cfg.Workspace, filepath.Dir(cfg.StdoutLog), filepath.Dir(cfg.StderrLog), filepath.Dir(cfg.Artifact)} {
+		if d == "" {
+			continue
+		}
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			return fmt.Errorf("mkdir %s: %w", d, err)
+		}
+	}
+	return nil
+}
+
 // openDriverLogs ensures the workspace + log + artifact dirs exist and
 // opens the stdout/stderr log files the inner CLI's output is redirected
 // to. The returned closeFn must be deferred by the caller.
 func openDriverLogs(cfg *Config) (stdoutF, stderrF *os.File, closeFn func(), err error) {
 	noop := func() {}
-	for _, d := range []string{cfg.Workspace, filepath.Dir(cfg.StdoutLog), filepath.Dir(cfg.StderrLog), filepath.Dir(cfg.Artifact)} {
-		if d == "" {
-			continue
-		}
-		if mkErr := os.MkdirAll(d, 0o755); mkErr != nil {
-			return nil, nil, noop, fmt.Errorf("mkdir %s: %w", d, mkErr)
-		}
+	if mkErr := ensureDirs(cfg); mkErr != nil {
+		return nil, nil, noop, mkErr
 	}
 	stdoutF, err = os.Create(cfg.StdoutLog)
 	if err != nil {
