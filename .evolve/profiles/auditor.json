@@ -139,7 +139,8 @@
       "project",
       "--plugin-dir",
       ".evolve/plugin"
-    ]
+    ],
+    "codex-tmux": []
   },
   "parallel_subtasks": [
     {
@@ -214,7 +215,7 @@
   "allowed_clis": [
     "all"
   ],
-  "_note": "Cross-family with builder. allowed_clis=all makes the invariant always satisfiable when \u22652 CLI families are installed.",
+  "_note": "Cross-family with builder (builder=agy/Gemini, auditor=codex/OpenAI -> different families, adversarial-audit invariant satisfied). allowed_clis=all. On codex-tmux the claude-only raw flags (--plugin-dir, --strict-mcp-config, ...) do NOT apply: codex realizes only -m <model> and runs the verification scripts via its own shell; extra_flags_by_cli.codex-tmux is intentionally empty. The claude-tmux flag set is retained for when the auditor runs on claude.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,

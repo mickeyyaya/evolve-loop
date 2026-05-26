@@ -116,9 +116,10 @@
   },
   "cross_family_with": "auditor",
   "allowed_clis": [
-    "claude"
+    "claude",
+    "agy"
   ],
-  "_note": "Restricted to claude until Phase 4 \u2014 Gemini/Codex/Grok adapters need sandbox + permission scoping + budget cap parity. Builder is safety-critical (writes code in worktree).",
+  "_note": "Cross-CLI enabled (ADR-0022 realizer). Builder defaults to agy-tmux (Gemini, subscription billing via the tmux controller); claude permitted as fallback. Per-CLI launch flags are realized from the manifest, and the tmux path runs the agent inside the cycle worktree (sandbox boundary) with bypass. CAVEAT: max_budget_usd is advisory for subscription CLIs (agy/codex bill to their subscription, not the metered cost meter); turn-based limits (max_turns) and the artifact timeout remain the hard stops. Builder is safety-critical (writes code in the worktree).",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,
