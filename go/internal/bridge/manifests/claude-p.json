@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "cli": "claude-p",
+  "binary": "claude",
+  "binary_min_version": "2.1.0",
+  "default_tier": "full",
+  "tier_dependencies": {
+    "full": ["claude"]
+  },
+  "prompt_marker": null,
+  "default_model": "haiku",
+  "default_args": [],
+  "interactive_prompts": []
+}

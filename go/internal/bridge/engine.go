@@ -67,6 +67,10 @@ type Deps struct {
 	// Default time.Sleep; tests inject a no-op so the loops iterate
 	// instantly (the loop bound is an iteration counter, not wall clock).
 	Sleep func(time.Duration)
+	// LookPath resolves a binary on PATH, like exec.LookPath. Probe uses
+	// it to detect available CLIs + tier dependencies. Default
+	// exec.LookPath; tests inject a controlled set.
+	LookPath func(file string) (string, error)
 }
 
 // withDefaults returns a copy of d with any zero-value seam replaced by
@@ -96,6 +100,9 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.Sleep == nil {
 		d.Sleep = time.Sleep
+	}
+	if d.LookPath == nil {
+		d.LookPath = exec.LookPath
 	}
 	return d
 }
@@ -141,11 +148,6 @@ type Engine struct {
 func NewEngine(deps Deps) *Engine {
 	return &Engine{deps: deps.withDefaults()}
 }
-
-// errNotImplemented marks the M0 scaffold stubs. M2–M6 replace each stub
-// with the ported logic; the error never reaches production because the
-// EVOLVE_BRIDGE_GO cutover (M7) only flips on once the stubs are gone.
-var errNotImplemented = errors.New("bridge: not implemented (M0 scaffold)")
 
 // Launch satisfies core.Bridge: the in-process entry the M7 adapter
 // cutover routes to. It maps a BridgeRequest onto the LaunchArgs pipeline
@@ -221,13 +223,6 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		return resp, nil
 	}
 	return resp, fmt.Errorf("bridge: launch exit=%d", code)
-}
-
-// Probe satisfies core.Bridge. M0 stub — real CLI/tier detection lands
-// in M6 (probe/ subpackage).
-func (e *Engine) Probe(ctx context.Context) (core.BridgeProbe, error) {
-	_ = ctx
-	return core.BridgeProbe{}, errNotImplemented
 }
 
 // EnabledFromEnv reports whether the in-process Go bridge should be used

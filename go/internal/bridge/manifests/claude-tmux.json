@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "cli": "claude-tmux",
+  "binary": "claude",
+  "binary_min_version": "2.1.0",
+  "default_tier": "hybrid",
+  "tier_dependencies": {
+    "full":     ["claude", "tmux"],
+    "hybrid":   ["claude", "tmux"],
+    "degraded": ["claude"]
+  },
+  "prompt_marker": "❯",
+  "default_model": "haiku",
+  "default_args": ["--dangerously-skip-permissions"],
+  "interactive_prompts": [
+    {
+      "name": "auth_recheck",
+      "regex": "Please log in|Authentication required|Login expired",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Bridge cannot complete OAuth; escalate to operator"
+    },
+    {
+      "name": "rate_limit",
+      "regex": "rate.?limit|too many requests|429",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Operator decides retry vs abandon"
+    },
+    {
+      "name": "model_deprecation_continue",
+      "regex": "model is deprecated.*[Cc]ontinue",
+      "response_keys": "y,Enter",
+      "policy": "auto_respond",
+      "note": "Common edge case on model rollover; comma-separated key names"
+    },
+    {
+      "name": "terminal_resize_redraw",
+      "regex": "Terminal too small.*resize",
+      "response_keys": "Enter",
+      "policy": "auto_respond",
+      "note": "Cosmetic redraw prompt; just press Enter"
+    }
+  ],
+  "_notes_on_removed_patterns": {
+    "fact_forcing_gate": "REMOVED v12.1.5 after live-smoke forensics (workspace bridge-t7-G3mPzn). The ECC gateguard PreToolUse hook fires once per Write attempt and Claude recovers natively — it presents the 4 requested facts and retries the Write. Neither extend_timeout nor auto_respond is appropriate: extend_timeout doesn't help (Claude isn't slow, it's just sequencing tool calls), and auto_respond stacks identical messages at the prompt every poll-tick because the gate error remains visible in pane scrollback, interfering with Claude's own recovery. The correct bridge behavior is no rule — let Claude handle the hook natively. Re-introduce only with dedupe logic that suppresses re-fires within a single agent turn (v12.1.6+ design)."
+  }
+}
