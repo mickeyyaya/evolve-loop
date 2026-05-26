@@ -131,6 +131,21 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		ExtraFlags:     raw.extra,
 	}
 
+	// Non-dispatch modes (bin/bridge order: validate-only → dry-run →
+	// require-full → driver dispatch).
+	if raw.validateOnly {
+		printResolvedConfig(stdout, &cfg, prof)
+		return ExitOK
+	}
+	if raw.dryRun {
+		return e.runDryRun(&cfg, stdout, stderr)
+	}
+	if raw.requireFull {
+		if rc, blocked := e.requireFullCheck(&cfg, stderr); blocked {
+			return rc
+		}
+	}
+
 	driver, ok := LookupDriver(cfg.CLI)
 	if !ok {
 		fmt.Fprintf(stderr, "[bridge] no driver for cli=%s\n", cfg.CLI)
