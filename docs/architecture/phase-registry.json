@@ -1,6 +1,13 @@
 {
-  "schema_version": 1,
-  "_note": "v1: data-only. Orchestrator reads registry (cycle-57). Registry consumed by list-phase-order.sh helper. Tester gate functions wired in cycle-57 (gate_build_to_tester + gate_tester_to_audit).",
+  "schema_version": 3,
+  "_note": "v1: data-only registry consumed by list-phase-order.sh + orchestrator (cycle-57). v3: + top-level config{} block for dynamic phase routing (config.Load is the sole consumer); + per-phase enabled/routing (Specification triggers). v2 was never released — version jumped 1→3 to align with the dynamic-routing plan's schema number. dynamic_routing=0 ⇒ Stage:Off ⇒ static state machine drives, byte-identical to pre-routing behavior.",
+  "config": {
+    "dynamic_routing": "0",
+    "routing_mode": "llm",
+    "mandatory_phases": ["scout", "build", "audit", "ship"],
+    "conditional_mandatory": { "tdd": "cycle_size!=trivial" },
+    "max_optional_insertions": 4
+  },
   "phases": [
     {
       "name": "intent",
@@ -144,6 +151,13 @@
       "role": "tester",
       "optional": true,
       "enable_var": null,
+      "enabled": "content",
+      "routing": {
+        "insert_when": [
+          { "field": "build.acs_red", "op": "gt", "value": 0 },
+          { "field": "build.severity_max", "op": "gte", "value": "HIGH" }
+        ]
+      },
       "inputs": {
         "files": [".evolve/runs/cycle-{cycle}/build-report.md"],
         "state_fields": []
@@ -154,6 +168,7 @@
       "gate_in": "gate_build_to_tester",
       "gate_out": "gate_tester_to_audit",
       "_v1_note": "Tester gate functions wired in cycle 57 (gate_build_to_tester + gate_tester_to_audit). Predicate 020 validates gate refs resolve to declared functions.",
+      "_v3_note": "routing.insert_when: a content-routed tester is proposed when the build's objective signals show failing predicates (acs_red>0) or a HIGH+ severity thrust. Honored only at Stage>=Advisory; in Shadow it is forensic-only.",
       "parallel_eligible": false,
       "skippable_when_present": false
     },
