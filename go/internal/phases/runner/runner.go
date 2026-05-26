@@ -31,11 +31,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseflags"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
-
 
 // Hooks captures the per-phase variation points BaseRunner delegates
 // to. Implementations are typically small value types embedded in each
@@ -92,10 +92,10 @@ type Skipper interface {
 // Options is the BaseRunner constructor envelope. Bridge and Prompts
 // are required; NowFn defaults to time.Now.
 type Options struct {
-	Hooks     Hooks
-	Bridge    core.Bridge
-	Prompts   *prompts.Loader
-	NowFn     func() time.Time
+	Hooks   Hooks
+	Bridge  core.Bridge
+	Prompts *prompts.Loader
+	NowFn   func() time.Time
 	// ResolveLLM is the seam for resolving the "auto" model sentinel.
 	// When nil, defaults to resolvellm.Resolve.
 	ResolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
@@ -103,17 +103,23 @@ type Options struct {
 	// When nil, defaults to logfilter.Process. Per-instance field (not a
 	// package global) keeps t.Parallel() tests race-free.
 	StdoutFilter func(workspace, phase string) error
+	// EventsProducer is the seam for the post-phase <phase>-events.ndjson
+	// writer (ADR-0020). When nil, defaults to phasestream.Produce. Unlike
+	// StdoutFilter this is load-bearing: cyclecost + cycleclassify read the
+	// events stream, so it is always-on (no disable flag).
+	EventsProducer func(workspace, phase, cli string, cycle int) error
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
 // phase via New(); use it as a core.PhaseRunner.
 type BaseRunner struct {
-	hooks        Hooks
-	bridge       core.Bridge
-	prompts      *prompts.Loader
-	nowFn        func() time.Time
-	resolveLLM   func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
-	stdoutFilter func(workspace, phase string) error
+	hooks          Hooks
+	bridge         core.Bridge
+	prompts        *prompts.Loader
+	nowFn          func() time.Time
+	resolveLLM     func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	stdoutFilter   func(workspace, phase string) error
+	eventsProducer func(workspace, phase, cli string, cycle int) error
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -134,13 +140,22 @@ func New(opts Options) *BaseRunner {
 	if stdoutFilter == nil {
 		stdoutFilter = logfilter.Process
 	}
+	eventsProducer := opts.EventsProducer
+	if eventsProducer == nil {
+		eventsProducer = func(workspace, phase, cli string, cycle int) error {
+			return phasestream.Produce(phasestream.ProduceConfig{
+				Workspace: workspace, Phase: phase, CLI: cli, Cycle: cycle,
+			})
+		}
+	}
 	return &BaseRunner{
-		hooks:        opts.Hooks,
-		bridge:       opts.Bridge,
-		prompts:      opts.Prompts,
-		nowFn:        nowFn,
-		resolveLLM:   resolveLLM,
-		stdoutFilter: stdoutFilter,
+		hooks:          opts.Hooks,
+		bridge:         opts.Bridge,
+		prompts:        opts.Prompts,
+		nowFn:          nowFn,
+		resolveLLM:     resolveLLM,
+		stdoutFilter:   stdoutFilter,
+		eventsProducer: eventsProducer,
 	}
 }
 
@@ -281,6 +296,18 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		ExtraFlags:   extraFlags,
 	})
 	durationMS := b.nowFn().Sub(start).Milliseconds()
+
+	// Always-on: normalize the raw logs into <phase>-events.ndjson (ADR-0020),
+	// the unified stream cyclecost (cost) + cycleclassify (infra) read. Runs
+	// BEFORE the bridge-error guard on purpose: a phase that fails on a
+	// timeout / 429 / 529 is exactly the infrastructure failure cycleclassify
+	// must detect, and the bridge writes the raw logs even when Launch errors.
+	// A failure WARNs loudly rather than blocking — the raw log remains the
+	// forensic source of truth and can be re-normalized — but it degrades cost
+	// accounting + failure classification, so it must never be silent.
+	if err := b.eventsProducer(req.Workspace, phase, cli, req.Cycle); err != nil {
+		fmt.Fprintf(os.Stderr, "[runner] WARN events producer phase=%s: %v (cost/classification degraded)\n", phase, err)
+	}
 
 	if bridgeErr != nil {
 		return core.PhaseResponse{

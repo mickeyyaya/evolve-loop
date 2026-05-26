@@ -21,25 +21,36 @@ func seedStateJSON(t *testing.T, evolveDir string, body string) {
 	}
 }
 
-// writeStdoutLog seeds <workspace>/<phase>-stdout.log with a
-// stream-json result event carrying the given cost.
+// writeStdoutLog seeds a cycle's cost source: <phase>-events.ndjson with a
+// kind==result envelope (what cyclecost now reads, ADR-0020), plus the legacy
+// <phase>-stdout.log for any path that still inspects raw output.
 func writeStdoutLog(t *testing.T, workspace, phase string, costUSD float64) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	ev := map[string]any{
+	// Legacy raw stdout.log (kept for any raw-output consumer).
+	raw, _ := json.Marshal(map[string]any{
 		"type":           "result",
 		"total_cost_usd": costUSD,
 		"usage": map[string]any{
 			"input_tokens": 100, "output_tokens": 50,
 			"cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
 		},
+	})
+	if err := os.WriteFile(filepath.Join(workspace, phase+"-stdout.log"), raw, 0o644); err != nil {
+		t.Fatalf("write stdout log: %v", err)
 	}
-	b, _ := json.Marshal(ev)
-	path := filepath.Join(workspace, phase+"-stdout.log")
-	if err := os.WriteFile(path, b, 0o644); err != nil {
-		t.Fatalf("write log: %v", err)
+	// Unified events.ndjson — the cost source cyclecost reads.
+	env, _ := json.Marshal(map[string]any{
+		"schema_version": "2.0", "seq": 1, "kind": "result", "severity": "INFO",
+		"data": map[string]any{
+			"cost_usd": costUSD,
+			"tokens":   map[string]any{"in": 100, "out": 50, "cache_r": 0, "cache_c": 0},
+		},
+	})
+	if err := os.WriteFile(filepath.Join(workspace, phase+"-events.ndjson"), env, 0o644); err != nil {
+		t.Fatalf("write events log: %v", err)
 	}
 }
 

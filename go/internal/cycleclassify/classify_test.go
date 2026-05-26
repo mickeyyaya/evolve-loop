@@ -1,9 +1,13 @@
 package cycleclassify
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
 // writeReport seeds a workspace with an orchestrator-report.md.
@@ -14,6 +18,37 @@ func writeReport(t *testing.T, body string) string {
 		t.Fatalf("write report: %v", err)
 	}
 	return ws
+}
+
+// seedEvents runs raw CLI output through the REAL phasestream.Classifier —
+// exactly as the live normalizer does — and writes the resulting envelope
+// stream to <name> in ws. This is the migration contract: cycleclassify must
+// recover the same infrastructure verdict the legacy raw-log regex produced,
+// now sourced from the clean events stream. stdoutLines feed Line(), stderr
+// lines feed Stderr().
+func seedEvents(t *testing.T, ws, name string, stdoutLines, stderrLines []string) {
+	t.Helper()
+	clf := phasestream.NewClassifier(
+		phasestream.Source{Producer: "normalizer", CLI: "claude-p", Cycle: 1, Phase: "memo", Agent: "memo"},
+		"classify-parity-trace", nil)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	emit := func(envs []phasestream.Envelope) {
+		for _, e := range envs {
+			if err := enc.Encode(e); err != nil {
+				t.Fatalf("encode envelope: %v", err)
+			}
+		}
+	}
+	for _, ln := range stdoutLines {
+		emit(clf.Line([]byte(ln)))
+	}
+	for _, ln := range stderrLines {
+		emit(clf.Stderr([]byte(ln)))
+	}
+	if err := os.WriteFile(filepath.Join(ws, name), buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write events %s: %v", name, err)
+	}
 }
 
 func TestClassify_NoReport_IntegrityBreach(t *testing.T) {
@@ -66,35 +101,101 @@ func TestClassify_Infrastructure(t *testing.T) {
 	}
 }
 
-func TestClassify_InfraInStderrLog(t *testing.T) {
+func TestClassify_InfraInEventsStdout(t *testing.T) {
 	t.Parallel()
-	// Report is clean; stderr log has the 529. Per cycle-61 forensics,
-	// the classifier must catch this.
+	// Report is clean; the events stream carries a stdout-borne 429. Per
+	// cycle-61 forensics the classifier must catch infra on stdout — now
+	// sourced from the unified events stream, not raw *-stdout.log.
 	ws := writeReport(t, "## Verdict\nNo errors detected")
-	if err := os.WriteFile(filepath.Join(ws, "memo-stdout.log"), []byte("429 Too Many Requests"), 0o644); err != nil {
-		t.Fatalf("write log: %v", err)
-	}
+	seedEvents(t, ws, "memo-events.ndjson", []string{"429 Too Many Requests"}, nil)
 	r := Classify(ws)
 	if r.Class != ClassInfrastructure {
-		t.Fatalf("got %q want infrastructure from stdout-log scan; marker=%q source=%q", r.Class, r.Marker, r.Source)
+		t.Fatalf("got %q want infrastructure from events scan; marker=%q source=%q", r.Class, r.Marker, r.Source)
 	}
-	if r.Source != "memo-stdout.log" {
-		t.Fatalf("source=%q want memo-stdout.log", r.Source)
+	if r.Source != "memo-events.ndjson" {
+		t.Fatalf("source=%q want memo-events.ndjson", r.Source)
+	}
+	if r.Marker != "api_429" {
+		t.Fatalf("marker=%q want api_429", r.Marker)
 	}
 }
 
-func TestClassify_InfraInStderrLogSuffix(t *testing.T) {
+func TestClassify_InfraInEventsStderr(t *testing.T) {
 	t.Parallel()
+	// A stderr-borne timeout, normalized into the events stream.
 	ws := writeReport(t, "OK")
-	if err := os.WriteFile(filepath.Join(ws, "builder-stderr.log"), []byte("ETIMEDOUT"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	seedEvents(t, ws, "builder-events.ndjson", nil, []string{"ETIMEDOUT"})
 	r := Classify(ws)
 	if r.Class != ClassInfrastructure {
 		t.Fatalf("got %q want infrastructure", r.Class)
 	}
-	if r.Source != "builder-stderr.log" {
-		t.Fatalf("source=%q want builder-stderr.log", r.Source)
+	if r.Source != "builder-events.ndjson" {
+		t.Fatalf("source=%q want builder-events.ndjson", r.Source)
+	}
+	if r.Marker != "timeout" {
+		t.Fatalf("marker=%q want timeout", r.Marker)
+	}
+}
+
+// TestClassify_ParityInfraRawVsEvents is the hard-switch migration guarantee:
+// raw CLI output that the legacy regex would have flagged as infrastructure,
+// when fed through the real phasestream.Classifier, still yields a
+// ClassInfrastructure verdict from the events stream. Covers both the stdout
+// (Line) and stderr (Stderr) channels in one events file.
+func TestClassify_ParityInfraRawVsEvents(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, marker        string
+		stdoutLines, stderr []string
+	}{
+		{"stdout-529", "api_529", []string{"some progress", "API Error 529 Overloaded"}, nil},
+		{"stderr-eperm", "eperm", nil, []string{"sandbox-exec: Operation not permitted"}},
+		{"stdout-among-prose", "rate_limit", []string{"Working on the task.", "hit a rate limit, backing off"}, nil},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ws := writeReport(t, "## Verdict\nclean report, no markers here")
+			seedEvents(t, ws, "scout-events.ndjson", tc.stdoutLines, tc.stderr)
+			r := Classify(ws)
+			if r.Class != ClassInfrastructure {
+				t.Fatalf("parity: got %q want infrastructure (marker=%q source=%q)", r.Class, r.Marker, r.Source)
+			}
+			if r.Marker != tc.marker {
+				t.Fatalf("parity marker: got %q want %q", r.Marker, tc.marker)
+			}
+		})
+	}
+}
+
+// TestClassify_ParityViaProduce is the ADR-0020 cutover gate for failure
+// classification: a raw <phase>-stderr.log written by the bridge, run through
+// the actual production path (phasestream.Produce as runner.go calls it),
+// yields an events.ndjson from which cycleclassify recovers ClassInfrastructure
+// — the end-to-end parity guarantee for the no-runtime-fallback collapse.
+func TestClassify_ParityViaProduce(t *testing.T) {
+	t.Parallel()
+	ws := writeReport(t, "## Verdict\nclean report, no markers")
+	if err := os.WriteFile(filepath.Join(ws, "memo-stdout.log"),
+		[]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write stdout: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "memo-stderr.log"),
+		[]byte("API Error 529 Overloaded\n"), 0o644); err != nil {
+		t.Fatalf("write stderr: %v", err)
+	}
+	if err := phasestream.Produce(phasestream.ProduceConfig{Workspace: ws, Phase: "memo", CLI: "claude-p", Cycle: 7}); err != nil {
+		t.Fatalf("Produce: %v", err)
+	}
+	r := Classify(ws)
+	if r.Class != ClassInfrastructure {
+		t.Fatalf("parity: got %q want infrastructure (marker=%q source=%q)", r.Class, r.Marker, r.Source)
+	}
+	if r.Marker != "api_529" {
+		t.Fatalf("parity marker: got %q want api_529", r.Marker)
+	}
+	if r.Source != "memo-events.ndjson" {
+		t.Fatalf("parity source: got %q want memo-events.ndjson", r.Source)
 	}
 }
 
@@ -195,21 +296,18 @@ func TestClassify_UnclassifiableReport_Breach(t *testing.T) {
 	}
 }
 
-func TestClassify_SortedLogScan(t *testing.T) {
+func TestClassify_SortedEventsScan(t *testing.T) {
 	t.Parallel()
-	// Two logs both contain an infra marker; classifier picks the
-	// alphabetically-first one for stable Source value.
+	// Two events files both carry an infra_failure; classifier picks the
+	// alphabetically-first one for a stable Source value.
 	ws := writeReport(t, "OK")
-	for _, name := range []string{"zeta-stdout.log", "alpha-stdout.log"} {
-		if err := os.WriteFile(filepath.Join(ws, name), []byte("EPERM"), 0o644); err != nil {
-			t.Fatalf("write %s: %v", name, err)
-		}
-	}
+	seedEvents(t, ws, "zeta-events.ndjson", nil, []string{"EPERM"})
+	seedEvents(t, ws, "alpha-events.ndjson", nil, []string{"EPERM"})
 	r := Classify(ws)
 	if r.Class != ClassInfrastructure {
 		t.Fatalf("got %q want infrastructure", r.Class)
 	}
-	if r.Source != "alpha-stdout.log" {
-		t.Fatalf("source=%q want alpha-stdout.log (sorted scan)", r.Source)
+	if r.Source != "alpha-events.ndjson" {
+		t.Fatalf("source=%q want alpha-events.ndjson (sorted scan)", r.Source)
 	}
 }

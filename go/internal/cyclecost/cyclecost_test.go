@@ -1,6 +1,7 @@
 package cyclecost
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,12 +10,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
 // diffAbs returns |a-b| for float epsilon comparisons.
 func diffAbs(a, b float64) float64 { return math.Abs(a - b) }
 
-// writeLog seeds a stdout-log file in workspace.
+// writeLog seeds an events-ndjson file in workspace.
 func writeLog(t *testing.T, workspace, name, content string) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -25,20 +28,37 @@ func writeLog(t *testing.T, workspace, name, content string) {
 	}
 }
 
-// resultLine generates a stream-json result event with the given cost
-// + token counts.
-func resultLine(cost float64, in, out, cacheRead, cacheCreate int64) string {
-	ev := map[string]any{
-		"type":           "result",
-		"total_cost_usd": cost,
-		"usage": map[string]any{
-			"input_tokens":                 in,
-			"output_tokens":                out,
-			"cache_read_input_tokens":      cacheRead,
-			"cache_creation_input_tokens":  cacheCreate,
+// resultEnvelope generates one normalized kind==result envelope line
+// (the shape phasestream.Classifier emits) with the given cost + tokens.
+func resultEnvelope(cost float64, in, out, cacheR, cacheC int64) string {
+	b, _ := json.Marshal(map[string]any{
+		"schema_version": "2.0",
+		"seq":            1,
+		"kind":           "result",
+		"severity":       "INFO",
+		"data": map[string]any{
+			"cost_usd": cost,
+			"tokens": map[string]any{
+				"in":      in,
+				"out":     out,
+				"cache_r": cacheR,
+				"cache_c": cacheC,
+			},
 		},
-	}
-	b, _ := json.Marshal(ev)
+	})
+	return string(b)
+}
+
+// textEnvelope is a non-result envelope (carries no cost) — used to verify
+// such lines are ignored and a phase with only them is skipped.
+func textEnvelope(text string) string {
+	b, _ := json.Marshal(map[string]any{
+		"schema_version": "2.0",
+		"seq":            1,
+		"kind":           "assistant_text",
+		"severity":       "INFO",
+		"data":           map[string]any{"text": text},
+	})
 	return string(b)
 }
 
@@ -75,17 +95,16 @@ func TestSummarizeCycle_WorkspaceIsFile(t *testing.T) {
 	}
 }
 
-func TestSummarizeCycle_SingleStreamJSONLog(t *testing.T) {
+func TestSummarizeCycle_SingleEventsLog(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-1")
-	// Stream-json: many intermediate events, one result at the end.
+	// Unified stream: intermediate non-result envelopes, one result at the end.
 	content := strings.Join([]string{
-		`{"type":"system","subtype":"init"}`,
-		`{"type":"assistant_message","content":"thinking..."}`,
-		`{"type":"tool_use","tool":"Read"}`,
-		resultLine(0.0512, 1234, 567, 9000, 1500),
+		textEnvelope("thinking..."),
+		`{"schema_version":"2.0","seq":2,"kind":"tool_use","severity":"INFO","data":{"name":"Read"}}`,
+		resultEnvelope(0.0512, 1234, 567, 9000, 1500),
 	}, "\n")
-	writeLog(t, ws, "scout-stdout.log", content)
+	writeLog(t, ws, "scout-events.ndjson", content)
 
 	s, err := SummarizeCycle(ws, 1)
 	if err != nil {
@@ -107,6 +126,9 @@ func TestSummarizeCycle_SingleStreamJSONLog(t *testing.T) {
 	if pc.InputTokens != 1234 || pc.OutputTokens != 567 {
 		t.Fatalf("tokens: in=%d out=%d want 1234/567", pc.InputTokens, pc.OutputTokens)
 	}
+	if pc.CacheReadInputTokens != 9000 || pc.CacheCreationInputTokens != 1500 {
+		t.Fatalf("cache tokens: r=%d c=%d want 9000/1500", pc.CacheReadInputTokens, pc.CacheCreationInputTokens)
+	}
 	if s.Total.CostUSD != 0.0512 {
 		t.Fatalf("total cost=%v want 0.0512", s.Total.CostUSD)
 	}
@@ -115,9 +137,9 @@ func TestSummarizeCycle_SingleStreamJSONLog(t *testing.T) {
 func TestSummarizeCycle_MultipleLogsSummed(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-2")
-	writeLog(t, ws, "scout-stdout.log", resultLine(0.10, 1000, 200, 0, 0))
-	writeLog(t, ws, "builder-stdout.log", resultLine(0.30, 5000, 800, 0, 0))
-	writeLog(t, ws, "auditor-stdout.log", resultLine(0.15, 2000, 400, 0, 0))
+	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.10, 1000, 200, 0, 0))
+	writeLog(t, ws, "builder-events.ndjson", resultEnvelope(0.30, 5000, 800, 0, 0))
+	writeLog(t, ws, "auditor-events.ndjson", resultEnvelope(0.15, 2000, 400, 0, 0))
 
 	s, err := SummarizeCycle(ws, 2)
 	if err != nil {
@@ -133,8 +155,6 @@ func TestSummarizeCycle_MultipleLogsSummed(t *testing.T) {
 			t.Fatalf("phases[%d]=%q want %q", i, s.Phases[i].Phase, want)
 		}
 	}
-	// Float-precision: 0.10+0.30+0.15 = 0.5499999... in IEEE 754.
-	// Assert within 1e-9 epsilon rather than exact equality.
 	if got, want := s.Total.CostUSD, 0.55; diffAbs(got, want) > 1e-9 {
 		t.Fatalf("total cost=%v want %v (epsilon-equal)", got, want)
 	}
@@ -145,14 +165,14 @@ func TestSummarizeCycle_MultipleLogsSummed(t *testing.T) {
 
 func TestSummarizeCycle_LastResultWins(t *testing.T) {
 	t.Parallel()
-	// Two result events in one log — the LAST one wins (mirrors `tail -1`).
+	// Two result envelopes in one stream — the LAST one wins.
 	ws := filepath.Join(t.TempDir(), "cycle-3")
 	content := strings.Join([]string{
-		resultLine(0.99, 100, 100, 0, 0), // older, should be ignored
-		`{"type":"assistant_message","content":"another turn"}`,
-		resultLine(0.05, 200, 50, 0, 0), // newer, wins
+		resultEnvelope(0.99, 100, 100, 0, 0), // older, ignored
+		textEnvelope("another turn"),
+		resultEnvelope(0.05, 200, 50, 0, 0), // newer, wins
 	}, "\n")
-	writeLog(t, ws, "scout-stdout.log", content)
+	writeLog(t, ws, "scout-events.ndjson", content)
 
 	s, err := SummarizeCycle(ws, 3)
 	if err != nil {
@@ -161,50 +181,39 @@ func TestSummarizeCycle_LastResultWins(t *testing.T) {
 	if s.Total.CostUSD != 0.05 {
 		t.Fatalf("cost=%v want 0.05 (last result wins)", s.Total.CostUSD)
 	}
-}
-
-func TestSummarizeCycle_LegacySingleBlobFallback(t *testing.T) {
-	t.Parallel()
-	// Legacy log: only one JSON blob with `"type":"result"`. The
-	// pre-filter still catches it.
-	ws := filepath.Join(t.TempDir(), "cycle-4")
-	content := resultLine(0.02, 50, 10, 0, 0)
-	writeLog(t, ws, "tdd-stdout.log", content)
-
-	s, err := SummarizeCycle(ws, 4)
-	if err != nil {
-		t.Fatalf("Summarize: %v", err)
-	}
-	if s.Total.CostUSD != 0.02 {
-		t.Fatalf("cost=%v want 0.02", s.Total.CostUSD)
+	if s.Total.InputTokens != 200 || s.Total.OutputTokens != 50 {
+		t.Fatalf("tokens: in=%d out=%d want 200/50 (last result)", s.Total.InputTokens, s.Total.OutputTokens)
 	}
 }
 
-func TestSummarizeCycle_NoResultTypeFallback(t *testing.T) {
+func TestSummarizeCycle_NoResultEnvelopeSkipped(t *testing.T) {
 	t.Parallel()
-	// Log has no result event — fallback parses the last line as
-	// a legacy blob.
+	// A phase that produced output but never a result envelope contributes
+	// nothing (no raw-fallback exists for the clean stream).
 	ws := filepath.Join(t.TempDir(), "cycle-5")
-	// Use a legacy-style blob WITHOUT `"type":"result"` substring.
-	// The fallback tail-1 should still parse it for cost.
-	legacy := `{"total_cost_usd":0.07,"usage":{"input_tokens":1,"output_tokens":1}}`
-	writeLog(t, ws, "ship-stdout.log", legacy)
+	content := strings.Join([]string{
+		textEnvelope("did some work"),
+		`{"schema_version":"2.0","seq":2,"kind":"tool_use","severity":"INFO","data":{"name":"Edit"}}`,
+	}, "\n")
+	writeLog(t, ws, "ship-events.ndjson", content)
 
 	s, err := SummarizeCycle(ws, 5)
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
 	}
-	if s.Total.CostUSD != 0.07 {
-		t.Fatalf("fallback cost=%v want 0.07", s.Total.CostUSD)
+	if len(s.Phases) != 0 {
+		t.Fatalf("phases=%d want 0 (no result envelope → skipped)", len(s.Phases))
+	}
+	if s.Total.CostUSD != 0 {
+		t.Fatalf("total cost=%v want 0", s.Total.CostUSD)
 	}
 }
 
 func TestSummarizeCycle_EmptyLogSkipped(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-6")
-	// One usable log, one empty.
-	writeLog(t, ws, "scout-stdout.log", resultLine(0.01, 1, 1, 0, 0))
-	writeLog(t, ws, "builder-stdout.log", "") // empty
+	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.01, 1, 1, 0, 0))
+	writeLog(t, ws, "builder-events.ndjson", "") // empty
 	s, err := SummarizeCycle(ws, 6)
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
@@ -214,17 +223,15 @@ func TestSummarizeCycle_EmptyLogSkipped(t *testing.T) {
 	}
 }
 
-func TestSummarizeCycle_MalformedJSONSkipped(t *testing.T) {
+func TestSummarizeCycle_MalformedLineSkipped(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-7")
-	// First log good; second log malformed.
-	writeLog(t, ws, "scout-stdout.log", resultLine(0.10, 1, 1, 0, 0))
-	writeLog(t, ws, "builder-stdout.log", `{not json}`)
+	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.10, 1, 1, 0, 0))
+	writeLog(t, ws, "builder-events.ndjson", `{not json}`)
 	s, err := SummarizeCycle(ws, 7)
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
 	}
-	// Builder skipped (no parseable result), scout counted.
 	if s.Total.CostUSD != 0.10 {
 		t.Fatalf("cost=%v want 0.10 (malformed skipped)", s.Total.CostUSD)
 	}
@@ -232,11 +239,10 @@ func TestSummarizeCycle_MalformedJSONSkipped(t *testing.T) {
 
 func TestSummarizeCycle_NonStandardPhaseName(t *testing.T) {
 	t.Parallel()
-	// Phase name with dots (e.g., parallel-worker logs) — must
-	// preserve the full name minus the suffix.
+	// Phase name with dots (parallel-worker logs) — full name minus suffix.
 	ws := filepath.Join(t.TempDir(), "cycle-8")
-	writeLog(t, ws, "subagent.scout.parallel-worker-1-stdout.log",
-		resultLine(0.01, 1, 1, 0, 0))
+	writeLog(t, ws, "subagent.scout.parallel-worker-1-events.ndjson",
+		resultEnvelope(0.01, 1, 1, 0, 0))
 	s, err := SummarizeCycle(ws, 8)
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
@@ -246,15 +252,15 @@ func TestSummarizeCycle_NonStandardPhaseName(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_LongLines verifies that scanner handles the
-// large stream-json events (each can be hundreds of KB).
-func TestSummarizeCycle_LongLines(t *testing.T) {
+// TestSummarizeCycle_LargeResultEnvelopeParsed verifies the scanner handles
+// large envelopes (the happy path; the over-cap failure path is covered by
+// TestParseEventsLog_ScannerErrLineTooLong).
+func TestSummarizeCycle_LargeResultEnvelopeParsed(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-9")
-	// Build a result event with a huge embedded payload.
 	pad := strings.Repeat("x", 100000)
-	content := fmt.Sprintf(`{"type":"result","total_cost_usd":0.42,"usage":{"input_tokens":1,"output_tokens":1},"_pad":%q}`, pad)
-	writeLog(t, ws, "scout-stdout.log", content)
+	content := fmt.Sprintf(`{"schema_version":"2.0","seq":1,"kind":"result","severity":"INFO","data":{"cost_usd":0.42,"tokens":{"in":1,"out":1,"cache_r":0,"cache_c":0},"_pad":%q}}`, pad)
+	writeLog(t, ws, "scout-events.ndjson", content)
 	s, err := SummarizeCycle(ws, 9)
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
@@ -264,17 +270,16 @@ func TestSummarizeCycle_LongLines(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_UnreadableLog covers the os.Open error branch
-// in parsePhaseLog. We create the file then make it unreadable.
+// TestSummarizeCycle_UnreadableLog covers the os.Open error branch.
 func TestSummarizeCycle_UnreadableLog(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("running as root — chmod doesn't restrict reads")
 	}
 	ws := filepath.Join(t.TempDir(), "cycle-10")
-	writeLog(t, ws, "scout-stdout.log", resultLine(0.10, 1, 1, 0, 0))
-	logPath := filepath.Join(ws, "builder-stdout.log")
-	if err := os.WriteFile(logPath, []byte(resultLine(0.20, 1, 1, 0, 0)), 0o644); err != nil {
+	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.10, 1, 1, 0, 0))
+	logPath := filepath.Join(ws, "builder-events.ndjson")
+	if err := os.WriteFile(logPath, []byte(resultEnvelope(0.20, 1, 1, 0, 0)), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	if err := os.Chmod(logPath, 0o000); err != nil {
@@ -286,8 +291,107 @@ func TestSummarizeCycle_UnreadableLog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
 	}
-	// Scout counted, builder skipped due to unreadable.
 	if s.Total.CostUSD != 0.10 {
 		t.Fatalf("cost=%v want 0.10 (unreadable log skipped)", s.Total.CostUSD)
+	}
+}
+
+// TestSummarizeCycle_ParityViaProduce is the ADR-0020 cutover gate: a raw
+// <phase>-stdout.log written by the bridge, run through the actual production
+// path (phasestream.Produce, exactly as runner.go now calls it), yields an
+// events.ndjson from which cyclecost recovers the SAME cost + tokens the raw
+// result carried. This is the end-to-end billing-parity guarantee for the
+// no-runtime-fallback collapse.
+func TestSummarizeCycle_ParityViaProduce(t *testing.T) {
+	t.Parallel()
+	const (
+		rawCost = 0.69127425
+		rawIn   = int64(17)
+		rawOut  = int64(6624)
+		rawCR   = int64(1136065)
+		rawCC   = int64(66945)
+	)
+	ws := filepath.Join(t.TempDir(), "cycle-7")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatalf("mkdir ws: %v", err)
+	}
+	raw := strings.Join([]string{
+		`{"type":"system","subtype":"init"}`,
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"building"}]}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta"}}`,
+		fmt.Sprintf(`{"type":"result","total_cost_usd":%v,"usage":{"input_tokens":%d,"output_tokens":%d,"cache_read_input_tokens":%d,"cache_creation_input_tokens":%d}}`,
+			rawCost, rawIn, rawOut, rawCR, rawCC),
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte(raw), 0o644); err != nil {
+		t.Fatalf("write raw log: %v", err)
+	}
+
+	if err := phasestream.Produce(phasestream.ProduceConfig{Workspace: ws, Phase: "build", CLI: "claude-p", Cycle: 7}); err != nil {
+		t.Fatalf("Produce: %v", err)
+	}
+
+	s, err := SummarizeCycle(ws, 7)
+	if err != nil {
+		t.Fatalf("Summarize: %v", err)
+	}
+	if s.Total.CostUSD != rawCost {
+		t.Fatalf("parity cost: got %v want %v", s.Total.CostUSD, rawCost)
+	}
+	if s.Total.InputTokens != rawIn || s.Total.OutputTokens != rawOut ||
+		s.Total.CacheReadInputTokens != rawCR || s.Total.CacheCreationInputTokens != rawCC {
+		t.Fatalf("parity tokens: %+v", s.Total)
+	}
+}
+
+// TestSummarizeCycle_ParityRawVsEvents is the migration guarantee: a real raw
+// stream-json sequence fed through the actual phasestream.Classifier (exactly
+// as the live normalizer would) produces an events.ndjson from which cyclecost
+// recovers the SAME cost + token values the raw result event carried.
+func TestSummarizeCycle_ParityRawVsEvents(t *testing.T) {
+	t.Parallel()
+	const (
+		rawCost = 0.4242
+		rawIn   = int64(12000)
+		rawOut  = int64(800)
+		rawCR   = int64(5000)
+		rawCC   = int64(1500)
+	)
+	rawLines := []string{
+		`{"type":"system","subtype":"init"}`,
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"working"}]}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta"}}`,
+		fmt.Sprintf(`{"type":"result","total_cost_usd":%v,"usage":{"input_tokens":%d,"output_tokens":%d,"cache_read_input_tokens":%d,"cache_creation_input_tokens":%d}}`,
+			rawCost, rawIn, rawOut, rawCR, rawCC),
+	}
+
+	// Run the raw lines through the real Classifier to build events.ndjson.
+	clf := phasestream.NewClassifier(
+		phasestream.Source{Producer: "normalizer", CLI: "claude-p", Cycle: 1, Phase: "scout", Agent: "scout"},
+		"parity-trace", nil)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for _, ln := range rawLines {
+		for _, e := range clf.Line([]byte(ln)) {
+			if err := enc.Encode(e); err != nil {
+				t.Fatalf("encode envelope: %v", err)
+			}
+		}
+	}
+
+	ws := filepath.Join(t.TempDir(), "cycle-1")
+	writeLog(t, ws, "scout-events.ndjson", buf.String())
+
+	s, err := SummarizeCycle(ws, 1)
+	if err != nil {
+		t.Fatalf("Summarize: %v", err)
+	}
+	if s.Total.CostUSD != rawCost {
+		t.Fatalf("parity cost: got %v want %v", s.Total.CostUSD, rawCost)
+	}
+	if s.Total.InputTokens != rawIn || s.Total.OutputTokens != rawOut {
+		t.Fatalf("parity tokens: in=%d out=%d want %d/%d", s.Total.InputTokens, s.Total.OutputTokens, rawIn, rawOut)
+	}
+	if s.Total.CacheReadInputTokens != rawCR || s.Total.CacheCreationInputTokens != rawCC {
+		t.Fatalf("parity cache: r=%d c=%d want %d/%d", s.Total.CacheReadInputTokens, s.Total.CacheCreationInputTokens, rawCR, rawCC)
 	}
 }

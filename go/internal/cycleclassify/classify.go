@@ -1,9 +1,13 @@
 // Package cycleclassify ports classify_cycle_failure from
 // archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:548-637. Given a
-// cycle workspace it inspects orchestrator-report.md plus per-role
-// *-stdout.log/*-stderr.log files and returns one of five canonical
+// cycle workspace it inspects orchestrator-report.md plus the unified
+// *-events.ndjson stream (ADR-0020) and returns one of five canonical
 // classifications. The result feeds the failure-adapter (M3) and
 // drives the cmd_loop dispatcher policy decision (RETRY vs STOP).
+//
+// The infrastructure signal that the legacy classifier found by re-scanning
+// raw *-stdout.log/*-stderr.log now comes from the normalizer's
+// kind==infra_failure events — one owner of the infra-marker vocabulary.
 //
 // Determinism: classification is order-sensitive. Infrastructure beats
 // ship-gate-config beats audit-fail beats build-fail. The order
@@ -13,7 +17,9 @@
 package cycleclassify
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -63,7 +69,7 @@ var (
 // Result carries the classification + the marker that triggered it.
 // Marker is useful for the cmd_loop log line and for tests assertion.
 type Result struct {
-	Class  Classification `json:"class"`
+	Class Classification `json:"class"`
 	// Marker is the regex hit substring that drove the verdict. Empty
 	// for integrity-breach (no marker matched).
 	Marker string `json:"marker,omitempty"`
@@ -79,8 +85,9 @@ type Result struct {
 // Scanning order per cycle:
 //
 //  1. orchestrator-report.md — infra patterns
-//  2. *-stdout.log + *-stderr.log — infra patterns (catches API 529s
-//     that landed in memo-stdout.log per cycle-61 forensics)
+//  2. *-events.ndjson — kind==infra_failure (the normalizer's typed infra
+//     signal; catches the API 529s that landed in memo-stdout.log per
+//     cycle-61 forensics, now sourced from the clean stream)
 //  3. orchestrator-report.md — ship-gate, audit-fail, build-fail
 //
 // Returns ClassIntegrityBreach with empty Marker/Source when
@@ -97,22 +104,19 @@ func Classify(workspace string) Result {
 	if m := reInfrastructure.Find(reportData); m != nil {
 		return Result{Class: ClassInfrastructure, Marker: string(m), Source: "orchestrator-report.md"}
 	}
-	// Pass 2: infrastructure in per-role stdout/stderr logs. v10.x
-	// catches API 529 / sandbox EPERM noise that lives in side logs.
-	if logs, err := listLogs(workspace); err == nil {
-		for _, log := range logs {
-			data, err := os.ReadFile(log)
-			if err != nil {
-				continue
-			}
-			if m := reInfrastructure.Find(data); m != nil {
-				return Result{
-					Class:  ClassInfrastructure,
-					Marker: string(m),
-					Source: filepath.Base(log),
-				}
-			}
-		}
+	// Pass 2: infrastructure in the unified events stream (ADR-0020). The
+	// normalizer owns the infra-marker vocabulary and emits
+	// kind==infra_failure for markers it sees on stdout OR stderr, so
+	// cycleclassify just filters that kind rather than re-scanning the raw
+	// *-stdout.log/*-stderr.log files. Catches the API 529 / sandbox EPERM
+	// signal (cycle-61 forensics) from the clean stream.
+	//
+	// Note: a transient stream-json rate_limit_event normalizes to
+	// kind==rate_limit (non-fatal backoff), deliberately distinct from
+	// kind==infra_failure — a recovered rate-limit no longer forces an
+	// infrastructure verdict on the retry/stop decision.
+	if src, marker, ok := scanEventsForInfra(workspace); ok {
+		return Result{Class: ClassInfrastructure, Marker: marker, Source: src}
 	}
 	// Pass 3: post-audit gate. Tested before audit-fail because a
 	// SHIP_GATE_DENIED report can also mention the verdict in passing.
@@ -208,25 +212,76 @@ var gitLogFn = func(cycleNum string) bool {
 }
 
 // globFn is a test seam for the filepath.Glob error branch. A literal
-// pattern like "*-stdout.log" cannot fail under filepath.Glob in
+// pattern like "*-events.ndjson" cannot fail under filepath.Glob in
 // practice, but tests can swap globFn to drive the defensive error
 // path that real-world Glob implementations might surface on exotic
 // filesystems.
 var globFn = filepath.Glob
 
-// listLogs returns sorted *-stdout.log + *-stderr.log paths in
-// workspace. Stable order makes Classify deterministic when the same
-// pattern hits two logs.
-func listLogs(workspace string) ([]string, error) {
-	stdoutMatches, err := globFn(filepath.Join(workspace, "*-stdout.log"))
+// maxScannerBufBytes caps the per-line read buffer. A result envelope can
+// embed a large payload on the same line, so the cap is generous (matches
+// cyclecost). A var so tests can shrink it to exercise the overflow branch.
+var maxScannerBufBytes = 1 << 24 // 16MB
+
+// infraEventEnvelope is the subset of a phasestream envelope this scan
+// needs: the kind discriminator plus the marker the normalizer recorded.
+type infraEventEnvelope struct {
+	Kind string `json:"kind"`
+	Data struct {
+		Marker string `json:"marker"`
+	} `json:"data"`
+}
+
+// scanEventsForInfra walks the workspace's *-events.ndjson files in sorted
+// order and returns the first kind==infra_failure envelope's marker plus the
+// basename of the file it was found in. ok=false when no infra event exists,
+// no events files are present, or the glob fails — Classify then continues to
+// the report-scan passes. Unreadable or malformed files are skipped, matching
+// the best-effort raw-log scan this replaces.
+func scanEventsForInfra(workspace string) (source, marker string, ok bool) {
+	logs, err := globFn(filepath.Join(workspace, "*-events.ndjson"))
 	if err != nil {
-		return nil, err
+		return "", "", false
 	}
-	stderrMatches, err := globFn(filepath.Join(workspace, "*-stderr.log"))
+	sort.Strings(logs) // deterministic Source when two files both carry infra
+	for _, log := range logs {
+		if m, found := firstInfraMarker(log); found {
+			return filepath.Base(log), m, true
+		}
+	}
+	return "", "", false
+}
+
+// firstInfraMarker returns the marker of the first kind==infra_failure
+// envelope in logPath, or ok=false when none is found / the file can't be
+// read. A cheap substring pre-check skips the JSON parse for the common
+// non-infra lines.
+func firstInfraMarker(logPath string) (marker string, ok bool) {
+	f, err := os.Open(logPath)
 	if err != nil {
-		return nil, err
+		return "", false
 	}
-	all := append(stdoutMatches, stderrMatches...)
-	sort.Strings(all)
-	return all, nil
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if !bytes.Contains(line, []byte(`"kind":"infra_failure"`)) {
+			continue
+		}
+		var ev infraEventEnvelope
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		if ev.Kind == "infra_failure" {
+			return ev.Data.Marker, true
+		}
+	}
+	// Mirror cyclecost.parseEventsLog: a scan error (e.g. a line exceeding
+	// maxScannerBufBytes) yields no infra signal rather than a partial one.
+	if err := scanner.Err(); err != nil {
+		return "", false
+	}
+	return "", false
 }
