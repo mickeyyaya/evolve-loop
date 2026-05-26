@@ -172,7 +172,7 @@ Steps 1-4 are non-negotiable per CLAUDE.md "Verification before claiming done". 
 
 | Surface | Reason deferred |
 |---|---|
-| `internal/adapters/bridge/` | Phase 2 — talks to `tools/agent-bridge/` subprocess + parses JSON output. Needs a fake bridge for unit tests. |
+| `internal/adapters/bridge/` | Now covered (v12): delegates to the in-process Go `bridge.Engine` (no subprocess); unit-tested with a fake `core.Bridge`. |
 | `internal/phases/*` | Phase 2 — Scout / TDD / Builder / Auditor phase impls. Each will need a fake `Bridge` + fake `Storage` for isolation. |
 | `internal/adapters/sandbox/` | Phase 2 — `sandbox-exec` (macOS) and `bwrap` (Linux) profiles. Tests need OS-specific build tags. |
 | `evolve loop` / `evolve cycle run` | Phase 2 — top-level CLI for the full Scout → Build → Audit → Ship → Retro cycle. Smoke + property test for the state machine. |
