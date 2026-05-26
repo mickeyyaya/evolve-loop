@@ -12,12 +12,17 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 3 {
+	os.Exit(run(os.Args[1:]))
+}
+
+func run(args []string) int {
+	if len(args) != 2 {
 		fmt.Fprintln(os.Stderr, "usage: filter-stdout <workspace> <phase>")
-		os.Exit(2)
+		return 2
 	}
-	if err := logfilter.Process(os.Args[1], os.Args[2]); err != nil {
+	if err := logfilter.Process(args[0], args[1]); err != nil {
 		fmt.Fprintf(os.Stderr, "filter error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

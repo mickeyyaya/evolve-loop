@@ -20,6 +20,8 @@ package build
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -54,6 +56,11 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
 	if req.Worktree != "" {
 		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
+	}
+	if req.Workspace != "" && req.Env["EVOLVE_BUILD_PLANNER"] == "1" {
+		if data, err := os.ReadFile(filepath.Join(req.Workspace, "build-plan.md")); err == nil {
+			fmt.Fprintf(&b, "\n\n## Build Plan\n%s", data)
+		}
 	}
 	return b.String()
 }
