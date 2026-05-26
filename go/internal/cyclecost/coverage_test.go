@@ -31,108 +31,96 @@ func TestSummarizeCycle_StatPermissionError(t *testing.T) {
 	defer os.Chmod(parent, 0o755)
 
 	_, err := SummarizeCycle(ws, 1)
-	// Either ErrNoWorkspace (Stat → ENOENT path with EACCES interpretation)
-	// or a wrapped EACCES error is acceptable. The important thing is the
-	// function returned a non-nil error without panicking.
+	// Either ErrNoWorkspace or a wrapped EACCES error is acceptable. The
+	// important thing is a non-nil error without panicking.
 	if err == nil {
 		t.Fatalf("expected error with parent chmod 000")
 	}
 }
 
-// TestSummarizeCycle_GlobBadPattern would be ideal but filepath.Glob
-// with a literal pattern can't fail. We test the ErrNoLogs path
-// instead (workspace exists, glob returns empty), which exercises
-// the len(logs) == 0 branch.
+// TestSummarizeCycle_GlobReturnsEmpty exercises the len(logs) == 0 branch
+// (workspace exists, no *-events.ndjson files).
 func TestSummarizeCycle_GlobReturnsEmpty(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-1")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// Workspace exists; no *-stdout.log files.
 	_, err := SummarizeCycle(ws, 1)
 	if !errors.Is(err, ErrNoLogs) {
 		t.Fatalf("err=%v want ErrNoLogs", err)
 	}
 }
 
-// TestParsePhaseLog_OpenError covers the os.Open error branch in
-// parsePhaseLog directly.
-func TestParsePhaseLog_OpenError(t *testing.T) {
+// TestParseEventsLog_OpenError covers the os.Open error branch directly.
+func TestParseEventsLog_OpenError(t *testing.T) {
 	t.Parallel()
-	_, ok := parsePhaseLog(filepath.Join(t.TempDir(), "does-not-exist-stdout.log"))
+	_, ok := parseEventsLog(filepath.Join(t.TempDir(), "does-not-exist-events.ndjson"))
 	if ok {
 		t.Fatalf("expected ok=false for missing file")
 	}
 }
 
-// TestParsePhaseLog_EmptyFile covers the lastLine == "" fallback branch.
-func TestParsePhaseLog_EmptyFile(t *testing.T) {
+// TestParseEventsLog_EmptyFile covers the no-result-found branch.
+func TestParseEventsLog_EmptyFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "empty-stdout.log")
+	path := filepath.Join(dir, "empty-events.ndjson")
 	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	_, ok := parsePhaseLog(path)
+	_, ok := parseEventsLog(path)
 	if ok {
 		t.Fatalf("empty file should yield ok=false")
 	}
 }
 
-// TestParsePhaseLog_OnlyBlankLines covers the lastLine-empty-after-trim
-// fallback branch (multiple blank lines, no JSON anywhere).
-func TestParsePhaseLog_OnlyBlankLines(t *testing.T) {
+// TestParseEventsLog_OnlyBlankLines covers blank-line-only input.
+func TestParseEventsLog_OnlyBlankLines(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "blank-stdout.log")
+	path := filepath.Join(dir, "blank-events.ndjson")
 	if err := os.WriteFile(path, []byte("\n\n   \n\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	_, ok := parsePhaseLog(path)
+	_, ok := parseEventsLog(path)
 	if ok {
 		t.Fatalf("blank-only file should yield ok=false")
 	}
 }
 
-// TestParsePhaseLog_MalformedAfterPreFilter covers the
-// `json.Unmarshal(line, &ev); err != nil { continue }` branch — a
-// line that contains the `"type":"result"` substring but is not
-// valid JSON.
-func TestParsePhaseLog_MalformedAfterPreFilter(t *testing.T) {
+// TestParseEventsLog_MalformedAfterPreFilter covers the
+// `json.Unmarshal(line, &ev); err != nil { continue }` branch — a line that
+// contains the `"kind":"result"` substring but is not valid JSON.
+func TestParseEventsLog_MalformedAfterPreFilter(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "broken-stdout.log")
-	// Line contains the substring but is not valid JSON. Parsing
-	// fails → continue → no result captured → fallback to lastLine
-	// (same broken line) which also fails to parse → ok=false.
-	body := `{garbage "type":"result" still garbage}`
+	path := filepath.Join(dir, "broken-events.ndjson")
+	body := `{garbage "kind":"result" still garbage}`
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	_, ok := parsePhaseLog(path)
+	_, ok := parseEventsLog(path)
 	if ok {
 		t.Fatalf("malformed-after-prefilter should yield ok=false")
 	}
 }
 
-// TestParsePhaseLog_ScannerErrLineTooLong covers the scanner.Err()
-// branch (bufio.ErrTooLong) by temporarily lowering the buffer cap
-// and feeding a line that exceeds it.
-func TestParsePhaseLog_ScannerErrLineTooLong(t *testing.T) {
+// TestParseEventsLog_ScannerErrLineTooLong covers the scanner.Err()
+// branch (bufio.ErrTooLong) by lowering the buffer cap.
+func TestParseEventsLog_ScannerErrLineTooLong(t *testing.T) {
 	// NOT t.Parallel — mutates package-level maxScannerBufBytes.
 	prev := maxScannerBufBytes
 	defer func() { maxScannerBufBytes = prev }()
 	maxScannerBufBytes = 1024
 
 	dir := t.TempDir()
-	path := filepath.Join(dir, "huge-stdout.log")
-	// One line of 2KB → exceeds 1KB cap → scanner errors.
+	path := filepath.Join(dir, "huge-events.ndjson")
 	body := strings.Repeat("x", 2048) + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	_, ok := parsePhaseLog(path)
+	_, ok := parseEventsLog(path)
 	if ok {
 		t.Fatalf("expected ok=false on scanner err")
 	}
