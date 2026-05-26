@@ -79,3 +79,23 @@ func TestRunBridge_AddRule(t *testing.T) {
 		t.Fatalf("add-rule missing regex exit = %d, want 10", code)
 	}
 }
+
+func TestRunBridge_Doctor(t *testing.T) {
+	var out, errb bytes.Buffer
+	code := runBridge([]string{"doctor", "--cli=claude-p"}, nil, &out, &errb)
+	if code < 0 || code > 2 {
+		t.Fatalf("doctor exit = %d, want a verdict code 0/1/2", code)
+	}
+	if !strings.Contains(out.String(), "summary:") {
+		t.Fatalf("doctor table should print a summary; got %q", out.String())
+	}
+	var out2 bytes.Buffer
+	runBridge([]string{"doctor", "--json", "--cli=claude-p"}, nil, &out2, &errb)
+	if !strings.Contains(out2.String(), `"summary"`) {
+		t.Fatalf("doctor --json should emit JSON; got %q", out2.String())
+	}
+	var out3 bytes.Buffer
+	if c := runBridge([]string{"doctor", "--help"}, nil, &out3, &errb); c != 0 {
+		t.Fatalf("doctor --help exit = %d, want 0", c)
+	}
+}

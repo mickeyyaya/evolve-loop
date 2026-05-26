@@ -143,6 +143,33 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
 		return 0
 
+	case "doctor":
+		filter, deep, jsonMode := "", false, false
+		for _, a := range rest {
+			switch {
+			case strings.HasPrefix(a, "--cli="):
+				filter = strings.TrimPrefix(a, "--cli=")
+			case a == "--deep":
+				deep = true
+			case a == "--json":
+				jsonMode = true
+			case a == "--help" || a == "-h":
+				fmt.Fprintln(stdout, "Usage: evolve bridge doctor [--cli=NAME] [--deep] [--json]")
+				return 0
+			}
+		}
+		rep, code := eng.Doctor(context.Background(), filter, deep)
+		if jsonMode {
+			b, _ := json.MarshalIndent(rep, "", "  ")
+			fmt.Fprintln(stdout, string(b))
+		} else {
+			for _, r := range rep.Results {
+				fmt.Fprintf(stdout, "%-14s %-8s %s\n", r.CLI, r.Verdict, r.Auth.Source)
+			}
+			fmt.Fprintf(stdout, "summary: ready=%d warning=%d blocked=%d\n", rep.Summary.Ready, rep.Summary.Warning, rep.Summary.Blocked)
+		}
+		return code
+
 	case "version", "-v", "--version":
 		fmt.Fprintln(stdout, version.Get())
 		return 0
