@@ -1,5 +1,15 @@
 # CLI adapters — native + optional bridge delegation
 
+> ⚠️ **SUPERSEDED (v12 Go-bridge cutover).** This document describes the pre-v12
+> model: bash `legacy/scripts/dispatch/subagent-run.sh` dispatching to bash
+> `cli_adapters/*.sh`, with an **external, operator-installed** `bridge` CLI
+> (`tools/agent-bridge`). That bash bridge and its separate-install model were
+> **removed** in v12 — the bridge is now an in-process Go implementation at
+> `go/internal/bridge/` (adapter `go/internal/adapters/bridge/`), with no separate
+> install and no `bash tools/agent-bridge/install.sh` step. The `EVOLVE_BRIDGE_GO`
+> toggle is gone (Go is the only path). See ADR-0021 (Go port) and ADR-0022
+> (LaunchIntent realizer). The contract table below remains accurate background.
+
 > **Audience**: operators considering enabling bridge for evolve-loop, contributors editing `legacy/scripts/cli_adapters/*.sh`, anyone debugging why a subagent didn't behave as expected.
 
 evolve-loop's `legacy/scripts/dispatch/subagent-run.sh` dispatches each cycle phase to a per-CLI adapter under `legacy/scripts/cli_adapters/`. The contract is well-defined: 8 mandatory env vars + a standard exit-code matrix. As of v10.18.0, **claude-tmux** has an **optional** delegation path to an external CLI called `bridge` — installed separately by the operator. All other adapters (`claude.sh`, `codex.sh`, `agy.sh`, `gemini.sh`) are unchanged.
