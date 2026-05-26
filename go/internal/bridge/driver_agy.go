@@ -47,7 +47,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	}
 	defer closeFn()
 
-	rc, err := deps.Runner(ctx, "agy", args, driverEnv(deps), nil, stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, resolveBinary(deps, "agy"), args, driverEnv(deps), nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[agy] %w", err)
 	}

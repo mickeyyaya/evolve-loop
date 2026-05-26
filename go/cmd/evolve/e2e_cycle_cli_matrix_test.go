@@ -231,7 +231,8 @@ func buildBinary(t *testing.T, outDir, name, pkg, repoRoot string) string {
 
 // mustRepoRoot resolves the evolve-loop repo root from this test's
 // file location (go/cmd/evolve/<this>.go). Walks up until it finds the
-// tools/agent-bridge/ directory.
+// go/go.mod module marker (the bash tools/agent-bridge marker was removed
+// in the v12 Go-bridge cutover).
 func mustRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -240,7 +241,7 @@ func mustRepoRoot(t *testing.T) string {
 	}
 	dir := filepath.Dir(thisFile)
 	for i := 0; i < 8; i++ {
-		if _, err := os.Stat(filepath.Join(dir, "tools", "agent-bridge", "bin", "bridge")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
 			return dir
 		}
 		dir = filepath.Dir(dir)
@@ -254,21 +255,14 @@ func mustRepoRoot(t *testing.T) string {
 //   - git init + initial commit (so ship's git commit has a parent)
 //   - .evolve/profiles/{intent,scout,triage,tdd,build,audit,retro}.json
 //     (stubs — bridge profile loader only requires `name`)
-//   - tools/agent-bridge symlinked into the real repo's copy
 //   - .evolve/state.json bootstrapped to cycle 0
+//
+// The in-process Go bridge resolves paths from the request (no
+// tools/agent-bridge tree is symlinked — that was the pre-cutover bash path).
 func setupTempProject(t *testing.T, repoRoot string) string {
 	t.Helper()
+	_ = repoRoot // reserved; the Go bridge needs no project-local bridge tree
 	root := t.TempDir()
-
-	// Bridge needs a tools/agent-bridge tree at the project root because
-	// the Go bridge adapter resolves `<projRoot>/tools/agent-bridge/bin/bridge`.
-	if err := os.MkdirAll(filepath.Join(root, "tools"), 0o755); err != nil {
-		t.Fatalf("mkdir tools/: %v", err)
-	}
-	if err := os.Symlink(filepath.Join(repoRoot, "tools", "agent-bridge"),
-		filepath.Join(root, "tools", "agent-bridge")); err != nil {
-		t.Fatalf("symlink agent-bridge: %v", err)
-	}
 
 	// Stub profiles. Names match what the Go phase runner constructs:
 	// strings.TrimPrefix(AgentPromptName, "evolve-") → AGENT-named, not

@@ -63,7 +63,7 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	}
 	defer closeFn()
 
-	rc, err := deps.Runner(ctx, "claude", args, driverEnv(deps), nil, stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, resolveBinary(deps, "claude"), args, driverEnv(deps), nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[claude-p] %w", err)
 	}

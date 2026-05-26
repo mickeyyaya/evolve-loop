@@ -1,1 +1,0 @@
-世界 — Unicode 🌍 emoji preserved. Write to $ARTIFACT_PATH.

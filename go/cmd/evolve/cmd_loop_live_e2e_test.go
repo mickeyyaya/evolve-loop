@@ -87,17 +87,6 @@ func TestE2E_M4PipelineAgainstLiveLedger(t *testing.T) {
 	if os.Getenv("ANTHROPIC_API_KEY") != "" {
 		t.Skip("ANTHROPIC_API_KEY is set — bridge refuses API-key auth path")
 	}
-	// Locate the bridge binary at <repo-root>/tools/agent-bridge/bin/bridge.
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	repoRoot := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
-	bridgeBin := filepath.Join(repoRoot, "tools", "agent-bridge", "bin", "bridge")
-	if _, err := os.Stat(bridgeBin); err != nil {
-		t.Skipf("bridge binary not at %s — run 'cd tools/agent-bridge && make' first", bridgeBin)
-	}
-
 	// Isolated project root. Init a git repo with one commit.
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -112,7 +101,7 @@ func TestE2E_M4PipelineAgainstLiveLedger(t *testing.T) {
 	// subagent.Runner currently composes prompts that start with
 	// "## INVOCATION CONTEXT ##" and v11.5.2+ uses that non-dash form so
 	// separately as a composePrompt fix (out of M4 scope).
-	br := bridge.New(bridgeBin, nil)
+	br := bridge.New()
 	ld := ledger.New(evolveDir)
 
 	artifactPath := filepath.Join(runsDir, "scout-report.md")

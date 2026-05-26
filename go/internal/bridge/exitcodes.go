@@ -13,8 +13,8 @@
 //   - Seams (Deps): CmdRunner, clock, challenge-token, tmux, fs — all
 //     injectable so the whole package is unit-testable with no LLM cost.
 //
-// The bash implementation is retained behind EVOLVE_BRIDGE_GO until
-// parity is proven, then deleted.
+// This Go bridge is the sole implementation: the bash tools/agent-bridge
+// and the EVOLVE_BRIDGE_GO selector toggle were removed in the v12 cutover.
 package bridge
 
 // Bridge exit codes — the single source of truth for the numeric

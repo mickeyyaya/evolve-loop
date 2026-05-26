@@ -12,6 +12,28 @@ import (
 // log-file setup, env construction). DRY by design: a new driver reuses
 // these instead of re-implementing them.
 
+// resolveBinary returns the executable name for a driver's inner CLI,
+// honoring the offline testing seam ported from the bash bridge: when
+// BRIDGE_TESTING=1, a BRIDGE_<CLI>_BINARY override (e.g.
+// BRIDGE_CLAUDE_BINARY) substitutes the real binary with a fake/stub so
+// the e2e harness can drive the full cycle path without a live CLI.
+// Outside testing the default name is always used, so a stray override in
+// a production environment can never redirect a real launch.
+//
+// defaultName must be a base binary name (claude|codex|agy) — NOT a driver
+// alias like "claude-tmux" — so the derived env key (BRIDGE_<UPPER>_BINARY)
+// is a valid shell variable. All six drivers pass the base name.
+func resolveBinary(deps Deps, defaultName string) string {
+	if v, _ := lookupEnv(deps, "BRIDGE_TESTING"); v != "1" {
+		return defaultName
+	}
+	key := "BRIDGE_" + strings.ToUpper(defaultName) + "_BINARY"
+	if v, ok := lookupEnv(deps, key); ok && v != "" {
+		return v
+	}
+	return defaultName
+}
+
 // driverEnv returns the environment for the inner CLI: the process env
 // plus the request-local Deps.Env overrides (later entries win, matching
 // the adapter's env-merge).
