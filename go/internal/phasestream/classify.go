@@ -41,6 +41,13 @@ func NewClassifier(src Source, traceID string, now func() time.Time) *Classifier
 	return &Classifier{src: src, traceID: traceID, now: now, lastFlush: now()}
 }
 
+// Emit builds an envelope for a normalizer-originated event (e.g. a stall
+// incident) using the same monotonic seq + source as line events, so the
+// unified stream stays gap-free across both line- and rule-events.
+func (c *Classifier) Emit(kind Kind, sev Severity, data map[string]any) Envelope {
+	return c.newEnvelope(kind, sev, data)
+}
+
 func (c *Classifier) newEnvelope(kind Kind, sev Severity, data map[string]any) Envelope {
 	c.seq++
 	return Envelope{

@@ -37,6 +37,7 @@ const (
 	KindInfraFailure  Kind = "infra_failure"
 	KindSystemHook    Kind = "system_hook"
 	KindError         Kind = "error"
+	KindStall         Kind = "stall"
 	KindUnknown       Kind = "unknown"
 )
 
