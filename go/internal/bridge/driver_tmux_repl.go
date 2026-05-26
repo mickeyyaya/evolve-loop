@@ -142,6 +142,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		}
 	}
 
+	// --- Seed any launch-time REPL input (e.g. "/model sonnet") after the
+	// boot marker, before the task prompt. Skipped on a resumed named
+	// session (the seed already ran on the original launch).
+	if !namedExists && len(cfg.Realization.REPLInput) > 0 {
+		for _, ln := range cfg.Realization.REPLInput {
+			_ = deps.Tmux.SendKeys(ctx, lp.session, ln, true)
+			deps.Sleep(time.Second)
+		}
+		fmt.Fprintf(deps.Stderr, "%s seeded %d REPL input line(s)\n", pfx, len(cfg.Realization.REPLInput))
+	}
+
 	// --- Deliver the prompt via the paste buffer (human-input cadence when engaged).
 	if human {
 		humanBootPause(deps)
