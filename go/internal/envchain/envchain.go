@@ -1,7 +1,8 @@
 // Package envchain encodes the canonical four-tier env-precedence
 // chain used across evolve-loop. It is the single source of truth for
-// "where does this value come from?" so phaseflags, bridge policy
-// resolution, and any future config-knob site stay aligned.
+// "where does this value come from?" so the runner's permission
+// resolution, bridge policy resolution, and any future config-knob site
+// stay aligned.
 //
 // Precedence (highest to lowest):
 //

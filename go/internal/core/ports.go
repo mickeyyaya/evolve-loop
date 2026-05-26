@@ -250,7 +250,13 @@ type BridgeRequest struct {
 	Agent        string            `json:"agent,omitempty"`         // role label
 	Cycle        int               `json:"cycle,omitempty"`
 	Env          map[string]string `json:"env,omitempty"`
-	ExtraFlags   []string          `json:"extra_flags,omitempty"` // pass-through to bridge
+	ExtraFlags   []string          `json:"extra_flags,omitempty"` // direct inner-CLI pass-through (after `--`)
+	// PermissionMode is the resolved per-phase permission mode (the
+	// EVOLVE_<AGENT>_PERMISSION_MODE override the runner resolves with the
+	// agent name). The bridge realizes it per-CLI via the LaunchIntent —
+	// passed as typed config, NOT a raw flag, so it never leaks into a
+	// non-claude launch command. Empty = profile/realizer default (bypass).
+	PermissionMode string `json:"permission_mode,omitempty"`
 }
 
 // BridgeResponse is the bridge's JSON-parsed reply.

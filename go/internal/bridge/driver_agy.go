@@ -39,7 +39,8 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 		return ExitBadFlags, err
 	}
 	args := []string{"-p", prompt, "--dangerously-skip-permissions"}
-	args = append(args, cfg.ExtraFlags...) // inner-CLI pass-through
+	args = append(args, cfg.Realization.LaunchFlags...) // profile raw flags (extra_flags_by_cli["agy"])
+	args = append(args, cfg.ExtraFlags...)              // direct `--` pass-through
 
 	stdoutF, stderrF, closeFn, err := openDriverLogs(cfg)
 	if err != nil {

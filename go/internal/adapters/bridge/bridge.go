@@ -113,8 +113,8 @@ func validate(req core.BridgeRequest) error {
 // resolvePolicy returns the effective interactive policy for the given
 // agent. The lookup chain is two layered envchain.Resolve calls — the
 // per-agent override layer first, then the global EVOLVE_INTERACTIVE_POLICY
-// layer — so the precedence semantics live in envchain and stay
-// aligned with phaseflags and any future per-phase env knob.
+// layer — so the precedence semantics live in envchain and stay aligned
+// with the runner's per-phase env resolution and any future config-knob site.
 //
 // Effective precedence:
 //

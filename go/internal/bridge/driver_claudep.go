@@ -52,6 +52,9 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	}
 	// Inner-CLI pass-through flags (the bash `--` separator): --bare,
 	// --strict-mcp-config, --setting-sources, etc. from the adapter.
+	// Profile raw flags (extra_flags_by_cli["claude-p"]) realized per-CLI,
+	// then the direct `--` pass-through. Uniform with the tmux drivers.
+	args = append(args, cfg.Realization.LaunchFlags...)
 	args = append(args, cfg.ExtraFlags...)
 
 	fmt.Fprintf(deps.Stderr, "[claude-p] cycle=%d agent=%s model=%s artifact=%s permission_mode=%s\n",

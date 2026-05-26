@@ -250,43 +250,6 @@ func writeScoutProfile(t *testing.T, contents string) string {
 	return root
 }
 
-// TestRun_PopulatesExtraFlagsFromProfile — profile.extra_flags and
-// profile.permission_mode surface in the BridgeRequest the phase sends
-// to the bridge.
-func TestRun_PopulatesExtraFlagsFromProfile(t *testing.T) {
-	root := writeScoutProfile(t, `{"extra_flags":["--require-full"],"permission_mode":"acceptEdits"}`)
-	fb := &fakeBridge{}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	_, _ = phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-	})
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	for _, want := range []string{"--require-full", "--permission-mode", "acceptEdits"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("ExtraFlags missing %q; got %v", want, fb.gotReq.ExtraFlags)
-		}
-	}
-}
-
-// TestRun_EnvOverridesProfilePermissionMode — EVOLVE_SCOUT_PERMISSION_MODE
-// in req.Env beats the profile's permission_mode.
-func TestRun_EnvOverridesProfilePermissionMode(t *testing.T) {
-	root := writeScoutProfile(t, `{"permission_mode":"acceptEdits"}`)
-	fb := &fakeBridge{}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	_, _ = phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_SCOUT_PERMISSION_MODE": "plan"},
-	})
-	got := strings.Join(fb.gotReq.ExtraFlags, " ")
-	if !strings.Contains(got, "--permission-mode plan") {
-		t.Errorf("env override not honored; got %v", fb.gotReq.ExtraFlags)
-	}
-	if strings.Contains(got, "acceptEdits") {
-		t.Errorf("profile value should be overridden, not appended; got %v", fb.gotReq.ExtraFlags)
-	}
-}
-
 // TestComposePrompt_InjectsGoalTextFromContext (cycle-108 bug #3): the
 // dispatcher routes --goal-text into Context["goal"]; Scout's prompt
 // must surface it so Scout treats the operator's goal as a constraint
