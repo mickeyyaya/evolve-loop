@@ -121,14 +121,15 @@ func installStubDeps(t *testing.T, storage core.Storage, ledger core.Ledger) fun
 	prev := wireOrchestratorDepsFn
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
 		runners := map[core.Phase]core.PhaseRunner{
-			core.PhaseIntent: noopRunner{name: "intent"},
-			core.PhaseScout:  noopRunner{name: "scout"},
-			core.PhaseTriage: noopRunner{name: "triage"},
-			core.PhaseTDD:    noopRunner{name: "tdd"},
-			core.PhaseBuild:  noopRunner{name: "build"},
-			core.PhaseAudit:  noopRunner{name: "audit"},
-			core.PhaseShip:   noopRunner{name: "ship"},
-			core.PhaseRetro:  noopRunner{name: "retro"},
+			core.PhaseIntent:       noopRunner{name: "intent"},
+			core.PhaseScout:        noopRunner{name: "scout"},
+			core.PhaseTriage:       noopRunner{name: "triage"},
+			core.PhaseTDD:          noopRunner{name: "tdd"},
+			core.PhaseBuildPlanner: noopRunner{name: "build-planner"},
+			core.PhaseBuild:        noopRunner{name: "build"},
+			core.PhaseAudit:        noopRunner{name: "audit"},
+			core.PhaseShip:         noopRunner{name: "ship"},
+			core.PhaseRetro:        noopRunner{name: "retro"},
 		}
 		return orchDeps{
 			Storage:      storage,

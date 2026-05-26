@@ -404,14 +404,15 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 		st := &fakeStorage{}
 		ld := &erroringLedger{fakeLedger: &fakeLedger{}}
 		runners := map[core.Phase]core.PhaseRunner{
-			core.PhaseIntent: noopRunner{name: "intent"},
-			core.PhaseScout:  noopRunner{name: "scout"},
-			core.PhaseTriage: noopRunner{name: "triage"},
-			core.PhaseTDD:    noopRunner{name: "tdd"},
-			core.PhaseBuild:  noopRunner{name: "build"},
-			core.PhaseAudit:  noopRunner{name: "audit"},
-			core.PhaseShip:   noopRunner{name: "ship"},
-			core.PhaseRetro:  noopRunner{name: "retro"},
+			core.PhaseIntent:       noopRunner{name: "intent"},
+			core.PhaseScout:        noopRunner{name: "scout"},
+			core.PhaseTriage:       noopRunner{name: "triage"},
+			core.PhaseTDD:          noopRunner{name: "tdd"},
+			core.PhaseBuildPlanner: noopRunner{name: "build-planner"},
+			core.PhaseBuild:        noopRunner{name: "build"},
+			core.PhaseAudit:        noopRunner{name: "audit"},
+			core.PhaseShip:         noopRunner{name: "ship"},
+			core.PhaseRetro:        noopRunner{name: "retro"},
 		}
 		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners)}
 	}
@@ -467,15 +468,18 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 		st := &fakeStorage{}
 		ld := &fakeLedger{}
 		// Every phase returns FAIL so the final verdict at retro is FAIL.
+		// build-planner uses noopRunner (PASS) because its ShouldSkip
+		// would return SKIPPED in shadow mode; FAIL at build is sufficient.
 		runners := map[core.Phase]core.PhaseRunner{
-			core.PhaseIntent: failVerdictRunner{name: "intent"},
-			core.PhaseScout:  failVerdictRunner{name: "scout"},
-			core.PhaseTriage: failVerdictRunner{name: "triage"},
-			core.PhaseTDD:    failVerdictRunner{name: "tdd"},
-			core.PhaseBuild:  failVerdictRunner{name: "build"},
-			core.PhaseAudit:  failVerdictRunner{name: "audit"},
-			core.PhaseShip:   failVerdictRunner{name: "ship"},
-			core.PhaseRetro:  failVerdictRunner{name: "retro"},
+			core.PhaseIntent:       failVerdictRunner{name: "intent"},
+			core.PhaseScout:        failVerdictRunner{name: "scout"},
+			core.PhaseTriage:       failVerdictRunner{name: "triage"},
+			core.PhaseTDD:          failVerdictRunner{name: "tdd"},
+			core.PhaseBuildPlanner: noopRunner{name: "build-planner"},
+			core.PhaseBuild:        failVerdictRunner{name: "build"},
+			core.PhaseAudit:        failVerdictRunner{name: "audit"},
+			core.PhaseShip:         failVerdictRunner{name: "ship"},
+			core.PhaseRetro:        failVerdictRunner{name: "retro"},
 		}
 		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners)}
 	}

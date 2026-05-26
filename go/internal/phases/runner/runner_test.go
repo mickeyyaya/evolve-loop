@@ -461,7 +461,7 @@ func TestRun_CLIResolutionPrecedence(t *testing.T) {
 		{"profile_codex_no_env", "codex", "", "codex"},
 		{"profile_agy_no_env", "agy", "", "agy"},
 		{"env_wins_over_profile", "codex", "claude-tmux", "claude-tmux"},
-		{"empty_profile_default", "", "", "claude-p"},
+		{"empty_profile_default", "", "", "claude-tmux"},
 		{"env_overrides_empty_profile", "", "codex", "codex"},
 	}
 	for _, tc := range cases {
