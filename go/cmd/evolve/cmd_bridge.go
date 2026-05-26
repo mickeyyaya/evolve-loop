@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -64,6 +65,36 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		emitProbeJSON(stdout, p, filter)
+		return 0
+
+	case "report":
+		ws, artName := "", "artifact.md"
+		for _, a := range rest {
+			switch {
+			case strings.HasPrefix(a, "--workspace="):
+				ws = strings.TrimPrefix(a, "--workspace=")
+			case strings.HasPrefix(a, "--artifact-name="):
+				artName = strings.TrimPrefix(a, "--artifact-name=")
+			case a == "--help" || a == "-h":
+				fmt.Fprintln(stdout, "Usage: evolve bridge report --workspace=PATH [--artifact-name=NAME]")
+				return 0
+			}
+		}
+		if ws == "" {
+			fmt.Fprintln(stderr, "evolve bridge report: --workspace required")
+			return 10
+		}
+		rep, err := bridge.BuildReport(ws, artName, time.Now())
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve bridge report: %v\n", err)
+			return 10
+		}
+		b, _ := json.MarshalIndent(rep, "", "  ")
+		fmt.Fprintln(stdout, string(b))
+		return 0
+
+	case "validate":
+		fmt.Fprintln(stderr, "evolve bridge validate: pass --validate-only to `bridge launch` to dry-validate config")
 		return 0
 
 	case "version", "-v", "--version":
