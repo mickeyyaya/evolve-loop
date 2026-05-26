@@ -63,6 +63,14 @@ type Manifest struct {
 	DefaultArgs        []string            `json:"default_args"`
 	InteractivePrompts []ManifestPrompt    `json:"interactive_prompts"`
 	Stub               bool                `json:"stub"`
+	// TierAliases maps an abstract model tier (haiku|sonnet|opus) to this
+	// CLI's concrete model name (e.g. codex sonnet→gpt-5.4, agy *→gemini-3.5-flash).
+	// Consumed by the LaunchIntent realizer's `from:"tier_alias"` specs (ADR-0022).
+	TierAliases map[string]string `json:"tier_aliases,omitempty"`
+	// Params is the declarative per-CLI realization table: how each high-level
+	// LaunchIntent parameter maps to this CLI's launch flags / REPL input /
+	// controller hints. Absent param → no-op. See ADR-0022 + realizer.go.
+	Params map[string]ParamSpec `json:"params,omitempty"`
 }
 
 // LoadManifest reads and validates the embedded manifest for cli. Error
