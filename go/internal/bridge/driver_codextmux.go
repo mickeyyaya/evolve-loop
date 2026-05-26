@@ -42,6 +42,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 		promptMarker:   "›", // U+203A
 		bootScrollback: 200, // alt-screen: bare capture-pane is blank
 		bootIntervalS:  2,
+		tickDuringBoot: true, // codex shows a trust prompt during boot
 		exitSeq:        []tmuxKey{{keys: "/quit", enter: true, pauseS: 2}},
 	})
 }

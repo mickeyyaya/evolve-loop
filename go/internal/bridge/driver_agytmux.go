@@ -27,6 +27,7 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 		promptMarker:   "? for shortcuts",
 		bootScrollback: 200, // alt-screen
 		bootIntervalS:  2,
+		tickDuringBoot: true, // agy shows a trust prompt during boot
 		// agy quits on Ctrl+C twice (no Enter).
 		exitSeq: []tmuxKey{{keys: "C-c", enter: false, pauseS: 1}, {keys: "C-c", enter: false, pauseS: 1}},
 	})

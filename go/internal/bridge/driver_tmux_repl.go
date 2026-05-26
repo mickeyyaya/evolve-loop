@@ -46,6 +46,7 @@ type tmuxLaunch struct {
 	promptMarker   string    // boot-ready marker to grep the pane for
 	bootScrollback int       // capture-pane scrollback during boot (0=visible; 200 for alt-screen CLIs)
 	bootIntervalS  int       // seconds per boot poll iteration
+	tickDuringBoot bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
 	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
 }
 
@@ -89,6 +90,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", pfx, lp.session, cfg.Model, workingDir)
 	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named)
 
+	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
+	ar := newAutoResponder(lp.name, cfg.Workspace, deps)
+
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
 		if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
@@ -117,7 +121,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", pfx, lp.promptMarker)
 				break
 			}
-			autoRespondTick(ctx, deps, lp.session) // handle trust/auth prompts during boot
+			if lp.tickDuringBoot {
+				ar.tick(ctx, lp.session) // codex/agy: handle trust prompts during boot
+			}
 		}
 		if !promptSeen {
 			fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", pfx, tmuxREPLBootTimeoutS)
@@ -143,7 +149,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			fmt.Fprintf(deps.Stderr, "%s artifact appeared: %s\n", pfx, cfg.Artifact)
 			break
 		}
-		action, rc := autoRespondTick(ctx, deps, lp.session)
+		action, rc := ar.tick(ctx, lp.session)
 		switch rc {
 		case 0, 1: // noop / responded
 		case 2:
@@ -203,14 +209,6 @@ func truncate64(s string) string {
 		return s[:64]
 	}
 	return s
-}
-
-// autoRespondTick is the placeholder for the auto-respond engine
-// (lib/auto-respond.sh). rc: 0=noop, 1=responded, 2=extend_timeout
-// (action "extend:<secs>"), 85=escalate, 86=loop-guard. Replaced by the
-// real engine in the auto-respond slice.
-func autoRespondTick(_ context.Context, _ Deps, _ string) (string, int) {
-	return "", 0
 }
 
 // parseExtendSecs parses an "extend:<secs>" auto-respond action.
