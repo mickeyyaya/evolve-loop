@@ -51,14 +51,16 @@ func TestStateMachine_CanTransition_Disallowed(t *testing.T) {
 	denied := []struct {
 		from, to Phase
 	}{
-		{PhaseStart, PhaseShip},   // can't ship without building
-		{PhaseStart, PhaseBuild},  // skipping scout/tdd
-		{PhaseBuild, PhaseShip},   // must audit first
-		{PhaseScout, PhaseAudit},  // skipping tdd+build
-		{PhaseEnd, PhaseShip},     // terminal
-		{PhaseEnd, PhaseStart},    // terminal
-		{PhaseShip, PhaseRetro},   // already shipped
-		{PhaseTriage, PhaseBuild}, // must go through tdd
+		{PhaseStart, PhaseShip},  // can't ship without building
+		{PhaseStart, PhaseBuild}, // skipping scout/tdd
+		{PhaseBuild, PhaseShip},  // must audit first
+		{PhaseScout, PhaseAudit}, // skipping tdd+build
+		{PhaseEnd, PhaseShip},    // terminal
+		{PhaseEnd, PhaseStart},   // terminal
+		{PhaseShip, PhaseRetro},  // already shipped
+		// NOTE: triage→build and scout→build are now LEGAL — dynamic routing
+		// skips tdd on trivial cycles (tdd is conditional-mandatory, not a hard
+		// gate). The artifact-backed SpineSatisfiedUpTo gate enforces the spine.
 	}
 	for _, edge := range denied {
 		t.Run(string(edge.from)+"→"+string(edge.to), func(t *testing.T) {

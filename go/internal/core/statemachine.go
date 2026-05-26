@@ -1,6 +1,11 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+)
 
 // StateMachine encodes the orchestrator lifecycle graph. It is the
 // runtime authority for "is this transition legal?" and "given a
@@ -28,10 +33,14 @@ type StateMachine struct {
 // transition table.
 func NewStateMachine() *StateMachine {
 	a := map[Phase]map[Phase]bool{
+		// Dynamic routing widens the spine with trivial-cycle skip edges
+		// (scout/triage → build when tdd is skipped on a trivial cycle). The
+		// canonical order is unchanged; these only make the skip paths LEGAL so
+		// the router's enforce-mode decisions validate via CanTransition.
 		PhaseStart:        {PhaseIntent: true, PhaseScout: true},
 		PhaseIntent:       {PhaseScout: true},
-		PhaseScout:        {PhaseTriage: true, PhaseTDD: true},
-		PhaseTriage:       {PhaseTDD: true},
+		PhaseScout:        {PhaseTriage: true, PhaseTDD: true, PhaseBuild: true},
+		PhaseTriage:       {PhaseTDD: true, PhaseBuild: true},
 		PhaseTDD:          {PhaseBuildPlanner: true, PhaseBuild: true},
 		PhaseBuildPlanner: {PhaseBuild: true},
 		PhaseBuild:        {PhaseAudit: true},
@@ -103,4 +112,83 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 		return "", fmt.Errorf("%w: end is terminal", ErrTransitionInvalid)
 	}
 	return "", fmt.Errorf("%w: no successor for %s", ErrTransitionInvalid, current)
+}
+
+// mandatoryAnchors is the canonical order of the spine anchors. Membership in
+// the *effective* spine is decided per-config; this only fixes their order.
+var mandatoryAnchors = []Phase{PhaseScout, PhaseBuild, PhaseAudit, PhaseShip}
+
+// SpineSatisfiedUpTo is the artifact-backed structural gate: target may run only
+// if every configured-mandatory anchor ordered BEFORE it has produced a real
+// handoff artifact this cycle (Audit additionally requires a PASS/WARN verdict).
+//
+// Because it keys off RoutingSignals.<X>.Present — digested from real on-disk
+// handoffs — the orchestrator cannot reach Ship by merely claiming Audit passed;
+// a real audit artifact with a shippable verdict must exist. This is the
+// non-gameable floor that survives whichever routing Strategy is selected.
+func (sm *StateMachine) SpineSatisfiedUpTo(target Phase, sig router.RoutingSignals, cfg config.RoutingConfig) bool {
+	ti := anchorIndex(target)
+	if ti < 0 {
+		// target is not an anchor (an optional phase): only require that any
+		// anchors strictly before its nearest preceding anchor are satisfied.
+		ti = precedingAnchorBound(target)
+	}
+	for i := 0; i < ti; i++ {
+		anchor := mandatoryAnchors[i]
+		if !isConfiguredMandatory(cfg, string(anchor)) {
+			continue // operator removed this anchor from the mandatory set
+		}
+		if !anchorArtifactPresent(anchor, sig) {
+			return false
+		}
+	}
+	return true
+}
+
+// anchorIndex returns target's position in mandatoryAnchors, or -1.
+func anchorIndex(target Phase) int {
+	for i, a := range mandatoryAnchors {
+		if a == target {
+			return i
+		}
+	}
+	return -1
+}
+
+// precedingAnchorBound maps a non-anchor target to the number of anchors that
+// must already be satisfied before it can run, based on canonical position.
+func precedingAnchorBound(target Phase) int {
+	switch target {
+	case PhaseStart, PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner:
+		return 0 // before/at the build anchor — only scout precedes, handled by index 0
+	case PhaseBuild:
+		return 1 // scout must be present
+	case PhaseRetro, PhaseEnd:
+		return 3 // after audit
+	default:
+		return 0
+	}
+}
+
+func anchorArtifactPresent(anchor Phase, sig router.RoutingSignals) bool {
+	switch anchor {
+	case PhaseScout:
+		return sig.Scout.Present
+	case PhaseBuild:
+		return sig.Build.Present
+	case PhaseAudit:
+		return sig.Audit.Present && (sig.Audit.Verdict == VerdictPASS || sig.Audit.Verdict == VerdictWARN)
+	case PhaseShip:
+		return true // ship has no pre-artifact of its own
+	}
+	return true
+}
+
+func isConfiguredMandatory(cfg config.RoutingConfig, phase string) bool {
+	for _, m := range cfg.Mandatory {
+		if m == phase {
+			return true
+		}
+	}
+	return false
 }
