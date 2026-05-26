@@ -86,10 +86,13 @@ jobs:
             exit 1
           fi
 
-      - name: Verify v6 required docs exist
+      - name: Verify reference docs exist
         run: |
+          # Paths updated for the v8.48.0 docs/ reorg (moved to docs/reference/);
+          # island-model.md was intentionally removed in the skill-publishing
+          # cleanup (49884d2), so it is no longer required.
           ERRORS=0
-          for doc in docs/genes.md docs/island-model.md docs/instincts.md docs/configuration.md; do
+          for doc in docs/reference/genes.md docs/reference/instincts.md docs/reference/configuration.md; do
             if [ ! -f "$doc" ]; then
               echo "FAIL: $doc not found"
               ERRORS=$((ERRORS + 1))
