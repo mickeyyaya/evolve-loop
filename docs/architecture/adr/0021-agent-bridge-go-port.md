@@ -48,16 +48,41 @@ and `billing-snapshot` (credential-isolation snapshot + compare).
 
 ## GATED — production cutover (requires human sign-off, NOT autonomous)
 
-The default remains bash because deleting the production path while a background loop may use it is
-unsafe. The remaining steps, in order, each gated on the prior:
+The default remains bash because the cutover crosses two boundaries an agent must not cross alone:
+real LLM spend (the tier-2 live-cycle proof) and a production merge to `main` (where the background
+loop runs). The remaining steps, each gated on the prior:
 
-1. **Shadow-parity:** run both bridges on identical `BridgeRequest` fixtures; diff exit codes +
-   artifact + report JSON until clean over a verification window.
-2. **Flip default:** make `EVOLVE_BRIDGE_GO=1` the default in the adapter.
-3. **Delete bash:** remove `tools/agent-bridge/`, retain the `bridge` entrypoint as a Go shim, and
-   update the `CLAUDE.md` env-var table.
+1. **Shadow-parity — tier 1 (fixtures, no LLM): ✅ DONE.** Bash vs Go on identical launch requests
+   agree on the contract (exit code + artifact presence) for `--dry-run`, `--validate-only`, and
+   `--require-full` — all MATCH. Re-run any time:
+   ```bash
+   # from the feat worktree; jq required for the bash bridge
+   cd go && go build -o /tmp/evolve ./cmd/evolve && cd ..
+   WS=$(mktemp -d); printf 'x\n' >"$WS/p"; printf '{"name":"s","model":"haiku"}\n' >"$WS/prof.json"
+   for mode in --dry-run --validate-only "--require-full --dry-run"; do
+     tools/agent-bridge/bin/bridge launch --cli=claude-p --profile="$WS/prof.json" --model=auto \
+       --prompt-file="$WS/p" --workspace="$WS/b" --stdout-log="$WS/bo" --stderr-log="$WS/be" \
+       --artifact="$WS/ba" $mode >/dev/null 2>&1; b=$?
+     /tmp/evolve bridge launch --cli=claude-p --profile="$WS/prof.json" --model=auto \
+       --prompt-file="$WS/p" --workspace="$WS/g" --stdout-log="$WS/go" --stderr-log="$WS/ge" \
+       --artifact="$WS/ga" $mode >/dev/null 2>&1; g=$?
+     printf '%-26s bash=%s go=%s\n' "$mode" "$b" "$g"
+   done
+   ```
+2. **Shadow-parity — tier 2 (live cycle, real LLM): operator-run.** Run one real cycle through the
+   Go path and confirm a clean Scout→Build→Audit→Ship with a committed cycle:
+   ```bash
+   EVOLVE_BRIDGE_GO=1 evolve cycle run   # or a 1-cycle /evolve-loop batch
+   ```
+3. **Flip default:** make `EVOLVE_BRIDGE_GO=1` the default in `adapters/bridge` (and update the
+   778-line `bridge_test.go` that currently assumes the bash default).
+4. **Delete bash + merge:** remove `tools/agent-bridge/`, keep the `bridge` entrypoint as a Go shim,
+   update the `CLAUDE.md` env-var table, drop the session-scoped `ECC_GATEGUARD=off` /
+   `EVOLVE_BYPASS_ROLE_GATE=1` from `.claude/settings.local.json`, then merge `feat/agent-bridge-go-port`
+   → `main`.
 
-Until step 3, `bridge launch`/`probe`/etc. continue to resolve to bash for any out-of-process caller.
+Until step 4, `bridge launch`/`probe`/etc. continue to resolve to bash for any out-of-process caller,
+and the branch is unmerged/unpushed — so production is untouched.
 
 ## Consequences
 
