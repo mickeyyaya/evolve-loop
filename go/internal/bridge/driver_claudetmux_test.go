@@ -18,15 +18,19 @@ import (
 // 6s timeout are deterministic here.
 
 type fakeTmux struct {
-	existing map[string]bool
-	sentKeys []string // recorded SendKeys (keys only)
-	paneSeq  []string // CapturePane returns, consumed in order; last value repeats
-	paneIdx  int
+	existing   map[string]bool
+	sentKeys   []string // recorded SendKeys (keys only)
+	paneSeq    []string // CapturePane returns, consumed in order; last value repeats
+	paneIdx    int
+	newSessErr error // when set, NewSession fails (covers the spawn-error path)
 }
 
 func (f *fakeTmux) HasSession(_ context.Context, name string) bool { return f.existing[name] }
 
 func (f *fakeTmux) NewSession(_ context.Context, name string, _, _ int) error {
+	if f.newSessErr != nil {
+		return f.newSessErr
+	}
 	if f.existing == nil {
 		f.existing = map[string]bool{}
 	}

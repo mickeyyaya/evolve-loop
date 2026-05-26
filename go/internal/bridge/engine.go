@@ -242,11 +242,15 @@ func EnabledFromEnv(env map[string]string) bool {
 	}
 }
 
+// randRead is the entropy source for defaultChallengeToken — a package
+// var so tests can exercise the (otherwise unreachable) read-error path.
+var randRead = rand.Read
+
 // defaultChallengeToken mints 8 random bytes as hex (16 chars), matching
 // `openssl rand -hex 8` from the bash dry-run path.
 func defaultChallengeToken() (string, error) {
 	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	if _, err := randRead(b[:]); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil

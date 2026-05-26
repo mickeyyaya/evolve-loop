@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 )
@@ -14,7 +15,17 @@ import (
 // cutover deletes it.
 //
 //go:embed manifests/*.json
-var manifestFS embed.FS
+var embeddedManifests embed.FS
+
+// manifestSource is the (test-swappable) source of manifest files. The
+// embed.FS satisfies it in production; tests inject a fake to drive the
+// ReadFile/ReadDir error branches that the always-valid embed can't.
+type manifestSource interface {
+	ReadFile(name string) ([]byte, error)
+	ReadDir(name string) ([]fs.DirEntry, error)
+}
+
+var manifestFS manifestSource = embeddedManifests
 
 // ManifestPrompt is one interactive_prompts[] rule consumed by the
 // auto-respond engine. ResponseKeys "" (JSON null) means escalate.
@@ -51,6 +62,13 @@ func LoadManifest(cli string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, fmt.Errorf("bridge:manifest: no manifest for cli=%s", cli)
 	}
+	return parseManifest(cli, data)
+}
+
+// parseManifest unmarshals + validates manifest bytes. Split out so the
+// JSON-error and missing-field branches are testable (the embedded
+// manifests are all valid, so they'd otherwise be unreachable).
+func parseManifest(cli string, data []byte) (Manifest, error) {
 	var m Manifest
 	if err := json.Unmarshal(data, &m); err != nil {
 		return Manifest{}, fmt.Errorf("bridge:manifest: invalid JSON for cli=%s: %w", cli, err)

@@ -78,9 +78,6 @@ func (e *Engine) requireFullCheck(cfg *Config, stderr io.Writer) (int, bool) {
 	tier := "none"
 	if m, err := LoadManifest(cfg.CLI); err == nil {
 		tier = resolveTier(m, func(b string) bool {
-			if b == "" {
-				return false
-			}
 			_, e2 := e.deps.LookPath(b)
 			return e2 == nil
 		})

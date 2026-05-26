@@ -40,9 +40,6 @@ func resolveTier(m Manifest, hasBinary func(string) bool) string {
 // core.BridgeProbe contract carries.
 func (e *Engine) Probe(_ context.Context) (core.BridgeProbe, error) {
 	hasBinary := func(bin string) bool {
-		if bin == "" {
-			return false
-		}
 		_, err := e.deps.LookPath(bin)
 		return err == nil
 	}
