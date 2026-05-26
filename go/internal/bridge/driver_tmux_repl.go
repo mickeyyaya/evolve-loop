@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
 // driver_tmux_repl.go — the shared REPL state machine for every *-tmux
@@ -25,6 +27,12 @@ const (
 	tmuxPaneWidth           = 220
 	tmuxPaneHeight          = 80
 	tmuxArtifactScrollback  = 10000 // deep capture for final scrollback
+
+	// maxInjectDefer bounds how many times a mid-turn command is re-queued
+	// while the agent is busy, so a never-idle agent cannot loop forever.
+	maxInjectDefer = 10
+	// injectInterruptSettle is the pause after an ESC before injecting text.
+	injectInterruptSettle = 500 * time.Millisecond
 )
 
 // tmuxKey is one keystroke group sent to the REPL (e.g. {"/exit", true, 2}
@@ -165,6 +173,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	fmt.Fprintf(deps.Stderr, "%s prompt delivered\n", pfx)
 
+	// --- Live-injection inbox cursor. Seek to EOF so a resumed named session
+	// (or a stale ephemeral file) never replays a pre-launch backlog — only
+	// envelopes appended AFTER the agent is running are delivered.
+	cursor := inbox.NewCursor(cfg.Workspace, cfg.Agent)
+	if fi, err := os.Stat(inbox.Path(cfg.Workspace, cfg.Agent)); err == nil {
+		cursor.SetOffset(fi.Size())
+	}
+
 	// --- Wait for the artifact, ticking the auto-respond fallback.
 	deadline := tmuxArtifactTimeoutS
 	if cfg.ArtifactTimeoutS > 0 {
@@ -177,6 +193,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			artifactSeen = true
 			fmt.Fprintf(deps.Stderr, "%s artifact appeared: %s\n", pfx, cfg.Artifact)
 			break
+		}
+		// Drain live-injection envelopes BEFORE the auto-respond tick so an
+		// operator interrupt pre-empts a pending auto-reply on this tick.
+		if envs, _ := cursor.Drain(); len(envs) > 0 {
+			for _, env := range envs {
+				injectEnvelope(ctx, cfg, deps, lp, env)
+			}
 		}
 		action, rc := ar.tick(ctx, lp.session)
 		switch rc {
@@ -218,6 +241,62 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	fmt.Fprintf(deps.Stderr, "%s DONE: artifact-only verdict = SUCCESS\n", pfx)
 	return 0, nil
+}
+
+// injectEnvelope delivers one live-injection envelope into the running REPL.
+// command/nudge/system_rule are idle-gated (injected only when the prompt
+// marker is visible); a mid-turn arrival is re-queued, bounded by
+// maxInjectDefer. interrupt sends ESC first, then injects regardless of state.
+func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, env inbox.Envelope) {
+	pfx := "[" + lp.name + "]"
+	if env.Kind == inbox.KindInterrupt {
+		_ = deps.Tmux.SendKeys(ctx, lp.session, "Escape", false)
+		deps.Sleep(injectInterruptSettle)
+		injectText(ctx, cfg, deps, lp.session, env.Body)
+		fmt.Fprintf(deps.Stderr, "%s injected interrupt (source=%s)\n", pfx, env.Source)
+		return
+	}
+
+	// Idle-gated kinds: only inject when the agent is waiting at the prompt.
+	pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	if !strings.Contains(pane, lp.promptMarker) {
+		if env.DeferCount >= maxInjectDefer {
+			fmt.Fprintf(deps.Stderr, "%s DROP injected %s after %d defers (agent never idled)\n", pfx, env.Kind, env.DeferCount)
+			return
+		}
+		env.DeferCount++
+		if err := inbox.Append(cfg.Workspace, cfg.Agent, env, deps.Now); err != nil {
+			fmt.Fprintf(deps.Stderr, "%s WARN re-queue of %s failed: %v\n", pfx, env.Kind, err)
+		}
+		return
+	}
+
+	body := env.Body
+	if env.Kind == inbox.KindSystemRule {
+		body = "## Rules\n" + body
+	}
+	injectText(ctx, cfg, deps, lp.session, body)
+	fmt.Fprintf(deps.Stderr, "%s injected %s (source=%s)\n", pfx, env.Kind, env.Source)
+}
+
+// injectText delivers body into the session via the paste buffer (so
+// multi-line/special characters survive — SendKeys would mangle them), then
+// Enter. It uses a dedicated scratch file so it never collides with the task
+// prompt's resolved-prompt.txt.
+func injectText(ctx context.Context, cfg *Config, deps Deps, session, body string) {
+	scratch := filepath.Join(cfg.Workspace, ".bridge-inbox", orDefault(cfg.Agent, "agent")+"-inject.txt")
+	if err := os.MkdirAll(filepath.Dir(scratch), 0o755); err != nil {
+		fmt.Fprintf(deps.Stderr, "[%s] WARN inject scratch mkdir: %v\n", session, err)
+		return
+	}
+	if err := os.WriteFile(scratch, []byte(body), 0o644); err != nil {
+		fmt.Fprintf(deps.Stderr, "[%s] WARN inject scratch write: %v\n", session, err)
+		return
+	}
+	_ = deps.Tmux.LoadBuffer(ctx, session, scratch)
+	_ = deps.Tmux.PasteBuffer(ctx, session)
+	deps.Sleep(time.Second)
+	_ = deps.Tmux.SendKeys(ctx, session, "", true) // Enter
 }
 
 // resolveSession returns the tmux session name and whether it is a stable
