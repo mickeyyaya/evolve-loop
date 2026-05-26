@@ -72,6 +72,8 @@ func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		Enforce:      enforce,
 		PollS:        atoiOr(os.Getenv("EVOLVE_OBSERVER_POLL_S"), 0),
 		StallS:       atoiOr(envOr("EVOLVE_OBSERVER_STALL_S", os.Getenv("EVOLVE_INACTIVITY_THRESHOLD_S")), 0),
+		NudgeS:       atoiOr(os.Getenv("EVOLVE_OBSERVER_NUDGE_S"), 0),
+		NudgeBody:    os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
 		EOFGraceS:    atoiOr(os.Getenv("EVOLVE_OBSERVER_EOF_GRACE_S"), 0),
 		ShutdownSig:  shutdown,
 	}, "", stderr)
