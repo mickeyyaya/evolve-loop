@@ -159,6 +159,84 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 	}
 }
 
+// TestRun_InvokesEventsProducer — the runner calls the EventsProducer seam
+// post-phase with (workspace, phase, cli, cycle), so cyclecost/cycleclassify
+// get their <phase>-events.ndjson (ADR-0020 wiring).
+func TestRun_InvokesEventsProducer(t *testing.T) {
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet", verdict: core.VerdictPASS}
+	fb := &fakeBridge{writeArtifact: "x"}
+	ws := t.TempDir()
+	var gotWS, gotPhase, gotCLI string
+	var gotCycle, calls int
+	r := New(Options{
+		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x"),
+		EventsProducer: func(workspace, phase, cli string, cycle int) error {
+			calls++
+			gotWS, gotPhase, gotCLI, gotCycle = workspace, phase, cli, cycle
+			return nil
+		},
+	})
+	if _, err := r.Run(context.Background(), core.PhaseRequest{
+		Cycle: 9, ProjectRoot: t.TempDir(), Workspace: ws,
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("EventsProducer calls=%d, want 1", calls)
+	}
+	if gotWS != ws || gotPhase != "build" || gotCycle != 9 {
+		t.Errorf("EventsProducer args: ws=%q phase=%q cycle=%d (want %q/build/9)", gotWS, gotPhase, gotCycle, ws)
+	}
+	if gotCLI != "claude-tmux" {
+		t.Errorf("EventsProducer cli=%q, want claude-tmux (default)", gotCLI)
+	}
+}
+
+// TestRun_EventsProducer_RunsOnBridgeError — events MUST be produced even when
+// the bridge errors: a phase that fails on a timeout/429/529 is exactly the
+// infrastructure failure cycleclassify (events-only since task 4) must detect.
+func TestRun_EventsProducer_RunsOnBridgeError(t *testing.T) {
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet"}
+	fb := &fakeBridge{err: errors.New("bridge timeout")}
+	var calls int
+	r := New(Options{
+		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x"),
+		EventsProducer: func(_, _, _ string, _ int) error { calls++; return nil },
+	})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("expected bridge error to propagate")
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL", resp.Verdict)
+	}
+	if calls != 1 {
+		t.Fatalf("EventsProducer calls=%d on bridge-error path, want 1 (infra classification depends on it)", calls)
+	}
+}
+
+// TestRun_EventsProducerError_NonBlocking — a producer failure WARNs but does
+// not fail the phase (the raw log remains the forensic source of truth).
+func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
+	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "sonnet", verdict: core.VerdictPASS}
+	fb := &fakeBridge{writeArtifact: "x"}
+	r := New(Options{
+		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-scout", "x"),
+		EventsProducer: func(_, _, _ string, _ int) error { return errors.New("disk full") },
+	})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("producer error must not fail the phase: %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS despite producer error", resp.Verdict)
+	}
+}
+
 // TestRun_EnvOverridesModel — EVOLVE_<PHASE>_MODEL env beats DefaultModel.
 func TestRun_EnvOverridesModel(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", verdict: core.VerdictPASS}

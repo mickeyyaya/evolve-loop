@@ -168,6 +168,37 @@ func TestClassify_ParityInfraRawVsEvents(t *testing.T) {
 	}
 }
 
+// TestClassify_ParityViaProduce is the ADR-0020 cutover gate for failure
+// classification: a raw <phase>-stderr.log written by the bridge, run through
+// the actual production path (phasestream.Produce as runner.go calls it),
+// yields an events.ndjson from which cycleclassify recovers ClassInfrastructure
+// — the end-to-end parity guarantee for the no-runtime-fallback collapse.
+func TestClassify_ParityViaProduce(t *testing.T) {
+	t.Parallel()
+	ws := writeReport(t, "## Verdict\nclean report, no markers")
+	if err := os.WriteFile(filepath.Join(ws, "memo-stdout.log"),
+		[]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write stdout: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "memo-stderr.log"),
+		[]byte("API Error 529 Overloaded\n"), 0o644); err != nil {
+		t.Fatalf("write stderr: %v", err)
+	}
+	if err := phasestream.Produce(phasestream.ProduceConfig{Workspace: ws, Phase: "memo", CLI: "claude-p", Cycle: 7}); err != nil {
+		t.Fatalf("Produce: %v", err)
+	}
+	r := Classify(ws)
+	if r.Class != ClassInfrastructure {
+		t.Fatalf("parity: got %q want infrastructure (marker=%q source=%q)", r.Class, r.Marker, r.Source)
+	}
+	if r.Marker != "api_529" {
+		t.Fatalf("parity marker: got %q want api_529", r.Marker)
+	}
+	if r.Source != "memo-events.ndjson" {
+		t.Fatalf("parity source: got %q want memo-events.ndjson", r.Source)
+	}
+}
+
 func TestClassify_ShipGateConfig(t *testing.T) {
 	t.Parallel()
 	tests := []string{

@@ -296,6 +296,53 @@ func TestSummarizeCycle_UnreadableLog(t *testing.T) {
 	}
 }
 
+// TestSummarizeCycle_ParityViaProduce is the ADR-0020 cutover gate: a raw
+// <phase>-stdout.log written by the bridge, run through the actual production
+// path (phasestream.Produce, exactly as runner.go now calls it), yields an
+// events.ndjson from which cyclecost recovers the SAME cost + tokens the raw
+// result carried. This is the end-to-end billing-parity guarantee for the
+// no-runtime-fallback collapse.
+func TestSummarizeCycle_ParityViaProduce(t *testing.T) {
+	t.Parallel()
+	const (
+		rawCost = 0.69127425
+		rawIn   = int64(17)
+		rawOut  = int64(6624)
+		rawCR   = int64(1136065)
+		rawCC   = int64(66945)
+	)
+	ws := filepath.Join(t.TempDir(), "cycle-7")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatalf("mkdir ws: %v", err)
+	}
+	raw := strings.Join([]string{
+		`{"type":"system","subtype":"init"}`,
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"building"}]}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta"}}`,
+		fmt.Sprintf(`{"type":"result","total_cost_usd":%v,"usage":{"input_tokens":%d,"output_tokens":%d,"cache_read_input_tokens":%d,"cache_creation_input_tokens":%d}}`,
+			rawCost, rawIn, rawOut, rawCR, rawCC),
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte(raw), 0o644); err != nil {
+		t.Fatalf("write raw log: %v", err)
+	}
+
+	if err := phasestream.Produce(phasestream.ProduceConfig{Workspace: ws, Phase: "build", CLI: "claude-p", Cycle: 7}); err != nil {
+		t.Fatalf("Produce: %v", err)
+	}
+
+	s, err := SummarizeCycle(ws, 7)
+	if err != nil {
+		t.Fatalf("Summarize: %v", err)
+	}
+	if s.Total.CostUSD != rawCost {
+		t.Fatalf("parity cost: got %v want %v", s.Total.CostUSD, rawCost)
+	}
+	if s.Total.InputTokens != rawIn || s.Total.OutputTokens != rawOut ||
+		s.Total.CacheReadInputTokens != rawCR || s.Total.CacheCreationInputTokens != rawCC {
+		t.Fatalf("parity tokens: %+v", s.Total)
+	}
+}
+
 // TestSummarizeCycle_ParityRawVsEvents is the migration guarantee: a real raw
 // stream-json sequence fed through the actual phasestream.Classifier (exactly
 // as the live normalizer would) produces an events.ndjson from which cyclecost

@@ -179,6 +179,10 @@ func TestDispatch_GuardShip_Allow(t *testing.T) {
 }
 
 func TestDispatch_GuardShip_Deny(t *testing.T) {
+	// Hermetic: a guard-deny assertion must not be flipped by an ambient
+	// operator bypass env (e.g. EVOLVE_BYPASS_SHIP_GATE=1 set in a dev
+	// session's settings.local.json). Clear it for this test.
+	t.Setenv("EVOLVE_BYPASS_SHIP_GATE", "")
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"git commit -m bypass"}}`)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"guard", "ship"}, in, &stdout, &stderr)
