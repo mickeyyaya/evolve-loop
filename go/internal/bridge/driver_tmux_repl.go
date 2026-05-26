@@ -189,8 +189,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	artifactSeen := false
 	for elapsed := 0; elapsed < deadline; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
-		if fileNonEmpty(cfg.Artifact) {
+		if ready, from := artifactReady(cfg); ready {
 			artifactSeen = true
+			if from != "" {
+				fmt.Fprintf(deps.Stderr, "%s artifact relocated from non-canonical %s → %s\n", pfx, from, cfg.Artifact)
+			}
 			fmt.Fprintf(deps.Stderr, "%s artifact appeared: %s\n", pfx, cfg.Artifact)
 			break
 		}
@@ -219,6 +222,10 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	if !artifactSeen {
 		fmt.Fprintf(deps.Stderr, "%s FAIL: artifact never appeared at %s after %ds\n", pfx, cfg.Artifact, deadline)
+		fmt.Fprintf(deps.Stderr, "%s diagnostic: files present under workspace %s:\n", pfx, cfg.Workspace)
+		for _, line := range listWorkspaceFiles(cfg.Workspace) {
+			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
+		}
 		// TODO(auto-respond slice): write escalation-report.json from final pane.
 		return ExitArtifactTimeout, nil
 	}
