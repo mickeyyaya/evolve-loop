@@ -1,6 +1,7 @@
 package releasepipeline
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -94,13 +95,17 @@ func TestCurrentBranch_ValidGitRepo(t *testing.T) {
 	}
 }
 
-// findRepoRoot walks up from the test binary's working directory to find a .git dir.
-// Falls back to t.TempDir() which will cause git calls to fail (acceptable for error tests).
+// findRepoRoot resolves the enclosing git repository's top level from the
+// test's working directory (the package dir). git handles both normal clones
+// and linked worktrees. The *_ValidGitRepo / *_RealRepo tests need real git
+// history + a buildable module, so the test is skipped when not run inside a
+// git checkout (e.g. a source tarball) rather than failing on a path that only
+// exists on one machine.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
-	// The Go test binary executes in the package directory, so two levels up
-	// from go/internal/releasepipeline is the repo root go/ module dir;
-	// use the module root where go.mod lives as the repo root.
-	// Absolute path for hermeticity.
-	return "/Users/danleemh/ai/claude/evolve-loop-test-hardening"
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		t.Skipf("not inside a git checkout (git rev-parse --show-toplevel: %v) — skipping real-repo test", err)
+	}
+	return strings.TrimSpace(string(out))
 }
