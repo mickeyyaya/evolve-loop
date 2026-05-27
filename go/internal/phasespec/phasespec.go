@@ -100,8 +100,9 @@ func (s PhaseSpec) ModelOrDefault() string {
 // Catalog is the ordered, lookup-able set of phase specs. Registry order is
 // preserved (All) for pipeline sequencing; Names is a sorted snapshot.
 type Catalog struct {
-	order  []string
-	byName map[string]PhaseSpec
+	order     []string
+	byName    map[string]PhaseSpec
+	userNames map[string]bool // names contributed by an operator overlay (see Merge)
 }
 
 // Get returns the spec for name. (spec, false) on miss.
