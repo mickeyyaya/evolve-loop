@@ -81,6 +81,9 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string) {
 	case "audit.verdict":
 		return 0, false, sig.Audit.Verdict
 	default:
+		// TODO(Stage 2): fall through to sig.Generic so user-phase signals
+		// (the uniform signal plane) are routable. Until then an unknown field
+		// is fail-safe false (an unrecognized trigger never fires).
 		return 0, false, ""
 	}
 }

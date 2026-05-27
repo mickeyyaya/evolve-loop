@@ -115,9 +115,7 @@ func retroDecision(in RouteInput) RouterDecision {
 		Reason:   "retro:" + string(dec.Action),
 		Evidence: map[string]interface{}{"action": string(dec.Action)},
 	}
-	for _, sp := range dec.SkipPhases { // activate the dormant SkipPhases field
-		d.SkipPhases = append(d.SkipPhases, sp)
-	}
+	d.SkipPhases = append(d.SkipPhases, dec.SkipPhases...) // carry failure-adapter skips
 	switch dec.Action {
 	case failureadapter.ActionRetryWithFallback:
 		d.NextPhase = "tdd"
