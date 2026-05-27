@@ -42,6 +42,13 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		},
 		{"claude auth-recheck → escalate", "claude-tmux", "Please log in to continue", "escalate:auth_recheck", 85},
 		{"claude rate-limit → escalate", "claude-tmux", "Error: rate limit exceeded (429)", "escalate:rate_limit", 85},
+		// Regression: an agent grepping rate-limit DETECTION CODE prints the
+		// token "rate_limit" all over its pane. That must NOT be mistaken for a
+		// real rate-limit banner (the old `rate.?limit` regex false-escalated
+		// here, killing cycle 113 mid-research). Underscore token ≠ banner.
+		{"claude rate_limit code-grep → noop (no false escalate)", "claude-tmux",
+			"Bash(grep -rn \"rate_limit|error_spike|cost_anomaly\" internal/phaseobserver)\n  detection rules (infinite_loop, error_spike, cost_anomaly, rate_limit) emit",
+			"noop", 0},
 		{"claude normal output → noop", "claude-tmux", "Wrote 3 files; running the test suite now.", "noop", 0},
 
 		// --- codex-tmux: trust dialog on first launch in an untrusted dir.

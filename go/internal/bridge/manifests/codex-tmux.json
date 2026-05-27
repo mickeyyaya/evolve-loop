@@ -5,18 +5,36 @@
   "binary_min_version": "0.13.0",
   "default_tier": "hybrid",
   "tier_dependencies": {
-    "full":     ["codex", "tmux"],
-    "hybrid":   ["codex", "tmux"],
-    "degraded": ["codex"]
+    "full": [
+      "codex",
+      "tmux"
+    ],
+    "hybrid": [
+      "codex",
+      "tmux"
+    ],
+    "degraded": [
+      "codex"
+    ]
   },
-  "prompt_marker": "›",
+  "prompt_marker": "\u203a",
   "default_model": "",
   "default_args": [],
   "params": {
-    "model_tier":     { "channel": "flag", "flag": "-m", "from": "tier_alias" },
-    "permission":     { "channel": "controller" },
-    "settings_scope": { "channel": "noop" },
-    "session_mode":   { "channel": "controller" }
+    "model_tier": {
+      "channel": "flag",
+      "flag": "-m",
+      "from": "tier_alias"
+    },
+    "permission": {
+      "channel": "controller"
+    },
+    "settings_scope": {
+      "channel": "noop"
+    },
+    "session_mode": {
+      "channel": "controller"
+    }
   },
   "interactive_prompts": [
     {
@@ -35,16 +53,16 @@
     },
     {
       "name": "rate_limit",
-      "regex": "rate.?limit|too many requests|429|quota exceeded",
+      "regex": "(usage|rate)[ -]limit (reached|exceeded|hit)|too many requests|quota exceeded",
       "response_keys": null,
       "policy": "escalate"
     }
   ],
   "stub": false,
   "tier_aliases": {
-    "haiku":  "gpt-5.4-mini",
+    "haiku": "gpt-5.4-mini",
     "sonnet": "gpt-5.4",
-    "opus":   "gpt-5.5"
+    "opus": "gpt-5.5"
   },
   "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same tier_aliases as the codex-headless driver."
 }
