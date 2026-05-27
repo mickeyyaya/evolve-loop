@@ -100,6 +100,23 @@ func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 	}
 }
 
+// Dry-run requires no attestation (it commits nothing).
+func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
+	repo := makeRepo(t)
+	excludeCommitGate(t, repo)
+	addRemote(t, repo)
+	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndry change\n")
+	res, _ := runShip(t, repo, Options{
+		Class:         ClassManual,
+		CommitMessage: "dry change",
+		DryRun:        true,
+		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+	})
+	if res.ExitCode != ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+}
+
 // EVOLVE_BYPASS_COMMIT_GATE=1 → ships without an attestation.
 func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 	repo := makeRepo(t)

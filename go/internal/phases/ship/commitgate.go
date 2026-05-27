@@ -33,6 +33,12 @@ type commitGateAttestation struct {
 // verifyManualConfirm's `git add -A`, so the computed SHA reflects exactly the
 // tree that will be committed.
 func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunResult) error {
+	if opts.DryRun {
+		// Dry-run simulates and commits nothing, so the review attestation is
+		// not required (matches the dry-run journal-only contract).
+		res.Logs = append(res.Logs, "[ship] commit-gate: dry-run — review attestation not required (no commit)")
+		return nil
+	}
 	if opts.envBool("EVOLVE_BYPASS_COMMIT_GATE") {
 		res.Logs = append(res.Logs, "[ship] commit-gate: EVOLVE_BYPASS_COMMIT_GATE=1 — review attestation skipped")
 		return nil
