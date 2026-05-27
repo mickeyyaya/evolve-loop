@@ -5,10 +5,14 @@ on:
     branches: [main, go-rewrite-phase-1]
     paths:
       - 'go/**'
+      - 'commit-gate/**'
+      - 'tests/commit-gate-test.sh'
       - '.github/workflows/go.yml'
   pull_request:
     paths:
       - 'go/**'
+      - 'commit-gate/**'
+      - 'tests/commit-gate-test.sh'
       - '.github/workflows/go.yml'
 
 permissions:
@@ -51,6 +55,12 @@ jobs:
           # live cycle context, not the unit gate (matches the Makefile).
           go test -race -count=1 -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
           go tool cover -func=coverage.txt
+      - name: commit-gate gate tests (bash)
+        # Runs here (not ci.yml) because the harness fixtures use `go 1.23`,
+        # which needs the toolchain set up above. golangci-lint is optional in
+        # the runner, so its absence in CI is fine.
+        working-directory: ${{ github.workspace }}
+        run: bash tests/commit-gate-test.sh
       - name: coverage gate (>=85% per internal/* package)
         run: |
           fail=0

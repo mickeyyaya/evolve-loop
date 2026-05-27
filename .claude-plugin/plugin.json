@@ -63,7 +63,9 @@
     "./skills/inspirer/",
     "./skills/evaluator/",
     "./skills/publish/",
-    "./skills/verify-release/"
+    "./skills/verify-release/",
+    "./skills/commit/",
+    "./skills/release/"
   ],
   "commands": [
     "./.claude-plugin/commands/scout.md",

@@ -183,6 +183,10 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 			opts.Env = map[string]string{}
 		}
 		opts.Env["EVOLVE_SHIP_AUTO_CONFIRM"] = "1"
+		// The legacy bypass is a declared emergency total-bypass, so it also
+		// waives the commit-gate review attestation (the manual class would
+		// otherwise require one).
+		opts.Env["EVOLVE_BYPASS_COMMIT_GATE"] = "1"
 		res.ClassUsed = ClassManual
 	}
 
