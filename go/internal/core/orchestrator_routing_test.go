@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -87,7 +88,76 @@ func shadowCfg(stage config.Stage) config.RoutingConfig {
 	}
 }
 
+func indexOfPhase(ps []Phase, name string) int {
+	for i, p := range ps {
+		if string(p) == name {
+			return i
+		}
+	}
+	return -1
+}
+
 // --- tests ---
+
+// CAPSTONE: a user-defined phase, authored as pure data and spliced into the
+// routing order, actually EXECUTES between build and audit when its signal
+// trigger fires — end-to-end through RunCycle with no LLM. This is the proof
+// that the whole framework (catalog → routing order → signal trigger →
+// orchestrator accept/run) works as one pipeline.
+func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
+	projectRoot := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	scanRunner := &fakeRunner{name: "security-scan"}
+	runners[Phase("security-scan")] = scanRunner
+
+	cycle := 1
+	// acs_red=0 so the built-in tester trigger stays quiet; a generic signal
+	// (build.cves>0) fires the user phase instead — isolating the new path.
+	seedWorkspace(t, projectRoot, cycle, map[string]string{
+		"handoff-build.json": `{"verdict":"PASS","acs_result":{"green":5,"red":0},"signals":{"cves":1}}`,
+	})
+
+	// Merge returns (Catalog, warnings) — no error. Guard the setup explicitly so
+	// a future Merge change that drops the phase fails here, not with a confusing
+	// "runner calls = 0" later.
+	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
+		{Name: "security-scan", Optional: true, After: "build"},
+	})
+	if _, ok := cat.Get("security-scan"); !ok {
+		t.Fatal("setup: security-scan missing from catalog after Merge")
+	}
+	cfg := shadowCfg(config.StageEnforce)
+	cfg.Order = []string{"scout", "triage", "tdd", "build-planner", "build", "tester", "security-scan", "audit", "ship"}
+	cfg.Triggers["security-scan"] = config.RoutingBlock{
+		InsertWhen: []config.Condition{{Field: "build.cves", Op: "gt", Value: 0}},
+	}
+
+	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithCatalog(cat))
+	res, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    "g",
+		Budget:      BudgetEnvelope{MaxUSD: 100},
+		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+
+	if scanRunner.calls != 1 {
+		t.Errorf("security-scan runner calls = %d, want 1 (the user phase must execute)", scanRunner.calls)
+	}
+	bi := indexOfPhase(res.PhasesRun, "build")
+	si := indexOfPhase(res.PhasesRun, "security-scan")
+	ai := indexOfPhase(res.PhasesRun, "audit")
+	if si < 0 {
+		t.Fatalf("security-scan absent from PhasesRun=%v", res.PhasesRun)
+	}
+	if bi < 0 || bi >= si || si >= ai {
+		t.Errorf("ordering wrong: build@%d security-scan@%d audit@%d (PhasesRun=%v)", bi, si, ai, res.PhasesRun)
+	}
+}
 
 // Stage:Off (default) must add NO routing forensics — byte-identical to legacy.
 func TestOrchestrator_StageOff_EmitsNoRoutingLedgerEntries(t *testing.T) {
