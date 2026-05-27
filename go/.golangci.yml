@@ -1,0 +1,33 @@
+# golangci-lint config (v2). Tunes the LOCAL commit-gate-runner's lint pass —
+# CI does not run golangci (.github/workflows/go.yml enforces go vet + gofmt +
+# tests only; golangci is "optional in the runner"). So this file only affects
+# the local gate, never CI or the live loop.
+#
+# Posture: keep the standard bug-catching linters on PRODUCTION code; quiet the
+# two pre-existing noise sources that are conventional to ignore:
+#   1. fmt.Fprint* to stdout/stderr — the CLI-output idiom whose error is
+#      conventionally discarded (the bulk of the errcheck findings).
+#   2. test-file cleanup/setup errors (os.Setenv, f.Close, …) — not worth
+#      checking in tests.
+version: "2"
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+  exclusions:
+    paths:
+      - acs/ # per-cycle ACS predicate evals — excluded from the unit gate (matches CI + Makefile)
+    rules:
+      # Test files legitimately ignore cleanup/setup errors, carry helper
+      # scaffolding, and don't warrant style-level nits. Hold them to the
+      # real-bug linters (govet, ineffassign) only.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - unused
+          - staticcheck

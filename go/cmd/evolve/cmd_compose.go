@@ -90,12 +90,12 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Export the composition signal so the kernel hook (evolve guard
 	// phase) and any downstream code can soft-WARN instead of BLOCK.
 	prevSignal := os.Getenv("EVOLVE_COMPOSE_PHASES")
-	os.Setenv("EVOLVE_COMPOSE_PHASES", "1")
+	_ = os.Setenv("EVOLVE_COMPOSE_PHASES", "1")
 	defer func() {
 		if prevSignal == "" {
-			os.Unsetenv("EVOLVE_COMPOSE_PHASES")
+			_ = os.Unsetenv("EVOLVE_COMPOSE_PHASES")
 		} else {
-			os.Setenv("EVOLVE_COMPOSE_PHASES", prevSignal)
+			_ = os.Setenv("EVOLVE_COMPOSE_PHASES", prevSignal)
 		}
 	}()
 
