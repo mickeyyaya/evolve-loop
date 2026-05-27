@@ -136,6 +136,97 @@ func TestRecordRoutingDecision_LedgerFailIsSwallowed(t *testing.T) {
 		router.RouterDecision{NextPhase: "audit", SkipPhases: []string{"tester"}})
 }
 
+// --- recordPhasePlan: happy + clamp log + error tolerance (ADR-0024 §2) ------
+
+// TestRecordPhasePlan_HappyAndClamps covers the phase-plan.json write, its SHA,
+// and the integrity-floor clamp-logging loop.
+func TestRecordPhasePlan_HappyAndClamps(t *testing.T) {
+	t.Parallel()
+	led := &fakeLedger{}
+	o := &Orchestrator{ledger: led, now: coverNow}
+	ws := t.TempDir()
+	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
+		{Phase: "scout", Run: true}, {Phase: "build", Run: true}, {Phase: "audit", Run: true}, {Phase: "ship", Run: true},
+	}}
+	clamps := []router.Clamp{
+		{Rule: "ship-requires-build", Proposed: "build=skip", Forced: "build=run"},
+		{Rule: "ship-requires-audit", Proposed: "audit=skip", Forced: "audit=run"},
+	}
+	o.recordPhasePlan(context.Background(), 5, CycleState{WorkspacePath: ws}, plan, clamps)
+
+	if _, err := os.Stat(filepath.Join(ws, "phase-plan.json")); err != nil {
+		t.Errorf("phase-plan artifact missing: %v", err)
+	}
+	if len(led.entries) != 1 {
+		t.Fatalf("ledger entries = %d, want 1 (phase_plan)", len(led.entries))
+	}
+	if led.entries[0].Kind != "phase_plan" || led.entries[0].ArtifactSHA256 == "" {
+		t.Errorf("entry = %+v, want phase_plan with SHA", led.entries[0])
+	}
+}
+
+// TestRecordPhasePlan_ArtifactFailIsSwallowed covers the two artifact-write
+// failure branches — each still emits exactly 1 phase_plan entry with a blank
+// ArtifactPath (plan forensics must never abort a cycle).
+func TestRecordPhasePlan_ArtifactFailIsSwallowed(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		ws   func(t *testing.T) string
+	}{
+		{
+			// workspace under a regular file → MkdirAll fails before WriteFile.
+			name: "mkdir-fail",
+			ws: func(t *testing.T) string {
+				t.Helper()
+				blocker := filepath.Join(t.TempDir(), "blocker")
+				if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				return filepath.Join(blocker, "ws")
+			},
+		},
+		{
+			// artifact path is a directory → mkdir succeeds, WriteFile fails.
+			name: "write-fail",
+			ws: func(t *testing.T) string {
+				t.Helper()
+				ws := t.TempDir()
+				if err := os.MkdirAll(filepath.Join(ws, "phase-plan.json"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				return ws
+			},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			led := &fakeLedger{}
+			o := &Orchestrator{ledger: led, now: coverNow}
+			plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "build", Run: true}}}
+			o.recordPhasePlan(context.Background(), 5, CycleState{WorkspacePath: tc.ws(t)}, plan, nil)
+			if len(led.entries) != 1 {
+				t.Fatalf("ledger entries = %d, want 1", len(led.entries))
+			}
+			if led.entries[0].ArtifactPath != "" {
+				t.Errorf("artifact failure should blank artifactPath, got %q", led.entries[0].ArtifactPath)
+			}
+		})
+	}
+}
+
+// TestRecordPhasePlan_LedgerFailIsSwallowed covers the swallowed ledger-append
+// error (plan forensics must never abort a cycle).
+func TestRecordPhasePlan_LedgerFailIsSwallowed(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{ledger: &fakeLedger{failOnAppend: true}, now: coverNow}
+	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "build", Run: true}}}
+	o.recordPhasePlan(context.Background(), 5, CycleState{WorkspacePath: t.TempDir()}, plan,
+		[]router.Clamp{{Rule: "ship-requires-build", Proposed: "build=skip", Forced: "build=run"}})
+}
+
 // --- archivePollutedWorkspace: stat/non-dir/readdir error branches ----------
 
 func TestArchivePollutedWorkspace_Branches(t *testing.T) {

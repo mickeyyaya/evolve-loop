@@ -61,6 +61,31 @@ var invariantChecks = map[string]invariantFn{
 			t.Errorf("Route nondeterministic:\n a=%+v\n b=%+v", a, b)
 		}
 	},
+	// ADR-0024 §1 integrity floor: a CLAMPED plan that runs ship MUST also run
+	// build and audit. Asserts on in.Plan AS THREADED (already floor-clamped by
+	// the engine/orchestrator) — the non-configurable guarantee the kernel keeps
+	// regardless of what the advisor proposed or how small cfg.Mandatory is.
+	"ship-implies-audit-in-plan": func(t *testing.T, in router.RouteInput, _ *router.Proposal, _ router.RouterDecision) {
+		if in.Plan == nil || !planRunsTest(in.Plan, "ship") {
+			return // no plan, or no-ship cycle: floor imposes nothing
+		}
+		for _, req := range []string{"build", "audit"} {
+			if !planRunsTest(in.Plan, req) {
+				t.Errorf("clamped plan runs ship but not %s (integrity floor violated): %+v", req, in.Plan.Entries)
+			}
+		}
+	},
+}
+
+// planRunsTest reports whether plan schedules phase with Run==true (test-side
+// mirror of router.planRuns, which is unexported).
+func planRunsTest(plan *router.PhasePlan, phase string) bool {
+	for _, e := range plan.Entries {
+		if e.Phase == phase {
+			return e.Run
+		}
+	}
+	return false
 }
 
 func assertInvariants(t *testing.T, s ScenarioSpec, in router.RouteInput, proposal *router.Proposal, got router.RouterDecision) {

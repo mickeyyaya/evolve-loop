@@ -41,6 +41,17 @@ type RouteInput struct {
 	ProjectRoot string
 	Cycle       int
 	Env         map[string]string
+
+	// Plan is the advisor's whole-cycle run/skip plan, ALREADY clamped to the
+	// integrity floor (ClampPlanToFloor) by the orchestrator before threading.
+	// Consulted by shouldRun ONLY at Stage>=Advisory: a NON-mandatory phase runs
+	// iff the plan schedules it (Run==true). Because the plan is pre-clamped, the
+	// ship-chain (build∧audit∧tdd) is Run even when those phases are not in the
+	// configurable mandatory set — the integrity floor that config cannot weaken.
+	// Nil ⇒ no advisor plan this cycle ⇒ the legacy trigger-driven path runs
+	// unchanged (byte-identical / fail-safe to static). Plain data handed in by
+	// the caller, so Route stays deterministic and I/O-free.
+	Plan *PhasePlan
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.
@@ -217,6 +228,29 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 		// rule not satisfied → phase is genuinely optional this cycle; fall through.
 	}
 
+	// Advisory+ with an advisor plan: the (already floor-clamped) whole-cycle
+	// plan drives run/skip for every NON-mandatory phase, replacing the
+	// trigger-driven path below. ClampPlanToFloor ran before this plan was
+	// threaded in, so the ship-chain (build∧audit∧tdd) is Run==true here even
+	// when those phases are absent from cfg.Mandatory — the non-configurable
+	// integrity floor. A phase the advisor skipped/omitted is genuinely optional
+	// this cycle (scout/triage included, when the operator shrinks the mandatory
+	// set). Below Advisory, or with no plan, control falls through to the legacy
+	// trigger path (byte-identical / fail-safe to static). The MaxInsertions cap
+	// is intentionally not applied here: the plan is the advisor's coherent,
+	// budget-aware whole-cycle selection, clamped by the floor rather than capped.
+	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil {
+		runs := planRuns(in.Plan, phase)
+		if runs && enable == config.EnableOff {
+			// The (clamped) plan runs a phase the operator disabled via EnableOff.
+			// The integrity floor or the advisor overrides the operator's off;
+			// record a clamp so the ledger shows the override — mirroring the
+			// mandatory-never-skipped clamp, never a silent discrepancy.
+			return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
+		}
+		return runs, true, nil
+	}
+
 	switch enable {
 	case config.EnableOff:
 		return false, true, nil
@@ -317,6 +351,12 @@ func reasonFor(in RouteInput, phase string, optional bool) string {
 	}
 	if enableOf(in.Cfg, phase) == config.EnableOn {
 		return "forced-on:" + phase
+	}
+	// Plan-driven (Stage>=Advisory): the upfront whole-cycle plan scheduled this
+	// phase, not a content trigger — name it so the ledger/forensics distinguish
+	// advisor-planned from trigger-inserted.
+	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil && planRuns(in.Plan, phase) {
+		return "plan:" + phase
 	}
 	return "content-insert:" + phase
 }

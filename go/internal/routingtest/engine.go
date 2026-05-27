@@ -92,6 +92,17 @@ func runPure(t *testing.T, s ScenarioSpec) {
 		Strict:          s.Env["EVOLVE_STRICT_AUDIT"] == "1",
 		Now:             fixedNow,
 	}
+	// Thread the advisor's CLAMPED whole-cycle plan exactly as the orchestrator
+	// does: clamp the scripted (unclamped) plan to the integrity floor, then hand
+	// it to the pure kernel. Only when a plan is scripted (and not a forced
+	// error) — otherwise in.Plan stays nil and shouldRun runs the legacy trigger
+	// path. The PureKernel surface thus proves the floor-clamped plan drives
+	// run/skip independently of any orchestrator I/O.
+	if len(s.Agent.Plan) > 0 {
+		raw := &router.PhasePlan{Entries: append([]router.PhasePlanEntry(nil), s.Agent.Plan...)}
+		plan, _ := router.ClampPlanToFloor(in, raw)
+		in.Plan = plan
+	}
 	proposal := s.Agent.Proposals[s.Current] // nil if none scripted at Current
 	got := router.Route(in, proposal)
 
@@ -123,9 +134,19 @@ func runPure(t *testing.T, s ScenarioSpec) {
 func runCycle(t *testing.T, s ScenarioSpec) {
 	cfg := buildConfig(s)
 	var strat router.RoutingStrategy = router.StaticPreset{}
+	var agent *scriptedProposer
 	if s.Agent.active() {
 		cfg.Mode = config.ModeDynamicLLM
-		strat = router.LLMProposal{Proposer: &scriptedProposer{spec: s.Agent}}
+		// ONE agent instance backs both router ports (Proposer + Planner),
+		// mirroring production where a single PhaseAdvisor satisfies both.
+		agent = &scriptedProposer{spec: s.Agent}
+		strat = router.LLMProposal{Proposer: agent}
+	}
+	// WithRouting leads (a later WithPlanner lands on a struct whose strategy is
+	// already set); WithPlanner is appended only when a plan is scripted.
+	opts := []core.Option{core.WithRouting(cfg, strat)}
+	if agent != nil && s.Agent.hasPlan() {
+		opts = append(opts, core.WithPlanner(agent))
 	}
 
 	projectRoot := t.TempDir()
@@ -135,7 +156,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	st := &FakeStorage{state: core.State{LastCycleNumber: s.LastCycle, FailedAt: failedRecords(s.FailedAt)}}
 	led := &FakeLedger{}
 	runners := buildRunners(s.Verdicts)
-	o := core.NewOrchestrator(st, led, runners, core.WithRouting(cfg, strat))
+	o := core.NewOrchestrator(st, led, runners, opts...)
 
 	env := map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"}
 	for k, v := range s.Env {
