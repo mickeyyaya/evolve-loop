@@ -85,6 +85,17 @@ func Severity(sev string) Brick {
 	}
 }
 
+// Backlog sets scout.backlog_size (queued-work breadth; marks scout present).
+func Backlog(n int) Brick { return func(s *ScenarioSpec) { s.Signals.ScoutBacklog = n } }
+
+// DiffLOC sets build.diff_loc (lines changed; marks build present).
+func DiffLOC(n int) Brick {
+	return func(s *ScenarioSpec) {
+		s.Signals.DiffLOC = n
+		s.Signals.BuildVerdict = orPASS(s.Signals.BuildVerdict)
+	}
+}
+
 // AuditIs marks the audit present with the given verdict.
 func AuditIs(v string) Brick { return func(s *ScenarioSpec) { s.Signals.AuditVerdict = v } }
 

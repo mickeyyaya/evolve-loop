@@ -75,6 +75,31 @@ type Proposal struct {
 	Justification string   `json:"justification"`
 }
 
+// PhasePlanEntry is one phase's whole-cycle run/skip decision plus the advisor's
+// rationale. It is the building block of PhasePlan (ADR-0024 §2): the upfront,
+// whole-cycle advisory deciding which phases run this cycle, computed once at
+// cycle start. It is the cadence companion to Proposal — Proposal answers the
+// per-branch "insert this optional phase?" question from post-phase signals the
+// upfront plan cannot yet see.
+type PhasePlanEntry struct {
+	Phase         string `json:"phase"`
+	Run           bool   `json:"run"`
+	Justification string `json:"justification,omitempty"`
+}
+
+// PhasePlan is the advisor's whole-cycle plan. ADVISORY only: the kernel clamp
+// re-validates it against the integrity floor before any phase runs, so a
+// hallucinated plan can never weaken the ship guarantee ("model proposes, kernel
+// disposes"). The clamp itself lands in a later slice; this is the carrier type.
+//
+// Wire format note: the on-disk/LLM form is a BARE JSON array of PhasePlanEntry
+// (see parsePhasePlan). Entries carries no json tag deliberately — callers
+// serialize plan.Entries directly (a bare array), never the PhasePlan wrapper,
+// so the round-trip stays symmetric with what the advisor emits.
+type PhasePlan struct {
+	Entries []PhasePlanEntry
+}
+
 // Route computes the routing decision. PURE: deterministic given its inputs.
 // Ordered rules; the clamp pass is non-bypassable and runs last.
 func Route(in RouteInput, proposal *Proposal) RouterDecision {

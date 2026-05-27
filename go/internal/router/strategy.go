@@ -22,6 +22,16 @@ type Proposer interface {
 	Propose(in RouteInput) (*Proposal, error)
 }
 
+// Planner produces the advisory WHOLE-CYCLE plan (ADR-0024 §2): a run/skip
+// decision + rationale for every phase, computed once at cycle start (the cheap,
+// coherent half of the hybrid cadence). Segregated from Proposer so a consumer
+// that only needs per-transition advice need not depend on whole-cycle planning,
+// and vice versa. Like Proposer, the concrete implementation lives in package
+// core; the plan is advisory and the kernel clamp remains the floor.
+type Planner interface {
+	Plan(in RouteInput) (*PhasePlan, error)
+}
+
 // LLMProposal is the dynamic-LLM brain: it asks a Proposer for advice, then
 // defers to the same pure Route() clamp. A nil/failed proposal degrades cleanly
 // to static behavior (the kernel decision stands).

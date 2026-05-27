@@ -39,6 +39,9 @@ func TestSignalSpec_DualRenderingAgree(t *testing.T) {
 		{SeverityMax: "HIGH", FilesTouched: 4, BuildVerdict: "WARN"},
 		{AuditVerdict: "PASS", AuditConf: 0.9},
 		{CycleSize: "small", ACSRed: 1, SeverityMax: "CRITICAL", FilesTouched: 2, AuditVerdict: "FAIL", AuditRedCount: 3},
+		{ScoutBacklog: 7},                    // backlog-only scout fixture
+		{DiffLOC: 540, BuildVerdict: "PASS"}, // diff_loc-only build fixture
+		{CycleSize: "large", ScoutBacklog: 12, ScoutCarryover: 3, DiffLOC: 800, FilesTouched: 6, BuildVerdict: "PASS"}, // both new fields + neighbors
 		{}, // empty fixture → all roles absent
 	}
 	for i, f := range fixtures {

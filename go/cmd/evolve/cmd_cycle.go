@@ -272,7 +272,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
 	// routing_mode=llm; otherwise it falls back to the deterministic
 	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
-	strategy := router.Select(cfg, core.NewRoutingProposer(br))
+	strategy := router.Select(cfg, core.NewPhaseAdvisor(br))
 
 	return orchDeps{
 		Storage:      st,

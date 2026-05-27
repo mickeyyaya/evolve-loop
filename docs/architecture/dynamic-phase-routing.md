@@ -2,7 +2,7 @@
 
 > **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default-off** (`EVOLVE_DYNAMIC_ROUTING=off`).
 > **Audience:** Operators experimenting with per-cycle phase selection; persona + router authors.
-> **Source:** `go/internal/config/config.go` (composition root), `go/internal/router/` (clamp + strategy), `go/internal/core/router_proposer.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
+> **Source:** `go/internal/config/config.go` (composition root), `go/internal/router/` (clamp + strategy), `go/internal/core/phase_advisor.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
 > **Successor design:** ADR-0024 (Proposed) replaces the fixed mandatory-spine model with a conditional floor + PhaseAdvisor — read it before extending this kernel.
 
 ## TL;DR
@@ -95,7 +95,7 @@ Triggers are honored only at `Stage >= Advisory`; in `Shadow` they are forensic-
 
 ## The LLM proposer
 
-`core.RoutingProposer` (`go/internal/core/router_proposer.go`) is the bridge-backed `DynamicLLM` brain:
+`core.PhaseAdvisor` (`go/internal/core/phase_advisor.go`) is the bridge-backed `DynamicLLM` brain:
 
 - Asks an LLM, via the `core.Bridge` port, which optional phases to insert/skip given the objective digest (`router.Digest`).
 - Defaults to a cheap/fast model (`haiku`) on the `claude-tmux` driver — routing is a lightweight read-only judgment, not heavy generation. Override with `WithProposerCLI` / `WithProposerModel`.
@@ -108,7 +108,7 @@ Each decision is recorded as a `routing-decision-N.json` artifact in the cycle w
 
 | Aspect | State |
 |---|---|
-| Kernel on `main` | Yes — `config` + `router` + `core.RoutingProposer`, fully unit-tested + the `routingtest` "Lego" scenario framework |
+| Kernel on `main` | Yes — `config` + `router` + `core.PhaseAdvisor`, fully unit-tested + the `routingtest` "Lego" scenario framework |
 | Default | Off — `WithRouting` is opt-in; absent it, the orchestrator runs legacy Stage:Off |
 | First live run | cycle-108 (`advisory`+`llm`) — proved the proposer emits valid strict JSON end-to-end; see `knowledge-base/research/cycle-108-routing-live-data.md` |
 | Known evolution | ADR-0024 (Proposed): shrink the hard mandatory set to a single conditional invariant + rename `RoutingProposer`→`PhaseAdvisor`, hybrid cadence, `phase-plan.json` |

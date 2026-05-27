@@ -8,9 +8,9 @@ import (
 
 func sigFixture() RoutingSignals {
 	return RoutingSignals{
-		Scout:  ScoutSignals{CycleSizeEstimate: "large", ItemCount: 5, CarryoverCount: 2, Present: true},
+		Scout:  ScoutSignals{CycleSizeEstimate: "large", ItemCount: 5, CarryoverCount: 2, BacklogSize: 9, Present: true},
 		Triage: TriageSignals{CycleSize: "medium", Present: true},
-		Build:  BuildSignals{Verdict: "PASS", ACSRed: 3, ACSGreen: 30, ACSRegression: 4, FilesTouched: 7, SeverityMax: SevHigh, Present: true},
+		Build:  BuildSignals{Verdict: "PASS", ACSRed: 3, ACSGreen: 30, ACSRegression: 4, FilesTouched: 7, DiffLOC: 540, SeverityMax: SevHigh, Present: true},
 		Audit:  AuditSignals{Verdict: "WARN", Confidence: 0.62, RedCount: 1, Present: true},
 	}
 }
@@ -33,8 +33,12 @@ func TestEvalCondition_NumericOps(t *testing.T) {
 		{"audit.red_count", "gt", 0, true},
 		{"scout.item_count", "gte", 5, true},
 		{"scout.carryover_count", "gt", 1, true},
+		{"scout.backlog_size", "gte", 9, true},
+		{"scout.backlog_size", "gt", 9, false},
 		{"build.acs_regression", "gt", 3, true},
 		{"build.files_touched", "gte", 7, true},
+		{"build.diff_loc", "gte", 500, true},
+		{"build.diff_loc", "lt", 500, false},
 		{"build.severity_max", "gte", "HIGH", true}, // severity coercion
 		{"build.severity_max", "gte", "CRITICAL", false},
 	}
