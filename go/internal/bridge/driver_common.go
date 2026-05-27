@@ -146,24 +146,35 @@ func isDir(path string) bool {
 // single source of truth that downstream phases read), and relocatedFrom
 // returns the fallback path so the caller can log the normalization. Empty
 // files never count (matching fileNonEmpty / the bash `[[ -s ]]` test).
+//
+// When the fallback artifact exists but the relocation fails (e.g. a
+// read-only workspace), the error is RETURNED rather than swallowed: a silent
+// (false, "") would make the driver spin the full artifact-wait window with no
+// signal, hiding a "wrote to the wrong place AND could not be moved" condition
+// from the operator. The caller logs it.
 // See docs/architecture/adr/0024-conditional-ship-gate-floor-and-phase-advisor.md.
-func artifactReady(cfg *Config) (ready bool, relocatedFrom string) {
+func artifactReady(cfg *Config) (ready bool, relocatedFrom string, err error) {
 	if fileNonEmpty(cfg.Artifact) {
-		return true, ""
+		return true, "", nil
 	}
 	fallback := filepath.Join(cfg.Workspace, "workspace", filepath.Base(cfg.Artifact))
 	if fallback != cfg.Artifact && fileNonEmpty(fallback) {
-		if err := relocateFile(fallback, cfg.Artifact); err == nil {
-			return true, fallback
+		if rerr := relocateFile(fallback, cfg.Artifact); rerr != nil {
+			return false, "", fmt.Errorf("relocate %s → %s: %w", fallback, cfg.Artifact, rerr)
 		}
+		return true, fallback, nil
 	}
-	return false, ""
+	return false, "", nil
 }
 
 // relocateFile moves src to dst, creating dst's parent directory. It tries an
 // atomic rename first and falls back to copy+remove when rename fails (e.g. a
-// cross-device move). Used by artifactReady to canonicalize a non-canonical
-// artifact write.
+// cross-device move). The copy goes through a "<dst>.tmp.<pid>" temp file in
+// dst's directory that is renamed into place, so a write that fails partway
+// (ENOSPC, network I/O) never leaves a truncated non-empty file at the
+// canonical path — which the poll loop would otherwise read as "ready". This
+// mirrors the ${file}.tmp.$$ + mv discipline used across the codebase's
+// atomic writers. Used by artifactReady to canonicalize a non-canonical write.
 func relocateFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("relocate: mkdir dst dir: %w", err)
@@ -175,31 +186,61 @@ func relocateFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("relocate: read src: %w", err)
 	}
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
-		return fmt.Errorf("relocate: write dst: %w", err)
+	tmp := fmt.Sprintf("%s.tmp.%d", dst, os.Getpid())
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("relocate: write dst tmp: %w", err)
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("relocate: rename tmp into place: %w", err)
 	}
 	_ = os.Remove(src)
 	return nil
 }
 
-// listWorkspaceFiles returns "relpath (N bytes)" lines for every regular file
-// under ws (recursing one workspace/ level deep). Used to make an
+// wsListMaxDepth/wsListMaxEntries bound the timeout diagnostic so a workspace
+// that contains a git worktree (per-cycle worktrees live under the cycle dir)
+// cannot flood stderr with thousands of lines. The diagnostic only needs the
+// artifact plus one nesting level — the canonical <ws>/<file> and the
+// non-canonical <ws>/workspace/<file> are both within depth 2.
+const (
+	wsListMaxDepth   = 2
+	wsListMaxEntries = 200
+)
+
+// listWorkspaceFiles returns "relpath (N bytes)" lines for regular files under
+// ws. Directories at depth >= wsListMaxDepth are pruned (their contents are
+// not walked), and the total is capped at wsListMaxEntries; together these
+// keep a per-cycle git worktree from flooding the diagnostic. Used to make an
 // artifact-wait timeout self-diagnosing: instead of only reporting the path
 // that did NOT appear, the driver lists what the agent actually wrote so an
 // operator can see a misplaced artifact at a glance. Best-effort: a walk error
 // yields a single diagnostic line rather than failing the caller.
 func listWorkspaceFiles(ws string) []string {
 	var out []string
+	truncated := false
 	err := filepath.Walk(ws, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip unreadable entries; keep walking
 		}
-		if info.IsDir() {
-			return nil
-		}
 		rel, relErr := filepath.Rel(ws, path)
 		if relErr != nil {
 			rel = path
+		}
+		depth := 0
+		if rel != "." {
+			depth = strings.Count(rel, string(filepath.Separator))
+		}
+		if info.IsDir() {
+			if depth >= wsListMaxDepth {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if len(out) >= wsListMaxEntries {
+			truncated = true
+			return filepath.SkipAll
 		}
 		out = append(out, fmt.Sprintf("%s (%d bytes)", rel, info.Size()))
 		return nil
@@ -209,6 +250,9 @@ func listWorkspaceFiles(ws string) []string {
 	}
 	if len(out) == 0 {
 		return []string{"(workspace is empty)"}
+	}
+	if truncated {
+		out = append(out, fmt.Sprintf("(… truncated at %d entries / depth %d)", wsListMaxEntries, wsListMaxDepth))
 	}
 	return out
 }
