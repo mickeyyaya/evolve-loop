@@ -1,5 +1,5 @@
 // Tests for the tdd phase. The RED phase agent writes failing tests
-// before Builder runs. Artifact = team-context.md (the contract) +
+// before Builder runs. Artifact = test-report.md (the contract) +
 // the RED test files in the worktree.
 package tdd
 
@@ -101,7 +101,7 @@ Add rate limiter to /login
 	if resp.DurationMS != 100 {
 		t.Errorf("DurationMS=%d, want 100", resp.DurationMS)
 	}
-	if fb.gotReq.ArtifactPath != filepath.Join(ws, "team-context.md") {
+	if fb.gotReq.ArtifactPath != filepath.Join(ws, "test-report.md") {
 		t.Errorf("ArtifactPath=%q", fb.gotReq.ArtifactPath)
 	}
 	if fb.gotReq.Worktree != "/tmp/proj/wt" {

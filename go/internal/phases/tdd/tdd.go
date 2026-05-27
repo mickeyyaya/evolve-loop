@@ -27,9 +27,14 @@ import (
 
 type hooks struct{}
 
-func (hooks) PhaseName() string                           { return string(core.PhaseTDD) }
-func (hooks) AgentPromptName() string                     { return "evolve-tdd-engineer" }
-func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "team-context.md" }
+func (hooks) PhaseName() string       { return string(core.PhaseTDD) }
+func (hooks) AgentPromptName() string { return "evolve-tdd-engineer" }
+
+// test-report.md is the name the tdd-engineer agent doc + the downstream
+// build-planner/builder contract all use (5 agent docs). "team-context.md" was
+// a stale pre-rewrite name that left the bridge polling a file the agent never
+// writes — every tdd phase timed out (exit 81) despite completing its work.
+func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "test-report.md" }
 func (hooks) DefaultModel() string                        { return "auto" }
 
 // ShouldSkip delegates to the central PhasePolicy (config.Load is the sole
