@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -34,16 +35,81 @@ import (
 // runCycle implements `evolve cycle <subcommand>`. Subcommands: run.
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run)")
+		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset)")
 		return 10
 	}
 	switch args[0] {
 	case "run":
 		return runCycleRun(args[1:], stdout, stderr)
+	case "reset":
+		return runCycleReset(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve cycle: unknown subcommand %q\n", args[0])
 		return 10
 	}
+}
+
+// runCycleReset seals an unfinished cycle: it archives the workspace +
+// cycle-state snapshot + a manifest (history preserved, never deleted),
+// appends an auditable ledger entry, advances lastCycleNumber so the number
+// is never reused, and clears cycle-state.json. The complement of
+// `evolve loop --resume`. See core.SealCycle.
+func runCycleReset(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve cycle reset", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var (
+		projectRoot string
+		evolveDir   string
+		reason      string
+		dryRun      bool
+		force       bool
+	)
+	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
+	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
+	fs.StringVar(&reason, "reason", "operator-requested reset", "reason recorded in the seal manifest + ledger")
+	fs.BoolVar(&dryRun, "dry-run", false, "print the seal plan without mutating any state")
+	fs.BoolVar(&force, "force", false, "seal even if a dispatcher appears to hold the .evolve lock")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if evolveDir == "" {
+		evolveDir = filepath.Join(projectRoot, ".evolve")
+	}
+
+	// Refuse to seal under a live dispatcher — it holds the .evolve flock
+	// (LOCK_NB). Skipped for dry-run (read-only) and when --force is set.
+	if !dryRun && !force {
+		st := storage.New(evolveDir)
+		release, err := st.AcquireLock(context.Background())
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve cycle reset: .evolve appears locked by a running dispatcher (%v); stop it first or pass --force\n", err)
+			return 1
+		}
+		defer func() { _ = release() }()
+	}
+
+	res, err := core.SealCycle(context.Background(), ledger.New(evolveDir), core.SealOptions{
+		EvolveDir:   evolveDir,
+		ProjectRoot: projectRoot,
+		Reason:      reason,
+		DryRun:      dryRun,
+	})
+	if err != nil {
+		if errors.Is(err, core.ErrNothingToReset) {
+			fmt.Fprintln(stderr, "evolve cycle reset: no in-progress cycle to seal")
+			return 1
+		}
+		fmt.Fprintf(stderr, "evolve cycle reset: %v\n", err)
+		return 1
+	}
+
+	verb := "sealed"
+	if res.DryRun {
+		verb = "would seal"
+	}
+	fmt.Fprintf(stdout, "%s cycle %d (phase=%s) → %s; next cycle %d\n",
+		verb, res.SealedCycleID, res.SealedPhase, res.ArchiveDir, res.NextCycle)
+	return 0
 }
 
 func runCycleRun(args []string, stdout, stderr io.Writer) int {
