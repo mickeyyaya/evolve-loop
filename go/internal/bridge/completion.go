@@ -3,7 +3,12 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
 // completion.go — the phase-completion Strategy (ADR-0027). runTmuxREPL used
@@ -52,9 +57,96 @@ func newCompletionDetector(mode string, cfg *Config, deps Deps, lp tmuxLaunch) c
 	switch mode {
 	case "stdout":
 		return &stdoutDetector{cfg: cfg, deps: deps, lp: lp, threshold: stdoutIdlePolls}
+	case "git":
+		return newGitEvidenceDetector(cfg, deps)
 	default:
 		return &artifactDetector{cfg: cfg}
 	}
+}
+
+// gitEvidenceDetector implements the ADR-0027 git-evidence contract: completion
+// = the worktree HEAD advanced to a NEW commit carrying an Evolve-Phase trailer
+// for this phase AND the cycle's challenge token. HEAD-advance alone is
+// insufficient (a stray/unrelated commit must not false-complete), so the
+// trailer is verified; an advance without a matching trailer just re-baselines
+// and keeps watching. gitCmd is a seam (default shells `git -C <worktree>` via
+// deps.Runner) so the detector is unit-testable without a real repo.
+type gitEvidenceDetector struct {
+	phase       string
+	expectedTok string
+	gitCmd      func(ctx context.Context, args ...string) (string, error)
+
+	baseline     string
+	haveBaseline bool
+}
+
+func newGitEvidenceDetector(cfg *Config, deps Deps) *gitEvidenceDetector {
+	tok := ""
+	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "challenge-token.txt")); err == nil {
+		tok = strings.TrimSpace(string(b))
+	}
+	if tok == "" && deps.Stderr != nil {
+		// Fail-closed: an empty token makes Verify always false, so the detector
+		// would wait forever. Surface it loudly rather than hang silently — the
+		// prompt template likely omitted $CHALLENGE_TOKEN.
+		fmt.Fprintf(deps.Stderr, "[git-evidence] WARN: challenge-token.txt missing/empty in %s — completion will never verify\n", cfg.Workspace)
+	}
+	worktree := cfg.Worktree
+	return &gitEvidenceDetector{
+		phase:       cfg.Agent,
+		expectedTok: tok,
+		gitCmd: func(ctx context.Context, args ...string) (string, error) {
+			var out strings.Builder
+			full := append([]string{"-C", worktree}, args...)
+			_, err := deps.Runner(ctx, "git", full, driverEnv(deps), nil, &out, io.Discard)
+			return strings.TrimSpace(out.String()), err
+		},
+	}
+}
+
+func (d *gitEvidenceDetector) poll(ctx context.Context) (bool, completionEvidence, string, error) {
+	head, err := d.gitCmd(ctx, "rev-parse", "HEAD")
+	if err != nil || head == "" {
+		// Worktree not ready or git error: keep waiting (reviewer bounds a hang).
+		return false, completionEvidence{}, "", nil
+	}
+	if !d.haveBaseline {
+		d.baseline, d.haveBaseline = head, true
+		return false, completionEvidence{}, "", nil
+	}
+	if head == d.baseline {
+		return false, completionEvidence{}, "", nil // HEAD not advanced yet
+	}
+	// HEAD advanced — scan EVERY new commit in baseline..HEAD, not just the tip.
+	// Two commits can land between polls (e.g. the phase evidence commit then an
+	// orchestrator commit); inspecting only HEAD would re-baseline past the
+	// evidence commit and wait forever. rev-list lists newest-first; any
+	// verifying commit in the range completes.
+	revList, err := d.gitCmd(ctx, "rev-list", d.baseline+"..HEAD")
+	if err != nil {
+		return false, completionEvidence{}, "", nil
+	}
+	for _, sha := range strings.Fields(revList) {
+		msg, err := d.gitCmd(ctx, "log", "-1", "--format=%B", sha)
+		if err != nil {
+			continue
+		}
+		if evidence.Parse(msg).Verify(d.phase, d.expectedTok) {
+			return true, completionEvidence{CommitSHA: sha},
+				fmt.Sprintf("git-evidence: %s commit %s verified", d.phase, shortSHA(sha)), nil
+		}
+	}
+	// No verifying commit in the new range (only stray commits): re-baseline to
+	// HEAD and keep watching rather than false-completing.
+	d.baseline = head
+	return false, completionEvidence{}, "", nil
+}
+
+func shortSHA(s string) string {
+	if len(s) > 8 {
+		return s[:8]
+	}
+	return s
 }
 
 // artifactDetector is the legacy contract: completion = a non-empty file at
