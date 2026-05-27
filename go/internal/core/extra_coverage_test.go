@@ -211,13 +211,13 @@ func TestDecideAfterRetro(t *testing.T) {
 	}
 }
 
-// --- router_proposer pure functions ----------------------------------------
+// --- phase_advisor pure functions ----------------------------------------
 
-// TestRoutingProposerOptions covers WithProposerCLI/WithProposerModel (both the
-// override and the empty-ignored guard) and the NewRoutingProposer opts loop.
-func TestRoutingProposerOptions(t *testing.T) {
+// TestPhaseAdvisorOptions covers WithProposerCLI/WithProposerModel (both the
+// override and the empty-ignored guard) and the NewPhaseAdvisor opts loop.
+func TestPhaseAdvisorOptions(t *testing.T) {
 	t.Parallel()
-	p := NewRoutingProposer(nil, WithProposerCLI("codex-tmux"), WithProposerModel("opus"))
+	p := NewPhaseAdvisor(nil, WithProposerCLI("codex-tmux"), WithProposerModel("opus"))
 	if p.cli != "codex-tmux" {
 		t.Errorf("cli = %q, want codex-tmux", p.cli)
 	}
@@ -225,7 +225,7 @@ func TestRoutingProposerOptions(t *testing.T) {
 		t.Errorf("model = %q, want opus", p.model)
 	}
 	// Empty values must NOT override the defaults.
-	d := NewRoutingProposer(nil, WithProposerCLI(""), WithProposerModel(""))
+	d := NewPhaseAdvisor(nil, WithProposerCLI(""), WithProposerModel(""))
 	if d.cli != "claude-tmux" || d.model != "haiku" {
 		t.Errorf("empty opts overrode defaults: cli=%q model=%q", d.cli, d.model)
 	}

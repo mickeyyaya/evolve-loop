@@ -11,7 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// RoutingProposer is the bridge-backed router.Proposer (the DynamicLLM brain).
+// PhaseAdvisor is the bridge-backed router.Proposer (the DynamicLLM brain).
 // It asks an LLM, via the existing core.Bridge port, which optional phases to
 // insert/skip next given the objective digest. Its output is ADVISORY: the pure
 // router.Route() clamp pass re-validates it against the kernel floor (mandatory
@@ -19,19 +19,19 @@ import (
 // proposal can never weaken the ship guarantee. Any failure is returned as an
 // error and LLMProposal.Decide degrades cleanly to the deterministic
 // StaticPreset — "model proposes, kernel disposes", fail-safe to the floor.
-type RoutingProposer struct {
+type PhaseAdvisor struct {
 	bridge  Bridge
 	cli     string
 	model   string
 	profile string // when non-empty, used verbatim; else derived from RouteInput.ProjectRoot
 }
 
-// RoutingProposerOption customizes a RoutingProposer.
-type RoutingProposerOption func(*RoutingProposer)
+// PhaseAdvisorOption customizes a PhaseAdvisor.
+type PhaseAdvisorOption func(*PhaseAdvisor)
 
 // WithProposerCLI overrides the CLI the proposer dispatches to.
-func WithProposerCLI(cli string) RoutingProposerOption {
-	return func(p *RoutingProposer) {
+func WithProposerCLI(cli string) PhaseAdvisorOption {
+	return func(p *PhaseAdvisor) {
 		if cli != "" {
 			p.cli = cli
 		}
@@ -39,19 +39,19 @@ func WithProposerCLI(cli string) RoutingProposerOption {
 }
 
 // WithProposerModel overrides the model tier the proposer requests.
-func WithProposerModel(model string) RoutingProposerOption {
-	return func(p *RoutingProposer) {
+func WithProposerModel(model string) PhaseAdvisorOption {
+	return func(p *PhaseAdvisor) {
 		if model != "" {
 			p.model = model
 		}
 	}
 }
 
-// NewRoutingProposer builds a proposer over the given bridge. Defaults to a
+// NewPhaseAdvisor builds a proposer over the given bridge. Defaults to a
 // fast/cheap model on the tmux Claude driver — routing is a lightweight
 // read-only judgment, not heavy generation.
-func NewRoutingProposer(bridge Bridge, opts ...RoutingProposerOption) *RoutingProposer {
-	p := &RoutingProposer{bridge: bridge, cli: "claude-tmux", model: "haiku"}
+func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
+	p := &PhaseAdvisor{bridge: bridge, cli: "claude-tmux", model: "haiku"}
 	for _, o := range opts {
 		o(p)
 	}
@@ -59,7 +59,7 @@ func NewRoutingProposer(bridge Bridge, opts ...RoutingProposerOption) *RoutingPr
 }
 
 // Propose implements router.Proposer.
-func (p *RoutingProposer) Propose(in router.RouteInput) (*router.Proposal, error) {
+func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 	if p.bridge == nil {
 		return nil, fmt.Errorf("routing proposer: nil bridge")
 	}
@@ -177,5 +177,5 @@ func parseProposal(stdout string) (*router.Proposal, error) {
 	return &prop, nil
 }
 
-// compile-time assertion that RoutingProposer satisfies the router port.
-var _ router.Proposer = (*RoutingProposer)(nil)
+// compile-time assertion that PhaseAdvisor satisfies the router port.
+var _ router.Proposer = (*PhaseAdvisor)(nil)

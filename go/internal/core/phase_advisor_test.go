@@ -39,9 +39,9 @@ func baseRouteInput() router.RouteInput {
 	}
 }
 
-func TestRoutingProposer_ParsesValidJSON(t *testing.T) {
+func TestPhaseAdvisor_ParsesValidJSON(t *testing.T) {
 	fb := &fakeBridge{stdout: `{"next_phase":"tester","insert_phases":["tester"],"justification":"acs red"}`}
-	p := NewRoutingProposer(fb)
+	p := NewPhaseAdvisor(fb)
 	prop, err := p.Propose(baseRouteInput())
 	if err != nil {
 		t.Fatalf("Propose: %v", err)
@@ -61,9 +61,9 @@ func TestRoutingProposer_ParsesValidJSON(t *testing.T) {
 	}
 }
 
-func TestRoutingProposer_TolerantOfFenceAndProse(t *testing.T) {
+func TestPhaseAdvisor_TolerantOfFenceAndProse(t *testing.T) {
 	fb := &fakeBridge{stdout: "Here is my routing call:\n```json\n{\"next_phase\":\"audit\",\"justification\":\"done\"}\n```\nThanks!"}
-	prop, err := NewRoutingProposer(fb).Propose(baseRouteInput())
+	prop, err := NewPhaseAdvisor(fb).Propose(baseRouteInput())
 	if err != nil {
 		t.Fatalf("Propose: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestRoutingProposer_TolerantOfFenceAndProse(t *testing.T) {
 	}
 }
 
-func TestRoutingProposer_FailSafe(t *testing.T) {
+func TestPhaseAdvisor_FailSafe(t *testing.T) {
 	cases := []struct {
 		name string
 		fb   *fakeBridge
@@ -83,17 +83,17 @@ func TestRoutingProposer_FailSafe(t *testing.T) {
 		{"empty proposal", &fakeBridge{stdout: `{"justification":"nothing"}`}, baseRouteInput()},
 	}
 	for _, c := range cases {
-		if _, err := NewRoutingProposer(c.fb).Propose(c.in); err == nil {
+		if _, err := NewPhaseAdvisor(c.fb).Propose(c.in); err == nil {
 			t.Errorf("%s: want error (so LLMProposal degrades to static), got nil", c.name)
 		}
 	}
 	// nil bridge + empty workspace also error without panicking.
-	if _, err := NewRoutingProposer(nil).Propose(baseRouteInput()); err == nil {
+	if _, err := NewPhaseAdvisor(nil).Propose(baseRouteInput()); err == nil {
 		t.Error("nil bridge: want error")
 	}
 	noWs := baseRouteInput()
 	noWs.Workspace = ""
-	if _, err := NewRoutingProposer(&fakeBridge{stdout: "{}"}).Propose(noWs); err == nil {
+	if _, err := NewPhaseAdvisor(&fakeBridge{stdout: "{}"}).Propose(noWs); err == nil {
 		t.Error("empty workspace: want error")
 	}
 }
@@ -101,9 +101,9 @@ func TestRoutingProposer_FailSafe(t *testing.T) {
 // Integration: LLMProposal defers to the proposer, but router.Route CLAMPS an
 // illegal proposal to the kernel's legal next — proving "model proposes, kernel
 // disposes". Proposer says ship (illegal from build); kernel forces audit.
-func TestRoutingProposer_ProposalIsClampedByKernel(t *testing.T) {
+func TestPhaseAdvisor_ProposalIsClampedByKernel(t *testing.T) {
 	fb := &fakeBridge{stdout: `{"next_phase":"ship","justification":"skip audit"}`}
-	strat := router.LLMProposal{Proposer: NewRoutingProposer(fb)}
+	strat := router.LLMProposal{Proposer: NewPhaseAdvisor(fb)}
 
 	in := baseRouteInput()
 	in.Cfg = config.RoutingConfig{
