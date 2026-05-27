@@ -1,10 +1,20 @@
 # ADR-0024: Conditional ship-gate floor + PhaseAdvisor
 
-> Status: **Proposed** (2026-05-27). Replaces the fixed `mandatory_spine` routing model (ADR-era
-> dynamic-routing, PR #4) with a *minimal conditional floor* + an LLM **PhaseAdvisor** that justifies
-> each phase's inclusion. Motivated by the first live `advisory`+`llm` cycle (cycle-108) — see
-> `knowledge-base/research/cycle-108-routing-live-data.md`. Builds on the dynamic-routing kernel
-> (`go/internal/router`, `core.RoutingProposer`) already on `main` (c9302d7).
+> Status: **Accepted — partially implemented** (2026-05-27). Replaces the fixed `mandatory_spine`
+> routing model (ADR-era dynamic-routing, PR #4) with a *minimal conditional floor* + an LLM
+> **PhaseAdvisor** that justifies each phase's inclusion. Motivated by the first live `advisory`+`llm`
+> cycle (cycle-108) — see `knowledge-base/research/cycle-108-routing-live-data.md`. Builds on the
+> dynamic-routing kernel (`go/internal/router`, `core.PhaseAdvisor`) already on `main`.
+>
+> **Implementation status:** foundational slices (digest widening, PhaseAdvisor rename, `phase-plan.json`
+> array shape) landed PR #14; the pure conditional floor `ClampPlanToFloor` landed dormant PR #15; the
+> **live-wiring (this PR-5)** activates it — the orchestrator computes the upfront plan, clamps it, and
+> drives non-mandatory run/skip at `Stage >= Advisory` (`enforceNext` widened Enforce→Advisory). The
+> floor (`ship ⇒ build ∧ audit ∧ tdd`) is decoupled from the *configurable* `EVOLVE_MANDATORY_PHASES`
+> set, so the operator's "only tdd mandatory" intent is safe. **Remaining:** §2 hybrid cadence
+> (per-transition `Propose` reduced to branch transitions — today both the upfront plan *and*
+> per-transition `Propose` run at Advisory), §6 `clamp_reason` forensics + Tier A/B registry rollout,
+> and an early-exit state-machine edge (`scout → end`) so no-ship cycles can end early end-to-end.
 
 ## Context
 

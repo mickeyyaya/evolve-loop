@@ -272,11 +272,22 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
 	// routing_mode=llm; otherwise it falls back to the deterministic
 	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
-	strategy := router.Select(cfg, core.NewPhaseAdvisor(br))
+	advisor := core.NewPhaseAdvisor(br)
+	strategy := router.Select(cfg, advisor)
+	// The same advisor also produces the upfront whole-cycle plan the integrity
+	// floor clamps (ADR-0024 §2). Wire it unconditionally: the orchestrator is the
+	// single gate — it consults the planner only at Stage>=Advisory AND
+	// Mode==DynamicLLM, so in static mode or below Advisory it is never called
+	// (no LLM cost), and the kernel falls back to the configurable spine.
+	opts := []core.Option{
+		core.WithRouting(cfg, strategy),
+		core.WithCatalog(catalog),
+		core.WithPlanner(advisor),
+	}
 
 	return orchDeps{
 		Storage:      st,
 		Ledger:       ld,
-		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithRouting(cfg, strategy), core.WithCatalog(catalog)),
+		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 	}
 }

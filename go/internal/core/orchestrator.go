@@ -79,6 +79,13 @@ type Orchestrator struct {
 	cfg      config.RoutingConfig
 	strategy router.RoutingStrategy
 
+	// planner produces the upfront whole-cycle plan (ADR-0024 §2). Optional:
+	// nil ⇒ no advisor plan ⇒ the kernel floor falls back to the configurable
+	// never-skip spine (fail-safe to static). Consulted once at cycle start,
+	// only at Stage>=Advisory; its output is clamped to the integrity floor
+	// before being threaded into every routing decision.
+	planner router.Planner
+
 	// catalog is the merged phase catalog (built-in + user overlays). It lets
 	// the orchestrator accept and run user-defined phases on the dynamic-routing
 	// path WITHOUT hardcoding them in the Phase enum / state machine. Empty (the
@@ -99,6 +106,18 @@ func WithRouting(cfg config.RoutingConfig, strategy router.RoutingStrategy) Opti
 		o.cfg = cfg
 		if strategy != nil {
 			o.strategy = strategy
+		}
+	}
+}
+
+// WithPlanner injects the whole-cycle phase planner (ADR-0024 §2 hybrid
+// cadence). A nil planner is ignored so the no-plan default stands; the
+// orchestrator consults it only at Stage>=Advisory and always clamps its
+// output to the integrity floor — "model proposes, kernel disposes".
+func WithPlanner(p router.Planner) Option {
+	return func(o *Orchestrator) {
+		if p != nil {
+			o.planner = p
 		}
 	}
 }
@@ -279,6 +298,44 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// Capture HEAD before any phase so finalizeOutcome can detect mid-cycle commits.
 	preCycleHEAD, _ := o.gitHEAD()
 
+	// Upfront whole-cycle plan (ADR-0024 §2). At Stage>=Advisory with a planner,
+	// ask the advisor once which phases to run, CLAMP the answer to the integrity
+	// floor (ship⇒build∧audit∧tdd), persist it, and thread the clamped plan into
+	// every routing decision below. The clamp is the non-bypassable kernel floor:
+	// it can only COMPLETE the ship-chain, never weaken it, so a hallucinated or
+	// adversarial plan cannot reach ship without a real build+audit. Any
+	// failure leaves clampedPlan nil ⇒ routing falls back to the configurable
+	// never-skip spine (fail-safe to static). Below Advisory, no plan is computed.
+	// This is the SINGLE gate for the upfront plan: Stage>=Advisory (the advisor
+	// drives) AND Mode==DynamicLLM (static mode makes no LLM calls) AND a planner
+	// is wired. The composition root passes WithPlanner unconditionally; the
+	// Mode check lives here so the invariant ("LLM plan iff DynamicLLM+Advisory")
+	// has one source of truth rather than two gates that could drift.
+	var clampedPlan *router.PhasePlan
+	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
+		planIn := router.RouteInput{
+			Current:         string(PhaseStart),
+			Signals:         router.RoutingSignals{}, // no handoffs exist yet at cycle start
+			Cfg:             o.cfg,
+			BudgetRemaining: req.Budget.MaxUSD,
+			Now:             o.now(),
+			Workspace:       cs.WorkspacePath,
+			ProjectRoot:     req.ProjectRoot,
+			Cycle:           cycle,
+			Env:             envSnap,
+		}
+		// ClampPlanToFloor's tddPinned reads planIn.Signals, empty here (no
+		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
+		// the conservative (more-mandatory) side at plan time.
+		if raw, perr := o.planner.Plan(planIn); perr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
+		} else if raw != nil {
+			var clamps []router.Clamp
+			clampedPlan, clamps = router.ClampPlanToFloor(planIn, raw)
+			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
+		}
+	}
+
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
 	current := PhaseStart
 	lastVerdict := VerdictPASS
@@ -317,12 +374,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// default — leaves the static state machine fully in control: no
 		// digest, no ledger entry, byte-identical to legacy. When enabled,
 		// digest the completed handoffs, ask the Strategy for a decision,
-		// record it forensically, and — only in Enforce — let the clamped
+		// record it forensically, and — at Advisory and above — let the clamped
 		// decision override the static successor, re-validated against the
 		// legality oracle (CanTransition) AND the artifact-backed spine gate
 		// (SpineSatisfiedUpTo). Retro keeps its failure-adapter shim
-		// (decideAfterRetro) while routing is bedded in, so enforce never
-		// overrides the retro branch.
+		// (decideAfterRetro) while routing is bedded in, so routing never
+		// overrides the retro branch. The configurable mandatory set
+		// (cfg.Mandatory) decides which phases are never-skip; the integrity
+		// floor (ClampPlanToFloor, applied to the upfront plan) decides what ship
+		// still requires regardless of how small the operator makes that set.
 		if o.cfg.Stage != config.StageOff {
 			routingSeq++
 			signals, _ := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
@@ -341,8 +401,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				ProjectRoot: req.ProjectRoot,
 				Cycle:       cycle,
 				Env:         envSnap,
+				// Clamped whole-cycle plan (Stage>=Advisory). nil below Advisory
+				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
+				Plan: clampedPlan,
 			})
-			if o.cfg.Stage >= config.StageEnforce && current != PhaseRetro {
+			if o.cfg.Stage >= config.StageAdvisory && current != PhaseRetro {
 				if forced, ok := o.enforceNext(current, next, signals, dec); ok {
 					next = forced
 				}
@@ -524,6 +587,41 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
 		}
+	}
+}
+
+// recordPhasePlan persists the advisor's CLAMPED whole-cycle plan to
+// <workspace>/phase-plan.json (a bare PhasePlanEntry array, symmetric with the
+// advisor's wire format) and appends a hash-bound phase_plan ledger entry. Any
+// integrity-floor clamps that fired are logged for operator visibility (rich
+// per-clamp forensics land in a later slice). Best-effort: a marshal/write/
+// append failure WARNs and is swallowed — plan forensics must never abort a
+// cycle. Called once per cycle, only at Stage>=Advisory with a non-nil plan.
+func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp) {
+	ts := o.now().UTC().Format(time.RFC3339)
+	artifactPath := filepath.Join(cs.WorkspacePath, "phase-plan.json")
+	sha := ""
+	if buf, err := json.MarshalIndent(plan.Entries, "", "  "); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan marshal: %v\n", err)
+		artifactPath = ""
+	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan mkdir: %v\n", err)
+		artifactPath = ""
+	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan write: %v\n", err)
+		artifactPath = ""
+	} else {
+		sum := sha256.Sum256(buf)
+		sha = hex.EncodeToString(sum[:])
+	}
+	for _, c := range clamps {
+		fmt.Fprintf(os.Stderr, "[orchestrator] integrity-floor clamp: %s (%s → %s)\n", c.Rule, c.Proposed, c.Forced)
+	}
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "phase_plan",
+		ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_plan ledger append: %v\n", err)
 	}
 }
 

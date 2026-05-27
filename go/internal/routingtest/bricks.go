@@ -166,6 +166,30 @@ func AgentError(atPhase string) Brick {
 	}
 }
 
+// PlanRun is one whole-cycle plan entry asserting a phase RUNS.
+func PlanRun(phase string) router.PhasePlanEntry {
+	return router.PhasePlanEntry{Phase: phase, Run: true, Justification: "scripted: run " + phase}
+}
+
+// PlanSkip is one whole-cycle plan entry asserting a phase is SKIPPED.
+func PlanSkip(phase string) router.PhasePlanEntry {
+	return router.PhasePlanEntry{Phase: phase, Run: false, Justification: "scripted: skip " + phase}
+}
+
+// AgentPlan scripts the advisor's UNCLAMPED upfront whole-cycle plan (ADR-0024
+// §2). The engine clamps it to the integrity floor before threading — exactly
+// as the orchestrator does — so a plan that reaches ship without build/audit is
+// COMPLETED by the floor, never left weakened.
+func AgentPlan(entries ...router.PhasePlanEntry) Brick {
+	return func(s *ScenarioSpec) { s.Agent.Plan = entries }
+}
+
+// AgentPlanError forces the planner to fail (exercises degrade-to-static-spine:
+// nil plan ⇒ the configurable never-skip spine drives, unchanged).
+func AgentPlanError() Brick {
+	return func(s *ScenarioSpec) { s.Agent.PlanError = true }
+}
+
 // --- expectations ---
 
 func ExpectNext(p string) Brick       { return func(s *ScenarioSpec) { s.Expect.NextPhase = p } }

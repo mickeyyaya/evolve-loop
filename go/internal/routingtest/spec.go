@@ -91,13 +91,23 @@ type SignalSpec struct {
 
 // AgentSpec is the simulated LLM router brain: a scripted proposal per
 // just-completed phase, or a forced error (to exercise degrade-to-static).
+// Plan scripts the upfront whole-cycle plan (ADR-0024 §2) the integrity floor
+// clamps; PlanError forces the planner to fail (degrade-to-static-spine path).
 type AgentSpec struct {
 	Proposals map[string]*router.Proposal // RouteInput.Current → proposal
 	ErrorsOn  map[string]bool             // RouteInput.Current → return error
+	Plan      []router.PhasePlanEntry     // upfront whole-cycle run/skip plan
+	PlanError bool                        // planner returns an error (fail-safe path)
 }
 
 // active reports whether a real agent is configured (⇒ LLMProposal strategy).
-func (a AgentSpec) active() bool { return len(a.Proposals) > 0 || len(a.ErrorsOn) > 0 }
+func (a AgentSpec) active() bool {
+	return len(a.Proposals) > 0 || len(a.ErrorsOn) > 0 || len(a.Plan) > 0 || a.PlanError
+}
+
+// hasPlan reports whether an upfront plan (or a forced plan error) is scripted —
+// i.e. whether the Planner path should be exercised.
+func (a AgentSpec) hasPlan() bool { return len(a.Plan) > 0 || a.PlanError }
 
 // FailedRecordSpec seeds one state.failedApproaches entry (the retro arc input).
 // RecordedAt is set non-expired by the engine.

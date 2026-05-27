@@ -33,10 +33,19 @@ This is **"model proposes, kernel disposes":** the LLM brain only ever produces 
 |---|---|---|---|
 | Off | `off` / `0` (default) | Static state machine | Legacy; byte-identical to pre-routing |
 | Shadow | `shadow` | Static; router computes + logs only | Soak: diff the would-have-routed plan vs static, zero behavior change |
-| Advisory | `advisory` | Router drives the **optional** surface; mandatory spine stays static | First live tier (cycle-108) |
-| Enforce | `enforce` | Router drives, kernel-clamped to the floor | Full routing |
+| Advisory | `advisory` | **Advisor drives** every non-mandatory phase via the clamped whole-cycle plan; `enforceNext` overrides the static successor | First live tier (cycle-108) |
+| Enforce | `enforce` | Same as Advisory (advisor drives, kernel-clamped) | Full routing |
 
 An unknown value resolves to `Off` and emits an `unknown-value` warning (never a hard error — typos must not break autonomy).
+
+**ADR-0024 §1 floor activation (PR-5, live as of this slice).** At `Stage >= Advisory` the orchestrator computes the advisor's whole-cycle plan once at cycle start, clamps it with `router.ClampPlanToFloor`, and threads the clamped plan into every `Route()` so it drives run/skip for non-mandatory phases. Two separate guarantees, deliberately decoupled:
+
+- **Configurable never-skip set** — `EVOLVE_MANDATORY_PHASES` (default `scout,build,audit,ship`). `shouldRun`'s mandatory branch runs first, so the advisor can never skip a mandatory phase.
+- **Non-configurable integrity floor** — `ship ⇒ build ∧ audit ∧ (tdd unless trivial)`, forced *into the plan* before it is threaded. This is what makes a tiny mandatory set safe: an operator may set `EVOLVE_MANDATORY_PHASES=tdd` and the advisor still cannot reach ship without a real build+audit, because `ClampPlanToFloor` re-adds them to the plan.
+
+A planner failure (or `routing_mode=static`, which has no advisor) ⇒ nil plan ⇒ the configurable spine drives via the trigger path (**fail-safe to static**). The `enforceNext` override stays re-validated by `CanTransition` + the artifact-backed `SpineSatisfiedUpTo`, and the ship phase's audit-binding remains the ultimate gate — three layers, the floor never the sole one.
+
+> **Known limit (cost, not safety):** a no-ship cycle ending early (`scout → end`) is honored by the pure kernel but NOT yet end-to-end — `CanTransition` has no `scout → end` edge, so `enforceNext` declines it and the static spine runs to completion. Widening the state-machine graph for early-exit is a follow-up; it cannot weaken ship-safety.
 
 ## Routing modes (the brain)
 
