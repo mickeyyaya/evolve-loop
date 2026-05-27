@@ -21,6 +21,11 @@ node_modules/
 # touches the project. Symlinks into ~/.gemini/config/projects/<UUID>.json.
 .antigravitycli/
 
+# Commit-gate review attestation (per-project runtime state). Written by the
+# /commit skill's runner (commit-gate/commit-gate-runner.sh) and verified by the
+# commit-gate PreToolUse hook. Never committed — it binds to the local tree SHA.
+.commit-gate/
+
 # Evolve Loop runtime state (generated per-project, not part of the plugin)
 # Ignore every direct child of .evolve/ ...
 # v8.21.0+: per-cycle git worktrees live at .evolve/worktrees/cycle-N — also

@@ -426,7 +426,9 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "ci change",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		// Bypass commit-gate: this test exercises the manual auto-confirm ship
+		// mechanics, not the review-attestation gate (covered in commitgate_test.go).
+		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1", "EVOLVE_BYPASS_COMMIT_GATE": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -646,7 +648,9 @@ func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "manual: ad-hoc fix",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		// Bypass commit-gate: this test asserts lastCycleNumber semantics, not
+		// the review-attestation gate (covered in commitgate_test.go).
+		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1", "EVOLVE_BYPASS_COMMIT_GATE": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
