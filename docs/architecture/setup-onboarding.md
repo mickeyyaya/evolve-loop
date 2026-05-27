@@ -25,7 +25,9 @@ The deterministic core lives in `evolve setup` (Go); the interactive recommendat
 | `evolve setup validate [--config P] [--strict] [--json] [--evolve-dir DIR]` | 0 OK · 2 error-violation · 1 IO/parse · 10 bad args | Clamps a config against the floor |
 | `evolve setup complete [--evolve-dir DIR]` | 0 · 1 IO | Stamps `state.setupCompletedAt` + `setupVersion` (lossless) |
 
-Roots resolve from `EVOLVE_PROJECT_ROOT` / `EVOLVE_PLUGIN_ROOT` (or cwd), `--evolve-dir` override; adapters from `<plugin>/adapters`.
+Project root resolves `--project-root` > `EVOLVE_PROJECT_ROOT` > cwd; `--evolve-dir` overrides `.evolve/`; plugin root from `EVOLVE_PLUGIN_ROOT` (or project); adapters from `<plugin>/adapters`.
+
+> **Root-parity note.** `evolve loop` resolves its root from `--project-root` (default cwd) and does **not** read `EVOLVE_PROJECT_ROOT`. So `setup complete`'s marker only silences the loop's first-run nudge when both resolve to the same `.evolve/`. In normal use they agree (the dispatcher runs both from the project, or passes `--project-root` to both). When invoking explicitly, pass the **same** `--project-root` to `evolve setup complete` and `evolve loop`.
 
 ## Detect digest
 
@@ -37,7 +39,8 @@ Roots resolve from `EVOLVE_PROJECT_ROOT` / `EVOLVE_PLUGIN_ROOT` (or cwd), `--evo
   "clis": [
     { "cli": "claude", "binary_present": true, "auth_configured": true,
       "auth_mode": "SUBSCRIPTION_OAUTH", "subscription_type": "",
-      "capability_tier": "full", "verdict": "ready", "env_warnings": [] }
+      "capability_tier": "full", "verdict": "ready", "env_warnings": [],
+      "tier_models": { "fast": "haiku", "balanced": "sonnet", "deep": "opus" } }
   ],
   "phases": [
     { "role": "builder", "current_cli": "claude", "current_model": "sonnet",
@@ -52,6 +55,9 @@ Roots resolve from `EVOLVE_PROJECT_ROOT` / `EVOLVE_PLUGIN_ROOT` (or cwd), `--evo
 - **CLIs** are grouped by base family (claude/codex/gemini/agy); `bridge.Doctor`'s `-tmux`/`-p` driver rows collapse to one row per family.
 - **auth_mode** (claude): `CUSTOM_PROXY` (base-url set) > `API_KEY` (api-key set) > `SUBSCRIPTION_OAUTH` (creds file) > `MISCONFIGURED`. Other CLIs: `SUBSCRIPTION` if configured, else `MISCONFIGURED`.
 - **capability_tier**: `full` (budget + permission native), `delegated` (delegates to claude / kernel hooks), `n/a` (no binary). The precise 5-dimension quality tier is available via `./bin/check-caps`.
+- **tier_models**: each abstract tier → that CLI's NATIVE model, sourced from the bridge manifest `tier_aliases` (single source of truth): `agy` → `gemini-3.5-flash` (all tiers; no model selector), `codex` → `gpt-5.4-mini`/`gpt-5.4`/`gpt-5.5`, `claude` → `haiku`/`sonnet`/`opus`. `/setup` writes these into `llm_config.model` so the config is self-documenting.
+
+> **Resolution nuance (footgun).** `resolvellm` reads `cli`/`model`/`model_tier` and **ignores the `tier` field** — `model` is what flows to dispatch (the realizer maps it per-CLI via `tier_aliases`, so `model:"sonnet"` on codex still resolves to `gpt-5.4`). The `tier` field is consumed only by `validate` (envelope) + the digest. Keep `tier` and `model` consistent (the skill derives `model` from `tier_models[tier]`), or `model` silently wins over a disagreeing `tier`.
 - **phases** cover the 12 configurable roles, each resolved by `resolvellm.Resolve` (precedence: `llm_config.phases` > `_fallback` > profile).
 
 ## Validation rules

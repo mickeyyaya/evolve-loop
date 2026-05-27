@@ -1,28 +1,28 @@
 {
   "_comment": "evolve-loop LLM router config — copy to .evolve/llm_config.json and edit, or generate it interactively with /setup.",
   "_comment2": "When absent, all phases use profile.cli (default: claude). schema_version 2: per-phase { provider, cli, tier, model }.",
-  "_comment3": "tier ∈ fast|balanced|deep; model is an alias (haiku|sonnet|opus) or an exact id. cli ∈ claude|gemini|codex|agy.",
+  "_comment3": "tier ∈ fast|balanced|deep (the envelope axis). model is the CLI's NATIVE model — claude: haiku|sonnet|opus; agy(Gemini): gemini-3.5-flash; codex(GPT): gpt-5.4-mini|gpt-5.4|gpt-5.5. `evolve setup detect` prints each CLI's tier→model map.",
   "schema_version": 2,
 
   "phases": {
-    "_comment": "Per-phase overrides keyed by role. Each tier must sit within the role's profile model_tier_envelope; `evolve setup validate` enforces this.",
+    "_comment": "Per-phase overrides keyed by role. tier must sit within the role's profile model_tier_envelope (`evolve setup validate` enforces this); model is the native model that CLI runs.",
 
     "scout": { "provider": "anthropic", "cli": "claude", "tier": "balanced", "model": "sonnet" },
 
     "builder": {
-      "_comment": "Adversarial integrity: prefer a DIFFERENT model family for builder vs auditor when you have ≥2 authed CLIs (e.g. builder=agy/Google, auditor=codex/OpenAI).",
-      "provider": "anthropic",
-      "cli": "claude",
+      "_comment": "Cross-family integrity: builder on a DIFFERENT vendor than the auditor. agy is Gemini-backed; its only model is gemini-3.5-flash (no model selector).",
+      "provider": "google",
+      "cli": "agy",
       "tier": "balanced",
-      "model": "sonnet"
+      "model": "gemini-3.5-flash"
     },
 
     "auditor": {
-      "_comment": "Deep tier for adversarial review. Use an exact model id instead of an alias if you want to pin a version.",
-      "provider": "anthropic",
-      "cli": "claude",
+      "_comment": "Adversarial judge on OpenAI (cross-family with builder=Google). codex tiers: fast=gpt-5.4-mini, balanced=gpt-5.4, deep=gpt-5.5.",
+      "provider": "openai",
+      "cli": "codex",
       "tier": "deep",
-      "model": "opus"
+      "model": "gpt-5.5"
     },
 
     "triage": { "provider": "anthropic", "cli": "claude", "tier": "fast", "model": "haiku" }

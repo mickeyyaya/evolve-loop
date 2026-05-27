@@ -39,10 +39,16 @@ func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// setupRoots resolves project/plugin/evolve/adapters dirs from env + cwd,
-// matching the convention used across the cmd package.
-func setupRoots(evolveDirFlag string) (project, plugin, evolveDir, adapters string) {
-	project = os.Getenv("EVOLVE_PROJECT_ROOT")
+// setupRoots resolves project/plugin/evolve/adapters dirs. Precedence for the
+// project root: --project-root flag > EVOLVE_PROJECT_ROOT > cwd. The flag gives
+// parity with `evolve loop` (which resolves from --project-root, default cwd)
+// so the dispatcher can pass the SAME root to both — guaranteeing `setup
+// complete`'s marker lands in the .evolve the loop nudge reads.
+func setupRoots(projectRootFlag, evolveDirFlag string) (project, plugin, evolveDir, adapters string) {
+	project = projectRootFlag
+	if project == "" {
+		project = os.Getenv("EVOLVE_PROJECT_ROOT")
+	}
 	if project == "" {
 		project, _ = os.Getwd()
 	}
@@ -62,13 +68,14 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve setup detect", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var asJSON bool
-	var evolveDirFlag string
+	var evolveDirFlag, projectRootFlag string
 	fs.BoolVar(&asJSON, "json", false, "emit the digest as JSON (default human table)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
+	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return 10
 	}
-	project, plugin, evolveDir, adapters := setupRoots(evolveDirFlag)
+	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag)
 	rep := setup.Detect(context.Background(), setup.DetectOptions{
 		ProjectRoot: project, EvolveDir: evolveDir, PluginRoot: plugin, AdaptersDir: adapters,
 	})
@@ -97,6 +104,10 @@ func printDetectHuman(w io.Writer, rep setup.DetectReport) {
 			auth = "✓ " + c.AuthMode
 		}
 		fmt.Fprintf(w, "  %-7s %-9s %-22s tier:%-9s %s\n", c.CLI, bin, auth, c.CapabilityTier, c.Verdict)
+		if len(c.TierModels) > 0 {
+			fmt.Fprintf(w, "          models: fast=%s  balanced=%s  deep=%s\n",
+				c.TierModels["fast"], c.TierModels["balanced"], c.TierModels["deep"])
+		}
 	}
 	fmt.Fprintln(w, "\nPer-phase routing (current):")
 	for _, p := range rep.Phases {
@@ -118,19 +129,21 @@ func runSetupValidate(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve setup validate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var (
-		configPath    string
-		evolveDirFlag string
-		strict        bool
-		asJSON        bool
+		configPath      string
+		evolveDirFlag   string
+		projectRootFlag string
+		strict          bool
+		asJSON          bool
 	)
 	fs.StringVar(&configPath, "config", "", "llm_config.json path (default <evolve-dir>/llm_config.json)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
+	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.BoolVar(&strict, "strict", false, "treat the builder≠auditor cross-family check as an error (default warn)")
 	fs.BoolVar(&asJSON, "json", false, "emit the report as JSON")
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return 10
 	}
-	_, _, evolveDir, _ := setupRoots(evolveDirFlag)
+	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag)
 	if configPath == "" {
 		configPath = filepath.Join(evolveDir, "llm_config.json")
 	}
@@ -142,7 +155,11 @@ func runSetupValidate(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if asJSON {
-		buf, _ := json.MarshalIndent(rep, "", "  ")
+		buf, mErr := json.MarshalIndent(rep, "", "  ")
+		if mErr != nil {
+			fmt.Fprintf(stderr, "evolve setup validate: %v\n", mErr)
+			return 1
+		}
 		fmt.Fprintf(stdout, "%s\n", buf)
 	} else {
 		for _, v := range rep.Violations {
@@ -179,12 +196,13 @@ func maybePrintSetupNudge(stderr io.Writer, evolveDir string) {
 func runSetupComplete(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve setup complete", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var evolveDirFlag string
+	var evolveDirFlag, projectRootFlag string
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
+	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return 10
 	}
-	_, _, evolveDir, _ := setupRoots(evolveDirFlag)
+	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag)
 	stamp, err := setup.Complete(setup.CompleteOptions{EvolveDir: evolveDir})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve setup complete: %v\n", err)

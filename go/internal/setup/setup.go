@@ -96,6 +96,45 @@ func capManifest(base string) string {
 	return base
 }
 
+// tierAliasKey maps the abstract envelope tier (fast/balanced/deep) to the
+// Claude-tier key the bridge manifests' tier_aliases are keyed on.
+var tierAliasKey = map[string]string{"fast": "haiku", "balanced": "sonnet", "deep": "opus"}
+
+// familyDriverManifest maps a base CLI family to the bridge manifest that
+// carries its tier_aliases (the interactive -tmux drivers are the multi-CLI
+// defaults; their tier_aliases match the headless variants).
+func familyDriverManifest(base string) string {
+	switch base {
+	case "claude":
+		return "claude-tmux"
+	case "codex":
+		return "codex-tmux"
+	case "agy":
+		return "agy-tmux"
+	}
+	return base
+}
+
+// tierModelsFor resolves {fast,balanced,deep} → the CLI's NATIVE model via the
+// bridge manifest's tier_aliases (the single source of truth — e.g. agy→
+// gemini-3.5-flash, codex deep→gpt-5.5). Empty tier_aliases (claude) means the
+// tier key IS the native model (haiku/sonnet/opus are Claude's own selectors).
+// Honors operator manifest overrides via bridge.LoadManifest.
+func tierModelsFor(base string) map[string]string {
+	man, err := bridge.LoadManifest(familyDriverManifest(base))
+	out := make(map[string]string, len(tierAliasKey))
+	for tier, key := range tierAliasKey {
+		model := key // identity fallback (claude: native == the alias key)
+		if err == nil {
+			if alias, ok := man.TierAliases[key]; ok && alias != "" {
+				model = alias
+			}
+		}
+		out[tier] = model
+	}
+	return out
+}
+
 // --- Detect ---
 
 // Envelope mirrors a profile's model_tier_envelope (fast/balanced/deep).
@@ -116,6 +155,11 @@ type CLIStatus struct {
 	CapabilityTier   string   `json:"capability_tier"` // full|delegated|n/a
 	Verdict          string   `json:"verdict"`         // ready|warning|blocked
 	EnvWarnings      []string `json:"env_warnings,omitempty"`
+	// TierModels maps each abstract tier (fast|balanced|deep) to THIS CLI's
+	// native model (e.g. agy→gemini-3.5-flash, codex deep→gpt-5.5). The
+	// /setup skill writes these into llm_config.model so the config is
+	// self-documenting; the realizer resolves the same via tier_aliases.
+	TierModels map[string]string `json:"tier_models,omitempty"`
 }
 
 // PhaseStatus is one phase agent's current routing + constraints.
@@ -200,6 +244,7 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 		} else {
 			cs.CapabilityTier = "n/a"
 		}
+		cs.TierModels = tierModelsFor(b)
 		clis = append(clis, cs)
 	}
 	sort.Slice(clis, func(i, j int) bool { return clis[i].CLI < clis[j].CLI })
@@ -457,8 +502,8 @@ func Complete(o CompleteOptions) (string, error) {
 	if err := os.WriteFile(tmp, out, 0o644); err != nil {
 		return "", fmt.Errorf("setup complete: write temp: %w", err)
 	}
+	defer os.Remove(tmp) // best-effort cleanup; no-op once the rename succeeds
 	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
 		return "", fmt.Errorf("setup complete: atomic rename: %w", err)
 	}
 	return stamp, nil

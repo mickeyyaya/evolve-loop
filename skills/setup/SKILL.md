@@ -19,14 +19,14 @@ Call `evolve` if on PATH; otherwise `./go/bin/evolve` (or `$EVOLVE_GO_BIN`). All
 
 ## Procedure
 
-1. **Detect.** Run `evolve setup detect --json` and parse it. The digest has `clis[]` (per family: `binary_present`, `auth_mode`, `subscription_type`, `capability_tier`, `verdict`) and `phases[]` (per role: `current_cli`, `current_model`/`current_tier`, `source`, `envelope` {min,default,max}, `cross_family_with`, `allowed_clis`).
+1. **Detect.** Run `evolve setup detect --json` and parse it. The digest has `clis[]` (per family: `binary_present`, `auth_mode`, `subscription_type`, `capability_tier`, `verdict`, and **`tier_models`** {fast,balanced,deep} → that CLI's NATIVE model) and `phases[]` (per role: `current_cli`, `current_model`/`current_tier`, `source`, `envelope` {min,default,max}, `cross_family_with`, `allowed_clis`).
 
 2. **Present the detection** as a compact table — one row per CLI family with binary/auth/tier/verdict.
    - **Caveat (state, don't hide):** on macOS, `claude` may report `MISCONFIGURED`/`blocked` even when authed, because detection only checks `~/.claude/.credentials.json` and misses Keychain-stored OAuth. If the user is clearly running in a Claude session, treat claude as available and say so.
 
 3. **Explain the pipeline** concisely (this is the teaching goal). Read the canonical sources first — do NOT invent: `README.md` "Pipeline Design", `docs/concepts/overview.md`, `docs/architecture/phase-architecture.md`, `docs/architecture/dynamic-phase-routing.md`. Cover, in ~6–10 lines: the cycle (Scout → Build → Audit → Ship → Learn), what each phase produces, and *why it is trustworthy* (deterministic EGPS verdicts, SHA-chained ledger, adversarial Builder≠Auditor). Personalize: reference the user's actual detected CLIs.
 
-4. **Propose per-phase models** with a one-line rationale each (this answers "which LLM + model for each phase"). Honor these rules:
+4. **Propose per-phase models** with a one-line rationale each (this answers "which LLM + model for each phase"). **Always name the CLI's NATIVE model** from that CLI's `tier_models` — never a Claude alias for a non-Claude CLI. E.g. agy/balanced → `gemini-3.5-flash`; codex/deep → `gpt-5.5`, codex/balanced → `gpt-5.4`, codex/fast → `gpt-5.4-mini`; claude/balanced → `sonnet`. Honor these rules:
    - **Envelope:** the chosen tier must be within each phase's `envelope` [min..max]. (fast↔haiku, balanced↔sonnet, deep↔opus.)
    - **allowed_clis:** only assign a CLI the profile permits (or `["all"]`).
    - **Availability:** never route a phase to a CLI whose `verdict` is `blocked` (not authed / no binary), unless the user overrides.
@@ -34,7 +34,7 @@ Call `evolve` if on PATH; otherwise `./go/bin/evolve` (or `$EVOLVE_GO_BIN`). All
    - **Tier heuristics** (`dynamic-phase-routing.md`): cheap/summarizing phases (triage, memo, evaluator) → fast; codegen/scan (scout, builder, tester) → balanced; adversarial/review/post-mortem (intent, plan-reviewer, tdd-engineer, auditor, retrospective) → deep.
    - Use **AskUserQuestion** to let the user accept the proposal or adjust specific phases.
 
-5. **Write** `.evolve/llm_config.json` (schema_version 2). Each phase entry: `{ "provider": <anthropic|google|openai>, "cli": <claude|gemini|codex|agy>, "tier": <fast|balanced|deep>, "model": <haiku|sonnet|opus|exact-id> }`, plus a `_fallback`. Match the existing file's shape (see `examples/llm_config.example.json`).
+5. **Write** `.evolve/llm_config.json` (schema_version 2). Each phase entry: `{ "provider": <anthropic|google|openai>, "cli": <claude|gemini|codex|agy>, "tier": <fast|balanced|deep>, "model": <the CLI's native model from tier_models> }`, plus a `_fallback`. The `tier` is the abstract envelope axis (drives `validate`); the `model` is the native model that CLI actually runs (`detect.clis[].tier_models[tier]`) — write both so the config is self-documenting AND envelope-checkable. Match `examples/llm_config.example.json`.
 
 6. **Validate (kernel clamp).** Run `evolve setup validate`. On exit `2`, read the printed `[error]` violations, fix the offending phases, and rewrite — loop until exit `0`. `[warn]` lines (e.g. cross-family on an all-one-family setup) are advisory; surface them but they do not block.
 

@@ -102,6 +102,25 @@ func TestMaybePrintSetupNudge(t *testing.T) {
 	}
 }
 
+func TestRunSetup_ProjectRootFlagWinsOverEnv(t *testing.T) {
+	// --project-root must override EVOLVE_PROJECT_ROOT so the dispatcher can
+	// point setup at the SAME root the loop uses (marker lands where loop reads).
+	dirEnv := t.TempDir()
+	dirFlag := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", dirEnv)
+
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"complete", "--project-root", dirFlag}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("complete: rc=%d (%s)", rc, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(dirFlag, ".evolve", "state.json")); err != nil {
+		t.Errorf("marker should land under --project-root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dirEnv, ".evolve", "state.json")); err == nil {
+		t.Error("marker must NOT land under EVOLVE_PROJECT_ROOT when --project-root is given")
+	}
+}
+
 func TestRunSetup_DetectJSON(t *testing.T) {
 	// detect runs the real (host) doctor probe; assert it exits 0 and emits
 	// parseable JSON regardless of which CLIs the host has.

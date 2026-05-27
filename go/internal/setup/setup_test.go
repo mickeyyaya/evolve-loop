@@ -110,6 +110,29 @@ func TestAuthMode(t *testing.T) {
 	}
 }
 
+func TestTierModelsFor(t *testing.T) {
+	// agy has no model selector → all tiers map to gemini-3.5-flash.
+	agy := tierModelsFor("agy")
+	for _, tier := range []string{"fast", "balanced", "deep"} {
+		if agy[tier] != "gemini-3.5-flash" {
+			t.Errorf("agy[%s] = %q, want gemini-3.5-flash", tier, agy[tier])
+		}
+	}
+	// codex maps to its native GPT tiers.
+	codex := tierModelsFor("codex")
+	want := map[string]string{"fast": "gpt-5.4-mini", "balanced": "gpt-5.4", "deep": "gpt-5.5"}
+	for tier, m := range want {
+		if codex[tier] != m {
+			t.Errorf("codex[%s] = %q, want %q", tier, codex[tier], m)
+		}
+	}
+	// claude has empty tier_aliases → identity (the keys ARE Claude's selectors).
+	claude := tierModelsFor("claude")
+	if claude["fast"] != "haiku" || claude["balanced"] != "sonnet" || claude["deep"] != "opus" {
+		t.Errorf("claude identity broken: %+v", claude)
+	}
+}
+
 // --- Detect ---
 
 func TestDetect(t *testing.T) {
