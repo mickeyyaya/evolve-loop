@@ -4,9 +4,9 @@
   "schema_version": 1,
   "prefixes": {
     "docs": {
-      "required_paths": ["docs/**", "README.md", "CHANGELOG.md", "**/*.md"],
+      "required_paths": ["docs/**", "README.md", "CHANGELOG.md", "CLAUDE.md", "AGENTS.md", "**/*.md"],
       "diff_must_be_subset": true,
-      "description": "Documentation only — diff must be entirely under doc paths"
+      "description": "Documentation only — diff must be entirely under doc paths. Root-level .md files (CLAUDE.md, AGENTS.md, README.md) are listed explicitly because the **/*.md glob requires a directory segment and does not match repo-root files."
     },
     "feat(guards)": {
       "required_paths": [
