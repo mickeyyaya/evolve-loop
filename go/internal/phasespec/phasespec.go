@@ -68,6 +68,10 @@ type PhaseSpec struct {
 	Classify      *ClassifyRules       `json:"classify,omitempty"`
 	Routing       *config.RoutingBlock `json:"routing,omitempty"`
 	Gates         Gates                `json:"gates,omitempty"`
+	// After names the phase this one slots in right after, in the routing order
+	// (e.g. "build" → runs between build and audit). Empty defaults to running
+	// just before "audit" — the canonical post-build check slot.
+	After string `json:"after,omitempty"`
 	// Verdict branch hints (Stage 3 routing inversion). Reserved; unused in Stage 1.
 	OnPass string `json:"on_pass,omitempty"`
 	OnFail string `json:"on_fail,omitempty"`
@@ -116,6 +120,18 @@ func (c Catalog) All() []PhaseSpec {
 	out := make([]PhaseSpec, 0, len(c.order))
 	for _, n := range c.order {
 		out = append(out, c.byName[n])
+	}
+	return out
+}
+
+// UserPhases returns specs for phases contributed by an operator overlay
+// (as opposed to built-in registry entries). Order matches registry insertion.
+func (c Catalog) UserPhases() []PhaseSpec {
+	out := make([]PhaseSpec, 0)
+	for _, n := range c.order {
+		if c.userNames[n] {
+			out = append(out, c.byName[n])
+		}
 	}
 	return out
 }

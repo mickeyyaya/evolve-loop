@@ -107,6 +107,11 @@ type RoutingConfig struct {
 	MaxInsertions int
 	PhaseEnable   map[string]Enable       // phase -> enablement source
 	Triggers      map[string]RoutingBlock // phase -> declarative triggers
+	// Order is the linear phase sequence the router walks, in registry order.
+	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
+	// loaded without a registry stays byte-identical to pre-Order behavior).
+	// The composition root may splice user phases into this slice.
+	Order []string
 }
 
 // Warning is a non-fatal config diagnostic surfaced to the operator (and ledger).
@@ -234,6 +239,7 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 		if p.Name == "" {
 			continue
 		}
+		cfg.Order = append(cfg.Order, p.Name)
 		if p.Enabled != "" {
 			cfg.PhaseEnable[p.Name] = parseEnable(p.Enabled, ws)
 		}

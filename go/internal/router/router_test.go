@@ -81,6 +81,45 @@ func TestRoute_BuildInsertsTesterOnRed(t *testing.T) {
 	}
 }
 
+// TestRoute_UserPhaseInsertedViaCatalogOrder proves the runtime integration: a
+// user-defined phase spliced into cfg.Order (after build) is proposed when its
+// insert_when fires against the uniform signal plane (sig.Generic). This is the
+// end of the chain — author → catalog → cfg.Order+Triggers → routed.
+func TestRoute_UserPhaseInsertedViaCatalogOrder(t *testing.T) {
+	in := base("build")
+	in.Completed = []string{"scout", "tdd", "build"}
+	in.Cfg.Order = []string{"scout", "tdd", "build", "security-scan", "audit", "ship"}
+	in.Cfg.Triggers["security-scan"] = config.RoutingBlock{
+		InsertWhen: []config.Condition{{Field: "security.cves", Op: "gt", Value: 0}},
+	}
+	in.Signals.Generic = map[string]any{"security.cves": float64(2)}
+
+	d := Route(in, nil)
+	if d.NextPhase != "security-scan" {
+		t.Errorf("build → %q, want security-scan (user phase inserted via order)", d.NextPhase)
+	}
+	if len(d.InsertPhases) != 1 || d.InsertPhases[0] != "security-scan" {
+		t.Errorf("InsertPhases = %v, want [security-scan]", d.InsertPhases)
+	}
+}
+
+// TestRoute_UserPhaseSkippedWhenTriggerQuiet confirms the user phase is skipped
+// (→ audit) when its signal trigger does not fire — no spurious insertion.
+func TestRoute_UserPhaseSkippedWhenTriggerQuiet(t *testing.T) {
+	in := base("build")
+	in.Completed = []string{"scout", "tdd", "build"}
+	in.Cfg.Order = []string{"scout", "tdd", "build", "security-scan", "audit", "ship"}
+	in.Cfg.Triggers["security-scan"] = config.RoutingBlock{
+		InsertWhen: []config.Condition{{Field: "security.cves", Op: "gt", Value: 0}},
+	}
+	in.Signals.Generic = map[string]any{"security.cves": float64(0)}
+
+	d := Route(in, nil)
+	if d.NextPhase != "audit" {
+		t.Errorf("build → %q, want audit (security-scan trigger quiet)", d.NextPhase)
+	}
+}
+
 func TestRoute_BuildToAuditWhenNoRed(t *testing.T) {
 	in := base("build")
 	in.Completed = []string{"scout", "tdd", "build"}
