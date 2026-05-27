@@ -111,6 +111,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 
+	// First-run onboarding nudge (non-blocking; defaults work without setup).
+	maybePrintSetupNudge(stderr, cfg.EvolveDir)
+
 	if cfg.DryRun {
 		buf, _ := json.MarshalIndent(map[string]any{
 			"dry_run": true,

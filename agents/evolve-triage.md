@@ -159,12 +159,14 @@ This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of
 
 ### 4. Write the decision
 
+**Write `triage-decision.md` to the exact path `$ARTIFACT_PATH`** — this canonical path is substituted in for you; write there directly. Write the companion `triage-decision.json` and `triage-reflection.yaml` in the **same directory** as `$ARTIFACT_PATH`. Do NOT create a `workspace/` subdirectory or write the artifacts anywhere else — the orchestrator only detects them at the canonical path.
+
 **triage-decision.md** required structure:
 
 The triage-decision.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `legacy/scripts/tests/anchor-extract-test.sh` can locate the decision region.
 
 ```markdown
-<!-- challenge-token: <token from runner> -->
+<!-- challenge-token: $CHALLENGE_TOKEN -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle N
 

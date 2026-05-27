@@ -370,6 +370,21 @@ cd evolve-loop
 ./install.sh
 ```
 
+### First-time setup (`/setup`)
+
+On first launch the loop prints a one-line nudge to run setup. `/setup` is an interactive onboarding flow (runs in your CLI session — no extra token cost) that:
+
+1. **Detects** which LLM CLIs you have (claude/codex/gemini/agy: binary, auth mode, capability tier).
+2. **Explains** the pipeline concisely — what each phase does and why it's trustworthy.
+3. **Proposes** which model each phase agent should use (you adjust interactively), writes `.evolve/llm_config.json`, and validates it against the integrity floor.
+
+```bash
+/setup                              # interactive onboarding (re-runnable anytime)
+evolve setup detect --json          # just the deterministic detection digest (read-only)
+```
+
+Setup is optional — the loop runs with sensible all-Claude defaults if you skip it. See [docs/architecture/setup-onboarding.md](docs/architecture/setup-onboarding.md).
+
 ### Run
 
 The v9.1.0 syntax is **budget-first** (cost-driven), with cycle-count and resume as alternatives:
@@ -435,6 +450,7 @@ Reset never deletes history — it archives the workspace + a `cycle-state.json`
 ./bin/preflight                         full pipeline dry-run (regression + simulate + release-pipeline dry-run)
 ./bin/check-caps [cli]                  show resolved capability tier per adapter
 evolve eval diversity-check <evalsDir>  adversarial-diversity score for an eval suite (v13.0.0+)
+evolve setup detect [--json]            onboarding digest: CLIs + per-phase routing (read-only)
 bash legacy/scripts/observability/show-context-monitor.sh <cycle>   per-cycle context usage (v9.1.0+)
 bash legacy/scripts/observability/show-context-monitor.sh --watch   live-tail latest cycle (3s refresh)
 bash legacy/scripts/observability/render-cli-resolution.sh <cycle>  per-phase CLI/model from ledger truth (v10.7+)
@@ -490,6 +506,7 @@ The README is the surface. Real depth lives in `docs/`:
 | [docs/architecture/orchestrator-context-modes.md](docs/architecture/orchestrator-context-modes.md) | `context_mode` profile field; digest vs full + FAIL-path promotion (v10.10+) |
 | [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md) | Opt-in phase-skip foundation (v10.17+); precedence rule + ledger contract |
 | [docs/architecture/dynamic-phase-routing.md](docs/architecture/dynamic-phase-routing.md) | Go routing kernel (v13.0.0/PR #4, default-off); stages, modes, integrity floor, LLM proposer |
+| [docs/architecture/setup-onboarding.md](docs/architecture/setup-onboarding.md) | `/setup` onboarding: CLI detection, per-phase model proposal + validation, pipeline explainer |
 | [docs/architecture/research-tool.md](docs/architecture/research-tool.md) | KB-first directive + research quota hook (v10.9 cycle 87-89) |
 | [docs/architecture/token-economics-2026.md](docs/architecture/token-economics-2026.md) | P1-P8 token-reduction roadmap with per-phase cost attribution |
 | [docs/architecture/acs-predicate-quality-gate.md](docs/architecture/acs-predicate-quality-gate.md) | Predicate-quality four-layer defense (cycles 80-86) |

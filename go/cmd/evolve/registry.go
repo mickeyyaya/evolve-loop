@@ -46,6 +46,7 @@ var commands = []subcommand{
 
 	// Phase 1 + Phase 2 core surface.
 	{Name: "doctor", Summary: "Probe environment", Run: runDoctor},
+	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
 	{Name: "guard", Summary: "Run a trust-kernel guard", Run: runGuard},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},

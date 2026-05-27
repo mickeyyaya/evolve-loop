@@ -119,6 +119,7 @@ Defaults reflect production posture as of v10.8.0. Detail docs linked per row.
 >
 > - `evolve guard list-audit-fails [--evolve-dir DIR] [--json]` — enumerates `state.json:failedApproaches[]` entries with `classification=code-audit-fail` that are still within their 30-day retention window. Surfaces the count + identity of the audit failures the retro-phase failure-adapter has been tallying. Pure read; never mutates state. Use `--json` for scripted triage.
 > - `evolve eval diversity-check <evalsDir> [slug]` — suite-level adversarial-diversity check (v13.0.0+): flags an eval suite that is positive-only by counting how many evals carry negative + edge cases. Exit `0` PASS, `1` WARN, `2` HALT (cohesive suite, zero negative cases), `10` bad args. Companions: `evolve eval quality-check <eval.md>` (Level-0 single-file tautology detection) and `evolve eval verify <eval.md> <workspace>` (independent eval re-execution). Read-only.
+> - `evolve setup detect [--json]` — onboarding digest (read-only): per-CLI binary/auth-mode/capability-tier/verdict + per-phase current routing + envelope/cross-family/allowed_clis constraints. Backs the in-session `/setup` skill. `evolve setup validate [--config P] [--strict]` clamps a proposed `llm_config.json` against the floor (envelope + allowed_clis are exit-2 errors; builder≠auditor cross-family is an advisory WARN, exit-2 only with `--strict`). See [docs/architecture/setup-onboarding.md](docs/architecture/setup-onboarding.md) + ADR-0027.
 
 > **Operator commands (write a verdict file):**
 >

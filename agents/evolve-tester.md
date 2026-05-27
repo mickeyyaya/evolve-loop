@@ -161,7 +161,7 @@ After writing all predicates and validating them, emit `tester-report.md`:
 The first line of tester-report.md MUST be a `<!-- ANCHOR:tester_summary -->` marker so downstream phases (auditor, retrospective) and `legacy/scripts/tests/anchor-extract-test.sh` can locate the summary region.
 
 ```markdown
-<!-- challenge-token: <token from runner> -->
+<!-- challenge-token: $CHALLENGE_TOKEN -->
 <!-- ANCHOR:tester_summary -->
 # Tester Report — Cycle N
 

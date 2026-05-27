@@ -1,42 +1,38 @@
 {
-  "_comment": "evolve-loop LLM router config — copy to .evolve/llm_config.json and edit.",
-  "_comment2": "When absent, all phases use profile.cli (default: claude). Backward-compatible.",
-  "schema_version": 1,
+  "_comment": "evolve-loop LLM router config — copy to .evolve/llm_config.json and edit, or generate it interactively with /setup.",
+  "_comment2": "When absent, all phases use profile.cli (default: claude). schema_version 2: per-phase { provider, cli, tier, model }.",
+  "_comment3": "tier ∈ fast|balanced|deep; model is an alias (haiku|sonnet|opus) or an exact id. cli ∈ claude|gemini|codex|agy.",
+  "schema_version": 2,
 
   "phases": {
-    "_comment": "Per-phase overrides. Keys are role names (scout, builder, auditor, triage, ...).",
-    "_comment2": "Each entry: { cli, model } where cli is one of: claude | gemini | codex",
+    "_comment": "Per-phase overrides keyed by role. Each tier must sit within the role's profile model_tier_envelope; `evolve setup validate` enforces this.",
 
-    "scout": {
-      "_comment": "Example: route Scout to Gemini for research-heavy phase.",
-      "provider": "google",
-      "cli": "gemini",
-      "model": "gemini-3-pro-preview"
-    },
+    "scout": { "provider": "anthropic", "cli": "claude", "tier": "balanced", "model": "sonnet" },
+
     "builder": {
-      "_comment": "Example: route Builder to Claude (default — same as omitting this entry).",
+      "_comment": "Adversarial integrity: prefer a DIFFERENT model family for builder vs auditor when you have ≥2 authed CLIs (e.g. builder=agy/Google, auditor=codex/OpenAI).",
       "provider": "anthropic",
       "cli": "claude",
-      "model_tier": "sonnet"
+      "tier": "balanced",
+      "model": "sonnet"
     },
+
     "auditor": {
-      "_comment": "Example: use a specific model string instead of a tier alias.",
+      "_comment": "Deep tier for adversarial review. Use an exact model id instead of an alias if you want to pin a version.",
       "provider": "anthropic",
       "cli": "claude",
-      "model": "claude-opus-4-7"
-    }
+      "tier": "deep",
+      "model": "opus"
+    },
+
+    "triage": { "provider": "anthropic", "cli": "claude", "tier": "fast", "model": "haiku" }
   },
 
   "_fallback": {
     "_comment": "Used for any phase not listed in phases.*.",
     "provider": "anthropic",
     "cli": "claude",
-    "model_tier": "sonnet"
-  },
-
-  "_global_overrides": {
-    "_comment": "Reserved for future global settings.",
-    "max_budget_usd_per_phase": null,
-    "force_strict_isolation": false
+    "tier": "balanced",
+    "model": "sonnet"
   }
 }
