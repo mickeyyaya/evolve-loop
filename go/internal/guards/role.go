@@ -55,7 +55,7 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 	if isUnderDir(path, cs.WorkspacePath) {
 		return core.GuardDecision{Allow: true}
 	}
-	if cs.Phase == "build" && cs.ActiveWorktree != "" && isUnderDir(path, cs.ActiveWorktree) {
+	if core.WorktreePhase(core.Phase(cs.Phase)) && cs.ActiveWorktree != "" && isUnderDir(path, cs.ActiveWorktree) {
 		return core.GuardDecision{Allow: true}
 	}
 	return core.GuardDecision{
@@ -66,14 +66,10 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 }
 
 func isAlwaysSafe(path string) bool {
-	abs := path
-	if !filepath.IsAbs(path) {
-		// Don't try to resolve relative paths — be conservative.
-	}
-	if strings.HasPrefix(abs, "/tmp/") || abs == "/tmp" {
+	if strings.HasPrefix(path, "/tmp/") || path == "/tmp" {
 		return true
 	}
-	if h := os.Getenv("HOME"); h != "" && strings.HasPrefix(abs, filepath.Join(h, ".claude")+"/") {
+	if h := os.Getenv("HOME"); h != "" && strings.HasPrefix(path, filepath.Join(h, ".claude")+"/") {
 		return true
 	}
 	return false

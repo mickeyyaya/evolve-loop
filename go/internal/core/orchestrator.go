@@ -64,6 +64,11 @@ type Orchestrator struct {
 	// outcome calculator falls back to SKIPPED_UNKNOWN.
 	gitHEAD func() (string, error)
 
+	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
+	// Default gitWorktree (real git); injected in tests via
+	// WithWorktreeProvisioner so RunCycle runs without touching real git.
+	worktree WorktreeProvisioner
+
 	// cfg + strategy drive dynamic phase routing ("model proposes, kernel
 	// disposes"). The zero value (Stage:Off, StaticPreset) reproduces the
 	// legacy static-state-machine behavior byte-for-byte: routing is
@@ -91,6 +96,16 @@ func WithRouting(cfg config.RoutingConfig, strategy router.RoutingStrategy) Opti
 	}
 }
 
+// WithWorktreeProvisioner injects a worktree provisioner. Tests pass a fake to
+// avoid real git; nil is ignored so the gitWorktree default stands.
+func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
+	return func(o *Orchestrator) {
+		if p != nil {
+			o.worktree = p
+		}
+	}
+}
+
 // NewOrchestrator wires the orchestrator with its dependencies. Routing stays
 // off unless a WithRouting option supplies an enabled-stage config.
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
@@ -101,6 +116,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		sm:       NewStateMachine(),
 		now:      time.Now,
 		gitHEAD:  defaultGitHEAD,
+		worktree: gitWorktree{},
 		strategy: router.StaticPreset{},
 	}
 	for _, opt := range opts {
@@ -220,6 +236,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN workspace archive failed: %v\n", err)
 		}
 	}
+	// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
+	// here, isolated from the live tree. cs.ActiveWorktree gates source writes
+	// in the role-gate and drives worktree-aware ship. Best-effort — on failure
+	// the source phases are denied by the role-gate (loud, not silent). Cleaned
+	// up on cycle exit (after ship has merged the worktree→main).
+	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
+	} else {
+		cs.ActiveWorktree = wtPath
+		defer func() { _ = o.worktree.Cleanup(req.ProjectRoot, wtPath) }()
+	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
 	}
@@ -337,10 +364,18 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
+		// Source-writing phases (tdd/build) run with cwd=worktree so their
+		// code writes land in the isolated worktree the role-gate permits;
+		// every other phase writes only its artifact to the absolute workspace.
+		phaseWorktree := ""
+		if WorktreePhase(next) {
+			phaseWorktree = cs.ActiveWorktree
+		}
 		resp, err := runner.Run(ctx, PhaseRequest{
 			Cycle:         cycle,
 			ProjectRoot:   req.ProjectRoot,
 			Workspace:     cs.WorkspacePath,
+			Worktree:      phaseWorktree,
 			GoalHash:      req.GoalHash,
 			Budget:        req.Budget,
 			PreviousPhase: string(current),

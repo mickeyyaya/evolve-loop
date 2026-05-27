@@ -63,6 +63,52 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 	}
 }
 
+// TestRole_TDDWritesTestsInWorktree is the kernel proof of the worktree-
+// provisioning fix: tdd (a source-writing phase) may now write *_test.go into
+// the per-cycle worktree. Before, only phase=="build" got this allowance, so
+// tdd's RED tests were denied ("may not write outside workspace") → exit 81.
+func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
+	worktree := "/work/wt/cycle-50" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID:        50,
+		Phase:          "tdd",
+		ActiveAgent:    "tdd-engineer",
+		ActiveWorktree: worktree,
+		WorkspacePath:  "/work/.evolve/runs/cycle-50",
+	})
+	g := NewRole(s)
+
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Write",
+		ToolInput: map[string]any{"file_path": filepath.Join(worktree, "go/internal/bridge/stopreview_stage1_test.go")},
+	})
+	if !dec.Allow {
+		t.Errorf("tdd write of *_test.go in worktree denied: %s", dec.Reason)
+	}
+}
+
+// TestRole_NonWorktreePhaseDeniedWorktreeWrite confirms the allowance is scoped:
+// a read-mostly phase (scout) cannot write source into the worktree even when
+// one exists — the source/non-source separation is preserved.
+func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
+	worktree := "/work/wt/cycle-51" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID:        51,
+		Phase:          "scout",
+		ActiveWorktree: worktree,
+		WorkspacePath:  "/work/.evolve/runs/cycle-51",
+	})
+	g := NewRole(s)
+
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Write",
+		ToolInput: map[string]any{"file_path": filepath.Join(worktree, "go/internal/foo/bar.go")},
+	})
+	if dec.Allow {
+		t.Error("scout (non-worktree phase) must not write source into the worktree")
+	}
+}
+
 func TestRole_AuditPhaseRestricted(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:       7,
