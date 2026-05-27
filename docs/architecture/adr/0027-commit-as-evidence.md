@@ -1,6 +1,6 @@
 # ADR-0027: Commit-as-Evidence for Phase Completion
 
-> Replace filesystem-path polling as the proof a phase finished with a **git commit** (or the artifact's git blob hash) on the per-cycle worktree branch. Completion becomes "HEAD advanced," not "a file appeared at the exact path I'm polling." Deterministic, tamper-evident, and aligned with the project's existing audit-binding. **Status: Proposed** — design captured for deliberate implementation; not yet built.
+> **Invariant: a commit is the evidence of a phase's deliverable — for every phase, without exception.** A phase has delivered iff it produced a commit on the per-cycle worktree branch; completion is "HEAD advanced," never "a file appeared at the exact path I'm polling." This holds uniformly across intent → scout → triage → tdd → build → tester → audit → ship → learn. There is no path-polling fallback as the source of truth. Deterministic, tamper-evident, and aligned with the project's existing audit-binding. **Status: Proposed** — design captured for deliberate implementation; not yet built.
 
 - **Status:** Proposed (design)
 - **Date:** 2026-05-27
@@ -20,7 +20,21 @@ The root brittleness: **path-polling couples completion to where the agent put t
 
 ## Decision
 
-Make **a commit the evidence of phase output.** A phase finishes when it has committed its artifact(s) to the per-cycle **worktree branch**; the orchestrator detects completion by inspecting git, not by polling a path:
+**A commit is the evidence of a phase's deliverable — universally, for every phase.** This is an invariant, not a per-phase choice: the orchestrator advances iff the phase produced its commit; detection is uniform (`git`), never a per-phase path heuristic. No phase is exempt and there is no "if the file shows up at path X" fallback that can substitute for the commit.
+
+| Phase | Deliverable (committed) | Evidence |
+|---|---|---|
+| intent | `intent.md` | worktree-branch commit |
+| scout | `scout-report.md` | worktree-branch commit |
+| triage | `triage-decision.md` / `.json` | worktree-branch commit |
+| tdd | predicate scripts | worktree-branch commit |
+| build | production code + `build-report.md` | worktree-branch commit |
+| tester | predicates + `tester-report.md` | worktree-branch commit |
+| audit | `audit-report.md` + verdict | worktree-branch commit |
+| **ship** | the `main` merge commit | **the gated commit** (only ship reaches `main`) |
+| learn / retro | lessons / instincts | worktree-branch commit |
+
+Ship is not an exception to the invariant — it is its apex: every upstream phase's evidence is a worktree-branch commit, and ship is the single phase whose evidence commit lands on `main` (through the existing gate). Mechanically, a phase finishes when it has committed its artifact(s) to the per-cycle **worktree branch**; the orchestrator detects completion by inspecting git, not by polling a path:
 
 ```
 Phase agent  → writes artifact(s) anywhere in the worktree, then commits
@@ -43,12 +57,14 @@ The kernel invariant is **"only `evolve ship` commits, and only to `main`"** (`e
 2. `evolve guard ship` is relaxed to permit commits **on a worktree branch** (detect via `git rev-parse --show-toplevel` ≠ project root, or branch name prefix), while still denying any commit/push that targets `main`.
 3. Today only **Builder** runs in a worktree; scout/intent/triage/audit write to `.evolve/runs/` outside a branch. Commit-as-evidence requires **every phase to operate on the worktree branch** — the largest structural change.
 
-## Recommended sequencing (hybrid first)
+## Rollout (incremental, but the end-state is the universal invariant)
 
-1. **Hybrid completion signal (smallest, do first):** keep file artifacts where they are, but make the orchestrator's completion check `git`-based — the phase emits a commit (or the runner computes `git hash-object` of the produced artifact) and the bridge treats *that* as "done," reading the artifact from the object. Kills path-polling brittleness with **no per-phase-branch requirement** and a minimal kernel touch.
-2. **Per-phase worktree branches:** move scout/intent/triage/audit onto the worktree branch so they can commit natively; relax `guard ship` per (2) above.
-3. **Commit trailer + ledger bind:** standardize a `Evolve-Phase:`/`Challenge-Token:` trailer; bind the phase commit SHA in the ledger (replaces the artifact-SHA field's role).
-4. **Retire relocate (ADR-0024)** once detection no longer depends on canonical paths.
+The invariant above is the destination for **all** phases; these steps are how we get there safely, not a license for some phases to stay on path-polling permanently.
+
+1. **Transitional `git`-based completion signal (smallest first step):** before every phase is moved onto a branch, make the orchestrator's completion check `git`-based — the runner computes `git hash-object` of the produced artifact (or the phase emits a commit) and the bridge treats *that* object as "done," reading the artifact from it. This is scaffolding that already kills path-polling brittleness with a minimal kernel touch; it is **not** the end-state.
+2. **Every phase on the worktree branch:** move intent/scout/triage/tdd/build/tester/audit/learn onto the per-cycle worktree branch so each commits its deliverable natively; relax `guard ship` to permit worktree-branch commits while still denying any commit/push to `main`. After this step the invariant holds uniformly.
+3. **Commit trailer + ledger bind:** standardize an `Evolve-Phase:` / `Challenge-Token:` trailer on every phase commit; bind the phase commit SHA in the ledger (it replaces the artifact-SHA field's role).
+4. **Retire path-polling + relocate (ADR-0024):** once completion is git-anchored for every phase, delete `artifactReady`'s path-polling/relocate fallback — there is no longer a non-commit source of truth to maintain.
 
 ## Consequences
 
