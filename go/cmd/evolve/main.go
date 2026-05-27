@@ -26,7 +26,8 @@ Commands:
                 PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
   serve-phase  Envelope-framed phase subprocess (phaseproto wire); the binary
                 end of phaseproto.SubprocessRunner ( serve-phase <name> )
-  cycle      Run one full cycle through the orchestrator ( cycle run --goal-hash X )
+  cycle      Run one full cycle, or seal an unfinished one
+              ( cycle run --goal-hash X | cycle reset [--dry-run] [--force] )
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N --budget-usd X )
   ship       Atomic commit + push (native; v11.3.0)

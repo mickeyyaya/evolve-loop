@@ -225,6 +225,34 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	// Unfinished-cycle guard (fresh runs only — resume returned above). A
+	// stuck cycle whose number is ahead of lastCycleNumber must not be
+	// silently clobbered: that would lose its history. Force the operator to
+	// choose — continue it (--resume) or seal it (evolve cycle reset, which
+	// archives it for analysis and advances the number). EVOLVE_FORCE_FRESH=1
+	// restores the prior silent-clobber behavior as an escape hatch.
+	if os.Getenv("EVOLVE_FORCE_FRESH") != "1" {
+		cs, csErr := deps.Storage.ReadCycleState(context.Background())
+		last, _ := readLastCycleNumber(context.Background(), deps.Storage)
+		// An UNREADABLE cycle-state (truncated JSON from a SIGKILL'd dispatcher
+		// mid-write — the most common stuck-cycle cause) must also block: a
+		// swallowed parse error would yield a zero CycleState that the
+		// predicate treats as "no cycle", letting the fresh run clobber it.
+		if csErr != nil || unfinishedCycle(cs, last) {
+			if csErr != nil {
+				fmt.Fprintf(stderr, "[loop] cycle-state.json is unreadable (%v) — treating as an unfinished cycle to avoid clobbering history.\n", csErr)
+			} else {
+				fmt.Fprintf(stderr, "[loop] unfinished cycle %d detected at phase %q (lastCycleNumber=%d).\n", cs.CycleID, cs.Phase, last)
+			}
+			fmt.Fprintln(stderr, "[loop]   • continue it:    evolve loop --resume")
+			fmt.Fprintln(stderr, "[loop]   • seal & move on: evolve cycle reset   (archives the cycle for analysis, advances the number)")
+			fmt.Fprintln(stderr, "[loop]   (or set EVOLVE_FORCE_FRESH=1 to start fresh and overwrite — history NOT sealed)")
+			lr.StopReason = "unfinished_cycle"
+			lr.emit(stdout)
+			return 2
+		}
+	}
+
 	policy := resolveDispatchPolicy(stderr)
 	threshold := resolveCircuitBreakerThreshold()
 
@@ -631,6 +659,15 @@ func readLastCycleNumber(ctx context.Context, st core.Storage) (int, error) {
 		return 0, err
 	}
 	return state.LastCycleNumber, nil
+}
+
+// unfinishedCycle reports whether cycle-state describes a cycle that started
+// but never completed — its id is ahead of lastCycleNumber. A clean cycle
+// advances lastCycleNumber to its own id on completion (orchestrator), so a
+// finished cycle has cs.CycleID == lastCycleNumber and is NOT flagged; a fresh
+// tree has cs.CycleID == 0. Only a genuinely stuck cycle (id > last) trips it.
+func unfinishedCycle(cs core.CycleState, lastCycleNumber int) bool {
+	return cs.CycleID != 0 && cs.CycleID > lastCycleNumber
 }
 
 // cycleWorkspace returns .evolve/runs/cycle-<N>/ for verify/classify.
