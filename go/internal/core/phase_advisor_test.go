@@ -161,8 +161,15 @@ func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 			if plan.Entries[0].Phase != "scout" || plan.Entries[0].Run != c.wantScoutRun {
 				t.Errorf("first entry=%+v, want scout run=%v", plan.Entries[0], c.wantScoutRun)
 			}
-			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "phase-plan.json") {
-				t.Errorf("artifact=%q, want .../phase-plan.json", fb.gotReq.ArtifactPath)
+			// ADR-0027: the advisor's RAW plan artifact is routing-plan.json,
+			// distinct from the orchestrator's clamped phase-plan.json (both
+			// survive for forensics); and it uses the stdout completion contract
+			// (prints JSON, writes no file) — the cycle-117 deadlock fix.
+			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-plan.json") {
+				t.Errorf("artifact=%q, want .../routing-plan.json", fb.gotReq.ArtifactPath)
+			}
+			if fb.gotReq.Completion != "stdout" {
+				t.Errorf("Completion=%q, want stdout", fb.gotReq.Completion)
 			}
 		})
 	}

@@ -247,19 +247,24 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 // writes Prompt to a file under Workspace before invoking the bridge
 // subprocess (callers don't manage tmp-file lifecycle).
 type BridgeRequest struct {
-	CLI          string            `json:"cli"`       // claude-p | claude-tmux | codex | agy
-	Profile      string            `json:"profile"`   // absolute path to .evolve/profiles/<name>.json
-	Model        string            `json:"model"`     // haiku | sonnet | opus | auto | gpt-* | gemini-*
-	Prompt       string            `json:"prompt"`    // prompt body; adapter materializes as a file
-	Workspace    string            `json:"workspace"` // absolute path; bridge writes outputs here
-	Worktree     string            `json:"worktree,omitempty"`
-	StdoutLog    string            `json:"stdout_log,omitempty"`
-	StderrLog    string            `json:"stderr_log,omitempty"`
-	ArtifactPath string            `json:"artifact_path,omitempty"` // adapter requires non-empty
-	Agent        string            `json:"agent,omitempty"`         // role label
-	Cycle        int               `json:"cycle,omitempty"`
-	Env          map[string]string `json:"env,omitempty"`
-	ExtraFlags   []string          `json:"extra_flags,omitempty"` // direct inner-CLI pass-through (after `--`)
+	CLI          string `json:"cli"`       // claude-p | claude-tmux | codex | agy
+	Profile      string `json:"profile"`   // absolute path to .evolve/profiles/<name>.json
+	Model        string `json:"model"`     // haiku | sonnet | opus | auto | gpt-* | gemini-*
+	Prompt       string `json:"prompt"`    // prompt body; adapter materializes as a file
+	Workspace    string `json:"workspace"` // absolute path; bridge writes outputs here
+	Worktree     string `json:"worktree,omitempty"`
+	StdoutLog    string `json:"stdout_log,omitempty"`
+	StderrLog    string `json:"stderr_log,omitempty"`
+	ArtifactPath string `json:"artifact_path,omitempty"` // adapter requires non-empty
+	// Completion selects the phase-completion contract (ADR-0027): "" /
+	// "artifact" = poll the artifact file (default); "stdout" = complete on
+	// REPL-idle for agents that print their answer and write no file (the
+	// router/advisor). Only the *-tmux drivers honor it; others ignore it.
+	Completion string            `json:"completion,omitempty"`
+	Agent      string            `json:"agent,omitempty"` // role label
+	Cycle      int               `json:"cycle,omitempty"`
+	Env        map[string]string `json:"env,omitempty"`
+	ExtraFlags []string          `json:"extra_flags,omitempty"` // direct inner-CLI pass-through (after `--`)
 	// PermissionMode is the resolved per-phase permission mode (the
 	// EVOLVE_<AGENT>_PERMISSION_MODE override the runner resolves with the
 	// agent name). The bridge realizes it per-CLI via the LaunchIntent —

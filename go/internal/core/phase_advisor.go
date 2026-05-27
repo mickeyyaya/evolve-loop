@@ -62,29 +62,9 @@ func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 
 // Propose implements router.Proposer.
 func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
-	if p.bridge == nil {
-		return nil, fmt.Errorf("routing proposer: nil bridge")
-	}
-	if in.Workspace == "" {
-		return nil, fmt.Errorf("routing proposer: empty workspace")
-	}
-	profile := p.profile
-	if profile == "" && in.ProjectRoot != "" {
-		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "router.json")
-	}
-	resp, err := p.bridge.Launch(context.Background(), BridgeRequest{
-		CLI:          p.cli,
-		Profile:      profile,
-		Model:        p.model,
-		Prompt:       buildRoutingPrompt(in),
-		Workspace:    in.Workspace,
-		ArtifactPath: filepath.Join(in.Workspace, "routing-proposal.json"),
-		Agent:        "router",
-		Cycle:        in.Cycle,
-		Env:          in.Env,
-	})
+	resp, err := p.advisorLaunch(in, "routing proposer", buildRoutingPrompt(in), "routing-proposal.json")
 	if err != nil {
-		return nil, fmt.Errorf("routing proposer: bridge launch: %w", err)
+		return nil, err
 	}
 	prop, err := parseProposal(resp.Stdout)
 	if err != nil {
@@ -96,14 +76,38 @@ func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 // Plan implements router.Planner: it asks the LLM for a whole-cycle run/skip
 // plan (ADR-0024 §2 hybrid cadence — the cheap, coherent upfront decision). The
 // returned plan is ADVISORY; the kernel clamp re-validates it against the floor.
-// Mirrors Propose's wiring but writes phase-plan.json and parses a JSON array.
+// Mirrors Propose's wiring but writes routing-plan.json and parses a JSON array.
 // Any failure returns an error so the caller degrades to the static path.
 func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
+	// The advisor's raw plan artifact (routing-plan.json) is distinct from the
+	// orchestrator's clamped phase-plan.json (written by recordPhasePlan):
+	// keeping them separate preserves both for forensics (advisory vs disposed).
+	resp, err := p.advisorLaunch(in, "phase advisor", buildPlanPrompt(in), "routing-plan.json")
+	if err != nil {
+		return nil, err
+	}
+	plan, err := parsePhasePlan(resp.Stdout)
+	if err != nil {
+		return nil, fmt.Errorf("phase advisor: %w", err)
+	}
+	return plan, nil
+}
+
+// advisorLaunch is the shared wiring for Propose and Plan: it guards the
+// required fields, resolves the router profile, and launches the bridge under
+// the stdout completion contract (ADR-0027).
+//
+// stdout contract: the advisor prints its JSON answer to the REPL and writes
+// no file; completion is REPL-idle, and the answer is read from the captured
+// scrollback. Without Completion:"stdout" the artifact-file poll would wait for
+// a file the advisor never writes → timeout → silent degrade to the static path
+// (the cycle-117 deadlock).
+func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, prompt, artifactFile string) (BridgeResponse, error) {
 	if p.bridge == nil {
-		return nil, fmt.Errorf("phase advisor: nil bridge")
+		return BridgeResponse{}, fmt.Errorf("%s: nil bridge", errPfx)
 	}
 	if in.Workspace == "" {
-		return nil, fmt.Errorf("phase advisor: empty workspace")
+		return BridgeResponse{}, fmt.Errorf("%s: empty workspace", errPfx)
 	}
 	profile := p.profile
 	if profile == "" && in.ProjectRoot != "" {
@@ -113,21 +117,18 @@ func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 		CLI:          p.cli,
 		Profile:      profile,
 		Model:        p.model,
-		Prompt:       buildPlanPrompt(in),
+		Prompt:       prompt,
 		Workspace:    in.Workspace,
-		ArtifactPath: filepath.Join(in.Workspace, "phase-plan.json"),
+		ArtifactPath: filepath.Join(in.Workspace, artifactFile),
+		Completion:   "stdout",
 		Agent:        "router",
 		Cycle:        in.Cycle,
 		Env:          in.Env,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("phase advisor: bridge launch: %w", err)
+		return BridgeResponse{}, fmt.Errorf("%s: bridge launch: %w", errPfx, err)
 	}
-	plan, err := parsePhasePlan(resp.Stdout)
-	if err != nil {
-		return nil, fmt.Errorf("phase advisor: %w", err)
-	}
-	return plan, nil
+	return resp, nil
 }
 
 // buildRoutingPrompt renders the per-transition routing context into a compact,
@@ -223,14 +224,16 @@ func writeSignals(b *strings.Builder, s router.RoutingSignals) {
 	}
 }
 
-// parseProposal extracts the strict-JSON proposal from the LLM stdout. It is
-// tolerant of a surrounding ```json fence or leading/trailing prose: it slices
-// from the first '{' to the last '}'. An empty or unparseable body is an error
-// (caller degrades to static).
+// parseProposal extracts the strict-JSON proposal from the LLM stdout. Under
+// the ADR-0027 stdout contract the "stdout" is the captured REPL scrollback,
+// which echoes the PROMPT — and the prompt carries a JSON example. A naive
+// first-'{'/last-'}' slice would span the example through the real answer, so
+// we take the LAST balanced object (the agent's reply is last). Tolerant of a
+// ```json fence / surrounding prose. Empty/unparseable → error (caller
+// degrades to static).
 func parseProposal(stdout string) (*router.Proposal, error) {
-	start := strings.IndexByte(stdout, '{')
-	end := strings.LastIndexByte(stdout, '}')
-	if start < 0 || end < start {
+	start, end, ok := lastBalancedSpan(stdout, '{', '}')
+	if !ok {
 		return nil, fmt.Errorf("no JSON object in proposer output")
 	}
 	var prop router.Proposal
@@ -245,13 +248,13 @@ func parseProposal(stdout string) (*router.Proposal, error) {
 
 // parsePhasePlan extracts the strict-JSON whole-cycle plan from the LLM stdout.
 // The wire format is a bare array of {phase, run, justification}; like
-// parseProposal it tolerates a surrounding ```json fence or leading/trailing
-// prose by slicing from the first '[' to the last ']'. An empty or unparseable
-// body is an error (caller degrades to the deterministic static plan).
+// parseProposal it takes the LAST balanced array so the prompt's echoed JSON
+// example (present in the captured scrollback under the ADR-0027 stdout
+// contract) is not mistaken for the answer. An empty or unparseable body is an
+// error (caller degrades to the deterministic static plan).
 func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
-	start := strings.IndexByte(stdout, '[')
-	end := strings.LastIndexByte(stdout, ']')
-	if start < 0 || end < start {
+	start, end, ok := lastBalancedSpan(stdout, '[', ']')
+	if !ok {
 		return nil, fmt.Errorf("no JSON array in plan output")
 	}
 	var entries []router.PhasePlanEntry
@@ -262,6 +265,49 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 		return nil, fmt.Errorf("empty phase plan")
 	}
 	return &router.PhasePlan{Entries: entries}, nil
+}
+
+// lastBalancedSpan finds the LAST top-level balanced span delimited by open/
+// close in s, returning [start, end] inclusive indices. It forward-scans while
+// tracking JSON string-literal context (with backslash escapes), so a literal
+// delimiter inside a "justification" value (e.g. `}` or `]`) is not miscounted.
+// It records every top-level span and returns the last, so the agent's reply is
+// extracted even when the scrollback also contains an earlier (prompt-echoed)
+// example of the same shape. Returns ok=false when no balanced span exists.
+func lastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
+	depth, spanStart := 0, -1
+	inStr, esc := false, false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inStr {
+			switch {
+			case esc:
+				esc = false
+			case c == '\\':
+				esc = true
+			case c == '"':
+				inStr = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inStr = true
+		case open:
+			if depth == 0 {
+				spanStart = i
+			}
+			depth++
+		case close:
+			if depth > 0 {
+				depth--
+				if depth == 0 && spanStart >= 0 {
+					start, end, ok = spanStart, i, true // keep scanning for a later span
+				}
+			}
+		}
+	}
+	return start, end, ok
 }
 
 // compile-time assertions that PhaseAdvisor satisfies both router ports.

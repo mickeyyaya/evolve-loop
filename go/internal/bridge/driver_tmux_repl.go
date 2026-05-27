@@ -200,8 +200,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	if reviewer == nil {
 		reviewer = newDeterministicReviewer(envInt(deps, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
 	}
-	artifactSeen := false
-	relocErrLogged := false
+	// ADR-0027: the completion contract is a Strategy. Default ("" / "artifact")
+	// is the legacy artifact-file poll, byte-identical to the pre-Strategy code;
+	// "stdout" completes on REPL-idle for agents that print their answer and
+	// write no file (the router/advisor). The detector ONLY decides readiness —
+	// the stop-review/extend liveness adjudication below is unchanged.
+	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp)
+	completed := false
+	detectErrLogged := false
 	attempt := 0
 	intervalStart := 0
 	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
@@ -211,24 +217,24 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// Context cancelled (orchestrator timeout / SIGTERM): stop waiting
 			// promptly rather than running out the reviewer's extend budget.
 			// Load-bearing once a Stage-1 LLM reviewer can extend at length.
-			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning artifact wait\n", pfx, err)
+			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning completion wait\n", pfx, err)
 			break
 		}
-		ready, from, relocErr := artifactReady(cfg)
+		ready, _, note, derr := detector.poll(ctx)
 		if ready {
-			artifactSeen = true
-			if from != "" {
-				fmt.Fprintf(deps.Stderr, "%s artifact relocated from non-canonical %s → %s\n", pfx, from, cfg.Artifact)
+			completed = true
+			if note != "" {
+				fmt.Fprintf(deps.Stderr, "%s %s\n", pfx, note)
 			}
-			fmt.Fprintf(deps.Stderr, "%s artifact appeared: %s\n", pfx, cfg.Artifact)
 			break
 		}
-		if relocErr != nil && !relocErrLogged {
-			// The artifact landed in the non-canonical location but could not be
-			// moved (e.g. read-only workspace). Surface it once, immediately,
-			// instead of spinning the full wait window with no signal.
-			fmt.Fprintf(deps.Stderr, "%s WARN: artifact present at non-canonical path but relocation failed: %v\n", pfx, relocErr)
-			relocErrLogged = true
+		if derr != nil && !detectErrLogged {
+			// The detector surfaced a fault (e.g. an artifact present at a
+			// non-canonical path that could not be relocated — read-only
+			// workspace). Surface it once, immediately, instead of spinning the
+			// full wait window with no signal.
+			fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, derr)
+			detectErrLogged = true
 		}
 		// Drain live-injection envelopes BEFORE the auto-respond tick so an
 		// operator interrupt pre-empts a pending auto-reply on this tick.
@@ -286,8 +292,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			intervalBaselinePane = curPane
 		}
 	}
-	if !artifactSeen {
-		fmt.Fprintf(deps.Stderr, "%s FAIL: artifact never appeared at %s (stop-review paused after %d interval(s) of %ds)\n", pfx, cfg.Artifact, attempt+1, interval)
+	if !completed {
+		fmt.Fprintf(deps.Stderr, "%s FAIL: completion never signalled (artifact %s; stop-review paused after %d interval(s) of %ds)\n", pfx, cfg.Artifact, attempt+1, interval)
 		fmt.Fprintf(deps.Stderr, "%s diagnostic: files present under workspace %s:\n", pfx, cfg.Workspace)
 		for _, line := range listWorkspaceFiles(cfg.Workspace) {
 			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
@@ -312,7 +318,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			}
 		}
 	}
-	fmt.Fprintf(deps.Stderr, "%s DONE: artifact-only verdict = SUCCESS\n", pfx)
+	contract := cfg.Completion
+	if contract == "" {
+		contract = "artifact"
+	}
+	fmt.Fprintf(deps.Stderr, "%s DONE: %s completion verdict = SUCCESS\n", pfx, contract)
 	return 0, nil
 }
 
