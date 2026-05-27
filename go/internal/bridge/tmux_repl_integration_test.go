@@ -210,11 +210,21 @@ func TestRealTmux_ArtifactTimeout(t *testing.T) {
 	// directive, so the path is a don't-care; runTmuxREPL still polls the
 	// real cfg.Artifact (set by itConfig) and never sees it appear.
 	cfg := itConfig(t, "ARTIFACT=/dev/null")
+	// This test asserts the *artifact*-timeout path (EC 81), which requires
+	// boot to succeed first. itDeps scales BOTH the boot-wait (60 polls) and
+	// the artifact-wait with one perTick, so a tight perTick that keeps the
+	// artifact-wait short also starves the boot budget: at 10ms the boot got
+	// only 60×10ms=600ms real, which raced real-tmux boot under parallel-suite
+	// load and returned ExitREPLBootTimeout(80) instead of 81. Decouple them:
+	// a generous perTick gives boot a 60×150ms=9s budget (it breaks early on
+	// the marker), while a short ArtifactTimeoutS bounds the artifact-wait to
+	// (4/2)×150ms≈300ms so the test stays fast.
+	cfg.ArtifactTimeoutS = 4
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "artifact-timeout", marker)
 	sess := itSession("artto")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(10*time.Millisecond),
+	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(150*time.Millisecond),
 		itLaunch(sess, launchCmd, marker, 0, false))
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout)", code, ExitArtifactTimeout)
