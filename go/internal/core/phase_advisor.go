@@ -11,14 +11,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// PhaseAdvisor is the bridge-backed router.Proposer (the DynamicLLM brain).
-// It asks an LLM, via the existing core.Bridge port, which optional phases to
-// insert/skip next given the objective digest. Its output is ADVISORY: the pure
-// router.Route() clamp pass re-validates it against the kernel floor (mandatory
-// spine, TDD-pin, ship-needs-real-audit), so a hallucinated or malformed
-// proposal can never weaken the ship guarantee. Any failure is returned as an
-// error and LLMProposal.Decide degrades cleanly to the deterministic
-// StaticPreset — "model proposes, kernel disposes", fail-safe to the floor.
+// PhaseAdvisor is the bridge-backed DynamicLLM brain. It satisfies two router
+// ports: router.Proposer (Propose — the per-transition "insert this optional
+// phase?" advice) and router.Planner (Plan — the upfront whole-cycle run/skip
+// plan, ADR-0024 §2). Both ask an LLM via the core.Bridge port given the
+// objective digest. All output is ADVISORY: the pure router.Route() clamp pass
+// re-validates it against the kernel floor (mandatory spine, TDD-pin,
+// ship-needs-real-audit), so a hallucinated or malformed proposal can never
+// weaken the ship guarantee. Any failure is returned as an error and the caller
+// degrades cleanly to the deterministic static path — "model proposes, kernel
+// disposes", fail-safe to the floor.
 type PhaseAdvisor struct {
 	bridge  Bridge
 	cli     string
@@ -91,7 +93,44 @@ func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 	return prop, nil
 }
 
-// buildRoutingPrompt renders the objective routing context into a compact,
+// Plan implements router.Planner: it asks the LLM for a whole-cycle run/skip
+// plan (ADR-0024 §2 hybrid cadence — the cheap, coherent upfront decision). The
+// returned plan is ADVISORY; the kernel clamp re-validates it against the floor.
+// Mirrors Propose's wiring but writes phase-plan.json and parses a JSON array.
+// Any failure returns an error so the caller degrades to the static path.
+func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
+	if p.bridge == nil {
+		return nil, fmt.Errorf("phase advisor: nil bridge")
+	}
+	if in.Workspace == "" {
+		return nil, fmt.Errorf("phase advisor: empty workspace")
+	}
+	profile := p.profile
+	if profile == "" && in.ProjectRoot != "" {
+		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "router.json")
+	}
+	resp, err := p.bridge.Launch(context.Background(), BridgeRequest{
+		CLI:          p.cli,
+		Profile:      profile,
+		Model:        p.model,
+		Prompt:       buildPlanPrompt(in),
+		Workspace:    in.Workspace,
+		ArtifactPath: filepath.Join(in.Workspace, "phase-plan.json"),
+		Agent:        "router",
+		Cycle:        in.Cycle,
+		Env:          in.Env,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("phase advisor: bridge launch: %w", err)
+	}
+	plan, err := parsePhasePlan(resp.Stdout)
+	if err != nil {
+		return nil, fmt.Errorf("phase advisor: %w", err)
+	}
+	return plan, nil
+}
+
+// buildRoutingPrompt renders the per-transition routing context into a compact,
 // deterministic prompt. It lists the just-completed phase, the digested
 // signals, the optional phases still available with their declarative triggers,
 // and the non-bypassable kernel rules — then asks for a strict-JSON proposal.
@@ -102,13 +141,46 @@ func buildRoutingPrompt(in router.RouteInput) string {
 	b.WriteString("and which optional phases to insert. Your proposal is ADVISORY and will be clamped to the ")
 	b.WriteString("mandatory spine, the TDD pin, and the ship-needs-audit rule — never propose skipping those.\n\n")
 
-	fmt.Fprintf(&b, "## Cycle\n- cycle: %d\n- just_completed: %s\n- last_verdict: %s\n", in.Cycle, in.Current, in.Verdict)
-	fmt.Fprintf(&b, "- completed_phases: %s\n", strings.Join(in.Completed, ", "))
-	fmt.Fprintf(&b, "- mandatory_spine: %s\n", strings.Join(in.Cfg.Mandatory, ", "))
-	fmt.Fprintf(&b, "- budget_remaining_usd: %.2f\n- max_optional_insertions: %d\n\n", in.BudgetRemaining, in.Cfg.MaxInsertions)
+	writeRoutingContext(&b, in)
+
+	b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
+	b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>"}`)
+	b.WriteString("\n")
+	return b.String()
+}
+
+// buildPlanPrompt renders the WHOLE-CYCLE planning context (ADR-0024 §2): the
+// same objective digest + rubric as buildRoutingPrompt, but it asks the advisor
+// to decide run/skip for EVERY phase of the cycle in one coherent pass, as a
+// strict-JSON array. The plan is advisory — the kernel clamp re-validates it.
+func buildPlanPrompt(in router.RouteInput) string {
+	var b strings.Builder
+	b.WriteString("You are the evolve-loop PHASE ADVISOR. The model proposes; the kernel disposes.\n")
+	b.WriteString("From the objective signals below, decide which phases should RUN this cycle and which to SKIP, ")
+	b.WriteString("with a one-sentence justification per phase. Your plan is ADVISORY and will be clamped to the ")
+	b.WriteString("integrity floor (ship requires a real PASS audit bound to the built tree) — a plan that reaches ")
+	b.WriteString("ship without audit is rejected by the kernel.\n\n")
+
+	writeRoutingContext(&b, in)
+
+	b.WriteString("\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n")
+	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>"},...]`)
+	b.WriteString("\n")
+	return b.String()
+}
+
+// writeRoutingContext writes the shared, deterministic decision context — cycle
+// header, digested objective signals, available optional phases, and the
+// decision rubric — consumed by both the per-transition prompt and the
+// whole-cycle plan prompt. Deterministic string ⇒ prompt-prefix cache friendly.
+func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
+	fmt.Fprintf(b, "## Cycle\n- cycle: %d\n- just_completed: %s\n- last_verdict: %s\n", in.Cycle, in.Current, in.Verdict)
+	fmt.Fprintf(b, "- completed_phases: %s\n", strings.Join(in.Completed, ", "))
+	fmt.Fprintf(b, "- mandatory_spine: %s\n", strings.Join(in.Cfg.Mandatory, ", "))
+	fmt.Fprintf(b, "- budget_remaining_usd: %.2f\n- max_optional_insertions: %d\n\n", in.BudgetRemaining, in.Cfg.MaxInsertions)
 
 	b.WriteString("## Objective signals (digested from handoff artifacts)\n")
-	writeSignals(&b, in.Signals)
+	writeSignals(b, in.Signals)
 
 	if len(in.Cfg.Triggers) > 0 {
 		b.WriteString("\n## Optional phases available (insert only on objective signal)\n")
@@ -118,13 +190,12 @@ func buildRoutingPrompt(in router.RouteInput) string {
 		}
 		sort.Strings(names) // deterministic prompt ⇒ prompt-prefix cache friendly
 		for _, name := range names {
-			fmt.Fprintf(&b, "- %s\n", name)
+			fmt.Fprintf(b, "- %s\n", name)
 		}
 	}
 
 	// Decision rubric — renders skills/adversarial-testing/SKILL.md §7 inline so
 	// the advisor reasons from the same objective-signal table the kernel uses.
-	// Deterministic string ⇒ prompt-prefix cache friendly.
 	b.WriteString("\n## Decision rubric (justify each optional phase by an objective signal)\n")
 	b.WriteString("- scout.carryover_count >= 3 → skip scout (work already queued)\n")
 	b.WriteString("- scout.item_count == 0 → end cycle early (no-ship is legitimate)\n")
@@ -133,11 +204,6 @@ func buildRoutingPrompt(in router.RouteInput) string {
 	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
 	b.WriteString("- cycle_size == trivial → skip tdd (conditional-mandatory exemption)\n")
 	b.WriteString("FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n")
-
-	b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
-	b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>"}`)
-	b.WriteString("\n")
-	return b.String()
 }
 
 func writeSignals(b *strings.Builder, s router.RoutingSignals) {
@@ -177,5 +243,29 @@ func parseProposal(stdout string) (*router.Proposal, error) {
 	return &prop, nil
 }
 
-// compile-time assertion that PhaseAdvisor satisfies the router port.
-var _ router.Proposer = (*PhaseAdvisor)(nil)
+// parsePhasePlan extracts the strict-JSON whole-cycle plan from the LLM stdout.
+// The wire format is a bare array of {phase, run, justification}; like
+// parseProposal it tolerates a surrounding ```json fence or leading/trailing
+// prose by slicing from the first '[' to the last ']'. An empty or unparseable
+// body is an error (caller degrades to the deterministic static plan).
+func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
+	start := strings.IndexByte(stdout, '[')
+	end := strings.LastIndexByte(stdout, ']')
+	if start < 0 || end < start {
+		return nil, fmt.Errorf("no JSON array in plan output")
+	}
+	var entries []router.PhasePlanEntry
+	if err := json.Unmarshal([]byte(stdout[start:end+1]), &entries); err != nil {
+		return nil, fmt.Errorf("parse phase plan: %w", err)
+	}
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("empty phase plan")
+	}
+	return &router.PhasePlan{Entries: entries}, nil
+}
+
+// compile-time assertions that PhaseAdvisor satisfies both router ports.
+var (
+	_ router.Proposer = (*PhaseAdvisor)(nil)
+	_ router.Planner  = (*PhaseAdvisor)(nil)
+)
