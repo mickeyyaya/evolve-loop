@@ -34,9 +34,9 @@ func TestEnforceNext(t *testing.T) {
 	}{
 		{"empty-proposal", "", PhaseTriage, false},
 		{"equals-static", "triage", PhaseTriage, false},
-		{"illegal-edge", "ship", PhaseTriage, false},   // scout↛ship
-		{"spine-gated", "build", PhaseTriage, false},   // legal edge, scout artifact absent
-		{"accepted", "tdd", PhaseTDD, true},            // legal, needs 0 anchors
+		{"illegal-edge", "ship", PhaseTriage, false}, // scout↛ship
+		{"spine-gated", "build", PhaseTriage, false}, // legal edge, scout artifact absent
+		{"accepted", "tdd", PhaseTDD, true},          // legal, needs 0 anchors
 	}
 	for _, tc := range cases {
 		gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, sig,

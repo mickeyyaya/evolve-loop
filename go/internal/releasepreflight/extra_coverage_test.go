@@ -113,7 +113,7 @@ func writeLedger(t *testing.T, lines ...string) string {
 func TestCheckRecentAudit_AllPhantom(t *testing.T) {
 	t.Parallel()
 	ledger := writeLedger(t,
-		auditEntry("", "2026-05-27T00:00:00Z"),                         // empty path → phantom
+		auditEntry("", "2026-05-27T00:00:00Z"),                             // empty path → phantom
 		auditEntry("/nonexistent/audit-report.md", "2026-05-27T00:00:00Z"), // missing → phantom
 	)
 	_, err := checkRecentAudit(ledger, false, time.Now())
