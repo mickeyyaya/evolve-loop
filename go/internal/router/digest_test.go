@@ -125,3 +125,44 @@ func TestCycleSize_FallbackToScout(t *testing.T) {
 		t.Errorf("empty signals CycleSize() should be empty string")
 	}
 }
+
+// TestDigest_GenericSignalFold verifies the uniform signal plane: a handoff's
+// top-level "signals" block is folded into sig.Generic, bare keys namespaced by
+// phase and already-dotted keys taken as-is. This is what makes a user phase's
+// signal routable without a bespoke typed extractor.
+func TestDigest_GenericSignalFold(t *testing.T) {
+	ws := t.TempDir()
+	// A build handoff that ALSO carries a uniform signals block (bare + dotted).
+	writeFile(t, ws, "handoff-build.json", `{
+	  "phase": "build", "verdict": "PASS",
+	  "acs_result": {"green": 1, "red": 0, "total": 1},
+	  "signals": { "files_touched": 4, "security.precheck": "clean" }
+	}`)
+	sig, err := Digest(ws, []string{"build"})
+	if err != nil {
+		t.Fatalf("Digest: %v", err)
+	}
+	got, ok := sig.GenericValue("build.files_touched")
+	if f, isF := got.(float64); !ok || !isF || f != 4 {
+		t.Errorf("Generic[build.files_touched] = %v (%T, ok=%v), want float64(4)", got, got, ok)
+	}
+	got, ok = sig.GenericValue("security.precheck")
+	if s, isS := got.(string); !ok || !isS || s != "clean" {
+		t.Errorf("Generic[security.precheck] = %v (%T, ok=%v), want \"clean\" (dotted key kept as-is)", got, got, ok)
+	}
+	// Typed extraction is unaffected (additive).
+	if !sig.Build.Present || sig.Build.Verdict != "PASS" {
+		t.Errorf("typed Build extraction regressed: %+v", sig.Build)
+	}
+}
+
+// TestDigest_NoSignalsBlock_GenericNil confirms a handoff without a signals
+// block leaves Generic nil (fail-open, no allocation).
+func TestDigest_NoSignalsBlock_GenericNil(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "handoff-scout.json", scoutHandoff)
+	sig, _ := Digest(ws, []string{"scout"})
+	if sig.Generic != nil {
+		t.Errorf("Generic = %v, want nil when no signals block present", sig.Generic)
+	}
+}

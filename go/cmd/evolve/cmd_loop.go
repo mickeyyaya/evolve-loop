@@ -407,10 +407,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// halts the batch.
 		if policy != dispatchPolicyOff {
 			vc := ledgerverify.LoadVerifyContext(workspace, cfg.EvolveDir)
-			vr, vErr := ledgerverify.VerifyCycle(context.Background(), deps.Ledger, ranCycle, ledgerverify.Options{
-				IntentRequired: vc.IntentRequired,
-				CycleVerdict:   vc.CycleVerdict,
-			})
+			vr, vErr := ledgerverify.VerifyCycle(context.Background(), deps.Ledger, ranCycle, ledgerverify.Options(vc))
 			if vErr != nil {
 				fmt.Fprintf(stderr, "[loop] verify cycle %d: %v\n", ranCycle, vErr)
 			} else if !vr.OK {

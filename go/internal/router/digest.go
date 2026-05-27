@@ -26,24 +26,53 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	if done["scout"] {
 		if raw, ok := readFirst(workspace, "handoff-scout.json"); ok {
 			sig.Scout = extractScout(raw)
+			sig.foldGeneric("scout", raw)
 		}
 	}
 	if done["triage"] {
 		if raw, ok := readFirst(workspace, "handoff-triage.json"); ok {
 			sig.Triage = extractTriage(raw)
+			sig.foldGeneric("triage", raw)
 		}
 	}
 	if done["build"] {
 		if raw, ok := readFirst(workspace, "handoff-build.json", "handoff-builder.json"); ok {
 			sig.Build = extractBuild(raw)
+			sig.foldGeneric("build", raw)
 		}
 	}
 	if done["audit"] {
 		if raw, ok := readFirst(workspace, "handoff-audit.json", "handoff-auditor.json"); ok {
 			sig.Audit = extractAudit(raw)
+			sig.foldGeneric("audit", raw)
 		}
 	}
 	return sig, nil
+}
+
+// foldGeneric merges a handoff's uniform top-level "signals" object into
+// sig.Generic, namespacing bare keys with the phase (keys already containing a
+// "." are taken as-is, letting a phase emit a cross-namespace signal). This is
+// the uniform signal plane that makes user-phase signals routable without a
+// bespoke extractor. Absent/unparseable "signals" is a no-op (fail-open).
+// Collisions are last-write-wins (Digest folds in phase order); built-ins never
+// collide since they don't use the dotted-key form.
+func (s *RoutingSignals) foldGeneric(phase string, raw []byte) {
+	var doc struct {
+		Signals map[string]any `json:"signals"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil || len(doc.Signals) == 0 {
+		return
+	}
+	if s.Generic == nil {
+		s.Generic = make(map[string]any, len(doc.Signals))
+	}
+	for k, v := range doc.Signals {
+		if !strings.Contains(k, ".") {
+			k = phase + "." + k
+		}
+		s.Generic[k] = v
+	}
 }
 
 func toSet(xs []string) map[string]bool {

@@ -81,6 +81,35 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string) {
 	case "audit.verdict":
 		return 0, false, sig.Audit.Verdict
 	default:
+		// Fall through to the uniform signal plane: a field not covered by the
+		// typed structs above is resolved from sig.Generic, so a user-defined
+		// phase's emitted signal is routable. Absent → fail-safe false (an
+		// unrecognized trigger never fires).
+		return resolveGeneric(sig, field)
+	}
+}
+
+// resolveGeneric resolves field from the namespaced generic signal bus. JSON
+// numbers arrive as float64; strings stay strings; bools render as
+// "true"/"false" so eq/ne comparisons work. Anything else is fail-safe false.
+func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string) {
+	v, ok := sig.GenericValue(field)
+	if !ok {
+		return 0, false, ""
+	}
+	switch t := v.(type) {
+	case float64:
+		return t, true, ""
+	case int:
+		return float64(t), true, "" // in-process assignment (encoding/json always emits float64)
+	case string:
+		return 0, false, t
+	case bool:
+		if t {
+			return 0, false, "true"
+		}
+		return 0, false, "false"
+	default:
 		return 0, false, ""
 	}
 }

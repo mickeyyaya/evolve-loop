@@ -125,14 +125,14 @@ func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, std
 	saved := map[string]string{}
 	for k, v := range env {
 		saved[k] = os.Getenv(k)
-		os.Setenv(k, v)
+		_ = os.Setenv(k, v)
 	}
 	defer func() {
 		for k, v := range saved {
 			if v == "" {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			} else {
-				os.Setenv(k, v)
+				_ = os.Setenv(k, v)
 			}
 		}
 	}()

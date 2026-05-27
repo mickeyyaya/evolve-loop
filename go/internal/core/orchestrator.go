@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -77,6 +78,12 @@ type Orchestrator struct {
 	// config.Load (the composition root) is the sole env/file reader.
 	cfg      config.RoutingConfig
 	strategy router.RoutingStrategy
+
+	// catalog is the merged phase catalog (built-in + user overlays). It lets
+	// the orchestrator accept and run user-defined phases on the dynamic-routing
+	// path WITHOUT hardcoding them in the Phase enum / state machine. Empty (the
+	// default) ⇒ only built-in phases exist ⇒ byte-identical legacy behavior.
+	catalog phasespec.Catalog
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -94,6 +101,13 @@ func WithRouting(cfg config.RoutingConfig, strategy router.RoutingStrategy) Opti
 			o.strategy = strategy
 		}
 	}
+}
+
+// WithCatalog injects the merged phase catalog so the orchestrator can accept
+// and run user-defined (non-built-in) phases on the dynamic-routing path. The
+// empty default keeps behavior byte-identical to the built-in-only pipeline.
+func WithCatalog(cat phasespec.Catalog) Option {
+	return func(o *Orchestrator) { o.catalog = cat }
 }
 
 // WithWorktreeProvisioner injects a worktree provisioner. Tests pass a fake to
@@ -286,6 +300,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		case current == PhaseStart:
 			// First edge is gated by intent_required, not by verdict.
 			next = o.sm.NextFromStart(cs.IntentRequired)
+		case !current.IsValid():
+			// current is a user-defined phase (only reachable when dynamic
+			// routing selected it). The static successor is simply the next
+			// entry in the configured order; the routing block below refines it.
+			next = o.nextInOrder(current)
 		default:
 			n, err := o.sm.Next(current, lastVerdict)
 			if err != nil {
@@ -368,7 +387,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// code writes land in the isolated worktree the role-gate permits;
 		// every other phase writes only its artifact to the absolute workspace.
 		phaseWorktree := ""
-		if WorktreePhase(next) {
+		if o.worktreePhase(next) {
 			phaseWorktree = cs.ActiveWorktree
 		}
 		resp, err := runner.Run(ctx, PhaseRequest{
@@ -515,17 +534,91 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 // the non-bypassable "kernel disposes" floor for Enforce mode — neither
 // Strategy can reach Ship without a real PASS/WARN audit artifact.
 func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision) (Phase, bool) {
-	cand := phaseFromRouter(dec.NextPhase)
+	cand := o.candidatePhase(dec.NextPhase)
 	if cand == "" || cand == staticNext {
 		return staticNext, false
 	}
-	if !o.sm.CanTransition(current, cand) {
+	if !o.transitionLegal(current, cand) {
 		return staticNext, false
 	}
 	if !o.sm.SpineSatisfiedUpTo(cand, sig, o.cfg) {
 		return staticNext, false
 	}
 	return cand, true
+}
+
+// candidatePhase resolves a router-proposed phase string to a runnable Phase:
+// a built-in (via phaseFromRouter) OR a user phase present in the catalog. An
+// unknown string yields "" so enforceNext declines it.
+func (o *Orchestrator) candidatePhase(s string) Phase {
+	if p := phaseFromRouter(s); p != "" {
+		return p
+	}
+	if _, ok := o.catalog.Get(s); ok {
+		return Phase(s)
+	}
+	return ""
+}
+
+// transitionLegal is the kernel legality gate for a proposed edge. Built-in
+// phases use the hardcoded state-machine graph. A user phase (optional,
+// catalog-defined) is legal iff it makes forward progress in the configured
+// order (cfg.Order) — the router only proposes the next runnable optional, and
+// SpineSatisfiedUpTo independently guards the mandatory anchors, so an optional
+// insertion between anchors cannot skip the spine or reach ship illegitimately.
+func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
+	if from.IsValid() && cand.IsValid() {
+		return o.sm.CanTransition(from, cand) // both built-in: hardcoded graph
+	}
+	// At least one endpoint is NOT a built-in phase — validate via order
+	// forward-progress (both-built-in edges took the sm.CanTransition branch above).
+	// A user-phase candidate must be optional (the floor). Leapfrogging a
+	// mandatory anchor is independently blocked by SpineSatisfiedUpTo in the caller.
+	if !cand.IsValid() {
+		spec, ok := o.catalog.Get(string(cand))
+		if !ok || !spec.Optional {
+			return false
+		}
+	}
+	ci, fi := orderIndex(o.cfg.Order, string(cand)), orderIndex(o.cfg.Order, string(from))
+	return ci >= 0 && fi >= 0 && ci > fi
+}
+
+// nextInOrder returns the phase immediately following p in the configured
+// order, or PhaseEnd when p is last/absent. Used to resume the normal sequence
+// after a user phase runs. Assumes cfg.Order is the complete registry order
+// (applyRegistry appends every registry phase), so a built-in successor is
+// always present when a registry is loaded.
+func (o *Orchestrator) nextInOrder(p Phase) Phase {
+	i := orderIndex(o.cfg.Order, string(p))
+	if i < 0 || i+1 >= len(o.cfg.Order) {
+		return PhaseEnd
+	}
+	return Phase(o.cfg.Order[i+1])
+}
+
+// orderIndex returns the position of phase in order, or -1 if absent.
+func orderIndex(order []string, phase string) int {
+	for i, p := range order {
+		if p == phase {
+			return i
+		}
+	}
+	return -1
+}
+
+// worktreePhase reports whether next writes source and so must run with
+// cwd=worktree. Built-in tdd/build always do; a user phase does iff its spec
+// sets writes_source. Method form (vs the free WorktreePhase) so it consults
+// the injected catalog.
+func (o *Orchestrator) worktreePhase(p Phase) bool {
+	if WorktreePhase(p) {
+		return true
+	}
+	if spec, ok := o.catalog.Get(string(p)); ok {
+		return spec.WritesSource
+	}
+	return false
 }
 
 // phaseFromRouter denormalizes a router phase string back to a core.Phase.

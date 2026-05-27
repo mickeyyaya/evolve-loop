@@ -115,9 +115,7 @@ func retroDecision(in RouteInput) RouterDecision {
 		Reason:   "retro:" + string(dec.Action),
 		Evidence: map[string]interface{}{"action": string(dec.Action)},
 	}
-	for _, sp := range dec.SkipPhases { // activate the dormant SkipPhases field
-		d.SkipPhases = append(d.SkipPhases, sp)
-	}
+	d.SkipPhases = append(d.SkipPhases, dec.SkipPhases...) // carry failure-adapter skips
 	switch dec.Action {
 	case failureadapter.ActionRetryWithFallback:
 		d.NextPhase = "tdd"
@@ -132,12 +130,13 @@ func retroDecision(in RouteInput) RouterDecision {
 func walk(in RouteInput, proposal *Proposal) RouterDecision {
 	d := RouterDecision{Evidence: map[string]interface{}{}}
 	done := toSet(in.Completed)
-	start := indexOf(normalize(in.Current)) // -1 for "start"/unknown
+	order := effectiveOrder(in.Cfg)
+	start := indexOfIn(order, normalize(in.Current)) // -1 for "start"/unknown
 
 	optionalUsed := countOptionalInserts(in.Cfg, in.Completed)
 
-	for i := start + 1; i < len(canonicalOrder); i++ {
-		phase := canonicalOrder[i]
+	for i := start + 1; i < len(order); i++ {
+		phase := order[i]
 		if done[phase] {
 			continue
 		}
@@ -297,8 +296,19 @@ func reasonFor(in RouteInput, phase string, optional bool) string {
 	return "content-insert:" + phase
 }
 
-func indexOf(phase string) int {
-	for i, p := range canonicalOrder {
+// effectiveOrder is the phase sequence the walk advances through: the
+// config-supplied Order (registry order, possibly with user phases spliced in)
+// when present, else the built-in canonicalOrder. Keeping the fallback means a
+// RoutingConfig built without a registry stays byte-identical to pre-Order behavior.
+func effectiveOrder(cfg config.RoutingConfig) []string {
+	if len(cfg.Order) > 0 {
+		return cfg.Order
+	}
+	return canonicalOrder
+}
+
+func indexOfIn(order []string, phase string) int {
+	for i, p := range order {
 		if p == phase {
 			return i
 		}

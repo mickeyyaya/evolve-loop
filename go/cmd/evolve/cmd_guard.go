@@ -61,7 +61,7 @@ func appendGuardsLog(evolveDir, guardName string, allow bool, reason string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = f.Write([]byte(line))
 }
 

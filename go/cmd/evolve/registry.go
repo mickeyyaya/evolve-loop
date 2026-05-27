@@ -51,6 +51,7 @@ var commands = []subcommand{
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
+	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: runPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: runServePhase},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},

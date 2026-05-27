@@ -320,7 +320,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[subagent-run] FAIL: PROMPT_FILE_OVERRIDE missing: %s\n", override)
 			return 1
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		promptReader = f
 	} else {
 		// Read from stdin.

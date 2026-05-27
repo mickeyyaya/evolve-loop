@@ -63,6 +63,22 @@ type RoutingSignals struct {
 	Triage TriageSignals
 	Build  BuildSignals
 	Audit  AuditSignals
+
+	// Generic is the uniform signal plane: namespaced <phase>.<key> values
+	// folded from each handoff's top-level "signals" block. This is what lets a
+	// user-defined phase emit a signal the router can key on without a bespoke
+	// typed extractor. Populated by Digest; consumed by resolveField as a
+	// fallback for fields not covered by the typed structs above (Stage 2).
+	Generic map[string]any
+}
+
+// GenericValue returns the namespaced generic signal for field (e.g.
+// "security.severity_max"); ok is false when absent. Type note: values come
+// from encoding/json, so JSON numbers are float64 (not int) — numeric callers
+// must assert float64.
+func (s RoutingSignals) GenericValue(field string) (any, bool) {
+	v, ok := s.Generic[field]
+	return v, ok
 }
 
 // ScoutSignals are the routing-relevant fields of handoff-scout.json.

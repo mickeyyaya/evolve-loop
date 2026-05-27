@@ -69,6 +69,36 @@ func TestEvalCondition_StringOps(t *testing.T) {
 	}
 }
 
+// TestEvalCondition_GenericSignals verifies routing conditions resolve against
+// the uniform signal plane (sig.Generic) — the path that makes a user-defined
+// phase's emitted signal routable. JSON numbers arrive as float64.
+func TestEvalCondition_GenericSignals(t *testing.T) {
+	sig := RoutingSignals{Generic: map[string]any{
+		"security.cves":         float64(2), // JSON number
+		"security.severity_max": "HIGH",     // string
+		"deploy.ready":          true,       // bool
+	}}
+	cases := []struct {
+		field, op string
+		val       interface{}
+		want      bool
+	}{
+		{"security.cves", "gt", 0, true},
+		{"security.cves", "eq", 2, true},
+		{"security.severity_max", "eq", "HIGH", true},
+		{"security.severity_max", "ne", "LOW", true},
+		{"deploy.ready", "eq", "true", true},
+		{"deploy.ready", "ne", "false", true},  // bool renders "true"/"false"
+		{"security.missing", "eq", "x", false}, // absent generic → fail-safe false
+	}
+	for _, c := range cases {
+		got := evalCondition(sig, config.Condition{Field: c.field, Op: c.op, Value: c.val})
+		if got != c.want {
+			t.Errorf("evalCondition(%s %s %v) = %v, want %v", c.field, c.op, c.val, got, c.want)
+		}
+	}
+}
+
 func TestCoerceNum_StringNumber(t *testing.T) {
 	// String numeric value coerces for a numeric field.
 	sig := sigFixture()

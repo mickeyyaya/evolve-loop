@@ -1,6 +1,10 @@
 package core
 
-import "context"
+import (
+	"context"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+)
 
 // Phase is the typed identity of an orchestrator lifecycle stage.
 // Stringly-backed for JSON portability.
@@ -98,6 +102,17 @@ type PhaseRequest struct {
 	Budget        BudgetEnvelope    `json:"budget"`
 	PreviousPhase string            `json:"previous_phase,omitempty"`
 	Env           map[string]string `json:"env,omitempty"`
+
+	// Spec is the brick's own declarative definition. A spec-driven (kind:llm)
+	// phase reads all of its behavior from here; built-in Go phases ignore it.
+	// Additive in Stage 1 (nothing sets it until the orchestrator becomes a pure
+	// driver in Stage 3).
+	Spec *phasespec.PhaseSpec `json:"spec,omitempty"`
+
+	// UpstreamSignals is the accumulating signal bus piped in from prior phases,
+	// namespaced <phase>.<key> (e.g. "build.files_touched"). A phase keys its
+	// own routing/classify decisions off these without re-reading artifacts.
+	UpstreamSignals map[string]any `json:"upstream_signals,omitempty"`
 }
 
 // PhaseResponse is the output envelope from PhaseRunner.Run.
@@ -110,6 +125,16 @@ type PhaseResponse struct {
 	Tokens       TokenUsage   `json:"tokens"`
 	DurationMS   int64        `json:"duration_ms"`
 	Diagnostics  []Diagnostic `json:"diagnostics,omitempty"`
+
+	// Signals is the namespaced signal map this phase emits onto the bus — the
+	// typed "message on the pipe." The router (Stage 3) consumes these directly
+	// instead of re-parsing markdown. Keys are <phase>.<key>. Additive in
+	// Stage 1: emitted but not yet read by routing.
+	Signals map[string]any `json:"signals,omitempty"`
+
+	// CommitSHA is the commit that anchors this phase's deliverable
+	// (ADR-0027 commit-as-evidence). Empty when the phase committed nothing.
+	CommitSHA string `json:"commit_sha,omitempty"`
 }
 
 // PhaseRunner runs a single phase. The orchestrator never knows which

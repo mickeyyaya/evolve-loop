@@ -41,7 +41,7 @@ func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	defer g.Cleanup(root, wt)
+	defer func() { _ = g.Cleanup(root, wt) }()
 
 	out, err := exec.Command("git", "-C", wt, "symbolic-ref", "--short", "HEAD").Output()
 	if err != nil {
@@ -62,7 +62,7 @@ func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 		t.Fatalf("reuse: got (%q, %v), want (%q, nil)", wt2, err, wt)
 	}
 
-	g.Cleanup(root, wt)
+	_ = g.Cleanup(root, wt)
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Fatalf("worktree not removed after Cleanup: stat err=%v", err)
 	}

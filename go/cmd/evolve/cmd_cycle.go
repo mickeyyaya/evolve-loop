@@ -27,8 +27,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -241,6 +243,32 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	for _, w := range warnings {
 		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
 	}
+
+	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
+	// over the built-in catalog, splice the VALID ones into the routing order +
+	// triggers (the floor is enforced here — invalid specs are never routed), and
+	// register a spec-driven runner for each so the orchestrator can execute it.
+	// No user phases ⇒ all of this is a no-op and behavior is byte-identical.
+	builtinCat, _ := phasespec.Load(registryPath)
+	userSpecs, discWarns := phasespec.DiscoverUserSpecs(filepath.Join(projectRoot, ".evolve", "phases"))
+	catalog, mergeWarns := builtinCat.Merge(userSpecs)
+	for _, w := range append(discWarns, mergeWarns...) {
+		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
+	}
+	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs) {
+		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
+	}
+	// Register a spec-driven runner for each valid user phase. ValidateUserSpec
+	// is not called again here — ApplyUserRouting already enforced the floor and
+	// emitted warnings for any invalid spec above.
+	for _, s := range catalog.UserPhases() {
+		if len(phasespec.ValidateUserSpec(s)) > 0 {
+			continue // ApplyUserRouting already warned + skipped it; no dead runner
+		}
+		if _, exists := runners[core.Phase(s.Name)]; !exists {
+			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: br, Prompts: prm})
+		}
+	}
 	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
 	// routing_mode=llm; otherwise it falls back to the deterministic
 	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
@@ -249,6 +277,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	return orchDeps{
 		Storage:      st,
 		Ledger:       ld,
-		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithRouting(cfg, strategy)),
+		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithRouting(cfg, strategy), core.WithCatalog(catalog)),
 	}
 }
