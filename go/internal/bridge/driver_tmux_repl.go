@@ -181,15 +181,39 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		cursor.SetOffset(fi.Size())
 	}
 
-	// --- Wait for the artifact, ticking the auto-respond fallback.
-	deadline := tmuxArtifactTimeoutS
-	if cfg.ArtifactTimeoutS > 0 {
-		deadline = cfg.ArtifactTimeoutS
+	// --- Wait for the artifact in review intervals. A hard wall-clock deadline
+	// kills a slow-but-productive agent (it cannot tell "stuck" from "still
+	// thinking"). Instead, when a review interval elapses without the artifact,
+	// a StopReviewer adjudicates the evidence — did the agent emit new output? —
+	// into extend (still working, wait another interval) or pause (stalled,
+	// surface for investigation, do not silently kill). See stopreview.go +
+	// ADR-0026. The interval defaults to tmuxArtifactTimeoutS,
+	// overridable per-launch (cfg.ArtifactTimeoutS) or via EVOLVE_ARTIFACT_TIMEOUT_S.
+	interval := cfg.ArtifactTimeoutS
+	if interval <= 0 {
+		interval = envInt(deps, "EVOLVE_ARTIFACT_TIMEOUT_S", tmuxArtifactTimeoutS)
+	}
+	// Defensive default: the Engine path sets deps.Reviewer via withDefaults,
+	// but direct runTmuxREPL callers (tests, future Stage-1 wiring) may not —
+	// avoid a nil-deref at the review checkpoint.
+	reviewer := deps.Reviewer
+	if reviewer == nil {
+		reviewer = newDeterministicReviewer(envInt(deps, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
 	}
 	artifactSeen := false
 	relocErrLogged := false
-	for elapsed := 0; elapsed < deadline; elapsed += 2 {
+	attempt := 0
+	intervalStart := 0
+	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, 0)
+	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
+		if err := ctx.Err(); err != nil {
+			// Context cancelled (orchestrator timeout / SIGTERM): stop waiting
+			// promptly rather than running out the reviewer's extend budget.
+			// Load-bearing once a Stage-1 LLM reviewer can extend at length.
+			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning artifact wait\n", pfx, err)
+			break
+		}
 		ready, from, relocErr := artifactReady(cfg)
 		if ready {
 			artifactSeen = true
@@ -217,9 +241,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		switch rc {
 		case 0, 1: // noop / responded
 		case 2:
-			if secs := parseExtendSecs(action); secs > 0 {
-				deadline += secs
-				fmt.Fprintf(deps.Stderr, "%s artifact-poll deadline extended +%ds → %ds\n", pfx, secs, deadline)
+			// Agent self-signalled progress ("extend_timeout"): restart the
+			// current review interval so the signal counts as activity. Bounded
+			// by the auto-respond loop guard (case 86) — an agent cannot defer
+			// the reviewer indefinitely by repeating the same extend prompt.
+			if parseExtendSecs(action) > 0 {
+				intervalStart = elapsed
+				fmt.Fprintf(deps.Stderr, "%s agent extend signal — review interval refreshed\n", pfx)
 			}
 		case 85:
 			fmt.Fprintf(deps.Stderr, "%s auto-respond escalation; abandoning run\n", pfx)
@@ -228,9 +256,38 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			fmt.Fprintf(deps.Stderr, "%s auto-respond loop guard tripped; abandoning run\n", pfx)
 			return ExitRespondLoopGuard, nil
 		}
+		// Review checkpoint: a full interval elapsed without the artifact.
+		if elapsed-intervalStart >= interval {
+			curPane, _ := deps.Tmux.CapturePane(ctx, lp.session, 0)
+			// Progressed = the pane changed during the interval. Stage-0 signal:
+			// good for the common cases (growing token counters, new tool calls),
+			// but a pure spinner/clock animation also reads as progress — so the
+			// maxExtends backstop, not this diff, bounds a spinner-stuck agent
+			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
+			// disambiguate genuine work from animation.
+			progressed := curPane != intervalBaselinePane
+			v := reviewer.Review(StopEvent{
+				Kind:       StopArtifactTimeout,
+				Phase:      cfg.Agent,
+				Cycle:      cfg.Cycle,
+				ElapsedS:   elapsed,
+				IntervalS:  interval,
+				Attempt:    attempt,
+				Progressed: progressed,
+				StdoutTail: lastLines(curPane, 40),
+			})
+			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
+				pfx, StopArtifactTimeout, elapsed, attempt, progressed, v.Action, v.Reason)
+			if v.Action != ReviewExtend {
+				break
+			}
+			attempt++
+			intervalStart = elapsed
+			intervalBaselinePane = curPane
+		}
 	}
 	if !artifactSeen {
-		fmt.Fprintf(deps.Stderr, "%s FAIL: artifact never appeared at %s after %ds\n", pfx, cfg.Artifact, deadline)
+		fmt.Fprintf(deps.Stderr, "%s FAIL: artifact never appeared at %s (stop-review paused after %d interval(s) of %ds)\n", pfx, cfg.Artifact, attempt+1, interval)
 		fmt.Fprintf(deps.Stderr, "%s diagnostic: files present under workspace %s:\n", pfx, cfg.Workspace)
 		for _, line := range listWorkspaceFiles(cfg.Workspace) {
 			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)

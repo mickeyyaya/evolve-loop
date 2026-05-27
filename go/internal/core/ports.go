@@ -70,6 +70,15 @@ type State struct {
 	CurrentBatch    BatchAccrual    `json:"currentBatch"`
 	FailedAt        []FailedRecord  `json:"failedApproaches,omitempty"`
 	CarryoverTodos  []CarryoverTodo `json:"carryoverTodos,omitempty"`
+	// SetupCompletedAt / SetupVersion are the first-run onboarding marker
+	// (RFC3339 stamp + version) written by `evolve setup complete`. Empty
+	// SetupCompletedAt means setup has never run → `evolve loop` prints a
+	// one-line non-blocking nudge. omitempty keeps pre-setup state.json
+	// byte-clean. NOTE: this struct is a SUBSET view of state.json (the
+	// orchestrator's WriteState would drop unmodeled keys), so the setup
+	// marker is written via a lossless raw-merge — never via WriteState.
+	SetupCompletedAt string `json:"setupCompletedAt,omitempty"`
+	SetupVersion     int    `json:"setupVersion,omitempty"`
 }
 
 // BatchAccrual tracks per-dispatcher-invocation cost.

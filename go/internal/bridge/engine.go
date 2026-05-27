@@ -71,6 +71,11 @@ type Deps struct {
 	// it to detect available CLIs + tier dependencies. Default
 	// exec.LookPath; tests inject a controlled set.
 	LookPath func(file string) (string, error)
+	// Reviewer adjudicates a pipeline StopEvent (e.g. the artifact wait
+	// elapsing a review interval) into extend/pause/stop. Default
+	// deterministicReviewer (output-progress heuristic); tests and the
+	// future LLM/orchestrator reviewer inject their own. See stopreview.go.
+	Reviewer StopReviewer
 }
 
 // withDefaults returns a copy of d with any zero-value seam replaced by
@@ -103,6 +108,10 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.LookPath == nil {
 		d.LookPath = exec.LookPath
+	}
+	if d.Reviewer == nil {
+		// envInt reads via d.LookupEnv, defaulted just above.
+		d.Reviewer = newDeterministicReviewer(envInt(d, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
 	}
 	return d
 }
