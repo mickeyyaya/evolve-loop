@@ -200,6 +200,14 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	if s.Expect.RetroPrefix != "" && !strings.HasPrefix(res.RetroDecision, s.Expect.RetroPrefix) {
 		t.Errorf("RetroDecision=%q, want prefix %q", res.RetroDecision, s.Expect.RetroPrefix)
 	}
+	if s.Expect.ProposeAt != nil {
+		if agent == nil {
+			t.Fatalf("ProposeAt expects a scripted agent but none was configured")
+		}
+		if !sameSet(agent.seen, s.Expect.ProposeAt) {
+			t.Errorf("Proposer invoked at %v, want exactly %v (hybrid cadence)", agent.seen, s.Expect.ProposeAt)
+		}
+	}
 }
 
 // --- assertion helpers ---
