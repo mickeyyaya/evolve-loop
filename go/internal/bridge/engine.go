@@ -122,14 +122,18 @@ func (d Deps) withDefaults() Deps {
 // it to the selected Driver, so drivers never re-parse flags or re-read
 // the profile. Field set mirrors the bin/bridge launch flag surface.
 type Config struct {
-	CLI            string
-	Profile        string
-	Model          string // effective model — "auto" already resolved
-	PromptFile     string
-	Workspace      string
-	StdoutLog      string
-	StderrLog      string
-	Artifact       string
+	CLI        string
+	Profile    string
+	Model      string // effective model — "auto" already resolved
+	PromptFile string
+	Workspace  string
+	StdoutLog  string
+	StderrLog  string
+	Artifact   string
+	// Completion selects the phase-completion contract (ADR-0027): "" /
+	// "artifact" = poll for the artifact file (default, legacy); "stdout" =
+	// complete on REPL-idle for agents that print their answer (router/advisor).
+	Completion     string
 	Cycle          int
 	Worktree       string
 	Agent          string
@@ -228,6 +232,9 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)
 	}
+	if req.Completion != "" {
+		args = append(args, "--completion="+req.Completion)
+	}
 	// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
 	// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
 	// into a non-claude launch command.
@@ -249,7 +256,15 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	code := e.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
 	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String()}
 	if code == ExitOK {
-		if b, err := os.ReadFile(req.ArtifactPath); err == nil {
+		// Strategy-aware result read (ADR-0027): the stdout contract writes no
+		// artifact file — its answer is the captured scrollback (stdoutLog), so
+		// reading req.ArtifactPath would always miss. Every other contract reads
+		// the artifact file as before.
+		readPath := req.ArtifactPath
+		if req.Completion == "stdout" {
+			readPath = stdoutLog
+		}
+		if b, err := os.ReadFile(readPath); err == nil {
 			resp.Stdout = string(b)
 		}
 		return resp, nil
