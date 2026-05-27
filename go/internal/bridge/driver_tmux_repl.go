@@ -187,12 +187,24 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		deadline = cfg.ArtifactTimeoutS
 	}
 	artifactSeen := false
+	relocErrLogged := false
 	for elapsed := 0; elapsed < deadline; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
-		if fileNonEmpty(cfg.Artifact) {
+		ready, from, relocErr := artifactReady(cfg)
+		if ready {
 			artifactSeen = true
+			if from != "" {
+				fmt.Fprintf(deps.Stderr, "%s artifact relocated from non-canonical %s → %s\n", pfx, from, cfg.Artifact)
+			}
 			fmt.Fprintf(deps.Stderr, "%s artifact appeared: %s\n", pfx, cfg.Artifact)
 			break
+		}
+		if relocErr != nil && !relocErrLogged {
+			// The artifact landed in the non-canonical location but could not be
+			// moved (e.g. read-only workspace). Surface it once, immediately,
+			// instead of spinning the full wait window with no signal.
+			fmt.Fprintf(deps.Stderr, "%s WARN: artifact present at non-canonical path but relocation failed: %v\n", pfx, relocErr)
+			relocErrLogged = true
 		}
 		// Drain live-injection envelopes BEFORE the auto-respond tick so an
 		// operator interrupt pre-empts a pending auto-reply on this tick.
@@ -219,6 +231,10 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	if !artifactSeen {
 		fmt.Fprintf(deps.Stderr, "%s FAIL: artifact never appeared at %s after %ds\n", pfx, cfg.Artifact, deadline)
+		fmt.Fprintf(deps.Stderr, "%s diagnostic: files present under workspace %s:\n", pfx, cfg.Workspace)
+		for _, line := range listWorkspaceFiles(cfg.Workspace) {
+			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
+		}
 		// TODO(auto-respond slice): write escalation-report.json from final pane.
 		return ExitArtifactTimeout, nil
 	}
