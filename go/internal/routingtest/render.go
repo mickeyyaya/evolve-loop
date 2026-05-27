@@ -11,12 +11,12 @@ import (
 // when any of its fields is set; this keeps the dual renderings (Signals /
 // HandoffFiles) in lock-step.
 func (s SignalSpec) scoutPresent() bool {
-	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0
+	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0 || s.ScoutBacklog > 0
 }
 func (s SignalSpec) triagePresent() bool { return s.TriageSize != "" }
 func (s SignalSpec) buildPresent() bool {
 	return s.BuildVerdict != "" || s.ACSRed > 0 || s.ACSGreen > 0 || s.ACSRegression > 0 ||
-		s.SeverityMax != "" || s.FilesTouched > 0
+		s.SeverityMax != "" || s.FilesTouched > 0 || s.DiffLOC > 0
 }
 func (s SignalSpec) auditPresent() bool {
 	return s.AuditVerdict != "" || s.AuditConf > 0 || s.AuditRedCount > 0
@@ -30,6 +30,7 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 			CycleSizeEstimate: s.CycleSize,
 			ItemCount:         s.ScoutItemCount,
 			CarryoverCount:    s.ScoutCarryover,
+			BacklogSize:       s.ScoutBacklog,
 			Present:           true,
 		}
 	}
@@ -44,6 +45,7 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 			ACSRegression: s.ACSRegression,
 			SeverityMax:   router.ParseSeverity(s.SeverityMax),
 			FilesTouched:  s.FilesTouched,
+			DiffLOC:       s.DiffLOC,
 			Present:       true,
 		}
 	}
@@ -71,6 +73,9 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 		if s.ScoutCarryover > 0 {
 			m["carryover_count"] = s.ScoutCarryover
 		}
+		if s.ScoutBacklog > 0 {
+			m["backlog_size"] = s.ScoutBacklog
+		}
 		// Digest counts keys "item<digit>..." for ItemCount.
 		for i := 1; i <= s.ScoutItemCount; i++ {
 			m[fmt.Sprintf("item%d_scope", i)] = "x"
@@ -85,6 +90,9 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 			"green": s.ACSGreen, "red": s.ACSRed, "regression": s.ACSRegression,
 		}
 		m := map[string]interface{}{"verdict": s.BuildVerdict, "acs_result": acs}
+		if s.DiffLOC > 0 {
+			m["diff_loc"] = s.DiffLOC
+		}
 		// One thrust carries SeverityMax + FilesTouched (digest takes max severity
 		// and len(union(files))).
 		if s.SeverityMax != "" || s.FilesTouched > 0 {

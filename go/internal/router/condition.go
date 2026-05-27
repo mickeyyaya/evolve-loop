@@ -62,6 +62,8 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string) {
 		return float64(sig.Scout.ItemCount), true, ""
 	case "scout.carryover_count":
 		return float64(sig.Scout.CarryoverCount), true, ""
+	case "scout.backlog_size":
+		return float64(sig.Scout.BacklogSize), true, ""
 	case "build.acs_red":
 		return float64(sig.Build.ACSRed), true, ""
 	case "build.acs_green":
@@ -70,6 +72,8 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string) {
 		return float64(sig.Build.ACSRegression), true, ""
 	case "build.files_touched":
 		return float64(sig.Build.FilesTouched), true, ""
+	case "build.diff_loc":
+		return float64(sig.Build.DiffLOC), true, ""
 	case "build.severity_max":
 		return float64(sig.Build.SeverityMax), true, ""
 	case "build.verdict":

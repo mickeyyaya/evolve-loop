@@ -128,7 +128,7 @@ func buildRoutingPrompt(in router.RouteInput) string {
 	b.WriteString("\n## Decision rubric (justify each optional phase by an objective signal)\n")
 	b.WriteString("- scout.carryover_count >= 3 → skip scout (work already queued)\n")
 	b.WriteString("- scout.item_count == 0 → end cycle early (no-ship is legitimate)\n")
-	b.WriteString("- build.diff_files_touched >= 10 OR diff_loc >= 500 → insert plan-review\n")
+	b.WriteString("- build.files_touched >= 10 OR build.diff_loc >= 500 → insert plan-review\n")
 	b.WriteString("- build.acs_red >= 1 OR build.severity_max >= HIGH → insert tester\n")
 	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
 	b.WriteString("- cycle_size == trivial → skip tdd (conditional-mandatory exemption)\n")
@@ -142,15 +142,15 @@ func buildRoutingPrompt(in router.RouteInput) string {
 
 func writeSignals(b *strings.Builder, s router.RoutingSignals) {
 	if s.Scout.Present {
-		fmt.Fprintf(b, "- scout: cycle_size_estimate=%s item_count=%d carryover=%d\n",
-			s.Scout.CycleSizeEstimate, s.Scout.ItemCount, s.Scout.CarryoverCount)
+		fmt.Fprintf(b, "- scout: cycle_size_estimate=%s item_count=%d carryover=%d backlog=%d\n",
+			s.Scout.CycleSizeEstimate, s.Scout.ItemCount, s.Scout.CarryoverCount, s.Scout.BacklogSize)
 	}
 	if s.Triage.Present {
 		fmt.Fprintf(b, "- triage: cycle_size=%s phase_skip=%s\n", s.Triage.CycleSize, strings.Join(s.Triage.PhaseSkip, ","))
 	}
 	if s.Build.Present {
-		fmt.Fprintf(b, "- build: verdict=%s acs_green=%d acs_red=%d acs_regression=%d severity_max=%s files_touched=%d\n",
-			s.Build.Verdict, s.Build.ACSGreen, s.Build.ACSRed, s.Build.ACSRegression, s.Build.SeverityMax, s.Build.FilesTouched)
+		fmt.Fprintf(b, "- build: verdict=%s acs_green=%d acs_red=%d acs_regression=%d severity_max=%s files_touched=%d diff_loc=%d\n",
+			s.Build.Verdict, s.Build.ACSGreen, s.Build.ACSRed, s.Build.ACSRegression, s.Build.SeverityMax, s.Build.FilesTouched, s.Build.DiffLOC)
 	}
 	if s.Audit.Present {
 		fmt.Fprintf(b, "- audit: verdict=%s confidence=%.2f red_count=%d\n", s.Audit.Verdict, s.Audit.Confidence, s.Audit.RedCount)

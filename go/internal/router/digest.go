@@ -101,6 +101,7 @@ func extractScout(raw []byte) ScoutSignals {
 	s := ScoutSignals{Present: true}
 	_ = json.Unmarshal(top["cycle_size_estimate"], &s.CycleSizeEstimate)
 	_ = json.Unmarshal(top["carryover_count"], &s.CarryoverCount)
+	_ = json.Unmarshal(top["backlog_size"], &s.BacklogSize)
 	for k := range top {
 		// itemN_* blocks measure scope breadth (cycle-56: item1_..item6_).
 		if strings.HasPrefix(k, "item") && hasDigitAfterPrefix(k, "item") {
@@ -139,6 +140,7 @@ func extractTriage(raw []byte) TriageSignals {
 func extractBuild(raw []byte) BuildSignals {
 	var d struct {
 		Verdict   string `json:"verdict"`
+		DiffLOC   int    `json:"diff_loc"`
 		ACSResult struct {
 			Green      int `json:"green"`
 			Red        int `json:"red"`
@@ -162,6 +164,7 @@ func extractBuild(raw []byte) BuildSignals {
 		ACSTotal:      d.ACSResult.Total,
 		ACSThisCycle:  d.ACSResult.ThisCycle,
 		ACSRegression: d.ACSResult.Regression,
+		DiffLOC:       d.DiffLOC,
 		Present:       true,
 	}
 	files := map[string]bool{}

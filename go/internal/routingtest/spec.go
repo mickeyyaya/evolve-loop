@@ -78,6 +78,7 @@ type SignalSpec struct {
 	ACSGreen       int
 	ACSRegression  int
 	FilesTouched   int
+	DiffLOC        int    // build.diff_loc (lines changed)
 	SeverityMax    string // "LOW"|"MEDIUM"|"HIGH"|"CRITICAL"
 	BuildVerdict   string
 	AuditVerdict   string
@@ -85,6 +86,7 @@ type SignalSpec struct {
 	AuditRedCount  int
 	ScoutItemCount int
 	ScoutCarryover int
+	ScoutBacklog   int // scout.backlog_size (queued work breadth)
 }
 
 // AgentSpec is the simulated LLM router brain: a scripted proposal per

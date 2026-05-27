@@ -86,6 +86,7 @@ type ScoutSignals struct {
 	CycleSizeEstimate string // "trivial|small|medium|large"
 	ItemCount         int    // # of itemN_* blocks (scope breadth)
 	CarryoverCount    int    // carryover todos surfaced
+	BacklogSize       int    // total queued backlog items (breadth of pending work)
 	Present           bool
 }
 
@@ -106,6 +107,7 @@ type BuildSignals struct {
 	ACSRegression int
 	SeverityMax   Severity // max thrusts[].severity, ordinal-encoded
 	FilesTouched  int      // union(thrusts[].files_modified + files_new)
+	DiffLOC       int      // lines-of-code changed this build (top-level diff_loc)
 	Present       bool
 }
 
