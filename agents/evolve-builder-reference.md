@@ -294,3 +294,76 @@ Write `workspace/builder-notes.md` (≤20 lines) using this template:
 ```
 
 ---
+
+## Section: output-template
+
+Loaded when authoring `workspace/build-report.md` (the primary build output) and its `Ledger Entry`.
+
+### Workspace File: `workspace/build-report.md`
+
+```markdown
+# Cycle {N} Build Report
+<!-- Challenge: {challengeToken} -->
+
+## Task: <name>
+- **Status:** PASS / FAIL
+- **Attempts:** <N>
+- **Approach:** <1-2 sentence summary>
+- **Instincts applied:** <list or "none">
+- **instinctsApplied:** [inst IDs that influenced decisions]
+
+## Worktree
+- **Branch:** <from `git branch --show-current`>
+- **Commit:** <SHA from `git rev-parse HEAD`>
+- **Files changed:** <N>
+
+## Build Steps
+```tsv
+#	Step	Confidence	Notes
+1	<step>	<0.0-1.0>	<reasoning>
+```
+
+<!-- ANCHOR:diff_summary -->
+## Changes
+```tsv
+Action	File	Description
+MODIFY	path/to/file	<what changed>
+```
+
+<!-- ANCHOR:test_results -->
+## Self-Verification
+```tsv
+Check	Result
+<eval grader 1>	PASS / FAIL
+```
+
+## E2E Verification
+<!-- Include ONLY when task triggered Step 4.5. Omit entirely for non-UI tasks. -->
+```tsv
+Test File	Command	Status	Report
+tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwright-report/index.html
+```
+
+## Discoveries
+```tsv
+#	Category	Finding	Severity	Target Files	Proposed Action	Confidence
+1	<category>	<finding>	low/medium/high	<files>	<action>	<0.0-1.0>
+```
+
+## Risks
+- <risk> — **confidence: high|medium|low** (cite why)
+
+## If Failed
+- **Approach tried:** <what>
+- **Error:** <what went wrong>
+- **Root cause reasoning:** <WHY it failed>
+- **Files affected:** <list>
+- **Suggestion:** <alternative approach>
+```
+
+### Ledger Entry
+```json
+{"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL","challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
+```
+
+---

@@ -250,72 +250,8 @@ The role-gate kernel hook enforces this — attempts to Edit/Write `acs/cycle-*/
 
 Legacy v10.1 fallback (Builder writes own predicates) is REMOVED. See plan `ultrathink-and-online-research-mutable-hollerith.md` for the four-layer defense rationale and `agents/evolve-tdd-engineer.md` for the new authoring contract.
 ## Output
-### Workspace File: `workspace/build-report.md`
 
-```markdown
-# Cycle {N} Build Report
-<!-- Challenge: {challengeToken} -->
-
-## Task: <name>
-- **Status:** PASS / FAIL
-- **Attempts:** <N>
-- **Approach:** <1-2 sentence summary>
-- **Instincts applied:** <list or "none">
-- **instinctsApplied:** [inst IDs that influenced decisions]
-
-## Worktree
-- **Branch:** <from `git branch --show-current`>
-- **Commit:** <SHA from `git rev-parse HEAD`>
-- **Files changed:** <N>
-
-## Build Steps
-```tsv
-#	Step	Confidence	Notes
-1	<step>	<0.0-1.0>	<reasoning>
-```
-
-<!-- ANCHOR:diff_summary -->
-## Changes
-```tsv
-Action	File	Description
-MODIFY	path/to/file	<what changed>
-```
-
-<!-- ANCHOR:test_results -->
-## Self-Verification
-```tsv
-Check	Result
-<eval grader 1>	PASS / FAIL
-```
-
-## E2E Verification
-<!-- Include ONLY when task triggered Step 4.5. Omit entirely for non-UI tasks. -->
-```tsv
-Test File	Command	Status	Report
-tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwright-report/index.html
-```
-
-## Discoveries
-```tsv
-#	Category	Finding	Severity	Target Files	Proposed Action	Confidence
-1	<category>	<finding>	low/medium/high	<files>	<action>	<0.0-1.0>
-```
-
-## Risks
-- <risk> — **confidence: high|medium|low** (cite why)
-
-## If Failed
-- **Approach tried:** <what>
-- **Error:** <what went wrong>
-- **Root cause reasoning:** <WHY it failed>
-- **Files affected:** <list>
-- **Suggestion:** <alternative approach>
-```
-
-### Ledger Entry
-```json
-{"ts":"<ISO-8601>","cycle":<N>,"role":"builder","type":"build","data":{"task":"<slug>","status":"PASS|FAIL","filesChanged":<N>,"attempts":<N>,"instinctsApplied":<N>,"selfVerify":"PASS|FAIL","challenge":"<challengeToken>","prevHash":"<hash of previous ledger entry>"}}
-```
+Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `output-template` for the full `workspace/build-report.md` format and `Ledger Entry` JSON template.
 
 ## POSTHOC enforcement (v10.10.0 Layer 3, ADR-0012)
 
