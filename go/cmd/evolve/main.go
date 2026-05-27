@@ -21,7 +21,7 @@ Commands:
   guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
-  acs        Run ACS predicates    ( acs run --cycle N <pkg> [--json=false] )
+  acs        Run ACS predicates    ( acs run --cycle N <pkg> | acs suite --cycle N )
   phase        Run a single phase in-process; PhaseRequest on stdin,
                 PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
   serve-phase  Envelope-framed phase subprocess (phaseproto wire); the binary
