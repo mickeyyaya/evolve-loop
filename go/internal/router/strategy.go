@@ -41,12 +41,42 @@ type LLMProposal struct {
 
 func (s LLMProposal) Decide(in RouteInput) RouterDecision {
 	var p *Proposal
-	if s.Proposer != nil {
+	if s.Proposer != nil && shouldPropose(in) {
 		if got, err := s.Proposer.Propose(in); err == nil {
 			p = got
 		}
 	}
 	return Route(in, p)
+}
+
+// shouldPropose implements the ADR-0024 §2 hybrid cadence. When an upfront
+// whole-cycle plan is driving (in.Plan != nil — set only when the orchestrator
+// produced a clamped plan, i.e. Stage>=Advisory + DynamicLLM), the per-transition
+// Proposer adds value ONLY at BRANCH transitions — post-build and
+// post-audit, where new objective signals (acs_red, audit verdict) appear that
+// the signal-poor start-of-cycle plan could not foresee. Every other transition
+// is already decided by the cached plan, and a proposal can never change the
+// kernel's NextPhase anyway (see applyProposal — it only annotates/clamps), so
+// calling the LLM there is wasted spend. With NO upfront plan (Shadow, static
+// mode, or a planner failure) the legacy per-transition cadence stands, so
+// Shadow-soak forensics are unchanged.
+func shouldPropose(in RouteInput) bool {
+	if in.Plan == nil {
+		return true
+	}
+	return isBranchTransition(in.Current)
+}
+
+// isBranchTransition reports whether the just-completed phase is a routing branch
+// point — where the verdict/signals genuinely fork the remaining plan. Extend
+// this set when adding a phase that produces NEW post-phase objective signals
+// worth a per-transition advisory (today: build's ACS, audit's verdict).
+func isBranchTransition(current string) bool {
+	switch normalize(current) {
+	case "build", "audit":
+		return true
+	}
+	return false
 }
 
 // Select chooses the strategy from config. DynamicLLM requires a non-nil

@@ -133,6 +133,7 @@ type ExpectSpec struct {
 	DecisionClamps   []string     // some logged routing decision carries these clamps
 	RoutingLedgerMin int          // ≥ this many routing_decision ledger entries
 	RetroPrefix      string       // CycleResult.RetroDecision has this prefix
+	ProposeAt        []string     // exact just-completed phases where the Proposer was invoked (hybrid cadence)
 
 	// Both surfaces.
 	Invariants []string // names resolved in invariants.go

@@ -217,6 +217,13 @@ func ExpectRoutingLedger(min int) Brick {
 	return func(s *ScenarioSpec) { s.Expect.RoutingLedgerMin = min }
 }
 func ExpectRetro(prefix string) Brick { return func(s *ScenarioSpec) { s.Expect.RetroPrefix = prefix } }
+
+// ExpectProposeAt asserts the EXACT set of just-completed phases at which the
+// Proposer (LLM per-transition advice) was invoked — the hybrid-cadence proof
+// (ADR-0024 §2): with an upfront plan, Propose fires only at branch transitions.
+func ExpectProposeAt(phases ...string) Brick {
+	return func(s *ScenarioSpec) { s.Expect.ProposeAt = phases }
+}
 func ExpectInvariants(names ...string) Brick {
 	return func(s *ScenarioSpec) { s.Expect.Invariants = append(s.Expect.Invariants, names...) }
 }

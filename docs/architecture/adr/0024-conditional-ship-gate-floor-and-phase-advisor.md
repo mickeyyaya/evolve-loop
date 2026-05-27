@@ -8,13 +8,15 @@
 >
 > **Implementation status:** foundational slices (digest widening, PhaseAdvisor rename, `phase-plan.json`
 > array shape) landed PR #14; the pure conditional floor `ClampPlanToFloor` landed dormant PR #15; the
-> **live-wiring (this PR-5)** activates it — the orchestrator computes the upfront plan, clamps it, and
+> **live-wiring (PR #16)** activates it — the orchestrator computes the upfront plan, clamps it, and
 > drives non-mandatory run/skip at `Stage >= Advisory` (`enforceNext` widened Enforce→Advisory). The
 > floor (`ship ⇒ build ∧ audit ∧ tdd`) is decoupled from the *configurable* `EVOLVE_MANDATORY_PHASES`
-> set, so the operator's "only tdd mandatory" intent is safe. **Remaining:** §2 hybrid cadence
-> (per-transition `Propose` reduced to branch transitions — today both the upfront plan *and*
-> per-transition `Propose` run at Advisory), §6 `clamp_reason` forensics + Tier A/B registry rollout,
-> and an early-exit state-machine edge (`scout → end`) so no-ship cycles can end early end-to-end.
+> set, so the operator's "only tdd mandatory" intent is safe. **§2 hybrid cadence (PR-6)** reduces the
+> per-transition `Propose` to branch transitions only (post-build, post-audit) once a plan is driving —
+> removing the per-transition double-spend (`LLMProposal.Decide`→`shouldPropose`); a proposal never
+> changed the kernel's `NextPhase` anyway, so this is forensics-only with zero routing change.
+> **Remaining:** §6 `clamp_reason` forensics + Tier A/B registry rollout, and an early-exit
+> state-machine edge (`scout → end`) so no-ship cycles can end early end-to-end.
 
 ## Context
 

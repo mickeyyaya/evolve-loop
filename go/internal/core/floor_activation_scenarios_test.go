@@ -59,5 +59,15 @@ func floorActivationCycleCatalog() []ScenarioSpec {
 			Cycle(), Off(),
 			AgentPlan(PlanRun("scout"), PlanRun("ship")),
 			ExpectPhases(scout, triage, tdd, planner, build, audit, ship)),
+
+		// Hybrid cadence (ADR-0024 §2): with the upfront plan driving, the
+		// per-transition Proposer fires ONLY at branch transitions (post-build,
+		// post-audit) — not at start/scout/tdd/ship. Proves the double-spend is
+		// removed without changing the routed sequence.
+		Scenario("hybrid cadence: Propose fires only at branch transitions under a plan",
+			Cycle(), Advisory(), Mandatory("tdd"), MediumCycle(),
+			AgentPlan(PlanRun("scout"), PlanRun("tdd"), PlanRun("build"), PlanRun("audit"), PlanRun("ship")),
+			ExpectProposeAt("build", "audit"),
+			ExpectPhases(scout, tdd, build, audit, ship)),
 	}
 }

@@ -113,6 +113,8 @@ Triggers are honored only at `Stage >= Advisory`; in `Shadow` they are forensic-
 
 Each decision is recorded as a `routing-decision-N.json` artifact in the cycle workspace (`Orchestrator.recordRoutingDecision`) so the Off→Shadow soak can diff advisor rationale vs the static path.
 
+**Hybrid cadence (ADR-0024 §2).** Once an upfront whole-cycle plan is driving (`Stage >= Advisory`, `in.Plan != nil`), `LLMProposal.Decide` invokes the per-transition `Propose` ONLY at **branch transitions** — post-build and post-audit, where new objective signals (`acs_red`, audit verdict) appear that the signal-poor start-of-cycle plan could not foresee. Every other transition is already decided by the cached plan, and a proposal can never change the kernel's `NextPhase` regardless (`applyProposal` only annotates + clamps), so calling the LLM there was pure cost. With NO upfront plan (Shadow, static mode, planner failure) the legacy per-transition cadence stands, so Shadow-soak forensics are unchanged. Gate: `router.shouldPropose(in)` → `isBranchTransition(in.Current)`.
+
 ## Integration status
 
 | Aspect | State |
