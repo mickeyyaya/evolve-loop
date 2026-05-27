@@ -100,13 +100,20 @@ type RoutingBlock struct {
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
 // the composition root, injected everywhere else.
 type RoutingConfig struct {
-	Stage         Stage
-	Mode          Mode
-	Mandatory     []string            // ordered mandatory phase names
-	Conditional   map[string]CondRule // phase -> conditional-mandatory rule
-	MaxInsertions int
-	PhaseEnable   map[string]Enable       // phase -> enablement source
-	Triggers      map[string]RoutingBlock // phase -> declarative triggers
+	Stage Stage
+	Mode  Mode
+	// CommitEvidence is the ADR-0027 commit-as-evidence rollout stage:
+	// StageOff (legacy path-poll, byte-identical), StageShadow (git-evidence
+	// computed + logged, artifact authoritative), StageEnforce (git-evidence
+	// authoritative, phases commit, kernel relaxed). StageAdvisory is not used
+	// for this axis. The bridge driver reads EVOLVE_COMMIT_EVIDENCE from env
+	// directly (it is a subprocess); this field is the orchestrator's view.
+	CommitEvidence Stage
+	Mandatory      []string            // ordered mandatory phase names
+	Conditional    map[string]CondRule // phase -> conditional-mandatory rule
+	MaxInsertions  int
+	PhaseEnable    map[string]Enable       // phase -> enablement source
+	Triggers       map[string]RoutingBlock // phase -> declarative triggers
 	// Order is the linear phase sequence the router walks, in registry order.
 	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
 	// loaded without a registry stays byte-identical to pre-Order behavior).
@@ -184,11 +191,12 @@ func Load(registryPath string, env map[string]string) (RoutingConfig, []Warning)
 
 func defaults() RoutingConfig {
 	return RoutingConfig{
-		Stage:         StageOff,
-		Mode:          ModeDynamicLLM,
-		Mandatory:     []string{"scout", "build", "audit", "ship"},
-		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
-		MaxInsertions: 4,
+		Stage:          StageOff,
+		Mode:           ModeDynamicLLM,
+		CommitEvidence: StageOff,
+		Mandatory:      []string{"scout", "build", "audit", "ship"},
+		Conditional:    map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
+		MaxInsertions:  4,
 		// Legacy phase-enable defaults, so PhasePolicy reproduces pre-routing
 		// behavior even when the registry file is absent (e.g. tests): triage
 		// and tdd run by default; build-planner is opt-in (shadow). These are
@@ -255,6 +263,9 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	}
 	if v := env["EVOLVE_ROUTING_MODE"]; v != "" {
 		cfg.Mode = parseMode(v, ws)
+	}
+	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
+		cfg.CommitEvidence = parseEvidenceStage(v, ws)
 	}
 	if v := env["EVOLVE_MANDATORY_PHASES"]; v != "" {
 		cfg.Mandatory = splitCSV(v)
@@ -323,6 +334,24 @@ func parseStage(v string, ws *[]Warning) Stage {
 		return StageEnforce
 	default:
 		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("dynamic_routing=%q unknown, defaulting to off", v)})
+		return StageOff
+	}
+}
+
+// parseEvidenceStage parses EVOLVE_COMMIT_EVIDENCE. Unlike parseStage it has no
+// "advisory" middle state — commit-as-evidence is compute-and-log (shadow) vs
+// act (enforce). "advisory" or any unknown value defaults to off with a warning
+// (a typo must never silently enable phase commits).
+func parseEvidenceStage(v string, ws *[]Warning) Stage {
+	switch strings.TrimSpace(v) {
+	case "0", "off":
+		return StageOff
+	case "shadow":
+		return StageShadow
+	case "enforce":
+		return StageEnforce
+	default:
+		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("commit_evidence=%q unknown (want off|shadow|enforce), defaulting to off", v)})
 		return StageOff
 	}
 }
