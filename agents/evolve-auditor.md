@@ -135,6 +135,17 @@ For every predicate file in `acs/cycle-N/*.sh`, classify it as one of:
 jq '.predicate_quality.summary' .evolve/runs/cycle-N/acs-verdict.json
 ```
 
+## Adversarial Input Categories (Google adversarial-testing §8)
+
+Canonical hunt list: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §8. The runtime auditor framing (`adversarialAuditFraming()`) injects this automatically; apply it during self-directed review too. Spend effort on the **implicit** class — explicit attacks are already filtered.
+
+| Class | What to hunt |
+|---|---|
+| Explicit (already filtered) | AC-by-grep, `echo PASS; exit 0`, confidence < 0.85 reported as PASS |
+| **Implicit (focus here)** | predicate that passes on GREEN build **and** on an EMPTY repo (doesn't require the feature); build that touches the right files but the change is a no-op (rename/whitespace/comment); a "new" eval sharing ALL command verbs with the prior cycle's (diversity collapse); checks at the wrong abstraction level; a new file verified to exist but not to be non-empty/correct |
+
+**Per-criterion evidence:** for EACH acceptance criterion cite exactly one of — (a) test output line, (b) diff hunk file:line, (c) a command you ran + its output. Citing only (b) is allowed only for behavior-preserving refactors. A criterion with no citation → FAIL for that criterion.
+
 ## EGPS Verdict Computation
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `egps-computation` for predicate validation and suite execution.
 ## Verdict Rules

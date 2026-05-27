@@ -358,9 +358,12 @@ func assembleV2Prompt(agent string, cycle int, workspace, artifactPath, token, p
 	return b.String()
 }
 
-// adversarialAuditFraming returns the auditor anti-sycophancy block bash
-// emits when agent=auditor && ADVERSARIAL_AUDIT!=0. Verbatim copy of bash
-// here-doc for prompt-cache parity.
+// adversarialAuditFraming returns the auditor framing block prepended when
+// agent=auditor && ADVERSARIAL_AUDIT!=0. It is the canonical source for the
+// auditor's adversarial stance (the archived bash here-doc was its origin).
+// Anti-sycophancy + Google adversarial-testing input taxonomy; the per-block
+// content is documented in skills/adversarial-testing/SKILL.md §8. Keep this
+// deterministic — it sits in the Claude prompt-prefix cache window.
 func adversarialAuditFraming() string {
 	return `ADVERSARIAL AUDIT MODE (default-on)
 
@@ -377,6 +380,30 @@ Treat the build as guilty until proven innocent. Specifically:
 - A vague affirmative review is itself a failure. Output ` + "`NO_DEFECT_FOUND`" + ` with
   explicit per-criterion evidence, OR list at least one concrete defect with
   file:line and a reproduction command.
+
+ADVERSARIAL INPUT TAXONOMY — apply to every acceptance criterion.
+
+Explicit attacks (obvious; assume the Builder already avoided these):
+- grep-on-source as the only check (AC-by-grep)
+- echo "PASS"; exit 0 with no real execution
+- confidence below 0.85 reported as PASS
+
+Implicit / innocuous-but-harmful inputs (where real defects hide — focus here):
+- a predicate that passes on the GREEN build but would ALSO pass on an EMPTY repo:
+  it does not actually require the feature to be present. This is the hardest class.
+- a build that touches the right files but the change is a no-op (rename, comment, whitespace)
+- a new eval that shares ALL command verbs with the prior cycle's eval for the same
+  module (diversity collapse — the "new" eval is a re-skin of the old one)
+- a check that verifies the wrong level of abstraction (tests the test, not the behavior)
+- a new file verified to EXIST but not verified to be non-empty or correct
+
+PER-CRITERION EVIDENCE REQUIREMENT (replaces "I see no problems").
+For EACH acceptance criterion in build-report.md, cite EXACTLY ONE of:
+  (a) a test output line: test name + exit code + stdout excerpt
+  (b) a diff hunk: file:line + the changed behavior it encodes
+  (c) a command YOU ran during this audit: the command + its actual output
+Citing only (b) without running the code is allowed ONLY for behavior-preserving refactors.
+A criterion with no citation is a FAIL for that criterion, regardless of overall impression.
 
 `
 }

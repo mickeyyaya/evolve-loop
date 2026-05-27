@@ -123,7 +123,9 @@ Algorithm: [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md).
 
 ### 8. Eval Integrity (Inoculation)
 
-Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `legacy/scripts/verification/eval-quality-check.sh` classifies — Level 0-1 trigger warnings or halt cycle.
+Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `evolve eval quality-check <eval.md>` classifies — Level 0-1 trigger warnings or halt cycle.
+
+**Adversarial diversity** (canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6). For each non-trivial feature: include ≥1 **negative case** (an input that must be rejected / a command expected to exit non-zero) and ≥1 **edge/OOD case** (empty, boundary, malformed). Evals for the same module must not share all command verbs (diversity collapse). For each criterion, name the cheapest gaming fake and test that it fails. Suite-level check: `evolve eval diversity-check .evolve/evals/`.
 
 ### 9. Write Eval Definitions
 

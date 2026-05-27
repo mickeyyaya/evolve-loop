@@ -261,6 +261,10 @@ func TestBuildRoutingPrompt_FullSignalsAndTriggers(t *testing.T) {
 		"audit: verdict=PASS",
 		"- plan-review",
 		"- tester",
+		// Decision rubric + the explicit forbidden-attack line (SKILL §7).
+		"## Decision rubric",
+		"insert tester",
+		"FORBIDDEN: never propose reaching ship without audit",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("prompt missing %q\n---\n%s", want, got)
