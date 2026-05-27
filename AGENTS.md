@@ -23,6 +23,8 @@ Every phase agent is spawned by `bash legacy/scripts/dispatch/subagent-run.sh <a
 ### 3. Commits go through `legacy/scripts/lifecycle/ship.sh`, never bare `git commit / git push`
 The ship-gate kernel hook (`legacy/scripts/guards/ship-gate.sh`) denies bare git commit/push/gh release create. The only canonical entry point is `legacy/scripts/lifecycle/ship.sh`. ship.sh enforces audit verification, cycle binding (HEAD + tree_state_sha match), and v8.32+ version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or `EVOLVE_BYPASS_SHIP_GATE=1` (emergency).
 
+Interactive `--class manual` commits additionally require a fresh **commit-gate review attestation** (v13.0.0+): `.commit-gate/attestation.json` whose `tree_state_sha` matches the staged tree. Produce it with `/commit` (code-simplifier + code-reviewer + language reviewer + lint + targeted tests). `EVOLVE_BYPASS_COMMIT_GATE=1` skips the check — routine use is a CLAUDE.md violation, identical in spirit to the `EVOLVE_BYPASS_SHIP_GATE` emergency hatch.
+
 ### 4. Builder writes only inside its worktree
 Each cycle gets a per-cycle git worktree (provisioned by `run-cycle.sh`, recorded in `cycle-state.json:active_worktree`). Builder's profile (`.evolve/profiles/builder.json`) restricts Edit/Write to the worktree path. The role-gate kernel hook (`legacy/scripts/guards/role-gate.sh`) denies edits outside that boundary. v8.31+ closed the Bash-redirect leak by adding interpreter-execution Bash denials.
 

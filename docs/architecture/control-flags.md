@@ -1,7 +1,8 @@
 # Control Flags Reference — `EVOLVE_*`
 
-> **86 distinct flags** as of 2026-05-10. See cluster annotations for consolidation targets in cycles 8–10.
-> Canonical source: `grep -rohE 'EVOLVE_[A-Z_]+' legacy/scripts/ agents/ skills/ | sort -u`
+> **93+ distinct flags** as of 2026-05-27 (count approximate). See cluster annotations for consolidation targets in cycles 8–10.
+> Canonical source — bash surface: `grep -rohE 'EVOLVE_[A-Z_]+' legacy/scripts/ agents/ skills/ | sort -u`.
+> Go-native surface (NOT captured by the bash grep — e.g. the dynamic-routing family and `EVOLVE_BYPASS_COMMIT_GATE` live in `go/internal/`): `grep -rohE 'EVOLVE_[A-Z_]+' go/ | sort -u`.
 
 ## Status Key
 
@@ -78,6 +79,7 @@
 | `EVOLVE_BYPASS_PHASE_GATE` | ACTIVE | Emergency hatch: bypass phase-gate-precondition |
 | `EVOLVE_BYPASS_ROLE_GATE` | ACTIVE | Emergency hatch: bypass role-gate |
 | `EVOLVE_BYPASS_POSTEDIT_VALIDATE` | ACTIVE | Emergency hatch: bypass postedit validation |
+| `EVOLVE_BYPASS_COMMIT_GATE` | ACTIVE (Go-native, v13.0.0+) | Emergency hatch: skip the `--class manual` commit-gate review attestation (`.commit-gate/attestation.json`). Routine use is a CLAUDE.md violation. `--dry-run` is exempt by construction. Reader: `go/internal/phases/ship/commitgate.go` |
 
 ## Triage Cluster (cycle 7 trim)
 
@@ -152,6 +154,19 @@
 | `EVOLVE_DIFF_COMPLEXITY_DISABLE` | ACTIVE | Disable diff-complexity check in auditor |
 | `EVOLVE_CONSENSUS_AUDIT` | ACTIVE | Enable consensus-dispatch for auditor |
 | `EVOLVE_AUDITOR_TIER_OVERRIDE` | ACTIVE | Override auditor model tier |
+
+## Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)
+
+> Read by the composition-root loader `go/internal/config/config.go` (the ONLY env site). Precedence: env > `docs/architecture/phase-registry.json` > built-in default. Distinct from the legacy bash PSMAS skip path (`EVOLVE_PSMAS_SKIP`). See [docs/architecture/dynamic-phase-routing.md](dynamic-phase-routing.md) and ADR-0024 (proposed PhaseAdvisor evolution).
+
+| Flag | Status | Purpose |
+|------|--------|---------|
+| `EVOLVE_DYNAMIC_ROUTING` | ACTIVE (default `off`) | Rollout stage: `off`/`0` (static state machine drives) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |
+| `EVOLVE_ROUTING_MODE` | ACTIVE (default `llm`) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
+| `EVOLVE_MANDATORY_PHASES` | ACTIVE (default `scout,build,audit,ship`) | CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN |
+| `EVOLVE_CONDITIONAL_MANDATORY` | ACTIVE (default `tdd:cycle_size!=trivial`) | `phase:expr` conditional-mandatory predicate; op ∈ `!= == >= <= > <` |
+| `EVOLVE_MAX_OPTIONAL_INSERTIONS` | ACTIVE (default `4`) | Cap on optional phases the router may insert |
+| `EVOLVE_USE_PHASE_REGISTRY` | ACTIVE (default on) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
 
 ## Observability / Prompt Tuning
 

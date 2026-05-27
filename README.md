@@ -404,6 +404,16 @@ If a cycle is checkpointed (subscription quota wall, batch cap near, or operator
 
 The dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree still exists), and re-spawns the orchestrator from the paused phase boundary. The trust kernel holds across resume.
 
+### Reset a stuck cycle (v13.0.0+)
+
+If a cycle can't be resumed (corrupt state, abandoned work), a fresh `/evolve-loop` run refuses to start and prints the resume∥reset fork. Resume to continue, or **reset** to seal it:
+
+```bash
+evolve cycle reset
+```
+
+Reset never deletes history — it archives the workspace + a `cycle-state.json` snapshot + a `reset-manifest.json` to `.evolve/runs/cycle-<N>.reset-<ts>/`, advances `lastCycleNumber`, and writes an auditable ledger entry. (`EVOLVE_FORCE_FRESH=1` restores the legacy silent-clobber, which does NOT seal history.)
+
 ### Strategy presets
 
 | Strategy | Focus | Approach | Strictness |
@@ -424,6 +434,7 @@ The dispatcher locates the most recent paused cycle, validates state (git HEAD u
 ./bin/verify-chain                      tamper-evident ledger chain check
 ./bin/preflight                         full pipeline dry-run (regression + simulate + release-pipeline dry-run)
 ./bin/check-caps [cli]                  show resolved capability tier per adapter
+evolve eval diversity-check <evalsDir>  adversarial-diversity score for an eval suite (v13.0.0+)
 bash legacy/scripts/observability/show-context-monitor.sh <cycle>   per-cycle context usage (v9.1.0+)
 bash legacy/scripts/observability/show-context-monitor.sh --watch   live-tail latest cycle (3s refresh)
 bash legacy/scripts/observability/render-cli-resolution.sh <cycle>  per-phase CLI/model from ledger truth (v10.7+)
@@ -478,6 +489,7 @@ The README is the surface. Real depth lives in `docs/`:
 | [docs/architecture/multi-llm-review.md](docs/architecture/multi-llm-review.md) | Why Auditor runs on a different model family |
 | [docs/architecture/orchestrator-context-modes.md](docs/architecture/orchestrator-context-modes.md) | `context_mode` profile field; digest vs full + FAIL-path promotion (v10.10+) |
 | [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md) | Opt-in phase-skip foundation (v10.17+); precedence rule + ledger contract |
+| [docs/architecture/dynamic-phase-routing.md](docs/architecture/dynamic-phase-routing.md) | Go routing kernel (v13.0.0/PR #4, default-off); stages, modes, integrity floor, LLM proposer |
 | [docs/architecture/research-tool.md](docs/architecture/research-tool.md) | KB-first directive + research quota hook (v10.9 cycle 87-89) |
 | [docs/architecture/token-economics-2026.md](docs/architecture/token-economics-2026.md) | P1-P8 token-reduction roadmap with per-phase cost attribution |
 | [docs/architecture/acs-predicate-quality-gate.md](docs/architecture/acs-predicate-quality-gate.md) | Predicate-quality four-layer defense (cycles 80-86) |
@@ -669,6 +681,8 @@ Contributions welcome. The project itself is run by evolve-loop — every commit
 
 1. A `--class manual` ship by an operator (with operator name + explicit message), OR
 2. A `--class cycle` ship by an automated `/evolve-loop` cycle (with full ledger + audit trail)
+
+Manual commits go through `/commit` (v13.0.0+) — it runs code-simplifier + code-reviewer + a language reviewer + lint + targeted tests, then writes a **commit-gate review attestation** that `evolve ship --class manual` verifies (matching the staged tree) before committing. `/release` wraps the self-healing version-bump → changelog → atomic-ship pipeline.
 
 Read [CLAUDE.md](CLAUDE.md) for the runtime contract. The two-folder content model and the structural-fix-before-prose-fix preference apply to PRs too.
 
