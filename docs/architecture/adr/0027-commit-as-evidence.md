@@ -49,11 +49,28 @@ Why this is the right shape for *this* codebase:
 - **Extends an existing pattern, not a new one.** Audit-binding already binds verdicts to `tree_state_sha`; the ledger is a `prev_hash` chain. Commit-as-evidence is the same git-anchored-provenance philosophy applied to every phase.
 - **Tamper-evident + naturally resumable.** Each phase commit is an auditable checkpoint; `--resume` can key off the last phase commit.
 
+## Merge-back: branch-isolated commits, orchestrator-curated `main` delta
+
+Phase commits are *evidence*, not auto-merged truth. They land **only** on the per-cycle worktree branch. Reaching `main` is a **separate, justified decision** — never an automatic ff-merge of the whole branch. The orchestrator reviews the branch and assigns each change a disposition it must justify:
+
+| Disposition | Meaning | Lands on `main`? |
+|---|---|---|
+| **merge** | validated, audit-passed deliverable | yes (via the ship gate) |
+| **drop** | failed / rejected / superseded / experimental | no — discarded |
+| **save** | useful but not for `main` (partial work, research, spike) | no — preserved off-`main` (archived branch / tag / `.evolve/runs/`) |
+
+So the cycle branch is a **staging area** that may hold more than the final `main` delta; the orchestrator is the curator. Mechanics + invariants:
+
+- The orchestrator **proposes** the disposition — a justified merge plan recorded to the ledger; **ship executes only the `merge` subset** onto `main` and remains the sole `main`-writer (trust kernel unchanged). The orchestrator justifies; ship gates + applies.
+- This **supersedes today's all-or-nothing** "ship ff-merges the entire worktree branch." A passing cycle no longer implies every branch change merges — partial merges with explicit drop/save are first-class.
+- `drop` and `save` are **explicit and justified — no silent loss**: a dropped change is recorded with a reason; a saved change is preserved at a named ref (branch/tag) so it stays recoverable.
+- The audit verdict **feeds** the disposition (a `red` change cannot be `merge` — only `drop` or `save`), but the orchestrator owns the final justified plan.
+
 ## Trust-kernel interaction (the hard part)
 
 The kernel invariant is **"only `evolve ship` commits, and only to `main`"** (`evolve guard ship` blocks all other git commit/push). Naively letting every phase commit violates it. It is compatible **iff**:
 
-1. Phase commits target the **per-cycle worktree branch**, never `main`. `ship` still exclusively gates the worktree→`main` ff-merge — the main-branch guarantee is unchanged.
+1. Phase commits target the **per-cycle worktree branch**, never `main`. `ship` still exclusively writes `main` — applying the orchestrator's curated `merge` subset (see Merge-back above), not a blind ff-merge — so the "only ship touches `main`" guarantee is unchanged.
 2. `evolve guard ship` is relaxed to permit commits **on a worktree branch** (detect via `git rev-parse --show-toplevel` ≠ project root, or branch name prefix), while still denying any commit/push that targets `main`.
 3. Today only **Builder** runs in a worktree; scout/intent/triage/audit write to `.evolve/runs/` outside a branch. Commit-as-evidence requires **every phase to operate on the worktree branch** — the largest structural change.
 
