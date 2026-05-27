@@ -88,23 +88,26 @@ type autoResponder struct {
 	counts    map[string]int
 	deps      Deps
 	human     bool // when true, deliver keys with human-input cadence
+	// scrollback is the capture-pane depth: 0 for visible-pane CLIs (claude),
+	// >0 for alt-screen CLIs (codex/agy) whose bare visible pane is blank.
+	scrollback int
 }
 
 // newAutoResponder builds the responder from the CLI's embedded manifest.
 // A missing/unreadable manifest yields an empty rule set (tick → noop).
 // human engages the keystroke-plausibility send path.
-func newAutoResponder(cli, workspace string, deps Deps, human bool) *autoResponder {
+func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback int) *autoResponder {
 	var prompts []ManifestPrompt
 	if m, err := LoadManifest(cli); err == nil {
 		prompts = m.InteractivePrompts
 	}
-	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human}
+	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
 // escalation-report). Returns (action, rc) for runTmuxREPL's loop.
 func (ar *autoResponder) tick(ctx context.Context, session string) (string, int) {
-	pane, _ := ar.deps.Tmux.CapturePane(ctx, session, 0)
+	pane, _ := ar.deps.Tmux.CapturePane(ctx, session, ar.scrollback)
 	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts)
 	switch rc {
 	case 1:

@@ -110,7 +110,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
 	human := humanActive(deps, cfg.HumanInput)
-	ar := newAutoResponder(lp.name, cfg.Workspace, deps, human)
+	ar := newAutoResponder(lp.name, cfg.Workspace, deps, human, lp.bootScrollback)
 
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
@@ -204,7 +204,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	relocErrLogged := false
 	attempt := 0
 	intervalStart := 0
-	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, 0)
+	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
 		if err := ctx.Err(); err != nil {
@@ -258,7 +258,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		}
 		// Review checkpoint: a full interval elapsed without the artifact.
 		if elapsed-intervalStart >= interval {
-			curPane, _ := deps.Tmux.CapturePane(ctx, lp.session, 0)
+			curPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			// Progressed = the pane changed during the interval. Stage-0 signal:
 			// good for the common cases (growing token counters, new tool calls),
 			// but a pure spinner/clock animation also reads as progress — so the

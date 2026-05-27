@@ -109,7 +109,7 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 			deps := Deps{Tmux: tx, Now: time.Now, Stderr: &stderr}.withDefaults()
 			// auto-responder seeded from sp.name's manifest → handles the
 			// codex/agy boot trust prompt, same as runTmuxREPL.
-			ar := newAutoResponder(sp.name, t.TempDir(), deps, false)
+			ar := newAutoResponder(sp.name, t.TempDir(), deps, false, 0)
 
 			if err := tx.NewSession(ctx, sess, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 				t.Fatalf("new-session: %v", err)
