@@ -60,6 +60,11 @@ type RouterDecision struct {
 	Reason       string                 `json:"reason"`
 	Evidence     map[string]interface{} `json:"evidence,omitempty"`
 	Clamps       []Clamp                `json:"clamps,omitempty"`
+	// Justification is the LLM advisor's one-sentence rationale (DynamicLLM
+	// mode only; empty in deterministic/static routing). Captured even when the
+	// proposal is clamped, so the shadow soak can diff advisor-rationale against
+	// the kernel's static path (ADR-0024 problem #2).
+	Justification string `json:"justification,omitempty"`
 }
 
 // Proposal is the optional LLM advisory input (DynamicLLM mode). Route treats
@@ -226,6 +231,9 @@ func applyProposal(d *RouterDecision, proposal *Proposal, in RouteInput) {
 	if proposal == nil || proposal.NextPhase == "" {
 		return
 	}
+	// Capture the advisor's rationale on the decision (whether or not it gets
+	// clamped) so the recorded decision carries the would-have-routed reasoning.
+	d.Justification = proposal.Justification
 	want := normalize(proposal.NextPhase)
 	if want == d.NextPhase {
 		return // proposal agrees with the kernel; nothing to clamp

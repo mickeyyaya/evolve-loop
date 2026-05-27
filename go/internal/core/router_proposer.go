@@ -122,6 +122,18 @@ func buildRoutingPrompt(in router.RouteInput) string {
 		}
 	}
 
+	// Decision rubric — renders skills/adversarial-testing/SKILL.md §7 inline so
+	// the advisor reasons from the same objective-signal table the kernel uses.
+	// Deterministic string ⇒ prompt-prefix cache friendly.
+	b.WriteString("\n## Decision rubric (justify each optional phase by an objective signal)\n")
+	b.WriteString("- scout.carryover_count >= 3 → skip scout (work already queued)\n")
+	b.WriteString("- scout.item_count == 0 → end cycle early (no-ship is legitimate)\n")
+	b.WriteString("- build.diff_files_touched >= 10 OR diff_loc >= 500 → insert plan-review\n")
+	b.WriteString("- build.acs_red >= 1 OR build.severity_max >= HIGH → insert tester\n")
+	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
+	b.WriteString("- cycle_size == trivial → skip tdd (conditional-mandatory exemption)\n")
+	b.WriteString("FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n")
+
 	b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
 	b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>"}`)
 	b.WriteString("\n")

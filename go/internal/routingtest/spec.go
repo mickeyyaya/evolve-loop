@@ -107,11 +107,12 @@ type FailedRecordSpec struct {
 // ExpectSpec is the composable expectation set. Empty fields are not asserted.
 type ExpectSpec struct {
 	// PureKernel single-decision expectations.
-	NextPhase string
-	Inserts   []string
-	Skips     []string
-	Clamps    []string // clamp rule names that must be present
-	Reason    string
+	NextPhase     string
+	Inserts       []string
+	Skips         []string
+	Clamps        []string // clamp rule names that must be present
+	Reason        string
+	Justification string // substring that must appear in decision.Justification
 
 	// FullOrchestrator expectations.
 	PhaseSequence    []core.Phase // exact PhasesRun (when non-nil)

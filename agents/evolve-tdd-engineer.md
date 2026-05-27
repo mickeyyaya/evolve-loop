@@ -104,6 +104,19 @@ echo ""; echo "Results: $PASS PASS, $FAIL FAIL"
 [ "$FAIL" -eq 0 ]
 ```
 
+### Step 3b: Adversarial Test Diversity
+
+Canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6. A happy-path test alone is gameable — a no-op implementation can pass it. For each criterion that has a rejection/error dimension, also write the **negative test**: the input that must be REJECTED (assert non-zero exit / error / `stdout_absent`). This is not over-testing — the rejection behavior is part of the criterion. Cover the four diversity axes:
+
+| Axis | Encode |
+|---|---|
+| Negative | an input that must FAIL (the strongest anti-no-op signal) |
+| Edge / OOD | empty, boundary (`0`/`-1`/max), malformed (`invalid`/`missing`/`corrupt`) |
+| Lexical | vary command verbs across a feature's tests — don't `grep` everything |
+| Semantic | distinct behaviors, not one behavior restated |
+
+The negative test is the highest-leverage one: a predicate that passes on a GREEN build but would also pass on an EMPTY repo does not actually require the feature (SKILL §2, implicit-adversarial class).
+
 ### Step 4: Run Tests — Verify RED
 
 Run all tests you just wrote. They MUST all fail at this stage:

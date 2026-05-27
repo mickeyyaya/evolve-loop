@@ -112,6 +112,9 @@ func runPure(t *testing.T, s ScenarioSpec) {
 	if s.Expect.Reason != "" && got.Reason != s.Expect.Reason {
 		t.Errorf("Reason=%q, want %q", got.Reason, s.Expect.Reason)
 	}
+	if s.Expect.Justification != "" && !strings.Contains(got.Justification, s.Expect.Justification) {
+		t.Errorf("Justification=%q, want substring %q", got.Justification, s.Expect.Justification)
+	}
 	assertInvariants(t, s, in, proposal, got)
 }
 

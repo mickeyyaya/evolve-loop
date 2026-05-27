@@ -27,6 +27,7 @@ package evalqualitycheck
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -76,17 +77,34 @@ func Check(opts Options) (Result, error) {
 
 	res := Result{Path: opts.Path, Overall: LevelPass}
 
+	cmds, err := scanBashCommands(f)
+	if err != nil {
+		return Result{}, fmt.Errorf("evalqualitycheck: read %s: %w", opts.Path, err)
+	}
+	for _, cmd := range cmds {
+		cl := classify(cmd)
+		res.Commands = append(res.Commands, cl)
+		if cl.Level > res.Overall {
+			res.Overall = cl.Level
+		}
+	}
+	return res, nil
+}
+
+// scanBashCommands returns the non-blank, non-comment command lines found
+// inside ```bash fenced blocks of r, in order. Shared by Check (single-file
+// rigor) and CheckDiversity (suite-level diversity) so both parse evals
+// identically.
+func scanBashCommands(r io.Reader) ([]string, error) {
+	var cmds []string
 	inBash := false
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(trimmed, "```") {
+			// Opening: ```bash sets inBash=true. Closing (```) or any
+			// non-bash fence sets inBash=false because "bash" is absent.
 			inBash = strings.Contains(trimmed, "bash") && !inBash
-			// Closing fence ```  flips out
-			if trimmed == "```" {
-				inBash = false
-			}
 			continue
 		}
 		if !inBash {
@@ -95,16 +113,12 @@ func Check(opts Options) (Result, error) {
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		cl := classify(trimmed)
-		res.Commands = append(res.Commands, cl)
-		if cl.Level > res.Overall {
-			res.Overall = cl.Level
-		}
+		cmds = append(cmds, trimmed)
 	}
 	if err := scanner.Err(); err != nil {
-		return Result{}, fmt.Errorf("evalqualitycheck: read %s: %w", opts.Path, err)
+		return nil, err
 	}
-	return res, nil
+	return cmds, nil
 }
 
 // Patterns considered Level-0 (HALT): always-pass tautologies.

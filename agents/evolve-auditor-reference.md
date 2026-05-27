@@ -81,7 +81,7 @@ Loaded for the Single-Pass Review.
 Loaded for EGPS Verdict Computation (v10.1.0+).
 
 1. **Validate predicates**: Run `validate-predicate.sh` on all `.sh` in `acs/cycle-N/`.
-2. **Run suite**: `run-acs-suite.sh "$cycle"`.
+2. **Run suite**: `evolve acs suite --cycle "$cycle"`. This deterministic host-side runner (Go) globs `acs/cycle-N/` + `acs/regression-suite/cycle-*/` + `acs/red-team/`, executes each bash predicate, and writes `acs-verdict.json`. It replaces the deleted `run-acs-suite.sh` (ADR-0025). The standing `acs/red-team/` predicates encode past gaming incidents and fire every cycle.
 3. **Cross-check**: Every AC MUST have a predicate.
 4. **Verdict**: PASS (red_count == 0) or FAIL (red_count > 0).
 

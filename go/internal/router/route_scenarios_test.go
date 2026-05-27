@@ -88,6 +88,18 @@ func kernelCatalog() []ScenarioSpec {
 		Scenario("LLM illegal ship-from-build clamped",
 			Pure(), At("build"), Done("scout", "tdd", "build"), GreenBuild(), Agent("build", "ship"),
 			ExpectNext("audit"), ExpectClamp("llm-proposal-clamped")),
+
+		// Advisor-rationale capture (ADR-0024 problem #2): the justification is
+		// recorded on the decision whether the proposal is adopted or clamped.
+		Scenario("LLM justification captured when proposal agrees",
+			Pure(), At("build"), Done("scout", "tdd", "build"), GreenBuild(),
+			AgentJustified("build", "audit", "green build, proceed to audit"),
+			ExpectNext("audit"), ExpectJustification("green build")),
+		Scenario("LLM justification captured even when clamped (forbidden ship-skip-audit)",
+			Pure(), At("build"), Done("scout", "tdd", "build"), GreenBuild(),
+			AgentJustified("build", "ship", "looks fine, skip audit"),
+			ExpectNext("audit"), ExpectClamp("llm-proposal-clamped"),
+			ExpectJustification("skip audit")),
 	}
 }
 

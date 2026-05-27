@@ -10,20 +10,23 @@ import (
 )
 
 // runEval implements `evolve eval <subcommand>`. Subcommands:
-//   - quality-check <eval.md> — Level-0 tautology detection
+//   - quality-check <eval.md> — Level-0 tautology detection (single file)
+//   - diversity-check <evalsDir> — suite-level adversarial-diversity check
 //   - verify <eval.md> <workspace> — independent eval re-execution (Phase 2A port 3)
 //
-// Exit codes from quality-check mirror the bash contract:
+// Exit codes from quality-check / diversity-check mirror the bash contract:
 //
 //	0 PASS, 1 WARN, 2 HALT, 10 bad args, 1 internal error.
 func runEval(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve eval: missing subcommand (quality-check|verify)")
+		fmt.Fprintln(stderr, "evolve eval: missing subcommand (quality-check|diversity-check|verify)")
 		return 10
 	}
 	switch args[0] {
 	case "quality-check":
 		return runEvalQualityCheck(args[1:], stdout, stderr)
+	case "diversity-check":
+		return runEvalDiversityCheck(args[1:], stdout, stderr)
 	case "verify":
 		return runEvalVerify(args[1:], stdout, stderr)
 	default:
@@ -61,6 +64,47 @@ func runEvalQualityCheck(args []string, stdout, stderr io.Writer) int {
 		return 1
 	default:
 		fmt.Fprintln(stdout, "[eval quality-check] verdict: HALT (Level-0 tautology)")
+		return 2
+	}
+}
+
+// runEvalDiversityCheck implements `evolve eval diversity-check <evalsDir> [slug]`.
+// Scores a directory of evals for adversarial diversity (negative + edge cases).
+// Exit codes: 0 PASS, 1 WARN, 2 HALT, 10 bad args, 1 internal error.
+func runEvalDiversityCheck(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("eval diversity-check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	rest := fs.Args()
+	if len(rest) < 1 {
+		fmt.Fprintln(stderr, "evolve eval diversity-check: missing <evalsDir> path")
+		return 10
+	}
+	opts := evalqualitycheck.DiversityOptions{EvalDir: rest[0]}
+	if len(rest) >= 2 {
+		opts.Slug = rest[1]
+	}
+	res, err := evalqualitycheck.CheckDiversity(opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve eval diversity-check: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "[eval diversity-check] %s — %d evals, %d with negative cases, %d with edge cases, %d positive-only\n",
+		res.EvalDir, res.EvalCount, res.NegativeCaseCount, res.EdgeCaseCount, res.PositiveOnlyCount)
+	for _, r := range res.Reasons {
+		fmt.Fprintf(stdout, "  %s\n", r)
+	}
+	switch res.Level {
+	case evalqualitycheck.DiversityPass:
+		fmt.Fprintln(stdout, "[eval diversity-check] verdict: PASS")
+		return 0
+	case evalqualitycheck.DiversityWarn:
+		fmt.Fprintln(stdout, "[eval diversity-check] verdict: WARN")
+		return 1
+	default:
+		fmt.Fprintln(stdout, "[eval diversity-check] verdict: HALT (cohesive suite, zero negative cases)")
 		return 2
 	}
 }

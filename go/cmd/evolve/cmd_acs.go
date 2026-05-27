@@ -8,24 +8,80 @@ import (
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 )
 
 // runACS implements `evolve acs <subcommand>`. Subcommands:
 //
 //	run --cycle N <pkg>   execute go test -json on <pkg>, write
 //	                       <evolve-dir>/runs/cycle-N/acs-verdict.json
+//	suite --cycle N       execute the bash EGPS predicate suite (cycle-N +
+//	                       regression-suite + red-team), write acs-verdict.json
 func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve acs: missing subcommand (try: run)")
+		fmt.Fprintln(stderr, "evolve acs: missing subcommand (try: run|suite)")
 		return 10
 	}
 	switch args[0] {
 	case "run":
 		return runACSRun(args[1:], stdout, stderr)
+	case "suite":
+		return runACSSuite(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve acs: unknown subcommand %q\n", args[0])
 		return 10
 	}
+}
+
+// runACSSuite implements `evolve acs suite --cycle N [--root .] [--evolve-dir .evolve]`.
+// It is the deterministic host-side replacement for the deleted bash
+// run-acs-suite.sh (ADR-0025): globs + runs the bash predicate suite and writes
+// acs-verdict.json. Exit 2 when any predicate is RED, 0 when all green.
+func runACSSuite(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve acs suite", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var (
+		cycle     int
+		root      string
+		evolveDir string
+		writeJSON bool
+	)
+	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
+	fs.StringVar(&root, "root", ".", "repo root containing acs/")
+	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.BoolVar(&writeJSON, "json", true, "write acs-verdict.json (default true)")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if cycle <= 0 {
+		fmt.Fprintln(stderr, "evolve acs suite: --cycle is required (must be >0)")
+		return 10
+	}
+	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: cycle})
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve acs suite: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "[acs suite] cycle=%d verdict=%s green=%d red=%d total=%d (cycle=%d regression=%d red-team=%d)\n",
+		v.Cycle, v.Verdict, v.GreenCount, v.RedCount, v.PredicateSuite.Total,
+		v.PredicateSuite.ThisCycleCount, v.PredicateSuite.RegressionSuiteCount, v.PredicateSuite.RedTeamCount)
+	for _, r := range v.Results {
+		if r.ResultStr == "red" {
+			fmt.Fprintf(stdout, "  RED %s (exit=%d)\n", r.ACID, r.ExitCode)
+		}
+	}
+	if writeJSON {
+		dst, wErr := acssuite.WriteVerdict(evolveDir, v)
+		if wErr != nil {
+			fmt.Fprintf(stderr, "evolve acs suite: write verdict: %v\n", wErr)
+			return 1
+		}
+		fmt.Fprintf(stderr, "[acs suite] verdict written to %s\n", dst)
+	}
+	if v.RedCount > 0 {
+		return 2
+	}
+	return 0
 }
 
 func runACSRun(args []string, stdout, stderr io.Writer) int {

@@ -134,6 +134,17 @@ func Agent(atPhase, next string, inserts ...string) Brick {
 	}
 }
 
+// AgentJustified scripts the proposer like Agent, but also attaches a
+// justification string — exercises the advisor-rationale capture path.
+func AgentJustified(atPhase, next, justification string, inserts ...string) Brick {
+	return func(s *ScenarioSpec) {
+		if s.Agent.Proposals == nil {
+			s.Agent.Proposals = map[string]*router.Proposal{}
+		}
+		s.Agent.Proposals[atPhase] = &router.Proposal{NextPhase: next, InsertPhases: inserts, Justification: justification}
+	}
+}
+
 // AgentError makes the proposer fail at atPhase (exercises degrade-to-static).
 func AgentError(atPhase string) Brick {
 	return func(s *ScenarioSpec) {
@@ -153,6 +164,9 @@ func ExpectClamp(rules ...string) Brick {
 	return func(s *ScenarioSpec) { s.Expect.Clamps = append(s.Expect.Clamps, rules...) }
 }
 func ExpectReason(r string) Brick { return func(s *ScenarioSpec) { s.Expect.Reason = r } }
+func ExpectJustification(substr string) Brick {
+	return func(s *ScenarioSpec) { s.Expect.Justification = substr }
+}
 
 func ExpectPhases(p ...core.Phase) Brick { return func(s *ScenarioSpec) { s.Expect.PhaseSequence = p } }
 func ExpectAbsent(p ...core.Phase) Brick {

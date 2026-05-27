@@ -478,6 +478,25 @@ func TestAdversarialAuditFraming(t *testing.T) {
 	}
 }
 
+// TestAdversarialAuditFraming_ContainsImplicitTaxonomy guards the Google
+// adversarial-testing extension: the framing must carry the explicit/implicit
+// input taxonomy and the per-criterion evidence requirement. A refactor that
+// silently drops these blocks regresses the auditor's hunt list.
+func TestAdversarialAuditFraming_ContainsImplicitTaxonomy(t *testing.T) {
+	got := adversarialAuditFraming()
+	for _, w := range []string{
+		"ADVERSARIAL INPUT TAXONOMY",
+		"Implicit / innocuous-but-harmful",
+		"EMPTY repo",
+		"diversity collapse",
+		"PER-CRITERION EVIDENCE REQUIREMENT",
+	} {
+		if !strings.Contains(got, w) {
+			t.Errorf("framing missing %q", w)
+		}
+	}
+}
+
 func TestClassifyArtifact_StatErrIsIntegrityFail(t *testing.T) {
 	opts := RunOptions{
 		StatMTime: func(string) (time.Time, error) { return time.Time{}, errors.New("missing") },
