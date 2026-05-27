@@ -51,6 +51,12 @@ func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 		t.Fatalf("worktree branch = %q, want cycle-77", got)
 	}
 
+	// linkGuardDeps must expose the dispatcher binary at the gitignored hook
+	// path so the trust-kernel hooks resolve inside the worktree.
+	if fi, err := os.Lstat(filepath.Join(wt, "go", "bin", "evolve")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Errorf("worktree go/bin/evolve should be a symlink (linkGuardDeps); lstat err=%v", err)
+	}
+
 	// Idempotent reuse returns the same valid worktree.
 	if wt2, err := g.Create(root, 77); err != nil || wt2 != wt {
 		t.Fatalf("reuse: got (%q, %v), want (%q, nil)", wt2, err, wt)

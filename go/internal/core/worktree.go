@@ -54,6 +54,7 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// tear down a stale stub before recreating.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
 		if exec.Command("git", "-C", wt, "rev-parse", "--git-dir").Run() == nil {
+			linkGuardDeps(wt, projectRoot)
 			return wt, nil
 		}
 		_ = exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt).Run()
@@ -70,7 +71,50 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("git worktree add -B %s %s: %v: %s", branch, wt, err, eb.String())
 	}
+	linkGuardDeps(wt, projectRoot)
 	return wt, nil
+}
+
+// linkGuardDeps makes the worktree self-sufficient for the trust-kernel
+// PreToolUse hooks. Those run `$CLAUDE_PROJECT_DIR/go/bin/evolve guard ...
+// --evolve-dir $CLAUDE_PROJECT_DIR/.evolve`, and Claude Code pins
+// CLAUDE_PROJECT_DIR to the cwd (the worktree) — it does NOT honor a pre-set
+// value. The binary (gitignored go/bin/evolve) and the runtime .evolve state
+// are absent in the fresh checkout, so the hooks fail and source phases stall.
+// We symlink the LIVE dispatcher binary + the guard-read state files into the
+// worktree so the hooks resolve to the real binary + current cycle-state.
+// Best-effort: failures are non-fatal (the phase will surface a denial loudly).
+func linkGuardDeps(worktree, projectRoot string) {
+	// Binary: the running dispatcher's own executable carries the current guard
+	// logic (incl. the worktree-phase role-gate allowance), avoiding a stale
+	// in-tree go/bin/evolve.
+	if self, err := os.Executable(); err == nil {
+		if err := os.MkdirAll(filepath.Join(worktree, "go", "bin"), 0o755); err == nil {
+			symlinkForce(self, filepath.Join(worktree, "go", "bin", "evolve"))
+		}
+	}
+	// Guard-read state: point the worktree's .evolve files at the live main
+	// copies so `--evolve-dir <worktree>/.evolve` reads real cycle-state. File-
+	// level links (not a .evolve dir link) avoid any tree-walk recursion.
+	if err := os.MkdirAll(filepath.Join(worktree, ".evolve"), 0o755); err == nil {
+		for _, f := range []string{"cycle-state.json", "state.json", "ledger.jsonl"} {
+			symlinkForce(filepath.Join(projectRoot, ".evolve", f), filepath.Join(worktree, ".evolve", f))
+		}
+	}
+}
+
+// symlinkForce replaces dst with a symlink to src (absolute), clearing any
+// stale checkout file/link first. src may not yet exist (a dangling link that
+// resolves once the target is written, e.g. cycle-state.json written just after
+// provisioning) — that is fine.
+func symlinkForce(src, dst string) {
+	_ = os.Remove(dst)
+	if err := os.Symlink(src, dst); err != nil {
+		// Observable, not fatal: a missing binary link makes hooks fail loudly,
+		// but a missing state link could let a guard read empty state and pass a
+		// tool it should deny — so surface it rather than swallow silently.
+		fmt.Fprintf(os.Stderr, "[worktree] WARN symlink %s → %s failed (guard hooks may not resolve): %v\n", dst, src, err)
+	}
 }
 
 func (gitWorktree) Cleanup(projectRoot, worktree string) error {
