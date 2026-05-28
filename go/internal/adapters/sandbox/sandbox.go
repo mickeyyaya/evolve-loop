@@ -146,7 +146,18 @@ func GenerateSBPL(cfg Config) string {
 
 // GenerateBwrapArgv emits the bubblewrap argv for the given Config and
 // inner command. Linux equivalent of generate_macos_sandbox_profile.
+// Equivalent to append(BwrapPrefix(cfg), innerArgv...) — kept for backcompat;
+// new callers that only need the prefix (e.g. the bridge SandboxWrap seam)
+// should call BwrapPrefix directly to avoid the throwaway append.
 func GenerateBwrapArgv(cfg Config, innerArgv []string) []string {
+	return append(BwrapPrefix(cfg), innerArgv...)
+}
+
+// BwrapPrefix returns the bwrap prefix argv (no inner). Workstream B uses it
+// from the bridge SandboxWrap seam, which composes the full argv at the
+// driver call site (the inner argv is the per-CLI binary + flags resolved
+// later).
+func BwrapPrefix(cfg Config) []string {
 	out := []string{
 		"--unshare-user",
 		"--unshare-pid",
@@ -184,12 +195,10 @@ func GenerateBwrapArgv(cfg Config, innerArgv []string) []string {
 	if !cfg.AllowNetwork {
 		out = append(out, "--unshare-net")
 	}
-	// Inner argv at the tail.
-	out = append(out, innerArgv...)
 	return out
 }
 
-// Sandbox is the runtime-dispatching impl of core.Sandbox. Exec wraps
+// Sandbox is the runtime-dispatching exec wrapper for ad-hoc CLI use. Exec wraps
 // the given argv in the host's sandbox primitive (sandbox-exec/bwrap)
 // when available, else runs unwrapped with a stderr NOTE.
 type Sandbox struct {

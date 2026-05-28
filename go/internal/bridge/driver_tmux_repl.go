@@ -124,6 +124,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if len(cfg.ExtraFlags) > 0 {
 			launchCmd += " " + strings.Join(cfg.ExtraFlags, " ")
 		}
+		// Workstream B: prepend the OS-sandbox prefix when this is a
+		// source-writing phase AND the host can wrap. Non-Claude drivers
+		// (codex/agy/ollama) get the same confinement Claude already gets via
+		// PreToolUse hooks. When wrap is unavailable (nested-claude / no
+		// sandbox binary / EVOLVE_SANDBOX=off), drivers run unwrapped —
+		// trust kernel falls back to its Claude-only pre-B posture.
+		if prefix, ok := sandboxPrefixForLaunch(deps, cfg); ok {
+			launchCmd = joinPrefixForTmux(prefix) + " " + launchCmd
+			fmt.Fprintf(deps.Stderr, "%s sandbox prefix applied (%d argv elements)\n", pfx, len(prefix))
+		}
 		_ = deps.Tmux.SendKeys(ctx, lp.session, launchCmd, true)
 		fmt.Fprintf(deps.Stderr, "%s launching: %s\n", pfx, launchCmd)
 
