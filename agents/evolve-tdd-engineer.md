@@ -172,6 +172,77 @@ Enumerate criteria that have no test coverage yet:
 \```
 ```
 
+### Step 6b: Eval File Authoring (REQUIRED — cycle-131 lesson)
+
+**Context.** Cycles 130 and 131 both ran all 7 phases with functionally correct code, but Auditor returned `FAIL` with CRITICAL `C1: missing .evolve/evals/<task-slug>.md`. Per auditor protocol: *"Missing = automatic CRITICAL FAIL."* The TDD-engineer prompt did not previously mandate this artifact; this section closes that gap.
+
+**The rule.** Every task with a `predicate` disposition (per the AC-Materialization Contract above) MUST also produce a persistent regression eval at `.evolve/evals/<task-slug>.md` before Step 7 (Mailbox). The slug comes from `scout-report.md` task slug — same value used for `tests/test-<slug>.sh` and `acs/cycle-<N>/<id>.sh`.
+
+**Why it exists separately from ACS predicates.**
+- ACS predicates (`acs/cycle-<N>/<id>.sh`) are CYCLE-SCOPED: they run during this cycle's audit and may be cleaned up after.
+- Eval files (`.evolve/evals/<task-slug>.md`) are PERMANENT regression entries: they cap future cycles' audit scores when the listed evidence breaks, even years later. They are how the cycle's contract survives beyond the cycle.
+
+**Schema.**
+```markdown
+---
+score_cap:
+  - criterion: "<one-line behavioral requirement this eval enforces>"
+    max_if_missing: <integer 1-10 — the audit score ceiling when this evidence is absent>
+    evidence: "<shell command that exits 0 when the requirement is met>"
+  - criterion: "<another criterion>"
+    max_if_missing: <integer>
+    evidence: "<command>"
+---
+
+# Eval: <human-readable task title>
+
+> One-paragraph narrative summarizing what this eval pins, why it matters,
+> and the source incident (cycle N) that motivated it.
+
+## Score Cap Rationale
+
+| Pattern | Criterion | max_if_missing | Evidence |
+|---|---|---|---|
+| <pattern label> | <criterion> | N/10 | `<command>` |
+| ... | ... | ... | ... |
+```
+
+**Authoring checklist** (verify before Step 7):
+- [ ] File exists at `.evolve/evals/<task-slug>.md` (slug matches scout-report task slug exactly).
+- [ ] YAML frontmatter has at least one `score_cap` entry per behavioral acceptance criterion (the `predicate` dispositions from the AC-Materialization Contract).
+- [ ] Each `evidence` command is a single-line shell invocation that returns exit 0 when the criterion holds, non-zero otherwise.
+- [ ] `max_if_missing` is an integer 1-10 (the audit-score ceiling when the evidence command fails — higher = the criterion is more central).
+- [ ] Body cites the source incident (cycle N) that motivated the eval.
+
+**Worked example** — for a task adding `IsCanonicalTier(s string) bool` to `go/internal/bridge/manifest.go`:
+
+```markdown
+---
+score_cap:
+  - criterion: "IsCanonicalTier accepts the three canonical tiers"
+    max_if_missing: 6
+    evidence: "cd go && go test -run TestIsCanonicalTier_Canonical ./internal/bridge/"
+  - criterion: "IsCanonicalTier rejects legacy Anthropic tier names"
+    max_if_missing: 7
+    evidence: "cd go && go test -run TestIsCanonicalTier_RejectsLegacy ./internal/bridge/"
+---
+
+# Eval: Add IsCanonicalTier helper to manifest.go
+
+> Pins the public-API contract of `IsCanonicalTier(s string) bool` introduced
+> in cycle 132. The helper distinguishes operator typos from the canonical
+> fast/balanced/deep vocabulary established in PR 2 (ADR-0022 PR 2 addendum).
+> Source incident: cycle 131 audit C1 — TDD-engineer prompt previously did
+> not mandate `.evolve/evals/` files.
+
+## Score Cap Rationale
+
+| Pattern | Criterion | max_if_missing | Evidence |
+|---|---|---|---|
+| canonical-positives | All 3 canonical tiers return true | 6/10 | `go test -run TestIsCanonicalTier_Canonical` |
+| legacy-negatives | Anthropic tier names return false | 7/10 | `go test -run TestIsCanonicalTier_RejectsLegacy` |
+```
+
 ### Step 7: Mailbox
 
 Post to `workspace/agent-mailbox.md` for Builder:
@@ -291,6 +362,29 @@ test -x legacy/scripts/dispatch/subagent-run.sh
 grep -qF 'exit 1' legacy/scripts/dispatch/subagent-run.sh
 ```
 *Why bad:* The `test -x` doesn't invoke the worktree-validation code path. The `grep -qF 'exit 1'` could match an `exit 1` anywhere in the 800-line script. Window-dressing on a grep-only predicate.
+
+### The cycle-131 indent-anchor footgun (REQUIRED reading for Go-test predicates)
+
+**Context.** Cycle 131 audit H1 finding: a behavioral predicate counted Go test PASS lines using `grep -c '^--- PASS:'`. The implementation was correct (all 8 sub-tests PASSED), but the predicate exited RED because Go's `testing` package emits sub-test PASS lines with **4-space indentation** (`    --- PASS: TestIsCanonicalTier/fast_is_canonical`), so the `^` anchor matched only the parent test's single PASS line (count=1 vs threshold=8). The auditor noted *"Implementation is correct — the defect is the predicate grep pattern."*
+
+**The rule for Go-test-output predicates.** Count PASS/FAIL lines without anchoring to line-start unless you've confirmed there's no parent-test indentation. Prefer one of:
+
+```bash
+# Pattern A — count by test-name prefix (NO ^ anchor, immune to indent depth):
+pass_count=$(grep -c 'PASS: TestIsCanonicalTier/' /tmp/test-output.txt)
+
+# Pattern B — explicit indent tolerance (still works on un-indented parents):
+pass_count=$(grep -cE '^[[:space:]]*--- PASS:' /tmp/test-output.txt)
+
+# Pattern C — use `go test -json` and parse with jq (robust across Go versions):
+pass_count=$(go test -json -run TestIsCanonicalTier ./internal/bridge/ \
+  | jq -r 'select(.Action=="pass" and .Test != null and (.Test | contains("/"))) | .Test' \
+  | wc -l)
+```
+
+**❌ DO NOT use** the unanchored `'PASS:'` form — it also matches FAIL output lines like `--- FAIL: ... (skipped because some PASS:` (false positives).
+
+**Source incident:** cycle 131 (2026-05-29), task `add-is-canonical-tier`. Predicate `acs/cycle-131/001-is-canonical-tier-behavior.sh:37` used `grep -c '^--- PASS:'` and reported FAIL despite all sub-tests PASSING. The defect was the grep pattern, not the implementation.
 
 **✅ GOOD (behavioral with subprocess invocation):**
 ```bash
