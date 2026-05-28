@@ -16,15 +16,32 @@ import (
 var ollamaModelTagRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@-]*$`)
 
 // ollamaComposeLaunchCmd composes the single REPL launch line `<binary> run
-// <model>`. Lives on the driver (not in a test mirror) so test pins exercise
-// the SAME function the driver runs — preventing the silent drift the
-// reviewer caught when the helper had been duplicated in a test file. The
-// binary is parameterized to keep the function pure + trivially testable.
-func ollamaComposeLaunchCmd(binary, model string) string {
+// <model> [extras...]`. Lives on the driver (not in a test mirror) so test
+// pins exercise the SAME function the driver runs — preventing the silent
+// drift the reviewer caught when the helper had been duplicated in a test
+// file. The binary is parameterized to keep the function pure + trivially
+// testable.
+//
+// extras lands AFTER the positional model — ollama's CLI parses
+// `ollama run <model>` as a subcommand-with-positional, and any flag the
+// operator wants to pass (e.g. `--experimental-yolo` to short-circuit the
+// per-edit-approval prompt cycle-123 surfaced for codex) must follow the
+// model token. Wired in cycle-124 G1a: the realizer's default_args
+// activation makes manifest.default_args reach LaunchFlags, and this
+// helper threads them into the right launch-line position. extras=nil or
+// empty is a no-op preserving the pre-fix launch shape exactly.
+func ollamaComposeLaunchCmd(binary, model string, extras []string) string {
 	if model == "" {
 		model = "llama3.1:8b" // matches manifest default_model
 	}
-	return binary + " run " + model
+	out := binary + " run " + model
+	for _, x := range extras {
+		if x == "" {
+			continue
+		}
+		out += " " + x
+	}
+	return out
 }
 
 // ollamaTmuxDriver drives an interactive `ollama run <model>` REPL through
@@ -87,8 +104,11 @@ func (ollamaTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 	// flag. The manifest declares model_tier channel:noop so the realizer
 	// emits no model flag; we compose the launch line directly via the
 	// shared ollamaComposeLaunchCmd (also exercised by the launch-cmd test
-	// pins, so the driver and tests can't silently drift).
-	launchCmd := ollamaComposeLaunchCmd(resolveBinary(deps, "ollama"), model)
+	// pins, so the driver and tests can't silently drift). cfg.Realization.
+	// LaunchFlags carries manifest.default_args (cycle-124 G1a:
+	// --experimental-yolo) plus any operator raw-by-CLI extras, threaded
+	// AFTER the positional model per ollama's CLI grammar.
+	launchCmd := ollamaComposeLaunchCmd(resolveBinary(deps, "ollama"), model, cfg.Realization.LaunchFlags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "ollama-tmux",

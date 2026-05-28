@@ -142,7 +142,37 @@ The honest scorecard for the cycle-122 plan: **1 of 3 fixes (Fix 3) was the unam
 
 ## Part 4: Follow-up Plan (cycle-124 / V3-recovery scope)
 
-This incident must be resolved before the "any CLI × any phase × any model" invariant from [`feedback-any-cli-any-phase-any-model-invariant`](../../../../../.claude/projects/-Users-danleemh-ai-claude-evolve-loop/memory/feedback_any_cli_any_phase_any_model_invariant.md) can be claimed. Three concrete fixes:
+> **AMENDMENT (2026-05-28, operator redirect after this report shipped).** The plan
+> below was written from the pre-redirect perspective — leading with G2 (cross-CLI
+> fallback chain) as the second fix. The operator subsequently directed: *"I don't
+> expect fallback to happen. LLM CLIs should complete their assigned tasks. We
+> have full tmux control — can always send query and command to ask LLM CLI
+> continue and correct its job."* Part 4 below stays in place as the historical
+> design record; the REDIRECTED priority sequence the cycle-124 PR actually ships
+> is:
+>
+> | # | Fix | What | Status (cycle-124 PR) |
+> |---|---|---|---|
+> | 1 | **G1a** | codex `--yolo` + ollama `--experimental-yolo` via manifest `default_args` (wire-up + claude/agy `--dangerously-skip-permissions` migration) | LANDED in PR |
+> | 2 | **F4** | `KindKeystroke` envelope — raw `tmux send-keys` channel for operator/observer to dismiss modals, navigate menus, send Ctrl chars (ADR-0023 addendum) | LANDED in PR |
+> | 3 | **G1b** | codex per-edit-modal regex in `interactive_prompts` (defense-in-depth behind G1a's `--yolo`) | LANDED in PR |
+> | 4 | **G3** | CLIPreflight optional interface — codex moves `pretrustCodexProjects` into `Preflight()`; opt-out by omission, no stubs in drivers that don't need prep | LANDED in PR |
+> | 5 | Liveness nudge (Task 6) | Standalone `evolve phase-observer` default flipped 0 → 300s; auto-spawn adapter wire-up DEFERRED with a documented gap | PARTIAL in PR |
+> | 6 | **G2** | implicit cross-CLI fallback chain — DEMOTED to LAST RESORT; ships in a follow-up cycle, not in cycle-124 | DEFERRED |
+>
+> Reasoning for the demotion: the operator's "full tmux control" mechanism (G1a +
+> F4 + G1b + active nudging) is the PRIMARY autonomous-completion path. G2 (fallback
+> to a different CLI when the primary fails) is only meaningful if items 1-5 fail
+> first — by design, they shouldn't, so the fallback becomes a safety net rather
+> than a routine recovery path. The cycle-124 PR ships items 1-4 fully + item 5
+> partial; G2 ships in a follow-up PR after V1-V3 verification confirms the
+> primary mechanisms are sufficient.
+>
+> Sources for this redirect: the operator's 2026-05-28 message captured in
+> `~/.claude/session-data/2026-05-28-cycle122-123-redirect-session.tmp` and the
+> `[[project_cycle122_remediation_shipped]]` memory anchor.
+
+This incident must be resolved before the "any CLI × any phase × any model" invariant from [`feedback-any-cli-any-phase-any-model-invariant`](../../../../../.claude/projects/-Users-danleemh-ai-claude-evolve-loop/memory/feedback_any_cli_any_phase_any_model_invariant.md) can be claimed. Three concrete fixes (PRE-REDIRECT plan — preserved as historical context; see the AMENDMENT block above for the ACTUAL cycle-124 PR sequence):
 
 ### Fix G1a — Launch codex with non-interactive approval flag
 
@@ -196,12 +226,15 @@ Cycle-124 V1-V3 verification then re-runs the cycle-123 multi-CLI fan-out and as
 
 | ID | Item | Owner |
 |---|---|---|
-| G1a | Codex `--ask-for-approval=never` launch flag | cycle-124 commit 1 |
-| G2  | Implicit cross-CLI fallback when `profile.cli_fallback` empty | cycle-124 commit 2 |
-| G3  | Per-CLI preflight pattern (interface + 4 driver impls) | cycle-124 commit 3 |
+| G1a | Codex `--yolo` + ollama `--experimental-yolo` via `manifest.default_args`; claude/agy migration | LANDED in cycle-124 PR |
+| F4  | `KindKeystroke` envelope (operator's "full tmux control" mechanism, ADR-0023 addendum) | LANDED in cycle-124 PR |
+| G1b | Codex per-edit-modal regex (`Would you like to make the following edits...`) — defense-in-depth behind G1a's `--yolo` | LANDED in cycle-124 PR |
+| G3  | CLIPreflight optional interface (codex preflight extracted; opt-out by omission) | LANDED in cycle-124 PR |
+| Liveness nudge (Task 6) | Standalone `phase-observer` default 0→300s; auto-spawn adapter wire-up gap documented | PARTIAL in cycle-124 PR |
+| G2  | Implicit cross-CLI fallback when `profile.cli_fallback` empty (operator-demoted to LAST RESORT) | DEFERRED to follow-up cycle |
 | G4 (deferred) | Fix 3 v2 — observer cancels cycle context on stall (instead of just emitting INCIDENT) | post-cycle-124 |
-| G5 (deferred) | Manifest completeness audit for all 4 tmux drivers | post-cycle-124 |
-| G6 (deferred) | F4 from cycle-122 plan: `KindKeystroke` bridge envelope for live keystroke injection | post-cycle-124 |
+| G5 (deferred) | Manifest completeness audit for remaining tmux drivers (claude/agy/ollama) | post-cycle-124 |
+| Adapter nudge wire-up | Port phaseobserver's nudge logic into adapters/observer's slim Watch loop OR consolidate the two observers | post-cycle-124 |
 
 ---
 

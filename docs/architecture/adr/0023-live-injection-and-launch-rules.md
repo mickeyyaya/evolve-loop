@@ -35,7 +35,44 @@ never wired.
 | Senders | `evolve bridge send --workspace --agent [--kind] [--source] <body>` (operator/scriptable) **and** the phase-observer soft-stall nudge (opt-in). Both use the same `inbox.Append`. |
 | Scope | **Go-tmux-only by physics.** Headless drivers (`claude -p`, `codex exec`, `agy -p`) exit after one prompt — nothing to inject into. `bridge send` to a headless agent accumulates an undrained file (harmless). The production default routes phases to tmux-REPL drivers, so the live workload is covered. |
 
-`Kind` vocabulary: `command` | `interrupt` | `nudge` | `system_rule`.
+`Kind` vocabulary: `command` | `interrupt` | `nudge` | `system_rule` | `keystroke`.
+
+### Facet A addendum (cycle-124 F4 / 2026-05-28) — `keystroke` envelope kind
+
+Cycle-122 / cycle-123 surfaced a class of stalls the existing vocabulary could not unblock without
+killing the session: codex 0.134's per-edit-approval modal that the operator's reply-key (`Enter`) had
+to literally reach the running REPL — neither `command` (idle-gated; the agent isn't idle, it's blocked
+on the modal) nor `interrupt` (sends ESC first, which dismisses the modal instead of confirming it)
+fit. **`keystroke` is the operator's "raw tmux send-keys" hatch** for cases where the bridge MUST send
+exactly one key sequence and nothing else:
+
+| Property | Value | Contrast |
+|---|---|---|
+| Idle-gate | **None** — fires regardless of agent state | command/nudge/system_rule are idle-gated |
+| Pre-send | **None** — no ESC, no settle delay | interrupt pre-sends ESC + sleeps `injectInterruptSettle` |
+| Body interpretation | **None** — sent verbatim to `tmux send-keys -t session <body>` (`enter=false`) | command/interrupt/nudge/system_rule body is treated as text + Enter-suffixed via the paste buffer |
+| Transport | Direct `SendKeys` | command/etc. use `LoadBuffer` + `PasteBuffer` + Enter via the scratch file |
+| Empty body | No-op (existing `SendKeys` contract: empty `keys` skips the arg) | n/a |
+
+**Body shape.** One tmux key-spec or several space-separated specs. Examples:
+- `--body=Enter` → confirms a y/N prompt
+- `--body='y Enter'` → types `y` then Enter (two key tokens, space-separated as tmux expects)
+- `--body=Escape` → bare ESC
+- `--body=C-c` → Ctrl-C
+- `--body=Up` / `--body=Down` / `--body=Right` → navigate a menu
+
+**Operator responsibility.** Because the bridge does not interpret the body, the operator owns
+everything that reaches the REPL. The `evolve bridge send --kind=keystroke` path is unprivileged
+(any writer of the workspace can append). The intentional gate-bypass is the point: the
+keystroke kind exists to send keys precisely WHEN the agent is not idle (e.g. a modal blocking the
+turn).
+
+**Source incidents.** docs/incidents/cycle-122-codex-permission-modal-and-wsg-fallback-gap.md +
+docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md. The cycle-124 plan
+in those reports placed F4 second after G1a (codex `--yolo` boot flag) because G1a defuses one
+specific failure mode (the per-edit-approval modal at boot) while F4 is the generic mechanism
+the operator asked for: "we have full tmux control" applies to every modal class, present and
+future, that the manifest's `interactive_prompts` regex list does not yet cover.
 
 ### Facet B — launch-time rules prepended at the policy seam
 

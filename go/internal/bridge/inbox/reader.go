@@ -64,7 +64,7 @@ func (c *Cursor) Drain() ([]Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Seek(c.offset, io.SeekStart); err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@
   },
   "prompt_marker": null,
   "default_model": "gemini-3.5-flash",
-  "default_args": ["--dangerously-skip-permissions"],
+  "default_args": [],
   "interactive_prompts": [
     {
       "name": "auth_recheck",

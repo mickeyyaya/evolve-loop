@@ -72,10 +72,19 @@ func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		Enforce:      enforce,
 		PollS:        atoiOr(os.Getenv("EVOLVE_OBSERVER_POLL_S"), 0),
 		StallS:       atoiOr(envOr("EVOLVE_OBSERVER_STALL_S", os.Getenv("EVOLVE_INACTIVITY_THRESHOLD_S")), 0),
-		NudgeS:       atoiOr(os.Getenv("EVOLVE_OBSERVER_NUDGE_S"), 0),
-		NudgeBody:    os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
-		EOFGraceS:    atoiOr(os.Getenv("EVOLVE_OBSERVER_EOF_GRACE_S"), 0),
-		ShutdownSig:  shutdown,
+		// Cycle-124 Task 6 / operator redirect: bridge has full tmux
+		// control and SHOULD nudge a soft-stalled agent BEFORE the hard
+		// SIGTERM. Default promoted from 0 (opt-in) to 300 (half of
+		// StallS=600) so every standalone phase-observer run sends one
+		// nudge envelope when the agent emits no fresh output for 5+
+		// minutes. Opt-out is still possible: set
+		// EVOLVE_OBSERVER_NUDGE_S=0. Body overridable via
+		// EVOLVE_OBSERVER_NUDGE_BODY. See CLAUDE.md env-var table row +
+		// docs/architecture/adr/0023 facet A.
+		NudgeS:      atoiOr(os.Getenv("EVOLVE_OBSERVER_NUDGE_S"), 300),
+		NudgeBody:   os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
+		EOFGraceS:   atoiOr(os.Getenv("EVOLVE_OBSERVER_EOF_GRACE_S"), 0),
+		ShutdownSig: shutdown,
 	}, "", stderr)
 }
 

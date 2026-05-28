@@ -29,19 +29,24 @@ func TestOllamaTmux_DriverRegistered(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_ManifestRealizesEmptyLaunchFlags is the realizer contract:
-// ollama-tmux declares all params channel:noop EXCEPT session_mode
-// (controller). So a typical LaunchIntent must produce zero launch flags —
-// the model is composed positionally in the driver, not via the realizer.
-func TestOllamaTmux_ManifestRealizesEmptyLaunchFlags(t *testing.T) {
+// TestOllamaTmux_ManifestRealizesYoloOnly is the realizer contract after the
+// cycle-124 G1a wire-up: ollama-tmux declares all params channel:noop EXCEPT
+// session_mode (controller), so the params table contributes NOTHING to
+// LaunchFlags for a typical LaunchIntent — but manifest.default_args =
+// ["--experimental-yolo"] now lands in LaunchFlags (cycle-124 activated the
+// previously-dead default_args channel in Realize()). The model still
+// composes positionally in the driver, not via the realizer; the realized
+// --experimental-yolo flag is threaded through cfg.Realization.LaunchFlags
+// into ollamaComposeLaunchCmd's extras tail (after the positional model).
+func TestOllamaTmux_ManifestRealizesYoloOnly(t *testing.T) {
 	intent := LaunchIntent{
 		ModelTier:     "sonnet",
 		Permission:    "bypass",
 		SettingsScope: "user",
 	}
 	got := RealizeFor("ollama-tmux", intent)
-	if len(got.LaunchFlags) != 0 {
-		t.Errorf("ollama-tmux LaunchFlags=%v, want empty (manifest declares all params noop except session_mode controller)", got.LaunchFlags)
+	if len(got.LaunchFlags) != 1 || got.LaunchFlags[0] != "--experimental-yolo" {
+		t.Errorf("ollama-tmux LaunchFlags=%v, want [--experimental-yolo] only (default_args from manifest; params still all noop except session_mode)", got.LaunchFlags)
 	}
 }
 
@@ -145,11 +150,41 @@ func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := ollamaComposeLaunchCmd("ollama", tc.model)
+			cmd := ollamaComposeLaunchCmd("ollama", tc.model, nil)
 			if cmd != tc.wantInCmd {
 				t.Errorf("launchCmd=%q, want %q", cmd, tc.wantInCmd)
 			}
 		})
+	}
+}
+
+// TestOllamaTmux_LaunchCmd_AppendsExtrasAfterModel pins the cycle-124 G1a
+// contract: `ollama run <model>` is followed by manifest default_args (and
+// any operator raw extras) in the launch line, AFTER the positional model.
+// Order is load-bearing — ollama's CLI parses `ollama run <model>` as a
+// subcommand-with-positional; flags before the model would be misparsed.
+func TestOllamaTmux_LaunchCmd_AppendsExtrasAfterModel(t *testing.T) {
+	got := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", []string{"--experimental-yolo"})
+	want := "ollama run llama3.1:8b --experimental-yolo"
+	if got != want {
+		t.Errorf("got %q, want %q (extras must follow positional model)", got, want)
+	}
+	// Empty / nil extras MUST be byte-identical to the pre-extras signature.
+	if cmd := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", nil); cmd != "ollama run llama3.1:8b" {
+		t.Errorf("nil extras must produce pre-fix shape; got %q", cmd)
+	}
+	if cmd := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", []string{}); cmd != "ollama run llama3.1:8b" {
+		t.Errorf("empty extras must produce pre-fix shape; got %q", cmd)
+	}
+	// Multiple extras append in order with single-space separators.
+	multi := ollamaComposeLaunchCmd("ollama", "m", []string{"--a", "--b", "--c"})
+	if multi != "ollama run m --a --b --c" {
+		t.Errorf("multi-extras: got %q, want %q", multi, "ollama run m --a --b --c")
+	}
+	// Empty string in extras is skipped (defensive).
+	skipped := ollamaComposeLaunchCmd("ollama", "m", []string{"--a", "", "--b"})
+	if skipped != "ollama run m --a --b" {
+		t.Errorf("empty-string extras must be skipped; got %q", skipped)
 	}
 }
 
@@ -159,7 +194,7 @@ func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
 // ollamaComposeLaunchCmd the driver uses, any drift in the function body
 // fails this pin.
 func TestOllamaTmux_CompositionPinsDriverInvariant(t *testing.T) {
-	got := ollamaComposeLaunchCmd("ollama", "test-model:tag")
+	got := ollamaComposeLaunchCmd("ollama", "test-model:tag", nil)
 	if !strings.HasPrefix(got, "ollama run ") {
 		t.Errorf("composition contract broken: %q must start with %q", got, "ollama run ")
 	}

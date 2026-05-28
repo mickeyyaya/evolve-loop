@@ -170,6 +170,97 @@ func TestRealize_AllowedToolsExpandsFlag(t *testing.T) {
 	}
 }
 
+// TestRealize_DefaultArgs_LandFirst pins the cycle-124 G1a wire-up: manifest
+// `default_args` is the always-on launch-flag channel (was a dead field
+// before cycle-124 — declared in manifest.go but never read). Tokens land in
+// LaunchFlags BEFORE per-param scalars, so a manifest can prepend
+// unconditional boot-time switches (e.g. codex-tmux --yolo, ollama-tmux
+// --experimental-yolo) without competing with intent-driven flags. An empty
+// or nil default_args remains a no-op (regression guard for the agy/claude
+// migration that emptied their default_args and let params.permission be
+// the sole emitter).
+func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
+	// Synthetic manifest: default_args + one per-param scalar. Tokens MUST
+	// appear in this exact order.
+	m := Manifest{
+		CLI:         "hypo",
+		DefaultArgs: []string{"--always", "--on"},
+		Params:      map[string]ParamSpec{"permission": {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}}},
+	}
+	got := Realize(m, LaunchIntent{Permission: "bypass"})
+	want := []string{"--always", "--on", "--bypass"}
+	if !reflect.DeepEqual(got.LaunchFlags, want) {
+		t.Fatalf("default_args must land FIRST; got %v, want %v", got.LaunchFlags, want)
+	}
+
+	// Empty default_args produces unchanged behavior — regression guard for the
+	// cycle-124 agy/claude migration that emptied default_args and let
+	// params.permission be the sole emitter of --dangerously-skip-permissions.
+	mEmpty := Manifest{
+		CLI:         "hypo-empty",
+		DefaultArgs: []string{},
+		Params:      map[string]ParamSpec{"permission": {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}}},
+	}
+	gotEmpty := Realize(mEmpty, LaunchIntent{Permission: "bypass"})
+	if !reflect.DeepEqual(gotEmpty.LaunchFlags, []string{"--bypass"}) {
+		t.Fatalf("empty default_args must be a no-op; got %v, want [--bypass]", gotEmpty.LaunchFlags)
+	}
+
+	// Nil default_args is also a no-op (covers the unset-key case in JSON).
+	mNil := Manifest{
+		CLI:    "hypo-nil",
+		Params: map[string]ParamSpec{"permission": {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}}},
+	}
+	gotNil := Realize(mNil, LaunchIntent{Permission: "bypass"})
+	if !reflect.DeepEqual(gotNil.LaunchFlags, []string{"--bypass"}) {
+		t.Fatalf("nil default_args must be a no-op; got %v, want [--bypass]", gotNil.LaunchFlags)
+	}
+}
+
+// TestRealize_DefaultArgs_Deduped covers the cycle-124 G1a wire-up's
+// order-preserving dedupe: when a manifest declares the same token in
+// default_args AND one of its params channels emits the same token, the
+// duplicate is silently dropped (the operator-declared default keeps the
+// leading position). This is the documented invariant for boolean-style
+// flags; flag/value PAIRS with different VALUES are preserved (the dedup is
+// token-level, so `--model gpt-5.4` and `--model gpt-5.5` would both
+// survive — neither matches the other as tokens).
+func TestRealize_DefaultArgs_Deduped(t *testing.T) {
+	// Collision case: default_args declares the same flag the bypass channel
+	// emits. Result must contain it exactly ONCE, at the leading position.
+	m := Manifest{
+		CLI:         "hypo",
+		DefaultArgs: []string{"--bypass"},
+		Params:      map[string]ParamSpec{"permission": {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}}},
+	}
+	got := Realize(m, LaunchIntent{Permission: "bypass"})
+	if !reflect.DeepEqual(got.LaunchFlags, []string{"--bypass"}) {
+		t.Fatalf("colliding token must dedupe to one; got %v, want [--bypass]", got.LaunchFlags)
+	}
+
+	// Distinct-value case: different VALUES of the same FLAG NAME survive
+	// (token-level dedupe doesn't conflate them). This is the property that
+	// makes the dedupe safe for non-boolean params.
+	m2 := Manifest{
+		CLI:         "hypo2",
+		DefaultArgs: []string{"--model", "gpt-5.4"},
+		Params: map[string]ParamSpec{
+			"model_tier": {Channel: "flag", Flag: "--model", From: "tier_alias"},
+		},
+		TierAliases: map[string]string{"sonnet": "gpt-5.5"},
+	}
+	got2 := Realize(m2, LaunchIntent{ModelTier: "sonnet"})
+	// First --model appears (default_args), gpt-5.4 appears, second --model is
+	// a duplicate token (dropped), gpt-5.5 appears. Net result keeps both
+	// values but only the first --model — accept that minor weirdness as the
+	// documented contract: dedupe is intentionally token-level, not
+	// flag-pair-aware. Callers that need pair semantics must not declare the
+	// flag in both default_args and params.
+	if !reflect.DeepEqual(got2.LaunchFlags, []string{"--model", "gpt-5.4", "gpt-5.5"}) {
+		t.Fatalf("token-level dedupe contract violated; got %v, want [--model gpt-5.4 gpt-5.5]", got2.LaunchFlags)
+	}
+}
+
 // --- small test helpers ----------------------------------------------------
 
 // sameFlags reports whether got and want contain the same tokens (order-insensitive).

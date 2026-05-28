@@ -179,6 +179,60 @@ func TestCoreAdapter_Start_ResolveDurationFallsBackOnBadEnv(t *testing.T) {
 	}
 }
 
+// TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable pins the cycle-124 Task 6
+// semantic split between resolveNudgeS and resolveDuration. resolveDuration
+// falls back to default on "0" (a value useful only as a typo); but for
+// nudging, "0" is the documented opt-out — set it explicitly to disable.
+// Unset → default (default-on per cycle-124). Garbage → default (typo
+// must not silently disable nudging). Negative → default (defensive).
+func TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable(t *testing.T) {
+	cases := []struct {
+		in   string
+		want time.Duration
+	}{
+		{"", DefaultNudgeS},        // unset → default (300s, default-on)
+		{"0", 0},                   // explicit opt-out — disable nudging
+		{"300", 300 * time.Second}, // identity
+		{"60", 60 * time.Second},   // custom
+		{"  ", DefaultNudgeS},      // whitespace-only → Atoi returns err → default
+		{"-5", DefaultNudgeS},      // negative → default (defensive)
+		{"abc", DefaultNudgeS},     // garbage → default (don't silently disable on typo)
+		{"5m", DefaultNudgeS},      // not bare integer → default
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
+			got := a.resolveNudgeS(DefaultNudgeS)
+			if got != tc.want {
+				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCoreAdapter_ResolveString_FallsBackOnEmpty pins the cycle-124 Task 6
+// helper for EVOLVE_OBSERVER_NUDGE_BODY (and any future env var that
+// carries a free-form string). Empty → default; whitespace-only is
+// considered set (callers may want to inject a space-padded body).
+func TestCoreAdapter_ResolveString_FallsBackOnEmpty(t *testing.T) {
+	cases := []struct {
+		in, def, want string
+	}{
+		{"", "default body", "default body"},
+		{"custom body", "default body", "custom body"},
+		{"   ", "default body", "   "}, // whitespace IS a value; only empty falls back
+	}
+	for _, tc := range cases {
+		t.Run(tc.in+"|"+tc.def, func(t *testing.T) {
+			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
+			got := a.resolveString("EVOLVE_OBSERVER_NUDGE_BODY", tc.def)
+			if got != tc.want {
+				t.Errorf("in=%q def=%q got=%q want=%q", tc.in, tc.def, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe pins
 // thread-safety: two phases starting in parallel (unusual but possible
 // under multi-execute) get isolated sinks + cancels.

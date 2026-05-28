@@ -96,7 +96,15 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "codex-tmux",
 			binary: "codex",
 			marker: "›",
-			want:   "codex -m gpt-5.4",
+			// Cycle-124 G1a: --yolo from codex-tmux.json:default_args lands
+			// FIRST per the realizer's wire-up order (default_args before
+			// per-param scalars), then -m gpt-5.4 from the params.model_tier
+			// tier_alias (sonnet → gpt-5.4). Behavior contract: --yolo at
+			// boot sets approval=never AND sandbox=danger-full-access,
+			// short-circuiting the per-edit-approval modal that hung cycle-
+			// 123 tdd. (Codex's --help 0.134 omits --yolo from its option
+			// list, but clap parses it; verified empirically.)
+			want:   "codex --yolo -m gpt-5.4",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}

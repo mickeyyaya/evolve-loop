@@ -19,9 +19,7 @@
   },
   "prompt_marker": "? for shortcuts",
   "default_model": "gemini-3.5-flash",
-  "default_args": [
-    "--dangerously-skip-permissions"
-  ],
+  "default_args": [],
   "params": {
     "model_tier": {
       "channel": "noop"

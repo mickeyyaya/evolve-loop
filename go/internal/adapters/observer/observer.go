@@ -23,8 +23,19 @@ import (
 
 // Defaults from CLAUDE.md env-var table.
 const (
-	DefaultPollS  = 5 * time.Second
+	DefaultPollS = 5 * time.Second
+	// DefaultStallS is the hard-kill threshold — after this many seconds of
+	// no stdout-log output the observer signals the runner to SIGTERM the
+	// subagent. ADR-0030 + EVOLVE_OBSERVER_STALL_S.
 	DefaultStallS = 600 * time.Second
+	// DefaultNudgeS is the soft-stall nudge threshold (cycle-124 Task 6 /
+	// operator redirect): when an agent emits no fresh output for this many
+	// seconds, the observer appends ONE nudge envelope to the agent's inbox
+	// asking it to summarize state + continue OR finalize, BEFORE the hard
+	// SIGTERM at DefaultStallS. Default is half of DefaultStallS so the
+	// agent gets a clear "still alive?" prompt with enough time to recover.
+	// Opt-out: set EVOLVE_OBSERVER_NUDGE_S=0. See ADR-0023 facet A.
+	DefaultNudgeS = 300 * time.Second
 )
 
 // Event is one observer emission, NDJSON-serialized.

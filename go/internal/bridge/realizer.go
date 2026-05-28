@@ -66,6 +66,18 @@ func RealizeFor(cli string, intent LaunchIntent) Realization {
 func Realize(m Manifest, intent LaunchIntent) Realization {
 	var r Realization
 
+	// Manifest-level default_args land FIRST so per-param flags + raw
+	// escape-hatch flags append after them. This is the "always-on" hook
+	// each CLI uses for unconditional launch flags (e.g. codex-tmux's
+	// --yolo to short-circuit the per-edit-approval modal that stalled
+	// cycle-123 tdd — see docs/incidents/cycle-123-codex-edit-approval-
+	// modal-and-empty-fallback-chain.md G1a). The field has existed on
+	// Manifest since manifest.go:63 but was previously unread; wired in
+	// cycle-124 Fix G1a.
+	if len(m.DefaultArgs) > 0 {
+		r.LaunchFlags = append(r.LaunchFlags, m.DefaultArgs...)
+	}
+
 	realizeScalar(&r, m, "model_tier", intent.ModelTier)
 	realizeScalar(&r, m, "permission", intent.Permission)
 	realizeScalar(&r, m, "settings_scope", intent.SettingsScope)
@@ -90,7 +102,46 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	if raw, ok := intent.RawByCLI[m.CLI]; ok {
 		r.LaunchFlags = append(r.LaunchFlags, raw...)
 	}
+	// Dedupe LaunchFlags (cycle-124 G1a wire-up consequence): a manifest's
+	// default_args may declare a flag that one of its params ALSO emits when
+	// a particular intent value is set (e.g. agy-tmux declares
+	// --dangerously-skip-permissions in default_args AND in
+	// params.permission.values.bypass; both fire under
+	// intent.Permission="bypass"). Dedupe is order-preserving (keep first
+	// occurrence) so the operator-declared default still takes the leading
+	// position. Idempotent for the already-unique case.
+	r.LaunchFlags = dedupeLaunchFlags(r.LaunchFlags)
 	return r
+}
+
+// dedupeLaunchFlags returns a copy of in with subsequent duplicates removed,
+// preserving order. Treats each token as an independent unit — a flag with
+// distinct values (e.g. -m gpt-5.4 vs -m gpt-5.5) is correctly kept twice
+// because the token values differ. Use ONLY for boolean-style flags
+// (--yolo, --dangerously-skip-permissions) where a duplicate is purely
+// redundant; flag-value pairs that legitimately repeat (e.g. multiple
+// --include patterns) should NOT be deduped this way. The current callers
+// from Realize emit boolean flags or unique flag/value pairs, so this
+// matches the contract.
+func dedupeLaunchFlags(in []string) []string {
+	if len(in) <= 1 {
+		return in
+	}
+	seen := make(map[string]struct{}, len(in))
+	// Fresh backing array (cycle-124 review HIGH): `out := in[:0]` would
+	// alias `in`'s storage. The function's contract is "returns a copy"
+	// and the call site relies on that — keeping `in` intact lets the
+	// caller hold a pre-dedupe reference for diagnostics without
+	// witnessing in-place writes through it.
+	out := make([]string, 0, len(in))
+	for _, tok := range in {
+		if _, dup := seen[tok]; dup {
+			continue
+		}
+		seen[tok] = struct{}{}
+		out = append(out, tok)
+	}
+	return out
 }
 
 // realizeScalar handles a single-valued intent param (model_tier, permission,

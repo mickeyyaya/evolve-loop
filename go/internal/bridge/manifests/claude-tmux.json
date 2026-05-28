@@ -19,9 +19,7 @@
   },
   "prompt_marker": "\u276f",
   "default_model": "haiku",
-  "default_args": [
-    "--dangerously-skip-permissions"
-  ],
+  "default_args": [],
   "tier_aliases": {},
   "params": {
     "permission": {

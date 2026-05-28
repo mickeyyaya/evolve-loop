@@ -176,7 +176,7 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return 10
 		}
 		if !inbox.Kind(kind).Valid() {
-			fmt.Fprintf(stderr, "evolve bridge send: invalid --kind %q (command|interrupt|nudge|system_rule)\n", kind)
+			fmt.Fprintf(stderr, "evolve bridge send: invalid --kind %q (command|interrupt|nudge|system_rule|keystroke)\n", kind)
 			return 10
 		}
 		env := inbox.Envelope{Kind: inbox.Kind(kind), Body: strings.Join(body, " "), Source: source}

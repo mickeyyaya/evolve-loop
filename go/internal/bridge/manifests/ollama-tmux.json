@@ -19,7 +19,7 @@
   },
   "prompt_marker": ">>> ",
   "default_model": "llama3.1:8b",
-  "default_args": [],
+  "default_args": ["--experimental-yolo"],
   "params": {
     "model_tier": {
       "channel": "noop"

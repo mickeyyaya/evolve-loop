@@ -30,6 +30,28 @@ type Driver interface {
 	Launch(ctx context.Context, cfg *Config, deps Deps) (int, error)
 }
 
+// CLIPreflight is an OPTIONAL Driver capability for per-CLI prep work that
+// must complete BEFORE the inner CLI process is launched. The Engine
+// dispatches it via type assertion (`driver.(CLIPreflight)`) so a driver
+// that needs no prep work simply omits the method — no no-op stubs in every
+// concrete driver. Establishing this seam (cycle-124 G3, redesign of the
+// inline pretrust call at the top of codexTmuxDriver.Launch) gives every
+// CLI a uniform place to mutate config files / refresh credentials / probe
+// the binary BEFORE the user-visible launch path runs. Today only
+// codex-tmux implements it (pre-trust worktree + workspace paths in
+// ~/.codex/config.toml per cycle-122 Fix 1); claude-tmux / agy-tmux /
+// ollama-tmux opt out by not declaring the method.
+//
+// Semantics: best-effort. The Engine LOGS a non-nil error to stderr but
+// continues to Launch — this matches the existing inline call's posture
+// (Fix 2's extended fallback trigger list is the downstream defense
+// against any preflight failure). A driver that needs Preflight to be
+// load-bearing (abort launch on failure) MUST encode that in its own
+// Launch body, not here.
+type CLIPreflight interface {
+	Preflight(ctx context.Context, cfg *Config, deps Deps) error
+}
+
 // driverRegistry is the self-registering Driver table. Pattern: Factory
 // Method / Registry (GoF) — identical in shape to
 // internal/phases/registry so the two stay mentally aligned. Lookups are

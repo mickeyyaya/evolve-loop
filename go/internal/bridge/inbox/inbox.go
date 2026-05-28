@@ -17,6 +17,15 @@ import "path/filepath"
 //	interrupt   — send ESC first, then inject regardless of agent state.
 //	nudge       — observer-originated command; idle-gated like command.
 //	system_rule — late rule injection; idle-gated, prefixed "## Rules".
+//	keystroke   — raw tmux send-keys, no idle-gate, no ESC prefix, no Enter
+//	              suffix. Body is one tmux key-spec (literal text or a named
+//	              key like "Enter" / "Escape" / "C-c" / "Up", or several
+//	              space-separated tokens) sent verbatim. This is the operator's
+//	              "full tmux control" hatch (cycle-124 F4 / ADR-0023): used by
+//	              `evolve bridge send` and the phase-observer to dismiss
+//	              modals, navigate menus, and confirm y/N prompts that no
+//	              other Kind handles. The operator carries full responsibility
+//	              for what reaches the running REPL.
 type Kind string
 
 const (
@@ -24,12 +33,13 @@ const (
 	KindInterrupt  Kind = "interrupt"
 	KindNudge      Kind = "nudge"
 	KindSystemRule Kind = "system_rule"
+	KindKeystroke  Kind = "keystroke"
 )
 
 // Valid reports whether k is a recognized envelope kind.
 func (k Kind) Valid() bool {
 	switch k {
-	case KindCommand, KindInterrupt, KindNudge, KindSystemRule:
+	case KindCommand, KindInterrupt, KindNudge, KindSystemRule, KindKeystroke:
 		return true
 	default:
 		return false

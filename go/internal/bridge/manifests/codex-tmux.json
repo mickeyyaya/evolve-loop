@@ -19,7 +19,7 @@
   },
   "prompt_marker": "\u203a",
   "default_model": "",
-  "default_args": [],
+  "default_args": ["--yolo"],
   "params": {
     "model_tier": {
       "channel": "flag",
@@ -43,6 +43,13 @@
       "response_keys": "1,Enter",
       "policy": "auto_respond",
       "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml."
+    },
+    {
+      "name": "per_edit_approval",
+      "regex": "Would you like to make the following edits|Press enter to confirm or esc to cancel|Yes, proceed",
+      "response_keys": "1,Enter",
+      "policy": "auto_respond",
+      "note": "Cycle-124 G1b (defense-in-depth for G1a's `--yolo`): codex per-edit-approval modal that hung cycle-123 tdd. The modal lists 3 numbered options ('1. Yes, proceed' / '2. Yes, and don't ask again' / '3. No, and tell Codex what to do differently'); response_keys '1,Enter' selects 'Yes, proceed' explicitly (the default highlight is option 1 so a bare 'Enter' would also work, but the explicit '1' is robust to future UX shifts in default selection). With G1a's `--yolo` in default_args, this modal should not fire — it's the regex backstop for the case where `--yolo` regresses (codex renames the flag, operator overrides default_args, OR the modal appears via a different code path codex's approval=never doesn't cover). Source: docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md."
     },
     {
       "name": "auth_recheck",

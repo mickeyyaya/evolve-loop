@@ -87,6 +87,18 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		Agent:     phase, // runner-side: agent name == phase name post-prefix-strip
 		StdoutLog: stdoutLog,
 	}
+	// Cycle-124 Task 6 — KNOWN GAP: the operator's "active liveness
+	// nudging" mechanism is wired into the STANDALONE `evolve phase-
+	// observer` (cmd_phase_observer.go default flipped 0 → 300s) but the
+	// AUTO-SPAWN path here does NOT yet emit nudge envelopes — this
+	// adapter's Observer is a thin Watch-only implementation; the full
+	// nudge logic (inbox append + nudged dedupe + soft_stall_nudge event)
+	// lives in `internal/phaseobserver` and would need porting. The
+	// resolveNudgeS + DefaultNudgeS scaffolding in this package is ready
+	// for that follow-up. Tracked as the cycle-124 backlog item: "auto-
+	// spawn observer nudge wire-up". For autonomous `evolve loop` runs,
+	// nudging is currently effectively opt-out (no nudge fires unless an
+	// operator runs the standalone phase-observer alongside the loop).
 	obs := New(cfg, sink)
 
 	watchCtx, cancel := context.WithCancel(ctx)
@@ -121,8 +133,11 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 }
 
 // resolveDuration reads an EVOLVE_OBSERVER_* env var as seconds; falls
-// back to def on empty/invalid. Honors the per-adapter EnvLookup test
-// seam.
+// back to def on empty/invalid OR on a non-positive value. Used for
+// PollS/StallS where 0 is meaningless (no polling / no stall threshold)
+// and indistinguishable from "the operator forgot to set it". Per-adapter
+// EnvLookup is honored. For NudgeS the 0-means-disable semantics differ —
+// see resolveNudgeS below.
 func (a *CoreAdapter) resolveDuration(key string, def time.Duration) time.Duration {
 	get := os.Getenv
 	if a.EnvLookup != nil {
@@ -136,5 +151,45 @@ func (a *CoreAdapter) resolveDuration(key string, def time.Duration) time.Durati
 	if err != nil || n <= 0 {
 		return def
 	}
+	return time.Duration(n) * time.Second
+}
+
+// resolveString reads an EVOLVE_OBSERVER_* env var as a string; falls back
+// to def on empty. Cycle-124 Task 6: used to thread EVOLVE_OBSERVER_NUDGE_BODY
+// into the auto-spawn adapter so an operator can override the built-in
+// nudge text without recompiling. An empty default tells phaseobserver.Run
+// to fall back to its own built-in body (phaseobserver.go:148).
+func (a *CoreAdapter) resolveString(key, def string) string {
+	get := os.Getenv
+	if a.EnvLookup != nil {
+		get = a.EnvLookup
+	}
+	if raw := get(key); raw != "" {
+		return raw
+	}
+	return def
+}
+
+// resolveNudgeS reads EVOLVE_OBSERVER_NUDGE_S with cycle-124 Task 6
+// semantics — DIFFERENT from resolveDuration. A "0" value is the
+// documented opt-OUT (disable nudging entirely), an UNSET var falls back
+// to def (DefaultNudgeS=300s, the new default-on behavior). A negative or
+// non-integer value also falls back to def so a typo doesn't accidentally
+// disable nudging. This semantic split matches the phaseobserver internal
+// sentinel `cfg.NudgeS == 0 → nudging disabled` (phaseobserver.go:148).
+func (a *CoreAdapter) resolveNudgeS(def time.Duration) time.Duration {
+	get := os.Getenv
+	if a.EnvLookup != nil {
+		get = a.EnvLookup
+	}
+	raw := get("EVOLVE_OBSERVER_NUDGE_S")
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return def
+	}
+	// n == 0 → explicit opt-out (returns 0 = disable).
 	return time.Duration(n) * time.Second
 }

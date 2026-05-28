@@ -55,6 +55,13 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		{"codex trust → 1,Enter", "codex-tmux", "Do you trust the contents of this directory?", "send:1,Enter", 1},
 		{"codex auth → escalate", "codex-tmux", "Please sign in to ChatGPT to continue", "escalate:auth_recheck", 85},
 		{"codex rate-limit → escalate", "codex-tmux", "quota exceeded — too many requests", "escalate:rate_limit", 85},
+		// Cycle-124 G1b: per-edit-approval modal that hung cycle-123 tdd.
+		// '1' selects 'Yes, proceed'. Defense-in-depth behind G1a's --yolo
+		// boot flag — covers the case where --yolo is dropped/renamed/
+		// overridden. Pane fragment is the actual cycle-123 capture.
+		{"codex per-edit-approval → 1,Enter (cycle-124 G1b)", "codex-tmux",
+			"Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again for these files\n  3. No, and tell Codex what to do differently\n\nPress enter to confirm or esc to cancel",
+			"send:1,Enter", 1},
 
 		// --- agy-tmux: trust + a belt-and-suspenders permission prompt.
 		{"agy trust → Enter", "agy-tmux", "Do you trust the contents of this project?", "send:Enter", 1},

@@ -218,3 +218,27 @@ func mustAppend(t *testing.T, ws, body string) {
 		t.Fatalf("Append(%q): %v", body, err)
 	}
 }
+
+// TestKind_Valid_AllRecognizedKinds pins the exhaustive set of envelope kinds
+// the bridge accepts. Adding a Kind constant requires extending Valid() in
+// the same change; this test fails if either drifts. Cycle-124 F4 added
+// KindKeystroke to the set (per ADR-0023 addendum) so the operator can send
+// raw tmux key tokens through `evolve bridge send --kind=keystroke`.
+func TestKind_Valid_AllRecognizedKinds(t *testing.T) {
+	for _, k := range []Kind{KindCommand, KindInterrupt, KindNudge, KindSystemRule, KindKeystroke} {
+		if !k.Valid() {
+			t.Errorf("Kind(%q).Valid() = false; every defined Kind must satisfy Valid()", k)
+		}
+	}
+}
+
+// TestKind_Valid_RejectsUnknown is the negative pin: an unknown string value
+// MUST be rejected. This is the gate cmd_bridge.go relies on to keep
+// operator typos from reaching the dispatch switch in injectEnvelope.
+func TestKind_Valid_RejectsUnknown(t *testing.T) {
+	for _, bad := range []Kind{"", "unknown", "Command", "KEYSTROKE", "key-stroke"} {
+		if bad.Valid() {
+			t.Errorf("Kind(%q).Valid() = true; want false (case-sensitive exact match only)", bad)
+		}
+	}
+}

@@ -68,6 +68,71 @@ func TestInjectEnvelope_CommandMidTurn_Defers(t *testing.T) {
 	}
 }
 
+// TestInjectEnvelope_Keystroke_RawSendNoEscNoGate covers the cycle-124 F4
+// hatch: a keystroke envelope is sent via SendKeys verbatim — NO ESC prefix
+// (unlike interrupt), NO idle-gate (unlike command/nudge/system_rule), NO
+// paste-buffer scratch file (unlike everything else), NO auto-Enter. This
+// is the "full tmux control" channel the operator needs to dismiss the
+// codex per-edit-approval modal that hung cycle-123 (`--body=Enter`),
+// confirm y/N prompts (`--body=y`), navigate menus (`--body=Up`), or send
+// control chars (`--body=C-c`). The gate-bypass is intentional: the
+// operator may need to send keys precisely BECAUSE the agent isn't idle.
+func TestInjectEnvelope_Keystroke_RawSendNoEscNoGate(t *testing.T) {
+	ws := t.TempDir()
+	cfg := injectCfg(ws)
+	deps := covDeps()
+	// Pane is busy (no marker) — keystroke must STILL fire (no idle-gate).
+	tmux := &fakeTmux{paneSeq: []string{"thinking..."}}
+	deps.Tmux = tmux
+	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: "Enter"})
+
+	// The sole SendKeys call must be the body, with enter=false.
+	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "Enter|false" {
+		t.Fatalf("keystroke must SendKeys body verbatim with enter=false; sentSeq=%v", tmux.sentSeq)
+	}
+	// MUST NOT pre-send Escape (that's interrupt's behavior).
+	for _, k := range tmux.sentSeq {
+		if k == "Escape|false" {
+			t.Fatalf("keystroke must NOT pre-send Escape; sentSeq=%v", tmux.sentSeq)
+		}
+	}
+	// MUST NOT write a paste-buffer scratch file (that's injectText's path).
+	if _, err := os.Stat(scratchPath(ws)); err == nil {
+		t.Fatal("keystroke must not write the paste-buffer scratch file")
+	}
+	// MUST NOT re-queue (that's the command/nudge defer path).
+	envs, _ := inbox.NewCursor(ws, "build").Drain()
+	if len(envs) != 0 {
+		t.Fatalf("keystroke must not re-queue; got %+v", envs)
+	}
+}
+
+// TestInjectEnvelope_Keystroke_EmptyBodyIsNoop is a defensive pin: an empty
+// --body must not crash and must not paste — the SendKeys impl (tmux.go
+// line 59) treats an empty keys arg as a no-op send-keys call. The test
+// also confirms no Escape pre-send leaks into the empty-body branch.
+func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
+	ws := t.TempDir()
+	cfg := injectCfg(ws)
+	deps := covDeps()
+	tmux := &fakeTmux{paneSeq: []string{"❯"}}
+	deps.Tmux = tmux
+	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: ""})
+
+	// One SendKeys call recorded (kept for ledger uniformity), no scratch
+	// file, no Escape token. The SendKeys body is empty.
+	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "|false" {
+		t.Fatalf("empty keystroke should still record one SendKeys with empty body; sentSeq=%v", tmux.sentSeq)
+	}
+	if _, err := os.Stat(scratchPath(ws)); err == nil {
+		t.Fatal("empty keystroke must not paste")
+	}
+}
+
 func TestInjectEnvelope_Interrupt_EscBeforeBody(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)

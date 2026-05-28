@@ -188,6 +188,20 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	d.Stdout = stdout
 	d.Stderr = stderr
 
+	// Cycle-124 G3: per-CLI Preflight seam (ADR-0022 extension). Drivers
+	// that implement the optional CLIPreflight interface get a uniform
+	// hook BEFORE Launch — today codex-tmux uses it to pre-trust the
+	// worktree + workspace paths in ~/.codex/config.toml (cycle-122 Fix 1).
+	// Best-effort: a non-nil error is logged but does NOT abort Launch
+	// (matches the prior inline behavior; Fix 2's extended fallback
+	// trigger list defends downstream). A driver opts in by declaring the
+	// method; nothing changes for drivers that don't.
+	if pf, ok := driver.(CLIPreflight); ok {
+		if err := pf.Preflight(ctx, &cfg, d); err != nil {
+			fmt.Fprintf(stderr, "[bridge] %s preflight: %v (continuing — best-effort)\n", cfg.CLI, err)
+		}
+	}
+
 	rc, err := driver.Launch(ctx, &cfg, d)
 	if err != nil {
 		fmt.Fprintf(stderr, "[bridge] %v\n", err)

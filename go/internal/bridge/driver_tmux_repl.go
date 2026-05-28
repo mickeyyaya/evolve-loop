@@ -349,8 +349,32 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 // command/nudge/system_rule are idle-gated (injected only when the prompt
 // marker is visible); a mid-turn arrival is re-queued, bounded by
 // maxInjectDefer. interrupt sends ESC first, then injects regardless of state.
+// keystroke sends body as raw tmux key tokens — no ESC prefix, no idle-gate,
+// no Enter suffix; the operator owns exactly what reaches the REPL.
 func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, env inbox.Envelope) {
 	pfx := "[" + lp.name + "]"
+	// Cycle-124 F4 / ADR-0023 addendum: the "full tmux control" hatch the
+	// operator asked for. Body is one tmux key-spec (literal text and/or
+	// space-separated named keys like "Enter" / "Escape" / "C-c" / "Up" /
+	// "y Enter") sent verbatim via SendKeys with enter=false. NO idle-gate
+	// (operator may need to send keys precisely BECAUSE the agent isn't
+	// idle — e.g. dismissing a modal that hung mid-turn), NO ESC prefix
+	// (unlike interrupt), NO automatic Enter append. Empty body is a no-op
+	// to match the existing SendKeys contract (line 59 of tmux.go skips
+	// empty key strings). The operator is fully responsible for what they
+	// inject; the bridge does not interpret the body.
+	if env.Kind == inbox.KindKeystroke {
+		// Surface a failed send instead of logging success unconditionally
+		// (cycle-124 review MEDIUM): a vanished session / killed pane would
+		// otherwise show as `injected keystroke "Enter"` on stderr while
+		// nothing actually reached the REPL.
+		if err := deps.Tmux.SendKeys(ctx, lp.session, env.Body, false); err != nil {
+			fmt.Fprintf(deps.Stderr, "%s keystroke send failed: %v (source=%s)\n", pfx, err, env.Source)
+			return
+		}
+		fmt.Fprintf(deps.Stderr, "%s injected keystroke %q (source=%s)\n", pfx, env.Body, env.Source)
+		return
+	}
 	if env.Kind == inbox.KindInterrupt {
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "Escape", false)
 		deps.Sleep(injectInterruptSettle)

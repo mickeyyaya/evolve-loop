@@ -38,7 +38,7 @@ func Append(workspace, agent string, env Envelope, now func() time.Time) error {
 	if err != nil {
 		return fmt.Errorf("inbox: open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(b); err != nil { // single write → atomic line
 		return fmt.Errorf("inbox: write: %w", err)
 	}

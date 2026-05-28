@@ -70,12 +70,18 @@ func TestCodexTmux_OpenAIKeyCostLeak(t *testing.T) {
 }
 
 func TestCodexTmux_LaunchCmd_ModelMapAndMarker(t *testing.T) {
-	// haiku → "codex -m gpt-5.4-mini" reaches the REPL launch line.
+	// haiku → "codex --yolo -m gpt-5.4-mini" reaches the REPL launch line.
+	// --yolo is the manifest default_args entry (cycle-124 G1a: codex's
+	// undocumented but parsed flag that sets approval=never AND
+	// sandbox=danger-full-access at boot, defusing the per-edit-approval
+	// modal that hung cycle-123 tdd). It lands FIRST per realizer order
+	// (default_args before per-param scalars), then -m gpt-5.4-mini from
+	// params.model_tier (tier_alias haiku → gpt-5.4-mini).
 	fx := newFixture(t, "codex-tmux", "") // profile model=haiku
 	tmux := &fakeTmux{}                   // no marker → REPL boot times out, but launchCmd already sent
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass")
-	if !tmux.sentContains("codex -m gpt-5.4-mini") {
-		t.Fatalf("codex-tmux launch should map haiku→gpt-5.4-mini; sentKeys=%v", tmux.sentKeys)
+	if !tmux.sentContains("codex --yolo -m gpt-5.4-mini") {
+		t.Fatalf("codex-tmux launch should map haiku→gpt-5.4-mini with --yolo prefix; sentKeys=%v", tmux.sentKeys)
 	}
 }
 
