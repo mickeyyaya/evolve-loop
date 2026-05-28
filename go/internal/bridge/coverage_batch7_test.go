@@ -48,6 +48,49 @@ func TestCodex_AutoModelOmitsM(t *testing.T) {
 	}
 }
 
+// TestPreparePrompt_ReadsExistingChallengeToken (cycle-136 lesson, PR 7):
+// when workspace/challenge-token.txt already exists (orchestrator minted +
+// wrote it at cycle start per PR 6), preparePrompt MUST reuse the existing
+// value and NOT mint+overwrite. One token per cycle is the invariant; the
+// bridge's per-phase mint was overwriting the orchestrator's token, causing
+// scout-report.md to use the orchestrator's token (plumbed via Context per
+// PR 6 / scout.go:64) while later phases saw the bridge's new token in the
+// workspace file. Cycle 136 audit C1 surfaced the divergence.
+func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
+	ws := t.TempDir()
+	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "prompt body $CHALLENGE_TOKEN tail")
+	// Pre-seed challenge-token.txt as if the orchestrator already minted it.
+	existing := "orchestrator-minted-12345678"
+	if err := os.WriteFile(filepath.Join(ws, "challenge-token.txt"), []byte(existing+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Mint would return a DIFFERENT value — proves the existing-token path
+	// is taken when it returns the orchestrator's value, not the mint's.
+	mintCalls := 0
+	out, err := preparePrompt(&Config{PromptFile: pf, Workspace: ws}, Deps{
+		NewChallengeToken: func() (string, error) {
+			mintCalls++
+			return "fresh-mint-should-not-be-used", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("preparePrompt: %v", err)
+	}
+	if !strings.Contains(out, existing) {
+		t.Errorf("prompt must substitute existing token %q; got %q", existing, out)
+	}
+	if strings.Contains(out, "fresh-mint-should-not-be-used") {
+		t.Errorf("prompt must NOT substitute fresh-mint when existing-token is on disk; got %q", out)
+	}
+	if mintCalls != 0 {
+		t.Errorf("NewChallengeToken called %d times; should be 0 when challenge-token.txt exists", mintCalls)
+	}
+	// File must still contain the orchestrator's value (no overwrite).
+	if b, _ := os.ReadFile(filepath.Join(ws, "challenge-token.txt")); strings.TrimSpace(string(b)) != existing {
+		t.Errorf("challenge-token.txt was overwritten; got %q want %q", strings.TrimSpace(string(b)), existing)
+	}
+}
+
 func TestPreparePrompt_TokenErrors(t *testing.T) {
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "x $CHALLENGE_TOKEN")
