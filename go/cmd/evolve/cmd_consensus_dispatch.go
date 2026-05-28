@@ -30,11 +30,10 @@ func runConsensusDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) 
 		PromptFile:      os.Getenv("PROMPT_FILE"),
 		ConsensusEnvOff: os.Getenv("EVOLVE_CONSENSUS_AUDIT") == "0",
 	}
-	// Resolve script-relative defaults from the legacy/scripts/ tree.
-	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
-	if projectRoot == "" {
-		projectRoot, _ = os.Getwd()
-	}
+	// Resolve script-relative defaults from the legacy/scripts/ tree. envOrCwd
+	// absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class) + falls back
+	// to cwd.
+	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
 	in.AdaptersDir = filepath.Join(projectRoot, "adapters")
 	in.DispatchDir = filepath.Join(projectRoot, "legacy", "scripts", "dispatch")
 

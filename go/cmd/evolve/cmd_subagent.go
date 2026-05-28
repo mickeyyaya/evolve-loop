@@ -451,10 +451,12 @@ func nextArg(args []string, i int) string {
 
 func envOrCwd(env string) string {
 	if v := os.Getenv(env); v != "" {
-		return v
+		// An explicitly-set root may be relative; absolutize it so paths
+		// derived downstream are cwd-independent (the cycle-119 fix class).
+		return paths.AbsoluteRoot(env, v, nil)
 	}
 	if cwd, err := os.Getwd(); err == nil {
-		return cwd
+		return cwd // os.Getwd is already absolute
 	}
 	return "."
 }

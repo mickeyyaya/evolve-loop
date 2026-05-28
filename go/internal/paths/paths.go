@@ -19,6 +19,7 @@
 package paths
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -147,4 +148,31 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 func ResolveFromEnv() Layout {
 	cwd, _ := os.Getwd()
 	return Resolve(os.Getenv, cwd)
+}
+
+// absFn is a seam so tests can exercise the filepath.Abs error branch.
+// filepath.Abs only fails when os.Getwd fails (cwd deleted/unmounted).
+var absFn = filepath.Abs
+
+// AbsoluteRoot resolves p — a project root, possibly relative or "." — to an
+// absolute path. A relative root silently breaks path-crossing contracts: a
+// worktree-phase agent (cwd=worktree) and the in-process bridge (cwd=main repo)
+// resolve the same relative artifact path to DIFFERENT absolute locations, which
+// caused cycle-119's ExitArtifactTimeout. This is the single shared helper
+// applied at every command entrypoint (replacing the one-off closure in
+// cmd_loop.go and the cwd-bound envOrCwd pattern).
+//
+// On the rare filepath.Abs error it WARNs via warn (when non-nil) and returns p
+// UNCHANGED rather than silently proceeding with a broken relative path — fail
+// loud, since continuing would reproduce the very timeout this guards against.
+// label names the source (e.g. "--project-root") for the warning.
+func AbsoluteRoot(label, p string, warn func(string)) string {
+	abs, err := absFn(p)
+	if err != nil {
+		if warn != nil {
+			warn(fmt.Sprintf("could not resolve %s %q to an absolute path (%v); worktree-phase paths may diverge across cwd boundaries", label, p, err))
+		}
+		return p
+	}
+	return abs
 }
