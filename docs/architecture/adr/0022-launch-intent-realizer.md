@@ -163,3 +163,31 @@ auditor→codex = `codex -m gpt-5.4`, scout→claude = full claude flags, zero c
   through `LaunchIntent.Permission` in Phase 2c.
 - **Dead flat `extra_flags` path.** `profiles.Profile.ExtraFlags` + the `phaseflags` read are now inert
   for migrated profiles; remove when headless unification lands.
+
+## Addendum (Bug A, 2026-05-29) — agent-keyed env-key contract
+
+Cycle-124 V1 verification surfaced a silent drop of `--model <agent>=<value>` overrides for any phase
+whose `PhaseName()` differs from its `AgentPromptName()` minus the `evolve-` prefix: tdd/tdd-engineer,
+build/builder, audit/auditor, retro/retrospective.
+
+**Contract (pin this):** per-agent override env keys are **agent-keyed**, NOT phase-keyed.
+
+| Override | Env key written by `cmd_loop.go:1131` | Read site that must agree |
+|---|---|---|
+| `--cli <agent>=X` | `EVOLVE_<AGENT>_CLI` | `runner.go:259` (`resolveCLIChain(profileName, …)`) ✓ |
+| `--model <agent>=X` | `EVOLVE_<AGENT>_MODEL` | `runner.go:284` (FIXED — now `PhaseEnvKey(profileName, "MODEL")`) ✓ |
+| `EVOLVE_<AGENT>_PERMISSION_MODE` | n/a (operator env) | `runner.go:310` ✓ already correct |
+| `EVOLVE_<AGENT>_INTERACTIVE_POLICY` | n/a (operator env) | `bridge.go:injectPolicyPrefix` ✓ already correct |
+| `EVOLVE_<AGENT>_SYSTEM_PROMPT` | n/a (operator env) | `systemprompt.Resolve(profileName, …)` ✓ already correct |
+
+The single drift was at `runner.go:284`, which had used `PhaseEnvKey(phase, "MODEL")` — fixed in PR 1 to
+`PhaseEnvKey(profileName, "MODEL")`. The regression guard is `runner_perphase_env_test.go`
+(`TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed`) which exercises every known phase ≠ profile
+pair.
+
+**Why the convention is AGENT not PHASE.** A phase is the runtime stage (scout, tdd, build); a profile
+is the deployment identity (scout, tdd-engineer, builder). The same phase could in principle dispatch
+to different profiles in different contexts (e.g., a consensus auditor running two profile variants),
+and the operator's override should pin to the profile that runs, not the phase that gates it. Aligning
+all per-agent env keys to `profileName` keeps the override syntax predictable: `EVOLVE_<AGENT>_<KNOB>`
+always reads the override for the profile of that name.

@@ -237,7 +237,10 @@ func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	}
 }
 
-// TestRun_EnvOverridesModel — EVOLVE_<PHASE>_MODEL env beats DefaultModel.
+// TestRun_EnvOverridesModel — EVOLVE_<AGENT>_MODEL env beats DefaultModel.
+// (scout is the one phase where PhaseName == profileName, so the agent-keyed
+// env var matches by coincidence; the broader contract for phase != agent
+// pairs is pinned in runner_perphase_env_test.go.)
 func TestRun_EnvOverridesModel(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}

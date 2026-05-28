@@ -281,7 +281,15 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			phase, profileName, cli, chain.primarySource, profilePath)
 	}
 
-	modelKey := envchain.PhaseEnvKey(phase, "MODEL")
+	// Bug A fix (cycle-124-followup): the model env key is AGENT-keyed
+	// (EVOLVE_<PROFILE_NAME>_MODEL), not PHASE-keyed. This matches the
+	// convention cmd_loop.go:1131 uses to write the override AND the
+	// EVOLVE_<AGENT>_PERMISSION_MODE resolver at line 310 below. The
+	// previous `PhaseEnvKey(phase, "MODEL")` form silently dropped
+	// `--model <agent>=X` overrides for tdd/tdd-engineer, build/builder,
+	// audit/auditor, retro/retrospective. See runner_perphase_env_test.go
+	// for the table-driven contract pin.
+	modelKey := envchain.PhaseEnvKey(profileName, "MODEL")
 	model := envchain.Resolve(modelKey, req.Env, profileModelTier, b.hooks.DefaultModel())
 	// Resolve the "auto" sentinel through llm_config.json + profile chain.
 	// Hooks.DefaultModel returns "auto" for most phases as a signal that
