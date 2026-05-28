@@ -1,9 +1,12 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,6 +135,221 @@ func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
 		t.Fatal("empty keystroke must not paste")
 	}
 }
+
+// TestInjectEnvelope_Keystroke_TmuxKeyNames covers the operator's
+// per-modal-class repertoire: every tmux named key the bridge might need
+// to send as a single envelope. The body is sent verbatim to SendKeys
+// with enter=false — tmux interprets these names natively, so a body of
+// "Escape" presses ESC, "C-c" sends Ctrl-C, "Up" presses ↑ etc. The fake
+// tmux records `<keys>|<enter>` so the assertion pins both the body and
+// the no-Enter contract. Idle-gate is bypassed (pane shows "busy") to
+// prove the named-key send fires regardless of agent state.
+func TestInjectEnvelope_Keystroke_TmuxKeyNames(t *testing.T) {
+	keys := []string{
+		"Escape", // cancel a modal
+		"Enter",  // confirm a y/N prompt
+		"C-c",    // Ctrl-C
+		"C-d",    // Ctrl-D / EOF
+		"Up",     // navigate menu
+		"Down",
+		"Left",
+		"Right",
+		"Tab",
+		"BSpace", // backspace
+		"PgUp",
+		"PgDn",
+		"Home",
+		"End",
+		"F1",  // function key
+		"F12", // last function key
+	}
+	for _, k := range keys {
+		t.Run(k, func(t *testing.T) {
+			ws := t.TempDir()
+			cfg := injectCfg(ws)
+			deps := covDeps()
+			tmux := &fakeTmux{paneSeq: []string{"busy"}} // gate-bypass
+			deps.Tmux = tmux
+			lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+			injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: k})
+
+			want := k + "|false"
+			if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != want {
+				t.Errorf("key %q: sentSeq=%v want [%q]", k, tmux.sentSeq, want)
+			}
+		})
+	}
+}
+
+// TestInjectEnvelope_Keystroke_MultiToken pins that space-separated tmux
+// tokens reach SendKeys as ONE concatenated string (tmux's send-keys
+// itself parses the tokens). This is how the operator builds
+// y-then-Enter, Esc-then-text, navigate-then-confirm sequences — the
+// bridge is a transparent pass-through, the operator owns parsing.
+func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
+	cases := []struct {
+		body string
+	}{
+		{"y Enter"},
+		{"Escape Enter"},
+		{"Up Up Down Down Left Right Left Right"}, // konami
+		{"C-x C-s"},     // emacs save
+		{"hello Enter"}, // literal + named
+	}
+	for _, tc := range cases {
+		t.Run(tc.body, func(t *testing.T) {
+			ws := t.TempDir()
+			cfg := injectCfg(ws)
+			deps := covDeps()
+			tmux := &fakeTmux{paneSeq: []string{"❯"}}
+			deps.Tmux = tmux
+			lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+			injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: tc.body})
+
+			want := tc.body + "|false"
+			if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != want {
+				t.Errorf("body %q: sentSeq=%v want [%q]", tc.body, tmux.sentSeq, want)
+			}
+		})
+	}
+}
+
+// TestInjectEnvelope_Keystroke_UnicodeBody pins that UTF-8 body bytes
+// survive the SendKeys pass-through. Some CLIs prompt in non-ASCII
+// (Japanese, Korean, Chinese localizations), and a literal `--body=はい`
+// must reach the REPL byte-for-byte.
+func TestInjectEnvelope_Keystroke_UnicodeBody(t *testing.T) {
+	cases := []string{
+		"はい",      // Japanese "yes"
+		"네",       // Korean "yes"
+		"是",       // Chinese "yes"
+		"oui",     // ASCII (sanity)
+		"é",       // composed accent
+		"🚀 Enter", // emoji + named key
+	}
+	for _, body := range cases {
+		t.Run(body, func(t *testing.T) {
+			ws := t.TempDir()
+			cfg := injectCfg(ws)
+			deps := covDeps()
+			tmux := &fakeTmux{paneSeq: []string{"❯"}}
+			deps.Tmux = tmux
+			lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+			injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: body})
+
+			want := body + "|false"
+			if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != want {
+				t.Errorf("unicode body %q: sentSeq=%v want [%q]", body, tmux.sentSeq, want)
+			}
+		})
+	}
+}
+
+// TestInjectEnvelope_Keystroke_DeferCountIgnored pins that the
+// DeferCount field on a keystroke envelope is NOT consulted by the
+// dispatch — keystroke bypasses the idle-gate entirely, so it never
+// enters the re-queue/defer path. An envelope arriving with
+// DeferCount=99 (well past maxInjectDefer=10) must STILL fire its
+// SendKeys, NOT drop.
+func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
+	ws := t.TempDir()
+	cfg := injectCfg(ws)
+	deps := covDeps()
+	tmux := &fakeTmux{paneSeq: []string{"busy"}} // idle-gate would block command/nudge
+	deps.Tmux = tmux
+	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+	envBig := inbox.Envelope{Kind: inbox.KindKeystroke, Body: "Enter", DeferCount: 999}
+	injectEnvelope(context.Background(), cfg, deps, lp, envBig)
+
+	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "Enter|false" {
+		t.Fatalf("keystroke with high DeferCount must still fire; sentSeq=%v", tmux.sentSeq)
+	}
+	// And MUST NOT be re-queued to the inbox.
+	envs, _ := inbox.NewCursor(ws, "build").Drain()
+	if len(envs) != 0 {
+		t.Fatalf("keystroke with high DeferCount must not re-queue; got %+v", envs)
+	}
+}
+
+// TestInjectEnvelope_Keystroke_LongBody pins that very long bodies reach
+// SendKeys intact. The tmux command line itself has limits in real
+// deployments, but the bridge's pass-through must not truncate or split.
+// 4 KB is well above any realistic operator-scripted body but below
+// macOS ARG_MAX (256 KB) so the test stays portable.
+func TestInjectEnvelope_Keystroke_LongBody(t *testing.T) {
+	ws := t.TempDir()
+	cfg := injectCfg(ws)
+	deps := covDeps()
+	tmux := &fakeTmux{paneSeq: []string{"❯"}}
+	deps.Tmux = tmux
+	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+	body := strings.Repeat("x", 4096)
+	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: body})
+
+	if len(tmux.sentSeq) != 1 {
+		t.Fatalf("expected 1 SendKeys call; got %d (sentSeq=%v)", len(tmux.sentSeq), tmux.sentSeq)
+	}
+	got := tmux.sentSeq[0]
+	wantSuffix := "|false"
+	if !strings.HasSuffix(got, wantSuffix) {
+		t.Fatalf("call must have enter=false suffix; got %q", got[:min(len(got), 80)])
+	}
+	gotBody := got[:len(got)-len(wantSuffix)]
+	if gotBody != body {
+		t.Fatalf("long body truncated/altered; len(got)=%d len(want)=%d", len(gotBody), len(body))
+	}
+}
+
+// TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced is the cycle-124
+// review MEDIUM regression guard: a failing SendKeys MUST produce a
+// "keystroke send failed" stderr line, NOT a "injected keystroke" success
+// line. Prevents the silent-failure mode where an operator sees `injected
+// keystroke "Enter"` in logs but nothing actually reached the (vanished)
+// pane.
+func TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced(t *testing.T) {
+	ws := t.TempDir()
+	cfg := injectCfg(ws)
+	stderr := &bytes.Buffer{}
+	deps := covDeps()
+	deps.Stderr = stderr
+	tmux := &errInjectingTmux{sendKeysErr: errors.New("session not found")}
+	deps.Tmux = tmux
+	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: "Enter"})
+
+	out := stderr.String()
+	if !strings.Contains(out, "keystroke send failed") {
+		t.Errorf("expected 'keystroke send failed' in stderr; got:\n%s", out)
+	}
+	if strings.Contains(out, "injected keystroke") {
+		t.Errorf("MUST NOT log success when SendKeys fails; got:\n%s", out)
+	}
+}
+
+// errInjectingTmux is a minimal fakeTmux that returns a configured error
+// from SendKeys — used only by TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced
+// to drive the error branch added in cycle-124 review MEDIUM fix.
+type errInjectingTmux struct {
+	sendKeysErr error
+}
+
+func (e *errInjectingTmux) HasSession(context.Context, string) bool            { return true }
+func (e *errInjectingTmux) NewSession(context.Context, string, int, int) error { return nil }
+func (e *errInjectingTmux) SendKeys(context.Context, string, string, bool) error {
+	return e.sendKeysErr
+}
+func (e *errInjectingTmux) CapturePane(context.Context, string, int) (string, error) {
+	return "busy", nil
+}
+func (e *errInjectingTmux) LoadBuffer(context.Context, string, string) error { return nil }
+func (e *errInjectingTmux) PasteBuffer(context.Context, string) error        { return nil }
+func (e *errInjectingTmux) KillSession(context.Context, string) error        { return nil }
 
 func TestInjectEnvelope_Interrupt_EscBeforeBody(t *testing.T) {
 	ws := t.TempDir()

@@ -261,6 +261,208 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 	}
 }
 
+// TestDedupeLaunchFlags_Edges directly exercises the helper that the cycle-124
+// HIGH review-finding had us re-write with a fresh backing slice. The Realize
+// integration tests above exercise the helper indirectly; this table drives
+// the pure function across every plausible input shape so future refactors
+// surface here first. Order-preservation (first occurrence wins) is the
+// load-bearing contract — flags-first reflects the operator-declared default,
+// per-param scalars deduplicate against it, and raw extras come last.
+func TestDedupeLaunchFlags_Edges(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"nil → nil (early return; len<=1)", nil, nil},
+		{"empty → empty (early return; len<=1)", []string{}, []string{}},
+		{"single → unchanged (early return; len<=1)", []string{"--a"}, []string{"--a"}},
+		{"two distinct → unchanged", []string{"--a", "--b"}, []string{"--a", "--b"}},
+		{"two identical → one (collision dedup)", []string{"--a", "--a"}, []string{"--a"}},
+		{"all-identical run → one (worst-case dedup)", []string{"--a", "--a", "--a", "--a"}, []string{"--a"}},
+		{
+			"flag-value pair declared twice → token-level dedup keeps the pair",
+			[]string{"--flag", "value", "--flag", "value"},
+			[]string{"--flag", "value"},
+		},
+		{
+			"flag-value pair with DISTINCT values → flag dedup, both values kept (documented footgun)",
+			[]string{"--model", "x", "--model", "y"},
+			[]string{"--model", "x", "y"},
+		},
+		{
+			"heterogeneous duplicates → first occurrence wins, order preserved",
+			[]string{"--a", "--b", "--a", "--c", "--b"},
+			[]string{"--a", "--b", "--c"},
+		},
+		{
+			"empty-string tokens collapse to one (defensive — manifest typo)",
+			[]string{"", "--a", ""},
+			[]string{"", "--a"},
+		},
+		{
+			"unicode + ascii mix preserved",
+			[]string{"--lang", "日本語", "--lang", "日本語"},
+			[]string{"--lang", "日本語"},
+		},
+		{
+			"order: late-occurring distinct value lands at the tail",
+			[]string{"--a", "--b", "--c", "--a"},
+			[]string{"--a", "--b", "--c"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := dedupeLaunchFlags(tc.in)
+			// Compare as slices; an "empty == nil" wash matches Realize's call
+			// site behavior (it iterates either to the same empty result).
+			if len(got) == 0 && len(tc.want) == 0 {
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("dedupeLaunchFlags(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDedupeLaunchFlags_AliasSafety pins the cycle-124 review HIGH fix:
+// dedupeLaunchFlags MUST return a slice that does not share backing storage
+// with its input. Pre-fix `out := in[:0]` would alias, so a caller holding
+// the original could see the deduped result through their reference. The
+// fix `out := make([]string, 0, len(in))` allocates fresh. This test
+// captures the invariant so a future "optimization" can't silently
+// regress it.
+func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
+	in := []string{"--a", "--b", "--a", "--c"}
+	original := append([]string(nil), in...) // snapshot before
+	got := dedupeLaunchFlags(in)
+
+	// Mutating the returned slice must NOT mutate the input.
+	if len(got) > 0 {
+		got[0] = "--MUTATED"
+	}
+	if !reflect.DeepEqual(in, original) {
+		t.Fatalf("dedupe result aliases input backing array; in mutated to %v (was %v)", in, original)
+	}
+
+	// And vice versa — mutating the input must NOT mutate the returned slice.
+	in[0] = "--TAMPERED"
+	if got[0] == "--TAMPERED" {
+		t.Fatalf("input mutation leaked into dedupe result; got[0]=%q", got[0])
+	}
+}
+
+// TestRealize_DefaultArgs_StackInteraction pins the FULL ordering invariant
+// across all 4 launch-flag sources Realize composes:
+//
+//	[default_args] + [model_tier] + [permission] + [settings_scope]
+//	  + [allowed_tools] + [raw_by_cli]   → dedupe → r.LaunchFlags
+//
+// Default_args land FIRST, per-param scalars next (in the realizer's
+// internal order), raw escape-hatch flags last. This is the documented
+// contract for a single CLI; cross-CLI tests live in realizer_realmanifest_test.go.
+func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
+	m := Manifest{
+		CLI:         "stack",
+		DefaultArgs: []string{"--default-1", "--default-2"},
+		TierAliases: map[string]string{"sonnet": "model-x"},
+		Params: map[string]ParamSpec{
+			"model_tier":     {Channel: "flag", Flag: "--model", From: "tier_alias"},
+			"permission":     {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}},
+			"settings_scope": {Channel: "flag", Values: map[string][]string{"project": {"--scope", "project"}}},
+		},
+	}
+	intent := LaunchIntent{
+		ModelTier:     "sonnet",
+		Permission:    "bypass",
+		SettingsScope: "project",
+		RawByCLI:      map[string][]string{"stack": {"--raw-tail"}},
+	}
+	got := Realize(m, intent)
+
+	// Exact ordering: default_args FIRST, then each per-param scalar in the
+	// internal realize order (model → permission → settings → allowed_tools),
+	// then raw extras at the tail.
+	want := []string{
+		"--default-1", "--default-2", // default_args
+		"--model", "model-x", // model_tier (tier_alias resolved)
+		"--bypass",           // permission bypass
+		"--scope", "project", // settings_scope
+		"--raw-tail", // raw_by_cli (last)
+	}
+	if !reflect.DeepEqual(got.LaunchFlags, want) {
+		t.Fatalf("stack order broken;\ngot:  %v\nwant: %v", got.LaunchFlags, want)
+	}
+}
+
+// TestRealize_DefaultArgs_DegenerateManifest covers manifests with NO params
+// table — default_args still fires. This protects the "minimum-viable
+// manifest" path: a brand-new driver with only DefaultArgs and a Binary can
+// still emit boot flags before its param table is fleshed out.
+func TestRealize_DefaultArgs_DegenerateManifest(t *testing.T) {
+	m := Manifest{CLI: "bare", DefaultArgs: []string{"--only-this"}}
+	got := Realize(m, LaunchIntent{ModelTier: "sonnet", Permission: "bypass"})
+	if !reflect.DeepEqual(got.LaunchFlags, []string{"--only-this"}) {
+		t.Fatalf("default_args must fire on degenerate manifest; got %v", got.LaunchFlags)
+	}
+	if len(got.REPLInput) != 0 {
+		t.Fatalf("degenerate manifest must not emit REPL input; got %v", got.REPLInput)
+	}
+}
+
+// TestRealize_DefaultArgs_InternalDuplicates pins that dedupe handles
+// repeats WITHIN default_args itself, not just collisions WITH the params
+// channel. A typo'd manifest `["--yolo", "--yolo"]` shouldn't double-emit.
+func TestRealize_DefaultArgs_InternalDuplicates(t *testing.T) {
+	m := Manifest{
+		CLI:         "dup-default",
+		DefaultArgs: []string{"--yolo", "--yolo", "--yolo"},
+	}
+	got := Realize(m, LaunchIntent{})
+	if !reflect.DeepEqual(got.LaunchFlags, []string{"--yolo"}) {
+		t.Fatalf("internal default_args duplicates must collapse; got %v", got.LaunchFlags)
+	}
+}
+
+// TestRealize_DefaultArgs_OrthogonalToREPLChannel ensures default_args
+// does NOT leak into REPLInput (the post-boot injection channel). REPL
+// channel params write to REPLInput; default_args writes to LaunchFlags.
+// They must remain orthogonal so a manifest can use both safely.
+func TestRealize_DefaultArgs_OrthogonalToREPLChannel(t *testing.T) {
+	m := Manifest{
+		CLI:         "mixed",
+		DefaultArgs: []string{"--launch-only"},
+		TierAliases: map[string]string{"sonnet": "model-x"},
+		Params: map[string]ParamSpec{
+			"model_tier": {Channel: "repl", Template: "/model {alias}", From: "tier_alias"},
+		},
+	}
+	got := Realize(m, LaunchIntent{ModelTier: "sonnet"})
+	if !reflect.DeepEqual(got.LaunchFlags, []string{"--launch-only"}) {
+		t.Fatalf("default_args must reach LaunchFlags only; got %v", got.LaunchFlags)
+	}
+	if !reflect.DeepEqual(got.REPLInput, []string{"/model model-x"}) {
+		t.Fatalf("REPL channel must reach REPLInput; got %v", got.REPLInput)
+	}
+}
+
+// TestRealize_DefaultArgs_EmptyTokenDefensive covers a typo'd manifest
+// declaring default_args with an empty string in the list. The dedupe
+// keeps one empty (defensive) so the realizer doesn't crash, but the
+// downstream launch helpers (driver_tmux_repl.go launchCmdLine,
+// driver_ollamatmux.go ollamaComposeLaunchCmd) treat empty tokens as
+// no-ops. This pins that contract at the realizer level.
+func TestRealize_DefaultArgs_EmptyTokenDefensive(t *testing.T) {
+	m := Manifest{CLI: "typo", DefaultArgs: []string{"", "--real", ""}}
+	got := Realize(m, LaunchIntent{})
+	// Dedupe collapses the two empties to one. The downstream join paths
+	// drop empties — the realizer's job is just to not crash on them.
+	if len(got.LaunchFlags) != 2 || got.LaunchFlags[1] != "--real" {
+		t.Fatalf("empty + real tokens; got %v (want a 2-elem slice with --real)", got.LaunchFlags)
+	}
+}
+
 // --- small test helpers ----------------------------------------------------
 
 // sameFlags reports whether got and want contain the same tokens (order-insensitive).

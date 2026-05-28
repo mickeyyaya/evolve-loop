@@ -103,3 +103,169 @@ func TestAutoRespond_MultiSelectRuleWinsOverSingleSelect(t *testing.T) {
 			action, rc)
 	}
 }
+
+// TestAutoRespond_CodexPerEditApprovalRegex covers each disjunct of the
+// cycle-124 G1b regex in isolation. The regex is alternation —
+// "Would you like to make the following edits|Press enter to confirm or
+// esc to cancel|Yes, proceed" — so any of the three strings as a
+// substring should fire `send:1,Enter`. Pinning each branch separately
+// catches a regression where someone narrows the regex (e.g., to require
+// all three substrings).
+func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
+	m, err := LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name, pane, wantAction string
+		wantRC                 int
+	}{
+		// Each disjunct alone — the regex must fire on any one of them.
+		{
+			"branch 1: 'Would you like to make the following edits' alone",
+			"Working... Would you like to make the following edits to foo.go?",
+			"send:1,Enter", 1,
+		},
+		{
+			"branch 2: 'Press enter to confirm or esc to cancel' alone",
+			"...some context...\nPress enter to confirm or esc to cancel\n",
+			"send:1,Enter", 1,
+		},
+		{
+			"branch 3: 'Yes, proceed' alone (in option list)",
+			"What now?\n  1. Yes, proceed\n  2. Refuse",
+			"send:1,Enter", 1,
+		},
+		// Full cycle-123 modal text — all 3 branches present.
+		{
+			"full modal: all three branches present (cycle-123 reproduction)",
+			"Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again for these files\n  3. No, and tell Codex what to do differently\n\nPress enter to confirm or esc to cancel",
+			"send:1,Enter", 1,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{})
+			if gotAction != tc.wantAction || gotRC != tc.wantRC {
+				t.Errorf("decide on %q\n  = (%q, %d)\n  want (%q, %d)", tc.pane, gotAction, gotRC, tc.wantAction, tc.wantRC)
+			}
+		})
+	}
+}
+
+// TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch is the negative
+// counterpart: a TRUNCATED version of any disjunct must NOT match. The
+// regex requires the full substring. A pane that says "Press enter to
+// confirm" alone (without "or esc to cancel") must not fire the per-edit
+// auto-response — that text appears in many other CLI prompts.
+func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
+	m, err := LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name, pane string
+	}{
+		{
+			"partial branch 1: 'Would you like to' alone (incomplete)",
+			"Would you like to know more? (yes/no)",
+		},
+		{
+			"partial branch 2: 'Press enter to confirm' without 'or esc to cancel'",
+			"Press enter to confirm.",
+		},
+		{
+			"partial branch 3: case-mismatched 'yes, proceed' (lowercase)",
+			"Result: yes, proceed.",
+		},
+		{
+			"unrelated text — no branch matches",
+			"Working on it... please wait.",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{})
+			if gotAction != "noop" || gotRC != 0 {
+				t.Errorf("partial pane %q must be a noop; got (%q, %d)", tc.pane, gotAction, gotRC)
+			}
+		})
+	}
+}
+
+// TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap pins the manifest
+// rule ordering: trust_prompt is declared BEFORE per_edit_approval in
+// codex-tmux.json. If a pane contains BOTH "Yes, continue" (trust) AND
+// "Yes, proceed" (per-edit) — unlikely but possible if codex chains
+// dialogs — the first-match-wins semantics should pick trust. Both rules
+// emit the same response_keys ("1,Enter"), so behaviorally this is a
+// no-op even if ordering changed — but pinning it locks in the order so
+// a future manifest reorder doesn't silently shift the auditable
+// "pattern=trust_prompt" log line to "pattern=per_edit_approval".
+func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
+	m, err := LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Find the indices of each rule by name.
+	trustIdx, perEditIdx := -1, -1
+	for i, p := range m.InteractivePrompts {
+		switch p.Name {
+		case "trust_prompt":
+			trustIdx = i
+		case "per_edit_approval":
+			perEditIdx = i
+		}
+	}
+	if trustIdx == -1 {
+		t.Fatal("trust_prompt rule missing from codex-tmux manifest")
+	}
+	if perEditIdx == -1 {
+		t.Fatal("per_edit_approval rule missing from codex-tmux manifest")
+	}
+	if trustIdx >= perEditIdx {
+		t.Errorf("trust_prompt (idx=%d) MUST precede per_edit_approval (idx=%d) so first-match resolves correctly", trustIdx, perEditIdx)
+	}
+
+	// Behavioral assertion: a pane with BOTH texts still resolves to
+	// "send:1,Enter" (both rules emit it). The win-by-ordering is a
+	// log-attribution invariant; this asserts the response is unchanged.
+	mixed := "Working with untrusted contents — Yes, continue\nWould you like to make the following edits?\n  1. Yes, proceed"
+	gotAction, gotRC := decideAutoRespond(mixed, m.InteractivePrompts, map[string]int{})
+	if gotAction != "send:1,Enter" || gotRC != 1 {
+		t.Errorf("overlap pane = (%q, %d); want (send:1,Enter, 1)", gotAction, gotRC)
+	}
+}
+
+// TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard documents
+// the known footgun: the per_edit_approval regex matches "Yes, proceed"
+// as a substring, so an agent that PRINTS the literal phrase in its
+// output (e.g., echoing a config option name, or in a grep result over a
+// test fixture) would false-match. The loop_guard handles this — repeated
+// failed responses without pane progression escalate to abandon — but
+// the FIRST match still tries to respond. This test pins that contract:
+// false-match IS expected, and the safety net is loop_guard (covered by
+// other tests). A future redesign would need anchoring like
+// "^.*1\\. Yes, proceed.*$" to be safer; tracked as a follow-up.
+func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.T) {
+	m, err := LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Agent output that mentions "Yes, proceed" as a string literal in
+	// what looks like a code grep — exactly the cycle-113-style false
+	// match pattern. We expect this to STILL fire send:1,Enter (it's
+	// the documented contract; the safety net is loop_guard).
+	pane := `Bash(grep -rn '"Yes, proceed"' internal/) ` + "\n" +
+		`  cmd/codex_test.go:12:  Body: "Yes, proceed"` + "\n" +
+		`  bridge/codex_test.go:45: "Yes, proceed",`
+	gotAction, gotRC := decideAutoRespond(pane, m.InteractivePrompts, map[string]int{})
+	if gotAction != "send:1,Enter" || gotRC != 1 {
+		t.Logf("DOCUMENTED FOOTGUN: agent code-grep mentioning %q matches per_edit_approval; got (%q, %d); want (send:1,Enter, 1)",
+			"Yes, proceed", gotAction, gotRC)
+		t.Logf("If this test changes behavior to 'noop', tighten the per_edit_approval regex to require the option-list context")
+		// Use t.Fail() (not t.Fatalf) so the test runs visibly even if the
+		// contract intentionally shifts.
+		t.Fail()
+	}
+}

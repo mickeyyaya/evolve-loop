@@ -242,3 +242,121 @@ func TestKind_Valid_RejectsUnknown(t *testing.T) {
 		}
 	}
 }
+
+// TestKindKeystroke_JSONRoundTrip pins that a keystroke envelope survives the
+// full Append→ReadFile→Unmarshal cycle byte-for-byte. Operators script
+// `evolve bridge send --kind=keystroke --body=Enter` which writes one NDJSON
+// line; the driver's drain loop reads it back and dispatches. A serialization
+// drift here would silently corrupt the operator's "full tmux control" hatch.
+func TestKindKeystroke_JSONRoundTrip(t *testing.T) {
+	ws := t.TempDir()
+	cases := []struct {
+		name, body, source string
+	}{
+		{"named-key", "Enter", "cli"},
+		{"control-char", "C-c", "cli"},
+		{"multi-token", "y Enter", "observer"},
+		{"unicode", "はい", "cli"},
+		{"empty", "", "cli"},
+		{"long", strings.Repeat("x", 1024), "cli"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Each subtest gets its own agent to avoid Append's append-to-same
+			// file behavior bleeding across cases.
+			agent := "agent-" + tc.name
+			env := Envelope{Kind: KindKeystroke, Body: tc.body, Source: tc.source}
+			if err := Append(ws, agent, env, fixedNow); err != nil {
+				t.Fatalf("Append: %v", err)
+			}
+			envs, err := NewCursor(ws, agent).Drain()
+			if err != nil {
+				t.Fatalf("Drain: %v", err)
+			}
+			if len(envs) != 1 {
+				t.Fatalf("expected 1 envelope; got %d", len(envs))
+			}
+			got := envs[0]
+			if got.Kind != KindKeystroke {
+				t.Errorf("Kind=%q want %q", got.Kind, KindKeystroke)
+			}
+			if got.Body != tc.body {
+				t.Errorf("Body=%q want %q", got.Body, tc.body)
+			}
+			if got.Source != tc.source {
+				t.Errorf("Source=%q want %q", got.Source, tc.source)
+			}
+			if got.TS == "" {
+				t.Error("TS empty — Append must mint a timestamp")
+			}
+		})
+	}
+}
+
+// TestKindKeystroke_AppendOrderPreserved pins that multiple keystroke
+// envelopes for the same agent drain in the order they were appended.
+// This matters when the operator scripts a multi-step recovery
+// ("Escape" then "y Enter") — the bridge must inject them in that order.
+func TestKindKeystroke_AppendOrderPreserved(t *testing.T) {
+	ws := t.TempDir()
+	bodies := []string{"Escape", "y Enter", "Up", "Down", "C-c"}
+	for _, b := range bodies {
+		if err := Append(ws, "ord", Envelope{Kind: KindKeystroke, Body: b, Source: "cli"}, fixedNow); err != nil {
+			t.Fatalf("Append(%q): %v", b, err)
+		}
+	}
+	envs, err := NewCursor(ws, "ord").Drain()
+	if err != nil {
+		t.Fatalf("Drain: %v", err)
+	}
+	if len(envs) != len(bodies) {
+		t.Fatalf("want %d envelopes; got %d", len(bodies), len(envs))
+	}
+	for i, want := range bodies {
+		if envs[i].Body != want {
+			t.Errorf("envs[%d].Body=%q want %q (order broken)", i, envs[i].Body, want)
+		}
+		if envs[i].Kind != KindKeystroke {
+			t.Errorf("envs[%d].Kind=%q want %q", i, envs[i].Kind, KindKeystroke)
+		}
+	}
+}
+
+// TestKindKeystroke_MixedWithOtherKinds pins that an inbox with mixed
+// envelope kinds — keystroke + command + interrupt + nudge — drains all
+// of them with each Kind preserved. The cursor doesn't filter; the
+// driver's dispatch switch reads Kind and routes per-envelope.
+func TestKindKeystroke_MixedWithOtherKinds(t *testing.T) {
+	ws := t.TempDir()
+	sends := []Envelope{
+		{Kind: KindCommand, Body: "do x", Source: "cli"},
+		{Kind: KindKeystroke, Body: "Enter", Source: "cli"},
+		{Kind: KindInterrupt, Body: "STOP", Source: "cli"},
+		{Kind: KindKeystroke, Body: "Escape", Source: "observer"},
+		{Kind: KindNudge, Body: "still there?", Source: "observer"},
+		{Kind: KindSystemRule, Body: "rule", Source: "cli"},
+	}
+	for _, e := range sends {
+		if err := Append(ws, "mix", e, fixedNow); err != nil {
+			t.Fatalf("Append %+v: %v", e, err)
+		}
+	}
+	envs, err := NewCursor(ws, "mix").Drain()
+	if err != nil {
+		t.Fatalf("Drain: %v", err)
+	}
+	if len(envs) != len(sends) {
+		t.Fatalf("want %d envelopes; got %d", len(sends), len(envs))
+	}
+	for i, want := range sends {
+		if envs[i].Kind != want.Kind {
+			t.Errorf("envs[%d].Kind=%q want %q", i, envs[i].Kind, want.Kind)
+		}
+		if envs[i].Body != want.Body {
+			t.Errorf("envs[%d].Body=%q want %q", i, envs[i].Body, want.Body)
+		}
+		if envs[i].Source != want.Source {
+			t.Errorf("envs[%d].Source=%q want %q", i, envs[i].Source, want.Source)
+		}
+	}
+}

@@ -233,6 +233,133 @@ func TestCoreAdapter_ResolveString_FallsBackOnEmpty(t *testing.T) {
 	}
 }
 
+// TestCoreAdapter_ResolveNudgeS_Bounds covers integer-parser edge cases
+// the cycle-124 helper must handle without surprises. Most paths share
+// strconv.Atoi semantics — but the "0 means disable" sentinel + "negative
+// fallback to default" branches deserve their own coverage beyond the
+// happy-path table in TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable.
+func TestCoreAdapter_ResolveNudgeS_Bounds(t *testing.T) {
+	cases := []struct {
+		in   string
+		want time.Duration
+	}{
+		// strconv.Atoi accepts leading zeros — preserves the parsed int.
+		{"060", 60 * time.Second},
+		// Atoi accepts leading + sign.
+		{"+60", 60 * time.Second},
+		// Atoi rejects leading whitespace (returns err) → default.
+		{" 60", DefaultNudgeS},
+		// Atoi rejects scientific notation → default.
+		{"6e1", DefaultNudgeS},
+		// Atoi rejects floats → default.
+		{"60.5", DefaultNudgeS},
+		// Hexadecimal → Atoi rejects → default.
+		{"0x3c", DefaultNudgeS},
+		// Very large positive integer — Atoi parses to int (32-bit safe
+		// on common platforms; 86400 = 1 day).
+		{"86400", 86400 * time.Second},
+		// MaxInt32 — still parses; this is the practical upper bound.
+		{"2147483647", time.Duration(2147483647) * time.Second},
+		// "-0" → Atoi parses as 0 (not negative) → n=0 → returns 0 (disable).
+		// This is the same path as plain "0", documented as the explicit
+		// opt-out sentinel for nudging.
+		{"-0", 0},
+		// Trailing whitespace → Atoi error → default.
+		{"60 ", DefaultNudgeS},
+		// Tab-separated number → Atoi error → default.
+		{"60\t", DefaultNudgeS},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
+			got := a.resolveNudgeS(DefaultNudgeS)
+			if got != tc.want {
+				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCoreAdapter_ResolveString_UnicodeAndSpecial covers the resolveString
+// helper across non-ASCII bodies and special chars the operator might
+// configure for EVOLVE_OBSERVER_NUDGE_BODY in localized deployments.
+func TestCoreAdapter_ResolveString_UnicodeAndSpecial(t *testing.T) {
+	cases := []struct {
+		in, def, want string
+	}{
+		{"続けて要約してください", "default", "続けて要約してください"},   // Japanese
+		{"계속하거나 마무리하세요", "default", "계속하거나 마무리하세요"}, // Korean
+		{"是否还在工作？", "default", "是否还在工作？"},           // Chinese
+		{"continue\\n", "default", "continue\\n"},   // backslash literal (operator-controlled escape)
+		{"\t\t", "default", "\t\t"},                 // tabs preserved
+		{"line1\nline2", "default", "line1\nline2"}, // literal newline (Atoi never sees this)
+		{"🚀", "default", "🚀"},                       // emoji
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
+			got := a.resolveString("EVOLVE_OBSERVER_NUDGE_BODY", tc.def)
+			if got != tc.want {
+				t.Errorf("in=%q got=%q want=%q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCoreAdapter_ResolveDuration_NovelBounds covers parser edges NOT
+// already exercised by TestCoreAdapter_Start_ResolveDurationFallsBackOnBadEnv
+// above (which handles "", whitespace, "600", "-5", "0", "10m", "abc").
+// The novel surface here: leading `+` sign, leading-zero base-10 (NOT
+// octal — Atoi is base-10 strict), and MaxInt32 as a sanity upper bound.
+// time.Duration is int64 so `MaxInt32 * Second` (2.1e9 * 1e9 = 2.1e18) is
+// safely below int64 max (~9.2e18). Cycle-124 test-review LOW: this test
+// was trimmed from 8 cases to 3 — the dropped 5 cases overlapped the
+// existing fallback table.
+func TestCoreAdapter_ResolveDuration_NovelBounds(t *testing.T) {
+	cases := []struct {
+		in   string
+		want time.Duration
+	}{
+		{"+60", 60 * time.Second},                               // Atoi accepts leading +
+		{"060", 60 * time.Second},                               // leading zero — Atoi treats as base-10, NOT octal
+		{"2147483647", time.Duration(2147483647) * time.Second}, // MaxInt32
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
+			got := a.resolveDuration("EVOLVE_OBSERVER_STALL_S", DefaultStallS)
+			if got != tc.want {
+				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCoreAdapter_ResolveString_EnvLookupNilFallsBackToOSGetenv pins the
+// dependency-injection invariant: when EnvLookup is nil, the helper
+// must fall back to os.Getenv — NOT panic on the nil func. This is the
+// production path; the test sets the env var so the assertion can run
+// without polluting os.Environ across tests.
+func TestCoreAdapter_ResolveString_EnvLookupNilFallsBackToOSGetenv(t *testing.T) {
+	t.Setenv("EVOLVE_OBSERVER_TEST_KEY", "from-os")
+	a := &CoreAdapter{} // EnvLookup nil
+	got := a.resolveString("EVOLVE_OBSERVER_TEST_KEY", "default")
+	if got != "from-os" {
+		t.Fatalf("nil EnvLookup must defer to os.Getenv; got %q", got)
+	}
+}
+
+// TestCoreAdapter_ResolveNudgeS_EnvLookupNilFallsBackToOSGetenv mirrors
+// the above for the nudge resolver.
+func TestCoreAdapter_ResolveNudgeS_EnvLookupNilFallsBackToOSGetenv(t *testing.T) {
+	t.Setenv("EVOLVE_OBSERVER_NUDGE_S", "120")
+	a := &CoreAdapter{} // EnvLookup nil
+	got := a.resolveNudgeS(DefaultNudgeS)
+	if got != 120*time.Second {
+		t.Fatalf("nil EnvLookup must defer to os.Getenv; got %v want 120s", got)
+	}
+}
+
 // TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe pins
 // thread-safety: two phases starting in parallel (unusual but possible
 // under multi-execute) get isolated sinks + cancels.
