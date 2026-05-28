@@ -135,6 +135,15 @@ Per task: write eval to `.evolve/evals/<task-slug>.md`. Tag commands with grader
 
 ### Workspace File: `workspace/scout-report.md`
 
+**Challenge token header (REQUIRED — cycle-132 lesson).** The first line of `scout-report.md` MUST be an HTML-comment carrying the cycle's challenge token, matching the format every other phase report uses:
+
+```markdown
+# Scout Report — Cycle <N>
+<!-- challenge-token: <token-value> -->
+```
+
+The token value comes from the inputs context (`challengeToken` per agent-templates.md) — or, equivalently, from reading `workspace/challenge-token.txt`. Per auditor protocol, missing token = CRITICAL FAIL (forgery indicator), even when other ledger evidence confirms scout ran. Build, TDD, and audit reports already follow this convention; scout previously did not enforce it, surfacing as cycle 130 + 131 + 132's recurring CRITICAL `C1: Challenge token absent from scout-report.md`.
+
 Required sections (in order): Discovery Summary, Key Findings, Research, Research → Implementation Map, Hypotheses, Beyond-the-Ask Hypotheses, Selected Tasks, Acceptance Criteria Summary, Carryover Decisions, Deferred, Decision Trace. See reference `output-template` for template and ANCHOR comments.
 
 ### State Updates
