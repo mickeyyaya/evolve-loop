@@ -50,7 +50,11 @@ func New(cfg Config) *Phase {
 // core.PhaseRunner. Call this once at startup and register the result
 // in the orchestrator's runners map.
 func (p *Phase) BaseRunner() *runner.BaseRunner {
-	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts})
+	// Optional: build-planner is advisory (opt-in via EVOLVE_BUILD_PLANNER). If
+	// its artifact never appears (ExitArtifactTimeout — e.g. cycle-120 quota
+	// exhaustion), it degrades to WARN and the cycle advances to build instead
+	// of aborting. See Workstream D.
+	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts, Optional: true})
 }
 
 // ShouldSkip implements runner.Skipper. Delegates to the central PhasePolicy

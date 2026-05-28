@@ -21,6 +21,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,6 +109,13 @@ type Options struct {
 	// StdoutFilter this is load-bearing: cyclecost + cycleclassify read the
 	// events stream, so it is always-on (no disable flag).
 	EventsProducer func(workspace, phase, cli string, cycle int) error
+	// Optional marks this phase as non-essential to the cycle. When true, a
+	// bridge ErrArtifactTimeout degrades to a WARN that lets the cycle
+	// advance (the state machine's successor is verdict-unconditional for
+	// optional phases like build-planner) instead of aborting. Set by the
+	// owning phase (e.g. buildplanner.New). Default false = hard-fail, the
+	// historical behavior for mandatory phases. See Workstream D / cycle-120.
+	Optional bool
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
@@ -120,6 +128,7 @@ type BaseRunner struct {
 	resolveLLM     func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
 	stdoutFilter   func(workspace, phase string) error
 	eventsProducer func(workspace, phase, cli string, cycle int) error
+	optional       bool
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -156,6 +165,7 @@ func New(opts Options) *BaseRunner {
 		resolveLLM:     resolveLLM,
 		stdoutFilter:   stdoutFilter,
 		eventsProducer: eventsProducer,
+		optional:       opts.Optional,
 	}
 }
 
@@ -315,6 +325,28 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 
 	if bridgeErr != nil {
+		// Optional-phase soft-fail (Workstream D): an OPTIONAL phase whose
+		// artifact never appeared (ErrArtifactTimeout) degrades to WARN with a
+		// nil error so the orchestrator advances instead of aborting the whole
+		// cycle. Safe because an optional phase's state-machine successor is
+		// verdict-unconditional (build-planner→build). Any OTHER bridge error,
+		// or a timeout on a MANDATORY phase, still hard-fails as before. This
+		// is the cycle-120 fix: an advisory build-planner timeout must not kill
+		// the cycle.
+		if b.optional && errors.Is(bridgeErr, core.ErrArtifactTimeout) {
+			return core.PhaseResponse{
+				Phase:        phase,
+				Verdict:      core.VerdictWARN,
+				ArtifactsDir: req.Workspace,
+				CostUSD:      bres.CostUSD,
+				Tokens:       bres.Tokens,
+				DurationMS:   durationMS,
+				Diagnostics: []core.Diagnostic{{
+					Severity: "warning",
+					Message:  fmt.Sprintf("optional phase %q degraded: artifact never appeared (%v); cycle continues", phase, bridgeErr),
+				}},
+			}, nil
+		}
 		return core.PhaseResponse{
 			Phase:        phase,
 			Verdict:      core.VerdictFAIL,

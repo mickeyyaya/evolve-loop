@@ -269,6 +269,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		}
 		return resp, nil
 	}
+	// Wrap the artifact-timeout exit with the port-level sentinel so the
+	// generic phase runner can errors.Is-match it (Workstream D soft-fail)
+	// without importing this adapter. Other non-zero codes stay plain.
+	if code == ExitArtifactTimeout {
+		return resp, fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrArtifactTimeout)
+	}
 	return resp, fmt.Errorf("bridge: launch exit=%d", code)
 }
 

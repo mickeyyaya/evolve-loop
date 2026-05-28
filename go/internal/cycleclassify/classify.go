@@ -57,6 +57,13 @@ const (
 	ClassExitTransportHang Classification = "exit-transport-hang"
 )
 
+// MarkerQuotaLikelyEmptyOutput is the Result.Marker set when the empty-output
+// pass (Workstream D2) reclassifies a would-be integrity-breach as recoverable
+// infrastructure. The dispatcher matches this exact marker to QUOTA-PAUSE the
+// batch (rc=5, auto-resume) instead of burning the next cycle into the same
+// quota wall. Exported so cmd_loop can branch on it without re-deriving it.
+const MarkerQuotaLikelyEmptyOutput = "quota-likely-empty-output"
+
 // Patterns are pre-compiled at package init. Each regex is the
 // case-insensitive (?i) variant of the bash `grep -qiE` pattern.
 var (
@@ -95,10 +102,11 @@ type Result struct {
 // hits.
 func Classify(workspace string) Result {
 	report := filepath.Join(workspace, "orchestrator-report.md")
-	reportData, err := os.ReadFile(report)
-	if err != nil {
-		return Result{Class: ClassIntegrityBreach}
-	}
+	reportData, _ := os.ReadFile(report)
+	// A missing report is no longer an immediate-breach short-circuit: a
+	// mid-cycle quota abort never writes one, and pass 6 below recovers that
+	// case from per-phase artifacts. The pattern passes harmlessly miss on
+	// empty data; nothing else here needs reportData to be non-empty.
 
 	// Pass 1: infrastructure in orchestrator-report.md.
 	if m := reInfrastructure.Find(reportData); m != nil {
@@ -142,8 +150,79 @@ func Classify(workspace string) Result {
 			return cls
 		}
 	}
+	// Pass 6: last-resort empty-output → quota-likely. Runs after all pattern
+	// passes so it can never mask a classifiable failure. See detectEmptyOutputSession.
+	if src, ok := detectEmptyOutputSession(workspace); ok {
+		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: src}
+	}
 	// Report exists but no pattern matched → breach.
 	return Result{Class: ClassIntegrityBreach}
+}
+
+// detectEmptyOutputSession reports whether some phase was launched (its
+// <agent>-stdout.log exists) but produced no model output — empty/whitespace
+// stdout AND zero assistant events in the matching <agent>-events.ndjson. That
+// pairing is the subscription-quota-wall signature (claude -p exits empty when
+// the quota is exhausted). Requiring the stdout.log to EXIST is the guard that
+// separates this from a true silent skip (where the phase never ran, so no log
+// was created) — the latter must stay an integrity-breach.
+func detectEmptyOutputSession(workspace string) (source string, ok bool) {
+	logs, err := globFn(filepath.Join(workspace, "*-stdout.log"))
+	if err != nil {
+		return "", false
+	}
+	sort.Strings(logs) // deterministic Source when several phases are empty
+	for _, logPath := range logs {
+		data, readErr := os.ReadFile(logPath)
+		if readErr != nil {
+			continue // unreadable: can't assert "launched but empty"
+		}
+		if len(bytes.TrimSpace(data)) != 0 {
+			continue // produced output → not a quota wall
+		}
+		// Empty stdout. Confirm zero assistant events in the paired stream so a
+		// log that was merely truncated (but events captured output) isn't
+		// misread as quota.
+		agent := strings.TrimSuffix(filepath.Base(logPath), "-stdout.log")
+		if hasAssistantEvents(filepath.Join(workspace, agent+"-events.ndjson")) {
+			continue
+		}
+		return filepath.Base(logPath), true
+	}
+	return "", false
+}
+
+// hasAssistantEvents reports whether eventsPath contains at least one
+// assistant_text envelope (i.e. the model produced output). A missing or
+// unreadable file ⇒ false (no assistant output observed), consistent with the
+// empty-session signature.
+//
+// On scanner.Err() (e.g. a line exceeding maxScannerBufBytes) the function
+// returns TRUE — conservatively assuming output was present so the caller does
+// not falsely flag a large-output truncation as a quota wall. Mirrors the
+// safety-bias in scanEventsForInfra.
+func hasAssistantEvents(eventsPath string) bool {
+	f, err := os.Open(eventsPath)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		// Tolerant of JSON formatting variants: phasestream emits compact
+		// `"kind":"assistant_text"` today, but a pretty-printed `"kind": "...`
+		// must not be missed if a downstream re-serializer ever inserts space.
+		if bytes.Contains(line, []byte(`"kind":"assistant_text"`)) ||
+			bytes.Contains(line, []byte(`"kind": "assistant_text"`)) {
+			return true
+		}
+	}
+	if scanner.Err() != nil {
+		return true // truncation: assume output present rather than risk a false quota-pause
+	}
+	return false
 }
 
 // detectHangShipped checks the two-factor invariant for
