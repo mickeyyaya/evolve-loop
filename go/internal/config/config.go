@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -123,7 +124,7 @@ type RoutingConfig struct {
 
 // Warning is a non-fatal config diagnostic surfaced to the operator (and ledger).
 type Warning struct {
-	Code    string // "weak-spine" | "unknown-value" | "unknown-key"
+	Code    string // "weak-spine" | "unknown-value" | "unknown-key" | "inert-phase-enable"
 	Message string
 }
 
@@ -186,7 +187,61 @@ func Load(registryPath string, env map[string]string) (RoutingConfig, []Warning)
 	applyEnv(&cfg, env, &ws)
 
 	validateSpine(cfg, &ws)
+	validateInertEnables(cfg, &ws)
 	return cfg, ws
+}
+
+// staticSpinePhases is the set of phases the legacy state machine drives as
+// agent runs (excluding the start/end sentinels). When Stage==StageOff the
+// router is off and ONLY these phases get a turn — so a PhaseEnable[p]=On for
+// any other phase is silently inert. Encoded as a local set rather than
+// imported from core because config is a leaf package; the
+// TestStaticSpineMatchesStateMachine cross-package contract test pins this
+// against the actual state machine's edge map.
+var staticSpinePhases = map[string]struct{}{
+	"intent":        {},
+	"scout":         {},
+	"triage":        {},
+	"tdd":           {},
+	"build-planner": {},
+	"build":         {},
+	"audit":         {},
+	"ship":          {},
+	"retro":         {},
+}
+
+// validateInertEnables warns when PhaseEnable[p]=EnableOn but p is neither
+// mandatory, in the static spine, nor reachable via the router (Stage<Advisory).
+// The classic trigger is EVOLVE_PLAN_REVIEW=1 with default routing: plan-review
+// only runs at Stage>=Advisory, so the enable is silently inert at Stage=Off
+// AND at Stage=Shadow (per the Stage docstring, shadow computes+logs but the
+// STATIC state machine still drives execution — so non-spine phases remain
+// unreachable). Surfacing this prevents the operator-confusion failure mode
+// from cycle 120.
+func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
+	if cfg.Stage >= StageAdvisory {
+		return // router drives; enable is effective
+	}
+	// Sort for deterministic warning order — map iteration is randomized.
+	phases := make([]string, 0, len(cfg.PhaseEnable))
+	for p := range cfg.PhaseEnable {
+		phases = append(phases, p)
+	}
+	sort.Strings(phases)
+	for _, p := range phases {
+		if cfg.PhaseEnable[p] != EnableOn {
+			continue
+		}
+		if containsPhase(cfg.Mandatory, p) {
+			continue
+		}
+		if _, inSpine := staticSpinePhases[p]; inSpine {
+			continue
+		}
+		*ws = append(*ws, Warning{"inert-phase-enable",
+			fmt.Sprintf("phase %q is force-enabled but the router is off/shadow (dynamic_routing<advisory) and it is not in the static state machine — the enable is inert; set dynamic_routing>=advisory or remove the enable", p),
+		})
+	}
 }
 
 func defaults() RoutingConfig {
@@ -298,20 +353,22 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	}
 }
 
-func validateSpine(cfg RoutingConfig, ws *[]Warning) {
-	has := func(p string) bool {
-		for _, m := range cfg.Mandatory {
-			if m == p {
-				return true
-			}
+// containsPhase reports whether slice contains p.
+func containsPhase(slice []string, p string) bool {
+	for _, s := range slice {
+		if s == p {
+			return true
 		}
-		return false
 	}
+	return false
+}
+
+func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 	var missing []string
-	if !has("audit") {
+	if !containsPhase(cfg.Mandatory, "audit") {
 		missing = append(missing, "audit")
 	}
-	if !has("ship") {
+	if !containsPhase(cfg.Mandatory, "ship") {
 		missing = append(missing, "ship")
 	}
 	if len(missing) > 0 {
