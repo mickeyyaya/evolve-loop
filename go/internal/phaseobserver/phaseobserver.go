@@ -67,6 +67,14 @@ type Config struct {
 	EOFGraceS      int
 	HeartbeatEvery int
 
+	// MaxNoProgressS is Workstream E1's "babbling agent" backstop. The existing
+	// StallS check resets on ANY valid JSON line — including pure assistant_text
+	// token streaming — so a livelocked agent that emits forever never trips it.
+	// MaxNoProgressS tracks "last MEANINGFUL progress" (tool_use / tool_result /
+	// progress events only) and emits stuck_no_progress when exceeded. 0 = the
+	// feature is disabled (legacy posture, byte-identical to pre-E1).
+	MaxNoProgressS int
+
 	// Testing seams.
 	Now         func() time.Time
 	KillPgrp    func(pgid int, sig syscall.Signal) error
@@ -78,10 +86,13 @@ type Config struct {
 type Observer struct {
 	cfg Config
 
-	traceID        string
-	startedAt      time.Time
-	startedAtISO   string
-	lastEventTS    time.Time
+	traceID      string
+	startedAt    time.Time
+	startedAtISO string
+	lastEventTS  time.Time
+	// lastProgressTS is updated ONLY on meaningful-progress events (tool_use,
+	// tool_result). Pure assistant_text streaming does NOT reset it. WS-E1.
+	lastProgressTS time.Time
 	lastByteOff    int64
 	eventCount     int
 	toolCallCount  int
@@ -172,11 +183,12 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 
 	now := cfg.Now()
 	obs := &Observer{
-		cfg:          cfg,
-		traceID:      fmt.Sprintf("cycle-%d-%s-%d", cfg.Cycle, cfg.Phase, now.Unix()),
-		startedAt:    now,
-		startedAtISO: now.UTC().Format("2006-01-02T15:04:05Z"),
-		lastEventTS:  now,
+		cfg:            cfg,
+		traceID:        fmt.Sprintf("cycle-%d-%s-%d", cfg.Cycle, cfg.Phase, now.Unix()),
+		startedAt:      now,
+		startedAtISO:   now.UTC().Format("2006-01-02T15:04:05Z"),
+		lastEventTS:    now,
+		lastProgressTS: now, // WS-E1: starts at now; only meaningful-progress events bump it
 	}
 
 	eventsPath := filepath.Join(cfg.Workspace, cfg.Agent+"-observer-events.ndjson")
@@ -267,6 +279,27 @@ OUTER:
 						_ = cfg.KillPgrp(cfg.SubagentPGID, syscall.SIGTERM)
 					}
 				}
+				// WS-E1: babbling-but-livelocked backstop. The idle clock above
+				// resets on EVERY valid JSON line including pure assistant_text,
+				// so an agent that produces tokens forever without doing real
+				// work (no tool_use / tool_result) never trips it. The progress
+				// clock only resets on meaningful events, so we catch that case.
+				// Opt-in via cfg.MaxNoProgressS > 0; 0 preserves legacy posture.
+				if cfg.MaxNoProgressS > 0 {
+					noProgress := cfg.Now().Sub(obs.lastProgressTS).Seconds()
+					if int(noProgress) >= cfg.MaxNoProgressS {
+						obs.emit(eventsPath, "stuck_no_progress", "INCIDENT", map[string]any{
+							"no_progress_s": int(noProgress),
+							"threshold_s":   cfg.MaxNoProgressS,
+							"tool_calls":    obs.toolCallCount,
+							"tool_results":  obs.toolResultCnt,
+						})
+						if cfg.Enforce && cfg.SubagentPGID > 0 {
+							logf("ENFORCE: killing pgid %d due to stuck_no_progress", cfg.SubagentPGID)
+							_ = cfg.KillPgrp(cfg.SubagentPGID, syscall.SIGTERM)
+						}
+					}
+				}
 			}
 
 			// heartbeat
@@ -351,6 +384,7 @@ func (o *Observer) processLine(line string) {
 				name = "?"
 			}
 			o.toolCallCount++
+			o.lastProgressTS = o.lastEventTS // WS-E1: tool dispatch is meaningful progress
 			input, _ := block["input"].(map[string]any)
 			inputJSON, _ := json.Marshal(input)
 			sum := sha256.Sum256(inputJSON)
@@ -369,6 +403,7 @@ func (o *Observer) processLine(line string) {
 		if rtype == "tool_result" {
 			isErr, _ := block["is_error"].(bool)
 			o.toolResultCnt++
+			o.lastProgressTS = o.lastEventTS // WS-E1: tool return is meaningful progress
 			if isErr {
 				o.errorCount++
 			}
