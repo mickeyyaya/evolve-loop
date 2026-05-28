@@ -17,6 +17,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -296,6 +297,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
 		core.WithPlanner(advisor),
+	}
+	// Cycle-122 Fix 3 / ADR-0030: auto-spawn the per-phase observer
+	// goroutine unless explicitly opted out via EVOLVE_OBSERVER_AUTOSPAWN=0.
+	// Restores the pre-v12 bash-dispatcher behavior the Go port silently
+	// dropped. The default StallS=600s matches the bridge's coarse
+	// artifact-timeout; an operator who wants faster detection can set
+	// EVOLVE_OBSERVER_STALL_S=90 (or similar).
+	if os.Getenv("EVOLVE_OBSERVER_AUTOSPAWN") != "0" {
+		opts = append(opts, core.WithObserver(observer.NewCoreAdapter()))
 	}
 
 	return orchDeps{

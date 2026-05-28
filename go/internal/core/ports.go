@@ -53,11 +53,10 @@ type Guard interface {
 	Decide(ctx context.Context, in GuardInput) GuardDecision
 }
 
-// Observer streams phase activity into abnormal-events.jsonl + slog.
-type Observer interface {
-	Watch(ctx context.Context, phase Phase) error
-	Stop() error
-}
+// (Legacy speculative Observer interface removed in cycle-122 Fix 3 /
+// ADR-0030 — it was scaffolding with zero callers. The live interface
+// is in observer.go with the Start(ctx, phase, req)→cancel shape that
+// the orchestrator actually wires from RunCycle.)
 
 // State mirrors the .evolve/state.json schema (subset used by orchestrator).
 // Full field set is round-tripped through encoding/json by the storage

@@ -107,6 +107,13 @@ type Orchestrator struct {
 	// WithReviewer; the deterministic default + future LLM reviewer
 	// implementations share the DeliverableReviewer interface.
 	reviewer DeliverableReviewer
+
+	// observer is the per-phase stall detector (cycle-122 Fix 3 / ADR-0030).
+	// Start is called once before each runner.Run; the returned cancel runs
+	// once after. Nil ⇒ noopObserver default ⇒ byte-identical to the pre-
+	// ADR-0030 cycle. Set via WithObserver; cmd_cycle.go wires the real
+	// implementation when EVOLVE_OBSERVER_AUTOSPAWN != "0" (default 1).
+	observer Observer
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -155,6 +162,23 @@ func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
 	}
 }
 
+// WithObserver injects a per-phase stall detector (cycle-122 Fix 3 / ADR-0030).
+// The orchestrator calls observer.Start(...) before each phase's runner.Run
+// and the returned cancel after — running a background watcher that emits
+// stall_no_output events to the workspace when the subagent's stdout-log
+// stops growing. A nil observer (default) keeps the noopObserver default,
+// which is byte-identical to the pre-ADR-0030 cycle.
+//
+// cmd_cycle.go wires the real implementation via
+// observer.NewCoreAdapter when EVOLVE_OBSERVER_AUTOSPAWN != "0" (default 1).
+func WithObserver(o Observer) Option {
+	return func(orch *Orchestrator) {
+		if o != nil {
+			orch.observer = o
+		}
+	}
+}
+
 // WithReviewer injects a per-phase deliverable reviewer (Workstream E2). The
 // orchestrator calls reviewer.Review(...) after each phase's runner.Run returns
 // a non-error, non-SKIPPED verdict, BEFORE the ledger append or
@@ -183,6 +207,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		worktree:      gitWorktree{},
 		strategy:      router.StaticPreset{},
 		reviewer:      noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
+		observer:      noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -529,7 +554,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				beforeDirty = snap
 			}
 		}
-		resp, err := runner.Run(ctx, PhaseRequest{
+		phaseReq := PhaseRequest{
 			Cycle:         cycle,
 			ProjectRoot:   req.ProjectRoot,
 			Workspace:     cs.WorkspacePath,
@@ -539,7 +564,18 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       ctxSnap,
-		})
+		}
+		// Cycle-122 Fix 3 / ADR-0030: attach the per-phase observer
+		// goroutine BEFORE runner.Run and cancel it AFTER. noopObserver
+		// (default when WithObserver wasn't used) is byte-identical to
+		// the pre-fix cycle. Real implementations spawn a stall detector
+		// that watches <workspace>/<agent>-stdout.log and emits stall
+		// events to <workspace>/<agent>-observer-events.ndjson.
+		obsCancel := o.observer.Start(ctx, string(next), phaseReq)
+		resp, err := runner.Run(ctx, phaseReq)
+		if obsCancel != nil {
+			obsCancel()
+		}
 		if err != nil {
 			return result, fmt.Errorf("phase %s: %w", next, err)
 		}
