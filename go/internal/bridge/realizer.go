@@ -15,11 +15,11 @@ import "strings"
 //   - Enum-mapped (permission, settings_scope): Values maps each intent value to
 //     the concrete flag tokens, e.g. {"bypass": ["--dangerously-skip-permissions"]}.
 //   - Dynamic (model_tier): Channel + Flag/Template, with From:"tier_alias" to
-//     resolve the value through the manifest's TierAliases before emitting.
+//     resolve the value through the manifest's ModelTierMap before emitting.
 type ParamSpec struct {
 	Channel  string              `json:"channel"`            // flag | repl | controller | noop
 	Flag     string              `json:"flag,omitempty"`     // flag name for a dynamic value (model_tier) or a multi-value flag (allowed_tools)
-	From     string              `json:"from,omitempty"`     // "tier_alias" → resolve via Manifest.TierAliases
+	From     string              `json:"from,omitempty"`     // "model_tier_map" (canonical) | "tier_alias" (deprecated) → resolve via Manifest.ModelTierMap
 	Template string              `json:"template,omitempty"` // repl: "/model {alias}"
 	Values   map[string][]string `json:"values,omitempty"`   // enum intent value → flag tokens
 }
@@ -144,6 +144,18 @@ func dedupeLaunchFlags(in []string) []string {
 	return out
 }
 
+// legacyTierAlias translates the deprecated Anthropic-named tier vocabulary
+// (haiku/sonnet/opus) into the canonical abstract vocabulary (fast/balanced/
+// deep) used by ModelTierMap keys after the cycle-124 schema migration.
+// Pass-through for already-canonical names AND for raw model identifiers
+// (which fall through to the realizer's identity-fallback at the call site).
+// Delegates to manifest.translateV1TierKey so the 3-entry mapping has a
+// single source of truth (avoids silent drift if a fourth legacy alias is
+// ever added — see ADR-0022 PR 2 addendum).
+func legacyTierAlias(value string) string {
+	return translateV1TierKey(value)
+}
+
 // realizeScalar handles a single-valued intent param (model_tier, permission,
 // settings_scope). No manifest entry, empty value, or an unmapped enum value
 // emits nothing.
@@ -161,9 +173,23 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 	}
 	// Dynamic: resolve the value (optionally via tier_alias) then emit per channel.
 	resolved := value
-	if spec.From == "tier_alias" {
-		if alias, found := m.TierAliases[value]; found && alias != "" {
+	// ParamSpec.From identifies the manifest sidecar table to translate
+	// through. "model_tier_map" is canonical (cycle-124 followup); the
+	// legacy spelling "tier_alias" is accepted unchanged for one release
+	// so operator-installed v1 override manifests keep working.
+	if spec.From == "model_tier_map" || spec.From == "tier_alias" {
+		// Fallback ladder for the cycle-124 deprecation window: try the raw
+		// intent value first (handles synthetic test fixtures + operator
+		// v1 manifests where keys are still haiku/sonnet/opus). If that
+		// misses, try the canonical translation (handles parseManifest's
+		// v1-shimmed manifests where keys are now fast/balanced/deep). Both
+		// surfaces remove together one release after the migration.
+		if alias, found := m.ModelTierMap[value]; found && alias != "" {
 			resolved = alias
+		} else if canonical := legacyTierAlias(value); canonical != value {
+			if alias, found := m.ModelTierMap[canonical]; found && alias != "" {
+				resolved = alias
+			}
 		}
 	}
 	switch spec.Channel {

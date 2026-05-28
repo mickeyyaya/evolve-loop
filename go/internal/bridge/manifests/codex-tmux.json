@@ -24,7 +24,7 @@
     "model_tier": {
       "channel": "flag",
       "flag": "-m",
-      "from": "tier_alias"
+      "from": "model_tier_map"
     },
     "permission": {
       "channel": "controller"
@@ -66,10 +66,10 @@
     }
   ],
   "stub": false,
-  "tier_aliases": {
-    "haiku": "gpt-5.4-mini",
-    "sonnet": "gpt-5.4",
-    "opus": "gpt-5.5"
+  "model_tier_map": {
+    "fast": "gpt-5.4-mini",
+    "balanced": "gpt-5.4",
+    "deep": "gpt-5.5"
   },
-  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same tier_aliases as the codex-headless driver."
+  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same model_tier_map as the codex-headless driver."
 }

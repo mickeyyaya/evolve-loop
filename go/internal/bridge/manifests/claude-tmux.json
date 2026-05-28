@@ -20,7 +20,11 @@
   "prompt_marker": "\u276f",
   "default_model": "haiku",
   "default_args": [],
-  "tier_aliases": {},
+  "model_tier_map": {
+    "fast": "haiku",
+    "balanced": "sonnet",
+    "deep": "opus"
+  },
   "params": {
     "permission": {
       "channel": "flag",
@@ -53,7 +57,7 @@
     "model_tier": {
       "channel": "flag",
       "flag": "--model",
-      "from": "tier_alias"
+      "from": "model_tier_map"
     },
     "settings_scope": {
       "channel": "flag",

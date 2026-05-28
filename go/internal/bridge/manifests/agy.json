@@ -41,10 +41,10 @@
     }
   ],
   "stub": false,
-  "tier_aliases": {
-    "haiku":  "gemini-3.5-flash",
-    "sonnet": "gemini-3.5-flash",
-    "opus":   "gemini-3.5-flash"
+  "model_tier_map": {
+    "fast": "gemini-3.5-flash",
+    "balanced": "gemini-3.5-flash",
+    "deep": "gemini-3.5-flash"
   },
-  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy CLI exposes no model selection flag (-c is --continue, not --config). Per operator directive 2026-05-21: all Claude tier aliases map to agy's default (gemini-3.5-flash). Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
+  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy CLI exposes no model selection flag (-c is --continue, not --config). All abstract tier values resolve to the same gemini-3.5-flash default — model_tier_map is informational here since params.model_tier.channel is noop. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
 }

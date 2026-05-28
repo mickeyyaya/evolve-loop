@@ -122,7 +122,10 @@ func TestResolve_LLMConfigFallbackDefaultsToSonnet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if r.ModelTier != "sonnet" || r.Source != "llm_config_fallback" {
+	// Cycle-124 followup: sentinel default migrated sonnet → balanced as part
+	// of the abstract-vocabulary normalization. The realizer's fallback
+	// ladder + parseManifest v1 shim keep legacy sonnet callers working.
+	if r.ModelTier != "balanced" || r.Source != "llm_config_fallback" {
 		t.Errorf("bad result: %+v", r)
 	}
 }
@@ -178,13 +181,13 @@ func TestResolve_ProfileFallback(t *testing.T) {
 	}
 }
 
-func TestResolve_ProfileDefaultsTierToSonnet(t *testing.T) {
+func TestResolve_ProfileDefaultsTierToBalanced(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	profDir := filepath.Join(dir, ".evolve", "profiles")
 	writeJSON(t, filepath.Join(profDir, "scout.json"), map[string]any{
 		"cli": "claude",
-		// no model_tier_default
+		// no model_tier_default — sentinel kicks in
 	})
 
 	r, err := Resolve("scout", Options{
@@ -194,8 +197,10 @@ func TestResolve_ProfileDefaultsTierToSonnet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if r.ModelTier != "sonnet" {
-		t.Errorf("want sonnet default, got %+v", r)
+	// Cycle-124 followup: profile-default sentinel migrated sonnet →
+	// balanced as part of the abstract-vocabulary normalization.
+	if r.ModelTier != "balanced" {
+		t.Errorf("want balanced default, got %+v", r)
 	}
 }
 

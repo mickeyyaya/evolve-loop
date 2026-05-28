@@ -191,3 +191,71 @@ to different profiles in different contexts (e.g., a consensus auditor running t
 and the operator's override should pin to the profile that runs, not the phase that gates it. Aligning
 all per-agent env keys to `profileName` keeps the override syntax predictable: `EVOLVE_<AGENT>_<KNOB>`
 always reads the override for the profile of that name.
+
+## Addendum (PR 2, 2026-05-29) — abstract vocabulary normalization + v1→v2 schema
+
+Cycle-124 V1 verification also surfaced a vocabulary cross-pollination: codex-tmux.json (and the other
+non-claude manifests) declared `tier_aliases` with Anthropic-named keys (`haiku|sonnet|opus`) mapping
+to non-Anthropic native models — `opus → gpt-5.5` on codex is the canonical example. The fix is to
+adopt one provider-neutral vocabulary end-to-end, matching what profiles' `model_tier_default` and
+`model_tier_envelope` already use.
+
+**Canonical vocabulary:** `fast | balanced | deep`. Provider-neutral, semantically meaningful,
+already-in-profiles. Replaces the Anthropic-leaked intermediate `haiku | sonnet | opus` that lived
+only in `setup.go:tierAliasKey` and the realizer's intent flow.
+
+**Schema v1 → v2 (manifests).** The manifest field `tier_aliases` is renamed to `model_tier_map`,
+and its keys swap from `haiku/sonnet/opus` → `fast/balanced/deep`. The Anthropic names that were
+KEYS now appear as VALUES under claude-tmux.json + claude-p.json — that's where they belong (native
+to claude's `--model` flag):
+
+| Manifest | v1 `tier_aliases` | v2 `model_tier_map` |
+|---|---|---|
+| `claude-tmux` / `claude-p` | `{}` (empty; identity) | `{fast: haiku, balanced: sonnet, deep: opus}` |
+| `codex-tmux` / `codex` | `{haiku: gpt-5.4-mini, sonnet: gpt-5.4, opus: gpt-5.5}` | `{fast: gpt-5.4-mini, balanced: gpt-5.4, deep: gpt-5.5}` |
+| `agy-tmux` / `agy` | all → `gemini-3.5-flash` | all → `gemini-3.5-flash` (informational; channel:noop) |
+| `ollama-tmux` | all → `llama3.1:8b` | `{fast: qwen3:7b, balanced: qwen3:30b, deep: qwen3-coder:30b}` |
+
+The `ParamSpec.From` enum is renamed from `"tier_alias"` → `"model_tier_map"`; both spellings are
+accepted for one release.
+
+**Schema v1 backward compat (parseManifest shim).** `parseManifestWithStderr` detects a `tier_aliases`
+JSON key in legacy manifests (e.g. operator-installed overrides in `EVOLVE_BRIDGE_MANIFEST_DIR`),
+translates `haiku → fast / sonnet → balanced / opus → deep` on read, populates the new
+`ModelTierMap` field, and emits ONE stderr deprecation warning per file naming the offending cli.
+Non-standard v1 keys (custom operator tiers) pass through verbatim. Removed in the cycle after
+the deprecation window — the test `manifest_v1_compat_test.go` will fail loudly when the planned
+removal happens.
+
+**Intent-vocabulary backward compat (realizer fallback ladder).** Callers still passing legacy
+Anthropic-named intent values (`ModelTier: "sonnet"`) get a transparent translation: the realizer
+first looks up the raw value in `ModelTierMap` (handles synthetic test fixtures + operator v1
+manifests where keys are still haiku/sonnet/opus), then falls back to the canonical translation
+(handles v2 manifests where keys are fast/balanced/deep). Both deprecation surfaces remove together.
+
+**Resolvellm sentinel defaults.** When a profile declares no `model_tier_default`, the sentinel
+fallback at `resolvellm.go:92, 118` returns `"balanced"` (was `"sonnet"`). Tests updated:
+`TestResolve_ProfileDefaultsTierToBalanced` (renamed from `…ToSonnet`).
+
+**Why one vocabulary end-to-end.** A profile that wants "the medium-effort tier" should not need
+to know whether the assigned CLI is claude (where `sonnet` is native) or codex (where `gpt-5.4` is
+native) or ollama (where `qwen3:30b` is the operator's choice). The abstract vocabulary lets the
+profile express intent in CLI-agnostic terms; the per-CLI `model_tier_map` is the single source of
+truth for the translation. Strategy pattern via declarative config, no Go-side mapping table.
+
+**v1 deprecation timeline.** Both compat surfaces (parseManifest shim + realizer fallback ladder)
+remove in the cycle after PR 2 ships. Operator-installed override manifests must migrate; the
+deprecation warning names each offending file by cli for surfacing.
+
+## Files this addendum touches
+
+| File | Role |
+|---|---|
+| `go/internal/bridge/manifest.go` | Field rename `TierAliases → ModelTierMap`; v1 compat shim in `parseManifestWithStderr`; `translateV1TierAliases` helper. |
+| `go/internal/bridge/realizer.go` | `ParamSpec.From` accepts `"model_tier_map"` (canonical) + `"tier_alias"` (deprecated); fallback ladder via `legacyTierAlias`. |
+| `go/internal/setup/setup.go` | Drop `tierAliasKey` map; rewrite `tierModelsFor` to look up `ModelTierMap` directly; `abstractTiers` slice. |
+| `go/internal/resolvellm/resolvellm.go` | Sentinel defaults at L92 + L118: `sonnet → balanced`. |
+| `go/internal/bridge/manifests/*.json` (7 files) | Replace `tier_aliases` with `model_tier_map` (fast/balanced/deep keys); update `from: "tier_alias"` → `"model_tier_map"`. |
+| `go/internal/bridge/manifest_v1_compat_test.go` (new) | 4-case suite pinning v1→v2 translation, partial-keys handling, v2-direct loading, custom-key pass-through. |
+| `go/internal/bridge/realizer_test.go` | `TierAliases:` field rename → `ModelTierMap:` (6 sites). |
+| `go/internal/resolvellm/resolvellm_test.go` | Test rename + sentinel-default value updates. |

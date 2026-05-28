@@ -75,10 +75,10 @@
     }
   ],
   "stub": false,
-  "tier_aliases": {
-    "haiku": "gemini-3.5-flash",
-    "sonnet": "gemini-3.5-flash",
-    "opus": "gemini-3.5-flash"
+  "model_tier_map": {
+    "fast": "gemini-3.5-flash",
+    "balanced": "gemini-3.5-flash",
+    "deep": "gemini-3.5-flash"
   },
   "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. agy has no CLI model selector."
 }

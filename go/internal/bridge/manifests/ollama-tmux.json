@@ -63,10 +63,10 @@
     }
   ],
   "stub": false,
-  "tier_aliases": {
-    "haiku": "llama3.1:8b",
-    "sonnet": "llama3.1:8b",
-    "opus": "llama3.1:8b"
+  "model_tier_map": {
+    "fast": "qwen3:7b",
+    "balanced": "qwen3:30b",
+    "deep": "qwen3-coder:30b"
   },
-  "note": "Local-or-cloud ollama via tmux REPL. Cloud routing is by MODEL TAG: `gpt-oss:120b-cloud` transparently hits ollama.com (needs OLLAMA_API_KEY / `ollama signin`); bare tags (`llama3.1:8b`, `qwen2.5-coder:32b`, ...) run on local hardware via the same daemon. OLLAMA_HOST selects WHICH `ollama serve` instance the CLI talks to (default 127.0.0.1:11434) — NOT cloud routing. Reasoning/review phases only — plain `ollama run` has no agentic tool-use (no Bash/Edit/Write), so source-writing phase assignment is rejected at Launch. Tier aliases default conservatively to llama3.1:8b; operators override via the per-phase EVOLVE_<AGENT>_MODEL or profile.model. Cloud cannot do `format: {schema}` structured output — pin local tags for schema-bound phases. See knowledge-base/research/ollama-control-surface-2026.md."
+  "note": "Local-or-cloud ollama via tmux REPL. Cloud routing is by MODEL TAG: `gpt-oss:120b-cloud` transparently hits ollama.com (needs OLLAMA_API_KEY / `ollama signin`); bare tags (`qwen3:30b`, `gemma4:26b`, ...) run on local hardware via the same daemon. OLLAMA_HOST selects WHICH `ollama serve` instance the CLI talks to (default 127.0.0.1:11434) — NOT cloud routing. Reasoning/review phases only — plain `ollama run` has no agentic tool-use (no Bash/Edit/Write), so source-writing phase assignment is rejected at Launch. model_tier_map defaults to the qwen3 family per the May 2026 ollama coding-agent rankings (fast→qwen3:7b for quick tasks, balanced→qwen3:30b for general work, deep→qwen3-coder:30b RL-trained on SWE-Bench); operators override via the per-phase EVOLVE_<AGENT>_MODEL or by `ollama pull`ing a different default. Cloud cannot do `format: {schema}` structured output — pin local tags for schema-bound phases. See knowledge-base/research/ollama-control-surface-2026.md + cycle-124 followup research dossier."
 }

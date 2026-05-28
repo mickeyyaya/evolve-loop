@@ -12,10 +12,10 @@
   "default_args": [],
   "interactive_prompts": [],
   "stub": false,
-  "tier_aliases": {
-    "haiku":  "gpt-5.4-mini",
-    "sonnet": "gpt-5.4",
-    "opus":   "gpt-5.5"
+  "model_tier_map": {
+    "fast": "gpt-5.4-mini",
+    "balanced": "gpt-5.4",
+    "deep": "gpt-5.5"
   },
-  "note": "default_model empty: codex picks the model compatible with active auth. tier_aliases map Claude tiers to codex equivalents (verified working with ChatGPT-account auth 2026-05-21)."
+  "note": "default_model empty: codex picks the model compatible with active auth. model_tier_map translates abstract fast/balanced/deep tiers to OpenAI-native models (gpt-5.5 is the ChatGPT-account default per ~/.codex/config.toml; verified 2026-05-29 post cycle-124 V1)."
 }

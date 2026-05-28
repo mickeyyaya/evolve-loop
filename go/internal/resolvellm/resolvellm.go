@@ -24,9 +24,14 @@ import (
 // Result mirrors the JSON shape emitted by resolve-llm.sh. Exactly one of
 // Model / ModelTier is non-empty in any single emission.
 type Result struct {
-	CLI       string
-	Model     string // exact model name (resolved from llm_config.phases.<role>.model)
-	ModelTier string // tier label ("sonnet", "haiku", "opus") — used by profile/fallback paths
+	CLI   string
+	Model string // exact model name (resolved from llm_config.phases.<role>.model)
+	// ModelTier is the canonical abstract tier ("fast" | "balanced" | "deep").
+	// Translated to CLI-native model by the realizer's ModelTierMap lookup.
+	// Legacy values ("haiku" | "sonnet" | "opus") are accepted for one
+	// release via the realizer fallback ladder + parseManifest v1 shim;
+	// see ADR-0022 PR 2 addendum for the deprecation timeline.
+	ModelTier string
 	Source    string // "llm_config" | "llm_config_fallback" | "profile"
 }
 
@@ -89,7 +94,7 @@ func Resolve(role string, opts Options) (Result, error) {
 			if cfg.Fallback != nil && cfg.Fallback.CLI != "" {
 				tier := cfg.Fallback.ModelTier
 				if tier == "" {
-					tier = "sonnet"
+					tier = "balanced"
 				}
 				return Result{CLI: cfg.Fallback.CLI, ModelTier: tier, Source: "llm_config_fallback"}, nil
 			}
@@ -115,7 +120,7 @@ func Resolve(role string, opts Options) (Result, error) {
 	}
 	tier := prof.ModelTierDefault
 	if tier == "" {
-		tier = "sonnet"
+		tier = "balanced"
 	}
 	return Result{CLI: prof.CLI, ModelTier: tier, Source: "profile"}, nil
 }

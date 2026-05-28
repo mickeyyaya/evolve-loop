@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -63,10 +64,16 @@ type Manifest struct {
 	DefaultArgs        []string            `json:"default_args"`
 	InteractivePrompts []ManifestPrompt    `json:"interactive_prompts"`
 	Stub               bool                `json:"stub"`
-	// TierAliases maps an abstract model tier (haiku|sonnet|opus) to this
-	// CLI's concrete model name (e.g. codex sonnet→gpt-5.4, agy *→gemini-3.5-flash).
-	// Consumed by the LaunchIntent realizer's `from:"tier_alias"` specs (ADR-0022).
-	TierAliases map[string]string `json:"tier_aliases,omitempty"`
+	// ModelTierMap translates the abstract, provider-neutral model tier
+	// (fast|balanced|deep — the same vocabulary profiles' model_tier_default
+	// + model_tier_envelope already use) to this CLI's concrete model
+	// identifier. Each CLI's table is the single source of truth for that
+	// translation; the realizer at realizer.go:realizeScalar is generic.
+	// Consumed by ParamSpec.From == "model_tier_map" (canonical) — the
+	// legacy spelling "tier_alias" is accepted for one release for
+	// backward compat with operator-installed v1 override manifests.
+	// See docs/architecture/adr/0022-launch-intent-realizer.md.
+	ModelTierMap map[string]string `json:"model_tier_map,omitempty"`
 	// Params is the declarative per-CLI realization table: how each high-level
 	// LaunchIntent parameter maps to this CLI's launch flags / REPL input /
 	// controller hints. Absent param → no-op. See ADR-0022 + realizer.go.
@@ -92,8 +99,17 @@ func LoadManifest(cli string) (Manifest, error) {
 
 // parseManifest unmarshals + validates manifest bytes. Split out so the
 // JSON-error and missing-field branches are testable (the embedded
-// manifests are all valid, so they'd otherwise be unreachable).
+// manifests are all valid, so they'd otherwise be unreachable). Defers
+// the actual work to parseManifestWithStderr with os.Stderr.
 func parseManifest(cli string, data []byte) (Manifest, error) {
+	return parseManifestWithStderr(cli, data, os.Stderr)
+}
+
+// parseManifestWithStderr is the testable seam for parseManifest. The
+// stderr writer captures the v1 deprecation warning so test suites can
+// assert it without polluting os.Stderr. Production calls go through
+// parseManifest with os.Stderr.
+func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifest, error) {
 	var m Manifest
 	if err := json.Unmarshal(data, &m); err != nil {
 		return Manifest{}, fmt.Errorf("bridge:manifest: invalid JSON for cli=%s: %w", cli, err)
@@ -101,7 +117,63 @@ func parseManifest(cli string, data []byte) (Manifest, error) {
 	if m.CLI == "" || m.Binary == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: missing required fields (cli, binary) for %s", cli)
 	}
+	// v1 → v2 schema compat (cycle-124 followup): a manifest declaring the
+	// legacy `tier_aliases` key — with the Anthropic-leaked vocabulary
+	// `{haiku|sonnet|opus → native}` — is read into a sidecar struct,
+	// translated to the canonical `fast|balanced|deep` keys, and merged
+	// into ModelTierMap. We only translate when ModelTierMap is empty
+	// (v1-only); a manifest declaring both keys keeps ModelTierMap as the
+	// source of truth without warnings. One deprecation line per manifest.
+	if len(m.ModelTierMap) == 0 {
+		var v1 struct {
+			TierAliases map[string]string `json:"tier_aliases"`
+		}
+		// Second Unmarshal of the same bytes: an error here is impossible
+		// given the first Unmarshal into `m` already validated the JSON
+		// shape; a struct-tag mismatch just leaves v1.TierAliases at nil.
+		// Explicit discard documents the intent for future readers (per
+		// cycle-124 PR 2 review).
+		_ = json.Unmarshal(data, &v1)
+		if len(v1.TierAliases) > 0 {
+			m.ModelTierMap = translateV1TierAliases(v1.TierAliases)
+			fmt.Fprintf(stderr, "[bridge:manifest] DEPRECATED v1 schema for cli=%s: `tier_aliases` is deprecated; migrate to `model_tier_map` with fast/balanced/deep keys. See ADR-0022.\n", cli)
+		}
+	}
 	return m, nil
+}
+
+// translateV1TierAliases maps the legacy Anthropic-named tier keys to the
+// canonical abstract vocabulary. Non-standard keys (e.g. operator-custom
+// "large") pass through verbatim. Delegates per-key translation to
+// translateV1TierKey so the 3-entry mapping is the single source of truth
+// (also called from realizer.go's intent-vocabulary fallback ladder —
+// keeping it canonical here avoids silent drift if a fourth legacy alias
+// is ever added).
+func translateV1TierAliases(v1 map[string]string) map[string]string {
+	out := make(map[string]string, len(v1))
+	for k, v := range v1 {
+		out[translateV1TierKey(k)] = v
+	}
+	return out
+}
+
+// translateV1TierKey is the canonical 3-entry haiku/sonnet/opus →
+// fast/balanced/deep mapping. Pass-through for anything else (so custom
+// operator tiers survive the migration unchanged). Pure function exported
+// at package scope so both the parse-time shim (translateV1TierAliases)
+// and the realize-time fallback ladder (realizer.legacyTierAlias)
+// reference the same table.
+func translateV1TierKey(k string) string {
+	switch k {
+	case "haiku":
+		return "fast"
+	case "sonnet":
+		return "balanced"
+	case "opus":
+		return "deep"
+	default:
+		return k
+	}
 }
 
 // ManifestNames returns the sorted set of CLI names with an embedded

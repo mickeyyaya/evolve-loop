@@ -31,7 +31,7 @@ func claudeTmuxManifest() Manifest {
 func codexTmuxManifest() Manifest {
 	return Manifest{
 		CLI: "codex-tmux", Binary: "codex",
-		TierAliases: map[string]string{"haiku": "gpt-5.4-mini", "sonnet": "gpt-5.4", "opus": "gpt-5.5"},
+		ModelTierMap: map[string]string{"haiku": "gpt-5.4-mini", "sonnet": "gpt-5.4", "opus": "gpt-5.5"},
 		Params: map[string]ParamSpec{
 			"model_tier":     {Channel: "flag", Flag: "-m", From: "tier_alias"}, // matches the real codex-tmux manifest + `codex -m` driver
 			"permission":     {Channel: "controller"},                           // codex has no bypass flag; trust handled by the auto-responder
@@ -44,7 +44,7 @@ func codexTmuxManifest() Manifest {
 func agyTmuxManifest() Manifest {
 	return Manifest{
 		CLI: "agy-tmux", Binary: "agy",
-		TierAliases: map[string]string{"haiku": "gemini-3.5-flash", "sonnet": "gemini-3.5-flash", "opus": "gemini-3.5-flash"},
+		ModelTierMap: map[string]string{"haiku": "gemini-3.5-flash", "sonnet": "gemini-3.5-flash", "opus": "gemini-3.5-flash"},
 		Params: map[string]ParamSpec{
 			"model_tier":     {Channel: "noop"}, // agy has no model selector
 			"permission":     {Channel: "flag", Values: map[string][]string{"bypass": {"--dangerously-skip-permissions"}}},
@@ -114,9 +114,9 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 // stays covered and documented as reserved.
 func TestRealize_REPLChannel(t *testing.T) {
 	m := Manifest{
-		CLI:         "hypo-tmux",
-		TierAliases: map[string]string{"sonnet": "model-x"},
-		Params:      map[string]ParamSpec{"model_tier": {Channel: "repl", Template: "/model {alias}", From: "tier_alias"}},
+		CLI:          "hypo-tmux",
+		ModelTierMap: map[string]string{"sonnet": "model-x"},
+		Params:       map[string]ParamSpec{"model_tier": {Channel: "repl", Template: "/model {alias}", From: "tier_alias"}},
 	}
 	got := Realize(m, LaunchIntent{ModelTier: "sonnet"})
 	if !reflect.DeepEqual(got.REPLInput, []string{"/model model-x"}) {
@@ -247,7 +247,7 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 		Params: map[string]ParamSpec{
 			"model_tier": {Channel: "flag", Flag: "--model", From: "tier_alias"},
 		},
-		TierAliases: map[string]string{"sonnet": "gpt-5.5"},
+		ModelTierMap: map[string]string{"sonnet": "gpt-5.5"},
 	}
 	got2 := Realize(m2, LaunchIntent{ModelTier: "sonnet"})
 	// First --model appears (default_args), gpt-5.4 appears, second --model is
@@ -364,9 +364,9 @@ func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
 // contract for a single CLI; cross-CLI tests live in realizer_realmanifest_test.go.
 func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
 	m := Manifest{
-		CLI:         "stack",
-		DefaultArgs: []string{"--default-1", "--default-2"},
-		TierAliases: map[string]string{"sonnet": "model-x"},
+		CLI:          "stack",
+		DefaultArgs:  []string{"--default-1", "--default-2"},
+		ModelTierMap: map[string]string{"sonnet": "model-x"},
 		Params: map[string]ParamSpec{
 			"model_tier":     {Channel: "flag", Flag: "--model", From: "tier_alias"},
 			"permission":     {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}},
@@ -431,9 +431,9 @@ func TestRealize_DefaultArgs_InternalDuplicates(t *testing.T) {
 // They must remain orthogonal so a manifest can use both safely.
 func TestRealize_DefaultArgs_OrthogonalToREPLChannel(t *testing.T) {
 	m := Manifest{
-		CLI:         "mixed",
-		DefaultArgs: []string{"--launch-only"},
-		TierAliases: map[string]string{"sonnet": "model-x"},
+		CLI:          "mixed",
+		DefaultArgs:  []string{"--launch-only"},
+		ModelTierMap: map[string]string{"sonnet": "model-x"},
 		Params: map[string]ParamSpec{
 			"model_tier": {Channel: "repl", Template: "/model {alias}", From: "tier_alias"},
 		},

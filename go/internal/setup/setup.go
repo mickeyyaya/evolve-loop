@@ -41,11 +41,16 @@ var Roles = []string{
 	"retrospective", "memo",
 }
 
-// --- tier + family normalization (the two vocabularies: fast/balanced/deep
-// in envelopes, haiku/sonnet/opus in llm_config + model_tier_default) ---
+// --- tier + family normalization (canonical vocabulary: fast/balanced/deep,
+// matching profiles' model_tier_default + model_tier_envelope and each
+// manifest's model_tier_map. The Anthropic-named legacy tokens haiku/
+// sonnet/opus are still recognized for one release for backward compat
+// with operator-installed v1 config files.) ---
 
-// tierRank maps a tier alias OR an exact model string to 1(fast)/2(balanced)/
-// 3(deep); 0 = unclassifiable (envelope check is skipped for rank 0).
+// tierRank maps a canonical tier (fast/balanced/deep) — or a legacy alias
+// (haiku/sonnet/opus) — or an exact model string — to 1/2/3; 0 = unclassifiable
+// (envelope check is skipped for rank 0). The substring fallbacks at the
+// bottom handle full model identifiers like "claude-haiku-4-5-20251001".
 func tierRank(s string) int {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "fast", "haiku":
@@ -96,13 +101,15 @@ func capManifest(base string) string {
 	return base
 }
 
-// tierAliasKey maps the abstract envelope tier (fast/balanced/deep) to the
-// Claude-tier key the bridge manifests' tier_aliases are keyed on.
-var tierAliasKey = map[string]string{"fast": "haiku", "balanced": "sonnet", "deep": "opus"}
+// abstractTiers is the canonical vocabulary used end-to-end in the
+// pipeline: profile model_tier_default, profile model_tier_envelope, the
+// model_tier_map keys in each manifest, and resolvellm sentinel defaults.
+// One source of truth, no cross-pollination.
+var abstractTiers = []string{"fast", "balanced", "deep"}
 
 // familyDriverManifest maps a base CLI family to the bridge manifest that
-// carries its tier_aliases (the interactive -tmux drivers are the multi-CLI
-// defaults; their tier_aliases match the headless variants).
+// carries its model_tier_map (the interactive -tmux drivers are the multi-
+// CLI defaults; their maps match the headless variants).
 func familyDriverManifest(base string) string {
 	switch base {
 	case "claude":
@@ -115,19 +122,22 @@ func familyDriverManifest(base string) string {
 	return base
 }
 
-// tierModelsFor resolves {fast,balanced,deep} → the CLI's NATIVE model via the
-// bridge manifest's tier_aliases (the single source of truth — e.g. agy→
-// gemini-3.5-flash, codex deep→gpt-5.5). Empty tier_aliases (claude) means the
-// tier key IS the native model (haiku/sonnet/opus are Claude's own selectors).
-// Honors operator manifest overrides via bridge.LoadManifest.
+// tierModelsFor resolves the abstract {fast,balanced,deep} tiers → this CLI's
+// NATIVE model identifier via the bridge manifest's model_tier_map (the
+// single source of truth — e.g. agy fast→gemini-3.5-flash, codex deep→
+// gpt-5.5, claude balanced→sonnet). When the manifest declares no entry
+// for an abstract tier, the abstract name passes through as the model
+// identifier (identity fallback — useful for legacy manifests still on the
+// v1 schema during the deprecation window). Honors operator manifest
+// overrides via bridge.LoadManifest.
 func tierModelsFor(base string) map[string]string {
 	man, err := bridge.LoadManifest(familyDriverManifest(base))
-	out := make(map[string]string, len(tierAliasKey))
-	for tier, key := range tierAliasKey {
-		model := key // identity fallback (claude: native == the alias key)
+	out := make(map[string]string, len(abstractTiers))
+	for _, tier := range abstractTiers {
+		model := tier // identity fallback if manifest missing the entry
 		if err == nil {
-			if alias, ok := man.TierAliases[key]; ok && alias != "" {
-				model = alias
+			if v, ok := man.ModelTierMap[tier]; ok && v != "" {
+				model = v
 			}
 		}
 		out[tier] = model
@@ -502,7 +512,7 @@ func Complete(o CompleteOptions) (string, error) {
 	if err := os.WriteFile(tmp, out, 0o644); err != nil {
 		return "", fmt.Errorf("setup complete: write temp: %w", err)
 	}
-	defer os.Remove(tmp) // best-effort cleanup; no-op once the rename succeeds
+	defer func() { _ = os.Remove(tmp) }() // best-effort cleanup; no-op once the rename succeeds
 	if err := os.Rename(tmp, path); err != nil {
 		return "", fmt.Errorf("setup complete: atomic rename: %w", err)
 	}
