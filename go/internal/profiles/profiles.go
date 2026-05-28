@@ -35,13 +35,20 @@ type Profile struct {
 	// the FIRST CLI that boots and returns a non-trigger exit wins.
 	CLIFallback []string `json:"cli_fallback,omitempty"`
 	// CLIFallbackOnExit enumerates the bridge exit codes that trigger
-	// fallback (Workstream G). Defaults to [80, 127] when nil/empty:
+	// fallback (Workstream G; default extended in cycle-122 Fix 2).
+	// Defaults to [80, 81, 124, 127] when nil/empty:
 	//   80  = ExitREPLBootTimeout (the *-tmux REPL never showed its prompt)
+	//   81  = ExitArtifactTimeout (bridge artifact-timeout — added in cycle-122)
+	//   124 = coreutils timeout(1) exit code (defensive; if a wrapper uses it)
 	//   127 = ExitMissingBinary  (the CLI binary isn't on PATH)
-	// Operators can extend per-agent (e.g. add 81 ExitArtifactTimeout) for
-	// a more aggressive policy. CLI failures NOT in this list still
-	// hard-fail — a legitimate FAIL verdict never silently routes to a
-	// different CLI. See bridge/exitcodes.go for the canonical exit numbers.
+	// Operators can extend per-agent (e.g. add 2 ExitSafetyGate) for an
+	// even more aggressive policy, OR shrink to [80, 127] for the
+	// production-strict posture where 81 should surface to the
+	// failure-adapter rather than retry. CLI failures NOT in this list
+	// still hard-fail — a legitimate FAIL verdict never silently routes
+	// to a different CLI. See bridge/exitcodes.go for the canonical exit
+	// numbers and runner/cli_chain.go:defaultFallbackOnExit for the live
+	// default per code.
 	CLIFallbackOnExit  []int              `json:"cli_fallback_on_exit,omitempty"`
 	ModelTierDefault   string             `json:"model_tier_default"`
 	ModelTierEnvelope  *ModelTierEnvelope `json:"model_tier_envelope,omitempty"`

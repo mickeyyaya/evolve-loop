@@ -106,9 +106,13 @@ func TestResolveCLIChain_FallbackDedupPreservesOrder(t *testing.T) {
 func TestResolveCLIChain_DefaultTriggers(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
 	got := resolveCLIChain("auditor", nil, prof)
-	want := []int{80, 127}
+	// Cycle-122 remediation Fix 2: default extended from [80, 127] to
+	// [80, 81, 124, 127] (REPL boot + artifact timeout + GNU timeout +
+	// missing binary). See cli_chain.go:defaultFallbackOnExit for the
+	// per-code rationale.
+	want := []int{80, 81, 124, 127}
 	if !reflect.DeepEqual(got.triggers, want) {
-		t.Errorf("triggers=%v, want %v (default = REPL boot + missing binary)", got.triggers, want)
+		t.Errorf("triggers=%v, want %v (default covers all CLI-side stall + missing-binary signals)", got.triggers, want)
 	}
 }
 

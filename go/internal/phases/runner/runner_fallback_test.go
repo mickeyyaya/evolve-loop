@@ -196,6 +196,101 @@ func TestRun_ChainExhausted_LastErrorSurfaces(t *testing.T) {
 	}
 }
 
+// TestRun_FallbackOnArtifactTimeout_DefaultTriggerListIncludes81 is the
+// cycle-122 cross-workstream contract test (Fix 2 of the cycle-122
+// remediation). It pins the WS-B↔WS-G integration that the prior
+// session shipped without: WS-B introduced ExitArtifactTimeout (81)
+// as the bridge's coarse stall-detection signal; WS-G's fallback chain
+// triggers on a list of exit codes. The default trigger list MUST
+// include 81 so artifact-timeout failures route to the next CLI
+// instead of aborting the cycle.
+//
+// Without this guarantee, cycle-122's codex-tmux tdd-phase hang
+// (which the artifact-timeout caught at exit=81) was not retried on
+// any other CLI — see docs/incidents/cycle-122-...md for the full
+// failure analysis.
+//
+// Profile sets cli + cli_fallback but DOES NOT set
+// cli_fallback_on_exit, so the default trigger list is exercised.
+func TestRun_FallbackOnArtifactTimeout_DefaultTriggerListIncludes81(t *testing.T) {
+	hooks := &fakeHooks{
+		phase: "tdd", agent: "evolve-tdd-engineer", model: "sonnet",
+		prompt: "x", verdict: core.VerdictPASS, nextPhase: "build",
+	}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"codex-tmux": {
+				resp: core.BridgeResponse{ExitCode: 81, Stderr: "bridge artifact timeout"},
+				err:  errors.New("bridge: launch exit=81: core: bridge artifact timeout"),
+			},
+			"claude-tmux": {}, // success
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-tdd-engineer", "codex-tmux", []string{"claude-tmux"})
+	r := New(Options{
+		Hooks:   hooks,
+		Bridge:  sb,
+		Prompts: fakePromptsFS("evolve-tdd-engineer", "x"),
+	})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{
+		ProjectRoot: root,
+		Workspace:   t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("expected fallback on exit=81 to succeed; got err=%v\n"+
+			"This is the cycle-122 regression: WS-G's default trigger\n"+
+			"list MUST include WS-B's ExitArtifactTimeout (81).", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("verdict=%s, want PASS (fallback succeeded)", resp.Verdict)
+	}
+	if len(sb.calls) != 2 {
+		t.Fatalf("expected 2 bridge.Launch calls (primary + fallback); got %d: %v", len(sb.calls), sb.calls)
+	}
+	if sb.calls[0] != "codex-tmux" || sb.calls[1] != "claude-tmux" {
+		t.Errorf("dispatch order = %v, want [codex-tmux claude-tmux]", sb.calls)
+	}
+}
+
+// TestRun_FallbackOnGNUTimeout_124 is the defensive companion to the
+// cycle-122 fix: coreutils `timeout(1)` exits 124 when its time limit
+// trips. If anything wraps a CLI in `timeout`, that 124 should retry
+// on the next CLI rather than abort. Same default-trigger-list contract.
+func TestRun_FallbackOnGNUTimeout_124(t *testing.T) {
+	hooks := &fakeHooks{
+		phase: "tdd", agent: "evolve-tdd-engineer", model: "sonnet",
+		prompt: "x", verdict: core.VerdictPASS, nextPhase: "build",
+	}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"codex-tmux": {
+				resp: core.BridgeResponse{ExitCode: 124, Stderr: "timeout"},
+				err:  errors.New("bridge: launch exit=124"),
+			},
+			"claude-tmux": {},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-tdd-engineer", "codex-tmux", []string{"claude-tmux"})
+	r := New(Options{
+		Hooks:   hooks,
+		Bridge:  sb,
+		Prompts: fakePromptsFS("evolve-tdd-engineer", "x"),
+	})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{
+		ProjectRoot: root, Workspace: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("expected fallback on exit=124 (GNU timeout); got err=%v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("verdict=%s, want PASS", resp.Verdict)
+	}
+	if len(sb.calls) != 2 || sb.calls[1] != "claude-tmux" {
+		t.Errorf("expected fallback to claude-tmux on exit=124; calls=%v", sb.calls)
+	}
+}
+
 // TestRun_NoFallback_ByteIdentical pins the opt-out contract: a profile
 // without cli_fallback set + no env override behaves exactly like pre-G —
 // single launch, single error path. This is the regression guard for the

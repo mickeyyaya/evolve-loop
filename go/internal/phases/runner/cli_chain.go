@@ -14,10 +14,11 @@ package runner
 //     conventions (see envchain.PhaseEnvKey).
 //
 //  2. FALLBACK CHAIN — profile.cli_fallback is the ordered list of alternates;
-//     profile.cli_fallback_on_exit (default [80, 127]) enumerates which bridge
-//     exit codes trigger fallback. A non-trigger exit (e.g. a real FAIL verdict)
-//     still hard-fails the phase — the chain never silently routes a legitimate
-//     model failure to a different CLI.
+//     profile.cli_fallback_on_exit (default [80, 81, 124, 127] — extended in
+//     cycle-122 Fix 2; see defaultFallbackOnExit) enumerates which bridge
+//     exit codes trigger fallback. A non-trigger exit (e.g. a real FAIL
+//     verdict) still hard-fails the phase — the chain never silently
+//     routes a legitimate model failure to a different CLI.
 //
 // Together: "any registered CLI can run any phase, and a CLI-level failure
 // degrades to the next one instead of killing the cycle."
@@ -91,13 +92,39 @@ func probeAvailableCLIChain(chain cliChain, lookPath func(string) (string, error
 	}
 }
 
-// defaultFallbackOnExit is the conservative trigger set: ExitREPLBootTimeout
-// (80) + ExitMissingBinary (127). Mirror of bridge/exitcodes.go (kept as
-// integer literals here so this leaf package doesn't depend on bridge).
+// defaultFallbackOnExit is the conservative trigger set covering all
+// known CLI-side stall + missing-binary signals. Mirror of
+// bridge/exitcodes.go (kept as integer literals here so this leaf
+// package doesn't depend on bridge):
 //
-// Operators that want the more aggressive policy — add 81 (ExitArtifactTimeout),
-// 2 (ExitSafetyGate), etc. — set profile.cli_fallback_on_exit per-agent.
-var defaultFallbackOnExit = []int{80, 127}
+//   - 80  ExitREPLBootTimeout    (WS-G original; codex 0.134 trust modal)
+//   - 81  ExitArtifactTimeout    (WS-B; cycle-122 codex permission stall)
+//   - 124 coreutils timeout(1)   (defensive — if any wrapper uses `timeout`)
+//   - 127 ExitMissingBinary      (WS-G original; capability-probe miss)
+//
+// The cycle-122 incident exposed that 81 was NOT in this list and the
+// codex-tmux artifact-timeout failure aborted the cycle instead of
+// retrying on claude-tmux. See:
+//   - docs/incidents/cycle-122-codex-permission-modal-and-wsg-fallback-gap.md
+//   - docs/architecture/adr/0029-cli-fallback-chain-and-per-agent-overrides.md
+//
+// Operators that want even more aggressive recovery — add 2
+// (ExitSafetyGate) or others — set profile.cli_fallback_on_exit
+// per-agent. A legitimate model FAIL verdict (not in this list) still
+// surfaces as-is; the chain only catches CLI-level integration bugs.
+//
+// Observation-gap note (per cycle-122 review MEDIUM): a SUCCESSFUL
+// fallback (primary trips a trigger, secondary returns PASS) does NOT
+// write to state.json:failedApproaches — failurelog.Record is invoked
+// only when the runner returns VerdictFAIL, which requires the chain
+// to exhaust. Persistent CLI pathologies that always recover via
+// fallback will not accumulate code-audit-fail entries; the
+// failure-adapter's 30-day retention window never trips. Forensic
+// visibility remains via the [runner] phase=X dispatch chain log
+// (runner.go ~line 365). For a production posture where ANY 81 must
+// surface to the failure-adapter, set profile.cli_fallback_on_exit to
+// the legacy [80, 127] explicitly.
+var defaultFallbackOnExit = []int{80, 81, 124, 127}
 
 // cliChain is the resolved per-phase dispatch plan: an ordered list of CLIs
 // to try, the exit codes that promote to the next CLI, and a human label for
@@ -119,7 +146,7 @@ type cliChain struct {
 //
 // The fallback chain is the primary PLUS profile.CLIFallback (deduped against
 // primary, preserving the operator's declared order). Triggers come from
-// profile.CLIFallbackOnExit, defaulting to {80, 127} when unset.
+// profile.CLIFallbackOnExit, defaulting to {80, 81, 124, 127} when unset.
 //
 // agentName is the canonical profile name (e.g. "auditor", "tdd-engineer") —
 // same key used for per-agent env elsewhere in the runner.

@@ -253,8 +253,9 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// WS-G1: resolve the per-phase CLI dispatch chain. Primary picked from
 	// EVOLVE_<AGENT>_CLI > EVOLVE_CLI > profile.cli > "claude-tmux". Fallback
 	// chain is profile.cli_fallback; triggers come from
-	// profile.cli_fallback_on_exit (default [80, 127]). A single-element
-	// chain reproduces pre-G byte-identical behavior.
+	// profile.cli_fallback_on_exit (default [80, 81, 124, 127] — see
+	// cli_chain.go:defaultFallbackOnExit for the rationale per code).
+	// A single-element chain reproduces pre-G byte-identical behavior.
 	chain := resolveCLIChain(profileName, req.Env, prof)
 	// WS-G3: probe each candidate's binary; demote (don't delete) any whose
 	// binary isn't on PATH so a missing CLI doesn't burn a 60s boot timeout
@@ -313,12 +314,14 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 
 	// WS-G1: dispatch through the chain. Each attempt: build BridgeRequest
 	// for the candidate CLI, Launch, normalize events. On a trigger exit
-	// (default {80, 127} — REPL-boot-timeout / missing-binary) we advance
-	// to the next candidate. Any other exit (or success) breaks the loop —
-	// a legitimate FAIL verdict from a model never silently routes to a
-	// different CLI. Final attempt's (bres, bridgeErr, cli) is what the
-	// rest of the function consumes; events file reflects the final CLI's
-	// stdout so cycleclassify sees what actually happened last.
+	// (default {80, 81, 124, 127} per cli_chain.go:defaultFallbackOnExit
+	// — REPL-boot-timeout / artifact-timeout / coreutils-timeout /
+	// missing-binary) we advance to the next candidate. Any other exit
+	// (or success) breaks the loop — a legitimate FAIL verdict from a
+	// model never silently routes to a different CLI. Final attempt's
+	// (bres, bridgeErr, cli) is what the rest of the function consumes;
+	// events file reflects the final CLI's stdout so cycleclassify sees
+	// what actually happened last.
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
@@ -350,7 +353,10 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			fmt.Fprintf(os.Stderr, "[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s=%d", candidateCLI, bres.ExitCode))
-		cli = candidateCLI // downstream (Classify, diagnostics, return value) needs the CLI that actually ran
+		// (Pre-existing WS-G dead assignment removed in cycle-122 Fix 2:
+		// `cli` was assigned here but never read downstream — the
+		// per-attempt CLI lives in attemptLog instead. Comment kept so
+		// `git blame` reveals the cleanup intent for a future reader.)
 		if bridgeErr == nil {
 			break // success
 		}

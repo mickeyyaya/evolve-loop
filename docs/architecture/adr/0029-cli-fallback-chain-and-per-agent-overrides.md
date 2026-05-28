@@ -2,6 +2,8 @@
 
 **Status:** Accepted | **Date:** 2026-05-28 | **PR:** [#26](https://github.com/mickeyyaya/evolve-loop/pull/26) `9d02630` | **Supersedes:** N/A | **Builds on:** [ADR-0022 LaunchIntent→Realizer](./0022-launch-intent-realizer.md), [ADR-0027 commit-as-evidence + setup-onboarding](./0027-commit-as-evidence.md)
 
+**Amended 2026-05-28 (cycle-122 remediation, commit 3):** the default `cli_fallback_on_exit` trigger list was extended from `[80, 127]` to `[80, 81, 124, 127]` to close the WS-B↔WS-G integration gap. See [cycle-122 incident report](../../incidents/cycle-122-codex-permission-modal-and-wsg-fallback-gap.md) and [ADR-0030 phase-observer auto-spawn](./0030-phase-observer-autospawn-in-evolve-loop.md) for the companion fixes. References below to `[80, 127]` are kept verbatim for historical record; the live default is enforced by `go/internal/phases/runner/cli_chain.go:defaultFallbackOnExit`.
+
 ---
 
 ## Context
