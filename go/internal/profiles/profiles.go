@@ -23,10 +23,26 @@ import (
 // underscore informational keys like `_comment`) survives in Raw so
 // callers can extract un-modeled fields via a second json.Unmarshal.
 type Profile struct {
-	Name               string             `json:"name"`
-	Role               string             `json:"role"`
-	CLI                string             `json:"cli"`
-	AllowedCLIs        []string           `json:"allowed_clis,omitempty"`
+	Name        string   `json:"name"`
+	Role        string   `json:"role"`
+	CLI         string   `json:"cli"`
+	AllowedCLIs []string `json:"allowed_clis,omitempty"`
+	// CLIFallback is the ordered list of alternate CLIs the runner tries when
+	// the primary CLI fails with one of CLIFallbackOnExit codes (Workstream
+	// G — "any CLI can run any phase"). Each entry MUST be a registered
+	// driver name (e.g. "claude-tmux", "agy-tmux"). Empty/absent = no
+	// fallback = the legacy single-CLI behavior. Chain is tried in order;
+	// the FIRST CLI that boots and returns a non-trigger exit wins.
+	CLIFallback []string `json:"cli_fallback,omitempty"`
+	// CLIFallbackOnExit enumerates the bridge exit codes that trigger
+	// fallback (Workstream G). Defaults to [80, 127] when nil/empty:
+	//   80  = ExitREPLBootTimeout (the *-tmux REPL never showed its prompt)
+	//   127 = ExitMissingBinary  (the CLI binary isn't on PATH)
+	// Operators can extend per-agent (e.g. add 81 ExitArtifactTimeout) for
+	// a more aggressive policy. CLI failures NOT in this list still
+	// hard-fail — a legitimate FAIL verdict never silently routes to a
+	// different CLI. See bridge/exitcodes.go for the canonical exit numbers.
+	CLIFallbackOnExit  []int              `json:"cli_fallback_on_exit,omitempty"`
 	ModelTierDefault   string             `json:"model_tier_default"`
 	ModelTierEnvelope  *ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
 	ModelTierOverrides map[string]string  `json:"model_tier_overrides,omitempty"`

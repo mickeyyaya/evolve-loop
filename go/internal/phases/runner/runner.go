@@ -242,28 +242,43 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// produced claude-sonnet-4-6 output despite cli=codex in every
 	// profile. Operator misread "delegation" because the resolved CLI
 	// wasn't logged.
-	profileCLI := ""
+	var prof *profiles.Profile
 	profileModelTier := ""
 	if loader := profiles.NewFromDir(profileDir); loader != nil {
-		if prof, err := loader.Get(profileName); err == nil {
-			profileCLI = prof.CLI
-			profileModelTier = prof.ModelTierDefault
+		if p, err := loader.Get(profileName); err == nil {
+			prof = &p
+			profileModelTier = p.ModelTierDefault
 		}
 	}
-	cli := envchain.Resolve("EVOLVE_CLI", req.Env, profileCLI, "claude-tmux")
-	cliSource := "default"
-	switch {
-	case req.Env["EVOLVE_CLI"] != "" || os.Getenv("EVOLVE_CLI") != "":
-		cliSource = "env(EVOLVE_CLI)"
-	case profileCLI != "":
-		cliSource = "profile." + profileName + ".cli"
+	// WS-G1: resolve the per-phase CLI dispatch chain. Primary picked from
+	// EVOLVE_<AGENT>_CLI > EVOLVE_CLI > profile.cli > "claude-tmux". Fallback
+	// chain is profile.cli_fallback; triggers come from
+	// profile.cli_fallback_on_exit (default [80, 127]). A single-element
+	// chain reproduces pre-G byte-identical behavior.
+	chain := resolveCLIChain(profileName, req.Env, prof)
+	// WS-G3: probe each candidate's binary; demote (don't delete) any whose
+	// binary isn't on PATH so a missing CLI doesn't burn a 60s boot timeout
+	// before the chain advances. nil lookPath uses exec.LookPath. Logging
+	// the demotion happens here so operators see it inline with the
+	// dispatch log, not buried in the per-attempt stderr.
+	preChain := chain
+	chain = probeAvailableCLIChain(chain, nil)
+	if !sameCandidates(preChain.candidates, chain.candidates) {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s capability probe reordered chain: %v -> %v\n",
+			phase, preChain.candidates, chain.candidates)
 	}
+	cli := chain.candidates[0]
 	// Disambiguating dispatch log: tells observers which CLI is actually
 	// being invoked and why. Without this an output stream that says
 	// `model: claude-sonnet-4-6` could be misread as "codex delegating
 	// to claude" when the actual cause is "runner ignored profile.cli".
-	fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
-		phase, profileName, cli, cliSource, profilePath)
+	if len(chain.candidates) > 1 {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s fallback=%v triggers=%v\n",
+			phase, profileName, cli, chain.primarySource, profilePath, chain.candidates[1:], chain.triggers)
+	} else {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
+			phase, profileName, cli, chain.primarySource, profilePath)
+	}
 
 	modelKey := envchain.PhaseEnvKey(phase, "MODEL")
 	model := envchain.Resolve(modelKey, req.Env, profileModelTier, b.hooks.DefaultModel())
@@ -296,34 +311,58 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// (profileName keys both the profile lookup and the EVOLVE_<AGENT>_* env).
 	sysPrompt := systemprompt.Resolve(profileName, profileDir, req.Env)
 
-	bres, bridgeErr := b.bridge.Launch(ctx, core.BridgeRequest{
-		CLI:            cli,
-		Profile:        profilePath,
-		Model:          model,
-		Prompt:         prompt,
-		Workspace:      req.Workspace,
-		Worktree:       req.Worktree,
-		ProjectRoot:    req.ProjectRoot,
-		ArtifactPath:   artifactPath,
-		Agent:          phase,
-		Cycle:          req.Cycle,
-		Env:            req.Env,
-		PermissionMode: permissionMode,
-		SystemPrompt:   sysPrompt,
-	})
-	durationMS := b.nowFn().Sub(start).Milliseconds()
-
-	// Always-on: normalize the raw logs into <phase>-events.ndjson (ADR-0020),
-	// the unified stream cyclecost (cost) + cycleclassify (infra) read. Runs
-	// BEFORE the bridge-error guard on purpose: a phase that fails on a
-	// timeout / 429 / 529 is exactly the infrastructure failure cycleclassify
-	// must detect, and the bridge writes the raw logs even when Launch errors.
-	// A failure WARNs loudly rather than blocking — the raw log remains the
-	// forensic source of truth and can be re-normalized — but it degrades cost
-	// accounting + failure classification, so it must never be silent.
-	if err := b.eventsProducer(req.Workspace, phase, cli, req.Cycle); err != nil {
-		fmt.Fprintf(os.Stderr, "[runner] WARN events producer phase=%s: %v (cost/classification degraded)\n", phase, err)
+	// WS-G1: dispatch through the chain. Each attempt: build BridgeRequest
+	// for the candidate CLI, Launch, normalize events. On a trigger exit
+	// (default {80, 127} — REPL-boot-timeout / missing-binary) we advance
+	// to the next candidate. Any other exit (or success) breaks the loop —
+	// a legitimate FAIL verdict from a model never silently routes to a
+	// different CLI. Final attempt's (bres, bridgeErr, cli) is what the
+	// rest of the function consumes; events file reflects the final CLI's
+	// stdout so cycleclassify sees what actually happened last.
+	var bres core.BridgeResponse
+	var bridgeErr error
+	var attemptLog []string
+	for i, candidateCLI := range chain.candidates {
+		if i > 0 {
+			fmt.Fprintf(os.Stderr,
+				"[runner] phase=%s fallback %d/%d: trying cli=%s (previous=%s exit=%d)\n",
+				phase, i+1, len(chain.candidates), candidateCLI, chain.candidates[i-1], bres.ExitCode)
+		}
+		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
+			CLI:            candidateCLI,
+			Profile:        profilePath,
+			Model:          model,
+			Prompt:         prompt,
+			Workspace:      req.Workspace,
+			Worktree:       req.Worktree,
+			ProjectRoot:    req.ProjectRoot,
+			ArtifactPath:   artifactPath,
+			Agent:          phase,
+			Cycle:          req.Cycle,
+			Env:            req.Env,
+			PermissionMode: permissionMode,
+			SystemPrompt:   sysPrompt,
+		})
+		// Normalize per attempt so the final events file reflects the
+		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson
+		// and we want it to describe what actually happened last.
+		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle); err != nil {
+			fmt.Fprintf(os.Stderr, "[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
+		}
+		attemptLog = append(attemptLog, fmt.Sprintf("%s=%d", candidateCLI, bres.ExitCode))
+		cli = candidateCLI // downstream (Classify, diagnostics, return value) needs the CLI that actually ran
+		if bridgeErr == nil {
+			break // success
+		}
+		if !chain.triggersFallback(bres.ExitCode) {
+			break // non-trigger error: surface to caller (real FAIL, real timeout on mandatory phase, etc.)
+		}
+		// trigger exit + more candidates → loop continues
 	}
+	if len(attemptLog) > 1 {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
+	}
+	durationMS := b.nowFn().Sub(start).Milliseconds()
 
 	if bridgeErr != nil {
 		// Optional-phase soft-fail (Workstream D): an OPTIONAL phase whose
