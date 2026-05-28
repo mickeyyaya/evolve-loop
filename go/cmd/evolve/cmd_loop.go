@@ -835,6 +835,28 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, 10
 	}
 
+	// Enforce the flag's "absolute path" contract for the project root AND the
+	// evolve dir. Downstream, WorkspacePath (= <root>/.evolve/runs/cycle-N) and
+	// every per-phase artifact path are derived by joining these; worktree phases
+	// run the agent with cwd=worktree, so a RELATIVE base makes the agent resolve
+	// the artifact path into the worktree subtree while the in-process bridge
+	// polls it against the main cwd — that divergence caused cycle-119's
+	// ExitArtifactTimeout (81). Resolving once here (the composition root) keeps
+	// every derived path cwd-independent. filepath.Abs only errors when os.Getwd
+	// fails (cwd deleted/unmounted), in which case continuing with a relative
+	// base would silently reproduce the very timeout this guards against — so we
+	// WARN loudly rather than swallow it (the loop may still serve non-worktree
+	// phases, so we degrade rather than abort).
+	absOrWarn := func(label, p string) string {
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve loop: WARN: could not resolve %s %q to an absolute path (%v); worktree-phase artifact paths may diverge across cwd boundaries\n", label, p, err)
+			return p
+		}
+		return abs
+	}
+	projectRoot = absOrWarn("--project-root", projectRoot)
+
 	// --budget-usd / --budget numeric validation (Go flag package allows
 	// negative floats; bash dispatcher rejects them).
 	if budgetUSD < 0 {
@@ -911,10 +933,14 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	}
 	budgetDriven := budgetMode
 
-	// Resolve evolve-dir.
+	// Resolve evolve-dir. The derived branch inherits projectRoot's (now
+	// absolute) anchor; an explicit --evolve-dir may still be relative, so
+	// absolutize the final value either way (same cwd-independence requirement
+	// as projectRoot — many consumers join cfg.EvolveDir).
 	if evolveDir == "" {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
+	evolveDir = absOrWarn("--evolve-dir", evolveDir)
 
 	return loopConfig{
 		ProjectRoot:    projectRoot,
