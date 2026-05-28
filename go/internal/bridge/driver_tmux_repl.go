@@ -145,13 +145,22 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		for elapsed := 0; elapsed < tmuxREPLBootTimeoutS; elapsed += interval {
 			deps.Sleep(time.Duration(interval) * time.Second)
 			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			// Cycle-121 fix (codex-cli-0.134-repl-boot-timeout dossier, Fix B):
+			// tick BEFORE the marker check. codex 0.134's trust modal renders
+			// `›` (U+203A) as a "Yes, continue" selection bullet — the same
+			// character codex-tmux uses as its REPL prompt marker. Pre-fix the
+			// loop saw `›` in the pane, declared the REPL booted, and exited
+			// before the auto-responder could press `1,Enter` to dismiss the
+			// modal — which then hung the actual REPL launch behind it.
+			// Running tick first lets the interactive_prompts regex match +
+			// dismiss the modal so the true REPL prompt can appear cleanly.
+			if lp.tickDuringBoot {
+				ar.tick(ctx, lp.session) // codex/agy: handle trust prompts during boot
+			}
 			if strings.Contains(pane, lp.promptMarker) {
 				promptSeen = true
 				fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", pfx, lp.promptMarker)
 				break
-			}
-			if lp.tickDuringBoot {
-				ar.tick(ctx, lp.session) // codex/agy: handle trust prompts during boot
 			}
 		}
 		if !promptSeen {

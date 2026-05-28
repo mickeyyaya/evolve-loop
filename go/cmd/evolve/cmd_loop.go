@@ -103,6 +103,15 @@ type loopConfig struct {
 	// and the loop stops when cumulative cost ≥ BudgetUSD with
 	// stop_reason=budget rc=0 (mirrors bash v8.60.0 contract).
 	BudgetDriven bool `json:"budget_driven,omitempty"`
+	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
+	// repeatable launch flags (Workstream G2). Each entry maps a profile
+	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
+	// should override the profile default for THIS loop invocation only.
+	// Translated into EVOLVE_<AGENT>_CLI / EVOLVE_<AGENT>_MODEL env entries
+	// inside buildCycleEnv; the runner picks them up via envchain.
+	// Empty map = byte-identical pre-G2 behavior.
+	PerAgentCLI   map[string]string `json:"per_agent_cli,omitempty"`
+	PerAgentModel map[string]string `json:"per_agent_model,omitempty"`
 }
 
 // runLoop implements `evolve loop`.
@@ -858,6 +867,32 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
 	fs.BoolVar(&consensusAudit, "consensus-audit", false, "opt-in cross-CLI auditor consensus mode")
 
+	// WS-G2 repeatable per-agent overrides:
+	//   --cli  auditor=claude-tmux              (one --cli per agent)
+	//   --cli  builder=ollama-tmux              (repeatable)
+	//   --model auditor=opus
+	//   --model builder=llama3.1:8b
+	// Syntactic sugar over EVOLVE_<AGENT>_CLI / EVOLVE_<AGENT>_MODEL —
+	// operators can experiment with combos per-run without editing profiles.
+	perAgentCLI := map[string]string{}
+	perAgentModel := map[string]string{}
+	fs.Func("cli", "per-agent CLI override (repeatable): --cli auditor=claude-tmux", func(v string) error {
+		agent, value, ok := strings.Cut(v, "=")
+		if !ok || strings.TrimSpace(agent) == "" || strings.TrimSpace(value) == "" {
+			return fmt.Errorf("--cli expects agent=cli (e.g. --cli auditor=claude-tmux); got %q", v)
+		}
+		perAgentCLI[strings.TrimSpace(agent)] = strings.TrimSpace(value)
+		return nil
+	})
+	fs.Func("model", "per-agent model override (repeatable): --model auditor=opus", func(v string) error {
+		agent, value, ok := strings.Cut(v, "=")
+		if !ok || strings.TrimSpace(agent) == "" || strings.TrimSpace(value) == "" {
+			return fmt.Errorf("--model expects agent=model (e.g. --model auditor=opus); got %q", v)
+		}
+		perAgentModel[strings.TrimSpace(agent)] = strings.TrimSpace(value)
+		return nil
+	})
+
 	if err := fs.Parse(args); err != nil {
 		return loopConfig{}, 10
 	}
@@ -980,6 +1015,8 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		ConsensusAudit: consensusAudit,
 		DryRun:         dryRun,
 		BudgetDriven:   budgetDriven,
+		PerAgentCLI:    perAgentCLI,
+		PerAgentModel:  perAgentModel,
 	}, 0
 }
 
@@ -1081,5 +1118,37 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 	if cfg.Reset {
 		out["EVOLVE_RESET"] = "1"
 	}
+	// WS-G2: per-agent --cli / --model launch flags translate to
+	// EVOLVE_<AGENT>_CLI / EVOLVE_<AGENT>_MODEL env keys (matching
+	// envchain.PhaseEnvKey's convention). The runner already reads these
+	// for the CLI resolver (G1) and the model resolver. Flag overrides win
+	// over inherited process env (their entries are written after the
+	// EVOLVE_* sweep above).
+	for agent, cli := range cfg.PerAgentCLI {
+		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_CLI"] = cli
+	}
+	for agent, model := range cfg.PerAgentModel {
+		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_MODEL"] = model
+	}
 	return out
+}
+
+// phaseEnvAgentKey upper-cases + dash-to-underscore an agent name to
+// build per-agent env keys (mirror of envchain.PhaseEnvKey's normalization).
+// e.g. "tdd-engineer" → "TDD_ENGINEER" so EVOLVE_TDD_ENGINEER_CLI/MODEL
+// match the runner's lookup.
+func phaseEnvAgentKey(agent string) string {
+	b := make([]byte, 0, len(agent))
+	for i := 0; i < len(agent); i++ {
+		c := agent[i]
+		switch {
+		case c == '-':
+			b = append(b, '_')
+		case c >= 'a' && c <= 'z':
+			b = append(b, c-32)
+		default:
+			b = append(b, c)
+		}
+	}
+	return string(b)
 }
