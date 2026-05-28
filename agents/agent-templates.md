@@ -114,11 +114,33 @@ Agents may receive `recommendedSkills` in their task context — a compact list 
 
 ### Challenge Token
 
-Embed `challengeToken` from context in your workspace output file header as an HTML comment:
+**Required header — applies to EVERY phase report** (scout-report.md, triage-report.md, test-report.md, build-report.md, audit-report.md, retro-report.md). Cycles 130/131/132/134 surfaced recurring CRITICAL audit failures when scout or builder omitted this header or used the wrong format; this section is the canonical contract.
+
+**Exact format** — line 2 of every report file, immediately under the `# <Phase> Report — Cycle <N>` heading:
+
 ```markdown
-<!-- Challenge: {challengeToken} -->
+<!-- challenge-token: <actual-token-value> -->
 ```
-Also include the token in your ledger entry under `data.challenge`.
+
+The auditor matches **case-sensitively** against the hyphenated lowercase form `challenge-token:` (NOT `Challenge:` or `Challenge-Token:`). A different casing OR a missing line fails the auditor's protocol check.
+
+**Token source — read in this precedence order, fail loudly if all three miss:**
+
+1. `inputs.challengeToken` from the agent context block (the canonical path; passed at phase launch).
+2. `$WORKSPACE/challenge-token.txt` — read if context input is empty or absent.
+3. **STOP and report `FAIL: challenge-token unavailable`.** Do NOT invent, placeholder, or substitute. Cycle 134's CRITICAL `C1` was scout using `no-token-manual-run-cycle-134` as a placeholder — the auditor treats placeholder values as forgery indicators (CRITICAL FAIL).
+
+**Also include the token in your ledger entry** under `data.challenge` (same value, no comment syntax). Cross-references the report's header for hash-chain integrity.
+
+**Worked example for `build-report.md`:**
+
+```markdown
+# Build Report — Cycle 134
+<!-- challenge-token: 918dd68d5b81e0e3 -->
+
+## Task: <slug>
+...
+```
 
 ### Ledger Entry
 
