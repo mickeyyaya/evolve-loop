@@ -27,6 +27,16 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-codex-")
 
+	// Cycle-122 Fix 1 (cycle-122 incident report + research dossier codex
+	// Fix A): pre-trust cfg.Worktree + cfg.Workspace in ~/.codex/config.toml
+	// so codex's own permission layer doesn't render the runtime
+	// "Press enter to confirm" modal that hung cycle-122 tdd. Best-effort
+	// — a failure must NOT block phase launch (Fix 2's extended fallback
+	// trigger list defends downstream). Operator sees stderr on failure.
+	if err := pretrustCodexProjects(cfg); err != nil {
+		fmt.Fprintf(deps.Stderr, "[codex-tmux] pretrust codex projects: %v (continuing — Fix 2 fallback chain defends)\n", err)
+	}
+
 	// Launch flags come from the per-CLI Realization (ADR-0022): codex resolves
 	// the model tier via its manifest tier_aliases (sonnet → gpt-5.4) and emits
 	// it as -m; permission is a controller no-op (trust handled by the
