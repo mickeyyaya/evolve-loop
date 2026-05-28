@@ -31,6 +31,11 @@ type AuthInfo struct {
 	Source           string `json:"source"`
 	SubscriptionType string `json:"subscription_type,omitempty"`
 	Hint             string `json:"hint,omitempty"`
+	// AuthOptional flips the doctor verdict so a CLI that runs unauthenticated
+	// (e.g. local-only ollama) is NOT marked "blocked" when Configured=false.
+	// Default false preserves the previous fail-loud posture for every other
+	// driver where missing auth genuinely blocks the launch.
+	AuthOptional bool `json:"auth_optional,omitempty"`
 }
 
 // DeepProbe is the optional live-noop result.
@@ -64,7 +69,7 @@ type DoctorReport struct {
 }
 
 // doctorBinaryFor maps a cli to its underlying binary (claude-p/claude-tmux
-// → claude, codex* → codex, agy* → agy).
+// → claude, codex* → codex, agy* → agy, ollama-tmux → ollama).
 func doctorBinaryFor(cli string) string {
 	switch cli {
 	case "claude-p", "claude-tmux":
@@ -73,6 +78,8 @@ func doctorBinaryFor(cli string) string {
 		return "codex"
 	case "agy", "agy-tmux":
 		return "agy"
+	case "ollama-tmux":
+		return "ollama"
 	}
 	return strings.TrimSuffix(cli, "-tmux")
 }
@@ -106,6 +113,17 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 			}
 		}
 		return AuthInfo{Hint: "Run `agy` once to trigger OAuth login + directory trust"}
+	case "ollama":
+		// Local-only ollama needs no auth. Cloud (:cloud-tagged models) needs
+		// OLLAMA_API_KEY OR an ollama signin OAuth key at ~/.ollama/id_ed25519.
+		if v, ok := lookupEnv(e.deps, "OLLAMA_API_KEY"); ok && v != "" {
+			return AuthInfo{Configured: true, Source: "env:OLLAMA_API_KEY", SubscriptionType: "ollama-cloud"}
+		}
+		if fileNonEmpty(filepath.Join(home, ".ollama", "id_ed25519")) {
+			return AuthInfo{Configured: true, Source: "file:~/.ollama/id_ed25519", SubscriptionType: "ollama-cloud"}
+		}
+		// Local-only: NOT blocked — that's the primary WS-F use case.
+		return AuthInfo{AuthOptional: true, Hint: "Local models work without auth; for :cloud models run `ollama signin` or set OLLAMA_API_KEY"}
 	}
 	return AuthInfo{Hint: "unknown CLI"}
 }
@@ -135,7 +153,7 @@ func (e *Engine) doctorEnvWarnings(cli string) []string {
 // doctorDeep runs a bounded live-noop for the headless CLIs.
 func (e *Engine) doctorDeep(ctx context.Context, cli, binary string) DeepProbe {
 	switch cli {
-	case "claude-tmux", "codex-tmux", "agy-tmux":
+	case "claude-tmux", "codex-tmux", "agy-tmux", "ollama-tmux":
 		return DeepProbe{Ran: false} // deep covers the headless backend only
 	}
 	var probeArgs []string
@@ -170,7 +188,10 @@ func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorRes
 	switch {
 	case !r.Binary.Present:
 		r.Verdict = "blocked"
-	case !r.Auth.Configured:
+	case !r.Auth.Configured && !r.Auth.AuthOptional:
+		// AuthOptional=true (local-only ollama) skips the blocked verdict
+		// because no auth is actually required to run. Every other driver
+		// keeps the historical fail-loud posture.
 		r.Verdict = "blocked"
 	case r.DeepProbe.Ran && !r.DeepProbe.Passed:
 		r.Verdict = "blocked"
