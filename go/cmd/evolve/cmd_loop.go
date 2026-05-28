@@ -33,6 +33,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 // validStrategies mirrors the bash whitelist at
@@ -848,12 +849,9 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	// WARN loudly rather than swallow it (the loop may still serve non-worktree
 	// phases, so we degrade rather than abort).
 	absOrWarn := func(label, p string) string {
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve loop: WARN: could not resolve %s %q to an absolute path (%v); worktree-phase artifact paths may diverge across cwd boundaries\n", label, p, err)
-			return p
-		}
-		return abs
+		return paths.AbsoluteRoot(label, p, func(m string) {
+			fmt.Fprintf(stderr, "evolve loop: WARN: %s\n", m)
+		})
 	}
 	projectRoot = absOrWarn("--project-root", projectRoot)
 

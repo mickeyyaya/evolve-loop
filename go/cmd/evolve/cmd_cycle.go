@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/buildplanner"
@@ -74,6 +75,12 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
+	// Absolutize the root so SealCycle's "workspace inside projectRoot" check
+	// compares absolute-to-absolute. A relative root here refused to seal
+	// cycle-120 (whose workspace_path was absolute, written by the fixed loop).
+	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve cycle reset: WARN: %s\n", m)
+	})
 	if evolveDir == "" {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
@@ -138,6 +145,12 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve cycle run: --goal-hash is required")
 		return 10
 	}
+	// Absolutize before any path is derived from projectRoot — a relative root
+	// (default ".") makes worktree-phase artifact paths diverge across the
+	// agent's worktree cwd and the in-process bridge's main cwd (cycle-119).
+	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
+	})
 	if evolveDir == "" {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseorder"
 )
 
@@ -27,7 +28,13 @@ func runPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	useRegistry := os.Getenv("EVOLVE_USE_PHASE_REGISTRY") != "0"
 
 	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
-	if projectRoot == "" {
+	if projectRoot != "" {
+		// Absolutize a relative env root (cycle-119 class). The git/cwd
+		// fallbacks below already yield absolute paths.
+		projectRoot = paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
+			fmt.Fprintf(stderr, "[phase-order] WARN: %s\n", m)
+		})
+	} else {
 		out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 		if err == nil {
 			projectRoot = strings.TrimSpace(string(out))

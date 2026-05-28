@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
@@ -44,14 +45,25 @@ func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // parity with `evolve loop` (which resolves from --project-root, default cwd)
 // so the dispatcher can pass the SAME root to both — guaranteeing `setup
 // complete`'s marker lands in the .evolve the loop nudge reads.
-func setupRoots(projectRootFlag, evolveDirFlag string) (project, plugin, evolveDir, adapters string) {
+func setupRoots(projectRootFlag, evolveDirFlag string, stderr io.Writer) (project, plugin, evolveDir, adapters string) {
 	project = projectRootFlag
 	if project == "" {
 		project = os.Getenv("EVOLVE_PROJECT_ROOT")
 	}
 	if project == "" {
-		project, _ = os.Getwd()
+		if cwd, err := os.Getwd(); err == nil {
+			project = cwd
+		} else {
+			// os.Getwd failed (cwd deleted/unmounted) — surface it rather than
+			// fall through to a silent relative ".evolve" (the cycle-119 class).
+			fmt.Fprintf(stderr, "[setup] WARN: could not determine cwd (%v); marker/state paths may be relative\n", err)
+		}
 	}
+	// Absolutize so `setup complete`'s marker lands in the SAME .evolve the loop
+	// nudge reads, regardless of a relative flag/env root (cycle-119 class).
+	project = paths.AbsoluteRoot("--project-root", project, func(m string) {
+		fmt.Fprintf(stderr, "[setup] WARN: %s\n", m)
+	})
 	plugin = os.Getenv("EVOLVE_PLUGIN_ROOT")
 	if plugin == "" {
 		plugin = project
@@ -75,7 +87,7 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return 10
 	}
-	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag)
+	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag, stderr)
 	rep := setup.Detect(context.Background(), setup.DetectOptions{
 		ProjectRoot: project, EvolveDir: evolveDir, PluginRoot: plugin, AdaptersDir: adapters,
 	})
@@ -143,7 +155,7 @@ func runSetupValidate(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return 10
 	}
-	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag)
+	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag, stderr)
 	if configPath == "" {
 		configPath = filepath.Join(evolveDir, "llm_config.json")
 	}
@@ -202,7 +214,7 @@ func runSetupComplete(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return 10
 	}
-	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag)
+	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag, stderr)
 	stamp, err := setup.Complete(setup.CompleteOptions{EvolveDir: evolveDir})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve setup complete: %v\n", err)

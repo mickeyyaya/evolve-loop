@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 )
 
@@ -63,6 +64,11 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
+	// A relative --project-root or $EVOLVE_PROJECT_ROOT would make audit-binding
+	// and commit-gate paths diverge from the worktree-relative ones (cycle-119).
+	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve ship: WARN: %s\n", m)
+	})
 	if pluginRoot == "" {
 		pluginRoot = os.Getenv("EVOLVE_PLUGIN_ROOT")
 	}

@@ -32,10 +32,8 @@ func runPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return 10
 		}
 	}
-	root := os.Getenv("EVOLVE_PROJECT_ROOT")
-	if root == "" {
-		root, _ = os.Getwd()
-	}
+	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class).
+	root := envOrCwd("EVOLVE_PROJECT_ROOT")
 	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
 	if pluginRoot == "" {
 		pluginRoot = root

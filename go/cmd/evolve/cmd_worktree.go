@@ -12,7 +12,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
+
+// absWorktreeRoot absolutizes a worktree subcommand's --project-root (default
+// ".") so the recorded worktree path and base dir are cwd-independent — the
+// same canonicalization every entrypoint applies (cycle-119 path-divergence).
+func absWorktreeRoot(projectRoot string, stderr io.Writer) string {
+	return paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve worktree: WARN: %s\n", m)
+	})
+}
 
 // runWorktree implements `evolve worktree <subcommand>`. Subcommands:
 // create | list | cleanup.
@@ -52,6 +63,7 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve worktree create: --cycle is required (>0)")
 		return 10
 	}
+	projectRoot = absWorktreeRoot(projectRoot, stderr)
 	if base == "" {
 		base = filepath.Join(projectRoot, ".evolve", "worktrees")
 	}
@@ -79,6 +91,7 @@ func runWorktreeList(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
+	projectRoot = absWorktreeRoot(projectRoot, stderr)
 	cmd := exec.Command("git", "-C", projectRoot, "worktree", "list")
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -103,6 +116,7 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
+	projectRoot = absWorktreeRoot(projectRoot, stderr)
 	if base == "" {
 		base = filepath.Join(projectRoot, ".evolve", "worktrees")
 	}

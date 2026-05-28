@@ -32,10 +32,8 @@ func runCycleSimulator(args []string, _ io.Reader, stdout, stderr io.Writer) int
 		fmt.Fprintf(stderr, "[simulator] cycle must be integer, got: %s\n", pos[0])
 		return cyclesimulator.ExitRuntimeErr
 	}
-	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
-	if projectRoot == "" {
-		projectRoot, _ = os.Getwd()
-	}
+	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class).
+	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
 	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
 	if pluginRoot == "" {
 		pluginRoot = projectRoot
