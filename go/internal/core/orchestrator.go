@@ -100,6 +100,13 @@ type Orchestrator struct {
 	// path WITHOUT hardcoding them in the Phase enum / state machine. Empty (the
 	// default) ⇒ only built-in phases exist ⇒ byte-identical legacy behavior.
 	catalog phasespec.Catalog
+
+	// reviewer adjudicates a finished phase's deliverable before the cycle
+	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
+	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
+	// WithReviewer; the deterministic default + future LLM reviewer
+	// implementations share the DeliverableReviewer interface.
+	reviewer DeliverableReviewer
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -148,6 +155,20 @@ func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
 	}
 }
 
+// WithReviewer injects a per-phase deliverable reviewer (Workstream E2). The
+// orchestrator calls reviewer.Review(...) after each phase's runner.Run returns
+// a non-error, non-SKIPPED verdict, BEFORE the ledger append or
+// CompletedPhases++. Approve=false aborts the cycle with the reviewer's Reason
+// (no retry budget yet — that's a follow-up; see the WS-E plan). A nil reviewer
+// keeps the noopReviewer default, which is byte-identical to the pre-E2 cycle.
+func WithReviewer(r DeliverableReviewer) Option {
+	return func(o *Orchestrator) {
+		if r != nil {
+			o.reviewer = r
+		}
+	}
+}
+
 // NewOrchestrator wires the orchestrator with its dependencies. Routing stays
 // off unless a WithRouting option supplies an enabled-stage config.
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
@@ -161,6 +182,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		gitDirtyPaths: defaultGitDirtyPaths,
 		worktree:      gitWorktree{},
 		strategy:      router.StaticPreset{},
+		reviewer:      noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -523,6 +545,27 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		}
 		if !IsVerdict(resp.Verdict) {
 			return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+		}
+
+		// Workstream E2: per-phase deliverable review gate. Runs ONLY for
+		// non-SKIPPED verdicts (a SKIPPED phase produced no deliverable to
+		// review) and BEFORE the tree-diff guard + ledger append, so a reject
+		// aborts the cycle without recording the phase as a success. The
+		// default reviewer is noopReviewer (every phase approved) so opt-out
+		// is byte-identical to pre-E2. Retry/N is a follow-up — today reject
+		// = abort.
+		if o.reviewer != nil && resp.Verdict != VerdictSKIPPED {
+			rin := ReviewInput{
+				Phase:       string(next),
+				Response:    resp,
+				Workspace:   cs.WorkspacePath,
+				Worktree:    phaseWorktree,
+				ProjectRoot: req.ProjectRoot,
+			}
+			rr := o.reviewer.Review(ctx, rin)
+			if !rr.Approve {
+				return result, fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
+			}
 		}
 
 		// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger

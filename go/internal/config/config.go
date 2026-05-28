@@ -110,11 +110,21 @@ type RoutingConfig struct {
 	// for this axis. The bridge driver reads EVOLVE_COMMIT_EVIDENCE from env
 	// directly (it is a subprocess); this field is the orchestrator's view.
 	CommitEvidence Stage
-	Mandatory      []string            // ordered mandatory phase names
-	Conditional    map[string]CondRule // phase -> conditional-mandatory rule
-	MaxInsertions  int
-	PhaseEnable    map[string]Enable       // phase -> enablement source
-	Triggers       map[string]RoutingBlock // phase -> declarative triggers
+	// ReviewGate is Workstream E2's per-phase review-gate rollout stage:
+	//   StageOff      — orchestrator uses noopReviewer (every non-SKIPPED
+	//                   verdict approved). Byte-identical to pre-E2.
+	//   StageShadow   — deterministic reviewer runs but is log-only.
+	//   StageEnforce  — deterministic + (future) LLM reviewer authoritative;
+	//                   reject aborts the cycle.
+	// StageAdvisory is not used for this axis (no advisory-intermediate). The
+	// orchestrator owns the stage interpretation; this field is the
+	// composition-root view, exactly like CommitEvidence.
+	ReviewGate    Stage
+	Mandatory     []string            // ordered mandatory phase names
+	Conditional   map[string]CondRule // phase -> conditional-mandatory rule
+	MaxInsertions int
+	PhaseEnable   map[string]Enable       // phase -> enablement source
+	Triggers      map[string]RoutingBlock // phase -> declarative triggers
 	// Order is the linear phase sequence the router walks, in registry order.
 	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
 	// loaded without a registry stays byte-identical to pre-Order behavior).
@@ -348,6 +358,12 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	}
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, ws)
+	}
+	if v := env["EVOLVE_REVIEW_GATE"]; v != "" {
+		// Same off/shadow/enforce trichotomy as CommitEvidence — no advisory
+		// intermediate. Reuses parseEvidenceStage to share the warning text +
+		// fallback (typo defaults to off, never silently enables a kill-path).
+		cfg.ReviewGate = parseEvidenceStage(v, ws)
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {
