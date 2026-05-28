@@ -76,6 +76,34 @@ type Deps struct {
 	// deterministicReviewer (output-progress heuristic); tests and the
 	// future LLM/orchestrator reviewer inject their own. See stopreview.go.
 	Reviewer StopReviewer
+	// SandboxWrap computes the OS-sandbox prefix argv for a source-writing
+	// phase (Workstream B — CLI-agnostic confinement). Returns
+	// (prefixArgv, true) when the host can sandbox AND the policy allows it;
+	// (nil, false) when sandboxing is unavailable or disabled — drivers then
+	// run unwrapped (degraded). cfg.Worktree=="" callers can skip this seam
+	// entirely (only source-writing phases need confinement).
+	//
+	// On macOS the prefix is ["sandbox-exec","-p","<sbpl-file>"]; the SBPL is
+	// written to a file (not inlined) so SendKeys doesn't have to shell-quote
+	// a multi-line profile. On Linux it is the bwrap prefix slice.
+	//
+	// Default reads cfg.SandboxMode from deps.Env + nested-claude / Probe.
+	SandboxWrap SandboxWrapper
+}
+
+// SandboxWrapper is the bridge's view of the sandbox decision — the bridge
+// package depends on adapters/sandbox via its Config type. Kept as a named
+// type so tests can substitute without naming the function type inline.
+type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
+
+// SandboxWrapRequest carries everything the wrapper needs to decide + emit a
+// prefix. Phase is the agent name (used as the SBPL file suffix). Workspace
+// is the absolute path to write the per-phase SBPL into when needed.
+type SandboxWrapRequest struct {
+	Phase     string // e.g. "build", "tdd"
+	Workspace string // absolute path; SBPL file lives here on darwin
+	Worktree  string // absolute path; the only write-allowed location
+	RepoRoot  string // absolute path; the read-only main repo root
 }
 
 // withDefaults returns a copy of d with any zero-value seam replaced by
@@ -113,6 +141,9 @@ func (d Deps) withDefaults() Deps {
 		// envInt reads via d.LookupEnv, defaulted just above.
 		d.Reviewer = newDeterministicReviewer(envInt(d, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
 	}
+	if d.SandboxWrap == nil {
+		d.SandboxWrap = defaultSandboxWrap(d)
+	}
 	return d
 }
 
@@ -136,6 +167,7 @@ type Config struct {
 	Completion     string
 	Cycle          int
 	Worktree       string
+	ProjectRoot    string // absolute path; sandbox uses this as the read-only RepoRoot (WS-B)
 	Agent          string
 	PermissionMode string // "" = driver default
 	StreamOutput   bool
@@ -231,6 +263,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	}
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)
+	}
+	if req.ProjectRoot != "" {
+		// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as
+		// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
+		// stays the single source of truth for Config construction.
+		args = append(args, "--project-root="+req.ProjectRoot)
 	}
 	if req.Completion != "" {
 		args = append(args, "--completion="+req.Completion)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -64,6 +65,14 @@ type Orchestrator struct {
 	// Errors are swallowed and treated as "no movement detected" — the
 	// outcome calculator falls back to SKIPPED_UNKNOWN.
 	gitHEAD func() (string, error)
+
+	// gitDirtyPaths returns the set of modified tracked paths in the main
+	// repo's working directory (`git diff --name-only HEAD` in repoRoot).
+	// Workstream B's tree-diff guard snapshots this before each source-
+	// writing phase and compares after — any newly-dirty MAIN-tree path is a
+	// leak that escaped the sandbox (each git worktree is a separate working
+	// dir, so its writes don't show up here). Injected for tests.
+	gitDirtyPaths func(ctx context.Context, repoRoot string) ([]string, error)
 
 	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
 	// Default gitWorktree (real git); injected in tests via
@@ -143,14 +152,15 @@ func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
 // off unless a WithRouting option supplies an enabled-stage config.
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
-		storage:  storage,
-		ledger:   ledger,
-		runners:  runners,
-		sm:       NewStateMachine(),
-		now:      time.Now,
-		gitHEAD:  defaultGitHEAD,
-		worktree: gitWorktree{},
-		strategy: router.StaticPreset{},
+		storage:       storage,
+		ledger:        ledger,
+		runners:       runners,
+		sm:            NewStateMachine(),
+		now:           time.Now,
+		gitHEAD:       defaultGitHEAD,
+		gitDirtyPaths: defaultGitDirtyPaths,
+		worktree:      gitWorktree{},
+		strategy:      router.StaticPreset{},
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -202,6 +212,28 @@ func defaultGitHEAD() (string, error) {
 		return "", nil
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// defaultGitDirtyPaths runs `git diff --name-only HEAD` in repoRoot and
+// returns the list of dirty tracked paths (one per line). Workstream B's
+// tree-diff guard uses this as a before/after snapshot — any path that
+// becomes dirty during a source-writing phase is a leak that escaped the
+// sandbox (each worktree is a separate working dir, so worktree writes don't
+// appear here). Errors propagate so the guard can degrade to "snapshot
+// missed" rather than misreport leaks.
+func defaultGitDirtyPaths(ctx context.Context, repoRoot string) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoRoot, "diff", "--name-only", "HEAD")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git diff --name-only HEAD: %w", err)
+	}
+	var paths []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			paths = append(paths, line)
+		}
+	}
+	return paths, nil
 }
 
 // finalizeOutcome translates SKIPPED into a more specific CycleOutcome label
@@ -453,6 +485,28 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		if o.worktreePhase(next) {
 			phaseWorktree = cs.ActiveWorktree
 		}
+		// Workstream B: snapshot the main-tree dirty set BEFORE a source-
+		// writing phase runs. After it runs we re-snapshot and compare —
+		// any newly-dirty MAIN-tree path is a leak that escaped the bridge
+		// sandbox (each git worktree is a separate working dir, so its
+		// writes don't show up here). The treediff package owns the
+		// snapshot/check + SnapshotMissed semantics; the orchestrator just
+		// threads it through. Skipped entirely for non-worktree phases.
+		var (
+			treeGuard      *treediff.Guard
+			beforeDirty    []string
+			snapshotFailed bool
+		)
+		if phaseWorktree != "" && o.gitDirtyPaths != nil {
+			treeGuard = treediff.New(o.gitDirtyPaths)
+			snap, err := treeGuard.Snapshot(ctx, req.ProjectRoot)
+			if err != nil {
+				snapshotFailed = true
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff pre-phase snapshot failed for %s: %v (sandbox guard degraded; post-phase leak check skipped)\n", next, err)
+			} else {
+				beforeDirty = snap
+			}
+		}
 		resp, err := runner.Run(ctx, PhaseRequest{
 			Cycle:         cycle,
 			ProjectRoot:   req.ProjectRoot,
@@ -469,6 +523,20 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		}
 		if !IsVerdict(resp.Verdict) {
 			return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+		}
+
+		// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger
+		// append so a leak aborts the cycle without recording the phase as a
+		// success. Snapshot failures (pre OR post) degrade silently — the
+		// guard is belt-and-suspenders to the OS sandbox, so a transient git
+		// read error must never cause a false abort.
+		if treeGuard != nil && !snapshotFailed {
+			res := treeGuard.Check(ctx, req.ProjectRoot, beforeDirty)
+			if res.SnapshotMissed {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff post-phase snapshot failed for %s (sandbox guard degraded; not aborting)\n", next)
+			} else if !res.OK() {
+				return result, res.Error(string(next), phaseWorktree)
+			}
 		}
 
 		if err := o.ledger.Append(ctx, LedgerEntry{

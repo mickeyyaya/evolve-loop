@@ -148,6 +148,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		Completion:     raw.completion,
 		Cycle:          cycle,
 		Worktree:       raw.worktree,
+		ProjectRoot:    raw.projectRoot,
 		Agent:          raw.agent,
 		PermissionMode: permMode,
 		StreamOutput:   streamOut,
@@ -201,7 +202,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 // resolution. Mirrors the local variables in bin/bridge cmd_launch.
 type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
-	cycle, worktree, agent, completion                                         string
+	cycle, worktree, projectRoot, agent, completion                            string
 	permissionMode, sessionName, streamOutput                                  string
 	validateOnly, dryRun, requireFull, allowBypass, humanInput                 bool
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
@@ -257,6 +258,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		artifact:       get("ARTIFACT_PATH"),
 		cycle:          get("CYCLE"),
 		worktree:       get("WORKTREE_PATH"),
+		projectRoot:    get("PROJECT_ROOT"),
 		agent:          get("AGENT"),
 		completion:     get("BRIDGE_COMPLETION"),
 		permissionMode: get("BRIDGE_PERMISSION_MODE"),
@@ -275,7 +277,8 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--prompt-file": &r.promptFile, "--workspace": &r.workspace,
 		"--stdout-log": &r.stdoutLog, "--stderr-log": &r.stderrLog,
 		"--artifact": &r.artifact, "--cycle": &r.cycle, "--worktree": &r.worktree,
-		"--agent": &r.agent, "--permission-mode": &r.permissionMode,
+		"--project-root": &r.projectRoot,
+		"--agent":        &r.agent, "--permission-mode": &r.permissionMode,
 		"--session-name": &r.sessionName, "--completion": &r.completion,
 	}
 

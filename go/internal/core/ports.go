@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 )
 
@@ -41,12 +40,12 @@ type Bridge interface {
 	Probe(ctx context.Context) (BridgeProbe, error)
 }
 
-// Sandbox wraps subprocess execution in OS-level isolation
-// (sandbox-exec on macOS, bwrap on Linux). Impls live in
-// internal/adapters/sandbox.
-type Sandbox interface {
-	Exec(ctx context.Context, profile SandboxProfile, argv []string, stdin io.Reader, stdout, stderr io.Writer) error
-}
+// (Retired in Workstream B.) The historical core.Sandbox port + SandboxProfile
+// struct were placeholders whose signature never matched the actual
+// adapters/sandbox.Sandbox.Exec impl, and nothing wired them. CLI-agnostic
+// confinement now lives at the bridge layer: bridge.Deps.SandboxWrap calls
+// adapters/sandbox.GenerateSBPL / BwrapPrefix directly. Removed to avoid the
+// dead port collecting future implementations.
 
 // Guard runs a trust-kernel guard. Impls live in internal/guards.
 type Guard interface {
@@ -247,12 +246,18 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 // writes Prompt to a file under Workspace before invoking the bridge
 // subprocess (callers don't manage tmp-file lifecycle).
 type BridgeRequest struct {
-	CLI          string `json:"cli"`       // claude-p | claude-tmux | codex | agy
-	Profile      string `json:"profile"`   // absolute path to .evolve/profiles/<name>.json
-	Model        string `json:"model"`     // haiku | sonnet | opus | auto | gpt-* | gemini-*
-	Prompt       string `json:"prompt"`    // prompt body; adapter materializes as a file
-	Workspace    string `json:"workspace"` // absolute path; bridge writes outputs here
-	Worktree     string `json:"worktree,omitempty"`
+	CLI       string `json:"cli"`       // claude-p | claude-tmux | codex | agy
+	Profile   string `json:"profile"`   // absolute path to .evolve/profiles/<name>.json
+	Model     string `json:"model"`     // haiku | sonnet | opus | auto | gpt-* | gemini-*
+	Prompt    string `json:"prompt"`    // prompt body; adapter materializes as a file
+	Workspace string `json:"workspace"` // absolute path; bridge writes outputs here
+	Worktree  string `json:"worktree,omitempty"`
+	// ProjectRoot is the absolute path to the main repo root. Needed by the
+	// bridge's SandboxWrap (Workstream B) to set RepoRoot read-only while
+	// allowing writes to Worktree+Workspace. Optional for back-compat: a zero
+	// value disables sandbox confinement for that call (degraded — the trust
+	// kernel's pre-B Claude-only PreToolUse hooks remain in effect).
+	ProjectRoot  string `json:"project_root,omitempty"`
 	StdoutLog    string `json:"stdout_log,omitempty"`
 	StderrLog    string `json:"stderr_log,omitempty"`
 	ArtifactPath string `json:"artifact_path,omitempty"` // adapter requires non-empty
@@ -290,13 +295,6 @@ type BridgeResponse struct {
 type BridgeProbe struct {
 	Version string            `json:"version"`
 	CLIs    map[string]string `json:"clis"` // cli name → tier (full/degraded/none)
-}
-
-// SandboxProfile selects an OS-level isolation policy for Sandbox.Exec.
-type SandboxProfile struct {
-	Name         string   // matches .evolve/profiles/<agent>.json:sandbox_profile
-	ReadOnlyRepo bool     // Auditor/Evaluator must NOT write to repo
-	AllowedDirs  []string // additional writable paths beyond /tmp + worktree
 }
 
 // GuardInput is the typed input to a guard's Decide() method.

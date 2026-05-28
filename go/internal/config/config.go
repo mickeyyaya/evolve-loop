@@ -120,7 +120,33 @@ type RoutingConfig struct {
 	// loaded without a registry stays byte-identical to pre-Order behavior).
 	// The composition root may splice user phases into this slice.
 	Order []string
+	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
+	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
+	//   "auto" (default) — wrap when nested-claude is NOT detected and the
+	//                       host's sandbox binary (sandbox-exec / bwrap) is
+	//                       present; degrade unwrapped otherwise.
+	//   "on"             — always wrap when the binary is available; WARN
+	//                       loudly (no fallback) when it isn't.
+	//   "off"            — never wrap. Operator-only emergency hatch; the
+	//                       trust kernel is then Claude-PreToolUse-only.
+	//
+	// PRECEDENCE NOTE: the bridge subprocess reads EVOLVE_SANDBOX from its
+	// own env chain (deps.Env / os.Getenv), which is the actual signal. This
+	// RoutingConfig field is the COMPOSITION-ROOT view — set from the same
+	// env var by applyEnv so operators auditing the loaded config can see the
+	// effective mode. Mirrors the CommitEvidence pattern (also env-direct on
+	// the subprocess hot path). Setting this field in code without also
+	// propagating EVOLVE_SANDBOX into the bridge's env map has no effect.
+	SandboxMode string
 }
+
+// Sandbox mode string constants — exported so the bridge + tests can match
+// without sprinkling magic strings.
+const (
+	SandboxModeAuto = "auto"
+	SandboxModeOn   = "on"
+	SandboxModeOff  = "off"
+)
 
 // Warning is a non-fatal config diagnostic surfaced to the operator (and ledger).
 type Warning struct {
@@ -249,6 +275,7 @@ func defaults() RoutingConfig {
 		Stage:          StageOff,
 		Mode:           ModeDynamicLLM,
 		CommitEvidence: StageOff,
+		SandboxMode:    SandboxModeAuto,
 		Mandatory:      []string{"scout", "build", "audit", "ship"},
 		Conditional:    map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions:  4,
@@ -321,6 +348,15 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	}
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, ws)
+	}
+	if v := env["EVOLVE_SANDBOX"]; v != "" {
+		switch strings.TrimSpace(v) {
+		case SandboxModeAuto, SandboxModeOn, SandboxModeOff:
+			cfg.SandboxMode = strings.TrimSpace(v)
+		default:
+			*ws = append(*ws, Warning{"unknown-value",
+				fmt.Sprintf("EVOLVE_SANDBOX=%q unknown (want auto|on|off), defaulting to %q", v, cfg.SandboxMode)})
+		}
 	}
 	if v := env["EVOLVE_MANDATORY_PHASES"]; v != "" {
 		cfg.Mandatory = splitCSV(v)
