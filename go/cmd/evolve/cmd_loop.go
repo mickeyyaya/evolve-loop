@@ -436,6 +436,32 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					lr.emit(stdout)
 					return 2
 				}
+				// D2: an empty-output session is the subscription-quota-wall
+				// signature. Continuing would just burn the next cycle into the
+				// same wall, so QUOTA-PAUSE (rc=5, resumable) instead — the same
+				// stop semantics as the checkpoint-driven path above, but driven
+				// by the classifier since the empty session never wrote a
+				// checkpoint. The failure is still recorded below first so the
+				// history survives the pause.
+				if class.Marker == cycleclassify.MarkerQuotaLikelyEmptyOutput {
+					fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d source=%s (empty-output session — likely subscription quota wall)\n", ranCycle, class.Source)
+					fmt.Fprintln(stderr, "[loop]   resume when quota resets: evolve loop --resume")
+					// Persist the failure so history survives the pause. The
+					// stop is unconditional (rc=5 either way) but a Record
+					// error is still surfaced — silent swallow would hide a
+					// state.json corruption that the next --resume will fail on.
+					if _, recErr := failurelog.Record(filepath.Join(cfg.EvolveDir, "state.json"), filepath.Join(cfg.ProjectRoot, ".evolve", "runs"), failurelog.RecordRequest{
+						Cycle:          ranCycle,
+						Classification: string(class.Class),
+						ReportPath:     filepath.Join(workspace, "orchestrator-report.md"),
+						Now:            time.Now().UTC(),
+					}); recErr != nil {
+						fmt.Fprintf(stderr, "[loop] WARN: could not record quota-pause failure for cycle %d: %v\n", ranCycle, recErr)
+					}
+					lr.StopReason = "quota-pause"
+					lr.emit(stdout)
+					return 5
+				}
 				// E1: persist the recoverable failure to
 				// state.json:failedApproaches so the next cycle's
 				// orchestrator can read history + adapt. Atomic-write

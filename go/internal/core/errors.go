@@ -27,6 +27,15 @@ var (
 	// (bridge, sandbox-exec, bwrap) exited non-zero.
 	ErrSubprocessNonZero = errors.New("core: subprocess exited non-zero")
 
+	// ErrArtifactTimeout is wrapped into the Bridge.Launch error when a
+	// driver returns ExitArtifactTimeout (81) — the agent's contracted
+	// artifact never appeared within the wait window. It lives on the
+	// Bridge port (not the concrete bridge adapter) so the generic phase
+	// runner can errors.Is-match it WITHOUT importing a specific driver:
+	// an OPTIONAL phase that hits this degrades to WARN+advance instead of
+	// aborting the whole cycle (Workstream D — cycle-120 build-planner).
+	ErrArtifactTimeout = errors.New("core: bridge artifact timeout")
+
 	// ErrPhaseInvalid means the supplied Phase value isn't a member of
 	// the enum.
 	ErrPhaseInvalid = errors.New("core: invalid phase")
