@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "cli": "ollama-tmux",
+  "binary": "ollama",
+  "binary_min_version": "0.1.0",
+  "default_tier": "hybrid",
+  "tier_dependencies": {
+    "full": [
+      "ollama",
+      "tmux"
+    ],
+    "hybrid": [
+      "ollama",
+      "tmux"
+    ],
+    "degraded": [
+      "ollama"
+    ]
+  },
+  "prompt_marker": ">>> ",
+  "default_model": "llama3.1:8b",
+  "default_args": [],
+  "params": {
+    "model_tier": {
+      "channel": "noop"
+    },
+    "permission": {
+      "channel": "noop"
+    },
+    "settings_scope": {
+      "channel": "noop"
+    },
+    "session_mode": {
+      "channel": "controller"
+    }
+  },
+  "interactive_prompts": [
+    {
+      "name": "auth_required",
+      "regex": "ollama signin|sign in to ollama|authentication required|unauthorized",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Cloud :cloud-suffixed models require OLLAMA_API_KEY or a prior `ollama signin`; local tags need no auth"
+    },
+    {
+      "name": "model_not_found",
+      "regex": "model.*not found|pull the model first|no such file or directory.*model",
+      "response_keys": null,
+      "policy": "escalate",
+      "note": "Operator must `ollama pull <model>` (local) or check the cloud model tag spelling"
+    },
+    {
+      "name": "context_exceeded",
+      "regex": "context.*exceed|context window|max.*tokens.*reached",
+      "response_keys": null,
+      "policy": "escalate"
+    },
+    {
+      "name": "rate_limit",
+      "regex": "(usage|rate)[ -]limit (reached|exceeded|hit)|too many requests|429",
+      "response_keys": null,
+      "policy": "escalate"
+    }
+  ],
+  "stub": false,
+  "tier_aliases": {
+    "haiku": "llama3.1:8b",
+    "sonnet": "llama3.1:8b",
+    "opus": "llama3.1:8b"
+  },
+  "note": "Local-or-cloud ollama via tmux REPL. Cloud routing is by MODEL TAG: `gpt-oss:120b-cloud` transparently hits ollama.com (needs OLLAMA_API_KEY / `ollama signin`); bare tags (`llama3.1:8b`, `qwen2.5-coder:32b`, ...) run on local hardware via the same daemon. OLLAMA_HOST selects WHICH `ollama serve` instance the CLI talks to (default 127.0.0.1:11434) — NOT cloud routing. Reasoning/review phases only — plain `ollama run` has no agentic tool-use (no Bash/Edit/Write), so source-writing phase assignment is rejected at Launch. Tier aliases default conservatively to llama3.1:8b; operators override via the per-phase EVOLVE_<AGENT>_MODEL or profile.model. Cloud cannot do `format: {schema}` structured output — pin local tags for schema-bound phases. See knowledge-base/research/ollama-control-surface-2026.md."
+}

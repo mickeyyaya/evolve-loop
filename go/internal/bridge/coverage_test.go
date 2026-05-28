@@ -26,8 +26,9 @@ type stubDriver struct{ name string }
 func (s stubDriver) Name() string                                     { return s.name }
 func (stubDriver) Launch(context.Context, *Config, Deps) (int, error) { return 0, nil }
 
-// registerBuiltins re-registers the six production drivers after a
+// registerBuiltins re-registers the seven production drivers after a
 // ResetDriversForTesting, so the global registry is restored for other tests.
+// WS-F added ollama-tmux as the seventh peer.
 func registerBuiltins() {
 	Register(claudePDriver{})
 	Register(codexDriver{})
@@ -35,13 +36,17 @@ func registerBuiltins() {
 	Register(claudeTmuxDriver{})
 	Register(codexTmuxDriver{})
 	Register(agyTmuxDriver{})
+	Register(ollamaTmuxDriver{})
 }
 
 func TestDriverRegistry(t *testing.T) {
-	// DriverNames over the real (init-registered) set.
+	// DriverNames over the real (init-registered) set. Strict count: an
+	// accidental init() registration (e.g. a test stub forgetting deferred
+	// cleanup) gets caught immediately; a deliberate addition explicitly
+	// bumps this constant.
 	names := DriverNames()
-	if len(names) < 6 {
-		t.Fatalf("DriverNames = %v, want >=6 builtins", names)
+	if len(names) != 7 {
+		t.Fatalf("DriverNames = %v (len %d), want exactly 7 builtins", names, len(names))
 	}
 	for i := 1; i < len(names); i++ {
 		if names[i-1] > names[i] {
