@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -372,6 +373,36 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	ctxSnap := make(map[string]string, len(req.Context))
 	for k, v := range req.Context {
 		ctxSnap[k] = v
+	}
+
+	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
+	// ONCE per cycle, at orchestrator start, BEFORE any phase runs. Surface
+	// it to every phase via Context["challengeToken"] (scout's ComposePrompt
+	// reads it at scout.go:64) AND persist it to <workspace>/challenge-
+	// token.txt so the agent-templates.md PR 5 fallback source is populated.
+	// Pre-PR-6, no Go code injected the token; scout invented its own
+	// (cycle 134 audit C1: "no-token-manual-run-cycle-134"; cycle 135 audit
+	// C1: scout minted `59576594e2e8d5c3` instead of using `5b96ecb69a0c848f`
+	// from challenge-token.txt). The mint is the same 8-byte-hex shape as
+	// bridge.defaultChallengeToken so post-cycle ledger entries are
+	// indistinguishable from the bridge-minted ones used pre-cycle-135.
+	if _, alreadySet := ctxSnap["challengeToken"]; !alreadySet {
+		var tokBytes [8]byte
+		if _, err := rand.Read(tokBytes[:]); err == nil {
+			tok := hex.EncodeToString(tokBytes[:])
+			ctxSnap["challengeToken"] = tok
+			// Best-effort workspace write — phase agents per agent-templates.md
+			// PR 5 read this as fallback source #2 when inputs.challengeToken
+			// is empty. Failure is logged but not fatal (the Context path is
+			// the primary route; phases that can't read the file just rely on
+			// Context).
+			_ = os.MkdirAll(cs.WorkspacePath, 0o755)
+			if err := os.WriteFile(filepath.Join(cs.WorkspacePath, "challenge-token.txt"), []byte(tok+"\n"), 0o644); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN challenge-token.txt write failed: %v (Context route still works)\n", err)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN challenge token mint failed: %v (phase agents will fall back to their own protocol)\n", err)
+		}
 	}
 
 	// Capture HEAD before any phase so finalizeOutcome can detect mid-cycle commits.

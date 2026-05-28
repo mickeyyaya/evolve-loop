@@ -283,3 +283,41 @@ func TestComposePrompt_OmitsGoalLineWhenContextEmpty(t *testing.T) {
 		t.Errorf("no goal in Context should omit the line; got: %q", got)
 	}
 }
+
+// TestComposePrompt_InjectsChallengeTokenFromRequest (cycle-135 lesson):
+// the auditor mandates `<!-- challenge-token: <value> -->` on line 2 of
+// every phase report. PR 5 centralized the contract in agent-templates.md;
+// PR 6 plumbs the actual token VALUE into scout's prompt via the
+// PhaseRequest.ChallengeToken field already on the struct (ports.go:148).
+// Without this fix, scout has to mint its own token or fall back to a
+// placeholder — cycle 135 audit C1: scout used `59576594e2e8d5c3` instead
+// of the actual `5b96ecb69a0c848f` from challenge-token.txt.
+func TestComposePrompt_InjectsChallengeTokenFromRequest(t *testing.T) {
+	h := hooks{}
+	req := core.PhaseRequest{
+		Cycle:       135,
+		GoalHash:    "abc",
+		ProjectRoot: "/p",
+		Workspace:   "/p/.evolve/runs/cycle-135",
+		Context: map[string]string{
+			"challengeToken": "5b96ecb69a0c848f",
+		},
+	}
+	got := h.ComposePrompt("BODY", req)
+	if !strings.Contains(got, "- challenge_token: 5b96ecb69a0c848f") {
+		t.Errorf("expected challenge_token line in scout prompt, got: %q", got)
+	}
+}
+
+// TestComposePrompt_OmitsChallengeTokenLineWhenEmpty pins the symmetric
+// case: when the orchestrator hasn't minted a token yet, scout's prompt
+// stays clean (the agent will then read challenge-token.txt or FAIL
+// loudly per agent-templates.md PR 5 contract — no placeholder mint).
+func TestComposePrompt_OmitsChallengeTokenLineWhenEmpty(t *testing.T) {
+	h := hooks{}
+	req := core.PhaseRequest{Cycle: 1, GoalHash: "x", ProjectRoot: "/p", Workspace: "/w"}
+	got := h.ComposePrompt("BODY", req)
+	if strings.Contains(got, "challenge_token:") {
+		t.Errorf("expected no challenge_token line when empty, got: %q", got)
+	}
+}

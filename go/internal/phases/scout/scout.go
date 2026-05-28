@@ -54,6 +54,20 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if g := req.Context["goal"]; g != "" {
 		fmt.Fprintf(&b, "- goal: %s\n", g)
 	}
+	// Cycle-135 fix (PR 6): plumb the cycle's challenge token into the
+	// Cycle Context block so scout doesn't have to mint its own. Per
+	// agent-templates.md PR 5, every phase report must include
+	// `<!-- challenge-token: <value> -->` on line 2 — the source-of-truth
+	// is the orchestrator-minted token, surfaced via
+	// Context["challengeToken"]. Scout was previously inventing tokens
+	// (cycle 134 audit C1: `no-token-manual-run-cycle-134`; cycle 135
+	// audit C1: `59576594e2e8d5c3` mint vs `5b96ecb69a0c848f` truth)
+	// when this line was absent. Pairs with the runner-side write of
+	// `<workspace>/challenge-token.txt` so the fallback source (per
+	// agent-templates.md PR 5 precedence step 2) is also populated.
+	if tok := req.Context["challengeToken"]; tok != "" {
+		fmt.Fprintf(&b, "- challenge_token: %s\n", tok)
+	}
 	return b.String()
 }
 
