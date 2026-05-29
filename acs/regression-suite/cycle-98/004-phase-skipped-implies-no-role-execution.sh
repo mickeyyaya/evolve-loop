@@ -6,9 +6,14 @@
 #   FOR every cycle N where the ledger contains an entry with
 #       kind == "phase_skipped" AND role == R,
 #   THERE MUST BE ZERO entries in the same cycle N with role == R AND
-#       kind matching an agent-execution kind (anything other than
-#       "phase_skipped"). i.e. the orchestrator either skipped the
-#       phase or executed it — never both.
+#       kind matching an AGENT-EXECUTION kind. The agent-execution kinds
+#       are exactly "agent_subprocess" and "agent_fanout" — the only
+#       ledger kinds that record a real agent run (they carry
+#       artifact_path/challenge_token/model/duration_s). Lifecycle-marker
+#       kinds ("phase", "phase_plan", "routing_decision", "reset",
+#       "cycle_terminal") are emitted by the orchestrator regardless of
+#       whether the agent ran and DO NOT count as execution. i.e. the
+#       orchestrator either skipped the phase or executed it — never both.
 #
 # This predicate also exercises the contract against a synthetic fixture
 # so it has positive AND negative test discrimination (defeats trivial
@@ -68,12 +73,14 @@ _validate_contract() {
   local line cycle role exec_count
   while IFS=$'\t' read -r cycle role; do
     [ -z "$cycle" ] && continue
-    # 2) Count agent-execution entries (kind != phase_skipped) for the
-    #    same cycle AND role. If non-zero, the contract is violated.
+    # 2) Count agent-execution entries (kind in the agent-execution set)
+    #    for the same cycle AND role. If non-zero, the contract is
+    #    violated. Lifecycle markers (phase/phase_plan/routing_decision/
+    #    reset/cycle_terminal) are NOT execution and are excluded.
     exec_count="$(jq -r --argjson c "$cycle" --arg r "$role" '
       select(.cycle == $c)
       | select(.role == $r)
-      | select(.kind != "phase_skipped")
+      | select(.kind == "agent_subprocess" or .kind == "agent_fanout")
       | .role' "$ledger" 2>/dev/null | wc -l | tr -d ' ')"
     if [ "${exec_count:-0}" -ne 0 ]; then
       violations=$(( violations + 1 ))

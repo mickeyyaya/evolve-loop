@@ -78,6 +78,19 @@ if [ -z "$LATEST_REPORT" ]; then
       | sort -V | tail -1)
   fi
 fi
+# cycle-147 remediation: skip the artifact-shape check on SYNTHETIC scout
+# reports. Simulator/dry-run stubs carry a distinctive challenge-token comment
+# (`<!-- challenge-token: sim-token-<N>-<N> -->`) or a `- ID: simulator-noop`
+# line and have no anchors — they are test fixtures, not real scout output, so
+# a missing anchor there is a false-RED. The marker patterns are anchored to
+# the exact fixture format (not a loose `sim-token` substring) so a real report
+# mentioning those words in prose is NOT skipped. The persona-static contract
+# above is the real, always-on guard; a genuine report has no such marker and
+# is still fully checked.
+if [ -n "$LATEST_REPORT" ] && [ -f "$LATEST_REPORT" ] && \
+   grep -qE 'challenge-token: sim-token-[0-9]|^- ID: simulator-noop$' "$LATEST_REPORT"; then
+  LATEST_REPORT=""
+fi
 if [ -n "$LATEST_REPORT" ] && [ -f "$LATEST_REPORT" ]; then
   for anchor in 'ANCHOR:task_proposals' 'ANCHOR:summary'; do
     if ! grep -qE "$anchor" "$LATEST_REPORT"; then
