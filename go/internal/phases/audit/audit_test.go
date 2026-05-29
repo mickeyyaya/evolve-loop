@@ -435,3 +435,89 @@ func writeAuditProfile(t *testing.T, contents string) string {
 	}
 	return root
 }
+
+// --- verdict-format robustness (cycle-148 mis-grade fix) ---
+
+func TestExtractAuditVerdict_Formats(t *testing.T) {
+	cases := []struct {
+		name      string
+		content   string
+		want      string
+		wantFound bool
+	}{
+		{"canonical", "## Verdict\n**PASS**\n", core.VerdictPASS, true},
+		{"canonical no bold", "## Verdict\nPASS\n", core.VerdictPASS, true},
+		{"canonical blank line", "## Verdict\n\n**WARN**\n", core.VerdictWARN, true},
+		{"inline bold colon", "**Verdict: PASS**\n", core.VerdictPASS, true},
+		{"inline bold split colon", "**Verdict:** PASS\n", core.VerdictPASS, true},
+		{"inline heading colon", "## Verdict: PASS\n", core.VerdictPASS, true},
+		{"inline plain colon", "Verdict: FAIL\n", core.VerdictFAIL, true},
+		{"inline preserves FAIL", "**Verdict: FAIL**\n", core.VerdictFAIL, true},
+		{"inline preserves SKIPPED", "Verdict: SKIPPED\n", core.VerdictSKIPPED, true},
+		{"real report cycle-148 shape", "# Audit\n<!-- token -->\n\n**Verdict: PASS**\n**Confidence: 0.92**\n", core.VerdictPASS, true},
+		{"empty", "", "", false},
+		{"no verdict declared", "# Audit Report\n\nLooks fine to me.\n", "", false},
+		{"lowercase json key not matched", "  \"verdict\": \"PASS\",\n", "", false},
+		{"prose mentioning verdict not matched", "The verdict criteria require PASS or FAIL.\n", "", false},
+		{"no-colon prose not matched", "Verdict PASS is required before shipping.\n", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, found := extractAuditVerdict(tc.content)
+			if found != tc.wantFound {
+				t.Fatalf("found=%v, want %v (verdict=%q)", found, tc.wantFound, got)
+			}
+			if found && got != tc.want {
+				t.Errorf("verdict=%q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// Regression for cycle-148: a genuine PASS written inline as "**Verdict: PASS**"
+// with red_count==0 must grade PASS and route to ship — not be mis-graded FAIL.
+func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
+	ws := t.TempDir()
+	writeACSVerdict(t, ws, 0)
+	body := "# Audit Report — Cycle 148\n<!-- audit_bound_tree_sha: deadbeef -->\n\n**Verdict: PASS**\n**Confidence: 0.92**\n\nNo defects.\n"
+	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.3}}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
+
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 148, ProjectRoot: "/tmp/p", Workspace: ws})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS (inline verdict + red_count=0 must ship)", resp.Verdict)
+	}
+	if resp.NextPhase != "ship" {
+		t.Errorf("NextPhase=%q, want ship", resp.NextPhase)
+	}
+}
+
+// A non-empty report with red_count==0 but NO parseable verdict must FAIL
+// LOUDLY (an explicit error diagnostic), not sink the cycle silently.
+func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
+	ws := t.TempDir()
+	writeACSVerdict(t, ws, 0)
+	body := "# Audit Report\n\nThe change looks acceptable but I forgot the verdict line.\n"
+	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.3}}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
+
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/tmp/p", Workspace: ws})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (unparseable verdict)", resp.Verdict)
+	}
+	var found bool
+	for _, d := range resp.Diagnostics {
+		if d.Severity == "error" && strings.Contains(d.Message, "no parseable verdict") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a loud error diagnostic about the unparseable verdict; got %+v", resp.Diagnostics)
+	}
+}

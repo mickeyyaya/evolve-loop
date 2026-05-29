@@ -7,11 +7,19 @@
 // EVOLVE_STRICT_AUDIT=1 additionally promotes WARN to FAIL.
 //
 // Verdict mapping:
-//   - empty artifact / missing "## Verdict" heading → FAIL
+//   - empty artifact / no parseable verdict declaration → FAIL
 //   - acs-verdict.json missing or unparseable → FAIL + error diag
 //   - acs-verdict.json red_count > 0 → FAIL + EGPS diag
 //   - WARN + EVOLVE_STRICT_AUDIT=1 → FAIL
-//   - otherwise → whatever the audit-report.md heading says (PASS/WARN/FAIL/SKIPPED)
+//   - otherwise → whatever verdict the audit-report.md declares (PASS/WARN/FAIL/SKIPPED)
+//
+// The verdict declaration is recognized in several agent-produced shapes —
+// canonical "## Verdict\n**PASS**" AND single-line variants like
+// "**Verdict: PASS**" or "Verdict: PASS". Prose formatting varies by CLI, so
+// the gate must not hinge on one exact shape: a genuine PASS written as
+// "**Verdict: PASS**" with red_count==0 must not be mis-graded FAIL (the
+// cycle-148 silent-no-ship bug). When the verdict is unparseable but the EGPS
+// suite is green, a loud diagnostic is emitted (never a silent FAIL).
 //
 // Default model is "opus" for adversarial cross-family diversity from
 // the build phase's Sonnet.
@@ -34,9 +42,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// verdictRE captures the verdict word from the canonical heading shape
-// "## Verdict\n**PASS**" (case-sensitive, allows surrounding whitespace).
-var verdictRE = regexp.MustCompile(`(?m)^##\s*Verdict\s*\n\*\*(PASS|FAIL|WARN|SKIPPED)\*\*`)
+// verdictCanonicalRE matches the canonical two-line heading
+// "## Verdict\n**PASS**" — bold optional, intervening blank lines tolerated.
+var verdictCanonicalRE = regexp.MustCompile(`(?m)^##[^\S\n]*Verdict[^\S\n]*\n\s*\*{0,2}(PASS|FAIL|WARN|SKIPPED)\*{0,2}`)
+
+// verdictInlineRE matches single-line variants agents emit when they don't
+// follow the canonical heading: "**Verdict: PASS**", "**Verdict:** PASS",
+// "## Verdict: PASS", "Verdict: PASS". Horizontal-whitespace classes keep the
+// match on one line. Case-sensitive on "Verdict" (capital V) so it never
+// matches the lowercase JSON key "verdict" in an embedded result blob. The
+// colon is REQUIRED: every real inline form has one, and requiring it stops a
+// prose line like "Verdict PASS is required before shipping." from being
+// mis-read as a PASS declaration on the ship gate. The no-colon canonical
+// "## Verdict\n**PASS**" shape is covered by verdictCanonicalRE above.
+var verdictInlineRE = regexp.MustCompile(`(?m)^[^\S\n]*(?:##[^\S\n]*)?\*{0,2}Verdict\*{0,2}[^\S\n]*:[^\S\n]*\*{0,2}[^\S\n]*(PASS|FAIL|WARN|SKIPPED)\b`)
 
 // hooks carries the audit phase's variation points. genVerdict is the
 // seam that generates acs-verdict.json when it is absent (cycle-138/139
@@ -67,7 +86,10 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 }
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	verdict := extractAuditVerdict(artifact)
+	verdict, verdictFound := extractAuditVerdict(artifact)
+	if !verdictFound {
+		verdict = core.VerdictFAIL
+	}
 	var diags []core.Diagnostic
 
 	verdictPath := filepath.Join(req.Workspace, "acs-verdict.json")
@@ -107,15 +129,38 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Message:  "EVOLVE_STRICT_AUDIT=1 promoted WARN to FAIL",
 		})
 	}
+
+	// A non-empty audit report whose verdict we could not parse, while the EGPS
+	// predicate suite is itself green (red_count==0), is almost always a verdict
+	// FORMAT miss — not a real defect (cycle-148: the agent wrote
+	// "**Verdict: PASS**" but the parser required "## Verdict\n**PASS**", so a
+	// genuine PASS was mis-graded FAIL and routed to retro, silently discarding
+	// the cycle's work). FAIL loudly so the mis-grade is visible instead of
+	// sinking the cycle without a trace.
+	if !verdictFound && acsErr == nil && redCount == 0 && strings.TrimSpace(artifact) != "" {
+		diags = append(diags, core.Diagnostic{
+			Severity: "error",
+			Message:  "audit-report.md is non-empty with red_count=0 but declares no parseable verdict — treating as FAIL. Declare it as '## Verdict' + a bold verdict on the next line, or inline as '**Verdict: PASS**'.",
+		})
+	}
 	return verdict, diags, string(core.PhaseShip)
 }
 
-func extractAuditVerdict(content string) string {
-	m := verdictRE.FindStringSubmatch(content)
-	if m == nil {
-		return core.VerdictFAIL
+// extractAuditVerdict returns the declared verdict word and whether a
+// parseable verdict declaration was found. It tries the canonical
+// "## Verdict\n**PASS**" heading first, then common single-line variants. The
+// found bool lets the caller distinguish "no verdict declared" (a format miss
+// worth a loud diagnostic) from an explicit "FAIL". A real FAIL/WARN/SKIPPED
+// declaration is captured verbatim, so broadening the accepted FORMATS never
+// turns a real non-PASS verdict into a PASS.
+func extractAuditVerdict(content string) (string, bool) {
+	if m := verdictCanonicalRE.FindStringSubmatch(content); m != nil {
+		return m[1], true
 	}
-	return m[1]
+	if m := verdictInlineRE.FindStringSubmatch(content); m != nil {
+		return m[1], true
+	}
+	return "", false
 }
 
 func readRedCount(path string) (int, error) {

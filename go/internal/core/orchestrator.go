@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -299,6 +300,11 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 	}
 	return CycleOutcomeSkippedUnknown
 }
+
+// phaseMaxAttempts bounds per-phase retries on a recoverable bridge
+// ArtifactTimeout (Fix D). 2 = one relaunch after the first timeout; a
+// deterministic timeout still aborts the cycle after the cap.
+const phaseMaxAttempts = 2
 
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
 // summary of what ran. The lock is acquired up front and released on
@@ -602,13 +608,29 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// the pre-fix cycle. Real implementations spawn a stall detector
 		// that watches <workspace>/<agent>-stdout.log and emits stall
 		// events to <workspace>/<agent>-observer-events.ndjson.
-		obsCancel := o.observer.Start(ctx, string(next), phaseReq)
-		resp, err := runner.Run(ctx, phaseReq)
-		if obsCancel != nil {
-			obsCancel()
-		}
-		if err != nil {
-			return result, fmt.Errorf("phase %s: %w", next, err)
+		// Self-heal (Fix D): a bridge ArtifactTimeout (exit=81) is the
+		// recoverable "agent produced no artifact within the wait window" case
+		// — a stalled launch where a fresh relaunch usually succeeds. Retry the
+		// phase a bounded number of times on THAT sentinel only; every other
+		// error (and exhaustion of the budget) aborts the cycle as before. A
+		// deterministic timeout (e.g. a misconfigured agent) simply fails again
+		// and aborts after the cap — at most one wasted retry. The observer is
+		// (re)started per attempt so each launch is watched.
+		var resp PhaseResponse
+		var err error
+		for attempt := 1; ; attempt++ {
+			obsCancel := o.observer.Start(ctx, string(next), phaseReq)
+			resp, err = runner.Run(ctx, phaseReq)
+			if obsCancel != nil {
+				obsCancel()
+			}
+			if err == nil {
+				break
+			}
+			if attempt >= phaseMaxAttempts || !errors.Is(err, ErrArtifactTimeout) {
+				return result, fmt.Errorf("phase %s: %w", next, err)
+			}
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a bridge artifact timeout; relaunching (self-heal)\n", next, attempt, phaseMaxAttempts)
 		}
 		if !IsVerdict(resp.Verdict) {
 			return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
@@ -691,6 +713,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 
 	postCycleHEAD, _ := o.gitHEAD()
 	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
+
+	// Notice the silent no-ship (Fix C): the cycle ran phases but ended without
+	// HEAD advancing and without an audit-advisory "would-have-blocked" record —
+	// i.e. work may have been produced and then discarded with the worktree
+	// (cycle-148: a genuine PASS mis-graded FAIL routed audit→retro→end). The
+	// outcome label alone is advisory and easily missed in a batch summary, so
+	// surface it loudly here. Not an error — some cycles legitimately produce no
+	// change — but always worth an operator's eyes.
+	if result.FinalVerdict == CycleOutcomeSkippedUnknown {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but HEAD did not advance and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
+	}
 
 	state.LastCycleNumber = cycle
 	if err := o.storage.WriteState(ctx, state); err != nil {

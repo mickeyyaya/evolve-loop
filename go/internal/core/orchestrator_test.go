@@ -108,12 +108,20 @@ type fakeRunner struct {
 	calls    int
 	requests []PhaseRequest
 	verdict  string
+	// failErr (when set) is returned for the first failUntil calls, then the
+	// runner succeeds. Models a transient phase failure for the self-heal
+	// retry path (Fix D). failErr nil → never fails (default).
+	failErr   error
+	failUntil int
 }
 
 func (f *fakeRunner) Name() string { return f.name }
 func (f *fakeRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
 	f.calls++
 	f.requests = append(f.requests, req)
+	if f.failErr != nil && f.calls <= f.failUntil {
+		return PhaseResponse{}, f.failErr
+	}
 	v := f.verdict
 	if v == "" {
 		v = VerdictPASS
@@ -665,3 +673,86 @@ func TestEntriesFromRecords_PreservesClassification(t *testing.T) {
 		t.Errorf("recordedAt lost")
 	}
 }
+
+// --- Fix D: self-heal on bridge ArtifactTimeout (exit=81) ---
+
+// A phase that hits a bridge ArtifactTimeout once then succeeds must be
+// relaunched, and the cycle must complete normally (cycle-149 exit=81 at scout
+// aborted the whole loop with no retry).
+func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	// wrapTimeout() wraps ErrArtifactTimeout so errors.Is matches (mirrors engine.go).
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 1}
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	if err != nil {
+		t.Fatalf("RunCycle should self-heal the transient timeout, got: %v", err)
+	}
+	if got := runners[PhaseScout].(*fakeRunner).calls; got != 2 {
+		t.Errorf("scout calls=%d, want 2 (one timeout + one successful relaunch)", got)
+	}
+	if res.FinalVerdict != VerdictPASS {
+		t.Errorf("verdict=%s, want PASS after recovery", res.FinalVerdict)
+	}
+	// The retry must not double-run downstream phases: each runs exactly once.
+	for _, p := range []Phase{PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip} {
+		if got := runners[p].(*fakeRunner).calls; got != 1 {
+			t.Errorf("phase %s calls=%d, want 1 (scout retry must not re-run downstream)", p, got)
+		}
+	}
+}
+
+// A phase that times out on every attempt must abort after phaseMaxAttempts —
+// not retry forever — and the error must still wrap ErrArtifactTimeout.
+func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 99}
+	o := NewOrchestrator(st, led, runners)
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatalf("RunCycle should abort after exhausting retries")
+	}
+	if !errors.Is(err, ErrArtifactTimeout) {
+		t.Errorf("err=%v, want wrapped ErrArtifactTimeout", err)
+	}
+	if got := runners[PhaseScout].(*fakeRunner).calls; got != phaseMaxAttempts {
+		t.Errorf("scout calls=%d, want %d (capped)", got, phaseMaxAttempts)
+	}
+}
+
+// A non-timeout error must abort immediately with NO retry — retry is reserved
+// for the recoverable artifact-timeout case.
+func TestOrchestrator_PhaseNonTimeoutError_NoRetry(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: errors.New("deterministic boom"), failUntil: 99}
+	o := NewOrchestrator(st, led, runners)
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	if err == nil {
+		t.Fatalf("RunCycle should abort on a non-timeout error")
+	}
+	if got := runners[PhaseScout].(*fakeRunner).calls; got != 1 {
+		t.Errorf("scout calls=%d, want 1 (no retry for non-timeout errors)", got)
+	}
+}
+
+// wrapTimeout returns an error that wraps ErrArtifactTimeout the way the bridge
+// engine does (fmt.Errorf("...: %w", ErrArtifactTimeout)).
+func wrapTimeout() error {
+	return errArtifactTimeoutWrapper{}
+}
+
+type errArtifactTimeoutWrapper struct{}
+
+func (errArtifactTimeoutWrapper) Error() string {
+	return "bridge: launch exit=81: " + ErrArtifactTimeout.Error()
+}
+func (errArtifactTimeoutWrapper) Unwrap() error { return ErrArtifactTimeout }
