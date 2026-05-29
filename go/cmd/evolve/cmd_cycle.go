@@ -238,7 +238,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
 		core.PhaseBuild:        build.New(build.Config{Bridge: br, Prompts: prm}),
-		core.PhaseAudit:        audit.New(audit.Config{Bridge: br, Prompts: prm}),
+		core.PhaseAudit:        audit.NewDefault(br, prm),
 		core.PhaseShip:         ship.NewWithDefaultRunner(),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
 	}

@@ -156,6 +156,19 @@ func New(c Config) *Phase {
 	}
 }
 
+// NewDefault builds the audit phase with production defaults — notably
+// GenerateVerdict wired to generateACSVerdict so the EGPS gate auto-generates
+// acs-verdict.json when the auditor agent leaves it absent (cycle-138/139 fix).
+// BOTH the registry init() and the loop's runner map (go/cmd/evolve/cmd_cycle.go)
+// MUST construct audit via this single seam so the generator can never again be
+// wired in one phase-construction path but dormant in the other — the
+// dual-source divergence that left the loop force-FAILing on a missing verdict
+// every cycle (cycle-147). New(Config) stays for tests that pin explicit
+// (nil or fake) generators.
+func NewDefault(br core.Bridge, prm *prompts.Loader) *Phase {
+	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict})
+}
+
 // generateACSVerdict runs the ACS predicate suite for req.Cycle and writes
 // <workspace>/acs-verdict.json. It runs the predicates discovered under the
 // cycle's worktree (where this cycle's acs/cycle-N/*.sh live), falling back
@@ -187,10 +200,6 @@ func generateACSVerdict(req core.PhaseRequest) error {
 
 func init() {
 	registry.Register(string(core.PhaseAudit), func(req core.PhaseRequest) core.PhaseRunner {
-		return New(Config{
-			Bridge:          bridge.NewDefault(req.ProjectRoot),
-			Prompts:         prompts.NewForProject(req.ProjectRoot),
-			GenerateVerdict: generateACSVerdict,
-		})
+		return NewDefault(bridge.NewDefault(req.ProjectRoot), prompts.NewForProject(req.ProjectRoot))
 	})
 }
