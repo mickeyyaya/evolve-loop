@@ -154,20 +154,42 @@ func TestRun_RunnerError_FAIL(t *testing.T) {
 	}
 }
 
-func TestRun_MissingCommitMessage_FAIL(t *testing.T) {
+// A missing Context["commit_message"] must NOT fail the ship (cycle-150): the
+// autonomous-loop path never sets it, so the phase synthesizes a deterministic
+// default from the cycle identity and proceeds to ship.
+func TestRun_MissingCommitMessage_DefaultsAndShips(t *testing.T) {
 	fc := &fakeCmd{exitCode: 0}
 	phase := New(Config{Runner: fc.runner()})
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
+		Cycle: 150, GoalHash: "abc123", ProjectRoot: "/p", Workspace: t.TempDir(),
+		Env: map[string]string{"EVOLVE_NATIVE_SHIP": "0"},
 	})
-	if err == nil {
-		t.Fatal("err=nil, want non-nil for missing commit_message")
+	if err != nil {
+		t.Fatalf("Run: %v (missing commit_message must default, not fail)", err)
 	}
-	if resp.Verdict != core.VerdictFAIL {
-		t.Errorf("Verdict=%q, want FAIL", resp.Verdict)
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
 	}
-	if fc.calls != 0 {
-		t.Errorf("CmdRunner called %d times; want 0 (missing commit message must short-circuit)", fc.calls)
+	if fc.calls != 1 {
+		t.Fatalf("CmdRunner called %d times; want 1 (must proceed to ship)", fc.calls)
+	}
+	// The synthesized message is the last argv element (--class cycle <msg>).
+	gotMsg := fc.gotArgs[len(fc.gotArgs)-1]
+	want := "evolve-cycle 150: goal=abc123"
+	if gotMsg != want {
+		t.Errorf("default commit message=%q, want %q", gotMsg, want)
+	}
+}
+
+func TestDefaultCommitMessage(t *testing.T) {
+	if got := defaultCommitMessage(core.PhaseRequest{Cycle: 7, GoalHash: "h"}); got != "evolve-cycle 7: goal=h" {
+		t.Errorf("got %q", got)
+	}
+	if got := defaultCommitMessage(core.PhaseRequest{Cycle: 7}); got != "evolve-cycle 7" {
+		t.Errorf("no-goalhash got %q", got)
+	}
+	if got := defaultCommitMessage(core.PhaseRequest{}); got != "evolve-cycle 0" {
+		t.Errorf("zero-value got %q", got)
 	}
 }
 

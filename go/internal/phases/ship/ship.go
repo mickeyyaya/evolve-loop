@@ -54,21 +54,34 @@ func New(c Config) *Phase {
 
 func (p *Phase) Name() string { return phaseName }
 
+// defaultCommitMessage synthesizes a deterministic cycle commit message when
+// the caller didn't supply Context["commit_message"]. Mirrors the shape
+// `evolve cycle run` uses (cmd_cycle.go), plus the cycle number for traceable
+// git history.
+func defaultCommitMessage(req core.PhaseRequest) string {
+	if req.GoalHash != "" {
+		return fmt.Sprintf("evolve-cycle %d: goal=%s", req.Cycle, req.GoalHash)
+	}
+	return fmt.Sprintf("evolve-cycle %d", req.Cycle)
+}
+
 func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	start := p.nowFn()
 	if p.runner == nil {
 		return core.PhaseResponse{}, fmt.Errorf("ship: runner required")
 	}
+	// An explicit Context["commit_message"] always wins. When absent, synthesize
+	// a deterministic message from the cycle identity rather than failing the
+	// ship (single seam, cycle-147 lesson): `evolve cycle run` populates this
+	// Context key but the autonomous-loop construction path (cmd_loop.go
+	// buildCycleContext) does not, so erroring here silently sank EVERY loop
+	// cycle at the ship step once the audit gate finally let cycles reach ship
+	// (cycle-150). Defaulting here covers all current and future callers; the
+	// manual `evolve ship` CLI always passes an explicit message and is
+	// unaffected.
 	msg := req.Context["commit_message"]
 	if msg == "" {
-		err := errors.New("ship: commit_message required in Context")
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			DurationMS:   p.nowFn().Sub(start).Milliseconds(),
-			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: err.Error()}},
-		}, err
+		msg = defaultCommitMessage(req)
 	}
 
 	// v11.3.0: dispatch to native Go ship by default. EVOLVE_NATIVE_SHIP=0
