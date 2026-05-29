@@ -132,19 +132,88 @@ func TestVerifyCycle_WrongCycleIgnored(t *testing.T) {
 	}
 }
 
-func TestVerifyCycle_NonSubprocessKindIgnored(t *testing.T) {
+// Bookkeeping kinds (agent_fanout, cycle_terminal, routing_decision, …)
+// must NOT satisfy a required role — only agent_subprocess and phase do.
+func TestVerifyCycle_BookkeepingKindIgnored(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
-		entry(1, "scout", "phase", 0), // wrong kind
+		entry(1, "scout", "routing_decision", 0), // bookkeeping kind
 		entry(1, "builder", "agent_subprocess", 0),
 		entry(1, "auditor", "agent_subprocess", 0),
 	}}
 	r, _ := VerifyCycle(context.Background(), l, 1, Options{})
 	if r.OK {
-		t.Fatalf("scout/phase kind should not count")
+		t.Fatalf("scout via bookkeeping kind should not count")
 	}
 	if r.Scout != 0 {
-		t.Fatalf("scout count=%d want 0 (phase kind ignored)", r.Scout)
+		t.Fatalf("scout count=%d want 0 (routing_decision kind ignored)", r.Scout)
+	}
+}
+
+// cycle-137 regression: the Go-native orchestrator records kind="phase"
+// with PHASE-name roles (scout, build, audit) — never agent_subprocess.
+// VerifyCycle must accept this vocabulary or it false-negatives every
+// native cycle as "missing [scout builder auditor]".
+func TestVerifyCycle_GoNativePhaseVocabulary(t *testing.T) {
+	t.Parallel()
+	l := &fakeLedger{entries: []core.LedgerEntry{
+		entry(1, "scout", "phase", 0),
+		entry(1, "triage", "phase", 0),        // not required; ignored
+		entry(1, "tdd", "phase", 0),           // not required; ignored
+		entry(1, "build-planner", "phase", 0), // not required; ignored
+		entry(1, "build", "phase", 0),         // canonicalizes to builder
+		entry(1, "audit", "phase", 0),         // canonicalizes to auditor
+		entry(1, "retro", "phase", 0),         // not required; ignored
+	}}
+	r, err := VerifyCycle(context.Background(), l, 1, Options{})
+	if err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if !r.OK {
+		t.Fatalf("Go-native phase vocabulary should verify OK; missing=%v", r.Missing)
+	}
+	if r.Scout != 1 || r.Builder != 1 || r.Auditor != 1 {
+		t.Fatalf("counts: scout=%d builder=%d auditor=%d (want 1/1/1)", r.Scout, r.Builder, r.Auditor)
+	}
+}
+
+// Mixed vocabularies (a cycle with both bash agent_subprocess and Go
+// phase entries) must not double-fault: either spelling satisfies a role.
+func TestVerifyCycle_MixedVocabularies(t *testing.T) {
+	t.Parallel()
+	l := &fakeLedger{entries: []core.LedgerEntry{
+		entry(1, "scout", "agent_subprocess", 0),   // bash spelling
+		entry(1, "build", "phase", 0),              // Go spelling → builder
+		entry(1, "auditor", "agent_subprocess", 0), // bash spelling
+	}}
+	r, err := VerifyCycle(context.Background(), l, 1, Options{})
+	if err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if !r.OK {
+		t.Fatalf("mixed vocabularies should verify OK; missing=%v", r.Missing)
+	}
+}
+
+// The Go-native PASS path: intent + memo also arrive as kind="phase".
+func TestVerifyCycle_GoNativeIntentAndMemoPhases(t *testing.T) {
+	t.Parallel()
+	l := &fakeLedger{entries: []core.LedgerEntry{
+		entry(1, "intent", "phase", 0),
+		entry(1, "scout", "phase", 0),
+		entry(1, "build", "phase", 0),
+		entry(1, "audit", "phase", 0),
+		entry(1, "memo", "phase", 0),
+	}}
+	r, err := VerifyCycle(context.Background(), l, 1, Options{IntentRequired: true, CycleVerdict: "PASS"})
+	if err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if !r.OK {
+		t.Fatalf("intent+memo as phase entries should verify OK; missing=%v", r.Missing)
+	}
+	if r.Intent != 1 || r.Memo != 1 {
+		t.Fatalf("intent=%d memo=%d (want 1/1)", r.Intent, r.Memo)
 	}
 }
 

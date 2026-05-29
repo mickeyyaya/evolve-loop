@@ -1,9 +1,25 @@
 // Package ledgerverify ports verify_cycle from legacy/scripts/dispatch/
 // evolve-loop-dispatch.sh:489-546. It walks the ledger.jsonl chain once
 // per cycle and asserts the pipeline ran end-to-end: scout + builder +
-// auditor each have at least one agent_subprocess entry with exit_code
-// zero, plus intent if the cycle was init'd with intent_required=true,
-// plus memo if the cycle's audit verdict was PASS.
+// auditor each have at least one exit_code-zero entry, plus intent if the
+// cycle was init'd with intent_required=true, plus memo if the cycle's
+// audit verdict was PASS.
+//
+// Ledger vocabulary (cycle-137 fix): two writers record per-phase entries
+// with DIFFERENT shapes, and the verifier must accept both or it
+// false-negatives an entire class of cycles:
+//
+//   - bash subagent-run.sh   → kind="agent_subprocess", role=AGENT name
+//     ("scout", "builder", "auditor")
+//   - Go native orchestrator → kind="phase",            role=PHASE name
+//     ("scout", "build", "audit")
+//
+// The Go `evolve loop` path emits ONLY kind="phase" entries (no
+// agent_subprocess), so a verifier that matched the bash shape alone
+// reported "missing [scout builder auditor]" for every native cycle —
+// the cycle-137 incident. canonicalRole + the kind allow-list below
+// fold both vocabularies onto the same {scout,builder,auditor,intent,
+// memo} buckets so bash and Go cycles verify identically.
 //
 // Pure: the package depends only on core.Ledger + small data types.
 // Callers (cmd_loop) are responsible for sourcing IntentRequired from
@@ -22,12 +38,47 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// kindSubprocess is the ledger entry kind subagent-run.sh writes; matches
-// the bash filter `'"kind":"agent_subprocess"'` in count_role.
-const kindSubprocess = "agent_subprocess"
+// Ledger entry kinds that represent a completed phase/agent run. Both
+// count toward verification (see package doc): the bash dispatcher wrote
+// agent_subprocess, the Go orchestrator writes phase. Any other kind
+// (agent_fanout, cycle_terminal, routing_decision, …) is bookkeeping and
+// is ignored.
+const (
+	kindSubprocess = "agent_subprocess"
+	kindPhase      = "phase"
+)
 
-// Roles required for every cycle (pre-intent, pre-memo gates).
+// Roles required for every cycle (pre-intent, pre-memo gates). Canonical
+// names; canonicalRole maps both ledger vocabularies onto these.
 var requiredRoles = []string{"scout", "builder", "auditor"}
+
+// canonicalRole folds the two ledger role vocabularies onto the canonical
+// buckets the verifier counts. The bash dispatcher records AGENT names
+// (builder, auditor); the Go orchestrator records PHASE names (build,
+// audit). scout/intent/memo are spelled identically in both. An
+// unrecognized role returns "" and is not counted.
+func canonicalRole(role string) string {
+	switch role {
+	case "scout":
+		return "scout"
+	case "builder", "build":
+		return "builder"
+	case "auditor", "audit":
+		return "auditor"
+	case "intent":
+		return "intent"
+	case "memo":
+		return "memo"
+	default:
+		return ""
+	}
+}
+
+// countsTowardVerify reports whether a ledger entry kind represents a real
+// phase/agent run (vs bookkeeping entries that must not satisfy a role).
+func countsTowardVerify(kind string) bool {
+	return kind == kindSubprocess || kind == kindPhase
+}
 
 // Options pins the cycle-specific gates: which optional roles to also
 // require. The caller fills these from cycle-state.json + .cycle-verdict.
@@ -99,13 +150,13 @@ func VerifyCycle(ctx context.Context, ledger core.Ledger, cycle int, opts Option
 		if entry.Cycle != cycle {
 			continue
 		}
-		if entry.Kind != kindSubprocess {
+		if !countsTowardVerify(entry.Kind) {
 			continue
 		}
 		if entry.ExitCode != 0 {
 			continue
 		}
-		switch entry.Role {
+		switch canonicalRole(entry.Role) {
 		case "scout":
 			r.Scout++
 		case "builder":
@@ -128,7 +179,7 @@ func VerifyCycle(ctx context.Context, ledger core.Ledger, cycle int, opts Option
 	return r, nil
 }
 
-// roleCount returns the counter field matching role.
+// roleCount returns the counter field matching a canonical role name.
 func roleCount(r Result, role string) int {
 	switch role {
 	case "scout":
