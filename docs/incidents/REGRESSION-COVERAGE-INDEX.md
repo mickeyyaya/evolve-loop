@@ -70,14 +70,28 @@ target was verified by an agent that read the incident and searched the suite.
   cycle → build committed inline; this is a *success* label, not a failure). The
   `cost $0` reflects OAuth-session billing (CLAUDE.md note), not zero work.
 
-The remaining question for a textbook-clean cycle is cosmetic: the cycle ships
-"via build" rather than via the formal ship phase, and the retro runs in fluent
-mode. Neither is a defect. **No new bug was found in cycle 138** — earlier text
-in this file claiming a runtime "missing [auditor]" line was an error; the log
-contains no such line.
+**UPDATE after cycle-139 (supersedes the "cosmetic" note above).** cycle-138
+shipping "via build" rather than via the formal ship phase is NOT cosmetic — it
+is the visible symptom of a real defect found in cycle-139: the audit phase's
+EGPS gate requires `acs-verdict.json` (red_count==0) to PASS, treats a MISSING
+file as FAIL by design, and **nothing in the autonomous loop generates that
+file** → every autonomous audit is structurally forced to FAIL → `audit→retro`,
+no formal ship. cycle-138 shipped only because its build committed inline before
+the forced-FAIL audit; cycle-139's build did not, so it shipped nothing
+(`SKIPPED_UNKNOWN`). Full analysis + approved fix:
+[cycle-138-140-egps-verdict-not-generated-in-autonomous-loop.md](cycle-138-140-egps-verdict-not-generated-in-autonomous-loop.md).
+This is gap #0 below — THE current blocker for two clean *shipped* cycles.
 
 ## Prioritized gap backlog continued
 
+0. **EGPS verdict not generated in autonomous loop (cycle-138/139, ❌none, 1.0)** —
+   THE blocker. Audit forces FAIL on missing `acs-verdict.json`, which the
+   autonomous `evolve loop` never produces. Approved fix: the **audit phase
+   generates it** via `acssuite.Run`+`WriteVerdict` when absent (honoring a
+   pre-staged file). Regression test: a cycle with `acs/cycle-N/` predicates +
+   no pre-staged verdict → audit generates it → red_count 0 → PASS → `audit→ship`.
+   Files: `phases/audit/audit.go` (Classify), `acssuite` (Run/WriteVerdict),
+   `statemachine.go:96`. See the dedicated incident doc.
 1. **cli_chain empty-fallback (cycle-123, ❌none, 0.95)** — a profile with no
    `cli_fallback` key + a fallback-trigger exit (81) attempts NO fallback; cycle
    aborts. The "any CLI any phase" invariant. →
