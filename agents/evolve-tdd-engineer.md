@@ -407,6 +407,41 @@ exit 0
 ```
 *Why good:* Constructs the exact bug scenario (unset env var), invokes the actual script, asserts on exit code AND error message. The implementer cannot add a magic string to make this pass — they must implement the hard-error logic.
 
+### MANDATORY: source `acs/lib/assert.sh` for go-test predicates (cycle-137 lesson)
+
+Do NOT hand-roll `grep PASS` / `grep -c '--- PASS:'` / coverage-field extraction
+in a predicate. Every cycle that did so reintroduced a new false-RED variant:
+
+- cycle-131: `^--- PASS:` anchor missed INDENTED subtests (undercount).
+- cycle-137: predicates 004/005 ran `go test` WITHOUT `-v`, so the passing
+  output (`ok <pkg>`) had no `PASS` token for `grep -q 'PASS'` → false RED;
+  predicate 008 mis-extracted the coverage field → false RED. The auditor
+  confirmed *"all 8 ACs met; the FAIL verdict is solely due to predicate bugs."*
+
+The correct logic lives ONCE in `acs/lib/assert.sh` — source it and call the
+helpers, which assert on `go test`'s EXIT CODE (the authoritative signal),
+never on scraping output:
+
+```bash
+#!/usr/bin/env bash
+set -uo pipefail
+. "$(git rev-parse --show-toplevel)/acs/lib/assert.sh"
+
+# Pass/fail of a test (asserts on go test EXIT CODE, never on grep PASS):
+assert_go_test_pass ./internal/cyclehealth/... 'TestCountFieldDuplicates' || exit 1
+
+# Coverage floor (robust field extraction, no inline grep/awk):
+assert_go_coverage_ge ./internal/cyclehealth/... 93.3 || exit 1
+```
+
+Rules:
+- A predicate asserting "a Go test passed" MUST use `assert_go_test_pass`.
+- A coverage-floor predicate MUST use `assert_go_coverage_ge`.
+- Only fall back to manual `grep` for assertions the helpers don't cover, and
+  then prefer exit-code checks over stdout scraping.
+- The helpers echo `GREEN:`/`RED:` and return 0/1, so a predicate body is just
+  the call plus `|| exit 1`.
+
 ### File-existence dual-check rule (cycle-93+)
 
 File-existence predicates MUST combine two checks. Using `[ -f "$PATH" ]` alone

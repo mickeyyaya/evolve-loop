@@ -50,18 +50,26 @@ func (s *fakeStorage) AcquireLock(context.Context) (func() error, error) {
 	return func() error { return nil }, nil
 }
 
-// fakeLedger answers Iter with a pre-baked slice; tests build the
-// slice in advance to drive the verify pipeline through specific
-// branches (complete cycle, missing builder, etc.).
+// fakeLedger answers Iter with the slice the test pre-seeds via the
+// `entries` field — tests build that slice in advance to drive the verify
+// pipeline through specific branches (complete cycle, missing builder,
+// etc.). Append is a deliberate NO-OP: verify reads the test-controlled
+// slice, NOT whatever the stub orchestrator incidentally writes during a
+// no-op run.
+//
+// (cycle-137: Append previously accumulated, but verify only counted the
+// bash-era kind:"agent_subprocess", so the stub orchestrator's kind:"phase"
+// appends were invisible and the pre-seeded slice was effectively the only
+// thing verify saw. Once verify was corrected to also count kind:"phase"
+// — the vocabulary the Go orchestrator actually writes — those incidental
+// appends would have made every no-op run look like a complete cycle,
+// silently defeating the failure-path tests.)
 type fakeLedger struct {
 	mu      sync.Mutex
 	entries []core.LedgerEntry
 }
 
-func (l *fakeLedger) Append(_ context.Context, e core.LedgerEntry) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.entries = append(l.entries, e)
+func (l *fakeLedger) Append(context.Context, core.LedgerEntry) error {
 	return nil
 }
 func (l *fakeLedger) Verify(context.Context) error { return nil }
