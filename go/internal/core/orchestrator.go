@@ -273,11 +273,28 @@ func defaultGitHEAD() (string, error) {
 // ship's computeTreeStateSHA so the bind matches. Best-effort: a failure WARNs
 // and is swallowed; ship then fails loudly on the missing/stale binding rather
 // than shipping unbound.
-func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, verdict string) {
+func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, worktree, verdict string) {
 	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
 		return
+	}
+	// Worktree CHANGES tree: stage everything (respects .gitignore) and write a
+	// tree object = exactly the tree ship will commit. This is what the auditor
+	// SHOULD bind (it audited the worktree's working changes); its persona binds
+	// HEAD^{tree} = the unchanged base, which can never equal the changes-commit
+	// tree → INTEGRITY_TREE_DRIFT every cycle (cycle-152). Ship prefers this
+	// over the auditor's comment. Best-effort: empty ⇒ ship falls back to the
+	// auditor's value. No commit is made (write-tree only); ship re-stages anyway.
+	worktreeTree := ""
+	if worktree != "" {
+		if _, _, aerr := gitCapture(ctx, worktree, "add", "-A"); aerr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git add -A in worktree failed: %v — WorktreeTreeSHA empty, ship falls back to the auditor comment\n", aerr)
+		} else if wt, code, werr := gitCapture(ctx, worktree, "write-tree"); werr == nil && code == 0 {
+			worktreeTree = strings.TrimSpace(wt)
+		} else {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git write-tree in worktree failed (rc=%d): %v\n", code, werr)
+		}
 	}
 	// `git diff HEAD` returns exit 1 when differences exist — not an error;
 	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
@@ -302,15 +319,16 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		exitCode = 1
 	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
-		TS:             o.now().UTC().Format(time.RFC3339),
-		Cycle:          cycle,
-		Role:           "auditor",
-		Kind:           "agent_subprocess",
-		ExitCode:       exitCode,
-		GitHEAD:        strings.TrimSpace(head),
-		TreeStateSHA:   hex.EncodeToString(treeSum[:]),
-		ArtifactPath:   artPath,
-		ArtifactSHA256: hex.EncodeToString(artSum[:]),
+		TS:              o.now().UTC().Format(time.RFC3339),
+		Cycle:           cycle,
+		Role:            "auditor",
+		Kind:            "agent_subprocess",
+		ExitCode:        exitCode,
+		GitHEAD:         strings.TrimSpace(head),
+		TreeStateSHA:    hex.EncodeToString(treeSum[:]),
+		WorktreeTreeSHA: worktreeTree,
+		ArtifactPath:    artPath,
+		ArtifactSHA256:  hex.EncodeToString(artSum[:]),
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding ledger append: %v\n", err)
 	}
@@ -761,7 +779,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// AUDIT_BINDING_HEAD_MOVED. Emit the rich binding entry after a shippable
 		// audit so ship binds to THIS cycle.
 		if next == PhaseAudit && (resp.Verdict == VerdictPASS || resp.Verdict == VerdictWARN) {
-			o.recordAuditBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath, resp.Verdict)
+			o.recordAuditBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath, cs.ActiveWorktree, resp.Verdict)
 		}
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))

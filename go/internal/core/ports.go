@@ -135,46 +135,53 @@ type CycleState struct {
 // On-disk bytes are never rewritten — doing so would cascade SHA256
 // hash-chain breaks through every subsequent entry.
 type LedgerEntry struct {
-	TS             string   `json:"ts"`
-	Cycle          int      `json:"cycle"`
-	CycleLabel     string   `json:"cycle_label,omitempty"`
-	Role           string   `json:"role"`
-	Kind           string   `json:"kind"`
-	Model          string   `json:"model,omitempty"`
-	ExitCode       int      `json:"exit_code"`
-	DurationS      string   `json:"duration_s,omitempty"`
-	ArtifactPath   string   `json:"artifact_path,omitempty"`
-	ArtifactSHA256 string   `json:"artifact_sha256,omitempty"`
-	ChallengeToken string   `json:"challenge_token,omitempty"`
-	GitHEAD        string   `json:"git_head,omitempty"`
-	TreeStateSHA   string   `json:"tree_state_sha,omitempty"`
-	EntrySeq       int      `json:"entry_seq"`
-	PrevHash       string   `json:"prev_hash"`
-	WorkerCount    int      `json:"worker_count,omitempty"`
-	Workers        []string `json:"workers,omitempty"`
+	TS             string `json:"ts"`
+	Cycle          int    `json:"cycle"`
+	CycleLabel     string `json:"cycle_label,omitempty"`
+	Role           string `json:"role"`
+	Kind           string `json:"kind"`
+	Model          string `json:"model,omitempty"`
+	ExitCode       int    `json:"exit_code"`
+	DurationS      string `json:"duration_s,omitempty"`
+	ArtifactPath   string `json:"artifact_path,omitempty"`
+	ArtifactSHA256 string `json:"artifact_sha256,omitempty"`
+	ChallengeToken string `json:"challenge_token,omitempty"`
+	GitHEAD        string `json:"git_head,omitempty"`
+	TreeStateSHA   string `json:"tree_state_sha,omitempty"`
+	// WorktreeTreeSHA is the git tree SHA of the per-cycle worktree's WORKING
+	// state (all changes staged) at audit time — the tree ship will commit.
+	// Written by the orchestrator's audit-binding entry so ship's pre/post-merge
+	// tree-drift check binds to the audited CHANGES, not the auditor's
+	// HEAD^{tree} (which is the unchanged base in the worktree flow, cycle-152).
+	WorktreeTreeSHA string   `json:"worktree_tree_sha,omitempty"`
+	EntrySeq        int      `json:"entry_seq"`
+	PrevHash        string   `json:"prev_hash"`
+	WorkerCount     int      `json:"worker_count,omitempty"`
+	Workers         []string `json:"workers,omitempty"`
 }
 
 // ledgerEntryWire is the JSON-facing twin of LedgerEntry. Cycle is a
 // json.RawMessage so the custom unmarshaler can route int vs string
 // without recursing back into LedgerEntry.UnmarshalJSON.
 type ledgerEntryWire struct {
-	TS             string          `json:"ts,omitempty"`
-	Cycle          json.RawMessage `json:"cycle,omitempty"`
-	CycleLabel     string          `json:"cycle_label,omitempty"`
-	Role           string          `json:"role,omitempty"`
-	Kind           string          `json:"kind,omitempty"`
-	Model          string          `json:"model,omitempty"`
-	ExitCode       int             `json:"exit_code,omitempty"`
-	DurationS      string          `json:"duration_s,omitempty"`
-	ArtifactPath   string          `json:"artifact_path,omitempty"`
-	ArtifactSHA256 string          `json:"artifact_sha256,omitempty"`
-	ChallengeToken string          `json:"challenge_token,omitempty"`
-	GitHEAD        string          `json:"git_head,omitempty"`
-	TreeStateSHA   string          `json:"tree_state_sha,omitempty"`
-	EntrySeq       int             `json:"entry_seq,omitempty"`
-	PrevHash       string          `json:"prev_hash,omitempty"`
-	WorkerCount    int             `json:"worker_count,omitempty"`
-	Workers        []string        `json:"workers,omitempty"`
+	TS              string          `json:"ts,omitempty"`
+	Cycle           json.RawMessage `json:"cycle,omitempty"`
+	CycleLabel      string          `json:"cycle_label,omitempty"`
+	Role            string          `json:"role,omitempty"`
+	Kind            string          `json:"kind,omitempty"`
+	Model           string          `json:"model,omitempty"`
+	ExitCode        int             `json:"exit_code,omitempty"`
+	DurationS       string          `json:"duration_s,omitempty"`
+	ArtifactPath    string          `json:"artifact_path,omitempty"`
+	ArtifactSHA256  string          `json:"artifact_sha256,omitempty"`
+	ChallengeToken  string          `json:"challenge_token,omitempty"`
+	GitHEAD         string          `json:"git_head,omitempty"`
+	TreeStateSHA    string          `json:"tree_state_sha,omitempty"`
+	WorktreeTreeSHA string          `json:"worktree_tree_sha,omitempty"`
+	EntrySeq        int             `json:"entry_seq,omitempty"`
+	PrevHash        string          `json:"prev_hash,omitempty"`
+	WorkerCount     int             `json:"worker_count,omitempty"`
+	Workers         []string        `json:"workers,omitempty"`
 }
 
 // UnmarshalJSON accepts cycle as int, whole-number float, or string.
@@ -196,6 +203,7 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.ChallengeToken = wire.ChallengeToken
 	e.GitHEAD = wire.GitHEAD
 	e.TreeStateSHA = wire.TreeStateSHA
+	e.WorktreeTreeSHA = wire.WorktreeTreeSHA
 	e.EntrySeq = wire.EntrySeq
 	e.PrevHash = wire.PrevHash
 	e.WorkerCount = wire.WorkerCount

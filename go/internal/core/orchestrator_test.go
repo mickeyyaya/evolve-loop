@@ -780,7 +780,7 @@ func TestOrchestrator_RecordAuditBinding_WritesShipBindableEntry(t *testing.T) {
 
 	led := &fakeLedger{}
 	o := NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
-	o.recordAuditBinding(context.Background(), 42, repo, ws, VerdictPASS)
+	o.recordAuditBinding(context.Background(), 42, repo, ws, repo, VerdictPASS)
 
 	var bind *LedgerEntry
 	for i := range led.entries {
@@ -802,6 +802,9 @@ func TestOrchestrator_RecordAuditBinding_WritesShipBindableEntry(t *testing.T) {
 	}
 	if bind.Cycle != 42 {
 		t.Errorf("cycle=%d, want 42", bind.Cycle)
+	}
+	if bind.WorktreeTreeSHA == "" || len(bind.WorktreeTreeSHA) != 40 {
+		t.Errorf("worktree_tree_sha=%q, want a 40-char tree SHA (ship binds the audited CHANGES tree)", bind.WorktreeTreeSHA)
 	}
 }
 

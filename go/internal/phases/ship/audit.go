@@ -28,13 +28,14 @@ import (
 
 // auditEntry is the subset of LedgerEntry fields ship cares about.
 type auditEntry struct {
-	Role           string `json:"role"`
-	Kind           string `json:"kind"`
-	ExitCode       int    `json:"exit_code"`
-	ArtifactPath   string `json:"artifact_path"`
-	ArtifactSHA256 string `json:"artifact_sha256"`
-	GitHEAD        string `json:"git_head"`
-	TreeStateSHA   string `json:"tree_state_sha"`
+	Role            string `json:"role"`
+	Kind            string `json:"kind"`
+	ExitCode        int    `json:"exit_code"`
+	ArtifactPath    string `json:"artifact_path"`
+	ArtifactSHA256  string `json:"artifact_sha256"`
+	GitHEAD         string `json:"git_head"`
+	TreeStateSHA    string `json:"tree_state_sha"`
+	WorktreeTreeSHA string `json:"worktree_tree_sha"`
 }
 
 // verifyAuditBinding implements the full audit-binding contract.
@@ -111,12 +112,16 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 			"artifact_path", entry.ArtifactPath)
 	}
 
-	// Extract audit_bound_tree_sha for pre-merge check (gitops.go consumes via res).
-	if m := auditBoundTreeSHARe.FindStringSubmatch(string(body)); m != nil {
-		// Stash into Provenance via a separate side-channel: use res.Logs note
-		// and pass via *Options internal extension.
-		// We attach it to res via a private field on res; add an unexported
-		// hook through Options for the gitops layer.
+	// Extract audit_bound_tree_sha for the gitops pre/post-merge tree-drift check.
+	// Source priority: the orchestrator's ledger binding entry (WorktreeTreeSHA =
+	// the worktree CHANGES tree it will commit) WINS over the auditor's report
+	// comment, because the auditor persona binds HEAD^{tree} = the unchanged base
+	// (the cycle's changes are uncommitted in the worktree at audit time), which
+	// can never equal the changes-commit tree → INTEGRITY_TREE_DRIFT every cycle
+	// (cycle-152). The report comment is the fallback for the non-worktree flow.
+	if entry.WorktreeTreeSHA != "" {
+		opts.internalAuditBoundTreeSHA = entry.WorktreeTreeSHA
+	} else if m := auditBoundTreeSHARe.FindStringSubmatch(string(body)); m != nil {
 		opts.internalAuditBoundTreeSHA = strings.TrimSpace(strings.Trim(m[1], "`"))
 	}
 

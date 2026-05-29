@@ -94,3 +94,10 @@ triage-report.md
 test-report.md
 build-plan.md
 *-reflection.yaml
+
+# Go coverage artifacts (`go test -coverprofile`). Never commit: left untracked
+# they get swept into cycle commits by `git add -A` and drift the committed tree
+# from the audit-bound tree (INTEGRITY_TREE_DRIFT, cycle-152).
+cover.out
+coverage.out
+*.coverprofile
