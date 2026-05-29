@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,6 +38,20 @@ const (
 	// agent gets a clear "still alive?" prompt with enough time to recover.
 	// Opt-out: set EVOLVE_OBSERVER_NUDGE_S=0. See ADR-0023 facet A.
 	DefaultNudgeS = 300 * time.Second
+
+	// observerEventsSuffix names the observer's own NDJSON sink file (the
+	// adapter writes <phase>-observer-events.ndjson into WorkspaceDir). It is
+	// excluded from the workspace-activity scan so the observer's own
+	// started/stall/stopped writes can never reset the stall timer and mask a
+	// genuine stall. Must match the adapter's eventsPath convention
+	// (core_adapter.go).
+	observerEventsSuffix = "-observer-events.ndjson"
+
+	// activityScanMaxFiles bounds the per-poll workspace walk. The per-phase
+	// workspace (.evolve/runs/cycle-N) is small and the per-cycle git worktree
+	// lives OUTSIDE it, so a real run never approaches this; the cap is a
+	// defensive backstop against a pathological tree.
+	activityScanMaxFiles = 500
 )
 
 // Event is one observer emission, NDJSON-serialized.
@@ -57,6 +73,15 @@ type Config struct {
 	Phase     string
 	Agent     string
 	StdoutLog string // path to subagent stdout-log file
+	// WorkspaceDir, when non-empty, makes a fresh write anywhere under it
+	// count as progress alongside stdout-log growth. This is load-bearing for
+	// tmux-driver agents (claude-tmux/codex-tmux/agy-tmux): their live output
+	// goes to the tmux scrollback and reaches the stdout-log only on clean
+	// exit, so the stdout-log stays flat while the agent is productively
+	// writing artifacts. Without this signal the observer falsely reports
+	// stall_no_output for a working tmux agent (cycle-141). Empty → stdout-log
+	// growth is the only progress signal (byte-identical to the pre-fix path).
+	WorkspaceDir string
 }
 
 // Observer watches one phase's stdout-log for activity and emits
@@ -94,6 +119,7 @@ func (o *Observer) Watch(ctx context.Context) error {
 	o.emit("started", "info", "observer attached")
 	lastGrowth := o.nowFunc()
 	lastSize := o.statSize()
+	lastActivity := o.newestActivity()
 	stallEmitted := false
 
 	ticker := time.NewTicker(o.cfg.PollS)
@@ -107,9 +133,15 @@ func (o *Observer) Watch(ctx context.Context) error {
 			o.emit("stopped", "info", "stop requested")
 			return nil
 		case <-ticker.C:
+			// Progress = stdout-log grew OR a fresh write landed in the
+			// workspace tree (the tmux-driver signal). Either resets the timer.
 			sz := o.statSize()
-			if sz > lastSize {
+			act := o.newestActivity()
+			if sz > lastSize || act.After(lastActivity) {
 				lastSize = sz
+				if act.After(lastActivity) {
+					lastActivity = act
+				}
 				lastGrowth = o.nowFunc()
 				stallEmitted = false
 				continue
@@ -121,6 +153,42 @@ func (o *Observer) Watch(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// newestActivity returns the most recent mtime among regular files under
+// cfg.WorkspaceDir, excluding the observer's own events file (see
+// observerEventsSuffix). Returns the zero Time when WorkspaceDir is unset
+// (disables the signal — stdout-log growth then governs alone) or empty.
+// The walk is bounded by activityScanMaxFiles; walk errors degrade to "no
+// fresh activity this tick" (the ticker retries) rather than failing Watch.
+func (o *Observer) newestActivity() time.Time {
+	if o.cfg.WorkspaceDir == "" {
+		return time.Time{}
+	}
+	var newest time.Time
+	seen := 0
+	_ = filepath.Walk(o.cfg.WorkspaceDir, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries; keep walking
+		}
+		if info.IsDir() {
+			return nil
+		}
+		// Exclude the observer's own sink BEFORE charging the cap — it is not
+		// part of the work budget, and excluding it can never reset the timer.
+		if strings.HasSuffix(info.Name(), observerEventsSuffix) {
+			return nil
+		}
+		if seen >= activityScanMaxFiles {
+			return filepath.SkipAll
+		}
+		seen++
+		if mt := info.ModTime(); mt.After(newest) {
+			newest = mt
+		}
+		return nil
+	})
+	return newest
 }
 
 // Stop signals the Watch goroutine to exit. Idempotent.

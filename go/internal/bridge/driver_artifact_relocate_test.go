@@ -164,6 +164,113 @@ func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
 	}
 }
 
+// TestArtifactReady_RelocatesFromWorktreeRoot — cycle-141 ExitArtifactTimeout
+// root cause: the builder runs with cwd=worktree (driver_tmux_repl.go:77) and
+// the prompt names the artifact by bare relative path ("Write build-report.md"),
+// so the agent writes it into the worktree root — a path the driver did not
+// poll. artifactReady must search the worktree cwd and relocate to canonical.
+func TestArtifactReady_RelocatesFromWorktreeRoot(t *testing.T) {
+	ws := t.TempDir()
+	wt := t.TempDir()
+	canonical := filepath.Join(ws, "build-report.md")
+	wtCopy := filepath.Join(wt, "build-report.md")
+	body := []byte("## Build Steps\nconverged\n")
+	if err := os.WriteFile(wtCopy, body, 0o644); err != nil {
+		t.Fatalf("seed worktree copy: %v", err)
+	}
+	cfg := &Config{Workspace: ws, Worktree: wt, Artifact: canonical}
+
+	ready, from, err := artifactReady(cfg)
+	if !ready || err != nil {
+		t.Fatalf("artifactReady should succeed when the artifact is in the worktree root; got ready=%v err=%v", ready, err)
+	}
+	if from != wtCopy {
+		t.Fatalf("relocatedFrom = %q, want %q", from, wtCopy)
+	}
+	got, err := os.ReadFile(canonical)
+	if err != nil || string(got) != string(body) {
+		t.Fatalf("canonical should hold the relocated body; got %q err=%v", got, err)
+	}
+	if _, statErr := os.Stat(wtCopy); !os.IsNotExist(statErr) {
+		t.Fatalf("worktree copy should be removed after relocation; stat err=%v", statErr)
+	}
+	assertNoTempArtifacts(t, ws)
+}
+
+// TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir — the agent (cwd=
+// worktree) may also read the doc's "workspace/" prefix as a literal subdir,
+// writing <worktree>/workspace/<file>. That path must also be searched.
+func TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir(t *testing.T) {
+	ws := t.TempDir()
+	wt := t.TempDir()
+	canonical := filepath.Join(ws, "build-report.md")
+	wtCopy := filepath.Join(wt, "workspace", "build-report.md")
+	if err := os.MkdirAll(filepath.Dir(wtCopy), 0o755); err != nil {
+		t.Fatalf("mkdir worktree subdir: %v", err)
+	}
+	body := []byte("## Build Steps\nok\n")
+	if err := os.WriteFile(wtCopy, body, 0o644); err != nil {
+		t.Fatalf("seed worktree subdir: %v", err)
+	}
+	cfg := &Config{Workspace: ws, Worktree: wt, Artifact: canonical}
+
+	ready, from, err := artifactReady(cfg)
+	if !ready || err != nil || from != wtCopy {
+		t.Fatalf("expected relocation from worktree workspace subdir; got ready=%v from=%q err=%v", ready, from, err)
+	}
+	got, err := os.ReadFile(canonical)
+	if err != nil || string(got) != string(body) {
+		t.Fatalf("canonical should hold the relocated body; got %q err=%v", got, err)
+	}
+}
+
+// TestArtifactReady_WorkspaceSubdirWinsOverWorktree — when the artifact exists
+// in BOTH the workspace/ subdir (cycle-108 path) and the worktree (cycle-141
+// path), the workspace/ subdir is preferred: it is closest to the canonical
+// location and is the path most agents already use. Pins search-order priority.
+func TestArtifactReady_WorkspaceSubdirWinsOverWorktree(t *testing.T) {
+	ws := t.TempDir()
+	wt := t.TempDir()
+	canonical := filepath.Join(ws, "build-report.md")
+	wsSub := filepath.Join(ws, "workspace", "build-report.md")
+	wtCopy := filepath.Join(wt, "build-report.md")
+	if err := os.MkdirAll(filepath.Dir(wsSub), 0o755); err != nil {
+		t.Fatalf("mkdir ws subdir: %v", err)
+	}
+	if err := os.WriteFile(wsSub, []byte("ws-subdir wins\n"), 0o644); err != nil {
+		t.Fatalf("seed ws subdir: %v", err)
+	}
+	if err := os.WriteFile(wtCopy, []byte("worktree loses\n"), 0o644); err != nil {
+		t.Fatalf("seed worktree copy: %v", err)
+	}
+	cfg := &Config{Workspace: ws, Worktree: wt, Artifact: canonical}
+
+	ready, from, err := artifactReady(cfg)
+	if !ready || err != nil {
+		t.Fatalf("artifactReady should succeed; got ready=%v err=%v", ready, err)
+	}
+	if from != wsSub {
+		t.Fatalf("workspace/ subdir must win over the worktree; relocatedFrom = %q, want %q", from, wsSub)
+	}
+	got, _ := os.ReadFile(canonical)
+	if string(got) != "ws-subdir wins\n" {
+		t.Fatalf("canonical should hold the workspace/ subdir body; got %q", got)
+	}
+}
+
+// TestArtifactReady_NoWorktreeConfigured_UnchangedBehavior — when cfg.Worktree
+// is empty (headless drivers, probes), behavior is byte-identical to the
+// pre-cycle-141 code: only the canonical path + the workspace/ subdir count.
+func TestArtifactReady_NoWorktreeConfigured_UnchangedBehavior(t *testing.T) {
+	ws := t.TempDir()
+	cfg := &Config{Workspace: ws, Artifact: filepath.Join(ws, "build-report.md")}
+
+	ready, from, err := artifactReady(cfg)
+	if ready || from != "" || err != nil {
+		t.Fatalf("with no worktree and no artifact, want (false, \"\", nil); got (%v, %q, %v)", ready, from, err)
+	}
+}
+
 func TestRelocateFile_HappyPath(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "sub", "report.md")

@@ -149,28 +149,48 @@ func isDir(path string) bool {
 
 // artifactReady reports whether the phase artifact is present and non-empty.
 // It accepts the canonical cfg.Artifact path and, as a tolerance for agent
-// doc-compliance variance, a single fallback: <workspace>/workspace/<basename>.
-// Some agents read the "workspace/" prefix in the agent docs as a literal
-// subdir under their cwd rather than the workspace directory, writing
-// <workspace>/workspace/<file>; the driver only polls the canonical path, so
-// that write caused the cycle-108 ExitArtifactTimeout. When the artifact is
-// found in the fallback location it is relocated to the canonical path (the
-// single source of truth that downstream phases read), and relocatedFrom
-// returns the fallback path so the caller can log the normalization. Empty
-// files never count (matching fileNonEmpty / the bash `[[ -s ]]` test).
+// doc-compliance variance, an ordered set of fallback locations that get
+// relocated to the canonical path (the single source of truth downstream
+// phases read). relocatedFrom returns the fallback the artifact was found at
+// so the caller can log the normalization. Empty files never count (matching
+// fileNonEmpty / the bash `[[ -s ]]` test).
 //
-// When the fallback artifact exists but the relocation fails (e.g. a
-// read-only workspace), the error is RETURNED rather than swallowed: a silent
-// (false, "") would make the driver spin the full artifact-wait window with no
-// signal, hiding a "wrote to the wrong place AND could not be moved" condition
-// from the operator. The caller logs it.
+// Fallback search order (first non-empty wins):
+//  1. <workspace>/workspace/<base> — cycle-108: agents read the doc's
+//     "workspace/" prefix as a literal subdir under their cwd.
+//  2. <worktree>/<base> — cycle-141 ExitArtifactTimeout: the builder runs with
+//     cwd=worktree (driver_tmux_repl.go), and the prompt names the artifact by
+//     bare relative path ("Write build-report.md"), so the agent writes it into
+//     the worktree root — which the driver did not poll.
+//  3. <worktree>/workspace/<base> — the same "workspace/" literal-subdir
+//     misread, but relative to the worktree cwd.
+//
+// Worktree candidates are only searched when cfg.Worktree is set (headless
+// drivers / probes leave it empty), so that path is byte-identical to the
+// pre-cycle-141 behavior.
+//
+// When a fallback artifact exists but the relocation fails (e.g. a read-only
+// workspace), the error is RETURNED rather than swallowed: a silent (false, "")
+// would make the driver spin the full artifact-wait window with no signal,
+// hiding a "wrote to the wrong place AND could not be moved" condition from the
+// operator. The caller logs it.
 // See docs/architecture/adr/0024-conditional-ship-gate-floor-and-phase-advisor.md.
 func artifactReady(cfg *Config) (ready bool, relocatedFrom string, err error) {
 	if fileNonEmpty(cfg.Artifact) {
 		return true, "", nil
 	}
-	fallback := filepath.Join(cfg.Workspace, "workspace", filepath.Base(cfg.Artifact))
-	if fallback != cfg.Artifact && fileNonEmpty(fallback) {
+	base := filepath.Base(cfg.Artifact)
+	candidates := []string{filepath.Join(cfg.Workspace, "workspace", base)}
+	if cfg.Worktree != "" {
+		candidates = append(candidates,
+			filepath.Join(cfg.Worktree, base),
+			filepath.Join(cfg.Worktree, "workspace", base),
+		)
+	}
+	for _, fallback := range candidates {
+		if fallback == cfg.Artifact || !fileNonEmpty(fallback) {
+			continue
+		}
 		if rerr := relocateFile(fallback, cfg.Artifact); rerr != nil {
 			return false, "", fmt.Errorf("relocate %s → %s: %w", fallback, cfg.Artifact, rerr)
 		}

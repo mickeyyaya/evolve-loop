@@ -86,6 +86,12 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		Phase:     phase,
 		Agent:     phase, // runner-side: agent name == phase name post-prefix-strip
 		StdoutLog: stdoutLog,
+		// Treat fresh writes anywhere in the workspace as progress — tmux-driver
+		// agents write live output to the tmux scrollback (not the stdout-log),
+		// so workspace artifact writes are the only filesystem liveness signal
+		// until clean exit. Without this the observer falsely stalls a working
+		// tmux build agent (cycle-141).
+		WorkspaceDir: req.Workspace,
 	}
 	// Cycle-124 Task 6 — KNOWN GAP: the operator's "active liveness
 	// nudging" mechanism is wired into the STANDALONE `evolve phase-

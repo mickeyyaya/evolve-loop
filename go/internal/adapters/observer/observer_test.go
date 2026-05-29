@@ -118,6 +118,143 @@ func TestWatch_GrowthResetsStallTimer(t *testing.T) {
 	}
 }
 
+// TestWatch_WorkspaceActivityResetsStallTimer — cycle-141: a tmux-driver
+// agent writes its live output to the tmux scrollback, NOT the stdout-log,
+// so the stdout-log stays flat while the agent is productively writing
+// artifacts (worktree commit, reflection.yaml) into the workspace tree. When
+// WorkspaceDir is set, a fresh write anywhere under it counts as progress and
+// resets the stall timer — so a working tmux agent is not falsely killed.
+func TestWatch_WorkspaceActivityResetsStallTimer(t *testing.T) {
+	tmp := t.TempDir()
+	logFile := filepath.Join(tmp, "build-stdout.log")
+	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sink syncBuffer
+	o := New(Config{
+		StallS: 200 * time.Millisecond,
+		PollS:  20 * time.Millisecond,
+		Cycle:  1, Phase: "build", Agent: "build",
+		StdoutLog:    logFile,
+		WorkspaceDir: tmp,
+	}, &sink)
+
+	// Append to a WORKSPACE artifact (not the stdout-log) every 50ms. The
+	// stdout-log never grows, but the workspace mtime advances → no stall.
+	stop := make(chan struct{})
+	go func() {
+		tick := time.NewTicker(50 * time.Millisecond)
+		defer tick.Stop()
+		for i := 0; i < 5; i++ {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+				p := filepath.Join(tmp, "build-reflection.yaml")
+				f, _ := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+				_, _ = f.Write([]byte("line\n"))
+				_ = f.Close()
+			}
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	_ = o.Watch(ctx)
+	close(stop)
+	for _, e := range parseEvents(t, sink.bytes()) {
+		if e.Type == "stall_no_output" {
+			t.Errorf("stall fired while the agent was writing workspace artifacts: %+v", e)
+		}
+	}
+}
+
+// TestWatch_WorkspaceConfiguredButIdle_StillStalls — guard against the
+// activity signal disabling stall detection: with WorkspaceDir set but no
+// writes anywhere, a genuine stall must still fire.
+func TestWatch_WorkspaceConfiguredButIdle_StillStalls(t *testing.T) {
+	tmp := t.TempDir()
+	logFile := filepath.Join(tmp, "build-stdout.log")
+	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sink bytes.Buffer
+	o := New(Config{
+		StallS: 100 * time.Millisecond,
+		PollS:  10 * time.Millisecond,
+		Cycle:  9, Phase: "build", Agent: "build",
+		StdoutLog:    logFile,
+		WorkspaceDir: tmp,
+	}, &sink)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	_ = o.Watch(ctx)
+	hasStall := false
+	for _, e := range parseEvents(t, sink.Bytes()) {
+		if e.Type == "stall_no_output" && e.Severity == "incident" {
+			hasStall = true
+		}
+	}
+	if !hasStall {
+		t.Error("idle agent with WorkspaceDir set must still stall")
+	}
+}
+
+// TestWatch_ObserverEventsFileDoesNotMaskStall — the observer's own events
+// sink, when it lives inside WorkspaceDir, must be excluded from the activity
+// scan. Otherwise the "started" (and later "stall") writes would advance the
+// workspace mtime and the observer could never detect a stall — it would keep
+// resetting on its own writes. Simulate by pre-creating the events file and
+// touching it on the same cadence the observer would; a real stall must fire.
+func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
+	tmp := t.TempDir()
+	logFile := filepath.Join(tmp, "build-stdout.log")
+	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The events file the production adapter creates: <phase>-observer-events.ndjson.
+	eventsFile := filepath.Join(tmp, "build-observer-events.ndjson")
+	var sink syncBuffer
+	o := New(Config{
+		StallS: 150 * time.Millisecond,
+		PollS:  10 * time.Millisecond,
+		Cycle:  3, Phase: "build", Agent: "build",
+		StdoutLog:    logFile,
+		WorkspaceDir: tmp,
+	}, &sink)
+
+	stop := make(chan struct{})
+	go func() {
+		tick := time.NewTicker(20 * time.Millisecond)
+		defer tick.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+				f, _ := os.OpenFile(eventsFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+				_, _ = f.Write([]byte("{}\n"))
+				_ = f.Close()
+			}
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	defer cancel()
+	_ = o.Watch(ctx)
+	close(stop)
+	hasStall := false
+	for _, e := range parseEvents(t, sink.bytes()) {
+		if e.Type == "stall_no_output" {
+			hasStall = true
+		}
+	}
+	if !hasStall {
+		t.Error("stall must fire even though the observer's own events file keeps growing (it must be excluded from the activity scan)")
+	}
+}
+
 // TestStop_StopsBeforeStallFires — calling Stop() interrupts the
 // observer before any stall can be detected.
 func TestStop_StopsBeforeStallFires(t *testing.T) {
