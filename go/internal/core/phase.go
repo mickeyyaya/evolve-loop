@@ -21,7 +21,13 @@ const (
 	PhaseAudit        Phase = "audit"
 	PhaseShip         Phase = "ship"
 	PhaseRetro        Phase = "retro"
-	PhaseEnd          Phase = "end"
+	// PhaseDebugger is the recovery phase the advisor can recommend when a
+	// phase (typically ship) returns a structured error/blocker. It receives
+	// the ShipError on its input, diagnoses the root cause, and emits a
+	// debug-decision (RESHIP / RERUN_PHASE / BLOCK) the orchestrator executes.
+	// OPTIONAL — never on the mandatory spine.
+	PhaseDebugger Phase = "debugger"
+	PhaseEnd      Phase = "end"
 )
 
 // String implements fmt.Stringer.
@@ -31,7 +37,7 @@ func (p Phase) String() string { return string(p) }
 func (p Phase) IsValid() bool {
 	switch p {
 	case PhaseStart, PhaseIntent, PhaseScout, PhaseTriage,
-		PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseEnd:
+		PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseDebugger, PhaseEnd:
 		return true
 	}
 	return false

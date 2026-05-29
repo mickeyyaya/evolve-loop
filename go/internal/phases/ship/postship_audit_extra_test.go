@@ -9,6 +9,8 @@ import (
 	"io"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func TestPromoteInbox_WithTriageDecision_Promotes(t *testing.T) {
@@ -41,14 +43,12 @@ func TestPromoteInbox_TriageDecisionWithNoIDs_NoPromoteLog(t *testing.T) {
 	}
 }
 
-func TestFindLatestAudit_MissingLedger_IntegrityError(t *testing.T) {
+func TestFindLatestAudit_MissingLedger_NoLedgerShipError(t *testing.T) {
 	_, err := findLatestAudit(filepath.Join(t.TempDir(), "does-not-exist.jsonl"))
 	if err == nil {
 		t.Fatal("missing ledger must error")
 	}
-	if _, ok := err.(*IntegrityError); !ok {
-		t.Errorf("want *IntegrityError, got %T", err)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, "no ledger")
 }
 
 func TestFindLatestAudit_AlienAndNonAuditorLinesSkipped(t *testing.T) {

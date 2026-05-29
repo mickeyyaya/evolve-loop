@@ -45,8 +45,8 @@ func TestCommitGate_ManualMissingAttestation_Refuses(t *testing.T) {
 		CommitMessage: "unreviewed change",
 		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (missing commit-gate attestation is a config error), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "requires a commit-gate review attestation") {
 		t.Errorf("missing attestation-required message in: %v", res.Logs)
@@ -92,8 +92,8 @@ func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 		CommitMessage: "actual change",
 		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (stale commit-gate attestation is a config error), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "stale") {
 		t.Errorf("missing 'stale' message in: %v", res.Logs)

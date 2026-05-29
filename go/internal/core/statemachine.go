@@ -46,8 +46,16 @@ func NewStateMachine() *StateMachine {
 		PhaseBuild:        {PhaseAudit: true},
 		PhaseAudit:        {PhaseShip: true, PhaseRetro: true},
 		PhaseRetro:        {PhaseShip: true, PhaseTDD: true, PhaseEnd: true},
-		PhaseShip:         {PhaseEnd: true},
-		PhaseEnd:          {},
+		// Ship can hand off to the debugger when it returns a structured
+		// error/blocker (advisor-recommended recovery). PhaseEnd is the
+		// success successor.
+		PhaseShip: {PhaseEnd: true, PhaseDebugger: true},
+		// Debugger recovery routes: re-attempt ship, or re-run an upstream
+		// phase to re-establish a stale precondition, or give up (end). Edges
+		// are legal; the actual choice comes from the debug-decision the
+		// orchestrator reads (decideAfterDebugger), like the retro branch.
+		PhaseDebugger: {PhaseShip: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseEnd: true},
+		PhaseEnd:      {},
 	}
 	return &StateMachine{allowed: a}
 }
@@ -103,6 +111,11 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 			return "", fmt.Errorf("%w: audit verdict %q", ErrTransitionInvalid, verdict)
 		}
 	case PhaseShip:
+		return PhaseEnd, nil
+	case PhaseDebugger:
+		// Decision-driven (RESHIP / RERUN_PHASE / BLOCK): the orchestrator
+		// overrides via scheduledNext from the debug-decision, mirroring the
+		// retro branch. Default end so callers can override explicitly.
 		return PhaseEnd, nil
 	case PhaseRetro:
 		// Default: failure-adapter is consulted by orchestrator. State

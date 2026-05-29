@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // makeRepo creates a fresh git repo with:
@@ -243,9 +245,12 @@ func containsLog(res RunResult, substr string) bool {
 func TestNative_A_NoAuditor_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "test commit"})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity, got %d (err=%v, logs=%v)", res.ExitCode, err, res.Logs)
+	// Reclassified: no-auditor is a re-establishable precondition (not a
+	// genuine integrity breach) → ExitFailure carrying AUDIT_BINDING_NO_AUDITOR.
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure, got %d (err=%v, logs=%v)", res.ExitCode, err, res.Logs)
 	}
+	wantShipErr(t, err, core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, "no Auditor")
 	if !containsLog(res, "no Auditor") {
 		t.Errorf("missing 'no Auditor' log in: %v", res.Logs)
 	}
@@ -294,8 +299,8 @@ func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
 		CommitMessage: "should not ship",
 		Env:           map[string]string{"EVOLVE_STRICT_AUDIT": "1"},
 	})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity, got %d", res.ExitCode)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (WARN+strict is a re-auditable precondition), got %d", res.ExitCode)
 	}
 	if !containsLog(res, "EVOLVE_STRICT_AUDIT=1") {
 		t.Errorf("missing strict-audit message in: %v", res.Logs)
@@ -311,8 +316,8 @@ func TestNative_D_TreeStateMismatch_Refuses(t *testing.T) {
 	// Mutate after audit:
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nversion 1 of audited content\nversion 2 — added after audit\n")
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "should refuse"})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity, got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (tree-state mismatch is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "tree-state mismatch") {
 		t.Errorf("missing tree-state-mismatch in: %v", res.Logs)
@@ -327,8 +332,8 @@ func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
 		"head": "0000000000000000000000000000000000000000",
 	})
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "should refuse"})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity, got %d", res.ExitCode)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (HEAD-moved is a re-auditable precondition), got %d", res.ExitCode)
 	}
 	if !containsLog(res, "HEAD has moved") {
 		t.Errorf("missing 'HEAD has moved' in: %v", res.Logs)
@@ -409,8 +414,8 @@ func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
 		Class:         ClassManual,
 		CommitMessage: "manual change",
 	})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (not-a-tty is a config error), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "requires interactive stdin") {
 		t.Errorf("missing tty-required message in: %v", res.Logs)
@@ -490,8 +495,8 @@ func TestNative_N_AuditorExit2_Refuses(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for exit-2 test\n")
 	seedAudit(t, repo, "PASS", map[string]string{"exit_code": "2"})
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: ship with exit-2"})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (auditor-exit-2 is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "Auditor exited 2") {
 		t.Errorf("missing 'Auditor exited 2' in: %v", res.Logs)
@@ -505,8 +510,8 @@ func TestNative_O_VerdictFAIL_Refuses(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for verdict-fail test\n")
 	seedAudit(t, repo, "FAIL")
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: ship with verdict fail"})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (verdict-FAIL is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "Verdict: FAIL") && !containsLog(res, "auditor explicitly rejected") {
 		t.Errorf("missing FAIL verdict diagnostic in: %v", res.Logs)
@@ -544,8 +549,8 @@ Verdict: PASS
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
 
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "ship dual-verdict"})
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (dual-verdict is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	if !containsLog(res, "BOTH 'Verdict: FAIL' AND 'Verdict: PASS'") {
 		t.Errorf("missing dual-verdict message in: %v", res.Logs)

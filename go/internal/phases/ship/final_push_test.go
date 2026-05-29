@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- Run: default wiring ---------------------------------------------------
@@ -417,9 +419,7 @@ func TestVerifyManualConfirm_LongDiff_Truncated(t *testing.T) {
 		Stdin:  strings.NewReader(""),
 	}
 	err := verifyManualConfirm(context.Background(), opts, &RunResult{})
-	if _, ok := err.(*IntegrityError); !ok {
-		t.Fatalf("non-tty check must fire; got %T: %v", err, err)
-	}
+	wantShipErr(t, err, core.CodeManualNotTTY, core.ShipClassConfig, "")
 	if !strings.Contains(stderrBuf.String(), "diff truncated") {
 		t.Errorf("truncation notice missing from stderr; got %q", stderrBuf.String())
 	}

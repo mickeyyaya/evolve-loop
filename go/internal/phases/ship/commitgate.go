@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // commitGateAttestation mirrors the subset of .commit-gate/attestation.json
@@ -48,35 +50,40 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 	raw, err := os.ReadFile(attPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &IntegrityError{
-				Msg: "--class manual requires a commit-gate review attestation, but .commit-gate/attestation.json is missing. " +
-					"Run /commit (code-simplifier + code-reviewer + language reviewer + lint + targeted tests) to produce one, " +
+			return shipErr(core.CodeCommitGateMissing, core.ShipClassConfig, core.StageVerifyClass,
+				"--class manual requires a commit-gate review attestation, but .commit-gate/attestation.json is missing. "+
+					"Run /commit (code-simplifier + code-reviewer + language reviewer + lint + targeted tests) to produce one, "+
 					"or set EVOLVE_BYPASS_COMMIT_GATE=1 to bypass.",
-			}
+				"attestation_path", attPath)
 		}
-		return fmt.Errorf("ship: read commit-gate attestation: %w", err)
+		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: read commit-gate attestation: "+err.Error(), "attestation_path", attPath)
 	}
 
 	var att commitGateAttestation
 	if err := json.Unmarshal(raw, &att); err != nil {
-		return &IntegrityError{Msg: fmt.Sprintf("commit-gate attestation is malformed JSON (%v) — re-run /commit", err)}
+		return shipErr(core.CodeCommitGateMalformed, core.ShipClassConfig, core.StageVerifyClass,
+			fmt.Sprintf("commit-gate attestation is malformed JSON (%v) — re-run /commit", err),
+			"attestation_path", attPath, "json_err", err.Error())
 	}
 	if att.TreeStateSHA == "" {
-		return &IntegrityError{Msg: "commit-gate attestation has no tree_state_sha — re-run /commit"}
+		return shipErr(core.CodeCommitGateMalformed, core.ShipClassConfig, core.StageVerifyClass,
+			"commit-gate attestation has no tree_state_sha — re-run /commit", "attestation_path", attPath)
 	}
 
 	cur, err := computeTreeStateSHA(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("ship: commit-gate tree SHA: %w", err)
+		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: commit-gate tree SHA: "+err.Error())
 	}
 	if att.TreeStateSHA != cur {
-		return &IntegrityError{
-			Msg: fmt.Sprintf(
+		return shipErr(core.CodeCommitGateStale, core.ShipClassConfig, core.StageVerifyClass,
+			fmt.Sprintf(
 				"commit-gate attestation is stale: reviewed tree=%s but staged tree=%s. "+
 					"The change set differs from what was reviewed — re-run /commit.",
 				att.TreeStateSHA, cur,
 			),
-		}
+			"reviewed_tree", att.TreeStateSHA, "staged_tree", cur)
 	}
 	res.Logs = append(res.Logs, "[ship] commit-gate: review attestation verified (tree "+cur+")")
 	if res.Provenance != "" {

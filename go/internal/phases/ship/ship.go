@@ -192,12 +192,23 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 
 	if err != nil {
-		verdict := core.VerdictFAIL
+		// Boundary preservation: wrap with %w so core.AsShipError still
+		// recovers the structured *core.ShipError from the orchestrator side,
+		// and surface its Code/Class/Debug as PhaseResponse.Signals so the
+		// debugger-routing layer can act on them without re-parsing strings.
+		signals := map[string]any{}
+		if se, ok := core.AsShipError(err); ok {
+			signals["ship.error_code"] = string(se.Code)
+			signals["ship.error_class"] = string(se.Class)
+			signals["ship.error_stage"] = string(se.Stage)
+			signals["ship.debug"] = se.DebugString()
+		}
 		return core.PhaseResponse{
 			Phase:        phaseName,
-			Verdict:      verdict,
+			Verdict:      core.VerdictFAIL,
 			ArtifactsDir: req.Workspace,
 			DurationMS:   durationMS,
+			Signals:      signals,
 			Diagnostics: []core.Diagnostic{
 				{Severity: "error", Message: err.Error()},
 			},
@@ -219,6 +230,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		Verdict:      core.VerdictPASS,
 		ArtifactsDir: req.Workspace,
 		NextPhase:    string(core.PhaseRetro),
+		CommitSHA:    res.CommitSHA,
 		DurationMS:   durationMS,
 	}, nil
 }

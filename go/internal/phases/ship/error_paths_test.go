@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // faultRunner returns (exit, failErr) for the git subcommand matching
@@ -112,7 +114,10 @@ func TestComputeTreeStateSHA_RunnerError_Errors(t *testing.T) {
 func TestFinalize_ClassifiesExitCodes(t *testing.T) {
 	opts := &Options{ProjectRoot: t.TempDir()} // DryRun=false → journal no-op
 	t.Run("integrity-error", func(t *testing.T) {
-		out, err := finalize(context.Background(), opts, &RunResult{}, &IntegrityError{Msg: "breach"}, "r")
+		// An integrity-class ShipError maps to ExitIntegrity; finalize now keys
+		// off the structured Class, not the Go type.
+		breach := shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip, "breach")
+		out, err := finalize(context.Background(), opts, &RunResult{}, breach, "r")
 		if err == nil || out.ExitCode != ExitIntegrity {
 			t.Errorf("want ExitIntegrity + err, got code=%d err=%v", out.ExitCode, err)
 		}

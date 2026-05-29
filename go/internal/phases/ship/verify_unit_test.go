@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- checkEGPSGate -------------------------------------------------------
@@ -71,13 +73,10 @@ func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
 	if err == nil {
 		t.Fatal("red_count>0 MUST block the ship — got nil error (trust-kernel breach)")
 	}
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("expected *IntegrityError, got %T: %v", err, err)
-	}
+	se := wantShipErr(t, err, core.CodeEGPSRedCount, core.ShipClassPrecondition, "")
 	// The refusal must name the RED predicate IDs so the operator can act.
-	if !strings.Contains(ie.Msg, "pred-auth-leak") || !strings.Contains(ie.Msg, "pred-null-deref") {
-		t.Errorf("IntegrityError must name RED predicate IDs; got %q", ie.Msg)
+	if !strings.Contains(se.Message, "pred-auth-leak") || !strings.Contains(se.Message, "pred-null-deref") {
+		t.Errorf("EGPS refusal must name RED predicate IDs; got %q", se.Message)
 	}
 }
 
@@ -122,13 +121,7 @@ func TestVerifyTrivial_RejectsNonTrivialEstimate(t *testing.T) {
 	writeCycleState(t, root, "small") // not "trivial"
 	opts := &Options{ProjectRoot: root, Runner: (&scriptedRunner{}).runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("non-trivial estimate must be rejected with IntegrityError; got %v", err)
-	}
-	if !strings.Contains(ie.Msg, "trivial") {
-		t.Errorf("error should explain the trivial requirement; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeTrivialNotTrivial, core.ShipClassConfig, "trivial")
 }
 
 // TestVerifyTrivial_RejectsPipelineCriticalPath: even a trivial-sized
@@ -143,13 +136,7 @@ func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
 	r.scripts["git ls-files"] = scriptResult(t, "skills/evolve-loop/SKILL.md\n", 0)
 	opts := &Options{ProjectRoot: root, Runner: r.runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("pipeline-critical path must be rejected; got %v", err)
-	}
-	if !strings.Contains(ie.Msg, "skills/evolve-loop/SKILL.md") {
-		t.Errorf("error should name the offending critical file; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeTrivialCriticalPaths, core.ShipClassConfig, "skills/evolve-loop/SKILL.md")
 }
 
 // TestVerifyTrivial_AcceptsCleanTrivialCycle: trivial estimate + no

@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- verifyClass -----------------------------------------------------------
@@ -303,12 +305,7 @@ func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 		Stdin:       strings.NewReader(stdinBuf.String()),
 	}
 	err := verifyManualConfirm(context.Background(), opts, &RunResult{})
-	if _, ok := err.(*IntegrityError); !ok {
-		t.Fatalf("non-TTY stdin must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(err.Error(), "not a tty") {
-		t.Errorf("error should mention tty; got %q", err.Error())
-	}
+	wantShipErr(t, err, core.CodeManualNotTTY, core.ShipClassConfig, "not a tty")
 }
 
 // --- verifyAuditBinding: TreeStateSHA mismatch (uncommitted changes) --------
@@ -323,10 +320,5 @@ func TestVerifyAuditBinding_TreeMismatch_IntegrityError(t *testing.T) {
 
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{})
-	if _, ok := err.(*IntegrityError); !ok {
-		t.Fatalf("tree mismatch must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(err.Error(), "uncommitted changes") {
-		t.Errorf("error should mention uncommitted changes; got %q", err.Error())
-	}
+	wantShipErr(t, err, core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, "uncommitted changes")
 }

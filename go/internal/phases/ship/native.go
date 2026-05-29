@@ -17,9 +17,10 @@ package ship
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Class enumerates the four commit lifecycles. Matches ship.sh --class.
@@ -136,13 +137,17 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 
 	// 0. Validate inputs.
 	if opts.CommitMessage == "" {
-		return res, fmt.Errorf("ship: commit message required")
+		return res, shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
+			"ship: commit message required")
 	}
 	if !opts.Class.IsValid() {
-		return res, fmt.Errorf("ship: invalid --class %q (must be: cycle|manual|release|trivial)", opts.Class)
+		return res, shipErr(core.CodeInvalidClass, core.ShipClassConfig, core.StageArgs,
+			"ship: invalid --class "+string(opts.Class)+" (must be: cycle|manual|release|trivial)",
+			"class", string(opts.Class))
 	}
 	if opts.ProjectRoot == "" {
-		return res, fmt.Errorf("ship: ProjectRoot required")
+		return res, shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
+			"ship: ProjectRoot required")
 	}
 
 	// Defaults.
@@ -219,9 +224,10 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		res.Logs = append(res.Logs, "[ship] WARN: post-ship hook error: "+err.Error())
 	}
 
-	res.ExitCode = ExitOK
-	writeDryRunJournal(ctx, &opts, &res, "normal")
-	return res, nil
+	// Success path also goes through finalize (with nil err) so it is the SINGLE
+	// exit-code + dry-run-journal site for every outcome — no separate journal
+	// write that could double up, and the err==nil branch is live, not dead.
+	return finalize(ctx, &opts, &res, nil, "normal")
 }
 
 // finalize classifies an error into the right ExitCode and writes the
@@ -230,7 +236,14 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exitReason string) (RunResult, error) {
 	if err == nil {
 		res.ExitCode = ExitOK
-	} else if _, isIntegrity := err.(*IntegrityError); isIntegrity {
+		writeDryRunJournal(ctx, opts, res, exitReason)
+		return *res, err
+	}
+	// The exit code is keyed off the structured error's Class, not the Go
+	// type: Class=integrity → ExitIntegrity; every other class (and any plain
+	// error) → ExitFailure. The orchestrator does the richer routing off the
+	// recovered ShipError (Code/Class/Stage/Debug).
+	if se, ok := core.AsShipError(err); ok && se.Class == core.ShipClassIntegrity {
 		res.ExitCode = ExitIntegrity
 		res.Logs = append(res.Logs, "[ship] INTEGRITY-FAIL: "+err.Error())
 	} else {

@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- verifySelfSHA: clean pass (SHA and version both match) ----------------
@@ -281,14 +283,9 @@ func TestVerifyTrivial_CriticalPathTruncated_Shows3Max(t *testing.T) {
 	}{stdout: "", exit: 0}
 	opts := &Options{ProjectRoot: root, Runner: r.runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("4 critical files must yield IntegrityError; got %T: %v", err, err)
-	}
-	// Must show "4 touched" but only sample 3 in the error.
-	if !strings.Contains(ie.Msg, "4 touched") {
-		t.Errorf("error should say '4 touched'; got %q", ie.Msg)
-	}
+	// 4 critical files → config-class refusal; message shows "4 touched" but
+	// only samples 3 paths.
+	wantShipErr(t, err, core.CodeTrivialCriticalPaths, core.ShipClassConfig, "4 touched")
 }
 
 // --- findLatestAudit: non-ErrNotExist read failure -------------------------
@@ -304,9 +301,14 @@ func TestFindLatestAudit_ReadError_Propagates(t *testing.T) {
 	if err == nil {
 		t.Fatal("read error must propagate")
 	}
-	// Must NOT be an IntegrityError — it's a runtime error.
+	// Must NOT be an integrity-class refusal — it's a transient IO error
+	// (the ledger read failed), recoverable as a transient ShipError.
 	if _, ok := err.(*IntegrityError); ok {
-		t.Errorf("read error should be plain error, not IntegrityError; got %v", err)
+		t.Errorf("read error should not be an IntegrityError; got %v", err)
+	}
+	se := mustShipErr(t, err)
+	if se.Class == core.ShipClassIntegrity {
+		t.Errorf("read error should be transient, not integrity; got class=%s", se.Class)
 	}
 }
 

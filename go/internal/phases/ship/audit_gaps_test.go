@@ -5,13 +5,14 @@ package ship
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // TestVerifyAuditBinding_AuditorExitCode2_IntegrityError: an auditor that
@@ -23,13 +24,7 @@ func TestVerifyAuditBinding_AuditorExitCode2_IntegrityError(t *testing.T) {
 	seedAudit(t, repo, "PASS", map[string]string{"exit_code": "2"})
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("exit_code=2 must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "exited 2") {
-		t.Errorf("error should mention exit code 2; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingAuditorExit, core.ShipClassPrecondition, "exited 2")
 }
 
 // TestVerifyAuditBinding_DualVerdict_PASS_and_FAIL_IntegrityError: an
@@ -44,13 +39,7 @@ func TestVerifyAuditBinding_DualVerdict_PASS_and_FAIL_IntegrityError(t *testing.
 	)
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("dual PASS+FAIL must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "BOTH") {
-		t.Errorf("error should mention BOTH; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingDualVerdict, core.ShipClassPrecondition, "BOTH")
 }
 
 // TestVerifyAuditBinding_Fail_Verdict_IntegrityError: "Verdict: FAIL" must
@@ -60,13 +49,7 @@ func TestVerifyAuditBinding_FailVerdict_IntegrityError(t *testing.T) {
 	seedAudit(t, repo, "FAIL")
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("FAIL verdict must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "FAIL") {
-		t.Errorf("error should mention FAIL verdict; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingVerdictFail, core.ShipClassPrecondition, "FAIL")
 }
 
 // TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError: a WARN verdict
@@ -78,13 +61,7 @@ func TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError(t *testing.T) {
 	opts := auditOpts(t, repo)
 	opts.Env = map[string]string{"EVOLVE_STRICT_AUDIT": "1"}
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("WARN + STRICT_AUDIT must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "WARN") {
-		t.Errorf("error should mention WARN; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingVerdictWarn, core.ShipClassPrecondition, "WARN")
 }
 
 // TestVerifyAuditBinding_NoVerdict_IntegrityError: an audit report with no
@@ -97,13 +74,7 @@ func TestVerifyAuditBinding_NoVerdict_IntegrityError(t *testing.T) {
 	)
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("no verdict must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "no recognizable verdict") {
-		t.Errorf("error should mention no recognizable verdict; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingMalformed, core.ShipClassPrecondition, "no recognizable verdict")
 }
 
 // TestVerifyAuditBinding_GitHEADMismatch_IntegrityError: the audit was
@@ -119,13 +90,7 @@ func TestVerifyAuditBinding_GitHEADMismatch_IntegrityError(t *testing.T) {
 
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("HEAD mismatch must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "git HEAD has moved") {
-		t.Errorf("error should mention HEAD moved; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, "git HEAD has moved")
 }
 
 // TestVerifyAuditBinding_StaleAudit_IntegrityError: an audit report older
@@ -148,13 +113,7 @@ func TestVerifyAuditBinding_StaleAudit_IntegrityError(t *testing.T) {
 		return Now{Unix: unix, RFC3339: time.Unix(unix, 0).UTC().Format(time.RFC3339)}
 	}
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("stale audit must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "old") {
-		t.Errorf("error should mention age; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingStale, core.ShipClassPrecondition, "old")
 }
 
 // TestVerifyAuditBinding_ArtifactMissing_IntegrityError: ledger points to
@@ -169,13 +128,7 @@ func TestVerifyAuditBinding_ArtifactMissing_IntegrityError(t *testing.T) {
 	}
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("missing artifact must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "missing on disk") {
-		t.Errorf("error should say 'missing on disk'; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingArtifactMissing, core.ShipClassPrecondition, "missing on disk")
 }
 
 // TestVerifyAuditBinding_ArtifactSHAMismatch_IntegrityError: artifact exists
@@ -190,13 +143,7 @@ func TestVerifyAuditBinding_ArtifactSHAMismatch_IntegrityError(t *testing.T) {
 	}
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("SHA mismatch must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "SHA mismatch") {
-		t.Errorf("error should mention SHA mismatch; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingArtifactSHA, core.ShipClassPrecondition, "SHA mismatch")
 }
 
 // TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError: an auditor
@@ -216,13 +163,7 @@ func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
 
 	opts := auditOpts(t, repo)
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
-	var ie *IntegrityError
-	if !errors.As(err, &ie) {
-		t.Fatalf("missing git_head must yield IntegrityError; got %T: %v", err, err)
-	}
-	if !strings.Contains(ie.Msg, "predates v8.13.0") {
-		t.Errorf("error should mention v8.13.0; got %q", ie.Msg)
-	}
+	wantShipErr(t, err, core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, "predates v8.13.0")
 }
 
 // --- helpers ----------------------------------------------------------------

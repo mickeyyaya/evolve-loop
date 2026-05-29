@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // atomicShip is the single entry point for "do the actual git work."
@@ -34,7 +35,8 @@ func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
 		return err
 	}
 	if branch == "" {
-		return fmt.Errorf("ship: detached HEAD — refuse to ship; checkout a branch first")
+		return shipErr(core.CodeGitDetachedHead, core.ShipClassPrecondition, core.StageAtomicShip,
+			"ship: detached HEAD — refuse to ship; checkout a branch first")
 	}
 
 	// Decide worktree path: only for --class cycle with active_worktree set.
@@ -72,7 +74,9 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	if !opts.DryRun {
 		exit, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
-			return fmt.Errorf("ship: git add -A failed (rc=%d): %v", exit, err)
+			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+				fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exit, err),
+				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err))
 		}
 	}
 
@@ -80,7 +84,8 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	// diff, 1 if diff. (We use io.Discard for stdout — there's no output.)
 	exit, err := opts.Runner(ctx, "git", []string{"diff", "--cached", "--quiet"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
 	if err != nil {
-		return fmt.Errorf("ship: git diff --cached --quiet failed: %w", err)
+		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+			"ship: git diff --cached --quiet failed: "+err.Error(), "git_err", err.Error())
 	}
 	if exit == 0 {
 		res.Logs = append(res.Logs, "[ship] no staged changes to ship; exiting cleanly (audit was for an empty diff)")
@@ -101,7 +106,9 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	// shellout to the bash gate when present; missing or non-executable
 	// is silently skipped to match bash behavior (`if [ -x ... ]`).
 	if err := runCommitPrefixGate(ctx, opts, msg, opts.ProjectRoot); err != nil {
-		return fmt.Errorf("ship: commit-prefix-gate rejected main-path commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual: %w", err)
+		return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
+			"ship: commit-prefix-gate rejected main-path commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual: "+err.Error(),
+			"gate_err", err.Error())
 	}
 
 	if opts.DryRun {
@@ -112,14 +119,18 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	// git commit -m <msg>
 	exit, err = opts.Runner(ctx, "git", []string{"commit", "-m", msg}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
-		return fmt.Errorf("ship: git commit failed (rc=%d): %v", exit, err)
+		return shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: git commit failed (rc=%d): %v", exit, err),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", branch)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: committed to %s", branch))
 
 	// git push origin <branch>
 	exit, err = opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
-		return fmt.Errorf("ship: git push failed (rc=%d): %v", exit, err)
+		return shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
+			fmt.Sprintf("ship: git push failed (rc=%d): %v", exit, err),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", branch)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
 
@@ -140,25 +151,31 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 
 	cycleBranch, err := captureGitOutputAtDir(ctx, opts, worktree, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return fmt.Errorf("ship: could not resolve cycle branch from worktree %s: %w", worktree, err)
+		return shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: could not resolve cycle branch from worktree %s: %v", worktree, err),
+			"worktree", worktree, "git_err", err.Error())
 	}
 	cycleBranch = strings.TrimSpace(cycleBranch)
 	if cycleBranch == "" {
-		return fmt.Errorf("ship: empty cycle branch from worktree %s", worktree)
+		return shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
+			"ship: empty cycle branch from worktree "+worktree, "worktree", worktree)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   cycle branch: %s", cycleBranch))
 
 	if !opts.DryRun {
 		exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
-			return fmt.Errorf("ship: worktree git add -A failed (rc=%d): %v", exit, err)
+			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+				fmt.Sprintf("ship: worktree git add -A failed (rc=%d): %v", exit, err),
+				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "worktree", worktree)
 		}
 	}
 
 	// Check staged changes in worktree.
 	exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "diff", "--cached", "--quiet"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
 	if err != nil {
-		return fmt.Errorf("ship: worktree diff --cached --quiet failed: %w", err)
+		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+			"ship: worktree diff --cached --quiet failed: "+err.Error(), "git_err", err.Error(), "worktree", worktree)
 	}
 	worktreeCleanNoCommit := exit == 0
 	if worktreeCleanNoCommit {
@@ -184,7 +201,9 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 		msg := opts.CommitMessage + footer
 
 		if err := runCommitPrefixGate(ctx, opts, msg, worktree); err != nil {
-			return fmt.Errorf("ship: commit-prefix-gate rejected worktree commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual: %w", err)
+			return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
+				"ship: commit-prefix-gate rejected worktree commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual: "+err.Error(),
+				"gate_err", err.Error(), "worktree", worktree)
 		}
 
 		if opts.DryRun {
@@ -193,7 +212,9 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "-c", "commit.gpgsign=false", "commit", "-m", msg},
 				os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 			if err != nil || exit != 0 {
-				return fmt.Errorf("ship: git commit in worktree failed (rc=%d): %v", exit, err)
+				return shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
+					fmt.Sprintf("ship: git commit in worktree failed (rc=%d): %v", exit, err),
+					"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "worktree", worktree)
 			}
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: committed in worktree on %s", cycleBranch))
 
@@ -207,10 +228,10 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 				if opts.internalAuditBoundTreeSHA != wtTreeSHA {
 					// Rollback worktree.
 					_, _ = opts.Runner(ctx, "git", []string{"-C", worktree, "reset", "--soft", "HEAD~1"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
-					return &IntegrityError{
-						Msg: fmt.Sprintf("INTEGRITY BREACH (pre-merge): audit-bound tree SHA %s != worktree-commit tree SHA — refused to ff-merge; worktree rolled back to staged state for operator triage",
+					return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip,
+						fmt.Sprintf("INTEGRITY BREACH (pre-merge): audit-bound tree SHA %s != worktree-commit tree SHA — refused to ff-merge; worktree rolled back to staged state for operator triage",
 							opts.internalAuditBoundTreeSHA),
-					}
+						"audit_bound_tree", opts.internalAuditBoundTreeSHA, "worktree_tree", wtTreeSHA, "phase", "pre-merge")
 				}
 				res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-merge tree-SHA binding verified (audit=%s worktree=%s)", opts.internalAuditBoundTreeSHA, wtTreeSHA))
 			}
@@ -225,7 +246,9 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	// ff-merge cycle branch into main.
 	exit, err = opts.Runner(ctx, "git", []string{"merge", "--ff-only", cycleBranch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
-		return fmt.Errorf("ship: ff-merge %s into %s failed (rc=%d; divergent history): %v", cycleBranch, branch, exit, err)
+		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: ff-merge %s into %s failed (rc=%d; divergent history): %v", cycleBranch, branch, exit, err),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", cycleBranch, "branch", branch)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: ff-merged %s into %s", cycleBranch, branch))
 
@@ -233,7 +256,9 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	exit, err = opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		headOut, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
-		return fmt.Errorf("ship: git push failed (rc=%d); main is at %s: %v", exit, strings.TrimSpace(headOut), err)
+		return shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
+			fmt.Sprintf("ship: git push failed (rc=%d); main is at %s: %v", exit, strings.TrimSpace(headOut), err),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", branch, "head", strings.TrimSpace(headOut))
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
 
@@ -245,9 +270,9 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	committedTree = strings.TrimSpace(committedTree)
 	if opts.internalAuditBoundTreeSHA != "" && committedTree != "" {
 		if opts.internalAuditBoundTreeSHA != committedTree {
-			return &IntegrityError{
-				Msg: fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s — worktree-to-main tree drift detected", opts.internalAuditBoundTreeSHA, committedTree),
-			}
+			return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip,
+				fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s — worktree-to-main tree drift detected", opts.internalAuditBoundTreeSHA, committedTree),
+				"audit_bound_tree", opts.internalAuditBoundTreeSHA, "committed_tree", committedTree, "phase", "post-push")
 		}
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: tree-SHA binding verified (audit=%s committed=%s)", opts.internalAuditBoundTreeSHA, committedTree))
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
@@ -92,14 +91,12 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if err != nil {
-		// Translate error categories to exit codes.
-		switch err.(type) {
-		case *ship.IntegrityError:
-			return int(ship.ExitIntegrity)
-		}
-		// Other errors from validation (e.g. invalid class) → runtime failure.
-		if strings.Contains(err.Error(), "invalid --class") || strings.Contains(err.Error(), "commit message required") {
-			return int(ship.ExitFailure)
+		// Trust finalize()'s authoritative exit-code classification (keyed off
+		// the structured ShipError.Class: integrity → ExitIntegrity, else →
+		// ExitFailure). Early-validation errors bypass finalize and leave
+		// ExitCode==ExitOK; map those to ExitFailure.
+		if res.ExitCode != ship.ExitOK {
+			return int(res.ExitCode)
 		}
 		return int(ship.ExitFailure)
 	}

@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // auditEntry is the subset of LedgerEntry fields ship cares about.
@@ -53,57 +55,60 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	case 0, 1:
 		// fall through
 	default:
-		return &IntegrityError{
-			Msg: fmt.Sprintf("most recent Auditor exited %d (error state — not a Unix-convention findings signal)", entry.ExitCode),
-		}
+		return shipErr(core.CodeAuditBindingAuditorExit, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("most recent Auditor exited %d (error state — not a Unix-convention findings signal)", entry.ExitCode),
+			"auditor_exit_code", fmt.Sprintf("%d", entry.ExitCode))
 	}
 
 	// 4. Artifact existence + SHA.
 	if _, err := os.Stat(entry.ArtifactPath); err != nil {
-		return &IntegrityError{Msg: fmt.Sprintf("audit-report.md missing on disk: %s", entry.ArtifactPath)}
+		return shipErr(core.CodeAuditBindingArtifactMissing, core.ShipClassPrecondition, core.StageVerifyClass,
+			"audit-report.md missing on disk: "+entry.ArtifactPath, "artifact_path", entry.ArtifactPath)
 	}
 	actualSHA, err := sha256File(entry.ArtifactPath)
 	if err != nil {
-		return fmt.Errorf("ship: SHA audit-report.md: %w", err)
+		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: SHA audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
 	}
 	if actualSHA != entry.ArtifactSHA256 {
-		return &IntegrityError{
-			Msg: fmt.Sprintf("audit-report.md SHA mismatch (ledger=%s actual=%s) — artifact mutated post-audit", entry.ArtifactSHA256, actualSHA),
-		}
+		return shipErr(core.CodeAuditBindingArtifactSHA, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("audit-report.md SHA mismatch (ledger=%s actual=%s) — artifact mutated post-audit", entry.ArtifactSHA256, actualSHA),
+			"ledger_sha", entry.ArtifactSHA256, "actual_sha", actualSHA, "artifact_path", entry.ArtifactPath)
 	}
 
 	// 4b. Verdict parse with dual-verdict detection (v8.30.0).
 	body, err := os.ReadFile(entry.ArtifactPath)
 	if err != nil {
-		return fmt.Errorf("ship: read audit-report.md: %w", err)
+		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: read audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
 	}
 	pass, warn, fail := parseVerdicts(string(body))
 
 	if fail && pass {
-		return &IntegrityError{
-			Msg: "audit-report.md declares BOTH 'Verdict: FAIL' AND 'Verdict: PASS' — auditor produced an inconsistent artifact. Re-run audit, or split into separate Verdict and per-eval-result sections.",
-		}
+		return shipErr(core.CodeAuditBindingDualVerdict, core.ShipClassPrecondition, core.StageVerifyClass,
+			"audit-report.md declares BOTH 'Verdict: FAIL' AND 'Verdict: PASS' — auditor produced an inconsistent artifact. Re-run audit, or split into separate Verdict and per-eval-result sections.",
+			"artifact_path", entry.ArtifactPath)
 	}
 	switch {
 	case fail:
-		return &IntegrityError{
-			Msg: "audit-report.md declares 'Verdict: FAIL' — auditor explicitly rejected this build",
-		}
+		return shipErr(core.CodeAuditBindingVerdictFail, core.ShipClassPrecondition, core.StageVerifyClass,
+			"audit-report.md declares 'Verdict: FAIL' — auditor explicitly rejected this build",
+			"artifact_path", entry.ArtifactPath)
 	case pass:
 		// clean ship
 	case warn:
 		if opts.envBool("EVOLVE_STRICT_AUDIT") {
-			return &IntegrityError{
-				Msg: "audit-report.md declares 'Verdict: WARN' and EVOLVE_STRICT_AUDIT=1 — strict mode rejects WARN",
-			}
+			return shipErr(core.CodeAuditBindingVerdictWarn, core.ShipClassPrecondition, core.StageVerifyClass,
+				"audit-report.md declares 'Verdict: WARN' and EVOLVE_STRICT_AUDIT=1 — strict mode rejects WARN",
+				"artifact_path", entry.ArtifactPath)
 		}
 		res.Logs = append(res.Logs,
 			"[ship] audit verdict: WARN — shipping per fluent-by-default policy (set EVOLVE_STRICT_AUDIT=1 to block on WARN)",
 		)
 	default:
-		return &IntegrityError{
-			Msg: "audit-report.md declares no recognizable verdict (PASS/WARN/FAIL) — auditor output malformed",
-		}
+		return shipErr(core.CodeAuditBindingMalformed, core.ShipClassPrecondition, core.StageVerifyClass,
+			"audit-report.md declares no recognizable verdict (PASS/WARN/FAIL) — auditor output malformed",
+			"artifact_path", entry.ArtifactPath)
 	}
 
 	// Extract audit_bound_tree_sha for pre-merge check (gitops.go consumes via res).
@@ -123,9 +128,8 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 
 	// 5. Cycle binding: current HEAD/tree must match ledger entry.
 	if entry.GitHEAD == "" || entry.TreeStateSHA == "" {
-		return &IntegrityError{
-			Msg: "Auditor ledger entry predates v8.13.0 cycle-binding (no git_head/tree_state_sha) — re-run audit",
-		}
+		return shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
+			"Auditor ledger entry predates v8.13.0 cycle-binding (no git_head/tree_state_sha) — re-run audit")
 	}
 	currentHEAD, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
 	if err != nil {
@@ -133,31 +137,32 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	}
 	currentHEAD = strings.TrimSpace(currentHEAD)
 	if currentHEAD != entry.GitHEAD {
-		return &IntegrityError{
-			Msg: fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
-		}
+		return shipErr(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
+			"audited", entry.GitHEAD, "current", currentHEAD)
 	}
 	currentTree, err := computeTreeStateSHA(ctx, opts)
 	if err != nil {
 		return err
 	}
 	if currentTree != entry.TreeStateSHA {
-		return &IntegrityError{
-			Msg: "uncommitted changes have been added since audit (tree-state mismatch) — re-run Auditor",
-		}
+		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
+			"uncommitted changes have been added since audit (tree-state mismatch) — re-run Auditor",
+			"audited_tree", entry.TreeStateSHA, "current_tree", currentTree)
 	}
 
 	// 6. Freshness (7d cap when cycle-bound).
 	fi, err := os.Stat(entry.ArtifactPath)
 	if err != nil {
-		return fmt.Errorf("ship: stat audit-report.md: %w", err)
+		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: stat audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
 	}
 	age := opts.NowFn().Unix - fi.ModTime().Unix()
 	const maxAge = 7 * 24 * 3600
 	if age > maxAge {
-		return &IntegrityError{
-			Msg: fmt.Sprintf("audit-report.md is %ds old (>%ds); re-run Auditor", age, maxAge),
-		}
+		return shipErr(core.CodeAuditBindingStale, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("audit-report.md is %ds old (>%ds); re-run Auditor", age, maxAge),
+			"age_seconds", fmt.Sprintf("%d", age), "max_age_seconds", fmt.Sprintf("%d", maxAge))
 	}
 
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: audit verified — verdict PASS, SHA matches, HEAD/tree bound to audit, age %ds", age))
@@ -177,9 +182,11 @@ func findLatestAudit(ledgerPath string) (*auditEntry, error) {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, &IntegrityError{Msg: fmt.Sprintf("no ledger at %s — no Auditor has ever run", ledgerPath)}
+			return nil, shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
+				fmt.Sprintf("no ledger at %s — no Auditor has ever run", ledgerPath), "ledger_path", ledgerPath)
 		}
-		return nil, fmt.Errorf("ship: read ledger: %w", err)
+		return nil, shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: read ledger: "+err.Error(), "ledger_path", ledgerPath)
 	}
 	lines := strings.Split(string(raw), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
@@ -195,7 +202,8 @@ func findLatestAudit(ledgerPath string) (*auditEntry, error) {
 			return &e, nil
 		}
 	}
-	return nil, &IntegrityError{Msg: "no Auditor ledger entry found — independent review missing"}
+	return nil, shipErr(core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, core.StageVerifyClass,
+		"no Auditor ledger entry found — independent review missing", "ledger_path", ledgerPath)
 }
 
 // parseVerdicts grep-and-awk's the audit report for PASS/WARN/FAIL.
@@ -248,7 +256,8 @@ func checkEGPSGate(path string, res *RunResult) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return fmt.Errorf("ship: read acs-verdict.json: %w", err)
+		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: read acs-verdict.json: "+err.Error(), "path", path)
 	}
 	var v struct {
 		RedCount       int      `json:"red_count"`
@@ -264,10 +273,11 @@ func checkEGPSGate(path string, res *RunResult) error {
 		return nil
 	}
 	if v.RedCount != 0 {
-		return &IntegrityError{
-			Msg: fmt.Sprintf("EGPS predicate suite has %d RED predicate(s): %s (acs-verdict.json verdict=%s total=%d)",
+		return shipErr(core.CodeEGPSRedCount, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("EGPS predicate suite has %d RED predicate(s): %s (acs-verdict.json verdict=%s total=%d)",
 				v.RedCount, strings.Join(v.RedIDs, ","), v.Verdict, v.PredicateSuite.Total),
-		}
+			"red_count", fmt.Sprintf("%d", v.RedCount), "red_ids", strings.Join(v.RedIDs, ","),
+			"verdict", v.Verdict, "total", fmt.Sprintf("%d", v.PredicateSuite.Total))
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: EGPS predicate suite verdict=%s (green=%d total=%d)", v.Verdict, v.GreenCount, v.PredicateSuite.Total))
 	return nil
@@ -280,11 +290,13 @@ func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
 	var buf strings.Builder
 	exitCode, err := opts.Runner(ctx, "git", []string{"diff", "HEAD"}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
 	if err != nil {
-		return "", fmt.Errorf("ship: git diff HEAD: %w", err)
+		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: git diff HEAD: "+err.Error(), "git_err", err.Error())
 	}
 	if exitCode > 1 {
 		// rc=1 from git diff is normal (differences). rc=128 is fatal.
-		return "", fmt.Errorf("ship: git diff HEAD exit %d", exitCode)
+		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
+			fmt.Sprintf("ship: git diff HEAD exit %d", exitCode), "git_rc", fmt.Sprintf("%d", exitCode))
 	}
 	h := sha256.New()
 	_, _ = h.Write([]byte(buf.String()))
