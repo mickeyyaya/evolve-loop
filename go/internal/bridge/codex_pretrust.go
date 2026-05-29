@@ -73,8 +73,12 @@ func pretrustCodexProjects(cfg *Config) error {
 		return fmt.Errorf("read codex config: %w", err)
 	}
 	merged := appendCodexTrustEntries(string(existing), paths)
+	// cycle-142: also suppress codex's "Approaching rate limits / Switch to
+	// <mini>?" model-switch modal, which is undismissable by the auto-responder
+	// and stalls the phase until the artifact-wait deadline.
+	merged = appendCodexNotice(merged)
 	if merged == string(existing) {
-		return nil // every path already trusted
+		return nil // every path already trusted + notice already present
 	}
 	// os.CreateTemp guarantees a unique filename — required for safe
 	// concurrent driver launches (HIGH-1 + MEDIUM-1 from cycle-122
@@ -164,6 +168,37 @@ func appendCodexTrustEntries(existing string, paths []string) string {
 		out += header + "\n" + `trust_level = "trusted"` + "\n"
 	}
 	return out
+}
+
+// codexRateLimitNudgeKey is the config.toml key that suppresses codex's
+// "Approaching rate limits / Switch to <mini>?" model-switch modal. Without it,
+// codex can render an undismissable modal mid-run that stalls the phase until
+// the artifact-wait deadline (cycle-142). Per the codex config reference
+// ([notice] hide_rate_limit_model_nudge).
+const codexRateLimitNudgeKey = "hide_rate_limit_model_nudge"
+
+// appendCodexNotice appends a `[notice]` table setting
+// hide_rate_limit_model_nudge = true when existing does not already set that
+// key. Append-only + idempotent, mirroring appendCodexTrustEntries. The
+// returned content ends with a newline. The key-presence check is substring-
+// based (consistent with appendCodexTrustEntries): codex's TOML parser
+// last-wins on duplicates, so a rare false-negative only yields a benign
+// duplicate, never a missing suppression.
+func appendCodexNotice(existing string) string {
+	if strings.Contains(existing, codexRateLimitNudgeKey) {
+		return existing
+	}
+	out := existing
+	if out != "" && !strings.HasSuffix(out, "\n") {
+		out += "\n"
+	}
+	// Extra blank line before the block: [notice] is a top-level TOML table, so
+	// it gets clearer separation from the preceding [projects."…"] sections than
+	// the single-line gap appendCodexTrustEntries uses between same-kind entries.
+	if out != "" {
+		out += "\n"
+	}
+	return out + "[notice]\n" + codexRateLimitNudgeKey + " = true\n"
 }
 
 // codexProjectHeader builds the `[projects."<escaped-path>"]` line for

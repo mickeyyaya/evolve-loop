@@ -44,10 +44,22 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	session, named := resolveSession(cfg, deps, "evolve-bridge-codex-")
 
 	// Launch flags come from the per-CLI Realization (ADR-0022): codex resolves
-	// the model tier via its manifest tier_aliases (sonnet → gpt-5.4) and emits
-	// it as -m; permission is a controller no-op (trust handled by the
+	// the model tier via its manifest model_tier_map (sonnet → gpt-5.4) and
+	// emits it as -m; permission is a controller no-op (trust handled by the
 	// auto-responder). No claude argv reaches codex.
-	launchCmd := launchCmdLine(resolveBinary(deps, "codex"), cfg.Realization.LaunchFlags)
+	flags := cfg.Realization.LaunchFlags
+	// cycle-142: clamp the model to a ChatGPT-safe one on subscription auth.
+	// gpt-5.4/gpt-5.5 are 400-rejected on ChatGPT accounts (API-key-only by
+	// plan tier), which otherwise hangs the phase on an undismissable
+	// model-switch modal. Best-effort: a manifest load failure leaves flags
+	// untouched (the legacy behavior).
+	if m, err := LoadManifest("codex-tmux"); err == nil {
+		if clamped, from, to := clampCodexModelForAuth(flags, m, codexAuthMode(deps)); from != "" {
+			flags = clamped
+			fmt.Fprintf(deps.Stderr, "[codex-tmux] model clamp (auth=chatgpt): %s → %s (gpt-5.4/gpt-5.5 are not usable on a ChatGPT account)\n", from, to)
+		}
+	}
+	launchCmd := launchCmdLine(resolveBinary(deps, "codex"), flags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "codex-tmux",

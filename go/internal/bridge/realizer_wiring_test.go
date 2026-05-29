@@ -98,13 +98,18 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			marker: "›",
 			// Cycle-124 G1a: --yolo from codex-tmux.json:default_args lands
 			// FIRST per the realizer's wire-up order (default_args before
-			// per-param scalars), then -m gpt-5.4 from the params.model_tier
-			// tier_alias (sonnet → gpt-5.4). Behavior contract: --yolo at
-			// boot sets approval=never AND sandbox=danger-full-access,
-			// short-circuiting the per-edit-approval modal that hung cycle-
-			// 123 tdd. (Codex's --help 0.134 omits --yolo from its option
-			// list, but clap parses it; verified empirically.)
-			want:   "codex --yolo -m gpt-5.4",
+			// per-param scalars), then -m from the params.model_tier tier_alias
+			// (sonnet → gpt-5.4). Behavior contract: --yolo at boot sets
+			// approval=never AND sandbox=danger-full-access, short-circuiting
+			// the per-edit-approval modal that hung cycle-123 tdd. (Codex's
+			// --help 0.134 omits --yolo from its option list, but clap parses
+			// it; verified empirically.)
+			// Cycle-142: this launch runs with no OPENAI_API_KEY → codexAuthMode
+			// == "chatgpt", so the driver clamps the realized gpt-5.4 (which a
+			// ChatGPT account 400-rejects) down to the ChatGPT-safe
+			// gpt-5.4-mini. The leak-absent assertions below are what this case
+			// actually guards; the model value rides along.
+			want:   "codex --yolo -m gpt-5.4-mini",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}

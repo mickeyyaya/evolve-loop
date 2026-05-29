@@ -74,6 +74,19 @@ type Manifest struct {
 	// backward compat with operator-installed v1 override manifests.
 	// See docs/architecture/adr/0022-launch-intent-realizer.md.
 	ModelTierMap map[string]string `json:"model_tier_map,omitempty"`
+	// ChatGPTSafeModels lists the concrete model IDs a ChatGPT/subscription
+	// account can reliably use for this CLI. When the resolved auth mode is
+	// "chatgpt" and the realized -m model is NOT in this set, the driver clamps
+	// it to ChatGPTDefaultModel. Empty → no clamp (API-key-only CLIs, or no
+	// constraint). codex's model picker/docs advertise models (gpt-5.4, gpt-5.5,
+	// gpt-5.3-codex) that the live backend 400-rejects on ChatGPT accounts by
+	// plan tier (multiple open OpenAI issues); this set is the proven-safe
+	// subset. See docs/incidents/cycle-142-* and the codex-chatgpt-model-support
+	// research dossier.
+	ChatGPTSafeModels []string `json:"chatgpt_safe_models,omitempty"`
+	// ChatGPTDefaultModel is the model substituted when a ChatGPT-auth launch
+	// resolves to a non-safe model. MUST be a member of ChatGPTSafeModels.
+	ChatGPTDefaultModel string `json:"chatgpt_default_model,omitempty"`
 	// Params is the declarative per-CLI realization table: how each high-level
 	// LaunchIntent parameter maps to this CLI's launch flags / REPL input /
 	// controller hints. Absent param → no-op. See ADR-0022 + realizer.go.

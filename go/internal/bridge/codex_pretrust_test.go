@@ -38,6 +38,10 @@ func TestPretrustCodexProjects(t *testing.T) {
 			},
 		},
 		{
+			// Fully idempotent only when BOTH the trust entries AND the cycle-142
+			// [notice] rate-limit-nudge suppression are already present; pretrust
+			// adds the notice alongside the trust entries, so a fixture missing it
+			// would (correctly) be rewritten.
 			name: "IdempotentWhenAlreadyTrusted",
 			existing: `model = "gpt-5.5"
 
@@ -46,6 +50,9 @@ trust_level = "trusted"
 
 [projects."/Users/op/proj/.evolve/runs/cycle-123"]
 trust_level = "trusted"
+
+[notice]
+hide_rate_limit_model_nudge = true
 `,
 			worktree:      "/Users/op/proj/.evolve/worktrees/cycle-123",
 			workspace:     "/Users/op/proj/.evolve/runs/cycle-123",
@@ -292,6 +299,53 @@ func TestPretrustCodexProjects_NilCfg(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("nil cfg should not create file (err=%v)", err)
+	}
+}
+
+// TestPretrustCodexProjects_WritesHideRateLimitNudge — cycle-142: the pretrust
+// pass must also suppress codex's "Approaching rate limits / Switch to mini?"
+// model-switch modal, which otherwise hangs the phase until the artifact-wait
+// deadline. The [notice] key is written alongside the trust entries and is
+// idempotent.
+func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
+	cfg := &Config{Worktree: filepath.Join(dir, "wt"), Workspace: filepath.Join(dir, "ws")}
+	if err := pretrustCodexProjects(cfg); err != nil {
+		t.Fatalf("pretrust: %v", err)
+	}
+	got, _ := os.ReadFile(path)
+	if !strings.Contains(string(got), "[notice]") || !strings.Contains(string(got), "hide_rate_limit_model_nudge = true") {
+		t.Errorf("config must contain a [notice] table suppressing the rate-limit nudge; got:\n%s", got)
+	}
+	// Trust entries must still be present (notice did not clobber them).
+	if !strings.Contains(string(got), "trust_level") {
+		t.Errorf("trust entries must coexist with the notice; got:\n%s", got)
+	}
+	// Idempotent: a second pass must not duplicate the key.
+	if err := pretrustCodexProjects(cfg); err != nil {
+		t.Fatalf("pretrust 2: %v", err)
+	}
+	got2, _ := os.ReadFile(path)
+	if n := strings.Count(string(got2), "hide_rate_limit_model_nudge"); n != 1 {
+		t.Errorf("notice must be idempotent; got %d occurrences:\n%s", n, got2)
+	}
+}
+
+// TestAppendCodexNotice is a pure-string unit test of the notice merge.
+func TestAppendCodexNotice(t *testing.T) {
+	out := appendCodexNotice("")
+	if !strings.Contains(out, "[notice]") || !strings.Contains(out, "hide_rate_limit_model_nudge = true") {
+		t.Errorf("empty → must add notice; got %q", out)
+	}
+	if out2 := appendCodexNotice(out); strings.Count(out2, "hide_rate_limit_model_nudge") != 1 {
+		t.Errorf("idempotent: already-present must be a no-op; got %q", out2)
+	}
+	existing := "[projects.\"/x\"]\ntrust_level = \"trusted\"\n"
+	out3 := appendCodexNotice(existing)
+	if !strings.Contains(out3, "trust_level") || !strings.Contains(out3, "hide_rate_limit_model_nudge") {
+		t.Errorf("must preserve existing content + append notice; got %q", out3)
 	}
 }
 
