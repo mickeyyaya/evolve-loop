@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/capabilities"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
@@ -30,6 +32,11 @@ Subcommands:
             ( bridge send --workspace=DIR --agent=NAME
               [--kind=command|interrupt|nudge|system_rule] [--source=cli]
               <body...> )
+  recipe    Drive a scripted slash-command sequence (e.g. plugin-install)
+            ( bridge recipe <run|list|show> ... — see 'recipe --help' )
+  capabilities  Print a CLI's capability catalog ( --cli=NAME [--json] )
+  introspect    Diff a CLI's live /help against its catalog
+                ( --cli=NAME [--pane-file=PATH | --workspace=DIR] )
   version   Print the bridge/evolve version
   help      Print this help
 
@@ -187,6 +194,15 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "queued %s envelope to %s\n", kind, inbox.Path(ws, agent))
 		return 0
 
+	case "recipe":
+		return runBridgeRecipe(rest, stdout, stderr)
+
+	case "capabilities":
+		return runBridgeCapabilities(rest, stdout, stderr)
+
+	case "introspect":
+		return runBridgeIntrospect(rest, stdout, stderr)
+
 	case "doctor":
 		filter, deep, jsonMode := "", false, false
 		for _, a := range rest {
@@ -284,6 +300,262 @@ func emitProbeJSON(stdout io.Writer, p core.BridgeProbe, filter string) {
 	}{OS: p.Version, Results: results}
 	b, _ := json.MarshalIndent(out, "", "  ")
 	fmt.Fprintln(stdout, string(b))
+}
+
+const recipeUsage = `Usage: evolve bridge recipe <run|list|show> [args]
+
+  recipe list                 List available recipes
+  recipe show <name>          Print a recipe definition (JSON)
+  recipe run <name> --cli=CLI --workspace=DIR [--param=k=v ...]
+            [--agent=NAME] [--session-name=NAME] [--worktree=DIR]
+            [--permission-mode=M] [--allow-bypass]
+
+Drives a scripted, multi-step interactive slash-command sequence (e.g.
+plugin-install) through the CLI's tmux REPL. Independent of the cycle loop.
+`
+
+// runBridgeRecipe implements `evolve bridge recipe <run|list|show>`. It keeps
+// the bridge independently drivable — an operator or the orchestrator can
+// install a plugin or run any scripted sequence with just a CLI + workspace.
+func runBridgeRecipe(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprint(stderr, recipeUsage)
+		return 10
+	}
+	action, rest := args[0], args[1:]
+	switch action {
+	case "list":
+		for _, n := range recipe.RecipeNames() {
+			fmt.Fprintln(stdout, n)
+		}
+		return 0
+	case "show":
+		if len(rest) == 0 {
+			fmt.Fprintln(stderr, "evolve bridge recipe show: recipe name required")
+			return 10
+		}
+		r, err := recipe.LoadRecipe(rest[0])
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve bridge recipe show: %v\n", err)
+			return 10
+		}
+		b, _ := json.MarshalIndent(r, "", "  ")
+		fmt.Fprintln(stdout, string(b))
+		return 0
+	case "run":
+		return runBridgeRecipeRun(rest, stdout, stderr)
+	case "--help", "-h":
+		fmt.Fprint(stdout, recipeUsage)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "evolve bridge recipe: unknown action %q\n", action)
+		return 10
+	}
+}
+
+func runBridgeRecipeRun(args []string, stdout, stderr io.Writer) int {
+	var name, cli, ws, agent, session, worktree, permMode string
+	allowBypass := false
+	params := map[string]string{}
+	for _, a := range args {
+		switch {
+		case strings.HasPrefix(a, "--cli="):
+			cli = strings.TrimPrefix(a, "--cli=")
+		case strings.HasPrefix(a, "--workspace="):
+			ws = strings.TrimPrefix(a, "--workspace=")
+		case strings.HasPrefix(a, "--agent="):
+			agent = strings.TrimPrefix(a, "--agent=")
+		case strings.HasPrefix(a, "--session-name="):
+			session = strings.TrimPrefix(a, "--session-name=")
+		case strings.HasPrefix(a, "--worktree="):
+			worktree = strings.TrimPrefix(a, "--worktree=")
+		case strings.HasPrefix(a, "--permission-mode="):
+			permMode = strings.TrimPrefix(a, "--permission-mode=")
+		case a == "--allow-bypass":
+			allowBypass = true
+		case strings.HasPrefix(a, "--param="):
+			k, v, ok := strings.Cut(strings.TrimPrefix(a, "--param="), "=")
+			if !ok {
+				fmt.Fprintf(stderr, "evolve bridge recipe run: --param must be k=v, got %q\n", a)
+				return 10
+			}
+			params[k] = v
+		case a == "--help" || a == "-h":
+			fmt.Fprint(stdout, recipeUsage)
+			return 0
+		case strings.HasPrefix(a, "--"):
+			fmt.Fprintf(stderr, "evolve bridge recipe run: unknown flag %q\n", a)
+			return 10
+		default:
+			if name == "" {
+				name = a
+			} else {
+				fmt.Fprintf(stderr, "evolve bridge recipe run: unexpected argument %q\n", a)
+				return 10
+			}
+		}
+	}
+	if name == "" || cli == "" || ws == "" {
+		fmt.Fprintln(stderr, "evolve bridge recipe run: <name>, --cli, and --workspace are required")
+		return 10
+	}
+	if agent == "" {
+		agent = "recipe"
+	}
+
+	intent := bridge.LaunchIntent{Permission: permMode}
+	if allowBypass && permMode == "" {
+		intent.Permission = "bypass"
+	}
+	cfg := &bridge.Config{
+		CLI:         cli,
+		Workspace:   ws,
+		Agent:       agent,
+		SessionName: session,
+		Worktree:    worktree,
+		AllowBypass: allowBypass,
+		Realization: bridge.RealizeFor(cli, intent),
+	}
+	res, err := bridge.RunRecipe(context.Background(), cfg, bridge.Deps{}, cli, name, params)
+	emitRecipeResult(stdout, res)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge recipe run: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// emitRecipeResult prints a recipe run's per-step outcome as JSON.
+func emitRecipeResult(stdout io.Writer, res recipe.Result) {
+	b, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Fprintln(stdout, string(b))
+}
+
+// runBridgeCapabilities implements `evolve bridge capabilities --cli=X [--json]`
+// — print the static, research-grounded capability catalog for a CLI.
+func runBridgeCapabilities(args []string, stdout, stderr io.Writer) int {
+	cli, jsonMode := "", false
+	for _, a := range args {
+		switch {
+		case strings.HasPrefix(a, "--cli="):
+			cli = strings.TrimPrefix(a, "--cli=")
+		case a == "--json":
+			jsonMode = true
+		case a == "--help" || a == "-h":
+			fmt.Fprintln(stdout, "Usage: evolve bridge capabilities --cli=NAME [--json]")
+			return 0
+		case strings.HasPrefix(a, "--"):
+			fmt.Fprintf(stderr, "evolve bridge capabilities: unknown flag %q\n", a)
+			return 10
+		}
+	}
+	if cli == "" {
+		fmt.Fprintln(stderr, "evolve bridge capabilities: --cli is required")
+		return 10
+	}
+	cat, err := capabilities.LoadCatalog(cli)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge capabilities: %v\n", err)
+		return 10
+	}
+	if jsonMode {
+		b, _ := json.MarshalIndent(cat, "", "  ")
+		fmt.Fprintln(stdout, string(b))
+		return 0
+	}
+	emitCatalogText(stdout, cat)
+	return 0
+}
+
+func emitCatalogText(stdout io.Writer, cat capabilities.Catalog) {
+	fmt.Fprintf(stdout, "%s (%s)\n", cat.DisplayName, cat.CLI)
+	fmt.Fprintf(stdout, "Extension: %s — %s\n", cat.Extension.Kind, cat.Extension.Summary)
+	if len(cat.Extension.InstallFlow) > 0 {
+		fmt.Fprintln(stdout, "Install flow:")
+		for _, s := range cat.Extension.InstallFlow {
+			fmt.Fprintf(stdout, "  - %s\n", s)
+		}
+	}
+	fmt.Fprintf(stdout, "Slash commands (%d):\n", len(cat.SlashCommands))
+	for _, c := range cat.SlashCommands {
+		fmt.Fprintf(stdout, "  %-18s %s\n", c.Name, c.Purpose)
+	}
+	if cat.Headless.Entrypoint != "" {
+		fmt.Fprintf(stdout, "Headless: %s\n", cat.Headless.Entrypoint)
+	}
+}
+
+// runBridgeIntrospect implements `evolve bridge introspect --cli=X`. With
+// --pane-file it diffs a captured /help pane against the catalog offline
+// (no tmux); otherwise it drives the live REPL to capture /help itself.
+func runBridgeIntrospect(args []string, stdout, stderr io.Writer) int {
+	cli, paneFile, ws, session := "", "", "", ""
+	allowBypass := false
+	for _, a := range args {
+		switch {
+		case strings.HasPrefix(a, "--cli="):
+			cli = strings.TrimPrefix(a, "--cli=")
+		case strings.HasPrefix(a, "--pane-file="):
+			paneFile = strings.TrimPrefix(a, "--pane-file=")
+		case strings.HasPrefix(a, "--workspace="):
+			ws = strings.TrimPrefix(a, "--workspace=")
+		case strings.HasPrefix(a, "--session-name="):
+			session = strings.TrimPrefix(a, "--session-name=")
+		case a == "--allow-bypass":
+			allowBypass = true
+		case a == "--help" || a == "-h":
+			fmt.Fprintln(stdout, "Usage: evolve bridge introspect --cli=NAME [--pane-file=PATH] [--workspace=DIR] [--session-name=NAME] [--allow-bypass]")
+			return 0
+		case strings.HasPrefix(a, "--"):
+			fmt.Fprintf(stderr, "evolve bridge introspect: unknown flag %q\n", a)
+			return 10
+		}
+	}
+	if cli == "" {
+		fmt.Fprintln(stderr, "evolve bridge introspect: --cli is required")
+		return 10
+	}
+	cat, err := capabilities.LoadCatalog(cli)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge introspect: %v\n", err)
+		return 10
+	}
+
+	var pane string
+	if paneFile != "" {
+		b, rerr := os.ReadFile(paneFile)
+		if rerr != nil {
+			fmt.Fprintf(stderr, "evolve bridge introspect: %v\n", rerr)
+			return 10
+		}
+		pane = string(b)
+	} else {
+		if ws == "" {
+			fmt.Fprintln(stderr, "evolve bridge introspect: --workspace is required for live capture (or pass --pane-file)")
+			return 10
+		}
+		intent := bridge.LaunchIntent{}
+		if allowBypass {
+			intent.Permission = "bypass"
+		}
+		cfg := &bridge.Config{
+			CLI: cli, Workspace: ws, Agent: "introspect", SessionName: session,
+			AllowBypass: allowBypass, Realization: bridge.RealizeFor(cli, intent),
+		}
+		pane, err = bridge.CaptureHelp(context.Background(), cfg, bridge.Deps{}, cli)
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve bridge introspect: %v\n", err)
+			return 1
+		}
+	}
+
+	drift := capabilities.Diff(cat, capabilities.ParseHelp(pane))
+	b, _ := json.MarshalIndent(drift, "", "  ")
+	fmt.Fprintln(stdout, string(b))
+	if !drift.Clean() {
+		return 3 // drift detected — non-fatal, but a distinct exit code
+	}
+	return 0
 }
 
 // envMap snapshots the process environment as a map for LaunchArgs's

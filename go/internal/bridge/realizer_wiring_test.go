@@ -89,7 +89,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "agy-tmux",
 			binary: "agy",
 			marker: "? for shortcuts",
-			want:   "agy --dangerously-skip-permissions",
+			want:   "agy -m gemini-3.5-flash --dangerously-skip-permissions",
 			absent: []string{"--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--model", "--no-session-persistence"},
 		},
 		{

@@ -1,0 +1,15 @@
+{
+  "name": "list-capabilities",
+  "description": "Send /help and capture the resulting pane so the introspect command can parse the live slash-command surface and diff it against the static capability catalog.",
+  "params": [],
+  "steps": [
+    {
+      "name": "send-help",
+      "send": { "kind": "command", "body": "/help" },
+      "await": {
+        "kind": "prompt_marker",
+        "timeout_s": 20
+      }
+    }
+  ]
+}

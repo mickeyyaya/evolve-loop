@@ -1,0 +1,52 @@
+{
+  "name": "plugin-install",
+  "description": "Add a plugin marketplace then install + activate a plugin. Mirrors the documented Claude Code flow: /plugin marketplace add <url> -> /plugin install <name>@<mkt> -> /reload-plugins (reload is mandatory; installs do not auto-activate mid-session).",
+  "params": [
+    { "name": "marketplace", "required": true },
+    { "name": "plugin", "required": true }
+  ],
+  "per_cli": {
+    "claude-tmux": [
+      {
+        "name": "add-marketplace",
+        "send": { "kind": "command", "body": "/plugin marketplace add {{marketplace}}" },
+        "await": {
+          "kind": "any_of",
+          "substrs": ["marketplace added", "Marketplace added", "already", "Added"],
+          "fail_regex": "(?i)error|failed|invalid|could not",
+          "timeout_s": 30
+        }
+      },
+      {
+        "name": "install-plugin",
+        "send": { "kind": "command", "body": "/plugin install {{plugin}}" },
+        "await": {
+          "kind": "any_of",
+          "substrs": ["installed", "Installed", "Will install"],
+          "fail_regex": "(?i)not found|error|failed|no such plugin",
+          "timeout_s": 60
+        }
+      },
+      {
+        "name": "reload-plugins",
+        "send": { "kind": "command", "body": "/reload-plugins" },
+        "await": {
+          "kind": "any_of",
+          "substrs": ["reloaded", "Reloaded", "Loaded", "loaded"],
+          "timeout_s": 30
+        }
+      }
+    ],
+    "codex-tmux": [
+      {
+        "name": "open-plugins-tui",
+        "send": { "kind": "command", "body": "/plugins" },
+        "await": {
+          "kind": "any_of",
+          "substrs": ["Plugins", "Install plugin", "marketplace"],
+          "timeout_s": 30
+        }
+      }
+    ]
+  }
+}

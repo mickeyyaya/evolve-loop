@@ -10,6 +10,13 @@
   "prompt_marker": null,
   "default_model": "gemini-3.5-flash",
   "default_args": [],
+  "params": {
+    "model_tier": {
+      "channel": "flag",
+      "flag": "-m",
+      "from": "model_tier_map"
+    }
+  },
   "interactive_prompts": [
     {
       "name": "auth_recheck",
@@ -46,5 +53,5 @@
     "balanced": "gemini-3.5-flash",
     "deep": "gemini-3.5-flash"
   },
-  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy CLI exposes no model selection flag (-c is --continue, not --config). All abstract tier values resolve to the same gemini-3.5-flash default — model_tier_map is informational here since params.model_tier.channel is noop. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
+  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy DOES accept a -m/--model flag (corrected 2026-05; the prior 'no model selection flag' claim was wrong — confirmed via `agy -m <model> -p`). model_tier_map values pinned to the documented default gemini-3.5-flash pending live -m value validation. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
 }

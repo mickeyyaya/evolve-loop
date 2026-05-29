@@ -290,6 +290,34 @@ stuck, the layer model gives a deterministic checklist:
 | Implicit cross-CLI fallback chain (G2) | cycle-123 incident report G2 — operator-demoted to LAST RESORT | Optional safety net; ships in a follow-up cycle if items 1–7 above prove insufficient. |
 | Observer cancels cycle context on stall instead of just emitting INCIDENT | cycle-123 incident report G4 | Lets the runner short-circuit before the full `StallS` elapses. |
 
+## 8.5 Driving sequences + knowing capabilities (ADR-0031)
+
+The 4-layer loop drives ONE keystroke/command at a time. Two layers above it
+turn that into full, scripted control:
+
+- **Recipe engine** (`go/internal/bridge/recipe/`) — a declarative, multi-step
+  slash-command sequencer. Each step sends a body then waits for a pane
+  condition (`prompt_marker` / `regex` / `any_of` / `all_of`, optional
+  `fail_regex`) before advancing, running the auto-responder every tick so
+  modals between steps are still dismissed. The canonical recipe is
+  `plugin-install` (the operator's ECC example):
+  `evolve bridge recipe run plugin-install --cli=claude-tmux --workspace=DIR --param=marketplace=https://github.com/affaan-m/ECC --param=plugin=ecc@ecc`.
+  It reuses the exact INJECT/READ/DECIDE primitives in this doc via a
+  bridge-side adapter (`recipe_adapter.go`); the engine itself imports nothing
+  from `bridge` (consumer-owned ports).
+
+- **Capability catalog** (`go/internal/bridge/capabilities/`) — the
+  written-down, per-CLI record of slash commands / key bindings / extension
+  mechanism / headless entrypoint. `evolve bridge capabilities --cli=X` prints
+  it; `evolve bridge introspect --cli=X` runs `/help` live (or `--pane-file=P`
+  offline) and diffs it against the catalog to surface drift. The
+  cross-comparison lives in [cli-capability-matrix.md](cli-capability-matrix.md).
+
+- **keyspec** (`go/internal/bridge/keyspec/`) — validates a `keystroke` body and
+  WARNs on mistyped key names (`Excape`) without ever blocking the send.
+
+See [ADR-0031](adr/0031-recipe-engine-and-capability-catalog.md).
+
 ## 9. Cross-references
 
 - **ADR-0022 — LaunchIntent / Realizer**: the seam between operator intent

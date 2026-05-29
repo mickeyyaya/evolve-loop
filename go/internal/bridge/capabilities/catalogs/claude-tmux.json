@@ -1,0 +1,58 @@
+{
+  "cli": "claude-tmux",
+  "display_name": "Claude Code CLI",
+  "slash_commands": [
+    { "name": "/help", "purpose": "Show help and available commands" },
+    { "name": "/clear", "purpose": "New conversation, empty context", "args": "[name]" },
+    { "name": "/compact", "purpose": "Summarize conversation to free context", "args": "[instructions]" },
+    { "name": "/model", "purpose": "Switch model and save as default", "args": "[model]" },
+    { "name": "/config", "purpose": "Open the Settings interface" },
+    { "name": "/plugin", "purpose": "Manage plugins (4-tab manager: Discover/Installed/Marketplaces/Errors)", "args": "marketplace add <url> | install <name>@<mkt>" },
+    { "name": "/reload-plugins", "purpose": "Reload active plugins to apply install/enable/disable without restart" },
+    { "name": "/reload-skills", "purpose": "Re-scan skill/command dirs for on-disk changes" },
+    { "name": "/skills", "purpose": "List skills" },
+    { "name": "/agents", "purpose": "Manage subagent configurations" },
+    { "name": "/mcp", "purpose": "Manage MCP server connections + OAuth" },
+    { "name": "/permissions", "purpose": "Manage allow/ask/deny tool rules" },
+    { "name": "/memory", "purpose": "Edit CLAUDE.md, toggle auto-memory" },
+    { "name": "/resume", "purpose": "Resume a session", "args": "[session]" },
+    { "name": "/context", "purpose": "Visualize context usage" },
+    { "name": "/cost", "purpose": "Session cost / usage" },
+    { "name": "/doctor", "purpose": "Diagnose install/settings" },
+    { "name": "/exit", "purpose": "Exit the CLI" }
+  ],
+  "key_bindings": [
+    { "keys": "Ctrl+C", "action": "Interrupt running op; 2nd press exits when idle" },
+    { "keys": "Ctrl+D", "action": "Exit session (EOF)" },
+    { "keys": "Esc", "action": "Interrupt Claude mid-turn (keeps work done)" },
+    { "keys": "Esc Esc", "action": "Clear draft, or open rewind menu when empty" },
+    { "keys": "Shift+Tab", "action": "Cycle permission modes (default/acceptEdits/plan/...)" },
+    { "keys": "Left/Right", "action": "Cycle dialog tabs (permission dialogs, plugin manager)" },
+    { "keys": "Up/Down", "action": "Move selection / navigate history" },
+    { "keys": "Enter", "action": "Select/apply the highlighted option" }
+  ],
+  "extension": {
+    "kind": "plugin_marketplace",
+    "summary": "Two-step model: add a marketplace (registers catalog), then install a plugin. Installs do NOT auto-activate mid-session — /reload-plugins is mandatory.",
+    "install_flow": [
+      "/plugin marketplace add <owner/repo|url|local-path>",
+      "/plugin install <plugin-name>@<marketplace-name>",
+      "/reload-plugins"
+    ]
+  },
+  "headless": {
+    "entrypoint": "claude -p \"<query>\"",
+    "available": [
+      "claude plugin install <plugin>[@mkt] [-s user|project|local]",
+      "claude plugin enable|disable|uninstall|list|details",
+      "claude -p / --print single-query (slash commands are REPL-only)"
+    ]
+  },
+  "sources": [
+    "https://code.claude.com/docs/en/commands",
+    "https://code.claude.com/docs/en/interactive-mode",
+    "https://code.claude.com/docs/en/discover-plugins",
+    "https://code.claude.com/docs/en/plugins-reference",
+    "https://code.claude.com/docs/en/cli-reference"
+  ]
+}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 )
 
 // driver_tmux_repl.go — the shared REPL state machine for every *-tmux
@@ -364,6 +365,13 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	// empty key strings). The operator is fully responsible for what they
 	// inject; the bridge does not interpret the body.
 	if env.Kind == inbox.KindKeystroke {
+		// Warn-not-block: flag tokens that look like a mistyped key name
+		// (e.g. "Excape") so an operator notices the keystroke will be typed
+		// verbatim rather than acted on — but NEVER refuse the send (this is
+		// the full-control hatch; literal text is a legitimate body).
+		if suspect := keyspec.Validate(env.Body); len(suspect) > 0 {
+			fmt.Fprintf(deps.Stderr, "%s keystroke WARN: unrecognized key token(s) %v in %q — sending verbatim\n", pfx, suspect, env.Body)
+		}
 		// Surface a failed send instead of logging success unconditionally
 		// (cycle-124 review MEDIUM): a vanished session / killed pane would
 		// otherwise show as `injected keystroke "Enter"` on stderr while
@@ -378,7 +386,7 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	if env.Kind == inbox.KindInterrupt {
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "Escape", false)
 		deps.Sleep(injectInterruptSettle)
-		injectText(ctx, cfg, deps, lp.session, env.Body)
+		_ = injectText(ctx, cfg, deps, lp.session, env.Body) // fire-and-forget live injection
 		fmt.Fprintf(deps.Stderr, "%s injected interrupt (source=%s)\n", pfx, env.Source)
 		return
 	}
@@ -401,28 +409,35 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	if env.Kind == inbox.KindSystemRule {
 		body = "## Rules\n" + body
 	}
-	injectText(ctx, cfg, deps, lp.session, body)
+	_ = injectText(ctx, cfg, deps, lp.session, body) // fire-and-forget live injection
 	fmt.Fprintf(deps.Stderr, "%s injected %s (source=%s)\n", pfx, env.Kind, env.Source)
 }
 
 // injectText delivers body into the session via the paste buffer (so
 // multi-line/special characters survive — SendKeys would mangle them), then
 // Enter. It uses a dedicated scratch file so it never collides with the task
-// prompt's resolved-prompt.txt.
-func injectText(ctx context.Context, cfg *Config, deps Deps, session, body string) {
+// prompt's resolved-prompt.txt. Returns the first transport error so callers
+// that gate on delivery (the recipe engine) can surface a dead session
+// instead of waiting out a full timeout; the fire-and-forget live-injection
+// callers ignore it (preserving prior behavior).
+func injectText(ctx context.Context, cfg *Config, deps Deps, session, body string) error {
 	scratch := filepath.Join(cfg.Workspace, ".bridge-inbox", orDefault(cfg.Agent, "agent")+"-inject.txt")
 	if err := os.MkdirAll(filepath.Dir(scratch), 0o755); err != nil {
 		fmt.Fprintf(deps.Stderr, "[%s] WARN inject scratch mkdir: %v\n", session, err)
-		return
+		return fmt.Errorf("inject scratch mkdir: %w", err)
 	}
 	if err := os.WriteFile(scratch, []byte(body), 0o644); err != nil {
 		fmt.Fprintf(deps.Stderr, "[%s] WARN inject scratch write: %v\n", session, err)
-		return
+		return fmt.Errorf("inject scratch write: %w", err)
 	}
-	_ = deps.Tmux.LoadBuffer(ctx, session, scratch)
-	_ = deps.Tmux.PasteBuffer(ctx, session)
+	if err := deps.Tmux.LoadBuffer(ctx, session, scratch); err != nil {
+		return fmt.Errorf("inject load-buffer: %w", err)
+	}
+	if err := deps.Tmux.PasteBuffer(ctx, session); err != nil {
+		return fmt.Errorf("inject paste-buffer: %w", err)
+	}
 	deps.Sleep(time.Second)
-	_ = deps.Tmux.SendKeys(ctx, session, "", true) // Enter
+	return deps.Tmux.SendKeys(ctx, session, "", true) // Enter
 }
 
 // resolveSession returns the tmux session name and whether it is a stable

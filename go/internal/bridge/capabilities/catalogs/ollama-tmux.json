@@ -1,0 +1,36 @@
+{
+  "cli": "ollama-tmux",
+  "display_name": "Ollama",
+  "slash_commands": [
+    { "name": "/set", "purpose": "Set a session variable", "args": "parameter|system|template|history|format|verbose ..." },
+    { "name": "/show", "purpose": "Show model information", "args": "info|license|modelfile|parameters|system|template" },
+    { "name": "/load", "purpose": "Load a session or another model", "args": "<model>" },
+    { "name": "/save", "purpose": "Save current session as a new named model", "args": "<model>" },
+    { "name": "/clear", "purpose": "Clear session context" },
+    { "name": "/bye", "purpose": "Exit the session" },
+    { "name": "/?", "purpose": "Help for commands" },
+    { "name": "/help", "purpose": "Help for commands" }
+  ],
+  "key_bindings": [
+    { "keys": ">>> ", "action": "REPL prompt marker" },
+    { "keys": "Ctrl+D", "action": "Exit the session (= /bye)" },
+    { "keys": "Ctrl+C", "action": "Interrupt generation / cancel input" },
+    { "keys": "\"\"\"", "action": "Wrap multi-line input (close with another triple-quote)" }
+  ],
+  "extension": {
+    "kind": "none",
+    "summary": "No plugin/skill/extension system. Customization is limited to Modelfiles (ollama create) and runtime /set overrides. There is no marketplace and no in-REPL MCP/agent layer.",
+    "install_flow": []
+  },
+  "headless": {
+    "entrypoint": "ollama run <model> \"<prompt>\"",
+    "available": [
+      "ollama pull|list|ps|stop|rm|cp|show|create (model selected as a positional arg, NOT a --model flag)",
+      "REST API for external agent integration"
+    ]
+  },
+  "sources": [
+    "https://docs.ollama.com/cli",
+    "https://github.com/ollama/ollama"
+  ]
+}
