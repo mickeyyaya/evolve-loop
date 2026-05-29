@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -37,7 +38,14 @@ import (
 // "## Verdict\n**PASS**" (case-sensitive, allows surrounding whitespace).
 var verdictRE = regexp.MustCompile(`(?m)^##\s*Verdict\s*\n\*\*(PASS|FAIL|WARN|SKIPPED)\*\*`)
 
-type hooks struct{}
+// hooks carries the audit phase's variation points. genVerdict is the
+// seam that generates acs-verdict.json when it is absent (cycle-138/139
+// fix): the autonomous loop never ran `evolve acs suite`, so the EGPS
+// gate was forced to FAIL on the missing file every cycle. nil = no
+// generation (a pre-staged file is then required, the legacy behavior).
+type hooks struct {
+	genVerdict func(req core.PhaseRequest) error
+}
 
 func (hooks) PhaseName() string                           { return string(core.PhaseAudit) }
 func (hooks) AgentPromptName() string                     { return "evolve-auditor" }
@@ -58,11 +66,25 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
+func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	verdict := extractAuditVerdict(artifact)
 	var diags []core.Diagnostic
 
 	verdictPath := filepath.Join(req.Workspace, "acs-verdict.json")
+	// Generate acs-verdict.json when absent and a generator is wired.
+	// Pre-staged files (operator/CI) are honored untouched. If generation
+	// writes nothing (zero predicates), the missing-file FAIL floor holds.
+	if h.genVerdict != nil {
+		if _, statErr := os.Stat(verdictPath); os.IsNotExist(statErr) {
+			if genErr := h.genVerdict(req); genErr != nil {
+				diags = append(diags, core.Diagnostic{
+					Severity: "warning",
+					Message:  fmt.Sprintf("acs-verdict generation failed: %s", genErr.Error()),
+				})
+			}
+		}
+	}
+
 	redCount, acsErr := readRedCount(verdictPath)
 	if acsErr != nil {
 		diags = append(diags, core.Diagnostic{
@@ -114,6 +136,11 @@ type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
 	NowFn   func() time.Time
+	// GenerateVerdict, when set, produces <workspace>/acs-verdict.json from
+	// the cycle's ACS predicates if the file is absent (cycle-138/139 fix).
+	// nil = no generation (legacy: a pre-staged file is required to PASS).
+	// The registry default wires generateACSVerdict (runs acssuite).
+	GenerateVerdict func(req core.PhaseRequest) error
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -121,7 +148,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{},
+			Hooks:   hooks{genVerdict: c.GenerateVerdict},
 			Bridge:  c.Bridge,
 			Prompts: c.Prompts,
 			NowFn:   c.NowFn,
@@ -129,11 +156,41 @@ func New(c Config) *Phase {
 	}
 }
 
+// generateACSVerdict runs the ACS predicate suite for req.Cycle and writes
+// <workspace>/acs-verdict.json. It runs the predicates discovered under the
+// cycle's worktree (where this cycle's acs/cycle-N/*.sh live), falling back
+// to the project root. When the suite discovers ZERO predicates it writes
+// NOTHING — the audit's missing-file FAIL floor then holds, so a cycle with
+// no predicates cannot auto-pass. EvolveDir is derived from the workspace
+// (<evolveDir>/runs/cycle-N), matching where audit reads the verdict.
+func generateACSVerdict(req core.PhaseRequest) error {
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: req.Cycle})
+	if err != nil {
+		return fmt.Errorf("acssuite run: %w", err)
+	}
+	if v.PredicateSuite.Total == 0 {
+		// No predicates → leave the file absent so the EGPS floor fails the
+		// cycle rather than auto-passing it on an empty suite.
+		return nil
+	}
+	// evolveDir = parent of runs/, i.e. dirname(dirname(workspace)).
+	evolveDir := filepath.Dir(filepath.Dir(req.Workspace))
+	if _, err := acssuite.WriteVerdict(evolveDir, v); err != nil {
+		return fmt.Errorf("write verdict: %w", err)
+	}
+	return nil
+}
+
 func init() {
 	registry.Register(string(core.PhaseAudit), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot),
-			Prompts: prompts.NewForProject(req.ProjectRoot),
+			Bridge:          bridge.NewDefault(req.ProjectRoot),
+			Prompts:         prompts.NewForProject(req.ProjectRoot),
+			GenerateVerdict: generateACSVerdict,
 		})
 	})
 }

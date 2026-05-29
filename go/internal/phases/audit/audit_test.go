@@ -274,6 +274,86 @@ func TestName(t *testing.T) {
 	}
 }
 
+// cycle-138/139 fix: when acs-verdict.json is ABSENT, the audit phase
+// generates it (via the injected GenerateVerdict seam → acssuite in prod)
+// before reading red_count, so a clean autonomous cycle reaches PASS→ship
+// instead of being forced to FAIL on the missing file. The generator
+// stand-in here writes a red_count==0 verdict, mimicking a green suite.
+func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
+	ws := t.TempDir()
+	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
+	fb := &fakeBridge{writeArtifact: body}
+	genCalls := 0
+	phase := New(Config{
+		Bridge:  fb,
+		Prompts: fakePromptsFS("body"),
+		GenerateVerdict: func(req core.PhaseRequest) error {
+			genCalls++
+			writeACSVerdict(t, req.Workspace, 0) // green suite
+			return nil
+		},
+	})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if genCalls != 1 {
+		t.Errorf("GenerateVerdict called %d times, want 1 (file was absent)", genCalls)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS (verdict generated, red_count=0)", resp.Verdict)
+	}
+	if resp.NextPhase != "ship" {
+		t.Errorf("NextPhase=%q, want ship", resp.NextPhase)
+	}
+}
+
+// A pre-staged acs-verdict.json must be honored as-is: the generator is
+// NOT invoked when the file already exists (operator/CI pre-stage path).
+func TestRun_ACSVerdictPresent_GeneratorNotCalled(t *testing.T) {
+	ws := t.TempDir()
+	writeACSVerdict(t, ws, 0)
+	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
+	fb := &fakeBridge{writeArtifact: body}
+	genCalls := 0
+	phase := New(Config{
+		Bridge:          fb,
+		Prompts:         fakePromptsFS("body"),
+		GenerateVerdict: func(core.PhaseRequest) error { genCalls++; return nil },
+	})
+	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if genCalls != 0 {
+		t.Errorf("GenerateVerdict called %d times, want 0 (file pre-staged)", genCalls)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
+	}
+}
+
+// When the generator runs but produces no verdict file (e.g. zero
+// predicates discovered), the missing-file FAIL floor still holds — a
+// cycle with nothing to prove must NOT auto-pass.
+func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
+	ws := t.TempDir()
+	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{
+		Bridge:          fb,
+		Prompts:         fakePromptsFS("body"),
+		GenerateVerdict: func(core.PhaseRequest) error { return nil }, // writes no file
+	})
+	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (no verdict produced → floor holds)", resp.Verdict)
+	}
+}
+
 // --- v12.1 Capability 1: phaseflags wiring tests ---
 
 func writeAuditProfile(t *testing.T, contents string) string {
