@@ -56,6 +56,26 @@ above and the backlog reflect the fuller parallel sweep.
 Highest value first (regression likelihood × blast radius × testability). Each
 target was verified by an agent that read the incident and searched the suite.
 
+0. **NEW — dispatcher verify vs audit-ledger ordering (cycle-138, ❌none)** —
+   THE current blocker for a clean cycle. cycle-138 had a **clean audit PASS
+   (red_count 0)** and `VerifyCycle(138)` against the final ledger returns
+   `OK=true, missing=[]` — yet at RUNTIME the dispatcher logged `cycle 138
+   incomplete: missing [auditor] classification=infrastructure` + a spurious
+   RECOVERABLE-FAILURE + `cost $0` + `FinalVerdict=SHIPPED_VIA_BUILD`. Code is
+   correct (canonicalRole maps audit→auditor; all 7 phase entries present with
+   exit 0 and sane timestamps; no worktree ledger). So the dispatcher's
+   `VerifyCycle` call ran BEFORE the audit (and retro) ledger appends were
+   visible to it — a read-before-write ordering bug between
+   `core.Orchestrator.RunCycle` (writes phase ledger entries) and
+   `cmd/evolve/cmd_loop.go` (calls `ledgerverify.VerifyCycle` post-RunCycle).
+   Bug A narrowed the false-negative from `[scout builder auditor]` (cycle-137)
+   to `[auditor]` only (cycle-138) — scout/build→builder now count; the residual
+   is purely this ordering race on the last-written entries. → Investigate the
+   RunCycle→verify seam: ensure all phase ledger appends are durably flushed (or
+   the cycle's verdict surfaced via state) before the dispatcher verifies; add a
+   regression test that runs a full no-op cycle and asserts the dispatcher reads
+   a complete ledger. Suspect files: `core/orchestrator.go` (audit/retro Append),
+   `cmd/evolve/cmd_loop.go` (verify call site).
 1. **cli_chain empty-fallback (cycle-123, ❌none, 0.95)** — a profile with no
    `cli_fallback` key + a fallback-trigger exit (81) attempts NO fallback; cycle
    aborts. The "any CLI any phase" invariant. →
