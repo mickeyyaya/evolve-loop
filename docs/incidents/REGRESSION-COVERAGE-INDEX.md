@@ -17,7 +17,7 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 13 |
+| Incidents mapped | 14 |
 | Distinct failure modes | 73 |
 | ✅ covered (a test would fail if the bug returned) | 40 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 20 |
@@ -50,6 +50,8 @@ above and the backlog reflect the fuller parallel sweep.
 | cycle-94-98 | watchdog over-fired, killed healthy phases | `adapters/observer/observer.go` | 🟡 | partial: `observer_test.go::TestObserver_NoStallWhenLogGrowing`; verify it pins the growing-stdout case |
 | cycle-94-98 | soft-stall nudge not emitted before hard SIGTERM | `adapters/observer/observer.go` | ❌ | **GAP:** nudge emitted when `NUDGE_S < idle < STALL_S` before kill |
 | gemini-forgery | cross-CLI: phase output not bound to cycle's real challenge token | `phases/scout/scout.go` | 🟡 | partial: `scout_test.go::TestComposePrompt_InjectsChallengeTokenFromRequest` pins the inject path; **GAP:** cross-CLI trust enforcement (auditor rejects a report whose token ≠ cycle token) |
+| cycle-141 | builder (cwd=worktree) wrote `build-report.md` to worktree; driver polled only workspace → `exit 81` artifact timeout | `bridge/driver_common.go` | ✅ | `bridge/driver_artifact_relocate_test.go::TestArtifactReady_RelocatesFromWorktreeRoot` (+WorktreeWorkspaceSubdir, WorkspaceSubdirWinsOverWorktree, NoWorktreeConfigured_UnchangedBehavior) |
+| cycle-141 | auto-spawn observer false `stall_no_output` on tmux drivers (live output → scrollback, stdout-log flat) | `adapters/observer/observer.go` | ✅ | `observer_test.go::TestWatch_WorkspaceActivityResetsStallTimer` (+WorkspaceConfiguredButIdle_StillStalls, ObserverEventsFileDoesNotMaskStall) |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
