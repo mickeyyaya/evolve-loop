@@ -3,6 +3,9 @@ package core
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -741,6 +744,64 @@ func TestOrchestrator_PhaseNonTimeoutError_NoRetry(t *testing.T) {
 	}
 	if got := runners[PhaseScout].(*fakeRunner).calls; got != 1 {
 		t.Errorf("scout calls=%d, want 1 (no retry for non-timeout errors)", got)
+	}
+}
+
+// recordAuditBinding must write the rich auditor ledger entry ship's
+// audit-binding requires (role=auditor, kind=agent_subprocess, git_head +
+// tree_state_sha + artifact_sha256) — the cycle-151 root cause: the Go
+// orchestrator otherwise wrote only kind:phase, so ship bound to an ancient
+// entry and every cycle failed AUDIT_BINDING_HEAD_MOVED.
+func TestOrchestrator_RecordAuditBinding_WritesShipBindableEntry(t *testing.T) {
+	repo := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "-A")
+	runGit("commit", "-q", "-m", "init")
+
+	ws := filepath.Join(repo, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "audit-report.md"), []byte("## Verdict\n**PASS**\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	led := &fakeLedger{}
+	o := NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
+	o.recordAuditBinding(context.Background(), 42, repo, ws, VerdictPASS)
+
+	var bind *LedgerEntry
+	for i := range led.entries {
+		if led.entries[i].Role == "auditor" && led.entries[i].Kind == "agent_subprocess" {
+			bind = &led.entries[i]
+		}
+	}
+	if bind == nil {
+		t.Fatalf("no role=auditor kind=agent_subprocess entry written; got %+v", led.entries)
+	}
+	if bind.GitHEAD == "" || len(bind.GitHEAD) != 40 {
+		t.Errorf("git_head=%q, want a 40-char SHA", bind.GitHEAD)
+	}
+	if bind.TreeStateSHA == "" || len(bind.TreeStateSHA) != 64 {
+		t.Errorf("tree_state_sha=%q, want a 64-char sha256", bind.TreeStateSHA)
+	}
+	if bind.ArtifactSHA256 == "" {
+		t.Errorf("artifact_sha256 empty — ship binding needs it")
+	}
+	if bind.Cycle != 42 {
+		t.Errorf("cycle=%d, want 42", bind.Cycle)
 	}
 }
 

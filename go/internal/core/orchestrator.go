@@ -263,6 +263,78 @@ func defaultGitHEAD() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// recordAuditBinding writes the rich auditor ledger entry that ship's
+// audit-binding (verify.go findLatestAudit / verifyAuditBinding) requires:
+// role=auditor, kind=agent_subprocess, with git_head + tree_state_sha +
+// artifact_path/sha256. Without it the Go orchestrator recorded audit only as
+// kind:phase (no binding fields), so ship fell back to an ancient bash-era
+// auditor entry and every cycle failed AUDIT_BINDING_HEAD_MOVED (root cause,
+// 2026-05-29). tree_state_sha is sha256(`git diff HEAD`) — byte-identical to
+// ship's computeTreeStateSHA so the bind matches. Best-effort: a failure WARNs
+// and is swallowed; ship then fails loudly on the missing/stale binding rather
+// than shipping unbound.
+func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, verdict string) {
+	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
+		return
+	}
+	// `git diff HEAD` returns exit 1 when differences exist — not an error;
+	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
+	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
+	if err != nil || code > 1 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git diff HEAD failed (rc=%d): %v\n", code, err)
+		return
+	}
+	treeSum := sha256.Sum256([]byte(diff))
+	artPath := filepath.Join(workspace, "audit-report.md")
+	artBytes, err := os.ReadFile(artPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: read %s: %v\n", artPath, err)
+		return
+	}
+	artSum := sha256.Sum256(artBytes)
+	// exit_code mirrors the Unix-convention auditor signal ship tolerates (0|1):
+	// 0 = clean PASS, 1 = findings (WARN). Ship's binding accepts both; this
+	// keeps the ledger semantically accurate for operators reading it.
+	exitCode := 0
+	if verdict == VerdictWARN {
+		exitCode = 1
+	}
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS:             o.now().UTC().Format(time.RFC3339),
+		Cycle:          cycle,
+		Role:           "auditor",
+		Kind:           "agent_subprocess",
+		ExitCode:       exitCode,
+		GitHEAD:        strings.TrimSpace(head),
+		TreeStateSHA:   hex.EncodeToString(treeSum[:]),
+		ArtifactPath:   artPath,
+		ArtifactSHA256: hex.EncodeToString(artSum[:]),
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding ledger append: %v\n", err)
+	}
+}
+
+// gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).
+// A non-zero exit is returned as exitCode with nil err (the caller decides
+// whether it's fatal — e.g. `git diff HEAD` exit 1 means "differences", not a
+// failure). Only a failure to launch git returns a non-nil err.
+func gitCapture(ctx context.Context, dir string, args ...string) (string, int, error) {
+	var buf strings.Builder
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr // surface git diagnostics (fatal: not a repo, …) for triage
+	if err := cmd.Run(); err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return buf.String(), ee.ExitCode(), nil
+		}
+		return "", -1, err
+	}
+	return buf.String(), 0, nil
+}
+
 // defaultGitDirtyPaths runs `git diff --name-only HEAD` in repoRoot and
 // returns the list of dirty tracked paths (one per line). Workstream B's
 // tree-diff guard uses this as a before/after snapshot — any path that
@@ -679,6 +751,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			ExitCode: 0,
 		}); err != nil {
 			return result, fmt.Errorf("ledger append for %s: %w", next, err)
+		}
+
+		// Audit-binding (root-cause fix, 2026-05-29): ship's verifyAuditBinding
+		// looks for the latest role=auditor kind=agent_subprocess ledger entry
+		// carrying git_head + tree_state_sha + artifact SHA. The Go orchestrator
+		// otherwise records audit only as kind:phase (no binding fields), so ship
+		// fell back to an ancient bash-era entry and EVERY cycle failed
+		// AUDIT_BINDING_HEAD_MOVED. Emit the rich binding entry after a shippable
+		// audit so ship binds to THIS cycle.
+		if next == PhaseAudit && (resp.Verdict == VerdictPASS || resp.Verdict == VerdictWARN) {
+			o.recordAuditBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath, resp.Verdict)
 		}
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
