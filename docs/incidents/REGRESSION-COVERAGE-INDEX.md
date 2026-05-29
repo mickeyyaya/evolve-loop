@@ -13,16 +13,21 @@
 | ❌ none | No regression test pins this mode. |
 | ⛔ untestable | Depends on external infra/CLI behavior (vendor rate limit, interactive modal) a unit test cannot reproduce; mitigate by design + docs, not a unit test. |
 
-## Summary (sweep 2026-05-29)
+## Summary (sweep 2026-05-29, 13-agent parallel coverage map)
 
 | | Count |
 |---|---|
 | Incidents mapped | 13 |
-| Distinct failure modes | 34 |
-| ✅ covered | 11 |
-| 🟡 partial | 9 |
-| ❌ none | 9 |
-| ⛔ untestable | 5 |
+| Distinct failure modes | 73 |
+| ✅ covered (a test would fail if the bug returned) | 40 |
+| 🟡 partial (related test, doesn't pin the exact mode) | 20 |
+| ❌ none (no regression test) | 10 |
+| ⛔ untestable (external infra / live CLI) | 3 |
+
+**40 of 73 modes are truly pinned; 30 have concrete gap-test proposals.** The
+prioritized backlog below lists the highest-value ones. The coverage map below
+is the original hand-pass (kept for the per-incident narrative); the counts
+above and the backlog reflect the fuller parallel sweep.
 
 ## Coverage map
 
@@ -46,16 +51,39 @@
 | cycle-94-98 | soft-stall nudge not emitted before hard SIGTERM | `adapters/observer/observer.go` | ❌ | **GAP:** nudge emitted when `NUDGE_S < idle < STALL_S` before kill |
 | gemini-forgery | cross-CLI: phase output not bound to cycle's real challenge token | `phases/scout/scout.go` | 🟡 | partial: `scout_test.go::TestComposePrompt_InjectsChallengeTokenFromRequest` pins the inject path; **GAP:** cross-CLI trust enforcement (auditor rejects a report whose token ≠ cycle token) |
 
-## Prioritized gap backlog
+## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
-Highest value first (regression likelihood × blast radius × testability):
+Highest value first (regression likelihood × blast radius × testability). Each
+target was verified by an agent that read the incident and searched the suite.
 
-1. **ledgerverify anti-gaming** — assert a cycle whose ledger has zero phase entries is reported incomplete AND the orchestrator does not advance `lastCycleNumber`. (Builds directly on the cycle-137 verify fix; cheap; pins cycle-132-141.)
-2. **cli_chain fallback** — boot-timeout (exit 80) advances to the next CLI; empty fallback list degrades gracefully with a clear error, no panic. (Pins cycle-121 + cycle-123; the "any CLI any phase" invariant.)
-3. **observer nudge-before-kill** — soft-stall nudge emitted before hard SIGTERM in the nudge window. (Pins cycle-94-98 second mode.)
-4. **ship audit-binding format** — canonical `## Verdict\n**PASS**` accepted, malformed rejected. (Pins cycle-62.)
-5. **runner relative-root** — artifact path resolves absolute under a relative `--project-root`. (Pins cycle-119.)
-6. **reset orphan-worktree** — SealCycle archives an orphaned worktree's state. (Pins cycle-31.)
+1. **cli_chain empty-fallback (cycle-123, ❌none, 0.95)** — a profile with no
+   `cli_fallback` key + a fallback-trigger exit (81) attempts NO fallback; cycle
+   aborts. The "any CLI any phase" invariant. →
+   `runner/runner_fallback_test.go::TestRun_FallbackOnArtifactTimeout_EmptyProfileFallback`
+   asserting `calls==[primary]`, plus a sibling where a populated chain DOES
+   advance. `runner/cli_chain.go:resolveCLIChain`.
+2. **Cross-CLI trust bypass (cycle-119 + gemini-forgery, ❌none, 0.9)** — a
+   read-only phase run via a non-Claude driver can write to the main tree
+   (Claude-Code PreToolUse hooks don't bind other CLIs). → `internal/core`
+   integration test: run a read-only phase via a non-Claude driver in a worktree,
+   assert main-tree source files unchanged post-phase (diff guard).
+3. **Observer auto-spawn wiring (cycle-122, 🟡partial, 0.9)** —
+   `wireOrchestratorDeps` wires `WithObserver(NewCoreAdapter())` when
+   `EVOLVE_OBSERVER_AUTOSPAWN!=0`, noop when `=0`. → `cmd/evolve` wiring test.
+4. **ledgerverify anti-gaming (cycle-132-141, 🟡partial)** — a cycle whose ledger
+   has zero phase entries is reported incomplete AND `lastCycleNumber` does not
+   advance. Builds directly on the cycle-137 verify fix; cheap.
+5. **Boot-scrollback load-bearing (cycle-121, 🟡partial, 0.75)** — codex-tmux boot
+   with `bootScrollback=0` + trust modal → `ExitREPLBootTimeout`. `driver_tmux_repl.go`.
+6. **codex per-edit-approval modal (cycle-123, 🟡partial, 0.85)** — synthetic
+   apply_patch fixture → modal appears and is auto-dismissed by the
+   `interactive_prompts` regex (manifest→pane integration). `driver_codextmux.go`.
+7. **stall-vs-progress (cycle-109, 🟡partial, 0.75)** — artifact-wait extends on
+   pane progress, pauses on stall (StopReviewer). `internal/bridge`.
+
+Lower tier (hand-pass, still valid): ship audit-binding format (cycle-62), runner
+relative-root (cycle-119), reset orphan-worktree (cycle-31), observer
+nudge-before-kill (cycle-94-98). 30 modes total carry concrete gap proposals.
 
 ## Untestable-by-unit (mitigate by design + docs, not a test)
 
