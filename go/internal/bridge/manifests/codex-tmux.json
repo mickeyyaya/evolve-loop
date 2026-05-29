@@ -60,7 +60,7 @@
     },
     {
       "name": "rate_limit",
-      "regex": "(usage|rate)[ -]limit (reached|exceeded|hit)|too many requests|quota exceeded",
+      "regex": "(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded",
       "response_keys": null,
       "policy": "escalate"
     }

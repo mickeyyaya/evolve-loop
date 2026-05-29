@@ -55,6 +55,22 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		{"codex trust → 1,Enter", "codex-tmux", "Do you trust the contents of this directory?", "send:1,Enter", 1},
 		{"codex auth → escalate", "codex-tmux", "Please sign in to ChatGPT to continue", "escalate:auth_recheck", 85},
 		{"codex rate-limit → escalate", "codex-tmux", "quota exceeded — too many requests", "escalate:rate_limit", 85},
+		// Cycle-144: a ChatGPT-account codex auditor hit its quota mid-audit. The
+		// actual banner ("You've hit your usage limit. Upgrade to Plus to
+		// continue…") did NOT match the original (usage|rate)[ -]limit
+		// (reached|exceeded|hit) regex ("hit" precedes "usage limit"), so codex
+		// sat at the message until the artifact-wait deadline (generic exit 81)
+		// instead of escalating. Must now fail fast.
+		{"codex usage-limit ChatGPT quota → escalate", "codex-tmux",
+			"■ You've hit your usage limit. Upgrade to Plus to continue using Codex (https://chatgpt.com/explore/plus), or try again at Jun 4th, 2026 3:45 PM.",
+			"escalate:rate_limit", 85},
+		// Negative guard (cycle-144 review HIGH): the real banner is caught by
+		// "hit your usage limit", so we deliberately do NOT match a bare
+		// "Upgrade to Plus to continue" — an agent echoing pricing/doc text with
+		// that phrase (but no limit reached) must stay noop, not falsely abort.
+		{"codex generic upgrade CTA (no limit) → noop", "codex-tmux",
+			"Doc excerpt: 'Upgrade to Plus to continue using advanced features' — noted for the pricing section.",
+			"noop", 0},
 		// Cycle-124 G1b: per-edit-approval modal that hung cycle-123 tdd.
 		// '1' selects 'Yes, proceed'. Defense-in-depth behind G1a's --yolo
 		// boot flag — covers the case where --yolo is dropped/renamed/
