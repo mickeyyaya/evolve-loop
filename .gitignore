@@ -80,3 +80,17 @@ node_modules/
 /warn.txt
 *.warn
 parity-audit-report.md
+
+# Phase-report runtime artifacts. Agents write these to their cwd (a per-cycle
+# worktree = a checkout of this repo), and the builder's `git add -A` + worktree
+# commit will sweep them into the repo root if they aren't ignored — that is how
+# a stale `build-report.md` (Cycle 65, 27bee92) ended up tracked and got
+# relocated into cycle-145 by artifactReady's worktree search (audit FAIL on a
+# wrong challenge token). These belong only under .evolve/runs/cycle-N/.
+build-report.md
+scout-report.md
+audit-report.md
+triage-report.md
+test-report.md
+build-plan.md
+*-reflection.yaml
