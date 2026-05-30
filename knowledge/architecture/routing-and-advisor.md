@@ -224,3 +224,49 @@ safety story, so it must be auditable — an operator (or the shadow soak) can a
 reconstruct *what the advisor proposed* vs *what the kernel forced*. All of this is
 best-effort: a forensics write failure WARNs and is swallowed, never aborting a
 cycle.
+
+## 10. Ship-error recovery & the debugger phase
+
+The advisor also governs **recovery**, not just the forward plan. Motivating case:
+a cycle whose audit genuinely PASSED but whose `ship` aborted on a stale process
+precondition (`AUDIT_BINDING_HEAD_MOVED`) — a *passing* audit that can't merge.
+The fix reshapes ship and adds a recovery brain (design: **Strategy + Chain-of-
+Responsibility + Saga + Retry**):
+
+- **Ship is a pure executor.** It verifies the process and executes
+  (commit → ff-merge → push); it has **no power to reject** a cycle. On any failure
+  it returns a structured `core.ShipError{Code, Class, Stage, Message, Debug}` on
+  its output — never a lossy `exit=N`. Classes: `TRANSIENT | PRECONDITION |
+  INTEGRITY | CONFIG`. (`go/internal/core/shiperror.go`; ~40 codes mapped at the
+  ship failure sites.)
+- **The advisor picks the recovery phase** (`router.RecoverFrom`, a Chain-of-
+  Responsibility of handlers in `go/internal/router/recovery.go`): a `PRECONDITION`/
+  `AUDIT_BINDING_*` error → re-run **audit** (Saga alternative-path: re-establish the
+  stale precondition); a `TRANSIENT` (push race, IO) → **retry ship** (bounded);
+  an `INTEGRITY` breach (`SELF_SHA_TAMPERED`, `INTEGRITY_TREE_DRIFT`) → **BLOCK**
+  (loud); anything unmatched → the **debugger** phase (the LLM catch-all).
+- **The debugger phase** (`go/internal/phases/debugger/`, persona
+  `agents/evolve-debugger.md`) receives the `ShipError` on its INPUT, diagnoses the
+  root cause against the worktree diff, and emits `debug-decision.json`
+  `{RESHIP | RERUN_PHASE:<p> | BLOCK}`. The orchestrator routes from that decision
+  (a `decideAfterDebugger`, sibling to `decideAfterRetro`).
+- **Bounded.** `maxRecoveryDepth` (per-cycle) caps ship↔recovery loops; the
+  `safety<32` outer loop is the backstop; exhaustion aborts loud with the
+  accumulated `ShipError`.
+- **State machine edges** (§ phase-pipeline): `ship → debugger` and
+  `debugger → {ship, audit, build, tdd, end}` are legal; the actual choice is
+  decision-driven. Debugger is OPTIONAL — never on the mandatory spine, so the
+  integrity floor (§4) is unaffected.
+
+Phases stay **isolated**: the only channel is `PhaseRequest` (input) → `PhaseResponse`
+(output). The `ShipError` travels on ship's output; the debugger receives it on its
+input; the orchestrator surfaces it to the advisor as routing context. The advisor is
+the single brain for "what phase next" in BOTH the normal and the recovery flow.
+
+> **Cross-CLI caveat:** recovery handles ship *errors*; it does not help when ship is
+> never *reached*. Audit→ship can be silently blocked by upstream CLI/runtime gaps
+> (verdict-file placement, headless cwd, prompt-envelope completeness) — see
+> [cli-matrix-and-drivers.md](cli-matrix-and-drivers.md) and
+> [../incidents/pattern-library.md](../incidents/pattern-library.md). Authoritative ADR
+> for the recovery design: the ship-as-executor decision in
+> [../evolution/decision-digest.md](../evolution/decision-digest.md).
