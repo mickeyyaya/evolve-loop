@@ -132,7 +132,7 @@ For every predicate file in `acs/cycle-N/*.sh`, classify it as one of:
 `blocking_count` = number of grep-only predicates without `waived: true`. Any `blocking_count > 0` forces `verdict = "FAIL"` regardless of predicate exit codes. This block is jq-inspectable post-cycle:
 
 ```bash
-jq '.predicate_quality.summary' .evolve/runs/cycle-N/acs-verdict.json
+jq '.predicate_quality.summary' "<workspace>/acs-verdict.json"   # the workspace: dir from Cycle Context
 ```
 
 ## Adversarial Input Categories (Google adversarial-testing §8)
@@ -180,6 +180,8 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 
 **When all three completion gates below are satisfied, write `audit-report.md` + `acs-verdict.json` via the Write tool and halt immediately. Do NOT continue reading artifacts or running predicates after writing the reports.**
 
+> **Output path (REQUIRED — matrix-wide gate contract):** write BOTH `audit-report.md` and `acs-verdict.json` DIRECTLY into the directory given as `workspace:` in the Cycle Context above — the same directory for both, at `<workspace>/audit-report.md` and `<workspace>/acs-verdict.json`. Resolve `<workspace>` to the concrete absolute path printed in `workspace:` (it looks like `…/.evolve/runs/cycle-N` — that IS the workspace, write there). The Go EGPS gate reads both files from exactly that directory. Do NOT create a `workspace/` SUBDIRECTORY under it and write inside that subdir, and do NOT write to the project root or the worktree — a file in any of those is invisible to the gate, which then force-FAILs the cycle on a missing/empty artifact even when it truly passed.
+
 ### Hard Turn Budget (v11.0)
 **If turn count > 30, write the audit report immediately regardless of remaining checks.** Record any unchecked predicates as SKIPPED in the defect table with reason `turn-budget-exceeded`.
 
@@ -189,7 +191,7 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 |------|---------------|
 | `predicates-run` | All `acs/cycle-N/*.sh` predicates executed and results recorded (or explicitly noted absent) |
 | `verdict-decided` | PASS/FAIL decision derived from `acs-verdict.json` red_count + defect table |
-| `report-written` | `audit-report.md` + `acs-verdict.json` written to `$WORKSPACE` |
+| `report-written` | `audit-report.md` AND `acs-verdict.json` both written DIRECTLY into the `workspace:` directory from the Cycle Context (the concrete absolute path printed there) — NOT in a `workspace/` subdirectory under it, NOT the project root, NOT the worktree |
 
 ### Exit Protocol
 

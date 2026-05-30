@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -17,20 +18,33 @@ import (
 
 func TestExecRunner_Real(t *testing.T) {
 	var out bytes.Buffer
-	// success
-	code, err := execRunner(context.Background(), "sh", []string{"-c", "exit 0"}, os.Environ(), nil, &out, &out)
+	// success (dir="" → inherit caller cwd, unchanged behavior)
+	code, err := execRunner(context.Background(), "sh", "", []string{"-c", "exit 0"}, os.Environ(), nil, &out, &out)
 	if err != nil || code != 0 {
 		t.Fatalf("exit 0: code=%d err=%v", code, err)
 	}
 	// non-zero exit → (code, nil)
-	code, err = execRunner(context.Background(), "sh", []string{"-c", "exit 7"}, nil, nil, &out, &out)
+	code, err = execRunner(context.Background(), "sh", "", []string{"-c", "exit 7"}, nil, nil, &out, &out)
 	if err != nil || code != 7 {
 		t.Fatalf("exit 7: code=%d err=%v, want (7,nil)", code, err)
 	}
 	// binary not found → (-1, err)
-	code, err = execRunner(context.Background(), "/no/such/binary-cov-xyz", nil, nil, nil, &out, &out)
+	code, err = execRunner(context.Background(), "/no/such/binary-cov-xyz", "", nil, nil, nil, &out, &out)
 	if err == nil || code != -1 {
 		t.Fatalf("missing binary: code=%d err=%v, want (-1, err)", code, err)
+	}
+	// dir != "" → subprocess cwd is set to dir (the worktree-cwd fix).
+	dir := t.TempDir()
+	out.Reset()
+	code, err = execRunner(context.Background(), "sh", dir, []string{"-c", "pwd"}, nil, nil, &out, &out)
+	if err != nil || code != 0 {
+		t.Fatalf("pwd: code=%d err=%v", code, err)
+	}
+	// macOS /tmp is a symlink to /private/tmp, so resolve both sides before compare.
+	gotPwd, _ := filepath.EvalSymlinks(strings.TrimSpace(out.String()))
+	wantPwd, _ := filepath.EvalSymlinks(dir)
+	if gotPwd != wantPwd {
+		t.Fatalf("subprocess cwd = %q, want dir %q", gotPwd, wantPwd)
 	}
 }
 

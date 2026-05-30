@@ -27,7 +27,14 @@ import (
 // unrecoverable failures (binary not found, context cancellation). A
 // non-zero exit code with err == nil is the normal "process ran but
 // failed" path.
-type CmdRunner func(ctx context.Context, name string, args, env []string,
+//
+// dir is the subprocess working directory. Source-writing phase drivers
+// (claude-p/codex/agy) pass cfg.Worktree so the inner CLI writes into the
+// per-cycle worktree rather than the parent cwd (= main repo root) — parity
+// with the tmux driver's `cd <worktree>`. An empty dir leaves cmd.Dir unset,
+// so the subprocess inherits the caller cwd (UNCHANGED behavior for the
+// git/probe utility callers that pass "").
+type CmdRunner func(ctx context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (exitCode int, err error)
 
 // Deps carries the injectable seams shared by the Engine and its
@@ -334,9 +341,11 @@ func defaultChallengeToken() (string, error) {
 // maps a process exit code to (code, nil), reserving err for
 // unrecoverable failures. Ported verbatim from the adapter so behavior
 // is identical across the cutover.
-func execRunner(ctx context.Context, name string, args, env []string,
+func execRunner(ctx context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	// Empty dir → leave cmd.Dir unset → inherit caller cwd (unchanged).
+	cmd.Dir = dir
 	cmd.Env = env
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout

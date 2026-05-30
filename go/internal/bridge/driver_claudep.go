@@ -69,7 +69,8 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// Workstream B: confine to worktree when this is a source-writing phase
 	// and the host can wrap (sandbox-exec / bwrap). Degrades unwrapped.
 	name, args := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
-	rc, err := deps.Runner(ctx, name, args, driverEnv(deps), nil, stdoutF, stderrF)
+	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
+	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[claude-p] %w", err)
 	}
