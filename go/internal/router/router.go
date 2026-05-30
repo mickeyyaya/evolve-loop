@@ -52,6 +52,11 @@ type RouteInput struct {
 	// unchanged (byte-identical / fail-safe to static). Plain data handed in by
 	// the caller, so Route stays deterministic and I/O-free.
 	Plan *PhasePlan
+
+	// Blocker is the string-only ship-error envelope the orchestrator passes
+	// when routing a ship FAILURE for recovery (Recover, not Route). It is nil
+	// for ordinary (non-recovery) routing; the pure Route() ignores it entirely.
+	Blocker *Blocker
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.

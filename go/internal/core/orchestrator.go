@@ -396,6 +396,14 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 // deterministic timeout still aborts the cycle after the cap.
 const phaseMaxAttempts = 2
 
+// maxRecoveryDepth bounds advisor-driven ship-error recovery per cycle
+// (Component #5/#7). Ship is a pure executor: a structured ShipError is
+// resolved by routing to a recovery phase (re-audit / retry-ship / debugger),
+// not by aborting. This caps ship→recover→ship so a persistent blocker cannot
+// loop forever; on exhaustion the orchestrator aborts loud with the accumulated
+// ShipError. A safety invariant, not a flag (the outer safety<32 loop backstops).
+const maxRecoveryDepth = 2
+
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
 // summary of what ran. The lock is acquired up front and released on
 // every exit path. State is updated incrementally so a crash leaves an
@@ -552,14 +560,24 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// routingSeq names the per-cycle routing-decision artifacts
 	// (routing-decision-<seq>.json). Incremented only when routing runs.
 	routingSeq := 0
+	// recoveryDepth bounds advisor-driven ship-error recovery across the whole
+	// cycle (maxRecoveryDepth). Persists across loop iterations.
+	recoveryDepth := 0
 
 	// Bounded loop guards against any transition-table cycle bug.
 	for safety := 0; safety < 32; safety++ {
 		var next Phase
+		// fromSchedule marks an iteration whose `next` came from scheduledNext —
+		// an authoritative injection by the retro branch, the ship-error recovery
+		// seam, or the debugger decision. The dynamic-routing override
+		// (enforceNext) must NOT second-guess such a transition, so it is gated on
+		// !fromSchedule (generalizing the prior current!=PhaseRetro guard).
+		fromSchedule := false
 		switch {
 		case scheduledNext != "":
 			next = scheduledNext
 			scheduledNext = ""
+			fromSchedule = true
 		case current == PhaseStart:
 			// First edge is gated by intent_required, not by verdict.
 			next = o.sm.NextFromStart(cs.IntentRequired)
@@ -611,7 +629,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
 				Plan: clampedPlan,
 			})
-			if o.cfg.Stage >= config.StageAdvisory && current != PhaseRetro {
+			if o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
 				if forced, ok := o.enforceNext(current, next, signals, dec); ok {
 					next = forced
 				}
@@ -708,6 +726,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// (re)started per attempt so each launch is watched.
 		var resp PhaseResponse
 		var err error
+		// shipRecovered marks that a ShipError was intercepted and routed to a
+		// recovery phase instead of aborting; the post-loop guard then continues
+		// the outer loop (skipping verdict/ledger handling for the failed ship).
+		shipRecovered := false
 		for attempt := 1; ; attempt++ {
 			obsCancel := o.observer.Start(ctx, string(next), phaseReq)
 			resp, err = runner.Run(ctx, phaseReq)
@@ -718,9 +740,32 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				break
 			}
 			if attempt >= phaseMaxAttempts || !errors.Is(err, ErrArtifactTimeout) {
+				// Ship-error recovery seam (Component #7): ship is a pure
+				// executor — a structured ShipError is resolved by the advisor's
+				// recovery chain (Strategy + CoR), not by aborting the cycle. The
+				// resolver records the error, picks the recovery phase
+				// (re-audit / retry-ship / debugger), and bounds the depth.
+				// Integrity breaches, an illegal edge, or exhausted depth return
+				// (_, false) and fall through to the loud abort below.
+				if se, ok := AsShipError(err); ok {
+					if rec, recovering := o.recoverFromShipError(ctx, cycle, cs, se, recoveryDepth); recovering {
+						ctxSnap["ship_error_code"] = string(se.Code)
+						ctxSnap["ship_error_class"] = string(se.Class)
+						ctxSnap["ship_error_stage"] = string(se.Stage)
+						ctxSnap["ship_error_debug"] = se.DebugString()
+						recoveryDepth++
+						scheduledNext = rec
+						current = PhaseShip // ship ran (and failed); keep forensics accurate
+						shipRecovered = true
+						break
+					}
+				}
 				return result, fmt.Errorf("phase %s: %w", next, err)
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a bridge artifact timeout; relaunching (self-heal)\n", next, attempt, phaseMaxAttempts)
+		}
+		if shipRecovered {
+			continue // run the recovery phase (scheduledNext) next iteration
 		}
 		if !IsVerdict(resp.Verdict) {
 			return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
@@ -810,6 +855,23 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			}
 			scheduledNext = branch
 		}
+
+		// The debugger phase is decision-driven (RESHIP / RERUN_PHASE / BLOCK),
+		// not verdict-driven — mirror the retro branch. The debugger runner
+		// surfaces its decision on PhaseResponse.Signals; decideAfterDebugger
+		// maps it to the next phase, which the next iteration runs via
+		// scheduledNext (bypassing the routing override, like retro).
+		if current == PhaseDebugger {
+			branch := o.decideAfterDebugger(resp)
+			o.recordDebuggerDecision(ctx, cycle, cs, resp)
+			if branch == PhaseEnd {
+				break
+			}
+			if !o.sm.CanTransition(PhaseDebugger, branch) {
+				return result, fmt.Errorf("debugger→%s not allowed by state machine", branch)
+			}
+			scheduledNext = branch
+		}
 	}
 
 	postCycleHEAD, _ := o.gitHEAD()
@@ -858,6 +920,142 @@ func (o *Orchestrator) decideAfterRetro(retroVerdict string, history []FailedRec
 		return PhaseEnd, nil, string(dec.Action) + ": " + dec.Reason
 	default: // ActionProceed
 		return PhaseEnd, dec.SetEnv, "proceed: " + dec.Reason
+	}
+}
+
+// recoverFromShipError resolves a ship-phase ShipError via the advisor's
+// recovery chain (Strategy + Chain-of-Responsibility, Component #6/#7). Ship is
+// a pure executor: it never rejects a cycle, it returns a structured error and
+// the orchestrator decides what to do. This records the error for forensics,
+// then asks the strategy's Recover() for the recovery phase. Returns
+// (phase, true) to proceed with recovery, or ("", false) to abort the cycle:
+//   - depth >= maxRecoveryDepth  → exhausted, abort loud
+//   - recovery routes to end     → integrity breach / unmapped, abort loud
+//   - illegal ship→cand edge     → defensive abort
+//
+// Recovery is structural (always available via StaticPreset.Recover) and so runs
+// regardless of the dynamic-routing Stage — it is error handling, not routing.
+func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError, depth int) (Phase, bool) {
+	o.recordShipError(ctx, cycle, cs, se)
+	if depth >= maxRecoveryDepth {
+		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s); aborting\n", depth, se.Code, se.Class)
+		return "", false
+	}
+	// Recovery is deterministic Chain-of-Responsibility (no LLM); both routing
+	// strategies just delegate to the pure router.Recover, so call it directly.
+	// This keeps recovery available even when no routing Strategy was wired
+	// (e.g. Stage:Off) — error handling must not depend on routing being on.
+	dec := router.Recover(router.RouteInput{
+		Blocker: &router.Blocker{
+			Code:  string(se.Code),
+			Class: string(se.Class),
+			Stage: string(se.Stage),
+		},
+	})
+	cand := o.candidatePhase(dec.NextPhase)
+	if cand == "" || cand == PhaseEnd {
+		fmt.Fprintf(os.Stderr, "[orchestrator] ship error %s (%s) is unrecoverable (%s); aborting\n", se.Code, se.Class, dec.Reason)
+		return "", false
+	}
+	if !o.sm.CanTransition(PhaseShip, cand) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery proposed illegal edge ship→%s (%s); aborting\n", cand, dec.Reason)
+		return "", false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] ship error %s (%s) → recovery routes to %s (%s)\n", se.Code, se.Class, cand, dec.Reason)
+	return cand, true
+}
+
+// decideAfterDebugger maps the debugger phase's recovery decision (surfaced on
+// PhaseResponse.Signals by the debugger runner) to the next phase, mirroring
+// decideAfterRetro. RESHIP→ship; RERUN_PHASE→the named phase (defaulting to
+// audit); BLOCK/empty/unknown→end. A malformed decision already safe-defaulted
+// to BLOCK in the debugger's Classify, so this conservatively ends on anything
+// not explicitly RESHIP/RERUN_PHASE.
+func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
+	action, _ := resp.Signals["debugger.action"].(string)
+	switch action {
+	case "RESHIP":
+		return PhaseShip
+	case "RERUN_PHASE":
+		// Clamp rerun targets to UPSTREAM phases (audit/build/tdd) — re-shipping
+		// is the dedicated RESHIP action, so a "rerun_phase: ship" must not become
+		// a reship that skips re-establishing the precondition. An unrecognized or
+		// non-upstream target defaults to audit, the dominant binding-recovery
+		// target. (Defense-in-depth: the loop's CanTransition gate independently
+		// rejects illegal edges.)
+		rerun, _ := resp.Signals["debugger.rerun_phase"].(string)
+		switch o.candidatePhase(rerun) {
+		case PhaseAudit:
+			return PhaseAudit
+		case PhaseBuild:
+			return PhaseBuild
+		case PhaseTDD:
+			return PhaseTDD
+		default:
+			return PhaseAudit
+		}
+	default: // BLOCK, empty, unknown
+		return PhaseEnd
+	}
+}
+
+// recordShipError persists a ShipError to <workspace>/ship-error.json and
+// appends a hash-bound ship_error ledger entry (Component #6 forensics). The
+// tamper-evident trail lets the failure-adapter and operators see every
+// auto-recovery. Best-effort: a marshal/write/append failure WARNs and is
+// swallowed — forensics must never compound a ship failure into a cycle abort.
+func (o *Orchestrator) recordShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError) {
+	ts := o.now().UTC().Format(time.RFC3339)
+	artifactPath := filepath.Join(cs.WorkspacePath, "ship-error.json")
+	sha := ""
+	payload := map[string]string{
+		"code":    string(se.Code),
+		"class":   string(se.Class),
+		"stage":   string(se.Stage),
+		"message": se.Message,
+		"debug":   se.DebugString(),
+	}
+	if buf, err := json.MarshalIndent(payload, "", "  "); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship-error marshal: %v\n", err)
+		artifactPath = ""
+	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship-error mkdir: %v\n", err)
+		artifactPath = ""
+	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship-error write: %v\n", err)
+		artifactPath = ""
+	} else {
+		sum := sha256.Sum256(buf)
+		sha = hex.EncodeToString(sum[:])
+	}
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS: ts, Cycle: cycle, Role: "ship", Kind: "ship_error",
+		ExitCode: 1, ArtifactPath: artifactPath, ArtifactSHA256: sha,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship_error ledger append: %v\n", err)
+	}
+}
+
+// recordDebuggerDecision appends a hash-bound debugger_decision ledger entry
+// pointing at the debugger's debug-decision.json artifact (Component #6
+// forensics). Best-effort: failures WARN and are swallowed.
+func (o *Orchestrator) recordDebuggerDecision(ctx context.Context, cycle int, cs CycleState, _ PhaseResponse) {
+	// The action + root_cause live in the debug-decision.json artifact; the
+	// ledger entry binds its SHA so the decision is tamper-evident without
+	// duplicating the payload into a field LedgerEntry does not have.
+	artifactPath := filepath.Join(cs.WorkspacePath, "debug-decision.json")
+	sha := ""
+	if buf, err := os.ReadFile(artifactPath); err == nil {
+		sum := sha256.Sum256(buf)
+		sha = hex.EncodeToString(sum[:])
+	} else {
+		artifactPath = ""
+	}
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS: o.now().UTC().Format(time.RFC3339), Cycle: cycle, Role: "debugger",
+		Kind: "debugger_decision", ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN debugger_decision ledger append: %v\n", err)
 	}
 }
 

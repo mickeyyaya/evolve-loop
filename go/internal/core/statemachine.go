@@ -46,10 +46,13 @@ func NewStateMachine() *StateMachine {
 		PhaseBuild:        {PhaseAudit: true},
 		PhaseAudit:        {PhaseShip: true, PhaseRetro: true},
 		PhaseRetro:        {PhaseShip: true, PhaseTDD: true, PhaseEnd: true},
-		// Ship can hand off to the debugger when it returns a structured
-		// error/blocker (advisor-recommended recovery). PhaseEnd is the
-		// success successor.
-		PhaseShip: {PhaseEnd: true, PhaseDebugger: true},
+		// Ship can hand off to a recovery phase when it returns a structured
+		// ShipError (advisor-recommended recovery, Component #6/#7): the
+		// recovery Chain-of-Responsibility may route a precondition error to
+		// re-run audit, a transient error to retry ship, or any unknown error
+		// to the debugger. PhaseEnd is the success successor (and the
+		// integrity-breach / recovery-exhausted abort target).
+		PhaseShip: {PhaseEnd: true, PhaseDebugger: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseShip: true},
 		// Debugger recovery routes: re-attempt ship, or re-run an upstream
 		// phase to re-establish a stale precondition, or give up (end). Edges
 		// are legal; the actual choice comes from the debug-decision the

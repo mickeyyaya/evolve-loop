@@ -31,6 +31,7 @@ import (
 	// line here; no edit to a dispatch switch (OCP).
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/debugger"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
