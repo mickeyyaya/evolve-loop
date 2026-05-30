@@ -15,6 +15,7 @@ without reading the raw cycle history (which has been retired; see
 |---|---|
 | **[00-overview/](00-overview/)** | The mental model in one page + a [glossary](00-overview/glossary.md) of every load-bearing term. |
 | **[architecture/](architecture/)** | How the system is built and **why**, grounded in the Go code (`go/internal/<pkg>`). Six docs: [phase-pipeline](architecture/phase-pipeline.md), [trust-kernel-and-egps](architecture/trust-kernel-and-egps.md), [routing-and-advisor](architecture/routing-and-advisor.md), [bridge-and-adapters](architecture/bridge-and-adapters.md), [state-and-ledger](architecture/state-and-ledger.md), [cli-matrix-and-drivers](architecture/cli-matrix-and-drivers.md) (the any-CLI×any-phase invariant + driver contract). |
+| **[guides/](guides/)** | The extension cookbook — actionable **how-to** recipes for future development: [add-a-phase](guides/add-a-phase.md), [add-a-cli-driver](guides/add-a-cli-driver.md), [write-an-eval-and-predicate](guides/write-an-eval-and-predicate.md), [run-and-debug-locally](guides/run-and-debug-locally.md), [the-dev-workflow](guides/the-dev-workflow.md). Each names real files/types and ends with the tests that pin it. |
 | **[evolution/](evolution/)** | What ~148 cycles **taught**: the [bash→Go port](evolution/bash-to-go-port.md), the [ADR decision digest](evolution/decision-digest.md), [rejected approaches](evolution/rejected-approaches.md) (anti-knowledge — don't repeat these), and the [compound-improvement arc](evolution/compound-improvement-arc.md). |
 | **[incidents/](incidents/)** | A synthesized [pattern library](incidents/pattern-library.md) — recurring failure modes, root causes, and the guards that now prevent them, with a triage table. |
 | **[reference/](reference/)** | Lookup tables: the [env-var reference](reference/env-vars.md) and the [CLI capability matrix](reference/cli-capability-matrix.md). |
@@ -25,6 +26,7 @@ without reading the raw cycle history (which has been retired; see
 - **New contributor:** overview → architecture/phase-pipeline → architecture/trust-kernel-and-egps → glossary as needed.
 - **Debugging a failure:** incidents/pattern-library (triage table) → the relevant architecture doc → evolution/rejected-approaches.
 - **Changing behavior:** reference/env-vars → the relevant architecture doc → evolution/decision-digest (check the rationale before reversing a decision).
+- **Extending the system:** guides/ (pick the recipe — add a phase / CLI / predicate) → the architecture doc it links → the tests that pin it.
 
 ## Governance
 
