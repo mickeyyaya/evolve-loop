@@ -28,6 +28,7 @@ import (
 // recordedCall captures one CmdRunner invocation for assertions.
 type recordedCall struct {
 	name string
+	dir  string
 	args []string
 	env  []string
 }
@@ -46,9 +47,9 @@ type fakeRunner struct {
 }
 
 func (f *fakeRunner) runner() CmdRunner {
-	return func(_ context.Context, name string, args, env []string,
+	return func(_ context.Context, name, dir string, args, env []string,
 		_ io.Reader, _, _ io.Writer) (int, error) {
-		f.calls = append(f.calls, recordedCall{name: name, args: append([]string(nil), args...), env: env})
+		f.calls = append(f.calls, recordedCall{name: name, dir: dir, args: append([]string(nil), args...), env: env})
 		if f.writeArtifactPath != "" {
 			_ = os.MkdirAll(filepath.Dir(f.writeArtifactPath), 0o755)
 			_ = os.WriteFile(f.writeArtifactPath, []byte(f.writeArtifactBody), 0o644)
@@ -284,6 +285,68 @@ func TestLaunchArgs_Agy_NoPermissionModeBackCompat(t *testing.T) {
 	code, _ := run(t, fr, fx.args("agy"))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK", code)
+	}
+}
+
+// --- worktree cwd parity (headless drivers ↔ tmux driver) ----------------
+
+// noSandboxWrap returns a SandboxWrapper that always declines, so the
+// headless drivers run the inner CLI unwrapped — keeping the recorded
+// (name, dir, args) clean for the assertion (no sandbox-exec/bwrap prefix
+// rewriting name/args). cfg.Worktree alone would otherwise invite the real
+// sandbox probe on hosts that can wrap.
+func noSandboxWrap() SandboxWrapper {
+	return func(SandboxWrapRequest) ([]string, bool) { return nil, false }
+}
+
+// runWithSandbox drives LaunchArgs with the fake runner, an empty env
+// lookup, and an injected SandboxWrap so the run is deterministic on any
+// host. Mirrors run() but threads the sandbox seam.
+func runWithSandbox(t *testing.T, fr *fakeRunner, sw SandboxWrapper, args []string) (int, string) {
+	t.Helper()
+	var stderr strings.Builder
+	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), SandboxWrap: sw})
+	code := eng.LaunchArgs(context.Background(), args, nil, io.Discard, &stderr)
+	return code, stderr.String()
+}
+
+func TestLaunchArgs_HeadlessDrivers_RunInWorktree(t *testing.T) {
+	// The headless drivers (claude-p/codex/agy) must set the subprocess cwd
+	// to cfg.Worktree for source-writing phases — parity with the tmux
+	// driver's `cd <worktree>`. Without this, a tdd/build agent writes test
+	// files to the MAIN tree and the tree-diff guard aborts the cycle.
+	for _, cli := range []string{"claude-p", "codex", "agy"} {
+		t.Run(cli+"/worktree-set", func(t *testing.T) {
+			fx := newFixture(t, cli, "")
+			worktree := t.TempDir()
+			fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
+			code, stderr := runWithSandbox(t, fr, noSandboxWrap(), fx.args(cli, "--worktree="+worktree))
+			if code != ExitOK {
+				t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
+			}
+			if len(fr.calls) == 0 {
+				t.Fatalf("driver did not invoke the inner CLI runner")
+			}
+			if got := fr.calls[0].dir; got != worktree {
+				t.Fatalf("runner dir = %q, want worktree %q", got, worktree)
+			}
+		})
+		t.Run(cli+"/worktree-empty", func(t *testing.T) {
+			// No --worktree → cfg.Worktree=="" → dir=="" → inherit caller cwd
+			// (byte-identical to pre-fix behavior for non-source-writing phases).
+			fx := newFixture(t, cli, "")
+			fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
+			code, stderr := runWithSandbox(t, fr, noSandboxWrap(), fx.args(cli))
+			if code != ExitOK {
+				t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
+			}
+			if len(fr.calls) == 0 {
+				t.Fatalf("driver did not invoke the inner CLI runner")
+			}
+			if got := fr.calls[0].dir; got != "" {
+				t.Fatalf("runner dir = %q, want empty (inherit caller cwd)", got)
+			}
+		})
 	}
 }
 

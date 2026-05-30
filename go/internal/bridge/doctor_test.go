@@ -20,7 +20,7 @@ func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, 
 			}
 			return "", errNoBin
 		},
-		Runner: func(_ context.Context, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+		Runner: func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
 			if len(args) > 0 && args[0] == "--version" {
 				_, _ = stdout.Write([]byte("v1.2.3\n"))
 				return 0, nil
@@ -142,7 +142,7 @@ func TestDoctorDeep(t *testing.T) {
 }
 
 func TestDoctorVersion_Error(t *testing.T) {
-	e := NewEngine(Deps{Runner: func(context.Context, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
+	e := NewEngine(Deps{Runner: func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
 		return -1, errNoBin
 	}})
 	if v := doctorVersion(context.Background(), e.deps, "x"); v != "unknown" {

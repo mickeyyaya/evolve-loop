@@ -23,7 +23,7 @@ func inertEnableWarn(ws []Warning) (Warning, bool) {
 // state machine ignores it (plan-review is router-only). Pre-fix this was a
 // silent no-op — the warning makes the inert flag loud.
 func TestLoad_PlanReviewEnabled_StageOff_EmitsInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{"EVOLVE_PLAN_REVIEW": "1"})
+	_, ws := Load("", map[string]string{"EVOLVE_PLAN_REVIEW": "1", "EVOLVE_DYNAMIC_ROUTING": "off"})
 	w, ok := inertEnableWarn(ws)
 	if !ok {
 		t.Fatalf("expected an inert-phase-enable warning; got %+v", ws)
@@ -85,6 +85,7 @@ func TestLoad_NoEnables_NoInertWarning(t *testing.T) {
 func TestLoad_OtherWarningsStillEmit(t *testing.T) {
 	_, ws := Load("", map[string]string{
 		"EVOLVE_PLAN_REVIEW":      "1",
+		"EVOLVE_DYNAMIC_ROUTING":  "off",         // force StageOff so plan-review is inert
 		"EVOLVE_MANDATORY_PHASES": "scout,build", // omits audit+ship → weak-spine
 	})
 	var sawInert, sawWeak bool

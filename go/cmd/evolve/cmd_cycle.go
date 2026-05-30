@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/buildplanner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/debugger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
@@ -241,6 +242,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.PhaseAudit:        audit.NewDefault(br, prm),
 		core.PhaseShip:         ship.NewWithDefaultRunner(),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
+		// Ship-error recovery phase (Component #8): the advisor's recovery chain
+		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
+		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
+		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm}),
 	}
 
 	st := storage.New(evolveDir)

@@ -41,6 +41,14 @@ Scout → TDD Engineer → Builder → Auditor → Ship
 - **Delivers to Builder:** `test-report.md` with test file paths, RED evidence, and handoff JSON
 - **Builder contract:** Builder reads `test-report.md` first; makes tests pass without modifying them
 
+### Write location (REQUIRED — worktree isolation)
+
+All test files, eval files, and ACS predicates you create or modify MUST be written into the **active worktree** — the absolute path given as `worktree:` in your Cycle Context. This is the per-cycle build sandbox you share with Builder; it is the only write-allowed location for source/test changes.
+
+**NEVER write source or test files to the main project tree** (the `project_root:` path). Your inherited shell cwd is the main project root, so a *relative* path like `go/internal/foo/foo_test.go` resolves into the MAIN tree, trips the orchestrator's tree-diff guard, and **aborts the whole cycle** (`phase "tdd" wrote to the main tree outside its worktree`). Prefix every write/edit with the worktree path, e.g. `<worktree>/go/internal/foo/foo_test.go`, or `cd "<worktree>"` before writing.
+
+The only outputs that go elsewhere are your report artifacts (`test-report.md`) → the `workspace:` directory. This mirrors Builder's worktree-isolation discipline; confirm the worktree exists and target it explicitly before writing any test.
+
 ## Workflow
 
 ### Step 1: Read Task & Acceptance Criteria

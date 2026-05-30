@@ -41,6 +41,14 @@ var expectedPhasesHappyPath = []string{"scout", "triage", "tdd", "build", "audit
 var allCLIs = []string{"claude-p", "codex", "agy"}
 
 func TestE2ECycleCLIMatrix(t *testing.T) {
+	// Stage 5.1 (Go-only consolidation): this harness fake-shipped via the now-removed
+	// EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT legacy hatch. With native-only ship,
+	// the shipper can no longer be stubbed here; the native ship path is covered by
+	// native_test.go + dispatch_test.go (which seed a real remote + auditor binding).
+	// A proper native CLI-matrix e2e (seed bare remote + audit ledger binding + resolve
+	// the worktree ff-merge divergence) belongs in go/test/e2e/ — tracked in
+	// go/test/trustkernel/PORTING-LEDGER.md.
+	t.Skip("legacy ship-script hatch removed (Stage 5.1); native CLI-matrix e2e pending port to go/test/e2e/ — see PORTING-LEDGER.md")
 	if testing.Short() {
 		t.Skip("E2E test; skipped in -short mode")
 	}

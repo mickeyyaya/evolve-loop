@@ -282,7 +282,13 @@ func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
 
 func defaults() RoutingConfig {
 	return RoutingConfig{
-		Stage:          StageOff,
+		// Dynamic routing is DEFAULT-ON (Component #7): the advisor drives phase
+		// selection every cycle, with the integrity floor (ClampPlanToFloor +
+		// SpineSatisfiedUpTo) — not a flag — protecting the ship guarantee.
+		// EVOLVE_DYNAMIC_ROUTING still overrides (e.g. =off for the legacy static
+		// path). Flipped from StageOff after the advisory mode soaked since
+		// cycle-108.
+		Stage:          StageAdvisory,
 		Mode:           ModeDynamicLLM,
 		CommitEvidence: StageOff,
 		SandboxMode:    SandboxModeAuto,

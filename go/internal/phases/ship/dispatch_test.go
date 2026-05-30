@@ -1,7 +1,7 @@
-// dispatch_test.go — covers the PhaseRunner dispatcher's NATIVE branch
-// (runNative) and the useNativeShip env matrix. ship_test.go exercises only
-// the legacy shell-out path (EVOLVE_NATIVE_SHIP=0); the default native path
-// through Phase.Run → runNative was previously 0% covered.
+// dispatch_test.go — covers the PhaseRunner dispatcher's native path
+// (Phase.Run → runNative), the only ship path. native_test.go exercises the
+// full native ship state machine; these tests assert the PhaseResponse
+// translation at the phase boundary.
 package ship
 
 import (
@@ -11,31 +11,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
-
-func TestUseNativeShip_EnvMatrix(t *testing.T) {
-	cases := []struct {
-		name string
-		env  map[string]string
-		want bool
-	}{
-		{"explicit-0-legacy", map[string]string{"EVOLVE_NATIVE_SHIP": "0"}, false},
-		{"explicit-1-native", map[string]string{"EVOLVE_NATIVE_SHIP": "1"}, true},
-		{"other-value-native", map[string]string{"EVOLVE_NATIVE_SHIP": "yes"}, true},
-		{"unset-defaults-native", map[string]string{}, true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Hermetic: the unset case consults os.Getenv, so pin it empty.
-			t.Setenv("EVOLVE_NATIVE_SHIP", "")
-			if v, ok := tc.env["EVOLVE_NATIVE_SHIP"]; ok {
-				t.Setenv("EVOLVE_NATIVE_SHIP", v)
-			}
-			if got := useNativeShip(tc.env); got != tc.want {
-				t.Errorf("useNativeShip(%v)=%v, want %v", tc.env, got, tc.want)
-			}
-		})
-	}
-}
 
 // TestPhaseRun_NativeDispatch_Ships drives Phase.Run through the native Go
 // implementation end-to-end against a real repo and asserts the
@@ -52,7 +27,7 @@ func TestPhaseRun_NativeDispatch_Ships(t *testing.T) {
 		ProjectRoot: repo,
 		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-1"),
 		Context:     map[string]string{"commit_message": "feat: native dispatch ship"},
-		Env:         map[string]string{"EVOLVE_NATIVE_SHIP": "1", "EVOLVE_PLUGIN_ROOT": repo},
+		Env:         map[string]string{"EVOLVE_PLUGIN_ROOT": repo},
 	})
 	if err != nil {
 		t.Fatalf("native dispatch errored: %v (diags=%v)", err, resp.Diagnostics)
@@ -77,7 +52,7 @@ func TestPhaseRun_NativeDispatch_NoAuditor_FailVerdict(t *testing.T) {
 		ProjectRoot: repo,
 		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-1"),
 		Context:     map[string]string{"commit_message": "feat: no auditor"},
-		Env:         map[string]string{"EVOLVE_NATIVE_SHIP": "1", "EVOLVE_PLUGIN_ROOT": repo},
+		Env:         map[string]string{"EVOLVE_PLUGIN_ROOT": repo},
 	})
 	if err == nil {
 		t.Fatal("want error from native dispatch with no auditor entry")

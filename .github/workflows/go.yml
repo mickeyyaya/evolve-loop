@@ -6,13 +6,13 @@ on:
     paths:
       - 'go/**'
       - 'commit-gate/**'
-      - 'tests/commit-gate-test.sh'
+      - 'go/test/commitgate/commit-gate-test.sh'
       - '.github/workflows/go.yml'
   pull_request:
     paths:
       - 'go/**'
       - 'commit-gate/**'
-      - 'tests/commit-gate-test.sh'
+      - 'go/test/commitgate/commit-gate-test.sh'
       - '.github/workflows/go.yml'
 
 permissions:
@@ -60,7 +60,7 @@ jobs:
         # which needs the toolchain set up above. golangci-lint is optional in
         # the runner, so its absence in CI is fine.
         working-directory: ${{ github.workspace }}
-        run: bash tests/commit-gate-test.sh
+        run: bash go/test/commitgate/commit-gate-test.sh
       - name: coverage gate (>=85% per internal/* package)
         run: |
           fail=0

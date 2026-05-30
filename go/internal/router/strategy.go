@@ -8,12 +8,21 @@ import "github.com/mickeyyaya/evolve-loop/go/internal/config"
 // conditional from the orchestrator loop.
 type RoutingStrategy interface {
 	Decide(in RouteInput) RouterDecision
+
+	// Recover returns the recovery route for a ship-failure Blocker. It is
+	// deterministic (Chain of Responsibility, no LLM) and shared across
+	// strategies, so implementations delegate to the pure Recover function.
+	Recover(in RouteInput) RouterDecision
 }
 
 // StaticPreset is the deterministic brain: triggers + spine only, no LLM.
 type StaticPreset struct{}
 
 func (StaticPreset) Decide(in RouteInput) RouterDecision { return Route(in, nil) }
+
+// Recover implements RoutingStrategy for StaticPreset by delegating to the
+// shared deterministic recovery chain.
+func (StaticPreset) Recover(in RouteInput) RouterDecision { return Recover(in) }
 
 // Proposer produces an advisory routing proposal from the digested signals.
 // The concrete implementation (which calls core.Bridge) lives in package core,
@@ -48,6 +57,10 @@ func (s LLMProposal) Decide(in RouteInput) RouterDecision {
 	}
 	return Route(in, p)
 }
+
+// Recover implements RoutingStrategy for LLMProposal by delegating to the
+// shared deterministic recovery chain (recovery needs no LLM).
+func (LLMProposal) Recover(in RouteInput) RouterDecision { return Recover(in) }
 
 // shouldPropose implements the ADR-0024 §2 hybrid cadence. When an upfront
 // whole-cycle plan is driving (in.Plan != nil — set only when the orchestrator

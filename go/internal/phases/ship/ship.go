@@ -1,32 +1,23 @@
-// Package ship implements the script-driven commit-and-push phase as a
+// Package ship implements the native Go commit-and-push phase as a
 // core.PhaseRunner. Unlike the LLM phases, ship does not call a Bridge;
-// it shells to legacy/scripts/lifecycle/ship.sh — the canonical atomic shipper
-// the v8.13.0 ship-gate hook allowlists for git commit / git push /
-// gh release create operations.
-//
-// EVOLVE_SHIP_SCRIPT env override points at an alternate script (used
-// by tests and by Phase 4 cutover when the Go-native ship lands).
+// it runs the native atomic shipper (native.go) directly — the
+// successor to legacy/scripts/lifecycle/ship.sh, reproducing the full
+// audit-binding / EGPS-gate / atomic commit+ff-merge+push state machine.
 package ship
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-const (
-	phaseName         = string(core.PhaseShip)
-	defaultShipScript = "legacy/scripts/lifecycle/ship.sh"
-)
+const phaseName = string(core.PhaseShip)
 
 // CmdRunner is the subprocess injection seam. Tests override it; the
 // production wiring uses execRunner.
@@ -84,58 +75,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		msg = defaultCommitMessage(req)
 	}
 
-	// v11.3.0: dispatch to native Go ship by default. EVOLVE_NATIVE_SHIP=0
-	// reverts to the legacy bash shell-out (rollback path).
-	if useNativeShip(req.Env) {
-		return p.runNative(ctx, req, msg, start)
-	}
-
-	script := req.Env["EVOLVE_SHIP_SCRIPT"]
-	if script == "" {
-		script = filepath.Join(req.ProjectRoot, defaultShipScript)
-	}
-
-	args := []string{"--class", "cycle", msg}
-	env := os.Environ()
-	for k, v := range req.Env {
-		env = append(env, k+"="+v)
-	}
-
-	var stdoutBuf, stderrBuf bytes.Buffer
-	exitCode, runErr := p.runner(ctx, script, args, env, req.ProjectRoot, nil, &stdoutBuf, &stderrBuf)
-	durationMS := p.nowFn().Sub(start).Milliseconds()
-
-	if runErr != nil {
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			DurationMS:   durationMS,
-			Diagnostics: []core.Diagnostic{
-				{Severity: "error", Message: fmt.Sprintf("ship.sh run error: %s", runErr.Error())},
-			},
-		}, fmt.Errorf("ship: run: %w", runErr)
-	}
-
-	if exitCode != 0 {
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			DurationMS:   durationMS,
-			Diagnostics: []core.Diagnostic{
-				{Severity: "error", Message: stderrBuf.String()},
-			},
-		}, fmt.Errorf("ship: exit=%d", exitCode)
-	}
-
-	return core.PhaseResponse{
-		Phase:        phaseName,
-		Verdict:      core.VerdictPASS,
-		ArtifactsDir: req.Workspace,
-		NextPhase:    string(core.PhaseRetro),
-		DurationMS:   durationMS,
-	}, nil
+	return p.runNative(ctx, req, msg, start)
 }
 
 // execRunner is the production CmdRunner.
@@ -161,20 +101,6 @@ func execRunner(ctx context.Context, name string, args, env []string, cwd string
 // wiring that uses exec.CommandContext.
 func NewWithDefaultRunner() *Phase {
 	return New(Config{Runner: execRunner})
-}
-
-// useNativeShip returns true when the native Go path should be used.
-// Default in v11.3.0: native. Override with EVOLVE_NATIVE_SHIP=0 to fall
-// back to the legacy bash shell-out (rollback path through v11.x).
-// EVOLVE_NATIVE_SHIP=1 (or unset/anything-else) → native.
-func useNativeShip(env map[string]string) bool {
-	if v, ok := env["EVOLVE_NATIVE_SHIP"]; ok {
-		return v != "0"
-	}
-	if v := os.Getenv("EVOLVE_NATIVE_SHIP"); v == "0" {
-		return false
-	}
-	return true
 }
 
 // runNative dispatches to the native Go ship implementation. Translates

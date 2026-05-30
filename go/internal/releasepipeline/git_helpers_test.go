@@ -6,6 +6,35 @@ import (
 	"testing"
 )
 
+// initTempRepoWithTag creates an isolated git repository in a fresh t.TempDir(),
+// makes one commit, and tags it. It returns the repo path. Using an isolated
+// repo keeps the test independent of the live repository's tag set — the
+// cautionary failure this replaces was a *_ValidGitRepo test that `git describe`'d
+// the live worktree and broke when a non-semver tag (pre-consolidation-*) shadowed
+// the expected v* tag. Tests must never depend on live-repo or runtime state.
+func initTempRepoWithTag(t *testing.T, tag string) string {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skipf("git not on PATH: %v", err)
+	}
+	dir := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		// Quiet, deterministic identity so the commit succeeds in any environment.
+		cmd.Env = append(cmd.Environ(),
+			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init")
+	run("commit", "--allow-empty", "-m", "initial")
+	run("tag", tag)
+	return dir
+}
+
 // === resolvePrevTag — error branch returns ("", err) =======================
 
 // TestResolvePrevTag_NonGitDir exercises the error path in resolvePrevTag:
@@ -19,26 +48,17 @@ func TestResolvePrevTag_NonGitDir(t *testing.T) {
 	}
 }
 
-// TestResolvePrevTag_GitDir exercises the success path: a real git repo with
-// at least one tag. We cannot guarantee a tag exists in CI, so this test
-// simply verifies the function does not panic on a valid dir and returns a
-// non-empty string when git succeeds.  We skip if git is not on PATH.
+// TestResolvePrevTag_ValidGitRepo exercises the success path against an ISOLATED
+// temp repo with exactly one known tag, so the assertion is deterministic and
+// does not depend on the live repository's tag set.
 func TestResolvePrevTag_ValidGitRepo(t *testing.T) {
-	// Use the actual repo root that contains real git history.
-	// If there are no tags, git describe exits non-zero — that's acceptable;
-	// the test proves the function CALLS git and handles both outcomes.
-	repo := findRepoRoot(t)
+	repo := initTempRepoWithTag(t, "v1.2.3")
 	tag, err := resolvePrevTag(repo)
 	if err != nil {
-		// No tags in repo — acceptable; function returned error correctly.
-		return
+		t.Fatalf("resolvePrevTag on tagged repo: unexpected error %v", err)
 	}
-	if tag == "" {
-		t.Errorf("resolvePrevTag returned empty tag with nil error")
-	}
-	// Tags in this repo begin with "v".
-	if !strings.HasPrefix(tag, "v") {
-		t.Errorf("resolvePrevTag = %q, expected v-prefixed tag", tag)
+	if tag != "v1.2.3" {
+		t.Errorf("resolvePrevTag = %q, want %q", tag, "v1.2.3")
 	}
 }
 

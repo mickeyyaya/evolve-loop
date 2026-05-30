@@ -65,7 +65,8 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	// codex reads the prompt on stdin.
 	// Workstream B: sandbox-confine source-writing phases (CLI-agnostic).
 	name, args := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "codex"), args)
-	rc, err := deps.Runner(ctx, name, args, driverEnv(deps), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
+	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
+	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[codex] %w", err)
 	}

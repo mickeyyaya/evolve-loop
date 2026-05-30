@@ -29,8 +29,8 @@ func hasWarning(ws []Warning, code string) bool {
 func TestLoad_DefaultsWhenRegistryMissing(t *testing.T) {
 	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{})
 
-	if cfg.Stage != StageOff {
-		t.Errorf("Stage = %v, want StageOff (safe default)", cfg.Stage)
+	if cfg.Stage != StageAdvisory {
+		t.Errorf("Stage = %v, want StageAdvisory (default-on since Component #7)", cfg.Stage)
 	}
 	if cfg.Mode != ModeDynamicLLM {
 		t.Errorf("Mode = %v, want ModeDynamicLLM (locked decision: LLM default)", cfg.Mode)
