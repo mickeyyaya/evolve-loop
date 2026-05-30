@@ -70,3 +70,12 @@ KEEP/RETIRE stamp when its body is read during the remaining port.
 `*_*InvestigationComplete`. These assert a one-time cycle artifact landed and
 carry no ongoing invariant — they should be deleted with `go/acs/cycle*/` at
 Stage 5, not ported.
+
+## Pending e2e-tier ports (go/test/e2e/)
+
+- **Native CLI-matrix full-cycle e2e** — `cmd/evolve/e2e_cycle_cli_matrix_test.go::TestE2ECycleCLIMatrix`
+  is `t.Skip`'d as of Stage 5.1 (it fake-shipped via the removed `EVOLVE_NATIVE_SHIP=0` +
+  `EVOLVE_SHIP_SCRIPT` hatch). Re-author in `go/test/e2e/` driving the **native** ship:
+  seed a bare remote + a real auditor ledger binding (mirror `dispatch_test.go`'s
+  `addRemote`/`seedAudit`) and resolve the worktree↔main `state.json` ff-merge divergence.
+  Until then, native ship is covered by `phases/ship/native_test.go` + `dispatch_test.go`.

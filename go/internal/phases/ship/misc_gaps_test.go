@@ -2,8 +2,7 @@
 // verifyClass (ClassRelease, ClassTrivial, invalid), postShip (non-cycle,
 // non-dryrun cycle success), Run (BYPASS_SHIP_VERIFY), writeShipBinding
 // (no cycle_id), currentBranch (runner error), buildDiffFooterAtDir
-// (empty files → empty footer), pluginVersion (invalid JSON), and
-// useNativeShip (os.Getenv=0 path).
+// (empty files → empty footer), and pluginVersion (invalid JSON).
 package ship
 
 import (
@@ -258,19 +257,6 @@ func TestPluginVersion_InvalidJSON_ReturnsEmpty(t *testing.T) {
 	mustWrite(t, filepath.Join(root, ".claude-plugin", "plugin.json"), `{not valid json`)
 	if got := pluginVersion(root); got != "" {
 		t.Errorf("invalid JSON must yield empty version; got %q", got)
-	}
-}
-
-// --- useNativeShip: os.Getenv="0" fallback ---------------------------------
-
-// TestUseNativeShip_OSGetenvZero_ReturnsFalse: when EVOLVE_NATIVE_SHIP is
-// not in the map but is "0" in the process env, useNativeShip should return
-// false (legacy bash path). This exercises the os.Getenv branch.
-func TestUseNativeShip_OSGetenvZero_ReturnsFalse(t *testing.T) {
-	t.Setenv("EVOLVE_NATIVE_SHIP", "0")
-	// Pass an empty map so the env-map branch is skipped.
-	if useNativeShip(map[string]string{}) {
-		t.Error("EVOLVE_NATIVE_SHIP=0 in os env with empty map must return false")
 	}
 }
 

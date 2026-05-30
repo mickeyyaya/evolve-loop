@@ -1,8 +1,7 @@
 // native.go — entry point for the native Go ship implementation.
 //
-// This is the v11.3.0 replacement for shelling out to
-// legacy/scripts/lifecycle/ship.sh. The bash script remains canonical until v12.0.0;
-// callers that want the legacy path set EVOLVE_NATIVE_SHIP=0.
+// This is the sole ship path — the Go replacement for the now-removed
+// legacy/scripts/lifecycle/ship.sh shell-out.
 //
 // The native Run() reproduces the full ship.sh state machine:
 //  1. arg parse (--class, --dry-run, commit message) + EVOLVE_BYPASS_SHIP_VERIFY bridge

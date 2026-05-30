@@ -22,7 +22,6 @@ var shipControlFlowEnvVars = []string{
 	"EVOLVE_STRICT_AUDIT",
 	"EVOLVE_SHIP_RELEASE_NOTES",
 	"EVOLVE_BYPASS_PREFIX_GATE",
-	"EVOLVE_NATIVE_SHIP",
 }
 
 func TestMain(m *testing.M) {
