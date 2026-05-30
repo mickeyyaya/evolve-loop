@@ -92,6 +92,26 @@ assert_go_test_pass() {
   return 1
 }
 
+# assert_go_build [pkg]: run `go build` for the package (default ./...) and
+# assert it EXITS 0 — the build is broken otherwise. The exit code is the
+# authoritative signal — never scrape stdout. Runs in the resolved module dir
+# (acs_go_module_dir) so it works regardless of the predicate's cwd; <pkg> is
+# module-relative (default ./...). Companion to assert_go_test_pass for
+# predicates that need to pin "the package still compiles".
+assert_go_build() {
+  local pkg="${1:-./...}"
+  local out rc dir
+  dir=$(acs_go_module_dir)
+  out=$(cd "$dir" && go build "$pkg" 2>&1); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "GREEN: go build $pkg exited 0" >&2
+    return 0
+  fi
+  echo "RED: go build $pkg exited $rc" >&2
+  echo "$out" | tail -5 >&2
+  return 1
+}
+
 # assert_go_coverage_ge <pkg> <min-pct>: run `go test -cover` for the
 # package and assert measured coverage >= min. Uses acs_coverage_pct +
 # acs_pct_ge so the brittle field-extraction is the tested pure function,
