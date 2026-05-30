@@ -10,7 +10,8 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Script lives at go/test/commitgate/ — repo root is three levels up.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RUNNER="$REPO_ROOT/commit-gate/commit-gate-runner.sh"
 
 PASS=0; FAIL=0
