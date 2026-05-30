@@ -112,6 +112,29 @@ func TestInjectEnvelope_Keystroke_RawSendNoEscNoGate(t *testing.T) {
 	}
 }
 
+// TestInjectEnvelope_Keystroke_SuspectWarnsButSends pins the keyspec
+// warn-not-block contract: a mistyped key name is flagged on stderr yet still
+// sent verbatim (the operator hatch is never refused).
+func TestInjectEnvelope_Keystroke_SuspectWarnsButSends(t *testing.T) {
+	ws := t.TempDir()
+	cfg := injectCfg(ws)
+	deps := covDeps()
+	var errb bytes.Buffer
+	deps.Stderr = &errb
+	tmux := &fakeTmux{paneSeq: []string{"thinking..."}}
+	deps.Tmux = tmux
+	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
+
+	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: "Excape"})
+
+	if !strings.Contains(errb.String(), "unrecognized key token") {
+		t.Errorf("expected keyspec WARN on stderr, got %q", errb.String())
+	}
+	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "Excape|false" {
+		t.Fatalf("suspect keystroke must still send verbatim; sentSeq=%v", tmux.sentSeq)
+	}
+}
+
 // TestInjectEnvelope_Keystroke_EmptyBodyIsNoop is a defensive pin: an empty
 // --body must not crash and must not paste — the SendKeys impl (tmux.go
 // line 59) treats an empty keys arg as a no-op send-keys call. The test

@@ -1,0 +1,55 @@
+{
+  "cli": "codex-tmux",
+  "display_name": "OpenAI Codex CLI",
+  "slash_commands": [
+    { "name": "/model", "purpose": "Switch the active model + reasoning effort" },
+    { "name": "/plan", "purpose": "Enter planning mode (proposals before implementation)" },
+    { "name": "/permissions", "purpose": "Adjust approval mode mid-session (replaces legacy /approvals)" },
+    { "name": "/approve", "purpose": "Retry a single denied action" },
+    { "name": "/plugins", "purpose": "Browse/install/toggle plugins (grouped by marketplace source)" },
+    { "name": "/skills", "purpose": "Select task-specific skills to inject (or $-mention)" },
+    { "name": "/mcp", "purpose": "List configured MCP tools" },
+    { "name": "/hooks", "purpose": "Review/trust/disable lifecycle hooks" },
+    { "name": "/agent", "purpose": "Inspect/continue subagent work" },
+    { "name": "/review", "purpose": "Request analysis of working-tree changes" },
+    { "name": "/diff", "purpose": "Show git diff incl. untracked" },
+    { "name": "/status", "purpose": "Model, approval policy, writable roots, tokens" },
+    { "name": "/init", "purpose": "Generate an AGENTS.md scaffold" },
+    { "name": "/compact", "purpose": "Summarize earlier turns to save context" },
+    { "name": "/clear", "purpose": "Reset display + start fresh conversation" },
+    { "name": "/quit", "purpose": "Terminate the session" }
+  ],
+  "key_bindings": [
+    { "keys": "Enter", "action": "Submit / inject new instruction into the running turn" },
+    { "keys": "Ctrl+C", "action": "Close the interactive session" },
+    { "keys": "Esc Esc", "action": "Edit previous message; walk back transcript" },
+    { "keys": "Tab", "action": "Queue follow-up text/command for next turn" },
+    { "keys": "Ctrl+O", "action": "Copy latest completed output (= /copy)" },
+    { "keys": "Alt+R", "action": "Toggle raw scrollback (= /raw)" },
+    { "keys": "Arrow keys", "action": "Menu/picker navigation" }
+  ],
+  "extension": {
+    "kind": "plugin_marketplace",
+    "summary": "2026 Codex has a full plugin+skill+MCP+hooks+subagent stack. Plugins bundle skills/apps/MCP/hooks; the directory has three source categories (curated by OpenAI, workspace-shared, user-created). Install is a menu-driven TUI, not a one-line command.",
+    "install_flow": [
+      "/plugins",
+      "navigate to 'Install plugin' (arrow keys + Enter)",
+      "select source + plugin, confirm"
+    ]
+  },
+  "headless": {
+    "entrypoint": "codex exec \"<prompt>\"  (alias: codex e)",
+    "available": [
+      "codex exec --json (JSONL stream)",
+      "codex exec resume --output-schema (structured)",
+      "codex mcp add|list|remove|get|login|logout"
+    ]
+  },
+  "sources": [
+    "https://developers.openai.com/codex/cli/slash-commands",
+    "https://developers.openai.com/codex/plugins",
+    "https://developers.openai.com/codex/skills",
+    "https://developers.openai.com/codex/agent-approvals-security",
+    "https://developers.openai.com/codex/cli/reference"
+  ]
+}
