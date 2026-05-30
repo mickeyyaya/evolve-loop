@@ -17,8 +17,9 @@ Hold three ideas in your head and the rest follows:
 1. **The system IS a Go binary (`evolve`, v13.0.0).** You run `evolve loop` and it
    orchestrates everything: sequencing phases, dispatching LLM subagents through a
    CLI-agnostic `bridge`, enforcing the trust kernel, and shipping commits. (The
-   pipeline was originally a tree of bash scripts; those still exist under
-   `legacy/scripts/` as a rollback path, but the Go binary is the primary runtime.)
+   pipeline was originally a tree of bash scripts; that `legacy/scripts/` tree was
+   removed in the Go-only consolidation — the Go binary is now the sole runtime, with
+   no bash fallback. See [evolution/bash-to-go-port](../evolution/bash-to-go-port.md).)
 
 2. **A cycle is an experiment, not a build step.** Each `cycle` is one pass through
    an ordered sequence of `phase`s. The LLM picks the work; the framework constrains

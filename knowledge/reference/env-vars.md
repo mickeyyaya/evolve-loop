@@ -47,8 +47,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 
 | Env var | Default | Effect | Rollback / notes |
 |---|---|---|---|
-| `EVOLVE_USE_LEGACY_BASH` | `0` (Go primary, v11.0.0+) | `0`: Go binary at `EVOLVE_GO_BIN` (or `go/bin/evolve`) is primary entrypoint for `evolve cycle run`/`loop`/`doctor`/`guard`/`ledger`/`acs`. `1`: `evolve loop` exec's to `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`. | `=1` rollback hatch to bash dispatcher (archived v11.5.0 M6). See [migration-from-bash](../../docs/migration-from-bash.md). |
-| `EVOLVE_GO_BIN` | unset | Path to the Go binary. When unset, dispatchers look for `<project_root>/go/bin/evolve`. | Set to cross-compiled artifact (e.g. `~/.local/bin/evolve-darwin-arm64`) for system-wide install. |
+| `EVOLVE_GO_BIN` | unset | Path to the Go binary — the sole runtime entrypoint for `evolve cycle run`/`loop`/`doctor`/`guard`/`ledger`/`acs`/`ship`. When unset, resolves `<project_root>/go/bin/evolve`. | Set to a cross-compiled artifact (e.g. `~/.local/bin/evolve-darwin-arm64`) for system-wide install. The bash dispatcher and the `EVOLVE_USE_LEGACY_BASH` rollback hatch were removed in the Go-only consolidation — there is no bash fallback. History: [migration-from-bash](../../docs/migration-from-bash.md). |
 | `EVOLVE_INTERACTIVE_POLICY` | `recommended_or_first` (default-on, v12.1+) | Bridge prepends a deterministic policy block to every phase prompt so subagents self-resolve `AskUserQuestion`/y/N without hanging. Values: `recommended_or_first` (pick "(Recommended)" or first), `escalate` (no block, fail loudly — legacy), `auto_yes` (binary y/N → yes; multi-option → recommended-or-first). Unknown values silently default to `recommended_or_first`. Block < 200 tokens, deterministic (preserves prompt-prefix cache). | `=escalate` for legacy fail-loud posture. Impl: `go/internal/adapters/bridge/bridge.go:injectPolicyPrefix`. |
 | `EVOLVE_<AGENT>_INTERACTIVE_POLICY` | unset | Per-agent override. `<AGENT>` = agent name upcased, hyphens→underscores (`scout` → `EVOLVE_SCOUT_INTERACTIVE_POLICY`, `tdd-engineer` → `EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY`). | Precedence: `req.Env` per-agent > process env per-agent > `req.Env` global > process env global > default. Pin one phase (e.g. `EVOLVE_AUDITOR_INTERACTIVE_POLICY=escalate`). |
 | `EVOLVE_<PHASE>_PERMISSION_MODE` | unset (v12.1+) | Sets the Claude Code `--permission-mode` flag for one phase invocation. Values: `plan`, `acceptEdits`, `default`. Wired into all 6 phase runners (intent, scout, triage, tdd, build, audit) via `go/internal/phaseflags/`. Only Claude drivers honor it (claude-p, claude-tmux); Codex/Gemini refuse gracefully (`plan_mode_degraded` ledger entry). | Precedence: `req.Env[EVOLVE_<PHASE>_PERMISSION_MODE]` > `profile.permission_mode` (JSON in `.evolve/profiles/<phase>.json`) > unset. `profile.extra_flags` pass through unconditionally. |
@@ -61,7 +60,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 | `EVOLVE_AGY_REQUIRE_FULL` | `0` | `1`: `agy.sh` exits 99 if neither `agy` nor `claude` binary found (mirrors `EVOLVE_GEMINI_REQUIRE_FULL`). | Default: graceful degradation. |
 | `EVOLVE_AGY_BINARY` | unset | Testing seam: override the `agy` binary path. Honored only when `EVOLVE_TESTING=1`. | Used by ACS predicates to force NATIVE/DEGRADED. |
 | `EVOLVE_GEMINI_BINARY` / `EVOLVE_CODEX_BINARY` | unset | Testing seam (gated by `EVOLVE_TESTING=1`): override PATH-detected binary for gemini/codex adapters. Empty value simulates "no binary found". | See [ADR-0003](../../docs/architecture/adr/0003-true-native-cli-invocation.md). |
-| `EVOLVE_ANTHROPIC_BASE_URL` | unset | When set, exported as `ANTHROPIC_BASE_URL` before every `claude -p`. Proxy-agnostic: target must speak Anthropic Messages API (`POST /v1/messages`). NOT required for subscription auth (`claude -p` reads `~/.claude.json` OAuth natively). Use only for custom endpoints (LiteLLM, corporate gateway). | Example: `http://127.0.0.1:4000/v1` (LiteLLM). `hermes proxy start` does not exist — do not use. Run `legacy/scripts/utility/doctor-subscription-auth.sh` to detect auth mode. |
+| `EVOLVE_ANTHROPIC_BASE_URL` | unset | When set, exported as `ANTHROPIC_BASE_URL` before every `claude -p`. Proxy-agnostic: target must speak Anthropic Messages API (`POST /v1/messages`). NOT required for subscription auth (`claude -p` reads `~/.claude.json` OAuth natively). Use only for custom endpoints (LiteLLM, corporate gateway). | Example: `http://127.0.0.1:4000/v1` (LiteLLM). `hermes proxy start` does not exist — do not use. Run `evolve doctor` to detect auth mode. |
 
 ## Budget & cost
 
@@ -116,7 +115,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 
 | Env var | Default | Effect | Rollback / notes |
 |---|---|---|---|
-| `EVOLVE_NATIVE_SHIP` | `1` (Go native, v11.3.0+) | unset or `1`: ship phase runs native Go (`go/internal/phases/ship/`): self-SHA TOFU, audit-binding, EGPS gate, atomic commit+ff-merge+push, gh release. CLI: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. | `=0` shells out to `legacy/scripts/lifecycle/ship.sh` (rollback hatch through v11.x). Parity: 23-test matrix in `native_test.go` mirrors `ship-integration-test.sh`. See [v12.0.0-roadmap](../../docs/v12.0.0-roadmap.md). |
+| `evolve ship` (native, no flag) | always native | The ship phase runs native Go (`go/internal/phases/ship/`): self-SHA TOFU, audit-binding, EGPS gate, atomic commit+ff-merge+push, gh release. CLI: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. | The `EVOLVE_NATIVE_SHIP=0` shell-out to a bash `ship.sh` was removed in the Go-only consolidation; ship is native-only. Parity history: `go/internal/phases/ship/native_test.go` pins commit-message footers, exit codes, and ledger semantics. |
 | `EVOLVE_BYPASS_COMMIT_GATE` | `0` (gate on, v13.0.0+) | `evolve ship --class manual` is the single chokepoint for interactive commits (bare `git commit` ship-gate-denied); requires a fresh commit-gate attestation `.commit-gate/attestation.json` whose `tree_state_sha == sha256(git diff HEAD)`. Produce with `/commit`. Missing/malformed/stale → ship refuses (`IntegrityError`). `--dry-run` exempt. | `=1` skips the check (routine use is a CLAUDE.md violation). Impl: `go/internal/phases/ship/commitgate.go`; runner `commit-gate/commit-gate-runner.sh`. See [commit skill](../../skills/commit/SKILL.md). |
 | `EVOLVE_SHIP_AUTO_CONFIRM` | unset | `1`: CI mode for `--class manual` — skips the interactive y/N confirm. | — |
 | `EVOLVE_BYPASS_SHIP_VERIFY` | `0` | `1`: permanent compatibility bridge that bypasses ship-gate verification (bare `git push origin main` is denied since v8.13.0). | Emits deprecation WARN — prefer `--class manual`. |
@@ -131,16 +130,16 @@ already enforced; an `(opt-in)` var does nothing until set.
 | `EVOLVE_ALLOW_DEEP_RESEARCH` | `0` | `1`: lifts per-agent quota cap; records `deep_overrides` counter. Does not disable hook telemetry. | See [research-tool](../../docs/architecture/research-tool.md). |
 | `EVOLVE_RESEARCH_QUOTA_SOFT` | *(planned)* | Soft quota: allows over-quota web calls but emits WARN in guards.log. | Not yet implemented in `research-quota-gate.sh` as of cycle-89. |
 | `EVOLVE_RESEARCH_HOOK_DISABLED` | `0` | `1`: `research-quota-gate.sh` is a no-op but counters still increment (telemetry-only). | — |
-| `EVOLVE_KB_SEARCH_PATHS` | `knowledge-base/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated roots for `legacy/scripts/research/kb-search.sh`. | — |
+| `EVOLVE_KB_SEARCH_PATHS` | `knowledge-base/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated roots for the native knowledge-base search (`go/internal/research`). | — |
 
 ## Non-env reference (paths, output labels, classes)
 
 | Item | Value / contract | Notes |
 |---|---|---|
-| Bash script location | `legacy/scripts/` (v11.1.0+) | Scripts physically live at `legacy/scripts/`. `legacy/scripts/` is a backcompat symlink; all existing references resolve. New code SHOULD reference `legacy/scripts/...`. |
+| Runtime location | `go/internal/...` (Go-only) | The runtime is the Go binary; the bash `legacy/scripts/` tree was removed in the Go-only consolidation. A few shell helpers remain only as test fixtures + the commit-gate runner. |
 | Ship class `cycle` (default) | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 | `/evolve-loop` cycle commits. |
 | Ship class `manual` | Skips audit-binding; requires fresh commit-gate attestation (bypass `EVOLVE_BYPASS_COMMIT_GATE=1`); interactive y/N (CI: `EVOLVE_SHIP_AUTO_CONFIRM=1`) | Operator-driven manual commits. |
-| Ship class `release` | Skips audit (version-bump.sh mutates files post-audit); logs RELEASE class loudly | `legacy/scripts/release-pipeline.sh` only. |
+| Ship class `release` | Skips audit (version-bump mutates files post-audit); logs RELEASE class loudly | `evolve release` pipeline only. |
 
 ### Operator read-only commands
 
