@@ -14,11 +14,11 @@ without reading the raw cycle history (which has been retired; see
 | Area | Read it for |
 |---|---|
 | **[00-overview/](00-overview/)** | The mental model in one page + a [glossary](00-overview/glossary.md) of every load-bearing term. |
-| **[architecture/](architecture/)** | How the system is built and **why**, grounded in the Go code (`go/internal/<pkg>`). Five docs: [phase-pipeline](architecture/phase-pipeline.md), [trust-kernel-and-egps](architecture/trust-kernel-and-egps.md), [routing-and-advisor](architecture/routing-and-advisor.md), [bridge-and-adapters](architecture/bridge-and-adapters.md), [state-and-ledger](architecture/state-and-ledger.md). |
+| **[architecture/](architecture/)** | How the system is built and **why**, grounded in the Go code (`go/internal/<pkg>`). Six docs: [phase-pipeline](architecture/phase-pipeline.md), [trust-kernel-and-egps](architecture/trust-kernel-and-egps.md), [routing-and-advisor](architecture/routing-and-advisor.md), [bridge-and-adapters](architecture/bridge-and-adapters.md), [state-and-ledger](architecture/state-and-ledger.md), [cli-matrix-and-drivers](architecture/cli-matrix-and-drivers.md) (the any-CLI×any-phase invariant + driver contract). |
 | **[evolution/](evolution/)** | What ~148 cycles **taught**: the [bash→Go port](evolution/bash-to-go-port.md), the [ADR decision digest](evolution/decision-digest.md), [rejected approaches](evolution/rejected-approaches.md) (anti-knowledge — don't repeat these), and the [compound-improvement arc](evolution/compound-improvement-arc.md). |
 | **[incidents/](incidents/)** | A synthesized [pattern library](incidents/pattern-library.md) — recurring failure modes, root causes, and the guards that now prevent them, with a triage table. |
 | **[reference/](reference/)** | Lookup tables: the [env-var reference](reference/env-vars.md) and the [CLI capability matrix](reference/cli-capability-matrix.md). |
-| **[_migration/](_migration/)** | The consolidation record: the [unmerged-work ledger](_migration/unmerged-work-ledger.md) (what was merged/dropped) and [history-recovery](_migration/history-recovery.md) (the safety net). |
+| **[_migration/](_migration/)** | The consolidation record: the [unmerged-work ledger](_migration/unmerged-work-ledger.md) (what was merged/dropped), [history-recovery](_migration/history-recovery.md) (the safety net), and the [plan architecture review](_migration/plan-architecture-review.md) (gap analysis + revised stage sequencing). |
 
 ## Reading paths
 
