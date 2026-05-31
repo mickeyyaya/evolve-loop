@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
@@ -704,6 +705,60 @@ const phaseMaxAttempts = 2
 // ShipError. A safety invariant, not a flag (the outer safety<32 loop backstops).
 const maxRecoveryDepth = 2
 
+// phaseTimingEntry records per-phase latency + outcome for phase-timing.json.
+type phaseTimingEntry struct {
+	Phase      string  `json:"phase"`
+	DurationMS int64   `json:"duration_ms"`
+	Verdict    string  `json:"verdict"`
+	CostUSD    float64 `json:"cost_usd"`
+}
+
+// phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
+// when a mandatory phase aborts after exhausting all retry attempts.
+type phaseFailureDiag struct {
+	Phase        string `json:"phase"`
+	Cycle        int    `json:"cycle"`
+	ErrorMessage string `json:"error_message"`
+	ExitCode     int    `json:"exit_code"`
+	AttemptCount int    `json:"attempt_count"`
+	Timestamp    string `json:"timestamp"`
+}
+
+// writePhaseFailureDiag writes a structured diagnostic file to
+// <workspace>/<phase>-failure-diag.json. Best-effort: failures are logged to
+// stderr but never mask the original error.
+func writePhaseFailureDiag(workspace, phase string, cycle int, phaseErr error, attempts int, now func() time.Time) {
+	exitCode := 1
+	var exitErr *exec.ExitError
+	if errors.Is(phaseErr, ErrArtifactTimeout) {
+		exitCode = 81
+	} else if errors.As(phaseErr, &exitErr) {
+		exitCode = exitErr.ExitCode()
+	}
+	diag := phaseFailureDiag{
+		Phase:        phase,
+		Cycle:        cycle,
+		ErrorMessage: phaseErr.Error(),
+		ExitCode:     exitCode,
+		AttemptCount: attempts,
+		Timestamp:    now().UTC().Format(time.RFC3339),
+	}
+	data, merr := json.Marshal(diag)
+	if merr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag marshal: %v\n", merr)
+		return
+	}
+	path := filepath.Join(workspace, phase+"-failure-diag.json")
+	tmp := path + ".tmp"
+	if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag write: %v\n", werr)
+		return
+	}
+	if rerr := os.Rename(tmp, path); rerr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag rename: %v\n", rerr)
+	}
+}
+
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
 // summary of what ran. The lock is acquired up front and released on
 // every exit path. State is updated incrementally so a crash leaves an
@@ -868,6 +923,28 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	}
 
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
+	var phaseTimings []phaseTimingEntry
+	// Deferred write of phase-timing.json runs even when RunCycle returns an
+	// error so partial timing data is preserved for operator inspection.
+	defer func() {
+		if len(phaseTimings) == 0 {
+			return
+		}
+		timingPath := filepath.Join(cs.WorkspacePath, "phase-timing.json")
+		data, merr := json.Marshal(phaseTimings)
+		if merr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing marshal: %v\n", merr)
+			return
+		}
+		tmp := timingPath + ".tmp"
+		if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing write: %v\n", werr)
+			return
+		}
+		if rerr := os.Rename(tmp, timingPath); rerr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing rename: %v\n", rerr)
+		}
+	}()
 	current := PhaseStart
 	lastVerdict := VerdictPASS
 	// scheduledNext, when non-empty, overrides the state machine for
@@ -1059,6 +1136,21 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				break
 			}
 			if attempt >= phaseMaxAttempts || !errors.Is(err, ErrArtifactTimeout) {
+				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
+				// try to reconstruct the artifact from stdout.clean.txt before aborting.
+				// Enabled by EVOLVE_BACKFILL_ENABLED=1; off by default.
+				if attempt >= phaseMaxAttempts && errors.Is(err, ErrArtifactTimeout) &&
+					(envSnap["EVOLVE_BACKFILL_ENABLED"] == "1" || os.Getenv("EVOLVE_BACKFILL_ENABLED") == "1") {
+					artifactPath := filepath.Join(cs.WorkspacePath, string(next)+"-report.md")
+					if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
+					} else if ok {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: ErrArtifactTimeout exhausted; backfilled artifact from stdout.clean.txt; proceeding with WARN verdict\n", next)
+						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cs.WorkspacePath}
+						err = nil
+						break
+					}
+				}
 				// Ship-error recovery seam (Component #7): ship is a pure
 				// executor — a structured ShipError is resolved by the advisor's
 				// recovery chain (Strategy + CoR), not by aborting the cycle. The
@@ -1079,9 +1171,20 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 						break
 					}
 				}
+				writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
 				return result, fmt.Errorf("phase %s: %w", next, err)
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a bridge artifact timeout; relaunching (self-heal)\n", next, attempt, phaseMaxAttempts)
+			// Emit structured audit trail for the self-heal retry.
+			if lerr := o.ledger.Append(ctx, LedgerEntry{
+				TS:       o.now().UTC().Format(time.RFC3339),
+				Cycle:    cycle,
+				Role:     string(next),
+				Kind:     "phase_retry",
+				ExitCode: 81,
+			}); lerr != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
+			}
 		}
 		if shipRecovered {
 			continue // run the recovery phase (scheduledNext) next iteration
@@ -1179,6 +1282,12 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 
 		result.PhasesRun = append(result.PhasesRun, next)
 		result.FinalVerdict = resp.Verdict
+		phaseTimings = append(phaseTimings, phaseTimingEntry{
+			Phase:      string(next),
+			DurationMS: resp.DurationMS,
+			Verdict:    resp.Verdict,
+			CostUSD:    resp.CostUSD,
+		})
 		current = next
 		lastVerdict = resp.Verdict
 
