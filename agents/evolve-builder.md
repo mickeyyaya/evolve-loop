@@ -175,20 +175,32 @@ Check `strategy` for budget constraints; if task too large, note it. Avoid unnec
 
 The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by `legacy/scripts/lifecycle/build-report-ac-verify.sh` at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
 
-## Pre-handoff Regression Slice (cycle-91+)
+## Pre-handoff Regression Slice (cycle-91+; native ACS suite since v12)
 
-**Before writing build-report.md**, Builder MUST run `legacy/scripts/lifecycle/run-regression-suite-slice.sh` with the set of files touched in this cycle. Include the script's verbatim PASS/FAIL output line in `build-report.md` under a `## Regression Slice` or `## Pre-handoff Slice` section.
+**Before writing build-report.md**, Builder MUST run the NATIVE ACS suite — the
+replacement for the v12-removed `run-regression-suite-slice.sh` — and confirm it is
+green. This is the SAME suite the auditor runs as ground truth, so passing it locally
+is what makes the audit a rubber-stamp instead of a rejection. (Cycles 172/174 were
+SKIPPED because the Builder claimed `Status: PASS` from self-assessment WITHOUT running
+it: 172 had a "no tests to run" eval grader, 174 had 4 red regression predicates — both
+would have been caught here.)
 
 ```bash
-# Example: pipe touched-file paths via stdin
-printf 'path/to/file1\npath/to/file2\n' | bash legacy/scripts/lifecycle/run-regression-suite-slice.sh
+./go/bin/evolve acs suite --cycle <N>    # native replacement for run-regression-suite-slice.sh; run from the worktree
 ```
 
-- **Exit 0 / `N/N PASS`**: proceed to write build-report.md.
-- **`0/0 PASS — no predicate-graph reachability`**: empty slice; proceed normally.
-- **Exit 1 / `N/M FAIL <ids>`**: BLOCK — do not write build-report.md until the failing predicates are remediated.
+- **`red=0` / exit 0**: proceed to write build-report.md with `Status: PASS`.
+- **`red>0` / exit 2**: BLOCK — do NOT write build-report.md or claim PASS until the red predicates are remediated (fix your code, your own `acs/cycle-N/*.sh` evals, AND the build-report-structure regression predicates), then re-run until `red=0`.
+- **Eval graders:** also run your task's graders (`go test -run <names>` from `evals/<task-slug>.md`). A `no tests to run` result means the required test does NOT exist — WRITE IT before claiming PASS; never report PASS for a grader that matched zero tests.
 
-The verbatim output line from `run-regression-suite-slice.sh` MUST appear in the final `build-report.md`. This requirement is enforced by predicate `acs/cycle-91/006-build-report-slice-attestation.sh`.
+Include the suite's verbatim output line in the final `build-report.md` under a
+`## Regression Slice` or `## Pre-handoff Slice` section, AND on its own line a
+`<green>/<total> PASS` summary derived from the suite's `green=`/`total=` fields
+(e.g. `72/72 PASS` when `green=72 total=72`) — predicate
+`acs/cycle-91/006-build-report-slice-attestation.sh` attests on that `N/N PASS` line,
+and the native `green=…/red=…` format alone does not match it. NEVER claim `Status: PASS`
+from self-assessment alone — the native suite + eval graders are the ground truth the
+auditor re-runs; if they are not green for you, they will not be green for the auditor either.
 
 ## Pre-handoff Git Tracking Attestation (cycle-93+)
 
