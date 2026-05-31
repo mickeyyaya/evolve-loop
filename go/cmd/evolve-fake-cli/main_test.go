@@ -115,7 +115,7 @@ func TestDetectPhase(t *testing.T) {
 		{"/tmp/ws/intent-delta.md", "intent"},
 		{"/tmp/ws/scout-report.md", "scout"},
 		{"/tmp/ws/triage-report.md", "triage"},
-		{"/tmp/ws/team-context.md", "tdd"},
+		{"/tmp/ws/test-report.md", "tdd"},
 		{"/tmp/ws/build-report.md", "build"},
 		{"/tmp/ws/audit-report.md", "audit"},
 		{"/tmp/ws/retrospective.md", "retro"},
@@ -158,7 +158,7 @@ func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 		},
 		{
 			phase:           "tdd",
-			mainPath:        filepath.Join(dir, "team-context.md"),
+			mainPath:        filepath.Join(dir, "test-report.md"),
 			wantMainMarkers: []string{"## Acceptance", "## RED Tests"},
 		},
 		{
@@ -182,7 +182,7 @@ func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.phase, func(t *testing.T) {
-			files, err := artifactsFor(tc.phase, tc.mainPath)
+			files, err := artifactsFor(tc.phase, tc.mainPath, "PASS")
 			if err != nil {
 				t.Fatalf("artifactsFor: %v", err)
 			}
@@ -217,7 +217,7 @@ func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 }
 
 func TestArtifactsFor_UnknownPhase(t *testing.T) {
-	files, err := artifactsFor("nonesuch", "/tmp/x.md")
+	files, err := artifactsFor("nonesuch", "/tmp/x.md", "PASS")
 	if err == nil && len(files) == 0 {
 		t.Error("unknown phase must error OR emit empty artifact, but got both no error and no files")
 	}
@@ -345,12 +345,12 @@ func TestParseArgs_CodexStdinError(t *testing.T) {
 }
 
 func TestRun_UnknownPhase(t *testing.T) {
-	// Mystery artifact — detectPhase returns "unknown", artifactsFor errors.
-	args := []string{"-p", "weird: /tmp/intent.md", "--model", "x"}
-	// But /tmp/intent.md matches the regex and IS the intent phase. We need a
-	// path whose basename is unknown. Hand-craft via --output-last-message.
+	// detectPhase returns "unknown" → artifactsFor errors. We need an artifact
+	// path whose basename isn't a known phase file; a "-p" prompt mentioning
+	// e.g. /tmp/intent.md would match the regex and resolve to the intent phase,
+	// so hand-craft an unknown basename via codex's --output-last-message.
 	mystery := "/tmp/mystery-output.md"
-	args = []string{"exec", "--output-last-message", mystery}
+	args := []string{"exec", "--output-last-message", mystery}
 
 	var stdout, stderr bytes.Buffer
 	rc := run(args, bytes.NewReader([]byte("prompt")), &stdout, &stderr)

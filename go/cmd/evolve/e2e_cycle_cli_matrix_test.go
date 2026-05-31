@@ -21,7 +21,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -377,16 +376,28 @@ func runWithTimeout(cmd *exec.Cmd, d time.Duration) (string, error) {
 	case r := <-done:
 		return string(r.out), r.err
 	case <-time.After(d):
+		// Kill the child, then DRAIN the goroutine: CombinedOutput is still
+		// blocked reading the child's pipes and only returns once they close
+		// (after the kill propagates). Without this wait the goroutine outlives
+		// the test — in long live-soak runs it survives past t.TempDir teardown
+		// and can read a deleted dir. Bounded by a short grace so a wedged child
+		// can't hang the test forever.
 		_ = cmd.Process.Kill()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+		}
 		return "", fmt.Errorf("timed out after %s", d)
 	}
 }
 
-// ledgerEntry is a partial view of the ledger.jsonl rows. We only need
-// the role field for assertions.
+// ledgerEntry is a partial view of the ledger.jsonl rows. We only deserialize
+// the fields the e2e assertions read: role/kind for shape, cost_usd for the
+// live budget-ceiling accounting.
 type ledgerEntry struct {
-	Role string `json:"role"`
-	Kind string `json:"kind"`
+	Role    string  `json:"role"`
+	Kind    string  `json:"kind"`
+	CostUSD float64 `json:"cost_usd"`
 }
 
 func readLedger(t *testing.T, projRoot string) []ledgerEntry {
@@ -466,7 +477,3 @@ func dumpWorkspaceLogs(t *testing.T, projRoot string) {
 		return nil
 	})
 }
-
-// errUnused is a compile-time guard so go vet doesn't complain about the
-// errors import when no error-typed value flows through the file.
-var _ = errors.New

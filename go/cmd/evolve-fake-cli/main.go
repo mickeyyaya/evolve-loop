@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -34,6 +35,16 @@ type Invocation struct {
 	Phase        string // resolved from agent heading or artifact filename
 	Prompt       string
 	VersionOnly  bool
+	// Style is the CLI family inferred from the invocation flags:
+	// "claude" (-p), "codex" (exec + stdin), or "agy" (-p +
+	// --dangerously-skip-permissions). Drives per-CLI exit injection so
+	// a fallback test can make the primary CLI fail while the fallback
+	// CLI — pointed at the same fake binary — succeeds.
+	Style string
+	// Interactive is true for a tmux/REPL launch: no -p prompt and no
+	// codex `exec` subcommand. In that mode the fake serves a persistent
+	// REPL (see repl.go) instead of doing a one-shot artifact write.
+	Interactive bool
 }
 
 // phaseToBasename maps the canonical phase name to the filename the
@@ -42,10 +53,14 @@ var phaseToBasename = map[string]string{
 	"intent": "intent.md",
 	"scout":  "scout-report.md",
 	"triage": "triage-report.md",
-	"tdd":    "team-context.md",
-	"build":  "build-report.md",
-	"audit":  "audit-report.md",
-	"retro":  "retrospective.md",
+	// tdd's artifact is test-report.md (NOT the stale pre-rewrite
+	// "team-context.md"); the tmux drivers poll this exact path, so a
+	// mismatch makes every tdd phase time out (exit 81). See the rename
+	// note in internal/phases/tdd/tdd.go.
+	"tdd":   "test-report.md",
+	"build": "build-report.md",
+	"audit": "audit-report.md",
+	"retro": "retrospective.md",
 }
 
 // agentHeadingToPhase maps the first-line heading of each agent .md
@@ -79,6 +94,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "fake-cli 0.1.0 (evolve-loop test stub)")
 		return 0
 	}
+	// Interactive (tmux/REPL) launch — serve a persistent REPL. Detected
+	// from argv alone (no env), because env vars do not reliably propagate
+	// into a tmux session; the boot marker is a fixed constant the test
+	// manifest pins as its prompt_marker.
+	if inv.Interactive {
+		return runREPL(stdin, stdout, stderr, auditVerdict())
+	}
+	// Per-CLI exit injection (headless path). Lets a fallback-chain test
+	// fail the primary CLI (e.g. exit 81) while the fallback CLI, pointed
+	// at this same fake, returns 0. Fires BEFORE any artifact write so the
+	// run looks like a genuine failed invocation (no artifact produced).
+	if code := injectedExitCode(inv.Style); code != 0 {
+		fmt.Fprintf(stderr, "fake-cli: injected exit %d for style=%s\n", code, inv.Style)
+		return code
+	}
 	if inv.ArtifactPath == "" {
 		fmt.Fprintln(stderr, "fake-cli: artifact path missing — neither --output-last-message nor a path in -p prompt was found")
 		return 3
@@ -87,20 +117,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if phase == "" {
 		phase = detectPhase(inv.ArtifactPath)
 	}
-	files, err := artifactsFor(phase, inv.ArtifactPath)
+	files, err := artifactsFor(phase, inv.ArtifactPath, auditVerdict())
 	if err != nil {
 		fmt.Fprintf(stderr, "fake-cli: artifactsFor(%s): %v\n", phase, err)
 		return 4
 	}
-	for path, content := range files {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			fmt.Fprintf(stderr, "fake-cli: mkdir %s: %v\n", filepath.Dir(path), err)
-			return 5
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			fmt.Fprintf(stderr, "fake-cli: write %s: %v\n", path, err)
-			return 5
-		}
+	if err := writeArtifacts(files); err != nil {
+		fmt.Fprintf(stderr, "fake-cli: %v\n", err)
+		return 5
 	}
 	fmt.Fprintf(stdout, "fake-cli: wrote %d artifact(s) for phase=%s\n", len(files), phase)
 	return 0
@@ -121,6 +145,8 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 		prompt        string
 		outputLastMsg string
 		isCodexExec   bool
+		hasPromptFlag bool
+		skipPerms     bool
 	)
 
 	i := 0
@@ -129,6 +155,7 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 		switch {
 		case a == "-p" && i+1 < len(args):
 			prompt = args[i+1]
+			hasPromptFlag = true
 			i += 2
 		case a == "--output-last-message" && i+1 < len(args):
 			outputLastMsg = args[i+1]
@@ -148,6 +175,7 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 				i++
 			}
 		case a == "--dangerously-skip-permissions":
+			skipPerms = true
 			i++
 		case strings.HasPrefix(a, "--"):
 			// Unknown flag with `=value` form, or boolean. Best-effort consume.
@@ -176,7 +204,29 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 	if artifactPath == "" {
 		artifactPath = resolveArtifactPath(prompt, phase)
 	}
-	return Invocation{ArtifactPath: artifactPath, Phase: phase, Prompt: prompt}, nil
+
+	// Infer CLI family for per-CLI exit injection: codex `exec`, then agy
+	// (-p + skip-permissions), else claude (-p). agy is checked before the
+	// plain -p case because agy also passes -p.
+	style := "claude"
+	switch {
+	case isCodexExec:
+		style = "codex"
+	case skipPerms:
+		style = "agy"
+	}
+
+	// A tmux/REPL launch carries neither -p nor codex `exec`. (--version is
+	// handled by the early-exit scan above and never reaches here.)
+	interactive := !hasPromptFlag && !isCodexExec
+
+	return Invocation{
+		ArtifactPath: artifactPath,
+		Phase:        phase,
+		Prompt:       prompt,
+		Style:        style,
+		Interactive:  interactive,
+	}, nil
 }
 
 // detectPhaseFromPrompt scans the prompt for the agent heading line.
@@ -205,33 +255,18 @@ func resolveArtifactPath(prompt, phase string) string {
 	return absPathRE.FindString(prompt)
 }
 
-// Known phase-artifact basenames the fake CLI emits. Listed once so
-// detectPhase / artifactsFor / findArtifactPath stay in sync.
-var knownArtifactBasenames = []string{
-	"intent.md", "intent-delta.md",
-	"scout-report.md", "triage-report.md",
-	"team-context.md", "build-report.md",
-	"audit-report.md", "retrospective.md",
-}
-
 // absPathRE matches absolute paths to known artifact basenames. The
 // dir prefix MUST be non-empty so a relative mention like
 // "workspace/scout-report.md" in the agent body doesn't accidentally
 // match as "/scout-report.md" — that quirk of greedy backtracking bit
 // us early in development.
 var absPathRE = regexp.MustCompile(
-	`/[A-Za-z0-9._-][A-Za-z0-9._/-]*/(?:intent\.md|intent-delta\.md|scout-report\.md|triage-report\.md|team-context\.md|build-report\.md|audit-report\.md|retrospective\.md)\b`,
+	`/[A-Za-z0-9._-][A-Za-z0-9._/-]*/(?:intent\.md|intent-delta\.md|scout-report\.md|triage-report\.md|test-report\.md|build-report\.md|audit-report\.md|retrospective\.md)\b`,
 )
 
 // workspaceLineRE matches the "- workspace: /path" line that
 // composePrompt appends to every phase prompt's Cycle Context section.
 var workspaceLineRE = regexp.MustCompile(`(?m)^[-*]\s*workspace:\s*(\S+)\s*$`)
-
-// findArtifactPath is kept for older tests that probed the prompt-only
-// fallback. Production resolution goes through resolveArtifactPath.
-func findArtifactPath(prompt string) string {
-	return resolveArtifactPath(prompt, detectPhaseFromPrompt(prompt))
-}
 
 // detectPhase classifies an artifact path by its basename. Each phase
 // has a unique filename in evolve-loop's contract.
@@ -244,7 +279,7 @@ func detectPhase(artifactPath string) string {
 		return "scout"
 	case "triage-report.md":
 		return "triage"
-	case "team-context.md":
+	case "test-report.md":
 		return "tdd"
 	case "build-report.md":
 		return "build"
@@ -258,9 +293,14 @@ func detectPhase(artifactPath string) string {
 }
 
 // artifactsFor returns the file map a phase must emit to satisfy its
-// PASS classifier. Audit emits TWO files (the report + acs-verdict.json
-// next to it); retro emits TWO (report + failure-lesson YAML).
-func artifactsFor(phase, mainPath string) (map[string]string, error) {
+// classifier. Audit emits TWO files (the report + acs-verdict.json next
+// to it); retro emits TWO (report + failure-lesson YAML).
+//
+// verdict ∈ {PASS,WARN,FAIL} steers ONLY the audit phase: it shapes both
+// the audit-report.md verdict line and the fused acs-verdict.json red_count
+// (FAIL → red_count 1, so the EGPS gate blocks). Other phases ignore it.
+// An empty/unknown verdict is treated as PASS by the caller (auditVerdict).
+func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 	out := map[string]string{}
 	switch phase {
 	case "intent":
@@ -274,9 +314,13 @@ func artifactsFor(phase, mainPath string) (map[string]string, error) {
 	case "build":
 		out[mainPath] = "# Build Report\n\n## Files Modified\n- file.go (synthetic)\n"
 	case "audit":
-		out[mainPath] = "# Audit Report\n\n## Verdict\n**PASS**\n\nNo defects found.\n"
+		redCount := 0
+		if verdict == "FAIL" {
+			redCount = 1
+		}
+		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n", verdict, verdict)
 		acsPath := filepath.Join(filepath.Dir(mainPath), "acs-verdict.json")
-		out[acsPath] = `{"red_count": 0, "yellow_count": 0, "green_count": 1}` + "\n"
+		out[acsPath] = fmt.Sprintf(`{"red_count": %d, "yellow_count": 0, "green_count": 1}`, redCount) + "\n"
 	case "retro":
 		out[mainPath] = "# Retrospective\n\n## Lessons\n- synthetic lesson learned\n"
 		lessonPath := filepath.Join(filepath.Dir(mainPath), "failure-lesson-1.yaml")
@@ -285,4 +329,32 @@ func artifactsFor(phase, mainPath string) (map[string]string, error) {
 		return nil, fmt.Errorf("unknown phase %q (no known artifact contract for %s)", phase, mainPath)
 	}
 	return out, nil
+}
+
+// auditVerdict reads FAKE_CLI_AUDIT_VERDICT and normalises it to one of
+// {PASS,WARN,FAIL}; anything else (including unset) is PASS. Read from the
+// process env, so it only takes effect on the headless path where env
+// propagates to the fake subprocess (tmux launches default to PASS).
+func auditVerdict() string {
+	switch v := strings.ToUpper(strings.TrimSpace(os.Getenv("FAKE_CLI_AUDIT_VERDICT"))); v {
+	case "WARN", "FAIL":
+		return v
+	default:
+		return "PASS"
+	}
+}
+
+// injectedExitCode returns the exit code a test wants this CLI family to
+// fail with, via FAKE_CLI_{CLAUDE,CODEX,AGY}_EXIT. 0 (or unset/garbage)
+// means "no injection — behave normally".
+func injectedExitCode(style string) int {
+	raw := os.Getenv("FAKE_CLI_" + strings.ToUpper(style) + "_EXIT")
+	if raw == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }

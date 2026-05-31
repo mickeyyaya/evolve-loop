@@ -74,8 +74,17 @@ Stage 5, not ported.
 ## Pending e2e-tier ports (go/test/e2e/)
 
 - **Native CLI-matrix full-cycle e2e** — `cmd/evolve/e2e_cycle_cli_matrix_test.go::TestE2ECycleCLIMatrix`
-  is `t.Skip`'d as of Stage 5.1 (it fake-shipped via the removed `EVOLVE_NATIVE_SHIP=0` +
-  `EVOLVE_SHIP_SCRIPT` hatch). Re-author in `go/test/e2e/` driving the **native** ship:
-  seed a bare remote + a real auditor ledger binding (mirror `dispatch_test.go`'s
-  `addRemote`/`seedAudit`) and resolve the worktree↔main `state.json` ff-merge divergence.
-  Until then, native ship is covered by `phases/ship/native_test.go` + `dispatch_test.go`.
+  and its tmux twin `cmd/evolve/e2e_cli_tmux_matrix_test.go::TestE2ECycleTmuxMatrix` are
+  both `t.Skip`'d as of Stage 5.1 (they fake-shipped via the removed `EVOLVE_NATIVE_SHIP=0` +
+  `EVOLVE_SHIP_SCRIPT` hatch; the tmux drivers themselves complete all six phases). Re-author
+  in `go/test/e2e/` driving the **native** ship: seed a bare remote + a real auditor ledger
+  binding (mirror `dispatch_test.go`'s `addRemote`/`seedAudit`) and resolve the worktree↔main
+  `state.json` ff-merge divergence. Until then, native ship is covered by
+  `phases/ship/native_test.go` + `dispatch_test.go`.
+- **Successful-native-ship outcome for the pipeline + fallback e2e** — `e2e_pipeline_paths_test.go`
+  (fluent-WARN, intent-gated happy path) and `e2e_cli_degradation_test.go` (ADR-0029 CLI
+  fallback) now assert the cycle **reaches** the ship phase via the ledger `role="ship"` entry
+  (recorded the moment ship is attempted), NOT that a ship commit landed — because native-only
+  ship cannot complete the ff-merge in the unit fixture. Their routing/fallback coverage is
+  intact; only the *ship-success* leg is deferred to the same `go/test/e2e/` native-ship harness
+  above (a successful native ship there would let these additionally assert a landed commit).

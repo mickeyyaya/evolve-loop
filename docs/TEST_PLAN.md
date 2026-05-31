@@ -168,15 +168,51 @@ Steps 1-4 are non-negotiable per CLAUDE.md "Verification before claiming done". 
 
 ---
 
+## Phase 2 — CLI scenario coverage (added 2026-05-30)
+
+End-to-end coverage of the "any CLI × any phase" invariant and the adversarial
+pipeline paths, layered on the `evolve-fake-cli` seam (`BRIDGE_TESTING=1` +
+`BRIDGE_<CLI>_BINARY`). Offline-deterministic by default; live opt-in via
+`EVOLVE_E2E_LIVE=1`. All E2E tests skip under `-short`.
+
+| Test (`go/cmd/evolve/`) | Scenario | Drivers / mechanism |
+|---|---|---|
+| `e2e_cycle_cli_matrix_test.go` (pre-existing) | Happy-path full cycle scout→ship | headless: claude-p, codex, agy |
+| `e2e_cli_tmux_matrix_test.go` | Happy-path full cycle through a **real tmux server** | interactive: claude-tmux, codex-tmux, agy-tmux. Fake serves a REPL printing every driver's boot marker; `HOME`/`EVOLVE_CODEX_CONFIG_PATH` redirected so preflights never touch the operator's real `~/.codex`. ~45s/CLI; timeout tunable via `EVOLVE_E2E_TMUX_TIMEOUT_S`. |
+| `e2e_cli_degradation_test.go` | CLI fallback chain (ADR-0029) | Primary claude-p fails with each trigger code {80,81,124,127} → runner retries codex → ships. Non-trigger 99 → no fallback → no ship. Per-CLI exit injection via `FAKE_CLI_CLAUDE_EXIT`. |
+| `e2e_pipeline_paths_test.go` | Audit FAIL→retro→no-ship; WARN fluent-ships vs strict-blocks; intent phase | headless; `FAKE_CLI_AUDIT_VERDICT`, `EVOLVE_STRICT_AUDIT`, `EVOLVE_REQUIRE_INTENT`. |
+| `e2e_setup_validation_test.go` | `evolve setup detect/validate` floor | in-process `runSetup`: envelope (ERROR), allowed_clis (ERROR), cross-family (WARN / `--strict` ERROR), detect JSON shape. |
+
+`evolve-fake-cli` gained a persistent REPL mode (auto-detected from a tmux launch:
+no `-p`, no `exec`), per-CLI exit injection, and audit-verdict injection — all
+backward-compatible. It also picked up a correctness fix: the tdd artifact is
+`test-report.md`, not the stale `team-context.md` (the headless matrix masked this
+because its completion is process-exit-based; the tmux artifact-poll exposed it).
+
+**Documented gap — bash-adapter graceful degradation.** The bash adapters'
+"missing binary → stub artifact → exit 0" degradation does NOT exist in the v11+
+Go path. The Go path returns a fallback-trigger exit code (127 `ExitMissingBinary`)
+and relies on the fallback chain; the `--require-full` hard-fail (exit 99) is
+covered at the bridge level (`internal/bridge/launch_modes_test.go:TestLaunchArgs_RequireFull_Unmet`,
+`coverage_batch2_test.go:TestRequireFull_ManifestMissing`). No E2E asserts the
+bash stub behavior, because it is unreachable through `evolve cycle run`.
+
+**Not yet covered (later pass):** live-injection (ADR-0023 send/nudge/keystroke),
+recipe engine + capability catalog (ADR-0031), and system-prompt/interactive-policy
+injection *content* — all have bridge-level unit coverage; full-cycle E2E is deferred.
+The `ollama-tmux` driver (local inference) is out of provider-matrix scope.
+
+---
+
 ## Gaps (Phase 2 owns these)
 
 | Surface | Reason deferred |
 |---|---|
 | `internal/adapters/bridge/` | Now covered (v12): delegates to the in-process Go `bridge.Engine` (no subprocess); unit-tested with a fake `core.Bridge`. |
-| `internal/phases/*` | Phase 2 — Scout / TDD / Builder / Auditor phase impls. Each will need a fake `Bridge` + fake `Storage` for isolation. |
+| `internal/phases/*` | Unit isolation still TBD, but every phase is now exercised end-to-end through the CLI-scenario E2E matrix above (headless + tmux + fallback + FAIL/retro). |
 | `internal/adapters/sandbox/` | Phase 2 — `sandbox-exec` (macOS) and `bwrap` (Linux) profiles. Tests need OS-specific build tags. |
-| `evolve loop` / `evolve cycle run` | Phase 2 — top-level CLI for the full Scout → Build → Audit → Ship → Retro cycle. Smoke + property test for the state machine. |
-| Cross-CLI parity (Gemini / AGY) | Phase 3 — model-router unit tests under `internal/router/` and capability-matrix snapshot tests. |
+| `evolve loop` / `evolve cycle run` | `evolve cycle run` now covered E2E across all 6 shipped drivers + fallback + adversarial paths (see Phase 2 section). `evolve loop` multi-cycle + state-machine property tests still TBD. |
+| Cross-CLI parity (Gemini / AGY) | agy-tmux now runs a full cycle in the tmux matrix; cross-family is enforced + tested via `evolve setup validate`. Model-router unit tests under `internal/router/` still Phase 3. |
 | Distribution | Phase 3 — GoReleaser config, brew formula smoke test, install.sh idempotency test. |
 | v11.0 cutover | Phase 4 — final coexistence sunset; bash predicates removed after `evolve acs run` consumes their verdict surface for one full release. |
 
