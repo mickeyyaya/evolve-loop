@@ -326,6 +326,9 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if code == ExitArtifactTimeout {
 		return resp, fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrArtifactTimeout)
 	}
+	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard {
+		return resp, fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrTransientBridgeFailure)
+	}
 	return resp, fmt.Errorf("bridge: launch exit=%d", code)
 }
 

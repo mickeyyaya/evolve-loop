@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -697,6 +698,34 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 // deterministic timeout still aborts the cycle after the cap.
 const phaseMaxAttempts = 2
 
+func isTransientBridgeError(err error) bool {
+	return errors.Is(err, ErrTransientBridgeFailure)
+}
+
+func bridgeExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	if errors.Is(err, ErrArtifactTimeout) {
+		return 81
+	}
+	errStr := err.Error()
+	const target = "bridge: launch exit="
+	idx := strings.Index(errStr, target)
+	if idx != -1 {
+		start := idx + len(target)
+		end := start
+		for end < len(errStr) && errStr[end] >= '0' && errStr[end] <= '9' {
+			end++
+		}
+		if end > start {
+			code, _ := strconv.Atoi(errStr[start:end])
+			return code
+		}
+	}
+	return 0
+}
+
 // maxRecoveryDepth bounds advisor-driven ship-error recovery per cycle
 // (Component #5/#7). Ship is a pure executor: a structured ShipError is
 // resolved by routing to a recovery phase (re-audit / retry-ship / debugger),
@@ -1132,65 +1161,92 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			if obsCancel != nil {
 				obsCancel()
 			}
-			if err == nil {
+			if err == nil && IsVerdict(resp.Verdict) {
 				break
 			}
-			if attempt >= phaseMaxAttempts || !errors.Is(err, ErrArtifactTimeout) {
-				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
-				// try to reconstruct the artifact from stdout.clean.txt before aborting.
-				// Enabled by EVOLVE_BACKFILL_ENABLED=1; off by default.
-				if attempt >= phaseMaxAttempts && errors.Is(err, ErrArtifactTimeout) &&
-					(envSnap["EVOLVE_BACKFILL_ENABLED"] == "1" || os.Getenv("EVOLVE_BACKFILL_ENABLED") == "1") {
-					artifactPath := filepath.Join(cs.WorkspacePath, string(next)+"-report.md")
-					if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
-					} else if ok {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: ErrArtifactTimeout exhausted; backfilled artifact from stdout.clean.txt; proceeding with WARN verdict\n", next)
-						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cs.WorkspacePath}
-						err = nil
-						break
+			if err != nil {
+				if attempt >= phaseMaxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
+					// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
+					// try to reconstruct the artifact from stdout.clean.txt before aborting.
+					// Enabled by EVOLVE_BACKFILL_ENABLED=1; off by default.
+					if attempt >= phaseMaxAttempts && errors.Is(err, ErrArtifactTimeout) &&
+						(envSnap["EVOLVE_BACKFILL_ENABLED"] == "1" || os.Getenv("EVOLVE_BACKFILL_ENABLED") == "1") {
+						artifactPath := filepath.Join(cs.WorkspacePath, string(next)+"-report.md")
+						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
+							fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
+						} else if ok {
+							fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: ErrArtifactTimeout exhausted; backfilled artifact from stdout.clean.txt; proceeding with WARN verdict\n", next)
+							resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cs.WorkspacePath}
+							err = nil
+							if lerr := o.ledger.Append(ctx, LedgerEntry{
+								TS:       o.now().UTC().Format(time.RFC3339),
+								Cycle:    cycle,
+								Role:     string(next),
+								Kind:     "backfill",
+								ExitCode: 81,
+							}); lerr != nil {
+								fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill ledger append: %v\n", lerr)
+							}
+							break
+						}
 					}
-				}
-				// Ship-error recovery seam (Component #7): ship is a pure
-				// executor — a structured ShipError is resolved by the advisor's
-				// recovery chain (Strategy + CoR), not by aborting the cycle. The
-				// resolver records the error, picks the recovery phase
-				// (re-audit / retry-ship / debugger), and bounds the depth.
-				// Integrity breaches, an illegal edge, or exhausted depth return
-				// (_, false) and fall through to the loud abort below.
-				if se, ok := AsShipError(err); ok {
-					if rec, recovering := o.recoverFromShipError(ctx, cycle, cs, se, recoveryDepth); recovering {
-						ctxSnap["ship_error_code"] = string(se.Code)
-						ctxSnap["ship_error_class"] = string(se.Class)
-						ctxSnap["ship_error_stage"] = string(se.Stage)
-						ctxSnap["ship_error_debug"] = se.DebugString()
-						recoveryDepth++
-						scheduledNext = rec
-						current = PhaseShip // ship ran (and failed); keep forensics accurate
-						shipRecovered = true
-						break
+					// Ship-error recovery seam (Component #7): ship is a pure
+					// executor — a structured ShipError is resolved by the advisor's
+					// recovery chain (Strategy + CoR), not by aborting the cycle. The
+					// resolver records the error, picks the recovery phase
+					// (re-audit / retry-ship / debugger), and bounds the depth.
+					// Integrity breaches, an illegal edge, or exhausted depth return
+					// (_, false) and fall through to the loud abort below.
+					if se, ok := AsShipError(err); ok {
+						if rec, recovering := o.recoverFromShipError(ctx, cycle, cs, se, recoveryDepth); recovering {
+							ctxSnap["ship_error_code"] = string(se.Code)
+							ctxSnap["ship_error_class"] = string(se.Class)
+							ctxSnap["ship_error_stage"] = string(se.Stage)
+							ctxSnap["ship_error_debug"] = se.DebugString()
+							recoveryDepth++
+							scheduledNext = rec
+							current = PhaseShip // ship ran (and failed); keep forensics accurate
+							shipRecovered = true
+							break
+						}
 					}
+					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
+					return result, fmt.Errorf("phase %s: %w", next, err)
 				}
-				writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
-				return result, fmt.Errorf("phase %s: %w", next, err)
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, phaseMaxAttempts)
+				// Emit structured audit trail for the self-heal retry.
+				if lerr := o.ledger.Append(ctx, LedgerEntry{
+					TS:       o.now().UTC().Format(time.RFC3339),
+					Cycle:    cycle,
+					Role:     string(next),
+					Kind:     "phase_retry",
+					ExitCode: bridgeExitCode(err),
+				}); lerr != nil {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
+				}
+				continue
 			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a bridge artifact timeout; relaunching (self-heal)\n", next, attempt, phaseMaxAttempts)
-			// Emit structured audit trail for the self-heal retry.
-			if lerr := o.ledger.Append(ctx, LedgerEntry{
-				TS:       o.now().UTC().Format(time.RFC3339),
-				Cycle:    cycle,
-				Role:     string(next),
-				Kind:     "phase_retry",
-				ExitCode: 81,
-			}); lerr != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
+			if err == nil && !IsVerdict(resp.Verdict) {
+				if attempt >= phaseMaxAttempts {
+					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict), attempt, o.now)
+					return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+				}
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, phaseMaxAttempts, resp.Verdict)
+				// Emit structured audit trail for the self-heal retry.
+				if lerr := o.ledger.Append(ctx, LedgerEntry{
+					TS:       o.now().UTC().Format(time.RFC3339),
+					Cycle:    cycle,
+					Role:     string(next),
+					Kind:     "phase_retry",
+					ExitCode: 0,
+				}); lerr != nil {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
+				}
+				continue
 			}
 		}
 		if shipRecovered {
 			continue // run the recovery phase (scheduledNext) next iteration
-		}
-		if !IsVerdict(resp.Verdict) {
-			return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
 		}
 
 		// Workstream E2: per-phase deliverable review gate. Runs ONLY for

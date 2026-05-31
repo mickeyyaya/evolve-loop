@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -170,5 +171,108 @@ func TestFailureDiag_NotWrittenOnPassingCycle(t *testing.T) {
 	matches, _ := filepath.Glob(filepath.Join(cycleWorkspaceDir(root, res.Cycle), "*-failure-diag.json"))
 	if len(matches) != 0 {
 		t.Errorf("no failure-diag may be written on a fully-PASS cycle; found %v", matches)
+	}
+}
+
+type backfillRunner struct {
+	content string
+}
+
+func (b *backfillRunner) Name() string { return "scout" }
+func (b *backfillRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	cleanFile := filepath.Join(req.Workspace, "scout-stdout.clean.txt")
+	_ = os.MkdirAll(req.Workspace, 0o755)
+	_ = os.WriteFile(cleanFile, []byte(b.content), 0o644)
+	return PhaseResponse{}, wrapTimeout()
+}
+
+func TestOrchestrator_Backfill_LedgerEntry(t *testing.T) {
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &backfillRunner{
+		content: "# Scout Report\n" + strings.Repeat("a", 250),
+	}
+	o := NewOrchestrator(st, led, runners)
+
+	req := CycleRequest{
+		ProjectRoot: root,
+		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "1"},
+	}
+	_, err := o.RunCycle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("RunCycle failed: %v", err)
+	}
+
+	var backfillEntry *LedgerEntry
+	for i := range led.entries {
+		if led.entries[i].Kind == "backfill" {
+			backfillEntry = &led.entries[i]
+			break
+		}
+	}
+	if backfillEntry == nil {
+		t.Fatalf("expected a kind=backfill ledger entry; entries=%+v", led.entries)
+	}
+}
+
+func TestOrchestrator_Backfill_LedgerRole(t *testing.T) {
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &backfillRunner{
+		content: "# Scout Report\n" + strings.Repeat("a", 250),
+	}
+	o := NewOrchestrator(st, led, runners)
+
+	req := CycleRequest{
+		ProjectRoot: root,
+		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "1"},
+	}
+	_, err := o.RunCycle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("RunCycle failed: %v", err)
+	}
+
+	var backfillEntry *LedgerEntry
+	for i := range led.entries {
+		if led.entries[i].Kind == "backfill" {
+			backfillEntry = &led.entries[i]
+			break
+		}
+	}
+	if backfillEntry == nil {
+		t.Fatalf("expected a kind=backfill ledger entry")
+	}
+	if backfillEntry.Role != "scout" {
+		t.Errorf("expected Role='scout', got %q", backfillEntry.Role)
+	}
+}
+
+func TestOrchestrator_Backfill_NoLedgerEntryWhenDisabled(t *testing.T) {
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &backfillRunner{
+		content: "# Scout Report\n" + strings.Repeat("a", 250),
+	}
+	o := NewOrchestrator(st, led, runners)
+
+	req := CycleRequest{
+		ProjectRoot: root,
+		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "0"},
+	}
+	_, err := o.RunCycle(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected RunCycle to abort because backfill is disabled")
+	}
+
+	for i := range led.entries {
+		if led.entries[i].Kind == "backfill" {
+			t.Errorf("unexpected kind=backfill ledger entry found: %+v", led.entries[i])
+		}
 	}
 }

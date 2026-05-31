@@ -36,6 +36,10 @@ var (
 	// aborting the whole cycle (Workstream D — cycle-120 build-planner).
 	ErrArtifactTimeout = errors.New("core: bridge artifact timeout")
 
+	// ErrTransientBridgeFailure is wrapped into the Bridge.Launch error when a
+	// driver returns exit 80, 85, or 86, which represent transient infra issues.
+	ErrTransientBridgeFailure = errors.New("core: transient bridge failure")
+
 	// ErrPhaseInvalid means the supplied Phase value isn't a member of
 	// the enum.
 	ErrPhaseInvalid = errors.New("core: invalid phase")

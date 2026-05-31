@@ -22,9 +22,9 @@ narrowly scoped to genuinely transient failures, never a model's real FAIL.
 
 | # | Site (orchestrator.go unless noted) | Trigger | Recoverable? | Fix posture |
 |---|---|---|---|---|
-| 1 | attempt loop `return ... "phase %s: %w"` | any non-ArtifactTimeout bridge error on a mandatory phase | yes (transient class) | **data-driven** — classify transient bridge errors → bounded retry/fallback; do NOT retry real FAILs (token cost) |
+| 1 | attempt loop `return ... "phase %s: %w"` | any non-ArtifactTimeout bridge error on a mandatory phase | yes (transient class) | **DONE** — cycle-173: transient bridge failures (exits 80/85/86) are classified and retried up to phaseMaxAttempts |
 | 9 | `retro.go` bridge-fail returns error | retro's OWN bridge dies | yes | **DONE** — return FAIL verdict + nil error → routes via `decideAfterRetro` |
-| 5 | `return ... "non-canonical verdict"` | runner returns verdict ∉ {PASS,FAIL,WARN,SKIPPED} (parse blip) | yes | data-driven — bounded retry within `phaseMaxAttempts` |
+| 5 | `return ... "non-canonical verdict"` | runner returns verdict ∉ {PASS,FAIL,WARN,SKIPPED} (parse blip) | yes | **DONE** — cycle-173: non-canonical verdicts are classified and retried up to phaseMaxAttempts |
 | 3 | `router/recovery.go` integrity-block | integrity-class ShipError (e.g. INTEGRITY_TREE_DRIFT false positive) | sometimes | route through `debugger` deep-dive before BLOCK |
 | 2 | `phaseMaxAttempts=2`, no backoff | repeated ArtifactTimeout | partly | optional: backoff/third attempt |
 | 4 | `maxRecoveryDepth=2` then abort | persistent ship blocker | by design | keep cap; escalate to operator notice |
