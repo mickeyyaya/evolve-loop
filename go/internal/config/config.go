@@ -187,6 +187,11 @@ var legacyFlags = map[string]legacyFlag{
 	"EVOLVE_TEST_PHASE_ENABLED":         {"tdd", EnableOn, EnableOff},
 	"EVOLVE_BUILD_PLANNER":              {"build-planner", EnableOn, EnableOff},
 	"EVOLVE_DISABLE_AUTO_RETROSPECTIVE": {"retrospective", EnableOff, EnableContent},
+	// Swarm planner (ADR-0032) — opt-in like build-planner. EVOLVE_SWARM_STAGE
+	// (shadow|advisory|enforce) is the rollout dial; any non-empty value other
+	// than off/shadow enables the planner phase. config.Load maps the legacy =1
+	// form here; the orchestrator reads the stage for dispatch behavior.
+	"EVOLVE_SWARM_PLANNER": {"swarm-plan", EnableOn, EnableOff},
 }
 
 // registryDoc is the subset of phase-registry.json this loader reads.
@@ -303,6 +308,7 @@ func defaults() RoutingConfig {
 			"triage":        EnableOn,
 			"tdd":           EnableOn,
 			"build-planner": EnableOff,
+			"swarm-plan":    EnableOff,
 		},
 		Triggers: map[string]RoutingBlock{},
 	}
