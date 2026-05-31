@@ -66,10 +66,14 @@ node_modules/
 # Operator-extensible but ships with sensible defaults; must be tracked so the
 # scripts/guards/commit-prefix-gate.sh hook applies consistently across clones.
 !.evolve/commit-prefix-scope.json
-# ... and except the evals directory and its markdown files (tracked, never ignored).
-!.evolve/
-!.evolve/evals/
-!.evolve/evals/*.md
+# NOTE (issue-#11 / cycle-176): a self-evolve cycle (ee77067) un-ignored .evolve/
+# (`!.evolve/` + `!.evolve/evals/`) to "track evals". That broke a LOAD-BEARING
+# invariant — recoverBuildLeak (go/internal/core/orchestrator.go) and the audit
+# assume .evolve/ is fully gitignored; un-ignoring it exposed ~300 eval files to
+# `git status`, which the leak-recovery then tried to relocate/`git add` and
+# aborted the cycle. Reverted to keep .evolve/ runtime state ignored. Versioning
+# eval definitions, if desired, must be a deliberate redesign that also updates the
+# recovery/audit machinery — not a blanket un-ignore.
 .claude/evolve/
 .claude/worktrees/
 .clone/

@@ -466,15 +466,18 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 		}
 		// Skip the orchestrator's own runtime state and directory entries — never
 		// build output, and not safe to relocate as a file:
-		//   - .evolve/ : cycle-state, ledger, runs, and the cycle's OWN worktree live
-		//     here. In the live repo it's gitignored (invisible to `git status`); a
-		//     fixture without that .gitignore must not see recoverBuildLeak relocate
-		//     ledger.tip into the worktree (audit-diff pollution).
+		//   - .evolve/ : cycle-state, ledger, runs, guards.log, and the cycle's OWN
+		//     worktree live here. Match it at ANY path depth — guard hooks run with
+		//     cwd set to subdirectories and write nested `<subdir>/.evolve/guards.log`
+		//     (cycle-176 / issue #11): top-level-only matching missed those, so
+		//     recoverBuildLeak relocated them and the gitignored `git add` failed →
+		//     batch abort. Both top-level (`.evolve/...`) and nested (`.../.evolve/...`)
+		//     are skipped.
 		//   - trailing '/' : a nested worktree/submodule that `-uall` reports as a bare
 		//     directory (it won't recurse into another working tree). moveFile cannot
 		//     move a directory — this is the cycle-1 worktree dir that aborted the cycle
 		//     (415a9a7 regression caught by the e2e ship-path tests).
-		if p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.HasSuffix(p, "/") {
+		if p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.Contains(p, "/.evolve/") || strings.HasSuffix(p, "/") {
 			continue
 		}
 		xy := line[:2]
@@ -539,8 +542,12 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 		// Stage ONLY the relocated files (not `git add -A`, which would also stage
 		// unrelated worktree content and pollute the auditor's `git diff HEAD`),
 		// so the relocated work is visible to audit + the binding — the same
-		// visibility reason as normalizeWorktreeToBase.
-		args := append([]string{"add", "--"}, relocated...)
+		// visibility reason as normalizeWorktreeToBase. Use -f: a relocated path may
+		// be gitignored in the WORKTREE (a builder that edited .gitignore, or a leak
+		// that only main's status surfaced) — a plain `git add` exits 1 on an ignored
+		// path and would abort the whole batch (cycle-176 / issue #11). The path is a
+		// real leak we deliberately moved here for audit, so force-stage it.
+		args := append([]string{"add", "-f", "--"}, relocated...)
 		if _, c, e := gitCapture(ctx, worktree, args...); e != nil || c != 0 {
 			// Fail loudly + return false: the files were physically relocated but
 			// are NOT staged, so the auditor's `git diff HEAD` would not see them.

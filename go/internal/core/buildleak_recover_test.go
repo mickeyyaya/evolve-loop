@@ -244,6 +244,36 @@ func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing
 	}
 }
 
+// Issue #11 (cycle-176): guard hooks run with cwd set to subdirectories and write
+// NESTED `<subdir>/.evolve/guards.log`. The top-level-only skip missed these, so
+// recoverBuildLeak relocated them and the gitignored `git add` failed → batch abort.
+// Nested `.evolve/` paths (path contains `/.evolve/`) must be skipped like top-level.
+func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
+	repo, wt := realWorktree(t)
+	baseline := porcelainDirtySet(context.Background(), repo) // clean
+
+	// Nested .evolve/ runtime state under tracked subdirs (mirrors cycle-176).
+	for _, d := range []string{"go", "go/internal/phases"} {
+		if err := os.MkdirAll(filepath.Join(repo, d, ".evolve"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(repo, d, ".evolve/guards.log"), []byte("guard\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if !recoverBuildLeak(context.Background(), repo, wt, baseline) {
+		t.Fatal("recoverBuildLeak must SKIP nested .evolve/ runtime state and return true, not abort")
+	}
+	// Left in place (not relocated into the worktree).
+	if _, err := os.Stat(filepath.Join(repo, "go/.evolve/guards.log")); err != nil {
+		t.Fatalf("nested go/.evolve/guards.log must be left untouched in main: %v", err)
+	}
+	if diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only"); strings.Contains(diff, ".evolve") {
+		t.Fatalf("nested .evolve/ runtime state must NOT be relocated/staged into the worktree; git diff HEAD=%q", diff)
+	}
+}
+
 // Pre-existing operator dirt (in the baseline) is left untouched; only build-introduced leaks move.
 func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 	repo, wt := realWorktree(t)
