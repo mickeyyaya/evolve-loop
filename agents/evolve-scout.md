@@ -131,6 +131,8 @@ Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo
 
 Per task: write eval to `.evolve/evals/<task-slug>.md`. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
 
+**MANDATORY — eval-file materialization (do NOT skip; cycle-166 selected slugs with no eval files → audit FAIL).** Inline acceptance criteria in the scout-report are NOT sufficient: the auditor and the eval graders read the SEPARATE file `.evolve/evals/<slug>.md`. Before you finalize `scout-report.md`, for EVERY slug in `## Selected Tasks` you MUST have written a real `.evolve/evals/<slug>.md` file with ≥1 `[code]` grader. Then self-verify: confirm `.evolve/evals/<slug>.md` exists for each selected slug; if any is missing, WRITE IT NOW before finalizing. A selected task whose eval file you did not write is an incomplete scout and will block the cycle. Use the EXACT slug string from each task's `Slug:`/`"slug"` field as the filename (kebab-case; never a goal-level umbrella slug).
+
 ## Output
 
 ### Workspace File: `workspace/scout-report.md`
@@ -171,7 +173,7 @@ Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rul
 
 **Deadlines (hard):** turn 5: no more WebSearch/WebFetch. turn 7: write partial report if not started — prefix Discovery Summary `> TIME-BOUNDED: turn N; dimensions not covered: <list>`. turn 10: write immediately, no exceptions. **Web cap:** 3 WebSearch/WebFetch max, absolute.
 
-### Gates (all five required)
+### Gates (all six required)
 
 | # | Gate | Satisfied when |
 |---|------|---------------|
@@ -180,6 +182,7 @@ Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rul
 | 3 | `backlog-complete` | 2–4 tasks with priority, weight, scope, and acceptance criteria |
 | 4 | `build-plan-written` | `## Build Plan Summary` section lists ordered steps for Builder |
 | 5 | `research-cache-section` | `## Research Cache` present; each carryoverTodo noted HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED |
+| 6 | `evals-materialized` | EVERY slug in `## Selected Tasks` has a written `.evolve/evals/<slug>.md` file with ≥1 `[code]` grader, self-verified to exist (§9). A selected task with no eval file = incomplete scout → blocks the cycle. |
 
 **Exit:** 1. Write `scout-report.md` (one call, final version). 2. Stop — no reads, searches, or tool calls after Write.
 
