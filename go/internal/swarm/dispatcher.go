@@ -4,11 +4,25 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
+
+// DefaultPortBase is the first port handed to swarm writer workers when
+// Deps.PortBase is unset. Worker i gets DefaultPortBase+i. Chosen in the
+// dynamic/private port range to stay clear of common service ports.
+const DefaultPortBase = 51000
+
+// portBaseOrDefault resolves the configured base, falling back to DefaultPortBase.
+func portBaseOrDefault(base int) int {
+	if base <= 0 {
+		return DefaultPortBase
+	}
+	return base
+}
 
 // DispatchRequest carries the cycle-scoped context the dispatcher needs that is
 // not part of the plan itself (the plan describes WHAT to run; this describes
@@ -88,7 +102,14 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 
 	for i, w := range plan.Workers {
 		wg.Add(1)
-		go func(i int, w WorkerSpec) {
+		// Writer workers get an isolated port (base+i) so concurrent dev servers in
+		// their separate worktrees never collide; readers share the read-only tree
+		// and run no server, so they get none.
+		port := 0
+		if plan.Mode == ModeWriter {
+			port = portBaseOrDefault(deps.PortBase) + i
+		}
+		go func(i int, w WorkerSpec, port int) {
 			defer wg.Done()
 			select {
 			case sem <- struct{}{}:
@@ -97,12 +118,12 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 				results[i] = WorkerResult{WorkerID: w.WorkerID, Agent: w.agentName(plan), Err: rootCtx.Err()}
 				return
 			}
-			wr := launchWorker(rootCtx, plan, req, w, worktrees[w.WorkerID], deps)
+			wr := launchWorker(rootCtx, plan, req, w, worktrees[w.WorkerID], port, deps)
 			results[i] = wr // each index written by exactly one goroutine — race-free
 			if wr.Err != nil {
 				fatalOnce.Do(func() { fatalErr = wr.Err; cancel() })
 			}
-		}(i, w)
+		}(i, w, port)
 	}
 	wg.Wait()
 
@@ -130,7 +151,7 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 // kills it by name. (Headless workers create no tmux session; their subprocess
 // is killed by ctx cancellation via exec.CommandContext, so they register with
 // an empty session, making the killer a benign no-op.)
-func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w WorkerSpec, worktree string, deps Deps) WorkerResult {
+func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w WorkerSpec, worktree string, port int, deps Deps) WorkerResult {
 	agent := w.agentName(plan)
 	wr := WorkerResult{WorkerID: w.WorkerID, Agent: agent, Branch: w.Branch, Worktree: worktree}
 
@@ -155,6 +176,13 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	}
 
 	workspace := filepath.Join(req.Workspace, agent)
+	wr.ArtifactPath = filepath.Join(workspace, agent+"-report.md")
+
+	// Per-worker env overlay: an isolated PORT for writer dev servers (port>0).
+	var env map[string]string
+	if port > 0 {
+		env = map[string]string{"PORT": strconv.Itoa(port)}
+	}
 	lr, err := deps.Launcher.Launch(ctx, LaunchRequest{
 		CLI:          w.CLI,
 		Model:        w.Model,
@@ -165,8 +193,9 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 		Workspace:    workspace,
 		Worktree:     worktree,
 		ProjectRoot:  req.ProjectRoot,
-		ArtifactPath: filepath.Join(workspace, agent+"-report.md"),
+		ArtifactPath: wr.ArtifactPath,
 		Cycle:        req.Cycle,
+		Env:          env,
 	})
 	if err != nil {
 		wr.Err = err

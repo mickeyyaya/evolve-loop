@@ -11,8 +11,30 @@
 > swarm result is the phase output. **Orphan-on-cancel is now HARDENED:** the dispatcher pins a
 > deterministic tmux session name (`swarm-c<cycle>-<workerID>` → `bridge.NamedSessionName`) and
 > REGISTERS it BEFORE launch, so a worker cancelled mid-spawn is still reaped by name; headless
-> workers create no session and are killed by ctx-cancel. Documented follow-ups (non-blocking):
-> reader-enforce synthesis-to-one-artifact, per-worker port isolation for server-running writers.
+> workers create no session and are killed by ctx-cancel. **Reader-enforce synthesis-to-one-artifact
+> and per-worker port isolation are now implemented** (see below); the remaining documented follow-up
+> (non-blocking) is a register-on-spawn Launcher adapter so the in-process registry can track a
+> tmux session a real Launcher started-then-cancelled (`evolve swarm reap` is today's backstop).
+
+### Reader-enforce synthesis
+
+On `enforce` for a reader phase, the Decorator folds every worker's `<agent>-report.md` into ONE
+synthesized document via `swarm.Synthesize`, written to the phase's canonical report path
+(`<workspace>/<phase>-report.md`) so downstream phases read a single artifact rather than N reports
+scattered across worker workspaces. Each `WorkerResult` carries its `ArtifactPath` (set at dispatch),
+so the reducer never re-derives the path convention. A 0-exit worker that failed to write its report
+is surfaced inline as a `[no artifact …]` marker rather than silently dropped.
+
+### Per-worker port isolation (writers)
+
+Writer workers run in isolated worktrees and may start dev servers; to keep concurrent servers from
+colliding, the dispatcher injects `PORT=<base+i>` into each writer worker's launch env (base from
+`Deps.PortBase`, default `swarm.DefaultPortBase` = 51000). Assignment is **index-based** (`base+i`),
+collision-free within a plan — chosen over a branch-hash because the port is injected (the worker
+reads `$PORT`, never recomputes it), so hashing's stateless-recompute advantage is moot while its
+collision risk is real. Readers share the read-only tree, run no server, and get no port. The
+per-worker overlay is merged OVER the shared phase env by the composition root (`mergeEnv`,
+overlay-wins, non-mutating).
 
 ## Session naming & teardown (orphan-on-cancel)
 

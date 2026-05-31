@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,13 +16,14 @@ import (
 // fakeLauncher records launches, tracks max in-flight (for the cap test), and
 // can be scripted to fail per-agent.
 type fakeLauncher struct {
-	mu        sync.Mutex
-	launched  []string
-	inFlight  int32
-	maxInFl   int32
-	exit      map[string]int
-	failAgent map[string]bool
-	delay     time.Duration
+	mu          sync.Mutex
+	launched    []string
+	portByAgent map[string]string // captures the injected PORT env per worker
+	inFlight    int32
+	maxInFl     int32
+	exit        map[string]int
+	failAgent   map[string]bool
+	delay       time.Duration
 }
 
 func (f *fakeLauncher) Launch(ctx context.Context, req LaunchRequest) (LaunchResult, error) {
@@ -42,6 +44,10 @@ func (f *fakeLauncher) Launch(ctx context.Context, req LaunchRequest) (LaunchRes
 	}
 	f.mu.Lock()
 	f.launched = append(f.launched, req.Agent)
+	if f.portByAgent == nil {
+		f.portByAgent = map[string]string{}
+	}
+	f.portByAgent[req.Agent] = req.Env["PORT"] // nil-map read is "" — fine
 	f.mu.Unlock()
 	if f.failAgent[req.Agent] {
 		return LaunchResult{}, errors.New("launch failed")
@@ -142,6 +148,67 @@ func TestDispatch_LaunchesAllWorkersAndReaps(t *testing.T) {
 	}
 	if len(reg.Live()) != 0 {
 		t.Errorf("sessions must be reaped after Dispatch, got live %v", reg.Live())
+	}
+}
+
+func TestDispatch_CapturesWorkerArtifactPath(t *testing.T) {
+	fk := &fakeLauncher{}
+	ws := t.TempDir()
+	res, err := Dispatch(context.Background(), twoWriterPlan(),
+		DispatchRequest{ProjectRoot: ".", Cycle: 1, Workspace: ws}, Deps{Launcher: fk, Concurrency: 2})
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	// Each worker result must record the artifact the dispatcher told it to write,
+	// so the reader fan-in can fold them without re-deriving the path convention.
+	for _, w := range res.Workers {
+		want := filepath.Join(ws, w.Agent, w.Agent+"-report.md")
+		if w.ArtifactPath != want {
+			t.Errorf("worker %s ArtifactPath = %q, want %q", w.WorkerID, w.ArtifactPath, want)
+		}
+	}
+}
+
+func TestDispatch_WriterWorkersGetUniquePorts(t *testing.T) {
+	fk := &fakeLauncher{}
+	_, err := Dispatch(context.Background(), twoWriterPlan(),
+		DispatchRequest{ProjectRoot: ".", Cycle: 1, Workspace: t.TempDir()},
+		Deps{Launcher: fk, Concurrency: 2, PortBase: 52000})
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	// base + worker index → collision-free within the plan, so concurrent dev
+	// servers in isolated worktrees never clash.
+	if fk.portByAgent["t1-w0"] != "52000" || fk.portByAgent["t1-w1"] != "52001" {
+		t.Errorf("writer ports not isolated: %v", fk.portByAgent)
+	}
+}
+
+func TestDispatch_WriterPortDefaultsWhenBaseUnset(t *testing.T) {
+	fk := &fakeLauncher{}
+	_, err := Dispatch(context.Background(), twoWriterPlan(),
+		DispatchRequest{ProjectRoot: ".", Cycle: 1, Workspace: t.TempDir()},
+		Deps{Launcher: fk, Concurrency: 2}) // PortBase 0 → DefaultPortBase
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	if got := fk.portByAgent["t1-w0"]; got != strconv.Itoa(DefaultPortBase) {
+		t.Errorf("unset base must default to %d, got %q", DefaultPortBase, got)
+	}
+}
+
+func TestDispatch_ReaderWorkersGetNoPort(t *testing.T) {
+	fk := &fakeLauncher{}
+	plan := SwarmPlan{Mode: ModeReader, Partitionable: true, TaskID: "r", Workers: []WorkerSpec{
+		{WorkerID: "w0"}, {WorkerID: "w1"},
+	}}
+	if _, err := Dispatch(context.Background(), plan, DispatchRequest{Workspace: t.TempDir()},
+		Deps{Launcher: fk, Concurrency: 2}); err != nil {
+		t.Fatal(err)
+	}
+	// Readers share the read-only tree and run no dev server → no port to isolate.
+	if got := fk.portByAgent["r-w0"]; got != "" {
+		t.Errorf("reader must NOT get an isolated port, got %q", got)
 	}
 }
 

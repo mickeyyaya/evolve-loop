@@ -25,6 +25,10 @@ type LaunchRequest struct {
 	ProjectRoot  string
 	ArtifactPath string
 	Cycle        int
+	// Env is the per-worker environment overlay the dispatcher computes (e.g. an
+	// isolated PORT for writer dev servers). The composition root merges it OVER
+	// the shared phase env, so per-worker keys win. Nil/empty = phase env only.
+	Env map[string]string
 }
 
 // LaunchResult is the per-worker launch outcome (subset of core.BridgeResponse).
@@ -49,4 +53,7 @@ type Deps struct {
 	// means "one slot per worker" (unbounded); callers should pass
 	// EVOLVE_SWARM_CONCURRENCY (default 2).
 	Concurrency int
+	// PortBase is the first port handed to writer workers (worker i → base+i) so
+	// their dev servers don't collide. <=0 falls back to DefaultPortBase.
+	PortBase int
 }

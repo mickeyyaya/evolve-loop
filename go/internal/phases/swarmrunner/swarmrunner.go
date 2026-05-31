@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -93,7 +94,7 @@ func (d *Decorator) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 	sr, derr := swarm.Dispatch(ctx, plan, swarm.DispatchRequest{
 		ProjectRoot: req.ProjectRoot, Cycle: req.Cycle, Workspace: req.Workspace,
 	}, d.dispatchDeps(req))
-	return d.enforce(ctx, plan, sr, derr) // enforce: the swarm result is the output
+	return d.enforce(ctx, req, plan, sr, derr) // enforce: the swarm result is the output
 }
 
 // dispatchDeps assembles the injected ports. Writers get a worktree provisioner;
@@ -112,14 +113,23 @@ func (d *Decorator) dispatchDeps(req core.PhaseRequest) swarm.Deps {
 	}
 	if d.mode == swarm.ModeWriter {
 		deps.Provisioner = swarm.NewGitWorkerProvisioner(nil)
+		deps.PortBase = portBaseFromEnv(req.Env) // 0 → swarm.DefaultPortBase
 	}
 	return deps
+}
+
+// portBaseFromEnv resolves the operator override for the writer dev-server port
+// base (EVOLVE_SWARM_PORT_BASE). Unset/invalid → 0, which the dispatcher reads as
+// "use swarm.DefaultPortBase".
+func portBaseFromEnv(env map[string]string) int {
+	n, _ := strconv.Atoi(env["EVOLVE_SWARM_PORT_BASE"])
+	return n
 }
 
 // enforce reduces the swarm to ONE authoritative PhaseResponse: writers run the
 // serialized merge-train into the integration branch; readers synthesize. Any
 // worker failure or merge failure → FAIL.
-func (d *Decorator) enforce(ctx context.Context, plan swarm.SwarmPlan, sr swarm.SwarmResult, derr error) (core.PhaseResponse, error) {
+func (d *Decorator) enforce(ctx context.Context, req core.PhaseRequest, plan swarm.SwarmPlan, sr swarm.SwarmResult, derr error) (core.PhaseResponse, error) {
 	resp := core.PhaseResponse{
 		Phase:   d.inner.Name(),
 		Verdict: core.VerdictPASS,
@@ -134,7 +144,7 @@ func (d *Decorator) enforce(ctx context.Context, plan swarm.SwarmPlan, sr swarm.
 	}
 
 	if d.mode == swarm.ModeWriter {
-		mr := swarm.RunMergeTrain(ctx, "", plan.IntegrationBranch, sr.MergeOrder, branchByID(plan),
+		mr := swarm.RunMergeTrain(ctx, plan.IntegrationBranch, sr.MergeOrder, branchByID(plan),
 			swarm.MergeTrainDeps{Merger: swarm.ExecGitMerger{IntegrationWorktree: sr.IntegrationWorktree}})
 		resp.Signals["swarm.merged"] = mr.AllMerged
 		if !mr.AllMerged {
@@ -143,9 +153,35 @@ func (d *Decorator) enforce(ctx context.Context, plan swarm.SwarmPlan, sr swarm.
 		}
 		resp.ArtifactsDir = sr.IntegrationWorktree
 	}
-	// Reader enforce: the dispatched workers' summaries are the output; the
-	// caller reads them from each worker workspace. (Synthesis-to-one-artifact is
-	// wired in the reader-phase follow-up; v4-final proves the writer path.)
+
+	if d.mode == swarm.ModeReader {
+		// Reader fan-in: fold each worker's report into ONE synthesized artifact at
+		// the phase's canonical report path (<phase>-report.md), so downstream
+		// phases read a single document instead of N reports scattered across
+		// worker workspaces. Readers do no git merge — overlap is harmless.
+		// sr.Workers is in plan order (results[i] = wr, one goroutine per index),
+		// so synthesis section order is deterministic across runs — do not sort.
+		order := make([]string, len(sr.Workers))
+		artifactByID := make(map[string]string, len(sr.Workers))
+		for i, w := range sr.Workers {
+			order[i] = w.WorkerID
+			body, rerr := os.ReadFile(w.ArtifactPath)
+			if rerr != nil {
+				// A worker that exited 0 should have written its report; surface the
+				// gap in the synthesis rather than silently dropping it (Rule 12).
+				artifactByID[w.WorkerID] = fmt.Sprintf("[no artifact at %s: %v]", w.ArtifactPath, rerr)
+				continue
+			}
+			artifactByID[w.WorkerID] = string(body)
+		}
+		synthPath := filepath.Join(req.Workspace, d.inner.Name()+"-report.md")
+		if werr := os.WriteFile(synthPath, []byte(swarm.Synthesize(order, artifactByID)), 0o644); werr != nil {
+			resp.Verdict = core.VerdictFAIL
+			return resp, fmt.Errorf("swarm reader synthesis write %s: %w", synthPath, werr)
+		}
+		resp.ArtifactsDir = req.Workspace
+		resp.Signals["swarm.synthesis"] = synthPath
+	}
 	return resp, nil
 }
 
@@ -215,10 +251,25 @@ func (l bridgeLauncher) Launch(ctx context.Context, r swarm.LaunchRequest) (swar
 		CLI: r.CLI, Model: r.Model, Profile: r.Profile, Agent: r.Agent,
 		SessionName: r.SessionName, Prompt: r.Prompt,
 		Workspace: r.Workspace, Worktree: r.Worktree, ProjectRoot: r.ProjectRoot,
-		ArtifactPath: r.ArtifactPath, Cycle: r.Cycle, Env: l.env,
+		ArtifactPath: r.ArtifactPath, Cycle: r.Cycle, Env: mergeEnv(l.env, r.Env),
 	})
 	if err != nil {
 		return swarm.LaunchResult{}, err
 	}
 	return swarm.LaunchResult{ExitCode: resp.ExitCode, CostUSD: resp.CostUSD}, nil
+}
+
+// mergeEnv overlays per-worker env over the shared phase env (overlay wins),
+// ALWAYS returning a fresh map. The shared phase-env (l.env) is owned by the
+// orchestrator and handed to every concurrent worker, so we never return it
+// aliased — the bridge is external code that may store or mutate what it's given.
+func mergeEnv(base, overlay map[string]string) map[string]string {
+	out := make(map[string]string, len(base)+len(overlay))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range overlay {
+		out[k] = v
+	}
+	return out
 }

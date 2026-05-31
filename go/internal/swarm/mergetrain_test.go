@@ -13,7 +13,7 @@ type scriptMerger struct {
 	merged     []string
 }
 
-func (m *scriptMerger) Merge(_ context.Context, _, _, fromBranch string) error {
+func (m *scriptMerger) Merge(_ context.Context, _, fromBranch string) error {
 	if m.failBranch[fromBranch] {
 		return ErrMergeConflict
 	}
@@ -31,7 +31,7 @@ func branchMap(ids ...string) map[string]string {
 
 func TestRunMergeTrain_AllCleanInOrder(t *testing.T) {
 	m := &scriptMerger{}
-	rep := RunMergeTrain(context.Background(), ".", "cycle-1-integration",
+	rep := RunMergeTrain(context.Background(), "cycle-1-integration",
 		[]string{"w0", "w1", "w2"}, branchMap("w0", "w1", "w2"), MergeTrainDeps{Merger: m})
 	if !rep.AllMerged {
 		t.Fatalf("all should merge: %+v", rep.Outcomes)
@@ -49,7 +49,7 @@ func TestRunMergeTrain_AcceptanceGateStops(t *testing.T) {
 		}
 		return nil
 	}
-	rep := RunMergeTrain(context.Background(), ".", "integ",
+	rep := RunMergeTrain(context.Background(), "integ",
 		[]string{"w0", "w1", "w2"}, branchMap("w0", "w1", "w2"),
 		MergeTrainDeps{Merger: m, Accept: accept})
 	if rep.AllMerged {
@@ -68,7 +68,7 @@ func TestRunMergeTrain_ConflictResolvedOnRetry(t *testing.T) {
 		}
 		return nil
 	}
-	rep := RunMergeTrain(context.Background(), ".", "integ",
+	rep := RunMergeTrain(context.Background(), "integ",
 		[]string{"w0", "w1"}, branchMap("w0", "w1"),
 		MergeTrainDeps{Merger: m, Resolver: resolver, MaxRetries: 1})
 	if !rep.AllMerged {
@@ -81,7 +81,7 @@ func TestRunMergeTrain_ConflictResolvedOnRetry(t *testing.T) {
 
 func TestRunMergeTrain_ConflictNoResolverFails(t *testing.T) {
 	m := &scriptMerger{failBranch: map[string]bool{"cycle-1-w0": true}}
-	rep := RunMergeTrain(context.Background(), ".", "integ",
+	rep := RunMergeTrain(context.Background(), "integ",
 		[]string{"w0"}, branchMap("w0"), MergeTrainDeps{Merger: m})
 	if rep.AllMerged || rep.Outcomes[0].Merged {
 		t.Errorf("conflict with no resolver must fail: %+v", rep.Outcomes)
@@ -89,7 +89,7 @@ func TestRunMergeTrain_ConflictNoResolverFails(t *testing.T) {
 }
 
 func TestRunMergeTrain_EmptyOrderNotMerged(t *testing.T) {
-	rep := RunMergeTrain(context.Background(), ".", "integ", nil, nil, MergeTrainDeps{Merger: &scriptMerger{}})
+	rep := RunMergeTrain(context.Background(), "integ", nil, nil, MergeTrainDeps{Merger: &scriptMerger{}})
 	if rep.AllMerged {
 		t.Error("empty order must not report AllMerged")
 	}

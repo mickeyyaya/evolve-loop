@@ -4,12 +4,30 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
+
+// artifactBridge writes a per-worker report to the requested ArtifactPath so the
+// reader fan-in has real worker summaries to synthesize.
+type artifactBridge struct{ launches int32 }
+
+func (b *artifactBridge) Launch(_ context.Context, r core.BridgeRequest) (core.BridgeResponse, error) {
+	atomic.AddInt32(&b.launches, 1)
+	if r.ArtifactPath != "" {
+		_ = os.MkdirAll(filepath.Dir(r.ArtifactPath), 0o755)
+		_ = os.WriteFile(r.ArtifactPath, []byte("summary from "+r.Agent), 0o644)
+	}
+	return core.BridgeResponse{ExitCode: 0, CostUSD: 0.01}, nil
+}
+
+func (b *artifactBridge) Probe(context.Context) (core.BridgeProbe, error) {
+	return core.BridgeProbe{}, nil
+}
 
 // fakeInner is a core.PhaseRunner that records whether it ran.
 type fakeInner struct {
@@ -133,6 +151,126 @@ func TestDecorator_EnforceReaderDrivesResult(t *testing.T) {
 	}
 	if resp.Verdict != core.VerdictPASS || resp.Signals["swarm.stage"] != "enforce" {
 		t.Errorf("enforce response wrong: verdict=%s signals=%+v", resp.Verdict, resp.Signals)
+	}
+}
+
+func TestDecorator_EnforceReaderSynthesizesArtifact(t *testing.T) {
+	inner := &fakeInner{name: "scout"}
+	bridge := &artifactBridge{}
+	d := New(inner, bridge, swarm.ModeReader)
+	ws := t.TempDir()
+	writePlan(t, ws, swarm.ModeReader)
+
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reader enforce must fold both workers' reports into ONE synthesized artifact
+	// at the phase's canonical report path (<phase>-report.md).
+	synth := filepath.Join(ws, "scout-report.md")
+	data, rerr := os.ReadFile(synth)
+	if rerr != nil {
+		t.Fatalf("reader enforce must write synthesized %s: %v", synth, rerr)
+	}
+	body := string(data)
+	for _, agent := range []string{"t-w0", "t-w1"} {
+		if !strings.Contains(body, "summary from "+agent) {
+			t.Errorf("synthesis missing worker %s content:\n%s", agent, body)
+		}
+	}
+	if resp.ArtifactsDir != ws {
+		t.Errorf("reader enforce ArtifactsDir = %q, want %q", resp.ArtifactsDir, ws)
+	}
+	if resp.Signals["swarm.synthesis"] != synth {
+		t.Errorf("reader enforce must record synthesis path, got %v", resp.Signals["swarm.synthesis"])
+	}
+}
+
+// envBridge captures the env the bridge received, to assert the per-worker overlay.
+type envBridge struct{ gotEnv map[string]string }
+
+func (b *envBridge) Launch(_ context.Context, r core.BridgeRequest) (core.BridgeResponse, error) {
+	b.gotEnv = r.Env
+	return core.BridgeResponse{ExitCode: 0}, nil
+}
+
+func (b *envBridge) Probe(context.Context) (core.BridgeProbe, error) {
+	return core.BridgeProbe{}, nil
+}
+
+func TestBridgeLauncher_MergesPerWorkerEnvOverPhaseEnv(t *testing.T) {
+	b := &envBridge{}
+	l := bridgeLauncher{bridge: b, env: map[string]string{"A": "1", "PORT": "9000"}}
+
+	if _, err := l.Launch(context.Background(), swarm.LaunchRequest{
+		Env: map[string]string{"PORT": "52000"}, // per-worker overlay
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if b.gotEnv["A"] != "1" {
+		t.Error("phase-level env must be preserved")
+	}
+	if b.gotEnv["PORT"] != "52000" {
+		t.Errorf("per-worker env must override phase env, got PORT=%q", b.gotEnv["PORT"])
+	}
+}
+
+func TestBridgeLauncher_NoOverlayKeepsPhaseEnv(t *testing.T) {
+	b := &envBridge{}
+	phaseEnv := map[string]string{"A": "1"}
+	l := bridgeLauncher{bridge: b, env: phaseEnv}
+
+	if _, err := l.Launch(context.Background(), swarm.LaunchRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if b.gotEnv["A"] != "1" {
+		t.Errorf("no overlay must pass phase env through, got %v", b.gotEnv)
+	}
+	// Must not mutate the caller's phase-env map.
+	if _, leaked := phaseEnv["PORT"]; leaked {
+		t.Error("merge must not mutate the shared phase-env map")
+	}
+}
+
+func TestDecorator_EnforceReaderMarksMissingArtifact(t *testing.T) {
+	inner := &fakeInner{name: "scout"}
+	bridge := &fakeBridge{} // succeeds but writes NO report file
+	d := New(inner, bridge, swarm.ModeReader)
+	ws := t.TempDir()
+	writePlan(t, ws, swarm.ModeReader)
+
+	if _, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"})); err != nil {
+		t.Fatal(err)
+	}
+
+	// A 0-exit worker that produced no report must be surfaced loudly in the
+	// synthesis, not silently dropped (Rule 12 — fail loudly).
+	data, rerr := os.ReadFile(filepath.Join(ws, "scout-report.md"))
+	if rerr != nil {
+		t.Fatalf("synthesis must still be written: %v", rerr)
+	}
+	if !strings.Contains(string(data), "[no artifact") {
+		t.Errorf("missing worker report must be marked, got:\n%s", data)
+	}
+}
+
+func TestPortBaseFromEnv(t *testing.T) {
+	cases := []struct {
+		name string
+		env  map[string]string
+		want int
+	}{
+		{"unset → 0 (dispatcher applies default)", map[string]string{}, 0},
+		{"valid override", map[string]string{"EVOLVE_SWARM_PORT_BASE": "60000"}, 60000},
+		{"invalid → 0", map[string]string{"EVOLVE_SWARM_PORT_BASE": "not-a-port"}, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := portBaseFromEnv(tc.env); got != tc.want {
+				t.Errorf("portBaseFromEnv(%v) = %d, want %d", tc.env, got, tc.want)
+			}
+		})
 	}
 }
 

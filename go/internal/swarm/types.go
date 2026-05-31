@@ -90,9 +90,13 @@ type WorkerResult struct {
 	Agent    string
 	Branch   string // writers: the dev branch the worker committed to
 	Worktree string
-	ExitCode int
-	CostUSD  float64
-	Err      error // non-nil = launch/transport failure (vs a clean non-zero exit)
+	// ArtifactPath is the report file the dispatcher told this worker to write.
+	// The reader fan-in (Synthesize) folds these into one document without
+	// re-deriving the path convention.
+	ArtifactPath string
+	ExitCode     int
+	CostUSD      float64
+	Err          error // non-nil = launch/transport failure (vs a clean non-zero exit)
 }
 
 // OK reports a successful worker run (no transport error, zero exit code).

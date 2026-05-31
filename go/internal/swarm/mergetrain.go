@@ -18,7 +18,7 @@ var ErrMergeConflict = errors.New("merge conflict")
 // (ExecGitMerger) shells out; on conflict it `git merge --abort`s so the
 // integration branch is never left half-merged.
 type GitMerger interface {
-	Merge(ctx context.Context, projectRoot, integrationBranch, fromBranch string) error
+	Merge(ctx context.Context, integrationBranch, fromBranch string) error
 }
 
 // AcceptanceChecker runs a worker's acceptance gate (e.g. `go test`) against the
@@ -68,7 +68,7 @@ type MergeTrainDeps struct {
 // the ConflictResolver (authoring worker) up to MaxRetries and retry → still
 // failing ⇒ record the failure and STOP (a half-built integration must not
 // proceed; the caller falls back / fails the phase).
-func RunMergeTrain(ctx context.Context, projectRoot, integrationBranch string, order []string, branchByID map[string]string, deps MergeTrainDeps) MergeReport {
+func RunMergeTrain(ctx context.Context, integrationBranch string, order []string, branchByID map[string]string, deps MergeTrainDeps) MergeReport {
 	maxRetries := deps.MaxRetries
 	if maxRetries < 0 {
 		maxRetries = 0
@@ -79,7 +79,7 @@ func RunMergeTrain(ctx context.Context, projectRoot, integrationBranch string, o
 	var rep MergeReport
 	rep.AllMerged = len(order) > 0
 	for _, id := range order {
-		out := mergeOneWorker(ctx, projectRoot, integrationBranch, id, branchByID[id], deps, maxRetries)
+		out := mergeOneWorker(ctx, integrationBranch, id, branchByID[id], deps, maxRetries)
 		rep.Outcomes = append(rep.Outcomes, out)
 		if !out.Merged {
 			rep.AllMerged = false
@@ -91,10 +91,10 @@ func RunMergeTrain(ctx context.Context, projectRoot, integrationBranch string, o
 
 // mergeOneWorker runs one worker's merge + acceptance, with bounded
 // conflict-resolution retries.
-func mergeOneWorker(ctx context.Context, projectRoot, integ, id, branch string, deps MergeTrainDeps, maxRetries int) MergeOutcome {
+func mergeOneWorker(ctx context.Context, integ, id, branch string, deps MergeTrainDeps, maxRetries int) MergeOutcome {
 	out := MergeOutcome{WorkerID: id}
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		stepErr := deps.Merger.Merge(ctx, projectRoot, integ, branch)
+		stepErr := deps.Merger.Merge(ctx, integ, branch)
 		if stepErr == nil {
 			if acErr := runAcceptance(ctx, deps.Accept, id, integ); acErr == nil {
 				out.Merged = true
@@ -134,7 +134,7 @@ type ExecGitMerger struct {
 }
 
 // Merge implements GitMerger.
-func (m ExecGitMerger) Merge(ctx context.Context, _, _, fromBranch string) error {
+func (m ExecGitMerger) Merge(ctx context.Context, _ /*integrationBranch*/, fromBranch string) error {
 	dir := m.IntegrationWorktree
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "merge", "--no-ff", "--no-edit", fromBranch)
 	var eb bytes.Buffer
