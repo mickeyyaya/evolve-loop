@@ -726,6 +726,47 @@ func resolvePhaseMaxAttempts(env map[string]string) int {
 	return num
 }
 
+func resolveRetryBackoffBase(env map[string]string) int {
+	if env == nil {
+		return 5
+	}
+	val := env["EVOLVE_RETRY_BACKOFF_BASE_S"]
+	if val == "" {
+		return 5
+	}
+	num, err := strconv.Atoi(val)
+	if err != nil {
+		return 5
+	}
+	if num < 0 {
+		return 0
+	}
+	return num
+}
+
+func executeRetryBackoff(attempt int, env map[string]string) {
+	base := resolveRetryBackoffBase(env)
+	if base <= 0 {
+		return
+	}
+	nextAttempt := attempt + 1
+	if nextAttempt < 2 {
+		return
+	}
+	sleepSecs := base * (1 << (nextAttempt - 2))
+	limitSecs := base
+	if limitSecs < 30 {
+		limitSecs = 30
+	}
+	if sleepSecs > limitSecs {
+		sleepSecs = limitSecs
+	}
+	if sleepSecs > 0 {
+		time.Sleep(time.Duration(sleepSecs) * time.Second)
+	}
+}
+
+
 func isTransientBridgeError(err error) bool {
 	return errors.Is(err, ErrTransientBridgeFailure)
 }
@@ -1256,6 +1297,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				}); lerr != nil {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 				}
+				executeRetryBackoff(attempt, phaseReq.Env)
 				continue
 			}
 			if err == nil && !IsVerdict(resp.Verdict) {
@@ -1274,6 +1316,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				}); lerr != nil {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 				}
+				executeRetryBackoff(attempt, phaseReq.Env)
 				continue
 			}
 		}

@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -104,6 +105,7 @@ func Check(opts Options) (Report, error) {
 		checkVelocity,
 		checkCanaryFiles,
 		checkCostEnvelope,
+		checkPhaseLatency,
 	}
 	for _, sc := range signals {
 		report.Anomalies = append(report.Anomalies, sc(opts)...)
@@ -140,6 +142,7 @@ func signalNames() []string {
 		"velocity",
 		"canary_files",
 		"cost_envelope",
+		"phase_latency",
 	}
 }
 
@@ -447,6 +450,50 @@ func checkCostEnvelope(opts Options) []Anomaly {
 			out = append(out, Anomaly{
 				Signal: "cost_envelope", Severity: SeverityWarn,
 				Message: fmt.Sprintf("%s phase cost %.2f > ceiling %.2f", e.Phase, e.CostUSD, defaultCostCeilingUSD),
+			})
+		}
+	}
+	return out
+}
+
+type phaseTimingEntry struct {
+	Phase        string  `json:"phase"`
+	DurationMS   int64   `json:"duration_ms"`
+	Verdict      string  `json:"verdict"`
+	CostUSD      float64 `json:"cost_usd"`
+	AttemptCount int     `json:"attempt_count"`
+}
+
+func checkPhaseLatency(opts Options) []Anomaly {
+	p := filepath.Join(opts.Workspace, "phase-timing.json")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	var entries []phaseTimingEntry
+	if err := json.Unmarshal(b, &entries); err != nil {
+		return []Anomaly{
+			{
+				Signal: "phase_latency", Severity: SeverityWarn,
+				Message: fmt.Sprintf("failed to parse phase-timing.json: %v", err),
+			},
+		}
+	}
+
+	ceilingSec := 900 // 15 min default
+	if val := os.Getenv("EVOLVE_PHASE_LATENCY_CEILING_S"); val != "" {
+		if num, err := strconv.Atoi(val); err == nil && num > 0 {
+			ceilingSec = num
+		}
+	}
+	ceilingMS := int64(ceilingSec) * 1000
+
+	var out []Anomaly
+	for _, entry := range entries {
+		if entry.DurationMS > ceilingMS {
+			out = append(out, Anomaly{
+				Signal: "phase_latency", Severity: SeverityWarn,
+				Message: fmt.Sprintf("%s phase latency %dms (> %dms)", entry.Phase, entry.DurationMS, ceilingMS),
 			})
 		}
 	}

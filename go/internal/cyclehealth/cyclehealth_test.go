@@ -391,12 +391,72 @@ func TestCheck_OverallFatal_TrueOnAnyFatal(t *testing.T) {
 	}
 }
 
-// TestSignalNames_ReturnsAllEleven — the public contract is "11
+// TestSignalNames_ReturnsTwelve — the public contract is "12
 // signals"; guard against accidental removal.
-func TestSignalNames_ReturnsAllEleven(t *testing.T) {
+func TestSignalNames_ReturnsTwelve(t *testing.T) {
 	names := signalNames()
-	if len(names) != 11 {
-		t.Errorf("signalNames len=%d, want 11; got %v", len(names), names)
+	if len(names) != 12 {
+		t.Errorf("signalNames len=%d, want 12; got %v", len(names), names)
+	}
+}
+
+func TestCheck_PhaseLatency_SlowPhase_Warn(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	
+	// Write a slow phase entry to phase-timing.json
+	entries := []phaseTimingEntry{
+		{Phase: "build", DurationMS: 950000, Verdict: "PASS"}, // 950s (exceeds default 900s limit)
+	}
+	data, _ := json.Marshal(entries)
+	if err := os.WriteFile(filepath.Join(ws, "phase-timing.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := Check(Options{Cycle: 1, Workspace: ws})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, a := range r.Anomalies {
+		if a.Signal == "phase_latency" {
+			found = true
+			if a.Severity != SeverityWarn {
+				t.Errorf("expected SeverityWarn for slow phase, got %s", a.Severity)
+			}
+			if !strings.Contains(a.Message, "build phase latency 950000ms") {
+				t.Errorf("unexpected anomaly message: %s", a.Message)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected phase_latency warning anomaly, not found")
+	}
+
+	// Test with custom ceiling override
+	t.Setenv("EVOLVE_PHASE_LATENCY_CEILING_S", "1000") // 1000s ceiling
+	r, err = Check(Options{Cycle: 1, Workspace: ws})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range r.Anomalies {
+		if a.Signal == "phase_latency" {
+			t.Errorf("unexpected slow phase anomaly with high ceiling override: %v", a)
+		}
+	}
+}
+
+func TestCheck_PhaseLatency_MissingFile_NoAnomaly(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	// phase-timing.json is missing by default
+	r, err := Check(Options{Cycle: 1, Workspace: ws})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range r.Anomalies {
+		if a.Signal == "phase_latency" {
+			t.Errorf("unexpected phase_latency anomaly when file is missing: %v", a)
+		}
 	}
 }
 

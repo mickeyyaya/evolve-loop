@@ -26,11 +26,14 @@ narrowly scoped to genuinely transient failures, never a model's real FAIL.
 | 9 | `retro.go` bridge-fail returns error | retro's OWN bridge dies | yes | **DONE** — return FAIL verdict + nil error → routes via `decideAfterRetro` |
 | 5 | `return ... "non-canonical verdict"` | runner returns verdict ∉ {PASS,FAIL,WARN,SKIPPED} (parse blip) | yes | **DONE** — cycle-173: non-canonical verdicts are classified and retried up to phaseMaxAttempts |
 | 3 | `router/recovery.go` integrity-block | integrity-class ShipError (e.g. INTEGRITY_TREE_DRIFT false positive) | sometimes | route through `debugger` deep-dive before BLOCK |
-| 2 | `phaseMaxAttempts=2`, no backoff | repeated ArtifactTimeout | partly | optional: backoff/third attempt |
+| 2 | `phaseMaxAttempts=2`, no backoff | repeated ArtifactTimeout | partly | **DONE** — cycle-180: configurable exponential backoff (`EVOLVE_RETRY_BACKOFF_BASE_S`, default 5s) |
 | 4 | `maxRecoveryDepth=2` then abort | persistent ship blocker | by design | keep cap; escalate to operator notice |
 | 6 | tree-diff guard / `recoverBuildLeak` false | unrecoverable leak | correctness guard | keep (bugs #5/#6 already hardened recoverBuildLeak) |
 | 7 | reviewer reject (noop default) | future reviewer trips | n/a today | add retry budget before any real reviewer ships |
 | 8 | state-machine transition error | unknown verdict edge | programmer error | keep (guards a bug, not runtime) |
+| 10 | Artifact timeout exhaustion | `ErrArtifactTimeout` occurs on final attempt, losing work | yes | **DONE** — cycle-171/179: [artifact-backfill](artifact-backfill.md) default-on, extracts artifact from raw stdout to avoid hard cycle aborts |
+| 11 | Retries forensically invisible | difficulty auditing retries | yes | **DONE** — cycle-171: `attempt_count` logged to [phase timing](phase-timing-and-diagnostics.md) and failure diagnostics |
+| 12 | Latency anomaly detection | phase runs excessively slow without crashing | yes | **DONE** — cycle-180: signal 12 `phase_latency` in `cyclehealth.go` raises warning on slow phases |
 
 ## Principle for fixes
 
@@ -39,6 +42,25 @@ A **transient** infra/bridge failure should retry-or-reroute, bounded (GAP 1/5).
 **genuine** model FAIL or correctness-guard breach must still stop — recovery is for
 transient/infra faults, not for masking real failures (token-optimization + the
 "imprecise-evaluator" caveat).
+
+## Completed as of cycle-180
+
+Over successive self-evolution cycles, we have systematically addressed the primary gaps identified in this living document:
+
+1. **Transient Bridge Retries (GAP 1 & 5)**:
+   - Implemented in cycle-173 to ensure transient bridge errors (exit codes 80, 85, 86) and non-canonical phase verdicts trigger bounded retries instead of immediately aborting.
+
+2. **Artifact Backfill (GAP 10)**:
+   - Added robust fallback in cycle-171 (further refined to default-on in cycle-179). If a write-tool artifact timeout (`ErrArtifactTimeout`) occurs on the final attempt, the orchestrator attempts to extract the phase artifact directly from the clean stdout file, writing a `WARN` verdict ledger entry and allowing the cycle to continue. Detailed in [artifact-backfill.md](artifact-backfill.md).
+
+3. **Configurable Exponential Backoff (GAP 2)**:
+   - Implemented in cycle-180. The retry loop now sleep-paces relaunch attempts using the `EVOLVE_RETRY_BACKOFF_BASE_S` env-var (defaulting to 5 seconds). The sleep duration scales as `base * 2^(attempt-2)` clamped to a ceiling of `max(base, 30)` seconds, preventing consecutive collision errors under resource contention.
+
+4. **Forensic Attempt Tracking (GAP 11)**:
+   - Unified timing, latency, and attempt counters. The `attempt_count` field is explicitly recorded in `phase-timing.json` and transient failure diagnostics, providing transparent visibility into self-heal events. Detailed in [phase-timing-and-diagnostics.md](phase-timing-and-diagnostics.md).
+
+5. **Phase Latency Monitoring (GAP 12)**:
+   - Added signal 12 `phase_latency` to `go/internal/cyclehealth/cyclehealth.go` in cycle-180. It reads `phase-timing.json` and evaluates each phase's duration against `EVOLVE_PHASE_LATENCY_CEILING_S` (default 900s / 15 minutes), raising warning anomalies when a phase executes abnormally slowly.
 
 ## Multi-CLI note
 
