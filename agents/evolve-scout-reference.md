@@ -184,7 +184,7 @@ Loaded when writing scout-report.md. Not needed when the common-path report stru
 
 ````markdown
 # Cycle {N} Scout Report
-<!-- Challenge: {challengeToken} -->
+<!-- challenge-token: {challengeToken} -->
 
 ## Discovery Summary
 - Scan mode: full / incremental / convergence-confirmation

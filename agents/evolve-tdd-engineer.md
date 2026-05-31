@@ -149,7 +149,7 @@ Enumerate criteria that have no test coverage yet:
 
 ```markdown
 # TDD Report — Cycle {N}
-<!-- Challenge: {challengeToken} -->
+<!-- challenge-token: {challengeToken} -->
 
 ## Task: <slug>
 ## Test Files Written

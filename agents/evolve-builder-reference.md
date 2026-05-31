@@ -303,7 +303,7 @@ Loaded when authoring `workspace/build-report.md` (the primary build output) and
 
 ```markdown
 # Cycle {N} Build Report
-<!-- Challenge: {challengeToken} -->
+<!-- challenge-token: {challengeToken} -->
 
 ## Task: <name>
 - **Status:** PASS / FAIL
