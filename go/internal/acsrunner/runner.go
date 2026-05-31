@@ -14,11 +14,14 @@ import (
 	"path/filepath"
 )
 
-// Verdict is the schema written to acs-verdict.json.
+// Verdict is the schema written to acs-verdict.json. SkipCount mirrors the
+// acssuite SKIP convention (a SKIP-action test counts neither red nor green) so
+// both verdict producers stay in schema lockstep.
 type Verdict struct {
 	Cycle      int         `json:"cycle"`
 	Total      int         `json:"total"`
 	RedCount   int         `json:"red_count"`
+	SkipCount  int         `json:"skip_count"`
 	Predicates []Predicate `json:"predicates"`
 }
 
@@ -88,6 +91,8 @@ func ParseTestJSON(r io.Reader, cycle int) (Verdict, error) {
 		v.Total++
 		if p.Verdict == "FAIL" {
 			v.RedCount++
+		} else if p.Verdict == "SKIP" {
+			v.SkipCount++
 		}
 		v.Predicates = append(v.Predicates, *p)
 	}

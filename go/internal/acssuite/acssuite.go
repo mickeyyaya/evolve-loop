@@ -11,7 +11,11 @@
 //   - <root>/acs/regression-suite/cycle-*/*.sh   accumulated prior predicates
 //   - <root>/acs/red-team/rt-*.sh          standing adversarial predicates
 //
-// red_count == 0 ⇒ verdict PASS ⇒ ship_eligible. Any non-zero exit is RED.
+// red_count == 0 ⇒ verdict PASS ⇒ ship_eligible. A non-zero exit is RED,
+// EXCEPT exit 77 = SKIP (the TAP/automake convention): an evidence-absent
+// predicate (e.g. a runtime-only regression predicate on a fresh clone where
+// the gitignored .evolve/ artifact it inspects does not exist) is counted
+// neither red nor green, so it cannot block the gate yet cannot fake a pass.
 // CLI: `evolve acs suite --cycle N`.
 package acssuite
 
@@ -39,12 +43,17 @@ const DefaultTimeout = 60 * time.Second
 // evidenceMax caps the captured output excerpt per predicate.
 const evidenceMax = 600
 
+// SkipExitCode is the TAP/automake SKIP convention: a predicate exiting 77
+// declares its evidence absent / not-applicable on this clone. It is counted
+// neither red nor green.
+const SkipExitCode = 77
+
 // Result is one predicate's outcome (egps-v10 schema).
 type Result struct {
 	ACID            string `json:"ac_id"`
 	Predicate       string `json:"predicate"` // repo-relative path
 	ExitCode        int    `json:"exit_code"`
-	ResultStr       string `json:"result"` // "green" | "red"
+	ResultStr       string `json:"result"` // "green" | "red" | "skip"
 	DurationMS      int64  `json:"duration_ms"`
 	IsRegression    bool   `json:"is_regression"`
 	IsRedTeam       bool   `json:"is_red_team,omitempty"`
@@ -56,6 +65,7 @@ type PredicateSuite struct {
 	ThisCycleCount       int `json:"this_cycle_count"`
 	RegressionSuiteCount int `json:"regression_suite_count"`
 	RedTeamCount         int `json:"red_team_count"`
+	SkippedCount         int `json:"skipped_count"`
 	Total                int `json:"total"`
 }
 
@@ -67,7 +77,9 @@ type Verdict struct {
 	Results        []Result       `json:"results"`
 	GreenCount     int            `json:"green_count"`
 	RedCount       int            `json:"red_count"`
+	SkipCount      int            `json:"skip_count"`
 	RedIDs         []string       `json:"red_ids"`
+	SkipIDs        []string       `json:"skip_ids,omitempty"`
 	Verdict        string         `json:"verdict"` // PASS | FAIL
 	ShipEligible   bool           `json:"ship_eligible"`
 }
@@ -133,10 +145,18 @@ func Run(opts Options) (Verdict, error) {
 			IsRegression: pf.isRegression,
 			IsRedTeam:    pf.isRedTeam,
 		}
-		if exitCode == 0 {
+		switch exitCode {
+		case 0:
 			r.ResultStr = "green"
 			v.GreenCount++
-		} else {
+		case SkipExitCode:
+			// TAP/automake SKIP: evidence absent / not applicable on this
+			// clone. Counted neither red nor green; capture the SKIP reason.
+			r.ResultStr = "skip"
+			v.SkipCount++
+			v.SkipIDs = append(v.SkipIDs, r.ACID)
+			r.EvidenceExcerpt = excerpt(output)
+		default:
 			r.ResultStr = "red"
 			v.RedCount++
 			v.RedIDs = append(v.RedIDs, r.ACID)
@@ -152,7 +172,10 @@ func Run(opts Options) (Verdict, error) {
 		}
 		v.Results = append(v.Results, r)
 	}
-	v.PredicateSuite.Total = len(v.Results)
+	v.PredicateSuite.SkippedCount = v.SkipCount
+	v.PredicateSuite.Total = len(v.Results) // skips included
+	// Invariant: a skip increments neither GreenCount nor RedCount, so
+	// PASS ⟺ red_count==0 is preserved exactly as before SKIP existed.
 	if v.RedCount == 0 {
 		v.Verdict = "PASS"
 		v.ShipEligible = true

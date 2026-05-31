@@ -59,18 +59,30 @@ Output: `acs-verdict.json` with schema:
 {
   "schema_version": "1.0",
   "cycle": 40,
-  "predicate_suite": { "this_cycle_count": 8, "regression_suite_count": 47, "total": 55 },
+  "predicate_suite": { "this_cycle_count": 8, "regression_suite_count": 47, "skipped_count": 1, "total": 55 },
   "results": [
     { "ac_id": "cycle-40-001", "predicate": "acs/cycle-40/001-foo.sh", "exit_code": 0, "result": "green", "duration_ms": 234, "is_regression": false },
-    { "ac_id": "cycle-32-001", "predicate": "acs/regression-suite/cycle-32/001-bar.sh", "exit_code": 1, "result": "red", "duration_ms": 89, "is_regression": true, "evidence_excerpt": "..." }
+    { "ac_id": "cycle-32-001", "predicate": "acs/regression-suite/cycle-32/001-bar.sh", "exit_code": 1, "result": "red", "duration_ms": 89, "is_regression": true, "evidence_excerpt": "..." },
+    { "ac_id": "cycle-57-030", "predicate": "acs/regression-suite/cycle-57/030-build-report-verdict-count-match.sh", "exit_code": 77, "result": "skip", "duration_ms": 12, "is_regression": true, "evidence_excerpt": "SKIP: .evolve/runs/cycle-57/build-report.md absent — runtime-only predicate, not applicable on this clone" }
   ],
-  "green_count": 54,
+  "green_count": 53,
   "red_count": 1,
+  "skip_count": 1,
   "red_ids": ["cycle-32-001"],
+  "skip_ids": ["cycle-57-030"],
   "verdict": "FAIL",
   "ship_eligible": false
 }
 ```
+
+A predicate that exits **77 = SKIP** (TAP/automake convention) is classified
+`result: "skip"` and counted in neither `green_count` nor `red_count` — it
+increments `skip_count` (mirrored as `predicate_suite.skipped_count`) and is
+listed in `skip_ids`. Use it for a runtime-only predicate whose evidence (a
+gitignored `.evolve/` artifact) is absent on a fresh clone: the predicate must
+neither block the gate (RED) nor fake a pass (GREEN). `total` includes skips, so
+the accounting identity is `green_count + red_count + skip_count == total`. The
+gate decision is unchanged: `red_count == 0 ⇒ verdict PASS ⇒ ship_eligible`.
 
 ## ship-gate integration
 

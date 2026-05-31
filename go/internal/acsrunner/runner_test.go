@@ -90,6 +90,9 @@ func TestParseTestJSON_SkipAction(t *testing.T) {
 	if v.RedCount != 0 {
 		t.Errorf("redCount=%d, want 0 (skip is not red)", v.RedCount)
 	}
+	if v.SkipCount != 1 {
+		t.Errorf("skipCount=%d, want 1 (skip is counted as skip)", v.SkipCount)
+	}
 	if v.Predicates[0].Verdict != "SKIP" {
 		t.Errorf("verdict=%q, want SKIP", v.Predicates[0].Verdict)
 	}

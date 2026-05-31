@@ -166,6 +166,52 @@ func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
 	wantShipErr(t, err, core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, "predates v8.13.0")
 }
 
+// TestCheckEGPSGate_SkipCountWithRedZero_Passes: a verdict carrying skip_count
+// + a result:"skip" row + red_count==0 must clear the EGPS gate (the
+// fresh-clone case). The gate keys solely off red_count; unknown/new fields are
+// tolerated by the anonymous-struct unmarshal.
+func TestCheckEGPSGate_SkipCountWithRedZero_Passes(t *testing.T) {
+	repo := t.TempDir()
+	verdict := `{
+		"red_count": 0,
+		"green_count": 1,
+		"skip_count": 4,
+		"verdict": "PASS",
+		"red_ids": [],
+		"skip_ids": ["regression-suite/cycle-57/030-build-report-verdict-count-match"],
+		"predicate_suite": {"total": 5, "skipped_count": 4},
+		"results": [
+			{"ac_id": "cycle-1/001", "result": "green", "exit_code": 0},
+			{"ac_id": "regression-suite/cycle-57/030-build-report-verdict-count-match", "result": "skip", "exit_code": 77}
+		]
+	}`
+	path := filepath.Join(repo, "acs-verdict.json")
+	mustWrite(t, path, verdict)
+	res := &RunResult{}
+	if err := checkEGPSGate(path, res); err != nil {
+		t.Fatalf("checkEGPSGate returned %v, want nil (red_count==0 with skips must pass)", err)
+	}
+}
+
+// TestCheckEGPSGate_RedCountWithSkipsPresent_Blocks: skips present alongside a
+// genuine red must still block ship — SKIP cannot mask a real RED.
+func TestCheckEGPSGate_RedCountWithSkipsPresent_Blocks(t *testing.T) {
+	repo := t.TempDir()
+	verdict := `{
+		"red_count": 1,
+		"green_count": 1,
+		"skip_count": 2,
+		"verdict": "FAIL",
+		"red_ids": ["cycle-1/002"],
+		"predicate_suite": {"total": 4, "skipped_count": 2}
+	}`
+	path := filepath.Join(repo, "acs-verdict.json")
+	mustWrite(t, path, verdict)
+	res := &RunResult{}
+	err := checkEGPSGate(path, res)
+	wantShipErr(t, err, core.CodeEGPSRedCount, core.ShipClassPrecondition, "RED predicate")
+}
+
 // --- helpers ----------------------------------------------------------------
 
 // auditOpts returns an Options wired for verifyAuditBinding unit tests: real

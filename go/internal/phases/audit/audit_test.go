@@ -74,6 +74,66 @@ func writeACSVerdict(t *testing.T, ws string, redCount int) {
 	}
 }
 
+// writeACSVerdictSkip writes a verdict with both red_count and skip_count set,
+// mirroring the post-SKIP-convention schema (a fresh clone produces skips).
+func writeACSVerdictSkip(t *testing.T, ws string, redCount, skipCount int) {
+	t.Helper()
+	// Verdict is derived from red_count (PASS ⟺ red_count==0) so the fixture
+	// stays internally consistent with the gate it feeds.
+	verdict := "PASS"
+	if redCount > 0 {
+		verdict = "FAIL"
+	}
+	v := map[string]any{
+		"cycle":      42,
+		"red_count":  redCount,
+		"skip_count": skipCount,
+		"verdict":    verdict,
+		"predicate_suite": map[string]any{
+			"total":         redCount + skipCount,
+			"skipped_count": skipCount,
+		},
+		"results": []any{
+			map[string]any{"ac_id": "cycle-42/001", "result": "skip", "exit_code": 77},
+		},
+	}
+	b, _ := json.Marshal(v)
+	if err := os.WriteFile(filepath.Join(ws, "acs-verdict.json"), b, 0o644); err != nil {
+		t.Fatalf("write verdict: %v", err)
+	}
+}
+
+// EGPS gate keys solely off red_count: skip_count>0 with red_count==0 must PASS
+// (the fresh-clone case where runtime-only predicates SKIP).
+func TestRun_SkipCountWithRedZero_PASS(t *testing.T) {
+	ws := t.TempDir()
+	writeACSVerdictSkip(t, ws, 0, 4)
+	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS (red_count==0 with skip_count=4)", resp.Verdict)
+	}
+}
+
+// A genuine red alongside skips must still FAIL — SKIP cannot mask a RED.
+func TestRun_RedCountWithSkipsPresent_FAIL(t *testing.T) {
+	ws := t.TempDir()
+	writeACSVerdictSkip(t, ws, 2, 3)
+	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (red_count=2 even with skips)", resp.Verdict)
+	}
+}
+
 func TestRun_HappyPath_PASS(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)

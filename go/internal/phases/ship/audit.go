@@ -267,6 +267,7 @@ func checkEGPSGate(path string, res *RunResult) error {
 	var v struct {
 		RedCount       int      `json:"red_count"`
 		GreenCount     int      `json:"green_count"`
+		SkipCount      int      `json:"skip_count"`
 		Verdict        string   `json:"verdict"`
 		RedIDs         []string `json:"red_ids"`
 		PredicateSuite struct {
@@ -284,7 +285,7 @@ func checkEGPSGate(path string, res *RunResult) error {
 			"red_count", fmt.Sprintf("%d", v.RedCount), "red_ids", strings.Join(v.RedIDs, ","),
 			"verdict", v.Verdict, "total", fmt.Sprintf("%d", v.PredicateSuite.Total))
 	}
-	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: EGPS predicate suite verdict=%s (green=%d total=%d)", v.Verdict, v.GreenCount, v.PredicateSuite.Total))
+	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: EGPS predicate suite verdict=%s (green=%d skip=%d total=%d)", v.Verdict, v.GreenCount, v.SkipCount, v.PredicateSuite.Total))
 	return nil
 }
 

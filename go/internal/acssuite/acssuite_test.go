@@ -44,6 +44,9 @@ func TestRun_MixedSuite(t *testing.T) {
 	if v.RedCount != 1 || v.GreenCount != 3 {
 		t.Errorf("red=%d green=%d, want 1/3", v.RedCount, v.GreenCount)
 	}
+	if v.SkipCount != 0 {
+		t.Errorf("skip=%d, want 0 (no skips in this suite)", v.SkipCount)
+	}
 	if v.Verdict != "FAIL" || v.ShipEligible {
 		t.Errorf("verdict=%q ship_eligible=%v, want FAIL/false", v.Verdict, v.ShipEligible)
 	}
@@ -58,6 +61,95 @@ func TestRun_MixedSuite(t *testing.T) {
 		if r.ResultStr == "green" && r.EvidenceExcerpt != "" {
 			t.Errorf("green predicate %s should have no evidence", r.ACID)
 		}
+	}
+}
+
+// TestRun_SkipExit77_NeitherGreenNorRed — a predicate exiting 77 (TAP/automake
+// SKIP) is classified "skip": it increments neither GreenCount nor RedCount, so
+// a suite of only skips is still PASS + ship_eligible (the fresh-clone case).
+func TestRun_SkipExit77_NeitherGreenNorRed(t *testing.T) {
+	root := t.TempDir()
+	writePred(t, root, "cycle-1", "001-skip.sh", "echo 'SKIP: evidence absent'; exit 77")
+	v, err := Run(Options{Root: root, Cycle: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Results) != 1 || v.Results[0].ResultStr != "skip" {
+		t.Fatalf("result=%q, want skip", v.Results[0].ResultStr)
+	}
+	if v.SkipCount != 1 || v.GreenCount != 0 || v.RedCount != 0 {
+		t.Errorf("skip=%d green=%d red=%d, want 1/0/0", v.SkipCount, v.GreenCount, v.RedCount)
+	}
+	if v.Verdict != "PASS" || !v.ShipEligible {
+		t.Errorf("verdict=%q ship=%v, want PASS/true (skip-only suite ships)", v.Verdict, v.ShipEligible)
+	}
+	if len(v.SkipIDs) != 1 {
+		t.Errorf("SkipIDs=%v, want one id", v.SkipIDs)
+	}
+	if v.Results[0].EvidenceExcerpt == "" {
+		t.Errorf("skip predicate should capture an evidence excerpt")
+	}
+	if v.PredicateSuite.SkippedCount != 1 {
+		t.Errorf("PredicateSuite.SkippedCount=%d, want 1", v.PredicateSuite.SkippedCount)
+	}
+}
+
+// TestRun_MixedGreenRedSkip — green(0)+red(1)+skip(77) accounting: Total counts
+// all three; the single red drives FAIL; SkipIDs is populated.
+func TestRun_MixedGreenRedSkip(t *testing.T) {
+	root := t.TempDir()
+	writePred(t, root, "cycle-1", "001-green.sh", "exit 0")
+	writePred(t, root, "cycle-1", "002-red.sh", "echo boom; exit 1")
+	writePred(t, root, "cycle-1", "003-skip.sh", "echo skipme; exit 77")
+	v, err := Run(Options{Root: root, Cycle: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.GreenCount != 1 || v.RedCount != 1 || v.SkipCount != 1 {
+		t.Errorf("green=%d red=%d skip=%d, want 1/1/1", v.GreenCount, v.RedCount, v.SkipCount)
+	}
+	if v.PredicateSuite.Total != 3 {
+		t.Errorf("Total=%d, want 3 (skips included)", v.PredicateSuite.Total)
+	}
+	if v.Verdict != "FAIL" || v.ShipEligible {
+		t.Errorf("verdict=%q ship=%v, want FAIL/false (a red is present)", v.Verdict, v.ShipEligible)
+	}
+	if len(v.SkipIDs) != 1 {
+		t.Errorf("SkipIDs=%v, want one id", v.SkipIDs)
+	}
+	if v.PredicateSuite.Total != v.GreenCount+v.RedCount+v.SkipCount {
+		t.Errorf("Total(%d) != green+red+skip(%d)", v.PredicateSuite.Total, v.GreenCount+v.RedCount+v.SkipCount)
+	}
+}
+
+// TestRun_GreenPlusSkipIsShipEligible — the fresh-clone proof: a suite of one
+// green + one skip has red_count==0 and PASSES, so a fresh worktree (where the
+// 4 runtime-only predicates SKIP) clears the EGPS gate.
+func TestRun_GreenPlusSkipIsShipEligible(t *testing.T) {
+	root := t.TempDir()
+	writePred(t, root, "cycle-1", "001-green.sh", "exit 0")
+	writePred(t, root, "regression-suite/cycle-9", "001-skip.sh", "exit 77")
+	v, err := Run(Options{Root: root, Cycle: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.RedCount != 0 || v.Verdict != "PASS" || !v.ShipEligible {
+		t.Errorf("red=%d verdict=%q ship=%v, want 0/PASS/true", v.RedCount, v.Verdict, v.ShipEligible)
+	}
+}
+
+// TestRun_GreenPlusRealExit1Blocks — a genuine exit 1 (not 77) still counts RED,
+// so the gate blocks real defects: SKIP must not weaken the gate.
+func TestRun_GreenPlusRealExit1Blocks(t *testing.T) {
+	root := t.TempDir()
+	writePred(t, root, "cycle-1", "001-green.sh", "exit 0")
+	writePred(t, root, "cycle-1", "002-real-red.sh", "echo defect; exit 1")
+	v, err := Run(Options{Root: root, Cycle: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.RedCount != 1 || v.Verdict != "FAIL" || v.ShipEligible {
+		t.Errorf("red=%d verdict=%q ship=%v, want 1/FAIL/false", v.RedCount, v.Verdict, v.ShipEligible)
 	}
 }
 
