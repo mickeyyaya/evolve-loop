@@ -3,8 +3,14 @@
 > Living guide for the multi-tmux-LLM-CLI subagent swarm harness. Design rationale: [ADR-0032](adr/0032-swarm-harness.md).
 > Research record: [knowledge-base/research/swarm-concurrency-2026-05.md](../../knowledge-base/research/swarm-concurrency-2026-05.md).
 >
-> **Status:** v1 (planner + validator, shadow). Dispatch/merge-train/reaper land in v2–v4; this guide
-> grows with them. Sections marked _(vN)_ describe planned behavior not yet wired.
+> **Status:** v4 — COMPLETE + WIRED (HEAD `32bae0f`). The full pipeline is live: planner+validator,
+> per-worker isolation (registry/reaper/provisioner), parallel dispatcher, merge-train (writer) +
+> synthesis (reader) fan-in, and the `swarmRunner` Decorator wired into the orchestrator runners map
+> (`cmd_cycle.go`: build=writer, scout=reader). Gated by `EVOLVE_SWARM_STAGE`: unset/`shadow` =
+> byte-identical N=1 delegate; `advisory` = live dispatch, inner runner authoritative; `enforce` =
+> swarm result is the phase output. Documented follow-ups (non-blocking): orphan-on-cancel (real
+> Launcher must register-on-spawn), reader-enforce synthesis-to-one-artifact, per-worker port
+> isolation for server-running writers.
 
 ## What it is
 

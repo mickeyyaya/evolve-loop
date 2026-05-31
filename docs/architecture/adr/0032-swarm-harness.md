@@ -1,6 +1,6 @@
 # ADR-0032: Multi-tmux-LLM-CLI Subagent Swarm Harness
 
-**Status:** Accepted (v1 — planner + validator, shadow). Implemented incrementally (v1→v4).
+**Status:** Accepted + IMPLEMENTED (v1→v4 shipped on `feat/swarm-harness`, HEAD `32bae0f`). The full harness — planner+validator (v1), isolation/registry/reaper (v2), parallel dispatcher (v3), merge-train/synthesis fan-in + `swarmRunner` Decorator WIRED into the orchestrator runners map (v4) — is live behind `EVOLVE_SWARM_STAGE` (default `shadow` = byte-identical N=1 delegate).
 **Date:** 2026-05-31
 **Related:** ADR-0023 (live injection), ADR-0024 (phase advisor), ADR-0027 (worktree provisioning / commit-as-evidence), ADR-0031 (tmux recipe engine + capability catalog); `docs/architecture/sequential-write-discipline.md`.
 
