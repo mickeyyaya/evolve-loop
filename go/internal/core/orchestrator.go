@@ -462,6 +462,19 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 		if p == "" || baseline[p] {
 			continue
 		}
+		// Skip the orchestrator's own runtime state and directory entries — never
+		// build output, and not safe to relocate as a file:
+		//   - .evolve/ : cycle-state, ledger, runs, and the cycle's OWN worktree live
+		//     here. In the live repo it's gitignored (invisible to `git status`); a
+		//     fixture without that .gitignore must not see recoverBuildLeak relocate
+		//     ledger.tip into the worktree (audit-diff pollution).
+		//   - trailing '/' : a nested worktree/submodule that `-uall` reports as a bare
+		//     directory (it won't recurse into another working tree). moveFile cannot
+		//     move a directory — this is the cycle-1 worktree dir that aborted the cycle
+		//     (415a9a7 regression caught by the e2e ship-path tests).
+		if p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.HasSuffix(p, "/") {
+			continue
+		}
 		xy := line[:2]
 		switch {
 		case strings.Contains(xy, "?"): // untracked file → relocate into the worktree

@@ -212,6 +212,38 @@ func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testin
 	}
 }
 
+// recoverBuildLeak must SKIP the orchestrator's own runtime state under .evolve/ —
+// it is never build output. In the live repo .evolve/ is gitignored (invisible to
+// `git status`); a minimal fixture without that .gitignore exposed recoverBuildLeak
+// (a) relocating .evolve/ledger.tip into the worktree (pollutes the audit diff) and
+// (b) CHOKING on the nested worktree dir .evolve/worktrees/cycle-1/ — `git status
+// -uall` reports a nested working tree as a bare directory, which moveFile cannot
+// relocate, so it returned false and aborted the cycle (415a9a7 regression caught by
+// the e2e ship-path tests). Both must be skipped; the cycle proceeds.
+func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing.T) {
+	repo, wt := realWorktree(t)
+	baseline := porcelainDirtySet(context.Background(), repo) // clean
+
+	if err := os.MkdirAll(filepath.Join(repo, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".evolve/ledger.tip"), []byte("tip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A real nested worktree — `git status -uall` reports it as a bare dir (no recurse).
+	gitInRepo(t, repo, "worktree", "add", "--detach", "-q", filepath.Join(repo, ".evolve/worktrees/cycle-1"), "HEAD")
+
+	if !recoverBuildLeak(context.Background(), repo, wt, baseline) {
+		t.Fatal("recoverBuildLeak must skip .evolve/ runtime state + the nested-worktree dir and return true, not abort")
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".evolve/ledger.tip")); err != nil {
+		t.Fatalf(".evolve/ledger.tip must be left untouched in main: %v", err)
+	}
+	if diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only"); strings.Contains(diff, ".evolve") {
+		t.Fatalf(".evolve/ runtime state must NOT be relocated/staged into the worktree; git diff HEAD=%q", diff)
+	}
+}
+
 // Pre-existing operator dirt (in the baseline) is left untouched; only build-introduced leaks move.
 func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 	repo, wt := realWorktree(t)
