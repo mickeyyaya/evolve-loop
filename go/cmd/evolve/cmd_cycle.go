@@ -31,10 +31,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/swarmrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // runCycle implements `evolve cycle <subcommand>`. Subcommands: run.
@@ -233,12 +235,16 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	prm := newPromptsLoader(projectRoot)
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent:       intent.New(intent.Config{Bridge: br, Prompts: prm}),
-		core.PhaseScout:        scout.New(scout.Config{Bridge: br, Prompts: prm}),
+		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
+		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
+		// Decorator so EVOLVE_SWARM_STAGE=advisory|enforce dispatches them across N
+		// parallel workers (reader fan-out / writer merge-train). Default (stage
+		// unset) = byte-identical delegate to the inner runner — zero behavior change.
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm}), br, swarm.ModeReader),
 		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
-		core.PhaseBuild:        build.New(build.Config{Bridge: br, Prompts: prm}),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm}), br, swarm.ModeWriter),
 		core.PhaseAudit:        audit.NewDefault(br, prm),
 		core.PhaseShip:         ship.NewWithDefaultRunner(),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),

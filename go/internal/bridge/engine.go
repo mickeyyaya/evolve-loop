@@ -286,6 +286,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if req.PermissionMode != "" {
 		args = append(args, "--permission-mode="+req.PermissionMode)
 	}
+	// SessionName pins a deterministic tmux session (swarm orphan-on-cancel
+	// hardening). parseLaunchArgs→LaunchArgs already validates + threads it into
+	// Config.SessionName; resolveSession then uses the named-session path.
+	if req.SessionName != "" {
+		args = append(args, "--session-name="+req.SessionName)
+	}
 	// The in-process entry is the autonomous runner's trusted path: it is the
 	// bypass authority, so it enables --allow-bypass for the tmux safety gates
 	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`

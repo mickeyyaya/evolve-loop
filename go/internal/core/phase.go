@@ -17,6 +17,7 @@ const (
 	PhaseTriage       Phase = "triage"
 	PhaseTDD          Phase = "tdd"
 	PhaseBuildPlanner Phase = "build-planner"
+	PhaseSwarmPlan    Phase = "swarm-plan"
 	PhaseBuild        Phase = "build"
 	PhaseAudit        Phase = "audit"
 	PhaseShip         Phase = "ship"
@@ -37,7 +38,7 @@ func (p Phase) String() string { return string(p) }
 func (p Phase) IsValid() bool {
 	switch p {
 	case PhaseStart, PhaseIntent, PhaseScout, PhaseTriage,
-		PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseDebugger, PhaseEnd:
+		PhaseTDD, PhaseBuildPlanner, PhaseSwarmPlan, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseDebugger, PhaseEnd:
 		return true
 	}
 	return false

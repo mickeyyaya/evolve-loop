@@ -446,7 +446,7 @@ func injectText(ctx context.Context, cfg *Config, deps Deps, session, body strin
 // sessions (claude-tmux only) use evolve-bridge-named-<name>.
 func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session string, named bool) {
 	if cfg.SessionName != "" {
-		return truncate64("evolve-bridge-named-" + cfg.SessionName), true
+		return NamedSessionName(cfg.SessionName), true
 	}
 	agent := orDefault(cfg.Agent, "probe")
 	s := fmt.Sprintf("%sc%d-%s-pid%d-%d", ephemeralPrefix, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
@@ -458,6 +458,14 @@ func truncate64(s string) string {
 		return s[:64]
 	}
 	return s
+}
+
+// NamedSessionName returns the tmux session name for a swarm-controlled named
+// session. It is the single source of truth shared by resolveSession (which
+// creates the session) and the swarm reaper (which kills it by this name).
+// Format: "evolve-bridge-named-<name>", truncated to 64 characters.
+func NamedSessionName(name string) string {
+	return truncate64("evolve-bridge-named-" + name)
 }
 
 // parseExtendSecs parses an "extend:<secs>" auto-respond action.

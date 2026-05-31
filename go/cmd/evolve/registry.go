@@ -55,6 +55,7 @@ var commands = []subcommand{
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: runServePhase},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
+	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
 	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
