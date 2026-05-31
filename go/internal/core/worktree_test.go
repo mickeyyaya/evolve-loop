@@ -123,8 +123,10 @@ func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 		t.Fatalf("Cleanup = %v, want [/tmp/wt/cycle-10]", wt.cleaned)
 	}
 
-	// Source phases run with cwd=worktree.
-	for _, p := range []Phase{PhaseTDD, PhaseBuild} {
+	// Source phases (tdd/build) AND the read-only audit phase run with
+	// cwd=worktree — audit so its verification commands inspect the builder's
+	// pending work there, not the empty main tree (issue #9).
+	for _, p := range []Phase{PhaseTDD, PhaseBuild, PhaseAudit} {
 		fr := runners[p].(*fakeRunner)
 		if len(fr.requests) == 0 {
 			t.Fatalf("phase %s never ran", p)
@@ -133,8 +135,8 @@ func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 			t.Errorf("phase %s Worktree = %q, want /tmp/wt/cycle-10", p, got)
 		}
 	}
-	// Read-mostly phases stay on the main tree (empty Worktree).
-	for _, p := range []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseAudit} {
+	// Read-mostly planning phases stay on the main tree (empty Worktree).
+	for _, p := range []Phase{PhaseIntent, PhaseScout, PhaseTriage} {
 		fr := runners[p].(*fakeRunner)
 		if len(fr.requests) > 0 && fr.requests[0].Worktree != "" {
 			t.Errorf("phase %s Worktree = %q, want empty (main tree)", p, fr.requests[0].Worktree)

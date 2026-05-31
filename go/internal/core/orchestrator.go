@@ -987,11 +987,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
-		// Source-writing phases (tdd/build) run with cwd=worktree so their
-		// code writes land in the isolated worktree the role-gate permits;
-		// every other phase writes only its artifact to the absolute workspace.
+		// Phases that run with cwd=worktree: source writers (tdd/build) so their
+		// code writes land in the isolated worktree the role-gate permits, AND the
+		// audit phase (read-only) so its verification commands inspect the builder's
+		// pending work there instead of the main tree (issue #9). Every other phase
+		// writes only its artifact to the absolute workspace.
 		phaseWorktree := ""
-		if o.worktreePhase(next) {
+		if o.runsInWorktree(next) {
 			phaseWorktree = cs.ActiveWorktree
 		}
 		// Workstream B: snapshot the main-tree dirty set BEFORE a source-
@@ -1570,6 +1572,20 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 		return spec.WritesSource
 	}
 	return false
+}
+
+// runsInWorktree reports whether a phase's subprocess should run with cwd set to
+// the cycle worktree. This is a SUPERSET of worktreePhase (source writers): the
+// audit phase also runs there — read-only — so its verification commands
+// (`git diff HEAD`, `go test`, `test -d`) inspect the builder's PENDING work in
+// the worktree rather than the main tree. (Issue #9: a non-Claude auditor running
+// a relative `cd go` from the project root inspected an empty main tree and
+// false-FAILed work that was present in the worktree; the audit-binding at
+// recordAuditBinding already uses cs.ActiveWorktree, so the auditor's cwd must
+// match it.) Audit is deliberately NOT a worktreePhase — it gets cwd for
+// inspection, never source-write permission (the role-gate keys off worktreePhase).
+func (o *Orchestrator) runsInWorktree(p Phase) bool {
+	return o.worktreePhase(p) || p == PhaseAudit
 }
 
 // phaseFromRouter denormalizes a router phase string back to a core.Phase.
