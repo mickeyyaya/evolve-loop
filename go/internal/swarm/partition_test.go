@@ -105,6 +105,28 @@ func TestValidate_Fallback_SingleWorker(t *testing.T) {
 	}
 }
 
+func TestValidate_DuplicateWorkerID_Collapses(t *testing.T) {
+	plan := writerPlan(
+		fileWorker("w0", "a.go"),
+		fileWorker("w0", "b.go"), // same ID → silent dedupe hazard
+	)
+	if got := Validate(plan); !got.Collapse || !strings.Contains(got.Reason, "duplicate worker_id") {
+		t.Errorf("duplicate worker_id must collapse: %+v", got)
+	}
+}
+
+// Case-insensitive filesystems: two workers claiming the same file with
+// different casing must collide (macOS/Windows treat them as one file).
+func TestValidate_WriterOverlap_CaseInsensitive(t *testing.T) {
+	plan := writerPlan(
+		fileWorker("w0", "go/internal/Foo/A.go"),
+		fileWorker("w1", "go/internal/foo/a.go"),
+	)
+	if got := Validate(plan); !got.Collapse {
+		t.Errorf("case-different overlap must collapse on case-insensitive FS: %+v", got)
+	}
+}
+
 func TestValidate_UnknownMode_Collapses(t *testing.T) {
 	plan := SwarmPlan{Mode: "bogus", Partitionable: true,
 		Workers: []WorkerSpec{fileWorker("w0", "a.go"), fileWorker("w1", "b.go")}}

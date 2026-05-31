@@ -30,6 +30,16 @@ func Validate(plan SwarmPlan) ValidationResult {
 		}
 	}
 
+	// Duplicate worker_id is a planner bug that would silently dedupe in the
+	// ownership/indegree maps (a 2-worker plan could validate OK with a 1-entry
+	// merge order). Reject before any mode-specific check.
+	if dup := duplicateWorkerID(plan.Workers); dup != "" {
+		return ValidationResult{
+			Collapse: true,
+			Reason:   fmt.Sprintf("duplicate worker_id %q → falling back to N=1", dup),
+		}
+	}
+
 	switch plan.Mode {
 	case ModeReader:
 		return validateReader(plan)
@@ -110,17 +120,33 @@ func detectConflicts(workers []WorkerSpec) []Conflict {
 	return conflicts
 }
 
+// duplicateWorkerID returns the first worker_id that appears more than once, or
+// "" if all IDs are unique.
+func duplicateWorkerID(workers []WorkerSpec) string {
+	seen := make(map[string]bool, len(workers))
+	for _, w := range workers {
+		if seen[w.WorkerID] {
+			return w.WorkerID
+		}
+		seen[w.WorkerID] = true
+	}
+	return ""
+}
+
 // normalizePath makes two spellings of the same repo file compare equal so an
 // overlap can't slip through via "./a.go" vs "a.go". Repo-relative, forward
-// slashes, no trailing slash. (Absolute/escape rejection is enforced later by
-// the post-build git-status guard, which runs against the real worktree.)
+// slashes, no trailing slash, and CASE-FOLDED — because the dev hosts (macOS
+// HFS+/APFS default, Windows) are case-insensitive, so "Foo/A.go" and
+// "foo/a.go" are the same file and must collide in the disjointness check.
+// (Absolute/escape rejection is enforced later by the post-build git-status
+// guard, which runs against the real worktree.)
 func normalizePath(p string) string {
 	p = strings.TrimSpace(p)
 	if p == "" {
 		return ""
 	}
 	p = filepath.ToSlash(filepath.Clean(p))
-	return strings.TrimSuffix(p, "/")
+	return strings.ToLower(strings.TrimSuffix(p, "/"))
 }
 
 func fallbackReason(plan SwarmPlan) string {
