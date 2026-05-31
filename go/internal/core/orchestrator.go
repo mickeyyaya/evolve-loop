@@ -373,6 +373,159 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 	fmt.Fprintf(os.Stderr, "[orchestrator] worktree-normalize: soft-reset builder commits to base %s — changes now pending for audit\n", short)
 }
 
+// porcelainDirtySet returns the set of paths `git status --porcelain` reports
+// dirty in dir — tracked-modified AND untracked. Captured for the main tree at
+// cycle start so recoverBuildLeak only touches paths the BUILD introduced, never
+// the operator's pre-existing uncommitted work. (The tree-diff guard's
+// `git diff --name-only HEAD` baseline is tracked-only and misses untracked, so
+// it can't serve this purpose — see the cycle-160 incident.)
+func porcelainDirtySet(ctx context.Context, dir string) map[string]bool {
+	set := map[string]bool{}
+	// -uall lists every untracked FILE individually (never a bare directory), so
+	// recoverBuildLeak relocates at file granularity — no dir-rename ENOTEMPTY in
+	// a real worktree, and the baseline is file-exact.
+	out, code, err := gitCapture(ctx, dir, "status", "--porcelain", "-uall")
+	if err != nil || code != 0 {
+		return set
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if len(line) < 4 {
+			continue
+		}
+		set[porcelainPath(line)] = true
+	}
+	return set
+}
+
+// porcelainPath extracts the path from a `git status --porcelain` line. Lines are
+// "XY <path>"; a rename/copy is "XY <old> -> <new>" (take the new path). Quotes
+// (paths with special chars) are trimmed best-effort.
+func porcelainPath(line string) string {
+	p := strings.TrimSpace(line[3:])
+	if i := strings.Index(p, " -> "); i >= 0 {
+		p = p[i+4:]
+	}
+	return strings.Trim(p, "\"")
+}
+
+// recoverBuildLeak relocates build-phase writes that escaped into the main tree
+// back into the worktree, then restores the main tree — the self-heal for the
+// cycle-160 incident (Option A). Non-Claude builders (agy/codex in tmux) are not
+// bound by the Claude-only role-gate, and the OS sandbox is off on nested-macOS,
+// so they can write to project_root instead of the worktree. Rather than abort
+// the cycle, move the build's output to where audit/ship expect it.
+//
+// baseline (file-granular via `git status --porcelain -uall`) = paths already
+// dirty in projectRoot before the build (operator / pre-existing work) — never
+// touched. For each NEW dirty path:
+//   - untracked ('?')                 → os.Rename(projectRoot/p → worktree/p);
+//     the relocated paths (and ONLY those) are then `git add --`'d in the worktree
+//     so the auditor's `git diff HEAD` sees them without sweeping in unrelated
+//     worktree content (same visibility reason as normalizeWorktreeToBase).
+//   - modified/staged/deleted ('M'/'A'/'D') tracked → git checkout HEAD -- p
+//     (discards staged AND unstaged; e.g. a rebuilt go/evolve the cycle shouldn't
+//     carry — plain `git checkout -- p` would no-op a staged-only change).
+//   - rename/copy/other → not safe to auto-recover → return false.
+//
+// Returns true iff every NEW leak was handled and the main tree is clean of them;
+// the caller continues. On false the caller ABORTS the cycle — the tree-diff
+// guard only backstops tracked leaks, so an unrecovered (esp. untracked) leak
+// must not be allowed to slip past into audit. "Couldn't determine" cases degrade
+// to true (let the guard be the backstop). Best-effort + loud WARNs throughout.
+func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baseline map[string]bool) bool {
+	if worktree == "" {
+		return true // no worktree to relocate into → degrade (caller guards this anyway)
+	}
+	// -uall lists untracked FILES individually (never a bare dir), so each leaked
+	// path is a file: os.Rename has no dir-collision and is overwrite-safe.
+	out, code, err := gitCapture(ctx, projectRoot, "status", "--porcelain", "-uall")
+	if err != nil || code != 0 {
+		// Can't determine leaks → DEGRADE to the tree-diff guard (return true, do
+		// not abort). false is reserved for a leak we detected but could not safely
+		// recover; "couldn't even check" is not that.
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git status failed (rc=%d): %v — degrading to tree-diff guard\n", code, err)
+		return true
+	}
+	var relocated []string
+	for _, line := range strings.Split(out, "\n") {
+		if len(line) < 4 {
+			continue
+		}
+		p := porcelainPath(line)
+		if p == "" || baseline[p] {
+			continue
+		}
+		xy := line[:2]
+		switch {
+		case strings.Contains(xy, "?"): // untracked file → relocate into the worktree
+			src := filepath.Join(projectRoot, p)
+			dst := filepath.Join(worktree, p)
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: mkdir for %s: %v\n", p, err)
+				return false
+			}
+			if err := moveFile(src, dst); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate %s: %v\n", p, err)
+				return false
+			}
+			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s into worktree\n", p)
+			relocated = append(relocated, p)
+		case strings.ContainsAny(xy, "MAD"): // modified/staged/deleted tracked → discard the leak
+			// `git checkout HEAD -- p` restores BOTH the index and working tree to
+			// HEAD, so it discards a staged-only ("M ") leak too (plain
+			// `git checkout -- p` is a no-op on staged changes).
+			if _, c, e := gitCapture(ctx, projectRoot, "checkout", "HEAD", "--", p); e != nil || c != 0 {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git checkout HEAD -- %s failed (rc=%d): %v\n", p, c, e)
+				return false
+			}
+			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s\n", p)
+		default: // rename/copy/unknown — not safe to auto-recover
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: unrecoverable leak status %q for %s (falling through to abort)\n", xy, p)
+			return false
+		}
+	}
+	if len(relocated) > 0 {
+		// Stage ONLY the relocated files (not `git add -A`, which would also stage
+		// unrelated worktree content and pollute the auditor's `git diff HEAD`),
+		// so the relocated work is visible to audit + the binding — the same
+		// visibility reason as normalizeWorktreeToBase.
+		args := append([]string{"add", "--"}, relocated...)
+		if _, c, e := gitCapture(ctx, worktree, args...); e != nil || c != 0 {
+			// Fail loudly + return false: the files were physically relocated but
+			// are NOT staged, so the auditor's `git diff HEAD` would not see them.
+			// Returning false lets the tree-diff guard below abort cleanly rather
+			// than ship a half-recovered, audit-invisible state.
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git add of relocated paths failed (rc=%d): %v — aborting recovery\n", c, e)
+			return false
+		}
+		fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: %d leaked path(s) relocated into worktree; main tree restored\n", len(relocated))
+	}
+	return true
+}
+
+// moveFile relocates src→dst, falling back to copy+remove when os.Rename fails.
+// os.Rename returns EXDEV when src and dst are on different filesystems — which
+// happens when the worktree base resolves to a different volume than projectRoot
+// (EVOLVE_WORKTREE_BASE / TMPDIR on another mount). The copy preserves the source
+// file mode. Used by recoverBuildLeak, which operates at file granularity (-uall).
+func moveFile(src, dst string) error {
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	mode := os.FileMode(0o644)
+	if fi, serr := os.Stat(src); serr == nil {
+		mode = fi.Mode()
+	}
+	if err := os.WriteFile(dst, data, mode); err != nil {
+		return err
+	}
+	return os.Remove(src)
+}
+
 // gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).
 // A non-zero exit is returned as exitCode with nil err (the caller decides
 // whether it's fatal — e.g. `git diff HEAD` exit 1 means "differences", not a
@@ -501,6 +654,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// the build phase we soft-reset to it so a committing builder's work becomes
 	// pending again (see normalizeWorktreeToBase + the cycle-156 incident).
 	var worktreeBaseSHA string
+	// Full main-tree dirty baseline (tracked + untracked) captured BEFORE any
+	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
+	// relocates paths the build introduced, never the operator's pre-existing work.
+	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
 	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
 	} else {
@@ -849,6 +1006,22 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// success. Snapshot failures (pre OR post) degrade silently — the
 		// guard is belt-and-suspenders to the OS sandbox, so a transient git
 		// read error must never cause a false abort.
+		// Cycle-160 fix (Option A): a non-Claude builder (agy/codex in tmux) is
+		// not bound by the Claude-only role-gate, and the OS sandbox is off on
+		// nested-macOS, so it can write build output to the MAIN tree instead of
+		// its worktree. Relocate any such leak into the worktree (staged, so audit
+		// sees it) and restore main BEFORE the tree-diff guard runs. Runs
+		// unconditionally after build (no-op when clean) because the guard's
+		// `git diff --name-only HEAD` baseline is tracked-only and misses
+		// pure-untracked leaks. On recovery FAILURE we abort explicitly — the
+		// tree-diff guard only backstops tracked leaks, so a failed recovery
+		// of an untracked leak must not slip past into audit.
+		if next == PhaseBuild && cs.ActiveWorktree != "" {
+			if !recoverBuildLeak(ctx, req.ProjectRoot, cs.ActiveWorktree, mainDirtyBaseline) {
+				return result, fmt.Errorf("phase build: worktree-leak recovery failed (main tree left unsafe for audit)")
+			}
+		}
+
 		if treeGuard != nil && !snapshotFailed {
 			res := treeGuard.Check(ctx, req.ProjectRoot, beforeDirty)
 			if res.SnapshotMissed {
