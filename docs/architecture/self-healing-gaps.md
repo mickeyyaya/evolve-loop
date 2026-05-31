@@ -46,6 +46,4 @@ Per-phase CLI is resolved via `EVOLVE_<AGENT>_CLI` > `EVOLVE_CLI` > profile.cli 
 `claude-tmux`, with a `cli_fallback` chain on trigger exits `[80 81 124 127]`
 (`runner/cli_chain.go`). A non-Claude CLI on any phase functions as long as (a) its
 manifest/flags are correct (bugs at 154), (b) its writes are confined or recovered
-(bugs #4/#5/#6 — `recoverBuildLeak`), and (c) the fallback chain is populated. GAP 1 is
-the remaining multi-CLI resilience gap: if all CLIs in a phase's chain return a trigger
-exit, the phase hard-aborts instead of escalating.
+(bugs #4/#5/#6 — `recoverBuildLeak`), and (c) the fallback chain is populated.

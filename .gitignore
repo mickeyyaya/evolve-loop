@@ -66,6 +66,10 @@ node_modules/
 # Operator-extensible but ships with sensible defaults; must be tracked so the
 # scripts/guards/commit-prefix-gate.sh hook applies consistently across clones.
 !.evolve/commit-prefix-scope.json
+# ... and except the evals directory and its markdown files (tracked, never ignored).
+!.evolve/
+!.evolve/evals/
+!.evolve/evals/*.md
 .claude/evolve/
 .claude/worktrees/
 .clone/

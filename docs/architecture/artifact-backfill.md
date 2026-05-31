@@ -83,8 +83,7 @@ On successful backfill, the orchestrator emits to stderr:
 
 The synthesized `PhaseResponse{Verdict: VerdictWARN}` flows through the normal
 ledger append and audit-binding path. Operators can identify backfilled cycles by
-looking for `kind=phase, verdict=WARN` entries alongside the absence of a normal
-artifact write.
+looking for the dedicated `kind=backfill` ledger entry.
 
 ---
 

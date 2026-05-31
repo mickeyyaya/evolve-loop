@@ -698,6 +698,27 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 // deterministic timeout still aborts the cycle after the cap.
 const phaseMaxAttempts = 2
 
+func resolvePhaseMaxAttempts(env map[string]string) int {
+	if env == nil {
+		return phaseMaxAttempts
+	}
+	val := env["EVOLVE_PHASE_MAX_ATTEMPTS"]
+	if val == "" {
+		return phaseMaxAttempts
+	}
+	num, err := strconv.Atoi(val)
+	if err != nil {
+		return phaseMaxAttempts
+	}
+	if num > 5 {
+		return 5
+	}
+	if num < 1 {
+		return phaseMaxAttempts
+	}
+	return num
+}
+
 func isTransientBridgeError(err error) bool {
 	return errors.Is(err, ErrTransientBridgeFailure)
 }
@@ -1155,6 +1176,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// recovery phase instead of aborting; the post-loop guard then continues
 		// the outer loop (skipping verdict/ledger handling for the failed ship).
 		shipRecovered := false
+		maxAttempts := resolvePhaseMaxAttempts(phaseReq.Env)
 		for attempt := 1; ; attempt++ {
 			obsCancel := o.observer.Start(ctx, string(next), phaseReq)
 			resp, err = runner.Run(ctx, phaseReq)
@@ -1165,11 +1187,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				break
 			}
 			if err != nil {
-				if attempt >= phaseMaxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
+				if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 					// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 					// try to reconstruct the artifact from stdout.clean.txt before aborting.
 					// Enabled by EVOLVE_BACKFILL_ENABLED=1; off by default.
-					if attempt >= phaseMaxAttempts && errors.Is(err, ErrArtifactTimeout) &&
+					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) &&
 						(envSnap["EVOLVE_BACKFILL_ENABLED"] == "1" || os.Getenv("EVOLVE_BACKFILL_ENABLED") == "1") {
 						artifactPath := filepath.Join(cs.WorkspacePath, string(next)+"-report.md")
 						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
@@ -1213,7 +1235,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
 					return result, fmt.Errorf("phase %s: %w", next, err)
 				}
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, phaseMaxAttempts)
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)
 				// Emit structured audit trail for the self-heal retry.
 				if lerr := o.ledger.Append(ctx, LedgerEntry{
 					TS:       o.now().UTC().Format(time.RFC3339),
@@ -1227,11 +1249,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				continue
 			}
 			if err == nil && !IsVerdict(resp.Verdict) {
-				if attempt >= phaseMaxAttempts {
+				if attempt >= maxAttempts {
 					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict), attempt, o.now)
 					return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
 				}
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, phaseMaxAttempts, resp.Verdict)
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)
 				// Emit structured audit trail for the self-heal retry.
 				if lerr := o.ledger.Append(ctx, LedgerEntry{
 					TS:       o.now().UTC().Format(time.RFC3339),

@@ -191,3 +191,112 @@ func TestTransientRetry_LedgerEntry(t *testing.T) {
 		t.Errorf("exit_code=%d, want 85", retryEntry.ExitCode)
 	}
 }
+
+func TestPhaseMaxAttempts_Default(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
+	o := NewOrchestrator(st, led, runners)
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+		Env:         map[string]string{},
+	})
+	if err == nil {
+		t.Fatal("expected failure")
+	}
+	if got := runners[PhaseScout].(*fakeRunner).calls; got != 2 {
+		t.Errorf("calls=%d, want 2", got)
+	}
+}
+
+func TestPhaseMaxAttempts_EnvOverride(t *testing.T) {
+	{
+		st := &fakeStorage{state: State{LastCycleNumber: 0}}
+		led := &fakeLedger{}
+		runners := buildRunners(nil)
+		runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
+		o := NewOrchestrator(st, led, runners)
+
+		_, err := o.RunCycle(context.Background(), CycleRequest{
+			ProjectRoot: t.TempDir(),
+			Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": "3"},
+		})
+		if err == nil {
+			t.Fatal("expected failure")
+		}
+		if got := runners[PhaseScout].(*fakeRunner).calls; got != 3 {
+			t.Errorf("calls=%d, want 3", got)
+		}
+	}
+	{
+		st := &fakeStorage{state: State{LastCycleNumber: 0}}
+		led := &fakeLedger{}
+		runners := buildRunners(nil)
+		runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
+		o := NewOrchestrator(st, led, runners)
+
+		_, err := o.RunCycle(context.Background(), CycleRequest{
+			ProjectRoot: t.TempDir(),
+			Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": "5"},
+		})
+		if err == nil {
+			t.Fatal("expected failure")
+		}
+		if got := runners[PhaseScout].(*fakeRunner).calls; got != 5 {
+			t.Errorf("calls=%d, want 5", got)
+		}
+	}
+}
+
+func TestPhaseMaxAttempts_OutOfRange(t *testing.T) {
+	cases := []struct {
+		val  string
+		want int
+	}{
+		{"0", 2},
+		{"6", 5},
+		{"", 2},
+		{"abc", 2},
+	}
+	for _, tc := range cases {
+		t.Run("val-"+tc.val, func(t *testing.T) {
+			st := &fakeStorage{state: State{LastCycleNumber: 0}}
+			led := &fakeLedger{}
+			runners := buildRunners(nil)
+			runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
+			o := NewOrchestrator(st, led, runners)
+
+			_, err := o.RunCycle(context.Background(), CycleRequest{
+				ProjectRoot: t.TempDir(),
+				Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": tc.val},
+			})
+			if err == nil {
+				t.Fatal("expected failure")
+			}
+			if got := runners[PhaseScout].(*fakeRunner).calls; got != tc.want {
+				t.Errorf("val=%s: calls=%d, want %d", tc.val, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPhaseMaxAttempts_NonTransient_NoExtraAttempt(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(2), failUntil: 99}
+	o := NewOrchestrator(st, led, runners)
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+		Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": "5"},
+	})
+	if err == nil {
+		t.Fatal("expected failure")
+	}
+	if got := runners[PhaseScout].(*fakeRunner).calls; got != 1 {
+		t.Errorf("calls=%d, want 1", got)
+	}
+}
