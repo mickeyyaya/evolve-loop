@@ -422,9 +422,16 @@ func porcelainPath(line string) string {
 //     the relocated paths (and ONLY those) are then `git add --`'d in the worktree
 //     so the auditor's `git diff HEAD` sees them without sweeping in unrelated
 //     worktree content (same visibility reason as normalizeWorktreeToBase).
-//   - modified/staged/deleted ('M'/'A'/'D') tracked → git checkout HEAD -- p
-//     (discards staged AND unstaged; e.g. a rebuilt go/evolve the cycle shouldn't
-//     carry — plain `git checkout -- p` would no-op a staged-only change).
+//   - rebuilt release binary (buildArtifacts: go/evolve, go/bin/evolve) → always
+//     discard (git checkout HEAD -- p); never relocate, or the cycle would commit
+//     binary drift (cycle-153). go/evolve is re-committed only by the release pipeline.
+//   - modified tracked ('M') → real builder work edited in the MAIN tree (cycle-162:
+//     orchestrator.go). If the worktree has NOT independently touched p (its copy is
+//     at HEAD) → relocate the leaked content into the worktree (preserve the work) +
+//     stage it. If the worktree diverged for p → discard the main leak (worktree is
+//     authoritative).
+//   - added/deleted tracked ('A'/'D') → git checkout HEAD -- p (discards staged AND
+//     unstaged; plain `git checkout -- p` would no-op a staged-only change).
 //   - rename/copy/other → not safe to auto-recover → return false.
 //
 // Returns true iff every NEW leak was handled and the main tree is clean of them;
@@ -470,12 +477,41 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s into worktree\n", p)
 			relocated = append(relocated, p)
-		case strings.ContainsAny(xy, "MAD"): // modified/staged/deleted tracked → discard the leak
-			// `git checkout HEAD -- p` restores BOTH the index and working tree to
-			// HEAD, so it discards a staged-only ("M ") leak too (plain
-			// `git checkout -- p` is a no-op on staged changes).
-			if _, c, e := gitCapture(ctx, projectRoot, "checkout", "HEAD", "--", p); e != nil || c != 0 {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git checkout HEAD -- %s failed (rc=%d): %v\n", p, c, e)
+		case buildArtifacts[p]: // rebuilt release binary leaked → always discard
+			// go/evolve is the marketplace-tracked binary, re-committed ONLY by the
+			// release pipeline (releasepipeline.go) and reset to HEAD by the ship phase
+			// (ship/gitops.go). A mid-cycle rebuild leaked into the main tree must be
+			// discarded, never relocated into the worktree — relocating would commit
+			// binary drift (the cycle-153 hazard). Discard regardless of status code.
+			if err := discardMainLeak(ctx, projectRoot, p); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
+				return false
+			}
+			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked rebuilt artifact %s\n", p)
+		case strings.Contains(xy, "M"): // modified tracked file (exists at HEAD)
+			// A non-Claude builder may edit an EXISTING tracked source file in the
+			// MAIN tree instead of its worktree (cycle-162: orchestrator.go). That is
+			// real builder work — preserve it by relocating the leaked content into the
+			// worktree, but ONLY when the worktree has not independently modified the
+			// same file: a divergent worktree edit is authoritative, and overlaying
+			// would clobber it, so discard the main leak in that case.
+			if worktreeCleanForPath(ctx, worktree, p) {
+				if err := relocateTrackedEdit(ctx, projectRoot, worktree, p); err != nil {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate tracked edit %s: %v\n", p, err)
+					return false
+				}
+				fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked tracked edit %s into worktree\n", p)
+				relocated = append(relocated, p)
+			} else {
+				if err := discardMainLeak(ctx, projectRoot, p); err != nil {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
+					return false
+				}
+				fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s (worktree diverged)\n", p)
+			}
+		case strings.ContainsAny(xy, "AD"): // added-not-at-HEAD / deleted tracked → discard (rare; conservative)
+			if err := discardMainLeak(ctx, projectRoot, p); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
 				return false
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s\n", p)
@@ -506,12 +542,21 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 // moveFile relocates src→dst, falling back to copy+remove when os.Rename fails.
 // os.Rename returns EXDEV when src and dst are on different filesystems — which
 // happens when the worktree base resolves to a different volume than projectRoot
-// (EVOLVE_WORKTREE_BASE / TMPDIR on another mount). The copy preserves the source
-// file mode. Used by recoverBuildLeak, which operates at file granularity (-uall).
+// (EVOLVE_WORKTREE_BASE / TMPDIR on another mount). Used by recoverBuildLeak, which
+// operates at file granularity (-uall).
 func moveFile(src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
 		return nil
 	}
+	if err := copyFile(src, dst); err != nil {
+		return err
+	}
+	return os.Remove(src)
+}
+
+// copyFile writes src's contents to dst (creating dst's parent dir), preserving src's
+// file mode. Shared by moveFile's cross-filesystem fallback and relocateTrackedEdit.
+func copyFile(src, dst string) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -520,10 +565,60 @@ func moveFile(src, dst string) error {
 	if fi, serr := os.Stat(src); serr == nil {
 		mode = fi.Mode()
 	}
-	if err := os.WriteFile(dst, data, mode); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	return os.Remove(src)
+	return os.WriteFile(dst, data, mode)
+}
+
+// relocateTrackedEdit moves a tracked-file edit that leaked into projectRoot back into
+// the worktree: it copies the leaked content over the worktree's copy of p, then
+// restores p in the main tree to HEAD (discarding the leak). The caller stages p in the
+// worktree afterward (batched with the other relocated paths) so the auditor's
+// `git diff HEAD` sees it. Only called when the worktree's copy of p is at HEAD, so the
+// overlay never clobbers independent in-worktree work.
+func relocateTrackedEdit(ctx context.Context, projectRoot, worktree, p string) error {
+	if err := copyFile(filepath.Join(projectRoot, p), filepath.Join(worktree, p)); err != nil {
+		return fmt.Errorf("relocate content of %s: %w", p, err)
+	}
+	return discardMainLeak(ctx, projectRoot, p) // restore main to HEAD; the worktree now holds the edit
+}
+
+// discardMainLeak restores p in projectRoot to HEAD, dropping a leaked change. `git
+// checkout HEAD -- p` resets BOTH index and working tree, so it discards a staged-only
+// ("M "/"A "/"D ") leak too (plain `git checkout -- p` no-ops a staged-only change).
+func discardMainLeak(ctx context.Context, projectRoot, p string) error {
+	// gitCapture returns a non-zero exit as (c != 0, e == nil); e is non-nil only on a
+	// launch failure. Branch so we never wrap a nil error with %w (which would render
+	// "<nil>" and break errors.Is/As on the result).
+	_, c, e := gitCapture(ctx, projectRoot, "checkout", "HEAD", "--", p)
+	if e != nil {
+		return fmt.Errorf("git checkout HEAD -- %s: %w", p, e)
+	}
+	if c != 0 {
+		return fmt.Errorf("git checkout HEAD -- %s: exit %d", p, c)
+	}
+	return nil
+}
+
+// worktreeCleanForPath reports whether the worktree's copy of p is unmodified from HEAD,
+// so overlaying a relocated edit won't clobber independent in-worktree work. `git diff
+// --quiet HEAD -- p` exits 0 (clean) / 1 (differs); any launch error is treated as
+// "not clean" so the caller falls back to the conservative discard path.
+func worktreeCleanForPath(ctx context.Context, worktree, p string) bool {
+	_, c, e := gitCapture(ctx, worktree, "diff", "--quiet", "HEAD", "--", p)
+	return e == nil && c == 0
+}
+
+// buildArtifacts are tracked build outputs a builder may rebuild into the main tree.
+// go/evolve is the marketplace-tracked binary, re-committed ONLY by the release pipeline
+// (releasepipeline.go) and reset to HEAD by the ship phase (ship/gitops.go); a mid-cycle
+// rebuild leaked here must be DISCARDED, never relocated into the worktree (relocating
+// would commit binary drift — cycle-153). go/bin/evolve is gitignored and normally never
+// appears in `git status`, but is listed defensively.
+var buildArtifacts = map[string]bool{
+	"go/evolve":     true,
+	"go/bin/evolve": true,
 }
 
 // gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).

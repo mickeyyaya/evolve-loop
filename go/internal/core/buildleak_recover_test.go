@@ -93,9 +93,14 @@ func TestRecoverBuildLeak_StagesOnlyRelocatedPaths(t *testing.T) {
 	}
 }
 
-// A modified TRACKED file leaked into main (e.g. a rebuilt go/evolve) is discarded,
-// including the staged-only ("M ") case that `git checkout -- p` would no-op.
-func TestRecoverBuildLeak_DiscardsModifiedTracked(t *testing.T) {
+// A modified TRACKED file leaked into main, where the worktree has NOT independently
+// touched that file (its copy is still at HEAD), is the real cycle-162 shape: a
+// non-Claude builder edited an existing tracked source file (orchestrator.go) in the
+// MAIN tree instead of the worktree. The builder's real work must be PRESERVED — the
+// leaked content is relocated into the worktree (overwriting its HEAD copy) and the
+// main tree restored. Covers the staged-only ("M ") case that `git checkout -- p`
+// would no-op.
+func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
 	repo, wt := realWorktree(t)
 	baseline := porcelainDirtySet(context.Background(), repo)
 
@@ -108,10 +113,102 @@ func TestRecoverBuildLeak_DiscardsModifiedTracked(t *testing.T) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	if st := gitInRepo(t, repo, "status", "--porcelain", "-uall"); st != "" {
-		t.Fatalf("main tree should be clean after discard; got %q", st)
+		t.Fatalf("main tree should be clean after recovery; got %q", st)
 	}
 	if got, _ := os.ReadFile(filepath.Join(repo, "base.txt")); string(got) != "base\n" {
-		t.Fatalf("base.txt should be restored to committed content; got %q", got)
+		t.Fatalf("main base.txt should be restored to committed content; got %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(wt, "base.txt")); string(got) != "LEAKED\n" {
+		t.Fatalf("builder's edit must be relocated into the worktree; got %q", got)
+	}
+	if diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only"); !strings.Contains(diff, "base.txt") {
+		t.Fatalf("relocated tracked edit must be staged/visible to git diff HEAD; got %q", diff)
+	}
+}
+
+// When the worktree ALSO modified the same tracked file (it diverged from HEAD), the
+// main-tree leak is DISCARDED and the worktree's own version is left untouched —
+// relocating would clobber legitimate in-worktree work. The worktree is authoritative.
+func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) {
+	repo, wt := realWorktree(t)
+	// The worktree independently edits base.txt (legitimate in-worktree builder work).
+	if err := os.WriteFile(filepath.Join(wt, "base.txt"), []byte("WORKTREE-EDIT\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	baseline := porcelainDirtySet(context.Background(), repo) // main still clean here
+
+	// A conflicting leak of the same file lands in the main tree.
+	if err := os.WriteFile(filepath.Join(repo, "base.txt"), []byte("MAIN-LEAK\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !recoverBuildLeak(context.Background(), repo, wt, baseline) {
+		t.Fatal("recoverBuildLeak should return true")
+	}
+	if got, _ := os.ReadFile(filepath.Join(repo, "base.txt")); string(got) != "base\n" {
+		t.Fatalf("main leak should be discarded (restored to HEAD); got %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(wt, "base.txt")); string(got) != "WORKTREE-EDIT\n" {
+		t.Fatalf("worktree's own edit must NOT be clobbered; got %q", got)
+	}
+}
+
+// A gitignored build artifact (e.g. go/evolve) rebuilt into the main tree must NOT be
+// treated as a leak: `git status --porcelain -uall` excludes ignored paths, so it never
+// reaches recoverBuildLeak's loop — the gitignore IS the build-artifact-discard
+// mechanism (no hardcoded path list). The artifact is left in place, untouched, and the
+// tracked-only tree-diff guard ignores it too.
+func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
+	repo, wt := realWorktree(t)
+	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("artifact.bin\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitInRepo(t, repo, "add", ".gitignore")
+	gitInRepo(t, repo, "commit", "-q", "-m", "ignore artifact")
+	gitInRepo(t, repo, "worktree", "prune") // keep wt valid after the new commit on main
+	baseline := porcelainDirtySet(context.Background(), repo)
+
+	if err := os.WriteFile(filepath.Join(repo, "artifact.bin"), []byte("rebuilt binary\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !recoverBuildLeak(context.Background(), repo, wt, baseline) {
+		t.Fatal("recoverBuildLeak should return true")
+	}
+	if _, err := os.Stat(filepath.Join(repo, "artifact.bin")); err != nil {
+		t.Fatalf("gitignored artifact must be left untouched in main: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wt, "artifact.bin")); !os.IsNotExist(err) {
+		t.Fatalf("gitignored artifact must NOT be relocated into the worktree; stat err=%v", err)
+	}
+}
+
+// A rebuilt tracked release binary (go/evolve) leaked into main must be DISCARDED even
+// when the worktree's copy is at HEAD — relocating it would commit binary drift
+// (cycle-153). go/evolve is re-committed only by the release pipeline, never a cycle.
+func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testing.T) {
+	repo, wt := realWorktree(t)
+	if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("OLD BINARY\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitInRepo(t, repo, "add", "go/evolve")
+	gitInRepo(t, repo, "commit", "-q", "-m", "track go/evolve")
+	gitInRepo(t, repo, "worktree", "prune")
+	baseline := porcelainDirtySet(context.Background(), repo)
+
+	// Builder rebuilds the binary into the main tree mid-cycle.
+	if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("REBUILT BINARY\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if !recoverBuildLeak(context.Background(), repo, wt, baseline) {
+		t.Fatal("recoverBuildLeak should return true")
+	}
+	if got, _ := os.ReadFile(filepath.Join(repo, "go/evolve")); string(got) != "OLD BINARY\n" {
+		t.Fatalf("rebuilt artifact must be discarded (restored to HEAD); got %q", got)
+	}
+	if diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only"); strings.Contains(diff, "go/evolve") {
+		t.Fatalf("artifact must NOT be relocated/staged into the worktree; git diff HEAD=%q", diff)
 	}
 }
 

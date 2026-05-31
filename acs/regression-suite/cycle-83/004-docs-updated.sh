@@ -9,11 +9,13 @@ grep -q '^## Auth modes' "$README" || { echo "RED AC4.1: README Auth modes headi
 for mode in CUSTOM_PROXY API_KEY SUBSCRIPTION_OAUTH MISCONFIGURED; do
     grep -q "\`$mode\`" "$README" || { echo "RED AC4.2: README missing mode $mode"; exit 1; }
 done
-grep -q 'doctor-subscription-auth.sh' "$README" || { echo "RED AC4.3: README missing doctor pointer"; exit 1; }
+# Doctor pointer: the `evolve doctor` command (the bash doctor-subscription-auth.sh was
+# removed in the Go-only consolidation; `evolve doctor` is its replacement — cycle-162).
+grep -q 'evolve doctor' "$README" || { echo "RED AC4.3: README missing doctor pointer"; exit 1; }
 
 # CLAUDE.md has doctor pointer on Subscription proxy row
 CLM="$ROOT/CLAUDE.md"
-grep -q 'doctor-subscription-auth.sh' "$CLM" || { echo "RED AC4.4: CLAUDE.md missing doctor pointer"; exit 1; }
+grep -q 'evolve doctor' "$CLM" || { echo "RED AC4.4: CLAUDE.md missing doctor pointer"; exit 1; }
 
 echo "GREEN AC4: README Auth modes section + CLAUDE.md doctor pointer present"
 exit 0

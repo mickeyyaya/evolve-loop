@@ -85,7 +85,18 @@ if [ -n "$LEDGER" ]; then
     fail_log="$fail_log  - cycle-$baseline_cycle (default-off baseline) has $baseline_skipped phase_skipped entries"$'\n'
   fi
 
-  if [ -z "${EVOLVE_PSMAS_SKIP:-}" ] || [ "${EVOLVE_PSMAS_SKIP:-0}" = "0" ]; then
+  # Cohort (b) enforces the PSMAS default-off guarantee, so it applies ONLY when no
+  # phase-skipping feature is active. EVOLVE_DYNAMIC_ROUTING=advisory|enforce is a
+  # SEPARATE feature whose advisor legitimately skips non-mandatory phases (emitting
+  # kind:phase_skipped by design) — those skips are not a PSMAS default-off violation.
+  # The predicate inherits the cycle's env, so gate on the routing flag the same way we
+  # gate on EVOLVE_PSMAS_SKIP. (cycle-162: an advisory-routing validation run tripped
+  # this false-positively.)
+  routing_drives=0
+  case "${EVOLVE_DYNAMIC_ROUTING:-}" in
+    advisory | enforce) routing_drives=1 ;;
+  esac
+  if { [ -z "${EVOLVE_PSMAS_SKIP:-}" ] || [ "${EVOLVE_PSMAS_SKIP:-0}" = "0" ]; } && [ "$routing_drives" -eq 0 ]; then
     current_cycle=""
     if [ -n "$STATE" ] && [ -f "$STATE" ]; then
       current_cycle="$(jq -r '.lastCycleNumber // empty' "$STATE" 2>/dev/null || true)"

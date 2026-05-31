@@ -473,7 +473,7 @@ Evolve-loop supports four authentication modes, detected in priority order:
 
 `EVOLVE_ANTHROPIC_BASE_URL` is proxy-agnostic — it works with LiteLLM, corporate gateways, or any endpoint that speaks the Anthropic Messages API. It is **not** required for subscription auth.
 
-To detect your active auth mode: `bash legacy/scripts/utility/doctor-subscription-auth.sh`
+To detect your active auth mode: `evolve doctor`
 
 ---
 
