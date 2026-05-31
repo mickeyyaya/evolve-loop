@@ -38,7 +38,6 @@
   "headless": {
     "entrypoint": "agy -p \"<prompt>\"",
     "available": [
-      "agy -m <model> (DOES take a --model flag, contra the legacy manifest)",
       "agy -c / --conversation <id> (resume)",
       "agy --add-dir <dir>, --dangerously-skip-permissions"
     ]

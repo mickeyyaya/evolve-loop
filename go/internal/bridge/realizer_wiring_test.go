@@ -89,8 +89,12 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "agy-tmux",
 			binary: "agy",
 			marker: "? for shortcuts",
-			want:   "agy -m gemini-3.5-flash --dangerously-skip-permissions",
-			absent: []string{"--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--model", "--no-session-persistence"},
+			// agy 1.0.3 has NO -m/--model flag (model_tier=noop). The realized
+			// launch cmd is just the binary + permission flag; -m is in `absent`
+			// to lock the regression out. See
+			// docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md.
+			want:   "agy --dangerously-skip-permissions",
+			absent: []string{"-m", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--model", "--no-session-persistence"},
 		},
 		{
 			cli:    "codex-tmux",

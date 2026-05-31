@@ -22,9 +22,7 @@
   "default_args": [],
   "params": {
     "model_tier": {
-      "channel": "flag",
-      "flag": "-m",
-      "from": "model_tier_map"
+      "channel": "noop"
     },
     "permission": {
       "channel": "flag",
@@ -82,5 +80,5 @@
     "balanced": "gemini-3.5-flash",
     "deep": "gemini-3.5-flash"
   },
-  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. agy DOES accept a -m/--model flag (corrected 2026-05; prior manifests wrongly set channel=noop). model_tier_map values pinned to the documented default gemini-3.5-flash pending live -m value validation; tier differentiation (deep -> gemini-3.1-pro) is a follow-up once the exact -m strings agy accepts are confirmed. See docs/architecture/cli-capability-matrix.md."
+  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. model_tier is channel=noop: agy 1.0.3 has NO -m/--model flag (verified live 2026-05-31: `agy -m X` -> 'flags provided but not defined: -m' + usage dump, REPL never boots -> exit=80). The 2026-05 'correction' to channel=flag was wrong and caused every agy-tmux launch to fail the 60s REPL boot wait; reverted to noop. model_tier_map retained as documentation of the implicit default (gemini-3.5-flash); agy selects its model server-side / via config, not a launch flag. See docs/architecture/cli-capability-matrix.md."
 }

@@ -12,9 +12,7 @@
   "default_args": [],
   "params": {
     "model_tier": {
-      "channel": "flag",
-      "flag": "-m",
-      "from": "model_tier_map"
+      "channel": "noop"
     }
   },
   "interactive_prompts": [
@@ -53,5 +51,5 @@
     "balanced": "gemini-3.5-flash",
     "deep": "gemini-3.5-flash"
   },
-  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy DOES accept a -m/--model flag (corrected 2026-05; the prior 'no model selection flag' claim was wrong — confirmed via `agy -m <model> -p`). model_tier_map values pinned to the documented default gemini-3.5-flash pending live -m value validation. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
+  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). model_tier is channel=noop: agy 1.0.3 has NO -m/--model flag in ANY mode (verified live 2026-05-31: `agy -m X --print` → 'flags provided but not defined: -m'). The 2026-05 'correction' to channel=flag was wrong (it claimed `agy -m <model> -p` worked; it does not) and is the same root cause as the agy-tmux exit=80 incident — see docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md. model_tier_map retained as documentation of the implicit default only. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
 }

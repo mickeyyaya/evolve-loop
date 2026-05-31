@@ -9,9 +9,9 @@ import (
 // manifests (not constructed fixtures). This is the contract the cycle-1 boot
 // failure violated: the SAME intent must realize to each CLI's own launch
 // flags and never leak one CLI's vocabulary into another. Flags-first: model
-// is a launch flag for claude (--model), codex (-m), and agy (-m — corrected
-// 2026-05; agy's model_tier was wrongly channel=noop). agy's model_tier_map
-// pins every tier to the documented default gemini-3.5-flash for now.
+// is a launch flag for claude (--model) and codex (-m) ONLY. agy 1.0.3 has NO
+// -m/--model flag (model_tier=noop) — verified live 2026-05-31; the 2026-05
+// channel=flag "correction" was wrong and caused exit=80 REPL-boot aborts.
 
 func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 	intent := LaunchIntent{ModelTier: "sonnet", Permission: "bypass", SettingsScope: "project", SessionMode: "ephemeral"}
@@ -33,11 +33,12 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 
 	t.Run("agy-tmux", func(t *testing.T) {
 		r := RealizeFor("agy-tmux", intent)
-		// agy now realizes -m (corrected); the sonnet tier maps via the legacy
-		// fallback to balanced → gemini-3.5-flash. Model flag first, then
-		// permission; settings_scope stays a no-op for agy.
-		if !reflect.DeepEqual(r.LaunchFlags, []string{"-m", "gemini-3.5-flash", "--dangerously-skip-permissions"}) {
-			t.Fatalf("agy-tmux = %v, want [-m gemini-3.5-flash --dangerously-skip-permissions]", r.LaunchFlags)
+		// agy 1.0.3 has NO -m/--model flag (verified live: `agy -m X` fails with
+		// "flags provided but not defined: -m" and dumps usage, so the REPL never
+		// boots → exit=80). model_tier is channel=noop; agy realizes ONLY its
+		// permission flag. settings_scope is also a no-op for agy.
+		if !reflect.DeepEqual(r.LaunchFlags, []string{"--dangerously-skip-permissions"}) {
+			t.Fatalf("agy-tmux = %v, want [--dangerously-skip-permissions]", r.LaunchFlags)
 		}
 	})
 
