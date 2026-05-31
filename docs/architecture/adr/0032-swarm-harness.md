@@ -57,7 +57,11 @@ section is the merge — exactly where the single-writer rule already applies.
 
 1. **Live, structured concurrency:** a `SessionRegistry` tracks every dispatched session; the dispatch
    scope blocks until all workers are reaped (process-group kill via `Setpgid`+`kill(-pgid)` → tmux
-   `kill-session` → `#{pane_dead}` confirm).
+   `kill-session` → `#{pane_dead}` confirm). **Orphan-on-cancel hardened:** the dispatcher pins a
+   deterministic tmux session name (`swarm-c<cycle>-<workerID>` via the shared `bridge.NamedSessionName`
+   formula) and REGISTERS it *before* `Launch`, so a worker cancelled mid-spawn is still reaped by name
+   (no reliance on the launch returning a session identity). Headless workers create no session and die
+   by ctx-cancel.
 2. **Crash-safe:** a persistent on-disk manifest + an `evolve swarm reap` sweep kills orphans even
    after a hard SIGKILL of the parent (the one case in-process defer cannot cover).
 

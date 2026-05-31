@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // fakeLauncher records launches, tracks max in-flight (for the cap test), and
@@ -61,6 +63,63 @@ func twoWriterPlan() SwarmPlan {
 type noopKiller struct{}
 
 func (noopKiller) Kill(context.Context, SessionHandle) error { return nil }
+
+// recordingKiller captures the SessionHandles it was asked to reap.
+type recordingKiller struct {
+	mu     sync.Mutex
+	killed []SessionHandle
+}
+
+func (k *recordingKiller) Kill(_ context.Context, h SessionHandle) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.killed = append(k.killed, h)
+	return nil
+}
+
+// Orphan-on-cancel hardening: a tmux worker whose LAUNCH FAILS must STILL be
+// reapable — the dispatcher pre-registers a deterministic named session BEFORE
+// the launch, so the post-wg Reap kills it by name even though Launch never
+// returned a session identity.
+func TestDispatch_TmuxWorker_PreRegisteredAndReapedOnLaunchFailure(t *testing.T) {
+	reg := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "scout", 1)
+	fk := &fakeLauncher{failAgent: map[string]bool{"r-w0": true}}
+	rk := &recordingKiller{}
+	plan := SwarmPlan{Mode: ModeReader, Partitionable: true, TaskID: "r", Workers: []WorkerSpec{
+		{WorkerID: "w0", CLI: "claude-tmux"},
+	}}
+	_, err := Dispatch(context.Background(), plan, DispatchRequest{Workspace: t.TempDir()},
+		Deps{Launcher: fk, Registry: reg, Killer: rk, Concurrency: 1})
+	if err == nil {
+		t.Fatal("expected launch failure to propagate")
+	}
+	if len(rk.killed) != 1 {
+		t.Fatalf("the pre-registered session must be reaped despite launch failure, got %d kills", len(rk.killed))
+	}
+	want := bridge.NamedSessionName("swarm-c0-w0") // sessionName = swarm-c<cycle>-<workerID>
+	if rk.killed[0].TmuxSession != want {
+		t.Errorf("reaped session name = %q, want the pre-pinned %q", rk.killed[0].TmuxSession, want)
+	}
+}
+
+// Headless workers create no tmux session: they register with an empty session
+// name (the killer is a benign no-op; ctx-cancel kills the subprocess).
+func TestDispatch_HeadlessWorker_NoTmuxSession(t *testing.T) {
+	reg := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "scout", 1)
+	fk := &fakeLauncher{}
+	plan := SwarmPlan{Mode: ModeReader, Partitionable: true, TaskID: "r", Workers: []WorkerSpec{
+		{WorkerID: "w0", CLI: "claude-p"},
+	}}
+	if _, err := Dispatch(context.Background(), plan, DispatchRequest{Workspace: t.TempDir()},
+		Deps{Launcher: fk, Registry: reg, Killer: noopKiller{}, Concurrency: 1}); err != nil {
+		t.Fatal(err)
+	}
+	// The session was recorded (manifest completeness) but with no tmux name.
+	snap := reg.Snapshot()
+	if len(snap) != 1 || snap[0].TmuxSession != "" {
+		t.Errorf("headless worker must register with empty tmux session, got %+v", snap)
+	}
+}
 
 func TestDispatch_LaunchesAllWorkersAndReaps(t *testing.T) {
 	reg := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "build", 1)

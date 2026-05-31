@@ -18,6 +18,7 @@ type LaunchRequest struct {
 	Model        string
 	Profile      string
 	Agent        string // "<task-or-mode>-w<i>" — collision-safe tmux/inbox key
+	SessionName  string // deterministic tmux session name (orphan-on-cancel hardening); empty for headless
 	Prompt       string
 	Workspace    string
 	Worktree     string

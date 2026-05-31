@@ -8,9 +8,30 @@
 > synthesis (reader) fan-in, and the `swarmRunner` Decorator wired into the orchestrator runners map
 > (`cmd_cycle.go`: build=writer, scout=reader). Gated by `EVOLVE_SWARM_STAGE`: unset/`shadow` =
 > byte-identical N=1 delegate; `advisory` = live dispatch, inner runner authoritative; `enforce` =
-> swarm result is the phase output. Documented follow-ups (non-blocking): orphan-on-cancel (real
-> Launcher must register-on-spawn), reader-enforce synthesis-to-one-artifact, per-worker port
-> isolation for server-running writers.
+> swarm result is the phase output. **Orphan-on-cancel is now HARDENED:** the dispatcher pins a
+> deterministic tmux session name (`swarm-c<cycle>-<workerID>` → `bridge.NamedSessionName`) and
+> REGISTERS it BEFORE launch, so a worker cancelled mid-spawn is still reaped by name; headless
+> workers create no session and are killed by ctx-cancel. Documented follow-ups (non-blocking):
+> reader-enforce synthesis-to-one-artifact, per-worker port isolation for server-running writers.
+
+## Session naming & teardown (orphan-on-cancel)
+
+A tmux worker's session name is **pinned and pre-registered**, not discovered after the fact:
+
+1. The dispatcher computes `sessionName = swarm-c<cycle>-<workerID>` — short (no validation
+   overflow), and collision-free (worker IDs are validated unique within a plan), built from
+   cycle+worker-id, NOT the task slug.
+2. It registers a `SessionHandle{TmuxSession: bridge.NamedSessionName(sessionName), ...}` in the
+   `SessionRegistry` (+ crash-safe manifest) **before** calling `Launch`.
+3. `Launch` forwards `SessionName` via `core.BridgeRequest` → `--session-name` → the driver's
+   `resolveSession` named-session path (a named session is *preserved* by the driver's own cleanup —
+   the swarm owns teardown).
+4. On dispatch scope exit (success, cancel, or fatal), `Reap` kills every registered session by its
+   exact pinned name. A worker spawned-then-cancelled is therefore never an orphan.
+
+`bridge.NamedSessionName(name)` (`"evolve-bridge-named-"+name`, truncated to 64) is the **single
+source of truth** shared by `resolveSession` (creates the session) and the swarm reaper (kills it) —
+they cannot drift. The crash-safe `evolve swarm reap` remains the backstop for a hard parent SIGKILL.
 
 ## What it is
 

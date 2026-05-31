@@ -286,6 +286,13 @@ type BridgeRequest struct {
 	// SystemPrompt is the per-agent launch-time rules block prepended to the
 	// prompt body (facet B). Resolved by the runner via systemprompt.Resolve.
 	SystemPrompt string `json:"system_prompt,omitempty"`
+	// SessionName, when non-empty, pins the tmux session to a deterministic,
+	// caller-controlled name (claude-tmux/*-tmux only; headless drivers ignore
+	// it). The swarm harness (ADR-0032) sets this and REGISTERS the name before
+	// calling Launch, so a worker cancelled mid-spawn can still be reaped by name
+	// (closing the orphan-on-cancel gap). A named session is preserved by the
+	// driver's own cleanup — the caller owns teardown.
+	SessionName string `json:"session_name,omitempty"`
 }
 
 // BridgeResponse is the bridge's JSON-parsed reply.

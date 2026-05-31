@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // DispatchRequest carries the cycle-scoped context the dispatcher needs that is
@@ -119,11 +121,38 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 	return res, fatalErr
 }
 
-// launchWorker realizes one WorkerSpec → LaunchRequest, launches, and registers
-// the session.
+// launchWorker realizes one WorkerSpec → LaunchRequest and launches it.
+//
+// ORPHAN-ON-CANCEL HARDENING: for a tmux worker we pin a deterministic,
+// swarm-controlled session name and REGISTER it BEFORE calling Launch. So even
+// if the launch spawns the tmux session and is then cancelled (cancel-on-fatal)
+// — never returning the session identity — the post-wg Reap still finds and
+// kills it by name. (Headless workers create no tmux session; their subprocess
+// is killed by ctx cancellation via exec.CommandContext, so they register with
+// an empty session, making the killer a benign no-op.)
 func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w WorkerSpec, worktree string, deps Deps) WorkerResult {
 	agent := w.agentName(plan)
 	wr := WorkerResult{WorkerID: w.WorkerID, Agent: agent, Branch: w.Branch, Worktree: worktree}
+
+	// A swarm-controlled session name (tmux drivers only). Empty for headless.
+	// Built from cycle + worker_id (validated-unique within a plan) — NOT the
+	// agent/task slug — so it stays short (no validation overflow) and
+	// collision-free (no two workers truncate to the same name). go-reviewer
+	// HIGH: a task-slug-based name could exceed limits / truncate-collide.
+	var sessionName, tmuxSession string
+	if strings.HasSuffix(w.CLI, "-tmux") {
+		sessionName = fmt.Sprintf("swarm-c%d-%s", req.Cycle, w.WorkerID)
+		tmuxSession = bridge.NamedSessionName(sessionName)
+	}
+
+	// Pre-register: the session is reapable by name from this point on, before
+	// any spawn can be cancelled mid-flight.
+	if deps.Registry != nil {
+		_ = deps.Registry.Register(SessionHandle{
+			WorkerID: w.WorkerID, Agent: agent, TmuxSession: tmuxSession,
+			Worktree: worktree, Branch: w.Branch,
+		})
+	}
 
 	workspace := filepath.Join(req.Workspace, agent)
 	lr, err := deps.Launcher.Launch(ctx, LaunchRequest{
@@ -131,6 +160,7 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 		Model:        w.Model,
 		Profile:      w.Profile,
 		Agent:        agent,
+		SessionName:  sessionName,
 		Prompt:       workerPrompt(w),
 		Workspace:    workspace,
 		Worktree:     worktree,
@@ -140,17 +170,10 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	})
 	if err != nil {
 		wr.Err = err
-		return wr
+		return wr // already registered → the post-wg Reap tears it down
 	}
 	wr.ExitCode = lr.ExitCode
 	wr.CostUSD = lr.CostUSD
-
-	if deps.Registry != nil {
-		_ = deps.Registry.Register(SessionHandle{
-			WorkerID: w.WorkerID, Agent: agent, TmuxSession: lr.TmuxSession,
-			PGID: lr.PGID, Worktree: worktree, Branch: w.Branch,
-		})
-	}
 	return wr
 }
 

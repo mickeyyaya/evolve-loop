@@ -200,9 +200,11 @@ func loadPlan(workspace string) (swarm.SwarmPlan, bool) {
 }
 
 // bridgeLauncher adapts core.Bridge to swarm.Launcher (accept-interface-where-
-// used). core.BridgeResponse carries no pgid/tmux-session, so those default to
-// 0/"" — the reaper's crash-safe manifest sweep is the backstop for sessions the
-// in-process registry can't track (documented orphan-on-cancel limitation).
+// used). It forwards the swarm-controlled SessionName so the dispatcher can
+// PRE-REGISTER a deterministic tmux session before launch (orphan-on-cancel
+// hardening) — core.BridgeResponse returns no session identity, but it no longer
+// needs to: the dispatcher already knows the name it pinned. The crash-safe
+// manifest sweep (`evolve swarm reap`) remains the backstop for a hard parent kill.
 type bridgeLauncher struct {
 	bridge core.Bridge
 	env    map[string]string
@@ -210,7 +212,8 @@ type bridgeLauncher struct {
 
 func (l bridgeLauncher) Launch(ctx context.Context, r swarm.LaunchRequest) (swarm.LaunchResult, error) {
 	resp, err := l.bridge.Launch(ctx, core.BridgeRequest{
-		CLI: r.CLI, Model: r.Model, Profile: r.Profile, Agent: r.Agent, Prompt: r.Prompt,
+		CLI: r.CLI, Model: r.Model, Profile: r.Profile, Agent: r.Agent,
+		SessionName: r.SessionName, Prompt: r.Prompt,
 		Workspace: r.Workspace, Worktree: r.Worktree, ProjectRoot: r.ProjectRoot,
 		ArtifactPath: r.ArtifactPath, Cycle: r.Cycle, Env: l.env,
 	})
