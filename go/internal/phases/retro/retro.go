@@ -110,15 +110,25 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 
 	if bridgeErr != nil {
+		// GAP 9 (self-healing): retro is the failure-analysis phase on the
+		// audit-FAIL path. A non-nil error from Run propagates to RunCycle as a
+		// hard abort that stops the WHOLE batch (the runs 154-162 abort mode) — a
+		// failure in the failure-handler must never be fatal. Return a FAIL verdict
+		// with NIL error so the orchestrator routes through decideAfterRetro
+		// (failure-adapter: retry/block/proceed) instead of aborting. The bridge
+		// error is preserved as a diagnostic for forensics; NextPhase is advisory
+		// (decideAfterRetro picks the real successor from the verdict + history).
+		fmt.Fprintf(os.Stderr, "[retro] WARN bridge failed (%v) — emitting FAIL verdict; orchestrator routes via failure-adapter (non-fatal)\n", bridgeErr)
 		return core.PhaseResponse{
 			Phase:        phaseName,
 			Verdict:      core.VerdictFAIL,
 			ArtifactsDir: req.Workspace,
+			NextPhase:    string(core.PhaseEnd),
 			CostUSD:      bres.CostUSD,
 			Tokens:       bres.Tokens,
 			DurationMS:   durationMS,
 			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
-		}, fmt.Errorf("retro: bridge: %w", bridgeErr)
+		}, nil
 	}
 
 	content := bres.Stdout

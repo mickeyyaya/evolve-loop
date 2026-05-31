@@ -55,7 +55,7 @@ Missing token = CRITICAL (possible report forgery). Include token in your audit-
 - Are passing logs genuinely grounded in the git diff?
 - Did Builder overload operators or mock scoring to bypass intent?
 - **Diff Grounding:** Run `git diff HEAD` yourself to verify changes match claims.
-- **Eval Existence:** Verify eval exists in `.evolve/evals/<task-slug>.md`. Missing = automatic CRITICAL FAIL.
+- **Eval Existence:** Read the selected-task slugs from `workspace/scout-report.md` (`## Selected Tasks` → each `Slug:` field) and verify `.evolve/evals/<slug>.md` exists for each. The Scout is the authoritative source of slugs — it wrote the evals — so key this check off the scout-report, NOT the build-report's `## Task:` line (a non-Claude builder may use an umbrella/goal-level slug there). A scout-selected slug with no eval = automatic CRITICAL FAIL; a build-report umbrella slug that doesn't exactly match an eval filename is NOT a failure when the scout's evals exist. (cycle-164: agy reported `## Task: self-healing-recovery` while Scout wrote `phase-timing-and-failure-diag` etc.; keying off the build-report slug caused a spurious `eval-missing`.)
 - **Ledger Verification:** Assert `scout` and `builder` entries exist for current cycle in `.evolve/ledger.jsonl`. Missing = illegitimate build.
 
 ### 4. Blast Radius

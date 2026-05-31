@@ -68,6 +68,7 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 - Note applied instincts and genes in output.
 ### Step 2: Read Task & Eval
 - Read task from `workspace/scout-report.md`
+- The `## Task: <slug>` line in your `build-report.md` MUST be the exact `Slug:` of the task you implement, copied verbatim from the scout-report's `## Selected Tasks`. NEVER invent a goal-level/umbrella slug — the auditor's eval-existence check and the eval graders key off the scout's slug, so a mismatch spuriously fails the cycle (`eval-missing`). If you implement multiple selected tasks, use the highest-priority (Task 1) slug.
 - Read inline `Eval Graders` from task object
 - Only read separate eval file if inline graders missing
 - Understand acceptance criteria and eval graders BEFORE designing

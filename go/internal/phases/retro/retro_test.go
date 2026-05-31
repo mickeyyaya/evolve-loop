@@ -161,19 +161,29 @@ func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 	}
 }
 
+// GAP 9 (self-healing): a retro BRIDGE failure must NOT propagate a fatal error.
+// Retro is the failure-analysis phase on the audit-FAIL path; a RunCycle error
+// stops the whole batch (the cause of the runs 154-162 aborts). If retro's own
+// bridge dies, it returns a FAIL verdict with NIL error so the orchestrator routes
+// through decideAfterRetro (failure-adapter: retry/block/proceed) instead of
+// hard-aborting the cycle AND the batch. The bridge error is preserved as an error
+// diagnostic for forensics. (A failure in the failure-handler must never be fatal.)
 func TestRun_BridgeError_FAIL(t *testing.T) {
-	bridgeErr := errors.New("bridge fail")
+	bridgeErr := errors.New("bridge boot timeout")
 	fb := &fakeBridge{err: bridgeErr}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
-	if !errors.Is(err, bridgeErr) {
-		t.Errorf("err=%v", err)
+	if err != nil {
+		t.Fatalf("retro bridge failure must NOT return a fatal error (it would abort the whole batch); got %v", err)
 	}
 	if resp.Verdict != core.VerdictFAIL {
-		t.Errorf("Verdict=%q, want FAIL", resp.Verdict)
+		t.Fatalf("Verdict=%q, want FAIL so the orchestrator routes via decideAfterRetro", resp.Verdict)
+	}
+	if len(resp.Diagnostics) == 0 || resp.Diagnostics[0].Severity != "error" {
+		t.Fatalf("bridge error must be preserved as an error diagnostic for forensics; got %+v", resp.Diagnostics)
 	}
 }
 
