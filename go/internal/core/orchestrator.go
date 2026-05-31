@@ -334,6 +334,45 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	}
 }
 
+// normalizeWorktreeToBase soft-resets the worktree to baseSHA so any commits a
+// builder made during the build phase become PENDING changes again. The builder
+// is instructed to `git add -A && git commit -m "… [worktree-build]"`
+// (agents/evolve-builder.md:235) for crash-safety, but the auditor
+// (agents/evolve-auditor.md:57: "Run `git diff HEAD`") and the orchestrator's
+// audit-binding (recordAuditBinding: sha256(`git diff HEAD`)) both inspect the
+// PENDING diff — which is empty after a commit. agy/Gemini followed the commit
+// instruction literally and every cycle's work was discarded as "tree lacks the
+// files". Resetting --soft to the cycle base re-exposes the work to `git diff
+// HEAD` without changing the auditor prompt or the security binding. See
+// docs/incidents/cycle-156-builder-commit-vs-audit-pending-diff.md (Option C).
+//
+// Best-effort: any failure WARNs and leaves the worktree untouched (audit then
+// inspects whatever state exists); it NEVER aborts the cycle. No-op when HEAD is
+// already at baseSHA (the builder left changes uncommitted — the historical
+// Claude-builder path), so opting in is byte-identical for non-committing builders.
+func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
+	if worktree == "" || baseSHA == "" {
+		return
+	}
+	head, _, err := gitCapture(ctx, worktree, "rev-parse", "HEAD")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD failed: %v (audit inspects worktree as-is)\n", err)
+		return
+	}
+	if strings.TrimSpace(head) == baseSHA {
+		return // builder left changes uncommitted — nothing to normalize
+	}
+	if _, code, rerr := gitCapture(ctx, worktree, "reset", "--soft", baseSHA); rerr != nil || code != 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: git reset --soft %s failed (rc=%d): %v (audit inspects committed state as-is)\n", baseSHA, code, rerr)
+		return
+	}
+	short := baseSHA
+	if len(short) > 12 {
+		short = short[:12]
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] worktree-normalize: soft-reset builder commits to base %s — changes now pending for audit\n", short)
+}
+
 // gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).
 // A non-zero exit is returned as exitCode with nil err (the caller decides
 // whether it's fatal — e.g. `git diff HEAD` exit 1 means "differences", not a
@@ -458,10 +497,23 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// in the role-gate and drives worktree-aware ship. Best-effort — on failure
 	// the source phases are denied by the role-gate (loud, not silent). Cleaned
 	// up on cycle exit (after ship has merged the worktree→main).
+	// worktreeBaseSHA is the worktree HEAD at creation == the cycle base. After
+	// the build phase we soft-reset to it so a committing builder's work becomes
+	// pending again (see normalizeWorktreeToBase + the cycle-156 incident).
+	var worktreeBaseSHA string
 	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
 	} else {
 		cs.ActiveWorktree = wtPath
+		if base, _, berr := gitCapture(ctx, wtPath, "rev-parse", "HEAD"); berr == nil {
+			worktreeBaseSHA = strings.TrimSpace(base)
+		} else {
+			// Fail loudly: an empty base disables the cycle-156 normalize, so a
+			// committing builder's work would again be discarded by the audit —
+			// the exact symptom Option C fixes. WARN rather than abort (the
+			// source phases still run; normalize just degrades to a no-op).
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD at worktree creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
+		}
 		defer func() { _ = o.worktree.Cleanup(req.ProjectRoot, wtPath) }()
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
@@ -825,6 +877,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// audit so ship binds to THIS cycle.
 		if next == PhaseAudit && (resp.Verdict == VerdictPASS || resp.Verdict == VerdictWARN) {
 			o.recordAuditBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath, cs.ActiveWorktree, resp.Verdict)
+		}
+
+		// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini
+		// following evolve-builder.md:235) leaves its work in a worktree
+		// commit, but audit + binding inspect `git diff HEAD` (empty after a
+		// commit). Soft-reset the build's commits to the cycle base so the
+		// work is pending again before audit runs (next iteration). No-op for
+		// non-committing builders. See the cycle-156 incident doc.
+		if next == PhaseBuild && cs.ActiveWorktree != "" {
+			normalizeWorktreeToBase(ctx, cs.ActiveWorktree, worktreeBaseSHA)
 		}
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
