@@ -6,10 +6,30 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 )
+
+// mainProjectRoot resolves the MAIN project root from dir, following a git worktree
+// back to its main checkout via --git-common-dir (whose parent is the main root).
+// Predicates read `.evolve/` runtime data from there, so the suite must point
+// EVOLVE_PROJECT_ROOT at it even when invoked from a worktree (issue #12). Falls
+// back to dir when git resolution is unavailable.
+func mainProjectRoot(dir string) string {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
+	if err != nil {
+		return dir
+	}
+	gitCommon := strings.TrimSpace(string(out))
+	if gitCommon == "" {
+		return dir
+	}
+	return filepath.Dir(gitCommon)
+}
 
 // runACS implements `evolve acs <subcommand>`. Subcommands:
 //
@@ -57,7 +77,7 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve acs suite: --cycle is required (must be >0)")
 		return 10
 	}
-	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: cycle})
+	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: mainProjectRoot(root), Cycle: cycle})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve acs suite: %v\n", err)
 		return 1

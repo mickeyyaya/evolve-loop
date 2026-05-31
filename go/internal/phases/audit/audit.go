@@ -226,7 +226,12 @@ func generateACSVerdict(req core.PhaseRequest) error {
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: req.Cycle})
+	// Discover predicate FILES from the worktree (Root), but resolve `.evolve/`
+	// runtime data (history, baselines, current build-report) to the MAIN project
+	// root via EVOLVE_PROJECT_ROOT — those live in main, not the worktree, so a
+	// suite run from the worktree (issue #9 audit-cwd=worktree) would else false-RED
+	// every regression predicate that reads .evolve/ (issue #12, cycle-177).
+	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: req.ProjectRoot, Cycle: req.Cycle})
 	if err != nil {
 		return fmt.Errorf("acssuite run: %w", err)
 	}

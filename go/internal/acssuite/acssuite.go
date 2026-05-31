@@ -86,9 +86,17 @@ type Verdict struct {
 
 // Options configures Run. Root and Cycle are required.
 type Options struct {
-	Root    string        // repo root containing acs/
-	Cycle   int           // current cycle number
-	Timeout time.Duration // per-predicate; 0 → DefaultTimeout
+	Root  string // repo root containing acs/ (where predicate FILES are discovered)
+	Cycle int    // current cycle number
+	// ProjectRoot is the MAIN project root whose `.evolve/` holds the runtime data
+	// (history under .evolve/runs/, baselines, the current build-report) that
+	// predicates read via ${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}. When set, it is
+	// exported as EVOLVE_PROJECT_ROOT to each predicate so a suite discovered from a
+	// worktree (Root=worktree, post issue-#9 audit-cwd=worktree) still resolves
+	// `.evolve/` to main rather than the worktree (where `.evolve/` is absent).
+	// Empty → predicates inherit the caller's env (legacy behavior). (issue #12)
+	ProjectRoot string
+	Timeout     time.Duration // per-predicate; 0 → DefaultTimeout
 	// Seams (default to production behavior when nil).
 	Now  func() time.Time
 	Exec func(ctx context.Context, path string) (exitCode int, output string)
@@ -118,8 +126,9 @@ func Run(opts Options) (Verdict, error) {
 	}
 	execFn := opts.Exec
 	if execFn == nil {
+		projectRoot := opts.ProjectRoot
 		execFn = func(ctx context.Context, path string) (int, string) {
-			return runBash(ctx, path)
+			return runBash(ctx, path, projectRoot)
 		}
 	}
 
@@ -232,8 +241,13 @@ func discover(root string, cycle int) ([]predFile, error) {
 // cmd.Process the signal is skipped, so WaitDelay is the guaranteed backstop —
 // it force-closes the pipes killGrace after cancellation, ensuring Run always
 // returns (a timed-out predicate counts RED) rather than blocking on a child.
-func runBash(ctx context.Context, path string) (int, string) {
+func runBash(ctx context.Context, path, projectRoot string) (int, string) {
 	cmd := exec.CommandContext(ctx, "bash", path)
+	if projectRoot != "" {
+		// Export EVOLVE_PROJECT_ROOT so predicates resolve `.evolve/` runtime data
+		// to the MAIN project root even when executed from a worktree (issue #12).
+		cmd.Env = append(os.Environ(), "EVOLVE_PROJECT_ROOT="+projectRoot)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process != nil {
@@ -298,7 +312,9 @@ func WriteVerdict(evolveDir string, v Verdict) (string, error) {
 		return "", fmt.Errorf("acssuite: create tmp: %w", err)
 	}
 	tmp := tmpf.Name()
-	tmpf.Close()
+	if cerr := tmpf.Close(); cerr != nil {
+		return "", fmt.Errorf("acssuite: close tmp: %w", cerr)
+	}
 	if err := os.WriteFile(tmp, buf, 0o644); err != nil {
 		return "", fmt.Errorf("acssuite: write %s: %w", tmp, err)
 	}

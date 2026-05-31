@@ -64,6 +64,28 @@ func TestRun_MixedSuite(t *testing.T) {
 	}
 }
 
+// Issue #12 (cycle-177): predicate FILES are discovered from the worktree (Root),
+// but predicates read `.evolve/` runtime data (history, baselines, current build-
+// report) which lives in MAIN. The suite must set EVOLVE_PROJECT_ROOT to the main
+// project root so a predicate run from a worktree (post issue-#9 audit-cwd=worktree)
+// still resolves `.evolve/` to main. Without it, regression predicates that read
+// `.evolve/runs/...`/baselines false-RED (builder saw green from main, auditor saw
+// red from worktree).
+func TestRun_SetsEvolveProjectRootForPredicates(t *testing.T) {
+	worktree := t.TempDir() // predicate files discovered here (Root)
+	mainRoot := t.TempDir() // .evolve/ data lives here (ProjectRoot)
+	writePred(t, worktree, "cycle-5", "001-projroot.sh",
+		`[ "$EVOLVE_PROJECT_ROOT" = "`+mainRoot+`" ] || { echo "got=[$EVOLVE_PROJECT_ROOT] want=[`+mainRoot+`]"; exit 1; }`)
+
+	v, err := Run(Options{Root: worktree, ProjectRoot: mainRoot, Cycle: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.RedCount != 0 || v.GreenCount != 1 {
+		t.Fatalf("red=%d green=%d, want 0/1 — predicate must see EVOLVE_PROJECT_ROOT=%s", v.RedCount, v.GreenCount, mainRoot)
+	}
+}
+
 // TestRun_SkipExit77_NeitherGreenNorRed — a predicate exiting 77 (TAP/automake
 // SKIP) is classified "skip": it increments neither GreenCount nor RedCount, so
 // a suite of only skips is still PASS + ship_eligible (the fresh-clone case).
