@@ -84,6 +84,52 @@ func (p SwarmPlan) IsFallback() bool {
 	return !p.Partitionable || len(p.Workers) < 2
 }
 
+// WorkerResult is the observable outcome of one dispatched worker.
+type WorkerResult struct {
+	WorkerID string
+	Agent    string
+	Branch   string // writers: the dev branch the worker committed to
+	Worktree string
+	ExitCode int
+	CostUSD  float64
+	Err      error // non-nil = launch/transport failure (vs a clean non-zero exit)
+}
+
+// OK reports a successful worker run (no transport error, zero exit code).
+func (r WorkerResult) OK() bool { return r.Err == nil && r.ExitCode == 0 }
+
+// SwarmResult is the reduced outcome of a whole swarm dispatch — the input to
+// the orchestrator's N→1 aggregation.
+type SwarmResult struct {
+	Mode              Mode
+	IntegrationBranch string
+	// IntegrationWorktree is the provisioned integration worktree path (writers);
+	// empty for readers. The merge-train runs `git merge` with -C this path.
+	IntegrationWorktree string
+	Workers             []WorkerResult
+	// MergeOrder is the validated serialized merge order (writers); nil for readers.
+	MergeOrder []string
+}
+
+// AllOK reports whether every worker succeeded (and there was at least one).
+func (s SwarmResult) AllOK() bool {
+	for _, w := range s.Workers {
+		if !w.OK() {
+			return false
+		}
+	}
+	return len(s.Workers) > 0
+}
+
+// TotalCostUSD sums per-worker cost for the single aggregated ledger entry.
+func (s SwarmResult) TotalCostUSD() float64 {
+	var sum float64
+	for _, w := range s.Workers {
+		sum += w.CostUSD
+	}
+	return sum
+}
+
 // Conflict records a file claimed by more than one worker (a writer-mode
 // disjointness violation).
 type Conflict struct {
