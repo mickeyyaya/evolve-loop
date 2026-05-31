@@ -764,10 +764,11 @@ const maxRecoveryDepth = 2
 
 // phaseTimingEntry records per-phase latency + outcome for phase-timing.json.
 type phaseTimingEntry struct {
-	Phase      string  `json:"phase"`
-	DurationMS int64   `json:"duration_ms"`
-	Verdict    string  `json:"verdict"`
-	CostUSD    float64 `json:"cost_usd"`
+	Phase        string  `json:"phase"`
+	DurationMS   int64   `json:"duration_ms"`
+	Verdict      string  `json:"verdict"`
+	CostUSD      float64 `json:"cost_usd"`
+	AttemptCount int     `json:"attempt_count"`
 }
 
 // phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
@@ -1184,7 +1185,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// the outer loop (skipping verdict/ledger handling for the failed ship).
 		shipRecovered := false
 		maxAttempts := resolvePhaseMaxAttempts(phaseReq.Env)
+		var attemptCount int
 		for attempt := 1; ; attempt++ {
+			attemptCount = attempt
 			obsCancel := o.observer.Start(ctx, string(next), phaseReq)
 			resp, err = runner.Run(ctx, phaseReq)
 			if obsCancel != nil {
@@ -1197,10 +1200,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 					// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 					// try to reconstruct the artifact from stdout.clean.txt before aborting.
-					// Enabled by EVOLVE_BACKFILL_ENABLED=1; off by default.
+					// Enabled by default (EVOLVE_BACKFILL_ENABLED != 0).
 					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) &&
-						(envSnap["EVOLVE_BACKFILL_ENABLED"] == "1" || os.Getenv("EVOLVE_BACKFILL_ENABLED") == "1") {
-						artifactPath := filepath.Join(cs.WorkspacePath, string(next)+"-report.md")
+						envSnap["EVOLVE_BACKFILL_ENABLED"] != "0" && os.Getenv("EVOLVE_BACKFILL_ENABLED") != "0" {
+						artifactPath := backfillArtifactPath(cs.WorkspacePath, string(next))
 						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
 							fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
 						} else if ok {
@@ -1368,10 +1371,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		result.PhasesRun = append(result.PhasesRun, next)
 		result.FinalVerdict = resp.Verdict
 		phaseTimings = append(phaseTimings, phaseTimingEntry{
-			Phase:      string(next),
-			DurationMS: resp.DurationMS,
-			Verdict:    resp.Verdict,
-			CostUSD:    resp.CostUSD,
+			Phase:        string(next),
+			DurationMS:   resp.DurationMS,
+			Verdict:      resp.Verdict,
+			CostUSD:      resp.CostUSD,
+			AttemptCount: attemptCount,
 		})
 		current = next
 		lastVerdict = resp.Verdict
@@ -1822,4 +1826,18 @@ func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
 		}
 	}
 	return out
+}
+
+// backfillArtifactPath returns the absolute path to the backfilled artifact file.
+func backfillArtifactPath(workspacePath, phase string) string {
+	var filename string
+	switch phase {
+	case "tdd":
+		filename = "test-report.md"
+	case "intent":
+		filename = "intent.md"
+	default:
+		filename = phase + "-report.md"
+	}
+	return filepath.Join(workspacePath, filename)
 }

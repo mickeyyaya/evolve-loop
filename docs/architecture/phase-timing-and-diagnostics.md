@@ -14,6 +14,7 @@ The JSON payload is an array of objects, where each object contains the followin
 - `duration_ms` (integer): The elapsed execution time of the phase in milliseconds.
 - `verdict` (string): The canonical verdict resolved for the phase (e.g. `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
 - `cost_usd` (number): The financial cost accrued by LLM calls during this phase.
+- `attempt_count` (integer): The number of attempts executed during this phase.
 
 ### Example Payload
 
@@ -23,13 +24,15 @@ The JSON payload is an array of objects, where each object contains the followin
     "phase": "scout",
     "duration_ms": 12450,
     "verdict": "PASS",
-    "cost_usd": 0.0452
+    "cost_usd": 0.0452,
+    "attempt_count": 1
   },
   {
     "phase": "build",
     "duration_ms": 48720,
     "verdict": "PASS",
-    "cost_usd": 0.3812
+    "cost_usd": 0.3812,
+    "attempt_count": 2
   }
 ]
 ```

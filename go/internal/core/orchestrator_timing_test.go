@@ -276,3 +276,92 @@ func TestOrchestrator_Backfill_NoLedgerEntryWhenDisabled(t *testing.T) {
 		}
 	}
 }
+
+type backfillRunnerGeneric struct {
+	phase   string
+	content string
+}
+
+func (b *backfillRunnerGeneric) Name() string { return b.phase }
+func (b *backfillRunnerGeneric) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	cleanFile := filepath.Join(req.Workspace, b.phase+"-stdout.clean.txt")
+	_ = os.MkdirAll(req.Workspace, 0o755)
+	_ = os.WriteFile(cleanFile, []byte(b.content), 0o644)
+	return PhaseResponse{}, wrapTimeout()
+}
+
+func TestOrchestrator_Backfill_TDDArtifactPath(t *testing.T) {
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[PhaseTDD] = &backfillRunnerGeneric{
+		phase:   "tdd",
+		content: "# TDD\n" + strings.Repeat("a", 250),
+	}
+	o := NewOrchestrator(st, led, runners)
+
+	req := CycleRequest{
+		ProjectRoot: root,
+		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "1"},
+	}
+	res, err := o.RunCycle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("RunCycle failed: %v", err)
+	}
+
+	workspace := cycleWorkspaceDir(root, res.Cycle)
+	// Must write to test-report.md, not tdd-report.md
+	testReportPath := filepath.Join(workspace, "test-report.md")
+	if _, err := os.Stat(testReportPath); err != nil {
+		t.Errorf("expected test-report.md to be written for tdd backfill: %v", err)
+	}
+	tddReportPath := filepath.Join(workspace, "tdd-report.md")
+	if _, err := os.Stat(tddReportPath); err == nil {
+		t.Errorf("unexpected tdd-report.md written for tdd backfill")
+	}
+}
+
+func TestPhaseTimingJSON_AttemptCount(t *testing.T) {
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	// Scout fails once then succeeds → exactly 2 attempts.
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 1}
+	// Build passes on first attempt → exactly 1 attempt.
+	runners[PhaseBuild] = &fakeRunner{name: "build"}
+	o := NewOrchestrator(st, led, runners)
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+
+	path := filepath.Join(cycleWorkspaceDir(root, res.Cycle), "phase-timing.json")
+	data, rerr := os.ReadFile(path)
+	if rerr != nil {
+		t.Fatalf("phase-timing.json must be written: %v", rerr)
+	}
+
+	var entries []map[string]any
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	seen := map[string]int{}
+	for _, e := range entries {
+		p, _ := e["phase"].(string)
+		if ac, ok := e["attempt_count"].(float64); ok {
+			seen[p] = int(ac)
+		}
+	}
+
+	if seen["scout"] != 2 {
+		t.Errorf("scout attempt_count=%d, want 2", seen["scout"])
+	}
+	if seen["build"] != 1 {
+		t.Errorf("build attempt_count=%d, want 1", seen["build"])
+	}
+}
+

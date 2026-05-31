@@ -1,6 +1,6 @@
 # Artifact Backfill
 
-**Status:** opt-in (gate: `EVOLVE_BACKFILL_ENABLED=1`, default `0`)  
+**Status:** default-on (gate: `EVOLVE_BACKFILL_ENABLED != 0`, default `1`)  
 **Implemented:** cycle-171  
 **Package:** `go/internal/backfill/`  
 **Orchestrator wiring:** `go/internal/core/orchestrator.go`
@@ -22,7 +22,7 @@ The work is lost, and the cycle dies, even though the output is recoverable.
 After `ErrArtifactTimeout` exhaustion (`phaseMaxAttempts` reached):
 
 1. The orchestrator checks `EVOLVE_BACKFILL_ENABLED`.
-2. If `"1"`, it calls `backfill.TryExtract(workspace, phase, artifactPath, 200)`.
+2. If not `"0"`, it calls `backfill.TryExtract(workspace, phase, artifactPath, 200)`.
 3. `TryExtract` reads `<workspace>/<phase>-stdout.clean.txt`, locates the **last
    occurrence** of the phase's canonical markdown header, extracts header-to-EOF
    (trimmed), and — when `len(content) >= minLen` (200 bytes default) — writes
@@ -42,8 +42,8 @@ After `ErrArtifactTimeout` exhaustion (`phaseMaxAttempts` reached):
 | scout   | `# Scout Report` | `scout-report.md` |
 | build   | `# Build Report` | `build-report.md` |
 | audit   | `# Audit Report` | `audit-report.md` |
-| tdd     | `# TDD`          | `tdd-report.md`   |
-| intent  | `# Intent`       | `intent-report.md`|
+| tdd     | `# TDD`          | `test-report.md`  |
+| intent  | `# Intent`       | `intent.md`       |
 | triage  | `# Triage`       | `triage-report.md`|
 
 Unknown phases return `(false, nil)` — no error, no write.
