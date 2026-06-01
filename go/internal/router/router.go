@@ -102,6 +102,23 @@ type PhasePlanEntry struct {
 	Phase         string `json:"phase"`
 	Run           bool   `json:"run"`
 	Justification string `json:"justification,omitempty"`
+	// Mint, when present, marks this entry as a NEW phase the advisor is
+	// proposing (absent from the catalog). The orchestrator registers it via
+	// the trust-kernel clamp and dispatches it by Phase name. Absent (the
+	// common case) ⇒ a plain run/skip decision for an existing phase.
+	Mint *MintSpec `json:"mint,omitempty"`
+}
+
+// MintSpec is the LLM-authorable subset of a minted phase: the persona + the
+// dispatch knobs an advisor can realistically emit. The advisor emits a TIER
+// (fast/balanced/deep), never a raw model. The full phaseconfig.PhaseConfig is
+// reconstructed from this + the entry's Phase name at parse time; gates/IO take
+// safe defaults (the registrar forces Optional + sandboxes source-writers).
+type MintSpec struct {
+	Prompt       string `json:"prompt"`
+	Tier         string `json:"tier,omitempty"`
+	CLI          string `json:"cli,omitempty"`
+	WritesSource bool   `json:"writes_source,omitempty"`
 }
 
 // PhasePlan is the advisor's whole-cycle plan. ADVISORY only: the kernel clamp
