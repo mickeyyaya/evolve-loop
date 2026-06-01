@@ -27,7 +27,7 @@ DIST_TARGETS := \
     $(DIST_DIR)/evolve-linux-amd64 \
     $(DIST_DIR)/evolve-linux-arm64
 
-.PHONY: build test cover lint tidy clean help dist dist-clean \
+.PHONY: build test cover lint tidy clean help dist dist-clean bench-latency \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64
 
 help:
@@ -66,6 +66,11 @@ cover: ## Per-package coverage report; fails if any package <85%
 	@$(GO) tool cover -func=coverage.txt | tee coverage.func.txt
 	@$(GO) tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage HTML: coverage.html"
+
+bench-latency: ## Regenerate test/latency-baseline.md from a -json test run
+	@$(GO) test -json -count=1 $$($(GO) list ./... | grep -v '/acs/') 2>/dev/null \
+	  | $(GO) run ./cmd/testlatency -title "Test latency baseline" > test/latency-baseline.md \
+	  && echo "Wrote test/latency-baseline.md"
 
 lint: ## go vet + format diff (read-only)
 	$(GO) vet $(PKG)
