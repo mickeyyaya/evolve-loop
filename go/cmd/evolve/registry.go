@@ -93,6 +93,7 @@ var commands = []subcommand{
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},
 	{Name: "compose", Summary: "Ad-hoc phase composition", Run: runCompose},
+	{Name: "models", Summary: "Live tier→model catalog: refresh | list", Run: runModels},
 }
 
 // lookupCommand returns the subcommand matching name or any of its
