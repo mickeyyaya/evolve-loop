@@ -118,8 +118,8 @@ func ValidatePin(phase string, pin Pin, prof *profiles.Profile) error {
 			phase, baseCLI(pin.CLI), prof.AllowedCLIs)
 	}
 	if pin.Model != "" && prof.ModelTierEnvelope != nil {
-		rank := tierRank(pin.Model)
-		minR, maxR := tierRank(prof.ModelTierEnvelope.Min), tierRank(prof.ModelTierEnvelope.Max)
+		rank := TierRank(pin.Model)
+		minR, maxR := TierRank(prof.ModelTierEnvelope.Min), TierRank(prof.ModelTierEnvelope.Max)
 		if rank > 0 && minR > 0 && maxR > 0 && (rank < minR || rank > maxR) {
 			return fmt.Errorf("policy: pin for phase %q: model %q (tier rank %d) outside envelope [%s..%s]",
 				phase, pin.Model, rank, prof.ModelTierEnvelope.Min, prof.ModelTierEnvelope.Max)
@@ -130,10 +130,12 @@ func ValidatePin(phase string, pin Pin, prof *profiles.Profile) error {
 
 // --- canonical tier/CLI vocabulary (mirror of setup.go; see package doc) ---
 
-// tierRank maps a canonical tier (fast/balanced/deep), a legacy alias
+// TierRank maps a canonical tier (fast/balanced/deep), a legacy alias
 // (haiku/sonnet/opus), or an exact model identifier to 1/2/3; 0 =
-// unclassifiable (the envelope check is skipped for rank 0).
-func tierRank(s string) int {
+// unclassifiable (the envelope check is skipped for rank 0). Exported so
+// callers that must REJECT (not exempt) an unclassifiable tier — e.g. the
+// phase registrar clamping a minted phase — can detect rank 0 themselves.
+func TierRank(s string) int {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "fast", "haiku":
 		return 1
