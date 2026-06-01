@@ -2,6 +2,7 @@ package subagent
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -234,6 +235,189 @@ func TestDispatchParallel_AntigravityRemappedForCapability(t *testing.T) {
 	}
 }
 
+// TestDispatchParallel_CachePrefixEnabledWritesPrefix covers
+// dispatchparallel.go:129-139 — the cache-prefix branch invokes the
+// WriteCache seam and passes the resulting path to fanout.
+func TestDispatchParallel_CachePrefixEnabledWritesPrefix(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	var cacheReq CachePrefixRequest
+	var cacheCalled bool
+	opts.WriteCache = func(req CachePrefixRequest, _ CachePrefixOptions) error {
+		cacheCalled = true
+		cacheReq = req
+		return os.WriteFile(req.OutPath, []byte("prefix\n"), 0o644)
+	}
+	var fanoutCacheFile string
+	innerFanout := opts.RunFanout
+	opts.RunFanout = func(cfg fanoutdispatch.Config, w io.Writer) int {
+		fanoutCacheFile = cfg.CachePrefixFile
+		return innerFanout(cfg, w)
+	}
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 4, WorkspacePath: ws, ProjectRoot: tmp,
+		CachePrefixEnabled: true,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !cacheCalled {
+		t.Fatalf("WriteCache seam not invoked")
+	}
+	wantPath := filepath.Join(ws, "workers", "cache-prefix.md")
+	if cacheReq.OutPath != wantPath {
+		t.Errorf("cache OutPath=%q, want %q", cacheReq.OutPath, wantPath)
+	}
+	if fanoutCacheFile != wantPath {
+		t.Errorf("fanout CachePrefixFile=%q, want %q", fanoutCacheFile, wantPath)
+	}
+}
+
+// TestDispatchParallel_CachePrefixErrorAborts covers dispatchparallel.go:138.
+func TestDispatchParallel_CachePrefixErrorAborts(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	opts.WriteCache = func(CachePrefixRequest, CachePrefixOptions) error {
+		return errors.New("cache write failed")
+	}
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: ws, ProjectRoot: tmp,
+		CachePrefixEnabled: true,
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "cache prefix") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestDispatchParallel_DefaultCLIAndAggPathWhenProfileSilent covers
+// dispatchparallel.go:109-111 (cli default "claude") and 147-149 (aggregate
+// path default to <workspace>/<agent>-report.md when output_artifact absent).
+func TestDispatchParallel_DefaultCLIAndAggPathWhenProfileSilent(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	// Profile omits "cli" and "output_artifact".
+	profile := `{"role":"scout","parallel_eligible":true,"parallel_subtasks":[{"name":"codebase","prompt_template":"scan {cycle}"}]}`
+	opts := dispatchHappyOpts(t, profile)
+	var inspectedCLI string
+	opts.InspectCap = func(_, cli string) (capability.Inspection, error) {
+		inspectedCLI = cli
+		return capability.Inspection{Manifest: capability.Manifest{BudgetNative: true, PermissionScoping: true}}, nil
+	}
+	res, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: ws, ProjectRoot: tmp,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if inspectedCLI != "claude" {
+		t.Errorf("cli default=%q, want claude", inspectedCLI)
+	}
+	wantAgg := filepath.Join(ws, "scout-report.md")
+	if res.AggregatePath != wantAgg {
+		t.Errorf("aggregate path=%q, want %q (default)", res.AggregatePath, wantAgg)
+	}
+}
+
+// TestDispatchParallel_GenTokenErrorAborts covers dispatchparallel.go:155-157.
+func TestDispatchParallel_GenTokenErrorAborts(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	opts.GenToken = func() (string, error) { return "", errors.New("rand exhausted") }
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: ws, ProjectRoot: tmp,
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "parent token") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestDispatchParallel_EmptyGitStateNormalizedToUnknown covers
+// dispatchparallel.go:159-164 — empty git head/diff become "unknown" in the
+// parent ledger entry.
+func TestDispatchParallel_EmptyGitStateNormalizedToUnknown(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	opts.GitState = func(context.Context, string) (string, string, error) { return "", "", nil }
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: ws, ProjectRoot: tmp,
+		LedgerPath: ledger,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	body, _ := os.ReadFile(ledger)
+	if !strings.Contains(string(body), `"git_head":"unknown"`) {
+		t.Errorf("empty git head not normalized: %s", body)
+	}
+	if !strings.Contains(string(body), `"tree_state_sha":"unknown"`) {
+		t.Errorf("empty tree diff not normalized: %s", body)
+	}
+}
+
+// TestDispatchParallel_TestExecutorBranchBuildsBashCommand covers
+// dispatchparallel.go:190-198 — when TestExecutor is set, the worker command
+// shells the test executor with EVOLVE_FANOUT_* env instead of recursing into
+// `evolve subagent run`.
+func TestDispatchParallel_TestExecutorBranchBuildsBashCommand(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	var commandsContents string
+	innerFanout := opts.RunFanout
+	opts.RunFanout = func(cfg fanoutdispatch.Config, w io.Writer) int {
+		data, _ := os.ReadFile(cfg.CommandsFile)
+		commandsContents = string(data)
+		return innerFanout(cfg, w)
+	}
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 2, WorkspacePath: ws, ProjectRoot: tmp,
+		TestExecutor: "/path/to/exec.sh",
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !strings.Contains(commandsContents, "EVOLVE_FANOUT_WORKER_NAME=codebase") {
+		t.Errorf("test-executor env not built: %s", commandsContents)
+	}
+	if !strings.Contains(commandsContents, "bash /path/to/exec.sh") {
+		t.Errorf("test-executor command not shelled: %s", commandsContents)
+	}
+	// The non-test-executor path (evolve subagent run) must NOT be present.
+	if strings.Contains(commandsContents, "subagent run scout-codebase") {
+		t.Errorf("should use test executor, not recursion: %s", commandsContents)
+	}
+}
+
+// TestDispatchParallel_LedgerWriteErrorPropagates covers
+// dispatchparallel.go:266-268.
+func TestDispatchParallel_LedgerWriteErrorPropagates(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	opts.WriteFanoutLed = func(string, FanoutLedgerEntry, func() time.Time) error {
+		return errors.New("ledger disk full")
+	}
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: ws, ProjectRoot: tmp,
+		LedgerPath: filepath.Join(tmp, "ledger.jsonl"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "ledger write") {
+		t.Errorf("got %v", err)
+	}
+}
+
 func TestExtractParallelSubtasks(t *testing.T) {
 	body := `{
 		"parallel_subtasks": [
@@ -324,6 +508,46 @@ func TestCapabilityExtractArray(t *testing.T) {
 	}
 	if _, ok := capabilityExtractArray(`{"x":"str"}`, "x"); ok {
 		t.Errorf("string should not match")
+	}
+}
+
+// TestCapabilityExtractArray_KeyWithoutColon covers dispatchparallel.go:343 —
+// the key is present but not followed by ':'.
+func TestCapabilityExtractArray_KeyWithoutColon(t *testing.T) {
+	if v, ok := capabilityExtractArray(`{"x" [1,2]}`, "x"); ok {
+		t.Errorf("key without colon should not match, got %q", v)
+	}
+}
+
+// TestCapabilityExtractArray_Unterminated covers dispatchparallel.go:362 —
+// an opening bracket that is never balanced falls through to (",false").
+func TestCapabilityExtractArray_Unterminated(t *testing.T) {
+	if v, ok := capabilityExtractArray(`{"x":[1,2`, "x"); ok {
+		t.Errorf("unterminated array should not match, got %q", v)
+	}
+}
+
+// TestFirstSubmatch covers dispatchparallel.go:317-322 including the no-match
+// branch (len(m) < 2 → "").
+func TestFirstSubmatch(t *testing.T) {
+	if got := firstSubmatch(subtaskNameRE, `{"name":"codebase"}`); got != "codebase" {
+		t.Errorf("match: got %q, want codebase", got)
+	}
+	if got := firstSubmatch(subtaskNameRE, `{"other":"x"}`); got != "" {
+		t.Errorf("no-match should be empty, got %q", got)
+	}
+}
+
+// TestExtractParallelSubtasks_SubtaskWithoutTemplate exercises firstSubmatch's
+// empty-return path through the public parser: a subtask object with a name
+// but no prompt_template yields an empty Template (not dropped).
+func TestExtractParallelSubtasks_SubtaskWithoutTemplate(t *testing.T) {
+	got := extractParallelSubtasks(`{"parallel_subtasks":[{"name":"codebase"}]}`)
+	if len(got) != 1 {
+		t.Fatalf("got %d subtasks, want 1", len(got))
+	}
+	if got[0].Name != "codebase" || got[0].Template != "" {
+		t.Errorf("subtask=%+v, want {codebase, empty template}", got[0])
 	}
 }
 

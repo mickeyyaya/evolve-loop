@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -341,6 +342,130 @@ func TestEvent_NDJSONFormat(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			t.Errorf("NDJSON line not valid JSON: %q: %v", line, err)
 		}
+	}
+}
+
+// TestStatSize_EmptyStdoutLogReturnsZero pins the early-return guard in
+// statSize: an Observer with no StdoutLog configured reports size 0 (the
+// "no output" sentinel) rather than calling os.Stat("").
+func TestStatSize_EmptyStdoutLogReturnsZero(t *testing.T) {
+	t.Parallel()
+	o := New(Config{StdoutLog: ""}, &bytes.Buffer{})
+	if got := o.statSize(); got != 0 {
+		t.Errorf("statSize with empty StdoutLog = %d, want 0", got)
+	}
+}
+
+// TestStatSize_MissingFileReturnsZero pins the os.Stat-error branch: a
+// configured-but-absent log file also reports 0 (treated as no output; the
+// ticker retries on a later poll once the runner creates the file).
+func TestStatSize_MissingFileReturnsZero(t *testing.T) {
+	t.Parallel()
+	o := New(Config{StdoutLog: filepath.Join(t.TempDir(), "never-created.log")}, &bytes.Buffer{})
+	if got := o.statSize(); got != 0 {
+		t.Errorf("statSize on missing file = %d, want 0", got)
+	}
+}
+
+// TestNewestActivity_UnsetWorkspaceReturnsZeroTime pins that the activity
+// signal is disabled (zero Time) when WorkspaceDir is unset — stdout-log
+// growth then governs stall detection alone.
+func TestNewestActivity_UnsetWorkspaceReturnsZeroTime(t *testing.T) {
+	t.Parallel()
+	o := New(Config{WorkspaceDir: ""}, &bytes.Buffer{})
+	if got := o.newestActivity(); !got.IsZero() {
+		t.Errorf("newestActivity with unset WorkspaceDir = %v, want zero time", got)
+	}
+}
+
+// TestNewestActivity_ReportsNewestFileMtime pins the happy path: the newest
+// regular file's mtime is returned, and the observer's own events file is
+// excluded from the scan (so its writes can never reset the stall timer).
+func TestNewestActivity_ReportsNewestFileMtime(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	old := filepath.Join(ws, "old.txt")
+	if err := os.WriteFile(old, []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(old, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	newer := filepath.Join(ws, "newer.txt")
+	if err := os.WriteFile(newer, []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	newTime := time.Now().Add(-time.Minute)
+	if err := os.Chtimes(newer, newTime, newTime); err != nil {
+		t.Fatal(err)
+	}
+	// The observer's own sink: must be ignored even though it is the most
+	// recent file on disk.
+	events := filepath.Join(ws, "build"+observerEventsSuffix)
+	if err := os.WriteFile(events, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	o := New(Config{WorkspaceDir: ws}, &bytes.Buffer{})
+	got := o.newestActivity()
+	if !got.Equal(newTime) {
+		t.Errorf("newestActivity = %v, want %v (newest non-events file)", got, newTime)
+	}
+}
+
+// TestNewestActivity_SkipsUnreadableEntries covers the walk-error branch
+// (the err != nil arm of the WalkFunc): an unreadable subdirectory is skipped
+// rather than aborting the scan, so a sibling readable file is still seen.
+func TestNewestActivity_SkipsUnreadableEntries(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("chmod 000 is ineffective for root")
+	}
+	t.Parallel()
+	ws := t.TempDir()
+	good := filepath.Join(ws, "good.txt")
+	if err := os.WriteFile(good, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	goodTime := time.Now().Add(-time.Minute)
+	if err := os.Chtimes(good, goodTime, goodTime); err != nil {
+		t.Fatal(err)
+	}
+	// An unreadable subdir → Walk invokes the WalkFunc with err != nil for
+	// its children, exercising the skip-on-error arm.
+	bad := filepath.Join(ws, "noread")
+	if err := os.MkdirAll(filepath.Join(bad, "child"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(bad, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(bad, 0o755) }) // so t.TempDir cleanup can remove it
+
+	o := New(Config{WorkspaceDir: ws}, &bytes.Buffer{})
+	got := o.newestActivity()
+	if got.IsZero() {
+		t.Error("newestActivity returned zero time; expected the readable sibling to be counted despite the unreadable subdir")
+	}
+}
+
+// TestNewestActivity_RespectsFileCap covers the activityScanMaxFiles backstop:
+// once the cap is hit the walk short-circuits (filepath.SkipAll). We assert the
+// scan still completes and returns a non-zero mtime — the cap must bound work,
+// never abort the observer.
+func TestNewestActivity_RespectsFileCap(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	for i := 0; i < activityScanMaxFiles+5; i++ {
+		p := filepath.Join(ws, "f"+strconv.Itoa(i)+".txt")
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := New(Config{WorkspaceDir: ws}, &bytes.Buffer{})
+	got := o.newestActivity()
+	if got.IsZero() {
+		t.Error("newestActivity returned zero time despite many files present; cap must bound work, not abort")
 	}
 }
 

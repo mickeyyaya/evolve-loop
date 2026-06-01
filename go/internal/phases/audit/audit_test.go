@@ -9,12 +9,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -484,6 +486,155 @@ func writeAuditProfile(t *testing.T, contents string) string {
 		t.Fatalf("write profile: %v", err)
 	}
 	return root
+}
+
+// When the wired GenerateVerdict seam returns an error (and the file stays
+// absent), Classify must surface a WARNING diagnostic naming the failure and
+// fall through to the missing-file FAIL floor — the generation error never
+// silently passes the gate.
+func TestRun_GeneratorReturnsError_WarnDiagAndFAIL(t *testing.T) {
+	ws := t.TempDir()
+	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{
+		Bridge:          fb,
+		Prompts:         fakePromptsFS("body"),
+		GenerateVerdict: func(core.PhaseRequest) error { return errors.New("acssuite boom") },
+	})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (generation failed → no verdict file → floor holds)", resp.Verdict)
+	}
+	var found bool
+	for _, d := range resp.Diagnostics {
+		if d.Severity == "warning" && strings.Contains(d.Message, "acs-verdict generation failed") && strings.Contains(d.Message, "acssuite boom") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a warning diagnostic naming the generation failure; got %+v", resp.Diagnostics)
+	}
+}
+
+// --- generateACSVerdict (the production GenerateVerdict default) ---
+
+// writePassingPredicate writes one trivial exit-0 predicate under
+// <root>/acs/cycle-<n>/ so acssuite.Run discovers a non-empty suite.
+func writePassingPredicate(t *testing.T, root string, cycle int) {
+	t.Helper()
+	dir := filepath.Join(root, "acs", "cycle-"+strconv.Itoa(cycle))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir preds: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "001-pass.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write predicate: %v", err)
+	}
+}
+
+// Worktree=="" must fall back to ProjectRoot as the predicate-discovery root.
+// A passing predicate under ProjectRoot/acs/cycle-N is discovered and the
+// verdict is written at <evolveDir>/runs/cycle-N/acs-verdict.json.
+func TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	writePassingPredicate(t, projectRoot, 5)
+	evolveDir := t.TempDir()
+	ws := filepath.Join(evolveDir, "runs", "cycle-5")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatalf("mkdir ws: %v", err)
+	}
+
+	err := generateACSVerdict(core.PhaseRequest{
+		Cycle: 5, ProjectRoot: projectRoot, Worktree: "", Workspace: ws,
+	})
+	if err != nil {
+		t.Fatalf("generateACSVerdict: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(ws, "acs-verdict.json")); statErr != nil {
+		t.Errorf("verdict not written via ProjectRoot fallback: %v", statErr)
+	}
+}
+
+// A Cycle <= 0 makes acssuite.Run reject the request; generateACSVerdict must
+// wrap and return that error rather than swallowing it.
+func TestGenerateACSVerdict_SuiteRunError_Propagates(t *testing.T) {
+	err := generateACSVerdict(core.PhaseRequest{
+		Cycle: 0, ProjectRoot: t.TempDir(), Worktree: t.TempDir(), Workspace: t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("err=nil, want acssuite run error (Cycle<=0)")
+	}
+	if !strings.Contains(err.Error(), "acssuite run") {
+		t.Errorf("err=%v, want wrapped 'acssuite run'", err)
+	}
+}
+
+// Zero predicates discovered → generateACSVerdict writes NOTHING and returns
+// nil, leaving the audit missing-file FAIL floor to fail the cycle.
+func TestGenerateACSVerdict_ZeroPredicates_WritesNothing(t *testing.T) {
+	root := t.TempDir() // no acs/ dir → empty suite
+	evolveDir := t.TempDir()
+	ws := filepath.Join(evolveDir, "runs", "cycle-9")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatalf("mkdir ws: %v", err)
+	}
+
+	if err := generateACSVerdict(core.PhaseRequest{
+		Cycle: 9, ProjectRoot: root, Worktree: root, Workspace: ws,
+	}); err != nil {
+		t.Fatalf("generateACSVerdict: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(ws, "acs-verdict.json")); !os.IsNotExist(statErr) {
+		t.Errorf("verdict file should be absent for a zero-predicate suite; stat err=%v", statErr)
+	}
+}
+
+// When the suite is non-empty but WriteVerdict cannot create the cycle dir
+// (here: the computed evolveDir is a regular FILE, so MkdirAll fails),
+// generateACSVerdict must wrap and return the write error.
+func TestGenerateACSVerdict_WriteVerdictError_Propagates(t *testing.T) {
+	root := t.TempDir()
+	writePassingPredicate(t, root, 3)
+
+	// evolveDir = dirname(dirname(workspace)). Make that path a regular file so
+	// acssuite.WriteVerdict's MkdirAll(<evolveDir>/runs/cycle-3) fails.
+	base := t.TempDir()
+	blocker := filepath.Join(base, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write blocker file: %v", err)
+	}
+	// workspace such that dirname(dirname(ws)) == blocker (a file).
+	ws := filepath.Join(blocker, "runs", "cycle-3")
+
+	err := generateACSVerdict(core.PhaseRequest{
+		Cycle: 3, ProjectRoot: root, Worktree: root, Workspace: ws,
+	})
+	if err == nil {
+		t.Fatal("err=nil, want write-verdict error (evolveDir is a file)")
+	}
+	if !strings.Contains(err.Error(), "write verdict") {
+		t.Errorf("err=%v, want wrapped 'write verdict'", err)
+	}
+}
+
+// The registry init() must publish an "audit" factory that builds a runnable
+// PhaseRunner with the production defaults wired (exercises the init closure).
+func TestRegistry_AuditFactory_BuildsRunner(t *testing.T) {
+	factory, ok := registry.For(string(core.PhaseAudit))
+	if !ok {
+		t.Fatal(`registry.For("audit") returned ok=false; init() did not register`)
+	}
+	runner := factory(core.PhaseRequest{ProjectRoot: t.TempDir()})
+	if runner == nil {
+		t.Fatal("factory returned nil runner")
+	}
+	if runner.Name() != string(core.PhaseAudit) {
+		t.Errorf("Name=%q, want audit", runner.Name())
+	}
 }
 
 // --- verdict-format robustness (cycle-148 mis-grade fix) ---

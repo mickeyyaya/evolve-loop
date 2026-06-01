@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -230,4 +231,45 @@ func writeTriageProfile(t *testing.T, contents string) string {
 		t.Fatalf("write profile: %v", err)
 	}
 	return root
+}
+
+// A non-empty report that never declares a "## top_n" section heading must
+// FAIL — there is no candidate task list to advance to TDD with. This pins the
+// "heading absent entirely" branch (distinct from "## top_n present but empty").
+func TestRun_NoTopNHeading_FAIL(t *testing.T) {
+	body := `# Triage Report
+
+## deferred
+- id: later-task
+
+## dropped
+- id: obsolete
+`
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (no ## top_n heading at all)", resp.Verdict)
+	}
+}
+
+// The registry init() must publish a "triage" factory that builds a runnable
+// PhaseRunner with the production defaults wired (exercises the init closure).
+func TestRegistry_TriageFactory_BuildsRunner(t *testing.T) {
+	factory, ok := registry.For(string(core.PhaseTriage))
+	if !ok {
+		t.Fatal(`registry.For("triage") returned ok=false; init() did not register`)
+	}
+	runner := factory(core.PhaseRequest{ProjectRoot: t.TempDir()})
+	if runner == nil {
+		t.Fatal("factory returned nil runner")
+	}
+	if runner.Name() != string(core.PhaseTriage) {
+		t.Errorf("Name=%q, want triage", runner.Name())
+	}
 }

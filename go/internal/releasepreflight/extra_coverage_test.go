@@ -1,7 +1,9 @@
 package releasepreflight
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,6 +87,51 @@ func TestDefaultSimulationRunner(t *testing.T) {
 	}
 }
 
+// TestRun_AdvisorySimulationDefaultRunner covers the SimulationRunner==nil
+// branch in Run: with no seam supplied (and tests not skipped), Run wires the
+// default runner. A fake `go` shim (exit 1) makes that default fail fast — the
+// failure is advisory, so Run still returns nil with SimulationAdvisoryOK=false.
+// Not parallel: mutates process env via t.Setenv.
+func TestRun_AdvisorySimulationDefaultRunner(t *testing.T) {
+	r := makeRepo(t, "1.0.0")
+	if err := os.MkdirAll(filepath.Join(r, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	shim := filepath.Join(t.TempDir(), "fake-go")
+	if err := os.WriteFile(shim, []byte("#!/bin/sh\necho boom; exit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_GO_BIN_TEST", shim)
+
+	opts := stubOpts(r, "1.0.1")
+	opts.SkipTests = false
+	opts.GateTestRunner = func(string, string) error { return nil }
+	opts.SimulationRunner = nil // force the default-runner branch
+	res, err := Run(opts)
+	if err != nil {
+		t.Fatalf("advisory failure must not abort Run, got %v", err)
+	}
+	if res.SimulationAdvisoryOK == nil || *res.SimulationAdvisoryOK {
+		t.Errorf("SimulationAdvisoryOK = %v, want &false (advisory failure)", res.SimulationAdvisoryOK)
+	}
+}
+
+// TestDefaultSimulationRunner_GoBinDefault covers the goBin=="" → "go" default
+// in defaultSimulationRunner: with EVOLVE_GO_BIN_TEST unset and a repo whose
+// go/ module dir is absent, the real `go test` fails fast (chdir error) before
+// any package compiles — exercising the default-binary path without a hermetic
+// nested test run. Skips if `go` is not on PATH.
+func TestDefaultSimulationRunner_GoBinDefault(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not on PATH")
+	}
+	t.Setenv("EVOLVE_GO_BIN_TEST", "") // force the goBin=="go" default
+	// repoRoot/go does not exist → cmd.Dir chdir fails → error returned.
+	if err := defaultSimulationRunner(filepath.Join(t.TempDir(), "no-such-repo")); err == nil {
+		t.Error("expected error when the go module dir is absent")
+	}
+}
+
 // auditEntry builds a single ledger JSONL line for an auditor entry.
 func auditEntry(artifactPath, ts string) string {
 	line := `{"role":"auditor"`
@@ -152,6 +199,179 @@ func TestCheckRecentAudit_MissingTS(t *testing.T) {
 	_, err := checkRecentAudit(ledger, false, time.Now())
 	if err == nil {
 		t.Error("expected 'ledger entry missing ts' error")
+	}
+}
+
+// TestRun_DryRunWithNilSeams covers the seam-default assignment block in Run
+// (Now/GitClean/CurrentBranch/GateTestRunner all nil → real defaults wired).
+// DryRun short-circuits steps 1/2/4/5 so the real git/test defaults are
+// assigned but never invoked — exercising the nil-default branches
+// deterministically without shelling out.
+func TestRun_DryRunWithNilSeams(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "1.0.0")
+	res, err := Run(Options{
+		Target:   "1.0.1",
+		RepoRoot: r,
+		DryRun:   true,
+		// All seams nil → defaults assigned inside Run.
+	})
+	if err != nil {
+		t.Fatalf("dry-run with nil seams: %v", err)
+	}
+	if res.StepsPassed != 5 {
+		t.Errorf("StepsPassed = %d, want 5", res.StepsPassed)
+	}
+}
+
+// TestRun_Step1GitError covers the step-1 error branch: GitClean returning a
+// non-nil error aborts with ErrCheckFailed referencing the git failure.
+func TestRun_Step1GitError(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "1.0.0")
+	opts := stubOpts(r, "1.0.1")
+	opts.GitClean = func(string) (bool, error) { return false, errors.New("git boom") }
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "step 1 git error") {
+		t.Errorf("err = %v, want contains 'step 1 git error'", err)
+	}
+}
+
+// TestRun_Step2BranchError covers the step-2 error branch: CurrentBranch
+// returning a non-nil error aborts with ErrCheckFailed.
+func TestRun_Step2BranchError(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "1.0.0")
+	opts := stubOpts(r, "1.0.1")
+	opts.CurrentBranch = func(string) (string, error) { return "", errors.New("symbolic-ref boom") }
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "step 2 git error") {
+		t.Errorf("err = %v, want contains 'step 2 git error'", err)
+	}
+}
+
+// TestRun_PluginJSONMissing covers the os.Stat-on-plugin.json error branch:
+// a repo without .claude-plugin/plugin.json fails step 3.
+func TestRun_PluginJSONMissing(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "1.0.0")
+	if err := os.Remove(filepath.Join(r, ".claude-plugin", "plugin.json")); err != nil {
+		t.Fatal(err)
+	}
+	opts := stubOpts(r, "1.0.1")
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "plugin.json missing") {
+		t.Errorf("err = %v, want contains 'plugin.json missing'", err)
+	}
+}
+
+// TestRun_ExtractVersionError covers the ExtractJSONVersion error branch: a
+// plugin.json with no "version" field fails step 3 before the semver check.
+func TestRun_ExtractVersionError(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "1.0.0")
+	if err := os.WriteFile(filepath.Join(r, ".claude-plugin", "plugin.json"),
+		[]byte(`{"name":"x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := stubOpts(r, "1.0.1")
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "no version field") {
+		t.Errorf("err = %v, want contains 'no version field'", err)
+	}
+}
+
+// TestRun_CurrentVersionNotSemver covers the branch where the on-disk
+// plugin.json version is present but not a valid semver — step 3 rejects it.
+func TestRun_CurrentVersionNotSemver(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "not.a.semver")
+	opts := stubOpts(r, "1.0.1")
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "current plugin.json version not semver") {
+		t.Errorf("err = %v, want contains 'current plugin.json version not semver'", err)
+	}
+}
+
+// TestRun_GateTestsRunWithStubSeam covers the step-5 success loop body
+// (GateTestsPassed increments) with a passing seam — distinct from the
+// SkipTests path which never enters the loop.
+func TestRun_GateTestsRunWithStubSeam(t *testing.T) {
+	t.Parallel()
+	r := makeRepo(t, "1.0.0")
+	opts := stubOpts(r, "1.0.1")
+	opts.SkipTests = false
+	calls := 0
+	opts.GateTestRunner = func(string, string) error { calls++; return nil }
+	opts.SimulationRunner = func(string) error { return nil }
+	res, err := Run(opts)
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if calls != len(DefaultGateTestSuites) {
+		t.Errorf("gate runner calls = %d, want %d", calls, len(DefaultGateTestSuites))
+	}
+	if res.GateTestsPassed != len(DefaultGateTestSuites) {
+		t.Errorf("GateTestsPassed = %d, want %d", res.GateTestsPassed, len(DefaultGateTestSuites))
+	}
+}
+
+// TestCheckRecentAudit_NoAuditorEntries covers the empty-ledger branch: a
+// ledger with no auditor entries returns "no auditor entry in ledger".
+func TestCheckRecentAudit_NoAuditorEntries(t *testing.T) {
+	t.Parallel()
+	ledger := writeLedger(t, `{"role":"builder","ts":"2026-05-27T00:00:00Z"}`+"\n")
+	_, err := checkRecentAudit(ledger, false, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "no auditor entry") {
+		t.Errorf("err = %v, want 'no auditor entry in ledger'", err)
+	}
+}
+
+// TestCheckRecentAudit_NoVerdictNonStrict covers the verdict-not-found branch
+// in non-strict mode: a valid, recent artifact whose body declares no verdict
+// fails with the non-strict message.
+func TestCheckRecentAudit_NoVerdictNonStrict(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	art := filepath.Join(dir, "audit-report.md")
+	if err := os.WriteFile(art, []byte("# Audit\n\nno verdict here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
+	_, err := checkRecentAudit(ledger, false, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "does not declare 'Verdict: PASS' or 'Verdict: WARN'") {
+		t.Errorf("err = %v, want non-strict no-verdict message", err)
+	}
+}
+
+// TestCheckRecentAudit_NoVerdictStrict covers the verdict-not-found branch in
+// strict mode: the STRICT_PASS message is emitted instead.
+func TestCheckRecentAudit_NoVerdictStrict(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	art := filepath.Join(dir, "audit-report.md")
+	if err := os.WriteFile(art, []byte("# Audit\n\nno verdict here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
+	_, err := checkRecentAudit(ledger, true, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "STRICT_PASS") {
+		t.Errorf("err = %v, want strict no-verdict message", err)
 	}
 }
 

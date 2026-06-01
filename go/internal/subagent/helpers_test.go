@@ -400,6 +400,78 @@ func TestReadChainLink_EmptyFile(t *testing.T) {
 	}
 }
 
+// TestAppendAbnormalEvent_OpenFileErrorTolerated covers helpers.go:55-58 —
+// when the events path can't be opened (here it already exists as a
+// directory), the best-effort writer swallows the error and returns nil.
+func TestAppendAbnormalEvent_OpenFileErrorTolerated(t *testing.T) {
+	ws := t.TempDir()
+	// Pre-create abnormal-events.jsonl as a DIRECTORY so OpenFile fails.
+	if err := os.Mkdir(filepath.Join(ws, "abnormal-events.jsonl"), 0o755); err != nil {
+		t.Fatalf("seed dir: %v", err)
+	}
+	if err := AppendAbnormalEvent(ws, AbnormalEvent{EventType: "x"}, nil); err != nil {
+		t.Errorf("open error should be tolerated, got %v", err)
+	}
+}
+
+// TestWriteFanoutLedgerEntry_ChainLinkError covers helpers.go:156-158 — the
+// ledger path is a directory, so readChainLink's os.ReadFile fails (a
+// directory is non-empty per os.Stat but unreadable as a file), surfacing the
+// chain-link error before the line is ever assembled.
+func TestWriteFanoutLedgerEntry_ChainLinkError(t *testing.T) {
+	tmp := t.TempDir()
+	ledgerDir := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.Mkdir(ledgerDir, 0o755); err != nil {
+		t.Fatalf("seed dir: %v", err)
+	}
+	err := WriteFanoutLedgerEntry(ledgerDir, FanoutLedgerEntry{
+		Cycle: 1, Agent: "scout", ChallengeToken: "x",
+		WorkerNames: []string{"w"}, WorkerCount: 1,
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "chain link") {
+		t.Errorf("expected chain-link error, got %v", err)
+	}
+}
+
+// TestReadChainLink_BlankLineFile covers helpers.go:241-243 — a file
+// containing only a newline trims to "" and yields the zero seed at seq 0
+// (the empty-first-line guard).
+func TestReadChainLink_BlankLineFile(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.WriteFile(p, []byte("\n"), 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	prev, seq, err := readChainLink(p)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if prev != ledgerZeroSeed || seq != 0 {
+		t.Errorf("blank-line file: got %s seq=%d, want zero seed seq 0", prev, seq)
+	}
+}
+
+// TestReadChainLink_UnreadableFile covers helpers.go:237-239 — a non-empty
+// file that can't be read (chmod 000) surfaces the os.ReadFile error.
+func TestReadChainLink_UnreadableFile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root cannot mask read permission")
+	}
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.WriteFile(p, []byte("a real line\n"), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := os.Chmod(p, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(p, 0o600) })
+	_, _, err := readChainLink(p)
+	if err == nil {
+		t.Errorf("expected read error for unreadable non-empty file")
+	}
+}
+
 func TestReadChainLink_SingleLine(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "ledger.jsonl")

@@ -157,6 +157,52 @@ func TestReadCommands_ScannerError(t *testing.T) {
 	}
 }
 
+// TestRun_MissingMetaWritesSentinelRow covers the merge-loop branch that
+// emits a "<name>\t-1\t0" sentinel and flags anyFail when a worker's .meta
+// file is absent at merge time (the SIGTERM'd-worker case). Reproduced
+// deterministically: a worker name containing a path separator routes its
+// .meta write into a nonexistent subdirectory, so os.WriteFile fails silently
+// and the merge sees no meta — exactly the missing-meta condition — while the
+// echo command itself still runs.
+func TestRun_MissingMetaWritesSentinelRow(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cmds := filepath.Join(dir, "cmds.tsv")
+	results := filepath.Join(dir, "r.tsv")
+	// "sub/w" → meta path <resultsDir>/sub/w.meta; <resultsDir>/sub does not
+	// exist, so the meta write fails and the merge falls to the sentinel.
+	writeFile(t, cmds, "sub/w\techo ok\n")
+	var b bytes.Buffer
+	rc := Run(Config{
+		CommandsFile: cmds,
+		ResultsFile:  results,
+		Concurrency:  1,
+		TimeoutSecs:  10,
+	}, &b)
+	// Missing meta forces anyFail → ExitWorkerFail even though echo exited 0.
+	if rc != ExitWorkerFail {
+		t.Fatalf("rc=%d, want %d (log=%s)", rc, ExitWorkerFail, b.String())
+	}
+	body, _ := os.ReadFile(results)
+	if got := string(body); got != "sub/w\t-1\t0\n" {
+		t.Errorf("results=%q, want sentinel %q", got, "sub/w\t-1\t0\n")
+	}
+}
+
+// TestCheckFailConsensus_GlobError covers checkFailConsensus's Glob-error
+// branch: when resultsDir contains an unbalanced "[" the joined glob pattern
+// is malformed (filepath.ErrBadPattern) and the function must return false
+// (no consensus) rather than panic or miscount.
+func TestCheckFailConsensus_GlobError(t *testing.T) {
+	t.Parallel()
+	// "ws[" makes the joined pattern "ws[/*.out" — an unterminated character
+	// class → filepath.ErrBadPattern from Glob.
+	badDir := filepath.Join(t.TempDir(), "ws[")
+	if checkFailConsensus(badDir, 1) {
+		t.Error("malformed glob pattern must yield no consensus (false)")
+	}
+}
+
 // TestCheckFailConsensus_UnreadableOutFile covers the per-file Open-error
 // continue: a glob-matched .out file that cannot be opened is skipped.
 func TestCheckFailConsensus_UnreadableOutFile(t *testing.T) {
