@@ -1,6 +1,37 @@
 package main
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+)
+
+func TestShouldRefreshCatalog(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	stale := modelcatalog.Catalog{FetchedAt: now.Add(-48 * time.Hour)}
+	fresh := modelcatalog.Catalog{FetchedAt: now.Add(-1 * time.Hour)}
+	empty := modelcatalog.Catalog{}
+
+	tests := []struct {
+		name    string
+		cat     modelcatalog.Catalog
+		disable string
+		want    bool
+	}{
+		{"stale → refresh", stale, "", true},
+		{"empty (never fetched) → refresh", empty, "", true},
+		{"fresh within TTL → skip", fresh, "", false},
+		{"disabled overrides stale", stale, "0", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldRefreshCatalog(tt.cat, now, tt.disable); got != tt.want {
+				t.Fatalf("shouldRefreshCatalog = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestPickClassifierCLI(t *testing.T) {
 	t.Setenv("EVOLVE_MODELCATALOG_CLASSIFIER_CLI", "")

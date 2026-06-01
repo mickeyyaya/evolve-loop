@@ -79,6 +79,12 @@ type Orchestrator struct {
 	// dir, so its writes don't show up here). Injected for tests.
 	gitDirtyPaths func(ctx context.Context, repoRoot string) ([]string, error)
 
+	// catalogRefresh optionally refreshes the live model catalog at cycle start
+	// (WithCatalogRefresher). It owns its own staleness check (TTL) and is
+	// best-effort: errors WARN and never block the cycle. nil ⇒ no auto-refresh
+	// (the composition root wires the closure; core never imports modelcatalog).
+	catalogRefresh func(ctx context.Context) error
+
 	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
 	// Default gitWorktree (real git); injected in tests via
 	// WithWorktreeProvisioner so RunCycle runs without touching real git.
@@ -182,6 +188,13 @@ func WithObserver(o Observer) Option {
 			orch.observer = o
 		}
 	}
+}
+
+// WithCatalogRefresher injects a best-effort live-model-catalog refresh run at
+// cycle start. The closure owns its TTL/staleness check; the orchestrator calls
+// it once per cycle before any phase runs and only WARNs on error (never blocks).
+func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
+	return func(o *Orchestrator) { o.catalogRefresh = fn }
 }
 
 // WithReviewer injects a per-phase deliverable reviewer (Workstream E2). The
@@ -995,6 +1008,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
+	}
+
+	// Cycle-start live-model-catalog refresh (TTL-gated inside the closure).
+	// Best-effort: a slow/failed refresh WARNs and never blocks the cycle.
+	if o.catalogRefresh != nil {
+		if err := o.catalogRefresh(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN model-catalog refresh failed: %v\n", err)
+		}
 	}
 
 	// One snapshot per cycle — operator mutation post-call must not
