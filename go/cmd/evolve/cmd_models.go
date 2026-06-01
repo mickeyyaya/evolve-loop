@@ -43,20 +43,26 @@ func runModels(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 }
 
 // modelsOpts holds the parsed flags + resolved roots shared by both
-// subcommands. `list` reads only EvolveDir/AsJSON; `refresh` uses all roots.
+// subcommands. `list` reads only EvolveDir/AsJSON; `refresh` also uses Source
+// and the roots.
 type modelsOpts struct {
 	EvolveDir, Project, Plugin, Adapters string
 	AsJSON                               bool
+	// Source selects the refresh strategy: "live" queries each CLI's /model
+	// (authoritative) with per-CLI detect fallback; "detect" uses only the
+	// manifest-derived map (fast, no REPL driving). Ignored by `list`.
+	Source string
 }
 
-// parseModelsFlags parses the shared --evolve-dir/--project-root/--json flags
-// and resolves the .evolve directory the same way `evolve setup` does.
+// parseModelsFlags parses the shared flags and resolves the .evolve directory
+// the same way `evolve setup` does.
 func parseModelsFlags(name string, args []string, stderr io.Writer) (modelsOpts, bool) {
 	fs := flag.NewFlagSet("evolve models "+name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var o modelsOpts
 	var evolveDirFlag, projectRootFlag string
 	fs.BoolVar(&o.AsJSON, "json", false, "emit as JSON instead of a human table")
+	fs.StringVar(&o.Source, "source", "live", "refresh source: live (query /model) | detect (manifest map)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
 	// NOTE: pass args straight to Parse — do NOT route through reorderArgs.
@@ -76,18 +82,30 @@ func runModelsRefresh(args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return 10
 	}
-	rep := setup.Detect(context.Background(), setup.DetectOptions{
+	ctx := context.Background()
+	rep := setup.Detect(ctx, setup.DetectOptions{
 		ProjectRoot: o.Project, EvolveDir: o.EvolveDir, PluginRoot: o.Plugin, AdaptersDir: o.Adapters,
 	})
-	snaps := make([]modelcatalog.CLISnapshot, 0, len(rep.CLIs))
-	for _, c := range rep.CLIs {
-		snaps = append(snaps, modelcatalog.CLISnapshot{
-			CLI:        c.CLI,
-			Ready:      c.Verdict == "ready",
-			TierModels: c.TierModels,
-		})
+
+	var (
+		cat    modelcatalog.Catalog
+		err    error
+		srcLbl string
+	)
+	switch o.Source {
+	case "detect":
+		cat, srcLbl = detectRefresh(rep), "setup detect"
+	case "live", "":
+		srcLbl = "live /model (detect fallback)"
+		cat, err = liveRefresh(ctx, rep, o.Project, stderr)
+	default:
+		fmt.Fprintf(stderr, "evolve models refresh: unknown --source %q (live|detect)\n", o.Source)
+		return 10
 	}
-	cat := modelcatalog.BuildFromSnapshots(snaps, time.Now().UTC())
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
+		return 1
+	}
 	if err := modelcatalog.Write(o.EvolveDir, cat); err != nil {
 		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
 		return 1
@@ -95,9 +113,22 @@ func runModelsRefresh(args []string, stdout, stderr io.Writer) int {
 	if o.AsJSON {
 		return emitCatalogJSON(cat, stdout, stderr)
 	}
-	fmt.Fprintf(stdout, "Refreshed model catalog (source: setup detect) → %d CLI(s):\n", len(cat.CLIs))
+	fmt.Fprintf(stdout, "Refreshed model catalog (source: %s) → %d CLI(s):\n", srcLbl, len(cat.CLIs))
 	printCatalogHuman(stdout, cat)
 	return 0
+}
+
+// detectRefresh builds a catalog from setup.Detect's manifest-derived tier
+// models (Source defaults to "detect" in BuildFromSnapshots — informational,
+// not dispatch-authoritative).
+func detectRefresh(rep setup.DetectReport) modelcatalog.Catalog {
+	snaps := make([]modelcatalog.CLISnapshot, 0, len(rep.CLIs))
+	for _, c := range rep.CLIs {
+		snaps = append(snaps, modelcatalog.CLISnapshot{
+			CLI: c.CLI, Ready: c.Verdict == "ready", TierModels: c.TierModels,
+		})
+	}
+	return modelcatalog.BuildFromSnapshots(snaps, time.Now().UTC())
 }
 
 func runModelsList(args []string, stdout, stderr io.Writer) int {
