@@ -336,6 +336,47 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	}
 }
 
+// recordBuildBinding writes the builder's provenance ledger entry — role=builder,
+// kind=agent_subprocess — that BOTH the red-team predicate rt-001-ledger-role-
+// completeness AND the auditor's Ledger-Verification check require as proof the
+// builder actually ran. The orchestrator's per-phase entry is role="build" (the
+// PHASE name), not "builder" (the AGENT name), and recent cycles no longer get a
+// bridge-written per-agent entry — so a cycle that goes through FORMAL audit (vs the
+// inline build-commit path that bypasses it) false-FAILed provenance with "no
+// role:builder entry" even though the build ran (cycle-181 / issue #13). Mirrors
+// recordAuditBinding (role=auditor); best-effort + loud WARN, never blocks the cycle.
+func (o *Orchestrator) recordBuildBinding(ctx context.Context, cycle int, projectRoot, workspace string) {
+	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-binding: git rev-parse HEAD failed: %v\n", err)
+		return
+	}
+	diff, code, derr := gitCapture(ctx, projectRoot, "diff", "HEAD")
+	if derr != nil || code > 1 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-binding: git diff HEAD failed (rc=%d): %v\n", code, derr)
+		return
+	}
+	treeSum := sha256.Sum256([]byte(diff))
+	artPath := filepath.Join(workspace, "build-report.md")
+	entry := LedgerEntry{
+		TS:           o.now().UTC().Format(time.RFC3339),
+		Cycle:        cycle,
+		Role:         "builder",
+		Kind:         "agent_subprocess",
+		ExitCode:     0,
+		GitHEAD:      strings.TrimSpace(head),
+		TreeStateSHA: hex.EncodeToString(treeSum[:]),
+		ArtifactPath: artPath,
+	}
+	if artBytes, rerr := os.ReadFile(artPath); rerr == nil {
+		s := sha256.Sum256(artBytes)
+		entry.ArtifactSHA256 = hex.EncodeToString(s[:])
+	}
+	if err := o.ledger.Append(ctx, entry); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-binding ledger append: %v\n", err)
+	}
+}
+
 // normalizeWorktreeToBase soft-resets the worktree to baseSHA so any commits a
 // builder made during the build phase become PENDING changes again. The builder
 // is instructed to `git add -A && git commit -m "… [worktree-build]"`
@@ -765,7 +806,6 @@ func executeRetryBackoff(attempt int, env map[string]string) {
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}
 }
-
 
 func isTransientBridgeError(err error) bool {
 	return errors.Is(err, ErrTransientBridgeFailure)
@@ -1394,6 +1434,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// audit so ship binds to THIS cycle.
 		if next == PhaseAudit && (resp.Verdict == VerdictPASS || resp.Verdict == VerdictWARN) {
 			o.recordAuditBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath, cs.ActiveWorktree, resp.Verdict)
+		}
+
+		// Builder provenance (issue #13, cycle-181): emit the role=builder
+		// kind=agent_subprocess entry that rt-001-ledger-role-completeness + the
+		// auditor's Ledger-Verification require. The per-phase entry above is
+		// role="build" (phase name), not "builder" (agent name), so without this a
+		// formally-audited cycle false-FAILs provenance even though the build ran.
+		if next == PhaseBuild && resp.Verdict != VerdictSKIPPED {
+			o.recordBuildBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath)
 		}
 
 		// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini

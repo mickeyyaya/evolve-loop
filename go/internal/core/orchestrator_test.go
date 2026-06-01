@@ -808,6 +808,64 @@ func TestOrchestrator_RecordAuditBinding_WritesShipBindableEntry(t *testing.T) {
 	}
 }
 
+// recordBuildBinding must write the builder provenance entry (role=builder,
+// kind=agent_subprocess) that rt-001-ledger-role-completeness + the auditor's
+// Ledger-Verification require — issue #13 (cycle-181): the per-phase entry is
+// role="build" (phase), not "builder" (agent), so a formally-audited cycle
+// false-FAILed provenance with "no role:builder entry" though the build ran.
+func TestOrchestrator_RecordBuildBinding_WritesBuilderProvenance(t *testing.T) {
+	repo := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "-A")
+	runGit("commit", "-q", "-m", "init")
+
+	ws := filepath.Join(repo, ".evolve", "runs", "cycle-181")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("# Build Report\n## Task: x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	led := &fakeLedger{}
+	o := NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
+	o.recordBuildBinding(context.Background(), 181, repo, ws)
+
+	var b *LedgerEntry
+	for i := range led.entries {
+		if led.entries[i].Role == "builder" && led.entries[i].Kind == "agent_subprocess" {
+			b = &led.entries[i]
+		}
+	}
+	if b == nil {
+		t.Fatalf("no role=builder kind=agent_subprocess entry written (rt-001 + auditor require it); got %+v", led.entries)
+	}
+	if b.GitHEAD == "" || len(b.GitHEAD) != 40 {
+		t.Errorf("git_head=%q, want a 40-char SHA", b.GitHEAD)
+	}
+	if b.TreeStateSHA == "" || len(b.TreeStateSHA) != 64 {
+		t.Errorf("tree_state_sha=%q, want a 64-char sha256", b.TreeStateSHA)
+	}
+	if b.ArtifactSHA256 == "" {
+		t.Errorf("artifact_sha256 empty — build-report.md should be hashed")
+	}
+	if b.Cycle != 181 {
+		t.Errorf("cycle=%d, want 181", b.Cycle)
+	}
+}
+
 // wrapTimeout returns an error that wraps ErrArtifactTimeout the way the bridge
 // engine does (fmt.Errorf("...: %w", ErrArtifactTimeout)).
 func wrapTimeout() error {
