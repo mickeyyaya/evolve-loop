@@ -233,6 +233,13 @@ type orchDeps struct {
 // queries (verify the ledger, read state.json) without re-instantiating
 // the adapters and risking divergence in the evolveDir resolution.
 func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
+	// Pin the model-catalog dir to the SAME .evolve the cycle-start refresher
+	// writes, so the in-process LoadManifest overlay reads the right file
+	// regardless of EVOLVE_PROJECT_ROOT (which the loop resolves from a flag,
+	// not necessarily the env). Set unconditionally — evolveDir is authoritative.
+	if evolveDir != "" {
+		_ = os.Setenv("EVOLVE_MODEL_CATALOG_DIR", evolveDir)
+	}
 	// Ledger and storage are created first so the bridge adapter can wire its
 	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
 	st := storage.New(evolveDir)
@@ -346,6 +353,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	if os.Getenv("EVOLVE_OBSERVER_AUTOSPAWN") != "0" {
 		opts = append(opts, core.WithObserver(observer.NewCoreAdapter()))
 	}
+	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
+	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.
+	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir)))
 
 	return orchDeps{
 		Storage:      st,

@@ -93,9 +93,21 @@ type Manifest struct {
 	Params map[string]ParamSpec `json:"params,omitempty"`
 }
 
-// LoadManifest reads and validates the embedded manifest for cli. Error
-// messages mirror lib/manifest-loader.sh.
+// LoadManifest reads and validates the embedded manifest for cli, then overlays
+// any LIVE model-catalog tier models over its ModelTierMap (see
+// catalog_overlay.go). The overlay is a no-op when no catalog exists, so this
+// is byte-identical to the raw load until `evolve models refresh` writes one.
+// Error messages mirror lib/manifest-loader.sh.
 func LoadManifest(cli string) (Manifest, error) {
+	m, err := loadManifestRaw(cli)
+	if err != nil {
+		return m, err
+	}
+	return overlayManifestCatalog(m), nil
+}
+
+// loadManifestRaw is the unmodified loader: operator override > embedded set.
+func loadManifestRaw(cli string) (Manifest, error) {
 	if cli == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: empty cli name")
 	}

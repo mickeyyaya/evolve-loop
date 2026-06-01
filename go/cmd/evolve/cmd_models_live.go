@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -12,6 +13,50 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
+
+// autoRefreshDisableEnv opts out of the cycle-start catalog auto-refresh.
+const autoRefreshDisableEnv = "EVOLVE_MODELCATALOG_AUTOREFRESH"
+
+// shouldRefreshCatalog is the pure cycle-start gate: refresh only when not
+// disabled AND the cached catalog is older than the TTL (so the live /model
+// drive runs at most once per day, not every cycle).
+func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, disableEnvVal string) bool {
+	if disableEnvVal == "0" {
+		return false
+	}
+	return cat.IsStale(now, modelcatalog.DefaultTTL)
+}
+
+// makeCatalogRefresher returns the closure core.WithCatalogRefresher invokes at
+// cycle start. It is TTL-gated (shouldRefreshCatalog) and best-effort; a failure
+// propagates to the orchestrator which only WARNs. Default-on; opt out with
+// EVOLVE_MODELCATALOG_AUTOREFRESH=0.
+func makeCatalogRefresher(projectRoot, evolveDir string) func(context.Context) error {
+	return func(ctx context.Context) error {
+		cat, rerr := modelcatalog.Read(evolveDir)
+		if rerr != nil {
+			// Corrupt cache: treat as stale (refresh overwrites it) but surface
+			// the corruption rather than papering over it silently.
+			fmt.Fprintf(os.Stderr, "[models] WARN unreadable catalog (will refresh): %v\n", rerr)
+		}
+		if !shouldRefreshCatalog(cat, time.Now(), os.Getenv(autoRefreshDisableEnv)) {
+			return nil
+		}
+		plugin := os.Getenv("EVOLVE_PLUGIN_ROOT")
+		if plugin == "" {
+			plugin = projectRoot
+		}
+		rep := setup.Detect(ctx, setup.DetectOptions{
+			ProjectRoot: projectRoot, EvolveDir: evolveDir,
+			PluginRoot: plugin, AdaptersDir: filepath.Join(plugin, "adapters"),
+		})
+		fresh, err := liveRefresh(ctx, rep, projectRoot, os.Stderr)
+		if err != nil {
+			return err
+		}
+		return modelcatalog.Write(evolveDir, fresh)
+	}
+}
 
 // bridgeModelCapturer adapts bridge.CaptureModelPicker to
 // modelquery.ModelCapturer. It translates a base CLI name (codex|agy|claude)
