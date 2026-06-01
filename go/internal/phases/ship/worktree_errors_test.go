@@ -27,7 +27,7 @@ func makeWorktreeScenario(t *testing.T) (string, string) {
 	seedAudit(t, repo, "PASS")
 
 	// Create a linked worktree on a new branch.
-	wt := t.TempDir()
+	wt := tempRepoDir(t)
 	runGit(t, repo, "worktree", "add", "-b", "cycle-1", wt)
 
 	// Stage a file in the worktree so worktreeCleanNoCommit == false.
@@ -95,7 +95,7 @@ func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
 	seedAudit(t, repo, "PASS")
 
 	// Create worktree on a branch that is ahead of main by one commit.
-	wt := t.TempDir()
+	wt := tempRepoDir(t)
 	runGit(t, repo, "worktree", "add", "-b", "cycle-ahead", wt)
 	mustWrite(t, filepath.Join(wt, "ahead.txt"), "ahead\n")
 	runGit(t, wt, "add", "ahead.txt")

@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,35 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// tempRepoDir returns a fresh temp directory for a git repo whose cleanup is
+// BEST-EFFORT — unlike t.TempDir(), a RemoveAll failure does NOT fail the test.
+//
+// On macOS CI runners, os.RemoveAll of a git work tree intermittently fails
+// with EBADF ("bad file descriptor") on .git internals (e.g. a hooks/*.sample
+// file) under -race load. With t.TempDir() that cleanup error fails an
+// otherwise-passing test and forces a full ~5-minute CI re-run (observed on
+// TestShipFromWorktree_GitAddFails_Errors, 2026-06-02). The temp dir is
+// ephemeral — CI reclaims it regardless — so best-effort removal is safe and
+// keeps a cosmetic cleanup race from gating a green build. The chmod-walk makes
+// git's 0444 pack/object files removable.
+func tempRepoDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "shiptest-*")
+	if err != nil {
+		t.Fatalf("mkdir temp repo: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(dir, func(p string, _ fs.DirEntry, walkErr error) error {
+			if walkErr == nil {
+				_ = os.Chmod(p, 0o755)
+			}
+			return nil
+		})
+		_ = os.RemoveAll(dir)
+	})
+	return dir
+}
+
 // makeRepo creates a fresh git repo with:
 //   - fixture.txt tracked
 //   - .gitignore (.evolve/)
@@ -36,10 +66,10 @@ import (
 //   - a stub ship-binary-fixture file (TOFU pins its SHA)
 //   - initial commit "initial test repo"
 //
-// Returns the absolute repo path. Cleanup is via t.Cleanup (TempDir).
+// Returns the absolute repo path. Cleanup is best-effort via tempRepoDir.
 func makeRepo(t *testing.T) string {
 	t.Helper()
-	repo := t.TempDir()
+	repo := tempRepoDir(t)
 	mustWrite(t, filepath.Join(repo, ".gitignore"), ".evolve/\n")
 	mustMkdir(t, filepath.Join(repo, ".evolve", "runs", "cycle-1"))
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), "")
@@ -63,7 +93,7 @@ func makeRepo(t *testing.T) string {
 // is fast-forward later.
 func addRemote(t *testing.T, repo string) string {
 	t.Helper()
-	bare := filepath.Join(t.TempDir(), "remote.git")
+	bare := filepath.Join(tempRepoDir(t), "remote.git")
 	cmd := exec.Command("git", "init", "-q", "--bare", bare)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git init --bare: %v\n%s", err, out)
