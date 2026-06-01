@@ -107,7 +107,30 @@ flags). Regenerate the fast-suite report any time:
 make test-latency   # → go/test/latency-report.md
 ```
 
-`go/test/latency-baseline.md` is the pre-split snapshot kept for comparison.
+`go/test/latency-baseline.md` is the pre-split snapshot; `go/test/latency-report.md`
+is the post-split snapshot. Both are machine-dependent and regenerable — they
+are tracked as comparison points, not gates.
+
+### Result and the known fast-suite poles
+
+The cost-axis split cut the default suite from **~206s to ~42s** (no race;
+`make test` with `-race` ≈ 46s) by moving `cmd/evolve`'s full-cycle e2e
+(205s→3.6s) and `internal/bridge`'s tmux/live tests (47s→0.47s) behind tags.
+
+The remaining poles are **deliberately left fast-resident**:
+
+- **`internal/phases/ship` (~22s)** — its tests do real `git` commit/merge in
+  temp repos (integration-*cost*), but they are ship's primary safety coverage
+  (audit-binding, gates). They stay in the fast suite so a developer can't break
+  ship without immediate feedback. They are **not** parallelized: ship reads
+  control-flow env via `t.Setenv`, which is incompatible with `t.Parallel`.
+- **`internal/core` (~12s)** — volume (≈200 small orchestrator-sequencing
+  tests). It overlaps under ship's wall, so parallelizing it would not lower the
+  suite's wall time; the churn/flake risk isn't worth a no-op gain.
+
+This is an intentional trade (determinism + safety coverage over shaving a
+ship-bound wall), not an oversight. Reducing ship further means faking `git` —
+a separate, larger refactor tracked outside this workstream.
 
 ### Where the legacy ACS predicates live
 
