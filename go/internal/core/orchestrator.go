@@ -813,6 +813,20 @@ func resolveRetryBackoffBase(env map[string]string) int {
 	return n
 }
 
+// backoffSleep is the sleep seam for executeRetryBackoff. Production uses the
+// real time.Sleep; the core test suite swaps in a no-op (see TestMain) so the
+// ~13 retry/transient/backfill/timeout tests don't each sleep the multi-second
+// backoff for real — the single highest-leverage knob for core-suite latency
+// (~254s → ~8s). Set once before any test runs, so concurrent reads by parallel
+// tests are safe.
+//
+// Why a package var and not an Orchestrator field (the `now` convention)?
+// executeRetryBackoff is a free function, and — decisively — only TestMain can
+// zero a package var for the WHOLE suite. A per-instance field would force every
+// retry test (and every future one) to inject a no-op at construction, which is
+// the exact per-test churn this seam removes.
+var backoffSleep = time.Sleep
+
 func executeRetryBackoff(attempt int, env map[string]string) {
 	base := resolveRetryBackoffBase(env)
 	if base <= 0 {
@@ -831,7 +845,7 @@ func executeRetryBackoff(attempt int, env map[string]string) {
 		sleepSecs = limitSecs
 	}
 	if sleepSecs > 0 {
-		time.Sleep(time.Duration(sleepSecs) * time.Second)
+		backoffSleep(time.Duration(sleepSecs) * time.Second)
 	}
 }
 
