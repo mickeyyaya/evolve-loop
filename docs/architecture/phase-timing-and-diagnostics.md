@@ -41,6 +41,34 @@ By collecting the `duration_ms` field for every phase, operator scripts or dashb
 
 ---
 
+## Per-Phase Usage Sidecar (`<phase>-usage.json`)
+
+Immediately after each phase successfully records its timing entry in the orchestrator, a structured usage sidecar file is written to `<workspace>/<phase>-usage.json`. This provides granular metrics for cost, duration, attempts, and verdict for each individual phase run.
+
+### Format and Schema
+
+The JSON object contains the following fields:
+
+- `phase` (string): The identifier of the phase (e.g. `"scout"`, `"build"`, `"audit"`, `"ship"`).
+- `cost_usd` (number): The financial cost accrued by LLM calls during this phase.
+- `duration_ms` (integer): The execution duration of the phase in milliseconds.
+- `attempt_count` (integer): The number of attempts executed before the phase finished.
+- `verdict` (string): The canonical verdict resolved for the phase (e.g. `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
+
+### Example Payload (`build-usage.json`)
+
+```json
+{
+  "phase": "build",
+  "cost_usd": 0.42,
+  "duration_ms": 48720,
+  "attempt_count": 1,
+  "verdict": "PASS"
+}
+```
+
+---
+
 ## Phase Failure Diagnostics (`<phase>-failure-diag.json`)
 
 When a mandatory phase exhausts its retries or encounters a non-recoverable error, the orchestrator writes a failure diagnostic file before returning the error and aborting the cycle. This file is saved to `<workspace>/<phase>-failure-diag.json`.
@@ -70,6 +98,42 @@ The diagnostic file contains key context fields to enable immediate automated pa
 ```
 
 The presence of the `failure-diag` file serves as a high-signal indicator for automated pipeline alerts. If the pipeline succeeds fully, no `failure-diag` files are created.
+
+---
+
+## Pause Escalation Report (`<phase>-escalation-report.json`)
+
+When the stop-reviewer issues a `ReviewPause` verdict (e.g., an agent artifact timeout), a detailed investigation report is written to `<workspace>/<phase>-escalation-report.json`. This preserves investigation evidence (such as the recent pane tail, elapsed time, intervals, and attempt count) before the runner returns a hard timeout exit code.
+
+### Format and Schema
+
+The JSON object contains the following fields:
+
+- `phase` (string): The identifier of the paused phase.
+- `cycle` (integer): The cycle ID in which the pause occurred.
+- `elapsed_s` (integer): The total seconds waited so far.
+- `interval_s` (integer): The review interval duration.
+- `attempt` (integer): The review attempt index when the pause was triggered.
+- `stop_kind` (string): The classification of the stop condition (e.g., `"artifact_timeout"`).
+- `action` (string): The reviewer's verdict action (e.g., `"pause"`).
+- `reason` (string): The human-readable justification produced by the reviewer.
+- `final_pane` (string): The last 40 lines of pane scrollback/stdout tail.
+
+### Example Payload (`scout-escalation-report.json`)
+
+```json
+{
+  "phase": "scout",
+  "cycle": 189,
+  "elapsed_s": 900,
+  "interval_s": 300,
+  "attempt": 3,
+  "stop_kind": "artifact_timeout",
+  "action": "pause",
+  "reason": "no output during the last 300s interval — stalled; pause for investigation",
+  "final_pane": "Scouting codebase...\nDeliberating on next steps...\n[idle for 300s]"
+}
+```
 
 ---
 

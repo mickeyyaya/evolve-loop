@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -225,6 +226,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// "stdout" completes on REPL-idle for agents that print their answer and
 	// write no file (the router/advisor). The detector ONLY decides readiness —
 	// the stop-review/extend liveness adjudication below is unchanged.
+	var lastEv StopEvent
+	var lastVerdict ReviewVerdict
 	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp)
 	completed := false
 	detectErrLogged := false
@@ -292,7 +295,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
 			// disambiguate genuine work from animation.
 			progressed := PaneHasSubstantiveChange(intervalBaselinePane, curPane)
-			v := reviewer.Review(StopEvent{
+			lastEv = StopEvent{
 				Kind:       StopArtifactTimeout,
 				Phase:      cfg.Agent,
 				Cycle:      cfg.Cycle,
@@ -301,17 +304,19 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				Attempt:    attempt,
 				Progressed: progressed,
 				StdoutTail: lastLines(curPane, 40),
-			})
+			}
+			v := reviewer.Review(lastEv)
+			lastVerdict = v
 			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
-				pfx, StopArtifactTimeout, elapsed, attempt, progressed, v.Action, v.Reason)
+				pfx, StopArtifactTimeout, elapsed, attempt, progressed, lastVerdict.Action, lastVerdict.Reason)
 			if deps.OnStopReview != nil {
 				phase := cfg.Agent
 				if phase == "" {
 					phase = lp.name // fall back to driver name when agent is unset
 				}
-				deps.OnStopReview(phase, string(v.Action), v.Reason)
+				deps.OnStopReview(phase, string(lastVerdict.Action), lastVerdict.Reason)
 			}
-			if v.Action != ReviewExtend {
+			if lastVerdict.Action != ReviewExtend {
 				break
 			}
 			attempt++
@@ -325,7 +330,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		for _, line := range listWorkspaceFiles(cfg.Workspace) {
 			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
 		}
-		// TODO(auto-respond slice): write escalation-report.json from final pane.
+		if lastVerdict.Action == ReviewPause {
+			phase := cfg.Agent
+			if phase == "" {
+				phase = lp.name
+			}
+			_ = writeEscalationReport(cfg.Workspace, phase, cfg.Cycle, lastEv, lastVerdict)
+		}
 		return ExitArtifactTimeout, nil
 	}
 
@@ -534,4 +545,36 @@ func tmuxNonClaudePreflight(name string, cfg *Config, deps Deps) (int, bool) {
 		return ExitSafetyGate, true
 	}
 	return 0, false
+}
+
+type escalationReport struct {
+	Phase     string `json:"phase"`
+	Cycle     int    `json:"cycle"`
+	ElapsedS  int    `json:"elapsed_s"`
+	IntervalS int    `json:"interval_s"`
+	Attempt   int    `json:"attempt"`
+	StopKind  string `json:"stop_kind"`
+	Action    string `json:"action"`
+	Reason    string `json:"reason"`
+	FinalPane string `json:"final_pane"`
+}
+
+func writeEscalationReport(workspace, phase string, cycle int, ev StopEvent, verdict ReviewVerdict) error {
+	report := escalationReport{
+		Phase:     phase,
+		Cycle:     cycle,
+		ElapsedS:  ev.ElapsedS,
+		IntervalS: ev.IntervalS,
+		Attempt:   ev.Attempt,
+		StopKind:  string(ev.Kind),
+		Action:    string(verdict.Action),
+		Reason:    verdict.Reason,
+		FinalPane: ev.StdoutTail,
+	}
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(workspace, fmt.Sprintf("%s-escalation-report.json", phase))
+	return os.WriteFile(path, data, 0o644)
 }

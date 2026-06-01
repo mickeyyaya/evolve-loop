@@ -852,6 +852,33 @@ type phaseTimingEntry struct {
 	AttemptCount int     `json:"attempt_count"`
 }
 
+type phaseUsageSidecar struct {
+	Phase        string  `json:"phase"`
+	CostUSD      float64 `json:"cost_usd"`
+	DurationMS   int64   `json:"duration_ms"`
+	AttemptCount int     `json:"attempt_count"`
+	Verdict      string  `json:"verdict"`
+}
+
+func writePhaseUsageSidecar(workspace, phase string, cost float64, duration int64, attempts int, verdict string) {
+	sidecar := phaseUsageSidecar{
+		Phase:        phase,
+		CostUSD:      cost,
+		DurationMS:   duration,
+		AttemptCount: attempts,
+		Verdict:      verdict,
+	}
+	data, err := json.MarshalIndent(sidecar, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to marshal usage sidecar for %s: %v\n", phase, err)
+		return
+	}
+	path := filepath.Join(workspace, fmt.Sprintf("%s-usage.json", phase))
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to write usage sidecar for %s to %s: %v\n", phase, path, err)
+	}
+}
+
 // phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
 // when a mandatory phase aborts after exhausting all retry attempts.
 type phaseFailureDiag struct {
@@ -1469,6 +1496,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			CostUSD:      resp.CostUSD,
 			AttemptCount: attemptCount,
 		})
+		writePhaseUsageSidecar(cs.WorkspacePath, string(next), resp.CostUSD, resp.DurationMS, attemptCount, resp.Verdict)
 		current = next
 		lastVerdict = resp.Verdict
 

@@ -35,6 +35,7 @@ narrowly scoped to genuinely transient failures, never a model's real FAIL.
 | 11 | Retries forensically invisible | difficulty auditing retries | yes | **DONE** — cycle-171: `attempt_count` logged to [phase timing](phase-timing-and-diagnostics.md) and failure diagnostics |
 | 12 | Latency anomaly detection | phase runs excessively slow without crashing | yes | **DONE** — cycle-180: signal 12 `phase_latency` in `cyclehealth.go` raises warning on slow phases |
 | 14 | `backfillArtifactPath` / `phaseHeaders` | retro & build-planner backfill coverage incomplete | yes | **DONE** — cycle-187: add retro/build-planner to backfill phaseHeaders and align retro runner polling path |
+| 16 | StopReviewer Pause Escalation | pause verdict triggers hard timeout without investigation evidence | yes | **DONE** — cycle-189: Distinct pause semantics write a detailed `<workspace>/<phase>-escalation-report.json` to preserve investigation evidence before pausing |
 
 ## Principle for fixes
 
@@ -44,7 +45,7 @@ A **transient** infra/bridge failure should retry-or-reroute, bounded (GAP 1/5).
 transient/infra faults, not for masking real failures (token-optimization + the
 "imprecise-evaluator" caveat).
 
-## Completed as of cycle-187
+## Completed as of cycle-189
 
 Over successive self-evolution cycles, we have systematically addressed the primary gaps identified in this living document:
 
@@ -74,6 +75,9 @@ Over successive self-evolution cycles, we have systematically addressed the prim
 
 9. **Stop-Review Ledger Trail (GAP 15 / ADR-0026 Stage 1 #5)**:
    - Implemented in cycle-188. Stop-review verdicts (extend AND pause) are now emitted to the ledger as `kind=stop_review` entries carrying the `action` (extend/pause) and `message` (reviewer justification). `Deps.OnStopReview` callback in `engine.go`; driver calls it nil-safely; orchestrator wires it to `ledger.Append`; `checkSelfHealEvents` in `cyclehealth.go` flags `action=pause` as `SeverityWarn`. ADR-0026 Stage 1 #5 closed.
+
+10. **Distinct Pause Semantics / Escalation Report (GAP 16 / ADR-0026 Stage 1 #3)**:
+    - Implemented in cycle-189. When a stop-reviewer issues a `ReviewPause` verdict, the bridge writes a `<workspace>/<phase>-escalation-report.json` containing detailed investigation evidence (phase, cycle, elapsed, attempt, stop kind, final pane tail, and verdict justification) before returning `ExitArtifactTimeout`. This closes ADR-0026 Stage 1 #3.
 
 ## Multi-CLI note
 
