@@ -159,3 +159,25 @@ func readJSONT(t *testing.T, path string) map[string]any {
 	}
 	return m
 }
+
+func TestUnionPhases(t *testing.T) {
+	cases := []struct {
+		name        string
+		base, extra []string
+		want        []string
+	}{
+		{"nil-extra", []string{"scout", "build"}, nil, []string{"scout", "build"}},
+		{"adds-new", []string{"scout", "audit"}, []string{"security-scan"}, []string{"scout", "audit", "security-scan"}},
+		{"dedups-existing", []string{"scout", "audit"}, []string{"audit", "scout"}, []string{"scout", "audit"}},
+		{"skips-empty", []string{"scout"}, []string{"", "ship"}, []string{"scout", "ship"}},
+		{"empty-base", nil, []string{"audit"}, []string{"audit"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := unionPhases(c.base, c.extra)
+			if strings.Join(got, ",") != strings.Join(c.want, ",") {
+				t.Errorf("unionPhases(%v,%v)=%v, want %v", c.base, c.extra, got, c.want)
+			}
+		})
+	}
+}

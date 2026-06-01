@@ -33,6 +33,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -250,6 +251,33 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		}
 	}
 
+	// User-controlled policy pin (absolute): a pinned CLI/model for this phase
+	// overrides env/profile/default resolution. Keyed by phase name. Validated
+	// against the profile guardrails (allowed_clis + model_tier_envelope) — an
+	// out-of-bounds pin hard-fails the phase loudly rather than silently
+	// breaching the trust-kernel constraints. Escape hatch: EVOLVE_POLICY_BYPASS=1.
+	var pin *policy.Pin
+	if !envchain.Bool("EVOLVE_POLICY_BYPASS", req.Env, false) {
+		pol, perr := policy.Load(filepath.Join(req.ProjectRoot, ".evolve", "policy.json"))
+		if perr != nil {
+			// Malformed policy must fail loudly, not silently ignore user rules.
+			return core.PhaseResponse{
+				Phase: phase, Verdict: core.VerdictFAIL, ArtifactsDir: req.Workspace,
+				Diagnostics: []core.Diagnostic{{Severity: "error", Message: perr.Error()}},
+			}, fmt.Errorf("%s: %w", phase, perr)
+		}
+		if p, ok := pol.PinFor(phase); ok {
+			if verr := policy.ValidatePin(phase, p, prof); verr != nil {
+				return core.PhaseResponse{
+					Phase: phase, Verdict: core.VerdictFAIL, ArtifactsDir: req.Workspace,
+					Diagnostics: []core.Diagnostic{{Severity: "error", Message: verr.Error()}},
+				}, fmt.Errorf("%s: %w", phase, verr)
+			}
+			pin = &p
+			fmt.Fprintf(os.Stderr, "[runner] phase=%s policy pin: cli=%q model=%q\n", phase, p.CLI, p.Model)
+		}
+	}
+
 	// Single dispatch resolver (llmroute): one Plan carries the CLI fallback
 	// chain AND the resolved model, so there is exactly one place that decides
 	// "which CLI + model runs this phase". Precedence (preserved verbatim):
@@ -281,15 +309,24 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		}
 		return "", false
 	}
-	plan := llmroute.Resolve(profileName, phase, b.hooks.DefaultModel(), req.Env, prof, autoExpand)
+	plan := llmroute.Resolve(profileName, phase, b.hooks.DefaultModel(), req.Env, prof, autoExpand, pin)
 	// Capability probe: demote (don't delete) candidates whose binary isn't on
 	// PATH so a missing CLI doesn't burn a 60s boot timeout before the chain
 	// advances. Log the reorder inline with the dispatch log.
-	preCandidates := plan.Candidates
-	plan = llmroute.Probe(plan, nil)
-	if !sameCandidates(preCandidates, plan.Candidates) {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s capability probe reordered chain: %v -> %v\n",
-			phase, preCandidates, plan.Candidates)
+	//
+	// SKIPPED when a CLI is policy-pinned: the probe reorders by binary
+	// availability, which would silently demote a pinned-but-missing CLI out of
+	// the primary slot — violating the "policy pin is absolute" contract. A
+	// pinned CLI is attempted as-is; if its binary is absent the dispatch
+	// surfaces a real ExitMissingBinary (127), which the profile fallback chain
+	// can still recover from via the normal trigger path.
+	if pin == nil || pin.CLI == "" {
+		preCandidates := plan.Candidates
+		plan = llmroute.Probe(plan, nil)
+		if !sameCandidates(preCandidates, plan.Candidates) {
+			fmt.Fprintf(os.Stderr, "[runner] phase=%s capability probe reordered chain: %v -> %v\n",
+				phase, preCandidates, plan.Candidates)
+		}
 	}
 	cli := plan.Candidates[0]
 	// Disambiguating dispatch log: tells observers which CLI is actually being

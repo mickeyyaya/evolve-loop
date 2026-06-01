@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -13,7 +14,7 @@ import (
 func TestResolve_EnvPerAgentBeatsProfile(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
 	env := map[string]string{"EVOLVE_AUDITOR_CLI": "claude-tmux"}
-	got := Resolve("auditor", "audit", "auto", env, prof, nil)
+	got := Resolve("auditor", "audit", "auto", env, prof, nil, nil)
 	if got.Candidates[0] != "claude-tmux" {
 		t.Errorf("primary=%q, want claude-tmux (per-agent env wins)", got.Candidates[0])
 	}
@@ -25,7 +26,7 @@ func TestResolve_EnvPerAgentBeatsProfile(t *testing.T) {
 func TestResolve_GlobalEnvBeatsProfile(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
 	env := map[string]string{"EVOLVE_CLI": "agy-tmux"}
-	got := Resolve("auditor", "audit", "auto", env, prof, nil)
+	got := Resolve("auditor", "audit", "auto", env, prof, nil, nil)
 	if got.Candidates[0] != "agy-tmux" || got.PrimarySource != "env(EVOLVE_CLI)" {
 		t.Errorf("got %q/%q, want agy-tmux/env(EVOLVE_CLI)", got.Candidates[0], got.PrimarySource)
 	}
@@ -34,7 +35,7 @@ func TestResolve_GlobalEnvBeatsProfile(t *testing.T) {
 func TestResolve_PerAgentBeatsGlobalEnv(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
 	env := map[string]string{"EVOLVE_AUDITOR_CLI": "claude-tmux", "EVOLVE_CLI": "agy-tmux"}
-	got := Resolve("auditor", "audit", "auto", env, prof, nil)
+	got := Resolve("auditor", "audit", "auto", env, prof, nil, nil)
 	if got.Candidates[0] != "claude-tmux" {
 		t.Errorf("primary=%q, want claude-tmux (per-agent beats global)", got.Candidates[0])
 	}
@@ -42,14 +43,14 @@ func TestResolve_PerAgentBeatsGlobalEnv(t *testing.T) {
 
 func TestResolve_ProfileUsedWhenNoEnv(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	if got.Candidates[0] != "codex-tmux" || got.PrimarySource != "profile.auditor.cli" {
 		t.Errorf("got %q/%q, want codex-tmux/profile.auditor.cli", got.Candidates[0], got.PrimarySource)
 	}
 }
 
 func TestResolve_DefaultWhenAllEmpty(t *testing.T) {
-	got := Resolve("auditor", "audit", "auto", nil, nil, nil)
+	got := Resolve("auditor", "audit", "auto", nil, nil, nil, nil)
 	if got.Candidates[0] != "claude-tmux" || got.PrimarySource != "default" {
 		t.Errorf("got %q/%q, want claude-tmux/default", got.Candidates[0], got.PrimarySource)
 	}
@@ -57,7 +58,7 @@ func TestResolve_DefaultWhenAllEmpty(t *testing.T) {
 
 func TestResolve_FallbackDedup(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux", CLIFallback: []string{"codex-tmux", "claude-tmux", "agy-tmux"}}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	want := []string{"codex-tmux", "claude-tmux", "agy-tmux"}
 	if !reflect.DeepEqual(got.Candidates, want) {
 		t.Errorf("candidates=%v, want %v (primary dedup'd)", got.Candidates, want)
@@ -66,7 +67,7 @@ func TestResolve_FallbackDedup(t *testing.T) {
 
 func TestResolve_FallbackDedupPreservesOrder(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux", CLIFallback: []string{"claude-tmux", "agy-tmux", "claude-tmux"}}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	want := []string{"codex-tmux", "claude-tmux", "agy-tmux"}
 	if !reflect.DeepEqual(got.Candidates, want) {
 		t.Errorf("candidates=%v, want %v", got.Candidates, want)
@@ -75,7 +76,7 @@ func TestResolve_FallbackDedupPreservesOrder(t *testing.T) {
 
 func TestResolve_DefaultTriggers(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	want := []int{80, 81, 124, 127}
 	if !reflect.DeepEqual(got.Triggers, want) {
 		t.Errorf("triggers=%v, want %v", got.Triggers, want)
@@ -84,7 +85,7 @@ func TestResolve_DefaultTriggers(t *testing.T) {
 
 func TestResolve_CustomTriggers(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux", CLIFallbackOnExit: []int{80, 127, 81, 2}}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	if !reflect.DeepEqual(got.Triggers, []int{80, 127, 81, 2}) {
 		t.Errorf("triggers=%v, want operator-extended list", got.Triggers)
 	}
@@ -92,7 +93,7 @@ func TestResolve_CustomTriggers(t *testing.T) {
 
 func TestResolve_TrimsWhitespace(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux", CLIFallback: []string{"  claude-tmux\n", "\tagy-tmux ", "  "}}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	want := []string{"codex-tmux", "claude-tmux", "agy-tmux"}
 	if !reflect.DeepEqual(got.Candidates, want) {
 		t.Errorf("candidates=%v, want %v (whitespace stripped, empty rejected)", got.Candidates, want)
@@ -207,7 +208,7 @@ func TestProbe_NilLookPathDefaultsToExecLookPath(t *testing.T) {
 func TestResolve_ModelEnvBeatsProfileAndDefault(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", ModelTierDefault: "sonnet"}
 	env := map[string]string{"EVOLVE_AUDITOR_MODEL": "opus"}
-	got := Resolve("auditor", "audit", "auto", env, prof, nil)
+	got := Resolve("auditor", "audit", "auto", env, prof, nil, nil)
 	if got.Model != "opus" {
 		t.Errorf("Model=%q, want opus (env override beats profile + default)", got.Model)
 	}
@@ -215,14 +216,14 @@ func TestResolve_ModelEnvBeatsProfileAndDefault(t *testing.T) {
 
 func TestResolve_ModelProfileTierBeatsDefault(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", ModelTierDefault: "sonnet"}
-	got := Resolve("auditor", "audit", "auto", nil, prof, nil)
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
 	if got.Model != "sonnet" {
 		t.Errorf("Model=%q, want sonnet (profile tier beats default 'auto')", got.Model)
 	}
 }
 
 func TestResolve_ModelDefaultWhenNoEnvNoProfile(t *testing.T) {
-	got := Resolve("auditor", "audit", "opus", nil, nil, nil)
+	got := Resolve("auditor", "audit", "opus", nil, nil, nil, nil)
 	if got.Model != "opus" {
 		t.Errorf("Model=%q, want opus (the supplied default)", got.Model)
 	}
@@ -235,7 +236,7 @@ func TestResolve_AutoExpandedViaSeam(t *testing.T) {
 		return "claude-opus-4-7", true
 	}
 	// defaultModel "auto" + no profile tier → "auto" → expander.
-	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand)
+	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand, nil)
 	if got.Model != "claude-opus-4-7" {
 		t.Errorf("Model=%q, want claude-opus-4-7 (auto expanded)", got.Model)
 	}
@@ -246,7 +247,7 @@ func TestResolve_AutoExpandedViaSeam(t *testing.T) {
 
 func TestResolve_AutoSeamFailureKeepsAuto(t *testing.T) {
 	autoExpand := func(role string) (string, bool) { return "", false }
-	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand)
+	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand, nil)
 	if got.Model != "auto" {
 		t.Errorf("Model=%q, want auto unchanged when expander returns ok=false", got.Model)
 	}
@@ -256,11 +257,60 @@ func TestResolve_NonAutoModelNotExpanded(t *testing.T) {
 	called := false
 	autoExpand := func(role string) (string, bool) { called = true; return "x", true }
 	prof := &profiles.Profile{CLI: "claude-tmux", ModelTierDefault: "sonnet"}
-	got := Resolve("auditor", "audit", "auto", nil, prof, autoExpand)
+	got := Resolve("auditor", "audit", "auto", nil, prof, autoExpand, nil)
 	if got.Model != "sonnet" {
 		t.Errorf("Model=%q, want sonnet", got.Model)
 	}
 	if called {
 		t.Error("autoExpand must not be called when model is already concrete (sonnet)")
+	}
+}
+
+// --- policy pin (absolute precedence) ---
+
+func TestResolve_PinCLIOverridesEnv(t *testing.T) {
+	// Pin beats even a per-agent env override (policy is the top authority).
+	prof := &profiles.Profile{CLI: "agy-tmux"}
+	env := map[string]string{"EVOLVE_AUDITOR_CLI": "agy-tmux"}
+	pin := &policy.Pin{CLI: "claude-tmux"}
+	got := Resolve("auditor", "audit", "auto", env, prof, nil, pin)
+	if got.Candidates[0] != "claude-tmux" || got.PrimarySource != "policy.pin" {
+		t.Errorf("got %q/%q, want claude-tmux/policy.pin (pin beats env)", got.Candidates[0], got.PrimarySource)
+	}
+}
+
+func TestResolve_PinModelBypassesAutoExpand(t *testing.T) {
+	called := false
+	autoExpand := func(role string) (string, bool) { called = true; return "x", true }
+	pin := &policy.Pin{Model: "claude-opus-4-8"}
+	// defaultModel "auto" would normally hit autoExpand; the pin must short it.
+	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand, pin)
+	if got.Model != "claude-opus-4-8" {
+		t.Errorf("Model=%q, want claude-opus-4-8 (pin absolute)", got.Model)
+	}
+	if called {
+		t.Error("autoExpand must NOT be called when model is pinned (no wasted resolvellm/catalog lookup)")
+	}
+}
+
+func TestResolve_PinPreservesProfileFallbackChain(t *testing.T) {
+	// A CLI pin replaces the primary but the profile fallback chain still
+	// applies (resilience): pinned claude-tmux + profile fallback [codex,agy].
+	prof := &profiles.Profile{CLI: "agy-tmux", CLIFallback: []string{"codex-tmux", "agy-tmux"}}
+	pin := &policy.Pin{CLI: "claude-tmux"}
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, pin)
+	want := []string{"claude-tmux", "codex-tmux", "agy-tmux"}
+	if !reflect.DeepEqual(got.Candidates, want) {
+		t.Errorf("candidates=%v, want %v (pin primary + profile fallback)", got.Candidates, want)
+	}
+}
+
+func TestResolve_PinCLIOnlyLeavesModelNormal(t *testing.T) {
+	// A pin with only CLI must not touch model resolution.
+	prof := &profiles.Profile{CLI: "agy-tmux", ModelTierDefault: "sonnet"}
+	pin := &policy.Pin{CLI: "claude-tmux"}
+	got := Resolve("auditor", "audit", "auto", nil, prof, nil, pin)
+	if got.Model != "sonnet" {
+		t.Errorf("Model=%q, want sonnet (CLI-only pin leaves model to normal chain)", got.Model)
 	}
 }

@@ -32,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -102,13 +103,32 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 //   - defaultModel is the phase Hooks' DefaultModel() (usually "auto").
 //   - prof may be nil (no profile on disk).
 //   - autoExpand may be nil (then "auto" is left as-is).
-func Resolve(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel) Plan {
+//   - pin may be nil (no policy pin). A non-nil pin is ABSOLUTE: pin.CLI
+//     replaces the resolved primary CLI (source="policy.pin"), and pin.Model
+//     replaces the resolved model outright — bypassing the env/profile/default
+//     chain AND the "auto" expansion (so a pinned model never triggers a
+//     resolvellm/catalog lookup). The caller is responsible for the
+//     EVOLVE_POLICY_BYPASS escape hatch (pass nil to bypass) and for validating
+//     the pin against the profile guardrails (policy.ValidatePin) before here.
+//     The profile fallback CHAIN is still appended after a pinned primary, so a
+//     pinned phase keeps CLI-failure resilience; an operator wanting a strict
+//     single-CLI phase empties profile.cli_fallback.
+func Resolve(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel, pin *policy.Pin) Plan {
 	primary, source := resolvePrimary(agent, env, prof)
+	if pin != nil && pin.CLI != "" {
+		primary, source = pin.CLI, "policy.pin"
+	}
+	var model string
+	if pin != nil && pin.Model != "" {
+		model = pin.Model // absolute — skip the env/profile/default/auto chain entirely
+	} else {
+		model = resolveModel(agent, phase, defaultModel, env, prof, autoExpand)
+	}
 	return Plan{
 		Candidates:    candidatesFrom(primary, prof),
 		Triggers:      resolveTriggers(prof),
 		PrimarySource: source,
-		Model:         resolveModel(agent, phase, defaultModel, env, prof, autoExpand),
+		Model:         model,
 	}
 }
 
