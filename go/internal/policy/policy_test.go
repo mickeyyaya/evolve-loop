@@ -3,6 +3,7 @@ package policy
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -50,6 +51,43 @@ func TestLoad_ParsesMandatoryAndPins(t *testing.T) {
 	pin, ok := p.PinFor("audit")
 	if !ok || pin.CLI != "claude-tmux" || pin.Model != "claude-opus-4-8" {
 		t.Errorf("PinFor(audit)=%+v ok=%v", pin, ok)
+	}
+}
+
+func TestMergeMandatory(t *testing.T) {
+	cases := []struct {
+		name string
+		pol  Policy
+		base []string
+		want []string
+	}{
+		{"empty-policy-returns-base", Policy{}, []string{"scout", "build"}, []string{"scout", "build"}},
+		{"adds-new", Policy{MandatoryPhases: []string{"security-scan"}}, []string{"scout", "audit"}, []string{"scout", "audit", "security-scan"}},
+		{"dedups-existing", Policy{MandatoryPhases: []string{"audit", "scout"}}, []string{"scout", "audit"}, []string{"scout", "audit"}},
+		{"skips-empty", Policy{MandatoryPhases: []string{"", "ship"}}, []string{"scout"}, []string{"scout", "ship"}},
+		{"empty-base", Policy{MandatoryPhases: []string{"audit"}}, nil, []string{"audit"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := c.pol.MergeMandatory(c.base)
+			if !slices.Equal(got, c.want) {
+				t.Errorf("MergeMandatory(%v over %v)=%v, want %v", c.pol.MandatoryPhases, c.base, got, c.want)
+			}
+		})
+	}
+}
+
+// TestMergeMandatory_DoesNotMutateBase guards the slice-copy invariant: the
+// caller's base (e.g. a shared cfg.Mandatory) must never be mutated.
+func TestMergeMandatory_DoesNotMutateBase(t *testing.T) {
+	base := []string{"scout", "audit"}
+	pol := Policy{MandatoryPhases: []string{"security-scan", "scout"}}
+	got := pol.MergeMandatory(base)
+	if !slices.Equal(base, []string{"scout", "audit"}) {
+		t.Errorf("base was mutated: %v", base)
+	}
+	if !slices.Equal(got, []string{"scout", "audit", "security-scan"}) {
+		t.Errorf("got=%v, want [scout audit security-scan]", got)
 	}
 }
 

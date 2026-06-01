@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // PhasePolicy is the single enablement-decision object (Fowler's "decision point
@@ -85,5 +86,13 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 func PolicyForProject(projectRoot string, env map[string]string) PhasePolicy {
 	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
 	cfg, _ := config.Load(registryPath, env)
+	// Apply the user policy's mandatory_phases here too, identically to the
+	// loop's composition root — otherwise a self-skipping phase (triage/tdd/
+	// build-planner) made mandatory ONLY by policy would re-read config without
+	// the merge and skip itself. A malformed policy is ignored here (best-effort
+	// for the skip decision); the runner re-loads it and hard-fails at dispatch.
+	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
+		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
+	}
 	return PhasePolicy{Cfg: cfg}
 }
