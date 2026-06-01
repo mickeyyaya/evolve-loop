@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -164,8 +166,15 @@ func buildPlanPrompt(in router.RouteInput) string {
 
 	writeRoutingContext(&b, in)
 
+	b.WriteString("\n## Optionally MINT a new phase\n")
+	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
+	b.WriteString("by attaching a \"mint\" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER ")
+	b.WriteString("(fast|balanced|deep — never a raw model name). Minted phases are always optional and clamped by the kernel; ")
+	b.WriteString("they can never reach ship without audit. Omit \"mint\" for existing phases.\n")
+
 	b.WriteString("\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n")
-	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>"},...]`)
+	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>"},`)
+	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","writes_source":false}}]`)
 	b.WriteString("\n")
 	return b.String()
 }
@@ -264,7 +273,33 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("empty phase plan")
 	}
-	return &router.PhasePlan{Entries: entries}, nil
+	return &router.PhasePlan{Entries: entries, MintPhases: mintConfigsFrom(entries)}, nil
+}
+
+// mintConfigsFrom reconstructs a phaseconfig.PhaseConfig for every entry that
+// carries a Mint block. The entry's Phase becomes the phase name (and default
+// agent/profile key); the MintSpec supplies the persona + dispatch knobs. The
+// registrar later forces Optional + clamps the tier/cli, so this mapping does
+// the minimum: name + inline prompt + tier + cli + writes_source.
+//
+// A mint entry is collected regardless of its Run flag: REGISTRATION (wiring the
+// phase into runners/catalog/routing) is distinct from DISPATCH (whether it runs
+// this cycle, which the entry's Run flag governs via the routing loop). A
+// run:false mint thus reserves the phase without executing it. Returns nil (the
+// common no-op path) when no entry mints.
+func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig {
+	var out []phaseconfig.PhaseConfig
+	for _, e := range entries {
+		if e.Mint == nil {
+			continue
+		}
+		out = append(out, phaseconfig.PhaseConfig{
+			PhaseSpec: phasespec.PhaseSpec{Name: e.Phase, WritesSource: e.Mint.WritesSource},
+			Dispatch:  phaseconfig.Dispatch{CLI: e.Mint.CLI, ModelTierDefault: e.Mint.Tier},
+			Prompt:    e.Mint.Prompt,
+		})
+	}
+	return out
 }
 
 // lastBalancedSpan finds the LAST top-level balanced span delimited by open/
