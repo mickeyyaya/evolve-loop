@@ -65,6 +65,33 @@ func TestLookupNilCatalog(t *testing.T) {
 	}
 }
 
+func TestDispatchModelGatesOnLiveSource(t *testing.T) {
+	c := Catalog{CLIs: map[string]CLIEntry{
+		"codex":  {TierModels: map[string]string{"deep": "gpt-5.5"}, Source: SourceLive},
+		"agy":    {TierModels: map[string]string{"deep": "gemini"}, Source: SourceDetect},
+		"ollama": {TierModels: map[string]string{"deep": "phi4"}}, // no source → not live
+	}}
+	tests := []struct {
+		name, cli, tier, wantModel string
+		wantOK                     bool
+	}{
+		{"live entry drives dispatch", "codex", "deep", "gpt-5.5", true},
+		{"detect entry does NOT drive dispatch", "agy", "deep", "", false},
+		{"missing-source entry does NOT drive dispatch", "ollama", "deep", "", false},
+		{"unknown cli", "gemini", "deep", "", false},
+		{"live cli, absent tier", "codex", "fast", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := c.DispatchModel(tt.cli, tt.tier)
+			if got != tt.wantModel || ok != tt.wantOK {
+				t.Fatalf("DispatchModel(%q,%q) = (%q,%v), want (%q,%v)",
+					tt.cli, tt.tier, got, ok, tt.wantModel, tt.wantOK)
+			}
+		})
+	}
+}
+
 func TestIsStale(t *testing.T) {
 	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	ttl := 24 * time.Hour
