@@ -116,6 +116,98 @@ func TestRunREPL_AuditVerdictInjection(t *testing.T) {
 	}
 }
 
+// EOF fallback: a prompt that never carries a "- workspace:" line (so the
+// per-line trigger never fires) but does mention an absolute artifact path
+// must still be served once when stdin closes.
+func TestRunREPL_EOFFallback_WritesFromAbsolutePath(t *testing.T) {
+	// Arrange: heading + absolute artifact path, NO workspace line.
+	ws := t.TempDir()
+	artifact := filepath.Join(ws, "scout-report.md")
+	prompt := "# Evolve Scout\n\nplease write " + artifact + "\n"
+	var stdout, stderr bytes.Buffer
+
+	// Act
+	rc := runREPL(strings.NewReader(prompt), &stdout, &stderr, "PASS")
+
+	// Assert
+	if rc != 0 {
+		t.Fatalf("rc=%d stderr=%s", rc, stderr.String())
+	}
+	body, err := os.ReadFile(artifact)
+	if err != nil {
+		t.Fatalf("EOF-fallback should have written %s: %v", artifact, err)
+	}
+	if !strings.Contains(string(body), "## Proposed Tasks") {
+		t.Errorf("scout artifact missing marker; got %q", string(body))
+	}
+}
+
+// emitREPLArtifacts returns false (and logs) when the phase has no artifact
+// contract — the REPL must not treat that as a successful turn.
+func TestEmitREPLArtifacts_UnknownPhase_ReturnsFalse(t *testing.T) {
+	// Arrange / Act
+	var stdout, stderr bytes.Buffer
+	ok := emitREPLArtifacts("nonesuch", "/tmp/x.md", "PASS", &stdout, &stderr)
+
+	// Assert
+	if ok {
+		t.Error("emitREPLArtifacts should return false for an unknown phase")
+	}
+	if !strings.Contains(stderr.String(), "artifactsFor") {
+		t.Errorf("stderr should report the artifactsFor failure; got %q", stderr.String())
+	}
+}
+
+// emitREPLArtifacts returns false when the underlying write fails (e.g. an
+// unwritable parent path); the failure is logged, never panics.
+func TestEmitREPLArtifacts_WriteFailure_ReturnsFalse(t *testing.T) {
+	// Arrange: a read-only directory so MkdirAll/WriteFile under it fails.
+	parent := t.TempDir()
+	ro := filepath.Join(parent, "ro")
+	if err := os.Mkdir(ro, 0o555); err != nil {
+		t.Fatalf("mkdir ro: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
+	artifact := filepath.Join(ro, "sub", "scout-report.md")
+
+	// Act
+	var stdout, stderr bytes.Buffer
+	ok := emitREPLArtifacts("scout", artifact, "PASS", &stdout, &stderr)
+
+	// Assert
+	if ok {
+		t.Error("emitREPLArtifacts should return false when the write fails")
+	}
+	if stderr.Len() == 0 {
+		t.Error("write failure should be logged to stderr")
+	}
+}
+
+// writeArtifacts must surface a write error (unwritable destination) rather
+// than silently dropping the artifact.
+func TestWriteArtifacts_UnwritableDestination_Errors(t *testing.T) {
+	// Arrange: a read-only directory; WriteFile into an existing path under it
+	// (dir already present so MkdirAll succeeds, then WriteFile fails).
+	parent := t.TempDir()
+	ro := filepath.Join(parent, "ro")
+	if err := os.Mkdir(ro, 0o555); err != nil {
+		t.Fatalf("mkdir ro: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
+
+	// Act: target is directly inside the read-only dir (no new subdir needed),
+	// so MkdirAll(ro) is a no-op success and WriteFile is the failing call.
+	err := writeArtifacts(map[string]string{filepath.Join(ro, "out.md"): "x"})
+
+	// Assert
+	if err == nil {
+		t.Fatal("writeArtifacts should error writing into a read-only directory")
+	}
+	if !strings.Contains(err.Error(), "write") {
+		t.Errorf("error should mention the write op; got %v", err)
+	}
+}
+
 // parseArgs must infer the CLI family (for exit injection) and the
 // interactive/REPL flag from the invocation flags alone.
 func TestParseArgs_StyleAndInteractive(t *testing.T) {

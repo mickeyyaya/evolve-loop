@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -222,6 +223,45 @@ func TestBuild_AtomicWrite_NoPartialFile(t *testing.T) {
 	var inv Inventory
 	if err := json.Unmarshal(b, &inv); err != nil {
 		t.Errorf("output is not valid JSON: %v", err)
+	}
+}
+
+// TestBuild_SkillsPathIsFile_ScanError — when <root>/skills exists but is a
+// regular file (not a directory), the loader's ReadDir fails with a non-
+// IsNotExist error (ENOTDIR), so scan propagates it and Build wraps it as a
+// "scan" error rather than emitting an empty inventory.
+func TestBuild_SkillsPathIsFile_ScanError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "skills"), []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Build(Options{ProjectRoot: root, Force: true})
+	if err == nil {
+		t.Fatal("Build with skills-as-file: want scan error")
+	}
+	if !strings.Contains(err.Error(), "skillinventory: scan:") {
+		t.Errorf("error %q must be wrapped as a scan failure", err)
+	}
+}
+
+// TestBuild_OutputPathIsDir_WriteError — when the destination
+// .evolve/skill-inventory.json is itself a directory, writeAtomic's final
+// os.Rename fails, and Build surfaces it as a wrapped "write" error.
+func TestBuild_OutputPathIsDir_WriteError(t *testing.T) {
+	root := t.TempDir()
+	writeSkill(t, root, "alpha", `name: alpha`)
+	// Pre-create .evolve/skill-inventory.json as a directory so MkdirAll(.evolve)
+	// still succeeds but the rename-onto-it cannot.
+	outDir := filepath.Join(root, ".evolve", "skill-inventory.json")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Build(Options{ProjectRoot: root, Force: true})
+	if err == nil {
+		t.Fatal("Build with output path as a directory: want write error")
+	}
+	if !strings.Contains(err.Error(), "skillinventory: write:") {
+		t.Errorf("error %q must be wrapped as a write failure", err)
 	}
 }
 

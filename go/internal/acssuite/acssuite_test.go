@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -296,6 +297,103 @@ func TestWriteVerdict_MkdirError(t *testing.T) {
 	// evolveDir under a regular file → MkdirAll fails.
 	if _, err := WriteVerdict(filepath.Join(blocker, "evolve"), Verdict{Cycle: 1}); err == nil {
 		t.Error("want error when evolveDir cannot be created")
+	}
+}
+
+// TestRun_DiscoverGlobError — a Root containing an unterminated '[' makes the
+// cycle-predicate glob pattern malformed (filepath.ErrBadPattern), so discover
+// fails and Run propagates the error rather than returning an empty PASS verdict
+// (acssuite.go:136-138, 203-205). Pins: a glob syntax error is surfaced, never
+// silently treated as "no predicates".
+func TestRun_DiscoverGlobError(t *testing.T) {
+	// The literal '[' lands in the joined glob path before the '*.sh' segment,
+	// leaving the bracket class unterminated.
+	badRoot := filepath.Join(t.TempDir(), "x[")
+	if _, err := Run(Options{Root: badRoot, Cycle: 1}); err == nil {
+		t.Fatal("Run must surface a glob syntax error from discover, got nil")
+	}
+}
+
+// TestDiscover_GlobErrorIsWrapped — direct white-box check that discover wraps a
+// malformed cycle glob with its "glob cycle" context (acssuite.go:203-205).
+func TestDiscover_GlobErrorIsWrapped(t *testing.T) {
+	_, err := discover(filepath.Join(t.TempDir(), "x["), 1)
+	if err == nil {
+		t.Fatal("discover must return an error for a malformed glob pattern")
+	}
+	if got := err.Error(); !strings.Contains(got, "glob cycle") {
+		t.Errorf("error must carry the 'glob cycle' context; got %q", got)
+	}
+}
+
+// TestRunBash_ExecError — when the bash binary cannot be resolved at all (PATH
+// emptied for this test), runBash cannot start the process: the error is NOT an
+// *exec.ExitError, so runBash returns the 126 exec-error sentinel with an
+// "exec error" diagnostic rather than masking the failure (acssuite.go:272).
+func TestRunBash_ExecError(t *testing.T) {
+	// t.Setenv forbids t.Parallel — this test mutates process PATH.
+	t.Setenv("PATH", "")
+	code, out := runBash(context.Background(), filepath.Join(t.TempDir(), "noexist.sh"), "")
+	if code != 126 {
+		t.Errorf("exit code=%d, want 126 (could-not-exec sentinel)", code)
+	}
+	if !strings.Contains(out, "exec error") {
+		t.Errorf("output must carry the exec-error diagnostic; got %q", out)
+	}
+}
+
+// TestRelPath_FallbackReturnsPath — when filepath.Rel cannot relativize (an
+// absolute root vs a relative target), relPath returns the input path unchanged
+// instead of an empty string (acssuite.go:285).
+func TestRelPath_FallbackReturnsPath(t *testing.T) {
+	const target = "relative/predicate.sh"
+	if got := relPath("/abs/root", target); got != target {
+		t.Errorf("relPath fallback = %q, want the input path %q", got, target)
+	}
+}
+
+// TestWriteVerdict_RenameError — when the destination acs-verdict.json already
+// exists as a DIRECTORY, the final os.Rename(tmp, dst) cannot complete, so
+// WriteVerdict surfaces a "rename" error rather than reporting success
+// (acssuite.go:321-323).
+func TestWriteVerdict_RenameError(t *testing.T) {
+	evolveDir := t.TempDir()
+	// Pre-create <evolveDir>/runs/cycle-1/acs-verdict.json as a directory so the
+	// rename of the temp file onto it fails.
+	collide := filepath.Join(evolveDir, "runs", "cycle-1", "acs-verdict.json")
+	if err := os.MkdirAll(collide, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteVerdict(evolveDir, Verdict{Cycle: 1}); err == nil {
+		t.Fatal("WriteVerdict must error when the destination cannot be renamed onto")
+	} else if !strings.Contains(err.Error(), "rename") {
+		t.Errorf("error must carry the 'rename' context; got %q", err.Error())
+	}
+}
+
+// TestWriteVerdict_CreateTempError — the cycle dir already exists but is
+// read-only: MkdirAll is a no-op (dir present), then os.CreateTemp cannot create
+// the temp file, so WriteVerdict surfaces a "create tmp" error rather than
+// silently dropping the verdict (acssuite.go:311-313).
+func TestWriteVerdict_CreateTempError(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("read-only-dir permission denial does not hold for root")
+	}
+	evolveDir := t.TempDir()
+	cycleDir := filepath.Join(evolveDir, "runs", "cycle-1")
+	if err := os.MkdirAll(cycleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(cycleDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	// Restore write perm so t.TempDir's recursive cleanup can remove it.
+	t.Cleanup(func() { _ = os.Chmod(cycleDir, 0o755) })
+
+	if _, err := WriteVerdict(evolveDir, Verdict{Cycle: 1}); err == nil {
+		t.Fatal("WriteVerdict must error when the temp file cannot be created")
+	} else if !strings.Contains(err.Error(), "create tmp") {
+		t.Errorf("error must carry the 'create tmp' context; got %q", err.Error())
 	}
 }
 

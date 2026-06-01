@@ -128,6 +128,51 @@ func TestRefreshRequiresSeams(t *testing.T) {
 	}
 }
 
+// TestRefreshEmptyModelListFallsBack covers liveTiers' len(ids)==0 branch: the
+// lister succeeds but returns zero models, so the CLI falls back to its detect
+// tier map rather than being treated as live.
+func TestRefreshEmptyModelListFallsBack(t *testing.T) {
+	deps := RefreshDeps{
+		CLIs:       []string{"codex"},
+		Lister:     fakeLister{ids: map[string][]string{"codex": {}}}, // empty, no error
+		Classifier: fakeClassifier{},
+		Fallback:   map[string]map[string]string{"codex": {"balanced": "gpt-detect"}},
+		Now:        fixedNow,
+	}
+	cat, err := Refresh(context.Background(), deps)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if m, ok := cat.Lookup("codex", "balanced"); !ok || m != "gpt-detect" {
+		t.Fatalf("empty-list CLI must fall back to detect, got (%q,%v)", m, ok)
+	}
+	// Detect fallback is informational, NOT dispatch-authoritative.
+	if _, ok := cat.DispatchModel("codex", "balanced"); ok {
+		t.Fatal("empty-list fallback entry must NOT drive dispatch")
+	}
+}
+
+// TestRefreshDefaultClockWhenNowNil covers the `now = time.Now` default branch
+// (Now seam left nil). Asserts FetchedAt is stamped within the invocation
+// window — deterministic without coupling to an exact wall-clock value.
+func TestRefreshDefaultClockWhenNowNil(t *testing.T) {
+	before := time.Now().UTC()
+	deps := RefreshDeps{
+		CLIs:       []string{"codex"},
+		Lister:     fakeLister{ids: map[string][]string{"codex": {"m1", "m2", "m3"}}},
+		Classifier: fakeClassifier{},
+		// Now intentionally nil → defaults to time.Now.
+	}
+	cat, err := Refresh(context.Background(), deps)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	after := time.Now().UTC()
+	if cat.FetchedAt.Before(before) || cat.FetchedAt.After(after) {
+		t.Errorf("FetchedAt=%v not within [%v,%v]", cat.FetchedAt, before, after)
+	}
+}
+
 func TestRouterRoutes(t *testing.T) {
 	ollama := fakeLister{ids: map[string][]string{"ollama": {"phi4"}}}
 	deflt := fakeLister{ids: map[string][]string{"codex": {"gpt-5.5"}}}

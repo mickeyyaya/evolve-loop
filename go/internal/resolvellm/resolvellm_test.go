@@ -325,6 +325,86 @@ func TestResolve_LLMConfigPhasePrecedesFallback(t *testing.T) {
 	}
 }
 
+// TestResolve_NoConfigPathNoEnv_GitRootEmpty_FallsBackToCwd exercises the
+// default-config-path derivation when neither ConfigPath nor EVOLVE_PROJECT_ROOT
+// is set and gitRoot() returns "" — Resolve must fall back to os.Getwd() to
+// build the config path, find no config + no profile, and surface
+// ErrProfileNotFound. PATH is emptied so the `git rev-parse` child fails
+// deterministically (gitRoot → ""), independent of ambient git.
+func TestResolve_NoConfigPathNoEnv_GitRootEmpty_FallsBackToCwd(t *testing.T) {
+	// Not parallel: mutates PATH and the process working directory.
+	dir := t.TempDir()
+	t.Setenv("PATH", "") // make exec.LookPath("git") fail → gitRoot() returns ""
+
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	// Env stub returns "" for EVOLVE_PROJECT_ROOT so the gitRoot()→getwd ladder
+	// is taken; the cwd (a fresh TempDir) has no .evolve tree, so the profile
+	// lookup also misses.
+	_, err = Resolve("scout", Options{Env: func(string) string { return "" }})
+	if !errors.Is(err, ErrProfileNotFound) {
+		t.Fatalf("want ErrProfileNotFound, got %v", err)
+	}
+}
+
+// TestResolve_ProfilePathIsDirectory_ReadError covers the os.ReadFile failure
+// branch: findProfile's os.Stat succeeds on the profile path (a directory named
+// scout.json exists), but ReadFile then fails because it is a directory.
+func TestResolve_ProfilePathIsDirectory_ReadError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// Create a DIRECTORY at the profile path so Stat succeeds but ReadFile fails.
+	profPath := filepath.Join(dir, ".evolve", "profiles", "scout.json")
+	if err := os.MkdirAll(profPath, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	_, err := Resolve("scout", Options{
+		ConfigPath:  filepath.Join(dir, "absent.json"),
+		ProjectRoot: dir,
+	})
+	if err == nil {
+		t.Fatal("want read-profile error when profile path is a directory")
+	}
+	if errors.Is(err, ErrProfileNotFound) {
+		t.Fatalf("want a read error, not ErrProfileNotFound: %v", err)
+	}
+	if !strings.Contains(err.Error(), "read profile") {
+		t.Errorf("want read-profile error, got %v", err)
+	}
+}
+
+// TestResolve_ProfileInvalidJSON_ParseError covers the json.Unmarshal failure
+// branch on the profile document (distinct from the llm_config invalid-JSON
+// path, which falls through silently).
+func TestResolve_ProfileInvalidJSON_ParseError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	profPath := filepath.Join(dir, ".evolve", "profiles", "scout.json")
+	if err := os.MkdirAll(filepath.Dir(profPath), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(profPath, []byte("not json {{"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_, err := Resolve("scout", Options{
+		ConfigPath:  filepath.Join(dir, "absent.json"),
+		ProjectRoot: dir,
+	})
+	if err == nil {
+		t.Fatal("want parse error for malformed profile JSON")
+	}
+	if !strings.Contains(err.Error(), "parse") {
+		t.Errorf("want parse error, got %v", err)
+	}
+}
+
 // TestResolve_ParityWithBash diffs Go output vs bash output across many
 // scenarios. Skipped when bash or jq are not on PATH.
 func TestResolve_ParityWithBash(t *testing.T) {

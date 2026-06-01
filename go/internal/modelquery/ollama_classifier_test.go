@@ -3,6 +3,7 @@ package modelquery
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -165,6 +166,136 @@ func TestCLIClassifierBadReply(t *testing.T) {
 	s := &stubRunner{out: "I cannot help with that."}
 	if _, err := (CLIClassifier{CLI: "codex", Run: s.run}).Classify(context.Background(), "codex", []string{"x"}); err == nil {
 		t.Fatal("expected error when reply has no JSON")
+	}
+}
+
+// TestDefaultRunner_CapturesOutput exercises the production exec runner end to
+// end against a guaranteed-present shell builtin wrapper. Skipped only when the
+// chosen binary is genuinely absent from PATH.
+func TestDefaultRunner_CapturesOutput(t *testing.T) {
+	t.Parallel()
+	echo, err := exec.LookPath("echo")
+	if err != nil {
+		t.Skip("echo not on PATH")
+	}
+	out, rerr := defaultRunner(context.Background(), echo, []string{"hello-runner"}, "")
+	if rerr != nil {
+		t.Fatalf("defaultRunner: %v", rerr)
+	}
+	if !strings.Contains(out, "hello-runner") {
+		t.Errorf("output = %q, want it to contain %q", out, "hello-runner")
+	}
+}
+
+// TestDefaultRunner_PipesStdin covers the stdin != "" branch via `cat`, which
+// echoes stdin to stdout. Skipped only when cat is genuinely absent.
+func TestDefaultRunner_PipesStdin(t *testing.T) {
+	t.Parallel()
+	cat, err := exec.LookPath("cat")
+	if err != nil {
+		t.Skip("cat not on PATH")
+	}
+	out, rerr := defaultRunner(context.Background(), cat, nil, "piped-in")
+	if rerr != nil {
+		t.Fatalf("defaultRunner: %v", rerr)
+	}
+	if strings.TrimSpace(out) != "piped-in" {
+		t.Errorf("output = %q, want %q", out, "piped-in")
+	}
+}
+
+// TestDefaultRunner_NonZeroExitReturnsError covers the error return path of the
+// production runner (CombinedOutput err non-nil).
+func TestDefaultRunner_NonZeroExitReturnsError(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("false"); err != nil {
+		t.Skip("false not on PATH")
+	}
+	if _, rerr := defaultRunner(context.Background(), "false", nil, ""); rerr == nil {
+		t.Fatal("want error from non-zero exit")
+	}
+}
+
+// TestErrNoLister_Error pins the error string of the router's no-lister sentinel.
+func TestErrNoLister_Error(t *testing.T) {
+	t.Parallel()
+	got := errNoLister("ollama").Error()
+	want := "modelquery: no lister for cli ollama"
+	if got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+}
+
+// TestOllamaLister_NilRunDefaultsToExecRunner covers the `run == nil` default
+// branch in OllamaLister.List: with no injected Runner it routes through
+// defaultRunner and shells out to the real `ollama`. The branch executes
+// regardless of whether ollama is installed — so the assertion tolerates both
+// outcomes (present → nil err + ids; absent → wrapped "ollama list" error) and
+// pins only that the nil-Run path does not panic and stays internally
+// consistent (error XOR ids).
+func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
+	t.Parallel()
+	ids, err := (OllamaLister{}).List(context.Background(), "ollama")
+	if err != nil {
+		if !strings.Contains(err.Error(), "ollama list") {
+			t.Errorf("want wrapped 'ollama list' error, got %v", err)
+		}
+		if ids != nil {
+			t.Errorf("ids must be nil on error, got %v", ids)
+		}
+	}
+}
+
+// TestCLIClassifier_NilRunDefaultsToExecRunner covers the `run == nil` default
+// branch in Classify: with no injected Runner it shells out to the named CLI,
+// which is absent in CI, so Classify returns the wrapped classifier error.
+func TestCLIClassifier_NilRunDefaultsToExecRunner(t *testing.T) {
+	t.Parallel()
+	const absentCLI = "evolve-absent-cli-xyz"
+	if _, err := exec.LookPath(absentCLI); err == nil {
+		t.Skip("sentinel CLI unexpectedly present on PATH")
+	}
+	_, err := (CLIClassifier{CLI: absentCLI}).Classify(
+		context.Background(), absentCLI, []string{"m1"})
+	if err == nil {
+		t.Fatal("want error when classifier CLI binary is absent")
+	}
+	if !strings.Contains(err.Error(), "classifier "+absentCLI) {
+		t.Errorf("want wrapped classifier error, got %v", err)
+	}
+}
+
+// TestCLIClassifier_AllObjectsFailToMap covers the loop's continue branch
+// (json.Unmarshal failure on a non-object) AND the terminal "no JSON object
+// mapped a tier" error: a reply with one malformed-typed object and one valid
+// JSON object whose models are all hallucinated → no tier survives sanitize.
+func TestCLIClassifier_AllObjectsFailToMap(t *testing.T) {
+	t.Parallel()
+	// First object has a non-string value → json.Unmarshal into map[string]string
+	// fails → continue. Second object is valid JSON but maps tiers to models that
+	// were never offered → sanitizeTierMap returns empty → loop continues → the
+	// terminal error fires.
+	reply := `{"fast":123}` + "\n" + `{"fast":"not-offered","deep":"also-not"}`
+	s := &stubRunner{out: reply}
+	_, err := (CLIClassifier{CLI: "codex", Run: s.run}).Classify(
+		context.Background(), "codex", []string{"real-model"})
+	if err == nil {
+		t.Fatal("want error when no object maps a tier to an offered model")
+	}
+	if !strings.Contains(err.Error(), "no JSON object mapped a tier") {
+		t.Errorf("want terminal mapping error, got %v", err)
+	}
+}
+
+// TestTruncate_LongStringTruncates covers truncate's tail branch (len > n):
+// it returns the first n runes plus an ellipsis. Multi-byte runes confirm the
+// cut is rune-aware, not byte-aware.
+func TestTruncate_LongStringTruncates(t *testing.T) {
+	t.Parallel()
+	got := truncate("ααααα", 3) // 5 two-byte runes, cap 3
+	want := "ααα" + "…"
+	if got != want {
+		t.Errorf("truncate = %q, want %q", got, want)
 	}
 }
 
