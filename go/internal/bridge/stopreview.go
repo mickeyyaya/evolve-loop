@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -122,4 +123,39 @@ func envInt(deps Deps, key string, def int) int {
 		return def
 	}
 	return n
+}
+
+var (
+	rxBraille      = regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`)
+	rxAsciiSpinner = regexp.MustCompile(`^[-/|\\]\s`)
+	rxDeliberating = regexp.MustCompile(`Deliberating.*[0-9]+[ms]`)
+	rxTokens       = regexp.MustCompile(`↓\s*[0-9]+(\.[0-9]+)?k\s+tokens`)
+)
+
+// PaneHasSubstantiveChange split each pane string by newline, discard lines that
+// match any volatile pattern, compare the stripped slices joined back as strings.
+func PaneHasSubstantiveChange(prev, cur string) bool {
+	cleanPrev := cleanPane(prev)
+	cleanCur := cleanPane(cur)
+	return cleanPrev != cleanCur
+}
+
+func cleanPane(pane string) string {
+	var lines []string
+	for _, line := range strings.Split(pane, "\n") {
+		if rxBraille.MatchString(line) {
+			continue
+		}
+		if rxAsciiSpinner.MatchString(line) {
+			continue
+		}
+		if rxDeliberating.MatchString(line) {
+			continue
+		}
+		if rxTokens.MatchString(line) {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }

@@ -51,7 +51,7 @@ The reviewer is a seam (`StopReviewer` interface), so the loop wiring never chan
 1. Route **all** pipeline stop conditions through `StopEvent`/`StopReviewer` (non-zero exit, launch error, audit block, quota wall) — one review layer, no per-kind mechanism.
 2. **LLM/orchestrator reviewer** behind `StopReviewer`: judge "stuck vs working" from `StdoutTail` + partial artifacts (Rule 5 — deterministic fast-path first, AI judgment for the ambiguous case).
 3. Distinct **`pause` semantics**: checkpoint + write an investigation report rather than reusing `ExitArtifactTimeout`; let the orchestrator decide retry/adapt/abandon.
-4. Sharper progress signal (strip volatile spinner lines; per-poll idle tracking) so spinner animation no longer reads as progress.
+4. **SHIPPED (cycle-186)**: Sharper progress signal (strip volatile spinner lines) so spinner animation no longer reads as progress. Implementation: `PaneHasSubstantiveChange` in `stopreview.go`, wired into the driver's wait loop.
 5. Emit the verdict + justification to the ledger as an auditable self-healing trail.
 
 ## Consequences

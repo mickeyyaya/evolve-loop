@@ -92,6 +92,14 @@ If a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout` but s
 
 ---
 
+## Cycle Health Self-Heal Signal (`self_heal_events`)
+
+To track recovery events during a cycle, the integrity checker (`evolve cycle-health`) includes the `self_heal_events` signal (signal 13).
+
+This signal automatically scans `ledger.jsonl` for any entries with `kind=phase_retry` or `kind=backfill` for the current cycle. For each event found, it generates a `SeverityWarn` anomaly containing the name of the retried/backfilled phase, alerting operators that a self-heal recovery occurred during the cycle.
+
+---
+
 ## References
 
 - For details on how artifacts are extracted and recovered from scrollback logs, see [Artifact Backfill](artifact-backfill.md).

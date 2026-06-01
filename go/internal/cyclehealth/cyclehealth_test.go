@@ -391,12 +391,155 @@ func TestCheck_OverallFatal_TrueOnAnyFatal(t *testing.T) {
 	}
 }
 
-// TestSignalNames_ReturnsTwelve — the public contract is "12
-// signals"; guard against accidental removal.
-func TestSignalNames_ReturnsTwelve(t *testing.T) {
+// TestSignalNames_ReturnsThirteen — the public contract grew to "13
+// signals" when self_heal_events was added (cycle-186); guard against
+// accidental removal and confirm the new signal is named.
+func TestSignalNames_ReturnsThirteen(t *testing.T) {
 	names := signalNames()
-	if len(names) != 12 {
-		t.Errorf("signalNames len=%d, want 12; got %v", len(names), names)
+	if len(names) != 13 {
+		t.Errorf("signalNames len=%d, want 13; got %v", len(names), names)
+	}
+	found := false
+	for _, n := range names {
+		if n == "self_heal_events" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("signalNames missing self_heal_events; got %v", names)
+	}
+}
+
+// writeSelfHealLedger writes an otherwise-healthy 3-role ledger plus any
+// extra entries, so a self_heal_events test can be healthy in every other
+// signal. Extra entries carry no EntryHash/Token (so hash_chain,
+// duplicate_ledger, challenge_tokens skip them) and timestamps after the
+// auditor entry (so ledger_timestamps stays monotonic).
+func writeSelfHealLedger(t *testing.T, ws string, cycle int, extra ...ledgerEntry) {
+	t.Helper()
+	entries := []ledgerEntry{
+		{Cycle: cycle, Role: "scout", Phase: "scout", Timestamp: 1000, Token: "tok-s", EntryHash: "h1"},
+		{Cycle: cycle, Role: "builder", Phase: "build", Timestamp: 1100, Token: "tok-b", PrevHash: "h1", EntryHash: "h2"},
+		{Cycle: cycle, Role: "auditor", Phase: "audit", Timestamp: 1200, Token: "tok-a", PrevHash: "h2", EntryHash: "h3"},
+	}
+	entries = append(entries, extra...)
+	var lines []string
+	for _, e := range entries {
+		b, _ := json.Marshal(e)
+		lines = append(lines, string(b))
+	}
+	if err := os.WriteFile(filepath.Join(ws, "ledger.jsonl"), []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// selfHealAnomalies returns just the self_heal_events anomalies from a report.
+func selfHealAnomalies(r Report) []Anomaly {
+	var out []Anomaly
+	for _, a := range r.Anomalies {
+		if a.Signal == "self_heal_events" {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// TestCheck_SelfHealEvents_PhaseRetry_Warn — a kind=phase_retry ledger
+// entry for this cycle surfaces exactly one self_heal_events WARN anomaly
+// (never fatal — a recovered cycle must still ship), naming the retried phase.
+func TestCheck_SelfHealEvents_PhaseRetry_Warn(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	writeSelfHealLedger(t, ws, 1, ledgerEntry{
+		Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1300, Kind: "phase_retry",
+	})
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := selfHealAnomalies(r)
+	if len(got) != 1 {
+		t.Fatalf("self_heal_events count=%d, want 1; anomalies=%+v", len(got), r.Anomalies)
+	}
+	if got[0].Severity != SeverityWarn {
+		t.Errorf("self_heal_events severity=%s, want warn (never fatal)", got[0].Severity)
+	}
+	if r.OverallFatal {
+		t.Errorf("self_heal_events must not be fatal; OverallFatal=true, anomalies=%+v", r.Anomalies)
+	}
+	if !strings.Contains(got[0].Message, "build") {
+		t.Errorf("expected retried phase 'build' in message; got %q", got[0].Message)
+	}
+}
+
+// TestCheck_SelfHealEvents_Backfill_Warn — a kind=backfill ledger entry
+// surfaces one self_heal_events WARN anomaly naming the backfilled phase.
+func TestCheck_SelfHealEvents_Backfill_Warn(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	writeSelfHealLedger(t, ws, 1, ledgerEntry{
+		Cycle: 1, Role: "auditor", Phase: "audit", Timestamp: 1300, Kind: "backfill",
+	})
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := selfHealAnomalies(r)
+	if len(got) != 1 {
+		t.Fatalf("self_heal_events count=%d, want 1; anomalies=%+v", len(got), r.Anomalies)
+	}
+	if got[0].Severity != SeverityWarn {
+		t.Errorf("self_heal_events severity=%s, want warn", got[0].Severity)
+	}
+	if !strings.Contains(got[0].Message, "audit") {
+		t.Errorf("expected backfilled phase 'audit' in message; got %q", got[0].Message)
+	}
+}
+
+// TestCheck_SelfHealEvents_NoEvents_NoAnomaly — the anti-no-op guard: a
+// clean cycle (no phase_retry / backfill entries) emits ZERO self_heal_events
+// anomalies. A signal that always fired would FAIL this.
+func TestCheck_SelfHealEvents_NoEvents_NoAnomaly(t *testing.T) {
+	ws := freshWorkspace(t, 1) // base 3-role ledger only, no self-heal kinds
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := selfHealAnomalies(r); len(got) != 0 {
+		t.Errorf("clean cycle emitted %d self_heal_events anomalies, want 0; got %+v", len(got), got)
+	}
+}
+
+// TestCheck_SelfHealEvents_OnePerEvent — N recovery entries surface N
+// anomalies (one per event), not one collapsed summary.
+func TestCheck_SelfHealEvents_OnePerEvent(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	writeSelfHealLedger(t, ws, 1,
+		ledgerEntry{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1300, Kind: "phase_retry"},
+		ledgerEntry{Cycle: 1, Role: "auditor", Phase: "audit", Timestamp: 1400, Kind: "backfill"},
+		ledgerEntry{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1500, Kind: "phase_retry"},
+	)
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := selfHealAnomalies(r); len(got) != 3 {
+		t.Errorf("self_heal_events count=%d, want 3 (one per event); got %+v", len(got), got)
+	}
+}
+
+// TestCheck_SelfHealEvents_OtherCycle_Ignored — a phase_retry entry tagged
+// for a DIFFERENT cycle must not leak into this cycle's report (cross-cycle
+// isolation — the common signal-accumulation defect).
+func TestCheck_SelfHealEvents_OtherCycle_Ignored(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	writeSelfHealLedger(t, ws, 1,
+		ledgerEntry{Cycle: 99, Role: "builder", Phase: "build", Timestamp: 1300, Kind: "phase_retry"},
+	)
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := selfHealAnomalies(r); len(got) != 0 {
+		t.Errorf("cycle-99 self-heal entry leaked into cycle-1 report: %d anomalies; got %+v", len(got), got)
 	}
 }
 

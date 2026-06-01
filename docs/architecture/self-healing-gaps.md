@@ -43,7 +43,7 @@ A **transient** infra/bridge failure should retry-or-reroute, bounded (GAP 1/5).
 transient/infra faults, not for masking real failures (token-optimization + the
 "imprecise-evaluator" caveat).
 
-## Completed as of cycle-180
+## Completed as of cycle-186
 
 Over successive self-evolution cycles, we have systematically addressed the primary gaps identified in this living document:
 
@@ -61,6 +61,12 @@ Over successive self-evolution cycles, we have systematically addressed the prim
 
 5. **Phase Latency Monitoring (GAP 12)**:
    - Added signal 12 `phase_latency` to `go/internal/cyclehealth/cyclehealth.go` in cycle-180. It reads `phase-timing.json` and evaluates each phase's duration against `EVOLVE_PHASE_LATENCY_CEILING_S` (default 900s / 15 minutes), raising warning anomalies when a phase executes abnormally slowly.
+
+6. **Self-Heal Event Signal (GAP 13)**:
+   - Added signal 13 `self_heal_events` to `go/internal/cyclehealth/cyclehealth.go` in cycle-186. It reads `ledger.jsonl` and filters for any phase relaunch (`phase_retry`) or recovery (`backfill`) events tagging the current cycle, surfacing them as `WARN` severity anomalies. Detailed in [phase-timing-and-diagnostics.md](phase-timing-and-diagnostics.md).
+
+7. **Progress Disambiguation (ADR-0026 Stage 1 #4)**:
+   - Implemented in cycle-186. The tmux REPL driver's progressed detection was enhanced using `PaneHasSubstantiveChange` in `stopreview.go`. This strips Unicode and ASCII spinners, deliberating time indicators, and token counters before comparing snapshots, preventing animated spinners from fooling the stall detector. Detailed in [ADR-0026](adr/0026-self-healing-review-layer.md).
 
 ## Multi-CLI note
 

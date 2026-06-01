@@ -99,6 +99,69 @@ func (alwaysExtendReviewer) Review(StopEvent) ReviewVerdict {
 	return ReviewVerdict{Action: ReviewExtend, Reason: "always extend"}
 }
 
+// TestPaneHasSubstantiveChange covers the spinner-disambiguation contract
+// (ADR-0026 Stage 1 #4): volatile chrome — braille spinner frame, elapsed-time
+// "Deliberating…" line, "↓ N.Nk tokens" counter — changing while the real
+// transcript is unchanged is NOT substantive progress (→ false); genuinely new
+// or changed transcript content IS (→ true). The "spinner frame advance only"
+// subtest is the anti-no-op guard: a bare `prev != cur` implementation returns
+// true here and FAILS it.
+func TestPaneHasSubstantiveChange(t *testing.T) {
+	const real = "❯ starting task\nTool: Read main.go\nplanning the change\n"
+	cases := []struct {
+		name      string
+		prev, cur string
+		want      bool
+	}{
+		{"identical", real, real, false},
+		{
+			"spinner frame advance only",
+			real + "⠋ Deliberating… 1m 2s · ↓ 1.2k tokens\n",
+			real + "⠙ Deliberating… 1m 2s · ↓ 1.2k tokens\n",
+			false,
+		},
+		{
+			"elapsed time only",
+			real + "Deliberating… 1m 2s\n",
+			real + "Deliberating… 1m 9s\n",
+			false,
+		},
+		{
+			"token counter only",
+			real + "↓ 1.2k tokens\n",
+			real + "↓ 4.7k tokens\n",
+			false,
+		},
+		{
+			"new real output line",
+			real,
+			real + "Tool: Write out.go\n",
+			true,
+		},
+		{
+			"changed real content",
+			"❯ starting task\nTool: Read main.go\n",
+			"❯ starting task\nTool: Read other.go\n",
+			true,
+		},
+		{
+			"mixed spinner advance plus new real output",
+			real + "⠋ Deliberating… 1m 2s · ↓ 1.2k tokens\n",
+			real + "⠙ Deliberating… 1m 5s · ↓ 1.4k tokens\nTool: Write out.go\n",
+			true,
+		},
+		{"both empty", "", "", false},
+		{"empty to real output", "", real, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := PaneHasSubstantiveChange(c.prev, c.cur); got != c.want {
+				t.Fatalf("PaneHasSubstantiveChange() = %v, want %v\nprev=%q\ncur=%q", got, c.want, c.prev, c.cur)
+			}
+		})
+	}
+}
+
 // TestRunTmuxREPL_ContextCancelledBreaks proves the wait loop honours context
 // cancellation even under a reviewer that would extend forever — so an
 // orchestrator timeout / SIGTERM is not swallowed by the extend budget.

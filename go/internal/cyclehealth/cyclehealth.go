@@ -106,6 +106,7 @@ func Check(opts Options) (Report, error) {
 		checkCanaryFiles,
 		checkCostEnvelope,
 		checkPhaseLatency,
+		checkSelfHealEvents,
 	}
 	for _, sc := range signals {
 		report.Anomalies = append(report.Anomalies, sc(opts)...)
@@ -143,6 +144,7 @@ func signalNames() []string {
 		"canary_files",
 		"cost_envelope",
 		"phase_latency",
+		"self_heal_events",
 	}
 }
 
@@ -196,6 +198,7 @@ type ledgerEntry struct {
 	EntryHash string  `json:"entry_hash"`
 	CostUSD   float64 `json:"cost_usd"`
 	Cycle     int     `json:"cycle"`
+	Kind      string  `json:"kind,omitempty"`
 }
 
 // requiredRoles is the set of subagent roles whose ledger entries are
@@ -494,6 +497,27 @@ func checkPhaseLatency(opts Options) []Anomaly {
 			out = append(out, Anomaly{
 				Signal: "phase_latency", Severity: SeverityWarn,
 				Message: fmt.Sprintf("%s phase latency %dms (> %dms)", entry.Phase, entry.DurationMS, ceilingMS),
+			})
+		}
+	}
+	return out
+}
+
+func checkSelfHealEvents(opts Options) []Anomaly {
+	entries, err := loadLedger(opts.Workspace)
+	if err != nil {
+		return nil
+	}
+	var out []Anomaly
+	for _, e := range entries {
+		if e.Cycle != opts.Cycle {
+			continue
+		}
+		if e.Kind == "phase_retry" || e.Kind == "backfill" {
+			out = append(out, Anomaly{
+				Signal:   "self_heal_events",
+				Severity: SeverityWarn,
+				Message:  fmt.Sprintf("%s event occurred in phase %s", e.Kind, e.Phase),
 			})
 		}
 	}

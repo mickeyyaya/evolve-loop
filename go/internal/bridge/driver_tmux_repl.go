@@ -291,7 +291,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// maxExtends backstop, not this diff, bounds a spinner-stuck agent
 			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
 			// disambiguate genuine work from animation.
-			progressed := curPane != intervalBaselinePane
+			progressed := PaneHasSubstantiveChange(intervalBaselinePane, curPane)
 			v := reviewer.Review(StopEvent{
 				Kind:       StopArtifactTimeout,
 				Phase:      cfg.Agent,
