@@ -13,16 +13,15 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 func newStore(t *testing.T) (*FilesystemStorage, string) {
 	t.Helper()
-	dir := t.TempDir()
-	evolveDir := filepath.Join(dir, ".evolve")
-	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	return New(evolveDir), evolveDir
+	// The temp-project + .evolve/ layout is built by the shared harness so this
+	// (previously copy-pasted across ~20 packages) lives in exactly one place.
+	ws := fixtures.NewWorkspace(t).Build()
+	return New(ws.EvolveDir), ws.EvolveDir
 }
 
 // ReadState on a fresh repo (no state.json) returns the zero value and no error.

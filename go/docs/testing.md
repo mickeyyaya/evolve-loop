@@ -83,7 +83,20 @@ load-bearing pieces:
 
 **Import-cycle note:** `fixtures` imports `core`, so a white-box `package core`
 test cannot import it (cycle). Such tests use `package core_test` (black-box) —
-which is exactly the "functional" granularity.
+which is exactly the "functional" granularity. **Exception:**
+`internal/core/orchestrator_test.go` exercises unexported internals
+(`recordAuditBinding`, `runGit`, …), so it must stay white-box and keeps its own
+private fakes — the one unavoidable duplicate of the harness doubles.
+
+**Duplication status / migration rule.** `fixtures` is the single source of
+truth for test doubles, workspace setup, clocks, and assertions. New tests use
+it. Existing duplicates are being migrated incrementally: the 8 copy-pasted
+`fixedClock` helpers (now `fixtures.FixedClock`) and `storage`'s `newStore` (now
+`fixtures.NewWorkspace`) are done; the remaining per-package `newStore`-style
+`.evolve` builders and scattered `must*`/`assert*` helpers should route through
+`fixtures` whenever a file is next touched (don't churn untouched files purely to
+migrate — KISS). Do **not** reintroduce a local fake/clock/temp-dir builder when
+the harness already provides one.
 
 ### How to add a test at each layer
 
