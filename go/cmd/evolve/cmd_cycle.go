@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -231,7 +232,22 @@ type orchDeps struct {
 // queries (verify the ledger, read state.json) without re-instantiating
 // the adapters and risking divergence in the evolveDir resolution.
 func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
+	// Ledger and storage are created first so the bridge adapter can wire its
+	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
+	st := storage.New(evolveDir)
+	ld := ledger.New(evolveDir)
+
 	br := bridge.NewDefault(projectRoot)
+	br.SetOnStopReview(func(cycle int, phase, action, reason string) {
+		_ = ld.Append(context.Background(), core.LedgerEntry{
+			TS:      time.Now().UTC().Format(time.RFC3339),
+			Cycle:   cycle,
+			Role:    phase,
+			Kind:    "stop_review",
+			Action:  action,
+			Message: reason,
+		})
+	})
 	prm := newPromptsLoader(projectRoot)
 
 	runners := map[core.Phase]core.PhaseRunner{
@@ -253,9 +269,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
 		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm}),
 	}
-
-	st := storage.New(evolveDir)
-	ld := ledger.New(evolveDir)
 
 	// Composition root: the SOLE reader of routing env+config. config.Load
 	// maps the central registry + contained env overrides into one immutable

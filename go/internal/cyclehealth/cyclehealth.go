@@ -201,6 +201,7 @@ type ledgerEntry struct {
 	CostUSD   float64 `json:"cost_usd"`
 	Cycle     int     `json:"cycle"`
 	Kind      string  `json:"kind,omitempty"`
+	Action    string  `json:"action,omitempty"`
 }
 
 // requiredRoles is the set of subagent roles whose ledger entries are
@@ -485,16 +486,17 @@ func checkPhaseLatency(opts Options) []Anomaly {
 		}
 	}
 
-	ceilingSec := 900 // 15 min default
+	globalCeilingSec := 900 // 15 min default
 	if val := os.Getenv("EVOLVE_PHASE_LATENCY_CEILING_S"); val != "" {
 		if num, err := strconv.Atoi(val); err == nil && num > 0 {
-			ceilingSec = num
+			globalCeilingSec = num
 		}
 	}
-	ceilingMS := int64(ceilingSec) * 1000
 
 	var out []Anomaly
 	for _, entry := range entries {
+		ceil := perPhaseCeiling(entry.Phase, globalCeilingSec)
+		ceilingMS := int64(ceil) * 1000
 		if entry.DurationMS > ceilingMS {
 			out = append(out, Anomaly{
 				Signal: "phase_latency", Severity: SeverityWarn,
@@ -503,6 +505,21 @@ func checkPhaseLatency(opts Options) []Anomaly {
 		}
 	}
 	return out
+}
+
+// perPhaseCeiling returns the effective latency ceiling (in seconds) for the
+// given phase name. It reads EVOLVE_<UPPER_PHASE>_LATENCY_CEILING_S where
+// <UPPER_PHASE> is the phase name uppercased with "-" replaced by "_" (e.g.
+// "build-planner" → EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S). When the
+// per-phase override is absent or invalid, globalCeiling is returned.
+func perPhaseCeiling(phase string, globalCeiling int) int {
+	key := "EVOLVE_" + strings.ToUpper(strings.ReplaceAll(phase, "-", "_")) + "_LATENCY_CEILING_S"
+	if val := os.Getenv(key); val != "" {
+		if num, err := strconv.Atoi(val); err == nil && num > 0 {
+			return num
+		}
+	}
+	return globalCeiling
 }
 
 func checkSelfHealEvents(opts Options) []Anomaly {
@@ -520,6 +537,20 @@ func checkSelfHealEvents(opts Options) []Anomaly {
 				Signal:   "self_heal_events",
 				Severity: SeverityWarn,
 				Message:  fmt.Sprintf("%s event occurred in phase %s", e.Kind, e.Phase),
+			})
+		}
+		// stop_review/pause means the reviewer judged the phase stalled and paused
+		// it for investigation — an anomalous outcome worth flagging. extend is healthy
+		// (the reviewer saw progress) and must NOT emit an anomaly.
+		if e.Kind == "stop_review" && e.Action == "pause" {
+			phase := e.Phase
+			if phase == "" {
+				phase = e.Role
+			}
+			out = append(out, Anomaly{
+				Signal:   "self_heal_events",
+				Severity: SeverityWarn,
+				Message:  fmt.Sprintf("stop_review/pause event occurred in phase %s", phase),
 			})
 		}
 	}

@@ -59,6 +59,11 @@ type Adapter struct {
 	// engineFactory builds the in-process core.Bridge for a given
 	// request-local env overlay. Defaulted in New; overridable in tests.
 	engineFactory func(env map[string]string) core.Bridge
+	// onStopReview, when non-nil, is invoked for every stop-review decision
+	// the tmux driver makes (extend AND pause). The cycle number is taken from
+	// BridgeRequest.Cycle at the time of the Launch call, so the callback is
+	// cycle-scoped. Set via SetOnStopReview after construction.
+	onStopReview func(cycle int, phase, action, reason string)
 }
 
 // New constructs an Adapter backed by the native-Go bridge.Engine. Tests
@@ -79,6 +84,13 @@ func NewDefault(projectRoot string) *Adapter { //nolint:unparam // projectRoot r
 	return New()
 }
 
+// SetOnStopReview wires a callback invoked for every stop-review verdict the
+// tmux driver makes during a Launch call. cycle is taken from BridgeRequest.Cycle.
+// Passing nil clears the callback (no-op; default production state).
+func (a *Adapter) SetOnStopReview(fn func(cycle int, phase, action, reason string)) {
+	a.onStopReview = fn
+}
+
 // Launch injects the resolved interactive policy into the prompt body and
 // delegates to the Engine, which materializes the prompt, dispatches the
 // driver, and reads the artifact into BridgeResponse.Stdout.
@@ -88,6 +100,17 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	}
 	inproc := req
 	inproc.Prompt = injectRulesPrefix(injectPolicyPrefix(req.Prompt, resolvePolicy(req.Agent, req.Env)), req.SystemPrompt)
+
+	// When an onStopReview callback is wired (production path), build the engine
+	// directly so we can inject the cycle-scoped OnStopReview into Deps.
+	// Tests that override engineFactory leave onStopReview nil, so they continue
+	// to use the engineFactory path unchanged.
+	if a.onStopReview != nil {
+		cycle := req.Cycle
+		cb := a.onStopReview
+		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
+		return gobridge.NewEngine(gobridge.Deps{Env: req.Env, OnStopReview: onSR}).Launch(ctx, inproc)
+	}
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
 }
 

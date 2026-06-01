@@ -158,6 +158,12 @@ type LedgerEntry struct {
 	PrevHash        string   `json:"prev_hash"`
 	WorkerCount     int      `json:"worker_count,omitempty"`
 	Workers         []string `json:"workers,omitempty"`
+	// Action carries the decision verb for self-heal events (e.g. "extend" or
+	// "pause" for stop_review entries). Empty for all other entry kinds.
+	Action  string `json:"action,omitempty"`
+	// Message carries a human-readable detail string for self-heal events
+	// (e.g. the stop-reviewer's justification text). Empty for other kinds.
+	Message string `json:"message,omitempty"`
 }
 
 // ledgerEntryWire is the JSON-facing twin of LedgerEntry. Cycle is a
@@ -180,8 +186,10 @@ type ledgerEntryWire struct {
 	WorktreeTreeSHA string          `json:"worktree_tree_sha,omitempty"`
 	EntrySeq        int             `json:"entry_seq,omitempty"`
 	PrevHash        string          `json:"prev_hash,omitempty"`
-	WorkerCount     int             `json:"worker_count,omitempty"`
-	Workers         []string        `json:"workers,omitempty"`
+	WorkerCount int      `json:"worker_count,omitempty"`
+	Workers     []string `json:"workers,omitempty"`
+	Action      string   `json:"action,omitempty"`
+	Message     string   `json:"message,omitempty"`
 }
 
 // UnmarshalJSON accepts cycle as int, whole-number float, or string.
@@ -208,6 +216,8 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.PrevHash = wire.PrevHash
 	e.WorkerCount = wire.WorkerCount
 	e.Workers = wire.Workers
+	e.Action = wire.Action
+	e.Message = wire.Message
 
 	// Route the cycle field: int → Cycle, string → CycleLabel.
 	if len(wire.Cycle) == 0 {

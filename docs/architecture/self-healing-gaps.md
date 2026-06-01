@@ -72,6 +72,9 @@ Over successive self-evolution cycles, we have systematically addressed the prim
 8. **Retro & Build-Planner Backfill (GAP 14)**:
    - Implemented in cycle-187 to extend backfill recovery coverage to the retrospective and build-planner phases, aligning the retro runner to poll the correct file path. Detailed in [artifact-backfill.md](artifact-backfill.md).
 
+9. **Stop-Review Ledger Trail (GAP 15 / ADR-0026 Stage 1 #5)**:
+   - Implemented in cycle-188. Stop-review verdicts (extend AND pause) are now emitted to the ledger as `kind=stop_review` entries carrying the `action` (extend/pause) and `message` (reviewer justification). `Deps.OnStopReview` callback in `engine.go`; driver calls it nil-safely; orchestrator wires it to `ledger.Append`; `checkSelfHealEvents` in `cyclehealth.go` flags `action=pause` as `SeverityWarn`. ADR-0026 Stage 1 #5 closed.
+
 ## Multi-CLI note
 
 Per-phase CLI is resolved via `EVOLVE_<AGENT>_CLI` > `EVOLVE_CLI` > profile.cli >

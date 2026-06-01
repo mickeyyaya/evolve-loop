@@ -304,6 +304,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			})
 			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
 				pfx, StopArtifactTimeout, elapsed, attempt, progressed, v.Action, v.Reason)
+			if deps.OnStopReview != nil {
+				phase := cfg.Agent
+				if phase == "" {
+					phase = lp.name // fall back to driver name when agent is unset
+				}
+				deps.OnStopReview(phase, string(v.Action), v.Reason)
+			}
 			if v.Action != ReviewExtend {
 				break
 			}

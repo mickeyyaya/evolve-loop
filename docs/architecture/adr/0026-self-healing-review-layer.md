@@ -52,7 +52,7 @@ The reviewer is a seam (`StopReviewer` interface), so the loop wiring never chan
 2. **LLM/orchestrator reviewer** behind `StopReviewer`: judge "stuck vs working" from `StdoutTail` + partial artifacts (Rule 5 — deterministic fast-path first, AI judgment for the ambiguous case).
 3. Distinct **`pause` semantics**: checkpoint + write an investigation report rather than reusing `ExitArtifactTimeout`; let the orchestrator decide retry/adapt/abandon.
 4. **SHIPPED (cycle-186)**: Sharper progress signal (strip volatile spinner lines) so spinner animation no longer reads as progress. Implementation: `PaneHasSubstantiveChange` in `stopreview.go`, wired into the driver's wait loop.
-5. Emit the verdict + justification to the ledger as an auditable self-healing trail.
+5. **SHIPPED (cycle-188)**: Emit the verdict + justification to the ledger as an auditable self-healing trail. Implementation: `Deps.OnStopReview` callback in `engine.go`; driver calls it (nil-safe) at each review checkpoint; orchestrator wires it to `ledger.Append(LedgerEntry{Kind:"stop_review", Action:action, Message:reason})`; `checkSelfHealEvents` in `cyclehealth.go` flags `action=pause` as `SeverityWarn`.
 
 ## Consequences
 

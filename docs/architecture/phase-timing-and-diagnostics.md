@@ -92,11 +92,41 @@ If a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout` but s
 
 ---
 
+## Stop-Review Ledger Trail (`kind=stop_review`)
+
+When the tmux driver's stop-review checkpoint fires (the artifact wait interval elapsed), the reviewer adjudicates the evidence and either extends or pauses the phase. Both decisions are now appended to the ledger as `kind=stop_review` entries:
+
+- **Role** (string): The phase agent name (e.g. `"build"`).
+- **Action** (string): The reviewer's decision — `"extend"` (continue waiting) or `"pause"` (stop for investigation).
+- **Message** (string): The human-readable justification the reviewer produced.
+
+`extend` events are healthy (the reviewer judged the agent still working) and produce NO cycle-health anomaly. `pause` events are anomalous (stall detected) and surface as a `SeverityWarn` on the `self_heal_events` signal.
+
+### Per-Phase Latency Ceiling Overrides
+
+`checkPhaseLatency` (signal 12) reads a global ceiling `EVOLVE_PHASE_LATENCY_CEILING_S` (default 900 s, 15 min) for all phases. Individual phases can override this ceiling with a per-phase env-var:
+
+```
+EVOLVE_<UPPER_PHASE>_LATENCY_CEILING_S
+```
+
+Phase name normalization: `strings.ToUpper` + `"-"` → `"_"`.  Examples:
+
+| Phase | Override env-var |
+|-------|-----------------|
+| `scout` | `EVOLVE_SCOUT_LATENCY_CEILING_S` |
+| `build` | `EVOLVE_BUILD_LATENCY_CEILING_S` |
+| `build-planner` | `EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S` |
+
+When a per-phase override is absent or invalid (non-numeric, ≤ 0), the global ceiling applies.
+
+---
+
 ## Cycle Health Self-Heal Signal (`self_heal_events`)
 
 To track recovery events during a cycle, the integrity checker (`evolve cycle-health`) includes the `self_heal_events` signal (signal 13).
 
-This signal automatically scans `ledger.jsonl` for any entries with `kind=phase_retry` or `kind=backfill` for the current cycle. For each event found, it generates a `SeverityWarn` anomaly containing the name of the retried/backfilled phase, alerting operators that a self-heal recovery occurred during the cycle.
+This signal automatically scans `ledger.jsonl` for any entries with `kind=phase_retry`, `kind=backfill`, or `kind=stop_review` (with `action=pause`) for the current cycle. For each event found, it generates a `SeverityWarn` anomaly containing the name of the retried/backfilled/paused phase, alerting operators that a self-heal recovery occurred during the cycle.
 
 ---
 

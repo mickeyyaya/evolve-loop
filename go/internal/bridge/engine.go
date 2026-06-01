@@ -96,6 +96,9 @@ type Deps struct {
 	//
 	// Default reads cfg.SandboxMode from deps.Env + nested-claude / Probe.
 	SandboxWrap SandboxWrapper
+	// OnStopReview is called when a stop-review decision is made.
+	// Nil-safe: drivers must check if it is non-nil before invoking.
+	OnStopReview func(phase, action, reason string)
 }
 
 // SandboxWrapper is the bridge's view of the sandbox decision — the bridge
