@@ -51,8 +51,6 @@ func (f *fakeBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// fixedClock returns t for the first Now() call and t+dur for subsequent.
-
 // fakePromptsFS builds a Loader that resolves agents/evolve-intent.md.
 func fakePromptsFS(body string) *prompts.Loader {
 	mapFS := fstest.MapFS{

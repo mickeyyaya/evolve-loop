@@ -58,7 +58,7 @@ func Parse(r io.Reader) (*Report, error) {
 
 	var tests []testStat
 	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 1024*1024), 16*1024*1024) // some Output lines are large
+	sc.Buffer(nil, 16*1024*1024) // grow lazily; some Output lines are large
 	for sc.Scan() {
 		line := sc.Bytes()
 		if len(line) == 0 || line[0] != '{' {
@@ -97,9 +97,10 @@ func Parse(r io.Reader) (*Report, error) {
 	for _, p := range pkgs {
 		rep.Packages = append(rep.Packages, *p)
 	}
-	sort.Slice(rep.Packages, func(i, j int) bool { return rep.Packages[i].Wall > rep.Packages[j].Wall })
+	// Stable sort so packages/tests with equal timing keep a reproducible order.
+	sort.SliceStable(rep.Packages, func(i, j int) bool { return rep.Packages[i].Wall > rep.Packages[j].Wall })
 	rep.Tests = tests
-	sort.Slice(rep.Tests, func(i, j int) bool { return rep.Tests[i].Elapsed > rep.Tests[j].Elapsed })
+	sort.SliceStable(rep.Tests, func(i, j int) bool { return rep.Tests[i].Elapsed > rep.Tests[j].Elapsed })
 	return rep, nil
 }
 

@@ -33,7 +33,12 @@ func TestE2E_VersionSubcommandRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run `evolve version`: %v\n%s", err, out)
 	}
-	if strings.TrimSpace(string(out)) == "" {
-		t.Fatal("`evolve version` produced no output")
+	// Assert the binary self-identifies (output starts with the program name),
+	// not just that it printed any non-empty bytes. The version/commit values
+	// themselves vary with ldflags (a plain `go build` yields "evolve (devel)
+	// (unknown)"), so we pin the stable token, not the version string.
+	got := strings.TrimSpace(string(out))
+	if !strings.HasPrefix(got, "evolve") {
+		t.Fatalf("`evolve version` output not self-identifying: %q", got)
 	}
 }

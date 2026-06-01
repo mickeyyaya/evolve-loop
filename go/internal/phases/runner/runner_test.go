@@ -88,10 +88,6 @@ func fakePromptsFS(agentName, body string) *prompts.Loader {
 	})
 }
 
-// fixedClock returns t on the first call, t+dur on the second — the
-// pattern the existing phase tests use to assert deterministic
-// DurationMS.
-
 // TestRun_HappyPath_DelegatesToHooksAndBridge — full success path.
 // Asserts every Hook callback fires and BridgeRequest carries the
 // expected per-phase fields.

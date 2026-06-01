@@ -77,7 +77,7 @@ test-integration: ## Integration tier: real FS/git/tmux subprocess tests (//go:b
 test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e); live sub-tier self-skips without EVOLVE_E2E_LIVE
 	$(GO) test -count=1 -tags e2e ./cmd/... ./test/e2e/...
 
-test-all: ## Everything CI runs: fast + component + integration + e2e, race on (excludes acs/)
+test-all: ## All tiers in one race run (local superset of CI; CI runs e2e WITHOUT -race in a separate step)
 	$(GO) test -race -count=1 -tags "integration e2e" $(FAST_PKGS)
 
 test-latency: ## Render the fast-suite latency report to test/latency-report.md

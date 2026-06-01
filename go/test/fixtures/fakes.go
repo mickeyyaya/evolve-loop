@@ -10,6 +10,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// Compile-time proof the fakes satisfy the core ports. If a port gains a
+// method, the failure surfaces here at the definition, not at a distant call.
+var (
+	_ core.Storage     = (*FakeStorage)(nil)
+	_ core.Ledger      = (*FakeLedger)(nil)
+	_ core.PhaseRunner = (*FakeRunner)(nil)
+	_ core.Bridge      = (*FakeBridge)(nil)
+)
+
 // This file is the single source of truth for the orchestrator-surface test
 // doubles. Before it existed, FakeStorage/FakeLedger/FakeRunner were defined
 // three times (internal/routingtest, internal/core, cmd/evolve) with subtly
@@ -129,7 +138,11 @@ func (f *FakeLedger) Append(_ context.Context, e core.LedgerEntry) error {
 	return nil
 }
 
-func (f *FakeLedger) Verify(context.Context) error { return f.VerifyErr }
+func (f *FakeLedger) Verify(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.VerifyErr
+}
 
 func (f *FakeLedger) Iter(context.Context) (core.LedgerIterator, error) {
 	f.mu.Lock()
@@ -163,6 +176,7 @@ type FakeRunner struct {
 	FailErr   error
 	FailUntil int
 
+	mu       sync.Mutex
 	Calls    int
 	Requests []core.PhaseRequest
 }
@@ -170,6 +184,8 @@ type FakeRunner struct {
 func (f *FakeRunner) Name() string { return f.PhaseName }
 
 func (f *FakeRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.Calls++
 	f.Requests = append(f.Requests, req)
 	if f.FailErr != nil && f.Calls <= f.FailUntil {
@@ -204,13 +220,16 @@ func BuildRunners(verdicts map[core.Phase]string) map[core.Phase]core.PhaseRunne
 type FakeBridge struct {
 	Resp          core.BridgeResponse
 	Err           error
-	ProbeResp        core.BridgeProbe
+	ProbeResp     core.BridgeProbe
 	WriteArtifact string
 
+	mu     sync.Mutex
 	GotReq core.BridgeRequest
 }
 
 func (f *FakeBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.GotReq = req
 	if f.WriteArtifact != "" && req.ArtifactPath != "" {
 		_ = os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755)
