@@ -364,4 +364,3 @@ func TestPhaseTimingJSON_AttemptCount(t *testing.T) {
 		t.Errorf("build attempt_count=%d, want 1", seen["build"])
 	}
 }
-

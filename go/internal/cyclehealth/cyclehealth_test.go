@@ -402,7 +402,7 @@ func TestSignalNames_ReturnsTwelve(t *testing.T) {
 
 func TestCheck_PhaseLatency_SlowPhase_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
-	
+
 	// Write a slow phase entry to phase-timing.json
 	entries := []phaseTimingEntry{
 		{Phase: "build", DurationMS: 950000, Verdict: "PASS"}, // 950s (exceeds default 900s limit)
