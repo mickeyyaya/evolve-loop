@@ -34,9 +34,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
 // Severity classifies a single anomaly's blocking force.
@@ -486,12 +487,7 @@ func checkPhaseLatency(opts Options) []Anomaly {
 		}
 	}
 
-	globalCeilingSec := 900 // 15 min default
-	if val := os.Getenv("EVOLVE_PHASE_LATENCY_CEILING_S"); val != "" {
-		if num, err := strconv.Atoi(val); err == nil && num > 0 {
-			globalCeilingSec = num
-		}
-	}
+	globalCeilingSec := envchain.IntMin(envchain.KeyPhaseLatencyCeilingS, nil, envchain.DefPhaseLatencyCeilingS, 1)
 
 	var out []Anomaly
 	for _, entry := range entries {
@@ -513,13 +509,7 @@ func checkPhaseLatency(opts Options) []Anomaly {
 // "build-planner" → EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S). When the
 // per-phase override is absent or invalid, globalCeiling is returned.
 func perPhaseCeiling(phase string, globalCeiling int) int {
-	key := "EVOLVE_" + strings.ToUpper(strings.ReplaceAll(phase, "-", "_")) + "_LATENCY_CEILING_S"
-	if val := os.Getenv(key); val != "" {
-		if num, err := strconv.Atoi(val); err == nil && num > 0 {
-			return num
-		}
-	}
-	return globalCeiling
+	return envchain.IntMin(envchain.PhaseEnvKey(phase, "LATENCY_CEILING_S"), nil, globalCeiling, 1)
 }
 
 func checkSelfHealEvents(opts Options) []Anomaly {

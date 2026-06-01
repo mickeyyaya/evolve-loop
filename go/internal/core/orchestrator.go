@@ -17,6 +17,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -744,45 +745,28 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 // phaseMaxAttempts bounds per-phase retries on a recoverable bridge
 // ArtifactTimeout (Fix D). 2 = one relaunch after the first timeout; a
 // deterministic timeout still aborts the cycle after the cap.
-const phaseMaxAttempts = 2
+const phaseMaxAttempts = envchain.DefPhaseMaxAttempts
 
+// resolvePhaseMaxAttempts reads EVOLVE_PHASE_MAX_ATTEMPTS and clamps it to
+// [1, MaxPhaseMaxAttempts]. A sub-1 or unparseable value is treated as
+// invalid → default; an over-max value is capped. (IntMin handles the lower
+// bound + invalid-input → default; the explicit cap handles the upper bound.)
 func resolvePhaseMaxAttempts(env map[string]string) int {
-	if env == nil {
-		return phaseMaxAttempts
+	n := envchain.IntMin(envchain.KeyPhaseMaxAttempts, env, phaseMaxAttempts, 1)
+	if n > envchain.MaxPhaseMaxAttempts {
+		return envchain.MaxPhaseMaxAttempts
 	}
-	val := env["EVOLVE_PHASE_MAX_ATTEMPTS"]
-	if val == "" {
-		return phaseMaxAttempts
-	}
-	num, err := strconv.Atoi(val)
-	if err != nil {
-		return phaseMaxAttempts
-	}
-	if num > 5 {
-		return 5
-	}
-	if num < 1 {
-		return phaseMaxAttempts
-	}
-	return num
+	return n
 }
 
+// resolveRetryBackoffBase reads EVOLVE_RETRY_BACKOFF_BASE_S, flooring a
+// negative value at 0 (disabled). Unset / empty / unparseable → default.
 func resolveRetryBackoffBase(env map[string]string) int {
-	if env == nil {
-		return 5
-	}
-	val := env["EVOLVE_RETRY_BACKOFF_BASE_S"]
-	if val == "" {
-		return 5
-	}
-	num, err := strconv.Atoi(val)
-	if err != nil {
-		return 5
-	}
-	if num < 0 {
+	n := envchain.Int(envchain.KeyRetryBackoffBaseS, env, envchain.DefRetryBackoffBaseS)
+	if n < 0 {
 		return 0
 	}
-	return num
+	return n
 }
 
 func executeRetryBackoff(attempt int, env map[string]string) {
@@ -948,7 +932,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// from the caller > env EVOLVE_REQUIRE_INTENT=="1" > false. This
 	// mirrors the bash dispatcher's check at run-cycle.sh:build_context.
 	intentRequired := req.Context["intent_required"] == "true" ||
-		req.Env["EVOLVE_REQUIRE_INTENT"] == "1"
+		envchain.BoolValue(req.Env["EVOLVE_REQUIRE_INTENT"], false)
 	cs := CycleState{
 		CycleID:        cycle,
 		Phase:          string(PhaseStart),
@@ -966,8 +950,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// downstream phases via the OLD task selection.
 	// Source incident: cycle-108 meta-loop attempts 1-4 (2026-05-26).
 	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that
-	// pre-seed workspace files to simulate phase state.
-	if req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"] != "1" && os.Getenv("EVOLVE_DISABLE_WORKSPACE_GUARD") != "1" {
+	// pre-seed workspace files to simulate phase state. The kill switch is
+	// honored from EITHER the request env OR the live process env (a disable
+	// from either source wins): tests set it programmatically via req.Env,
+	// operators via the shell. Reading the live env is a deliberate, narrow
+	// break from per-cycle snapshot isolation — it can only DISABLE a
+	// default-on guard, never enable new mid-cycle behavior.
+	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false) ||
+		envchain.BoolValue(os.Getenv("EVOLVE_DISABLE_WORKSPACE_GUARD"), false)
+	if !guardDisabled {
 		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
 			// Best-effort: WARN but don't block the cycle; the failure
 			// mode it prevents is bad-data steering, not safety.
@@ -1178,7 +1169,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				Cfg:             o.cfg,
 				BudgetRemaining: req.Budget.MaxUSD,
 				Completed:       cs.CompletedPhases,
-				Strict:          envSnap["EVOLVE_STRICT_AUDIT"] == "1",
+				Strict:          envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
 				Now:             o.now(),
 				// Proposer context (DynamicLLM only; ignored by pure Route).
 				Workspace:   cs.WorkspacePath,
@@ -1308,9 +1299,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 					// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 					// try to reconstruct the artifact from stdout.clean.txt before aborting.
-					// Enabled by default (EVOLVE_BACKFILL_ENABLED != 0).
-					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) &&
-						envSnap["EVOLVE_BACKFILL_ENABLED"] != "0" && os.Getenv("EVOLVE_BACKFILL_ENABLED") != "0" {
+					// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in EITHER
+					// the per-cycle snapshot OR the live process env (same dual-source
+					// disable rationale as the workspace guard above — a "0" from either
+					// source wins, and the live read can only ever disable a default-on
+					// safety net).
+					backfillEnabled := envchain.BoolValue(envSnap["EVOLVE_BACKFILL_ENABLED"], true) &&
+						envchain.BoolValue(os.Getenv("EVOLVE_BACKFILL_ENABLED"), true)
+					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
 						artifactPath := backfillArtifactPath(cs.WorkspacePath, string(next))
 						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
 							fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
