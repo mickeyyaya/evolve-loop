@@ -472,3 +472,280 @@ func TestAtomicWrite_RestoresOnError(t *testing.T) {
 		t.Errorf("expected error writing into missing dir")
 	}
 }
+
+// TestAtomicWrite_RenameError pins that a tmp-write success followed by a
+// rename failure surfaces a "rename" error (and leaves the target dir intact).
+// Renaming the .tmp file onto an existing directory fails on Unix.
+func TestAtomicWrite_RenameError(t *testing.T) {
+	tmp := t.TempDir()
+	// target is an existing directory; tmp write to "<dir>.tmp" succeeds,
+	// but os.Rename(tmp, dir) fails because the destination dir exists.
+	target := filepath.Join(tmp, "destdir")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	err := atomicWrite(target, []byte("x"))
+	if err == nil {
+		t.Fatalf("expected rename error onto existing directory")
+	}
+	if !strings.Contains(err.Error(), "rename") {
+		t.Errorf("got %v, want a rename error", err)
+	}
+}
+
+// roDir creates a directory containing `file` with given content, then makes
+// the directory read-only so that atomicWrite's tmp-write fails. The cleanup
+// restores write permission so t.TempDir teardown can remove it.
+func roDir(t *testing.T, content string) string {
+	t.Helper()
+	tmp := t.TempDir()
+	dir := filepath.Join(tmp, "ro")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	p := filepath.Join(dir, "file")
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	return p
+}
+
+// TestBumpJSONVersion_InvalidJSON pins that a file whose version regex matches
+// but whose body is not valid JSON surfaces a "parse" error rather than writing.
+func TestBumpJSONVersion_InvalidJSON(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "plugin.json")
+	writeFile(t, p, `{"version":"11.6.6" this is broken`)
+	_, err := BumpJSONVersion(p, "11.7.0", false)
+	if err == nil || !strings.Contains(err.Error(), "parse") {
+		t.Errorf("got %v, want a parse error", err)
+	}
+}
+
+// TestBumpJSONVersion_AtomicWriteError pins that a write failure (read-only
+// parent dir) propagates an error and does not silently report success.
+func TestBumpJSONVersion_AtomicWriteError(t *testing.T) {
+	p := roDir(t, `{"version":"11.6.6"}`)
+	changed, err := BumpJSONVersion(p, "11.7.0", false)
+	if err == nil {
+		t.Fatalf("expected write error")
+	}
+	if changed {
+		t.Errorf("changed must be false on write error, got true")
+	}
+}
+
+// TestBumpSkillHeading_DryRunReportsButDoesNotWrite pins dry-run semantics:
+// reports would-change without mutating the file.
+func TestBumpSkillHeading_DryRunReportsButDoesNotWrite(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "SKILL.md")
+	writeFile(t, p, "# Evolve Loop v11.6.6\nbody")
+	changed, err := BumpSkillHeading(p, "11.7", true)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if !changed {
+		t.Errorf("dry-run should report would-change")
+	}
+	body, _ := os.ReadFile(p)
+	if !strings.Contains(string(body), "# Evolve Loop v11.6.6") {
+		t.Errorf("dry-run mutated file: %s", body)
+	}
+}
+
+// TestBumpSkillHeading_ReadErrorNonNotExist pins that a non-IsNotExist read
+// error (a directory at the path) surfaces a wrapped read error.
+func TestBumpSkillHeading_ReadErrorNonNotExist(t *testing.T) {
+	dir := t.TempDir()
+	_, err := BumpSkillHeading(dir, "11.7", false)
+	if err == nil || !strings.Contains(err.Error(), "read") {
+		t.Errorf("got %v, want a read error for directory path", err)
+	}
+}
+
+// TestBumpSkillHeading_AtomicWriteError pins write-failure propagation.
+func TestBumpSkillHeading_AtomicWriteError(t *testing.T) {
+	p := roDir(t, "# Evolve Loop v11.6.6\nbody")
+	changed, err := BumpSkillHeading(p, "11.7", false)
+	if err == nil {
+		t.Fatalf("expected write error")
+	}
+	if changed {
+		t.Errorf("changed must be false on write error")
+	}
+}
+
+// TestCurrentReadmeCurrent_MissingFile pins the read-error return.
+func TestCurrentReadmeCurrent_MissingFile(t *testing.T) {
+	_, err := CurrentReadmeCurrent(filepath.Join(t.TempDir(), "missing"))
+	if err == nil {
+		t.Errorf("expected read error for missing file")
+	}
+}
+
+// TestCurrentReadmeCurrent_NoMatch pins the empty-result (no version) path.
+func TestCurrentReadmeCurrent_NoMatch(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "README.md")
+	writeFile(t, p, "no current marker here\n")
+	got, err := CurrentReadmeCurrent(p)
+	if err != nil || got != "" {
+		t.Errorf("got %q err %v, want empty", got, err)
+	}
+}
+
+// TestBumpReadmeCurrent_DryRunReportsButDoesNotWrite pins dry-run semantics.
+func TestBumpReadmeCurrent_DryRunReportsButDoesNotWrite(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "README.md")
+	writeFile(t, p, "Current (v11.6)\n")
+	changed, err := BumpReadmeCurrent(p, "11.7", true)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if !changed {
+		t.Errorf("dry-run should report would-change")
+	}
+	body, _ := os.ReadFile(p)
+	if !strings.Contains(string(body), "Current (v11.6)") {
+		t.Errorf("dry-run mutated file: %s", body)
+	}
+}
+
+// TestBumpReadmeCurrent_ReadErrorNonNotExist pins a directory-path read error.
+func TestBumpReadmeCurrent_ReadErrorNonNotExist(t *testing.T) {
+	dir := t.TempDir()
+	_, err := BumpReadmeCurrent(dir, "11.7", false)
+	if err == nil || !strings.Contains(err.Error(), "read") {
+		t.Errorf("got %v, want a read error for directory path", err)
+	}
+}
+
+// TestBumpReadmeHistory_ReadErrorNonNotExist pins a directory-path read error.
+func TestBumpReadmeHistory_ReadErrorNonNotExist(t *testing.T) {
+	dir := t.TempDir()
+	_, err := BumpReadmeHistory(dir, "11.7", time.Unix(0, 0).UTC(), false)
+	if err == nil || !strings.Contains(err.Error(), "read") {
+		t.Errorf("got %v, want a read error for directory path", err)
+	}
+}
+
+// TestRun_PropagatesBumpErrors pins that a failure in any single bump phase
+// aborts Run and returns that error, rather than silently continuing. One
+// subtest per phase positions the failure so the earlier phases are clean
+// no-ops (already at target) and the targeted phase errors.
+func TestRun_PropagatesBumpErrors(t *testing.T) {
+	const target = "11.7.0"
+	const mm = "11.7"
+	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
+
+	// cleanJSON / cleanSkill / cleanReadme write files already at target so
+	// their bump phases are no-op-clean (changed=false, no error).
+	cleanJSON := func(t *testing.T, dir, name string) string {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		writeFile(t, p, `{"version":"`+target+`"}`)
+		return p
+	}
+
+	t.Run("plugin json parse error", func(t *testing.T) {
+		tmp := t.TempDir()
+		paths := Paths{
+			PluginJSON:      filepath.Join(tmp, "plugin.json"),
+			MarketplaceJSON: cleanJSON(t, tmp, "marketplace.json"),
+			SkillMD:         filepath.Join(tmp, "SKILL.md"),
+			ReadmeMD:        filepath.Join(tmp, "README.md"),
+		}
+		writeFile(t, paths.PluginJSON, `{"version":"11.6.6" broken`)
+		_, err := Run(paths, target, false, now)
+		if err == nil || !strings.Contains(err.Error(), "parse") {
+			t.Errorf("got %v, want parse error from plugin.json phase", err)
+		}
+	})
+
+	t.Run("marketplace json parse error", func(t *testing.T) {
+		tmp := t.TempDir()
+		paths := Paths{
+			PluginJSON:      cleanJSON(t, tmp, "plugin.json"),
+			MarketplaceJSON: filepath.Join(tmp, "marketplace.json"),
+			SkillMD:         filepath.Join(tmp, "SKILL.md"),
+			ReadmeMD:        filepath.Join(tmp, "README.md"),
+		}
+		writeFile(t, paths.MarketplaceJSON, `{"version":"11.6.6" broken`)
+		_, err := Run(paths, target, false, now)
+		if err == nil || !strings.Contains(err.Error(), "parse") {
+			t.Errorf("got %v, want parse error from marketplace phase", err)
+		}
+	})
+
+	t.Run("skill heading read error", func(t *testing.T) {
+		tmp := t.TempDir()
+		skillDir := filepath.Join(tmp, "skilldir")
+		if err := os.Mkdir(skillDir, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		paths := Paths{
+			PluginJSON:      cleanJSON(t, tmp, "plugin.json"),
+			MarketplaceJSON: cleanJSON(t, tmp, "marketplace.json"),
+			SkillMD:         skillDir, // directory → non-IsNotExist read error
+			ReadmeMD:        filepath.Join(tmp, "README.md"),
+		}
+		_, err := Run(paths, target, false, now)
+		if err == nil || !strings.Contains(err.Error(), "read") {
+			t.Errorf("got %v, want read error from skill phase", err)
+		}
+	})
+
+	t.Run("readme current read error", func(t *testing.T) {
+		tmp := t.TempDir()
+		readmeDir := filepath.Join(tmp, "readmedir")
+		if err := os.Mkdir(readmeDir, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		paths := Paths{
+			PluginJSON:      cleanJSON(t, tmp, "plugin.json"),
+			MarketplaceJSON: cleanJSON(t, tmp, "marketplace.json"),
+			SkillMD:         filepath.Join(tmp, "missing-skill.md"), // IsNotExist → no-op
+			ReadmeMD:        readmeDir,                              // directory → read error
+		}
+		_, err := Run(paths, target, false, now)
+		if err == nil || !strings.Contains(err.Error(), "read") {
+			t.Errorf("got %v, want read error from README current phase", err)
+		}
+	})
+
+	t.Run("readme history write error", func(t *testing.T) {
+		// Position failure at the history phase: plugin/marketplace clean,
+		// skill missing, README's "Current" already at target so the Current
+		// phase is a no-op, but the README has an unbumped history row AND
+		// lives in a read-only dir so atomicWrite fails in the history phase.
+		tmp := t.TempDir()
+		dir := filepath.Join(tmp, "ro")
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		paths := Paths{
+			PluginJSON:      filepath.Join(dir, "plugin.json"),
+			MarketplaceJSON: filepath.Join(dir, "marketplace.json"),
+			SkillMD:         filepath.Join(dir, "missing-skill.md"),
+			ReadmeMD:        filepath.Join(dir, "README.md"),
+		}
+		writeFile(t, paths.PluginJSON, `{"version":"`+target+`"}`)
+		writeFile(t, paths.MarketplaceJSON, `{"version":"`+target+`"}`)
+		// "Current" already at target (no-op), history row unbumped (needs write).
+		writeFile(t, paths.ReadmeMD, "Current (v"+mm+")\n| v11.6 | May 23 | shipped |\n")
+		if err := os.Chmod(dir, 0o555); err != nil {
+			t.Fatalf("chmod: %v", err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+		_, err := Run(paths, target, false, now)
+		if err == nil {
+			t.Fatalf("expected write error from history phase")
+		}
+	})
+}
