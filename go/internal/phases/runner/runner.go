@@ -92,6 +92,20 @@ type Skipper interface {
 	ShouldSkip(req core.PhaseRequest) (skipped bool, verdict, nextPhase string, diags []core.Diagnostic)
 }
 
+// InlinePromptProvider is an optional Hooks extension. When a Hooks
+// implementation also satisfies it AND returns ok=true, BaseRunner composes
+// the prompt from the supplied in-band body and never reads
+// agents/<AgentPromptName>.md. Returning ("", false) — or not implementing
+// this interface at all — preserves the legacy disk-load path byte-for-byte.
+//
+// Used by minted/spec phases (specrunner) that ship their prompt as data
+// (no file on disk). Optional for the same ISP reason as Skipper: built-in
+// phases load their agent docs from disk and must not be forced to implement
+// a no-op.
+type InlinePromptProvider interface {
+	InlinePromptBody() (string, bool)
+}
+
 // Options is the BaseRunner constructor envelope. Bridge and Prompts
 // are required; NowFn defaults to time.Now.
 type Options struct {
@@ -213,12 +227,22 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		}
 	}
 
-	agent, err := b.prompts.Agent(b.hooks.AgentPromptName())
-	if err != nil {
-		return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w", phase, err)
+	// Inline body wins over disk-load, keyed on the provider's ok flag (not
+	// body emptiness). Only phases that opt into InlinePromptProvider are
+	// consulted; see its godoc for the ISP rationale.
+	body, inline := "", false
+	if ip, ok := b.hooks.(InlinePromptProvider); ok {
+		body, inline = ip.InlinePromptBody()
+	}
+	if !inline {
+		agent, err := b.prompts.Agent(b.hooks.AgentPromptName())
+		if err != nil {
+			return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w", phase, err)
+		}
+		body = agent.Body
 	}
 
-	prompt := b.hooks.ComposePrompt(agent.Body, req)
+	prompt := b.hooks.ComposePrompt(body, req)
 	artifactPath := filepath.Join(req.Workspace, b.hooks.ArtifactFilename(req))
 	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
 	// Profile JSON files use the AGENT name (e.g., tdd-engineer.json,
