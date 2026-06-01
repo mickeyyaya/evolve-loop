@@ -48,13 +48,18 @@ jobs:
           fi
       - name: build
         run: make build
-      - name: test (race + cover)
+      - name: test (race + cover, incl. integration tier)
         run: |
           # Exclude acs/ — per-cycle ACS predicate evals that read runtime
           # artifacts (.evolve/runs/cycle-N/...) absent in CI; they run in the
           # live cycle context, not the unit gate (matches the Makefile).
-          go test -race -count=1 -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
+          # -tags integration pulls in the real-FS/git/tmux tier so internal/*
+          # coverage reflects it. The e2e tier (subprocess-heavy, no -race) runs
+          # in the separate step below. See go/docs/testing.md (cost × granularity).
+          go test -race -count=1 -tags integration -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
           go tool cover -func=coverage.txt
+      - name: e2e tier (no race; live sub-tier self-skips without EVOLVE_E2E_LIVE)
+        run: go test -count=1 -tags e2e ./cmd/... ./test/e2e/...
       - name: commit-gate gate tests (bash)
         # Runs here (not ci.yml) because the harness fixtures use `go 1.23`,
         # which needs the toolchain set up above. golangci-lint is optional in

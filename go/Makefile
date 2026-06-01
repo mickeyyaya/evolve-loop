@@ -27,8 +27,15 @@ DIST_TARGETS := \
     $(DIST_DIR)/evolve-linux-amd64 \
     $(DIST_DIR)/evolve-linux-arm64
 
-.PHONY: build test cover lint tidy clean help dist dist-clean \
+.PHONY: build test test-component test-integration test-e2e test-all \
+        test-latency cover lint tidy clean help dist dist-clean \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64
+
+# FAST_PKGS is every non-acs package. The default (no build tags) compiles
+# only the fast cost-axis layer: tests in files tagged `//go:build integration`
+# or `//go:build e2e` are excluded, so `make test` stays sub-10s. See
+# docs/testing.md for the two-axis (cost × granularity) model.
+FAST_PKGS = $$($(GO) list ./... | grep -v '/acs/')
 
 help:
 	@awk '/^[a-zA-Z_-]+:.*?##/ {sub(/:.*##/, "\t"); print}' $(MAKEFILE_LIST)
@@ -58,11 +65,27 @@ $(DIST_DIR)/evolve-%:
 dist-clean: ## Remove cross-compiled artifacts
 	rm -rf $(DIST_DIR)
 
-test: ## Run unit + adapter tests with race detector (excludes per-cycle acs/)
-	$(GO) test -race -count=1 -cover $$($(GO) list ./... | grep -v '/acs/')
+test: ## FAST layer: co-located unit/functional/component tests, race on (excludes acs/, integration, e2e)
+	$(GO) test -race -count=1 -cover $(FAST_PKGS)
 
-cover: ## Per-package coverage report; fails if any package <85%
-	@$(GO) test -race -count=1 -coverprofile=coverage.txt $$($(GO) list ./... | grep -v '/acs/')
+test-component: ## Component tier: several internal packages wired against temp FS (no subprocess)
+	$(GO) test -race -count=1 ./test/component/...
+
+test-integration: ## Integration tier: real FS/git/tmux subprocess tests (//go:build integration)
+	$(GO) test -race -count=1 -tags integration ./internal/... ./cmd/... ./test/integration/...
+
+test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e); live sub-tier self-skips without EVOLVE_E2E_LIVE
+	$(GO) test -count=1 -tags e2e ./cmd/... ./test/e2e/...
+
+test-all: ## Everything CI runs: fast + component + integration + e2e, race on (excludes acs/)
+	$(GO) test -race -count=1 -tags "integration e2e" $(FAST_PKGS)
+
+test-latency: ## Render the fast-suite latency report to test/latency-report.md
+	@$(GO) test -json $(FAST_PKGS) | $(GO) run ./cmd/testlatency -title "Fast suite latency" > test/latency-report.md
+	@echo "Latency report: test/latency-report.md"
+
+cover: ## Per-package coverage report (incl. integration tier); fails if any internal/* package <85%
+	@$(GO) test -race -count=1 -tags integration -coverprofile=coverage.txt $(FAST_PKGS)
 	@$(GO) tool cover -func=coverage.txt | tee coverage.func.txt
 	@$(GO) tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage HTML: coverage.html"

@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-end coverage of the CLI fallback chain (ADR-0029 / Workstream G)
 // driven through `evolve cycle run`: when the primary CLI fails with a
 // trigger exit code, the runner must retry the phase on the next allowed CLI

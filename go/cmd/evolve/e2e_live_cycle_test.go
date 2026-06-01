@@ -1,3 +1,5 @@
+//go:build e2e
+
 // Tier 1 — LIVE per-CLI happy cycle. Each available CLI runs a full cycle
 // against its cheapest real model, through both the headless and tmux drivers.
 // Assertions are STRUCTURAL: the real CLIs must drive the pipeline far enough to

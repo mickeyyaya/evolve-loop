@@ -4,25 +4,110 @@
 > bash→Go parity plan). Once the Go-only consolidation lands, `docs/TEST_PLAN.md`
 > is historical.
 
-The Go binary is the only runtime. Tests are organized into **tiers** by scope
-and cost, not by cycle number. Tests are named for the **behavior** they pin —
-never `TestCycle<N>_*` / `TestC<N>_*`.
+The Go binary is the only runtime. Tests are named for the **behavior** they pin
+— never `TestCycle<N>_*` / `TestC<N>_*`. They are organized along **two
+independent axes**:
 
-## Tier model
+- **Cost axis** (enforced by Go **build tags**) — controls what the default
+  suite runs and therefore wall-clock time: `default` (fast) → `integration` →
+  `e2e`. This is the only mechanism that gates the fast/slow split.
+- **Granularity axis** (a **convention + harness**, documented, not a build
+  tag) — describes *what a test exercises*: unit → functional → component →
+  integration → e2e.
+
+Why two axes? If granularity were a build tag, tagging every unit file
+`//go:build unit` would make a bare `go test ./...` compile **zero** tests and
+silently void the coverage gate. So granularity is how you *write* a test;
+cost is how it's *selected*.
+
+### Cost axis (build tags + Make targets)
+
+| Cost layer | Build tag | What runs | Command |
+|---|---|---|---|
+| **fast** (default) | _(none)_ | All co-located tests NOT tagged integration/e2e + `test/component`. Sub-10s. | `make test` |
+| **integration** | `//go:build integration` | Real FS / git / tmux subprocess tests + `test/integration`. | `make test-integration` |
+| **e2e** | `//go:build e2e` | Full-cycle subprocess paths (`cmd/evolve/e2e_*`) + `test/e2e`. Live sub-tier self-skips without `EVOLVE_E2E_LIVE`. | `make test-e2e` |
+| **everything** | both | Fast + integration + e2e (what CI runs). | `make test-all` |
+
+A file's build tag must sit at the very top, followed by a blank line:
+
+```go
+//go:build integration
+
+package bridge
+```
+
+**Self-containment rule:** a build-tagged file is excluded from the default
+build, so a *fast* (untagged) test must never reference a symbol defined only
+in a tagged file (the default build would fail to compile). Keep shared helpers
+that fast tests need in an untagged file. Tagged files in the same package +
+tag compile together, so they freely share helpers among themselves.
+
+### Granularity axis (convention + the `go/test/fixtures` harness)
+
+| Granularity | Where | Package style | Collaborators |
+|---|---|---|---|
+| **unit** | co-located `*_test.go` | `package foo` (white-box) | none / fixtures fakes |
+| **functional** | co-located `*_test.go` | `package foo_test` (black-box) | the package's exported API only |
+| **component** | `go/test/component/` | `package component` | several real adapters wired via `fixtures.NewWorkspace`, temp FS, no subprocess |
+| **integration** | `go/test/integration/` | `package integration` (`+integration`) | real git / tmux / FS |
+| **e2e** | `go/test/e2e/` + `cmd/evolve/e2e_*` | `package e2e` (`+e2e`) | the built `evolve` binary, full cycle |
+
+Two tiers stand outside the axes:
 
 | Tier | Location | Scope | How to run |
 |---|---|---|---|
-| **Unit** (co-located) | `go/internal/<pkg>/*_test.go`, `go/cmd/<pkg>/*_test.go`, `go/pkg/<pkg>/*_test.go` | One package, exercised in-package (white-box). The bulk of coverage. | `go test ./internal/... ./cmd/... ./pkg/...` |
-| **Integration** | `go/test/integration/` | Several `internal/` packages wired together against real temp-dir filesystem state; no CLI subagent spawned. | `go test ./test/integration/` |
-| **E2E** | `go/test/e2e/` | A full cycle path through orchestrator/ship against fixture workspaces; may shell out to git. Heaviest, slowest. | `go test ./test/e2e/` |
-| **Trust-kernel** | `go/test/trustkernel/` | Black-box pinning of the small set of safety invariants (ship gate, audit-binding, routing floor, transition legality, profile validity). Exercises real exported Go code. | `go test ./test/trustkernel/` |
-| **Commit-gate** | `go/test/commitgate/` | `commit-gate-test.sh` exercises `commit-gate/commit-gate-runner.sh` over ephemeral repos (bash); enforcement at commit time is in `internal/phases/ship/commitgate_test.go`. | `bash go/test/commitgate/commit-gate-test.sh` |
-| **Fixtures** | `go/test/fixtures/` | Shared builders (temp workspaces, sample `acs-verdict.json` / ledger / phase-plans) for the tiers above. No tests of its own. | n/a |
+| **Trust-kernel** | `go/test/trustkernel/` | Black-box pinning of safety invariants (ship gate, audit-binding, routing floor, transition legality, profile validity). | `go test ./test/trustkernel/` |
+| **Commit-gate** | `go/test/commitgate/` | `commit-gate-test.sh` over ephemeral repos (bash). | `bash go/test/commitgate/commit-gate-test.sh` |
 
-The co-located unit tests are the foundation and stay put: high cohesion with the
-code they test, white-box access to unexported helpers. The `go/test/*` tiers are
-black-box — they may call only **exported** APIs, which keeps them honest about
-the public contract.
+## The `go/test/fixtures` harness — single source of truth
+
+Every layer builds on one harness so adding a test is fast and duplication
+can't regrow. Read `go/test/fixtures/*.go` for the full surface; the
+load-bearing pieces:
+
+- **`NewWorkspace(t)`** — Builder for an isolated temp project root + `.evolve/`.
+  `.WithState(...).WithCycleState(...).WithFiles(...).WithCycleFiles(n,...).WithGitInit().Build()`.
+  Replaces the old `newStore()` / `SetupTempProject()` copies. Storage-free by
+  design (callers construct `storage.New(ws.EvolveDir)` themselves).
+- **`FakeStorage` / `FakeLedger` / `FakeRunner` / `FakeBridge`** — canonical
+  `core.*` test doubles (supersets with opt-in error/lock injection). One
+  implementation, not three.
+- **`BuildRunners(verdicts)`** — full per-phase runner map for orchestrator tests.
+- **`FixedClock(start, step)`** — deterministic clock for `DurationMS` assertions.
+- **`RequireNoErr` / `RequireErrContains` / `MustWrite` / `MustRead` /
+  `WantFileContains` / `FilePresent`** — the assertion facade. `FilePresent` is
+  the pure-bool existence check for genuine skip preconditions (do **not** use
+  `acsassert.FileExists`, which logs an `Errorf`, as a skip guard).
+- **`NewLedgerEntry(opts...)`** — Object-Mother for valid `core.LedgerEntry`s.
+
+**Import-cycle note:** `fixtures` imports `core`, so a white-box `package core`
+test cannot import it (cycle). Such tests use `package core_test` (black-box) —
+which is exactly the "functional" granularity.
+
+### How to add a test at each layer
+
+- **unit** — add `TestFoo_Behavior` to `internal/foo/foo_test.go` (`package foo`).
+  Use `fixtures` fakes for `core.*` collaborators. No build tag.
+- **functional** — same dir, `package foo_test`; call only exported API.
+- **component** — add to `go/test/component/`; `fixtures.NewWorkspace(t).Build()`,
+  construct the real adapter(s), assert a cross-cutting property. No build tag.
+- **integration** — add to `go/test/integration/` with `//go:build integration`;
+  `t.Skip` if the external tool is absent; shell out and assert.
+- **e2e** — add to `go/test/e2e/` (or `cmd/evolve/e2e_*`) with `//go:build e2e`;
+  build the binary into `t.TempDir()`, exec it, assert real stdout/exit.
+
+## Latency measurement
+
+`go/cmd/testlatency` turns a `go test -json` stream into a Markdown report
+(per-package wall time, longest-path test per package, slowest tests, threshold
+flags). Regenerate the fast-suite report any time:
+
+```
+make test-latency   # → go/test/latency-report.md
+```
+
+`go/test/latency-baseline.md` is the pre-split snapshot kept for comparison.
 
 ### Where the legacy ACS predicates live
 
@@ -93,7 +178,9 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
 
 `.github/workflows/go.yml`:
 
-- `go test -race -count=1 -coverprofile=… $(go list ./... | grep -v '/acs/')` —
-  unit + integration + e2e + trustkernel tiers, race detector on.
+- `go test -race -count=1 -tags integration -coverprofile=… $(go list ./... | grep -v '/acs/')`
+  — fast + integration tiers + trustkernel, race detector on, coverage captured.
+- `go test -count=1 -tags e2e ./cmd/... ./test/e2e/...` — e2e tier, no race
+  (subprocess-heavy); live sub-tier self-skips without `EVOLVE_E2E_LIVE`.
 - `bash go/test/commitgate/commit-gate-test.sh` — commit-gate runner tier.
-- Per-package `internal/*` coverage gate at ≥85%.
+- Per-package `internal/*` coverage gate at ≥85% (computed on the integration run).

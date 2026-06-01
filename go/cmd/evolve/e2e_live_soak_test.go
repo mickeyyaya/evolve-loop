@@ -1,3 +1,5 @@
+//go:build e2e
+
 // Tier 3 — LIVE cross-family adversarial soak. Runs a full cycle with the
 // builder and auditor on DIFFERENT model families (e.g. claude builder × codex
 // auditor) so the adversarial-audit integrity the offline tests can only assert

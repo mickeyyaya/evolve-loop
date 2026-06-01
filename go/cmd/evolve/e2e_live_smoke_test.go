@@ -1,3 +1,5 @@
+//go:build e2e
+
 // Tier 0 — LIVE SMOKE. The cheapest real-CLI proof: a single `evolve bridge
 // launch` call (one LLM turn) per available CLI, asserting the real binary
 // boots, accepts the prompt, and writes a parseable artifact. ollama is FREE

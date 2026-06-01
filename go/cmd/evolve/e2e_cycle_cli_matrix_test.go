@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-end matrix test that drives a full evolve cycle (Scout →
 // Triage → TDD → Build → Audit → Ship) for each of the three CLI
 // backends — claude-p, codex, agy — through the real agent-bridge,

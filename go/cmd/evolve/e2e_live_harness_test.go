@@ -1,3 +1,5 @@
+//go:build e2e
+
 // Shared robustness harness for the LIVE e2e tiers (T0–T3) that exercise real
 // LLM CLIs. See docs/testing/live-e2e-plan.md.
 //
