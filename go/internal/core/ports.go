@@ -160,7 +160,7 @@ type LedgerEntry struct {
 	Workers         []string `json:"workers,omitempty"`
 	// Action carries the decision verb for self-heal events (e.g. "extend" or
 	// "pause" for stop_review entries). Empty for all other entry kinds.
-	Action  string `json:"action,omitempty"`
+	Action string `json:"action,omitempty"`
 	// Message carries a human-readable detail string for self-heal events
 	// (e.g. the stop-reviewer's justification text). Empty for other kinds.
 	Message string `json:"message,omitempty"`
@@ -186,10 +186,10 @@ type ledgerEntryWire struct {
 	WorktreeTreeSHA string          `json:"worktree_tree_sha,omitempty"`
 	EntrySeq        int             `json:"entry_seq,omitempty"`
 	PrevHash        string          `json:"prev_hash,omitempty"`
-	WorkerCount int      `json:"worker_count,omitempty"`
-	Workers     []string `json:"workers,omitempty"`
-	Action      string   `json:"action,omitempty"`
-	Message     string   `json:"message,omitempty"`
+	WorkerCount     int             `json:"worker_count,omitempty"`
+	Workers         []string        `json:"workers,omitempty"`
+	Action          string          `json:"action,omitempty"`
+	Message         string          `json:"message,omitempty"`
 }
 
 // UnmarshalJSON accepts cycle as int, whole-number float, or string.
