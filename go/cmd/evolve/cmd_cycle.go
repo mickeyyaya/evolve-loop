@@ -36,6 +36,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
@@ -231,6 +232,28 @@ type orchDeps struct {
 // underlying storage + ledger so callers can run cross-cutting
 // queries (verify the ledger, read state.json) without re-instantiating
 // the adapters and risking divergence in the evolveDir resolution.
+// unionPhases returns base plus any phase in extra not already present,
+// preserving order — the additive merge for policy mandatory_phases (policy
+// can ADD mandatory phases but never remove them from the configured spine).
+func unionPhases(base, extra []string) []string {
+	seen := make(map[string]struct{}, len(base))
+	for _, p := range base {
+		seen[p] = struct{}{}
+	}
+	out := append([]string(nil), base...)
+	for _, p := range extra {
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
+}
+
 func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Ledger and storage are created first so the bridge adapter can wire its
 	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
@@ -280,6 +303,20 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	cfg, warnings := config.Load(registryPath, filterEvolveEnv(os.Environ()))
 	for _, w := range warnings {
 		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
+	}
+
+	// User policy (.evolve/policy.json): merge mandatory_phases into the routing
+	// spine so the advisor can never drop a user-declared mandatory phase. This
+	// is ADDITIVE — policy can only ADD mandatory phases; the non-configurable
+	// integrity floor (ship ⇒ build ∧ audit, enforced in config.Load) keeps the
+	// core spine regardless. A malformed policy is WARNed here (this construction
+	// path returns no error) and hard-fails loudly at the first phase dispatch,
+	// where the runner re-loads it for pins. Per-phase CLI/model pins are
+	// consulted at dispatch by the runner.
+	if pol, perr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); perr != nil {
+		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", perr)
+	} else {
+		cfg.Mandatory = unionPhases(cfg.Mandatory, pol.MandatoryPhases)
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
