@@ -30,6 +30,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -243,72 +244,65 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// profile. Operator misread "delegation" because the resolved CLI
 	// wasn't logged.
 	var prof *profiles.Profile
-	profileModelTier := ""
 	if loader := profiles.NewFromDir(profileDir); loader != nil {
 		if p, err := loader.Get(profileName); err == nil {
 			prof = &p
-			profileModelTier = p.ModelTierDefault
 		}
-	}
-	// WS-G1: resolve the per-phase CLI dispatch chain. Primary picked from
-	// EVOLVE_<AGENT>_CLI > EVOLVE_CLI > profile.cli > "claude-tmux". Fallback
-	// chain is profile.cli_fallback; triggers come from
-	// profile.cli_fallback_on_exit (default [80, 81, 124, 127] — see
-	// cli_chain.go:defaultFallbackOnExit for the rationale per code).
-	// A single-element chain reproduces pre-G byte-identical behavior.
-	chain := resolveCLIChain(profileName, req.Env, prof)
-	// WS-G3: probe each candidate's binary; demote (don't delete) any whose
-	// binary isn't on PATH so a missing CLI doesn't burn a 60s boot timeout
-	// before the chain advances. nil lookPath uses exec.LookPath. Logging
-	// the demotion happens here so operators see it inline with the
-	// dispatch log, not buried in the per-attempt stderr.
-	preChain := chain
-	chain = probeAvailableCLIChain(chain, nil)
-	if !sameCandidates(preChain.candidates, chain.candidates) {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s capability probe reordered chain: %v -> %v\n",
-			phase, preChain.candidates, chain.candidates)
-	}
-	cli := chain.candidates[0]
-	// Disambiguating dispatch log: tells observers which CLI is actually
-	// being invoked and why. Without this an output stream that says
-	// `model: claude-sonnet-4-6` could be misread as "codex delegating
-	// to claude" when the actual cause is "runner ignored profile.cli".
-	if len(chain.candidates) > 1 {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s fallback=%v triggers=%v\n",
-			phase, profileName, cli, chain.primarySource, profilePath, chain.candidates[1:], chain.triggers)
-	} else {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
-			phase, profileName, cli, chain.primarySource, profilePath)
 	}
 
-	// Bug A fix (cycle-124-followup): the model env key is AGENT-keyed
-	// (EVOLVE_<PROFILE_NAME>_MODEL), not PHASE-keyed. This matches the
-	// convention cmd_loop.go:1131 uses to write the override AND the
-	// EVOLVE_<AGENT>_PERMISSION_MODE resolver at line 310 below. The
-	// previous `PhaseEnvKey(phase, "MODEL")` form silently dropped
-	// `--model <agent>=X` overrides for tdd/tdd-engineer, build/builder,
-	// audit/auditor, retro/retrospective. See runner_perphase_env_test.go
-	// for the table-driven contract pin.
-	modelKey := envchain.PhaseEnvKey(profileName, "MODEL")
-	model := envchain.Resolve(modelKey, req.Env, profileModelTier, b.hooks.DefaultModel())
-	// Resolve the "auto" sentinel through llm_config.json + profile chain.
-	// Hooks.DefaultModel returns "auto" for most phases as a signal that
-	// the resolver should pick a concrete model based on phase role +
-	// llm_config tier mapping. claude -p rejects "auto" with HTTP 404
-	// ("There's an issue with the selected model (auto). It may not exist
-	// or you may not have access to it."), so the resolution MUST happen
-	// before bridge dispatch. Source: cycle 106 (2026-05-25) integration
-	// smoke that uncovered the v12.1.0 missing wire.
-	if model == "auto" {
-		if res, err := b.resolveLLM(phase, resolvellm.Options{}); err == nil {
-			switch {
-			case res.Model != "":
-				model = res.Model
-			case res.ModelTier != "":
-				model = res.ModelTier
-			}
+	// Single dispatch resolver (llmroute): one Plan carries the CLI fallback
+	// chain AND the resolved model, so there is exactly one place that decides
+	// "which CLI + model runs this phase". Precedence (preserved verbatim):
+	//   CLI:   EVOLVE_<AGENT>_CLI > EVOLVE_CLI > profile.cli > "claude-tmux",
+	//          then + profile.cli_fallback (deduped); triggers default
+	//          {80,81,124,127}. A single-element chain is byte-identical to
+	//          pre-fallback behavior.
+	//   model: EVOLVE_<AGENT>_MODEL > profile.model_tier_default >
+	//          Hooks.DefaultModel(), then "auto" → autoExpand.
+	// The model env key is AGENT-keyed (EVOLVE_<PROFILE_NAME>_MODEL), matching
+	// cmd_loop's `--model <agent>=X` writer + the PERMISSION_MODE resolver below.
+	//
+	// autoExpand bridges the existing resolvellm seam so "auto" expansion stays
+	// byte-identical (keyed by `phase`, NOT profileName — llm_config is
+	// phase-keyed). claude -p rejects a literal "auto" (HTTP 404), so this MUST
+	// resolve before dispatch. The CLI the seam computes is intentionally NOT
+	// used for dispatch — the chain above is authoritative (a Step-9 decision
+	// may revisit whether llm_config.cli should feed the chain).
+	autoExpand := func(role string) (string, bool) {
+		res, err := b.resolveLLM(role, resolvellm.Options{})
+		if err != nil {
+			return "", false
 		}
+		if res.Model != "" {
+			return res.Model, true
+		}
+		if res.ModelTier != "" {
+			return res.ModelTier, true
+		}
+		return "", false
 	}
+	plan := llmroute.Resolve(profileName, phase, b.hooks.DefaultModel(), req.Env, prof, autoExpand)
+	// Capability probe: demote (don't delete) candidates whose binary isn't on
+	// PATH so a missing CLI doesn't burn a 60s boot timeout before the chain
+	// advances. Log the reorder inline with the dispatch log.
+	preCandidates := plan.Candidates
+	plan = llmroute.Probe(plan, nil)
+	if !sameCandidates(preCandidates, plan.Candidates) {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s capability probe reordered chain: %v -> %v\n",
+			phase, preCandidates, plan.Candidates)
+	}
+	cli := plan.Candidates[0]
+	// Disambiguating dispatch log: tells observers which CLI is actually being
+	// invoked and why (an output stream saying `model: claude-sonnet-4-6` could
+	// otherwise be misread as "codex delegating to claude").
+	if len(plan.Candidates) > 1 {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s fallback=%v triggers=%v\n",
+			phase, profileName, cli, plan.PrimarySource, profilePath, plan.Candidates[1:], plan.Triggers)
+	} else {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
+			phase, profileName, cli, plan.PrimarySource, profilePath)
+	}
+	model := plan.Model
 	// Per-phase permission-mode override: EVOLVE_<AGENT>_PERMISSION_MODE,
 	// resolved here with the AGENT name (profileName) so the env key matches
 	// CLAUDE.md's convention (EVOLVE_TDD_ENGINEER_PERMISSION_MODE, not
@@ -333,11 +327,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
-	for i, candidateCLI := range chain.candidates {
+	for i, candidateCLI := range plan.Candidates {
 		if i > 0 {
 			fmt.Fprintf(os.Stderr,
 				"[runner] phase=%s fallback %d/%d: trying cli=%s (previous=%s exit=%d)\n",
-				phase, i+1, len(chain.candidates), candidateCLI, chain.candidates[i-1], bres.ExitCode)
+				phase, i+1, len(plan.Candidates), candidateCLI, plan.Candidates[i-1], bres.ExitCode)
 		}
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
 			CLI:            candidateCLI,
@@ -368,7 +362,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		if bridgeErr == nil {
 			break // success
 		}
-		if !chain.triggersFallback(bres.ExitCode) {
+		if !plan.TriggersFallback(bres.ExitCode) {
 			break // non-trigger error: surface to caller (real FAIL, real timeout on mandatory phase, etc.)
 		}
 		// trigger exit + more candidates → loop continues
