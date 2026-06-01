@@ -145,6 +145,20 @@ This is an intentional trade (determinism + safety coverage over shaving a
 ship-bound wall), not an oversight. Reducing ship further means faking `git` —
 a separate, larger refactor tracked outside this workstream.
 
+### Known: real-tmux integration tests are load-sensitive
+
+The `internal/bridge` `TestRealTmux_*` integration tests (`//go:build
+integration`) drive a real `tmux` session and poll for a REPL prompt. They pass
+reliably **in isolation** (`make test-integration`, or `go test -race -tags
+integration ./internal/bridge/`), but can flake (`exit 80`, "REPL prompt never
+appeared") inside a single `make test-all` invocation on a high-core machine,
+where ~100 packages run concurrently (`go test -p`) and starve the prompt
+detection. This is **pre-existing** (the test bodies predate the cost-axis split
+and are unchanged) and **CI-neutral** (CI runners' lower parallelism tolerates
+it, as they did before tagging). Triage a tmux failure by re-running
+`make test-integration` alone before suspecting a code change. Hardening these
+tests against load (retry / longer prompt timeout) is tracked as bridge follow-up.
+
 ### Where the legacy ACS predicates live
 
 `go/acs/cycle*/predicates_test.go` (the cycle-pegged `TestC<N>_*` Go ports of the
