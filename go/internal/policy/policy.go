@@ -45,6 +45,35 @@ type Policy struct {
 	Pins map[string]Pin `json:"pins,omitempty"`
 }
 
+// MergeMandatory returns base plus any phase in MandatoryPhases not already
+// present, preserving order. ADDITIVE — policy can only ADD mandatory phases,
+// never remove them from the configured spine (and the non-configurable
+// integrity floor applies on top regardless). This is the single merge used at
+// EVERY config-load site (the autonomous loop's composition root AND the
+// per-phase router.PolicyForProject) so a policy-mandatory phase is honored
+// uniformly, including by self-skipping phases.
+func (p Policy) MergeMandatory(base []string) []string {
+	if len(p.MandatoryPhases) == 0 {
+		return base
+	}
+	seen := make(map[string]struct{}, len(base))
+	for _, ph := range base {
+		seen[ph] = struct{}{}
+	}
+	out := append([]string(nil), base...)
+	for _, ph := range p.MandatoryPhases {
+		if ph == "" {
+			continue
+		}
+		if _, ok := seen[ph]; ok {
+			continue
+		}
+		seen[ph] = struct{}{}
+		out = append(out, ph)
+	}
+	return out
+}
+
 // PinFor returns the pin for phase and whether a non-empty one exists.
 func (p Policy) PinFor(phase string) (Pin, bool) {
 	pin, ok := p.Pins[phase]

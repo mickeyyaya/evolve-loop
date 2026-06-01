@@ -232,28 +232,6 @@ type orchDeps struct {
 // underlying storage + ledger so callers can run cross-cutting
 // queries (verify the ledger, read state.json) without re-instantiating
 // the adapters and risking divergence in the evolveDir resolution.
-// unionPhases returns base plus any phase in extra not already present,
-// preserving order — the additive merge for policy mandatory_phases (policy
-// can ADD mandatory phases but never remove them from the configured spine).
-func unionPhases(base, extra []string) []string {
-	seen := make(map[string]struct{}, len(base))
-	for _, p := range base {
-		seen[p] = struct{}{}
-	}
-	out := append([]string(nil), base...)
-	for _, p := range extra {
-		if p == "" {
-			continue
-		}
-		if _, ok := seen[p]; ok {
-			continue
-		}
-		seen[p] = struct{}{}
-		out = append(out, p)
-	}
-	return out
-}
-
 func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Ledger and storage are created first so the bridge adapter can wire its
 	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
@@ -316,7 +294,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	if pol, perr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); perr != nil {
 		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", perr)
 	} else {
-		cfg.Mandatory = unionPhases(cfg.Mandatory, pol.MandatoryPhases)
+		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json

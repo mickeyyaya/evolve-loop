@@ -79,16 +79,8 @@ Implementation: `go/internal/policy` (load + validate), consulted by
 `go/internal/llmroute` (pin) and `go/internal/phases/runner` (load + bypass +
 validate before dispatch).
 
-## Known limitation (follow-up)
-
-`mandatory_phases` is merged into the routing spine at cycle start
-(`cmd_cycle.go`). However, the *self-skipping* phases (triage, tdd,
-build-planner) decide whether to run via `router.PolicyForProject`, which
-re-loads the routing config **without** the policy mandatory-merge. So a
-self-skipping phase made mandatory *only* via `policy.mandatory_phases` (and not
-otherwise enabled) may still skip itself. Phases mandatory by default
-(`scout`/`build`/`audit`/`ship`) and **all dispatch pins** are unaffected — this
-gap only touches the advanced case of promoting an opt-in optional phase to
-mandatory purely through policy. Fix: thread the policy merge through
-`PolicyForProject` (a shared `policy.MergeMandatory` helper across both
-config-load sites).
+`mandatory_phases` is applied uniformly via the shared `policy.MergeMandatory`
+helper at **both** config-load sites — the loop's composition root
+(`cmd_cycle.go`) and the per-phase `router.PolicyForProject` — so a
+policy-mandatory phase is honored even by the self-skipping phases (triage,
+tdd, build-planner) when they decide whether to run.
