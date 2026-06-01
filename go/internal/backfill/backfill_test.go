@@ -21,6 +21,35 @@ import (
 	"testing"
 )
 
+// Error axis: header present + content above minLen, but the artifact's parent
+// directory does not exist → atomicWrite's os.WriteFile fails → TryExtract
+// returns (false, err) with the wrapped "backfill write" context, and no
+// artifact is left behind. Pins the I/O-error branch (backfill.go:59-61, 68-70).
+func TestTryExtract_WriteErrorReturnsWrappedError(t *testing.T) {
+	ws := t.TempDir()
+	report := "# Scout Report\n\nReconstructed scout body long enough to clear the minimum-length floor.\n"
+	seedClean(t, ws, "scout", report)
+	// Parent directory "nope/" was never created → WriteFile of the .tmp fails.
+	artifact := filepath.Join(ws, "nope", "scout-report.md")
+
+	ok, err := TryExtract(ws, "scout", artifact, 50)
+	if ok {
+		t.Errorf("TryExtract must report extracted=false when the artifact write fails")
+	}
+	if err == nil {
+		t.Fatalf("TryExtract must return an error when atomicWrite fails")
+	}
+	if !strings.Contains(err.Error(), "backfill write") {
+		t.Errorf("error must carry the backfill-write context; got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), artifact) {
+		t.Errorf("error must name the target artifact path %q; got %q", artifact, err.Error())
+	}
+	if _, serr := os.Stat(artifact); !os.IsNotExist(serr) {
+		t.Errorf("no artifact must be left behind when the write fails")
+	}
+}
+
 func seedClean(t *testing.T, ws, phase, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(ws, phase+"-stdout.clean.txt"), []byte(body), 0o644); err != nil {

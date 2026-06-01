@@ -3,6 +3,8 @@ package phaseconfig
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -124,5 +126,49 @@ func TestLoad_EmptyNameIsError(t *testing.T) {
 func TestLoad_MissingFileIsError(t *testing.T) {
 	if _, err := Load(filepath.Join(t.TempDir(), "nope.json")); err == nil {
 		t.Fatal("missing file must error")
+	}
+}
+
+// NOTE: this package's internal (white-box) tests cannot import go/test/fixtures:
+// fixtures imports internal/core, which imports internal/phaseconfig — pulling
+// the facade in would form an import cycle. The local writeCfg helper above is
+// the sanctioned alternative for this package.
+
+func TestLoad_MalformedJSONIsError(t *testing.T) {
+	// Arrange: a syntactically invalid JSON body (trailing junk after a value).
+	path := writeCfg(t, `{"name": "x", }not-json`)
+
+	// Act
+	_, err := Load(path)
+
+	// Assert: the parse branch must fail, and the error must name the phase and
+	// the offending path so the operator can locate the bad config.
+	if err == nil {
+		t.Fatal("malformed JSON must error")
+	}
+	if !strings.Contains(err.Error(), "parse") || !strings.Contains(err.Error(), path) {
+		t.Errorf("error %q must mention %q and the path %q", err.Error(), "parse", path)
+	}
+}
+
+func TestSpec_ReturnsEmbeddedPhaseSpecVerbatim(t *testing.T) {
+	// Arrange
+	pc, err := Load(writeCfg(t, sample))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	got := pc.Spec()
+
+	// Assert: Spec() is the embedded value, byte-for-byte — not a derived/copied
+	// projection. reflect.DeepEqual pins that no field is dropped or rewritten.
+	if !reflect.DeepEqual(got, pc.PhaseSpec) {
+		t.Errorf("Spec() = %+v, want embedded %+v", got, pc.PhaseSpec)
+	}
+	// Spot-check a representative field so a future DeepEqual-on-empty regression
+	// (e.g. Spec() returning a zero value) is caught loudly.
+	if got.Name != "security-scan" || got.After != "build" {
+		t.Errorf("Spec() identity: name=%q after=%q", got.Name, got.After)
 	}
 }

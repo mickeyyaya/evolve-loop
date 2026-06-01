@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,11 +81,49 @@ func TestCLIFamily(t *testing.T) {
 		"claude": "anthropic", "claude-tmux": "anthropic", "claude-p": "anthropic",
 		"codex": "openai", "codex-tmux": "openai",
 		"gemini": "google", "agy": "google", "agy-tmux": "google",
+		// Unknown CLI falls through to the baseCLI passthrough (default branch).
+		"mystery":      "mystery",
+		"mystery-tmux": "mystery",
 	}
 	for in, want := range cases {
 		if got := cliFamily(in); got != want {
 			t.Errorf("cliFamily(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestCapManifest pins the agy→antigravity special-case and the identity
+// passthrough for every other CLI (the manifest-stem mapping).
+func TestCapManifest(t *testing.T) {
+	if got := capManifest("agy"); got != "antigravity" {
+		t.Errorf("capManifest(agy) = %q, want antigravity", got)
+	}
+	for _, base := range []string{"claude", "codex", "gemini"} {
+		if got := capManifest(base); got != base {
+			t.Errorf("capManifest(%q) = %q, want identity", base, got)
+		}
+	}
+}
+
+// TestEffTier pins the tier > model_tier > model precedence ladder, including
+// the two fallback rungs the existing suite never exercised.
+func TestEffTier(t *testing.T) {
+	cases := []struct {
+		name string
+		p    cfgPhase
+		want string
+	}{
+		{"tier wins", cfgPhase{Tier: "deep", ModelTier: "balanced", Model: "opus"}, "deep"},
+		{"model_tier fallback", cfgPhase{ModelTier: "balanced", Model: "sonnet"}, "balanced"},
+		{"model last resort", cfgPhase{Model: "claude-opus-4-7"}, "claude-opus-4-7"},
+		{"all empty", cfgPhase{}, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.p.effTier(); got != c.want {
+				t.Errorf("effTier() = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 
@@ -191,6 +230,138 @@ func TestDetect(t *testing.T) {
 	}
 }
 
+// TestCapTierFromManifest exercises the default CapTier seam directly:
+// empty AdaptersDir → unknown; a manifest declaring both native capabilities
+// → full; one missing → delegated; a missing manifest file → Inspect defaults
+// both to true → full.
+func TestCapTierFromManifest(t *testing.T) {
+	if got := capTierFromManifest("", "claude"); got != "unknown" {
+		t.Errorf("empty adaptersDir: got %q, want unknown", got)
+	}
+
+	dir := t.TempDir()
+	// Full: both native capabilities present (under the .supports block, the
+	// shape capability.Inspect reads).
+	writeFile(t, filepath.Join(dir, "claude.capabilities.json"),
+		`{"supports": {"budget_cap_native": true, "permission_scoping": true}}`)
+	if got := capTierFromManifest(dir, "claude"); got != "full" {
+		t.Errorf("both-native manifest: got %q, want full", got)
+	}
+
+	// Delegated: one capability false flips the verdict.
+	writeFile(t, filepath.Join(dir, "codex.capabilities.json"),
+		`{"supports": {"budget_cap_native": false, "permission_scoping": true}}`)
+	if got := capTierFromManifest(dir, "codex"); got != "delegated" {
+		t.Errorf("missing-budget manifest: got %q, want delegated", got)
+	}
+
+	// agy resolves via the antigravity manifest stem (capManifest mapping).
+	writeFile(t, filepath.Join(dir, "antigravity.capabilities.json"),
+		`{"supports": {"budget_cap_native": true, "permission_scoping": true}}`)
+	if got := capTierFromManifest(dir, "agy"); got != "full" {
+		t.Errorf("agy via antigravity manifest: got %q, want full", got)
+	}
+
+	// Absent manifest → Inspect defaults both to true → full (not unknown).
+	if got := capTierFromManifest(dir, "gemini"); got != "full" {
+		t.Errorf("absent manifest: got %q, want full (Inspect defaults true)", got)
+	}
+
+	// Inspect I/O error (non-ENOENT) → unknown: make the manifest path a
+	// directory so os.ReadFile fails with EISDIR.
+	if err := os.MkdirAll(filepath.Join(dir, "perl.capabilities.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := capTierFromManifest(dir, "perl"); got != "unknown" {
+		t.Errorf("manifest-read error: got %q, want unknown", got)
+	}
+}
+
+// TestReadProfileConstraints_MalformedJSON pins that a profile that exists but
+// is not valid JSON reports ok=false (the unmarshal-error branch) rather than
+// returning partial constraints.
+func TestReadProfileConstraints_MalformedJSON(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "scout.json"), `{not valid json`)
+	_, _, _, ok := readProfileConstraints(dir, "scout")
+	if ok {
+		t.Error("malformed profile JSON should report ok=false")
+	}
+	// Missing file is also ok=false (the ReadFile-error branch).
+	if _, _, _, ok := readProfileConstraints(dir, "absent"); ok {
+		t.Error("missing profile should report ok=false")
+	}
+}
+
+// TestDetect_DefaultSeams drives Detect with NO seam overrides except Doctor +
+// CapTier (so no live binaries are probed): exercises the nil Env/Now default
+// branches, a profile-less role (resolvellm error / no-constraints path), and
+// the SetupCompletedAt populated readback.
+func TestDetect_DefaultSeams(t *testing.T) {
+	project, evolveDir := fixtureRepo(t)
+	// Stamp a setup marker so the SetupCompletedAt/SetupVersion readback fires.
+	writeFile(t, filepath.Join(evolveDir, "state.json"),
+		`{"setupCompletedAt":"2025-12-31T00:00:00Z","setupVersion":1}`)
+
+	// Env + Now left nil → defaults (os.Getenv, time.Now) are used.
+	rep := Detect(context.Background(), DetectOptions{
+		ProjectRoot: project,
+		EvolveDir:   evolveDir,
+		Doctor:      fakeDoctor,
+		CapTier:     func(string) string { return "full" },
+	})
+
+	if rep.SetupCompletedAt != "2025-12-31T00:00:00Z" || rep.SetupVersion != 1 {
+		t.Errorf("setup marker readback: at=%q ver=%d", rep.SetupCompletedAt, rep.SetupVersion)
+	}
+	if rep.ScannedAt == "" {
+		t.Error("default Now seam should still stamp ScannedAt")
+	}
+	// "intent" has no profile file → no constraints; should still appear.
+	var sawIntent bool
+	for _, p := range rep.Phases {
+		if p.Role == "intent" {
+			sawIntent = true
+			if len(p.AllowedCLIs) != 0 {
+				t.Errorf("profile-less role should carry no allowed_clis: %+v", p)
+			}
+		}
+	}
+	if !sawIntent {
+		t.Error("intent role missing from phases")
+	}
+}
+
+// TestDetect_NilDoctorAndCapTierSeams drives Detect with Doctor AND CapTier
+// left nil so the default closures (real bridge.Doctor + capTierFromManifest)
+// execute. It is offline/deterministic: bridge.Doctor probes the local
+// environment without network or repo state, and we assert only structural
+// invariants (one CLIStatus per detected base family, every Role present) so
+// the result is stable regardless of which CLIs the host has installed.
+func TestDetect_NilDoctorAndCapTierSeams(t *testing.T) {
+	project, evolveDir := fixtureRepo(t)
+	rep := Detect(context.Background(), DetectOptions{
+		ProjectRoot: project,
+		EvolveDir:   evolveDir,
+		AdaptersDir: t.TempDir(), // empty → capTierFromManifest returns full/unknown deterministically
+		// Doctor + CapTier nil → default seams run.
+	})
+	if rep.ScannedAt == "" {
+		t.Error("default Now seam should stamp ScannedAt")
+	}
+	if len(rep.Phases) != len(Roles) {
+		t.Errorf("phases len = %d, want %d (one per Role)", len(rep.Phases), len(Roles))
+	}
+	// Base-family dedup invariant holds regardless of host CLIs.
+	seen := map[string]bool{}
+	for _, c := range rep.CLIs {
+		if seen[c.CLI] {
+			t.Errorf("duplicate CLI family in report: %q", c.CLI)
+		}
+		seen[c.CLI] = true
+	}
+}
+
 // --- Validate ---
 
 func TestValidate(t *testing.T) {
@@ -276,6 +447,26 @@ func TestValidate(t *testing.T) {
 			t.Error("missing config should error")
 		}
 	})
+
+	t.Run("malformed config JSON errors", func(t *testing.T) {
+		writeFile(t, cfgPath, `{"phases": {not json`)
+		if _, err := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir}); err == nil {
+			t.Error("unparseable config should error")
+		}
+	})
+
+	t.Run("role without a profile is skipped, not an error", func(t *testing.T) {
+		// "intent" has no profile in fixtureRepo → readProfileConstraints
+		// reports !ok → the role is skipped (no violation, OK stays true).
+		writeFile(t, cfgPath, `{"phases":{"intent":{"cli":"codex","tier":"fast"}}}`)
+		rep, err := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !rep.OK || len(rep.Violations) != 0 {
+			t.Errorf("profile-less role should pass with no violations: %+v", rep)
+		}
+	})
 }
 
 // --- Complete (lossless merge) ---
@@ -337,5 +528,22 @@ func TestCompleteRefusesMalformedState(t *testing.T) {
 	writeFile(t, filepath.Join(evolveDir, "state.json"), `{not json`)
 	if _, err := Complete(CompleteOptions{EvolveDir: evolveDir}); err == nil {
 		t.Error("malformed state.json should error rather than clobber")
+	}
+}
+
+// TestCompleteMkdirFails pins the MkdirAll error branch: when EvolveDir's
+// parent is a regular file, MkdirAll cannot create the directory, so Complete
+// returns an error instead of silently proceeding.
+func TestCompleteMkdirFails(t *testing.T) {
+	base := t.TempDir()
+	fileAsParent := filepath.Join(base, "iam-a-file")
+	writeFile(t, fileAsParent, "x")
+	// EvolveDir nests under a regular file → MkdirAll fails (ENOTDIR).
+	_, err := Complete(CompleteOptions{EvolveDir: filepath.Join(fileAsParent, "evolve")})
+	if err == nil {
+		t.Error("Complete under a file-path parent should fail at MkdirAll")
+	}
+	if err != nil && !strings.Contains(err.Error(), "mkdir") {
+		t.Errorf("error should name the mkdir step, got %v", err)
 	}
 }

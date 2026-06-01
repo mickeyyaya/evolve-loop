@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -51,6 +52,60 @@ func TestLoad_ParsesMandatoryAndPins(t *testing.T) {
 	pin, ok := p.PinFor("audit")
 	if !ok || pin.CLI != "claude-tmux" || pin.Model != "claude-opus-4-8" {
 		t.Errorf("PinFor(audit)=%+v ok=%v", pin, ok)
+	}
+}
+
+// TestLoad_ReadErrorNotMissing covers the non-ErrNotExist read failure: a path
+// that exists but cannot be read as a file. A directory yields EISDIR from
+// os.ReadFile (not os.ErrNotExist) so the loud-error branch fires rather than
+// the absent-is-empty one.
+func TestLoad_ReadErrorNotMissing(t *testing.T) {
+	dir := t.TempDir() // a directory: exists, but os.ReadFile fails on it
+	p, err := Load(dir)
+	if err == nil {
+		t.Fatalf("reading a directory as policy must error, got policy %+v", p)
+	}
+	if !strings.Contains(err.Error(), "policy: read "+dir) {
+		t.Errorf("error %q must name the read failure on %q", err, dir)
+	}
+	if len(p.MandatoryPhases) != 0 || len(p.Pins) != 0 {
+		t.Errorf("on error Load must return zero Policy, got %+v", p)
+	}
+}
+
+// TestTierRank covers every classification branch: canonical tiers, legacy
+// aliases, exact-model substring matches, and the unclassifiable rank-0 case.
+func TestTierRank(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		// canonical tier names
+		{"fast", 1},
+		{"balanced", 2},
+		{"deep", 3},
+		// legacy aliases
+		{"haiku", 1},
+		{"sonnet", 2},
+		{"opus", 3},
+		// case / whitespace insensitivity on the canonical switch
+		{"  FAST  ", 1},
+		{"Balanced", 2},
+		{"DEEP", 3},
+		// exact-model identifiers fall through to substring matching
+		{"claude-haiku-4-5", 1},
+		{"claude-sonnet-4-6", 2},
+		{"claude-opus-4-8", 3},
+		// unclassifiable → rank 0 (envelope check is skipped for these)
+		{"gpt-5.5", 0},
+		{"", 0},
+	}
+	for _, c := range cases {
+		t.Run(c.in, func(t *testing.T) {
+			if got := TierRank(c.in); got != c.want {
+				t.Errorf("TierRank(%q)=%d, want %d", c.in, got, c.want)
+			}
+		})
 	}
 }
 

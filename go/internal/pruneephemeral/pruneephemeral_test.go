@@ -274,6 +274,180 @@ func TestRun_OverrideDirs(t *testing.T) {
 	}
 }
 
+// === Non-dir entries under runs/ are skipped ===============================
+// A stray FILE sitting directly in .evolve/runs/ (not a cycle dir) must be
+// ignored by the cycle walk, exercising the !cycleEntry.IsDir() continue.
+func TestRun_NonDirEntryInRunsSkipped(t *testing.T) {
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-10 * 24 * time.Hour)
+	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
+	// Drop a loose stale FILE alongside the cycle dir.
+	stray := filepath.Join(repo, ".evolve", "runs", "stray.txt")
+	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write stray: %v", err)
+	}
+	if err := os.Chtimes(stray, stale, stale); err != nil {
+		t.Fatalf("chtime stray: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: repo, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	// Only the real cycle's .ephemeral counts; the stray file is untouched.
+	if res.EphemeralPruned != 1 {
+		t.Errorf("EphemeralPruned = %d, want 1 (stray file ignored)", res.EphemeralPruned)
+	}
+	if _, err := os.Stat(stray); err != nil {
+		t.Errorf("stray file should be untouched: %v", err)
+	}
+}
+
+// === Cycle dir without an .ephemeral subdir is skipped =====================
+// Exercises the os.Stat(ephemeralDir) err-or-not-dir continue.
+func TestRun_CycleWithoutEphemeralSkipped(t *testing.T) {
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-10 * 24 * time.Hour)
+	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
+	// cycle-2 exists but has NO .ephemeral child (just a plain file).
+	bare := filepath.Join(repo, ".evolve", "runs", "cycle-2")
+	if err := os.MkdirAll(bare, 0o755); err != nil {
+		t.Fatalf("mkdir bare: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bare, "report.md"), []byte("kept"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: repo, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if res.EphemeralPruned != 1 {
+		t.Errorf("EphemeralPruned = %d, want 1 (cycle-2 has no .ephemeral)", res.EphemeralPruned)
+	}
+}
+
+// === A subdir among the dispatch logs is skipped ===========================
+// Exercises the e.IsDir() continue in the log walk.
+func TestRun_DispatchLogSubdirSkipped(t *testing.T) {
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * 24 * time.Hour)
+	repo := makeRepo(t, nil, []logSpec{{"batch-old.log", stale}})
+	// A directory named like a batch log must be skipped (only regular files prune).
+	subdir := filepath.Join(repo, ".evolve", "dispatch-logs", "batch-dir.log")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+	if err := os.Chtimes(subdir, stale, stale); err != nil {
+		t.Fatalf("chtime subdir: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: repo, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if res.LogFilesPruned != 1 {
+		t.Errorf("LogFilesPruned = %d, want 1 (subdir ignored)", res.LogFilesPruned)
+	}
+	if _, err := os.Stat(subdir); err != nil {
+		t.Errorf("batch-dir.log subdir should be untouched: %v", err)
+	}
+}
+
+// === RemoveAll failure surfaces as a skipped prune (count not incremented) ==
+// A read-only parent cycle dir makes os.RemoveAll(ephemeralDir) fail; the WARN
+// branch must `continue` WITHOUT incrementing EphemeralPruned.
+func TestRun_EphemeralRemovalFailureNotCounted(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory write permissions")
+	}
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-10 * 24 * time.Hour)
+	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
+	cycleDir := filepath.Join(repo, ".evolve", "runs", "cycle-1")
+	// Read-only parent → cannot unlink the .ephemeral child.
+	if err := os.Chmod(cycleDir, 0o555); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(cycleDir, 0o755) })
+
+	var buf bytes.Buffer
+	res, err := Run(Options{ProjectRoot: repo, Stderr: &buf, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if res.EphemeralPruned != 0 {
+		t.Errorf("EphemeralPruned = %d, want 0 (removal failed)", res.EphemeralPruned)
+	}
+	if !strings.Contains(buf.String(), "WARN: failed to remove") {
+		t.Errorf("expected WARN log on removal failure, got: %q", buf.String())
+	}
+}
+
+// === Log-file removal failure surfaces as a skipped prune ===================
+// Read-only dispatch-logs dir makes os.Remove fail; WARN branch must continue.
+func TestRun_LogRemovalFailureNotCounted(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory write permissions")
+	}
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * 24 * time.Hour)
+	repo := makeRepo(t, nil, []logSpec{{"batch-old.log", stale}})
+	logsDir := filepath.Join(repo, ".evolve", "dispatch-logs")
+	if err := os.Chmod(logsDir, 0o555); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(logsDir, 0o755) })
+
+	var buf bytes.Buffer
+	res, err := Run(Options{ProjectRoot: repo, Stderr: &buf, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if res.LogFilesPruned != 0 {
+		t.Errorf("LogFilesPruned = %d, want 0 (removal failed)", res.LogFilesPruned)
+	}
+	if !strings.Contains(buf.String(), "WARN: failed to remove") {
+		t.Errorf("expected WARN log on removal failure, got: %q", buf.String())
+	}
+}
+
+// === A dangling batch-*.log symlink is skipped (os.Stat fails) =============
+// The entry passes the prefix/suffix filter and is not a dir, but os.Stat
+// (which follows the link) errors → the prune-walk must `continue`.
+func TestRun_DanglingLogSymlinkSkipped(t *testing.T) {
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * 24 * time.Hour)
+	repo := makeRepo(t, nil, []logSpec{{"batch-old.log", stale}})
+	link := filepath.Join(repo, ".evolve", "dispatch-logs", "batch-dangling.log")
+	if err := os.Symlink(filepath.Join(repo, "does-not-exist"), link); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: repo, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	// Only the real stale log prunes; the dangling link is skipped, not counted.
+	if res.LogFilesPruned != 1 {
+		t.Errorf("LogFilesPruned = %d, want 1 (dangling symlink skipped)", res.LogFilesPruned)
+	}
+}
+
+// === nil Now defaults to the real wall clock ===============================
+// Covers the `now == nil → now = time.Now` default. We assert behavior by
+// planting a dir whose mtime is far enough in the past that the real clock,
+// whatever it reads, treats it as stale — pinning that the default clock IS
+// consulted (a missing default would nil-panic).
+func TestRun_NilNowUsesWallClock(t *testing.T) {
+	// 100 days before the actual current time → definitely past the 7d TTL.
+	stale := time.Now().Add(-100 * 24 * time.Hour)
+	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
+	res, err := Run(Options{ProjectRoot: repo}) // Now left nil
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if res.EphemeralPruned != 1 {
+		t.Errorf("EphemeralPruned = %d, want 1 (default wall clock should treat 100d-old as stale)", res.EphemeralPruned)
+	}
+}
+
 // === Fresh dirs survive (mtime within TTL) =================================
 func TestRun_FreshEphemeralSurvives(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)

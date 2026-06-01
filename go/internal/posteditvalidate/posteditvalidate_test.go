@@ -176,6 +176,68 @@ func TestRun_PyError(t *testing.T) {
 	}
 }
 
+// === Valid bash → OK, no WARN, OK logged ===================================
+func TestRun_ValidBash(t *testing.T) {
+	d := t.TempDir()
+	p := filepath.Join(d, "good.sh")
+	if err := os.WriteFile(p, []byte("echo hi"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var buf bytes.Buffer
+	fixedNow := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	vBash := func(string) (bool, string) { return true, "" }
+	res := Run(Options{
+		Payload:      payload(p),
+		ProjectRoot:  d,
+		LLMStderr:    &buf,
+		ValidateBash: vBash,
+		Now:          func() time.Time { return fixedNow },
+	})
+	if res.Kind != "sh" || !res.OK || res.WarnEmitted {
+		t.Errorf("res = %+v, want sh+OK no warn", res)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("valid bash must emit no LLM output: %q", buf.String())
+	}
+	logBody, err := os.ReadFile(filepath.Join(d, ".evolve", "guards.log"))
+	if err != nil {
+		t.Fatalf("read guards.log: %v", err)
+	}
+	if !strings.Contains(string(logBody), "(bash syntax)") {
+		t.Errorf("guards.log missing bash OK entry: %q", logBody)
+	}
+}
+
+// === Valid python → OK, no WARN, OK logged =================================
+func TestRun_ValidPy(t *testing.T) {
+	d := t.TempDir()
+	p := filepath.Join(d, "good.py")
+	if err := os.WriteFile(p, []byte("print('hi')\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var buf bytes.Buffer
+	vPy := func(string) (bool, string) { return true, "" }
+	res := Run(Options{
+		Payload:     payload(p),
+		ProjectRoot: d,
+		LLMStderr:   &buf,
+		ValidatePy:  vPy,
+	})
+	if res.Kind != "py" || !res.OK || res.WarnEmitted {
+		t.Errorf("res = %+v, want py+OK no warn", res)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("valid py must emit no LLM output: %q", buf.String())
+	}
+	logBody, err := os.ReadFile(filepath.Join(d, ".evolve", "guards.log"))
+	if err != nil {
+		t.Fatalf("read guards.log: %v", err)
+	}
+	if !strings.Contains(string(logBody), "(py_compile)") {
+		t.Errorf("guards.log missing py OK entry: %q", logBody)
+	}
+}
+
 // === guards.log gets appended ==============================================
 func TestRun_AppendsGuardsLog(t *testing.T) {
 	d := t.TempDir()

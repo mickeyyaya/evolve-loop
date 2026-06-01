@@ -313,6 +313,240 @@ func TestAppendAbnormalEvent_BadWorkspaceNoop(t *testing.T) {
 	appendAbnormalEvent("/nonexistent-dir-xyz", "x", time.Now)
 }
 
+func TestMtimeUnix_EmptyPathIsZero(t *testing.T) {
+	t.Parallel()
+	if m := mtimeUnix(""); m != 0 {
+		t.Errorf("empty path → 0, got %d", m)
+	}
+}
+
+func TestMtimeUnix_StatErrorIsZero(t *testing.T) {
+	t.Parallel()
+	if m := mtimeUnix(filepath.Join(t.TempDir(), "absent.json")); m != 0 {
+		t.Errorf("non-existent path → 0 (stat error branch), got %d", m)
+	}
+}
+
+func TestMtimeUnix_ReturnsModTime(t *testing.T) {
+	t.Parallel()
+	p := filepath.Join(t.TempDir(), "f.json")
+	if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
+	if err := os.Chtimes(p, want, want); err != nil {
+		t.Fatal(err)
+	}
+	if got := mtimeUnix(p); got != want.Unix() {
+		t.Errorf("mtimeUnix=%d, want %d", got, want.Unix())
+	}
+}
+
+// TestNewestMatch_GlobError — a malformed glob pattern (unterminated '[')
+// returns the (0, "") zero result rather than panicking (phasewatchdog.go:265).
+func TestNewestMatch_GlobError(t *testing.T) {
+	t.Parallel()
+	m, p := newestMatch(filepath.Join(t.TempDir(), "x[", "*.log"))
+	if m != 0 || p != "" {
+		t.Errorf("malformed glob → (0, \"\"), got (%d, %q)", m, p)
+	}
+}
+
+// TestAppendAbnormalEvent_NilNowUsesWallClock — when now is nil the helper falls
+// back to time.Now and still writes a timestamped event (phasewatchdog.go:286-288).
+func TestAppendAbnormalEvent_NilNowUsesWallClock(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	appendAbnormalEvent(dir, "idle_s=42", nil)
+	body, err := os.ReadFile(filepath.Join(dir, "abnormal-events.jsonl"))
+	if err != nil {
+		t.Fatalf("event must be written even with nil now: %v", err)
+	}
+	if !strings.Contains(string(body), `"timestamp"`) {
+		t.Errorf("nil-now event must still carry a timestamp; got %s", body)
+	}
+}
+
+// TestAppendAbnormalEvent_OpenFileErrorNoop — when the target jsonl path already
+// exists as a DIRECTORY, OpenFile fails and the helper returns silently without
+// panicking and without leaving a stray file (phasewatchdog.go:303-305).
+func TestAppendAbnormalEvent_OpenFileErrorNoop(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// Block the append target by pre-creating it as a directory.
+	if err := os.Mkdir(filepath.Join(dir, "abnormal-events.jsonl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Must not panic; the dir must remain a dir (no write).
+	appendAbnormalEvent(dir, "idle_s=1", time.Now)
+	info, err := os.Stat(filepath.Join(dir, "abnormal-events.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.IsDir() {
+		t.Errorf("append target should remain a directory (OpenFile error path)")
+	}
+}
+
+// TestDefaultKillPgrp_Signal0Succeeds — exercises the real defaultKillPgrp
+// (phasewatchdog.go:312-314). Signal 0 is the POSIX existence probe: it performs
+// no kill, so targeting this test process's own group is safe and deterministic,
+// and it must return nil (the group exists).
+func TestDefaultKillPgrp_Signal0Succeeds(t *testing.T) {
+	t.Parallel()
+	pgid, err := syscall.Getpgid(os.Getpid())
+	if err != nil {
+		t.Skipf("Getpgid unavailable: %v", err)
+	}
+	if err := defaultKillPgrp(pgid, syscall.Signal(0)); err != nil {
+		t.Errorf("signal-0 existence probe of own pgid should succeed, got %v", err)
+	}
+}
+
+// TestRun_PhaseAdvanceLogsTransition — when the phase in cycle-state.json changes
+// from one non-empty value to another between iterations, Run logs the "phase
+// advance: 'X' → 'Y'" line and resets the baseline (phasewatchdog.go:127-129).
+// The Sleep seam rewrites the phase file between iterations to drive the change
+// deterministically (no real sleep, no goroutine race).
+func TestRun_PhaseAdvanceLogsTransition(t *testing.T) {
+	// Not parallel: drives shared file state across iterations via the Sleep seam.
+	ws := tempWorkspace(t)
+	cycleState := filepath.Join(ws, "cycle-state.json")
+	if err := os.WriteFile(cycleState, []byte(`{"phase":"build"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	nowFn := func() time.Time { return base.Add(1 * time.Second) }
+
+	// After the first iteration's Sleep, flip the phase to "audit" so iteration 2
+	// observes a non-empty→non-empty transition (the advance branch).
+	sleeps := 0
+	sleepFn := func(time.Duration) {
+		sleeps++
+		if sleeps == 1 {
+			if err := os.WriteFile(cycleState, []byte(`{"phase":"audit"}`), 0o644); err != nil {
+				t.Errorf("rewrite cycle-state: %v", err)
+			}
+		}
+	}
+
+	var stderr bytes.Buffer
+	rc := Run(Config{
+		Workspace: ws, TargetPGID: 7, Cycle: 1, CycleStatePath: cycleState,
+		ThresholdS: 600, WarnPct: 75, PollS: 1, GraceS: 1,
+		Now:       nowFn,
+		Sleep:     sleepFn,
+		KillPgrp:  func(int, syscall.Signal) error { return nil },
+		StopAfter: 2,
+	}, &stderr)
+	if rc != ExitOK {
+		t.Fatalf("rc=%d, want 0 (log=%s)", rc, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "phase observed: 'build'") {
+		t.Errorf("first iteration should observe phase 'build'; log=%s", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "phase advance: 'build' → 'audit'") {
+		t.Errorf("second iteration should log the advance to 'audit'; log=%s", stderr.String())
+	}
+}
+
+// TestRun_CycleStateMtimeIsFreshestActivity — when cycle-state.json has the
+// newest mtime (no log/md/json activity files beat it), it is selected as the
+// last-activity baseline (phasewatchdog.go:148-151). With a fresh mtime the
+// baseline is recent → no FIRE; the test asserts no kill and clean exit.
+func TestRun_CycleStateMtimeIsFreshestActivity(t *testing.T) {
+	t.Parallel()
+	ws := tempWorkspace(t)
+	// cycle-state.json lives OUTSIDE the workspace so the workspace "*.json" glob
+	// does not catch it — that forces the explicit cycle-state mtime branch
+	// (phasewatchdog.go:148-151) to be the source that beats bestMtime.
+	cycleState := filepath.Join(t.TempDir(), "cycle-state.json")
+	if err := os.WriteFile(cycleState, []byte(`{"phase":"build"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Seed a stale workspace log so the (fresh) cycle-state is strictly newer.
+	stale := filepath.Join(ws, "old.log")
+	if err := os.WriteFile(stale, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	staleT := base.Add(-1000 * time.Second)
+	if err := os.Chtimes(stale, staleT, staleT); err != nil {
+		t.Fatal(err)
+	}
+	// cycle-state mtime equals "now" → idle ≈ 0 → never fires.
+	if err := os.Chtimes(cycleState, base, base); err != nil {
+		t.Fatal(err)
+	}
+	nowFn := func() time.Time { return base }
+
+	killed := false
+	var stderr bytes.Buffer
+	rc := Run(Config{
+		Workspace: ws, TargetPGID: 7, Cycle: 1, CycleStatePath: cycleState,
+		ThresholdS: 600, WarnPct: 75, PollS: 1, GraceS: 1,
+		Now:       nowFn,
+		Sleep:     func(time.Duration) {},
+		KillPgrp:  func(int, syscall.Signal) error { killed = true; return nil },
+		StopAfter: 1,
+	}, &stderr)
+	if rc != ExitOK {
+		t.Fatalf("rc=%d, want 0", rc)
+	}
+	if killed {
+		t.Errorf("fresh cycle-state mtime should keep idle near 0 → no fire")
+	}
+}
+
+// TestRun_LedgerMtimeIsFreshestActivity — when ProjectRoot is set and
+// .evolve/ledger.jsonl has the newest mtime, the ledger is selected as the
+// last-activity source (phasewatchdog.go:154-159). A fresh ledger mtime keeps
+// idle near 0 → no fire.
+func TestRun_LedgerMtimeIsFreshestActivity(t *testing.T) {
+	t.Parallel()
+	ws := tempWorkspace(t)
+	projectRoot := t.TempDir()
+	ledgerDir := filepath.Join(projectRoot, ".evolve")
+	if err := os.MkdirAll(ledgerDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ledger := filepath.Join(ledgerDir, "ledger.jsonl")
+	if err := os.WriteFile(ledger, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(ledger, base, base); err != nil {
+		t.Fatal(err)
+	}
+	// Seed a stale workspace log so the ledger (fresh) is strictly newer.
+	stale := filepath.Join(ws, "old.log")
+	if err := os.WriteFile(stale, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	staleT := base.Add(-1000 * time.Second)
+	if err := os.Chtimes(stale, staleT, staleT); err != nil {
+		t.Fatal(err)
+	}
+	nowFn := func() time.Time { return base } // == ledger mtime → idle ≈ 0
+
+	killed := false
+	var stderr bytes.Buffer
+	rc := Run(Config{
+		Workspace: ws, TargetPGID: 7, Cycle: 1, ProjectRoot: projectRoot,
+		ThresholdS: 600, WarnPct: 75, PollS: 1, GraceS: 1,
+		Now:       nowFn,
+		Sleep:     func(time.Duration) {},
+		KillPgrp:  func(int, syscall.Signal) error { killed = true; return nil },
+		StopAfter: 1,
+	}, &stderr)
+	if rc != ExitOK {
+		t.Fatalf("rc=%d, want 0", rc)
+	}
+	if killed {
+		t.Errorf("fresh ledger mtime should keep idle near 0 → no fire")
+	}
+}
+
 func TestAppendAbnormalEvent_WritesLine(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

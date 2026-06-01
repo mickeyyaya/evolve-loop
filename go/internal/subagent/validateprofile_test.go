@@ -62,6 +62,24 @@ func TestValidateProfile_HappyPath(t *testing.T) {
 	}
 }
 
+// TestValidateProfile_NilOptionsWireDefaults covers the six `if opts.X == nil`
+// default-wiring branches (validateprofile.go:85-102). Passing a zero
+// ValidateProfileOptions forces every default to be installed; the call then
+// fails at the real defaultReadProfile (missing file) — the point is that the
+// default seams are exercised, not that the validation succeeds.
+func TestValidateProfile_NilOptionsWireDefaults(t *testing.T) {
+	_, err := ValidateProfile(context.Background(), ValidateProfileRequest{
+		Agent:       "scout",
+		ProfilesDir: filepath.Join(t.TempDir(), "profiles"),
+		AdaptersDir: filepath.Join(t.TempDir(), "adapters"),
+	}, ValidateProfileOptions{})
+	// defaultReadProfile on a nonexistent profile path errors with
+	// "profile not found".
+	if err == nil || !strings.Contains(err.Error(), "profile not found") {
+		t.Errorf("expected profile-not-found through defaults, got %v", err)
+	}
+}
+
 func TestValidateProfile_MissingAgentName(t *testing.T) {
 	_, err := ValidateProfile(context.Background(),
 		ValidateProfileRequest{ProfilesDir: "/p", AdaptersDir: "/a"},
@@ -434,6 +452,37 @@ func TestCapabilityExtractObject_NotPresent(t *testing.T) {
 	}
 	if _, ok := capabilityExtractObject(`{"x":  `, "x"); ok {
 		t.Errorf("truncated should not match")
+	}
+}
+
+// TestCapabilityExtractObject_KeyWithoutColon covers the branch where the
+// key is found but the next non-space rune is not ':' — the parser must
+// reject rather than mis-read the following token as a value.
+func TestCapabilityExtractObject_KeyWithoutColon(t *testing.T) {
+	if v, ok := capabilityExtractObject(`{"x" 5}`, "x"); ok {
+		t.Errorf("key without colon should not match, got %q", v)
+	}
+}
+
+// TestCapabilityExtractObject_UnterminatedObject covers the fall-through
+// return when an opening brace is found but never balanced.
+func TestCapabilityExtractObject_UnterminatedObject(t *testing.T) {
+	if v, ok := capabilityExtractObject(`{"x":{"inner":1`, "x"); ok {
+		t.Errorf("unterminated object should not match, got %q", v)
+	}
+}
+
+// TestDefaultResolveLLM_BridgesToResolver exercises the defaultResolveLLM
+// seam directly (0% before). A nonexistent config path makes resolvellm
+// surface an error; the point is to execute the bridge line itself.
+func TestDefaultResolveLLM_BridgesToResolver(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "no-such-llm_config.json")
+	// The call must not panic and must return through the resolver. We assert
+	// only that the bridge returns the resolver's own result/error pair —
+	// either a populated CLI or a non-nil error, never both empty+nil.
+	res, err := defaultResolveLLM("scout", missing)
+	if err == nil && res.CLI == "" {
+		t.Errorf("bridge returned empty result with nil error: %+v", res)
 	}
 }
 

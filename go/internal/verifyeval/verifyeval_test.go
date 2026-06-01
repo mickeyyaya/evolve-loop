@@ -1,6 +1,7 @@
 package verifyeval
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"os"
@@ -269,6 +270,85 @@ func TestParseEval_BashBlockAfterExpected(t *testing.T) {
 	if !found {
 		t.Errorf("commands missing 'run'; got %v", cmds)
 	}
+}
+
+// TestParseEval_ScannerError — a bash-block line longer than
+// bufio.MaxScanTokenSize (64KiB) makes the Scanner return ErrTooLong,
+// which parseEval must surface as an error rather than silently
+// truncating commands. Deterministic: no clock/net/repo.
+func TestParseEval_ScannerError(t *testing.T) {
+	huge := strings.Repeat("x", bufio.MaxScanTokenSize+1)
+	path := writeEval(t, "```bash\n"+huge+"\n```\n")
+	_, _, err := parseEval(path)
+	if err == nil {
+		t.Fatal("over-long line should surface a scanner error")
+	}
+	if !strings.Contains(err.Error(), "read") {
+		t.Errorf("error should name the read step, got %v", err)
+	}
+}
+
+// TestDefaultRunner_DefaultBuild covers the production CmdRunner in the
+// DEFAULT build (the integration-tagged file only runs under -tags
+// integration). It uses /bin/sh shell builtins (exit/echo) so no external
+// binary beyond the shell is required; deterministic and offline. Skips
+// only when /bin/sh is genuinely absent.
+func TestDefaultRunner_DefaultBuild(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh not present")
+	}
+	ctx := context.Background()
+
+	t.Run("zero exit + stdout captured", func(t *testing.T) {
+		stdout, stderr, exit, err := DefaultRunner(ctx, "", "echo marker-out")
+		if err != nil {
+			t.Fatalf("err=%v, want nil", err)
+		}
+		if exit != 0 {
+			t.Errorf("exit=%d, want 0", exit)
+		}
+		if !strings.Contains(stdout, "marker-out") {
+			t.Errorf("stdout=%q, want it to contain marker-out", stdout)
+		}
+		if stderr != "" {
+			t.Errorf("stderr=%q, want empty", stderr)
+		}
+	})
+
+	t.Run("non-zero exit maps to exitCode with nil err", func(t *testing.T) {
+		_, _, exit, err := DefaultRunner(ctx, "", "exit 7")
+		if err != nil {
+			t.Errorf("err=%v, want nil (exit-error mapped to exitCode)", err)
+		}
+		if exit != 7 {
+			t.Errorf("exit=%d, want 7", exit)
+		}
+	})
+
+	t.Run("stderr captured separately", func(t *testing.T) {
+		_, stderr, _, err := DefaultRunner(ctx, "", "echo oops 1>&2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(stderr, "oops") {
+			t.Errorf("stderr=%q, want it to contain oops", stderr)
+		}
+	})
+
+	t.Run("workdir honored", func(t *testing.T) {
+		dir := t.TempDir()
+		stdout, _, exit, err := DefaultRunner(ctx, dir, "pwd")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exit != 0 {
+			t.Errorf("exit=%d, want 0", exit)
+		}
+		// macOS symlinks /var → /private/var; match on the tail to stay portable.
+		if !strings.Contains(stdout, filepath.Base(dir)) {
+			t.Errorf("pwd=%q, want it to reflect workdir %q", strings.TrimSpace(stdout), dir)
+		}
+	})
 }
 
 // TestVerify_MultipleBashBlocks_AllRun — every block contributes

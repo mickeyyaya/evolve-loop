@@ -344,6 +344,81 @@ func TestParseArgs_CodexStdinError(t *testing.T) {
 	}
 }
 
+// run() must surface a parse failure (e.g. codex stdin read error) as the
+// dedicated exit code 2, not crash or write an artifact.
+func TestRun_ParseArgsError_ExitsWithCode2(t *testing.T) {
+	// Arrange: codex `exec` reads the prompt from stdin; a failing reader makes
+	// parseArgs return an error.
+	args := []string{"exec", "--output-last-message", "/tmp/x.md"}
+
+	// Act
+	var stdout, stderr bytes.Buffer
+	rc := run(args, errReader{}, &stdout, &stderr)
+
+	// Assert
+	if rc != 2 {
+		t.Errorf("rc=%d, want 2 (parse args failure)", rc)
+	}
+	if !strings.Contains(stderr.String(), "parse args") {
+		t.Errorf("stderr must mention parse args; got %q", stderr.String())
+	}
+}
+
+// An interactive (tmux/REPL) launch — no -p and no `exec` — must route through
+// run() into the REPL, which prints the boot marker and writes the artifact
+// resolved from the pasted prompt's workspace line.
+func TestRun_InteractiveLaunch_ServesREPL(t *testing.T) {
+	// Arrange: no -p / no exec ⇒ Interactive=true. Prompt fed on stdin.
+	ws := t.TempDir()
+	prompt := strings.Join([]string{
+		"# Evolve Scout",
+		"synthetic",
+		"",
+		"## Cycle Context",
+		"- workspace: " + ws,
+	}, "\n")
+	args := []string{"--model", "sonnet"}
+
+	// Act
+	var stdout, stderr bytes.Buffer
+	rc := run(args, strings.NewReader(prompt), &stdout, &stderr)
+
+	// Assert
+	if rc != 0 {
+		t.Fatalf("rc=%d, want 0; stderr=%s", rc, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), replBootMarkers) {
+		t.Errorf("interactive run must print the REPL boot marker; got %q", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(ws, "scout-report.md")); err != nil {
+		t.Errorf("REPL should have written scout-report.md: %v", err)
+	}
+}
+
+// injectedExitCode must treat a non-numeric or negative FAKE_CLI_<STYLE>_EXIT
+// as "no injection" (return 0) rather than failing the invocation.
+func TestInjectedExitCode_GarbageAndNegativeMeanNoInjection(t *testing.T) {
+	cases := map[string]int{
+		"":        0, // unset
+		"81":      81,
+		"0":       0,
+		"notanum": 0, // Atoi error
+		"-1":      0, // negative rejected
+	}
+	for raw, want := range cases {
+		t.Run("claude="+raw, func(t *testing.T) {
+			if raw == "" {
+				os.Unsetenv("FAKE_CLI_CLAUDE_EXIT")
+			} else {
+				t.Setenv("FAKE_CLI_CLAUDE_EXIT", raw)
+			}
+			if got := injectedExitCode("claude"); got != want {
+				t.Errorf("injectedExitCode(claude) with %q = %d, want %d", raw, got, want)
+			}
+		})
+	}
+}
+
 func TestRun_UnknownPhase(t *testing.T) {
 	// detectPhase returns "unknown" → artifactsFor errors. We need an artifact
 	// path whose basename isn't a known phase file; a "-p" prompt mentioning

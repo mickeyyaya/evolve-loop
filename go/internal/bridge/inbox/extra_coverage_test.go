@@ -63,3 +63,50 @@ func TestDrainStatErrorPropagates(t *testing.T) {
 		t.Fatal("want a non-ErrNotExist stat error, got nil")
 	}
 }
+
+// TestDrainOpenErrorPropagates pins that when the inbox file exists (Stat
+// succeeds, size > offset) but cannot be opened for reading, Drain surfaces
+// the os.Open error rather than swallowing it or returning an empty slice.
+// The race window this guards: a file that is statted, then loses read
+// permission before Open. Reproduced deterministically with chmod 0000.
+func TestDrainOpenErrorPropagates(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("running as root: chmod 0000 does not deny open")
+	}
+	ws := t.TempDir()
+	p := Path(ws, "build")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Non-empty so Drain gets past the size==offset short-circuit into Open.
+	if err := os.WriteFile(p, []byte("{\"kind\":\"command\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(p, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(p, 0o644) }) // let t.TempDir cleanup remove it
+
+	c := NewCursor(ws, "build")
+	if _, err := c.Drain(); err == nil {
+		t.Fatal("want an open permission error, got nil")
+	}
+}
+
+// TestAppendOpenFileErrorPropagates pins that when the target inbox path
+// already exists as a DIRECTORY (so MkdirAll on its parent succeeds but the
+// O_WRONLY OpenFile of the path itself fails with EISDIR), Append returns the
+// wrapped "open" error instead of panicking or silently succeeding.
+func TestAppendOpenFileErrorPropagates(t *testing.T) {
+	ws := t.TempDir()
+	p := Path(ws, "build")
+	// Create the inbox path as a directory; Append's OpenFile(p, O_WRONLY) →
+	// "is a directory".
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := Append(ws, "build", Envelope{Kind: KindCommand, Body: "x"}, fixedNow)
+	if err == nil || !strings.Contains(err.Error(), "open") {
+		t.Fatalf("want wrapped open error when inbox path is a dir, got %v", err)
+	}
+}

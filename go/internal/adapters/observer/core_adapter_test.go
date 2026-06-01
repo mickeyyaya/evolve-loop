@@ -382,6 +382,32 @@ func TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe(t *testing.T) {
 	// Test passes if no race detected by -race + no panic.
 }
 
+// TestCoreAdapter_Start_DegradesToNoopWhenEventsFileUnopenable covers the
+// os.OpenFile error branch in Start: when Sink is nil and the events file
+// cannot be created, the adapter must degrade to a no-op cancel (never block
+// the phase, per ADR-0030) rather than panic. We force the failure by pointing
+// Workspace at a path that is a regular FILE, so the events path's parent is
+// not a directory and OpenFile fails.
+func TestCoreAdapter_Start_DegradesToNoopWhenEventsFileUnopenable(t *testing.T) {
+	dir := t.TempDir()
+	wsFile := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &CoreAdapter{} // Sink nil → adapter tries to open the events file
+	cancel := a.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: wsFile, Cycle: 1})
+	if cancel == nil {
+		t.Fatal("expected non-nil (no-op) cancel when events file cannot be opened")
+	}
+	cancel() // must not panic
+	cancel() // idempotent
+
+	// No events file should have been created under the bogus workspace path.
+	if _, err := os.Stat(filepath.Join(wsFile, "tdd-observer-events.ndjson")); err == nil {
+		t.Error("events file unexpectedly created under a non-directory workspace")
+	}
+}
+
 // helper to consume NDJSON if any future test needs it.
 func decodeEvents(t *testing.T, body []byte) []Event {
 	t.Helper()

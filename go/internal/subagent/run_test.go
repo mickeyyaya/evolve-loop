@@ -422,6 +422,240 @@ func TestRun_LedgerEntryWritten(t *testing.T) {
 	}
 }
 
+// TestRun_CLIFromProfileWhenResolverFails covers run.go:156-159 — when the
+// LLM resolver errors, cli falls back to the profile's "cli" field and source
+// becomes "profile".
+func TestRun_CLIFromProfileWhenResolverFails(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+		return resolvellm.Result{}, errors.New("no llm_config")
+	}
+	// Profile still declares cli=claude; model falls to ResolveModelTier.
+	res, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if res.CLI != "claude" {
+		t.Errorf("CLI=%q, want claude (from profile fallback)", res.CLI)
+	}
+}
+
+// TestRun_CLIUnresolvedFails covers run.go:163-165 — resolver fails AND the
+// profile has no cli field, so cli is unresolvable.
+func TestRun_CLIUnresolvedFails(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+		return resolvellm.Result{}, errors.New("no llm_config")
+	}
+	opts.ReadProfile = func(string) (string, error) {
+		return `{"role":"scout","output_artifact":".evolve/runs/cycle-{cycle}/scout.md"}`, nil
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "cli unresolved") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestRun_ResolveModelTierInvokedWhenResolverHasNoModel covers run.go:187-199
+// — when the resolver returns a CLI but no model/tier, Run delegates to the
+// adaptive ResolveModelTier seam.
+func TestRun_ResolveModelTierInvokedWhenResolverHasNoModel(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+		// CLI present, no Model/ModelTier → forces the tier-resolver branch.
+		return resolvellm.Result{CLI: "claude", Source: "llm_config"}, nil
+	}
+	called := false
+	opts.ResolveModelTier = func(ResolveModelTierRequest, ResolveModelTierOptions) (string, error) {
+		called = true
+		return "haiku", nil
+	}
+	res, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !called {
+		t.Errorf("ResolveModelTier seam was not invoked")
+	}
+	if res.Model != "haiku" {
+		t.Errorf("Model=%q, want haiku (from tier resolver)", res.Model)
+	}
+}
+
+// TestRun_ResolveModelTierErrorPropagates covers run.go:200-202.
+func TestRun_ResolveModelTierErrorPropagates(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+		return resolvellm.Result{CLI: "claude", Source: "llm_config"}, nil
+	}
+	opts.ResolveModelTier = func(ResolveModelTierRequest, ResolveModelTierOptions) (string, error) {
+		return "", errors.New("tier resolution failed")
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "resolve tier") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestRun_CapabilityInspectErrorFails covers run.go:211-213.
+func TestRun_CapabilityInspectErrorFails(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.InspectCapability = func(string, string) (capability.Inspection, error) {
+		return capability.Inspection{}, errors.New("manifest parse error")
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "capability inspect") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestRun_GitStateEmptyFallsBackToUnknown covers run.go:233-238 — empty
+// git head/diff strings are normalized to "unknown" in the ledger entry.
+func TestRun_GitStateEmptyFallsBackToUnknown(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	opts := runHappyOpts(t)
+	opts.GitState = func(context.Context, string) (string, string, error) {
+		return "", "", nil // empty, not an error
+	}
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"), LedgerPath: ledger,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	body, _ := os.ReadFile(ledger)
+	if !strings.Contains(string(body), `"git_head":"unknown"`) {
+		t.Errorf("empty git head not normalized to unknown: %s", body)
+	}
+	if !strings.Contains(string(body), `"tree_state_sha":"unknown"`) {
+		t.Errorf("empty tree diff not normalized to unknown: %s", body)
+	}
+}
+
+// erroringReader fails on Read to drive run.go:242-244.
+type erroringReader struct{}
+
+func (erroringReader) Read([]byte) (int, error) { return 0, errors.New("pipe broken") }
+
+// TestRun_PromptReadErrorFails covers run.go:242-244.
+func TestRun_PromptReadErrorFails(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: erroringReader{},
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "read prompt") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestRun_LedgerWriteErrorPropagates covers run.go:325-327 — a ledger path
+// whose parent is a regular file makes writeSubprocessLedger's MkdirAll fail.
+func TestRun_LedgerWriteErrorPropagates(t *testing.T) {
+	tmp := t.TempDir()
+	blocker := filepath.Join(tmp, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatalf("seed blocker: %v", err)
+	}
+	opts := runHappyOpts(t)
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+		LedgerPath:   filepath.Join(blocker, "sub", "ledger.jsonl"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "ledger write") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestRun_TokenGenerateErrorAborts covers run.go:229-231 — a failing Rand
+// source makes generateRunToken error before the adapter is invoked.
+func TestRun_TokenGenerateErrorAborts(t *testing.T) {
+	tmp := t.TempDir()
+	opts := runHappyOpts(t)
+	opts.Rand = func([]byte) (int, error) { return 0, errors.New("entropy depleted") }
+	_, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"),
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "token") {
+		t.Errorf("got %v", err)
+	}
+}
+
+// TestRun_AdapterExecErrorReturnsAfterLedger covers run.go:330-332 — when the
+// adapter exec itself errors, the ledger entry is still written (if a path is
+// set) and the error is returned with the result populated.
+func TestRun_AdapterExecErrorReturnsAfterLedger(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	opts := runHappyOpts(t)
+	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
+		// Still write a valid artifact so verdict classification runs, but
+		// return a hard error to exercise the execErr return branch.
+		path := env["ARTIFACT_PATH"]
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		_ = os.WriteFile(path, []byte("<!-- challenge-token: "+env["CHALLENGE_TOKEN"]+" -->\nbody\n"), 0o644)
+		now := opts.Now()
+		_ = os.Chtimes(path, now, now)
+		return 126, errors.New("adapter crashed")
+	}
+	res, err := Run(context.Background(), RunRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
+		PromptReader: strings.NewReader("hi"), LedgerPath: ledger,
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "adapter exec") {
+		t.Errorf("got %v", err)
+	}
+	if res.ExitCode != 126 {
+		t.Errorf("ExitCode=%d, want 126 (result populated despite error)", res.ExitCode)
+	}
+	// Ledger entry written before the error return.
+	if _, statErr := os.Stat(ledger); statErr != nil {
+		t.Errorf("ledger not written before exec-error return: %v", statErr)
+	}
+}
+
+// TestWriteSubprocessLedger_NilClockUsesWallClock covers run.go:450-452 — a
+// nil `now` defaults to time.Now (the line executes; we only assert the entry
+// is written with a parseable timestamp, not a specific value).
+func TestWriteSubprocessLedger_NilClockUsesWallClock(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := writeSubprocessLedger(ledger, subprocessLedger{
+		Cycle: 1, Role: "scout", Model: "sonnet", ChallengeToken: "tok",
+	}, nil); err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	body, _ := os.ReadFile(ledger)
+	if !strings.Contains(string(body), `"kind":"agent_subprocess"`) {
+		t.Errorf("entry not written with nil clock: %s", body)
+	}
+}
+
 func TestParseAgentName(t *testing.T) {
 	tests := []struct {
 		in, role, worker string

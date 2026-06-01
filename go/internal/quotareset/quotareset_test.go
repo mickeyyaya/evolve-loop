@@ -203,6 +203,80 @@ func TestParseHint_InvalidMinutes(t *testing.T) {
 	}
 }
 
+func TestCompute_OperatorOverrideValidRFC3339(t *testing.T) {
+	// A well-formed RFC3339 override (colon in the zone offset) parses, so
+	// WakeAt is the parsed instant — not the synthesized now() of the
+	// unparseable branch.
+	override := "2026-05-23T20:00:00+00:00"
+	r, err := Compute("", Options{
+		Env: func(name string) string {
+			if name == "EVOLVE_QUOTA_RESET_AT" {
+				return override
+			}
+			return ""
+		},
+		Now: func() time.Time { return refNow },
+	})
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	if r.Source != "operator-override" {
+		t.Errorf("Source=%q want operator-override", r.Source)
+	}
+	if r.ISO != override {
+		t.Errorf("ISO=%q want %q", r.ISO, override)
+	}
+	want, _ := time.Parse(time.RFC3339, override)
+	if !r.WakeAt.Equal(want) {
+		t.Errorf("WakeAt=%v want parsed instant %v", r.WakeAt, want)
+	}
+}
+
+func TestCompute_DefaultClockUsedWhenNowNil(t *testing.T) {
+	// Now seam left nil → Compute falls back to time.Now(). Assert only the
+	// deterministic parts (source + that WakeAt is in the future window) to
+	// avoid coupling to the wall clock.
+	before := time.Now()
+	r, err := Compute("", Options{
+		Env:     func(string) string { return "" },
+		HoursFn: func() float64 { return 1.0 },
+	})
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	if r.Source != "default" {
+		t.Errorf("Source=%q want default", r.Source)
+	}
+	// WakeAt = now()+1h; bound generously to stay deterministic under load.
+	if r.WakeAt.Before(before.Add(59*time.Minute)) || r.WakeAt.After(time.Now().Add(61*time.Minute)) {
+		t.Errorf("WakeAt=%v not ~1h after invocation", r.WakeAt)
+	}
+}
+
+func TestCompute_HintLongerThan32CharsTruncated(t *testing.T) {
+	dir := t.TempDir()
+	hintPath := filepath.Join(dir, "quota-reset-hint.txt")
+	// >32 chars; the parseable "8:30pm" sits within the first 32 bytes so the
+	// truncated head still parses. Padding pushes total length over the cap.
+	contents := "your limit resets 8:30pm----------------------------tail"
+	if len(contents) <= 32 {
+		t.Fatalf("test setup: contents must exceed 32 chars, got %d", len(contents))
+	}
+	if err := os.WriteFile(hintPath, []byte(contents), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	r, err := Compute(dir, Options{Now: func() time.Time { return refNow }})
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	if r.Source != "parsed" {
+		t.Errorf("Source=%q want parsed (8:30pm within first 32 chars)", r.Source)
+	}
+	if r.WakeAt.Hour() != 20 || r.WakeAt.Minute() != 30 {
+		t.Errorf("WakeAt time=%02d:%02d want 20:30", r.WakeAt.Hour(), r.WakeAt.Minute())
+	}
+}
+
 func TestCompute_EmptyHintFile(t *testing.T) {
 	dir := t.TempDir()
 	hintPath := filepath.Join(dir, "quota-reset-hint.txt")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -68,5 +69,121 @@ func TestMarkdown_FlagsSlowPackagesAndTests(t *testing.T) {
 	}
 	if strings.Contains(md, "github.com/mickeyyaya") {
 		t.Error("module prefix should be trimmed in the report via shortPkg")
+	}
+}
+
+// A line that begins with '{' but is not valid JSON must be tolerated and
+// skipped (test2json streams can interleave malformed/truncated fragments),
+// while the surrounding valid events are still aggregated.
+func TestParse_ToleratesMalformedJSONLine(t *testing.T) {
+	// Arrange: a valid event, a '{'-prefixed but broken line, another valid event.
+	const stream = `
+{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestA","Elapsed":0.2}
+{"Action":"pass","Package": not-valid-json
+{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.5}
+`
+	// Act
+	rep, err := Parse(strings.NewReader(stream))
+
+	// Assert: parse succeeds; the broken line is dropped, the two valid events kept.
+	if err != nil {
+		t.Fatalf("Parse should tolerate a malformed line, got err: %v", err)
+	}
+	if len(rep.Packages) != 1 {
+		t.Fatalf("got %d packages, want 1", len(rep.Packages))
+	}
+	if rep.Packages[0].NumTests != 1 {
+		t.Errorf("NumTests = %d, want 1 (only TestA is a valid top-level test)", rep.Packages[0].NumTests)
+	}
+	if rep.Packages[0].Wall != 0.5 {
+		t.Errorf("Wall = %.2f, want 0.50 (package summary event)", rep.Packages[0].Wall)
+	}
+}
+
+// failingReader yields one line of valid data, then a non-EOF read error,
+// so Parse exercises the sc.Err() failure path deterministically (no I/O).
+type failingReader struct {
+	data []byte
+	done bool
+}
+
+func (r *failingReader) Read(p []byte) (int, error) {
+	if !r.done {
+		r.done = true
+		n := copy(p, r.data)
+		return n, nil
+	}
+	return 0, errReadBoom
+}
+
+var errReadBoom = errors.New("boom")
+
+// Parse must surface a stream read error rather than silently returning a
+// partial report — the scanner error path is the only place a malformed pipe
+// can be reported to the caller.
+func TestParse_ScannerError_Propagates(t *testing.T) {
+	// Arrange: a reader that returns data then fails.
+	r := &failingReader{data: []byte(`{"Action":"pass","Package":"p","Elapsed":1}` + "\n")}
+
+	// Act
+	rep, err := Parse(r)
+
+	// Assert
+	if err == nil {
+		t.Fatalf("Parse should propagate the scanner read error, got nil (rep=%+v)", rep)
+	}
+	if !errors.Is(err, errReadBoom) {
+		t.Errorf("error chain = %v, want to wrap errReadBoom", err)
+	}
+	if rep != nil {
+		t.Errorf("rep = %+v, want nil on error", rep)
+	}
+}
+
+// When no package exceeds the wall-time threshold, the slow-packages table
+// must render the explicit "_(none)_" placeholder row rather than an empty
+// table body — that placeholder is the signal a reader scans for.
+func TestMarkdown_NoSlowPackages_RendersNonePlaceholder(t *testing.T) {
+	// Arrange: a fast suite (budget package only, 0.4s wall < 5s threshold).
+	const fastOnly = `
+{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.4}
+`
+	rep, err := Parse(strings.NewReader(fastOnly))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	// Act
+	md := rep.Markdown(MarkdownOptions{Title: "T", Top: 10, ThresholdPkg: 5.0, ThresholdTst: 1.0})
+
+	// Assert
+	if !strings.Contains(md, "| _(none)_ | | | | | |") {
+		t.Errorf("expected the no-slow-packages placeholder row; got:\n%s", md)
+	}
+	if !strings.Contains(md, "0 tests exceed the 1.0s per-test threshold") {
+		t.Errorf("expected zero tests over per-test threshold; got:\n%s", md)
+	}
+}
+
+// The slowest-tests table must honour the Top cap: with Top=1 and two tests,
+// only the single slowest row is rendered.
+func TestMarkdown_TopCap_TruncatesSlowestTable(t *testing.T) {
+	// Arrange
+	rep, err := Parse(strings.NewReader(sample))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	// Act: Top=1 forces the i >= o.Top break after the first (slowest) row.
+	md := rep.Markdown(MarkdownOptions{Title: "T", Top: 1, ThresholdPkg: 5.0, ThresholdTst: 1.0})
+
+	// Assert: the slowest test (TestSlow) is present, the next-slowest (TestFast)
+	// is truncated out of the per-test table.
+	if !strings.Contains(md, "| TestSlow | internal/bridge | 12.50 |") {
+		t.Errorf("slowest test row TestSlow missing; got:\n%s", md)
+	}
+	if strings.Contains(md, "| TestFast |") {
+		t.Errorf("Top=1 must truncate TestFast from the slowest-tests table; got:\n%s", md)
 	}
 }

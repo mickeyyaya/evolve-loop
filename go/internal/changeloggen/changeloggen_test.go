@@ -282,6 +282,61 @@ func TestWriteEntry_PrependPreservesHeader(t *testing.T) {
 	}
 }
 
+// TestWriteEntry_FreshCreateError pins that when the CHANGELOG does not exist
+// (fresh-create path) but the parent directory is not writable, WriteEntry
+// returns the wrapped "create fresh" error and reports (false,false,err) —
+// it must not claim a write happened. Reproduced with a 0555 directory.
+func TestWriteEntry_FreshCreateError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory write permission")
+	}
+	dir := filepath.Join(t.TempDir(), "ro")
+	if err := os.Mkdir(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	cl := filepath.Join(dir, "CHANGELOG.md") // does not exist → fresh path
+
+	wrote, skipped, err := WriteEntry(cl, "1.0.0", "## [1.0.0]\n")
+	if err == nil || !strings.Contains(err.Error(), "create fresh") {
+		t.Fatalf("want wrapped create-fresh error, got %v", err)
+	}
+	if wrote || skipped {
+		t.Errorf("wrote=%v skipped=%v, want false/false on create failure", wrote, skipped)
+	}
+}
+
+// TestWriteEntry_WriteTmpError pins that when the CHANGELOG exists (so the
+// non-fresh prepend path runs) but the tmp sibling cannot be written because
+// the directory is read-only, WriteEntry surfaces the wrapped "write tmp"
+// error and reports no write. Reproduced by seeding the file, then chmod'ing
+// the directory to 0555.
+func TestWriteEntry_WriteTmpError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory write permission")
+	}
+	dir := filepath.Join(t.TempDir(), "rw")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cl := filepath.Join(dir, "CHANGELOG.md")
+	if err := os.WriteFile(cl, []byte("# Changelog\n\n## [0.9.0]\n\nold\n\n---\n\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil { // block tmp creation
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	wrote, skipped, err := WriteEntry(cl, "1.0.0", "## [1.0.0]\n\n- x\n\n---\n\n")
+	if err == nil || !strings.Contains(err.Error(), "write tmp") {
+		t.Fatalf("want wrapped write-tmp error, got %v", err)
+	}
+	if wrote || skipped {
+		t.Errorf("wrote=%v skipped=%v, want false/false on tmp-write failure", wrote, skipped)
+	}
+}
+
 func TestIsSemver(t *testing.T) {
 	for _, ok := range []string{"1.0.0", "11.6.6", "0.0.1"} {
 		if !IsSemver(ok) {

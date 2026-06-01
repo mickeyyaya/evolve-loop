@@ -107,6 +107,49 @@ func TestGuard_PostPhaseGitFails_DegradesNotAborts(t *testing.T) {
 	}
 }
 
+func TestCheckResult_Error_NoLeak_ReturnsNil(t *testing.T) {
+	// A clean result (no leaks, snapshot worked) must produce no error — the
+	// orchestrator uses a nil return to mean "phase respected its worktree".
+	r := CheckResult{}
+	if err := r.Error("build", "/wt/cycle-5"); err != nil {
+		t.Errorf("clean result must yield nil error; got %v", err)
+	}
+}
+
+func TestCheckResult_Error_SnapshotMissed_DegradeMessage(t *testing.T) {
+	// When the pre-phase snapshot failed, Error names the phase and states
+	// that leak detection was skipped — NOT a leak abort message. This is the
+	// degrade-not-abort branch the orchestrator must distinguish.
+	r := CheckResult{SnapshotMissed: true}
+	err := r.Error("scout", "/wt/cycle-7")
+	if err == nil {
+		t.Fatal("SnapshotMissed must produce a (degrade) error, got nil")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "scout") {
+		t.Errorf("degrade message must name the phase; got %q", msg)
+	}
+	if !strings.Contains(msg, "snapshot failed") || !strings.Contains(msg, "skipped") {
+		t.Errorf("degrade message must explain snapshot-failed/skipped; got %q", msg)
+	}
+	if strings.Contains(msg, "leaked paths") {
+		t.Errorf("snapshot-missed message must NOT claim a leak; got %q", msg)
+	}
+}
+
+func TestGuard_Check_NoSeam_OKByDefault(t *testing.T) {
+	// A guard with no git seam is disabled: Check returns a zero CheckResult
+	// (OK, no leaks, snapshot not missed) so a disabled guard never blocks.
+	g := New(nil)
+	res := g.Check(context.Background(), "/repo", []string{"docs/x.md"})
+	if !res.OK() {
+		t.Errorf("disabled guard must be OK; got %+v", res)
+	}
+	if res.SnapshotMissed || res.Leaked != nil {
+		t.Errorf("disabled guard must yield zero result; got %+v", res)
+	}
+}
+
 func equalLeaks(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

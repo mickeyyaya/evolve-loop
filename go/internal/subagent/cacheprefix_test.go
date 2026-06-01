@@ -276,6 +276,68 @@ func TestWriteCachePrefix_MkdirError(t *testing.T) {
 	}
 }
 
+// failingWriter returns an error after writeCount successful writes, used to
+// drive the io.WriteString error branch in renderCachePrefix.
+type failingWriter struct {
+	failAfter int
+	writes    int
+}
+
+func (w *failingWriter) Write(p []byte) (int, error) {
+	if w.writes >= w.failAfter {
+		return 0, errors.New("disk full")
+	}
+	w.writes++
+	return len(p), nil
+}
+
+// TestRenderCachePrefix_WriteError covers the io.WriteString failure branch
+// (cacheprefix.go:102) by injecting a writer that fails on the first part.
+func TestRenderCachePrefix_WriteError(t *testing.T) {
+	err := renderCachePrefix(&failingWriter{failAfter: 0}, CachePrefixRequest{
+		Cycle: 1, Agent: "scout", Workspace: "/ws",
+	}, "goal", "summary")
+	if err == nil {
+		t.Fatalf("expected write error")
+	}
+	if !strings.Contains(err.Error(), "write") {
+		t.Errorf("expected write error, got %v", err)
+	}
+}
+
+// TestRenderCachePrefix_WriteErrorMidStream covers the failure occurring on a
+// later part rather than the first, confirming the error short-circuits the
+// loop wherever it fires.
+func TestRenderCachePrefix_WriteErrorMidStream(t *testing.T) {
+	err := renderCachePrefix(&failingWriter{failAfter: 3}, CachePrefixRequest{
+		Cycle: 2, Agent: "auditor", Workspace: "/ws",
+	}, "g", "s")
+	if err == nil {
+		t.Fatalf("expected mid-stream write error")
+	}
+}
+
+// TestWriteCachePrefix_CreateError covers the os.Create failure branch
+// (cacheprefix.go:68) — OutPath points at an existing directory, so Create
+// fails even though MkdirAll of its parent succeeds.
+func TestWriteCachePrefix_CreateError(t *testing.T) {
+	tmp := t.TempDir()
+	// OutPath is the tmp dir itself; filepath.Dir(tmp) exists so MkdirAll
+	// succeeds, but os.Create on a directory path fails.
+	err := WriteCachePrefix(CachePrefixRequest{
+		Cycle: 0, Agent: "x", Workspace: tmp, ProjectRoot: tmp, OutPath: tmp,
+	}, CachePrefixOptions{
+		ReadOrchestratorPrompt: func(string) (string, error) { return "", os.ErrNotExist },
+		ReadCycleState:         func(string) (string, error) { return "", os.ErrNotExist },
+	})
+	if err == nil {
+		t.Fatalf("expected create error for directory OutPath")
+	}
+	if !strings.Contains(err.Error(), "create") {
+		t.Errorf("expected create error, got %v", err)
+	}
+}
+
 func TestDefaultReadersReturnErrorForMissingFiles(t *testing.T) {
 	tmp := t.TempDir()
 	if _, err := defaultReadOrchestratorPrompt(tmp); err == nil {

@@ -292,6 +292,126 @@ func TestRun_TokenGenerateError(t *testing.T) {
 	}
 }
 
+// TestRun_GitStateErrorFallsBackToUnknown covers subagent.go:177-181 — when
+// the GitState seam errors, the ledger entry records "unknown:unknown" rather
+// than aborting the run.
+func TestRun_GitStateErrorFallsBackToUnknown(t *testing.T) {
+	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
+	bridge := &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}
+	ledger := &fakeLedger{}
+	loader := profiles.NewFromFS(fstest.MapFS{
+		"builder.json": &fstest.MapFile{Data: []byte(`{
+			"name":"builder","role":"builder","cli":"claude-p",
+			"model_tier_default":"sonnet",
+			"output_artifact":".evolve/runs/cycle-{cycle}/build-report.md"
+		}`)},
+	})
+	r, err := New(Config{
+		Profiles: loader, Bridge: bridge, Ledger: ledger,
+		Now:  func() time.Time { return now },
+		Rand: deterministicRand(0xAB),
+		GitState: func(context.Context, string) (string, string, error) {
+			return "", "", errors.New("not a git repo")
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	token := strings.Repeat("ab", ChallengeTokenBytes)
+	tmp := t.TempDir()
+	bridge.onLaunch = func(req core.BridgeRequest) error {
+		writeArtifact(t, req.ArtifactPath, "<!-- challenge-token: "+token+" -->\nok\n", now)
+		return nil
+	}
+	res, err := r.Run(context.Background(), Request{
+		Agent: "builder", Cycle: 3, ProjectRoot: tmp,
+		Workspace: filepath.Join(tmp, ".evolve/runs/cycle-3"), Prompt: "go",
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.LedgerEntry.GitHEAD != "unknown" || res.LedgerEntry.TreeStateSHA != "unknown" {
+		t.Errorf("git state on error: head=%q tree=%q, want unknown/unknown",
+			res.LedgerEntry.GitHEAD, res.LedgerEntry.TreeStateSHA)
+	}
+}
+
+// TestRun_DefaultsCLIAndModelWhenProfileSilent covers subagent.go:195-197 and
+// 202-204 — a profile lacking cli + model_tier_default makes Run fall back to
+// "claude-tmux" / "auto" in the bridge request.
+func TestRun_DefaultsCLIAndModelWhenProfileSilent(t *testing.T) {
+	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
+	bridge := &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}
+	ledger := &fakeLedger{}
+	loader := profiles.NewFromFS(fstest.MapFS{
+		// No "cli", no "model_tier_default".
+		"builder.json": &fstest.MapFile{Data: []byte(`{
+			"name":"builder","role":"builder",
+			"output_artifact":".evolve/runs/cycle-{cycle}/build-report.md"
+		}`)},
+	})
+	r, err := New(Config{
+		Profiles: loader, Bridge: bridge, Ledger: ledger,
+		Now:  func() time.Time { return now },
+		Rand: deterministicRand(0xAB),
+		GitState: func(context.Context, string) (string, string, error) {
+			return "h", "t", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	token := strings.Repeat("ab", ChallengeTokenBytes)
+	tmp := t.TempDir()
+	bridge.onLaunch = func(req core.BridgeRequest) error {
+		writeArtifact(t, req.ArtifactPath, "<!-- challenge-token: "+token+" -->\nok\n", now)
+		return nil
+	}
+	if _, err := r.Run(context.Background(), Request{
+		Agent: "builder", Cycle: 3, ProjectRoot: tmp,
+		Workspace: filepath.Join(tmp, ".evolve/runs/cycle-3"), Prompt: "go",
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	bridge.mu.Lock()
+	defer bridge.mu.Unlock()
+	if len(bridge.calls) != 1 {
+		t.Fatalf("expected 1 bridge call, got %d", len(bridge.calls))
+	}
+	got := bridge.calls[0]
+	if got.CLI != "claude-tmux" {
+		t.Errorf("CLI default=%q, want claude-tmux", got.CLI)
+	}
+	if got.Model != "auto" {
+		t.Errorf("Model default=%q, want auto", got.Model)
+	}
+}
+
+// TestClassify_EmptyArtifactIsIntegrityFail covers subagent.go:331-337 — a
+// fresh, readable, but zero-length artifact fails integrity before the token
+// check runs.
+func TestClassify_EmptyArtifactIsIntegrityFail(t *testing.T) {
+	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
+	r := &Runner{cfg: Config{
+		Now:       func() time.Time { return now },
+		StatMTime: func(string) (time.Time, error) { return now, nil },
+		ReadFile:  func(string) ([]byte, error) { return []byte{}, nil },
+	}}
+	verdict, diags := r.classify(nil, "/tmp/stub", "tok", 0)
+	if verdict != VerdictIntegrityFail {
+		t.Errorf("verdict=%q, want %q", verdict, VerdictIntegrityFail)
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "empty") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'artifact empty' diagnostic, got %+v", diags)
+	}
+}
+
 // TestClassify_StaleAndTokenMissing exercises the combined edge:
 // artifact exists but is stale AND missing the token. Stale-check fires
 // first (returns IntegrityFail before token check).
