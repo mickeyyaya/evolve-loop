@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 type fakeBridge struct{}
@@ -114,6 +116,25 @@ func TestRegister_InvalidName_Rejected(t *testing.T) {
 	}
 }
 
+// TestRegister_NonKebabDerivedProfileName_Rejected covers the SECOND name guard:
+// the spec Name is valid kebab (passes ValidateUserSpec), but the advisor-set
+// Agent field derives a non-kebab profile name. ValidateUserSpec does not check
+// Agent, so this guard is the only thing stopping a bad filename + silent runner
+// lookup miss. (Distinct from TestRegister_InvalidName_Rejected, which is caught
+// earlier by ValidateUserSpec and never reaches the derived-name check.)
+func TestRegister_NonKebabDerivedProfileName_Rejected(t *testing.T) {
+	r := newRegistrar(t)
+	cfg := validCfg()
+	cfg.Name = "minted-reviewer"  // valid kebab → passes ValidateUserSpec
+	cfg.Agent = "evolve-Bad Name" // ProfileName() strips "evolve-" → "Bad Name": caps+space
+	_, err := r.Register(cfg)
+	fixtures.RequireErrContains(t, err, "must be lowercase kebab-case")
+	// Nothing persisted: the guard fires before persist.
+	if fixtures.FilePresent(filepath.Join(r.PhasesDir, "minted-reviewer", "phase.json")) {
+		t.Error("phase spec persisted despite a rejected derived profile name")
+	}
+}
+
 func TestRegister_SourceWriter_GetsSandbox(t *testing.T) {
 	r := newRegistrar(t)
 	cfg := validCfg()
@@ -191,5 +212,158 @@ func TestRegister_EmptyDirs_SkipsPersistence(t *testing.T) {
 	}
 	if res.Runner == nil {
 		t.Fatal("expected a runner even when persistence is skipped")
+	}
+}
+
+// TestRegister_SpecModelHint_DrivesClamp proves dispatchTier falls back to the
+// spec Model hint when Dispatch.ModelTierDefault is empty: an out-of-envelope
+// spec model must be rejected, which can only happen if cfg.Model is the tier
+// fed to the clamp. (Mirror of TestRegister_TierOutsideEnvelope but via the
+// Model-hint code path, covering dispatchTier's second return.)
+func TestRegister_SpecModelHint_DrivesClamp(t *testing.T) {
+	r := newRegistrar(t)
+	cfg := validCfg()
+	cfg.Dispatch.ModelTierDefault = ""                                                     // force the spec-model-hint branch
+	cfg.Dispatch.ModelTierEnvelope = &profiles.ModelTierEnvelope{Min: "fast", Max: "fast"} // [1..1]
+	cfg.Model = "deep"                                                                     // rank 3, outside [1..1]
+	if _, err := r.Register(cfg); err == nil {
+		t.Fatal("expected rejection: spec model hint deep outside [fast..fast]")
+	}
+}
+
+// TestRegister_SpecModelHint_InEnvelope_Persists is the GREEN companion: with
+// no ModelTierDefault, an in-envelope spec model registers AND the persisted
+// profile carries an empty model_tier_default (proving ToProfile copied the
+// empty dispatch default, not the spec hint).
+func TestRegister_SpecModelHint_InEnvelope_Persists(t *testing.T) {
+	r := newRegistrar(t)
+	cfg := validCfg()
+	cfg.Dispatch.ModelTierDefault = "" // spec-model-hint branch
+	cfg.Model = "balanced"             // rank 2, inside [fast..deep]
+	res, err := r.Register(cfg)
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if res.Spec.Model != "balanced" {
+		t.Errorf("spec Model=%q, want balanced (preserved)", res.Spec.Model)
+	}
+	var prof profiles.Profile
+	if err := json.Unmarshal([]byte(fixtures.MustRead(t, filepath.Join(r.ProfilesDir, "minted-reviewer.json"))), &prof); err != nil {
+		t.Fatalf("parse persisted profile: %v", err)
+	}
+	if prof.ModelTierDefault != "" {
+		t.Errorf("persisted model_tier_default=%q, want empty (dispatch default was unset)", prof.ModelTierDefault)
+	}
+}
+
+// TestRegister_ProfilePersistFails_PropagatesError proves a persist failure on
+// the dispatch profile aborts Register with a wrapped error and writes no spec.
+// We make ProfilesDir a regular FILE so MkdirAll on it fails inside
+// writeJSONAtomic. (Covers persist's profile error return + writeJSONAtomic's
+// MkdirAll error branch + Register's persist error propagation.)
+func TestRegister_ProfilePersistFails_PropagatesError(t *testing.T) {
+	r := newRegistrar(t)
+	// Replace ProfilesDir with a file occupying that path → MkdirAll fails.
+	fixtures.MustWrite(t, r.ProfilesDir, "i am a file, not a dir")
+
+	_, err := r.Register(validCfg())
+	fixtures.RequireErrContains(t, err, "persist profile")
+	// The spec must NOT have been persisted (profile write failed first).
+	if fixtures.FilePresent(filepath.Join(r.PhasesDir, "minted-reviewer", "phase.json")) {
+		t.Error("phase spec persisted despite profile-write failure")
+	}
+}
+
+// TestRegister_SpecPersistFails_PropagatesError proves a persist failure on the
+// phase spec (after the profile succeeds) aborts Register with the spec-specific
+// wrap. PhasesDir is a regular file, so MkdirAll for PhasesDir/<name> fails.
+func TestRegister_SpecPersistFails_PropagatesError(t *testing.T) {
+	r := newRegistrar(t)
+	fixtures.MustWrite(t, r.PhasesDir, "i am a file, not a dir")
+
+	_, err := r.Register(validCfg())
+	fixtures.RequireErrContains(t, err, "persist phase spec")
+	// The profile DID persist (it is written first, before the spec).
+	if !fixtures.FilePresent(filepath.Join(r.ProfilesDir, "minted-reviewer.json")) {
+		t.Error("expected the dispatch profile to persist before the spec write failed")
+	}
+}
+
+// TestWriteJSONAtomic_RenameTargetIsDir proves writeJSONAtomic surfaces the
+// rename failure (and cleans up its temp file) when the destination path is an
+// existing DIRECTORY — os.Rename(tmpFile, dir) fails. This exercises the
+// rename-error branch that the higher-level persist tests cannot reach (their
+// MkdirAll fails first). Asserted directly against the unexported helper.
+func TestWriteJSONAtomic_RenameTargetIsDir(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "occupied")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatalf("setup mkdir: %v", err)
+	}
+
+	err := writeJSONAtomic(target, map[string]string{"k": "v"})
+	fixtures.RequireErrContains(t, err, "rename")
+
+	// Temp-file cleanup: no leftover .phaseregistrar-*.tmp in the dir.
+	entries, derr := os.ReadDir(dir)
+	if derr != nil {
+		t.Fatalf("readdir: %v", derr)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".phaseregistrar-") {
+			t.Errorf("temp file leaked after rename failure: %s", e.Name())
+		}
+	}
+}
+
+// TestWriteJSONAtomic_MarshalError surfaces a json.MarshalIndent failure (a
+// func value is unencodable) WITHOUT leaving a temp file — the error must
+// return before CreateTemp.
+func TestWriteJSONAtomic_MarshalError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.json")
+
+	err := writeJSONAtomic(path, func() {}) // funcs are not JSON-encodable
+	if err == nil {
+		t.Fatal("expected a marshal error for an unencodable value")
+	}
+	if fixtures.FilePresent(path) {
+		t.Error("no file should be written on a marshal failure")
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".phaseregistrar-") {
+			t.Errorf("temp file created despite marshal failing before CreateTemp: %s", e.Name())
+		}
+	}
+}
+
+// TestWriteJSONAtomic_CreateTempFails proves the CreateTemp error branch: the
+// destination's parent dir exists (MkdirAll succeeds) but is read-only, so
+// CreateTemp inside it fails. Skipped under root, which bypasses mode bits.
+func TestWriteJSONAtomic_CreateTempFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("read-only dir is not enforced for root")
+	}
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0o555); err != nil { // r-x: MkdirAll(existing) ok, CreateTemp denied
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) }) // let TempDir cleanup remove it
+
+	err := writeJSONAtomic(filepath.Join(parent, "out.json"), map[string]string{"k": "v"})
+	fixtures.RequireErrContains(t, err, "create temp")
+}
+
+// TestWriteJSONAtomic_Succeeds_WritesIndentedJSON pins the happy-path output
+// shape: the file exists, round-trips, and is MarshalIndent'd (2-space).
+func TestWriteJSONAtomic_Succeeds_WritesIndentedJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "out.json")
+	if err := writeJSONAtomic(path, map[string]string{"name": "x"}); err != nil {
+		t.Fatalf("writeJSONAtomic: %v", err)
+	}
+	got := fixtures.MustRead(t, path)
+	if got != "{\n  \"name\": \"x\"\n}" {
+		t.Errorf("unexpected JSON layout:\n%q", got)
 	}
 }

@@ -152,6 +152,168 @@ func TestExtractJSONVersion(t *testing.T) {
 	}
 }
 
+// === A single missing marker file is reported MISSING + logged ============
+// Removing marketplace.json (but keeping plugin.json so Run reaches the checks)
+// drives checkJSONVersion's os.Stat-err → MISSING branch and the MISSING log line.
+func TestCheck_MarkerFileMissing(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	if err := os.Remove(filepath.Join(d, ".claude-plugin/marketplace.json")); err != nil {
+		t.Fatalf("rm: %v", err)
+	}
+	var buf bytes.Buffer
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2", Stderr: &buf})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	if res.Errors != 1 {
+		t.Errorf("Errors = %d, want 1", res.Errors)
+	}
+	var mk Check
+	for _, c := range res.Checks {
+		if c.File == ".claude-plugin/marketplace.json" {
+			mk = c
+		}
+	}
+	if mk.Status != "MISSING" {
+		t.Errorf("marketplace.json status = %q, want MISSING", mk.Status)
+	}
+	if !strings.Contains(buf.String(), "MISSING  .claude-plugin/marketplace.json") {
+		t.Errorf("log missing MISSING line: %s", buf.String())
+	}
+}
+
+// === A JSON marker present but with no "version" field → NO_MATCH ==========
+// Drives checkJSONVersion's extractJSONVersion-err → NO_MATCH branch and the
+// NO MATCH log line in Run's switch (covers Run's case "NO_MATCH").
+func TestCheck_MarkerNoVersionField(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	// marketplace.json present but lacks a version field.
+	if err := os.WriteFile(filepath.Join(d, ".claude-plugin/marketplace.json"),
+		[]byte(`{"plugins":[{"name":"evolve-loop"}]}`), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var buf bytes.Buffer
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2", Stderr: &buf})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	var mk Check
+	for _, c := range res.Checks {
+		if c.File == ".claude-plugin/marketplace.json" {
+			mk = c
+		}
+	}
+	if mk.Status != "NO_MATCH" {
+		t.Errorf("marketplace.json status = %q, want NO_MATCH", mk.Status)
+	}
+	if !strings.Contains(buf.String(), "NO MATCH .claude-plugin/marketplace.json") {
+		t.Errorf("log missing NO MATCH line: %s", buf.String())
+	}
+}
+
+// === SKILL.md absent → MISSING ============================================
+// Drives checkSkillHeading's os.ReadFile-err → MISSING branch.
+func TestCheck_SkillFileMissing(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	if err := os.Remove(filepath.Join(d, "skills/evolve-loop/SKILL.md")); err != nil {
+		t.Fatalf("rm: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	if statusOf(res, "skills/evolve-loop/SKILL.md") != "MISSING" {
+		t.Errorf("SKILL.md status = %q, want MISSING", statusOf(res, "skills/evolve-loop/SKILL.md"))
+	}
+}
+
+// === SKILL.md present but no matching heading → NO_MATCH ===================
+// Drives checkSkillHeading's loop-exhausted → NO_MATCH branch.
+func TestCheck_SkillHeadingAbsent(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	if err := os.WriteFile(filepath.Join(d, "skills/evolve-loop/SKILL.md"),
+		[]byte("---\nname: x\n---\n\n# Some Other Title\n\nbody\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	if statusOf(res, "skills/evolve-loop/SKILL.md") != "NO_MATCH" {
+		t.Errorf("SKILL.md status = %q, want NO_MATCH", statusOf(res, "skills/evolve-loop/SKILL.md"))
+	}
+}
+
+// === README.md absent → MISSING for the current-version check =============
+// Drives checkReadmeCurrent's os.ReadFile-err → MISSING branch.
+func TestCheck_ReadmeFileMissing(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	if err := os.Remove(filepath.Join(d, "README.md")); err != nil {
+		t.Fatalf("rm: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	// Both README checks (current-version + history row) are MISSING.
+	if statusOf(res, "README.md") != "MISSING" {
+		t.Errorf("README.md current-version status = %q, want MISSING", statusOf(res, "README.md"))
+	}
+}
+
+// === README.md present but no "Current (vX.Y)" cell → NO_MATCH ============
+// Drives checkReadmeCurrent's regex-no-match → NO_MATCH branch. The history
+// "v11.8" row is kept so only the current-version check trips.
+func TestCheck_ReadmeCurrentCellAbsent(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	if err := os.WriteFile(filepath.Join(d, "README.md"),
+		[]byte("# Evolve Loop\n\nno current cell here\n\n| v11.8 | 2026 |\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	// First README check (current version) is NO_MATCH; history row still OK.
+	var current Check
+	for _, c := range res.Checks {
+		if c.File == "README.md" {
+			current = c
+			break // first README entry is the current-version check
+		}
+	}
+	if current.Status != "NO_MATCH" {
+		t.Errorf("README current-version status = %q, want NO_MATCH", current.Status)
+	}
+}
+
+// === CHANGELOG.md absent → MISSING ========================================
+// Drives checkContains's os.ReadFile-err → MISSING branch (distinct from the
+// existing TestCheck_NoChangelogEntry which exercises file-present-no-match).
+func TestCheck_ChangelogFileMissing(t *testing.T) {
+	d := makeRepo(t, "11.8.2")
+	if err := os.Remove(filepath.Join(d, "CHANGELOG.md")); err != nil {
+		t.Fatalf("rm: %v", err)
+	}
+	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("err = %v, want ErrInconsistent", err)
+	}
+	if statusOf(res, "CHANGELOG.md") != "MISSING" {
+		t.Errorf("CHANGELOG.md status = %q, want MISSING", statusOf(res, "CHANGELOG.md"))
+	}
+}
+
+// statusOf returns the status of the first check matching file.
+func statusOf(res Result, file string) string {
+	for _, c := range res.Checks {
+		if c.File == file {
+			return c.Status
+		}
+	}
+	return "<absent>"
+}
+
 // === majorMinor table ======================================================
 func TestMajorMinor(t *testing.T) {
 	cases := []struct{ in, want string }{
