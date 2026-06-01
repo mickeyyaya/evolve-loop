@@ -104,7 +104,9 @@ For every predicate file in `acs/cycle-N/*.sh`, classify it as one of:
 |---|---|---|
 | `behavioral` | Uses subprocess invocations (`$(...)`, backtick, pipe-to-shell) or arithmetic/jq/wc to verify real system state | None — compliant |
 | `grep-only` | Last meaningful line is `grep -q ...` with no subprocess invocations (string-presence check only) | Raise **CRITICAL** defect unless `waived: true` |
-| `mixed` | Has both grep-q calls AND subprocess invocations in the same file | Raise **HIGH** warning — verify subprocess path exercises real behavior |
+| `mixed` | Has both grep-q calls AND subprocess invocations in the same file | **Window-dressing test** (see note): subprocess is decoration → effectively `grep-only` → **HIGH**; subprocess exercises real behavior → **LOW** advisory only |
+
+**Window-dressing test (for `mixed`):** if removing the subprocess invocation would leave a self-sufficient `grep -q` that still covers the same assertion (the string-check is load-bearing, the subprocess is decoration), the predicate is effectively `grep-only` → escalate to **HIGH**. Otherwise the subprocess exercises real behavior the grep does not → **LOW** advisory note only. A substantive mixed predicate still contains a real behavioral assertion (unlike `grep-only`, a gaming risk → CRITICAL), so it is a clarity concern, not a functional defect: LOW does not trigger WARN/FAIL (Verdict Rules below: WARN=MEDIUM+ blocks shipping), so a functionally-green cycle (`red_count=0`) PASSes with the note rather than being discarded. (cycle-184: a green build was wrongly discarded on a single mixed scout predicate raised HIGH.)
 
 **How to classify:** Run `bash legacy/scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain` and read the per-file verdict lines.
 
