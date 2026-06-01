@@ -245,7 +245,7 @@ func TestBuild_SkillsPathIsFile_ScanError(t *testing.T) {
 }
 
 // TestBuild_OutputPathIsDir_WriteError — when the destination
-// .evolve/skill-inventory.json is itself a directory, writeAtomic's final
+// .evolve/skill-inventory.json is itself a directory, atomicwrite's final
 // os.Rename fails, and Build surfaces it as a wrapped "write" error.
 func TestBuild_OutputPathIsDir_WriteError(t *testing.T) {
 	root := t.TempDir()

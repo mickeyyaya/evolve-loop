@@ -76,56 +76,13 @@ func TestMustMarshalToAny_Defensive(t *testing.T) {
 	}
 }
 
-// TestAtomicWriteJSONReal_MarshalError exercises the
-// json.MarshalIndent error branch by passing an unmarshalable map.
-func TestAtomicWriteJSONReal_MarshalError(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	state := map[string]any{"chan": make(chan int)}
-	if err := atomicWriteJSONReal(path, state); err == nil {
-		t.Fatalf("expected marshal error")
-	}
-}
-
-// TestAtomicWriteJSONReal_WriteTmpError exercises the os.WriteFile
-// error branch by writing to a parent directory that doesn't exist.
-func TestAtomicWriteJSONReal_WriteTmpError(t *testing.T) {
-	t.Parallel()
-	// Target path under a nonexistent dir → write fails.
-	target := filepath.Join(t.TempDir(), "nope", "subdir", "state.json")
-	err := atomicWriteJSONReal(target, map[string]any{"k": "v"})
-	if err == nil {
-		t.Fatalf("expected write error")
-	}
-	if !strings.Contains(err.Error(), "write tmp") {
-		t.Fatalf("error should mention 'write tmp': %v", err)
-	}
-}
-
-// TestAtomicWriteJSONReal_RenameError exercises the os.Rename error
-// branch by trying to rename over a directory (which fails).
-func TestAtomicWriteJSONReal_RenameError(t *testing.T) {
-	t.Parallel()
-	if os.Geteuid() == 0 {
-		t.Skip("root can rename over anything")
-	}
-	dir := t.TempDir()
-	// Make target a directory — os.Rename over a dir from a file fails
-	// on most filesystems.
-	target := filepath.Join(dir, "state.json")
-	if err := os.MkdirAll(target, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	// Place an unwriteable child inside so the dir-is-non-empty error fires.
-	if err := os.WriteFile(filepath.Join(target, "child.txt"), nil, 0o644); err != nil {
-		t.Fatalf("seed child: %v", err)
-	}
-	err := atomicWriteJSONReal(target, map[string]any{"k": "v"})
-	if err == nil {
-		t.Fatalf("expected rename error")
-	}
-}
+// NOTE: the former TestAtomicWriteJSONReal_{MarshalError,WriteTmpError,
+// RenameError} tests exercised the package-local atomicWriteJSONReal
+// helper's internals. That helper was removed in favor of the shared
+// internal/atomicwrite package, whose own tests cover those OS-fault
+// branches at 100%. The write path is still verified through the public
+// API via the atomicWriteJSON seam-override tests in record_test.go,
+// prune_test.go, and prune_by_class_test.go.
 
 // TestPruneExpired_StateUnreadable covers the os.ReadFile non-NotExist
 // error branch in PruneExpired (permission denied).

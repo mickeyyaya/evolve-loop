@@ -464,37 +464,8 @@ func TestResultJSON_EmptyModified(t *testing.T) {
 	}
 }
 
-func TestAtomicWrite_RestoresOnError(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "non", "existent", "dir", "file")
-	err := atomicWrite(target, []byte("x"))
-	if err == nil {
-		t.Errorf("expected error writing into missing dir")
-	}
-}
-
-// TestAtomicWrite_RenameError pins that a tmp-write success followed by a
-// rename failure surfaces a "rename" error (and leaves the target dir intact).
-// Renaming the .tmp file onto an existing directory fails on Unix.
-func TestAtomicWrite_RenameError(t *testing.T) {
-	tmp := t.TempDir()
-	// target is an existing directory; tmp write to "<dir>.tmp" succeeds,
-	// but os.Rename(tmp, dir) fails because the destination dir exists.
-	target := filepath.Join(tmp, "destdir")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	err := atomicWrite(target, []byte("x"))
-	if err == nil {
-		t.Fatalf("expected rename error onto existing directory")
-	}
-	if !strings.Contains(err.Error(), "rename") {
-		t.Errorf("got %v, want a rename error", err)
-	}
-}
-
 // roDir creates a directory containing `file` with given content, then makes
-// the directory read-only so that atomicWrite's tmp-write fails. The cleanup
+// the directory read-only so that atomicwrite.Bytes's tmp-write fails. The cleanup
 // restores write permission so t.TempDir teardown can remove it.
 func roDir(t *testing.T, content string) string {
 	t.Helper()
@@ -723,7 +694,7 @@ func TestRun_PropagatesBumpErrors(t *testing.T) {
 		// Position failure at the history phase: plugin/marketplace clean,
 		// skill missing, README's "Current" already at target so the Current
 		// phase is a no-op, but the README has an unbumped history row AND
-		// lives in a read-only dir so atomicWrite fails in the history phase.
+		// lives in a read-only dir so atomicwrite.Bytes fails in the history phase.
 		tmp := t.TempDir()
 		dir := filepath.Join(tmp, "ro")
 		if err := os.Mkdir(dir, 0o755); err != nil {

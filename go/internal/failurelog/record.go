@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // MaxEntries caps state.json:failedApproaches at this many entries.
@@ -184,27 +186,12 @@ func mustMarshalToAny(v any) map[string]any {
 	return m
 }
 
-// atomicWriteJSON serializes state to <path>.tmp.<pid> then renames
-// over <path>. Mirrors the bash dispatcher's mv-of-tmp pattern (POSIX
-// rename is atomic on the same filesystem). Returns an error if any
-// step fails; leaves no partial file behind.
+// atomicWriteJSON serializes state and writes it atomically (mv-of-tmp,
+// POSIX rename is atomic on the same filesystem; no partial file on
+// failure). Delegates to the shared internal/atomicwrite implementation.
 //
-// Exposed via writeFn seam so tests can drive the write-error branch
+// Exposed via this seam so tests can drive the write-error branch
 // without contriving filesystem permissions.
-var atomicWriteJSON = atomicWriteJSONReal
-
-func atomicWriteJSONReal(path string, state map[string]any) error {
-	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
-	b, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return fmt.Errorf("write tmp: %w", err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("rename: %w", err)
-	}
-	return nil
+var atomicWriteJSON = func(path string, state map[string]any) error {
+	return atomicwrite.JSON(path, state)
 }

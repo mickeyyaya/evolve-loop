@@ -13,14 +13,13 @@
 package phaseregistrar
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
@@ -120,47 +119,15 @@ func dispatchTier(cfg phaseconfig.PhaseConfig) string {
 // skipped when its dir is empty.
 func (r Registrar) persist(spec phasespec.PhaseSpec, prof profiles.Profile) error {
 	if r.ProfilesDir != "" {
-		if err := writeJSONAtomic(filepath.Join(r.ProfilesDir, prof.Name+".json"), prof); err != nil {
+		if err := atomicwrite.JSON(filepath.Join(r.ProfilesDir, prof.Name+".json"), prof); err != nil {
 			return fmt.Errorf("phaseregistrar: persist profile: %w", err)
 		}
 	}
 	if r.PhasesDir != "" {
 		path := filepath.Join(r.PhasesDir, spec.Name, "phase.json")
-		if err := writeJSONAtomic(path, spec); err != nil {
+		if err := atomicwrite.JSON(path, spec); err != nil {
 			return fmt.Errorf("phaseregistrar: persist phase spec: %w", err)
 		}
-	}
-	return nil
-}
-
-func writeJSONAtomic(path string, v any) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", dir, err)
-	}
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	// CreateTemp gives a unique name so concurrent Register calls for the same
-	// phase don't clobber each other's temp file before the rename.
-	tmp, err := os.CreateTemp(dir, ".phaseregistrar-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create temp in %s: %w", dir, err)
-	}
-	tmpName := tmp.Name()
-	if _, err := tmp.Write(b); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("write %s: %w", tmpName, err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("close %s: %w", tmpName, err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("rename %s -> %s: %w", tmpName, path, err)
 	}
 	return nil
 }
