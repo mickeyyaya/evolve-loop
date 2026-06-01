@@ -47,38 +47,43 @@ func TestResolveRetryBackoffBase(t *testing.T) {
 	}
 }
 
-func TestExecuteRetryBackoff_ZeroBaseDisables(t *testing.T) {
-	env := map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "0"}
-	start := time.Now()
-	executeRetryBackoff(1, env) // would sleep if enabled
-	duration := time.Since(start)
+// captureBackoff swaps in a recording sleep and returns pointers to the
+// captured duration and a called-flag, plus a restore func. Tests the COMPUTED
+// backoff duration directly via the seam — no wall-clock sleeping (instant) and
+// exact (not a fuzzy time window). The called-flag is load-bearing for the
+// zero-base case, where executeRetryBackoff returns before invoking the seam, so
+// a 0 duration alone can't distinguish "not called" from "slept 0".
+func captureBackoff() (*time.Duration, *bool, func()) {
+	prev := backoffSleep
+	var slept time.Duration
+	var called bool
+	backoffSleep = func(d time.Duration) { called = true; slept = d }
+	return &slept, &called, func() { backoffSleep = prev }
+}
 
-	if duration > 100*time.Millisecond {
-		t.Errorf("expected no sleep for zero base, slept for %v", duration)
+func TestExecuteRetryBackoff_ZeroBaseDisables(t *testing.T) {
+	_, called, restore := captureBackoff()
+	defer restore()
+	executeRetryBackoff(1, map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "0"})
+	if *called {
+		t.Error("zero base must not invoke the sleep")
 	}
 }
 
 func TestExecuteRetryBackoff_AppliedOnAttempt2(t *testing.T) {
-	// attempt = 1 in loop means we finished attempt 1 and are about to start attempt 2.
-	// Since we sleep inside the loop before continuing to next attempt,
-	// when attempt = 1, nextAttempt = 2.
-	// We want to test that nextAttempt >= 2 triggers backoff.
-	// Let's use a base of 1 second to test a quick 1-second sleep.
+	slept, called, restore := captureBackoff()
+	defer restore()
 	env := map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "1"}
 
-	// 1. nextAttempt = 1 (attempt = 0) -> no sleep (it should skip since nextAttempt < 2)
-	start := time.Now()
+	// nextAttempt = 1 (attempt = 0) -> below the >=2 threshold, no sleep.
 	executeRetryBackoff(0, env)
-	duration := time.Since(start)
-	if duration > 100*time.Millisecond {
-		t.Errorf("expected no sleep for nextAttempt < 2, slept for %v", duration)
+	if *called {
+		t.Errorf("nextAttempt < 2 must not sleep; slept %v", *slept)
 	}
 
-	// 2. nextAttempt = 2 (attempt = 1) -> should sleep for base * 2^(2-2) = 1 * 1 = 1 second
-	start = time.Now()
+	// nextAttempt = 2 (attempt = 1) -> base * 2^(2-2) = 1s exactly.
 	executeRetryBackoff(1, env)
-	duration = time.Since(start)
-	if duration < 900*time.Millisecond || duration > 1500*time.Millisecond {
-		t.Errorf("expected sleep around 1s for attempt 2, slept for %v", duration)
+	if !*called || *slept != 1*time.Second {
+		t.Errorf("attempt 2: want exactly 1s sleep, got called=%v slept=%v", *called, *slept)
 	}
 }
