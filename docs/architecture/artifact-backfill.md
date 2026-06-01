@@ -45,6 +45,8 @@ After `ErrArtifactTimeout` exhaustion (`phaseMaxAttempts` reached):
 | tdd     | `# TDD`          | `test-report.md`  |
 | intent  | `# Intent`       | `intent.md`       |
 | triage  | `# Triage`       | `triage-report.md`|
+| retro   | `# Retrospective Report` | `retrospective-report.md`|
+| build-planner| `# Build Plan` | `build-plan.md` |
 
 Unknown phases return `(false, nil)` — no error, no write.
 
@@ -106,5 +108,7 @@ req.Env["EVOLVE_BACKFILL_ENABLED"] = "1"
 
 - `go/internal/backfill/backfill.go` — `TryExtract` implementation
 - `go/internal/core/orchestrator.go` — wiring in `RunCycle` retry loop
+- `go/internal/phases/retro/retro.go` — `retro` phase runner updated to align with agent output
+- `docs/architecture/self-healing-gaps.md` — self-healing gaps registry
 - `docs/architecture/adr/0026-self-healing-review-layer.md` — Stage 1 backlog
 - `CLAUDE.md` — env-var table entry for `EVOLVE_BACKFILL_ENABLED`

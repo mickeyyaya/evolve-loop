@@ -110,8 +110,12 @@ func TestRun_PreviousFAIL_PASSWithLesson(t *testing.T) {
 	if resp.DurationMS != 90 {
 		t.Errorf("DurationMS=%d, want 90", resp.DurationMS)
 	}
-	if fb.gotReq.ArtifactPath != filepath.Join(ws, "retrospective.md") {
-		t.Errorf("ArtifactPath=%q", fb.gotReq.ArtifactPath)
+	// cycle-187 AC-5/AC-6: retro must poll the file the evolve-retrospective
+	// agent actually writes — "retrospective-report.md" — not the stale
+	// "retrospective.md" the runner used before. The mismatch made the bridge
+	// time out on every retro invocation (Scout Gap B).
+	if fb.gotReq.ArtifactPath != filepath.Join(ws, "retrospective-report.md") {
+		t.Errorf("ArtifactPath=%q, want retrospective-report.md (agent output path)", fb.gotReq.ArtifactPath)
 	}
 	wantProfile := filepath.Join("/tmp/proj", ".evolve", "profiles", "retrospective.json")
 	if fb.gotReq.Profile != wantProfile {

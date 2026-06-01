@@ -83,7 +83,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	}
 
 	prompt := composePrompt(agent.Body, req, prev)
-	artifactPath := filepath.Join(req.Workspace, "retrospective.md")
+	artifactPath := filepath.Join(req.Workspace, "retrospective-report.md")
 	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "retrospective.json")
 
 	cli := req.Env["EVOLVE_CLI"]

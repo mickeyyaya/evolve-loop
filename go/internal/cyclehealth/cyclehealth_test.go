@@ -680,3 +680,34 @@ func TestLoadLedger_Missing_NoFile(t *testing.T) {
 		t.Errorf("expected ledger_completeness fatal; got %+v", r.Anomalies)
 	}
 }
+
+// TestCheck_RunsThirteenSignals pins the signal roster to 13 (cycle-187
+// AC-10/AC-11 context). After cycles 180 and 186 the suite grew from 11 to 13
+// signals; the package comment must say "13", not the stale "11". This
+// behavioral test ties that number to reality: SignalsRun must list exactly 13
+// names, including the two newest — phase_latency (12) and self_heal_events
+// (13). It is pre-existing GREEN at the cycle-187 baseline (signals 12+13 already
+// shipped in cycle 186), and serves as the regression guard that keeps the
+// comment's "13" claim honest against the actual signal slice.
+func TestCheck_RunsThirteenSignals(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.SignalsRun) != 13 {
+		t.Errorf("SignalsRun has %d entries, want 13: %v", len(r.SignalsRun), r.SignalsRun)
+	}
+	for _, want := range []string{"phase_latency", "self_heal_events"} {
+		found := false
+		for _, s := range r.SignalsRun {
+			if s == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("signal %q missing from SignalsRun=%v", want, r.SignalsRun)
+		}
+	}
+}

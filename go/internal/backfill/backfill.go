@@ -12,12 +12,14 @@ import (
 // phaseHeaders maps each phase name to its canonical markdown header.
 // The header marks the start of the phase's artifact in stdout.clean.txt.
 var phaseHeaders = map[string]string{
-	"scout":  "# Scout Report",
-	"build":  "# Build Report",
-	"audit":  "# Audit Report",
-	"tdd":    "# TDD",
-	"intent": "# Intent",
-	"triage": "# Triage",
+	"scout":         "# Scout Report",
+	"build":         "# Build Report",
+	"audit":         "# Audit Report",
+	"tdd":           "# TDD",
+	"intent":        "# Intent",
+	"triage":        "# Triage",
+	"retro":         "# Retrospective Report",
+	"build-planner": "# Build Plan",
 }
 
 // TryExtract attempts to reconstruct a phase artifact from its stdout.clean.txt.

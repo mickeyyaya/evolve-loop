@@ -1,10 +1,10 @@
-// Package cyclehealth performs an 11-signal integrity check on a
+// Package cyclehealth performs a 13-signal integrity check on a
 // completed cycle's workspace and writes the findings to
 // <workspace>/cycle-health.json. The orchestrator and Scout read the
 // file before the next phase; any ANOMALY in a non-WARN-only signal
 // halts the cycle so the integrity breach is investigated.
 //
-// The 11 signals (each emits zero or more anomalies):
+// The 13 signals (each emits zero or more anomalies):
 //
 //  1. ledger_completeness  — every required role appears in ledger.jsonl
 //  2. ledger_timestamps    — entries are monotonic, no future timestamps
@@ -18,6 +18,8 @@
 //
 // 10. cost_envelope        — per-phase cost ≤ EVOLVE_PHASE_COST_CEILING
 // 11. duplicate_ledger     — no two ledger entries with same SHA
+// 12. phase_latency        — per-phase execution time ≤ EVOLVE_PHASE_LATENCY_CEILING
+// 13. self_heal_events     — anomalous self-heal retries / backfills in cycle
 //
 // Per the skill docs: "Any ANOMALY = halt." Operators bypass via
 // EVOLVE_SKIP_CYCLE_HEALTH=1 (logged loudly).
@@ -70,7 +72,7 @@ type Options struct {
 	NowFn     func() time.Time
 }
 
-// Check runs the 11 signals and writes cycle-health.json. Returns the
+// Check runs the 13 signals and writes cycle-health.json. Returns the
 // Report whether or not anomalies were found; the caller decides
 // whether to HALT based on Report.OverallFatal.
 func Check(opts Options) (Report, error) {

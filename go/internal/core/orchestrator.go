@@ -1924,6 +1924,10 @@ func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
 func backfillArtifactPath(workspacePath, phase string) string {
 	var filename string
 	switch phase {
+	case "retro":
+		filename = "retrospective-report.md"
+	case "build-planner":
+		filename = "build-plan.md"
 	case "tdd":
 		filename = "test-report.md"
 	case "intent":

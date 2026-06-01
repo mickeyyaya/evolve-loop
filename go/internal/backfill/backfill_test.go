@@ -119,3 +119,67 @@ func TestTryExtract_MissingCleanFileReturnsFalse(t *testing.T) {
 		t.Errorf("artifact must NOT be written when clean.txt is missing")
 	}
 }
+
+// --- cycle-187: backfill coverage extended to retro + build-planner ---
+
+// AC-1 / AC-7 (cycle-187): "retro" is a newly backfill-covered phase. The
+// retrospective agent's stdout carries the canonical "# Retrospective Report"
+// header — the exact form every real retrospective-report.md on disk uses
+// (e.g. ".evolve/runs/cycle-29/retrospective-report.md" → "# Retrospective
+// Report — Cycle 29"). With "retro" in phaseHeaders, that report must be
+// reconstructed and written to the artifact path.
+//
+// RED at baseline: phaseHeaders has no "retro" entry → TryExtract takes the
+// unknown-phase branch and returns (false, nil) → ok==false, artifact absent.
+func TestTryExtract_Retro_PositiveWritesArtifact(t *testing.T) {
+	ws := t.TempDir()
+	report := "# Retrospective Report — Cycle 187\n\n## Verdict trigger\n" +
+		"Auditor verdict: FAIL. Root cause reconstructed from stdout for backfill recovery.\n"
+	// "last occurrence" wins even with leading bridge/spinner noise.
+	seedClean(t, ws, "retro", "bridge boot timeout noise\nspinner chatter line\n"+report)
+	artifact := filepath.Join(ws, "retrospective-report.md")
+
+	ok, err := TryExtract(ws, "retro", artifact, 50)
+	if err != nil {
+		t.Fatalf("TryExtract(retro) returned err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("retro must be a backfill-covered phase: expected extracted=true for a present # Retrospective Report header")
+	}
+	got, rerr := os.ReadFile(artifact)
+	if rerr != nil {
+		t.Fatalf("retro artifact must be written on successful extract: %v", rerr)
+	}
+	if !strings.Contains(string(got), "# Retrospective Report") {
+		t.Errorf("extracted retro artifact must contain its header; got %q", got)
+	}
+}
+
+// AC-2 / AC-7 (cycle-187): "build-planner" is a newly backfill-covered phase.
+// Its artifact is build-plan.md, headed "# Build Plan" (real on-disk form:
+// "# Build Plan — Cycle 121"). With "build-planner" in phaseHeaders, the plan
+// must be reconstructed from its stdout.clean.txt.
+//
+// RED at baseline: no "build-planner" entry in phaseHeaders → (false, nil).
+func TestTryExtract_BuildPlanner_PositiveWritesArtifact(t *testing.T) {
+	ws := t.TempDir()
+	report := "# Build Plan — Cycle 187\n\n## Approach\n" +
+		"File-by-file implementation plan reconstructed from build-planner stdout, long enough to clear minLen.\n"
+	seedClean(t, ws, "build-planner", "planner spinner line\n"+report)
+	artifact := filepath.Join(ws, "build-plan.md")
+
+	ok, err := TryExtract(ws, "build-planner", artifact, 50)
+	if err != nil {
+		t.Fatalf("TryExtract(build-planner) returned err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("build-planner must be a backfill-covered phase: expected extracted=true for a present # Build Plan header")
+	}
+	got, rerr := os.ReadFile(artifact)
+	if rerr != nil {
+		t.Fatalf("build-plan.md must be written on successful extract: %v", rerr)
+	}
+	if !strings.Contains(string(got), "# Build Plan") {
+		t.Errorf("extracted build-plan artifact must contain its header; got %q", got)
+	}
+}

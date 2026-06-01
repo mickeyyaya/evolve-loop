@@ -25,15 +25,16 @@ narrowly scoped to genuinely transient failures, never a model's real FAIL.
 | 1 | attempt loop `return ... "phase %s: %w"` | any non-ArtifactTimeout bridge error on a mandatory phase | yes (transient class) | **DONE** — cycle-173: transient bridge failures (exits 80/85/86) are classified and retried up to phaseMaxAttempts |
 | 9 | `retro.go` bridge-fail returns error | retro's OWN bridge dies | yes | **DONE** — return FAIL verdict + nil error → routes via `decideAfterRetro` |
 | 5 | `return ... "non-canonical verdict"` | runner returns verdict ∉ {PASS,FAIL,WARN,SKIPPED} (parse blip) | yes | **DONE** — cycle-173: non-canonical verdicts are classified and retried up to phaseMaxAttempts |
-| 3 | `router/recovery.go` integrity-block | integrity-class ShipError (e.g. INTEGRITY_TREE_DRIFT false positive) | sometimes | route through `debugger` deep-dive before BLOCK |
+| 3 | `router/recovery.go` integrity-block | integrity-class ShipError (e.g. INTEGRITY_TREE_DRIFT false positive) | sometimes | route through `debugger` deep-dive before BLOCK (deferred/by-design) |
 | 2 | `phaseMaxAttempts=2`, no backoff | repeated ArtifactTimeout | partly | **DONE** — cycle-180: configurable exponential backoff (`EVOLVE_RETRY_BACKOFF_BASE_S`, default 5s) |
-| 4 | `maxRecoveryDepth=2` then abort | persistent ship blocker | by design | keep cap; escalate to operator notice |
+| 4 | `maxRecoveryDepth=2` then abort | persistent ship blocker | by design | keep cap; escalate to operator notice (deferred/by-design) |
 | 6 | tree-diff guard / `recoverBuildLeak` false | unrecoverable leak | correctness guard | keep (bugs #5/#6 already hardened recoverBuildLeak) |
-| 7 | reviewer reject (noop default) | future reviewer trips | n/a today | add retry budget before any real reviewer ships |
-| 8 | state-machine transition error | unknown verdict edge | programmer error | keep (guards a bug, not runtime) |
+| 7 | reviewer reject (noop default) | future reviewer trips | n/a today | add retry budget before any real reviewer ships (deferred/by-design) |
+| 8 | state-machine transition error | unknown verdict edge | programmer error | keep (guards a bug, not runtime) (deferred/by-design) |
 | 10 | Artifact timeout exhaustion | `ErrArtifactTimeout` occurs on final attempt, losing work | yes | **DONE** — cycle-171/179: [artifact-backfill](artifact-backfill.md) default-on, extracts artifact from raw stdout to avoid hard cycle aborts |
 | 11 | Retries forensically invisible | difficulty auditing retries | yes | **DONE** — cycle-171: `attempt_count` logged to [phase timing](phase-timing-and-diagnostics.md) and failure diagnostics |
 | 12 | Latency anomaly detection | phase runs excessively slow without crashing | yes | **DONE** — cycle-180: signal 12 `phase_latency` in `cyclehealth.go` raises warning on slow phases |
+| 14 | `backfillArtifactPath` / `phaseHeaders` | retro & build-planner backfill coverage incomplete | yes | **DONE** — cycle-187: add retro/build-planner to backfill phaseHeaders and align retro runner polling path |
 
 ## Principle for fixes
 
@@ -43,7 +44,7 @@ A **transient** infra/bridge failure should retry-or-reroute, bounded (GAP 1/5).
 transient/infra faults, not for masking real failures (token-optimization + the
 "imprecise-evaluator" caveat).
 
-## Completed as of cycle-186
+## Completed as of cycle-187
 
 Over successive self-evolution cycles, we have systematically addressed the primary gaps identified in this living document:
 
@@ -67,6 +68,9 @@ Over successive self-evolution cycles, we have systematically addressed the prim
 
 7. **Progress Disambiguation (ADR-0026 Stage 1 #4)**:
    - Implemented in cycle-186. The tmux REPL driver's progressed detection was enhanced using `PaneHasSubstantiveChange` in `stopreview.go`. This strips Unicode and ASCII spinners, deliberating time indicators, and token counters before comparing snapshots, preventing animated spinners from fooling the stall detector. Detailed in [ADR-0026](adr/0026-self-healing-review-layer.md).
+
+8. **Retro & Build-Planner Backfill (GAP 14)**:
+   - Implemented in cycle-187 to extend backfill recovery coverage to the retrospective and build-planner phases, aligning the retro runner to poll the correct file path. Detailed in [artifact-backfill.md](artifact-backfill.md).
 
 ## Multi-CLI note
 
