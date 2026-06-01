@@ -29,11 +29,20 @@ import (
 // value (specs are small, immutable data).
 type hooks struct {
 	spec phasespec.PhaseSpec
+	// promptBody is an optional in-band prompt. When non-empty, the
+	// BaseRunner uses it instead of reading agents/<AgentName>.md — the
+	// path that lets a minted phase ship its persona as pure data.
+	promptBody string
 }
 
 func (h hooks) PhaseName() string       { return h.spec.Name }
 func (h hooks) AgentPromptName() string { return h.spec.AgentName() }
 func (h hooks) DefaultModel() string    { return h.spec.ModelOrDefault() }
+
+// InlinePromptBody satisfies runner.InlinePromptProvider. ok is true only
+// when an in-band body was supplied; otherwise BaseRunner falls back to the
+// on-disk agent doc (byte-identical to the legacy path).
+func (h hooks) InlinePromptBody() (string, bool) { return h.promptBody, h.promptBody != "" }
 
 // ArtifactFilename returns the basename of the first declared output file, or
 // the conventional "<name>-report.md" when none is declared. The registry may
@@ -148,6 +157,10 @@ type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
 	NowFn   func() time.Time
+	// PromptBody, when non-empty, is forwarded as the inline prompt body;
+	// empty (the default) loads agents/<AgentName>.md from disk — see the
+	// hooks.promptBody field for the full contract.
+	PromptBody string
 }
 
 // Phase is a spec-driven core.PhaseRunner.
@@ -157,7 +170,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(spec phasespec.PhaseSpec, c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{spec: spec},
+			Hooks:   hooks{spec: spec, promptBody: c.PromptBody},
 			Bridge:  c.Bridge,
 			Prompts: c.Prompts,
 			NowFn:   c.NowFn,
