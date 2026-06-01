@@ -21,6 +21,13 @@ type CLISnapshot struct {
 	// TierModels maps each tier to the CLI's concrete model id, as the source
 	// currently reports it. Empty models and non-canonical tiers are ignored.
 	TierModels map[string]string
+	// Available is the raw enumerated model-id list (audit trail), passed
+	// through to CLIEntry.Available. Optional; nil for detect-derived snapshots.
+	Available []string
+	// Source is the provenance written to CLIEntry.Source (SourceLive /
+	// SourceDetect). Empty defaults to SourceDetect — a snapshot of unknown
+	// provenance is treated as the non-authoritative kind.
+	Source string
 }
 
 // BuildFromSnapshots assembles a Catalog from per-CLI snapshots, stamping
@@ -47,7 +54,11 @@ func BuildFromSnapshots(snaps []CLISnapshot, fetchedAt time.Time) Catalog {
 		if len(tiers) == 0 {
 			continue
 		}
-		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers}
+		source := s.Source
+		if source == "" {
+			source = SourceDetect
+		}
+		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers, Available: s.Available, Source: source}
 	}
 	return cat
 }

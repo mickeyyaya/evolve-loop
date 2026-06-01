@@ -35,7 +35,7 @@ type Catalog struct {
 	CLIs map[string]CLIEntry `json:"clis"`
 }
 
-// CLIEntry is one CLI's live model information.
+// CLIEntry is one CLI's model information.
 type CLIEntry struct {
 	// TierModels translates the abstract tier (fast|balanced|deep) to this
 	// CLI's concrete model id — the live analogue of
@@ -44,6 +44,33 @@ type CLIEntry struct {
 	// Available is the raw enumerated model-id list as offered by the CLI, kept
 	// as an audit/debug trail. Not consumed at dispatch.
 	Available []string `json:"available,omitempty"`
+	// Source records provenance: "live" (queried from the CLI itself) vs
+	// "detect" (derived from the static, possibly-degenerate manifest map).
+	// Only "live" entries are trustworthy enough to OVERRIDE the manifest at
+	// dispatch; "detect" entries are informational (shown by `models list`).
+	Source string `json:"source,omitempty"`
+}
+
+// SourceLive marks a tier map queried from the CLI itself (authoritative).
+const SourceLive = "live"
+
+// SourceDetect marks a tier map derived from the static manifest (informational).
+const SourceDetect = "detect"
+
+// DispatchModel returns the concrete model for (cli, tier) ONLY when the entry
+// is live-sourced — the gate that keeps a degenerate detect-derived catalog
+// from overriding the proven static manifest at dispatch. Non-live or missing
+// entries return ok=false so the caller falls back to the manifest.
+func (c Catalog) DispatchModel(cli, tier string) (model string, ok bool) {
+	entry, found := c.CLIs[cli]
+	if !found || entry.Source != SourceLive {
+		return "", false
+	}
+	m := entry.TierModels[tier]
+	if m == "" {
+		return "", false
+	}
+	return m, true
 }
 
 // Lookup returns the concrete model for (cli, tier). ok is false when the CLI
