@@ -16,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 type fakeBridge struct {
@@ -45,17 +46,6 @@ func fakePromptsFS(body string) *prompts.Loader {
 			Data: []byte("---\nname: evolve-auditor\n---\n" + body),
 		},
 	})
-}
-
-func fixedClock(t time.Time, dur time.Duration) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		defer func() { calls++ }()
-		if calls == 0 {
-			return t
-		}
-		return t.Add(dur)
-	}
 }
 
 // writeACSVerdict writes a verdict.json to ws/acs-verdict.json with the
@@ -139,7 +129,7 @@ func TestRun_HappyPath_PASS(t *testing.T) {
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n\nNo defects found.\n"
 	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.30}}
-	clock := fixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)
+	clock := fixtures.FixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)
 	phase := New(Config{
 		Bridge:  fb,
 		Prompts: fakePromptsFS("# Auditor body"),
@@ -541,7 +531,7 @@ func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report — Cycle 148\n<!-- audit_bound_tree_sha: deadbeef -->\n\n**Verdict: PASS**\n**Confidence: 0.92**\n\nNo defects.\n"
 	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.3}}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixtures.FixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 148, ProjectRoot: "/tmp/p", Workspace: ws})
 	if err != nil {
@@ -562,7 +552,7 @@ func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\nThe change looks acceptable but I forgot the verdict line.\n"
 	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.3}}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixtures.FixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/tmp/p", Workspace: ws})
 	if err != nil {

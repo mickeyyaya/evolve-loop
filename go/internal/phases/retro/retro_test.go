@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 type fakeBridge struct {
@@ -50,17 +51,6 @@ func fakePromptsFS(body string) *prompts.Loader {
 	})
 }
 
-func fixedClock(t time.Time, dur time.Duration) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		defer func() { calls++ }()
-		if calls == 0 {
-			return t
-		}
-		return t.Add(dur)
-	}
-}
-
 func TestRun_PreviousPASS_SKIPPEDWithoutBridgeCall(t *testing.T) {
 	fb := &fakeBridge{}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
@@ -87,7 +77,7 @@ func TestRun_PreviousFAIL_PASSWithLesson(t *testing.T) {
 	body := "# Retrospective\n\n## Root Cause\nMissing rate limit.\n\n## Lessons\nApply rate limiter pattern.\n"
 	lesson := "id: rate-limit-missing\ntags: [auth, security]\nlesson: install rate limiter\n"
 	fb := &fakeBridge{writeArtifact: body, writeLesson: lesson, resp: core.BridgeResponse{CostUSD: 0.15}}
-	clock := fixedClock(time.Unix(1_700_000_000, 0), 90*time.Millisecond)
+	clock := fixtures.FixedClock(time.Unix(1_700_000_000, 0), 90*time.Millisecond)
 	phase := New(Config{
 		Bridge:  fb,
 		Prompts: fakePromptsFS("# Retro body"),

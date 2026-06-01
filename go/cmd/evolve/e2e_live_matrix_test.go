@@ -1,3 +1,5 @@
+//go:build e2e
+
 // Tier 2 — LIVE model-tier matrix. For each CLI, fire a single cheap bridge
 // launch at EACH supported tier's concrete model and assert the call succeeds
 // and writes an artifact. This catches model-deprecation / tier-resolution

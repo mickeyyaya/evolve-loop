@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-end coverage of the ADVERSARIAL pipeline paths that the happy-path
 // matrices never exercise: audit FAIL → retro → no-ship, audit WARN under
 // fluent vs strict, and the optional intent phase. All run through the

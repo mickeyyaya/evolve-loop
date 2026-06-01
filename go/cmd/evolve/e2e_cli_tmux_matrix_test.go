@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-end matrix that drives a FULL evolve cycle (Scout → Triage → TDD →
 // Build → Audit → Ship) through the INTERACTIVE tmux drivers — claude-tmux,
 // codex-tmux, agy-tmux — against a REAL tmux server, with evolve-fake-cli

@@ -1,3 +1,5 @@
+//go:build e2e
+
 // Coverage of `evolve setup detect|validate` — the kernel clamp behind the
 // /setup skill that enforces the CLI×model integrity floor (ADR-0027):
 //   - tier ∈ profile model_tier_envelope  → ERROR (exit 2)
