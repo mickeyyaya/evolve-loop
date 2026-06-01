@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 type fakeBridge struct {
@@ -45,17 +46,6 @@ func fakePromptsFS(body string) *prompts.Loader {
 	})
 }
 
-func fixedClock(t time.Time, dur time.Duration) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		defer func() { calls++ }()
-		if calls == 0 {
-			return t
-		}
-		return t.Add(dur)
-	}
-}
-
 func TestRun_HappyPath_PASSWithFilesModified(t *testing.T) {
 	ws := t.TempDir()
 	body := `# Build Report
@@ -74,7 +64,7 @@ func TestRun_HappyPath_PASSWithFilesModified(t *testing.T) {
 		writeArtifact: body,
 		resp:          core.BridgeResponse{CostUSD: 0.85},
 	}
-	clock := fixedClock(time.Unix(1_700_000_000, 0), 200*time.Millisecond)
+	clock := fixtures.FixedClock(time.Unix(1_700_000_000, 0), 200*time.Millisecond)
 	phase := New(Config{
 		Bridge:  fb,
 		Prompts: fakePromptsFS("# Builder body"),

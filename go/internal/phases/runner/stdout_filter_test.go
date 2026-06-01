@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 func TestRun_StdoutFilter_InvokedOnSuccess(t *testing.T) {
@@ -26,7 +27,7 @@ func TestRun_StdoutFilter_InvokedOnSuccess(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
 		Prompts: fakePromptsFS("evolve-builder", "body"),
-		NowFn:   fixedClock(time.Unix(1, 0), time.Millisecond),
+		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
 		StdoutFilter: func(workspace, phase string) error {
 			called.count++
 			called.workspace = workspace
@@ -60,7 +61,7 @@ func TestRun_StdoutFilter_ErrorDoesNotBlockPhase(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
 		Prompts: fakePromptsFS("evolve-scout", "body"),
-		NowFn:   fixedClock(time.Unix(1, 0), time.Millisecond),
+		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
 		StdoutFilter: func(workspace, phase string) error {
 			return errors.New("synthetic filter blowup")
 		},
@@ -87,7 +88,7 @@ func TestRun_StdoutFilter_OffEnvSkipsFilter(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
 		Prompts: fakePromptsFS("evolve-scout", "body"),
-		NowFn:   fixedClock(time.Unix(1, 0), time.Millisecond),
+		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
 		StdoutFilter: func(workspace, phase string) error {
 			called++
 			return nil
@@ -125,7 +126,7 @@ func TestRun_StdoutFilter_E2E_WritesCompanionFile(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
 		Prompts: fakePromptsFS("evolve-builder", "body"),
-		NowFn:   fixedClock(time.Unix(1, 0), time.Millisecond),
+		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
 		// StdoutFilter unset → defaults to real logfilter.Process
 	})
 

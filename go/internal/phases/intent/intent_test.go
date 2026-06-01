@@ -17,6 +17,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // fakeBridge captures the most recent Launch call and produces a
@@ -51,16 +52,6 @@ func (f *fakeBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 }
 
 // fixedClock returns t for the first Now() call and t+dur for subsequent.
-func fixedClock(t time.Time, dur time.Duration) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		defer func() { calls++ }()
-		if calls == 0 {
-			return t
-		}
-		return t.Add(dur)
-	}
-}
 
 // fakePromptsFS builds a Loader that resolves agents/evolve-intent.md.
 func fakePromptsFS(body string) *prompts.Loader {
@@ -88,7 +79,7 @@ risk_level: high
 Body here.
 `
 	fb := &fakeBridge{writeArtifact: artifactBody}
-	clock := fixedClock(time.Unix(1_700_000_000, 0), 50*time.Millisecond)
+	clock := fixtures.FixedClock(time.Unix(1_700_000_000, 0), 50*time.Millisecond)
 	phase := New(Config{
 		Bridge:  fb,
 		Prompts: fakePromptsFS("# Intent Architect body"),

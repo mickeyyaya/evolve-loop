@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 type fakeBridge struct {
@@ -46,17 +47,6 @@ func fakePromptsFS(body string) *prompts.Loader {
 	})
 }
 
-func fixedClock(t time.Time, dur time.Duration) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		defer func() { calls++ }()
-		if calls == 0 {
-			return t
-		}
-		return t.Add(dur)
-	}
-}
-
 func TestRun_HappyPath_PASSWithContract(t *testing.T) {
 	ws := t.TempDir()
 	contract := `# Team Context (RED Contract)
@@ -76,7 +66,7 @@ Add rate limiter to /login
 - rate.Limiter (token bucket; 5 req / 60s)
 `
 	fb := &fakeBridge{writeArtifact: contract, resp: core.BridgeResponse{CostUSD: 0.20}}
-	clock := fixedClock(time.Unix(1_700_000_000, 0), 100*time.Millisecond)
+	clock := fixtures.FixedClock(time.Unix(1_700_000_000, 0), 100*time.Millisecond)
 	phase := New(Config{
 		Bridge:  fb,
 		Prompts: fakePromptsFS("# TDD body"),

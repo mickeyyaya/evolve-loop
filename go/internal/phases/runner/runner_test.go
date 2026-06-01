@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // fakeHooks is a minimal Hooks impl that records calls and returns
@@ -90,16 +91,6 @@ func fakePromptsFS(agentName, body string) *prompts.Loader {
 // fixedClock returns t on the first call, t+dur on the second — the
 // pattern the existing phase tests use to assert deterministic
 // DurationMS.
-func fixedClock(t time.Time, dur time.Duration) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		defer func() { calls++ }()
-		if calls == 0 {
-			return t
-		}
-		return t.Add(dur)
-	}
-}
 
 // TestRun_HappyPath_DelegatesToHooksAndBridge — full success path.
 // Asserts every Hook callback fires and BridgeRequest carries the
@@ -114,7 +105,7 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 		nextPhase: "audit",
 	}
 	fb := &fakeBridge{writeArtifact: "# build artifact\n## Files Modified\n- a.go\n"}
-	clock := fixedClock(time.Unix(1_700_000_000, 0), 200*time.Millisecond)
+	clock := fixtures.FixedClock(time.Unix(1_700_000_000, 0), 200*time.Millisecond)
 	r := New(Options{
 		Hooks:   hooks,
 		Bridge:  fb,
