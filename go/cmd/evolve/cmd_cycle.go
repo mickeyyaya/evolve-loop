@@ -23,6 +23,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseregistrar"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/buildplanner"
@@ -343,6 +345,16 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
 		core.WithPlanner(advisor),
+		// Mint advisor-proposed phases (Steps 11/12): persist their dispatch
+		// profile + spec under .evolve so the unchanged runner resolves them
+		// from disk, then dispatch by name like a built-in. Only active when the
+		// advisor drives (Stage>=Advisory) and a plan carries MintPhases.
+		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
+			Bridge:      br,
+			Prompts:     prm,
+			ProfilesDir: filepath.Join(evolveDir, "profiles"),
+			PhasesDir:   filepath.Join(evolveDir, "phases"),
+		}}),
 	}
 	// Cycle-122 Fix 3 / ADR-0030: auto-spawn the per-phase observer
 	// goroutine unless explicitly opted out via EVOLVE_OBSERVER_AUTOSPAWN=0.
@@ -362,4 +374,17 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		Ledger:       ld,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 	}
+}
+
+// registrarMinter adapts the concrete phaseregistrar.Registrar to the narrow
+// core.PhaseMinter port (which returns spec + runner separately) so core stays
+// decoupled from phaseregistrar/specrunner.
+type registrarMinter struct{ r phaseregistrar.Registrar }
+
+func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseSpec, core.PhaseRunner, error) {
+	res, err := m.r.Register(cfg)
+	if err != nil {
+		return phasespec.PhaseSpec{}, nil, err
+	}
+	return res.Spec, res.Runner, nil
 }

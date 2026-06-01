@@ -29,7 +29,12 @@ func ClampPlanToFloor(in RouteInput, plan *PhasePlan) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
 	}
-	out := &PhasePlan{Entries: append([]PhasePlanEntry(nil), plan.Entries...)}
+	// MintPhases carried through unchanged: the clamp governs the run/skip
+	// Entries (the integrity floor), never the set of minted phases.
+	out := &PhasePlan{
+		Entries:    append([]PhasePlanEntry(nil), plan.Entries...),
+		MintPhases: plan.MintPhases,
+	}
 
 	// No-ship cycle: the implication's antecedent is false, so the floor imposes
 	// nothing. scout-only / investigation cycles are legitimate.

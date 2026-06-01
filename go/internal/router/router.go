@@ -5,6 +5,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 )
 
 // canonicalOrder is the linear phase sequence the walk advances through. The
@@ -114,6 +115,12 @@ type PhasePlanEntry struct {
 // so the round-trip stays symmetric with what the advisor emits.
 type PhasePlan struct {
 	Entries []PhasePlanEntry
+	// MintPhases are NEW phases the advisor proposes that are absent from the
+	// catalog — each a self-contained config (inline prompt/persona + tier +
+	// CLI + gates). The orchestrator registers them through the trust-kernel
+	// clamp (envelope/allowed-CLIs) at cycle start, then dispatches them by
+	// name through the same path as a built-in. Empty in the common case.
+	MintPhases []phaseconfig.PhaseConfig
 }
 
 // Route computes the routing decision. PURE: deterministic given its inputs.

@@ -20,9 +20,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
+
+// PhaseMinter registers a minted phase config into a dispatchable runner. The
+// orchestrator depends on this narrow port (not phaseregistrar directly) so
+// core stays decoupled from specrunner/phaseregistrar; the composition root
+// adapts the concrete Registrar to it. Register validates + clamps the config
+// against the trust-kernel guardrails and returns the normalized spec + runner,
+// or an error (out-of-envelope tier, disallowed CLI, invalid spec).
+// Implementations MUST return a spec with Optional=true (a minted phase can
+// never satisfy or displace the build→audit→ship floor); the orchestrator's
+// transitionLegal gate independently rejects a non-optional candidate, so a
+// non-conforming minter degrades to a refused edge rather than a kernel breach.
+type PhaseMinter interface {
+	Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseSpec, PhaseRunner, error)
+}
 
 // CycleRequest is the operator-facing input to RunCycle.
 type CycleRequest struct {
@@ -112,6 +127,11 @@ type Orchestrator struct {
 	// default) ⇒ only built-in phases exist ⇒ byte-identical legacy behavior.
 	catalog phasespec.Catalog
 
+	// registrar mints advisor-proposed phases at cycle start (Steps 11/12).
+	// Nil (default) ⇒ MintPhases are ignored ⇒ byte-identical legacy behavior.
+	// Set via WithRegistrar; the composition root adapts phaseregistrar.Registrar.
+	registrar PhaseMinter
+
 	// reviewer adjudicates a finished phase's deliverable before the cycle
 	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
 	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
@@ -161,6 +181,17 @@ func WithPlanner(p router.Planner) Option {
 // empty default keeps behavior byte-identical to the built-in-only pipeline.
 func WithCatalog(cat phasespec.Catalog) Option {
 	return func(o *Orchestrator) { o.catalog = cat }
+}
+
+// WithRegistrar injects the phase minter so the orchestrator can register
+// advisor-proposed phases at cycle start (Steps 11/12). Nil is ignored, leaving
+// the no-mint default (byte-identical legacy behavior).
+func WithRegistrar(m PhaseMinter) Option {
+	return func(o *Orchestrator) {
+		if m != nil {
+			o.registrar = m
+		}
+	}
 }
 
 // WithWorktreeProvisioner injects a worktree provisioner. Tests pass a fake to
@@ -1097,6 +1128,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			var clamps []router.Clamp
 			clampedPlan, clamps = router.ClampPlanToFloor(planIn, raw)
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
+			// Register advisor-minted phases (Steps 11/12) into runners +
+			// catalog + routing BEFORE the dispatch loop, so a minted phase the
+			// plan selected is dispatchable + routable through the same path as a
+			// built-in. The trust-kernel clamp is enforced inside the registrar.
+			o.registerMintedPhases(clampedPlan)
 		}
 	}
 
@@ -1870,6 +1906,50 @@ func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
 	}
 	ci, fi := orderIndex(o.cfg.Order, string(cand)), orderIndex(o.cfg.Order, string(from))
 	return ci >= 0 && fi >= 0 && ci > fi
+}
+
+// registerMintedPhases registers each advisor-minted phase from the clamped
+// plan, making it BOTH dispatchable (runners map) and routable (catalog +
+// cfg.Order, the same live-read path build-time user phases take). The
+// trust-kernel clamp (envelope/allowed-CLIs) is enforced inside the injected
+// registrar — a rejected config is a loud skip, never a registered dead phase,
+// and a name that collides with a built-in is never clobbered. Best-effort: a
+// nil plan, nil registrar, or empty MintPhases is a no-op (byte-identical
+// legacy behavior).
+func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
+	if plan == nil || o.registrar == nil || len(plan.MintPhases) == 0 {
+		return
+	}
+	for _, cfg := range plan.MintPhases {
+		spec, runner, err := o.registrar.Register(cfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q rejected (skipping): %v\n", cfg.Name, err)
+			continue
+		}
+		// The runner-collision check intentionally gates ALL THREE splices
+		// below: a name already in runners (built-in or earlier mint) is left
+		// wholly untouched — never half-registered into catalog/routing only.
+		p := Phase(spec.Name)
+		if _, exists := o.runners[p]; exists {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q clashes with an existing runner — keeping existing\n", spec.Name)
+			continue
+		}
+		// Splice into the three live-read structures: runners (dispatch lookup),
+		// catalog (candidatePhase/transitionLegal recognition), and cfg routing
+		// (Order forward-progress + triggers/enable). Catalog.Merge keeps the
+		// built-in on a name clash, so the splice cannot displace a built-in.
+		// ApplyUserRouting extends o.cfg.Order in place; the mid-cycle RouteInput
+		// copies built below inherit that extended order intentionally.
+		merged, warns := o.catalog.Merge([]phasespec.PhaseSpec{spec})
+		for _, w := range warns {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q: %s\n", spec.Name, w)
+		}
+		o.catalog = merged
+		for _, w := range phasespec.ApplyUserRouting(&o.cfg, []phasespec.PhaseSpec{spec}) {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q routing: %s\n", spec.Name, w)
+		}
+		o.runners[p] = runner
+	}
 }
 
 // nextInOrder returns the phase immediately following p in the configured
