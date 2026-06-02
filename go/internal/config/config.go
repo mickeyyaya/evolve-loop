@@ -98,11 +98,12 @@ type RoutingBlock struct {
 	SkipWhen   []Condition `json:"skip_when"`
 }
 
-// RoutingConfig is the immutable, typed configuration object. Loaded once at
-// the composition root, injected everywhere else.
-type RoutingConfig struct {
-	Stage Stage
-	Mode  Mode
+// RolloutStages groups the three independent rollout-axis dials, each gating a
+// subsystem's Off→Shadow→Enforce migration. They share no logic, but all three
+// are composition-root *views* of an env-driven signal the subprocess reads
+// directly. Embedded anonymously in RoutingConfig, so every cfg.CommitEvidence
+// / cfg.ReviewGate / cfg.SandboxMode access is unchanged via field promotion.
+type RolloutStages struct {
 	// CommitEvidence is the ADR-0027 commit-as-evidence rollout stage:
 	// StageOff (legacy path-poll, byte-identical), StageShadow (git-evidence
 	// computed + logged, artifact authoritative), StageEnforce (git-evidence
@@ -119,17 +120,7 @@ type RoutingConfig struct {
 	// StageAdvisory is not used for this axis (no advisory-intermediate). The
 	// orchestrator owns the stage interpretation; this field is the
 	// composition-root view, exactly like CommitEvidence.
-	ReviewGate    Stage
-	Mandatory     []string            // ordered mandatory phase names
-	Conditional   map[string]CondRule // phase -> conditional-mandatory rule
-	MaxInsertions int
-	PhaseEnable   map[string]Enable       // phase -> enablement source
-	Triggers      map[string]RoutingBlock // phase -> declarative triggers
-	// Order is the linear phase sequence the router walks, in registry order.
-	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
-	// loaded without a registry stays byte-identical to pre-Order behavior).
-	// The composition root may splice user phases into this slice.
-	Order []string
+	ReviewGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
 	//   "auto" (default) — wrap when nested-claude is NOT detected and the
@@ -142,12 +133,33 @@ type RoutingConfig struct {
 	//
 	// PRECEDENCE NOTE: the bridge subprocess reads EVOLVE_SANDBOX from its
 	// own env chain (deps.Env / os.Getenv), which is the actual signal. This
-	// RoutingConfig field is the COMPOSITION-ROOT view — set from the same
-	// env var by applyEnv so operators auditing the loaded config can see the
-	// effective mode. Mirrors the CommitEvidence pattern (also env-direct on
-	// the subprocess hot path). Setting this field in code without also
-	// propagating EVOLVE_SANDBOX into the bridge's env map has no effect.
+	// field is the COMPOSITION-ROOT view — set from the same env var by
+	// applyEnv so operators auditing the loaded config can see the effective
+	// mode. Mirrors the CommitEvidence pattern (also env-direct on the
+	// subprocess hot path). Setting this field in code without also propagating
+	// EVOLVE_SANDBOX into the bridge's env map has no effect.
 	SandboxMode string
+}
+
+// RoutingConfig is the immutable, typed configuration object. Loaded once at
+// the composition root, injected everywhere else.
+type RoutingConfig struct {
+	Stage Stage
+	Mode  Mode
+	// RolloutStages embeds CommitEvidence / ReviewGate / SandboxMode — the
+	// three subsystem-migration dials, promoted so existing field access is
+	// unchanged (see RolloutStages).
+	RolloutStages
+	Mandatory     []string            // ordered mandatory phase names
+	Conditional   map[string]CondRule // phase -> conditional-mandatory rule
+	MaxInsertions int
+	PhaseEnable   map[string]Enable       // phase -> enablement source
+	Triggers      map[string]RoutingBlock // phase -> declarative triggers
+	// Order is the linear phase sequence the router walks, in registry order.
+	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
+	// loaded without a registry stays byte-identical to pre-Order behavior).
+	// The composition root may splice user phases into this slice.
+	Order []string
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match
@@ -293,13 +305,12 @@ func defaults() RoutingConfig {
 		// EVOLVE_DYNAMIC_ROUTING still overrides (e.g. =off for the legacy static
 		// path). Flipped from StageOff after the advisory mode soaked since
 		// cycle-108.
-		Stage:          StageAdvisory,
-		Mode:           ModeDynamicLLM,
-		CommitEvidence: StageOff,
-		SandboxMode:    SandboxModeAuto,
-		Mandatory:      []string{"scout", "build", "audit", "ship"},
-		Conditional:    map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
-		MaxInsertions:  4,
+		Stage:         StageAdvisory,
+		Mode:          ModeDynamicLLM,
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto},
+		Mandatory:     []string{"scout", "build", "audit", "ship"},
+		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
+		MaxInsertions: 4,
 		// Legacy phase-enable defaults, so PhasePolicy reproduces pre-routing
 		// behavior even when the registry file is absent (e.g. tests): triage
 		// and tdd run by default; build-planner is opt-in (shadow). These are
