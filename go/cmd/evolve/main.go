@@ -18,7 +18,7 @@ Usage:
 Commands:
   version    Print build version and exit
   doctor     Probe environment ( doctor probe <tool> [--json] [--quiet] )
-  setup      Onboarding ( setup detect [--json] | setup validate [--config P] [--strict] | setup complete )
+  setup      Onboarding ( setup detect [--json] | setup complete )
   guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
