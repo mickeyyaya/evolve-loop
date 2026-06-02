@@ -3,9 +3,10 @@
 // encodes scout-specific variation points.
 //
 // Verdict mapping (artifact body inspected, all checks case-sensitive):
-//   - convergence-confirmation strategy + no Proposed Tasks → SKIPPED
-//   - "## Proposed Tasks" section with at least one item → PASS
-//   - empty/missing artifact, or "## Proposed Tasks" missing → FAIL
+//   - convergence-confirmation strategy + no tasks section → SKIPPED
+//   - "## Proposed Tasks" or "## Selected Tasks" section with at least one
+//     list item or "### " task subheading → PASS
+//   - empty/missing artifact, or tasks section absent/empty → FAIL
 //
 // Convergence is the only path that maps to SKIPPED. Empty backlog
 // elsewhere is a real failure (Scout has nothing to feed Triage).
@@ -24,10 +25,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// proposedTasksRE matches "## Proposed Tasks" followed by at least one
-// Markdown list item (numbered or bulleted). Used to confirm Scout
-// produced a non-empty backlog.
-var proposedTasksRE = regexp.MustCompile(`(?m)^## Proposed Tasks\b[\s\S]*?^[*\-0-9]+\.?\s+\S`)
+// proposedTasksRE confirms Scout produced a non-empty task backlog. The
+// scout template's section heading drifted from "## Proposed Tasks" to the
+// current "## Selected Tasks" (evolve-scout.md "Required sections"), and tasks
+// now render as "### Task N:" subheadings rather than bullet/numbered list
+// items. A classifier pinned to the old heading + list-item shape false-FAILs
+// every current scout report (cycle-192). Accept either heading followed by a
+// list item OR a "### " task subheading.
+var proposedTasksRE = regexp.MustCompile(`(?m)^## (?:Proposed|Selected) Tasks\b[\s\S]*?^(?:[*\-0-9]+\.?\s+\S|###\s+\S)`)
 
 type hooks struct{}
 

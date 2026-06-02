@@ -109,6 +109,25 @@ func TestRun_NoFilesModified_FAIL(t *testing.T) {
 	}
 }
 
+// TestClassifyArtifact_HeadingVariants — cycle-192: the builder template's
+// changed-files heading drifted to "## Changes"; the classifier must accept it
+// (and the legacy/template variants) or a valid build report false-FAILs and
+// trips the auditor cross-check, blocking ship.
+func TestClassifyArtifact_HeadingVariants(t *testing.T) {
+	for _, h := range []string{"## Changes", "## Files Changed", "## Files Modified"} {
+		body := "# Build Report\n\n" + h + "\n- foo.go\n"
+		if got := classifyArtifact(body); got != core.VerdictPASS {
+			t.Errorf("heading %q: classifyArtifact=%q, want PASS", h, got)
+		}
+	}
+	if got := classifyArtifact("# Build Report\n\n## Verdict\nGREEN\n"); got != core.VerdictFAIL {
+		t.Errorf("report with no changed-files section: got %q, want FAIL", got)
+	}
+	if got := classifyArtifact("   "); got != core.VerdictFAIL {
+		t.Errorf("empty: got %q, want FAIL", got)
+	}
+}
+
 func TestRun_CostExceedsThreshold_Advisory_PASSWithDiagnostic(t *testing.T) {
 	// Advisory mode (EVOLVE_BUILDER_COST_GUARD_STRICT not set): emit a
 	// diagnostic but still PASS so the cycle continues. Audit sees the

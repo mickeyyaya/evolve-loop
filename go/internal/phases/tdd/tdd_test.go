@@ -206,6 +206,28 @@ func TestName(t *testing.T) {
 	}
 }
 
+// TestClassify_HeadingVariants — cycle-192: the TDD report's acceptance and
+// RED-tests headings drifted ("## RED Run Output"/"## Test Files Written",
+// "## AC-Materialization"/"## Coverage Map"); the classifier must accept the
+// current variants (and the legacy "## Acceptance"/"## RED Tests") or every
+// current TDD report false-FAILs.
+func TestClassify_HeadingVariants(t *testing.T) {
+	current := "# TDD Report\n\n## Test Files Written\n- x_test.go\n\n## RED Run Output\nfail\n\n## Coverage Map\n..\n"
+	if got := classify(current); got != core.VerdictPASS {
+		t.Errorf("current TDD headings: classify=%q, want PASS", got)
+	}
+	legacy := "# TDD Report\n\n## Acceptance\n- a\n\n## RED Tests\n- t\n"
+	if got := classify(legacy); got != core.VerdictPASS {
+		t.Errorf("legacy headings: classify=%q, want PASS", got)
+	}
+	if got := classify("# TDD Report\n\n## RED Run Output\nfail\n"); got != core.VerdictFAIL {
+		t.Errorf("RED present but no acceptance section: classify=%q, want FAIL", got)
+	}
+	if got := classify("# TDD Report\n\n## Coverage Map\n..\n"); got != core.VerdictFAIL {
+		t.Errorf("acceptance present but no RED section: classify=%q, want FAIL", got)
+	}
+}
+
 // --- v12.1 Capability 1: phaseflags wiring tests ---
 
 func writeTddProfile(t *testing.T, contents string) string {

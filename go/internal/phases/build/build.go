@@ -69,15 +69,27 @@ func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespons
 	return classifyArtifact(artifact), nil, string(core.PhaseAudit)
 }
 
+// buildReportMarkers are the accepted "this is a complete build report"
+// section headings. The builder template's mandated changed-files section has
+// drifted across versions ("## Files Modified" → "## Files Changed" → the
+// current "## Changes"); a classifier pinned to a single stale heading
+// false-FAILs a valid build report, and that spurious FAIL trips the auditor's
+// build-report-vs-build-usage cross-check → the cycle never ships (cycle-192).
+// Accept any of the known variants so the verdict tracks report completeness,
+// not one frozen heading string.
+var buildReportMarkers = []string{"## Changes", "## Files Changed", "## Files Modified"}
+
 func classifyArtifact(content string) string {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return core.VerdictFAIL
 	}
-	if !strings.Contains(trimmed, "## Files Modified") {
-		return core.VerdictFAIL
+	for _, m := range buildReportMarkers {
+		if strings.Contains(trimmed, m) {
+			return core.VerdictPASS
+		}
 	}
-	return core.VerdictPASS
+	return core.VerdictFAIL
 }
 
 // Config is the public constructor envelope. Preserved so callers

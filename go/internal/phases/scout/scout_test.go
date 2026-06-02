@@ -311,3 +311,21 @@ func TestComposePrompt_OmitsChallengeTokenLineWhenEmpty(t *testing.T) {
 		t.Errorf("expected no challenge_token line when empty, got: %q", got)
 	}
 }
+
+// TestClassify_SelectedTasksHeading — cycle-192: the scout template's backlog
+// heading is "## Selected Tasks" with "### Task N:" subheadings; the classifier
+// must accept it (and the legacy "## Proposed Tasks" + list-item shape) or every
+// current scout report false-FAILs.
+func TestClassify_SelectedTasksHeading(t *testing.T) {
+	current := "# Scout Report\n\n## Selected Tasks\n\n### Task 1: `acs-fix` (HIGH, M)\nbody\n"
+	if got := classify(current, "balanced"); got != core.VerdictPASS {
+		t.Errorf("## Selected Tasks + ### Task: classify=%q, want PASS", got)
+	}
+	legacy := "# Scout Report\n\n## Proposed Tasks\n1. do the thing\n"
+	if got := classify(legacy, "balanced"); got != core.VerdictPASS {
+		t.Errorf("legacy ## Proposed Tasks + list: classify=%q, want PASS", got)
+	}
+	if got := classify("# Scout Report\n\n## Discovery Summary\nnothing actionable\n", "balanced"); got != core.VerdictFAIL {
+		t.Errorf("no tasks section: classify=%q, want FAIL", got)
+	}
+}
