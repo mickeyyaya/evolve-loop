@@ -275,6 +275,16 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		}
 	}
 
+	// Advisory turn-budget hint: when a profile declares turn_budget_hint, append
+	// a non-binding budget note so the agent self-limits (prioritize breadth,
+	// finalize once completion gates are met). Purely advisory — the hard stops
+	// remain max_turns + the artifact timeout. Activates the otherwise-dormant
+	// profiles.Profile.TurnBudgetHint field (declared in ~8 profiles but never
+	// consumed before this).
+	if prof != nil && prof.TurnBudgetHint > 0 {
+		prompt += fmt.Sprintf("\n\n## Budget\nAdvisory turn budget for this phase: ~%d turns. Prioritize breadth over depth; write your report as soon as the completion gates are satisfied.\n", prof.TurnBudgetHint)
+	}
+
 	// User-controlled policy pin (absolute): a pinned CLI/model for this phase
 	// overrides env/profile/default resolution. Keyed by phase name. Validated
 	// against the profile guardrails (allowed_clis + model_tier_envelope) — an
