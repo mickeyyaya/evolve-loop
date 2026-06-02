@@ -565,7 +565,9 @@ func TestRunnerAutoModel_ResolvesConcreteModel(t *testing.T) {
 		Prompts: fakePromptsFS("evolve-auditor", "body"),
 		ResolveLLM: func(phase string, opts resolvellm.Options) (resolvellm.Result, error) {
 			stubCalled = true
-			return resolvellm.Result{Model: wantModel, CLI: "claude-p"}, nil
+			// Step 9: resolvellm emits a tier; autoExpand returns it as the model
+			// (the realizer's catalog-overlaid ModelTierMap translates it downstream).
+			return resolvellm.Result{ModelTier: wantModel, CLI: "claude-p"}, nil
 		},
 	})
 	_, err := r.Run(context.Background(), core.PhaseRequest{

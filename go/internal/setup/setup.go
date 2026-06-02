@@ -259,19 +259,18 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 	}
 	sort.Slice(clis, func(i, j int) bool { return clis[i].CLI < clis[j].CLI })
 
-	// Phases — current routing + profile constraints.
-	configPath := o.ConfigPath
-	if configPath == "" {
-		configPath = filepath.Join(o.EvolveDir, "llm_config.json")
-	}
+	// Phases — current routing + profile constraints. (Step 9: llm_config
+	// removed; resolvellm reads the profile directly.)
 	profilesDir := filepath.Join(o.EvolveDir, "profiles")
 	var phases []PhaseStatus
 	for _, role := range Roles {
 		ps := PhaseStatus{Role: role, Source: "unresolved"}
 		if res, err := resolvellm.Resolve(role, resolvellm.Options{
-			ConfigPath: configPath, ProjectRoot: o.ProjectRoot, PluginRoot: o.PluginRoot, Env: env,
+			ProjectRoot: o.ProjectRoot, PluginRoot: o.PluginRoot, Env: env,
 		}); err == nil {
-			ps.CurrentCLI, ps.CurrentModel, ps.CurrentTier, ps.Source = res.CLI, res.Model, res.ModelTier, res.Source
+			// Step 9: resolvellm no longer emits an exact Model (always a tier);
+			// CurrentModel stays empty (report-schema field, pruned in 9b).
+			ps.CurrentCLI, ps.CurrentTier, ps.Source = res.CLI, res.ModelTier, res.Source
 		}
 		if envlp, fam, allowed, ok := readProfileConstraints(profilesDir, role); ok {
 			ps.Envelope, ps.CrossFamilyWith, ps.AllowedCLIs = envlp, fam, allowed

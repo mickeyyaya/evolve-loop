@@ -68,7 +68,7 @@ func WriteCachePrefix(req CachePrefixRequest, opts CachePrefixOptions) error {
 	if err != nil {
 		return fmt.Errorf("subagent/cacheprefix: create %s: %w", req.OutPath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	w := bufio.NewWriter(f)
 	if err := renderCachePrefix(w, req, goalText, csSummary); err != nil {
 		return err

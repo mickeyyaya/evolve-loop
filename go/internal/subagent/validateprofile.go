@@ -125,10 +125,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	if llmErr == nil && llm.CLI != "" {
 		cli = llm.CLI
 		source = llm.Source
-		resolvedModel = llm.Model
-		if resolvedModel == "" {
-			resolvedModel = llm.ModelTier
-		}
+		resolvedModel = llm.ModelTier // Step 9: resolvellm emits only a tier
 	} else {
 		// Fall through to profile.
 		cli = extractProfileString(profileBody, "cli")
@@ -294,9 +291,13 @@ func capabilityExtractObject(body, name string) (string, bool) {
 	return "", false
 }
 
-// defaultResolveLLM bridges to resolvellm.Resolve with the canonical options.
-func defaultResolveLLM(agent, configPath string) (resolvellm.Result, error) {
-	return resolvellm.Resolve(agent, resolvellm.Options{ConfigPath: configPath})
+// defaultResolveLLM bridges to resolvellm.Resolve. configPath is ignored as of
+// Step 9 (llm_config.json removed; resolvellm reads the profile). The param +
+// the LLMConfigPath plumbing are now dead and can be pruned in a follow-up; the
+// seam signature is kept to avoid churning subagent callers + tests in the
+// removal slice.
+func defaultResolveLLM(agent, _ string) (resolvellm.Result, error) {
+	return resolvellm.Resolve(agent, resolvellm.Options{})
 }
 
 // defaultAdapterExists checks the executable bit. Mirrors bash `[ -x ]`.

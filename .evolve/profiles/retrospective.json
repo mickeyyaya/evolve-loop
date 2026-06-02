@@ -1,7 +1,11 @@
 {
   "name": "retrospective",
   "role": "retrospective",
-  "cli": "claude-tmux",
+  "cli": "agy-tmux",
+  "cli_fallback": [
+    "codex-tmux",
+    "claude-tmux"
+  ],
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "systemic_failure": "opus",
