@@ -49,6 +49,29 @@ func TestParse_AggregatesAndExcludesSubtests(t *testing.T) {
 	}
 }
 
+// TestParse_FlagsIncompletePackage proves a package that starts but emits no
+// terminal pass/fail/skip summary (truncated stream / panic / timeout) is
+// recorded as Incomplete and surfaced in the Markdown, not silently dropped.
+func TestParse_FlagsIncompletePackage(t *testing.T) {
+	stream := `
+{"Action":"run","Package":"x/crashy","Test":"TestBoom"}
+{"Action":"output","Package":"x/crashy","Test":"TestBoom","Output":"panic: boom\n"}
+{"Action":"pass","Package":"x/ok","Test":"TestFine","Elapsed":0.2}
+{"Action":"pass","Package":"x/ok","Elapsed":0.3}
+`
+	rep, err := Parse(strings.NewReader(stream))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(rep.Incomplete) != 1 || rep.Incomplete[0] != "x/crashy" {
+		t.Fatalf("Incomplete = %v, want [x/crashy]", rep.Incomplete)
+	}
+	md := rep.Markdown(MarkdownOptions{Title: "t", ThresholdPkg: 5, ThresholdTst: 1, Top: 10})
+	if !strings.Contains(md, "no terminal summary") || !strings.Contains(md, "x/crashy") {
+		t.Errorf("Markdown missing incomplete-package note:\n%s", md)
+	}
+}
+
 func TestMarkdown_FlagsSlowPackagesAndTests(t *testing.T) {
 	rep, err := Parse(strings.NewReader(sample))
 	if err != nil {
