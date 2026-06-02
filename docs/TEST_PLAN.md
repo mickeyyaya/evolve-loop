@@ -212,7 +212,7 @@ The `ollama-tmux` driver (local inference) is out of provider-matrix scope.
 | `internal/phases/*` | Unit isolation still TBD, but every phase is now exercised end-to-end through the CLI-scenario E2E matrix above (headless + tmux + fallback + FAIL/retro). |
 | `internal/adapters/sandbox/` | Phase 2 — `sandbox-exec` (macOS) and `bwrap` (Linux) profiles. Tests need OS-specific build tags. |
 | `evolve loop` / `evolve cycle run` | `evolve cycle run` now covered E2E across all 6 shipped drivers + fallback + adversarial paths (see Phase 2 section). `evolve loop` multi-cycle + state-machine property tests still TBD. |
-| Cross-CLI parity (Gemini / AGY) | agy-tmux now runs a full cycle in the tmux matrix; cross-family is enforced + tested via `evolve setup validate`. Model-router unit tests under `internal/router/` still Phase 3. |
+| Cross-CLI parity (Gemini / AGY) | agy-tmux now runs a full cycle in the tmux matrix; the cli/model floor (envelope + allowed_clis) is enforced via `policy.ValidatePin` and surfaced by `evolve setup detect` (`pin_violation`). Model-router unit tests under `internal/router/` still Phase 3. |
 | Distribution | Phase 3 — GoReleaser config, brew formula smoke test, install.sh idempotency test. |
 | v11.0 cutover | Phase 4 — final coexistence sunset; bash predicates removed after `evolve acs run` consumes their verdict surface for one full release. |
 
