@@ -101,6 +101,9 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		}
 		msg = msg + footer
 	}
+	// Reviewed-by trailer (manual class only) — durable per-commit record of
+	// who reviewed before commit, derived from the verified attestation.
+	msg += reviewedByTrailer(opts)
 
 	// Optional: commit-prefix-gate (Layer 1 of ADR-0012). Best-effort
 	// shellout to the bash gate when present; missing or non-executable
@@ -198,6 +201,8 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 		if err != nil {
 			return err
 		}
+		// No Reviewed-by trailer here: this worktree path is --class cycle only
+		// (gated above), and the trailer is manual-class only.
 		msg := opts.CommitMessage + footer
 
 		if err := runCommitPrefixGate(ctx, opts, msg, worktree); err != nil {
