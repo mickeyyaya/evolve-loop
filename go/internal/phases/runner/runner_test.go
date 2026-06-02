@@ -146,6 +146,60 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 	}
 }
 
+// writeBudgetProfile writes a scout profile (optionally with a turn_budget_hint)
+// into <root>/.evolve/profiles and returns root.
+func writeBudgetProfile(t *testing.T, profileJSON string) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "scout.json"), []byte(profileJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func runScoutWithProfile(t *testing.T, root string) *fakeBridge {
+	t.Helper()
+	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "sonnet", prompt: "scout body", verdict: core.VerdictPASS}
+	fb := &fakeBridge{writeArtifact: "## Proposed Tasks\n1. x\n"}
+	r := New(Options{
+		Hooks: hooks, Bridge: fb,
+		Prompts: fakePromptsFS("evolve-scout", "agent body"),
+		NowFn:   fixtures.FixedClock(time.Unix(1_700_000_000, 0), 0),
+	})
+	if _, err := r.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: root, Workspace: t.TempDir()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	return fb
+}
+
+// TestRun_InjectsAdvisoryBudgetHint: a profile's turn_budget_hint is appended to
+// the composed prompt as an advisory note (activates the dormant field) without
+// replacing the original prompt body.
+func TestRun_InjectsAdvisoryBudgetHint(t *testing.T) {
+	root := writeBudgetProfile(t, `{"name":"scout","role":"scout","cli":"claude-tmux","turn_budget_hint":15}`)
+	fb := runScoutWithProfile(t, root)
+	if !strings.HasPrefix(fb.gotReq.Prompt, "scout body") {
+		t.Errorf("budget hint should append to the prompt, not replace it; got %q", fb.gotReq.Prompt)
+	}
+	if !strings.Contains(fb.gotReq.Prompt, "Advisory turn budget") || !strings.Contains(fb.gotReq.Prompt, "~15 turns") {
+		t.Errorf("prompt missing advisory budget hint; got %q", fb.gotReq.Prompt)
+	}
+}
+
+// TestRun_NoBudgetHintWhenProfileOmitsIt: a profile without turn_budget_hint
+// leaves the prompt untouched (the field defaults to 0 → no injection).
+func TestRun_NoBudgetHintWhenProfileOmitsIt(t *testing.T) {
+	root := writeBudgetProfile(t, `{"name":"scout","role":"scout","cli":"claude-tmux"}`)
+	fb := runScoutWithProfile(t, root)
+	if fb.gotReq.Prompt != "scout body" {
+		t.Errorf("no hint expected; prompt should be unchanged, got %q", fb.gotReq.Prompt)
+	}
+}
+
 // TestRun_InvokesEventsProducer — the runner calls the EventsProducer seam
 // post-phase with (workspace, phase, cli, cycle), so cyclecost/cycleclassify
 // get their <phase>-events.ndjson (ADR-0020 wiring).
