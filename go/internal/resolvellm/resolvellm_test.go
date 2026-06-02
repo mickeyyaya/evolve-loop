@@ -159,6 +159,49 @@ func TestResolve_InvalidJSONFallsThroughToProfile(t *testing.T) {
 	}
 }
 
+// TestResolve_PrecedenceOrdering_MigrationContract anchors the cross-source
+// precedence order: phase entry > _fallback > profile.
+//
+// Two sub-cases: (1) all three present → phase entry wins; (2) phase entry
+// removed → _fallback wins over the profile. The per-source tests each cover
+// one source in isolation; this pins the ORDER between them — the invariant the
+// Step-9 llm_config removal must preserve or change deliberately. See
+// docs/architecture/step9-llm-config-removal.md.
+func TestResolve_PrecedenceOrdering_MigrationContract(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// Profile present for the lowest rung.
+	writeJSON(t, filepath.Join(dir, ".evolve", "profiles", "scout.json"), map[string]any{
+		"cli": "claude", "model_tier_default": "balanced",
+	})
+	cfg := filepath.Join(dir, ".evolve", "llm_config.json")
+
+	// All three present → phase entry wins.
+	writeJSON(t, cfg, map[string]any{
+		"phases":    map[string]any{"scout": map[string]any{"cli": "codex", "model": "gpt-5.5"}},
+		"_fallback": map[string]any{"cli": "gemini", "model_tier": "deep"},
+	})
+	r, err := Resolve("scout", Options{ConfigPath: cfg, ProjectRoot: dir})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if r.Source != "llm_config" || r.CLI != "codex" || r.Model != "gpt-5.5" {
+		t.Errorf("phase entry must win over fallback+profile; got %+v", r)
+	}
+
+	// Phase entry removed → _fallback wins over the profile.
+	writeJSON(t, cfg, map[string]any{
+		"_fallback": map[string]any{"cli": "gemini", "model_tier": "deep"},
+	})
+	r, err = Resolve("scout", Options{ConfigPath: cfg, ProjectRoot: dir})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if r.Source != "llm_config_fallback" || r.CLI != "gemini" || r.ModelTier != "deep" {
+		t.Errorf("_fallback must win over profile; got %+v", r)
+	}
+}
+
 func TestResolve_ProfileFallback(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
