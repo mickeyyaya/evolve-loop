@@ -203,6 +203,27 @@ func TestParseLoopArgs_BudgetDriven(t *testing.T) {
 	}
 }
 
+// TestBudgetGatingUnobservable — cycle-190: detect when a --budget-usd run
+// cannot be gated by spend because the driver/auth reports $0 cost.
+func TestBudgetGatingUnobservable(t *testing.T) {
+	cases := []struct {
+		name         string
+		budgetDriven bool
+		delta        float64
+		want         bool
+	}{
+		{"budget-driven, zero-cost cycle (tmux/subscription)", true, 0, true},
+		{"budget-driven, observable cost", true, 0.42, false},
+		{"cycles-mode, zero cost (not budget-gated)", false, 0, false},
+		{"cycles-mode, observable cost", false, 1.0, false},
+	}
+	for _, c := range cases {
+		if got := budgetGatingUnobservable(c.budgetDriven, c.delta); got != c.want {
+			t.Errorf("%s: budgetGatingUnobservable(%v, %v)=%v, want %v", c.name, c.budgetDriven, c.delta, got, c.want)
+		}
+	}
+}
+
 // TestParsePositional unit-tests the heuristic in isolation.
 func TestParsePositional(t *testing.T) {
 	cases := []struct {

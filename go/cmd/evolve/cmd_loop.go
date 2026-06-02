@@ -260,6 +260,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// consecutive identical values. Trips at threshold.
 	prevRanCycle := -1
 	sameCycleStreak := 0
+	budgetUnobsWarned := false // cycle-190: warn once when --budget-usd can't gate
 
 	for i := 0; i < cfg.MaxCycles; i++ {
 		// Snapshot state.LastCycleNumber so we can detect
@@ -317,6 +318,15 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				lr.TotalCost += cs.Total.CostUSD
 				fmt.Fprintf(stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f / cap $%.2f)\n",
 					ranCycle, cs.Total.CostUSD, lr.TotalCost, cfg.BatchCapUSD)
+				// cycle-190: a --budget-usd run whose cycle reports $0 cost cannot
+				// be gated by spend (tmux-driver / subscription auth surfaces no
+				// usage). Warn ONCE so the operator isn't misled into thinking the
+				// budget bounds the run — the cycle cap governs instead.
+				if budgetGatingUnobservable(cfg.BudgetDriven, cs.Total.CostUSD) && !budgetUnobsWarned {
+					budgetUnobsWarned = true
+					fmt.Fprintf(stderr, "[loop] WARN BUDGET-UNOBSERVABLE: --budget-usd $%.2f cannot gate this run — cycle %d reported $0.0000 cost (tmux-driver / subscription auth surfaces no usage events). Cost-based stop is INERT; the cycle cap (%d) governs. Use --cycles N for a deterministic bound on this driver/auth.\n",
+						cfg.BudgetUSD, ranCycle, cfg.MaxCycles)
+				}
 			}
 			if cfg.BatchCapUSD > 0 && !checkpointDisabled {
 				pct := (lr.TotalCost / cfg.BatchCapUSD) * 100
@@ -675,6 +685,21 @@ func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak in
 		prev = ranCycle
 	}
 	return prev, streak, streak >= threshold
+}
+
+// budgetGatingUnobservable reports whether cost-based budget gating cannot
+// function this run: a --budget-usd run whose completed cycle contributed $0
+// cost. That is the signature of an unobservable-cost driver/auth (tmux-driver
+// scrollback or subscription auth surfaces no stream-json usage events), so the
+// `--budget-usd` stop can never trip and the run would silently fall through to
+// the cycle cap while the operator believes spend is bounding it. The loop uses
+// this to warn ONCE; it deliberately does NOT fabricate a stop, because true
+// cost is unknown — the cap governs and the operator is told to use --cycles N.
+func budgetGatingUnobservable(budgetDriven bool, cycleCostDelta float64) bool {
+	// Exact == 0 (not an epsilon) is intentional: an unobservable driver/auth
+	// produces exactly 0.0 (no usage events written), whereas any sub-cent but
+	// non-zero cost means usage IS observable and the budget can gate — don't warn.
+	return budgetDriven && cycleCostDelta == 0
 }
 
 // quotaPause is the parsed cycle-state.json checkpoint block when the

@@ -127,8 +127,16 @@ func Run(opts Options) (Verdict, error) {
 	execFn := opts.Exec
 	if execFn == nil {
 		projectRoot := opts.ProjectRoot
+		// cycle-190: execute predicates with cwd at opts.Root — the tree being
+		// shipped (the worktree for worktree cycles, main otherwise). Predicates
+		// are DISCOVERED from Root; running them with cwd=Root makes a relative
+		// `go test ./...` compile the SAME source the auditor reviewed, instead of
+		// the caller's cwd (main), which lacks the builder's worktree changes and
+		// silently RED-flagged new-code predicates → discarded PASS-audited work.
+		// `.evolve/` runtime data still resolves to main via EVOLVE_PROJECT_ROOT.
+		workdir := opts.Root
 		execFn = func(ctx context.Context, path string) (int, string) {
-			return runBash(ctx, path, projectRoot)
+			return runBash(ctx, path, projectRoot, workdir)
 		}
 	}
 
@@ -241,8 +249,11 @@ func discover(root string, cycle int) ([]predFile, error) {
 // cmd.Process the signal is skipped, so WaitDelay is the guaranteed backstop —
 // it force-closes the pipes killGrace after cancellation, ensuring Run always
 // returns (a timed-out predicate counts RED) rather than blocking on a child.
-func runBash(ctx context.Context, path, projectRoot string) (int, string) {
+func runBash(ctx context.Context, path, projectRoot, workdir string) (int, string) {
 	cmd := exec.CommandContext(ctx, "bash", path)
+	if workdir != "" {
+		cmd.Dir = workdir // cycle-190 / issue #9: run predicates with cwd at the shipped tree (the Run closure passes opts.Root)
+	}
 	if projectRoot != "" {
 		// Export EVOLVE_PROJECT_ROOT so predicates resolve `.evolve/` runtime data
 		// to the MAIN project root even when executed from a worktree (issue #12).
