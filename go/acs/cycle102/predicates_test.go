@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC102_001_ProfileMaxTurnsCeilings ports cycle-102/001.
@@ -24,7 +25,7 @@ func TestC102_001_ProfileMaxTurnsCeilings(t *testing.T) {
 		{filepath.Join(root, ".evolve", "profiles", "builder.json"), 36},
 	}
 	for _, tup := range tuples {
-		if !acsassert.FileExists(t, tup.path) {
+		if !fixtures.FilePresent(tup.path) {
 			t.Skipf("%s missing — skip cycle-102-001", tup.path)
 			return
 		}
@@ -40,7 +41,7 @@ func TestC102_001_ProfileMaxTurnsCeilings(t *testing.T) {
 func TestC102_002_IncidentDocTurnOverrun(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, "docs", "operations", "incidents", "cycle-99-100-turn-overrun.md")
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("cycle-99-100-turn-overrun.md missing — skip cycle-102-002")
 	}
 	// Density: ≥30 non-blank lines

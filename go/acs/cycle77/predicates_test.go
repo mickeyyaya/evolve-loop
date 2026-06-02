@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC77_001_AuditorColdMoveStage8 ports cycle-77/001.
@@ -21,7 +22,7 @@ func TestC77_001_AuditorColdMoveStage8(t *testing.T) {
 	ref := filepath.Join(root, "agents", "evolve-auditor-reference.md")
 	adr := filepath.Join(root, "docs", "architecture", "adr", "0015-auditor-cold-move-stage8.md")
 
-	if !acsassert.FileExists(t, auditor) {
+	if !fixtures.FilePresent(auditor) {
 		t.Skip("evolve-auditor.md missing — skip cycle-77-001")
 	}
 	if lines := countLines(t, auditor); lines > 300 {
@@ -35,7 +36,7 @@ func TestC77_001_AuditorColdMoveStage8(t *testing.T) {
 	if !acsassert.FileMatchesRegex(t, auditor, `evolve-auditor-reference\.md.*output-template`) {
 		return
 	}
-	if !acsassert.FileExists(t, adr) {
+	if !fixtures.FilePresent(adr) {
 		t.Errorf("AC4: ADR-0015 missing: %s", adr)
 		return
 	}

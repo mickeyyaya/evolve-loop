@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC55_011_CapabilityGateBlocksNativeGemini ports cycle-55/011 (wiring-only).
@@ -15,7 +16,7 @@ import (
 func TestC55_011_CapabilityGateBlocksNativeGemini(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gemini := filepath.Join(root, "legacy", "scripts", "cli_adapters", "gemini.sh")
-	if !acsassert.FileExists(t, gemini) {
+	if !fixtures.FilePresent(gemini) {
 		t.Skip("gemini.sh missing — skip cycle-55-011")
 	}
 	for _, marker := range []string{"_GEMINI_NATIVE_CAP", "non_interactive_prompt"} {
@@ -29,7 +30,7 @@ func TestC55_011_CapabilityGateBlocksNativeGemini(t *testing.T) {
 func TestC55_012_CapabilityGateBlocksNativeCodex(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	codex := filepath.Join(root, "legacy", "scripts", "cli_adapters", "codex.sh")
-	if !acsassert.FileExists(t, codex) {
+	if !fixtures.FilePresent(codex) {
 		t.Skip("codex.sh missing — skip cycle-55-012")
 	}
 	for _, marker := range []string{"_CODEX_NATIVE_CAP", "non_interactive_prompt"} {
@@ -44,7 +45,7 @@ func TestC55_012_CapabilityGateBlocksNativeCodex(t *testing.T) {
 func TestC55_020_PhaseRegistryExistsAndValidates(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	registry := filepath.Join(root, "docs", "architecture", "phase-registry.json")
-	if !acsassert.FileExists(t, registry) {
+	if !fixtures.FilePresent(registry) {
 		t.Skip("phase-registry.json missing — skip cycle-55-020")
 	}
 	// AC2-AC4: valid JSON with schema_version + non-empty phases.
@@ -63,7 +64,7 @@ func TestC55_020_PhaseRegistryExistsAndValidates(t *testing.T) {
 	// exists and contains at least one gate_ function. Full resolution
 	// requires jq + cross-file analysis; the bash predicate is authoritative.
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("phase-gate.sh missing — skip cycle-55-020 (gate-ref check)")
 	}
 	if !acsassert.FileMatchesRegex(t, gate, `(?m)^gate_\w+\(\)`) {
@@ -76,7 +77,7 @@ func TestC55_020_PhaseRegistryExistsAndValidates(t *testing.T) {
 func TestC55_021_OrchestratorReadsRegistryNotNarrative(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	helper := filepath.Join(root, "legacy", "scripts", "dispatch", "list-phase-order.sh")
-	if !acsassert.FileExists(t, helper) {
+	if !fixtures.FilePresent(helper) {
 		t.Skip("list-phase-order.sh missing — skip cycle-55-021")
 	}
 	if !acsassert.FileContains(t, helper, "EVOLVE_USE_PHASE_REGISTRY") {

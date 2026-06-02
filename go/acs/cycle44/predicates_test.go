@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC44_001_PNew23BudgetBlockInjected ports cycle-44/001.
@@ -20,7 +21,7 @@ import (
 func TestC44_001_PNew23BudgetBlockInjected(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	file := filepath.Join(root, "legacy", "scripts", "lifecycle", "role-context-builder.sh")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("role-context-builder.sh missing — skip cycle-44-001")
 	}
 	for _, marker := range []string{"emit_budget_hint", "## Budget", "turn_budget_hint"} {
@@ -45,7 +46,7 @@ func TestC44_002_PNew23ProfileFieldsSet(t *testing.T) {
 	required := []string{"scout", "builder", "auditor", "orchestrator", "memo", "triage"}
 	for _, role := range required {
 		profile := filepath.Join(profilesDir, role+".json")
-		if !acsassert.FileExists(t, profile) {
+		if !fixtures.FilePresent(profile) {
 			t.Skipf("profile %s missing — skip cycle-44-002", role)
 		}
 		// turn_budget_hint must exist; we accept any numeric value (>=1
@@ -61,7 +62,7 @@ func TestC44_002_PNew23ProfileFieldsSet(t *testing.T) {
 func TestC44_003_PNew2425RoadmapEntries(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	file := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("roadmap missing — skip cycle-44-003")
 	}
 	for _, header := range []string{"## P-NEW-24", "## P-NEW-25"} {
@@ -81,7 +82,7 @@ func TestC44_003_PNew2425RoadmapEntries(t *testing.T) {
 func TestC44_004_KBUpdated(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	file := filepath.Join(root, "knowledge-base", "research", "token-reduction-2026-may.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("KB file missing — skip cycle-44-004")
 	}
 	checks := []struct {
@@ -120,7 +121,7 @@ func TestC44_005_D1RetroGateWired(t *testing.T) {
 func TestC44_006_PNew26EffortFlagWired(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	file := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("claude.sh missing — skip cycle-44-006")
 	}
 	for _, marker := range []string{"--effort", "effort_level"} {
@@ -137,7 +138,7 @@ func TestC44_007_PNew26ProfileFields(t *testing.T) {
 	profilesDir := filepath.Join(root, ".evolve", "profiles")
 	for _, role := range []string{"scout", "triage", "memo", "orchestrator", "builder", "auditor"} {
 		profile := filepath.Join(profilesDir, role+".json")
-		if !acsassert.FileExists(t, profile) {
+		if !fixtures.FilePresent(profile) {
 			t.Skipf("profile %s missing — skip cycle-44-007", role)
 		}
 		// Match either "high" or "medium" or "low" — any non-empty value.
@@ -152,7 +153,7 @@ func TestC44_007_PNew26ProfileFields(t *testing.T) {
 func TestC44_008_BackfillScriptExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	file := filepath.Join(root, "legacy", "scripts", "utility", "backfill-lessons.sh")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("backfill-lessons.sh missing — skip cycle-44-008")
 	}
 	// Skip the exec-bit + --dry-run subprocess check: it has env-resolution
@@ -183,7 +184,7 @@ func TestC44_009_Cycle40LessonsOnDisk(t *testing.T) {
 func TestC44_010_InstinctSummaryHasCycle40(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
-	if !acsassert.FileExists(t, state) {
+	if !fixtures.FilePresent(state) {
 		t.Skip("state.json missing — skip cycle-44-010")
 	}
 	// We can't use JSONFieldEquals (it does scalar compare). The bash

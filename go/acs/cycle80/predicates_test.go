@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC80_AcTableInBuildReport ports cycle-80/assert-ac-table-in-build-report.sh.
@@ -16,7 +17,7 @@ import (
 func TestC80_AcTableInBuildReport(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, ".evolve", "runs", "cycle-80", "build-report.md")
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("cycle-80 build-report.md missing — skip (ephemeral artifact)")
 	}
 	for _, marker := range []string{
@@ -35,7 +36,7 @@ func TestC80_AcTableInBuildReport(t *testing.T) {
 func TestC80_BuilderWriteToAcTableDenied(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "guards", "role-gate.sh")
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("role-gate.sh missing — skip cycle-80")
 	}
 	for _, marker := range []string{
@@ -53,7 +54,7 @@ func TestC80_BuilderWriteToAcTableDenied(t *testing.T) {
 func TestC80_HarnessExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	harness := filepath.Join(root, "legacy", "scripts", "lifecycle", "build-report-ac-verify.sh")
-	if !acsassert.FileExists(t, harness) {
+	if !fixtures.FilePresent(harness) {
 		t.Skip("build-report-ac-verify.sh missing — skip cycle-80")
 	}
 	info, err := os.Stat(harness)

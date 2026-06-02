@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC68_001_IntentMaxTurnsRaised ports cycle-68/001.
@@ -15,7 +16,7 @@ import (
 func TestC68_001_IntentMaxTurnsRaised(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "intent.json")
-	if !acsassert.FileExists(t, profile) {
+	if !fixtures.FilePresent(profile) {
 		t.Skip("intent.json missing — skip cycle-68-001")
 	}
 	// JSONFieldEquals only checks one value; assert max_turns is in range
@@ -29,7 +30,7 @@ func TestC68_001_IntentMaxTurnsRaised(t *testing.T) {
 func TestC68_002_OverrunLogFormat(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
-	if !acsassert.FileExists(t, script) {
+	if !fixtures.FilePresent(script) {
 		t.Skip("subagent-run.sh missing — skip cycle-68-002")
 	}
 	// Required: new format string.

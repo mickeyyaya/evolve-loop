@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC72_001_P2InertCycle72 ports cycle-72/001 (P2 INERT marking verification).
@@ -18,7 +19,7 @@ func TestC72_001_P2InertCycle72(t *testing.T) {
 	tokenEcon := filepath.Join(root, "docs", "architecture", "token-economics-2026.md")
 	adr := filepath.Join(root, "docs", "architecture", "adr", "0009-p2-turn-budget-inert.md")
 
-	if !acsassert.FileExists(t, tokenEcon) {
+	if !fixtures.FilePresent(tokenEcon) {
 		t.Skip("token-economics-2026.md missing — skip cycle-72-001")
 	}
 	if !acsassert.FileContains(t, tokenEcon, "INERT cycle 72") {
@@ -27,7 +28,7 @@ func TestC72_001_P2InertCycle72(t *testing.T) {
 	if !acsassert.FileMatchesRegex(t, tokenEcon, `39 turns / \$0\.7305 vs.*26 turns / \$0\.5931`) {
 		return
 	}
-	if !acsassert.FileExists(t, adr) {
+	if !fixtures.FilePresent(adr) {
 		t.Errorf("%s: ADR 0009 missing", adr)
 		return
 	}

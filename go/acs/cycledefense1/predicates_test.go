@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestCDefense1_CommitPrefixGate ports the cycle-defense-layer-1 predicate.
@@ -27,10 +28,10 @@ func TestCDefense1_CommitPrefixGate(t *testing.T) {
 	gate := filepath.Join(root, "legacy", "scripts", "guards", "commit-prefix-gate.sh")
 	manifest := filepath.Join(root, ".evolve", "commit-prefix-scope.json")
 
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("commit-prefix-gate.sh missing — skip cycle-defense-layer-1")
 	}
-	if !acsassert.FileExists(t, manifest) {
+	if !fixtures.FilePresent(manifest) {
 		t.Errorf("manifest missing: %s", manifest)
 		return
 	}

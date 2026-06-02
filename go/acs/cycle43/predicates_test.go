@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // Local aliases keep the cycle-43 tests reading the same as before,
@@ -34,7 +35,7 @@ func countOccurrencesAny(path string, variants ...string) int {
 func TestC43_001_PNew17InvestigationComplete(t *testing.T) {
 	root := repoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-43-001")
 	}
 	if !acsassert.FileContains(t, roadmap, "INVESTIGATION-COMPLETE") {
@@ -47,7 +48,7 @@ func TestC43_001_PNew17InvestigationComplete(t *testing.T) {
 func TestC43_001b_RetrospectiveYAMLContract(t *testing.T) {
 	root := repoRoot(t)
 	file := filepath.Join(root, "agents", "evolve-retrospective.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("evolve-retrospective.md missing — skip cycle-43-001b")
 	}
 	if !acsassert.FileContains(t, file, "MUST-FIRST") {
@@ -65,7 +66,7 @@ func TestC43_001b_RetrospectiveYAMLContract(t *testing.T) {
 func TestC43_002_Cycle42CostSnapshot(t *testing.T) {
 	root := repoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-43-002")
 	}
 	if !acsassert.FileContains(t, roadmap, "Cycle-42 cost snapshot") {
@@ -81,7 +82,7 @@ func TestC43_002_Cycle42CostSnapshot(t *testing.T) {
 func TestC43_002b_OrchestratorMergeRCCheck(t *testing.T) {
 	root := repoRoot(t)
 	file := filepath.Join(root, "agents", "evolve-orchestrator.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("evolve-orchestrator.md missing — skip cycle-43-002b")
 	}
 	if !acsassert.FileContains(t, file, "MERGE_RC=$?") {
@@ -97,7 +98,7 @@ func TestC43_002b_OrchestratorMergeRCCheck(t *testing.T) {
 func TestC43_003_PNew18And19Exist(t *testing.T) {
 	root := repoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-43-003")
 	}
 	if !acsassert.FileContains(t, roadmap, "P-NEW-18") {
@@ -112,7 +113,7 @@ func TestC43_003_PNew18And19Exist(t *testing.T) {
 func TestC43_003b_PhaseGateRetroComplete(t *testing.T) {
 	root := repoRoot(t)
 	file := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("phase-gate.sh missing — skip cycle-43-003b")
 	}
 	if !acsassert.FileMatchesRegex(t, file, `(?m)^gate_retrospective_to_complete\(\)`) {
@@ -130,7 +131,7 @@ func TestC43_003b_PhaseGateRetroComplete(t *testing.T) {
 func TestC43_004_AuditorStopCriterion(t *testing.T) {
 	root := repoRoot(t)
 	file := filepath.Join(root, "agents", "evolve-auditor.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("evolve-auditor.md missing — skip cycle-43-004")
 	}
 	if !acsassert.FileContains(t, file, "## STOP CRITERION") {
@@ -152,7 +153,7 @@ func TestC43_004b_CachePrefixV2DefaultOn(t *testing.T) {
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	claudeSh := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
 	flagsDoc := filepath.Join(root, "docs", "architecture", "control-flags.md")
-	if !acsassert.FileExists(t, subagent) || !acsassert.FileExists(t, claudeSh) {
+	if !fixtures.FilePresent(subagent) || !acsassert.FileExists(t, claudeSh) {
 		t.Skip("subagent-run.sh or claude.sh missing — skip cycle-43-004b")
 	}
 	if !acsassert.FileContains(t, subagent, "EVOLVE_CACHE_PREFIX_V2:-1") {
@@ -176,7 +177,7 @@ func TestC43_004b_CachePrefixV2DefaultOn(t *testing.T) {
 func TestC43_005_BuilderStopCriterion(t *testing.T) {
 	root := repoRoot(t)
 	file := filepath.Join(root, "agents", "evolve-builder.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("evolve-builder.md missing — skip cycle-43-005")
 	}
 	if !acsassert.FileContains(t, file, "## STOP CRITERION") {
@@ -196,7 +197,7 @@ func TestC43_005_BuilderStopCriterion(t *testing.T) {
 func TestC43_006_RoadmapPNew21To23(t *testing.T) {
 	root := repoRoot(t)
 	file := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("roadmap missing — skip cycle-43-006")
 	}
 	for _, id := range []string{"P-NEW-21", "P-NEW-22", "P-NEW-23"} {

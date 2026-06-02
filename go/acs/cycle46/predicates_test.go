@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC46_001_AbnormalEventsOnIntegrityFail ports cycle-46/001.
 func TestC46_001_AbnormalEventsOnIntegrityFail(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "failure", "merge-lesson-into-state.sh")
-	if !acsassert.FileExists(t, script) {
+	if !fixtures.FilePresent(script) {
 		t.Skip("merge-lesson-into-state.sh missing — skip cycle-46-001")
 	}
 	for _, marker := range []string{"persistence-fail", "_append_abnormal_event"} {
@@ -109,7 +110,7 @@ func TestC46_005_GateAuditToRetroAbnormalEvents(t *testing.T) {
 func TestC46_006_NoPhantomFieldsBuilderJson(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "builder.json")
-	if !acsassert.FileExists(t, profile) {
+	if !fixtures.FilePresent(profile) {
 		t.Skip("builder.json missing — skip cycle-46-006")
 	}
 	if acsassert.CountOccurrencesAny(profile, "context_compact") != 0 {
@@ -134,7 +135,7 @@ func TestC46_007_ScoutBannedPatternsPresent(t *testing.T) {
 func TestC46_008_RoadmapPNew27(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-46-008")
 	}
 	if !acsassert.FileContains(t, roadmap, "P-NEW-27") {
@@ -150,7 +151,7 @@ func TestC46_008_RoadmapPNew27(t *testing.T) {
 func TestC46_009_RoadmapPNew25Closed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-46-009")
 	}
 	if !acsassert.FileContains(t, roadmap, "P-NEW-25") {
@@ -168,7 +169,7 @@ func TestC46_009_RoadmapPNew25Closed(t *testing.T) {
 func TestC46_010_AbnormalEventTestExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	test := filepath.Join(root, "legacy", "scripts", "tests", "abnormal-event-capture-test.sh")
-	if !acsassert.FileExists(t, test) {
+	if !fixtures.FilePresent(test) {
 		t.Skip("abnormal-event-capture-test.sh missing — skip cycle-46-010")
 	}
 }
@@ -177,7 +178,7 @@ func TestC46_010_AbnormalEventTestExists(t *testing.T) {
 func TestC46_011_AbnormalEventCaptureDocExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, "docs", "architecture", "abnormal-event-capture.md")
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("abnormal-event-capture.md missing — skip cycle-46-011")
 	}
 	// Substantive (>=200 chars). Use the regex assertion: any single
@@ -191,7 +192,7 @@ func TestC46_011_AbnormalEventCaptureDocExists(t *testing.T) {
 func TestC46_012_ReconcileCarryoverHandlesAbnormal(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
-	if !acsassert.FileExists(t, script) {
+	if !fixtures.FilePresent(script) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-46-012")
 	}
 	if !acsassert.FileContains(t, script, "abnormal-events.jsonl") {
@@ -204,7 +205,7 @@ func TestC46_013_ProfilesSchemaFilterEnabled(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, role := range []string{"scout", "triage", "memo"} {
 		profile := filepath.Join(root, ".evolve", "profiles", role+".json")
-		if !acsassert.FileExists(t, profile) {
+		if !fixtures.FilePresent(profile) {
 			t.Skipf("profile %s missing — skip cycle-46-013", role)
 		}
 		if !acsassert.FileContains(t, profile, "schema_filter_enabled") {
@@ -232,7 +233,7 @@ func TestC46_014_RoadmapPNew22Measured(t *testing.T) {
 func TestC46_015_RoadmapPNew29Exists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-46-015")
 	}
 	if !acsassert.FileContains(t, roadmap, "P-NEW-29") {

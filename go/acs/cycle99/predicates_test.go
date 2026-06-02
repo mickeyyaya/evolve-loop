@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC99_001_PsmasABVerificationDocumented ports cycle-99/001.
@@ -22,7 +23,7 @@ import (
 func TestC99_001_PsmasABVerificationDocumented(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, "docs", "architecture", "psmas-phase-scheduling.md")
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("psmas-phase-scheduling.md missing — skip cycle-99-001")
 	}
 	// ≥5 distinct cycle-NN identifiers
@@ -56,7 +57,7 @@ func TestC99_001_PsmasABVerificationDocumented(t *testing.T) {
 func TestC99_002_GitignoreReachabilityGuardFunctional(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	guard := filepath.Join(root, "legacy", "scripts", "guards", "gitignore-reachability-check.sh")
-	if !acsassert.FileExists(t, guard) {
+	if !fixtures.FilePresent(guard) {
 		t.Skip("gitignore-reachability-check.sh missing — skip cycle-99-002")
 	}
 

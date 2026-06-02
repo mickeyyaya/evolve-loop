@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC63_056_ResolveRootsWorktree ports cycle-63/056 (wiring-only).
@@ -16,7 +17,7 @@ import (
 func TestC63_056_ResolveRootsWorktree(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	resolve := filepath.Join(root, "legacy", "scripts", "lifecycle", "resolve-roots.sh")
-	if !acsassert.FileExists(t, resolve) {
+	if !fixtures.FilePresent(resolve) {
 		t.Skip("resolve-roots.sh missing — skip cycle-63-056")
 	}
 	if !acsassert.FileContains(t, resolve, "git-common-dir") {
@@ -31,7 +32,7 @@ func TestC63_057_HandoffSchemasC2(t *testing.T) {
 	slugs := []string{"intent-report", "triage-decision", "tdd-report", "ship-report", "retrospective-report"}
 	for _, slug := range slugs {
 		schema := filepath.Join(root, "schemas", "handoff", slug+".schema.json")
-		if !acsassert.FileExists(t, schema) {
+		if !fixtures.FilePresent(schema) {
 			t.Skipf("%s.schema.json missing — skip cycle-63-057", slug)
 		}
 		// AC2-AC5: declare canonical keys.
@@ -54,7 +55,7 @@ func TestC63_057_HandoffSchemasC2(t *testing.T) {
 	}
 	// AC6: ADR 0009 references all 8 phase slugs.
 	adr := filepath.Join(root, "docs", "adr", "0009-phase-handoff-schemas.md")
-	if !acsassert.FileExists(t, adr) {
+	if !fixtures.FilePresent(adr) {
 		t.Skip("ADR 0009 missing — skip cycle-63-057 AC6")
 	}
 	for _, slug := range []string{
@@ -71,7 +72,7 @@ func TestC63_057_HandoffSchemasC2(t *testing.T) {
 func TestC63_058_Cycle62IncidentCloseout(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, "docs", "incidents", "cycle-62-ship-refused.md")
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("cycle-62-ship-refused.md missing — skip cycle-63-058")
 	}
 	for _, section := range []string{"## What happened", "## Why this was expected", "## Resolution"} {

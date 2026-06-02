@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC95_AuditorMasteryGate ports pred-auditor-mastery-gate.sh.
@@ -29,7 +30,7 @@ func TestC95_AuditorMasteryGate(t *testing.T) {
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	auditor := filepath.Join(root, ".evolve", "profiles", "auditor.json")
 
-	if !acsassert.FileExists(t, subagent) {
+	if !fixtures.FilePresent(subagent) {
 		t.Skip("subagent-run.sh missing — skip cycle-95 mastery-gate")
 	}
 	for _, marker := range []string{
@@ -41,7 +42,7 @@ func TestC95_AuditorMasteryGate(t *testing.T) {
 			return
 		}
 	}
-	if !acsassert.FileExists(t, auditor) {
+	if !fixtures.FilePresent(auditor) {
 		t.Errorf("auditor profile missing: %s", auditor)
 	}
 }
@@ -54,7 +55,7 @@ func TestC95_FastFailCounterDocs(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 
-	if !acsassert.FileExists(t, subagent) {
+	if !fixtures.FilePresent(subagent) {
 		t.Skip("subagent-run.sh missing — skip cycle-95 fastfail-docs")
 	}
 	if !acsassert.FileContains(t, subagent, ".fast-fail-counter") {

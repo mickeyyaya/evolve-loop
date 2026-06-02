@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC60_040_E2EMixedCliCycle ports cycle-60/040 (wiring-only).
@@ -16,7 +17,7 @@ import (
 func TestC60_040_E2EMixedCliCycle(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	resolv := filepath.Join(root, "legacy", "scripts", "dispatch", "resolve-llm.sh")
-	if !acsassert.FileExists(t, resolv) {
+	if !fixtures.FilePresent(resolv) {
 		t.Skip("resolve-llm.sh missing — skip cycle-60-040")
 	}
 	if !acsassert.FileContainsAny(resolv, "llm_config", "cli_resolution_source") {
@@ -28,7 +29,7 @@ func TestC60_040_E2EMixedCliCycle(t *testing.T) {
 func TestC60_042_LegacyNoLLMConfigCycleCompletes(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	sub := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
-	if !acsassert.FileExists(t, sub) {
+	if !fixtures.FilePresent(sub) {
 		t.Skip("subagent-run.sh missing — skip cycle-60-042")
 	}
 	for _, marker := range []string{"--validate-profile", "cli_resolution_source"} {

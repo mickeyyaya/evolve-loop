@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC101_001_AgyAdapterDispatchResolves ports cycle-101/001.
@@ -22,7 +23,7 @@ func TestC101_001_AgyAdapterDispatchResolves(t *testing.T) {
 	adapter := filepath.Join(root, "legacy", "scripts", "cli_adapters", "agy.sh")
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 
-	if !acsassert.FileExists(t, adapter) {
+	if !fixtures.FilePresent(adapter) {
 		t.Skip("agy.sh missing — skip cycle-101-001")
 	}
 	info, err := os.Stat(adapter)
@@ -46,7 +47,7 @@ func TestC101_001_AgyAdapterDispatchResolves(t *testing.T) {
 func TestC101_002_AgyAdapterEmitsZeroCostEnvelope(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	adapter := filepath.Join(root, "legacy", "scripts", "cli_adapters", "agy.sh")
-	if !acsassert.FileExists(t, adapter) {
+	if !fixtures.FilePresent(adapter) {
 		t.Skip("agy.sh missing — skip cycle-101-002")
 	}
 	// DEGRADED mode must emit "adapter":"agy" in the envelope

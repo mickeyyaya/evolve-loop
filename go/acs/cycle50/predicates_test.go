@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC50_001_ScoutStep45Exists ports cycle-50/001.
@@ -15,7 +16,7 @@ import (
 func TestC50_001_ScoutStep45Exists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
-	if !acsassert.FileExists(t, scout) {
+	if !fixtures.FilePresent(scout) {
 		t.Skip("evolve-scout.md missing — skip cycle-50-001")
 	}
 	if !acsassert.FileMatchesRegex(t, scout, `### 4\.5\.`) {
@@ -48,7 +49,7 @@ func TestC50_002_ScoutStep55Exists(t *testing.T) {
 func TestC50_003_ScoutStopCriterionCacheSection(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
-	if !acsassert.FileExists(t, scout) {
+	if !fixtures.FilePresent(scout) {
 		t.Skip("evolve-scout.md missing — skip cycle-50-003")
 	}
 	if !acsassert.FileContainsAny(scout, "STOP CRITERION", "## Stop Criterion", "## STOP") {
@@ -76,7 +77,7 @@ func TestC50_004_BuilderStep25ResearchPointer(t *testing.T) {
 func TestC50_005_TriagePassthroughAllThreeFields(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	triage := filepath.Join(root, "agents", "evolve-triage.md")
-	if !acsassert.FileExists(t, triage) {
+	if !fixtures.FilePresent(triage) {
 		t.Skip("evolve-triage.md missing — skip cycle-50-005")
 	}
 	for _, field := range []string{"research_pointer", "research_fingerprint", "research_cycle"} {
@@ -90,7 +91,7 @@ func TestC50_005_TriagePassthroughAllThreeFields(t *testing.T) {
 func TestC50_006_ReconcileInvalidateOnDrop(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
-	if !acsassert.FileExists(t, rec) {
+	if !fixtures.FilePresent(rec) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-50-006")
 	}
 	for _, marker := range []string{"research-cache.sh invalidate", "dropped-cycle"} {
@@ -104,7 +105,7 @@ func TestC50_006_ReconcileInvalidateOnDrop(t *testing.T) {
 func TestC50_007_ReconcilePromoteOnPass(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
-	if !acsassert.FileExists(t, rec) {
+	if !fixtures.FilePresent(rec) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-50-007")
 	}
 	if !acsassert.FileContains(t, rec, "promote-research-cache.sh") {
@@ -123,7 +124,7 @@ func TestC50_007_ReconcilePromoteOnPass(t *testing.T) {
 func TestC50_008_InjectTaskResearchPointerFlag(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	inj := filepath.Join(root, "legacy", "scripts", "utility", "inject-task.sh")
-	if !acsassert.FileExists(t, inj) {
+	if !fixtures.FilePresent(inj) {
 		t.Skip("inject-task.sh missing — skip cycle-50-008")
 	}
 	if !acsassert.FileContains(t, inj, "--research-pointer") {
@@ -138,7 +139,7 @@ func TestC50_008_InjectTaskResearchPointerFlag(t *testing.T) {
 func TestC50_009_TesterDualVarWorktreePattern(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	tester := filepath.Join(root, "agents", "evolve-tester.md")
-	if !acsassert.FileExists(t, tester) {
+	if !fixtures.FilePresent(tester) {
 		t.Skip("evolve-tester.md missing — skip cycle-50-009")
 	}
 	if !acsassert.FileContains(t, tester, "EVOLVE_WORKTREE_PATH:-${WORKTREE_PATH:-") {

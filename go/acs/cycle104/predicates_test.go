@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // repoRoot resolves the repository root by shelling to
@@ -59,7 +60,7 @@ func TestC104_001_OrchestratorDefaultAdvisory(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "agents", "evolve-orchestrator-reference.md")
 
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("orchestrator reference missing — skip cycle-104-001")
 	}
 	if !acsassert.FileContains(t, doc, "EVOLVE_BUILD_PLANNER") {
@@ -86,7 +87,7 @@ func TestC104_002_BuilderStep3Preserved(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "agents", "evolve-builder.md")
 
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("builder doc missing — skip cycle-104-002")
 	}
 	acsassert.FileContains(t, doc, "### Step 3: Design (chain-of-thought required)")
@@ -98,7 +99,7 @@ func TestC104_003_BuilderAdvisoryReadStep(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "agents", "evolve-builder.md")
 
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("builder doc missing — skip cycle-104-003")
 	}
 	if !acsassert.FileContains(t, doc, "build-plan.md") {
@@ -128,7 +129,7 @@ func TestC104_004_AuditorPlanAdherenceAdvisory(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "agents", "evolve-auditor.md")
 
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("auditor doc missing — skip cycle-104-004")
 	}
 	if !acsassert.FileContains(t, doc, "## Plan Adherence (advisory)") {
@@ -163,7 +164,7 @@ func TestC104_005_ControlFlagsAdvisoryDefaultOn(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "docs", "architecture", "control-flags.md")
 
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("control-flags doc missing — skip cycle-104-005")
 	}
 	if !acsassert.FileContains(t, doc, "EVOLVE_BUILD_PLANNER") {

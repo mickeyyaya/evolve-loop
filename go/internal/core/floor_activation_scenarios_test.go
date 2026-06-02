@@ -47,6 +47,13 @@ func floorActivationCycleCatalog() []ScenarioSpec {
 			AgentPlan(PlanRun("scout"), PlanRun("ship")),
 			ExpectPhases(scout, tdd, build, audit, ship)),
 
+		// Enforce mode safety: the advisor omits build+audit but ships, and under
+		// Enforce() the floor forces build+audit to run before ship.
+		Scenario("enforce: advisor ships without build+audit forces floor",
+			Cycle(), Enforce(), Mandatory("tdd"), MediumCycle(),
+			AgentPlan(PlanRun("scout"), PlanRun("ship")),
+			ExpectPhases(scout, tdd, build, audit, ship)),
+
 		// Fail-safe-to-floor: a planner error ⇒ nil plan ⇒ the configurable spine
 		// drives via the trigger path (the cycle still ships safely, never crashes).
 		Scenario("planner error degrades to static spine",

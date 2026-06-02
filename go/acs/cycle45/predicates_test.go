@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC45_001_BuilderEffortMedium ports cycle-45/001.
@@ -13,7 +14,7 @@ import (
 func TestC45_001_BuilderEffortMedium(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "builder.json")
-	if !acsassert.FileExists(t, profile) {
+	if !fixtures.FilePresent(profile) {
 		t.Skip("builder.json missing — skip cycle-45-001")
 	}
 	if !acsassert.FileMatchesRegex(t, profile, `"effort_level"\s*:\s*"medium"`) {
@@ -26,7 +27,7 @@ func TestC45_001_BuilderEffortMedium(t *testing.T) {
 func TestC45_002_BuilderTurnGate(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	file := filepath.Join(root, "agents", "evolve-builder.md")
-	if !acsassert.FileExists(t, file) {
+	if !fixtures.FilePresent(file) {
 		t.Skip("evolve-builder.md missing — skip cycle-45-002")
 	}
 	if acsassert.CountOccurrencesAny(file, "turn-budget-respected") < 1 {
@@ -60,7 +61,7 @@ func TestC45_004_TrajectoryCompressionProfile(t *testing.T) {
 func TestC45_005_PNew21RoadmapDone(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	roadmap := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, roadmap) {
+	if !fixtures.FilePresent(roadmap) {
 		t.Skip("roadmap missing — skip cycle-45-005")
 	}
 	if !acsassert.LineContainsAll(roadmap, "P-NEW-21", "DONE (cycle 45)") {

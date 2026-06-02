@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC84_001_LintBaselineExists ports cycle-84/001.
@@ -17,7 +18,7 @@ import (
 func TestC84_001_LintBaselineExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	baseline := filepath.Join(root, ".evolve", "baselines", "lint-markdown-structure-baseline.txt")
-	if !acsassert.FileExists(t, baseline) {
+	if !fixtures.FilePresent(baseline) {
 		t.Skip("lint-markdown-structure-baseline.txt missing — skip cycle-84-001")
 	}
 	raw, err := os.ReadFile(baseline)
@@ -35,7 +36,7 @@ func TestC84_001_LintBaselineExists(t *testing.T) {
 func TestC84_002_CarryoverTodosCleared(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
-	if !acsassert.FileExists(t, state) {
+	if !fixtures.FilePresent(state) {
 		t.Skip("state.json missing — skip cycle-84-002")
 	}
 	// JSONFieldEquals can't compare a slice to an empty array via scalar
@@ -50,7 +51,7 @@ func TestC84_002_CarryoverTodosCleared(t *testing.T) {
 func TestC84_003_ChangelogEntryExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	changelog := filepath.Join(root, "CHANGELOG.md")
-	if !acsassert.FileExists(t, changelog) {
+	if !fixtures.FilePresent(changelog) {
 		t.Skip("CHANGELOG.md missing — skip cycle-84-003")
 	}
 	if !acsassert.FileMatchesRegex(t, changelog, `(?i)Cycle 84`) {

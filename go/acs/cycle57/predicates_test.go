@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC57_022_OrchestratorUsesRegistry ports cycle-57/022 (wiring-only).
@@ -38,7 +39,7 @@ func TestC57_030_BuildReportVerdictCountMatch(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-57")
 	verdict := filepath.Join(workspace, "acs-verdict.json")
-	if !acsassert.FileExists(t, verdict) {
+	if !fixtures.FilePresent(verdict) {
 		t.Skip("cycle-57 acs-verdict.json missing — skip (runtime-only)")
 	}
 	// AC1: required fields exist via raw-file regex.

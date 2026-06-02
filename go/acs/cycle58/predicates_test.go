@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC58_023_CheckPhaseInputsDetectsMissing ports cycle-58/023 (wiring-only).
@@ -31,7 +32,7 @@ func TestC58_024_ScoutRunsStandalone(t *testing.T) {
 	initScript := filepath.Join(root, "legacy", "scripts", "utility", "init-standalone-cycle.sh")
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
 	for _, f := range []string{initScript, subagent} {
-		if !acsassert.FileExists(t, f) {
+		if !fixtures.FilePresent(f) {
 			t.Skipf("required file missing — skip cycle-58-024: %s", f)
 		}
 	}

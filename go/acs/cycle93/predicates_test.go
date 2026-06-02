@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // gitTracked reports whether the path is tracked by git in the given
@@ -34,7 +35,7 @@ func gitTracked(repoRoot, relPath string) bool {
 func TestC93_001_GitignoreProfilesMdException(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	ig := filepath.Join(root, ".gitignore")
-	if !acsassert.FileExists(t, ig) {
+	if !fixtures.FilePresent(ig) {
 		t.Skip(".gitignore missing — skip cycle-93-001")
 	}
 	if !acsassert.FileMatchesRegex(t, ig, `(?m)^!\.evolve/profiles/\*\.md$`) {
@@ -72,7 +73,7 @@ func TestC93_002_ProfilesAgentsMdGitTracked(t *testing.T) {
 func TestC93_003_BuilderAttestationStep(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "agents", "evolve-builder.md")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("evolve-builder.md missing — skip cycle-93-003")
 	}
 	if !gitTracked(root, "agents/evolve-builder.md") {
@@ -104,7 +105,7 @@ func TestC93_003_BuilderAttestationStep(t *testing.T) {
 func TestC93_004_TddPredicateTemplateLsFiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "agents", "evolve-tdd-engineer.md")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("evolve-tdd-engineer.md missing — skip cycle-93-004")
 	}
 	if !gitTracked(root, "agents/evolve-tdd-engineer.md") {

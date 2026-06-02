@@ -166,3 +166,16 @@ func TestDigest_NoSignalsBlock_GenericNil(t *testing.T) {
 		t.Errorf("Generic = %v, want nil when no signals block present", sig.Generic)
 	}
 }
+
+func TestDigest_FailOpenOnTruncatedJSON(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "handoff-build.json", `{"phase":"build"`)
+
+	sig, err := Digest(ws, []string{"scout", "build", "audit"})
+	if err != nil {
+		t.Fatalf("Digest should not error on truncated JSON: %v", err)
+	}
+	if sig.Build.Present {
+		t.Errorf("truncated build handoff must yield Present:false (fail-open)")
+	}
+}

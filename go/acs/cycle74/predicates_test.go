@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC74_AssertIntentStopCriterion ports cycle-74/assert-intent-stop-criterion.sh.
 func TestC74_AssertIntentStopCriterion(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	intent := filepath.Join(root, "agents", "evolve-intent.md")
-	if !acsassert.FileExists(t, intent) {
+	if !fixtures.FilePresent(intent) {
 		t.Skip("evolve-intent.md missing — skip cycle-74")
 	}
 	for _, marker := range []string{"Emergency Exit", "Hard Stop"} {

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC78_001_RetrospectiveColdMoveStage9 ports cycle-78/001.
@@ -21,7 +22,7 @@ func TestC78_001_RetrospectiveColdMoveStage9(t *testing.T) {
 	adr := filepath.Join(root, "docs", "architecture", "adr", "0016-retrospective-cold-move-stage9.md")
 	scoutProfile := filepath.Join(root, ".evolve", "profiles", "scout.json")
 
-	if !acsassert.FileExists(t, retro) {
+	if !fixtures.FilePresent(retro) {
 		t.Skip("evolve-retrospective.md missing — skip cycle-78-001")
 	}
 
@@ -53,13 +54,13 @@ func TestC78_001_RetrospectiveColdMoveStage9(t *testing.T) {
 	}
 
 	// AC6: ADR-0016 exists
-	if !acsassert.FileExists(t, adr) {
+	if !fixtures.FilePresent(adr) {
 		t.Errorf("AC6: ADR-0016 missing: %s", adr)
 		return
 	}
 
 	// AC7: scout max_turns == 30
-	if !acsassert.FileExists(t, scoutProfile) {
+	if !fixtures.FilePresent(scoutProfile) {
 		t.Skipf("scout profile missing: %s — skip AC7", scoutProfile)
 	}
 	turns, err := readMaxTurns(scoutProfile)

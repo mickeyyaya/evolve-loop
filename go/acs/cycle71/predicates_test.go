@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC71_001_RoleGateRetrospective ports cycle-71/001.
 func TestC71_001_RoleGateRetrospective(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "guards", "role-gate.sh")
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("role-gate.sh missing — skip cycle-71-001")
 	}
 	for _, marker := range []string{"retrospective)", "learn)"} {

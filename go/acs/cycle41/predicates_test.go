@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC41_001_TesterAllowlist ports cycle-41/001.
@@ -22,7 +23,7 @@ import (
 func TestC41_001_TesterAllowlist(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
-	if !acsassert.FileExists(t, script) {
+	if !fixtures.FilePresent(script) {
 		t.Skip("subagent-run.sh missing — skip cycle-41-001")
 	}
 	if !acsassert.FileContains(t, script, "tester") {
@@ -38,7 +39,7 @@ func TestC41_001_TesterAllowlist(t *testing.T) {
 func TestC41_002_WorktreeIsolationDefaultOn(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("phase-gate.sh missing — skip cycle-41-002")
 	}
 	for _, marker := range []string{

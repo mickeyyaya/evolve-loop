@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // osReadFile + indexOf are tiny shims to keep the ordering check below
@@ -28,7 +29,7 @@ func indexOf(raw []byte, needle string) int {
 func TestC47_ShipBacktickStripping(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	ship := filepath.Join(root, "legacy", "scripts", "lifecycle", "ship.sh")
-	if !acsassert.FileExists(t, ship) {
+	if !fixtures.FilePresent(ship) {
 		t.Skip("ship.sh missing — skip cycle-47-001-backtick")
 	}
 	// The fix: tr -d's delete set includes a backtick. Accept any
@@ -43,7 +44,7 @@ func TestC47_ShipBacktickStripping(t *testing.T) {
 func TestC47_SchemaFilterAdapterEnforcement(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "legacy", "scripts", "cli_adapters", "claude.sh")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("claude.sh missing — skip cycle-47-001-schema")
 	}
 	for _, marker := range []string{"SCHEMA_FILTER_ENABLED", "schema_filter_enabled", "strict-mcp-config"} {
@@ -57,7 +58,7 @@ func TestC47_SchemaFilterAdapterEnforcement(t *testing.T) {
 func TestC47_ReconcileSrcUnbound(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
-	if !acsassert.FileExists(t, rec) {
+	if !fixtures.FilePresent(rec) {
 		t.Skip("reconcile-carryover-todos.sh missing — skip cycle-47-002")
 	}
 	// Must not contain bare `$src` SKIP-promote log; must contain `$_src`.
@@ -73,7 +74,7 @@ func TestC47_ReconcileSrcUnbound(t *testing.T) {
 func TestC47_TurnOverrunObservability(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("subagent-run.sh missing — skip cycle-47-002-turn")
 	}
 	for _, marker := range []string{"turn-overrun", "_actual_turns", "_max_turns_profile"} {
@@ -88,7 +89,7 @@ func TestC47_TurnOverrunObservability(t *testing.T) {
 func TestC47_DispatchCounterNonAdvanceEvent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	dispatch := filepath.Join(root, "archive", "legacy", "scripts", "dispatch", "evolve-loop-dispatch.sh")
-	if !acsassert.FileExists(t, dispatch) {
+	if !fixtures.FilePresent(dispatch) {
 		t.Skip("evolve-loop-dispatch.sh missing — skip cycle-47-003")
 	}
 	for _, marker := range []string{"counter-non-advance", "abnormal-events.jsonl"} {
@@ -164,7 +165,7 @@ func TestC47_ACSMetadataFixed(t *testing.T) {
 func TestC47_RoadmapPNew30Exists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("roadmap missing — skip cycle-47-006")
 	}
 	for _, marker := range []string{"P-NEW-30", "TACO", "2604.19572"} {
@@ -178,7 +179,7 @@ func TestC47_RoadmapPNew30Exists(t *testing.T) {
 func TestC47_RoadmapPNew22Done(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("roadmap missing — skip cycle-47-007")
 	}
 	// Bash: grep "P-NEW-22.*DONE.*cycle 47" — single-line match.
@@ -191,7 +192,7 @@ func TestC47_RoadmapPNew22Done(t *testing.T) {
 func TestC47_ShipRefusedDocExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	target := filepath.Join(root, "docs", "architecture", "abnormal-event-capture.md")
-	if !acsassert.FileExists(t, target) {
+	if !fixtures.FilePresent(target) {
 		t.Skip("abnormal-event-capture.md missing — skip cycle-47-008")
 	}
 	// Bash: grep "ship-refused.*tree-drift\|tree-drift.*ship-refused".
@@ -230,7 +231,7 @@ func TestC47_LastCycleCounterAdvance(t *testing.T) {
 func TestC47_ShipRefusedC46RCA(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, "docs", "incidents", "cycle-46-ship-refused.md")
-	if !acsassert.FileExists(t, doc) {
+	if !fixtures.FilePresent(doc) {
 		t.Skip("cycle-46-ship-refused.md missing — skip cycle-47-010")
 	}
 	for _, section := range []string{"## Root Cause", "## Fix"} {
@@ -248,7 +249,7 @@ func TestC47_ShipRefusedC46RCA(t *testing.T) {
 func TestC47_LastCycleIs47(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
-	if !acsassert.FileExists(t, state) {
+	if !fixtures.FilePresent(state) {
 		t.Skip("state.json missing — skip cycle-47-011")
 	}
 	// Just verify the field is present and parses as a number >= 47.

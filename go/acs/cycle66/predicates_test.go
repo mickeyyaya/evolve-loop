@@ -9,13 +9,14 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC66_059_DispositionMemoComplete ports cycle-66/059.
 func TestC66_059_DispositionMemoComplete(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	memo := filepath.Join(root, ".evolve", "runs", "cycle-66", "disposition-memo.md")
-	if !acsassert.FileExists(t, memo) {
+	if !fixtures.FilePresent(memo) {
 		t.Skip("cycle-66 disposition-memo.md missing — skip (runtime-only)")
 	}
 	if !acsassert.FileContains(t, memo, "challenge-token:") {

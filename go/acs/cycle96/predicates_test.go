@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC96_001_BuilderStopCriterionTurn18 ports cycle-96/001.
@@ -68,7 +69,7 @@ func TestC96_001_BuilderStopCriterionTurn18(t *testing.T) {
 func TestC96_002_MasteryPassRecognition(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("phase-gate.sh missing — skip cycle-96-002")
 	}
 	if !acsassert.FileMatchesRegex(t, gate, `gate_cycle_complete`) {

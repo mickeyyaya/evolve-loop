@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC54_005_GeminiNativeInvocation ports cycle-54/005 (wiring-only).
@@ -21,7 +22,7 @@ import (
 func TestC54_005_GeminiNativeInvocation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gemini := filepath.Join(root, "legacy", "scripts", "cli_adapters", "gemini.sh")
-	if !acsassert.FileExists(t, gemini) {
+	if !fixtures.FilePresent(gemini) {
 		t.Skip("gemini.sh missing — skip cycle-54-005")
 	}
 	for _, marker := range []string{"detect_gemini_native", "EVOLVE_GEMINI_BINARY"} {
@@ -35,7 +36,7 @@ func TestC54_005_GeminiNativeInvocation(t *testing.T) {
 func TestC54_006_CodexNativeInvocation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	codex := filepath.Join(root, "legacy", "scripts", "cli_adapters", "codex.sh")
-	if !acsassert.FileExists(t, codex) {
+	if !fixtures.FilePresent(codex) {
 		t.Skip("codex.sh missing — skip cycle-54-006")
 	}
 	for _, marker := range []string{"detect_codex_native", "EVOLVE_CODEX_BINARY"} {
@@ -50,7 +51,7 @@ func TestC54_006_CodexNativeInvocation(t *testing.T) {
 func TestC54_009_AdapterOverridesBlockHonored(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	sub := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
-	if !acsassert.FileExists(t, sub) {
+	if !fixtures.FilePresent(sub) {
 		t.Skip("subagent-run.sh missing — skip cycle-54-009")
 	}
 	for _, marker := range []string{"adapter_overrides", "ADAPTER_TOOLS_OVERRIDE"} {
@@ -65,7 +66,7 @@ func TestC54_009_AdapterOverridesBlockHonored(t *testing.T) {
 func TestC54_010_TrustKernelCliIndependent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "guards", "role-gate.sh")
-	if !acsassert.FileExists(t, gate) {
+	if !fixtures.FilePresent(gate) {
 		t.Skip("role-gate.sh missing — skip cycle-54-010")
 	}
 	if !acsassert.FileContains(t, gate, "allow_for_phase") {
