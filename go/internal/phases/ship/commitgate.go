@@ -20,14 +20,54 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // commitGateAttestation mirrors the subset of .commit-gate/attestation.json
-// this check reads. The full file also records ts/checks_passed/reviewers_run.
+// this check reads. The full file also records ts/checks_passed.
 type commitGateAttestation struct {
-	TreeStateSHA string `json:"tree_state_sha"`
+	TreeStateSHA string   `json:"tree_state_sha"`
+	ReviewersRun []string `json:"reviewers_run"`
+}
+
+// reviewedByTrailer returns a "Reviewed-by:" git trailer block derived from the
+// commit-gate attestation's reviewers_run — one standard `Reviewed-by: <name>`
+// line per reviewer, as a trailing paragraph git parses as trailers. This makes
+// "was this commit reviewed before commit, by whom" a durable, machine-parseable
+// property of the SHA (`git log --format='%(trailers:key=Reviewed-by)'`).
+//
+// Returns "" (no trailer == not reviewed) unless ALL hold: class is manual (the
+// only class that carries + verifies a review attestation), the commit gate was
+// NOT bypassed (EVOLVE_BYPASS_COMMIT_GATE — a bypass means review was skipped, so
+// a stale on-disk attestation must NOT falsely assert review), and the
+// attestation parses with ≥1 valid reviewer. Best-effort: a read/parse error
+// omits the trailer. Reviewers with embedded newlines are dropped so a corrupt
+// attestation can't inject spurious lines into the trailer block.
+func reviewedByTrailer(opts *Options) string {
+	if opts.Class != ClassManual || opts.envBool("EVOLVE_BYPASS_COMMIT_GATE") {
+		return ""
+	}
+	raw, err := os.ReadFile(filepath.Join(opts.ProjectRoot, ".commit-gate", "attestation.json"))
+	if err != nil {
+		return ""
+	}
+	var att commitGateAttestation
+	if json.Unmarshal(raw, &att) != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range att.ReviewersRun {
+		if r = strings.TrimSpace(r); r == "" || strings.ContainsAny(r, "\n\r") {
+			continue
+		}
+		fmt.Fprintf(&b, "\nReviewed-by: %s", r)
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "\n" + b.String() // leading blank line separates the trailer block from the body
 }
 
 // verifyCommitGateAttestation requires a fresh review attestation whose
