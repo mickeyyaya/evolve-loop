@@ -1,11 +1,7 @@
 {
   "name": "tester",
   "role": "builder",
-  "cli": "agy-tmux",
-  "cli_fallback": [
-    "codex-tmux",
-    "claude-tmux"
-  ],
+  "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "ultrathink_strategy": "opus",
@@ -111,10 +107,8 @@
     "max": "balanced"
   },
   "allowed_clis": [
-    "claude",
-    "agy",
-    "codex"
+    "claude"
   ],
-  "_note": "Restricted to claude — same safety reasoning as builder.",
+  "_note": "Restricted to claude \u2014 same safety reasoning as builder.",
   "stream_output": true
 }

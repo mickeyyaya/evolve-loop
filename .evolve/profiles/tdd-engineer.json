@@ -1,11 +1,7 @@
 {
   "name": "tdd-engineer",
   "role": "tdd-engineer",
-  "cli": "agy-tmux",
-  "cli_fallback": [
-    "codex-tmux",
-    "claude-tmux"
-  ],
+  "cli": "claude-tmux",
   "model_tier_default": "opus",
   "model_tier_overrides": {
     "ultrathink_strategy": "opus",
@@ -14,7 +10,7 @@
     "s_complex_with_cache": "opus"
   },
   "cross_family_with": "builder",
-  "_model_family_rationale": "Opus tier-1 fixed (no downgrade) — anti-cooperative-bias separation from Builder's Sonnet. The strongest model is the adversarial test author, structurally inverting LLM cooperative bias. Parallels existing Auditor convention (Opus reviewing Sonnet). Decision recorded in plan: ultrathink-and-online-research-mutable-hollerith.md Resolved Decision #5.",
+  "_model_family_rationale": "Opus tier-1 fixed (no downgrade) \u2014 anti-cooperative-bias separation from Builder's Sonnet. The strongest model is the adversarial test author, structurally inverting LLM cooperative bias. Parallels existing Auditor convention (Opus reviewing Sonnet). Decision recorded in plan: ultrathink-and-online-research-mutable-hollerith.md Resolved Decision #5.",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -117,11 +113,9 @@
     "max": "deep"
   },
   "allowed_clis": [
-    "claude",
-    "agy",
-    "codex"
+    "claude"
   ],
-  "_note": "Restricted to claude — RED-phase test writing is safety-critical.",
+  "_note": "Restricted to claude \u2014 RED-phase test writing is safety-critical.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,
