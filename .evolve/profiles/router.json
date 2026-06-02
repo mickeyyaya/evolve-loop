@@ -1,11 +1,7 @@
 {
   "name": "router",
   "role": "router",
-  "cli": "agy-tmux",
-  "cli_fallback": [
-    "codex-tmux",
-    "claude-tmux"
-  ],
+  "cli": "claude-tmux",
   "model_tier_default": "fast",
   "allowed_tools": [
     "Read",
@@ -50,9 +46,7 @@
     "Write(.evolve/ledger.jsonl)",
     "Write(.evolve/profiles/**)"
   ],
-  "add_dir": [
-    "."
-  ],
+  "add_dir": ["."],
   "max_budget_usd": 0.1,
   "max_turns": 6,
   "turn_budget_hint": 3,
@@ -70,9 +64,7 @@
   },
   "sandbox": {
     "enabled": true,
-    "write_subpaths": [
-      ".evolve/runs/cycle-*"
-    ],
+    "write_subpaths": [".evolve/runs/cycle-*"],
     "read_only_repo": true,
     "deny_subpaths": [
       ".git",
@@ -93,9 +85,7 @@
     "default": "fast",
     "max": "balanced"
   },
-  "allowed_clis": [
-    "all"
-  ],
+  "allowed_clis": ["all"],
   "stream_output": true,
   "_note": "v3 (dynamic routing): the DynamicLLM router brain. Read-only, fast, low-budget advisory phase. Emits routing-proposal.json {next_phase, insert_phases, justification}. Output is ADVISORY — router.Route clamps it to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit). Only invoked at Stage>=Shadow with routing_mode=llm."
 }

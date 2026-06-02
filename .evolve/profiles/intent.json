@@ -1,11 +1,7 @@
 {
   "name": "intent",
   "role": "intent",
-  "cli": "agy-tmux",
-  "cli_fallback": [
-    "codex-tmux",
-    "claude-tmux"
-  ],
+  "cli": "claude-tmux",
   "model_tier_default": "opus",
   "model_tier_overrides": {
     "vague_goal": "opus",
