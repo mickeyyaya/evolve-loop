@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestRunLoop_ResetErrorLogged covers the PruneByClassification error
@@ -44,8 +46,8 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 		t.Skip("running as root — chmod 555 doesn't restrict writes")
 	}
 
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	var stdout, stderr bytes.Buffer
@@ -72,8 +74,8 @@ func TestRunLoop_BudgetDrivenCapExceeded(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	_ = os.MkdirAll(evolveDir, 0o755)
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// Cycle cost $1.50 — exceeds both budget ($0.50) AND batch cap

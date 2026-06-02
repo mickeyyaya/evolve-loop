@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // fixedNow is the deterministic clock for pure-kernel decisions.
@@ -153,9 +154,9 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	cycle := s.LastCycle + 1
 	ws := seedWorkspace(t, projectRoot, cycle, s.Signals.HandoffFiles())
 
-	st := &FakeStorage{state: core.State{LastCycleNumber: s.LastCycle, FailedAt: failedRecords(s.FailedAt)}}
-	led := &FakeLedger{}
-	runners := buildRunners(s.Verdicts)
+	st := &fixtures.FakeStorage{State: core.State{LastCycleNumber: s.LastCycle, FailedAt: failedRecords(s.FailedAt)}}
+	led := &fixtures.FakeLedger{}
+	runners := fixtures.BuildRunners(verdictsByPhase(s.Verdicts))
 	o := core.NewOrchestrator(st, led, runners, opts...)
 
 	env := map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"}
@@ -193,7 +194,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 		}
 	}
 	if s.Expect.RoutingLedgerMin > 0 {
-		if n := countLedgerKind(led.entries, "routing_decision"); n < s.Expect.RoutingLedgerMin {
+		if n := countLedgerKind(led.Entries, "routing_decision"); n < s.Expect.RoutingLedgerMin {
 			t.Errorf("routing_decision ledger entries=%d, want >=%d", n, s.Expect.RoutingLedgerMin)
 		}
 	}

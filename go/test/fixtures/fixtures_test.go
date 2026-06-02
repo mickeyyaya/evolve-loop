@@ -49,6 +49,17 @@ func TestFakeStorage_LockIsExclusiveAndCounts(t *testing.T) {
 	}
 }
 
+func TestFakeStorage_LockReleaseFn_OverridesRelease(t *testing.T) {
+	t.Parallel()
+	relErr := errors.New("release boom")
+	st := &fixtures.FakeStorage{LockReleaseFn: func() error { return relErr }}
+	release, err := st.AcquireLock(context.Background())
+	fixtures.RequireNoErr(t, err, "AcquireLock")
+	if got := release(); !errors.Is(got, relErr) {
+		t.Fatalf("release() = %v, want the scripted error", got)
+	}
+}
+
 func TestFakeStorage_WriteCycleStateFailAt_FailsNthCall(t *testing.T) {
 	t.Parallel()
 	st := &fixtures.FakeStorage{WriteCycleStateFailAt: 2}

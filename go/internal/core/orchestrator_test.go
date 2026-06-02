@@ -16,6 +16,12 @@ import (
 // impls land in Phase 2.
 
 // --- fakes ---
+//
+// These stay local (not migrated to go/test/fixtures, which has the canonical
+// FakeStorage/FakeLedger/FakeRunner): this is a white-box `package core` test
+// that also exercises unexported internals (recordAuditBinding, runGit, …), and
+// fixtures imports core — importing it here would be a cycle. This is the one
+// place the test-double dedup deliberately cannot reach.
 
 type fakeStorage struct {
 	state            State

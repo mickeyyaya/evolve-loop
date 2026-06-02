@@ -6,31 +6,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// writeState seeds <dir>/state.json with the given top-level shape and
-// returns its path. Used by Record + Prune tests.
+// writeState seeds state.json under an isolated workspace root with the given
+// top-level shape and returns its path. Used by Record + Prune tests.
 func writeState(t *testing.T, content string) string {
 	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write state: %v", err)
-	}
-	return path
+	ws := fixtures.NewWorkspace(t).Build()
+	return ws.Write("state.json", content)
 }
 
 // readState parses state.json from disk for assertions.
 func readState(t *testing.T, path string) map[string]any {
 	t.Helper()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read state: %v", err)
-	}
 	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := json.Unmarshal([]byte(fixtures.MustRead(t, path)), &m); err != nil {
 		t.Fatalf("parse state: %v", err)
 	}
 	return m
@@ -145,9 +140,7 @@ Three retries all failed.
 ## Verdict
 **FAIL** — manual triage required.
 `
-	if err := os.WriteFile(filepath.Join(cycleDir, "orchestrator-report.md"), []byte(report), 0o644); err != nil {
-		t.Fatalf("write report: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(cycleDir, "orchestrator-report.md"), report)
 	rec, err := Record(path, runsDir, RecordRequest{
 		Cycle:          7,
 		Classification: "build-fail",
@@ -159,7 +152,7 @@ Three retries all failed.
 	if rec.Summary == "" {
 		t.Fatalf("summary should be non-empty when report exists")
 	}
-	if !contains(rec.Summary, "Builder timed out") {
+	if !strings.Contains(rec.Summary, "Builder timed out") {
 		t.Fatalf("summary should include Failure section: %q", rec.Summary)
 	}
 }
@@ -180,11 +173,7 @@ func TestRecord_AtomicWriteFailure(t *testing.T) {
 
 func TestExtractSummary_Empty(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "report.md")
-	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), "")
 	if s := extractSummary(path); s != "" {
 		t.Fatalf("summary=%q want empty", s)
 	}
@@ -199,12 +188,8 @@ func TestExtractSummary_MissingFile(t *testing.T) {
 
 func TestExtractSummary_NoSectionMarker(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "report.md")
 	body := "# Cycle 1\n\nNo recognized section markers here.\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	if s := extractSummary(path); s != "" {
 		t.Fatalf("no-marker report should return empty: %q", s)
 	}
@@ -212,8 +197,6 @@ func TestExtractSummary_NoSectionMarker(t *testing.T) {
 
 func TestExtractSummary_StopsAtNextSection(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "report.md")
 	body := `# Cycle 1
 ## Failure Root Cause
 Line A
@@ -221,47 +204,26 @@ Line B
 ## Next Section
 Should not appear.
 `
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	s := extractSummary(path)
-	if !contains(s, "Line A") || !contains(s, "Line B") {
+	if !strings.Contains(s, "Line A") || !strings.Contains(s, "Line B") {
 		t.Fatalf("summary should include failure lines: %q", s)
 	}
-	if contains(s, "Should not appear") {
+	if strings.Contains(s, "Should not appear") {
 		t.Fatalf("summary should stop at next section: %q", s)
 	}
 }
 
 func TestExtractSummary_HighlyVerboseTruncatedTo400(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "report.md")
 	// Build a long single-line summary that exceeds 400 chars.
 	long := ""
 	for i := 0; i < 100; i++ {
 		long += fmt.Sprintf("word%d ", i)
 	}
 	body := "## Failure Root Cause\n" + long + "\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	if got := len(extractSummary(path)); got > 400 {
 		t.Fatalf("summary len=%d want <=400", got)
 	}
-}
-
-// contains is a tiny strings.Contains shim so the test reads naturally.
-func contains(haystack, needle string) bool {
-	return len(haystack) > 0 && len(needle) > 0 &&
-		indexOf(haystack, needle) >= 0
-}
-
-func indexOf(haystack, needle string) int {
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return i
-		}
-	}
-	return -1
 }

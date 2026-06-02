@@ -9,12 +9,13 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 func tempWorkspace(t *testing.T) string {
 	t.Helper()
-	d := t.TempDir()
-	return d
+	return fixtures.NewWorkspace(t).Build().Root
 }
 
 func TestRun_RejectsBadInputs(t *testing.T) {

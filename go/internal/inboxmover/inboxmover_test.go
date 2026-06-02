@@ -9,17 +9,21 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // makeRepo sets up an inbox/-style repo with optional inbox/ files,
 // processing/cycle-N/ files, and cycle-state.json. Returns the repo root.
+// The temp-dir/.evolve scaffold comes from fixtures.NewWorkspace; the inbox/
+// subdir is the domain-specific seeding this package needs.
 func makeRepo(t *testing.T) string {
 	t.Helper()
-	d := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(d, ".evolve", "inbox"), 0o755); err != nil {
+	ws := fixtures.NewWorkspace(t).Build()
+	if err := os.MkdirAll(filepath.Join(ws.EvolveDir, "inbox"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	return d
+	return ws.Root
 }
 
 // dropInboxFile creates inbox/<name>.json with {"id":<id>} content.

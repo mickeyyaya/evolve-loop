@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // seedStateJSON writes a baseline state.json at <evolveDir>/state.json
@@ -66,8 +68,8 @@ func TestRunLoop_M5_RecordsRecoverable(t *testing.T) {
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	seedStateJSON(t, evolveDir, `{"lastCycleNumber": 0}`)
 
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{} // empty → verify fails
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger() // empty → verify fails
 	defer installStubDeps(t, storage, ledger)()
 
 	workspace := cycleWorkspace(projectRoot, 1)
@@ -135,8 +137,8 @@ func TestRunLoop_M5_AutoPruneAtStart(t *testing.T) {
 		t.Fatalf("write state: %v", err)
 	}
 
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	var stdout, stderr bytes.Buffer
@@ -177,8 +179,8 @@ func TestRunLoop_M5_CostAccumulationLogged(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// Pre-seed the cycle-1 workspace with a real-shaped stdout log so
@@ -223,8 +225,8 @@ func TestRunLoop_M5_CheckpointThresholdWARN(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// $0.85 of $1.00 cap = 85% — between 80% (WARN) and 95% (CRITICAL).
@@ -257,8 +259,8 @@ func TestRunLoop_M5_CheckpointThresholdCRITICAL(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// $0.99 of $1.00 cap = 99% → CRITICAL.
@@ -320,8 +322,8 @@ func TestRunLoop_M5_AutoPruneErrorLogged(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "state.json"), []byte("{not json"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	var stdout, stderr bytes.Buffer
@@ -350,8 +352,8 @@ func TestRunLoop_M5_StateUnwritableHalts(t *testing.T) {
 	if err := os.MkdirAll(statePath, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{} // empty → verify fail → Record called
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger() // empty → verify fail → Record called
 	defer installStubDeps(t, storage, ledger)()
 	workspace := cycleWorkspace(projectRoot, 1)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {

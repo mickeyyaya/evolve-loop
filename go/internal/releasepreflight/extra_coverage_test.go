@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestExtractJSONVersion_Errors covers the two error branches: unreadable file
@@ -146,12 +148,7 @@ func auditEntry(artifactPath, ts string) string {
 
 func writeLedger(t *testing.T, lines ...string) string {
 	t.Helper()
-	dir := t.TempDir()
-	p := filepath.Join(dir, "ledger.jsonl")
-	if err := os.WriteFile(p, []byte(strings.Join(lines, "")), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return p
+	return fixtures.MustWrite(t, filepath.Join(t.TempDir(), "ledger.jsonl"), strings.Join(lines, ""))
 }
 
 // TestCheckRecentAudit_AllPhantom covers the all-entries-phantom branch: every
@@ -337,9 +334,7 @@ func TestCheckRecentAudit_NoAuditorEntries(t *testing.T) {
 	t.Parallel()
 	ledger := writeLedger(t, `{"role":"builder","ts":"2026-05-27T00:00:00Z"}`+"\n")
 	_, err := checkRecentAudit(ledger, false, time.Now())
-	if err == nil || !strings.Contains(err.Error(), "no auditor entry") {
-		t.Errorf("err = %v, want 'no auditor entry in ledger'", err)
-	}
+	fixtures.RequireErrContains(t, err, "no auditor entry")
 }
 
 // TestCheckRecentAudit_NoVerdictNonStrict covers the verdict-not-found branch
@@ -354,9 +349,7 @@ func TestCheckRecentAudit_NoVerdictNonStrict(t *testing.T) {
 	}
 	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
 	_, err := checkRecentAudit(ledger, false, time.Now())
-	if err == nil || !strings.Contains(err.Error(), "does not declare 'Verdict: PASS' or 'Verdict: WARN'") {
-		t.Errorf("err = %v, want non-strict no-verdict message", err)
-	}
+	fixtures.RequireErrContains(t, err, "does not declare 'Verdict: PASS' or 'Verdict: WARN'")
 }
 
 // TestCheckRecentAudit_NoVerdictStrict covers the verdict-not-found branch in
@@ -370,9 +363,7 @@ func TestCheckRecentAudit_NoVerdictStrict(t *testing.T) {
 	}
 	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
 	_, err := checkRecentAudit(ledger, true, time.Now())
-	if err == nil || !strings.Contains(err.Error(), "STRICT_PASS") {
-		t.Errorf("err = %v, want strict no-verdict message", err)
-	}
+	fixtures.RequireErrContains(t, err, "STRICT_PASS")
 }
 
 // TestCheckRecentAudit_UnparseableTS covers the ts-parse-fallback branch: an

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestRunLoop_DryRun verifies the --dry-run short-circuit prints the
@@ -82,8 +83,8 @@ func TestRunLoop_EnvFlagPropagationNonDry(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	var stdout, stderr bytes.Buffer
@@ -102,7 +103,7 @@ func TestRunLoop_EnvFlagPropagationNonDry(t *testing.T) {
 
 // erroringReadStorage returns an error on ReadState, driving the
 // err != nil branch in readLastCycleNumber.
-type erroringReadStorage struct{ fakeStorage }
+type erroringReadStorage struct{ fixtures.FakeStorage }
 
 func (e *erroringReadStorage) ReadState(context.Context) (core.State, error) {
 	return core.State{}, errors.New("synthetic ReadState error")
@@ -225,8 +226,8 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fakeStorage{}
-		ld := &fakeLedger{}
+		st := &fixtures.FakeStorage{}
+		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseBuild: errorRunner{phase: "build"}, // errors → resume err branch
 			core.PhaseAudit: noopRunner{name: "audit"},
@@ -302,8 +303,8 @@ func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fakeStorage{}
-		ld := &fakeLedger{}
+		st := &fixtures.FakeStorage{}
+		ld := newFakeLedger()
 		// Audit + downstream all FAIL → final verdict is FAIL
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseAudit: failVerdictRunner{name: "audit"},
@@ -349,8 +350,8 @@ func TestRunLoop_OrchestratorError(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fakeStorage{}
-		ld := &fakeLedger{}
+		st := &fixtures.FakeStorage{}
+		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseScout:  errorRunner{phase: "scout"},
 			core.PhaseTriage: noopRunner{name: "triage"},
@@ -381,7 +382,7 @@ func TestRunLoop_OrchestratorError(t *testing.T) {
 
 // erroringLedger satisfies core.Ledger but always errors on Iter,
 // driving the verify-error branch in cmd_loop.
-type erroringLedger struct{ *fakeLedger }
+type erroringLedger struct{ *fakeLedgerNoAppend }
 
 func (l *erroringLedger) Iter(context.Context) (core.LedgerIterator, error) {
 	return nil, errors.New("synthetic ledger iter error")
@@ -401,8 +402,8 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fakeStorage{}
-		ld := &erroringLedger{fakeLedger: &fakeLedger{}}
+		st := &fixtures.FakeStorage{}
+		ld := &erroringLedger{fakeLedgerNoAppend: newFakeLedger()}
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseIntent:       noopRunner{name: "intent"},
 			core.PhaseScout:        noopRunner{name: "scout"},
@@ -465,8 +466,8 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fakeStorage{}
-		ld := &fakeLedger{}
+		st := &fixtures.FakeStorage{}
+		ld := newFakeLedger()
 		// Every phase returns FAIL so the final verdict at retro is FAIL.
 		// build-planner uses noopRunner (PASS) because its ShouldSkip
 		// would return SKIPPED in shadow mode; FAIL at build is sufficient.
@@ -514,8 +515,8 @@ func TestRunLoop_ResumeMissingCheckpoint(t *testing.T) {
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
 		return orchDeps{
-			Storage: &fakeStorage{},
-			Ledger:  &fakeLedger{},
+			Storage: &fixtures.FakeStorage{},
+			Ledger:  newFakeLedger(),
 		}
 	}
 
@@ -602,8 +603,8 @@ func TestRunLoop_ResumeFullProtocol(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fakeStorage{}
-		ld := &fakeLedger{}
+		st := &fixtures.FakeStorage{}
+		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseBuild: noopRunner{name: "build"},
 			core.PhaseAudit: noopRunner{name: "audit"},

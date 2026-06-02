@@ -45,6 +45,10 @@ type FakeStorage struct {
 	WriteCycleStateErr    error
 	LockErr               error
 	WriteCycleStateFailAt int // 0 = never; N = the N-th WriteCycleState call fails
+	// LockReleaseFn, when set, is returned as the release func from AcquireLock
+	// (instead of the default that flips lockHeld). Lets a test script the
+	// release behaviour — e.g. a release that errors.
+	LockReleaseFn func() error
 
 	// Observability.
 	LockCount    int
@@ -110,6 +114,17 @@ func (f *FakeStorage) AcquireLock(context.Context) (func() error, error) {
 	}
 	f.lockHeld = true
 	f.LockCount++
+	if f.LockReleaseFn != nil {
+		// Wrap so the scripted release still clears lockHeld — otherwise a
+		// later AcquireLock on the same fake spuriously returns ErrLockHeld.
+		fn := f.LockReleaseFn
+		return func() error {
+			f.mu.Lock()
+			f.lockHeld = false
+			f.mu.Unlock()
+			return fn()
+		}, nil
+	}
 	return func() error {
 		f.mu.Lock()
 		f.lockHeld = false
