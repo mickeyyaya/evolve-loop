@@ -1,14 +1,13 @@
-// Package resolvellm ports legacy/scripts/dispatch/resolve-llm.sh.
+// Package resolvellm resolves a phase role to {cli, model_tier} from its
+// profile. Zero side effects.
 //
-// Pure-function LLM router. Given a role name and optional llm_config path,
-// returns {cli, model|model_tier, source} describing which CLI+model the
-// phase agent should use. Zero side effects.
+// Step 9 (see docs/architecture/step9-llm-config-removal.md) removed the
+// .evolve/llm_config.json layer: profiles (+ policy pins, applied upstream)
+// own the CLI, and the live model-catalog overlay on the manifest ModelTierMap
+// (Step 10c) translates the tier to a concrete model downstream. What remains
+// here is the profile read:
 //
-// Resolution precedence (per ADR-1):
-//  1. llm_config.phases.<role>        → source="llm_config"
-//  2. llm_config._fallback            → source="llm_config_fallback"
-//  3. profile cli + model_tier_default → source="profile"
-//  4. llm_config absent               → source="profile"
+//	profile cli + model_tier_default (default "balanced") → source="profile"
 package resolvellm
 
 import (
@@ -21,29 +20,24 @@ import (
 	"strings"
 )
 
-// Result mirrors the JSON shape emitted by resolve-llm.sh. Exactly one of
-// Model / ModelTier is non-empty in any single emission.
+// Result is the resolved dispatch info for a role: the CLI + the abstract model
+// tier. (Step 9 removed the exact-model path; the realizer's ModelTierMap —
+// catalog-overlaid in Step 10c — translates ModelTier to a concrete model.)
 type Result struct {
-	CLI   string
-	Model string // exact model name (resolved from llm_config.phases.<role>.model)
+	CLI string
 	// ModelTier is the canonical abstract tier ("fast" | "balanced" | "deep").
-	// Translated to CLI-native model by the realizer's ModelTierMap lookup.
-	// Legacy values ("haiku" | "sonnet" | "opus") are accepted for one
-	// release via the realizer fallback ladder + parseManifest v1 shim;
-	// see ADR-0022 PR 2 addendum for the deprecation timeline.
+	// Legacy values ("haiku" | "sonnet" | "opus") are accepted for one release
+	// via the realizer fallback ladder + parseManifest v1 shim; see ADR-0022.
 	ModelTier string
-	Source    string // "llm_config" | "llm_config_fallback" | "profile"
+	Source    string // always "profile" since Step 9
 }
 
-// ErrProfileNotFound signals neither llm_config nor a profile contained
-// usable routing data. Matches bash exit code 1.
+// ErrProfileNotFound signals the role's profile was not found. Matches bash
+// exit code 1.
 var ErrProfileNotFound = errors.New("resolvellm: profile not found")
 
 // Options exposes seams for testing.
 type Options struct {
-	// ConfigPath optionally overrides the llm_config.json path. When empty,
-	// the package derives it from EVOLVE_PROJECT_ROOT or git rev-parse.
-	ConfigPath string
 	// PluginRoot maps to EVOLVE_PLUGIN_ROOT. Searched first for profile JSON.
 	PluginRoot string
 	// ProjectRoot maps to EVOLVE_PROJECT_ROOT. Searched second.
@@ -64,45 +58,10 @@ func Resolve(role string, opts Options) (Result, error) {
 		getEnv = os.Getenv
 	}
 
-	// Step 1 / 2 — read llm_config.json
-	configPath := opts.ConfigPath
-	if configPath == "" {
-		root := getEnv("EVOLVE_PROJECT_ROOT")
-		if root == "" {
-			root = gitRoot()
-			if root == "" {
-				root, _ = os.Getwd()
-			}
-		}
-		configPath = filepath.Join(root, ".evolve", "llm_config.json")
-	}
-
-	if raw, err := os.ReadFile(configPath); err == nil {
-		// File exists. Try to parse — invalid JSON logs warning + falls through.
-		var cfg llmConfig
-		if perr := json.Unmarshal(raw, &cfg); perr == nil {
-			if entry, ok := cfg.Phases[role]; ok && entry.CLI != "" {
-				if entry.Model != "" {
-					return Result{CLI: entry.CLI, Model: entry.Model, Source: "llm_config"}, nil
-				}
-				if entry.ModelTier != "" {
-					return Result{CLI: entry.CLI, ModelTier: entry.ModelTier, Source: "llm_config"}, nil
-				}
-				// cli only, no model/tier — bash emits empty model
-				return Result{CLI: entry.CLI, Model: "", Source: "llm_config"}, nil
-			}
-			if cfg.Fallback != nil && cfg.Fallback.CLI != "" {
-				tier := cfg.Fallback.ModelTier
-				if tier == "" {
-					tier = "balanced"
-				}
-				return Result{CLI: cfg.Fallback.CLI, ModelTier: tier, Source: "llm_config_fallback"}, nil
-			}
-		}
-		// else: silently fall through (matches bash WARNING behaviour for callers)
-	}
-
-	// Step 3 — profile fallback
+	// Profile resolution (Step 9: llm_config.json removed). CLI + model tier come
+	// from the per-phase profile; the tier→concrete-model translation happens
+	// downstream via the live model-catalog overlay on the manifest ModelTierMap
+	// (Step 10c). See docs/architecture/step9-llm-config-removal.md.
 	profilePath, err := findProfile(role, opts, getEnv)
 	if err != nil {
 		return Result{}, ErrProfileNotFound
@@ -125,12 +84,9 @@ func Resolve(role string, opts Options) (Result, error) {
 	return Result{CLI: prof.CLI, ModelTier: tier, Source: "profile"}, nil
 }
 
-// JSON returns the byte-identical wire shape of resolve-llm.sh. Manual
-// formatting (not encoding/json) preserves key order across all four shapes.
+// JSON returns the single wire shape resolvellm now emits (cli + model_tier +
+// source). Manual formatting (not encoding/json) preserves key order.
 func (r Result) JSON() string {
-	if r.Model != "" || (r.Source == "llm_config" && r.ModelTier == "") {
-		return fmt.Sprintf(`{"cli":"%s","model":"%s","source":"%s"}`, r.CLI, r.Model, r.Source)
-	}
 	return fmt.Sprintf(`{"cli":"%s","model_tier":"%s","source":"%s"}`, r.CLI, r.ModelTier, r.Source)
 }
 
@@ -169,18 +125,6 @@ func gitRoot() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
-}
-
-// llmConfig models the subset of .evolve/llm_config.json we consume.
-type llmConfig struct {
-	Phases   map[string]phaseEntry `json:"phases"`
-	Fallback *phaseEntry           `json:"_fallback,omitempty"`
-}
-
-type phaseEntry struct {
-	CLI       string `json:"cli"`
-	Model     string `json:"model"`
-	ModelTier string `json:"model_tier"`
 }
 
 type profileDoc struct {

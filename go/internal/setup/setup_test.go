@@ -212,14 +212,16 @@ func TestDetect(t *testing.T) {
 		t.Errorf("gemini should be absent/n_a: %+v", c)
 	}
 
-	// Phases: builder resolves from llm_config, carries envelope + cross-family.
+	// Phases: builder resolves from its PROFILE (Step 9 removed llm_config, so
+	// the llm_config.json written above is ignored), carrying envelope +
+	// cross-family. The profile is cli=agy-tmux, model_tier_default=sonnet.
 	var builder PhaseStatus
 	for _, p := range rep.Phases {
 		if p.Role == "builder" {
 			builder = p
 		}
 	}
-	if builder.CurrentCLI != "claude" || builder.CurrentModel != "sonnet" || builder.Source != "llm_config" {
+	if builder.CurrentCLI != "agy-tmux" || builder.CurrentTier != "sonnet" || builder.Source != "profile" {
 		t.Errorf("builder routing: %+v", builder)
 	}
 	if builder.Envelope.Max != "deep" || builder.CrossFamilyWith != "auditor" {

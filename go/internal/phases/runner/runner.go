@@ -325,9 +325,6 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		if err != nil {
 			return "", false
 		}
-		if res.Model != "" {
-			return res.Model, true
-		}
 		if res.ModelTier != "" {
 			return res.ModelTier, true
 		}

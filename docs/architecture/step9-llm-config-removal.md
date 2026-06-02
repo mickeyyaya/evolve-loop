@@ -1,8 +1,26 @@
 # Step 9 — Remove `llm_config.json` (migration plan)
 
-> **Status:** PREP / not yet executed. This doc de-risks the migration so a
-> focused future session can execute it cleanly. The behavior change itself is
-> deliberately deferred (touches core dispatch; needs a soak).
+> **Status:** **9a DONE** (dispatch resolution no longer reads llm_config);
+> **9b remaining** (residual operator surfaces). Split because 9a is the
+> load-bearing behavior change and is coherent + tested on its own.
+>
+> **9a (done):** `resolvellm.Resolve` collapsed to profile-only — the
+> `llm_config.phases`/`_fallback` branches + the `ConfigPath` option + the
+> `llmConfig`/`phaseEntry` types are gone. Profiles (+ policy pins upstream) own
+> the CLI; the Step-10c catalog overlay owns tier→model. Consumers updated:
+> `setup.Detect`, `cmd resolve-llm` (dropped the `[config_path]` arg),
+> `subagent.defaultResolveLLM` (ignores the now-dead configPath). New
+> `TestResolve_IgnoresLLMConfig` proves a present llm_config.json is ignored.
+>
+> **9b (remaining, follow-up):** the residual non-dispatch surfaces — remove
+> `setup.Validate`'s llm_config clamp + the `evolve setup validate` subcommand's
+> `--config`/default, `paths.LLMConfigFile`, the dead `subagent` `LLMConfigPath`
+> plumbing (`run.go`/`validateprofile.go` field + `ResolveLLM(agent, configPath)`
+> seam), `examples/llm_config.example.json`, the stale `llm_config` comments in
+> `llmroute.go`/`runner.go`, the now-always-empty `setup.PhaseStatus.CurrentModel`
+> report field, and the stale `acs/cycle52`+`acs/cycle53` predicates (which still
+> assert `source=llm_config`; acs/ is excluded from CI so they don't fail the
+> gate, but they test removed behavior). None is load-bearing for dispatch.
 
 ## Goal
 

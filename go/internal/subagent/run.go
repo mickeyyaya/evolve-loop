@@ -149,10 +149,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 	var cli, source, resolvedModel string
 	if llmErr == nil && llm.CLI != "" {
 		cli, source = llm.CLI, llm.Source
-		resolvedModel = llm.Model
-		if resolvedModel == "" {
-			resolvedModel = llm.ModelTier
-		}
+		resolvedModel = llm.ModelTier // Step 9: resolvellm emits only a tier
 	} else {
 		cli = extractProfileString(profileBody, "cli")
 		source = "profile"
@@ -259,12 +256,12 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		return RunResult{}, fmt.Errorf("subagent/run: prompt tempfile: %w", err)
 	}
 	promptPath := promptFile.Name()
-	defer os.Remove(promptPath)
+	defer func() { _ = os.Remove(promptPath) }()
 	if _, err := promptFile.WriteString(fullPrompt); err != nil {
-		promptFile.Close()
+		_ = promptFile.Close()
 		return RunResult{}, fmt.Errorf("subagent/run: write prompt tempfile: %w", err)
 	}
-	promptFile.Close()
+	_ = promptFile.Close()
 
 	overrides := extractAdapterOverrides(profileBody, cli)
 	env := map[string]string{

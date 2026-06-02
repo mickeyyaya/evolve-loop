@@ -56,7 +56,7 @@ func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Tim
 		// Bash uses `|| true` so failures here are tolerated. Mirror that.
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.WriteString(line + "\n"); err != nil {
 		return nil
 	}
