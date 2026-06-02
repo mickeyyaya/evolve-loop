@@ -1,25 +1,25 @@
 ---
 name: setup
-description: Use when the user runs /setup, asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Detects which LLM CLIs/subscriptions are available, explains the pipeline concisely, proposes a per-phase model assignment the user can adjust, writes .evolve/llm_config.json, and validates it against the integrity floor. Runs once on first launch (the loop nudges) and is re-runnable anytime.
-argument-hint: "[--strict]"
+description: Use when the user runs /setup, asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Detects which LLM CLIs/subscriptions are available, explains the pipeline concisely, proposes a per-phase CLI/model assignment the user can adjust, writes per-phase pins to .evolve/policy.json, and verifies them against the integrity floor. Runs once on first launch (the loop nudges) and is re-runnable anytime.
+argument-hint: ""
 ---
 
 # /setup
 
-> Interactive onboarding. The deterministic parts (detection, validation, marker) run in the Go binary (`evolve setup detect|validate|complete`); the judgment parts (recommend models, explain the pipeline) run HERE, in your session — zero extra API cost. You PROPOSE; `evolve setup validate` is the kernel CLAMP (envelope + allowed_clis are hard, cross-family is advisory). See [docs/architecture/setup-onboarding.md](../../docs/architecture/setup-onboarding.md) and the deterministic core in [go/internal/setup/setup.go](../../go/internal/setup/setup.go).
+> Interactive onboarding. The deterministic parts (detection, pin verification, marker) run in the Go binary (`evolve setup detect|complete`); the judgment parts (recommend models, explain the pipeline) run HERE, in your session — zero extra API cost. You PROPOSE per-phase pins; the kernel CLAMP (envelope + allowed_clis) is enforced two ways: `evolve setup detect` reports any pin that breaches the floor as `pin_violation`, and dispatch hard-fails an out-of-bounds pin at cycle time. Step 9 removed the old `llm_config.json` layer — the durable per-phase override is now `.evolve/policy.json` `pins`. See [docs/architecture/setup-onboarding.md](../../docs/architecture/setup-onboarding.md) and the deterministic core in [go/internal/setup/setup.go](../../go/internal/setup/setup.go).
 
 ## When to use
 
 - The loop printed `[setup] First run …`, or the user typed `/setup`, or asked to configure models / learn the pipeline.
-- Re-running is always safe — it re-detects and rewrites `.evolve/llm_config.json`.
+- Re-running is always safe — it re-detects and rewrites `.evolve/policy.json` pins.
 
 ## Binary
 
-Call `evolve` if on PATH; otherwise `./go/bin/evolve` (or `$EVOLVE_GO_BIN`). All commands below are read-only except `complete` (stamps the marker) and your Write of `llm_config.json`.
+Call `evolve` if on PATH; otherwise `./go/bin/evolve` (or `$EVOLVE_GO_BIN`). All commands below are read-only except `complete` (stamps the marker) and your Write of `.evolve/policy.json`.
 
 ## Procedure
 
-1. **Detect.** Run `evolve setup detect --json` and parse it. The digest has `clis[]` (per family: `binary_present`, `auth_mode`, `subscription_type`, `capability_tier`, `verdict`, and **`tier_models`** {fast,balanced,deep} → that CLI's NATIVE model) and `phases[]` (per role: `current_cli`, `current_model`/`current_tier`, `source`, `envelope` {min,default,max}, `cross_family_with`, `allowed_clis`).
+1. **Detect.** Run `evolve setup detect --json` and parse it. The digest has `clis[]` (per family: `binary_present`, `auth_mode`, `subscription_type`, `capability_tier`, `verdict`, and **`tier_models`** {fast,balanced,deep} → that CLI's NATIVE model) and `phases[]` (per role: `current_cli`, `current_tier`, `source` — `profile` or `policy-pin`, `envelope` {min,default,max}, `cross_family_with`, `allowed_clis`, and `pin_violation` when a pin breaches the floor). A malformed `.evolve/policy.json` shows up as a top-level `policy_error`.
 
 2. **Present the detection** as a compact table — one row per CLI family with binary/auth/tier/verdict.
    - **Caveat (state, don't hide):** on macOS, `claude` may report `MISCONFIGURED`/`blocked` even when authed, because detection only checks `~/.claude/.credentials.json` and misses Keychain-stored OAuth. If the user is clearly running in a Claude session, treat claude as available and say so.
@@ -34,14 +34,20 @@ Call `evolve` if on PATH; otherwise `./go/bin/evolve` (or `$EVOLVE_GO_BIN`). All
    - **Tier heuristics** (`dynamic-phase-routing.md`): cheap/summarizing phases (triage, memo, evaluator) → fast; codegen/scan (scout, builder, tester) → balanced; adversarial/review/post-mortem (intent, plan-reviewer, tdd-engineer, auditor, retrospective) → deep.
    - Use **AskUserQuestion** to let the user accept the proposal or adjust specific phases.
 
-5. **Write** `.evolve/llm_config.json` (schema_version 2). Each phase entry: `{ "provider": <anthropic|google|openai>, "cli": <claude|gemini|codex|agy>, "tier": <fast|balanced|deep>, "model": <the CLI's native model from tier_models> }`, plus a `_fallback`. The `tier` is the abstract envelope axis (drives `validate`); the `model` is the native model that CLI actually runs (`detect.clis[].tier_models[tier]`) — write both so the config is self-documenting AND envelope-checkable. Match `examples/llm_config.example.json`.
+5. **Write** `.evolve/policy.json` — the user-owned override layer. Set `pins`, a map of phase → `{ "cli": <claude|gemini|codex|agy>, "model": <the CLI's native model from tier_models> }`. Only write a pin where you are OVERRIDING the profile default (an unpinned phase keeps its profile's `cli` + `model_tier_default` — don't pin every phase just to restate the defaults). `model` is optional: pinning `cli` alone routes the phase to that CLI at the profile's tier; add `model` to also fix the exact model. Always use the CLI's NATIVE model from `detect.clis[].tier_models[tier]` (e.g. agy/balanced → `gemini-3.5-flash`; codex/deep → `gpt-5.5`; claude/deep → `claude-opus-4-7`). Merge into any existing `policy.json` — never drop the user's `mandatory_phases`. Example:
+   ```json
+   { "pins": { "auditor": { "cli": "codex", "model": "gpt-5.5" },
+               "builder": { "cli": "claude" } } }
+   ```
 
-6. **Validate (kernel clamp).** Run `evolve setup validate`. On exit `2`, read the printed `[error]` violations, fix the offending phases, and rewrite — loop until exit `0`. `[warn]` lines (e.g. cross-family on an all-one-family setup) are advisory; surface them but they do not block.
+6. **Verify (kernel clamp).** Re-run `evolve setup detect` and check the `phases[]`: each phase you pinned should show `source: "policy-pin"` with your CLI/tier and an EMPTY `pin_violation`. If any `pin_violation` is present (cli ∉ `allowed_clis`, or model tier outside the `envelope`) or a `policy_error` appears, fix the offending pin and rewrite — loop until clean. Cross-family (builder vs auditor sharing a family) is advisory: surface it, don't block.
 
 7. **Mark complete.** Run `evolve setup complete` to stamp the first-run marker (so the loop stops nudging). Confirm to the user that setup is done and they can re-run `/setup` anytime.
 
 ## Notes
 
-- Detection + validation are deterministic and live in Go; this skill never re-implements them.
+- Detection + pin verification are deterministic and live in Go; this skill never re-implements them.
+- Pins live in `.evolve/policy.json` (the user-owned override layer); profiles own the per-phase defaults. Pinning is OPT-IN per phase — leave a phase unpinned to keep its profile default.
+- The kernel clamp is enforced at dispatch too: an out-of-bounds pin hard-fails the phase at cycle time, so `pin_violation` in `detect` is your pre-flight catch.
 - `evolve setup complete` writes the marker via a lossless raw-merge — it never clobbers other `state.json` fields.
 - All-Claude is a valid configuration; cross-family is preferred only when the user actually has multiple authed families.

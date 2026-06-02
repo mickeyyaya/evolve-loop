@@ -1,8 +1,21 @@
 # Step 9 — Remove `llm_config.json` (migration plan)
 
-> **Status:** **9a DONE** (dispatch resolution no longer reads llm_config);
-> **9b remaining** (residual operator surfaces). Split because 9a is the
-> load-bearing behavior change and is coherent + tested on its own.
+> **Status:** **9a + 9b DONE (2026-06-02)** — `llm_config.json` is fully removed.
+> 9a removed it from the dispatch resolution path; 9b removed the residual
+> operator surfaces AND repointed `/setup` onboarding at `.evolve/policy.json`
+> `pins` (the durable per-phase override layer) with `evolve setup detect`
+> overlaying + validating pins via `policy.ValidatePin`. The standalone
+> `evolve setup validate` subcommand is gone. Split because 9a was the
+> load-bearing behavior change and was coherent + tested on its own.
+>
+> **9b shipped:** removed `setup.Validate` + the `evolve setup validate`
+> subcommand + `--config`, `paths.LLMConfigFile` + `EVOLVE_LLM_CONFIG_PATH`, the
+> `subagent` `LLMConfigPath` plumbing + the `ResolveLLM(agent, configPath)` seam
+> param, `examples/llm_config.example.json`, the stale `llm_config` comments in
+> `llmroute.go`/`runner.go`, `setup.PhaseStatus.CurrentModel` + the dead
+> `DetectOptions.ConfigPath`, and the `acs/cycle-52`+`acs/cycle-53` llm_config
+> predicates. New: `setup.Detect` is policy-pin-aware (`source=policy-pin`,
+> `pin_violation`, `policy_error`); `/setup` SKILL + setup-onboarding.md rewritten.
 >
 > **9a (done):** `resolvellm.Resolve` collapsed to profile-only — the
 > `llm_config.phases`/`_fallback` branches + the `ConfigPath` option + the

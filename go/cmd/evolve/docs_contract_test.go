@@ -73,7 +73,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_INACTIVITY_POLL_S":         true, // phase-watchdog
 	"EVOLVE_INACTIVITY_WARN_PCT":       true, // phase-watchdog
 	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
-	"EVOLVE_LLM_CONFIG_PATH":           true, // resolvellm config override
 	"EVOLVE_MARKETPLACE_DIR":           true, // marketplace-poll path override
 	"EVOLVE_OBSERVER_EOF_GRACE_S":      true, // phase-observer
 	"EVOLVE_OBSERVER_POLL_S":           true, // phase-observer

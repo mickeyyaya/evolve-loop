@@ -314,12 +314,12 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// The model env key is AGENT-keyed (EVOLVE_<PROFILE_NAME>_MODEL), matching
 	// cmd_loop's `--model <agent>=X` writer + the PERMISSION_MODE resolver below.
 	//
-	// autoExpand bridges the existing resolvellm seam so "auto" expansion stays
-	// byte-identical (keyed by `phase`, NOT profileName — llm_config is
-	// phase-keyed). claude -p rejects a literal "auto" (HTTP 404), so this MUST
-	// resolve before dispatch. The CLI the seam computes is intentionally NOT
-	// used for dispatch — the chain above is authoritative (a Step-9 decision
-	// may revisit whether llm_config.cli should feed the chain).
+	// autoExpand bridges the resolvellm seam so "auto" expansion stays
+	// byte-identical (keyed by `phase`, NOT profileName — preserved from the
+	// pre-Step-9 behavior when the now-removed llm_config layer was phase-keyed).
+	// claude -p rejects a literal "auto" (HTTP 404), so this MUST resolve before
+	// dispatch. The CLI the seam computes is intentionally NOT used for dispatch —
+	// the chain above is authoritative.
 	autoExpand := func(role string) (string, bool) {
 		res, err := b.resolveLLM(role, resolvellm.Options{})
 		if err != nil {

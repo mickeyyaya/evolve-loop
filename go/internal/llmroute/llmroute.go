@@ -16,15 +16,13 @@
 //	triggers:     profile.cli_fallback_on_exit or {80,81,124,127}
 //	model:        EVOLVE_<AGENT>_MODEL > profile.model_tier_default > defaultModel,
 //	              then if the result is "auto", expand via the injected resolver
-//	              (llm_config.phases.<phase> > _fallback > profile) — same call
-//	              the runner made before.
+//	              (the per-phase profile) — same call the runner made before.
 //
 // Layering: imports envchain + profiles + stdlib only. It MUST NOT import the
-// runner, resolvellm, or core. resolvellm stays an independent public API
-// (4 external consumers); the runner bridges it in via the AutoModel seam, so
-// "auto" expansion is byte-identical to the pre-llmroute behavior. Whether
-// llm_config.cli should feed the dispatch chain (today it does not) is a
-// deliberate, separate decision deferred to Step 9.
+// runner, resolvellm, or core. resolvellm stays an independent public API; the
+// runner bridges it in via the AutoModel seam, so "auto" expansion is
+// byte-identical to the pre-llmroute behavior. (Step 9 removed the
+// llm_config.json layer entirely; the resolver now reads the per-phase profile.)
 package llmroute
 
 import (
@@ -98,8 +96,9 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 //   - agent is the canonical profile name ("auditor", "tdd-engineer"): it keys
 //     the per-agent env vars (EVOLVE_<AGENT>_CLI / _MODEL) and the profile.
 //   - phase is the phase/role name ("audit", "build"): it is the role passed to
-//     the AutoModel expander (llm_config is keyed by phase, not agent — this
-//     asymmetry is preserved from the prior runner behavior).
+//     the AutoModel expander (keyed by phase, not agent — this asymmetry is
+//     preserved from the prior runner behavior, when the now-removed llm_config
+//     layer was phase-keyed).
 //   - defaultModel is the phase Hooks' DefaultModel() (usually "auto").
 //   - prof may be nil (no profile on disk).
 //   - autoExpand may be nil (then "auto" is left as-is).

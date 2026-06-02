@@ -33,7 +33,6 @@ type RunRequest struct {
 	ProjectRoot   string
 	PluginRoot    string
 	WorktreePath  string
-	LLMConfigPath string
 	LedgerPath    string
 
 	// PromptReader supplies the user task prompt. Caller can pass an
@@ -54,7 +53,7 @@ type RunRequest struct {
 // defaults; tests substitute doubles.
 type RunOptions struct {
 	ReadProfile       func(path string) (string, error)
-	ResolveLLM        func(agent, configPath string) (resolvellm.Result, error)
+	ResolveLLM        func(agent string) (resolvellm.Result, error)
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
 	ResolveModelTier  func(req ResolveModelTierRequest, opts ResolveModelTierOptions) (string, error)
 	AdapterExists     func(path string) bool
@@ -145,7 +144,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 	}
 
 	// Step 3: resolve cli + model via LLM router (with profile fallback).
-	llm, llmErr := opts.ResolveLLM(role, req.LLMConfigPath)
+	llm, llmErr := opts.ResolveLLM(role)
 	var cli, source, resolvedModel string
 	if llmErr == nil && llm.CLI != "" {
 		cli, source = llm.CLI, llm.Source
@@ -176,8 +175,8 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		return RunResult{}, fmt.Errorf("subagent/run: adapter not executable: %s", adapterPath)
 	}
 
-	// Step 6: model tier resolution. llm_config override wins; otherwise the
-	// adaptive resolver evaluates profile + mastery gate + diff complexity.
+	// Step 6: model tier resolution. A tier resolved from the profile wins;
+	// otherwise the adaptive resolver evaluates profile + mastery gate + diff complexity.
 	var model string
 	if resolvedModel != "" {
 		model = resolvedModel

@@ -106,16 +106,11 @@ exit 1
 	}
 	t.Cleanup(func() { _ = os.Remove(realManifest) })
 
-	// Empty llm_config so both implementations fall back to profile.cli.
-	llmConfigPath := filepath.Join(fixtureRoot, "llm_config.json")
-	if err := os.WriteFile(llmConfigPath, []byte(`{}`), 0o644); err != nil {
-		t.Fatalf("write llm_config: %v", err)
-	}
-
+	// Step 9 removed llm_config.json — both implementations resolve cli from
+	// profile.cli directly.
 	commonEnv := []string{
 		"EVOLVE_PROFILES_DIR_OVERRIDE=" + profilesDir,
 		"EVOLVE_ADAPTERS_DIR_OVERRIDE=" + adaptersDir,
-		"EVOLVE_LLM_CONFIG_PATH=" + llmConfigPath,
 		"EVOLVE_PROJECT_ROOT=" + fixtureRoot,
 		"EVOLVE_PLUGIN_ROOT=" + repoRoot, // bash uses this to find resolve-llm.sh sibling
 	}

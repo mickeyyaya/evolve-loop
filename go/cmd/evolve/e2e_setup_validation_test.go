@@ -1,15 +1,16 @@
 //go:build e2e
 
-// Coverage of `evolve setup detect|validate` — the kernel clamp behind the
-// /setup skill that enforces the CLI×model integrity floor (ADR-0027):
-//   - tier ∈ profile model_tier_envelope  → ERROR (exit 2)
-//   - cli  ∈ profile allowed_clis          → ERROR (exit 2)
-//   - builder family == auditor family     → WARN (exit 0); ERROR under --strict
+// Coverage of `evolve setup detect` — the kernel clamp behind the /setup skill
+// that enforces the CLI×model integrity floor (ADR-0027). Step 9b removed the
+// standalone `setup validate` subcommand (+ the llm_config.json it clamped); the
+// same floor is now applied by policy.ValidatePin and surfaced inline by detect:
+//   - pinned tier ∉ profile model_tier_envelope → phase `pin_violation` (+ dispatch hard-fail)
+//   - pinned cli  ∉ profile allowed_clis         → phase `pin_violation` (+ dispatch hard-fail)
 //
 // Driven in-process via runSetup (this is package main), so these are fast and
-// host-independent: validate reads only the fixture llm_config.json + profiles
-// written into a temp evolve-dir. (detect additionally scans the host for CLI
-// binaries, so it is asserted on SHAPE only, not on host-specific values.)
+// host-independent: the pin overlay reads only the fixture .evolve/policy.json +
+// profiles. (detect additionally scans the host for CLI binaries, so the clis[]
+// array is asserted on SHAPE only, not on host-specific values.)
 package main
 
 import (
@@ -21,8 +22,8 @@ import (
 )
 
 // writeSetupFixture lays out a temp evolve-dir with the given per-role profiles
-// and an llm_config.json, and returns the evolve-dir path.
-func writeSetupFixture(t *testing.T, profiles map[string]string, llmConfig string) string {
+// and an optional policy.json (empty → no file), and returns the evolve-dir path.
+func writeSetupFixture(t *testing.T, profiles map[string]string, policyJSON string) string {
 	t.Helper()
 	evolveDir := t.TempDir()
 	profDir := filepath.Join(evolveDir, "profiles")
@@ -34,88 +35,112 @@ func writeSetupFixture(t *testing.T, profiles map[string]string, llmConfig strin
 			t.Fatalf("write profile %s: %v", role, err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(evolveDir, "llm_config.json"), []byte(llmConfig), 0o644); err != nil {
-		t.Fatalf("write llm_config: %v", err)
+	if policyJSON != "" {
+		if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(policyJSON), 0o644); err != nil {
+			t.Fatalf("write policy.json: %v", err)
+		}
 	}
 	return evolveDir
 }
 
-// runValidate invokes `evolve setup validate` in-process and returns the exit
-// code + combined stdout.
-func runValidate(t *testing.T, evolveDir string, strict bool) (int, string) {
+// detectReport is the subset of the digest these tests assert on.
+type detectReport struct {
+	CLIs   []map[string]any `json:"clis"`
+	Phases []struct {
+		Role         string `json:"role"`
+		Source       string `json:"source"`
+		CurrentCLI   string `json:"current_cli"`
+		CurrentTier  string `json:"current_tier"`
+		PinViolation string `json:"pin_violation"`
+	} `json:"phases"`
+	PolicyError string `json:"policy_error"`
+}
+
+// runDetectJSON invokes `evolve setup detect --json` in-process and parses it.
+func runDetectJSON(t *testing.T, evolveDir string) detectReport {
 	t.Helper()
-	args := []string{"validate", "--evolve-dir=" + evolveDir, "--project-root=" + evolveDir}
-	if strict {
-		args = append(args, "--strict")
-	}
 	var stdout, stderr bytes.Buffer
-	code := runSetup(args, nil, &stdout, &stderr)
-	return code, stdout.String() + stderr.String()
+	code := runSetup([]string{"detect", "--json", "--evolve-dir=" + evolveDir, "--project-root=" + evolveDir}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("detect --json exit = %d, want 0\n%s", code, stderr.String())
+	}
+	var rep detectReport
+	if err := json.Unmarshal(stdout.Bytes(), &rep); err != nil {
+		t.Fatalf("detect --json not valid JSON: %v\n%s", err, stdout.String())
+	}
+	return rep
 }
 
-// envelope violation: builder tier below the profile's min → ERROR (exit 2).
-func TestSetupValidate_EnvelopeViolation(t *testing.T) {
+func phase(rep detectReport, role string) (string, string, string, string) {
+	for _, p := range rep.Phases {
+		if p.Role == role {
+			return p.Source, p.CurrentCLI, p.CurrentTier, p.PinViolation
+		}
+	}
+	return "", "", "", ""
+}
+
+// envelope violation: a pinned tier below the profile's min is surfaced as a
+// pin_violation naming the envelope.
+func TestSetupDetect_PinEnvelopeViolation(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
-			"builder": `{"name":"builder","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
+			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
 		},
-		`{"phases":{"builder":{"cli":"claude","tier":"fast"}}}`, // fast (rank 1) < min balanced (rank 2)
+		`{"pins":{"builder":{"cli":"claude","model":"haiku"}}}`, // haiku (rank 1) < min balanced (rank 2)
 	)
-	code, out := runValidate(t, evolveDir, false)
-	if code != 2 {
-		t.Fatalf("envelope violation exit = %d, want 2\n%s", code, out)
-	}
-	if !bytes.Contains([]byte(out), []byte("envelope")) {
-		t.Errorf("output should name the envelope violation; got %q", out)
+	_, _, _, viol := phase(runDetectJSON(t, evolveDir), "builder")
+	if viol == "" || !bytes.Contains([]byte(viol), []byte("envelope")) {
+		t.Errorf("expected envelope pin_violation, got %q", viol)
 	}
 }
 
-// allowed_clis violation: builder cli outside the profile's allowed_clis → ERROR.
-func TestSetupValidate_AllowedCLIsViolation(t *testing.T) {
+// allowed_clis violation: a pinned cli outside the profile's allowed_clis is
+// surfaced as a pin_violation.
+func TestSetupDetect_PinAllowedCLIsViolation(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
-			"builder": `{"name":"builder","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
+			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
 		},
-		`{"phases":{"builder":{"cli":"codex","tier":"deep"}}}`, // codex ∉ {claude,agy}
+		`{"pins":{"builder":{"cli":"codex","model":"sonnet"}}}`, // codex ∉ {claude,agy}
 	)
-	code, out := runValidate(t, evolveDir, false)
-	if code != 2 {
-		t.Fatalf("allowed_clis violation exit = %d, want 2\n%s", code, out)
+	_, _, _, viol := phase(runDetectJSON(t, evolveDir), "builder")
+	if viol == "" || !bytes.Contains([]byte(viol), []byte("allowed_clis")) {
+		t.Errorf("expected allowed_clis pin_violation, got %q", viol)
 	}
 }
 
-// Cross-family: builder and auditor on the same family (both claude/anthropic)
-// is a WARN by default (exit 0) and an ERROR under --strict (exit 2).
-func TestSetupValidate_CrossFamily_WarnVsStrict(t *testing.T) {
-	profiles := map[string]string{
-		"builder": `{"name":"builder","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"deep","max":"deep"}}`,
-		"auditor": `{"name":"auditor","allowed_clis":["all"],"model_tier_envelope":{"min":"deep","default":"deep","max":"deep"}}`,
+// a valid pin overlays the routing with source=policy-pin and no violation.
+func TestSetupDetect_PinValidNoViolation(t *testing.T) {
+	evolveDir := writeSetupFixture(t,
+		map[string]string{
+			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
+		},
+		`{"pins":{"builder":{"cli":"claude","model":"opus"}}}`, // claude ∈ allowed, opus ∈ balanced..deep
+	)
+	src, cli, tier, viol := phase(runDetectJSON(t, evolveDir), "builder")
+	if src != "policy-pin" || cli != "claude" || tier != "opus" {
+		t.Errorf("expected pinned claude/opus, got src=%q cli=%q tier=%q", src, cli, tier)
 	}
-	// Both claude → same family (anthropic); envelopes satisfied so ONLY the
-	// cross-family rule can fire.
-	cfg := `{"phases":{"builder":{"cli":"claude","tier":"deep"},"auditor":{"cli":"claude","tier":"deep"}}}`
-	evolveDir := writeSetupFixture(t, profiles, cfg)
-
-	if code, out := runValidate(t, evolveDir, false); code != 0 {
-		t.Fatalf("cross-family default exit = %d, want 0 (WARN, not blocking)\n%s", code, out)
-	}
-	if code, out := runValidate(t, evolveDir, true); code != 2 {
-		t.Fatalf("cross-family --strict exit = %d, want 2 (ERROR)\n%s", code, out)
+	if viol != "" {
+		t.Errorf("valid pin should have no violation, got %q", viol)
 	}
 }
 
-// Cross-family clean: different families (claude builder, codex auditor) → no
-// cross-family violation, exit 0 even under --strict.
-func TestSetupValidate_CrossFamily_DifferentFamiliesPass(t *testing.T) {
-	profiles := map[string]string{
-		"builder": `{"name":"builder","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"deep","max":"deep"}}`,
-		"auditor": `{"name":"auditor","allowed_clis":["all"],"model_tier_envelope":{"min":"deep","default":"deep","max":"deep"}}`,
+// a malformed policy.json sets the top-level policy_error and disables overlay.
+func TestSetupDetect_MalformedPolicy(t *testing.T) {
+	evolveDir := writeSetupFixture(t,
+		map[string]string{
+			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
+		},
+		`{"pins": {not valid json`,
+	)
+	rep := runDetectJSON(t, evolveDir)
+	if rep.PolicyError == "" {
+		t.Error("malformed policy.json should set policy_error")
 	}
-	cfg := `{"phases":{"builder":{"cli":"claude","tier":"deep"},"auditor":{"cli":"codex","tier":"deep"}}}`
-	evolveDir := writeSetupFixture(t, profiles, cfg)
-
-	if code, out := runValidate(t, evolveDir, true); code != 0 {
-		t.Fatalf("different-family --strict exit = %d, want 0\n%s", code, out)
+	if src, _, _, _ := phase(rep, "builder"); src == "policy-pin" {
+		t.Error("malformed policy should not overlay pins")
 	}
 }
 
@@ -124,27 +149,16 @@ func TestSetupValidate_CrossFamily_DifferentFamiliesPass(t *testing.T) {
 func TestSetupDetect_JSONShape(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
-			"builder": `{"name":"builder","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
-			"auditor": `{"name":"auditor","allowed_clis":["all"],"model_tier_envelope":{"min":"deep","default":"deep","max":"deep"}}`,
+			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
+			"auditor": `{"name":"auditor","cli":"codex-tmux","allowed_clis":["all"],"model_tier_envelope":{"min":"deep","default":"deep","max":"deep"}}`,
 		},
-		`{"phases":{}}`,
+		"",
 	)
-	var stdout, stderr bytes.Buffer
-	code := runSetup([]string{"detect", "--json", "--evolve-dir=" + evolveDir, "--project-root=" + evolveDir}, nil, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("detect --json exit = %d, want 0\n%s", code, stderr.String())
-	}
-	var rep struct {
-		CLIs   []map[string]any `json:"clis"`
-		Phases []map[string]any `json:"phases"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &rep); err != nil {
-		t.Fatalf("detect --json not valid JSON: %v\n%s", err, stdout.String())
-	}
+	rep := runDetectJSON(t, evolveDir)
 	if len(rep.CLIs) == 0 {
-		t.Errorf("detect digest should enumerate known CLIs; got none\n%s", stdout.String())
+		t.Errorf("detect digest should enumerate known CLIs; got none")
 	}
 	if len(rep.Phases) == 0 {
-		t.Errorf("detect digest should enumerate per-phase routing; got none\n%s", stdout.String())
+		t.Errorf("detect digest should enumerate per-phase routing; got none")
 	}
 }

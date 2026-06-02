@@ -33,7 +33,39 @@ func TestRunSetup_Dispatch(t *testing.T) {
 	}
 }
 
-func TestRunSetup_ValidateAndComplete(t *testing.T) {
+// detectPhase is the subset of a detect-report phase entry the setup tests assert on.
+type detectPhase struct {
+	Role         string `json:"role"`
+	Source       string `json:"source"`
+	CurrentCLI   string `json:"current_cli"`
+	CurrentTier  string `json:"current_tier"`
+	PinViolation string `json:"pin_violation"`
+}
+
+// phaseFromDetectJSON runs `evolve setup detect --json` and returns the named
+// phase entry (the durable per-phase view the /setup loop inspects).
+func phaseFromDetectJSON(t *testing.T, role string) detectPhase {
+	t.Helper()
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"detect", "--json"}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("detect --json: rc=%d (%s)", rc, errb.String())
+	}
+	var rep struct {
+		Phases []detectPhase `json:"phases"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("parse detect json: %v\n%s", err, out.String())
+	}
+	for _, p := range rep.Phases {
+		if p.Role == role {
+			return p
+		}
+	}
+	t.Fatalf("%s phase not found in detect report", role)
+	return detectPhase{}
+}
+
+func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 	project := t.TempDir()
 	evolveDir := filepath.Join(project, ".evolve")
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
@@ -44,25 +76,27 @@ func TestRunSetup_ValidateAndComplete(t *testing.T) {
 	  "model_tier_envelope":{"min":"deep","default":"deep","max":"deep"},
 	  "cross_family_with":"builder","allowed_clis":["all"]
 	}`)
+	policyPath := filepath.Join(evolveDir, "policy.json")
 
-	cfg := filepath.Join(evolveDir, "llm_config.json")
-
-	// Within-envelope config → validate exit 0.
-	setupWrite(t, cfg, `{"phases":{"auditor":{"cli":"codex","tier":"deep"}}}`)
-	var out, errb bytes.Buffer
-	if rc := runSetup([]string{"validate"}, nil, &out, &errb); rc != 0 {
-		t.Fatalf("clean validate: rc=%d want 0 (%s)", rc, out.String())
+	// Within-envelope pin → detect overlays it as policy-pin, no violation.
+	setupWrite(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"opus"}}}`)
+	a := phaseFromDetectJSON(t, "auditor")
+	if a.Source != "policy-pin" || a.CurrentCLI != "codex" || a.CurrentTier != "opus" {
+		t.Fatalf("clean pin: got %+v", a)
+	}
+	if a.PinViolation != "" {
+		t.Fatalf("clean pin should have no violation, got %q", a.PinViolation)
 	}
 
-	// Below-envelope tier → validate exit 2.
-	setupWrite(t, cfg, `{"phases":{"auditor":{"cli":"codex","tier":"balanced"}}}`)
-	out.Reset()
-	if rc := runSetup([]string{"validate"}, nil, &out, &errb); rc != 2 {
-		t.Fatalf("envelope violation: rc=%d want 2 (%s)", rc, out.String())
+	// Below-envelope pin → detect surfaces a pin_violation (deep..deep rejects balanced).
+	setupWrite(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"balanced"}}}`)
+	a = phaseFromDetectJSON(t, "auditor")
+	if a.PinViolation == "" {
+		t.Fatalf("below-envelope pin should report a violation, got %+v", a)
 	}
 
 	// Complete stamps the marker.
-	out.Reset()
+	var out, errb bytes.Buffer
 	if rc := runSetup([]string{"complete"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("complete: rc=%d want 0 (%s)", rc, errb.String())
 	}

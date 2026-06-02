@@ -145,7 +145,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 
 - `evolve guard list-audit-fails [--evolve-dir DIR] [--json]` — enumerate `state.json:failedApproaches[]` with `classification=code-audit-fail` still within the 30-day retention window. Pure read.
 - `evolve eval diversity-check <evalsDir> [slug]` — suite-level adversarial-diversity check (v13.0.0+). Exit `0` PASS, `1` WARN, `2` HALT, `10` bad args. Companions: `evolve eval quality-check <eval.md>` (Level-0 tautology), `evolve eval verify <eval.md> <workspace>` (independent re-execution). Read-only.
-- `evolve setup detect [--json]` — onboarding digest (read-only): per-CLI binary/auth-mode/capability-tier/verdict + per-phase routing + envelope/cross-family/allowed_clis constraints. `evolve setup validate [--config P] [--strict]` clamps a proposed `llm_config.json` against the floor. See [setup-onboarding](../../docs/architecture/setup-onboarding.md), ADR-0027.
+- `evolve setup detect [--json]` — onboarding digest (read-only): per-CLI binary/auth-mode/capability-tier/verdict + per-phase routing + envelope/cross-family/allowed_clis constraints, with `.evolve/policy.json` pins overlaid and any floor breach reported as `pin_violation`. (Step 9b removed `evolve setup validate` + `llm_config.json`; the clamp now lives in `policy.ValidatePin`, surfaced by `detect` and hard-enforced at dispatch.) See [setup-onboarding](../../docs/architecture/setup-onboarding.md), ADR-0027.
 
 ### Operator verdict-writing commands
 
