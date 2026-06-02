@@ -2,7 +2,7 @@
   "name": "builder",
   "role": "builder",
   "cli": "agy-tmux",
-  "cli_fallback": ["claude-tmux"],
+  "cli_fallback": ["codex-tmux", "claude-tmux"],
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "ultrathink_strategy": "opus",
@@ -118,7 +118,8 @@
   "cross_family_with": "auditor",
   "allowed_clis": [
     "claude",
-    "agy"
+    "agy",
+    "codex"
   ],
   "_note": "Cross-CLI enabled (ADR-0022 realizer). Builder defaults to agy-tmux (Gemini, subscription billing via the tmux controller); claude permitted as fallback. Per-CLI launch flags are realized from the manifest, and the tmux path runs the agent inside the cycle worktree (sandbox boundary) with bypass. CAVEAT: max_budget_usd is advisory for subscription CLIs (agy/codex bill to their subscription, not the metered cost meter); turn-based limits (max_turns) and the artifact timeout remain the hard stops. Builder is safety-critical (writes code in the worktree).",
   "research_quota": {

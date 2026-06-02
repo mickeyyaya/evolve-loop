@@ -2,7 +2,7 @@
   "name": "auditor",
   "role": "auditor",
   "cli": "codex-tmux",
-  "cli_fallback": ["claude-tmux"],
+  "cli_fallback": ["agy-tmux", "claude-tmux"],
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "security_sensitive": "opus",

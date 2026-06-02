@@ -1,7 +1,8 @@
 {
   "name": "scout",
   "role": "scout",
-  "cli": "claude-tmux",
+  "cli": "agy-tmux",
+  "cli_fallback": ["codex-tmux", "claude-tmux"],
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "cycle_1_or_low_goal": "opus",
