@@ -8,28 +8,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // makeRepo creates a fixture repo with all 4 markers at the given version.
 func makeRepo(t *testing.T, version string) string {
 	t.Helper()
-	d := t.TempDir()
 	mm := majorMinor(version)
-	must := func(rel, body string) {
-		path := filepath.Join(d, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Fatalf("write %s: %v", rel, err)
-		}
-	}
-	must(".claude-plugin/plugin.json", fmt.Sprintf(`{"name":"evolve-loop","version":"%s"}`, version))
-	must(".claude-plugin/marketplace.json", fmt.Sprintf(`{"plugins":[{"name":"evolve-loop","version":"%s"}]}`, version))
-	must("skills/evolve-loop/SKILL.md", fmt.Sprintf("---\nname: x\n---\n\n# Evolve Loop v%s\n\nbody\n", mm))
-	must("README.md", fmt.Sprintf("# Evolve Loop\n\n**Current (v%s)** description\n\n| v%s | 2026 |\n", mm, mm))
-	must("CHANGELOG.md", fmt.Sprintf("# Changelog\n\n## [%s] - 2026-05-24\n\nEntries.\n", version))
-	return d
+	return fixtures.NewWorkspace(t).WithFiles(map[string]string{
+		".claude-plugin/plugin.json":      fmt.Sprintf(`{"name":"evolve-loop","version":"%s"}`, version),
+		".claude-plugin/marketplace.json": fmt.Sprintf(`{"plugins":[{"name":"evolve-loop","version":"%s"}]}`, version),
+		"skills/evolve-loop/SKILL.md":     fmt.Sprintf("---\nname: x\n---\n\n# Evolve Loop v%s\n\nbody\n", mm),
+		"README.md":                       fmt.Sprintf("# Evolve Loop\n\n**Current (v%s)** description\n\n| v%s | 2026 |\n", mm, mm),
+		"CHANGELOG.md":                    fmt.Sprintf("# Changelog\n\n## [%s] - 2026-05-24\n\nEntries.\n", version),
+	}).Build().Root
 }
 
 // === Happy path: all markers consistent ====================================
@@ -76,9 +69,7 @@ func TestCheck_PluginJSONMismatch(t *testing.T) {
 func TestCheck_NoChangelogEntry(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
 	// Strip the entry.
-	if err := os.WriteFile(filepath.Join(d, "CHANGELOG.md"), []byte("# Changelog\n\nno entries\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(d, "CHANGELOG.md"), "# Changelog\n\nno entries\n")
 	_, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
@@ -88,10 +79,7 @@ func TestCheck_NoChangelogEntry(t *testing.T) {
 // === SKILL.md heading at wrong version → MISMATCH ==========================
 func TestCheck_SkillHeadingMismatch(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	if err := os.WriteFile(filepath.Join(d, "skills/evolve-loop/SKILL.md"),
-		[]byte("# Evolve Loop v10.0\n\nstale\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(d, "skills/evolve-loop/SKILL.md"), "# Evolve Loop v10.0\n\nstale\n")
 	_, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
@@ -114,10 +102,7 @@ func TestCheck_DerivesTargetFromPluginJSON(t *testing.T) {
 // === README current cell mismatch → MISMATCH ===============================
 func TestCheck_ReadmeCurrentMismatch(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	if err := os.WriteFile(filepath.Join(d, "README.md"),
-		[]byte("# Evolve Loop\n\n**Current (v9.0)** stale\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(d, "README.md"), "# Evolve Loop\n\n**Current (v9.0)** stale\n")
 	_, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
@@ -135,18 +120,12 @@ func TestCheck_EmptyProjectRoot(t *testing.T) {
 // === extractJSONVersion handles malformed gracefully =======================
 func TestExtractJSONVersion(t *testing.T) {
 	d := t.TempDir()
-	p := filepath.Join(d, "v.json")
-	if err := os.WriteFile(p, []byte(`{"version":"1.2.3"}`), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	p := fixtures.MustWrite(t, filepath.Join(d, "v.json"), `{"version":"1.2.3"}`)
 	v, err := extractJSONVersion(p)
 	if err != nil || v != "1.2.3" {
 		t.Errorf("extractJSONVersion = (%q, %v), want (1.2.3, nil)", v, err)
 	}
-	bad := filepath.Join(d, "no-version.json")
-	if err := os.WriteFile(bad, []byte(`{"name":"foo"}`), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	bad := fixtures.MustWrite(t, filepath.Join(d, "no-version.json"), `{"name":"foo"}`)
 	if _, err := extractJSONVersion(bad); err == nil {
 		t.Error("want err for no version field")
 	}
@@ -188,10 +167,7 @@ func TestCheck_MarkerFileMissing(t *testing.T) {
 func TestCheck_MarkerNoVersionField(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
 	// marketplace.json present but lacks a version field.
-	if err := os.WriteFile(filepath.Join(d, ".claude-plugin/marketplace.json"),
-		[]byte(`{"plugins":[{"name":"evolve-loop"}]}`), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(d, ".claude-plugin/marketplace.json"), `{"plugins":[{"name":"evolve-loop"}]}`)
 	var buf bytes.Buffer
 	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2", Stderr: &buf})
 	if !errors.Is(err, ErrInconsistent) {
@@ -231,10 +207,7 @@ func TestCheck_SkillFileMissing(t *testing.T) {
 // Drives checkSkillHeading's loop-exhausted → NO_MATCH branch.
 func TestCheck_SkillHeadingAbsent(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	if err := os.WriteFile(filepath.Join(d, "skills/evolve-loop/SKILL.md"),
-		[]byte("---\nname: x\n---\n\n# Some Other Title\n\nbody\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(d, "skills/evolve-loop/SKILL.md"), "---\nname: x\n---\n\n# Some Other Title\n\nbody\n")
 	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
@@ -266,10 +239,7 @@ func TestCheck_ReadmeFileMissing(t *testing.T) {
 // "v11.8" row is kept so only the current-version check trips.
 func TestCheck_ReadmeCurrentCellAbsent(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	if err := os.WriteFile(filepath.Join(d, "README.md"),
-		[]byte("# Evolve Loop\n\nno current cell here\n\n| v11.8 | 2026 |\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	fixtures.MustWrite(t, filepath.Join(d, "README.md"), "# Evolve Loop\n\nno current cell here\n\n| v11.8 | 2026 |\n")
 	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)

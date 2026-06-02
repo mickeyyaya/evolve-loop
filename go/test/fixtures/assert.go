@@ -2,6 +2,7 @@ package fixtures
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -43,10 +44,13 @@ func RequireErrContains(t *testing.T, err error, sub string) {
 	}
 }
 
-// MustWrite writes body to path (creating nothing — caller owns the dir) and
+// MustWrite writes body to path, creating parent directories as needed, and
 // fails on error. Returns path for chaining.
 func MustWrite(t *testing.T, path, body string) string {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MustWrite(%q): mkdir: %v", path, err)
+	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("MustWrite(%q): %v", path, err)
 	}

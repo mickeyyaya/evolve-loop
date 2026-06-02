@@ -10,39 +10,35 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 var osExec = osexec.Command
 
 // makeRepo sets up a minimal preflight-compatible repo fixture matching
 // the bash test helper. Returns the repo dir; cleanup is t.TempDir-managed.
+//
+// The isolated project root + .evolve/ scaffolding come from
+// fixtures.NewWorkspace (replacing the hand-rolled t.TempDir + MkdirAll
+// dance); the preflight-specific files (plugin.json, audit-report.md, ledger)
+// are seeded through the workspace's relative-path writers.
 func makeRepo(t *testing.T, version string) string {
 	t.Helper()
-	d := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(d, ".claude-plugin"), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(d, ".evolve", "runs", "cycle-99"), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	pj := fmt.Sprintf(`{"name":"x","version":"%s"}`, version)
-	if err := os.WriteFile(filepath.Join(d, ".claude-plugin", "plugin.json"),
-		[]byte(pj), 0o644); err != nil {
-		t.Fatalf("plugin.json: %v", err)
-	}
-	auditPath := filepath.Join(d, ".evolve", "runs", "cycle-99", "audit-report.md")
-	if err := os.WriteFile(auditPath, []byte("# Audit\n\nVerdict: PASS\n\nConfidence: 1.0\n"), 0o644); err != nil {
-		t.Fatalf("audit: %v", err)
-	}
+	auditRel := filepath.Join(".evolve", "runs", "cycle-99", "audit-report.md")
+	ws := fixtures.NewWorkspace(t).
+		WithFiles(map[string]string{
+			filepath.Join(".claude-plugin", "plugin.json"): fmt.Sprintf(`{"name":"x","version":"%s"}`, version),
+			auditRel: "# Audit\n\nVerdict: PASS\n\nConfidence: 1.0\n",
+		}).
+		Build()
+	auditPath := ws.Path(auditRel)
 	now := time.Now().UTC().Format(time.RFC3339)
 	ledger := fmt.Sprintf(
 		`{"ts":"%s","cycle":99,"role":"auditor","kind":"agent_subprocess","model":"opus","exit_code":0,"artifact_path":"%s","artifact_sha256":"deadbeef","git_head":"none","tree_state_sha":"none"}`+"\n",
 		now, auditPath)
-	if err := os.WriteFile(filepath.Join(d, ".evolve", "ledger.jsonl"),
-		[]byte(ledger), 0o644); err != nil {
-		t.Fatalf("ledger: %v", err)
-	}
-	return d
+	ws.Write(filepath.Join(".evolve", "ledger.jsonl"), ledger)
+	return ws.Root
 }
 
 // stubOpts returns Options pre-wired with passing seams for a happy-path repo.

@@ -1,9 +1,7 @@
 package routingtest
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,62 +11,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// FakeStorage is an in-memory core.Storage for the orchestrator surface.
-type FakeStorage struct {
-	state core.State
-	cs    core.CycleState
-}
-
-func (f *FakeStorage) ReadState(context.Context) (core.State, error)           { return f.state, nil }
-func (f *FakeStorage) WriteState(_ context.Context, s core.State) error        { f.state = s; return nil }
-func (f *FakeStorage) ReadCycleState(context.Context) (core.CycleState, error) { return f.cs, nil }
-func (f *FakeStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
-	f.cs = cs
-	return nil
-}
-func (f *FakeStorage) AcquireLock(context.Context) (func() error, error) {
-	return func() error { return nil }, nil
-}
-
-// FakeLedger records appended entries.
-type FakeLedger struct{ entries []core.LedgerEntry }
-
-func (f *FakeLedger) Append(_ context.Context, e core.LedgerEntry) error {
-	f.entries = append(f.entries, e)
-	return nil
-}
-func (f *FakeLedger) Verify(context.Context) error { return nil }
-func (f *FakeLedger) Iter(context.Context) (core.LedgerIterator, error) {
-	return nil, errors.New("routingtest: ledger Iter unused")
-}
-
-// FakeRunner is a no-LLM phase runner returning a canned verdict.
-type FakeRunner struct {
-	name    string
-	verdict string
-	calls   int
-}
-
-func (f *FakeRunner) Name() string { return f.name }
-func (f *FakeRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	f.calls++
-	v := f.verdict
-	if v == "" {
-		v = core.VerdictPASS
+// verdictsByPhase converts a phase-name→verdict map (the routingtest spec form)
+// into the core.Phase-keyed map fixtures.BuildRunners expects.
+func verdictsByPhase(verdicts map[string]string) map[core.Phase]string {
+	if verdicts == nil {
+		return nil
 	}
-	return core.PhaseResponse{Phase: f.name, Verdict: v, ArtifactsDir: req.Workspace}, nil
-}
-
-// orchestratorPhases is the runnable set the orchestrator may sequence.
-var orchestratorPhases = []core.Phase{
-	core.PhaseIntent, core.PhaseScout, core.PhaseTriage, core.PhaseTDD,
-	core.PhaseBuildPlanner, core.PhaseBuild, core.PhaseAudit, core.PhaseShip, core.PhaseRetro,
-}
-
-func buildRunners(verdicts map[string]string) map[core.Phase]core.PhaseRunner {
-	out := make(map[core.Phase]core.PhaseRunner, len(orchestratorPhases))
-	for _, p := range orchestratorPhases {
-		out[p] = &FakeRunner{name: string(p), verdict: verdicts[string(p)]}
+	out := make(map[core.Phase]string, len(verdicts))
+	for name, v := range verdicts {
+		out[core.Phase(name)] = v
 	}
 	return out
 }

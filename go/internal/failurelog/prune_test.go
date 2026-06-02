@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // seedStateWithEntries writes state.json with the given failedApproaches.
@@ -17,12 +19,8 @@ func seedStateWithEntries(t *testing.T, entries []map[string]any) string {
 		"failedApproaches": entries,
 	}
 	raw, _ := json.Marshal(state)
-	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := os.WriteFile(path, raw, 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	return path
+	ws := fixtures.NewWorkspace(t).Build()
+	return ws.Write("state.json", string(raw))
 }
 
 func TestPruneExpired_RemovesPastExpiresAt(t *testing.T) {
@@ -110,11 +108,7 @@ func TestPruneExpired_NonObjectEntryKept(t *testing.T) {
 			map[string]any{"cycle": float64(2), "expiresAt": "2020-01-01T00:00:00Z"}, // expired
 		},
 	})
-	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := os.WriteFile(path, raw, 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "state.json"), string(raw))
 	res, err := PruneExpired(path, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("PruneExpired: %v", err)
@@ -142,11 +136,7 @@ func TestPruneExpired_NoStateFile(t *testing.T) {
 
 func TestPruneExpired_BadJSON(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := os.WriteFile(path, []byte("{bad"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "state.json"), "{bad")
 	if _, err := PruneExpired(path, time.Now()); err == nil {
 		t.Fatalf("expected error on bad JSON")
 	}

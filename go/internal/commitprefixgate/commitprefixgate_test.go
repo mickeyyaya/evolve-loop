@@ -4,29 +4,22 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // makeRepo writes a manifest at .evolve/commit-prefix-scope.json with the
 // given prefix entries. Returns the repo dir.
 func makeRepo(t *testing.T, manifestJSON string) string {
 	t.Helper()
-	d := t.TempDir()
-	dir := filepath.Join(d, ".evolve")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
+	b := fixtures.NewWorkspace(t)
 	if manifestJSON != "" {
-		if err := os.WriteFile(filepath.Join(dir, "commit-prefix-scope.json"),
-			[]byte(manifestJSON), 0o644); err != nil {
-			t.Fatalf("write: %v", err)
-		}
+		b = b.WithFiles(map[string]string{".evolve/commit-prefix-scope.json": manifestJSON})
 	}
-	return d
+	return b.Build().Root
 }
 
 // stubDiffPaths returns a GetDiffPaths seam that returns a fixed list.
@@ -303,13 +296,7 @@ func TestRun_AppendsGuardsLog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	body, err := os.ReadFile(filepath.Join(repo, ".evolve", "guards.log"))
-	if err != nil {
-		t.Fatalf("read guards.log: %v", err)
-	}
-	if !strings.Contains(string(body), "2026-05-24T12:00:00Z") {
-		t.Errorf("guards.log missing fixed timestamp: %q", body)
-	}
+	fixtures.WantFileContains(t, filepath.Join(repo, ".evolve", "guards.log"), "2026-05-24T12:00:00Z")
 }
 
 // === matchPath table =======================================================

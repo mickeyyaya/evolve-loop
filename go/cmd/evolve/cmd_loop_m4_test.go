@@ -9,91 +9,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// fakeStorage is an in-memory core.Storage for runLoop integration
-// tests. Mirrors the on-disk layout enough for cmd_loop helpers
-// (readLastCycleNumber, LoadVerifyContext) to read realistic values.
-type fakeStorage struct {
-	mu     sync.Mutex
-	state  core.State
-	cs     core.CycleState
-	lockFn func() error
-}
-
-func (s *fakeStorage) ReadState(context.Context) (core.State, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.state, nil
-}
-func (s *fakeStorage) WriteState(_ context.Context, st core.State) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.state = st
-	return nil
-}
-func (s *fakeStorage) ReadCycleState(context.Context) (core.CycleState, error) {
-	return s.cs, nil
-}
-func (s *fakeStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
-	s.cs = cs
-	return nil
-}
-func (s *fakeStorage) AcquireLock(context.Context) (func() error, error) {
-	if s.lockFn != nil {
-		return s.lockFn, nil
-	}
-	return func() error { return nil }, nil
-}
-
-// fakeLedger answers Iter with the slice the test pre-seeds via the
-// `entries` field — tests build that slice in advance to drive the verify
-// pipeline through specific branches (complete cycle, missing builder,
-// etc.). Append is a deliberate NO-OP: verify reads the test-controlled
-// slice, NOT whatever the stub orchestrator incidentally writes during a
-// no-op run.
+// fakeLedgerNoAppend wraps fixtures.FakeLedger but makes Append a deliberate
+// NO-OP, so verify reads ONLY the test-controlled Entries slice — NOT whatever
+// the stub orchestrator incidentally writes during a no-op run.
 //
-// (cycle-137: Append previously accumulated, but verify only counted the
-// bash-era kind:"agent_subprocess", so the stub orchestrator's kind:"phase"
-// appends were invisible and the pre-seeded slice was effectively the only
-// thing verify saw. Once verify was corrected to also count kind:"phase"
-// — the vocabulary the Go orchestrator actually writes — those incidental
-// appends would have made every no-op run look like a complete cycle,
-// silently defeating the failure-path tests.)
-type fakeLedger struct {
-	mu      sync.Mutex
-	entries []core.LedgerEntry
+// (cycle-137: an accumulating Append plus a verify that counts kind:"phase"
+// — the vocabulary the Go orchestrator actually writes — would make every
+// no-op run look like a complete cycle, silently defeating the failure-path
+// tests. fixtures.FakeLedger.Append accumulates by design, so the cmd/evolve
+// loop tests keep this thin no-op-Append wrapper rather than the canonical
+// accumulating fake.)
+type fakeLedgerNoAppend struct {
+	*fixtures.FakeLedger
 }
 
-func (l *fakeLedger) Append(context.Context, core.LedgerEntry) error {
-	return nil
-}
-func (l *fakeLedger) Verify(context.Context) error { return nil }
-func (l *fakeLedger) Iter(context.Context) (core.LedgerIterator, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	cp := append([]core.LedgerEntry{}, l.entries...)
-	return &sliceIter{entries: cp}, nil
-}
+func (fakeLedgerNoAppend) Append(context.Context, core.LedgerEntry) error { return nil }
 
-type sliceIter struct {
-	entries []core.LedgerEntry
-	i       int
+func newFakeLedger() *fakeLedgerNoAppend {
+	return &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{}}
 }
-
-func (it *sliceIter) Next() (core.LedgerEntry, bool, error) {
-	if it.i >= len(it.entries) {
-		return core.LedgerEntry{}, false, nil
-	}
-	e := it.entries[it.i]
-	it.i++
-	return e, true, nil
-}
-func (it *sliceIter) Close() error { return nil }
 
 // scriptedOrch is a *core.Orchestrator stand-in that returns canned
 // cycle results in sequence. The real Orchestrator type is a struct,
@@ -102,8 +42,8 @@ func (it *sliceIter) Close() error { return nil }
 type scriptedOrch struct {
 	results []core.CycleResult
 	errs    []error
-	storage *fakeStorage
-	ledger  *fakeLedger
+	storage *fixtures.FakeStorage
+	ledger  *fakeLedgerNoAppend
 	idx     int
 }
 
@@ -123,7 +63,7 @@ func (noopRunner) Run(_ context.Context, _ core.PhaseRequest) (core.PhaseRespons
 // The orchestrator's state machine runs but every phase is a no-op,
 // so the only ledger entries are the phase-kind appends the
 // orchestrator writes itself — verify will fail unless the test
-// pre-seeds agent_subprocess entries via fakeLedger.entries.
+// pre-seeds agent_subprocess entries via fixtures.FakeLedger.Entries.
 func installStubDeps(t *testing.T, storage core.Storage, ledger core.Ledger) func() {
 	t.Helper()
 	prev := wireOrchestratorDepsFn
@@ -246,7 +186,7 @@ func TestCycleWorkspace(t *testing.T) {
 
 func TestReadLastCycleNumber(t *testing.T) {
 	t.Parallel()
-	s := &fakeStorage{state: core.State{LastCycleNumber: 42}}
+	s := &fixtures.FakeStorage{State: core.State{LastCycleNumber: 42}}
 	n, err := readLastCycleNumber(context.Background(), s)
 	if err != nil || n != 42 {
 		t.Fatalf("got n=%d err=%v", n, err)
@@ -285,8 +225,8 @@ func helperPrepWorkspace(t *testing.T, projectRoot string, cycle int, report, ve
 // runM4Loop prepares a stub that, on RunCycle, populates the fake
 // ledger with the entries the test expects + advances state.
 func runM4Loop(t *testing.T, projectRoot, evolveDir string, args []string,
-	storage *fakeStorage, ledger *fakeLedger,
-	beforeRun func(*fakeStorage, *fakeLedger),
+	storage *fixtures.FakeStorage, ledger *fakeLedgerNoAppend,
+	beforeRun func(*fixtures.FakeStorage, *fakeLedgerNoAppend),
 	report, verdict string,
 	cycleNum int,
 ) (int, string, string) {
@@ -322,8 +262,8 @@ func TestRunLoop_PolicyOff_SkipsVerify(t *testing.T) {
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 
 	args := []string{
 		"--project-root", projectRoot,
@@ -354,8 +294,8 @@ func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{} // empty → verify will fail with missing-all
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger() // empty → verify will fail with missing-all
 	args := []string{
 		"--project-root", projectRoot,
 		"--evolve-dir", evolveDir,
@@ -394,8 +334,8 @@ func TestRunLoop_PolicyVerify_IntegrityBreachStops(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 
 	args := []string{
 		"--project-root", projectRoot,
@@ -429,8 +369,8 @@ func TestRunLoop_PolicyStop_AnyVerifyFailStops(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	args := []string{
 		"--project-root", projectRoot,
 		"--evolve-dir", evolveDir,
@@ -461,12 +401,12 @@ func TestRunLoop_VerifyOK_NoEvents(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{state: core.State{LastCycleNumber: 0}}
-	ledger := &fakeLedger{entries: []core.LedgerEntry{
+	storage := &fixtures.FakeStorage{State: core.State{LastCycleNumber: 0}}
+	ledger := &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{Entries: []core.LedgerEntry{
 		{Cycle: 1, Role: "scout", Kind: "agent_subprocess", ExitCode: 0},
 		{Cycle: 1, Role: "builder", Kind: "agent_subprocess", ExitCode: 0},
 		{Cycle: 1, Role: "auditor", Kind: "agent_subprocess", ExitCode: 0},
-	}}
+	}}}
 	args := []string{
 		"--project-root", projectRoot,
 		"--evolve-dir", evolveDir,
@@ -490,7 +430,7 @@ func TestRunLoop_VerifyOK_NoEvents(t *testing.T) {
 
 // TestUpdateBreaker tabulates the step function in isolation. The
 // integration in runLoop is exercised via TestRunLoop_CircuitBreakerTrips,
-// which drives a stuck orchestrator through a fakeStorage that does
+// which drives a stuck orchestrator through a fixtures.FakeStorage that does
 // not advance LastCycleNumber.
 func TestUpdateBreaker(t *testing.T) {
 	t.Parallel()
@@ -520,13 +460,13 @@ func TestUpdateBreaker(t *testing.T) {
 	}
 }
 
-// stuckStorage is a fakeStorage variant whose WriteState is a no-op.
+// stuckStorage is a fixtures.FakeStorage variant whose WriteState is a no-op.
 // The orchestrator's RunCycle calls WriteState(state) at the end to
 // bump LastCycleNumber; stuckStorage ignores this so result.Cycle
 // stays at 1 every iteration, simulating a state.json that the OS
 // sandbox refuses to write (the bash scenario the breaker was added
 // to catch).
-type stuckStorage struct{ fakeStorage }
+type stuckStorage struct{ fixtures.FakeStorage }
 
 func (s *stuckStorage) WriteState(context.Context, core.State) error { return nil }
 
@@ -543,7 +483,7 @@ func TestRunLoop_CircuitBreakerTrips(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	storage := &stuckStorage{}
-	ledger := &fakeLedger{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// Pre-create workspace cycle-1 so EmitCircuitBreakerTripped can

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // ============================================================================
@@ -247,8 +249,8 @@ func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// Pre-seed the quota-likely cycle-state. detectQuotaPause runs
@@ -297,8 +299,8 @@ func TestRunLoop_BatchCapOverrun_Rc4(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// Cycle 1 cost = $2.50, cap = $1.00 → overrun → rc=4
@@ -330,8 +332,8 @@ func TestRunLoop_BudgetMode_Rc0(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	// Cycle 1 cost = $0.60, budget = $0.50 → BUDGET-DRIVEN COMPLETE rc=0
@@ -379,8 +381,8 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 	b, _ := json.Marshal(state)
 	_ = os.WriteFile(filepath.Join(evolveDir, "state.json"), b, 0o644)
 
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	var stdout, stderr bytes.Buffer
@@ -418,8 +420,8 @@ func TestRunLoop_CheckpointDisabledSkipsWarn(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	_ = os.MkdirAll(evolveDir, 0o755)
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 	// $0.85 of $1.00 → WARN would normally fire; checkpoint-disabled silences it
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 0.85)
@@ -449,8 +451,8 @@ func TestRunLoop_BatchBudgetDisabledSkipsAccounting(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	_ = os.MkdirAll(evolveDir, 0o755)
-	storage := &fakeStorage{}
-	ledger := &fakeLedger{}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 	// $2.50 of $1.00 — would normally rc=4; disabled bypasses that
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 2.50)
