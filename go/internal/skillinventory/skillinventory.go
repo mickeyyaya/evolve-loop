@@ -16,7 +16,6 @@
 package skillinventory
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -98,10 +98,8 @@ func Build(opts Options) (Result, error) {
 		return Result{}, fmt.Errorf("skillinventory: scan: %w", err)
 	}
 
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return Result{}, fmt.Errorf("skillinventory: mkdir: %w", err)
-	}
-	if err := writeAtomic(outPath, inv); err != nil {
+	// atomicwrite.JSON creates the parent dir, writes 0644, and renames atomically.
+	if err := atomicwrite.JSON(outPath, inv); err != nil {
 		return Result{}, fmt.Errorf("skillinventory: write: %w", err)
 	}
 	return Result{OutputPath: outPath, SkillCount: inv.SkillCount}, nil
@@ -211,18 +209,4 @@ func extractCategories(fm map[string]any) []string {
 		return out
 	}
 	return nil
-}
-
-// writeAtomic uses the project's mv-of-tempfile convention so a
-// half-written inventory never appears on disk.
-func writeAtomic(path string, inv Inventory) error {
-	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
-	data, err := json.MarshalIndent(inv, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }

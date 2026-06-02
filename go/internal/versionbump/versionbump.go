@@ -23,6 +23,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // Result is the JSON-compatible summary version-bump prints to stdout.
@@ -163,7 +165,7 @@ func BumpJSONVersion(path, target string, dryRun bool) (bool, error) {
 	// (which the operator + diff tools care about), we do an in-place
 	// string substitution of just the version values instead.
 	updated := jsonVersionRE.ReplaceAllString(string(data), fmt.Sprintf(`"version": "%s"`, target))
-	if err := atomicWrite(path, []byte(updated)); err != nil {
+	if err := atomicwrite.Bytes(path, []byte(updated)); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -213,7 +215,7 @@ func BumpSkillHeading(path, majorMinor string, dryRun bool) (bool, error) {
 		replaced = true
 		return "# Evolve Loop v" + majorMinor
 	})
-	if err := atomicWrite(path, []byte(out)); err != nil {
+	if err := atomicwrite.Bytes(path, []byte(out)); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -254,7 +256,7 @@ func BumpReadmeCurrent(path, majorMinor string, dryRun bool) (bool, error) {
 		return false, err
 	}
 	out := readmeCurrentRE.ReplaceAllString(string(data), fmt.Sprintf("Current (v%s)", majorMinor))
-	return true, atomicWrite(path, []byte(out))
+	return true, atomicwrite.Bytes(path, []byte(out))
 }
 
 // --- README history-table row bump ---
@@ -315,27 +317,13 @@ func BumpReadmeHistory(path, majorMinor string, now time.Time, dryRun bool) (boo
 	updated := append([]string{}, lines[:lastVRow+1]...)
 	updated = append(updated, newRow)
 	updated = append(updated, lines[lastVRow+1:]...)
-	return true, atomicWrite(path, []byte(strings.Join(updated, "\n")))
+	return true, atomicwrite.Bytes(path, []byte(strings.Join(updated, "\n")))
 }
 
 // formatHistoryDate mirrors bash `date +"%b %-d"` ("May 24", "May 4").
 // Go's "Jan _2" pads single-digit days with a leading space — strip it.
 func formatHistoryDate(t time.Time) string {
 	return fmt.Sprintf("%s %d", t.Format("Jan"), t.Day())
-}
-
-// --- atomic write ---
-
-func atomicWrite(path string, data []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("versionbump: write %s: %w", tmp, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return fmt.Errorf("versionbump: rename %s: %w", path, err)
-	}
-	return nil
 }
 
 // ResultJSON renders the bash-compatible JSON summary line. Returns it

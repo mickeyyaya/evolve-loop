@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -258,9 +257,9 @@ func TestRegister_SpecModelHint_InEnvelope_Persists(t *testing.T) {
 
 // TestRegister_ProfilePersistFails_PropagatesError proves a persist failure on
 // the dispatch profile aborts Register with a wrapped error and writes no spec.
-// We make ProfilesDir a regular FILE so MkdirAll on it fails inside
-// writeJSONAtomic. (Covers persist's profile error return + writeJSONAtomic's
-// MkdirAll error branch + Register's persist error propagation.)
+// We make ProfilesDir a regular FILE so the MkdirAll inside atomicwrite.JSON
+// fails. (Covers persist's profile error return + Register's persist error
+// propagation; atomicwrite's own MkdirAll branch is pinned in that package.)
 func TestRegister_ProfilePersistFails_PropagatesError(t *testing.T) {
 	r := newRegistrar(t)
 	// Replace ProfilesDir with a file occupying that path → MkdirAll fails.
@@ -289,81 +288,7 @@ func TestRegister_SpecPersistFails_PropagatesError(t *testing.T) {
 	}
 }
 
-// TestWriteJSONAtomic_RenameTargetIsDir proves writeJSONAtomic surfaces the
-// rename failure (and cleans up its temp file) when the destination path is an
-// existing DIRECTORY — os.Rename(tmpFile, dir) fails. This exercises the
-// rename-error branch that the higher-level persist tests cannot reach (their
-// MkdirAll fails first). Asserted directly against the unexported helper.
-func TestWriteJSONAtomic_RenameTargetIsDir(t *testing.T) {
-	dir := t.TempDir()
-	target := filepath.Join(dir, "occupied")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatalf("setup mkdir: %v", err)
-	}
-
-	err := writeJSONAtomic(target, map[string]string{"k": "v"})
-	fixtures.RequireErrContains(t, err, "rename")
-
-	// Temp-file cleanup: no leftover .phaseregistrar-*.tmp in the dir.
-	entries, derr := os.ReadDir(dir)
-	if derr != nil {
-		t.Fatalf("readdir: %v", derr)
-	}
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".phaseregistrar-") {
-			t.Errorf("temp file leaked after rename failure: %s", e.Name())
-		}
-	}
-}
-
-// TestWriteJSONAtomic_MarshalError surfaces a json.MarshalIndent failure (a
-// func value is unencodable) WITHOUT leaving a temp file — the error must
-// return before CreateTemp.
-func TestWriteJSONAtomic_MarshalError(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "out.json")
-
-	err := writeJSONAtomic(path, func() {}) // funcs are not JSON-encodable
-	if err == nil {
-		t.Fatal("expected a marshal error for an unencodable value")
-	}
-	if fixtures.FilePresent(path) {
-		t.Error("no file should be written on a marshal failure")
-	}
-	entries, _ := os.ReadDir(dir)
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".phaseregistrar-") {
-			t.Errorf("temp file created despite marshal failing before CreateTemp: %s", e.Name())
-		}
-	}
-}
-
-// TestWriteJSONAtomic_CreateTempFails proves the CreateTemp error branch: the
-// destination's parent dir exists (MkdirAll succeeds) but is read-only, so
-// CreateTemp inside it fails. Skipped under root, which bypasses mode bits.
-func TestWriteJSONAtomic_CreateTempFails(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("read-only dir is not enforced for root")
-	}
-	parent := t.TempDir()
-	if err := os.Chmod(parent, 0o555); err != nil { // r-x: MkdirAll(existing) ok, CreateTemp denied
-		t.Fatalf("chmod: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) }) // let TempDir cleanup remove it
-
-	err := writeJSONAtomic(filepath.Join(parent, "out.json"), map[string]string{"k": "v"})
-	fixtures.RequireErrContains(t, err, "create temp")
-}
-
-// TestWriteJSONAtomic_Succeeds_WritesIndentedJSON pins the happy-path output
-// shape: the file exists, round-trips, and is MarshalIndent'd (2-space).
-func TestWriteJSONAtomic_Succeeds_WritesIndentedJSON(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "out.json")
-	if err := writeJSONAtomic(path, map[string]string{"name": "x"}); err != nil {
-		t.Fatalf("writeJSONAtomic: %v", err)
-	}
-	got := fixtures.MustRead(t, path)
-	if got != "{\n  \"name\": \"x\"\n}" {
-		t.Errorf("unexpected JSON layout:\n%q", got)
-	}
-}
+// The atomic-write OS-fault branches (rename/createtemp/write/close) and the
+// marshal-error + happy-path JSON layout now live in internal/atomicwrite and
+// are pinned by its own 100%-coverage tests. persist's error wraps are covered
+// by TestRegister_ProfilePersistFails / _SpecPersistFails above.

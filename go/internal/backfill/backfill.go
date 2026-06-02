@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // phaseHeaders maps each phase name to its canonical markdown header.
@@ -56,17 +58,8 @@ func TryExtract(workspace, phase, artifactPath string, minLen int) (bool, error)
 		return false, nil
 	}
 
-	if err := atomicWrite(artifactPath, content); err != nil {
+	if err := atomicwrite.Bytes(artifactPath, []byte(content)); err != nil {
 		return false, fmt.Errorf("backfill write %s: %w", artifactPath, err)
 	}
 	return true, nil
-}
-
-// atomicWrite writes content to path via a temp-file rename to avoid partial writes.
-func atomicWrite(path, content string) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }
