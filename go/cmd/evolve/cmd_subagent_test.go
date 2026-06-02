@@ -271,7 +271,6 @@ func TestRunSubagent_ValidateProfile_MissingProfileFails(t *testing.T) {
 	t.Setenv("EVOLVE_PROFILES_DIR_OVERRIDE", tmp)
 	t.Setenv("EVOLVE_ADAPTERS_DIR_OVERRIDE", tmp)
 	t.Setenv("EVOLVE_DISPATCH_PLAN_LOG", "")
-	t.Setenv("EVOLVE_LLM_CONFIG_PATH", filepath.Join(tmp, "absent.json"))
 	t.Setenv("EVOLVE_PROJECT_ROOT", tmp)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", tmp)
 	_, errOut, rc := runCLI("validate-profile", "no-such-agent")

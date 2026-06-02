@@ -23,8 +23,8 @@ func runHappyOpts(t *testing.T) RunOptions {
 		ReadProfile: func(string) (string, error) {
 			return `{"role":"scout","cli":"claude","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/scout.md"}`, nil
 		},
-		ResolveLLM: func(string, string) (resolvellm.Result, error) {
-			return resolvellm.Result{CLI: "claude", ModelTier: "sonnet", Source: "llm_config"}, nil
+		ResolveLLM: func(string) (resolvellm.Result, error) {
+			return resolvellm.Result{CLI: "claude", ModelTier: "sonnet", Source: "profile"}, nil
 		},
 		InspectCapability: func(string, string) (capability.Inspection, error) {
 			return capability.Inspection{
@@ -201,8 +201,8 @@ func TestRun_WorkerNameRoute(t *testing.T) {
 func TestRun_AntigravityRemappedToAgy(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
-		return resolvellm.Result{CLI: "antigravity", ModelTier: "sonnet", Source: "llm_config"}, nil
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
+		return resolvellm.Result{CLI: "antigravity", ModelTier: "sonnet", Source: "profile"}, nil
 	}
 	res, err := Run(context.Background(), RunRequest{
 		Agent:         "scout",
@@ -428,7 +428,7 @@ func TestRun_LedgerEntryWritten(t *testing.T) {
 func TestRun_CLIFromProfileWhenResolverFails(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{}, errors.New("no llm_config")
 	}
 	// Profile still declares cli=claude; model falls to ResolveModelTier.
@@ -449,7 +449,7 @@ func TestRun_CLIFromProfileWhenResolverFails(t *testing.T) {
 func TestRun_CLIUnresolvedFails(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{}, errors.New("no llm_config")
 	}
 	opts.ReadProfile = func(string) (string, error) {
@@ -470,9 +470,9 @@ func TestRun_CLIUnresolvedFails(t *testing.T) {
 func TestRun_ResolveModelTierInvokedWhenResolverHasNoModel(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		// CLI present, no Model/ModelTier → forces the tier-resolver branch.
-		return resolvellm.Result{CLI: "claude", Source: "llm_config"}, nil
+		return resolvellm.Result{CLI: "claude", Source: "profile"}, nil
 	}
 	called := false
 	opts.ResolveModelTier = func(ResolveModelTierRequest, ResolveModelTierOptions) (string, error) {
@@ -498,8 +498,8 @@ func TestRun_ResolveModelTierInvokedWhenResolverHasNoModel(t *testing.T) {
 func TestRun_ResolveModelTierErrorPropagates(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
-		return resolvellm.Result{CLI: "claude", Source: "llm_config"}, nil
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
+		return resolvellm.Result{CLI: "claude", Source: "profile"}, nil
 	}
 	opts.ResolveModelTier = func(ResolveModelTierRequest, ResolveModelTierOptions) (string, error) {
 		return "", errors.New("tier resolution failed")

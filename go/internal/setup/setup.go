@@ -4,15 +4,9 @@
 //   - Detect  — aggregate per-CLI auth/binary/capability (reuse bridge.Doctor +
 //     capability.Inspect) + per-phase current routing (resolvellm.Resolve) +
 //     per-phase constraints (profile envelope / cross-family / allowed_clis).
-//   - Validate — clamp a proposed llm_config.json against the integrity floor:
-//     tier ∈ profile envelope (ERROR), cli ∈ allowed_clis (ERROR),
-//     builder-family ≠ auditor-family (WARN advisory; ERROR under --strict).
 //   - Complete — stamp the first-run marker into state.json via a LOSSLESS
 //     raw-merge (never core.State WriteState, which drops unmodeled keys like
 //     expected_ship_sha).
-//
-// The skill proposes; Validate is the kernel clamp — "model proposes, kernel
-// disposes", the same pattern the routing engine uses.
 package setup
 
 import (
@@ -27,6 +21,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
@@ -41,55 +37,12 @@ var Roles = []string{
 	"retrospective", "memo",
 }
 
-// --- tier + family normalization (canonical vocabulary: fast/balanced/deep,
-// matching profiles' model_tier_default + model_tier_envelope and each
-// manifest's model_tier_map. The Anthropic-named legacy tokens haiku/
-// sonnet/opus are still recognized for one release for backward compat
-// with operator-installed v1 config files.) ---
-
-// tierRank maps a canonical tier (fast/balanced/deep) — or a legacy alias
-// (haiku/sonnet/opus) — or an exact model string — to 1/2/3; 0 = unclassifiable
-// (envelope check is skipped for rank 0). The substring fallbacks at the
-// bottom handle full model identifiers like "claude-haiku-4-5-20251001".
-func tierRank(s string) int {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "fast", "haiku":
-		return 1
-	case "balanced", "sonnet":
-		return 2
-	case "deep", "opus":
-		return 3
-	}
-	l := strings.ToLower(s)
-	switch {
-	case strings.Contains(l, "haiku"):
-		return 1
-	case strings.Contains(l, "sonnet"):
-		return 2
-	case strings.Contains(l, "opus"):
-		return 3
-	}
-	return 0
-}
+// --- CLI-name normalization ---
 
 // baseCLI strips driver suffixes: claude-tmux/claude-p → claude, codex-tmux →
 // codex, agy-tmux → agy.
 func baseCLI(cli string) string {
 	return strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(cli), "-tmux"), "-p")
-}
-
-// cliFamily maps a CLI to its model-vendor family (the cross-family axis:
-// builder-family must differ from auditor-family for adversarial integrity).
-func cliFamily(cli string) string {
-	switch baseCLI(cli) {
-	case "claude":
-		return "anthropic"
-	case "codex":
-		return "openai"
-	case "gemini", "agy":
-		return "google"
-	}
-	return baseCLI(cli)
 }
 
 // capManifest maps a base CLI to its capability-manifest stem (agy's manifest
@@ -166,22 +119,26 @@ type CLIStatus struct {
 	Verdict          string   `json:"verdict"`         // ready|warning|blocked
 	EnvWarnings      []string `json:"env_warnings,omitempty"`
 	// TierModels maps each abstract tier (fast|balanced|deep) to THIS CLI's
-	// native model (e.g. agy→gemini-3.5-flash, codex deep→gpt-5.5). The
-	// /setup skill writes these into llm_config.model so the config is
-	// self-documenting; the realizer resolves the same via tier_aliases.
+	// native model (e.g. agy→gemini-3.5-flash, codex deep→gpt-5.5), surfaced by
+	// the /setup skill so per-phase routing is self-documenting; the realizer
+	// resolves the same via tier_aliases.
 	TierModels map[string]string `json:"tier_models,omitempty"`
 }
 
-// PhaseStatus is one phase agent's current routing + constraints.
+// PhaseStatus is one phase agent's current routing + constraints. Source is
+// "profile" for the profile default or "policy-pin" when a .evolve/policy.json
+// pin overrides it. PinViolation is non-empty when that pin breaches the floor
+// (cli ∉ allowed_clis, or model tier outside the envelope) — surfaced so the
+// /setup onboarding loop can fix the offending pin before it hard-fails dispatch.
 type PhaseStatus struct {
 	Role            string   `json:"role"`
 	CurrentCLI      string   `json:"current_cli,omitempty"`
-	CurrentModel    string   `json:"current_model,omitempty"`
 	CurrentTier     string   `json:"current_tier,omitempty"`
 	Source          string   `json:"source"`
 	Envelope        Envelope `json:"envelope"`
 	CrossFamilyWith string   `json:"cross_family_with,omitempty"`
 	AllowedCLIs     []string `json:"allowed_clis,omitempty"`
+	PinViolation    string   `json:"pin_violation,omitempty"`
 }
 
 // DetectReport is the digest the /setup skill consumes.
@@ -191,6 +148,11 @@ type DetectReport struct {
 	Phases           []PhaseStatus `json:"phases"`
 	SetupCompletedAt string        `json:"setup_completed_at,omitempty"`
 	SetupVersion     int           `json:"setup_version,omitempty"`
+	// PolicyError is non-empty when .evolve/policy.json exists but is malformed.
+	// A malformed policy disables pin overlay (the floor still applies at
+	// dispatch); surfaced so onboarding can fix the JSON rather than silently
+	// ignore the user's pins.
+	PolicyError string `json:"policy_error,omitempty"`
 }
 
 // DetectOptions configures Detect. Seams (Env/Doctor/CapTier/Now) keep the
@@ -200,7 +162,6 @@ type DetectOptions struct {
 	EvolveDir   string
 	PluginRoot  string
 	AdaptersDir string
-	ConfigPath  string // default <EvolveDir>/llm_config.json
 	Env         func(string) string
 	Now         func() time.Time
 	Doctor      func(ctx context.Context) bridge.DoctorReport // default: bridge.NewEngine(Deps{}).Doctor(ctx,"",false)
@@ -259,26 +220,55 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 	}
 	sort.Slice(clis, func(i, j int) bool { return clis[i].CLI < clis[j].CLI })
 
-	// Phases — current routing + profile constraints. (Step 9: llm_config
-	// removed; resolvellm reads the profile directly.)
+	// Phases — current routing + profile constraints, then the user's
+	// .evolve/policy.json pins overlaid (Step 9 removed llm_config.json; profiles
+	// own the default CLI+tier and policy pins are the user-owned override layer
+	// the /setup skill writes).
 	profilesDir := filepath.Join(o.EvolveDir, "profiles")
+	pol, polErr := policy.Load(filepath.Join(o.EvolveDir, "policy.json"))
+	profLoader := profiles.NewFromDir(profilesDir)
 	var phases []PhaseStatus
 	for _, role := range Roles {
 		ps := PhaseStatus{Role: role, Source: "unresolved"}
 		if res, err := resolvellm.Resolve(role, resolvellm.Options{
 			ProjectRoot: o.ProjectRoot, PluginRoot: o.PluginRoot, Env: env,
 		}); err == nil {
-			// Step 9: resolvellm no longer emits an exact Model (always a tier);
-			// CurrentModel stays empty (report-schema field, pruned in 9b).
+			// Step 9: resolvellm emits a tier, never an exact model.
 			ps.CurrentCLI, ps.CurrentTier, ps.Source = res.CLI, res.ModelTier, res.Source
 		}
 		if envlp, fam, allowed, ok := readProfileConstraints(profilesDir, role); ok {
 			ps.Envelope, ps.CrossFamilyWith, ps.AllowedCLIs = envlp, fam, allowed
 		}
+		// Overlay the policy pin (the dispatch resolver honors it absolutely) and
+		// validate it against the same floor dispatch enforces, so onboarding can
+		// fix a breaching pin before it hard-fails a real cycle. A malformed
+		// policy (polErr != nil) is reported via dr.PolicyError below — skip the
+		// overlay rather than act on a partially-parsed Policy.
+		if pin, ok := pol.PinFor(role); polErr == nil && ok {
+			if pin.CLI != "" {
+				ps.CurrentCLI = pin.CLI
+			}
+			if pin.Model != "" {
+				ps.CurrentTier = pin.Model
+			}
+			ps.Source = "policy-pin"
+			if prof, err := profLoader.Get(role); err == nil {
+				if verr := policy.ValidatePin(role, pin, &prof); verr != nil {
+					ps.PinViolation = verr.Error()
+				}
+			} else {
+				// A pin for a phase with no profile can't be floor-checked — say so
+				// rather than show a false green (source=policy-pin, no violation).
+				ps.PinViolation = fmt.Sprintf("profile %s.json not found; pin cannot be validated", role)
+			}
+		}
 		phases = append(phases, ps)
 	}
 
 	dr := DetectReport{ScannedAt: now().UTC().Format(time.RFC3339), CLIs: clis, Phases: phases}
+	if polErr != nil {
+		dr.PolicyError = polErr.Error()
+	}
 	dr.SetupCompletedAt, dr.SetupVersion = readStateMarker(o.EvolveDir)
 	return dr
 }
@@ -345,128 +335,6 @@ func readStateMarker(evolveDir string) (string, int) {
 	}
 	_ = json.Unmarshal(b, &m)
 	return m.SetupCompletedAt, m.SetupVersion
-}
-
-// --- Validate ---
-
-// Violation is one clamp finding. Severity "error" → exit 2; "warn" → advisory.
-type Violation struct {
-	Role     string `json:"role"`
-	Kind     string `json:"kind"`     // envelope|allowed_cli|cross_family
-	Severity string `json:"severity"` // error|warn
-	Message  string `json:"message"`
-}
-
-// ValidateReport is the clamp result. OK = no error-severity violations.
-type ValidateReport struct {
-	Config     string      `json:"config"`
-	Violations []Violation `json:"violations"`
-	OK         bool        `json:"ok"`
-}
-
-// ValidateOptions configures Validate.
-type ValidateOptions struct {
-	ConfigPath  string
-	ProfilesDir string // default <EvolveDir>/profiles
-	EvolveDir   string
-	Strict      bool // when true, cross-family same-family is an error (not a warn)
-}
-
-type cfgPhase struct {
-	CLI       string `json:"cli"`
-	Tier      string `json:"tier"`
-	Model     string `json:"model"`
-	ModelTier string `json:"model_tier"`
-}
-
-// effTier returns the phase's effective tier signal (tier > model_tier > model).
-func (p cfgPhase) effTier() string {
-	if p.Tier != "" {
-		return p.Tier
-	}
-	if p.ModelTier != "" {
-		return p.ModelTier
-	}
-	return p.Model
-}
-
-// Validate clamps a proposed llm_config.json against the integrity floor.
-func Validate(o ValidateOptions) (ValidateReport, error) {
-	rep := ValidateReport{Config: o.ConfigPath, OK: true}
-	raw, err := os.ReadFile(o.ConfigPath)
-	if err != nil {
-		return rep, fmt.Errorf("setup validate: read config: %w", err)
-	}
-	var cfg struct {
-		Phases map[string]cfgPhase `json:"phases"`
-	}
-	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return rep, fmt.Errorf("setup validate: parse config: %w", err)
-	}
-	profilesDir := o.ProfilesDir
-	if profilesDir == "" {
-		profilesDir = filepath.Join(o.EvolveDir, "profiles")
-	}
-
-	// Sort roles for deterministic violation order.
-	roles := make([]string, 0, len(cfg.Phases))
-	for r := range cfg.Phases {
-		roles = append(roles, r)
-	}
-	sort.Strings(roles)
-
-	for _, role := range roles {
-		ph := cfg.Phases[role]
-		env, _, allowed, ok := readProfileConstraints(profilesDir, role)
-		if !ok {
-			continue // no profile constraints to enforce
-		}
-		// Envelope bound (ERROR).
-		rank := tierRank(ph.effTier())
-		minR, maxR := tierRank(env.Min), tierRank(env.Max)
-		if rank > 0 && minR > 0 && maxR > 0 && (rank < minR || rank > maxR) {
-			rep.Violations = append(rep.Violations, Violation{
-				Role: role, Kind: "envelope", Severity: "error",
-				Message: fmt.Sprintf("tier %q (rank %d) outside envelope [%s..%s]", ph.effTier(), rank, env.Min, env.Max),
-			})
-			rep.OK = false
-		}
-		// allowed_clis (ERROR).
-		if len(allowed) > 0 && !contains(allowed, "all") && ph.CLI != "" && !contains(allowed, baseCLI(ph.CLI)) {
-			rep.Violations = append(rep.Violations, Violation{
-				Role: role, Kind: "allowed_cli", Severity: "error",
-				Message: fmt.Sprintf("cli %q not in allowed_clis %v", baseCLI(ph.CLI), allowed),
-			})
-			rep.OK = false
-		}
-	}
-
-	// Cross-family: builder ≠ auditor family. WARN by default (all-Claude is a
-	// legitimate fallback per the cycle-100 recovery + dynamic-model-routing.md
-	// advisory posture); ERROR only under --strict.
-	if b, okB := cfg.Phases["builder"]; okB {
-		if a, okA := cfg.Phases["auditor"]; okA && b.CLI != "" && a.CLI != "" && cliFamily(b.CLI) == cliFamily(a.CLI) {
-			sev := "warn"
-			if o.Strict {
-				sev = "error"
-				rep.OK = false
-			}
-			rep.Violations = append(rep.Violations, Violation{
-				Role: "builder+auditor", Kind: "cross_family", Severity: sev,
-				Message: fmt.Sprintf("builder and auditor share family %q — adversarial-audit integrity is weakened (set different-family CLIs when available)", cliFamily(b.CLI)),
-			})
-		}
-	}
-	return rep, nil
-}
-
-func contains(xs []string, s string) bool {
-	for _, x := range xs {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // --- Complete ---

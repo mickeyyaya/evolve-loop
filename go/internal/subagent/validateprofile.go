@@ -31,7 +31,6 @@ type ValidateProfileRequest struct {
 	CapabilityDir   string // manifest dir (real install; ignores override)
 	ProjectRoot     string // writable project root (host repo)
 	WorktreePath    string // optional WORKTREE_PATH override
-	LLMConfigPath   string // EVOLVE_LLM_CONFIG_PATH override (empty → default)
 	DispatchPlanLog string // EVOLVE_DISPATCH_PLAN_LOG path; empty disables emission
 }
 
@@ -40,7 +39,7 @@ type ValidateProfileRequest struct {
 // InspectCapability, ExecAdapter.
 type ValidateProfileOptions struct {
 	ReadProfile       func(path string) (string, error)
-	ResolveLLM        func(agent, configPath string) (resolvellm.Result, error)
+	ResolveLLM        func(agent string) (resolvellm.Result, error)
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
 	// ExecAdapter runs the bash adapter with VALIDATE_ONLY=1. Returns the
 	// CLI's exit code + any execution error. Tests supply a fake.
@@ -57,7 +56,7 @@ type ValidateProfileOptions struct {
 type ValidateProfileResult struct {
 	CLI              string
 	Model            string
-	CLIResolutionSrc string // "llm_config" | "llm_config_fallback" | "profile"
+	CLIResolutionSrc string // source from resolvellm.Resolve ("profile" since Step 9 removed llm_config)
 	Warns            []string
 	AdapterOverrides AdapterOverrides
 	AdapterExitCode  int
@@ -120,7 +119,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 		return ValidateProfileResult{}, fmt.Errorf("subagent/validate: profile is not valid JSON: %s", profilePath)
 	}
 
-	llm, llmErr := opts.ResolveLLM(req.Agent, req.LLMConfigPath)
+	llm, llmErr := opts.ResolveLLM(req.Agent)
 	var cli, source, resolvedModel string
 	if llmErr == nil && llm.CLI != "" {
 		cli = llm.CLI
@@ -291,12 +290,9 @@ func capabilityExtractObject(body, name string) (string, bool) {
 	return "", false
 }
 
-// defaultResolveLLM bridges to resolvellm.Resolve. configPath is ignored as of
-// Step 9 (llm_config.json removed; resolvellm reads the profile). The param +
-// the LLMConfigPath plumbing are now dead and can be pruned in a follow-up; the
-// seam signature is kept to avoid churning subagent callers + tests in the
-// removal slice.
-func defaultResolveLLM(agent, _ string) (resolvellm.Result, error) {
+// defaultResolveLLM bridges to resolvellm.Resolve, which reads the per-phase
+// profile (Step 9 removed the llm_config.json layer entirely).
+func defaultResolveLLM(agent string) (resolvellm.Result, error) {
 	return resolvellm.Resolve(agent, resolvellm.Options{})
 }
 

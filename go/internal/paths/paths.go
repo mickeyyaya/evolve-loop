@@ -8,7 +8,7 @@
 //
 //  1. The corresponding EVOLVE_*_OVERRIDE env var, if set.
 //  2. A path derived from PluginRoot (profiles, adapters, capability)
-//     or ProjectRoot (state, ledger, llm_config).
+//     or ProjectRoot (state, ledger).
 //  3. cwd when env is empty (ProjectRoot only).
 //
 // CapabilityDir is intentionally NEVER honored by
@@ -53,10 +53,6 @@ type Layout struct {
 	// LedgerFile is <EvolveDir>/ledger.jsonl — hash-chained audit
 	// trail. Overridable via EVOLVE_LEDGER_OVERRIDE.
 	LedgerFile string
-
-	// LLMConfigFile is <EvolveDir>/llm_config.json — role→cli+model
-	// routing. Overridable via EVOLVE_LLM_CONFIG_PATH.
-	LLMConfigFile string
 
 	// ProfilesDir is <PluginRoot>/.evolve/profiles — sandbox + LLM
 	// profile JSONs. Overridable via EVOLVE_PROFILES_DIR_OVERRIDE.
@@ -117,10 +113,6 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 	// install path even when the override points to a test sentinel dir.
 	capabilityDir := filepath.Join(pluginRoot, "adapters")
 
-	llmConfigFile := lookupEnv("EVOLVE_LLM_CONFIG_PATH")
-	if llmConfigFile == "" {
-		llmConfigFile = filepath.Join(evolveDir, "llm_config.json")
-	}
 	ledgerFile := lookupEnv("EVOLVE_LEDGER_OVERRIDE")
 	if ledgerFile == "" {
 		ledgerFile = filepath.Join(evolveDir, "ledger.jsonl")
@@ -133,7 +125,6 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		StateFile:      filepath.Join(evolveDir, "state.json"),
 		CycleStateFile: filepath.Join(evolveDir, "cycle-state.json"),
 		LedgerFile:     ledgerFile,
-		LLMConfigFile:  llmConfigFile,
 		ProfilesDir:    profilesDir,
 		AdaptersDir:    adaptersDir,
 		CapabilityDir:  capabilityDir,

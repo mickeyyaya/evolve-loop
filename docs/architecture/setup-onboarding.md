@@ -1,18 +1,18 @@
 # Setup Onboarding (`evolve setup` + `/setup`)
 
-> **Status:** Shipped 2026-05-27. First-launch onboarding: detect CLIs, propose + validate per-phase models, explain the pipeline.
+> **Status:** Shipped 2026-05-27. Step-9b migration (2026-06-02) repointed the durable per-phase override from the removed `llm_config.json` to `.evolve/policy.json` `pins`. First-launch onboarding: detect CLIs, propose per-phase CLI/model pins, verify them against the floor, explain the pipeline.
 > **Audience:** Operators onboarding a new checkout; anyone changing per-phase model routing.
 > **Source:** `go/internal/setup/setup.go`, `go/cmd/evolve/cmd_setup.go`, `skills/setup/SKILL.md`. Design: [adr/0027-setup-onboarding.md](adr/0027-setup-onboarding.md).
 
 ## TL;DR
 
-The deterministic core lives in `evolve setup` (Go); the interactive recommendation + pipeline explanation live in the `/setup` skill (your CLI session — no extra token cost). The skill **proposes** a per-phase model config; `evolve setup validate` is the **kernel clamp**. Setup runs once on first launch (the loop nudges) and is re-runnable anytime.
+The deterministic core lives in `evolve setup` (Go); the interactive recommendation + pipeline explanation live in the `/setup` skill (your CLI session — no extra token cost). The skill **proposes** per-phase CLI/model pins written to `.evolve/policy.json`; the **kernel clamp** (envelope + allowed_clis) is reported by `evolve setup detect` as a `pin_violation` and hard-enforced at dispatch. Profiles own the per-phase defaults; pins are the OPT-IN override layer (Step 9 removed the old `llm_config.json`). Setup runs once on first launch (the loop nudges) and is re-runnable anytime.
 
 ## Contents
 
 - [Subcommands](#subcommands)
 - [Detect digest](#detect-digest)
-- [Validation rules](#validation-rules)
+- [Pin verification rules](#pin-verification-rules)
 - [First-run marker + nudge](#first-run-marker--nudge)
 - [The /setup skill flow](#the-setup-skill-flow)
 - [Limitations](#limitations)
@@ -21,9 +21,13 @@ The deterministic core lives in `evolve setup` (Go); the interactive recommendat
 
 | Command | Exit codes | Notes |
 |---|---|---|
-| `evolve setup detect [--json] [--evolve-dir DIR]` | 0 | Read-only digest (human table or JSON) |
-| `evolve setup validate [--config P] [--strict] [--json] [--evolve-dir DIR]` | 0 OK · 2 error-violation · 1 IO/parse · 10 bad args | Clamps a config against the floor |
+| `evolve setup detect [--json] [--evolve-dir DIR]` | 0 | Read-only digest (human table or JSON); overlays `.evolve/policy.json` pins onto the per-phase routing and reports any `pin_violation` |
 | `evolve setup complete [--evolve-dir DIR]` | 0 · 1 IO | Stamps `state.setupCompletedAt` + `setupVersion` (lossless) |
+
+> The standalone `evolve setup validate` subcommand was removed in Step 9b (it
+> validated the now-deleted `llm_config.json`). The same envelope + allowed_clis
+> clamp is now applied by `policy.ValidatePin` and surfaced inline by `detect`'s
+> `pin_violation` field; an out-of-bounds pin also hard-fails the phase at dispatch.
 
 Project root resolves `--project-root` > `EVOLVE_PROJECT_ROOT` > cwd; `--evolve-dir` overrides `.evolve/`; plugin root from `EVOLVE_PLUGIN_ROOT` (or project); adapters from `<plugin>/adapters`.
 
@@ -43,32 +47,32 @@ Project root resolves `--project-root` > `EVOLVE_PROJECT_ROOT` > cwd; `--evolve-
       "tier_models": { "fast": "haiku", "balanced": "sonnet", "deep": "opus" } }
   ],
   "phases": [
-    { "role": "builder", "current_cli": "claude", "current_model": "sonnet",
-      "current_tier": "", "source": "llm_config",
+    { "role": "builder", "current_cli": "claude", "current_tier": "sonnet",
+      "source": "policy-pin", "pin_violation": "",
       "envelope": {"min":"balanced","default":"balanced","max":"deep"},
       "cross_family_with": "auditor", "allowed_clis": ["claude","agy"] }
   ],
-  "setup_completed_at": "", "setup_version": 0
+  "setup_completed_at": "", "setup_version": 0, "policy_error": ""
 }
 ```
 
 - **CLIs** are grouped by base family (claude/codex/gemini/agy); `bridge.Doctor`'s `-tmux`/`-p` driver rows collapse to one row per family.
 - **auth_mode** (claude): `CUSTOM_PROXY` (base-url set) > `API_KEY` (api-key set) > `SUBSCRIPTION_OAUTH` (creds file) > `MISCONFIGURED`. Other CLIs: `SUBSCRIPTION` if configured, else `MISCONFIGURED`.
 - **capability_tier**: `full` (budget + permission native), `delegated` (delegates to claude / kernel hooks), `n/a` (no binary). The precise 5-dimension quality tier is available via `./bin/check-caps`.
-- **tier_models**: each abstract tier → that CLI's NATIVE model, sourced from the bridge manifest `tier_aliases` (single source of truth): `agy` → `gemini-3.5-flash` (all tiers; no model selector), `codex` → `gpt-5.4-mini`/`gpt-5.4`/`gpt-5.5`, `claude` → `haiku`/`sonnet`/`opus`. `/setup` writes these into `llm_config.model` so the config is self-documenting.
+- **tier_models**: each abstract tier → that CLI's NATIVE model, sourced from the bridge manifest `tier_aliases` (single source of truth): `agy` → `gemini-3.5-flash` (all tiers; no model selector), `codex` → `gpt-5.4-mini`/`gpt-5.4`/`gpt-5.5`, `claude` → `haiku`/`sonnet`/`opus`. `/setup` writes the chosen native model into `.evolve/policy.json` `pins[<phase>].model`.
 
-> **Resolution nuance (footgun).** `resolvellm` reads `cli`/`model`/`model_tier` and **ignores the `tier` field** — `model` is what flows to dispatch (the realizer maps it per-CLI via `tier_aliases`, so `model:"sonnet"` on codex still resolves to `gpt-5.4`). The `tier` field is consumed only by `validate` (envelope) + the digest. Keep `tier` and `model` consistent (the skill derives `model` from `tier_models[tier]`), or `model` silently wins over a disagreeing `tier`.
-- **phases** cover the 12 configurable roles, each resolved by `resolvellm.Resolve` (precedence: `llm_config.phases` > `_fallback` > profile).
+> **Resolution nuance.** Without a pin, `resolvellm` resolves a phase from its profile (`cli` + `model_tier_default`, default `balanced`) — Step 9 removed the `llm_config.json` layer, so the profile is the only default source. A `.evolve/policy.json` `pin` then overrides: `pin.cli` sets the CLI and `pin.model` sets the exact model the realizer dispatches. The pin's tier (for the envelope check) is classified from `pin.model` via `policy.TierRank` (Claude models classify by substring; gemini/gpt models are rank 0 → envelope check skipped, `allowed_clis` still applies).
+- **phases** cover the 12 configurable roles, each resolved from its profile by `resolvellm.Resolve`, then the matching `.evolve/policy.json` pin overlaid (`source` becomes `policy-pin`). A malformed `policy.json` sets the top-level `policy_error` and disables overlay (the floor still applies at dispatch).
 
-## Validation rules
+## Pin verification rules
 
-`validate` reads `llm_config.json` and each phase's profile (`.evolve/profiles/<role>.json`):
+`detect` overlays each `.evolve/policy.json` pin and runs `policy.ValidatePin` against the phase's profile (`.evolve/profiles/<role>.json`), reporting the first breach in `pin_violation`. The same check hard-fails the phase at dispatch.
 
 | Check | Severity | Rule |
 |---|---|---|
-| Envelope | **error** (exit 2) | phase tier ∈ `[envelope.min .. envelope.max]`. Tiers normalize across both vocabularies: `fast↔haiku`, `balanced↔sonnet`, `deep↔opus`; exact model strings classify by substring. |
-| allowed_clis | **error** (exit 2) | phase `cli` ∈ profile `allowed_clis` (unless `["all"]`) |
-| Cross-family | **warn** (advisory) | `builder` family ≠ `auditor` family. WARN by default — all-Claude is a legitimate fallback. `--strict` promotes to error. Families: claude→anthropic, codex→openai, gemini/agy→google. |
+| Envelope | **pin_violation** + dispatch hard-fail | pinned model's tier ∈ `[envelope.min .. envelope.max]`. Tiers normalize across both vocabularies: `fast↔haiku`, `balanced↔sonnet`, `deep↔opus`; exact model strings classify by substring. Non-Claude models (gemini/gpt) are tier-rank 0 → envelope check skipped (allowed_clis still applies). |
+| allowed_clis | **pin_violation** + dispatch hard-fail | pinned `cli` family ∈ profile `allowed_clis` (unless `["all"]`) |
+| Cross-family | advisory (skill-applied) | `builder` family ≠ `auditor` family is PREFERRED for adversarial integrity but enforced by no command — the `/setup` skill surfaces it from each phase's `cross_family_with`. All-Claude is a legitimate fallback. Families: claude→anthropic, codex→openai, gemini/agy→google. |
 
 ## First-run marker + nudge
 
@@ -77,7 +81,7 @@ Project root resolves `--project-root` > `EVOLVE_PROJECT_ROOT` > cwd; `--evolve-
 
 ## The /setup skill flow
 
-`detect --json` → present CLIs → explain pipeline (grounded in README/overview/phase-architecture/[[dynamic-phase-routing]]) → propose per-phase models (envelope + allowed_clis + availability + cross-family-when-possible + tier heuristics) → AskUserQuestion to adjust → write `.evolve/llm_config.json` (schema v2) → `validate` (clamp loop on exit 2) → `complete`. Full procedure: `skills/setup/SKILL.md`.
+`detect --json` → present CLIs → explain pipeline (grounded in README/overview/phase-architecture/[[dynamic-phase-routing]]) → propose per-phase models (envelope + allowed_clis + availability + cross-family-when-possible + tier heuristics) → AskUserQuestion to adjust → write `.evolve/policy.json` `pins` (only where overriding a profile default) → re-run `detect` and loop until every pinned phase shows `source:"policy-pin"` with empty `pin_violation` (and no `policy_error`) → `complete`. Full procedure: `skills/setup/SKILL.md`.
 
 ## Limitations
 

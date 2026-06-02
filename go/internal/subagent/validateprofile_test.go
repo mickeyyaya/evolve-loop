@@ -17,8 +17,8 @@ import (
 func happyOpts(profileBody string, cli string) ValidateProfileOptions {
 	return ValidateProfileOptions{
 		ReadProfile: func(string) (string, error) { return profileBody, nil },
-		ResolveLLM: func(string, string) (resolvellm.Result, error) {
-			return resolvellm.Result{CLI: cli, ModelTier: "sonnet", Source: "llm_config"}, nil
+		ResolveLLM: func(string) (resolvellm.Result, error) {
+			return resolvellm.Result{CLI: cli, ModelTier: "sonnet", Source: "profile"}, nil
 		},
 		InspectCapability: func(string, string) (capability.Inspection, error) {
 			return capability.Inspection{
@@ -54,7 +54,7 @@ func TestValidateProfile_HappyPath(t *testing.T) {
 	if res.Model != "sonnet" {
 		t.Errorf("Model=%q", res.Model)
 	}
-	if res.CLIResolutionSrc != "llm_config" {
+	if res.CLIResolutionSrc != "profile" {
 		t.Errorf("Source=%q", res.CLIResolutionSrc)
 	}
 	if len(res.Warns) != 0 {
@@ -131,7 +131,7 @@ func TestValidateProfile_InvalidJSON(t *testing.T) {
 func TestValidateProfile_LLMResolveFailureFallsThroughToProfile(t *testing.T) {
 	body := `{"cli":"claude","model_tier_default":"opus"}`
 	opts := happyOpts(body, "claude")
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{}, errors.New("config missing")
 	}
 	res, err := ValidateProfile(context.Background(),
@@ -148,7 +148,7 @@ func TestValidateProfile_LLMResolveFailureFallsThroughToProfile(t *testing.T) {
 func TestValidateProfile_LLMReturnsEmptyCLIFallsThrough(t *testing.T) {
 	body := `{"cli":"claude","model_tier_default":"sonnet"}`
 	opts := happyOpts(body, "claude")
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{CLI: ""}, nil
 	}
 	res, err := ValidateProfile(context.Background(),
@@ -179,7 +179,7 @@ func TestValidateProfile_AntigravityRemappedToAgy(t *testing.T) {
 func TestValidateProfile_UnresolvedCLI(t *testing.T) {
 	body := `{"model_tier_default":"sonnet"}` // no cli field
 	opts := happyOpts(body, "")
-	opts.ResolveLLM = func(string, string) (resolvellm.Result, error) {
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{}, errors.New("nope")
 	}
 	_, err := ValidateProfile(context.Background(),
@@ -473,14 +473,12 @@ func TestCapabilityExtractObject_UnterminatedObject(t *testing.T) {
 }
 
 // TestDefaultResolveLLM_BridgesToResolver exercises the defaultResolveLLM
-// seam directly (0% before). A nonexistent config path makes resolvellm
-// surface an error; the point is to execute the bridge line itself.
+// seam directly (0% before); the point is to execute the bridge line itself.
 func TestDefaultResolveLLM_BridgesToResolver(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "no-such-llm_config.json")
 	// The call must not panic and must return through the resolver. We assert
 	// only that the bridge returns the resolver's own result/error pair —
 	// either a populated CLI or a non-nil error, never both empty+nil.
-	res, err := defaultResolveLLM("scout", missing)
+	res, err := defaultResolveLLM("scout")
 	if err == nil && res.CLI == "" {
 		t.Errorf("bridge returned empty result with nil error: %+v", res)
 	}

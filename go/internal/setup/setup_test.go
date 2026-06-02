@@ -24,7 +24,7 @@ func writeFile(t *testing.T, path, body string) {
 	}
 }
 
-// fixtureRepo lays down a temp project with .evolve/profiles + llm_config.
+// fixtureRepo lays down a temp project with .evolve/profiles.
 func fixtureRepo(t *testing.T) (project, evolveDir string) {
 	t.Helper()
 	project = t.TempDir()
@@ -62,35 +62,7 @@ func fakeDoctor(ctx context.Context) bridge.DoctorReport {
 	}
 }
 
-// --- tier + family normalization ---
-
-func TestTierRank(t *testing.T) {
-	cases := map[string]int{
-		"fast": 1, "haiku": 1, "balanced": 2, "sonnet": 2, "deep": 3, "opus": 3,
-		"claude-opus-4-7": 3, "claude-3-5-sonnet": 2, "claude-haiku-4-5": 1, "gpt-5": 0, "": 0,
-	}
-	for in, want := range cases {
-		if got := tierRank(in); got != want {
-			t.Errorf("tierRank(%q) = %d, want %d", in, got, want)
-		}
-	}
-}
-
-func TestCLIFamily(t *testing.T) {
-	cases := map[string]string{
-		"claude": "anthropic", "claude-tmux": "anthropic", "claude-p": "anthropic",
-		"codex": "openai", "codex-tmux": "openai",
-		"gemini": "google", "agy": "google", "agy-tmux": "google",
-		// Unknown CLI falls through to the baseCLI passthrough (default branch).
-		"mystery":      "mystery",
-		"mystery-tmux": "mystery",
-	}
-	for in, want := range cases {
-		if got := cliFamily(in); got != want {
-			t.Errorf("cliFamily(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
+// --- CLI-name normalization ---
 
 // TestCapManifest pins the agy→antigravity special-case and the identity
 // passthrough for every other CLI (the manifest-stem mapping).
@@ -102,28 +74,6 @@ func TestCapManifest(t *testing.T) {
 		if got := capManifest(base); got != base {
 			t.Errorf("capManifest(%q) = %q, want identity", base, got)
 		}
-	}
-}
-
-// TestEffTier pins the tier > model_tier > model precedence ladder, including
-// the two fallback rungs the existing suite never exercised.
-func TestEffTier(t *testing.T) {
-	cases := []struct {
-		name string
-		p    cfgPhase
-		want string
-	}{
-		{"tier wins", cfgPhase{Tier: "deep", ModelTier: "balanced", Model: "opus"}, "deep"},
-		{"model_tier fallback", cfgPhase{ModelTier: "balanced", Model: "sonnet"}, "balanced"},
-		{"model last resort", cfgPhase{Model: "claude-opus-4-7"}, "claude-opus-4-7"},
-		{"all empty", cfgPhase{}, ""},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := c.p.effTier(); got != c.want {
-				t.Errorf("effTier() = %q, want %q", got, c.want)
-			}
-		})
 	}
 }
 
@@ -229,6 +179,103 @@ func TestDetect(t *testing.T) {
 	}
 	if rep.SetupCompletedAt != "" {
 		t.Errorf("fresh repo should have no setup marker, got %q", rep.SetupCompletedAt)
+	}
+}
+
+// detectWithPolicy runs Detect over fixtureRepo with the offline seams, after
+// writing the given policy.json body (empty body → no file).
+func detectWithPolicy(t *testing.T, policyBody string) DetectReport {
+	t.Helper()
+	project, evolveDir := fixtureRepo(t)
+	if policyBody != "" {
+		writeFile(t, filepath.Join(evolveDir, "policy.json"), policyBody)
+	}
+	return Detect(context.Background(), DetectOptions{
+		ProjectRoot: project,
+		EvolveDir:   evolveDir,
+		Env:         func(string) string { return "" },
+		Now:         func() time.Time { return time.Unix(0, 0).UTC() },
+		Doctor:      fakeDoctor,
+		CapTier:     func(base string) string { return map[string]string{"claude": "full", "codex": "delegated"}[base] },
+	})
+}
+
+func phaseByRole(rep DetectReport, role string) PhaseStatus {
+	for _, p := range rep.Phases {
+		if p.Role == role {
+			return p
+		}
+	}
+	return PhaseStatus{}
+}
+
+// TestDetect_PolicyPinOverlay: a valid pin overrides the profile routing and is
+// reported with source="policy-pin" and no violation.
+func TestDetect_PolicyPinOverlay(t *testing.T) {
+	// builder profile: allowed_clis [claude,agy], envelope balanced..deep.
+	// Pin claude+deep is within both guardrails.
+	rep := detectWithPolicy(t, `{"pins":{"builder":{"cli":"claude","model":"deep"}}}`)
+	b := phaseByRole(rep, "builder")
+	if b.Source != "policy-pin" || b.CurrentCLI != "claude" || b.CurrentTier != "deep" {
+		t.Errorf("expected pinned claude/deep, got %+v", b)
+	}
+	if b.PinViolation != "" {
+		t.Errorf("valid pin should have no violation, got %q", b.PinViolation)
+	}
+	// An unpinned phase keeps its profile routing.
+	if s := phaseByRole(rep, "scout"); s.Source != "profile" {
+		t.Errorf("unpinned scout should stay profile-sourced, got %+v", s)
+	}
+}
+
+// TestDetect_PolicyPinCLIViolation: a pin whose CLI is outside allowed_clis is
+// surfaced as a violation (still overlaid so the user sees what they wrote).
+func TestDetect_PolicyPinCLIViolation(t *testing.T) {
+	// builder allows only [claude,agy]; codex breaches allowed_clis.
+	rep := detectWithPolicy(t, `{"pins":{"builder":{"cli":"codex","model":"deep"}}}`)
+	b := phaseByRole(rep, "builder")
+	if b.Source != "policy-pin" || b.CurrentCLI != "codex" {
+		t.Errorf("pin should overlay even when invalid, got %+v", b)
+	}
+	if b.PinViolation == "" || !strings.Contains(b.PinViolation, "allowed_clis") {
+		t.Errorf("expected allowed_clis violation, got %q", b.PinViolation)
+	}
+}
+
+// TestDetect_PolicyPinTierViolation: a pin whose tier is outside the envelope is
+// surfaced as a violation.
+func TestDetect_PolicyPinTierViolation(t *testing.T) {
+	// auditor envelope is deep..deep; fast (rank 1) is below min.
+	rep := detectWithPolicy(t, `{"pins":{"auditor":{"cli":"claude","model":"fast"}}}`)
+	a := phaseByRole(rep, "auditor")
+	if a.PinViolation == "" || !strings.Contains(a.PinViolation, "envelope") {
+		t.Errorf("expected envelope violation, got %q", a.PinViolation)
+	}
+}
+
+// TestDetect_PolicyPinNoProfile: a pin for a phase with no profile file can't be
+// floor-checked, so detect reports a violation rather than a false green.
+func TestDetect_PolicyPinNoProfile(t *testing.T) {
+	// fixtureRepo writes builder/auditor/scout profiles only — "intent" has none.
+	rep := detectWithPolicy(t, `{"pins":{"intent":{"cli":"claude","model":"opus"}}}`)
+	i := phaseByRole(rep, "intent")
+	if i.Source != "policy-pin" {
+		t.Errorf("pin should overlay even without a profile, got %+v", i)
+	}
+	if i.PinViolation == "" || !strings.Contains(i.PinViolation, "not found") {
+		t.Errorf("expected a profile-not-found violation, got %q", i.PinViolation)
+	}
+}
+
+// TestDetect_MalformedPolicy: a present-but-unparseable policy.json sets
+// PolicyError and disables pin overlay (phases stay profile-sourced).
+func TestDetect_MalformedPolicy(t *testing.T) {
+	rep := detectWithPolicy(t, `{"pins": {not json`)
+	if rep.PolicyError == "" {
+		t.Error("malformed policy.json should set PolicyError")
+	}
+	if b := phaseByRole(rep, "builder"); b.Source != "profile" {
+		t.Errorf("malformed policy should leave builder profile-sourced, got %+v", b)
 	}
 }
 
@@ -362,113 +409,6 @@ func TestDetect_NilDoctorAndCapTierSeams(t *testing.T) {
 		}
 		seen[c.CLI] = true
 	}
-}
-
-// --- Validate ---
-
-func TestValidate(t *testing.T) {
-	_, evolveDir := fixtureRepo(t)
-	cfgPath := filepath.Join(evolveDir, "cfg.json")
-
-	t.Run("clean all-claude (cross-family WARN only, exit OK)", func(t *testing.T) {
-		writeFile(t, cfgPath, `{"phases":{
-		  "builder":{"cli":"claude","tier":"balanced"},
-		  "auditor":{"cli":"claude","tier":"deep"}
-		}}`)
-		rep, err := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !rep.OK {
-			t.Fatalf("all-claude within envelope should be OK (cross-family is a warn): %+v", rep.Violations)
-		}
-		var sawWarn bool
-		for _, v := range rep.Violations {
-			if v.Kind == "cross_family" && v.Severity == "warn" {
-				sawWarn = true
-			}
-		}
-		if !sawWarn {
-			t.Errorf("expected a cross_family warn, got %+v", rep.Violations)
-		}
-	})
-
-	t.Run("cross-family error under --strict", func(t *testing.T) {
-		writeFile(t, cfgPath, `{"phases":{
-		  "builder":{"cli":"claude","tier":"balanced"},
-		  "auditor":{"cli":"claude","tier":"deep"}
-		}}`)
-		rep, _ := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir, Strict: true})
-		if rep.OK {
-			t.Errorf("strict mode should fail same-family: %+v", rep.Violations)
-		}
-	})
-
-	t.Run("envelope violation is an error", func(t *testing.T) {
-		// auditor envelope is deep..deep; balanced is below min → error.
-		writeFile(t, cfgPath, `{"phases":{"auditor":{"cli":"codex","tier":"balanced"}}}`)
-		rep, _ := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir})
-		if rep.OK {
-			t.Fatalf("below-envelope tier should fail: %+v", rep.Violations)
-		}
-		if rep.Violations[0].Kind != "envelope" {
-			t.Errorf("want envelope violation, got %+v", rep.Violations)
-		}
-	})
-
-	t.Run("allowed_clis violation is an error", func(t *testing.T) {
-		// builder allows [claude,agy]; codex is not allowed → error.
-		writeFile(t, cfgPath, `{"phases":{"builder":{"cli":"codex","tier":"balanced"}}}`)
-		rep, _ := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir})
-		if rep.OK {
-			t.Fatalf("disallowed cli should fail: %+v", rep.Violations)
-		}
-		if rep.Violations[0].Kind != "allowed_cli" {
-			t.Errorf("want allowed_cli violation, got %+v", rep.Violations)
-		}
-	})
-
-	t.Run("cross-family OK when families differ", func(t *testing.T) {
-		writeFile(t, cfgPath, `{"phases":{
-		  "builder":{"cli":"agy","tier":"balanced"},
-		  "auditor":{"cli":"codex","tier":"deep"}
-		}}`)
-		rep, _ := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir})
-		if !rep.OK {
-			t.Fatalf("agy/codex differ: should be OK: %+v", rep.Violations)
-		}
-		for _, v := range rep.Violations {
-			if v.Kind == "cross_family" {
-				t.Errorf("no cross_family violation expected: %+v", v)
-			}
-		}
-	})
-
-	t.Run("missing config errors", func(t *testing.T) {
-		if _, err := Validate(ValidateOptions{ConfigPath: filepath.Join(evolveDir, "nope.json"), EvolveDir: evolveDir}); err == nil {
-			t.Error("missing config should error")
-		}
-	})
-
-	t.Run("malformed config JSON errors", func(t *testing.T) {
-		writeFile(t, cfgPath, `{"phases": {not json`)
-		if _, err := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir}); err == nil {
-			t.Error("unparseable config should error")
-		}
-	})
-
-	t.Run("role without a profile is skipped, not an error", func(t *testing.T) {
-		// "intent" has no profile in fixtureRepo → readProfileConstraints
-		// reports !ok → the role is skipped (no violation, OK stays true).
-		writeFile(t, cfgPath, `{"phases":{"intent":{"cli":"codex","tier":"fast"}}}`)
-		rep, err := Validate(ValidateOptions{ConfigPath: cfgPath, EvolveDir: evolveDir})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !rep.OK || len(rep.Violations) != 0 {
-			t.Errorf("profile-less role should pass with no violations: %+v", rep)
-		}
-	})
 }
 
 // --- Complete (lossless merge) ---

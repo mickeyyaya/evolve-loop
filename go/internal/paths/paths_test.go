@@ -26,7 +26,6 @@ func TestResolve_DefaultLayout(t *testing.T) {
 		StateFile:      "/tmp/proj/.evolve/state.json",
 		CycleStateFile: "/tmp/proj/.evolve/cycle-state.json",
 		LedgerFile:     "/tmp/proj/.evolve/ledger.jsonl",
-		LLMConfigFile:  "/tmp/proj/.evolve/llm_config.json",
 		ProfilesDir:    "/tmp/proj/.evolve/profiles",
 		AdaptersDir:    "/tmp/proj/adapters",
 		CapabilityDir:  "/tmp/proj/adapters",
@@ -78,9 +77,6 @@ func TestResolve_SplitPluginRoot(t *testing.T) {
 	if got.LedgerFile != "/work/repo/.evolve/ledger.jsonl" {
 		t.Errorf("LedgerFile=%q, want under ProjectRoot", got.LedgerFile)
 	}
-	if got.LLMConfigFile != "/work/repo/.evolve/llm_config.json" {
-		t.Errorf("LLMConfigFile=%q, want under ProjectRoot", got.LLMConfigFile)
-	}
 	if got.ProfilesDir != "/opt/plugin/.evolve/profiles" {
 		t.Errorf("ProfilesDir=%q, want under PluginRoot", got.ProfilesDir)
 	}
@@ -115,13 +111,6 @@ func TestResolve_DirOverrides(t *testing.T) {
 			envVal: "/custom/adapters",
 			field:  func(l Layout) string { return l.AdaptersDir },
 			want:   "/custom/adapters",
-		},
-		{
-			name:   "llm_config_override",
-			envKey: "EVOLVE_LLM_CONFIG_PATH",
-			envVal: "/etc/llm.json",
-			field:  func(l Layout) string { return l.LLMConfigFile },
-			want:   "/etc/llm.json",
 		},
 		{
 			name:   "ledger_override",

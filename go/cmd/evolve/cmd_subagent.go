@@ -33,8 +33,7 @@ Subcommands:
                      ( validate-profile <agent> )
                      Honors EVOLVE_PROFILES_DIR_OVERRIDE,
                      EVOLVE_ADAPTERS_DIR_OVERRIDE,
-                     EVOLVE_DISPATCH_PLAN_LOG,
-                     EVOLVE_LLM_CONFIG_PATH.
+                     EVOLVE_DISPATCH_PLAN_LOG.
   run                Execute one phase agent end-to-end (v2 cache-prefix
                      prompt + adapter exec + verify + ledger).
                      ( run <agent> <cycle> <workspace_path> )
@@ -250,7 +249,7 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile <agent>")
 		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE,")
-		fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG, EVOLVE_LLM_CONFIG_PATH")
+		fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG")
 		return 0
 	}
 	if len(args) != 1 {
@@ -269,7 +268,6 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 			CapabilityDir:   layout.CapabilityDir,
 			ProjectRoot:     layout.ProjectRoot,
 			WorktreePath:    os.Getenv("WORKTREE_PATH"),
-			LLMConfigPath:   layout.LLMConfigFile,
 			DispatchPlanLog: os.Getenv("EVOLVE_DISPATCH_PLAN_LOG"),
 		},
 		subagent.ValidateProfileOptions{},
@@ -340,7 +338,6 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		ProjectRoot:            layout.ProjectRoot,
 		PluginRoot:             layout.PluginRoot,
 		WorktreePath:           os.Getenv("WORKTREE_PATH"),
-		LLMConfigPath:          layout.LLMConfigFile,
 		LedgerPath:             layout.LedgerFile,
 		PromptReader:           promptReader,
 		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
