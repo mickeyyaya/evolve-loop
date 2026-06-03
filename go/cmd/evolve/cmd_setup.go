@@ -80,7 +80,11 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&asJSON, "json", false, "emit the digest as JSON (default human table)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	if err := fs.Parse(reorderArgs(args)); err != nil {
+	// No positional args here, so parse directly. reorderArgs is for commands
+	// with positionals BEFORE flags; with string flags it would let a
+	// space-separated value swallow the next flag (e.g. `--evolve-dir X --json`
+	// → --evolve-dir="--json"). See cmd_phase_verify.go for the same fix.
+	if err := fs.Parse(args); err != nil {
 		return 10
 	}
 	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag, stderr)
@@ -157,7 +161,9 @@ func runSetupComplete(args []string, stdout, stderr io.Writer) int {
 	var evolveDirFlag, projectRootFlag string
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	if err := fs.Parse(reorderArgs(args)); err != nil {
+	// No positional args; parse directly (reorderArgs + string flags would
+	// swallow the next flag in space form — see runSetupDetect).
+	if err := fs.Parse(args); err != nil {
 		return 10
 	}
 	_, _, evolveDir, _ := setupRoots(projectRootFlag, evolveDirFlag, stderr)
