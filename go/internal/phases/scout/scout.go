@@ -20,19 +20,25 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// proposedTasksRE confirms Scout produced a non-empty task backlog. The
-// scout template's section heading drifted from "## Proposed Tasks" to the
-// current "## Selected Tasks" (evolve-scout.md "Required sections"), and tasks
-// now render as "### Task N:" subheadings rather than bullet/numbered list
-// items. A classifier pinned to the old heading + list-item shape false-FAILs
-// every current scout report (cycle-192). Accept either heading followed by a
-// list item OR a "### " task subheading.
-var proposedTasksRE = regexp.MustCompile(`(?m)^## (?:Proposed|Selected) Tasks\b[\s\S]*?^(?:[*\-0-9]+\.?\s+\S|###\s+\S)`)
+// proposedTasksRE confirms a non-empty backlog: the tasks heading followed by a
+// list item OR a "### " task subheading. The accepted headings come from
+// phasecontract.Scout (single source); the "≥1 item" shape is stable here.
+var proposedTasksRE = buildScoutBacklogRE()
+
+func buildScoutBacklogRE() *regexp.Regexp {
+	accepted := phasecontract.Scout.Sections[0].Accepted
+	alts := make([]string, len(accepted))
+	for i, h := range accepted {
+		alts[i] = regexp.QuoteMeta(h)
+	}
+	return regexp.MustCompile(`(?m)^(?:` + strings.Join(alts, "|") + `)\b[\s\S]*?^(?:[*\-0-9]+\.?\s+\S|###\s+\S)`)
+}
 
 type hooks struct{}
 

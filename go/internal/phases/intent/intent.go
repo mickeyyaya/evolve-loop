@@ -23,6 +23,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -79,7 +80,8 @@ func classify(content string, delta bool) string {
 	if delta && strings.Contains(trimmed, "[intent-unchanged]") {
 		return core.VerdictSKIPPED
 	}
-	if strings.Contains(trimmed, "goal:") && strings.Contains(trimmed, "acceptance_checks:") {
+	// Required line tokens live in phasecontract.Intent (single source).
+	if phasecontract.Intent.Complete(trimmed) {
 		return core.VerdictPASS
 	}
 	return core.VerdictFAIL

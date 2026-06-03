@@ -19,6 +19,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -66,33 +67,18 @@ func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespons
 	return classify(artifact), nil, string(core.PhaseBuild)
 }
 
-// containsAny reports whether content holds at least one of markers.
-func containsAny(content string, markers ...string) bool {
-	for _, m := range markers {
-		if strings.Contains(content, m) {
-			return true
-		}
-	}
-	return false
-}
-
-// classify confirms the TDD report carries both an acceptance-criteria section
-// and a RED-tests section. Both headings drifted across template versions
-// ("## Acceptance" → "## AC-Materialization …"/"## Coverage Map"; "## RED Tests"
-// → "## RED Run Output"/"## Test Files Written"), so a classifier pinned to the
-// old exact headings false-FAILs every current TDD report (cycle-192). Accept
-// the known variants of each so the verdict tracks report completeness.
+// classify confirms the TDD report carries both an acceptance section and a
+// RED-tests section (== phasecontract.TDD.Complete; the accepted headings are
+// the single source shared with the producer-side contract test).
 func classify(content string) string {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return core.VerdictFAIL
 	}
-	hasAcceptance := containsAny(trimmed, "## Acceptance", "## AC-Materialization", "## Coverage Map")
-	hasRed := containsAny(trimmed, "## RED Tests", "## RED Run Output", "## Test Files Written")
-	if !hasAcceptance || !hasRed {
-		return core.VerdictFAIL
+	if phasecontract.TDD.Complete(trimmed) {
+		return core.VerdictPASS
 	}
-	return core.VerdictPASS
+	return core.VerdictFAIL
 }
 
 type Config struct {
