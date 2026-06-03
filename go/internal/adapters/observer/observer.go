@@ -82,6 +82,20 @@ type Config struct {
 	// stall_no_output for a working tmux agent (cycle-141). Empty → stdout-log
 	// growth is the only progress signal (byte-identical to the pre-fix path).
 	WorkspaceDir string
+
+	// LivenessProbe, when non-nil, is consulted ONLY at the stall threshold,
+	// before a stall_no_output incident is emitted. It reports whether the
+	// agent is still alive by a signal the filesystem cannot see: for
+	// tmux-driver phases, whether the live tmux pane changed since the last
+	// check (the spinner / token-counter advancing during a long single
+	// "Incubating" turn that commits no scrollback lines and writes no
+	// artifact yet). On true, the observer treats the agent as alive — it
+	// resets the stall clock and emits a benign stall_probe_active info event
+	// instead of a false incident (cycle-190). The probe is consulted at most
+	// once per StallS window, so a subprocess-backed probe (tmux capture-pane)
+	// costs nothing on the common no-stall path. Nil → no probe; stdout-log +
+	// workspace growth govern alone (byte-identical to the pre-probe path).
+	LivenessProbe func() bool
 }
 
 // Observer watches one phase's stdout-log for activity and emits
@@ -147,6 +161,18 @@ func (o *Observer) Watch(ctx context.Context) error {
 				continue
 			}
 			if !stallEmitted && o.nowFunc().Sub(lastGrowth) >= o.cfg.StallS {
+				// Before declaring a stall, consult the liveness probe (if any).
+				// A tmux agent mid-"Incubating" turn produces no filesystem
+				// growth but is alive (pane spinner advancing) — holding the
+				// kill here avoids the cycle-190 false-positive. The probe is
+				// only reached at the threshold, so it never runs on the common
+				// healthy path.
+				if o.cfg.LivenessProbe != nil && o.cfg.LivenessProbe() {
+					lastGrowth = o.nowFunc()
+					o.emit("stall_probe_active", "info",
+						fmt.Sprintf("no fs growth for %s but liveness probe active", o.cfg.StallS))
+					continue
+				}
 				o.emit("stall_no_output", "incident",
 					fmt.Sprintf("no stdout growth for %s", o.cfg.StallS))
 				stallEmitted = true
