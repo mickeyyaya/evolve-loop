@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // TestRun_PredicateExecutesWithCwdAtRoot — cycle-190 regression. Predicates are
@@ -44,5 +45,32 @@ func TestRun_PredicateExecutesWithCwdAtRoot(t *testing.T) {
 	if v.Results[0].ResultStr != "green" {
 		t.Errorf("predicate ran with cwd not at opts.Root: result=%q exit=%d excerpt=%q — cycle-190 tree-visibility bug",
 			v.Results[0].ResultStr, v.Results[0].ExitCode, v.Results[0].EvidenceExcerpt)
+	}
+}
+
+// TestResolveTimeout — cycle-200: a full-suite predicate can exceed the 60s
+// default and flake to a false RED (exit 124). EVOLVE_ACS_PREDICATE_TIMEOUT_S
+// must raise the per-predicate timeout; opts.Timeout still wins; bad/unset env
+// falls back to the default.
+func TestResolveTimeout(t *testing.T) {
+	const def = DefaultTimeout
+	cases := []struct {
+		name string
+		opts time.Duration
+		env  string
+		want time.Duration
+	}{
+		{"opts wins over env", 90 * time.Second, "300", 90 * time.Second},
+		{"env override when opts unset", 0, "300", 300 * time.Second},
+		{"unset env → default", 0, "", def},
+		{"invalid env → default", 0, "abc", def},
+		{"zero env → default", 0, "0", def},
+		{"negative env → default", 0, "-5", def},
+	}
+	for _, c := range cases {
+		got := resolveTimeout(c.opts, func(string) string { return c.env })
+		if got != c.want {
+			t.Errorf("%s: resolveTimeout(%v, env=%q)=%v, want %v", c.name, c.opts, c.env, got, c.want)
+		}
 	}
 }

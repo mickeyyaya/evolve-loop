@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -37,8 +38,31 @@ import (
 const killGrace = 2 * time.Second
 
 // DefaultTimeout bounds a single predicate's execution. EGPS predicates are
-// fast assertions; a predicate that hangs is treated as RED (timeout).
+// meant to be fast assertions; a predicate that hangs is treated as RED
+// (timeout). But agents legitimately author "full-suite-green" predicates that
+// run `go test ./...`, which on a large repo exceeds 60s and flakes to a false
+// RED (exit 124) — a passing suite must not be sunk by a too-tight timeout
+// (cycle-200). EVOLVE_ACS_PREDICATE_TIMEOUT_S overrides this when a suite
+// legitimately needs longer; unset/invalid keeps the 60s default.
 const DefaultTimeout = 60 * time.Second
+
+// resolveTimeout returns the per-predicate timeout: opts.Timeout when > 0, else
+// EVOLVE_ACS_PREDICATE_TIMEOUT_S (seconds) when set to a positive integer, else
+// DefaultTimeout. envGet defaults to os.Getenv (injectable for tests).
+func resolveTimeout(optsTimeout time.Duration, envGet func(string) string) time.Duration {
+	if optsTimeout > 0 {
+		return optsTimeout
+	}
+	if envGet == nil {
+		envGet = os.Getenv
+	}
+	if raw := envGet("EVOLVE_ACS_PREDICATE_TIMEOUT_S"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return DefaultTimeout
+}
 
 // evidenceMax caps the captured output excerpt per predicate.
 const evidenceMax = 600
@@ -120,10 +144,7 @@ func Run(opts Options) (Verdict, error) {
 	if now == nil {
 		now = time.Now
 	}
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = DefaultTimeout
-	}
+	timeout := resolveTimeout(opts.Timeout, nil)
 	execFn := opts.Exec
 	if execFn == nil {
 		projectRoot := opts.ProjectRoot
