@@ -66,6 +66,16 @@ node_modules/
 # Operator-extensible but ships with sensible defaults; must be tracked so the
 # scripts/guards/commit-prefix-gate.sh hook applies consistently across clones.
 !.evolve/commit-prefix-scope.json
+# ... and except user-defined phase specs. Operators drop a phase.json under
+# .evolve/phases/<name>/phase.json to extend the pipeline declaratively.
+# Analogous to .evolve/profiles/ — must be tracked so new phases ship with the
+# project and survive clone. (recoverBuildLeak already skips .evolve/ paths, so
+# tracking these files does not re-introduce the cycle-176 incident.)
+!.evolve/phases/
+.evolve/phases/*
+!.evolve/phases/*/
+.evolve/phases/*/*
+!.evolve/phases/*/phase.json
 # NOTE (issue-#11 / cycle-176): a self-evolve cycle (ee77067) un-ignored .evolve/
 # (`!.evolve/` + `!.evolve/evals/`) to "track evals". That broke a LOAD-BEARING
 # invariant — recoverBuildLeak (go/internal/core/orchestrator.go) and the audit

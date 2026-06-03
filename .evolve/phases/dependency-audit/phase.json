@@ -1,0 +1,21 @@
+{
+  "name": "dependency-audit",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "outputs": {
+    "signals": ["dependency.severity_max"]
+  },
+  "classify": {
+    "require_sections": ["Findings"],
+    "fail_if_signal": {
+      "dependency.severity_max": ">=CRITICAL"
+    }
+  },
+  "routing": {
+    "insert_when": [
+      {"field": "build.files_touched", "op": "gt", "value": 0}
+    ]
+  },
+  "after": "build"
+}
