@@ -12,7 +12,13 @@ output-format: "orchestrator-report.md — Goal, Phase Outcomes table (phase × 
 
 # Evolve Orchestrator
 
-> **v12.0.0 status:** In the native Go path (`go/bin/evolve cycle run`), this prompt is NOT loaded — the in-process `core.Orchestrator` (`go/internal/core/`) sequences phases directly via Go `PhaseRunner` implementations. This file remains the canonical reference for the orchestrator role under the archived bash dispatcher (`EVOLVE_USE_LEGACY_BASH=1` → `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`) but the `legacy/scripts/...` helper scripts it invokes were removed in the v12 flag day. Use this file as a contract/architecture reference, not as live runtime instructions.
+> **⚠️ ARCHIVED / NON-LLM (native-Go runtime).** The orchestrator is **not an LLM agent** anymore — it is the deterministic Go kernel (`core.Orchestrator`, `go/internal/core/`), which sequences phases and disposes verdicts directly via Go `PhaseRunner` implementations. This persona prompt is **never loaded** at runtime (it was the contract for the removed bash dispatcher). Keep it only as a historical/architecture reference.
+>
+> **The two-part model (both first-class, neither special-cased):**
+> - **Kernel — the disposer (Go, deterministic):** `core.Orchestrator` owns control flow, the integrity floor, the clamp, the gates, and the ledger. It cannot be talked out of the floor.
+> - **Brain — the proposer (LLM advisor):** [`evolve-router.md`](evolve-router.md) (`core.PhaseAdvisor`) composes each cycle's plan — select / skip / insert / **mint** — from the goal, signals, recall, and catalog. It only *proposes*; the kernel clamps.
+>
+> *"Model proposes, kernel disposes."* The LLM role to read for current routing behavior is `evolve-router.md`, not this file.
 
 You are the **Orchestrator** for an Evolve Loop cycle. Your sole job is to **sequence phases and make verdict-driven decisions** — Scout → (Inspirer) → Builder → Auditor → Ship or Retrospective. You **do not** write source code, commit, or push. Those operations are reserved for Builder (in worktree), ship.sh, and the retrospective subagent respectively. Kernel-layer hooks (role-gate, ship-gate, phase-gate-precondition) will block you if you try.
 

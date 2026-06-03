@@ -161,15 +161,102 @@ func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 			if plan.Entries[0].Phase != "scout" || plan.Entries[0].Run != c.wantScoutRun {
 				t.Errorf("first entry=%+v, want scout run=%v", plan.Entries[0], c.wantScoutRun)
 			}
-			// ADR-0027: the advisor's RAW plan artifact is routing-plan.json,
-			// distinct from the orchestrator's clamped phase-plan.json (both
-			// survive for forensics); and it uses the stdout completion contract
-			// (prints JSON, writes no file) — the cycle-117 deadlock fix.
+			// The advisor's RAW plan artifact is routing-plan.json, distinct from
+			// the orchestrator's clamped phase-plan.json (both survive for
+			// forensics). The Plan path now uses the UNIFORM artifact-completion
+			// contract (the brain WRITES routing-plan.json; the bridge reads it
+			// back) — same as every phase agent, replacing the brittle stdout scrape.
 			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-plan.json") {
 				t.Errorf("artifact=%q, want .../routing-plan.json", fb.gotReq.ArtifactPath)
 			}
-			if fb.gotReq.Completion != "stdout" {
-				t.Errorf("Completion=%q, want stdout", fb.gotReq.Completion)
+			if fb.gotReq.Completion != "artifact" {
+				t.Errorf("Completion=%q, want artifact", fb.gotReq.Completion)
+			}
+		})
+	}
+}
+
+// TestPhaseAdvisor_PersonaComposition proves the Plan prompt is composed the
+// uniform way: the injected persona (agents/evolve-router.md body) followed by
+// the dynamic per-cycle context — and falls back to the inline framing when no
+// persona is injected.
+func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
+	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
+
+	t.Run("persona used + dynamic context appended", func(t *testing.T) {
+		fb := &fakeBridge{stdout: plan}
+		adv := NewPhaseAdvisor(fb, WithPersona("PERSONA_MARKER_42"))
+		if _, err := adv.Plan(router.RouteInput{Workspace: "/tmp/x", Cycle: 7}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(fb.gotReq.Prompt, "PERSONA_MARKER_42") {
+			t.Error("prompt must include the injected persona body")
+		}
+		if !strings.Contains(fb.gotReq.Prompt, "# This cycle") {
+			t.Error("prompt must append the dynamic per-cycle context after the persona")
+		}
+	})
+
+	t.Run("no persona falls back to inline framing", func(t *testing.T) {
+		fb := &fakeBridge{stdout: plan}
+		adv := NewPhaseAdvisor(fb) // no persona injected
+		if _, err := adv.Plan(router.RouteInput{Workspace: "/tmp/x", Cycle: 7}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(fb.gotReq.Prompt, "PHASE ADVISOR") {
+			t.Error("fallback prompt must use the legacy inline framing")
+		}
+	})
+}
+
+// TestPhaseAdvisor_DispatchWiringFlowsToBridge proves the configured {cli,model}
+// actually REACH BridgeRequest.{CLI,Model} on a Plan launch — and that the
+// uniform contract (artifact completion + routing-plan.json + injected persona)
+// holds identically for non-claude CLIs. This is the heart of the any-CLI ×
+// any-model invariant: the brain is dispatched to whatever the composition root
+// resolved, not a hardcoded claude/opus. (Regression guard: TestPhaseAdvisorOptions
+// pins the struct fields; this pins the field→bridge flow that advisorLaunch owns.)
+func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
+	t.Parallel()
+	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
+	cases := []struct{ cli, model string }{
+		{"codex-tmux", "gpt-5.5"},   // openai family, deep model
+		{"agy", "gemini-3.5-flash"}, // google family, headless
+		{"claude-tmux", "opus"},     // anthropic default
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.cli+"/"+c.model, func(t *testing.T) {
+			t.Parallel()
+			fb := &fakeBridge{stdout: plan}
+			adv := NewPhaseAdvisor(fb,
+				WithProposerCLI(c.cli),
+				WithProposerModel(c.model),
+				WithPersona("PERSONA_MARKER_42"),
+			)
+			if _, err := adv.Plan(baseRouteInput()); err != nil {
+				t.Fatalf("Plan: %v", err)
+			}
+			if fb.gotReq.CLI != c.cli {
+				t.Errorf("BridgeRequest.CLI=%q, want %q (config must flow to the bridge)", fb.gotReq.CLI, c.cli)
+			}
+			if fb.gotReq.Model != c.model {
+				t.Errorf("BridgeRequest.Model=%q, want %q", fb.gotReq.Model, c.model)
+			}
+			// The uniform contract is CLI-agnostic: artifact completion, the
+			// routing-plan.json deliverable, and the injected persona hold for
+			// every CLI, not just claude.
+			if fb.gotReq.Completion != "artifact" {
+				t.Errorf("Completion=%q, want artifact for %s", fb.gotReq.Completion, c.cli)
+			}
+			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-plan.json") {
+				t.Errorf("artifact=%q, want .../routing-plan.json for %s", fb.gotReq.ArtifactPath, c.cli)
+			}
+			if !strings.Contains(fb.gotReq.Prompt, "PERSONA_MARKER_42") {
+				t.Errorf("persona missing from prompt for %s (persona path must hold for non-claude CLIs)", c.cli)
+			}
+			if fb.gotReq.Agent != "router" {
+				t.Errorf("Agent=%q, want router", fb.gotReq.Agent)
 			}
 		})
 	}
@@ -201,6 +288,23 @@ func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
 	noWs.Workspace = ""
 	if _, err := NewPhaseAdvisor(&fakeBridge{stdout: "[]"}).Plan(noWs); err == nil {
 		t.Error("empty workspace: want error")
+	}
+}
+
+// TestWriteRoutingContext_RendersGoal proves the advisor's prompt surfaces the
+// goal text (RouteInput.GoalText) so the brain can reason about WHAT the cycle is
+// for — the precondition for genuinely selecting a design phase or minting,
+// rather than rubber-stamping the spine blind. Empty goal renders nothing.
+func TestWriteRoutingContext_RendersGoal(t *testing.T) {
+	t.Parallel()
+	const goal = "redesign the auth subsystem with a new token-rotation architecture"
+	got := buildPlanPrompt(router.RouteInput{Cycle: 5, GoalText: goal})
+	if !strings.Contains(got, goal) {
+		t.Errorf("plan prompt must surface the goal text so the advisor reasons from it:\n%s", got)
+	}
+	// No goal ⇒ no goal section (keeps the prompt prefix stable for the empty case).
+	if strings.Contains(buildPlanPrompt(router.RouteInput{Cycle: 5}), "## Goal") {
+		t.Error("empty GoalText must not emit a Goal section")
 	}
 }
 

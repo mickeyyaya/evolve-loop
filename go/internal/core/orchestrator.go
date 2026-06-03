@@ -1178,6 +1178,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			LastReason:      lastReason,
 			Lessons:         lessons,
 			Catalog:         phaseCardsFromCatalog(o.catalog),
+			// The goal TEXT (Context["goal"] — the same key the dispatcher sets and
+			// Scout reads; NOT Context["strategy"], which is the strategy MODE like
+			// "balanced"/"harden") lets the advisor reason about WHAT the cycle is for
+			// — selecting a design phase or minting when the work warrants it, instead
+			// of planning blind. Reading a nil/absent map key is safe (empty ⇒ no Goal
+			// section in the prompt).
+			GoalText: req.Context["goal"],
 		}
 		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on

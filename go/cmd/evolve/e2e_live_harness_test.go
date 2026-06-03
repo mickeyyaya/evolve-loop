@@ -214,6 +214,7 @@ type liveCycleCfg struct {
 	Driver    string // EVOLVE_CLI for every phase
 	Tier      string // model_tier_default written into profiles
 	GoalHash  string
+	Goal      string   // human-readable goal text (--goal); threaded to Scout + advisor. Optional.
 	ExtraEnv  []string // e.g. EVOLVE_<AGENT>_CLI for cross-family
 	Timeout   time.Duration
 	BudgetUSD float64 // per-cycle --budget-usd cap
@@ -300,6 +301,9 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 		"--goal-hash", cfg.GoalHash,
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
 		"--budget-usd", strconv.FormatFloat(cfg.BudgetUSD, 'f', 2, 64),
+	}
+	if cfg.Goal != "" {
+		args = append(args, "--goal", cfg.Goal)
 	}
 	cmd := exec.Command(cfg.EvolveBin, args...)
 	cmd.Env = env
@@ -415,7 +419,10 @@ func liveBridgeLaunch(t *testing.T, evolveBin, driver, model string, timeout tim
 func writeLiveProfiles(t *testing.T, projRoot, driver, tier string) {
 	t.Helper()
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
-	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {
+	// "router" (the advisor brain) is included so a dynamic_routing=advisory cycle
+	// has a profile for the advisor's bridge launch; its model tier is normally
+	// overridden to deep via EVOLVE_ROUTER_MODEL.
+	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective", "router"} {
 		body := fmt.Sprintf(
 			`{"name":%q,"role":%q,"cli":%q,"allowed_clis":["all"],"model_tier_default":%q,"model_tier_envelope":{"min":"fast","default":%q,"max":"deep"},"allowed_tools":["Read","Write","Bash"]}`,
 			name, name, driver, tier, tier)
