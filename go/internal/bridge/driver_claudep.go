@@ -69,8 +69,17 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// Workstream B: confine to worktree when this is a source-writing phase
 	// and the host can wrap (sandbox-exec / bwrap). Degrades unwrapped.
 	name, args := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
+	// Publish the agent PID to a per-phase file so the auto-spawn observer's CPU
+	// liveness probe can tell a silently-thinking headless agent from a hung one
+	// (the tmux drivers use the pane probe instead, so only the headless driver
+	// sets this). Derived from StdoutLog so it matches the observer's path
+	// (<ws>/<phase>.bridge-pid); a mismatch degrades to no probe (best-effort).
+	env := driverEnv(deps)
+	if pidFile := pidFileFor(cfg.StdoutLog); pidFile != "" {
+		env = append(env, "EVOLVE_BRIDGE_PIDFILE="+pidFile)
+	}
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
-	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), nil, stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, env, nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[claude-p] %w", err)
 	}

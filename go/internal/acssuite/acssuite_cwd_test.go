@@ -48,6 +48,44 @@ func TestRun_PredicateExecutesWithCwdAtRoot(t *testing.T) {
 	}
 }
 
+// TestRun_DualRoot_CodeVsRuntimeData pins the INTENTIONAL dual root: a predicate
+// runs with cwd at the SHIPPED tree (Root=worktree, so `go test` compiles the
+// shipped code) while EVOLVE_PROJECT_ROOT points at the MAIN tree (so `.evolve/`
+// runtime data resolves to main). Collapsing the two roots into one would
+// reintroduce the cycle-190 "predicate ran against main" bug; this guards it.
+func TestRun_DualRoot_CodeVsRuntimeData(t *testing.T) {
+	main := t.TempDir()
+	worktree := t.TempDir()
+	if err := os.WriteFile(filepath.Join(worktree, "code-here"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(main, "data-here"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	predDir := filepath.Join(worktree, "acs", "cycle-1")
+	if err := os.MkdirAll(predDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// cwd must see code-here (worktree); $EVOLVE_PROJECT_ROOT must contain
+	// data-here (main); and the two roots must be DISTINCT.
+	pred := "#!/usr/bin/env bash\n" +
+		"[ -f code-here ] || { echo 'cwd not worktree'; exit 1; }\n" +
+		"[ -f \"$EVOLVE_PROJECT_ROOT/data-here\" ] || { echo 'project_root not main'; exit 1; }\n" +
+		"[ \"$EVOLVE_PROJECT_ROOT\" != \"$PWD\" ] || { echo 'roots not distinct'; exit 1; }\n" +
+		"exit 0\n"
+	if err := os.WriteFile(filepath.Join(predDir, "001-dualroot.sh"), []byte(pred), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := Run(Options{Root: worktree, ProjectRoot: main, Cycle: 1})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(v.Results) != 1 || v.Results[0].ResultStr != "green" {
+		t.Errorf("dual-root predicate not green: %+v — code (cwd=worktree) and data (EVOLVE_PROJECT_ROOT=main) roots not split correctly", v.Results)
+	}
+}
+
 // TestResolveTimeout — cycle-200: a full-suite predicate can exceed the 60s
 // default and flake to a false RED (exit 124). EVOLVE_ACS_PREDICATE_TIMEOUT_S
 // must raise the per-predicate timeout; opts.Timeout still wins; bad/unset env

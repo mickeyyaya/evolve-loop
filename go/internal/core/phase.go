@@ -100,9 +100,22 @@ type Diagnostic struct {
 // so the subprocess override path (pkg/phaseproto) can serialise the
 // same struct over stdin/stdout.
 type PhaseRequest struct {
-	Cycle         int               `json:"cycle"`
-	ProjectRoot   string            `json:"project_root"`
-	Workspace     string            `json:"workspace"`
+	Cycle int `json:"cycle"`
+	// ProjectRoot is the MAIN repo root — the RUNTIME-DATA root. All `.evolve/`
+	// state (runs/, evals/, the ledger, baselines) lives here, and it is what a
+	// subprocess sees as EVOLVE_PROJECT_ROOT. Stable across the whole cycle.
+	ProjectRoot string `json:"project_root"`
+	// Workspace is this cycle's per-phase scratch dir, under
+	// <ProjectRoot>/.evolve/runs/cycle-<N>/ — where artifacts, phase logs, and
+	// the observer's sinks are written.
+	Workspace string `json:"workspace"`
+	// Worktree is the per-cycle git worktree — the SHIPPED-TREE root. A
+	// source-writing phase edits here, and an EGPS predicate's `go test`
+	// compiles here (acssuite runs predicates with cwd=Worktree while `.evolve/`
+	// still resolves to ProjectRoot via EVOLVE_PROJECT_ROOT — the intentional
+	// dual root, issue #9 + #12). Empty for read-only phases, which then run
+	// against ProjectRoot. Keep ProjectRoot (data) and Worktree (code) distinct:
+	// collapsing them reintroduces the cycle-190 "predicate ran against main" bug.
 	Worktree      string            `json:"worktree"`
 	GoalHash      string            `json:"goal_hash"`
 	Context       map[string]string `json:"context,omitempty"`

@@ -35,7 +35,7 @@ func TestCommitEvidence_EnvParse(t *testing.T) {
 			}
 			gotWarn := false
 			for _, w := range ws {
-				if w.Code == "unknown-value" && contains(w.Message, "commit_evidence") {
+				if w.Code == "unknown-value" && contains(w.Message, "EVOLVE_COMMIT_EVIDENCE") {
 					gotWarn = true
 				}
 			}

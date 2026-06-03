@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -362,7 +363,21 @@ func execRunner(ctx context.Context, name, dir string, args, env []string,
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
+	// cmd.Run() = Start() + Wait(); split so the agent PID can be published
+	// between them (behavior-identical otherwise).
+	if err := cmd.Start(); err != nil {
+		return -1, err
+	}
+	// Best-effort: publish the agent PID so the auto-spawn observer's CPU
+	// liveness probe can tell a silently-thinking HEADLESS agent from a hung
+	// one. Gated by EVOLVE_BRIDGE_PIDFILE (set only by the headless driver, so
+	// tmux drivers — which use the pane probe — are unaffected). Removed on exit.
+	if pidFile := envValue(env, "EVOLVE_BRIDGE_PIDFILE"); pidFile != "" {
+		// cmd.Process is guaranteed non-nil after a successful Start.
+		_ = os.WriteFile(pidFile, []byte(strconv.Itoa(cmd.Process.Pid)), 0o644)
+		defer func() { _ = os.Remove(pidFile) }()
+	}
+	if err := cmd.Wait(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return exitErr.ExitCode(), nil
@@ -370,4 +385,27 @@ func execRunner(ctx context.Context, name, dir string, args, env []string,
 		return -1, err
 	}
 	return 0, nil
+}
+
+// envValue returns the value of key in a KEY=VALUE env slice, or "".
+func envValue(env []string, key string) string {
+	prefix := key + "="
+	for _, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			return e[len(prefix):]
+		}
+	}
+	return ""
+}
+
+// pidFileFor derives the agent-PID file path from the phase stdout-log path
+// (<ws>/<phase>-stdout.log → <ws>/<phase>.bridge-pid), matching the path the
+// observer's CPU probe reads (core_adapter.go). Returns "" when stdoutLog does
+// not follow the convention, so the probe simply degrades to a no-op.
+func pidFileFor(stdoutLog string) string {
+	const suffix = "-stdout.log"
+	if stdoutLog == "" || !strings.HasSuffix(stdoutLog, suffix) {
+		return ""
+	}
+	return strings.TrimSuffix(stdoutLog, suffix) + ".bridge-pid"
 }

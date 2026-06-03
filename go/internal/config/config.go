@@ -121,6 +121,15 @@ type RolloutStages struct {
 	// orchestrator owns the stage interpretation; this field is the
 	// composition-root view, exactly like CommitEvidence.
 	ReviewGate Stage
+	// EvalGate is the structural inter-phase eval-gate rollout stage
+	// (internal/evalgate): StageOff — no eval gates (orchestrator keeps the
+	// noopReviewer; byte-identical); StageShadow — Gate A (scout eval-file
+	// materialization) + Gate B (tdd predicate-quality) run + log but always
+	// approve; StageEnforce — a CERTAIN violation (a stat'd-missing eval file
+	// or a definite tautology) aborts the cycle. The gates fail OPEN on any
+	// ambiguity, so enforce-default never false-blocks a healthy cycle. Set
+	// from EVOLVE_EVAL_GATE via applyEnv; default StageEnforce.
+	EvalGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
 	//   "auto" (default) — wrap when nested-claude is NOT detected and the
@@ -307,7 +316,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce},
 		Mandatory:     []string{"scout", "build", "audit", "ship"},
 		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions: 4,
@@ -380,13 +389,20 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		cfg.Mode = parseMode(v, ws)
 	}
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
-		cfg.CommitEvidence = parseEvidenceStage(v, ws)
+		cfg.CommitEvidence = parseEvidenceStage(v, "EVOLVE_COMMIT_EVIDENCE", ws)
 	}
 	if v := env["EVOLVE_REVIEW_GATE"]; v != "" {
 		// Same off/shadow/enforce trichotomy as CommitEvidence — no advisory
 		// intermediate. Reuses parseEvidenceStage to share the warning text +
 		// fallback (typo defaults to off, never silently enables a kill-path).
-		cfg.ReviewGate = parseEvidenceStage(v, ws)
+		cfg.ReviewGate = parseEvidenceStage(v, "EVOLVE_REVIEW_GATE", ws)
+	}
+	if v := env["EVOLVE_EVAL_GATE"]; v != "" {
+		// Structural eval gates (internal/evalgate). Same off/shadow/enforce
+		// trichotomy; reuses parseEvidenceStage so a typo defaults to off
+		// rather than silently enabling a kill-path. Default (no env) is
+		// enforce, set in defaults().
+		cfg.EvalGate = parseEvidenceStage(v, "EVOLVE_EVAL_GATE", ws)
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {
@@ -470,11 +486,12 @@ func parseStage(v string, ws *[]Warning) Stage {
 	}
 }
 
-// parseEvidenceStage parses EVOLVE_COMMIT_EVIDENCE. Unlike parseStage it has no
-// "advisory" middle state — commit-as-evidence is compute-and-log (shadow) vs
-// act (enforce). "advisory" or any unknown value defaults to off with a warning
-// (a typo must never silently enable phase commits).
-func parseEvidenceStage(v string, ws *[]Warning) Stage {
+// parseEvidenceStage parses an off/shadow/enforce dial. Unlike parseStage it has
+// no "advisory" middle state — these axes are compute-and-log (shadow) vs act
+// (enforce). Any unknown value defaults to off with a warning (a typo must never
+// silently enable a kill-path). Shared by EVOLVE_COMMIT_EVIDENCE / _REVIEW_GATE /
+// _EVAL_GATE; varName names the offending env var in the warning.
+func parseEvidenceStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
 		return StageOff
@@ -483,7 +500,7 @@ func parseEvidenceStage(v string, ws *[]Warning) Stage {
 	case "enforce":
 		return StageEnforce
 	default:
-		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("commit_evidence=%q unknown (want off|shadow|enforce), defaulting to off", v)})
+		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("%s=%q unknown (want off|shadow|enforce), defaulting to off", varName, v)})
 		return StageOff
 	}
 }

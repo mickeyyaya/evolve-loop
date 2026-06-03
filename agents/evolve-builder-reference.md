@@ -119,6 +119,18 @@ Every AC in `build-report.md` MUST have an executable predicate at `acs/cycle-N/
 
 Banned: `grep -q` as only check, `exit 0` no-op, `curl`, `sleep` > 2s.
 
+**Scope a "full-suite-green" predicate to the changed packages, never `go test ./...`.**
+A predicate that runs `go test ./...` (whole repo) exceeds the per-predicate
+timeout on a large repo and flakes to a false RED (exit 124, cycle-200). Use the
+shared helper, which reads the cycle's touched packages from `$CHANGED_PACKAGES`
+(exported automatically from `handoff-build.json`) and no-ops cleanly on a
+pure-docs cycle:
+```bash
+. "$(git rev-parse --show-toplevel)/acs/lib/assert.sh"
+assert_go_test_pass_changed          # all touched packages must pass
+# assert_go_test_pass ./internal/foo/...   # or name the package explicitly
+```
+
 After Step 5 self-verify passes, optionally run the lightweight pipeline
 layer on the changes:
 
