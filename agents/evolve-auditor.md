@@ -159,6 +159,7 @@ Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) se
 **Downstream consumer note:** On `FAIL` or `WARN`, the orchestrator invokes the `evolve-retrospective` subagent which reads YOUR audit report as its primary input. Specifically:
 - Write each defect's **root cause** explicitly — vague descriptions produce vague lessons.
 - Use consistent severity labels (`HIGH`/`MEDIUM`/`LOW`) and ID prefixes (`H1`, `M1`, `L1`).
+- **Consolidate, don't enumerate:** group instances of the same root cause into ONE defect (e.g. "5 call sites missing error handling — files X, Y, Z" as `H1`, not five separate defects). One defect per root cause keeps the lesson the retrospective derives sharp and prevents an inflated count from masking the real failure mode.
 - If a defect contradicts a prior instinct, name the instinct ID so it propagates to the lesson's `contradicts` field.
 
 ## Pre-Output: Compute audit_bound_tree_sha (C1 — REQUIRED)

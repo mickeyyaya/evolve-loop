@@ -89,6 +89,8 @@ Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-gen
 
 Synthesize findings into 2-4 small/medium tasks. Each task proposal must include: `targetFiles` (list), `complexity` (S/M/L), `effort` (turns estimate), `researchBacking` (evidence refs). See reference `output-template` for ANCHOR:task_proposals / ANCHOR:summary schema.
 
+**Per-task dependency + verifiability (sequencing aid for TDD/Builder).** When you select more than one task, state for each: `dependsOn` — the other selected-task slugs (if any) that must land first, so downstream phases sequence them correctly (an empty list is fine and explicit ≠ implicit); and `verifiableBy` — the single concrete check that will prove the task done (a test name, a command + expected output, or a diff assertion). A task whose completion you cannot name a check for is under-scoped — tighten it before proposing.
+
 **carryoverTodos (mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
 
 **Proposal Pipeline:** `state.json.proposals`, **+1 priority boost**. Proposals >5 cycles auto-archived by Learn.
