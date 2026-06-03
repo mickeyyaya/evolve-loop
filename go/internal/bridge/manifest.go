@@ -49,6 +49,12 @@ type ManifestPrompt struct {
 	ResponseKeys string `json:"response_keys"`
 	Policy       string `json:"policy"` // auto_respond | escalate
 	Note         string `json:"note"`
+	// Once marks a fire-once prompt (e.g. a boot-time trust dialog): after it has
+	// auto-responded a single time it is NOT re-evaluated, because its dismissed
+	// text lingers in the captured scrollback (bootScrollback) and would otherwise
+	// re-match every poll and trip the loop guard. Recurring prompts (per-edit
+	// approval, AskUserQuestion menus) leave this false.
+	Once bool `json:"once"`
 }
 
 // Manifest is a per-CLI capability manifest (schema v1). Drives probe
