@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
@@ -55,7 +56,8 @@ type Gates struct {
 // phase.json can be minimal; accessor methods supply conventional defaults.
 type PhaseSpec struct {
 	Name          string               `json:"name"`
-	Kind          string               `json:"kind,omitempty"` // "llm" (default) | "native" | "command" (reserved)
+	Kind          string               `json:"kind,omitempty"`      // "llm" (default) | "native" | "command" (reserved)
+	Role          string               `json:"archetype,omitempty"` // Plan|Build|Evaluate|Control archetype (see Role; inferred from Name when empty). NOTE: distinct from the registry's "role" key, which names the agent/profile (intent/scout/builder/auditor); this is the composition archetype, hence a separate "archetype" JSON key.
 	Optional      bool                 `json:"optional,omitempty"`
 	Agent         string               `json:"agent,omitempty"`
 	Model         string               `json:"model,omitempty"`
@@ -83,6 +85,50 @@ func (s PhaseSpec) KindOrDefault() string {
 		return "llm"
 	}
 	return s.Kind
+}
+
+// Role is the Plan/Build/Evaluate archetype a phase fulfills — the organizing
+// abstraction for advisor composition (compose within roles) and the integrity
+// floor (a plan reaching ship must run ≥1 Evaluate phase). Control covers
+// pipeline mechanics that are none of the three (ship, retro, memo, debugger).
+type Role string
+
+const (
+	RolePlan     Role = "plan"     // decide what/how: intent, scout, triage, tdd, build-planner, architecture-design
+	RoleBuild    Role = "build"    // produce the change: build
+	RoleEvaluate Role = "evaluate" // verify the change: audit, tester
+	RoleControl  Role = "control"  // pipeline control, not Plan/Build/Evaluate: ship, retro, memo, debugger
+)
+
+// inferredRoles maps the built-in phase names to their archetype. A phase whose
+// Role is unset falls back to this table (so existing registry entries need no
+// edit); an unknown name defaults to Plan (the safest "needs scoping" bucket).
+var inferredRoles = map[string]Role{
+	"intent": RolePlan, "scout": RolePlan, "triage": RolePlan, "tdd": RolePlan,
+	"build-planner": RolePlan, "swarm-plan": RolePlan, "architecture-design": RolePlan, "plan-review": RolePlan,
+	"build": RoleBuild,
+	"audit": RoleEvaluate, "tester": RoleEvaluate, "evaluator": RoleEvaluate,
+	"ship": RoleControl, "retro": RoleControl, "retrospective": RoleControl,
+	"memo": RoleControl, "debugger": RoleControl, "start": RoleControl, "end": RoleControl,
+}
+
+// RoleOrDefault returns the explicit Role (normalized + validated), or infers
+// one from the phase Name when unset or unrecognized. Used by the floor
+// (Evaluate detection) and the advisor catalog, so a mis-cased or typo'd
+// "role" in registry/overlay JSON must NOT silently become an unmatchable
+// Role — it falls through to name inference instead.
+func (s PhaseSpec) RoleOrDefault() Role {
+	if s.Role != "" {
+		switch normalized := Role(strings.ToLower(strings.TrimSpace(s.Role))); normalized {
+		case RolePlan, RoleBuild, RoleEvaluate, RoleControl:
+			return normalized
+		}
+		// unknown explicit value → fall through to name inference
+	}
+	if r, ok := inferredRoles[s.Name]; ok {
+		return r
+	}
+	return RolePlan
 }
 
 // AgentName returns Agent, defaulting to the evolve-<name> convention.

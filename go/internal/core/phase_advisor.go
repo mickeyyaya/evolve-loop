@@ -166,6 +166,8 @@ func buildPlanPrompt(in router.RouteInput) string {
 
 	writeRoutingContext(&b, in)
 
+	writeCatalog(&b, in.Catalog)
+
 	b.WriteString("\n## Optionally MINT a new phase\n")
 	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
 	b.WriteString("by attaching a \"mint\" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER ")
@@ -177,6 +179,27 @@ func buildPlanPrompt(in router.RouteInput) string {
 	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","writes_source":false}}]`)
 	b.WriteString("\n")
 	return b.String()
+}
+
+// writeCatalog renders the pre-defined phases the advisor may SELECT (WS3),
+// biasing toward reuse over minting: a selectable phase already has a tuned
+// persona + profile, so minting should be the exception (YAGNI for new phases).
+// Deterministic order (catalog order) ⇒ prompt-prefix-cache friendly. Emits
+// nothing when the catalog is empty (legacy built-in-only path).
+func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
+	if len(cards) == 0 {
+		return
+	}
+	b.WriteString("\n## Pre-defined phases you may SELECT (prefer these over minting)\n")
+	b.WriteString("Each already exists with a tuned persona + profile. SELECT one by naming it in your plan ")
+	b.WriteString("(no \"mint\" block). Only MINT a new phase when none of these fit the work.\n")
+	for _, c := range cards {
+		ws := ""
+		if c.WritesSource {
+			ws = ", writes-source"
+		}
+		fmt.Fprintf(b, "- %s [%s%s]\n", c.Name, c.Role, ws)
+	}
 }
 
 // writeRoutingContext writes the shared, deterministic decision context — cycle
@@ -191,6 +214,8 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 
 	b.WriteString("## Objective signals (digested from handoff artifacts)\n")
 	writeSignals(b, in.Signals)
+
+	writeRecallMemory(b, in)
 
 	if len(in.Cfg.Triggers) > 0 {
 		b.WriteString("\n## Optional phases available (insert only on objective signal)\n")
@@ -214,6 +239,25 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
 	b.WriteString("- cycle_size == trivial → skip tdd (conditional-mandatory exemption)\n")
 	b.WriteString("FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n")
+}
+
+// writeRecallMemory renders the WS2 recall section — the most recent failure's
+// short reason and the prior lessons that match it — so the advisor plans WITH
+// the benefit of what went wrong before (Reflexion-style recall). Both fields
+// are pre-computed by the orchestrator (KB lookup is its I/O, not the advisor's),
+// so this stays a pure deterministic render. Emits nothing when there is neither
+// a reason nor a lesson, keeping the prompt prefix stable for the no-history case.
+func writeRecallMemory(b *strings.Builder, in router.RouteInput) {
+	if in.LastReason == "" && len(in.Lessons) == 0 {
+		return
+	}
+	b.WriteString("\n## Recall memory (learn from prior cycles — do not repeat these)\n")
+	if in.LastReason != "" {
+		fmt.Fprintf(b, "- why the last cycle failed: %s\n", in.LastReason)
+	}
+	for _, lesson := range in.Lessons {
+		fmt.Fprintf(b, "- lesson: %s\n", lesson)
+	}
 }
 
 func writeSignals(b *strings.Builder, s router.RoutingSignals) {

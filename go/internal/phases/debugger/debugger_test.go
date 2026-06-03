@@ -227,29 +227,29 @@ func (f *fakeBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 
 func TestPhase_Run(t *testing.T) {
 	ws := t.TempDir()
-	
+
 	decisionBody := `{"action":"RERUN_PHASE","rerun_phase":"audit","root_cause":"stale audit binding","reasoning":"head moved"}`
 	fb := &fakeBridge{
 		writeArtifact: decisionBody,
 		resp:          core.BridgeResponse{CostUSD: 0.15},
 	}
-	
+
 	clock := func() time.Time {
 		return time.Unix(1_700_000_000, 0)
 	}
-	
+
 	pl := prompts.NewFromFS(fstest.MapFS{
 		"agents/evolve-debugger.md": &fstest.MapFile{
 			Data: []byte("---\nname: evolve-debugger\n---\n# Debugger body"),
 		},
 	})
-	
+
 	phase := New(Config{
 		Bridge:  fb,
 		Prompts: pl,
 		NowFn:   clock,
 	})
-	
+
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle:       197,
 		ProjectRoot: "/tmp/proj",
@@ -259,19 +259,19 @@ func TestPhase_Run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	
+
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict = %q, want PASS", resp.Verdict)
 	}
-	
+
 	if resp.Signals == nil {
 		t.Fatal("expected response to carry signals, got nil")
 	}
-	
+
 	if got := resp.Signals[signalAction]; got != actionRerunPhase {
 		t.Errorf("Signals[%s] = %q, want %q", signalAction, got, actionRerunPhase)
 	}
-	
+
 	if got := resp.Signals[signalRerunPhase]; got != "audit" {
 		t.Errorf("Signals[%s] = %q, want %q", signalRerunPhase, got, "audit")
 	}
