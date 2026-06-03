@@ -209,6 +209,30 @@ func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
 	})
 }
 
+// TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath pins the fix for the
+// cycle-210 degradation: composePlanPrompt must instruct the agent to write the
+// ABSOLUTE workspace artifact path (the same path advisorLaunch tells the bridge
+// to watch), not a relative "routing-plan.json". Under claude-tmux the REPL cwd
+// is NOT the workspace (it varies per cycle — repo root / worktree), so a relative
+// write lands where the bridge never polls → 600s artifact-timeout → degrade to
+// static. The absolute path makes the file land where the bridge watches,
+// regardless of REPL cwd.
+func TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath(t *testing.T) {
+	t.Parallel()
+	const ws = "/tmp/ws-abs-artifact-test"
+	fb := &fakeBridge{stdout: `[{"phase":"scout","run":true,"justification":"x"}]`}
+	if _, err := NewPhaseAdvisor(fb, WithPersona("PERSONA")).Plan(router.RouteInput{Workspace: ws, Cycle: 7}); err != nil {
+		t.Fatal(err)
+	}
+	want := ws + "/routing-plan.json" // absolute — must equal advisorLaunch's watched ArtifactPath
+	if !strings.Contains(fb.gotReq.Prompt, want) {
+		t.Errorf("plan prompt must instruct the ABSOLUTE artifact path %q so the agent writes where the bridge watches; a relative path lands in the REPL cwd → the cycle-210 artifact-timeout. Prompt:\n%s", want, fb.gotReq.Prompt)
+	}
+	if fb.gotReq.ArtifactPath != want {
+		t.Errorf("bridge ArtifactPath=%q, want %q (prompt + watched path must agree)", fb.gotReq.ArtifactPath, want)
+	}
+}
+
 // TestPhaseAdvisor_DispatchWiringFlowsToBridge proves the configured {cli,model}
 // actually REACH BridgeRequest.{CLI,Model} on a Plan launch — and that the
 // uniform contract (artifact completion + routing-plan.json + injected persona)

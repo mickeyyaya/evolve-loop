@@ -127,7 +127,12 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput) string {
 	b.WriteString("\n\n---\n# This cycle\n\n")
 	writeRoutingContext(&b, in)
 	writeCatalog(&b, in.Catalog)
-	b.WriteString("\nNow write your whole-cycle plan as a strict JSON array to routing-plan.json (no prose, no fence).\n")
+	// Instruct the ABSOLUTE artifact path — the same path advisorLaunch tells the
+	// bridge to watch (filepath.Join(in.Workspace, "routing-plan.json")). A relative
+	// path lands in the REPL's cwd (under claude-tmux that is NOT the workspace — it
+	// varies per cycle), so the bridge never sees it and the artifact-wait times out
+	// → degrade to static (the cycle-210 failure). Absolute path = lands where watched.
+	fmt.Fprintf(&b, "\nNow write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", filepath.Join(in.Workspace, "routing-plan.json"))
 	return b.String()
 }
 
