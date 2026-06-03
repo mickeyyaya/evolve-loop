@@ -76,9 +76,17 @@ rather than red-failing on host setup.
 - **claude-tmux + opus latency**: the interactive REPL path is too slow for opus
   (>10 min) while headless is ~30 s. Investigate the tmux completion-detection /
   REPL throughput for deep models. Quarantined for now.
-- **Activation** (Phase 2 final step, pending): flip `dynamic_routing=advisory`
-  and run one real cycle to capture the first-ever `routing-plan.json` produced
-  inside an orchestrated cycle + the first `role:router` ledger entry, confirming
-  the kernel clamps the advisory plan. (Recorded here once executed.)
+- ~~**Activation**~~ **DONE (2026-06-03):** `TestE2ELiveAdvisorActivation` runs
+  one isolated (temp-project) cycle with `EVOLVE_DYNAMIC_ROUTING=advisory` and the
+  advisor on **claude-p@opus**. Result: the advisor wrote a **9-entry
+  routing-plan.json** and the orchestrator clamped + recorded it — confirmed by a
+  `phase_plan` ledger entry (`recordPhasePlan`). This is the first time the advisor
+  brain has driven a real cycle (the audit had found 0 plans ever).
+  **Correction to the original plan's assumption:** there is intentionally NO
+  `role:router` ledger entry — the advisor calls `bridge.Launch` directly, not via
+  the phase runner that stamps agent roles, so the real activation signal is the
+  orchestrator's `phase_plan` entry (role=orchestrator), not a router-role entry.
+  claude-p@opus is used (not claude-tmux@opus) because the headless path completes
+  in ~30s vs the tmux REPL exceeding the ceiling.
 - Phase 3: prove a genuine `architecture-design` selection or a first mint
   (`registerMintedPhases` ledger entry) under `ship_floor:["audit"]`.

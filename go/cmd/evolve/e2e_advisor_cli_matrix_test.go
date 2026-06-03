@@ -326,6 +326,94 @@ func advisorEnvUnavailable(out string) bool {
 	return false
 }
 
+// TestE2ELiveAdvisorActivation is the ACTIVATION proof: it runs one real,
+// isolated (temp-project) cycle with EVOLVE_DYNAMIC_ROUTING=advisory and the
+// advisor on claude-p@opus (deep, ~30s headless — claude-tmux@opus exceeds the
+// REPL ceiling), then asserts the orchestrator actually consulted the planner
+// and disposed its plan. The definitive signal is the orchestrator's
+// `phase_plan` ledger entry (recordPhasePlan: planner ran → kernel clamped to the
+// integrity floor → recorded) plus the advisor's raw routing-plan.json artifact.
+// NOTE: there is intentionally NO `role:router` ledger entry — the advisor calls
+// bridge.Launch directly (not via the phase runner that stamps agent roles), so
+// `phase_plan` (role=orchestrator) is the real activation signal, correcting the
+// plan's original assumption. EVOLVE_MANDATORY_PHASES=scout keeps the cycle tiny;
+// the planner runs at cycle start regardless. Gate: EVOLVE_E2E_LIVE_ADVISOR=1.
+func TestE2ELiveAdvisorActivation(t *testing.T) {
+	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
+	if ok, why := liveCLIAvailable(liveCLI{Driver: "claude-p", Binary: "claude"}); !ok {
+		t.Skip(why)
+	}
+	repoRoot := mustRepoRoot(t)
+	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)
+
+	res := runLiveCycle(t, liveCycleCfg{
+		EvolveBin: evolveBin,
+		RepoRoot:  repoRoot,
+		Driver:    "claude-p",
+		Tier:      "fast", // incidental phases stay cheap; the advisor is opus via env
+		GoalHash:  "advisor-activation-proof",
+		ExtraEnv: []string{
+			"EVOLVE_DYNAMIC_ROUTING=advisory", // Stage=Advisory ⇒ the advisor drives
+			"EVOLVE_ROUTER_CLI=claude-p",      // headless opus completes fast
+			"EVOLVE_ROUTER_MODEL=opus",        // advisor at its deep production tier
+			"EVOLVE_MANDATORY_PHASES=scout",   // keep the cycle tiny; planner runs regardless
+		},
+		Timeout:   envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
+		BudgetUSD: 2.0,
+	})
+	if res.TransientExhausted {
+		t.Skipf("activation transient (quarantined):\n%s", lastN(res.Out, 600))
+	}
+
+	// Proof 1: the orchestrator consulted the planner, clamped its plan to the
+	// integrity floor, and recorded it (recordPhasePlan → kind=phase_plan).
+	hasPhasePlan := false
+	for _, e := range res.Entries {
+		if e.Kind == "phase_plan" {
+			hasPhasePlan = true
+			break
+		}
+	}
+	if !hasPhasePlan {
+		if isTransient(res.Out, res.Err) || advisorEnvUnavailable(res.Out) {
+			t.Skipf("no phase_plan ledger entry, but output is transient/env-unavailable:\n%s", lastN(res.Out, 800))
+		}
+		t.Fatalf("ACTIVATION FAILED: no phase_plan ledger entry — the planner was not consulted at dynamic_routing=advisory\n%s", lastN(res.Out, 1200))
+	}
+
+	// Proof 2: the advisor's RAW plan artifact (routing-plan.json) was written and
+	// parses to a non-empty plan.
+	raw := readFirstFileNamed(res.ProjRoot, "routing-plan.json")
+	if len(raw) == 0 {
+		t.Fatalf("phase_plan present but no routing-plan.json artifact found under %s", res.ProjRoot)
+	}
+	entries, perr := parseRoutingPlanArray(raw)
+	if perr != nil || len(entries) == 0 {
+		t.Fatalf("routing-plan.json did not parse to a non-empty plan: err=%v\n%s", perr, lastN(string(raw), 800))
+	}
+	t.Logf("[advisor-activation] dynamic_routing=advisory: phase_plan ledger entry present + %d-entry routing-plan.json written — the advisor drove the cycle", len(entries))
+}
+
+// readFirstFileNamed returns the contents of the first file named `name` found
+// under root (depth-first), or nil if none. Used to locate the advisor's
+// routing-plan.json without computing the cycle number.
+func readFirstFileNamed(root, name string) []byte {
+	var found []byte
+	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if filepath.Base(p) == name {
+			if b, rerr := os.ReadFile(p); rerr == nil {
+				found = b
+				return filepath.SkipAll // stop traversal — file in hand
+			}
+		}
+		return nil
+	})
+	return found
+}
+
 func TestE2ELiveAdvisorCLIMatrix(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	repoRoot := mustRepoRoot(t)

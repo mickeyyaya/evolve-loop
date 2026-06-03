@@ -415,7 +415,10 @@ func liveBridgeLaunch(t *testing.T, evolveBin, driver, model string, timeout tim
 func writeLiveProfiles(t *testing.T, projRoot, driver, tier string) {
 	t.Helper()
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
-	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {
+	// "router" (the advisor brain) is included so a dynamic_routing=advisory cycle
+	// has a profile for the advisor's bridge launch; its model tier is normally
+	// overridden to deep via EVOLVE_ROUTER_MODEL.
+	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective", "router"} {
 		body := fmt.Sprintf(
 			`{"name":%q,"role":%q,"cli":%q,"allowed_clis":["all"],"model_tier_default":%q,"model_tier_envelope":{"min":"fast","default":%q,"max":"deep"},"allowed_tools":["Read","Write","Bash"]}`,
 			name, name, driver, tier, tier)
