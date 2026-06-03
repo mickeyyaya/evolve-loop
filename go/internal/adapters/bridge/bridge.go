@@ -16,6 +16,7 @@ import (
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Interactive policy values for EVOLVE_INTERACTIVE_POLICY and the
@@ -99,7 +100,12 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		return core.BridgeResponse{}, err
 	}
 	inproc := req
-	inproc.Prompt = injectRulesPrefix(injectPolicyPrefix(req.Prompt, resolvePolicy(req.Agent, req.Env)), req.SystemPrompt)
+	// Order top-to-bottom: Rules < Policy < Contract block < Body < path footer.
+	// The contract's invariant block sits in the cacheable prefix; the volatile
+	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
+	// optimal. See injectContract.
+	body := injectContract(req.Prompt, req.Agent, req.ArtifactPath)
+	inproc.Prompt = injectRulesPrefix(injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env)), req.SystemPrompt)
 
 	// When an onStopReview callback is wired (production path), build the engine
 	// directly so we can inject the cycle-scoped OnStopReview into Deps.
@@ -177,6 +183,21 @@ func injectPolicyPrefix(prompt, policy string) string {
 	default: // PolicyRecommendedOrFirst and unknown values both inject the default block
 		return policyBlockRecommendedOrFirst + prompt
 	}
+}
+
+// injectContract wraps the prompt body with the Deliverable Contract (ADR-0034)
+// when the agent has a registered contract: the invariant instruction block is
+// prepended (cacheable prefix) and the volatile exact-path footer is appended
+// (last line). Agents with no contract (non-phase bridge callers) pass through
+// unchanged. The path is surfaced in the prompt TEXT here, not just in the
+// BridgeRequest.ArtifactPath flag the engine uses to poll — closing the gap that
+// forced the agent to infer its own output path.
+func injectContract(prompt, agent, artifactPath string) string {
+	c, ok := phasecontract.For(agent)
+	if !ok {
+		return prompt
+	}
+	return phasecontract.RenderContractBlock(c) + prompt + phasecontract.RenderContractFooter(c, artifactPath)
 }
 
 // injectRulesPrefix prepends a "## Rules" block carrying the per-agent

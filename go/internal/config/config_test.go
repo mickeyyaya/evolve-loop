@@ -134,6 +134,28 @@ func TestLoad_EvalGateStage(t *testing.T) {
 	}
 }
 
+func TestLoad_ContractGateStage(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	// Default (no env): enforce — the deliverable-contract gate is on by default (ADR-0034).
+	if cfg, _ := Load(absent, map[string]string{}); cfg.ContractGate != StageEnforce {
+		t.Errorf("default ContractGate = %v, want StageEnforce", cfg.ContractGate)
+	}
+	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
+		if cfg, _ := Load(absent, map[string]string{"EVOLVE_CONTRACT_GATE": v}); cfg.ContractGate != want {
+			t.Errorf("EVOLVE_CONTRACT_GATE=%q → %v, want %v", v, cfg.ContractGate, want)
+		}
+	}
+	// A typo defaults to off (never silently keeps a kill-path) and warns.
+	cfg, ws := Load(absent, map[string]string{"EVOLVE_CONTRACT_GATE": "banana"})
+	if cfg.ContractGate != StageOff {
+		t.Errorf("typo EVOLVE_CONTRACT_GATE → %v, want StageOff", cfg.ContractGate)
+	}
+	if !hasWarning(ws, "unknown-value") {
+		t.Error("typo EVOLVE_CONTRACT_GATE should warn unknown-value")
+	}
+}
+
 func TestLoad_UnknownStageDefaultsSafe(t *testing.T) {
 	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
 		"EVOLVE_DYNAMIC_ROUTING": "banana",

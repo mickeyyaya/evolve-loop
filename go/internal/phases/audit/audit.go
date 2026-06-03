@@ -37,6 +37,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -154,6 +155,12 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 // declaration is captured verbatim, so broadening the accepted FORMATS never
 // turns a real non-PASS verdict into a PASS.
 func extractAuditVerdict(content string) (string, bool) {
+	// Layer-5 strangler: the machine-readable sentinel wins when present; the
+	// legacy regex-on-prose remains the fallback for reports written against the
+	// older templates.
+	if v, ok := phasecontract.ParseVerdictSentinel(content); ok {
+		return v, true
+	}
 	if m := verdictCanonicalRE.FindStringSubmatch(content); m != nil {
 		return m[1], true
 	}

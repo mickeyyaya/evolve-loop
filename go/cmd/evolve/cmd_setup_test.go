@@ -173,3 +173,22 @@ func TestRunSetup_DetectJSON(t *testing.T) {
 		t.Errorf("detect JSON missing phases: %v", rep)
 	}
 }
+
+// TestRunSetup_DetectSpaceSeparatedStringFlagThenBool regresses the
+// reorderArgs flag-swallow bug: a space-separated STRING flag followed by
+// another flag (`--evolve-dir X --json`) must NOT consume the trailing --json
+// as its value. Before the fix this emitted the human table (--json ignored).
+func TestRunSetup_DetectSpaceSeparatedStringFlagThenBool(t *testing.T) {
+	project := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	ev := t.TempDir()
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"detect", "--evolve-dir", ev, "--json"}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("detect: rc=%d (%s)", rc, errb.String())
+	}
+	var rep map[string]any
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("--json after a space-separated --evolve-dir must still emit JSON; got:\n%s", out.String())
+	}
+}

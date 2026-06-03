@@ -8,6 +8,7 @@
     "clear_goal": "sonnet"
   },
   "allowed_tools": [
+    "Bash(evolve phase verify:*)",
     "Read",
     "Bash(cat:*)",
     "Write(.evolve/runs/cycle-*/intent.md)",

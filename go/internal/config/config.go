@@ -130,6 +130,16 @@ type RolloutStages struct {
 	// ambiguity, so enforce-default never false-blocks a healthy cycle. Set
 	// from EVOLVE_EVAL_GATE via applyEnv; default StageEnforce.
 	EvalGate Stage
+	// ContractGate is the deliverable-contract gate rollout stage
+	// (internal/deliverable, ADR-0034): StageOff — no contract gate
+	// (orchestrator keeps the noopReviewer; byte-identical); StageShadow —
+	// the verifier runs but every violation is log-only; StageEnforce — a
+	// confirmed well-formedness violation (missing/misplaced/malformed
+	// deliverable) rejects the phase. The gate fails OPEN on ambiguity, and a
+	// runtime circuit breaker demotes enforce→advisory after N consecutive
+	// blocks so a miscalibrated gate cannot brick the loop. Set from
+	// EVOLVE_CONTRACT_GATE via applyEnv; default StageEnforce.
+	ContractGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
 	//   "auto" (default) — wrap when nested-claude is NOT detected and the
@@ -316,7 +326,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce},
 		Mandatory:     []string{"scout", "build", "audit", "ship"},
 		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions: 4,
@@ -403,6 +413,13 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// rather than silently enabling a kill-path. Default (no env) is
 		// enforce, set in defaults().
 		cfg.EvalGate = parseEvidenceStage(v, "EVOLVE_EVAL_GATE", ws)
+	}
+	if v := env["EVOLVE_CONTRACT_GATE"]; v != "" {
+		// Deliverable-contract gate (internal/deliverable, ADR-0034). Same
+		// off/shadow/enforce trichotomy; reuses parseEvidenceStage so a typo
+		// defaults to off rather than silently enabling the kill-path. Default
+		// (no env) is enforce, set in defaults().
+		cfg.ContractGate = parseEvidenceStage(v, "EVOLVE_CONTRACT_GATE", ws)
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {

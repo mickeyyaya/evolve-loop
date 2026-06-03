@@ -9,6 +9,7 @@
     "adversarial_audit": "opus"
   },
   "allowed_tools": [
+    "Bash(evolve phase verify:*)",
     "Bash(verify-eval.sh:*)",
     "Bash(cycle-health-check.sh:*)",
     "Bash(eval-quality-check.sh:*)",
