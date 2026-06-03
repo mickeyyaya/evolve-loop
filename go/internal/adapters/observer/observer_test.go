@@ -119,6 +119,92 @@ func TestWatch_GrowthResetsStallTimer(t *testing.T) {
 	}
 }
 
+// TestWatch_LivenessProbeSuppressesFalseStall — cycle-190 regression: a
+// tmux-driver agent in a long single "Incubating" turn (extended thinking +
+// one big tool call) commits NO scrollback lines and writes NO workspace
+// artifact for minutes, then dumps everything at the end. Both filesystem
+// liveness signals (stdout-log size, workspace mtime) stay flat, so the
+// observer falsely fires stall_no_output. When a LivenessProbe reports the
+// agent is still alive (e.g. the tmux pane spinner/token-counter advancing),
+// the observer must HOLD the stall: reset the clock and emit a benign
+// stall_probe_active info event instead of a false incident.
+func TestWatch_LivenessProbeSuppressesFalseStall(t *testing.T) {
+	tmp := t.TempDir()
+	logFile := filepath.Join(tmp, "tdd-stdout.log")
+	// Flat log, no growth, no WorkspaceDir activity — exactly the cycle-190
+	// think-then-dump window.
+	if err := os.WriteFile(logFile, []byte("start"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sink syncBuffer
+	o := New(Config{
+		StallS:    60 * time.Millisecond,
+		PollS:     10 * time.Millisecond,
+		Cycle:     190,
+		Phase:     "tdd",
+		Agent:     "tdd",
+		StdoutLog: logFile,
+		// Agent is alive mid-turn (tmux pane changing) though the filesystem
+		// shows nothing yet.
+		LivenessProbe: func() bool { return true },
+	}, &sink)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	_ = o.Watch(ctx)
+
+	var sawStall, sawProbeActive bool
+	for _, e := range parseEvents(t, sink.bytes()) {
+		switch e.Type {
+		case "stall_no_output":
+			sawStall = true
+		case "stall_probe_active":
+			sawProbeActive = true
+		}
+	}
+	if sawStall {
+		t.Error("stall_no_output fired despite liveness probe reporting active (cycle-190 false-positive stall)")
+	}
+	if !sawProbeActive {
+		t.Error("expected a stall_probe_active liveness event when the probe holds the kill")
+	}
+}
+
+// TestWatch_LivenessProbeFalseStillStalls — the probe only ever SUPPRESSES a
+// stall on positive liveness. A probe that reports inactive (no tmux session,
+// pane unchanged) must NOT mask a genuine stall: stall_no_output still fires.
+func TestWatch_LivenessProbeFalseStillStalls(t *testing.T) {
+	tmp := t.TempDir()
+	logFile := filepath.Join(tmp, "tdd-stdout.log")
+	if err := os.WriteFile(logFile, []byte("start"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sink syncBuffer
+	o := New(Config{
+		StallS:        60 * time.Millisecond,
+		PollS:         10 * time.Millisecond,
+		Cycle:         1,
+		Phase:         "tdd",
+		Agent:         "tdd",
+		StdoutLog:     logFile,
+		LivenessProbe: func() bool { return false },
+	}, &sink)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	_ = o.Watch(ctx)
+
+	saw := false
+	for _, e := range parseEvents(t, sink.bytes()) {
+		if e.Type == "stall_no_output" && e.Severity == "incident" {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Error("stall_no_output must still fire when the liveness probe reports inactive")
+	}
+}
+
 // TestWatch_WorkspaceActivityResetsStallTimer — cycle-141: a tmux-driver
 // agent writes its live output to the tmux scrollback, NOT the stdout-log,
 // so the stdout-log stays flat while the agent is productively writing
