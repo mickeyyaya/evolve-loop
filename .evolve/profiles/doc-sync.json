@@ -1,0 +1,24 @@
+{
+  "name": "doc-sync",
+  "role": "doc-sync",
+  "cli": "claude-tmux",
+  "model_tier_default": "sonnet",
+  "max_turns": 10,
+  "output_artifact": ".evolve/runs/cycle-{cycle}/doc-sync-report.md",
+  "challenge_token_required": true,
+  "allowed_tools": [
+    "Write(docs/**)",
+    "Edit(docs/**)",
+    "Write(knowledge-base/**)",
+    "Edit(knowledge-base/**)"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*",
+      "docs",
+      "knowledge-base"
+    ],
+    "read_only_repo": false
+  }
+}

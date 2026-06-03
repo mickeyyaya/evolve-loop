@@ -66,6 +66,23 @@
       "skippable_when_present": false
     },
     {
+      "name": "spec-verify",
+      "role": "spec-verifier",
+      "optional": true,
+      "inputs": {
+        "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+        "state_fields": []
+      },
+      "outputs": {
+        "files": [".evolve/runs/cycle-{cycle}/spec-verify-report.md"]
+      },
+      "gate_in": "gate_triage_to_plan_review",
+      "gate_out": "gate_plan_review_to_tdd",
+      "parallel_eligible": false,
+      "skippable_when_present": false
+    },
+
+    {
       "name": "architecture-design",
       "role": "architecture-design",
       "archetype": "plan",
@@ -184,6 +201,23 @@
       "parallel_eligible": false,
       "skippable_when_present": false
     },
+    {
+      "name": "doc-sync",
+      "role": "doc-sync",
+      "optional": true,
+      "inputs": {
+        "files": [".evolve/runs/cycle-{cycle}/build-report.md"],
+        "state_fields": []
+      },
+      "outputs": {
+        "files": [".evolve/runs/cycle-{cycle}/doc-sync-report.md"]
+      },
+      "gate_in": "gate_build_to_audit",
+      "gate_out": "gate_audit_to_ship",
+      "parallel_eligible": false,
+      "skippable_when_present": false
+    },
+
     {
       "name": "tester",
       "role": "tester",
