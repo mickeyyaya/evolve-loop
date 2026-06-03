@@ -333,7 +333,7 @@ func TestDiscover_GlobErrorIsWrapped(t *testing.T) {
 func TestRunBash_ExecError(t *testing.T) {
 	// t.Setenv forbids t.Parallel — this test mutates process PATH.
 	t.Setenv("PATH", "")
-	code, out := runBash(context.Background(), filepath.Join(t.TempDir(), "noexist.sh"), "", "")
+	code, out := runBash(context.Background(), filepath.Join(t.TempDir(), "noexist.sh"), "", "", nil)
 	if code != 126 {
 		t.Errorf("exit code=%d, want 126 (could-not-exec sentinel)", code)
 	}

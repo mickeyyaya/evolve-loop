@@ -92,6 +92,24 @@ assert_go_test_pass() {
   return 1
 }
 
+# assert_go_test_pass_changed [run_regex]: run `go test` scoped to the packages
+# this cycle touched, read from CHANGED_PACKAGES (space-separated patterns
+# exported by acssuite). Empty/unset CHANGED_PACKAGES is a no-op GREEN (a
+# pure-docs cycle touches no Go packages). Optional $1 -run regex forwarded.
+assert_go_test_pass_changed() {
+  local re="${1:-}"
+  local pkgs="${CHANGED_PACKAGES:-}"
+  if [ -z "$pkgs" ]; then
+    echo "GREEN: assert_go_test_pass_changed: no CHANGED_PACKAGES (no Go packages touched)" >&2
+    return 0
+  fi
+  local pkg rc=0
+  for pkg in $pkgs; do
+    assert_go_test_pass "$pkg" "$re" || rc=1
+  done
+  return "$rc"
+}
+
 # assert_go_build [pkg]: run `go build` for the package (default ./...) and
 # assert it EXITS 0 — the build is broken otherwise. The exit code is the
 # authoritative signal — never scrape stdout. Runs in the resolved module dir

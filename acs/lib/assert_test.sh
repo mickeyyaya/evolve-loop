@@ -56,6 +56,13 @@ acs_pct_ge "80" "80.0"; check_rc "80 >= 80.0 (mixed precision)" 0 $?
 acs_pct_ge "" "50"; check_rc "empty treated as 0 < 50" 1 $?
 acs_pct_ge "75%" "50%"; check_rc "trailing %% stripped" 0 $?
 
+# --- assert_go_test_pass_changed: empty CHANGED_PACKAGES is a no-op GREEN ---
+# (the non-empty path delegates to assert_go_test_pass, exercised by live cycle.)
+( unset CHANGED_PACKAGES; assert_go_test_pass_changed >/dev/null 2>&1 ); \
+  check_rc "unset CHANGED_PACKAGES → no-op pass" 0 $?
+( CHANGED_PACKAGES="" assert_go_test_pass_changed >/dev/null 2>&1 ); \
+  check_rc "blank CHANGED_PACKAGES → no-op pass" 0 $?
+
 if [ "$fails" -eq 0 ]; then
   echo "PASS: all assert.sh helper tests green"
   exit 0

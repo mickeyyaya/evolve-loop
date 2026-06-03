@@ -31,6 +31,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 )
 
 // killGrace is how long runBash waits, after the timeout kills the predicate's
@@ -156,8 +158,12 @@ func Run(opts Options) (Verdict, error) {
 		// silently RED-flagged new-code predicates → discarded PASS-audited work.
 		// `.evolve/` runtime data still resolves to main via EVOLVE_PROJECT_ROOT.
 		workdir := opts.Root
+		// Export CHANGED_PACKAGES so a predicate can scope `go test` to the
+		// cycle's touched packages (assert_go_test_pass_changed) instead of the
+		// whole repo — best-effort, empty when the handoff is absent (cycle-200).
+		changed := changedPackagesForCycle(opts.ProjectRoot, opts.Cycle)
 		execFn = func(ctx context.Context, path string) (int, string) {
-			return runBash(ctx, path, projectRoot, workdir)
+			return runBash(ctx, path, projectRoot, workdir, changed)
 		}
 	}
 
@@ -259,6 +265,24 @@ func discover(root string, cycle int) ([]predFile, error) {
 	return out, nil
 }
 
+// changedPackagesForCycle returns the go test patterns for the files the
+// builder touched this cycle, read from handoff-build.json under the cycle
+// workspace (<projectRoot>/.evolve/runs/cycle-<N>/). Best-effort: nil when
+// projectRoot is empty or no handoff is found, so predicates fall back to their
+// own scope.
+func changedPackagesForCycle(projectRoot string, cycle int) []string {
+	if projectRoot == "" {
+		return nil
+	}
+	dir := filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
+	for _, name := range []string{"handoff-build.json", "handoff-builder.json"} {
+		if pkgs := changedpkgs.ChangedPackages(filepath.Join(dir, name)); len(pkgs) > 0 {
+			return pkgs
+		}
+	}
+	return nil
+}
+
 // runBash executes `bash <path>` and returns its exit code + combined output.
 // A non-exec failure (e.g. bash missing) or timeout maps to a non-zero exit so
 // the predicate counts as RED — the suite never silently swallows a failure.
@@ -270,16 +294,28 @@ func discover(root string, cycle int) ([]predFile, error) {
 // cmd.Process the signal is skipped, so WaitDelay is the guaranteed backstop —
 // it force-closes the pipes killGrace after cancellation, ensuring Run always
 // returns (a timed-out predicate counts RED) rather than blocking on a child.
-func runBash(ctx context.Context, path, projectRoot, workdir string) (int, string) {
+func runBash(ctx context.Context, path, projectRoot, workdir string, changedPkgs []string) (int, string) {
 	cmd := exec.CommandContext(ctx, "bash", path)
 	if workdir != "" {
 		cmd.Dir = workdir // cycle-190 / issue #9: run predicates with cwd at the shipped tree (the Run closure passes opts.Root)
 	}
+	// Build the predicate env additively. With no extras, env == os.Environ(),
+	// which matches the prior inherit behavior (no os.Setenv runs between
+	// startup and here, so the snapshot is equivalent).
+	env := os.Environ()
 	if projectRoot != "" {
 		// Export EVOLVE_PROJECT_ROOT so predicates resolve `.evolve/` runtime data
 		// to the MAIN project root even when executed from a worktree (issue #12).
-		cmd.Env = append(os.Environ(), "EVOLVE_PROJECT_ROOT="+projectRoot)
+		env = append(env, "EVOLVE_PROJECT_ROOT="+projectRoot)
 	}
+	if len(changedPkgs) > 0 {
+		// Export CHANGED_PACKAGES so a predicate can scope `go test` to this
+		// cycle's touched packages via assert_go_test_pass_changed instead of
+		// `go test ./...` (cycle-200). Space-joining is safe: go package
+		// patterns never contain spaces.
+		env = append(env, "CHANGED_PACKAGES="+strings.Join(changedPkgs, " "))
+	}
+	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process != nil {
