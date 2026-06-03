@@ -102,7 +102,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		//     phases, which have no pane; PID written by the bridge at launch).
 		LivenessProbe: anyProbe(
 			newTmuxPaneProbe(req.Cycle, phase, nil),
-			newProcessCPUProbe(pidFileFromStdoutLog(stdoutLog), nil),
+			newProcessCPUProbe(core.BridgePIDFile(stdoutLog), nil),
 		),
 	}
 	// Cycle-124 Task 6 — KNOWN GAP: the operator's "active liveness

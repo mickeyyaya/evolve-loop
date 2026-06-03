@@ -10,21 +10,6 @@ import (
 	"testing"
 )
 
-func TestPidFileFor(t *testing.T) {
-	cases := map[string]string{
-		"/ws/build-stdout.log": "/ws/build.bridge-pid",
-		"/ws/tdd-stdout.log":   "/ws/tdd.bridge-pid",
-		"build-stdout.log":     "build.bridge-pid",
-		"":                     "",
-		"/ws/build.log":        "", // not the -stdout.log convention
-	}
-	for in, want := range cases {
-		if got := pidFileFor(in); got != want {
-			t.Errorf("pidFileFor(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 func TestEnvValue(t *testing.T) {
 	env := []string{"A=1", "B=two", "X=a=b"}
 	cases := map[string]string{"A": "1", "B": "two", "X": "a=b", "MISSING": ""}

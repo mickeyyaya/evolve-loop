@@ -397,15 +397,3 @@ func envValue(env []string, key string) string {
 	}
 	return ""
 }
-
-// pidFileFor derives the agent-PID file path from the phase stdout-log path
-// (<ws>/<phase>-stdout.log → <ws>/<phase>.bridge-pid), matching the path the
-// observer's CPU probe reads (core_adapter.go). Returns "" when stdoutLog does
-// not follow the convention, so the probe simply degrades to a no-op.
-func pidFileFor(stdoutLog string) string {
-	const suffix = "-stdout.log"
-	if stdoutLog == "" || !strings.HasSuffix(stdoutLog, suffix) {
-		return ""
-	}
-	return strings.TrimSuffix(stdoutLog, suffix) + ".bridge-pid"
-}

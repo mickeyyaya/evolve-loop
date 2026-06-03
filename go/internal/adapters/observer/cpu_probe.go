@@ -1,14 +1,21 @@
 package observer
 
-// cpu_probe.go — a ground-truth LivenessProbe for HEADLESS phases. The tmux
+// cpu_probe.go — a CPU-delta LivenessProbe for HEADLESS phases. The tmux
 // pane-hash probe (tmux_probe.go) covers tmux-driver agents, but a headless
 // `claude -p` phase that thinks for minutes in one turn with no streamed output
 // has no pane to probe and its stdout-log + workspace both go flat — the same
 // false-stall shape as cycle-190, one layer over. This probe reads the agent
-// process's accumulated CPU time: a working agent (even silently thinking)
+// process's accumulated CPU time: a computing agent (even silently thinking)
 // accrues CPU; a deadlocked one does not. The bridge writes the agent PID to a
 // per-phase file at launch (engine.go execRunner, gated by EVOLVE_BRIDGE_PIDFILE);
 // this probe reads it.
+//
+// NOT absolute ground truth — it is a better PROXY than stdout-flatness, with
+// its own blind spots: an agent blocked on a slow API response mid-turn accrues
+// little CPU (false-negative), and a wedged busy-loop reads alive (false-pos).
+// It fails SAFE: a no-claim (false) leaves the caller's existing stall logic
+// unchanged, and the first sighting grants one window. The true fix remains a
+// bridge wall-clock heartbeat envelope independent of agent output.
 
 import (
 	"os"
@@ -83,18 +90,4 @@ func readPID(pidFile string) (int, bool) {
 		return 0, false
 	}
 	return pid, true
-}
-
-// pidFileFromStdoutLog derives the agent-PID file path from the phase stdout-log
-// path (<ws>/<phase>-stdout.log → <ws>/<phase>.bridge-pid), IDENTICALLY to the
-// bridge's pidFileFor. Both sides key off the same stdout-log path the observer
-// already watches, so pidfile agreement reduces to stdout-log agreement — which
-// is already a hard precondition for the observer to function (it watches that
-// very log for growth). Returns "" off-convention → the CPU probe no-ops.
-func pidFileFromStdoutLog(stdoutLog string) string {
-	const suffix = "-stdout.log"
-	if !strings.HasSuffix(stdoutLog, suffix) {
-		return ""
-	}
-	return strings.TrimSuffix(stdoutLog, suffix) + ".bridge-pid"
 }
