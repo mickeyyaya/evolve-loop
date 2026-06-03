@@ -3,6 +3,8 @@ package bridge
 import (
 	"context"
 	"fmt"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // claudePDriver is the headless `claude -p` driver — the Go port of
@@ -75,7 +77,7 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// sets this). Derived from StdoutLog so it matches the observer's path
 	// (<ws>/<phase>.bridge-pid); a mismatch degrades to no probe (best-effort).
 	env := driverEnv(deps)
-	if pidFile := pidFileFor(cfg.StdoutLog); pidFile != "" {
+	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
 		env = append(env, "EVOLVE_BRIDGE_PIDFILE="+pidFile)
 	}
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.

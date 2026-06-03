@@ -17,9 +17,10 @@ func TestFileToPackage(t *testing.T) {
 		{"go/internal/foo/bar_test.go", "./internal/foo/...", true},
 		{"go/cmd/evolve/cmd_x.go", "./cmd/evolve/...", true},
 		{"./go/internal/a/b.go", "./internal/a/...", true},
-		{"go/main.go", "./...", true},      // module-root file
-		{"internal/foo/bar.go", "", false}, // not under go/ → rejected (under-scope, never misroute)
-		{"acs/lib/helper.go", "", false},   // a .go file outside the module → rejected
+		{"go/main.go", "./...", true},             // module-root file
+		{"internal/foo/bar.go", "", false},        // not under go/ → rejected (under-scope, never misroute)
+		{"acs/lib/helper.go", "", false},          // a .go file outside the module → rejected
+		{"go/internal/foo bar/baz.go", "", false}, // whitespace → rejected (would word-split CHANGED_PACKAGES)
 		{"docs/readme.md", "", false},
 		{"acs/cycle-1/001-x.sh", "", false},
 		{"CLAUDE.md", "", false},

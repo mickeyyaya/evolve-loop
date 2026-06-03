@@ -36,6 +36,13 @@ func FileToPackage(file string) (string, bool) {
 	if !strings.HasPrefix(p, "go/") {
 		return "", false
 	}
+	// A package pattern with whitespace would be word-split by the bash consumer
+	// (assert_go_test_pass_changed iterates $CHANGED_PACKAGES unquoted) into bogus
+	// tokens → a false-RED predicate. Go package dirs never contain whitespace;
+	// reject defensively rather than emit a splittable pattern.
+	if strings.ContainsAny(p, " \t\n") {
+		return "", false
+	}
 	dir := path.Dir(strings.TrimPrefix(p, "go/"))
 	if dir == "." || dir == "" {
 		return "./...", true // module-root file: no narrower scope

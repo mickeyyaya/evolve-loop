@@ -75,6 +75,22 @@ No env flag sprawl — reuse an existing rollout dial or a single `EVOLVE_VERDIC
 - **Structure only the output (`verdict.go` as-is).** Rejected as sufficient: enriches a verdict whose *input* is still a prose grep — the cycle-192 failure happens before `VerdictReason` is constructed.
 - **Force every agent to emit JSON only (no markdown report).** Rejected as too broad now: the markdown reports are human-debugging artifacts; a verdict sentinel/sidecar gets the determinism without losing them.
 
+## Implementation note (as-built)
+
+Move 1 was implemented as a **new `internal/phasecontract` package that centralizes
+the heading STRINGS** (shared by the 6 classifiers and the `TestProducersDeclareCanonical`
+drift alarm), **not** as a migration of the classifiers onto `phasespec.ClassifyRules`.
+Rationale: `ClassifyRules.RequireSections` is a flat AND-of-substrings and cannot
+express build's OR-of-headings, scout/triage's heading-plus-≥1-item, tdd's
+OR-within-AND, or audit's verdict-token extraction; forcing those onto the
+declarative schema would have required extending it (OR-groups, item-count
+predicates) — a larger change than the drift problem warranted. The stable matching
+*logic* stays in Go; only the drift-prone heading *strings* are centralized. This
+leaves `phasespec.ClassifyRules` as the declarative path for user/registry phases
+and `phasecontract` for the 6 built-ins — a deliberate split, not unfinished work.
+A future unification (extend `ClassifyRules` to subsume `phasecontract`) is possible
+but not required.
+
 ## Related
 
 - Failure-class note: [verdict-and-gate-proxy-failure-class-2026-06-03.md](../../../knowledge-base/research/verdict-and-gate-proxy-failure-class-2026-06-03.md)
