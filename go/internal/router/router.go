@@ -79,12 +79,11 @@ type RouteInput struct {
 
 // PhaseCard is the advisor-facing projection of one pre-defined phase: enough
 // for the planner to decide "select this" vs "mint a new one". Deliberately
-// minimal — name, role archetype, a one-line purpose, the model tier, and
-// whether it writes source (the advisor needs the last for sandbox reasoning).
+// minimal — name, role archetype, the model tier, and whether it writes source
+// (the advisor needs the last for sandbox reasoning).
 type PhaseCard struct {
 	Name         string `json:"name"`
-	Role         string `json:"role"`    // plan|build|evaluate|control
-	Purpose      string `json:"purpose"` // one-line description
+	Role         string `json:"role"` // plan|build|evaluate|control
 	Tier         string `json:"tier,omitempty"`
 	WritesSource bool   `json:"writes_source,omitempty"`
 }

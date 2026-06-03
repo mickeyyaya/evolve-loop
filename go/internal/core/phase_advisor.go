@@ -166,6 +166,8 @@ func buildPlanPrompt(in router.RouteInput) string {
 
 	writeRoutingContext(&b, in)
 
+	writeCatalog(&b, in.Catalog)
+
 	b.WriteString("\n## Optionally MINT a new phase\n")
 	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
 	b.WriteString("by attaching a \"mint\" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER ")
@@ -177,6 +179,27 @@ func buildPlanPrompt(in router.RouteInput) string {
 	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","writes_source":false}}]`)
 	b.WriteString("\n")
 	return b.String()
+}
+
+// writeCatalog renders the pre-defined phases the advisor may SELECT (WS3),
+// biasing toward reuse over minting: a selectable phase already has a tuned
+// persona + profile, so minting should be the exception (YAGNI for new phases).
+// Deterministic order (catalog order) ⇒ prompt-prefix-cache friendly. Emits
+// nothing when the catalog is empty (legacy built-in-only path).
+func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
+	if len(cards) == 0 {
+		return
+	}
+	b.WriteString("\n## Pre-defined phases you may SELECT (prefer these over minting)\n")
+	b.WriteString("Each already exists with a tuned persona + profile. SELECT one by naming it in your plan ")
+	b.WriteString("(no \"mint\" block). Only MINT a new phase when none of these fit the work.\n")
+	for _, c := range cards {
+		ws := ""
+		if c.WritesSource {
+			ws = ", writes-source"
+		}
+		fmt.Fprintf(b, "- %s [%s%s]\n", c.Name, c.Role, ws)
+	}
 }
 
 // writeRoutingContext writes the shared, deterministic decision context — cycle

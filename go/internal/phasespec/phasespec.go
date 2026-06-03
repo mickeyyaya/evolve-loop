@@ -56,8 +56,8 @@ type Gates struct {
 // phase.json can be minimal; accessor methods supply conventional defaults.
 type PhaseSpec struct {
 	Name          string               `json:"name"`
-	Kind          string               `json:"kind,omitempty"` // "llm" (default) | "native" | "command" (reserved)
-	Role          string               `json:"role,omitempty"` // Plan|Build|Evaluate|Control archetype (see Role; inferred from Name when empty)
+	Kind          string               `json:"kind,omitempty"`      // "llm" (default) | "native" | "command" (reserved)
+	Role          string               `json:"archetype,omitempty"` // Plan|Build|Evaluate|Control archetype (see Role; inferred from Name when empty). NOTE: distinct from the registry's "role" key, which names the agent/profile (intent/scout/builder/auditor); this is the composition archetype, hence a separate "archetype" JSON key.
 	Optional      bool                 `json:"optional,omitempty"`
 	Agent         string               `json:"agent,omitempty"`
 	Model         string               `json:"model,omitempty"`

@@ -1157,6 +1157,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			Env:             envSnap,
 			LastReason:      lastReason,
 			Lessons:         lessons,
+			Catalog:         phaseCardsFromCatalog(o.catalog),
 		}
 		// ClampPlanToFloor's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
@@ -2088,6 +2089,29 @@ func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord
 		digests = append(digests, l.Digest())
 	}
 	return latest.Summary, digests
+}
+
+// phaseCardsFromCatalog projects the composable phases (Plan/Build/Evaluate
+// archetypes) of the catalog into advisor-facing PhaseCards, so the advisor can
+// SELECT a pre-defined phase instead of minting a new one (WS3: prefer reuse —
+// DRY at the agent level). Control-archetype phases (ship/retro/memo/debugger)
+// are kernel-managed, not advisor-composed, so they are omitted. Order follows
+// the catalog's registry order for a deterministic, prompt-cache-friendly result.
+func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
+	var cards []router.PhaseCard
+	for _, spec := range cat.All() {
+		role := spec.RoleOrDefault()
+		if role == phasespec.RoleControl {
+			continue
+		}
+		cards = append(cards, router.PhaseCard{
+			Name:         spec.Name,
+			Role:         string(role),
+			Tier:         spec.ModelOrDefault(),
+			WritesSource: spec.WritesSource,
+		})
+	}
+	return cards
 }
 
 // entriesFromRecords converts FailedRecord values into failureadapter.Entry.
