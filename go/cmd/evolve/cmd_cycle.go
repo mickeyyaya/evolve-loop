@@ -39,6 +39,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
@@ -318,7 +319,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// triggers (the floor is enforced here — invalid specs are never routed), and
 	// register a spec-driven runner for each so the orchestrator can execute it.
 	// No user phases ⇒ all of this is a no-op and behavior is byte-identical.
-	builtinCat, _ := phasespec.Load(registryPath)
+	builtinCat, builtinErr := phasespec.Load(registryPath)
+	if builtinErr != nil {
+		// Non-fatal (matches config.Load's tolerant posture above), but no longer
+		// silent: a missing/malformed registry means registerBuiltinSpecRunners
+		// wires nothing, so a selectable phase could later abort at dispatch —
+		// surface the cause here rather than leave it undiagnosable.
+		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
+	}
 	userSpecs, discWarns := phasespec.DiscoverUserSpecs(filepath.Join(projectRoot, ".evolve", "phases"))
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)
 	for _, w := range append(discWarns, mergeWarns...) {
@@ -338,6 +346,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: br, Prompts: prm})
 		}
 	}
+	// Spec-runner fallback for BUILTIN registry phases the advisor can SELECT
+	// (see registerBuiltinSpecRunners) — makes the invariant "every
+	// advisor-selectable phase is dispatchable" hold.
+	registerBuiltinSpecRunners(runners, builtinCat, prm, br, os.Stderr)
 	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
 	// routing_mode=llm; otherwise it falls back to the deterministic
 	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
@@ -406,6 +418,34 @@ func kbRootsAbs(projectRoot string) []string {
 		out = append(out, filepath.Join(projectRoot, p))
 	}
 	return out
+}
+
+// registerBuiltinSpecRunners wires a spec-driven runner for every builtin
+// registry phase the advisor can SELECT (WS3 catalog cards = non-Control
+// archetypes) that is declared kind:llm but is absent from the hand-wired
+// runners map (e.g. tester, an advisor-selectable architecture-design). Without
+// this such a phase is catalog-visible — the advisor can select it — yet has no
+// runner, so dispatch would abort (ErrPhaseInvalid). Mutates runners in place.
+//
+// Control-archetype phases (memo/retrospective) are kernel-dispatched under
+// their canonical names and are NOT advisor-selectable, so they are excluded (no
+// dead entries). Guarded on persona existence: a kind:llm phase whose
+// agents/<name>.md is missing (e.g. plan-review today) is skipped + WARNed to
+// `warn` rather than wired to a runner it cannot execute.
+func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtinCat phasespec.Catalog, prm *prompts.Loader, br core.Bridge, warn io.Writer) {
+	for _, s := range builtinCat.All() {
+		if s.KindOrDefault() != "llm" || s.RoleOrDefault() == phasespec.RoleControl {
+			continue
+		}
+		if _, exists := runners[core.Phase(s.Name)]; exists {
+			continue
+		}
+		if _, err := prm.Agent(s.AgentName()); err != nil {
+			fmt.Fprintf(warn, "[phases] WARN selectable spec phase %q (kind:llm) has no runner and no persona %s.md — not dispatchable until a persona is added\n", s.Name, s.AgentName())
+			continue
+		}
+		runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: br, Prompts: prm})
+	}
 }
 
 // registrarMinter adapts the concrete phaseregistrar.Registrar to the narrow
