@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseregistrar"
@@ -383,6 +384,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// EVOLVE_OBSERVER_STALL_S=90 (or similar).
 	if os.Getenv("EVOLVE_OBSERVER_AUTOSPAWN") != "0" {
 		opts = append(opts, core.WithObserver(observer.NewCoreAdapter()))
+	}
+	// Structural eval gates (internal/evalgate): Gate A (scout eval-file
+	// materialization) + Gate B (tdd predicate-quality), mounted at the
+	// per-phase DeliverableReviewer seam. Default enforce (config.defaults);
+	// EVOLVE_EVAL_GATE=off keeps the noopReviewer default (byte-identical).
+	// The gates fail open on any ambiguity, so enforce never false-blocks.
+	if cfg.EvalGate != config.StageOff {
+		opts = append(opts, core.WithReviewer(evalgate.NewReviewer(cfg.EvalGate)))
 	}
 	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
 	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.

@@ -110,6 +110,30 @@ func TestLoad_EnvOverridesRegistryAndDefault(t *testing.T) {
 	}
 }
 
+func TestLoad_EvalGateStage(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	// Default (no env): enforce — the structural eval gates are on by default.
+	if cfg, _ := Load(absent, map[string]string{}); cfg.EvalGate != StageEnforce {
+		t.Errorf("default EvalGate = %v, want StageEnforce", cfg.EvalGate)
+	}
+
+	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
+		if cfg, _ := Load(absent, map[string]string{"EVOLVE_EVAL_GATE": v}); cfg.EvalGate != want {
+			t.Errorf("EVOLVE_EVAL_GATE=%q → %v, want %v", v, cfg.EvalGate, want)
+		}
+	}
+
+	// A typo defaults to off (never silently keeps a kill-path) and warns.
+	cfg, ws := Load(absent, map[string]string{"EVOLVE_EVAL_GATE": "banana"})
+	if cfg.EvalGate != StageOff {
+		t.Errorf("typo EVOLVE_EVAL_GATE → %v, want StageOff", cfg.EvalGate)
+	}
+	if !hasWarning(ws, "unknown-value") {
+		t.Error("typo EVOLVE_EVAL_GATE should warn unknown-value")
+	}
+}
+
 func TestLoad_UnknownStageDefaultsSafe(t *testing.T) {
 	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
 		"EVOLVE_DYNAMIC_ROUTING": "banana",
