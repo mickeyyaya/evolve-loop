@@ -405,3 +405,75 @@ func TestDefaultPull_NonGitDir(t *testing.T) {
 		t.Errorf("DefaultPull on non-git dir err = %v, want nil", err)
 	}
 }
+
+// === DefaultPull: .git directory present — git cmds run, errors swallowed ===
+// Exercises the git-checkout branch: when .git is a directory the function
+// runs git fetch + git reset; since d is not a real repo both fail, but
+// DefaultPull swallows every error and returns nil (mirrors bash behaviour).
+func TestDefaultPull_GitDirPresent_ExecutesGit_ErrorsSwallowed(t *testing.T) {
+	d := t.TempDir()
+	if err := os.Mkdir(filepath.Join(d, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+	if err := DefaultPull(d); err != nil {
+		t.Errorf("DefaultPull with .git dir = %v, want nil (errors must be swallowed)", err)
+	}
+}
+
+// === DefaultReleaseSh tests ==================================================
+
+// TestDefaultReleaseSh_ScriptAbsent_ReturnsNil exercises the v12.0.0+ path:
+// legacy/scripts/utility/release.sh is absent → graceful no-op, nil return.
+func TestDefaultReleaseSh_ScriptAbsent_ReturnsNil(t *testing.T) {
+	d := t.TempDir() // no script under legacy/scripts/utility/
+	if err := DefaultReleaseSh(d, "1.2.3"); err != nil {
+		t.Errorf("DefaultReleaseSh with absent script = %v, want nil", err)
+	}
+}
+
+// TestDefaultReleaseSh_ScriptExitsNonZero_ReturnsError exercises the failure
+// branch: script present but exits 1 → non-nil error containing the canonical
+// "release.sh exited non-zero" prefix.
+func TestDefaultReleaseSh_ScriptExitsNonZero_ReturnsError(t *testing.T) {
+	d := t.TempDir()
+	scriptDir := filepath.Join(d, "legacy", "scripts", "utility")
+	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(scriptDir, "release.sh"),
+		[]byte("#!/usr/bin/env bash\nexit 1\n"),
+		0o755,
+	); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	err := DefaultReleaseSh(d, "1.2.3")
+	if err == nil {
+		t.Fatal("DefaultReleaseSh with exit-1 script = nil, want non-nil error")
+	}
+	if !strings.Contains(err.Error(), "release.sh exited non-zero") {
+		t.Errorf("error = %q, want to contain 'release.sh exited non-zero'", err.Error())
+	}
+}
+
+// TestDefaultReleaseSh_ScriptExitsOK_ReturnsNil exercises the happy path:
+// script present and exits 0 → nil return.
+func TestDefaultReleaseSh_ScriptExitsOK_ReturnsNil(t *testing.T) {
+	d := t.TempDir()
+	scriptDir := filepath.Join(d, "legacy", "scripts", "utility")
+	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(scriptDir, "release.sh"),
+		[]byte("#!/usr/bin/env bash\nexit 0\n"),
+		0o755,
+	); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	if err := DefaultReleaseSh(d, "1.2.3"); err != nil {
+		t.Errorf("DefaultReleaseSh with exit-0 script = %v, want nil", err)
+	}
+}
