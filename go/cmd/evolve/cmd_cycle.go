@@ -350,10 +350,25 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// (see registerBuiltinSpecRunners) — makes the invariant "every
 	// advisor-selectable phase is dispatchable" hold.
 	registerBuiltinSpecRunners(runners, builtinCat, prm, br, os.Stderr)
-	// DynamicLLM brain: a bridge-backed proposer. Select uses it only when
-	// routing_mode=llm; otherwise it falls back to the deterministic
-	// StaticPreset. Either way the kernel clamp in router.Route is the floor.
-	advisor := core.NewPhaseAdvisor(br)
+	// DynamicLLM brain: the routing advisor, defined like every phase agent —
+	// persona (agents/evolve-router.md) + profile (router.json) + artifact. Its
+	// {cli, model} resolve from the profile + EVOLVE_ROUTER_CLI/_MODEL env (the
+	// same precedence phases use), so the brain is configurable to any LLM CLI
+	// (claude/opus default, or codex/gpt-5.5-high, agy/gemini, …). Composing the
+	// cycle + minting phases is deep-reasoning work, hence the opus/deep default.
+	// Select consults it only at routing_mode=llm; the kernel clamp is the floor.
+	advCLI, advModel := resolveRouterDispatch(evolveDir)
+	var advPersona string
+	if rp, perr := prm.Agent("evolve-router"); perr == nil {
+		advPersona = rp.Body
+	} else {
+		fmt.Fprintf(os.Stderr, "[router] WARN persona evolve-router.md not loaded (%v); advisor uses legacy inline framing\n", perr)
+	}
+	advisor := core.NewPhaseAdvisor(br,
+		core.WithProposerCLI(advCLI),
+		core.WithProposerModel(advModel),
+		core.WithPersona(advPersona),
+	)
 	strategy := router.Select(cfg, advisor)
 	// The same advisor also produces the upfront whole-cycle plan the integrity
 	// floor clamps (ADR-0024 §2). Wire it unconditionally: the orchestrator is the
@@ -418,6 +433,36 @@ func kbRootsAbs(projectRoot string) []string {
 		out = append(out, filepath.Join(projectRoot, p))
 	}
 	return out
+}
+
+// resolveRouterDispatch resolves the routing advisor's {cli, model} the same way
+// a phase resolves its capability: profile (.evolve/profiles/router.json) defaults,
+// overridden by the per-agent env (EVOLVE_ROUTER_CLI / EVOLVE_ROUTER_MODEL). This
+// makes the brain configurable to any LLM CLI (e.g. codex-tmux + deep→gpt-5.5).
+// Fallback is opus on claude-tmux (deep reasoning for composition/minting).
+func resolveRouterDispatch(evolveDir string) (cli, model string) {
+	cli, model = "claude-tmux", "opus"
+	if raw, err := os.ReadFile(filepath.Join(evolveDir, "profiles", "router.json")); err == nil {
+		var pj struct {
+			CLI              string `json:"cli"`
+			ModelTierDefault string `json:"model_tier_default"`
+		}
+		if json.Unmarshal(raw, &pj) == nil {
+			if pj.CLI != "" {
+				cli = pj.CLI
+			}
+			if pj.ModelTierDefault != "" {
+				model = pj.ModelTierDefault
+			}
+		}
+	}
+	if v := os.Getenv("EVOLVE_ROUTER_CLI"); v != "" {
+		cli = v
+	}
+	if v := os.Getenv("EVOLVE_ROUTER_MODEL"); v != "" {
+		model = v
+	}
+	return cli, model
 }
 
 // registerBuiltinSpecRunners wires a spec-driven runner for every builtin

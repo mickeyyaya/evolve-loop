@@ -315,9 +315,12 @@ func TestPhaseAdvisorOptions(t *testing.T) {
 	if p.model != "opus" {
 		t.Errorf("model = %q, want opus", p.model)
 	}
-	// Empty values must NOT override the defaults.
+	// Empty values must NOT override the defaults. The model default is opus
+	// (deep): composing the cycle + minting phases is deep-reasoning work, not
+	// lightweight routing. The composition root normally overrides both from the
+	// router profile + EVOLVE_ROUTER_CLI/_MODEL so the brain is CLI/model-configurable.
 	d := NewPhaseAdvisor(nil, WithProposerCLI(""), WithProposerModel(""))
-	if d.cli != "claude-tmux" || d.model != "haiku" {
+	if d.cli != "claude-tmux" || d.model != "opus" {
 		t.Errorf("empty opts overrode defaults: cli=%q model=%q", d.cli, d.model)
 	}
 }

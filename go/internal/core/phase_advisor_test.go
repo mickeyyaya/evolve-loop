@@ -161,18 +161,52 @@ func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 			if plan.Entries[0].Phase != "scout" || plan.Entries[0].Run != c.wantScoutRun {
 				t.Errorf("first entry=%+v, want scout run=%v", plan.Entries[0], c.wantScoutRun)
 			}
-			// ADR-0027: the advisor's RAW plan artifact is routing-plan.json,
-			// distinct from the orchestrator's clamped phase-plan.json (both
-			// survive for forensics); and it uses the stdout completion contract
-			// (prints JSON, writes no file) — the cycle-117 deadlock fix.
+			// The advisor's RAW plan artifact is routing-plan.json, distinct from
+			// the orchestrator's clamped phase-plan.json (both survive for
+			// forensics). The Plan path now uses the UNIFORM artifact-completion
+			// contract (the brain WRITES routing-plan.json; the bridge reads it
+			// back) — same as every phase agent, replacing the brittle stdout scrape.
 			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-plan.json") {
 				t.Errorf("artifact=%q, want .../routing-plan.json", fb.gotReq.ArtifactPath)
 			}
-			if fb.gotReq.Completion != "stdout" {
-				t.Errorf("Completion=%q, want stdout", fb.gotReq.Completion)
+			if fb.gotReq.Completion != "artifact" {
+				t.Errorf("Completion=%q, want artifact", fb.gotReq.Completion)
 			}
 		})
 	}
+}
+
+// TestPhaseAdvisor_PersonaComposition proves the Plan prompt is composed the
+// uniform way: the injected persona (agents/evolve-router.md body) followed by
+// the dynamic per-cycle context — and falls back to the inline framing when no
+// persona is injected.
+func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
+	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
+
+	t.Run("persona used + dynamic context appended", func(t *testing.T) {
+		fb := &fakeBridge{stdout: plan}
+		adv := NewPhaseAdvisor(fb, WithPersona("PERSONA_MARKER_42"))
+		if _, err := adv.Plan(router.RouteInput{Workspace: "/tmp/x", Cycle: 7}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(fb.gotReq.Prompt, "PERSONA_MARKER_42") {
+			t.Error("prompt must include the injected persona body")
+		}
+		if !strings.Contains(fb.gotReq.Prompt, "# This cycle") {
+			t.Error("prompt must append the dynamic per-cycle context after the persona")
+		}
+	})
+
+	t.Run("no persona falls back to inline framing", func(t *testing.T) {
+		fb := &fakeBridge{stdout: plan}
+		adv := NewPhaseAdvisor(fb) // no persona injected
+		if _, err := adv.Plan(router.RouteInput{Workspace: "/tmp/x", Cycle: 7}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(fb.gotReq.Prompt, "PHASE ADVISOR") {
+			t.Error("fallback prompt must use the legacy inline framing")
+		}
+	})
 }
 
 // TestPhaseAdvisor_PlanFailSafe proves every malformed/failed plan returns an

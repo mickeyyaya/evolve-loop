@@ -28,12 +28,15 @@ type PhaseAdvisor struct {
 	cli     string
 	model   string
 	profile string // when non-empty, used verbatim; else derived from RouteInput.ProjectRoot
+	persona string // agents/evolve-router.md body; injected by the composition root (uniform with phase agents). Empty ⇒ legacy inline framing.
 }
 
 // PhaseAdvisorOption customizes a PhaseAdvisor.
 type PhaseAdvisorOption func(*PhaseAdvisor)
 
-// WithProposerCLI overrides the CLI the proposer dispatches to.
+// WithProposerCLI overrides the CLI the advisor dispatches to. The composition
+// root resolves this from the router profile + EVOLVE_ROUTER_CLI (same path as
+// phases), so the brain is configurable to any LLM CLI (claude/codex/agy).
 func WithProposerCLI(cli string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if cli != "" {
@@ -42,7 +45,8 @@ func WithProposerCLI(cli string) PhaseAdvisorOption {
 	}
 }
 
-// WithProposerModel overrides the model tier the proposer requests.
+// WithProposerModel overrides the model tier the advisor requests. Resolved by
+// the composition root from the router profile + EVOLVE_ROUTER_MODEL.
 func WithProposerModel(model string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if model != "" {
@@ -51,11 +55,24 @@ func WithProposerModel(model string) PhaseAdvisorOption {
 	}
 }
 
-// NewPhaseAdvisor builds a proposer over the given bridge. Defaults to a
-// fast/cheap model on the tmux Claude driver — routing is a lightweight
-// read-only judgment, not heavy generation.
+// WithPersona injects the advisor's persona body (agents/evolve-router.md),
+// making the brain defined identically to every phase agent (persona + profile +
+// artifact). Empty ⇒ the legacy inline framing is used as a fail-safe.
+func WithPersona(body string) PhaseAdvisorOption {
+	return func(p *PhaseAdvisor) {
+		if body != "" {
+			p.persona = body
+		}
+	}
+}
+
+// NewPhaseAdvisor builds the routing brain over the given bridge. The cli/model
+// FALLBACK is deep (opus) on the tmux Claude driver — composing the cycle and
+// inventing phases is deep-reasoning work, not lightweight routing — but the
+// composition root normally overrides both from the router profile + env so the
+// brain is configurable to any CLI/model.
 func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
-	p := &PhaseAdvisor{bridge: bridge, cli: "claude-tmux", model: "haiku"}
+	p := &PhaseAdvisor{bridge: bridge, cli: "claude-tmux", model: "opus"}
 	for _, o := range opts {
 		o(p)
 	}
@@ -64,7 +81,7 @@ func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 
 // Propose implements router.Proposer.
 func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
-	resp, err := p.advisorLaunch(in, "routing proposer", buildRoutingPrompt(in), "routing-proposal.json")
+	resp, err := p.advisorLaunch(in, "routing proposer", buildRoutingPrompt(in), "routing-proposal.json", "stdout")
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +101,7 @@ func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	// The advisor's raw plan artifact (routing-plan.json) is distinct from the
 	// orchestrator's clamped phase-plan.json (written by recordPhasePlan):
 	// keeping them separate preserves both for forensics (advisory vs disposed).
-	resp, err := p.advisorLaunch(in, "phase advisor", buildPlanPrompt(in), "routing-plan.json")
+	resp, err := p.advisorLaunch(in, "phase advisor", p.composePlanPrompt(in), "routing-plan.json", "artifact")
 	if err != nil {
 		return nil, err
 	}
@@ -95,16 +112,35 @@ func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	return plan, nil
 }
 
+// composePlanPrompt builds the whole-cycle planning prompt the uniform way: the
+// persona body (agents/evolve-router.md — identity, job, mint guidance, output
+// contract) followed by the DYNAMIC per-cycle context (objective digest, recall
+// memory, catalog, decision rubric) appended in Go, exactly as a phase appends
+// its cycle context. When no persona was injected it falls back to the legacy
+// fully-inline framing (buildPlanPrompt) so the advisor still functions.
+func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput) string {
+	if p.persona == "" {
+		return buildPlanPrompt(in)
+	}
+	var b strings.Builder
+	b.WriteString(p.persona)
+	b.WriteString("\n\n---\n# This cycle\n\n")
+	writeRoutingContext(&b, in)
+	writeCatalog(&b, in.Catalog)
+	b.WriteString("\nNow write your whole-cycle plan as a strict JSON array to routing-plan.json (no prose, no fence).\n")
+	return b.String()
+}
+
 // advisorLaunch is the shared wiring for Propose and Plan: it guards the
 // required fields, resolves the router profile, and launches the bridge under
-// the stdout completion contract (ADR-0027).
+// the given completion contract.
 //
-// stdout contract: the advisor prints its JSON answer to the REPL and writes
-// no file; completion is REPL-idle, and the answer is read from the captured
-// scrollback. Without Completion:"stdout" the artifact-file poll would wait for
-// a file the advisor never writes → timeout → silent degrade to the static path
-// (the cycle-117 deadlock).
-func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, prompt, artifactFile string) (BridgeResponse, error) {
+// Plan uses completion="artifact" (the uniform, robust contract): the brain
+// WRITES routing-plan.json and the bridge reads it back into resp.Stdout — same
+// as every phase writes its report. Propose still uses completion="stdout"
+// (ADR-0027 REPL-idle scrollback) pending its own unification. Either way, a
+// failure returns an error and the caller degrades cleanly to the static path.
+func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, prompt, artifactFile, completion string) (BridgeResponse, error) {
 	if p.bridge == nil {
 		return BridgeResponse{}, fmt.Errorf("%s: nil bridge", errPfx)
 	}
@@ -122,7 +158,7 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, prompt, artif
 		Prompt:       prompt,
 		Workspace:    in.Workspace,
 		ArtifactPath: filepath.Join(in.Workspace, artifactFile),
-		Completion:   "stdout",
+		Completion:   completion,
 		Agent:        "router",
 		Cycle:        in.Cycle,
 		Env:          in.Env,
@@ -234,6 +270,7 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	b.WriteString("\n## Decision rubric (justify each optional phase by an objective signal)\n")
 	b.WriteString("- scout.carryover_count >= 3 → skip scout (work already queued)\n")
 	b.WriteString("- scout.item_count == 0 → end cycle early (no-ship is legitimate)\n")
+	b.WriteString("- scout.cycle_size == large OR a novel/cross-cutting goal → insert architecture-design (a design pass before tdd/build)\n")
 	b.WriteString("- build.files_touched >= 10 OR build.diff_loc >= 500 → insert plan-review\n")
 	b.WriteString("- build.acs_red >= 1 OR build.severity_max >= HIGH → insert tester\n")
 	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
