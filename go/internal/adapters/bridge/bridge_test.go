@@ -92,6 +92,53 @@ func TestLaunch_DelegatesToEngine(t *testing.T) {
 	}
 }
 
+// TestLaunch_InjectsDeliverableContract — for a registered agent the prompt the
+// engine receives carries the Deliverable Contract block AND a footer with the
+// EXACT artifact path as (essentially) the last line. The per-cycle path must
+// appear only in the suffix, not in the cacheable prefix (cache-safety). ADR-0034.
+func TestLaunch_InjectsDeliverableContract(t *testing.T) {
+	fe := &fakeEngine{}
+	artifact := "/abs/.evolve/runs/cycle-213/build-report.md"
+	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-tmux", Profile: "/p", Prompt: "PERSONA-BODY",
+		Workspace: t.TempDir(), ArtifactPath: artifact, Agent: "build",
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	got := fe.gotReq.Prompt
+	if !strings.Contains(got, "## Deliverable Contract (build)") {
+		t.Errorf("prompt missing contract block:\n%s", truncate(got, 400))
+	}
+	if !strings.Contains(got, artifact) {
+		t.Errorf("prompt missing exact artifact path %q", artifact)
+	}
+	// Footer recency: the exact path must be in the tail, after the persona body.
+	if strings.Index(got, artifact) < strings.Index(got, "PERSONA-BODY") {
+		t.Errorf("artifact path must appear AFTER the body (footer/recency); prompt:\n%s", got)
+	}
+	// Cache-safety: the path must not appear before the body (no path in prefix).
+	if before := got[:strings.Index(got, "PERSONA-BODY")]; strings.Contains(before, artifact) {
+		t.Errorf("artifact path leaked into the cacheable prefix:\n%s", before)
+	}
+}
+
+// TestLaunch_NoContract_ForUnregisteredAgent — an agent with no contract gets no
+// block (graceful), so non-phase bridge callers are unaffected.
+func TestLaunch_NoContract_ForUnregisteredAgent(t *testing.T) {
+	fe := &fakeEngine{}
+	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-tmux", Profile: "/p", Prompt: "BODY",
+		Workspace: t.TempDir(), ArtifactPath: "/a.md", Agent: "not-a-phase",
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	if strings.Contains(fe.gotReq.Prompt, "Deliverable Contract") {
+		t.Errorf("unregistered agent should get no contract block")
+	}
+}
+
 // TestProbe_DelegatesToEngine — Probe forwards the engine's probe.
 func TestProbe_DelegatesToEngine(t *testing.T) {
 	fe := &fakeEngine{probe: core.BridgeProbe{Version: "darwin", CLIs: map[string]string{"claude-tmux": "full"}}}
@@ -148,8 +195,11 @@ func TestLaunch_NoPolicyPrefix_WhenEscalateExplicit(t *testing.T) {
 	if strings.Contains(body, "Subagent Interactive Policy") {
 		t.Errorf("escalate policy must not inject a block; got first 120 chars: %q", truncate(body, 120))
 	}
-	if body != "builder body" {
-		t.Errorf("body=%q, want %q (no prefix)", body, "builder body")
+	// The Deliverable Contract block (ADR-0034) is orthogonal to interactive
+	// policy and is still injected for a registered agent; assert only that the
+	// original body survives and no policy block was added.
+	if !strings.Contains(body, "builder body") {
+		t.Errorf("original body missing under escalate; got %q", truncate(body, 120))
 	}
 }
 
@@ -228,7 +278,7 @@ func TestLaunch_PerAgentEnvOverrides_GlobalDefault(t *testing.T) {
 	t.Setenv("EVOLVE_INTERACTIVE_POLICY", "")
 	t.Setenv("EVOLVE_SCOUT_INTERACTIVE_POLICY", PolicyEscalate)
 
-	if scoutBody := runOnce(t, "scout", "scout body", nil); scoutBody != "scout body" {
+	if scoutBody := runOnce(t, "scout", "scout body", nil); strings.Contains(scoutBody, "Subagent Interactive Policy") || !strings.Contains(scoutBody, "scout body") {
 		t.Errorf("scout per-agent escalate not honored; got %q", truncate(scoutBody, 120))
 	}
 	if builderBody := runOnce(t, "builder", "builder body", nil); !strings.HasPrefix(builderBody, "## Subagent Interactive Policy (recommended_or_first)") {
@@ -239,17 +289,23 @@ func TestLaunch_PerAgentEnvOverrides_GlobalDefault(t *testing.T) {
 func TestLaunch_ReqEnvOverridesProcessEnv(t *testing.T) {
 	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
 	body := runOnce(t, "builder", "builder body", map[string]string{"EVOLVE_INTERACTIVE_POLICY": PolicyEscalate})
-	if body != "builder body" {
-		t.Errorf("reqEnv should override process env; got %q", truncate(body, 120))
+	if strings.Contains(body, "Subagent Interactive Policy") || !strings.Contains(body, "builder body") {
+		t.Errorf("reqEnv should override process env (escalate → no policy block); got %q", truncate(body, 120))
 	}
 }
 
 func TestLaunch_PolicyBlockStableAcrossRuns(t *testing.T) {
 	t.Setenv("EVOLVE_INTERACTIVE_POLICY", "")
-	body1 := runOnce(t, "scout", "x", nil)
-	body2 := runOnce(t, "scout", "y", nil)
-	if prefix1, prefix2 := strings.TrimSuffix(body1, "x"), strings.TrimSuffix(body2, "y"); prefix1 != prefix2 {
-		t.Errorf("policy prefix not stable across runs (cache invalidation risk)\n  run1: %q\n  run2: %q",
+	body1 := runOnce(t, "scout", "BODYTOKEN1", nil)
+	body2 := runOnce(t, "scout", "BODYTOKEN2", nil)
+	// The cacheable prefix is everything BEFORE the per-run body. With the
+	// Deliverable Contract (ADR-0034) the volatile per-cycle path lives in a
+	// footer AFTER the body, so the prefix (policy + invariant contract block)
+	// must still be byte-identical across runs.
+	prefix1 := body1[:strings.Index(body1, "BODYTOKEN1")]
+	prefix2 := body2[:strings.Index(body2, "BODYTOKEN2")]
+	if prefix1 != prefix2 {
+		t.Errorf("cacheable prefix not stable across runs (cache invalidation risk)\n  run1: %q\n  run2: %q",
 			truncate(prefix1, 100), truncate(prefix2, 100))
 	}
 }

@@ -53,6 +53,11 @@ func runPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10
 	}
+	// `evolve phase verify ...` is the deliverable-contract self-check (ADR-0034),
+	// not an in-process phase run — it reads no stdin JSON.
+	if strings.ToLower(args[0]) == "verify" {
+		return runPhaseVerify(args[1:], stdout, stderr)
+	}
 	name := strings.ToLower(args[0])
 	factory, ok := registry.For(name)
 	if !ok {

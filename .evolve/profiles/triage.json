@@ -81,7 +81,7 @@
   "max_turns": 18,
   "turn_budget_hint": 12,
   "effort_level": "medium",
-  "output_artifact": ".evolve/runs/cycle-{cycle}/triage-decision.md",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/triage-report.md",
   "challenge_token_required": true,
   "extra_flags_by_cli": {
     "claude-tmux": [

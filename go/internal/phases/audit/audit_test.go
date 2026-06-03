@@ -36,6 +36,23 @@ func TestExtractHonorsPhaseContract(t *testing.T) {
 	}
 }
 
+// TestExtractPrefersSentinel pins the Layer-5 strangler: when an evolve-verdict
+// sentinel is present, it wins over the prose; when absent, the legacy regex
+// fallback still works (backward compatible).
+func TestExtractPrefersSentinel(t *testing.T) {
+	// Sentinel says FAIL even though prose says PASS — sentinel must win.
+	body := "## Verdict\n**PASS**\n" + phasecontract.RenderVerdictSentinel("audit", "FAIL") + "\n"
+	got, found := extractAuditVerdict(body)
+	if !found || got != core.VerdictFAIL {
+		t.Fatalf("sentinel-first: got (%q,%v), want (FAIL,true)", got, found)
+	}
+	// No sentinel → legacy regex still parses prose.
+	got, found = extractAuditVerdict("## Verdict\n**WARN**\n")
+	if !found || got != core.VerdictWARN {
+		t.Fatalf("regex fallback: got (%q,%v), want (WARN,true)", got, found)
+	}
+}
+
 type fakeBridge struct {
 	resp          core.BridgeResponse
 	err           error
