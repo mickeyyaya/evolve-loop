@@ -100,6 +100,7 @@
     {
       "name": "plan-review",
       "role": "plan-reviewer",
+      "agent": "plan-reviewer",
       "optional": true,
       "enable_var": "EVOLVE_PLAN_REVIEW",
       "inputs": {

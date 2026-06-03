@@ -48,3 +48,30 @@ func TestRealRegistry_ArchitectureDesign(t *testing.T) {
 		t.Errorf("require_sections %v must include %q", s.Classify.RequireSections, wantSection)
 	}
 }
+
+// TestRealRegistry_PlanReviewAgentResolves guards the plan-review fix: its
+// AgentName must resolve to the persona file that actually exists
+// (agents/plan-reviewer.md) rather than the evolve-<name> default
+// (evolve-plan-review.md, which does NOT exist). Without the explicit
+// "agent":"plan-reviewer" field, the specrunner fallback's persona guard
+// (prm.Agent(AgentName())) skips plan-review + WARNs, leaving it
+// selectable-but-runnerless. This pins the resolution so plan-review is
+// dispatchable (its Plan archetype + kind:llm make it a fallback candidate).
+func TestRealRegistry_PlanReviewAgentResolves(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")
+	cat, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load real registry: %v", err)
+	}
+	s, ok := cat.Get("plan-review")
+	if !ok {
+		t.Fatal("plan-review missing from the real registry")
+	}
+	if got := s.AgentName(); got != "plan-reviewer" {
+		t.Errorf("AgentName = %q, want plan-reviewer (the persona file that exists); "+
+			"the evolve-plan-review default has no persona", got)
+	}
+	if s.RoleOrDefault() != RolePlan {
+		t.Errorf("archetype = %q, want plan (fallback candidate + advisor catalog card)", s.RoleOrDefault())
+	}
+}
