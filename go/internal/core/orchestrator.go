@@ -140,6 +140,14 @@ type Orchestrator struct {
 	// root wires research.NewFileKB(research.SearchPathsFromEnv()).
 	kb research.KB
 
+	// shipFloor is the resolved integrity floor (WS4): the phases a plan reaching
+	// ship MUST run. Empty (default) ⇒ router.DefaultShipFloor ({tdd,build,audit},
+	// byte-identical legacy behavior). The composition root sets it from
+	// policy.FloorPhases() when the user configured an explicit .evolve/policy.json
+	// ship_floor (e.g. ["audit"] for the audit-only posture). The router self-seals
+	// the non-removable evaluator regardless, so this can only relax build/tdd.
+	shipFloor []string
+
 	// reviewer adjudicates a finished phase's deliverable before the cycle
 	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
 	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
@@ -209,6 +217,18 @@ func WithKB(kb research.KB) Option {
 	return func(o *Orchestrator) {
 		if kb != nil {
 			o.kb = kb
+		}
+	}
+}
+
+// WithShipFloor sets the resolved integrity floor (WS4) — the phases a plan
+// reaching ship must run. Empty/nil is ignored, leaving the safe structural
+// default (router.DefaultShipFloor). The composition root passes the user's
+// policy.FloorPhases() result when an explicit ship_floor is configured.
+func WithShipFloor(floor []string) Option {
+	return func(o *Orchestrator) {
+		if len(floor) > 0 {
+			o.shipFloor = floor
 		}
 	}
 }
@@ -1159,14 +1179,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			Lessons:         lessons,
 			Catalog:         phaseCardsFromCatalog(o.catalog),
 		}
-		// ClampPlanToFloor's tddPinned reads planIn.Signals, empty here (no
+		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
-		// the conservative (more-mandatory) side at plan time.
+		// the conservative (more-mandatory) side at plan time. The floor is the
+		// user-resolved set (WS4) or the safe default; the router self-seals the
+		// non-removable evaluator regardless.
 		if raw, perr := o.planner.Plan(planIn); perr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
 			var clamps []router.Clamp
-			clampedPlan, clamps = router.ClampPlanToFloor(planIn, raw)
+			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor())
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
 			// Register advisor-minted phases (Steps 11/12) into runners +
 			// catalog + routing BEFORE the dispatch loop, so a minted phase the
@@ -2089,6 +2111,17 @@ func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord
 		digests = append(digests, l.Digest())
 	}
 	return latest.Summary, digests
+}
+
+// resolvedShipFloor returns the integrity floor to clamp the advisor's plan to:
+// the user-configured floor (WS4) when set, else the router's safe structural
+// default ({tdd,build,audit}). The router self-seals the non-removable evaluator
+// either way, so this never returns a floor that could reach ship without audit.
+func (o *Orchestrator) resolvedShipFloor() []string {
+	if len(o.shipFloor) > 0 {
+		return o.shipFloor
+	}
+	return router.DefaultShipFloor()
 }
 
 // phaseCardsFromCatalog projects the composable phases (Plan/Build/Evaluate

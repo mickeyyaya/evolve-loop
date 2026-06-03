@@ -55,7 +55,9 @@ type Policy struct {
 
 // evaluatorFloorPhase is the single non-removable floor phase: a plan can never
 // reach ship without an evaluator. Kept here (not router) because the
-// non-removability is a policy-layer guarantee.
+// non-removability is a policy-layer guarantee. Mirrors router.EvaluatorFloorPhase
+// (each layer independently guarantees the evaluator — defense in depth); if the
+// evaluator phase name ever changes, update BOTH.
 const evaluatorFloorPhase = "audit"
 
 // FloorPhases resolves the configured ship-floor. It returns (floor, overridden):

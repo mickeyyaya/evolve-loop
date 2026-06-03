@@ -301,10 +301,16 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// path returns no error) and hard-fails loudly at the first phase dispatch,
 	// where the runner re-loads it for pins. Per-phase CLI/model pins are
 	// consulted at dispatch by the runner.
+	var shipFloor []string // WS4: nil ⇒ orchestrator uses router.DefaultShipFloor
 	if pol, perr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); perr != nil {
 		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", perr)
 	} else {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
+		// WS4: a user-configured ship_floor (e.g. ["audit"] for audit-only) drives
+		// the integrity-floor clamp; absent ⇒ leave nil so the safe default stands.
+		if floor, overridden := pol.FloorPhases(); overridden {
+			shipFloor = floor
+		}
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
@@ -374,6 +380,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// with recall memory (prior failures + lessons). Lookup is best-effort and
 	// only consulted at plan time; an absent corpus is a no-op.
 	opts = append(opts, core.WithKB(research.NewFileKB(kbRootsAbs(projectRoot))))
+
+	// WS4 configurable integrity floor: pass the user-resolved ship_floor (nil ⇒
+	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
+	opts = append(opts, core.WithShipFloor(shipFloor))
 
 	return orchDeps{
 		Storage:      st,
