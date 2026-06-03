@@ -68,30 +68,35 @@ func (c Contract) ArtifactPath(r Roots) string {
 
 // markdownVerdicts is the standard verdict-token vocabulary for phases that
 // declare a verdict. Audit additionally emits SKIPPED.
-var (
-	verdictsPassFail        = []string{"PASS", "FAIL"}
-	verdictsPassFailWarn    = []string{"PASS", "FAIL", "WARN"}
-	verdictsPassFailWarnSkp = []string{"PASS", "FAIL", "WARN", "SKIPPED"}
-)
+// verdictsPassFailWarnSkp is audit's verdict vocabulary — audit is the only
+// phase whose classifier extracts a verdict token (the others classify on
+// section presence, so their contracts leave Verdicts nil).
+var verdictsPassFailWarnSkp = []string{"PASS", "FAIL", "WARN", "SKIPPED"}
 
 // contracts is the registry: the 6 phase agents + the advisor (LLM routing
 // brain, JSON deliverable) + the orchestrator (host-side driver, validates its
 // own cycle-state.json). Section sets are wired from the Report vars in
 // contract.go so the headings stay single-sourced.
 var contracts = map[string]Contract{
+	// build/scout/tdd/intent/triage classify on SECTION presence, not a verdict
+	// token (only audit extracts a verdict). Leaving Verdicts nil keeps the
+	// contract gate strictly additive — it requires the same sections the
+	// existing classifiers do, plus correct location, without inventing a
+	// verdict requirement those phases never emitted (which would false-block at
+	// enforce).
 	"build": {
 		Phase: "build", AgentName: "builder", ArtifactName: "build-report.md",
-		Kind: KindMarkdown, Sections: Build.Sections, Verdicts: verdictsPassFail,
+		Kind: KindMarkdown, Sections: Build.Sections, Verdicts: nil,
 		WriteTarget: TargetWorkspace,
 	},
 	"scout": {
 		Phase: "scout", AgentName: "scout", ArtifactName: "scout-report.md",
-		Kind: KindMarkdown, Sections: Scout.Sections, Verdicts: verdictsPassFail,
+		Kind: KindMarkdown, Sections: Scout.Sections, Verdicts: nil,
 		WriteTarget: TargetWorkspace,
 	},
 	"tdd": {
 		Phase: "tdd", AgentName: "tdd-engineer", ArtifactName: "test-report.md",
-		Kind: KindMarkdown, Sections: TDD.Sections, Verdicts: verdictsPassFail,
+		Kind: KindMarkdown, Sections: TDD.Sections, Verdicts: nil,
 		WriteTarget: TargetWorkspace,
 	},
 	"audit": {

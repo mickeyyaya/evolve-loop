@@ -100,9 +100,10 @@ func TestVerify_EmptyArtifact(t *testing.T) {
 
 func TestVerify_BadVerdict(t *testing.T) {
 	ws := t.TempDir()
-	// Has the required ## Changes section but no PASS/FAIL token.
-	writeFile(t, ws, "build-report.md", "## Changes\n- foo.go\nall done\n")
-	res, _ := Verify("build", phasecontract.Roots{Workspace: ws})
+	// audit is the only phase with a required verdict; a report with the Verdict
+	// section heading but no PASS/FAIL/WARN/SKIPPED token must flag bad_verdict.
+	writeFile(t, ws, "audit-report.md", "## Verdict\ninconclusive musings, no token\n")
+	res, _ := Verify("audit", phasecontract.Roots{Workspace: ws})
 	if res.OK || !hasCode(res, CodeBadVerdict) {
 		t.Errorf("want bad_verdict, got %+v", res.Violations)
 	}

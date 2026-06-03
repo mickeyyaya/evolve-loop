@@ -19,13 +19,27 @@ func TestRenderContractBlock_Markdown_NoPath(t *testing.T) {
 	if !strings.Contains(block, "evolve phase verify build") {
 		t.Errorf("block must instruct the self-check command; got:\n%s", block)
 	}
-	if !strings.Contains(block, "evolve-verdict") {
-		t.Errorf("markdown block must mention the verdict sentinel; got:\n%s", block)
-	}
 	// Cache-safety: the invariant block must NOT embed an absolute path.
 	if strings.Contains(block, "/") && strings.Contains(block, "build-report.md") {
 		t.Errorf("block must not embed the artifact path (cache-safety); got:\n%s", block)
 	}
+}
+
+func TestRenderContractBlock_Audit_MentionsVerdictSentinel(t *testing.T) {
+	// audit is the verdict-bearing phase, so its block instructs the sentinel.
+	block := RenderContractBlock(mustContract(t, "audit"))
+	if !strings.Contains(block, "evolve-verdict") {
+		t.Errorf("audit block must mention the verdict sentinel; got:\n%s", block)
+	}
+}
+
+func mustContract(t *testing.T, phase string) Contract {
+	t.Helper()
+	c, ok := For(phase)
+	if !ok {
+		t.Fatalf("no contract for %q", phase)
+	}
+	return c
 }
 
 func TestRenderContractBlock_Deterministic(t *testing.T) {
