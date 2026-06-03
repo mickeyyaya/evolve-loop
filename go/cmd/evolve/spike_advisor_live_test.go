@@ -18,7 +18,7 @@ import (
 )
 
 func TestSpikeAdvisorLive(t *testing.T) {
-	root, err := filepath.Abs("../..") // worktree repo root (go/cmd/evolve → repo)
+	root, err := filepath.Abs("../../..") // repo root: go/cmd/evolve → cmd → go → repo
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,14 @@ func TestSpikeAdvisorLive(t *testing.T) {
 	cfg, _ := config.Load(registry, filterEvolveEnv(os.Environ()))
 
 	br := bridge.NewDefault(root)
-	adv := core.NewPhaseAdvisor(br, core.WithProposerModel("opus"))
+	cli, model := resolveRouterDispatch(filepath.Join(root, ".evolve"))
+	var persona string
+	if rp, perr := newPromptsLoader(root).Agent("evolve-router"); perr == nil {
+		persona = rp.Body
+	}
+	t.Logf("SPIKE: advisor cli=%s model=%s persona=%dB", cli, model, len(persona))
+	adv := core.NewPhaseAdvisor(br,
+		core.WithProposerCLI(cli), core.WithProposerModel(model), core.WithPersona(persona))
 
 	in := router.RouteInput{
 		Current:         string(core.PhaseStart),
