@@ -63,6 +63,20 @@ func TestPhaseVerify_JSONOutput(t *testing.T) {
 	}
 }
 
+func TestPhaseVerify_SpaceSeparatedFlags(t *testing.T) {
+	// Space-separated form `verify build --workspace <dir>` must work (not just
+	// the `=` form). Regression for the reorderArgs flag-swallow bug.
+	ws := t.TempDir()
+	code, _, errb := runVerify(t, "build", "--workspace", ws, "--json")
+	if code == 0 {
+		t.Fatalf("want non-zero for missing artifact; stderr=%s", errb)
+	}
+	// The phase must be parsed as build (not the workspace value).
+	if strings.Contains(errb, "unknown phase") {
+		t.Errorf("space-separated flags mis-parsed: %s", errb)
+	}
+}
+
 func TestPhaseVerify_UnknownPhase_Usage(t *testing.T) {
 	code, _, _ := runVerify(t, "nope", "--workspace="+t.TempDir())
 	if code != 10 {

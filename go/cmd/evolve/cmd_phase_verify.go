@@ -24,21 +24,35 @@ import (
 //	10 — usage error (missing/unknown phase)
 //	2  — ambiguity/infra (e.g. unreadable dir) — caller should fail OPEN
 func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
+	// Pull the positional phase name out FIRST (it precedes the flags in the
+	// natural form `verify build --workspace X`), then flag-parse the remainder.
+	// This supports both `--flag value` and `--flag=value` — unlike reorderArgs,
+	// which groups flags together and lets a space-separated flag swallow the
+	// next flag as its value.
+	var phaseArg string
+	var flags []string
+	for _, a := range args {
+		if phaseArg == "" && !strings.HasPrefix(a, "-") {
+			phaseArg = a
+			continue
+		}
+		flags = append(flags, a)
+	}
+	if phaseArg == "" {
+		fmt.Fprintf(stderr, "evolve phase verify: missing phase name\n")
+		return 10
+	}
+
 	fs := flag.NewFlagSet("phase verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	workspace := fs.String("workspace", "", "per-cycle workspace dir (.evolve/runs/cycle-N)")
 	worktree := fs.String("worktree", "", "isolated build worktree (optional)")
 	evolveDir := fs.String("evolve-dir", "", "project .evolve dir (for orchestrator deliverables)")
 	asJSON := fs.Bool("json", false, "emit machine-readable JSON")
-	if err := fs.Parse(reorderArgs(args)); err != nil {
+	if err := fs.Parse(flags); err != nil {
 		return 10
 	}
-	rest := fs.Args()
-	if len(rest) < 1 {
-		fmt.Fprintf(stderr, "evolve phase verify: missing phase name\n")
-		return 10
-	}
-	phase := strings.ToLower(rest[0])
+	phase := strings.ToLower(phaseArg)
 	if _, ok := phasecontract.For(phase); !ok {
 		fmt.Fprintf(stderr, "evolve phase verify: unknown phase %q\n", phase)
 		return 10
