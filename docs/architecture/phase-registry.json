@@ -66,6 +66,38 @@
       "skippable_when_present": false
     },
     {
+      "name": "architecture-design",
+      "role": "architecture-design",
+      "archetype": "plan",
+      "optional": true,
+      "enable_var": null,
+      "enabled": "content",
+      "kind": "llm",
+      "model": "opus",
+      "agent": "evolve-architecture-design",
+      "writes_source": false,
+      "routing": {
+        "insert_when": [
+          { "field": "scout.cycle_size", "op": "==", "value": "large" }
+        ]
+      },
+      "inputs": {
+        "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+        "state_fields": []
+      },
+      "outputs": {
+        "files": [".evolve/runs/cycle-{cycle}/architecture-design.md"]
+      },
+      "classify": {
+        "require_sections": ["## Design", "## Decision", "## Blueprint"],
+        "fail_if_empty": true,
+        "verdict_on_pass": "PASS"
+      },
+      "_note": "WS3 free-topology: a Plan-archetype design pass the advisor SELECTS (catalog card) or that auto-inserts on a large-cycle scout signal. Reads scout's task, produces a trade-off-driven architecture-design.md; never writes source. Runner wired by registerBuiltinSpecRunners (specrunner fallback) since the persona evolve-architecture-design.md exists.",
+      "parallel_eligible": false,
+      "skippable_when_present": true
+    },
+    {
       "name": "plan-review",
       "role": "plan-reviewer",
       "optional": true,
