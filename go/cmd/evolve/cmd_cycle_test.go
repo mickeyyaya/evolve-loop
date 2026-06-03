@@ -40,6 +40,82 @@ func seedResetDir(t *testing.T, cycleID, lastCycle int) (projectRoot, evolveDir 
 	return projectRoot, evolveDir
 }
 
+// TestResolveRouterDispatch_Precedence pins the advisor's {cli,model} resolution
+// order — env (EVOLVE_ROUTER_CLI/_MODEL) > profile (router.json) > opus/claude-tmux
+// fallback — the same precedence a phase uses, so the routing brain is configurable
+// to any LLM CLI. Uses t.Setenv, so it must not run in parallel.
+func TestResolveRouterDispatch_Precedence(t *testing.T) {
+	writeRouterProfile := func(t *testing.T, dir, cli, tier string) {
+		t.Helper()
+		profDir := filepath.Join(dir, "profiles")
+		if err := os.MkdirAll(profDir, 0o755); err != nil {
+			t.Fatalf("mkdir profiles: %v", err)
+		}
+		body := `{"name":"router","role":"router"`
+		if cli != "" {
+			body += `,"cli":"` + cli + `"`
+		}
+		if tier != "" {
+			body += `,"model_tier_default":"` + tier + `"`
+		}
+		body += "}"
+		if err := os.WriteFile(filepath.Join(profDir, "router.json"), []byte(body), 0o644); err != nil {
+			t.Fatalf("write router.json: %v", err)
+		}
+	}
+
+	t.Run("fallback when no profile and no env", func(t *testing.T) {
+		t.Setenv("EVOLVE_ROUTER_CLI", "")
+		t.Setenv("EVOLVE_ROUTER_MODEL", "")
+		cli, model := resolveRouterDispatch(t.TempDir()) // empty dir ⇒ no profile file
+		if cli != "claude-tmux" || model != "opus" {
+			t.Errorf("fallback = (%q,%q), want (claude-tmux,opus)", cli, model)
+		}
+	})
+
+	t.Run("profile beats fallback", func(t *testing.T) {
+		t.Setenv("EVOLVE_ROUTER_CLI", "")
+		t.Setenv("EVOLVE_ROUTER_MODEL", "")
+		dir := t.TempDir()
+		writeRouterProfile(t, dir, "codex-tmux", "deep")
+		cli, model := resolveRouterDispatch(dir)
+		if cli != "codex-tmux" || model != "deep" {
+			t.Errorf("profile = (%q,%q), want (codex-tmux,deep)", cli, model)
+		}
+	})
+
+	t.Run("env beats profile", func(t *testing.T) {
+		t.Setenv("EVOLVE_ROUTER_CLI", "agy")
+		t.Setenv("EVOLVE_ROUTER_MODEL", "balanced")
+		dir := t.TempDir()
+		writeRouterProfile(t, dir, "codex-tmux", "deep")
+		cli, model := resolveRouterDispatch(dir)
+		if cli != "agy" || model != "balanced" {
+			t.Errorf("env = (%q,%q), want (agy,balanced) — env must override profile", cli, model)
+		}
+	})
+
+	t.Run("env beats fallback when no profile", func(t *testing.T) {
+		t.Setenv("EVOLVE_ROUTER_CLI", "gemini-tmux")
+		t.Setenv("EVOLVE_ROUTER_MODEL", "fast")
+		cli, model := resolveRouterDispatch(t.TempDir())
+		if cli != "gemini-tmux" || model != "fast" {
+			t.Errorf("env-only = (%q,%q), want (gemini-tmux,fast)", cli, model)
+		}
+	})
+
+	t.Run("partial profile: cli only keeps fallback model", func(t *testing.T) {
+		t.Setenv("EVOLVE_ROUTER_CLI", "")
+		t.Setenv("EVOLVE_ROUTER_MODEL", "")
+		dir := t.TempDir()
+		writeRouterProfile(t, dir, "codex-tmux", "") // no model_tier_default
+		cli, model := resolveRouterDispatch(dir)
+		if cli != "codex-tmux" || model != "opus" {
+			t.Errorf("partial = (%q,%q), want (codex-tmux,opus) — model falls back", cli, model)
+		}
+	})
+}
+
 func TestRunCycleReset_DryRun(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	var stdout, stderr bytes.Buffer

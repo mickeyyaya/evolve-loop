@@ -209,6 +209,59 @@ func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
 	})
 }
 
+// TestPhaseAdvisor_DispatchWiringFlowsToBridge proves the configured {cli,model}
+// actually REACH BridgeRequest.{CLI,Model} on a Plan launch — and that the
+// uniform contract (artifact completion + routing-plan.json + injected persona)
+// holds identically for non-claude CLIs. This is the heart of the any-CLI ×
+// any-model invariant: the brain is dispatched to whatever the composition root
+// resolved, not a hardcoded claude/opus. (Regression guard: TestPhaseAdvisorOptions
+// pins the struct fields; this pins the field→bridge flow that advisorLaunch owns.)
+func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
+	t.Parallel()
+	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
+	cases := []struct{ cli, model string }{
+		{"codex-tmux", "gpt-5.5"},   // openai family, deep model
+		{"agy", "gemini-3.5-flash"}, // google family, headless
+		{"claude-tmux", "opus"},     // anthropic default
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.cli+"/"+c.model, func(t *testing.T) {
+			t.Parallel()
+			fb := &fakeBridge{stdout: plan}
+			adv := NewPhaseAdvisor(fb,
+				WithProposerCLI(c.cli),
+				WithProposerModel(c.model),
+				WithPersona("PERSONA_MARKER_42"),
+			)
+			if _, err := adv.Plan(baseRouteInput()); err != nil {
+				t.Fatalf("Plan: %v", err)
+			}
+			if fb.gotReq.CLI != c.cli {
+				t.Errorf("BridgeRequest.CLI=%q, want %q (config must flow to the bridge)", fb.gotReq.CLI, c.cli)
+			}
+			if fb.gotReq.Model != c.model {
+				t.Errorf("BridgeRequest.Model=%q, want %q", fb.gotReq.Model, c.model)
+			}
+			// The uniform contract is CLI-agnostic: artifact completion, the
+			// routing-plan.json deliverable, and the injected persona hold for
+			// every CLI, not just claude.
+			if fb.gotReq.Completion != "artifact" {
+				t.Errorf("Completion=%q, want artifact for %s", fb.gotReq.Completion, c.cli)
+			}
+			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-plan.json") {
+				t.Errorf("artifact=%q, want .../routing-plan.json for %s", fb.gotReq.ArtifactPath, c.cli)
+			}
+			if !strings.Contains(fb.gotReq.Prompt, "PERSONA_MARKER_42") {
+				t.Errorf("persona missing from prompt for %s (persona path must hold for non-claude CLIs)", c.cli)
+			}
+			if fb.gotReq.Agent != "router" {
+				t.Errorf("Agent=%q, want router", fb.gotReq.Agent)
+			}
+		})
+	}
+}
+
 // TestPhaseAdvisor_PlanFailSafe proves every malformed/failed plan returns an
 // error so the caller degrades to the deterministic static path (fail to floor).
 func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
