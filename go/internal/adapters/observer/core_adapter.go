@@ -92,12 +92,18 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		// until clean exit. Without this the observer falsely stalls a working
 		// tmux build agent (cycle-141).
 		WorkspaceDir: req.Workspace,
-		// cycle-190: when even workspace writes go quiet (a long single
-		// "Incubating" turn that thinks for minutes then dumps its artifact),
-		// the live tmux pane is the only liveness signal. This probe is
-		// consulted ONLY at the stall threshold; a non-tmux phase finds no
-		// matching session and the probe is a no-op (false → legacy behavior).
-		LivenessProbe: newTmuxPaneProbe(req.Cycle, phase, nil),
+		// cycle-190 + headless follow-up: when even workspace writes go quiet
+		// (a long single "Incubating" turn that thinks for minutes then dumps
+		// its artifact), filesystem signals are blind. Two ground-truth probes,
+		// consulted ONLY at the stall threshold and OR-ed (alive if either):
+		//   - tmux pane-hash: the live pane spinner/token-counter advancing
+		//     (tmux-driver phases; a non-tmux phase finds no session → no-op);
+		//   - process CPU time: the agent subprocess accruing CPU (HEADLESS
+		//     phases, which have no pane; PID written by the bridge at launch).
+		LivenessProbe: anyProbe(
+			newTmuxPaneProbe(req.Cycle, phase, nil),
+			newProcessCPUProbe(pidFileFromStdoutLog(stdoutLog), nil),
+		),
 	}
 	// Cycle-124 Task 6 — KNOWN GAP: the operator's "active liveness
 	// nudging" mechanism is wired into the STANDALONE `evolve phase-

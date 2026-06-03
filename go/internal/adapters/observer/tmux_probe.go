@@ -15,6 +15,24 @@ import (
 	"strings"
 )
 
+// anyProbe composes liveness probes: the agent is alive if ANY sub-probe says
+// so. ALL sub-probes are consulted every call (no short-circuit) so each keeps
+// its internal last-sample state consistent across calls. Nil sub-probes are
+// skipped; an all-nil/empty set yields a probe that always returns false. Lives
+// here (not in cpu_probe.go) because it is a generic combinator over the probe
+// type, not CPU-specific.
+func anyProbe(probes ...func() bool) func() bool {
+	return func() bool {
+		alive := false
+		for _, p := range probes {
+			if p != nil && p() {
+				alive = true
+			}
+		}
+		return alive
+	}
+}
+
 // tmuxRunner runs a tmux subcommand and returns its stdout. Injectable so the
 // probe is unit-testable without a real tmux server. Nil → realTmuxRunner.
 type tmuxRunner func(args ...string) ([]byte, error)
