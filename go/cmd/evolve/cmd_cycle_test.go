@@ -116,6 +116,27 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 	})
 }
 
+// TestCycleContext_GoalOnlyWhenGiven pins that a supplied --goal becomes
+// Context["goal"] (the convention Scout + the routing advisor read; NOT
+// Context["strategy"], the strategy mode), while omitting it preserves the prior
+// behavior (no goal key). commit_message is always present.
+func TestCycleContext_GoalOnlyWhenGiven(t *testing.T) {
+	t.Parallel()
+	withGoal := cycleContext("abc12345", "redesign the auth subsystem")
+	if withGoal["goal"] != "redesign the auth subsystem" {
+		t.Errorf("goal=%q, want the goal text", withGoal["goal"])
+	}
+	if _, ok := withGoal["strategy"]; ok {
+		t.Error("cycleContext must NOT set strategy (that is the mode key, set elsewhere)")
+	}
+	if withGoal["commit_message"] == "" {
+		t.Error("commit_message must always be set")
+	}
+	if _, ok := cycleContext("abc12345", "")["goal"]; ok {
+		t.Error("no goal key when goal text is empty (preserves prior behavior)")
+	}
+}
+
 func TestRunCycleReset_DryRun(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	var stdout, stderr bytes.Buffer

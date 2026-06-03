@@ -214,6 +214,7 @@ type liveCycleCfg struct {
 	Driver    string // EVOLVE_CLI for every phase
 	Tier      string // model_tier_default written into profiles
 	GoalHash  string
+	Goal      string   // human-readable goal text (--goal); threaded to Scout + advisor. Optional.
 	ExtraEnv  []string // e.g. EVOLVE_<AGENT>_CLI for cross-family
 	Timeout   time.Duration
 	BudgetUSD float64 // per-cycle --budget-usd cap
@@ -300,6 +301,9 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 		"--goal-hash", cfg.GoalHash,
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
 		"--budget-usd", strconv.FormatFloat(cfg.BudgetUSD, 'f', 2, 64),
+	}
+	if cfg.Goal != "" {
+		args = append(args, "--goal", cfg.Goal)
 	}
 	cmd := exec.Command(cfg.EvolveBin, args...)
 	cmd.Env = env

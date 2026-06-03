@@ -291,6 +291,23 @@ func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
 	}
 }
 
+// TestWriteRoutingContext_RendersGoal proves the advisor's prompt surfaces the
+// goal text (RouteInput.GoalText) so the brain can reason about WHAT the cycle is
+// for — the precondition for genuinely selecting a design phase or minting,
+// rather than rubber-stamping the spine blind. Empty goal renders nothing.
+func TestWriteRoutingContext_RendersGoal(t *testing.T) {
+	t.Parallel()
+	const goal = "redesign the auth subsystem with a new token-rotation architecture"
+	got := buildPlanPrompt(router.RouteInput{Cycle: 5, GoalText: goal})
+	if !strings.Contains(got, goal) {
+		t.Errorf("plan prompt must surface the goal text so the advisor reasons from it:\n%s", got)
+	}
+	// No goal ⇒ no goal section (keeps the prompt prefix stable for the empty case).
+	if strings.Contains(buildPlanPrompt(router.RouteInput{Cycle: 5}), "## Goal") {
+		t.Error("empty GoalText must not emit a Goal section")
+	}
+}
+
 // TestBuildPlanPrompt_WholeCycleArray proves the plan prompt shares the routing
 // context (rubric) with buildRoutingPrompt but asks for the whole-cycle ARRAY
 // shape, not the per-transition object — the two cadences diverge correctly.

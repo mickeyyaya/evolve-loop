@@ -137,6 +137,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	var (
 		projectRoot string
 		goalHash    string
+		goalText    string
 		evolveDir   string
 		budgetUSD   float64
 		batchCapUSD float64
@@ -144,6 +145,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
 	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
+	fs.StringVar(&goalText, "goal", "", "human-readable goal text (threaded to Scout + the routing advisor as Context[\"goal\"]); optional")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "per-cycle USD budget cap")
 	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap across cycles")
@@ -178,10 +180,8 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 			MaxUSD:      budgetUSD,
 			BatchCapUSD: batchCapUSD,
 		},
-		Env: filterEvolveEnv(os.Environ()),
-		Context: map[string]string{
-			"commit_message": fmt.Sprintf("evolve-cycle: goal=%s", goalHash),
-		},
+		Env:     filterEvolveEnv(os.Environ()),
+		Context: cycleContext(goalHash, goalText),
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
@@ -433,6 +433,21 @@ func kbRootsAbs(projectRoot string) []string {
 		out = append(out, filepath.Join(projectRoot, p))
 	}
 	return out
+}
+
+// cycleContext builds the CycleRequest.Context seed: the commit message always,
+// plus Context["goal"] = the human-readable goal text when one was supplied. The
+// "goal" key is the convention the `evolve loop` dispatcher uses and that Scout +
+// the routing advisor read (Context["strategy"] is the distinct strategy MODE, not
+// the goal). Omitting --goal keeps the prior behavior (no goal key).
+func cycleContext(goalHash, goalText string) map[string]string {
+	ctx := map[string]string{
+		"commit_message": fmt.Sprintf("evolve-cycle: goal=%s", goalHash),
+	}
+	if goalText != "" {
+		ctx["goal"] = goalText
+	}
+	return ctx
 }
 
 // resolveRouterDispatch resolves the routing advisor's {cli, model} the same way

@@ -414,6 +414,68 @@ func readFirstFileNamed(root, name string) []byte {
 	return found
 }
 
+// TestE2ELiveAdvisorSelectsDesignPhase is the Phase 3 payoff: with the advisor
+// now goal-aware (GoalText threaded), an explicitly architectural goal should make
+// the brain SELECT the non-spine `architecture-design` phase (or MINT one) in its
+// routing-plan.json — genuine AI-driven composition, not the rubber-stamped spine.
+// The advisor runs at opus (deep). Tolerant: transient/env-unavailable → skip.
+// Gate: EVOLVE_E2E_LIVE_ADVISOR=1.
+func TestE2ELiveAdvisorSelectsDesignPhase(t *testing.T) {
+	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
+	if ok, why := liveCLIAvailable(liveCLI{Driver: "claude-p", Binary: "claude"}); !ok {
+		t.Skip(why)
+	}
+	repoRoot := mustRepoRoot(t)
+	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)
+
+	res := runLiveCycle(t, liveCycleCfg{
+		EvolveBin: evolveBin,
+		RepoRoot:  repoRoot,
+		Driver:    "claude-p",
+		Tier:      "fast",
+		GoalHash:  "arch-design-proof",
+		Goal: "Large, novel, cross-cutting redesign: re-architect the authentication " +
+			"subsystem end-to-end (token rotation, session store, RBAC boundaries). This " +
+			"spans many modules and needs a dedicated up-front architecture/design pass " +
+			"BEFORE any implementation.",
+		ExtraEnv: []string{
+			"EVOLVE_DYNAMIC_ROUTING=advisory",
+			"EVOLVE_ROUTER_CLI=claude-p",
+			"EVOLVE_ROUTER_MODEL=opus",
+			"EVOLVE_MANDATORY_PHASES=scout",
+		},
+		Timeout:   envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
+		BudgetUSD: 2.0,
+	})
+	if res.TransientExhausted {
+		t.Skipf("design-selection transient (quarantined):\n%s", lastN(res.Out, 600))
+	}
+
+	raw := readFirstFileNamed(res.ProjRoot, "routing-plan.json")
+	if len(raw) == 0 {
+		if isTransient(res.Out, res.Err) || advisorEnvUnavailable(res.Out) {
+			t.Skipf("no routing-plan.json but output transient/env-unavailable:\n%s", lastN(res.Out, 600))
+		}
+		t.Fatalf("advisor produced no routing-plan.json under %s", res.ProjRoot)
+	}
+	entries, perr := parseRoutingPlanArray(raw)
+	if perr != nil {
+		t.Fatalf("routing-plan.json did not parse: %v\n%s", perr, lastN(string(raw), 800))
+	}
+
+	selectedDesign := false
+	for _, e := range entries {
+		if e.Phase == "architecture-design" && e.Run {
+			selectedDesign = true
+		}
+	}
+	minted := strings.Contains(string(raw), `"mint"`)
+	if !selectedDesign && !minted {
+		t.Fatalf("goal-aware advisor selected NEITHER architecture-design NOR a mint for an explicitly architectural goal — composition is still spine-only.\nplan=%s", lastN(string(raw), 1500))
+	}
+	t.Logf("[advisor-design] goal-aware advisor produced a non-spine decision (architecture-design=%v, mint=%v) — genuine AI-driven composition", selectedDesign, minted)
+}
+
 func TestE2ELiveAdvisorCLIMatrix(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	repoRoot := mustRepoRoot(t)

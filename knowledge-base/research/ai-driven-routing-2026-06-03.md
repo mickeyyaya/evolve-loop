@@ -88,5 +88,46 @@ rather than red-failing on host setup.
   orchestrator's `phase_plan` entry (role=orchestrator), not a router-role entry.
   claude-p@opus is used (not claude-tmux@opus) because the headless path completes
   in ~30s vs the tmux REPL exceeding the ceiling.
-- Phase 3: prove a genuine `architecture-design` selection or a first mint
-  (`registerMintedPhases` ledger entry) under `ship_floor:["audit"]`.
+- ~~Phase 3~~ **DONE (2026-06-03):** see "Phase 3" below.
+- ~~Phase 4~~ **DONE (2026-06-03):** see "Phase 4" below.
+
+## Phase 3 — genuine AI-driven composition (the payoff)
+
+**Root finding:** the advisor was structurally **goal-blind**. `RouteInput` had no goal
+field, and `evolve cycle run` carried only an 8-char `--goal-hash` (no text). At cycle
+start the advisor saw empty signals + catalog + recall — so its plan was necessarily the
+default spine. *That* is why it rubber-stamped, not a model-quality problem.
+
+**Fix (the architectural one, not a workaround):** thread the goal text into the advisor.
+- `router.RouteInput.GoalText` (Planner-only; pure `Route()` ignores it).
+- orchestrator: `planIn.GoalText = req.Context["goal"]` — the same key the `evolve loop`
+  dispatcher sets and Scout reads (`Context["strategy"]` is the distinct strategy MODE).
+- `writeRoutingContext` renders a `## Goal` section (capped at 4000 chars).
+- new `evolve cycle run --goal "<text>"` flag → `Context["goal"]` via `cycleContext`.
+- Tests: `TestWriteRoutingContext_RendersGoal`, `TestOrchestrator_ThreadsGoalTextToPlanner`
+  (capturing planner), `TestCycleContext_GoalOnlyWhenGiven`.
+
+**Proof (live, claude-p@opus, `dynamic_routing=advisory`):** with an explicitly
+architectural goal, `TestE2ELiveAdvisorSelectsDesignPhase` shows the goal-aware advisor
+**SELECT the non-spine `architecture-design` phase** (and, in one run, also **MINT** a
+brand-new phase) in its routing-plan.json — genuine AI-driven composition, while the
+kernel floor/clamp still hold. This is the verifiable answer to "has the advisor ever
+created its own phase?" → **yes.** (LLM choice varies run-to-run; architecture-design
+selection is the stable signal, minting an observed bonus.)
+
+## Phase 4 — the two-part model, dead artifacts archived
+
+The deterministic Go kernel IS the orchestrator (the disposer); it is not an LLM role, so
+it is exempt from the persona format. The dead bash-era artifacts that blurred this story
+are now clearly marked **ARCHIVED / non-LLM**: `agents/evolve-orchestrator.md` (banner +
+two-part-model explainer, cross-refs `evolve-router.md`) and `.evolve/profiles/orchestrator.json`
+(`_deprecated` marker). The model, stated once and for all:
+
+- **Kernel — disposer (Go, deterministic):** `core.Orchestrator` — control flow, integrity
+  floor, clamp, gates, ledger. Cannot be weakened.
+- **Brain — proposer (LLM advisor):** `core.PhaseAdvisor` / `agents/evolve-router.md` —
+  composes the cycle (select/skip/insert/mint) from goal + signals + recall + catalog.
+
+*"Model proposes, kernel disposes"* — both first-class, neither special-cased.
+
+## Earlier open follow-ups (still open)

@@ -159,6 +159,53 @@ func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
 	}
 }
 
+// capturingPlanner records the RouteInput the orchestrator hands the advisor,
+// so a test can assert what context the brain actually receives. Returns no plan
+// (the orchestrator degrades to the static spine — irrelevant to the capture).
+type capturingPlanner struct {
+	got   router.RouteInput
+	calls int
+}
+
+func (p *capturingPlanner) Plan(in router.RouteInput) (*router.PhasePlan, error) {
+	p.calls++
+	p.got = in
+	return nil, nil
+}
+
+// TestOrchestrator_ThreadsGoalTextToPlanner proves the orchestrator threads the
+// cycle goal (CycleRequest.Context["strategy"]) into the advisor's RouteInput.
+// GoalText — so the brain plans goal-aware, the precondition for genuinely
+// selecting a design phase or minting one. Deterministic: a capturing planner,
+// no LLM.
+func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	cfg := shadowCfg(config.StageAdvisory) // advisory ⇒ the planner is consulted
+	cfg.Mode = config.ModeDynamicLLM       // DynamicLLM ⇒ the LLM planner gate opens
+	cp := &capturingPlanner{}
+	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithPlanner(cp))
+
+	const goal = "redesign the auth subsystem with token rotation"
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+		GoalHash:    "g",
+		Budget:      BudgetEnvelope{MaxUSD: 100},
+		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		Context:     map[string]string{"goal": goal}, // the goal-text key (not "strategy" = mode)
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if cp.calls == 0 {
+		t.Fatal("planner was never consulted (Stage>=Advisory + Mode==DynamicLLM gate not opened?)")
+	}
+	if cp.got.GoalText != goal {
+		t.Errorf("advisor RouteInput.GoalText=%q, want the Context[strategy] goal %q", cp.got.GoalText, goal)
+	}
+}
+
 // Stage:Off (default) must add NO routing forensics — byte-identical to legacy.
 func TestOrchestrator_StageOff_EmitsNoRoutingLedgerEntries(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}

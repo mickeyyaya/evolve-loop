@@ -238,6 +238,22 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 	}
 }
 
+// maxGoalTextChars bounds the goal text rendered into the advisor prompt so an
+// oversized operator-pasted goal cannot crowd the catalog + rubric out of the
+// context window.
+const maxGoalTextChars = 4000
+
+// truncateGoal trims surrounding whitespace and caps the goal at maxGoalTextChars
+// (rune-safe), marking truncation. Empty/whitespace-only ⇒ "" (no Goal section).
+func truncateGoal(s string) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) <= maxGoalTextChars {
+		return s
+	}
+	return string(r[:maxGoalTextChars]) + " …[truncated]"
+}
+
 // writeRoutingContext writes the shared, deterministic decision context — cycle
 // header, digested objective signals, available optional phases, and the
 // decision rubric — consumed by both the per-transition prompt and the
@@ -247,6 +263,16 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	fmt.Fprintf(b, "- completed_phases: %s\n", strings.Join(in.Completed, ", "))
 	fmt.Fprintf(b, "- mandatory_spine: %s\n", strings.Join(in.Cfg.Mandatory, ", "))
 	fmt.Fprintf(b, "- budget_remaining_usd: %.2f\n- max_optional_insertions: %d\n\n", in.BudgetRemaining, in.Cfg.MaxInsertions)
+
+	// The goal text (when threaded) is the brain's primary input for composing the
+	// cycle: it lets the advisor judge whether the work is novel/cross-cutting
+	// enough to warrant a design phase or a minted phase, instead of planning blind.
+	// Capped so an oversized operator-pasted goal cannot push the catalog/rubric out
+	// of the context window. Placed before the per-cycle signals: the goal is stable
+	// across a run's cycles, so a stable section stays ahead of the volatile ones.
+	if g := truncateGoal(in.GoalText); g != "" {
+		fmt.Fprintf(b, "## Goal\n%s\n\n", g)
+	}
 
 	b.WriteString("## Objective signals (digested from handoff artifacts)\n")
 	writeSignals(b, in.Signals)

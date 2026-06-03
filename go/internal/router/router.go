@@ -43,6 +43,15 @@ type RouteInput struct {
 	Cycle       int
 	Env         map[string]string
 
+	// GoalText is the human-readable goal/strategy for this cycle (the same text
+	// Scout works from). Populated by the orchestrator from
+	// CycleRequest.Context["strategy"]; consumed ONLY by the DynamicLLM advisor's
+	// prompt so the brain can reason about WHAT the cycle is for — the precondition
+	// for genuinely selecting a design phase or minting one, rather than planning
+	// blind. The pure Route() ignores it, so determinism is preserved. Empty when
+	// no goal text was threaded (the advisor then plans from signals + recall only).
+	GoalText string
+
 	// Catalog is the set of pre-defined phases the advisor may SELECT instead of
 	// minting a new one (WS3: prefer select-over-mint = DRY at the agent level).
 	// Populated by the orchestrator from the phase catalog; consumed ONLY by a
