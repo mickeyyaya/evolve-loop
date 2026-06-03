@@ -45,7 +45,8 @@
       "regex": "Do you trust the contents of this project|Antigravity CLI requires permission",
       "response_keys": "Enter",
       "policy": "auto_respond",
-      "note": "agy asks to trust dir on first launch; default selection is 'Yes, I trust this folder'"
+      "once": true,
+      "note": "agy asks to trust dir on first launch; default selection is 'Yes, I trust this folder'. `once`: one-time boot dialog — must not re-fire after a single response (its text lingers in the scrollback capture during the artifact-wait loop)."
     },
     {
       "name": "auth_recheck",

@@ -73,9 +73,28 @@ rather than red-failing on host setup.
 
 ## Open follow-ups
 
-- **claude-tmux + opus latency**: the interactive REPL path is too slow for opus
-  (>10 min) while headless is ~30 s. Investigate the tmux completion-detection /
-  REPL throughput for deep models. Quarantined for now.
+- ~~**claude-tmux + opus latency**~~ **INVESTIGATED → environmental (no code bug), 2026-06-03.**
+  Root-caused: the tmux artifact detector short-circuits the instant the artifact
+  file appears (`completion.go` `artifactDetector` / `driver_common.go:artifactReady`);
+  it does NOT wait for REPL idle. The >10 min is opus's genuine inference time inside
+  the interactive REPL (headless `claude -p` is a subprocess that simply exits). The
+  correct handling already exists: the e2e quarantine-SKIPs on timeout, and the
+  operator lever is `EVOLVE_ARTIFACT_TIMEOUT_S` (raise per-model). No completion-path
+  fix warranted. (A separate latent edge — `cleanPane` stripping a sole token-counter
+  line → a false "no progress" stall — is the documented tmux-liveness-probe concern,
+  not this latency.)
+- ~~**codex-tmux trust-prompt loop**~~ **FIXED (2026-06-03), branch `fix/codex-tmux-trust-once`.**
+  Root cause: the artifact-wait loop re-captures `bootScrollback=200` lines every poll
+  (`driver_tmux_repl.go`), so a DISMISSED trust dialog lingers in scrollback and
+  re-matches `trust_prompt` on every tick → the responder re-sends `1,Enter` until
+  `counts>5` trips the loop guard and abandons the run (exit 86; the codex-tmux SKIP).
+  A naive regex-narrow is wrong: the `"Yes, continue"` disjunct was added intentionally
+  (cycle-121) AND the question disjuncts persist in scrollback too. Fix: a data-driven
+  `"once": true` flag on the boot-time trust rules (codex + agy manifests); `decideAutoRespond`
+  skips a fire-once prompt after its first response, so it never re-fires from scrollback
+  and never reaches the loop guard. Intentional disjuncts untouched. TDD:
+  `TestAutoRespond_TrustPromptFiresOnce` (RED reproduced the loop for both codex+agy;
+  GREEN after the flag). `go test ./... 143/143 PASS`.
 - ~~**Activation**~~ **DONE (2026-06-03):** `TestE2ELiveAdvisorActivation` runs
   one isolated (temp-project) cycle with `EVOLVE_DYNAMIC_ROUTING=advisory` and the
   advisor on **claude-p@opus**. Result: the advisor wrote a **9-entry

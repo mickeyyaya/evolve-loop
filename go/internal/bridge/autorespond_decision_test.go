@@ -101,6 +101,52 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 	}
 }
 
+// TestAutoRespond_TrustPromptFiresOnce reproduces the codex-tmux loop-guard
+// abandon (exit 86) and pins its fix. A boot-time trust dialog is dismissed by
+// one `1,Enter`, but the artifact-wait loop re-captures bootScrollback=200 lines
+// every poll — so the DISMISSED dialog text lingers in scrollback and re-matches
+// trust_prompt on every subsequent tick. Without a fire-once guard the responder
+// keeps re-sending `1,Enter` until counts>5 trips the loop guard and kills the
+// run. With `"once": true` on the trust rule, it auto-responds exactly once and
+// then noops on later ticks (sharing the live counts map, as ar.counts does
+// across the boot→wait phases). The intentional cycle-121 disjuncts are
+// untouched — this fixes the re-fire, not the detection.
+func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
+	for _, cli := range []string{"codex-tmux", "agy-tmux"} {
+		t.Run(cli, func(t *testing.T) {
+			m, err := LoadManifest(cli)
+			if err != nil {
+				t.Fatalf("LoadManifest(%s): %v", cli, err)
+			}
+			// A real trust dialog (matches a specific question disjunct, not just
+			// the generic affirmative).
+			pane := "Do you trust the contents of this directory?\n  1. Yes, continue\n  2. No, exit"
+			if cli == "agy-tmux" {
+				pane = "Do you trust the contents of this project?\n  1. Yes\n  2. No"
+			}
+			counts := map[string]int{} // shared across ticks, like the live ar.counts
+
+			// First tick: the real dialog → auto-respond once.
+			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts)
+			if a == "noop" || rc == 0 {
+				t.Fatalf("%s first tick must auto-respond to the trust dialog; got (%q,%d)", cli, a, rc)
+			}
+
+			// Later ticks: the dialog is dismissed but its text lingers in the
+			// captured scrollback. A fire-once trust rule must NOT re-fire (rc 0,
+			// no keys) and must never reach the loop guard (rc 86). It surfaces the
+			// distinct `suppress_once:` sentinel (rc 0) so the caller WARNs once
+			// rather than silently skipping.
+			for i := 0; i < 8; i++ {
+				a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts)
+				if rc != 0 || a != "suppress_once:trust_prompt" {
+					t.Fatalf("%s tick %d = (%q,%d), want (suppress_once:trust_prompt, 0) — trust is fire-once; re-firing trips the loop guard and abandons the run", cli, i+2, a, rc)
+				}
+			}
+		})
+	}
+}
+
 // TestAutoRespond_MultiSelectRuleWinsOverSingleSelect guards the manifest
 // ordering invariant: a multi-select pane contains BOTH the checkbox markers
 // and the single-select footer, so the checkbox rule MUST be listed first or

@@ -34,6 +34,7 @@ const autoRespondLoopGuardLimit = 5
 // to match the pane wins; counts tracks per-pattern match frequency for
 // the loop guard. Mirrors auto_respond_decide.
 func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]int) (string, int) {
+	suppressedOnce := "" // a fire-once prompt that matched but was already handled
 	for _, p := range prompts {
 		if p.Regex == "" {
 			continue
@@ -43,6 +44,19 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 			continue
 		}
 		if !re.MatchString(pane) {
+			continue
+		}
+		// A fire-once prompt (boot-time trust dialog) is handled a single time.
+		// On later ticks the dismissed dialog lingers in the captured scrollback
+		// and still matches; skip it rather than re-firing (which would trip the
+		// loop guard and abandon the run). It does not count toward the guard.
+		// Keep scanning so a genuinely-new prompt (e.g. per-edit approval) on the
+		// same pane still fires; only if nothing else matches do we surface the
+		// suppression (rc 0) so the caller can WARN once — never a silent skip.
+		if p.Once && counts[p.Name] >= 1 {
+			if suppressedOnce == "" {
+				suppressedOnce = p.Name
+			}
 			continue
 		}
 		counts[p.Name]++
@@ -63,6 +77,13 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 		default: // escalate
 			return "escalate:" + p.Name, 85
 		}
+	}
+	// Nothing fired, but a fire-once prompt is still matching (its dismissed text
+	// lingering in scrollback). rc 0 = no action, like noop; the distinct action
+	// lets the caller WARN once so a genuinely-stuck dialog is diagnosable instead
+	// of silently timing out.
+	if suppressedOnce != "" {
+		return "suppress_once:" + suppressedOnce, 0
 	}
 	return "noop", 0
 }
@@ -91,6 +112,9 @@ type autoResponder struct {
 	// scrollback is the capture-pane depth: 0 for visible-pane CLIs (claude),
 	// >0 for alt-screen CLIs (codex/agy) whose bare visible pane is blank.
 	scrollback int
+	// suppressLogged tracks fire-once prompts we have already WARNed about, so a
+	// lingering-in-scrollback once-prompt is surfaced exactly once, not every poll.
+	suppressLogged map[string]bool
 }
 
 // newAutoResponder builds the responder from the CLI's embedded manifest.
@@ -101,7 +125,7 @@ func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback i
 	if m, err := LoadManifest(cli); err == nil {
 		prompts = m.InteractivePrompts
 	}
-	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback}
+	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
@@ -130,6 +154,14 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 		ar.writeEscalation(pane, strings.TrimPrefix(action, "loop_guard:"), "loop_guard", session)
 		return "", 86
 	default:
+		// A fire-once prompt is still matching after its single response (its
+		// dismissed text lingering in scrollback). No action — but WARN once so a
+		// genuinely-unanswered dialog is diagnosable rather than a silent timeout.
+		if name, ok := strings.CutPrefix(action, "suppress_once:"); ok && !ar.suppressLogged[name] {
+			ar.suppressLogged[name] = true
+			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] %s already handled; suppressing re-fire (dialog lingering in scrollback). "+
+				"If the agent stalls, the dialog may still be unanswered.\n", name)
+		}
 		return "", 0
 	}
 }

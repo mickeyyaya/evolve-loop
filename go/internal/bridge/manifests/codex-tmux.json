@@ -42,7 +42,8 @@
       "regex": "Do you trust the contents of this directory|Trust this directory|Working with untrusted contents|This folder has not been trusted|Yes, continue",
       "response_keys": "1,Enter",
       "policy": "auto_respond",
-      "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml."
+      "once": true,
+      "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml. `once`: a one-time boot dialog — after a single auto-response it must not re-fire, since its dismissed text lingers in the bootScrollback=200 capture during the artifact-wait loop and would otherwise re-match every poll and trip the loop guard (the codex-tmux abandon observed 2026-06-03)."
     },
     {
       "name": "per_edit_approval",
