@@ -43,6 +43,36 @@ type Policy struct {
 	MandatoryPhases []string `json:"mandatory_phases,omitempty"`
 	// Pins maps a phase name (e.g. "audit") to its hard CLI/model pin.
 	Pins map[string]Pin `json:"pins,omitempty"`
+	// ShipFloor is the user-configurable integrity floor: the phases a plan
+	// reaching ship MUST run. ABSENT/empty ⇒ the orchestrator uses the router's
+	// safe structural default ({tdd, build, audit}); a present list is an
+	// override (e.g. ["audit"] for an audit-only posture). "audit" is the one
+	// non-removable gate — FloorPhases re-appends it if a supplied floor omits
+	// it, so policy can never (even by typo) produce a floor without an
+	// evaluator. This is the ONLY hard product invariant in this layer.
+	ShipFloor []string `json:"ship_floor,omitempty"`
+}
+
+// evaluatorFloorPhase is the single non-removable floor phase: a plan can never
+// reach ship without an evaluator. Kept here (not router) because the
+// non-removability is a policy-layer guarantee.
+const evaluatorFloorPhase = "audit"
+
+// FloorPhases resolves the configured ship-floor. It returns (floor, overridden):
+// when overridden is false the caller MUST fall back to the router's structural
+// default (this keeps the default floor's definition in one place — the router —
+// rather than duplicating {tdd,build,audit} here). When overridden is true the
+// returned floor is the user's list with the non-removable evaluator phase
+// guaranteed present (appended last if absent). Pure; never mutates the receiver.
+func (p Policy) FloorPhases() (floor []string, overridden bool) {
+	if len(p.ShipFloor) == 0 {
+		return nil, false
+	}
+	out := append([]string(nil), p.ShipFloor...)
+	if !contains(out, evaluatorFloorPhase) {
+		out = append(out, evaluatorFloorPhase)
+	}
+	return out, true
 }
 
 // MergeMandatory returns base plus any phase in MandatoryPhases not already

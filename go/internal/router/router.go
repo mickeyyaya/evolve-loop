@@ -43,6 +43,14 @@ type RouteInput struct {
 	Cycle       int
 	Env         map[string]string
 
+	// Catalog is the set of pre-defined phases the advisor may SELECT instead of
+	// minting a new one (WS3: prefer select-over-mint = DRY at the agent level).
+	// Populated by the orchestrator from the phase catalog; consumed ONLY by a
+	// DynamicLLM Planner when rendering its prompt. The pure Route() ignores it,
+	// so determinism is preserved. Additive: nil until the advisor-prompt slice
+	// wires it.
+	Catalog []PhaseCard
+
 	// Plan is the advisor's whole-cycle run/skip plan, ALREADY clamped to the
 	// integrity floor (ClampPlanToFloor) by the orchestrator before threading.
 	// Consulted by shouldRun ONLY at Stage>=Advisory: a NON-mandatory phase runs
@@ -58,6 +66,18 @@ type RouteInput struct {
 	// when routing a ship FAILURE for recovery (Recover, not Route). It is nil
 	// for ordinary (non-recovery) routing; the pure Route() ignores it entirely.
 	Blocker *Blocker
+}
+
+// PhaseCard is the advisor-facing projection of one pre-defined phase: enough
+// for the planner to decide "select this" vs "mint a new one". Deliberately
+// minimal — name, role archetype, a one-line purpose, the model tier, and
+// whether it writes source (the advisor needs the last for sandbox reasoning).
+type PhaseCard struct {
+	Name         string `json:"name"`
+	Role         string `json:"role"`    // plan|build|evaluate|control
+	Purpose      string `json:"purpose"` // one-line description
+	Tier         string `json:"tier,omitempty"`
+	WritesSource bool   `json:"writes_source,omitempty"`
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.

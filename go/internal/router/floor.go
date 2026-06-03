@@ -1,5 +1,13 @@
 package router
 
+import "slices"
+
+// EvaluatorFloorPhase is the single non-removable floor phase: a plan can never
+// reach ship without an evaluator. It mirrors policy's own constant of the same
+// value — each layer independently guarantees the evaluator (defense in depth),
+// so ClampPlanToFloorWith re-asserts it rather than trusting its caller.
+const EvaluatorFloorPhase = "audit"
+
 // floor.go implements the ADR-0024 §1 conditional integrity floor: the SINGLE
 // causal invariant that replaces the fixed mandatory-spine never-skip list when
 // an advisor drives phase selection (Stage>=Advisory). It is a PURE plan-level
@@ -25,9 +33,46 @@ package router
 // artifact-backed SpineSatisfiedUpTo gate. Defense in depth — never the sole gate.
 //
 // PURE: returns a NEW plan (input unmutated) plus the clamps applied.
+//
+// This is the back-compat entry point: it enforces the SAFE STRUCTURAL DEFAULT
+// floor (DefaultShipFloor). Callers that honor a user-configured floor
+// (.evolve/policy.json:ship_floor) call ClampPlanToFloorWith with the resolved
+// set instead. Keeping this wrapper byte-identical to the historical behavior is
+// what lets the existing floor_test.go suite stand as the default-preserving proof.
 func ClampPlanToFloor(in RouteInput, plan *PhasePlan) (*PhasePlan, []Clamp) {
+	return ClampPlanToFloorWith(in, plan, DefaultShipFloor())
+}
+
+// DefaultShipFloor is the safe structural default: a plan reaching ship must run
+// tdd (unless the cycle is trivial), build, and audit. The router owns this
+// definition (single source of truth); policy.FloorPhases overrides it only when
+// the user supplies an explicit ship_floor.
+func DefaultShipFloor() []string { return []string{"tdd", "build", "audit"} }
+
+// ClampPlanToFloorWith enforces a CONFIGURABLE integrity floor on an advisory
+// whole-cycle plan: floor is the set of phases a plan reaching ship MUST run.
+// For each floor phase the clamp forces it on (recording one Clamp), EXCEPT
+// "tdd", which carries the trivial-cycle exemption (forced only when tddPinned).
+// Floor order is preserved for deterministic clamp listing. A no-ship plan is
+// unconstrained (the implication's antecedent is false). The evaluator phase is
+// re-asserted into the floor if absent (self-sealing — see EvaluatorFloorPhase),
+// so this function cannot be made to produce a floor without an evaluator even
+// by a caller that bypasses policy.FloorPhases. Same defense-in-depth caveat as
+// ClampPlanToFloor: this forces audit to RUN; the ship phase's audit-binding
+// still guarantees it PASSED.
+//
+// PURE: returns a NEW plan (input unmutated) plus the clamps applied.
+func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
+	}
+	// Self-sealing evaluator guarantee: re-assert the non-removable evaluator
+	// rather than trust the caller, so a future direct caller cannot produce a
+	// floor without it. policy.FloorPhases already guarantees this; we do not
+	// rely on that.
+	if !slices.Contains(floor, EvaluatorFloorPhase) {
+		floor = append([]string(nil), floor...)
+		floor = append(floor, EvaluatorFloorPhase)
 	}
 	// MintPhases carried through unchanged: the clamp governs the run/skip
 	// Entries (the integrity floor), never the set of minted phases.
@@ -55,13 +100,16 @@ func ClampPlanToFloor(in RouteInput, plan *PhasePlan) (*PhasePlan, []Clamp) {
 		})
 	}
 
-	// Chain order (execution order) for deterministic clamp listing. build + audit
-	// are unconditional once ship is reached; tdd carries the trivial exemption.
-	if tddPinned(in) {
-		force("tdd")
+	for _, phase := range floor {
+		if phase == "tdd" {
+			// tdd carries the trivial exemption — forced only when pinned.
+			if tddPinned(in) {
+				force("tdd")
+			}
+			continue
+		}
+		force(phase)
 	}
-	force("build")
-	force("audit")
 	return out, clamps
 }
 
