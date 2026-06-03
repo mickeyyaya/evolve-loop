@@ -27,6 +27,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -69,25 +70,15 @@ func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespons
 	return classifyArtifact(artifact), nil, string(core.PhaseAudit)
 }
 
-// buildReportMarkers are the accepted "this is a complete build report"
-// section headings. The builder template's mandated changed-files section has
-// drifted across versions ("## Files Modified" → "## Files Changed" → the
-// current "## Changes"); a classifier pinned to a single stale heading
-// false-FAILs a valid build report, and that spurious FAIL trips the auditor's
-// build-report-vs-build-usage cross-check → the cycle never ships (cycle-192).
-// Accept any of the known variants so the verdict tracks report completeness,
-// not one frozen heading string.
-var buildReportMarkers = []string{"## Changes", "## Files Changed", "## Files Modified"}
-
+// classifyArtifact derives the build verdict from report completeness; the
+// accepted changed-files headings live in phasecontract.Build (single source).
 func classifyArtifact(content string) string {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return core.VerdictFAIL
 	}
-	for _, m := range buildReportMarkers {
-		if strings.Contains(trimmed, m) {
-			return core.VerdictPASS
-		}
+	if phasecontract.Build.Complete(trimmed) {
+		return core.VerdictPASS
 	}
 	return core.VerdictFAIL
 }

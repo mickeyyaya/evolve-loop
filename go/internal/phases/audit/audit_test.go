@@ -16,10 +16,25 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
+
+// TestExtractHonorsPhaseContract pins audit's verdict extractor to the canonical
+// heading declared in phasecontract.Audit — the single source the producer-side
+// contract test (phasecontract/contract_test.go) also reads. Audit is the only
+// phase whose classifier keeps its own regex (it extracts a verdict TOKEN, not
+// section presence); this test ties it to the shared contract so the two cannot
+// drift apart.
+func TestExtractHonorsPhaseContract(t *testing.T) {
+	canonical := phasecontract.Audit.Sections[0].Canonical
+	got, found := extractAuditVerdict(canonical + ": PASS\n")
+	if !found || got != core.VerdictPASS {
+		t.Fatalf("extract under contract canonical %q = (%q,%v), want (PASS,true)", canonical, got, found)
+	}
+}
 
 type fakeBridge struct {
 	resp          core.BridgeResponse

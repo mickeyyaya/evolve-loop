@@ -20,14 +20,16 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// topNHeadingRE locates the "## top_n" section heading.
-var topNHeadingRE = regexp.MustCompile(`(?m)^## top_n\b`)
+// topNHeadingRE locates the selection-section heading (phasecontract.Triage,
+// single source).
+var topNHeadingRE = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(phasecontract.Triage.Sections[0].Canonical) + `\b`)
 
 // listItemRE matches a single non-empty Markdown list item line.
 var listItemRE = regexp.MustCompile(`(?m)^[-*]\s+\S`)
