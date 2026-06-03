@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -132,6 +133,13 @@ type Orchestrator struct {
 	// Set via WithRegistrar; the composition root adapts phaseregistrar.Registrar.
 	registrar PhaseMinter
 
+	// kb is the knowledge-base recall port (WS2): at plan time the orchestrator
+	// looks up prior lessons matching the most recent failure and threads them
+	// into the advisor's prompt (recall memory). Nil (default) ⇒ no recall is
+	// added ⇒ byte-identical legacy behavior. Set via WithKB; the composition
+	// root wires research.NewFileKB(research.SearchPathsFromEnv()).
+	kb research.KB
+
 	// reviewer adjudicates a finished phase's deliverable before the cycle
 	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
 	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
@@ -190,6 +198,17 @@ func WithRegistrar(m PhaseMinter) Option {
 	return func(o *Orchestrator) {
 		if m != nil {
 			o.registrar = m
+		}
+	}
+}
+
+// WithKB injects the knowledge-base recall port (WS2). Nil is ignored, leaving
+// the no-recall default (byte-identical legacy behavior). The composition root
+// wires research.NewFileKB(research.SearchPathsFromEnv()).
+func WithKB(kb research.KB) Option {
+	return func(o *Orchestrator) {
+		if kb != nil {
+			o.kb = kb
 		}
 	}
 }
@@ -1122,6 +1141,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// has one source of truth rather than two gates that could drift.
 	var clampedPlan *router.PhasePlan
 	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
+		// WS2 recall memory: thread the most recent failure's reason + matching KB
+		// lessons into the plan prompt so the advisor plans WITH the benefit of
+		// what went wrong before. No-op when no KB is wired or no failure history.
+		lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
 		planIn := router.RouteInput{
 			Current:         string(PhaseStart),
 			Signals:         router.RoutingSignals{}, // no handoffs exist yet at cycle start
@@ -1132,6 +1155,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			ProjectRoot:     req.ProjectRoot,
 			Cycle:           cycle,
 			Env:             envSnap,
+			LastReason:      lastReason,
+			Lessons:         lessons,
 		}
 		// ClampPlanToFloor's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
@@ -2032,6 +2057,37 @@ func phaseFromRouter(s string) Phase {
 		return ""
 	}
 	return p
+}
+
+// recallForPlan builds the WS2 recall-memory context for the advisor's plan: the
+// short reason of the most recent failure and the prior lessons that match it.
+// It is the orchestrator's I/O (a KB lookup), kept out of the pure advisor so the
+// advisor only renders. Returns ("", nil) when no KB is wired or there is no
+// failure history — the legacy no-recall behavior. An empty lesson result is the
+// novel-failure signal (nothing in the corpus matches yet), surfaced as the
+// reason-without-lessons case.
+func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord) (lastReason string, lessons []string) {
+	if o.kb == nil || len(history) == 0 {
+		return "", nil
+	}
+	latest := history[len(history)-1]
+	if latest.Summary == "" && latest.Classification == "" {
+		return "", nil
+	}
+	found, err := o.kb.Lookup(ctx, research.Query{
+		Consequence: latest.Classification,
+		Keywords:    strings.Fields(latest.Summary),
+	})
+	if err != nil {
+		// Recall is best-effort: a KB read error must never block planning.
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN KB recall lookup failed (continuing without lessons): %v\n", err)
+		return latest.Summary, nil
+	}
+	digests := make([]string, 0, len(found))
+	for _, l := range found {
+		digests = append(digests, l.Digest())
+	}
+	return latest.Summary, digests
 }
 
 // entriesFromRecords converts FailedRecord values into failureadapter.Entry.

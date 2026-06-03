@@ -51,6 +51,15 @@ type RouteInput struct {
 	// wires it.
 	Catalog []PhaseCard
 
+	// LastReason + Lessons are the recall-memory context (WS2): the short "why"
+	// of the most recent failure and the prior lessons that match it, looked up
+	// from the knowledge base by the orchestrator. Consumed ONLY by the advisor's
+	// prompt (recall informs planning); the pure Route() ignores them. Empty when
+	// there is no recent failure or no matching lesson — which is itself the
+	// novel-failure signal.
+	LastReason string
+	Lessons    []string
+
 	// Plan is the advisor's whole-cycle run/skip plan, ALREADY clamped to the
 	// integrity floor (ClampPlanToFloor) by the orchestrator before threading.
 	// Consulted by shouldRun ONLY at Stage>=Advisory: a NON-mandatory phase runs

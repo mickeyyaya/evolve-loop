@@ -39,6 +39,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
@@ -369,11 +370,32 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir)))
 
+	// WS2 knowledge-base recall: wire the lessons corpus so the advisor plans
+	// with recall memory (prior failures + lessons). Lookup is best-effort and
+	// only consulted at plan time; an absent corpus is a no-op.
+	opts = append(opts, core.WithKB(research.NewFileKB(kbRootsAbs(projectRoot))))
+
 	return orchDeps{
 		Storage:      st,
 		Ledger:       ld,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 	}
+}
+
+// kbRootsAbs resolves the EVOLVE_KB_SEARCH_PATHS roots (relative by default,
+// e.g. ".evolve/instincts/lessons/") against the project root so the KB reads
+// the right corpus regardless of the process cwd. Absolute roots pass through.
+func kbRootsAbs(projectRoot string) []string {
+	raw := research.SearchPathsFromEnv()
+	out := make([]string, 0, len(raw))
+	for _, p := range raw {
+		if filepath.IsAbs(p) {
+			out = append(out, p)
+			continue
+		}
+		out = append(out, filepath.Join(projectRoot, p))
+	}
+	return out
 }
 
 // registrarMinter adapts the concrete phaseregistrar.Registrar to the narrow

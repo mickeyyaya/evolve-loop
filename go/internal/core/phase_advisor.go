@@ -192,6 +192,8 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	b.WriteString("## Objective signals (digested from handoff artifacts)\n")
 	writeSignals(b, in.Signals)
 
+	writeRecallMemory(b, in)
+
 	if len(in.Cfg.Triggers) > 0 {
 		b.WriteString("\n## Optional phases available (insert only on objective signal)\n")
 		names := make([]string, 0, len(in.Cfg.Triggers))
@@ -214,6 +216,25 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
 	b.WriteString("- cycle_size == trivial → skip tdd (conditional-mandatory exemption)\n")
 	b.WriteString("FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n")
+}
+
+// writeRecallMemory renders the WS2 recall section — the most recent failure's
+// short reason and the prior lessons that match it — so the advisor plans WITH
+// the benefit of what went wrong before (Reflexion-style recall). Both fields
+// are pre-computed by the orchestrator (KB lookup is its I/O, not the advisor's),
+// so this stays a pure deterministic render. Emits nothing when there is neither
+// a reason nor a lesson, keeping the prompt prefix stable for the no-history case.
+func writeRecallMemory(b *strings.Builder, in router.RouteInput) {
+	if in.LastReason == "" && len(in.Lessons) == 0 {
+		return
+	}
+	b.WriteString("\n## Recall memory (learn from prior cycles — do not repeat these)\n")
+	if in.LastReason != "" {
+		fmt.Fprintf(b, "- why the last cycle failed: %s\n", in.LastReason)
+	}
+	for _, lesson := range in.Lessons {
+		fmt.Fprintf(b, "- lesson: %s\n", lesson)
+	}
 }
 
 func writeSignals(b *strings.Builder, s router.RoutingSignals) {
