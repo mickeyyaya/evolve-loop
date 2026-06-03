@@ -8,6 +8,7 @@
     "cycle_4_plus_mature": "haiku"
   },
   "allowed_tools": [
+    "Bash(evolve phase verify:*)",
     "Read",
     "Grep",
     "Glob",

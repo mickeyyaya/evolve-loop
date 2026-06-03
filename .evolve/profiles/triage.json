@@ -4,6 +4,7 @@
   "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "allowed_tools": [
+    "Bash(evolve phase verify:*)",
     "Read",
     "Grep",
     "Glob",

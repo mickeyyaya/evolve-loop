@@ -58,6 +58,28 @@ type DeliverableReviewer interface {
 	Review(ctx context.Context, in ReviewInput) ReviewResult
 }
 
+// ChainReviewers composes reviewers into one that approves only when ALL
+// approve; the first rejection short-circuits and is returned verbatim (Chain
+// of Responsibility). nil entries are skipped. Used to mount the evalgate gates
+// and the deliverable-contract gate (ADR-0034) at the single orchestrator seam.
+func ChainReviewers(reviewers ...DeliverableReviewer) DeliverableReviewer {
+	return chainReviewer(reviewers)
+}
+
+type chainReviewer []DeliverableReviewer
+
+func (c chainReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
+	for _, r := range c {
+		if r == nil {
+			continue
+		}
+		if res := r.Review(ctx, in); !res.Approve {
+			return res
+		}
+	}
+	return ReviewResult{Approve: true}
+}
+
 // noopReviewer is the orchestrator's default when WithReviewer was not used:
 // every phase is approved unconditionally, exactly reproducing the pre-E2
 // cycle. Kept here (not in a separate file) so the contract — "nil reviewer
