@@ -54,6 +54,11 @@ type Envelope struct {
 	Body   string `json:"body"`             // text to inject
 	Source string `json:"source,omitempty"` // "cli" | "observer" | custom
 
+	// CorrID, when set, ties this injected ask to the agent's reply in the
+	// channel feed (ADR-0037). The driver echoes it in its inject_applied /
+	// idle_reached breadcrumbs; the producer brackets the answer span by it.
+	CorrID string `json:"corr_id,omitempty"`
+
 	// DeferCount tracks how many times a mid-turn command was re-queued by
 	// the driver while the agent was busy. Bounded so a never-idle agent
 	// cannot loop the inbox forever.
