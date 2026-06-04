@@ -167,9 +167,12 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 				Kind: inbox.KindCommand, Body: "answer me", CorrID: "cX", Source: "supervisor",
 			}, fixedTime)
 		case 2:
-			tmux.setPane("thinking...") // busy (marker gone)
+			// Busy: a real claude thinking footer (PaneBusy keys on the
+			// interrupt affordance, not the ❯ marker which persists throughout).
+			tmux.setPane("❯ q\n\n✽ Inferring…\n\n❯\n  ⏵⏵ bypass permissions on · esc to interrupt")
 		case 3:
-			tmux.setPane("❯") // idle again → busy→idle transition
+			// Idle: answer present, no interrupt affordance → busy→idle transition.
+			tmux.setPane("❯ q\n\n⏺ done\n\n❯\n  ⏵⏵ bypass permissions on · ← for agents")
 		default:
 			// Drop the artifact only after both breadcrumbs are in the file so
 			// the loop cannot exit before idle_reached fires.

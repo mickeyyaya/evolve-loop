@@ -246,6 +246,11 @@ func collectSpan(path string, lo, hi int64) []map[string]any {
 
 	var result []map[string]any
 	scanner := bufio.NewScanner(f)
+	// A single content envelope (one answer line) can exceed bufio.Scanner's
+	// default 64 KB token cap; without a larger buffer Scan() stops on
+	// ErrTooLong and the long answer is silently dropped from the span. Match
+	// the project convention (phaseobserver / aggregator): 1 MB start, 10 MB max.
+	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 	for scanner.Scan() {
 		var env map[string]any
 		if err := json.Unmarshal(scanner.Bytes(), &env); err != nil {
@@ -259,6 +264,12 @@ func collectSpan(path string, lo, hi int64) []map[string]any {
 		if seq >= lo && seq <= hi {
 			result = append(result, env)
 		}
+	}
+	// Surface a scan error (e.g. a line still exceeding the 10 MB buffer) rather
+	// than returning a silently-truncated span — the whole point of the sized
+	// buffer above is to not lose answer content without a trace.
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "[channel] WARN collectSpan scan %s: %v\n", path, err)
 	}
 	return result
 }

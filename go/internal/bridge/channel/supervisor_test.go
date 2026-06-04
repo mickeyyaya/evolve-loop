@@ -248,6 +248,25 @@ func TestCollectSpan_MalformedLine(t *testing.T) {
 	}
 }
 
+// TestCollectSpan_RecoversLineOver64KB confirms a single content envelope longer
+// than bufio.Scanner's default 64 KB token cap is fully recovered (a long answer
+// line must not be silently truncated out of the span). RT4.
+func TestCollectSpan_RecoversLineOver64KB(t *testing.T) {
+	ws := t.TempDir()
+	big := strings.Repeat("x", 100*1024) // 100 KB > the 64 KB default Scanner cap
+	appendFeed(t, ws, "build",
+		`{"seq":5,"kind":"assistant_text","data":{"text":"`+big+`"}}`,
+	)
+	result := collectSpan(FeedPath(ws, "build"), 1, 10)
+	if len(result) != 1 {
+		t.Fatalf("expected the >64KB line recovered (1 event), got %d", len(result))
+	}
+	data, _ := result[0]["data"].(map[string]any)
+	if txt, _ := data["text"].(string); len(txt) != len(big) {
+		t.Errorf("answer text truncated: got %d bytes, want %d", len(txt), len(big))
+	}
+}
+
 // TestSupervisor_Ask_SpanWithInt64Seq confirms collectSpan works when seq
 // values are encoded as int64 (not float64) — exercises the int64 toI64 branch
 // in a realistic end-to-end path.

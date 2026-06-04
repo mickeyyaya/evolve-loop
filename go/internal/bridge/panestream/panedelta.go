@@ -127,6 +127,12 @@ type PaneProfile struct {
 	// markdown blockquote "> quoted"). CLIs with a unique/non-ASCII marker or a
 	// placeholder-bearing input box keep prefix matching (BoundaryExact false).
 	BoundaryExact bool
+	// IdlePlaceholder is a substring that appears ONLY when the REPL is idle at
+	// its input prompt — used by PaneBusy for a CLI whose input box vanishes
+	// during generation and whose spinner persists into the answer (ollama's
+	// ">>> Send a message"). Empty for CLIs whose busy state is detected by the
+	// interrupt/spinner affordance instead (claude/agy) or not at all (codex).
+	IdlePlaceholder string
 }
 
 // Profiles holds the tuned PaneProfile for each supported tmux LLM CLI.
@@ -137,8 +143,47 @@ var Profiles = map[string]PaneProfile{
 	// markdown blockquote line ("> quoted text") inside answer content.
 	// The empty input box is EXACTLY ">" (nothing after it), while the echoed
 	// prompt is "> In exactly 3…" (has text) — exact-match distinguishes them.
-	"agy":    {Name: "agy", BoundaryMarker: ">", BoundaryExact: true},
-	"ollama": {Name: "ollama", BoundaryMarker: ">>>"},
+	"agy": {Name: "agy", BoundaryMarker: ">", BoundaryExact: true},
+	// ollama's ">>>" prefixes BOTH the echoed prompt and the idle input line, so
+	// marker presence cannot signal idle; the full input placeholder appears only
+	// when idle, and its "Thinking…" spinner persists into the answer — so busy is
+	// detected by the placeholder's ABSENCE (see PaneBusy).
+	"ollama": {Name: "ollama", BoundaryMarker: ">>>", IdlePlaceholder: "Send a message"},
+}
+
+// busyAffordanceRE matches the interrupt/cancel footer hint a CLI shows for the
+// ENTIRE interruptible turn (claude "esc to interrupt", agy "esc to cancel") —
+// the most reliable busy signal for CLIs whose input box persists during
+// generation. The spinner words ("Inferring"/"Generating") are deliberately NOT
+// matched: they're redundant (the esc affordance already covers claude/agy busy)
+// and, as bare words, could false-match an idle answer that happens to contain
+// them. ollama has no esc affordance — it uses the IdlePlaceholder rule instead.
+// Verified against every testdata/<cli>/{thinking,answer}.txt.
+var busyAffordanceRE = regexp.MustCompile(`esc to interrupt|esc to cancel`)
+
+// PaneBusy reports whether the rendered pane shows the CLI is actively
+// generating a turn (vs idle at the prompt). The driver brackets the
+// correlation span's idle_reached on a busy→idle transition; the input-box
+// MARKER cannot be that signal because it persists during generation for
+// claude/agy (and ollama echoes it on the prompt line), so two complementary
+// rules cover the real frames:
+//
+//  1. an interrupt/spinner affordance is present (claude/agy); OR
+//  2. the profile's IdlePlaceholder is set AND absent (ollama, whose input
+//     placeholder vanishes mid-turn while its "Thinking…" header persists).
+//
+// A CLI with neither signal in its capture (codex in the committed fixtures)
+// always reads not-busy: its span cannot be bracketed (a documented weak-signal
+// degradation), but live monitoring is unaffected.
+func PaneBusy(rendered string, p PaneProfile) bool {
+	clean := stripANSI(rendered)
+	if busyAffordanceRE.MatchString(clean) {
+		return true
+	}
+	if p.IdlePlaceholder != "" && !strings.Contains(clean, p.IdlePlaceholder) {
+		return true
+	}
+	return false
 }
 
 // PaneDelta tracks how much stable content has already been emitted so each
