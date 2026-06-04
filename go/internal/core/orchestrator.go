@@ -1583,6 +1583,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if err != nil {
 					return result, fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
 				}
+				// A correction re-dispatch must produce a canonical verdict to be
+				// evaluable, same invariant the outer attempt loop enforces before
+				// breaking. Corrections deliberately skip the bridge-timeout retry
+				// ladder (scope note), so a non-canonical result here aborts rather
+				// than retrying.
+				if !IsVerdict(resp.Verdict) {
+					return result, fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
+				}
+				// rin.Response is refreshed for reviewer consistency; the deliverable
+				// reviewer reads the filesystem (workspace/worktree), not this field.
 				rin.Response = resp
 				rr = o.reviewer.Review(ctx, rin)
 			}

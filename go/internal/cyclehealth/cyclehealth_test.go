@@ -494,6 +494,34 @@ func TestCheck_SelfHealEvents_Backfill_Warn(t *testing.T) {
 	}
 }
 
+// TestCheck_SelfHealEvents_ContractCorrection_Warn — a kind=contract_correction
+// ledger entry (the orchestrator re-dispatched a phase to fix a deliverable
+// violation) surfaces one self_heal_events WARN naming the corrected phase. A
+// correction consumes an LLM call like phase_retry, so it must be visible.
+func TestCheck_SelfHealEvents_ContractCorrection_Warn(t *testing.T) {
+	ws := freshWorkspace(t, 1)
+	writeSelfHealLedger(t, ws, 1, ledgerEntry{
+		Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1300, Kind: "contract_correction",
+	})
+	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := selfHealAnomalies(r)
+	if len(got) != 1 {
+		t.Fatalf("self_heal_events count=%d, want 1; anomalies=%+v", len(got), r.Anomalies)
+	}
+	if got[0].Severity != SeverityWarn {
+		t.Errorf("self_heal_events severity=%s, want warn (never fatal)", got[0].Severity)
+	}
+	if r.OverallFatal {
+		t.Errorf("self_heal_events must not be fatal; OverallFatal=true, anomalies=%+v", r.Anomalies)
+	}
+	if !strings.Contains(got[0].Message, "build") {
+		t.Errorf("expected corrected phase 'build' in message; got %q", got[0].Message)
+	}
+}
+
 // TestCheck_SelfHealEvents_NoEvents_NoAnomaly — the anti-no-op guard: a
 // clean cycle (no phase_retry / backfill entries) emits ZERO self_heal_events
 // anomalies. A signal that always fired would FAIL this.

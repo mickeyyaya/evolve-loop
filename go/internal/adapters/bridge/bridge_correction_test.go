@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -55,5 +56,46 @@ func TestCorrectionDirectiveComposesWithRules(t *testing.T) {
 	off.SystemPrompt = "RULE TEXT"
 	if got := injectCorrectionPrefix(injectRulesPrefix("BODY", off.SystemPrompt), off.CorrectionDirective); got != withRules {
 		t.Fatalf("empty directive must be a no-op; got %q want %q", got, withRules)
+	}
+}
+
+// TestLaunch_InjectsCorrectionBlock proves the REAL Adapter.Launch assembly path
+// (not just the helper) injects the ## Correction block OUTERMOST when the
+// BridgeRequest carries a CorrectionDirective.
+func TestLaunch_InjectsCorrectionBlock(t *testing.T) {
+	fe := &fakeEngine{}
+	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-tmux", Profile: "/p", Prompt: "PERSONA-BODY",
+		Workspace: t.TempDir(), ArtifactPath: "/a.md", Agent: "build",
+		CorrectionDirective: "rewrite the Verdict section per the contract",
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	got := fe.gotReq.Prompt
+	if !strings.HasPrefix(got, "## Correction") {
+		t.Errorf("correction block must lead the materialized prompt:\n%s", truncate(got, 300))
+	}
+	if !strings.Contains(got, "rewrite the Verdict section per the contract") {
+		t.Errorf("directive text missing from launched prompt:\n%s", truncate(got, 300))
+	}
+	if ci, bi := strings.Index(got, "## Correction"), strings.Index(got, "PERSONA-BODY"); ci >= bi {
+		t.Errorf("correction must precede the body; corr=%d body=%d", ci, bi)
+	}
+}
+
+// TestLaunch_NoCorrectionBlock_WhenDirectiveEmpty — the default path: no
+// CorrectionDirective ⇒ no block (byte-identical to pre-feature launches).
+func TestLaunch_NoCorrectionBlock_WhenDirectiveEmpty(t *testing.T) {
+	fe := &fakeEngine{}
+	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
+		CLI: "claude-tmux", Profile: "/p", Prompt: "BODY",
+		Workspace: t.TempDir(), ArtifactPath: "/a.md", Agent: "build",
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	if strings.Contains(fe.gotReq.Prompt, "## Correction") {
+		t.Errorf("empty directive must produce no correction block:\n%s", truncate(fe.gotReq.Prompt, 300))
 	}
 }

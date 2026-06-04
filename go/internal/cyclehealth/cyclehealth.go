@@ -522,7 +522,7 @@ func checkSelfHealEvents(opts Options) []Anomaly {
 		if e.Cycle != opts.Cycle {
 			continue
 		}
-		if e.Kind == "phase_retry" || e.Kind == "backfill" {
+		if e.Kind == "phase_retry" || e.Kind == "backfill" || e.Kind == "contract_correction" {
 			out = append(out, Anomaly{
 				Signal:   "self_heal_events",
 				Severity: SeverityWarn,

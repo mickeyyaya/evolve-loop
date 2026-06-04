@@ -226,6 +226,45 @@ func TestCorrectionLoop_ExhaustsThenAborts(t *testing.T) {
 	}
 }
 
+// sequencedRunner returns verdicts[i] on the i-th Run (clamped to the last
+// element), with no error. Used to script a correction re-dispatch that returns
+// a non-canonical verdict.
+type sequencedRunner struct {
+	name     string
+	verdicts []string
+	calls    int
+}
+
+func (r *sequencedRunner) Name() string { return r.name }
+func (r *sequencedRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	v := r.verdicts[min(r.calls, len(r.verdicts)-1)]
+	r.calls++
+	return PhaseResponse{Phase: r.name, Verdict: v, ArtifactsDir: req.Workspace}, nil
+}
+
+// TestCorrectionLoop_NonCanonicalVerdictAborts: a correction re-dispatch that
+// returns err==nil but a non-canonical verdict aborts (same invariant the outer
+// attempt loop enforces) rather than slipping a bad verdict downstream.
+func TestCorrectionLoop_NonCanonicalVerdictAborts(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	rev := &sequencedReviewer{phase: "build", results: []ReviewResult{
+		{Approve: false, Reason: "missing header"},
+		{Approve: true}, // never reached — the bad verdict aborts first
+	}}
+	runners := buildRunners(nil)
+	runners[PhaseBuild] = &sequencedRunner{name: "build", verdicts: []string{VerdictPASS, ""}}
+	o := NewOrchestrator(st, led, runners, WithReviewer(rev))
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	if err == nil {
+		t.Fatal("expected abort on a non-canonical correction verdict; got nil")
+	}
+	if !strings.Contains(err.Error(), "non-canonical verdict") {
+		t.Errorf("error should name the non-canonical verdict; got %v", err)
+	}
+}
+
 // TestCorrectionLoop_DisabledIsImmediateAbort: =0 ⇒ no re-dispatch, immediate
 // abort with the pre-feature error message (byte-identical disable path).
 func TestCorrectionLoop_DisabledIsImmediateAbort(t *testing.T) {
