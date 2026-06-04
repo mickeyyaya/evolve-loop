@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -68,6 +69,60 @@ func TestProducer_ExplicitSourcePaths(t *testing.T) {
 	}
 	if strings.Contains(string(data), "LEGACY-STDOUT") {
 		t.Errorf("feed leaked legacy stdout.log despite explicit StdoutPath:\n%s", data)
+	}
+}
+
+// TestProducer_WarnsWhenSourceNeverAppears asserts that a channel-on phase whose
+// content source file never materializes (an agent/phase name mismatch or a
+// mis-resolved CLI family pointing at a tmux driver's empty stdout.log) emits a
+// loud WARN rather than silently producing an empty feed for the whole phase.
+func TestProducer_WarnsWhenSourceNeverAppears(t *testing.T) {
+	ws := t.TempDir()
+	var warn bytes.Buffer
+	p := NewProducer(ProducerConfig{
+		Workspace: ws, Agent: "build", Phase: "build",
+		StdoutPath: filepath.Join(ws, "build-pane.live"), // never created
+		StderrPath: filepath.Join(ws, "build-breadcrumbs.live"),
+		PollEvery:  time.Millisecond, Now: func() time.Time { return time.Unix(0, 0).UTC() },
+		Warn: &warn,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = p.Run(ctx); close(done) }()
+	time.Sleep(60 * time.Millisecond) // >> the miss threshold at 1ms polls
+	cancel()
+	<-done // wait for Run to return so the buffer read does not race the writer
+
+	if !strings.Contains(warn.String(), "source") {
+		t.Errorf("expected a WARN that the channel source never appeared; got %q", warn.String())
+	}
+	// The WARN must fire exactly once (not every poll).
+	if n := strings.Count(warn.String(), "never appeared"); n > 1 {
+		t.Errorf("WARN fired %d times, want exactly 1", n)
+	}
+}
+
+// TestProducer_NoWarnWhenSourceExists asserts the never-appeared WARN does NOT
+// fire when the source file is present (the normal case, incl. a legitimately
+// quiet phase whose file exists but is empty).
+func TestProducer_NoWarnWhenSourceExists(t *testing.T) {
+	ws := t.TempDir()
+	os.WriteFile(filepath.Join(ws, "build-pane.live"), nil, 0o644) // exists, empty
+	var warn bytes.Buffer
+	p := NewProducer(ProducerConfig{
+		Workspace: ws, Agent: "build", Phase: "build",
+		StdoutPath: filepath.Join(ws, "build-pane.live"),
+		PollEvery:  time.Millisecond, Now: func() time.Time { return time.Unix(0, 0).UTC() },
+		Warn: &warn,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = p.Run(ctx); close(done) }()
+	time.Sleep(60 * time.Millisecond)
+	cancel()
+	<-done // wait for Run to return so the buffer read does not race the writer
+	if strings.Contains(warn.String(), "never appeared") {
+		t.Errorf("must not WARN when source file exists; got %q", warn.String())
 	}
 }
 

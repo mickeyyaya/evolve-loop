@@ -3,6 +3,7 @@ package channel
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -26,7 +27,18 @@ type ProducerConfig struct {
 	StderrPath string
 	PollEvery  time.Duration
 	Now        func() time.Time
+	// Warn is where the producer writes operational warnings (e.g. the content
+	// source never appearing). Defaults to os.Stderr. Injected in tests.
+	Warn io.Writer
 }
+
+// sourceMissThreshold is how many consecutive polls the content source
+// (StdoutPath) may be absent before the producer WARNs once. At the default 2 s
+// poll this is ~40 s of grace — well beyond a tmux driver's boot+open latency,
+// so it fires only on a genuine misconfiguration (agent/phase name mismatch, or
+// a mis-resolved CLI family pointing at a tmux driver's empty stdout.log) that
+// would otherwise leave the feed silently empty for the whole phase.
+const sourceMissThreshold = 20
 
 // Producer is the SOLE writer of the per-agent feed file. It opens the feed
 // O_APPEND, builds one Normalizer over the phase's raw logs, and polls until
@@ -80,11 +92,33 @@ func (p *Producer) Run(ctx context.Context) error {
 		Now:        p.cfg.Now,
 	})
 
+	warn := p.cfg.Warn
+	if warn == nil {
+		warn = os.Stderr
+	}
+	// Detect a silently-empty feed: if the content source never appears, the
+	// channel is misconfigured (agent/phase name mismatch, or a mis-resolved CLI
+	// family pointing at a tmux driver's empty stdout.log). WARN once rather than
+	// produce an empty feed for the whole phase with no signal.
+	sourceSeen := false
+	missedPolls := 0
+
 	t := time.NewTicker(p.cfg.PollEvery)
 	defer t.Stop()
 	for {
 		if _, err := n.Poll(); err != nil {
-			fmt.Fprintf(os.Stderr, "[channel] WARN poll: %v\n", err)
+			fmt.Fprintf(warn, "[channel] WARN poll: %v\n", err)
+		}
+		if !sourceSeen {
+			if _, err := os.Stat(stdoutPath); err == nil {
+				sourceSeen = true
+			} else {
+				missedPolls++
+				if missedPolls >= sourceMissThreshold {
+					fmt.Fprintf(warn, "[channel] WARN content source never appeared after %d polls: %s — feed will be empty (agent/phase name mismatch or wrong CLI family?)\n", missedPolls, stdoutPath)
+					sourceSeen = true // suppress further checks; WARN fires exactly once
+				}
+			}
 		}
 		select {
 		case <-ctx.Done():
