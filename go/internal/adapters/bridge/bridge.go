@@ -65,6 +65,11 @@ type Adapter struct {
 	// BridgeRequest.Cycle at the time of the Launch call, so the callback is
 	// cycle-scoped. Set via SetOnStopReview after construction.
 	onStopReview func(cycle int, phase, action, reason string)
+	// resolver resolves the deliverable contract injected into each phase's
+	// prompt. Defaults to built-in-only; SetContractResolver upgrades it to a
+	// catalog-aware resolver so user/minted phases get their spec-derived
+	// contract block + exact-path footer (WS-A, ADR-0034).
+	resolver phasecontract.Resolver
 }
 
 // New constructs an Adapter backed by the native-Go bridge.Engine. Tests
@@ -74,6 +79,7 @@ func New() *Adapter {
 		engineFactory: func(env map[string]string) core.Bridge {
 			return gobridge.NewEngine(gobridge.Deps{Env: env})
 		},
+		resolver: phasecontract.BuiltinResolver{},
 	}
 }
 
@@ -92,6 +98,17 @@ func (a *Adapter) SetOnStopReview(fn func(cycle int, phase, action, reason strin
 	a.onStopReview = fn
 }
 
+// SetContractResolver upgrades the adapter to inject spec-derived contracts for
+// user/minted phases. Pass a phasecontract.NewCatalogResolver(catalog.Get) built
+// from the orchestrator's merged catalog. Passing nil restores built-in-only
+// resolution (the default).
+func (a *Adapter) SetContractResolver(r phasecontract.Resolver) {
+	if r == nil {
+		r = phasecontract.BuiltinResolver{}
+	}
+	a.resolver = r
+}
+
 // Launch injects the resolved interactive policy into the prompt body and
 // delegates to the Engine, which materializes the prompt, dispatches the
 // driver, and reads the artifact into BridgeResponse.Stdout.
@@ -104,7 +121,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	// The contract's invariant block sits in the cacheable prefix; the volatile
 	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
 	// optimal. See injectContract.
-	body := injectContract(req.Prompt, req.Agent, req.ArtifactPath)
+	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
 	inproc.Prompt = injectRulesPrefix(injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env)), req.SystemPrompt)
 
 	// When an onStopReview callback is wired (production path), build the engine
@@ -192,8 +209,16 @@ func injectPolicyPrefix(prompt, policy string) string {
 // unchanged. The path is surfaced in the prompt TEXT here, not just in the
 // BridgeRequest.ArtifactPath flag the engine uses to poll — closing the gap that
 // forced the agent to infer its own output path.
-func injectContract(prompt, agent, artifactPath string) string {
-	c, ok := phasecontract.For(agent)
+//
+// Resolution runs through a.resolver: built-ins always, plus spec-derived
+// contracts for user/minted phases when a catalog resolver is wired (WS-A). A
+// nil resolver (zero-value Adapter in a test) degrades to built-in-only.
+func (a *Adapter) injectContract(prompt, agent, artifactPath string) string {
+	resolver := a.resolver
+	if resolver == nil {
+		resolver = phasecontract.BuiltinResolver{}
+	}
+	c, ok := resolver.Resolve(agent)
 	if !ok {
 		return prompt
 	}

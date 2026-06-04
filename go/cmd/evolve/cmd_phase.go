@@ -58,6 +58,11 @@ func runPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if strings.ToLower(args[0]) == "verify" {
 		return runPhaseVerify(args[1:], stdout, stderr)
 	}
+	// `evolve phase lint <name>` validates a phase descriptor against the unified
+	// schema (ADR-0035). Fail-open: warnings only, never blocks.
+	if strings.ToLower(args[0]) == "lint" {
+		return runPhaseLint(args[1:], stdout, stderr)
+	}
 	name := strings.ToLower(args[0])
 	factory, ok := registry.For(name)
 	if !ok {

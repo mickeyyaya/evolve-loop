@@ -26,6 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseregistrar"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
@@ -334,6 +335,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	for _, w := range append(discWarns, mergeWarns...) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
+	// Make the bridge catalog-aware so user/minted phases get their spec-derived
+	// Deliverable Contract block + exact-path footer injected (WS-A, ADR-0034).
+	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
@@ -416,7 +420,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
 	}
 	if cfg.ContractGate != config.StageOff {
-		reviewers = append(reviewers, deliverable.NewReviewer(cfg.ContractGate))
+		// Catalog-aware so user/minted phases get spec-derived contracts (WS-A):
+		// the host gate enforces the SAME well-formedness the agent's
+		// `evolve phase verify` self-check derives from the phase.json.
+		reviewers = append(reviewers, deliverable.NewReviewerWithCatalog(cfg.ContractGate, catalog))
 	}
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))

@@ -37,10 +37,15 @@ func NewStateMachine() *StateMachine {
 		// (scout/triage → build when tdd is skipped on a trivial cycle). The
 		// canonical order is unchanged; these only make the skip paths LEGAL so
 		// the router's enforce-mode decisions validate via CanTransition.
-		PhaseStart:        {PhaseIntent: true, PhaseScout: true},
-		PhaseIntent:       {PhaseScout: true},
-		PhaseScout:        {PhaseTriage: true, PhaseTDD: true, PhaseBuild: true},
-		PhaseTriage:       {PhaseTDD: true, PhaseBuild: true},
+		PhaseStart:  {PhaseIntent: true, PhaseScout: true},
+		PhaseIntent: {PhaseScout: true},
+		// scout/triage → end are the guarded EARLY-EXIT edges (no-ship
+		// convergence, e.g. scout found nothing to do). They are structurally
+		// legal so CanTransition passes, but the SEMANTIC authority is
+		// CanTerminateEarly — the orchestrator must consult it (a ship-intended
+		// cycle can never take these edges). See CanTerminateEarly.
+		PhaseScout:        {PhaseTriage: true, PhaseTDD: true, PhaseBuild: true, PhaseEnd: true},
+		PhaseTriage:       {PhaseTDD: true, PhaseBuild: true, PhaseEnd: true},
 		PhaseTDD:          {PhaseBuildPlanner: true, PhaseBuild: true},
 		PhaseBuildPlanner: {PhaseBuild: true},
 		PhaseBuild:        {PhaseAudit: true},
@@ -61,6 +66,31 @@ func NewStateMachine() *StateMachine {
 		PhaseEnd:      {},
 	}
 	return &StateMachine{allowed: a}
+}
+
+// CanTerminateEarly reports whether the cycle may legally END now from `from` —
+// i.e. the advisor proposes a no-ship convergence cycle and there is no further
+// work to evaluate. It is the SEMANTIC gate on the guarded scout/triage→end
+// edges (CanTransition reports structural legality; this reports whether taking
+// the edge is permitted).
+//
+// The invariant it defends: early-exit is ONLY ever a no-ship convergence. A
+// ship-intended cycle (shipPlanned) can NEVER terminate early — it must satisfy
+// the full integrity floor (build ∧ audit) and reach ship through the normal
+// spine. And only the pre-build decision points (scout, triage) may terminate
+// early: past build, real work exists and must be evaluated, not abandoned.
+// Together these guarantee no path lands at `end` having intended to ship
+// without a real, audit-bound build.
+func (sm *StateMachine) CanTerminateEarly(from Phase, shipPlanned bool) bool {
+	if shipPlanned {
+		return false
+	}
+	switch from {
+	case PhaseScout, PhaseTriage:
+		return true
+	default:
+		return false
+	}
 }
 
 // CanTransition reports whether from → to is a legal edge.

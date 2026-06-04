@@ -1307,7 +1307,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				Plan: clampedPlan,
 			})
 			if o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
-				if forced, ok := o.enforceNext(current, next, signals, dec); ok {
+				if forced, ok := o.enforceNext(current, next, signals, dec, planRunsShip(clampedPlan)); ok {
 					next = forced
 				}
 				// Full spine-integrity check on the SELECTED next (static OR
@@ -1926,9 +1926,21 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 // gate (SpineSatisfiedUpTo). Otherwise the static successor stands. This is
 // the non-bypassable "kernel disposes" floor for Enforce mode — neither
 // Strategy can reach Ship without a real PASS/WARN audit artifact.
-func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision) (Phase, bool) {
+func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision, shipPlanned bool) (Phase, bool) {
 	cand := o.candidatePhase(dec.NextPhase)
 	if cand == "" || cand == staticNext {
+		return staticNext, false
+	}
+	// Early-exit (guarded scout/triage→end): the advisor proposes ending a
+	// no-ship convergence cycle. CanTerminateEarly is the SOLE authority — it
+	// rejects any ship-intended cycle, so this can never bypass build/audit on a
+	// path to ship. It deliberately precedes (and skips) the
+	// SpineSatisfiedUpTo(end) gate — which would require build+audit — because a
+	// no-ship early-exit legitimately happens before those anchors run.
+	if cand == PhaseEnd {
+		if o.sm.CanTerminateEarly(current, shipPlanned) {
+			return PhaseEnd, true
+		}
 		return staticNext, false
 	}
 	if !o.transitionLegal(current, cand) {
@@ -1938,6 +1950,21 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.Routing
 		return staticNext, false
 	}
 	return cand, true
+}
+
+// planRunsShip reports whether the advisor's clamped plan schedules the ship
+// phase. A nil plan (static spine, no advisor) is treated as ship-intended so
+// early-exit is never taken without an explicit advisor decision.
+func planRunsShip(plan *router.PhasePlan) bool {
+	if plan == nil {
+		return true
+	}
+	for _, e := range plan.Entries {
+		if Phase(e.Phase) == PhaseShip {
+			return e.Run
+		}
+	}
+	return false
 }
 
 // candidatePhase resolves a router-proposed phase string to a runnable Phase:
