@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // reviewer.go — Layer 4 of the deliverable contract (ADR-0034): the host-side
@@ -36,18 +37,33 @@ type Reviewer struct {
 	threshold   int
 	breakerPath string // override for the consecutive-block counter file (tests); "" → derive under .evolve
 	logf        func(format string, args ...any)
+	resolver    phasecontract.Resolver // built-in only by default; catalog-aware via NewReviewerWithCatalog
 }
 
 // breakerFile is the default persistent counter location.
 const breakerFile = "contract-gate-breaker.json"
 
-// NewReviewer builds the contract gate for a stage. Callers wire it via
-// core.WithReviewer (chained after evalgate) only when stage != StageOff.
+// NewReviewer builds the contract gate for a stage, resolving only built-in
+// contracts. Callers wire it via core.WithReviewer (chained after evalgate)
+// only when stage != StageOff.
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.BuiltinResolver{})
+}
+
+// NewReviewerWithCatalog builds the contract gate resolving built-in contracts
+// first and falling back to spec-derived contracts (FromSpec) for the catalog's
+// user/minted phases. This is what gives a config-only phase host-side
+// well-formedness enforcement with no Go change.
+func NewReviewerWithCatalog(stage config.Stage, cat phasespec.Catalog) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get))
+}
+
+func newReviewer(stage config.Stage, resolver phasecontract.Resolver) *Reviewer {
 	return &Reviewer{
 		stage:     stage,
 		threshold: defaultBreakerThreshold,
 		logf:      func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
+		resolver:  resolver,
 	}
 }
 
@@ -61,7 +77,10 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		Worktree:  in.Worktree,
 		EvolveDir: filepath.Join(in.ProjectRoot, ".evolve"),
 	}
-	res, err := Verify(in.Phase, roots)
+	// r.resolver is always set by newReviewer (the single construction point):
+	// BuiltinResolver for NewReviewer, a CatalogResolver for
+	// NewReviewerWithCatalog. No nil guard needed.
+	res, err := VerifyWith(in.Phase, roots, r.resolver)
 	if err != nil {
 		// Ambiguity / infra — fail OPEN (never brick the loop on the gate's own
 		// inability to decide). Does not touch the breaker.

@@ -52,10 +52,20 @@ const (
 )
 
 // Verify runs the deterministic well-formedness checks for a phase's deliverable
-// against the phasecontract registry. See the package doc for the return
-// contract.
+// against the built-in phasecontract registry. See the package doc for the
+// return contract. It is VerifyWith with the BuiltinResolver default —
+// preserved so existing callers (and any path that only deals in built-in
+// phases) are unchanged.
 func Verify(phase string, roots phasecontract.Roots) (Result, error) {
-	c, ok := phasecontract.For(phase)
+	return VerifyWith(phase, roots, phasecontract.BuiltinResolver{})
+}
+
+// VerifyWith runs the well-formedness checks resolving the phase's contract
+// through the given Resolver. A CatalogResolver lets user/minted phases be
+// verified against a spec-derived contract (FromSpec) with no Go change, while
+// built-ins stay authoritative. See the package doc for the return contract.
+func VerifyWith(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (Result, error) {
+	c, ok := resolver.Resolve(phase)
 	if !ok {
 		// Ambiguity: we cannot determine what "well-formed" means. Fail OPEN.
 		return Result{}, fmt.Errorf("deliverable: no contract registered for phase %q", phase)

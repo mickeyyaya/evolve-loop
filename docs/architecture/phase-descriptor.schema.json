@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://evolve-loop/docs/architecture/phase-descriptor.schema.json",
+  "title": "Evolve Loop Phase Descriptor",
+  "description": "The unified, declarative definition of a pipeline phase (a registry entry in docs/architecture/phase-registry.json:phases[], or an operator overlay at .evolve/phases/<name>/phase.json). Mirrors go/internal/phasespec.PhaseSpec. This schema is a LINT AID consumed by `evolve phase lint`; it is NOT a load-time gate (the runtime parser is tolerant + fail-open, ADR-0035). The deliverable contract (artifact path, kind, required sections, verdict vocab) is DERIVED from these fields by phasecontract.FromSpec — there is no separate contract file.",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Lowercase kebab-case identifier. Safe as a filename, agent suffix, and routing token."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["llm", "native", "command"],
+      "default": "llm",
+      "description": "Runner kind. Only 'llm' is executable today; 'native'/'command' are reserved. Orthogonal to the deliverable's markdown/json shape (that is derived from outputs.files[0]'s extension)."
+    },
+    "archetype": {
+      "type": "string",
+      "enum": ["plan", "build", "evaluate", "control"],
+      "description": "Composition archetype for advisor selection and the integrity floor. Inferred from name when omitted. Note: distinct from the registry 'role' key (the agent/profile name)."
+    },
+    "optional": {
+      "type": "boolean",
+      "description": "User (overlay) phases MUST be optional:true — a user phase can never displace or satisfy the build->audit->ship floor."
+    },
+    "agent": {
+      "type": "string",
+      "description": "Persona basename under agents/ (without .md). Defaults to evolve-<name>."
+    },
+    "model": {
+      "type": "string",
+      "description": "Model tier or sentinel. Defaults to 'auto'."
+    },
+    "writes_source": { "type": "boolean", "description": "Whether the phase writes production code (runs in the worktree under the role-gate)." },
+    "enabled": { "type": "string" },
+    "enable_var": { "type": "string", "description": "Env var that toggles the phase." },
+    "inputs": { "$ref": "#/definitions/io" },
+    "outputs": { "$ref": "#/definitions/io" },
+    "prompt_context": { "type": "array", "items": { "type": "string" } },
+    "classify": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Declarative verdict rules. require_sections drives the DERIVED contract's required markdown headings; verdict_on_pass opts an evaluate phase into the PASS/FAIL/WARN/SKIPPED verdict vocabulary.",
+      "properties": {
+        "require_sections": { "type": "array", "items": { "type": "string" } },
+        "fail_if_empty": { "type": "boolean" },
+        "fail_if_signal": { "type": "object", "additionalProperties": { "type": "string" } },
+        "verdict_on_pass": { "type": "string", "enum": ["PASS", "FAIL", "WARN", "SKIPPED"] }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "description": "Conditional/dynamic-edge triggers evaluated against the digested signal plane. insert_when adds the phase; skip_when removes it.",
+      "properties": {
+        "insert_when": { "type": "array", "items": { "$ref": "#/definitions/condition" } },
+        "skip_when": { "type": "array", "items": { "$ref": "#/definitions/condition" } }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "in": { "type": "string" }, "out": { "type": "string" } }
+    },
+    "after": { "type": "string", "description": "Slot this phase right after the named phase in the routing order. Empty defaults to the pre-audit slot." },
+    "on_pass": { "type": "string" },
+    "on_fail": { "type": "string" }
+  },
+  "definitions": {
+    "io": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "signals": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "op", "value"],
+      "properties": {
+        "field": { "type": "string", "description": "Signal field path, e.g. build.files_touched." },
+        "op": { "type": "string", "enum": ["eq", "==", "ne", "!=", "gt", ">", "gte", ">=", "lt", "<", "lte", "<="] },
+        "value": {}
+      }
+    }
+  }
+}

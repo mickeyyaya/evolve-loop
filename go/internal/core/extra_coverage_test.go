@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -21,29 +22,62 @@ func coverNow() time.Time { return time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC) 
 // (SpineSatisfiedUpTo false), and a legal differing edge that survives.
 func TestEnforceNext(t *testing.T) {
 	t.Parallel()
+	// Catalog carries one optional user phase "extra-check" so the candidatePhase
+	// catalog-lookup branch (a router-proposed USER phase) is exercised, not just
+	// the built-in phaseFromRouter path.
+	userCat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "extra-check", Optional: true}})
 	o := &Orchestrator{
-		sm:  NewStateMachine(),
-		cfg: config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}},
+		sm:      NewStateMachine(),
+		cfg:     config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}, Order: []string{"scout", "extra-check", "triage", "tdd", "build", "audit", "ship"}},
+		catalog: userCat,
 	}
 	sig := router.RoutingSignals{} // scout absent → build's spine gate fails
 	cases := []struct {
-		name      string
-		next      string
-		wantPhase Phase
-		wantOK    bool
+		name        string
+		next        string
+		shipPlanned bool
+		wantPhase   Phase
+		wantOK      bool
 	}{
-		{"empty-proposal", "", PhaseTriage, false},
-		{"equals-static", "triage", PhaseTriage, false},
-		{"illegal-edge", "ship", PhaseTriage, false}, // scout↛ship
-		{"spine-gated", "build", PhaseTriage, false}, // legal edge, scout artifact absent
-		{"accepted", "tdd", PhaseTDD, true},          // legal, needs 0 anchors
+		{"empty-proposal", "", true, PhaseTriage, false},
+		{"equals-static", "triage", true, PhaseTriage, false},
+		{"illegal-edge", "ship", true, PhaseTriage, false}, // scout↛ship
+		{"spine-gated", "build", true, PhaseTriage, false}, // legal edge, scout artifact absent
+		{"accepted", "tdd", true, PhaseTDD, true},          // legal, needs 0 anchors
+		// Early-exit: advisor proposes end from scout. Allowed only for a no-ship
+		// cycle; a ship-intended cycle is declined (must satisfy the floor).
+		{"early-exit-noship", "end", false, PhaseEnd, true},
+		{"early-exit-blocked-when-ship", "end", true, PhaseTriage, false},
+		// User phase proposed by the advisor resolves via candidatePhase's catalog
+		// branch (forward-progress legal: scout→extra-check in cfg.Order).
+		{"user-phase-insert", "extra-check", true, Phase("extra-check"), true},
 	}
 	for _, tc := range cases {
 		gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, sig,
-			router.RouterDecision{NextPhase: tc.next})
+			router.RouterDecision{NextPhase: tc.next}, tc.shipPlanned)
 		if gotPhase != tc.wantPhase || gotOK != tc.wantOK {
 			t.Errorf("%s: enforceNext = (%s, %v), want (%s, %v)", tc.name, gotPhase, gotOK, tc.wantPhase, tc.wantOK)
 		}
+	}
+}
+
+// TestPlanRunsShip covers the no-ship detection that gates early-exit.
+func TestPlanRunsShip(t *testing.T) {
+	t.Parallel()
+	if !planRunsShip(nil) {
+		t.Error("nil plan must be treated as ship-intended (no silent early-exit)")
+	}
+	shipRun := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}, {Phase: "ship", Run: true}}}
+	if !planRunsShip(shipRun) {
+		t.Error("plan with ship run=true should report ship planned")
+	}
+	shipSkipped := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}, {Phase: "ship", Run: false}}}
+	if planRunsShip(shipSkipped) {
+		t.Error("plan with ship run=false is a no-ship cycle")
+	}
+	noShip := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}}
+	if planRunsShip(noShip) {
+		t.Error("plan without a ship entry is a no-ship cycle")
 	}
 }
 

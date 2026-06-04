@@ -53,13 +53,17 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	phase := strings.ToLower(phaseArg)
-	if _, ok := phasecontract.For(phase); !ok {
+	// Resolve through the SAME merged catalog the host-side contract gate uses, so
+	// the agent's self-check and the gate agree on user/minted phases (no drift —
+	// ADR-0034). A catalog-load failure degrades to built-in-only resolution.
+	resolver := phaseVerifyResolver()
+	if _, ok := resolver.Resolve(phase); !ok {
 		fmt.Fprintf(stderr, "evolve phase verify: unknown phase %q\n", phase)
 		return 10
 	}
 
 	roots := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
-	res, err := deliverable.Verify(phase, roots)
+	res, err := deliverable.VerifyWith(phase, roots, resolver)
 	if err != nil {
 		// Ambiguity/infra — fail OPEN at the call site.
 		fmt.Fprintf(stderr, "evolve phase verify: %v\n", err)
@@ -81,4 +85,17 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	return 1
+}
+
+// phaseVerifyResolver builds a contract resolver from the merged phase catalog
+// (built-in registry + .evolve/phases overlays). A load failure degrades to
+// built-in-only resolution so the self-check never hard-fails on a catalog
+// glitch — built-in phases always verify.
+func phaseVerifyResolver() phasecontract.Resolver {
+	project := envOrCwd("EVOLVE_PROJECT_ROOT")
+	cat, _, err := mergedCatalog(project)
+	if err != nil {
+		return phasecontract.BuiltinResolver{}
+	}
+	return phasecontract.NewCatalogResolver(cat.Get)
 }
