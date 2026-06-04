@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -127,10 +128,27 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		_ = obs.Watch(watchCtx) // ctx.Err() or nil on Stop — neither is fatal here
 	}()
 
+	// ADR-0037: when EVOLVE_CHANNEL=1, spawn the live channel producer beside
+	// the observer. It is the SOLE writer of <agent>-channel.ndjson. Off →
+	// byte-identical to pre-channel behavior (no producer, no feed file).
+	var prodCancel func()
+	if a.envGet("EVOLVE_CHANNEL") == "1" {
+		p := channel.NewProducer(channel.ProducerConfig{
+			Workspace: req.Workspace, Agent: phase, Phase: phase, Cycle: req.Cycle,
+		})
+		pctx, pcancel := context.WithCancel(ctx)
+		prodCancel = pcancel
+		wg.Add(1)
+		go func() { defer wg.Done(); _ = p.Run(pctx) }()
+	}
+
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			cancel()
+			if prodCancel != nil {
+				prodCancel()
+			}
 			_ = obs.Stop()
 			// Bounded wait so a deadlocked watcher can't hold up the
 			// orchestrator. The watcher's ticker loop checks ctx.Done
@@ -148,6 +166,14 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 			}
 		})
 	}
+}
+
+// envGet returns the value of key via EnvLookup when set, else os.Getenv.
+func (a *CoreAdapter) envGet(key string) string {
+	if a.EnvLookup != nil {
+		return a.EnvLookup(key)
+	}
+	return os.Getenv(key)
 }
 
 // resolveDuration reads an EVOLVE_OBSERVER_* env var as seconds; falls
