@@ -25,6 +25,12 @@ const (
 	// beyond which cycle-health raises a phase_latency anomaly. Per-phase
 	// overrides use PhaseEnvKey(phase, "LATENCY_CEILING_S").
 	KeyPhaseLatencyCeilingS = "EVOLVE_PHASE_LATENCY_CEILING_S"
+
+	// KeyContractCorrectionRetries bounds how many times the orchestrator
+	// re-dispatches a phase with a correction directive after a deliverable
+	// contract violation. Range [0,5]; 0 disables (immediate abort, the
+	// pre-feature behavior). Out-of-range/unparseable → DefContractCorrectionRetries.
+	KeyContractCorrectionRetries = "EVOLVE_CONTRACT_CORRECTION_RETRIES"
 )
 
 // Default values for the knobs above.
@@ -38,4 +44,8 @@ const (
 	DefRetryBackoffBaseS = 5
 	// DefPhaseLatencyCeilingS: 15 minutes.
 	DefPhaseLatencyCeilingS = 900
+	// DefContractCorrectionRetries: 2 correction re-dispatches before abort.
+	DefContractCorrectionRetries = 2
+	// MaxContractCorrectionRetries is the hard ceiling on correction re-dispatches.
+	MaxContractCorrectionRetries = 5
 )
