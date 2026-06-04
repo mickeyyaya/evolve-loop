@@ -1,0 +1,50 @@
+user@host /tmp % claude --model claude-haiku-4-5 --dangerously-skip-permissions
+╭─── Claude Code v2.1.162 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting started                                                                                                                        │
+│                  Welcome back USER!                 │ Run /init to create a CLAUDE.md file with instructions for Claude                                                                               │
+│                                                    │ ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
+│                       ▐▛███▜▌                      │ What's new                                                                                                                                      │
+│                      ▝▜█████▛▘                     │ `claude agents --json` now includes `waitingFor` showing what a waiting session is blocked on (e.g. permission prompt)                          │
+│                        ▘▘ ▝▝                       │ `--tools`: explicitly listing Grep/Glob now provides the dedicated search tools on native builds with embedded search (previously these names … │
+│  Haiku 4.5 · Claude Max · USER@example.com's   │ `/effort` now confirms when your chosen level will persist as the default for new sessions                                                      │
+│  Organization                                      │ /release-notes for more                                                                                                                         │
+│                    /private/tmp                    │                                                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ⚠ 1 setup issue: MCP · /doctor
+
+❯ List 3 short bullet points explaining what tmux is.
+
+✽ Inferring…
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
