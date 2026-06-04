@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 )
+
+// emitChannelBreadcrumb writes one structured channel marker to w (the driver's
+// stderr log). The producer's correlator parses these to bracket an injected
+// ask's answer span (ADR-0037). Empty corrID is a no-op so non-correlated
+// injects add no noise.
+func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
+	if corrID == "" {
+		return
+	}
+	fmt.Fprintf(w, "{\"evolve_channel\":%q,\"corr_id\":%q}\n", channel, corrID)
+}
 
 // driver_tmux_repl.go — the shared REPL state machine for every *-tmux
 // driver (claude-tmux, codex-tmux, agy-tmux). Template Method: the fixed
@@ -233,6 +245,18 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	detectErrLogged := false
 	attempt := 0
 	intervalStart := 0
+	// --- Correlation span tracking for the bidirectional channel (ADR-0037).
+	// openCorrID is the CorrID of the most-recently-delivered idle-gated ask
+	// that has not yet been answered. sawBusy guards against a false
+	// idle_reached: the prompt marker is still visible immediately after the
+	// paste (the agent hasn't started its turn yet), so we require observing
+	// at least one BUSY pane (marker absent) before the next marker-visible
+	// pane counts as the agent returning to idle. Heuristic given the 2s poll:
+	// a turn shorter than one poll interval may be missed, in which case the
+	// idle_reached fires on a later idle tick (the open CorrID persists until
+	// a busy→idle pair is seen) — never a false-early bracket.
+	openCorrID := ""
+	sawBusy := false
 	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
@@ -263,7 +287,28 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// operator interrupt pre-empts a pending auto-reply on this tick.
 		if envs, _ := cursor.Drain(); len(envs) > 0 {
 			for _, env := range envs {
-				injectEnvelope(ctx, cfg, deps, lp, env)
+				if cid := injectEnvelope(ctx, cfg, deps, lp, env); cid != "" {
+					// A correlated ask was just delivered: open its span. A new
+					// ask supersedes any prior unanswered one (its idle_reached
+					// is then unobservable; the producer ignores an idle_reached
+					// with no matching open inject, so dropping it is safe).
+					openCorrID = cid
+					sawBusy = false
+				}
+			}
+		}
+		// Bracket the open ask: once delivered, watch for the agent going BUSY
+		// (marker gone) and then back to IDLE (marker visible again), and emit
+		// idle_reached exactly once on that busy→idle transition.
+		if openCorrID != "" {
+			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			idle := strings.Contains(pane, lp.promptMarker)
+			if !idle {
+				sawBusy = true
+			} else if sawBusy {
+				emitChannelBreadcrumb(deps.Stderr, "idle_reached", openCorrID)
+				openCorrID = ""
+				sawBusy = false
 			}
 		}
 		action, rc := ar.tick(ctx, lp.session)
@@ -370,7 +415,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 // maxInjectDefer. interrupt sends ESC first, then injects regardless of state.
 // keystroke sends body as raw tmux key tokens — no ESC prefix, no idle-gate,
 // no Enter suffix; the operator owns exactly what reaches the REPL.
-func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, env inbox.Envelope) {
+//
+// It returns the CorrID of a successfully-delivered idle-gated ask (empty
+// otherwise: non-correlated body, keystroke/interrupt path, re-queue, or drop)
+// so the caller in runTmuxREPL can open the busy→idle span for idle_reached.
+// inject_applied is emitted here, at the moment of the paste, because only
+// this function knows the idle-gate passed (vs re-queued/dropped).
+func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, env inbox.Envelope) string {
 	pfx := "[" + lp.name + "]"
 	// Cycle-124 F4 / ADR-0023 addendum: the "full tmux control" hatch the
 	// operator asked for. Body is one tmux key-spec (literal text and/or
@@ -396,17 +447,17 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 		// nothing actually reached the REPL.
 		if err := deps.Tmux.SendKeys(ctx, lp.session, env.Body, false); err != nil {
 			fmt.Fprintf(deps.Stderr, "%s keystroke send failed: %v (source=%s)\n", pfx, err, env.Source)
-			return
+			return ""
 		}
 		fmt.Fprintf(deps.Stderr, "%s injected keystroke %q (source=%s)\n", pfx, env.Body, env.Source)
-		return
+		return ""
 	}
 	if env.Kind == inbox.KindInterrupt {
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "Escape", false)
 		deps.Sleep(injectInterruptSettle)
 		_ = injectText(ctx, cfg, deps, lp.session, env.Body) // fire-and-forget live injection
 		fmt.Fprintf(deps.Stderr, "%s injected interrupt (source=%s)\n", pfx, env.Source)
-		return
+		return ""
 	}
 
 	// Idle-gated kinds: only inject when the agent is waiting at the prompt.
@@ -414,13 +465,13 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	if !strings.Contains(pane, lp.promptMarker) {
 		if env.DeferCount >= maxInjectDefer {
 			fmt.Fprintf(deps.Stderr, "%s DROP injected %s after %d defers (agent never idled)\n", pfx, env.Kind, env.DeferCount)
-			return
+			return ""
 		}
 		env.DeferCount++
 		if err := inbox.Append(cfg.Workspace, cfg.Agent, env, deps.Now); err != nil {
 			fmt.Fprintf(deps.Stderr, "%s WARN re-queue of %s failed: %v\n", pfx, env.Kind, err)
 		}
-		return
+		return ""
 	}
 
 	body := env.Body
@@ -429,6 +480,11 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	}
 	_ = injectText(ctx, cfg, deps, lp.session, body) // fire-and-forget live injection
 	fmt.Fprintf(deps.Stderr, "%s injected %s (source=%s)\n", pfx, env.Kind, env.Source)
+	// Open the correlation span: the idle-gated ask is now on the wire. The
+	// inject_applied breadcrumb is a no-op when CorrID is empty (uncorrelated
+	// inject) so this adds zero noise to the common path.
+	emitChannelBreadcrumb(deps.Stderr, "inject_applied", env.CorrID)
+	return env.CorrID
 }
 
 // injectText delivers body into the session via the paste buffer (so
