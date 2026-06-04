@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,9 +15,12 @@ import (
 // doctor.go — per-CLI auth + binary preflight (Go port of lib/doctor.sh's
 // shallow path + an optional deep live-noop via the runner seam).
 //
-// Simplification vs bash: auth detection is file-based (the bash Keychain
-// branch is macOS-specific and not portably testable); the file fallback
-// covers the common case. Verdict + exit-code contract is preserved.
+// Auth detection is file/env-based with one macOS exception: claude stores its
+// OAuth token in the login Keychain (service "Claude Code-credentials"), not a
+// file, so doctorAuth consults the KeychainProbe seam (defaultKeychainProbe)
+// for claude before reporting unconfigured. The probe is injectable so tests
+// stay hermetic and non-darwin hosts skip it. Verdict + exit-code contract is
+// preserved.
 
 // BinaryInfo describes a CLI binary's presence on PATH.
 type BinaryInfo struct {
@@ -91,13 +95,42 @@ func (e *Engine) doctorHome() string {
 	return os.Getenv("HOME")
 }
 
-// doctorAuth probes file-based auth signals for cli.
+// defaultKeychainProbe builds the production KeychainProbe seam. On macOS it
+// shells (via the Runner seam) to `security find-generic-password -s <service>`
+// and reports presence by exit code; on every other OS there is no login
+// Keychain, so it returns a probe that is always false (file/env checks cover
+// those hosts). Kept as a constructor so it can capture the resolved Runner.
+func defaultKeychainProbe(d Deps) func(service string) bool {
+	if runtime.GOOS != "darwin" {
+		return func(string) bool { return false }
+	}
+	runner := d.Runner
+	return func(service string) bool {
+		if runner == nil || service == "" {
+			return false
+		}
+		// Bound the probe so a stalled securityd can't hang `setup detect`
+		// (mirrors doctorDeep's timeout; a local Keychain lookup is sub-second).
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		rc, err := runner(ctx, "security", "",
+			[]string{"find-generic-password", "-s", service}, nil, nil, io.Discard, io.Discard)
+		return err == nil && rc == 0
+	}
+}
+
+// doctorAuth probes auth signals for cli (file/env, plus the macOS Keychain
+// for claude).
 func (e *Engine) doctorAuth(cli string) AuthInfo {
 	home := e.doctorHome()
 	switch doctorBinaryFor(cli) {
 	case "claude":
 		if fileNonEmpty(filepath.Join(home, ".claude", ".credentials.json")) {
 			return AuthInfo{Configured: true, Source: "file:credentials.json"}
+		}
+		// Claude Code stores OAuth in the macOS login Keychain, not a file.
+		if e.deps.KeychainProbe != nil && e.deps.KeychainProbe("Claude Code-credentials") {
+			return AuthInfo{Configured: true, Source: "keychain:Claude Code-credentials"}
 		}
 		return AuthInfo{Hint: "Run `claude login` or check the macOS Keychain"}
 	case "codex":
