@@ -9,47 +9,82 @@
 // the thinking spinner) re-painted every tick. This package emits only the NEW
 // stable content above that volatile region.
 //
-// # Delta-boundary rule (tuned against the real frames in testdata/)
+// # Per-CLI PaneProfile
 //
-// A claude REPL pane has TWO `❯` prompt-marker lines: the echoed submitted
-// prompt (e.g. `❯ List 3 short bullet points …`) high in the pane, and the
-// EMPTY input box near the bottom. The bottom input box, the `────` separators
-// around it, the footer (`⏵⏵ bypass permissions …`), and the status/spinner
-// line (`✽ Inferring…` / `✻ Worked for Ns`) are all VOLATILE and must never be
-// emitted as content.
+// The four supported tmux LLM CLIs (claude, codex, agy, ollama) each paint a
+// different bottom-UI, so the extractor is configured per CLI via a PaneProfile
+// (see Profiles). A profile carries the ONE thing that differs structurally —
+// the input-line BoundaryMarker — and otherwise shares a single volatile-tail
+// matcher derived from the real frames under testdata/.
+//
+// # Delta-boundary rule (general, tuned against the real frames in testdata/)
+//
+// Every CLI echoes the submitted prompt high in the pane on a line that starts
+// with the same marker as its empty input box, then re-paints the EMPTY input
+// box near the bottom. The bottom input box, the `────` separators around it,
+// the footer (claude `⏵⏵ bypass permissions …`, codex `gpt-5.5 medium · /dir`,
+// agy `? for shortcuts … Gemini …`, ollama folds its footer INTO the input
+// line), and the status/spinner line (`✽ Inferring…`, `⣯ Generating…`,
+// `▸ Thought for Ns`) are all VOLATILE and must never be emitted as content.
 //
 // The boundary is computed in two trims:
 //
-//  1. Drop everything at/below the LAST line containing promptMarker. That
-//     removes the empty input box, the `────` separator below it, the footer,
-//     and any spinner text on the footer line.
+//  1. Drop everything at/below the LAST line whose TRIMMED text matches the
+//     boundary. Match mode depends on PaneProfile.BoundaryExact: when false
+//     (default), HasPrefix on the left-trimmed line is used — the marker must
+//     be at line start, so an interior `>` never fires, and codex's
+//     placeholder-bearing input box (`› Summarize recent commits`) is correctly
+//     caught as the boundary. When true (agy only), the line must equal the
+//     marker exactly after trimming — so the empty input box `>` matches but a
+//     markdown blockquote `> quoted text` does not.
+//     That removes the empty input box, any separator/footer below it, and any
+//     spinner text painted on those rows. For codex this also drops the
+//     next-prompt echo (`› Summarize recent commits`) that the REPL paints as
+//     the new bottom prompt after an answer.
 //  2. From the BOTTOM of what remains, drop a trailing run of volatile rows —
-//     `────` separator lines and status/spinner lines (`✽ …`, `✻ …`) and the
-//     blank lines interleaved with them. This is the load-bearing tuning the
-//     real frames forced: between the submitted prompt and the empty input box
-//     sits a volatile zone that, mid-thinking, is the spinner+separator and,
-//     post-answer, is the `✻ Worked for Ns`+separator. Because that zone is the
-//     SAME height in the thinking frame as in the answer frame, a naive
-//     append-only index cursor primed on the thinking frame would skip the
-//     answer bullets (they land where the spinner used to be) and emit only the
-//     `✻ Worked`/separator tail. Trimming the volatile tail makes the stable
-//     region end exactly at the last real content line in BOTH frames, so the
-//     index cursor diffs correctly.
+//     `────` separators, status/spinner lines, footers, and the blank lines
+//     interleaved with them (isVolatileTailRow). This is the load-bearing
+//     tuning the real frames forced: between the submitted prompt and the empty
+//     input box sits a volatile zone whose height is the SAME in the thinking
+//     frame as in the answer frame, so a naive append-only index cursor primed
+//     on the thinking frame would skip the answer (it lands where the spinner
+//     used to be) and emit only the spinner/separator tail. Trimming the
+//     volatile tail makes the stable region end at the last real content line in
+//     BOTH frames, so the index cursor diffs correctly.
 //
 // Because the FIRST snapshot primes the baseline (records the current stable
 // length and emits nothing), the boot banner, the setup-warning, AND the echoed
-// submitted-prompt line are counted at prime time and never re-emitted. So the
-// submitted-prompt echo line is NOT emitted as content: it is pre-existing
-// chrome absorbed by the priming baseline, exactly like the boot box.
+// submitted-prompt line are counted at prime time and never re-emitted.
 //
-// When the answer appears in a later frame it grows the stable region, so only
-// the freshly-appended assistant lines (the `⏺ …` bullets) are returned.
-// Residual blank/border noise is dropped downstream by the Normalizer's
-// plaintext classifier, so this extractor stays simple.
+// # CLI-specific notes (verified against testdata/)
 //
-// Fallback: if NO line contains promptMarker (REPL not yet drawn / unusual
-// pane), the last volatileFallbackRows rows are treated as volatile so a
-// half-painted footer/spinner is not mistaken for content.
+//   - claude (BoundaryMarker "❯"): two `❯` lines — echoed prompt + empty input.
+//     Answer is `⏺ - …` / `  - …`; status leader is `✻`/`✽`.
+//   - codex (BoundaryMarker "›"): three `›`-prefixed lines after an answer —
+//     echoed prompt, the empty/next input echo, and the next-prompt line; the
+//     LAST is dropped at boundary so the footer `gpt-5.5 medium · /dir` and the
+//     next-prompt echo `› Summarize recent commits` never leak. Answer `• - …`.
+//   - agy (BoundaryMarker ">"): the driver's BOOT marker is the footer
+//     `? for shortcuts`, which sits BELOW the input box — NOT the content
+//     boundary. The `>`-prefixed lines are the echoed prompt `> In exactly 3…`
+//     and the empty input `>`; the LAST is the empty box → correct boundary.
+//     agy emits a visible `▸ Thought for Ns` + reasoning preamble before the
+//     `•` bullets; that reasoning IS real model output and is emitted as content
+//     (only the `▸ Thought for Ns` status leader itself is volatile-trimmed when
+//     it is the trailing row).
+//   - ollama (BoundaryMarker ">>>"): the bottom line is
+//     `>>> Send a message (/? for help)`. DECISION on gemma's chain-of-thought:
+//     while generating, the thinking frame has NO bottom `>>>` input line at all
+//     (it is replaced by `Thinking…`/CoT), so the last `>>>` at prime time is
+//     the echoed prompt and almost nothing is baselined. When the answer frame
+//     arrives the whole region above `>>> Send a message` — the visible CoT, the
+//     `…done thinking.` delimiter, AND the `*  …` bullets — becomes stable and is
+//     emitted. We treat the visible CoT as legitimate content (it is genuinely
+//     streamed model output; ollama chose to surface it), NOT as something this
+//     low-level extractor silently deletes from the middle of the transcript.
+//     The only volatile rows trimmed are the trailing input line / blanks. This
+//     keeps the shared rule honest (no per-CLI middle-of-buffer surgery) and
+//     leaves any further CoT suppression to a downstream normalizer.
 package panestream
 
 import (
@@ -68,55 +103,159 @@ func stripANSI(s string) string {
 }
 
 // volatileFallbackRows is how many bottom rows are treated as volatile when no
-// prompt marker is found in the snapshot (best-effort: input box + separator +
+// boundary marker is found in the snapshot (best-effort: input box + separator +
 // footer ≈ 3 rows).
 const volatileFallbackRows = 3
+
+// PaneProfile describes how to find the content boundary in one CLI's rendered
+// pane. The only field that differs structurally between CLIs is the
+// input-line BoundaryMarker; the volatile-tail matcher (isVolatileTailRow) is
+// shared because the real frames showed the same small family of separator /
+// status / footer rows across all four CLIs.
+type PaneProfile struct {
+	// Name identifies the CLI: "claude" | "codex" | "agy" | "ollama".
+	Name string
+	// BoundaryMarker is the input-line prefix that marks the bottom of content.
+	// The stable region is everything ABOVE the LAST line whose left-trimmed
+	// text starts with this marker (claude "❯", codex "›", agy ">", ollama
+	// ">>>"). Required at line start so a marker char inside prose never matches.
+	BoundaryMarker string
+	// BoundaryExact, when true, treats a line as the input-box boundary only
+	// when its left+right-trimmed text EQUALS BoundaryMarker (the empty input
+	// box) — not merely starts with it. Needed for CLIs whose marker is an
+	// ASCII char that can legitimately start a content line (agy's ">" vs a
+	// markdown blockquote "> quoted"). CLIs with a unique/non-ASCII marker or a
+	// placeholder-bearing input box keep prefix matching (BoundaryExact false).
+	BoundaryExact bool
+}
+
+// Profiles holds the tuned PaneProfile for each supported tmux LLM CLI.
+var Profiles = map[string]PaneProfile{
+	"claude": {Name: "claude", BoundaryMarker: "❯"},
+	"codex":  {Name: "codex", BoundaryMarker: "›"},
+	// agy uses BoundaryExact because ">" is plain ASCII and can start a
+	// markdown blockquote line ("> quoted text") inside answer content.
+	// The empty input box is EXACTLY ">" (nothing after it), while the echoed
+	// prompt is "> In exactly 3…" (has text) — exact-match distinguishes them.
+	"agy":    {Name: "agy", BoundaryMarker: ">", BoundaryExact: true},
+	"ollama": {Name: "ollama", BoundaryMarker: ">>>"},
+}
 
 // PaneDelta tracks how much stable content has already been emitted so each
 // capture-pane snapshot yields only NEW content lines (the assistant output),
 // excluding the volatile bottom UI (input box / footer / spinner).
+//
+// The cursor is CONTENT-ANCHORED, not a raw positional index: it remembers the
+// last content line it emitted and, on the next frame, re-locates that line
+// (searching from the bottom) in the new stable region and emits only the lines
+// AFTER it. This survives a top-of-buffer shift — when older scrollback or a
+// late prelude is prepended, every content line keeps its text but moves to a
+// new index. The real `final.txt` frames exhibit exactly this: codex prepends
+// the trust-prompt prelude (stable 24→36), agy/ollama prepend a leading blank
+// (18→19, 35→36) while the answer text is unchanged. A purely positional cursor
+// misreads that downward shift as fresh bottom growth and re-emits the last
+// bullet; the content anchor does not.
 type PaneDelta struct {
+	// emitted is the count of stable lines already emitted (the positional
+	// fallback used at prime time and when the anchor cannot be found).
 	emitted int
-	primed  bool
+	// anchor is the text of the last content line emitted, or "" if none yet.
+	anchor string
+	primed bool
 }
 
-// Next takes one rendered capture-pane snapshot and the REPL prompt marker
-// (e.g. "❯"). It returns content lines that are new since the last call.
+// Next takes one rendered capture-pane snapshot and the CLI's PaneProfile. It
+// returns content lines that are new since the last call.
 //
-//   - stable region = lines ABOVE the LAST line containing promptMarker
-//     (everything at/below that line is the volatile input box + footer +
-//     spinner and is never emitted).
-//   - the FIRST call PRIMES the baseline (records the current stable size) and
+//   - stable region = lines ABOVE the LAST line whose left-trimmed text starts
+//     with p.BoundaryMarker (everything at/below that line is the volatile input
+//     box + footer + spinner and is never emitted), minus a trailing volatile
+//     run.
+//   - the FIRST call PRIMES the baseline (records the current stable tail) and
 //     returns nil, so pre-existing boot chrome / prior history is NOT emitted —
 //     only content that appears AFTER the extractor starts.
-//   - subsequent calls return stable[emitted:].
-//   - if the pane scrolled and the stable region shrank (emitted > len), re-anchor
-//     to the new length (best-effort; emit nothing that tick).
-func (d *PaneDelta) Next(rendered, promptMarker string) []string {
-	stable := stableLines(rendered, promptMarker)
+//   - subsequent calls re-locate the anchor (last emitted line) from the bottom
+//     of the new stable region and return everything after it. A top-of-buffer
+//     shift therefore emits nothing (the anchor is found at a new index with no
+//     real content after it).
+//   - if the anchor is not found (pane scrolled past it, or stable shrank below
+//     the baseline), fall back to the positional cursor and re-anchor.
+func (d *PaneDelta) Next(rendered string, p PaneProfile) []string {
+	stable := stableLines(rendered, p)
 
 	if !d.primed {
-		d.emitted = len(stable)
 		d.primed = true
+		d.emitted = len(stable)
+		d.anchor = lastOf(stable)
 		return nil
 	}
 
+	// Content-anchored path: find the last-emitted line (from the bottom) and
+	// emit only what follows it.
+	if d.anchor != "" {
+		if idx := lastIndexOf(stable, d.anchor); idx >= 0 {
+			out := append([]string(nil), stable[idx+1:]...)
+			d.emitted = len(stable)
+			if last := lastOf(stable); last != "" {
+				d.anchor = last
+			}
+			return out
+		}
+	}
+
+	// Positional fallback (no anchor yet, or anchor scrolled out of the pane).
 	if d.emitted > len(stable) {
 		// Pane scrolled / stable region shrank — re-anchor, emit nothing.
 		d.emitted = len(stable)
+		d.anchor = lastOf(stable)
 		return nil
 	}
-
 	out := append([]string(nil), stable[d.emitted:]...)
 	d.emitted = len(stable)
+	if last := lastOf(stable); last != "" {
+		d.anchor = last
+	}
+	// NOTE: when last == "" (answer ends in a stable blank line) the anchor
+	// stays unchanged — anti-shift is not applied on the next call and the
+	// positional cursor drives instead. Acknowledged gap; a content-line that
+	// is genuinely blank is rare enough that the positional path is acceptable.
 	return out
 }
 
-// stableLines renders the snapshot to the stable above-prompt region: ANSI is
-// stripped, trailing blank rows are trimmed, and everything at/below the LAST
-// promptMarker line is dropped. With no marker, the last volatileFallbackRows
-// rows are treated as volatile.
-func stableLines(rendered, promptMarker string) []string {
+// lastOf returns the last element of s, or "" if s is empty.
+func lastOf(s []string) string {
+	if len(s) == 0 {
+		return ""
+	}
+	return s[len(s)-1]
+}
+
+// lastIndexOf returns the index of the last element of s equal to want, or -1.
+// Searching from the bottom anchors on the most recent occurrence, so a
+// repeated line (e.g. an empty content row) anchors on the freshest copy.
+func lastIndexOf(s []string, want string) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == want {
+			return i
+		}
+	}
+	return -1
+}
+
+// stableLines renders the snapshot to the stable above-boundary region: ANSI is
+// stripped, trailing blank rows are trimmed, everything at/below the LAST line
+// matching the boundary is dropped, and a trailing volatile run is trimmed.
+// With no marker, the last volatileFallbackRows rows are treated as volatile.
+//
+// The boundary match is controlled by p.BoundaryExact:
+//   - false (default): left-trimmed line starts with BoundaryMarker (HasPrefix).
+//     Safe for non-ASCII / unique markers (❯, ›, >>>) and for markers whose
+//     input box carries placeholder text (codex "› Summarize recent commits").
+//   - true: left+right-trimmed line equals BoundaryMarker exactly. Used for agy
+//     whose marker ">" is plain ASCII and can start a markdown blockquote line
+//     ("> quoted text") in answer content — exact-match lets ">" mean "empty
+//     input box" while "> quoted" is treated as content.
+func stableLines(rendered string, p PaneProfile) []string {
 	clean := stripANSI(rendered)
 	lines := strings.Split(clean, "\n")
 
@@ -131,9 +270,17 @@ func stableLines(rendered, promptMarker string) []string {
 		return nil
 	}
 
+	isBoundary := func(ln string) bool {
+		trimmed := strings.TrimLeft(ln, " \t")
+		if p.BoundaryExact {
+			return strings.TrimSpace(trimmed) == p.BoundaryMarker
+		}
+		return strings.HasPrefix(trimmed, p.BoundaryMarker)
+	}
+
 	lastMarker := -1
 	for i, ln := range lines {
-		if strings.Contains(ln, promptMarker) {
+		if isBoundary(ln) {
 			lastMarker = i
 		}
 	}
@@ -149,9 +296,10 @@ func stableLines(rendered, promptMarker string) []string {
 }
 
 // trimVolatileTail drops a trailing run of volatile rows (separators, spinner /
-// status lines, and the blank rows interleaved with them) from the bottom of
-// the above-prompt region so the stable region ends at the last real content
-// line. See the package boundary-rule comment for why this is load-bearing.
+// status lines, footers, and the blank rows interleaved with them) from the
+// bottom of the above-boundary region so the stable region ends at the last
+// real content line. See the package boundary-rule comment for why this is
+// load-bearing.
 func trimVolatileTail(lines []string) []string {
 	end := len(lines)
 	for end > 0 && isVolatileTailRow(lines[end-1]) {
@@ -160,15 +308,30 @@ func trimVolatileTail(lines []string) []string {
 	return lines[:end]
 }
 
-// isVolatileTailRow reports whether a row is part of the volatile zone that
-// hugs the input box: a `────` separator, a spinner/status line (claude renders
-// these with the `✽`/`✻` leaders), or a blank line.
+// statusRE is the small union of status/spinner/footer fragments observed in the
+// real frames across all four CLIs. A trailing row matching any of these is
+// volatile and trimmed. Kept deliberately small and frame-derived rather than a
+// per-CLI list (see knowledge-base/research/tmux-live-capture-2026-06-04/).
+var statusRE = regexp.MustCompile(
+	`esc to interrupt|esc to cancel|Worked for|Thought for|Generating|Inferring|done thinking|\btokens?$|· /|\? for shortcuts|Send a message`,
+)
+
+// isVolatileTailRow reports whether a row is part of the volatile zone that hugs
+// the input box: a blank line, a `────` separator, a spinner/status row (the
+// claude `✽`/`✻` leaders, the agy `⣯`/`▸` leaders), or a status/footer fragment
+// matched by statusRE.
 func isVolatileTailRow(line string) bool {
 	t := strings.TrimSpace(line)
 	if t == "" {
 		return true
 	}
-	if strings.HasPrefix(t, "✽") || strings.HasPrefix(t, "✻") {
+	// Known spinner / status / reasoning-status leaders.
+	for _, lead := range []string{"✽", "✻", "⣯", "▸"} {
+		if strings.HasPrefix(t, lead) {
+			return true
+		}
+	}
+	if statusRE.MatchString(t) {
 		return true
 	}
 	// A run of box-drawing horizontal rules ("─" U+2500) is a separator row.
