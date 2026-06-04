@@ -19,13 +19,12 @@ import (
 // 6s timeout are deterministic here.
 
 type fakeTmux struct {
-	existing      map[string]bool
-	sentKeys      []string // recorded SendKeys (keys only)
-	sentSeq       []string // recorded SendKeys as "keys|enter", preserving order
-	paneSeq       []string // CapturePane returns, consumed in order; last value repeats
-	paneIdx       int
-	newSessErr    error    // when set, NewSession fails (covers the spawn-error path)
-	pipePaneCalls []string // recorded shellCmd args from PipePane (empty string = stop form)
+	existing   map[string]bool
+	sentKeys   []string // recorded SendKeys (keys only)
+	sentSeq    []string // recorded SendKeys as "keys|enter", preserving order
+	paneSeq    []string // CapturePane returns, consumed in order; last value repeats
+	paneIdx    int
+	newSessErr error // when set, NewSession fails (covers the spawn-error path)
 }
 
 func (f *fakeTmux) HasSession(_ context.Context, name string) bool { return f.existing[name] }
@@ -63,10 +62,6 @@ func (f *fakeTmux) LoadBuffer(_ context.Context, _, _ string) error { return nil
 func (f *fakeTmux) PasteBuffer(_ context.Context, _ string) error   { return nil }
 func (f *fakeTmux) KillSession(_ context.Context, name string) error {
 	delete(f.existing, name)
-	return nil
-}
-func (f *fakeTmux) PipePane(_ context.Context, _ string, shellCmd string) error {
-	f.pipePaneCalls = append(f.pipePaneCalls, shellCmd)
 	return nil
 }
 

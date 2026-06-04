@@ -29,9 +29,6 @@ type TmuxController interface {
 	PasteBuffer(ctx context.Context, session string) error
 	// KillSession terminates the session (best-effort; no error if absent).
 	KillSession(ctx context.Context, session string) error
-	// PipePane streams all pane output to shellCmd as it is produced
-	// (tmux `pipe-pane -o`). An empty shellCmd stops piping (the -o toggle).
-	PipePane(ctx context.Context, session, shellCmd string) error
 }
 
 // execTmux is the production TmuxController — thin wrappers over the
@@ -94,22 +91,6 @@ func (t execTmux) PasteBuffer(ctx context.Context, session string) error {
 
 func (t execTmux) KillSession(ctx context.Context, session string) error {
 	_, err := t.run(ctx, "kill-session", "-t", session)
-	return err
-}
-
-// pipePaneArgs builds the arg slice for tmux pipe-pane.
-// An empty shellCmd produces the stop form (no trailing command); a non-empty
-// shellCmd produces the start form with the command appended.
-func pipePaneArgs(session, shellCmd string) []string {
-	args := []string{"pipe-pane", "-o", "-t", session}
-	if shellCmd != "" {
-		args = append(args, shellCmd)
-	}
-	return args
-}
-
-func (t execTmux) PipePane(ctx context.Context, session, shellCmd string) error {
-	_, err := t.run(ctx, pipePaneArgs(session, shellCmd)...)
 	return err
 }
 
