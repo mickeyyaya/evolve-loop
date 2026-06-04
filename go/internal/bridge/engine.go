@@ -100,6 +100,15 @@ type Deps struct {
 	// OnStopReview is called when a stop-review decision is made.
 	// Nil-safe: drivers must check if it is non-nil before invoking.
 	OnStopReview func(phase, action, reason string)
+	// KeychainProbe reports whether a macOS login-Keychain generic-password
+	// item exists for the given service. doctorAuth consults it for claude,
+	// whose OAuth token Claude Code stores in the Keychain (service
+	// "Claude Code-credentials") rather than a file — so a file-only check
+	// false-negatives on a Keychain-authenticated host. Default
+	// (defaultKeychainProbe): on darwin shells to `security find-generic-password`
+	// via Runner; on other OSes always false (no Keychain). Tests inject a
+	// deterministic stub.
+	KeychainProbe func(service string) bool
 }
 
 // SandboxWrapper is the bridge's view of the sandbox decision — the bridge
@@ -154,6 +163,9 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.SandboxWrap == nil {
 		d.SandboxWrap = defaultSandboxWrap(d)
+	}
+	if d.KeychainProbe == nil {
+		d.KeychainProbe = defaultKeychainProbe(d)
 	}
 	return d
 }

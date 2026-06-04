@@ -27,7 +27,13 @@ func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, 
 			}
 			return runnerRC, runnerErr
 		},
-		Now: time.Now,
+		// Hermetic default: no Keychain. Tests that exercise the macOS Keychain
+		// claude-auth path inject their own KeychainProbe (see
+		// TestDoctorAuth_ClaudeKeychain); without this, the production default
+		// would shell out to `security` and pick up the dev host's real login
+		// Keychain, making auth assertions host-dependent.
+		KeychainProbe: func(string) bool { return false },
+		Now:           time.Now,
 	})
 }
 
@@ -91,6 +97,33 @@ func TestDoctorAuth(t *testing.T) {
 	}
 	if a := eng.doctorAuth("agy-tmux"); !a.Configured {
 		t.Fatalf("agy auth = %+v", a)
+	}
+}
+
+// TestDoctorAuth_ClaudeKeychain — claude OAuth lives in the macOS login
+// Keychain (service "Claude Code-credentials"), NOT a file, so the file-only
+// check false-negatives. doctorAuth must consult the KeychainProbe seam.
+func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
+	home := t.TempDir() // deliberately NO ~/.claude/.credentials.json
+
+	// Keychain present → configured via the keychain source.
+	eng := NewEngine(Deps{
+		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
+		KeychainProbe: func(service string) bool { return service == "Claude Code-credentials" },
+	})
+	if a := eng.doctorAuth("claude-tmux"); !a.Configured || a.Source != "keychain:Claude Code-credentials" {
+		t.Fatalf("claude keychain auth = %+v, want Configured via keychain", a)
+	}
+
+	// Keychain absent AND no file → unconfigured (hint), for both families.
+	eng2 := NewEngine(Deps{
+		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
+		KeychainProbe: func(string) bool { return false },
+	})
+	for _, cli := range []string{"claude-p", "claude-tmux"} {
+		if a := eng2.doctorAuth(cli); a.Configured {
+			t.Fatalf("%s: no file + no keychain should be unconfigured; got %+v", cli, a)
+		}
 	}
 }
 
