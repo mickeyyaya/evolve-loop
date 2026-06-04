@@ -373,6 +373,7 @@ func (e *errInjectingTmux) CapturePane(context.Context, string, int) (string, er
 func (e *errInjectingTmux) LoadBuffer(context.Context, string, string) error { return nil }
 func (e *errInjectingTmux) PasteBuffer(context.Context, string) error        { return nil }
 func (e *errInjectingTmux) KillSession(context.Context, string) error        { return nil }
+func (e *errInjectingTmux) PipePane(context.Context, string, string) error   { return nil }
 
 func TestInjectEnvelope_Interrupt_EscBeforeBody(t *testing.T) {
 	ws := t.TempDir()
