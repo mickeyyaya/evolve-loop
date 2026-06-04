@@ -117,12 +117,15 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		return core.BridgeResponse{}, err
 	}
 	inproc := req
-	// Order top-to-bottom: Rules < Policy < Contract block < Body < path footer.
+	// Prompt assembly order (top of string → bottom):
+	//   Correction (outermost, re-dispatch only) > Rules > Policy > Contract block > Body > path footer.
 	// The contract's invariant block sits in the cacheable prefix; the volatile
 	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
 	// optimal. See injectContract.
 	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
-	inproc.Prompt = injectRulesPrefix(injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env)), req.SystemPrompt)
+	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env))
+	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
+	inproc.Prompt = injectCorrectionPrefix(withRules, req.CorrectionDirective)
 
 	// When an onStopReview callback is wired (production path), build the engine
 	// directly so we can inject the cycle-scoped OnStopReview into Deps.
@@ -235,4 +238,16 @@ func injectRulesPrefix(prompt, rules string) string {
 		return prompt
 	}
 	return "## Rules\n\n" + rules + "\n\n---\n\n" + prompt
+}
+
+// injectCorrectionPrefix prepends a "## Correction" block carrying the
+// orchestrator's contract-correction directive (the previous deliverable was
+// rejected; fix it). Empty directive passes through unchanged. Applied at the
+// same CLI-agnostic seam as injectRulesPrefix, OUTERMOST so it lands at the very
+// top of the prompt where the agent sees the correction first.
+func injectCorrectionPrefix(prompt, directive string) string {
+	if directive == "" {
+		return prompt
+	}
+	return "## Correction\n\n" + directive + "\n\n---\n\n" + prompt
 }

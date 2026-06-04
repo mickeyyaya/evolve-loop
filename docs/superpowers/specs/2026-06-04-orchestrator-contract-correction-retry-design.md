@@ -199,3 +199,25 @@ breaker reset.
   `BridgeRequest` is built (the model for `CorrectionDirective`).
 - CLAUDE.md — `EVOLVE_PHASE_MAX_ATTEMPTS` (the distinct transient-retry counter), the deliverable
   contract gate + circuit breaker rows.
+
+---
+
+## 9. Refinement (as-built, 2026-06-05)
+
+§4.1 described wrapping "the existing run + bridge-timeout retry loop." During implementation the
+bridge-timeout retry turned out to be the orchestrator's `for attempt` loop at
+`orchestrator.go:~1437` — a large, fragile block. Wrapping it would have been a risky refactor for
+marginal benefit. **As built**, the correction loop is **localized** at the deliverable-review reject
+point (`orchestrator.go`, the `if !rr.Approve` block): it re-runs `runner.Run(ctx, phaseReq)`
+directly per correction (the runner still performs its internal CLI-fallback chain), re-reviews, and
+repeats up to `EVOLVE_CONTRACT_CORRECTION_RETRIES` (default 2) before aborting with the preserved
+floor error. The directive flows `PhaseRequest.CorrectionDirective → BridgeRequest.CorrectionDirective
+→ injectCorrectionPrefix` (a `## Correction` block, OUTERMOST at the `bridge.go:125` seam).
+
+**Consequence:** a correction re-dispatch that hits a transient bridge error aborts the cycle rather
+than re-trying the timeout (it does not re-enter the `for attempt` ladder). This is a rare edge case;
+the common path (deterministic contract violation → re-dispatch → fixed) is identical to the spec's
+intent. `EVOLVE_CONTRACT_CORRECTION_RETRIES=0` is byte-identical to the pre-feature behavior,
+including the original abort message. Each correction appends a `contract_correction` ledger entry
+(Role = phase, distinct from the `phase` success entry) for observability; no new cycle numbers are
+minted (within-phase).
