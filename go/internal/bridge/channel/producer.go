@@ -17,8 +17,15 @@ type ProducerConfig struct {
 	Phase     string
 	Cycle     int
 	CLI       string
-	PollEvery time.Duration
-	Now       func() time.Time
+	// StdoutPath/StderrPath are the source files the Normalizer tails. Empty
+	// (the headless default) falls back to <phase>-stdout.log / -stderr.log, so
+	// headless phases are byte-identical to pre-RT3. A tmux-family phase sets
+	// these to the driver's live pair (<agent>-pane.live / -breadcrumbs.live),
+	// whose <phase>-stdout.log stays empty until the at-exit dump (ADR-0037 RT3).
+	StdoutPath string
+	StderrPath string
+	PollEvery  time.Duration
+	Now        func() time.Time
 }
 
 // Producer is the SOLE writer of the per-agent feed file. It opens the feed
@@ -49,6 +56,15 @@ func (p *Producer) Run(ctx context.Context) error {
 	}
 	defer func() { _ = feed.Close() }()
 
+	stdoutPath := p.cfg.StdoutPath
+	if stdoutPath == "" {
+		stdoutPath = filepath.Join(p.cfg.Workspace, p.cfg.Phase+"-stdout.log")
+	}
+	stderrPath := p.cfg.StderrPath
+	if stderrPath == "" {
+		stderrPath = filepath.Join(p.cfg.Workspace, p.cfg.Phase+"-stderr.log")
+	}
+
 	n := phasestream.NewNormalizer(phasestream.NormalizerConfig{
 		Source: phasestream.Source{
 			Producer: "normalizer",
@@ -58,8 +74,8 @@ func (p *Producer) Run(ctx context.Context) error {
 			Agent:    p.cfg.Agent,
 		},
 		TraceID:    fmt.Sprintf("cycle-%d-%s-channel", p.cfg.Cycle, p.cfg.Phase),
-		StdoutPath: filepath.Join(p.cfg.Workspace, p.cfg.Phase+"-stdout.log"),
-		StderrPath: filepath.Join(p.cfg.Workspace, p.cfg.Phase+"-stderr.log"),
+		StdoutPath: stdoutPath,
+		StderrPath: stderrPath,
 		Sink:       feed,
 		Now:        p.cfg.Now,
 	})

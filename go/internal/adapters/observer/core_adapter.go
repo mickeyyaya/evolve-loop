@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -133,8 +134,15 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 	// byte-identical to pre-channel behavior (no producer, no feed file).
 	var prodCancel func()
 	if a.envGet("EVOLVE_CHANNEL") == "1" {
+		// Transport-aware source (ADR-0037 RT3): a tmux-family driver streams its
+		// live answer to <agent>-pane.live and breadcrumbs to
+		// <agent>-breadcrumbs.live (its stdout.log is empty until the at-exit
+		// dump), so point the Producer there. Headless → empty paths → the
+		// Producer keeps its legacy <phase>-stdout/-stderr.log defaults.
+		stdoutPath, stderrPath := a.channelSourcePaths(req, phase)
 		p := channel.NewProducer(channel.ProducerConfig{
 			Workspace: req.Workspace, Agent: phase, Phase: phase, Cycle: req.Cycle,
+			StdoutPath: stdoutPath, StderrPath: stderrPath,
 		})
 		pctx, pcancel := context.WithCancel(ctx)
 		prodCancel = pcancel
@@ -174,6 +182,51 @@ func (a *CoreAdapter) envGet(key string) string {
 		return a.EnvLookup(key)
 	}
 	return os.Getenv(key)
+}
+
+// channelSourcePaths returns the (stdout, stderr) files the channel Producer
+// should tail for this phase (ADR-0037 RT3). A tmux-family driver streams its
+// live answer to <agent>-pane.live + correlation breadcrumbs to
+// <agent>-breadcrumbs.live, so the producer reads that pair. A headless driver
+// streams live to <phase>-stdout.log, so empty strings are returned and the
+// producer keeps its legacy defaults. The family is resolved best-effort from
+// the per-phase CLI env (profile.cli pins not surfaced in env are not seen
+// here — a wrong guess only degrades that phase's live feed, never the phase).
+func (a *CoreAdapter) channelSourcePaths(req core.PhaseRequest, phase string) (stdout, stderr string) {
+	if !isTmuxFamilyCLI(a.phaseCLI(req, phase)) {
+		return "", ""
+	}
+	return filepath.Join(req.Workspace, phase+"-pane.live"),
+		filepath.Join(req.Workspace, phase+"-breadcrumbs.live")
+}
+
+// phaseCLI resolves the per-phase CLI/driver name, mirroring llmroute's
+// precedence head (EVOLVE_<AGENT>_CLI > EVOLVE_CLI), checking the per-cycle
+// req.Env snapshot before the process env, and defaulting to llmroute's default
+// "claude-tmux". The agent key uppercases the phase with hyphens → underscores
+// (tdd-engineer → EVOLVE_TDD_ENGINEER_CLI).
+func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
+	look := func(k string) string {
+		if v, ok := req.Env[k]; ok && v != "" {
+			return v
+		}
+		return a.envGet(k)
+	}
+	agentKey := "EVOLVE_" + strings.ToUpper(strings.ReplaceAll(phase, "-", "_")) + "_CLI"
+	if v := look(agentKey); v != "" {
+		return v
+	}
+	if v := look("EVOLVE_CLI"); v != "" {
+		return v
+	}
+	return "claude-tmux"
+}
+
+// isTmuxFamilyCLI reports whether cli is a tmux-driven REPL driver (claude-tmux,
+// codex-tmux, agy-tmux, ollama-tmux) vs a headless "-p" driver. The default
+// (claude-tmux) is tmux, so an unresolved CLI reads as tmux.
+func isTmuxFamilyCLI(cli string) bool {
+	return strings.HasSuffix(cli, "-tmux")
 }
 
 // resolveDuration reads an EVOLVE_OBSERVER_* env var as seconds; falls
