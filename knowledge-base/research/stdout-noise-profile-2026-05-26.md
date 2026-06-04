@@ -123,10 +123,16 @@ and keep the assembled form" — much simpler and more compressive.
 ## What was deliberately NOT done
 
 - Raw file replacement (would break cyclecost — companion-file pattern instead)
-- NDJSON event stream (deferred; the clean.txt covers the operator pain)
-- Auto-prune of raw after filter (deferred until shadow-mode telemetry confirms safe)
+- NDJSON event stream (deferred; the clean.txt covers the operator pain) — **shipped** as
+  `internal/phasestream`/`events.ndjson` (ADR-0020); the channel protocol and the
+  `clean.txt`→`events.ndjson` consolidation are now specified in
+  [ADR-0036](../../docs/architecture/adr/0036-content-vs-liveness-channel-protocol.md)
+- Auto-prune of raw after filter (deferred until shadow-mode telemetry confirms safe) — note:
+  the **liveness** channel must keep the raw `stdout.log` byte-growth, so any prune is
+  content-channel only (see ADR-0036 Channel B)
 - Per-phase filter tuning (all phases share rules in MVP)
-- Feeding filtered output back into agent context (separate token-optimization workstream)
+- Feeding filtered output back into agent context (separate token-optimization workstream) —
+  the single content surface to feed from is `events.ndjson`, never raw stdout (ADR-0036)
 
 ## Caveats for future tuning
 

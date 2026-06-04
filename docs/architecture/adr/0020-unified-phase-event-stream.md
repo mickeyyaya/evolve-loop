@@ -1,6 +1,6 @@
 # ADR 0020 — Unified phase event stream (live normalizer)
 
-Status: ACCEPTED (2026-05-26) · Supersedes the post-phase-only machine role of `internal/logfilter` (`.clean.txt` human render retained)
+Status: ACCEPTED (2026-05-26) · Supersedes the post-phase-only machine role of `internal/logfilter` (`.clean.txt` human render retained) · Superseded-by: [ADR-0036](0036-content-vs-liveness-channel-protocol.md) (content-vs-liveness channel protocol — closes the logfilter-duplicate + phaseobserver-raw-read ends left open here)
 
 > **Implemented** on branch `worktree-phasestream-normalizer` (tasks 1–5, commits e43873a → 34f162a). Go-pipeline notes vs the original proposal below:
 > - **Post-phase, not live tail.** The Go `bridge.Launch` is synchronous and both machine consumers (cyclecost, cycleclassify) read strictly post-phase, so the producer is `phasestream.Produce` (batch, called from `phases/runner` after `bridge.Launch`), not a live-tailing goroutine. `Normalizer.Poll`/`Run` remain for a future live call site.
