@@ -1,6 +1,33 @@
 # ADR 0037 — Bidirectional channel for long-running tmux-REPL phases
 
-Status: ACCEPTED (2026-06-04) · Builds on: ADR-0020 (event stream), ADR-0023 (live injection), ADR-0030 (observer autospawn), ADR-0036 (content-vs-liveness channel protocol)
+Status: ACCEPTED (2026-06-04), AMENDED (2026-06-04, RT0–RT5) · Builds on: ADR-0020 (event stream), ADR-0023 (live injection), ADR-0030 (observer autospawn), ADR-0036 (content-vs-liveness channel protocol)
+
+> **⚠ Implementation correction (RT0–RT5).** A holistic review + a **real live capture**
+> ([`knowledge-base/research/tmux-live-capture-2026-06-04/`](../../../knowledge-base/research/tmux-live-capture-2026-06-04/NOTES.md))
+> disproved three assumptions in the original decision below. The shipped channel differs:
+>
+> 1. **Live content source is `<agent>-pane.live`, not `<agent>-stdout.log`.** A tmux driver's
+>    stdout.log is empty until the at-exit dump (it streams to the tmux *pane*). The driver
+>    now polls `capture-pane` each tick and appends newly-stabilized rendered lines (extracted
+>    per-CLI by `panestream.PaneDelta`) to `<agent>-pane.live`. (`tmux pipe-pane` was tried
+>    first and reverted — its raw stream is 2D cursor motion that needs a terminal emulator;
+>    `capture-pane` is already rendered. See the capture NOTES.)
+> 2. **Breadcrumbs go to `<agent>-breadcrumbs.live`, not stderr.** The original `deps.Stderr`
+>    sink was an in-memory stream the Producer never read, so correlation never functioned.
+>    The driver now appends `inject_applied` / `idle_reached` to a `<agent>-breadcrumbs.live`
+>    file (O_APPEND), which the Producer tails as its `StderrPath` (RT3 transport-aware spawn:
+>    tmux → the `.live` pair, headless → the legacy `<phase>-stdout/-stderr.log`).
+> 3. **busy→idle is detected by `panestream.PaneBusy`, not the prompt marker.** The input-box
+>    marker PERSISTS during generation for claude/agy (and ollama echoes it on the prompt
+>    line), so the original "idle = marker visible" check was always-idle and `idle_reached`
+>    never fired. `PaneBusy` keys on the real per-CLI signal: the interrupt/cancel affordance
+>    (claude `esc to interrupt`, agy `esc to cancel`) OR an absent idle placeholder (ollama
+>    `Send a message`). codex has no capturable signal in the fixtures → documented
+>    weak-signal degradation (monitoring works; its span cannot be bracketed).
+>
+> Sections 3, 4, and 7 below are corrected inline. The Supervisor/Watch/Gating decisions are
+> unchanged. RT4 also sized `collectSpan`'s scanner buffer (1 MB/10 MB) so a >64 KB answer
+> line is not silently dropped from the recovered span.
 
 > **TL;DR.** Long-running tmux-REPL phases now have a live, filtered content feed
 > (`<agent>-channel.ndjson`) and a Go API for correlated mid-task asks
@@ -64,6 +91,15 @@ stall-detection loop. The Producer instantiates a `phasestream.Normalizer` with
 `StdoutPath`, `StderrPath`, and an append-only sink pointing at the feed file, then calls
 `Poll()` each tick to emit filtered content + correlation envelopes into the feed.
 
+> **Corrected (RT3).** The Producer's source paths are now **transport-aware**
+> (`CoreAdapter.channelSourcePaths`): a tmux-family phase reads `StdoutPath =
+> <agent>-pane.live` + `StderrPath = <agent>-breadcrumbs.live`; a headless phase keeps the
+> legacy `<phase>-stdout.log` / `<phase>-stderr.log` (empty `Stdout/StderrPath` on
+> `ProducerConfig` falls back to those defaults, so headless is byte-identical). Family is
+> resolved best-effort from the per-phase CLI env (`EVOLVE_<AGENT>_CLI` > `EVOLVE_CLI` >
+> default `claude-tmux`); a profile-pinned CLI not surfaced in env is mis-read as tmux —
+> a contained degradation (the Normalizer WARNs on a missing file, never blocks).
+
 The Producer is the **sole writer** of the feed file, honoring the sequential-write-discipline
 invariant. The observer's raw byte-growth and pane-hash liveness floor (ADR-0036 Channel B)
 is untouched.
@@ -71,18 +107,26 @@ is untouched.
 ### 4. Correlation — driver-owned bracketing, no agent cooperation
 
 `inbox.Envelope` gains one optional field `CorrID string`. When the tmux driver delivers a
-`CorrID`-bearing idle-gated ask, it writes a structured stderr breadcrumb:
+`CorrID`-bearing idle-gated ask, it appends a structured breadcrumb to
+`<agent>-breadcrumbs.live` (the file the Producer tails as `StderrPath` — **corrected from
+the original stderr sink, which the Producer never read**):
 
 ```json
 {"evolve_channel":"inject_applied","corr_id":"<id>"}
 ```
 
-When the REPL returns to idle after that injection (busy→idle, guarded so it never fires
-off a still-visible prompt marker), the driver writes:
+When the REPL returns to idle after that injection (busy→idle), the driver appends:
 
 ```json
 {"evolve_channel":"idle_reached","corr_id":"<id>"}
 ```
+
+> **Corrected (RT2/RT5).** "Busy" is **not** the prompt marker being absent — the input box
+> persists during generation for claude/agy. The driver brackets on
+> `panestream.PaneBusy(pane, profile)`: busy = an interrupt/cancel affordance present
+> (`esc to interrupt` / `esc to cancel`) OR the profile's idle placeholder absent (ollama
+> `Send a message`). `idle_reached` fires exactly once on the busy→idle transition. codex
+> has no capturable busy signal → its span is not bracketed (weak-signal degradation).
 
 The Producer's classifier turns these breadcrumbs into `KindCorrelation` envelopes:
 `request{corr_id,at_seq}` on `inject_applied` and `response_complete{corr_id,start_seq,end_seq}`
@@ -120,8 +164,8 @@ inbox or the feed. Symmetric with `evolve bridge send` (ADR-0023).
 
 | Component | Sole writer of | Reads |
 |---|---|---|
-| `channel.Producer` (observer goroutine) | `<agent>-channel.ndjson` feed | `<agent>-stdout.log` (content via Normalizer), `<agent>-stderr.log` (breadcrumbs) |
-| tmux driver | its own `<agent>-stderr.log` breadcrumbs | inbox (drains — existing) |
+| `channel.Producer` (observer goroutine) | `<agent>-channel.ndjson` feed | tmux: `<agent>-pane.live` (content) + `<agent>-breadcrumbs.live` (breadcrumbs); headless: `<phase>-stdout.log` + `<phase>-stderr.log` |
+| tmux driver | `<agent>-pane.live` (capture-pane delta) + `<agent>-breadcrumbs.live` (correlation) | inbox (drains — existing), `capture-pane` (read-only) |
 | `channel.Supervisor` / `evolve bridge send` | inbox (`inbox.Append`) | feed |
 | `evolve bridge watch` | — (read-only) | feed |
 | observer liveness floor | unchanged | raw `stdout.log` byte-growth + pane-hash (Channel B, ADR-0036) |
@@ -140,7 +184,8 @@ is reserved to gate supervisor auto-attach; currently opt-in manual wiring only.
   finally wired to a live output file — activating the live normalizer path ADR-0020 built
   but never used.
 - **Correlated ask↔answer without agent cooperation.** Bracketing is driver-owned via
-  stderr breadcrumbs; no changes to agent prompts or personas required.
+  `<agent>-breadcrumbs.live` breadcrumbs + `panestream.PaneBusy`; no changes to agent prompts
+  or personas required.
 - **ADR-0036 liveness floor preserved.** The raw byte-growth + pane-hash stall floor is
   explicitly untouched; the content feed is added alongside and never filters the liveness
   path. The false-stall fix (observer tmux liveness probe) has no regression risk.
@@ -152,18 +197,21 @@ is reserved to gate supervisor auto-attach; currently opt-in manual wiring only.
 - **Smart supervisor deferred.** A policy that reasons over the feed content and formulates
   follow-up questions is a future addition against the `Policy` interface; this ADR ships
   only the plumbing and a minimal stall-ask default.
-- **Coverage:** all four new/changed internal packages ≥95% — `internal/bridge/inbox`
-  96.6%, `internal/phasestream` 96.3%, `internal/bridge/channel` 96.3%,
-  `internal/adapters/observer` 97.7%; watch funcs 100% (syscall-error follow-loop branches
-  excluded).
+- **Coverage:** all changed internal packages ≥95% (post-RT5 sweep) — `internal/bridge/inbox`
+  96.6%, `internal/phasestream` 96.3%, `internal/bridge/channel` 96.5%,
+  `internal/bridge/panestream` 100%, `internal/adapters/observer` 97.8%.
 
 ## Files (shipped)
 
 - **New:** `go/internal/bridge/channel/` — `feed.go`, `producer.go`, `supervisor.go`,
-  `policy.go`; `go/cmd/evolve/cmd_bridge_watch.go`
+  `policy.go`; `go/internal/bridge/panestream/panedelta.go` (capture-pane delta extractor +
+  per-CLI `Profiles` + `PaneBusy`); `go/cmd/evolve/cmd_bridge_watch.go`
 - **Edited:** `go/internal/bridge/inbox/` (CorrID field); `go/internal/bridge/driver_tmux_repl.go`
-  (breadcrumbs + idle bracket); `go/internal/phasestream/` (`KindCorrelation` + `correlation.go`
-  + classifier wiring); `go/internal/adapters/observer/core_adapter.go` (spawn Producer)
+  (RT2 per-tick `PaneDelta` → `<agent>-pane.live`, breadcrumbs → `<agent>-breadcrumbs.live`,
+  RT5 `PaneBusy` bracket); `go/internal/bridge/channel/producer.go` (RT3 `StdoutPath`/`StderrPath`),
+  `go/internal/bridge/channel/supervisor.go` (RT4 sized scan buffer); `go/internal/phasestream/`
+  (`KindCorrelation` + `correlation.go` + classifier wiring); `go/internal/adapters/observer/core_adapter.go`
+  (RT3 transport-aware `channelSourcePaths` + spawn Producer)
 
 ## References
 
