@@ -12,17 +12,41 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// emitChannelBreadcrumb writes one structured channel marker to w (the driver's
-// stderr log). The producer's correlator parses these to bracket an injected
-// ask's answer span (ADR-0037). Empty corrID is a no-op so non-correlated
-// injects add no noise.
+// emitChannelBreadcrumb writes one structured channel marker to w. The producer's
+// correlator parses these to bracket an injected ask's answer span (ADR-0037).
+// Empty corrID is a no-op so non-correlated injects add no noise. The caller
+// chooses w: the <agent>-breadcrumbs.live file when EVOLVE_CHANNEL=1, else
+// io.Discard (the producer tails the FILE — RT2 moved these off the in-memory
+// stderr stream a discarded producer never read).
 func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 	if corrID == "" {
 		return
 	}
 	fmt.Fprintf(w, "{\"evolve_channel\":%q,\"corr_id\":%q}\n", channel, corrID)
+}
+
+// channelEnabled reports whether the live bidirectional channel (ADR-0037) is
+// opted in via EVOLVE_CHANNEL=1. Off → byte-identical: no .live files, no
+// per-tick capture-pane delta streaming, and no correlation breadcrumbs.
+func channelEnabled(deps Deps) bool {
+	v, _ := lookupEnv(deps, "EVOLVE_CHANNEL")
+	return v == "1"
+}
+
+// paneProfileFor resolves the panestream PaneProfile for a tmux driver by
+// stripping the "-tmux" suffix from the driver name (claude-tmux → claude). An
+// unknown driver (e.g. the test "itest-tmux") falls back to a profile built
+// from the launch's own prompt marker so the delta extractor still has a
+// content boundary.
+func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
+	cli := strings.TrimSuffix(lp.name, "-tmux")
+	if p, ok := panestream.Profiles[cli]; ok {
+		return p
+	}
+	return panestream.PaneProfile{Name: cli, BoundaryMarker: lp.promptMarker}
 }
 
 // driver_tmux_repl.go — the shared REPL state machine for every *-tmux
@@ -214,6 +238,39 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		cursor.SetOffset(fi.Size())
 	}
 
+	// --- Live bidirectional channel (ADR-0037), opt-in via EVOLVE_CHANNEL=1.
+	// When on, the driver is the SOLE writer of two live files the Producer
+	// tails: <agent>-pane.live (newly-stabilized capture-pane content, extracted
+	// per CLI by panestream.PaneDelta) and <agent>-breadcrumbs.live
+	// (inject_applied / idle_reached correlation markers). Off → byte-identical:
+	// both sinks are io.Discard, no files are created, and the per-tick delta
+	// capture in the wait loop is skipped. A file that cannot be opened WARNs and
+	// degrades to io.Discard — channel telemetry never aborts the phase.
+	channelOn := channelEnabled(deps)
+	// io.Discard has static type io.Writer (var Discard Writer = …), so := infers
+	// io.Writer here and the *os.File reassignment below compiles.
+	paneLiveW := io.Discard
+	breadcrumbW := io.Discard
+	var paneDelta panestream.PaneDelta
+	var paneProfile panestream.PaneProfile
+	if channelOn {
+		paneProfile = paneProfileFor(lp)
+		if f, err := os.OpenFile(filepath.Join(cfg.Workspace, cfg.Agent+"-pane.live"),
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+			defer func() { _ = f.Close() }()
+			paneLiveW = f
+		} else {
+			fmt.Fprintf(deps.Stderr, "%s WARN channel pane.live open: %v\n", pfx, err)
+		}
+		if f, err := os.OpenFile(filepath.Join(cfg.Workspace, cfg.Agent+"-breadcrumbs.live"),
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+			defer func() { _ = f.Close() }()
+			breadcrumbW = f
+		} else {
+			fmt.Fprintf(deps.Stderr, "%s WARN channel breadcrumbs.live open: %v\n", pfx, err)
+		}
+	}
+
 	// --- Wait for the artifact in review intervals. A hard wall-clock deadline
 	// kills a slow-but-productive agent (it cannot tell "stuck" from "still
 	// thinking"). Instead, when a review interval elapses without the artifact,
@@ -267,6 +324,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning completion wait\n", pfx, err)
 			break
 		}
+		// Live channel: stream newly-stabilized rendered content to pane.live.
+		// The first Next() primes the baseline (echoed prompt + boot chrome are
+		// counted, not emitted); later ticks emit only the assistant output that
+		// appeared above the volatile input box. Gated so off adds no capture.
+		if channelOn {
+			if rendered, cerr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback); cerr == nil {
+				for _, ln := range paneDelta.Next(rendered, paneProfile) {
+					fmt.Fprintln(paneLiveW, ln)
+				}
+			}
+		}
 		ready, _, note, derr := detector.poll(ctx)
 		if ready {
 			completed = true
@@ -287,11 +355,19 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// operator interrupt pre-empts a pending auto-reply on this tick.
 		if envs, _ := cursor.Drain(); len(envs) > 0 {
 			for _, env := range envs {
-				if cid := injectEnvelope(ctx, cfg, deps, lp, env); cid != "" {
+				// injectEnvelope returns a non-empty CorrID only when an
+				// idle-gated correlated ask was actually pasted (not re-queued,
+				// dropped, or a keystroke/interrupt). The breadcrumb is emitted
+				// HERE — at the moment delivery is confirmed — so the channel sink
+				// (and the open-span tracking) lives entirely in this loop. Gated:
+				// channel off → no breadcrumb, no span tracking.
+				cid := injectEnvelope(ctx, cfg, deps, lp, env)
+				if cid != "" && channelOn {
 					// A correlated ask was just delivered: open its span. A new
 					// ask supersedes any prior unanswered one (its idle_reached
 					// is then unobservable; the producer ignores an idle_reached
 					// with no matching open inject, so dropping it is safe).
+					emitChannelBreadcrumb(breadcrumbW, "inject_applied", cid)
 					openCorrID = cid
 					sawBusy = false
 				}
@@ -300,13 +376,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// Bracket the open ask: once delivered, watch for the agent going BUSY
 		// (marker gone) and then back to IDLE (marker visible again), and emit
 		// idle_reached exactly once on that busy→idle transition.
-		if openCorrID != "" {
+		if channelOn && openCorrID != "" {
 			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			idle := strings.Contains(pane, lp.promptMarker)
 			if !idle {
 				sawBusy = true
 			} else if sawBusy {
-				emitChannelBreadcrumb(deps.Stderr, "idle_reached", openCorrID)
+				emitChannelBreadcrumb(breadcrumbW, "idle_reached", openCorrID)
 				openCorrID = ""
 				sawBusy = false
 			}
@@ -417,10 +493,10 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 // no Enter suffix; the operator owns exactly what reaches the REPL.
 //
 // It returns the CorrID of a successfully-delivered idle-gated ask (empty
-// otherwise: non-correlated body, keystroke/interrupt path, re-queue, or drop)
-// so the caller in runTmuxREPL can open the busy→idle span for idle_reached.
-// inject_applied is emitted here, at the moment of the paste, because only
-// this function knows the idle-gate passed (vs re-queued/dropped).
+// otherwise: non-correlated body, keystroke/interrupt path, re-queue, or drop).
+// Only this function knows the idle-gate passed (vs re-queued/dropped), so the
+// non-empty return is the caller's signal in runTmuxREPL to emit inject_applied
+// and open the busy→idle span for idle_reached.
 func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, env inbox.Envelope) string {
 	pfx := "[" + lp.name + "]"
 	// Cycle-124 F4 / ADR-0023 addendum: the "full tmux control" hatch the
@@ -480,10 +556,9 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	}
 	_ = injectText(ctx, cfg, deps, lp.session, body) // fire-and-forget live injection
 	fmt.Fprintf(deps.Stderr, "%s injected %s (source=%s)\n", pfx, env.Kind, env.Source)
-	// Open the correlation span: the idle-gated ask is now on the wire. The
-	// inject_applied breadcrumb is a no-op when CorrID is empty (uncorrelated
-	// inject) so this adds zero noise to the common path.
-	emitChannelBreadcrumb(deps.Stderr, "inject_applied", env.CorrID)
+	// Return the CorrID of the just-delivered idle-gated ask so runTmuxREPL can
+	// emit the inject_applied breadcrumb (to the channel sink it owns) and open
+	// the busy→idle span. Empty CorrID = uncorrelated inject → caller no-ops.
 	return env.CorrID
 }
 
