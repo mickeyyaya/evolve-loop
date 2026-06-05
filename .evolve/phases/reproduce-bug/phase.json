@@ -1,0 +1,58 @@
+{
+  "name": "reproduce-bug",
+  "kind": "llm",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-reproduce-bug",
+  "model": "auto",
+  "writes_source": true,
+  "description": "Produce a FAIL_TO_PASS reproduction test that demonstrably fails on the current tree, BEFORE any patch.",
+  "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build — reproduce-first anchors the fix and raises resolution rates.",
+  "categories": [
+    "bugfix"
+  ],
+  "inputs": {
+    "files": [
+      "scout-report.md",
+      "fault-localization-report.md"
+    ],
+    "signals": [
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      "reproduce-bug-report.md"
+    ],
+    "signals": [
+      "repro.failing",
+      "repro.test_path"
+    ]
+  },
+  "prompt_context": [
+    "goal"
+  ],
+  "classify": {
+    "require_sections": [
+      "Reproduction",
+      "Verification"
+    ],
+    "fail_if_empty": true,
+    "fail_if_signal": {
+      "repro.failing": "==false"
+    },
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "bugfix"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "fault-localization"
+}

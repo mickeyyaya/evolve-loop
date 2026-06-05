@@ -250,15 +250,22 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 
 	enriched, overflow := cards, []router.PhaseCard(nil)
 	if len(cards) > maxEnrichedCatalogCards {
-		var opt, rest []router.PhaseCard
+		// Stable three-bucket priority for the enriched slots: a SELECTable card
+		// with metadata has something to show; a metadata-less optional card
+		// renders the same either way; spine cards run via the mandatory config
+		// regardless of rendering.
+		var withMeta, opt, rest []router.PhaseCard
 		for _, c := range cards {
-			if c.Optional {
+			switch {
+			case c.Optional && (c.WhenToUse != "" || c.Description != "" || len(c.Categories) > 0):
+				withMeta = append(withMeta, c)
+			case c.Optional:
 				opt = append(opt, c)
-			} else {
+			default:
 				rest = append(rest, c)
 			}
 		}
-		ordered := append(opt, rest...)
+		ordered := append(append(withMeta, opt...), rest...)
 		enriched, overflow = ordered[:maxEnrichedCatalogCards], ordered[maxEnrichedCatalogCards:]
 	}
 	for _, c := range enriched {
