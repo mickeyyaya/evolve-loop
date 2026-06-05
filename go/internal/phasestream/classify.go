@@ -31,6 +31,7 @@ type Classifier struct {
 	pendingDeltas   int
 	cumOutputTokens int64
 	lastFlush       time.Time
+	corr            *correlator
 }
 
 // NewClassifier builds a Classifier. now defaults to time.Now.
@@ -38,7 +39,7 @@ func NewClassifier(src Source, traceID string, now func() time.Time) *Classifier
 	if now == nil {
 		now = time.Now
 	}
-	return &Classifier{src: src, traceID: traceID, now: now, lastFlush: now()}
+	return &Classifier{src: src, traceID: traceID, now: now, lastFlush: now(), corr: newCorrelator()}
 }
 
 // Emit builds an envelope for a normalizer-originated event (e.g. a stall
@@ -83,13 +84,29 @@ func (c *Classifier) Line(raw []byte) []Envelope {
 	return c.classifyPlain(trimmed)
 }
 
-// Stderr classifies one stderr line. Emits an infra_failure envelope
-// when an infrastructure marker is present, otherwise drops the line
-// (stderr noise carries no signal for the consumers).
+// Stderr classifies one stderr line. Breadcrumb lines (JSON with
+// evolve_channel) are converted to KindCorrelation envelopes first.
+// Infrastructure marker lines emit KindInfraFailure. Everything else is
+// dropped (stderr noise carries no signal for the consumers).
 func (c *Classifier) Stderr(raw []byte) []Envelope {
 	line := strings.TrimSpace(string(raw))
 	if line == "" {
 		return nil
+	}
+	if marks := c.corr.observe([]byte(line), c.seq); len(marks) > 0 {
+		var out []Envelope
+		for _, m := range marks {
+			data := map[string]any{"sub": m.sub, "corr_id": m.corrID}
+			switch m.sub {
+			case "request":
+				data["at_seq"] = m.atSeq
+			case "response_complete":
+				data["start_seq"] = m.startSeq
+				data["end_seq"] = m.endSeq
+			}
+			out = append(out, c.Emit(KindCorrelation, SeverityInfo, data))
+		}
+		return out
 	}
 	if marker := detectInfraMarker(line); marker != "" {
 		return []Envelope{c.infraEnvelope(marker, "stderr", line)}

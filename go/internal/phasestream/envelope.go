@@ -38,7 +38,12 @@ const (
 	KindSystemHook    Kind = "system_hook"
 	KindError         Kind = "error"
 	KindStall         Kind = "stall"
-	KindUnknown       Kind = "unknown"
+	// KindCorrelation Data keys (ADR-0037):
+	//   sub: "request"           + corr_id, at_seq
+	//   sub: "response_complete" + corr_id, start_seq, end_seq
+	//   sub: "response_timeout"  + corr_id, waited_s
+	KindCorrelation Kind = "correlation"
+	KindUnknown     Kind = "unknown"
 )
 
 // Source identifies the producer + phase context. Mirrors

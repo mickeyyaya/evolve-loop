@@ -212,6 +212,35 @@ func TestDrainSkipsMalformedLine(t *testing.T) {
 	}
 }
 
+// TestDrainSeekError covers reader.go:68 — the f.Seek error branch.
+// A negative SetOffset forces Seek(negative, SeekStart) → "invalid argument".
+func TestDrainSeekError(t *testing.T) {
+	ws := t.TempDir()
+	mustAppend(t, ws, "existing")
+	c := NewCursor(ws, "build")
+	c.SetOffset(-1) // negative offset → Seek from start returns EINVAL
+	_, err := c.Drain()
+	if err == nil {
+		t.Fatal("want Seek error for negative offset, got nil")
+	}
+}
+
+func TestEnvelope_CorrID_RoundTrips(t *testing.T) {
+	dir := t.TempDir()
+	now := func() time.Time { return time.Unix(0, 0).UTC() }
+	want := Envelope{Kind: KindCommand, Body: "summarize", CorrID: "c1", Source: "supervisor"}
+	if err := Append(dir, "build", want, now); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	got, err := NewCursor(dir, "build").Drain()
+	if err != nil || len(got) != 1 {
+		t.Fatalf("drain: %v len=%d", err, len(got))
+	}
+	if got[0].CorrID != "c1" {
+		t.Fatalf("CorrID = %q, want c1", got[0].CorrID)
+	}
+}
+
 func mustAppend(t *testing.T, ws, body string) {
 	t.Helper()
 	if err := Append(ws, "build", Envelope{Kind: KindCommand, Body: body, Source: "cli"}, fixedNow); err != nil {

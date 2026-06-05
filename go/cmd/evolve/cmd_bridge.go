@@ -32,6 +32,8 @@ Subcommands:
             ( bridge send --workspace=DIR --agent=NAME
               [--kind=command|interrupt|nudge|system_rule] [--source=cli]
               <body...> )
+  watch     Pretty-print the live channel feed (read-only, human debug)
+            ( bridge watch --workspace=DIR --agent=NAME [--follow] )
   recipe    Drive a scripted slash-command sequence (e.g. plugin-install)
             ( bridge recipe <run|list|show> ... — see 'recipe --help' )
   capabilities  Print a CLI's capability catalog ( --cli=NAME [--json] )
@@ -154,6 +156,9 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
 		return 0
+
+	case "watch":
+		return cmdBridgeWatch(rest, stdout, stderr)
 
 	case "send":
 		ws, agent, kind, source := "", "", "command", "cli"

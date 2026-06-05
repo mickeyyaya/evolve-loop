@@ -244,6 +244,51 @@ func TestClassifier_SeqMonotonic(t *testing.T) {
 	}
 }
 
+func TestClassifier_Stderr_EmitsCorrelationEnvelopes(t *testing.T) {
+	clf := NewClassifier(Source{Phase: "build", Agent: "build"}, "trace", func() time.Time { return time.Unix(0, 0).UTC() })
+	// prime with one content line so seq advances before the breadcrumb
+	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`))
+	got := clf.Stderr([]byte(`{"evolve_channel":"inject_applied","corr_id":"c1"}`))
+	if len(got) != 1 || got[0].Kind != KindCorrelation {
+		t.Fatalf("want 1 correlation envelope, got %+v", got)
+	}
+	if got[0].Data["sub"] != "request" || got[0].Data["corr_id"] != "c1" {
+		t.Fatalf("data = %+v", got[0].Data)
+	}
+	// at_seq should be 1 (the seq value before Emit increments it for this envelope)
+	if asInt(got[0].Data["at_seq"]) != 1 {
+		t.Errorf("at_seq: want 1 got %v", got[0].Data["at_seq"])
+	}
+}
+
+func TestClassifier_Stderr_CorrelationResponseComplete(t *testing.T) {
+	clf := NewClassifier(Source{Phase: "build", Agent: "build"}, "trace", func() time.Time { return time.Unix(0, 0).UTC() })
+	// prime: seq advances to 1 after this line
+	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`))
+	// inject_applied: correlator records openAtSeq["c2"]=1; Emit increments seq to 2
+	req := clf.Stderr([]byte(`{"evolve_channel":"inject_applied","corr_id":"c2"}`))
+	if len(req) != 1 || req[0].Kind != KindCorrelation || req[0].Data["sub"] != "request" {
+		t.Fatalf("want request correlation, got %+v", req)
+	}
+	// prime more lines: seq advances to 3, 4
+	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"a"}]}}`))
+	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"b"}]}}`))
+	// idle_reached: currentSeq=4 when observe is called; startSeq=openAtSeq+1=2, endSeq=4; Emit increments seq to 5
+	resp := clf.Stderr([]byte(`{"evolve_channel":"idle_reached","corr_id":"c2"}`))
+	if len(resp) != 1 || resp[0].Kind != KindCorrelation {
+		t.Fatalf("want 1 correlation envelope for response_complete, got %+v", resp)
+	}
+	if resp[0].Data["sub"] != "response_complete" || resp[0].Data["corr_id"] != "c2" {
+		t.Fatalf("data = %+v", resp[0].Data)
+	}
+	if asInt(resp[0].Data["start_seq"]) != 2 {
+		t.Errorf("start_seq: want 2 got %v", resp[0].Data["start_seq"])
+	}
+	if asInt(resp[0].Data["end_seq"]) != 4 {
+		t.Errorf("end_seq: want 4 got %v", resp[0].Data["end_seq"])
+	}
+}
+
 // ---- tiny test helpers (assert on map[string]any wire shape) ----
 
 func asFloat(v any) float64 {

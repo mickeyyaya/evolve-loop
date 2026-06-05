@@ -1,0 +1,50 @@
+user@host /tmp % ollama run gemma4:latest
+>>> In exactly 3 short bullet points, what is tmux?
+Thinking...
+Here's a thinking process to arrive at the suggested bullet points:
+
+1.  **Analyze the Request:**
+    *   Topic: What is tmux?
+    *   Constraint 1: Exactly 3 bullet points.
+    *   Constraint 2: Short.
+
+2.  **Define tmux (Core Concept):**
+    *   It's a terminal multiplexer.
+    *   Purpose: To manage multiple terminal sessions within a single SSH connection/window.
+    *   Key Benefit 1: Session persistence (if you disconnect, the sessions keep running).
+    *   Key Benefit 2: Split panes/window management (like having multiple virtual terminals).
+
+3.  **Drafting Potential Points (Focusing on the "Why" and "What"):**
+    *   *Attempt 1 (Technical):* It's a terminal multiplexer. It lets you run multiple sessions. It persists sessions when you disconnect. (A bit dry.)
+    *   *Attempt 2 (Benefit-Oriented):* Keeps your work alive after logout. Lets you see multiple screens at once. Divides one screen into many parts. (Better, more accessible.)
+
+4.  **Refining and Selecting the Three Strongest/Most Distinct Points (The "Three Pillars"):**
+    *   **Point 1 (What it does):** It's the container/manager. (Terminal Multiplexing).
+    *   **Point 2 (The biggest benefit):** Persistence. (Separating the work from the connection).
+    *   **Point 3 (The usability feature):** Layout management. (Split panes/windows).
+
+5.  **Final Polish (Ensuring brevity and clarity):**
+
+    *   *(Self-Correction check: Are they exactly 3? Yes. Are they short? Yes.)*
+
+6.  **Output Generation.** (This matches the final provided answer.)
+...done thinking.
+
+*   **Terminal Multiplexer:** It allows you to manage multiple independent terminal sessions (or "panes") within a single SSH connection or window.
+*   **Session Persistence:** Your running sessions remain active and connected to the server even if your local internet connection drops or you close your terminal window.
+*   **Virtual Workspace:** It acts as a container, letting you switch between virtual windows and split your single screen into multiple, persistent command environments.
+
+>>> Send a message (/? for help)
+
+
+
+
+
+
+
+
+
+
+
+
+

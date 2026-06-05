@@ -1,0 +1,50 @@
+user@host /tmp % ollama run gemma4:latest
+>>> In exactly 3 short bullet points, what is tmux?
+Thinking...
+Here's a thinking process to arrive at the suggested bullet points:
+
+1.  **Analyze the Request:**
+    *   Topic: What is tmux?
+    *   Constraint 1: Exactly 3 bullet points.
+    *   Constraint 2: Short.
+
+2.  **Define tmux (Core Concept):**
+    *   It's a terminal multiplexer.
+    *   Purpose: To manage multiple terminal sessions within a single SSH connection/window.
+    *   Key Benefit 1: Session persistence (if you disconnect, the sessions keep running).
+    *   Key Benefit 2: Split panes/window management (like having multiple virtual terminals).
+
+3.  **Drafting Potential Points (Focusing on the "Why" and "What"):**
+    *   *Attempt 1 (Technical):* It's a terminal multiplexer. It lets you run multiple sessions. It persists sessions when you disconnect. (A bit dry.)
+    *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

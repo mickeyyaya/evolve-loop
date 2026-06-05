@@ -1,0 +1,51 @@
+
+user@host /tmp % agy --dangerously-skip-permissions
+
+      ▄▀▀▄        Antigravity CLI 1.0.4
+     ▀▀▀▀▀▀       USER@example.com
+    ▀▀▀▀▀▀▀▀      Gemini 3.5 Flash (Medium)
+   ▄▀▀    ▀▀▄     /tmp
+  ▄▀▀      ▀▀▄
+
+────────────────────────────────────────────────────────────
+> In exactly 3 short bullet points, what is tmux?
+
+▸ Thought for 2s, 264 tokens
+  Defining Tmux Simply
+  Here is what tmux is:
+
+  • Terminal Multiplexer: It allows you to create, switch between, and manage multiple terminal sessions from a single screen.
+  • Session Persistence: You can detach from active sessions and reattach to them later, keeping your running background processes alive even if you disconnect from SSH.
+  • Window & Pane Management: It lets you split your terminal display into multiple horizontal and vertical panes, allowing you to run and view several commands side-by-side.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+? for shortcuts                                                                                                                                                                Gemini 3.5 Flash (Medium)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
