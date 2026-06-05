@@ -26,7 +26,13 @@ The advisor composes each cycle from a catalog of ~15 built-ins + 4 user phases.
 
 Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name>/phase.json` + `agent.md` at implementation time and validate with `evolve phases validate <name>`.
 
-### Wave 1 — goal-defining phases
+### Naming rule (added 2026-06-05)
+
+- **Phase names are `<object>-<action>`**: the thing examined, then the operation on it (`smell-scan`, `mutation-gate`, `dependency-audit`). A name must answer "what does this phase look at, and what does it do about it" without reading the spec. Grandfathered outlier: `reproduce-bug` (shipped action-object; do not rename shipped phases for cosmetics).
+- **Every phase declares a one-line CORE VALUE** — the single risk it removes — maintained in the router persona's "Phase Catalog — Core Values" table (`agents/evolve-router.md`), which is what the advisor justifies selections against. When the `user-phase-persona-resolution` fix lands, this moves into a `description` field in `phase.json` (schema + `phasespec.PhaseSpec` + catalog-card surfacing) so the value line is machine-carried, not persona-maintained.
+- **Work-item / batch names follow the same rule**: deliverable-describing, not sequence-describing (`phases-quality-gates`, not `micro-phase-wave-2`).
+
+### Wave 1 — goal-defining phases (`phases-goal-defining`) — ✅ SHIPPED cycle 217 (`a354d85`)
 
 #### `fault-localization` (plan)
 - **Responsibility:** Hierarchical narrowing for bugfix cycles: repo-tree → suspicious files → declaration skeleton → element → edit locations. No fixing.
@@ -70,7 +76,7 @@ Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name
 - **Classify:** require `["Generated Tests", "Results"]`; fail_if_empty. Signal `amplify.failures_found > 0` routes the existing content-routed `tester` phase.
 - **Evidence:** AgentCoder anti-bias test designer (2312.13010); AlphaCodium AI-test phase (2401.08500).
 
-### Wave 2 — deterministic-tooling gates
+### Wave 2 — deterministic-tooling gates (`phases-quality-gates`)
 
 #### `mutation-gate` (evaluate, gate)
 - **Responsibility:** Diff-scoped mutation testing of changed packages; mutation score gates test-suite strength.
@@ -100,7 +106,7 @@ Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name
 - **Routing:** `ship.class == cycle` with high-risk change (releases, migration-touching, >N files).
 - **Evidence:** Google SRE release engineering; DORA change-failure-rate (<5% elite).
 
-### Wave 3 — release / feature / memory
+### Wave 3 — release / feature / memory (`phases-release-and-memory`)
 
 #### `changelog-sync` (control)
 - **Responsibility:** Verify CHANGELOG/release-notes drift vs shipped commits (conventional-commit derivation); deterministic tooling wrapped, minimal LLM.

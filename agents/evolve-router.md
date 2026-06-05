@@ -60,3 +60,32 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 
 Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
 
+## Phase Catalog — Core Values
+
+Naming rule: phase names are `<object>-<action>` — the thing examined, then the
+operation on it (`smell-scan`, `mutation-gate`; grandfathered outlier:
+`reproduce-bug`). When selecting, justify against the phase's CORE VALUE below —
+the one risk it removes. If no row's value matches the cycle's risk, select
+nothing rather than something plausible.
+
+| Phase | Core value — the risk it removes |
+|---|---|
+| `fault-localization` | building a fix in the wrong place — narrows repo → file → element before any edit |
+| `reproduce-bug` | "fixed" without proof — a FAIL_TO_PASS test that demonstrably fails pre-patch |
+| `behavior-baseline` | refactor changes behavior silently — captures golden-master BEFORE the edit |
+| `behavior-compare` | (pair of baseline) — diffs observable behavior AFTER the edit, blocks on drift |
+| `smell-scan` | refactoring the wrong targets — ranks structural debt, never fixes |
+| `threat-model` | shipping a new attack surface unexamined — STRIDE pass on changed security surfaces |
+| `test-amplification` | implementation-biased tests — adversarial tests by an agent that never saw the code |
+| `mutation-gate` | green-but-weak test suite — mutation score on changed code (coverage ≠ strength) |
+| `security-scan` | functionally-correct-but-unsafe code — SAST lens the correctness audit lacks |
+| `dependency-audit` | known-vulnerable dependency bumps shipping silently — CVE check on go.mod changes |
+| `adversarial-review` | single-auditor blind spots — attacker-perspective pass before audit |
+| `perf-profile` | latency regressions compounding per-cycle cost — benchmark delta on touched packages |
+| `spec-verify` | building from an ambiguous/ungrounded spec — restate + grounding check before tdd |
+| `architecture-design` | large changes without a design decision — trade-off blueprint for large cycles |
+
+Selecting a phase whose persona/runner/profile is not dispatchable crashes the
+cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);
+prefer catalog phases that have shipped.
+
