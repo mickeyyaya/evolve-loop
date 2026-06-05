@@ -6,7 +6,7 @@
 # constraint "phase specs must follow micro-phase-catalog.md §3 verbatim".
 # These tests MUST FAIL at RED baseline (the phase dirs do not exist yet) and
 # pass only once Builder drops valid .evolve/phases/{fault-localization,
-# reproduce-bug}/{phase.json,agent.md}.
+# bug-reproduction}/{phase.json,agent.md}.
 #
 # Behavioral: the load-bearing checks invoke the `evolve` binary (phases
 # validate / phases list) — the real DiscoverUserSpecs → Merge →
@@ -20,8 +20,8 @@ BIN="${EVOLVE_GO_BIN:-$ROOT/go/bin/evolve}"
 
 FL_JSON="$ROOT/.evolve/phases/fault-localization/phase.json"
 FL_AGENT="$ROOT/.evolve/phases/fault-localization/agent.md"
-RB_JSON="$ROOT/.evolve/phases/reproduce-bug/phase.json"
-RB_AGENT="$ROOT/.evolve/phases/reproduce-bug/agent.md"
+RB_JSON="$ROOT/.evolve/phases/bug-reproduction/phase.json"
+RB_AGENT="$ROOT/.evolve/phases/bug-reproduction/agent.md"
 
 PASS=0; FAIL=0
 ok() { echo "PASS: $1"; PASS=$((PASS+1)); }
@@ -38,9 +38,9 @@ fi
 if validate_phase fault-localization; then ok "evolve phases validate fault-localization exits 0"
 else no "evolve phases validate fault-localization exits 0"; fi
 
-# --- AC1.2: `evolve phases validate reproduce-bug` exits 0 (behavioral) ------
-if validate_phase reproduce-bug; then ok "evolve phases validate reproduce-bug exits 0"
-else no "evolve phases validate reproduce-bug exits 0"; fi
+# --- AC1.2: `evolve phases validate bug-reproduction` exits 0 (behavioral) ------
+if validate_phase bug-reproduction; then ok "evolve phases validate bug-reproduction exits 0"
+else no "evolve phases validate bug-reproduction exits 0"; fi
 
 # --- file presence + git-tracking dual-check (cycle-92 gitignore footgun) ----
 for f in "$FL_JSON" "$FL_AGENT" "$RB_JSON" "$RB_AGENT"; do
@@ -53,7 +53,7 @@ for f in "$FL_JSON" "$FL_AGENT" "$RB_JSON" "$RB_AGENT"; do
 done
 
 # --- both register as USER phases (zero-Go ADR-0035 path, not registry edit) -
-for p in fault-localization reproduce-bug; do
+for p in fault-localization bug-reproduction; do
   if list_phases | grep -E "^${p}[[:space:]]" | grep -q "user"; then
     ok "$p SOURCE == user in phases list"
   else no "$p SOURCE == user in phases list"; fi
@@ -66,10 +66,10 @@ if [ -f "$FL_JSON" ] && jq -e \
   ok "fault-localization insert_when: scout.goal_type == bugfix"
 else no "fault-localization insert_when: scout.goal_type == bugfix"; fi
 
-# --- AC1.4: reproduce-bug FAIL_TO_PASS gate (the strongest signal gate) ------
+# --- AC1.4: bug-reproduction FAIL_TO_PASS gate (the strongest signal gate) ------
 if [ -f "$RB_JSON" ] && jq -e '.classify.fail_if_signal["repro.failing"] == "==false"' "$RB_JSON" >/dev/null 2>&1; then
-  ok "reproduce-bug classify.fail_if_signal repro.failing == \"==false\""
-else no "reproduce-bug classify.fail_if_signal repro.failing == \"==false\""; fi
+  ok "bug-reproduction classify.fail_if_signal repro.failing == \"==false\""
+else no "bug-reproduction classify.fail_if_signal repro.failing == \"==false\""; fi
 
 # --- AC1.5: both phases optional:true, writes_source:false -------------------
 for f in "$FL_JSON" "$RB_JSON"; do
@@ -88,8 +88,8 @@ if [ -f "$FL_JSON" ] && [ "$(jq -r '.after' "$FL_JSON" 2>/dev/null)" = "triage" 
 else no "fault-localization after == triage"; fi
 
 if [ -f "$RB_JSON" ] && jq -e '.classify.require_sections | index("Reproduction") and index("Verification")' "$RB_JSON" >/dev/null 2>&1; then
-  ok "reproduce-bug require_sections has Reproduction + Verification"
-else no "reproduce-bug require_sections has Reproduction + Verification"; fi
+  ok "bug-reproduction require_sections has Reproduction + Verification"
+else no "bug-reproduction require_sections has Reproduction + Verification"; fi
 
 if [ -f "$FL_JSON" ] && jq -e '.classify.require_sections | index("Suspect Ranking") and index("Edit Locations")' "$FL_JSON" >/dev/null 2>&1; then
   ok "fault-localization require_sections has Suspect Ranking + Edit Locations"

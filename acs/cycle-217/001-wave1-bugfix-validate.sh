@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ACS cycle-217 / Task-1 AC1+AC2 — fault-localization and reproduce-bug exist
+# ACS cycle-217 / Task-1 AC1+AC2 — fault-localization and bug-reproduction exist
 # as USER phases and pass `evolve phases validate` (exit 0).
 #
 # Behavioral: invokes the real evolve binary (DiscoverUserSpecs → Merge →
@@ -18,7 +18,7 @@ BIN="${EVOLVE_GO_BIN:-$TOP/go/bin/evolve}"
 [ -x "$BIN" ] || BIN="$TOP/go/evolve"
 [ -x "$BIN" ] || { echo "RED: evolve binary not found (go/bin/evolve or go/evolve)" >&2; exit 1; }
 
-for p in fault-localization reproduce-bug; do
+for p in fault-localization bug-reproduction; do
   # Behavioral core: the validator must accept the spec.
   if ! EVOLVE_PROJECT_ROOT="$TOP" "$BIN" phases validate "$p" >/dev/null 2>&1; then
     echo "RED: evolve phases validate $p exits non-zero" >&2
@@ -38,5 +38,5 @@ for p in fault-localization reproduce-bug; do
   done
 done
 
-echo "GREEN: fault-localization + reproduce-bug validate as tracked user phases" >&2
+echo "GREEN: fault-localization + bug-reproduction validate as tracked user phases" >&2
 exit 0

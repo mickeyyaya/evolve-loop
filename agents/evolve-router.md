@@ -50,7 +50,7 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 
 | Goal type | Recipe (optional insertions around the mandatory spine) |
 |---|---|
-| bugfix | fault-localization → reproduce-bug → [tdd, build] → (regression via existing tdd/audit) |
+| bugfix | fault-localization → bug-reproduction → [tdd, build] → (regression via existing tdd/audit) |
 | feature | problem-reflection (spec-verify card) → api-contract-design → [tdd, build] → test-amplification → tester |
 | refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → cleanup-sweep |
 | security | threat-model → [tdd, build] → security-scan + dependency-audit (existing) → fuzz-probe |
@@ -62,16 +62,20 @@ Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevan
 
 ## Phase Catalog — Core Values
 
-Naming rule: phase names are `<object>-<action>` — the thing examined, then the
-operation on it (`smell-scan`, `mutation-gate`; grandfathered outlier:
-`reproduce-bug`). When selecting, justify against the phase's CORE VALUE below —
-the one risk it removes. If no row's value matches the cycle's risk, select
-nothing rather than something plausible.
+Naming rule (two tiers — name shape encodes phase tier): **single-word names are
+the reserved core-pipeline vocabulary** (`scout`, `build`, `audit`, `ship`, `tdd`,
+`intent`, `triage`, `tester`, `memo`, `retrospective`) — closed set, never minted;
+**every optional/advisor-selectable phase is `<object>-<action>`** — the thing
+examined, then the operation on it (`smell-scan`, `mutation-gate`,
+`bug-reproduction`). Minted phases MUST follow `<object>-<action>`. When
+selecting, justify against the phase's CORE VALUE below — the one risk it
+removes. If no row's value matches the cycle's risk, select nothing rather than
+something plausible.
 
 | Phase | Core value — the risk it removes |
 |---|---|
 | `fault-localization` | building a fix in the wrong place — narrows repo → file → element before any edit |
-| `reproduce-bug` | "fixed" without proof — a FAIL_TO_PASS test that demonstrably fails pre-patch |
+| `bug-reproduction` | "fixed" without proof — a FAIL_TO_PASS test that demonstrably fails pre-patch |
 | `behavior-baseline` | refactor changes behavior silently — captures golden-master BEFORE the edit |
 | `behavior-compare` | (pair of baseline) — diffs observable behavior AFTER the edit, blocks on drift |
 | `smell-scan` | refactoring the wrong targets — ranks structural debt, never fixes |

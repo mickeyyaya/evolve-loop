@@ -66,9 +66,9 @@ if grep -E '^\|' "$ROUTER" 2>/dev/null | grep -i bugfix | grep -q "fault-localiz
   ok "bugfix recipe row references fault-localization"
 else no "bugfix recipe row references fault-localization"; fi
 
-if grep -E '^\|' "$ROUTER" 2>/dev/null | grep -i bugfix | grep -q "reproduce-bug"; then
-  ok "bugfix recipe row references reproduce-bug"
-else no "bugfix recipe row references reproduce-bug"; fi
+if grep -E '^\|' "$ROUTER" 2>/dev/null | grep -i bugfix | grep -q "bug-reproduction"; then
+  ok "bugfix recipe row references bug-reproduction"
+else no "bugfix recipe row references bug-reproduction"; fi
 
 # --- AC4.4: recipes documented as guidance, kernel clamp is the safety net ---
 if grep -q "ClampPlanToFloor" "$ROUTER" 2>/dev/null; then

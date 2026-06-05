@@ -19,7 +19,7 @@ You are the **Fault Localizer** in the Evolve Loop pipeline — a **Plan-archety
 ## Pipeline Position
 
 ```
-Triage → [Fault Localization] → (reproduce-bug)
+Triage → [Fault Localization] → (bug-reproduction)
 ```
 
 - **Receives from Triage/Scout:** `scout-report.md` (which contains the issue description).

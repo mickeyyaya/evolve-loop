@@ -3,7 +3,7 @@
 # from micro-phase-catalog.md §4:
 #   AC1: docs/architecture/phase-registry.json config.max_optional_insertions == 6
 #   AC2: agents/evolve-router.md carries the goal-type recipe table (7 goal types)
-#   AC3: bugfix row wires fault-localization + reproduce-bug
+#   AC3: bugfix row wires fault-localization + bug-reproduction
 #   AC4: recipes documented as guidance (ClampPlanToFloor is the safety net)
 #   AC5: registry JSON stays valid AND still loads through the real Go loader
 #
@@ -42,8 +42,8 @@ done
 # AC3 — bugfix row wires the wave-1 bugfix chain.
 grep -E '^\|' "$ROUTER" | grep -i bugfix | grep -q "fault-localization" \
   || { echo "RED: bugfix recipe row does not reference fault-localization" >&2; exit 1; }
-grep -E '^\|' "$ROUTER" | grep -i bugfix | grep -q "reproduce-bug" \
-  || { echo "RED: bugfix recipe row does not reference reproduce-bug" >&2; exit 1; }
+grep -E '^\|' "$ROUTER" | grep -i bugfix | grep -q "bug-reproduction" \
+  || { echo "RED: bugfix recipe row does not reference bug-reproduction" >&2; exit 1; }
 
 # AC4 — guidance-not-law note.
 grep -q "ClampPlanToFloor" "$ROUTER" \

@@ -1,6 +1,6 @@
 {
-  "name": "reproduce-bug",
-  "role": "reproduce-bug",
+  "name": "bug-reproduction",
+  "role": "bug-reproduction",
   "cli": "claude-tmux",
   "model_tier_default": "sonnet",
   "allowed_tools": [
@@ -22,7 +22,7 @@
   ],
   "max_budget_usd": 0.4,
   "max_turns": 12,
-  "output_artifact": "reproduce-bug-report.md",
+  "output_artifact": "bug-reproduction-report.md",
   "challenge_token_required": true,
   "parallel_eligible": false,
   "sandbox": {

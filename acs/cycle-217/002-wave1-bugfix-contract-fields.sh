@@ -2,7 +2,7 @@
 # ACS cycle-217 / Task-1 AC3+AC4+AC5 — bugfix-pair contract fields per
 # micro-phase-catalog.md §3 Wave 1:
 #   - fault-localization routes on scout.goal_type == bugfix
-#   - reproduce-bug carries the FAIL_TO_PASS gate (fail_if_signal
+#   - bug-reproduction carries the FAIL_TO_PASS gate (fail_if_signal
 #     repro.failing == "==false") — a repro that doesn't fail is a failed phase
 #   - both are optional:true and writes_source:false
 #
@@ -18,12 +18,12 @@ BIN="${EVOLVE_GO_BIN:-$TOP/go/bin/evolve}"
 [ -x "$BIN" ] || { echo "RED: evolve binary not found" >&2; exit 1; }
 
 FL=".evolve/phases/fault-localization/phase.json"
-RB=".evolve/phases/reproduce-bug/phase.json"
+RB=".evolve/phases/bug-reproduction/phase.json"
 [ -f "$FL" ] || { echo "RED: $FL missing" >&2; exit 1; }
 [ -f "$RB" ] || { echo "RED: $RB missing" >&2; exit 1; }
 
 # Behavioral anchor: both specs must pass real validation first.
-for p in fault-localization reproduce-bug; do
+for p in fault-localization bug-reproduction; do
   EVOLVE_PROJECT_ROOT="$TOP" "$BIN" phases validate "$p" >/dev/null 2>&1 \
     || { echo "RED: phases validate $p failed — field checks below would be moot" >&2; exit 1; }
 done
@@ -35,7 +35,7 @@ jq -e '.routing.insert_when[]? | select(.field=="scout.goal_type" and (.op=="=="
 
 # AC4 — FAIL_TO_PASS gate on the reproduction.
 jq -e '.classify.fail_if_signal["repro.failing"] == "==false"' "$RB" >/dev/null 2>&1 \
-  || { echo "RED: reproduce-bug lacks fail_if_signal repro.failing==\"==false\"" >&2; exit 1; }
+  || { echo "RED: bug-reproduction lacks fail_if_signal repro.failing==\"==false\"" >&2; exit 1; }
 
 # AC5 — optional:true + writes_source:false on both.
 for f in "$FL" "$RB"; do

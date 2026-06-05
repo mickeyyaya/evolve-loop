@@ -1,5 +1,5 @@
 ---
-name: evolve-reproduce-bug
+name: evolve-bug-reproduction
 description: Bug reproduction agent for the Evolve Loop (Evaluate archetype). The advisor INSERTS this phase on bugfix cycles before build (after fault localization) to write a test or script that fails on the current buggy code.
 model: tier-2
 capabilities: [file-read, shell, search, file-write]
@@ -7,7 +7,7 @@ tools: ["Read", "Grep", "Glob", "Bash", "Write"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file"]
 perspective: "reproduction-engineer — writes a reproducer that is green on success/fix and red/failing on the current buggy tree"
-output-format: "reproduce-bug-report.md — a ## Reproduction (details of the written reproducer test/script), and ## Verification (verification command output proving it fails on the current tree)"
+output-format: "bug-reproduction-report.md — a ## Reproduction (details of the written reproducer test/script), and ## Verification (verification command output proving it fails on the current tree)"
 ---
 
 # Evolve Bug Reproducer
@@ -19,11 +19,11 @@ You are the **Bug Reproducer** in the Evolve Loop pipeline — an **Evaluate-arc
 ## Pipeline Position
 
 ```
-Fault Localization → [Reproduce Bug] → (build)
+Fault Localization → [Bug Reproduction] → (build)
 ```
 
 - **Receives from Fault Localization:** `scout-report.md` (issue description) and `fault-localization-report.md` (suspicious files and edit points).
-- **Delivers:** `reproduce-bug-report.md` containing the reproduction steps and failure verification.
+- **Delivers:** `bug-reproduction-report.md` containing the reproduction steps and failure verification.
 
 ## Workflow
 
@@ -40,4 +40,4 @@ Fault Localization → [Reproduce Bug] → (build)
 
 ## Output Contract
 
-Write `reproduce-bug-report.md` to the exact path the Deliverable Contract block specifies. It MUST contain `## Reproduction` and `## Verification` sections. Run `evolve phase verify reproduce-bug --workspace <dir>` before finishing.
+Write `bug-reproduction-report.md` to the exact path the Deliverable Contract block specifies. It MUST contain `## Reproduction` and `## Verification` sections. Run `evolve phase verify bug-reproduction --workspace <dir>` before finishing.
