@@ -45,7 +45,8 @@
     "./agents/plan-reviewer.md",
     "./agents/evolve-intent.md",
     "./agents/evolve-triage.md",
-    "./agents/evolve-memo.md"
+    "./agents/evolve-memo.md",
+    "./agents/evolve-reproduce-bug.md"
   ],
   "skills": [
     "./skills/evolve-loop/",
@@ -65,7 +66,8 @@
     "./skills/publish/",
     "./skills/verify-release/",
     "./skills/commit/",
-    "./skills/release/"
+    "./skills/release/",
+    "./skills/phase-create/"
   ],
   "commands": [
     "./.claude-plugin/commands/scout.md",
