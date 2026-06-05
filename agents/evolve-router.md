@@ -43,3 +43,20 @@ To mint, add a `mint` block to that element:
 ```
 
 Cover every phase you want to RUN plus any you explicitly SKIP. The kernel will complete the floor if you under-specify the ship chain.
+
+## Goal-Type Recipes
+
+The advisor classifies the cycle goal (classify-then-route) and composes from the recipe row, dropping phases whose `insert_when` doesn't fire:
+
+| Goal type | Recipe (optional insertions around the mandatory spine) |
+|---|---|
+| bugfix | fault-localization → reproduce-bug → [tdd, build] → (regression via existing tdd/audit) |
+| feature | problem-reflection (spec-verify card) → api-contract-design → [tdd, build] → test-amplification → tester |
+| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → cleanup-sweep |
+| security | threat-model → [tdd, build] → security-scan + dependency-audit (existing) → fuzz-probe |
+| performance | benchmark baseline capture → [build] → benchmark-gate |
+| release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
+| docs / trivial | spine only (no insertions) |
+
+Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
+

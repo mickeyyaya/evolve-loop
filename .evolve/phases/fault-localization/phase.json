@@ -1,0 +1,29 @@
+{
+  "name": "fault-localization",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "plan",
+  "agent": "evolve-fault-localization",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "signals": []
+  },
+  "outputs": {
+    "files": [".evolve/runs/cycle-{cycle}/fault-localization-report.md"],
+    "signals": ["fault.locations_count", "fault.confidence"]
+  },
+  "prompt_context": ["goal"],
+  "classify": {
+    "require_sections": ["Suspect Ranking", "Edit Locations"],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      { "field": "scout.goal_type", "op": "==", "value": "bugfix" }
+    ]
+  },
+  "after": "triage"
+}

@@ -32,7 +32,13 @@ node_modules/
 # implicitly ignored by this rule. Worktrees are created by run-cycle.sh
 # and removed via its EXIT trap; they should never appear in commits.
 .evolve/*
-**/.evolve/
+# Nested .evolve dirs only (e.g. runtime state created inside per-cycle
+# worktrees). v16.6 operator fix: was `**/.evolve/`, which also matched the
+# ROOT .evolve/ directory and dead-lettered every whitelist below (a directory
+# exclusion forbids re-including descendants) — new phase.json/agent.md/
+# profile files could only be staged with `git add -f`. Root .evolve/ is
+# governed by the `.evolve/*` ladder above + the explicit re-includes below.
+*/**/.evolve/
 # ... except the agent permission profiles, which ship with the plugin and are
 # required by scripts/subagent-run.sh for least-privilege subagent invocation.
 !.evolve/profiles/
@@ -76,6 +82,10 @@ node_modules/
 !.evolve/phases/*/
 .evolve/phases/*/*
 !.evolve/phases/*/phase.json
+# v16.6 (cycle-217 operator fix): agent personas authored beside the spec
+# (ADR-0035 authoring path: .evolve/phases/<name>/agent.md) must ship too —
+# without this line, ship's plain `git add -A` silently drops them.
+!.evolve/phases/*/agent.md
 # NOTE (issue-#11 / cycle-176): a self-evolve cycle (ee77067) un-ignored .evolve/
 # (`!.evolve/` + `!.evolve/evals/`) to "track evals". That broke a LOAD-BEARING
 # invariant — recoverBuildLeak (go/internal/core/orchestrator.go) and the audit

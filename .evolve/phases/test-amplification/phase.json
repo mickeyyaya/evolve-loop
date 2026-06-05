@@ -1,0 +1,33 @@
+{
+  "name": "test-amplification",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-test-amplification",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/tdd-contract.md",
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": []
+  },
+  "outputs": {
+    "files": [".evolve/runs/cycle-{cycle}/test-amplification-report.md"],
+    "signals": ["amplify.tests_added", "amplify.failures_found"]
+  },
+  "prompt_context": ["goal"],
+  "classify": {
+    "require_sections": ["Generated Tests", "Results"],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      { "field": "build.files_touched", "op": "gt", "value": 0 },
+      { "field": "scout.cycle_size", "op": "!=", "value": "trivial" }
+    ]
+  },
+  "after": "build"
+}
