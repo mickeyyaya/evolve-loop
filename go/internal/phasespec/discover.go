@@ -55,6 +55,31 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 	return specs, warnings
 }
 
+// DiscoverUserSpecsFromRoots reads phase definitions from each discovery root
+// in order and concatenates them (ADR-0038 multi-root: .evolve/phases plus any
+// plugin-bundle roots from EVOLVE_PHASE_ROOTS). On an inter-root name
+// collision the LEFT-MOST root wins with a shadowing warning — so the local
+// project root, conventionally first, can deliberately shadow a plugin phase.
+// sources maps each kept phase name to the root it was loaded from
+// (provenance for the inventory and `phases list`). Missing roots are
+// fail-open, exactly like DiscoverUserSpecs.
+func DiscoverUserSpecsFromRoots(roots []string) (specs []PhaseSpec, sources map[string]string, warnings []string) {
+	sources = make(map[string]string)
+	for _, root := range roots {
+		rootSpecs, rootWarns := DiscoverUserSpecs(root)
+		warnings = append(warnings, rootWarns...)
+		for _, s := range rootSpecs {
+			if prev, dup := sources[s.Name]; dup {
+				warnings = append(warnings, "phase "+s.Name+" in "+root+" shadowed by "+prev+" (left-most root wins)")
+				continue
+			}
+			specs = append(specs, s)
+			sources[s.Name] = root
+		}
+	}
+	return specs, sources, warnings
+}
+
 // Merge returns a new Catalog with the user specs layered over the built-in
 // catalog. A user spec whose name clashes with a built-in is DROPPED with a
 // warning (built-ins win — an operator cannot silently redefine a spine phase).
