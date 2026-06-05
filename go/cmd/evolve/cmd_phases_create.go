@@ -96,8 +96,17 @@ func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr
 	}
 
 	// Persona target must not be silently overwritten — a plugin must not
-	// hijack another phase's persona.
+	// hijack another phase's persona. Defense-in-depth on top of the
+	// ValidateUserSpec kebab-case agent floor: the resolved path must stay
+	// inside agents/ (an LLM-supplied spec is untrusted input).
 	personaPath := filepath.Join(project, "agents", spec.AgentName()+".md")
+	if agentsDir := filepath.Join(project, "agents") + string(filepath.Separator); !strings.HasPrefix(personaPath, agentsDir) {
+		return emitEnvelope(stdout, createEnvelopeOut{
+			OK: false, Phase: spec.Name,
+			Errors: []string{fmt.Sprintf("agent %q resolves outside agents/ — refusing", spec.AgentName())},
+			Hint:   createHint,
+		}, 2)
+	}
 	if personaBody != "" {
 		if _, err := os.Stat(personaPath); err == nil {
 			return emitEnvelope(stdout, createEnvelopeOut{
@@ -111,26 +120,37 @@ func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr
 	}
 
 	// Transactional scaffold: everything validated above; write phase.json,
-	// then the persona; roll the phase dir back if the persona write fails.
-	targetRoot := *rootArg
-	if targetRoot == "" {
-		targetRoot = roots[0]
-	} else if !filepath.IsAbs(targetRoot) {
-		targetRoot = filepath.Join(project, targetRoot)
+	// then the persona; roll back what THIS invocation wrote if the persona
+	// write fails. (Check-then-write is not atomic across concurrent create
+	// invocations — accepted for a single-operator CLI; atomicwrite's rename
+	// keeps each individual file flip atomic.)
+	targetRoot, ok := resolveTargetRoot(*rootArg, project, roots)
+	if !ok {
+		fmt.Fprintf(stderr, "--root %q is neither a configured discovery root (EVOLVE_PHASE_ROOTS) nor inside the project\n", *rootArg)
+		return 10
 	}
 	specJSON, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		fmt.Fprintf(stderr, "marshal spec: %v\n", err)
 		return 1
 	}
-	phasePath := filepath.Join(targetRoot, spec.Name, "phase.json")
+	phaseDir := filepath.Join(targetRoot, spec.Name)
+	_, statErr := os.Stat(phaseDir)
+	dirCreatedByUs := os.IsNotExist(statErr)
+	phasePath := filepath.Join(phaseDir, "phase.json")
 	if err := atomicwrite.Bytes(phasePath, specJSON); err != nil {
 		fmt.Fprintf(stderr, "write %s: %v\n", phasePath, err)
 		return 1
 	}
 	if personaBody != "" {
 		if err := atomicwrite.Bytes(personaPath, []byte(personaBody)); err != nil {
-			_ = os.RemoveAll(filepath.Dir(phasePath)) // no half-scaffold
+			// No half-scaffold — but only remove what this invocation created:
+			// a pre-existing directory may hold operator files.
+			if dirCreatedByUs {
+				_ = os.RemoveAll(phaseDir)
+			} else {
+				_ = os.Remove(phasePath)
+			}
 			fmt.Fprintf(stderr, "write %s: %v\n", personaPath, err)
 			return 1
 		}
@@ -249,10 +269,39 @@ func softLintWarnings(s phasespec.PhaseSpec) []string {
 	return warnings
 }
 
+// resolveTargetRoot resolves --root to an absolute directory and enforces
+// containment: an empty arg means the first configured root; otherwise the
+// resolved path must be one of the configured discovery roots or inside the
+// project tree. Anything else is refused — `create` must never write outside
+// the surfaces the pipeline reads (and a failed rollback must never RemoveAll
+// an arbitrary directory).
+func resolveTargetRoot(arg, project string, roots []string) (string, bool) {
+	if arg == "" {
+		return roots[0], true
+	}
+	target := arg
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(project, target)
+	}
+	target = filepath.Clean(target)
+	for _, r := range roots {
+		if target == filepath.Clean(r) {
+			return target, true
+		}
+	}
+	if strings.HasPrefix(target+string(filepath.Separator), filepath.Clean(project)+string(filepath.Separator)) {
+		return target, true
+	}
+	return "", false
+}
+
 func emitEnvelope(stdout io.Writer, env createEnvelopeOut, code int) int {
 	raw, err := json.MarshalIndent(env, "", "  ")
 	if err != nil {
-		fmt.Fprintf(stdout, `{"ok":false,"errors":["internal: envelope marshal: %s"]}`+"\n", err)
+		// Nearly unreachable (strings+bools marshal cleanly), but the fallback
+		// must still be valid JSON — the envelope is a machine contract.
+		msg, _ := json.Marshal("internal: envelope marshal: " + err.Error())
+		fmt.Fprintf(stdout, `{"ok":false,"errors":[%s]}`+"\n", msg)
 		return 1
 	}
 	fmt.Fprintln(stdout, string(raw))

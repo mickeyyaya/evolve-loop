@@ -70,7 +70,7 @@ func DiscoverUserSpecsFromRoots(roots []string) (specs []PhaseSpec, sources map[
 		warnings = append(warnings, rootWarns...)
 		for _, s := range rootSpecs {
 			if prev, dup := sources[s.Name]; dup {
-				warnings = append(warnings, "phase "+s.Name+" in "+root+" shadowed by "+prev+" (left-most root wins)")
+				warnings = append(warnings, "phase "+s.Name+" in "+root+" ignored — already loaded from "+prev+" (left-most root wins)")
 				continue
 			}
 			specs = append(specs, s)

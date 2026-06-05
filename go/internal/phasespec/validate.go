@@ -62,6 +62,13 @@ func ValidateUserSpec(s PhaseSpec) []string {
 		v = append(v, fmt.Sprintf("unknown kind %q (expected llm|native|command)", s.Kind))
 	}
 
+	// The agent name is used as a filename under agents/ (persona write path in
+	// `phases create`), so it gets the same kebab-case floor as the phase name —
+	// a crafted "../../x" agent must never escape the agents/ directory.
+	if s.Agent != "" && !nameRE.MatchString(s.Agent) {
+		v = append(v, fmt.Sprintf("agent %q must be lowercase kebab-case (^[a-z][a-z0-9-]*$)", s.Agent))
+	}
+
 	if s.Classify != nil && s.Classify.VerdictOnPass != "" && !canonicalVerdicts[s.Classify.VerdictOnPass] {
 		v = append(v, fmt.Sprintf("classify.verdict_on_pass %q must be one of PASS/FAIL/WARN/SKIPPED", s.Classify.VerdictOnPass))
 	}

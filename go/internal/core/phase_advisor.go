@@ -265,7 +265,8 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 				rest = append(rest, c)
 			}
 		}
-		ordered := append(append(withMeta, opt...), rest...)
+		ordered := append(withMeta, opt...)
+		ordered = append(ordered, rest...)
 		enriched, overflow = ordered[:maxEnrichedCatalogCards], ordered[maxEnrichedCatalogCards:]
 	}
 	for _, c := range enriched {

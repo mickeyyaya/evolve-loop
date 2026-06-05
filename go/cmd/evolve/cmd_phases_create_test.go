@@ -230,6 +230,85 @@ func TestPhasesCreate_MintPromotion(t *testing.T) {
 	}
 }
 
+func TestPhasesCreate_RejectsTraversalAgentName(t *testing.T) {
+	root := createFixtureProject(t)
+	// A crafted agent field must not escape agents/ (path traversal).
+	spec := `{"name": "sneaky-agent", "optional": true, "agent": "../../outside/evil"}`
+	persona := filepath.Join(root, "p.md")
+	if err := os.WriteFile(persona, []byte("evil"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, _ := runCreate(t, spec, "--spec", "-", "--persona", persona)
+	if code != 2 {
+		t.Fatalf("traversal agent must be refused (exit 2); got %d", code)
+	}
+	if env := parseEnvelope(t, out); env.OK {
+		t.Error("envelope must be ok:false")
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(root), "outside")); !os.IsNotExist(err) {
+		t.Fatal("file escaped the project tree")
+	}
+}
+
+func TestPhasesCreate_RejectsRootOutsideProjectAndRoots(t *testing.T) {
+	root := createFixtureProject(t)
+	outside := t.TempDir()
+
+	code, _, errb := runCreate(t, validCreateSpec, "--spec", "-", "--root", outside)
+	if code != 10 {
+		t.Fatalf("unconfigured absolute --root must be a usage error (10); got %d (stderr=%q)", code, errb)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "threat-model")); !os.IsNotExist(err) {
+		t.Error("nothing may be written outside configured roots")
+	}
+	// But a configured plugin root IS a valid target.
+	pluginRoot := t.TempDir()
+	t.Setenv("EVOLVE_PHASE_ROOTS", ".evolve/phases:"+pluginRoot)
+	code, out, errb := runCreate(t, validCreateSpec, "--spec", "-", "--root", pluginRoot)
+	if code != 0 {
+		t.Fatalf("configured root must be accepted; got %d (stderr=%q stdout=%q)", code, errb, out)
+	}
+	if _, err := os.Stat(filepath.Join(pluginRoot, "threat-model", "phase.json")); err != nil {
+		t.Errorf("phase.json not written to the configured root: %v", err)
+	}
+	_ = root
+}
+
+func TestPhasesCreate_RollbackPreservesPreexistingDir(t *testing.T) {
+	root := createFixtureProject(t)
+	// A directory with the phase's name exists but has no phase.json (invisible
+	// to the collision check) and holds unrelated content.
+	dir := filepath.Join(root, ".evolve", "phases", "threat-model")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	keep := filepath.Join(dir, "notes.txt")
+	if err := os.WriteFile(keep, []byte("operator notes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Force the persona write to fail AFTER phase.json is written: pre-create
+	// agents/ as a FILE so the persona's parent mkdir fails.
+	if err := os.WriteFile(filepath.Join(root, "agents"), []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	persona := filepath.Join(root, "p.md")
+	if err := os.WriteFile(persona, []byte("body"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _, _ := runCreate(t, validCreateSpec, "--spec", "-", "--persona", persona)
+	if code == 0 {
+		t.Fatal("persona write should have failed")
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Errorf("rollback must not delete pre-existing operator files: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "phase.json")); !os.IsNotExist(err) {
+		t.Error("the half-written phase.json itself must be rolled back")
+	}
+}
+
 func TestPhasesCreate_UsageErrors(t *testing.T) {
 	createFixtureProject(t)
 	if code, _, _ := runCreate(t, ""); code != 10 {
