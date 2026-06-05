@@ -162,6 +162,26 @@ Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) se
 - **Consolidate, don't enumerate:** group instances of the same root cause into ONE defect (e.g. "5 call sites missing error handling — files X, Y, Z" as `H1`, not five separate defects). One defect per root cause keeps the lesson the retrospective derives sharp and prevents an inflated count from masking the real failure mode.
 - If a defect contradicts a prior instinct, name the instinct ID so it propagates to the lesson's `contradicts` field.
 
+## ACS Suite Invocation (C0 — REQUIRED, evaluation topology)
+
+The suite MUST evaluate the tree that CONTAINS THE BUILDER'S CHANGES. When a
+cycle worktree is active, that tree is the WORKTREE — never the main repo.
+Run the suite EXACTLY like this (no improvised -root):
+
+```bash
+WORKTREE=$(cycle-state.sh get active_worktree 2>/dev/null || echo "")
+if [ -n "$WORKTREE" ]; then
+    cd "$WORKTREE" && evolve acs suite --cycle <N> -root "$WORKTREE"
+else
+    evolve acs suite --cycle <N> -root "$(git rev-parse --show-toplevel)"
+fi
+```
+
+Passing the main repo as -root while a worktree is active evaluates the
+UNCHANGED base: every new predicate reds with missing-symbol/missing-file and
+the cycle false-FAILs even when the build is correct (cycles 226–227
+incident — two full pipelines lost to an improvised -root).
+
 ## Pre-Output: Compute audit_bound_tree_sha (C1 — REQUIRED)
 
 Before writing audit-report.md, run:
