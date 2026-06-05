@@ -75,6 +75,9 @@ func lintSpec(s phasespec.PhaseSpec) []string {
 	if len(s.Outputs.Files) == 0 {
 		warnings = append(warnings, fmt.Sprintf("no outputs.files — the deliverable will default to %q", s.Name+"-report.md"))
 	}
+	for _, c := range phasespec.UnknownCategories(s) {
+		warnings = append(warnings, fmt.Sprintf("unknown category %q — known: bugfix|feature|refactor|security|performance|release|docs", c))
+	}
 	return warnings
 }
 

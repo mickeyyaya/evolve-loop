@@ -71,6 +71,46 @@ func TestPhaseLint_InvalidSpecWarnsButExitsZero(t *testing.T) {
 	}
 }
 
+func TestPhaseLint_UnknownCategoryWarnsButExitsZero(t *testing.T) {
+	root := t.TempDir()
+	writeUserPhase(t, root, "cat-check", `{
+  "name": "cat-check", "kind": "llm", "optional": true, "archetype": "evaluate",
+  "categories": ["bugfix", "fooly"],
+  "outputs": { "files": ["cat-check-report.md"] },
+  "classify": { "require_sections": ["Findings"], "verdict_on_pass": "PASS" }
+}`)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	var out, errb bytes.Buffer
+	if code := runPhaseLint([]string{"cat-check"}, &out, &errb); code != 0 {
+		t.Fatalf("lint must be fail-open; got %d", code)
+	}
+	combined := out.String() + errb.String()
+	if !strings.Contains(combined, "fooly") {
+		t.Errorf("expected a warning naming the unknown category; got %q", combined)
+	}
+	if strings.Contains(combined, "bugfix") && strings.Contains(combined, `"bugfix"`) {
+		t.Errorf("known category bugfix must not be flagged; got %q", combined)
+	}
+}
+
+func TestPhaseLint_KnownCategoriesNoWarning(t *testing.T) {
+	root := t.TempDir()
+	writeUserPhase(t, root, "good-cats", `{
+  "name": "good-cats", "kind": "llm", "optional": true, "archetype": "evaluate",
+  "categories": ["security", "performance"],
+  "outputs": { "files": ["good-cats-report.md"] },
+  "classify": { "require_sections": ["Findings"], "verdict_on_pass": "PASS" }
+}`)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	var out, errb bytes.Buffer
+	if code := runPhaseLint([]string{"good-cats"}, &out, &errb); code != 0 {
+		t.Fatalf("lint must be fail-open; got %d", code)
+	}
+	if !strings.Contains(out.String(), "OK") {
+		t.Errorf("valid categories should lint clean (OK line); got %q", out.String())
+	}
+}
+
 func TestPhaseLint_MissingName(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := runPhaseLint(nil, &out, &errb); code != 10 {

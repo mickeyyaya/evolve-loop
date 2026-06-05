@@ -36,6 +36,19 @@
       "description": "Model tier or sentinel. Defaults to 'auto'."
     },
     "writes_source": { "type": "boolean", "description": "Whether the phase writes production code (runs in the worktree under the role-gate)." },
+    "description": {
+      "type": "string",
+      "description": "One line: what the phase produces. Rendered into the phase inventory and the advisor's SELECT catalog (ADR-0038)."
+    },
+    "when_to_use": {
+      "type": "string",
+      "description": "The signal/goal that should trigger SELECTing this phase — the advisor's primary routing hint. Keep it under ~140 characters; the catalog renderer truncates beyond that."
+    },
+    "categories": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["bugfix", "feature", "refactor", "security", "performance", "release", "docs"] },
+      "description": "Goal types this phase serves; drives the inventory's category_index and the advisor's goal-type relevance filter. Unknown values are a lint warning, never a load failure."
+    },
     "enabled": { "type": "string" },
     "enable_var": { "type": "string", "description": "Env var that toggles the phase." },
     "inputs": { "$ref": "#/definitions/io" },
