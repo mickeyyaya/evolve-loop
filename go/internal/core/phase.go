@@ -123,6 +123,11 @@ type PhaseRequest struct {
 	PreviousPhase string            `json:"previous_phase,omitempty"`
 	Env           map[string]string `json:"env,omitempty"`
 
+	// CorrectionDirective is set by the orchestrator's contract-correction loop
+	// on a re-dispatch after a deliverable reject; the runner copies it into the
+	// BridgeRequest. Empty on the first dispatch.
+	CorrectionDirective string `json:"correction_directive,omitempty"`
+
 	// Spec is the brick's own declarative definition. A spec-driven (kind:llm)
 	// phase reads all of its behavior from here; built-in Go phases ignore it.
 	// Additive in Stage 1 (nothing sets it until the orchestrator becomes a pure

@@ -842,6 +842,31 @@ func resolvePhaseMaxAttempts(env map[string]string) int {
 	return n
 }
 
+// composeCorrection turns a deliverable-reject reason into the correction
+// directive injected into the phase re-dispatch (## Correction prompt block).
+func composeCorrection(reason string) string {
+	return "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" +
+		reason +
+		"\n\nFix the deliverable so it satisfies the contract — write it at the EXACT contracted path " +
+		"with all required sections / valid structure — then finish. Do not change unrelated files."
+}
+
+// resolveContractCorrectionRetries reads EVOLVE_CONTRACT_CORRECTION_RETRIES.
+// 0 is valid (disable → immediate abort). Negative/unparseable → default 2;
+// above the ceiling → clamped to 5. (envchain.Int returns the default on an
+// empty/unparseable value; the explicit guards handle the negative-but-parseable
+// and over-max cases.)
+func resolveContractCorrectionRetries(env map[string]string) int {
+	n := envchain.Int(envchain.KeyContractCorrectionRetries, env, envchain.DefContractCorrectionRetries)
+	if n < 0 {
+		return envchain.DefContractCorrectionRetries
+	}
+	if n > envchain.MaxContractCorrectionRetries {
+		return envchain.MaxContractCorrectionRetries
+	}
+	return n
+}
+
 // resolveRetryBackoffBase reads EVOLVE_RETRY_BACKOFF_BASE_S, flooring a
 // negative value at 0 (disabled). Unset / empty / unparseable → default.
 func resolveRetryBackoffBase(env map[string]string) int {
@@ -1518,8 +1543,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// review) and BEFORE the tree-diff guard + ledger append, so a reject
 		// aborts the cycle without recording the phase as a success. The
 		// default reviewer is noopReviewer (every phase approved) so opt-out
-		// is byte-identical to pre-E2. Retry/N is a follow-up — today reject
-		// = abort.
+		// is byte-identical to pre-E2. On reject the correction loop below
+		// re-dispatches up to EVOLVE_CONTRACT_CORRECTION_RETRIES times (default
+		// 2; 0 = immediate abort, the pre-feature behavior) before aborting.
 		if o.reviewer != nil && resp.Verdict != VerdictSKIPPED {
 			rin := ReviewInput{
 				Phase:       string(next),
@@ -1529,8 +1555,56 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				ProjectRoot: req.ProjectRoot,
 			}
 			rr := o.reviewer.Review(ctx, rin)
+			// Contract-correction retry: on a deliverable-contract reject,
+			// re-dispatch the phase with the violation injected as a
+			// "## Correction" directive (bounded by EVOLVE_CONTRACT_CORRECTION_RETRIES,
+			// default 2). 0 disables → immediate abort, byte-identical to the
+			// pre-feature behavior. This re-runs runner.Run directly (no
+			// bridge-timeout retry on corrections — see the design's scope note).
+			maxCorrections := resolveContractCorrectionRetries(phaseReq.Env)
+			for corr := 1; !rr.Approve && corr <= maxCorrections; corr++ {
+				fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
+					next, corr, maxCorrections, rr.Reason)
+				if lerr := o.ledger.Append(ctx, LedgerEntry{
+					TS:       o.now().UTC().Format(time.RFC3339),
+					Cycle:    cycle,
+					Role:     string(next),
+					Kind:     "contract_correction",
+					ExitCode: 0,
+				}); lerr != nil {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN contract_correction ledger append: %v\n", lerr)
+				}
+				phaseReq.CorrectionDirective = composeCorrection(rr.Reason)
+				obsCancel := o.observer.Start(ctx, string(next), phaseReq)
+				resp, err = runner.Run(ctx, phaseReq)
+				if obsCancel != nil {
+					obsCancel()
+				}
+				if err != nil {
+					return result, fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
+				}
+				// A correction re-dispatch must produce a canonical verdict to be
+				// evaluable, same invariant the outer attempt loop enforces before
+				// breaking. Corrections deliberately skip the bridge-timeout retry
+				// ladder (scope note), so a non-canonical result here aborts rather
+				// than retrying.
+				if !IsVerdict(resp.Verdict) {
+					return result, fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
+				}
+				// rin.Response is refreshed for reviewer consistency; the deliverable
+				// reviewer reads the filesystem (workspace/worktree), not this field.
+				rin.Response = resp
+				rr = o.reviewer.Review(ctx, rin)
+			}
+			// Defensive: phaseReq is fresh per phase iteration, but never let the
+			// directive outlive the loop.
+			phaseReq.CorrectionDirective = ""
 			if !rr.Approve {
-				return result, fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
+				if maxCorrections == 0 {
+					// Byte-identical to the pre-feature abort message.
+					return result, fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
+				}
+				return result, fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
 			}
 		}
 

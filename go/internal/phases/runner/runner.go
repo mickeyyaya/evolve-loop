@@ -402,19 +402,20 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				phase, i+1, len(plan.Candidates), candidateCLI, plan.Candidates[i-1], bres.ExitCode)
 		}
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
-			CLI:            candidateCLI,
-			Profile:        profilePath,
-			Model:          model,
-			Prompt:         prompt,
-			Workspace:      req.Workspace,
-			Worktree:       req.Worktree,
-			ProjectRoot:    req.ProjectRoot,
-			ArtifactPath:   artifactPath,
-			Agent:          phase,
-			Cycle:          req.Cycle,
-			Env:            req.Env,
-			PermissionMode: permissionMode,
-			SystemPrompt:   sysPrompt,
+			CLI:                 candidateCLI,
+			Profile:             profilePath,
+			Model:               model,
+			Prompt:              prompt,
+			Workspace:           req.Workspace,
+			Worktree:            req.Worktree,
+			ProjectRoot:         req.ProjectRoot,
+			ArtifactPath:        artifactPath,
+			Agent:               phase,
+			Cycle:               req.Cycle,
+			Env:                 req.Env,
+			PermissionMode:      permissionMode,
+			SystemPrompt:        sysPrompt,
+			CorrectionDirective: req.CorrectionDirective,
 		})
 		// Normalize per attempt so the final events file reflects the
 		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson

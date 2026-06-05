@@ -1,13 +1,16 @@
 // docs_contract_test.go — v12.1 test layer 7: docs-contract enforcement.
 // Asserts that every EVOLVE_* env var referenced in the Go code (via
-// envchain.PhaseEnvKey, os.Getenv, or req.Env lookups) appears in
-// CLAUDE.md's "Current behavior" table. Fails when a developer adds a
-// new env var without documenting it.
+// envchain.PhaseEnvKey, os.Getenv, or req.Env lookups) appears in the
+// "Current behavior" table — which lives in
+// docs/operations/runtime-reference.md since 2026-06-05 (moved out of
+// CLAUDE.md to keep it under the 40k-char context limit; both files are
+// scanned). Fails when a developer adds a new env var without
+// documenting it.
 //
 // Two intentional softnesses:
 //   - We allow EVOLVE_<PHASE>_PERMISSION_MODE / _MODEL / _PLAN_INPUT /
 //     _PLAN_OUTPUT / _INTERACTIVE_POLICY as documented patterns; only
-//     the parent variable needs to be in CLAUDE.md.
+//     the parent variable needs to be in the scanned docs.
 //   - Test-only env vars (EVOLVE_TEST_*, EVOLVE_GO_BIN test override)
 //     are exempted.
 
@@ -27,15 +30,17 @@ import (
 var envVarRE = regexp.MustCompile(`EVOLVE_[A-Z][A-Z0-9_]*`)
 
 // allowedUndocumented lists env vars that intentionally don't appear
-// in CLAUDE.md. Add a rationale comment when expanding this list —
-// these become technical debt otherwise.
+// in the scanned docs (CLAUDE.md / runtime-reference.md). Add a
+// rationale comment when expanding this list — these become technical
+// debt otherwise.
 var allowedUndocumented = map[string]bool{
 	// Test-only injection vars.
 	"EVOLVE_TEST_COST_THRESHOLD":    true,
 	"EVOLVE_TEST_COST_GUARD_STRICT": true,
 	"EVOLVE_TESTING":                true,
 	// Per-phase env-var FAMILIES — documented as a pattern, not per-phase.
-	// The base pattern (e.g., EVOLVE_<PHASE>_PERMISSION_MODE) IS in CLAUDE.md.
+	// The base pattern (e.g., EVOLVE_<PHASE>_PERMISSION_MODE) IS in
+	// runtime-reference.md.
 	"EVOLVE_BUILD_MODEL":                      true,
 	"EVOLVE_SCOUT_MODEL":                      true,
 	"EVOLVE_INTENT_MODEL":                     true,
@@ -64,8 +69,9 @@ var allowedUndocumented = map[string]bool{
 
 	// --- Pre-v12.1 baseline: env vars that existed in the codebase
 	// before this contract test landed. Each should eventually be
-	// either (a) added to CLAUDE.md OR (b) removed from code. Tracked
-	// as technical debt; the contract test still catches NEW additions.
+	// either (a) documented in runtime-reference.md OR (b) removed from
+	// code. Tracked as technical debt; the contract test still catches
+	// NEW additions.
 	"EVOLVE_GUARDS_LOG":                true, // observability shunt
 	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
 	"EVOLVE_INACTIVITY_DISABLE":        true, // phase-watchdog opt-out
@@ -75,7 +81,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
 	"EVOLVE_MARKETPLACE_DIR":           true, // marketplace-poll path override
 	"EVOLVE_OBSERVER_EOF_GRACE_S":      true, // phase-observer
-	"EVOLVE_OBSERVER_POLL_S":           true, // phase-observer
 	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
 	"EVOLVE_PHASE_BUILD_BIN":           true, // per-phase subprocess override pattern
 	"EVOLVE_PHASE_COST_CEILING":        true, // cyclehealth signal
@@ -107,12 +112,19 @@ var allowedUndocumented = map[string]bool{
 // the allowedUndocumented exemption set.
 func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
 	repoRoot := findRepoRoot(t)
-	claudemd := filepath.Join(repoRoot, "CLAUDE.md")
-	body, err := os.ReadFile(claudemd)
-	if err != nil {
-		t.Fatalf("read CLAUDE.md: %v", err)
+	// The env-var table moved to docs/operations/runtime-reference.md
+	// (2026-06-05); CLAUDE.md keeps a digest. Scan both so a row in
+	// either file satisfies the contract.
+	var claudeBody string
+	for _, rel := range []string{"CLAUDE.md", filepath.Join("docs", "operations", "runtime-reference.md")} {
+		body, err := os.ReadFile(filepath.Join(repoRoot, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		// "\n" separator: prevent a phantom EVOLVE_* token forming
+		// across the file boundary.
+		claudeBody += string(body) + "\n"
 	}
-	claudeBody := string(body)
 
 	used := collectEnvVarsFromCode(t, filepath.Join(repoRoot, "go"))
 	var missing []string
@@ -132,8 +144,8 @@ func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
 	// fail the build. EVOLVE_DOCS_CONTRACT_STRICT=1 flips to hard
 	// failure for the future tightening pass once the backlog is paid
 	// down (or the allowedUndocumented map fully covers it).
-	msg := fmt.Sprintf("docs-contract: %d EVOLVE_* env vars used in code but not in CLAUDE.md:\n  %s\n\n"+
-		"Either add rows to CLAUDE.md 'Current behavior' table OR add entries to allowedUndocumented "+
+	msg := fmt.Sprintf("docs-contract: %d EVOLVE_* env vars used in code but not in CLAUDE.md or docs/operations/runtime-reference.md:\n  %s\n\n"+
+		"Either add rows to the runtime-reference.md 'Current behavior' table OR add entries to allowedUndocumented "+
 		"in docs_contract_test.go (with a one-line rationale comment per entry).",
 		len(missing), strings.Join(missing, "\n  "))
 	if os.Getenv("EVOLVE_DOCS_CONTRACT_STRICT") == "1" {
