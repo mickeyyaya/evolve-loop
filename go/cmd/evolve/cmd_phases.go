@@ -16,9 +16,9 @@ import (
 
 // runPhases dispatches the phases subcommands. Exit codes: 0 ok, 2 validation
 // failure, 10 usage error, 1 I/O error.
-func runPhases(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func runPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>>")
+		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>|create --spec <file|->>")
 		return 10
 	}
 	project := envOrCwd("EVOLVE_PROJECT_ROOT")
@@ -29,8 +29,10 @@ func runPhases(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return phasesValidate(project, args[1:], stdout, stderr)
 	case "add":
 		return phasesAdd(project, args[1:], stdout, stderr)
+	case "create":
+		return phasesCreate(project, args[1:], stdin, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add)\n", args[0])
+		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add|create)\n", args[0])
 		return 10
 	}
 }

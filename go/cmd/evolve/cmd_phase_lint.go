@@ -62,23 +62,12 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 }
 
 // lintSpec collects descriptor warnings: the hard ValidateUserSpec floor plus
-// soft best-practice checks (an evaluate phase with no required sections produces
-// a contract that verifies nothing; an undefined artifact name).
+// the soft best-practice checks shared with `phases create` (an evaluate phase
+// with no required sections produces a contract that verifies nothing; an
+// undefined artifact name; unknown categories).
 func lintSpec(s phasespec.PhaseSpec) []string {
 	warnings := append([]string(nil), phasespec.ValidateUserSpec(s)...)
-
-	if s.RoleOrDefault() == phasespec.RoleEvaluate {
-		if s.Classify == nil || len(s.Classify.RequireSections) == 0 {
-			warnings = append(warnings, "evaluate phase declares no classify.require_sections — its derived contract checks no structure")
-		}
-	}
-	if len(s.Outputs.Files) == 0 {
-		warnings = append(warnings, fmt.Sprintf("no outputs.files — the deliverable will default to %q", s.Name+"-report.md"))
-	}
-	for _, c := range phasespec.UnknownCategories(s) {
-		warnings = append(warnings, fmt.Sprintf("unknown category %q — known: bugfix|feature|refactor|security|performance|release|docs", c))
-	}
-	return warnings
+	return append(warnings, softLintWarnings(s)...)
 }
 
 func kindLabel(k phasecontract.Kind) string {
