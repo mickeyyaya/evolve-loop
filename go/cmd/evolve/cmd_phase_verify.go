@@ -93,7 +93,7 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 // glitch — built-in phases always verify.
 func phaseVerifyResolver() phasecontract.Resolver {
 	project := envOrCwd("EVOLVE_PROJECT_ROOT")
-	cat, _, err := mergedCatalog(project)
+	cat, _, _, err := mergedCatalog(project)
 	if err != nil {
 		return phasecontract.BuiltinResolver{}
 	}

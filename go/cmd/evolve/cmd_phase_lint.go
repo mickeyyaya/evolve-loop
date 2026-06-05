@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -13,8 +12,8 @@ import (
 // runPhaseLint implements `evolve phase lint <name>` — a developer aid that
 // checks an operator-authored phase descriptor against the unified phase
 // descriptor (ADR-0035) and reports what the runtime WILL derive from it. It
-// reuses the exact runtime path (DiscoverUserSpecs → ValidateUserSpec →
-// FromSpec) so the lint reflects production behavior, not a parallel schema.
+// reuses the exact runtime path (DiscoverUserSpecsFromRoots → ValidateUserSpec
+// → FromSpec) so the lint reflects production behavior, not a parallel schema.
 //
 // It is FAIL-OPEN by contract: every finding is a warning and the command
 // always exits 0 (except a usage error: missing name → 10). Linting must never
@@ -28,7 +27,7 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 	name := strings.ToLower(strings.TrimSpace(args[0]))
 	project := envOrCwd("EVOLVE_PROJECT_ROOT")
 
-	user, discWarns := phasespec.DiscoverUserSpecs(filepath.Join(project, ".evolve", "phases"))
+	user, _, discWarns := phasespec.DiscoverUserSpecsFromRoots(phaseRoots(project))
 	for _, w := range discWarns {
 		fmt.Fprintln(stdout, "WARN:", w)
 	}
@@ -43,7 +42,7 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 	}
 	if !found {
 		// Fail-open: a missing phase is a warning, not an error.
-		fmt.Fprintf(stdout, "WARN: no user phase named %q under %s/.evolve/phases/\n", name, project)
+		fmt.Fprintf(stdout, "WARN: no user phase named %q in any phase root of %s\n", name, project)
 		return 0
 	}
 
