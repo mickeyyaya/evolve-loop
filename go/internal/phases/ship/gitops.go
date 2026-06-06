@@ -206,7 +206,8 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			continue
 		}
 		if info.IsDir() {
-			filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
+			// Best-effort expansion: per-entry Walk errors are tolerated (callback returns nil).
+			_ = filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
 				if walkErr != nil {
 					return nil
 				}
@@ -248,8 +249,6 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			fmt.Sprintf("ship: untracked files in main working tree would be overwritten by merge: %s", strings.Join(colliders, ", ")),
 			"colliders", strings.Join(colliders, ","))
 	}
-
-
 
 	if !opts.DryRun {
 		exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)

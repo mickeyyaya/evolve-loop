@@ -25,9 +25,9 @@ import (
 func TestTwoTierNaming_DigitsRejected_Amp(t *testing.T) {
 	digitNames := []string{
 		"phase2-check", // digit in first segment
-		"my-phase2",   // digit in second segment
-		"a-1-b",       // pure-digit middle segment
-		"2-check",     // starts with digit (also breaks legacy nameRE)
+		"my-phase2",    // digit in second segment
+		"a-1-b",        // pure-digit middle segment
+		"2-check",      // starts with digit (also breaks legacy nameRE)
 	}
 	for _, name := range digitNames {
 		spec := phasespec.PhaseSpec{
