@@ -100,6 +100,26 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Tasks", "## Blocking Items", "## Sign-off"},
 			hasVerdict: false,
 		},
+		// Wave PM (cycle 6) — domain-phase-catalog.md §3 Wave PM table.
+		// dependency-map is the only evaluate phase (verdict vocabulary);
+		// risk-register and scope-baseline are plan phases — verdict_on_pass
+		// is carried for uniformity but contract derivation leaves it inert
+		// (ADR-0035, runbook-draft/capacity-plan precedent).
+		"risk-register": {
+			artifact:   "risk-register-report.md",
+			sections:   []string{"## Risks", "## Scoring", "## Response Strategies", "## Owners"},
+			hasVerdict: false,
+		},
+		"scope-baseline": {
+			artifact:   "scope-baseline-report.md",
+			sections:   []string{"## Deliverables", "## Acceptance Criteria", "## Exclusions", "## Constraints and Assumptions"},
+			hasVerdict: false,
+		},
+		"dependency-map": {
+			artifact:   "dependency-map-report.md",
+			sections:   []string{"## Dependencies", "## Critical Path", "## Blockers"},
+			hasVerdict: true,
+		},
 	}
 
 	for name, w := range cases {
