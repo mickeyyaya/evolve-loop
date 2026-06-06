@@ -131,7 +131,7 @@ Integration cycle: router recipe table + core-values table + `docs/architecture/
 | Accounting | ✅ done (cycle 5) |
 | Product | ✅ done (cycle 10) |
 | Ops | ✅ done (cycle 5) |
-| Integration | ⬜ queued (cycle 6) |
+| Integration | ✅ done (cycle 12) |
 
 ## 6. Out of scope (documented kills — see research §§1–5)
 
