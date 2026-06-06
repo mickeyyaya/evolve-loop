@@ -272,7 +272,7 @@ Plus all **AC-existence claims** ("file X exists" or "command Y exits 0").
 **Required format** in build-report.md:
 
 ```markdown
-| num_turns | pending <!-- POSTHOC: jq '.num_turns' .evolve/runs/cycle-N/builder-usage.json --> |
+| num_turns | pending <!-- POSTHOC: jq '.num_turns' .evolve/runs/cycle-N/build-usage.json --> |
 | docs/architecture/foo.md exists | pending <!-- POSTHOC: test -f docs/architecture/foo.md && echo OK || echo MISSING --> |
 ```
 

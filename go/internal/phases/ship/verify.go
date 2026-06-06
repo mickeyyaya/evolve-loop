@@ -172,7 +172,10 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 	case ClassCycle:
 		res.Logs = append(res.Logs, "[ship] class: cycle (audit-bound)")
 		res.Provenance = "cycle (audit-verified)"
-		return verifyAuditBinding(ctx, opts, res)
+		if err := verifyAuditBinding(ctx, opts, res); err != nil {
+			return err
+		}
+		return runPersonaLint(ctx, opts, res)
 
 	case ClassRelease:
 		res.Logs = append(res.Logs, "[ship] class: release (pipeline-internal)")
@@ -189,7 +192,10 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		// Hard gate: interactive commits must carry a fresh commit-gate review
 		// attestation. Runs after verifyManualConfirm's `git add -A` so the SHA
 		// reflects the staged tree. Bypassed by EVOLVE_BYPASS_COMMIT_GATE=1.
-		return verifyCommitGateAttestation(ctx, opts, res)
+		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
+			return err
+		}
+		return runPersonaLint(ctx, opts, res)
 
 	case ClassTrivial:
 		res.Logs = append(res.Logs, "[ship] class: trivial (skip-audit eligible)")

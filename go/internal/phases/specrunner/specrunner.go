@@ -120,10 +120,10 @@ func evaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, 
 
 	var diags []core.Diagnostic
 	if len(rules.FailIfSignal) > 0 {
-		diags = append(diags, core.Diagnostic{
-			Severity: "warning",
-			Message:  "fail_if_signal declared but not yet evaluated (requires Stage 3 signal bus)",
-		})
+		return core.VerdictFAIL, []core.Diagnostic{{
+			Severity: "error",
+			Message:  "fail_if_signal declared but Stage-3 signal bus not available — remove or defer this gate",
+		}}
 	}
 
 	verdict := core.VerdictPASS

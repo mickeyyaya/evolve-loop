@@ -6,12 +6,12 @@
 
 ## Why POSTHOC sentinels exist
 
-Cycle 71 retrospective established that **the Builder cannot reliably self-quote metrics about its own run** because the metrics are written by the runner *after* the Builder's session ends. Cycle 71's Builder claimed `cost ≈ $0.65 / +10%`; the ground-truth `builder-usage.json` showed `$0.73 / +23%`. The Builder underreported cost by 13 percentage points — not from malice but because the value was an in-session estimate.
+Cycle 71 retrospective established that **the Builder cannot reliably self-quote metrics about its own run** because the metrics are written by the runner *after* the Builder's session ends. Cycle 71's Builder claimed `cost ≈ $0.65 / +10%`; the ground-truth `build-usage.json` showed `$0.73 / +23%`. The Builder underreported cost by 13 percentage points — not from malice but because the value was an in-session estimate.
 
 Cycle 72 codified the fix as a **POSTHOC sentinel pattern** for cost data only:
 
 ```markdown
-| total_cost_usd | pending <!-- POSTHOC: jq '.total_cost_usd' .evolve/runs/cycle-N/builder-usage.json --> |
+| total_cost_usd | pending <!-- POSTHOC: jq '.total_cost_usd' .evolve/runs/cycle-N/build-usage.json --> |
 ```
 
 Builder writes the literal text `pending` plus an HTML-comment sentinel containing the verification command. The Auditor (or runner) executes the command and substitutes the actual value before audit verdict.
