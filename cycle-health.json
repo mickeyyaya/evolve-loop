@@ -1,0 +1,43 @@
+{
+  "cycle": 5,
+  "workspace": "/Users/danleemh/ai/claude/evolve-loop-domains/.evolve/worktrees/cycle-5",
+  "generated_at": "2026-06-06T13:01:42.163405+08:00",
+  "signals_run": [
+    "workspace_artifacts",
+    "artifact_substance",
+    "ledger_completeness",
+    "ledger_timestamps",
+    "duplicate_ledger",
+    "hash_chain",
+    "artifact_checksums",
+    "challenge_tokens",
+    "velocity",
+    "canary_files",
+    "cost_envelope",
+    "phase_latency",
+    "self_heal_events"
+  ],
+  "anomalies": [
+    {
+      "signal": "workspace_artifacts",
+      "severity": "fatal",
+      "message": "required artifact missing: scout-report.md"
+    },
+    {
+      "signal": "workspace_artifacts",
+      "severity": "fatal",
+      "message": "required artifact missing: build-report.md"
+    },
+    {
+      "signal": "workspace_artifacts",
+      "severity": "fatal",
+      "message": "required artifact missing: audit-report.md"
+    },
+    {
+      "signal": "ledger_completeness",
+      "severity": "fatal",
+      "message": "no ledger.jsonl found"
+    }
+  ],
+  "overall_fatal": true
+}

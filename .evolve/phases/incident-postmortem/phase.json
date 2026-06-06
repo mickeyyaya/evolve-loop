@@ -1,0 +1,30 @@
+{
+  "name": "incident-postmortem",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-incident-postmortem",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "signals": []
+  },
+  "outputs": {
+    "files": [".evolve/runs/cycle-{cycle}/incident-postmortem-report.md"],
+    "signals": ["postmortem.open_actions"]
+  },
+  "prompt_context": ["goal"],
+  "classify": {
+    "require_sections": ["Impact", "Timeline", "Root Cause", "Action Items"],
+    "fail_if_empty": true,
+    "fail_if_signal": { "postmortem.open_actions": ">0" },
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      { "field": "scout.goal_type", "op": "==", "value": "ops-incident" }
+    ]
+  },
+  "after": "triage"
+}

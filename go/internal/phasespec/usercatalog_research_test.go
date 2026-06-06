@@ -23,9 +23,10 @@ func repoRoot(t *testing.T) string {
 }
 
 // TestResearchPhasesAreConfigOnly loads the real merged catalog and asserts the
-// 2026-research-informed phases (adversarial-review, perf-profile) exist as
-// optional user phases whose spec-derived contract is well-formed — the zero-Go
-// proof for WS-A + WS-C.
+// 2026-research-informed phases (adversarial-review, perf-profile) plus the
+// domain-wave phases (Wave Ops + Wave Accounting, domain-phase-catalog.md §3)
+// exist as optional user phases whose spec-derived contract is well-formed —
+// the zero-Go proof for WS-A + WS-C and the campaign's config-only invariant.
 func TestResearchPhasesAreConfigOnly(t *testing.T) {
 	root := repoRoot(t)
 	registry := filepath.Join(root, "docs", "architecture", "phase-registry.json")
@@ -60,6 +61,44 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			artifact:   "perf-profile-report.md",
 			sections:   []string{"## Benchmarks", "## Findings", "## Verdict"},
 			hasVerdict: true,
+		},
+		// Wave Ops (cycle 5) — domain-phase-catalog.md §3 Wave Ops table.
+		// incident-postmortem is the only evaluate phase (verdict vocabulary);
+		// runbook-draft (control) and capacity-plan (plan) carry
+		// verdict_on_pass but contract derivation leaves it inert (ADR-0035).
+		"incident-postmortem": {
+			artifact:   "incident-postmortem-report.md",
+			sections:   []string{"## Impact", "## Timeline", "## Root Cause", "## Action Items"},
+			hasVerdict: true,
+		},
+		"runbook-draft": {
+			artifact:   "runbook-draft-report.md",
+			sections:   []string{"## Trigger", "## Diagnosis", "## Resolution Steps", "## Escalation"},
+			hasVerdict: false,
+		},
+		"capacity-plan": {
+			artifact:   "capacity-plan-report.md",
+			sections:   []string{"## Demand Forecast", "## Current Capacity", "## Capacity Gap"},
+			hasVerdict: false,
+		},
+		// Wave Accounting (cycle-3 carry-forward) — domain-phase-catalog.md §3
+		// Wave Accounting table. Phase dirs were authored in cycle 3 but never
+		// committed; these cases pin the contract so the carry-forward commit
+		// is spec-covered.
+		"account-reconcile": {
+			artifact:   "account-reconcile-report.md",
+			sections:   []string{"## GL vs Source Balance", "## Reconciling Items", "## Adjustments", "## Sign-off"},
+			hasVerdict: true,
+		},
+		"variance-analysis": {
+			artifact:   "variance-analysis-report.md",
+			sections:   []string{"## Budget vs Actual", "## Classification", "## Drivers", "## Reforecast Impact"},
+			hasVerdict: true,
+		},
+		"close-checklist": {
+			artifact:   "close-checklist-report.md",
+			sections:   []string{"## Tasks", "## Blocking Items", "## Sign-off"},
+			hasVerdict: false,
 		},
 	}
 
