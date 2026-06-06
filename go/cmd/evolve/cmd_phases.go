@@ -13,8 +13,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // runPhases dispatches the phases subcommands. Exit codes: 0 ok, 2 validation
