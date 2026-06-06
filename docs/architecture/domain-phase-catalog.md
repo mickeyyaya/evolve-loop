@@ -127,7 +127,7 @@ Integration cycle: router recipe table + core-values table + `docs/architecture/
 | Wave | Status |
 |---|---|
 | PM | ✅ done (cycle 6) |
-| Strategy | ⬜ queued (cycle 2) |
+| Strategy | ✅ done (cycle 8) |
 | Accounting | ✅ done (cycle 5) |
 | Product | ⬜ queued (cycle 4) |
 | Ops | ✅ done (cycle 5) |

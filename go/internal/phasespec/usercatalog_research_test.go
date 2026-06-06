@@ -120,6 +120,26 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Dependencies", "## Critical Path", "## Blockers"},
 			hasVerdict: true,
 		},
+		// Wave Strategy (cycle 8) — domain-phase-catalog.md §3 Wave Strategy
+		// table. forces-analysis and market-sizing are evaluate phases
+		// (verdict vocabulary); okr-draft is a plan phase — verdict_on_pass
+		// is carried for uniformity but contract derivation leaves it inert
+		// (ADR-0035, risk-register/scope-baseline precedent).
+		"forces-analysis": {
+			artifact:   "forces-analysis-report.md",
+			sections:   []string{"## Competitive Rivalry", "## Buyer and Supplier Power", "## Entry and Substitute Threats", "## Attractiveness Verdict"},
+			hasVerdict: true,
+		},
+		"market-sizing": {
+			artifact:   "market-sizing-report.md",
+			sections:   []string{"## TAM", "## SAM", "## SOM", "## Methodology and Assumptions"},
+			hasVerdict: true,
+		},
+		"okr-draft": {
+			artifact:   "okr-draft-report.md",
+			sections:   []string{"## Objective", "## Key Results", "## Confidence and Scoring"},
+			hasVerdict: false,
+		},
 	}
 
 	for name, w := range cases {
