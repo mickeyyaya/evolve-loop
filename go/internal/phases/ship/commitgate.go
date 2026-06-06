@@ -199,4 +199,3 @@ func runPersonaLint(ctx context.Context, opts *Options, res *RunResult) error {
 	res.Logs = append(res.Logs, "[ship] persona-lint: check completed with no blocking errors")
 	return nil
 }
-
