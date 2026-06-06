@@ -162,19 +162,21 @@ Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) se
 - **Consolidate, don't enumerate:** group instances of the same root cause into ONE defect (e.g. "5 call sites missing error handling — files X, Y, Z" as `H1`, not five separate defects). One defect per root cause keeps the lesson the retrospective derives sharp and prevents an inflated count from masking the real failure mode.
 - If a defect contradicts a prior instinct, name the instinct ID so it propagates to the lesson's `contradicts` field.
 
-## Worktree-Anchored Suite + Tree SHA (C0+C1 — REQUIRED)
+## Worktree-Anchored Suite + Tree SHA (C0+C1 — NOTE)
 
-Both the ACS suite and the tree SHA MUST anchor to the tree containing the
-builder's changes — the active worktree when one exists, NEVER the main repo
-(cycles 226–227: an improvised `-root` on main false-FAILed two correct
-builds). Run EXACTLY (no improvised roots):
+The ACS suite root is kernel-owned and automatically resolved from the
+`cycle-state.json` (using its `active_worktree` property) when `--root` is not
+explicitly set, preventing the improvised `-root` anomalies that false-failed
+cycles 226–227.
+
+The tree SHA MUST anchor to the tree containing the builder's changes:
 
 ```bash
-WORKTREE=$(cycle-state.sh get active_worktree 2>/dev/null || echo "")
+WORKTREE=$(jq -r '.active_worktree // empty' .evolve/runs/cycle-<N>/cycle-state.json 2>/dev/null || echo "")
 ROOT="${WORKTREE:-$(git rev-parse --show-toplevel)}"
-(cd "$ROOT" && evolve acs suite --cycle <N> -root "$ROOT")
 TREE_SHA=$(git -C "$ROOT" rev-parse "HEAD^{tree}" 2>/dev/null || echo "UNKNOWN")
 ```
+
 
 Emit `audit_bound_tree_sha: $TREE_SHA` in the report header (right after the challenge token comment, before the Verdict anchor). ship.sh reads this field for post-commit integrity verification — a mismatch triggers `INTEGRITY BREACH`. If `TREE_SHA` is `UNKNOWN`, emit it anyway so ship.sh can detect the gap gracefully.
 
@@ -268,33 +270,14 @@ Each audit criterion in `audit-report.md` MUST cite at least one of 8 principles
 
 **Enforcement:** `legacy/scripts/verification/audit-constitution-check.sh <audit-report.md>` requires ≥1 total principle citation (P1..P8) and ≥1 P1 citation. Missing citations → `principle-citation-missing` defect (HIGH).
 
-## Hypothesis falsification emission (v10.10.0 Layer 2, ADR-0012)
+## Hypothesis falsification emission
+Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `hypothesis-falsification-example` for schema, P4 requirement, and `unfalsifiable-claim` defect format.
 
-When the build-report contains a falsifiable hypothesis ("will reduce X by Y%", "expected to reduce", "should improve", "predicted") about a future-cycle metric, emit a `falsifiable_claims[]` entry in `handoff-auditor.json`. See [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `hypothesis-falsification-example` for the full schema.
-
-**Falsifiability requirement (P4):** any optimization claim WITHOUT specifying `verification_artifact` and `verification_field` is itself a defect — emit `unfalsifiable-claim` (P4 constitutional violation).
-
-## WARN-elevation hardening (v10.10.0 Layer 5, ADR-0012)
-
-After your audit-report is written, `legacy/scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Include a literal `**Confidence:** N.NN` line near your verdict where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, POSTHOC values match Builder's narrative, no P-violations remain."
-
-`EVOLVE_PASS_CONFIDENCE_THRESHOLD=0.85` (default). **Why (P6):** "I think it works but I'm not sure" must NOT ship. Layer 5 makes confidence honesty load-bearing.
-
-**Integration**: ship.sh post-audit chain (cycle-78+) invokes verdict-elevation.sh and updates `acs-verdict.json:verdict` if elevation fires.
+## WARN-elevation hardening
+Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `warn-elevation` for confidence threshold, `EVOLVE_PASS_CONFIDENCE_THRESHOLD`, and `verdict-elevation.sh` integration.
 
 ## Reflection Authoring (v10.20.0+)
+Execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md`'s `## Reflection` section and `audit-reflection.yaml` sidecar. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md`'s `## Reflection` section and `audit-reflection.yaml` sidecar. Auditor-specific friction commonly maps to `ambiguous-input` (defect-detection blind spots, evidence-chain gaps) or `profile-restriction` (model-family separation enforcement friction). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
-
-## Reflection-sycophancy defect check (v10.20.0+)
-
-When auditing each `<phase>-reflection.yaml` sidecar present in the cycle dir, emit a `reflection-sycophancy` defect at severity **medium** if ANY of these hold:
-
-- `slowdowns: []` AND `phase_smooth: false` (or `phase_smooth` absent) — the phase claims everything went well without asserting smoothness.
-- `phase_smooth: true` AND `phase_tracker_refs.cost_usd > baseline × 1.1` OR `phase_tracker_refs.turns > profile_max` — the smoothness assertion contradicts the tracker numbers.
-- `reflection_confidence < 0.3` — the agent's own confidence undermines the reflection.
-- `slowdowns[]` has entries WITHOUT each having a non-empty `evidence` field — vague friction is itself a defect.
-
-Severity is **medium** (advisory only). EGPS blocks ship only on `red_count == 0`, so MEDIUM defects surface in the audit report without stopping ship — calibrated to encourage genuine reflection without weaponizing the gate against truly smooth phases.
-
-Cite the YAML file and offending line(s) in the defect's `location` field. Example: `location: ".evolve/runs/cycle-N/builder-reflection.yaml:line=5"`.
+## Reflection-sycophancy defect check
+Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `reflection-sycophancy` for trigger conditions, severity rules, and `location` field format.

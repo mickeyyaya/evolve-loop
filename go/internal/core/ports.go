@@ -164,6 +164,9 @@ type LedgerEntry struct {
 	// Message carries a human-readable detail string for self-heal events
 	// (e.g. the stop-reviewer's justification text). Empty for other kinds.
 	Message string `json:"message,omitempty"`
+	// Source identifies the skip-decision origin for phase_skipped entries.
+	// Values: router | psmas | content. Omitted for all other entry kinds.
+	Source string `json:"source,omitempty"`
 }
 
 // ledgerEntryWire is the JSON-facing twin of LedgerEntry. Cycle is a
@@ -190,6 +193,7 @@ type ledgerEntryWire struct {
 	Workers         []string        `json:"workers,omitempty"`
 	Action          string          `json:"action,omitempty"`
 	Message         string          `json:"message,omitempty"`
+	Source          string          `json:"source,omitempty"`
 }
 
 // UnmarshalJSON accepts cycle as int, whole-number float, or string.
@@ -218,6 +222,7 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.Workers = wire.Workers
 	e.Action = wire.Action
 	e.Message = wire.Message
+	e.Source = wire.Source
 
 	// Route the cycle field: int → Cycle, string → CycleLabel.
 	if len(wire.Cycle) == 0 {

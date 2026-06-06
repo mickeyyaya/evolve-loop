@@ -72,6 +72,7 @@ func readActiveWorktree(opts *Options) string {
 //	git push origin <branch>
 func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch string) error {
 	if !opts.DryRun {
+		_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
 		exit, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
 			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
@@ -165,7 +166,93 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   cycle branch: %s", cycleBranch))
 
+	// Collider pre-flight check (v12.2 / Task 2)
+	incomingFiles := make(map[string]bool)
+
+	// 1. Files modified in commits branch..cycleBranch
+	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, "diff", "--name-only", branch, cycleBranch)
+	if err == nil {
+		for _, line := range strings.Split(diffOut, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				incomingFiles[line] = true
+			}
+		}
+	}
+
+	// 2. Files in worktree status (modified, added, untracked, staged)
+	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain")
+	if err == nil {
+		for _, line := range strings.Split(statusOut, "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) > 3 {
+				status := line[:2]
+				if !strings.Contains(status, "D") { // Skip deleted files
+					path := line[3:]
+					if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
+						path = path[1 : len(path)-1]
+					}
+					incomingFiles[path] = true
+				}
+			}
+		}
+	}
+
+	// Expand directories in incomingFiles
+	expandedIncomingFiles := make(map[string]bool)
+	for p := range incomingFiles {
+		wtFilePath := filepath.Join(worktree, p)
+		info, err := os.Stat(wtFilePath)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			// Best-effort expansion: per-entry Walk errors are tolerated (callback returns nil).
+			_ = filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
+				if walkErr != nil {
+					return nil
+				}
+				if !walkInfo.IsDir() {
+					rel, relErr := filepath.Rel(worktree, path)
+					if relErr == nil {
+						expandedIncomingFiles[rel] = true
+					}
+				}
+				return nil
+			})
+		} else {
+			expandedIncomingFiles[p] = true
+		}
+	}
+
+	var colliders []string
+	for p := range expandedIncomingFiles {
+		wtFilePath := filepath.Join(worktree, p)
+		if _, err := os.Stat(wtFilePath); err != nil {
+			continue // Does not exist in worktree
+		}
+		mainFilePath := filepath.Join(opts.ProjectRoot, p)
+		if _, err := os.Stat(mainFilePath); err != nil {
+			continue // Does not exist on main side
+		}
+		// Check if it is untracked in main repo
+		mainTracked, err := captureGitOutput(ctx, opts, "ls-files", p)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(mainTracked) == "" {
+			colliders = append(colliders, p)
+		}
+	}
+
+	if len(colliders) > 0 {
+		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: untracked files in main working tree would be overwritten by merge: %s", strings.Join(colliders, ", ")),
+			"colliders", strings.Join(colliders, ","))
+	}
+
 	if !opts.DryRun {
+		_ = discardBinaryChurn(ctx, opts, worktree)
 		exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
 			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
@@ -460,4 +547,53 @@ func maybeCreateRelease(ctx context.Context, opts *Options, res *RunResult) erro
 func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args ...string) (string, error) {
 	all := append([]string{"-C", dir}, args...)
 	return captureGitOutput(ctx, opts, all...)
+}
+
+// discardBinaryChurn discards unaudited tracked-binary rebuild churn from the
+// WORKTREE before `git add -A` stages the ship commit. It deliberately uses
+// `git checkout -- <path>` (restore from INDEX), not `git checkout HEAD -- <path>`:
+// after normalizeWorktreeToBase's `git reset --soft`, the index holds the full
+// audited diff, so the index — not HEAD — is the audited reference. Restoring
+// from the index discards exactly the post-audit worktree churn (e.g. an ACS
+// rerun rebuilding go/evolve) while preserving an audited, intentionally staged
+// binary update. Contrast with core.discardMainLeak, which runs mid-cycle on the
+// MAIN tree where the cycle is not yet committed and HEAD is the audited
+// reference — there `HEAD --` is correct. The two forms are not interchangeable.
+func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
+	binPath := opts.ShipBinaryPath
+	if binPath == "" {
+		if execPath, err := os.Executable(); err == nil {
+			binPath = execPath
+		}
+	}
+	var relBin string
+	if binPath != "" {
+		if rel, err := filepath.Rel(opts.ProjectRoot, binPath); err == nil && !strings.HasPrefix(rel, "..") {
+			relBin = filepath.ToSlash(rel)
+		}
+	}
+
+	// Always discard the standard production path "go/evolve" as well as relBin
+	pathsToDiscard := []string{"go/evolve"}
+	if relBin != "" && relBin != "go/evolve" {
+		pathsToDiscard = append(pathsToDiscard, relBin)
+	}
+
+	for _, p := range pathsToDiscard {
+		absPath := filepath.Join(dir, p)
+		if _, err := os.Stat(absPath); os.IsNotExist(err) {
+			continue // doesn't exist, skip
+		}
+		// Check if it is tracked in the repository context of dir
+		var buf strings.Builder
+		exitCode, err := opts.Runner(ctx, "git", []string{"-C", dir, "ls-files", p}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+		if err == nil && exitCode == 0 && strings.TrimSpace(buf.String()) != "" {
+			// Revert the changes
+			_, _ = opts.Runner(ctx, "git", []string{"-C", dir, "checkout", "--", p}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+		} else {
+			// Untracked: remove the file
+			_ = os.Remove(absPath)
+		}
+	}
+	return nil
 }

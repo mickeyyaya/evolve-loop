@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 )
+
+// resolveACSSuiteRoot reads <evolveDir>/runs/cycle-<cycle>/cycle-state.json and
+// returns its active_worktree value, or "" when absent, malformed, or empty.
+func resolveACSSuiteRoot(evolveDir string, cycle int) string {
+	path := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var state struct {
+		ActiveWorktree string `json:"active_worktree"`
+	}
+	if err := json.Unmarshal(data, &state); err != nil {
+		return ""
+	}
+	return state.ActiveWorktree
+}
 
 // mainProjectRoot resolves the MAIN project root from dir, following a git worktree
 // back to its main checkout via --git-common-dir (whose parent is the main root).
@@ -76,6 +94,13 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 	if cycle <= 0 {
 		fmt.Fprintln(stderr, "evolve acs suite: --cycle is required (must be >0)")
 		return 10
+	}
+	// Auto-resolve suite root from kernel-owned cycle-state.json when --root
+	// was not explicitly overridden from the default (mode 5, ADR-0025).
+	if root == "." {
+		if resolved := resolveACSSuiteRoot(evolveDir, cycle); resolved != "" {
+			root = resolved
+		}
 	}
 	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: mainProjectRoot(root), Cycle: cycle})
 	if err != nil {

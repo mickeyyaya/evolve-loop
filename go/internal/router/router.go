@@ -52,6 +52,13 @@ type RouteInput struct {
 	// no goal text was threaded (the advisor then plans from signals + recall only).
 	GoalText string
 
+	// CarryoverTodos are unresolved operator/workflow tasks from previous cycles,
+	// projected from state.json:carryoverTodos by the orchestrator at cycle start.
+	// Consumed ONLY by the DynamicLLM planner prompt so the upfront whole-cycle
+	// advisor can select phases based on known backlog before Scout has produced
+	// any handoff artifacts. The pure Route() ignores it.
+	CarryoverTodos []CarryoverTodo
+
 	// Catalog is the set of pre-defined phases the advisor may SELECT instead of
 	// minting a new one (WS3: prefer select-over-mint = DRY at the agent level).
 	// Populated by the orchestrator from the phase catalog; consumed ONLY by a
@@ -95,6 +102,17 @@ type PhaseCard struct {
 	Role         string `json:"role"` // plan|build|evaluate|control
 	Tier         string `json:"tier,omitempty"`
 	WritesSource bool   `json:"writes_source,omitempty"`
+}
+
+// CarryoverTodo is the router/advisor-facing projection of one unresolved
+// carryover task. It mirrors core.CarryoverTodo without importing core into the
+// leaf router package.
+type CarryoverTodo struct {
+	ID             string `json:"id"`
+	Action         string `json:"action"`
+	Priority       string `json:"priority"`
+	FirstSeenCycle int    `json:"first_seen_cycle"`
+	CyclesUnpicked int    `json:"cycles_unpicked"`
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.

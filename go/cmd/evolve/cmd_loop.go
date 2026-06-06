@@ -23,6 +23,10 @@ import (
 	"strings"
 	"time"
 
+	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
+	// so the orchestrator writes a resumable checkpoint at every phase boundary.
+	// Without this the hook stays nil and the feature silently no-ops in production.
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
@@ -280,6 +284,25 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		result, err := orch.RunCycle(context.Background(), req)
 		lr.Cycles = append(lr.Cycles, result)
 		if err != nil {
+			var clf *core.ErrCycleLevelFailure
+			if errors.As(err, &clf) {
+				fmt.Fprintf(stderr, "evolve loop: cycle %d: %v\n", result.Cycle, err)
+				lr.RecoverableFailures++
+
+				statePath := filepath.Join(cfg.EvolveDir, "state.json")
+				runsParent := filepath.Join(cfg.ProjectRoot, ".evolve", "runs")
+				class := cycleclassify.Classify(cycleWorkspace(cfg.ProjectRoot, result.Cycle))
+				_, recordErr := failurelog.Record(statePath, runsParent, failurelog.RecordRequest{
+					Cycle:          result.Cycle,
+					Classification: string(class.Class),
+					ReportPath:     filepath.Join(cycleWorkspace(cfg.ProjectRoot, result.Cycle), "orchestrator-report.md"),
+					Now:            time.Now().UTC(),
+				})
+				if recordErr != nil && !errors.Is(recordErr, failurelog.ErrStateMissing) {
+					fmt.Fprintf(stderr, "[loop] WARN: could not record cycle failure: %v\n", recordErr)
+				}
+				continue
+			}
 			lr.StopReason = "error"
 			fmt.Fprintf(stderr, "evolve loop: cycle %d: %v\n", result.Cycle, err)
 			break
