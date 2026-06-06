@@ -23,9 +23,10 @@ func repoRoot(t *testing.T) string {
 }
 
 // TestResearchPhasesAreConfigOnly loads the real merged catalog and asserts the
-// 2026-research-informed phases (adversarial-review, perf-profile) exist as
-// optional user phases whose spec-derived contract is well-formed — the zero-Go
-// proof for WS-A + WS-C.
+// 2026-research-informed phases (adversarial-review, perf-profile) plus the
+// domain-wave phases (Wave Ops + Wave Accounting, domain-phase-catalog.md §3)
+// exist as optional user phases whose spec-derived contract is well-formed —
+// the zero-Go proof for WS-A + WS-C and the campaign's config-only invariant.
 func TestResearchPhasesAreConfigOnly(t *testing.T) {
 	root := repoRoot(t)
 	registry := filepath.Join(root, "docs", "architecture", "phase-registry.json")
@@ -59,6 +60,104 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 		"perf-profile": {
 			artifact:   "perf-profile-report.md",
 			sections:   []string{"## Benchmarks", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		// Wave Ops (cycle 5) — domain-phase-catalog.md §3 Wave Ops table.
+		// incident-postmortem is the only evaluate phase (verdict vocabulary);
+		// runbook-draft (control) and capacity-plan (plan) carry
+		// verdict_on_pass but contract derivation leaves it inert (ADR-0035).
+		"incident-postmortem": {
+			artifact:   "incident-postmortem-report.md",
+			sections:   []string{"## Impact", "## Timeline", "## Root Cause", "## Action Items"},
+			hasVerdict: true,
+		},
+		"runbook-draft": {
+			artifact:   "runbook-draft-report.md",
+			sections:   []string{"## Trigger", "## Diagnosis", "## Resolution Steps", "## Escalation"},
+			hasVerdict: false,
+		},
+		"capacity-plan": {
+			artifact:   "capacity-plan-report.md",
+			sections:   []string{"## Demand Forecast", "## Current Capacity", "## Capacity Gap"},
+			hasVerdict: false,
+		},
+		// Wave Accounting (cycle-3 carry-forward) — domain-phase-catalog.md §3
+		// Wave Accounting table. Phase dirs were authored in cycle 3 but never
+		// committed; these cases pin the contract so the carry-forward commit
+		// is spec-covered.
+		"account-reconcile": {
+			artifact:   "account-reconcile-report.md",
+			sections:   []string{"## GL vs Source Balance", "## Reconciling Items", "## Adjustments", "## Sign-off"},
+			hasVerdict: true,
+		},
+		"variance-analysis": {
+			artifact:   "variance-analysis-report.md",
+			sections:   []string{"## Budget vs Actual", "## Classification", "## Drivers", "## Reforecast Impact"},
+			hasVerdict: true,
+		},
+		"close-checklist": {
+			artifact:   "close-checklist-report.md",
+			sections:   []string{"## Tasks", "## Blocking Items", "## Sign-off"},
+			hasVerdict: false,
+		},
+		// Wave PM (cycle 6) — domain-phase-catalog.md §3 Wave PM table.
+		// dependency-map is the only evaluate phase (verdict vocabulary);
+		// risk-register and scope-baseline are plan phases — verdict_on_pass
+		// is carried for uniformity but contract derivation leaves it inert
+		// (ADR-0035, runbook-draft/capacity-plan precedent).
+		"risk-register": {
+			artifact:   "risk-register-report.md",
+			sections:   []string{"## Risks", "## Scoring", "## Response Strategies", "## Owners"},
+			hasVerdict: false,
+		},
+		"scope-baseline": {
+			artifact:   "scope-baseline-report.md",
+			sections:   []string{"## Deliverables", "## Acceptance Criteria", "## Exclusions", "## Constraints and Assumptions"},
+			hasVerdict: false,
+		},
+		"dependency-map": {
+			artifact:   "dependency-map-report.md",
+			sections:   []string{"## Dependencies", "## Critical Path", "## Blockers"},
+			hasVerdict: true,
+		},
+		// Wave Strategy (cycle 8) — domain-phase-catalog.md §3 Wave Strategy
+		// table. forces-analysis and market-sizing are evaluate phases
+		// (verdict vocabulary); okr-draft is a plan phase — verdict_on_pass
+		// is carried for uniformity but contract derivation leaves it inert
+		// (ADR-0035, risk-register/scope-baseline precedent).
+		"forces-analysis": {
+			artifact:   "forces-analysis-report.md",
+			sections:   []string{"## Competitive Rivalry", "## Buyer and Supplier Power", "## Entry and Substitute Threats", "## Attractiveness Verdict"},
+			hasVerdict: true,
+		},
+		"market-sizing": {
+			artifact:   "market-sizing-report.md",
+			sections:   []string{"## TAM", "## SAM", "## SOM", "## Methodology and Assumptions"},
+			hasVerdict: true,
+		},
+		"okr-draft": {
+			artifact:   "okr-draft-report.md",
+			sections:   []string{"## Objective", "## Key Results", "## Confidence and Scoring"},
+			hasVerdict: false,
+		},
+		// Wave Product (cycle 10) — domain-phase-catalog.md §3 Wave Product
+		// table. metric-tree is the only evaluate phase (verdict vocabulary);
+		// opportunity-map and prd-draft are plan phases — verdict_on_pass
+		// is carried for uniformity but contract derivation leaves it inert
+		// (ADR-0035, okr-draft/risk-register precedent).
+		"opportunity-map": {
+			artifact:   "opportunity-map-report.md",
+			sections:   []string{"## Desired Outcome", "## Opportunities", "## Candidate Solutions", "## Assumption Tests"},
+			hasVerdict: false,
+		},
+		"prd-draft": {
+			artifact:   "prd-draft-report.md",
+			sections:   []string{"## Problem", "## Goals and Success Metrics", "## Requirements", "## Out of Scope"},
+			hasVerdict: false,
+		},
+		"metric-tree": {
+			artifact:   "metric-tree-report.md",
+			sections:   []string{"## North Star Metric", "## Input Metrics", "## Guardrail Metrics"},
 			hasVerdict: true,
 		},
 	}

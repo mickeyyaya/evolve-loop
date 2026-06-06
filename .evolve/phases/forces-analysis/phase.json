@@ -1,0 +1,29 @@
+{
+  "name": "forces-analysis",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-forces-analysis",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "signals": []
+  },
+  "outputs": {
+    "files": [".evolve/runs/cycle-{cycle}/forces-analysis-report.md"],
+    "signals": ["forces.high_pressure_count"]
+  },
+  "prompt_context": ["goal"],
+  "classify": {
+    "require_sections": ["Competitive Rivalry", "Buyer and Supplier Power", "Entry and Substitute Threats", "Attractiveness Verdict"],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      { "field": "scout.goal_type", "op": "==", "value": "business-strategy" }
+    ]
+  },
+  "after": "triage"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "market-sizing",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-market-sizing",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "signals": []
+  },
+  "outputs": {
+    "files": [".evolve/runs/cycle-{cycle}/market-sizing-report.md"],
+    "signals": ["market.layers_quantified"]
+  },
+  "prompt_context": ["goal"],
+  "classify": {
+    "require_sections": ["TAM", "SAM", "SOM", "Methodology and Assumptions"],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      { "field": "scout.goal_type", "op": "==", "value": "business-strategy" }
+    ]
+  },
+  "after": "triage"
+}

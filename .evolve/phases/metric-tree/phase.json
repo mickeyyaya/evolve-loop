@@ -1,0 +1,45 @@
+{
+  "name": "metric-tree",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-metric-tree",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ],
+    "signals": []
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/metric-tree-report.md"
+    ],
+    "signals": [
+      "metric.inputs_count"
+    ]
+  },
+  "prompt_context": [
+    "goal"
+  ],
+  "classify": {
+    "require_sections": [
+      "North Star Metric",
+      "Input Metrics",
+      "Guardrail Metrics"
+    ],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "product-discovery"
+      }
+    ]
+  },
+  "after": "triage"
+}

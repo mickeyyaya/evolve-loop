@@ -57,6 +57,11 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 | performance | benchmark baseline capture → [build] → benchmark-gate |
 | release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
 | docs / trivial | spine only (no insertions) |
+| project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
+| business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
+| accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
+| product-discovery | opportunity-map → prd-draft → metric-tree → [build] |
+| ops-incident | incident-postmortem → runbook-draft → capacity-plan → [build] |
 
 Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
 
@@ -88,6 +93,21 @@ something plausible.
 | `perf-profile` | latency regressions compounding per-cycle cost — benchmark delta on touched packages |
 | `spec-verify` | building from an ambiguous/ungrounded spec — restate + grounding check before tdd |
 | `architecture-design` | large changes without a design decision — trade-off blueprint for large cycles |
+| `risk-register` | unowned, unscored threats surfacing late — scores and assigns all risks before the plan is baselined |
+| `scope-baseline` | scope creep against no reference line — captures deliverables, ACs, exclusions before any build |
+| `dependency-map` | hidden cross-task blockers and an unknown critical path — maps deps and zero-float chain |
+| `forces-analysis` | entering a structurally unprofitable market blind — Porter five-forces pass on industry structure |
+| `market-sizing` | pursuing an opportunity too small or an inflated TAM — quantifies TAM/SAM/SOM with methodology |
+| `okr-draft` | activity-based, unmeasurable goals — ensures each objective has ≥3 scored key results |
+| `account-reconcile` | an unsubstantiated GL balance — reconciles GL vs source and flags unexplained items |
+| `variance-analysis` | unexplained budget-to-actual drift — classifies variances and projects reforecast impact |
+| `close-checklist` | an incomplete or unauthorized close — blocks close until all tasks signed off |
+| `opportunity-map` | solutioning without a validated customer problem — maps outcomes, opportunities, and assumption tests |
+| `prd-draft` | building with no documented problem or success contract — ensures goals and non-goals are explicit |
+| `metric-tree` | shipping with no measurable definition of success — defines NSM + input + guardrail metrics |
+| `incident-postmortem` | root cause and corrective actions unrecorded → incident recurs — structured 4-section debrief |
+| `runbook-draft` | on-call responders improvising with no recovery path — validated trigger-to-resolution playbook |
+| `capacity-plan` | capacity shortfall from unforecasted demand growth — quantifies gap before it becomes an outage |
 
 Selecting a phase whose persona/runner/profile is not dispatchable crashes the
 cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);
