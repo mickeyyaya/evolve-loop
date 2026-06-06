@@ -2,7 +2,9 @@
   "name": "auditor",
   "role": "auditor",
   "cli": "codex-tmux",
-  "cli_fallback": ["claude-tmux"],
+  "cli_fallback": [
+    "claude-tmux"
+  ],
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "security_sensitive": "opus",
@@ -223,5 +225,6 @@
     "web_fetch": 5,
     "kb_search": 20
   },
-  "stream_output": true
+  "stream_output": true,
+  "generated_from": "hand-authored"
 }

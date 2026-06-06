@@ -41,5 +41,6 @@
     "allow_network": false
   },
   "_note": "Opt C build-planner phase (cycle-103). Shadow mode default \u2014 EVOLVE_BUILD_PLANNER=0. max_turns=10 and max_budget_usd=0.30 enforce a lightweight planning-only session.",
-  "stream_output": true
+  "stream_output": true,
+  "generated_from": "hand-authored"
 }

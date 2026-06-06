@@ -110,5 +110,6 @@
     "claude"
   ],
   "_note": "Restricted to claude \u2014 same safety reasoning as builder.",
-  "stream_output": true
+  "stream_output": true,
+  "generated_from": "hand-authored"
 }

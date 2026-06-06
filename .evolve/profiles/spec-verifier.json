@@ -12,5 +12,6 @@
       ".evolve/runs/cycle-*"
     ],
     "read_only_repo": true
-  }
+  },
+  "generated_from": "hand-authored"
 }

@@ -68,6 +68,7 @@ type Profile struct {
 	StreamOutput       bool               `json:"stream_output,omitempty"`
 	StopCriterion      string             `json:"stop_criterion,omitempty"`
 	TurnBudgetHint     int                `json:"turn_budget_hint,omitempty"`
+	GeneratedFrom      string             `json:"generated_from,omitempty"`
 	// SystemPrompt / SystemPromptFile carry per-agent system-level rules
 	// prepended to the prompt at launch (facet B). SystemPromptFile is read
 	// relative to the profile dir when not absolute; SystemPrompt wins if both

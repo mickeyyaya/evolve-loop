@@ -148,5 +148,6 @@
     "web_fetch": 5,
     "kb_search": 20
   },
-  "stream_output": true
+  "stream_output": true,
+  "generated_from": "hand-authored"
 }

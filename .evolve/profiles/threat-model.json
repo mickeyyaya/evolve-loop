@@ -37,5 +37,6 @@
       ".evolve/evals"
     ],
     "allow_network": false
-  }
+  },
+  "generated_from": "hand-authored"
 }

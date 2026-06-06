@@ -1,5 +1,5 @@
 {
-  "_deprecated": "ARCHIVED / non-LLM. The orchestrator is the deterministic Go kernel (core.Orchestrator), not an LLM agent — this bash-era profile is never loaded at runtime. The LLM routing brain is the advisor (profiles/router.json + agents/evolve-router.md). Kept for historical reference only.",
+  "_deprecated": "ARCHIVED / non-LLM. The orchestrator is the deterministic Go kernel (core.Orchestrator), not an LLM agent \u2014 this bash-era profile is never loaded at runtime. The LLM routing brain is the advisor (profiles/router.json + agents/evolve-router.md). Kept for historical reference only.",
   "name": "orchestrator",
   "role": "orchestrator",
   "context_mode": "digest",
@@ -259,5 +259,6 @@
   "allowed_clis": [
     "all"
   ],
-  "stream_output": true
+  "stream_output": true,
+  "generated_from": "hand-authored"
 }
