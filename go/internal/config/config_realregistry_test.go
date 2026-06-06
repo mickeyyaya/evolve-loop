@@ -28,8 +28,10 @@ func TestLoad_RealRegistry(t *testing.T) {
 			t.Errorf("Mandatory[%d]=%s, want %s", i, cfg.Mandatory[i], p)
 		}
 	}
-	if cfg.MaxInsertions != 4 {
-		t.Errorf("MaxInsertions=%d, want 4", cfg.MaxInsertions)
+	// 6 since cycle 217 (micro-phase catalog §4.2): the refactor recipe needs
+	// six optional insertions; registry config.max_optional_insertions raised 4→6.
+	if cfg.MaxInsertions != 6 {
+		t.Errorf("MaxInsertions=%d, want 6 (registry max_optional_insertions, raised in cycle 217)", cfg.MaxInsertions)
 	}
 	if r, ok := cfg.Conditional["tdd"]; !ok || r.Field != "cycle_size" || r.Op != "!=" || r.Value != "trivial" {
 		t.Errorf("Conditional[tdd]=%+v (ok=%v), want cycle_size != trivial", r, ok)

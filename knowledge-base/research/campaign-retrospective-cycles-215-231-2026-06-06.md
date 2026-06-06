@@ -149,5 +149,13 @@ Trust kernel (zero breaches; every unsound merge blocked); advisor composition (
 ## 8. Open decision (user)
 Resume the remaining campaign cycles now, or land migration steps 1–3 first? **Recommendation: land step 1 (`201f7cb`) + step 2 in one or two supervised cycles, then resume the campaign** — the remaining 10 cycles then run on rails that none of this report's incidents can derail.
 
+## Addendum (post-pause, found while landing this report)
+
+**I-14 — Cache-masked assertion drift:** `TestLoad_RealRegistry` expected `MaxInsertions=4` and has been broken since cycle 217 intentionally raised the registry to 6 — masked locally by Go's test cache (the release's "146/146 ok" verification was partially cache-grounded; CI's uncached race run exposed it). Same class as I-1 (assertion encodes a moved truth) plus a verification lesson: release preflight and operator test runs must use `-count=1`. Fixed: expectation updated to 6 with provenance comment.
+
+**I-15 — `ship --class manual` stages `-A`:** the docs-only retro commit (`faafbab`) silently swept cycle-231 residue (5 unaudited predicates + a RED Go test) and a locally-rebuilt `go/evolve` binary into the repo; removed in `342a202`. Fresh I-10/Practice-4 evidence: ship-by-belief ("the tree is exactly my commit") instead of ship-by-manifest. The Invariant-2 handle model (ship stages what the handle *tracked*) retires this class too.
+
+**I-12 closure:** the persona line budget is now met on main (auditor persona compressed to exactly 300 by merging the duplicated C0/C1 worktree blocks — DRY fixed the budget), `cycle-77` predicate + Go twin both green.
+
 ## Appendix — artifact index
 Reset seals: `.evolve/runs/cycle-{216,219,220,221,222,224,225,228,230,231}.reset-*` · Salvage: git stash "cycle-226 FAILED-audit builder leak", `/tmp/evolve-c230-salvage/`, branch `cycle-230`@`201f7cb` · Carryover todos: `phases-quality-gates`, `phases-release-and-memory`, `user-phase-persona-resolution` (6 modes; superseded by §4–5 of this report)
