@@ -165,6 +165,92 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   cycle branch: %s", cycleBranch))
 
+	// Collider pre-flight check (v12.2 / Task 2)
+	incomingFiles := make(map[string]bool)
+
+	// 1. Files modified in commits branch..cycleBranch
+	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, "diff", "--name-only", branch, cycleBranch)
+	if err == nil {
+		for _, line := range strings.Split(diffOut, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				incomingFiles[line] = true
+			}
+		}
+	}
+
+	// 2. Files in worktree status (modified, added, untracked, staged)
+	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain")
+	if err == nil {
+		for _, line := range strings.Split(statusOut, "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) > 3 {
+				status := line[:2]
+				if !strings.Contains(status, "D") { // Skip deleted files
+					path := line[3:]
+					if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
+						path = path[1 : len(path)-1]
+					}
+					incomingFiles[path] = true
+				}
+			}
+		}
+	}
+
+	// Expand directories in incomingFiles
+	expandedIncomingFiles := make(map[string]bool)
+	for p := range incomingFiles {
+		wtFilePath := filepath.Join(worktree, p)
+		info, err := os.Stat(wtFilePath)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
+				if walkErr != nil {
+					return nil
+				}
+				if !walkInfo.IsDir() {
+					rel, relErr := filepath.Rel(worktree, path)
+					if relErr == nil {
+						expandedIncomingFiles[rel] = true
+					}
+				}
+				return nil
+			})
+		} else {
+			expandedIncomingFiles[p] = true
+		}
+	}
+
+	var colliders []string
+	for p := range expandedIncomingFiles {
+		wtFilePath := filepath.Join(worktree, p)
+		if _, err := os.Stat(wtFilePath); err != nil {
+			continue // Does not exist in worktree
+		}
+		mainFilePath := filepath.Join(opts.ProjectRoot, p)
+		if _, err := os.Stat(mainFilePath); err != nil {
+			continue // Does not exist on main side
+		}
+		// Check if it is untracked in main repo
+		mainTracked, err := captureGitOutput(ctx, opts, "ls-files", p)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(mainTracked) == "" {
+			colliders = append(colliders, p)
+		}
+	}
+
+	if len(colliders) > 0 {
+		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: untracked files in main working tree would be overwritten by merge: %s", strings.Join(colliders, ", ")),
+			"colliders", strings.Join(colliders, ","))
+	}
+
+
+
 	if !opts.DryRun {
 		exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {

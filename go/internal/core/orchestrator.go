@@ -1953,6 +1953,7 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 	for _, sp := range dec.SkipPhases {
 		if err := o.ledger.Append(ctx, LedgerEntry{
 			TS: ts, Cycle: cycle, Role: sp, Kind: "phase_skipped", ExitCode: 0,
+			Source: "router",
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
 		}

@@ -177,6 +177,31 @@ HIGH	<issue>	<file>	<line>
 
 ---
 
+## Section: warn-elevation
+
+`legacy/scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Include a literal `**Confidence:** N.NN` line near your verdict where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, POSTHOC values match Builder's narrative, no P-violations remain."
+
+`EVOLVE_PASS_CONFIDENCE_THRESHOLD=0.85` (default). **Why (P6):** "I think it works but I'm not sure" must NOT ship. Layer 5 makes confidence honesty load-bearing.
+
+**Integration**: ship.sh post-audit chain (cycle-78+) invokes verdict-elevation.sh and updates `acs-verdict.json:verdict` if elevation fires.
+
+---
+
+## Section: reflection-sycophancy
+
+When auditing each `<phase>-reflection.yaml` sidecar present in the cycle dir, emit a `reflection-sycophancy` defect at severity **medium** if ANY of these hold:
+
+- `slowdowns: []` AND `phase_smooth: false` (or `phase_smooth` absent) — the phase claims everything went well without asserting smoothness.
+- `phase_smooth: true` AND `phase_tracker_refs.cost_usd > baseline × 1.1` OR `phase_tracker_refs.turns > profile_max` — the smoothness assertion contradicts the tracker numbers.
+- `reflection_confidence < 0.3` — the agent's own confidence undermines the reflection.
+- `slowdowns[]` has entries WITHOUT each having a non-empty `evidence` field — vague friction is itself a defect.
+
+Severity is **medium** (advisory only). EGPS blocks ship only on `red_count == 0`, so MEDIUM defects surface in the audit report without stopping ship — calibrated to encourage genuine reflection without weaponizing the gate against truly smooth phases.
+
+Cite the YAML file and offending line(s) in the defect's `location` field. Example: `location: ".evolve/runs/cycle-N/builder-reflection.yaml:line=5"`.
+
+---
+
 ## Section: hypothesis-falsification-example
 
 Example `falsifiable_claims[]` entry for `handoff-auditor.json`:
