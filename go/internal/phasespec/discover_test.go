@@ -93,6 +93,8 @@ func TestValidateUserSpec(t *testing.T) {
 		{"bad name", PhaseSpec{Name: "Security Scan", Optional: true}, false, "kebab-case"},
 		{"not optional (floor)", PhaseSpec{Name: "x", Optional: false}, false, "must be optional"},
 		{"native reserved", PhaseSpec{Name: "x", Optional: true, Kind: "native"}, false, "reserved"},
+		{"traversal agent", PhaseSpec{Name: "x", Optional: true, Agent: "../../evil"}, false, "kebab-case"},
+		{"valid agent", PhaseSpec{Name: "x-check", Optional: true, Agent: "evolve-x-check"}, true, ""},
 		{"unknown kind", PhaseSpec{Name: "x", Optional: true, Kind: "wat"}, false, "unknown kind"},
 		{"bad verdict_on_pass", PhaseSpec{Name: "x", Optional: true, Classify: &ClassifyRules{VerdictOnPass: "pass"}}, false, "PASS/FAIL/WARN/SKIPPED"},
 	}

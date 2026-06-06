@@ -222,11 +222,24 @@ func buildPlanPrompt(in router.RouteInput) string {
 	return b.String()
 }
 
+// maxEnrichedCatalogCards bounds how many cards render with full metadata
+// (categories + when-to-use hint) so a large plugin ecosystem cannot crowd the
+// rubric out of the context window. Overflow phases stay SELECTable via a
+// name-only line — a phase absent from the prompt cannot be selected at all.
+const maxEnrichedCatalogCards = 12
+
+// maxCardHintRunes caps a single card's when-to-use hint.
+const maxCardHintRunes = 140
+
 // writeCatalog renders the pre-defined phases the advisor may SELECT (WS3),
 // biasing toward reuse over minting: a selectable phase already has a tuned
 // persona + profile, so minting should be the exception (YAGNI for new phases).
-// Deterministic order (catalog order) ⇒ prompt-prefix-cache friendly. Emits
-// nothing when the catalog is empty (legacy built-in-only path).
+// Cards carry the spec's advisor-facing metadata (ADR-0038); relevance judgment
+// is the advisor LLM's job — Go only bounds the token cost. When the catalog
+// exceeds the enriched cap, Optional (SELECTable) phases take the enriched
+// slots — spine phases run via the mandatory config regardless. Deterministic
+// order (catalog order, stable partition) ⇒ prompt-prefix-cache friendly.
+// Emits nothing when the catalog is empty (legacy built-in-only path).
 func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 	if len(cards) == 0 {
 		return
@@ -234,13 +247,63 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 	b.WriteString("\n## Pre-defined phases you may SELECT (prefer these over minting)\n")
 	b.WriteString("Each already exists with a tuned persona + profile. SELECT one by naming it in your plan ")
 	b.WriteString("(no \"mint\" block). Only MINT a new phase when none of these fit the work.\n")
-	for _, c := range cards {
-		ws := ""
-		if c.WritesSource {
-			ws = ", writes-source"
+
+	enriched, overflow := cards, []router.PhaseCard(nil)
+	if len(cards) > maxEnrichedCatalogCards {
+		// Stable three-bucket priority for the enriched slots: a SELECTable card
+		// with metadata has something to show; a metadata-less optional card
+		// renders the same either way; spine cards run via the mandatory config
+		// regardless of rendering.
+		var withMeta, opt, rest []router.PhaseCard
+		for _, c := range cards {
+			switch {
+			case c.Optional && (c.WhenToUse != "" || c.Description != "" || len(c.Categories) > 0):
+				withMeta = append(withMeta, c)
+			case c.Optional:
+				opt = append(opt, c)
+			default:
+				rest = append(rest, c)
+			}
 		}
-		fmt.Fprintf(b, "- %s [%s%s]\n", c.Name, c.Role, ws)
+		ordered := append(withMeta, opt...)
+		ordered = append(ordered, rest...)
+		enriched, overflow = ordered[:maxEnrichedCatalogCards], ordered[maxEnrichedCatalogCards:]
 	}
+	for _, c := range enriched {
+		writeCard(b, c)
+	}
+	if len(overflow) > 0 {
+		names := make([]string, 0, len(overflow))
+		for _, c := range overflow {
+			names = append(names, c.Name)
+		}
+		fmt.Fprintf(b, "- also available (same SELECT rules; details in .evolve/phase-inventory.json): %s\n",
+			strings.Join(names, ", "))
+	}
+}
+
+// writeCard renders one enriched catalog line:
+//
+//   - bug-reproduction [evaluate] (bugfix) — when: bugfix cycles, before tdd/build
+//
+// Metadata-less cards degrade to the legacy "- name [role]" form.
+func writeCard(b *strings.Builder, c router.PhaseCard) {
+	ws := ""
+	if c.WritesSource {
+		ws = ", writes-source"
+	}
+	fmt.Fprintf(b, "- %s [%s%s]", c.Name, c.Role, ws)
+	if len(c.Categories) > 0 {
+		fmt.Fprintf(b, " (%s)", strings.Join(c.Categories, ", "))
+	}
+	hint := c.WhenToUse
+	if hint == "" {
+		hint = c.Description
+	}
+	if hint = truncateRunes(hint, maxCardHintRunes); hint != "" {
+		fmt.Fprintf(b, " — when: %s", hint)
+	}
+	b.WriteString("\n")
 }
 
 // maxGoalTextChars bounds the goal text rendered into the advisor prompt so an
@@ -250,13 +313,17 @@ const maxGoalTextChars = 4000
 
 // truncateGoal trims surrounding whitespace and caps the goal at maxGoalTextChars
 // (rune-safe), marking truncation. Empty/whitespace-only ⇒ "" (no Goal section).
-func truncateGoal(s string) string {
+func truncateGoal(s string) string { return truncateRunes(s, maxGoalTextChars) }
+
+// truncateRunes trims surrounding whitespace and caps s at max runes, marking
+// truncation. Shared by the goal section and the catalog card hints.
+func truncateRunes(s string, max int) string {
 	s = strings.TrimSpace(s)
 	r := []rune(s)
-	if len(r) <= maxGoalTextChars {
+	if len(r) <= max {
 		return s
 	}
-	return string(r[:maxGoalTextChars]) + " …[truncated]"
+	return string(r[:max]) + " …[truncated]"
 }
 
 // writeRoutingContext writes the shared, deterministic decision context — cycle

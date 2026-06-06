@@ -18,6 +18,28 @@ var twoTierNameRE = regexp.MustCompile(`^[a-z]+(-[a-z]+)+$`)
 // because phasespec must not depend on core — core imports phasespec.
 var canonicalVerdicts = map[string]bool{"PASS": true, "FAIL": true, "WARN": true, "SKIPPED": true}
 
+// knownCategories is the closed goal-type vocabulary for PhaseSpec.Categories.
+// It mirrors the advisor's goal-type classification (micro-phase catalog) so
+// category_index buckets line up with cycle goal types. The check is SOFT: an
+// unknown category is a lint warning (UnknownCategories), never a load or
+// ValidateUserSpec floor violation — metadata must not block execution.
+var knownCategories = map[string]bool{
+	"bugfix": true, "feature": true, "refactor": true, "security": true,
+	"performance": true, "release": true, "docs": true,
+}
+
+// UnknownCategories returns the entries of s.Categories that are not in the
+// known goal-type vocabulary, in input order. Empty/nil categories → nil.
+func UnknownCategories(s PhaseSpec) []string {
+	var unknown []string
+	for _, c := range s.Categories {
+		if !knownCategories[c] {
+			unknown = append(unknown, c)
+		}
+	}
+	return unknown
+}
+
 // ValidateUserSpec returns human-readable violations for an operator-authored
 // phase spec, or nil when valid. It enforces the safety floor for user phases:
 // they MUST be optional (a user phase can never displace or satisfy the
@@ -44,6 +66,13 @@ func ValidateUserSpec(s PhaseSpec) []string {
 		v = append(v, fmt.Sprintf("kind %q is reserved but not yet executable — use \"llm\"", s.Kind))
 	default:
 		v = append(v, fmt.Sprintf("unknown kind %q (expected llm|native|command)", s.Kind))
+	}
+
+	// The agent name is used as a filename under agents/ (persona write path in
+	// `phases create`), so it gets the same kebab-case floor as the phase name —
+	// a crafted "../../x" agent must never escape the agents/ directory.
+	if s.Agent != "" && !nameRE.MatchString(s.Agent) {
+		v = append(v, fmt.Sprintf("agent %q must be lowercase kebab-case (^[a-z][a-z0-9-]*$)", s.Agent))
 	}
 
 	if s.Classify != nil && s.Classify.VerdictOnPass != "" && !canonicalVerdicts[s.Classify.VerdictOnPass] {

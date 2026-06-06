@@ -55,13 +55,19 @@ type Gates struct {
 // PhaseSpec is the brick definition. All fields are optional in JSON so a user
 // phase.json can be minimal; accessor methods supply conventional defaults.
 type PhaseSpec struct {
-	Name          string               `json:"name"`
-	Kind          string               `json:"kind,omitempty"`      // "llm" (default) | "native" | "command" (reserved)
-	Role          string               `json:"archetype,omitempty"` // Plan|Build|Evaluate|Control archetype (see Role; inferred from Name when empty). NOTE: distinct from the registry's "role" key, which names the agent/profile (intent/scout/builder/auditor); this is the composition archetype, hence a separate "archetype" JSON key.
-	Optional      bool                 `json:"optional,omitempty"`
-	Agent         string               `json:"agent,omitempty"`
-	Model         string               `json:"model,omitempty"`
-	WritesSource  bool                 `json:"writes_source,omitempty"`
+	Name         string `json:"name"`
+	Kind         string `json:"kind,omitempty"`      // "llm" (default) | "native" | "command" (reserved)
+	Role         string `json:"archetype,omitempty"` // Plan|Build|Evaluate|Control archetype (see Role; inferred from Name when empty). NOTE: distinct from the registry's "role" key, which names the agent/profile (intent/scout/builder/auditor); this is the composition archetype, hence a separate "archetype" JSON key.
+	Optional     bool   `json:"optional,omitempty"`
+	Agent        string `json:"agent,omitempty"`
+	Model        string `json:"model,omitempty"`
+	WritesSource bool   `json:"writes_source,omitempty"`
+	// Advisor-facing metadata (ADR-0038): rendered into the phase inventory and
+	// the advisor's SELECT catalog so routing decisions are informed, not
+	// name-guessing. All optional; absence degrades to today's name-only card.
+	Description   string               `json:"description,omitempty"` // one line: what the phase produces
+	WhenToUse     string               `json:"when_to_use,omitempty"` // the signal/goal that should trigger SELECTing it
+	Categories    []string             `json:"categories,omitempty"`  // goal types, validated softly by UnknownCategories
 	Enabled       string               `json:"enabled,omitempty"`
 	EnableVar     string               `json:"enable_var,omitempty"`
 	Inputs        IO                   `json:"inputs,omitempty"`

@@ -87,7 +87,7 @@ func CheckProvenance(artifact string, expected ProvenanceFields) []Violation {
 	ledgerFile := layout.LedgerFile
 	if _, err := os.Stat(ledgerFile); err == nil {
 		if f, err := os.Open(ledgerFile); err == nil {
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			scanner := bufio.NewScanner(f)
 			foundEntry := false
 			var ledgerTreeSHA string

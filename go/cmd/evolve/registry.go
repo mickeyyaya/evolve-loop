@@ -89,6 +89,7 @@ var commands = []subcommand{
 
 	// v12.1 utilities + composition.
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
+	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: runPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: runEval},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},

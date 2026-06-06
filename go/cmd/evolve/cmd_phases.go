@@ -19,9 +19,9 @@ import (
 
 // runPhases dispatches the phases subcommands. Exit codes: 0 ok, 2 validation
 // failure, 10 usage error, 1 I/O error.
-func runPhases(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func runPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>>")
+		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>|create --spec <file|->>")
 		return 10
 	}
 	project := envOrCwd("EVOLVE_PROJECT_ROOT")
@@ -36,26 +36,30 @@ func runPhases(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return phasesCheckArtifactCoherence(project, args[1:], stdout, stderr)
 	case "add":
 		return phasesAdd(project, args[1:], stdout, stderr)
+	case "create":
+		return phasesCreate(project, args[1:], stdin, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add)\n", args[0])
+		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add|create)\n", args[0])
 		return 10
 	}
 }
 
-// mergedCatalog loads the built-in registry and overlays user phases.
-func mergedCatalog(project string) (phasespec.Catalog, []string, error) {
+// mergedCatalog loads the built-in registry and overlays user phases from
+// every discovery root (EVOLVE_PHASE_ROOTS). sources maps user phase name →
+// discovery root (provenance for the ROOT column).
+func mergedCatalog(project string) (phasespec.Catalog, map[string]string, []string, error) {
 	registryPath := filepath.Join(project, "docs", "architecture", "phase-registry.json")
 	builtin, err := phasespec.Load(registryPath)
 	if err != nil {
-		return phasespec.Catalog{}, nil, err
+		return phasespec.Catalog{}, nil, nil, err
 	}
-	user, warns := phasespec.DiscoverUserSpecs(filepath.Join(project, ".evolve", "phases"))
+	user, sources, warns := phasespec.DiscoverUserSpecsFromRoots(phaseRoots(project))
 	merged, mWarns := builtin.Merge(user)
-	return merged, append(warns, mWarns...), nil
+	return merged, sources, append(warns, mWarns...), nil
 }
 
 func phasesList(project string, stdout, stderr io.Writer) int {
-	cat, warns, err := mergedCatalog(project)
+	cat, sources, warns, err := mergedCatalog(project)
 	if err != nil {
 		fmt.Fprintf(stderr, "load phase catalog: %v\n", err)
 		return 1
@@ -64,13 +68,14 @@ func phasesList(project string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "WARN:", w)
 	}
 	tw := tabwriter.NewWriter(stdout, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tKIND\tOPTIONAL\tSOURCE")
+	fmt.Fprintln(tw, "NAME\tKIND\tOPTIONAL\tSOURCE\tROOT")
 	for _, s := range cat.All() {
-		source := "builtin"
+		source, root := "builtin", ""
 		if cat.IsUser(s.Name) {
 			source = "user"
+			root = relTo(project, sources[s.Name])
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%t\t%s\n", s.Name, s.KindOrDefault(), s.Optional, source)
+		fmt.Fprintf(tw, "%s\t%s\t%t\t%s\t%s\n", s.Name, s.KindOrDefault(), s.Optional, source, root)
 	}
 	if err := tw.Flush(); err != nil {
 		fmt.Fprintf(stderr, "write: %v\n", err)
@@ -115,14 +120,14 @@ func phasesValidate(project string, args []string, stdout, stderr io.Writer) int
 		}
 	}
 
-	user, warns := phasespec.DiscoverUserSpecs(filepath.Join(project, ".evolve", "phases"))
+	user, _, warns := phasespec.DiscoverUserSpecsFromRoots(phaseRoots(project))
 	for _, w := range warns {
 		fmt.Fprintln(stderr, "WARN:", w)
 	}
 	if len(args) > 0 {
 		user = filterByName(user, args[0])
 		if len(user) == 0 {
-			fmt.Fprintf(stderr, "no user phase named %q under .evolve/phases/\n", args[0])
+			fmt.Fprintf(stderr, "no user phase named %q in any phase root\n", args[0])
 			if provenanceFailed {
 				return 2
 			}

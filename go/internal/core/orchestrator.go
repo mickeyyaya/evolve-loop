@@ -2522,6 +2522,10 @@ func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 			Role:         string(role),
 			Tier:         spec.ModelOrDefault(),
 			WritesSource: spec.WritesSource,
+			Optional:     spec.Optional,
+			Description:  spec.Description,
+			WhenToUse:    spec.WhenToUse,
+			Categories:   spec.Categories,
 		})
 	}
 	return cards

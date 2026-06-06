@@ -95,14 +95,19 @@ type RouteInput struct {
 }
 
 // PhaseCard is the advisor-facing projection of one pre-defined phase: enough
-// for the planner to decide "select this" vs "mint a new one". Deliberately
-// minimal — name, role archetype, the model tier, and whether it writes source
-// (the advisor needs the last for sandbox reasoning).
+// for the planner to decide "select this" vs "mint a new one" — identity plus
+// the spec's advisor-facing metadata (ADR-0038). The renderer (writeCatalog)
+// caps how much of this reaches the prompt; relevance judgment stays with the
+// advisor LLM, never a deterministic classifier.
 type PhaseCard struct {
-	Name         string `json:"name"`
-	Role         string `json:"role"` // plan|build|evaluate|control
-	Tier         string `json:"tier,omitempty"`
-	WritesSource bool   `json:"writes_source,omitempty"`
+	Name         string   `json:"name"`
+	Role         string   `json:"role"` // plan|build|evaluate|control
+	Tier         string   `json:"tier,omitempty"`
+	WritesSource bool     `json:"writes_source,omitempty"`
+	Optional     bool     `json:"optional,omitempty"`    // SELECTable (vs spine) — prioritized for enriched rendering
+	Description  string   `json:"description,omitempty"` // one line: what the phase produces
+	WhenToUse    string   `json:"when_to_use,omitempty"` // the SELECT hint
+	Categories   []string `json:"categories,omitempty"`  // goal types
 }
 
 // CarryoverTodo is the router/advisor-facing projection of one unresolved
