@@ -140,6 +140,26 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Objective", "## Key Results", "## Confidence and Scoring"},
 			hasVerdict: false,
 		},
+		// Wave Product (cycle 10) — domain-phase-catalog.md §3 Wave Product
+		// table. metric-tree is the only evaluate phase (verdict vocabulary);
+		// opportunity-map and prd-draft are plan phases — verdict_on_pass
+		// is carried for uniformity but contract derivation leaves it inert
+		// (ADR-0035, okr-draft/risk-register precedent).
+		"opportunity-map": {
+			artifact:   "opportunity-map-report.md",
+			sections:   []string{"## Desired Outcome", "## Opportunities", "## Candidate Solutions", "## Assumption Tests"},
+			hasVerdict: false,
+		},
+		"prd-draft": {
+			artifact:   "prd-draft-report.md",
+			sections:   []string{"## Problem", "## Goals and Success Metrics", "## Requirements", "## Out of Scope"},
+			hasVerdict: false,
+		},
+		"metric-tree": {
+			artifact:   "metric-tree-report.md",
+			sections:   []string{"## North Star Metric", "## Input Metrics", "## Guardrail Metrics"},
+			hasVerdict: true,
+		},
 	}
 
 	for name, w := range cases {
