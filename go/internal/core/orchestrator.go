@@ -2250,9 +2250,26 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.Routing
 		}
 		return false
 	}
+	// Skip-advance: when the static successor is a phase the router has
+	// declined (dec.SkipPhases — e.g. an EnableOff optional like build-planner,
+	// or a plan veto), advance to the next NON-skipped phase so the spine-decline
+	// fallback below never lands on a vetoed phase (cycle-238 D1).
+	//
+	// GUARD (cycle-240 e2e regression): nextInOrder reads o.cfg.Order, which is
+	// EMPTY when no phase-registry.json is present (the e2e fixtures, and any
+	// repo without the registry). An empty/exhausted order makes nextInOrder
+	// return PhaseEnd, which would silently rewrite staticNext to "end" — turning
+	// "skip this optional phase" into "terminate the cycle before build/audit/
+	// ship". Only advance while the order can name a real successor; if it yields
+	// PhaseEnd we cannot trust it, so keep the original staticNext (the cand
+	// override + downstream gates still drive forward exactly as pre-regression).
 	advanced := false
 	for isSkipped(staticNext) {
-		staticNext = o.nextInOrder(staticNext)
+		nxt := o.nextInOrder(staticNext)
+		if nxt == PhaseEnd {
+			break
+		}
+		staticNext = nxt
 		advanced = true
 	}
 
