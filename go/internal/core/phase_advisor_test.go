@@ -332,6 +332,33 @@ func TestWriteRoutingContext_RendersGoal(t *testing.T) {
 	}
 }
 
+func TestWriteRoutingContext_RendersCarryoverTodos(t *testing.T) {
+	t.Parallel()
+	got := buildPlanPrompt(router.RouteInput{
+		Cycle: 5,
+		CarryoverTodos: []router.CarryoverTodo{
+			{
+				ID:             "cycle-4-failed-build",
+				Action:         "Review failed build learning and fix missing audit binding",
+				Priority:       "P0",
+				FirstSeenCycle: 4,
+				CyclesUnpicked: 1,
+			},
+		},
+	})
+	for _, want := range []string{
+		"## Carryover todos from previous cycles",
+		"cycle-4-failed-build",
+		"Review failed build learning",
+		"P0",
+		"cycles_unpicked=1",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("plan prompt missing %q:\n%s", want, got)
+		}
+	}
+}
+
 // TestBuildPlanPrompt_WholeCycleArray proves the plan prompt shares the routing
 // context (rubric) with buildRoutingPrompt but asks for the whole-cycle ARRAY
 // shape, not the per-transition object — the two cadences diverge correctly.

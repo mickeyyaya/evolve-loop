@@ -48,3 +48,18 @@ var (
 	// no defined successor in the state machine.
 	ErrTransitionInvalid = errors.New("core: invalid phase transition")
 )
+
+// ErrCycleLevelFailure wraps a phase failure that should escalate to cycle-level
+// instead of batch-fatal abort.
+type ErrCycleLevelFailure struct {
+	Phase string
+	Cause error
+}
+
+func (e *ErrCycleLevelFailure) Error() string {
+	return "cycle level failure in phase " + e.Phase + ": " + e.Cause.Error()
+}
+
+func (e *ErrCycleLevelFailure) Unwrap() error {
+	return e.Cause
+}

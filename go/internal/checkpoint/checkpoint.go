@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -33,12 +34,13 @@ const (
 	ReasonBatchCapNear    Reason = "batch-cap-near"
 	ReasonOperatorRequest Reason = "operator-requested"
 	ReasonStallInactivity Reason = "stall-inactivity"
+	ReasonPhaseComplete   Reason = "phase-complete"
 )
 
-// IsValid reports whether r is one of the four canonical reasons.
+// IsValid reports whether r is one of the five canonical reasons.
 func (r Reason) IsValid() bool {
 	switch r {
-	case ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity:
+	case ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity, ReasonPhaseComplete:
 		return true
 	}
 	return false
@@ -137,7 +139,7 @@ func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, no
 // if reason is not one of the four bash-canonical values.
 func ComposeChecked(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time) (Checkpoint, error) {
 	if !reason.IsValid() {
-		return Checkpoint{}, fmt.Errorf("checkpoint: invalid reason %q (want quota-likely | batch-cap-near | operator-requested | stall-inactivity)", reason)
+		return Checkpoint{}, fmt.Errorf("checkpoint: invalid reason %q (want quota-likely | batch-cap-near | operator-requested | stall-inactivity | phase-complete)", reason)
 	}
 	return Compose(cs, reason, cost, gitHead, now), nil
 }
@@ -222,3 +224,43 @@ func envIntDefault(key string, dflt int) int {
 // EVOLVE_AUTO_RESUME_MAX_ATTEMPTS exhaustion (bash exit rc=2). Phase 2
 // out-of-scope; Phase 3 wires it.
 var ErrAutoResumeExhausted = errors.New("checkpoint: auto-resume attempts exhausted")
+
+func init() {
+	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
+		cycleStatePath := filepath.Join(projectRoot, ".evolve", "cycle-state.json")
+		yield, err := hasEscalationCheckpoint(cycleStatePath)
+		if err != nil {
+			return err
+		}
+		if yield {
+			// phase-complete is the lowest-priority reason: never clobber an
+			// escalation checkpoint (quota-likely, batch-cap-near,
+			// operator-requested, stall-inactivity) — those must survive until
+			// their consumer (e.g. detectQuotaPause after RunCycle) reads them.
+			return nil
+		}
+		return ApplyToStateFile(cycleStatePath, Compose(cs, ReasonPhaseComplete, 0, "", now))
+	}
+}
+
+// hasEscalationCheckpoint reports whether path already holds a checkpoint
+// block with a canonical reason other than phase-complete.
+func hasEscalationCheckpoint(path string) (bool, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("checkpoint: read state: %w", err)
+	}
+	var state struct {
+		Checkpoint *struct {
+			Reason Reason `json:"reason"`
+		} `json:"checkpoint"`
+	}
+	if err := json.Unmarshal(b, &state); err != nil {
+		return false, fmt.Errorf("checkpoint: parse state: %w", err)
+	}
+	if state.Checkpoint == nil {
+		return false, nil
+	}
+	r := state.Checkpoint.Reason
+	return r.IsValid() && r != ReasonPhaseComplete, nil
+}

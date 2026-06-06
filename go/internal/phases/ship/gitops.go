@@ -72,6 +72,7 @@ func readActiveWorktree(opts *Options) string {
 //	git push origin <branch>
 func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch string) error {
 	if !opts.DryRun {
+		_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
 		exit, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
 			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
@@ -251,6 +252,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	}
 
 	if !opts.DryRun {
+		_ = discardBinaryChurn(ctx, opts, worktree)
 		exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
 			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
@@ -545,4 +547,53 @@ func maybeCreateRelease(ctx context.Context, opts *Options, res *RunResult) erro
 func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args ...string) (string, error) {
 	all := append([]string{"-C", dir}, args...)
 	return captureGitOutput(ctx, opts, all...)
+}
+
+// discardBinaryChurn discards unaudited tracked-binary rebuild churn from the
+// WORKTREE before `git add -A` stages the ship commit. It deliberately uses
+// `git checkout -- <path>` (restore from INDEX), not `git checkout HEAD -- <path>`:
+// after normalizeWorktreeToBase's `git reset --soft`, the index holds the full
+// audited diff, so the index — not HEAD — is the audited reference. Restoring
+// from the index discards exactly the post-audit worktree churn (e.g. an ACS
+// rerun rebuilding go/evolve) while preserving an audited, intentionally staged
+// binary update. Contrast with core.discardMainLeak, which runs mid-cycle on the
+// MAIN tree where the cycle is not yet committed and HEAD is the audited
+// reference — there `HEAD --` is correct. The two forms are not interchangeable.
+func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
+	binPath := opts.ShipBinaryPath
+	if binPath == "" {
+		if execPath, err := os.Executable(); err == nil {
+			binPath = execPath
+		}
+	}
+	var relBin string
+	if binPath != "" {
+		if rel, err := filepath.Rel(opts.ProjectRoot, binPath); err == nil && !strings.HasPrefix(rel, "..") {
+			relBin = filepath.ToSlash(rel)
+		}
+	}
+
+	// Always discard the standard production path "go/evolve" as well as relBin
+	pathsToDiscard := []string{"go/evolve"}
+	if relBin != "" && relBin != "go/evolve" {
+		pathsToDiscard = append(pathsToDiscard, relBin)
+	}
+
+	for _, p := range pathsToDiscard {
+		absPath := filepath.Join(dir, p)
+		if _, err := os.Stat(absPath); os.IsNotExist(err) {
+			continue // doesn't exist, skip
+		}
+		// Check if it is tracked in the repository context of dir
+		var buf strings.Builder
+		exitCode, err := opts.Runner(ctx, "git", []string{"-C", dir, "ls-files", p}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+		if err == nil && exitCode == 0 && strings.TrimSpace(buf.String()) != "" {
+			// Revert the changes
+			_, _ = opts.Runner(ctx, "git", []string{"-C", dir, "checkout", "--", p}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+		} else {
+			// Untracked: remove the file
+			_ = os.Remove(absPath)
+		}
+	}
+	return nil
 }

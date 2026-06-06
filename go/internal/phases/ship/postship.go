@@ -6,10 +6,14 @@ package ship
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
@@ -168,9 +172,30 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 			return nil // best-effort
 		}
 	}
-	postSHA, err := sha256File(binPath)
-	if err != nil {
-		return nil
+
+	var postSHA string
+	relBin, relErr := filepath.Rel(opts.ProjectRoot, binPath)
+	if relErr == nil && !strings.HasPrefix(relBin, "..") {
+		relBin = filepath.ToSlash(relBin)
+		runner := opts.Runner
+		if runner == nil {
+			runner = execRunner
+		}
+		var buf strings.Builder
+		exitCode, gitErr := runner(context.Background(), "git", []string{"show", "HEAD:" + relBin}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+		if gitErr == nil && exitCode == 0 {
+			h := sha256.New()
+			_, _ = h.Write([]byte(buf.String()))
+			postSHA = hex.EncodeToString(h.Sum(nil))
+		}
+	}
+
+	if postSHA == "" {
+		var err error
+		postSHA, err = sha256File(binPath)
+		if err != nil {
+			return nil
+		}
 	}
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
