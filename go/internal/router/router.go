@@ -34,6 +34,7 @@ type RouteInput struct {
 	Completed       []string // phases already done this cycle
 	Strict          bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
 	Now             time.Time
+	IntentRequired  bool
 
 	// Proposer context — populated by the orchestrator, consumed ONLY by a
 	// DynamicLLM Proposer (which needs to dispatch a bridge call). The pure
@@ -332,6 +333,9 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 			// mandatory-never-skipped clamp, never a silent discrepancy.
 			return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
 		}
+		if runs && enable == config.EnableContent && optionalUsed >= in.Cfg.MaxInsertions && !isFloorPhase(phase) {
+			return false, true, &Clamp{Rule: "max-insertions-cap", Proposed: phase + "=insert", Forced: phase + "=skip"}
+		}
 		return runs, true, nil
 	}
 
@@ -471,4 +475,13 @@ func normalize(phase string) string {
 		return "retrospective"
 	}
 	return phase
+}
+
+func isFloorPhase(phase string) bool {
+	switch phase {
+	case "intent", "scout", "tdd", "build", "audit", "ship":
+		return true
+	default:
+		return false
+	}
 }

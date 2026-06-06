@@ -40,7 +40,7 @@ const EvaluatorFloorPhase = "audit"
 // set instead. Keeping this wrapper byte-identical to the historical behavior is
 // what lets the existing floor_test.go suite stand as the default-preserving proof.
 func ClampPlanToFloor(in RouteInput, plan *PhasePlan) (*PhasePlan, []Clamp) {
-	return ClampPlanToFloorWith(in, plan, DefaultShipFloor())
+	return ClampPlanToFloorWith(in, plan, DefaultShipFloor(), in.IntentRequired)
 }
 
 // DefaultShipFloor is the safe structural default: a plan reaching ship must run
@@ -62,7 +62,7 @@ func DefaultShipFloor() []string { return []string{"tdd", "build", "audit"} }
 // still guarantees it PASSED.
 //
 // PURE: returns a NEW plan (input unmutated) plus the clamps applied.
-func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string) (*PhasePlan, []Clamp) {
+func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intentRequired bool) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
 	}
@@ -81,34 +81,38 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string) (*Phas
 		MintPhases: plan.MintPhases,
 	}
 
-	// No-ship cycle: the implication's antecedent is false, so the floor imposes
-	// nothing. scout-only / investigation cycles are legitimate.
-	if !planRuns(out, "ship") {
-		return out, nil
-	}
-
 	var clamps []Clamp
-	force := func(phase string) {
+	force := func(phase string, rule string) {
 		if planRuns(out, phase) {
 			return // already running — nothing to clamp
 		}
 		ensureRun(out, phase)
 		clamps = append(clamps, Clamp{
-			Rule:     "ship-requires-" + phase,
+			Rule:     rule,
 			Proposed: phase + "=skip",
 			Forced:   phase + "=run",
 		})
+	}
+
+	if intentRequired {
+		force("intent", "require-intent")
+	}
+
+	// No-ship cycle: the implication's antecedent is false, so the floor imposes
+	// nothing. scout-only / investigation cycles are legitimate.
+	if !planRuns(out, "ship") {
+		return out, clamps
 	}
 
 	for _, phase := range floor {
 		if phase == "tdd" {
 			// tdd carries the trivial exemption — forced only when pinned.
 			if tddPinned(in) {
-				force("tdd")
+				force("tdd", "ship-requires-tdd")
 			}
 			continue
 		}
-		force(phase)
+		force(phase, "ship-requires-"+phase)
 	}
 	return out, clamps
 }

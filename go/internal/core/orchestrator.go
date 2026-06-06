@@ -1383,6 +1383,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// section in the prompt).
 			GoalText:       req.Context["goal"],
 			CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
+			IntentRequired: cs.IntentRequired,
 		}
 		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
@@ -1393,7 +1394,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
 			var clamps []router.Clamp
-			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor())
+			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
 			// Register advisor-minted phases (Steps 11/12) into runners +
 			// catalog + routing BEFORE the dispatch loop, so a minted phase the
@@ -1517,7 +1518,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				Env:         envSnap,
 				// Clamped whole-cycle plan (Stage>=Advisory). nil below Advisory
 				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
-				Plan: clampedPlan,
+				Plan:           clampedPlan,
+				IntentRequired: cs.IntentRequired,
 			})
 			if o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
 				if forced, ok := o.enforceNext(current, next, signals, dec, planRunsShip(clampedPlan)); ok {
@@ -2240,9 +2242,23 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 // the non-bypassable "kernel disposes" floor for Enforce mode — neither
 // Strategy can reach Ship without a real PASS/WARN audit artifact.
 func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision, shipPlanned bool) (Phase, bool) {
+	isSkipped := func(p Phase) bool {
+		for _, skip := range dec.SkipPhases {
+			if Phase(skip) == p {
+				return true
+			}
+		}
+		return false
+	}
+	advanced := false
+	for isSkipped(staticNext) {
+		staticNext = o.nextInOrder(staticNext)
+		advanced = true
+	}
+
 	cand := o.candidatePhase(dec.NextPhase)
 	if cand == "" || cand == staticNext {
-		return staticNext, false
+		return staticNext, advanced
 	}
 	// Early-exit (guarded scout/triage→end): the advisor proposes ending a
 	// no-ship convergence cycle. CanTerminateEarly is the SOLE authority — it
@@ -2254,13 +2270,13 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.Routing
 		if o.sm.CanTerminateEarly(current, shipPlanned) {
 			return PhaseEnd, true
 		}
-		return staticNext, false
+		return staticNext, advanced
 	}
 	if !o.transitionLegal(current, cand) {
-		return staticNext, false
+		return staticNext, advanced
 	}
 	if !o.sm.SpineSatisfiedUpTo(cand, sig, o.cfg) {
-		return staticNext, false
+		return staticNext, advanced
 	}
 	return cand, true
 }

@@ -263,6 +263,163 @@ func TestStrategy_StaticVsLLM_SameClampFloor(t *testing.T) {
 	}
 }
 
+// --- cycle-240 advisory-soak defect tests (D1 plan-veto, D3 insertion cap) ---
+
+// advisoryCfg is testCfg lifted to Stage:Advisory — the configuration under
+// which the advisor's whole-cycle plan drives shouldRun's plan path.
+func advisoryCfg() config.RoutingConfig {
+	c := testCfg()
+	c.Stage = config.StageAdvisory
+	return c
+}
+
+// spinePlan is the floor-clamped plan shape the orchestrator always threads:
+// the full ship-chain Run:true, plus any extra entries the test supplies.
+func spinePlan(extra ...PhasePlanEntry) *PhasePlan {
+	entries := []PhasePlanEntry{
+		pe("scout", true), pe("tdd", true), pe("build", true),
+		pe("audit", true), pe("ship", true),
+	}
+	return &PhasePlan{Entries: append(entries, extra...)}
+}
+
+// TestRoute_AdvisoryTriggerCapEnforced encodes cycle-238 defect D3: a
+// trigger-class (EnableContent) phase scheduled by the advisory plan must
+// still respect MaxInsertions. In cycle 238, 9 optional inserts ran against a
+// cap of 6 because the plan path skipped the cap check wholesale.
+func TestRoute_AdvisoryTriggerCapEnforced(t *testing.T) {
+	in := base("build")
+	in.Cfg = advisoryCfg()
+	in.Cfg.MaxInsertions = 1
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // 1 optional already spent
+	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true}       // tester trigger would fire too
+	in.Plan = spinePlan(pe("tester", true))
+
+	d := Route(in, nil)
+	if d.NextPhase != "audit" {
+		t.Errorf("cap hit in advisory → %q, want audit (tester insert dropped)", d.NextPhase)
+	}
+	if !hasClamp(d, "max-insertions-cap") {
+		t.Errorf("expected max-insertions-cap clamp, got %+v", d.Clamps)
+	}
+	if contains(d.InsertPhases, "tester") {
+		t.Errorf("tester inserted past the cap: InsertPhases=%v", d.InsertPhases)
+	}
+}
+
+// TestRoute_AdvisoryTriggerWithinCap is the cap test's negative case AND the
+// D1 negative case (plan run:true phase still fires): the same plan-scheduled
+// EnableContent phase runs normally while the cap has headroom.
+func TestRoute_AdvisoryTriggerWithinCap(t *testing.T) {
+	in := base("build")
+	in.Cfg = advisoryCfg() // MaxInsertions: 4
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"}
+	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true}
+	in.Plan = spinePlan(pe("tester", true))
+
+	d := Route(in, nil)
+	if d.NextPhase != "tester" {
+		t.Errorf("within cap → %q, want tester (plan run:true phase fires)", d.NextPhase)
+	}
+	if hasClamp(d, "max-insertions-cap") {
+		t.Errorf("unexpected max-insertions-cap clamp within cap: %+v", d.Clamps)
+	}
+}
+
+// TestRoute_AdvisoryPlanPhaseExemptsFromCap: an operator-forced (EnableOn)
+// phase the plan schedules is NOT a content-trigger insert — it stays
+// cap-exempt even when the cap is exhausted. Guards against over-fixing D3
+// into "cap everything in the plan".
+func TestRoute_AdvisoryPlanPhaseExemptsFromCap(t *testing.T) {
+	in := base("build")
+	in.Cfg = advisoryCfg()
+	in.Cfg.MaxInsertions = 1
+	in.Cfg.PhaseEnable["tester"] = config.EnableOn
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // cap spent
+	in.Plan = spinePlan(pe("tester", true))
+
+	d := Route(in, nil)
+	if d.NextPhase != "tester" {
+		t.Errorf("EnableOn plan-phase at cap → %q, want tester (plan-scheduled, cap-exempt)", d.NextPhase)
+	}
+}
+
+// TestRoute_AdvisoryFloorPhaseNotCapped is the integrity-floor guard on the D3
+// fix (intent.md constraint: "veto/cap logic must never drop mandatory
+// phases"): with a shrunken mandatory set, audit is EnableContent by default
+// and reaches shouldRun via the plan path with a floor-forced Run:true entry.
+// The insertion cap must NEVER skip a ship-floor phase — precedence is
+// floor > cap.
+func TestRoute_AdvisoryFloorPhaseNotCapped(t *testing.T) {
+	in := base("build")
+	in.Cfg = advisoryCfg()
+	in.Cfg.Mandatory = []string{"scout", "build", "ship"} // audit NOT mandatory here
+	in.Cfg.MaxInsertions = 1
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // cap spent
+	in.Plan = spinePlan()                                           // audit Run:true via the spine plan (floor-forced shape)
+
+	d := Route(in, nil)
+	if d.NextPhase != "audit" {
+		t.Errorf("floor phase at cap → %q, want audit (ship-floor phases are never cap-skipped)", d.NextPhase)
+	}
+}
+
+// TestRoute_AdvisoryPlanRunFalse encodes cycle-238 defect D1 at the kernel
+// layer: an explicit plan run:false VETOES a phase whose insert_when trigger
+// fires. The plan's veto outranks the content trigger.
+func TestRoute_AdvisoryPlanRunFalse(t *testing.T) {
+	in := base("build")
+	in.Cfg = advisoryCfg()
+	in.Completed = []string{"scout", "tdd", "build"}
+	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true} // tester trigger fires
+	in.Plan = spinePlan(pe("tester", false))                  // advisor explicitly vetoed tester
+
+	d := Route(in, nil)
+	if d.NextPhase != "audit" {
+		t.Errorf("plan run:false + firing trigger → %q, want audit (veto wins)", d.NextPhase)
+	}
+	if !contains(d.SkipPhases, "tester") {
+		t.Errorf("tester not recorded as skipped: SkipPhases=%v", d.SkipPhases)
+	}
+	if contains(d.InsertPhases, "tester") {
+		t.Errorf("vetoed tester inserted: InsertPhases=%v", d.InsertPhases)
+	}
+}
+
+// TestRoute_AdvisoryPlanVetoUserPhaseAbsentSignal composes D1+D2 in the exact
+// cycle-238 shape: a catalog phase spliced into cfg.Order, with a
+// `goal_type ne <other-goal>` trigger over a NEVER-EMITTED generic signal, and
+// a plan run:false entry. Neither the fail-open trigger nor the plan path may
+// run it.
+func TestRoute_AdvisoryPlanVetoUserPhaseAbsentSignal(t *testing.T) {
+	in := base("build")
+	in.Cfg = advisoryCfg()
+	in.Cfg.Order = []string{"scout", "tdd", "build", "growth-loop", "audit", "ship"}
+	in.Cfg.Triggers["growth-loop"] = config.RoutingBlock{
+		InsertWhen: []config.Condition{{Field: "scout.goal_type", Op: "ne", Value: "growth"}},
+	}
+	in.Completed = []string{"scout", "tdd", "build"}
+	// No Generic signals: scout.goal_type was never emitted (the cycle-238 state).
+	in.Plan = spinePlan(pe("growth-loop", false))
+
+	d := Route(in, nil)
+	if d.NextPhase != "audit" {
+		t.Errorf("vetoed catalog phase with absent-signal trigger → %q, want audit", d.NextPhase)
+	}
+	if contains(d.InsertPhases, "growth-loop") {
+		t.Errorf("growth-loop inserted despite plan veto: InsertPhases=%v", d.InsertPhases)
+	}
+}
+
+func contains(xs []string, want string) bool {
+	for _, x := range xs {
+		if x == want {
+			return true
+		}
+	}
+	return false
+}
+
 type fakeProposer struct{ p *Proposal }
 
 func (f fakeProposer) Propose(in RouteInput) (*Proposal, error) { return f.p, nil }
