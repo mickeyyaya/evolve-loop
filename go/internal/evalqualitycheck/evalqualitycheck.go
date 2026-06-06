@@ -73,7 +73,7 @@ func Check(opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("evalqualitycheck: open %s: %w", opts.Path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	res := Result{Path: opts.Path, Overall: LevelPass}
 
@@ -131,6 +131,19 @@ var (
 	// inlined into the eval rather than a workspace file. RE2 has no
 	// backreferences, so we accept any two adjacent quoted args.
 	grepLiteralRE = regexp.MustCompile(`^grep\s+(-[a-zA-Z]+\s+)*["'][^"']+["']\s+["'][^"']+["']\s*$`)
+	// commitPresenceRE matches `git log`/`git rev-list` invocations whose
+	// arguments contain a revision range (`a..b` / `a...b` / trailing-open
+	// `a..`), anywhere in the line (the RE is unanchored, so it also fires
+	// inside $(...) and after && — the [^|&;]* guard only stops a range in
+	// a LATER segment being attributed to this invocation). Such predicates
+	// assert commit PRESENCE, which is structurally false after
+	// worktree-normalize soft-resets builder commits to base before audit
+	// (killed cycles 236/237). Boundaries require rev-name characters so
+	// pathspecs like `dir/../file` don't fire. Deliberate gaps: left-open
+	// `..HEAD` and `^main HEAD` exclusion syntax are not matched (rare in
+	// eval predicates); `git diff a..b` is NOT matched — content parity is
+	// the sanctioned pattern.
+	commitPresenceRE = regexp.MustCompile(`\bgit\s+(log|rev-list)\b[^|&;]*[a-zA-Z0-9_~^@]\.{2,3}([a-zA-Z0-9_~^@]|\s|$)`)
 )
 
 // classify maps one command line to a Level + reason.
@@ -140,6 +153,8 @@ func classify(cmd string) ClassifiedLine {
 		return ClassifiedLine{Line: cmd, Level: LevelHalt, Reason: "always-pass tautology"}
 	case tautologyBrackRE.MatchString(cmd):
 		return ClassifiedLine{Line: cmd, Level: LevelHalt, Reason: "trivial bracket test"}
+	case commitPresenceRE.MatchString(cmd):
+		return ClassifiedLine{Line: cmd, Level: LevelHalt, Reason: "commit-presence assertion (structurally false after worktree-normalize); assert content parity instead, e.g. `git diff <ref> --quiet` (exemplar: acs/cycle-236/001-rescue-parity-landed.sh)"}
 	case echoOnlyRE.MatchString(cmd):
 		return ClassifiedLine{Line: cmd, Level: LevelWarn, Reason: "echo-only (no workspace inspection)"}
 	case grepLiteralRE.MatchString(cmd):

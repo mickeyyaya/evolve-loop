@@ -102,7 +102,7 @@ func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 			return DiversityResult{}, fmt.Errorf("evalqualitycheck: open %s: %w", path, err)
 		}
 		cmds, scanErr := scanBashCommands(f)
-		f.Close()
+		_ = f.Close()
 		if scanErr != nil {
 			return DiversityResult{}, fmt.Errorf("evalqualitycheck: scan %s: %w", path, scanErr)
 		}
