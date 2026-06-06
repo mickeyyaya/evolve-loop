@@ -287,9 +287,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 
 	// Composition root: the SOLE reader of routing env+config. config.Load
 	// maps the central registry + contained env overrides into one immutable
-	// RoutingConfig; router.Select picks the brain once. Default
-	// dynamic_routing=0 (Stage:Off) ⇒ NewOrchestrator behaves exactly as
-	// before. A nil proposer means DynamicLLM degrades to the deterministic
+	// RoutingConfig; router.Select picks the brain once. With
+	// dynamic_routing=0 (Stage:Off, the escape hatch; advisory is the
+	// default since 2026-06-06) NewOrchestrator behaves exactly as before. A nil proposer means DynamicLLM degrades to the deterministic
 	// StaticPreset (the bridge-backed Proposer is a tracked follow-on).
 	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
 	cfg, warnings := config.Load(registryPath, filterEvolveEnv(os.Environ()))

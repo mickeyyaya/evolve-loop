@@ -1,13 +1,13 @@
 # Dynamic Phase Routing (Go kernel)
 
-> **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default-off** (`EVOLVE_DYNAMIC_ROUTING=off`).
+> **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default `advisory`** since 2026-06-06 (registry-pinned after retro migration steps 1-3 landed; was default-off from v13.0.0; `EVOLVE_DYNAMIC_ROUTING=off` remains the static escape hatch).
 > **Audience:** Operators experimenting with per-cycle phase selection; persona + router authors.
 > **Source:** `go/internal/config/config.go` (composition root), `go/internal/router/` (clamp + strategy), `go/internal/core/phase_advisor.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
 > **Successor design:** ADR-0024 (Proposed) replaces the fixed mandatory-spine model with a conditional floor + PhaseAdvisor — read it before extending this kernel.
 
 ## TL;DR
 
-The static state machine runs a fixed phase sequence every cycle. The routing kernel lets a strategy (deterministic *or* LLM-proposed) decide which **optional** phases run per cycle, while a pure clamp pass guarantees the **integrity floor** (mandatory spine + TDD-pin + ship-needs-real-audit) can never be weakened. It is **off by default** — when `EVOLVE_DYNAMIC_ROUTING=off` (the default), behavior is byte-identical to pre-routing.
+The static state machine runs a fixed phase sequence every cycle. The routing kernel lets a strategy (deterministic *or* LLM-proposed) decide which **optional** phases run per cycle, while a pure clamp pass guarantees the **integrity floor** (mandatory spine + TDD-pin + ship-needs-real-audit) can never be weakened. Since 2026-06-06 it is **advisory by default** (registry-pinned); with `EVOLVE_DYNAMIC_ROUTING=off` (the escape hatch), behavior is byte-identical to pre-routing.
 
 This is **"model proposes, kernel disposes":** the LLM brain only ever produces an advisory plan; `router.Route()` re-validates it against the floor, and any malformed/hallucinated/timed-out proposal degrades cleanly to the deterministic `StaticPreset`.
 
@@ -31,7 +31,7 @@ This is **"model proposes, kernel disposes":** the LLM brain only ever produces 
 
 | Stage | Value | Who drives | Use |
 |---|---|---|---|
-| Off | `off` / `0` (default) | Static state machine | Legacy; byte-identical to pre-routing |
+| Off | `off` / `0` (escape hatch; was default until 2026-06-06) | Static state machine | Legacy; byte-identical to pre-routing |
 | Shadow | `shadow` | Static; router computes + logs only | Soak: diff the would-have-routed plan vs static, zero behavior change |
 | Advisory | `advisory` | **Advisor drives** every non-mandatory phase via the clamped whole-cycle plan; `enforceNext` overrides the static successor | First live tier (cycle-108) |
 | Enforce | `enforce` | Same as Advisory (advisor drives, kernel-clamped) | Full routing |
@@ -76,7 +76,7 @@ The clamp pass in `go/internal/router` enforces the floor regardless of stage or
 
 | Env var | Default | Maps to |
 |---|---|---|
-| `EVOLVE_DYNAMIC_ROUTING` | `off` | `Stage` |
+| `EVOLVE_DYNAMIC_ROUTING` | `advisory` (since 2026-06-06; was `off`) | `Stage` |
 | `EVOLVE_ROUTING_MODE` | `llm` | `Mode` |
 | `EVOLVE_MANDATORY_PHASES` | `scout,build,audit,ship` | `Mandatory` (CSV) |
 | `EVOLVE_CONDITIONAL_MANDATORY` | `tdd:cycle_size!=trivial` | `Conditional` (`phase:expr`; op ∈ `!= == >= <= > <`) |

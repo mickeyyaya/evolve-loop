@@ -161,7 +161,7 @@
 
 | Flag | Status | Purpose |
 |------|--------|---------|
-| `EVOLVE_DYNAMIC_ROUTING` | ACTIVE (default `off`) | Rollout stage: `off`/`0` (static state machine drives) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |
+| `EVOLVE_DYNAMIC_ROUTING` | ACTIVE (default `advisory` since 2026-06-06, registry-pinned; was `off`) | Rollout stage: `off`/`0` (static state machine drives — operator escape hatch) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static; DEFAULT) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |
 | `EVOLVE_ROUTING_MODE` | ACTIVE (default `llm`) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
 | `EVOLVE_MANDATORY_PHASES` | ACTIVE (default `scout,build,audit,ship`) | CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN |
 | `EVOLVE_CONDITIONAL_MANDATORY` | ACTIVE (default `tdd:cycle_size!=trivial`) | `phase:expr` conditional-mandatory predicate; op ∈ `!= == >= <= > <` |

@@ -12,9 +12,12 @@ func TestLoad_RealRegistry(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")
 	cfg, ws := Load(path, map[string]string{})
 
-	// Default posture: dynamic_routing=0 ⇒ Stage:Off (static SM drives).
-	if cfg.Stage != StageOff {
-		t.Errorf("Stage=%v, want StageOff (registry dynamic_routing=0)", cfg.Stage)
+	// Default posture since 2026-06-06 (retro migration steps 1-3 landed):
+	// dynamic_routing=advisory ⇒ the advisor drives the optional surface while
+	// the spine stays static and ClampPlanToFloor protects the ship guarantee.
+	// EVOLVE_DYNAMIC_ROUTING=off remains the operator escape hatch.
+	if cfg.Stage != StageAdvisory {
+		t.Errorf("Stage=%v, want StageAdvisory (registry dynamic_routing=advisory)", cfg.Stage)
 	}
 	if cfg.Mode != ModeDynamicLLM {
 		t.Errorf("Mode=%v, want ModeDynamicLLM (registry routing_mode=llm)", cfg.Mode)

@@ -97,7 +97,7 @@ User phases are **optional-only** and kernel-clamped. Enforced at every gate:
 3. The orchestrator's transition check requires forward progress in the order and rejects non-optional user phases.
 4. `SpineSatisfiedUpTo` independently guards the anchors — `ship` still requires a real audit PASS/WARN bound to the build tree.
 
-A user phase therefore cannot skip `build`/`audit`, cannot reach `ship` illegitimately, and cannot run before its declared position. The static pipeline (`EVOLVE_DYNAMIC_ROUTING=off`, the default) ignores user phases entirely.
+A user phase therefore cannot skip `build`/`audit`, cannot reach `ship` illegitimately, and cannot run before its declared position. The static pipeline (`EVOLVE_DYNAMIC_ROUTING=off` — the escape hatch; advisory is the default since 2026-06-06) ignores user phases entirely; under the advisory default, user phases are advisor-routable out of the box.
 
 ## CLI reference
 

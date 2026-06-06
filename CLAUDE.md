@@ -44,7 +44,7 @@ bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date
 - Default execution = tmux-LLM drivers (`claude-tmux` etc.); headless `claude -p` is opt-in only. Claude OAuth detected from macOS Keychain.
 - Commits: bare `git commit` / `git push origin main` are ship-gate-denied. Interactive commits: `/commit` → attestation → `evolve ship --class manual` (`EVOLVE_BYPASS_COMMIT_GATE=1` routine use is a violation). Cycle commits: `--class cycle` (full audit-binding). Releases: `evolve release X.Y.Z` — "publish" ≠ "push".
 - Unfinished cycle → `evolve loop --resume` or `evolve cycle reset`; never routine `EVOLVE_FORCE_FRESH=1`.
-- Routing: `EVOLVE_DYNAMIC_ROUTING=off` default; integrity floor `ship ⇒ build ∧ audit ∧ (tdd unless trivial)`; policy pins in `.evolve/policy.json` (`EVOLVE_POLICY_BYPASS` off). Swarm: `EVOLVE_SWARM_STAGE=shadow`.
+- Routing: `EVOLVE_DYNAMIC_ROUTING=advisory` default (since 2026-06-06, retro steps 1-3 landed; `=off` is the static escape hatch); integrity floor `ship ⇒ build ∧ audit ∧ (tdd unless trivial)`; policy pins in `.evolve/policy.json` (`EVOLVE_POLICY_BYPASS` off). Swarm: `EVOLVE_SWARM_STAGE=shadow`.
 - Observer auto-spawn default-on (`EVOLVE_OBSERVER_AUTOSPAWN=1`, stall 600s, tmux liveness probe).
 - Run `/clear` before a new evolve-loop batch (session cost isolation).
 

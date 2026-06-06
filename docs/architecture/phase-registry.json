@@ -1,9 +1,9 @@
 {
   "schema_version": 4,
-  "_note": "v1: data-only registry consumed by list-phase-order.sh + orchestrator (cycle-57). v3: + top-level config{} block for dynamic phase routing (config.Load is the sole consumer); + per-phase enabled/routing (Specification triggers). v2 was never released — version jumped 1→3 to align with the dynamic-routing plan's schema number. dynamic_routing=0 ⇒ Stage:Off ⇒ static state machine drives, byte-identical to pre-routing behavior.",
+  "_note": "v1: data-only registry consumed by list-phase-order.sh + orchestrator (cycle-57). v3: + top-level config{} block for dynamic phase routing (config.Load is the sole consumer); + per-phase enabled/routing (Specification triggers). v2 was never released — version jumped 1→3 to align with the dynamic-routing plan's schema number. dynamic_routing=0 ⇒ Stage:Off ⇒ static state machine drives, byte-identical to pre-routing behavior (the operator escape hatch). As of 2026-06-06 the default in the config block below is advisory.",
   "_v4_note": "v4 (user-definable phases / 'Lego pipeline'): the phasespec.PhaseSpec parser reads the FULL phase entry, accepting additive optional fields — kind (llm|native|command), agent, model, writes_source, inputs.signals/outputs.signals (the typed signal contract), prompt_context, classify (declarative verdict rules), gates.in/out, on_pass/on_fail. All optional and back-compat: omitted fields default (kind→llm, agent→evolve-<name>, model→auto). config.Load still reads only its routing subset and ignores the rest. User phases merge from .evolve/phases/<name>/phase.json over this built-in array (built-ins win on name clash).",
   "config": {
-    "dynamic_routing": "0",
+    "dynamic_routing": "advisory",
     "routing_mode": "llm",
     "mandatory_phases": ["scout", "build", "audit", "ship"],
     "conditional_mandatory": { "tdd": "cycle_size!=trivial" },
