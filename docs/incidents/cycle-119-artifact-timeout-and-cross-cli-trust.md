@@ -78,7 +78,7 @@ evolveDir = absOrWarn("--evolve-dir", evolveDir)
 
 ### Issue 3 — `EVOLVE_PLAN_REVIEW=1` silent no-op under static routing — **OPEN**
 
-**Root cause.** `plan-review` is a **router-only** phase: no core `Phase` constant (`phase.go`), no state-machine edge (`statemachine.go` goes `triage → tdd`). `EVOLVE_PLAN_REVIEW=1` only sets `cfg.PhaseEnable["plan-review"]=EnableOn`, which is consulted **solely** by the dynamic router (`router.go:enableOf`), and the router only drives at `Stage>=Advisory`. Under the default `EVOLVE_DYNAMIC_ROUTING=off`, the flag is read by nothing → silent no-op (no phase, no warning). Violates fail-loudly.
+**Root cause.** `plan-review` is a **router-only** phase: no core `Phase` constant (`phase.go`), no state-machine edge (`statemachine.go` goes `triage → tdd`). `EVOLVE_PLAN_REVIEW=1` only sets `cfg.PhaseEnable["plan-review"]=EnableOn`, which is consulted **solely** by the dynamic router (`router.go:enableOf`), and the router only drives at `Stage>=Advisory`. Under `EVOLVE_DYNAMIC_ROUTING=off` (the default at the time; advisory since 2026-06-06), the flag is read by nothing → silent no-op (no phase, no warning). Violates fail-loudly.
 
 **Fix (proposed).** In `config.Load` (which already emits `[]Warning`), add an `inert-phase-enable` warning when a phase is set `EnableOn` but the routing stage will never run the advisor that inserts it. Do **not** add plan-review to the static state machine (that would break the byte-identical legacy spine).
 

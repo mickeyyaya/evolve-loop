@@ -10,6 +10,10 @@ import (
 // safe to use as a filename, agent suffix, and routing token.
 var nameRE = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
+// twoTierNameRE enforces the two-tier naming rule: user/optional phases must be
+// multi-word kebab-case. Single-word names are the reserved built-in vocabulary.
+var twoTierNameRE = regexp.MustCompile(`^[a-z]+(-[a-z]+)+$`)
+
 // canonicalVerdicts mirrors core's verdict set. Duplicated here (not imported)
 // because phasespec must not depend on core — core imports phasespec.
 var canonicalVerdicts = map[string]bool{"PASS": true, "FAIL": true, "WARN": true, "SKIPPED": true}
@@ -47,6 +51,8 @@ func ValidateUserSpec(s PhaseSpec) []string {
 		v = append(v, "name is required")
 	} else if !nameRE.MatchString(s.Name) {
 		v = append(v, fmt.Sprintf("name %q must be lowercase kebab-case (^[a-z][a-z0-9-]*$)", s.Name))
+	} else if !twoTierNameRE.MatchString(s.Name) {
+		v = append(v, fmt.Sprintf("name %q must be multi-word kebab-case for user/optional phases (e.g. my-check); single-word names are reserved for built-in phases", s.Name))
 	}
 
 	if !s.Optional {

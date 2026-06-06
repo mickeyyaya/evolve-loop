@@ -1,0 +1,51 @@
+{
+  "name": "mutation-gate",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-mutation-gate",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "amplify.tests_added"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/mutation-gate-report.md"
+    ],
+    "signals": [
+      "mutation.score",
+      "mutation.survivors"
+    ]
+  },
+  "prompt_context": [
+    "goal"
+  ],
+  "classify": {
+    "require_sections": [
+      "Summary",
+      "Survivors",
+      "Verdict"
+    ],
+    "fail_if_empty": true,
+    "fail_if_signal": {
+      "mutation.score": "<60"
+    },
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "amplify.tests_added",
+        "op": "gt",
+        "value": 0
+      }
+    ]
+  },
+  "after": "test-amplification"
+}

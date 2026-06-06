@@ -55,10 +55,13 @@ if [ "${schema_count:-0}" -lt 1 ]; then
 fi
 
 # (4) Cross-reference from at least one canonical doc. Accept any of:
-#   CLAUDE.md, AGENTS.md, agents/evolve-scout.md
+#   CLAUDE.md, AGENTS.md, agents/evolve-scout.md,
+#   docs/operations/runtime-reference.md (added 2026-06-05: the CLAUDE.md
+#   split d8ac721 moved runtime cross-refs there; it is CLAUDE.md's linked
+#   canonical extension).
 # Reference forms accepted: bare filename "research-tool.md", relative path
 # "docs/architecture/research-tool.md", or anchor "research-tool.md#...".
-ref_targets="$REPO_ROOT/CLAUDE.md $REPO_ROOT/AGENTS.md $REPO_ROOT/agents/evolve-scout.md"
+ref_targets="$REPO_ROOT/CLAUDE.md $REPO_ROOT/AGENTS.md $REPO_ROOT/agents/evolve-scout.md $REPO_ROOT/docs/operations/runtime-reference.md"
 ref_hits=0
 matched_in=""
 for tgt in $ref_targets; do
@@ -70,7 +73,7 @@ for tgt in $ref_targets; do
   fi
 done
 if [ "$ref_hits" -lt 1 ]; then
-  errors="${errors}\n  ADR not referenced from CLAUDE.md, AGENTS.md, or agents/evolve-scout.md"
+  errors="${errors}\n  ADR not referenced from CLAUDE.md, AGENTS.md, agents/evolve-scout.md, or docs/operations/runtime-reference.md"
   fail=$((fail + 1))
 fi
 

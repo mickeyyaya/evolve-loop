@@ -21,6 +21,23 @@ evolve phases list                   # see it in the merged catalog as a 'user' 
 
 Your phase runs only under dynamic routing: set `EVOLVE_DYNAMIC_ROUTING=advisory` (or `enforce`).
 
+## Naming rule (REQUIRED for new phases)
+
+**`<object>-<action>`** — the thing your phase examines, then the operation on it:
+`smell-scan`, `mutation-gate`, `dependency-audit`, `bug-reproduction`. The action
+may be a nominal (`-localization`, `-amplification`) when the short verb reads
+ambiguously. Test: the name alone must answer *"what does this phase look at, and
+what does it do about it."*
+
+- **Single-word names are reserved** for the built-in core pipeline (`scout`,
+  `build`, `audit`, `ship`, …) — a closed set; never name a user phase with one word.
+- Declare the phase's **core value** (the one risk it removes) as a row in
+  `agents/evolve-router.md` → "Phase Catalog — Core Values" so the advisor can
+  justify selecting it. (A machine-carried `description` field is planned; see
+  docs/architecture/micro-phase-catalog.md §3 naming rule.)
+- Don't copy the grandfathered shapes `tester` / `build-planner` — they predate
+  this rule.
+
 ## The three files
 
 `.evolve/phases/<name>/`:
@@ -80,7 +97,7 @@ User phases are **optional-only** and kernel-clamped. Enforced at every gate:
 3. The orchestrator's transition check requires forward progress in the order and rejects non-optional user phases.
 4. `SpineSatisfiedUpTo` independently guards the anchors — `ship` still requires a real audit PASS/WARN bound to the build tree.
 
-A user phase therefore cannot skip `build`/`audit`, cannot reach `ship` illegitimately, and cannot run before its declared position. The static pipeline (`EVOLVE_DYNAMIC_ROUTING=off`, the default) ignores user phases entirely.
+A user phase therefore cannot skip `build`/`audit`, cannot reach `ship` illegitimately, and cannot run before its declared position. The static pipeline (`EVOLVE_DYNAMIC_ROUTING=off` — the escape hatch; advisory is the default since 2026-06-06) ignores user phases entirely; under the advisory default, user phases are advisor-routable out of the box.
 
 ## CLI reference
 

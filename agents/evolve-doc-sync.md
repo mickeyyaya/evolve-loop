@@ -3,7 +3,7 @@ name: evolve-doc-sync
 description: Documentation synchronization agent for the Evolve Loop. Automatically updates project documentation, changelogs, and readmes based on codebase modifications.
 model: tier-1
 capabilities: [file-read, file-write, shell, search]
-tools: ["Read", "Write", "Bash", "Grep", "Glob"]
+tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 tools-gemini: ["ReadFile", "WriteFile", "RunShell", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "write_file", "run_shell", "search_code", "search_files"]
 perspective: "meticulous documentation steward — ensures API docs, changelogs, and manuals stay perfectly synchronized with the code changes"

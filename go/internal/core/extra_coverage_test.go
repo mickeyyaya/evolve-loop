@@ -61,6 +61,22 @@ func TestEnforceNext(t *testing.T) {
 	}
 }
 
+// TestEnforceNext_EmptyOrderSkipAdvance pins the cycle-240 e2e regression: with
+// an EMPTY cfg.Order (no phase-registry.json — the e2e fixtures and any bare
+// repo), the skip-advance loop must NOT rewrite a skipped staticNext to
+// PhaseEnd (nextInOrder returns PhaseEnd for any phase absent from an empty
+// order, which silently terminated cycles after tdd). The original staticNext
+// is kept — pre-skip-advance parity — and no advance is reported.
+func TestEnforceNext_EmptyOrderSkipAdvance(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{sm: NewStateMachine(), cfg: config.RoutingConfig{}}
+	gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, router.RoutingSignals{},
+		router.RouterDecision{SkipPhases: []string{"triage"}}, true)
+	if gotPhase != PhaseTriage || gotOK {
+		t.Errorf("empty-order skip-advance: enforceNext = (%s, %v), want (%s, false) — skipped staticNext must survive, never become PhaseEnd", gotPhase, gotOK, PhaseTriage)
+	}
+}
+
 // TestPlanRunsShip covers the no-ship detection that gates early-exit.
 func TestPlanRunsShip(t *testing.T) {
 	t.Parallel()

@@ -12,9 +12,12 @@ func TestLoad_RealRegistry(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")
 	cfg, ws := Load(path, map[string]string{})
 
-	// Default posture: dynamic_routing=0 ⇒ Stage:Off (static SM drives).
-	if cfg.Stage != StageOff {
-		t.Errorf("Stage=%v, want StageOff (registry dynamic_routing=0)", cfg.Stage)
+	// Default posture since 2026-06-06 (retro migration steps 1-3 landed):
+	// dynamic_routing=advisory ⇒ the advisor drives the optional surface while
+	// the spine stays static and ClampPlanToFloor protects the ship guarantee.
+	// EVOLVE_DYNAMIC_ROUTING=off remains the operator escape hatch.
+	if cfg.Stage != StageAdvisory {
+		t.Errorf("Stage=%v, want StageAdvisory (registry dynamic_routing=advisory)", cfg.Stage)
 	}
 	if cfg.Mode != ModeDynamicLLM {
 		t.Errorf("Mode=%v, want ModeDynamicLLM (registry routing_mode=llm)", cfg.Mode)
@@ -28,8 +31,10 @@ func TestLoad_RealRegistry(t *testing.T) {
 			t.Errorf("Mandatory[%d]=%s, want %s", i, cfg.Mandatory[i], p)
 		}
 	}
-	if cfg.MaxInsertions != 4 {
-		t.Errorf("MaxInsertions=%d, want 4", cfg.MaxInsertions)
+	// 6 since cycle 217 (micro-phase catalog §4.2): the refactor recipe needs
+	// six optional insertions; registry config.max_optional_insertions raised 4→6.
+	if cfg.MaxInsertions != 6 {
+		t.Errorf("MaxInsertions=%d, want 6 (registry max_optional_insertions, raised in cycle 217)", cfg.MaxInsertions)
 	}
 	if r, ok := cfg.Conditional["tdd"]; !ok || r.Field != "cycle_size" || r.Op != "!=" || r.Value != "trivial" {
 		t.Errorf("Conditional[tdd]=%+v (ok=%v), want cycle_size != trivial", r, ok)

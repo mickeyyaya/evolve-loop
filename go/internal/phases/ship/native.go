@@ -16,8 +16,11 @@ package ship
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -201,6 +204,19 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		return finalize(ctx, &opts, &res, err, "verify-self-sha")
 	}
 
+	// 1.5 Check post-push idempotency.
+	if opts.Class == ClassCycle {
+		idempotent, err := checkPostPushIdempotency(ctx, &opts)
+		if err == nil && idempotent {
+			head, err := captureGitOutput(ctx, &opts, "rev-parse", "HEAD")
+			if err == nil {
+				res.CommitSHA = strings.TrimSpace(head)
+				res.Logs = append(res.Logs, fmt.Sprintf("[ship] post-push correction detected (HEAD is already the ship commit %s); succeeding report-only", res.CommitSHA))
+				return finalize(ctx, &opts, &res, nil, "post-push-idempotency")
+			}
+		}
+	}
+
 	// 2. Class-aware pre-flight (audit-binding, kernel checks, or interactive confirm).
 	if err := verifyClass(ctx, &opts, &res); err != nil {
 		if _, isClean := err.(*cleanExitError); isClean {
@@ -268,4 +284,30 @@ func (o *Options) envStr(key string) string {
 		return v
 	}
 	return os.Getenv(key)
+}
+
+func checkPostPushIdempotency(ctx context.Context, opts *Options) (bool, error) {
+	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csMap, err := readStateMap(csPath)
+	if err != nil {
+		return false, err
+	}
+	cid, ok := stateInt(csMap, "cycle_id")
+	if !ok {
+		return false, nil
+	}
+	bindingPath := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid), "ship-binding.json")
+	bindingMap, err := readStateMap(bindingPath)
+	if err != nil {
+		return false, err
+	}
+	bindingCommitSHA := stateString(bindingMap, "commit_sha")
+	if bindingCommitSHA == "" {
+		return false, nil
+	}
+	head, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(head) == strings.TrimSpace(bindingCommitSHA), nil
 }

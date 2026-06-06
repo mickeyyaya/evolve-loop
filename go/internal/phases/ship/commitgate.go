@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence"
 )
 
 // commitGateAttestation mirrors the subset of .commit-gate/attestation.json
@@ -129,5 +130,72 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 	if res.Provenance != "" {
 		res.Provenance += " + commit-gate attested"
 	}
+	return nil
+}
+
+func runPersonaLint(ctx context.Context, opts *Options, res *RunResult) error {
+	if opts.envBool("EVOLVE_BYPASS_COMMIT_GATE") {
+		res.Logs = append(res.Logs, "[ship] persona-lint: EVOLVE_BYPASS_COMMIT_GATE=1 — persona lint skipped")
+		return nil
+	}
+
+	profileDir := opts.envStr("EVOLVE_PROFILE_DIR")
+	if profileDir == "" {
+		profileDir = filepath.Join(opts.ProjectRoot, ".evolve", "profiles")
+	}
+
+	agentsDir := filepath.Join(opts.ProjectRoot, "agents")
+	if _, err := os.Stat(agentsDir); os.IsNotExist(err) {
+		res.Logs = append(res.Logs, "[ship] persona-lint: agents/ directory missing, skipping lint")
+		return nil
+	}
+	if _, err := os.Stat(profileDir); os.IsNotExist(err) {
+		res.Logs = append(res.Logs, "[ship] persona-lint: profiles directory missing, skipping lint")
+		return nil
+	}
+
+	overrides := make(map[string]string)
+	if override := opts.envStr("EVOLVE_PERSONA_OVERRIDE"); override != "" {
+		parts := strings.SplitN(override, ":", 2)
+		if len(parts) == 2 {
+			path := parts[0]
+			name := parts[1]
+			overrides[name] = path
+		}
+	}
+
+	pcOpts := phasecoherence.Options{
+		AgentsFS:   os.DirFS(opts.ProjectRoot),
+		ProfilesFS: os.DirFS(profileDir),
+		Overrides:  overrides,
+	}
+
+	violations1, err := phasecoherence.Check(pcOpts)
+	if err != nil {
+		return err
+	}
+	violations2, err := phasecoherence.CheckArtifactNames(pcOpts)
+	if err != nil {
+		return err
+	}
+
+	allViolations := append(violations1, violations2...)
+
+	var errMsgs []string
+	for _, v := range allViolations {
+		msg := fmt.Sprintf("[ship] persona-lint: %s: %s: %s", v.Severity, v.Persona, v.Message)
+		res.Logs = append(res.Logs, msg)
+
+		if v.Kind == "disallowed" {
+			errMsgs = append(errMsgs, fmt.Sprintf("%s: %s", v.Persona, v.Message))
+		}
+	}
+
+	if len(errMsgs) > 0 {
+		return shipErr(core.ShipErrorCode("PERSONA_COHERENCE_MISMATCH"), core.ShipClassIntegrity, core.StageVerifyClass,
+			"persona coherence check failed: "+strings.Join(errMsgs, "; "))
+	}
+
+	res.Logs = append(res.Logs, "[ship] persona-lint: check completed with no blocking errors")
 	return nil
 }

@@ -34,6 +34,7 @@ type RouteInput struct {
 	Completed       []string // phases already done this cycle
 	Strict          bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
 	Now             time.Time
+	IntentRequired  bool
 
 	// Proposer context — populated by the orchestrator, consumed ONLY by a
 	// DynamicLLM Proposer (which needs to dispatch a bridge call). The pure
@@ -51,6 +52,13 @@ type RouteInput struct {
 	// blind. The pure Route() ignores it, so determinism is preserved. Empty when
 	// no goal text was threaded (the advisor then plans from signals + recall only).
 	GoalText string
+
+	// CarryoverTodos are unresolved operator/workflow tasks from previous cycles,
+	// projected from state.json:carryoverTodos by the orchestrator at cycle start.
+	// Consumed ONLY by the DynamicLLM planner prompt so the upfront whole-cycle
+	// advisor can select phases based on known backlog before Scout has produced
+	// any handoff artifacts. The pure Route() ignores it.
+	CarryoverTodos []CarryoverTodo
 
 	// Catalog is the set of pre-defined phases the advisor may SELECT instead of
 	// minting a new one (WS3: prefer select-over-mint = DRY at the agent level).
@@ -100,6 +108,17 @@ type PhaseCard struct {
 	Description  string   `json:"description,omitempty"` // one line: what the phase produces
 	WhenToUse    string   `json:"when_to_use,omitempty"` // the SELECT hint
 	Categories   []string `json:"categories,omitempty"`  // goal types
+}
+
+// CarryoverTodo is the router/advisor-facing projection of one unresolved
+// carryover task. It mirrors core.CarryoverTodo without importing core into the
+// leaf router package.
+type CarryoverTodo struct {
+	ID             string `json:"id"`
+	Action         string `json:"action"`
+	Priority       string `json:"priority"`
+	FirstSeenCycle int    `json:"first_seen_cycle"`
+	CyclesUnpicked int    `json:"cycles_unpicked"`
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.
@@ -319,6 +338,9 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 			// mandatory-never-skipped clamp, never a silent discrepancy.
 			return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
 		}
+		if runs && enable == config.EnableContent && optionalUsed >= in.Cfg.MaxInsertions && !isFloorPhase(phase) {
+			return false, true, &Clamp{Rule: "max-insertions-cap", Proposed: phase + "=insert", Forced: phase + "=skip"}
+		}
 		return runs, true, nil
 	}
 
@@ -458,4 +480,13 @@ func normalize(phase string) string {
 		return "retrospective"
 	}
 	return phase
+}
+
+func isFloorPhase(phase string) bool {
+	switch phase {
+	case "intent", "scout", "tdd", "build", "audit", "ship":
+		return true
+	default:
+		return false
+	}
 }

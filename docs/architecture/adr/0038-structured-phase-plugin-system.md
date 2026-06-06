@@ -66,7 +66,8 @@ the worktree.
   envelope contract makes self-correction mechanical. Mints can be persisted (`--mint`).
 - The advisor's SELECT decisions are informed (when-to-use + categories) and the prompt
   cost is bounded regardless of how many plugin phases exist.
-- The seed `reproduce-bug` phase (highest-leverage micro-phase per the 2026-06-05 research)
+- The seed `reproduce-bug` phase (highest-leverage micro-phase per the 2026-06-05 research;
+  since renamed `bug-reproduction` by the two-tier naming rule)
   was registered THROUGH the new flow as the end-to-end proof; the real-catalog e2e test
   (`seed_phase_e2e_test.go`) guards the merged-catalog → advisor-card → rendering chain.
 - Known accepted risk: `.gitignore`'s `**/.evolve/` shadows *new* `phase.json` files

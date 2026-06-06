@@ -69,6 +69,28 @@ if [ "${count_fix:-0}" -eq 0 ]; then
   exit 1
 fi
 
+# Synthetic sanity for the artifact-evidence exemption (2026-06-06): the glob
+# logic must (a) exempt a cycle whose run dir carries routing-plan.json,
+# (b) NOT exempt a cycle without one.
+syn_runs="$TMPDIR_FIX/runs"
+mkdir -p "$syn_runs/cycle-9100"
+syn_drives() {  # $1 = cycle; mirrors the production glob check
+  local d
+  for d in "$syn_runs/cycle-$1" "$syn_runs/cycle-$1".reset-*; do
+    [ -f "$d/routing-plan.json" ] && return 0
+  done
+  return 1
+}
+if syn_drives 9100; then
+  echo "RED: exemption fired without a routing artifact (synthetic)" >&2
+  exit 1
+fi
+printf '[]' > "$syn_runs/cycle-9100/routing-plan.json"
+if ! syn_drives 9100; then
+  echo "RED: exemption failed to fire on a present routing artifact (synthetic)" >&2
+  exit 1
+fi
+
 # ── Cohorts (a) baseline cycle-97 + (b) current cycle (when flag-unset) ──
 fail_count=0
 fail_log=""
@@ -89,18 +111,34 @@ if [ -n "$LEDGER" ]; then
   # phase-skipping feature is active. EVOLVE_DYNAMIC_ROUTING=advisory|enforce is a
   # SEPARATE feature whose advisor legitimately skips non-mandatory phases (emitting
   # kind:phase_skipped by design) — those skips are not a PSMAS default-off violation.
-  # The predicate inherits the cycle's env, so gate on the routing flag the same way we
-  # gate on EVOLVE_PSMAS_SKIP. (cycle-162: an advisory-routing validation run tripped
-  # this false-positively.)
+  # The env gate below handles the in-cycle case (predicate inherits the cycle's env);
+  # the artifact-evidence block after it handles the post-hoc case — env alone is NOT
+  # sufficient (cycle-162 and cycle-224 incidents).
   routing_drives=0
   case "${EVOLVE_DYNAMIC_ROUTING:-}" in
     advisory | enforce) routing_drives=1 ;;
   esac
+  current_cycle=""
+  if [ -n "$STATE" ] && [ -f "$STATE" ]; then
+    current_cycle="$(jq -r '.lastCycleNumber // empty' "$STATE" 2>/dev/null || true)"
+  fi
+  # Re-baselined 2026-06-06: the env gate above only exempts when THIS process
+  # inherits the routing flag — but lastCycleNumber may record a cycle that ran
+  # routing-driven while the predicate later runs in a static-mode env (first
+  # static cycle after an advisory run false-positives on the prior cycle's
+  # legitimate advisor skips). Judge the CYCLE by its own artifact evidence:
+  # a routing-plan.json in its run dir (live or reset-sealed) proves the
+  # advisor drove it, so its skips are by design, not a PSMAS violation.
+  if [ "$routing_drives" -eq 0 ] && [ -n "$current_cycle" ]; then
+    runs_base="$(dirname "$LEDGER")/runs"
+    for d in "$runs_base/cycle-${current_cycle}" "$runs_base/cycle-${current_cycle}".reset-*; do
+      if [ -f "$d/routing-plan.json" ]; then
+        routing_drives=1
+        break
+      fi
+    done
+  fi
   if { [ -z "${EVOLVE_PSMAS_SKIP:-}" ] || [ "${EVOLVE_PSMAS_SKIP:-0}" = "0" ]; } && [ "$routing_drives" -eq 0 ]; then
-    current_cycle=""
-    if [ -n "$STATE" ] && [ -f "$STATE" ]; then
-      current_cycle="$(jq -r '.lastCycleNumber // empty' "$STATE" 2>/dev/null || true)"
-    fi
     if [ -n "$current_cycle" ]; then
       current_skipped="$(jq -r --argjson c "$current_cycle" '
         select(.cycle == $c and .kind == "phase_skipped") | .role' "$LEDGER" 2>/dev/null | wc -l | tr -d ' ')"

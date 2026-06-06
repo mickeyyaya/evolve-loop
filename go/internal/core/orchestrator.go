@@ -26,6 +26,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
+// PhaseBoundaryCheckpointer is a package-level hook to write a checkpoint block
+// at phase boundaries, set by the checkpoint package to avoid circular imports.
+var PhaseBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
+
+func wrapCycleLevelError(phase Phase, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ErrPhaseGateFailed) || errors.Is(err, ErrLedgerChainBroken) || errors.Is(err, ErrLockHeld) {
+		return err
+	}
+	return &ErrCycleLevelFailure{Phase: string(phase), Cause: err}
+}
+
 // PhaseMinter registers a minted phase config into a dispatchable runner. The
 // orchestrator depends on this narrow port (not phaseregistrar directly) so
 // core stays decoupled from specrunner/phaseregistrar; the composition root
@@ -966,6 +980,20 @@ type phaseUsageSidecar struct {
 	Verdict      string  `json:"verdict"`
 }
 
+type failureLearningRequest struct {
+	CycleRequest CycleRequest
+	Cycle        int
+	Failed       Phase
+	Err          error
+	Attempt      int
+	State        *State
+	CycleState   *CycleState
+	Context      map[string]string
+	Env          map[string]string
+	Result       *CycleResult
+	Timings      *[]phaseTimingEntry
+}
+
 func writePhaseUsageSidecar(workspace, phase string, cost float64, duration int64, attempts int, verdict string) {
 	sidecar := phaseUsageSidecar{
 		Phase:        phase,
@@ -1029,6 +1057,150 @@ func writePhaseFailureDiag(workspace, phase string, cycle int, phaseErr error, a
 	if rerr := os.Rename(tmp, path); rerr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag rename: %v\n", rerr)
 	}
+}
+
+func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLearningRequest) {
+	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
+		return
+	}
+	summary := failureLearningSummary(fl.Cycle, fl.Failed, fl.Err)
+	todoID := fmt.Sprintf("cycle-%d-failed-%s", fl.Cycle, fl.Failed)
+	if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
+		fl.State.CarryoverTodos = append(fl.State.CarryoverTodos, CarryoverTodo{
+			ID:             todoID,
+			Action:         "Review the failed cycle learning and fix before retrying: " + summary,
+			Priority:       "P0",
+			FirstSeenCycle: fl.Cycle,
+			CyclesUnpicked: 0,
+		})
+	}
+	now := o.now().UTC().Format(time.RFC3339)
+	fl.State.FailedAt = append(fl.State.FailedAt, FailedRecord{
+		TS:             now,
+		Cycle:          fl.Cycle,
+		Verdict:        VerdictFAIL,
+		Classification: "cycle-mid-execution-fail",
+		RecordedAt:     now,
+		Summary:        summary,
+		Defects:        []string{summary},
+		Retrospected:   true,
+	})
+	fl.State.LastCycleNumber = fl.Cycle
+
+	retroRunner, ok := o.runners[PhaseRetro]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: no retro runner registered; queued carryover todo only\n")
+		o.writeFailureLearningState(ctx, fl.State)
+		return
+	}
+
+	retroReq := fl.retroRequest(summary, todoID)
+	retroStarted := o.now().UTC()
+	fl.CycleState.Phase = string(PhaseRetro)
+	fl.CycleState.PhaseStartedAt = retroStarted.Format(time.RFC3339)
+	fl.CycleState.ActiveAgent = string(PhaseRetro)
+	if err := o.storage.WriteCycleState(ctx, *fl.CycleState); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write cycle-state pre-retro: %v\n", err)
+	}
+
+	cancel := o.observer.Start(ctx, string(PhaseRetro), retroReq)
+	retroResp, retroErr := retroRunner.Run(ctx, retroReq)
+	if cancel != nil {
+		cancel()
+	}
+	if retroErr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
+		o.writeFailureLearningState(ctx, fl.State)
+		return
+	}
+	if !IsVerdict(retroResp.Verdict) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
+		o.writeFailureLearningState(ctx, fl.State)
+		return
+	}
+
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS:       o.now().UTC().Format(time.RFC3339),
+		Cycle:    fl.Cycle,
+		Role:     string(PhaseRetro),
+		Kind:     "phase",
+		ExitCode: 0,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro ledger append: %v\n", err)
+	}
+	fl.CycleState.CompletedPhases = append(fl.CycleState.CompletedPhases, string(PhaseRetro))
+	if err := o.storage.WriteCycleState(ctx, *fl.CycleState); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write cycle-state post-retro: %v\n", err)
+	}
+	if PhaseBoundaryCheckpointer != nil {
+		if err := PhaseBoundaryCheckpointer(*fl.CycleState, fl.CycleRequest.ProjectRoot, o.now()); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro checkpoint failed: %v\n", err)
+		}
+	}
+	fl.Result.PhasesRun = append(fl.Result.PhasesRun, PhaseRetro)
+	fl.Result.FinalVerdict = retroResp.Verdict
+	fl.Result.RetroDecision = "failure-learning: queued " + todoID
+	*fl.Timings = append(*fl.Timings, phaseTimingEntry{
+		Phase:        string(PhaseRetro),
+		DurationMS:   retroResp.DurationMS,
+		Verdict:      retroResp.Verdict,
+		CostUSD:      retroResp.CostUSD,
+		AttemptCount: 1,
+	})
+	writePhaseUsageSidecar(fl.CycleState.WorkspacePath, string(PhaseRetro), retroResp.CostUSD, retroResp.DurationMS, 1, retroResp.Verdict)
+	o.writeFailureLearningState(ctx, fl.State)
+}
+
+func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseRequest {
+	retroCtx := make(map[string]string, len(fl.Context)+5)
+	for k, v := range fl.Context {
+		retroCtx[k] = v
+	}
+	retroCtx["previous_verdict"] = VerdictFAIL
+	retroCtx["failed_phase"] = string(fl.Failed)
+	retroCtx["failure_error"] = fl.Err.Error()
+	retroCtx["failure_attempt"] = strconv.Itoa(fl.Attempt)
+	retroCtx["failure_summary"] = summary
+	retroCtx["next_cycle_todo_id"] = todoID
+	return PhaseRequest{
+		Cycle:         fl.Cycle,
+		ProjectRoot:   fl.CycleRequest.ProjectRoot,
+		Workspace:     fl.CycleState.WorkspacePath,
+		GoalHash:      fl.CycleRequest.GoalHash,
+		Budget:        fl.CycleRequest.Budget,
+		PreviousPhase: string(fl.Failed),
+		Env:           fl.Env,
+		Context:       retroCtx,
+	}
+}
+
+func (o *Orchestrator) writeFailureLearningState(ctx context.Context, state *State) {
+	if state == nil {
+		return
+	}
+	if err := o.storage.WriteState(ctx, *state); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write state: %v\n", err)
+	}
+}
+
+func carryoverTodoExists(todos []CarryoverTodo, id string) bool {
+	for _, t := range todos {
+		if t.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+const maxFailureLearningSummaryChars = 500
+
+func failureLearningSummary(cycle int, failed Phase, err error) string {
+	msg := err.Error()
+	r := []rune(msg)
+	if len(r) > maxFailureLearningSummaryChars {
+		msg = string(r[:maxFailureLearningSummaryChars]) + " ...[truncated]"
+	}
+	return fmt.Sprintf("cycle %d failed during %s: %s", cycle, failed, msg)
 }
 
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
@@ -1209,7 +1381,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// — selecting a design phase or minting when the work warrants it, instead
 			// of planning blind. Reading a nil/absent map key is safe (empty ⇒ no Goal
 			// section in the prompt).
-			GoalText: req.Context["goal"],
+			GoalText:       req.Context["goal"],
+			CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
+			IntentRequired: cs.IntentRequired,
 		}
 		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
@@ -1220,7 +1394,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
 			var clamps []router.Clamp
-			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor())
+			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
 			// Register advisor-minted phases (Steps 11/12) into runners +
 			// catalog + routing BEFORE the dispatch loop, so a minted phase the
@@ -1265,6 +1439,21 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// recoveryDepth bounds advisor-driven ship-error recovery across the whole
 	// cycle (maxRecoveryDepth). Persists across loop iterations.
 	recoveryDepth := 0
+	recordFailureLearning := func(failed Phase, failErr error, attempt int) {
+		o.recordFailureLearning(ctx, failureLearningRequest{
+			CycleRequest: req,
+			Cycle:        cycle,
+			Failed:       failed,
+			Err:          failErr,
+			Attempt:      attempt,
+			State:        &state,
+			CycleState:   &cs,
+			Context:      ctxSnap,
+			Env:          envSnap,
+			Result:       &result,
+			Timings:      &phaseTimings,
+		})
+	}
 
 	// Bounded loop guards against any transition-table cycle bug.
 	for safety := 0; safety < 32; safety++ {
@@ -1329,7 +1518,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				Env:         envSnap,
 				// Clamped whole-cycle plan (Stage>=Advisory). nil below Advisory
 				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
-				Plan: clampedPlan,
+				Plan:           clampedPlan,
+				IntentRequired: cs.IntentRequired,
 			})
 			if o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
 				if forced, ok := o.enforceNext(current, next, signals, dec, planRunsShip(clampedPlan)); ok {
@@ -1403,6 +1593,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				beforeDirty = snap
 			}
 		}
+		phaseCtx := ctxSnap
+		if next == PhaseRetro {
+			phaseCtx = make(map[string]string, len(ctxSnap)+1)
+			for k, v := range ctxSnap {
+				phaseCtx[k] = v
+			}
+			phaseCtx["previous_verdict"] = lastVerdict
+		}
 		phaseReq := PhaseRequest{
 			Cycle:         cycle,
 			ProjectRoot:   req.ProjectRoot,
@@ -1412,7 +1610,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			Budget:        req.Budget,
 			PreviousPhase: string(current),
 			Env:           envSnap,
-			Context:       ctxSnap,
+			Context:       phaseCtx,
 		}
 		// Cycle-122 Fix 3 / ADR-0030: attach the per-phase observer
 		// goroutine BEFORE runner.Run and cancel it AFTER. noopObserver
@@ -1497,8 +1695,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 							break
 						}
 					}
+					phaseErr := fmt.Errorf("phase %s: %w", next, err)
 					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
-					return result, fmt.Errorf("phase %s: %w", next, err)
+					recordFailureLearning(next, phaseErr, attempt)
+					return result, wrapCycleLevelError(next, phaseErr)
 				}
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)
 				// Emit structured audit trail for the self-heal retry.
@@ -1516,8 +1716,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			}
 			if err == nil && !IsVerdict(resp.Verdict) {
 				if attempt >= maxAttempts {
-					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict), attempt, o.now)
-					return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+					ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, ferr, attempt, o.now)
+					recordFailureLearning(next, ferr, attempt)
+					return result, wrapCycleLevelError(next, ferr)
 				}
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)
 				// Emit structured audit trail for the self-heal retry.
@@ -1581,7 +1783,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					obsCancel()
 				}
 				if err != nil {
-					return result, fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
+					phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
+					recordFailureLearning(next, phaseErr, corr)
+					return result, wrapCycleLevelError(next, phaseErr)
 				}
 				// A correction re-dispatch must produce a canonical verdict to be
 				// evaluable, same invariant the outer attempt loop enforces before
@@ -1589,7 +1793,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// ladder (scope note), so a non-canonical result here aborts rather
 				// than retrying.
 				if !IsVerdict(resp.Verdict) {
-					return result, fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
+					phaseErr := fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
+					recordFailureLearning(next, phaseErr, corr)
+					return result, wrapCycleLevelError(next, phaseErr)
 				}
 				// rin.Response is refreshed for reviewer consistency; the deliverable
 				// reviewer reads the filesystem (workspace/worktree), not this field.
@@ -1602,9 +1808,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			if !rr.Approve {
 				if maxCorrections == 0 {
 					// Byte-identical to the pre-feature abort message.
-					return result, fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
+					phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
+					recordFailureLearning(next, phaseErr, 1)
+					return result, wrapCycleLevelError(next, phaseErr)
 				}
-				return result, fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
+				phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
+				recordFailureLearning(next, phaseErr, maxCorrections)
+				return result, wrapCycleLevelError(next, phaseErr)
 			}
 		}
 
@@ -1625,7 +1835,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// of an untracked leak must not slip past into audit.
 		if next == PhaseBuild && cs.ActiveWorktree != "" {
 			if !recoverBuildLeak(ctx, req.ProjectRoot, cs.ActiveWorktree, mainDirtyBaseline) {
-				return result, fmt.Errorf("phase build: worktree-leak recovery failed (main tree left unsafe for audit)")
+				phaseErr := fmt.Errorf("phase build: worktree-leak recovery failed (main tree left unsafe for audit)")
+				recordFailureLearning(next, phaseErr, 1)
+				return result, phaseErr
 			}
 		}
 
@@ -1634,7 +1846,29 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			if res.SnapshotMissed {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff post-phase snapshot failed for %s (sandbox guard degraded; not aborting)\n", next)
 			} else if !res.OK() {
-				return result, res.Error(string(next), phaseWorktree)
+				// Attempt phase-agnostic binary churn discard for build artifacts
+				var relBin string
+				if execPath, err := os.Executable(); err == nil {
+					if rel, err := filepath.Rel(req.ProjectRoot, execPath); err == nil && !strings.HasPrefix(rel, "..") {
+						relBin = filepath.ToSlash(rel)
+					}
+				}
+
+				// Always discard "go/evolve" and relBin (if set)
+				_ = discardMainLeak(ctx, req.ProjectRoot, "go/evolve")
+				if relBin != "" && relBin != "go/evolve" {
+					_ = discardMainLeak(ctx, req.ProjectRoot, relBin)
+				}
+
+				// Re-snapshot and check again
+				res2 := treeGuard.Check(ctx, req.ProjectRoot, beforeDirty)
+				if res2.OK() {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: discarded binary rebuild churn in phase %s; continuing\n", next)
+				} else {
+					phaseErr := res2.Error(string(next), phaseWorktree)
+					recordFailureLearning(next, phaseErr, 1)
+					return result, phaseErr
+				}
 			}
 		}
 
@@ -1681,6 +1915,12 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			return result, fmt.Errorf("write cycle-state post-%s: %w", next, err)
+		}
+
+		if PhaseBoundaryCheckpointer != nil {
+			if err := PhaseBoundaryCheckpointer(cs, req.ProjectRoot, o.now()); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase boundary checkpoint failed: %v\n", err)
+			}
 		}
 
 		result.PhasesRun = append(result.PhasesRun, next)
@@ -1953,6 +2193,7 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 	for _, sp := range dec.SkipPhases {
 		if err := o.ledger.Append(ctx, LedgerEntry{
 			TS: ts, Cycle: cycle, Role: sp, Kind: "phase_skipped", ExitCode: 0,
+			Source: "router",
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
 		}
@@ -2001,9 +2242,40 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 // the non-bypassable "kernel disposes" floor for Enforce mode — neither
 // Strategy can reach Ship without a real PASS/WARN audit artifact.
 func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision, shipPlanned bool) (Phase, bool) {
+	isSkipped := func(p Phase) bool {
+		for _, skip := range dec.SkipPhases {
+			if Phase(skip) == p {
+				return true
+			}
+		}
+		return false
+	}
+	// Skip-advance: when the static successor is a phase the router has
+	// declined (dec.SkipPhases — e.g. an EnableOff optional like build-planner,
+	// or a plan veto), advance to the next NON-skipped phase so the spine-decline
+	// fallback below never lands on a vetoed phase (cycle-238 D1).
+	//
+	// GUARD (cycle-240 e2e regression): nextInOrder reads o.cfg.Order, which is
+	// EMPTY when no phase-registry.json is present (the e2e fixtures, and any
+	// repo without the registry). An empty/exhausted order makes nextInOrder
+	// return PhaseEnd, which would silently rewrite staticNext to "end" — turning
+	// "skip this optional phase" into "terminate the cycle before build/audit/
+	// ship". Only advance while the order can name a real successor; if it yields
+	// PhaseEnd we cannot trust it, so keep the original staticNext (the cand
+	// override + downstream gates still drive forward exactly as pre-regression).
+	advanced := false
+	for isSkipped(staticNext) {
+		nxt := o.nextInOrder(staticNext)
+		if nxt == PhaseEnd {
+			break
+		}
+		staticNext = nxt
+		advanced = true
+	}
+
 	cand := o.candidatePhase(dec.NextPhase)
 	if cand == "" || cand == staticNext {
-		return staticNext, false
+		return staticNext, advanced
 	}
 	// Early-exit (guarded scout/triage→end): the advisor proposes ending a
 	// no-ship convergence cycle. CanTerminateEarly is the SOLE authority — it
@@ -2015,13 +2287,13 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.Routing
 		if o.sm.CanTerminateEarly(current, shipPlanned) {
 			return PhaseEnd, true
 		}
-		return staticNext, false
+		return staticNext, advanced
 	}
 	if !o.transitionLegal(current, cand) {
-		return staticNext, false
+		return staticNext, advanced
 	}
 	if !o.sm.SpineSatisfiedUpTo(cand, sig, o.cfg) {
-		return staticNext, false
+		return staticNext, advanced
 	}
 	return cand, true
 }
@@ -2257,6 +2529,23 @@ func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 		})
 	}
 	return cards
+}
+
+func carryoverTodosForAdvisor(todos []CarryoverTodo) []router.CarryoverTodo {
+	if len(todos) == 0 {
+		return nil
+	}
+	out := make([]router.CarryoverTodo, len(todos))
+	for i, t := range todos {
+		out[i] = router.CarryoverTodo{
+			ID:             t.ID,
+			Action:         t.Action,
+			Priority:       t.Priority,
+			FirstSeenCycle: t.FirstSeenCycle,
+			CyclesUnpicked: t.CyclesUnpicked,
+		}
+	}
+	return out
 }
 
 // entriesFromRecords converts FailedRecord values into failureadapter.Entry.

@@ -1,0 +1,46 @@
+{
+  "name": "variance-analysis",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-variance-analysis",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ],
+    "signals": []
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/variance-analysis-report.md"
+    ],
+    "signals": [
+      "variance.material_count"
+    ]
+  },
+  "prompt_context": [
+    "goal"
+  ],
+  "classify": {
+    "require_sections": [
+      "Budget vs Actual",
+      "Classification",
+      "Drivers",
+      "Reforecast Impact"
+    ],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "accounting-close"
+      }
+    ]
+  },
+  "after": "triage"
+}

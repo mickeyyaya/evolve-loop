@@ -1,0 +1,43 @@
+{
+  "name": "okr-draft",
+  "role": "okr-draft",
+  "cli": "claude-tmux",
+  "model_tier_default": "sonnet",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Bash(git push:*)",
+    "Bash(git commit:*)",
+    "Bash(git config:*)"
+  ],
+  "max_budget_usd": 0.4,
+  "max_turns": 12,
+  "output_artifact": "okr-draft-report.md",
+  "challenge_token_required": true,
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "generated_from": "hand-authored"
+}

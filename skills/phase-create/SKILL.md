@@ -48,7 +48,7 @@ to humans too).
 Draft the `phase.json` (kebab-case name; `optional:true`; `kind:"llm"`; the
 metadata trio `description` / `when_to_use` / `categories`; typed
 `inputs`/`outputs` incl. signals; `classify`; `routing`; `after`) and a persona
-markdown. Model the persona on `agents/evolve-reproduce-bug.md`: frontmatter
+markdown. Model the persona on `agents/evolve-bug-reproduction.md`: frontmatter
 (name/description/model/tools/output-format), pipeline-position diagram,
 numbered workflow, an **Output Contract** section naming the required headings,
 and an anti-Goodhart note. Show both to the user for approval before

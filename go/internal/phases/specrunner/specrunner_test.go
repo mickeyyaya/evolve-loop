@@ -70,9 +70,13 @@ func TestEvaluateClassify(t *testing.T) {
 			"content", core.VerdictWARN, "",
 		},
 		{
-			"fail_if_signal emits WARN diag, still PASS",
+			// cycle-241 declared-semantics-rejection: a fail_if_signal gate
+			// without the Stage-3 signal bus can never fire — silently passing
+			// it lets an authoring mistake reach runtime undetected (retro
+			// 215-231 Practice 4). Loud authoring-time FAIL, not WARN.
+			"fail_if_signal without signal bus → FAIL (authoring-time rejection)",
 			&phasespec.ClassifyRules{FailIfSignal: map[string]string{"security.severity_max": ">=HIGH"}},
-			"content", core.VerdictPASS, "not yet evaluated",
+			"content", core.VerdictFAIL, "fail_if_signal",
 		},
 		{
 			"invalid verdict_on_pass → FAIL (fail loud on typo)",
@@ -105,6 +109,34 @@ func TestEvaluateClassify(t *testing.T) {
 				t.Errorf("diags %+v missing substring %q", diags, tc.wantDiag)
 			}
 		})
+	}
+}
+
+// TestEvaluateClassify_FailIfSignal_RejectsWithErrorSeverity pins the
+// severity of the cycle-241 declared-semantics rejection: the diagnostic
+// naming fail_if_signal must be Severity "error" (not "warning") AND the
+// verdict must be FAIL. The table above checks verdict+message; this test
+// is the severity pin the table's shape cannot express.
+func TestEvaluateClassify_FailIfSignal_RejectsWithErrorSeverity(t *testing.T) {
+	rules := &phasespec.ClassifyRules{FailIfSignal: map[string]string{"security.severity_max": ">=HIGH"}}
+
+	verdict, diags := evaluateClassify("non-empty artifact", rules)
+	if verdict != core.VerdictFAIL {
+		t.Errorf("verdict = %q, want %q (fail_if_signal without a signal bus is an authoring error)", verdict, core.VerdictFAIL)
+	}
+
+	found := false
+	for _, d := range diags {
+		if !strings.Contains(d.Message, "fail_if_signal") {
+			continue
+		}
+		found = true
+		if d.Severity != "error" {
+			t.Errorf("fail_if_signal diagnostic severity = %q, want \"error\" (silent WARN is the retro-215-231 defect class)", d.Severity)
+		}
+	}
+	if !found {
+		t.Errorf("no diagnostic names fail_if_signal — rejection must be a named violation; diags=%+v", diags)
 	}
 }
 

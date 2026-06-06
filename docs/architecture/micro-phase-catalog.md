@@ -18,7 +18,7 @@ The advisor composes each cycle from a catalog of ~15 built-ins + 4 user phases.
 1. **One responsibility per phase.** ≤2 input artifacts, 1 report artifact + namespaced signals, ONE classify rule. If the phase description needs "and", split it.
 2. **LLM judges, tooling gates** (Core Rule 5; EGPS alignment). Detection/enumeration phases are LLM judgment. Gate phases wrap deterministic tooling (benchstat, mutation runner, deadcode, test runner) executed by the LLM agent via the bridge, emitting hard signals. All phases are `kind: llm` (native/command reserved) — deterministic gates are LLM-orchestrated tool runs, the proven `perf-profile` pattern.
 3. **Routing triggers scope cost.** Every phase has `insert_when`; heavy phases are diff-scoped (Google incremental-mutation lesson); conditional phases gate on preconditions (SBFL ⇒ tests exist).
-4. **Generated tests are signals, not oracles.** `test-amplification` / `reproduce-bug` outputs feed the tdd/audit gates; they never carry independent ship authority (LLM test suites are documented-unreliable).
+4. **Generated tests are signals, not oracles.** `test-amplification` / `bug-reproduction` outputs feed the tdd/audit gates; they never carry independent ship authority (LLM test suites are documented-unreliable).
 5. **Anti-bias isolation.** A test-designing agent must not see the implementation (AgentCoder); preserves the existing builder≠auditor cross-family floor philosophy.
 6. **Advisor composes, kernel clamps.** Goal-type recipes live in the router persona as guidance; `ClampPlanToFloor` remains the non-bypassable safety net.
 
@@ -26,7 +26,17 @@ The advisor composes each cycle from a catalog of ~15 built-ins + 4 user phases.
 
 Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name>/phase.json` + `agent.md` at implementation time and validate with `evolve phases validate <name>`.
 
-### Wave 1 — goal-defining phases
+### Naming rule (added 2026-06-05; unified 2026-06-06)
+
+Two tiers — **the shape of a name encodes the phase's tier**:
+
+1. **Single-word names are the reserved core-pipeline vocabulary**: `intent`, `scout`, `triage`, `tdd`, `build`, `tester`, `audit`, `ship`, `retrospective`, `memo`. This set is CLOSED — no new single-word phase names, ever. (They are wired into the trust kernel, 53 ACS predicates, and the ledger; renaming them is a migration, not a cleanup.)
+2. **Every optional / advisor-selectable / user / minted phase is `<object>-<action>`**: the thing examined, then the operation on it — `smell-scan`, `mutation-gate`, `dependency-audit`, `bug-reproduction` (renamed from `reproduce-bug` 2026-06-06 to fit the rule; signal namespace `repro.*` kept — signals are namespaces, not phase names). The action may be a nominal (`-localization`, `-amplification`, `-reproduction`) when the short verb is ambiguous. A name must answer "what does this phase look at, and what does it do about it" without reading the spec.
+3. **Grandfathered Go-wired exceptions** (violate tier 2's shape but cost a Go migration to fix): `tester` (single-word but optional → would be `integration-test`), `build-planner` (role-noun → would be `build-plan`). Do not copy their shapes for new phases.
+4. **Every phase declares a one-line CORE VALUE** — the single risk it removes — maintained in the router persona's "Phase Catalog — Core Values" table (`agents/evolve-router.md`). When the `user-phase-persona-resolution` fix lands, this moves into a `description` field in `phase.json` (schema + `phasespec.PhaseSpec` + catalog-card surfacing) so the value line is machine-carried; the same fix adds a naming lint (`evolve phases validate`: optional phases must match `^[a-z]+(-[a-z]+)+$`).
+5. **Work-item / batch names follow the same spirit**: deliverable-describing, not sequence-describing (`phases-quality-gates`, not `micro-phase-wave-2`).
+
+### Wave 1 — goal-defining phases (`phases-goal-defining`) — ✅ SHIPPED cycle 217 (`a354d85`)
 
 #### `fault-localization` (plan)
 - **Responsibility:** Hierarchical narrowing for bugfix cycles: repo-tree → suspicious files → declaration skeleton → element → edit locations. No fixing.
@@ -35,9 +45,9 @@ Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name
 - **Classify:** require sections `["Suspect Ranking", "Edit Locations"]`; fail_if_empty.
 - **Evidence:** Agentless (arXiv 2407.01489) — 32% SWE-bench Lite @ $0.70/issue with this exact phase first.
 
-#### `reproduce-bug` (evaluate)
+#### `bug-reproduction` (evaluate)
 - **Responsibility:** Produce a FAIL_TO_PASS reproduction test/script that demonstrably fails on the current tree, BEFORE any patch.
-- **Inputs:** scout-report.md, fault-localization-report.md. **Outputs:** `reproduce-bug-report.md` + repro test file path; signals `repro.failing` (must be true), `repro.test_path`.
+- **Inputs:** scout-report.md, fault-localization-report.md. **Outputs:** `bug-reproduction-report.md` + repro test file path; signals `repro.failing` (must be true), `repro.test_path`.
 - **Routing:** `insert_when: [{field: "scout.goal_type", op: "==", value: "bugfix"}]`, `after: "fault-localization"` (falls back to after triage).
 - **Classify:** require `["Reproduction", "Verification"]`; `fail_if_signal: {"repro.failing": "==false"}` — a repro that doesn't fail is a failed phase.
 - **Evidence:** TestPrune (2510.18270): +9.4–12.9% relative resolution; SWE-Tester (2601.13713); SWE-agent/OpenHands reproduce-first. **Highest-leverage single addition.**
@@ -70,7 +80,7 @@ Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name
 - **Classify:** require `["Generated Tests", "Results"]`; fail_if_empty. Signal `amplify.failures_found > 0` routes the existing content-routed `tester` phase.
 - **Evidence:** AgentCoder anti-bias test designer (2312.13010); AlphaCodium AI-test phase (2401.08500).
 
-### Wave 2 — deterministic-tooling gates
+### Wave 2 — deterministic-tooling gates (`phases-quality-gates`)
 
 #### `mutation-gate` (evaluate, gate)
 - **Responsibility:** Diff-scoped mutation testing of changed packages; mutation score gates test-suite strength.
@@ -100,7 +110,7 @@ Sketches use v4 phase-descriptor vocabulary; transcribe to `.evolve/phases/<name
 - **Routing:** `ship.class == cycle` with high-risk change (releases, migration-touching, >N files).
 - **Evidence:** Google SRE release engineering; DORA change-failure-rate (<5% elite).
 
-### Wave 3 — release / feature / memory
+### Wave 3 — release / feature / memory (`phases-release-and-memory`)
 
 #### `changelog-sync` (control)
 - **Responsibility:** Verify CHANGELOG/release-notes drift vs shipped commits (conventional-commit derivation); deterministic tooling wrapped, minimal LLM.
@@ -134,7 +144,7 @@ The advisor classifies the cycle goal (classify-then-route — Anthropic/LangGra
 
 | Goal type | Recipe (optional insertions around the mandatory spine) |
 |---|---|
-| bugfix | fault-localization → reproduce-bug → [tdd, build] → (regression via existing tdd/audit) |
+| bugfix | fault-localization → bug-reproduction → [tdd, build] → (regression via existing tdd/audit) |
 | feature | problem-reflection (spec-verify card) → api-contract-design → [tdd, build] → test-amplification → tester |
 | refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → cleanup-sweep |
 | security | threat-model → [tdd, build] → security-scan + dependency-audit (existing) → fuzz-probe |

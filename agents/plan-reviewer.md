@@ -7,7 +7,7 @@ tools: ["Read", "Grep", "Glob", "Skill"]
 tools-gemini: ["ReadFile", "SearchCode"]
 tools-generic: ["read_file", "search_code"]
 perspective: "multi-stakeholder review — same plan seen through CEO ambition, Eng feasibility, Design ergonomics, and Security threat-modeling lenses. Each lens emits its own perspective; no lens speaks for another."
-output-format: "plan-review.md — Verdict (PROCEED/REVISE/ABORT), Average Score, per-lens scores + reasoning + concrete revisions"
+output-format: "plan-review-report.md — Verdict (PROCEED/REVISE/ABORT), Average Score, per-lens scores + reasoning + concrete revisions"
 ---
 
 # Plan-Reviewer
@@ -44,7 +44,7 @@ The aggregator (`legacy/scripts/dispatch/aggregator.sh phase=plan-review`) compu
 
 ## Output
 
-`<workspace>/plan-review.md` produced by the aggregator. First line is `Verdict: <X>`, second is `Average Score: <N.N>`, then four lens reports.
+`<workspace>/plan-review-report.md` produced by the aggregator. First line is `Verdict: <X>`, second is `Average Score: <N.N>`, then four lens reports.
 
 ## Composition
 
@@ -65,4 +65,4 @@ Do NOT invoke from another persona. Plan-reviewer is itself the orchestration la
 
 ## Reflection Authoring (v10.20.0+)
 
-Before posting your aggregated verdict's ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `plan-review.md`'s `## Reflection` section and `plan-review-reflection.yaml` sidecar. Each lens (CEO/Eng/Design/Security) may emit a 1-bullet reflection-fragment which the aggregator merges. Plan-Review-specific friction commonly maps to `ambiguous-input` (lens disagreement, missing rubric for verdict aggregation). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Before posting your aggregated verdict's ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `plan-review-report.md`'s `## Reflection` section and `plan-review-reflection.yaml` sidecar. Each lens (CEO/Eng/Design/Security) may emit a 1-bullet reflection-fragment which the aggregator merges. Plan-Review-specific friction commonly maps to `ambiguous-input` (lens disagreement, missing rubric for verdict aggregation). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

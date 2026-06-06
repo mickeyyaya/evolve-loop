@@ -14,16 +14,16 @@ import (
 // TestC100_001_ObserverEnforceDefaultOn ports cycle-100/001.
 func TestC100_001_ObserverEnforceDefaultOn(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	claudeMd := filepath.Join(root, "CLAUDE.md")
-	if _, err := os.Stat(claudeMd); err != nil {
-		t.Skip("CLAUDE.md missing — skip")
+	runtimeRef := filepath.Join(root, "docs/operations/runtime-reference.md")
+	if _, err := os.Stat(runtimeRef); err != nil {
+		t.Skip("runtime-reference.md missing — skip")
 	}
-	if !acsassert.FileContains(t, claudeMd, "EVOLVE_OBSERVER_ENFORCE") {
+	if !acsassert.FileContains(t, runtimeRef, "EVOLVE_OBSERVER_ENFORCE") {
 		return
 	}
 	// Must be default-on (`1`)
-	if !acsassert.FileMatchesRegex(t, claudeMd, `EVOLVE_OBSERVER_ENFORCE.*`+"`"+`1`+"`") {
-		t.Logf("CLAUDE.md: EVOLVE_OBSERVER_ENFORCE may not be default-on")
+	if !acsassert.FileMatchesRegex(t, runtimeRef, `EVOLVE_OBSERVER_ENFORCE.*`+"`"+`1`+"`") {
+		t.Logf("runtime-reference.md: EVOLVE_OBSERVER_ENFORCE may not be default-on")
 	}
 }
 

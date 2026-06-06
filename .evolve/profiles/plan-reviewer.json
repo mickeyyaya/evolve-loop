@@ -133,5 +133,6 @@
   "allowed_clis": [
     "all"
   ],
-  "stream_output": true
+  "stream_output": true,
+  "generated_from": "hand-authored"
 }

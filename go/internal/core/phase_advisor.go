@@ -284,7 +284,7 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 
 // writeCard renders one enriched catalog line:
 //
-//   - reproduce-bug [evaluate, writes-source] (bugfix) — when: bugfix cycles, before tdd/build
+//   - bug-reproduction [evaluate] (bugfix) — when: bugfix cycles, before tdd/build
 //
 // Metadata-less cards degrade to the legacy "- name [role]" form.
 func writeCard(b *strings.Builder, c router.PhaseCard) {
@@ -349,6 +349,8 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	b.WriteString("## Objective signals (digested from handoff artifacts)\n")
 	writeSignals(b, in.Signals)
 
+	writeCarryoverTodos(b, in.CarryoverTodos)
+
 	writeRecallMemory(b, in)
 
 	if len(in.Cfg.Triggers) > 0 {
@@ -392,6 +394,27 @@ func writeRecallMemory(b *strings.Builder, in router.RouteInput) {
 	}
 	for _, lesson := range in.Lessons {
 		fmt.Fprintf(b, "- lesson: %s\n", lesson)
+	}
+}
+
+const maxCarryoverTodosInPrompt = 20
+
+func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
+	if len(todos) == 0 {
+		return
+	}
+	b.WriteString("\n## Carryover todos from previous cycles (consider when selecting phases)\n")
+	limit := len(todos)
+	if limit > maxCarryoverTodosInPrompt {
+		limit = maxCarryoverTodosInPrompt
+	}
+	for i := 0; i < limit; i++ {
+		t := todos[i]
+		fmt.Fprintf(b, "- [%s] %s: %s (first_seen_cycle=%d, cycles_unpicked=%d)\n",
+			t.Priority, t.ID, t.Action, t.FirstSeenCycle, t.CyclesUnpicked)
+	}
+	if len(todos) > limit {
+		fmt.Fprintf(b, "- ... %d more carryover todo(s) omitted from prompt\n", len(todos)-limit)
 	}
 }
 

@@ -41,16 +41,16 @@ func TestC89_OnlineResearcherReferenceDoc(t *testing.T) {
 // TestC89_ClaudeMdResearchEnvVars ports cycle-89/003.
 func TestC89_ClaudeMdResearchEnvVars(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	claudeMd := filepath.Join(root, "CLAUDE.md")
-	if _, err := os.Stat(claudeMd); err != nil {
-		t.Skip("CLAUDE.md missing — skip")
+	runtimeRef := filepath.Join(root, "docs/operations/runtime-reference.md")
+	if _, err := os.Stat(runtimeRef); err != nil {
+		t.Skip("runtime-reference.md missing — skip")
 	}
 	for _, marker := range []string{
 		"EVOLVE_RESEARCH_CACHE_ENABLED",
 		"EVOLVE_ALLOW_DEEP_RESEARCH",
 		"EVOLVE_RESEARCH_HOOK_DISABLED",
 	} {
-		if !acsassert.FileContains(t, claudeMd, marker) {
+		if !acsassert.FileContains(t, runtimeRef, marker) {
 			return
 		}
 	}

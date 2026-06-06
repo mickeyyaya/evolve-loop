@@ -43,3 +43,73 @@ To mint, add a `mint` block to that element:
 ```
 
 Cover every phase you want to RUN plus any you explicitly SKIP. The kernel will complete the floor if you under-specify the ship chain.
+
+## Goal-Type Recipes
+
+The advisor classifies the cycle goal (classify-then-route) and composes from the recipe row, dropping phases whose `insert_when` doesn't fire:
+
+| Goal type | Recipe (optional insertions around the mandatory spine) |
+|---|---|
+| bugfix | fault-localization → bug-reproduction → [tdd, build] → (regression via existing tdd/audit) |
+| feature | problem-reflection (spec-verify card) → api-contract-design → [tdd, build] → test-amplification → tester |
+| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → cleanup-sweep |
+| security | threat-model → [tdd, build] → security-scan + dependency-audit (existing) → fuzz-probe |
+| performance | benchmark baseline capture → [build] → benchmark-gate |
+| release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
+| docs / trivial | spine only (no insertions) |
+| project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
+| business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
+| accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
+| product-discovery | opportunity-map → prd-draft → metric-tree → [build] |
+| ops-incident | incident-postmortem → runbook-draft → capacity-plan → [build] |
+
+Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
+
+## Phase Catalog — Core Values
+
+Naming rule (two tiers — name shape encodes phase tier): **single-word names are
+the reserved core-pipeline vocabulary** (`scout`, `build`, `audit`, `ship`, `tdd`,
+`intent`, `triage`, `tester`, `memo`, `retrospective`) — closed set, never minted;
+**every optional/advisor-selectable phase is `<object>-<action>`** — the thing
+examined, then the operation on it (`smell-scan`, `mutation-gate`,
+`bug-reproduction`). Minted phases MUST follow `<object>-<action>`. When
+selecting, justify against the phase's CORE VALUE below — the one risk it
+removes. If no row's value matches the cycle's risk, select nothing rather than
+something plausible.
+
+| Phase | Core value — the risk it removes |
+|---|---|
+| `fault-localization` | building a fix in the wrong place — narrows repo → file → element before any edit |
+| `bug-reproduction` | "fixed" without proof — a FAIL_TO_PASS test that demonstrably fails pre-patch |
+| `behavior-baseline` | refactor changes behavior silently — captures golden-master BEFORE the edit |
+| `behavior-compare` | (pair of baseline) — diffs observable behavior AFTER the edit, blocks on drift |
+| `smell-scan` | refactoring the wrong targets — ranks structural debt, never fixes |
+| `threat-model` | shipping a new attack surface unexamined — STRIDE pass on changed security surfaces |
+| `test-amplification` | implementation-biased tests — adversarial tests by an agent that never saw the code |
+| `mutation-gate` | green-but-weak test suite — mutation score on changed code (coverage ≠ strength) |
+| `security-scan` | functionally-correct-but-unsafe code — SAST lens the correctness audit lacks |
+| `dependency-audit` | known-vulnerable dependency bumps shipping silently — CVE check on go.mod changes |
+| `adversarial-review` | single-auditor blind spots — attacker-perspective pass before audit |
+| `perf-profile` | latency regressions compounding per-cycle cost — benchmark delta on touched packages |
+| `spec-verify` | building from an ambiguous/ungrounded spec — restate + grounding check before tdd |
+| `architecture-design` | large changes without a design decision — trade-off blueprint for large cycles |
+| `risk-register` | unowned, unscored threats surfacing late — scores and assigns all risks before the plan is baselined |
+| `scope-baseline` | scope creep against no reference line — captures deliverables, ACs, exclusions before any build |
+| `dependency-map` | hidden cross-task blockers and an unknown critical path — maps deps and zero-float chain |
+| `forces-analysis` | entering a structurally unprofitable market blind — Porter five-forces pass on industry structure |
+| `market-sizing` | pursuing an opportunity too small or an inflated TAM — quantifies TAM/SAM/SOM with methodology |
+| `okr-draft` | activity-based, unmeasurable goals — ensures each objective has ≥3 scored key results |
+| `account-reconcile` | an unsubstantiated GL balance — reconciles GL vs source and flags unexplained items |
+| `variance-analysis` | unexplained budget-to-actual drift — classifies variances and projects reforecast impact |
+| `close-checklist` | an incomplete or unauthorized close — blocks close until all tasks signed off |
+| `opportunity-map` | solutioning without a validated customer problem — maps outcomes, opportunities, and assumption tests |
+| `prd-draft` | building with no documented problem or success contract — ensures goals and non-goals are explicit |
+| `metric-tree` | shipping with no measurable definition of success — defines NSM + input + guardrail metrics |
+| `incident-postmortem` | root cause and corrective actions unrecorded → incident recurs — structured 4-section debrief |
+| `runbook-draft` | on-call responders improvising with no recovery path — validated trigger-to-resolution playbook |
+| `capacity-plan` | capacity shortfall from unforecasted demand growth — quantifies gap before it becomes an outage |
+
+Selecting a phase whose persona/runner/profile is not dispatchable crashes the
+cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);
+prefer catalog phases that have shipped.
+

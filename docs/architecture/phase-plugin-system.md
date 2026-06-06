@@ -23,7 +23,8 @@ Decomposed with the user into ten pinned decisions:
    pipeline framework, rules, and policies are identical for built-in and plugin phases.
 6. Rich metadata lives in `phase.json` (schema extension), not agent frontmatter.
 7. New phases become visible at the **next cycle start** (no mid-cycle plan mutation).
-8. Scope: infrastructure + one seed phase (`reproduce-bug`) registered through the new
+8. Scope: infrastructure + one seed phase (`reproduce-bug`, since renamed
+   `bug-reproduction` by the two-tier naming rule) registered through the new
    flow as the end-to-end proof.
 9. Go CLI does the work; the skill is a thin conversational wrapper.
 10. Built directly as feature-dev in an isolated worktree.
@@ -120,7 +121,7 @@ a SELECT hint, never break a cycle. Gitignored as a generated cache (same as
 `writeCatalog` renders:
 
 ```
-- reproduce-bug [evaluate, writes-source] (bugfix) — when: bugfix cycles, after fault-localization …
+- bug-reproduction [evaluate] (bugfix) — when: bugfix cycles, after fault-localization …
 ```
 
 Token control without a deterministic classifier: at most **12 enriched** cards —
@@ -160,10 +161,11 @@ from the envelope (≤3 passes). All enforcement lives in the binary, which is w
 the flow identical on claude/codex/gemini (the binary is tier-1 everywhere; skills are
 not).
 
-## 4. Seed phase: `reproduce-bug`
+## 4. Seed phase: `bug-reproduction` (née `reproduce-bug`)
 
-Registered THROUGH `evolve phases create` (envelope: ok:true) as the e2e proof.
-Evaluate archetype, `writes_source:true`, `categories:["bugfix"]`,
+Registered THROUGH `evolve phases create` (envelope: ok:true) as the e2e proof, then
+renamed `bug-reproduction` when the two-tier naming rule landed (2026-06-06; signal
+namespace `repro.*` kept). Evaluate archetype, `categories:["bugfix"]`,
 `fail_if_signal {"repro.failing":"==false"}` — a repro that doesn't fail is a failed
 phase. Evidence: +9.4–12.9% relative issue-resolution (TestPrune), SWE-Tester, the
 SWE-bench FAIL_TO_PASS oracle. Guarded by `seed_phase_e2e_test.go`, which loads the

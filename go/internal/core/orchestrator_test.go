@@ -628,6 +628,13 @@ func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 	if !strings.HasPrefix(res.RetroDecision, "proceed:") {
 		t.Errorf("RetroDecision=%q, want proceed: prefix", res.RetroDecision)
 	}
+	retroReqs := runners[PhaseRetro].(*fakeRunner).requests
+	if len(retroReqs) != 1 {
+		t.Fatalf("retro requests = %d, want 1", len(retroReqs))
+	}
+	if got := retroReqs[0].Context["previous_verdict"]; got != VerdictFAIL {
+		t.Errorf("retro previous_verdict context = %q, want FAIL", got)
+	}
 }
 
 // Retro FAIL + 2 distinct code-audit-fail records → BLOCK-CODE (strict)

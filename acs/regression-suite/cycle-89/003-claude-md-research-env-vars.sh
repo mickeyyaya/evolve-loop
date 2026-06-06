@@ -28,6 +28,14 @@ if [ ! -f "$CLAUDE_MD" ]; then
   exit 1
 fi
 
+# Re-baselined 2026-06-05: the CLAUDE.md split (d8ac721) moved the env-var
+# table to docs/operations/runtime-reference.md. The intent (well-formed
+# table rows for the research env vars in a canonical doc) is preserved by
+# scanning both files; a row may live in either.
+RUNTIME_REF="$REPO_ROOT/docs/operations/runtime-reference.md"
+SCAN_FILES="$CLAUDE_MD"
+[ -f "$RUNTIME_REF" ] && SCAN_FILES="$CLAUDE_MD $RUNTIME_REF"
+
 REQUIRED="EVOLVE_ALLOW_DEEP_RESEARCH EVOLVE_RESEARCH_HOOK_DISABLED EVOLVE_KB_SEARCH_PATHS"
 
 missing=""
@@ -49,11 +57,11 @@ for var in $REQUIRED; do
       if (filled >= 4) { found = 1; exit }
     }
     END { print (found ? "OK" : "MALFORMED") }
-  ' "$CLAUDE_MD")
+  ' $SCAN_FILES)
 
   if [ "$row_check" = "OK" ]; then
     : # row present and well-formed
-  elif grep -qF "$var" "$CLAUDE_MD"; then
+  elif grep -qF "$var" $SCAN_FILES; then
     # Var name appears but not in well-formed row → malformed.
     malformed="${malformed} ${var}"
   else
@@ -64,7 +72,7 @@ done
 
 fail=0
 if [ -n "$missing" ]; then
-  echo "RED cycle-89-003-claude-md-research-env-vars: missing env-var rows in CLAUDE.md:${missing}" >&2
+  echo "RED cycle-89-003-claude-md-research-env-vars: missing env-var rows in CLAUDE.md/runtime-reference.md:${missing}" >&2
   fail=1
 fi
 if [ -n "$malformed" ]; then
@@ -74,7 +82,7 @@ fi
 
 # Soft-check (informational): EVOLVE_RESEARCH_QUOTA_SOFT. Logged but does not
 # fail the predicate (scout flagged as TBD; Builder may omit).
-if ! grep -qF "EVOLVE_RESEARCH_QUOTA_SOFT" "$CLAUDE_MD"; then
+if ! grep -qF "EVOLVE_RESEARCH_QUOTA_SOFT" $SCAN_FILES; then
   echo "[info] EVOLVE_RESEARCH_QUOTA_SOFT not present in CLAUDE.md (acceptable — scout flagged unimplemented in scripts)" >&2
 fi
 

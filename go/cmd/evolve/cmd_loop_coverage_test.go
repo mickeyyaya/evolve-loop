@@ -327,8 +327,7 @@ func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 	}
 }
 
-// errorRunner satisfies core.PhaseRunner but always returns an error,
-// driving the orchestrator's err return → runLoop's cycle-error branch.
+// errorRunner satisfies core.PhaseRunner but always returns an error.
 type errorRunner struct{ phase string }
 
 func (e errorRunner) Name() string { return e.phase }
@@ -336,9 +335,17 @@ func (e errorRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse
 	return core.PhaseResponse{}, fmt.Errorf("synthetic phase error in %s", e.phase)
 }
 
+// fatalRunner satisfies core.PhaseRunner but returns a batch-fatal error.
+type fatalRunner struct{ phase string }
+
+func (f fatalRunner) Name() string { return f.phase }
+func (f fatalRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse, error) {
+	return core.PhaseResponse{}, core.ErrLedgerChainBroken
+}
+
 // TestRunLoop_OrchestratorError covers the err != nil branch at line
-// 174-177 (cycle error path). Replace the scout runner with errorRunner
-// so the orchestrator returns an error on the very first phase.
+// 174-177 (cycle error path). Replace the scout runner with fatalRunner
+// so the orchestrator returns a batch-fatal error on the very first phase.
 func TestRunLoop_OrchestratorError(t *testing.T) {
 	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 
@@ -353,7 +360,7 @@ func TestRunLoop_OrchestratorError(t *testing.T) {
 		st := &fixtures.FakeStorage{}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
-			core.PhaseScout:  errorRunner{phase: "scout"},
+			core.PhaseScout:  fatalRunner{phase: "scout"},
 			core.PhaseTriage: noopRunner{name: "triage"},
 			core.PhaseTDD:    noopRunner{name: "tdd"},
 			core.PhaseBuild:  noopRunner{name: "build"},

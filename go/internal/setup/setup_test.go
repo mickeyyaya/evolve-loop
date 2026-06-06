@@ -100,6 +100,7 @@ func TestAuthMode(t *testing.T) {
 }
 
 func TestTierModelsFor(t *testing.T) {
+	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
 	// agy has no model selector → all tiers map to gemini-3.5-flash.
 	agy := tierModelsFor("agy")
 	for _, tier := range []string{"fast", "balanced", "deep"} {

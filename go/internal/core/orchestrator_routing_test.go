@@ -206,6 +206,47 @@ func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
 	}
 }
 
+func TestOrchestrator_ThreadsCarryoverTodosToPlanner(t *testing.T) {
+	st := &fakeStorage{state: State{
+		LastCycleNumber: 3,
+		CarryoverTodos: []CarryoverTodo{
+			{
+				ID:             "cycle-3-failed-build",
+				Action:         "Fix build leak discovered by failed cycle",
+				Priority:       "P0",
+				FirstSeenCycle: 3,
+				CyclesUnpicked: 2,
+			},
+		},
+	}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	cfg := shadowCfg(config.StageAdvisory)
+	cfg.Mode = config.ModeDynamicLLM
+	cp := &capturingPlanner{}
+	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithPlanner(cp))
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+		GoalHash:    "g",
+		Budget:      BudgetEnvelope{MaxUSD: 100},
+		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if cp.calls == 0 {
+		t.Fatal("planner was never consulted")
+	}
+	if len(cp.got.CarryoverTodos) != 1 {
+		t.Fatalf("planner carryover todos = %+v, want one", cp.got.CarryoverTodos)
+	}
+	got := cp.got.CarryoverTodos[0]
+	if got.ID != "cycle-3-failed-build" || got.Priority != "P0" || got.CyclesUnpicked != 2 {
+		t.Errorf("planner carryover todo = %+v, want projected state todo", got)
+	}
+}
+
 // Stage:Off (default) must add NO routing forensics — byte-identical to legacy.
 func TestOrchestrator_StageOff_EmitsNoRoutingLedgerEntries(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}

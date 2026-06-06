@@ -25,7 +25,7 @@ description: Use when scout-report.md exists and TDD/Build hasn't started yet. R
 |---|---|---|
 | 1 | Verify `<workspace>/scout-report.md` exists + fresh | scout-report.md valid |
 | 2 | Dispatch 4 lenses in parallel via `subagent-run.sh dispatch-parallel plan-reviewer` | 4 worker artifacts |
-| 3 | Aggregator computes verdict (PROCEED/REVISE/ABORT) | `<workspace>/plan-review.md` present, first line is `Verdict: <X>` |
+| 3 | Aggregator computes verdict (PROCEED/REVISE/ABORT) | `<workspace>/plan-review-report.md` present, first line is `Verdict: <X>` |
 | 4 | Phase gate `gate_plan_review_to_tdd` enforces verdict | Gate passes only on PROCEED |
 
 ## Verdict semantics
@@ -38,7 +38,7 @@ description: Use when scout-report.md exists and TDD/Build hasn't started yet. R
 
 ## Output contract
 
-`<workspace>/plan-review.md` with first line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
+`<workspace>/plan-review-report.md` with first line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
 
 ## Composition
 

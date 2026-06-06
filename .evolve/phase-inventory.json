@@ -1,0 +1,682 @@
+{
+  "generated_at": "2026-06-07T06:51:01.091621+08:00",
+  "project_root": "/Users/danleemh/ai/claude/evolve-loop-phase-plugin",
+  "phase_count": 42,
+  "phases": [
+    {
+      "name": "account-reconcile",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-account-reconcile",
+      "artifact": "account-reconcile-report.md",
+      "required_sections": [
+        "## GL vs Source Balance",
+        "## Reconciling Items",
+        "## Adjustments",
+        "## Sign-off"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "adversarial-review",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-adversarial-review",
+      "artifact": "adversarial-review-report.md",
+      "required_sections": [
+        "## Threat Model",
+        "## Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "architecture-design",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "opus",
+      "agent": "evolve-architecture-design",
+      "artifact": "architecture-design.md",
+      "required_sections": [
+        "## Design",
+        "## Decision",
+        "## Blueprint"
+      ]
+    },
+    {
+      "name": "audit",
+      "source": "builtin",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "tier": "auto",
+      "agent": "evolve-audit",
+      "artifact": "audit-report.md"
+    },
+    {
+      "name": "behavior-baseline",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-behavior-baseline",
+      "artifact": "behavior-baseline.md",
+      "required_sections": [
+        "## Baseline"
+      ],
+      "emits_verdict": true,
+      "after": "tdd"
+    },
+    {
+      "name": "behavior-compare",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-behavior-compare",
+      "artifact": "behavior-compare-report.md",
+      "required_sections": [
+        "## Comparison",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "bug-reproduction",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-bug-reproduction",
+      "description": "Produce a FAIL_TO_PASS reproduction that demonstrably fails on the current tree, BEFORE any patch.",
+      "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build — reproduce-first anchors the fix and raises resolution rates.",
+      "categories": [
+        "bugfix"
+      ],
+      "artifact": "bug-reproduction-report.md",
+      "required_sections": [
+        "## Reproduction",
+        "## Verification"
+      ],
+      "emits_verdict": true,
+      "after": "fault-localization"
+    },
+    {
+      "name": "build",
+      "source": "builtin",
+      "archetype": "build",
+      "kind": "llm",
+      "tier": "auto",
+      "agent": "evolve-build",
+      "artifact": "build-report.md"
+    },
+    {
+      "name": "build-planner",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-build-planner",
+      "artifact": "build-plan.md"
+    },
+    {
+      "name": "capacity-plan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-capacity-plan",
+      "artifact": "capacity-plan-report.md",
+      "required_sections": [
+        "## Demand Forecast",
+        "## Current Capacity",
+        "## Capacity Gap"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "close-checklist",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-close-checklist",
+      "artifact": "close-checklist-report.md",
+      "required_sections": [
+        "## Tasks",
+        "## Blocking Items",
+        "## Sign-off"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "dependency-audit",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-dependency-audit",
+      "artifact": "dependency-audit-report.md",
+      "required_sections": [
+        "## Findings"
+      ],
+      "after": "build"
+    },
+    {
+      "name": "dependency-map",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-dependency-map",
+      "artifact": "dependency-map-report.md",
+      "required_sections": [
+        "## Dependencies",
+        "## Critical Path",
+        "## Blockers"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "doc-sync",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-doc-sync",
+      "artifact": "doc-sync-report.md"
+    },
+    {
+      "name": "fault-localization",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-fault-localization",
+      "artifact": "fault-localization-report.md",
+      "required_sections": [
+        "## Suspect Ranking",
+        "## Edit Locations"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "forces-analysis",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-forces-analysis",
+      "artifact": "forces-analysis-report.md",
+      "required_sections": [
+        "## Competitive Rivalry",
+        "## Buyer and Supplier Power",
+        "## Entry and Substitute Threats",
+        "## Attractiveness Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "incident-postmortem",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-incident-postmortem",
+      "artifact": "incident-postmortem-report.md",
+      "required_sections": [
+        "## Impact",
+        "## Timeline",
+        "## Root Cause",
+        "## Action Items"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "intent",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-intent",
+      "artifact": "intent.md"
+    },
+    {
+      "name": "market-sizing",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-market-sizing",
+      "artifact": "market-sizing-report.md",
+      "required_sections": [
+        "## TAM",
+        "## SAM",
+        "## SOM",
+        "## Methodology and Assumptions"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "memo",
+      "source": "builtin",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-memo",
+      "artifact": "memo.md"
+    },
+    {
+      "name": "metric-tree",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-metric-tree",
+      "artifact": "metric-tree-report.md",
+      "required_sections": [
+        "## North Star Metric",
+        "## Input Metrics",
+        "## Guardrail Metrics"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "mutation-gate",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-mutation-gate",
+      "artifact": "mutation-gate-report.md",
+      "required_sections": [
+        "## Summary",
+        "## Survivors",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "test-amplification"
+    },
+    {
+      "name": "okr-draft",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-okr-draft",
+      "artifact": "okr-draft-report.md",
+      "required_sections": [
+        "## Objective",
+        "## Key Results",
+        "## Confidence and Scoring"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "opportunity-map",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-opportunity-map",
+      "artifact": "opportunity-map-report.md",
+      "required_sections": [
+        "## Desired Outcome",
+        "## Opportunities",
+        "## Candidate Solutions",
+        "## Assumption Tests"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "perf-profile",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-perf-profile",
+      "artifact": "perf-profile-report.md",
+      "required_sections": [
+        "## Benchmarks",
+        "## Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "plan-review",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "plan-reviewer",
+      "artifact": "plan-review-report.md"
+    },
+    {
+      "name": "prd-draft",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-prd-draft",
+      "artifact": "prd-draft-report.md",
+      "required_sections": [
+        "## Problem",
+        "## Goals and Success Metrics",
+        "## Requirements",
+        "## Out of Scope"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "retrospective",
+      "source": "builtin",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-retrospective",
+      "artifact": "retrospective-report.md"
+    },
+    {
+      "name": "risk-register",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-risk-register",
+      "artifact": "risk-register-report.md",
+      "required_sections": [
+        "## Risks",
+        "## Scoring",
+        "## Response Strategies",
+        "## Owners"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "runbook-draft",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-runbook-draft",
+      "artifact": "runbook-draft-report.md",
+      "required_sections": [
+        "## Trigger",
+        "## Diagnosis",
+        "## Resolution Steps",
+        "## Escalation"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "scope-baseline",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-scope-baseline",
+      "artifact": "scope-baseline-report.md",
+      "required_sections": [
+        "## Deliverables",
+        "## Acceptance Criteria",
+        "## Exclusions",
+        "## Constraints and Assumptions"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "scout",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "tier": "auto",
+      "agent": "evolve-scout",
+      "artifact": "scout-report.md"
+    },
+    {
+      "name": "security-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-security-scan",
+      "artifact": "security-scan-report.md",
+      "required_sections": [
+        "## Findings"
+      ],
+      "after": "build"
+    },
+    {
+      "name": "ship",
+      "source": "builtin",
+      "archetype": "control",
+      "kind": "llm",
+      "tier": "auto",
+      "agent": "evolve-ship",
+      "artifact": "ship-report.md"
+    },
+    {
+      "name": "smell-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-smell-scan",
+      "artifact": "smell-scan-report.md",
+      "required_sections": [
+        "## Findings"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "spec-verify",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-spec-verify",
+      "artifact": "spec-verify-report.md"
+    },
+    {
+      "name": "tdd",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-tdd",
+      "artifact": "tdd-contract.md"
+    },
+    {
+      "name": "test-amplification",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-test-amplification",
+      "artifact": "test-amplification-report.md",
+      "required_sections": [
+        "## Generated Tests",
+        "## Results"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "tester",
+      "source": "builtin",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-tester",
+      "artifact": "tester-report.md"
+    },
+    {
+      "name": "threat-model",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-threat-model",
+      "artifact": "threat-model.md",
+      "required_sections": [
+        "## Threats",
+        "## Mitigations"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "triage",
+      "source": "builtin",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-triage",
+      "artifact": "triage-decision.md"
+    },
+    {
+      "name": "variance-analysis",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-variance-analysis",
+      "artifact": "variance-analysis-report.md",
+      "required_sections": [
+        "## Budget vs Actual",
+        "## Classification",
+        "## Drivers",
+        "## Reforecast Impact"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    }
+  ],
+  "category_index": {
+    "bugfix": [
+      "bug-reproduction"
+    ],
+    "uncategorized": [
+      "account-reconcile",
+      "adversarial-review",
+      "architecture-design",
+      "audit",
+      "behavior-baseline",
+      "behavior-compare",
+      "build",
+      "build-planner",
+      "capacity-plan",
+      "close-checklist",
+      "dependency-audit",
+      "dependency-map",
+      "doc-sync",
+      "fault-localization",
+      "forces-analysis",
+      "incident-postmortem",
+      "intent",
+      "market-sizing",
+      "memo",
+      "metric-tree",
+      "mutation-gate",
+      "okr-draft",
+      "opportunity-map",
+      "perf-profile",
+      "plan-review",
+      "prd-draft",
+      "retrospective",
+      "risk-register",
+      "runbook-draft",
+      "scope-baseline",
+      "scout",
+      "security-scan",
+      "ship",
+      "smell-scan",
+      "spec-verify",
+      "tdd",
+      "test-amplification",
+      "tester",
+      "threat-model",
+      "triage",
+      "variance-analysis"
+    ]
+  }
+}
