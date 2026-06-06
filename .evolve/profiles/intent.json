@@ -10,6 +10,8 @@
   "allowed_tools": [
     "Bash(evolve phase verify:*)",
     "Read",
+    "Grep",
+    "Glob",
     "Bash(cat:*)",
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/intent-stdout.log)",
