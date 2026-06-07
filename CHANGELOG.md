@@ -2,11 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [17.1.0] - 2026-06-07
 
 ### Added
 
 - `evolve skills publish` — single-source projection of canonical skills to Codex CLI (`$CODEX_HOME/skills/evolve-*`), Antigravity/agy (native plugin install), and Ollama (Modelfile SYSTEM-prompt embedding, read-only skill subset). Stage-only by default; `--install` gates all user-environment mutation; provenance-marked prune; `--check` drift mode (ADR-0041).
+
+---
 
 ## [17.0.0] - 2026-06-07
 
