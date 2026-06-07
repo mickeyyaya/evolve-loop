@@ -182,6 +182,28 @@ func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 	}
 }
 
+// Pins the line-anchored matching semantics adopted with the
+// EvaluateClassify migration: a "goal:" token occurring only mid-line is
+// NOT a section. The pre-migration phasecontract path used
+// strings.Contains and would have passed this artifact; the tightening
+// is intentional (intent artifacts are YAML-style, tokens begin lines).
+func TestRun_MidLineGoalToken_FAIL_LineAnchored(t *testing.T) {
+	ws := t.TempDir()
+	fb := &fakeBridge{writeArtifact: "The main goal: ship it. Also acceptance_checks: are described inline."}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle:       1,
+		ProjectRoot: "/tmp/proj",
+		Workspace:   ws,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (mid-line tokens must not satisfy line-anchored section matching)", resp.Verdict)
+	}
+}
+
 func TestRun_MissingRequiredSections_FAIL(t *testing.T) {
 	ws := t.TempDir()
 	fb := &fakeBridge{writeArtifact: "Some prose without YAML frontmatter or goal."}

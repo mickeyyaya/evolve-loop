@@ -258,6 +258,30 @@ func TestRun_NoTopNHeading_FAIL(t *testing.T) {
 	}
 }
 
+// Pins the verdict invariant across the EvaluateClassify migration:
+// hasSection's prefix match accepts "## top_n_extra" where the old
+// word-boundary regexp did not, but hasTopNItems still gates on
+// topNHeadingRE — so a prefix-only heading must still FAIL overall.
+// (Only the diagnostic message changed, not the verdict.)
+func TestRun_TopNPrefixOnlyHeading_StillFAIL(t *testing.T) {
+	body := `# Triage Report
+
+## top_n_extra
+- id: smuggled-task
+`
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL (## top_n_extra must not satisfy the ## top_n invariant)", resp.Verdict)
+	}
+}
+
 // The registry init() must publish a "triage" factory that builds a runnable
 // PhaseRunner with the production defaults wired (exercises the init closure).
 func TestRegistry_TriageFactory_BuildsRunner(t *testing.T) {

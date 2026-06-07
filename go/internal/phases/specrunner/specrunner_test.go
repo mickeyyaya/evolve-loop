@@ -95,7 +95,7 @@ func TestEvaluateClassify(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			verdict, diags := evaluateClassify(tc.artifact, tc.rules)
+			verdict, diags := EvaluateClassify(tc.artifact, tc.rules)
 			if verdict != tc.wantVerdict {
 				t.Errorf("verdict = %q, want %q", verdict, tc.wantVerdict)
 			}
@@ -120,7 +120,7 @@ func TestEvaluateClassify(t *testing.T) {
 func TestEvaluateClassify_FailIfSignal_RejectsWithErrorSeverity(t *testing.T) {
 	rules := &phasespec.ClassifyRules{FailIfSignal: map[string]string{"security.severity_max": ">=HIGH"}}
 
-	verdict, diags := evaluateClassify("non-empty artifact", rules)
+	verdict, diags := EvaluateClassify("non-empty artifact", rules)
 	if verdict != core.VerdictFAIL {
 		t.Errorf("verdict = %q, want %q (fail_if_signal without a signal bus is an authoring error)", verdict, core.VerdictFAIL)
 	}

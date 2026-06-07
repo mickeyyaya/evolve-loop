@@ -506,3 +506,19 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		Diagnostics:  diags,
 	}, nil
 }
+
+// BaseCycleContext returns the canonical "## Cycle Context" block shared by
+// every phase that uses BaseRunner. It writes body, then the four mandatory
+// fields (cycle, goal_hash, project_root, workspace). Phase-specific extras
+// (worktree, goal, mode, carryover_summary, etc.) are the caller's responsibility
+// — they append them after this call so the base block stays the single source.
+func BaseCycleContext(body string, req core.PhaseRequest) string {
+	var b strings.Builder
+	b.WriteString(body)
+	b.WriteString("\n\n## Cycle Context\n")
+	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
+	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
+	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
+	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	return b.String()
+}

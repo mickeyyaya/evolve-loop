@@ -23,9 +23,10 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -44,12 +45,7 @@ func (hooks) ArtifactFilename(req core.PhaseRequest) string {
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
-	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
-	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
-	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
-	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
-	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	b.WriteString(runner.BaseCycleContext(body, req))
 	// The persona's template instructs it to "parse the user's goal" —
 	// that requires the actual TEXT, not just the hash. When the
 	// operator passes --goal-text "...", the dispatcher routes it
@@ -67,25 +63,17 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 }
 
 func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	return classify(artifact, isDeltaMode(req)), nil, string(core.PhaseScout)
+	if isDeltaMode(req) && strings.Contains(strings.TrimSpace(artifact), "[intent-unchanged]") {
+		return core.VerdictSKIPPED, nil, string(core.PhaseScout)
+	}
+	verdict, diags := specrunner.EvaluateClassify(artifact, &phasespec.ClassifyRules{
+		RequireSections: []string{"goal:", "acceptance_checks:"},
+		FailIfEmpty:     true,
+	})
+	return verdict, diags, string(core.PhaseScout)
 }
 
 func isDeltaMode(req core.PhaseRequest) bool { return req.Env["EVOLVE_INTENT_DELTA"] == "1" }
-
-func classify(content string, delta bool) string {
-	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
-		return core.VerdictFAIL
-	}
-	if delta && strings.Contains(trimmed, "[intent-unchanged]") {
-		return core.VerdictSKIPPED
-	}
-	// Required line tokens live in phasecontract.Intent (single source).
-	if phasecontract.Intent.Complete(trimmed) {
-		return core.VerdictPASS
-	}
-	return core.VerdictFAIL
-}
 
 // Config preserves the existing public constructor surface.
 type Config struct {

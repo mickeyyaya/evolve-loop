@@ -23,6 +23,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -57,12 +59,7 @@ func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Dia
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
-	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
-	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
-	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
-	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
-	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	b.WriteString(runner.BaseCycleContext(body, req))
 	if s := req.Context["carryover_summary"]; s != "" {
 		fmt.Fprintf(&b, "- carryover_summary: %s\n", s)
 	}
@@ -70,28 +67,34 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 }
 
 func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	return classify(artifact), nil, string(core.PhaseTDD)
+	// EvaluateClassify handles the empty-artifact and section-presence checks.
+	verdict, diags := specrunner.EvaluateClassify(artifact, &phasespec.ClassifyRules{
+		RequireSections: []string{phasecontract.Triage.Sections[0].Canonical},
+		FailIfEmpty:     true,
+	})
+	if verdict != core.VerdictPASS {
+		return verdict, diags, string(core.PhaseTDD)
+	}
+	// Extra triage invariant: ## top_n must contain at least one list item.
+	if !hasTopNItems(strings.TrimSpace(artifact)) {
+		return core.VerdictFAIL, []core.Diagnostic{{
+			Severity: "error",
+			Message:  "## top_n section has no list items",
+		}}, string(core.PhaseTDD)
+	}
+	return core.VerdictPASS, nil, string(core.PhaseTDD)
 }
 
-func classify(content string) string {
-	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
-		return core.VerdictFAIL
-	}
+func hasTopNItems(trimmed string) bool {
 	loc := topNHeadingRE.FindStringIndex(trimmed)
 	if loc == nil {
-		return core.VerdictFAIL
+		return false
 	}
-	// Slice from end of "## top_n" line to the next "## " heading
-	// (or end-of-string). RE2 has no lookahead, so do it by hand.
 	body := trimmed[loc[1]:]
 	if next := nextHeadingRE.FindStringIndex(body); next != nil {
 		body = body[:next[0]]
 	}
-	if !listItemRE.MatchString(body) {
-		return core.VerdictFAIL
-	}
-	return core.VerdictPASS
+	return listItemRE.MatchString(body)
 }
 
 type Config struct {

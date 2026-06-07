@@ -49,12 +49,7 @@ func (hooks) DefaultModel() string                        { return "auto" }
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
-	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
-	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
-	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
-	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
-	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	b.WriteString(runner.BaseCycleContext(body, req))
 	if s := req.Context["strategy"]; s != "" {
 		fmt.Fprintf(&b, "- strategy: %s\n", s)
 	}

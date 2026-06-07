@@ -62,12 +62,7 @@ func (h hooks) ArtifactFilename(_ core.PhaseRequest) string {
 // the Stage 3 signal bus.
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
-	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
-	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
-	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
-	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
-	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	b.WriteString(runner.BaseCycleContext(body, req))
 	for _, key := range h.spec.PromptContext {
 		if v := req.Context[key]; v != "" {
 			fmt.Fprintf(&b, "- %s: %s\n", key, v)
@@ -80,12 +75,12 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 // The next-phase hint comes from spec.OnPass (empty lets the orchestrator's
 // state machine pick the successor — Stage 1 behavior).
 func (h hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	verdict, diags := evaluateClassify(artifact, h.spec.Classify)
+	verdict, diags := EvaluateClassify(artifact, h.spec.Classify)
 	return verdict, diags, h.spec.OnPass
 }
 
-// evaluateClassify is the declarative verdict evaluator. Pure function (no I/O)
-// so it is exhaustively unit-testable.
+// EvaluateClassify is the declarative verdict evaluator shared by specrunner and
+// built-in phases. Pure function (no I/O) so it is exhaustively unit-testable.
 //
 //   - empty artifact → FAIL when rules are absent or rules.FailIfEmpty is set
 //     (rules present with FailIfEmpty unset → an empty artifact is allowed to
@@ -97,7 +92,7 @@ func (h hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespo
 //     rather than being silently ignored.
 //   - rules.VerdictOnPass overrides the pass verdict, but must be a canonical
 //     verdict (guards against silent typos in user phase JSON); else FAIL
-func evaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, []core.Diagnostic) {
+func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, []core.Diagnostic) {
 	if strings.TrimSpace(artifact) == "" && (rules == nil || rules.FailIfEmpty) {
 		return core.VerdictFAIL, []core.Diagnostic{{Severity: "error", Message: "phase produced an empty artifact"}}
 	}

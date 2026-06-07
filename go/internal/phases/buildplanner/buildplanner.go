@@ -17,7 +17,6 @@
 package buildplanner
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -80,17 +79,10 @@ func (p *Phase) ArtifactFilename(_ core.PhaseRequest) string { return "build-pla
 // from Builder's Sonnet to preserve anti-cooperative-bias invariant.
 func (p *Phase) DefaultModel() string { return "opus" }
 
-// ComposePrompt implements runner.Hooks. Appends a standard cycle-context
-// block to the agent prompt body.
+// ComposePrompt implements runner.Hooks. Delegates to runner.BaseCycleContext;
+// build-planner has no phase-specific extras.
 func (p *Phase) ComposePrompt(body string, req core.PhaseRequest) string {
-	var b strings.Builder
-	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
-	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
-	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
-	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
-	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
-	return b.String()
+	return runner.BaseCycleContext(body, req)
 }
 
 // Classify implements runner.Hooks. Verifies the required section headings

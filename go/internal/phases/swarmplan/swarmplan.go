@@ -16,7 +16,6 @@
 package swarmplan
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -70,10 +69,10 @@ func (p *Phase) ArtifactFilename(_ core.PhaseRequest) string { return "swarm-pla
 // reasoning, and an independent session from the workers' models.
 func (p *Phase) DefaultModel() string { return "opus" }
 
-// ComposePrompt implements runner.Hooks. Appends a standard cycle-context block.
+// ComposePrompt implements runner.Hooks. Delegates to runner.BaseCycleContext;
+// swarm-plan has no phase-specific extras.
 func (p *Phase) ComposePrompt(body string, req core.PhaseRequest) string {
-	return fmt.Sprintf("%s\n\n## Cycle Context\n- cycle: %d\n- goal_hash: %s\n- project_root: %s\n- workspace: %s\n",
-		body, req.Cycle, req.GoalHash, req.ProjectRoot, req.Workspace)
+	return runner.BaseCycleContext(body, req)
 }
 
 // Classify implements runner.Hooks. v1 is non-blocking: an empty artifact is a
