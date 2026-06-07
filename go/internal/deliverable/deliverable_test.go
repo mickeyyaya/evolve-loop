@@ -198,3 +198,54 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// --- ADR-0039 §7: failure-context conditionality ---
+
+// A FAIL/WARN sentinel on a RequireFailureContext contract must carry the
+// structured failure block; its absence is a confirmed violation whose message
+// is the correction directive (the retry machinery injects it verbatim).
+func TestVerify_AuditFailWithoutFailureBlock_Violation(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "audit-report.md",
+		"## Verdict\nFAIL\n"+phasecontract.RenderVerdictSentinel("audit", "FAIL")+"\n")
+	res, err := Verify("audit", phasecontract.Roots{Workspace: ws})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.OK || !hasCode(res, "failure_context_missing") {
+		t.Fatalf("want failure_context_missing violation, got %+v", res.Violations)
+	}
+	for _, v := range res.Violations {
+		if v.Code == "failure_context_missing" &&
+			(!contains(v.Message, "failure") || !contains(v.Message, "schema_version")) {
+			t.Errorf("violation message must tell the agent HOW to fix (failure block, schema_version 2); got %q", v.Message)
+		}
+	}
+}
+
+func TestVerify_AuditFailWithFailureBlock_OK(t *testing.T) {
+	ws := t.TempDir()
+	line := phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL",
+		&phasecontract.FailureBlock{Class: "code-audit-fail", Defects: []string{"d1"}})
+	writeFile(t, ws, "audit-report.md", "## Verdict\nFAIL\n"+line+"\n")
+	res, err := Verify("audit", phasecontract.Roots{Workspace: ws})
+	if err != nil || !res.OK {
+		t.Fatalf("structured FAIL must verify clean; err=%v violations=%+v", err, res.Violations)
+	}
+}
+
+// PASS needs no failure block; legacy prose-only FAIL (no sentinel) stays
+// legal forever (v1 artifacts predate the failure contract).
+func TestVerify_FailureContextNotRequiredOnPassOrLegacy(t *testing.T) {
+	for name, content := range map[string]string{
+		"pass":   "## Verdict\nPASS\n" + phasecontract.RenderVerdictSentinel("audit", "PASS") + "\n",
+		"legacy": "## Verdict\nFAIL\n",
+	} {
+		ws := t.TempDir()
+		writeFile(t, ws, "audit-report.md", content)
+		res, err := Verify("audit", phasecontract.Roots{Workspace: ws})
+		if err != nil || !res.OK {
+			t.Errorf("%s: must verify clean; err=%v violations=%+v", name, err, res.Violations)
+		}
+	}
+}

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // staticVerdictRunner succeeds at the transport level but returns a
@@ -128,5 +129,68 @@ func TestRecordFailureLearning_RetroSucceeds_NoDeterministicFallback(t *testing.
 	lessons, _ := filepath.Glob(filepath.Join(root, ".evolve", "instincts", "lessons", "*.yaml"))
 	if len(lessons) != 0 {
 		t.Errorf("deterministic lessons %v written although the LLM retro succeeded", lessons)
+	}
+}
+
+// reportingErrRunner writes a report carrying a v2 failure-block sentinel,
+// then fails — the "phase was healthy enough to self-report" shape
+// (ADR-0039 §7 item 5).
+type reportingErrRunner struct{ name string }
+
+func (r *reportingErrRunner) Name() string { return r.name }
+func (r *reportingErrRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	body := "## Triage\nFAIL\n" + phasecontract.RenderVerdictSentinelWithFailure("triage", "FAIL",
+		&phasecontract.FailureBlock{
+			Class:         "code-build-fail",
+			Defects:       []string{"defect-alpha: walk drops clamp", "defect-beta: nil evidence map"},
+			EvidencePaths: []string{"triage-report.md"},
+		}) + "\n"
+	_ = os.WriteFile(filepath.Join(req.Workspace, "triage-report.md"), []byte(body), 0o644)
+	return core.PhaseResponse{Phase: r.name, Verdict: "FAIL", ArtifactsDir: req.Workspace},
+		errStatic("triage exploded after self-report")
+}
+
+type errStatic string
+
+func (e errStatic) Error() string { return string(e) }
+
+// A failed phase that self-reported a structured failure block must have its
+// REAL defects/class/evidence flow into the deterministic learning artifacts —
+// not the generic summary string. Supervisor synthesis stays the fallback for
+// phases that died without reporting (the existing tests above).
+func TestRecordFailureLearning_StructuredBlockFlowsIntoArtifacts(t *testing.T) {
+	root := t.TempDir()
+	seedCycleStateFile(t, root)
+	orch, _, _ := newTestOrchestrator(t, newRunners(map[core.Phase]core.PhaseRunner{
+		core.PhaseTriage: &reportingErrRunner{name: "triage"},
+		core.PhaseRetro:  &alwaysErrRunner{name: "retro"},
+	}))
+	if _, err := orch.RunCycle(context.Background(), core.CycleRequest{
+		ProjectRoot: root,
+		GoalHash:    "test-goal",
+		Context:     map[string]string{"commit_message": "test commit"},
+	}); err == nil {
+		t.Fatal("triage hard failure must surface as a cycle error")
+	}
+
+	report, err := os.ReadFile(filepath.Join(root, ".evolve", "runs", "cycle-1", "retrospective-report.md"))
+	if err != nil {
+		t.Fatalf("deterministic retrospective must exist: %v", err)
+	}
+	for _, want := range []string{"defect-alpha", "defect-beta", "code-build-fail"} {
+		if !strings.Contains(string(report), want) {
+			t.Errorf("retrospective missing structured %q:\n%s", want, report)
+		}
+	}
+
+	lessons, _ := filepath.Glob(filepath.Join(root, ".evolve", "instincts", "lessons", "cycle-1-phase-*.yaml"))
+	if len(lessons) != 1 {
+		t.Fatalf("want 1 lesson, got %v", lessons)
+	}
+	lesson, _ := os.ReadFile(lessons[0])
+	for _, want := range []string{"defect-alpha", "code-build-fail"} {
+		if !strings.Contains(string(lesson), want) {
+			t.Errorf("lesson missing structured %q:\n%s", want, lesson)
+		}
 	}
 }

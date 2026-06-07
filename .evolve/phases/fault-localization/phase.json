@@ -22,7 +22,9 @@
   },
   "routing": {
     "insert_when": [
-      { "field": "scout.goal_type", "op": "==", "value": "bugfix" }
+      { "field": "scout.goal_type", "op": "==", "value": "bugfix" },
+      { "field": "tdd.failure_class", "op": "eq", "value": "code-build-fail" },
+      { "field": "audit.failure_class", "op": "eq", "value": "code-audit-fail" }
     ]
   },
   "after": "triage"

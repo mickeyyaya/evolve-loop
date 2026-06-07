@@ -55,6 +55,13 @@ type Contract struct {
 	Verdicts     []string  // markdown only — allowed verdict tokens
 	RequiredKeys []string  // json only — minimal required top-level keys
 	WriteTarget  string    // one of Target*
+	// RequireFailureContext makes a FAIL/WARN verdict sentinel without a
+	// structured failure block a violation (ADR-0039 §7) — the correction
+	// loop then re-dispatches with the exact fix. Applies only to
+	// sentinel-declared verdicts: legacy prose-only artifacts stay legal
+	// forever. Set for built-ins that extract a verdict; user phases opt in
+	// via classify.require_failure_context.
+	RequireFailureContext bool
 }
 
 // ArtifactPath resolves the absolute path the agent must write to, joining the
@@ -102,7 +109,7 @@ var contracts = map[string]Contract{
 	"audit": {
 		Phase: "audit", AgentName: "auditor", ArtifactName: "audit-report.md",
 		Kind: KindMarkdown, Sections: Audit.Sections, Verdicts: verdictsPassFailWarnSkp,
-		WriteTarget: TargetWorkspace,
+		WriteTarget: TargetWorkspace, RequireFailureContext: true,
 	},
 	"intent": {
 		Phase: "intent", AgentName: "intent", ArtifactName: "intent.md",

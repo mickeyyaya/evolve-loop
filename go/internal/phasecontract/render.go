@@ -49,6 +49,14 @@ func RenderContractBlock(c Contract) string {
 			fmt.Fprintf(&b, "- End it with this machine-readable line (use your real verdict, one of %s):\n  %s\n",
 				bracketJoin(c.Verdicts), RenderVerdictSentinel(c.Phase, c.Verdicts[0]))
 		}
+		if c.RequireFailureContext {
+			fmt.Fprintf(&b, "- On FAIL or WARN, the sentinel MUST carry your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it):\n  %s\n",
+				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", &FailureBlock{
+					Class:         "code-" + c.Phase + "-fail",
+					Defects:       []string{"<one line per defect>"},
+					EvidencePaths: []string{"<artifact path>"},
+				}))
+		}
 	}
 
 	fmt.Fprintf(&b, "- Before you finish, run:  evolve phase verify %s --workspace <your workspace dir>\n", c.Phase)

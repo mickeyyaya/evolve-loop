@@ -22,15 +22,18 @@ import (
 // map first and only fall back to FromSpec on a miss, so a user phase can never
 // weaken a spine phase's contract.
 func FromSpec(spec phasespec.PhaseSpec) Contract {
+	verdicts := verdictsFromSpec(spec)
 	return Contract{
 		Phase:        spec.Name,
 		AgentName:    spec.AgentName(),
 		ArtifactName: artifactNameFromSpec(spec),
 		Kind:         kindFromArtifact(artifactNameFromSpec(spec)),
 		Sections:     sectionsFromClassify(spec),
-		Verdicts:     verdictsFromSpec(spec),
+		Verdicts:     verdicts,
 		RequiredKeys: nil,
 		WriteTarget:  TargetWorkspace,
+		// Opt-in, and only meaningful for verdict-emitting phases (ADR-0039 §7).
+		RequireFailureContext: len(verdicts) > 0 && spec.Classify != nil && spec.Classify.RequireFailureContext,
 	}
 }
 

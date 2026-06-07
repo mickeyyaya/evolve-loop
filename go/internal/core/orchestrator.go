@@ -20,8 +20,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -1083,7 +1085,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		})
 	}
 	now := o.now().UTC().Format(time.RFC3339)
-	fl.State.FailedAt = append(fl.State.FailedAt, FailedRecord{
+	record := FailedRecord{
 		TS:             now,
 		Cycle:          fl.Cycle,
 		Verdict:        VerdictFAIL,
@@ -1092,7 +1094,20 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		Summary:        summary,
 		Defects:        []string{summary},
 		Retrospected:   true,
-	})
+	}
+	// ADR-0039 §7: a phase healthy enough to self-report owns its failure
+	// description — its structured block beats the supervisor's synthesis.
+	// Read ONCE here and thread to the deterministic-learning fallback, so
+	// state.json and the lesson artifacts can never diverge on the same
+	// failure event.
+	structured := adoptStructuredFailure(fl.CycleState.WorkspacePath, string(fl.Failed))
+	if structured != nil {
+		record.Classification = structured.Class
+		if len(structured.Defects) > 0 {
+			record.Defects = structured.Defects
+		}
+	}
+	fl.State.FailedAt = append(fl.State.FailedAt, record)
 	fl.State.LastCycleNumber = fl.Cycle
 
 	retroRunner, ok := o.runners[PhaseRetro]
@@ -1118,13 +1133,13 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	if retroErr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
-		o.writeDeterministicLearning(fl, summary)
+		o.writeDeterministicLearning(fl, summary, structured)
 		o.writeFailureLearningState(ctx, fl.State)
 		return
 	}
 	if !IsVerdict(retroResp.Verdict) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
-		o.writeDeterministicLearning(fl, summary)
+		o.writeDeterministicLearning(fl, summary, structured)
 		o.writeFailureLearningState(ctx, fl.State)
 		return
 	}
@@ -1168,7 +1183,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 // failure-lesson YAML — so the lesson survives instead of degrading to
 // a stderr WARN. Best-effort: a floor write failure must never mask the
 // original phase failure.
-func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, summary string) {
+func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, summary string, structured *phasecontract.FailureBlock) {
 	ev := faillearn.FailureEvent{
 		Cycle:          fl.Cycle,
 		FailedPhase:    string(fl.Failed),
@@ -1180,10 +1195,62 @@ func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, sum
 		EvidencePaths:  []string{fl.CycleState.WorkspacePath},
 		Now:            o.now().UTC(),
 	}
+	// ADR-0039 §7: prefer the failed phase's own structured failure block
+	// (validated + capped by adoptStructuredFailure, read ONCE by the
+	// caller so state.json and the lesson cannot diverge) over the
+	// synthesized summary.
+	if structured != nil {
+		ev.Classification = structured.Class
+		if len(structured.Defects) > 0 {
+			ev.Defects = structured.Defects
+		}
+		if len(structured.EvidencePaths) > 0 {
+			ev.EvidencePaths = append(structured.EvidencePaths, fl.CycleState.WorkspacePath)
+		}
+	}
 	lessonsDir := filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "instincts", "lessons")
 	if err := faillearn.WriteArtifacts(ev, fl.CycleState.WorkspacePath, lessonsDir); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: deterministic fallback write: %v\n", err)
 	}
+}
+
+// adoptStructuredFailure is the trust boundary for agent-written failure
+// blocks (ADR-0039 §7): adopt the failed phase's self-report ONLY when its
+// class normalizes into the canonical taxonomy (never blind trust — an
+// out-of-taxonomy class would round-trip to UnknownClassification on the
+// next state read), and cap list/entry sizes so a misbehaving agent cannot
+// bloat state.json or the lesson corpus.
+func adoptStructuredFailure(workspace, phase string) *phasecontract.FailureBlock {
+	fb, ok := phasecontract.ReadFailureBlock(workspace, phase)
+	if !ok {
+		return nil
+	}
+	if failurelog.NormalizeLegacy(fb.Class) == failurelog.UnknownClassification {
+		return nil
+	}
+	fb.Defects = capStrings(fb.Defects, maxAdoptedDefects, maxAdoptedDefectRunes)
+	fb.EvidencePaths = capStrings(fb.EvidencePaths, maxAdoptedDefects, maxAdoptedDefectRunes)
+	return fb
+}
+
+const (
+	maxAdoptedDefects     = 20  // entries per adopted list
+	maxAdoptedDefectRunes = 500 // runes per adopted entry (mirrors faillearn's summary cap)
+)
+
+// capStrings bounds an agent-written string list at the adoption boundary.
+func capStrings(in []string, maxEntries, maxRunes int) []string {
+	if len(in) > maxEntries {
+		in = in[:maxEntries]
+	}
+	out := make([]string, len(in))
+	for i, s := range in {
+		if r := []rune(s); len(r) > maxRunes {
+			s = string(r[:maxRunes]) + "…"
+		}
+		out[i] = s
+	}
+	return out
 }
 
 func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseRequest {

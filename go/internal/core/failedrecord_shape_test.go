@@ -13,10 +13,14 @@ package core
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 func jsonKeys(t *testing.T, v any) map[string]struct{} {
@@ -61,5 +65,41 @@ func TestFailedRecord_SupersetOfFailurelogRecordedShape(t *testing.T) {
 		if _, ok := failedKeys[k]; !ok {
 			t.Errorf("failurelog.Recorded emits key %q that core.FailedRecord does not — the two failedApproaches appenders drifted", k)
 		}
+	}
+}
+
+// adoptStructuredFailure is the trust boundary for agent-written failure
+// blocks: out-of-taxonomy classes are refused (they would round-trip to
+// UnknownClassification on the next state read) and sizes are capped.
+func TestAdoptStructuredFailure_TrustBoundary(t *testing.T) {
+	ws := t.TempDir()
+	write := func(class string, defects []string) {
+		body := "## Triage\nFAIL\n" + phasecontract.RenderVerdictSentinelWithFailure("triage", "FAIL",
+			&phasecontract.FailureBlock{Class: class, Defects: defects}) + "\n"
+		if err := os.WriteFile(filepath.Join(ws, "triage-report.md"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("totally-novel-class", []string{"d"})
+	if fb := adoptStructuredFailure(ws, "triage"); fb != nil {
+		t.Errorf("out-of-taxonomy class must be refused; got %+v", fb)
+	}
+
+	big := strings.Repeat("x", 2000)
+	many := make([]string, 50)
+	for i := range many {
+		many[i] = big
+	}
+	write("code-build-fail", many)
+	fb := adoptStructuredFailure(ws, "triage")
+	if fb == nil {
+		t.Fatal("canonical class must be adopted")
+	}
+	if len(fb.Defects) != maxAdoptedDefects {
+		t.Errorf("defect list not capped: %d", len(fb.Defects))
+	}
+	if r := []rune(fb.Defects[0]); len(r) != maxAdoptedDefectRunes+1 { // +1 for the ellipsis
+		t.Errorf("defect entry not capped: %d runes", len(r))
 	}
 }

@@ -62,7 +62,12 @@ type lessonYAML struct {
 	Type             string  `yaml:"type"`
 	Category         string  `yaml:"category"`
 	PreventiveAction string  `yaml:"preventiveAction"`
-	FailureContext   struct {
+	// Defects carries the failed phase's self-reported defect list (ADR-0039
+	// §7) — real failure content for KB recall, not just the summary string.
+	// omitempty keeps supervisor-synthesized lessons byte-identical when the
+	// defect list is just the summary (see RenderLessonYAML).
+	Defects        []string `yaml:"defects,omitempty"`
+	FailureContext struct {
 		FailedStep    string `yaml:"failedStep"`
 		ErrorCategory string `yaml:"errorCategory"`
 		AuditVerdict  string `yaml:"auditVerdict"`
@@ -107,6 +112,7 @@ func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 		Type:             "failure-lesson",
 		Category:         "episodic",
 		PreventiveAction: preventiveAction(ev),
+		Defects:          structuredDefects(ev),
 		FailureContext: struct {
 			FailedStep    string `yaml:"failedStep"`
 			ErrorCategory string `yaml:"errorCategory"`
@@ -125,6 +131,17 @@ func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 		panic("faillearn: yaml.Marshal of lesson entry must not fail: " + err.Error())
 	}
 	return id, body
+}
+
+// structuredDefects returns the defect list when it carries REAL content
+// (ADR-0039 §7 self-reported defects) — a list that merely echoes the
+// synthesized summary adds nothing over Description, so it is omitted
+// (keeps pre-v2 lessons byte-identical via omitempty).
+func structuredDefects(ev FailureEvent) []string {
+	if len(ev.Defects) == 1 && ev.Defects[0] == ev.Summary {
+		return nil
+	}
+	return ev.Defects
 }
 
 // lessonID derives the stable artifact id "cycle-N-<scope>-<slug>".

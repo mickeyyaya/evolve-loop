@@ -43,6 +43,11 @@ type ClassifyRules struct {
 	FailIfEmpty     bool              `json:"fail_if_empty,omitempty"`
 	FailIfSignal    map[string]string `json:"fail_if_signal,omitempty"`
 	VerdictOnPass   string            `json:"verdict_on_pass,omitempty"`
+	// RequireFailureContext opts a verdict-emitting phase into the ADR-0039
+	// failure-signal contract: a FAIL/WARN sentinel must carry the structured
+	// failure block (class/defects/evidence_paths) or the contract gate
+	// re-dispatches with a correction.
+	RequireFailureContext bool `json:"require_failure_context,omitempty"`
 }
 
 // Gates names the inter-phase gate functions (declarative; resolved by the

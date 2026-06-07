@@ -68,3 +68,23 @@ func TestRenderContractFooter_CarriesExactPath(t *testing.T) {
 		t.Errorf("footer must carry the exact path %q; got:\n%s", path, footer)
 	}
 }
+
+// ADR-0039 §7: a RequireFailureContext contract teaches the failure-block
+// emission in the SAME injected block that teaches the sentinel — one
+// instruction surface for every persona/CLI, no per-agent prose copies.
+func TestRenderContractBlock_FailureContextInstruction(t *testing.T) {
+	audit, _ := For("audit")
+	block := RenderContractBlock(audit)
+	for _, want := range []string{"failure", "schema_version\":2", "\"defects\""} {
+		if !strings.Contains(block, want) {
+			t.Errorf("audit contract block missing failure-context teaching %q:\n%s", want, block)
+		}
+	}
+
+	// Phases without the requirement keep their block free of it (cache
+	// prefix stability + no irrelevant instructions).
+	build, _ := For("build")
+	if strings.Contains(RenderContractBlock(build), "schema_version\":2") {
+		t.Error("build contract block must not carry the failure-context teaching")
+	}
+}

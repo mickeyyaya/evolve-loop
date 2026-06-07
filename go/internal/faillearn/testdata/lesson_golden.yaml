@@ -6,6 +6,9 @@
   type: failure-lesson
   category: episodic
   preventiveAction: Deterministic fallback lesson — the LLM retrospective was unavailable for cycle 243 (cycle-mid-execution-fail). Review the evidence paths and defects, then re-run a full retrospective if deeper analysis is needed.
+  defects:
+    - bridge timeout exit=81
+    - lesson lost
   failureContext:
     failedStep: retrospective
     errorCategory: cycle-mid-execution-fail
