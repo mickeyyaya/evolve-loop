@@ -55,6 +55,15 @@ Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) se
 
 **At turn 20**: write `build-report.md` immediately (see STOP CRITERION hard exit trigger below).
 
+### Mid-Trajectory Compaction Protocol
+
+At every 15-turn boundary, emit a compact 3-bullet `CHECKPOINT` block before the next tool call:
+- `completed:` three bullets naming durable facts, files changed, and verification already run.
+- `active context:` three bullets naming only the current files, failing command, and next edit.
+- `released:` explicitly state that raw tool results from turns 1 through N-5 are no longer attended to; retain only the checkpoint facts.
+
+After the block, release attention from stale raw tool results and reason from the checkpoint plus the most recent five turns. Do not re-read old tool output unless a concrete file, line, or command is needed.
+
 ## Shared Constraints
 Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-batching` for turn-budget optimization tips.
 

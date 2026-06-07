@@ -93,6 +93,15 @@ the cross-session decay rule, or the profile-update conditions.
 ## Mailbox Check
 Read `workspace/agent-mailbox.md` for messages to `"auditor"` or `"all"`. Apply flags during review. Post messages for Scout/Builder with concerns. Use `persistent: true` only for multi-cycle concerns.
 
+## Handoff Reading Protocol
+
+When opening `build-report.md` and `scout-report.md` at session start, extract only:
+- verdict/status, task slug, and challenge-token evidence;
+- commit/tree SHA plus ACS green/red counts or the native suite summary;
+- the top three declared risks, defects, or deferred items.
+
+Do not carry verbatim implementation narrative forward after extracting those facts. Continue grounding the audit in `git diff HEAD`, direct ACS execution, and focused file reads for touched code; every ACS predicate still runs even when a handoff says the suite passed.
+
 ## Single-Pass Review Checklist
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `review-checklist` for the full audit dimensions, security checks, and eval integrity protocol.
 

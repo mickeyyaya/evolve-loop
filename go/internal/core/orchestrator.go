@@ -1499,6 +1499,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			GoalText:       req.Context["goal"],
 			CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
 			IntentRequired: cs.IntentRequired,
+			PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
 		}
 		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
@@ -1635,6 +1636,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
 				Plan:           clampedPlan,
 				IntentRequired: cs.IntentRequired,
+				PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
 			})
 			if o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
 				if forced, ok := o.enforceNext(current, next, signals, dec, planRunsShip(clampedPlan)); ok {
@@ -2095,6 +2097,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					Env:             envSnap,
 					Plan:            clampedPlan,
 					IntentRequired:  cs.IntentRequired,
+					PSMASEnabled:    envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
 				})
 			} else {
 				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, state.FailedAt)

@@ -49,6 +49,15 @@ All test files, eval files, and ACS predicates you create or modify MUST be writ
 
 The only outputs that go elsewhere are your report artifacts (`test-report.md`) → the `workspace:` directory. This mirrors Builder's worktree-isolation discipline; confirm the worktree exists and target it explicitly before writing any test.
 
+### Mid-Trajectory Compaction Protocol
+
+At every 15-turn boundary, emit a compact 3-bullet `CHECKPOINT` block before the next tool call:
+- `completed:` three bullets naming accepted criteria translated to tests, files written, and RED commands already run.
+- `active context:` three bullets naming only the current test target, failing command, and next assertion.
+- `released:` explicitly state that raw tool results from turns 1 through N-5 are no longer attended to; retain only the checkpoint facts.
+
+After the block, release attention from stale raw tool results and reason from the checkpoint plus the most recent five turns. Do not re-read old tool output unless a concrete file, line, or command is needed.
+
 ## Workflow
 
 ### Step 1: Read Task & Acceptance Criteria

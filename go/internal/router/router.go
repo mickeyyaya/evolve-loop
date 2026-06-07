@@ -36,6 +36,7 @@ type RouteInput struct {
 	Strict          bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
 	Now             time.Time
 	IntentRequired  bool
+	PSMASEnabled    bool // EVOLVE_PSMAS_SKIP — consume triage phase_skip[] when enabled.
 
 	// Proposer context — populated by the orchestrator, consumed ONLY by a
 	// DynamicLLM Proposer (which needs to dispatch a bridge call). The pure
@@ -385,6 +386,7 @@ func applyLearningRichness(d *RouterDecision, proposal *Proposal, in RouteInput)
 func walk(in RouteInput, proposal *Proposal) RouterDecision {
 	d := RouterDecision{Evidence: map[string]interface{}{}}
 	done := toSet(in.Completed)
+	psmasSkip := psmasSkipSet(in)
 	order := effectiveOrder(in.Cfg)
 	start := indexOfIn(order, normalize(in.Current)) // -1 for "start"/unknown
 
@@ -405,6 +407,10 @@ func walk(in RouteInput, proposal *Proposal) RouterDecision {
 			}
 			continue
 		}
+		if optional && psmasSkip[phase] {
+			d.SkipPhases = append(d.SkipPhases, phase)
+			continue
+		}
 		if optional {
 			d.InsertPhases = append(d.InsertPhases, phase)
 		}
@@ -419,6 +425,19 @@ func walk(in RouteInput, proposal *Proposal) RouterDecision {
 	d.Reason = "no-runnable-phase-remaining"
 	applyProposal(&d, proposal, in)
 	return d
+}
+
+func psmasSkipSet(in RouteInput) map[string]bool {
+	out := map[string]bool{}
+	if !in.PSMASEnabled || !in.Signals.Triage.Present {
+		return out
+	}
+	for _, phase := range in.Signals.Triage.PhaseSkip {
+		if p := normalize(phase); p != "" {
+			out[p] = true
+		}
+	}
+	return out
 }
 
 // reserved imports guard removed; all imports are used.
@@ -605,8 +624,11 @@ func indexOfIn(order []string, phase string) int {
 
 // normalize folds the core.PhaseRetro alias "retro" to the canonical "retrospective".
 func normalize(phase string) string {
-	if phase == "retro" {
+	switch phase {
+	case "retro":
 		return "retrospective"
+	case "tdd-engineer":
+		return "tdd"
 	}
 	return phase
 }

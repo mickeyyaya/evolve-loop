@@ -90,6 +90,7 @@
     "allow_network": true
   },
   "parallel_eligible": false,
+  "context_compact_trigger_turns": 15,
   "context_clear_trigger_tokens": 30000,
   "context_anchors": [
     "scout-report.md:proposed_tasks",
