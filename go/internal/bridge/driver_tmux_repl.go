@@ -299,6 +299,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	var lastVerdict ReviewVerdict
 	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp)
 	completed := false
+	nudgeSent := false
 	detectErrLogged := false
 	attempt := 0
 	intervalStart := 0
@@ -442,6 +443,19 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				deps.OnStopReview(phase, string(lastVerdict.Action), lastVerdict.Reason)
 			}
 			if lastVerdict.Action != ReviewExtend {
+				_, isDetVal := reviewer.(deterministicReviewer)
+				_, isDetPtr := reviewer.(*deterministicReviewer)
+				isDeterministic := isDetVal || isDetPtr
+				if isDeterministic && !panestream.PaneBusy(curPane, paneProfileFor(lp)) && !nudgeSent {
+					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
+					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
+					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
+					nudgeSent = true
+					intervalStart = elapsed
+					intervalBaselinePane = curPane
+					attempt++
+					continue
+				}
 				break
 			}
 			attempt++

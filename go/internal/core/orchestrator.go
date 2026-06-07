@@ -762,6 +762,13 @@ func discardMainLeak(ctx context.Context, projectRoot, p string) error {
 	return nil
 }
 
+// isGitignored reports whether the given path is ignored by git in the repository.
+func isGitignored(ctx context.Context, dir, p string) bool {
+	// git check-ignore -q exits 0 if the path is ignored, 1 if not ignored.
+	_, code, err := gitCapture(ctx, dir, "check-ignore", "-q", "--", p)
+	return err == nil && code == 0
+}
+
 // worktreeCleanForPath reports whether the worktree's copy of p is unmodified from HEAD,
 // so overlaying a relocated edit won't clobber independent in-worktree work. `git diff
 // --quiet HEAD -- p` exits 0 (clean) / 1 (differs); any launch error is treated as
@@ -1833,9 +1840,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// pure-untracked leaks. On recovery FAILURE we abort explicitly — the
 		// tree-diff guard only backstops tracked leaks, so a failed recovery
 		// of an untracked leak must not slip past into audit.
-		if next == PhaseBuild && cs.ActiveWorktree != "" {
+		if WorktreePhase(next) && cs.ActiveWorktree != "" {
 			if !recoverBuildLeak(ctx, req.ProjectRoot, cs.ActiveWorktree, mainDirtyBaseline) {
-				phaseErr := fmt.Errorf("phase build: worktree-leak recovery failed (main tree left unsafe for audit)")
+				phaseErr := fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for audit)", next)
 				recordFailureLearning(next, phaseErr, 1)
 				return result, phaseErr
 			}
@@ -1857,7 +1864,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// Always discard "go/evolve" and relBin (if set)
 				_ = discardMainLeak(ctx, req.ProjectRoot, "go/evolve")
 				if relBin != "" && relBin != "go/evolve" {
-					_ = discardMainLeak(ctx, req.ProjectRoot, relBin)
+					if isGitignored(ctx, req.ProjectRoot, relBin) {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN: relBin path %q is gitignored; skipping discardMainLeak to prevent checkout error\n", relBin)
+					} else {
+						_ = discardMainLeak(ctx, req.ProjectRoot, relBin)
+					}
 				}
 
 				// Re-snapshot and check again
@@ -1867,6 +1878,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				} else {
 					phaseErr := res2.Error(string(next), phaseWorktree)
 					recordFailureLearning(next, phaseErr, 1)
+					// After abort, check if go/bin/evolve is absent
+					evolveBinPath := filepath.Join(req.ProjectRoot, "go/bin/evolve")
+					if _, err := os.Stat(evolveBinPath); os.IsNotExist(err) {
+						fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL: go/bin/evolve absent after cycle abort — trust-kernel guards degraded\n")
+					}
 					return result, phaseErr
 				}
 			}

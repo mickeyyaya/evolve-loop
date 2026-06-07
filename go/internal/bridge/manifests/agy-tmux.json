@@ -73,6 +73,13 @@
       "response_keys": "y,Enter",
       "policy": "auto_respond",
       "note": "Belt-and-suspenders alongside --dangerously-skip-permissions; harmless if bypass already accepted it"
+    },
+    {
+      "name": "session_rating",
+      "regex": "Rate (this|your|the) (response|session)|How helpful|Thank you.*feedback",
+      "response_keys": "4,Enter",
+      "policy": "auto_respond",
+      "note": "agy end-of-session rating dialog; '4' = neutral skip"
     }
   ],
   "stub": false,
