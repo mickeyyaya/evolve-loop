@@ -1,0 +1,12 @@
+- id: cycle-243-phase-retrospective
+  pattern: cycle-mid-execution-fail
+  description: retro bridge exited 81 before writing retrospective-report.md
+  confidence: 0.5
+  source: .evolve/runs/cycle-243/orchestrator-report.md
+  type: failure-lesson
+  category: episodic
+  preventiveAction: Deterministic fallback lesson — the LLM retrospective was unavailable for cycle 243 (cycle-mid-execution-fail). Review the evidence paths and defects, then re-run a full retrospective if deeper analysis is needed.
+  failureContext:
+    failedStep: retrospective
+    errorCategory: cycle-mid-execution-fail
+    auditVerdict: FAIL
