@@ -142,7 +142,7 @@
 | `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
 | `EVOLVE_REQUIRE_TEAM_CONTEXT` | ACTIVE | Require team context before builder |
 | `EVOLVE_PLAN_REVIEW` | ACTIVE | Enable Sprint 2 plan-review phase (opt-in) |
-| `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` | ACTIVE | Opt-out of inline retrospective on FAIL/WARN |
+| `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` | DEPRECATED | Superseded by `policy.json:failure_floor` (ADR-0039) which wins when both set; honored one more release with a `deprecated-flag` WARN; removal target next release |
 | `EVOLVE_DISPATCH_POLICY` | ACTIVE (canonical) | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
 | `EVOLVE_DISPATCH_STOP_ON_FAIL` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+ |
 | `EVOLVE_DISPATCH_VERIFY` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=off` (when `=0`); emits stderr WARN; removal target v8.61+ |

@@ -303,6 +303,7 @@
       "optional": true,
       "enable_var": "EVOLVE_DISABLE_AUTO_RETROSPECTIVE",
       "enable_var_inverted": true,
+      "_deprecation_note": "enable_var is DEPRECATED (honored one more release; config.Load WARNs deprecated-flag when set): .evolve/policy.json failure_floor is the ONE failure-learning surface and wins when both are set. The deterministic floor (FailedRecord + retrospective/lesson artifacts on every abnormal termination) is non-configurable either way.",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/audit-report.md",
