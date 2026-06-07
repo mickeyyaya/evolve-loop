@@ -131,6 +131,27 @@ Defaults reflect production posture as of v10.8.0. Detail docs linked per row.
 
 Bare `git push origin main` is denied by ship-gate (v8.13.0+). `EVOLVE_BYPASS_SHIP_VERIFY=1` is a permanent compatibility bridge but emits deprecation WARN — prefer `--class manual`.
 
+### Ship self-healing (repair ladder, ADR-0039 §8)
+
+Ship attempts ONE typed, provably-safe repair per error code per run before surfacing a
+failure — no new bypass env vars, no rebase, no force-push, no content deletion:
+
+- **Stale TOFU pin** (`SELF_SHA_TAMPERED`): re-pins when the running binary matches the blob at
+  `HEAD:<bin>` (verified rebuild of committed source); any divergence still BLOCKs.
+- **Merged-but-unpushed** (`AUDIT_BINDING_HEAD_MOVED`): when HEAD already carries the
+  audit-bound tree and origin is strictly behind, ship completes with a push-only closure.
+- **Untracked colliders** (`GIT_FF_MERGE_DIVERGED`): byte-identical main-side copies are
+  removed; differing copies are quarantine-moved to `.evolve/quarantine/cycle-<N>/` (with
+  `manifest.json`) — inspect/restore from there; content is never deleted.
+- **Push race** (`GIT_PUSH_REJECTED`): one fetch + ff-retry; a diverged origin reclassifies to
+  `needs-reaudit` (local commit preserved — the recovery chain re-audits on the new base).
+
+Operator-visible: `[ship] REPAIR:` log lines; `ship.repair_attempted` / `ship.repair_outcome`
+signals; declined attempts annotate `ship-error.json`. On an unresolved ship failure the cycle
+worktree is PRESERVED (not pruned) — reclaim via `evolve loop --resume` or `evolve cycle reset`.
+Ship-local residues (`GIT_FF_MERGE_DIVERGED`, `COMMIT_PREFIX_GATE`, `GIT_DETACHED_HEAD`,
+`WORKTREE_RESOLVE`) route to the debugger phase, never back into the audit↔ship loop.
+
 ## Publishing releases
 
 "publish" ≠ "push". Use the native self-healing pipeline:

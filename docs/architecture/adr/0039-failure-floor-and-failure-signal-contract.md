@@ -131,6 +131,47 @@ contract's fallback):
   stays the fallback); `cycleclassify` gains a Pass-0 sentinel read mapped via
   `failurelog.NormalizeLegacy` (unknown classes fall through to regex passes).
 
+### 8. Self-healing ship repair ladder (Phase 7 — executor-side complement)
+
+The retrospectives for cycles 230 and 243–248 converged on one verdict: *every ship
+enforcement point is a cycle-killer; none has a correction tier* — audited-PASS work was
+repeatedly hand-salvaged (stale TOFU pin ×2, merged-but-unpushed main ahead-1, colliders
+looping audit↔ship to depth exhaustion, worktrees pruned with PASS work inside). The repair
+ladder (`go/internal/phases/ship/repair.go`) is the executor-side complement of the failure
+floor: ship finds the *legitimate* way to land the audited tree before surfacing an error.
+
+Rules (operator-approved 2026-06-07):
+
+- **Bounded**: each `ShipError` code gets at most ONE typed repair per Run
+  (`opts.repairAttempted` once-guard); the orchestrator's `maxRecoveryDepth` bounds the outer
+  loop independently. No unbounded recovery anywhere.
+- **Provably safe**: every repair re-runs the violated invariant afterwards (the failed stage
+  re-executes, or the closure re-verifies the tree binding). A repair that cannot prove safety
+  declines and the original error stands.
+- **Policy floor untouched**: never rebase, never force-push, never set bypass env vars, never
+  delete content. Integrity class still defaults to BLOCK — only the provably-safe sub-cases
+  below proceed.
+
+| Code | Signature healed | Repair | Re-verify |
+|---|---|---|---|
+| `SELF_SHA_TAMPERED` | stale TOFU pin: running binary SHA == blob at `HEAD:<bin>` (legit rebuild/manual-ship of committed source; cycles 246-248) | re-pin `expected_ship_sha` | `verifySelfSHA` re-runs |
+| `AUDIT_BINDING_HEAD_MOVED` | merged-but-unpushed: `HEAD^{tree}` == audit-bound tree, audited base ∈ ancestors, origin strictly behind (cycle 246) | push-only closure + `ship-binding.json` | tree binding checked by the closure itself |
+| `GIT_FF_MERGE_DIVERGED` (collider variant) | untracked main-side colliders (cycle 230) | byte-identical → remove; differing → quarantine-move to `.evolve/quarantine/cycle-<N>/` + `manifest.json` (never deleted) | atomic-ship stage re-runs incl. collider pre-flight |
+| `GIT_PUSH_REJECTED` | push race | inline fetch + ONE ff-retry when origin ∈ ancestors; diverged origin reclassifies to Precondition `repair_outcome=needs-reaudit` (local commit preserved, re-audit on the new base) | post-push verification on the healed path |
+
+Routing fix (`router/recovery.go`): ship-LOCAL preconditions a re-audit cannot re-establish
+(`GIT_FF_MERGE_DIVERGED`, `COMMIT_PREFIX_GATE`, `GIT_DETACHED_HEAD`, `WORKTREE_RESOLVE`) now
+route to the **debugger** phase, not audit — the in-Run ladder already declined by the time the
+router sees the error, and re-auditing was the cycle-230 audit↔ship loop. `AUDIT_BINDING_*`
+residues still re-audit; integrity still blocks.
+
+Worktree preservation (D10 fix): the orchestrator's exit cleanup skips pruning while a ship
+failure is unresolved; the worktree is reclaimed when ship eventually succeeds or via
+`evolve cycle reset`. Observability: every attempt logs `[ship] REPAIR:`, stamps
+`RepairAttempted`/`RepairOutcome` on the run result, surfaces `ship.repair_attempted` /
+`ship.repair_outcome` signals (v2 sentinel plane), and declined attempts annotate the
+`ShipError` Debug map → `ship-error.json` → failure floor.
+
 ## Consequences
 
 - No abnormal termination is silent: kill -9 a retro bridge, `evolve cycle reset`, or a loop

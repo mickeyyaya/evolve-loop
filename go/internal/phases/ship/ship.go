@@ -129,6 +129,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 			signals["ship.error_stage"] = string(se.Stage)
 			signals["ship.debug"] = se.DebugString()
 		}
+		addRepairSignals(signals, res)
 		return core.PhaseResponse{
 			Phase:        phaseName,
 			Verdict:      core.VerdictFAIL,
@@ -151,6 +152,13 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 			},
 		}, fmt.Errorf("ship: native exit=%d", res.ExitCode)
 	}
+	// Signals stays nil on a repair-free success — byte-identical to the
+	// pre-ladder response shape.
+	var signals map[string]any
+	if res.RepairAttempted != "" {
+		signals = map[string]any{}
+		addRepairSignals(signals, res)
+	}
 	return core.PhaseResponse{
 		Phase:        phaseName,
 		Verdict:      core.VerdictPASS,
@@ -158,5 +166,16 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		NextPhase:    string(core.PhaseRetro),
 		CommitSHA:    res.CommitSHA,
 		DurationMS:   durationMS,
+		Signals:      signals,
 	}, nil
+}
+
+// addRepairSignals mirrors the repair ladder's observability fields
+// (ADR-0039 §8) onto the generic signal plane — present on both PASS
+// (self-healed) and FAIL (repair declined) responses.
+func addRepairSignals(signals map[string]any, res RunResult) {
+	if res.RepairAttempted != "" {
+		signals["ship.repair_attempted"] = res.RepairAttempted
+		signals["ship.repair_outcome"] = res.RepairOutcome
+	}
 }

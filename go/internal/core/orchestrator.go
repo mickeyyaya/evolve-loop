@@ -1370,6 +1370,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// the build phase we soft-reset to it so a committing builder's work becomes
 	// pending again (see normalizeWorktreeToBase + the cycle-156 incident).
 	var worktreeBaseSHA string
+	// preserveWorktree (ADR-0039 §8, D10 fix): set when a ship-stage failure
+	// is recorded and cleared only when a later ship attempt succeeds. While
+	// set, the exit cleanup below SKIPS pruning so audited (possibly
+	// uncommitted) work survives for recovery — `evolve loop --resume` or an
+	// explicit `evolve cycle reset` reclaims it. Cycle 7 lost its entire
+	// PASS work to this prune; cycle 12 survived only via operator snapshot.
+	preserveWorktree := false
 	// Full main-tree dirty baseline (tracked + untracked) captured BEFORE any
 	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
 	// relocates paths the build introduced, never the operator's pre-existing work.
@@ -1387,7 +1394,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// source phases still run; normalize just degrades to a no-op).
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD at worktree creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
 		}
-		defer func() { _ = o.worktree.Cleanup(req.ProjectRoot, wtPath) }()
+		defer func() {
+			if preserveWorktree {
+				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — ship failed; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
+				return
+			}
+			_ = o.worktree.Cleanup(req.ProjectRoot, wtPath)
+		}()
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
@@ -1785,6 +1798,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					// Integrity breaches, an illegal edge, or exhausted depth return
 					// (_, false) and fall through to the loud abort below.
 					if se, ok := AsShipError(err); ok {
+						// Preserve the worktree from the exit cleanup while a
+						// ship failure is unresolved (ADR-0039 §8 / D10) —
+						// cleared when a later ship attempt succeeds.
+						preserveWorktree = true
 						if rec, recovering := o.recoverFromShipError(ctx, cycle, cs, se, recoveryDepth); recovering {
 							ctxSnap["ship_error_code"] = string(se.Code)
 							ctxSnap["ship_error_class"] = string(se.Class)
@@ -1918,6 +1935,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				recordFailureLearning(next, phaseErr, maxCorrections)
 				return result, wrapCycleLevelError(next, phaseErr)
 			}
+		}
+
+		if next == PhaseShip && resp.Verdict == VerdictPASS {
+			// Ship landed AND survived the deliverable review gate above — the
+			// worktree is merged, normal exit cleanup applies. Deliberately
+			// AFTER the review gate: a review-rejected ship abort must still
+			// preserve the worktree for triage (ADR-0039 §8 / D10).
+			preserveWorktree = false
 		}
 
 		// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger

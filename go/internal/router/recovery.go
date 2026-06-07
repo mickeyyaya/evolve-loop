@@ -28,6 +28,20 @@ type recoveryHandler struct {
 // auditBindingPrefix is the code prefix shared by every audit-binding failure.
 const auditBindingPrefix = "AUDIT_BINDING_"
 
+// shipLocalCodes are ship-LOCAL preconditions a re-audit cannot re-establish:
+// re-running audit re-verifies the same code while the blocking condition
+// (merge divergence, prefix-gate scope, detached HEAD, unresolvable worktree)
+// lives entirely on the ship side — the cycle-230 audit↔ship loop (3 PASS
+// audits, 0 ships). Ship's in-Run repair ladder (ADR-0039 §8) already
+// attempted the typed repair before this error surfaced, so the residue goes
+// to the LLM debugger phase for triage, never back to audit.
+var shipLocalCodes = map[string]bool{
+	"GIT_FF_MERGE_DIVERGED": true,
+	"COMMIT_PREFIX_GATE":    true,
+	"GIT_DETACHED_HEAD":     true,
+	"WORKTREE_RESOLVE":      true,
+}
+
 // recoveryChain is the ordered Chain of Responsibility for ship-failure
 // recovery. Order is load-bearing: integrity is checked before precondition so
 // an integrity breach that also looks like a binding precondition still blocks.
@@ -38,6 +52,18 @@ var recoveryChain = []recoveryHandler{
 		match: func(b Blocker) (string, bool) {
 			if b.Class == "integrity" {
 				return PhaseEnd, true
+			}
+			return "", false
+		},
+	},
+	{
+		// Ship-local precondition (repair ladder already declined) → debugger.
+		// Ordered AFTER integrity-block (integrity always wins) and BEFORE
+		// precondition-reaudit (these codes must never loop back to audit).
+		name: "ship-local-debugger",
+		match: func(b Blocker) (string, bool) {
+			if shipLocalCodes[b.Code] {
+				return "debugger", true
 			}
 			return "", false
 		},

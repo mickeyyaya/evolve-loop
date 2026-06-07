@@ -6,11 +6,8 @@ package ship
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -176,18 +173,7 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 	var postSHA string
 	relBin, relErr := filepath.Rel(opts.ProjectRoot, binPath)
 	if relErr == nil && !strings.HasPrefix(relBin, "..") {
-		relBin = filepath.ToSlash(relBin)
-		runner := opts.Runner
-		if runner == nil {
-			runner = execRunner
-		}
-		var buf strings.Builder
-		exitCode, gitErr := runner(context.Background(), "git", []string{"show", "HEAD:" + relBin}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
-		if gitErr == nil && exitCode == 0 {
-			h := sha256.New()
-			_, _ = h.Write([]byte(buf.String()))
-			postSHA = hex.EncodeToString(h.Sum(nil))
-		}
+		postSHA = committedBinSHA(context.Background(), opts, filepath.ToSlash(relBin))
 	}
 
 	if postSHA == "" {

@@ -30,6 +30,18 @@ func TestRecover_Branches(t *testing.T) {
 		// precondition class with a non-binding, non-egps code → re-audit.
 		{"precondition generic", &Blocker{Code: "SOME_PRECONDITION", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
+		// Ship-LOCAL preconditions: conditions a re-audit cannot re-establish
+		// (the cycle-230 audit↔ship loop). Ship's in-Run repair ladder already
+		// attempted the typed repair before this error surfaced, so the router
+		// hands the residue to the debugger phase — never back to audit.
+		{"ship-local ff-merge diverged", &Blocker{Code: "GIT_FF_MERGE_DIVERGED", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
+		{"ship-local commit prefix gate", &Blocker{Code: "COMMIT_PREFIX_GATE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
+		{"ship-local detached head", &Blocker{Code: "GIT_DETACHED_HEAD", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
+		{"ship-local worktree resolve", &Blocker{Code: "WORKTREE_RESOLVE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
+		// Push rejection already declined by ship's in-Run fetch+ff-retry and
+		// reclassified precondition (needs-reaudit) → re-audit is correct.
+		{"push rejected needs-reaudit", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
+
 		// AUDIT_BINDING_ prefix but empty class still routes via the prefix rule.
 		{"binding prefix no class", &Blocker{Code: "AUDIT_BINDING_FUTURE_CODE", Class: "", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
