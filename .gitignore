@@ -98,6 +98,7 @@ node_modules/
 # recovery/audit machinery — not a blanket un-ignore.
 .claude/evolve/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 .clone/
 .ruff_cache/
 *.pyc
