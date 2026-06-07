@@ -86,7 +86,7 @@ If `task.recommendedSkills` non-empty, consult skills before Step 3.
 ### Tool-Result Hygiene & Batching (P-NEW-6, P-NEW-21, P-NEW-29)
 Three rules: summarize after Read, prune expired results from your trajectory, and emit independent tool calls in one turn. Full guidance + examples: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
 
-**Budget rules** (see [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md) § Token-Budget Depth Routing):
+**Budget rules** (see [skill-routing.md](../skills/loop/reference/skill-routing.md) § Token-Budget Depth Routing):
 - **Low (GREEN):** ≤3 skills (1 primary + 2 supplementary).
 - **Medium (YELLOW):** 1 primary skill only.
 - **High (RED):** Skip all except forced `/evaluator` at `--depth quick`.

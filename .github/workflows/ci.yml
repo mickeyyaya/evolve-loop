@@ -74,7 +74,7 @@ jobs:
       - name: Verify required skill files exist
         run: |
           ERRORS=0
-          for skill in skills/evolve-loop/SKILL.md skills/evolve-loop/phases.md skills/evolve-loop/memory-protocol.md skills/evolve-loop/eval-runner.md; do
+          for skill in skills/loop/SKILL.md skills/loop/phases.md skills/loop/memory-protocol.md skills/loop/eval-runner.md; do
             if [ ! -f "$skill" ]; then
               echo "FAIL: $skill not found"
               ERRORS=$((ERRORS + 1))

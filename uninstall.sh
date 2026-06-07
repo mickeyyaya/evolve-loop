@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Evolve Loop Uninstaller
-# Removes agents from ~/.claude/agents/ and skill from ~/.claude/skills/evolve-loop/
+# Removes agents from ~/.claude/agents/ and skill from ~/.claude/skills/loop/
 #
 # CI validation mode (dry-run, no deletions):
 #   CI=true ./uninstall.sh
@@ -17,7 +17,7 @@ if [[ "${1:-}" == "--ci" ]]; then
 fi
 
 AGENTS_DIR="$HOME/.claude/agents"
-SKILLS_DIR="$HOME/.claude/skills/evolve-loop"
+SKILLS_DIR="$HOME/.claude/skills/loop"
 
 # In CI mode, validate structure only (no deletions)
 if [[ "$CI_MODE" == "true" ]]; then

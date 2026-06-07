@@ -65,7 +65,7 @@ rates:
 |---|---|---|---|---|
 | D1 | `intent.md` to Auditor | Full 8.2 KB emitted; Auditor only uses `acceptance_criteria` | Add `intent.md:acceptance_criteria` to `auditor.json:context_anchors` | ~7 KB / cycle, ~$0.05 |
 | D2 | Cache CREATION per phase | Every phase pays ~$0.40–$0.63 cache-creation independently (5 phases × ~95K tokens) | Architectural — see Roadmap §6 (PSMAS-style phase scheduling) | Up to $2/cycle on skipped phases |
-| D3 | `retrospective.md` persona embeds ~3 KB YAML template | Loaded every retrospective invocation; static schema | Externalize to `skills/evolve-loop/lesson-template.yaml` + on-demand Read | ~$0.05 / retrospective |
+| D3 | `retrospective.md` persona embeds ~3 KB YAML template | Loaded every retrospective invocation; static schema | Externalize to `skills/loop/lesson-template.yaml` + on-demand Read | ~$0.05 / retrospective |
 | D4 | `agent-mailbox.md` 3× reads per cycle (Scout/Builder/Auditor) | Intentional sequential signaling | **Not** a dedup target — communication protocol | n/a |
 
 ## 2026 external research applied to evolve-loop

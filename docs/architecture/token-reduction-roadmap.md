@@ -84,9 +84,9 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `agents/evolve-retrospective.md` + new `skills/evolve-loop/lesson-template.yaml` |
+| **Subsystem** | `agents/evolve-retrospective.md` + new `skills/loop/lesson-template.yaml` |
 | **Expected saving** | ~$0.05/cycle (reduce retrospective persona from 12,988B by ~2KB inline template) |
-| **LoC delta** | ~30 LoC: extract template to `skills/evolve-loop/lesson-template.yaml`; persona reads on demand |
+| **LoC delta** | ~30 LoC: extract template to `skills/loop/lesson-template.yaml`; persona reads on demand |
 | **Risk** | Low |
 | **Target cycle** | 17 |
 | **Verification** | `retrospective-usage.json` `input_tokens` before/after; assert −15% |
@@ -302,7 +302,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P2 Builder turn cap (≤20 → actual 25) | DONE | `builder.json max_turns=25`; v9.0.4; update roadmap target to ≤25 |
 | P3 Triage right-sizing | DONE (cycle 24) | Context savings delivered via EVOLVE_CONTEXT_DIGEST=1 default-on; triage gets compact intent; 123-line persona already lean |
 | P4 Auditor anchor mode | DONE | `auditor.json:context_anchors` 4 anchors configured; v8.63.0 |
-| P5 Retrospective YAML template | DONE (cycle 24) | `lesson-template.yaml` created at `.agents/skills/evolve-loop/`; `evolve-retrospective.md` trimmed −19 lines |
+| P5 Retrospective YAML template | DONE (cycle 24) | `lesson-template.yaml` created at `.agents/skills/loop/`; `evolve-retrospective.md` trimmed −19 lines |
 | P6 PSMAS phase-skip | PENDING | No implementation; benchmark updated to 34.8% (was 27.3%) |
 | P7 TOON structured outputs | PENDING | No TSV template or parser; benchmark updated to 40–65% (was 30–60%) |
 | P8 LLMLingua integration | PENDING | No integration; external dep |
@@ -360,12 +360,12 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `skills/evolve-loop/phases.md`, `SKILL.md`, `online-researcher.md`, `benchmark-eval.md` |
+| **Subsystem** | `skills/loop/phases.md`, `SKILL.md`, `online-researcher.md`, `benchmark-eval.md` |
 | **Expected saving** | $0.10–0.40/cycle: phases.md 28,911→~14KB = 16KB saved per load × 2+ loads/cycle ≈ 8,000 tokens × $3/MTok = $0.024/cycle minimum; scales 5–10× when EVOLVE_BUILDER_SELF_REVIEW becomes default-ON |
-| **LoC delta** | ~0 LoC code change; ~60 LoC moved to `skills/evolve-loop/reference/<name>-detail.md`; core bodies trimmed to <14KB each |
+| **LoC delta** | ~0 LoC code change; ~60 LoC moved to `skills/loop/reference/<name>-detail.md`; core bodies trimmed to <14KB each |
 | **Risk** | Low — read-only content reorganization; skill invocation path unchanged |
 | **Target cycle** | 24 (I1 shipped — `phases.md` split done) |
-| **Verification** | `wc -c .agents/skills/evolve-loop/phases.md` < 14000; `test -f skills/evolve-loop/reference/phases-detail.md` |
+| **Verification** | `wc -c .agents/skills/loop/phases.md` < 14000; `test -f skills/loop/reference/phases-detail.md` |
 | **Source** | SkillReducer (arXiv:2603.29919, March 2026) + addyosmani/agent-skills (GitHub, Oct 2025) |
 
 **Anti-gaming:** Moving content to reference sub-files doesn't change tool grants. Builder cannot self-mark PASS on "skill still works" — Auditor re-invokes and checks exit 0 independently.

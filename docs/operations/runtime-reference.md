@@ -164,6 +164,6 @@ evolve release X.Y.Z --skip-tests     # hot-fix (CI-pre-verified)
 
 Pipeline lifecycle: pre-flight (`evolve release-preflight`) → version bump (`evolve version-bump`) → auto-changelog (`evolve changelog-gen`, conventional commits) → consistency check (`evolve release-consistency`) → atomic ship via native `evolve ship` → marketplace propagation polling (`evolve marketplace-poll`, 5 min) → cache refresh → auto-rollback (`evolve rollback`) on post-push failure.
 
-Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/evolve-loop/SKILL.md` (heading), `README.md`, `CHANGELOG.md`. `evolve release-consistency` is the standalone consistency verifier.
+Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/loop/SKILL.md` (heading), `README.md`, `CHANGELOG.md`. `evolve release-consistency` is the standalone consistency verifier.
 
 Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/publishing-releases.md](../guides/publishing-releases.md).

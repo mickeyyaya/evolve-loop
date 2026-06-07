@@ -54,17 +54,17 @@ if [[ "$CI_MODE" == "true" ]]; then
 
   # Validate skill files
   for skill in SKILL.md phases.md memory-protocol.md eval-runner.md online-researcher.md; do
-    if [ ! -f "$SCRIPT_DIR/skills/evolve-loop/${skill}" ]; then
-      echo "FAIL: skills/evolve-loop/${skill} not found"
+    if [ ! -f "$SCRIPT_DIR/skills/loop/${skill}" ]; then
+      echo "FAIL: skills/loop/${skill} not found"
       ERRORS=$((ERRORS + 1))
     else
-      echo "OK: skills/evolve-loop/${skill}"
+      echo "OK: skills/loop/${skill}"
     fi
   done
 
   # Machine-readable summary
   AGENT_COUNT=$(ls "$SCRIPT_DIR"/agents/evolve-*.md 2>/dev/null | wc -l | tr -d ' ')
-  SKILL_COUNT=$(ls "$SCRIPT_DIR"/skills/evolve-loop/*.md 2>/dev/null | wc -l | tr -d ' ')
+  SKILL_COUNT=$(ls "$SCRIPT_DIR"/skills/loop/*.md 2>/dev/null | wc -l | tr -d ' ')
   echo "EVOLVE_LOOP_VALIDATED=true"
   echo "EVOLVE_LOOP_AGENTS=${AGENT_COUNT}"
   echo "EVOLVE_LOOP_SKILLS=${SKILL_COUNT}"
@@ -78,7 +78,7 @@ fi
 
 # Manual install mode — copy to ~/.claude/
 AGENTS_DIR="$HOME/.claude/agents"
-SKILLS_DIR="$HOME/.claude/skills/evolve-loop"
+SKILLS_DIR="$HOME/.claude/skills/loop"
 
 # Check if plugin is already installed — warn about duplication
 PLUGIN_CACHE="$HOME/.claude/plugins/cache/evolve-loop"
@@ -123,7 +123,7 @@ done
 # Copy skill files
 echo ""
 echo "Copying skill to $SKILLS_DIR/"
-for skill in "$SCRIPT_DIR"/skills/evolve-loop/*.md; do
+for skill in "$SCRIPT_DIR"/skills/loop/*.md; do
   filename=$(basename "$skill")
   if [ -f "$SKILLS_DIR/$filename" ]; then
     echo "  Overwriting: $filename"
@@ -134,7 +134,7 @@ for skill in "$SCRIPT_DIR"/skills/evolve-loop/*.md; do
 done
 
 AGENT_COUNT=$(ls "$SCRIPT_DIR"/agents/evolve-*.md | wc -l | tr -d ' ')
-SKILL_COUNT=$(ls "$SCRIPT_DIR"/skills/evolve-loop/*.md | wc -l | tr -d ' ')
+SKILL_COUNT=$(ls "$SCRIPT_DIR"/skills/loop/*.md | wc -l | tr -d ' ')
 
 echo ""
 echo "Installation complete!"

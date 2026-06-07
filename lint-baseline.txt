@@ -15,90 +15,90 @@ WARN  skills/evaluator/reference/eval-lifecycle.md: file has 144 lines but no ##
 WARN  skills/evaluator/reference/scoring-dimensions.md: missing YAML frontmatter (file does not start with ---)
 WARN  skills/evaluator/reference/scoring-dimensions.md: missing ## TLDR section
 WARN  skills/evaluator/reference/scoring-dimensions.md: file has 130 lines but no ## Table of Contents section
-WARN  skills/evolve-audit/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-build/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-intent/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-loop/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-loop/SKILL.md: file has 293 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/SKILL.md: H2 heading may not use imperative voice: '## Architecture'
-WARN  skills/evolve-loop/benchmark-eval.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/benchmark-eval.md: missing ## TLDR section
-WARN  skills/evolve-loop/benchmark-eval.md: file has 507 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/eval-runner.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/eval-runner.md: missing ## TLDR section
-WARN  skills/evolve-loop/eval-runner.md: file has 285 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/eval-runner.md: H2 heading may not use imperative voice: '## Summary'
-WARN  skills/evolve-loop/memory-protocol.md: missing ## TLDR section
-WARN  skills/evolve-loop/memory-protocol.md: file has 109 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/online-researcher.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/online-researcher.md: missing ## TLDR section
-WARN  skills/evolve-loop/online-researcher.md: file has 322 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phase0-calibrate.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase1-research.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase1-research.md: file has 124 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phase2-discover.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase2-discover.md: file has 171 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phase3-build.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/phase3-build.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase3-build.md: file has 333 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phase5-ship.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase5-ship.md: file has 181 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phase5-ship.md: H2 heading may not use imperative voice: '## Updating state.json'
-WARN  skills/evolve-loop/phase6-learn.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/phase6-learn.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase6-learn.md: file has 516 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phase7-meta.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/phase7-meta.md: missing ## TLDR section
-WARN  skills/evolve-loop/phase7-meta.md: file has 180 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/phases.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/phases.md: missing ## TLDR section
-WARN  skills/evolve-loop/phases.md: file has 285 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/claude-runtime.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/claude-runtime.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/claude-tools.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/claude-tools.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/claude-tools.md: H2 heading may not use imperative voice: '## Notes for evolve-loop'
-WARN  skills/evolve-loop/reference/codex-runtime.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/codex-runtime.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/codex-runtime.md: file has 139 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/codex-tools.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/codex-tools.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/gemini-runtime.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/gemini-runtime.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/gemini-runtime.md: file has 114 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/gemini-tools.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/gemini-tools.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/generic-runtime.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/generic-runtime.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/initialization.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/output-contracts.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/output-contracts.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/phases-detail.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/phases-detail.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/phases-detail.md: file has 263 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/phases-detail.md: H2 heading may not use imperative voice: '## Context Budget Gate'
-WARN  skills/evolve-loop/reference/platform-detect.md: missing YAML frontmatter (file does not start with ---)
-WARN  skills/evolve-loop/reference/platform-detect.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/policies.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/policies.md: file has 190 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/policies.md: H2 heading may not use imperative voice: '## Context Window Strategy'
-WARN  skills/evolve-loop/reference/policies.md: H2 heading may not use imperative voice: '## Context Management'
-WARN  skills/evolve-loop/reference/safety.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/search-integration.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/search-integration.md: file has 197 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/search-stages.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/search-stages.md: file has 301 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/skill-routing.md: missing ## TLDR section
-WARN  skills/evolve-loop/reference/skill-routing.md: file has 113 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/reference/task-selection.md: missing ## TLDR section
-WARN  skills/evolve-loop/smart-web-search.md: missing ## TLDR section
-WARN  skills/evolve-loop/smart-web-search.md: file has 117 lines but no ## Table of Contents section
-WARN  skills/evolve-loop/smart-web-search.md: H2 heading may not use imperative voice: '## Overview'
-WARN  skills/evolve-plan-review/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-retro/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-ship/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-spec/SKILL.md: missing ## TLDR section
-WARN  skills/evolve-tdd/SKILL.md: missing ## TLDR section
+WARN  skills/audit/SKILL.md: missing ## TLDR section
+WARN  skills/build/SKILL.md: missing ## TLDR section
+WARN  skills/intent/SKILL.md: missing ## TLDR section
+WARN  skills/loop/SKILL.md: missing ## TLDR section
+WARN  skills/loop/SKILL.md: file has 293 lines but no ## Table of Contents section
+WARN  skills/loop/SKILL.md: H2 heading may not use imperative voice: '## Architecture'
+WARN  skills/loop/benchmark-eval.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/benchmark-eval.md: missing ## TLDR section
+WARN  skills/loop/benchmark-eval.md: file has 507 lines but no ## Table of Contents section
+WARN  skills/loop/eval-runner.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/eval-runner.md: missing ## TLDR section
+WARN  skills/loop/eval-runner.md: file has 285 lines but no ## Table of Contents section
+WARN  skills/loop/eval-runner.md: H2 heading may not use imperative voice: '## Summary'
+WARN  skills/loop/memory-protocol.md: missing ## TLDR section
+WARN  skills/loop/memory-protocol.md: file has 109 lines but no ## Table of Contents section
+WARN  skills/loop/online-researcher.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/online-researcher.md: missing ## TLDR section
+WARN  skills/loop/online-researcher.md: file has 322 lines but no ## Table of Contents section
+WARN  skills/loop/phase0-calibrate.md: missing ## TLDR section
+WARN  skills/loop/phase1-research.md: missing ## TLDR section
+WARN  skills/loop/phase1-research.md: file has 124 lines but no ## Table of Contents section
+WARN  skills/loop/phase2-discover.md: missing ## TLDR section
+WARN  skills/loop/phase2-discover.md: file has 171 lines but no ## Table of Contents section
+WARN  skills/loop/phase3-build.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/phase3-build.md: missing ## TLDR section
+WARN  skills/loop/phase3-build.md: file has 333 lines but no ## Table of Contents section
+WARN  skills/loop/phase5-ship.md: missing ## TLDR section
+WARN  skills/loop/phase5-ship.md: file has 181 lines but no ## Table of Contents section
+WARN  skills/loop/phase5-ship.md: H2 heading may not use imperative voice: '## Updating state.json'
+WARN  skills/loop/phase6-learn.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/phase6-learn.md: missing ## TLDR section
+WARN  skills/loop/phase6-learn.md: file has 516 lines but no ## Table of Contents section
+WARN  skills/loop/phase7-meta.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/phase7-meta.md: missing ## TLDR section
+WARN  skills/loop/phase7-meta.md: file has 180 lines but no ## Table of Contents section
+WARN  skills/loop/phases.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/phases.md: missing ## TLDR section
+WARN  skills/loop/phases.md: file has 285 lines but no ## Table of Contents section
+WARN  skills/loop/reference/claude-runtime.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/claude-runtime.md: missing ## TLDR section
+WARN  skills/loop/reference/claude-tools.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/claude-tools.md: missing ## TLDR section
+WARN  skills/loop/reference/claude-tools.md: H2 heading may not use imperative voice: '## Notes for evolve-loop'
+WARN  skills/loop/reference/codex-runtime.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/codex-runtime.md: missing ## TLDR section
+WARN  skills/loop/reference/codex-runtime.md: file has 139 lines but no ## Table of Contents section
+WARN  skills/loop/reference/codex-tools.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/codex-tools.md: missing ## TLDR section
+WARN  skills/loop/reference/gemini-runtime.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/gemini-runtime.md: missing ## TLDR section
+WARN  skills/loop/reference/gemini-runtime.md: file has 114 lines but no ## Table of Contents section
+WARN  skills/loop/reference/gemini-tools.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/gemini-tools.md: missing ## TLDR section
+WARN  skills/loop/reference/generic-runtime.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/generic-runtime.md: missing ## TLDR section
+WARN  skills/loop/reference/initialization.md: missing ## TLDR section
+WARN  skills/loop/reference/output-contracts.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/output-contracts.md: missing ## TLDR section
+WARN  skills/loop/reference/phases-detail.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/phases-detail.md: missing ## TLDR section
+WARN  skills/loop/reference/phases-detail.md: file has 263 lines but no ## Table of Contents section
+WARN  skills/loop/reference/phases-detail.md: H2 heading may not use imperative voice: '## Context Budget Gate'
+WARN  skills/loop/reference/platform-detect.md: missing YAML frontmatter (file does not start with ---)
+WARN  skills/loop/reference/platform-detect.md: missing ## TLDR section
+WARN  skills/loop/reference/policies.md: missing ## TLDR section
+WARN  skills/loop/reference/policies.md: file has 190 lines but no ## Table of Contents section
+WARN  skills/loop/reference/policies.md: H2 heading may not use imperative voice: '## Context Window Strategy'
+WARN  skills/loop/reference/policies.md: H2 heading may not use imperative voice: '## Context Management'
+WARN  skills/loop/reference/safety.md: missing ## TLDR section
+WARN  skills/loop/reference/search-integration.md: missing ## TLDR section
+WARN  skills/loop/reference/search-integration.md: file has 197 lines but no ## Table of Contents section
+WARN  skills/loop/reference/search-stages.md: missing ## TLDR section
+WARN  skills/loop/reference/search-stages.md: file has 301 lines but no ## Table of Contents section
+WARN  skills/loop/reference/skill-routing.md: missing ## TLDR section
+WARN  skills/loop/reference/skill-routing.md: file has 113 lines but no ## Table of Contents section
+WARN  skills/loop/reference/task-selection.md: missing ## TLDR section
+WARN  skills/loop/smart-web-search.md: missing ## TLDR section
+WARN  skills/loop/smart-web-search.md: file has 117 lines but no ## Table of Contents section
+WARN  skills/loop/smart-web-search.md: H2 heading may not use imperative voice: '## Overview'
+WARN  skills/plan-review/SKILL.md: missing ## TLDR section
+WARN  skills/retro/SKILL.md: missing ## TLDR section
+WARN  skills/ship/SKILL.md: missing ## TLDR section
+WARN  skills/scout/SKILL.md: missing ## TLDR section
+WARN  skills/tdd/SKILL.md: missing ## TLDR section
 WARN  skills/inspirer/SKILL.md: missing ## TLDR section
 WARN  skills/inspirer/SKILL.md: file has 345 lines but no ## Table of Contents section
 WARN  skills/inspirer/SKILL.md: H2 heading may not use imperative voice: '## Architecture'

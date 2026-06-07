@@ -224,7 +224,7 @@ This is the Karpathy Rule constraint: incremental mode must never suppress premi
 
 - `.evolve/research/intent-capture-patterns.md` — research grounding for this design
 - `.evolve/profiles/intent.json` — permission profile
-- `skills/evolve-intent/SKILL.md` — workflow steps + exit criteria
+- `skills/intent/SKILL.md` — workflow steps + exit criteria
 - `legacy/scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
 - `arxiv 2409.00557` — Ask-when-Needed framework
 - `agents/evolve-orchestrator.md` — Phase Loop integration point

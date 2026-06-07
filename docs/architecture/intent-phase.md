@@ -104,7 +104,7 @@ Without `EVOLVE_REQUIRE_INTENT=1` at init, `cycle-state.intent_required` is `fal
 ## References
 
 - `agents/evolve-intent.md` — persona
-- `skills/evolve-intent/SKILL.md` — workflow
+- `skills/intent/SKILL.md` — workflow
 - `.claude-plugin/commands/intent.md` — slash command
 - `.evolve/profiles/intent.json` — permission profile
 - `legacy/scripts/lifecycle/phase-gate.sh` — `gate_calibrate_to_intent`, `gate_intent_to_research`

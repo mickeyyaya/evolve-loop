@@ -15,7 +15,7 @@
 | File | Change |
 |------|--------|
 | `agents/evolve-*.md` | ... |
-| `skills/evolve-loop/*.md` | ... |
+| `skills/loop/*.md` | ... |
 
 ## Test Plan
 

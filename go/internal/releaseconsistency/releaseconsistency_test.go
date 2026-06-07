@@ -19,7 +19,7 @@ func makeRepo(t *testing.T, version string) string {
 	return fixtures.NewWorkspace(t).WithFiles(map[string]string{
 		".claude-plugin/plugin.json":      fmt.Sprintf(`{"name":"evolve-loop","version":"%s"}`, version),
 		".claude-plugin/marketplace.json": fmt.Sprintf(`{"plugins":[{"name":"evolve-loop","version":"%s"}]}`, version),
-		"skills/evolve-loop/SKILL.md":     fmt.Sprintf("---\nname: x\n---\n\n# Evolve Loop v%s\n\nbody\n", mm),
+		"skills/loop/SKILL.md":            fmt.Sprintf("---\nname: x\n---\n\n# Evolve Loop v%s\n\nbody\n", mm),
 		"README.md":                       fmt.Sprintf("# Evolve Loop\n\n**Current (v%s)** description\n\n| v%s | 2026 |\n", mm, mm),
 		"CHANGELOG.md":                    fmt.Sprintf("# Changelog\n\n## [%s] - 2026-05-24\n\nEntries.\n", version),
 	}).Build().Root
@@ -79,7 +79,7 @@ func TestCheck_NoChangelogEntry(t *testing.T) {
 // === SKILL.md heading at wrong version → MISMATCH ==========================
 func TestCheck_SkillHeadingMismatch(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	fixtures.MustWrite(t, filepath.Join(d, "skills/evolve-loop/SKILL.md"), "# Evolve Loop v10.0\n\nstale\n")
+	fixtures.MustWrite(t, filepath.Join(d, "skills/loop/SKILL.md"), "# Evolve Loop v10.0\n\nstale\n")
 	_, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
@@ -191,15 +191,15 @@ func TestCheck_MarkerNoVersionField(t *testing.T) {
 // Drives checkSkillHeading's os.ReadFile-err → MISSING branch.
 func TestCheck_SkillFileMissing(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	if err := os.Remove(filepath.Join(d, "skills/evolve-loop/SKILL.md")); err != nil {
+	if err := os.Remove(filepath.Join(d, "skills/loop/SKILL.md")); err != nil {
 		t.Fatalf("rm: %v", err)
 	}
 	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
 	}
-	if statusOf(res, "skills/evolve-loop/SKILL.md") != "MISSING" {
-		t.Errorf("SKILL.md status = %q, want MISSING", statusOf(res, "skills/evolve-loop/SKILL.md"))
+	if statusOf(res, "skills/loop/SKILL.md") != "MISSING" {
+		t.Errorf("SKILL.md status = %q, want MISSING", statusOf(res, "skills/loop/SKILL.md"))
 	}
 }
 
@@ -207,13 +207,13 @@ func TestCheck_SkillFileMissing(t *testing.T) {
 // Drives checkSkillHeading's loop-exhausted → NO_MATCH branch.
 func TestCheck_SkillHeadingAbsent(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
-	fixtures.MustWrite(t, filepath.Join(d, "skills/evolve-loop/SKILL.md"), "---\nname: x\n---\n\n# Some Other Title\n\nbody\n")
+	fixtures.MustWrite(t, filepath.Join(d, "skills/loop/SKILL.md"), "---\nname: x\n---\n\n# Some Other Title\n\nbody\n")
 	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2"})
 	if !errors.Is(err, ErrInconsistent) {
 		t.Fatalf("err = %v, want ErrInconsistent", err)
 	}
-	if statusOf(res, "skills/evolve-loop/SKILL.md") != "NO_MATCH" {
-		t.Errorf("SKILL.md status = %q, want NO_MATCH", statusOf(res, "skills/evolve-loop/SKILL.md"))
+	if statusOf(res, "skills/loop/SKILL.md") != "NO_MATCH" {
+		t.Errorf("SKILL.md status = %q, want NO_MATCH", statusOf(res, "skills/loop/SKILL.md"))
 	}
 }
 

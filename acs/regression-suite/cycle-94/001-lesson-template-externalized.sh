@@ -2,9 +2,9 @@
 # AC-ID: cycle-94-001-lesson-template-externalized
 # AC-source: cycle-94/intent.md acceptance_check #3 + #4
 # Behavioral predicate: P5 — retrospective YAML template lives at
-#   skills/evolve-loop/lesson-template.yaml and NOT inline in
+#   skills/loop/lesson-template.yaml and NOT inline in
 #   agents/evolve-retrospective.md. The retrospective profile must
-#   reference Read(skills/evolve-loop/lesson-template.yaml) explicitly.
+#   reference Read(skills/loop/lesson-template.yaml) explicitly.
 #
 # Rationale: cycle-94 P5 externalizes the retrospective lesson schema
 # so the persona prompt sheds N tokens per retrospective invocation.
@@ -26,7 +26,7 @@ if [ -z "$REPO_ROOT" ]; then
 fi
 cd "$REPO_ROOT" || { echo "RED: cd failed" >&2; exit 1; }
 
-TEMPLATE="skills/evolve-loop/lesson-template.yaml"
+TEMPLATE="skills/loop/lesson-template.yaml"
 PERSONA="agents/evolve-retrospective.md"
 PROFILE=".evolve/profiles/retrospective.json"
 
@@ -37,8 +37,8 @@ if [ ! -s "$TEMPLATE" ]; then
 fi
 
 # Check 2: persona references the externalized template by relative path
-if ! grep -Fq 'skills/evolve-loop/lesson-template.yaml' "$PERSONA"; then
-  echo "RED: $PERSONA does not reference skills/evolve-loop/lesson-template.yaml" >&2
+if ! grep -Fq 'skills/loop/lesson-template.yaml' "$PERSONA"; then
+  echo "RED: $PERSONA does not reference skills/loop/lesson-template.yaml" >&2
   exit 1
 fi
 
@@ -53,14 +53,14 @@ fi
 # Check 4: profile allowed_tools contains explicit Read(<template>) entry.
 # Use jq for structured query — falls back to grep if jq unavailable.
 if command -v jq >/dev/null 2>&1; then
-  if ! jq -e '.allowed_tools | index("Read(skills/evolve-loop/lesson-template.yaml)")' \
+  if ! jq -e '.allowed_tools | index("Read(skills/loop/lesson-template.yaml)")' \
        "$PROFILE" >/dev/null 2>&1; then
-    echo "RED: $PROFILE allowed_tools missing Read(skills/evolve-loop/lesson-template.yaml)" >&2
+    echo "RED: $PROFILE allowed_tools missing Read(skills/loop/lesson-template.yaml)" >&2
     exit 1
   fi
 else
-  if ! grep -Fq '"Read(skills/evolve-loop/lesson-template.yaml)"' "$PROFILE"; then
-    echo "RED: $PROFILE allowed_tools missing Read(skills/evolve-loop/lesson-template.yaml)" >&2
+  if ! grep -Fq '"Read(skills/loop/lesson-template.yaml)"' "$PROFILE"; then
+    echo "RED: $PROFILE allowed_tools missing Read(skills/loop/lesson-template.yaml)" >&2
     exit 1
   fi
 fi

@@ -20,14 +20,14 @@ Current agents: Scout, Builder, Auditor, Operator.
 
 ### 2. Phases
 
-Phase instructions live in `skills/evolve-loop/phases.md`. When modifying:
+Phase instructions live in `skills/loop/phases.md`. When modifying:
 - Update the architecture diagram in `SKILL.md`
 - Update `memory-protocol.md` if adding new workspace files
 - Update the agent table in `SKILL.md`
 
 ### 3. Eval System
 
-Eval definitions and the eval runner live in `skills/evolve-loop/eval-runner.md`.
+Eval definitions and the eval runner live in `skills/loop/eval-runner.md`.
 - Eval definitions are created by the Scout agent at runtime
 - The eval runner is orchestrator-executed (not a separate agent)
 - Max 3 retry attempts before failure

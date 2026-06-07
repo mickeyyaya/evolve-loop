@@ -15,7 +15,7 @@ import (
 )
 
 // Lesson is the typed view of one entry in a .evolve/instincts/lessons/*.yaml
-// file (schema: skills/evolve-loop/lesson-template.yaml). The flattened
+// file (schema: skills/loop/lesson-template.yaml). The flattened
 // failureContext fields are the ones relevant to taxonomy-shaped lookup.
 type Lesson struct {
 	ID               string

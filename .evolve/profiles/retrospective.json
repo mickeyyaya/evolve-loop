@@ -9,7 +9,7 @@
   },
   "allowed_tools": [
     "Read",
-    "Read(skills/evolve-loop/lesson-template.yaml)",
+    "Read(skills/loop/lesson-template.yaml)",
     "Grep",
     "Glob",
     "Bash(git status:*)",

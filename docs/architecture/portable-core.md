@@ -143,7 +143,7 @@ Layers that compose on top of the core but are not load-bearing for the basic Sc
 
 | Extension | Files | When to add |
 |---|---|---|
-| Plan review | `agents/evolve-plan-reviewer.md`, `.evolve/profiles/plan-reviewer.json` | When Scout misallocates effort and a CEO/Eng/Design/Security cross-check would catch it earlier |
+| Plan review | `agents/plan-reviewer.md`, `.evolve/profiles/plan-reviewer.json` | When Scout misallocates effort and a CEO/Eng/Design/Security cross-check would catch it earlier |
 | TDD-first | `agents/evolve-tdd-engineer.md`, `.evolve/profiles/tdd-engineer.json` | When the project's test discipline benefits from RED-phase test-first (failing tests encode acceptance) |
 | EGPS Tester | `agents/evolve-tester.md`, `.evolve/profiles/tester.json` | When you need an independent predicate-author separate from Builder (anti-gaming) |
 | Inspirer | `agents/evolve-inspirer.md`, `.evolve/profiles/inspirer.json` | When you want a "diff-aware reflection" persona between Scout and Builder |

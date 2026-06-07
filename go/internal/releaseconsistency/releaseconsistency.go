@@ -5,7 +5,7 @@
 //
 //	.claude-plugin/plugin.json        json "version" field
 //	.claude-plugin/marketplace.json   json "version" field
-//	skills/evolve-loop/SKILL.md       `# Evolve Loop vX.Y` heading
+//	skills/loop/SKILL.md       `# Evolve Loop vX.Y` heading
 //	README.md                          `Current (vX.Y)` cell
 //	CHANGELOG.md                       contains `[<target>]` entry
 //	README.md history                  contains `v<major.minor>` row
@@ -135,7 +135,7 @@ func Run(opts Options) (Result, error) {
 			func() Check {
 				return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/marketplace.json", "marketplace.json version", target)
 			}},
-		{"skills/evolve-loop/SKILL.md", "SKILL.md heading (major.minor)",
+		{"skills/loop/SKILL.md", "SKILL.md heading (major.minor)",
 			func() Check { return checkSkillHeading(opts.ProjectRoot, res.MajorMinor) }},
 		{"README.md", "README.md current version table",
 			func() Check { return checkReadmeCurrent(opts.ProjectRoot, res.MajorMinor) }},
@@ -205,7 +205,7 @@ func checkJSONVersion(repoRoot, relPath, desc, target string) Check {
 }
 
 func checkSkillHeading(repoRoot, majorMinor string) Check {
-	relPath := "skills/evolve-loop/SKILL.md"
+	relPath := "skills/loop/SKILL.md"
 	c := Check{File: relPath, Description: "SKILL.md heading (major.minor)", Expected: majorMinor}
 	full := filepath.Join(repoRoot, relPath)
 	body, err := os.ReadFile(full)

@@ -128,7 +128,7 @@ To add a 4th CLI (e.g., `copilot`):
 3. Add `copilot` to the adapter enum in `_capabilities-schema.json:properties.adapter.enum`.
 4. Add tests at `legacy/scripts/tests/copilot-adapter-test.sh` mirroring `codex-adapter-test.sh`.
 5. Register the test in `legacy/scripts/utility/run-all-regression-tests.sh:SUITES`.
-6. Document at `skills/evolve-loop/reference/copilot-runtime.md` and `copilot-tools.md`.
+6. Document at `skills/loop/reference/copilot-runtime.md` and `copilot-tools.md`.
 7. Run `./bin/preflight` to validate end-to-end.
 
 The pipeline does NOT need to change. The capability framework absorbs the new adapter at dispatch time.
@@ -148,4 +148,4 @@ The `quality_tier` field added to ledger entries in v8.51.0 is **backward-compat
 
 - [docs/architecture/platform-compatibility.md](platform-compatibility.md) — capability matrix per CLI + install guidance
 - [docs/incidents/gemini-forgery.md](../incidents/gemini-forgery.md) — why structural defenses are pipeline-level (so degraded mode is safe)
-- [skills/evolve-loop/reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [codex-runtime.md](../../skills/evolve-loop/reference/codex-runtime.md) — per-CLI invocation patterns
+- [skills/loop/reference/claude-runtime.md](../../skills/loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/loop/reference/gemini-runtime.md), [codex-runtime.md](../../skills/loop/reference/codex-runtime.md) — per-CLI invocation patterns

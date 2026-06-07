@@ -49,7 +49,7 @@ func fixtureFS() fstest.MapFS {
 	return fstest.MapFS{
 		"agents/evolve-scout.md":       &fstest.MapFile{Data: []byte(sampleAgent)},
 		"agents/evolve-builder.md":     &fstest.MapFile{Data: []byte("---\nname: evolve-builder\ndescription: builder\n---\nBody.")},
-		"skills/evolve-loop/SKILL.md":  &fstest.MapFile{Data: []byte(sampleSkill)},
+		"skills/loop/SKILL.md":         &fstest.MapFile{Data: []byte(sampleSkill)},
 		"skills/santa-loop/SKILL.md":   &fstest.MapFile{Data: []byte("---\nname: santa-loop\ndescription: santa\n---\nBody.")},
 		"skills/empty/notSkillFile.md": &fstest.MapFile{Data: []byte("ignored")}, // must not appear in Skills()
 	}
@@ -94,12 +94,12 @@ func TestNewFromFS_Agent_HappyPath(t *testing.T) {
 // resolution (NOT skills/<name>.md). Mirrors the repo convention.
 func TestNewFromFS_Skill_PathConvention(t *testing.T) {
 	l := NewFromFS(fixtureFS())
-	p, err := l.Skill("evolve-loop")
+	p, err := l.Skill("loop")
 	if err != nil {
 		t.Fatalf("Skill: %v", err)
 	}
-	if p.Name != "evolve-loop" {
-		t.Errorf("Name=%q, want evolve-loop", p.Name)
+	if p.Name != "loop" {
+		t.Errorf("Name=%q, want loop", p.Name)
 	}
 	if !contains(p.Body, "# Evolve Loop") {
 		t.Errorf("Body missing skill heading: %q", p.Body[:min(60, len(p.Body))])
@@ -143,7 +143,7 @@ func TestSkills_OnlySKILL_Md(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Skills: %v", err)
 	}
-	want := []string{"evolve-loop", "santa-loop"}
+	want := []string{"loop", "santa-loop"}
 	if !reflect.DeepEqual(names, want) {
 		t.Errorf("Skills()=%v, want %v (sorted, no skills/empty)", names, want)
 	}

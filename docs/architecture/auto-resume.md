@@ -104,7 +104,7 @@ QUOTA-PAUSE: cycle=N wake-at=2026-05-15T05:20:00+0800 source=parsed attempts=0/3
 `DISPATCH_RC=5` is the v10.6.0 addition to the dispatcher exit-code table
 (0/1/2/3/4 were in use; 5 was free).
 
-`.agents/skills/evolve-loop/SKILL.md` carries a "Quota Handling &
+`.agents/skills/loop/SKILL.md` carries a "Quota Handling &
 Auto-Resume" section that instructs the model: when `DISPATCH_RC=5` appears
 in dispatcher output, parse the `wake-at=ISO8601` value, compute a clamped
 `delaySeconds`, call `ScheduleWakeup` with `prompt="/evolve-loop --resume"`,
@@ -240,6 +240,6 @@ EVOLVE_QUOTA_RESET_HOURS=0.05 /evolve-loop --budget-usd 5 "smoke test"
 - `legacy/scripts/cli_adapters/claude.sh:628+` — Layer 1 stderr scraper
 - `legacy/scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint` — Layer 2 schema
 - `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — Layer 3 DISPATCH_RC=5 path
-- `.agents/skills/evolve-loop/SKILL.md` — Layer 3 SKILL handler
+- `.agents/skills/loop/SKILL.md` — Layer 3 SKILL handler
 - `docs/architecture/checkpoint-resume.md` — v9.1.0 baseline this builds on
 - `knowledge-base/research/auto-resume-design.md` — research dossier

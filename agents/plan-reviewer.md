@@ -59,7 +59,7 @@ Do NOT invoke from another persona. Plan-reviewer is itself the orchestration la
 
 ## Reference
 
-- `skills/evolve-plan-review/SKILL.md` — workflow detail
+- `skills/plan-review/SKILL.md` — workflow detail
 - `.evolve/profiles/plan-reviewer.json` — lens prompt templates
 - `docs/architecture/tri-layer.md` — composition rules
 

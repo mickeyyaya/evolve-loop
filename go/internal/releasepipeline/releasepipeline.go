@@ -517,7 +517,7 @@ func defaultVersionBump(repoRoot, target string, dryRun bool) error {
 
 // defaultRebuildBinary runs `go build -o go/evolve ./cmd/evolve` from
 // <repoRoot>/go. The output path go/evolve is the marketplace-tracked
-// binary location (matches the find-expression in skills/evolve-loop/SKILL.md).
+// binary location (matches the find-expression in skills/loop/SKILL.md).
 // Returns nil for dryRun (the orchestration layer also skips, but defense
 // in depth in case it's called directly). Test seam: callers in tests
 // can pass a fake function via Steps.RebuildBinary.

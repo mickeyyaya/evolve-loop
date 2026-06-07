@@ -97,8 +97,8 @@
         ".claude-plugin/**",
         "CHANGELOG.md",
         "README.md",
-        "skills/evolve-loop/SKILL.md",
-        ".agents/skills/evolve-loop/SKILL.md"
+        "skills/loop/SKILL.md",
+        ".agents/skills/loop/SKILL.md"
       ],
       "description": "Version-bump release (per scripts/release-pipeline.sh)"
     },

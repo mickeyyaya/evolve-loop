@@ -76,9 +76,9 @@ This file covers the universal contract. CLI-specific runtime details live in co
 
 - **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. Driven by the native gemini bridge driver (`go/internal/bridge/driver_gemini*.go`): NATIVE when `gemini` is on PATH, HYBRID (delegates to the `claude` binary) otherwise.
 
-- **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. Driven by the native agy bridge driver (`go/internal/bridge/driver_agy*.go`): NATIVE mode (`agy -p`) when the agy binary is on PATH; HYBRID when claude on PATH; DEGRADED otherwise. The cross-name resolver maps `antigravity → agy`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/evolve-loop/reference/agy-runtime.md). Capability tier: `evolve bridge probe`.
+- **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. Driven by the native agy bridge driver (`go/internal/bridge/driver_agy*.go`): NATIVE mode (`agy -p`) when the agy binary is on PATH; HYBRID when claude on PATH; DEGRADED otherwise. The cross-name resolver maps `antigravity → agy`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/loop/reference/agy-runtime.md). Capability tier: `evolve bridge probe`.
 
-- **Generic / unsupported CLI**: see [skills/evolve-loop/reference/generic-runtime.md](skills/evolve-loop/reference/generic-runtime.md). Tool name translation tables at `skills/evolve-loop/reference/<platform>-tools.md`.
+- **Generic / unsupported CLI**: see [skills/loop/reference/generic-runtime.md](skills/loop/reference/generic-runtime.md). Tool name translation tables at `skills/loop/reference/<platform>-tools.md`.
 
 ## Discovery contract for AI agents reading this file
 

@@ -88,7 +88,7 @@ else
 fi
 
 # ── AC7: output-contracts.md reference exists with phase × schema matrix
-REF="$REPO_ROOT/.agents/skills/evolve-loop/reference/output-contracts.md"
+REF="$REPO_ROOT/.agents/skills/loop/reference/output-contracts.md"
 if [ ! -f "$REF" ]; then
     echo "RED AC7: $REF missing"
     rc=1

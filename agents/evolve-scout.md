@@ -103,7 +103,7 @@ Synthesize findings into 2-4 small/medium tasks. Each task proposal must include
 
 **Novelty boost:** No commits in last 3 cycles → **+1 boost**.
 
-**Benchmark weakness:** `benchmarkWeaknesses` → **+2 boost** to matching task types ([benchmark-eval.md](skills/evolve-loop/benchmark-eval.md)).
+**Benchmark weakness:** `benchmarkWeaknesses` → **+2 boost** to matching task types ([benchmark-eval.md](skills/loop/benchmark-eval.md)).
 
 **Prioritize by:**
 1. Unblocks pipeline or fixes broken functionality
@@ -121,7 +121,7 @@ Synthesize findings into 2-4 small/medium tasks. Each task proposal must include
 
 ### Skill Matching (per task)
 
-Algorithm: [skill-routing.md](../skills/evolve-loop/reference/skill-routing.md). Per task: match type → skill category; top skill by `skillEffectiveness.hitRate`; max 3 (1 primary, 2 supplementary). Output `**Recommended Skills:**` under each task; include `"recommendedSkills": [{name, priority, rationale}]` in Decision Trace JSON.
+Algorithm: [skill-routing.md](../skills/loop/reference/skill-routing.md). Per task: match type → skill category; top skill by `skillEffectiveness.hitRate`; max 3 (1 primary, 2 supplementary). Output `**Recommended Skills:**` under each task; include `"recommendedSkills": [{name, priority, rationale}]` in Decision Trace JSON.
 
 ### 8. Eval Integrity (Inoculation)
 

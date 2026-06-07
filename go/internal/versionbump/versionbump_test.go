@@ -54,7 +54,7 @@ func TestDefaultPaths(t *testing.T) {
 	if p.MarketplaceJSON != "/repo/.claude-plugin/marketplace.json" {
 		t.Errorf("MarketplaceJSON=%q", p.MarketplaceJSON)
 	}
-	if p.SkillMD != "/repo/skills/evolve-loop/SKILL.md" {
+	if p.SkillMD != "/repo/skills/loop/SKILL.md" {
 		t.Errorf("SkillMD=%q", p.SkillMD)
 	}
 	if p.ReadmeMD != "/repo/README.md" {

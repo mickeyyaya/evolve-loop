@@ -157,7 +157,7 @@ Loaded for Step 2.5.
 
 **Fallback (research_pointer absent or feature disabled):**
 - Check `.evolve/research/` for existing Knowledge Capsules → `Research Source: knowledge-capsule`
-- If needs external knowledge, follow Accurate Online Researcher Protocol (`skills/evolve-loop/online-researcher.md`) → `Research Source: web-search`
+- If needs external knowledge, follow Accurate Online Researcher Protocol (`skills/loop/online-researcher.md`) → `Research Source: web-search`
 - Save capsule to `.evolve/research/<topic-slug>.md`
 - If no research needed → `Research Source: no-research-needed`
 

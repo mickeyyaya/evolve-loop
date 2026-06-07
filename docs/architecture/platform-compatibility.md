@@ -107,7 +107,7 @@ EVOLVE_AGY_REQUIRE_FULL=1 bash legacy/scripts/cli_adapters/agy.sh
 # or pass --require-full
 ```
 
-Note: in NATIVE mode, cost is reported as `cost_blind:true` (zero attribution). A rollout cycle must add a billing tap or turn-cap before cost tracking is accurate. See [reference/agy-runtime.md](../../skills/evolve-loop/reference/agy-runtime.md).
+Note: in NATIVE mode, cost is reported as `cost_blind:true` (zero attribution). A rollout cycle must add a billing tap or turn-cap before cost tracking is accurate. See [reference/agy-runtime.md](../../skills/loop/reference/agy-runtime.md).
 
 ### Other CLIs (`none` — skill content only)
 
@@ -166,7 +166,7 @@ Operators who require strict hybrid for production (budget caps, subprocess isol
 ## See also
 
 - [capability-schema.md](capability-schema.md) — adapter capability manifest schema + authoring guide for new CLIs
-- [reference/platform-detect.md](../../skills/evolve-loop/reference/platform-detect.md) — env-var probe table consulted at skill activation
-- [reference/claude-tools.md](../../skills/evolve-loop/reference/claude-tools.md), [gemini-tools.md](../../skills/evolve-loop/reference/gemini-tools.md), [codex-tools.md](../../skills/evolve-loop/reference/codex-tools.md), [agy-tools.md](../../skills/evolve-loop/reference/agy-tools.md) — per-platform tool name maps
-- [reference/claude-runtime.md](../../skills/evolve-loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/evolve-loop/reference/gemini-runtime.md), [agy-runtime.md](../../skills/evolve-loop/reference/agy-runtime.md), [generic-runtime.md](../../skills/evolve-loop/reference/generic-runtime.md) — per-platform invocation patterns
+- [reference/platform-detect.md](../../skills/loop/reference/platform-detect.md) — env-var probe table consulted at skill activation
+- [reference/claude-tools.md](../../skills/loop/reference/claude-tools.md), [gemini-tools.md](../../skills/loop/reference/gemini-tools.md), [codex-tools.md](../../skills/loop/reference/codex-tools.md), [agy-tools.md](../../skills/loop/reference/agy-tools.md) — per-platform tool name maps
+- [reference/claude-runtime.md](../../skills/loop/reference/claude-runtime.md), [gemini-runtime.md](../../skills/loop/reference/gemini-runtime.md), [agy-runtime.md](../../skills/loop/reference/agy-runtime.md), [generic-runtime.md](../../skills/loop/reference/generic-runtime.md) — per-platform invocation patterns
 - [docs/incidents/gemini-forgery.md](../incidents/gemini-forgery.md) — why structural defenses are pipeline-level, not adapter-level

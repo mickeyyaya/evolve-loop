@@ -114,7 +114,7 @@ All 4 cards kept. Ranked: insp-002 (0.73), insp-001 (0.67), insp-003 (0.67), ins
     {
       "id": "insp-001",
       "title": "Stigmergic coordination via shared artifacts",
-      "targetFiles": ["agents/agent-templates.md", "skills/evolve-loop/memory-protocol.md"],
+      "targetFiles": ["agents/agent-templates.md", "skills/loop/memory-protocol.md"],
       "complexity": "M",
       "feasibility": 0.7,
       "impact": 0.7,
@@ -127,7 +127,7 @@ All 4 cards kept. Ranked: insp-002 (0.73), insp-001 (0.67), insp-003 (0.67), ins
     {
       "id": "insp-002",
       "title": "Adopt CrewAI hierarchical delegation",
-      "targetFiles": ["skills/evolve-loop/phases.md"],
+      "targetFiles": ["skills/loop/phases.md"],
       "complexity": "S",
       "feasibility": 0.8,
       "impact": 0.6,

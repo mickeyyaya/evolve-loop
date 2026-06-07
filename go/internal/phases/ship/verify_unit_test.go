@@ -133,10 +133,10 @@ func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
 	r.runner() // init map
-	r.scripts["git ls-files"] = scriptResult(t, "skills/evolve-loop/SKILL.md\n", 0)
+	r.scripts["git ls-files"] = scriptResult(t, "skills/loop/SKILL.md\n", 0)
 	opts := &Options{ProjectRoot: root, Runner: r.runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
-	wantShipErr(t, err, core.CodeTrivialCriticalPaths, core.ShipClassConfig, "skills/evolve-loop/SKILL.md")
+	wantShipErr(t, err, core.CodeTrivialCriticalPaths, core.ShipClassConfig, "skills/loop/SKILL.md")
 }
 
 // TestVerifyTrivial_AcceptsCleanTrivialCycle: trivial estimate + no

@@ -33,7 +33,7 @@ Repository documentation uses Claude Code tool names. Gemini equivalents:
 | Glob | SearchFiles |
 | Skill | activate_skill |
 
-Full table: [skills/evolve-loop/reference/gemini-tools.md](skills/evolve-loop/reference/gemini-tools.md).
+Full table: [skills/loop/reference/gemini-tools.md](skills/loop/reference/gemini-tools.md).
 
 ## Invariants (apply to Gemini context too)
 

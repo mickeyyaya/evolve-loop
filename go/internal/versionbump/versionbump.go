@@ -3,7 +3,7 @@
 // Atomic version updater across the canonical version markers:
 //   - .claude-plugin/plugin.json         (always)
 //   - .claude-plugin/marketplace.json    (always; updates every plugins[].version)
-//   - skills/evolve-loop/SKILL.md        (only major.minor)
+//   - skills/loop/SKILL.md        (only major.minor)
 //   - README.md "Current (vX.Y)" cell    (only major.minor)
 //   - README.md history table            (only major.minor; adds new row)
 //
@@ -38,7 +38,7 @@ type Result struct {
 type Paths struct {
 	PluginJSON      string // <repo>/.claude-plugin/plugin.json
 	MarketplaceJSON string // <repo>/.claude-plugin/marketplace.json
-	SkillMD         string // <repo>/skills/evolve-loop/SKILL.md
+	SkillMD         string // <repo>/skills/loop/SKILL.md
 	ReadmeMD        string // <repo>/README.md
 }
 
@@ -47,7 +47,7 @@ func DefaultPaths(repoRoot string) Paths {
 	return Paths{
 		PluginJSON:      filepath.Join(repoRoot, ".claude-plugin", "plugin.json"),
 		MarketplaceJSON: filepath.Join(repoRoot, ".claude-plugin", "marketplace.json"),
-		SkillMD:         filepath.Join(repoRoot, "skills", "evolve-loop", "SKILL.md"),
+		SkillMD:         filepath.Join(repoRoot, "skills", "loop", "SKILL.md"),
 		ReadmeMD:        filepath.Join(repoRoot, "README.md"),
 	}
 }
@@ -89,7 +89,7 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 	if changed, err := BumpSkillHeading(paths.SkillMD, mm, dryRun); err != nil {
 		return res, err
 	} else if changed {
-		res.Modified = append(res.Modified, "skills/evolve-loop/SKILL.md")
+		res.Modified = append(res.Modified, "skills/loop/SKILL.md")
 	}
 	if changed, err := BumpReadmeCurrent(paths.ReadmeMD, mm, dryRun); err != nil {
 		return res, err

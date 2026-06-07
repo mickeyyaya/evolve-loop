@@ -135,7 +135,7 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 
 ### 5. Write the lesson YAML(s)
 
-Output path: `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml`. Use the schema in [lesson-template.yaml](../skills/evolve-loop/lesson-template.yaml). **One YAML per root cause**, not per defect.
+Output path: `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml`. Use the schema in [lesson-template.yaml](../skills/loop/lesson-template.yaml). **One YAML per root cause**, not per defect.
 
 **MUST-FIRST — verify on-disk before recording ID:** After writing each YAML file, confirm it exists on disk before adding its ID to `handoff-retrospective.json:lessonIds[]`. Use the Write tool, then verify:
 ```bash
@@ -143,7 +143,7 @@ test -f ".evolve/instincts/lessons/inst-LXXX-slug.yaml" || { echo "INTEGRITY_FAI
 ```
 If Write fails or the file is absent: do NOT add the ID to `lessonIds[]` — exit 2 (INTEGRITY_FAIL). A lessonId with no corresponding YAML causes `merge-lesson-into-state.sh` to exit 2, silently freezing `state.json:instinctSummary[]`.
 
-See [lesson-template.yaml](../skills/evolve-loop/lesson-template.yaml) for the full schema.
+See [lesson-template.yaml](../skills/loop/lesson-template.yaml) for the full schema.
 
 ### 6. Write handoff JSON
 
