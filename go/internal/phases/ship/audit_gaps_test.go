@@ -260,3 +260,32 @@ func seedCustomAudit(t *testing.T, repo, body string, exitCode int) {
 		exitCode, auditPath, sha, headSHA, treeSHA)
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), entry)
 }
+
+// TestParseVerdicts_BareHeadingLine: the heading form must also accept a BARE
+// verdict line (`## Verdict` + `PASS` without bold) — the cycle-249 shape that
+// blocked the v16.8.0 release preflight and would equally have produced a
+// false AUDIT_BINDING_MALFORMED_VERDICT here. The bare line must be exactly
+// the verdict word (a sentence containing PASS must NOT match).
+func TestParseVerdicts_BareHeadingLine(t *testing.T) {
+	cases := []struct {
+		name             string
+		body             string
+		pass, warn, fail bool
+	}{
+		{"bare PASS", "## Verdict\nPASS\n\n**Confidence:** 0.97\n", true, false, false},
+		{"bare WARN", "## Verdict\nWARN\n", false, true, false},
+		{"bare FAIL", "## Verdict\nFAIL\n", false, false, true},
+		{"bare PASS with blank line", "## Verdict\n\nPASS\n", true, false, false},
+		{"sentence containing PASS not matched", "## Verdict\nAll tests PASS here\n", false, false, false},
+		{"bare PASS outside 5-line window", "## Verdict\n\n\n\n\n\nPASS\n", false, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pass, warn, fail := parseVerdicts(tc.body)
+			if pass != tc.pass || warn != tc.warn || fail != tc.fail {
+				t.Errorf("parseVerdicts = (pass=%v warn=%v fail=%v), want (pass=%v warn=%v fail=%v)",
+					pass, warn, fail, tc.pass, tc.warn, tc.fail)
+			}
+		})
+	}
+}

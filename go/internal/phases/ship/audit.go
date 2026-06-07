@@ -237,12 +237,14 @@ var inlineVerdictRe = map[string]*regexp.Regexp{
 	"FAIL": regexp.MustCompile(`(?i)Verdict\s*:\s*\*?\*?\s*FAIL(\s|$|\*)`),
 }
 
-// headingVerdictRe matches the `## Verdict` heading followed by
-// `**X**` within 5 lines. Mirrors the bash awk window.
+// headingVerdictRe matches the `## Verdict` heading followed, within 5
+// lines, by either `**X**` (bash awk window parity) or a BARE verdict line
+// (exactly `X` — the cycle-249 shape; a sentence containing the word must
+// not match).
 var headingVerdictRe = map[string]*regexp.Regexp{
-	"PASS": regexp.MustCompile(`(?m)^#+\s+Verdict\s*\n(?:.*\n){0,4}.*\*\*PASS\*\*`),
-	"WARN": regexp.MustCompile(`(?m)^#+\s+Verdict\s*\n(?:.*\n){0,4}.*\*\*WARN\*\*`),
-	"FAIL": regexp.MustCompile(`(?m)^#+\s+Verdict\s*\n(?:.*\n){0,4}.*\*\*FAIL\*\*`),
+	"PASS": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*PASS\*\*|[ \t]*PASS[ \t]*$)`),
+	"WARN": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*WARN\*\*|[ \t]*WARN[ \t]*$)`),
+	"FAIL": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*FAIL\*\*|[ \t]*FAIL[ \t]*$)`),
 }
 
 func hasVerdict(body, verdict string) bool {

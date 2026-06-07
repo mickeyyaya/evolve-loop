@@ -509,6 +509,14 @@ func TestExtractVerdict(t *testing.T) {
 		{"heading WARN strict-rejected", "## Verdict\n\n**WARN**\n", true, "", false},
 		{"no verdict", "lorem ipsum\n", false, "", false},
 		{"heading PASS too far", "## Verdict\n\n\n\n\n\n**PASS**\n", false, "", false},
+		// Bare-line heading form — the cycle-249 release-blocker shape
+		// (auditor wrote `## Verdict\nPASS` without bold).
+		{"heading bare PASS", "## Verdict\nPASS\n\n**Confidence:** 0.97\n", false, "PASS", true},
+		{"heading bare WARN non-strict", "## Verdict\nWARN\n", false, "WARN", true},
+		{"heading bare WARN strict-rejected", "## Verdict\nWARN\n", true, "", false},
+		{"heading bare FAIL not accepted", "## Verdict\nFAIL\n", false, "", false},
+		{"bare PASS inside sentence not accepted", "## Verdict\nAll tests PASS here\n", false, "", false},
+		{"heading bare PASS too far", "## Verdict\n\n\n\n\n\nPASS\n", false, "", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

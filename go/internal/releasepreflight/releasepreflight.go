@@ -473,7 +473,7 @@ func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResul
 	}
 	if candidate == "" {
 		if res.phantomCount > 0 {
-			return res, fmt.Errorf("all %d auditor entries point at missing artifacts (cleaned up?). Run a fresh cycle to produce a new audit-report.md.",
+			return res, fmt.Errorf("all %d auditor entries point at missing artifacts (cleaned up?) — run a fresh cycle to produce a new audit-report.md",
 				res.phantomCount)
 		}
 		return res, errors.New("no auditor entry in ledger")
@@ -523,17 +523,20 @@ func extractVerdict(body string, strict bool) (string, bool) {
 		return v, true
 	}
 	// Heading form: scan for `## Verdict` line, then within 5 lines look
-	// for **PASS** or **WARN**.
+	// for **PASS**/**WARN** or a BARE verdict line (exactly `PASS`/`WARN`,
+	// the cycle-249 shape — auditors legitimately omit the bold). A sentence
+	// merely containing the word must not match.
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		if !verdictHeadingRE.MatchString(line) {
 			continue
 		}
 		for j := i + 1; j <= i+5 && j < len(lines); j++ {
-			if strings.Contains(lines[j], "**PASS**") {
+			trimmed := strings.TrimSpace(lines[j])
+			if strings.Contains(lines[j], "**PASS**") || trimmed == "PASS" {
 				return "PASS", true
 			}
-			if !strict && strings.Contains(lines[j], "**WARN**") {
+			if !strict && (strings.Contains(lines[j], "**WARN**") || trimmed == "WARN") {
 				return "WARN", true
 			}
 		}
