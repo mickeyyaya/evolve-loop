@@ -162,6 +162,10 @@ func pushDivergentCommit(t *testing.T, bare string) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git clone: %v\n%s", err, out)
 	}
+	// CI parity: the bare remote's HEAD may point at an unborn default branch
+	// (init.defaultBranch is unset on CI runners), leaving the clone's HEAD
+	// unborn too. Pin the clone to main explicitly.
+	runGit(t, clone, "checkout", "-q", "-B", "main", "origin/main")
 	runGit(t, clone, "config", "user.email", "second@evolve-loop.test")
 	runGit(t, clone, "config", "user.name", "Second Writer")
 	mustWrite(t, filepath.Join(clone, "divergent.txt"), "independent change\n")
