@@ -110,10 +110,12 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// it; verified empirically.)
 			// Cycle-142: this launch runs with no OPENAI_API_KEY → codexAuthMode
 			// == "chatgpt", so the driver clamps the realized gpt-5.4 (which a
-			// ChatGPT account 400-rejects) down to the ChatGPT-safe
-			// gpt-5.4-mini. The leak-absent assertions below are what this case
-			// actually guards; the model value rides along.
-			want:   "codex --yolo -m gpt-5.4-mini",
+			// ChatGPT account 400-rejects) to the ChatGPT-safe default —
+			// gpt-5.5 since the 2026-06-07 safe-set refresh (plan tier now
+			// accepts gpt-5.5; gpt-5.2 left the picker). The leak-absent
+			// assertions below are what this case actually guards; the model
+			// value rides along.
+			want:   "codex --yolo -m gpt-5.5",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}

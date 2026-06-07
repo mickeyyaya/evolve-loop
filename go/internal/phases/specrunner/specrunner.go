@@ -134,17 +134,37 @@ func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, 
 	return verdict, diags
 }
 
-// hasSection reports whether section appears as a line-anchored markdown header
-// (the section text begins a line, ignoring leading whitespace). This matches
-// the line-anchored convention of the hand-written phases rather than a loose
-// substring match that could fire on a mid-line occurrence.
+// hasSection reports whether section appears as a line-anchored markdown
+// header (the section text begins a line). Matching is heading-aware:
+// markdown heading markers (a "#"-run followed by whitespace) are stripped
+// from BOTH the rule and the line before the prefix compare, so
+// the rule "Baseline" matches "## Baseline" and the rule "## Findings" matches
+// a bare "Findings" line — one semantic, no dual matching modes (inbox
+// classify-heading-prefix-mismatch, 2026-06-07). Line anchoring still rejects
+// mid-line occurrences.
 func hasSection(artifact, section string) bool {
+	want := stripHeadingMarker(section)
 	for _, line := range strings.Split(artifact, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), section) {
+		if strings.HasPrefix(stripHeadingMarker(line), want) {
 			return true
 		}
 	}
 	return false
+}
+
+// stripHeadingMarker trims s and removes a leading markdown heading marker —
+// a run of '#' followed by whitespace. A '#'-run glued to text ("##Findings")
+// is not a markdown heading and is left untouched.
+func stripHeadingMarker(s string) string {
+	s = strings.TrimSpace(s)
+	i := 0
+	for i < len(s) && s[i] == '#' {
+		i++
+	}
+	if i > 0 && i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		return strings.TrimSpace(s[i:])
+	}
+	return s
 }
 
 // Config carries the runner dependencies, matching the hand-written phases.

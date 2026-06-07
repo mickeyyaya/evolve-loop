@@ -72,7 +72,7 @@
     "balanced": "gpt-5.4",
     "deep": "gpt-5.5"
   },
-  "chatgpt_safe_models": ["gpt-5.4-mini", "gpt-5.2"],
-  "chatgpt_default_model": "gpt-5.4-mini",
-  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same model_tier_map as the codex-headless driver. chatgpt_safe_models/chatgpt_default_model (cycle-142): on a ChatGPT/subscription account the backend 400-rejects gpt-5.4/gpt-5.5 (API-key-only by plan tier — see OpenAI codex issues #14190/#19654), so the driver clamps balanced/deep tiers down to gpt-5.4-mini when auth=chatgpt. API-key auth keeps the larger models."
+  "chatgpt_safe_models": ["gpt-5.5", "gpt-5.4-mini"],
+  "chatgpt_default_model": "gpt-5.5",
+  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same model_tier_map as the codex-headless driver. chatgpt_safe_models/chatgpt_default_model (cycle-142 mechanism; set refreshed 2026-06-07 per operator): this ChatGPT plan accepts gpt-5.5 and gpt-5.4-mini; gpt-5.4 still 400-rejects on subscription auth (see OpenAI codex issues #14190/#19654) and gpt-5.2 is gone from the /model picker, so the balanced tier (gpt-5.4) clamps UP to gpt-5.5 when auth=chatgpt. API-key auth bypasses the clamp entirely."
 }

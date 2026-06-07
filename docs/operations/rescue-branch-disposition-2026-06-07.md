@@ -129,8 +129,14 @@ tdd(claude) ≠ builder(codex) ✓; **agy absent from every chain** ✓.
 
 ## Still open (not part of this disposition)
 
-- Inbox `classify-heading-prefix-mismatch` — `require_sections` vs `hasSection` prefix
-  matching; NOT closed by `e0232550` (that fixed verdict parsers). Baseline FAILed 2/2.
+- ~~Inbox `classify-heading-prefix-mismatch`~~ — **FIXED in the follow-up commit** (same
+  session): `hasSection` made heading-aware (`stripHeadingMarker` on both rule and line —
+  one semantic, no dual matching), pinned by
+  `TestEvaluateClassifyExported_HeadingAwareSections`. Root-cause scan found the class was
+  35 phase.json files wide (not 3); the heading-aware matcher makes prefix-less rules
+  canonical so zero config churn was needed. Deferred from that inbox item: the
+  "optional-evaluate-phase FAIL silently fail-opens the spine" loop-behavior question —
+  needs its own design pass.
 - agy demotion decision (profile archaeology only; agy already banned from chains).
 - ~105 dead symbols flagged by the dedup campaign's smell-scan — future cleanup-sweep fodder.
 - Codex-primary soak: watch the stage-1 band + builder for codex-specific failures over the

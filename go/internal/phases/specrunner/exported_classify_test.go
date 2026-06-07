@@ -104,6 +104,81 @@ func TestEvaluateClassifyExported(t *testing.T) {
 	}
 }
 
+// Pins heading-aware require_sections matching (inbox
+// classify-heading-prefix-mismatch, 2026-06-07) — semantics documented on
+// hasSection in specrunner.go. Includes strict-superset cases proving legacy
+// matches are preserved.
+func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
+	tests := []struct {
+		name        string
+		artifact    string
+		rules       *phasespec.ClassifyRules
+		wantVerdict string
+	}{
+		{
+			// The cycle-249/250 regression: bare rule vs "## " heading.
+			name:        "bare rule matches h2 heading",
+			artifact:    "## Baseline\n- ok\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Baseline"}},
+			wantVerdict: core.VerdictPASS,
+		},
+		{
+			name:        "bare rule matches h3 heading",
+			artifact:    "### Verdict\nPASS\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Verdict"}},
+			wantVerdict: core.VerdictPASS,
+		},
+		{
+			// CommonMark permits a tab as the marker/text separator.
+			name:        "tab-separated heading matches bare rule",
+			artifact:    "##\tFindings\n- x\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Findings"}},
+			wantVerdict: core.VerdictPASS,
+		},
+		{
+			name:        "prefixed rule matches bare line",
+			artifact:    "Findings\n- one\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"## Findings"}},
+			wantVerdict: core.VerdictPASS,
+		},
+		{
+			// Legacy prose-anchored behavior is preserved (strict superset).
+			name:        "bare rule matches line-anchored prose",
+			artifact:    "Verdict: PASS\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Verdict"}},
+			wantVerdict: core.VerdictPASS,
+		},
+		{
+			name:        "mid-line occurrence still does not match",
+			artifact:    "see Findings below\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Findings"}},
+			wantVerdict: core.VerdictFAIL,
+		},
+		{
+			// "#"-run without trailing whitespace is not a markdown heading;
+			// no stripping happens on that line.
+			name:        "hashtag-glued line is not a heading",
+			artifact:    "##Findings\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Findings"}},
+			wantVerdict: core.VerdictFAIL,
+		},
+		{
+			name:        "absent section still fails",
+			artifact:    "## Other\n",
+			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Baseline"}},
+			wantVerdict: core.VerdictFAIL,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			verdict, diags := EvaluateClassify(tc.artifact, tc.rules)
+			if verdict != tc.wantVerdict {
+				t.Errorf("verdict = %q, want %q (diags: %+v)", verdict, tc.wantVerdict, diags)
+			}
+		})
+	}
+}
+
 // The missing-section diagnostic must NAME the missing section so a phase
 // author can debug a FAIL from the message alone (easy-to-debug scaffold
 // is an explicit cycle-249 goal).
