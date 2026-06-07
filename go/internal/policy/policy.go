@@ -94,8 +94,9 @@ func (p Policy) FailurePolicy() (alwaysLearn bool, auditFailRoutesTo string) {
 // evaluatorFloorPhase is the single non-removable floor phase: a plan can never
 // reach ship without an evaluator. Kept here (not router) because the
 // non-removability is a policy-layer guarantee. Mirrors router.EvaluatorFloorPhase
-// (each layer independently guarantees the evaluator — defense in depth); if the
-// evaluator phase name ever changes, update BOTH.
+// (each layer independently guarantees the evaluator — defense in depth; a single
+// shared const would create an import cycle). Divergence trips
+// router's TestEvaluatorFloorPhase_SingleSource.
 const evaluatorFloorPhase = "audit"
 
 // FloorPhases resolves the configured ship-floor. It returns (floor, overridden):

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // tddRuleCfg is the default TDD-pin (EVOLVE_CONDITIONAL_MANDATORY): tdd is
@@ -207,5 +208,22 @@ func TestClampPlanToFloor_NoTDDRuleDefaultsPinned(t *testing.T) {
 	}
 	if !clampsHave(clamps, "ship-requires-tdd") {
 		t.Errorf("expected ship-requires-tdd clamp, got %+v", clamps)
+	}
+}
+
+// TestEvaluatorFloorPhase_SingleSource: router.EvaluatorFloorPhase and
+// policy's unexported twin are deliberate defense-in-depth (the reverse
+// import would cycle: router/policy.go imports policy), so the usual
+// never-duplicate rule is satisfied by this tripwire instead — divergence
+// between the two consts must be loud, not silent. policy.FloorPhases
+// re-appends ITS evaluator const LAST to any floor that omits it; the
+// appended phase must be the one router's clamp re-asserts. (The fixture
+// must omit the evaluator so the append branch is taken — an
+// evaluator-containing fixture would false-green.)
+func TestEvaluatorFloorPhase_SingleSource(t *testing.T) {
+	t.Parallel()
+	floor, _ := policy.Policy{ShipFloor: []string{"build"}}.FloorPhases()
+	if got := floor[len(floor)-1]; got != EvaluatorFloorPhase {
+		t.Fatalf("policy re-appends %q as the evaluator floor phase; router.EvaluatorFloorPhase = %q — the defense-in-depth twins diverged", got, EvaluatorFloorPhase)
 	}
 }
