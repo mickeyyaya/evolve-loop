@@ -94,8 +94,13 @@ v12.1 utilities + composition:
                               skills/*/SKILL.md ( skill-inventory build
                               [--ttl 1h] [--force] )
   skills                    Project phase facts into phase skill docs
-                              from their SSOTs; drift-checked in CI
-                              ( skills <generate|check> ) — ADR-0040
+                              from their SSOTs; drift-checked in CI;
+                              publish projects canonical skills to other
+                              LLM CLIs ( skills <generate|check> |
+                              skills publish [--target codex,agy,ollama]
+                              [--dry-run] [--install] [--check]
+                              [--ollama-base M] [--codex-home D]
+                              [--no-prune] ) — ADR-0040/ADR-0041
   eval                      Eval-quality + verify subcommands
                               ( eval quality-check <eval.md>
                               | eval verify <eval.md> <workspace> )

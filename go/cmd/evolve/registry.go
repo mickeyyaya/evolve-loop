@@ -89,7 +89,7 @@ var commands = []subcommand{
 
 	// v12.1 utilities + composition.
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
-	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check) — ADR-0040", Run: runSkills},
+	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check); publish skills to other LLM CLIs (publish) — ADR-0040/0041", Run: runSkills},
 	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: runPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: runEval},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},

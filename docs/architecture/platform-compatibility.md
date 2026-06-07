@@ -113,6 +113,27 @@ Note: in NATIVE mode, cost is reported as `cost_blind:true` (zero attribution). 
 
 You can read SKILL.md and the phase docs from any CLI. To run cycles, implement an adapter at `legacy/scripts/cli_adapters/<your-cli>.sh` mirroring `gemini.sh`'s pattern + ship a `<your-cli>.capabilities.json` manifest. See [Adapter contract](#adapter-contract) below.
 
+### Skill publishing to other CLIs (ADR-0041)
+
+Independent of *runtime* tiers above, the canonical skills can be **published** to foreign CLI
+skill surfaces via `evolve skills publish` (single-source projection; see
+[ADR-0041](adr/0041-cross-cli-skill-publishing.md)):
+
+| Target | Surface | What lands there |
+|---|---|---|
+| Codex CLI | `$CODEX_HOME/skills/evolve-<name>/` | all 22 skills, `evolve-` prefixed (flat namespace) |
+| Antigravity (agy) | `agy plugin install` → `~/.gemini/config/plugins/evolve-loop/` | all 22 skills, unprefixed under the `evolve-loop` plugin |
+| Ollama | `ollama create evolve-<name>` Modelfiles | read-only reasoning/review subset only (no tool use in `ollama run`) |
+
+```bash
+evolve skills publish                 # stage-only: gitignored mirrors under .evolve/publish/ + agy validate
+evolve skills publish --install       # mutate: copy to $CODEX_HOME/skills, agy plugin install, ollama create
+evolve skills publish --check         # CI drift gate against the staged mirrors (exit 2 on drift)
+```
+
+In-repo Codex discovery via the `.agents/skills/` symlink layer is unaffected — publish adds
+the user-global surface.
+
 ## Adapter contract
 
 Every adapter at `legacy/scripts/cli_adapters/<cli>.sh` is invoked by `subagent-run.sh` with these env vars:

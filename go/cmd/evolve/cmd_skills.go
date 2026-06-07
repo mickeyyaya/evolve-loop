@@ -83,7 +83,7 @@ type skillFacts struct {
 
 func runSkills(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: evolve skills <generate|check>")
+		fmt.Fprintln(stderr, "usage: evolve skills <generate|check|publish>")
 		return 10
 	}
 	project := envOrCwd("EVOLVE_PROJECT_ROOT")
@@ -92,8 +92,14 @@ func runSkills(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return skillsRun(project, true, stdout, stderr)
 	case "check":
 		return skillsRun(project, false, stdout, stderr)
+	case "publish":
+		cfg, ok := parsePublishFlags(args[1:], stderr)
+		if !ok {
+			return 10
+		}
+		return runSkillsPublish(project, cfg, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown subcommand %q (want generate|check)\n", args[0])
+		fmt.Fprintf(stderr, "unknown subcommand %q (want generate|check|publish)\n", args[0])
 		return 10
 	}
 }

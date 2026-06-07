@@ -1,0 +1,9 @@
+# {{.Sentinel}} — generated from {{.CanonicalRel}} by `evolve skills publish --target ollama`.
+# Do not edit; edit the canonical skill and re-run the publish command.
+FROM {{.Base}}
+
+SYSTEM """
+{{.Description}}
+
+{{.Body}}
+"""

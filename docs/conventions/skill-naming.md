@@ -27,6 +27,22 @@
    gates, fan-out) are generated from their SSOTs by `evolve skills generate`; edit the SSOT,
    not the generated region.
 
+## Cross-CLI projection (ADR-0041)
+
+`evolve skills publish` projects canonical skills into foreign CLI surfaces. Naming there is
+namespace-relative:
+
+- **Flat-namespace targets (Codex)** get the `evolve-` prefix — dir AND frontmatter `name:`
+  become `evolve-<name>` (e.g. `~/.codex/skills/evolve-build`). This is the namespace
+  *projection* for a target that has no plugin prefix, not a violation of rule 2: stutter is
+  only stutter when the namespace already supplies the prefix.
+- **Plugin-namespaced targets (agy)** keep unprefixed names — the `evolve-loop` plugin name
+  supplies the namespace, mirroring the Claude layout.
+- **Ollama** models are named `evolve-<name>` (flat model registry, same reasoning as Codex).
+
+Projected artifacts carry the `EVOLVE-PUBLISH:projection` provenance marker; edit the
+canonical skill and re-run `evolve skills publish`, never the projection.
+
 ## Phase → skill → agent → profile mapping
 
 | Phase (registry) | Skill dir | Agent persona | Profile |
