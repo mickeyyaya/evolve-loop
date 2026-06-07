@@ -1,7 +1,10 @@
 {
   "name": "api-contract-design",
   "role": "api-contract-design",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
   "model_tier_default": "sonnet",
   "allowed_tools": [
     "Read",
@@ -20,7 +23,7 @@
     "Bash(git commit:*)",
     "Bash(git config:*)"
   ],
-  "max_budget_usd": 0.50,
+  "max_budget_usd": 0.5,
   "max_turns": 15,
   "output_artifact": "api-contract.md",
   "challenge_token_required": true,

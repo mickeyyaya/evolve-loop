@@ -1,7 +1,10 @@
 {
   "name": "changelog-sync",
   "role": "changelog-sync",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
   "model_tier_default": "sonnet",
   "allowed_tools": [
     "Read",
