@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
+	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
@@ -80,6 +81,58 @@ func (lr loopResult) emit(w io.Writer) {
 		return
 	}
 	fmt.Fprintln(w, string(buf))
+}
+
+// emitFatal is emit for ABNORMAL exits: record the loop-fatal learning
+// first (failure floor, inbox retro-always-invariant gap 3), then emit.
+// Plain emit stays in use for success exits and for paths that already
+// recorded their failure (quota-pause empty-output) or structurally
+// cannot (state_unwritable — the record write is the thing that failed;
+// unfinished-cycle guard — learning is captured downstream by the
+// forced reset/resume).
+func (lr loopResult) emitFatal(w, stderr io.Writer, cfg loopConfig, cycle int) {
+	recordLoopFatal(stderr, cfg, cycle, lr.StopReason)
+	lr.emit(w)
+}
+
+// recordLoopFatal persists a batch-level failedApproaches entry
+// (classification loop-fatal, stop_reason in the summary) plus a
+// deterministic lesson artifact. Best-effort: a floor failure must
+// never change the exit path — WARN is the only trace. cycle may be 0
+// when unknown (Record's lastCycleNumber advance is monotonic, so a
+// zero cycle cannot regress the counter).
+func recordLoopFatal(stderr io.Writer, cfg loopConfig, cycle int, stopReason string) {
+	now := time.Now().UTC()
+	stop := "stop_reason=" + stopReason
+	if _, err := failurelog.Record(filepath.Join(cfg.EvolveDir, "state.json"), "", failurelog.RecordRequest{
+		Cycle:          cycle,
+		Classification: string(failurelog.LoopFatal),
+		Summary:        stop,
+		Now:            now,
+	}); err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: could not record loop-fatal (%s): %v\n", stopReason, err)
+	}
+	ev := faillearn.FailureEvent{
+		Cycle:          cycle,
+		FailedPhase:    stop,
+		Scope:          faillearn.ScopeLoop,
+		Classification: string(failurelog.LoopFatal),
+		Verdict:        "FATAL",
+		Summary:        fmt.Sprintf("batch stopped abnormally (%s) at cycle %d", stop, cycle),
+		Now:            now,
+	}
+	if err := faillearn.WriteArtifacts(ev, "", filepath.Join(cfg.EvolveDir, "instincts", "lessons")); err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: could not write loop-fatal lesson: %v\n", err)
+	}
+}
+
+// lastCycleIn returns the last attempted cycle number in the batch, 0
+// when no cycle ran.
+func lastCycleIn(lr loopResult) int {
+	if n := len(lr.Cycles); n > 0 {
+		return lr.Cycles[n-1].Cycle
+	}
+	return 0
 }
 
 // loopConfig is the resolved invocation. Extracted so --dry-run and
@@ -196,7 +249,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
 			lr.StopReason = "error"
-			lr.emit(stdout)
+			lr.emitFatal(stdout, stderr, cfg, 0)
 			return 2
 		}
 		fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f\n",
@@ -221,10 +274,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		} else {
 			lr.StopReason = "resumed_complete"
 		}
-		lr.emit(stdout)
 		if lr.StopReason == "error" || lr.StopReason == "fail" {
+			lr.emitFatal(stdout, stderr, cfg, result.Cycle)
 			return 2
 		}
+		lr.emit(stdout)
 		return 0
 	}
 
@@ -397,7 +451,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				lr.TotalCost, cfg.BatchCapUSD, ranCycle)
 			fmt.Fprintln(stderr, "[loop]   override: EVOLVE_BATCH_BUDGET_DISABLE=1 or --batch-cap-usd <higher>")
 			lr.StopReason = "batch_cap"
-			lr.emit(stdout)
+			lr.emitFatal(stdout, stderr, cfg, ranCycle)
 			return 4
 		}
 
@@ -425,7 +479,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				_ = w.EmitCircuitBreakerTripped(ranCycle, sameCycleStreak, threshold)
 			}
 			lr.StopReason = "circuit_breaker"
-			lr.emit(stdout)
+			lr.emitFatal(stdout, stderr, cfg, ranCycle)
 			return 1
 		}
 
@@ -454,14 +508,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 				if policy == dispatchPolicyStop {
 					lr.StopReason = "verify_failed_stop"
-					lr.emit(stdout)
+					lr.emitFatal(stdout, stderr, cfg, ranCycle)
 					return 2
 				}
 				// policy == verify: STOP only on integrity-breach;
 				// recoverable classes continue the loop.
 				if class.Class == cycleclassify.ClassIntegrityBreach {
 					lr.StopReason = "integrity_breach"
-					lr.emit(stdout)
+					lr.emitFatal(stdout, stderr, cfg, ranCycle)
 					return 2
 				}
 				// D2: an empty-output session is the subscription-quota-wall
@@ -533,10 +587,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	lr.emit(stdout)
 	if lr.StopReason == "error" || lr.StopReason == "fail" {
+		lr.emitFatal(stdout, stderr, cfg, lastCycleIn(lr))
 		return 2
 	}
+	lr.emit(stdout)
 	// E1 exit-code contract: when any cycle in the batch hit a
 	// recoverable failure (verify-fail + classify → recoverable),
 	// signal rc=3 so CI sees "batch completed but with infra/audit/

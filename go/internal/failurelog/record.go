@@ -33,6 +33,10 @@ type RecordRequest struct {
 	// ReportPath is the absolute path to the cycle's
 	// orchestrator-report.md. Optional — empty leaves Summary blank.
 	ReportPath string
+	// Summary, when non-empty, is used verbatim instead of deriving it
+	// from ReportPath. Lets callers without a report (loop fatals,
+	// operator resets) carry context like "stop_reason=<reason>".
+	Summary string
 	// Now is the timestamp the failure happened at. Defaults to
 	// time.Now().UTC() when zero.
 	Now time.Time
@@ -85,14 +89,16 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 		return Recorded{}, fmt.Errorf("failurelog: parse state: %w", err)
 	}
 
-	// Resolve summary: explicit path > runsDir-derived path > "".
-	report := req.ReportPath
-	if report == "" && runsDir != "" {
-		report = filepath.Join(runsDir, fmt.Sprintf("cycle-%d", req.Cycle), "orchestrator-report.md")
-	}
-	summary := ""
-	if report != "" {
-		summary = extractSummary(report)
+	// Resolve summary: explicit override > explicit path > runsDir-derived path > "".
+	summary := req.Summary
+	if summary == "" {
+		report := req.ReportPath
+		if report == "" && runsDir != "" {
+			report = filepath.Join(runsDir, fmt.Sprintf("cycle-%d", req.Cycle), "orchestrator-report.md")
+		}
+		if report != "" {
+			summary = extractSummary(report)
+		}
 	}
 
 	entry := Recorded{
@@ -114,7 +120,12 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 	// Advance lastCycleNumber so the next attempt uses a fresh
 	// workspace. Bash dispatcher does this in a separate jq pass; we
 	// merge it with the failedApproaches update to atomicize both.
-	state["lastCycleNumber"] = float64(req.Cycle)
+	// Monotonic: loop-fatal records may carry an unknown cycle (0) —
+	// regressing the counter would reuse cycle numbers and corrupt
+	// workspace history.
+	if cur, _ := state["lastCycleNumber"].(float64); float64(req.Cycle) > cur {
+		state["lastCycleNumber"] = float64(req.Cycle)
+	}
 
 	// Atomic write via tmp+mv.
 	if err := atomicWriteJSON(statePath, state); err != nil {

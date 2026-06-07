@@ -2,7 +2,7 @@
 // record_failed_approach + cycle-state.sh:prune-expired-failures logic
 // into Go. Three responsibilities:
 //
-//  1. Classification taxonomy (11 named failure classes, each with
+//  1. Classification taxonomy (13 named failure classes, each with
 //     a severity tier, age-out window, and retry policy).
 //  2. Record: append a failed cycle's summary to
 //     state.json:failedApproaches with FIFO cap 50 + atomic write +
@@ -43,7 +43,14 @@ const (
 	HumanAbort              Classification = "human-abort"
 	ExitTransportHang       Classification = "exit-transport-hang"
 	IntegrityBreach         Classification = "integrity-breach"
-	UnknownClassification   Classification = "unknown-classification"
+	// OperatorReset records an `evolve cycle reset` of a partial cycle
+	// (failure-floor: operator action, not a code defect).
+	OperatorReset Classification = "operator-reset"
+	// LoopFatal records a loop-runner fatal exit. The stop_reason rides
+	// in the entry Summary ("stop_reason=<reason>") — one finite const,
+	// not a parametric classification family.
+	LoopFatal             Classification = "loop-fatal"
+	UnknownClassification Classification = "unknown-classification"
 )
 
 // Severity buckets classifications by triage impact. Returned by Severity().
@@ -95,6 +102,10 @@ func AgeOutSeconds(c Classification) int64 {
 		return 3600 // 1 hour (cycle shipped, just transport hang)
 	case IntegrityBreach:
 		return 604800 // 7 days
+	case OperatorReset:
+		return 3600 // 1 hour — operator action, like human-abort
+	case LoopFatal:
+		return 604800 // 7 days — batch-stopper, retain across the week
 	default:
 		return 86400 // unknown → 1 day default
 	}
@@ -105,9 +116,10 @@ func AgeOutSeconds(c Classification) int64 {
 func SeverityOf(c Classification) Severity {
 	switch c {
 	case InfrastructureTransient, IntentMalformed, HumanAbort,
-		ShipGateConfig, CodeAuditWarn, ExitTransportHang:
+		ShipGateConfig, CodeAuditWarn, ExitTransportHang, OperatorReset:
 		return SeverityLow
-	case InfrastructureSystemic, CodeBuildFail, CodeAuditFail, IntegrityBreach:
+	case InfrastructureSystemic, CodeBuildFail, CodeAuditFail, IntegrityBreach,
+		LoopFatal:
 		return SeverityHigh
 	case IntentRejected:
 		return SeverityTerminal
@@ -121,9 +133,9 @@ func SeverityOf(c Classification) Severity {
 func RetryPolicyOf(c Classification) RetryPolicy {
 	switch c {
 	case InfrastructureTransient, IntentMalformed, HumanAbort,
-		ShipGateConfig, CodeAuditWarn, ExitTransportHang:
+		ShipGateConfig, CodeAuditWarn, ExitTransportHang, OperatorReset:
 		return RetryYes
-	case InfrastructureSystemic, IntegrityBreach:
+	case InfrastructureSystemic, IntegrityBreach, LoopFatal:
 		return RetryNeedsOp
 	case IntentRejected:
 		return RetryNo
@@ -150,7 +162,7 @@ func NormalizeLegacy(raw string) Classification {
 		string(IntentMalformed), string(IntentRejected),
 		string(CodeBuildFail), string(CodeAuditFail), string(CodeAuditWarn),
 		string(HumanAbort), string(IntegrityBreach), string(ShipGateConfig),
-		string(ExitTransportHang):
+		string(ExitTransportHang), string(OperatorReset), string(LoopFatal):
 		return Classification(raw)
 
 	// Legacy dispatcher classifications.
@@ -224,5 +236,7 @@ func KnownClassifications() []Classification {
 		HumanAbort,
 		ExitTransportHang,
 		IntegrityBreach,
+		OperatorReset,
+		LoopFatal,
 	}
 }

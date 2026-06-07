@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
 // reset.go — the complement of resume.go. Where resume CONTINUES a
@@ -135,6 +138,27 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 	}
 	manRaw = append(manRaw, '\n')
 
+	// Failure floor (retro-always-invariant gap 2): an operator reset is
+	// an abnormal termination and must LEARN, not just archive. The
+	// deterministic retrospective is written INTO the workspace alongside
+	// the snapshot/manifest (before the rename — same complete-at-
+	// appearance invariant), the lesson goes to instincts/lessons/.
+	ev := faillearn.FailureEvent{
+		Cycle:          cycleID,
+		FailedPhase:    phase,
+		Scope:          faillearn.ScopeReset,
+		Classification: string(failurelog.OperatorReset),
+		Verdict:        "RESET",
+		Summary:        fmt.Sprintf("operator reset of cycle %d at phase %s: %s", cycleID, phase, opts.Reason),
+		// archiveDir is the DURABLE location: the workspace path stops
+		// existing at the rename below, so the lesson points at where the
+		// evidence will live, not where it briefly was.
+		EvidencePaths: []string{archiveDir},
+		GitHead:       head,
+		Now:           t,
+	}
+	lessonsDir := filepath.Join(opts.EvolveDir, "instincts", "lessons")
+
 	// 1+2. Seal the workspace into the archive. The snapshot + manifest are
 	// written INTO the workspace BEFORE the rename, so the archive is complete
 	// the instant it appears — a partial failure can never split the workspace
@@ -146,6 +170,13 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		}
 		if err := os.WriteFile(filepath.Join(dir, "reset-manifest.json"), manRaw, 0o644); err != nil {
 			return fmt.Errorf("reset: write manifest: %w", err)
+		}
+		// Hard-fail (unlike the WARN-only orchestrator/loop floor sites):
+		// this runs BEFORE the destructive rename, so aborting here leaves
+		// the workspace intact for a clean retry — strictly safer than
+		// sealing without learning.
+		if err := faillearn.WriteArtifacts(ev, dir, lessonsDir); err != nil {
+			return fmt.Errorf("reset: write learning artifacts: %w", err)
 		}
 		return nil
 	}
@@ -181,9 +212,25 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		}
 	}
 
+	// 3b. Record the operator-reset in state.json:failedApproaches via the
+	// single canonical appender. ORDERING IS LOAD-BEARING: Record runs
+	// BEFORE the seal's own read-modify-write below, so the seal's write
+	// (which re-reads the file, picking up the new entry) stays the final
+	// authority on lastCycleNumber / currentBatch / lastUpdated. A missing
+	// state.json is soft-skipped (preflight owns creating it; the seal's
+	// own write below will create it fresh).
+	statePath := filepath.Join(opts.EvolveDir, "state.json")
+	if _, recErr := failurelog.Record(statePath, "", failurelog.RecordRequest{
+		Cycle:          cycleID,
+		Classification: string(failurelog.OperatorReset),
+		Summary:        ev.Summary,
+		Now:            t,
+	}); recErr != nil && !errors.Is(recErr, failurelog.ErrStateMissing) {
+		return SealResult{}, fmt.Errorf("reset: record failed approach: %w", recErr)
+	}
+
 	// 4. Advance lastCycleNumber (number never reused) + zero the batch accrual,
 	//    via a full-fidelity map so unmodelled fields survive.
-	statePath := filepath.Join(opts.EvolveDir, "state.json")
 	sm, err := readJSONMapFile(statePath)
 	if err != nil {
 		return SealResult{}, fmt.Errorf("reset: read state.json: %w", err)

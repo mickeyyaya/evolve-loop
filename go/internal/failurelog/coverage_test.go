@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestRecord_StateUnreadable covers the os.ReadFile error branch that
@@ -19,7 +17,7 @@ func TestRecord_StateUnreadable(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root — chmod 000 doesn't block reads")
 	}
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "state.json"), `{}`)
+	path := mustWrite(t, filepath.Join(t.TempDir(), "state.json"), `{}`)
 	if err := os.Chmod(path, 0o000); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
@@ -42,7 +40,7 @@ func TestExtractSummary_CapsAtMaxLines(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		body += fmt.Sprintf("line%d\n", i)
 	}
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
+	path := mustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	s := extractSummary(path)
 	// 8 lines kept; lines 0-7 included, lines 8-11 dropped.
 	if !strings.Contains(s, "line7") {
@@ -85,7 +83,7 @@ func TestPruneExpired_StateUnreadable(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root — chmod 000 doesn't block reads")
 	}
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "state.json"), `{}`)
+	path := mustWrite(t, filepath.Join(t.TempDir(), "state.json"), `{}`)
 	if err := os.Chmod(path, 0o000); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}

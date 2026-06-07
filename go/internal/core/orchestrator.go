@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -1117,11 +1118,13 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	if retroErr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
+		o.writeDeterministicLearning(fl, summary)
 		o.writeFailureLearningState(ctx, fl.State)
 		return
 	}
 	if !IsVerdict(retroResp.Verdict) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
+		o.writeDeterministicLearning(fl, summary)
 		o.writeFailureLearningState(ctx, fl.State)
 		return
 	}
@@ -1156,6 +1159,31 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	})
 	writePhaseUsageSidecar(fl.CycleState.WorkspacePath, string(PhaseRetro), retroResp.CostUSD, retroResp.DurationMS, 1, retroResp.Verdict)
 	o.writeFailureLearningState(ctx, fl.State)
+}
+
+// writeDeterministicLearning is the failure floor (inbox
+// retro-always-invariant, gap 1 / cycle-243): when the LLM retro cannot
+// run or returns a non-canonical verdict, render the learning artifacts
+// deterministically — retrospective-report.md in the cycle workspace +
+// failure-lesson YAML — so the lesson survives instead of degrading to
+// a stderr WARN. Best-effort: a floor write failure must never mask the
+// original phase failure.
+func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, summary string) {
+	ev := faillearn.FailureEvent{
+		Cycle:          fl.Cycle,
+		FailedPhase:    string(fl.Failed),
+		Scope:          faillearn.ScopePhase,
+		Classification: "cycle-mid-execution-fail",
+		Verdict:        VerdictFAIL,
+		Summary:        summary,
+		Defects:        []string{summary},
+		EvidencePaths:  []string{fl.CycleState.WorkspacePath},
+		Now:            o.now().UTC(),
+	}
+	lessonsDir := filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "instincts", "lessons")
+	if err := faillearn.WriteArtifacts(ev, fl.CycleState.WorkspacePath, lessonsDir); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: deterministic fallback write: %v\n", err)
+	}
 }
 
 func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseRequest {

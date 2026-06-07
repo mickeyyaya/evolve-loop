@@ -9,23 +9,20 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // writeState seeds state.json under an isolated workspace root with the given
 // top-level shape and returns its path. Used by Record + Prune tests.
 func writeState(t *testing.T, content string) string {
 	t.Helper()
-	ws := fixtures.NewWorkspace(t).Build()
-	return ws.Write("state.json", content)
+	return mustWrite(t, filepath.Join(t.TempDir(), "state.json"), content)
 }
 
 // readState parses state.json from disk for assertions.
 func readState(t *testing.T, path string) map[string]any {
 	t.Helper()
 	var m map[string]any
-	if err := json.Unmarshal([]byte(fixtures.MustRead(t, path)), &m); err != nil {
+	if err := json.Unmarshal([]byte(mustRead(t, path)), &m); err != nil {
 		t.Fatalf("parse state: %v", err)
 	}
 	return m
@@ -140,7 +137,7 @@ Three retries all failed.
 ## Verdict
 **FAIL** — manual triage required.
 `
-	fixtures.MustWrite(t, filepath.Join(cycleDir, "orchestrator-report.md"), report)
+	mustWrite(t, filepath.Join(cycleDir, "orchestrator-report.md"), report)
 	rec, err := Record(path, runsDir, RecordRequest{
 		Cycle:          7,
 		Classification: "build-fail",
@@ -173,7 +170,7 @@ func TestRecord_AtomicWriteFailure(t *testing.T) {
 
 func TestExtractSummary_Empty(t *testing.T) {
 	t.Parallel()
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), "")
+	path := mustWrite(t, filepath.Join(t.TempDir(), "report.md"), "")
 	if s := extractSummary(path); s != "" {
 		t.Fatalf("summary=%q want empty", s)
 	}
@@ -189,7 +186,7 @@ func TestExtractSummary_MissingFile(t *testing.T) {
 func TestExtractSummary_NoSectionMarker(t *testing.T) {
 	t.Parallel()
 	body := "# Cycle 1\n\nNo recognized section markers here.\n"
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
+	path := mustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	if s := extractSummary(path); s != "" {
 		t.Fatalf("no-marker report should return empty: %q", s)
 	}
@@ -204,7 +201,7 @@ Line B
 ## Next Section
 Should not appear.
 `
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
+	path := mustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	s := extractSummary(path)
 	if !strings.Contains(s, "Line A") || !strings.Contains(s, "Line B") {
 		t.Fatalf("summary should include failure lines: %q", s)
@@ -222,8 +219,71 @@ func TestExtractSummary_HighlyVerboseTruncatedTo400(t *testing.T) {
 		long += fmt.Sprintf("word%d ", i)
 	}
 	body := "## Failure Root Cause\n" + long + "\n"
-	path := fixtures.MustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
+	path := mustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	if got := len(extractSummary(path)); got > 400 {
 		t.Fatalf("summary len=%d want <=400", got)
+	}
+}
+
+func TestRecord_SummaryOverridePreferredOverReport(t *testing.T) {
+	t.Parallel()
+	path := writeState(t, `{"lastCycleNumber": 4}`)
+	rec, err := Record(path, "", RecordRequest{
+		Cycle:          5,
+		Classification: "loop-fatal",
+		Summary:        "stop_reason=circuit_breaker",
+		Now:            time.Date(2026, 6, 7, 9, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	if rec.Summary != "stop_reason=circuit_breaker" {
+		t.Fatalf("summary=%q want explicit override", rec.Summary)
+	}
+	if rec.Classification != LoopFatal {
+		t.Fatalf("class=%s want loop-fatal (canonical pass-through)", rec.Classification)
+	}
+}
+
+func TestRecord_EmptySummaryStillDerivedFromReport(t *testing.T) {
+	t.Parallel()
+	path := writeState(t, `{"lastCycleNumber": 4}`)
+	report := mustWrite(t, filepath.Join(t.TempDir(), "report.md"),
+		"## Failure\nbridge died mid-phase\n")
+	rec, err := Record(path, "", RecordRequest{
+		Cycle:          5,
+		Classification: "infrastructure",
+		ReportPath:     report,
+		Now:            time.Date(2026, 6, 7, 9, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	if !strings.Contains(rec.Summary, "bridge died mid-phase") {
+		t.Fatalf("summary=%q want report-derived when no override", rec.Summary)
+	}
+}
+
+// The failure floor records loop fatals whose cycle may be unknown (0,
+// e.g. resume-load failure). lastCycleNumber must be monotonic — a
+// Record call can advance it, never regress it (cycle-number reuse
+// corrupts workspace history).
+func TestRecord_DoesNotRegressLastCycleNumber(t *testing.T) {
+	t.Parallel()
+	path := writeState(t, `{"lastCycleNumber": 7}`)
+	if _, err := Record(path, "", RecordRequest{
+		Cycle:          0,
+		Classification: "loop-fatal",
+		Summary:        "stop_reason=error",
+		Now:            time.Date(2026, 6, 7, 9, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	state := readState(t, path)
+	if got := state["lastCycleNumber"].(float64); got != 7 {
+		t.Fatalf("lastCycleNumber=%v want 7 (must never regress)", got)
+	}
+	if entries := state["failedApproaches"].([]any); len(entries) != 1 {
+		t.Fatalf("entries=%d want 1 (the record itself must still append)", len(entries))
 	}
 }

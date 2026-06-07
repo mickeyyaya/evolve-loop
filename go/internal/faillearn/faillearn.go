@@ -177,6 +177,9 @@ func writeBulletSection(b *bytes.Buffer, title string, items []string) {
 // truncateRunes caps s at max runes without allocating in the common
 // short-string case (range over a string iterates runes).
 func truncateRunes(s string, max int) string {
+	if len(s) <= max { // byte length bounds rune count from above
+		return s
+	}
 	n := 0
 	for i := range s {
 		if n == max {
