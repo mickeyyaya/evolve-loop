@@ -47,6 +47,21 @@ func TestLoad_RealRegistry(t *testing.T) {
 	if tb.InsertWhen[0].Field != "build.acs_red" || tb.InsertWhen[0].Op != "gt" {
 		t.Errorf("tester insert_when[0]=%+v, want build.acs_red gt", tb.InsertWhen[0])
 	}
+	// Phase 4b: judgment-only rubric guidance is registry data
+	// (routing.rubric_hint); lines derivable from insert_when /
+	// conditional_mandatory are NOT restated here — the renderer projects
+	// them from the structured source.
+	for phase, hints := range map[string]int{"scout": 2, "plan-review": 1, "architecture-design": 1, "retrospective": 1} {
+		blk, ok := cfg.Triggers[phase]
+		if !ok || len(blk.RubricHint) != hints {
+			t.Errorf("Triggers[%s].RubricHint=%v (ok=%v), want %d hints", phase, blk.RubricHint, ok, hints)
+		}
+	}
+	for _, phase := range []string{"build", "audit", "tdd"} {
+		if len(cfg.Triggers[phase].RubricHint) != 0 {
+			t.Errorf("Triggers[%s].RubricHint=%v, want none (derivable beliefs live in structured routing data)", phase, cfg.Triggers[phase].RubricHint)
+		}
+	}
 	// A spine with audit+ship must not raise weak-spine.
 	if hasWarning(ws, "weak-spine") {
 		t.Errorf("unexpected weak-spine warning for the default spine: %v", ws)

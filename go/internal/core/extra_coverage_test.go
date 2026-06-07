@@ -394,7 +394,14 @@ func TestBuildRoutingPrompt_FullSignalsAndTriggers(t *testing.T) {
 		Cfg: config.RoutingConfig{
 			Mandatory:     []string{"scout", "build", "audit", "ship"},
 			MaxInsertions: 4,
-			Triggers:      map[string]config.RoutingBlock{"tester": {}, "plan-review": {}},
+			Triggers: map[string]config.RoutingBlock{
+				// Phase 4b: the rubric's "insert tester" line derives from
+				// the structured insert_when — the same data the walk uses.
+				"tester": {InsertWhen: []config.Condition{
+					{Field: "build.acs_red", Op: "gt", Value: 0},
+				}},
+				"plan-review": {},
+			},
 		},
 	}
 	got := buildRoutingPrompt(in)

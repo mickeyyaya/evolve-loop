@@ -1,6 +1,7 @@
 package router
 
 import (
+	"sort"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -336,6 +337,19 @@ func applyFailureProposal(d *RouterDecision, proposal *Proposal, action failurea
 func IsFailureInsert(phase string) bool {
 	_, ok := failureInsertPhases[phase]
 	return ok
+}
+
+// FailureInsertPhases returns the retry-path insert phases, sorted. The
+// advisor prompt renders its failure vocabulary from this — the kernel map
+// above is the ONE home of that belief (never restate the names in prompt
+// code or phase cards).
+func FailureInsertPhases() []string {
+	out := make([]string, 0, len(failureInsertPhases))
+	for p := range failureInsertPhases {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // applyLearningRichness lets the advisor choose the LIGHTWEIGHT learning

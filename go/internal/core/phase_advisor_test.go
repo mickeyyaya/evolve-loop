@@ -369,6 +369,10 @@ func TestBuildPlanPrompt_WholeCycleArray(t *testing.T) {
 		Cycle:     3,
 		Completed: []string{},
 		Signals:   router.RoutingSignals{Scout: router.ScoutSignals{CycleSizeEstimate: "medium", Present: true}},
+		Cfg: config.RoutingConfig{Triggers: map[string]config.RoutingBlock{
+			// Phase 4b: rubric lines are registry data (routing.rubric_hint).
+			"scout": {RubricHint: []string{"scout.carryover_count >= 3 → skip scout (work already queued)"}},
+		}},
 	}
 	got := buildPlanPrompt(in)
 	// shared context (rubric line from writeRoutingContext)

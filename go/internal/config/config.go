@@ -96,6 +96,13 @@ type Condition struct {
 type RoutingBlock struct {
 	InsertWhen []Condition `json:"insert_when"`
 	SkipWhen   []Condition `json:"skip_when"`
+	// RubricHint lines render into the advisor's decision rubric (one "- "
+	// bullet each, phases sorted), making the rubric phase DATA instead of
+	// hardcoded Go (failure floor Phase 4b). A rubric-only block is
+	// walk-inert: mandatory phases never consult Triggers, and empty
+	// insert_when never fires (pinned by
+	// TestWalk_MandatoryPhaseWithRubricOnlyRoutingBlockUnchanged).
+	RubricHint []string `json:"rubric_hint,omitempty"`
 }
 
 // RolloutStages groups the three independent rollout-axis dials, each gating a
