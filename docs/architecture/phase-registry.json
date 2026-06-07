@@ -43,6 +43,12 @@
       },
       "gate_in": "gate_intent_to_discover",
       "gate_out": "gate_discover_to_triage",
+      "routing": {
+        "rubric_hint": [
+          "scout.carryover_count >= 3 → skip scout (work already queued)",
+          "scout.item_count == 0 → end cycle early (no-ship is legitimate)"
+        ]
+      },
       "parallel_eligible": true,
       "skippable_when_present": false
     },
@@ -96,6 +102,9 @@
       "routing": {
         "insert_when": [
           { "field": "scout.cycle_size", "op": "==", "value": "large" }
+        ],
+        "rubric_hint": [
+          "a novel/cross-cutting goal also warrants architecture-design (a design pass before tdd/build)"
         ]
       },
       "inputs": {
@@ -132,6 +141,12 @@
       },
       "gate_in": "gate_triage_to_plan_review",
       "gate_out": "gate_plan_review_to_tdd",
+      "routing": {
+        "rubric_hint": [
+          "build.files_touched >= 10 OR build.diff_loc >= 500 → insert plan-review"
+        ],
+        "_note": "Deliberately prose-only: plan-review PRECEDES build in canonical order, so build.* signals cannot drive an insert_when mid-walk — the hint guides the advisor's whole-cycle/next-cycle judgment. This hint is the thresholds' ONE home; if an insert_when is ever added, drop the hint (the rubric derives insert lines from structured triggers)."
+      },
       "parallel_eligible": true,
       "skippable_when_present": false
     },
@@ -288,6 +303,7 @@
       "optional": true,
       "enable_var": "EVOLVE_DISABLE_AUTO_RETROSPECTIVE",
       "enable_var_inverted": true,
+      "_deprecation_note": "enable_var is DEPRECATED (honored one more release; config.Load WARNs deprecated-flag when set): .evolve/policy.json failure_floor is the ONE failure-learning surface and wins when both are set. The deterministic floor (FailedRecord + retrospective/lesson artifacts on every abnormal termination) is non-configurable either way.",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/audit-report.md",
@@ -300,6 +316,11 @@
       },
       "gate_in": "gate_audit_to_retrospective",
       "gate_out": "gate_retrospective_to_complete",
+      "routing": {
+        "rubric_hint": [
+          "audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective"
+        ]
+      },
       "parallel_eligible": true,
       "skippable_when_present": false
     },

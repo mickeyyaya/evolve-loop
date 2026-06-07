@@ -315,6 +315,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		if floor, overridden := pol.FloorPhases(); overridden {
 			shipFloor = floor
 		}
+		// Failure floor (Phase 4a): policy.json:failure_floor is the one
+		// surface for the audit-FAIL learning route; shared fold with
+		// router.PolicyForProject so per-phase consumers see the same route.
+		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json

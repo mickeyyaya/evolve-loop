@@ -46,6 +46,11 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "bugfix"
+      },
+      {
+        "field": "audit.failure_class",
+        "op": "eq",
+        "value": "code-audit-fail"
       }
     ]
   },

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -431,4 +432,35 @@ func hasClamp(d RouterDecision, rule string) bool {
 		}
 	}
 	return false
+}
+
+// Phase 4b risk pin: a rubric-only routing block on MANDATORY phases must be
+// walk-inert — mandatory phases never consult Triggers, and an empty
+// insert_when never fires. The registry adds routing.rubric_hint to
+// scout/build/audit; this guards the walk against that becoming a behavior
+// change.
+func TestWalk_MandatoryPhaseWithRubricOnlyRoutingBlockUnchanged(t *testing.T) {
+	run := func(in RouteInput) RouterDecision { return Route(in, nil) }
+
+	plain := base("scout")
+	plain.Completed = []string{"scout"}
+	plain.Signals.Scout = ScoutSignals{CycleSizeEstimate: "medium", Present: true}
+
+	hinted := base("scout")
+	hinted.Completed = []string{"scout"}
+	hinted.Signals.Scout = ScoutSignals{CycleSizeEstimate: "medium", Present: true}
+	for _, p := range []string{"scout", "build", "audit", "tdd"} {
+		blk := hinted.Cfg.Triggers[p]
+		blk.RubricHint = []string{"some advisory hint for " + p}
+		hinted.Cfg.Triggers[p] = blk
+	}
+
+	d1, d2 := run(plain), run(hinted)
+	if d1.NextPhase != d2.NextPhase || d1.Reason != d2.Reason {
+		t.Errorf("rubric-only blocks changed the walk: (%q,%q) → (%q,%q)",
+			d1.NextPhase, d1.Reason, d2.NextPhase, d2.Reason)
+	}
+	if !reflect.DeepEqual(d1.Clamps, d2.Clamps) {
+		t.Errorf("rubric-only blocks changed clamps: %+v → %+v", d1.Clamps, d2.Clamps)
+	}
 }

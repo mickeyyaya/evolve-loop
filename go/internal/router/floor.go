@@ -4,8 +4,10 @@ import "slices"
 
 // EvaluatorFloorPhase is the single non-removable floor phase: a plan can never
 // reach ship without an evaluator. It mirrors policy's own constant of the same
-// value — each layer independently guarantees the evaluator (defense in depth),
+// value — each layer independently guarantees the evaluator (defense in depth;
+// unifying them would create an import cycle, router/policy.go imports policy),
 // so ClampPlanToFloorWith re-asserts it rather than trusting its caller.
+// Divergence trips TestEvaluatorFloorPhase_SingleSource.
 const EvaluatorFloorPhase = "audit"
 
 // floor.go implements the ADR-0024 §1 conditional integrity floor: the SINGLE

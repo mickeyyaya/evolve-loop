@@ -15,6 +15,8 @@ func TestNormalizeLegacy(t *testing.T) {
 		{"infrastructure-transient", InfrastructureTransient},
 		{"code-audit-warn", CodeAuditWarn},
 		{"ship-gate-config", ShipGateConfig},
+		{"operator-reset", OperatorReset},
+		{"loop-fatal", LoopFatal},
 
 		// Legacy dispatcher classifications.
 		{"infrastructure", InfrastructureTransient},
@@ -69,6 +71,8 @@ func TestAgeOutSeconds(t *testing.T) {
 		{HumanAbort, 3600},
 		{ExitTransportHang, 3600},
 		{IntegrityBreach, 604800},
+		{OperatorReset, 3600},                  // 1h — operator action, like human-abort
+		{LoopFatal, 604800},                    // 7d — batch-stopper, retain across the week
 		{Classification("nonexistent"), 86400}, // default 1d
 	}
 	for _, tc := range tests {
@@ -94,11 +98,13 @@ func TestSeverityOf(t *testing.T) {
 		{ShipGateConfig, SeverityLow},
 		{CodeAuditWarn, SeverityLow},
 		{ExitTransportHang, SeverityLow},
+		{OperatorReset, SeverityLow},
 
 		{InfrastructureSystemic, SeverityHigh},
 		{CodeBuildFail, SeverityHigh},
 		{CodeAuditFail, SeverityHigh},
 		{IntegrityBreach, SeverityHigh},
+		{LoopFatal, SeverityHigh},
 
 		{IntentRejected, SeverityTerminal},
 
@@ -127,6 +133,8 @@ func TestRetryPolicyOf(t *testing.T) {
 		{CodeAuditWarn, RetryYes},
 		{ExitTransportHang, RetryYes},
 		{IntentMalformed, RetryYes},
+		{OperatorReset, RetryYes},
+		{LoopFatal, RetryNeedsOp},
 
 		{InfrastructureSystemic, RetryNeedsOp},
 		{IntegrityBreach, RetryNeedsOp},
@@ -176,8 +184,20 @@ func TestComputeExpiresAt(t *testing.T) {
 func TestKnownClassifications(t *testing.T) {
 	t.Parallel()
 	got := KnownClassifications()
-	if len(got) != 11 {
-		t.Fatalf("KnownClassifications len=%d want 11", len(got))
+	if len(got) != 13 {
+		t.Fatalf("KnownClassifications len=%d want 13", len(got))
+	}
+	for _, want := range []Classification{OperatorReset, LoopFatal} {
+		found := false
+		for _, c := range got {
+			if c == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("KnownClassifications missing %q", want)
+		}
 	}
 	// Spot-check that UnknownClassification is NOT in the list.
 	for _, c := range got {

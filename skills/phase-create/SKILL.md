@@ -33,7 +33,10 @@ Establish, in order:
    condition on a real signal like `scout.goal_type` or `build.diff_loc`).
 5. **Report shape** — 2–3 required `## section` headings for its report
    (`classify.require_sections`); evaluate phases should opt into a verdict
-   (`verdict_on_pass: "PASS"`).
+   (`verdict_on_pass: "PASS"`) and, when they do, into the failure-signal
+   contract (`require_failure_context: true`, ADR-0039): a FAIL/WARN verdict
+   sentinel must then carry `failure: {class, defects[], evidence_paths[]}` —
+   the contract gate teaches the exact line and re-dispatches on omission.
 6. **writes_source?** — does it write files into the worktree? (true ⇒ sandbox
    role-gate; most evaluate phases are read-only.)
 7. **Position** — `after` which phase? (empty = the pre-audit slot.)

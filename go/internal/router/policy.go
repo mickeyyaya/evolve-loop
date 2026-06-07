@@ -93,6 +93,27 @@ func PolicyForProject(projectRoot string, env map[string]string) PhasePolicy {
 	// for the skip decision); the runner re-loads it and hard-fails at dispatch.
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
+		cfg.AuditFailRoutesTo = FailureRouteFromPolicy(pol)
 	}
 	return PhasePolicy{Cfg: cfg}
+}
+
+// FailureRouteFromPolicy folds policy.json:failure_floor into the single
+// audit-FAIL route the router consumes (Phase 4a — one user surface).
+// always_learn=false tunes the DEFAULT route down to the lightweight memo
+// phase — an explicitly written audit_fail_routes_to:"retrospective" wins
+// (explicit beats derived; FailurePolicy launders defaults, so the raw
+// field is checked here). An absent failure_floor returns "" so the
+// deprecated enable-chain behavior stands for one more release. The
+// deterministic floor is unaffected either way.
+func FailureRouteFromPolicy(pol policy.Policy) string {
+	if pol.FailureFloor == nil {
+		return ""
+	}
+	alwaysLearn, route := pol.FailurePolicy()
+	explicitRetro := pol.FailureFloor.AuditFailRoutesTo == "retrospective"
+	if !alwaysLearn && route == "retrospective" && !explicitRetro {
+		route = "memo"
+	}
+	return route
 }

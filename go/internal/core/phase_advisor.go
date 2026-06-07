@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -187,10 +188,44 @@ func buildRoutingPrompt(in router.RouteInput) string {
 
 	writeRoutingContext(&b, in)
 
+	if isFailureTransition(in) {
+		writeFailureVocabulary(&b)
+		b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
+		b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>","learning_richness":"full|memo","recovery_action":"retry|end"}`)
+		b.WriteString("\n")
+		return b.String()
+	}
+
 	b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
 	b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>"}`)
 	b.WriteString("\n")
 	return b.String()
+}
+
+// isFailureTransition reports whether this routing call sits on a failure
+// branch — the post-retro recovery decision or the audit-FAIL learning
+// choice — where the failure vocabulary applies. Happy-path prompts stay
+// byte-identical (prompt-prefix cache friendliness).
+func isFailureTransition(in router.RouteInput) bool {
+	switch strings.ToLower(strings.TrimSpace(in.Current)) {
+	case "retrospective", "retro":
+		return true
+	case "audit":
+		return in.Verdict == "FAIL"
+	}
+	return false
+}
+
+// writeFailureVocabulary renders the failure-path decision space (failure
+// floor Phase 3). The floor is stated explicitly so the model does not
+// waste tokens proposing what the kernel will clamp.
+func writeFailureVocabulary(b *strings.Builder) {
+	b.WriteString("\n## Failure-path vocabulary (this is a failure transition)\n")
+	b.WriteString("- recovery_action: \"retry\" re-enters tdd to fix forward; \"end\" stops the cycle (e.g. budget nearly exhausted, systemic cause).\n")
+	fmt.Fprintf(b, "- insert_phases may name %s to run BEFORE the retry (they precede tdd in canonical order).\n",
+		strings.Join(router.FailureInsertPhases(), " or "))
+	b.WriteString("- learning_richness: \"memo\" routes the lightweight memo phase instead of the full retrospective after an audit FAIL; \"full\" (default) keeps the retrospective. Learning ALWAYS happens — the deterministic floor records the failure regardless of your choice.\n")
+	b.WriteString("- The failure-adapter's BLOCK verdicts are non-overridable: a blocked cycle ends no matter what you propose (the attempt is recorded as a clamp).\n")
 }
 
 // buildPlanPrompt renders the WHOLE-CYCLE planning context (ADR-0024 §2): the
@@ -365,17 +400,96 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 		}
 	}
 
-	// Decision rubric — renders skills/adversarial-testing/SKILL.md §7 inline so
-	// the advisor reasons from the same objective-signal table the kernel uses.
+	// Decision rubric — a PROJECTION of the structured routing data the
+	// kernel walks (failure floor Phase 4b). Only the FORBIDDEN line stays
+	// hardcoded — it is a kernel invariant, not phase data.
 	b.WriteString("\n## Decision rubric (justify each optional phase by an objective signal)\n")
-	b.WriteString("- scout.carryover_count >= 3 → skip scout (work already queued)\n")
-	b.WriteString("- scout.item_count == 0 → end cycle early (no-ship is legitimate)\n")
-	b.WriteString("- scout.cycle_size == large OR a novel/cross-cutting goal → insert architecture-design (a design pass before tdd/build)\n")
-	b.WriteString("- build.files_touched >= 10 OR build.diff_loc >= 500 → insert plan-review\n")
-	b.WriteString("- build.acs_red >= 1 OR build.severity_max >= HIGH → insert tester\n")
-	b.WriteString("- audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective\n")
-	b.WriteString("- cycle_size == trivial → skip tdd (conditional-mandatory exemption)\n")
+	writeRubricLines(b, in.Cfg)
 	b.WriteString("FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n")
+}
+
+// writeRubricLines renders the decision rubric as a projection of the
+// structured routing data the kernel already walks — conditional_mandatory
+// rules (op negated: the rule says when the phase is PINNED; the rubric
+// tells the advisor when it may be skipped), insert_when triggers, and the
+// judgment-only routing.rubric_hint lines from the registry. One renderer,
+// one home per belief: a threshold can never disagree between the walk and
+// the prompt. Phases sort for a deterministic, prompt-prefix-cache-friendly
+// string.
+func writeRubricLines(b *strings.Builder, cfg config.RoutingConfig) {
+	seen := make(map[string]struct{}, len(cfg.Triggers)+len(cfg.Conditional))
+	for p := range cfg.Conditional {
+		seen[p] = struct{}{}
+	}
+	for p := range cfg.Triggers {
+		seen[p] = struct{}{}
+	}
+	names := make([]string, 0, len(seen))
+	for p := range seen {
+		names = append(names, p)
+	}
+	sort.Strings(names)
+	for _, p := range names {
+		if rule, ok := cfg.Conditional[p]; ok {
+			if op, ok := negateOp(rule.Op); ok {
+				fmt.Fprintf(b, "- %s %s %s → skip %s (conditional-mandatory exemption)\n", rule.Field, op, rule.Value, p)
+			}
+		}
+		blk := cfg.Triggers[p]
+		if len(blk.InsertWhen) > 0 {
+			clauses := make([]string, len(blk.InsertWhen))
+			for i, c := range blk.InsertWhen {
+				clauses[i] = fmt.Sprintf("%s %s %v", c.Field, opSymbol(c.Op), c.Value)
+			}
+			fmt.Fprintf(b, "- %s → insert %s\n", strings.Join(clauses, " OR "), p)
+		}
+		for _, hint := range blk.RubricHint {
+			fmt.Fprintf(b, "- %s\n", hint)
+		}
+	}
+}
+
+// opSymbol maps the condition-op vocabulary (router.evalCondition) to the
+// comparison symbol the rubric prose uses. Already-symbolic and unknown ops
+// render raw.
+func opSymbol(op string) string {
+	switch op {
+	case "eq":
+		return "=="
+	case "ne":
+		return "!="
+	case "gt":
+		return ">"
+	case "gte":
+		return ">="
+	case "lt":
+		return "<"
+	case "lte":
+		return "<="
+	}
+	return op
+}
+
+// negateOp inverts a comparison and returns it symbolically. parseCondRule
+// stores CondRule ops symbolically, but word-form ops (the Condition
+// vocabulary) are accepted too so an in-process caller cannot silently lose
+// an exemption line. Unknown ops render no line rather than a wrong one.
+func negateOp(op string) (string, bool) {
+	switch op {
+	case "==", "eq":
+		return "!=", true
+	case "!=", "ne":
+		return "==", true
+	case ">", "gt":
+		return "<=", true
+	case ">=", "gte":
+		return "<", true
+	case "<", "lt":
+		return ">=", true
+	case "<=", "lte":
+		return ">", true
+	}
+	return "", false
 }
 
 // writeRecallMemory renders the WS2 recall section — the most recent failure's
@@ -451,7 +565,8 @@ func parseProposal(stdout string) (*router.Proposal, error) {
 	if err := json.Unmarshal([]byte(stdout[start:end+1]), &prop); err != nil {
 		return nil, fmt.Errorf("parse proposal: %w", err)
 	}
-	if prop.NextPhase == "" && len(prop.InsertPhases) == 0 {
+	if prop.NextPhase == "" && len(prop.InsertPhases) == 0 &&
+		prop.RecoveryAction == "" && prop.LearningRichness == "" {
 		return nil, fmt.Errorf("empty proposal")
 	}
 	return &prop, nil

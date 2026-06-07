@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func TestPhasePolicy_Enabled(t *testing.T) {
@@ -33,6 +34,33 @@ func TestPhasePolicy_Enabled(t *testing.T) {
 	for _, c := range cases {
 		if got := p.Enabled(c.phase, c.sig); got != c.want {
 			t.Errorf("%s: Enabled(%q) = %v, want %v", c.name, c.phase, got, c.want)
+		}
+	}
+}
+
+// FailureRouteFromPolicy is the policy→router fold (Phase 4a). The
+// always_learn=false downgrade applies to the DEFAULT route only — an
+// explicitly written audit_fail_routes_to wins (explicit beats derived).
+func TestFailureRouteFromPolicy(t *testing.T) {
+	f := func(b bool) *bool { return &b }
+	cases := []struct {
+		name  string
+		floor *policy.FailureFloor
+		want  string
+	}{
+		{"absent floor keeps legacy enable-chain", nil, ""},
+		{"empty block routes the default", &policy.FailureFloor{}, "retrospective"},
+		{"always_learn=false folds the default to memo", &policy.FailureFloor{AlwaysLearn: f(false)}, "memo"},
+		{"explicit retrospective beats the always_learn fold", &policy.FailureFloor{AlwaysLearn: f(false), AuditFailRoutesTo: "retrospective"}, "retrospective"},
+		{"explicit memo stands with always_learn=false", &policy.FailureFloor{AlwaysLearn: f(false), AuditFailRoutesTo: "memo"}, "memo"},
+		{"explicit memo stands alone", &policy.FailureFloor{AuditFailRoutesTo: "memo"}, "memo"},
+		{"typo route alone falls back to the default", &policy.FailureFloor{AuditFailRoutesTo: "retro"}, "retrospective"},
+		{"typo route with always_learn=false folds to memo", &policy.FailureFloor{AlwaysLearn: f(false), AuditFailRoutesTo: "retro"}, "memo"},
+	}
+	for _, c := range cases {
+		got := FailureRouteFromPolicy(policy.Policy{FailureFloor: c.floor})
+		if got != c.want {
+			t.Errorf("%s: FailureRouteFromPolicy = %q, want %q", c.name, got, c.want)
 		}
 	}
 }

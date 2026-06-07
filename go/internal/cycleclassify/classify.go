@@ -27,6 +27,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Classification is the typed verdict the classifier returns. The
@@ -108,6 +111,16 @@ func Classify(workspace string) Result {
 	// case from per-phase artifacts. The pattern passes harmlessly miss on
 	// empty data; nothing else here needs reportData to be non-empty.
 
+	// Pass 0 (ADR-0039 §7): a phase that self-reported a structured failure
+	// class (sentinel v2) is the authority on WHY it failed — the regex
+	// passes below are heuristics over prose. Only classes that normalize
+	// into the canonical taxonomy are trusted; an out-of-taxonomy agent
+	// string falls through to the regex passes (never UnknownClassification,
+	// never blind trust).
+	if cls, ok := classifyFromSentinels(workspace); ok {
+		return cls
+	}
+
 	// Pass 1: infrastructure in orchestrator-report.md.
 	if m := reInfrastructure.Find(reportData); m != nil {
 		return Result{Class: ClassInfrastructure, Marker: string(m), Source: "orchestrator-report.md"}
@@ -157,6 +170,49 @@ func Classify(workspace string) Result {
 	}
 	// Report exists but no pattern matched → breach.
 	return Result{Class: ClassIntegrityBreach}
+}
+
+// classifyFromSentinels scans the workspace's phase reports (sorted glob —
+// deterministic when several phases self-reported) for a FAIL/WARN verdict
+// sentinel carrying a failure block, and returns its class normalized through
+// failurelog.NormalizeLegacy. failurelog.Record re-normalizes idempotently
+// (canonical values pass through), so the canonical string is wire-safe.
+func classifyFromSentinels(workspace string) (Result, bool) {
+	reports, err := globFn(filepath.Join(workspace, "*-report.md"))
+	if err != nil {
+		return Result{}, false
+	}
+	sort.Strings(reports)
+	for _, path := range reports {
+		switch filepath.Base(path) {
+		case "orchestrator-report.md", "retrospective-report.md":
+			// The supervisor's report is prose for the regex passes; the
+			// retrospective is learning ABOUT a failure, not the failure.
+			continue
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			continue
+		}
+		// FAIL only: a phase's FAIL IS the cycle's failure, but a WARN is
+		// not necessarily why the cycle stopped — a later infra crash must
+		// keep winning (the pass-ordering invariant: infrastructure beats
+		// audit-fail). WARNs fall through to the regex passes.
+		s, ok := phasecontract.ParseVerdictSentinelFull(string(data))
+		if !ok || s.Verdict != "FAIL" || s.Failure == nil || s.Failure.Class == "" {
+			continue
+		}
+		norm := failurelog.NormalizeLegacy(s.Failure.Class)
+		if norm == failurelog.UnknownClassification {
+			continue // out-of-taxonomy → regex passes decide
+		}
+		return Result{
+			Class:  Classification(norm),
+			Marker: s.Failure.Class,
+			Source: filepath.Base(path),
+		}, true
+	}
+	return Result{}, false
 }
 
 // detectEmptyOutputSession reports whether some phase was launched (its

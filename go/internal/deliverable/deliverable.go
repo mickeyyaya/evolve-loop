@@ -49,6 +49,10 @@ const (
 	CodeStrayInWorktree = "stray_in_worktree"
 	CodeInvalidJSON     = "invalid_json"
 	CodeMissingKey      = "missing_key"
+	// CodeFailureContextMissing: a sentinel-declared FAIL/WARN lacks the
+	// ADR-0039 structured failure block. (snake_case to match this closed
+	// vocabulary; ADR prose spells it with hyphens.)
+	CodeFailureContextMissing = "failure_context_missing"
 )
 
 // Verify runs the deterministic well-formedness checks for a phase's deliverable
@@ -111,6 +115,18 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	}
 	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts) {
 		res.add(CodeBadVerdict, fmt.Sprintf("no parseable verdict; expected one of %v", c.Verdicts))
+	}
+	// ADR-0039 §7: a sentinel-declared FAIL/WARN on a RequireFailureContext
+	// contract must carry the structured failure block. Applies ONLY to
+	// sentinel verdicts — legacy prose-only artifacts stay legal forever.
+	// The message is the correction directive (re-dispatched verbatim).
+	if c.RequireFailureContext {
+		if s, ok := phasecontract.ParseVerdictSentinelFull(content); ok &&
+			(s.Verdict == "FAIL" || s.Verdict == "WARN") &&
+			(s.Failure == nil || s.Failure.Class == "") {
+			res.add(CodeFailureContextMissing, fmt.Sprintf(
+				"verdict %s declares no structured failure context — re-emit the evolve-verdict sentinel as schema_version 2 with a failure block: {\"class\":\"<failure class>\",\"defects\":[\"<one line per defect>\"],\"evidence_paths\":[\"<artifact>\"]}", s.Verdict))
+		}
 	}
 	checkStray(res, c, roots)
 }

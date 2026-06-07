@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Digest is the observe→digest boundary: the ONLY code that knows the on-disk
@@ -47,7 +49,32 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 			sig.foldGeneric("audit", raw)
 		}
 	}
+	// ADR-0039 §7: lift each completed phase's structured failure context
+	// (report-sentinel v2 failure block) onto the generic plane — this is
+	// what lets failure-phase insertion be DATA-driven via insert_when.
+	for _, phase := range completed {
+		sig.foldFailureSentinel(workspace, phase)
+	}
 	return sig, nil
+}
+
+// foldFailureSentinel surfaces a phase's self-reported failure as
+// <phase>.failure_class + <phase>.defect_count generic signals, via the ONE
+// shared reader (phasecontract.ReadFailureBlock). Fail-open: no report/block
+// is a no-op — crash-class failures are the supervisor's to synthesize, not
+// the router's.
+func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
+	fb, ok := phasecontract.ReadFailureBlock(workspace, phase)
+	if !ok {
+		return
+	}
+	if s.Generic == nil {
+		s.Generic = make(map[string]any, 2)
+	}
+	// float64 matches the generic plane's JSON-number convention
+	// (GenericValue doc: numeric callers assert float64).
+	s.Generic[phase+".failure_class"] = fb.Class
+	s.Generic[phase+".defect_count"] = float64(len(fb.Defects))
 }
 
 // foldGeneric merges a handoff's uniform top-level "signals" object into

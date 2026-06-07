@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
@@ -309,5 +310,83 @@ func TestClassify_SortedEventsScan(t *testing.T) {
 	}
 	if r.Source != "alpha-events.ndjson" {
 		t.Fatalf("source=%q want alpha-events.ndjson (sorted scan)", r.Source)
+	}
+}
+
+// --- ADR-0039 §7 item 6: Pass 0 — structured sentinel beats regex guess ---
+
+// A phase that self-reported a structured failure class (sentinel v2) is the
+// authority on WHY it failed; the regex passes are heuristics over prose and
+// must not override it.
+func TestClassify_Pass0_StructuredClassBeatsRegex(t *testing.T) {
+	// Prose alone would regex-classify audit-fail (Pass 4).
+	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
+	line := phasecontract.RenderVerdictSentinelWithFailure("tdd", "FAIL",
+		&phasecontract.FailureBlock{Class: "code-build-fail", Defects: []string{"red suite"}})
+	if err := os.WriteFile(filepath.Join(ws, "test-report.md"), []byte("## Tests\nFAIL\n"+line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := Classify(ws)
+	if got.Class != Classification("code-build-fail") {
+		t.Errorf("Class = %q, want code-build-fail (structured sentinel, normalized)", got.Class)
+	}
+	if got.Source != "test-report.md" {
+		t.Errorf("Source = %q, want test-report.md", got.Source)
+	}
+}
+
+// An out-of-taxonomy structured class falls through to the regex passes —
+// never UnknownClassification, never a blind trust of arbitrary agent strings.
+func TestClassify_Pass0_UnknownClassFallsThroughToRegex(t *testing.T) {
+	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
+	line := phasecontract.RenderVerdictSentinelWithFailure("tdd", "FAIL",
+		&phasecontract.FailureBlock{Class: "totally-novel-class"})
+	if err := os.WriteFile(filepath.Join(ws, "test-report.md"), []byte("## Tests\n"+line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := Classify(ws)
+	if got.Class != ClassAuditFail {
+		t.Errorf("Class = %q, want audit-fail (regex fallback; unknown structured class is not trusted)", got.Class)
+	}
+}
+
+// A PASS sentinel (or no failure block) leaves every pass untouched.
+func TestClassify_Pass0_PassSentinelInert(t *testing.T) {
+	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
+	if err := os.WriteFile(filepath.Join(ws, "scout-report.md"),
+		[]byte("## Findings\n"+phasecontract.RenderVerdictSentinel("scout", "PASS")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Classify(ws); got.Class != ClassAuditFail {
+		t.Errorf("Class = %q, want audit-fail (PASS sentinel must be inert)", got.Class)
+	}
+}
+
+// Pass 0 is FAIL-only: a WARN sentinel is not necessarily the reason the
+// cycle stopped — a later infra crash must keep winning (the established
+// pass-ordering invariant: infrastructure beats audit-fail).
+func TestClassify_Pass0_WarnDoesNotSuppressInfra(t *testing.T) {
+	ws := writeReport(t, "# Cycle Report\nsandbox-exec: Operation not permitted\n")
+	line := phasecontract.RenderVerdictSentinelWithFailure("audit", "WARN",
+		&phasecontract.FailureBlock{Class: "code-audit-warn", Defects: []string{"w1"}})
+	if err := os.WriteFile(filepath.Join(ws, "audit-report.md"), []byte("## Verdict\nWARN\n"+line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Classify(ws); got.Class != ClassInfrastructure {
+		t.Errorf("Class = %q, want infrastructure (WARN sentinel must not suppress the infra pass)", got.Class)
+	}
+}
+
+// The floor's own retrospective-report.md is learning ABOUT a failure, not
+// the failure itself — never a Pass-0 source.
+func TestClassify_Pass0_SkipsRetrospectiveReport(t *testing.T) {
+	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
+	line := phasecontract.RenderVerdictSentinelWithFailure("retrospective", "FAIL",
+		&phasecontract.FailureBlock{Class: "infrastructure-transient"})
+	if err := os.WriteFile(filepath.Join(ws, "retrospective-report.md"), []byte("# Retro\n"+line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Classify(ws); got.Class != ClassAuditFail {
+		t.Errorf("Class = %q, want audit-fail (retrospective report excluded from Pass 0)", got.Class)
 	}
 }

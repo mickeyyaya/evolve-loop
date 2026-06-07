@@ -83,10 +83,12 @@ func shouldPropose(in RouteInput) bool {
 // isBranchTransition reports whether the just-completed phase is a routing branch
 // point — where the verdict/signals genuinely fork the remaining plan. Extend
 // this set when adding a phase that produces NEW post-phase objective signals
-// worth a per-transition advisory (today: build's ACS, audit's verdict).
+// worth a per-transition advisory (today: build's ACS, audit's verdict, and
+// the retrospective's failure context — recovery retry/end + failure-scoped
+// inserts are advisor-decidable, failure floor Phase 3).
 func isBranchTransition(current string) bool {
 	switch normalize(current) {
-	case "build", "audit":
+	case "build", "audit", "retrospective":
 		return true
 	}
 	return false
