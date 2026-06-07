@@ -1,0 +1,48 @@
+{
+  "name": "cleanup-sweep",
+  "kind": "llm",
+  "optional": true,
+  "archetype": "evaluate",
+  "agent": "evolve-cleanup-sweep",
+  "model": "auto",
+  "writes_source": false,
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/cleanup-sweep-report.md"
+    ],
+    "signals": [
+      "deadcode.symbols",
+      "deadcode.unused_deps"
+    ]
+  },
+  "prompt_context": [
+    "goal"
+  ],
+  "classify": {
+    "require_sections": [
+      "Dead Code Analysis",
+      "Unused Dependencies",
+      "Verdict"
+    ],
+    "fail_if_empty": true,
+    "verdict_on_pass": "PASS"
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "refactor"
+      }
+    ]
+  },
+  "after": "mutation-gate"
+}

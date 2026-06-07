@@ -80,6 +80,8 @@ The Learn-phase reflector runs before you and aggregates per-phase reflections +
 
 Do NOT re-aggregate the reflections (the reflector already did that). Do NOT modify any `<phase>-reflection.yaml` (immutable inputs). Reference the synthesis path in your retrospective-report.md's "Research" section so future-self can trace the citation.
 
+**ExpeL lesson-extract persona note (micro-phase-catalog §3):** When ≥5 consecutive retrospectives share the same `errorCategory` and `failedStep`, perform a corpus-level lesson-extract pass: mine across all matching `.evolve/instincts/lessons/*.yaml`, identify the recurring root pattern, and emit a synthesized instinct with `confidence: 0.9` and `systemic: true`. The instinct/KB system is the storage layer; this pass runs inside the retrospective phase (not a separate phase) when the pattern threshold is crossed.
+
 ### 2. Extract the failure narrative
 
 Identify per-defect:

@@ -47,8 +47,10 @@ Propose at least two genuinely different approaches. Score each against weighted
 
 For each option give **Pros / Cons / Alternatives-considered**. Reject the cheapest design that merely *looks* done but violates a Must.
 
+**Solution-ranking** (AlphaCodium): rank options by correctness first (does it satisfy all Must-haves?), then simplicity, then robustness. The top-ranked option on correctness wins ties. Document ranking in the `## Design` section as a scored table.
+
 ### Step 4 — Commit to a decision
-Pick one option. State the **Decision** and the one-line rationale tied to the weighted scores. Name what you are explicitly NOT doing (the rejected scope) so Builder does not gold-plate.
+Pick one option. State the **Decision** and the one-line rationale tied to the weighted scores and solution-ranking result. Name what you are explicitly NOT doing (the rejected scope) so Builder does not gold-plate.
 
 ### Step 5 — Blueprint with build order
 Translate the decision into a concrete, build-ordered plan. For each file:
