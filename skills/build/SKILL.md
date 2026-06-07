@@ -35,13 +35,24 @@ Builder runs in a worktree with `EVOLVE_BUILDER_WORKTREE` set. Concurrent builde
 
 This is **why Builder cannot fan-out** even though Scout and Auditor can.
 
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/builder.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `build` (build archetype, mandatory) |
+| Persona | `agents/evolve-builder.md` |
+| Profile | `.evolve/profiles/builder.json` — CLI `codex-tmux`, tier `sonnet`, single-writer |
+| Inputs | `scout-report.md` · `triage-decision.md` |
+| Artifact | `build-report.md` (cycle workspace) |
+
 ## Output contract
 
-`<workspace>/build-report.md` with sections:
-- `## Files Modified`
-- `## Test Results` (must show RED → GREEN transition)
-- `## Regression Status`
-- `## Build Status` (PASS / FAIL)
+`build-report.md` must declare:
+
+- `## Changes` (also accepted: `## Files Changed`, `## Files Modified`)
+
+<!-- GENERATED:phase-facts END -->
 
 ## Composition
 

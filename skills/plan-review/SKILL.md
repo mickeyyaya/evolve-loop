@@ -36,9 +36,26 @@ description: Use when scout-report.md exists and TDD/Build hasn't started yet. R
 | `REVISE` | Avg ≥ 5 AND any lens < 5 | Re-run Scout (max 2 retries) |
 | `ABORT` | Any lens explicit ABORT, OR avg < 5 | End cycle |
 
+## Report format
+
+First line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
+
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/plan-reviewer.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `plan-review` (plan archetype, optional, gated by `EVOLVE_PLAN_REVIEW`) |
+| Persona | `agents/plan-reviewer.md` |
+| Profile | `.evolve/profiles/plan-reviewer.json` — CLI `codex-tmux`, tier `sonnet`, fan-out ×4 |
+| Inputs | `scout-report.md` · `triage-decision.md` |
+| Artifact | `plan-review-report.md` (cycle workspace) |
+
 ## Output contract
 
-`<workspace>/plan-review-report.md` with first line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
+`plan-review-report.md` — no required sections (classified by the phase runner).
+
+<!-- GENERATED:phase-facts END -->
 
 ## Composition
 
@@ -46,7 +63,7 @@ Invoked by:
 - `/evolve-loop:plan-review`
 - `loop` macro (between Scout and TDD when `EVOLVE_PLAN_REVIEW=1`)
 
-The `plan-reviewer` persona uses `parallel_subtasks` (see `.evolve/profiles/plan-reviewer.json`) — four lens sub-personas run concurrently and merge via `aggregator.sh phase=plan-review`.
+The `plan-reviewer` persona uses `parallel_subtasks` (see `.evolve/profiles/plan-reviewer.json`) — the lens sub-personas (count projected into Phase facts above) run concurrently and merge via `aggregator.sh phase=plan-review`.
 
 ## Reference
 

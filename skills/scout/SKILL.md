@@ -29,7 +29,7 @@ description: Use when starting a new evolve-loop cycle and the cycle goal is amb
 | 4 | Surface unknowns + risks | Risks enumerated with mitigation hints |
 | 5 | Write spec to `<workspace>/spec.md` | File present, fresh, contains challenge token |
 
-## Output contract
+## Spec format (standalone deliverable)
 
 Spec at `<workspace>/spec.md` with sections:
 - `## Goal` (one paragraph)
@@ -37,6 +37,25 @@ Spec at `<workspace>/spec.md` with sections:
 - `## Dependency Graph` (text or ASCII)
 - `## Risks` (table: risk / likelihood / mitigation)
 - `## Out of Scope` (explicit deferrals)
+
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/scout.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `scout` (plan archetype, mandatory) |
+| Persona | `agents/evolve-scout.md` |
+| Profile | `.evolve/profiles/scout.json` — CLI `claude-tmux`, tier `sonnet`, fan-out ×3 |
+| Inputs | `intent.md` |
+| Artifact | `scout-report.md` (cycle workspace) |
+
+## Output contract
+
+`scout-report.md` must declare:
+
+- `## Selected Tasks` (also accepted: `## Proposed Tasks`)
+
+<!-- GENERATED:phase-facts END -->
 
 ## Composition
 

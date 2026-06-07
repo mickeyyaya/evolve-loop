@@ -39,6 +39,25 @@ This skill MUST NOT block on human approval. The intent persona produces intent.
 
 Like every other agent, intent.md gets a ledger entry with `(artifact_sha256, git_head, tree_state_sha, challenge_token)`. ship.sh's downstream tree-state check works against the same SHA-binding the auditor uses.
 
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/intent.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `intent` (plan archetype, optional, gated by `EVOLVE_REQUIRE_INTENT`) |
+| Persona | `agents/evolve-intent.md` |
+| Profile | `.evolve/profiles/intent.json` — CLI `claude-tmux`, tier `opus`, single-writer |
+| Artifact | `intent.md` (cycle workspace) |
+
+## Output contract
+
+`intent.md` must declare:
+
+- `goal:`
+- `acceptance_checks:`
+
+<!-- GENERATED:phase-facts END -->
+
 ## Composition
 
 Invoked by:

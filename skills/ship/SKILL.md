@@ -35,6 +35,17 @@ Ship is ATOMIC by design — even if other phases fan out, Ship cannot. There is
 
 `legacy/scripts/lifecycle/ship.sh` refuses to ship if the current tree-state SHA differs from the SHA captured at audit time (in the auditor's ledger entry). Prevents "audit cycle 50, ship cycle 51" exploits. This guarantee is preserved through Sprint 3's tri-layer refactor.
 
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/orchestrator.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `ship` (control archetype, mandatory) |
+| Persona | `agents/evolve-orchestrator.md` |
+| Profile | `.evolve/profiles/orchestrator.json` — CLI `claude-tmux`, tier `sonnet`, single-writer |
+| Inputs | `audit-report.md` |
+<!-- GENERATED:phase-facts END -->
+
 ## Composition
 
 Invoked by:

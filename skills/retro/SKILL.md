@@ -34,9 +34,26 @@ description: Use after ship completes. Three sub-reflectors (instinct, gene, fai
 | `retro-gene` | Gene-pool updates based on cycle outcome | `## Lesson: <gene insight>` |
 | `retro-failure` | Failed approaches with reproduction steps | `## Lesson: <failure pattern>` |
 
+## Report format
+
+`retrospective-report.md` carries deduplicated `## Lesson:` blocks. Optionally one or more YAML files in `.evolve/instincts/lessons/`.
+
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/retrospective.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `retrospective` (control archetype, optional, gated by `EVOLVE_DISABLE_AUTO_RETROSPECTIVE`) |
+| Persona | `agents/evolve-retrospective.md` |
+| Profile | `.evolve/profiles/retrospective.json` — CLI `claude-tmux`, tier `sonnet`, fan-out ×3 |
+| Inputs | `audit-report.md` · `build-report.md` |
+| Artifact | `retrospective-report.md` (cycle workspace) |
+
 ## Output contract
 
-`<workspace>/retrospective-report.md` with deduplicated `## Lesson:` blocks. Optionally one or more YAML files in `.evolve/instincts/lessons/`.
+`retrospective-report.md` — no required sections (classified by the phase runner).
+
+<!-- GENERATED:phase-facts END -->
 
 ## Composition
 
@@ -44,7 +61,7 @@ Invoked by:
 - `/evolve-loop:retro`
 - `loop` macro after `/ship`
 
-Fan-out controlled by `.evolve/profiles/retrospective.json:parallel_subtasks` (3 entries).
+Fan-out prompts live in `.evolve/profiles/retrospective.json:parallel_subtasks` (count projected into Phase facts above).
 
 ## Reference
 

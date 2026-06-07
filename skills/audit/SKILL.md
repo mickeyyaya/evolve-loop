@@ -38,9 +38,25 @@ description: Use after build has produced build-report.md. Validates the build v
 
 Default ON: each sub-auditor's prompt prepends "ADVERSARIAL AUDIT MODE — require positive evidence for PASS". Disable only via `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps. Auditor model defaults to Opus while Builder defaults to Sonnet — different family breaks same-model-judge sycophancy.
 
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/auditor.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `audit` (evaluate archetype, mandatory) |
+| Persona | `agents/evolve-auditor.md` |
+| Profile | `.evolve/profiles/auditor.json` — CLI `claude-tmux`, tier `sonnet`, fan-out ×4 |
+| Inputs | `build-report.md` · `tester-report.md` |
+| Artifact | `audit-report.md` (cycle workspace) |
+
 ## Output contract
 
-`<workspace>/audit-report.md` with first line `Verdict: <X>`, then four lens reports concatenated.
+`audit-report.md` must declare:
+
+- `## Verdict` (also accepted: `Verdict:`)
+
+Verdict tokens: `PASS` | `FAIL` | `WARN` | `SKIPPED`.
+<!-- GENERATED:phase-facts END -->
 
 ## Composition
 
@@ -48,7 +64,7 @@ Invoked by:
 - `/evolve-loop:audit`
 - `loop` macro after `/build`
 
-Fan-out controlled by `.evolve/profiles/auditor.json:parallel_subtasks` (4 entries).
+Fan-out prompts live in `.evolve/profiles/auditor.json:parallel_subtasks` (count projected into Phase facts above).
 
 ## Reference
 

@@ -93,6 +93,9 @@ v12.1 utilities + composition:
   skill-inventory           Build .evolve/skill-inventory.json from
                               skills/*/SKILL.md ( skill-inventory build
                               [--ttl 1h] [--force] )
+  skills                    Project phase facts into phase skill docs
+                              from their SSOTs; drift-checked in CI
+                              ( skills <generate|check> ) — ADR-0040
   eval                      Eval-quality + verify subcommands
                               ( eval quality-check <eval.md>
                               | eval verify <eval.md> <workspace> )

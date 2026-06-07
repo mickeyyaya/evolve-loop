@@ -32,11 +32,31 @@ description: Use when the plan-review verdict is PROCEED (or plan-review is disa
 
 Tests MUST fail when run against the current codebase. A test that passes immediately is NOT a TDD contract — it does not exercise the new behavior. Builder will refuse to start without confirmed RED state.
 
-## Output contract
+## Handoffs (beyond the contract artifact)
 
 - `<workspace>/tdd-contract.md` with sections: `## Tests Written`, `## RED Verification`, `## Contract for Builder`
 - New/modified test files in the repo (Builder reads these)
 - `<workspace>/team-context.md` has populated `## TDD Contract` section
+
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/tdd-engineer.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `tdd` (plan archetype, optional, gated by `EVOLVE_TEST_PHASE_ENABLED`) |
+| Persona | `agents/evolve-tdd-engineer.md` |
+| Profile | `.evolve/profiles/tdd-engineer.json` — CLI `claude-tmux`, tier `opus`, single-writer |
+| Inputs | `scout-report.md` · `plan-review-report.md` |
+| Artifact | `test-report.md` (cycle workspace) |
+
+## Output contract
+
+`test-report.md` must declare:
+
+- `## AC-Materialization` (also accepted: `## Acceptance`, `## Coverage Map`)
+- `## RED Run Output` (also accepted: `## RED Tests`, `## Test Files Written`)
+
+<!-- GENERATED:phase-facts END -->
 
 ## Composition
 

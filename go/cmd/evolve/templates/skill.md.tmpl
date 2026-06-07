@@ -1,0 +1,26 @@
+<!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/{{.Role}}.json -->
+## Phase facts
+
+| Fact | Value |
+|---|---|
+| Phase | `{{.Phase}}` ({{.Archetype}} archetype, {{if .Optional}}optional{{else}}mandatory{{end}}{{if .EnableVar}}, gated by `{{.EnableVar}}`{{end}}) |
+| Persona | {{if .PersonaPath}}`{{.PersonaPath}}`{{else}}— (native phase){{end}} |
+| Profile | `.evolve/profiles/{{.Role}}.json` — CLI `{{.CLI}}`, tier `{{.Tier}}`{{if .FanOut}}, fan-out ×{{.FanOut}}{{else}}, single-writer{{end}} |
+{{- if .InputFiles}}
+| Inputs | {{range $i, $f := .InputFiles}}{{if $i}} · {{end}}`{{$f}}`{{end}} |
+{{- end}}
+{{- if .ArtifactName}}
+| Artifact | `{{.ArtifactName}}` ({{.WriteTargetLabel}}) |
+
+## Output contract
+
+`{{.ArtifactName}}`{{if .Sections}} must declare:
+
+{{range .Sections}}- `{{.Canonical}}`{{if .Alternates}} (also accepted: {{range $i, $a := .Alternates}}{{if $i}}, {{end}}`{{$a}}`{{end}}){{end}}
+{{end}}{{else}} — no required sections (classified by the phase runner).
+{{end}}
+{{- end}}
+{{- if .Verdicts}}
+Verdict tokens: {{range $i, $v := .Verdicts}}{{if $i}} | {{end}}`{{$v}}`{{end}}.
+{{- end}}
+<!-- GENERATED:phase-facts END -->
