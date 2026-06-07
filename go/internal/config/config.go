@@ -179,6 +179,12 @@ type RoutingConfig struct {
 	// loaded without a registry stays byte-identical to pre-Order behavior).
 	// The composition root may splice user phases into this slice.
 	Order []string
+	// AuditFailRoutesTo is the failure-floor policy route for the audit-FAIL
+	// edge ("retrospective" | "memo"), merged from .evolve/policy.json:
+	// failure_floor at the composition root — the ONE user surface for this
+	// decision. Empty ⇒ the deprecated enable-chain behavior
+	// (EVOLVE_DISABLE_AUTO_RETROSPECTIVE) stands for one more release.
+	AuditFailRoutesTo string
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match

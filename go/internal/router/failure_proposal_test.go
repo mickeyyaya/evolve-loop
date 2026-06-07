@@ -183,3 +183,64 @@ func TestShouldPropose_RetroIsBranchTransition(t *testing.T) {
 		t.Error("retrospective must be a branch transition (proposer consulted on failure paths)")
 	}
 }
+
+// Phase 4a: the audit-FAIL route comes from ONE surface —
+// policy.json:failure_floor — not the deprecated env-flag enable chain.
+// Policy wins when both are set.
+func TestAuditFail_RoutesPerFailurePolicyNotEnableVar(t *testing.T) {
+	auditFail := func() RouteInput {
+		in := base("audit")
+		in.Verdict = "FAIL"
+		in.Completed = []string{"scout", "build", "audit"}
+		return in
+	}
+
+	// Deprecated env-flag path says OFF — policy must still win.
+	t.Run("memo route beats enable-chain off", func(t *testing.T) {
+		in := auditFail()
+		in.Cfg.AuditFailRoutesTo = "memo"
+		in.Cfg.PhaseEnable["retrospective"] = config.EnableOff
+		d := Route(in, nil)
+		if d.NextPhase != "memo" {
+			t.Errorf("audit(FAIL) with failure_floor route=memo → %q, want memo (policy is the one surface)", d.NextPhase)
+		}
+	})
+
+	t.Run("retrospective route beats enable-chain off", func(t *testing.T) {
+		in := auditFail()
+		in.Cfg.AuditFailRoutesTo = "retrospective"
+		in.Cfg.PhaseEnable["retrospective"] = config.EnableOff
+		d := Route(in, nil)
+		if d.NextPhase != "retrospective" {
+			t.Errorf("audit(FAIL) with failure_floor route=retrospective → %q, want retrospective", d.NextPhase)
+		}
+	})
+
+	// Policy already routed memo and the advisor proposes memo richness:
+	// the proposal AGREES with the decision — evidence recorded, but a
+	// clamp here would be forensic noise (nothing was forced).
+	t.Run("memo route with agreeing memo proposal records no clamp", func(t *testing.T) {
+		in := auditFail()
+		in.Cfg.AuditFailRoutesTo = "memo"
+		d := Route(in, &Proposal{LearningRichness: "memo"})
+		if d.NextPhase != "memo" {
+			t.Fatalf("audit(FAIL) route=memo + richness=memo → %q, want memo", d.NextPhase)
+		}
+		if got := d.Evidence["learning_richness"]; got != "memo" {
+			t.Errorf("evidence learning_richness = %v, want memo", got)
+		}
+		if hasClamp(d, "failure-proposal-clamped") {
+			t.Errorf("agreeing proposal must not be clamp-recorded; got %+v", d.Clamps)
+		}
+	})
+
+	// Unset (legacy) keeps the deprecated enable-chain behavior.
+	t.Run("legacy path unset falls back to enable-chain", func(t *testing.T) {
+		in := auditFail()
+		in.Cfg.PhaseEnable["retrospective"] = config.EnableOff
+		d := Route(in, nil)
+		if d.NextPhase != PhaseEnd {
+			t.Errorf("audit(FAIL) legacy path with EnableOff → %q, want end", d.NextPhase)
+		}
+	})
+}

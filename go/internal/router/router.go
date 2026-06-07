@@ -233,7 +233,13 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 				Reason:    "audit-fail-to-retrospective",
 				Evidence:  map[string]interface{}{"verdict": in.Verdict},
 			}
-			if enableOf(in.Cfg, "retrospective") == config.EnableOff {
+			if in.Cfg.AuditFailRoutesTo != "" {
+				// Phase 4a: policy.json:failure_floor is the one surface
+				// for this route; it supersedes the deprecated env-flag
+				// enable chain entirely.
+				d.NextPhase = in.Cfg.AuditFailRoutesTo
+				d.Reason = "audit-fail-to-" + in.Cfg.AuditFailRoutesTo
+			} else if enableOf(in.Cfg, "retrospective") == config.EnableOff {
 				d.NextPhase = PhaseEnd
 			}
 			applyLearningRichness(&d, proposal, in)
@@ -345,6 +351,11 @@ func applyLearningRichness(d *RouterDecision, proposal *Proposal, in RouteInput)
 	// (retrospective disabled → end, or memo disabled) is clamped, never
 	// silently dropped: the forensic trail is the point of this feature.
 	d.Evidence["learning_richness"] = proposal.LearningRichness
+	if d.NextPhase == "memo" {
+		// Policy already routed memo (Phase 4a) and the advisor agrees —
+		// nothing was forced, so a clamp here would be forensic noise.
+		return
+	}
 	if d.NextPhase != "retrospective" || enableOf(in.Cfg, "memo") == config.EnableOff {
 		d.Clamps = append(d.Clamps, Clamp{
 			Rule:     "failure-proposal-clamped",

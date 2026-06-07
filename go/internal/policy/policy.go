@@ -51,6 +51,44 @@ type Policy struct {
 	// it, so policy can never (even by typo) produce a floor without an
 	// evaluator. This is the ONLY hard product invariant in this layer.
 	ShipFloor []string `json:"ship_floor,omitempty"`
+	// FailureFloor is the ONE user surface for failure-learning policy
+	// (failure floor Phase 4a). It tunes the LLM-learning layer only —
+	// the deterministic floor (FailedRecord + retrospective/lesson
+	// artifacts on every abnormal termination) is NON-configurable, like
+	// the integrity floor.
+	FailureFloor *FailureFloor `json:"failure_floor,omitempty"`
+}
+
+// FailureFloor configures the failure-learning policy surface.
+type FailureFloor struct {
+	// AlwaysLearn=false tunes LLM-retro richness down (memo-weight
+	// learning after an audit FAIL); it can NEVER suppress the
+	// deterministic floor. Absent ⇒ true.
+	AlwaysLearn *bool `json:"always_learn,omitempty"`
+	// AuditFailRoutesTo picks the learning phase after an audit FAIL:
+	// "retrospective" (default) or "memo". Unknown values fall back to
+	// the default — the floor guarantees SOME learning phase routes.
+	AuditFailRoutesTo string `json:"audit_fail_routes_to,omitempty"`
+}
+
+// FailurePolicy resolves the failure_floor config with defaults applied:
+// (true, "retrospective") for an absent/partial block; unknown route
+// values fall back to the default. Pure.
+func (p Policy) FailurePolicy() (alwaysLearn bool, auditFailRoutesTo string) {
+	alwaysLearn, auditFailRoutesTo = true, "retrospective"
+	if p.FailureFloor == nil {
+		return alwaysLearn, auditFailRoutesTo
+	}
+	if p.FailureFloor.AlwaysLearn != nil {
+		alwaysLearn = *p.FailureFloor.AlwaysLearn
+	}
+	// Closed vocabulary: unknown values fall back to the default so the floor
+	// guarantees SOME learning phase routes regardless of a typo.
+	switch p.FailureFloor.AuditFailRoutesTo {
+	case "retrospective", "memo":
+		auditFailRoutesTo = p.FailureFloor.AuditFailRoutesTo
+	}
+	return alwaysLearn, auditFailRoutesTo
 }
 
 // evaluatorFloorPhase is the single non-removable floor phase: a plan can never
