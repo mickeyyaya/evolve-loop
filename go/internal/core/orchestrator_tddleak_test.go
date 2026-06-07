@@ -97,6 +97,9 @@ func TestDiscardGitignore(t *testing.T) {
 		t.Fatalf("git add gitignore: %v\n%s", err, out)
 	}
 	cmd = exec.Command("git", "-C", root, "commit", "-m", "add gitignore")
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit gitignore: %v\n%s", err, out)
 	}
