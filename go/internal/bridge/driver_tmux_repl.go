@@ -252,9 +252,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	paneLiveW := io.Discard
 	breadcrumbW := io.Discard
 	var paneDelta panestream.PaneDelta
-	var paneProfile panestream.PaneProfile
+	// Resolve once: reused by the channel idle/busy bracket, the stop-review
+	// busy-liveness signal, and the nudge gate below (all need the per-CLI
+	// busy affordance). lp is immutable across the wait loop.
+	paneProfile := paneProfileFor(lp)
 	if channelOn {
-		paneProfile = paneProfileFor(lp)
 		if f, err := os.OpenFile(filepath.Join(cfg.Workspace, cfg.Agent+"-pane.live"),
 			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
 			defer func() { _ = f.Close() }()
@@ -429,6 +431,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				IntervalS:  interval,
 				Attempt:    attempt,
 				Progressed: progressed,
+				Busy:       panestream.PaneBusy(curPane, paneProfile),
 				StdoutTail: lastLines(curPane, 40),
 			}
 			v := reviewer.Review(lastEv)
@@ -446,7 +449,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				_, isDetVal := reviewer.(deterministicReviewer)
 				_, isDetPtr := reviewer.(*deterministicReviewer)
 				isDeterministic := isDetVal || isDetPtr
-				if isDeterministic && !panestream.PaneBusy(curPane, paneProfileFor(lp)) && !nudgeSent {
+				if isDeterministic && !panestream.PaneBusy(curPane, paneProfile) && !nudgeSent {
 					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
 					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)

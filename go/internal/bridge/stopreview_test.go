@@ -35,6 +35,36 @@ func TestDeterministicReviewer(t *testing.T) {
 	}
 }
 
+// TestDeterministicReviewer_BusyPaneIsLiveness pins the fix for the Opus
+// recovery-audit false-FAIL (cycles 254/255): a pane with no substantive delta
+// (Progressed=false) but a visible per-CLI busy affordance (Busy=true) is a
+// WORKING agent — extended-thinking models (Opus) render only the stripped
+// "Deliberating Ns"/token-counter lines, so PaneHasSubstantiveChange reads false
+// while the agent is demonstrably alive. Such an agent must be EXTENDED (bounded
+// by maxExtends), never paused/killed at interval 0 — that kill recorded a PASS
+// audit report as FAIL and halted the batch.
+func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
+	r := newDeterministicReviewer(2)
+	cases := []struct {
+		name string
+		ev   StopEvent
+		want ReviewAction
+	}{
+		{"busy AND progressing → extend", StopEvent{Progressed: true, Busy: true, Attempt: 0}, ReviewExtend},
+		{"busy, no delta, first interval → extend", StopEvent{Progressed: false, Busy: true, Attempt: 0}, ReviewExtend},
+		{"busy, no delta, under cap → extend", StopEvent{Progressed: false, Busy: true, Attempt: 1}, ReviewExtend},
+		{"busy, no delta, at cap → pause (backstop)", StopEvent{Progressed: false, Busy: true, Attempt: 2}, ReviewPause},
+		{"idle, no delta → pause immediately", StopEvent{Progressed: false, Busy: false, Attempt: 0}, ReviewPause},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := r.Review(c.ev).Action; got != c.want {
+				t.Fatalf("Review(%+v).Action = %q, want %q", c.ev, got, c.want)
+			}
+		})
+	}
+}
+
 // TestDeterministicReviewer_NonPositiveMaxFallsBack guards that a 0/negative cap
 // does not collapse to "pause at interval 0" (which would resurrect the
 // kill-a-working-agent bug): it falls back to the default backstop.

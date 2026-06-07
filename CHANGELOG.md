@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Busy-pane liveness in the self-healing stop-reviewer** — a tmux-LLM phase whose agent was visibly mid-turn (per-CLI "esc to interrupt" affordance / vanished idle placeholder) but emitting no *substantive* pane delta was killed at review interval 0 with `exit=81` artifact timeout, then recorded as FAIL despite having written a valid deliverable. This hit Opus recovery-audits hardest: their long quiet extended-thinking renders only the `Deliberating Ns`/token-counter lines that `cleanPane` strips (ADR-0026 backlog #4), so `Progressed` read false while the agent was alive — producing false-FAIL cycles that halted batches in a self-perpetuating loop (post-FAIL → Opus audit → false FAIL → …). The deterministic reviewer now extends on `Progressed || Busy` (bounded by the same `maxExtends` backstop); `StopEvent.Busy` is populated from `panestream.PaneBusy` at each checkpoint. Codex (no busy signal) is unchanged. ADR-0026 addendum.
+
+---
+
 ## [17.1.0] - 2026-06-07
 
 ### Added

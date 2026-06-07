@@ -53,6 +53,20 @@ The reviewer is a seam (`StopReviewer` interface), so the loop wiring never chan
 3. **SHIPPED (cycle-189)**: Distinct **`pause` semantics**: checkpoint + write an investigation report rather than reusing `ExitArtifactTimeout`; let the orchestrator decide retry/adapt/abandon.
 4. **SHIPPED (cycle-186)**: Sharper progress signal (strip volatile spinner lines) so spinner animation no longer reads as progress. Implementation: `PaneHasSubstantiveChange` in `stopreview.go`, wired into the driver's wait loop.
 5. **SHIPPED (cycle-188)**: Emit the verdict + justification to the ledger as an auditable self-healing trail. Implementation: `Deps.OnStopReview` callback in `engine.go`; driver calls it (nil-safe) at each review checkpoint; orchestrator wires it to `ledger.Append(LedgerEntry{Kind:"stop_review", Action:action, Message:reason})`; `checkSelfHealEvents` in `cyclehealth.go` flags `action=pause` as `SeverityWarn`.
+6. **SHIPPED (busy-liveness)**: A **busy pane is liveness** — the reviewer extends a demonstrably mid-turn agent even when `Progressed` reads false. See the addendum below.
+
+## Addendum — busy-pane liveness (false-FAIL regression of #4)
+
+**Incident.** A token-optimization batch produced two false-FAIL cycles: an Opus **recovery-audit** (the stronger model forced after any prior FAIL) wrote a complete `audit-report.md` with a **PASS** verdict, yet the phase was recorded as **FAIL** (`exit=81` artifact timeout) and routed to retro instead of ship. Because every post-FAIL cycle re-invokes the Opus recovery-audit, this self-perpetuated: FAIL → Opus audit → false FAIL → FAIL → … halting the batch.
+
+**Root cause — #4 over-stripped.** Backlog #4 (cycle-186) sharpened `Progressed` by stripping volatile lines in `cleanPane` — including `Deliberating.*[0-9]+[ms]` (the Opus/Claude extended-thinking timer) and the `↓ Nk tokens` counter. For an Opus agent in a long quiet think, *those stripped lines are the only pane delta*, so `PaneHasSubstantiveChange` → false → `Progressed` false → the deterministic reviewer returned `pause`, and the driver killed the agent at interval 0 — moments before it finished writing the artifact (~336–352s vs the 300s interval). The fix that stopped spinners faking progress also made genuine quiet thinking read as a stall: the system punished its strongest model precisely when it forced it.
+
+**Approaches considered.**
+- *Raise the artifact-wait deadline* (`EVOLVE_ARTIFACT_TIMEOUT_S`): rejected — that env var feeds the review **interval**, not a hard wall, and a slow agent that thinks 2× longer next time re-breaks; it tunes a timer instead of fixing the liveness signal.
+- *Un-strip the `Deliberating`/token lines from `cleanPane`*: rejected — it would resurrect #4 (spinner/clock animation again reads as substantive progress).
+- *Treat a busy pane as liveness* (**chosen**): `Progressed` is a *content* signal (did deliverable text change?); `PaneBusy` is an orthogonal *activity* signal (is the per-CLI "esc to interrupt" affordance visible / idle placeholder gone?). A busy pane is, by definition, mid-turn — not stalled — regardless of whether visible content changed. The reviewer now extends on `Progressed || Busy`.
+
+**Implementation.** `StopEvent.Busy bool`; `deterministicReviewer.Review` extends on `Progressed || Busy` (still bounded by `maxExtends`, so a busy-spinner-stuck agent surfaces after the same backstop — a busy pane buys extensions, not immortality); the driver populates `Busy: panestream.PaneBusy(curPane, paneProfile)` at the review checkpoint. Scope: `PaneBusy` reads true for claude/agy (affordance) and ollama (idle placeholder); codex has neither signal, so codex phases keep the `Progressed`-only path unchanged.
 
 ## Consequences
 

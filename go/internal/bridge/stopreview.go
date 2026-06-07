@@ -45,6 +45,7 @@ type StopEvent struct {
 	IntervalS  int    // the review interval that just elapsed
 	Attempt    int    // review index: 0 = first review, 1 = after one extension, …
 	Progressed bool   // did the agent emit new output during the last interval?
+	Busy       bool   // is the agent visibly mid-turn per the per-CLI busy affordance?
 	StdoutTail string // recent pane/stdout — evidence for an LLM reviewer (Stage 1)
 }
 
@@ -93,16 +94,29 @@ func newDeterministicReviewer(maxExtends int) deterministicReviewer {
 }
 
 func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
-	if ev.Progressed {
+	// "Still working" = the agent EITHER emitted substantive new output
+	// (Progressed) OR is visibly mid-turn per the per-CLI busy affordance
+	// (Busy). Busy is load-bearing for quiet extended-thinking models (Opus):
+	// the pane's only delta is the "Deliberating Ns"/token-counter lines that
+	// PaneHasSubstantiveChange strips as volatile, so Progressed reads false
+	// while the agent is demonstrably alive. Pausing/killing such an agent at
+	// interval 0 recorded a PASS audit report as FAIL and halted the batch
+	// (cycles 254/255). The maxExtends backstop still bounds a genuinely-hung
+	// busy-spinner agent, so a busy pane buys extensions, not immortality.
+	if ev.Progressed || ev.Busy {
+		signal := "busy mid-turn (no pane delta — likely extended thinking)"
+		if ev.Progressed {
+			signal = "still producing output"
+		}
 		if ev.Attempt < r.maxExtends {
 			return ReviewVerdict{
 				Action: ReviewExtend,
-				Reason: fmt.Sprintf("agent still producing output (interval %d/%d) — extend", ev.Attempt+1, r.maxExtends),
+				Reason: fmt.Sprintf("agent %s (interval %d/%d) — extend", signal, ev.Attempt+1, r.maxExtends),
 			}
 		}
 		return ReviewVerdict{
 			Action: ReviewPause,
-			Reason: fmt.Sprintf("agent still producing output but exhausted %d extensions — pause for investigation", r.maxExtends),
+			Reason: fmt.Sprintf("agent %s but exhausted %d extensions — pause for investigation", signal, r.maxExtends),
 		}
 	}
 	return ReviewVerdict{
