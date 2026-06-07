@@ -187,10 +187,43 @@ func buildRoutingPrompt(in router.RouteInput) string {
 
 	writeRoutingContext(&b, in)
 
+	if isFailureTransition(in) {
+		writeFailureVocabulary(&b)
+		b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
+		b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>","learning_richness":"full|memo","recovery_action":"retry|end"}`)
+		b.WriteString("\n")
+		return b.String()
+	}
+
 	b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
 	b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>"}`)
 	b.WriteString("\n")
 	return b.String()
+}
+
+// isFailureTransition reports whether this routing call sits on a failure
+// branch — the post-retro recovery decision or the audit-FAIL learning
+// choice — where the failure vocabulary applies. Happy-path prompts stay
+// byte-identical (prompt-prefix cache friendliness).
+func isFailureTransition(in router.RouteInput) bool {
+	switch strings.ToLower(strings.TrimSpace(in.Current)) {
+	case "retrospective", "retro":
+		return true
+	case "audit":
+		return in.Verdict == "FAIL"
+	}
+	return false
+}
+
+// writeFailureVocabulary renders the failure-path decision space (failure
+// floor Phase 3). The floor is stated explicitly so the model does not
+// waste tokens proposing what the kernel will clamp.
+func writeFailureVocabulary(b *strings.Builder) {
+	b.WriteString("\n## Failure-path vocabulary (this is a failure transition)\n")
+	b.WriteString("- recovery_action: \"retry\" re-enters tdd to fix forward; \"end\" stops the cycle (e.g. budget nearly exhausted, systemic cause).\n")
+	b.WriteString("- insert_phases may name fault-localization or bug-reproduction to run BEFORE the retry (they precede tdd in canonical order).\n")
+	b.WriteString("- learning_richness: \"memo\" routes the lightweight memo phase instead of the full retrospective after an audit FAIL; \"full\" (default) keeps the retrospective. Learning ALWAYS happens — the deterministic floor records the failure regardless of your choice.\n")
+	b.WriteString("- The failure-adapter's BLOCK verdicts are non-overridable: a blocked cycle ends no matter what you propose (the attempt is recorded as a clamp).\n")
 }
 
 // buildPlanPrompt renders the WHOLE-CYCLE planning context (ADR-0024 §2): the
@@ -451,7 +484,8 @@ func parseProposal(stdout string) (*router.Proposal, error) {
 	if err := json.Unmarshal([]byte(stdout[start:end+1]), &prop); err != nil {
 		return nil, fmt.Errorf("parse proposal: %w", err)
 	}
-	if prop.NextPhase == "" && len(prop.InsertPhases) == 0 {
+	if prop.NextPhase == "" && len(prop.InsertPhases) == 0 &&
+		prop.RecoveryAction == "" && prop.LearningRichness == "" {
 		return nil, fmt.Errorf("empty proposal")
 	}
 	return &prop, nil

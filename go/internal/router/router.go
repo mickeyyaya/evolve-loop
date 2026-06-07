@@ -151,6 +151,14 @@ type Proposal struct {
 	NextPhase     string   `json:"next_phase"`
 	InsertPhases  []string `json:"insert_phases"`
 	Justification string   `json:"justification"`
+	// Failure-path vocabulary (failure floor Phase 3) — meaningful only
+	// at failure transitions, applied ABOVE the deterministic floor:
+	// LearningRichness picks WHICH learning phase follows an audit FAIL
+	// ("full" → retrospective, "memo" → memo; never none) and
+	// RecoveryAction picks the post-retro branch ("retry" → tdd, "end")
+	// unless the failure-adapter says BLOCK (non-overridable, clamped).
+	LearningRichness string `json:"learning_richness,omitempty"`
+	RecoveryAction   string `json:"recovery_action,omitempty"`
 }
 
 // PhasePlanEntry is one phase's whole-cycle run/skip decision plus the advisor's
@@ -207,24 +215,29 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 	cur := normalize(in.Current)
 
 	// Rule 0 — Retro delegation. Do NOT duplicate failure logic; defer to the
-	// deterministic failure-adapter exactly as orchestrator.decideAfterRetro does.
+	// deterministic failure-adapter exactly as orchestrator.decideAfterRetro
+	// does. The advisor's failure vocabulary (RecoveryAction, failure-scoped
+	// inserts) applies above that floor — BLOCK is non-overridable.
 	if cur == "retrospective" {
-		return retroDecision(in)
+		return retroDecision(in, proposal)
 	}
 
 	// Rule 1 — Audit verdict branch (the one verdict-driven edge). FAIL must not
-	// proceed to ship; it diverts to the retrospective learning gate.
+	// proceed to ship; it diverts to a learning phase. The advisor's
+	// LearningRichness picks WHICH one (full retrospective vs memo) — never
+	// none: a disabled choice is clamped back to the retrospective.
 	if cur == "audit" {
 		if in.Verdict == "FAIL" {
-			next := "retrospective"
-			if enableOf(in.Cfg, "retrospective") == config.EnableOff {
-				next = PhaseEnd
-			}
-			return RouterDecision{
-				NextPhase: next,
+			d := RouterDecision{
+				NextPhase: "retrospective",
 				Reason:    "audit-fail-to-retrospective",
 				Evidence:  map[string]interface{}{"verdict": in.Verdict},
 			}
+			if enableOf(in.Cfg, "retrospective") == config.EnableOff {
+				d.NextPhase = PhaseEnd
+			}
+			applyLearningRichness(&d, proposal, in)
+			return d
 		}
 		// PASS/WARN fall through to the walk (→ ship).
 	}
@@ -234,8 +247,9 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 	return walk(in, proposal)
 }
 
-// retroDecision implements Rule 0 via failureadapter.Decide.
-func retroDecision(in RouteInput) RouterDecision {
+// retroDecision implements Rule 0 via failureadapter.Decide, then applies
+// the advisor's failure proposal above that floor.
+func retroDecision(in RouteInput, proposal *Proposal) RouterDecision {
 	dec := failureadapter.Decide(in.History, failureadapter.Options{Now: in.Now, Strict: in.Strict})
 	d := RouterDecision{
 		Reason:   "retro:" + string(dec.Action),
@@ -250,7 +264,97 @@ func retroDecision(in RouteInput) RouterDecision {
 	default: // PROCEED
 		d.NextPhase = PhaseEnd
 	}
+	applyFailureProposal(&d, proposal, dec.Action)
 	return d
+}
+
+// failureInsertPhases are the only phases an advisor may insert on the
+// retry path: both precede tdd in canonical order, so after they run the
+// walk continues naturally into the retry.
+var failureInsertPhases = map[string]struct{}{
+	"fault-localization": {},
+	"bug-reproduction":   {},
+}
+
+// applyFailureProposal adopts the advisor's RecoveryAction (and an
+// optional failure-scoped insert) ONLY when the failure-adapter permits:
+// BLOCK is the floor — an override attempt is recorded as a clamp, never
+// honored. Mirrors applyProposal's "annotate or clamp, never weaken".
+func applyFailureProposal(d *RouterDecision, proposal *Proposal, action failureadapter.Action) {
+	if proposal == nil || proposal.RecoveryAction == "" {
+		return
+	}
+	if proposal.Justification != "" {
+		d.Justification = proposal.Justification
+	}
+	// Validate before recording: an unrecognized action must neither route
+	// nor masquerade as a real one in the evidence — clamp and keep the
+	// kernel branch.
+	if proposal.RecoveryAction != "retry" && proposal.RecoveryAction != "end" {
+		d.Clamps = append(d.Clamps, Clamp{
+			Rule:     "failure-proposal-clamped",
+			Proposed: proposal.RecoveryAction,
+			Forced:   d.NextPhase,
+		})
+		return
+	}
+	d.Evidence["recovery_action"] = proposal.RecoveryAction
+
+	blocked := action == failureadapter.ActionBlockCode || action == failureadapter.ActionBlockOperatorAction
+	want := PhaseEnd
+	if proposal.RecoveryAction == "retry" {
+		want = "tdd"
+		if len(proposal.InsertPhases) > 0 {
+			if p := normalize(proposal.InsertPhases[0]); IsFailureInsert(p) {
+				want = p
+			}
+		}
+	}
+	if blocked {
+		if want != d.NextPhase {
+			d.Clamps = append(d.Clamps, Clamp{
+				Rule:     "failure-proposal-clamped",
+				Proposed: want,
+				Forced:   d.NextPhase,
+			})
+		}
+		return
+	}
+	d.NextPhase = want
+}
+
+// IsFailureInsert reports whether phase is one of the failure-scoped
+// inserts an advisor may schedule ahead of a retry. Exported so the
+// orchestrator's SM clamp can distinguish a retry-intent insert from an
+// arbitrary illegal phase.
+func IsFailureInsert(phase string) bool {
+	_, ok := failureInsertPhases[phase]
+	return ok
+}
+
+// applyLearningRichness lets the advisor choose the LIGHTWEIGHT learning
+// phase (memo) over the full retrospective after an audit FAIL. The
+// floor: some learning phase always runs — a memo choice with memo
+// disabled is clamped back to the retrospective, and unknown richness
+// values are ignored.
+func applyLearningRichness(d *RouterDecision, proposal *Proposal, in RouteInput) {
+	if proposal == nil || proposal.LearningRichness != "memo" {
+		return
+	}
+	// Always record the proposal — a memo choice that cannot apply
+	// (retrospective disabled → end, or memo disabled) is clamped, never
+	// silently dropped: the forensic trail is the point of this feature.
+	d.Evidence["learning_richness"] = proposal.LearningRichness
+	if d.NextPhase != "retrospective" || enableOf(in.Cfg, "memo") == config.EnableOff {
+		d.Clamps = append(d.Clamps, Clamp{
+			Rule:     "failure-proposal-clamped",
+			Proposed: "memo",
+			Forced:   d.NextPhase,
+		})
+		return
+	}
+	d.NextPhase = "memo"
+	d.Reason = "audit-fail-to-memo"
 }
 
 func walk(in RouteInput, proposal *Proposal) RouterDecision {

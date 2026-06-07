@@ -1985,7 +1985,28 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// the retro verdict to pick {ship | tdd | end}. Set scheduledNext
 		// so the next loop iteration runs the chosen phase.
 		if current == PhaseRetro {
-			branch, extraEnv, reason := o.decideAfterRetro(resp.Verdict, state.FailedAt)
+			var branch Phase
+			var extraEnv map[string]string
+			var reason string
+			if o.cfg.Stage >= config.StageAdvisory {
+				// Failure floor Phase 3: the failure branch is advisor-
+				// decidable (clamped) and leaves a routing-decision artifact.
+				routingSeq++
+				branch, extraEnv, reason = o.decideAfterRetroRouted(ctx, cycle, cs, routingSeq, resp.Verdict, state.FailedAt, router.RouteInput{
+					Cfg:             o.cfg,
+					BudgetRemaining: req.Budget.MaxUSD,
+					Completed:       cs.CompletedPhases,
+					Strict:          envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
+					Workspace:       cs.WorkspacePath,
+					ProjectRoot:     req.ProjectRoot,
+					Cycle:           cycle,
+					Env:             envSnap,
+					Plan:            clampedPlan,
+					IntentRequired:  cs.IntentRequired,
+				})
+			} else {
+				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, state.FailedAt)
+			}
 			for k, v := range extraEnv {
 				envSnap[k] = v
 			}
@@ -2049,6 +2070,61 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 //
 // Returned reason is "<action>: <failureadapter reason>" for the
 // CycleResult.RetroDecision audit field.
+// decideAfterRetroRouted is decideAfterRetro for Stage>=Advisory (failure
+// floor Phase 3): the routing strategy decides the failure branch — which
+// applies the advisor's failure vocabulary (RecoveryAction, failure-scoped
+// inserts) above the failure-adapter floor, BLOCK non-overridable — and the
+// decision is recorded as a routing-decision artifact, giving failure
+// branches the same forensic trail as happy-path transitions. extraEnv
+// still comes from the deterministic adapter (SetEnv is kernel-owned).
+//
+// The routed branch is adopted only where the state machine allows
+// (retro→{ship,tdd,end} today); a routed failure-insert (fault-localization
+// / bug-reproduction) is clamped to the legal retry target until the SM
+// opens that edge — kernel disposes, and the clamp is visible in the
+// artifact.
+func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs CycleState, seq int, retroVerdict string, history []FailedRecord, in router.RouteInput) (Phase, map[string]string, string) {
+	// Deterministic baseline: branch, kernel-owned SetEnv, and the
+	// operator-facing reason contract ("proceed:"/"retry-with-fallback:"/…)
+	// that dashboards and scenario pins grep for.
+	detNext, extraEnv, detReason := o.decideAfterRetro(retroVerdict, history)
+	if retroVerdict == VerdictPASS {
+		return detNext, extraEnv, detReason // PASS recovers; not a failure branch
+	}
+
+	in.Current = string(PhaseRetro)
+	in.Verdict = retroVerdict
+	in.History = entriesFromRecords(history)
+	in.Now = o.now()
+	rdec := o.strategy.Decide(in)
+
+	branch := PhaseEnd
+	if rdec.NextPhase != "" && rdec.NextPhase != router.PhaseEnd {
+		branch = Phase(rdec.NextPhase)
+	}
+	if branch != PhaseEnd && !o.sm.CanTransition(PhaseRetro, branch) {
+		// A failure-scoped insert (fault-localization/bug-reproduction)
+		// carries retry intent — clamp to the legal retry target. Any
+		// other illegal phase falls back to the deterministic branch:
+		// the SM clamp must never UPGRADE a proceed-to-end into a retry.
+		forced := detNext
+		if router.IsFailureInsert(string(branch)) {
+			forced = PhaseTDD
+		}
+		rdec.Clamps = append(rdec.Clamps, router.Clamp{
+			Rule:     "retro-branch-sm-clamped",
+			Proposed: string(branch),
+			Forced:   string(forced),
+		})
+		branch = forced
+	}
+	o.recordRoutingDecision(ctx, cycle, cs, seq, rdec)
+	if branch == detNext {
+		return branch, extraEnv, detReason // advisor agrees; keep the contract string
+	}
+	return branch, extraEnv, "retro-routed: " + rdec.Reason
+}
+
 func (o *Orchestrator) decideAfterRetro(retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string) {
 	// retro PASS → ship; no failureadapter consultation.
 	if retroVerdict == VerdictPASS {
