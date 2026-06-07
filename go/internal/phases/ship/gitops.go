@@ -19,6 +19,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
@@ -49,6 +50,93 @@ func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
 	}
 
 	return shipDirect(ctx, opts, res, branch)
+}
+
+// detectColliders returns the sorted list of paths that are incoming from the
+// worktree (commits branch..cycleBranch + worktree status) AND exist UNTRACKED
+// in the main working tree — the files a ff-merge would refuse to overwrite.
+// Shared by the shipFromWorktree pre-flight and the collider repair
+// (repair.go) so both always see the same list.
+func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycleBranch string) ([]string, error) {
+	incomingFiles := make(map[string]bool)
+
+	// 1. Files modified in commits branch..cycleBranch
+	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, "diff", "--name-only", branch, cycleBranch)
+	if err == nil {
+		for _, line := range strings.Split(diffOut, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				incomingFiles[line] = true
+			}
+		}
+	}
+
+	// 2. Files in worktree status (modified, added, untracked, staged)
+	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain")
+	if err == nil {
+		for _, line := range strings.Split(statusOut, "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) > 3 {
+				status := line[:2]
+				if !strings.Contains(status, "D") { // Skip deleted files
+					path := line[3:]
+					if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
+						path = path[1 : len(path)-1]
+					}
+					incomingFiles[path] = true
+				}
+			}
+		}
+	}
+
+	// Expand directories in incomingFiles
+	expandedIncomingFiles := make(map[string]bool)
+	for p := range incomingFiles {
+		wtFilePath := filepath.Join(worktree, p)
+		info, err := os.Stat(wtFilePath)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			// Best-effort expansion: per-entry Walk errors are tolerated (callback returns nil).
+			_ = filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
+				if walkErr != nil {
+					return nil
+				}
+				if !walkInfo.IsDir() {
+					rel, relErr := filepath.Rel(worktree, path)
+					if relErr == nil {
+						expandedIncomingFiles[rel] = true
+					}
+				}
+				return nil
+			})
+		} else {
+			expandedIncomingFiles[p] = true
+		}
+	}
+
+	var colliders []string
+	for p := range expandedIncomingFiles {
+		wtFilePath := filepath.Join(worktree, p)
+		if _, err := os.Stat(wtFilePath); err != nil {
+			continue // Does not exist in worktree
+		}
+		mainFilePath := filepath.Join(opts.ProjectRoot, p)
+		if _, err := os.Stat(mainFilePath); err != nil {
+			continue // Does not exist on main side
+		}
+		// Check if it is untracked in main repo
+		mainTracked, err := captureGitOutput(ctx, opts, "ls-files", p)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(mainTracked) == "" {
+			colliders = append(colliders, p)
+		}
+	}
+	sort.Strings(colliders) // deterministic error messages + manifest order
+	return colliders, nil
 }
 
 // readActiveWorktree extracts cycle-state.json:active_worktree. Empty
@@ -129,12 +217,16 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: committed to %s", branch))
 
-	// git push origin <branch>
+	// git push origin <branch> — a rejection gets ONE inline fetch+ff-retry
+	// (repairPushRace); a diverged origin reclassifies to needs-reaudit.
 	exit, err = opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
-		return shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
+		origErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
 			fmt.Sprintf("ship: git push failed (rc=%d): %v", exit, err),
 			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", branch)
+		if rerr := repairPushRace(ctx, opts, res, branch, origErr); rerr != nil {
+			return rerr
+		}
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
 
@@ -166,85 +258,13 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   cycle branch: %s", cycleBranch))
 
-	// Collider pre-flight check (v12.2 / Task 2)
-	incomingFiles := make(map[string]bool)
-
-	// 1. Files modified in commits branch..cycleBranch
-	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, "diff", "--name-only", branch, cycleBranch)
-	if err == nil {
-		for _, line := range strings.Split(diffOut, "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				incomingFiles[line] = true
-			}
-		}
+	// Collider pre-flight check (v12.2 / Task 2). detectColliders is the
+	// single source of truth — the repair ladder (repair.go) re-derives the
+	// same list when healing this refusal.
+	colliders, err := detectColliders(ctx, opts, worktree, branch, cycleBranch)
+	if err != nil {
+		return err
 	}
-
-	// 2. Files in worktree status (modified, added, untracked, staged)
-	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain")
-	if err == nil {
-		for _, line := range strings.Split(statusOut, "\n") {
-			line = strings.TrimSpace(line)
-			if len(line) > 3 {
-				status := line[:2]
-				if !strings.Contains(status, "D") { // Skip deleted files
-					path := line[3:]
-					if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
-						path = path[1 : len(path)-1]
-					}
-					incomingFiles[path] = true
-				}
-			}
-		}
-	}
-
-	// Expand directories in incomingFiles
-	expandedIncomingFiles := make(map[string]bool)
-	for p := range incomingFiles {
-		wtFilePath := filepath.Join(worktree, p)
-		info, err := os.Stat(wtFilePath)
-		if err != nil {
-			continue
-		}
-		if info.IsDir() {
-			// Best-effort expansion: per-entry Walk errors are tolerated (callback returns nil).
-			_ = filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
-				if walkErr != nil {
-					return nil
-				}
-				if !walkInfo.IsDir() {
-					rel, relErr := filepath.Rel(worktree, path)
-					if relErr == nil {
-						expandedIncomingFiles[rel] = true
-					}
-				}
-				return nil
-			})
-		} else {
-			expandedIncomingFiles[p] = true
-		}
-	}
-
-	var colliders []string
-	for p := range expandedIncomingFiles {
-		wtFilePath := filepath.Join(worktree, p)
-		if _, err := os.Stat(wtFilePath); err != nil {
-			continue // Does not exist in worktree
-		}
-		mainFilePath := filepath.Join(opts.ProjectRoot, p)
-		if _, err := os.Stat(mainFilePath); err != nil {
-			continue // Does not exist on main side
-		}
-		// Check if it is untracked in main repo
-		mainTracked, err := captureGitOutput(ctx, opts, "ls-files", p)
-		if err != nil {
-			continue
-		}
-		if strings.TrimSpace(mainTracked) == "" {
-			colliders = append(colliders, p)
-		}
-	}
-
 	if len(colliders) > 0 {
 		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
 			fmt.Sprintf("ship: untracked files in main working tree would be overwritten by merge: %s", strings.Join(colliders, ", ")),
@@ -360,13 +380,17 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: ff-merged %s into %s", cycleBranch, branch))
 
-	// Push.
+	// Push — same inline fetch+ff-retry policy as shipDirect; the healed
+	// path falls through to the post-push tree verification + sidecar.
 	exit, err = opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		headOut, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
-		return shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
+		origErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
 			fmt.Sprintf("ship: git push failed (rc=%d); main is at %s: %v", exit, strings.TrimSpace(headOut), err),
 			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", branch, "head", strings.TrimSpace(headOut))
+		if rerr := repairPushRace(ctx, opts, res, branch, origErr); rerr != nil {
+			return rerr
+		}
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
 

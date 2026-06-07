@@ -105,6 +105,10 @@ type Options struct {
 	// audit-report.md; gitops.go reads it to enforce the pre-merge
 	// tree-SHA binding check. Not part of the public API.
 	internalAuditBoundTreeSHA string
+
+	// repairAttempted is the repair ladder's once-per-code-per-Run guard
+	// (repair.go). Lazily initialized by attemptRepair/repairPushRace.
+	repairAttempted map[core.ShipErrorCode]bool
 }
 
 // Now is a minimal time interface (Unix seconds + RFC3339 formatter) so
@@ -123,6 +127,17 @@ type RunResult struct {
 	Provenance string
 	Logs       []string // human-readable [ship] log lines
 	DryRunPath string   // non-empty when DryRun=1 and journal was written
+
+	// RepairAttempted/RepairOutcome surface the repair ladder (ADR-0039 §8):
+	// the ShipError code a typed repair was attempted for, and its outcome
+	// (e.g. "repinned-verified-rebuild", "resume-pushed", "push-retried",
+	// "colliders-healed:…", "needs-reaudit", "declined"). Empty when no
+	// repair fired. When multiple repairs fire in one Run (e.g. a healed
+	// stale pin followed by a push retry) this records the LAST attempt —
+	// the full per-attempt trail lives in Logs and the ShipError Debug map.
+	// Mirrored as ship.repair_* signals by the PhaseRunner.
+	RepairAttempted string
+	RepairOutcome   string
 }
 
 // Run executes the ship lifecycle end-to-end. Caller-supplied opts drive
@@ -199,8 +214,11 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 
 	// 1. Self-SHA TOFU verification. Writes state.json on first-run /
 	// version-bump / legacy migration. INTEGRITY-FAILs on same-version
-	// SHA mismatch.
-	if err := verifySelfSHA(ctx, &opts, &res); err != nil {
+	// SHA mismatch. The repair ladder (ADR-0039 §8) may heal a stale pin
+	// (verified rebuild of committed source) and re-run the check once.
+	if _, err := runStageWithRepair(ctx, &opts, &res, func() error {
+		return verifySelfSHA(ctx, &opts, &res)
+	}); err != nil {
 		return finalize(ctx, &opts, &res, err, "verify-self-sha")
 	}
 
@@ -217,8 +235,15 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		}
 	}
 
-	// 2. Class-aware pre-flight (audit-binding, kernel checks, or interactive confirm).
-	if err := verifyClass(ctx, &opts, &res); err != nil {
+	// 2. Class-aware pre-flight (audit-binding, kernel checks, or interactive
+	// confirm). The repair ladder may COMPLETE the ship here: an
+	// AUDIT_BINDING_HEAD_MOVED whose HEAD already carries the audit-bound
+	// tree (the cycle-246 merged-but-unpushed death) closes with a push-only
+	// resume — in that case the mutate stage below is skipped.
+	resumed, err := runStageWithRepair(ctx, &opts, &res, func() error {
+		return verifyClass(ctx, &opts, &res)
+	})
+	if err != nil {
 		if _, isClean := err.(*cleanExitError); isClean {
 			res.ExitCode = ExitOK
 			writeDryRunJournal(ctx, &opts, &res, "no-staged-changes")
@@ -228,9 +253,14 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 	}
 	res.Logs = append(res.Logs, "[ship] provenance: "+res.Provenance)
 
-	// 3. Atomic ship (commit + push + optional gh release).
-	if err := atomicShip(ctx, &opts, &res); err != nil {
-		return finalize(ctx, &opts, &res, err, "atomic-ship")
+	// 3. Atomic ship (commit + push + optional gh release). A collider
+	// repair (quarantine/remove) re-runs this stage exactly once.
+	if !resumed {
+		if _, err := runStageWithRepair(ctx, &opts, &res, func() error {
+			return atomicShip(ctx, &opts, &res)
+		}); err != nil {
+			return finalize(ctx, &opts, &res, err, "atomic-ship")
+		}
 	}
 
 	// 4. Post-ship hooks (lastCycleNumber, inbox lifecycle, post-cycle repin).
