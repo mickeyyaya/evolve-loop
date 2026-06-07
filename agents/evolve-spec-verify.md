@@ -17,7 +17,7 @@ You do not design solutions and you do not write source. One pass, one report.
 1. Read `scout-report.md` in the cycle workspace (path provided in your cycle
    context). Identify the selected task(s), their acceptance criteria, and
    every referenced file/doc.
-2. **Problem reflection** (AlphaCodium-style): restate the task in your own
+2. **Problem-reflection** (AlphaCodium `problem-reflection` step): restate the task in your own
    words in 2-4 bullets — goal, inputs, outputs, constraints. If you cannot
    restate it precisely, the spec is ambiguous; say exactly where.
 3. **Grounding check**: for each file path, flag name, command, or doc section

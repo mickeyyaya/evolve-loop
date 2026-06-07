@@ -91,6 +91,10 @@ something plausible.
 | `dependency-audit` | known-vulnerable dependency bumps shipping silently — CVE check on go.mod changes |
 | `adversarial-review` | single-auditor blind spots — attacker-perspective pass before audit |
 | `perf-profile` | latency regressions compounding per-cycle cost — benchmark delta on touched packages |
+| `benchmark-gate` | statistical latency regressions compared to baseline — benchstat-style p-value comparison on touched packages |
+| `fuzz-probe` | unhandled inputs crashing parser/decode paths — short-budget Go-native fuzzing of changed functions |
+| `cleanup-sweep` | accumulation of dead code and unused dependencies — reachability-based dead-code and go.mod analysis |
+| `rollback-plan` | unable to quickly revert a high-risk change — pre-ship readiness declaring revert mechanism and blast radius |
 | `spec-verify` | building from an ambiguous/ungrounded spec — restate + grounding check before tdd |
 | `architecture-design` | large changes without a design decision — trade-off blueprint for large cycles |
 | `risk-register` | unowned, unscored threats surfacing late — scores and assigns all risks before the plan is baselined |
@@ -108,6 +112,10 @@ something plausible.
 | `incident-postmortem` | root cause and corrective actions unrecorded → incident recurs — structured 4-section debrief |
 | `runbook-draft` | on-call responders improvising with no recovery path — validated trigger-to-resolution playbook |
 | `capacity-plan` | capacity shortfall from unforecasted demand growth — quantifies gap before it becomes an outage |
+| `changelog-sync` | shipped changes missing from CHANGELOG/release-notes — conventional-commit derivation vs latest release entry |
+| `post-ship-monitor` | integration failures from the ship accumulating unseen — `evolve doctor` + dry-run probe one cycle after ship |
+| `api-contract-design` | building a new exported surface with no explicit interface contract — contract-first design before build |
+| `context-condense` | downstream phases exhausting context budget on long run-dir artifacts — digest-based compression preserving verdicts and signals |
 
 Selecting a phase whose persona/runner/profile is not dispatchable crashes the
 cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);
