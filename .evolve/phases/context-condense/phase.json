@@ -1,11 +1,7 @@
 {
   "name": "context-condense",
-  "kind": "llm",
-  "optional": true,
   "archetype": "control",
   "agent": "evolve-context-condense",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -22,18 +18,13 @@
       "condense.ratio"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Artifacts Scanned",
       "Condensed Digest",
       "Verdict"
     ],
-    "fail_if_empty": true,
-    "fail_if_signal": {},
-    "verdict_on_pass": "PASS"
+    "fail_if_signal": {}
   },
   "routing": {
     "insert_when": [
@@ -44,5 +35,6 @@
       }
     ]
   },
-  "after": "triage"
+  "after": "triage",
+  "optional": true
 }

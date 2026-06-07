@@ -1,11 +1,7 @@
 {
   "name": "benchmark-gate",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-benchmark-gate",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/build-report.md"
@@ -24,20 +20,15 @@
       "perf.significant"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Benchmarks",
       "Statistical Comparison",
       "Verdict"
     ],
-    "fail_if_empty": true,
     "fail_if_signal": {
       "perf.significant": "==true"
-    },
-    "verdict_on_pass": "PASS"
+    }
   },
   "routing": {
     "insert_when": [

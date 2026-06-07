@@ -1,28 +1,34 @@
 {
   "name": "behavior-baseline",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-behavior-baseline",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
-    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ],
     "signals": []
   },
   "outputs": {
-    "files": [".evolve/runs/cycle-{cycle}/behavior-baseline.md"],
-    "signals": ["behavior.preserved", "behavior.delta_count"]
+    "files": [
+      ".evolve/runs/cycle-{cycle}/behavior-baseline.md"
+    ],
+    "signals": [
+      "behavior.preserved",
+      "behavior.delta_count"
+    ]
   },
-  "prompt_context": ["goal"],
   "classify": {
-    "require_sections": ["Baseline"],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    "require_sections": [
+      "Baseline"
+    ]
   },
   "routing": {
     "insert_when": [
-      { "field": "scout.goal_type", "op": "==", "value": "refactor" }
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "refactor"
+      }
     ]
   },
   "after": "tdd"

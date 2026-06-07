@@ -1,11 +1,7 @@
 {
   "name": "fuzz-probe",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-fuzz-probe",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/build-report.md"
@@ -23,20 +19,15 @@
       "fuzz.coverage_new"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Target Functions",
       "Fuzz Results",
       "Verdict"
     ],
-    "fail_if_empty": true,
     "fail_if_signal": {
       "fuzz.crashers": ">0"
-    },
-    "verdict_on_pass": "PASS"
+    }
   },
   "routing": {
     "insert_when": [

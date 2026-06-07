@@ -1,11 +1,7 @@
 {
   "name": "behavior-compare",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-behavior-compare",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/build-report.md",
@@ -14,19 +10,30 @@
     "signals": []
   },
   "outputs": {
-    "files": [".evolve/runs/cycle-{cycle}/behavior-compare-report.md"],
-    "signals": ["behavior.preserved", "behavior.delta_count"]
+    "files": [
+      ".evolve/runs/cycle-{cycle}/behavior-compare-report.md"
+    ],
+    "signals": [
+      "behavior.preserved",
+      "behavior.delta_count"
+    ]
   },
-  "prompt_context": ["goal"],
   "classify": {
-    "require_sections": ["Comparison", "Verdict"],
-    "fail_if_empty": true,
-    "fail_if_signal": { "behavior.preserved": "==false" },
-    "verdict_on_pass": "PASS"
+    "require_sections": [
+      "Comparison",
+      "Verdict"
+    ],
+    "fail_if_signal": {
+      "behavior.preserved": "==false"
+    }
   },
   "routing": {
     "insert_when": [
-      { "field": "scout.goal_type", "op": "==", "value": "refactor" }
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "refactor"
+      }
     ]
   },
   "after": "build"

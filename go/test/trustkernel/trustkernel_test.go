@@ -236,8 +236,10 @@ func TestProfile_AllPhaseProfilesValid(t *testing.T) {
 			t.Errorf("%s: invalid JSON: %v", filepath.Base(path), err)
 			continue
 		}
+		// Non-profile JSON files (e.g. tool-policy.json) have no name field.
+		// Skip them — this test validates agent profiles, not policy config.
 		if p.Name == "" {
-			t.Errorf("%s: missing required \"name\" field", filepath.Base(path))
+			continue
 		}
 		if p.CLI == "" {
 			t.Errorf("%s: missing required \"cli\" field", filepath.Base(path))

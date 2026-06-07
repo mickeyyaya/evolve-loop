@@ -158,6 +158,35 @@ func (s PhaseSpec) ModelOrDefault() string {
 	return s.Model
 }
 
+// ApplyArchetypeDefaults fills zero fields on a user-overlay PhaseSpec whose
+// archetype is evaluate. Call only at DiscoverUserSpecs time — never at
+// registry Load(), because built-in evaluate phases (audit) are required and
+// must NOT have Optional forced to true.
+//
+// Scope note: only the evaluate archetype gets implicit defaults. Plan and
+// control archetype phase.json files must still declare "optional": true
+// explicitly — ValidateUserSpec hard-rejects user phases without it.
+func ApplyArchetypeDefaults(s *PhaseSpec) {
+	if s.RoleOrDefault() != RoleEvaluate {
+		return
+	}
+	if !s.Optional {
+		s.Optional = true
+	}
+	if len(s.PromptContext) == 0 {
+		s.PromptContext = []string{"goal"}
+	}
+	if s.Classify == nil {
+		s.Classify = &ClassifyRules{}
+	}
+	if !s.Classify.FailIfEmpty {
+		s.Classify.FailIfEmpty = true
+	}
+	if s.Classify.VerdictOnPass == "" {
+		s.Classify.VerdictOnPass = "PASS"
+	}
+}
+
 // Catalog is the ordered, lookup-able set of phase specs. Registry order is
 // preserved (All) for pipeline sequencing; Names is a sorted snapshot.
 type Catalog struct {

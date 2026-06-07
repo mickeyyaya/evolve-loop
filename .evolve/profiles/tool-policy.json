@@ -1,0 +1,24 @@
+{
+  "policies": {
+    "no-inline-script-exec": [
+      "Bash(perl:*)",
+      "Bash(perl -e:*)",
+      "Bash(ruby:*)",
+      "Bash(ruby -e:*)",
+      "Bash(python3 -c:*)",
+      "Bash(python -c:*)",
+      "Bash(node -e:*)",
+      "Bash(osascript:*)",
+      "Bash(osascript -e:*)",
+      "Bash(sh -c:*)",
+      "Bash(bash -c:*)",
+      "Bash(zsh -c:*)",
+      "Bash(env:*)",
+      "Bash(exec:*)",
+      "Bash(eval:*)",
+      "Bash(awk:*)",
+      "Bash(unlink:*)",
+      "Bash(ln:*)"
+    ]
+  }
+}

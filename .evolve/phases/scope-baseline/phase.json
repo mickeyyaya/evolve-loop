@@ -1,29 +1,38 @@
 {
   "name": "scope-baseline",
-  "kind": "llm",
-  "optional": true,
   "archetype": "plan",
   "agent": "evolve-scope-baseline",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
-    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ],
     "signals": []
   },
   "outputs": {
-    "files": [".evolve/runs/cycle-{cycle}/scope-baseline-report.md"],
-    "signals": ["scope.deliverables_count"]
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scope-baseline-report.md"
+    ],
+    "signals": [
+      "scope.deliverables_count"
+    ]
   },
-  "prompt_context": ["goal"],
   "classify": {
-    "require_sections": ["Deliverables", "Acceptance Criteria", "Exclusions", "Constraints and Assumptions"],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    "require_sections": [
+      "Deliverables",
+      "Acceptance Criteria",
+      "Exclusions",
+      "Constraints and Assumptions"
+    ]
   },
   "routing": {
     "insert_when": [
-      { "field": "scout.goal_type", "op": "==", "value": "project-management" }
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "project-management"
+      }
     ]
   },
-  "after": "triage"
+  "after": "triage",
+  "optional": true
 }

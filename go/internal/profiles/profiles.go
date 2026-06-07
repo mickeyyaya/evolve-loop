@@ -132,12 +132,80 @@ func (l *Loader) Get(name string) (Profile, error) {
 	if err := json.Unmarshal(raw, &prof); err != nil {
 		return Profile{}, fmt.Errorf("profiles: parse %s: %w", p, err)
 	}
+	// Raw keeps the ORIGINAL bytes — any $include_policy sentinels in it are
+	// unexpanded. Callers extracting tool lists must use the typed fields
+	// below, which carry the expanded (effective) sets.
 	prof.Raw = json.RawMessage(raw)
+	expanded, err := l.expandPolicies(prof.DisallowedTools)
+	if err != nil {
+		return Profile{}, fmt.Errorf("profiles: expand policies in %s: %w", p, err)
+	}
+	prof.DisallowedTools = expanded
+	expandedAllowed, err := l.expandPolicies(prof.AllowedTools)
+	if err != nil {
+		return Profile{}, fmt.Errorf("profiles: expand policies in %s: %w", p, err)
+	}
+	prof.AllowedTools = expandedAllowed
 	return prof, nil
 }
 
+const policyFile = "tool-policy.json"
+const policyPrefix = "$include_policy:"
+
+// expandPolicies replaces "$include_policy:<name>" sentinels in tools with the
+// entries from tool-policy.json. Duplicates are removed; sentinel order preserved.
+// Returns tools unchanged when no sentinel is present (no policy file needed).
+func (l *Loader) expandPolicies(tools []string) ([]string, error) {
+	hasSentinel := false
+	for _, t := range tools {
+		if strings.HasPrefix(t, policyPrefix) {
+			hasSentinel = true
+			break
+		}
+	}
+	if !hasSentinel {
+		return tools, nil
+	}
+
+	raw, err := fs.ReadFile(l.fs, policyFile)
+	if err != nil {
+		return nil, fmt.Errorf("$include_policy used but %s not found: %w", policyFile, err)
+	}
+	var doc struct {
+		Policies map[string][]string `json:"policies"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", policyFile, err)
+	}
+
+	seen := make(map[string]bool, len(tools))
+	result := make([]string, 0, len(tools))
+	for _, t := range tools {
+		if strings.HasPrefix(t, policyPrefix) {
+			name := t[len(policyPrefix):]
+			entries, ok := doc.Policies[name]
+			if !ok {
+				return nil, fmt.Errorf("unknown policy %q in $include_policy directive", name)
+			}
+			for _, e := range entries {
+				if !seen[e] {
+					seen[e] = true
+					result = append(result, e)
+				}
+			}
+		} else {
+			if !seen[t] {
+				seen[t] = true
+				result = append(result, t)
+			}
+		}
+	}
+	return result, nil
+}
+
 // List enumerates profile names (without .json extension), sorted.
-// Non-JSON files (e.g., AGENTS.md, README.txt) are excluded.
+// Non-JSON files (e.g., AGENTS.md, README.txt) and non-profile JSON
+// files (e.g., tool-policy.json which has no "name" field) are excluded.
 func (l *Loader) List() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil
@@ -150,6 +218,18 @@ func (l *Loader) List() ([]string, error) {
 	for _, e := range entries {
 		n := e.Name()
 		if e.IsDir() || !strings.HasSuffix(n, ".json") {
+			continue
+		}
+		// Skip non-profile JSON files (e.g., tool-policy.json) — profiles
+		// must have a non-empty "name" field.
+		raw, rerr := fs.ReadFile(l.fs, n)
+		if rerr != nil {
+			continue
+		}
+		var quick struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(raw, &quick) != nil || quick.Name == "" {
 			continue
 		}
 		out = append(out, strings.TrimSuffix(n, ".json"))

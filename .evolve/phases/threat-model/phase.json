@@ -1,30 +1,40 @@
 {
   "name": "threat-model",
-  "kind": "llm",
-  "optional": true,
   "archetype": "plan",
   "agent": "evolve-threat-model",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
-    "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ],
     "signals": []
   },
   "outputs": {
-    "files": [".evolve/runs/cycle-{cycle}/threat-model.md"],
-    "signals": ["threat.count", "threat.severity_max"]
+    "files": [
+      ".evolve/runs/cycle-{cycle}/threat-model.md"
+    ],
+    "signals": [
+      "threat.count",
+      "threat.severity_max"
+    ]
   },
-  "prompt_context": ["goal"],
   "classify": {
-    "require_sections": ["Threats", "Mitigations"],
-    "fail_if_empty": true,
-    "fail_if_signal": { "threat.severity_max": ">=CRITICAL" },
-    "verdict_on_pass": "PASS"
+    "require_sections": [
+      "Threats",
+      "Mitigations"
+    ],
+    "fail_if_signal": {
+      "threat.severity_max": ">=CRITICAL"
+    }
   },
   "routing": {
     "insert_when": [
-      { "field": "scout.security_relevant", "op": "==", "value": true }
+      {
+        "field": "scout.security_relevant",
+        "op": "==",
+        "value": true
+      }
     ]
   },
-  "after": "triage"
+  "after": "triage",
+  "optional": true
 }

@@ -1,11 +1,7 @@
 {
   "name": "capacity-plan",
-  "kind": "llm",
-  "optional": true,
   "archetype": "plan",
   "agent": "evolve-capacity-plan",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -20,17 +16,12 @@
       "capacity.gap_count"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Demand Forecast",
       "Current Capacity",
       "Capacity Gap"
-    ],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    ]
   },
   "routing": {
     "insert_when": [
@@ -41,5 +32,6 @@
       }
     ]
   },
-  "after": "triage"
+  "after": "triage",
+  "optional": true
 }

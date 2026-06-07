@@ -50,6 +50,7 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 			}
 			s.Name = dir
 		}
+		ApplyArchetypeDefaults(&s)
 		specs = append(specs, s)
 	}
 	return specs, warnings

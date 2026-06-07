@@ -1,11 +1,7 @@
 {
   "name": "opportunity-map",
-  "kind": "llm",
-  "optional": true,
   "archetype": "plan",
   "agent": "evolve-opportunity-map",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -20,18 +16,13 @@
       "opportunity.count"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Desired Outcome",
       "Opportunities",
       "Candidate Solutions",
       "Assumption Tests"
-    ],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    ]
   },
   "routing": {
     "insert_when": [
@@ -42,5 +33,6 @@
       }
     ]
   },
-  "after": "triage"
+  "after": "triage",
+  "optional": true
 }

@@ -1,11 +1,7 @@
 {
   "name": "account-reconcile",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-account-reconcile",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -20,18 +16,13 @@
       "reconcile.unexplained_count"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "GL vs Source Balance",
       "Reconciling Items",
       "Adjustments",
       "Sign-off"
-    ],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    ]
   },
   "routing": {
     "insert_when": [

@@ -1,11 +1,7 @@
 {
   "name": "rollback-plan",
-  "kind": "llm",
-  "optional": true,
   "archetype": "control",
   "agent": "evolve-rollback-plan",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/build-report.md"
@@ -22,9 +18,6 @@
       "rollback.ready"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Reversion Mechanism",
@@ -32,11 +25,9 @@
       "Verification",
       "Verdict"
     ],
-    "fail_if_empty": true,
     "fail_if_signal": {
       "rollback.ready": "==false"
-    },
-    "verdict_on_pass": "PASS"
+    }
   },
   "routing": {
     "insert_when": [
@@ -47,5 +38,6 @@
       }
     ]
   },
-  "after": "audit"
+  "after": "audit",
+  "optional": true
 }

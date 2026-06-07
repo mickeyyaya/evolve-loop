@@ -1,11 +1,7 @@
 {
   "name": "incident-postmortem",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-incident-postmortem",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -20,18 +16,13 @@
       "postmortem.action_items_count"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Impact",
       "Timeline",
       "Root Cause",
       "Action Items"
-    ],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    ]
   },
   "routing": {
     "insert_when": [

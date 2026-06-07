@@ -1,11 +1,7 @@
 {
   "name": "cleanup-sweep",
-  "kind": "llm",
-  "optional": true,
   "archetype": "evaluate",
   "agent": "evolve-cleanup-sweep",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/build-report.md"
@@ -23,17 +19,12 @@
       "deadcode.unused_deps"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Dead Code Analysis",
       "Unused Dependencies",
       "Verdict"
-    ],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    ]
   },
   "routing": {
     "insert_when": [

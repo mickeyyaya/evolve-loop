@@ -107,7 +107,7 @@ func Build(opts Options) (Result, error) {
 
 // scan walks the skills directory and assembles the Inventory.
 func scan(projectRoot string, now time.Time) (Inventory, error) {
-	loader := prompts.NewForProject(projectRoot)
+	loader := prompts.NewFromDir(projectRoot)
 	names, err := loader.Skills()
 	if err != nil {
 		// No skills dir is not fatal — emit an empty inventory.

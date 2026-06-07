@@ -1,11 +1,7 @@
 {
   "name": "runbook-draft",
-  "kind": "llm",
-  "optional": true,
   "archetype": "control",
   "agent": "evolve-runbook-draft",
-  "model": "auto",
-  "writes_source": false,
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -20,18 +16,13 @@
       "runbook.steps_count"
     ]
   },
-  "prompt_context": [
-    "goal"
-  ],
   "classify": {
     "require_sections": [
       "Trigger",
       "Diagnosis",
       "Resolution Steps",
       "Escalation"
-    ],
-    "fail_if_empty": true,
-    "verdict_on_pass": "PASS"
+    ]
   },
   "routing": {
     "insert_when": [
@@ -42,5 +33,6 @@
       }
     ]
   },
-  "after": "triage"
+  "after": "triage",
+  "optional": true
 }
