@@ -310,6 +310,20 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
+	// Pre-batch readiness gate (deterministic; NOT an LLM phase — an env-check
+	// agent would run THROUGH the very bridge it must verify). Confirms the
+	// pipeline can actually run — wiring, profiles, LLM CLIs, host capabilities,
+	// and a REAL bridge boot — before any cycle spends LLM budget, catching the
+	// cycle-258 ExitREPLBootTimeout at batch start instead of ~30 min in.
+	// EVOLVE_SKIP_PREFLIGHT=1 bypasses the whole gate; EVOLVE_SKIP_PREFLIGHT_BOOT=1
+	// runs the cheap checks but skips the boot test (CI/offline). No cycle exists
+	// yet, so this uses plain emit (cycle=0), mirroring the unfinished-cycle guard.
+	if loopPreflightHalts(cfg, stderr) {
+		lr.StopReason = "preflight_failed"
+		lr.emit(stdout)
+		return 2
+	}
+
 	policy := resolveDispatchPolicy(stderr)
 	threshold := resolveCircuitBreakerThreshold()
 

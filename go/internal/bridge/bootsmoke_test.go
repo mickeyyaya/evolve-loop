@@ -93,3 +93,24 @@ func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 		t.Errorf("sandboxed boot must prepend the sandbox prefix to the launch cmd; sent=%v", tmux.sentKeys)
 	}
 }
+
+func TestScrollbackTail(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"empty", "", 3, ""},
+		{"fewer than n", "a\nb", 5, "a\nb"},
+		{"trims blank lines", "a\n\n  \nb\n\n", 3, "a\nb"},
+		{"keeps last n non-empty", "1\n2\n3\n4\n5", 2, "4\n5"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ScrollbackTail(tc.in, tc.n); got != tc.want {
+				t.Fatalf("ScrollbackTail(%q,%d)=%q want %q", tc.in, tc.n, got, tc.want)
+			}
+		})
+	}
+}

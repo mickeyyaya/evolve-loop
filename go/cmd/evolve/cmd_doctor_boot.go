@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -76,22 +75,9 @@ func runDoctorBoot(args []string, stdout, stderr io.Writer) int {
 		return 10
 	default:
 		fmt.Fprintf(stderr, "[doctor] BOOT FAILED: %s rc=%d (sandbox=%v)\n", driver, rc, sandbox)
-		if tail := lastScrollbackLines(scrollback, 12); tail != "" {
+		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		return 1
 	}
-}
-
-// lastScrollbackLines returns the last n non-empty lines of s (the boot pane
-// tail shown on a boot failure).
-func lastScrollbackLines(s string, n int) string {
-	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
-	out := make([]string, 0, n)
-	for i := len(lines) - 1; i >= 0 && len(out) < n; i-- {
-		if strings.TrimSpace(lines[i]) != "" {
-			out = append([]string{lines[i]}, out...)
-		}
-	}
-	return strings.Join(out, "\n")
 }

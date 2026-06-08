@@ -57,3 +57,17 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	}
 	return rc, scrollback
 }
+
+// ScrollbackTail returns the last n non-empty lines of s — the boot pane tail
+// shown on a boot failure. Single source for both `evolve doctor boot` and the
+// loop readiness gate's bridge-boot diagnostic.
+func ScrollbackTail(s string, n int) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	out := make([]string, 0, n)
+	for i := len(lines) - 1; i >= 0 && len(out) < n; i-- {
+		if strings.TrimSpace(lines[i]) != "" {
+			out = append([]string{lines[i]}, out...)
+		}
+	}
+	return strings.Join(out, "\n")
+}
