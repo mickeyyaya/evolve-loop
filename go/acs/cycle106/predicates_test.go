@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle106 holds the cycle-106 ACS predicates.
 //
 // Tasks covered:

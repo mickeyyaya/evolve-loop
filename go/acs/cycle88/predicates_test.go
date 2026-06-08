@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle88 ports the cycle-88 ACS predicates (7 bash files).
 // Subjects: online-researcher purge, orchestrator phase1 purge,
 // phase-gate dispatch legacy error, phase-gate function migration,

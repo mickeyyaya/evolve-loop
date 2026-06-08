@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle102 ports the cycle-102 ACS predicates (3 bash files).
 package cycle102
 

@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle53 ports the cycle-53 ACS predicates (3 files) — all
 // subprocess-with-env-scaffolding style — from acs/cycle-53/*.sh.
 //

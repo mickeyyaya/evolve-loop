@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycle41 ports the cycle-41 ACS predicates (2 bash files, 7 ACs total).
 package cycle41

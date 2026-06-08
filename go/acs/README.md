@@ -1,53 +1,77 @@
 # ACS — Adversarial Cycle Suite
 
-This directory contains per-cycle test packages (`cycleN/predicates_test.go`) that encode the acceptance criteria for each historical evolve-loop cycle. Each package is a leaf: no cross-package imports, no shared fixtures.
+This directory contains per-cycle test packages (`cycleN/predicates_test.go`) that
+encode the acceptance criteria (EGPS predicates) for each evolve-loop cycle. Each
+package is a leaf: no cross-package imports, no shared fixtures.
 
-## Build tags
+## Build tag: `//go:build acs`
 
-| Tag | Selects | Use case |
+**Every `cycleN/predicates_test.go` carries `//go:build acs`.** EGPS predicates are
+state/environment assertions, not unit tests — a predicate like cycle106's
+"working tree has no uncommitted changes" is false mid-edit, so it must **not**
+run in the normal `go test ./...` / CI suite. The `acs` tag is what excludes them
+from the normal suite and selects them for the host-side predicate lane.
+
+| Invocation | Runs predicates? | Used by |
 |---|---|---|
-| (none — default) | All cycles whose predicates still apply on the current Go-native pipeline | Every CI run, every `go test ./...` |
-| `legacy` | Cycles whose predicates were authored against the pre-v12.0.0 bash pipeline and check for deleted `legacy/scripts/...` paths | On-demand historical replay only |
+| `go test ./...` / CI (`-tags integration`, `/acs/` excluded) | **No** (excluded by the `acs` tag) | every CI run |
+| `evolve acs suite --cycle N` | **Yes** — bash lanes + the Go lane scoped to `./acs/cycleN` | the audit phase / EGPS ship gate |
+| `go test -tags acs ./acs/cycleN` | **Yes** — that one cycle | local debugging |
+| `go test -tags acs ./acs/...` | **Yes** — *all* historical cycles (see caveat below) | bulk replay only |
 
-Run quarantined cycles:
+The one enforcement point is `internal/acssuite.TestAllACSPredicatesAreTagged`
+(runs in the normal suite): it fails CI if any `predicates_test.go` is missing
+`//go:build acs`.
 
-```bash
-go test -tags=legacy ./acs/...
+> The `redteam/` package holds a **meta-test** of the bash `rt-*.sh` predicates
+> (it shells out to them with fabricated-attack fixtures). It is *not* an EGPS
+> predicate, so it is **not** `acs`-tagged and is named `redteam_test.go` (not
+> `predicates_test.go`) — it runs in the normal suite like any other unit test.
+
+## The gate runs only the current cycle
+
+`evolve acs suite` scopes the Go lane to `./acs/cycleN/...` — the current cycle
+only. This mirrors the bash lane, which auto-runs the current cycle + the curated
+`acs/regression-suite/` (hand-promoted, durable predicates), and never replays
+every historical `acs/cycle-N/`. A blind `go test -tags acs ./acs/...` would drag
+in bit-rotted historical predicates and block the ship gate.
+
+**Caveat — historical bit-rot.** Several older packages (authored against
+point-in-time state, e.g. `phase-registry.json` schema_version, `state.json`
+`carryoverTodos`, deleted `legacy/scripts/...` paths) **FAIL** under a full
+`go test -tags acs ./acs/...` because the codebase has legitimately moved past
+what they assert. They are kept for the historical record — read
+`acs/cycle47/predicates_test.go` to see what *was* enforced at cycle-47 ship time
+— but they are **never run by the gate** (current-cycle scope). Triaging /
+retiring them is tracked under the EGPS Go-native migration Phase C.
+
+## Authoring a new cycle's predicates (Phase B contract)
+
+A new acceptance criterion is a Go test, not a bash `.sh`:
+
+```go
+//go:build acs
+
+// Package cycleN ports the cycle-N ACS predicates.
+package cycleN
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+)
+
+func TestCN_001_Slug(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	// Behavioral predicates invoke the system-under-test (no source-grep gaming).
+	if !acsassert.FileContains(t, filepath.Join(root, "..."), "...") {
+		t.Errorf("...")
+	}
+}
 ```
 
-Default suite (no quarantined cycles):
-
-```bash
-go test ./acs/...
-```
-
-## Why the quarantine exists
-
-The v12.0.0 flag day (commit `4614782`, 2026-05-24) removed `legacy/scripts/` entirely. The native Go pipeline is the only runtime. 23 cycle packages remained pinned to the old shape — their predicates either:
-
-- **Bucket A** — assert the existence of files under `legacy/scripts/X.sh` (now permanently gone),
-- **Bucket B** — parse engineering markers from script content (the script no longer exists), or
-- **Bucket C** — shell out to a removed bash script.
-
-The behavior these predicates guard against has been retired by design. The tests are kept under the `legacy` tag rather than deleted so the historical record stays readable: a future engineer can read `acs/cycle47/predicates_test.go` to understand what *was* enforced at cycle-47 ship time.
-
-## Quarantined cycle list (as of v12.1)
-
-```
-cycle41  cycle43  cycle44  cycle46  cycle47  cycle48  cycle50
-cycle54  cycle55  cycle58  cycle60  cycle61  cycle63  cycle68
-cycle71  cycle80  cycle84  cycle93  cycle95  cycle96  cycle99
-cycle101 cycledefense1
-```
-
-Each file's first line is `//go:build legacy`, followed by a blank line, then the original test code.
-
-## Re-promoting a quarantined cycle
-
-If a predicate becomes relevant again on the Go pipeline (e.g., the equivalent Go-side behavior gets reintroduced and you want regression coverage):
-
-1. Identify which predicate(s) still apply to the new code shape.
-2. Remove the `//go:build legacy` tag from that one file.
-3. Edit the predicate(s) to assert against the Go-side artifact (e.g., a `cmd_X.go` file or a `.evolve/cycle-state.json` field) instead of the deleted bash path.
-4. Run `go test ./acs/cycleN/...` to confirm the rewritten predicate passes on current code.
-5. Run `go test -tags=legacy ./acs/cycleN/...` to confirm it still passes (or document why it doesn't) under the historical build.
+Place it at `go/acs/cycleN/predicates_test.go`. The `acssuite` Go lane picks it
+up automatically when the cycle runs. If a bash predicate for the same
+`(cycle, ac)` still exists, delete the `.sh` in the same change — the double-count
+guard synthesizes a RED if both lanes assert the same pair.

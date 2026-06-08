@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle52 ports the cycle-52 ACS predicates (3 bash files).
 // Source-presence ports of the resolve-llm.sh behavior contract.
 package cycle52

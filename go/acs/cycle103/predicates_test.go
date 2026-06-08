@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle103 ports the cycle-103 ACS predicates (9 bash files).
 // Subject: build-planner phase introduction (Opt C build-plan rollout).
 package cycle103

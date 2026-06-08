@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle94 ports the cycle-94 ACS predicates (5 bash files).
 // Subjects: lesson template externalization, fast-fail counter logic,
 // orchestrator fast-fail stop criterion, stream-json operator visibility,

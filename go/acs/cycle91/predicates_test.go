@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle91 ports the cycle-91 ACS predicates (6 bash files).
 // Subjects: regression-suite slicing, builder pre-handoff,
 // TDD-engineer 1:1 contract, triage MEDIUM rubric.

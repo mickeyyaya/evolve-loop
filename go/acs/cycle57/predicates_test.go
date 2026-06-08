@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle57 ports the cycle-57 ACS predicates (3 bash files).
 package cycle57
 

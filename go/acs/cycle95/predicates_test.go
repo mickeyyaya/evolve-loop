@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycle95 ports the cycle-95 ACS predicates (2 bash files, ~10 ACs total).
 //

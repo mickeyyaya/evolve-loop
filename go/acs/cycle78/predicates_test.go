@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle78 ports the cycle-78 ACS predicates (1 bash file, 7 ACs).
 package cycle78
 

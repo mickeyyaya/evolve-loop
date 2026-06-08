@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle42 ports the cycle-42 ACS predicates (4 files) — all
 // file-grep / file-existence style — from acs/cycle-42/*.sh.
 package cycle42

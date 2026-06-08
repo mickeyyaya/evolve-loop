@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycle96 ports the cycle-96 ACS predicates (3 bash files).
 //

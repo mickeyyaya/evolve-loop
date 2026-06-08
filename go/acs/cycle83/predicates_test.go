@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle83 ports the cycle-83 ACS predicates (4 bash files).
 // Subject: doctor-subscription-auth.sh + subagent-run.sh CLI gating + docs.
 package cycle83

@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle66 ports the cycle-66 ACS predicates (2 bash files).
 //
 // Both predicates read runtime artifacts under .evolve/runs/cycle-66/.

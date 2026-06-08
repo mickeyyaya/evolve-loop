@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle97 ports the cycle-97 ACS predicates (5 bash files).
 // Subjects: orchestrator profile context-mode, role-context-builder honors
 // profile + env, fail-promotion to full context, triage extraction no-dup.

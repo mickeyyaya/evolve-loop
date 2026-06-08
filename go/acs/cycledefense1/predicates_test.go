@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycledefense1 ports the cycle-defense-layer-1 ACS predicate
 // (Reward-Hacking Defense System Layer 1 commit-prefix-gate behavior).

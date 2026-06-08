@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle98 ports the cycle-98 ACS predicates (5 bash files).
 // Subjects: triage phase-skip schema, orchestrator phase-skip precedence,
 // phase-gate forward-skip-under-flag, no-role-execution invariant.

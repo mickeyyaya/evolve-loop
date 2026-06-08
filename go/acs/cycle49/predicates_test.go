@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle49 ports the cycle-49 ACS predicates (6 bash files).
 // Source-presence ports of the task-fingerprint + research-cache + CLAUDE.md schema acceptance criteria.
 package cycle49

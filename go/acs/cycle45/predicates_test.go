@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle45 ports the cycle-45 ACS predicates (5 bash files).
 package cycle45
 

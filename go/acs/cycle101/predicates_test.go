@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycle101 ports the cycle-101 ACS predicates (3 bash files).
 //

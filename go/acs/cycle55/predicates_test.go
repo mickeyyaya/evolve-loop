@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycle55 ports the cycle-55 ACS predicates (4 bash files).
 package cycle55

@@ -211,6 +211,14 @@ $gofiles
 EOF3
   sort -u "$map" -o "$map"
 
+  # EGPS predicate packages under acs/ are build-tagged (//go:build acs) state
+  # assertions, NOT unit tests. Vetting/testing them in the default (untagged)
+  # config fails with "build constraints exclude all Go files", and running them
+  # would false-fail on historical bit-rot. They are gated by `evolve acs suite`
+  # (current-cycle scope, at audit) + the tagguard test in internal/acssuite.
+  # Exclude them here, mirroring CI's `go list ./... | grep -v '/acs/'`.
+  awk -F'\t' '$2 !~ /^\.\/acs\//' "$map" > "$map.f" && mv "$map.f" "$map"
+
   local moddir glc=0
   for moddir in $(cut -f1 "$map" | sort -u); do
     local pkgs; pkgs="$(awk -F'\t' -v m="$moddir" '$1==m{print $2}' "$map" | tr '\n' ' ')"

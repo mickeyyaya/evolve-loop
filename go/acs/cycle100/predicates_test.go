@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle100 ports the cycle-100 ACS predicates (5 bash files).
 // Subjects: phase-observer default-on, watchdog deprecation, doc migration,
 // incident resolution.

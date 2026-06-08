@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle74 ports the cycle-74 ACS predicate (1 bash file).
 package cycle74
 

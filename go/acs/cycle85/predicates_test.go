@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle85 ports the cycle-85 ACS predicates (7 bash files).
 // Subjects: builder worktree isolation, cycle-state phase validation,
 // memo profile, orchestrator closure mode, promote ACS fallback,

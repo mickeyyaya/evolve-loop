@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle62 ports the cycle-62 ACS predicates (7 bash files).
 // Subjects: post-mortem cycle-61, gemini native-block, classifier role-log scan,
 // scout grounding, audit citations, CLI resolution, memo tools.

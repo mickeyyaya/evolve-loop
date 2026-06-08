@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle87 ports the cycle-87 ACS predicates (8 bash files).
 // Subjects: kb-search behavior, research-quota gate behavior, profile JSON validation.
 package cycle87

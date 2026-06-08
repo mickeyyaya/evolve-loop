@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,6 +35,32 @@ func writeCycleState(t *testing.T, evolveDir string, cycle int, body string) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "cycle-state.json"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write cycle-state.json: %v", err)
+	}
+}
+
+// TestACSSuite_NoGoFlagAccepted pins the `evolve acs suite --no-go` opt-out
+// wiring (Phase A): the flag must parse and the suite must still run the bash
+// lane. Without the flag added, flag.ContinueOnError makes fs.Parse reject the
+// unknown `--no-go` and runACSSuite returns 10 — this test is RED until the flag
+// exists. (The deep behavior, RunGo=false skips the Go lane, is proven in
+// acssuite.TestGoLane_RunGoFalse_OptOut.)
+func TestACSSuite_NoGoFlagAccepted(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "acs", "cycle-3")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "001.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	code := runACSSuite([]string{
+		"--cycle", "3", "--root", root,
+		"--evolve-dir", filepath.Join(root, ".evolve"),
+		"--no-go", "--json=false",
+	}, &out, &errb)
+	if code != 0 {
+		t.Fatalf("exit=%d, want 0 (--no-go accepted, bash lane green); stderr=%s", code, errb.String())
 	}
 }
 

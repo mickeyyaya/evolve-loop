@@ -3,13 +3,25 @@
 // run-acs-suite.sh used to provide (v12 flag-day removed it without a Go
 // port — see ADR-0025), and extends it with the standing red-team glob.
 //
-// Run globs three predicate roots, executes each bash predicate with a
-// per-predicate timeout, and produces an acs-verdict.json conforming to the
-// schema the audit + ship gates read (docs/architecture/egps-v10.md):
+// Run executes TWO predicate lanes and merges them into one acs-verdict.json
+// conforming to the schema the audit + ship gates read
+// (docs/architecture/egps-v10.md):
 //
-//   - <root>/acs/cycle-<N>/*.sh            this cycle's predicates
-//   - <root>/acs/regression-suite/cycle-*/*.sh   accumulated prior predicates
-//   - <root>/acs/red-team/rt-*.sh          standing adversarial predicates
+//  1. Bash lane — globs three roots, executes each `.sh` with a per-predicate
+//     timeout:
+//     - <root>/acs/cycle-<N>/*.sh                    this cycle's predicates
+//     - <root>/acs/regression-suite/cycle-*/*.sh     accumulated prior predicates
+//     - <root>/acs/red-team/rt-*.sh                  standing adversarial predicates
+//  2. Go lane — one post-pass `go test -json -tags acs -count=1 ./acs/cycle<N>`
+//     from the Go module dir (<root>/go by default), scoped to the CURRENT
+//     cycle (mirrors the bash lane, which never runs every historical cycle).
+//     Each test maps to a Result via the SAME counting path as the bash lane,
+//     so the gate invariant cannot diverge. A non-compiling predicate package
+//     is a HARD error, never a silent PASS; a cycle with no Go package yet is a
+//     no-op. The lane is on by default; Options.RunGo=false opts out.
+//
+// A double-count guard synthesizes a RED for any (cycle, ac) pair asserted by
+// BOTH a bash and a Go predicate (a missed Phase-C lockstep-delete).
 //
 // red_count == 0 ⇒ verdict PASS ⇒ ship_eligible. A non-zero exit is RED,
 // EXCEPT exit 77 = SKIP (the TAP/automake convention): an evidence-absent
@@ -20,12 +32,16 @@
 package acssuite
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -122,10 +138,28 @@ type Options struct {
 	// `.evolve/` to main rather than the worktree (where `.evolve/` is absent).
 	// Empty → predicates inherit the caller's env (legacy behavior). (issue #12)
 	ProjectRoot string
-	Timeout     time.Duration // per-predicate; 0 → DefaultTimeout
+	Timeout     time.Duration // per-predicate (bash lane); 0 → DefaultTimeout
+	// GoModuleDir is the directory holding go.mod + the acs/ predicate subtree.
+	// Empty → filepath.Join(Root, "go"). The Go lane runs
+	// `go test -json -tags acs -count=1 ./acs/cycle<N>` from here.
+	GoModuleDir string
+	// RunGo gates the Go predicate lane: nil or *true → run; *false → skip
+	// (the `evolve acs suite --no-go` opt-out). The Go lane is strictly stricter
+	// than the bash-only suite (Go predicates were previously uncounted), so it
+	// is on by default.
+	RunGo *bool
+	// GoTimeout bounds the WHOLE Go lane via context cancellation (not
+	// per-predicate; Go compiles per package). 0 → EVOLVE_ACS_GO_TIMEOUT_S
+	// (seconds) when set, else DefaultTimeout (the current-cycle scope runs a
+	// single package).
+	GoTimeout time.Duration
 	// Seams (default to production behavior when nil).
 	Now  func() time.Time
 	Exec func(ctx context.Context, path string) (exitCode int, output string)
+	// GoExec runs the Go predicate lane and returns the raw `go test -json`
+	// output plus the process exit error (nil on exit 0, an *exec.ExitError on
+	// nonzero). Injected by tests; nil → defaultGoExec.
+	GoExec func(ctx context.Context, moduleDir string, env []string) (rawJSON string, err error)
 }
 
 type predFile struct {
@@ -173,6 +207,8 @@ func Run(opts Options) (Verdict, error) {
 	}
 
 	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle}
+
+	// ── Bash lane (unchanged execution; counting unified via v.record) ──
 	for _, pf := range files {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		start := now()
@@ -192,30 +228,40 @@ func Run(opts Options) (Verdict, error) {
 		switch exitCode {
 		case 0:
 			r.ResultStr = "green"
-			v.GreenCount++
 		case SkipExitCode:
 			// TAP/automake SKIP: evidence absent / not applicable on this
 			// clone. Counted neither red nor green; capture the SKIP reason.
 			r.ResultStr = "skip"
-			v.SkipCount++
-			v.SkipIDs = append(v.SkipIDs, r.ACID)
 			r.EvidenceExcerpt = excerpt(output)
 		default:
 			r.ResultStr = "red"
-			v.RedCount++
-			v.RedIDs = append(v.RedIDs, r.ACID)
 			r.EvidenceExcerpt = excerpt(output)
 		}
-		switch {
-		case pf.isRedTeam:
-			v.PredicateSuite.RedTeamCount++
-		case pf.isRegression:
-			v.PredicateSuite.RegressionSuiteCount++
-		default:
-			v.PredicateSuite.ThisCycleCount++
-		}
-		v.Results = append(v.Results, r)
+		v.record(r)
 	}
+
+	// ── Go lane: one post-pass `go test -json -tags acs ./acs/...` whose
+	// per-test results merge into the SAME verdict via v.record, so the gate
+	// invariant (red_count==0 ⟺ PASS) is identical for both lanes. A non-
+	// compiling predicate package is a HARD error, never a silent PASS. ──
+	if runGoEnabled(opts) {
+		goResults, gErr := runGoTest(opts)
+		if gErr != nil {
+			return Verdict{}, gErr
+		}
+		for _, r := range goResults {
+			v.record(r)
+		}
+	}
+
+	// ── Double-count guard: a bash predicate and a Go predicate that resolve
+	// to the same (cycle, ac) pair (a missed lockstep-delete during the Phase-C
+	// port) synthesize a RED, so the slip fails loudly instead of inflating
+	// green. Conservative: unparseable ACIDs are skipped. ──
+	for _, r := range doubleCountReds(v.Results) {
+		v.record(r)
+	}
+
 	v.PredicateSuite.SkippedCount = v.SkipCount
 	v.PredicateSuite.Total = len(v.Results) // skips included
 	// Invariant: a skip increments neither GreenCount nor RedCount, so
@@ -227,6 +273,353 @@ func Run(opts Options) (Verdict, error) {
 		v.Verdict = "FAIL"
 	}
 	return v, nil
+}
+
+// record appends a result and updates the green/red/skip tallies + the
+// PredicateSuite bucketing. Shared by the bash and Go lanes so the gate
+// invariant (red_count==0 ⟺ PASS) cannot diverge between them.
+func (v *Verdict) record(r Result) {
+	switch r.ResultStr {
+	case "green":
+		v.GreenCount++
+	case "skip":
+		v.SkipCount++
+		v.SkipIDs = append(v.SkipIDs, r.ACID)
+	case "red":
+		v.RedCount++
+		v.RedIDs = append(v.RedIDs, r.ACID)
+	}
+	switch {
+	case r.IsRedTeam:
+		v.PredicateSuite.RedTeamCount++
+	case r.IsRegression:
+		v.PredicateSuite.RegressionSuiteCount++
+	default:
+		v.PredicateSuite.ThisCycleCount++
+	}
+	v.Results = append(v.Results, r)
+}
+
+// predicateEnv builds the env exported to BOTH lanes: EVOLVE_PROJECT_ROOT (so
+// predicates resolve `.evolve/` runtime data to MAIN even from a worktree, issue
+// #12) and CHANGED_PACKAGES (so a predicate can scope `go test` to the cycle's
+// touched packages, cycle-200). With no extras it equals os.Environ() — the
+// prior inherit behavior.
+func predicateEnv(projectRoot string, changedPkgs []string) []string {
+	env := os.Environ()
+	if projectRoot != "" {
+		env = append(env, "EVOLVE_PROJECT_ROOT="+projectRoot)
+	}
+	if len(changedPkgs) > 0 {
+		// Space-joining is safe: go package patterns never contain spaces.
+		env = append(env, "CHANGED_PACKAGES="+strings.Join(changedPkgs, " "))
+	}
+	return env
+}
+
+// runGoEnabled reports whether the Go predicate lane should run (default on).
+func runGoEnabled(opts Options) bool {
+	return opts.RunGo == nil || *opts.RunGo
+}
+
+// hasGoACSTree reports whether moduleDir is a Go module (go.mod present) with an
+// acs/ predicate subtree. When false, the Go lane is a no-op (backward-compat
+// for callers without a Go predicate tree).
+func hasGoACSTree(moduleDir string) bool {
+	if fi, err := os.Stat(filepath.Join(moduleDir, "go.mod")); err != nil || fi.IsDir() {
+		return false
+	}
+	if fi, err := os.Stat(filepath.Join(moduleDir, "acs")); err != nil || !fi.IsDir() {
+		return false
+	}
+	return true
+}
+
+// defaultGoExec runs the real `go test -json -tags acs -count=1 <pkgPattern>`
+// from moduleDir and returns the combined output + the process exit error.
+// CombinedOutput merges build errors (stderr, non-JSON) into the stream;
+// parseGoTestJSON tolerates the non-JSON lines.
+func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []string) (string, error) {
+	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
+	cmd.Dir = moduleDir
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// goLaneTimeout returns the whole-lane timeout: opts.GoTimeout when > 0, else
+// EVOLVE_ACS_GO_TIMEOUT_S (seconds) when set, else DefaultTimeout. The Go lane
+// is bounded as a whole (via context cancellation in runGoTest) because Go
+// compiles per package; the current-cycle scope runs a single package, so one
+// DefaultTimeout is the right ceiling.
+func goLaneTimeout(optsTimeout time.Duration, envGet func(string) string) time.Duration {
+	if optsTimeout > 0 {
+		return optsTimeout
+	}
+	if envGet == nil {
+		envGet = os.Getenv
+	}
+	if raw := envGet("EVOLVE_ACS_GO_TIMEOUT_S"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return DefaultTimeout
+}
+
+// currentCycleGoPkgDir is the Go predicate package dir for the current cycle:
+// <moduleDir>/acs/cycle<N>.
+func currentCycleGoPkgDir(moduleDir string, cycle int) string {
+	return filepath.Join(moduleDir, "acs", fmt.Sprintf("cycle%d", cycle))
+}
+
+// currentCycleGoPkgExists reports whether the current cycle has a Go predicate
+// package on disk. When absent, the Go lane is a no-op (not an error) — the
+// cycle simply has no Go ACs yet.
+func currentCycleGoPkgExists(moduleDir string, cycle int) bool {
+	fi, err := os.Stat(currentCycleGoPkgDir(moduleDir, cycle))
+	return err == nil && fi.IsDir()
+}
+
+// runGoTest executes the Go predicate lane and maps its `go test -json` output
+// into []Result. The lane is scoped to the CURRENT cycle's package
+// (`./acs/cycle<N>`), mirroring the bash lane (which auto-runs only the
+// current cycle + the curated regression-suite, never every historical cycle);
+// a blind `./acs/...` would drag bit-rotted historical predicates into the gate.
+//
+// It returns (nil, nil) when the lane is a no-op (no Go module / acs subtree, or
+// the current cycle has no Go package yet, and no GoExec seam). It returns a
+// HARD error — never an empty, gate-clearing slice — when the lane exited
+// nonzero having produced zero test events (a compile error / infra failure):
+// a broken predicate package must not silently PASS the gate.
+func runGoTest(opts Options) ([]Result, error) {
+	moduleDir := opts.GoModuleDir
+	if moduleDir == "" {
+		moduleDir = filepath.Join(opts.Root, "go")
+	}
+	// Non-recursive on purpose: an exact single-package pattern. A trailing
+	// `/...` could let a sub-package compile failure return partial results
+	// past the (execErr && len==0) guard; the cycle dirs are flat leaves, so
+	// the exact pattern is both correct and closes that latent escape hatch.
+	pkgPattern := fmt.Sprintf("./acs/cycle%d", opts.Cycle)
+	goExec := opts.GoExec
+	if goExec == nil {
+		// No seam: require a real Go module + acs subtree AND a Go package for
+		// the current cycle, else no-op (the cycle has no Go ACs yet).
+		if !hasGoACSTree(moduleDir) || !currentCycleGoPkgExists(moduleDir, opts.Cycle) {
+			return nil, nil
+		}
+		goExec = func(ctx context.Context, dir string, env []string) (string, error) {
+			return defaultGoExec(ctx, dir, pkgPattern, env)
+		}
+	}
+
+	changed := changedPackagesForCycle(opts.ProjectRoot, opts.Cycle)
+	env := predicateEnv(opts.ProjectRoot, changed)
+
+	ctx, cancel := context.WithTimeout(context.Background(), goLaneTimeout(opts.GoTimeout, nil))
+	defer cancel()
+
+	raw, execErr := goExec(ctx, moduleDir, env)
+	results := parseGoTestJSON(strings.NewReader(raw), opts.Cycle)
+	if execErr != nil && len(results) == 0 {
+		// Nonzero exit with zero test events ⇒ the package did not compile (or
+		// `go test` could not run). This must FAIL loudly, not silent-PASS.
+		return nil, fmt.Errorf("acssuite: go predicate lane produced no test events but exited nonzero "+
+			"(compile error / infra failure): %w\noutput:\n%s", execErr, excerpt(raw))
+	}
+	return results, nil
+}
+
+// goEvent is the subset of the `go test -json` event schema we consume.
+type goEvent struct {
+	Action  string  `json:"Action"`
+	Package string  `json:"Package"`
+	Test    string  `json:"Test"`
+	Output  string  `json:"Output"`
+	Elapsed float64 `json:"Elapsed"`
+}
+
+// parseGoTestJSON walks `go test -json` NDJSON and maps each test into a Result,
+// keyed by Package+"/"+Test so the same test name in two packages stays two
+// results (acsrunner keys by bare Test and would collide them — reuse boundary).
+// PASS→green/0, FAIL→red/1, SKIP→skip/77. Evidence is captured for red/skip only
+// (green carries none — existing invariant). Classification is by package suffix:
+// cycle<N> with N==cycle → this-cycle; any other cycle → regression; a redteam
+// package → IsRedTeam.
+func parseGoTestJSON(r io.Reader, cycle int) []Result {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	type acc struct {
+		pkg, test string
+		result    string // green|red|skip
+		dur       int64
+		output    strings.Builder
+	}
+	byKey := map[string]*acc{}
+	order := []string{}
+	for scanner.Scan() {
+		raw := scanner.Bytes()
+		if len(raw) == 0 {
+			continue
+		}
+		var ev goEvent
+		if err := json.Unmarshal(raw, &ev); err != nil {
+			continue // tolerate non-JSON build-output lines
+		}
+		if ev.Test == "" {
+			continue // package-level event
+		}
+		key := ev.Package + "/" + ev.Test
+		a, ok := byKey[key]
+		if !ok {
+			a = &acc{pkg: ev.Package, test: ev.Test}
+			byKey[key] = a
+			order = append(order, key)
+		}
+		switch ev.Action {
+		case "output":
+			a.output.WriteString(ev.Output)
+		case "pass":
+			a.result = "green"
+			a.dur = int64(ev.Elapsed * 1000)
+		case "fail":
+			a.result = "red"
+			a.dur = int64(ev.Elapsed * 1000)
+		case "skip":
+			a.result = "skip"
+			a.dur = int64(ev.Elapsed * 1000)
+		}
+	}
+	var out []Result
+	if err := scanner.Err(); err != nil {
+		// A scan error (e.g. a single output line exceeding the buffer) would
+		// silently truncate the stream and could drop a later FAIL — a
+		// gate-weakening path. Fail LOUD: emit a synthetic RED so the verdict
+		// blocks rather than silent-passing on a partial parse.
+		out = append(out, Result{
+			ACID:            "egps/go-lane-parse-error",
+			Predicate:       "egps/go-lane-parse-error",
+			ExitCode:        1,
+			ResultStr:       "red",
+			EvidenceExcerpt: excerpt("go test -json stream parse error (results may be truncated): " + err.Error()),
+		})
+	}
+	for _, key := range order {
+		a := byKey[key]
+		if a.result == "" {
+			continue // saw the test run but never a terminal action; ignore
+		}
+		dir := path.Base(a.pkg)
+		isReg, isRT := classifyGoPkg(dir, cycle)
+		r := Result{
+			ACID:         dir + "/" + a.test,
+			Predicate:    "go/acs/" + dir + "/...:" + a.test,
+			DurationMS:   a.dur,
+			IsRegression: isReg,
+			IsRedTeam:    isRT,
+			ResultStr:    a.result,
+		}
+		switch a.result {
+		case "green":
+			r.ExitCode = 0
+		case "skip":
+			r.ExitCode = SkipExitCode
+			r.EvidenceExcerpt = excerpt(a.output.String())
+		case "red":
+			r.ExitCode = 1
+			r.EvidenceExcerpt = excerpt(a.output.String())
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// classifyGoPkg maps a predicate package dir to (isRegression, isRedTeam):
+// a redteam dir → red-team; cycle<N> with N==cycle → this-cycle (false,false);
+// any other dir (other cycle, or non-numeric like cycledefense1) → regression.
+func classifyGoPkg(dir string, cycle int) (isRegression, isRedTeam bool) {
+	if strings.Contains(dir, "redteam") || strings.Contains(dir, "red-team") {
+		return false, true
+	}
+	if n, ok := cycleNumFromDir(dir); ok && n == cycle {
+		return false, false
+	}
+	return true, false
+}
+
+// cycleNumFromDir parses the integer N from a "cycle<N>" package dir. Returns
+// (0,false) for non-numeric suffixes (e.g. "cycledefense1").
+func cycleNumFromDir(dir string) (int, bool) {
+	if !strings.HasPrefix(dir, "cycle") {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(dir, "cycle"))
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+var (
+	// bashACIDRe matches a bash predicate ACID's (cycle, ac): "cycle-<N>/<NNN>".
+	// Anchored on the cycle-N/NNN segment, so it also matches the regression
+	// form "regression-suite/cycle-<N>/<NNN>-slug".
+	bashACIDRe = regexp.MustCompile(`cycle-(\d+)/0*(\d+)`)
+	// goACIDRe matches a Go predicate ACID's (cycle, ac): "cycle<N>/TestC<M>_<NNN>".
+	goACIDRe = regexp.MustCompile(`cycle(\d+)/TestC\d+_0*(\d+)`)
+)
+
+// doubleCountReds returns synthetic RED results for any (cycle, ac) pair that
+// appears in BOTH a bash ACID and a Go ACID — a missed lockstep-delete during
+// the Phase-C port. Conservative: ACIDs that don't parse are skipped (they
+// cannot collide), so the guard never invents a RED from an unrecognized id.
+func doubleCountReds(results []Result) []Result {
+	bash := map[[2]int]bool{}
+	go_ := map[[2]int]bool{}
+	for _, r := range results {
+		if m := goACIDRe.FindStringSubmatch(r.ACID); m != nil {
+			go_[acKey(m)] = true
+			continue
+		}
+		if m := bashACIDRe.FindStringSubmatch(r.ACID); m != nil {
+			bash[acKey(m)] = true
+		}
+	}
+	// Deterministic order: sort the colliding keys.
+	var dupes [][2]int
+	for k := range bash {
+		if go_[k] {
+			dupes = append(dupes, k)
+		}
+	}
+	sort.Slice(dupes, func(i, j int) bool {
+		if dupes[i][0] != dupes[j][0] {
+			return dupes[i][0] < dupes[j][0]
+		}
+		return dupes[i][1] < dupes[j][1]
+	})
+	var out []Result
+	for _, k := range dupes {
+		id := fmt.Sprintf("egps/double-count-cycle%d-ac%d", k[0], k[1])
+		out = append(out, Result{
+			ACID:      id,
+			Predicate: id,
+			ExitCode:  1,
+			ResultStr: "red",
+			EvidenceExcerpt: fmt.Sprintf(
+				"cycle %d ac %d is asserted by BOTH a bash predicate and a Go predicate; "+
+					"delete the bash .sh in the same change that adds the Go test (Phase-C lockstep)", k[0], k[1]),
+		})
+	}
+	return out
+}
+
+// acKey turns a regex submatch [full, cycle, ac] into a (cycle, ac) key.
+func acKey(m []string) [2]int {
+	c, _ := strconv.Atoi(m[1])
+	a, _ := strconv.Atoi(m[2])
+	return [2]int{c, a}
 }
 
 // discover globs the three predicate roots in a deterministic order.
@@ -299,23 +692,10 @@ func runBash(ctx context.Context, path, projectRoot, workdir string, changedPkgs
 	if workdir != "" {
 		cmd.Dir = workdir // cycle-190 / issue #9: run predicates with cwd at the shipped tree (the Run closure passes opts.Root)
 	}
-	// Build the predicate env additively. With no extras, env == os.Environ(),
-	// which matches the prior inherit behavior (no os.Setenv runs between
-	// startup and here, so the snapshot is equivalent).
-	env := os.Environ()
-	if projectRoot != "" {
-		// Export EVOLVE_PROJECT_ROOT so predicates resolve `.evolve/` runtime data
-		// to the MAIN project root even when executed from a worktree (issue #12).
-		env = append(env, "EVOLVE_PROJECT_ROOT="+projectRoot)
-	}
-	if len(changedPkgs) > 0 {
-		// Export CHANGED_PACKAGES so a predicate can scope `go test` to this
-		// cycle's touched packages via assert_go_test_pass_changed instead of
-		// `go test ./...` (cycle-200). Space-joining is safe: go package
-		// patterns never contain spaces.
-		env = append(env, "CHANGED_PACKAGES="+strings.Join(changedPkgs, " "))
-	}
-	cmd.Env = env
+	// Shared with the Go lane so both lanes export an identical predicate env
+	// (EVOLVE_PROJECT_ROOT, CHANGED_PACKAGES). With no extras this equals
+	// os.Environ() — the prior inherit behavior.
+	cmd.Env = predicateEnv(projectRoot, changedPkgs)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process != nil {

@@ -1,4 +1,4 @@
-//go:build legacy
+//go:build acs
 
 // Package cycle68 ports the cycle-68 ACS predicates (2 bash files).
 package cycle68

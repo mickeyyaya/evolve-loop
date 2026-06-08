@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle86 ports the cycle-86 ACS predicates (5 bash files).
 package cycle86
 

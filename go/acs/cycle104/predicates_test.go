@@ -1,3 +1,5 @@
+//go:build acs
+
 // Package cycle104 ports the cycle-104 ACS predicates (5 files) from
 // acs/cycle-104/*.sh to Go test counterparts using pkg/acsassert.
 //
