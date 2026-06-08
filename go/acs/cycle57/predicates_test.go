@@ -1,6 +1,9 @@
 //go:build acs
 
-// Package cycle57 ports the cycle-57 ACS predicates (3 bash files).
+// Package cycle57 ports the cycle-57 ACS predicates (2 bash files; the obsolete
+// 031 cycle-predicate-file-count-match was retired in the EGPS Go-native
+// migration — bash-predicate-infra integrity is now covered by the acssuite
+// tagguard test + compile-error hard gate).
 package cycle57
 
 import (
@@ -49,19 +52,5 @@ func TestC57_030_BuildReportVerdictCountMatch(t *testing.T) {
 		if !acsassert.FileContainsAny(verdict, field) {
 			t.Errorf("%s: missing required field %s", verdict, field)
 		}
-	}
-}
-
-// TestC57_031_CyclePredicateFileCountMatch ports cycle-57/031.
-// Verifies that acs/cycle-57/ directory has at least one .sh file.
-// Skips the runtime acs-verdict.json:this_cycle_count cross-check.
-func TestC57_031_CyclePredicateFileCountMatch(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	matches, err := filepath.Glob(filepath.Join(root, "acs", "cycle-57", "*.sh"))
-	if err != nil {
-		t.Fatalf("glob: %v", err)
-	}
-	if len(matches) == 0 {
-		t.Errorf("acs/cycle-57/ contains no .sh files (this_cycle_count would be 0)")
 	}
 }

@@ -154,7 +154,7 @@ func classify(cmd string) ClassifiedLine {
 	case tautologyBrackRE.MatchString(cmd):
 		return ClassifiedLine{Line: cmd, Level: LevelHalt, Reason: "trivial bracket test"}
 	case commitPresenceRE.MatchString(cmd):
-		return ClassifiedLine{Line: cmd, Level: LevelHalt, Reason: "commit-presence assertion (structurally false after worktree-normalize); assert content parity instead, e.g. `git diff <ref> --quiet` (exemplar: acs/cycle-236/001-rescue-parity-landed.sh)"}
+		return ClassifiedLine{Line: cmd, Level: LevelHalt, Reason: "commit-presence assertion (structurally false after worktree-normalize); assert content parity instead, e.g. `git diff <ref> --quiet`"}
 	case echoOnlyRE.MatchString(cmd):
 		return ClassifiedLine{Line: cmd, Level: LevelWarn, Reason: "echo-only (no workspace inspection)"}
 	case grepLiteralRE.MatchString(cmd):
