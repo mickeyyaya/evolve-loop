@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Pre-batch readiness gate for `evolve loop`.** A deterministic host-side gate (`go/internal/looppreflight`) runs after the unfinished-cycle guard and before the first cycle, verifying the pipeline can actually run via four accumulate-then-decide checks: **pipeline-structure** (every spine phase has a registry factory + phasecontract; every profile `cli`/`cli_fallback` resolves to a known driver), **llm-cli-status** (each distinct CLI binary present via `doctor.Probe`), **host-capabilities** (tmux + writable `.evolve`/`.evolve/runs` Halt; sandbox-degraded, low-disk, and stale `evolve-bridge-*` tmux sessions Warn), and **bridge-boot** (really boots each `-tmux` REPL via `bridge.BootSmokeTest` under a 90s budget). On any Halt the batch aborts BEFORE spending LLM budget — exit 2, `stop_reason=preflight_failed` (cycle=0), a persisted `.evolve/loop-preflight.json`, and a human Summary to stderr — catching the cycle-258 `ExitREPLBootTimeout` at batch start instead of ~30 min in. `EVOLVE_SKIP_PREFLIGHT=1` bypasses the whole gate; `EVOLVE_SKIP_PREFLIGHT_BOOT=1` runs the cheap checks but skips the real boot (CI/offline). Mirrors the `releasepreflight` Options→Run→Result seam blueprint; completes readiness-gate build-order steps 3–7 + 9 (steps 1/2/8 shipped in 18.0.0 prep as `bridge.BootSmokeTest` + `evolve doctor boot`).
+
+### Changed
+
+- **`bridge.ScrollbackTail`** centralizes the boot-pane scrollback-tail formatting that was duplicated between `evolve doctor boot` and the new readiness gate (single source).
+
 ## [18.0.0] - 2026-06-08
 
 ### Added

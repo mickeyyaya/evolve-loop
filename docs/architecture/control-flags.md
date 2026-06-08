@@ -132,6 +132,15 @@
 | `EVOLVE_DRY_RUN_PROVISION_WORKTREE` | ACTIVE | Dry-run worktree provisioning |
 | `EVOLVE_PROFILE_WORKTREE_AWARE` | ACTIVE | Mark profile as worktree-aware |
 
+## Readiness Gate (pre-batch)
+
+> Deterministic host-side gate run by `evolve loop` BEFORE the first cycle (Go: `go/internal/looppreflight`, wired in `cmd_loop.go` after the unfinished-cycle guard). On a Halt it aborts with `stop_reason=preflight_failed`, rc=2, cycle=0, and persists `.evolve/loop-preflight.json`. Catches the cycle-258 `ExitREPLBootTimeout` at batch start instead of mid-cycle.
+
+| Flag | Status | Purpose |
+|------|--------|---------|
+| `EVOLVE_SKIP_PREFLIGHT` | ACTIVE | Emergency hatch: skip the whole readiness gate (no checks, no boot) |
+| `EVOLVE_SKIP_PREFLIGHT_BOOT` | ACTIVE | Run the cheap checks (structure/CLI/host) but skip the real bridge-boot probe — CI/offline (bridge-boot downgrades Halt→Warn) |
+
 ## Workflow Defaults
 
 | Flag | Status | Purpose |
