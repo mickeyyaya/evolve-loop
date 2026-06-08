@@ -1,7 +1,8 @@
 // Package acsassert is the assertion DSL ACS predicates write against.
 //
-// Each Go test file under acs/cycle-*/ uses these helpers in the same
-// way bash predicates use [ -f ], grep -q, jq -e, etc. The helpers
+// Each Go predicate under go/acs/{cycle<N>,regression,redteam}/ uses these
+// helpers in the same way the retired bash predicates used [ -f ], grep -q,
+// jq -e, etc. (ADR-0042). The helpers
 // take a TB instead of *testing.T so they're testable in isolation
 // (the test for FileExists doesn't have to fail itself when checking
 // missing-file behaviour).
@@ -203,7 +204,7 @@ func SetupTempProject(t *testing.T) string {
 // RepoRoot resolves the repository root via `git rev-parse --show-toplevel`.
 // Skips the test when not inside a git work tree — predicate suites can
 // then run cleanly on bare exports without false failures. Shared across
-// every acs/cycle*/ test package.
+// every go/acs/ predicate package.
 func RepoRoot(t *testing.T) string {
 	t.Helper()
 	stdout, _, code, err := SubprocessOutput("git", "rev-parse", "--show-toplevel")

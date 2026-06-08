@@ -1,5 +1,11 @@
 # EGPS — Execution-Grounded Process Supervision (v10.0.0+)
 
+> **Superseded in part by EGPS v11 ([ADR-0042](adr/0042-egps-v11-go-native-predicates.md), 2026-06-08).**
+> The verdict contract (`acs-verdict.json`, `red_count == 0` ⟺ PASS, no WARN) and the gaming-signal
+> analysis below remain current. The **predicate FORMAT changed**: acceptance predicates are now Go
+> tests (`//go:build acs`) under `go/acs/{cycle<N>,regression,redteam}/`, not bash `acs/cycle-N/*.sh`.
+> See ADR-0042 + `go/acs/README.md` for the current contract; the bash format below is historical.
+
 > Unified architectural pattern that replaces model-claimed verdicts with sandbox exit codes. Subsumes the 5 gaming signals diagnosed in cycles 30–39 (AC-by-grep, confidence cliff, recurring isolation breach, self-referential tautological-eval, carryover work-shifting). Research basis: [knowledge-base/research/execution-grounded-process-supervision-2026.md](../../knowledge-base/research/execution-grounded-process-supervision-2026.md).
 
 ## One sentence

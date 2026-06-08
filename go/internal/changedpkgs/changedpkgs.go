@@ -5,10 +5,10 @@
 // timeout on a large repo and flakes to a false RED (cycle-200; the
 // EVOLVE_ACS_PREDICATE_TIMEOUT_S band-aid only widens the window).
 //
-// The package list is exported to predicates as the CHANGED_PACKAGES env var;
-// the acs/lib/assert.sh helper assert_go_test_pass_changed consumes it. All
-// functions are pure + best-effort: an absent/unparseable handoff yields an
-// empty list (the predicate then falls back to its own scope), never an error.
+// The package list is exported to predicates as the CHANGED_PACKAGES env var
+// (a Go predicate can scope its `go test` to it). All functions are pure +
+// best-effort: an absent/unparseable handoff yields an empty list (the predicate
+// then falls back to its own scope), never an error.
 package changedpkgs
 
 import (
