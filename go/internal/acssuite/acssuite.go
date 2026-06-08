@@ -1,34 +1,20 @@
-// Package acssuite is the deterministic, host-side EGPS predicate-suite
-// runner. It restores the suite-execution mechanism that the deleted bash
-// run-acs-suite.sh used to provide (v12 flag-day removed it without a Go
-// port — see ADR-0025), and extends it with the standing red-team glob.
+// Package acssuite is the deterministic, host-side EGPS predicate-suite runner.
+// It executes the Go predicate lane and writes acs-verdict.json conforming to
+// the schema the audit + ship gates read (EGPS v11 — see ADR-0042; supersedes
+// the bash run-acs-suite.sh of ADR-0025).
 //
-// Run executes TWO predicate lanes and merges them into one acs-verdict.json
-// conforming to the schema the audit + ship gates read
-// (docs/architecture/egps-v10.md):
+// The Go lane runs three scopes, each as a SEPARATE `go test -json -tags acs`
+// (so a per-package compile error is a HARD error, never a silent PASS):
+//   - ./acs/cycle<N>          this cycle's predicates (authored fresh)
+//   - ./acs/regression/<sub>  curated durable predicates, every cycle
+//   - ./acs/redteam           standing anti-gaming predicates, every cycle
 //
-//  1. Bash lane — globs three roots, executes each `.sh` with a per-predicate
-//     timeout:
-//     - <root>/acs/cycle-<N>/*.sh                    this cycle's predicates
-//     - <root>/acs/regression-suite/cycle-*/*.sh     accumulated prior predicates
-//     - <root>/acs/red-team/rt-*.sh                  standing adversarial predicates
-//  2. Go lane — one post-pass `go test -json -tags acs -count=1 ./acs/cycle<N>`
-//     from the Go module dir (<root>/go by default), scoped to the CURRENT
-//     cycle (mirrors the bash lane, which never runs every historical cycle).
-//     Each test maps to a Result via the SAME counting path as the bash lane,
-//     so the gate invariant cannot diverge. A non-compiling predicate package
-//     is a HARD error, never a silent PASS; a cycle with no Go package yet is a
-//     no-op. The lane is on by default; Options.RunGo=false opts out.
-//
-// A double-count guard synthesizes a RED for any (cycle, ac) pair asserted by
-// BOTH a bash and a Go predicate (a missed Phase-C lockstep-delete).
-//
-// red_count == 0 ⇒ verdict PASS ⇒ ship_eligible. A non-zero exit is RED,
-// EXCEPT exit 77 = SKIP (the TAP/automake convention): an evidence-absent
-// predicate (e.g. a runtime-only regression predicate on a fresh clone where
-// the gitignored .evolve/ artifact it inspects does not exist) is counted
-// neither red nor green, so it cannot block the gate yet cannot fake a pass.
-// CLI: `evolve acs suite --cycle N`.
+// Each test maps to a Result via v.record. red_count == 0 ⇒ verdict PASS ⇒
+// ship_eligible. A test that FAILs is RED; a t.Skip is SKIP (the TAP/automake
+// convention, exit 77 in the Result) — an evidence-absent predicate (e.g. a
+// runtime-only regression predicate on a fresh clone) is counted neither red nor
+// green, so it cannot block the gate yet cannot fake a pass. CLI:
+// `evolve acs suite --cycle N`.
 package acssuite
 
 import (
@@ -41,46 +27,16 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 )
 
-// killGrace is how long runBash waits, after the timeout kills the predicate's
-// process group, for I/O to drain before force-closing the pipes.
-const killGrace = 2 * time.Second
-
-// DefaultTimeout bounds a single predicate's execution. EGPS predicates are
-// meant to be fast assertions; a predicate that hangs is treated as RED
-// (timeout). But agents legitimately author "full-suite-green" predicates that
-// run `go test ./...`, which on a large repo exceeds 60s and flakes to a false
-// RED (exit 124) — a passing suite must not be sunk by a too-tight timeout
-// (cycle-200). EVOLVE_ACS_PREDICATE_TIMEOUT_S overrides this when a suite
-// legitimately needs longer; unset/invalid keeps the 60s default.
+// DefaultTimeout bounds the whole Go lane (per scope) via context cancellation.
+// EVOLVE_ACS_GO_TIMEOUT_S overrides it when a scope legitimately needs longer.
 const DefaultTimeout = 60 * time.Second
-
-// resolveTimeout returns the per-predicate timeout: opts.Timeout when > 0, else
-// EVOLVE_ACS_PREDICATE_TIMEOUT_S (seconds) when set to a positive integer, else
-// DefaultTimeout. envGet defaults to os.Getenv (injectable for tests).
-func resolveTimeout(optsTimeout time.Duration, envGet func(string) string) time.Duration {
-	if optsTimeout > 0 {
-		return optsTimeout
-	}
-	if envGet == nil {
-		envGet = os.Getenv
-	}
-	if raw := envGet("EVOLVE_ACS_PREDICATE_TIMEOUT_S"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
-			return time.Duration(n) * time.Second
-		}
-	}
-	return DefaultTimeout
-}
 
 // evidenceMax caps the captured output excerpt per predicate.
 const evidenceMax = 600
@@ -128,34 +84,24 @@ type Verdict struct {
 
 // Options configures Run. Root and Cycle are required.
 type Options struct {
-	Root  string // repo root containing acs/ (where predicate FILES are discovered)
+	Root  string // repo root (the Go module's parent; the lane runs from <Root>/go)
 	Cycle int    // current cycle number
 	// ProjectRoot is the MAIN project root whose `.evolve/` holds the runtime data
 	// (history under .evolve/runs/, baselines, the current build-report) that
 	// predicates read via ${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}. When set, it is
-	// exported as EVOLVE_PROJECT_ROOT to each predicate so a suite discovered from a
+	// exported as EVOLVE_PROJECT_ROOT to each predicate so a suite run from a
 	// worktree (Root=worktree, post issue-#9 audit-cwd=worktree) still resolves
 	// `.evolve/` to main rather than the worktree (where `.evolve/` is absent).
-	// Empty → predicates inherit the caller's env (legacy behavior). (issue #12)
+	// Empty → predicates inherit the caller's env. (issue #12)
 	ProjectRoot string
-	Timeout     time.Duration // per-predicate (bash lane); 0 → DefaultTimeout
 	// GoModuleDir is the directory holding go.mod + the acs/ predicate subtree.
 	// Empty → filepath.Join(Root, "go"). The Go lane runs
-	// `go test -json -tags acs -count=1 ./acs/cycle<N>` from here.
+	// `go test -json -tags acs -count=1 <scope>` from here.
 	GoModuleDir string
-	// RunGo gates the Go predicate lane: nil or *true → run; *false → skip
-	// (the `evolve acs suite --no-go` opt-out). The Go lane is strictly stricter
-	// than the bash-only suite (Go predicates were previously uncounted), so it
-	// is on by default.
-	RunGo *bool
 	// GoTimeout bounds the WHOLE Go lane via context cancellation (not
 	// per-predicate; Go compiles per package). 0 → EVOLVE_ACS_GO_TIMEOUT_S
-	// (seconds) when set, else DefaultTimeout (the current-cycle scope runs a
-	// single package).
+	// (seconds) when set, else DefaultTimeout.
 	GoTimeout time.Duration
-	// Seams (default to production behavior when nil).
-	Now  func() time.Time
-	Exec func(ctx context.Context, path string) (exitCode int, output string)
 	// GoExec runs ONE Go predicate-lane package pattern and returns the raw
 	// `go test -json` output plus the process exit error (nil on exit 0, an
 	// *exec.ExitError on nonzero). It is called once per active scope
@@ -164,13 +110,9 @@ type Options struct {
 	GoExec func(ctx context.Context, moduleDir, pkgPattern string, env []string) (rawJSON string, err error)
 }
 
-type predFile struct {
-	path         string // absolute
-	isRegression bool
-	isRedTeam    bool
-}
-
-// Run discovers and executes the predicate suite, returning the Verdict.
+// Run executes the Go predicate lane (current cycle + regression + redteam
+// scopes, each a separate `go test -json -tags acs`) and returns the Verdict.
+// A non-compiling predicate package is a HARD error, never a silent PASS.
 func Run(opts Options) (Verdict, error) {
 	if opts.Root == "" {
 		return Verdict{}, fmt.Errorf("acssuite: Root required")
@@ -178,96 +120,21 @@ func Run(opts Options) (Verdict, error) {
 	if opts.Cycle <= 0 {
 		return Verdict{}, fmt.Errorf("acssuite: Cycle must be > 0")
 	}
-	now := opts.Now
-	if now == nil {
-		now = time.Now
-	}
-	timeout := resolveTimeout(opts.Timeout, nil)
-	execFn := opts.Exec
-	if execFn == nil {
-		projectRoot := opts.ProjectRoot
-		// cycle-190: execute predicates with cwd at opts.Root — the tree being
-		// shipped (the worktree for worktree cycles, main otherwise). Predicates
-		// are DISCOVERED from Root; running them with cwd=Root makes a relative
-		// `go test ./...` compile the SAME source the auditor reviewed, instead of
-		// the caller's cwd (main), which lacks the builder's worktree changes and
-		// silently RED-flagged new-code predicates → discarded PASS-audited work.
-		// `.evolve/` runtime data still resolves to main via EVOLVE_PROJECT_ROOT.
-		workdir := opts.Root
-		// Export CHANGED_PACKAGES so a predicate can scope `go test` to the
-		// cycle's touched packages (assert_go_test_pass_changed) instead of the
-		// whole repo — best-effort, empty when the handoff is absent (cycle-200).
-		changed := changedPackagesForCycle(opts.ProjectRoot, opts.Cycle)
-		execFn = func(ctx context.Context, path string) (int, string) {
-			return runBash(ctx, path, projectRoot, workdir, changed)
-		}
-	}
-
-	files, err := discover(opts.Root, opts.Cycle)
-	if err != nil {
-		return Verdict{}, err
-	}
 
 	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle}
 
-	// ── Bash lane (unchanged execution; counting unified via v.record) ──
-	for _, pf := range files {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		start := now()
-		exitCode, output := execFn(ctx, pf.path)
-		dur := now().Sub(start).Milliseconds()
-		cancel()
-
-		rel := relPath(opts.Root, pf.path)
-		r := Result{
-			ACID:         acIDFromRel(rel),
-			Predicate:    rel,
-			ExitCode:     exitCode,
-			DurationMS:   dur,
-			IsRegression: pf.isRegression,
-			IsRedTeam:    pf.isRedTeam,
-		}
-		switch exitCode {
-		case 0:
-			r.ResultStr = "green"
-		case SkipExitCode:
-			// TAP/automake SKIP: evidence absent / not applicable on this
-			// clone. Counted neither red nor green; capture the SKIP reason.
-			r.ResultStr = "skip"
-			r.EvidenceExcerpt = excerpt(output)
-		default:
-			r.ResultStr = "red"
-			r.EvidenceExcerpt = excerpt(output)
-		}
-		v.record(r)
+	goResults, gErr := runGoTest(opts)
+	if gErr != nil {
+		return Verdict{}, gErr
 	}
-
-	// ── Go lane: one post-pass `go test -json -tags acs ./acs/...` whose
-	// per-test results merge into the SAME verdict via v.record, so the gate
-	// invariant (red_count==0 ⟺ PASS) is identical for both lanes. A non-
-	// compiling predicate package is a HARD error, never a silent PASS. ──
-	if runGoEnabled(opts) {
-		goResults, gErr := runGoTest(opts)
-		if gErr != nil {
-			return Verdict{}, gErr
-		}
-		for _, r := range goResults {
-			v.record(r)
-		}
-	}
-
-	// ── Double-count guard: a bash predicate and a Go predicate that resolve
-	// to the same (cycle, ac) pair (a missed lockstep-delete during the Phase-C
-	// port) synthesize a RED, so the slip fails loudly instead of inflating
-	// green. Conservative: unparseable ACIDs are skipped. ──
-	for _, r := range doubleCountReds(v.Results) {
+	for _, r := range goResults {
 		v.record(r)
 	}
 
 	v.PredicateSuite.SkippedCount = v.SkipCount
 	v.PredicateSuite.Total = len(v.Results) // skips included
 	// Invariant: a skip increments neither GreenCount nor RedCount, so
-	// PASS ⟺ red_count==0 is preserved exactly as before SKIP existed.
+	// PASS ⟺ red_count==0 holds.
 	if v.RedCount == 0 {
 		v.Verdict = "PASS"
 		v.ShipEligible = true
@@ -278,8 +145,8 @@ func Run(opts Options) (Verdict, error) {
 }
 
 // record appends a result and updates the green/red/skip tallies + the
-// PredicateSuite bucketing. Shared by the bash and Go lanes so the gate
-// invariant (red_count==0 ⟺ PASS) cannot diverge between them.
+// PredicateSuite bucketing — the single place RedCount is incremented, so the
+// gate invariant (red_count==0 ⟺ PASS) has one source of truth.
 func (v *Verdict) record(r Result) {
 	switch r.ResultStr {
 	case "green":
@@ -317,11 +184,6 @@ func predicateEnv(projectRoot string, changedPkgs []string) []string {
 		env = append(env, "CHANGED_PACKAGES="+strings.Join(changedPkgs, " "))
 	}
 	return env
-}
-
-// runGoEnabled reports whether the Go predicate lane should run (default on).
-func runGoEnabled(opts Options) bool {
-	return opts.RunGo == nil || *opts.RunGo
 }
 
 // hasGoACSTree reports whether moduleDir is a Go module (go.mod present) with an
@@ -384,7 +246,7 @@ func currentCycleGoPkgExists(moduleDir string, cycle int) bool {
 }
 
 // goLanePatterns returns the existence-gated, NON-recursive package patterns the
-// Go lane runs every cycle, mirroring the bash lane's three roots:
+// Go lane runs every cycle — the three predicate scopes:
 //   - the current cycle's package (`./acs/cycle<N>`) — this cycle's predicates;
 //   - each regression sub-package (`./acs/regression/<sub>`) — the curated
 //     durable set, run every cycle;
@@ -419,9 +281,9 @@ func dirExists(p string) bool {
 
 // runGoTest executes the Go predicate lane and maps its `go test -json` output
 // into []Result. It runs each active scope (current cycle + regression
-// sub-packages + redteam) as a SEPARATE pattern, merging results, mirroring the
-// bash lane (current cycle + curated regression + red-team — never every
-// historical cycle, which would drag bit-rotted predicates into the gate).
+// sub-packages + redteam) as a SEPARATE pattern, merging results. The current
+// cycle + curated regression + red-team are run — never every historical cycle,
+// which would drag bit-rotted predicates into the gate.
 //
 // It returns (nil, nil) when the lane is a no-op (no Go module / acs subtree and
 // no GoExec seam, or no scope is present). It returns a HARD error — never an
@@ -608,103 +470,6 @@ func cycleNumFromDir(dir string) (int, bool) {
 	return n, true
 }
 
-var (
-	// bashACIDRe matches a bash predicate ACID's (cycle, ac): "cycle-<N>/<NNN>".
-	// Anchored on the cycle-N/NNN segment, so it also matches the regression
-	// form "regression-suite/cycle-<N>/<NNN>-slug".
-	bashACIDRe = regexp.MustCompile(`cycle-(\d+)/0*(\d+)`)
-	// goACIDRe matches a Go predicate ACID's (cycle, ac): "cycle<N>/TestC<M>_<NNN>".
-	goACIDRe = regexp.MustCompile(`cycle(\d+)/TestC\d+_0*(\d+)`)
-)
-
-// doubleCountReds returns synthetic RED results for any (cycle, ac) pair that
-// appears in BOTH a bash ACID and a Go ACID — a missed lockstep-delete during
-// the Phase-C port. Conservative: ACIDs that don't parse are skipped (they
-// cannot collide), so the guard never invents a RED from an unrecognized id.
-func doubleCountReds(results []Result) []Result {
-	bash := map[[2]int]bool{}
-	go_ := map[[2]int]bool{}
-	for _, r := range results {
-		if m := goACIDRe.FindStringSubmatch(r.ACID); m != nil {
-			go_[acKey(m)] = true
-			continue
-		}
-		if m := bashACIDRe.FindStringSubmatch(r.ACID); m != nil {
-			bash[acKey(m)] = true
-		}
-	}
-	// Deterministic order: sort the colliding keys.
-	var dupes [][2]int
-	for k := range bash {
-		if go_[k] {
-			dupes = append(dupes, k)
-		}
-	}
-	sort.Slice(dupes, func(i, j int) bool {
-		if dupes[i][0] != dupes[j][0] {
-			return dupes[i][0] < dupes[j][0]
-		}
-		return dupes[i][1] < dupes[j][1]
-	})
-	var out []Result
-	for _, k := range dupes {
-		id := fmt.Sprintf("egps/double-count-cycle%d-ac%d", k[0], k[1])
-		out = append(out, Result{
-			ACID:      id,
-			Predicate: id,
-			ExitCode:  1,
-			ResultStr: "red",
-			EvidenceExcerpt: fmt.Sprintf(
-				"cycle %d ac %d is asserted by BOTH a bash predicate and a Go predicate; "+
-					"delete the bash .sh in the same change that adds the Go test (Phase-C lockstep)", k[0], k[1]),
-		})
-	}
-	return out
-}
-
-// acKey turns a regex submatch [full, cycle, ac] into a (cycle, ac) key.
-func acKey(m []string) [2]int {
-	c, _ := strconv.Atoi(m[1])
-	a, _ := strconv.Atoi(m[2])
-	return [2]int{c, a}
-}
-
-// discover globs the three predicate roots in a deterministic order.
-func discover(root string, cycle int) ([]predFile, error) {
-	var out []predFile
-
-	cycleGlob := filepath.Join(root, "acs", fmt.Sprintf("cycle-%d", cycle), "*.sh")
-	cyc, err := filepath.Glob(cycleGlob)
-	if err != nil {
-		return nil, fmt.Errorf("acssuite: glob cycle: %w", err)
-	}
-	sort.Strings(cyc)
-	for _, p := range cyc {
-		out = append(out, predFile{path: p})
-	}
-
-	regGlob := filepath.Join(root, "acs", "regression-suite", "cycle-*", "*.sh")
-	reg, err := filepath.Glob(regGlob)
-	if err != nil {
-		return nil, fmt.Errorf("acssuite: glob regression: %w", err)
-	}
-	sort.Strings(reg)
-	for _, p := range reg {
-		out = append(out, predFile{path: p, isRegression: true})
-	}
-
-	rtGlob := filepath.Join(root, "acs", "red-team", "rt-*.sh")
-	rt, err := filepath.Glob(rtGlob)
-	if err != nil {
-		return nil, fmt.Errorf("acssuite: glob red-team: %w", err)
-	}
-	sort.Strings(rt)
-	for _, p := range rt {
-		out = append(out, predFile{path: p, isRedTeam: true})
-	}
-	return out, nil
-}
-
 // changedPackagesForCycle returns the go test patterns for the files the
 // builder touched this cycle, read from handoff-build.json under the cycle
 // workspace (<projectRoot>/.evolve/runs/cycle-<N>/). Best-effort: nil when
@@ -721,63 +486,6 @@ func changedPackagesForCycle(projectRoot string, cycle int) []string {
 		}
 	}
 	return nil
-}
-
-// runBash executes `bash <path>` and returns its exit code + combined output.
-// A non-exec failure (e.g. bash missing) or timeout maps to a non-zero exit so
-// the predicate counts as RED — the suite never silently swallows a failure.
-//
-// The predicate runs in its own process group so a timeout can kill the whole
-// tree (a predicate that spawns `sleep` would otherwise hold the output pipe
-// open and defeat ctx cancellation). The Cancel hook signals the group on
-// timeout; in the narrow window where the deadline fires before Start sets
-// cmd.Process the signal is skipped, so WaitDelay is the guaranteed backstop —
-// it force-closes the pipes killGrace after cancellation, ensuring Run always
-// returns (a timed-out predicate counts RED) rather than blocking on a child.
-func runBash(ctx context.Context, path, projectRoot, workdir string, changedPkgs []string) (int, string) {
-	cmd := exec.CommandContext(ctx, "bash", path)
-	if workdir != "" {
-		cmd.Dir = workdir // cycle-190 / issue #9: run predicates with cwd at the shipped tree (the Run closure passes opts.Root)
-	}
-	// Shared with the Go lane so both lanes export an identical predicate env
-	// (EVOLVE_PROJECT_ROOT, CHANGED_PACKAGES). With no extras this equals
-	// os.Environ() — the prior inherit behavior.
-	cmd.Env = predicateEnv(projectRoot, changedPkgs)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if cmd.Process != nil {
-			// Negative pid → signal the whole process group.
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		}
-		return nil
-	}
-	cmd.WaitDelay = killGrace
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		return 0, string(out)
-	}
-	if ee, ok := err.(*exec.ExitError); ok {
-		if code := ee.ExitCode(); code >= 0 {
-			return code, string(out)
-		}
-		// Killed by signal (timeout) → no exit code; treat as RED timeout.
-		return 124, string(out) + "\n[acssuite] predicate killed (timeout)"
-	}
-	// Could not run at all (bash missing, etc.) — RED with diagnostic.
-	return 126, string(out) + "\n[acssuite] exec error: " + err.Error()
-}
-
-// acIDFromRel derives a stable id from a repo-relative path: "<parent-dir>/<base-without-ext>".
-func acIDFromRel(rel string) string {
-	rel = strings.TrimSuffix(rel, ".sh")
-	return strings.TrimPrefix(rel, "acs/")
-}
-
-func relPath(root, path string) string {
-	if rel, err := filepath.Rel(root, path); err == nil {
-		return rel
-	}
-	return path
 }
 
 func excerpt(s string) string {

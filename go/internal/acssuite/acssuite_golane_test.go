@@ -56,17 +56,13 @@ type goSeamOut struct {
 	err error
 }
 
-// boolPtr is a local helper for the *bool RunGo option.
-func boolPtr(b bool) *bool { return &b }
-
-// TestGoLane_BashGreenGoFail_MergedRed is the KEYSTONE: a green bash predicate
-// plus a failing Go predicate must produce a single merged verdict with
-// red_count==1, FAIL, not ship-eligible. This is the whole point of unifying
-// the runner — a Go predicate failure can now block the gate.
-func TestGoLane_BashGreenGoFail_MergedRed(t *testing.T) {
+// TestGoLane_GoGreenGoFail_Verdict is the KEYSTONE: a green + a failing Go
+// predicate produce red_count==1, FAIL, not ship-eligible — a Go predicate
+// failure blocks the gate.
+func TestGoLane_GoGreenGoFail_Verdict(t *testing.T) {
 	root := t.TempDir()
-	writePred(t, root, "cycle-9", "001-pass.sh", "exit 0")
 	raw := goStream(
+		goLine(acsPkgBase+"cycle9", "TestC9_001_Ok", "pass"),
 		goLine(acsPkgBase+"cycle9", "TestC9_002_Bar", "run"),
 		goLine(acsPkgBase+"cycle9", "TestC9_002_Bar", "output"),
 		goLine(acsPkgBase+"cycle9", "TestC9_002_Bar", "fail"),
@@ -76,7 +72,7 @@ func TestGoLane_BashGreenGoFail_MergedRed(t *testing.T) {
 		t.Fatal(err)
 	}
 	if v.GreenCount != 1 || v.RedCount != 1 {
-		t.Errorf("green=%d red=%d, want 1/1 (bash green + go fail merged)", v.GreenCount, v.RedCount)
+		t.Errorf("green=%d red=%d, want 1/1", v.GreenCount, v.RedCount)
 	}
 	if v.Verdict != "FAIL" || v.ShipEligible {
 		t.Errorf("verdict=%q ship=%v, want FAIL/false", v.Verdict, v.ShipEligible)
@@ -156,59 +152,16 @@ func TestGoLane_PackageQualifiedDedup(t *testing.T) {
 	}
 }
 
-// TestGoLane_NoGoModule_BehavesAsToday — without a GoExec seam and with no go/
-// module subtree under Root, the Go lane is a no-op: the verdict matches the
-// bash-only behavior (backward-compat).
-func TestGoLane_NoGoModule_BehavesAsToday(t *testing.T) {
+// TestGoLane_NoScopePresent_EmptyPass — with no GoExec seam and no Go module /
+// acs subtree under Root, the lane is a no-op → an empty PASS verdict.
+func TestGoLane_NoScopePresent_EmptyPass(t *testing.T) {
 	root := t.TempDir()
-	writePred(t, root, "cycle-1", "001.sh", "exit 0")
 	v, err := Run(Options{Root: root, Cycle: 1}) // no GoExec, no go/ subtree
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.PredicateSuite.Total != 1 || v.GreenCount != 1 || v.Verdict != "PASS" {
-		t.Errorf("total=%d green=%d verdict=%q, want 1/1/PASS (go lane no-op)", v.PredicateSuite.Total, v.GreenCount, v.Verdict)
-	}
-}
-
-// TestGoLane_DoubleCount_SyntheticRed — a bash predicate and a Go predicate that
-// resolve to the same (cycle, ac) pair (a missed lockstep-delete during the
-// Phase-C port) must surface a synthetic RED rather than silently inflating
-// green, so the slip fails loudly.
-func TestGoLane_DoubleCount_SyntheticRed(t *testing.T) {
-	root := t.TempDir()
-	writePred(t, root, "cycle-9", "001-foo.sh", "exit 0")
-	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_001_Foo", "pass"))
-	v, err := Run(Options{Root: root, Cycle: 9, GoExec: seamGo(raw, nil)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v.RedCount < 1 {
-		t.Fatalf("red=%d, want ≥1 (double-counted (9,1) must synthesize a RED)", v.RedCount)
-	}
-	var found bool
-	for _, id := range v.RedIDs {
-		if strings.Contains(id, "double-count") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("RedIDs=%v, want one containing 'double-count'", v.RedIDs)
-	}
-}
-
-// TestGoLane_RunGoFalse_OptOut — RunGo=false skips the Go lane entirely even
-// when a GoExec seam is supplied; the failing Go predicate is ignored.
-func TestGoLane_RunGoFalse_OptOut(t *testing.T) {
-	root := t.TempDir()
-	writePred(t, root, "cycle-9", "001.sh", "exit 0")
-	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_002_Fail", "fail"))
-	v, err := Run(Options{Root: root, Cycle: 9, RunGo: boolPtr(false), GoExec: seamGo(raw, &fakeExitErr{1})})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v.RedCount != 0 || v.Verdict != "PASS" {
-		t.Errorf("red=%d verdict=%q, want 0/PASS (RunGo=false skips go lane)", v.RedCount, v.Verdict)
+	if v.PredicateSuite.Total != 0 || v.Verdict != "PASS" || !v.ShipEligible {
+		t.Errorf("total=%d verdict=%q ship=%v, want 0/PASS/true (no scope → empty PASS)", v.PredicateSuite.Total, v.Verdict, v.ShipEligible)
 	}
 }
 
@@ -217,20 +170,18 @@ func TestGoLane_RunGoFalse_OptOut(t *testing.T) {
 // an error (never a silent PASS), so a broken predicate pkg cannot clear the gate.
 func TestGoLane_CompileError_HardError(t *testing.T) {
 	root := t.TempDir()
-	writePred(t, root, "cycle-9", "001.sh", "exit 0")
 	// Build failure: go emits package-level build-output (no Test field) + nonzero exit.
 	raw := `{"Action":"build-output","Package":"` + acsPkgBase + `cycle9","Output":"./x.go:1: syntax error\n"}` + "\n"
 	_, err := Run(Options{Root: root, Cycle: 9, GoExec: seamGo(raw, &fakeExitErr{2})})
 	if err == nil {
-		t.Fatal("Run must surface a hard error when the Go predicate lane fails to compile (zero test events + nonzero exit), got nil")
+		t.Fatal("Run must surface a hard error when a Go predicate scope fails to compile (zero test events + nonzero exit), got nil")
 	}
 }
 
-// TestGoLane_GreenInvariantPreserved — on an all-green merged verdict, no green
-// result carries an evidence excerpt (the existing invariant), and verdict PASS.
+// TestGoLane_GreenInvariantPreserved — on an all-green verdict, no green result
+// carries an evidence excerpt (the existing invariant), and verdict PASS.
 func TestGoLane_GreenInvariantPreserved(t *testing.T) {
 	root := t.TempDir()
-	writePred(t, root, "cycle-9", "001.sh", "exit 0")
 	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_002_Ok", "pass"))
 	v, err := Run(Options{Root: root, Cycle: 9, GoExec: seamGo(raw, nil)})
 	if err != nil {
@@ -349,9 +300,10 @@ func TestParseGoTestJSON_ScanErrorFailsLoud(t *testing.T) {
 }
 
 // TestGoLane_CurrentCycleScope — the default lane (no seam) is scoped to the
-// current cycle's Go package. With a real Go module + acs subtree present but NO
-// package for the current cycle, the lane is a no-op (not a hard error): the
-// verdict is bash-only. This is what keeps bit-rotted historical predicates out
+// current cycle's Go package. With a real Go module + acs subtree present (and a
+// cycle5 package) but NO package for the current cycle (9) and no regression /
+// redteam dir, every scope is absent → the lane is a no-op (not a hard error):
+// an empty PASS verdict. This is what keeps bit-rotted historical predicates out
 // of the gate.
 func TestGoLane_CurrentCycleScope(t *testing.T) {
 	root := t.TempDir()
@@ -359,7 +311,6 @@ func TestGoLane_CurrentCycleScope(t *testing.T) {
 	// A Go module with an acs/ tree and a cycle5 package — but the run is cycle 9.
 	mustMkdir(t, filepath.Join(goDir, "acs", "cycle5"))
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module x\n\ngo 1.21\n")
-	writePred(t, root, "cycle-9", "001.sh", "exit 0")
 
 	if currentCycleGoPkgExists(goDir, 9) {
 		t.Fatal("precondition: go/acs/cycle9 must be absent")
@@ -368,13 +319,13 @@ func TestGoLane_CurrentCycleScope(t *testing.T) {
 		t.Fatal("precondition: go/acs/cycle5 must exist")
 	}
 
-	v, err := Run(Options{Root: root, Cycle: 9}) // no go/acs/cycle9 → Go lane no-op
+	v, err := Run(Options{Root: root, Cycle: 9}) // no go/acs/cycle9, no regression/redteam → no-op
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.PredicateSuite.Total != 1 || v.GreenCount != 1 || v.Verdict != "PASS" {
-		t.Errorf("total=%d green=%d verdict=%q, want 1/1/PASS (Go lane no-op, no cycle9 pkg)",
-			v.PredicateSuite.Total, v.GreenCount, v.Verdict)
+	if v.PredicateSuite.Total != 0 || v.Verdict != "PASS" {
+		t.Errorf("total=%d verdict=%q, want 0/PASS (no scope present → empty PASS)",
+			v.PredicateSuite.Total, v.Verdict)
 	}
 }
 

@@ -60,8 +60,9 @@ events.
   `internal/redteamcheck` (adversarially unit-tested in CI) + thin `go/acs/redteam` predicates;
   relocated the durable regression set to `go/acs/regression/`.
 - **Phase D** — retired the bash runtime: deleted every bash predicate + `acs/lib/` (the `acs/`
-  tree is gone), recorded this ADR; the now-inert `acssuite` bash lane (`discover`/`runBash` — globs
-  nothing once no `.sh` remain) is removed in the final cleanup commit.
+  tree is gone), removed the bash lane from `acssuite` (`discover`/`runBash`/`predFile`/the
+  per-predicate timeout + double-count guard — `Run` is now a Go-lane-only function), dropped the
+  vestigial `evolve acs suite --no-go` flag, and recorded this ADR.
 
 ## Consequences
 

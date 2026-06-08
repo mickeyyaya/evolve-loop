@@ -71,14 +71,12 @@ func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// runACSSuite implements `evolve acs suite --cycle N [--root .] [--evolve-dir .evolve] [--no-go]`.
-// It is the deterministic host-side replacement for the deleted bash
-// run-acs-suite.sh (ADR-0025): it runs BOTH the bash predicate suite and the Go
-// predicate lane (go test -tags acs ./acs/cycle<N>, scoped to the current
-// cycle), merging both into one acs-verdict.json. --no-go skips the Go lane
-// (bash only). Exit 2 when any
-// predicate is RED, 0 when all green, 1 on a hard error (e.g. a Go predicate
-// package that fails to compile — never a silent PASS).
+// runACSSuite implements `evolve acs suite --cycle N [--root .] [--evolve-dir .evolve]`.
+// It runs the Go predicate lane (current cycle + regression + redteam scopes,
+// each `go test -tags acs`) and writes acs-verdict.json (EGPS v11; ADR-0042,
+// successor to the bash run-acs-suite.sh of ADR-0025). Exit 2 when any predicate
+// is RED, 0 when all green, 1 on a hard error (e.g. a predicate package that
+// fails to compile — never a silent PASS).
 func runACSSuite(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve acs suite", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -87,13 +85,11 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 		root      string
 		evolveDir string
 		writeJSON bool
-		noGo      bool
 	)
 	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
-	fs.StringVar(&root, "root", ".", "repo root containing acs/")
+	fs.StringVar(&root, "root", ".", "repo root (the Go module's parent)")
 	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
 	fs.BoolVar(&writeJSON, "json", true, "write acs-verdict.json (default true)")
-	fs.BoolVar(&noGo, "no-go", false, "skip the Go predicate lane (go test -tags acs ./acs/cycle<N>); bash lane only")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -108,12 +104,7 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 			root = resolved
 		}
 	}
-	opts := acssuite.Options{Root: root, ProjectRoot: mainProjectRoot(root), Cycle: cycle}
-	if noGo {
-		runGo := false
-		opts.RunGo = &runGo
-	}
-	v, err := acssuite.Run(opts)
+	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: mainProjectRoot(root), Cycle: cycle})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve acs suite: %v\n", err)
 		return 1

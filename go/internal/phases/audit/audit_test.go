@@ -447,15 +447,9 @@ func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
 // tests) and would have failed against the pre-fix cmd_cycle.go wiring, which
 // left GenerateVerdict nil.
 func TestNewDefault_WiresVerdictGenerator(t *testing.T) {
-	// Predicate root (the cycle worktree): one trivial passing predicate.
+	// Predicate root (the cycle worktree): one trivial passing Go predicate.
 	root := t.TempDir()
-	predDir := filepath.Join(root, "acs", "cycle-7")
-	if err := os.MkdirAll(predDir, 0o755); err != nil {
-		t.Fatalf("mkdir preds: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(predDir, "001-pass.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("write predicate: %v", err)
-	}
+	writeGoPredFixture(t, root, 7, true)
 
 	// Workspace must be <evolveDir>/runs/cycle-7 so generateACSVerdict's
 	// evolveDir = dirname(dirname(workspace)) lands the verdict exactly where
@@ -555,15 +549,25 @@ func TestRun_GeneratorReturnsError_WarnDiagAndFAIL(t *testing.T) {
 
 // --- generateACSVerdict (the production GenerateVerdict default) ---
 
-// writePassingPredicate writes one trivial exit-0 predicate under
-// <root>/acs/cycle-<n>/ so acssuite.Run discovers a non-empty suite.
-func writePassingPredicate(t *testing.T, root string, cycle int) {
+// writeGoPredFixture writes a minimal Go ACS predicate module under <root>/go so
+// acssuite.Run's Go lane discovers one predicate for `cycle` (passing when pass)
+// via real `go test -tags acs` execution.
+func writeGoPredFixture(t *testing.T, root string, cycle int, pass bool) {
 	t.Helper()
-	dir := filepath.Join(root, "acs", "cycle-"+strconv.Itoa(cycle))
+	pkg := "cycle" + strconv.Itoa(cycle)
+	dir := filepath.Join(root, "go", "acs", pkg)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir preds: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "001-pass.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go", "go.mod"), []byte("module acsfixture\n\ngo 1.21\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	body := "//go:build acs\n\npackage " + pkg + "\n\nimport \"testing\"\n\nfunc TestC" + strconv.Itoa(cycle) + "_001_Fixture(t *testing.T) {\n"
+	if !pass {
+		body += "\tt.Fatal(\"fixture RED\")\n"
+	}
+	body += "}\n"
+	if err := os.WriteFile(filepath.Join(dir, "predicates_test.go"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write predicate: %v", err)
 	}
 }
@@ -573,7 +577,7 @@ func writePassingPredicate(t *testing.T, root string, cycle int) {
 // verdict is written at <evolveDir>/runs/cycle-N/acs-verdict.json.
 func TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot(t *testing.T) {
 	projectRoot := t.TempDir()
-	writePassingPredicate(t, projectRoot, 5)
+	writeGoPredFixture(t, projectRoot, 5, true)
 	evolveDir := t.TempDir()
 	ws := filepath.Join(evolveDir, "runs", "cycle-5")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -630,7 +634,7 @@ func TestGenerateACSVerdict_ZeroPredicates_WritesNothing(t *testing.T) {
 // generateACSVerdict must wrap and return the write error.
 func TestGenerateACSVerdict_WriteVerdictError_Propagates(t *testing.T) {
 	root := t.TempDir()
-	writePassingPredicate(t, root, 3)
+	writeGoPredFixture(t, root, 3, true)
 
 	// evolveDir = dirname(dirname(workspace)). Make that path a regular file so
 	// acssuite.WriteVerdict's MkdirAll(<evolveDir>/runs/cycle-3) fails.

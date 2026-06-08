@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -32,25 +33,32 @@ func repoRoot(t *testing.T) string {
 // red_count the ship phase's checkEGPSGate refuses to ship on.
 // Knowledge: knowledge/architecture/trust-kernel-and-egps.md
 
-// fakeSuite builds an acssuite that runs a fixed roster of predicate scripts,
-// each returning the exit code encoded in its filename suffix (_green=0, _red=1),
-// so the verdict is deterministic without invoking real bash predicate logic.
-func writePredicate(t *testing.T, dir, name string, exit int) {
+// writeGoPredFixture writes a minimal Go ACS predicate module under <root>/go so
+// acssuite.Run's Go lane discovers one predicate for `cycle` (passing or RED) via
+// real `go test -tags acs` execution — the integration the ship gate depends on.
+func writeGoPredFixture(t *testing.T, root string, cycle int, pass bool) {
 	t.Helper()
-	body := "#!/usr/bin/env bash\nexit " + map[bool]string{true: "0", false: "1"}[exit == 0] + "\n"
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755); err != nil {
+	pkg := "cycle" + strconv.Itoa(cycle)
+	dir := filepath.Join(root, "go", "acs", pkg)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go", "go.mod"), []byte("module acsfixture\n\ngo 1.21\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := "//go:build acs\n\npackage " + pkg + "\n\nimport \"testing\"\n\nfunc TestC" + strconv.Itoa(cycle) + "_001_Fixture(t *testing.T) {\n"
+	if !pass {
+		body += "\tt.Fatal(\"fixture RED\")\n"
+	}
+	body += "}\n"
+	if err := os.WriteFile(filepath.Join(dir, "predicates_test.go"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestShipGate_ShipEligibleOnlyWhenRedCountZero(t *testing.T) {
 	root := t.TempDir()
-	cycleDir := filepath.Join(root, "acs", "cycle-1")
-	if err := os.MkdirAll(cycleDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writePredicate(t, cycleDir, "p-001.sh", 0)
-	writePredicate(t, cycleDir, "p-002.sh", 0)
+	writeGoPredFixture(t, root, 1, true)
 
 	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: 1})
 	if err != nil {
@@ -66,12 +74,7 @@ func TestShipGate_ShipEligibleOnlyWhenRedCountZero(t *testing.T) {
 
 func TestShipGate_BlocksWhenRedCountNonZero(t *testing.T) {
 	root := t.TempDir()
-	cycleDir := filepath.Join(root, "acs", "cycle-1")
-	if err := os.MkdirAll(cycleDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writePredicate(t, cycleDir, "p-001.sh", 0)
-	writePredicate(t, cycleDir, "p-002.sh", 1) // RED
+	writeGoPredFixture(t, root, 1, false) // RED predicate
 
 	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: 1})
 	if err != nil {
