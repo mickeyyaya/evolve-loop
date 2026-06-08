@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [18.0.0] - 2026-06-08
+
+### Added
+
+- **EGPS v11 — Go-native acceptance predicates (ADR-0042).** Acceptance criteria are now authored as Go tests (`//go:build acs`, `predicates_test.go`), not bash `acs/cycle-N/*.sh`. `evolve acs suite` runs three scopes every cycle — the current cycle (`go/acs/cycle<N>/`, authored fresh per cycle), the curated regression set (`go/acs/regression/`, standing), and the standing red-team anti-gaming predicates (`go/acs/redteam/`) — each as a separate `go test -json -tags acs` so a per-package compile error is a HARD suite error, never a silent PASS. The `red_count == 0 ⟺ PASS ⟺ ship_eligible` verdict invariant is unchanged. The red-team detection logic (`internal/redteamcheck`) is adversarially unit-tested in normal CI; a normal-suite guard (`acssuite.TestAllACSPredicatesAreTagged`) fails CI if any predicate file is missing `//go:build acs`.
+
+### Changed
+
+- **Retired the bash predicate runtime (BREAKING for predicate authors).** `acssuite` is now a Go-lane-only runner: the bash glob/exec lane (`discover`/`runBash`), `acs/lib/assert.sh`, ~408 dormant historical bash predicates, and the `evolve acs suite --no-go` flag are all removed; the `acs/` tree is gone. The authoring contract (`agents/evolve-{tdd-engineer,builder}.md` + `.evolve/profiles/`) now targets Go predicates, and the Builder is role-gate-denied from writing `go/acs/**`. The durable regression set was relocated to `go/acs/regression/`; the 3 red-team predicates were ported to Go. The Go lane is scoped to the current cycle + curated regression (never every historical cycle), keeping bit-rotted point-in-time predicates out of the gate. Supersedes the bash predicate format of egps-v10 / ADR-0025.
+
+### Documentation
+
+- **ADR-0042 (EGPS v11)** records the Go-native predicate contract; `docs/architecture/egps-v10.md` carries a superseded-in-part banner; `go/acs/README.md` documents the three-scope authoring model.
+
 ### Fixed
 
 - **Reconcile bridge timeout against the deliverable** — `BaseRunner.Run` synthesized `verdict=FAIL` on *any* bridge error without reading the artifact the agent produced, so a complete PASS deliverable written just as the bridge gave up on the artifact-wait window (`ErrArtifactTimeout`, exit 81) was discarded and the cycle routed to retro instead of ship (the deeper root cause behind the cycle-254/255 false-FAILs — the busy-pane fix below extends a working agent; this closes the residual write-after-give-up race at the verdict-synthesis chokepoint). On `ErrArtifactTimeout` only, the runner now reconciles against the deliverable via an injectable `verifyFn` (`deliverable.Verify`): if it is on disk and well-formed, control falls through to the same artifact-read + `Classify` path the happy case uses — so audit's EGPS/`red_count` gate still decides (a PASS report with red predicates can never ship). A reconciled phase is a *completed* phase (nil error, the agent's own verdict authoritative); a reconciled FAIL routes as a real `code-audit-fail`, not an infra-timeout retry. Reconciliation only ever upgrades a synthesized FAIL toward the agent's real verdict — it never invents a PASS; malformed/absent/non-timeout cases keep prior behavior. `PhaseResponse.Reconciled` drives an auditable `reconciled_timeout` ledger entry (mirrors `backfill`).
