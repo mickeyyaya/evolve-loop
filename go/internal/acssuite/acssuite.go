@@ -156,10 +156,12 @@ type Options struct {
 	// Seams (default to production behavior when nil).
 	Now  func() time.Time
 	Exec func(ctx context.Context, path string) (exitCode int, output string)
-	// GoExec runs the Go predicate lane and returns the raw `go test -json`
-	// output plus the process exit error (nil on exit 0, an *exec.ExitError on
-	// nonzero). Injected by tests; nil → defaultGoExec.
-	GoExec func(ctx context.Context, moduleDir string, env []string) (rawJSON string, err error)
+	// GoExec runs ONE Go predicate-lane package pattern and returns the raw
+	// `go test -json` output plus the process exit error (nil on exit 0, an
+	// *exec.ExitError on nonzero). It is called once per active scope
+	// (current-cycle, each regression sub-package, redteam). Injected by tests;
+	// nil → defaultGoExec.
+	GoExec func(ctx context.Context, moduleDir, pkgPattern string, env []string) (rawJSON string, err error)
 }
 
 type predFile struct {
@@ -381,36 +383,77 @@ func currentCycleGoPkgExists(moduleDir string, cycle int) bool {
 	return err == nil && fi.IsDir()
 }
 
-// runGoTest executes the Go predicate lane and maps its `go test -json` output
-// into []Result. The lane is scoped to the CURRENT cycle's package
-// (`./acs/cycle<N>`), mirroring the bash lane (which auto-runs only the
-// current cycle + the curated regression-suite, never every historical cycle);
-// a blind `./acs/...` would drag bit-rotted historical predicates into the gate.
+// goLanePatterns returns the existence-gated, NON-recursive package patterns the
+// Go lane runs every cycle, mirroring the bash lane's three roots:
+//   - the current cycle's package (`./acs/cycle<N>`) — this cycle's predicates;
+//   - each regression sub-package (`./acs/regression/<sub>`) — the curated
+//     durable set, run every cycle;
+//   - the red-team package (`./acs/redteam`) — standing anti-gaming predicates.
 //
-// It returns (nil, nil) when the lane is a no-op (no Go module / acs subtree, or
-// the current cycle has no Go package yet, and no GoExec seam). It returns a
-// HARD error — never an empty, gate-clearing slice — when the lane exited
-// nonzero having produced zero test events (a compile error / infra failure):
-// a broken predicate package must not silently PASS the gate.
+// Each is a single, non-recursive pattern run as a SEPARATE `go test` so a
+// per-package compile error is caught by the (execErr && zero-events) hard-gate;
+// a recursive `./acs/regression/...` could let one sub-package's compile failure
+// hide behind another's events. Patterns whose dir is absent are skipped.
+func goLanePatterns(moduleDir string, cycle int) []string {
+	var pats []string
+	if dirExists(currentCycleGoPkgDir(moduleDir, cycle)) {
+		pats = append(pats, fmt.Sprintf("./acs/cycle%d", cycle))
+	}
+	if entries, err := os.ReadDir(filepath.Join(moduleDir, "acs", "regression")); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				pats = append(pats, "./acs/regression/"+e.Name())
+			}
+		}
+	}
+	if dirExists(filepath.Join(moduleDir, "acs", "redteam")) {
+		pats = append(pats, "./acs/redteam")
+	}
+	return pats
+}
+
+func dirExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
+}
+
+// runGoTest executes the Go predicate lane and maps its `go test -json` output
+// into []Result. It runs each active scope (current cycle + regression
+// sub-packages + redteam) as a SEPARATE pattern, merging results, mirroring the
+// bash lane (current cycle + curated regression + red-team — never every
+// historical cycle, which would drag bit-rotted predicates into the gate).
+//
+// It returns (nil, nil) when the lane is a no-op (no Go module / acs subtree and
+// no GoExec seam, or no scope is present). It returns a HARD error — never an
+// empty, gate-clearing slice — when ANY scope exited nonzero having produced
+// zero test events (a compile error / infra failure): a broken predicate package
+// must not silently PASS the gate.
 func runGoTest(opts Options) ([]Result, error) {
 	moduleDir := opts.GoModuleDir
 	if moduleDir == "" {
 		moduleDir = filepath.Join(opts.Root, "go")
 	}
-	// Non-recursive on purpose: an exact single-package pattern. A trailing
-	// `/...` could let a sub-package compile failure return partial results
-	// past the (execErr && len==0) guard; the cycle dirs are flat leaves, so
-	// the exact pattern is both correct and closes that latent escape hatch.
-	pkgPattern := fmt.Sprintf("./acs/cycle%d", opts.Cycle)
+
 	goExec := opts.GoExec
+	var patterns []string
 	if goExec == nil {
-		// No seam: require a real Go module + acs subtree AND a Go package for
-		// the current cycle, else no-op (the cycle has no Go ACs yet).
-		if !hasGoACSTree(moduleDir) || !currentCycleGoPkgExists(moduleDir, opts.Cycle) {
+		// No seam: require a real Go module + acs subtree, then existence-gate
+		// each scope against the real filesystem.
+		if !hasGoACSTree(moduleDir) {
 			return nil, nil
 		}
-		goExec = func(ctx context.Context, dir string, env []string) (string, error) {
-			return defaultGoExec(ctx, dir, pkgPattern, env)
+		goExec = defaultGoExec
+		patterns = goLanePatterns(moduleDir, opts.Cycle)
+		if len(patterns) == 0 {
+			return nil, nil
+		}
+	} else {
+		// Seam mode: the seam decides each scope's output (returns "" for
+		// inactive scopes), so the scope list is fixed and filesystem-independent.
+		patterns = []string{
+			fmt.Sprintf("./acs/cycle%d", opts.Cycle),
+			"./acs/regression/...",
+			"./acs/redteam",
 		}
 	}
 
@@ -420,15 +463,19 @@ func runGoTest(opts Options) ([]Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), goLaneTimeout(opts.GoTimeout, nil))
 	defer cancel()
 
-	raw, execErr := goExec(ctx, moduleDir, env)
-	results := parseGoTestJSON(strings.NewReader(raw), opts.Cycle)
-	if execErr != nil && len(results) == 0 {
-		// Nonzero exit with zero test events ⇒ the package did not compile (or
-		// `go test` could not run). This must FAIL loudly, not silent-PASS.
-		return nil, fmt.Errorf("acssuite: go predicate lane produced no test events but exited nonzero "+
-			"(compile error / infra failure): %w\noutput:\n%s", execErr, excerpt(raw))
+	var all []Result
+	for _, pat := range patterns {
+		raw, execErr := goExec(ctx, moduleDir, pat, env)
+		results := parseGoTestJSON(strings.NewReader(raw), opts.Cycle)
+		if execErr != nil && len(results) == 0 {
+			// Nonzero exit with zero test events ⇒ that package did not compile
+			// (or `go test` could not run). FAIL loudly, never silent-PASS.
+			return nil, fmt.Errorf("acssuite: go predicate scope %q produced no test events but exited "+
+				"nonzero (compile error / infra failure): %w\noutput:\n%s", pat, execErr, excerpt(raw))
+		}
+		all = append(all, results...)
 	}
-	return results, nil
+	return all, nil
 }
 
 // goEvent is the subset of the `go test -json` event schema we consume.

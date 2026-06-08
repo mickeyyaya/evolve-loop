@@ -27,9 +27,33 @@ func goStream(lines ...string) string { return strings.Join(lines, "\n") + "\n" 
 
 const acsPkgBase = "github.com/mickeyyaya/evolve-loop/go/acs/"
 
-// seamGo returns a GoExec seam that yields the canned NDJSON and the given err.
-func seamGo(raw string, err error) func(context.Context, string, []string) (string, error) {
-	return func(context.Context, string, []string) (string, error) { return raw, err }
+// seamGo returns a GoExec seam that yields the canned NDJSON + err for the
+// CURRENT-cycle scope (`./acs/cycle<N>`) and empty output for the regression /
+// redteam scopes — so single-scope tests behave as before the lane gained
+// regression + redteam scopes.
+func seamGo(raw string, err error) func(context.Context, string, string, []string) (string, error) {
+	return func(_ context.Context, _ string, pattern string, _ []string) (string, error) {
+		if strings.HasPrefix(pattern, "./acs/cycle") {
+			return raw, err
+		}
+		return "", nil
+	}
+}
+
+// seamGoByPattern returns a GoExec seam that yields canned (raw, err) keyed by
+// the exact package pattern, empty for any other scope.
+func seamGoByPattern(byPat map[string]goSeamOut) func(context.Context, string, string, []string) (string, error) {
+	return func(_ context.Context, _ string, pattern string, _ []string) (string, error) {
+		if v, ok := byPat[pattern]; ok {
+			return v.raw, v.err
+		}
+		return "", nil
+	}
+}
+
+type goSeamOut struct {
+	raw string
+	err error
 }
 
 // boolPtr is a local helper for the *bool RunGo option.
@@ -249,6 +273,58 @@ func TestParseGoTestJSON_PackageQualifiedKeys(t *testing.T) {
 	}
 	if fail.ResultStr != "red" || fail.EvidenceExcerpt == "" {
 		t.Errorf("fail: result=%q evidence=%q, want red/non-empty", fail.ResultStr, fail.EvidenceExcerpt)
+	}
+}
+
+// TestGoLane_RegressionScope — the Go lane runs the regression scope every
+// cycle (not just the current cycle). A failing regression predicate blocks the
+// gate even when the current-cycle scope is clean.
+func TestGoLane_RegressionScope(t *testing.T) {
+	root := t.TempDir()
+	regRaw := goStream(goLine(acsPkgBase+"regression/cycle84", "TestC84_002_CarryoverTodosCleared", "fail"))
+	v, err := Run(Options{Root: root, Cycle: 256, GoExec: seamGoByPattern(map[string]goSeamOut{
+		"./acs/regression/...": {raw: regRaw, err: &fakeExitErr{1}},
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.RedCount != 1 || v.Verdict != "FAIL" {
+		t.Errorf("red=%d verdict=%q, want 1/FAIL (regression scope runs every cycle)", v.RedCount, v.Verdict)
+	}
+	if v.PredicateSuite.RegressionSuiteCount != 1 {
+		t.Errorf("RegressionSuiteCount=%d, want 1", v.PredicateSuite.RegressionSuiteCount)
+	}
+}
+
+// TestGoLane_RedteamScope — the Go lane runs the redteam scope every cycle; its
+// results are classified IsRedTeam.
+func TestGoLane_RedteamScope(t *testing.T) {
+	root := t.TempDir()
+	rtRaw := goStream(goLine(acsPkgBase+"redteam", "TestRT001_LedgerRoleCompleteness", "pass"))
+	v, err := Run(Options{Root: root, Cycle: 256, GoExec: seamGoByPattern(map[string]goSeamOut{
+		"./acs/redteam": {raw: rtRaw},
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.PredicateSuite.RedTeamCount != 1 || len(v.Results) != 1 || !v.Results[0].IsRedTeam {
+		t.Errorf("RedTeamCount=%d results=%v, want 1 red-team result", v.PredicateSuite.RedTeamCount, v.Results)
+	}
+}
+
+// TestGoLane_PerScopeCompileError — a compile error in ONE scope (regression)
+// is a HARD error even though another scope (current cycle) ran fine. This pins
+// the per-scope hard-gate: scopes run as separate `go test` invocations so a
+// broken regression package cannot hide behind the current cycle's events.
+func TestGoLane_PerScopeCompileError(t *testing.T) {
+	root := t.TempDir()
+	v := map[string]goSeamOut{
+		"./acs/cycle256":       {raw: goStream(goLine(acsPkgBase+"cycle256", "TestC256_001_Ok", "pass"))},
+		"./acs/regression/...": {raw: `{"Action":"build-output","Package":"x/acs/regression/cycle9","Output":"./x.go:1: syntax error\n"}` + "\n", err: &fakeExitErr{2}},
+	}
+	_, err := Run(Options{Root: root, Cycle: 256, GoExec: seamGoByPattern(v)})
+	if err == nil {
+		t.Fatal("a regression-scope compile error must be a HARD error even when the current-cycle scope is clean, got nil")
 	}
 }
 
