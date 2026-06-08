@@ -199,7 +199,7 @@ would have been caught here.)
 ```
 
 - **`red=0` / exit 0**: proceed to write build-report.md with `Status: PASS`.
-- **`red>0` / exit 2**: BLOCK — do NOT write build-report.md or claim PASS until the red predicates are remediated (fix your code, your own `acs/cycle-N/*.sh` evals, AND the build-report-structure regression predicates), then re-run until `red=0`.
+- **`red>0` / exit 2**: BLOCK — do NOT write build-report.md or claim PASS until the red predicates are remediated by **fixing your code** (you may NOT edit the predicates themselves — bash `acs/cycle-N/*.sh` OR Go `go/acs/cycle<N>/predicates_test.go`; both are TDD-engineer-owned), then re-run until `red=0`. A Go-lane compile error surfaces as a hard suite error, not a silent pass.
 - **Eval graders:** also run your task's graders (`go test -run <names>` from `evals/<task-slug>.md`). A `no tests to run` result means the required test does NOT exist — WRITE IT before claiming PASS; never report PASS for a grader that matched zero tests.
 
 Include the suite's verbatim output line in the final `build-report.md` under a
@@ -264,11 +264,11 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` rule #2.
 
 ## EGPS Predicate Authoring
 
-**Builder MUST NOT write or modify ACS predicates** (`acs/cycle-*/*.sh`, `acs/regression-suite/**`). Predicate authoring is the exclusive responsibility of the TDD-engineer phase (enabled via `EVOLVE_TEST_PHASE_ENABLED=1`). This separation prevents the test-author == code-author cooperative-bias failure mode (cycle-85 fake-predicate incident: 7/7 predicates degenerated into `grep -qF "magic_string" file.sh` checks).
+**Builder MUST NOT write or modify ACS predicates** — neither the Go form (`go/acs/cycle*/**`, the current authoring target) nor the legacy bash form (`acs/cycle-*/*.sh`, `acs/regression-suite/**`). Predicate authoring is the exclusive responsibility of the TDD-engineer phase (enabled via `EVOLVE_TEST_PHASE_ENABLED=1`). This separation prevents the test-author == code-author cooperative-bias failure mode (cycle-85 fake-predicate incident: 7/7 predicates degenerated into `grep -qF "magic_string" file.sh` checks).
 
 If you observe an existing predicate that appears wrong, do NOT edit it. Record an entry in `workspace/abnormal-events.jsonl` describing the issue; the next TDD-engineer cycle will adjudicate.
 
-The role-gate kernel hook enforces this — attempts to Edit/Write `acs/cycle-*/**` or `acs/regression-suite/**` from the Builder profile are rejected (rc=2) per `.evolve/profiles/builder.json:disallowed_tools`.
+The role-gate kernel hook enforces this — attempts to Edit/Write `go/acs/cycle*/**`, `acs/cycle-*/**`, or `acs/regression-suite/**` from the Builder profile are rejected (rc=2) per `.evolve/profiles/builder.json:disallowed_tools`.
 
 Legacy v10.1 fallback (Builder writes own predicates) is REMOVED. See plan `ultrathink-and-online-research-mutable-hollerith.md` for the four-layer defense rationale and `agents/evolve-tdd-engineer.md` for the new authoring contract.
 ## Output

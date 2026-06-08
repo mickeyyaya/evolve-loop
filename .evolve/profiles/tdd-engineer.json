@@ -87,6 +87,7 @@
       "{worktree_path}/tests",
       "{worktree_path}/scripts/*-test.sh",
       "{worktree_path}/scripts/test-*.sh",
+      "{worktree_path}/go/acs/cycle*",
       "{worktree_path}/acs/cycle-*",
       ".evolve/runs/cycle-*"
     ],

@@ -79,9 +79,11 @@ command -v pytest python3 node jest bash 2>/dev/null
 ls Makefile legacy/scripts/*.sh legacy/scripts/test* 2>/dev/null
 ```
 
-If no test infrastructure exists: write shell-based assertion scripts in `tests/` (bash assertions are valid tests). Document the gap in `test-report.md`.
+In this Go-only repo the default is a Go ACS predicate (`go/acs/cycle<N>/predicates_test.go`, see Step 3) — the Go toolchain is always present, so test infrastructure is never "missing" for predicates. Shell-based assertion scripts in `tests/` are a fallback ONLY for a criterion that genuinely cannot be a Go test; document any such gap in `test-report.md`.
 
 ### Step 3: Write Failing Tests (RED)
+
+**For `predicate`-dispositioned ACs (the default in this Go-only repo), the RED test IS the Go ACS predicate** — a `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `<worktree>/go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). Author from the [go/acs/README.md](../go/acs/README.md) template. There is no separate `acs/cycle-<N>/*.sh` (bash predicates are retired) and no separate `tests/test-<slug>.sh` for these — the one Go test is both the RED test Builder turns GREEN and the audit-gating predicate (`evolve acs suite` runs it). The `tests/test-<slug>.sh` shell form below is a fallback only for a criterion that genuinely cannot be a Go test.
 
 For each acceptance criterion, write a test that:
 1. **Directly encodes** the criterion — the test name must match the criterion language
@@ -139,7 +141,10 @@ The negative test is the highest-leverage one: a predicate that passes on a GREE
 Run all tests you just wrote. They MUST all fail at this stage:
 
 ```bash
-bash tests/test-<task-slug>.sh 2>&1 | tee workspace/test-red-output.txt
+# Go ACS predicates (the default) — RED = compile failure or t.Errorf/t.Fatalf:
+( cd "<worktree>/go" && go test -tags acs -count=1 ./acs/cycle<N> ) 2>&1 | tee workspace/test-red-output.txt
+# Fallback shell tests (non-Go criteria only):
+bash tests/test-<task-slug>.sh 2>&1 | tee -a workspace/test-red-output.txt
 ```
 
 **RED verification rules:**
@@ -164,7 +169,7 @@ Enumerate criteria that have no test coverage yet:
 ## Test Files Written
 | File | Test Count | Framework |
 |------|-----------|-----------|
-| tests/test-<slug>.sh | N | bash assertions |
+| go/acs/cycle<N>/predicates_test.go | N | Go (acsassert, `//go:build acs`) |
 
 ## RED Run Output
 \```
@@ -179,7 +184,7 @@ Enumerate criteria that have no test coverage yet:
 ## Handoff to Builder
 \```json
 {
-  "testFiles": ["tests/test-<slug>.sh"],
+  "testFiles": ["go/acs/cycle<N>/predicates_test.go"],
   "redRunConfirmed": true,
   "allTestsMustPassForShip": true,
   "doNotModifyTests": true,
@@ -193,10 +198,10 @@ Enumerate criteria that have no test coverage yet:
 
 **Context.** Cycles 130 and 131 both ran all 7 phases with functionally correct code, but Auditor returned `FAIL` with CRITICAL `C1: missing .evolve/evals/<task-slug>.md`. Per auditor protocol: *"Missing = automatic CRITICAL FAIL."* The TDD-engineer prompt did not previously mandate this artifact; this section closes that gap.
 
-**The rule.** Every task with a `predicate` disposition (per the AC-Materialization Contract above) MUST also produce a persistent regression eval at `.evolve/evals/<task-slug>.md` before Step 7 (Mailbox). The slug comes from `scout-report.md` task slug — same value used for `tests/test-<slug>.sh` and `acs/cycle-<N>/<id>.sh`.
+**The rule.** Every task with a `predicate` disposition (per the AC-Materialization Contract above) MUST also produce a persistent regression eval at `.evolve/evals/<task-slug>.md` before Step 7 (Mailbox). The slug comes from `scout-report.md` task slug.
 
 **Why it exists separately from ACS predicates.**
-- ACS predicates (`acs/cycle-<N>/<id>.sh`) are CYCLE-SCOPED: they run during this cycle's audit and may be cleaned up after.
+- ACS predicates (Go tests in `go/acs/cycle<N>/predicates_test.go`) are CYCLE-SCOPED: they run during this cycle's audit (the Go lane is scoped to the current cycle) and are not replayed by later cycles' gates.
 - Eval files (`.evolve/evals/<task-slug>.md`) are PERMANENT regression entries: they cap future cycles' audit scores when the listed evidence breaks, even years later. They are how the cycle's contract survives beyond the cycle.
 
 **Schema.**
@@ -266,8 +271,8 @@ Post to `workspace/agent-mailbox.md` for Builder:
 
 ```markdown
 ## Message from: tdd-engineer → builder
-- Test contract written: tests/test-<slug>.sh
-- All N tests currently RED — your job is to make them GREEN
+- Test contract written: go/acs/cycle<N>/predicates_test.go
+- All N tests currently RED (`cd go && go test -tags acs ./acs/cycle<N>`) — your job is to make them GREEN
 - DO NOT modify the test file — implement production code only
 - pre-existing GREEN criteria: <list or "none">
 ```
@@ -278,7 +283,7 @@ Post to `workspace/agent-mailbox.md` for Builder:
 2. **RED is success.** A failing test suite is the correct output of this phase. Do not treat RED as a problem to fix.
 3. **Tests encode intent, not implementation.** Test the observable behavior specified in acceptance criteria, not internal implementation details.
 4. **One test per criterion.** Over-testing creates maintenance burden; under-testing creates gaps. One direct test per acceptance criterion is the target.
-5. **Bash tests are first-class.** For evolve-loop (a documentation/agent-definition project), shell assertions are the most natural test form. Don't force-fit Python or Jest.
+5. **Go ACS predicates are the EGPS form.** evolve-loop is a Go-only project; acceptance criteria are materialized as Go tests in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`). Bash `.sh` predicates are retired (EGPS Go-native migration); shell assertions remain valid only as a fallback for criteria that genuinely cannot be a Go test. Don't force-fit Python or Jest.
 
 ## AC-Materialization Contract (cycle-91+) — REQUIRED
 
@@ -290,7 +295,7 @@ Each AC is assigned exactly one of:
 
 | Disposition | When to use | Required artifact |
 |-------------|-------------|-------------------|
-| **predicate** | The criterion is mechanically verifiable (file exists, token present, exit code, behavioral subprocess call) | `acs/cycle-<N>/<id>.sh` predicate script |
+| **predicate** | The criterion is mechanically verifiable (file exists, token present, exit code, behavioral subprocess call) | A **Go test** `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). See [go/acs/README.md](../go/acs/README.md) for the template. **Bash `acs/cycle-<N>/<id>.sh` is RETIRED for new ACs** (EGPS Go-native migration) — do not author new `.sh` predicates. |
 | **manual+checklist** | The criterion is verifiable by a human but not automatable (UI appearance, UX flow, operator judgment) | Checklist item in `test-report.md` with explicit steps |
 | **unverifiable-remove** | The criterion cannot be verified by any means AND carries no enforcement value | Remove the AC from the cycle with documented rationale in `test-report.md` |
 
@@ -308,210 +313,104 @@ Before writing `test-report.md`, verify:
 
 ## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)
 
-**Context:** Cycle 85 shipped 7 ACS predicates that all degenerated into `grep -qF "magic_string" file.sh` checks. None invoked the system under test. They passed when the author added the magic string to a source file, regardless of whether the bug was fixed. This is the failure mode this section prevents.
+**Context:** Cycle 85 shipped 7 ACS predicates that all degenerated into `grep -qF "magic_string" file` checks. None invoked the system under test. They passed when the author added the magic string to a source file, regardless of whether the bug was fixed. This is the failure mode this section prevents — and it is **just as easy to commit in Go** (`acsassert.FileContains` is the Go-native `grep -qF`).
 
 ### The rule
 
-**Every ACS predicate you write MUST invoke the system under test as a subprocess.** Grep-for-string predicates are forbidden as standalone tests. A predicate that only checks "does this file contain text X" does not verify behavior — it verifies that text exists in a file, which the implementer can trivially add.
+**Every ACS predicate you write MUST exercise the system under test** — call the function, run the subprocess (`acsassert.SubprocessOutput`), or assert on a real artifact the system emits — and assert on its return value, output, exit code, or side effect. A predicate whose load-bearing assertion is only "does this file contain text X" (`acsassert.FileContains`/`FileMatchesRegex` over a source file) is FORBIDDEN as a standalone test: it verifies that text exists, which the implementer can trivially add.
 
-### The classification
+### The classification (Go form)
 
 | Category | Pattern | Verdict |
 |---|---|---|
-| **Behavioral** | Predicate runs the function/script/process and asserts on its output, exit code, or side effects | REQUIRED — this is the only acceptable shape |
-| **Mixed** | Predicate runs the system AND also greps source for sanity strings | ACCEPTABLE — the behavioral portion carries the weight; grep is auxiliary |
-| **Grep-only** | Predicate ONLY contains `grep`, `test`, `[`, `[[` calls — no invocation of the system under test | FORBIDDEN — this is the cycle-85 failure mode |
-| **Waived grep** | Inherently config-presence check (e.g., "config file contains required key") declared with `# acs-predicate: config-check` waiver comment | ALLOWED with explicit waiver — Auditor reviews waiver validity |
+| **Behavioral** | Runs the function/subprocess and asserts on output, exit code, or side effects (`acsassert.SubprocessOutput`, a direct call, `JSONFieldEquals` on emitted state) | REQUIRED — the only acceptable shape |
+| **Mixed** | Runs the system AND also `FileContains`-greps source for sanity | ACCEPTABLE — the behavioral portion carries the weight; grep is auxiliary |
+| **Grep-only** | ONLY `FileContains`/`FileMatchesRegex`/`FileExists` over source — never invokes the system | FORBIDDEN — the cycle-85 failure mode |
+| **Waived grep** | Inherently a config-presence check (e.g. "config file contains required key") declared with a `// acs-predicate: config-check` waiver comment | ALLOWED with explicit waiver — Auditor reviews validity |
+
+### Template + assertion library (single source)
+
+The canonical Go predicate template and the `acsassert` DSL (`RepoRoot`, `FileExists`, `FileContains`, `FileMatchesRegex`, `JSONFieldEquals`, `SubprocessOutput`, `CountOccurrencesAny`, `LineContainsAll`, `AllOf`, …) live in **[go/acs/README.md](../go/acs/README.md)** — author from there; do not re-derive. A predicate is a `func TestC<N>_<NNN>_<slug>(t *testing.T)` and reports RED simply by failing (`t.Errorf`/`t.Fatalf`). **There is NO output scraping** — the test's own pass/fail IS the verdict, so the bash-era footguns (the `grep '^--- PASS:'` indent-anchor of cycle-131, the missing-`-v` false-RED of cycle-137, sourcing `acs/lib/assert.sh`) are all gone.
 
 ### Examples
 
-**❌ BAD (grep-only, cycle-85 pattern):**
-```bash
-#!/usr/bin/env bash
-# ACS — verify Triage has priority floor rule
-set -uo pipefail
-if ! grep -qF 'Operator-queue priority floor' agents/evolve-triage.md; then
-    echo "FAIL: rule missing"; exit 1
-fi
-echo "PASS"; exit 0
+**❌ BAD (grep-only — the cycle-85 pattern, Go form):**
+```go
+func TestC<N>_001_TriageHasPriorityFloor(t *testing.T) {
+    root := acsassert.RepoRoot(t)
+    if !acsassert.FileContains(t, filepath.Join(root, "agents/evolve-triage.md"), "Operator-queue priority floor") {
+        t.Errorf("rule missing")
+    }
+}
 ```
-*Why bad:* Tests that text exists in a markdown file. Adding the magic string satisfies the test without changing Triage behavior. The bug it claims to verify (Triage demoting HIGH operator todos) is not actually exercised.
+*Why bad:* asserts text exists in a markdown file. Adding the magic string satisfies it without changing Triage behavior — the bug it claims to verify (Triage demoting HIGH operator todos) is never exercised.
 
-**✅ GOOD (behavioral):**
-```bash
-#!/usr/bin/env bash
-# ACS — verify Triage promotes HIGH operator-queued todos to top_n
-set -uo pipefail
-WORKSPACE=$(mktemp -d)
-# Set up: queue 3 HIGH operator todos + 5 MEDIUM goal-derived
-cat > "$WORKSPACE/carryoverTodos.json" <<'JSON'
-[
-  {"id":"op-1","priority":"HIGH","source":"operator"},
-  {"id":"op-2","priority":"HIGH","source":"operator"},
-  {"id":"op-3","priority":"HIGH","source":"operator"},
-  {"id":"goal-1","priority":"MEDIUM","source":"goal"},
-  {"id":"goal-2","priority":"MEDIUM","source":"goal"},
-  {"id":"goal-3","priority":"MEDIUM","source":"goal"},
-  {"id":"goal-4","priority":"MEDIUM","source":"goal"},
-  {"id":"goal-5","priority":"MEDIUM","source":"goal"}
-]
-JSON
-# Execute the actual triage scoring
-output=$(bash legacy/scripts/lifecycle/triage-rank.sh "$WORKSPACE/carryoverTodos.json" --top-n 3)
-# Assert at least one HIGH operator todo is in top_n (the priority floor)
-if ! echo "$output" | grep -q '"source":"operator"'; then
-    echo "FAIL: no operator todo in top_n — priority floor not enforced"
-    exit 1
-fi
-rm -rf "$WORKSPACE"
-echo "PASS"; exit 0
+**✅ GOOD (behavioral — invokes the system under test):**
+```go
+func TestC<N>_001_TriagePromotesHighOperatorTodos(t *testing.T) {
+    root := acsassert.RepoRoot(t)
+    fixture := filepath.Join(t.TempDir(), "carryoverTodos.json")
+    // Set up the bug scenario: a HIGH operator todo among MEDIUM goal-derived.
+    if err := os.WriteFile(fixture, []byte(`[
+      {"id":"op-1","priority":"HIGH","source":"operator"},
+      {"id":"goal-1","priority":"MEDIUM","source":"goal"}
+    ]`), 0o644); err != nil {
+        t.Fatal(err)
+    }
+    // Run the actual system; assert on observable output.
+    out, _, code, err := acsassert.SubprocessOutput(
+        filepath.Join(root, "go", "evolve"), "triage", "--top-n", "3", "--input", fixture)
+    if err != nil || code != 0 {
+        t.Fatalf("triage exit=%d: %v", code, err)
+    }
+    if !strings.Contains(out, `"source":"operator"`) {
+        t.Errorf("no operator todo in top_n — priority floor not enforced")
+    }
+}
 ```
-*Why good:* Constructs a realistic input scenario, invokes the actual ranking script, asserts on observable behavior (operator todo present in top_n). Adding a magic string to `evolve-triage.md` cannot make this pass. A real implementation change is required.
+*Why good:* constructs a realistic input, runs the real binary, asserts on observable behavior (operator todo present in top_n). A magic string in a doc cannot make it pass — a real implementation change is required. The test's own pass/fail IS the verdict; there is no `go test` output scraping to get wrong.
 
-**❌ BAD (mixed, but the behavioral portion is fake):**
-```bash
-#!/usr/bin/env bash
-# ACS — verify subagent-run.sh hard-errors on unset WORKTREE_PATH
-set -uo pipefail
-# "Behavioral" — but only checks the script exists
-test -x legacy/scripts/dispatch/subagent-run.sh
-# The actual check is still grep-only:
-grep -qF 'exit 1' legacy/scripts/dispatch/subagent-run.sh
+### File-existence: assert TRACKING, not just disk presence (cycle-93 lesson)
+
+A predicate asserting a deliverable file exists MUST also assert it is **git-tracked** — `acsassert.FileExists` (disk only) passes for a gitignored worktree file that is then silently dropped at ship (cycle-92 defect mode). Pair disk presence with a tracking check:
+
+```go
+root := acsassert.RepoRoot(t)
+if !acsassert.FileExists(t, filepath.Join(root, rel)) {
+    t.Fatalf("RED: %s missing on disk", rel)
+}
+if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel); code != 0 {
+    t.Errorf("RED: %s untracked — may be gitignored (dropped at ship)", rel)
+}
 ```
-*Why bad:* The `test -x` doesn't invoke the worktree-validation code path. The `grep -qF 'exit 1'` could match an `exit 1` anywhere in the 800-line script. Window-dressing on a grep-only predicate.
-
-### The cycle-131 indent-anchor footgun (REQUIRED reading for Go-test predicates)
-
-**Context.** Cycle 131 audit H1 finding: a behavioral predicate counted Go test PASS lines using `grep -c '^--- PASS:'`. The implementation was correct (all 8 sub-tests PASSED), but the predicate exited RED because Go's `testing` package emits sub-test PASS lines with **4-space indentation** (`    --- PASS: TestIsCanonicalTier/fast_is_canonical`), so the `^` anchor matched only the parent test's single PASS line (count=1 vs threshold=8). The auditor noted *"Implementation is correct — the defect is the predicate grep pattern."*
-
-**The rule for Go-test-output predicates.** Count PASS/FAIL lines without anchoring to line-start unless you've confirmed there's no parent-test indentation. Prefer one of:
-
-```bash
-# Pattern A — count by test-name prefix (NO ^ anchor, immune to indent depth):
-pass_count=$(grep -c 'PASS: TestIsCanonicalTier/' /tmp/test-output.txt)
-
-# Pattern B — explicit indent tolerance (still works on un-indented parents):
-pass_count=$(grep -cE '^[[:space:]]*--- PASS:' /tmp/test-output.txt)
-
-# Pattern C — use `go test -json` and parse with jq (robust across Go versions):
-pass_count=$(go test -json -run TestIsCanonicalTier ./internal/bridge/ \
-  | jq -r 'select(.Action=="pass" and .Test != null and (.Test | contains("/"))) | .Test' \
-  | wc -l)
-```
-
-**❌ DO NOT use** the unanchored `'PASS:'` form — it also matches FAIL output lines like `--- FAIL: ... (skipped because some PASS:` (false positives).
-
-**Source incident:** cycle 131 (2026-05-29), task `add-is-canonical-tier`. Predicate `acs/cycle-131/001-is-canonical-tier-behavior.sh:37` used `grep -c '^--- PASS:'` and reported FAIL despite all sub-tests PASSING. The defect was the grep pattern, not the implementation.
-
-**✅ GOOD (behavioral with subprocess invocation):**
-```bash
-#!/usr/bin/env bash
-# ACS — verify subagent-run.sh hard-errors when WORKTREE_PATH unset for worktree-aware profile
-set -uo pipefail
-# Actually invoke subagent-run.sh with a worktree-aware profile and no WORKTREE_PATH
-output=$(unset WORKTREE_PATH; bash legacy/scripts/dispatch/subagent-run.sh builder 999 /tmp/nonexistent 2>&1)
-rc=$?
-if [ "$rc" -eq 0 ]; then
-    echo "FAIL: subagent-run.sh succeeded when WORKTREE_PATH unset — expected exit 1"
-    exit 1
-fi
-if ! echo "$output" | grep -qF 'ERROR: profile'; then
-    echo "FAIL: expected 'ERROR: profile' message, got: $output"
-    exit 1
-fi
-echo "PASS: subagent-run.sh hard-errors as expected"
-exit 0
-```
-*Why good:* Constructs the exact bug scenario (unset env var), invokes the actual script, asserts on exit code AND error message. The implementer cannot add a magic string to make this pass — they must implement the hard-error logic.
-
-### MANDATORY: source `acs/lib/assert.sh` for go-test predicates (cycle-137 lesson)
-
-Do NOT hand-roll `grep PASS` / `grep -c '--- PASS:'` / coverage-field extraction
-in a predicate. Every cycle that did so reintroduced a new false-RED variant:
-
-- cycle-131: `^--- PASS:` anchor missed INDENTED subtests (undercount).
-- cycle-137: predicates 004/005 ran `go test` WITHOUT `-v`, so the passing
-  output (`ok <pkg>`) had no `PASS` token for `grep -q 'PASS'` → false RED;
-  predicate 008 mis-extracted the coverage field → false RED. The auditor
-  confirmed *"all 8 ACs met; the FAIL verdict is solely due to predicate bugs."*
-
-The correct logic lives ONCE in `acs/lib/assert.sh` — source it and call the
-helpers, which assert on `go test`'s EXIT CODE (the authoritative signal),
-never on scraping output:
-
-```bash
-#!/usr/bin/env bash
-set -uo pipefail
-. "$(git rev-parse --show-toplevel)/acs/lib/assert.sh"
-
-# Pass/fail of a test (asserts on go test EXIT CODE, never on grep PASS):
-assert_go_test_pass ./internal/cyclehealth/... 'TestCountFieldDuplicates' || exit 1
-
-# Coverage floor (robust field extraction, no inline grep/awk):
-assert_go_coverage_ge ./internal/cyclehealth/... 93.3 || exit 1
-```
-
-Rules:
-- A predicate asserting "a Go test passed" MUST use `assert_go_test_pass`.
-- A coverage-floor predicate MUST use `assert_go_coverage_ge`.
-- Only fall back to manual `grep` for assertions the helpers don't cover, and
-  then prefer exit-code checks over stdout scraping.
-- The helpers echo `GREEN:`/`RED:` and return 0/1, so a predicate body is just
-  the call plus `|| exit 1`.
-
-### File-existence dual-check rule (cycle-93+)
-
-File-existence predicates MUST combine two checks. Using `[ -f "$PATH" ]` alone
-is insufficient — a gitignored file passes `[ -f ]` in the worktree but will be
-silently dropped at ship (cycle-92 defect mode).
-
-**Required dual-check pattern:**
-
-```bash
-# Check 1: disk presence
-[ -f "$path" ] || { echo "RED: $path missing on disk" >&2; exit 1; }
-
-# Check 2: git tracking — catches gitignored worktree files
-git ls-files --error-unmatch "$path" >/dev/null 2>&1 \
-  || { echo "RED: $path untracked — may be gitignored" >&2; exit 1; }
-```
-
-Both checks are required. A predicate that only tests `[ -f ]` is not behavioral
-for file-tracking purposes — it verifies disk presence, not git tracking. The
-`git ls-files --error-unmatch` check is the load-bearing guard against gitignore
-silencing.
-
-Run both checks after `git add` so newly staged files are visible to
-`git ls-files`. Unstaged new files exit non-zero (untracked), which is the
-correct RED signal at pre-implementation baseline (RED phase).
 
 ### Authoring checklist
 
 Before declaring a predicate done, verify ALL:
 
-- [ ] Does the predicate invoke the system under test as a subprocess? (`bash`, `python`, function call, etc.)
-- [ ] If I deleted lines of the implementation, would this predicate fail? Try it mentally.
-- [ ] Is the assertion on observable behavior (exit code, stdout, file mutation, side effect)?
-- [ ] Does the predicate avoid grepping the source file under test as its primary assertion?
-- [ ] If grep is used, is it auxiliary (e.g., for diagnostic output), NOT the load-bearing check?
+- [ ] Does the test exercise the system under test (function call, subprocess, emitted artifact) — not just grep source?
+- [ ] If I deleted lines of the implementation, would this test fail? (Try it mentally.)
+- [ ] Is the assertion on observable behavior (return value, exit code, stdout, file mutation, side effect)?
+- [ ] Is any `FileContains`/`FileMatchesRegex` auxiliary, NOT the load-bearing check?
+- [ ] `//go:build acs`, `package cycle<N>`, func named `TestC<N>_<NNN>_<slug>`? (enforced by `internal/acssuite.TestAllACSPredicatesAreTagged`)
 
-If any answer is "no", the predicate is grep-only or mixed-fake. Rewrite it before handoff.
+If any answer is "no", the predicate is grep-only or mis-tagged. Rewrite it before handoff.
 
 ### Reference
 
-- Plan: `ultrathink-and-online-research-mutable-hollerith.md` (Layer 2 static lint catches violations of this rule)
-- Cycle-85 forensic: see `.evolve/runs/archive/cycle-85-*/` for the negative examples
-- Linter: `legacy/scripts/verification/lint-acs-predicates.sh` (Cycle 2 — automated enforcement of this rule at `gate_test_to_build`)
+- Go predicate template + `acsassert` DSL: [go/acs/README.md](../go/acs/README.md) (single source).
+- Adversarial diversity: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6.
+- Cycle-85 forensic: `.evolve/runs/archive/cycle-85-*/` (the negative examples).
 
 ## Failure Modes
 
 | Symptom | Recovery |
 |---------|----------|
-| No test infrastructure found | Create `tests/` dir; write shell assertions; document gap |
+| No test infrastructure found | N/A for predicates — author the Go ACS predicate (`go/acs/cycle<N>/predicates_test.go`); the Go toolchain is always present |
 | Test passes (unexpectedly GREEN) | Log as pre-existing; mark in handoff; do not delete the test |
 | Test errors with syntax issue | Fix test syntax; re-run; confirm it now fails for the right reason |
 | Acceptance criteria is untestable | Document as "manual verify required"; note WHY in test-report.md |
-| Test framework not installed | Fall back to bash assertions; note framework gap in report |
+| Test framework not installed | Go is always available — use a Go ACS predicate. This row applies only to a non-predicate test needing pytest/jest/etc.; note the gap in the report |
 
 ## Output
 

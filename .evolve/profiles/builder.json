@@ -44,7 +44,9 @@
     "Write(acs/cycle-*/**)",
     "Write(acs/cycle-*)",
     "Edit(acs/regression-suite/**)",
-    "Write(acs/regression-suite/**)"
+    "Write(acs/regression-suite/**)",
+    "Edit(go/acs/**)",
+    "Write(go/acs/**)"
   ],
   "add_dir": [
     "{worktree_path}"
