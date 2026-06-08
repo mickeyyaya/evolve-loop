@@ -211,6 +211,12 @@ type Config struct {
 	// want a tighter ceiling than the default — e.g. fast agents, or a probe
 	// that should fail quickly rather than wait the full five minutes.
 	ArtifactTimeoutS int
+	// BootOnly turns a *-tmux launch into a boot smoke-test: the shared REPL
+	// state machine boots the CLI and waits for the prompt marker, then exits
+	// cleanly WITHOUT delivering a prompt or waiting for an artifact. Used by
+	// BootSmokeTest / the loop readiness gate to verify the bridge can boot the
+	// CLI before any real work (and LLM budget) is committed.
+	BootOnly bool
 }
 
 // Engine is the core.Bridge implementation and the Template Method host:

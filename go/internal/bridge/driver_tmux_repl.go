@@ -94,6 +94,7 @@ type tmuxLaunch struct {
 	bootIntervalS  int       // seconds per boot poll iteration
 	tickDuringBoot bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
 	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
+	bootOnly       bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
 }
 
 // launchCmdLine joins an inner-CLI binary with its realized launch flags
@@ -121,16 +122,21 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		return ExitBadFlags, nil
 	}
 
-	prompt, err := preparePrompt(cfg, deps)
-	if err != nil {
-		return ExitBadFlags, err
-	}
 	if err := ensureDirs(cfg); err != nil {
 		return ExitBadFlags, fmt.Errorf("%s %w", pfx, err)
 	}
-	resolvedPromptFile := filepath.Join(cfg.Workspace, "resolved-prompt.txt")
-	if err := os.WriteFile(resolvedPromptFile, []byte(prompt+"\n"), 0o644); err != nil {
-		return ExitBadFlags, fmt.Errorf("%s write resolved prompt: %w", pfx, err)
+	// Boot smoke-test (lp.bootOnly) skips prompt prep entirely — it never
+	// delivers a task, so there is no prompt to resolve/write.
+	var resolvedPromptFile string
+	if !lp.bootOnly {
+		prompt, err := preparePrompt(cfg, deps)
+		if err != nil {
+			return ExitBadFlags, err
+		}
+		resolvedPromptFile = filepath.Join(cfg.Workspace, "resolved-prompt.txt")
+		if err := os.WriteFile(resolvedPromptFile, []byte(prompt+"\n"), 0o644); err != nil {
+			return ExitBadFlags, fmt.Errorf("%s write resolved prompt: %w", pfx, err)
+		}
 	}
 
 	namedExists := false
@@ -206,6 +212,23 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", pfx, tmuxREPLBootTimeoutS)
 			return ExitREPLBootTimeout, nil
 		}
+	}
+
+	// --- Boot smoke-test: the REPL booted to its prompt marker. That is the
+	// entire signal we want (the bridge can launch this CLI) — exit cleanly
+	// without delivering a prompt or waiting for an artifact. The deferred
+	// tmuxCleanup captures the final scrollback for the caller to read.
+	if lp.bootOnly {
+		if !lp.named {
+			for _, k := range lp.exitSeq {
+				_ = deps.Tmux.SendKeys(ctx, lp.session, k.keys, k.enter)
+				if k.pauseS > 0 {
+					deps.Sleep(time.Duration(k.pauseS) * time.Second)
+				}
+			}
+		}
+		fmt.Fprintf(deps.Stderr, "%s BOOT-SMOKE: REPL booted; exiting without prompt\n", pfx)
+		return ExitOK, nil
 	}
 
 	// --- Seed any launch-time REPL input (e.g. "/model sonnet") after the

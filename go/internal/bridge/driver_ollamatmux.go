@@ -120,6 +120,7 @@ func (ollamaTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		bootIntervalS:  1,
 		tickDuringBoot: false, // no boot-time interactive prompts on the happy path
 		exitSeq:        []tmuxKey{{keys: "/bye", enter: true, pauseS: 1}},
+		bootOnly:       cfg.BootOnly,
 	})
 }
 

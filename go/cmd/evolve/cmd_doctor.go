@@ -8,17 +8,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 )
 
-// runDoctor implements `evolve doctor <subcommand>`. Currently the
-// only subcommand is `probe <tool>` (the port of scripts/utility/
-// probe-tool.sh). Returns the process exit code.
+// runDoctor implements `evolve doctor <subcommand>`: `probe <tool>` (CLI
+// discovery) and `boot <driver>` (real bridge-boot smoke-test). Returns the
+// process exit code.
 func runDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool>)")
+		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver>)")
 		return 10
 	}
 	switch args[0] {
 	case "probe":
 		return runDoctorProbe(args[1:], stdout, stderr)
+	case "boot":
+		return runDoctorBoot(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve doctor: unknown subcommand %q\n", args[0])
 		return 10

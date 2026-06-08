@@ -71,6 +71,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 		bootIntervalS:  2,
 		tickDuringBoot: true, // codex shows a trust prompt during boot
 		exitSeq:        []tmuxKey{{keys: "/quit", enter: true, pauseS: 2}},
+		bootOnly:       cfg.BootOnly,
 	})
 }
 

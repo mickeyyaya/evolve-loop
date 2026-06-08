@@ -60,6 +60,7 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		bootScrollback: 0, // claude renders to the visible pane
 		bootIntervalS:  1,
 		exitSeq:        []tmuxKey{{keys: "/exit", enter: true, pauseS: 2}},
+		bootOnly:       cfg.BootOnly,
 	})
 }
 
