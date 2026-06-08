@@ -19,12 +19,13 @@ import (
 // 6s timeout are deterministic here.
 
 type fakeTmux struct {
-	existing   map[string]bool
-	sentKeys   []string // recorded SendKeys (keys only)
-	sentSeq    []string // recorded SendKeys as "keys|enter", preserving order
-	paneSeq    []string // CapturePane returns, consumed in order; last value repeats
-	paneIdx    int
-	newSessErr error // when set, NewSession fails (covers the spawn-error path)
+	existing          map[string]bool
+	sentKeys          []string // recorded SendKeys (keys only)
+	sentSeq           []string // recorded SendKeys as "keys|enter", preserving order
+	paneSeq           []string // CapturePane returns, consumed in order; last value repeats
+	paneIdx           int
+	captureScrollback []int // recorded scrollback (3rd) arg of each CapturePane call
+	newSessErr        error // when set, NewSession fails (covers the spawn-error path)
 }
 
 func (f *fakeTmux) HasSession(_ context.Context, name string) bool { return f.existing[name] }
@@ -46,7 +47,8 @@ func (f *fakeTmux) SendKeys(_ context.Context, _, keys string, enter bool) error
 	return nil
 }
 
-func (f *fakeTmux) CapturePane(_ context.Context, _ string, _ int) (string, error) {
+func (f *fakeTmux) CapturePane(_ context.Context, _ string, scrollback int) (string, error) {
+	f.captureScrollback = append(f.captureScrollback, scrollback)
 	if len(f.paneSeq) == 0 {
 		return "", nil
 	}

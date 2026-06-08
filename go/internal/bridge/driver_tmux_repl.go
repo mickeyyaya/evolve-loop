@@ -143,8 +143,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		}
 	}
 	scrollbackFile := filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")
+	artifactScrollback := envInt(deps, "EVOLVE_SCROLLBACK_LINES", tmuxArtifactScrollback)
 	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", pfx, lp.session, cfg.Model, workingDir)
-	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named)
+	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named, artifactScrollback)
 
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
 	human := humanActive(deps, cfg.HumanInput)
@@ -303,6 +304,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	completed := false
 	nudgeSent := false
 	detectErrLogged := false
+	peakTokens := 0
+	recordTokens := func(pane string) {
+		if n := extractTokenCount(pane); n > peakTokens {
+			peakTokens = n
+		}
+	}
 	attempt := 0
 	intervalStart := 0
 	// --- Correlation span tracking for the bidirectional channel (ADR-0037).
@@ -318,6 +325,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	openCorrID := ""
 	sawBusy := false
 	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	recordTokens(intervalBaselinePane)
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
 		if err := ctx.Err(); err != nil {
@@ -333,6 +341,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// appeared above the volatile input box. Gated so off adds no capture.
 		if channelOn {
 			if rendered, cerr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback); cerr == nil {
+				recordTokens(rendered)
 				for _, ln := range paneDelta.Next(rendered, paneProfile) {
 					fmt.Fprintln(paneLiveW, ln)
 				}
@@ -416,6 +425,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// Review checkpoint: a full interval elapsed without the artifact.
 		if elapsed-intervalStart >= interval {
 			curPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			recordTokens(curPane)
 			// Progressed = the pane changed during the interval. Stage-0 signal:
 			// good for the common cases (growing token counters, new tool calls),
 			// but a pure spinner/clock animation also reads as progress — so the
@@ -483,9 +493,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 
 	// --- Capture scrollback: raw → stderr-log, ANSI-stripped → stdout-log.
-	raw, _ := deps.Tmux.CapturePane(ctx, lp.session, tmuxArtifactScrollback)
+	raw, _ := deps.Tmux.CapturePane(ctx, lp.session, artifactScrollback)
+	recordTokens(raw)
 	_ = os.WriteFile(cfg.StderrLog, []byte(raw+"\n"), 0o644)
 	_ = os.WriteFile(cfg.StdoutLog, []byte(stripANSI(raw)+"\n"), 0o644)
+	writeTokenUsage(cfg.Workspace, peakTokens)
 	fmt.Fprintf(deps.Stderr, "%s scrollback captured\n", pfx)
 
 	if lp.named {
@@ -656,12 +668,12 @@ func parseExtendSecs(action string) int {
 
 // tmuxCleanup captures final scrollback then kills the session — unless it
 // is a named session, which is preserved for resume.
-func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile string, named bool) {
+func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile string, named bool, scrollback int) {
 	pfx := "[" + name + "]"
 	if !deps.Tmux.HasSession(ctx, session) {
 		return
 	}
-	if raw, err := deps.Tmux.CapturePane(ctx, session, tmuxArtifactScrollback); err == nil {
+	if raw, err := deps.Tmux.CapturePane(ctx, session, scrollback); err == nil {
 		_ = os.WriteFile(scrollbackFile, []byte(raw), 0o644)
 	}
 	if named {
@@ -670,6 +682,19 @@ func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile s
 	}
 	_ = deps.Tmux.KillSession(ctx, session)
 	fmt.Fprintf(deps.Stderr, "%s session killed: %s\n", pfx, session)
+}
+
+func writeTokenUsage(workspace string, peakTokens int) {
+	if peakTokens < 0 {
+		peakTokens = 0
+	}
+	data, err := json.MarshalIndent(struct {
+		PeakTokens int `json:"peak_tokens"`
+	}{PeakTokens: peakTokens}, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(workspace, "token-usage.json"), append(data, '\n'), 0o644)
 }
 
 // tmuxNonClaudePreflight runs the rejections shared by codex-tmux and

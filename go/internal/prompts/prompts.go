@@ -148,6 +148,19 @@ func (l *Loader) load(p, name string) (Prompt, error) {
 	}, nil
 }
 
+// StripOnDemandSections removes the static reference tail from prompt bodies
+// when compact prompt mode is explicitly enabled by the caller.
+func StripOnDemandSections(body string) string {
+	offset := 0
+	for _, line := range strings.SplitAfter(body, "\n") {
+		if strings.TrimRight(line, "\r\n") == "## Reference Index" {
+			return body[:offset]
+		}
+		offset += len(line)
+	}
+	return body
+}
+
 // ParseFrontmatter splits a raw .md file into (frontmatter map, body).
 //
 // Behavior:

@@ -240,6 +240,9 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w", phase, err)
 		}
 		body = agent.Body
+		if envchain.Bool("EVOLVE_COMPACT_PROMPTS", req.Env, false) {
+			body = prompts.StripOnDemandSections(body)
+		}
 	}
 
 	prompt := b.hooks.ComposePrompt(body, req)

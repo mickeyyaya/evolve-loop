@@ -143,8 +143,26 @@ var (
 	rxBraille      = regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`)
 	rxAsciiSpinner = regexp.MustCompile(`^[-/|\\]\s`)
 	rxDeliberating = regexp.MustCompile(`Deliberating.*[0-9]+[ms]`)
-	rxTokens       = regexp.MustCompile(`↓\s*[0-9]+(\.[0-9]+)?k\s+tokens`)
+	rxTokens       = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)k\s+tokens`)
 )
+
+func extractTokenCount(pane string) int {
+	peak := 0
+	for _, match := range rxTokens.FindAllStringSubmatch(pane, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		v, err := strconv.ParseFloat(match[1], 64)
+		if err != nil {
+			continue
+		}
+		tokens := int(v*1000 + 0.5)
+		if tokens > peak {
+			peak = tokens
+		}
+	}
+	return peak
+}
 
 // PaneHasSubstantiveChange split each pane string by newline, discard lines that
 // match any volatile pattern, compare the stripped slices joined back as strings.

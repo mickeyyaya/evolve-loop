@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,7 @@ type Report struct {
 	} `json:"logs"`
 	EscalationReport  FileRef `json:"escalation_report"`
 	AutoRespondCounts FileRef `json:"auto_respond_counts"`
+	TokenUsage        int     `json:"token_usage"`
 }
 
 // statRef builds a FileRef by stat'ing path.
@@ -97,6 +99,7 @@ func BuildReport(workspace, artifactName string, now time.Time) (Report, error) 
 	rep.Logs.ResolvedPrompt = statRef(filepath.Join(workspace, "resolved-prompt.txt"))
 	rep.EscalationReport = statRef(filepath.Join(workspace, "escalation-report.json"))
 	rep.AutoRespondCounts = statRef(filepath.Join(workspace, "auto-respond-counts.csv"))
+	rep.TokenUsage = readTokenUsage(filepath.Join(workspace, "token-usage.json"))
 
 	switch {
 	case rep.EscalationReport.Exists:
@@ -111,4 +114,18 @@ func BuildReport(workspace, artifactName string, now time.Time) (Report, error) 
 		rep.Verdict = "incomplete"
 	}
 	return rep, nil
+}
+
+func readTokenUsage(path string) int {
+	var usage struct {
+		PeakTokens int `json:"peak_tokens"`
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	if err := json.Unmarshal(data, &usage); err != nil || usage.PeakTokens < 0 {
+		return 0
+	}
+	return usage.PeakTokens
 }
