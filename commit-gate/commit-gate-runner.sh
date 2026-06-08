@@ -171,7 +171,14 @@ cg_ensure_tool() {  # $1 tool  $2 install-cmd  $3 manual-hint   (install-cmd="" 
   return 3
 }
 
-files_ext() { printf '%s\n' "$FILES" | grep -E "\\.$1\$" || true; }
+# files_ext lists changed files with extension $1 that STILL EXIST in the working
+# tree — deleted files (mass refactors, file moves) carry no lintable/testable
+# content and their (possibly deleted) parent dir breaks cg_find_up's go.mod walk.
+files_ext() {
+  printf '%s\n' "$FILES" | grep -E "\\.$1\$" | while IFS= read -r f; do
+    [ -n "$f" ] && [ -e "$ROOT/$f" ] && printf '%s\n' "$f"
+  done || true
+}
 
 # Nearest ancestor dir of file $1 containing $2 (e.g. go.mod / Cargo.toml).
 cg_find_up() {

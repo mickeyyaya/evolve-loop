@@ -4,6 +4,7 @@
 package cycle84
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,18 +32,41 @@ func TestC84_001_LintBaselineExists(t *testing.T) {
 	}
 }
 
-// TestC84_002_CarryoverTodosCleared ports cycle-84/002.
-// state.json:carryoverTodos is an empty array.
-func TestC84_002_CarryoverTodosCleared(t *testing.T) {
+// TestC84_002_CarryoverTodosSchemaValid ports cycle-84/002 (re-baselined
+// 2026-06-05): state.json:carryoverTodos must be ABSENT or an ARRAY, and every
+// entry must carry id/action/priority (go/internal/core/ports.go). The original
+// "must be an empty array" assertion was retired — queueing deferred work via
+// carryoverTodos[] is the sanctioned operator workflow, so a non-empty array is
+// valid as long as it is well-formed. (The prior Go port both used the stale
+// empty-array rule AND mis-used the asserting FileMatchesRegex helper, which
+// t.Errorf'd before the intended t.Skipf could run — a false RED.)
+func TestC84_002_CarryoverTodosSchemaValid(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
 	if !fixtures.FilePresent(state) {
 		t.Skip("state.json missing — skip cycle-84-002")
 	}
-	// JSONFieldEquals can't compare a slice to an empty array via scalar
-	// path. Approximate by matching the canonical "[]" formatting.
-	if !acsassert.FileMatchesRegex(t, state, `"carryoverTodos"\s*:\s*\[\s*\]`) {
-		t.Skipf("%s: carryoverTodos not empty array (matches runtime state)", state)
+	raw, err := os.ReadFile(state)
+	if err != nil {
+		t.Fatalf("read state.json: %v", err)
+	}
+	// Unmarshaling carryoverTodos into a typed slice fails if it is present but
+	// not an array of objects → RED (matches the bash "not an array" branch).
+	var s struct {
+		CarryoverTodos []struct {
+			ID       string `json:"id"`
+			Action   string `json:"action"`
+			Priority string `json:"priority"`
+		} `json:"carryoverTodos"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		t.Errorf("cycle-84-002: carryoverTodos is not a valid array of objects: %v", err)
+		return
+	}
+	for i, td := range s.CarryoverTodos {
+		if td.ID == "" || td.Action == "" || td.Priority == "" {
+			t.Errorf("cycle-84-002: carryoverTodos[%d] missing required field (id/action/priority)", i)
+		}
 	}
 }
 

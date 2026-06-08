@@ -1,51 +1,55 @@
-# ACS — Adversarial Cycle Suite
+# ACS — Adversarial Cycle Suite (Go-native)
 
-This directory contains per-cycle test packages (`cycleN/predicates_test.go`) that
-encode the acceptance criteria (EGPS predicates) for each evolve-loop cycle. Each
-package is a leaf: no cross-package imports, no shared fixtures.
+Go test packages that encode the acceptance criteria (EGPS predicates) the audit
+phase / ship gate runs. Three scopes, all `//go:build acs`:
+
+| Dir | Scope | When it runs |
+|---|---|---|
+| `go/acs/cycle<N>/` | the **current cycle**'s predicates (authored fresh each cycle) | that cycle's audit |
+| `go/acs/regression/cycle<N>/` | the curated **durable** predicates, promoted from past cycles | **every** cycle |
+| `go/acs/redteam/` | standing **anti-gaming** predicates (ledger/state integrity) | **every** cycle |
+
+Each package is a leaf: no cross-package imports, no shared fixtures. The
+red-team predicates are thin wrappers over `go/internal/redteamcheck` (where the
+detection logic lives and is adversarially unit-tested in normal CI).
 
 ## Build tag: `//go:build acs`
 
-**Every `cycleN/predicates_test.go` carries `//go:build acs`.** EGPS predicates are
-state/environment assertions, not unit tests — a predicate like cycle106's
-"working tree has no uncommitted changes" is false mid-edit, so it must **not**
-run in the normal `go test ./...` / CI suite. The `acs` tag is what excludes them
-from the normal suite and selects them for the host-side predicate lane.
+**Every `predicates_test.go` carries `//go:build acs`.** EGPS predicates are
+state/environment assertions, not unit tests — e.g. "the working tree has no
+uncommitted changes" is false mid-edit — so they must **not** run in the normal
+`go test ./...` / CI suite. The `acs` tag excludes them from the normal suite and
+selects them for the host-side predicate lane.
 
 | Invocation | Runs predicates? | Used by |
 |---|---|---|
 | `go test ./...` / CI (`-tags integration`, `/acs/` excluded) | **No** (excluded by the `acs` tag) | every CI run |
-| `evolve acs suite --cycle N` | **Yes** — bash lanes + the Go lane scoped to `./acs/cycleN` | the audit phase / EGPS ship gate |
-| `go test -tags acs ./acs/cycleN` | **Yes** — that one cycle | local debugging |
-| `go test -tags acs ./acs/...` | **Yes** — *all* historical cycles (see caveat below) | bulk replay only |
+| `evolve acs suite --cycle N` | **Yes** — the Go lane: `./acs/cycle<N>` + each `./acs/regression/<sub>` + `./acs/redteam`, each a separate `go test` | the audit phase / EGPS ship gate |
+| `go test -tags acs ./acs/regression/cycle<N>` | **Yes** — one regression package | local debugging |
 
-The one enforcement point is `internal/acssuite.TestAllACSPredicatesAreTagged`
-(runs in the normal suite): it fails CI if any `predicates_test.go` is missing
-`//go:build acs`.
+Enforcement: `internal/acssuite.TestAllACSPredicatesAreTagged` (runs in the
+normal suite) fails CI if any `predicates_test.go` is missing `//go:build acs`. A
+predicate package that fails to compile is a HARD suite error (never a silent
+PASS); each scope runs as a separate `go test` so one broken package can't hide
+behind another's events.
 
-> The `redteam/` package holds a **meta-test** of the bash `rt-*.sh` predicates
-> (it shells out to them with fabricated-attack fixtures). It is *not* an EGPS
-> predicate, so it is **not** `acs`-tagged and is named `redteam_test.go` (not
-> `predicates_test.go`) — it runs in the normal suite like any other unit test.
+## The gate scope mirrors the (retired) bash lane
 
-## The gate runs only the current cycle
+`evolve acs suite` runs the current cycle + the curated regression set + red-team
+every cycle — never every historical cycle (a blind `./acs/...` would drag in
+bit-rotted point-in-time predicates and block the gate). This is the Go-native
+successor to the bash `acs/cycle-N/` + `acs/regression-suite/cycle-*/` +
+`acs/red-team/` lanes, retired in the EGPS Go-native migration (ADR-0025 → the
+egps-v11 ADR).
 
-`evolve acs suite` scopes the Go lane to `./acs/cycleN/...` — the current cycle
-only. This mirrors the bash lane, which auto-runs the current cycle + the curated
-`acs/regression-suite/` (hand-promoted, durable predicates), and never replays
-every historical `acs/cycle-N/`. A blind `go test -tags acs ./acs/...` would drag
-in bit-rotted historical predicates and block the ship gate.
+> **Regression set is a SUPERSET of the former bash curation.** Phase C relocated
+> the durable predicates by moving each origin cycle's whole Go port into
+> `go/acs/regression/cycle<N>/`, so a few *non-promoted* (but green) funcs from
+> those cycles ride along — stricter coverage, not weaker. All are green or SKIP
+> (on absent runtime state) today. If a non-curated func ever flakes, prune that
+> single func; the durable predicates are the load-bearing ones.
 
-**Caveat — historical bit-rot.** Several older packages (authored against
-point-in-time state, e.g. `phase-registry.json` schema_version, `state.json`
-`carryoverTodos`, deleted `legacy/scripts/...` paths) **FAIL** under a full
-`go test -tags acs ./acs/...` because the codebase has legitimately moved past
-what they assert. They are kept for the historical record — read
-`acs/cycle47/predicates_test.go` to see what *was* enforced at cycle-47 ship time
-— but they are **never run by the gate** (current-cycle scope). Triaging /
-retiring them is tracked under the EGPS Go-native migration Phase C.
-
-## Authoring a new cycle's predicates (Phase B contract)
+## Authoring a new cycle's predicates
 
 A new acceptance criterion is a Go test, not a bash `.sh`:
 
@@ -71,7 +75,6 @@ func TestCN_001_Slug(t *testing.T) {
 }
 ```
 
-Place it at `go/acs/cycleN/predicates_test.go`. The `acssuite` Go lane picks it
-up automatically when the cycle runs. If a bash predicate for the same
-`(cycle, ac)` still exists, delete the `.sh` in the same change — the double-count
-guard synthesizes a RED if both lanes assert the same pair.
+Place it at `go/acs/cycle<N>/predicates_test.go`; the `acssuite` Go lane picks it
+up when the cycle runs. To promote a predicate to the permanent regression set,
+move its package under `go/acs/regression/`.
