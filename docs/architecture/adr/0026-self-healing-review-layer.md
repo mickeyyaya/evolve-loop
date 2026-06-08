@@ -68,6 +68,14 @@ The reviewer is a seam (`StopReviewer` interface), so the loop wiring never chan
 
 **Implementation.** `StopEvent.Busy bool`; `deterministicReviewer.Review` extends on `Progressed || Busy` (still bounded by `maxExtends`, so a busy-spinner-stuck agent surfaces after the same backstop — a busy pane buys extensions, not immortality); the driver populates `Busy: panestream.PaneBusy(curPane, paneProfile)` at the review checkpoint. Scope: `PaneBusy` reads true for claude/agy (affordance) and ollama (idle placeholder); codex has neither signal, so codex phases keep the `Progressed`-only path unchanged.
 
+## Addendum — reconcile-on-timeout (the deliverable is the ground truth of completion)
+
+Busy-liveness keeps a *working* agent alive, but it cannot close the residual race: the artifact lands in the instant the bridge gives up on the wait window (or the wait genuinely elapses while the agent is finishing). The verdict-synthesis chokepoint compounded it — `BaseRunner.Run` (`go/internal/phases/runner/runner.go`) synthesized `verdict=FAIL` on *any* bridge error **without reading the artifact**, so a complete PASS deliverable on disk was discarded.
+
+**Principle.** A bridge artifact-wait timeout is a *process* signal, not a *verdict*. The timeout's job is to detect an agent that produced **nothing**. If the agent's contracted deliverable is on disk and well-formed, the agent demonstrably finished — so the deliverable's verdict is authoritative, not a synthesized FAIL.
+
+**Mechanism.** On `ErrArtifactTimeout` only, the runner calls `deliverable.Verify(phase, roots)` (injectable `verifyFn` seam). Well-formed ⇒ control **falls through to the same artifact-read + `Classify` path the happy case uses** — deliberately, so phase-specific gates still run (audit's EGPS `red_count`: a PASS sentinel with red predicates still FAILs — Goodhart-resistant). A reconciled phase is treated as a *completed* phase: nil error, the agent's own verdict authoritative. A reconciled FAIL therefore routes as a real `code-audit-fail` (→ retro), **not** an infra-timeout retry — correct classification and no wasted re-run of a finished phase. Reconciliation only ever *upgrades* a synthesized FAIL toward the agent's real verdict; it never invents a PASS. Malformed/absent (mandatory→FAIL, optional→WARN) and non-timeout errors keep prior behavior. `PhaseResponse.Reconciled` drives a `reconciled_timeout` ledger entry (mirrors `backfill`), so the self-healing is auditable, never silent. This *improves on* the orchestrator's `backfill.TryExtract` (which scrapes `stdout.clean.txt` and flattens to WARN): reconciliation reads the *contracted* deliverable, trusts its *real* verdict, and fires first (per-attempt, inside the runner).
+
 ## Consequences
 
 - **+** A slow-but-productive phase is no longer killed; the pipeline survives long phases → "run for long hours."
