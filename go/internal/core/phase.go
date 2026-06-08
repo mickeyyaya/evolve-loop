@@ -160,6 +160,13 @@ type PhaseResponse struct {
 	// CommitSHA is the commit that anchors this phase's deliverable
 	// (ADR-0027 commit-as-evidence). Empty when the phase committed nothing.
 	CommitSHA string `json:"commit_sha,omitempty"`
+
+	// Reconciled is set when the bridge reported a process failure
+	// (ErrArtifactTimeout) but the agent's deliverable was on disk, well-formed,
+	// and gate-passing — so the runner trusted the deliverable's verdict instead
+	// of synthesizing FAIL. Surfaced for the auditable self-healing trail
+	// (orchestrator appends a reconciled_timeout ledger entry).
+	Reconciled bool `json:"reconciled,omitempty"`
 }
 
 // PhaseRunner runs a single phase. The orchestrator never knows which

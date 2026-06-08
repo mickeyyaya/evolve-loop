@@ -29,9 +29,11 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -132,6 +134,13 @@ type Options struct {
 	// owning phase (e.g. buildplanner.New). Default false = hard-fail, the
 	// historical behavior for mandatory phases. See Workstream D / cycle-120.
 	Optional bool
+	// VerifyFn is the seam for the deliverable well-formedness check used by
+	// reconcile-on-timeout: when the bridge reports ErrArtifactTimeout but the
+	// agent's contracted deliverable is on disk and well-formed, the runner
+	// trusts the deliverable's verdict instead of synthesizing FAIL. When nil,
+	// defaults to deliverable.Verify. Per-instance (not a package global) so
+	// t.Parallel() tests stay race-free, mirroring StdoutFilter.
+	VerifyFn func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
@@ -145,6 +154,7 @@ type BaseRunner struct {
 	stdoutFilter   func(workspace, phase string) error
 	eventsProducer func(workspace, phase, cli string, cycle int) error
 	optional       bool
+	verifyFn       func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -173,6 +183,10 @@ func New(opts Options) *BaseRunner {
 			})
 		}
 	}
+	verifyFn := opts.VerifyFn
+	if verifyFn == nil {
+		verifyFn = deliverable.Verify
+	}
 	return &BaseRunner{
 		hooks:          opts.Hooks,
 		bridge:         opts.Bridge,
@@ -182,6 +196,7 @@ func New(opts Options) *BaseRunner {
 		stdoutFilter:   stdoutFilter,
 		eventsProducer: eventsProducer,
 		optional:       opts.Optional,
+		verifyFn:       verifyFn,
 	}
 }
 
@@ -444,42 +459,85 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 	durationMS := b.nowFn().Sub(start).Milliseconds()
 
+	// reconciled is set when a bridge ErrArtifactTimeout is overridden by a
+	// well-formed deliverable on disk: control then FALLS THROUGH to the same
+	// artifact-read + Classify path the happy case uses (so audit's EGPS gate
+	// still applies — reconciliation can never ship a green-looking report whose
+	// predicates are red). See the reconcile-on-timeout block below.
+	reconciled := false
 	if bridgeErr != nil {
-		// Optional-phase soft-fail (Workstream D): an OPTIONAL phase whose
-		// artifact never appeared (ErrArtifactTimeout) degrades to WARN with a
-		// nil error so the orchestrator advances instead of aborting the whole
-		// cycle. Safe because an optional phase's state-machine successor is
-		// verdict-unconditional (build-planner→build). Any OTHER bridge error,
-		// or a timeout on a MANDATORY phase, still hard-fails as before. This
-		// is the cycle-120 fix: an advisory build-planner timeout must not kill
-		// the cycle.
-		if b.optional && errors.Is(bridgeErr, core.ErrArtifactTimeout) {
+		// A bridge artifact-wait timeout (exit 81) is a PROCESS failure, not a
+		// verdict: the agent may have written its contracted deliverable just as
+		// the bridge gave up on the wait window (the cycle-254/255 false-FAIL —
+		// a complete PASS audit report recorded as FAIL). Reconcile against the
+		// deliverable: if it is on disk and well-formed, trust its verdict (via
+		// Classify) instead of synthesizing FAIL. Reconciliation can only UPGRADE
+		// a timeout toward the agent's real verdict, never downgrade a real one.
+		if errors.Is(bridgeErr, core.ErrArtifactTimeout) {
+			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
+			res, verr := b.verifyFn(phase, roots)
+			switch {
+			case verr == nil && res.OK:
+				// Deliverable survived the timeout — fall through to Classify.
+				reconciled = true
+			case b.optional:
+				// Optional-phase soft-fail (Workstream D / cycle-120): no
+				// trustworthy deliverable, but an optional phase's successor is
+				// verdict-unconditional, so degrade to WARN and let the cycle
+				// advance instead of aborting.
+				msg := fmt.Sprintf("optional phase %q degraded: artifact never appeared (%v); cycle continues", phase, bridgeErr)
+				if verr != nil {
+					msg = fmt.Sprintf("%s [deliverable unverifiable: %v]", msg, verr)
+				}
+				return core.PhaseResponse{
+					Phase:        phase,
+					Verdict:      core.VerdictWARN,
+					ArtifactsDir: req.Workspace,
+					CostUSD:      bres.CostUSD,
+					Tokens:       bres.Tokens,
+					DurationMS:   durationMS,
+					Diagnostics: []core.Diagnostic{{
+						Severity: "warning",
+						Message:  msg,
+					}},
+				}, nil
+			default:
+				// Mandatory phase, no trustworthy deliverable (absent/malformed/
+				// unverifiable): hard-fail as before, enriched with the
+				// well-formedness violation when we have one.
+				msg := bridgeErr.Error()
+				if verr == nil && len(res.Violations) > 0 {
+					msg = fmt.Sprintf("%s; deliverable not trustworthy: %s", msg, res.Violations[0].Message)
+				}
+				return core.PhaseResponse{
+					Phase:        phase,
+					Verdict:      core.VerdictFAIL,
+					ArtifactsDir: req.Workspace,
+					CostUSD:      bres.CostUSD,
+					Tokens:       bres.Tokens,
+					DurationMS:   durationMS,
+					Diagnostics:  []core.Diagnostic{{Severity: "error", Message: msg}},
+				}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
+			}
+		} else {
+			// Any non-timeout bridge error (launch/boot/safety/cost) means no
+			// shippable work was produced — hard-fail, optional or not.
 			return core.PhaseResponse{
 				Phase:        phase,
-				Verdict:      core.VerdictWARN,
+				Verdict:      core.VerdictFAIL,
 				ArtifactsDir: req.Workspace,
 				CostUSD:      bres.CostUSD,
 				Tokens:       bres.Tokens,
 				DurationMS:   durationMS,
-				Diagnostics: []core.Diagnostic{{
-					Severity: "warning",
-					Message:  fmt.Sprintf("optional phase %q degraded: artifact never appeared (%v); cycle continues", phase, bridgeErr),
-				}},
-			}, nil
+				Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
+			}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
 		}
-		return core.PhaseResponse{
-			Phase:        phase,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			CostUSD:      bres.CostUSD,
-			Tokens:       bres.Tokens,
-			DurationMS:   durationMS,
-			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
-		}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
 	}
 
 	artifact := bres.Stdout
-	if artifact == "" {
+	// On a reconciled timeout bres.Stdout may be partial — force the file read so
+	// Classify sees the deliverable Verify already proved well-formed.
+	if reconciled || artifact == "" {
 		if data, readErr := os.ReadFile(artifactPath); readErr == nil {
 			artifact = string(data)
 		}
@@ -498,7 +556,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 
 	verdict, diags, nextPhase := b.hooks.Classify(artifact, req, bres)
 
-	return core.PhaseResponse{
+	resp := core.PhaseResponse{
 		Phase:        phase,
 		Verdict:      verdict,
 		ArtifactsDir: req.Workspace,
@@ -507,7 +565,26 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		Tokens:       bres.Tokens,
 		DurationMS:   durationMS,
 		Diagnostics:  diags,
-	}, nil
+	}
+	if reconciled {
+		// A well-formed deliverable on a bridge timeout means the phase actually
+		// COMPLETED — the timeout was a red herring (the bridge gave up on the
+		// wait window just as, or after, the agent finished writing). So we treat
+		// it exactly like a normal completed phase: nil error, the agent's own
+		// Classify verdict authoritative. A reconciled FAIL therefore routes as a
+		// real code-audit-fail (→ retro), NOT an infra-timeout retry — which is
+		// both correct classification and avoids re-running a finished phase.
+		// Reconciliation only ever upgrades a synthesized FAIL toward the agent's
+		// real verdict; it never invents a PASS (Classify, incl. audit's EGPS
+		// red_count gate, still decides).
+		resp.Reconciled = true
+		resp.Diagnostics = append(resp.Diagnostics, core.Diagnostic{
+			Severity: "warning",
+			Message:  fmt.Sprintf("bridge timed out (exit 81) but deliverable %s is well-formed; reconciled to %s from the agent's own report", artifactPath, verdict),
+		})
+		fmt.Fprintf(os.Stderr, "[runner] RECONCILED phase=%s exit=81 verdict=%s deliverable=%s\n", phase, verdict, artifactPath)
+	}
+	return resp, nil
 }
 
 // BaseCycleContext returns the canonical "## Cycle Context" block shared by

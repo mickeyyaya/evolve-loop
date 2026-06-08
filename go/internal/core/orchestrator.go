@@ -1759,6 +1759,22 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				obsCancel()
 			}
 			if err == nil && IsVerdict(resp.Verdict) {
+				// Self-healing trail: a bridge artifact-wait timeout (exit 81) was
+				// reconciled by the runner against a well-formed, gate-passing
+				// deliverable, so this phase ships on the agent's own verdict
+				// instead of a synthesized FAIL. Record it (mirrors the backfill
+				// entry) so the recovery is auditable, never silent.
+				if resp.Reconciled {
+					if lerr := o.ledger.Append(ctx, LedgerEntry{
+						TS:       o.now().UTC().Format(time.RFC3339),
+						Cycle:    cycle,
+						Role:     string(next),
+						Kind:     "reconciled_timeout",
+						ExitCode: 81,
+					}); lerr != nil {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN reconciled_timeout ledger append: %v\n", lerr)
+					}
+				}
 				break
 			}
 			if err != nil {
