@@ -39,6 +39,10 @@ func TestIntegration_BridgeBoot_ClaudeTmux(t *testing.T) {
 		},
 		DriverKnown: func(string) bool { return true },
 		// BootTester left nil → newDefaultBootTester → bridge.BootSmokeTest.
+		// Freeze seams benign: this test exercises the BOOT path; a dev box
+		// with codex installed-but-unpinned must not false-halt it.
+		SelfUpdateEvidence: func(string) (bool, string, error) { return false, "", nil },
+		PinnedLister:       func() ([]string, error) { return nil, nil },
 	}
 
 	r, err := Run(opts)

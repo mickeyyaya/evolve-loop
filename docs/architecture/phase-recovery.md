@@ -188,12 +188,19 @@ Keep the Observer as pure detection (it is already a clean Observer pattern emit
 Inject a **`StallPolicy`** that maps events → actions (`extend | kill+retry | escalate`). Detection and action
 become independently testable; the observer stops being a passive logger.
 
-### C5 — CLI-version-freeze Specification (preflight) → fixes D6
+### C5 — CLI-version-freeze Specification (preflight) → fixes D6 — ✅ SHIPPED 2026-06-10
 Extend `looppreflight` (ADR readiness gate) with a predicate: any `-tmux` CLI reporting `startup update
 check = true` (e.g. via `codex doctor`) must be pinned (converge the state) or the batch Halts with guidance.
 Idempotent and crash-safe — pinning is a steady state, **not** a per-cycle toggle (a pin/unpin-on-exit is
 fragile: a hard kill never runs the unpin, freezing the host's CLI silently; and `brew pin` is global +
 persistent, not session-scoped). See §8 alternatives.
+
+**As built** (`internal/looppreflight/freeze.go`, the gate's 5th check): host-grounding showed `codex doctor`
+does not reliably emit update info, so "risky" is detected via the `SelfUpdateEvidence` seam (default
+registry: codex → `~/.codex/version.json`, the updater-state file from the incident) and "pinned" via
+`PinnedLister` (default `brew list --pinned`). Confirmed risk without a pin → Halt with the exact
+`brew pin codex` guidance; unverifiable pin state → Warn (fail-open on ambiguity); headless-only usage is
+out of scope (the updater fires on the TUI launch path).
 
 ### Where AI genuinely drives (the escalation tail)
 `LLMFailureAdvisor` is the **last** link, reached only for *unclassified* terminal states. It reasons about a
@@ -208,7 +215,7 @@ handle over time; the LLM is never on the hot path for a known failure.
 | 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest leverage — makes 262-class record divergence impossible | M |
 | 2 | ✅ **C2 `ModelFlagPolicy`** (shipped 2026-06-10 at the realizer chokepoint — matrix-wide omit-on-auto) | Tiny; stops the exact retro break | S |
 | 3 | ✅ **C2 `FatalPaneDetector`** (shipped 2026-06-10; seeded with the 3 cycle-262 signatures, `EVOLVE_PHASE_RECOVERY`-staged, shadow default) | Eliminates the ~20-min slow-fails (in enforce) | M |
-| 4 | **C5 freeze preflight** + **D4 meta-phase fallbacks** (config) | Cheap; prevents recurrence | S |
+| 4 | ✅ **C5 freeze preflight** + **D4 retro fallback** (shipped 2026-06-10: `looppreflight` 5th check — self-update evidence ∧ tmux-driven ⇒ brew-pinned or Halt; `retrospective.json` gains `cli_fallback:["codex-tmux"]`; broader meta-phase coverage rides C3) | Cheap; prevents recurrence | S |
 | 5 | **C4 observer `StallPolicy`** | Corrective detection | M |
 | 6 | **C3 Chain refactor** (compose 1–4) + LLM advisor + promotion loop | Unifies into the protocol | L |
 

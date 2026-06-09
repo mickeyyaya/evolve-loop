@@ -124,6 +124,16 @@ type Options struct {
 	// under the supplied context and returns its bridge exit code + scrollback.
 	// Default wraps bridge.BootSmokeTest (mirrors `evolve doctor boot`).
 	BootTester func(ctx context.Context, driver string, sandbox bool) (rc int, scrollback string)
+
+	// CLI-version-freeze seams (ADR-0044 C5).
+	// SelfUpdateEvidence reports whether bin self-updates on launch, plus the
+	// host evidence found. A non-nil error means the evidence was
+	// UNVERIFIABLE (ambiguity → Warn), distinct from a clean absence.
+	// Default: the known-updater registry (codex → ~/.codex/version.json).
+	SelfUpdateEvidence func(bin string) (bool, string, error)
+	// PinnedLister lists version-frozen package names. Default:
+	// `brew list --pinned`; an error is treated as ambiguity (Warn).
+	PinnedLister func() ([]string, error)
 }
 
 // resolved is Options with every seam and default filled in.
@@ -149,6 +159,9 @@ type resolved struct {
 	diskFreeBytes func(string) (uint64, error)
 	tmuxSessions  func() ([]string, error)
 	bootTester    func(context.Context, string, bool) (int, string)
+
+	selfUpdateEvidence func(string) (bool, string, error)
+	pinnedLister       func() ([]string, error)
 }
 
 // DefaultBootBudget is the per-driver REPL boot deadline (mirrors the
@@ -179,6 +192,9 @@ func resolve(opts Options) (resolved, error) {
 		diskFreeBytes: opts.DiskFreeBytes,
 		tmuxSessions:  opts.TmuxSessions,
 		bootTester:    opts.BootTester,
+
+		selfUpdateEvidence: opts.SelfUpdateEvidence,
+		pinnedLister:       opts.PinnedLister,
 	}
 	if o.stderr == nil {
 		o.stderr = io.Discard
@@ -231,6 +247,12 @@ func resolve(opts Options) (resolved, error) {
 	if o.bootTester == nil {
 		o.bootTester = newDefaultBootTester(o.projectRoot, o.stderr)
 	}
+	if o.selfUpdateEvidence == nil {
+		o.selfUpdateEvidence = defaultSelfUpdateEvidence
+	}
+	if o.pinnedLister == nil {
+		o.pinnedLister = defaultPinnedLister
+	}
 	return o, nil
 }
 
@@ -247,6 +269,7 @@ func Run(opts Options) (Result, error) {
 		checkPipelineStructure(o),
 		checkLLMCLIStatus(o),
 		checkHostCapabilities(o),
+		checkCLIVersionFreeze(o),
 		checkBridgeBoot(o),
 	}
 	return finalize(checks, o.now()), nil

@@ -44,6 +44,10 @@ func goodPipelineOptions(t *testing.T) Options {
 		DirWritable:   func(string) bool { return true },
 		DiskFreeBytes: func(string) (uint64, error) { return 50 << 30, nil }, // 50 GiB
 		TmuxSessions:  func() ([]string, error) { return nil, nil },
+		// Freeze seams (ADR-0044 C5): benign defaults so unrelated tests
+		// never stat the real ~/.codex or exec real brew.
+		SelfUpdateEvidence: func(string) (bool, string, error) { return false, "", nil },
+		PinnedLister:       func() ([]string, error) { return nil, nil },
 	}
 }
 

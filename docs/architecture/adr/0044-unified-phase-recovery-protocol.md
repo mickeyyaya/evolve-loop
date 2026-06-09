@@ -98,6 +98,23 @@ C4, and finally the C3 chain refactor that composes them.
   shadow-neutral-logs / busy-never / off-skips / stage parse), `bridge/realizer_modelpolicy_test.go`
   (auto-omits on both channels, concrete tiers + raw names unaffected).
 
+- **Slice 3 / C5 (+D4 config) — shipped 2026-06-10.** `looppreflight.checkCLIVersionFreeze`
+  (`internal/looppreflight/freeze.go`), the fifth readiness check: the Specification
+  *risky(bin) ∧ tmuxDriven(bin) ⇒ pinned(bin)*. "Risky" = host evidence of a self-updater via the
+  `SelfUpdateEvidence` seam (default registry: codex → `~/.codex/version.json`, the updater-state file from
+  the incident; the design sketch's "probe `codex doctor`" was dropped after host-grounding showed the doctor
+  subcommand does not reliably emit update info). "Pinned" via the `PinnedLister` seam (default
+  `brew list --pinned` — verified live: codex is a pinned formula). Confirmed risk + no pin → **Halt** with
+  the exact convergent action (`brew pin codex` + the deliberate-update procedure); pin state unverifiable
+  (brew absent/exec error) → **Warn**, never a false Halt (eval-gate fail-open posture); scope is *-tmux
+  drivers only (headless `codex exec` does not run the updater). Read-only probes ⇒ idempotent by
+  construction; the pin is the operator's one-time convergent state (per-cycle pin/unpin rejected in
+  §Alternatives). **D4 config half:** `retrospective.json` gains `cli_fallback: ["codex-tmux"]` — the
+  cycle-262 retro had NO recovery path at all (`cli_fallback:null`); with the runner's exit-81 trigger chain
+  this works immediately, independent of the C2 stage. Broader meta-phase fallback-coverage audit rides C3.
+  Tests: `looppreflight/freeze_test.go` (unpinned-halts w/ guidance, pinned-passes, no-evidence-passes,
+  headless-only-skipped, pin-probe-error-warns, idempotent).
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states
