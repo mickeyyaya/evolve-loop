@@ -88,6 +88,10 @@
       "any_path": true,
       "description": "Generic refactor — gate is permissive"
     },
+    "chore(build)": {
+      "required_paths": ["go/evolve", "go/bin/**"],
+      "description": "Tracked-binary rebuilds (go/evolve, go/bin output)"
+    },
     "chore": {
       "any_path": true,
       "description": "Generic maintenance — gate is permissive"
