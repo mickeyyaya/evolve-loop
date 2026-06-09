@@ -91,20 +91,29 @@ Revisit after A lands and the measurement shows residual serial read cost.
    no flag sprawl), once A0/A1 prove the boot share is worth the pool's complexity.
 3. **C — swarm read-parallelism**, only if measurement shows meaningful residual serial read cost.
 
-## A0 instrumentation seam (for whoever implements it)
+## A0 instrumentation seam (as built, `12dcd18b`)
 
-In-process flow already carries `DurationMS` the same way; `BootMS` rides alongside it:
+Shipped behavior-neutral. `BootMS` rides the in-process chain alongside `DurationMS`:
 
-- `go/internal/core/ports.go:318` — `BridgeResponse`: add `BootMS int64 \`json:"boot_ms,omitempty"\``.
-- `go/internal/bridge` (`engine.go` + `driver_tmux_repl.go`) — capture `start` at
-  `:161` (just before `NewSession`) and stamp elapsed at `promptSeen` (`:206`); populate
-  `BridgeResponse.BootMS`. Named/warm path → `BootMS=0` (no boot), which is itself the signal.
-- `go/internal/phases/runner/runner.go` — copy `bres.BootMS` onto every `PhaseResponse` it builds
-  (~5 sites near `:498-566`).
-- `go/internal/core/orchestrator.go:977` — `phaseTimingEntry`: add `BootMS int64
-  \`json:"boot_ms,omitempty"\``; copy at the two construction sites (`:1168`, `:2082`).
-- Unit-test with the bridge package's existing seam-injection style (fake `Tmux`/`Sleep` in `Deps`),
-  asserting `BootMS` reflects the simulated marker-poll window and is `0` on the named-session path.
+- `go/internal/core/ports.go` — `BridgeResponse.BootMS int64 \`json:"boot_ms,omitempty"\``.
+- `go/internal/bridge/driver_tmux_repl.go:196` — the driver accumulates `bootWaitMS = fixedReadinessWaits×1000
+  + bootInterval×polls`, **counting intended sleep/poll iterations rather than wall-clock** (deterministic under
+  test, ≈ wall in prod), and fires injected `deps.OnBoot(bootWaitMS)` **once** on the cold-boot marker (`:227`).
+  The warm `namedExists` path and a boot timeout never fire it → `BootMS=0` is the "no cold boot" signal.
+- `go/internal/bridge/engine.go` — `Launch` captures the value via a per-call `OnBoot` wrap (doc-noted not
+  concurrency-safe; prod builds a fresh engine per launch).
+- `go/internal/core/phase.go` — `PhaseResponse.BootMS`; `go/internal/phases/runner/runner.go` (~`:499-570`)
+  copies `bres.BootMS` onto every `PhaseResponse`.
+- `go/internal/core/orchestrator.go:977` — `phaseTimingEntry.BootMS`, copied at the construction sites; the
+  **deferred** `phase-timing.json` write (`:1529`) persists it even when the cycle errors.
+- 3 unit tests (`driver_tmux_repl_bootms_test.go`): cold=3000ms, boot-timeout=0, warm named-session=0.
+
+> **Divergence from the original design above:** the first draft proposed wall-clock `start→promptSeen`; as-built
+> counts iterations for test determinism. **Coverage gap (surfaced by the first measured cycle):** the
+> CLI-fallback and failed-phase dispatch paths don't record a timing entry. The measured boot-vs-think split
+> (boot is only ~1–3% of think-heavy phases — which *lowers* A1/A2 priority) and the gap analysis live in
+> [ADR-0043 §"A0 — as-built + first measurement"](adr/0043-pipeline-latency-program.md); the fix for the gap is
+> [ADR-0044](adr/0044-unified-phase-recovery-protocol.md) D1 (single-source verdict reconciliation).
 
 ## Risks & non-goals
 

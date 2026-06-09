@@ -1,9 +1,10 @@
 # ADR-0043: Pipeline-latency program — attack cold REPL boot, measurement-gated
 
-> Status: **Proposed** (2026-06-09). Design-first: this ADR records the analysis and the chosen
-> *direction*; hot-loop code changes land behind a measurement gate (A0) and a default-off stage
-> flag, with explicit operator greenlight. Full analysis: [pipeline-latency.md](../pipeline-latency.md).
-> Sibling (test latency, separate & already resolved): `go/docs/testing.md`.
+> Status: **A0 Implemented** (`12dcd18b`, tracked binary rebuilt `aacd95de`; 2026-06-09). **A1/A2/C remain
+> Proposed**, gated on A0 measurement + a default-off stage flag + explicit operator greenlight. Design-first:
+> this ADR records the analysis and chosen *direction*; hot-loop code does not ship on assertion. Full analysis:
+> [pipeline-latency.md](../pipeline-latency.md). Sibling (test latency, separate & already resolved):
+> `go/docs/testing.md`. **First measurement + as-built notes: see §"A0 — as-built + first measurement" below.**
 
 ## Context
 
@@ -38,6 +39,41 @@ Pursue **REPL boot reuse** as the primary lever, measurement-gated and risk-rank
 
 Lever **B (prompt-cache ordering) is already done** — the remaining question is empirical (does the
 tmux CLI realize the API cache across sessions) and becomes moot under A2.
+
+## A0 — as-built + first measurement (2026-06-09)
+
+**As-built (deliberately diverged from the proposed seam).** The proposed seam captured wall-clock
+`start→promptSeen`. As shipped, the driver instead **counts intended sleep/poll iterations**
+(`bootWaitMS = fixedReadinessWaits×1000 + bootInterval×polls`, `driver_tmux_repl.go:196-200`) and fires an
+injected `deps.OnBoot(bootWaitMS)` callback **once** on the cold-boot marker (`:227`). Rationale:
+iteration-counting is **deterministic under test** (where `Sleep` is a no-op) yet ≈ wall-clock in prod — which
+let the 3 unit tests assert exact values (cold=3000ms, boot-timeout=0, warm named-session=0). `OnBoot` never
+fires on the warm (`namedExists`) path or a boot timeout, so `boot_ms=0` is itself the "no cold boot" signal.
+The value rides the in-process chain `driver → BridgeResponse → PhaseResponse → phaseTimingEntry`; the deferred
+`phase-timing.json` write persists it even when the cycle errors.
+
+**First measured cycle (262).** `phase-timing.json`:
+
+| phase | duration | boot_ms | boot share |
+|---|---|---|---|
+| scout (claude/sonnet) | 218.2s | 6000ms | 2.7% |
+| tdd (claude/opus) | 253.7s | 3000ms | 1.2% |
+| retro (claude/auto) | 1213.6s (FAIL) | 0 | — |
+
+**Finding 1 — boot is a small fraction of think-heavy phases.** The 6s/3s boot matches the per-phase design
+estimate (~3–5s), but as a *fraction* of multi-minute LLM phases it is only ~1–3%. So the A1/A2 boot-reduction
+levers have **bounded payoff for think-heavy phases**; they matter most for short, high-count phase sequences.
+This *lowers* A1/A2 priority below the design's initial framing — exactly the correction the measurement gate
+exists to produce. A1/A2 stay Proposed; revisit only if a cycle's phase mix is demonstrably boot-bound.
+
+**Finding 2 — A0 coverage gap (ties to ADR-0044).** Only 3 of 5 phases recorded a timing entry: **build and
+audit are absent.** Build went through the **CLI-fallback** path (codex→claude), which does not write a
+`phase-timing` entry (the same un-reconciled-fallback defect as [ADR-0044](0044-unified-phase-recovery-protocol.md)
+D1); audit never ran (the cycle mis-recorded build as failed and skipped it). And retro shows `boot_ms=0` despite
+reaching the `❯` prompt — its claude booted into a fatal `--model auto` error (ADR-0044 D3), a degenerate boot
+the cold-boot accounting doesn't attribute. **A0 is correct on the primary-dispatch happy path but has coverage
+holes on fallback / failed-phase paths; closing ADR-0044 C1 (single-source reconciliation) also closes the
+timing gap.**
 
 ## Consequences
 

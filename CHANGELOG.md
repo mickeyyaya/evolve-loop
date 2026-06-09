@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Cold REPL-boot latency instrumentation (`boot_ms`, ADR-0043 A0).** Each tmux-REPL phase dispatch records the cold-boot window (fixed readiness sleeps + marker-poll) as an additive `boot_ms` field threaded `driver → core.BridgeResponse → core.PhaseResponse → phaseTimingEntry` (`phase-timing.json`, `omitempty`, behavior-neutral). The driver counts intended sleep/poll *iterations* rather than wall-clock so the value is deterministic under tests while ≈ wall-clock in prod; `OnBoot` fires once on the cold-boot marker, never on the warm named-session path or a boot timeout (both → `boot_ms=0`, itself a signal). This is the measurement gate for the pipeline-latency program — A1/A2 hot-loop changes stay gated on these numbers. The first measured cycle showed boot is ~1–3% of think-heavy phases, lowering A1/A2 priority (ADR-0043 §"A0 — as-built + first measurement"). (`12dcd18b`; tracked binary rebuilt `aacd95de`.)
+
+### Performance
+
+- **Test-suite latency pass (token-neutral, quality-preserving).** `t.Parallel()` on `internal/core` (196 tests, 10.5s→5.0s) and `internal/observer` (34 tests, 5.2s→1.6s); `testing.Short()` gates on 7 real-subprocess tests so `go test -short` skips them (audit `-short` 16s→0.42s) while CI-full still runs them; pre-existing `errcheck` in `rollback.go` fixed. (`9724461d`.)
+
+### Documentation
+
+- **ADR-0044 — Unified Phase Recovery Protocol** + `docs/architecture/phase-recovery.md`. From the cycle-262 post-mortem: a cycle whose work was done correctly recorded itself as a *failure* because a successful CLI fallback was never reconciled into orchestration. Documents the D1–D7 defect taxonomy, the root cause (recovery is an un-owned cross-cutting concern across 5 modules), AI-driven principles (deterministic-first/LLM-last), and a pattern-based solution (single-source verdict reconciliation, Template-Method terminal-state classification, Chain-of-Responsibility recovery pipeline, Observer+StallPolicy, Specification CLI-freeze preflight). Also records the codex self-update hazard (mitigated host-side via `brew pin codex`). (`29c457f7`.)
+- **ADR-0043 — pipeline-latency program** (REPL boot reuse, measurement-gated) + `docs/architecture/pipeline-latency.md`: design, A0 as-built seam, and first measured boot-vs-think split. (`9ab6522c`.)
+- **Ship-test parallelization dead-end** recorded in `go/docs/testing.md` — macOS EBADF FD-teardown flake under `-race -count=3 -shuffle`; the wall is git-subprocess-bound, so the only real lever is faking `git`. (`89c8c969`.)
+
 ## [18.1.0] - 2026-06-08
 
 ### Added
