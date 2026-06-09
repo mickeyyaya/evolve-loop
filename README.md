@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**Current (v18.1)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v18.2)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 > **v11.2.0 breaking change**: the `scripts/` symlink has been removed. Operator integrations that hardcode `scripts/...` paths must update to `legacy/scripts/...`. Go binary remains the primary runtime; bash continues to work from `legacy/scripts/`. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
 
@@ -629,6 +629,7 @@ Active milestones (cycles that shipped substantive structural changes):
 | v17.1 | Jun 7 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v18.0 | Jun 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v18.1 | Jun 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v18.2 | Jun 9 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md). Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
 
