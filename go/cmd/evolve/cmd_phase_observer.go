@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // runPhaseObserver is the `evolve phase-observer [--enforce] [--scope=...] <ws> <pgid> <cycle> <phase> <agent> [state]` subcommand.
@@ -85,7 +86,24 @@ func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		NudgeBody:   os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
 		EOFGraceS:   atoiOr(os.Getenv("EVOLVE_OBSERVER_EOF_GRACE_S"), 0),
 		ShutdownSig: shutdown,
+		// ADR-0044 C3: the chain-backed stall policy executes ONLY at
+		// enforce (the observer subprocess reads the program's one dial from
+		// env, same pattern as the bridge). off/shadow/unset ⇒ nil policy ⇒
+		// byte-identical legacy Enforce branch — shadow observability for
+		// stalls already exists via the INCIDENT events themselves.
+		StallPolicy: stallPolicyFromEnv(),
 	}, "", stderr)
+}
+
+// stallPolicyFromEnv resolves the ADR-0044 stage for the observer
+// subprocess: only an explicit "enforce" injects the chain-backed policy;
+// any other value (off, shadow, unset, typo) keeps the legacy nil-policy
+// behavior — a typo must never enable a kill-path.
+func stallPolicyFromEnv() recovery.StallPolicy {
+	if strings.ToLower(strings.TrimSpace(os.Getenv("EVOLVE_PHASE_RECOVERY"))) != "enforce" {
+		return nil
+	}
+	return recovery.NewChainStallPolicy(atoiOr(os.Getenv("EVOLVE_ARTIFACT_MAX_EXTENDS"), 0))
 }
 
 func envOr(primary, fallback string) string {

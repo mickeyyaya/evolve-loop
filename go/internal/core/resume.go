@@ -175,6 +175,24 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
 
+	// ADR-0044 C1 (deferred-to-C3 debt, now paid): the resume path was a
+	// SECOND recording boundary that wrote no timings/sidecars at all —
+	// resumed phases were invisible in phase-timing.json. Every terminal
+	// disposition below funnels through the same recordPhaseOutcome
+	// chokepoint RunCycle uses; the deferred writer flushes on abort too
+	// and APPEND-MERGES with the pre-crash entries (writePhaseTimings).
+	// Semantic note: PhasesRun now includes aborted-but-DISPATCHED phases on
+	// resume too (the chokepoint appends on every terminal path) — same
+	// what-actually-ran contract RunCycle adopted in Slice 1; consumers are
+	// printing/telemetry only (audited then).
+	var phaseTimings []phaseTimingEntry
+	defer func() {
+		if len(phaseTimings) == 0 {
+			return
+		}
+		writePhaseTimings(cs.WorkspacePath, phaseTimings)
+	}()
+
 	// Synthesize the loop: start from `startPhase`, follow the state
 	// machine forward like RunCycle does.
 	current := startPhase
@@ -225,10 +243,14 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			Context:       ctxSnap,
 		})
 		if err != nil {
-			return result, fmt.Errorf("phase %s: %w", next, err)
+			phaseErr := fmt.Errorf("phase %s: %w", next, err)
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, phaseErr.Error()))
+			return result, phaseErr
 		}
 		if !IsVerdict(resp.Verdict) {
-			return result, fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+			ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ferr.Error()))
+			return result, ferr
 		}
 
 		if err := o.ledger.Append(ctx, LedgerEntry{
@@ -238,16 +260,20 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			Kind:     "phase",
 			ExitCode: 0,
 		}); err != nil {
-			return result, fmt.Errorf("ledger append for %s: %w", next, err)
+			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, lerr.Error()))
+			return result, lerr
 		}
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-			return result, fmt.Errorf("write cycle-state post-%s: %w", next, err)
+			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, werr.Error()))
+			return result, werr
 		}
 
-		result.PhasesRun = append(result.PhasesRun, next)
 		result.FinalVerdict = resp.Verdict
+		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ""))
 		current = next
 		lastVerdict = resp.Verdict
 

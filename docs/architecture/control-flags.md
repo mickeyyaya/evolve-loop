@@ -183,7 +183,7 @@
 
 | Flag | Status | Purpose |
 |------|--------|---------|
-| `EVOLVE_PHASE_RECOVERY` | ACTIVE (default `shadow`, v18.3+) | Fatal-pane fast-fail stage at the stop-review checkpoint: `off` (detector not consulted; byte-identical legacy) / `shadow` (DEFAULT — detect + log the would-be fast-fail, legacy verdict decides) / `enforce` (a fatal match on a non-Busy pane preempts the reviewer with `stop`, exiting the artifact wait in one interval instead of burning the `maxExtends` backstop; exit 81 hands the phase to the runner's CLI fallback chain). Unknown value → `off` (a typo never enables a kill-path). A Busy pane is never preempted regardless of stage |
+| `EVOLVE_PHASE_RECOVERY` | ACTIVE (default `shadow`, v18.3+) | The whole ADR-0044 program rides this one dial — fatal-pane fast-fail at the stop-review checkpoint, the observer's chain-backed StallPolicy (subprocess injects it ONLY at explicit `enforce`), and the orchestrator's escalate→advise→promote hook (`config.RolloutStages.PhaseRecovery` view). Stages: `off` (detector not consulted; byte-identical legacy) / `shadow` (DEFAULT — detect + log the would-be fast-fail, legacy verdict decides) / `enforce` (a fatal match on a non-Busy pane preempts the reviewer with `stop`, exiting the artifact wait in one interval instead of burning the `maxExtends` backstop; exit 81 hands the phase to the runner's CLI fallback chain). Unknown value → `off` (a typo never enables a kill-path). A Busy pane is never preempted regardless of stage |
 
 ## Observability / Prompt Tuning
 

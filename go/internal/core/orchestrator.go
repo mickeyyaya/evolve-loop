@@ -179,6 +179,13 @@ type Orchestrator struct {
 	// ADR-0030 cycle. Set via WithObserver; cmd_cycle.go wires the real
 	// implementation when EVOLVE_OBSERVER_AUTOSPAWN != "0" (default 1).
 	observer Observer
+
+	// failureAdviser is the ADR-0044 C3 LLM escalation tail consulted by
+	// adviseOnUnclassifiedFailure (failure_hook.go) — only at
+	// cfg.PhaseRecovery == StageEnforce, only for unclassified
+	// artifact-timeout panes. Nil (default) ⇒ hook inert. Set via
+	// WithFailureAdviser.
+	failureAdviser FailureAdviser
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -1077,6 +1084,38 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	}
 }
 
+// writePhaseTimings atomically persists phase-timing.json — shared by
+// RunCycle's and RunCycleFromPhase's deferred writers (ADR-0044 C1: one
+// record format, every execution path). APPEND-MERGE semantics: entries
+// already on disk (a crashed earlier attempt, the pre-resume phases) are
+// preserved and the new entries appended — the timing file is a LOG of real
+// dispatches, so a phase appearing twice (failed attempt + resumed attempt)
+// is reality, not duplication. A fresh cycle workspace has no existing file
+// ⇒ byte-identical to the pre-merge behavior. Best-effort: failures WARN,
+// never mask the cycle outcome.
+func writePhaseTimings(workspace string, timings []phaseTimingEntry) {
+	timingPath := filepath.Join(workspace, "phase-timing.json")
+	if prev, rerr := os.ReadFile(timingPath); rerr == nil {
+		var existing []phaseTimingEntry
+		if jerr := json.Unmarshal(prev, &existing); jerr == nil && len(existing) > 0 {
+			timings = append(existing, timings...)
+		}
+	}
+	data, merr := json.Marshal(timings)
+	if merr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing marshal: %v\n", merr)
+		return
+	}
+	tmp := timingPath + ".tmp"
+	if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing write: %v\n", werr)
+		return
+	}
+	if rerr := os.Rename(tmp, timingPath); rerr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing rename: %v\n", rerr)
+	}
+}
+
 // phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
 // when a mandatory phase aborts after exhausting all retry attempts.
 type phaseFailureDiag struct {
@@ -1574,20 +1613,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		if len(phaseTimings) == 0 {
 			return
 		}
-		timingPath := filepath.Join(cs.WorkspacePath, "phase-timing.json")
-		data, merr := json.Marshal(phaseTimings)
-		if merr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing marshal: %v\n", merr)
-			return
-		}
-		tmp := timingPath + ".tmp"
-		if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing write: %v\n", werr)
-			return
-		}
-		if rerr := os.Rename(tmp, timingPath); rerr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing rename: %v\n", rerr)
-		}
+		writePhaseTimings(cs.WorkspacePath, phaseTimings)
 	}()
 	current := PhaseStart
 	lastVerdict := VerdictPASS
@@ -1890,6 +1916,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					// agent verdict exists on this path → synthesized FAIL.
 					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error()))
 					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
+					// ADR-0044 C3: enforce-only, best-effort — classify the
+					// unclassified pane via the LLM tail and promote, so the
+					// NEXT occurrence is deterministic. Never alters the abort.
+					o.adviseOnUnclassifiedFailure(ctx, cycle, cs.WorkspacePath, req.ProjectRoot, next, err, envSnap)
 					recordFailureLearning(next, phaseErr, attempt)
 					return result, wrapCycleLevelError(next, phaseErr)
 				}

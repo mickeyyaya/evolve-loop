@@ -165,6 +165,21 @@ type RolloutStages struct {
 	// subprocess hot path). Setting this field in code without also propagating
 	// EVOLVE_SANDBOX into the bridge's env map has no effect.
 	SandboxMode string
+	// PhaseRecovery is the ADR-0044 Unified Phase Recovery rollout stage —
+	// the ONE dial for the whole program (fatal-pane fast-fail, the
+	// observer's chain-backed StallPolicy, the orchestrator's failure-advisor
+	// hook):
+	//   StageOff     — recovery components inert; byte-identical legacy.
+	//   StageShadow  — classify + log would-be actions only (DEFAULT).
+	//   StageEnforce — corrective actions execute (fast-fail, stall policy,
+	//                  advise+promote). Classification is always-on above off;
+	//                  only ACTING is staged.
+	// PRECEDENCE NOTE: the bridge and observer subprocesses read
+	// EVOLVE_PHASE_RECOVERY from their own env (the actual hot-path signal,
+	// same pattern as CommitEvidence/SandboxMode); this field is the
+	// composition-root/orchestrator view, set from the same env var by
+	// applyEnv. Default StageShadow per ADR-0044 (behavior-neutral first ship).
+	PhaseRecovery Stage
 }
 
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
@@ -346,7 +361,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, PhaseRecovery: StageShadow},
 		Mandatory:     []string{"scout", "build", "audit", "ship"},
 		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions: 4,
@@ -440,6 +455,12 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// defaults to off rather than silently enabling the kill-path. Default
 		// (no env) is enforce, set in defaults().
 		cfg.ContractGate = parseEvidenceStage(v, "EVOLVE_CONTRACT_GATE", ws)
+	}
+	if v := env["EVOLVE_PHASE_RECOVERY"]; v != "" {
+		// ADR-0044 Unified Phase Recovery — the one dial for the whole
+		// program. Same trichotomy; a typo defaults to off, never silently
+		// enabling a kill-path. Default (no env) is shadow, set in defaults().
+		cfg.PhaseRecovery = parseEvidenceStage(v, "EVOLVE_PHASE_RECOVERY", ws)
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {

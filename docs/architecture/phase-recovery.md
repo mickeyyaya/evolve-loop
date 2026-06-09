@@ -173,15 +173,30 @@ chokepoint** (`realizeScalar`: post-resolution `auto` emits no model param on an
 guard instead of N per-driver copies; the headless codex driver keeps its exec-path guard. The per-driver
 `ClassifyTerminal` hook was deliberately NOT added yet — no consumer; it rides with C3 if the chain needs it.
 
-### C3 — Chain of Responsibility for recovery → composes D1–D4
-The dispatch result flows through an ordered chain; each handler recovers, passes, or escalates:
+### C3 — Chain of Responsibility for recovery → composes D1–D4 — ✅ SHIPPED 2026-06-10 (as-built below)
+The dispatch result flows through an ordered chain; each handler recovers, passes, or escalates. The design
+sketch named the pre-dispatch guards as links:
 
 ```
 ModelFlagPolicy → FatalPaneDetector → FallbackStrategy(cli/model) → VerdictReconciler → LLMFailureAdvisor (escalate)
 ```
 
-Adding a recovery behavior = adding a handler. The chain *is* the protocol that is currently missing; it gives
-recovery a single, testable owner and a single place to reason about ordering.
+**As built** (`recovery/handler.go`, modeled on `router/recovery.go`): the always-on correctness pieces
+(ModelFlagPolicy at the realizer, VerdictReconciler = the C1 chokepoint, FallbackStrategy = the runner's
+exit-81 chain) stay where the slices put them — they are not runtime *decisions*. The chain owns the
+DECISIONS for a classified terminal state:
+
+```
+integrity-escalate → busy-extend → known-fatal-kill → stall-budget-extend → unknown-advise (terminal)
+```
+
+`Recover(RecoverInput) → Decision{Action, Handler, Reason}` — pure, deterministic, every decision justified.
+Consumers: the observer's chain-backed StallPolicy (`NewChainStallPolicy`, injected by the observer
+subprocess ONLY at `EVOLVE_PHASE_RECOVERY=enforce`; advise degrades to escalate there) and the
+orchestrator's escalate→advise→promote hook (`core/failure_hook.go`, `WithFailureAdviser`, enforce-only,
+deterministic-registry-first, best-effort). `config.RolloutStages.PhaseRecovery` is the orchestrator's view
+of the one dial (default shadow); `resume.go` was unified through the C1 chokepoint in the same slice.
+Adding a recovery behavior = adding a handler. The chain *is* the protocol that was missing.
 
 ### C4 — Observer + StallPolicy (Single Responsibility) → fixes D5 — ✅ SHIPPED 2026-06-10 (seam default-nil; real policy wired in C3)
 Keep the Observer as pure detection (it is already a clean Observer pattern emitting `stall_no_output` etc.).
@@ -225,7 +240,12 @@ the tmux driver boots via `SeedDetectorWithPromotions`, so each novel state is p
 | 3 | ✅ **C2 `FatalPaneDetector`** (shipped 2026-06-10; seeded with the 3 cycle-262 signatures, `EVOLVE_PHASE_RECOVERY`-staged, shadow default) | Eliminates the ~20-min slow-fails (in enforce) | M |
 | 4 | ✅ **C5 freeze preflight** + **D4 retro fallback** (shipped 2026-06-10: `looppreflight` 5th check — self-update evidence ∧ tmux-driven ⇒ brew-pinned or Halt; `retrospective.json` gains `cli_fallback:["codex-tmux"]`; broader meta-phase coverage rides C3) | Cheap; prevents recurrence | S |
 | 5 | ✅ **C4 observer `StallPolicy`** (shipped 2026-06-10: `recovery.StallPolicy` Strategy at both INCIDENT sites, default-nil byte-identical; verdict + justification recorded in the envelope) | Corrective detection | M |
-| 6 | **C3 Chain refactor** (compose 1–4) + LLM advisor + promotion loop | Unifies into the protocol | L |
+| 6 | ✅ **C3 Chain refactor** (shipped 2026-06-10: `recovery.Recover` CoR + chain-backed StallPolicy [enforce-only] + `config.PhaseRecovery` dial [shadow default] + resume.go→C1 chokepoint + the enforce-only advise→promote hook) | Unifies into the protocol | L |
+
+**Program status (2026-06-10): all six steps shipped.** The dial ships at `shadow`; flip
+`EVOLVE_PHASE_RECOVERY=enforce` (and wire `WithFailureAdviser(core.NewFailureAdvisor(bridge, …))` at the
+composition root) after a soak batch shows clean shadow logs. The cycle-262 replay tests pin every D1–D6
+fix; D7 (typed recovery beyond ship) is the chain itself.
 
 Each step ships behind the project's gates (TDD red→green, adversarial audit, EGPS red_count==0), measured and
 behavior-neutral where possible — never a blind change to the hot dispatch loop.

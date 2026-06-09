@@ -1,7 +1,8 @@
 # ADR-0044: Unified Phase Recovery Protocol — deterministic-first, single-owner recovery
 
-> Status: **Accepted — C1 implemented** (designed 2026-06-09; implementation started 2026-06-10, slice record in
-> §Implementation). Design-first: records the analysis and chosen direction; implementation is
+> Status: **Implemented** (designed 2026-06-09; all six slices shipped 2026-06-10 — record in
+> §Implementation; rollout dial `EVOLVE_PHASE_RECOVERY` default **shadow**, flip to `enforce` after soak).
+> Design-first: records the analysis and chosen direction; implementation is
 > risk-ranked and gate-tested (no blind change to the hot dispatch loop). Full evidence + design:
 > [phase-recovery.md](../phase-recovery.md). Builds on [ADR-0026](0026-self-healing-review-layer.md) (stop-reviewer),
 > [ADR-0029](0029-cli-fallback-chain-and-per-agent-overrides.md) (CLI fallback), [ADR-0039](0039-failure-floor-and-failure-signal-contract.md) (ship repair ladder + failure floor).
@@ -148,6 +149,33 @@ C4, and finally the C3 chain refactor that composes them.
   `core/failure_advisor_test.go` (parse+dispatch contract, malformed/unknown-cause/nil-bridge/bridge-error
   all fail safe), `recovery/promote_test.go` (in-memory immediate catch, seed precedence, durable
   absent-only + idempotent id, replay, corrupt-file safety, PromoteAdvice validation).
+
+- **Slice 6 / C3 — shipped 2026-06-10 (the composing slice; ADR → Implemented).** Four parts.
+  (a) **The chain** (`recovery/handler.go`, modeled on `router/recovery.go`): ordered
+  `integrity-escalate → busy-extend → known-fatal-kill → stall-budget-extend → unknown-advise(terminal)`,
+  pure `Recover(RecoverInput) → Decision{Action, Handler, Reason}`; order pinned by tests (integrity
+  outranks busy outranks known-fatal; known causes NEVER reach the LLM; only the unknown residue advises).
+  `NewChainStallPolicy` adapts the chain to the C4 StallPolicy port (advise degrades to escalate — the
+  observer subprocess cannot dispatch an advisor). (b) **The dial's orchestrator view**:
+  `config.RolloutStages.PhaseRecovery` (EVOLVE_PHASE_RECOVERY via `parseEvidenceStage`, default
+  **StageShadow**, typo→off) — the bridge/observer subprocesses keep reading env directly (the
+  CommitEvidence/SandboxMode precedent). The observer subprocess (`cmd_phase_observer.go`) injects the
+  chain-backed policy ONLY at explicit `enforce`. (c) **resume.go unified through the C1 chokepoint**
+  (the deferred debt): `RunCycleFromPhase` now records every terminal disposition via
+  `recordPhaseOutcome` + the shared `writePhaseTimings` writer — resumed phases are no longer invisible
+  in phase-timing.json. (d) **The escalate→advise→promote hook** (`core/failure_hook.go`):
+  `WithFailureAdviser` injects the Slice-5 tail behind the `FailureAdviser` port; at StageEnforce only,
+  for artifact-timeout aborts only, the hook reads the bridge's escalation report (`final_pane`), checks
+  the deterministic registry FIRST (known panes never pay for an LLM call), then Advise→PromoteAdvice —
+  strictly best-effort (WARNs, never alters the abort flow). Tests:
+  `recovery/handler_test.go` (order-is-load-bearing, known-fatal-never-hits-LLM, unknown-advises,
+  integrity-always-escalates, observer adaptation), `core/failure_hook_test.go`
+  (shadow/off-never-consults [the plan's ShadowDefault_NoCorrectiveAction], enforce-advises-and-promotes
+  + second-occurrence-deterministic, known-pane-skips-advisor, advisor-error-best-effort),
+  `config.TestLoad_PhaseRecoveryStage` (default shadow, trichotomy, typo→off+warn).
+  **Not wired anywhere by default**: the composition root gains the dial but no caller passes
+  `WithFailureAdviser` yet — flipping enforce + wiring `NewFailureAdvisor` at cmd-level is the
+  post-soak step, deliberately separate from this slice.
 
 ## Consequences
 
