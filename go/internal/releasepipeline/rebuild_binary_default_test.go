@@ -1,7 +1,9 @@
 package releasepipeline
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -38,8 +40,31 @@ func TestDefaultRebuildBinary_NonDryRun_RealRepo(t *testing.T) {
 	}
 	repoRoot := findRepoRoot(t)
 
-	err := defaultRebuildBinary(repoRoot, false)
-	if err != nil {
+	// defaultRebuildBinary writes <repoRoot>/go/evolve in place. Snapshot the
+	// tracked binary and restore it afterward so this integration test never
+	// leaves the committed artifact dirty — otherwise every `go test` (commit
+	// gate, CI, make test) silently mutates go/evolve, which then trips the ship
+	// gate's self-SHA check and pollutes unrelated commits.
+	binPath := filepath.Join(repoRoot, "go", "evolve")
+	origInfo, statErr := os.Stat(binPath)
+	orig, readErr := os.ReadFile(binPath)
+	t.Cleanup(func() {
+		if readErr != nil {
+			return // nothing to restore (binary absent before the test)
+		}
+		mode := os.FileMode(0o755)
+		if statErr == nil {
+			mode = origInfo.Mode() // preserve the committed file's exact mode
+		}
+		if err := os.WriteFile(binPath, orig, mode); err != nil {
+			t.Errorf("restore %s: %v", binPath, err)
+		}
+	})
+
+	if err := defaultRebuildBinary(repoRoot, false); err != nil {
 		t.Errorf("defaultRebuildBinary on real repo: %v", err)
+	}
+	if _, err := os.Stat(binPath); err != nil {
+		t.Errorf("expected rebuilt binary at %s: %v", binPath, err)
 	}
 }

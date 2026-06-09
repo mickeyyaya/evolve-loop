@@ -119,6 +119,45 @@ func TestResolveEvolveBin_AllMissing(t *testing.T) {
 	}
 }
 
+// === resolveEvolveBin — <repoRoot>/go/evolve (rebuild-binary output) =========
+
+// TestResolveEvolveBin_TrackedGoEvolve: the release's rebuild-binary step builds
+// to <repoRoot>/go/evolve; resolveEvolveBin must find it when go/bin/evolve is
+// absent. Regression guard for the v18.2.0 release failure, where ship reported
+// "binary not found" one step after rebuild-binary produced the binary there.
+func TestResolveEvolveBin_TrackedGoEvolve(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EVOLVE_GO_BIN", "")
+	t.Setenv("PATH", "") // no ambient evolve on PATH
+	goDir := filepath.Join(dir, "go")
+	if err := os.MkdirAll(goDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	want := makeExecutable(t, goDir, "evolve")
+
+	if got := resolveEvolveBin(dir); got != want {
+		t.Errorf("resolveEvolveBin = %q, want %q (<repoRoot>/go/evolve)", got, want)
+	}
+}
+
+// TestResolveEvolveBin_RepoBinBeatsTrackedGoEvolve: precedence — when both
+// <repoRoot>/go/bin/evolve and <repoRoot>/go/evolve exist, the gitignored local
+// build (go/bin/evolve) wins over the tracked binary.
+func TestResolveEvolveBin_RepoBinBeatsTrackedGoEvolve(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EVOLVE_GO_BIN", "")
+	binDir := filepath.Join(dir, "go", "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	wantBin := makeExecutable(t, binDir, "evolve")
+	makeExecutable(t, filepath.Join(dir, "go"), "evolve") // also present, lower precedence
+
+	if got := resolveEvolveBin(dir); got != wantBin {
+		t.Errorf("resolveEvolveBin = %q, want %q (go/bin precedence)", got, wantBin)
+	}
+}
+
 // === defaultRebuildBinary — dryRun=true short-circuits =====================
 
 // TestDefaultRebuildBinary_DryRunIsNoop: dryRun=true must return nil without

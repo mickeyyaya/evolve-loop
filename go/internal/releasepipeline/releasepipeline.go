@@ -555,13 +555,13 @@ func defaultReleaseSh(repoRoot, target string) error {
 // defaultShip invokes the native evolve binary's ship subcommand
 // (v11.8.3+; prior versions shelled out to legacy/scripts/lifecycle/ship.sh).
 // Resolves the binary path via EVOLVE_GO_BIN, then <repoRoot>/go/bin/evolve,
-// then `evolve` on PATH; falls back to bash ship.sh only if all three fail.
+// then <repoRoot>/go/evolve (what rebuild-binary produces), then `evolve` on PATH.
 // Returns the new HEAD SHA after the commit lands.
 func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	binPath := resolveEvolveBin(repoRoot)
 	if binPath == "" {
-		return "", fmt.Errorf("evolve binary not found (set EVOLVE_GO_BIN or place at %s/go/bin/evolve); v12.0.0+ requires the native binary",
-			repoRoot)
+		return "", fmt.Errorf("evolve binary not found (set EVOLVE_GO_BIN, or place at %s/go/bin/evolve or %s/go/evolve); v12.0.0+ requires the native binary",
+			repoRoot, repoRoot)
 	}
 	cmd := exec.Command(binPath, "ship", "--class", "release", msg)
 	cmd.Env = append(os.Environ(),
@@ -578,22 +578,38 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	return strings.TrimSpace(string(headOut)), nil
 }
 
-// resolveEvolveBin returns a path to the native evolve binary, or "" if
-// none is callable.
+// resolveEvolveBin returns a path to the native evolve binary, or "" if none is
+// callable. Resolution order:
+//
+//  1. EVOLVE_GO_BIN (if set + executable)
+//  2. <repoRoot>/go/bin/evolve (the gitignored local build — make build / runtime hooks)
+//  3. <repoRoot>/go/evolve (the tracked binary defaultRebuildBinary produces)
+//  4. `evolve` on PATH
+//
+// Step 3 is essential: the release's rebuild-binary step builds to
+// <repoRoot>/go/evolve (`go build -o evolve`, cwd go/), so the very next step
+// (ship) must resolve it there. Without it, a release on a host with no prior
+// `make build` failed "binary not found" one step after building the binary.
 func resolveEvolveBin(repoRoot string) string {
-	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" {
-		if info, err := os.Stat(p); err == nil && info.Mode()&0o111 != 0 {
-			return p
-		}
+	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" && isExecutableFile(p) {
+		return p
 	}
-	candidate := filepath.Join(repoRoot, "go", "bin", "evolve")
-	if info, err := os.Stat(candidate); err == nil && info.Mode()&0o111 != 0 {
-		return candidate
+	if c := filepath.Join(repoRoot, "go", "bin", "evolve"); isExecutableFile(c) {
+		return c
+	}
+	if c := filepath.Join(repoRoot, "go", "evolve"); isExecutableFile(c) {
+		return c
 	}
 	if found, err := exec.LookPath("evolve"); err == nil {
 		return found
 	}
 	return ""
+}
+
+// isExecutableFile reports whether path exists and has any execute bit set.
+func isExecutableFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode()&0o111 != 0
 }
 
 // defaultMarketplacePoll calls marketplacepoll.Run with the default
