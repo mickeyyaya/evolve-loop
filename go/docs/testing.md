@@ -135,15 +135,32 @@ The remaining poles are **deliberately left fast-resident**:
 - **`internal/phases/ship` (~22s)** — its tests do real `git` commit/merge in
   temp repos (integration-*cost*), but they are ship's primary safety coverage
   (audit-binding, gates). They stay in the fast suite so a developer can't break
-  ship without immediate feedback. They are **not** parallelized: ship reads
-  control-flow env via `t.Setenv`, which is incompatible with `t.Parallel`.
+  ship without immediate feedback. They are **not** parallelized — for two
+  reasons, both empirically confirmed (2026-06-09):
+  1. **Most tests can't be parallel.** ~22 of 34 test files spawn real `git`;
+     several mutate process env via `t.Setenv` (panics under `t.Parallel`) or
+     save/restore package-var seams (data races), and the `git worktree` tests
+     contend under load.
+  2. **Even the pure-logic subset can't be parallel on macOS.** The ~10 git-free
+     files (69 tests) *can* take `t.Parallel` in principle, but doing so triggers
+     the darwin **EBADF** FD-teardown flake (`close …: bad file descriptor`,
+     `TempDir RemoveAll cleanup: fcntl …: bad file descriptor`) under the trust
+     bar `go test -race -count=3 -shuffle=on`. Isolated proof: serial baseline
+     **clean 2/2**, pure-logic-parallel **flaked 1/1** — the added concurrency
+     raises FD pressure across the package and trips the pre-existing race that
+     `tempRepoDir`'s best-effort cleanup + `captureWithEBADFRetry` only partially
+     contain. The wall is git-subprocess-bound anyway, so parallelizing the cheap
+     pure-logic tail bought **~0s** (26.46s→26.59s, no-race) even before it flaked.
 - **`internal/core` (~12s)** — volume (≈200 small orchestrator-sequencing
   tests). It overlaps under ship's wall, so parallelizing it would not lower the
-  suite's wall time; the churn/flake risk isn't worth a no-op gain.
+  suite's wall time; the churn/flake risk isn't worth a no-op gain. *(Core +
+  observer were since parallelized in `9724461d` — they are FD-light and pass the
+  stress bar, unlike ship.)*
 
 This is an intentional trade (determinism + safety coverage over shaving a
-ship-bound wall), not an oversight. Reducing ship further means faking `git` —
-a separate, larger refactor tracked outside this workstream.
+ship-bound wall), not an oversight. The only real lever is **faking `git`** (or an
+in-memory FS) — which removes both the subprocess wall *and* the EBADF surface,
+unlocking parallelism — a separate, larger refactor tracked outside this workstream.
 
 ### Known: real-tmux integration tests are load-sensitive
 
