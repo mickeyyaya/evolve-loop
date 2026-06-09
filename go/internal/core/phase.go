@@ -142,14 +142,18 @@ type PhaseRequest struct {
 
 // PhaseResponse is the output envelope from PhaseRunner.Run.
 type PhaseResponse struct {
-	Phase        string       `json:"phase"`
-	Verdict      string       `json:"verdict"`
-	ArtifactsDir string       `json:"artifacts_dir"`
-	NextPhase    string       `json:"next_phase,omitempty"`
-	CostUSD      float64      `json:"cost_usd"`
-	Tokens       TokenUsage   `json:"tokens"`
-	DurationMS   int64        `json:"duration_ms"`
-	Diagnostics  []Diagnostic `json:"diagnostics,omitempty"`
+	Phase        string     `json:"phase"`
+	Verdict      string     `json:"verdict"`
+	ArtifactsDir string     `json:"artifacts_dir"`
+	NextPhase    string     `json:"next_phase,omitempty"`
+	CostUSD      float64    `json:"cost_usd"`
+	Tokens       TokenUsage `json:"tokens"`
+	DurationMS   int64      `json:"duration_ms"`
+	// BootMS is the cold REPL-boot latency carried up from the bridge
+	// (ADR-0043 A0) — the slice of DurationMS that was pure dispatch overhead
+	// (tmux new-session → prompt marker), not model think time. 0 = no cold boot.
+	BootMS      int64        `json:"boot_ms,omitempty"`
+	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
 
 	// Signals is the namespaced signal map this phase emits onto the bus — the
 	// typed "message on the pipe." The router (Stage 3) consumes these directly

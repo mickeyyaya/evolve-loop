@@ -322,6 +322,11 @@ type BridgeResponse struct {
 	CostUSD    float64    `json:"cost_usd"`
 	Tokens     TokenUsage `json:"tokens"`
 	DurationMS int64      `json:"duration_ms"`
+	// BootMS is the cold-boot latency the tmux-REPL driver spent from
+	// tmux new-session to the REPL prompt marker appearing — pure dispatch
+	// overhead, paid before the prompt is delivered (ADR-0043 A0). 0 when no
+	// cold boot happened (a resumed/warm named session, or a headless driver).
+	BootMS int64 `json:"boot_ms,omitempty"`
 }
 
 // BridgeProbe is what bridge reports about its environment + CLIs.

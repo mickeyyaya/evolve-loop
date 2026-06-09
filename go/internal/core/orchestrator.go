@@ -975,8 +975,11 @@ const maxRecoveryDepth = 2
 
 // phaseTimingEntry records per-phase latency + outcome for phase-timing.json.
 type phaseTimingEntry struct {
-	Phase        string  `json:"phase"`
-	DurationMS   int64   `json:"duration_ms"`
+	Phase      string `json:"phase"`
+	DurationMS int64  `json:"duration_ms"`
+	// BootMS is the cold REPL-boot slice of DurationMS (ADR-0043 A0) — pure
+	// dispatch overhead before the model worked. omitempty: 0 for warm/headless.
+	BootMS       int64   `json:"boot_ms,omitempty"`
 	Verdict      string  `json:"verdict"`
 	CostUSD      float64 `json:"cost_usd"`
 	AttemptCount int     `json:"attempt_count"`
@@ -1168,6 +1171,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	*fl.Timings = append(*fl.Timings, phaseTimingEntry{
 		Phase:        string(PhaseRetro),
 		DurationMS:   retroResp.DurationMS,
+		BootMS:       retroResp.BootMS,
 		Verdict:      retroResp.Verdict,
 		CostUSD:      retroResp.CostUSD,
 		AttemptCount: 1,
@@ -2082,6 +2086,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		phaseTimings = append(phaseTimings, phaseTimingEntry{
 			Phase:        string(next),
 			DurationMS:   resp.DurationMS,
+			BootMS:       resp.BootMS,
 			Verdict:      resp.Verdict,
 			CostUSD:      resp.CostUSD,
 			AttemptCount: attemptCount,

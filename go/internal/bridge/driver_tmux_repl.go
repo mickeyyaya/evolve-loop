@@ -186,9 +186,18 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if interval <= 0 {
 			interval = 1
 		}
+		// ADR-0043 A0: accumulate the cold-boot wait. Seeded with the two fixed
+		// deps.Sleep(time.Second) readiness waits above (post new-session, post
+		// cd); each poll iteration adds its interval. Derived from the Sleep-driven
+		// counter (not wall clock) so it is deterministic under the test no-op
+		// Sleep and ≈ wall time in production. Keep fixedReadinessWaits in sync
+		// with the count of fixed deps.Sleep(time.Second) calls above.
+		const fixedReadinessWaits = 2
+		bootWaitMS := int64(fixedReadinessWaits) * 1000
 		promptSeen := false
 		for elapsed := 0; elapsed < tmuxREPLBootTimeoutS; elapsed += interval {
 			deps.Sleep(time.Duration(interval) * time.Second)
+			bootWaitMS += int64(interval) * 1000
 			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			// Cycle-121 fix (codex-cli-0.134-repl-boot-timeout dossier, Fix B):
 			// tick BEFORE the marker check. codex 0.134's trust modal renders
@@ -211,6 +220,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if !promptSeen {
 			fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", pfx, tmuxREPLBootTimeoutS)
 			return ExitREPLBootTimeout, nil
+		}
+		// ADR-0043 A0: report cold-boot latency to the prompt marker. Only the
+		// cold path reaches here; the warm/resumed named-session branch skips
+		// this whole block, so OnBoot never fires there and BootMS stays 0.
+		if deps.OnBoot != nil {
+			deps.OnBoot(bootWaitMS)
 		}
 	}
 

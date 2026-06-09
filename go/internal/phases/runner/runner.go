@@ -496,6 +496,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 					CostUSD:      bres.CostUSD,
 					Tokens:       bres.Tokens,
 					DurationMS:   durationMS,
+					BootMS:       bres.BootMS,
 					Diagnostics: []core.Diagnostic{{
 						Severity: "warning",
 						Message:  msg,
@@ -516,6 +517,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 					CostUSD:      bres.CostUSD,
 					Tokens:       bres.Tokens,
 					DurationMS:   durationMS,
+					BootMS:       bres.BootMS,
 					Diagnostics:  []core.Diagnostic{{Severity: "error", Message: msg}},
 				}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
 			}
@@ -529,6 +531,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				CostUSD:      bres.CostUSD,
 				Tokens:       bres.Tokens,
 				DurationMS:   durationMS,
+				BootMS:       bres.BootMS,
 				Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
 			}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
 		}
@@ -564,6 +567,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		CostUSD:      bres.CostUSD,
 		Tokens:       bres.Tokens,
 		DurationMS:   durationMS,
+		BootMS:       bres.BootMS,
 		Diagnostics:  diags,
 	}
 	if reconciled {

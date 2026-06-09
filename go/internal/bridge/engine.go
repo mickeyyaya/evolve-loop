@@ -100,6 +100,12 @@ type Deps struct {
 	// OnStopReview is called when a stop-review decision is made.
 	// Nil-safe: drivers must check if it is non-nil before invoking.
 	OnStopReview func(phase, action, reason string)
+	// OnBoot is called once by a tmux-REPL driver when the REPL prompt marker
+	// first appears, reporting the cold-boot latency in milliseconds (ADR-0043
+	// A0 instrumentation). Not called on a warm/resumed named session (no boot)
+	// or by headless drivers. Nil-safe: drivers check before invoking. The
+	// Engine wires this per-Launch to populate BridgeResponse.BootMS.
+	OnBoot func(bootMS int64)
 	// KeychainProbe reports whether a macOS login-Keychain generic-password
 	// item exists for the given service. doctorAuth consults it for claude,
 	// whose OAuth token Claude Code stores in the Keychain (service
@@ -240,6 +246,12 @@ func NewEngine(deps Deps) *Engine {
 // --prompt-file contract), then reads the artifact into the response on
 // success — matching the existing subprocess adapter's behavior so the
 // cutover is a drop-in.
+//
+// NOT safe for concurrent calls on the same Engine: Launch installs a
+// call-local OnBoot hook on e.deps (restored via defer) to capture BootMS.
+// Production always builds a fresh Engine per Launch (adapters/bridge), so the
+// "sequential reuse" contract holds; a future caller must not Launch the same
+// Engine from multiple goroutines.
 func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	switch "" {
 	case req.CLI:
@@ -325,9 +337,23 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		args = append(args, req.ExtraFlags...)
 	}
 
+	// Capture the cold-boot latency the tmux-REPL driver reports via OnBoot
+	// (ADR-0043 A0) into this call's BridgeResponse, chaining any pre-wired
+	// callback. The production engine is built fresh per Launch, so mutating
+	// e.deps here is call-local; the defer restores it for any sequential reuse.
+	var bootMS int64
+	prevOnBoot := e.deps.OnBoot
+	e.deps.OnBoot = func(ms int64) {
+		bootMS = ms
+		if prevOnBoot != nil {
+			prevOnBoot(ms)
+		}
+	}
+	defer func() { e.deps.OnBoot = prevOnBoot }()
+
 	var stderrBuf bytes.Buffer
 	code := e.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
-	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String()}
+	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
 	if code == ExitOK {
 		// Strategy-aware result read (ADR-0027): the stdout contract writes no
 		// artifact file — its answer is the captured scrollback (stdoutLog), so
