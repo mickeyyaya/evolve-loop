@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -983,6 +984,10 @@ type phaseTimingEntry struct {
 	Verdict      string  `json:"verdict"`
 	CostUSD      float64 `json:"cost_usd"`
 	AttemptCount int     `json:"attempt_count"`
+	// AbortReason is set when the cycle aborted AFTER this phase produced its
+	// outcome (ADR-0044 C1): the verdict above stays the agent's own; the
+	// abort is a cycle-level disposition. omitempty: absent on happy paths.
+	AbortReason string `json:"abort_reason,omitempty"`
 }
 
 type phaseUsageSidecar struct {
@@ -991,6 +996,8 @@ type phaseUsageSidecar struct {
 	DurationMS   int64   `json:"duration_ms"`
 	AttemptCount int     `json:"attempt_count"`
 	Verdict      string  `json:"verdict"`
+	// AbortReason mirrors phaseTimingEntry.AbortReason (ADR-0044 C1).
+	AbortReason string `json:"abort_reason,omitempty"`
 }
 
 type failureLearningRequest struct {
@@ -1007,22 +1014,66 @@ type failureLearningRequest struct {
 	Timings      *[]phaseTimingEntry
 }
 
-func writePhaseUsageSidecar(workspace, phase string, cost float64, duration int64, attempts int, verdict string) {
-	sidecar := phaseUsageSidecar{
-		Phase:        phase,
-		CostUSD:      cost,
-		DurationMS:   duration,
-		AttemptCount: attempts,
+// phaseOutcomeFrom builds the single-source outcome record for one phase
+// dispatch (ADR-0044 C1). The verdict reconciliation rule lives HERE and only
+// here: a canonical agent verdict is recorded as-is; anything else (empty,
+// non-canonical, error-path zero response) synthesizes FAIL. A synthesized
+// PASS is structurally impossible — reconciliation only ever describes what
+// the agent itself reported.
+func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason string) recovery.PhaseOutcome {
+	verdict := resp.Verdict
+	if !IsVerdict(verdict) {
+		verdict = VerdictFAIL
+	}
+	return recovery.PhaseOutcome{
+		Phase:        string(phase),
 		Verdict:      verdict,
+		CostUSD:      resp.CostUSD,
+		DurationMS:   resp.DurationMS,
+		BootMS:       resp.BootMS,
+		AttemptCount: attempts,
+		AbortReason:  abortReason,
+	}
+}
+
+// recordPhaseOutcome is the C1 recording chokepoint (ADR-0044): EVERY
+// terminal disposition of a dispatched phase — happy advance AND each abort
+// return (exhausted retries, non-canonical verdict, review-gate reject,
+// ship-error recovery, worktree-leak recovery failure, tree-diff guard,
+// ledger/state persistence failure) — funnels through here exactly once, so
+// PhasesRun, phase-timing.json, and <phase>-usage.json always reflect what
+// actually ran. cycle-262: the build ran, PASSed, and burned tokens, but the
+// tree-guard abort path skipped all three records — the divergence this
+// chokepoint makes structurally impossible. Paths where the phase never
+// dispatched (no runner registered, pre-phase state-write failure) have no
+// outcome to record and stay bare.
+func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseTimingEntry, workspace string, out recovery.PhaseOutcome) {
+	result.PhasesRun = append(result.PhasesRun, Phase(out.Phase))
+	*timings = append(*timings, phaseTimingEntry{
+		Phase:        out.Phase,
+		DurationMS:   out.DurationMS,
+		BootMS:       out.BootMS,
+		Verdict:      out.Verdict,
+		CostUSD:      out.CostUSD,
+		AttemptCount: out.AttemptCount,
+		AbortReason:  out.AbortReason,
+	})
+	sidecar := phaseUsageSidecar{
+		Phase:        out.Phase,
+		CostUSD:      out.CostUSD,
+		DurationMS:   out.DurationMS,
+		AttemptCount: out.AttemptCount,
+		Verdict:      out.Verdict,
+		AbortReason:  out.AbortReason,
 	}
 	data, err := json.MarshalIndent(sidecar, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to marshal usage sidecar for %s: %v\n", phase, err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to marshal usage sidecar for %s: %v\n", out.Phase, err)
 		return
 	}
-	path := filepath.Join(workspace, fmt.Sprintf("%s-usage.json", phase))
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to write usage sidecar for %s to %s: %v\n", phase, path, err)
+	path := filepath.Join(workspace, fmt.Sprintf("%s-usage.json", out.Phase))
+	if werr := os.WriteFile(path, data, 0o644); werr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to write usage sidecar for %s to %s: %v\n", out.Phase, path, werr)
 	}
 }
 
@@ -1165,18 +1216,9 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro checkpoint failed: %v\n", err)
 		}
 	}
-	fl.Result.PhasesRun = append(fl.Result.PhasesRun, PhaseRetro)
 	fl.Result.FinalVerdict = retroResp.Verdict
 	fl.Result.RetroDecision = "failure-learning: queued " + todoID
-	*fl.Timings = append(*fl.Timings, phaseTimingEntry{
-		Phase:        string(PhaseRetro),
-		DurationMS:   retroResp.DurationMS,
-		BootMS:       retroResp.BootMS,
-		Verdict:      retroResp.Verdict,
-		CostUSD:      retroResp.CostUSD,
-		AttemptCount: 1,
-	})
-	writePhaseUsageSidecar(fl.CycleState.WorkspacePath, string(PhaseRetro), retroResp.CostUSD, retroResp.DurationMS, 1, retroResp.Verdict)
+	o.recordPhaseOutcome(fl.Result, fl.Timings, fl.CycleState.WorkspacePath, phaseOutcomeFrom(PhaseRetro, retroResp, 1, ""))
 	o.writeFailureLearningState(ctx, fl.State)
 }
 
@@ -1829,6 +1871,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 							ctxSnap["ship_error_class"] = string(se.Class)
 							ctxSnap["ship_error_stage"] = string(se.Stage)
 							ctxSnap["ship_error_debug"] = se.DebugString()
+							// ADR-0044 C1: the failed ship attempt ran and burned
+							// budget — record it before routing to recovery. A
+							// later successful ship records its own outcome.
+							o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount,
+								fmt.Sprintf("ship error %s: recovering via %s", se.Code, rec)))
 							recoveryDepth++
 							scheduledNext = rec
 							current = PhaseShip // ship ran (and failed); keep forensics accurate
@@ -1837,6 +1884,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 						}
 					}
 					phaseErr := fmt.Errorf("phase %s: %w", next, err)
+					// ADR-0044 C1: record the dispatch outcome BEFORE the
+					// failure-learning retro so the timing record stays
+					// chronological (failed phase, then retro). No canonical
+					// agent verdict exists on this path → synthesized FAIL.
+					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error()))
 					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
 					recordFailureLearning(next, phaseErr, attempt)
 					return result, wrapCycleLevelError(next, phaseErr)
@@ -1858,6 +1910,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			if err == nil && !IsVerdict(resp.Verdict) {
 				if attempt >= maxAttempts {
 					ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
+					// ADR-0044 C1: a non-canonical verdict is never recorded
+					// raw and never upgraded — phaseOutcomeFrom synthesizes FAIL.
+					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error()))
 					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, ferr, attempt, o.now)
 					recordFailureLearning(next, ferr, attempt)
 					return result, wrapCycleLevelError(next, ferr)
@@ -1925,6 +1980,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				}
 				if err != nil {
 					phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
+					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 					recordFailureLearning(next, phaseErr, corr)
 					return result, wrapCycleLevelError(next, phaseErr)
 				}
@@ -1935,6 +1991,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// than retrying.
 				if !IsVerdict(resp.Verdict) {
 					phaseErr := fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
+					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 					recordFailureLearning(next, phaseErr, corr)
 					return result, wrapCycleLevelError(next, phaseErr)
 				}
@@ -1950,10 +2007,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if maxCorrections == 0 {
 					// Byte-identical to the pre-feature abort message.
 					phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
+					// ADR-0044 C1: the phase ran and produced its own verdict;
+					// the reject is recorded as the abort reason, not a rewrite.
+					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 					recordFailureLearning(next, phaseErr, 1)
 					return result, wrapCycleLevelError(next, phaseErr)
 				}
 				phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
+				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 				recordFailureLearning(next, phaseErr, maxCorrections)
 				return result, wrapCycleLevelError(next, phaseErr)
 			}
@@ -1985,6 +2046,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		if WorktreePhase(next) && cs.ActiveWorktree != "" {
 			if !recoverBuildLeak(ctx, req.ProjectRoot, cs.ActiveWorktree, mainDirtyBaseline) {
 				phaseErr := fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for audit)", next)
+				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 				recordFailureLearning(next, phaseErr, 1)
 				return result, phaseErr
 			}
@@ -2019,6 +2081,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: discarded binary rebuild churn in phase %s; continuing\n", next)
 				} else {
 					phaseErr := res2.Error(string(next), phaseWorktree)
+					// ADR-0044 C1 — THE cycle-262 path: the build ran, PASSed,
+					// and burned tokens before the guard caught its main-tree
+					// leak. The abort is correct; erasing the outcome was not.
+					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 					recordFailureLearning(next, phaseErr, 1)
 					// After abort, check if go/bin/evolve is absent
 					evolveBinPath := filepath.Join(req.ProjectRoot, "go/bin/evolve")
@@ -2037,7 +2103,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			Kind:     "phase",
 			ExitCode: 0,
 		}); err != nil {
-			return result, fmt.Errorf("ledger append for %s: %w", next, err)
+			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
+			// ADR-0044 C1: the phase completed; a persistence failure must
+			// not erase its outcome from the timing/usage record.
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, lerr.Error()))
+			return result, lerr
 		}
 
 		// Audit-binding (root-cause fix, 2026-05-29): ship's verifyAuditBinding
@@ -2072,7 +2142,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-			return result, fmt.Errorf("write cycle-state post-%s: %w", next, err)
+			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, werr.Error()))
+			return result, werr
 		}
 
 		if PhaseBoundaryCheckpointer != nil {
@@ -2081,17 +2153,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			}
 		}
 
-		result.PhasesRun = append(result.PhasesRun, next)
 		result.FinalVerdict = resp.Verdict
-		phaseTimings = append(phaseTimings, phaseTimingEntry{
-			Phase:        string(next),
-			DurationMS:   resp.DurationMS,
-			BootMS:       resp.BootMS,
-			Verdict:      resp.Verdict,
-			CostUSD:      resp.CostUSD,
-			AttemptCount: attemptCount,
-		})
-		writePhaseUsageSidecar(cs.WorkspacePath, string(next), resp.CostUSD, resp.DurationMS, attemptCount, resp.Verdict)
+		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, ""))
 		current = next
 		lastVerdict = resp.Verdict
 

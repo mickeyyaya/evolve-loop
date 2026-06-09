@@ -3,10 +3,12 @@ package runner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -316,5 +318,63 @@ func TestRun_NoFallback_ByteIdentical(t *testing.T) {
 	}
 	if len(sb.calls) != 1 {
 		t.Errorf("expected exactly 1 launch (no fallback); got %d: %v", len(sb.calls), sb.calls)
+	}
+}
+
+// TestRun_FallbackOnArtifactTimeout_CarriesVerdictCostDuration is the
+// cycle-262 link at the runner level (ADR-0044 C1 / Slice 1): primary CLI
+// exits 81 (artifact timeout — exactly what codex's mid-phase self-upgrade
+// produced), the fallback CLI succeeds, and the runner's response must carry
+// the FINAL attempt's verdict + cost + boot, a positive duration, and a nil
+// error. Baseline-GREEN pin: the dispatch chain already behaves this way (the
+// 262 recording loss was downstream, in the orchestrator's abort paths) —
+// this test makes the link regression-proof while C1 reshapes the recording.
+func TestRun_FallbackOnArtifactTimeout_CarriesVerdictCostDuration(t *testing.T) {
+	hooks := &fakeHooks{
+		phase: "build", agent: "evolve-builder", model: "sonnet",
+		prompt: "x", verdict: core.VerdictPASS, nextPhase: "audit",
+	}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"codex-tmux": {
+				resp: core.BridgeResponse{ExitCode: 81, Stderr: "artifact timeout"},
+				err:  fmt.Errorf("bridge: launch exit=81: %w", core.ErrArtifactTimeout),
+			},
+			"claude-tmux": {
+				resp: core.BridgeResponse{CostUSD: 0.37, BootMS: 1200},
+			},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-builder", "codex-tmux", []string{"claude-tmux"})
+	base := time.Date(2026, 6, 9, 14, 0, 0, 0, time.UTC)
+	tick := 0
+	r := New(Options{
+		Hooks:   hooks,
+		Bridge:  sb,
+		Prompts: fakePromptsFS("evolve-builder", "x"),
+		NowFn: func() time.Time {
+			tick++
+			return base.Add(time.Duration(tick) * time.Second)
+		},
+	})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("fallback success must return nil error (the timeout was the PRIMARY's, not the phase's); got %v", err)
+	}
+	if got := []string{"codex-tmux", "claude-tmux"}; len(sb.calls) != 2 || sb.calls[0] != got[0] || sb.calls[1] != got[1] {
+		t.Fatalf("dispatch chain=%v, want %v", sb.calls, got)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("verdict=%s, want PASS (the fallback attempt's own Classify verdict)", resp.Verdict)
+	}
+	if resp.CostUSD != 0.37 {
+		t.Errorf("CostUSD=%v, want 0.37 (the final attempt's cost must survive into the response)", resp.CostUSD)
+	}
+	if resp.BootMS != 1200 {
+		t.Errorf("BootMS=%v, want 1200", resp.BootMS)
+	}
+	if resp.DurationMS <= 0 {
+		t.Errorf("DurationMS=%v, want >0", resp.DurationMS)
 	}
 }

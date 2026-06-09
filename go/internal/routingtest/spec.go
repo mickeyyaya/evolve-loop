@@ -128,7 +128,7 @@ type ExpectSpec struct {
 
 	// FullOrchestrator expectations.
 	PhaseSequence    []core.Phase // exact PhasesRun (when non-nil)
-	PhasesAbsent     []core.Phase // these must NOT appear in PhasesRun
+	PhasesAbsent     []core.Phase // must NOT appear in PhasesRun. Note: since ADR-0044 C1, PhasesRun includes aborted-but-DISPATCHED phases — use this only for phases routed around entirely (never dispatched)
 	DecisionInserts  []string     // some logged routing decision proposed these inserts
 	DecisionClamps   []string     // some logged routing decision carries these clamps
 	RoutingLedgerMin int          // ≥ this many routing_decision ledger entries

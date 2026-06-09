@@ -58,6 +58,21 @@ So the orchestration spine saw `build` as not-completed, **skipped audit** (`shi
 advance), routed to retro as a failed cycle, and the failure-learning logged `cycle-262-failed-build`. **The
 work was done; only the recording was missing.**
 
+**Mechanism located (2026-06-10, Slice 1 locate-the-fork — supersedes the paragraph above's implicit guess
+that the fallback wasn't reconciled):** the loop log proves the runner's fallback chain worked end-to-end
+(`dispatch chain: codex-tmux=81 -> claude-tmux=0`; Classify ran; the runner returned PASS with nil error).
+What erased the record: the claude fallback builder wrote the tracked config
+`.evolve/commit-prefix-scope.json` into the **main tree** instead of its worktree; `recoverBuildLeak`
+deliberately never relocates `.evolve/` paths (they're normally runtime state, orchestrator.go:622), so the
+post-phase **tree-diff guard correctly aborted the cycle** (`leaked paths: [.evolve/commit-prefix-scope.json]`
+is the cycle's final error) — and that abort path, like *every* abort path between `runner.Run` returning and
+the orchestrator's single happy-path recording site (~9 paths: review-gate reject, correction failures,
+ship-error recovery, leak-recovery failure, tree-guard, ledger/state persistence failures), returned
+**without recording the outcome** — no timing entry, no usage sidecar, no `PhasesRun` membership. The guard
+was right; erasing the evidence was the defect. (Adjacent finding, not D1: the guard system has a blind spot
+for builders whose *legitimate deliverable* is a tracked `.evolve/` config — relocation skips it by design,
+so such a build can only ever abort. Tracked as a C3-era question.)
+
 ### Cost of the two slow-fails
 codex-dead (2a) burned ~20 min and retro-model-error (2b) burned ~20 min — each ran to the `maxExtends`
 backstop (`tmuxArtifactTimeoutS=300` × ~4) because **nothing recognizes a self-describing fatal pane state**.
@@ -67,7 +82,7 @@ backstop (`tmuxArtifactTimeoutS=300` × ~4) because **nothing recognizes a self-
 
 | # | Defect | Severity | Layer | Root |
 |---|--------|----------|-------|------|
-| **D1** | Successful CLI fallback not reconciled into orchestration (no verdict/usage/timing) → spine can't advance | 🔴 Critical | runner ↔ orchestrator | recording path forks by dispatch route |
+| **D1** | Phase outcome recording is happy-path-only: every orchestrator abort path between dispatch return and the recording site erases the outcome (no verdict/usage/timing/PhasesRun) → record diverges from reality | 🔴 Critical | orchestrator (as-located 2026-06-10; runner reconciles correctly) | one recording site, ~9 abort returns before it |
 | **D2** | No fatal-pane-state detection → full `maxExtends` wait on self-describing fatal states | 🔴 Critical | bridge driver | terminal state is untyped |
 | **D3** | `auto` model leaks to `claude --model auto` (invalid); no omit-on-auto guard for claude-tmux | 🟠 High | bridge driver | model-flag policy not uniform across drivers |
 | **D4** | Meta-phases (retro) have `cli_fallback:null, model_fallback:null` — no recovery path at all | 🟠 High | profiles | fallback coverage incomplete |
@@ -109,21 +124,30 @@ failure.** A correctly-architected recovery layer makes that divergence structur
 Introduce **one owner**: a *Phase Recovery Pipeline* whose single responsibility is *"given a dispatch result,
 produce a reconciled `PhaseOutcome` or a typed terminal failure."* It is assembled from standard patterns.
 
-### C1 — Single-source verdict reconciliation (DRY chokepoint) → fixes D1
-Today only the artifact-timeout path reconciles against the deliverable (the v18.0.0 `BaseRunner.Run` →
-`deliverable.Verify` `verifyFn` work). Make **every** terminal path funnel through that same reconciliation:
+### C1 — Single-source outcome recording (DRY chokepoint) → fixes D1 — ✅ SHIPPED 2026-06-10 (as-located)
+The design sketch below predates locate-the-fork; the shipped shape moved the chokepoint to where the fork
+actually is — the **orchestrator**, whose phase iteration had ONE recording site on the happy path and ~9
+abort returns before it (the runner already reconciles every dispatch route correctly, including
+fallback-success and reconcile-on-timeout):
 
 ```
-BEFORE (divergent; fallback success is lost)            AFTER (one chokepoint)
-  primary success  ─► record verdict/usage/timing        primary  ─┐
-  artifact-timeout ─► reconcile(deliverable) ─► record    fallback ─┼─► reconcile(deliverable, dispatch)
-  fallback success ─► (nothing) ───────────────► ✗ LOST   timeout  ─┘        └─► record verdict/usage/timing ─► spine
+BEFORE (recording is happy-path-only)                AFTER (one chokepoint, every terminal disposition)
+  happy advance        ─► record verdict/usage/…      happy advance      ─┐
+  review-gate reject   ─► (nothing) ──► ✗ LOST        exhausted retries  ─┤
+  tree-guard abort     ─► (nothing) ──► ✗ LOST        review reject      ─┼─► recordPhaseOutcome(PhaseOutcome)
+  leak-recovery fail   ─► (nothing) ──► ✗ LOST        ship-err recovery  ─┤      └─► PhasesRun + phase-timing.json
+  ledger/state fail    ─► (nothing) ──► ✗ LOST        guard/persist abort─┘          + <phase>-usage.json (+abort_reason)
 ```
 
-`reconcilePhaseOutcome(deliverable, dispatchResult) → PhaseOutcome` is called by **all** paths. A valid
-deliverable on disk *always* yields a recorded verdict + timing + usage, regardless of which CLI (primary or
-fallback) produced it. **This single change makes cycle-262 PASS** — the build deliverable was valid; only the
-recording was missing.
+As built: `go/internal/recovery/` leaf package owns the `PhaseOutcome` envelope;
+`core.phaseOutcomeFrom(phase, resp, attempts, abortReason)` owns the reconciliation rule (canonical agent
+verdict recorded as-is; anything else synthesizes FAIL — **never PASS**); the verdict stays the agent's own on
+abort paths, with the abort recorded as additive `abort_reason` (omitempty) in both artifacts. Aborted-but-
+dispatched phases now appear in `PhasesRun`. **This makes the 262-class divergence structurally impossible** —
+the faithful 262 replay (test `TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome`) still fails the cycle on
+the genuine leak (the guard is right) but records build's PASS + cost + timing, so a salvage needs no forensic
+reconstruction. Deferred to the C3 slice: `resume.go` is a second, simpler recording boundary (writes no
+timings/sidecars at all) to be unified through the same chokepoint.
 
 ### C2 — Terminal-state classification (Template Method hook + Strategy) → fixes D2, D3
 The tmux driver already *is* a Template Method (`driver_tmux_repl.go`). Add one hook every driver implements:
@@ -169,7 +193,7 @@ handle over time; the LLM is never on the hot path for a known failure.
 
 | Order | Change | Why first | Size |
 |------|--------|-----------|------|
-| 1 | **C1 reconciler unification** (TDD; extends `deliverable.Verify` to all paths) | Highest leverage — makes 262-class cycles PASS | M |
+| 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest leverage — makes 262-class record divergence impossible | M |
 | 2 | **C2 `ModelFlagPolicy`** (claude omit-on-auto + ensure every phase gets a concrete model) | Tiny; stops the exact retro break | S |
 | 3 | **C2 `FatalPaneDetector`** (seed with the 3 known signatures) | Eliminates the ~20-min slow-fails | M |
 | 4 | **C5 freeze preflight** + **D4 meta-phase fallbacks** (config) | Cheap; prevents recurrence | S |
