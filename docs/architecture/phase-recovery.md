@@ -183,7 +183,7 @@ ModelFlagPolicy → FatalPaneDetector → FallbackStrategy(cli/model) → Verdic
 Adding a recovery behavior = adding a handler. The chain *is* the protocol that is currently missing; it gives
 recovery a single, testable owner and a single place to reason about ordering.
 
-### C4 — Observer + StallPolicy (Single Responsibility) → fixes D5
+### C4 — Observer + StallPolicy (Single Responsibility) → fixes D5 — ✅ SHIPPED 2026-06-10 (seam default-nil; real policy wired in C3)
 Keep the Observer as pure detection (it is already a clean Observer pattern emitting `stall_no_output` etc.).
 Inject a **`StallPolicy`** that maps events → actions (`extend | kill+retry | escalate`). Detection and action
 become independently testable; the observer stops being a passive logger.
@@ -216,7 +216,7 @@ handle over time; the LLM is never on the hot path for a known failure.
 | 2 | ✅ **C2 `ModelFlagPolicy`** (shipped 2026-06-10 at the realizer chokepoint — matrix-wide omit-on-auto) | Tiny; stops the exact retro break | S |
 | 3 | ✅ **C2 `FatalPaneDetector`** (shipped 2026-06-10; seeded with the 3 cycle-262 signatures, `EVOLVE_PHASE_RECOVERY`-staged, shadow default) | Eliminates the ~20-min slow-fails (in enforce) | M |
 | 4 | ✅ **C5 freeze preflight** + **D4 retro fallback** (shipped 2026-06-10: `looppreflight` 5th check — self-update evidence ∧ tmux-driven ⇒ brew-pinned or Halt; `retrospective.json` gains `cli_fallback:["codex-tmux"]`; broader meta-phase coverage rides C3) | Cheap; prevents recurrence | S |
-| 5 | **C4 observer `StallPolicy`** | Corrective detection | M |
+| 5 | ✅ **C4 observer `StallPolicy`** (shipped 2026-06-10: `recovery.StallPolicy` Strategy at both INCIDENT sites, default-nil byte-identical; verdict + justification recorded in the envelope) | Corrective detection | M |
 | 6 | **C3 Chain refactor** (compose 1–4) + LLM advisor + promotion loop | Unifies into the protocol | L |
 
 Each step ships behind the project's gates (TDD red→green, adversarial audit, EGPS red_count==0), measured and

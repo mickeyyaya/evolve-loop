@@ -115,6 +115,18 @@ C4, and finally the C3 chain refactor that composes them.
   Tests: `looppreflight/freeze_test.go` (unpinned-halts w/ guidance, pinned-passes, no-evidence-passes,
   headless-only-skipped, pin-probe-error-warns, idempotent).
 
+- **Slice 4 / C4 — shipped 2026-06-10.** `recovery.StallPolicy` (Strategy; `recovery/stallpolicy.go`):
+  typed `StallEvent` → `extend | kill_retry | escalate` + justification. The observer's two INCIDENT sites
+  (`phaseobserver.go` stuck_no_output / stuck_no_progress) now funnel through one `handleStallIncident`
+  closure: **nil policy (the default) is byte-identical legacy** (Enforce→SIGTERM branch, unenriched
+  envelope — pinned by `TestRun_StallPolicyNil_EnvelopeUnenriched` + the pre-existing enforce/no-enforce
+  tests); with a policy injected, its verdict outranks `Enforce` (extend/escalate suppress the kill;
+  kill_retry kills even without Enforce) and the decision lands INSIDE the INCIDENT envelope
+  (`action` / `action_reason` — every recovery decision justified). Detection and action are now
+  independently testable (SRP); no caller injects a policy yet — the C3 composition slice wires the real,
+  stage-gated implementation. Tests: `phaseobserver/stallpolicy_test.go` (extend-no-kill,
+  kill-retry-without-enforce, escalate-no-kill, nil-unenriched).
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states

@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 const (
@@ -74,6 +75,16 @@ type Config struct {
 	// progress events only) and emits stuck_no_progress when exceeded. 0 = the
 	// feature is disabled (legacy posture, byte-identical to pre-E1).
 	MaxNoProgressS int
+
+	// StallPolicy (ADR-0044 C4) maps a stall INCIDENT to a recovery action
+	// (extend | kill_retry | escalate), decoupling action from detection.
+	// nil — the default until the C3 composition slice wires a real policy —
+	// preserves the legacy inline behavior byte-for-byte: Enforce → SIGTERM,
+	// unenriched INCIDENT envelope. With a policy injected, its verdict
+	// outranks Enforce (extend/escalate suppress the kill; kill_retry kills
+	// even without Enforce) and the decision + justification are recorded
+	// inside the INCIDENT envelope (action / action_reason).
+	StallPolicy recovery.StallPolicy
 
 	// Testing seams.
 	Now         func() time.Time
@@ -205,6 +216,43 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 		"poll_s":  cfg.PollS,
 	})
 
+	// handleStallIncident (ADR-0044 C4) is the single emit+act path for both
+	// stall INCIDENT sites. nil StallPolicy ⇒ byte-identical legacy behavior:
+	// unenriched envelope + the Enforce→SIGTERM branch. With a policy, its
+	// verdict outranks Enforce and is recorded inside the envelope — every
+	// recovery decision is justified, never silent.
+	type stallIncident struct {
+		kind    string
+		payload map[string]any
+		event   recovery.StallEvent
+	}
+	handleStallIncident := func(in stallIncident) {
+		if cfg.StallPolicy == nil {
+			obs.emit(eventsPath, in.kind, "INCIDENT", in.payload)
+			if cfg.Enforce && cfg.SubagentPGID > 0 {
+				logf("ENFORCE: killing pgid %d due to %s", cfg.SubagentPGID, in.kind)
+				_ = cfg.KillPgrp(cfg.SubagentPGID, syscall.SIGTERM)
+			}
+			return
+		}
+		action, reason := cfg.StallPolicy.Decide(in.event)
+		// The envelope records what will ACTUALLY happen, never the intent
+		// alone: a kill_retry with no pgid to kill must not claim a kill
+		// (the record-reflects-reality invariant this whole ADR exists for).
+		willKill := action == recovery.StallKillRetry && cfg.SubagentPGID > 0
+		effective := string(action)
+		if action == recovery.StallKillRetry && !willKill {
+			effective = "kill_retry_skipped_no_pgid"
+		}
+		in.payload["action"] = effective
+		in.payload["action_reason"] = reason
+		obs.emit(eventsPath, in.kind, "INCIDENT", in.payload)
+		if willKill {
+			logf("stall-policy: killing pgid %d due to %s (%s)", cfg.SubagentPGID, in.kind, reason)
+			_ = cfg.KillPgrp(cfg.SubagentPGID, syscall.SIGTERM)
+		}
+	}
+
 	// Poll loop.
 	tickerInterval := time.Duration(cfg.PollS) * time.Second
 	if cfg.StopAfterMS > 0 {
@@ -270,14 +318,14 @@ OUTER:
 					})
 				}
 				if int(stall) >= cfg.StallS {
-					obs.emit(eventsPath, "stuck_no_output", "INCIDENT", map[string]any{
-						"idle_s":      int(stall),
-						"threshold_s": cfg.StallS,
+					handleStallIncident(stallIncident{
+						kind:    "stuck_no_output",
+						payload: map[string]any{"idle_s": int(stall), "threshold_s": cfg.StallS},
+						event: recovery.StallEvent{
+							Kind: "stuck_no_output", Phase: cfg.Phase,
+							IdleS: int(stall), ThresholdS: cfg.StallS,
+						},
 					})
-					if cfg.Enforce && cfg.SubagentPGID > 0 {
-						logf("ENFORCE: killing pgid %d due to stuck_no_output", cfg.SubagentPGID)
-						_ = cfg.KillPgrp(cfg.SubagentPGID, syscall.SIGTERM)
-					}
 				}
 				// WS-E1: babbling-but-livelocked backstop. The idle clock above
 				// resets on EVERY valid JSON line including pure assistant_text,
@@ -288,16 +336,20 @@ OUTER:
 				if cfg.MaxNoProgressS > 0 {
 					noProgress := cfg.Now().Sub(obs.lastProgressTS).Seconds()
 					if int(noProgress) >= cfg.MaxNoProgressS {
-						obs.emit(eventsPath, "stuck_no_progress", "INCIDENT", map[string]any{
-							"no_progress_s": int(noProgress),
-							"threshold_s":   cfg.MaxNoProgressS,
-							"tool_calls":    obs.toolCallCount,
-							"tool_results":  obs.toolResultCnt,
+						handleStallIncident(stallIncident{
+							kind: "stuck_no_progress",
+							payload: map[string]any{
+								"no_progress_s": int(noProgress),
+								"threshold_s":   cfg.MaxNoProgressS,
+								"tool_calls":    obs.toolCallCount,
+								"tool_results":  obs.toolResultCnt,
+							},
+							event: recovery.StallEvent{
+								Kind: "stuck_no_progress", Phase: cfg.Phase,
+								IdleS: int(noProgress), ThresholdS: cfg.MaxNoProgressS,
+								ToolCalls: obs.toolCallCount, ToolResults: obs.toolResultCnt,
+							},
 						})
-						if cfg.Enforce && cfg.SubagentPGID > 0 {
-							logf("ENFORCE: killing pgid %d due to stuck_no_progress", cfg.SubagentPGID)
-							_ = cfg.KillPgrp(cfg.SubagentPGID, syscall.SIGTERM)
-						}
 					}
 				}
 			}
@@ -341,7 +393,7 @@ func (o *Observer) tail(stdoutPath string) ([]string, int64) {
 	if err != nil {
 		return nil, o.lastByteOff
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only handle; close error carries no signal
 	if _, err := f.Seek(o.lastByteOff, 0); err != nil {
 		return nil, o.lastByteOff
 	}
@@ -458,7 +510,7 @@ func (o *Observer) emit(eventsPath, eventType, severity string, data map[string]
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // best-effort event append; write below is already discarded
 	_, _ = f.Write(append(b, '\n'))
 	if severity == "INCIDENT" {
 		o.incidents = append(o.incidents, envelope)
