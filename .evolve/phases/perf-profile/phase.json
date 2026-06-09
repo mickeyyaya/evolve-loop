@@ -25,10 +25,7 @@
       "Benchmarks",
       "Findings",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "perf.regression_pct": ">=10"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

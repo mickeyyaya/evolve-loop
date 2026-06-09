@@ -23,8 +23,7 @@
       "Artifacts Scanned",
       "Condensed Digest",
       "Verdict"
-    ],
-    "fail_if_signal": {}
+    ]
   },
   "routing": {
     "insert_when": [

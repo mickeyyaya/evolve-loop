@@ -24,10 +24,7 @@
       "Target Functions",
       "Fuzz Results",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "fuzz.crashers": ">0"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

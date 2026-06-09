@@ -87,9 +87,13 @@ func (h hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespo
 //     pass; the operator opted out explicitly)
 //   - every require_sections header must be present as a line-anchored markdown
 //     header, else FAIL
-//   - fail_if_signal is parsed but NOT evaluated here — it needs the Stage 3
-//     signal bus. A non-empty fail_if_signal emits a loud WARN diagnostic
-//     rather than being silently ignored.
+//   - fail_if_signal is parsed but CANNOT be evaluated here — it needs the
+//     Stage 3 signal bus. A non-empty fail_if_signal is a HARD FAIL (the
+//     cycle-241 declared-semantics rejection: an inert gate must fail loudly,
+//     never silently pass — retro 215-231 Practice 4). The repo-catalog CI
+//     guard (phasespec.TestRepoPhaseCatalog_NoInertFailIfSignal) enforces the
+//     same invariant at authoring time so the rejection never fires mid-cycle
+//     (cycle-263: 15 mis-authored catalog phases hit this in production).
 //   - rules.VerdictOnPass overrides the pass verdict, but must be a canonical
 //     verdict (guards against silent typos in user phase JSON); else FAIL
 func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, []core.Diagnostic) {
@@ -113,7 +117,6 @@ func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, 
 		}}
 	}
 
-	var diags []core.Diagnostic
 	if len(rules.FailIfSignal) > 0 {
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
@@ -124,14 +127,14 @@ func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, 
 	verdict := core.VerdictPASS
 	if rules.VerdictOnPass != "" {
 		if !core.IsVerdict(rules.VerdictOnPass) {
-			return core.VerdictFAIL, append(diags, core.Diagnostic{
+			return core.VerdictFAIL, []core.Diagnostic{{
 				Severity: "error",
 				Message:  fmt.Sprintf("invalid verdict_on_pass %q: must be PASS/FAIL/WARN/SKIPPED", rules.VerdictOnPass),
-			})
+			}}
 		}
 		verdict = rules.VerdictOnPass
 	}
-	return verdict, diags
+	return verdict, nil
 }
 
 // hasSection reports whether section appears as a line-anchored markdown

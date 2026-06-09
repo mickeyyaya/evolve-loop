@@ -24,8 +24,7 @@
       "Changelog State",
       "Drift",
       "Verdict"
-    ],
-    "fail_if_signal": {}
+    ]
   },
   "routing": {
     "insert_when": [

@@ -21,10 +21,7 @@
     "require_sections": [
       "Threats",
       "Mitigations"
-    ],
-    "fail_if_signal": {
-      "threat.severity_max": ">=CRITICAL"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

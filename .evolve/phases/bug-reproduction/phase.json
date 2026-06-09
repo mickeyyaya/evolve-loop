@@ -27,10 +27,7 @@
     "require_sections": [
       "Reproduction",
       "Verification"
-    ],
-    "fail_if_signal": {
-      "repro.failing": "==false"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

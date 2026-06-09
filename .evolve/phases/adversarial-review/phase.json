@@ -25,10 +25,7 @@
       "Threat Model",
       "Findings",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "adversarial.severity_max": ">=HIGH"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

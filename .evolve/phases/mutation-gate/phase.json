@@ -24,10 +24,7 @@
       "Summary",
       "Survivors",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "mutation.score": "<60"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

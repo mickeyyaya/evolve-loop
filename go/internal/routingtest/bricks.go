@@ -30,7 +30,11 @@ func Cycle() Brick { return func(s *ScenarioSpec) { s.Surface = FullOrchestrator
 func At(phase string) Brick { return func(s *ScenarioSpec) { s.Current = phase } }
 
 // Done sets the already-completed phases (PureKernel RouteInput.Completed).
-func Done(phases ...string) Brick { return func(s *ScenarioSpec) { s.Completed = phases } }
+// Defensive copy: storing the variadic backing array directly aliased caller
+// memory (cycle-263 audit, C263_002 — same class as Mandatory below).
+func Done(phases ...string) Brick {
+	return func(s *ScenarioSpec) { s.Completed = append([]string(nil), phases...) }
+}
 
 // CompletedVerdict sets the verdict of the just-completed phase (audit branch).
 func CompletedVerdict(v string) Brick { return func(s *ScenarioSpec) { s.Verdict = v } }
@@ -42,9 +46,16 @@ func Shadow() Brick   { return func(s *ScenarioSpec) { s.Stage = config.StageSha
 func Advisory() Brick { return func(s *ScenarioSpec) { s.Stage = config.StageAdvisory } }
 func Enforce() Brick  { return func(s *ScenarioSpec) { s.Stage = config.StageEnforce } }
 
-func Budget(v float64) Brick      { return func(s *ScenarioSpec) { s.BudgetUSD = v } }
-func MaxInserts(n int) Brick      { return func(s *ScenarioSpec) { s.MaxInsertions = n } }
-func Mandatory(p ...string) Brick { return func(s *ScenarioSpec) { s.Mandatory = p } }
+func Budget(v float64) Brick { return func(s *ScenarioSpec) { s.BudgetUSD = v } }
+func MaxInserts(n int) Brick { return func(s *ScenarioSpec) { s.MaxInsertions = n } }
+
+// Mandatory sets the ordered mandatory spine. Defensive copy: the cycle-263
+// audit (C263_002) caught the variadic backing array stored directly —
+// callers reusing/mutating their slice silently corrupted the spec
+// (shared-backing-storage aliasing; immutability rule).
+func Mandatory(p ...string) Brick {
+	return func(s *ScenarioSpec) { s.Mandatory = append([]string(nil), p...) }
+}
 
 // SeverityTrigger swaps the tester insert trigger to build.severity_max>=HIGH
 // (the default is build.acs_red>0).

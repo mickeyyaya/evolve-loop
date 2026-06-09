@@ -24,8 +24,7 @@
       "Interface Definitions",
       "Invariants",
       "Verdict"
-    ],
-    "fail_if_signal": {}
+    ]
   },
   "routing": {
     "insert_when": [

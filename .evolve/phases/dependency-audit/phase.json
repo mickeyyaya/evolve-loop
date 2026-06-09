@@ -9,10 +9,7 @@
   "classify": {
     "require_sections": [
       "Findings"
-    ],
-    "fail_if_signal": {
-      "dependency.severity_max": ">=CRITICAL"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

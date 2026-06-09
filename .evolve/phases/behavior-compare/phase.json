@@ -22,10 +22,7 @@
     "require_sections": [
       "Comparison",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "behavior.preserved": "==false"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

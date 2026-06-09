@@ -9,10 +9,7 @@
   "classify": {
     "require_sections": [
       "Findings"
-    ],
-    "fail_if_signal": {
-      "security.severity_max": ">=HIGH"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

@@ -1065,6 +1065,14 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		AttemptCount: out.AttemptCount,
 		AbortReason:  out.AbortReason,
 	})
+	// Empty workspace ⇒ no sidecar: filepath.Join("", f) is CWD-relative and
+	// leaked <phase>-usage.json into go/cmd/evolve during `go test` (the C1
+	// abort-path recording made previously-silent test cycles write). The
+	// in-memory record above still stands.
+	if workspace == "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: empty workspace — skipping %s-usage.json sidecar (in-memory record kept)\n", out.Phase)
+		return
+	}
 	sidecar := phaseUsageSidecar{
 		Phase:        out.Phase,
 		CostUSD:      out.CostUSD,
@@ -1094,6 +1102,11 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 // ⇒ byte-identical to the pre-merge behavior. Best-effort: failures WARN,
 // never mask the cycle outcome.
 func writePhaseTimings(workspace string, timings []phaseTimingEntry) {
+	// Same CWD-relative leak guard as the usage sidecar (recordPhaseOutcome).
+	if workspace == "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: empty workspace — skipping phase-timing.json write\n")
+		return
+	}
 	timingPath := filepath.Join(workspace, "phase-timing.json")
 	if prev, rerr := os.ReadFile(timingPath); rerr == nil {
 		var existing []phaseTimingEntry

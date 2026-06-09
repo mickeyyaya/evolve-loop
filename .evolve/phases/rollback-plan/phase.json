@@ -24,10 +24,7 @@
       "Blast Radius",
       "Verification",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "rollback.ready": "==false"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

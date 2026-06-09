@@ -23,10 +23,7 @@
       "Health Probes",
       "Results",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "post_ship.health": "==false"
-    }
+    ]
   },
   "routing": {
     "insert_when": [

@@ -25,10 +25,7 @@
       "Benchmarks",
       "Statistical Comparison",
       "Verdict"
-    ],
-    "fail_if_signal": {
-      "perf.significant": "==true"
-    }
+    ]
   },
   "routing": {
     "insert_when": [
