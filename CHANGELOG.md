@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [18.2.0] - 2026-06-09
+
 ### Added
 
 - **Cold REPL-boot latency instrumentation (`boot_ms`, ADR-0043 A0).** Each tmux-REPL phase dispatch records the cold-boot window (fixed readiness sleeps + marker-poll) as an additive `boot_ms` field threaded `driver → core.BridgeResponse → core.PhaseResponse → phaseTimingEntry` (`phase-timing.json`, `omitempty`, behavior-neutral). The driver counts intended sleep/poll *iterations* rather than wall-clock so the value is deterministic under tests while ≈ wall-clock in prod; `OnBoot` fires once on the cold-boot marker, never on the warm named-session path or a boot timeout (both → `boot_ms=0`, itself a signal). This is the measurement gate for the pipeline-latency program — A1/A2 hot-loop changes stay gated on these numbers. The first measured cycle showed boot is ~1–3% of think-heavy phases, lowering A1/A2 priority (ADR-0043 §"A0 — as-built + first measurement"). (`12dcd18b`; tracked binary rebuilt `aacd95de`.)
