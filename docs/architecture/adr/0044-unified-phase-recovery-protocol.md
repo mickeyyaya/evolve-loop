@@ -75,6 +75,29 @@ C4, and finally the C3 chain refactor that composes them.
   unify it through the chokepoint in the C3 slice. `PhasesRun` consumers audited: printing/telemetry +
   routingtest only; no gate reads it.
 
+- **Slice 2 / C2 — shipped 2026-06-10.** Two halves. (a) `recovery.FatalPaneDetector` (the deterministic
+  registry, `internal/recovery/detector.go`): typed `TerminalCause` vocabulary
+  (model_invalid / cli_self_updated / dead_shell / unknown), ordered first-match-wins substring signatures
+  seeded from the real cycle-262 pane text; consulted by the bridge's stop-review checkpoint via the
+  `fatalPaneVerdict` seam (`bridge/fatalpane.go`) BEFORE the reviewer — because the dead panes read as
+  "progressed" (the bridge's own nudge echoed into them), the check must preempt the
+  extend-while-progressing flow. Stage-gated by `EVOLVE_PHASE_RECOVERY` (off | shadow [DEFAULT] | enforce;
+  unknown→off; bridge reads env directly, subprocess pattern): shadow logs the would-be fast-fail only;
+  enforce returns `ReviewStop` → the wait exits in ONE interval and exit-81 hands the phase to the runner's
+  fallback chain (cycle-262's ~20-min burns become ~5 min each). A Busy pane is never preempted (prime
+  directive: never kill a working agent); the nudge is now gated on `ReviewPause` (behavior-identical for
+  the legacy reviewer, which never emits stop) so a fatal verdict is never nudged; Stop also writes the
+  escalation report. (b) `ModelFlagPolicy` at the realizer chokepoint (`realizer.go` `realizeScalar`):
+  post-resolution `model_tier == "auto"` emits NO model param on ANY channel (flag or repl) — matrix-wide,
+  one guard for claude-tmux/codex-tmux/every future manifest (the headless codex driver keeps its own
+  exec-path guard). Always-on correctness, not stage-gated: `--model auto` is fatal for every CLI.
+  **Deviation from the design sketch:** the optional runner-`Hooks` `ClassifyTerminal` extension was NOT
+  added — nothing consumes it yet (the bridge checkpoint + realizer policy are the load-bearing pieces);
+  it rides with C3 when the chain needs it. Tests: `recovery/detector_test.go` (real-262-fixture seeds,
+  first-match-wins, healthy/empty-pane negatives), `bridge/fatalpane_test.go` (enforce-preempts /
+  shadow-neutral-logs / busy-never / off-skips / stage parse), `bridge/realizer_modelpolicy_test.go`
+  (auto-omits on both channels, concrete tiers + raw names unaffected).
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states

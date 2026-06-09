@@ -149,8 +149,8 @@ the genuine leak (the guard is right) but records build's PASS + cost + timing, 
 reconstruction. Deferred to the C3 slice: `resume.go` is a second, simpler recording boundary (writes no
 timings/sidecars at all) to be unified through the same chokepoint.
 
-### C2 — Terminal-state classification (Template Method hook + Strategy) → fixes D2, D3
-The tmux driver already *is* a Template Method (`driver_tmux_repl.go`). Add one hook every driver implements:
+### C2 — Terminal-state classification (Template Method hook + Strategy) → fixes D2, D3 — ✅ SHIPPED 2026-06-10 (as-built below)
+The tmux driver already *is* a Template Method (`driver_tmux_repl.go`). The design sketch:
 
 ```
 ClassifyTerminal(pane, exitCode, artifactPresent) → TerminalCause
@@ -160,6 +160,18 @@ ClassifyTerminal(pane, exitCode, artifactPresent) → TerminalCause
 Known-fatal causes → **fast-fail with a typed cause** (no `maxExtends` backstop). Model-flag normalization
 (`auto` → omit or concrete) becomes a per-driver **`ModelFlagPolicy`** (Strategy): codex already has it,
 claude-tmux gets the same. Adding a CLI ⇒ a new policy, zero edits elsewhere (Open/Closed).
+
+**As built:** the typed-cause registry is `recovery.FatalPaneDetector` (`internal/recovery/detector.go` —
+the single recovery owner, not a per-driver hook), seeded with the three cycle-262 signatures and consulted
+by `bridge.fatalPaneVerdict` at the stop-review checkpoint **before** the reviewer — load-bearing ordering,
+because the dead panes counted as "progressed" (the bridge's own nudge echoed into them), so a post-reviewer
+check would never fire. Stage-gated by `EVOLVE_PHASE_RECOVERY` (off | **shadow default** | enforce; typo→off;
+classification always-on above off, only the kill is staged); a Busy pane is never preempted; the one-shot
+nudge is now gated on `ReviewPause` so a fatal `ReviewStop` exits immediately (exit 81 → the runner's
+fallback chain takes over — cycle-262's rescue, ~20 min sooner). `ModelFlagPolicy` landed at the **realizer
+chokepoint** (`realizeScalar`: post-resolution `auto` emits no model param on any channel) — one matrix-wide
+guard instead of N per-driver copies; the headless codex driver keeps its exec-path guard. The per-driver
+`ClassifyTerminal` hook was deliberately NOT added yet — no consumer; it rides with C3 if the chain needs it.
 
 ### C3 — Chain of Responsibility for recovery → composes D1–D4
 The dispatch result flows through an ordered chain; each handler recovers, passes, or escalates:
@@ -194,8 +206,8 @@ handle over time; the LLM is never on the hot path for a known failure.
 | Order | Change | Why first | Size |
 |------|--------|-----------|------|
 | 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest leverage — makes 262-class record divergence impossible | M |
-| 2 | **C2 `ModelFlagPolicy`** (claude omit-on-auto + ensure every phase gets a concrete model) | Tiny; stops the exact retro break | S |
-| 3 | **C2 `FatalPaneDetector`** (seed with the 3 known signatures) | Eliminates the ~20-min slow-fails | M |
+| 2 | ✅ **C2 `ModelFlagPolicy`** (shipped 2026-06-10 at the realizer chokepoint — matrix-wide omit-on-auto) | Tiny; stops the exact retro break | S |
+| 3 | ✅ **C2 `FatalPaneDetector`** (shipped 2026-06-10; seeded with the 3 cycle-262 signatures, `EVOLVE_PHASE_RECOVERY`-staged, shadow default) | Eliminates the ~20-min slow-fails (in enforce) | M |
 | 4 | **C5 freeze preflight** + **D4 meta-phase fallbacks** (config) | Cheap; prevents recurrence | S |
 | 5 | **C4 observer `StallPolicy`** | Corrective detection | M |
 | 6 | **C3 Chain refactor** (compose 1–4) + LLM advisor + promotion loop | Unifies into the protocol | L |

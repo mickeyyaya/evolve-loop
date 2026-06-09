@@ -192,6 +192,18 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 			}
 		}
 	}
+	// ModelFlagPolicy (ADR-0044 C2 / D3): "auto" is the loop's resolve-me
+	// sentinel, never a valid concrete model for ANY CLI. When resolution
+	// leaves the sentinel intact (cycle-262: retro was dispatched with no
+	// concrete model assigned, and `claude --model auto` boots into the fatal
+	// "There's an issue with the selected model (auto)" pane), omit the model
+	// param entirely — the CLI's own default model is always preferable to a
+	// fatal boot. The realizer is the single emit point for every flag/repl
+	// CLI, so this one guard is matrix-wide; the headless codex driver keeps
+	// its own equivalent (driver_codex.go omit-on-auto) for the exec path.
+	if param == "model_tier" && resolved == "auto" {
+		return
+	}
 	switch spec.Channel {
 	case "flag":
 		if spec.Flag != "" {

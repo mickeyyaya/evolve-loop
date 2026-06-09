@@ -177,6 +177,14 @@
 | `EVOLVE_MAX_OPTIONAL_INSERTIONS` | ACTIVE (default `4`) | Cap on optional phases the router may insert |
 | `EVOLVE_USE_PHASE_REGISTRY` | ACTIVE (default on) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
 
+## Phase Recovery (ADR-0044, Go-native — one dial for the whole program)
+
+> The Unified Phase Recovery Protocol's single rollout dial. Read by the bridge subprocess directly from env (`go/internal/bridge/fatalpane.go`, same subprocess pattern as `EVOLVE_COMMIT_EVIDENCE`); later slices (C3/C4) add the orchestrator's `config.RolloutStages` view. Classification (the `recovery.FatalPaneDetector` registry) is always-on above `off`; only ACTING on a classification is staged. See [phase-recovery.md](phase-recovery.md) + ADR-0044.
+
+| Flag | Status | Purpose |
+|------|--------|---------|
+| `EVOLVE_PHASE_RECOVERY` | ACTIVE (default `shadow`, v18.3+) | Fatal-pane fast-fail stage at the stop-review checkpoint: `off` (detector not consulted; byte-identical legacy) / `shadow` (DEFAULT — detect + log the would-be fast-fail, legacy verdict decides) / `enforce` (a fatal match on a non-Busy pane preempts the reviewer with `stop`, exiting the artifact wait in one interval instead of burning the `maxExtends` backstop; exit 81 hands the phase to the runner's CLI fallback chain). Unknown value → `off` (a typo never enables a kill-path). A Busy pane is never preempted regardless of stage |
+
 ## Observability / Prompt Tuning
 
 | Flag | Status | Purpose |

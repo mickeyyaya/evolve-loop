@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // emitChannelBreadcrumb writes one structured channel marker to w. The producer's
@@ -331,6 +332,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	if reviewer == nil {
 		reviewer = newDeterministicReviewer(envInt(deps, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
 	}
+	// ADR-0044 C2: the fatal-pane registry consulted before each review
+	// checkpoint (fatalpane.go). Stage off ⇒ fatalPaneVerdict short-circuits
+	// before touching the detector; nil detector is unreachable on that path.
+	recoveryStage := recoveryStageFromEnv(deps)
+	var fatalDet *recovery.FatalPaneDetector
+	if recoveryStage != "off" {
+		fatalDet = recovery.SeedDetector()
+	}
 	// ADR-0027: the completion contract is a Strategy. Default ("" / "artifact")
 	// is the legacy artifact-file poll, byte-identical to the pre-Strategy code;
 	// "stdout" completes on REPL-idle for agents that print their answer and
@@ -482,7 +491,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				Busy:       panestream.PaneBusy(curPane, paneProfile),
 				StdoutTail: lastLines(curPane, 40),
 			}
-			v := reviewer.Review(lastEv)
+			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
+			// self-update, dead shell) preempts the reviewer in enforce —
+			// cycle-262's dead panes read as "progressed" because the
+			// bridge's own nudge echoed into them, so the legacy
+			// extend-while-progressing flow burned the full maxExtends
+			// backstop on REPLs that no longer existed.
+			v, preempted := fatalPaneVerdict(fatalDet, lastEv, recoveryStage, deps.Stderr, pfx)
+			if !preempted {
+				v = reviewer.Review(lastEv)
+			}
 			lastVerdict = v
 			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
 				pfx, StopArtifactTimeout, elapsed, attempt, progressed, lastVerdict.Action, lastVerdict.Reason)
@@ -497,7 +515,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				_, isDetVal := reviewer.(deterministicReviewer)
 				_, isDetPtr := reviewer.(*deterministicReviewer)
 				isDeterministic := isDetVal || isDetPtr
-				if isDeterministic && !panestream.PaneBusy(curPane, paneProfile) && !nudgeSent {
+				// Nudge only on PAUSE (idle agent, remind it once). A fatal
+				// ReviewStop (ADR-0044 C2) must exit now — nudging a dead
+				// shell is exactly the echo that bought cycle-262's dead
+				// panes their extensions. Behavior-identical for the legacy
+				// reviewer, which only ever emits extend|pause.
+				if lastVerdict.Action == ReviewPause && isDeterministic && !panestream.PaneBusy(curPane, paneProfile) && !nudgeSent {
 					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
 					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
@@ -520,7 +543,10 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		for _, line := range listWorkspaceFiles(cfg.Workspace) {
 			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
 		}
-		if lastVerdict.Action == ReviewPause {
+		// Pause (ambiguous stall) and Stop (typed fatal fast-fail, ADR-0044
+		// C2) both leave the operator-facing escalation report; extend keeps
+		// the legacy no-report behavior.
+		if lastVerdict.Action == ReviewPause || lastVerdict.Action == ReviewStop {
 			phase := cfg.Agent
 			if phase == "" {
 				phase = lp.name
