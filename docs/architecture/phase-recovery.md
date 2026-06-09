@@ -202,11 +202,19 @@ registry: codex → `~/.codex/version.json`, the updater-state file from the inc
 `brew pin codex` guidance; unverifiable pin state → Warn (fail-open on ambiguity); headless-only usage is
 out of scope (the updater fires on the TUI launch path).
 
-### Where AI genuinely drives (the escalation tail)
+### Where AI genuinely drives (the escalation tail) — ✅ COMPONENTS SHIPPED 2026-06-10 (CoR wiring in C3)
 `LLMFailureAdvisor` is the **last** link, reached only for *unclassified* terminal states. It reasons about a
 never-seen failure and proposes a recovery — and its classification of a novel pane signature is **written back
 into the deterministic registry** that `FatalPaneDetector` reads. Each failure class gets cheaper and faster to
 handle over time; the LLM is never on the hot path for a known failure.
+
+**As built:** `core.FailureAdvisor` (PhaseAdvisor blueprint: bridge + persona
+`agents/evolve-failure-advisor.md` + profile `failure-advisor.json`, strict-JSON, every failure mode errors →
+caller escalates) returns `recovery.FailureAdvice{cause, pane_substr, justification}`;
+`recovery.PromoteAdvice` is the validating trust boundary (typed-vocabulary cause, ≥12-char substring) that
+promotes in-memory (after seeds — promotions never shadow vetted entries) AND durably
+(`.evolve/instincts/fatal-signatures/<content-hash-id>.yaml`, absent-only, confidence 0.5, zero-dep YAML);
+the tmux driver boots via `SeedDetectorWithPromotions`, so each novel state is paid for exactly once.
 
 ## 7. Implementation order (risk-ranked, test-gated)
 

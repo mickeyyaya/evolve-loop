@@ -338,7 +338,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	recoveryStage := recoveryStageFromEnv(deps)
 	var fatalDet *recovery.FatalPaneDetector
 	if recoveryStage != "off" {
-		fatalDet = recovery.SeedDetector()
+		// Seeds + durable advisor promotions (ADR-0044 Slice 5): a novel
+		// signature classified once is caught deterministically on every
+		// later boot. Empty ProjectRoot degrades to seeds only.
+		fatalDet = recovery.SeedDetectorWithPromotions(
+			filepath.Join(cfg.ProjectRoot, ".evolve", "instincts", "fatal-signatures"))
 	}
 	// ADR-0027: the completion contract is a Strategy. Default ("" / "artifact")
 	// is the legacy artifact-file poll, byte-identical to the pre-Strategy code;

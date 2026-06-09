@@ -127,6 +127,28 @@ C4, and finally the C3 chain refactor that composes them.
   stage-gated implementation. Tests: `phaseobserver/stallpolicy_test.go` (extend-no-kill,
   kill-retry-without-enforce, escalate-no-kill, nil-unenriched).
 
+- **Slice 5 / LLMFailureAdvisor + promotion — shipped 2026-06-10.** The AI escalation tail.
+  `core.FailureAdvisor` (`failure_advisor.go`, built exactly like `PhaseAdvisor`: bridge-dispatched,
+  functional options, persona-injectable, strict-JSON-parsed, fail-safe — nil bridge / launch error /
+  malformed output / vocabulary violation all return errors so the caller ESCALATES, never acts on
+  garbage): `Advise(FailureAdviseInput) → *recovery.FailureAdvice` reads one CauseUnknown pane and returns
+  {cause, pane_substr, justification}; validation at the parse site is the trust boundary (cause must be in
+  the typed vocabulary; empty justification rejected). Persona `agents/evolve-failure-advisor.md` + profile
+  `.evolve/profiles/failure-advisor.json` (deep tier, read-only tools + Write scoped to
+  `failure-advice.json`, $0.5 budget — judgment work, off the hot loop). **Promotion loop**
+  (`recovery/promote.go`, Reflexion-style): `Detect`or`.Promote` (in-memory, AFTER seeds — promotions can
+  never shadow vetted seeds) + `PromoteSignature` (durable absent-only `<id>.yaml` under
+  `.evolve/instincts/fatal-signatures/`, deterministic content-hash id ⇒ idempotent, confidence 0.5,
+  zero-dep fixed-key YAML written AND parsed in the leaf) + `SeedDetectorWithPromotions(dir)` (replay at
+  boot; corrupt files skipped — a bad promotion never bricks boot) + `PromoteAdvice` (the validating
+  chokepoint: out-of-vocabulary cause or <12-char substring REJECTED — short substrings are false-positive
+  bombs). The tmux driver now boots its detector via `SeedDetectorWithPromotions(<root>/.evolve/instincts/
+  fatal-signatures)`, so a signature classified once is caught deterministically forever. No production
+  caller invokes Advise yet — C3 wires the CoR's escalate→advise→promote path. Tests:
+  `core/failure_advisor_test.go` (parse+dispatch contract, malformed/unknown-cause/nil-bridge/bridge-error
+  all fail safe), `recovery/promote_test.go` (in-memory immediate catch, seed precedence, durable
+  absent-only + idempotent id, replay, corrupt-file safety, PromoteAdvice validation).
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states

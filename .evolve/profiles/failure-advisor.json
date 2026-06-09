@@ -1,0 +1,73 @@
+{
+  "name": "failure-advisor",
+  "role": "failure-advisor",
+  "cli": "claude-tmux",
+  "model_tier_default": "deep",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(tail:*)",
+    "Write(.evolve/runs/cycle-*/failure-advice.json)",
+    "Edit(.evolve/runs/cycle-*/failure-advice.json)"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git worktree:*)",
+    "Bash(gh:*)",
+    "Bash(rm:*)",
+    "Bash(mv:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "Bash(npm:*)",
+    "Bash(pip:*)",
+    "Bash(brew:*)",
+    "WebFetch",
+    "WebSearch",
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 0.5,
+  "max_turns": 8,
+  "output_artifact": ".evolve/runs/cycle-{cycle}/failure-advice.json",
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_clis": [
+    "all"
+  ],
+  "stream_output": true,
+  "generated_from": "hand-authored (ADR-0044 Slice 5)"
+}
