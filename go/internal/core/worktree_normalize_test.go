@@ -49,6 +49,7 @@ func newRepoWithBaseCommit(t *testing.T) (string, string) {
 // a builder commit on top of base must be soft-reset to base so the file shows
 // in `git diff HEAD`.
 func TestNormalizeWorktreeToBase_UncommitsBuilderCommit(t *testing.T) {
+	t.Parallel()
 	dir, base := newRepoWithBaseCommit(t)
 	// Simulate the builder: write a feature file + commit it [worktree-build].
 	if err := os.WriteFile(filepath.Join(dir, "feature.go"), []byte("package x\n"), 0o644); err != nil {
@@ -76,6 +77,7 @@ func TestNormalizeWorktreeToBase_UncommitsBuilderCommit(t *testing.T) {
 // UNCOMMITTED (HEAD already == base — the historical Claude-builder path), the
 // helper is a no-op and the pending changes survive untouched.
 func TestNormalizeWorktreeToBase_NoopWhenUncommitted(t *testing.T) {
+	t.Parallel()
 	dir, base := newRepoWithBaseCommit(t)
 	if err := os.WriteFile(filepath.Join(dir, "pending.go"), []byte("package x\n"), 0o644); err != nil {
 		t.Fatal(err)

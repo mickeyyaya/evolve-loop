@@ -42,6 +42,7 @@ var _ io.Writer = (*syncSink)(nil)
 // guard at the top of Start: pre-cycle / non-phase calls must not
 // touch the filesystem and must return a non-nil cancel.
 func TestCoreAdapter_Start_ReturnsNoopCancelOnEmptyWorkspace(t *testing.T) {
+	t.Parallel()
 	a := NewCoreAdapter()
 	cancel := a.Start(context.Background(), "", core.PhaseRequest{})
 	if cancel == nil {
@@ -80,6 +81,7 @@ func TestCoreAdapter_Start_CreatesEventsFile(t *testing.T) {
 // stdout-log never appears (codex hung at modal). The observer must
 // emit a stall_no_output INCIDENT.
 func TestCoreAdapter_Start_EmitsStallEventWhenFileNeverGrows(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	sink := &syncSink{}
 	a := &CoreAdapter{
@@ -156,6 +158,7 @@ func TestCoreAdapter_Start_StopsCleanlyOnCancel(t *testing.T) {
 // the default. Otherwise a typo like EVOLVE_OBSERVER_STALL_S=10m
 // would silently disable stall detection.
 func TestCoreAdapter_Start_ResolveDurationFallsBackOnBadEnv(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want time.Duration
@@ -186,6 +189,7 @@ func TestCoreAdapter_Start_ResolveDurationFallsBackOnBadEnv(t *testing.T) {
 // Unset → default (default-on per cycle-124). Garbage → default (typo
 // must not silently disable nudging). Negative → default (defensive).
 func TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want time.Duration
@@ -215,6 +219,7 @@ func TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable(t *testing.T) {
 // carries a free-form string). Empty → default; whitespace-only is
 // considered set (callers may want to inject a space-padded body).
 func TestCoreAdapter_ResolveString_FallsBackOnEmpty(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in, def, want string
 	}{
@@ -239,6 +244,7 @@ func TestCoreAdapter_ResolveString_FallsBackOnEmpty(t *testing.T) {
 // fallback to default" branches deserve their own coverage beyond the
 // happy-path table in TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable.
 func TestCoreAdapter_ResolveNudgeS_Bounds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want time.Duration
@@ -284,6 +290,7 @@ func TestCoreAdapter_ResolveNudgeS_Bounds(t *testing.T) {
 // helper across non-ASCII bodies and special chars the operator might
 // configure for EVOLVE_OBSERVER_NUDGE_BODY in localized deployments.
 func TestCoreAdapter_ResolveString_UnicodeAndSpecial(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in, def, want string
 	}{
@@ -316,6 +323,7 @@ func TestCoreAdapter_ResolveString_UnicodeAndSpecial(t *testing.T) {
 // was trimmed from 8 cases to 3 — the dropped 5 cases overlapped the
 // existing fallback table.
 func TestCoreAdapter_ResolveDuration_NovelBounds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want time.Duration
@@ -389,6 +397,7 @@ func TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe(t *testing.T) {
 // Workspace at a path that is a regular FILE, so the events path's parent is
 // not a directory and OpenFile fails.
 func TestCoreAdapter_Start_DegradesToNoopWhenEventsFileUnopenable(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	wsFile := filepath.Join(dir, "not-a-dir")
 	if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {

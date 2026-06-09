@@ -25,6 +25,7 @@ func (r *tddLeakRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse,
 // TestTDDLeakRecover verifies that when the TDD phase leaks a tracked file to the main tree,
 // recoverBuildLeak relocates it into the active worktree and restores main to HEAD, allowing the cycle to continue.
 func TestTDDLeakRecover(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -74,6 +75,7 @@ func TestTDDLeakRecover(t *testing.T) {
 // TestDiscardGitignore verifies that isGitignored correctly identifies gitignored files
 // and that untracked gitignored paths are correctly identified.
 func TestDiscardGitignore(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

@@ -3,6 +3,7 @@ package core
 import "testing"
 
 func TestBridgePIDFile(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"/ws/build-stdout.log": "/ws/build.bridge-pid",
 		"/ws/tdd-stdout.log":   "/ws/tdd.bridge-pid",

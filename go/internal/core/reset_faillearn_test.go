@@ -18,6 +18,7 @@ import (
 )
 
 func TestSealCycle_WritesRetrospectiveIntoSealedDir(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	sealFixture(t, ev, 108)
 
@@ -38,6 +39,7 @@ func TestSealCycle_WritesRetrospectiveIntoSealedDir(t *testing.T) {
 }
 
 func TestSealCycle_WritesLessonIntoLessonsDir(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	sealFixture(t, ev, 108)
 
@@ -52,6 +54,7 @@ func TestSealCycle_WritesLessonIntoLessonsDir(t *testing.T) {
 }
 
 func TestSealCycle_AppendsOperatorResetFailedApproach(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	sealFixture(t, ev, 108)
 
@@ -84,6 +87,7 @@ func TestSealCycle_AppendsOperatorResetFailedApproach(t *testing.T) {
 }
 
 func TestSealCycle_DryRunWritesNoLearning(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	sealFixture(t, ev, 108)
 

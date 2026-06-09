@@ -10,6 +10,7 @@ import (
 // plan.MintPhases as a phaseconfig.PhaseConfig (name from the entry, persona +
 // tier + cli from the mint block), while plain run/skip entries are untouched.
 func TestPhaseAdvisor_PlanEmitsMintPhases(t *testing.T) {
+	t.Parallel()
 	stdout := `[
 	  {"phase":"scout","run":true,"justification":"fresh"},
 	  {"phase":"security-sweep","run":true,"justification":"auth changed","mint":{"prompt":"You are a security reviewer. Audit the diff for authz gaps.","tier":"deep","cli":"claude","writes_source":false}}
@@ -43,6 +44,7 @@ func TestPhaseAdvisor_PlanEmitsMintPhases(t *testing.T) {
 // untouched: a plan with no mint sub-objects yields zero MintPhases (so
 // registerMintedPhases is a no-op — byte-identical to pre-emit behavior).
 func TestPhaseAdvisor_PlanNoMint_EmptyMintPhases(t *testing.T) {
+	t.Parallel()
 	stdout := `[{"phase":"scout","run":true},{"phase":"triage","run":false}]`
 	plan, err := NewPhaseAdvisor(&fakeBridge{stdout: stdout}).Plan(baseRouteInput())
 	if err != nil {
@@ -58,6 +60,7 @@ func TestPhaseAdvisor_PlanNoMint_EmptyMintPhases(t *testing.T) {
 // the tier-not-model constraint with the concrete enum, plus the mint JSON
 // example — meaningful instruction, not just the bare word "mint".
 func TestBuildPlanPrompt_DocumentsMinting(t *testing.T) {
+	t.Parallel()
 	got := buildPlanPrompt(baseRouteInput())
 	for _, want := range []string{
 		`"mint":{`,           // the JSON example shape
@@ -75,6 +78,7 @@ func TestBuildPlanPrompt_DocumentsMinting(t *testing.T) {
 // still mapped into MintPhases (registration is distinct from dispatch — the
 // routing loop governs whether it runs).
 func TestPhaseAdvisor_MintRunFalse_StillCollected(t *testing.T) {
+	t.Parallel()
 	stdout := `[{"phase":"deferred-probe","run":false,"justification":"reserve","mint":{"prompt":"probe persona","tier":"fast"}}]`
 	plan, err := NewPhaseAdvisor(&fakeBridge{stdout: stdout}).Plan(baseRouteInput())
 	if err != nil {

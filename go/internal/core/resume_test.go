@@ -27,6 +27,7 @@ func writeStateFile(t *testing.T, dir string, body any) string {
 }
 
 func TestLoadResumeState_HappyPath(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	worktree := filepath.Join(tmp, "wt")
@@ -74,6 +75,7 @@ func TestLoadResumeState_HappyPath(t *testing.T) {
 }
 
 func TestLoadResumeState_MissingFile(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	_, err := LoadResumeState(context.Background(), tmp, filepath.Join(tmp, ".evolve"), ResumeOptions{})
 	if err == nil || !errors.Is(err, ErrNoCheckpoint) {
@@ -82,6 +84,7 @@ func TestLoadResumeState_MissingFile(t *testing.T) {
 }
 
 func TestLoadResumeState_NoCheckpointBlock(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{"cycle_id": 3, "phase": "scout"})
@@ -92,6 +95,7 @@ func TestLoadResumeState_NoCheckpointBlock(t *testing.T) {
 }
 
 func TestLoadResumeState_CheckpointDisabled(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{
@@ -105,6 +109,7 @@ func TestLoadResumeState_CheckpointDisabled(t *testing.T) {
 }
 
 func TestLoadResumeState_StaleHead(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{
@@ -128,6 +133,7 @@ func TestLoadResumeState_StaleHead(t *testing.T) {
 }
 
 func TestLoadResumeState_AllowHeadMoved(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{
@@ -152,6 +158,7 @@ func TestLoadResumeState_AllowHeadMoved(t *testing.T) {
 }
 
 func TestLoadResumeState_WorktreeMissing(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{
@@ -175,6 +182,7 @@ func TestLoadResumeState_WorktreeMissing(t *testing.T) {
 }
 
 func TestLoadResumeState_MissingResumeFromPhase(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{
@@ -188,6 +196,7 @@ func TestLoadResumeState_MissingResumeFromPhase(t *testing.T) {
 }
 
 func TestLoadResumeState_UnknownHeadSkipsValidation(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	writeStateFile(t, evolveDir, map[string]any{

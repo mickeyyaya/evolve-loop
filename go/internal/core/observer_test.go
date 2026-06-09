@@ -28,6 +28,7 @@ func (r *recordingObserver) Start(_ context.Context, phase string, _ PhaseReques
 // the orchestrator runs every phase to completion exactly like the
 // pre-fix cycle — no observer-related behavior observable.
 func TestOrchestrator_NoopObserver_IsByteIdentical(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 9}}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -56,6 +57,7 @@ func TestOrchestrator_NoopObserver_IsByteIdentical(t *testing.T) {
 // count must equal the cancel count must equal the phase count —
 // every Start gets paired with exactly one cancel.
 func TestOrchestrator_WithObserver_StartsAndCancelsPerPhase(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	obs := &recordingObserver{}
@@ -106,6 +108,7 @@ func TestOrchestrator_WithObserver_StartsAndCancelsPerPhase(t *testing.T) {
 // overwrite the noopObserver default (a nil observer panics on first
 // Start call).
 func TestOrchestrator_WithNilObserver_FallsBackToNoop(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil), WithObserver(nil))
@@ -125,6 +128,7 @@ func TestOrchestrator_WithNilObserver_FallsBackToNoop(t *testing.T) {
 // contract directly: even the noop must return a callable cancel
 // (orchestrator code calls cancel() unconditionally per ADR-0030).
 func TestNoopObserver_StartReturnsNonNilCancel(t *testing.T) {
+	t.Parallel()
 	c := noopObserver{}.Start(context.Background(), "tdd", PhaseRequest{})
 	if c == nil {
 		t.Fatal("noopObserver.Start returned nil cancel")

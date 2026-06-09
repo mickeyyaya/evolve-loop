@@ -9,6 +9,7 @@ import (
 )
 
 func TestReasonFromDiagnostics(t *testing.T) {
+	t.Parallel()
 	tax := Taxonomy{
 		Source:      "audit",
 		FailureMode: "egps-red",
@@ -80,6 +81,7 @@ func TestReasonFromDiagnostics(t *testing.T) {
 }
 
 func TestReasonFromDiagnosticsTruncatesRuneSafe(t *testing.T) {
+	t.Parallel()
 	// A multibyte message longer than the cap must be truncated on a rune
 	// boundary — never producing invalid UTF-8.
 	msg := strings.Repeat("é", maxReasonSummaryLen+10) // 2 bytes/rune
@@ -93,6 +95,7 @@ func TestReasonFromDiagnosticsTruncatesRuneSafe(t *testing.T) {
 }
 
 func TestTaxonomyIsZero(t *testing.T) {
+	t.Parallel()
 	if !(Taxonomy{}).IsZero() {
 		t.Error("empty Taxonomy should be zero")
 	}
@@ -105,6 +108,7 @@ func TestTaxonomyIsZero(t *testing.T) {
 // is typed as failureadapter.Classification, so misuse is a compile error rather than a
 // runtime mismatch. This test simply pins that the field accepts the canonical constants.
 func TestConsequenceIsClassification(t *testing.T) {
+	t.Parallel()
 	for _, c := range []failureadapter.Classification{
 		failureadapter.CodeAuditFail, failureadapter.CodeBuildFail, failureadapter.InfraTransient,
 	} {

@@ -16,6 +16,7 @@ import (
 // edge listed in §2 of the parent plan + the failure-adapter PROCEED/
 // RETRY/BLOCK semantics.
 func TestStateMachine_CanTransition_Allowed(t *testing.T) {
+	t.Parallel()
 	sm := NewStateMachine()
 	allowed := []struct {
 		from, to Phase
@@ -47,6 +48,7 @@ func TestStateMachine_CanTransition_Allowed(t *testing.T) {
 }
 
 func TestStateMachine_CanTransition_Disallowed(t *testing.T) {
+	t.Parallel()
 	sm := NewStateMachine()
 	denied := []struct {
 		from, to Phase
@@ -74,6 +76,7 @@ func TestStateMachine_CanTransition_Disallowed(t *testing.T) {
 // Next determines the post-phase target based on Verdict + caller hints.
 // Audit verdict drives the most important branch (ship vs retro).
 func TestStateMachine_Next(t *testing.T) {
+	t.Parallel()
 	sm := NewStateMachine()
 	cases := []struct {
 		name    string
@@ -114,12 +117,14 @@ func TestStateMachine_Next(t *testing.T) {
 }
 
 func TestPhase_String(t *testing.T) {
+	t.Parallel()
 	if PhaseScout.String() != "scout" {
 		t.Errorf("Phase.String wrong: %s", PhaseScout.String())
 	}
 }
 
 func TestStateMachine_CanTransition_InvalidPhase(t *testing.T) {
+	t.Parallel()
 	sm := NewStateMachine()
 	if sm.CanTransition(Phase("garbage"), PhaseScout) {
 		t.Error("invalid from accepted")
@@ -130,6 +135,7 @@ func TestStateMachine_CanTransition_InvalidPhase(t *testing.T) {
 }
 
 func TestPhase_IsValid(t *testing.T) {
+	t.Parallel()
 	for _, p := range []Phase{PhaseStart, PhaseIntent, PhaseScout, PhaseTriage,
 		PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseEnd} {
 		if !p.IsValid() {

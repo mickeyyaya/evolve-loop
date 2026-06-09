@@ -24,6 +24,7 @@ func userPhaseOrchestrator(t *testing.T) *Orchestrator {
 }
 
 func TestCandidatePhase(t *testing.T) {
+	t.Parallel()
 	o := userPhaseOrchestrator(t)
 	cases := []struct {
 		in   string
@@ -42,6 +43,7 @@ func TestCandidatePhase(t *testing.T) {
 }
 
 func TestTransitionLegal_UserPhases(t *testing.T) {
+	t.Parallel()
 	o := userPhaseOrchestrator(t)
 	cases := []struct {
 		from, cand Phase
@@ -62,6 +64,7 @@ func TestTransitionLegal_UserPhases(t *testing.T) {
 }
 
 func TestWorktreePhase_FromSpec(t *testing.T) {
+	t.Parallel()
 	o := userPhaseOrchestrator(t)
 	cases := []struct {
 		p    Phase
@@ -87,6 +90,7 @@ func TestWorktreePhase_FromSpec(t *testing.T) {
 // present in the worktree. runsInWorktree adds audit to the cwd set WITHOUT making
 // it a source-writer (worktreePhase / role-gate write permission stays false).
 func TestRunsInWorktree_AuditInspectsWorktreeButIsNotAWriter(t *testing.T) {
+	t.Parallel()
 	o := userPhaseOrchestrator(t)
 	cwdCases := []struct {
 		p    Phase
@@ -111,6 +115,7 @@ func TestRunsInWorktree_AuditInspectsWorktreeButIsNotAWriter(t *testing.T) {
 }
 
 func TestNextInOrder(t *testing.T) {
+	t.Parallel()
 	o := userPhaseOrchestrator(t)
 	if got := o.nextInOrder("security-scan"); got != "writer" {
 		t.Errorf("nextInOrder(security-scan) = %q, want writer", got)

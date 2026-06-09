@@ -43,6 +43,7 @@ func realWorktree(t *testing.T) (string, string) {
 // Relocate a leaked NEW file written into an EXISTING tracked directory in main —
 // the real cycle-160 shape (agy wrote go/internal/phases/backfill/* into main).
 func TestRecoverBuildLeak_RelocatesIntoRealWorktree(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	baseline := porcelainDirtySet(context.Background(), repo) // clean
 
@@ -71,6 +72,7 @@ func TestRecoverBuildLeak_RelocatesIntoRealWorktree(t *testing.T) {
 // Staging must be SCOPED to the relocated paths — pre-existing untracked worktree
 // content must NOT be swept into the audit's `git diff HEAD` (CRITICAL: not `git add -A`).
 func TestRecoverBuildLeak_StagesOnlyRelocatedPaths(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	// Pre-existing untracked leftover already in the worktree.
 	if err := os.WriteFile(filepath.Join(wt, "leftover.txt"), []byte("not part of this build\n"), 0o644); err != nil {
@@ -101,6 +103,7 @@ func TestRecoverBuildLeak_StagesOnlyRelocatedPaths(t *testing.T) {
 // main tree restored. Covers the staged-only ("M ") case that `git checkout -- p`
 // would no-op.
 func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	baseline := porcelainDirtySet(context.Background(), repo)
 
@@ -130,6 +133,7 @@ func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
 // main-tree leak is DISCARDED and the worktree's own version is left untouched —
 // relocating would clobber legitimate in-worktree work. The worktree is authoritative.
 func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	// The worktree independently edits base.txt (legitimate in-worktree builder work).
 	if err := os.WriteFile(filepath.Join(wt, "base.txt"), []byte("WORKTREE-EDIT\n"), 0o644); err != nil {
@@ -159,6 +163,7 @@ func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) 
 // mechanism (no hardcoded path list). The artifact is left in place, untouched, and the
 // tracked-only tree-diff guard ignores it too.
 func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("artifact.bin\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -187,6 +192,7 @@ func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
 // when the worktree's copy is at HEAD — relocating it would commit binary drift
 // (cycle-153). go/evolve is re-committed only by the release pipeline, never a cycle.
 func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("OLD BINARY\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -221,6 +227,7 @@ func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testin
 // relocate, so it returned false and aborted the cycle (415a9a7 regression caught by
 // the e2e ship-path tests). Both must be skipped; the cycle proceeds.
 func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	baseline := porcelainDirtySet(context.Background(), repo) // clean
 
@@ -249,6 +256,7 @@ func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing
 // recoverBuildLeak relocated them and the gitignored `git add` failed → batch abort.
 // Nested `.evolve/` paths (path contains `/.evolve/`) must be skipped like top-level.
 func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	baseline := porcelainDirtySet(context.Background(), repo) // clean
 
@@ -276,6 +284,7 @@ func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
 
 // Pre-existing operator dirt (in the baseline) is left untouched; only build-introduced leaks move.
 func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
+	t.Parallel()
 	repo, wt := realWorktree(t)
 	if err := os.WriteFile(filepath.Join(repo, "preexisting.txt"), []byte("mine\n"), 0o644); err != nil {
 		t.Fatal(err)

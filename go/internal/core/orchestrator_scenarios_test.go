@@ -14,6 +14,7 @@ import (
 )
 
 func TestCycleScenarios(t *testing.T) {
+	t.Parallel()
 	RunAll(t, cycleCatalog())
 }
 

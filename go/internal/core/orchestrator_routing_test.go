@@ -105,6 +105,7 @@ func indexOfPhase(ps []Phase, name string) int {
 // that the whole framework (catalog → routing order → signal trigger →
 // orchestrator accept/run) works as one pipeline.
 func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -179,6 +180,7 @@ func (p *capturingPlanner) Plan(in router.RouteInput) (*router.PhasePlan, error)
 // selecting a design phase or minting one. Deterministic: a capturing planner,
 // no LLM.
 func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -207,6 +209,7 @@ func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
 }
 
 func TestOrchestrator_ThreadsCarryoverTodosToPlanner(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{
 		LastCycleNumber: 3,
 		CarryoverTodos: []CarryoverTodo{
@@ -249,6 +252,7 @@ func TestOrchestrator_ThreadsCarryoverTodosToPlanner(t *testing.T) {
 
 // Stage:Off (default) must add NO routing forensics — byte-identical to legacy.
 func TestOrchestrator_StageOff_EmitsNoRoutingLedgerEntries(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -277,6 +281,7 @@ func TestOrchestrator_StageOff_EmitsNoRoutingLedgerEntries(t *testing.T) {
 // state machine still drives. With handoff-build.json acs_red>0 the post-build
 // decision must propose inserting tester — WITHOUT altering the path run.
 func TestOrchestrator_Shadow_LogsTesterInsert_StaticPathUnchanged(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -335,6 +340,7 @@ func TestOrchestrator_Shadow_LogsTesterInsert_StaticPathUnchanged(t *testing.T) 
 // proposes scout→build (skipping triage/tdd/build-planner). The kernel-
 // validated override (CanTransition + SpineSatisfiedUpTo) adopts it.
 func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -381,6 +387,7 @@ func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
 // — the integrity signal fires WITHOUT blocking the cycle. Only handoff-scout is
 // seeded, so the build→audit and audit→ship transitions warn.
 func TestOrchestrator_Enforce_SpineUnsatisfied_WarnsButProceeds(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

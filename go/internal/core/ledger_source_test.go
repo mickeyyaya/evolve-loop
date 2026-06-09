@@ -27,6 +27,7 @@ import (
 // field tagged `json:"source,omitempty"` (omitempty keeps historical hash-chain
 // bytes stable — absent on every pre-cycle-230 entry).
 func TestLedgerEntrySource_FieldPresent(t *testing.T) {
+	t.Parallel()
 	f, ok := reflect.TypeOf(LedgerEntry{}).FieldByName("Source")
 	if !ok {
 		t.Fatal("LedgerEntry has no Source field — skip-source attribution missing")
@@ -43,6 +44,7 @@ func TestLedgerEntrySource_FieldPresent(t *testing.T) {
 // Source:"router" on every phase_skipped entry it appends. Asserted at the
 // JSON wire level (the observable ledger.jsonl behavior).
 func TestLedgerEntrySource_RouterStamp(t *testing.T) {
+	t.Parallel()
 	led := &fakeLedger{}
 	o := NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
 	cs := CycleState{WorkspacePath: t.TempDir()}
@@ -79,6 +81,7 @@ func TestLedgerEntrySource_RouterStamp(t *testing.T) {
 // WITHOUT a source must not grow a "source" key (omitempty — hash-chain
 // stability for all historical lines).
 func TestLedgerEntrySource_RoundTrip(t *testing.T) {
+	t.Parallel()
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(`{"ts":"2026-06-06T00:00:00Z","cycle":230,"role":"bug-reproduction","kind":"phase_skipped","source":"router","entry_seq":1,"prev_hash":"x"}`), &e); err != nil {
 		t.Fatalf("unmarshal: %v", err)

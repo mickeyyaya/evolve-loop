@@ -11,6 +11,7 @@ import (
 // (pkg/phaseproto) and the in-memory contract between orchestrator
 // and phases.
 func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
 	in := PhaseRequest{
 		Cycle:       104,
 		ProjectRoot: "/tmp/x",
@@ -41,6 +42,7 @@ func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
 }
 
 func TestPhaseResponse_JSONShape(t *testing.T) {
+	t.Parallel()
 	r := PhaseResponse{
 		Phase:        "scout",
 		Verdict:      "PASS",
@@ -71,6 +73,7 @@ func TestPhaseResponse_JSONShape(t *testing.T) {
 // VerdictPASS/FAIL/WARN/SKIPPED are the only allowed verdict strings
 // (matches EGPS gate semantics — see CLAUDE.md env-var table).
 func TestVerdict_Recognised(t *testing.T) {
+	t.Parallel()
 	for _, v := range []string{VerdictPASS, VerdictFAIL, VerdictWARN, VerdictSKIPPED} {
 		if !IsVerdict(v) {
 			t.Errorf("IsVerdict(%q) = false; want true", v)

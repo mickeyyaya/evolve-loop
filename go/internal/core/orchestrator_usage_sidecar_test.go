@@ -10,6 +10,7 @@ import (
 )
 
 func TestOrchestrator_WritesPhaseUsageSidecar(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

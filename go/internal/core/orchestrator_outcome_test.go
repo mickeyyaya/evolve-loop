@@ -9,6 +9,7 @@ import "testing"
 // existing TestOrchestrator_HappyPath_* tests in orchestrator_test.go.
 
 func TestFinalizeOutcome_KeepsFAILUnchanged(t *testing.T) {
+	t.Parallel()
 	o := &Orchestrator{}
 	if got := o.finalizeOutcome(VerdictFAIL, "", "abc", "abc"); got != VerdictFAIL {
 		t.Errorf("FAIL must pass through, got %q", got)
@@ -16,6 +17,7 @@ func TestFinalizeOutcome_KeepsFAILUnchanged(t *testing.T) {
 }
 
 func TestFinalizeOutcome_KeepsPASSUnchanged(t *testing.T) {
+	t.Parallel()
 	o := &Orchestrator{}
 	if got := o.finalizeOutcome(VerdictPASS, "ship: ok", "abc", "abc"); got != VerdictPASS {
 		t.Errorf("PASS must pass through, got %q", got)
@@ -23,6 +25,7 @@ func TestFinalizeOutcome_KeepsPASSUnchanged(t *testing.T) {
 }
 
 func TestFinalizeOutcome_KeepsWARNUnchanged(t *testing.T) {
+	t.Parallel()
 	o := &Orchestrator{}
 	if got := o.finalizeOutcome(VerdictWARN, "", "abc", "abc"); got != VerdictWARN {
 		t.Errorf("WARN must pass through, got %q", got)
@@ -30,6 +33,7 @@ func TestFinalizeOutcome_KeepsWARNUnchanged(t *testing.T) {
 }
 
 func TestFinalizeOutcome_SkippedWithHeadMoved_ShippedViaBuild(t *testing.T) {
+	t.Parallel()
 	o := &Orchestrator{}
 	if got := o.finalizeOutcome(VerdictSKIPPED, "proceed: fluent mode", "abc123", "def456"); got != CycleOutcomeShippedViaBuild {
 		t.Errorf("SKIPPED + HEAD moved must be SHIPPED_VIA_BUILD, got %q", got)
@@ -37,6 +41,7 @@ func TestFinalizeOutcome_SkippedWithHeadMoved_ShippedViaBuild(t *testing.T) {
 }
 
 func TestFinalizeOutcome_SkippedWithRetroAdvisory_SkippedAuditAdvisory(t *testing.T) {
+	t.Parallel()
 	o := &Orchestrator{}
 	decision := "proceed: fluent mode (set EVOLVE_STRICT_AUDIT=1 for legacy blocking): would-have-blocked: BLOCK-CODE — 16 non-expired code-audit-fail entries (within 30d retention)"
 	if got := o.finalizeOutcome(VerdictSKIPPED, decision, "abc", "abc"); got != CycleOutcomeSkippedAuditAdvisory {
@@ -45,6 +50,7 @@ func TestFinalizeOutcome_SkippedWithRetroAdvisory_SkippedAuditAdvisory(t *testin
 }
 
 func TestFinalizeOutcome_SkippedBareNoSignal_SkippedUnknown(t *testing.T) {
+	t.Parallel()
 	o := &Orchestrator{}
 	if got := o.finalizeOutcome(VerdictSKIPPED, "", "abc", "abc"); got != CycleOutcomeSkippedUnknown {
 		t.Errorf("SKIPPED with no signal must be SKIPPED_UNKNOWN, got %q", got)
@@ -52,6 +58,7 @@ func TestFinalizeOutcome_SkippedBareNoSignal_SkippedUnknown(t *testing.T) {
 }
 
 func TestFinalizeOutcome_HeadMovedTrumpsAdvisory(t *testing.T) {
+	t.Parallel()
 	// If HEAD moved AND retro had an advisory, the commit wins — the
 	// cycle DID ship value, the advisory is informational.
 	o := &Orchestrator{}
@@ -62,6 +69,7 @@ func TestFinalizeOutcome_HeadMovedTrumpsAdvisory(t *testing.T) {
 }
 
 func TestFinalizeOutcome_EmptyHeads_FallsBackToUnknown(t *testing.T) {
+	t.Parallel()
 	// gitHEAD seam might return "" on probe failure — treat as "no
 	// movement detected" rather than crashing.
 	o := &Orchestrator{}

@@ -10,6 +10,7 @@ import "testing"
 // unaffected.
 
 func TestLastBalancedSpan(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name               string
 		s                  string
@@ -44,6 +45,7 @@ func TestLastBalancedSpan(t *testing.T) {
 }
 
 func TestParsePhasePlan_IgnoresPromptEchoExample(t *testing.T) {
+	t.Parallel()
 	// The scrollback: prompt's example array FIRST, then the agent's reply.
 	scrollback := `## Respond with STRICT JSON only (a bare array):
 [{"phase":"<phase>","run":true,"justification":"<one sentence>"},...]
@@ -70,6 +72,7 @@ func TestParsePhasePlan_IgnoresPromptEchoExample(t *testing.T) {
 }
 
 func TestParsePhasePlan_CleanBodyUnchanged(t *testing.T) {
+	t.Parallel()
 	// Mock-bridge path: a clean single array must still parse (parity).
 	plan, err := parsePhasePlan(`[{"phase":"scout","run":true,"justification":"x"}]`)
 	if err != nil || len(plan.Entries) != 1 || plan.Entries[0].Phase != "scout" {
@@ -78,6 +81,7 @@ func TestParsePhasePlan_CleanBodyUnchanged(t *testing.T) {
 }
 
 func TestParseProposal_IgnoresPromptEchoExample(t *testing.T) {
+	t.Parallel()
 	scrollback := `Respond with STRICT JSON:
 {"next_phase":"<phase>","insert_phases":["<phase>"],"justification":"<one sentence>"}
 

@@ -67,6 +67,9 @@ func TestDefaultGateTestRunner_Error(t *testing.T) {
 // shim seam — a fake `go` that exits 0 (success) then 1 (failure), avoiding a
 // real nested test run. Not parallel: mutates process env via t.Setenv.
 func TestDefaultSimulationRunner(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "go"), 0o755); err != nil {
 		t.Fatal(err)
@@ -95,6 +98,9 @@ func TestDefaultSimulationRunner(t *testing.T) {
 // failure is advisory, so Run still returns nil with SimulationAdvisoryOK=false.
 // Not parallel: mutates process env via t.Setenv.
 func TestRun_AdvisorySimulationDefaultRunner(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	r := makeRepo(t, "1.0.0")
 	if err := os.MkdirAll(filepath.Join(r, "go"), 0o755); err != nil {
 		t.Fatal(err)

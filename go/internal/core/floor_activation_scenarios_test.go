@@ -16,6 +16,7 @@ import (
 )
 
 func TestFloorActivationCycle(t *testing.T) {
+	t.Parallel()
 	RunAll(t, floorActivationCycleCatalog())
 }
 

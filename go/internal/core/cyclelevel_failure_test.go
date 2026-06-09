@@ -34,6 +34,7 @@ import (
 // a struct error carrying the failed phase and the original cause, with
 // Unwrap so errors.Is reaches the root.
 func TestErrCycleLevelFailure_WrapsCauseForErrorsIs(t *testing.T) {
+	t.Parallel()
 	cause := errors.New("tmux pane died")
 	var err error = &core.ErrCycleLevelFailure{Phase: "build", Cause: cause}
 
@@ -71,6 +72,7 @@ func (r *bridgeDeadRunner) Run(context.Context, core.PhaseRequest) (core.PhaseRe
 // with a bridge that always fails returns ErrCycleLevelFailure (carrying the
 // failed phase + the bridge cause), instead of a bare batch-fatal error.
 func TestOrchestrator_BridgeExhaustion_CycleLevelFailure(t *testing.T) {
+	t.Parallel()
 	scout := &bridgeDeadRunner{name: "scout"}
 	orch, _, _ := newTestOrchestrator(t, newRunners(map[core.Phase]core.PhaseRunner{
 		core.PhaseScout: scout,
@@ -110,6 +112,7 @@ func (r *integrityErrRunner) Run(context.Context, core.PhaseRequest) (core.Phase
 // indiscriminately converts every phase error would pass the bridge test
 // above but fail here (the adversarial pair).
 func TestOrchestrator_IntegrityBreach_StillBatchFatal(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		sentinel error
@@ -186,6 +189,7 @@ func (r *countingPassRunner) Run(_ context.Context, req core.PhaseRequest) (core
 //     the batch (covered by TestOrchestrator_IntegrityBreach_StillBatchFatal
 //     and the existing TestRunCycle_ShipIntegrityError_AbortsLoud).
 func TestOrchestrator_RecoveryDepthBudget(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass, "always stale")
 	ship := &shipErrorStub{name: "ship", failFirst: 99, errOnFail: se}
 	audit := &countingPassRunner{name: "audit"}

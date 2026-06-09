@@ -289,20 +289,26 @@ func Run(opts Options) (Result, error) {
 }
 
 // appendLedger ensures the parent dir exists then appends one NDJSON line.
-func appendLedger(path string, line []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+func appendLedger(path string, line []byte) (err error) {
+	if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	if _, err := f.Write(line); err != nil {
-		return err
+	// Capture the Close (flush) error on the success path — this is a durable
+	// ledger append, so a failed flush must surface rather than be swallowed.
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+	if _, werr := f.Write(line); werr != nil {
+		return werr
 	}
-	if _, err := f.Write([]byte("\n")); err != nil {
-		return err
+	if _, werr := f.Write([]byte("\n")); werr != nil {
+		return werr
 	}
 	return nil
 }

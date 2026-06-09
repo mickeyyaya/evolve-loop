@@ -29,6 +29,7 @@ func (r *recordingReviewer) Review(_ context.Context, in ReviewInput) ReviewResu
 // runs every phase to completion exactly like pre-E2 — no review-gate behavior
 // observable.
 func TestOrchestrator_NoopReviewer_IsByteIdentical(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 9}}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -55,6 +56,7 @@ func TestOrchestrator_NoopReviewer_IsByteIdentical(t *testing.T) {
 // an injected reviewer that returns Approve:true on every phase doesn't
 // disturb the cycle, AND the reviewer was actually consulted (calls > 0).
 func TestOrchestrator_ReviewerApproves_CycleAdvances(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &recordingReviewer{default_: ReviewResult{Approve: true}}
@@ -91,6 +93,7 @@ func TestOrchestrator_ReviewerApproves_CycleAdvances(t *testing.T) {
 // (retries=0) and reject-then-approve paths are pinned by the TestCorrectionLoop_*
 // tests.
 func TestOrchestrator_ReviewerRejects_CycleAborts(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &recordingReviewer{
@@ -150,6 +153,7 @@ func (s *sequencedReviewer) Review(_ context.Context, in ReviewInput) ReviewResu
 // correction re-dispatch carrying the violation directive, then the cycle
 // proceeds normally.
 func TestCorrectionLoop_RejectThenApprove(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &sequencedReviewer{phase: "build", results: []ReviewResult{
@@ -200,6 +204,7 @@ func TestCorrectionLoop_RejectThenApprove(t *testing.T) {
 // TestCorrectionLoop_ExhaustsThenAborts: always reject ⇒ abort after the
 // default 2 corrections, error names the count and the reason.
 func TestCorrectionLoop_ExhaustsThenAborts(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &recordingReviewer{
@@ -246,6 +251,7 @@ func (r *sequencedRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespons
 // returns err==nil but a non-canonical verdict aborts (same invariant the outer
 // attempt loop enforces) rather than slipping a bad verdict downstream.
 func TestCorrectionLoop_NonCanonicalVerdictAborts(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &sequencedReviewer{phase: "build", results: []ReviewResult{
@@ -268,6 +274,7 @@ func TestCorrectionLoop_NonCanonicalVerdictAborts(t *testing.T) {
 // TestCorrectionLoop_DisabledIsImmediateAbort: =0 ⇒ no re-dispatch, immediate
 // abort with the pre-feature error message (byte-identical disable path).
 func TestCorrectionLoop_DisabledIsImmediateAbort(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &recordingReviewer{
@@ -302,6 +309,7 @@ func TestCorrectionLoop_DisabledIsImmediateAbort(t *testing.T) {
 // review, so the reviewer is NOT called for it (avoiding noise + false
 // rejections of skipped-by-policy phases).
 func TestOrchestrator_ReviewerSkippedPhasesNotConsulted(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	rev := &recordingReviewer{default_: ReviewResult{Approve: true}}
@@ -325,6 +333,7 @@ func TestOrchestrator_ReviewerSkippedPhasesNotConsulted(t *testing.T) {
 // TestNoopReviewer_AlwaysApproves is the unit-level pin on the noopReviewer
 // default — every input shape gets Approve:true.
 func TestNoopReviewer_AlwaysApproves(t *testing.T) {
+	t.Parallel()
 	r := noopReviewer{}
 	for _, phase := range []string{"scout", "tdd", "build", "ship", "user-defined-phase"} {
 		got := r.Review(context.Background(), ReviewInput{Phase: phase})

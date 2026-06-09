@@ -62,6 +62,7 @@ func mintPlan(names ...string) *router.PhasePlan {
 // routable (recognized by candidatePhase + a legal forward edge) — with no Go
 // recompile, the same path a built-in or build-time user phase takes.
 func TestRegisterMintedPhases_MakesPhaseDispatchableAndRoutable(t *testing.T) {
+	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{})
 	o.registerMintedPhases(mintPlan("minted-reviewer"))
 
@@ -79,6 +80,7 @@ func TestRegisterMintedPhases_MakesPhaseDispatchableAndRoutable(t *testing.T) {
 // TestRegisterMintedPhases_RejectedPhaseIsSkipped proves a registrar rejection
 // (e.g. out-of-envelope) is a loud skip, not a registered dead phase.
 func TestRegisterMintedPhases_RejectedPhaseIsSkipped(t *testing.T) {
+	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{reject: map[string]bool{"bad-phase": true}})
 	o.registerMintedPhases(mintPlan("bad-phase"))
 
@@ -93,6 +95,7 @@ func TestRegisterMintedPhases_RejectedPhaseIsSkipped(t *testing.T) {
 // TestRegisterMintedPhases_DoesNotClobberBuiltin proves a minted phase that
 // collides with a built-in name never overwrites the built-in runner.
 func TestRegisterMintedPhases_DoesNotClobberBuiltin(t *testing.T) {
+	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{})
 	before := o.runners[PhaseBuild]
 	o.registerMintedPhases(mintPlan("build")) // collides with built-in
@@ -104,6 +107,7 @@ func TestRegisterMintedPhases_DoesNotClobberBuiltin(t *testing.T) {
 // TestRegisterMintedPhases_NilPlanIsNoop guards the common path: no minted
 // phases (or no plan) must leave the orchestrator byte-identical.
 func TestRegisterMintedPhases_NilPlanIsNoop(t *testing.T) {
+	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{})
 	n := len(o.runners)
 	o.registerMintedPhases(nil)

@@ -26,6 +26,7 @@ func (p *fixedPlanner) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 }
 
 func TestOrchestrator_AdvisoryPlanVetoSurvivesSpineDecline(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

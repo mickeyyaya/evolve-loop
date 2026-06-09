@@ -39,6 +39,7 @@ func (e errGenericExit) Error() string {
 }
 
 func TestIsTransientBridgeError(t *testing.T) {
+	t.Parallel()
 	if !isTransientBridgeError(wrapTransient(80)) {
 		t.Error("exit 80 should be transient")
 	}
@@ -57,6 +58,7 @@ func TestIsTransientBridgeError(t *testing.T) {
 }
 
 func TestOrchestrator_RetryOnTransientExit(t *testing.T) {
+	t.Parallel()
 	for _, code := range []int{80, 85, 86} {
 		t.Run("exit-"+strconv.Itoa(code), func(t *testing.T) {
 			st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -93,6 +95,7 @@ func (n *nonCanonicalRunner) Run(_ context.Context, req PhaseRequest) (PhaseResp
 }
 
 func TestOrchestrator_NonCanonicalVerdictRetry(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -112,6 +115,7 @@ func TestOrchestrator_NonCanonicalVerdictRetry(t *testing.T) {
 }
 
 func TestOrchestrator_NonTransientError_NoRetry(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -128,6 +132,7 @@ func TestOrchestrator_NonTransientError_NoRetry(t *testing.T) {
 }
 
 func TestTransientRetry_Exhausted_WritesFailureDiag(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -150,6 +155,7 @@ func TestTransientRetry_Exhausted_WritesFailureDiag(t *testing.T) {
 }
 
 func TestFAILVerdict_NotRetried(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -166,6 +172,7 @@ func TestFAILVerdict_NotRetried(t *testing.T) {
 }
 
 func TestTransientRetry_LedgerEntry(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -193,6 +200,7 @@ func TestTransientRetry_LedgerEntry(t *testing.T) {
 }
 
 func TestPhaseMaxAttempts_Default(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -212,6 +220,7 @@ func TestPhaseMaxAttempts_Default(t *testing.T) {
 }
 
 func TestPhaseMaxAttempts_EnvOverride(t *testing.T) {
+	t.Parallel()
 	{
 		st := &fakeStorage{state: State{LastCycleNumber: 0}}
 		led := &fakeLedger{}
@@ -251,6 +260,7 @@ func TestPhaseMaxAttempts_EnvOverride(t *testing.T) {
 }
 
 func TestPhaseMaxAttempts_OutOfRange(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		val  string
 		want int
@@ -283,6 +293,7 @@ func TestPhaseMaxAttempts_OutOfRange(t *testing.T) {
 }
 
 func TestPhaseMaxAttempts_NonTransient_NoExtraAttempt(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)

@@ -110,6 +110,7 @@ func (p *checkpointProbeRunner) Run(_ context.Context, req core.PhaseRequest) (c
 //     phase in completedPhases
 //   - pre-existing cycle-state.json fields survive (additive splice)
 func TestOrchestrator_PhaseBoundaryCheckpoint(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	statePath := seedCycleStateFile(t, root)
 
@@ -191,6 +192,7 @@ func (r *recordingRetroRunner) Run(_ context.Context, req core.PhaseRequest) (co
 // as completed would resume PAST the failed phase and lose work. Retro may be
 // recorded after failure-learning runs.
 func TestOrchestrator_FailedPhase_NoSuccessCheckpoint(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	statePath := seedCycleStateFile(t, root)
 
@@ -228,6 +230,7 @@ func TestOrchestrator_FailedPhase_NoSuccessCheckpoint(t *testing.T) {
 }
 
 func TestOrchestrator_FailedPhase_QueuesNextCycleTodo(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 

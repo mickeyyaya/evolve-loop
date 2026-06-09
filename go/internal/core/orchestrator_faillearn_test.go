@@ -78,11 +78,13 @@ func assertDeterministicArtifacts(t *testing.T, root string) {
 }
 
 func TestRecordFailureLearning_RetroRunnerError_WritesDeterministicArtifacts(t *testing.T) {
+	t.Parallel()
 	root := runCycleWithFailingTriage(t, &alwaysErrRunner{name: "retro"})
 	assertDeterministicArtifacts(t, root)
 }
 
 func TestRecordFailureLearning_NonCanonicalVerdict_WritesDeterministicArtifacts(t *testing.T) {
+	t.Parallel()
 	root := runCycleWithFailingTriage(t, &staticVerdictRunner{name: "retro", verdict: "GIBBERISH"})
 	assertDeterministicArtifacts(t, root)
 }
@@ -90,6 +92,7 @@ func TestRecordFailureLearning_NonCanonicalVerdict_WritesDeterministicArtifacts(
 // The floor adds artifacts; it must not regress the FailedRecord that
 // recordFailureLearning already persists on the degradation path.
 func TestRecordFailureLearning_RetroRunnerError_FailedRecordStillPersisted(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 
@@ -120,6 +123,7 @@ func TestRecordFailureLearning_RetroRunnerError_FailedRecordStillPersisted(t *te
 // When the LLM retro succeeds, the floor must stay out of the way: no
 // deterministic-fallback report may shadow or precede the LLM artifact.
 func TestRecordFailureLearning_RetroSucceeds_NoDeterministicFallback(t *testing.T) {
+	t.Parallel()
 	root := runCycleWithFailingTriage(t, &recordingRetroRunner{name: "retro"})
 
 	report := filepath.Join(root, ".evolve", "runs", "cycle-1", "retrospective-report.md")
@@ -159,6 +163,7 @@ func (e errStatic) Error() string { return string(e) }
 // not the generic summary string. Supervisor synthesis stays the fallback for
 // phases that died without reporting (the existing tests above).
 func TestRecordFailureLearning_StructuredBlockFlowsIntoArtifacts(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 	orch, _, _ := newTestOrchestrator(t, newRunners(map[core.Phase]core.PhaseRunner{

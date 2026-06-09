@@ -55,6 +55,7 @@ func dynamicCfg() config.RoutingConfig {
 // when the advisor proposes end from scout AND the plan does not run ship, the
 // cycle terminates after scout — build/audit/ship never execute.
 func TestRunCycle_EarlyExit_NoShipConvergence(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -85,6 +86,7 @@ func TestRunCycle_EarlyExit_NoShipConvergence(t *testing.T) {
 // end-to-end: even when the advisor proposes end from scout, a ship-intended
 // plan makes the kernel REFUSE the early-exit — the spine runs and ship executes.
 func TestRunCycle_EarlyExit_RefusedWhenShipPlanned(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)

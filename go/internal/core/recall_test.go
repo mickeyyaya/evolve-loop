@@ -22,6 +22,7 @@ func (f *fakeKB) Lookup(_ context.Context, q research.Query) ([]research.Lesson,
 }
 
 func TestRecallForPlan(t *testing.T) {
+	t.Parallel()
 	t.Run("no KB wired returns empty", func(t *testing.T) {
 		o := &Orchestrator{}
 		reason, lessons := o.recallForPlan(context.Background(), []FailedRecord{{Summary: "x"}})
@@ -72,6 +73,7 @@ func TestRecallForPlan(t *testing.T) {
 }
 
 func TestWriteRecallMemory(t *testing.T) {
+	t.Parallel()
 	t.Run("empty recall renders nothing", func(t *testing.T) {
 		var b strings.Builder
 		writeRecallMemory(&b, router.RouteInput{})

@@ -16,6 +16,7 @@ import (
 // regression guards so a future phase addition can't silently re-break the
 // default-branch phases.
 func TestBackfillArtifactPath_AllPhases(t *testing.T) {
+	t.Parallel()
 	const ws = "/ws"
 	cases := []struct {
 		phase string

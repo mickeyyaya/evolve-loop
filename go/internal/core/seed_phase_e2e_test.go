@@ -28,6 +28,7 @@ func seedRepoRoot(t *testing.T) string {
 // make an informed SELECT on bugfix cycles. (The original ADR-0038 seed was
 // named reproduce-bug; the two-tier naming rule renamed it bug-reproduction.)
 func TestSeedPhase_BugReproductionReachesAdvisorCatalog(t *testing.T) {
+	t.Parallel()
 	root := seedRepoRoot(t)
 	builtin, err := phasespec.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"))
 	if err != nil {

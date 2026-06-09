@@ -9,6 +9,7 @@ import (
 )
 
 func TestPhaseCardsFromCatalog(t *testing.T) {
+	t.Parallel()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
 		{Name: "scout"},                     // → plan
 		{Name: "build", WritesSource: true}, // → build
@@ -46,6 +47,7 @@ func TestPhaseCardsFromCatalog(t *testing.T) {
 }
 
 func TestPhaseCardsFromCatalog_CarriesMetadata(t *testing.T) {
+	t.Parallel()
 	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
 		{
 			Name: "reproduce-bug", Optional: true, Role: "evaluate", WritesSource: true,
@@ -65,6 +67,7 @@ func TestPhaseCardsFromCatalog_CarriesMetadata(t *testing.T) {
 }
 
 func TestWriteCatalog_EnrichedCardLine(t *testing.T) {
+	t.Parallel()
 	var b strings.Builder
 	writeCatalog(&b, []router.PhaseCard{
 		{Name: "reproduce-bug", Role: "evaluate", Optional: true, WritesSource: true,
@@ -79,6 +82,7 @@ func TestWriteCatalog_EnrichedCardLine(t *testing.T) {
 }
 
 func TestWriteCatalog_TruncatesLongWhenToUse(t *testing.T) {
+	t.Parallel()
 	var b strings.Builder
 	long := strings.Repeat("x", 400)
 	writeCatalog(&b, []router.PhaseCard{
@@ -94,6 +98,7 @@ func TestWriteCatalog_TruncatesLongWhenToUse(t *testing.T) {
 }
 
 func TestWriteCatalog_CapsEnrichedCardsKeepsAllSelectable(t *testing.T) {
+	t.Parallel()
 	// 14 optional cards + 2 spine cards: enriched rendering must cap, but every
 	// name must still appear (a phase absent from the prompt cannot be SELECTed).
 	var cards []router.PhaseCard
@@ -129,6 +134,7 @@ func TestWriteCatalog_CapsEnrichedCardsKeepsAllSelectable(t *testing.T) {
 }
 
 func TestWriteCatalog(t *testing.T) {
+	t.Parallel()
 	t.Run("empty catalog renders nothing", func(t *testing.T) {
 		var b strings.Builder
 		writeCatalog(&b, nil)

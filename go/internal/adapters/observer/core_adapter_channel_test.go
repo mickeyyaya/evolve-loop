@@ -12,6 +12,7 @@ import (
 )
 
 func TestCoreAdapter_SpawnsProducer_WhenChannelOn(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	os.WriteFile(filepath.Join(ws, "build-stdout.log"),
 		[]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`+"\n"), 0o644)
@@ -30,6 +31,7 @@ func TestCoreAdapter_SpawnsProducer_WhenChannelOn(t *testing.T) {
 }
 
 func TestCoreAdapter_NoProducer_WhenChannelOff(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte("{}\n"), 0o644)
 	a := &CoreAdapter{EnvLookup: func(string) string { return "" }}
@@ -45,6 +47,7 @@ func TestCoreAdapter_NoProducer_WhenChannelOff(t *testing.T) {
 // *-tmux) streams live content to <agent>-pane.live + breadcrumbs to
 // <agent>-breadcrumbs.live, so the producer must tail those.
 func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	a := &CoreAdapter{EnvLookup: func(string) string { return "" }} // no override → default claude-tmux
 
@@ -75,6 +78,7 @@ func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 // <phase>-stdout.log, so the helper returns empty strings and the producer
 // falls back to its legacy defaults (no pane.live exists for headless).
 func TestChannelSourcePaths_Headless(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	a := &CoreAdapter{EnvLookup: func(string) string { return "" }}
 	req := core.PhaseRequest{Workspace: ws, Env: map[string]string{"EVOLVE_BUILD_CLI": "claude-p"}}
@@ -88,6 +92,7 @@ func TestChannelSourcePaths_Headless(t *testing.T) {
 // hyphens map to underscores (tdd-engineer → EVOLVE_TDD_ENGINEER_CLI), and a
 // value present only in the process env (EnvLookup) is honored.
 func TestChannelSourcePaths_PerAgentKeyAndProcessEnv(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	a := &CoreAdapter{EnvLookup: func(k string) string {
 		if k == "EVOLVE_TDD_ENGINEER_CLI" {

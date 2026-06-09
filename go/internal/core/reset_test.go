@@ -77,6 +77,7 @@ func sealOpts(evolveDir string) SealOptions {
 }
 
 func TestSealCycle_NothingToReset(t *testing.T) {
+	t.Parallel()
 	t.Run("missing cycle-state", func(t *testing.T) {
 		ev := t.TempDir()
 		_, err := SealCycle(context.Background(), &recordingLedger{}, sealOpts(ev))
@@ -95,6 +96,7 @@ func TestSealCycle_NothingToReset(t *testing.T) {
 }
 
 func TestSealCycle_HappyPath(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	workspace := sealFixture(t, ev, 108)
 	led := &recordingLedger{}
@@ -161,6 +163,7 @@ func TestSealCycle_HappyPath(t *testing.T) {
 }
 
 func TestSealCycle_DryRunMutatesNothing(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	workspace := sealFixture(t, ev, 108)
 	led := &recordingLedger{}
@@ -194,6 +197,7 @@ func TestSealCycle_DryRunMutatesNothing(t *testing.T) {
 }
 
 func TestSealCycle_EmptyWorkspaceStillSeals(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	// cycle-state present but the workspace dir was never created.
 	workspace := filepath.Join(ev, "runs", "cycle-108")
@@ -215,6 +219,7 @@ func TestSealCycle_EmptyWorkspaceStillSeals(t *testing.T) {
 }
 
 func TestSealCycle_RefusesWorkspaceOutsideRoots(t *testing.T) {
+	t.Parallel()
 	ev := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "elsewhere", "cycle-108")
 	if err := os.MkdirAll(outside, 0o755); err != nil {

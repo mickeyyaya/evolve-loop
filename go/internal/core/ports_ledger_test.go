@@ -9,6 +9,7 @@ import (
 // TestLedgerEntry_Unmarshal_IntCycle is the existing happy path: cycle
 // arrives as a JSON number, populates Cycle, leaves CycleLabel empty.
 func TestLedgerEntry_Unmarshal_IntCycle(t *testing.T) {
+	t.Parallel()
 	raw := `{"ts":"2026-05-26T00:00:00Z","cycle":107,"role":"build","kind":"phase","exit_code":0,"entry_seq":1865,"prev_hash":"abc"}`
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(raw), &e); err != nil {
@@ -27,6 +28,7 @@ func TestLedgerEntry_Unmarshal_IntCycle(t *testing.T) {
 // release. cycle="manual-release-v10.16.0" must parse without error and
 // land in CycleLabel; Cycle stays 0.
 func TestLedgerEntry_Unmarshal_StringCycle(t *testing.T) {
+	t.Parallel()
 	raw := `{"ts":"2026-05-20T04:15:01Z","cycle":"manual-release-v10.16.0","role":"auditor","kind":"agent_subprocess","exit_code":0,"entry_seq":1740,"prev_hash":"4f288f60"}`
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(raw), &e); err != nil {
@@ -46,6 +48,7 @@ func TestLedgerEntry_Unmarshal_StringCycle(t *testing.T) {
 // TestLedgerEntry_Unmarshal_ExplicitCycleLabel covers the canonical
 // new-writer convention: numeric cycle: 0 + explicit cycle_label field.
 func TestLedgerEntry_Unmarshal_ExplicitCycleLabel(t *testing.T) {
+	t.Parallel()
 	raw := `{"ts":"2026-06-01T00:00:00Z","cycle":0,"cycle_label":"manual-release-v12.2.0","role":"auditor","exit_code":0,"entry_seq":2000,"prev_hash":"deadbeef"}`
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(raw), &e); err != nil {
@@ -62,6 +65,7 @@ func TestLedgerEntry_Unmarshal_ExplicitCycleLabel(t *testing.T) {
 // TestLedgerEntry_Marshal_NormalEntry confirms normal entries serialize
 // WITHOUT a cycle_label field (omitempty).
 func TestLedgerEntry_Marshal_NormalEntry(t *testing.T) {
+	t.Parallel()
 	e := LedgerEntry{Cycle: 107, Role: "build", EntrySeq: 1865, PrevHash: "abc"}
 	b, err := json.Marshal(e)
 	if err != nil {
@@ -78,6 +82,7 @@ func TestLedgerEntry_Marshal_NormalEntry(t *testing.T) {
 // TestLedgerEntry_Marshal_LabeledEntry confirms manual entries written
 // with the new convention round-trip (int cycle + explicit label).
 func TestLedgerEntry_Marshal_LabeledEntry(t *testing.T) {
+	t.Parallel()
 	e := LedgerEntry{Cycle: 0, CycleLabel: "manual-release-v12.2.0", Role: "auditor", EntrySeq: 2000, PrevHash: "deadbeef"}
 	b, err := json.Marshal(e)
 	if err != nil {
@@ -96,6 +101,7 @@ func TestLedgerEntry_Marshal_LabeledEntry(t *testing.T) {
 // canonical form (cycle:0 + cycle_label) — NOT the original string form
 // — so future writers and consumers see normalized data.
 func TestLedgerEntry_RoundTrip_StringCycle_NormalizesToLabel(t *testing.T) {
+	t.Parallel()
 	raw := `{"ts":"2026-05-20T04:15:01Z","cycle":"manual-release-v10.16.0","role":"auditor","exit_code":0,"entry_seq":1740,"prev_hash":"abc"}`
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(raw), &e); err != nil {
@@ -118,6 +124,7 @@ func TestLedgerEntry_RoundTrip_StringCycle_NormalizesToLabel(t *testing.T) {
 // values for the cycle field (e.g., null, object). These must surface
 // as errors so corrupt entries aren't silently absorbed.
 func TestLedgerEntry_Unmarshal_MalformedCycle(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		raw  string
@@ -140,6 +147,7 @@ func TestLedgerEntry_Unmarshal_MalformedCycle(t *testing.T) {
 // theory. Real ledger entries never use floats, but the unmarshaler
 // should accept whole-number floats (102.0 → 102) and reject fractional.
 func TestLedgerEntry_Unmarshal_FloatCycle(t *testing.T) {
+	t.Parallel()
 	t.Run("whole-number float accepted", func(t *testing.T) {
 		var e LedgerEntry
 		if err := json.Unmarshal([]byte(`{"cycle":107.0,"role":"x"}`), &e); err != nil {
@@ -160,6 +168,7 @@ func TestLedgerEntry_Unmarshal_FloatCycle(t *testing.T) {
 // TestLedgerEntry_Unmarshal_EmptyCycle: cycle field absent entirely is
 // the pre-v8.37 case; LedgerEntry.Cycle defaults to 0 and parses cleanly.
 func TestLedgerEntry_Unmarshal_EmptyCycle(t *testing.T) {
+	t.Parallel()
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(`{"role":"x","entry_seq":5}`), &e); err != nil {
 		t.Fatalf("missing cycle should not error: %v", err)
@@ -174,6 +183,7 @@ func TestLedgerEntry_Unmarshal_EmptyCycle(t *testing.T) {
 // the guard, very-large cycle numbers would silently truncate on a
 // 32-bit builder.
 func TestLedgerEntry_Unmarshal_CycleOutOfRange(t *testing.T) {
+	t.Parallel()
 	cases := []string{
 		`{"cycle":2147483648,"role":"x"}`,  // MaxInt32 + 1
 		`{"cycle":-2147483649,"role":"x"}`, // MinInt32 - 1

@@ -9,6 +9,7 @@ import (
 // the cycle/phase infix, the probe makes no liveness claim (false), so a
 // non-tmux phase never has its stall masked.
 func TestTmuxPaneProbe_NoMatchingSession(t *testing.T) {
+	t.Parallel()
 	run := func(args ...string) ([]byte, error) {
 		if args[0] == "ls" {
 			// A different cycle/phase + an unrelated session.
@@ -24,6 +25,7 @@ func TestTmuxPaneProbe_NoMatchingSession(t *testing.T) {
 
 // TestTmuxPaneProbe_TmuxError — tmux absent / ls error → false (no claim).
 func TestTmuxPaneProbe_TmuxError(t *testing.T) {
+	t.Parallel()
 	run := func(args ...string) ([]byte, error) { return nil, fmt.Errorf("tmux: not found") }
 	probe := newTmuxPaneProbe(190, "build", run)
 	if probe() {
@@ -36,6 +38,7 @@ func TestTmuxPaneProbe_TmuxError(t *testing.T) {
 // advancing) reports alive. The first sighting also reports alive (grace
 // window); an unchanged pane afterward reports not-alive (possibly hung).
 func TestTmuxPaneProbe_PaneAnimatingIsAlive(t *testing.T) {
+	t.Parallel()
 	pane := "Incubating… (12m 48s · ↑ 54.0k tokens)"
 	run := func(args ...string) ([]byte, error) {
 		switch args[0] {
@@ -64,6 +67,7 @@ func TestTmuxPaneProbe_PaneAnimatingIsAlive(t *testing.T) {
 // TestTmuxPaneProbe_CaptureError — session found but capture-pane errors
 // (pane died mid-check) → false.
 func TestTmuxPaneProbe_CaptureError(t *testing.T) {
+	t.Parallel()
 	run := func(args ...string) ([]byte, error) {
 		switch args[0] {
 		case "ls":

@@ -17,6 +17,7 @@ import (
 
 // TestRunCycleFromPhase_NilResumePoint covers the input-validation guard.
 func TestRunCycleFromPhase_NilResumePoint(t *testing.T) {
+	t.Parallel()
 	o := mustBuildOrchestrator(t)
 	_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{}, nil)
 	if err == nil {
@@ -26,6 +27,7 @@ func TestRunCycleFromPhase_NilResumePoint(t *testing.T) {
 
 // TestRunCycleFromPhase_InvalidPhase covers the phase-validation guard.
 func TestRunCycleFromPhase_InvalidPhase(t *testing.T) {
+	t.Parallel()
 	o := mustBuildOrchestrator(t)
 	_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{},
 		&ResumePoint{Phase: "bogus-phase"})
@@ -36,6 +38,7 @@ func TestRunCycleFromPhase_InvalidPhase(t *testing.T) {
 
 // TestRunCycleFromPhase_PhaseEndInvalid — PhaseEnd cannot be a resume target.
 func TestRunCycleFromPhase_PhaseEndInvalid(t *testing.T) {
+	t.Parallel()
 	o := mustBuildOrchestrator(t)
 	_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{},
 		&ResumePoint{Phase: string(PhaseEnd)})
@@ -46,6 +49,7 @@ func TestRunCycleFromPhase_PhaseEndInvalid(t *testing.T) {
 
 // TestRunCycleFromPhase_HappyPath drives a real resumption from PhaseBuild.
 func TestRunCycleFromPhase_HappyPath(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{
 		state:      State{LastCycleNumber: 5},
 		cycleState: CycleState{CycleID: 5, WorkspacePath: "/tmp/ws"},
@@ -72,6 +76,7 @@ func TestRunCycleFromPhase_HappyPath(t *testing.T) {
 
 // TestRunCycleFromPhase_MissingRunner covers the no-runner-registered branch.
 func TestRunCycleFromPhase_MissingRunner(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{
 		state:      State{LastCycleNumber: 5},
 		cycleState: CycleState{CycleID: 5, WorkspacePath: "/tmp/ws"},
@@ -91,6 +96,7 @@ func TestRunCycleFromPhase_MissingRunner(t *testing.T) {
 
 // TestRunCycleFromPhase_LedgerError covers the ledger-append error path.
 func TestRunCycleFromPhase_LedgerError(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{
 		state:      State{LastCycleNumber: 5},
 		cycleState: CycleState{CycleID: 5, WorkspacePath: "/tmp/ws"},
@@ -109,6 +115,7 @@ func TestRunCycleFromPhase_LedgerError(t *testing.T) {
 // TestDefaultCurrentHead_RealRepo exercises defaultCurrentHead in a real
 // ephemeral git repo (0% baseline → covered).
 func TestDefaultCurrentHead_RealRepo(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	for _, args := range [][]string{
 		{"init", "-q"},
@@ -133,6 +140,7 @@ func TestDefaultCurrentHead_RealRepo(t *testing.T) {
 
 // TestDefaultCurrentHead_NotARepo covers the error branch.
 func TestDefaultCurrentHead_NotARepo(t *testing.T) {
+	t.Parallel()
 	if _, err := defaultCurrentHead(t.TempDir()); err == nil {
 		t.Errorf("expected error for non-git dir")
 	}
@@ -140,6 +148,7 @@ func TestDefaultCurrentHead_NotARepo(t *testing.T) {
 
 // TestDefaultPathExists covers both true/false branches.
 func TestDefaultPathExists(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	if !defaultPathExists(tmp) {
 		t.Errorf("expected true for existing dir")
@@ -151,6 +160,7 @@ func TestDefaultPathExists(t *testing.T) {
 
 // TestIntFromAny_AllTypes covers the int/float64/default branches.
 func TestIntFromAny_AllTypes(t *testing.T) {
+	t.Parallel()
 	if intFromAny(float64(42)) != 42 {
 		t.Error("float64")
 	}
@@ -167,6 +177,7 @@ func TestIntFromAny_AllTypes(t *testing.T) {
 
 // TestFloatFromAny_AllTypes covers float64/int/default branches.
 func TestFloatFromAny_AllTypes(t *testing.T) {
+	t.Parallel()
 	if floatFromAny(float64(1.5)) != 1.5 {
 		t.Error("float64")
 	}
@@ -183,6 +194,7 @@ func TestFloatFromAny_AllTypes(t *testing.T) {
 
 // TestStrFromAny covers the assertion-fails branch.
 func TestStrFromAny_Wrong(t *testing.T) {
+	t.Parallel()
 	if got := strFromAny(42); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
@@ -193,6 +205,7 @@ func TestStrFromAny_Wrong(t *testing.T) {
 
 // TestDecideAfterRetro_AllBranches covers HOLD/FAST-FAIL and verdict branches.
 func TestDecideAfterRetro_AllBranches(t *testing.T) {
+	t.Parallel()
 	o := mustBuildOrchestrator(t)
 	// PASS verdict → ship branch
 	branch, _, _ := o.decideAfterRetro(VerdictPASS, nil)
@@ -207,6 +220,7 @@ func TestDecideAfterRetro_AllBranches(t *testing.T) {
 
 // TestLoadResumeState_InvalidJSON covers the json.Unmarshal error path.
 func TestLoadResumeState_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

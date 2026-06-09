@@ -10,6 +10,7 @@ import (
 // This is the contract the orchestrator and adapters rely on to make
 // branching decisions ("if errors.Is(err, ErrBudgetExceeded) { … }").
 func TestSentinels_ErrorsIs(t *testing.T) {
+	t.Parallel()
 	sentinels := []error{
 		ErrPhaseGateFailed,
 		ErrLedgerChainBroken,
@@ -39,6 +40,7 @@ func TestSentinels_ErrorsIs(t *testing.T) {
 }
 
 func TestSentinels_MessagesArePresent(t *testing.T) {
+	t.Parallel()
 	sentinels := []error{
 		ErrPhaseGateFailed, ErrLedgerChainBroken, ErrBudgetExceeded,
 		ErrLockHeld, ErrSubprocessNonZero, ErrPhaseInvalid, ErrTransitionInvalid,

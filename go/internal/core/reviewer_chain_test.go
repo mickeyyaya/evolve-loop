@@ -22,6 +22,7 @@ func (s stubReviewer) Review(_ context.Context, _ ReviewInput) ReviewResult {
 // rejection short-circuits with its reason. ADR-0034.
 
 func TestChainReviewers_AllApprove(t *testing.T) {
+	t.Parallel()
 	c := ChainReviewers(
 		stubReviewer{result: ReviewResult{Approve: true}},
 		stubReviewer{result: ReviewResult{Approve: true}},
@@ -32,6 +33,7 @@ func TestChainReviewers_AllApprove(t *testing.T) {
 }
 
 func TestChainReviewers_FirstRejectionShortCircuits(t *testing.T) {
+	t.Parallel()
 	second := 0
 	c := ChainReviewers(
 		stubReviewer{result: ReviewResult{Approve: false, Reason: "nope"}},
@@ -47,6 +49,7 @@ func TestChainReviewers_FirstRejectionShortCircuits(t *testing.T) {
 }
 
 func TestChainReviewers_SkipsNil(t *testing.T) {
+	t.Parallel()
 	c := ChainReviewers(nil, stubReviewer{result: ReviewResult{Approve: true}}, nil)
 	if got := c.Review(context.Background(), ReviewInput{}); !got.Approve {
 		t.Errorf("nil reviewers skipped; got %+v", got)

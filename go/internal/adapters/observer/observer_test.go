@@ -21,6 +21,7 @@ import (
 // TestNew_Defaults — empty Config uses bash-defaults from CLAUDE.md
 // env-var table: StallS=600s, PollS=5s.
 func TestNew_Defaults(t *testing.T) {
+	t.Parallel()
 	o := New(Config{}, &bytes.Buffer{})
 	if o == nil {
 		t.Fatal("New=nil")
@@ -37,6 +38,7 @@ func TestNew_Defaults(t *testing.T) {
 // virtual clock advanced past StallS, Watch emits an "incident" event
 // reporting stall_no_output. Mirrors bash phase-observer.sh:stall rule.
 func TestWatch_StallEmitsIncident(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "scout-stdout.log")
 	// Pre-create the log so the observer has something to stat. No growth
@@ -77,6 +79,7 @@ func TestWatch_StallEmitsIncident(t *testing.T) {
 // timer resets. Test by appending bytes mid-watch and asserting no
 // stall fires in the short window.
 func TestWatch_GrowthResetsStallTimer(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "scout-stdout.log")
 	if err := os.WriteFile(logFile, []byte("a"), 0o644); err != nil {
@@ -129,6 +132,7 @@ func TestWatch_GrowthResetsStallTimer(t *testing.T) {
 // the observer must HOLD the stall: reset the clock and emit a benign
 // stall_probe_active info event instead of a false incident.
 func TestWatch_LivenessProbeSuppressesFalseStall(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "tdd-stdout.log")
 	// Flat log, no growth, no WorkspaceDir activity — exactly the cycle-190
@@ -174,6 +178,7 @@ func TestWatch_LivenessProbeSuppressesFalseStall(t *testing.T) {
 // stall on positive liveness. A probe that reports inactive (no tmux session,
 // pane unchanged) must NOT mask a genuine stall: stall_no_output still fires.
 func TestWatch_LivenessProbeFalseStillStalls(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "tdd-stdout.log")
 	if err := os.WriteFile(logFile, []byte("start"), 0o644); err != nil {
@@ -212,6 +217,7 @@ func TestWatch_LivenessProbeFalseStillStalls(t *testing.T) {
 // WorkspaceDir is set, a fresh write anywhere under it counts as progress and
 // resets the stall timer — so a working tmux agent is not falsely killed.
 func TestWatch_WorkspaceActivityResetsStallTimer(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "build-stdout.log")
 	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
@@ -260,6 +266,7 @@ func TestWatch_WorkspaceActivityResetsStallTimer(t *testing.T) {
 // activity signal disabling stall detection: with WorkspaceDir set but no
 // writes anywhere, a genuine stall must still fire.
 func TestWatch_WorkspaceConfiguredButIdle_StillStalls(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "build-stdout.log")
 	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
@@ -295,6 +302,7 @@ func TestWatch_WorkspaceConfiguredButIdle_StillStalls(t *testing.T) {
 // resetting on its own writes. Simulate by pre-creating the events file and
 // touching it on the same cadence the observer would; a real stall must fire.
 func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "build-stdout.log")
 	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
@@ -345,6 +353,7 @@ func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
 // TestStop_StopsBeforeStallFires — calling Stop() interrupts the
 // observer before any stall can be detected.
 func TestStop_StopsBeforeStallFires(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "x.log")
 	_ = os.WriteFile(logFile, []byte("x"), 0o644)
@@ -374,6 +383,7 @@ func TestStop_StopsBeforeStallFires(t *testing.T) {
 
 // TestWatch_ContextCancelReturnsErr — context cancellation propagates.
 func TestWatch_ContextCancelReturnsErr(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "x.log")
 	_ = os.WriteFile(logFile, []byte("x"), 0o644)
@@ -393,6 +403,7 @@ func TestWatch_ContextCancelReturnsErr(t *testing.T) {
 // either tolerates it (file may be created mid-watch) or surfaces an
 // initial-stat error. The contract: never panic.
 func TestWatch_MissingLogFile(t *testing.T) {
+	t.Parallel()
 	o := New(Config{
 		StallS: 50 * time.Millisecond, PollS: 10 * time.Millisecond,
 		Cycle: 1, Phase: "x", Agent: "x",
@@ -408,6 +419,7 @@ func TestWatch_MissingLogFile(t *testing.T) {
 // per line. The aggregator (bash) parses NDJSON; the Go port must
 // preserve that line discipline.
 func TestEvent_NDJSONFormat(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "x.log")
 	_ = os.WriteFile(logFile, []byte("x"), 0o644)

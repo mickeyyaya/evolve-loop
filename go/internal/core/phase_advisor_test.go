@@ -40,6 +40,7 @@ func baseRouteInput() router.RouteInput {
 }
 
 func TestPhaseAdvisor_ParsesValidJSON(t *testing.T) {
+	t.Parallel()
 	fb := &fakeBridge{stdout: `{"next_phase":"tester","insert_phases":["tester"],"justification":"acs red"}`}
 	p := NewPhaseAdvisor(fb)
 	prop, err := p.Propose(baseRouteInput())
@@ -62,6 +63,7 @@ func TestPhaseAdvisor_ParsesValidJSON(t *testing.T) {
 }
 
 func TestPhaseAdvisor_TolerantOfFenceAndProse(t *testing.T) {
+	t.Parallel()
 	fb := &fakeBridge{stdout: "Here is my routing call:\n```json\n{\"next_phase\":\"audit\",\"justification\":\"done\"}\n```\nThanks!"}
 	prop, err := NewPhaseAdvisor(fb).Propose(baseRouteInput())
 	if err != nil {
@@ -73,6 +75,7 @@ func TestPhaseAdvisor_TolerantOfFenceAndProse(t *testing.T) {
 }
 
 func TestPhaseAdvisor_FailSafe(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fb   *fakeBridge
@@ -102,6 +105,7 @@ func TestPhaseAdvisor_FailSafe(t *testing.T) {
 // illegal proposal to the kernel's legal next — proving "model proposes, kernel
 // disposes". Proposer says ship (illegal from build); kernel forces audit.
 func TestPhaseAdvisor_ProposalIsClampedByKernel(t *testing.T) {
+	t.Parallel()
 	fb := &fakeBridge{stdout: `{"next_phase":"ship","justification":"skip audit"}`}
 	strat := router.LLMProposal{Proposer: NewPhaseAdvisor(fb)}
 
@@ -138,6 +142,7 @@ func TestPhaseAdvisor_ProposalIsClampedByKernel(t *testing.T) {
 // JSON array (run true+false mix), fence/prose tolerance, and that the plan path
 // wires phase-plan.json (distinct from Propose's routing-proposal.json).
 func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name         string
 		stdout       string
@@ -181,6 +186,7 @@ func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 // the dynamic per-cycle context — and falls back to the inline framing when no
 // persona is injected.
 func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
+	t.Parallel()
 	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
 
 	t.Run("persona used + dynamic context appended", func(t *testing.T) {
@@ -289,6 +295,7 @@ func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
 // TestPhaseAdvisor_PlanFailSafe proves every malformed/failed plan returns an
 // error so the caller degrades to the deterministic static path (fail to floor).
 func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fb   *fakeBridge

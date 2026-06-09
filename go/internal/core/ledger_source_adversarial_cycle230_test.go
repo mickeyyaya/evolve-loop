@@ -23,6 +23,7 @@ import (
 // phases must produce exactly 5 phase_skipped entries, all carrying
 // Source:"router". Guards against off-by-one or partial-stamping bugs.
 func TestLedgerEntrySource_LargeSkipList_Amp(t *testing.T) {
+	t.Parallel()
 	led := &fakeLedger{}
 	o := NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
 	cs := CycleState{WorkspacePath: t.TempDir()}
@@ -66,6 +67,7 @@ func TestLedgerEntrySource_LargeSkipList_Amp(t *testing.T) {
 // must preserve it verbatim. This guards against UnmarshalJSON hardcoding
 // "router" instead of routing the raw wire field.
 func TestLedgerEntrySource_NonRouterSourcePreserved_Amp(t *testing.T) {
+	t.Parallel()
 	customSources := []string{"psmas", "content", "user-defined-value"}
 	for _, src := range customSources {
 		var e LedgerEntry
@@ -92,6 +94,7 @@ func TestLedgerEntrySource_NonRouterSourcePreserved_Amp(t *testing.T) {
 // JSON object with a "source" key. Uses reflection (same pattern as
 // ledger_source_test.go) so this file compiles even if the field is absent.
 func TestLedgerEntrySource_DirectMarshal_Amp(t *testing.T) {
+	t.Parallel()
 	var e LedgerEntry
 	v := reflect.ValueOf(&e).Elem()
 	sf := v.FieldByName("Source")

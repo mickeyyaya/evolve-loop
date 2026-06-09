@@ -6,6 +6,7 @@ import (
 )
 
 func TestComposeCorrection(t *testing.T) {
+	t.Parallel()
 	got := composeCorrection("audit deliverable failed contract: [missing_section] required section 'Verdict' not found")
 	if !strings.Contains(got, "REJECTED") {
 		t.Errorf("missing rejection framing: %q", got)
@@ -19,6 +20,7 @@ func TestComposeCorrection(t *testing.T) {
 }
 
 func TestResolveContractCorrectionRetries(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   map[string]string
 		want int

@@ -447,6 +447,9 @@ func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
 // tests) and would have failed against the pre-fix cmd_cycle.go wiring, which
 // left GenerateVerdict nil.
 func TestNewDefault_WiresVerdictGenerator(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	// Predicate root (the cycle worktree): one trivial passing Go predicate.
 	root := t.TempDir()
 	writeGoPredFixture(t, root, 7, true)
@@ -576,6 +579,9 @@ func writeGoPredFixture(t *testing.T, root string, cycle int, pass bool) {
 // A passing predicate under ProjectRoot/acs/cycle-N is discovered and the
 // verdict is written at <evolveDir>/runs/cycle-N/acs-verdict.json.
 func TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	projectRoot := t.TempDir()
 	writeGoPredFixture(t, projectRoot, 5, true)
 	evolveDir := t.TempDir()
@@ -633,6 +639,9 @@ func TestGenerateACSVerdict_ZeroPredicates_WritesNothing(t *testing.T) {
 // (here: the computed evolveDir is a regular FILE, so MkdirAll fails),
 // generateACSVerdict must wrap and return the write error.
 func TestGenerateACSVerdict_WriteVerdictError_Propagates(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	root := t.TempDir()
 	writeGoPredFixture(t, root, 3, true)
 

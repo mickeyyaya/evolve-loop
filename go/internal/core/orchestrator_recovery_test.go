@@ -164,6 +164,7 @@ func runRecoveryCycle(t *testing.T, over map[core.Phase]core.PhaseRunner) (core.
 // chain re-runs audit (saga alternative path); ship then succeeds. The cycle
 // completes without error and ship is invoked twice.
 func TestRunCycle_ShipPreconditionError_ReRunsAuditThenShips(t *testing.T) {
+	t.Parallel()
 	ship := &shipErrorStub{
 		name:      "ship",
 		failFirst: 1,
@@ -184,6 +185,7 @@ func TestRunCycle_ShipPreconditionError_ReRunsAuditThenShips(t *testing.T) {
 
 // Transient-class ShipError (e.g. GIT_PUSH_REJECTED) → retry ship directly.
 func TestRunCycle_ShipTransientError_RetriesShip(t *testing.T) {
+	t.Parallel()
 	ship := &shipErrorStub{
 		name:      "ship",
 		failFirst: 1,
@@ -201,6 +203,7 @@ func TestRunCycle_ShipTransientError_RetriesShip(t *testing.T) {
 // Integrity-class ShipError (e.g. INTEGRITY_TREE_DRIFT) → BLOCK: the cycle
 // aborts loudly with the ShipError surfaced, never auto-recovered.
 func TestRunCycle_ShipIntegrityError_AbortsLoud(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip, "tree drift")
 	ship := &shipErrorStub{name: "ship", failFirst: 99, errOnFail: se}
 	_, err, _ := runRecoveryCycle(t, map[core.Phase]core.PhaseRunner{core.PhaseShip: ship})
@@ -218,6 +221,7 @@ func TestRunCycle_ShipIntegrityError_AbortsLoud(t *testing.T) {
 // A persistently-failing precondition error exhausts maxRecoveryDepth (2) and
 // then aborts — the bounded-recursion safety invariant.
 func TestRunCycle_ShipRecoveryExhausted_Aborts(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass, "always stale")
 	ship := &shipErrorStub{name: "ship", failFirst: 99, errOnFail: se}
 	_, err, _ := runRecoveryCycle(t, map[core.Phase]core.PhaseRunner{core.PhaseShip: ship})
@@ -233,6 +237,7 @@ func TestRunCycle_ShipRecoveryExhausted_Aborts(t *testing.T) {
 // Unknown/unmapped ShipError → debugger phase; its RESHIP decision routes back
 // to ship, which then succeeds.
 func TestRunCycle_ShipUnknownError_DebuggerReship(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeWorktreeResolve, core.ShipClassConfig, core.StageArgs, "novel")
 	ship := &shipErrorStub{name: "ship", failFirst: 1, errOnFail: se}
 	dbg := &signalStub{name: "debugger", signals: map[string]any{"debugger.action": "RESHIP"}}
@@ -257,6 +262,7 @@ func TestRunCycle_ShipUnknownError_DebuggerReship(t *testing.T) {
 
 // Debugger RERUN_PHASE:audit → re-run audit, then ship succeeds.
 func TestRunCycle_ShipUnknownError_DebuggerRerunAudit(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeWorktreeResolve, core.ShipClassConfig, core.StageArgs, "novel")
 	ship := &shipErrorStub{name: "ship", failFirst: 1, errOnFail: se}
 	dbg := &signalStub{name: "debugger", signals: map[string]any{
@@ -277,6 +283,7 @@ func TestRunCycle_ShipUnknownError_DebuggerRerunAudit(t *testing.T) {
 
 // Debugger BLOCK → cycle ends without re-shipping (no further ship attempt).
 func TestRunCycle_ShipUnknownError_DebuggerBlock(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeWorktreeResolve, core.ShipClassConfig, core.StageArgs, "novel")
 	ship := &shipErrorStub{name: "ship", failFirst: 99, errOnFail: se}
 	dbg := &signalStub{name: "debugger", signals: map[string]any{"debugger.action": "BLOCK"}}

@@ -17,6 +17,7 @@ func writePIDFile(t *testing.T, content string) string {
 }
 
 func TestProcessCPUProbe_AdvancingCPUIsAlive(t *testing.T) {
+	t.Parallel()
 	pidFile := writePIDFile(t, "4242")
 	samples := []string{"0:01.00", "0:01.00", "0:02.50"}
 	i := 0
@@ -42,6 +43,7 @@ func TestProcessCPUProbe_AdvancingCPUIsAlive(t *testing.T) {
 }
 
 func TestProcessCPUProbe_FailOpenPaths(t *testing.T) {
+	t.Parallel()
 	t.Run("missing pidfile → false", func(t *testing.T) {
 		probe := newProcessCPUProbe(filepath.Join(t.TempDir(), "absent"), func(int) (string, error) {
 			t.Fatal("ps must not run when the pidfile is absent")
@@ -75,6 +77,7 @@ func TestProcessCPUProbe_FailOpenPaths(t *testing.T) {
 }
 
 func TestReadPID(t *testing.T) {
+	t.Parallel()
 	if _, ok := readPID(""); ok {
 		t.Error("empty path → not ok")
 	}
@@ -90,6 +93,7 @@ func TestReadPID(t *testing.T) {
 }
 
 func TestAnyProbe(t *testing.T) {
+	t.Parallel()
 	tru := func() bool { return true }
 	fls := func() bool { return false }
 

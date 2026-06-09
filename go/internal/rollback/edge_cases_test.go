@@ -294,6 +294,9 @@ func TestAppendLedger_OpenFileFails_ParentIsUnwritable(t *testing.T) {
 // path: `gh release view` succeeds (exit 0) AND `gh release delete` succeeds.
 // We use a fake `gh` script to control both outcomes.
 func TestDefaultGhDeleteRelease_ViewSucceeds_DeleteSucceeds(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	dir := t.TempDir()
 	// Fake gh: always exits 0 regardless of sub-command.
 	ghScript := filepath.Join(dir, "gh")
@@ -311,6 +314,9 @@ func TestDefaultGhDeleteRelease_ViewSucceeds_DeleteSucceeds(t *testing.T) {
 // TestDefaultGhDeleteRelease_ViewSucceeds_DeleteFails — `gh release view`
 // succeeds (release present) but `gh release delete` fails (exit 1).
 func TestDefaultGhDeleteRelease_ViewSucceeds_DeleteFails(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
+	}
 	dir := t.TempDir()
 	// Fake gh: `view` exits 0; `delete` exits 1.
 	ghScript := filepath.Join(dir, "gh")

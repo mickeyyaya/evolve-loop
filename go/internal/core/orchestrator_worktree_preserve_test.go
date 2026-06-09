@@ -41,6 +41,7 @@ func (r *recoveringShipRunner) Run(_ context.Context, _ PhaseRequest) (PhaseResp
 // (integrity) ship failure aborts the cycle — and the worktree must survive
 // for operator/recovery triage instead of being pruned by the exit cleanup.
 func TestOrchestrator_ShipFailureAborts_PreservesWorktree(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -62,6 +63,7 @@ func TestOrchestrator_ShipFailureAborts_PreservesWorktree(t *testing.T) {
 // retries ship and it succeeds, the normal exit cleanup applies — the
 // preservation rule must not leak worktrees on eventually-successful cycles.
 func TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree(t *testing.T) {
+	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)

@@ -32,6 +32,7 @@ func cycleWorkspaceDir(root string, cycle int) string {
 // subset assertion is the anti-no-op guard: an empty or stub file cannot satisfy
 // it because it pins the entries to the phases RunCycle actually executed.
 func TestPhaseTimingJSON_WrittenAfterRunCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -84,6 +85,7 @@ func TestPhaseTimingJSON_WrittenAfterRunCycle(t *testing.T) {
 // carrying exit_code 81. Today only an os.Stderr WARN line is emitted (no
 // structured audit trail) — so this is RED until Builder adds the append.
 func TestPhaseTimingJSON_RetryEmitsLedgerEntry(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -120,6 +122,7 @@ func TestPhaseTimingJSON_RetryEmitsLedgerEntry(t *testing.T) {
 // non-empty error_message. RED today: the abort path returns the wrapped error
 // with no structured file.
 func TestFailureDiag_WrittenOnPhaseAbort(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -160,6 +163,7 @@ func TestFailureDiag_WrittenOnPhaseAbort(t *testing.T) {
 // GREEN after Builder wires the abort-only writer — it pins the "abort-only"
 // contract.
 func TestFailureDiag_NotWrittenOnPassingCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
@@ -187,6 +191,7 @@ func (b *backfillRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse
 }
 
 func TestOrchestrator_Backfill_LedgerEntry(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -218,6 +223,7 @@ func TestOrchestrator_Backfill_LedgerEntry(t *testing.T) {
 }
 
 func TestOrchestrator_Backfill_LedgerRole(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -252,6 +258,7 @@ func TestOrchestrator_Backfill_LedgerRole(t *testing.T) {
 }
 
 func TestOrchestrator_Backfill_NoLedgerEntryWhenDisabled(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -291,6 +298,7 @@ func (b *backfillRunnerGeneric) Run(_ context.Context, req PhaseRequest) (PhaseR
 }
 
 func TestOrchestrator_Backfill_TDDArtifactPath(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -323,6 +331,7 @@ func TestOrchestrator_Backfill_TDDArtifactPath(t *testing.T) {
 }
 
 func TestPhaseTimingJSON_AttemptCount(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

@@ -7,6 +7,7 @@ import (
 )
 
 func TestResolvedShipFloor(t *testing.T) {
+	t.Parallel()
 	t.Run("unset falls back to the router default", func(t *testing.T) {
 		o := &Orchestrator{}
 		got := o.resolvedShipFloor()
