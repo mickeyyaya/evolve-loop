@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,6 +168,24 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	phaseName := orDefault(cfg.Agent, lp.name)
 	irec := interaction.NewRecorder(cfg.Workspace)
 	ar.rec, ar.phase, ar.cycle = irec, phaseName, cfg.Cycle
+	// ADR-0045 I3: the AskBroker's KernelAnswerer over THIS dispatch's closed
+	// fact set. It answers only facts the agent's own prompt already carried
+	// (artifact path, workspace, worktree, cycle) — structurally unable to
+	// disclose anything off-list (threat S7). Gated by the same
+	// EVOLVE_PHASE_RECOVERY stage as every other corrective ACTION.
+	ar.broker = interaction.NewKernelAnswerer(interaction.KernelFacts{
+		ArtifactPath: cfg.Artifact,
+		Workspace:    cfg.Workspace,
+		Worktree:     cfg.Worktree,
+		Cycle:        strconv.Itoa(cfg.Cycle),
+	})
+	ar.brokerStage = recoveryStageFromEnv(deps)
+	// ADR-0045 I4: merge ENFORCE-stage promoted auto-respond rules (durable
+	// registry under .evolve/instincts/interaction-rules), re-validated against
+	// the immutable healthy-pane corpus at load — a rule a new CLI banner now
+	// matches is demoted, never fired. Appended AFTER the manifest rules so a
+	// promoted rule can never shadow a vetted built-in (first match wins).
+	ar.prompts = append(ar.prompts, loadPromotedPrompts(cfg.ProjectRoot)...)
 	// A send can be in flight on ANY exit path (boot-time trust prompts
 	// included) — flush so the last one is never silently dropped.
 	defer ar.flushPending()
