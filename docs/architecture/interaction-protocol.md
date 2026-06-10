@@ -1,11 +1,51 @@
 # Corrective Interaction Protocol — self-correction through orchestrator ⇄ tmux-CLI interaction
 
-> Design doc for **ADR-0045** (status: Proposed). Companion to
+> Design doc for **ADR-0045** (status: **Accepted — Implemented**, 2026-06-10). Companion to
 > [phase-recovery.md](phase-recovery.md) / ADR-0044, which owns *terminal-state* recovery
 > (classify a dead/stuck phase → kill/fallback/advise). This document owns the layer ABOVE death:
 > **repairing a live or just-completed phase through bounded, validated interaction**, so fewer
 > states ever become terminal. Authored 2026-06-10 from the ADR-0044 validation-batch forensics
-> (cycles 263–269); implementation deferred to a dedicated session.
+> (cycles 263–269) and implemented the same day across five slices + two security-hardening fixes
+> (all merged to main). The sections below are the original design + threat model + rationale;
+> the **As-built deltas** immediately below record where the shipped code intentionally diverged
+> from this sketch — read them first if you are reading this doc to understand the running system.
+
+## As-built deltas (2026-06-10)
+
+The implementation is faithful to the design; these are the deliberate divergences and the
+deferred surface, each with its code home (the ADR's [§Implementation map](adr/0045-corrective-interaction-protocol.md)
+lists the canonical symbols):
+
+- **I2 `CorrectionInput.Violation` is a `string`, not `deliverable.Violation`** (`internal/interaction/correction.go`).
+  The `interaction` leaf cannot import `deliverable` (which imports `core`) without a cycle, so the
+  violation crosses as a string — the same identifiers-as-strings move `recovery` uses for verdicts.
+- **I3 `KernelAnswerer` answers four facts, not six** (`internal/interaction/askbroker.go`):
+  `artifact_path`, `workspace`, `worktree`, `cycle`. `goal_hash` and `required_sections` are named
+  in the design but **not** shipped — `bridge.Config` carries neither yet; they are deliberately
+  absent rather than declared-but-dead (add the fact + its keywords together when Config grows them).
+- **I3 injects the kernel answer via direct `SendKeys` into the attached pane**, not `inbox.KindCommand`
+  (`internal/bridge/autorespond.go:tryKernelAnswer`) — the answer fires inside the auto-respond tick,
+  which already owns the live session. The `inbox.KindNudge` path is the (dormant) rung-2 surface.
+- **I2 rung 2 (live fix) is decision-complete but execution-DORMANT at v1.** `interaction.NextCorrection`
+  decides it, but the orchestrator hard-codes `NamedREPL: false`, so the rung never executes until the
+  named-session request/reaper plumbing lands (the C1→C3 deferred-unification move). The salvage and
+  re-dispatch rungs are live.
+- **The quarantined-LLM advisor tail (I3 *proposes* a novel answer; I4 *mints* a rule from an escalation)
+  is the one named follow-up — NOT shipped.** What shipped is the **deterministic** half: the
+  `KernelAnswerer` (I3) and the full validation/promotion/consumption substrate (I4:
+  `internal/interaction/rulepromote.go` + `internal/bridge/interaction_rules.go`). The in-bridge
+  mid-launch second-LLM dispatch that would feed them is future work.
+- **§8's TDD list is the original RED plan; several names were consolidated or renamed in delivery**,
+  and the advisor-tail tests track the deferred follow-up above. The shipped suites live in
+  `internal/{interaction,panetrust}/*_test.go`, `internal/core/correction_ladder_test.go`,
+  `internal/deliverable/verifier_test.go`, and `internal/bridge/{askbroker_rung,interaction_telemetry,interaction_e2e}_test.go`.
+- **I6 (this doc §4.I6 / §6 S5):** the live channel is now implied by the stage (`enforce` ⇒ on);
+  `EVOLVE_CHANNEL` is deprecated, honored for one more release with a WARN. So the S5 note's
+  "`io.Discard` unless `EVOLVE_CHANNEL=1`" now reads "unless the channel is on (stage `enforce`, or
+  the deprecated `EVOLVE_CHANNEL=1`)." Single source: `internal/bridge/channel.Enabled`/`ResolveStage`.
+- **Two post-merge security hardenings** (independent review, both LOW): S6 redaction now also covers
+  compound credential key names (`access_token`, `private_key`, …); S2 salvage adds a `withinRoot`
+  destination-confinement guard (workspace or `<ProjectRoot>/.evolve` only).
 
 ## 1. The request
 

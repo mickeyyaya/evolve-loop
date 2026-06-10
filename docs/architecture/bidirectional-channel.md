@@ -7,6 +7,15 @@
 >
 > Status: shipped on `feat/bidirectional-channel-design` (RT0–RT6 + a post-review hardening
 > commit), opt-in via `EVOLVE_CHANNEL=1`, not yet merged to `main`.
+>
+> **Update (ADR-0045 I6, 2026-06-10): `EVOLVE_CHANNEL` is DEPRECATED.** The channel now rides the
+> `EVOLVE_PHASE_RECOVERY` stage — `enforce` implies it; `off`/`shadow` leave it off (byte-identical).
+> An explicit `EVOLVE_CHANNEL` is honored for one more release with a one-time WARN, then removed.
+> The single source for "is the channel on" is `internal/bridge/channel.Enabled` +
+> `channel.ResolveStage` (shared by the bridge driver and the observer adapter). The
+> `EVOLVE_CHANNEL=1` references throughout this guide describe the *pre-I6* opt-in mechanism; the
+> wiring is unchanged, only the gate that turns it on moved to the recovery dial. See
+> [control-flags.md](control-flags.md) and [interaction-protocol.md](interaction-protocol.md) §I6.
 
 ---
 
@@ -163,8 +172,8 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
 
 | Env var | Default | Effect |
 |---|---|---|
-| `EVOLVE_CHANNEL` | `0` | `1` enables the producer + live feed + `.live` files. |
-| `EVOLVE_CHANNEL_SUPERVISOR` | `0` | Reserved: auto-attach a `Supervisor` on phase launch (manual wiring only today). |
+| `EVOLVE_CHANNEL` | `0` | **DEPRECATED (ADR-0045 I6)** — the channel is now implied by `EVOLVE_PHASE_RECOVERY` (`enforce` ⇒ on). `1` still enables the producer + live feed + `.live` files for one more release (with a WARN); then removed. Resolution lives in `bridge/channel.Enabled`. |
+| `EVOLVE_CHANNEL_SUPERVISOR` | `0` | Reserved: auto-attach a `Supervisor` on phase launch (manual wiring only today). **Not** affected by the I6 fold — only the feed flag (`EVOLVE_CHANNEL`) is deprecated. |
 | `EVOLVE_<AGENT>_CLI` / `EVOLVE_CLI` | unset → `claude-tmux` | Resolves the per-phase CLI family for transport-aware source selection. |
 
 - **Human debug tail:** `evolve bridge watch --workspace DIR --agent NAME [--follow]` (read-only).
