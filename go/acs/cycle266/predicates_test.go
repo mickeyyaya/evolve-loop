@@ -5,13 +5,13 @@
 // turning the misnamed `TestInvariant_DuplicatePhaseRejected` (which only proved
 // tolerance) into a real, behavior-grounded kernel-floor invariant.
 //
-//	1. add a `no-duplicate-phase` entry to `invariantChecks` in invariants.go
-//	   that calls t.Errorf when in.Plan.Entries repeats a Phase value;
-//	2. rename the misleading test to `TestInvariant_DuplicatePhaseTolerated`
-//	   (its scenario genuinely asserts tolerance/determinism);
-//	3. add `TestInvariant_NoDuplicatePhaseEnforcesUniqueness` with a positive
-//	   (unique plan → invariant silent) and a negative (duplicate plan → fires)
-//	   sub-case.
+//  1. add a `no-duplicate-phase` entry to `invariantChecks` in invariants.go
+//     that calls t.Errorf when in.Plan.Entries repeats a Phase value;
+//  2. rename the misleading test to `TestInvariant_DuplicatePhaseTolerated`
+//     (its scenario genuinely asserts tolerance/determinism);
+//  3. add `TestInvariant_NoDuplicatePhaseEnforcesUniqueness` with a positive
+//     (unique plan → invariant silent) and a negative (duplicate plan → fires)
+//     sub-case.
 //
 // These predicates are BEHAVIORAL (cycle-85 lesson): each RUNS the
 // system-under-test — the `internal/routingtest` Go suite — as a subprocess and
