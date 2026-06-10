@@ -191,6 +191,15 @@ func PromoteAdvice(d *FatalPaneDetector, dir string, advice FailureAdvice) error
 	if len(advice.PaneSubstr) < minPromotedSubstrLen {
 		return fmt.Errorf("recovery: advice substring %q too short to promote safely (min %d chars — short substrings are false-positive bombs)", advice.PaneSubstr, minPromotedSubstrLen)
 	}
+	// ADR-0045 I5 backstop: the advisor reads a NEUTRALIZED pane digest, but
+	// Detect matches RAW panes — a substring carrying a neutralization
+	// artifact can never fire. Reject loudly (the caller escalates) instead
+	// of promoting a permanently-dead signature.
+	for _, artifact := range []string{"[REDACTED]", "[untrusted]", "'''"} {
+		if strings.Contains(advice.PaneSubstr, artifact) {
+			return fmt.Errorf("recovery: pane_substr %q contains neutralization artifact %q — quoted from the digest view, not the raw pane; promotion rejected", advice.PaneSubstr, artifact)
+		}
+	}
 	sig := FatalSignature{Substr: advice.PaneSubstr, Cause: cause, Note: advice.Justification}
 	if _, err := PromoteSignature(dir, sig); err != nil {
 		return fmt.Errorf("recovery: durable promotion: %w", err)

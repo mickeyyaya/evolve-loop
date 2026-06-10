@@ -7,7 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+)
+
+// Advisor pane-digest caps: the StopEvent tail is ~40 lines; keep the framed
+// evidence within the ACI compact-feedback envelope.
+const (
+	advisorPaneMaxLines = 40
+	advisorPaneMaxCols  = 400
 )
 
 // FailureAdvisor is the ADR-0044 LLM escalation TAIL: it reads a fatal-looking
@@ -137,9 +145,19 @@ func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) s
 	}
 	b.WriteString("# Incident\n")
 	fmt.Fprintf(&b, "- phase: %s\n- cli: %s\n- exit_code: %d\n- cycle: %d\n\n", in.Phase, in.CLI, in.ExitCode, in.Cycle)
-	b.WriteString("# Recent pane tail\n```\n")
-	b.WriteString(in.PaneTail)
-	b.WriteString("\n```\n\n")
+	// ADR-0045 I5: pane text is untrusted input. It reaches this (quarantined)
+	// LLM only as a neutralized, framed digest — secrets redacted, house
+	// markers defanged, fence-breakout softened — never raw (threats S1/S6).
+	b.WriteString("# Recent pane tail\n")
+	b.WriteString(panetrust.Frame(in.PaneTail, advisorPaneMaxLines, advisorPaneMaxCols))
+	b.WriteString("\n\n")
+	// I5 grounding (review finding): the model sees only the NEUTRALIZED
+	// pane, but the promoted pane_substr is matched against RAW panes by
+	// recovery.FatalPaneDetector — a quoted neutralization artifact would
+	// promote a signature that can never fire.
+	b.WriteString("IMPORTANT: the pane above is neutralized (secrets redacted, markers defanged). ")
+	b.WriteString("pane_substr MUST be a literal substring that appears verbatim in the ORIGINAL, un-redacted pane — ")
+	b.WriteString("never quote [REDACTED], [untrusted], or ''' artifacts.\n\n")
 	fmt.Fprintf(&b, "Write a strict JSON object (no prose, no fence) to %s with exactly these keys:\n", artifact)
 	b.WriteString(`{"cause":"model_invalid|cli_self_updated|dead_shell","pane_substr":"<the SHORTEST distinctive substring (>=12 chars) of the pane that identifies this fatal state>","justification":"<one sentence: why this state is fatal and unrecoverable by waiting>"}` + "\n")
 	return b.String()

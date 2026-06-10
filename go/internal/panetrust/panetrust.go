@@ -45,18 +45,49 @@ var markerBreaks = [...][2]string{
 	{`"evolve_channel"`, `"evolve_channel` + defangTag + `"`},
 }
 
+// redactedToken replaces secret-shaped strings in digests. Digests persist
+// (the interaction ledger) and ship into prompts — possibly to a
+// different-vendor fallback CLI — so a credential an agent echoed must never
+// survive (threat S6).
+const redactedToken = "[REDACTED]"
+
+// secretREs are the secret-shaped patterns redacted WHOLE; kvSecretRE
+// additionally redacts the VALUE of key:value lines whose key names a
+// credential. RE2-only (no backtracking blowups by construction).
+var secretREs = []*regexp.Regexp{
+	regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}`),                                        // OpenAI/Anthropic-style keys
+	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),                                           // AWS access key id
+	regexp.MustCompile(`\b(?:ghp|gho|ghu|ghs)_[A-Za-z0-9]{20,}\b`),                       // GitHub tokens
+	regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}\b`),                               // GitHub fine-grained PAT
+	regexp.MustCompile(`\bxox[a-z]-[A-Za-z0-9-]{10,}`),                                   // Slack tokens (all xox? families)
+	regexp.MustCompile(`\bxapp-[A-Za-z0-9-]{10,}`),                                       // Slack app-level tokens
+	regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*`), // JWTs (header.payload.sig)
+	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),                             // PEM headers
+}
+var kvSecretRE = regexp.MustCompile(`(?i)\b(api[_-]?key|secret|token|password|passwd|authorization)(\s*[:=]\s*)\S+`)
+
+// redactSecrets applies the secret patterns to already-ANSI-stripped text.
+func redactSecrets(s string) string {
+	for _, re := range secretREs {
+		s = re.ReplaceAllString(s, redactedToken)
+	}
+	return kvSecretRE.ReplaceAllString(s, "${1}${2}"+redactedToken)
+}
+
 // Digest returns a neutralized digest of pane text, safe by construction to
 // persist or to embed in an LLM prompt (under the caller's untrusted-content
-// framing): ANSI/OSC stripped, house markers defanged, capped at maxLines
-// from the TAIL (recency beats volume) and maxCols runes per line (rune-safe
-// truncation). maxLines <= 0 requests nothing; maxCols <= 0 means no column
-// cap. Digest never joins pane text with anything else — no env, no
-// templates — so nothing beyond what the agent printed can leak out (S6).
+// framing): ANSI/OSC stripped, secrets redacted, house markers defanged,
+// capped at maxLines from the TAIL (recency beats volume) and maxCols runes
+// per line (rune-safe truncation). maxLines <= 0 requests nothing;
+// maxCols <= 0 means no column cap. Digest never joins pane text with
+// anything else — no env, no templates — so nothing beyond what the agent
+// printed (minus secrets) can leak out (S6).
 func Digest(pane string, maxLines, maxCols int) string {
 	if pane == "" || maxLines <= 0 {
 		return ""
 	}
 	s := ansiRE.ReplaceAllString(pane, "")
+	s = redactSecrets(s)
 	for _, mb := range markerBreaks {
 		s = strings.ReplaceAll(s, mb[0], mb[1])
 	}
