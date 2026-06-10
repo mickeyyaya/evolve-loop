@@ -2,6 +2,7 @@ package looppreflight
 
 import (
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -111,5 +112,36 @@ func TestRun_BridgeBoot_SandboxEngageDerived(t *testing.T) {
 	}
 	if base(t, false) {
 		t.Fatalf("host sandbox not expected to work → boot should NOT engage sandbox")
+	}
+}
+
+func TestBootRCName(t *testing.T) {
+	cases := []struct {
+		name    string
+		rc      int
+		contain string
+	}{
+		{"ExitREPLBootTimeout", bridge.ExitREPLBootTimeout, "ExitREPLBootTimeout"},
+		{"ExitMissingBinary", bridge.ExitMissingBinary, "ExitMissingBinary"},
+		{"ExitBadFlags", bridge.ExitBadFlags, "ExitBadFlags"},
+		{"WorkspaceSetupFailed", exitWorkspaceSetupFailed, "workspace setup failed"},
+		{"UnknownCode1", 1, "boot failure"},
+		{"UnknownCode99", 99, "boot failure"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := bootRCName(tc.rc)
+			if !strings.Contains(got, tc.contain) {
+				t.Errorf("bootRCName(%d) = %q; want substring %q", tc.rc, got, tc.contain)
+			}
+		})
+	}
+}
+
+func TestNewDefaultBootTester_ReturnsNonNil(t *testing.T) {
+	tester := newDefaultBootTester(t.TempDir(), io.Discard)
+	if tester == nil {
+		t.Fatal("newDefaultBootTester returned nil")
 	}
 }

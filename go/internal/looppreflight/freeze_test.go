@@ -152,3 +152,31 @@ func TestRun_VersionFreeze_Idempotent(t *testing.T) {
 		t.Fatalf("freeze check must be idempotent; run1=(%s,%q) run2=(%s,%q)", c1.Level, c1.Message, c2.Level, c2.Message)
 	}
 }
+
+// Tests for the real default* implementations in freeze.go.
+
+func TestDefaultSelfUpdateEvidence_NonCodex(t *testing.T) {
+	ok, evidence, err := defaultSelfUpdateEvidence("claude")
+	if err != nil {
+		t.Fatalf("unexpected error for non-codex binary: %v", err)
+	}
+	if ok {
+		t.Fatal("non-codex binary must not have self-update evidence")
+	}
+	if evidence != "" {
+		t.Fatalf("non-codex evidence must be empty; got %q", evidence)
+	}
+}
+
+func TestDefaultSelfUpdateEvidence_Codex(t *testing.T) {
+	// Smoke: result depends on whether ~/.codex/version.json exists on this host.
+	_, _, err := defaultSelfUpdateEvidence("codex")
+	if err != nil {
+		t.Logf("defaultSelfUpdateEvidence(codex): %v (expected only if home dir unresolvable)", err)
+	}
+}
+
+func TestDefaultPinnedLister_Smoke(t *testing.T) {
+	// brew may be absent; error is acceptable — just verify no panic.
+	_, _ = defaultPinnedLister()
+}

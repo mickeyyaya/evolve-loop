@@ -144,3 +144,38 @@ func TestRun_EmptyProjectRoot_IsHarnessError(t *testing.T) {
 		t.Fatalf("expected a harness error for empty ProjectRoot, got nil")
 	}
 }
+
+// TestResolve_NilDefaults verifies that resolve() fills every function seam
+// when Options contains only the required ProjectRoot. This is the binding
+// test for the nil-branch logic at looppreflight.go:resolve() — a missed nil
+// check would leave a function field nil and panic at batch start.
+func TestResolve_NilDefaults(t *testing.T) {
+	o, err := resolve(Options{ProjectRoot: t.TempDir()})
+	if err != nil {
+		t.Fatalf("resolve with minimal opts: %v", err)
+	}
+	checks := []struct {
+		name string
+		set  bool
+	}{
+		{"now", o.now != nil},
+		{"factoryKnown", o.factoryKnown != nil},
+		{"contractKnown", o.contractKnown != nil},
+		{"driverKnown", o.driverKnown != nil},
+		{"profileLister", o.profileLister != nil},
+		{"profileGetter", o.profileGetter != nil},
+		{"probeCLI", o.probeCLI != nil},
+		{"hostProbe", o.hostProbe != nil},
+		{"dirWritable", o.dirWritable != nil},
+		{"diskFreeBytes", o.diskFreeBytes != nil},
+		{"tmuxSessions", o.tmuxSessions != nil},
+		{"bootTester", o.bootTester != nil},
+		{"selfUpdateEvidence", o.selfUpdateEvidence != nil},
+		{"pinnedLister", o.pinnedLister != nil},
+	}
+	for _, c := range checks {
+		if !c.set {
+			t.Errorf("resolve(): field %q must not be nil after resolve with nil Options", c.name)
+		}
+	}
+}

@@ -114,7 +114,10 @@ func bootRCName(rc int) string {
 	case exitWorkspaceSetupFailed:
 		return "workspace setup failed (os.MkdirTemp)"
 	default:
-		return "boot failure"
+		// Carry the numeric code: a bare "boot failure" made rc=42
+		// indistinguishable from rc=99 in preflight output (cycle-270
+		// fault-localization Rank 2).
+		return fmt.Sprintf("boot failure (exit=%d)", rc)
 	}
 }
 
