@@ -26,12 +26,16 @@ import (
 type fakeVerifier struct {
 	mu          sync.Mutex
 	destSub     string // contracted path relative to the workspace
+	absDest     string // when set, the contracted path verbatim (S2 confinement tests)
 	alwaysBad   bool   // verify !OK even when the destination exists
 	destExisted []bool
 }
 
 func (f *fakeVerifier) VerifyDeliverable(_ context.Context, in ReviewInput) (ContractVerification, error) {
 	dest := filepath.Join(in.Workspace, f.destSub)
+	if f.absDest != "" {
+		dest = f.absDest
+	}
 	_, statErr := os.Stat(dest)
 	exists := statErr == nil
 	f.mu.Lock()
@@ -377,6 +381,47 @@ func TestSalvageHelper_RejectsUnsafeCandidates(t *testing.T) {
 		}
 		if string(got) != "FROM-WORKTREE" {
 			t.Errorf("search order is worktree → workspace → cwd; relocated %q", got)
+		}
+	})
+
+	t.Run("dest_outside_roots_refused", func(t *testing.T) {
+		// S2 defense-in-depth: a verifier returning a contracted dest OUTSIDE
+		// the workspace/.evolve roots must never make salvage relocate there,
+		// even when a valid candidate exists in the workspace.
+		ws := t.TempDir()
+		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		outside := filepath.Join(t.TempDir(), "elsewhere", "build-report.md")
+		fv := &fakeVerifier{absDest: outside}
+		sr := newO(fv).salvageDeliverable(ctx, ReviewInput{Phase: "build", Workspace: ws, ProjectRoot: ws})
+		if sr.Relocated {
+			t.Errorf("an out-of-roots dest must be refused: %+v", sr)
+		}
+		if _, err := os.Stat(outside); !os.IsNotExist(err) {
+			t.Errorf("nothing may be written to the out-of-roots dest (stat err=%v)", err)
+		}
+	})
+
+	t.Run("evolve_dir_dest_allowed", func(t *testing.T) {
+		// The guard must NOT break TargetEvolveDir contracts (router/advisor
+		// JSON under <ProjectRoot>/.evolve): a dest there is legitimate.
+		root := t.TempDir()
+		ws := filepath.Join(root, "ws")
+		if err := os.MkdirAll(ws, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(ws, "routing-decision.json"), []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		evolveDest := filepath.Join(root, ".evolve", "routing-decision.json")
+		fv := &fakeVerifier{absDest: evolveDest}
+		sr := newO(fv).salvageDeliverable(ctx, ReviewInput{Phase: "router", Workspace: ws, ProjectRoot: root})
+		if !sr.Relocated {
+			t.Fatalf("a dest under <ProjectRoot>/.evolve must be allowed: %+v", sr)
+		}
+		if _, err := os.Stat(evolveDest); err != nil {
+			t.Errorf("the deliverable must land under .evolve: %v", err)
 		}
 	})
 }
