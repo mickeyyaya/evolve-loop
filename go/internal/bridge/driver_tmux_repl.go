@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
@@ -157,6 +158,18 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
 	human := humanActive(deps, cfg.HumanInput)
 	ar := newAutoResponder(lp.name, cfg.Workspace, deps, human, lp.bootScrollback)
+
+	// ADR-0045 I1: interaction telemetry — every injection this launch fires
+	// (auto-respond sends, the one-shot nudge) records a typed outcome in
+	// <workspace>/<phase>-interactions.ndjson. Recording runs at EVERY
+	// EVOLVE_PHASE_RECOVERY stage including `off`: observation is never the
+	// kill-switch's business; only corrective ACTIONS gate on the stage.
+	phaseName := orDefault(cfg.Agent, lp.name)
+	irec := interaction.NewRecorder(cfg.Workspace)
+	ar.rec, ar.phase, ar.cycle = irec, phaseName, cfg.Cycle
+	// A send can be in flight on ANY exit path (boot-time trust prompts
+	// included) — flush so the last one is never silently dropped.
+	defer ar.flushPending()
 
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
@@ -354,6 +367,26 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp)
 	completed := false
 	nudgeSent := false
+	// ADR-0045 I1: the one-shot nudge's outcome window — resolved when the
+	// run concludes, against the only evidence that matters: did the
+	// artifact appear within the bounded wait? `nudgeSent=true` with no
+	// outcome record is the cycles-263–269 defect this closes.
+	var nudgeEv *interaction.Event
+	var nudgeAt time.Time
+	defer func() {
+		if nudgeEv == nil {
+			return
+		}
+		res := interaction.ResultNoEffect
+		if completed {
+			res = interaction.ResultArtifactAppeared
+		}
+		irec.Record(interaction.Outcome{
+			Event:     *nudgeEv,
+			Result:    res,
+			LatencyMS: deps.Now().Sub(nudgeAt).Milliseconds(),
+		})
+	}()
 	detectErrLogged := false
 	peakTokens := 0
 	recordTokens := func(pane string) {
@@ -509,11 +542,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
 				pfx, StopArtifactTimeout, elapsed, attempt, progressed, lastVerdict.Action, lastVerdict.Reason)
 			if deps.OnStopReview != nil {
-				phase := cfg.Agent
-				if phase == "" {
-					phase = lp.name // fall back to driver name when agent is unset
-				}
-				deps.OnStopReview(phase, string(lastVerdict.Action), lastVerdict.Reason)
+				deps.OnStopReview(phaseName, string(lastVerdict.Action), lastVerdict.Reason)
 			}
 			if lastVerdict.Action != ReviewExtend {
 				_, isDetVal := reviewer.(deterministicReviewer)
@@ -529,6 +558,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
 					nudgeSent = true
+					nudgeEv = &interaction.Event{
+						Kind:    interaction.KindNudge,
+						Phase:   phaseName,
+						Cycle:   cfg.Cycle,
+						Trigger: "idle_no_artifact",
+						Payload: nudgeMsg,
+					}
+					nudgeAt = deps.Now()
 					intervalStart = elapsed
 					intervalBaselinePane = curPane
 					attempt++
@@ -551,11 +588,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// C2) both leave the operator-facing escalation report; extend keeps
 		// the legacy no-report behavior.
 		if lastVerdict.Action == ReviewPause || lastVerdict.Action == ReviewStop {
-			phase := cfg.Agent
-			if phase == "" {
-				phase = lp.name
-			}
-			_ = writeEscalationReport(cfg.Workspace, phase, cfg.Cycle, lastEv, lastVerdict)
+			_ = writeEscalationReport(cfg.Workspace, phaseName, cfg.Cycle, lastEv, lastVerdict)
 		}
 		return ExitArtifactTimeout, nil
 	}

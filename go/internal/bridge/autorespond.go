@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 // autorespond.go — the fallback prompt-detection engine for interactive
@@ -115,6 +117,25 @@ type autoResponder struct {
 	// suppressLogged tracks fire-once prompts we have already WARNed about, so a
 	// lingering-in-scrollback once-prompt is surfaced exactly once, not every poll.
 	suppressLogged map[string]bool
+	// Interaction telemetry (ADR-0045 I1): rec records every send with its
+	// deterministically-resolved outcome ("prompt-pattern cleared on next
+	// capture"). nil = no telemetry (the recipe adapter's capability runs are
+	// outside the phase-interaction surface). phase/cycle stamp the events;
+	// pending is the one in-flight send awaiting resolution.
+	rec     *interaction.Recorder
+	phase   string
+	cycle   int
+	pending *pendingAutoRespond
+}
+
+// pendingAutoRespond is one auto-respond send awaiting its outcome: the rule
+// that fired, its compiled pattern (re-checked against the NEXT capture), and
+// the send timestamp for latency.
+type pendingAutoRespond struct {
+	rule string
+	re   *regexp.Regexp
+	keys string
+	at   time.Time
 }
 
 // newAutoResponder builds the responder from the CLI's embedded manifest.
@@ -132,6 +153,17 @@ func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback i
 // escalation-report). Returns (action, rc) for runTmuxREPL's loop.
 func (ar *autoResponder) tick(ctx context.Context, session string) (string, int) {
 	pane, _ := ar.deps.Tmux.CapturePane(ctx, session, ar.scrollback)
+	// ADR-0045 I1: resolve the in-flight send against THIS capture before
+	// deciding — the pattern no longer matching is the deterministic
+	// "it worked" signal ("prompt-pattern cleared on next capture").
+	ar.resolvePending(pane)
+	var prevCounts map[string]int
+	if ar.rec != nil {
+		prevCounts = make(map[string]int, len(ar.counts))
+		for k, v := range ar.counts {
+			prevCounts[k] = v
+		}
+	}
 	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts)
 	switch rc {
 	case 1:
@@ -143,6 +175,7 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 			sendKeySequence(ctx, ar.deps, session, keysCSV)
 			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s\n", keysCSV)
 		}
+		ar.openPending(prevCounts, keysCSV)
 		return "", 1
 	case 2:
 		fmt.Fprintf(ar.deps.Stderr, "[auto-respond] extend_timeout signal: %s\n", action)
@@ -151,19 +184,110 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 		ar.writeEscalation(pane, strings.TrimPrefix(action, "escalate:"), "escalate", session)
 		return "", 85
 	case 86:
-		ar.writeEscalation(pane, strings.TrimPrefix(action, "loop_guard:"), "loop_guard", session)
+		// The guard trips because the SAME pattern kept matching — the
+		// pending send demonstrably did not clear it.
+		name := strings.TrimPrefix(action, "loop_guard:")
+		if ar.pending != nil && ar.pending.rule == name {
+			ar.record(ar.pending, interaction.ResultNoEffect)
+			ar.pending = nil
+		}
+		ar.writeEscalation(pane, name, "loop_guard", session)
 		return "", 86
 	default:
 		// A fire-once prompt is still matching after its single response (its
 		// dismissed text lingering in scrollback). No action — but WARN once so a
 		// genuinely-unanswered dialog is diagnosable rather than a silent timeout.
-		if name, ok := strings.CutPrefix(action, "suppress_once:"); ok && !ar.suppressLogged[name] {
-			ar.suppressLogged[name] = true
-			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] %s already handled; suppressing re-fire (dialog lingering in scrollback). "+
-				"If the agent stalls, the dialog may still be unanswered.\n", name)
+		if name, ok := strings.CutPrefix(action, "suppress_once:"); ok {
+			// Lingering-in-scrollback is genuinely indistinguishable from an
+			// unanswered dialog at this layer — record the honest bucket, not
+			// a guessed success (mirrors the WARN below).
+			if ar.pending != nil && ar.pending.rule == name {
+				ar.record(ar.pending, interaction.ResultSuppressedLingering)
+				ar.pending = nil
+			}
+			if !ar.suppressLogged[name] {
+				ar.suppressLogged[name] = true
+				fmt.Fprintf(ar.deps.Stderr, "[auto-respond] %s already handled; suppressing re-fire (dialog lingering in scrollback). "+
+					"If the agent stalls, the dialog may still be unanswered.\n", name)
+			}
 		}
 		return "", 0
 	}
+}
+
+// resolvePending re-checks the in-flight send against the current capture and
+// records prompt_cleared when its pattern no longer matches. A still-matching
+// pattern stays pending — decide() may re-fire it (→ no_effect) or suppress
+// it (→ suppressed_lingering); a nil re (recompile failed — unreachable for a
+// pattern that just matched) is left for flushPending so nothing is fabricated.
+func (ar *autoResponder) resolvePending(pane string) {
+	if ar.pending == nil || ar.pending.re == nil {
+		return
+	}
+	if !ar.pending.re.MatchString(pane) {
+		ar.record(ar.pending, interaction.ResultPromptCleared)
+		ar.pending = nil
+	}
+}
+
+// openPending resolves a still-matching predecessor honestly (its pattern was
+// still on screen when another send was needed ⇒ no_effect) and opens the
+// outcome window for the send that just fired. prevCounts identifies the rule
+// decideAutoRespond matched — the only counter that moved — without changing
+// decideAutoRespond's pinned signature. No-op without a recorder, so the
+// recipe adapter's capability runs pay zero tracking cost.
+func (ar *autoResponder) openPending(prevCounts map[string]int, keysCSV string) {
+	if ar.rec == nil {
+		return
+	}
+	if ar.pending != nil {
+		ar.record(ar.pending, interaction.ResultNoEffect)
+		ar.pending = nil
+	}
+	name := ""
+	for n, c := range ar.counts {
+		if c > prevCounts[n] {
+			name = n
+			break
+		}
+	}
+	if name == "" {
+		return // defensive: a send without a counted rule is unreachable
+	}
+	var re *regexp.Regexp
+	for _, p := range ar.prompts {
+		if p.Name == name {
+			re, _ = regexp.Compile(p.Regex) // compiled in decide already (it matched)
+			break
+		}
+	}
+	ar.pending = &pendingAutoRespond{rule: name, re: re, keys: keysCSV, at: ar.deps.Now()}
+}
+
+// flushPending resolves an in-flight auto-respond send the run is ending on
+// (no further capture will arrive): record run_ended, never silence.
+func (ar *autoResponder) flushPending() {
+	if ar.pending == nil {
+		return
+	}
+	ar.record(ar.pending, interaction.ResultRunEnded)
+	ar.pending = nil
+}
+
+// record emits one resolved auto-respond outcome through the I1 chokepoint.
+func (ar *autoResponder) record(p *pendingAutoRespond, result string) {
+	ar.rec.Record(interaction.Outcome{
+		Event: interaction.Event{
+			Kind:    interaction.KindAutoRespond,
+			Phase:   ar.phase,
+			Cycle:   ar.cycle,
+			Trigger: "prompt_matched",
+			Payload: p.keys,
+			RuleID:  p.rule,
+		},
+		Result:    result,
+		LatencyMS: ar.deps.Now().Sub(p.at).Milliseconds(),
+	})
 }
 
 // autoRespondInterKeyPause spaces out the keystrokes of a multi-step response

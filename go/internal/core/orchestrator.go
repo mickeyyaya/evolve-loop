@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -1661,10 +1662,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// Deferred write of phase-timing.json runs even when RunCycle returns an
 	// error so partial timing data is preserved for operator inspection.
 	defer func() {
-		if len(phaseTimings) == 0 {
-			return
+		if len(phaseTimings) > 0 {
+			writePhaseTimings(cs.WorkspacePath, phaseTimings)
 		}
-		writePhaseTimings(cs.WorkspacePath, phaseTimings)
+		// ADR-0045 I1: roll every per-phase interaction ledger (bridge
+		// subprocess + orchestrator producers alike) into
+		// interaction-summary.json. Best-effort, abort paths included —
+		// an interaction that isn't recorded with its outcome doesn't exist.
+		if werr := interaction.WriteRollup(cs.WorkspacePath); werr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN interaction-summary write: %v\n", werr)
+		}
 	}()
 	current := PhaseStart
 	lastVerdict := VerdictPASS
@@ -2055,6 +2062,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// pre-feature behavior. This re-runs runner.Run directly (no
 			// bridge-timeout retry on corrections — see the design's scope note).
 			maxCorrections := resolveContractCorrectionRetries(phaseReq.Env)
+			// ADR-0045 I1: a correction re-dispatch is an interaction — every
+			// rung of ONE correction decision shares a DecisionID, and each
+			// re-dispatch records an outcome resolved by its verdict + the
+			// re-review. The I2 ladder's salvage/live-fix rungs will join
+			// this same decision when they ship.
+			irec := interaction.NewRecorder(cs.WorkspacePath)
+			decisionID := ""
+			if !rr.Approve && maxCorrections > 0 {
+				decisionID = fmt.Sprintf("%s-c%d-%d", next, cycle, o.now().UnixNano())
+			}
 			for corr := 1; !rr.Approve && corr <= maxCorrections; corr++ {
 				fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 					next, corr, maxCorrections, rr.Reason)
@@ -2067,6 +2084,27 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				}); lerr != nil {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN contract_correction ledger append: %v\n", lerr)
 				}
+				// Payload carries the violation that TRIGGERED this dispatch;
+				// a rejected_again outcome's NEW violation appears as the next
+				// iteration's payload (trigger semantics, not result semantics).
+				corrEv := interaction.Event{
+					Kind:       interaction.KindCorrectionRedispatch,
+					Phase:      string(next),
+					Cycle:      cycle,
+					Trigger:    "contract_reject",
+					Rung:       "redispatch",
+					DecisionID: decisionID,
+					Payload:    rr.Reason,
+				}
+				corrStart := o.now()
+				recordCorrection := func(res string) {
+					irec.Record(interaction.Outcome{
+						Event:     corrEv,
+						Result:    res,
+						LatencyMS: o.now().Sub(corrStart).Milliseconds(),
+						CostUSD:   resp.CostUSD,
+					})
+				}
 				phaseReq.CorrectionDirective = composeCorrection(rr.Reason)
 				obsCancel := o.observer.Start(ctx, string(next), phaseReq)
 				resp, err = runner.Run(ctx, phaseReq)
@@ -2074,6 +2112,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					obsCancel()
 				}
 				if err != nil {
+					recordCorrection(interaction.ResultDispatchFailed)
 					phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
 					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 					recordFailureLearning(next, phaseErr, corr)
@@ -2085,6 +2124,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// ladder (scope note), so a non-canonical result here aborts rather
 				// than retrying.
 				if !IsVerdict(resp.Verdict) {
+					recordCorrection(interaction.ResultNonCanonicalVerdict)
 					phaseErr := fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
 					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
 					recordFailureLearning(next, phaseErr, corr)
@@ -2094,6 +2134,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// reviewer reads the filesystem (workspace/worktree), not this field.
 				rin.Response = resp
 				rr = o.reviewer.Review(ctx, rin)
+				if rr.Approve {
+					recordCorrection(interaction.ResultAccepted)
+				} else {
+					recordCorrection(interaction.ResultRejectedAgain)
+				}
 			}
 			// Defensive: phaseReq is fresh per phase iteration, but never let the
 			// directive outlive the loop.
