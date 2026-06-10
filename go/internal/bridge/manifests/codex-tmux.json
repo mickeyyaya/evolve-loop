@@ -3,6 +3,7 @@
   "cli": "codex-tmux",
   "binary": "codex",
   "binary_min_version": "0.13.0",
+  "transport": "tmux",
   "default_tier": "hybrid",
   "tier_dependencies": {
     "full": [

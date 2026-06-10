@@ -60,8 +60,14 @@ type ManifestPrompt struct {
 // Manifest is a per-CLI capability manifest (schema v1). Drives probe
 // tiering, the REPL prompt marker, and the auto-respond rule set.
 type Manifest struct {
-	CLI                string              `json:"cli"`
-	Binary             string              `json:"binary"`
+	CLI    string `json:"cli"`
+	Binary string `json:"binary"`
+	// Transport classifies the execution model: "tmux" for interactive REPL
+	// drivers that require a tmux session, "headless" for non-interactive
+	// subprocess drivers. Use Manifest.IsTmux() rather than inspecting the
+	// CLI name string directly — that is the closed abstraction point for
+	// this distinction across the entire codebase.
+	Transport          string              `json:"transport,omitempty"`
 	BinaryMinVersion   string              `json:"binary_min_version"`
 	DefaultTier        string              `json:"default_tier"`
 	TierDependencies   map[string][]string `json:"tier_dependencies"`
@@ -205,6 +211,23 @@ func translateV1TierKey(k string) string {
 	default:
 		return k
 	}
+}
+
+// IsTmux reports whether this manifest represents a tmux-driven REPL driver.
+// Prefer this over inspecting CLI name strings (e.g. strings.HasSuffix(cli, "-tmux"))
+// so the transport classification has a single authoritative source.
+func (m Manifest) IsTmux() bool {
+	return m.Transport == "tmux"
+}
+
+// IsTmuxDriver reports whether cli is a tmux-driven REPL driver by consulting
+// its manifest's Transport field. Falls back to the "-tmux" suffix check when
+// the manifest cannot be loaded (e.g. an unknown operator-installed CLI).
+func IsTmuxDriver(cli string) bool {
+	if m, err := LoadManifest(cli); err == nil {
+		return m.IsTmux()
+	}
+	return strings.HasSuffix(cli, "-tmux")
 }
 
 // ManifestNames returns the sorted set of CLI names with an embedded

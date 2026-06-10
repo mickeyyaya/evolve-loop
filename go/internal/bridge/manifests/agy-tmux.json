@@ -3,6 +3,7 @@
   "cli": "agy-tmux",
   "binary": "agy",
   "binary_min_version": "1.0.0",
+  "transport": "tmux",
   "default_tier": "hybrid",
   "tier_dependencies": {
     "full": [

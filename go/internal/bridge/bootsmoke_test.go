@@ -94,6 +94,17 @@ func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 	}
 }
 
+// TestBootSmokeTest_NilCfg verifies that passing cfg==nil triggers the
+// self-provisioning path (workspace auto-created, cleaned up on return).
+func TestBootSmokeTest_NilCfg(t *testing.T) {
+	tmux := &fakeTmux{paneSeq: []string{"❯"}} // prompt marker present → boot succeeds
+	deps, _ := bootSmokeDeps(tmux)
+	rc, _ := BootSmokeTest(context.Background(), "claude-tmux", nil, deps)
+	if rc != ExitOK {
+		t.Errorf("nil-cfg boot: rc=%d, want ExitOK (%d)", rc, ExitOK)
+	}
+}
+
 func TestScrollbackTail(t *testing.T) {
 	tests := []struct {
 		name string

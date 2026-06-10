@@ -2,6 +2,35 @@ package channel
 
 import "testing"
 
+// TestResolveStage covers all branches of ResolveStage (ADR-0045 I6).
+func TestResolveStage(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		raw  string
+		want string
+	}{
+		{"", "shadow"},         // unset → shadow default
+		{"shadow", "shadow"},   // canonical
+		{"off", "off"},         // canonical
+		{"enforce", "enforce"}, // canonical
+		{"SHADOW", "shadow"},   // case-insensitive
+		{"OFF", "off"},
+		{"ENFORCE", "enforce"},
+		{"  enforce  ", "enforce"}, // trim whitespace
+		{"typo", "off"},            // unknown → off (fail-safe)
+		{"yes", "off"},
+		{"1", "off"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.raw+"->"+tc.want, func(t *testing.T) {
+			if got := ResolveStage(tc.raw); got != tc.want {
+				t.Errorf("ResolveStage(%q)=%q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestEnabled_FoldsFlagIntoStage — ADR-0045 I6: the deprecated EVOLVE_CHANNEL
 // flag is honored one release (with a deprecation signal); when unset the
 // channel is implied by the EVOLVE_PHASE_RECOVERY stage, and shadow/off stay

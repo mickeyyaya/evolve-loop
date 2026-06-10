@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,5 +138,27 @@ func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
 	}
 	if fileNonEmpty(fx.artifact) {
 		t.Fatal("stdout contract must not require (or create) an artifact file")
+	}
+}
+
+// TestGitEvidenceDetector_ClosureCalled covers the gitCmd closure body
+// (lines 98-103 in completion.go) which is only executed when d.poll() fires.
+// The closure calls deps.Runner; a fake runner lets us verify the dispatch
+// without a real git worktree.
+func TestGitEvidenceDetector_ClosureCalled(t *testing.T) {
+	called := false
+	deps := Deps{
+		Runner: func(_ context.Context, _, _ string, _ []string, _ []string,
+			_ io.Reader, stdout, _ io.Writer) (int, error) {
+			called = true
+			_, _ = stdout.Write([]byte("abc123"))
+			return 0, nil
+		},
+	}
+	cfg := &Config{Workspace: t.TempDir(), Agent: "build", Worktree: t.TempDir()}
+	d := newGitEvidenceDetector(cfg, deps)
+	_, _, _, _ = d.poll(context.Background())
+	if !called {
+		t.Error("gitCmd closure was not invoked by poll()")
 	}
 }

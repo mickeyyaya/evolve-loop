@@ -3,6 +3,7 @@
   "cli": "codex",
   "binary": "codex",
   "binary_min_version": "0.13.0",
+  "transport": "headless",
   "default_tier": "full",
   "tier_dependencies": {
     "full": ["codex"]

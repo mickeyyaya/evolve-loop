@@ -3,6 +3,7 @@
   "cli": "agy",
   "binary": "agy",
   "binary_min_version": "1.0.0",
+  "transport": "headless",
   "default_tier": "full",
   "tier_dependencies": {
     "full": ["agy"]

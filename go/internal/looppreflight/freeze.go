@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // pinnedListerTimeout bounds the brew exec: a hung brew (lock contention, tap
@@ -89,7 +91,7 @@ func checkCLIVersionFreeze(o resolved) CheckResult {
 	seen := map[string]struct{}{}
 	var bins []string
 	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
-		if !strings.HasSuffix(d, "-tmux") {
+		if !bridge.IsTmuxDriver(d) {
 			continue
 		}
 		b := driverBinary(d)

@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -109,5 +110,18 @@ func TestLoadManifest_LiveCatalogOverlays(t *testing.T) {
 	}
 	if m.ModelTierMap["deep"] != "claude-opus-4-8-LIVE" {
 		t.Fatalf("live catalog did not overlay manifest: deep=%q", m.ModelTierMap["deep"])
+	}
+}
+
+// TestModelCatalogDir_DefaultPath covers the else branch (line 30): when
+// EVOLVE_MODEL_CATALOG_DIR is unset the function falls through to the
+// EVOLVE_PROJECT_ROOT/.evolve default. In the normal test run EVOLVE_MODEL_CATALOG_DIR
+// is set to the real .evolve dir by the shell, so this branch is otherwise dead.
+func TestModelCatalogDir_DefaultPath(t *testing.T) {
+	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", "")
+	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	got := modelCatalogDir()
+	if got != filepath.Join("", ".evolve") {
+		t.Errorf("modelCatalogDir() = %q, want %q", got, filepath.Join("", ".evolve"))
 	}
 }

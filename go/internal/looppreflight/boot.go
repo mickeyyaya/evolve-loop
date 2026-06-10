@@ -30,7 +30,7 @@ func checkBridgeBoot(o resolved) CheckResult {
 
 	var bootable []string
 	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
-		if strings.HasSuffix(d, "-tmux") {
+		if bridge.IsTmuxDriver(d) {
 			bootable = append(bootable, d)
 		}
 	}

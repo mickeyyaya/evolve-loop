@@ -3,6 +3,7 @@
   "cli": "claude-p",
   "binary": "claude",
   "binary_min_version": "2.1.0",
+  "transport": "headless",
   "default_tier": "full",
   "tier_dependencies": {
     "full": ["claude"]

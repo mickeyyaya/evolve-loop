@@ -161,7 +161,7 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	// collision-free (no two workers truncate to the same name). go-reviewer
 	// HIGH: a task-slug-based name could exceed limits / truncate-collide.
 	var sessionName, tmuxSession string
-	if strings.HasSuffix(w.CLI, "-tmux") {
+	if bridge.IsTmuxDriver(w.CLI) {
 		sessionName = fmt.Sprintf("swarm-c%d-%s", req.Cycle, w.WorkerID)
 		tmuxSession = bridge.NamedSessionName(sessionName)
 	}

@@ -144,3 +144,14 @@ func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 		t.Errorf("chatgpt_default_model %q must be a member of chatgpt_safe_models %v", m.ChatGPTDefaultModel, m.ChatGPTSafeModels)
 	}
 }
+
+// TestModelFlagIndex_TrailingFlag covers the return -1 branch when the -m or
+// --model flag appears as the last element (no value follows it).
+func TestModelFlagIndex_TrailingFlag(t *testing.T) {
+	if got := modelFlagIndex([]string{"-m"}); got != -1 {
+		t.Errorf("modelFlagIndex([\"-m\"]) = %d, want -1 (flag with no value)", got)
+	}
+	if got := modelFlagIndex([]string{"--other", "--model"}); got != -1 {
+		t.Errorf("modelFlagIndex([\"--other\",\"--model\"]) = %d, want -1", got)
+	}
+}

@@ -347,6 +347,11 @@ func TestAppendCodexNotice(t *testing.T) {
 	if !strings.Contains(out3, "trust_level") || !strings.Contains(out3, "hide_rate_limit_model_nudge") {
 		t.Errorf("must preserve existing content + append notice; got %q", out3)
 	}
+	// Cover the `out += "\n"` branch: existing non-empty without trailing newline.
+	out4 := appendCodexNotice("no-newline-at-end")
+	if !strings.HasSuffix(out4, "\n") || !strings.Contains(out4, "hide_rate_limit_model_nudge") {
+		t.Errorf("non-newline-terminated input must have newline added + notice appended; got %q", out4)
+	}
 }
 
 // TestAppendCodexTrustEntries is a pure-string unit test of the merge

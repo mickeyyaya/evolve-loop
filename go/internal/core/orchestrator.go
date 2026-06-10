@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -321,6 +322,17 @@ func WithContractVerifier(v ContractVerifier) Option {
 	return func(o *Orchestrator) {
 		if v != nil {
 			o.contractVerifier = v
+		}
+	}
+}
+
+// WithGitDirtyPaths overrides the git-dirty-path seam for the tree-diff guard.
+// Intended for tests that want to control exactly what paths the guard sees
+// without a real git repo.
+func WithGitDirtyPaths(fn func(ctx context.Context, repoRoot string) ([]string, error)) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.gitDirtyPaths = fn
 		}
 	}
 }
@@ -670,21 +682,12 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 		if p == "" || baseline[p] {
 			continue
 		}
-		// Skip the orchestrator's own runtime state and directory entries — never
-		// build output, and not safe to relocate as a file:
-		//   - .evolve/ : cycle-state, ledger, runs, guards.log, and the cycle's OWN
-		//     worktree live here. Match it at ANY path depth — guard hooks run with
-		//     cwd set to subdirectories and write nested `<subdir>/.evolve/guards.log`
-		//     (cycle-176 / issue #11): top-level-only matching missed those, so
-		//     recoverBuildLeak relocated them and the gitignored `git add` failed →
-		//     batch abort. Both top-level (`.evolve/...`) and nested (`.../.evolve/...`)
-		//     are skipped.
-		//   - trailing '/' : a nested worktree/submodule that `-uall` reports as a bare
-		//     directory (it won't recurse into another working tree). moveFile cannot
-		//     move a directory — this is the cycle-1 worktree dir that aborted the cycle
-		//     (415a9a7 regression caught by the e2e ship-path tests).
-		if (p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.Contains(p, "/.evolve/") || strings.HasSuffix(p, "/")) &&
-			!isEvolveDeliverablePath(p) {
+		// Skip paths isLegitimateMainTreePath classifies as runtime state (R9: one
+		// classification path shared with the every-boundary guard check). This
+		// covers .evolve/ non-deliverable state at any nesting depth (cycle-176) and
+		// bare directory entries from -uall (cycle-1 worktree dir abort).
+		// evolveDeliverablePrefixes are NOT skipped — they relocate into the worktree.
+		if isLegitimateMainTreePath(p) && !buildArtifacts[p] {
 			continue
 		}
 		xy := line[:2]
@@ -857,6 +860,38 @@ var buildArtifacts = map[string]bool{
 	"go/bin/evolve": true,
 }
 
+// isLegitimateMainTreePath reports whether a main-tree path is a legitimate
+// write target that must NOT trigger the tree-diff guard abort. Specifically:
+//   - tracked build artifacts (binary churn)
+//   - `.evolve/` paths at any nesting depth that are NOT evolve deliverables
+//     (runtime state: runs/, state.json, ledger.jsonl, instincts/, guards.log,
+//     worktrees/ etc.) — the same carve-out inline in recoverBuildLeak's skip
+//     branch; `isEvolveDeliverablePath` deliverables (evals/, phases/, commit-
+//     prefix-scope.json) are excluded so a worktree-phase leak of those paths
+//     still fires the guard
+//   - bare directory entries (trailing "/") from `git status --porcelain -uall`
+//
+// This is the single classification point consulted by BOTH the build-leak
+// recovery path (recoverBuildLeak) and the every-boundary guard check (R9).
+func isLegitimateMainTreePath(p string) bool {
+	// Build artifacts: a builder may rebuild these into the main tree.
+	if buildArtifacts[p] {
+		return true
+	}
+	// Trailing "/" = a bare directory entry (nested worktree/submodule that
+	// `-uall` reports without recursing): never a file we can act on.
+	if strings.HasSuffix(p, "/") {
+		return true
+	}
+	// `.evolve/` paths at any nesting depth are runtime state — EXCEPT the
+	// evolve deliverable prefixes (evals/, phases/, commit-prefix-scope.json)
+	// which only flow through worktree-based phases and must never escape.
+	if p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.Contains(p, "/.evolve/") {
+		return !isEvolveDeliverablePath(p)
+	}
+	return false
+}
+
 // gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).
 // A non-zero exit is returned as exitCode with nil err (the caller decides
 // whether it's fatal — e.g. `git diff HEAD` exit 1 means "differences", not a
@@ -876,25 +911,20 @@ func gitCapture(ctx context.Context, dir string, args ...string) (string, int, e
 	return buf.String(), 0, nil
 }
 
-// defaultGitDirtyPaths runs `git diff --name-only HEAD` in repoRoot and
-// returns the list of dirty tracked paths (one per line). Workstream B's
-// tree-diff guard uses this as a before/after snapshot — any path that
-// becomes dirty during a source-writing phase is a leak that escaped the
-// sandbox (each worktree is a separate working dir, so worktree writes don't
-// appear here). Errors propagate so the guard can degrade to "snapshot
-// missed" rather than misreport leaks.
+// defaultGitDirtyPaths runs `git status --porcelain -uall` in repoRoot and
+// returns the list of dirty paths (tracked-modified AND untracked), one per
+// entry. Porcelain granularity is required for the tree-diff guard to catch
+// NEW UNTRACKED files written by inserted/non-worktree phases — the tracked-
+// only `git diff --name-only HEAD` baseline that preceded this missed them
+// (the cycle-270 root cause). Errors propagate so the guard degrades to
+// "snapshot missed" rather than misreport leaks.
 func defaultGitDirtyPaths(ctx context.Context, repoRoot string) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "git", "-C", repoRoot, "diff", "--name-only", "HEAD")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("git diff --name-only HEAD: %w", err)
+	set := porcelainDirtySet(ctx, repoRoot)
+	paths := make([]string, 0, len(set))
+	for p := range set {
+		paths = append(paths, p)
 	}
-	var paths []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			paths = append(paths, line)
-		}
-	}
+	sort.Strings(paths)
 	return paths, nil
 }
 
@@ -1862,7 +1892,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			beforeDirty    []string
 			snapshotFailed bool
 		)
-		if phaseWorktree != "" && o.gitDirtyPaths != nil {
+		if o.gitDirtyPaths != nil {
 			treeGuard = treediff.New(o.gitDirtyPaths)
 			snap, err := treeGuard.Snapshot(ctx, req.ProjectRoot)
 			if err != nil {
@@ -2333,18 +2363,40 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if res2.OK() {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: discarded binary rebuild churn in phase %s; continuing\n", next)
 				} else {
-					phaseErr := res2.Error(string(next), phaseWorktree)
-					// ADR-0044 C1 — THE cycle-262 path: the build ran, PASSed,
-					// and burned tokens before the guard caught its main-tree
-					// leak. The abort is correct; erasing the outcome was not.
-					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-					recordFailureLearning(next, phaseErr, 1)
-					// After abort, check if go/bin/evolve is absent
-					evolveBinPath := filepath.Join(req.ProjectRoot, "go/bin/evolve")
-					if _, err := os.Stat(evolveBinPath); os.IsNotExist(err) {
-						fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL: go/bin/evolve absent after cycle abort — trust-kernel guards degraded\n")
+					// For non-worktree phases (phaseWorktree == ""), filter the leaked
+					// set through isLegitimateMainTreePath so that scout/triage/retro
+					// workspace writes under .evolve/ don't trip the guard (R7).
+					// Worktree phases keep the old strict behavior (any leak aborts).
+					leaked := res2.Leaked
+					if phaseWorktree == "" {
+						var realLeaks []string
+						for _, p := range leaked {
+							if !isLegitimateMainTreePath(p) {
+								realLeaks = append(realLeaks, p)
+							}
+						}
+						if len(realLeaks) == 0 {
+							fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s wrote only legitimate main-tree paths (.evolve/ workspace); continuing\n", next)
+							leaked = nil
+						} else {
+							leaked = realLeaks
+						}
 					}
-					return result, phaseErr
+					if len(leaked) > 0 {
+						phaseErr := fmt.Errorf("tree-diff guard: phase %q wrote to the main tree outside its worktree %q — leaked paths: %v",
+							string(next), phaseWorktree, leaked)
+						// ADR-0044 C1 — THE cycle-262 path: the build ran, PASSed,
+						// and burned tokens before the guard caught its main-tree
+						// leak. The abort is correct; erasing the outcome was not.
+						o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+						recordFailureLearning(next, phaseErr, 1)
+						// After abort, check if go/bin/evolve is absent
+						evolveBinPath := filepath.Join(req.ProjectRoot, "go/bin/evolve")
+						if _, err := os.Stat(evolveBinPath); os.IsNotExist(err) {
+							fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL: go/bin/evolve absent after cycle abort — trust-kernel guards degraded\n")
+						}
+						return result, phaseErr
+					}
 				}
 			}
 		}

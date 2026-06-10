@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -200,7 +201,7 @@ func (a *CoreAdapter) envGet(key string) string {
 // the per-phase CLI env (profile.cli pins not surfaced in env are not seen
 // here — a wrong guess only degrades that phase's live feed, never the phase).
 func (a *CoreAdapter) channelSourcePaths(req core.PhaseRequest, phase string) (stdout, stderr string) {
-	if !isTmuxFamilyCLI(a.phaseCLI(req, phase)) {
+	if !bridge.IsTmuxDriver(a.phaseCLI(req, phase)) {
 		return "", ""
 	}
 	return filepath.Join(req.Workspace, phase+"-pane.live"),
@@ -227,13 +228,6 @@ func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 		return v
 	}
 	return "claude-tmux"
-}
-
-// isTmuxFamilyCLI reports whether cli is a tmux-driven REPL driver (claude-tmux,
-// codex-tmux, agy-tmux, ollama-tmux) vs a headless "-p" driver. The default
-// (claude-tmux) is tmux, so an unresolved CLI reads as tmux.
-func isTmuxFamilyCLI(cli string) bool {
-	return strings.HasSuffix(cli, "-tmux")
 }
 
 // resolveDuration reads an EVOLVE_OBSERVER_* env var as seconds; falls
