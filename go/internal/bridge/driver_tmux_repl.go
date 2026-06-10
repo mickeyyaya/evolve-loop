@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
@@ -32,11 +33,18 @@ func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 }
 
 // channelEnabled reports whether the live bidirectional channel (ADR-0037) is
-// opted in via EVOLVE_CHANNEL=1. Off → byte-identical: no .live files, no
-// per-tick capture-pane delta streaming, and no correlation breadcrumbs.
+// on. ADR-0045 I6 folded the rollout into EVOLVE_PHASE_RECOVERY: the channel is
+// implied by the stage (enforce → on; off/shadow → off, byte-identical), and
+// the legacy EVOLVE_CHANNEL flag is deprecated — honored one release with a
+// one-time WARN. channel.Enabled is the single source for both this driver and
+// the observer adapter.
 func channelEnabled(deps Deps) bool {
-	v, _ := lookupEnv(deps, "EVOLVE_CHANNEL")
-	return v == "1"
+	explicit, _ := lookupEnv(deps, "EVOLVE_CHANNEL")
+	on, deprecated := channel.Enabled(recoveryStageFromEnv(deps), explicit)
+	if deprecated {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_CHANNEL is deprecated and will be removed next release — the live channel now rides EVOLVE_PHASE_RECOVERY (enforce implies it). See docs/architecture/control-flags.md.\n")
+	}
+	return on
 }
 
 // paneProfileFor resolves the panestream PaneProfile for a tmux driver by

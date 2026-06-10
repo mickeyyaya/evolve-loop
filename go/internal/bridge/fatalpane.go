@@ -31,8 +31,8 @@ package bridge
 import (
 	"fmt"
 	"io"
-	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
@@ -43,16 +43,11 @@ import (
 // unrecognized value → "off" — a typo must never silently enable a
 // kill-path (same posture as config.parseEvidenceStage).
 func recoveryStageFromEnv(deps Deps) string {
-	v, ok := lookupEnv(deps, "EVOLVE_PHASE_RECOVERY")
-	if !ok || strings.TrimSpace(v) == "" {
-		return "shadow"
-	}
-	switch s := strings.ToLower(strings.TrimSpace(v)); s {
-	case "off", "shadow", "enforce":
-		return s
-	default:
-		return "off"
-	}
+	v, _ := lookupEnv(deps, "EVOLVE_PHASE_RECOVERY")
+	// channel.ResolveStage is the single home of the resolution rule (unset →
+	// shadow, typo → off), shared with the observer adapter so the subprocess
+	// and in-process readers can never drift (ADR-0045 I6).
+	return channel.ResolveStage(v)
 }
 
 // fatalPaneVerdict consults the fatal-pane registry for one stop-review
