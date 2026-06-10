@@ -536,6 +536,48 @@ func TestRun_PermissionModeOverride(t *testing.T) {
 	}
 }
 
+func TestRunnerMissingProfileFastFail(t *testing.T) {
+	root := t.TempDir()
+	profileDir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
+	fb := &fakeBridge{writeArtifact: "x"}
+	r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x")})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+	if err == nil {
+		t.Fatal("Run succeeded with .evolve/profiles present but builder.json missing")
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Fatalf("Verdict=%q, want FAIL", resp.Verdict)
+	}
+	if fb.gotReq.Profile != "" {
+		t.Fatalf("bridge was launched despite missing profile: %+v", fb.gotReq)
+	}
+}
+
+func TestRunnerMissingProfileDiagnostic(t *testing.T) {
+	root := t.TempDir()
+	profileDir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(profileDir, "builder.json")
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
+	r := New(Options{Hooks: hooks, Bridge: &fakeBridge{}, Prompts: fakePromptsFS("evolve-builder", "x")})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+	if err == nil {
+		t.Fatal("Run succeeded with missing profile")
+	}
+	if !strings.Contains(err.Error(), missing) {
+		t.Fatalf("error %q does not name missing profile path %q", err, missing)
+	}
+	if len(resp.Diagnostics) == 0 || !strings.Contains(resp.Diagnostics[0].Message, missing) {
+		t.Fatalf("diagnostics do not name missing profile path %q: %+v", missing, resp.Diagnostics)
+	}
+}
+
 // TestRun_CLIResolutionPrecedence pins the precedence chain:
 //
 //	EVOLVE_CLI env var > profile.cli field > "claude-p" default

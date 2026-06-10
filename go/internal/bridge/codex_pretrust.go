@@ -1,10 +1,12 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // tomlKeyEscaper escapes the characters TOML basic strings prohibit
@@ -140,6 +142,42 @@ func codexConfigPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".codex", "config.toml"), nil
+}
+
+func codexVersionPath() (string, error) {
+	if v := os.Getenv("EVOLVE_CODEX_VERSION_PATH"); v != "" {
+		return v, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".codex", "version.json"), nil
+}
+
+func dismissCodexUpdateNag() error {
+	path, err := codexVersionPath()
+	if err != nil {
+		return fmt.Errorf("resolve codex version path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("ensure codex version dir: %w", err)
+	}
+	var state map[string]any
+	if raw, err := os.ReadFile(path); err == nil && len(strings.TrimSpace(string(raw))) > 0 {
+		_ = json.Unmarshal(raw, &state)
+	}
+	if state == nil {
+		state = map[string]any{}
+	}
+	state["dismissed_version"] = "999.999.999"
+	state["last_checked_at"] = time.Now().UTC().Format(time.RFC3339)
+	body, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode codex version state: %w", err)
+	}
+	body = append(body, '\n')
+	return os.WriteFile(path, body, 0o600)
 }
 
 // appendCodexTrustEntries returns existing with one new

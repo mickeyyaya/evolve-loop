@@ -3,7 +3,10 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -84,6 +87,30 @@ func TestCLIPreflight_CodexPreflightReturnsHelperError(t *testing.T) {
 		}
 	}()
 	_ = pf.Preflight(context.Background(), cfg, deps)
+}
+
+func TestCodexTmuxPreflightDismissesUpdateNag(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	versionPath := filepath.Join(t.TempDir(), "version.json")
+	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", configPath)
+	t.Setenv("EVOLVE_CODEX_VERSION_PATH", versionPath)
+
+	d := codexTmuxDriver{}
+	cfg := &Config{Worktree: t.TempDir(), Workspace: t.TempDir()}
+	if err := d.Preflight(context.Background(), cfg, Deps{}); err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+	raw, err := os.ReadFile(versionPath)
+	if err != nil {
+		t.Fatalf("read version state: %v", err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(raw, &state); err != nil {
+		t.Fatalf("version state JSON: %v\n%s", err, raw)
+	}
+	if state["dismissed_version"] != "999.999.999" {
+		t.Fatalf("dismissed_version=%v, want durable high-water suppression", state["dismissed_version"])
+	}
 }
 
 // recordingDriver is a synthetic Driver used to pin the Engine's CLIPreflight

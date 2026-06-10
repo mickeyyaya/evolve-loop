@@ -90,6 +90,16 @@ func SeedDetector() *FatalPaneDetector {
 			Cause:  CauseDeadShell,
 			Note:   "shell rejecting agent-directed input — the REPL is gone (cycle-262: nudged bare zsh)",
 		},
+		{
+			Substr: "\nquote>",
+			Cause:  CauseDeadShell,
+			Note:   "zsh continuation prompt after prompt spill — the REPL is gone (cycle-274 codex update-menu wedge)",
+		},
+		{
+			Substr: "\nbquote>",
+			Cause:  CauseDeadShell,
+			Note:   "zsh backquote continuation prompt after prompt spill — the REPL is gone (cycle-274 codex update-menu wedge)",
+		},
 	})
 }
 

@@ -104,6 +104,7 @@ type tmuxLaunch struct {
 	bootScrollback int       // capture-pane scrollback during boot (0=visible; 200 for alt-screen CLIs)
 	bootIntervalS  int       // seconds per boot poll iteration
 	tickDuringBoot bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
+	bootMenuSkip   string    // non-empty: keypress sent when an interstitial update menu is detected
 	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
 	bootOnly       bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
 }
@@ -253,6 +254,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				ar.tick(ctx, lp.session) // codex/agy: handle trust prompts during boot
 			}
 			if strings.Contains(pane, lp.promptMarker) {
+				if lp.bootMenuSkip != "" && tmuxPaneLooksLikeUpdateMenu(pane) {
+					_ = deps.Tmux.SendKeys(ctx, lp.session, lp.bootMenuSkip, true)
+					fmt.Fprintf(deps.Stderr, "%s boot interstitial dismissed before prompt delivery\n", pfx)
+					continue
+				}
 				promptSeen = true
 				fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", pfx, lp.promptMarker)
 				break
@@ -644,6 +650,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	fmt.Fprintf(deps.Stderr, "%s DONE: %s completion verdict = SUCCESS\n", pfx, contract)
 	return 0, nil
+}
+
+func tmuxPaneLooksLikeUpdateMenu(pane string) bool {
+	return strings.Contains(pane, "Update available!") &&
+		strings.Contains(pane, "Update now") &&
+		strings.Contains(pane, "Skip")
 }
 
 // injectEnvelope delivers one live-injection envelope into the running REPL.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"sync"
 )
 
 // TmuxController is the seam over the `tmux` operations the *-tmux
@@ -92,6 +93,88 @@ func (t execTmux) PasteBuffer(ctx context.Context, session string) error {
 func (t execTmux) KillSession(ctx context.Context, session string) error {
 	_, err := t.run(ctx, "kill-session", "-t", session)
 	return err
+}
+
+// FakeTmuxController is a scriptable TmuxController for deterministic REPL
+// state-machine tests. CapturePane consumes CaptureFrames in order and panics on
+// underrun, so a fixture that forgets a frame fails at the exact missing read.
+type FakeTmuxController struct {
+	mu             sync.Mutex
+	Existing       map[string]bool
+	CaptureFrames  []string
+	Events         []string
+	SentKeys       []string
+	SentSeq        []string
+	LoadedBuffers  []string
+	PasteCount     int
+	KilledSessions []string
+	NewSessionErr  error
+}
+
+func (f *FakeTmuxController) HasSession(_ context.Context, name string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Existing[name]
+}
+
+func (f *FakeTmuxController) NewSession(_ context.Context, name string, _, _ int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.NewSessionErr != nil {
+		return f.NewSessionErr
+	}
+	if f.Existing == nil {
+		f.Existing = map[string]bool{}
+	}
+	f.Existing[name] = true
+	f.Events = append(f.Events, "new-session:"+name)
+	return nil
+}
+
+func (f *FakeTmuxController) SendKeys(_ context.Context, _ string, keys string, enter bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.SentKeys = append(f.SentKeys, keys)
+	f.SentSeq = append(f.SentSeq, fmt.Sprintf("%s|%v", keys, enter))
+	f.Events = append(f.Events, fmt.Sprintf("send:%s|%v", keys, enter))
+	return nil
+}
+
+func (f *FakeTmuxController) CapturePane(_ context.Context, _ string, _ int) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.CaptureFrames) == 0 {
+		panic("FakeTmuxController CapturePane underrun")
+	}
+	frame := f.CaptureFrames[0]
+	f.CaptureFrames = f.CaptureFrames[1:]
+	f.Events = append(f.Events, "capture")
+	return frame, nil
+}
+
+func (f *FakeTmuxController) LoadBuffer(_ context.Context, _ string, file string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.LoadedBuffers = append(f.LoadedBuffers, file)
+	f.Events = append(f.Events, "load-buffer")
+	return nil
+}
+
+func (f *FakeTmuxController) PasteBuffer(_ context.Context, _ string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.PasteCount++
+	f.Events = append(f.Events, "paste-buffer")
+	return nil
+}
+
+func (f *FakeTmuxController) KillSession(_ context.Context, session string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.Existing, session)
+	f.KilledSessions = append(f.KilledSessions, session)
+	f.Events = append(f.Events, "kill-session:"+session)
+	return nil
 }
 
 // ansiRE matches the CSI / OSC escape sequences the bash driver strips

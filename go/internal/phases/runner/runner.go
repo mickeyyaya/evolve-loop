@@ -290,6 +290,14 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if loader := profiles.NewFromDir(profileDir); loader != nil {
 		if p, err := loader.Get(profileName); err == nil {
 			prof = &p
+		} else if st, statErr := os.Stat(profileDir); statErr == nil && st.IsDir() {
+			msg := fmt.Sprintf("profile not found: %s", profilePath)
+			return core.PhaseResponse{
+				Phase:        phase,
+				Verdict:      core.VerdictFAIL,
+				ArtifactsDir: req.Workspace,
+				Diagnostics:  []core.Diagnostic{{Severity: "error", Message: msg}},
+			}, fmt.Errorf("%s: %s: %w", phase, msg, err)
 		}
 	}
 

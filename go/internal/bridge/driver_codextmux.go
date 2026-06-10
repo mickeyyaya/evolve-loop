@@ -26,7 +26,10 @@ func (codexTmuxDriver) Name() string { return "codex-tmux" }
 func (codexTmuxDriver) Preflight(ctx context.Context, cfg *Config, deps Deps) error {
 	_ = ctx // reserved for future timeouts on TOML rewrites
 	_ = deps
-	return pretrustCodexProjects(cfg)
+	if err := pretrustCodexProjects(cfg); err != nil {
+		return err
+	}
+	return dismissCodexUpdateNag()
 }
 
 func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
@@ -70,6 +73,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 		bootScrollback: 200, // alt-screen: bare capture-pane is blank
 		bootIntervalS:  2,
 		tickDuringBoot: true, // codex shows a trust prompt during boot
+		bootMenuSkip:   "2",  // codex update menu: Skip before prompt injection
 		exitSeq:        []tmuxKey{{keys: "/quit", enter: true, pauseS: 2}},
 		bootOnly:       cfg.BootOnly,
 	})
