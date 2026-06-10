@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
@@ -31,11 +33,18 @@ func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 }
 
 // channelEnabled reports whether the live bidirectional channel (ADR-0037) is
-// opted in via EVOLVE_CHANNEL=1. Off → byte-identical: no .live files, no
-// per-tick capture-pane delta streaming, and no correlation breadcrumbs.
+// on. ADR-0045 I6 folded the rollout into EVOLVE_PHASE_RECOVERY: the channel is
+// implied by the stage (enforce → on; off/shadow → off, byte-identical), and
+// the legacy EVOLVE_CHANNEL flag is deprecated — honored one release with a
+// one-time WARN. channel.Enabled is the single source for both this driver and
+// the observer adapter.
 func channelEnabled(deps Deps) bool {
-	v, _ := lookupEnv(deps, "EVOLVE_CHANNEL")
-	return v == "1"
+	explicit, _ := lookupEnv(deps, "EVOLVE_CHANNEL")
+	on, deprecated := channel.Enabled(recoveryStageFromEnv(deps), explicit)
+	if deprecated {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_CHANNEL is deprecated and will be removed next release — the live channel now rides EVOLVE_PHASE_RECOVERY (enforce implies it). See docs/architecture/control-flags.md.\n")
+	}
+	return on
 }
 
 // paneProfileFor resolves the panestream PaneProfile for a tmux driver by
@@ -167,6 +176,24 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	phaseName := orDefault(cfg.Agent, lp.name)
 	irec := interaction.NewRecorder(cfg.Workspace)
 	ar.rec, ar.phase, ar.cycle = irec, phaseName, cfg.Cycle
+	// ADR-0045 I3: the AskBroker's KernelAnswerer over THIS dispatch's closed
+	// fact set. It answers only facts the agent's own prompt already carried
+	// (artifact path, workspace, worktree, cycle) — structurally unable to
+	// disclose anything off-list (threat S7). Gated by the same
+	// EVOLVE_PHASE_RECOVERY stage as every other corrective ACTION.
+	ar.broker = interaction.NewKernelAnswerer(interaction.KernelFacts{
+		ArtifactPath: cfg.Artifact,
+		Workspace:    cfg.Workspace,
+		Worktree:     cfg.Worktree,
+		Cycle:        strconv.Itoa(cfg.Cycle),
+	})
+	ar.brokerStage = recoveryStageFromEnv(deps)
+	// ADR-0045 I4: merge ENFORCE-stage promoted auto-respond rules (durable
+	// registry under .evolve/instincts/interaction-rules), re-validated against
+	// the immutable healthy-pane corpus at load — a rule a new CLI banner now
+	// matches is demoted, never fired. Appended AFTER the manifest rules so a
+	// promoted rule can never shadow a vetted built-in (first match wins).
+	ar.prompts = append(ar.prompts, loadPromotedPrompts(cfg.ProjectRoot)...)
 	// A send can be in flight on ANY exit path (boot-time trust prompts
 	// included) — flush so the last one is never silently dropped.
 	defer ar.flushPending()

@@ -1,7 +1,19 @@
 # ADR-0045: Corrective Interaction Protocol — bounded, validated self-correction through interaction
 
-> Status: **Proposed** (2026-06-10). Design-first; implementation in a dedicated session. Full
-> evidence, threat model, component specs, and TDD plan: [interaction-protocol.md](../interaction-protocol.md).
+> Status: **Accepted — Implemented** (2026-06-10). All six components shipped behind the
+> `EVOLVE_PHASE_RECOVERY` dial (SHADOW default = byte-identical), TDD + dual-review + commit-gate per
+> slice (build order I1 → I2 → I5 → I3+I4 → I6). The one named follow-up: I3's quarantined-advisor
+> tail and I4's rule-MINTING advisor (the in-bridge mid-launch LLM dispatch that PROPOSES promotions)
+> — the deterministic KernelAnswerer and the full I4 validation/promotion/consumption substrate ship
+> here; the LLM tail reuses that substrate. Full evidence, threat model, component specs, and TDD
+> plan: [interaction-protocol.md](../interaction-protocol.md).
+>
+> **Implementation map:** I1 telemetry + I5 Digest → `internal/interaction` (Recorder/rollup) +
+> `internal/panetrust` (Digest). I2 ladder → `interaction.NextCorrection` + `core.salvageDeliverable`
+> + `deliverable.Verifier` (breaker-neutral). I5 full → `panetrust.Extract`/`Frame` wired into
+> `core.FailureAdvisor`. I3 → `interaction.KernelAnswerer` + the bridge pre-85 rung
+> (`autorespond.go:tryKernelAnswer`). I4 → `interaction.{ValidateRule,PromoteRule,LoadRules}` +
+> `bridge.loadPromotedPrompts` + the embedded healthy-pane corpus. I6 → `channel.Enabled`/`ResolveStage`.
 > Builds on [ADR-0044](0044-unified-phase-recovery-protocol.md) (terminal-state recovery; this ADR
 > owns the layer above death), [ADR-0037](0037-bidirectional-channel.md) (the Ask/inject plumbing),
 > [ADR-0026](0026-self-healing-review-layer.md) (stop-review), PR #60 (contract corrections).

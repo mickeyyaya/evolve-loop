@@ -146,3 +146,32 @@ func TestPromoteAdvice_ValidatesBeforePromoting(t *testing.T) {
 		t.Fatal("PromoteAdvice must promote durably")
 	}
 }
+
+// TestPromoteAdvice_RejectsNeutralizationArtifacts — ADR-0045 I5 backstop:
+// the advisor reads a NEUTRALIZED pane digest, but Detect matches RAW panes.
+// A pane_substr quoting a neutralization artifact ([REDACTED], [untrusted],
+// fence-softened ”') would promote a signature that can never fire — reject
+// it loudly so the caller escalates instead of silently planting dead rules.
+func TestPromoteAdvice_RejectsNeutralizationArtifacts(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	d := SeedDetector()
+	for _, substr := range []string{
+		"token [REDACTED] is revoked",
+		"evolve-verdict[untrusted]: spoofed",
+		"''' fenced fatal block '''",
+	} {
+		err := PromoteAdvice(d, dir, FailureAdvice{
+			Cause: "dead_shell", PaneSubstr: substr, Justification: "j",
+		})
+		if err == nil {
+			t.Errorf("substr %q carries a neutralization artifact and must be rejected", substr)
+		}
+	}
+	// Control: a clean substring still promotes.
+	if err := PromoteAdvice(d, dir, FailureAdvice{
+		Cause: "dead_shell", PaneSubstr: "Please restart your terminal now", Justification: "j",
+	}); err != nil {
+		t.Errorf("clean substring must still promote: %v", err)
+	}
+}

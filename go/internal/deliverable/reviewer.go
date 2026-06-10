@@ -72,11 +72,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	if r.stage == config.StageOff {
 		return core.ReviewResult{Approve: true}
 	}
-	roots := phasecontract.Roots{
-		Workspace: in.Workspace,
-		Worktree:  in.Worktree,
-		EvolveDir: filepath.Join(in.ProjectRoot, ".evolve"),
-	}
+	roots := rootsFor(in)
 	// r.resolver is always set by newReviewer (the single construction point):
 	// BuiltinResolver for NewReviewer, a CatalogResolver for
 	// NewReviewerWithCatalog. No nil guard needed.

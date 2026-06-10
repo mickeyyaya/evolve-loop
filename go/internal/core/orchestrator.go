@@ -187,6 +187,12 @@ type Orchestrator struct {
 	// artifact-timeout panes. Nil (default) ⇒ hook inert. Set via
 	// WithFailureAdviser.
 	failureAdviser FailureAdviser
+
+	// contractVerifier is the ADR-0045 I2 breaker-neutral deliverable
+	// re-check used by the correction ladder's salvage rung. Nil (default)
+	// ⇒ the salvage rung gets zero budget and the ladder degrades to
+	// redispatch-only — exactly the pre-I2 correction loop.
+	contractVerifier ContractVerifier
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -303,6 +309,18 @@ func WithReviewer(r DeliverableReviewer) Option {
 	return func(o *Orchestrator) {
 		if r != nil {
 			o.reviewer = r
+		}
+	}
+}
+
+// WithContractVerifier injects the breaker-neutral deliverable re-check the
+// ADR-0045 I2 salvage rung verifies relocations with. Nil is ignored, leaving
+// the redispatch-only ladder (byte-identical to the pre-I2 correction loop).
+// cmd_cycle.go wires deliverable.NewVerifierWithCatalog beside the reviewer.
+func WithContractVerifier(v ContractVerifier) Option {
+	return func(o *Orchestrator) {
+		if v != nil {
+			o.contractVerifier = v
 		}
 	}
 }
@@ -2069,10 +2087,91 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// this same decision when they ship.
 			irec := interaction.NewRecorder(cs.WorkspacePath)
 			decisionID := ""
-			if !rr.Approve && maxCorrections > 0 {
+			if !rr.Approve && (maxCorrections > 0 || o.contractVerifier != nil) {
 				decisionID = fmt.Sprintf("%s-c%d-%d", next, cycle, o.now().UnixNano())
 			}
-			for corr := 1; !rr.Approve && corr <= maxCorrections; corr++ {
+			// ADR-0045 I2: graduated correction ladder. The DECISION is the
+			// pure interaction.NextCorrection CoR (salvage → live_fix →
+			// redispatch, cheapest first); EXECUTION is stage-gated here.
+			// Salvage gets budget only when a breaker-neutral verifier is
+			// wired. Rung 2 (live_fix) is decision-complete but
+			// execution-dormant at v1: the orchestrator does not yet request
+			// named sessions, so NamedREPL is hard-false until the session
+			// request + reaper plumbing lands (the C1→C3 deferred-unification
+			// precedent; see interaction/correction.go).
+			rungBudget := map[string]int{
+				interaction.RungSalvage:    1,
+				interaction.RungLiveFix:    1,
+				interaction.RungRedispatch: maxCorrections,
+			}
+			if o.contractVerifier == nil {
+				rungBudget[interaction.RungSalvage] = 0
+			}
+			corr := 0
+			salvagedFromInvalid := "" // found-but-invalid origin → rung-3 kernel evidence
+			for !rr.Approve {
+				act := interaction.NextCorrection(interaction.CorrectionInput{
+					Phase:      string(next),
+					Workspace:  cs.WorkspacePath,
+					Worktree:   phaseWorktree,
+					Violation:  rr.Reason,
+					NamedREPL:  false, // v1: no named-session request plumbing yet
+					Busy:       false,
+					DecisionID: decisionID,
+					RungBudget: rungBudget,
+				})
+				if act.Rung == "" {
+					break // ladder exhausted → abort below, exactly as today
+				}
+				rungBudget[act.Rung]-- // every iteration spends budget: the loop is finite
+				if act.Rung == interaction.RungSalvage {
+					salvEv := interaction.Event{
+						Kind:       interaction.KindSalvage,
+						Phase:      string(next),
+						Cycle:      cycle,
+						Trigger:    "contract_reject",
+						Rung:       interaction.RungSalvage,
+						DecisionID: decisionID,
+						Payload:    rr.Reason,
+					}
+					if o.cfg.PhaseRecovery != config.StageEnforce {
+						fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: would-salvage misplaced deliverable (%s; EVOLVE_PHASE_RECOVERY=%s)\n", next, act.Reason, o.cfg.PhaseRecovery)
+						irec.Record(interaction.Outcome{Event: salvEv, Result: interaction.ResultWouldAct})
+						continue
+					}
+					salvStart := o.now()
+					sr := o.salvageDeliverable(ctx, rin)
+					switch {
+					case sr.Relocated && sr.Verified:
+						// Never-upgrades-verdict: the relocated artifact faces
+						// the SAME gate — the breaker-touching FINAL outcome.
+						rr = o.reviewer.Review(ctx, rin)
+						res := interaction.ResultRejectedAgain
+						if rr.Approve {
+							res = interaction.ResultAccepted
+						}
+						fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: salvaged %s → contracted path (gate approve=%v)\n", next, sr.From, rr.Approve)
+						irec.Record(interaction.Outcome{Event: salvEv, Result: res, LatencyMS: o.now().Sub(salvStart).Milliseconds()})
+					case sr.Relocated:
+						salvagedFromInvalid = sr.From
+						fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: salvage relocated %s but the destination failed verification — falling through\n", next, sr.From)
+						irec.Record(interaction.Outcome{Event: salvEv, Result: interaction.ResultFoundButInvalid, LatencyMS: o.now().Sub(salvStart).Milliseconds()})
+					default:
+						fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: nothing to salvage (%s)\n", next, sr.Reason)
+						irec.Record(interaction.Outcome{Event: salvEv, Result: interaction.ResultNotFound, LatencyMS: o.now().Sub(salvStart).Milliseconds()})
+					}
+					continue
+				}
+				if act.Rung == interaction.RungLiveFix {
+					// Unreachable at v1 (NamedREPL hard-false). Termination
+					// invariant for when the named-session plumbing lands:
+					// the decrement above already spent this rung's budget,
+					// and live_fix never mutates rr — so the `continue` is
+					// safe under `for !rr.Approve` and the ladder stays
+					// finite (every iteration spends budget or breaks).
+					continue
+				}
+				corr++
 				fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 					next, corr, maxCorrections, rr.Reason)
 				if lerr := o.ledger.Append(ctx, LedgerEntry{
@@ -2105,7 +2204,21 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 						CostUSD:   resp.CostUSD,
 					})
 				}
-				phaseReq.CorrectionDirective = composeCorrection(rr.Reason)
+				directive := composeCorrection(rr.Reason)
+				if o.cfg.PhaseRecovery == config.StageEnforce {
+					// Evidence-enriched re-dispatch (I2 rung 3): kernel-verified
+					// facts only — never agent self-assessment. Shadow keeps
+					// today's directive byte-identical.
+					if digest := kernelEvidenceDigest(phaseWorktree, salvagedFromInvalid); digest != "" {
+						directive += "\n\n" + digest
+					}
+					// Consume-once: the found-but-invalid note describes what
+					// rung 1 discovered for the IMMEDIATE next dispatch; after
+					// that agent has rewritten the artifact, repeating the old
+					// path would be stale, not kernel-verified.
+					salvagedFromInvalid = ""
+				}
+				phaseReq.CorrectionDirective = directive
 				obsCancel := o.observer.Start(ctx, string(next), phaseReq)
 				resp, err = runner.Run(ctx, phaseReq)
 				if obsCancel != nil {

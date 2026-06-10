@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 )
 
 // autorespond.go — the fallback prompt-detection engine for interactive
@@ -126,16 +127,29 @@ type autoResponder struct {
 	phase   string
 	cycle   int
 	pending *pendingAutoRespond
+	// I3 AskBroker (ADR-0045): when an escalation would fire (rc 85) and the
+	// kernel KNOWS the answer to the blocking question, inject it ONCE and buy
+	// one more interval instead of failing the whole phase to a cross-family
+	// re-dispatch. nil broker / non-enforce stage / a miss all fall through to
+	// the unchanged 85 → fallback chain (the unconditional floor). brokerTried
+	// bounds it to once per launch.
+	broker      *interaction.KernelAnswerer
+	brokerStage string
+	brokerTried bool
 }
 
-// pendingAutoRespond is one auto-respond send awaiting its outcome: the rule
-// that fired, its compiled pattern (re-checked against the NEXT capture), and
-// the send timestamp for latency.
+// pendingAutoRespond is one injection awaiting its outcome: the rule/source
+// that fired, its compiled pattern (re-checked against the NEXT capture), the
+// payload, the send timestamp, and the I1 Kind/Trigger to record under (an
+// auto-respond send vs an I3 kernel answer resolve identically — pattern
+// cleared on next capture — so they share this struct).
 type pendingAutoRespond struct {
-	rule string
-	re   *regexp.Regexp
-	keys string
-	at   time.Time
+	rule    string
+	re      *regexp.Regexp
+	keys    string
+	at      time.Time
+	kind    string // interaction.Kind* (default KindAutoRespond)
+	trigger string
 }
 
 // newAutoResponder builds the responder from the CLI's embedded manifest.
@@ -181,6 +195,13 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 		fmt.Fprintf(ar.deps.Stderr, "[auto-respond] extend_timeout signal: %s\n", action)
 		return action, 2
 	case 85:
+		// ADR-0045 I3: the pre-85 rung. If the kernel can answer the blocking
+		// question, inject it once and return "responded" (rc 1) to buy one
+		// more interval. Any miss / non-enforce / no-typed-question falls
+		// through to today's escalation — I3 never suppresses the 85 chain.
+		if ar.tryKernelAnswer(ctx, session, pane) {
+			return "", 1
+		}
 		ar.writeEscalation(pane, strings.TrimPrefix(action, "escalate:"), "escalate", session)
 		return "", 85
 	case 86:
@@ -274,20 +295,92 @@ func (ar *autoResponder) flushPending() {
 	ar.pending = nil
 }
 
-// record emits one resolved auto-respond outcome through the I1 chokepoint.
+// record emits one resolved injection outcome through the I1 chokepoint. The
+// pending carries its own Kind/Trigger so an auto-respond send and an I3
+// kernel answer record under the right vocabulary (both resolve the same way:
+// pattern cleared on the next capture).
 func (ar *autoResponder) record(p *pendingAutoRespond, result string) {
+	kind := p.kind
+	if kind == "" {
+		kind = interaction.KindAutoRespond
+	}
+	trigger := p.trigger
+	if trigger == "" {
+		trigger = "prompt_matched"
+	}
 	ar.rec.Record(interaction.Outcome{
 		Event: interaction.Event{
-			Kind:    interaction.KindAutoRespond,
+			Kind:    kind,
 			Phase:   ar.phase,
 			Cycle:   ar.cycle,
-			Trigger: "prompt_matched",
+			Trigger: trigger,
 			Payload: p.keys,
 			RuleID:  p.rule,
 		},
 		Result:    result,
 		LatencyMS: ar.deps.Now().Sub(p.at).Milliseconds(),
 	})
+}
+
+// tryKernelAnswer is the I3 pre-85 rung: extract the blocking question via the
+// panetrust trust boundary (typed extraction — the privileged path never
+// branches on raw pane), ask the KernelAnswerer, and on a hit inject the
+// answer ONCE. Returns true only when an answer was actually injected (enforce
+// stage). Shadow records a would-act soak signal but injects nothing; off,
+// a nil broker, a non-extractable pane, or a kernel MISS all return false so
+// the caller escalates exactly as today.
+func (ar *autoResponder) tryKernelAnswer(ctx context.Context, session, pane string) bool {
+	if ar.broker == nil || ar.brokerTried || ar.brokerStage == "off" || ar.brokerStage == "" {
+		return false
+	}
+	q, err := panetrust.Extract(pane, panetrust.ExtractSpec{Kind: panetrust.ExtractQuestion})
+	if err != nil {
+		return false // no typed question → fall through to the chain, never guess
+	}
+	answer, ok := ar.broker.Answer(q.Value)
+	if !ok {
+		return false // kernel doesn't know → the 85 chain is the floor
+	}
+	if ar.brokerStage != "enforce" {
+		// Shadow soak: record what we WOULD have answered, change nothing.
+		// brokerTried is NOT consumed here — the once-budget bounds INJECTION
+		// (enforce), not soak recording; the escalate rule's own loop guard
+		// caps how many ticks reach this path.
+		fmt.Fprintf(ar.deps.Stderr, "[ask-broker] shadow: would answer %q with %q (EVOLVE_PHASE_RECOVERY=%s)\n", q.Value, answer, ar.brokerStage)
+		if ar.rec != nil {
+			ar.rec.Record(interaction.Outcome{
+				Event:  interaction.Event{Kind: interaction.KindKernelAnswer, Phase: ar.phase, Cycle: ar.cycle, Trigger: "unknown_prompt", Payload: answer, RuleID: "would_act"},
+				Result: interaction.ResultWouldAct,
+			})
+		}
+		return false
+	}
+	// Enforce: inject the answer once. The agent is blocked AT a prompt
+	// (that is why an escalation fired), so it is idle by construction — no
+	// Busy guard needed here. brokerTried is consumed on THIS path only.
+	ar.brokerTried = true
+	if ar.human {
+		humanReadingPause(ar.deps, pane)
+	}
+	_ = ar.deps.Tmux.SendKeys(ctx, session, answer, true)
+	fmt.Fprintf(ar.deps.Stderr, "[ask-broker] answered %q with kernel fact %q\n", q.Value, answer)
+	// Resolve like an auto-respond send: if the question text clears on the
+	// next capture it worked (prompt_cleared); otherwise the run ends with it
+	// pending (run_ended) — never a fabricated success. QuoteMeta output always
+	// compiles, so a nil re (handled by resolvePending) is unreachable here.
+	if ar.rec != nil {
+		ar.flushPending() // resolve any prior auto-respond send first
+		re, _ := regexp.Compile(regexp.QuoteMeta(strings.TrimSpace(q.Value)))
+		ar.pending = &pendingAutoRespond{
+			rule:    "kernel_answer",
+			re:      re,
+			keys:    answer,
+			at:      ar.deps.Now(),
+			kind:    interaction.KindKernelAnswer,
+			trigger: "unknown_prompt",
+		}
+	}
+	return true
 }
 
 // autoRespondInterKeyPause spaces out the keystrokes of a multi-step response

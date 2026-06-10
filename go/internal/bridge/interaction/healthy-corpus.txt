@@ -1,0 +1,32 @@
+# Healthy-pane corpus (ADR-0045 I4) — IMMUTABLE, operator-reviewed.
+# One line per representative line of NORMAL (non-prompting) output from each
+# driver CLI's working pane. A promoted auto-respond rule's regex must NOT
+# match any line here (a rule that fires on healthy output injects keystrokes
+# into working agents — a DoS). Seeded once from real panes; NEVER
+# auto-regenerated from live panes (a poisoned pane during regeneration would
+# launder future poison rules — threat S3). Lines starting with # are comments.
+#
+# claude-tmux
+❯
+esc to interrupt
+⏵⏵ accept edits on
+● Writing the file to the workspace…
+✻ Deliberating…
+Deliberating 12s
+✓ Updated build-report.md
+# codex-tmux
+›
+working ⠋
+tokens used: 1234
+• Ran command
+# agy-tmux
+? for shortcuts
+✦ Generating response…
+Using 1 context file
+# ollama-tmux
+>>> Send a message
+⠴ thinking
+# generic progress chrome
+[1/3] building
+Done in 4.2s
+PASS
