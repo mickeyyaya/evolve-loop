@@ -186,10 +186,12 @@ type PhasePlanEntry struct {
 // reconstructed from this + the entry's Phase name at parse time; gates/IO take
 // safe defaults (the registrar forces Optional + sandboxes source-writers).
 type MintSpec struct {
-	Prompt       string `json:"prompt"`
-	Tier         string `json:"tier,omitempty"`
-	CLI          string `json:"cli,omitempty"`
-	WritesSource bool   `json:"writes_source,omitempty"`
+	Prompt string `json:"prompt"`
+	Tier   string `json:"tier,omitempty"`
+	CLI    string `json:"cli,omitempty"`
+	// WritesSource is tri-state so omitted advisor output can take the safe
+	// minted-phase default while an explicit false remains a read-only opt-out.
+	WritesSource *bool `json:"writes_source,omitempty"`
 }
 
 // PhasePlan is the advisor's whole-cycle plan. ADVISORY only: the kernel clamp

@@ -1583,6 +1583,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
 	// relocates paths the build introduced, never the operator's pre-existing work.
 	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
+	cycleCompletedNormally := false
 	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
 	} else {
@@ -1597,8 +1598,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD at worktree creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
 		}
 		defer func() {
-			if preserveWorktree {
-				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — ship failed; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
+			if preserveWorktree || !cycleCompletedNormally {
+				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
 				return
 			}
 			_ = o.worktree.Cleanup(req.ProjectRoot, wtPath)
@@ -2563,6 +2564,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	if err := o.storage.WriteState(ctx, state); err != nil {
 		return result, fmt.Errorf("write state: %w", err)
 	}
+	cycleCompletedNormally = true
 	return result, nil
 }
 
