@@ -1,0 +1,36 @@
+{
+  "name": "memo",
+  "archetype": "learn",
+  "agent": "evolve-memo",
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/audit-report.md",
+      ".evolve/runs/cycle-{cycle}/build-report.md",
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/memo.md",
+      ".evolve/runs/cycle-{cycle}/carryover-todos.json"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Artifact Index",
+      "Skill Suggestions",
+      "carryoverTodo Guidance"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "ship.class",
+        "op": "==",
+        "value": "cycle"
+      }
+    ]
+  },
+  "after": "ship",
+  "optional": true
+}

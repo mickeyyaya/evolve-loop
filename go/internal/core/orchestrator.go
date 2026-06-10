@@ -1753,7 +1753,21 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 
 		runner, ok := o.runners[next]
 		if !ok {
-			return result, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
+			// The routing surface (registry order + catalog) can know phases
+			// the dispatch surface cannot run (cycle-265: registry-listed
+			// `memo` had no .evolve/phases config ⇒ no specrunner; the static
+			// order walked into it post-ship and killed a PASSING batch). A
+			// non-dispatchable OPTIONAL USER phase is skipped loudly and the
+			// walk continues; a missing BUILT-IN or configured-mandatory
+			// runner stays fatal — that is a wiring bug, not routing-surface
+			// drift (built-ins always have factories; only registry/user
+			// phases can be known to routing yet unregistered).
+			if next.IsValid() || isConfiguredMandatory(o.cfg, string(next)) {
+				return result, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
+			}
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s selected but no runner is registered — skipping (register a runner or remove it from the registry order)\n", next)
+			current = next
+			continue
 		}
 
 		phaseStarted := o.now().UTC()
