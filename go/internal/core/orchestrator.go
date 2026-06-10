@@ -591,6 +591,43 @@ func porcelainPath(line string) string {
 // guard only backstops tracked leaks, so an unrecovered (esp. untracked) leak
 // must not be allowed to slip past into audit. "Couldn't determine" cases degrade
 // to true (let the guard be the backstop). Best-effort + loud WARNs throughout.
+// evolveDeliverablePrefixes are the `.evolve/` subpaths that are REPO CONTENT
+// — locations agents legitimately write as cycle deliverables. A leak under
+// one of these relocates into the worktree like any other repo path
+// (cycle-262: tracked commit-prefix-scope.json edit; cycle-268: a NEW eval
+// file — both previously hit the blanket `.evolve/` skip, were unrecoverable,
+// and killed their cycles at the tree-diff guard). Everything else under
+// `.evolve/` is never relocated: runtime state (runs/, worktrees/,
+// state.json, ledger.jsonl, instincts/, nested guards.log — pinned by the
+// Skips tests) AND the TRUST-SENSITIVE operator-privilege documents
+// (.evolve/profiles/, .evolve/policy.json) — those configure the gates and
+// the auditor's own constraints, so an agent write there must stay
+// unrecoverable (the guard kills the cycle, forcing human review; an auditor
+// cannot safely review the file that redefines the auditor).
+var evolveDeliverablePrefixes = []string{
+	".evolve/evals/",
+	".evolve/phases/",
+	".evolve/commit-prefix-scope.json",
+}
+
+// isEvolveDeliverablePath reports whether a TOP-LEVEL `.evolve/` path is a
+// deliverable location (nested `<subdir>/.evolve/` runtime residue never is).
+// Directory entries (trailing "/") prefix-match their contents; exact-file
+// entries require equality — a bare HasPrefix would false-positive
+// look-alikes such as `.evolve/commit-prefix-scope.json.bak`.
+func isEvolveDeliverablePath(p string) bool {
+	for _, pfx := range evolveDeliverablePrefixes {
+		if strings.HasSuffix(pfx, "/") {
+			if p == strings.TrimSuffix(pfx, "/") || strings.HasPrefix(p, pfx) {
+				return true
+			}
+		} else if p == pfx {
+			return true
+		}
+	}
+	return false
+}
+
 func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baseline map[string]bool) bool {
 	if worktree == "" {
 		return true // no worktree to relocate into → degrade (caller guards this anyway)
@@ -627,7 +664,8 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 		//     directory (it won't recurse into another working tree). moveFile cannot
 		//     move a directory — this is the cycle-1 worktree dir that aborted the cycle
 		//     (415a9a7 regression caught by the e2e ship-path tests).
-		if p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.Contains(p, "/.evolve/") || strings.HasSuffix(p, "/") {
+		if (p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.Contains(p, "/.evolve/") || strings.HasSuffix(p, "/")) &&
+			!isEvolveDeliverablePath(p) {
 			continue
 		}
 		xy := line[:2]

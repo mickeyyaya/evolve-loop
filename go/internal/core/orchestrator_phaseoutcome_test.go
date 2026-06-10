@@ -153,12 +153,19 @@ func phasesRunContains(phases []Phase, want Phase) bool {
 	return false
 }
 
-// TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome is the faithful
-// cycle-262 reproduction: build PASSes with real cost, leaks a tracked
-// .evolve/ config into the main tree, the tree-diff guard aborts the cycle
-// (CORRECT — the leak is real), and the build outcome must STILL be recorded:
-// PhasesRun membership, a phase-timing entry carrying the agent's own PASS +
-// cost + duration + a non-empty abort_reason, and build-usage.json.
+// TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome pins the cycle-262
+// CLASS: build PASSes with real cost, leaves the main tree dirty in a way
+// recovery cannot repair, the tree-diff guard aborts the cycle (CORRECT),
+// and the build outcome must STILL be recorded: PhasesRun membership, a
+// phase-timing entry carrying the agent's own PASS + cost + duration + a
+// non-empty abort_reason, and build-usage.json.
+//
+// Fixture note: the original fixture was 262's literal leak (a tracked
+// .evolve/commit-prefix-scope.json edit) — that is now RECOVERABLE by design
+// (the deliverable allowlist relocates it; pinned in
+// buildleak_recover_test.go), so this test uses a STAGED RENAME of a tracked
+// file, which no recovery branch handles — the canonical still-unrecoverable
+// main-tree mutation.
 func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -170,9 +177,11 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 		name: string(PhaseBuild), verdict: VerdictPASS,
 		costUSD: 0.42, durationMS: 1234,
 		onRun: func() {
-			p := filepath.Join(root, ".evolve", "commit-prefix-scope.json")
-			if err := os.WriteFile(p, []byte(`{"prefixes":["chore(build)"]}`+"\n"), 0o644); err != nil {
-				t.Errorf("leak write: %v", err)
+			// A staged rename of a tracked file: porcelain 'R ' matches no
+			// recovery branch → the guard re-check stays dirty → abort.
+			cmd := exec.Command("git", "-C", root, "mv", ".evolve/commit-prefix-scope.json", ".evolve/commit-prefix-scope.renamed.json")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Errorf("leak rename: %v\n%s", err, out)
 			}
 		},
 	}

@@ -308,3 +308,74 @@ func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 		t.Fatalf("new leak should be in the worktree: %v", err)
 	}
 }
+
+// cycle-268 (and the cycle-262 carryover the loop kept dying on): `.evolve/`
+// DELIVERABLE locations — eval files, phase configs, profiles, the tracked
+// prefix-scope/policy configs — are repo content that legitimately ships
+// with cycles, not runtime state. The blanket `.evolve/` skip made any agent
+// that wrote one into the MAIN tree unrecoverable (relocation refused → the
+// tree-diff guard aborted the cycle; cycle-268's tdd died writing its OWN
+// eval). Deliverable subpaths now relocate exactly like any other repo path;
+// runtime state (runs/, worktrees/, ledger, state.json…) stays skipped —
+// pinned by the two Skips tests above.
+func TestRecoverBuildLeak_RelocatesUntrackedEvalDeliverable(t *testing.T) {
+	t.Parallel()
+	repo, wt := realWorktree(t)
+	baseline := porcelainDirtySet(context.Background(), repo)
+
+	if err := os.MkdirAll(filepath.Join(repo, ".evolve/evals"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	leak := filepath.Join(repo, ".evolve/evals/recover-build-leak.md")
+	if err := os.WriteFile(leak, []byte("# Eval\n- C1: …\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !recoverBuildLeak(context.Background(), repo, wt, baseline) {
+		t.Fatal("an eval-deliverable leak must be recoverable, not abort")
+	}
+	if _, err := os.Stat(leak); !os.IsNotExist(err) {
+		t.Fatalf("main-tree eval leak must be relocated away; stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wt, ".evolve/evals/recover-build-leak.md")); err != nil {
+		t.Fatalf("eval must land in the worktree: %v", err)
+	}
+}
+
+// The cycle-262 shape: a TRACKED `.evolve/` config edited in main (worktree
+// clean for that path) must relocate via the existing tracked-edit branch.
+func TestRecoverBuildLeak_RelocatesTrackedEvolveConfigEdit(t *testing.T) {
+	t.Parallel()
+	repo, wt := realWorktree(t)
+	// Track a config under .evolve/ (the commit-prefix-scope shape).
+	if err := os.MkdirAll(filepath.Join(repo, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(repo, ".evolve/commit-prefix-scope.json")
+	if err := os.WriteFile(cfgPath, []byte(`{"prefixes":[]}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitInRepo(t, repo, "add", "-f", ".evolve/commit-prefix-scope.json")
+	gitInRepo(t, repo, "commit", "-q", "-m", "track prefix scope")
+	// Recreate the worktree off the NEW head so it shares the tracked file.
+	wt2 := filepath.Join(t.TempDir(), "wt2")
+	gitInRepo(t, repo, "worktree", "add", "--detach", "-q", wt2, "HEAD")
+	_ = wt
+
+	baseline := porcelainDirtySet(context.Background(), repo)
+	if err := os.WriteFile(cfgPath, []byte(`{"prefixes":["chore(build)"]}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !recoverBuildLeak(context.Background(), repo, wt2, baseline) {
+		t.Fatal("a tracked .evolve config edit must be recoverable (cycle-262), not abort")
+	}
+	got, err := os.ReadFile(filepath.Join(wt2, ".evolve/commit-prefix-scope.json"))
+	if err != nil || !strings.Contains(string(got), "chore(build)") {
+		t.Fatalf("edited content must land in the worktree; got %q err=%v", got, err)
+	}
+	main, _ := os.ReadFile(cfgPath)
+	if strings.Contains(string(main), "chore(build)") {
+		t.Fatalf("main tree must be restored to HEAD content; got %q", main)
+	}
+}
