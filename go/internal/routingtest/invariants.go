@@ -61,6 +61,11 @@ var invariantChecks = map[string]invariantFn{
 			t.Errorf("Route nondeterministic:\n a=%+v\n b=%+v", a, b)
 		}
 	},
+	"no-duplicate-phase": func(t *testing.T, in router.RouteInput, _ *router.Proposal, _ router.RouterDecision) {
+		for _, phase := range duplicatePlanPhases(in.Plan) {
+			t.Errorf("duplicate phase %q in plan", phase)
+		}
+	},
 	// ADR-0024 §1 integrity floor: a CLAMPED plan that runs ship MUST also run
 	// build and audit. Asserts on in.Plan AS THREADED (already floor-clamped by
 	// the engine/orchestrator) — the non-configurable guarantee the kernel keeps
@@ -75,6 +80,22 @@ var invariantChecks = map[string]invariantFn{
 			}
 		}
 	},
+}
+
+func duplicatePlanPhases(plan *router.PhasePlan) []string {
+	if plan == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var duplicates []string
+	for _, e := range plan.Entries {
+		if seen[e.Phase] {
+			duplicates = append(duplicates, e.Phase)
+			continue
+		}
+		seen[e.Phase] = true
+	}
+	return duplicates
 }
 
 // planRunsTest reports whether plan schedules phase with Run==true (test-side

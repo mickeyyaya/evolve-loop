@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 func TestInvariant_ProposalNeverWeakens(t *testing.T) {
@@ -80,7 +81,7 @@ func TestInvariant_ShipImpliesAuditInPlan(t *testing.T) {
 	})
 }
 
-func TestInvariant_DuplicatePhaseRejected(t *testing.T) {
+func TestInvariant_DuplicatePhaseTolerated(t *testing.T) {
 	RunAll(t, []ScenarioSpec{
 		Scenario("duplicate plan entries still yield one deterministic walk",
 			Pure(), Advisory(), Mandatory("scout"), At("scout"), Done("scout"), SmallCycle(),
@@ -88,5 +89,30 @@ func TestInvariant_DuplicatePhaseRejected(t *testing.T) {
 			ExpectNext("tdd"),
 			ExpectInvariants("ship-implies-audit-in-plan", "determinism"),
 		),
+	})
+}
+
+func TestInvariant_NoDuplicatePhaseEnforcesUniqueness(t *testing.T) {
+	t.Run("unique_plan_is_silent", func(t *testing.T) {
+		RunAll(t, []ScenarioSpec{
+			Scenario("unique plan phases satisfy invariant",
+				Pure(), Advisory(), Mandatory("scout"), At("scout"), Done("scout"), SmallCycle(),
+				AgentPlan(PlanRun("scout"), PlanRun("tdd"), PlanRun("build"), PlanRun("audit"), PlanRun("ship")),
+				ExpectInvariants("no-duplicate-phase"),
+			),
+		})
+	})
+
+	t.Run("duplicate_plan_is_detected", func(t *testing.T) {
+		duplicates := duplicatePlanPhases(&router.PhasePlan{
+			Entries: []router.PhasePlanEntry{
+				PlanRun("scout"),
+				PlanRun("ship"),
+				PlanSkip("ship"),
+			},
+		})
+		if len(duplicates) != 1 || duplicates[0] != "ship" {
+			t.Fatalf("duplicatePlanPhases() = %v, want [ship]", duplicates)
+		}
 	})
 }
