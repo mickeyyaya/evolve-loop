@@ -303,6 +303,21 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		prompt += fmt.Sprintf("\n\n## Budget\nAdvisory turn budget for this phase: ~%d turns. Prioritize breadth over depth; write your report as soon as the completion gates are satisfied.\n", prof.TurnBudgetHint)
 	}
 
+	// Challenge-token injection (cycle-269): the bash→Go migration dropped
+	// the prompt-side half of the proof-of-read protocol — builders were
+	// never TOLD to echo the minted token, so compliance depended on an
+	// agent spontaneously reading scout-report line 2 (the claude fallback
+	// didn't; a perfect build FAILed at audit). Contract-driven (the same
+	// SSOT the deliverable gate checks), deterministic, and absent-token ⇒
+	// byte-identical prompt.
+	if c, ok := phasecontract.For(phase); ok && c.RequireChallengeToken {
+		if tok, terr := os.ReadFile(filepath.Join(req.Workspace, "challenge-token.txt")); terr == nil {
+			if t := strings.TrimSpace(string(tok)); t != "" {
+				prompt += fmt.Sprintf("\n\n## Challenge Token (proof-of-read — MANDATORY)\nCopy this token verbatim into your report as an HTML comment near the top: <!-- challenge-token: %s -->\nA report without it is rejected and re-dispatched.\n", t)
+			}
+		}
+	}
+
 	// User-controlled policy pin (absolute): a pinned CLI/model for this phase
 	// overrides env/profile/default resolution. Keyed by phase name. Validated
 	// against the profile guardrails (allowed_clis + model_tier_envelope) — an

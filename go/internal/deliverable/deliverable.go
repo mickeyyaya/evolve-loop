@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -45,10 +46,16 @@ const (
 	CodeMissingArtifact = "missing_artifact"
 	CodeEmptyArtifact   = "empty_artifact"
 	CodeMissingSection  = "missing_section"
-	CodeBadVerdict      = "bad_verdict"
-	CodeStrayInWorktree = "stray_in_worktree"
-	CodeInvalidJSON     = "invalid_json"
-	CodeMissingKey      = "missing_key"
+	// CodeMissingChallengeToken: a RequireChallengeToken contract's report
+	// does not echo the minted <workspace>/challenge-token.txt token
+	// (proof-of-read, cycle-269). Checked here — the correctable boundary —
+	// so the PR-#60 correction loop re-dispatches with the exact token
+	// BEFORE the audit backstop. Fail-open when no token was minted.
+	CodeMissingChallengeToken = "missing_challenge_token"
+	CodeBadVerdict            = "bad_verdict"
+	CodeStrayInWorktree       = "stray_in_worktree"
+	CodeInvalidJSON           = "invalid_json"
+	CodeMissingKey            = "missing_key"
 	// CodeFailureContextMissing: a sentinel-declared FAIL/WARN lacks the
 	// ADR-0039 structured failure block. (snake_case to match this closed
 	// vocabulary; ADR prose spells it with hyphens.)
@@ -126,6 +133,19 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 			(s.Failure == nil || s.Failure.Class == "") {
 			res.add(CodeFailureContextMissing, fmt.Sprintf(
 				"verdict %s declares no structured failure context — re-emit the evolve-verdict sentinel as schema_version 2 with a failure block: {\"class\":\"<failure class>\",\"defects\":[\"<one line per defect>\"],\"evidence_paths\":[\"<artifact>\"]}", s.Verdict))
+		}
+	}
+	// Cycle-269: the challenge-token echo (proof the agent read the upstream
+	// report) was audit-only — a perfect EGPS-green build FAILed the whole
+	// cycle, unrecoverably, over a missing echo. Enforce at THIS boundary so
+	// the correction loop fixes it pre-audit. The minted token lives in the
+	// workspace; absent/empty file ⇒ nothing to echo ⇒ silent (fail-open).
+	if c.RequireChallengeToken {
+		if tok, err := os.ReadFile(filepath.Join(roots.Workspace, "challenge-token.txt")); err == nil {
+			if t := strings.TrimSpace(string(tok)); t != "" && !strings.Contains(content, t) {
+				res.add(CodeMissingChallengeToken, fmt.Sprintf(
+					"report does not echo the challenge token — copy it verbatim into the report (e.g. as the comment <!-- challenge-token: %s -->) to prove the upstream report was read", t))
+			}
 		}
 	}
 	checkStray(res, c, roots)

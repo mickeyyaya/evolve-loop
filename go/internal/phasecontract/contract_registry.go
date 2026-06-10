@@ -62,6 +62,15 @@ type Contract struct {
 	// forever. Set for built-ins that extract a verdict; user phases opt in
 	// via classify.require_failure_context.
 	RequireFailureContext bool
+	// RequireChallengeToken makes a report that fails to echo the minted
+	// <workspace>/challenge-token.txt token a violation (cycle-269: the
+	// proof-of-read protocol was audit-enforced only — unrecoverable — and
+	// the bash→Go migration had dropped the prompt-side injection entirely).
+	// The runner injects the token block at dispatch; the deliverable gate
+	// checks the echo so the correction loop re-dispatches with the exact
+	// fix BEFORE audit. Fail-open when no token was minted. scout (the
+	// minter) must never set this — echoing yourself is circular.
+	RequireChallengeToken bool
 }
 
 // ArtifactPath resolves the absolute path the agent must write to, joining the
@@ -94,7 +103,7 @@ var contracts = map[string]Contract{
 	"build": {
 		Phase: "build", AgentName: "builder", ArtifactName: "build-report.md",
 		Kind: KindMarkdown, Sections: Build.Sections, Verdicts: nil,
-		WriteTarget: TargetWorkspace,
+		WriteTarget: TargetWorkspace, RequireChallengeToken: true,
 	},
 	"scout": {
 		Phase: "scout", AgentName: "scout", ArtifactName: "scout-report.md",
