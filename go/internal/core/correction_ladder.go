@@ -87,6 +87,17 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 	}
 
 	destClean := filepath.Clean(dest)
+	// S2 defense-in-depth: relocate ONLY to a contracted path inside the two
+	// legitimate roots phasecontract.ArtifactPath can resolve to — the workspace
+	// (TargetWorkspace) or <ProjectRoot>/.evolve (TargetEvolveDir). The basename
+	// check above bounds the filename; this bounds the DIRECTORY, so a future or
+	// compromised ContractVerifier returning an out-of-tree absolute path can
+	// never make salvage write outside the run's own roots. Current production
+	// dests always satisfy this (ArtifactName is a single component), so it is a
+	// guard, not a behavior change.
+	if !withinRoot(destClean, in.Workspace) && !withinRoot(destClean, filepath.Join(in.ProjectRoot, ".evolve")) {
+		return salvageResult{Reason: fmt.Sprintf("contracted dest %q is outside the workspace/.evolve roots", destClean)}
+	}
 	now := o.now()
 	var skips []string
 	cwd, cwdErr := os.Getwd()
@@ -132,6 +143,20 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 		reason += " (" + strings.Join(skips, "; ") + ")"
 	}
 	return salvageResult{Reason: reason}
+}
+
+// withinRoot reports whether path is root itself or lives under it, without
+// following symlinks or admitting `..` traversal. An empty root never matches
+// (so a missing ProjectRoot can't accidentally whitelist the whole tree).
+func withinRoot(path, root string) bool {
+	if root == "" {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(root), path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
 }
 
 // fileSalvageable applies the S2 candidate gates: regular file (lstat — a

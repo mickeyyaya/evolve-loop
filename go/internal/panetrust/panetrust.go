@@ -64,7 +64,13 @@ var secretREs = []*regexp.Regexp{
 	regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*`), // JWTs (header.payload.sig)
 	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),                             // PEM headers
 }
-var kvSecretRE = regexp.MustCompile(`(?i)\b(api[_-]?key|secret|token|password|passwd|authorization)(\s*[:=]\s*)\S+`)
+
+// kvSecretRE redacts the VALUE of a `key: value` / `key=value` line whose key
+// names a credential. The compound forms (access_token, private_key, …) are
+// listed BEFORE the bare token/secret/key so the longer key name is the one
+// captured — a bare `token` alternative cannot match inside `access_token`
+// anyway (no word boundary before `token`), which is the gap this closes (S6).
+var kvSecretRE = regexp.MustCompile(`(?i)\b(access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|api[_-]?key|credential|secret|token|password|passwd|authorization)(\s*[:=]\s*)\S+`)
 
 // redactSecrets applies the secret patterns to already-ANSI-stripped text.
 func redactSecrets(s string) string {

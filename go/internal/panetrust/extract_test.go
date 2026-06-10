@@ -80,6 +80,37 @@ func TestDigest_PlantedSecretSentinelNeverSurvives(t *testing.T) {
 	}
 }
 
+// panetrustRedacted mirrors the package's redaction marker for assertions.
+const panetrustRedacted = "[REDACTED]"
+
+// TestDigest_CompoundCredentialKeyNamesRedacted — S6 hardening: a credential
+// echoed under a COMPOUND key name (access_token, refresh_token, private_key,
+// client_secret, credential) whose opaque value matches no per-shape pattern
+// must still have its value redacted (the bare `token`/`secret`/`key`
+// alternative cannot match inside the compound name — no word boundary).
+func TestDigest_CompoundCredentialKeyNamesRedacted(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		"access_token: oPaQ4eValue000XYZ",
+		"refresh_token = rTokOpaque999abc",
+		"id_token: idValOpaque123zzz",
+		"client_secret: csOpaqueVal4567",
+		"private_key: pkOpaqueVal8901",
+		"credential = credOpaqueVal234",
+		"Authorization: BearerOpaque5678", // case-insensitive, no JWT shape
+	}
+	for _, line := range cases {
+		got := panetrust.Digest(line, 5, 200)
+		if !strings.Contains(got, panetrustRedacted) {
+			t.Errorf("compound-key credential not redacted: in=%q got=%q", line, got)
+		}
+		val := strings.TrimSpace(line[strings.IndexAny(line, ":=")+1:])
+		if strings.Contains(got, val) {
+			t.Errorf("credential value %q survived redaction: %q", val, got)
+		}
+	}
+}
+
 // TestUntrustedFraming_PrefixesEveryLLMConsumption — Frame = explicit
 // untrusted preamble + fenced digest; pane-printed backticks cannot break out
 // of the fence.
