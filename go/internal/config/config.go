@@ -362,6 +362,11 @@ func defaults() RoutingConfig {
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
 		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, PhaseRecovery: StageShadow},
+		// NOTE: this built-in baseline intentionally omits triage; the real
+		// registry (docs/architecture/phase-registry.json) adds it via
+		// applyRegistry (cycles 263/264: the advisory router skipped the
+		// scope-clamp). Tests constructing RoutingConfig directly keep this
+		// 4-phase baseline.
 		Mandatory:     []string{"scout", "build", "audit", "ship"},
 		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions: 4,

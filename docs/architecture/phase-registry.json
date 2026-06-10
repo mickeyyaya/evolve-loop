@@ -5,7 +5,7 @@
   "config": {
     "dynamic_routing": "advisory",
     "routing_mode": "llm",
-    "mandatory_phases": ["scout", "build", "audit", "ship"],
+    "mandatory_phases": ["scout", "triage", "build", "audit", "ship"],
     "conditional_mandatory": { "tdd": "cycle_size!=trivial" },
     "max_optional_insertions": 6
   },

@@ -22,7 +22,15 @@ func TestLoad_RealRegistry(t *testing.T) {
 	if cfg.Mode != ModeDynamicLLM {
 		t.Errorf("Mode=%v, want ModeDynamicLLM (registry routing_mode=llm)", cfg.Mode)
 	}
-	wantSpine := []string{"scout", "build", "audit", "ship"}
+	// triage joined the mandatory spine 2026-06-10 (cycles 263/264 post-mortem):
+	// the advisory router skipped triage on the premise "scout picks ONE item"
+	// while the scout authored THREE tasks — with the scope-clamp gone, the
+	// builder under-delivered and the all-or-nothing audit failed the cycle.
+	// Dispatch-level mandatory restores the pre-advisory equilibrium; triage's
+	// own runner-level auto-skip (EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL) still
+	// short-circuits genuinely trivial cycles, so the router may not remove
+	// the clamp but the clamp stays cheap.
+	wantSpine := []string{"scout", "triage", "build", "audit", "ship"}
 	if len(cfg.Mandatory) != len(wantSpine) {
 		t.Fatalf("Mandatory=%v, want %v", cfg.Mandatory, wantSpine)
 	}
