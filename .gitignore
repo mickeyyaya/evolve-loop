@@ -132,3 +132,7 @@ build-plan.md
 cover.out
 coverage.out
 *.coverprofile
+
+# Boot-smoke / bridge log dropped in the repo root by `evolve release` preflight.
+# Never commit: it was swept into the v18.3.0 release commit by the broad stage.
+evolve.log
