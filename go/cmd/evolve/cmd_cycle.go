@@ -432,6 +432,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
 	}
+	if cfg.ContractGate != config.StageOff {
+		// ADR-0045 I2: the breaker-neutral re-check the salvage rung verifies
+		// relocations with — same catalog-aware resolution as the gate, so the
+		// rung and the gate can never disagree about "well-formed". Wired at
+		// every contract-gate stage (shadow needs it for would-salvage soak
+		// telemetry); execution stays gated on EVOLVE_PHASE_RECOVERY=enforce.
+		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalog(catalog)))
+	}
 	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
 	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir)))

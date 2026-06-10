@@ -58,6 +58,29 @@ type DeliverableReviewer interface {
 	Review(ctx context.Context, in ReviewInput) ReviewResult
 }
 
+// ContractVerification is a breaker-neutral well-formedness verdict for one
+// phase deliverable (ADR-0045 I2). ArtifactPath is the CONTRACTED destination
+// — the only path the salvage rung may relocate to.
+type ContractVerification struct {
+	OK           bool
+	ArtifactPath string
+	Violations   []string // "[code] message" per violation
+}
+
+// ContractVerifier re-checks a phase's deliverable WITHOUT touching the
+// contract-gate circuit breaker. The I2 integrity rule (cycle-265 forensics):
+// the correction ladder's intermediate rung re-checks (salvage's
+// verify-after-move, live-fix's post-window re-verify) must never increment
+// the GLOBAL breaker in deliverable/reviewer.go — a multi-rung repair attempt
+// would otherwise count three blocks for one flaky deliverable and silently
+// demote the contract gate batch-wide. Only the ladder's FINAL outcome goes
+// through DeliverableReviewer.Review. The error follows deliverable.Verify's
+// fail-open contract: err => ambiguity (unknown phase) => the caller skips
+// the rung rather than acting blind.
+type ContractVerifier interface {
+	VerifyDeliverable(ctx context.Context, in ReviewInput) (ContractVerification, error)
+}
+
 // ChainReviewers composes reviewers into one that approves only when ALL
 // approve; the first rejection short-circuits and is returned verbatim (Chain
 // of Responsibility). nil entries are skipped. Used to mount the evalgate gates
