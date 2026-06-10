@@ -2,6 +2,9 @@ package core
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -166,6 +169,84 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 	}
 }
 
+// TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase pins the CI regression
+// from the cycle-274 salvage: during a WORKTREE phase (tdd/build), the
+// orchestrator-side contract gate writes its own untracked runtime state
+// (.evolve/contract-gate-breaker.json) into the main tree. That is not a
+// phase escape — recoverBuildLeak already classifies it legitimate and skips
+// it — so the tree-diff guard must apply the same classification instead of
+// aborting the cycle (guard and recovery must agree on one vocabulary).
+func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
+	breakerPath := ".evolve/contract-gate-breaker.json"
+	// Phase-aware seam: the dirty set appears only once BUILD has run, so the
+	// leak is attributed to the worktree phase (fakeGitDirty's first-call flip
+	// would surface it at scout, a non-worktree phase, and miss the branch
+	// under test).
+	leakPhaseRan := false
+	dirtyFn := func(_ context.Context, _ string) ([]string, error) {
+		if leakPhaseRan {
+			return []string{breakerPath}, nil // gate wrote its breaker during the phase
+		}
+		return nil, nil // clean before the worktree phase
+	}
+	// tdd: a worktree phase (runsInWorktree) reachable with minimalRunners —
+	// build sits behind build-planner, which this harness does not register.
+	runners := minimalRunners(PhaseTDD, &leakInjector{
+		name:  PhaseTDD,
+		onRun: func(PhaseRequest) { leakPhaseRan = true },
+	})
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
+		WithGitDirtyPaths(dirtyFn),
+	)
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+		GoalHash:    "g",
+	})
+	// The guard must NOT have fired. Any other error (e.g. ship gate) is acceptable.
+	if err != nil && strings.Contains(err.Error(), "tree-diff") {
+		t.Errorf("guard must not fire on orchestrator self-write during a worktree phase; got: %v", err)
+	}
+}
+
+// TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase pins the companion
+// strict case: when both rename sides reach the guard (the porcelain
+// emission contract is pinned separately by
+// TestDefaultGitDirtyPaths_RenameEmitsBothSides), the deliverable old path
+// keeps the guard armed even though the look-alike new path classifies as
+// legitimate runtime state — so a worktree phase cannot smuggle a
+// deliverable out via rename.
+func TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase(t *testing.T) {
+	leakPhaseRan := false
+	dirtyFn := func(_ context.Context, _ string) ([]string, error) {
+		if leakPhaseRan {
+			return []string{
+				".evolve/commit-prefix-scope.json",         // rename source (deliverable)
+				".evolve/commit-prefix-scope.renamed.json", // rename target (look-alike)
+			}, nil
+		}
+		return nil, nil
+	}
+	runners := minimalRunners(PhaseTDD, &leakInjector{
+		name:  PhaseTDD,
+		onRun: func(PhaseRequest) { leakPhaseRan = true },
+	})
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
+		WithGitDirtyPaths(dirtyFn),
+	)
+	_, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+		GoalHash:    "g",
+	})
+	if err == nil {
+		t.Fatal("expected cycle abort for deliverable rename leak; got nil error")
+	}
+	if !strings.Contains(err.Error(), "tree-diff") {
+		t.Errorf("abort must come from the tree-diff guard; got: %v", err)
+	}
+}
+
 // TestGuardIgnoresLegitimateWorkspaceWrite tests R7: a non-worktree phase that
 // writes only its .evolve/runs/... workspace artifact must NOT trip the guard.
 // The cycle must NOT fail due to "tree-diff" after the workspace write.
@@ -190,5 +271,45 @@ func TestGuardIgnoresLegitimateWorkspaceWrite(t *testing.T) {
 	// The guard must NOT have fired. Any other error (e.g. ship gate) is acceptable.
 	if err != nil && strings.Contains(err.Error(), "tree-diff") {
 		t.Errorf("guard must not fire on legitimate .evolve/ workspace write; got: %v", err)
+	}
+}
+
+// TestDefaultGitDirtyPaths_RenameEmitsBothSides pins the porcelain parsing
+// contract the rename-smuggle guard case depends on: a staged rename must
+// surface BOTH the old and the new path, so a deliverable renamed to a
+// look-alike name cannot vanish from the guard's view.
+func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q")
+	run("config", "user.email", "t@t")
+	run("config", "user.name", "t")
+	if err := os.WriteFile(filepath.Join(root, "tracked.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "tracked.json")
+	run("commit", "-q", "-m", "seed")
+	run("mv", "tracked.json", "renamed.json")
+
+	paths, err := defaultGitDirtyPaths(context.Background(), root)
+	if err != nil {
+		t.Fatalf("defaultGitDirtyPaths: %v", err)
+	}
+	got := map[string]bool{}
+	for _, p := range paths {
+		got[p] = true
+	}
+	if !got["tracked.json"] || !got["renamed.json"] {
+		t.Errorf("rename must emit both sides; got %v", paths)
 	}
 }

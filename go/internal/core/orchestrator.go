@@ -576,6 +576,12 @@ func porcelainDirtySet(ctx context.Context, dir string) map[string]bool {
 			continue
 		}
 		set[porcelainPath(line)] = true
+		// A rename/copy dirties BOTH sides: without the old path, a deliverable
+		// renamed to a look-alike name would vanish from the tree-diff guard's
+		// view (the new path classifies as legitimate runtime state).
+		if old := porcelainOldPath(line); old != "" {
+			set[old] = true
+		}
 	}
 	return set
 }
@@ -589,6 +595,17 @@ func porcelainPath(line string) string {
 		p = p[i+4:]
 	}
 	return strings.Trim(p, "\"")
+}
+
+// porcelainOldPath extracts the rename/copy SOURCE from a porcelain line
+// ("XY <old> -> <new>"), or "" for non-rename lines.
+func porcelainOldPath(line string) string {
+	p := strings.TrimSpace(line[3:])
+	i := strings.Index(p, " -> ")
+	if i < 0 {
+		return ""
+	}
+	return strings.Trim(p[:i], "\"")
 }
 
 // recoverBuildLeak relocates build-phase writes that escaped into the main tree
@@ -2363,24 +2380,30 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if res2.OK() {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: discarded binary rebuild churn in phase %s; continuing\n", next)
 				} else {
-					// For non-worktree phases (phaseWorktree == ""), filter the leaked
-					// set through isLegitimateMainTreePath so that scout/triage/retro
-					// workspace writes under .evolve/ don't trip the guard (R7).
-					// Worktree phases keep the old strict behavior (any leak aborts).
+					// Filter the leaked set through isLegitimateMainTreePath for EVERY
+					// phase — the same classification recoverBuildLeak applies (R9: one
+					// vocabulary, two consumers). Non-worktree phases need it for their
+					// .evolve/ workspace writes (R7); worktree phases need it because
+					// orchestrator-side gates write their own untracked runtime state
+					// (.evolve/contract-gate-breaker.json) into the main tree mid-phase
+					// — recovery skips those by design, so a strict guard here turned
+					// every contract-gate trip into a false cycle abort (the cycle-274
+					// salvage CI regression). Real escapes stay armed: source files and
+					// deliverable paths classify as leaks, and porcelainDirtySet emits
+					// both rename sides so a deliverable renamed to a look-alike name
+					// still aborts via its source path.
 					leaked := res2.Leaked
-					if phaseWorktree == "" {
-						var realLeaks []string
-						for _, p := range leaked {
-							if !isLegitimateMainTreePath(p) {
-								realLeaks = append(realLeaks, p)
-							}
+					var realLeaks []string
+					for _, p := range leaked {
+						if !isLegitimateMainTreePath(p) {
+							realLeaks = append(realLeaks, p)
 						}
-						if len(realLeaks) == 0 {
-							fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s wrote only legitimate main-tree paths (.evolve/ workspace); continuing\n", next)
-							leaked = nil
-						} else {
-							leaked = realLeaks
-						}
+					}
+					if len(realLeaks) == 0 {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s wrote only legitimate main-tree paths (.evolve/ workspace); continuing\n", next)
+						leaked = nil
+					} else {
+						leaked = realLeaks
 					}
 					if len(leaked) > 0 {
 						phaseErr := fmt.Errorf("tree-diff guard: phase %q wrote to the main tree outside its worktree %q — leaked paths: %v",
