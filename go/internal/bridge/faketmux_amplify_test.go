@@ -106,7 +106,7 @@ func TestFakeTmuxController_SendKeysRecording(t *testing.T) {
 	ctx := context.Background()
 	f := &FakeTmuxController{}
 
-	_ = f.SendKeys(ctx, "s", "2", true)    // menu Skip
+	_ = f.SendKeys(ctx, "s", "2", true)      // menu Skip
 	_ = f.SendKeys(ctx, "s", "hello", false) // no trailing Enter
 
 	if len(f.SentKeys) != 2 || f.SentKeys[0] != "2" || f.SentKeys[1] != "hello" {
