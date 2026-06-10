@@ -1,0 +1,45 @@
+{
+  "name": "debugger",
+  "role": "debugger",
+  "cli": "claude-tmux",
+  "cli_fallback": [],
+  "model_tier_default": "opus",
+  "allowed_tools": [
+    "Read",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit",
+    "Write",
+    "Bash(git push:*)",
+    "Bash(git commit:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git stash:*)",
+    "Bash(git config:*)"
+  ],
+  "max_budget_usd": 0.5,
+  "max_turns": 12,
+  "output_artifact": "debug-decision.json",
+  "challenge_token_required": false,
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "generated_from": "hand-authored",
+  "_note": "Added 2026-06-10 after cycle-270: the ship-error recovery route dispatched the debugger, but the bridge hard-requires the profile file at launch (launch.go LoadProfile -> ExitBadFlags 10) while the runner tolerates a missing profile at CLI-resolution time (source=default) -- so the recovery path had never successfully launched. Decision-only role: diagnoses the ShipError envelope and emits debug-decision.json (RESHIP | RERUN_PHASE | BLOCK); it never edits the repo, so Edit/Write are disallowed and the decision file is written via shell into the run workspace. Opus per persona frontmatter (recovery diagnosis is the high-stakes tier, matching the forced-Opus recovery-audit convention). No cli_fallback: claude is the universal-fallback family and a precision diagnosis must not silently hop families."
+}
