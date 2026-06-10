@@ -40,6 +40,12 @@ import (
 //
 //   - 80  ExitREPLBootTimeout    (the *-tmux REPL never showed its prompt)
 //   - 81  ExitArtifactTimeout    (bridge artifact-timeout; cycle-122 codex stall)
+//   - 85  ExitUnknownPrompt      (pane stuck on an unhandled interactive prompt,
+//     incl. provider rate-limit escalations — cycle-267: codex's usage quota
+//     exhausted mid-batch, the rate_limit pattern escalated with 85, and the
+//     codex→claude chain never fired because 85 wasn't a trigger; a
+//     quota-blocked/stuck primary is exactly when a different CLI family can
+//     serve. The escalation report is still written before the chain advances.)
 //   - 124 coreutils timeout(1)   (defensive — if any wrapper uses `timeout`)
 //   - 127 ExitMissingBinary      (the CLI binary isn't on PATH)
 //
@@ -47,7 +53,7 @@ import (
 // ExitSafetyGate) or shrink to [80,127] for the production-strict posture. A
 // CLI failure NOT in this list still hard-fails — a legitimate FAIL verdict
 // never silently routes to a different CLI.
-var defaultFallbackOnExit = []int{80, 81, 124, 127}
+var defaultFallbackOnExit = []int{80, 81, 85, 124, 127}
 
 // cliBinaryFor maps a registered CLI driver name to the binary the host needs
 // on PATH. Used by Probe to demote candidates whose binary is missing — fast

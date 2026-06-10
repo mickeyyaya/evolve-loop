@@ -77,7 +77,9 @@ func TestResolve_FallbackDedupPreservesOrder(t *testing.T) {
 func TestResolve_DefaultTriggers(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
 	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
-	want := []int{80, 81, 124, 127}
+	// 85 (ExitUnknownPrompt, incl. provider rate-limit escalations) joined the
+	// defaults after cycle-267: a quota-blocked codex never chained to claude.
+	want := []int{80, 81, 85, 124, 127}
 	if !reflect.DeepEqual(got.Triggers, want) {
 		t.Errorf("triggers=%v, want %v", got.Triggers, want)
 	}
