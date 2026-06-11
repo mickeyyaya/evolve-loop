@@ -275,10 +275,10 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		}
 
 		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
-		// TODO(cycle-156 parity): RunCycle also runs normalizeWorktreeToBase
-		// after PhaseBuild so a committing builder's work is visible to audit
-		// as pending changes; a resume-from-build with a committing builder
-		// still lacks that soft-reset here.
+		// Cycle-156 parity: same post-build normalize RunCycle runs, driven
+		// by the persisted CycleState.WorktreeBaseSHA (empty on pre-field
+		// checkpoints → no-op).
+		o.normalizeBuildWorktree(ctx, next, cs)
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {

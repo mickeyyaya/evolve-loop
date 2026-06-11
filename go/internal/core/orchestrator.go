@@ -606,6 +606,15 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 	if strings.TrimSpace(head) == baseSHA {
 		return // builder left changes uncommitted — nothing to normalize
 	}
+	// Rebase-recovery guard: a PERSISTED base (resume path) can be stale after
+	// the operator rebased the cycle worktree onto a moved main. Resetting
+	// --soft to a non-ancestor would repoint the branch and stage the entire
+	// delta between histories as a spurious diff. Skip instead — the manual
+	// recovery already leaves the work pending, so "as-is" is correct.
+	if _, code, aerr := gitCapture(ctx, worktree, "merge-base", "--is-ancestor", baseSHA, "HEAD"); aerr != nil || code != 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: base %s is not an ancestor of worktree HEAD (rebase recovery?) — skipping soft-reset, audit inspects worktree as-is\n", baseSHA)
+		return
+	}
 	if _, code, rerr := gitCapture(ctx, worktree, "reset", "--soft", baseSHA); rerr != nil || code != 0 {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: git reset --soft %s failed (rc=%d): %v (audit inspects committed state as-is)\n", baseSHA, code, rerr)
 		return
@@ -615,6 +624,17 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 		short = short[:12]
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] worktree-normalize: soft-reset builder commits to base %s — changes now pending for audit\n", short)
+}
+
+// normalizeBuildWorktree runs the cycle-156 build-commit normalize at the
+// PhaseBuild boundary, shared by RunCycle and RunCycleFromPhase (resume).
+// No-op unless the just-completed phase is PhaseBuild with an active
+// worktree; the base comes from the persisted CycleState.WorktreeBaseSHA.
+func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Phase, cs CycleState) {
+	if completed != PhaseBuild || cs.ActiveWorktree == "" {
+		return
+	}
+	normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA)
 }
 
 // porcelainDirtySet returns the set of paths `git status --porcelain` reports
@@ -1643,10 +1663,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// in the role-gate and drives worktree-aware ship. Best-effort — on failure
 	// the source phases are denied by the role-gate (loud, not silent). Cleaned
 	// up on cycle exit (after ship has merged the worktree→main).
-	// worktreeBaseSHA is the worktree HEAD at creation == the cycle base. After
-	// the build phase we soft-reset to it so a committing builder's work becomes
-	// pending again (see normalizeWorktreeToBase + the cycle-156 incident).
-	var worktreeBaseSHA string
+	// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
+	// cycle base. After the build phase we soft-reset to it so a committing
+	// builder's work becomes pending again (see normalizeWorktreeToBase + the
+	// cycle-156 incident). Persisted in CycleState so the crash-resume path
+	// can run the same normalize.
 	// preserveWorktree (ADR-0039 §8, D10 fix): set when a ship-stage failure
 	// is recorded and cleared only when a later ship attempt succeeds. While
 	// set, the exit cleanup below SKIPS pruning so audited (possibly
@@ -1664,7 +1685,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	} else {
 		cs.ActiveWorktree = wtPath
 		if base, _, berr := gitCapture(ctx, wtPath, "rev-parse", "HEAD"); berr == nil {
-			worktreeBaseSHA = strings.TrimSpace(base)
+			cs.WorktreeBaseSHA = strings.TrimSpace(base)
 		} else {
 			// Fail loudly: an empty base disables the cycle-156 normalize, so a
 			// committing builder's work would again be discarded by the audit —
@@ -2589,9 +2610,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// commit). Soft-reset the build's commits to the cycle base so the
 		// work is pending again before audit runs (next iteration). No-op for
 		// non-committing builders. See the cycle-156 incident doc.
-		if next == PhaseBuild && cs.ActiveWorktree != "" {
-			normalizeWorktreeToBase(ctx, cs.ActiveWorktree, worktreeBaseSHA)
-		}
+		o.normalizeBuildWorktree(ctx, next, cs)
 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {

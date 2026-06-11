@@ -153,6 +153,12 @@ type CycleState struct {
 	// Additive omitempty field — pre-CA.5 cycle-state files decode/encode
 	// unchanged.
 	RunID string `json:"run_id,omitempty"`
+	// WorktreeBaseSHA is the per-cycle worktree HEAD at creation == the cycle
+	// base. Persisted so the crash-resume path (RunCycleFromPhase) can run the
+	// cycle-156 build-commit normalize, which RunCycle previously drove from a
+	// run-local variable. Empty (omitted) for pre-field checkpoints and
+	// worktree-less cycles → the normalize degrades to a no-op.
+	WorktreeBaseSHA string `json:"worktree_base_sha,omitempty"`
 }
 
 // LedgerEntry is one .jsonl line in .evolve/ledger.jsonl.

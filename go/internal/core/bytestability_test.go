@@ -47,7 +47,8 @@ var legacyCycleStateKeys = []string{
 }
 
 var additiveCycleStateKeys = []string{
-	"run_id", // CA.5
+	"run_id",            // CA.5
+	"worktree_base_sha", // cycle-156 resume parity
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

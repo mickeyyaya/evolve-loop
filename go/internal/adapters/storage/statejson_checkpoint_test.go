@@ -136,3 +136,39 @@ func TestWriteCycleState_CheckpointNotDuplicated(t *testing.T) {
 		t.Errorf("RED: \"checkpoint\" key count = %d after two writes, want exactly 1 (0 = erased, >1 = duplicated)", n)
 	}
 }
+
+// TestWriteCycleState_PreservesWorktreeBaseSHAWithCheckpoint: the cycle-156
+// resume-parity fix persists the cycle base in CycleState.WorktreeBaseSHA.
+// It must round-trip through WriteCycleState/ReadCycleState AND coexist with
+// the checkpoint-block preservation splice (cycle-295 fix) — proving the two
+// mechanisms don't interact.
+func TestWriteCycleState_PreservesWorktreeBaseSHAWithCheckpoint(t *testing.T) {
+	s, evolveDir := newStore(t)
+	cp := map[string]any{"resume_from_phase": "build"}
+	path := writeCheckpointedState(t, evolveDir, cp)
+
+	next := core.CycleState{
+		CycleID:         294,
+		Phase:           "audit",
+		WorktreeBaseSHA: "abc123def4567890abc123def4567890abc123de",
+	}
+	if err := s.WriteCycleState(context.Background(), next); err != nil {
+		t.Fatalf("WriteCycleState: %v", err)
+	}
+
+	got := readStateMap(t, path)
+	if got["worktree_base_sha"] != next.WorktreeBaseSHA {
+		t.Errorf("worktree_base_sha = %v, want %q", got["worktree_base_sha"], next.WorktreeBaseSHA)
+	}
+	if _, ok := got["checkpoint"].(map[string]any); !ok {
+		t.Errorf("checkpoint block lost when writing a state with WorktreeBaseSHA")
+	}
+
+	rt, err := s.ReadCycleState(context.Background())
+	if err != nil {
+		t.Fatalf("ReadCycleState: %v", err)
+	}
+	if rt.WorktreeBaseSHA != next.WorktreeBaseSHA {
+		t.Errorf("ReadCycleState WorktreeBaseSHA = %q, want %q — the resume path depends on this round-trip", rt.WorktreeBaseSHA, next.WorktreeBaseSHA)
+	}
+}
