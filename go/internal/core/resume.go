@@ -137,7 +137,8 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		return CycleResult{}, fmt.Errorf("RunCycleFromPhase: resumePoint required")
 	}
 	startPhase := Phase(resumePoint.Phase)
-	if !startPhase.IsValid() || startPhase == PhaseEnd || startPhase == PhaseStart {
+	_, inRunners := o.runners[startPhase]
+	if (!startPhase.IsValid() && !inRunners) || startPhase == PhaseEnd || startPhase == PhaseStart {
 		return CycleResult{}, fmt.Errorf("RunCycleFromPhase: invalid resume phase %q", resumePoint.Phase)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -71,6 +72,59 @@ func TestRunCycleFromPhase_HappyPath(t *testing.T) {
 	}
 	if res.FinalVerdict != VerdictPASS {
 		t.Errorf("verdict=%q", res.FinalVerdict)
+	}
+}
+
+// TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted pins the resume-correctness
+// fix: an advisor-inserted phase (e.g. "mutation-gate") is registered in o.runners
+// at runtime via MintPhase but is NOT one of the 13 spine phases Phase.IsValid()
+// recognizes. The cycle-295 checkpoint-preservation fix makes resumeFromPhase
+// record such a phase, so RunCycleFromPhase must ACCEPT a startPhase found in
+// o.runners (not reject it as "invalid resume phase"). Behavioral assertion: the
+// inserted runner is actually dispatched (Run called) — proof the guard let it
+// through. RED baseline: the guard rejects before the lock, so calls == 0.
+func TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted(t *testing.T) {
+	t.Parallel()
+	const inserted = Phase("mutation-gate") // registered at runtime, not spine-valid
+	if inserted.IsValid() {
+		t.Fatalf("test premise broken: %q must NOT be a spine-valid phase", inserted)
+	}
+	st := &fakeStorage{
+		state:      State{LastCycleNumber: 5},
+		cycleState: CycleState{CycleID: 5, WorkspacePath: "/tmp/ws"},
+	}
+	runners := buildRunners(nil)
+	insertedRunner := &fakeRunner{name: string(inserted)}
+	runners[inserted] = insertedRunner // advisor-minted runner present in the map
+	o := NewOrchestrator(st, &fakeLedger{}, runners)
+
+	_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(),
+	}, &ResumePoint{Phase: string(inserted), CycleID: 5})
+
+	// The inserted phase has no state-machine transition, so the cycle may stop
+	// with a downstream transition error AFTER dispatching it — that's expected.
+	// The contract under test is only that the guard ACCEPTED it and dispatched.
+	if insertedRunner.calls == 0 {
+		t.Fatalf("RED: inserted phase %q in o.runners was rejected by the resume guard "+
+			"(runner never dispatched); RunCycleFromPhase err=%v", inserted, err)
+	}
+	if err != nil && strings.Contains(err.Error(), "invalid resume phase") {
+		t.Errorf("RED: guard returned invalid-resume-phase for an in-runners phase: %v", err)
+	}
+}
+
+// TestRunCycleFromPhase_PhaseStartRejected pins the negative axis parity with the
+// existing PhaseEnd guard: PhaseStart is registered nowhere as a resumable target
+// and must be rejected even though IsValid() accepts it. (PhaseEnd rejection is
+// covered by TestRunCycleFromPhase_PhaseEndInvalid; this is its PhaseStart twin.)
+func TestRunCycleFromPhase_PhaseStartRejected(t *testing.T) {
+	t.Parallel()
+	o := mustBuildOrchestrator(t)
+	_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{},
+		&ResumePoint{Phase: string(PhaseStart)})
+	if err == nil {
+		t.Errorf("RED/REGRESSION: PhaseStart must be rejected as a resume target")
 	}
 }
 

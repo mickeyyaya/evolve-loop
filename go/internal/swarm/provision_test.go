@@ -121,21 +121,51 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase covers the EVOLVE_WORKTREE_BASE env-override path.
+// TestWorktreeBase covers the EVOLVE_WORKTREE_BASE env-override path. An
+// absolute override is honored verbatim with no error.
 func TestWorktreeBase_EnvOverride(t *testing.T) {
-	custom := filepath.Join(t.TempDir(), "custom-base")
+	custom := filepath.Join(t.TempDir(), "custom-base") // t.TempDir is absolute
 	t.Setenv("EVOLVE_WORKTREE_BASE", custom)
-	if got := worktreeBase("/some/project"); got != custom {
+	got, err := worktreeBase("/some/project")
+	if err != nil {
+		t.Fatalf("absolute override must not error, got %v", err)
+	}
+	if got != custom {
 		t.Errorf("worktreeBase = %q, want %q", got, custom)
 	}
 }
 
-// TestWorktreeBase_DefaultPath covers the default (no env) path.
+// TestWorktreeBase_DefaultPath covers the default (no env) path. The default is
+// rooted at the absolute projectRoot, so it returns no error.
 func TestWorktreeBase_DefaultPath(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", "")
-	got := worktreeBase("/proj")
+	got, err := worktreeBase("/proj")
+	if err != nil {
+		t.Fatalf("absolute default must not error, got %v", err)
+	}
 	if !strings.HasSuffix(got, filepath.Join(".evolve", "worktrees")) {
 		t.Errorf("default worktreeBase = %q, must end with .evolve/worktrees", got)
+	}
+}
+
+// TestWorktreeBase_RelativeEnvReturnsError pins the inbox-defect closure
+// (swarm-tests-relative-worktree-base): the guard refusing a non-absolute base
+// must live in worktreeBase ITSELF — not only one call-site deeper in
+// addWorktree. A relative EVOLVE_WORKTREE_BASE must make worktreeBase return a
+// ("", error) whose message identifies the base must be absolute, BEFORE any
+// caller touches git/MkdirAll. This is the negative (anti-no-op) axis: a build
+// that leaves worktreeBase returning the relative string verbatim fails here.
+func TestWorktreeBase_RelativeEnvReturnsError(t *testing.T) {
+	t.Setenv("EVOLVE_WORKTREE_BASE", "relative-worktrees")
+	got, err := worktreeBase("/some/project")
+	if err == nil {
+		t.Fatalf("worktreeBase with a relative EVOLVE_WORKTREE_BASE must return an error, got path %q", got)
+	}
+	if got != "" {
+		t.Errorf("on a relative base worktreeBase must return an empty path, got %q", got)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
+		t.Errorf("error = %q, want a message indicating the worktree base must be absolute", err)
 	}
 }
 

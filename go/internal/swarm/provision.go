@@ -51,11 +51,14 @@ func NewGitWorkerProvisioner(linkGuardDeps func(worktree, projectRoot string)) W
 	return gitWorkerProvisioner{LinkGuardDeps: linkGuardDeps}
 }
 
-func worktreeBase(projectRoot string) string {
+func worktreeBase(projectRoot string) (string, error) {
 	if b := os.Getenv("EVOLVE_WORKTREE_BASE"); b != "" {
-		return b
+		if !filepath.IsAbs(b) {
+			return "", fmt.Errorf("worktree base must be absolute: %s", b)
+		}
+		return b, nil
 	}
-	return filepath.Join(projectRoot, ".evolve", "worktrees")
+	return filepath.Join(projectRoot, ".evolve", "worktrees"), nil
 }
 
 func (g gitWorkerProvisioner) CreateIntegration(ctx context.Context, projectRoot string, cycle int) (string, error) {
@@ -75,9 +78,9 @@ func (g gitWorkerProvisioner) CreateWorker(ctx context.Context, projectRoot stri
 // addWorktree runs the idempotent `git worktree add -B <branch> <wt> <base>`,
 // reusing an existing valid worktree (and tearing down a stale stub first).
 func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, branch, base string) (string, error) {
-	root := worktreeBase(projectRoot)
-	if !filepath.IsAbs(root) {
-		return "", fmt.Errorf("worktree base must be absolute: %s", root)
+	root, err := worktreeBase(projectRoot)
+	if err != nil {
+		return "", err
 	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", fmt.Errorf("worktree base: %w", err)
