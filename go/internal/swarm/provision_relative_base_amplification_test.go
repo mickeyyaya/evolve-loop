@@ -14,7 +14,7 @@ import (
 func TestGitProvisioner_RelativeWorktreeBaseHasNoFilesystemSideEffects(t *testing.T) {
 	repo := initAmplificationGitRepo(t)
 	cwd := t.TempDir()
-	t.Chdir(cwd)
+	chdirForAmplification(t, cwd)
 
 	relativeBase := filepath.Join("relative-base", "nested")
 	t.Setenv("EVOLVE_WORKTREE_BASE", relativeBase)
@@ -32,6 +32,25 @@ func TestGitProvisioner_RelativeWorktreeBaseHasNoFilesystemSideEffects(t *testin
 
 	assertMissingAmplificationPath(t, filepath.Join(cwd, relativeBase))
 	assertMissingAmplificationPath(t, filepath.Join(repo, relativeBase))
+}
+
+// chdirForAmplification is testing.T.Chdir for the CI-pinned toolchain —
+// t.Chdir is Go 1.24+; CI runs Go 1.23. os.Chdir is process-global: must
+// not be called from a t.Parallel test.
+func chdirForAmplification(t *testing.T, dir string) {
+	t.Helper()
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir %s: %v", dir, err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(prev); err != nil {
+			t.Errorf("restore cwd %s: %v", prev, err)
+		}
+	})
 }
 
 func initAmplificationGitRepo(t *testing.T) string {

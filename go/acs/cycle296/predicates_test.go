@@ -74,8 +74,8 @@ func tail(s string, n int) string {
 // --- shared one-shot subprocess runners (one `go test` per scope, reused) ---
 
 var (
-	swarmOnce sync.Once
-	swarmOut  string
+	swarmOnce  sync.Once
+	swarmOut   string
 	resumeOnce sync.Once
 	resumeOut  string
 )
@@ -132,13 +132,14 @@ func TestC296_001_WorktreeBaseRefusesRelativeBase(t *testing.T) {
 		t.Errorf("RED: TestWorktreeBase_RelativeEnvReturnsError did not PASS — worktreeBase " +
 			"does not yet refuse a relative EVOLVE_WORKTREE_BASE itself (guard still only in addWorktree)")
 	}
-	// Auxiliary anti-duplication check (not RED-discriminating): after the fix the
-	// IsAbs guard lives ONLY in worktreeBase, so provision.go contains exactly one
-	// IsAbs reference — the guard moved, it was not copied.
+	// Auxiliary anti-duplication check (not RED-discriminating): the IsAbs guards
+	// live ONLY in worktreeBase — the cycle-296 env-base guard plus the cycle-297
+	// projectRoot guard — and are not duplicated in addWorktree, so provision.go
+	// contains exactly two IsAbs references.
 	prov := filepath.Join(goDir(t), "internal", "swarm", "provision.go")
-	if n := acsassert.CountOccurrencesAny(prov, "filepath.IsAbs"); n != 1 {
-		t.Errorf("expected exactly 1 filepath.IsAbs in provision.go (guard in worktreeBase, "+
-			"not duplicated in addWorktree), found %d", n)
+	if n := acsassert.CountOccurrencesAny(prov, "filepath.IsAbs"); n != 2 {
+		t.Errorf("expected exactly 2 filepath.IsAbs in provision.go (env-base + projectRoot "+
+			"guards, both in worktreeBase, none in addWorktree), found %d", n)
 	}
 }
 
