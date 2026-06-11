@@ -148,6 +148,11 @@ type CycleState struct {
 	CompletedPhases []string `json:"completed_phases,omitempty"`
 	WorkspacePath   string   `json:"workspace_path"`
 	IntentRequired  bool     `json:"intent_required"`
+	// RunID is the CA.5 event-sourced run identity: the ULID RunCycle mints
+	// for this run, also stamped on every ledger entry the run emits.
+	// Additive omitempty field — pre-CA.5 cycle-state files decode/encode
+	// unchanged.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // LedgerEntry is one .jsonl line in .evolve/ledger.jsonl.

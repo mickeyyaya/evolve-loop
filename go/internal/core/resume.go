@@ -161,6 +161,14 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	if cycle == 0 {
 		cycle = resumePoint.CycleID
 	}
+	// CA.5: resume REUSES the run record's identity — the resumed phases'
+	// ledger entries attribute to the original run. A pre-CA.5 record (no
+	// run_id) mints fresh rather than leaving entries unattributed.
+	if cs.RunID == "" {
+		cs.RunID = MintRunID(o.now())
+	}
+	o.currentRunID.Store(cs.RunID)
+	defer o.currentRunID.Store("")
 
 	// Snapshot env/context (same discipline as RunCycle).
 	envSnap := make(map[string]string, len(req.Env)+1)
