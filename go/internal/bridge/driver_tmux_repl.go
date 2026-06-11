@@ -577,7 +577,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		}
 		// Review checkpoint: a full interval elapsed without the artifact.
 		if elapsed-intervalStart >= interval {
-			curPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)
 			recordTokens(curPane)
 			// Progressed = the pane changed during the interval. Stage-0 signal:
 			// good for the common cases (growing token counters, new tool calls),
@@ -594,7 +595,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				IntervalS:  interval,
 				Attempt:    attempt,
 				Progressed: progressed,
-				Busy:       panestream.PaneBusy(curPane, paneProfile),
+				Busy:       panestream.PaneBusy(curPane, paneProfile) || renderWedged,
 				StdoutTail: lastLines(curPane, 40),
 			}
 			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
@@ -894,6 +895,31 @@ func parseExtendSecs(action string) int {
 		n = n*10 + int(c-'0')
 	}
 	return n
+}
+
+// recoverBlankPane handles the claude ≥2.1.173 BLANK-PANE render wedge
+// (inbox claude-2.1.173-blank-pane-after-interval): an EMPTY capture while
+// the session is alive is the Ink renderer wedging, not idleness —
+// cycle-291's agent kept working behind a blank pane and the stall-pause
+// burned interval×attempts to exit=81. Recovery: jiggle the window width
+// (two SIGWINCHes → full repaint, windowJiggler optional capability) and
+// re-read. Returns the freshest pane and whether the wedge persisted — a
+// still-blank pane must read BUSY (extend; never pause a live agent on a
+// pane that stopped rendering; the maxExtends backstop still bounds it).
+func recoverBlankPane(ctx context.Context, deps Deps, session string, scrollback int, pane, pfx string) (string, bool) {
+	if strings.TrimSpace(pane) != "" || !deps.Tmux.HasSession(ctx, session) {
+		return pane, false
+	}
+	if j, ok := deps.Tmux.(windowJiggler); ok {
+		_ = j.JiggleWindow(ctx, session)
+		deps.Sleep(time.Second)
+	}
+	if re, err := deps.Tmux.CapturePane(ctx, session, scrollback); err == nil && strings.TrimSpace(re) != "" {
+		fmt.Fprintf(deps.Stderr, "%s render wedge: blank pane redrawn after jiggle\n", pfx)
+		return re, false
+	}
+	fmt.Fprintf(deps.Stderr, "%s render wedge: pane still blank after jiggle — treating live session as busy\n", pfx)
+	return pane, true
 }
 
 // tmuxCleanup captures final scrollback then kills the session — unless it
