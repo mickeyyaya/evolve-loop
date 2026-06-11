@@ -273,6 +273,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			return result, lerr
 		}
 
+		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
+		// TODO(cycle-156 parity): RunCycle also runs normalizeWorktreeToBase
+		// after PhaseBuild so a committing builder's work is visible to audit
+		// as pending changes; a resume-from-build with a committing builder
+		// still lacks that soft-reset here.
+
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)

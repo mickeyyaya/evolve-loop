@@ -450,6 +450,22 @@ func defaultGitHEAD() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// emitPhaseBindings writes the per-agent provenance ledger entries ship's
+// verification requires after a phase completes (see recordAuditBinding /
+// recordBuildBinding for the per-entry contracts). Shared by RunCycle and
+// RunCycleFromPhase — the resume path originally skipped these, so a resumed
+// audit→ship bound to a stale auditor entry from an earlier cycle and always
+// failed AUDIT_BINDING_HEAD_MOVED (cycle-294 incident, 2026-06-12).
+// Best-effort: failures are logged to stderr; ship then refuses to bind.
+func (o *Orchestrator) emitPhaseBindings(ctx context.Context, cycle int, projectRoot string, cs CycleState, phase Phase, verdict string) {
+	if phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN) {
+		o.recordAuditBinding(ctx, cycle, projectRoot, cs.WorkspacePath, cs.ActiveWorktree, verdict)
+	}
+	if phase == PhaseBuild && verdict != VerdictSKIPPED {
+		o.recordBuildBinding(ctx, cycle, projectRoot, cs.WorkspacePath)
+	}
+}
+
 // recordAuditBinding writes the rich auditor ledger entry that ship's
 // audit-binding (verify.go findLatestAudit / verifyAuditBinding) requires:
 // role=auditor, kind=agent_subprocess, with git_head + tree_state_sha +
@@ -2565,25 +2581,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			return result, lerr
 		}
 
-		// Audit-binding (root-cause fix, 2026-05-29): ship's verifyAuditBinding
-		// looks for the latest role=auditor kind=agent_subprocess ledger entry
-		// carrying git_head + tree_state_sha + artifact SHA. The Go orchestrator
-		// otherwise records audit only as kind:phase (no binding fields), so ship
-		// fell back to an ancient bash-era entry and EVERY cycle failed
-		// AUDIT_BINDING_HEAD_MOVED. Emit the rich binding entry after a shippable
-		// audit so ship binds to THIS cycle.
-		if next == PhaseAudit && (resp.Verdict == VerdictPASS || resp.Verdict == VerdictWARN) {
-			o.recordAuditBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath, cs.ActiveWorktree, resp.Verdict)
-		}
-
-		// Builder provenance (issue #13, cycle-181): emit the role=builder
-		// kind=agent_subprocess entry that rt-001-ledger-role-completeness + the
-		// auditor's Ledger-Verification require. The per-phase entry above is
-		// role="build" (phase name), not "builder" (agent name), so without this a
-		// formally-audited cycle false-FAILs provenance even though the build ran.
-		if next == PhaseBuild && resp.Verdict != VerdictSKIPPED {
-			o.recordBuildBinding(ctx, cycle, req.ProjectRoot, cs.WorkspacePath)
-		}
+		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
 
 		// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini
 		// following evolve-builder.md:235) leaves its work in a worktree
