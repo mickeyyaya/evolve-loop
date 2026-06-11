@@ -169,6 +169,32 @@ func TestWorktreeBase_RelativeEnvReturnsError(t *testing.T) {
 	}
 }
 
+// TestWorktreeBase_RelativeProjectRootRefused pins the LAST gap of the
+// swarm-tests-relative-worktree-base inbox defect (cycle-297). Cycle 296 moved
+// the IsAbs guard into worktreeBase, but only on the EVOLVE_WORKTREE_BASE
+// (env-override) branch. The DEFAULT branch still returned
+// filepath.Join(projectRoot, ".evolve", "worktrees") verbatim — which is
+// RELATIVE when projectRoot is relative (e.g. "."). A relative worktree base
+// breaks `git worktree add` (resolved against an unintended cwd) and the
+// tree-diff guard. With EVOLVE_WORKTREE_BASE unset, worktreeBase(".") must
+// return ("", error) whose message identifies that the base/root must be
+// absolute, BEFORE any caller touches git/MkdirAll. This is the negative
+// (anti-no-op) axis: the RED baseline returned ".evolve/worktrees" with a nil
+// error, so this test fails until the default branch also guards IsAbs.
+func TestWorktreeBase_RelativeProjectRootRefused(t *testing.T) {
+	t.Setenv("EVOLVE_WORKTREE_BASE", "") // force the default-path branch
+	got, err := worktreeBase(".")
+	if err == nil {
+		t.Fatalf("worktreeBase(\".\") with the default branch must return an error for a relative project root, got path %q", got)
+	}
+	if got != "" {
+		t.Errorf("on a relative project root worktreeBase must return an empty path, got %q", got)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
+		t.Errorf("error = %q, want a message indicating the worktree base/project root must be absolute", err)
+	}
+}
+
 func TestAddWorktree_RelativeBaseRefused(t *testing.T) {
 	root := gitInit(t)
 	t.Setenv("EVOLVE_WORKTREE_BASE", "relative-worktrees")

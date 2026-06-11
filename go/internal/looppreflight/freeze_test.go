@@ -19,6 +19,8 @@ package looppreflight
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -155,16 +157,132 @@ func TestRun_VersionFreeze_Idempotent(t *testing.T) {
 
 // Tests for the real default* implementations in freeze.go.
 
-func TestDefaultSelfUpdateEvidence_NonCodex(t *testing.T) {
-	ok, evidence, err := defaultSelfUpdateEvidence("claude")
+// TestDefaultSelfUpdateEvidence_Unregistered pins the registry default: a CLI
+// with no self-update entry (here "agy") has no evidence and no error. (This
+// test previously probed "claude"; cycle-297 adds claude to the registry, so
+// the non-registered example moved to a binary that genuinely has no entry —
+// otherwise it would now collide with the real claude evidence on a host that
+// has ~/.claude/settings.json.)
+func TestDefaultSelfUpdateEvidence_Unregistered(t *testing.T) {
+	ok, evidence, err := defaultSelfUpdateEvidence("agy")
 	if err != nil {
-		t.Fatalf("unexpected error for non-codex binary: %v", err)
+		t.Fatalf("unexpected error for unregistered binary: %v", err)
 	}
 	if ok {
-		t.Fatal("non-codex binary must not have self-update evidence")
+		t.Fatal("unregistered binary must not have self-update evidence")
 	}
 	if evidence != "" {
-		t.Fatalf("non-codex evidence must be empty; got %q", evidence)
+		t.Fatalf("unregistered evidence must be empty; got %q", evidence)
+	}
+}
+
+// TestDefaultSelfUpdateEvidence_ClaudePresent is the load-bearing RED test for
+// cycle-297 Task 2 (claude-cli-version-freeze inbox HIGH). claude 2.1.173
+// self-updated mid-soak (removed the `esc to interrupt` affordance), breaking
+// PaneBusy detection and causing exit=81 in cycles 286/288/289/291. The freeze
+// registry must recognize claude as self-updating via its updater state file
+// ~/.claude/settings.json, exactly as it recognizes codex via
+// ~/.codex/version.json. HOME is redirected to a temp dir with the file present
+// so the assertion is deterministic and host-independent. RED baseline:
+// defaultSelfUpdateEvidence("claude") returns (false,"",nil) because the
+// function only handles "codex" — this test fails until the claude case lands.
+func TestDefaultSelfUpdateEvidence_ClaudePresent(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	settings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ok, evidence, err := defaultSelfUpdateEvidence("claude")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("claude with ~/.claude/settings.json present must report self-update evidence")
+	}
+	if !strings.Contains(evidence, settings) {
+		t.Errorf("evidence must name the settings.json path; got %q", evidence)
+	}
+}
+
+// TestDefaultSelfUpdateEvidence_ClaudeAbsent is the negative (anti-no-op) axis:
+// with no ~/.claude/settings.json the claude case must report NO evidence (and
+// no error) — absence of the updater state means nothing to freeze, exactly
+// like the codex no-state path. HOME is redirected to an empty temp dir.
+func TestDefaultSelfUpdateEvidence_ClaudeAbsent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir()) // empty home: no ~/.claude/settings.json
+	ok, evidence, err := defaultSelfUpdateEvidence("claude")
+	if err != nil {
+		t.Fatalf("absent settings file is not ambiguity; want no error, got %v", err)
+	}
+	if ok {
+		t.Fatal("claude without ~/.claude/settings.json must report no self-update evidence")
+	}
+	if evidence != "" {
+		t.Fatalf("absent-evidence detail must be empty; got %q", evidence)
+	}
+}
+
+// TestRun_VersionFreeze_ClaudeUnpinnedRealEvidence_Halts is the end-to-end RED
+// test: it wires the REAL defaultSelfUpdateEvidence (not the injected stub)
+// behind a claude-tmux profile with HOME holding ~/.claude/settings.json and an
+// empty pin list. The Specification risky(claude) ∧ tmuxDriven(claude) ∧
+// ¬pinned(claude) must HALT with the exact `brew pin claude` convergent action.
+// RED baseline: the real evidence function ignores claude → no risky binary →
+// LevelPass, so this fails until the claude registry case lands.
+func TestRun_VersionFreeze_ClaudeUnpinnedRealEvidence_Halts(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	settings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := goodPipelineOptions(t)
+	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
+		return profiles.Profile{Name: name, CLI: "claude-tmux"}, nil
+	}
+	opts.SelfUpdateEvidence = defaultSelfUpdateEvidence // exercise the REAL registry
+	opts.PinnedLister = func() ([]string, error) { return nil, nil }
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	c := findCheck(t, r, "cli-version-freeze")
+	if c.Level != LevelHalt {
+		t.Fatalf("self-updating claude-tmux without a pin must HALT (claude 2.1.173 broke 4 soak cycles); got %s (%s)", c.Level, c.Detail)
+	}
+	if !strings.Contains(c.Detail, "brew pin claude") {
+		t.Errorf("halt detail must carry the exact convergent-action guidance for claude; got %q", c.Detail)
+	}
+	if !r.Halted() {
+		t.Errorf("overall verdict must halt")
+	}
+}
+
+// TestRun_VersionFreeze_ClaudeNoSettings_Passes is the end-to-end negative axis
+// of the real-evidence wiring: a claude-tmux profile with NO ~/.claude/settings.json
+// has no evidence to freeze → LevelPass. Guards against a no-op that flags
+// claude unconditionally regardless of host updater state.
+func TestRun_VersionFreeze_ClaudeNoSettings_Passes(t *testing.T) {
+	t.Setenv("HOME", t.TempDir()) // empty home
+	opts := goodPipelineOptions(t)
+	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
+		return profiles.Profile{Name: name, CLI: "claude-tmux"}, nil
+	}
+	opts.SelfUpdateEvidence = defaultSelfUpdateEvidence // real registry
+	opts.PinnedLister = func() ([]string, error) { return nil, nil }
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if c := findCheck(t, r, "cli-version-freeze"); c.Level != LevelPass {
+		t.Fatalf("claude with no updater state → nothing to freeze → pass; got %s (%s)", c.Level, c.Detail)
 	}
 }
 

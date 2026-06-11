@@ -38,28 +38,37 @@ import (
 const pinnedListerTimeout = 5 * time.Second
 
 // defaultSelfUpdateEvidence reports whether bin is known to self-update on
-// launch, based on host evidence. Registry-style: today the only entry is
-// codex (its updater maintains ~/.codex/version.json — the file that recorded
-// dismissed_version=0.137.0 < latest=0.138.0 right before the cycle-262
-// mid-phase upgrade). A CLI without evidence is not freeze-checked; new
-// self-updaters are added here as incidents (or release notes) reveal them.
-// Assumption: codex keeps its updater state under ~/.codex (no CODEX_HOME-style
-// override is documented today; revisit the registry entry if one appears).
+// launch, based on host evidence. Registry-style: codex maintains
+// ~/.codex/version.json (the file that recorded dismissed_version=0.137.0 <
+// latest=0.138.0 right before the cycle-262 mid-phase upgrade), and claude
+// maintains ~/.claude/settings.json. A CLI without evidence is not
+// freeze-checked; new self-updaters are added here as incidents reveal them.
+// Assumption: these CLIs keep updater state under their default home
+// directories (no CODEX_HOME/CLAUDE_HOME-style override is documented today).
 // A failed home-dir lookup is AMBIGUITY (error), not absence of evidence —
 // the caller WARNs instead of silently passing (fail loudly).
 func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
-	if bin != "codex" {
+	var rel string
+	var label string
+	switch bin {
+	case "codex":
+		rel = filepath.Join(".codex", "version.json")
+		label = "codex updater state"
+	case "claude":
+		rel = filepath.Join(".claude", "settings.json")
+		label = "claude updater state"
+	default:
 		return false, "", nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return false, "", fmt.Errorf("user home dir unresolvable (evidence for %q unverifiable): %w", bin, err)
 	}
-	p := filepath.Join(home, ".codex", "version.json")
+	p := filepath.Join(home, rel)
 	if _, err := os.Stat(p); err != nil {
 		return false, "", nil
 	}
-	return true, p + " present (codex updater state)", nil
+	return true, p + " present (" + label + ")", nil
 }
 
 // defaultPinnedLister lists brew-pinned formulae. An error (brew absent, exec

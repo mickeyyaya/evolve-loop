@@ -58,6 +58,9 @@ func worktreeBase(projectRoot string) (string, error) {
 		}
 		return b, nil
 	}
+	if !filepath.IsAbs(projectRoot) {
+		return "", fmt.Errorf("worktree base: project root must be absolute: %s", projectRoot)
+	}
 	return filepath.Join(projectRoot, ".evolve", "worktrees"), nil
 }
 
