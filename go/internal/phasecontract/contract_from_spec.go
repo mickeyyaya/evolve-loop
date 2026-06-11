@@ -37,6 +37,21 @@ func FromSpec(spec phasespec.PhaseSpec) Contract {
 	}
 }
 
+// SynthesizesContract reports whether a spec yields a meaningful derived
+// contract: only "llm"-kind phases (an agent actually writes the artifact) or
+// specs that explicitly declare outputs.files. Native/command executors with
+// no declared outputs get NO synthesized contract — inventing <name>-report.md
+// for a deterministic executor produced the unsatisfiable ship contract that
+// tripped the enforce gate 3× and forced a breaker demotion every shipping
+// cycle (cycle-281). This predicate is the single home of the rule; Resolve
+// and any projection (inventory, lint) must consult it before FromSpec.
+func SynthesizesContract(spec phasespec.PhaseSpec) bool {
+	if spec.KindOrDefault() == "llm" {
+		return true
+	}
+	return len(spec.Outputs.Files) > 0 && spec.Outputs.Files[0] != ""
+}
+
 // artifactNameFromSpec returns the bare filename the phase writes. It takes only
 // the basename of outputs.files[0] (stripping any cycle-{cycle}/ template path),
 // matching the built-in convention of storing bare filenames. Falls back to the

@@ -17,14 +17,17 @@ const EvaluatorFloorPhase = "audit"
 // Advisory or above; below that the legacy static path runs unchanged.
 
 // ClampPlanToFloor enforces the conditional integrity floor on an advisory
-// whole-cycle plan. The floor is one causal implication:
+// whole-cycle plan. The floor is two causal implications:
 //
 //	reach(ship) ⇒ build ∧ audit ∧ (tdd, unless the cycle is trivial)
+//	run(build)  ⇒ audit ∧ ship   (operator policy 2026-06-11)
 //
 // If the plan runs ship, the clamp forces build + audit on (and tdd unless the
 // cycle is trivial per the configured TDD-pin), recording one Clamp per forced
-// phase. If the plan does NOT run ship, nothing is forced — a no-ship cycle may
-// legitimately end after scout (investigation/convergence). The clamp can only
+// phase. If the plan BUILDS, review and ship are forced — built work may not
+// strand unreviewed or unshipped. Only a no-build, no-ship plan is left fully
+// unconstrained — such a cycle may legitimately end after scout
+// (investigation/convergence). The clamp can only
 // COMPLETE the set, never weaken it (sequencing across the set is the walk's job,
 // not the floor's). Phase names must be canonical lowercase — the caller
 // normalizes the advisor's parsed output before clamping.
@@ -100,6 +103,17 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 		force("intent", "require-intent")
 	}
 
+	// Converse implication (operator policy 2026-06-11): a cycle that BUILDS
+	// must schedule review and ship — built work may not strand unreviewed or
+	// unshipped (the cycle-283 class: a completed build discarded with
+	// audit/ship unreached). Forcing ship here makes the building plan
+	// ship-bound, so the ship floor below then completes the set. No-build
+	// investigation cycles are untouched (the antecedent is false).
+	if planRuns(out, "build") {
+		force(EvaluatorFloorPhase, "build-requires-"+EvaluatorFloorPhase)
+		force("ship", "build-requires-ship")
+	}
+
 	// No-ship cycle: the implication's antecedent is false, so the floor imposes
 	// nothing. scout-only / investigation cycles are legitimate.
 	if !planRuns(out, "ship") {
@@ -142,7 +156,7 @@ func ensureRun(plan *PhasePlan, phase string) {
 	plan.Entries = append(plan.Entries, PhasePlanEntry{
 		Phase:         phase,
 		Run:           true,
-		Justification: "floor: ship requires " + phase,
+		Justification: "floor: integrity floor requires " + phase,
 	})
 }
 

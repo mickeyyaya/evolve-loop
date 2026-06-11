@@ -46,6 +46,35 @@ func wrapCycleLevelError(phase Phase, err error) error {
 	return &ErrCycleLevelFailure{Phase: string(phase), Cause: err}
 }
 
+// optionalInfraSkip reports whether a phase whose retries exhausted may
+// degrade to WARN+advance instead of aborting the cycle (the Workstream-D
+// intent documented on ErrArtifactTimeout; cycle-283). Three conditions, all
+// required: the error is INFRA-shaped (artifact timeout / transient bridge —
+// never integrity or logic failures), the phase is catalog-Optional, and the
+// phase sits outside the resolved ship floor — so the skip can never weaken
+// `ship ⇒ build ∧ audit ∧ tdd`. Ship is always mandatory by convention; its
+// explicit guard is belt-and-suspenders against a misconfigured catalog
+// (ship is not in the floor set, so the floor loop would not catch it).
+func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
+	if !errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err) {
+		return false
+	}
+	if p == PhaseShip {
+		return false
+	}
+	spec, ok := o.catalog.Get(string(p))
+	if !ok || !spec.Optional {
+		return false
+	}
+	name := string(p)
+	for _, f := range o.resolvedShipFloor() {
+		if name == f {
+			return false
+		}
+	}
+	return true
+}
+
 // PhaseMinter registers a minted phase config into a dispatchable runner. The
 // orchestrator depends on this narrow port (not phaseregistrar directly) so
 // core stays decoupled from specrunner/phaseregistrar; the composition root
@@ -2017,6 +2046,29 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 							}
 							break
 						}
+					}
+					// Optional-phase infra skip (Workstream-D intent on
+					// ErrArtifactTimeout; cycle-283): an enrichment phase must not
+					// veto completed spine work. When backfill could not reconstruct
+					// the artifact, a catalog-Optional, non-floor phase whose
+					// exhaustion is infra-shaped degrades to a synthesized WARN and
+					// the cycle advances toward audit/ship. The failed attempts stay
+					// in failure-learning and the ledger — recovered, never silent.
+					if o.optionalInfraSkip(next, err) {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: optional phase exhausted infra retries (%v); degrading to WARN and advancing (optional_infra_skip)\n", next, err)
+						recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
+						if lerr := o.ledger.Append(ctx, LedgerEntry{
+							TS:       o.now().UTC().Format(time.RFC3339),
+							Cycle:    cycle,
+							Role:     string(next),
+							Kind:     "optional_infra_skip",
+							ExitCode: bridgeExitCode(err),
+						}); lerr != nil {
+							fmt.Fprintf(os.Stderr, "[orchestrator] WARN optional_infra_skip ledger append: %v\n", lerr)
+						}
+						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cs.WorkspacePath}
+						err = nil
+						break
 					}
 					// Ship-error recovery seam (Component #7): ship is a pure
 					// executor — a structured ShipError is resolved by the advisor's

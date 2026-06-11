@@ -180,10 +180,17 @@ func entryFromSpec(spec phasespec.PhaseSpec, isUser bool, root, projectRoot stri
 		}
 	}
 
-	contract := phasecontract.FromSpec(spec)
-	sections := make([]string, 0, len(contract.Sections))
-	for _, s := range contract.Sections {
-		sections = append(sections, s.Canonical)
+	// Same rule as the runtime resolver: only synthesizable specs project a
+	// derived contract — a native executor with no declared outputs has none,
+	// so its entry truthfully shows no artifact/sections/verdict.
+	var contract phasecontract.Contract
+	var sections []string
+	if phasecontract.SynthesizesContract(spec) {
+		contract = phasecontract.FromSpec(spec)
+		sections = make([]string, 0, len(contract.Sections))
+		for _, s := range contract.Sections {
+			sections = append(sections, s.Canonical)
+		}
 	}
 
 	return PhaseEntry{

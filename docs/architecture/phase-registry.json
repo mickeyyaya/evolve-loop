@@ -284,6 +284,7 @@
     {
       "name": "ship",
       "role": "orchestrator",
+      "kind": "native",
       "optional": false,
       "inputs": {
         "files": [".evolve/runs/cycle-{cycle}/audit-report.md"],

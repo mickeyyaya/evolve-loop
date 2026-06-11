@@ -76,8 +76,10 @@ func TestClampPlanToFloor_ForcesOnlyMissing(t *testing.T) {
 	if !planRuns(out, "audit") {
 		t.Errorf("audit must be forced on; plan=%+v", out.Entries)
 	}
-	if len(clamps) != 1 || clamps[0].Rule != "ship-requires-audit" {
-		t.Errorf("expected exactly ship-requires-audit, got %+v", clamps)
+	// Since the 2026-06-11 review-floor policy, the converse implication
+	// (build-requires-audit) fires first and claims the single clamp.
+	if len(clamps) != 1 || clamps[0].Rule != "build-requires-audit" {
+		t.Errorf("expected exactly build-requires-audit, got %+v", clamps)
 	}
 }
 
@@ -120,12 +122,12 @@ func TestClampPlanToFloor_AbsentPhaseAppended(t *testing.T) {
 	if !planRuns(out, "audit") {
 		t.Errorf("absent audit must be appended as run=true; plan=%+v", out.Entries)
 	}
-	if !clampsHave(clamps, "ship-requires-audit") {
-		t.Errorf("expected ship-requires-audit clamp, got %+v", clamps)
+	if !clampsHave(clamps, "build-requires-audit") {
+		t.Errorf("expected build-requires-audit clamp (converse implication fires first), got %+v", clamps)
 	}
 	found := false
 	for _, e := range out.Entries {
-		if e.Phase == "audit" && e.Run && e.Justification == "floor: ship requires audit" {
+		if e.Phase == "audit" && e.Run && e.Justification == "floor: integrity floor requires audit" {
 			found = true
 		}
 	}
@@ -134,25 +136,35 @@ func TestClampPlanToFloor_AbsentPhaseAppended(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_ShipFalseNotReached: an explicit ship run:false does not
-// trip the implication (ship is not reached).
-func TestClampPlanToFloor_ShipFalseNotReached(t *testing.T) {
+// TestClampPlanToFloor_ShipFalseWithBuildOverridden: POLICY CHANGE
+// (2026-06-11, repeals the former ShipFalseNotReached expectation): an
+// explicit ship veto in a BUILDING plan is overridden — built work may not
+// strand unshipped. Only no-build plans may decline ship.
+func TestClampPlanToFloor_ShipFalseWithBuildOverridden(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("build", true), pe("ship", false)}}
-	_, clamps := ClampPlanToFloor(in, p)
-	if len(clamps) != 0 {
-		t.Errorf("ship=false does not reach ship; no clamp expected, got %+v", clamps)
+	out, clamps := ClampPlanToFloor(in, p)
+	if !planRuns(out, "ship") {
+		t.Errorf("ship veto must be overridden when build runs; plan=%+v", out.Entries)
+	}
+	if !clampsHave(clamps, "build-requires-ship") {
+		t.Errorf("expected build-requires-ship clamp, got %+v", clamps)
 	}
 }
 
-// TestClampPlanToFloor_ShipAbsentNotReached: ship missing from the plan entirely
-// (not merely run:false) is also not reaching ship — the floor imposes nothing.
-func TestClampPlanToFloor_ShipAbsentNotReached(t *testing.T) {
+// TestClampPlanToFloor_ShipAbsentWithBuildAppended: POLICY CHANGE
+// (2026-06-11, repeals the former ShipAbsentNotReached expectation): ship
+// missing entirely from a BUILDING plan is appended run=true — same rationale
+// as the explicit-veto override.
+func TestClampPlanToFloor_ShipAbsentWithBuildAppended(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("build", true)}}
-	_, clamps := ClampPlanToFloor(in, p)
-	if len(clamps) != 0 {
-		t.Errorf("ship absent → not reached; no clamp expected, got %+v", clamps)
+	out, clamps := ClampPlanToFloor(in, p)
+	if !planRuns(out, "ship") {
+		t.Errorf("absent ship must be appended when build runs; plan=%+v", out.Entries)
+	}
+	if !clampsHave(clamps, "build-requires-ship") {
+		t.Errorf("expected build-requires-ship clamp, got %+v", clamps)
 	}
 }
 

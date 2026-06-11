@@ -46,7 +46,7 @@ func (r CatalogResolver) Resolve(name string) (Contract, bool) {
 	if r.lookup == nil {
 		return Contract{}, false
 	}
-	if spec, ok := r.lookup(name); ok {
+	if spec, ok := r.lookup(name); ok && SynthesizesContract(spec) {
 		return FromSpec(spec), true
 	}
 	return Contract{}, false
