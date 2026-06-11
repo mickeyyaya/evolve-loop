@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 )
 
@@ -30,6 +31,16 @@ type TmuxController interface {
 	PasteBuffer(ctx context.Context, session string) error
 	// KillSession terminates the session (best-effort; no error if absent).
 	KillSession(ctx context.Context, session string) error
+}
+
+// PaneCommander is an OPTIONAL TmuxController capability: the foreground
+// process name of the session's active pane (`#{pane_current_command}`).
+// The boot handshake and post-paste spill check type-assert for it — a
+// controller without it degrades to the marker-only behavior (cycle-274
+// fix, inbox codex-update-menu-swallows-injection). Optional so existing
+// test doubles keep compiling.
+type PaneCommander interface {
+	PaneCommand(ctx context.Context, session string) (string, error)
 }
 
 // execTmux is the production TmuxController — thin wrappers over the
@@ -95,6 +106,15 @@ func (t execTmux) KillSession(ctx context.Context, session string) error {
 	return err
 }
 
+// PaneCommand implements PaneCommander: the active pane's foreground process
+// name. A wedged shell reports "zsh"/"bash"; a healthy claude REPL reports
+// "node", codex "codex" — which is why callers reject-known-shell instead of
+// require-known-binary.
+func (t execTmux) PaneCommand(ctx context.Context, session string) (string, error) {
+	out, err := t.run(ctx, "display-message", "-p", "-t", session, "#{pane_current_command}")
+	return strings.TrimSpace(out), err
+}
+
 // FakeTmuxController is a scriptable TmuxController for deterministic REPL
 // state-machine tests. CapturePane consumes CaptureFrames in order and panics on
 // underrun, so a fixture that forgets a frame fails at the exact missing read.
@@ -109,6 +129,18 @@ type FakeTmuxController struct {
 	PasteCount     int
 	KilledSessions []string
 	NewSessionErr  error
+	// PaneCmd is the PaneCommander answer. Zero value "" means "unknown" —
+	// isShellProcess("")==false, so fixtures that don't set it keep the
+	// pre-handshake behavior.
+	PaneCmd string
+}
+
+// PaneCommand implements PaneCommander (see TmuxController docs).
+func (f *FakeTmuxController) PaneCommand(_ context.Context, _ string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Events = append(f.Events, "panecmd")
+	return f.PaneCmd, nil
 }
 
 func (f *FakeTmuxController) HasSession(_ context.Context, name string) bool {
