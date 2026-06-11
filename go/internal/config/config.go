@@ -147,6 +147,16 @@ type RolloutStages struct {
 	// blocks so a miscalibrated gate cannot brick the loop. Set from
 	// EVOLVE_CONTRACT_GATE via applyEnv; default StageEnforce.
 	ContractGate Stage
+	// TriageCapGate is the R9.2 triage capacity clamp rollout stage
+	// (internal/triagecap): StageOff — no clamp; StageShadow — overpacked
+	// triage logs a would-block but is approved; StageEnforce — committed
+	// coverage floors above ceil(1.25·K) (K = observed throughput window)
+	// reject the triage deliverable through the correction ladder with a
+	// cap directive (inbox coverage-floor-overpacking: three consecutive
+	// coverage cycles burned on the same overpacked shape). Fails OPEN on
+	// any ambiguity. Set from EVOLVE_TRIAGE_CAP_GATE via applyEnv; default
+	// StageEnforce.
+	TriageCapGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
 	//   "auto" (default) — wrap when nested-claude is NOT detected and the
@@ -361,7 +371,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, PhaseRecovery: StageShadow},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
@@ -460,6 +470,13 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// defaults to off rather than silently enabling the kill-path. Default
 		// (no env) is enforce, set in defaults().
 		cfg.ContractGate = parseEvidenceStage(v, "EVOLVE_CONTRACT_GATE", ws)
+	}
+	if v := env["EVOLVE_TRIAGE_CAP_GATE"]; v != "" {
+		// Triage capacity clamp (internal/triagecap, R9.2). Same
+		// off/shadow/enforce trichotomy; reuses parseEvidenceStage so a typo
+		// defaults to off rather than silently enabling the kill-path.
+		// Default (no env) is enforce, set in defaults().
+		cfg.TriageCapGate = parseEvidenceStage(v, "EVOLVE_TRIAGE_CAP_GATE", ws)
 	}
 	if v := env["EVOLVE_PHASE_RECOVERY"]; v != "" {
 		// ADR-0044 Unified Phase Recovery — the one dial for the whole

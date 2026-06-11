@@ -46,6 +46,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 // runCycle implements `evolve cycle <subcommand>`. Subcommands: run.
@@ -396,6 +397,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// validated promotion (each promotion saves ~20 min of maxExtends
 		// burn on every future occurrence).
 		core.WithFailureAdviser(core.NewFailureAdvisor(br)),
+		// R9.1 triage-capacity: record shipped cycles' committed-floor counts
+		// into the rolling throughput window (state.json:triageThroughput) —
+		// the observed-capacity signal the R9.2 clamp bounds triage with.
+		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
 		// Mint advisor-proposed phases (Steps 11/12): persist their dispatch
 		// profile + spec under .evolve so the unchanged runner resolves them
 		// from disk, then dispatch by name like a built-in. Only active when the
@@ -435,6 +440,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// the host gate enforces the SAME well-formedness the agent's
 		// `evolve phase verify` self-check derives from the phase.json.
 		reviewers = append(reviewers, deliverable.NewReviewerWithCatalog(cfg.ContractGate, catalog))
+	}
+	if cfg.TriageCapGate != config.StageOff {
+		// R9.2 triage capacity clamp (internal/triagecap): committed coverage
+		// floors above ceil(1.25·K observed throughput) reject the triage
+		// deliverable into the correction ladder with a cap directive.
+		// Chained AFTER the contract gate: well-formedness first, capacity
+		// second. Fails open on ambiguity.
+		reviewers = append(reviewers, triagecap.NewReviewer(cfg.TriageCapGate))
 	}
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))

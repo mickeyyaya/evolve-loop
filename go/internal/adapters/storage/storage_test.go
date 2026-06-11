@@ -51,6 +51,9 @@ func TestStateJSON_RoundTrip(t *testing.T) {
 		CarryoverTodos: []core.CarryoverTodo{
 			{ID: "todo-1", Action: "investigate", Priority: "P1"},
 		},
+		TriageThroughput: []core.TriageThroughputEntry{
+			{Cycle: 281, Floors: 5},
+		},
 	}
 	if err := s.WriteState(context.Background(), in); err != nil {
 		t.Fatalf("WriteState: %v", err)
@@ -70,6 +73,9 @@ func TestStateJSON_RoundTrip(t *testing.T) {
 	}
 	if len(out.CarryoverTodos) != 1 || out.CarryoverTodos[0].Priority != "P1" {
 		t.Errorf("carryoverTodos lost: %+v", out.CarryoverTodos)
+	}
+	if len(out.TriageThroughput) != 1 || out.TriageThroughput[0].Floors != 5 {
+		t.Errorf("triageThroughput lost: %+v", out.TriageThroughput)
 	}
 }
 

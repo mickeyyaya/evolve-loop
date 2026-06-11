@@ -77,6 +77,18 @@ type State struct {
 	// marker is written via a lossless raw-merge — never via WriteState.
 	SetupCompletedAt string `json:"setupCompletedAt,omitempty"`
 	SetupVersion     int    `json:"setupVersion,omitempty"`
+	// TriageThroughput is the rolling window (last 5 floor-bearing PASS
+	// cycles) of coverage floors passed per cycle — the observed builder
+	// throughput that bounds triage's per-cycle floor commitments (R9,
+	// inbox coverage-floor-overpacking). Ops live in internal/triagecap.
+	TriageThroughput []TriageThroughputEntry `json:"triageThroughput,omitempty"`
+}
+
+// TriageThroughputEntry is one observed cycle in the triage-capacity rolling
+// window: a PASS cycle and how many coverage floors it committed and passed.
+type TriageThroughputEntry struct {
+	Cycle  int `json:"cycle"`
+	Floors int `json:"floors"`
 }
 
 // BatchAccrual tracks per-dispatcher-invocation cost.
