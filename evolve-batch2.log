@@ -1,0 +1,101 @@
+[setup] First run — run /setup to pick per-phase models + learn the pipeline (using defaults for now).
+[phases] WARN user phase memo clashes with a built-in — built-in kept, user definition ignored
+[phases] WARN phase memo not routed (invalid): name "memo" must be multi-word kebab-case for user/optional phases (e.g. my-check); single-word names are reserved for built-in phases
+[loop] auto-prune: removed 2 expired failedApproaches (30→28)
+[claude-tmux] session=evolve-bridge-c0-probe-pid97895-1781132553 model= workdir=/Users/danleemh/ai/claude/evolve-loop
+[claude-tmux] launching: claude
+[claude-tmux] REPL prompt (❯) detected
+[claude-tmux] BOOT-SMOKE: REPL booted; exiting without prompt
+[claude-tmux] session killed: evolve-bridge-c0-probe-pid97895-1781132553
+[codex-tmux] session=evolve-bridge-codex-c0-probe-pid97895-1781132558 model= workdir=/Users/danleemh/ai/claude/evolve-loop
+[codex-tmux] launching: codex
+[codex-tmux] REPL prompt (›) detected
+[codex-tmux] BOOT-SMOKE: REPL booted; exiting without prompt
+[codex-tmux] session killed: evolve-bridge-codex-c0-probe-pid97895-1781132558
+Loop readiness: WARN (4/5 checks passed)
+  [pass] pipeline-structure: 6 spine phases wired; 57 profile(s) resolve to known drivers
+  [pass] llm-cli-status: 2 CLI binary/binaries present
+  [warn] host-capabilities: 1 host-capability warning(s)
+      profiles request sandboxing but host sandbox is not expected to work (Darwin nested-Claude: sandbox_apply() returns EPERM (rc=71)) — the bridge degrades gracefully
+  [pass] cli-version-freeze: 1 self-updating tmux CLI(s) version-frozen (convergent steady state)
+      codex (/Users/danleemh/.codex/version.json present (codex updater state))
+  [pass] bridge-boot: 2 driver(s) booted (sandbox=false)
+[recipe] launching: agy
+[recipe] REPL prompt (? for shortcuts) detected
+[modelquery] WARN agy: classify models: classifier codex: exit status 1 (output: Reading additional input from stdin...
+OpenAI Codex v0.139.0
+--------
+workdir: /Users/danleemh/ai/claude/evolve-loop
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, …)
+[modelquery] WARN agy: live query unavailable; using detect fallback
+[recipe] launching: claude
+[recipe] REPL prompt (❯) detected
+[modelquery] WARN claude: classify models: classifier codex: exit status 1 (output: Reading additional input from stdin...
+OpenAI Codex v0.139.0
+--------
+workdir: /Users/danleemh/ai/claude/evolve-loop
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, …)
+[modelquery] WARN claude: live query unavailable; using detect fallback
+[recipe] launching: codex --yolo
+[recipe] REPL prompt (›) detected
+[modelquery] WARN codex: classify models: classifier codex: exit status 1 (output: Reading additional input from stdin...
+OpenAI Codex v0.139.0
+--------
+workdir: /Users/danleemh/ai/claude/evolve-loop
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, …)
+[modelquery] WARN codex: live query unavailable; using detect fallback
+[modelquery] WARN ollama: classify models: classifier codex: exit status 1 (output: Reading additional input from stdin...
+OpenAI Codex v0.139.0
+--------
+workdir: /Users/danleemh/ai/claude/evolve-loop
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, …)
+[modelquery] WARN ollama: live query unavailable; using detect fallback
+[runner] phase=scout agent=scout cli=claude-tmux (source=profile.scout.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json
+[runner] phase=triage agent=triage cli=claude-tmux (source=profile.triage.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/triage.json
+[runner] phase=api-contract-design agent=api-contract-design cli=codex-tmux (source=profile.api-contract-design.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/api-contract-design.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=api-contract-design fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=api-contract-design dispatch chain: codex-tmux=85 -> claude-tmux=0
+[runner] phase=architecture-design agent=architecture-design cli=codex-tmux (source=profile.architecture-design.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/architecture-design.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=architecture-design fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=architecture-design dispatch chain: codex-tmux=85 -> claude-tmux=0
+[runner] phase=tdd agent=tdd-engineer cli=claude-tmux (source=profile.tdd-engineer.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/tdd-engineer.json
+[orchestrator] WARN spine not satisfied for next=build (a mandatory predecessor's handoff artifact is missing); proceeding fail-open
+[runner] phase=build agent=builder cli=codex-tmux (source=profile.builder.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/builder.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=build fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=build dispatch chain: codex-tmux=85 -> claude-tmux=81
+[orchestrator] WARN phase build attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)
+[runner] phase=build agent=builder cli=codex-tmux (source=profile.builder.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/builder.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=build fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=build dispatch chain: codex-tmux=85 -> claude-tmux=0
+[orchestrator] build-leak-recover: relocated leaked tracked edit go/internal/phases/swarmplan/swarmplan_test.go into worktree
+[orchestrator] build-leak-recover: relocated leaked tracked edit go/internal/phases/swarmrunner/swarmrunner_test.go into worktree
+[orchestrator] build-leak-recover: relocated leaked tracked edit go/internal/swarm/provision_test.go into worktree
+[orchestrator] build-leak-recover: relocated leaked tracked edit go/internal/swarm/registry_test.go into worktree
+[orchestrator] build-leak-recover: relocated leaked go/internal/phases/swarmrunner/kill_unix_test.go into worktree
+[orchestrator] build-leak-recover: relocated leaked go/internal/swarm/types_test.go into worktree
+[orchestrator] build-leak-recover: 6 leaked path(s) relocated into worktree; main tree restored
+[orchestrator] worktree-normalize: soft-reset builder commits to base ec4de60e7fd8 — changes now pending for audit
+[runner] phase=test-amplification agent=test-amplification cli=codex-tmux (source=profile.test-amplification.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/test-amplification.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=test-amplification fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=test-amplification dispatch chain: codex-tmux=85 -> claude-tmux=81
+[orchestrator] WARN phase test-amplification attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)
+[runner] phase=test-amplification agent=test-amplification cli=codex-tmux (source=profile.test-amplification.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/test-amplification.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=test-amplification fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=test-amplification dispatch chain: codex-tmux=85 -> claude-tmux=81
+[orchestrator] preserving worktree /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-283 — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`
+evolve loop: cycle 283: cycle level failure in phase test-amplification: phase test-amplification: test-amplification: bridge: bridge: launch exit=81: core: bridge artifact timeout
+[runner] phase=scout agent=scout cli=claude-tmux (source=profile.scout.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json
+[orchestrator] WARN phase scout attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)
+[runner] phase=scout agent=scout cli=claude-tmux (source=profile.scout.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json

@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -97,5 +98,41 @@ func TestLoadManifest_MissingFileIsEmpty(t *testing.T) {
 	}
 	if cycle != 0 || sessions != nil {
 		t.Errorf("missing manifest should be empty, got cycle=%d sessions=%v", cycle, sessions)
+	}
+}
+
+func TestLoadManifest_CorruptJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.json")
+	if err := os.WriteFile(path, []byte("not json {{{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, _, err := LoadManifest(path)
+	if err == nil {
+		t.Error("corrupt manifest must return error")
+	}
+}
+
+// TestPersistLocked_InMemoryMode covers the empty-manifestPath fast path.
+func TestPersistLocked_InMemoryMode(t *testing.T) {
+	// empty path → in-memory mode; persist is a no-op and must return nil
+	r := NewSessionRegistry("", 1, "build", 1)
+	if err := r.Register(handle("w0")); err != nil {
+		t.Fatalf("in-memory register must not error: %v", err)
+	}
+}
+
+// TestPersistLocked_UnwritableDir covers the MkdirAll error path.
+func TestPersistLocked_UnwritableDir(t *testing.T) {
+	// Create a read-only parent directory so MkdirAll on the subdir fails.
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0o555); err != nil {
+		t.Skip("cannot set read-only dir on this system")
+	}
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) })
+
+	path := filepath.Join(parent, "sub", "sessions.json")
+	r := NewSessionRegistry(path, 1, "build", 1)
+	if err := r.Register(handle("w0")); err == nil {
+		t.Error("persist to unwritable dir must return error")
 	}
 }

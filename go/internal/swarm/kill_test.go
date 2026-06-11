@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// ——— ExecSessionKiller adversarial edge cases ———
+
 // fakeKiller records what it was asked to kill and can be set to fail.
 type fakeKiller struct {
 	killed []string
@@ -93,5 +95,47 @@ func TestExecSessionKiller_SkipsZeroPGIDAndEmptyTmux(t *testing.T) {
 	}
 	if called {
 		t.Error("killer must not act on a zero pgid / empty tmux session")
+	}
+}
+
+// KillGroup error must be captured as firstErr; KillTmux must STILL be called
+// (best-effort sweep: one error must not skip the sibling teardown step).
+func TestExecSessionKiller_KillGroupError_ContinuesToKillTmux(t *testing.T) {
+	var tmuxCalled bool
+	k := ExecSessionKiller{
+		KillGroup: func(int) error { return errors.New("no such process") },
+		KillTmux:  func(_ context.Context, _ string) error { tmuxCalled = true; return nil },
+	}
+	err := k.Kill(context.Background(), SessionHandle{PGID: 100, TmuxSession: "sess-w0"})
+	if err == nil {
+		t.Error("KillGroup error must propagate as the return value")
+	}
+	if !tmuxCalled {
+		t.Error("KillTmux must still be called even when KillGroup errors (both steps are best-effort)")
+	}
+}
+
+// When KillGroup succeeds and KillTmux errors, the tmux error becomes firstErr.
+func TestExecSessionKiller_KillTmuxError_ReturnsErr(t *testing.T) {
+	k := ExecSessionKiller{
+		KillTmux: func(context.Context, string) error { return errors.New("session not found") },
+	}
+	err := k.Kill(context.Background(), SessionHandle{TmuxSession: "dead-sess"})
+	if err == nil {
+		t.Error("KillTmux error must propagate as the return value")
+	}
+}
+
+// PGID == 1 is the init/launchd PID; killing it would send SIGKILL to every
+// process on the system. The guard must reject it.
+func TestExecSessionKiller_RejectsPGID1(t *testing.T) {
+	called := false
+	k := ExecSessionKiller{
+		KillGroup: func(int) error { called = true; return nil },
+	}
+	// PGID 1 fails the h.PGID > 1 guard → KillGroup must NOT be called.
+	_ = k.Kill(context.Background(), SessionHandle{PGID: 1})
+	if called {
+		t.Error("KillGroup must NOT be called for PGID 1 (init protection)")
 	}
 }

@@ -199,11 +199,13 @@ lane_go() {
   local unformatted="" f
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    [ -n "$(gofmt -l "$ROOT/$f" 2>/dev/null)" ] && unformatted="$unformatted $f"
+    # -s (simplify) matches CI's `gofmt -d -s` — plain gofmt passes code CI then
+    # rejects (inbox cycle-gate-gofmt-not-simplify; recurring since 2026-06-05).
+    [ -n "$(gofmt -s -l "$ROOT/$f" 2>/dev/null)" ] && unformatted="$unformatted $f"
   done <<EOF2
 $gofiles
 EOF2
-  if [ -n "$unformatted" ]; then cg_log "[commit-gate] go: gofmt needs:$unformatted"; return 1; fi
+  if [ -n "$unformatted" ]; then cg_log "[commit-gate] go: gofmt -s needs:$unformatted"; return 1; fi
   pass "go:gofmt"
 
   local map; map="$(mktemp)"; local fdir rel

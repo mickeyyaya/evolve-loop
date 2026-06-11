@@ -120,3 +120,67 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 		t.Errorf("cleanup of empty path should be no-op, got %v", err)
 	}
 }
+
+// TestWorktreeBase covers the EVOLVE_WORKTREE_BASE env-override path.
+func TestWorktreeBase_EnvOverride(t *testing.T) {
+	custom := filepath.Join(t.TempDir(), "custom-base")
+	t.Setenv("EVOLVE_WORKTREE_BASE", custom)
+	if got := worktreeBase("/some/project"); got != custom {
+		t.Errorf("worktreeBase = %q, want %q", got, custom)
+	}
+}
+
+// TestWorktreeBase_DefaultPath covers the default (no env) path.
+func TestWorktreeBase_DefaultPath(t *testing.T) {
+	t.Setenv("EVOLVE_WORKTREE_BASE", "")
+	got := worktreeBase("/proj")
+	if !strings.HasSuffix(got, filepath.Join(".evolve", "worktrees")) {
+		t.Errorf("default worktreeBase = %q, must end with .evolve/worktrees", got)
+	}
+}
+
+// TestCreateWorker_EmptyIntegrationBranch covers the empty-integrationBranch fallback.
+func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
+	root := gitInit(t)
+	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
+	ctx := context.Background()
+	p := NewGitWorkerProvisioner(nil)
+	// Empty integrationBranch → falls back to "HEAD"
+	wt, err := p.CreateWorker(ctx, root, 9, "w0", "")
+	if err != nil {
+		t.Fatalf("CreateWorker with empty integrationBranch: %v", err)
+	}
+	if branchOf(t, wt) != "cycle-9-w0" {
+		t.Errorf("branch = %q, want cycle-9-w0", branchOf(t, wt))
+	}
+}
+
+// TestAddWorktree_StaleStubRemoved covers the stale-directory teardown path in
+// addWorktree: when the path exists but is NOT a valid git worktree (missing
+// .git), git worktree add -B would fail. The impl removes the stub and retries.
+func TestAddWorktree_StaleStubRemoved(t *testing.T) {
+	root := gitInit(t)
+	base := filepath.Join(root, ".evolve", "worktrees")
+	t.Setenv("EVOLVE_WORKTREE_BASE", base)
+	ctx := context.Background()
+
+	// Pre-create a stale stub directory (just a plain dir, no .git).
+	stub := filepath.Join(base, "cycle-7-w0")
+	if err := os.MkdirAll(stub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Write a dummy file to confirm the stub is not silently kept.
+	if err := os.WriteFile(filepath.Join(stub, "stale.txt"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := NewGitWorkerProvisioner(nil)
+	wt, err := p.CreateWorker(ctx, root, 7, "w0", "")
+	if err != nil {
+		t.Fatalf("CreateWorker with stale stub: %v", err)
+	}
+	// The stale file must have been swept away.
+	if _, err := os.Stat(filepath.Join(wt, "stale.txt")); !os.IsNotExist(err) {
+		t.Error("stale stub content should have been removed before worktree re-creation")
+	}
+}

@@ -82,8 +82,13 @@ func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, bran
 	wt := filepath.Join(root, branch)
 
 	// Reuse an existing VALID worktree; tear down a stale stub git rejects.
+	// Validity needs BOTH probes: a `.git` entry at the worktree root (a plain
+	// stub dir inside the parent repo passes rev-parse by walking up to the
+	// parent's .git, silently "reusing" a non-worktree — cycle-283 finding) and
+	// a rev-parse to reject a corrupt/orphaned .git entry.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
-		if exec.CommandContext(ctx, "git", "-C", wt, "rev-parse", "--git-dir").Run() == nil {
+		_, gitEntryErr := os.Stat(filepath.Join(wt, ".git"))
+		if gitEntryErr == nil && exec.CommandContext(ctx, "git", "-C", wt, "rev-parse", "--git-dir").Run() == nil {
 			g.link(wt, projectRoot)
 			return wt, nil
 		}

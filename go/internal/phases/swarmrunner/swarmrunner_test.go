@@ -2,6 +2,7 @@ package swarmrunner
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,22 +90,6 @@ func TestDecorator_ShadowDelegates(t *testing.T) {
 	if resp.Signals["inner"] != true {
 		t.Error("shadow must return the inner response verbatim")
 	}
-}
-
-func TestDecorator_NoPlanFallsBackToInner(t *testing.T) {
-	inner := &fakeInner{name: "build"}
-	bridge := &fakeBridge{}
-	d := New(inner, bridge, swarm.ModeWriter)
-	ws := t.TempDir() // no swarm-plan.json written
-
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if atomic.LoadInt32(&inner.ran) != 1 || atomic.LoadInt32(&bridge.launches) != 0 {
-		t.Errorf("missing plan must fall back to inner N=1 (ran=%d launches=%d)", inner.ran, bridge.launches)
-	}
-	_ = resp
 }
 
 func TestDecorator_AdvisoryDispatchesButInnerAuthoritative(t *testing.T) {
@@ -277,5 +262,294 @@ func TestPortBaseFromEnv(t *testing.T) {
 func TestDecorator_Name(t *testing.T) {
 	if New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter).Name() != "build" {
 		t.Error("Name must be transparent (inner phase name)")
+	}
+}
+
+// errBridge simulates a total transport failure (bridge is unreachable / crashed).
+type errBridge struct{}
+
+func (b *errBridge) Launch(_ context.Context, _ core.BridgeRequest) (core.BridgeResponse, error) {
+	return core.BridgeResponse{}, errors.New("transport down")
+}
+
+func (b *errBridge) Probe(context.Context) (core.BridgeProbe, error) {
+	return core.BridgeProbe{}, nil
+}
+
+// writeWriterPlan writes a valid WRITER swarm plan (disjoint files, two workers).
+func writeWriterPlan(t *testing.T, ws string) {
+	t.Helper()
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plan := `{"swarm_plan":{"task_id":"t","mode":"writer","partitionable":true,` +
+		`"workers":[{"worker_id":"w0","cli":"claude","target_files":["a.go"]},` +
+		`{"worker_id":"w1","cli":"codex","target_files":["b.go"]}]}}`
+	if err := os.WriteFile(filepath.Join(ws, "swarm-plan.json"), []byte(plan), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// branchByID must return a worker_id → branch map for every worker in the plan.
+func TestBranchByID_Empty(t *testing.T) {
+	if m := branchByID(swarm.SwarmPlan{}); len(m) != 0 {
+		t.Errorf("empty plan must produce empty map, got %v", m)
+	}
+}
+
+// annotate must emit swarm.error only when derr is non-nil.
+func TestAnnotate_RecordsDispatchError(t *testing.T) {
+	resp := &core.PhaseResponse{Signals: map[string]any{}}
+	annotate(resp, swarm.SwarmPlan{Mode: swarm.ModeReader}, swarm.SwarmResult{},
+		errors.New("transport failed"), "advisory")
+	if _, ok := resp.Signals["swarm.error"]; !ok {
+		t.Error("dispatch error must be recorded under swarm.error signal")
+	}
+}
+
+func TestAnnotate_NoDispatchError_NoErrorSignal(t *testing.T) {
+	resp := &core.PhaseResponse{Signals: map[string]any{}}
+	annotate(resp, swarm.SwarmPlan{Mode: swarm.ModeReader}, swarm.SwarmResult{}, nil, "enforce")
+	if _, ok := resp.Signals["swarm.error"]; ok {
+		t.Error("no dispatch error must NOT produce swarm.error signal")
+	}
+}
+
+// bridgeLauncher must propagate launch errors from the underlying bridge.
+func TestBridgeLauncher_PropagatesLaunchError(t *testing.T) {
+	l := bridgeLauncher{bridge: &errBridge{}, env: map[string]string{}}
+	_, err := l.Launch(context.Background(), swarm.LaunchRequest{})
+	if err == nil {
+		t.Error("bridgeLauncher must propagate bridge launch errors")
+	}
+}
+
+// dispatchDeps: writer mode must inject a WorkerProvisioner; reader must not.
+func TestDecorator_DispatchDeps_WriterMode_SetsProvisioner(t *testing.T) {
+	d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter)
+	deps := d.dispatchDeps(reqWith(t.TempDir(), map[string]string{}))
+	if deps.Provisioner == nil {
+		t.Error("writer mode dispatchDeps must set a non-nil WorkerProvisioner")
+	}
+}
+
+func TestDecorator_DispatchDeps_ReaderMode_NoProvisioner(t *testing.T) {
+	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader)
+	deps := d.dispatchDeps(reqWith(t.TempDir(), map[string]string{}))
+	if deps.Provisioner != nil {
+		t.Error("reader mode dispatchDeps must NOT set a WorkerProvisioner")
+	}
+}
+
+// enforce must return FAIL when all workers fail due to transport errors.
+func TestDecorator_EnforceReader_WorkerFailureReturnsFail(t *testing.T) {
+	d := New(&fakeInner{name: "scout"}, &errBridge{}, swarm.ModeReader)
+	ws := t.TempDir()
+	writePlan(t, ws, swarm.ModeReader)
+
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	if err == nil {
+		t.Fatal("enforce with all-worker transport failure must return a non-nil error")
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("enforce must produce VerdictFAIL on dispatch error, got %s", resp.Verdict)
+	}
+}
+
+// A non-partitionable plan must collapse to the inner runner even in enforce mode.
+func TestDecorator_ValidateCollapse_FallsBackToInner(t *testing.T) {
+	inner := &fakeInner{name: "build"}
+	d := New(inner, &fakeBridge{}, swarm.ModeWriter)
+	ws := t.TempDir()
+	// Non-partitionable → Validate returns Collapse=true → inner must run.
+	plan := `{"swarm_plan":{"task_id":"t","mode":"writer","partitionable":false,` +
+		`"workers":[{"worker_id":"w0","cli":"claude"},{"worker_id":"w1","cli":"codex"}]}}`
+	_ = os.MkdirAll(ws, 0o755)
+	_ = os.WriteFile(filepath.Join(ws, "swarm-plan.json"), []byte(plan), 0o644)
+
+	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&inner.ran) != 1 {
+		t.Error("non-partitionable plan must fall back to the inner runner exactly once")
+	}
+}
+
+// swarmStage must map "shadow" (explicit) and any unknown value to off (not just the empty string).
+func TestSwarmStage_ShadowAndUnknownMapToOff(t *testing.T) {
+	cases := map[string]string{
+		"shadow":        "off",
+		"SHADOW":        "off",
+		"":              "off",
+		"unknown_value": "off",
+	}
+	for input, want := range cases {
+		st := swarmStage(map[string]string{"EVOLVE_SWARM_STAGE": input})
+		if want == "off" && st != stageOff {
+			t.Errorf("swarmStage(%q) = %v, want stageOff", input, st)
+		}
+	}
+}
+
+// loadPlan must return ok=false for a workspace with neither swarm-plan.json nor
+// swarm-plan.md, ensuring a graceful N=1 fallback rather than a panic.
+func TestDecorator_NoPlanFile_FallsBackToInner(t *testing.T) {
+	inner := &fakeInner{name: "build"}
+	bridge := &fakeBridge{}
+	d := New(inner, bridge, swarm.ModeWriter)
+	ws := t.TempDir() // no plan file written
+
+	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&inner.ran) != 1 {
+		t.Error("missing plan must fall back to inner runner")
+	}
+	if atomic.LoadInt32(&bridge.launches) != 0 {
+		t.Error("missing plan must NOT dispatch any swarm workers")
+	}
+}
+
+// mergeEnv must produce a new map (not alias the base or overlay) so concurrent
+// workers that receive the same base env can't corrupt each other's copies.
+func TestMergeEnv_NoAliasOfBase(t *testing.T) {
+	base := map[string]string{"A": "1", "B": "2"}
+	overlay := map[string]string{"B": "override", "C": "3"}
+	out := mergeEnv(base, overlay)
+
+	if out["A"] != "1" {
+		t.Errorf("base key A not preserved: %v", out)
+	}
+	if out["B"] != "override" {
+		t.Errorf("overlay must win for key B, got %v", out["B"])
+	}
+	if out["C"] != "3" {
+		t.Errorf("overlay-only key C missing: %v", out)
+	}
+	// Mutating the output must not affect the base (no aliasing).
+	out["A"] = "mutated"
+	if base["A"] != "1" {
+		t.Error("mergeEnv must not alias the base map (mutation leaked)")
+	}
+}
+
+func TestMergeEnv_NilBase(t *testing.T) {
+	out := mergeEnv(nil, map[string]string{"X": "1"})
+	if out["X"] != "1" {
+		t.Errorf("mergeEnv with nil base must include overlay, got %v", out)
+	}
+}
+
+func TestMergeEnv_NilOverlay(t *testing.T) {
+	out := mergeEnv(map[string]string{"X": "1"}, nil)
+	if out["X"] != "1" {
+		t.Errorf("mergeEnv with nil overlay must include base, got %v", out)
+	}
+}
+
+// annotate must initialise Signals if the response had a nil map (defensive
+// nil-safety for callers that produce a bare PhaseResponse).
+func TestAnnotate_InitialisesNilSignals(t *testing.T) {
+	resp := &core.PhaseResponse{} // Signals is nil
+	annotate(resp, swarm.SwarmPlan{Mode: swarm.ModeWriter}, swarm.SwarmResult{}, nil, "enforce")
+	if resp.Signals == nil {
+		t.Error("annotate must initialise a nil Signals map")
+	}
+	if resp.Signals["swarm.stage"] != "enforce" {
+		t.Errorf("swarm.stage not set after nil-init, signals=%v", resp.Signals)
+	}
+}
+
+// portBaseFromEnv must handle the full range of parsing failures gracefully,
+// returning 0 (→ dispatcher uses DefaultPortBase) for any non-integer input.
+func TestPortBaseFromEnv_EdgeCases(t *testing.T) {
+	cases := []struct {
+		env  map[string]string
+		want int
+	}{
+		{map[string]string{}, 0},
+		{map[string]string{"EVOLVE_SWARM_PORT_BASE": ""}, 0},
+		{map[string]string{"EVOLVE_SWARM_PORT_BASE": "abc"}, 0},
+		{map[string]string{"EVOLVE_SWARM_PORT_BASE": "-1"}, -1}, // negative allowed by Atoi
+		{map[string]string{"EVOLVE_SWARM_PORT_BASE": "65535"}, 65535},
+	}
+	for _, tc := range cases {
+		got := portBaseFromEnv(tc.env)
+		if got != tc.want {
+			t.Errorf("portBaseFromEnv(%v) = %d, want %d", tc.env, got, tc.want)
+		}
+	}
+}
+
+// enforce reader with a valid plan and workers that write their reports must
+// synthesise a combined report at <phase>-report.md in the workspace.
+func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
+	inner := &fakeInner{name: "scout"}
+	bridge := &artifactBridge{}
+	d := New(inner, bridge, swarm.ModeReader)
+	ws := t.TempDir()
+	writePlan(t, ws, swarm.ModeReader)
+
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	if err != nil {
+		t.Fatalf("reader enforce with artifact bridge must not error: %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("reader enforce with all OK workers must PASS, got %s", resp.Verdict)
+	}
+	synthPath := filepath.Join(ws, "scout-report.md")
+	if _, err := os.Stat(synthPath); err != nil {
+		t.Errorf("synthesis must be written to scout-report.md, stat err=%v", err)
+	}
+	if resp.Signals["swarm.synthesis"] != synthPath {
+		t.Errorf("swarm.synthesis signal must point to %s, got %v", synthPath, resp.Signals["swarm.synthesis"])
+	}
+}
+
+// Enforce writer path: when all workers fail → FAIL verdict + non-nil error.
+func TestDecorator_EnforceWriter_WorkerFailureReturnsFail(t *testing.T) {
+	inner := &fakeInner{name: "build"}
+	d := New(inner, &errBridge{}, swarm.ModeWriter)
+	ws := t.TempDir()
+	writeWriterPlan(t, ws)
+
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	if err == nil {
+		t.Fatal("enforce writer with transport failure must return error")
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("enforce writer transport failure must produce VerdictFAIL, got %s", resp.Verdict)
+	}
+	// inner runner must NOT have run (swarm is authoritative in enforce mode).
+	if atomic.LoadInt32(&inner.ran) != 0 {
+		t.Error("enforce writer must not run the inner runner")
+	}
+}
+
+// TestBranchByID verifies the pure plan→branchMap helper.
+func TestBranchByID(t *testing.T) {
+	plan := swarm.SwarmPlan{Workers: []swarm.WorkerSpec{
+		{WorkerID: "w0", Branch: "cycle-1-w0"},
+		{WorkerID: "w1", Branch: "cycle-1-w1"},
+	}}
+	got := branchByID(plan)
+	if got["w0"] != "cycle-1-w0" || got["w1"] != "cycle-1-w1" {
+		t.Errorf("branchByID wrong: %v", got)
+	}
+	if len(got) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(got))
+	}
+}
+
+// TestDecorator_Enforce_WorkerFail covers the !sr.AllOK() path in enforce.
+func TestDecorator_Enforce_WorkerFail(t *testing.T) {
+	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader)
+	plan := swarm.SwarmPlan{Mode: swarm.ModeReader, Workers: []swarm.WorkerSpec{{WorkerID: "w0"}}}
+	sr := swarm.SwarmResult{Workers: []swarm.WorkerResult{{WorkerID: "w0", ExitCode: 1}}}
+	resp, _ := d.enforce(context.Background(), core.PhaseRequest{}, plan, sr, nil)
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("enforce verdict = %q, want FAIL when worker fails", resp.Verdict)
 	}
 }

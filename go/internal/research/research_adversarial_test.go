@@ -58,12 +58,12 @@ func TestSplitSearchPaths_EdgeCases(t *testing.T) {
 		wantLen int
 	}{
 		{"", 0},
-		{":", 0},          // colon-only splits to two empties → both dropped
-		{"::", 0},         // all empties
-		{"/a:/b", 2},      // normal case
-		{"/a::/b", 2},     // empty middle entry dropped
+		{":", 0},             // colon-only splits to two empties → both dropped
+		{"::", 0},            // all empties
+		{"/a:/b", 2},         // normal case
+		{"/a::/b", 2},        // empty middle entry dropped
 		{"  /a  :  /b  ", 2}, // whitespace-trimmed entries
-		{"/single", 1},    // no colon
+		{"/single", 1},       // no colon
 	}
 	for _, c := range cases {
 		got := SplitSearchPaths(c.raw)
@@ -153,7 +153,7 @@ func TestLessonDigest_AllPaths(t *testing.T) {
 func TestQueryTerms_Deduplication(t *testing.T) {
 	q := Query{
 		FailureMode: "egps red count",
-		Consequence: "egps gate fail",  // "egps" already in FailureMode
+		Consequence: "egps gate fail",                 // "egps" already in FailureMode
 		Keywords:    []string{"red", "egps", "count"}, // all already seen
 	}
 	terms := q.terms()
