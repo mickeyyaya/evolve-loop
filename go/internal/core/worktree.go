@@ -44,6 +44,9 @@ func (gitWorktree) base(projectRoot string) string {
 
 func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	base := g.base(projectRoot)
+	if !filepath.IsAbs(base) {
+		return "", fmt.Errorf("worktree base must be absolute: %s", base)
+	}
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", fmt.Errorf("worktree base: %w", err)
 	}

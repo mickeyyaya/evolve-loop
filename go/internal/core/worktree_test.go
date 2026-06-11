@@ -81,6 +81,82 @@ func TestWorktreePhase(t *testing.T) {
 	}
 }
 
+// chdirTempNonGit chdirs the process into a fresh non-git temp dir for the
+// duration of the test and restores the prior cwd on cleanup. The core
+// package tests run sequentially (no t.Parallel), so the process-global cwd
+// swap is safe. It serves two purposes for the relative-base guard tests:
+//   - cwd is NOT inside a git repo, so an un-guarded (RED) build's
+//     `git -C "." worktree add` fails cleanly instead of polluting the live
+//     evolve-loop repo with a stray cycle-N branch/worktree.
+//   - any relative base dir an un-guarded MkdirAll creates lands under this
+//     temp dir, which t.TempDir() auto-removes — RED stays side-effect-free.
+func chdirTempNonGit(t *testing.T) string {
+	t.Helper()
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir %s: %v", dir, err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	return dir
+}
+
+// TestGitWorktree_RelativeBaseRefused: a RELATIVE EVOLVE_WORKTREE_BASE must
+// be refused with an "absolute" error BEFORE any MkdirAll/git runs, so a
+// relative base can never silently create worktree dirs under the cwd.
+// Mirrors the swarm/provision.go addWorktree guard added in cycle 294.
+//
+// RED today: gitWorktree.Create has no IsAbs guard — it MkdirAll's the
+// relative base and then `git -C <root> worktree add` fails with a *git*
+// message that does NOT mention "absolute", so the discriminating
+// assertion fails.
+func TestGitWorktree_RelativeBaseRefused(t *testing.T) {
+	chdirTempNonGit(t)
+	const relBase = "relative-base-probe" // relative → the bug class
+	t.Setenv("EVOLVE_WORKTREE_BASE", relBase)
+
+	g := gitWorktree{}
+	wt, err := g.Create(".", 1)
+	if err == nil {
+		t.Fatalf("RED: relative EVOLVE_WORKTREE_BASE %q must be refused; got worktree %q, nil error", relBase, wt)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
+		t.Errorf("RED: guard absent — error %q does not indicate the worktree base must be absolute", err.Error())
+	}
+	// No filesystem side effect: the guard must fire before MkdirAll, so the
+	// relative base dir must not exist under the (temp) cwd.
+	if _, statErr := os.Stat(relBase); !errors.Is(statErr, os.ErrNotExist) {
+		t.Errorf("RED: relative base dir %q was created (stat err=%v) — guard did not fire before MkdirAll", relBase, statErr)
+	}
+}
+
+// TestGitWorktree_RelativeProjectRootRefused: with EVOLVE_WORKTREE_BASE
+// unset and a relative projectRoot, base = "<root>/.evolve/worktrees" is
+// itself relative and must also be refused. This is the live-default path
+// (no env override) and the one that silently created dirs in the cwd.
+//
+// RED today: no guard → MkdirAll(".evolve/worktrees") then a git error
+// lacking "absolute".
+func TestGitWorktree_RelativeProjectRootRefused(t *testing.T) {
+	chdirTempNonGit(t)
+	t.Setenv("EVOLVE_WORKTREE_BASE", "") // empty → base() falls back to <root>/.evolve/worktrees
+
+	g := gitWorktree{}
+	wt, err := g.Create(".", 1)
+	if err == nil {
+		t.Fatalf("RED: relative projectRoot %q must yield a refused (non-absolute) base; got worktree %q, nil error", ".", wt)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
+		t.Errorf("RED: guard absent — error %q does not indicate the worktree base must be absolute", err.Error())
+	}
+	if _, statErr := os.Stat(filepath.Join(".evolve", "worktrees")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Errorf("RED: .evolve/worktrees was created (stat err=%v) — guard did not fire before MkdirAll", statErr)
+	}
+}
+
 // fakeWorktree records Create/Cleanup calls and returns a scripted path/err.
 type fakeWorktree struct {
 	createdCycles []int

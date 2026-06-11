@@ -55,10 +55,51 @@ func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, 
 	return cs, nil
 }
 
-// WriteCycleState atomically replaces .evolve/cycle-state.json.
+// WriteCycleState atomically replaces .evolve/cycle-state.json while preserving
+// the checkpoint block written by the checkpoint package. core.CycleState does
+// not model that key, so a plain struct rewrite would erase resume state.
 func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
 	path := filepath.Join(s.evolveDir, "cycle-state.json")
-	return writeJSONAtomic(path, cs)
+	checkpoint, ok, err := readExistingCheckpoint(path)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return writeJSONAtomic(path, cs)
+	}
+
+	raw, err := json.Marshal(cs)
+	if err != nil {
+		return fmt.Errorf("marshal cycle state: %w", err)
+	}
+	var merged map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &merged); err != nil {
+		return fmt.Errorf("unmarshal cycle state: %w", err)
+	}
+	merged["checkpoint"] = checkpoint
+	return writeJSONAtomic(path, merged)
+}
+
+func readExistingCheckpoint(path string) (json.RawMessage, bool, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("read %s: %w", path, err)
+	}
+	if len(raw) == 0 {
+		return nil, false, nil
+	}
+	var existing map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &existing); err != nil {
+		return nil, false, fmt.Errorf("unmarshal %s: %w", path, err)
+	}
+	checkpoint, ok := existing["checkpoint"]
+	if !ok || len(checkpoint) == 0 || string(checkpoint) == "null" {
+		return nil, false, nil
+	}
+	return checkpoint, true, nil
 }
 
 // readJSON reads a JSON file into v. Missing file is not an error;
