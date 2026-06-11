@@ -87,6 +87,11 @@ type State struct {
 	// UpdateState; a gap/repeat in the sequence betrays a writer that
 	// bypassed the lock. Additive field — single-mode byte-stable.
 	StateRevision int `json:"stateRevision,omitempty"`
+	// LastAllocatedCycleNumber is the CA.4 allocation lease: the highest
+	// cycle number ever minted (≠ LastCycleNumber, the highest COMPLETED).
+	// Bumped atomically via UpdateState before a run starts; a crashed run
+	// burns its number. Additive field — single-mode byte-stable.
+	LastAllocatedCycleNumber int `json:"lastAllocatedCycleNumber,omitempty"`
 }
 
 // TriageThroughputEntry is one observed cycle in the triage-capacity rolling

@@ -1556,7 +1556,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("read state: %w", err)
 	}
-	cycle := state.LastCycleNumber + 1
+	// CA.4: mint the cycle number through the allocation lease when the
+	// storage supports the serialized RMW (legacy +1 otherwise). A crashed
+	// run burns its number; resume re-enters via RunCycleFromPhase with the
+	// run record's cycle and never re-allocates.
+	cycle, err := o.allocateCycle(ctx, &state)
+	if err != nil {
+		return CycleResult{}, fmt.Errorf("allocate cycle: %w", err)
+	}
 
 	startedAt := o.now().UTC().Format(time.RFC3339)
 	// IntentRequired is the gate for the start→intent vs start→scout
@@ -2669,7 +2676,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	}
 
 	state.LastCycleNumber = cycle
-	if err := o.storage.WriteState(ctx, state); err != nil {
+	if err := o.persistCycleEndState(ctx, state); err != nil {
 		return result, fmt.Errorf("write state: %w", err)
 	}
 	cycleCompletedNormally = true
