@@ -20,8 +20,10 @@
 //	func Check(opts Options) ([]Violation, error)
 //
 // Semantics pinned by these tests (architecture R4/R5/R6/R11):
-//   - persona agents/evolve-<name>.md pairs with <name>.json; either side
-//     missing → pair silently skipped; non `evolve-`-prefixed .md ignored.
+//   - persona agents/evolve-<name>.md pairs with <name>.json; a missing
+//     profile → "unpaired" WARN (cycle-270 fix; "-reference" docs exempt —
+//     see unpaired_test.go); a missing persona side is silent (Check
+//     iterates personas); non `evolve-`-prefixed .md ignored.
 //   - `tools:` frontmatter only; `tools-gemini:`/`tools-generic:` are NOT the
 //     tools line (multi-CLI coherence is out of scope). No tools: line → skip.
 //   - profile without allowed_tools → no constraint → skip.
@@ -200,9 +202,12 @@ func TestCoherence_ProfileWithoutAllowedToolsSkipped(t *testing.T) {
 }
 
 func TestCoherence_UnpairedAndNonPersonaFilesSkipped(t *testing.T) {
-	// Persona without profile, profile without persona, and the
+	// Contract updated for inbox dispatchable-agent-profile-completeness
+	// (cycle-270): a persona without a profile is now an "unpaired" WARN —
+	// see unpaired_test.go for its pins. Still SILENT here: a profile
+	// without a persona (Check iterates personas only) and the
 	// certain-to-exist non-persona .md files in agents/ (AGENTS.md,
-	// agent-templates.md — architecture risk table) → all silently skipped.
+	// agent-templates.md — architecture risk table).
 	agents, profs := fixtures(
 		map[string]string{
 			"evolve-orphan": personaMD("orphan", `tools: ["Read"]`),
@@ -218,8 +223,16 @@ func TestCoherence_UnpairedAndNonPersonaFilesSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if len(vs) != 0 {
-		t.Errorf("violations = %+v, want none (unpaired/non-persona skip)", vs)
+	for _, v := range vs {
+		if v.Kind != "unpaired" {
+			t.Errorf("unexpected non-unpaired violation %+v (non-persona files must stay skipped)", v)
+		}
+		if v.Persona != "orphan" {
+			t.Errorf("violation for %q — only the unpaired persona may warn", v.Persona)
+		}
+	}
+	if len(vs) != 1 {
+		t.Errorf("violations = %+v, want exactly the orphan unpaired WARN", vs)
 	}
 }
 
