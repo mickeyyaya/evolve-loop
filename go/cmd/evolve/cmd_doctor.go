@@ -9,11 +9,12 @@ import (
 )
 
 // runDoctor implements `evolve doctor <subcommand>`: `probe <tool>` (CLI
-// discovery) and `boot <driver>` (real bridge-boot smoke-test). Returns the
-// process exit code.
+// discovery), `boot <driver>` (real bridge-boot smoke-test), and
+// `live <driver>` (boot + submit one trivial prompt — the probe that can see
+// a quota wall). Returns the process exit code.
 func runDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver>)")
+		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver>)")
 		return 10
 	}
 	switch args[0] {
@@ -21,6 +22,8 @@ func runDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runDoctorProbe(args[1:], stdout, stderr)
 	case "boot":
 		return runDoctorBoot(args[1:], stdout, stderr)
+	case "live":
+		return runDoctorLive(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve doctor: unknown subcommand %q\n", args[0])
 		return 10

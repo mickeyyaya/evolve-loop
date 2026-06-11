@@ -27,7 +27,9 @@ package llmroute
 
 import (
 	"os/exec"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -237,5 +239,47 @@ func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 	// through Probe automatically (no silent omission).
 	out := p
 	out.Candidates = append(available, missing...)
+	return out
+}
+
+// Family maps a registered CLI driver name to its CLI family — the binary
+// name from cliBinaryFor ("codex-tmux" → "codex"). A transient outage (quota
+// wall, auth expiry) hits every transport of a family, so health state is
+// keyed here, not per driver. Unknown names map to themselves.
+func Family(cli string) string {
+	if bin := cliBinaryFor[cli]; bin != "" {
+		return bin
+	}
+	return cli
+}
+
+// ApplyBench demotes candidates whose family is benched (cycle-283: a walled
+// codex re-burned its 5-15min boot on every dispatch) to the chain end,
+// mirroring Probe's demote-not-drop reorder. benched maps family → BenchedAt.
+// Bench is advice, never a veto: when EVERY candidate is benched the chain is
+// instead ordered least-recently-benched first — the caller logs loudly and
+// dispatch proceeds. Copy-struct convention carries non-Candidates fields.
+func ApplyBench(p Plan, benched map[string]time.Time) Plan {
+	if len(p.Candidates) <= 1 || len(benched) == 0 {
+		return p
+	}
+	var healthy, demoted []string
+	for _, cli := range p.Candidates {
+		if _, hit := benched[Family(cli)]; hit {
+			demoted = append(demoted, cli)
+		} else {
+			healthy = append(healthy, cli)
+		}
+	}
+	out := p
+	if len(healthy) == 0 {
+		all := append([]string(nil), p.Candidates...)
+		sort.SliceStable(all, func(i, j int) bool {
+			return benched[Family(all[i])].Before(benched[Family(all[j])])
+		})
+		out.Candidates = all
+		return out
+	}
+	out.Candidates = append(healthy, demoted...)
 	return out
 }

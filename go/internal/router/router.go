@@ -46,6 +46,14 @@ type RouteInput struct {
 	Cycle       int
 	Env         map[string]string
 
+	// BenchedCLIs is ENVIRONMENTAL context (not a handoff signal — it keeps
+	// RoutingSignals handoff-pure): CLI families currently benched by the
+	// cli-health store (classified transient wall, e.g. rate_limit). Consumed
+	// ONLY by the DynamicLLM advisor prompt so plans adapt to a degraded
+	// family — fewer inserts routed there, scope sized for the fallback CLI
+	// carrying the cycle. The pure Route() ignores it.
+	BenchedCLIs []BenchedCLI
+
 	// GoalText is the human-readable goal/strategy for this cycle (the same text
 	// Scout works from). Populated by the orchestrator from
 	// CycleRequest.Context["strategy"]; consumed ONLY by the DynamicLLM advisor's
@@ -642,4 +650,12 @@ func isFloorPhase(phase string) bool {
 	default:
 		return false
 	}
+}
+
+// BenchedCLI is one benched CLI family projected from the cli-health store
+// for the advisor's environmental context (see RouteInput.BenchedCLIs).
+type BenchedCLI struct {
+	Family string    // CLI family, e.g. "codex"
+	Reason string    // classifier pattern, e.g. "rate_limit"
+	Until  time.Time // bench expiry (the canary re-probes after this)
 }

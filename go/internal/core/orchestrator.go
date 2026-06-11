@@ -1703,6 +1703,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// is wired. The composition root passes WithPlanner unconditionally; the
 	// Mode check lives here so the invariant ("LLM plan iff DynamicLLM+Advisory")
 	// has one source of truth rather than two gates that could drift.
+	// CLI-health snapshot, taken ONCE at cycle start and threaded to both the
+	// whole-cycle plan input and every per-transition Decide: the advisor and
+	// the dispatcher must reason from the SAME bench state (review H2 — two
+	// reads could diverge when a bench expires mid-planning).
+	benchedCLIs := benchedCLIsForRouting(req.ProjectRoot)
 	var clampedPlan *router.PhasePlan
 	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
 		// WS2 recall memory: thread the most recent failure's reason + matching KB
@@ -1730,6 +1735,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// section in the prompt).
 			GoalText:       req.Context["goal"],
 			CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
+			BenchedCLIs:    benchedCLIs,
 			IntentRequired: cs.IntentRequired,
 			PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
 		}
@@ -1857,6 +1863,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				ProjectRoot: req.ProjectRoot,
 				Cycle:       cycle,
 				Env:         envSnap,
+				BenchedCLIs: benchedCLIs,
 				// Clamped whole-cycle plan (Stage>=Advisory). nil below Advisory
 				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
 				Plan:           clampedPlan,

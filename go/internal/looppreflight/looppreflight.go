@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -134,6 +135,11 @@ type Options struct {
 	// PinnedLister lists version-frozen package names. Default:
 	// `brew list --pinned`; an error is treated as ambiguity (Warn).
 	PinnedLister func() ([]string, error)
+
+	// CLIHealthActive lists CLI families with an ACTIVE bench (classified
+	// transient wall, e.g. rate_limit). Default reads
+	// .evolve/cli-health.json via the clihealth store.
+	CLIHealthActive func() []clihealth.Entry
 }
 
 // resolved is Options with every seam and default filled in.
@@ -162,6 +168,7 @@ type resolved struct {
 
 	selfUpdateEvidence func(string) (bool, string, error)
 	pinnedLister       func() ([]string, error)
+	cliHealthActive    func() []clihealth.Entry
 }
 
 // DefaultBootBudget is the per-driver REPL boot deadline (mirrors the
@@ -195,6 +202,7 @@ func resolve(opts Options) (resolved, error) {
 
 		selfUpdateEvidence: opts.SelfUpdateEvidence,
 		pinnedLister:       opts.PinnedLister,
+		cliHealthActive:    opts.CLIHealthActive,
 	}
 	if o.stderr == nil {
 		o.stderr = io.Discard
@@ -253,6 +261,9 @@ func resolve(opts Options) (resolved, error) {
 	if o.pinnedLister == nil {
 		o.pinnedLister = defaultPinnedLister
 	}
+	if o.cliHealthActive == nil {
+		o.cliHealthActive = defaultCLIHealthActive(o.projectRoot)
+	}
 	return o, nil
 }
 
@@ -270,6 +281,7 @@ func Run(opts Options) (Result, error) {
 		checkLLMCLIStatus(o),
 		checkHostCapabilities(o),
 		checkCLIVersionFreeze(o),
+		checkCLIHealth(o),
 		checkBridgeBoot(o),
 	}
 	return finalize(checks, o.now()), nil

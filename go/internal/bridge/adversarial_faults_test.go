@@ -3,6 +3,7 @@ package bridge
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -58,6 +59,17 @@ func adversarialFaultCases() []adversarialFaultCase {
 				panes:    []string{f.marker, "!!! malformed terminal frame !!!"},
 				wantCode: ExitArtifactTimeout,
 			},
+			// rate-limit-wall: the cycle-283 quota wall — the REPL boots, work
+			// is submitted, then the provider wall appears. The autoresponder
+			// must CLASSIFY (pattern rate_limit), persist the escalation
+			// report (the artifact the runner's bench-writer consumes), and
+			// escalate with ExitUnknownPrompt instead of stalling to the
+			// artifact timeout.
+			adversarialFaultCase{
+				family: f.family, cli: f.cli, marker: f.marker, fault: "rate-limit-wall",
+				panes:    []string{f.marker, rateLimitWallFor(f.family)},
+				wantCode: ExitUnknownPrompt,
+			},
 		)
 	}
 	for i := range out {
@@ -74,6 +86,21 @@ func adversarialFaultCases() []adversarialFaultCase {
 	return out
 }
 
+// rateLimitWallFor returns each family's real wall phrasing (matching that
+// family's manifest rate_limit regex). The codex text is verbatim from the
+// cycle-283 escalation report — the incident this fault replays.
+func rateLimitWallFor(family string) string {
+	switch family {
+	case "codex":
+		return "■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), " +
+			"visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 6:11 AM."
+	case "claude":
+		return "Claude usage limit reached. Your limit will reset at 6:11 AM."
+	default: // agy / gemini family
+		return "RESOURCE_EXHAUSTED: rate limit exceeded — try again in 2 hours."
+	}
+}
+
 func TestAdversarialFaultMatrix(t *testing.T) {
 	for _, tc := range adversarialFaultCases() {
 		tc := tc
@@ -88,6 +115,15 @@ func TestAdversarialFaultMatrix(t *testing.T) {
 			code, stderr := runTmuxCLI(t, fx, tc.cli, tmux, nil, "--allow-bypass")
 			if code != tc.wantCode {
 				t.Fatalf("%s/%s exit=%d, want %d; stderr=%s", tc.family, tc.fault, code, tc.wantCode, stderr)
+			}
+			if tc.fault == "rate-limit-wall" {
+				raw, err := os.ReadFile(filepath.Join(fx.ws, "escalation-report.json"))
+				if err != nil {
+					t.Fatalf("%s wall left no escalation report (the bench-writer's input): %v", tc.family, err)
+				}
+				if !strings.Contains(string(raw), `"pattern_name": "rate_limit"`) && !strings.Contains(string(raw), `"pattern_name":"rate_limit"`) {
+					t.Fatalf("%s wall escalation report not classified rate_limit: %s", tc.family, raw)
+				}
 			}
 			if tc.assert != nil {
 				tc.assert(t, tmux, stderr)
@@ -113,7 +149,7 @@ func TestAdversarialFaultMatrix_RequiredFaultTypesPresent(t *testing.T) {
 	for _, tc := range adversarialFaultCases() {
 		seen[strings.ReplaceAll(tc.fault, "-", "")] = true
 	}
-	for _, fault := range []string{"stall", "crash", "updatemenu", "weakbusy", "emptypane", "malformed"} {
+	for _, fault := range []string{"stall", "crash", "updatemenu", "weakbusy", "emptypane", "malformed", "ratelimitwall"} {
 		if !seen[fault] {
 			t.Fatalf("missing adversarial fault type %q", fault)
 		}

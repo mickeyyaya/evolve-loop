@@ -400,6 +400,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				phase, preCandidates, plan.Candidates)
 		}
 	}
+	// CLI-health bench: demote families with an ACTIVE bench (classified
+	// transient wall, e.g. rate_limit) so the chain starts at a healthy CLI
+	// instead of re-burning the walled primary's boot window (cycle-283).
+	// Same pin bypass as the capability probe; lazy expiry inside.
+	plan = b.applyBenchToPlan(req.ProjectRoot, phase, plan, pin != nil && pin.CLI != "", req.Env)
 	cli := plan.Candidates[0]
 	// Disambiguating dispatch log: tells observers which CLI is actually being
 	// invoked and why (an output stream saying `model: claude-sonnet-4-6` could
@@ -465,6 +470,15 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			fmt.Fprintf(os.Stderr, "[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s=%d", candidateCLI, bres.ExitCode))
+		// CLI-health bench: an exit-85 with a fresh benchable escalation
+		// report (rate_limit class) is remembered ACROSS dispatches — run on
+		// every candidate including the last, so the wall is recorded even
+		// when no fallback remains (cycle-283). Staleness is judged against
+		// the RUN start: the guard exists to exclude cross-PHASE leftovers in
+		// the shared workspace, not earlier attempts of this same run.
+		if bridgeErr != nil && bres.ExitCode == 85 {
+			b.maybeBenchOnEscalation(req.ProjectRoot, req.Workspace, candidateCLI, start, req.Env)
+		}
 		// (Pre-existing WS-G dead assignment removed in cycle-122 Fix 2:
 		// `cli` was assigned here but never read downstream — the
 		// per-attempt CLI lives in attemptLog instead. Comment kept so

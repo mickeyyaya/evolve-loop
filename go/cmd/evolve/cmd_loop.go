@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+
 	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
 	// so the orchestrator writes a resumable checkpoint at every phase boundary.
 	// Without this the hook stays nil and the feature silently no-ops in production.
@@ -335,6 +337,17 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	budgetUnobsWarned := false // cycle-190: warn once when --budget-usd can't gate
 
 	for i := 0; i < cfg.MaxCycles; i++ {
+		// CLI-health canary (the per-cycle health seam): one cheap live probe
+		// per EXPIRED bench — recovered families rejoin dispatch, still-walled
+		// ones re-bench with a doubled cooldown, instead of a full phase
+		// re-discovering the wall the expensive way (cycle-283).
+		runCLIHealthCanary(cfg.ProjectRoot, cycleEnv, func(driver string) (int, string, string) {
+			probeCtx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+			defer cancel()
+			return bridge.LiveSmokeTest(probeCtx, driver,
+				&bridge.Config{ProjectRoot: cfg.ProjectRoot}, bridge.Deps{Stderr: stderr})
+		}, stderr)
+
 		// Snapshot state.LastCycleNumber so we can detect
 		// counter-non-advance after RunCycle returns.
 		lastBefore, _ := readLastCycleNumber(context.Background(), deps.Storage)

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -382,6 +384,21 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 		fmt.Fprintf(b, "## Goal\n%s\n\n", g)
 	}
 
+	// Environmental CLI health: benched families mean dispatch chains start at
+	// their fallback — the advisor should plan around the degraded family
+	// (fewer inserts routed there; scope sized for the fallback carrying the
+	// cycle) instead of discovering it one phase at a time (cycle-283).
+	if len(in.BenchedCLIs) > 0 {
+		b.WriteString("## CLI health (environmental)\n")
+		benched := append([]router.BenchedCLI(nil), in.BenchedCLIs...)
+		sort.Slice(benched, func(i, j int) bool { return benched[i].Family < benched[j].Family })
+		for _, e := range benched {
+			fmt.Fprintf(b, "- %s: benched (%s) until %s — its dispatch chains start at the fallback CLI\n",
+				e.Family, e.Reason, e.Until.UTC().Format("15:04Z"))
+		}
+		b.WriteString("\n")
+	}
+
 	b.WriteString("## Objective signals (digested from handoff artifacts)\n")
 	writeSignals(b, in.Signals)
 
@@ -672,3 +689,20 @@ var (
 	_ router.Proposer = (*PhaseAdvisor)(nil)
 	_ router.Planner  = (*PhaseAdvisor)(nil)
 )
+
+// benchedCLIsForRouting projects the cli-health store's ACTIVE benches into
+// the advisor's environmental context, sorted by family for a deterministic
+// (prompt-prefix-cache-friendly) prompt. Empty when the store is empty or
+// unreadable — CLI health is advice, never a planning prerequisite.
+func benchedCLIsForRouting(projectRoot string) []router.BenchedCLI {
+	active := clihealth.NewStore(projectRoot, nil).Active()
+	if len(active) == 0 {
+		return nil
+	}
+	out := make([]router.BenchedCLI, 0, len(active))
+	for _, e := range active {
+		out = append(out, router.BenchedCLI{Family: e.Family, Reason: e.Reason, Until: e.BenchedUntil})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Family < out[j].Family })
+	return out
+}
