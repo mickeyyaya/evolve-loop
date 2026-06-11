@@ -24,6 +24,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
 // atomicShip is the single entry point for "do the actual git work."
@@ -160,12 +161,25 @@ func readActiveWorktree(opts *Options) string {
 //	git push origin <branch>
 func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch string) error {
 	if !opts.DryRun {
-		_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
-		exit, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
-		if err != nil || exit != 0 {
-			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
-				fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exit, err),
-				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err))
+		if opts.Class == ClassRelease {
+			// Release staging is class-special (v18.3.0→v18.5.0 forensics):
+			// the pipeline's rebuild-binary step is the AUDITED producer of
+			// go/evolve, so the churn discard below would throw away the
+			// release's own product (→ SELF_SHA_TAMPERED on the next ship);
+			// and `add -A` swept untracked operator files (evolve.log,
+			// release-*.log) into release commits. Stage exactly the known
+			// release set instead.
+			if err := stageReleaseSet(ctx, opts); err != nil {
+				return err
+			}
+		} else {
+			_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
+			exit, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
+			if err != nil || exit != 0 {
+				return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+					fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exit, err),
+					"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err))
+			}
 		}
 	}
 
@@ -571,6 +585,52 @@ func maybeCreateRelease(ctx context.Context, opts *Options, res *RunResult) erro
 func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args ...string) (string, error) {
 	all := append([]string{"-C", dir}, args...)
 	return captureGitOutput(ctx, opts, all...)
+}
+
+// stageReleaseSet stages the explicit release pathspec: the versionbump
+// marker files (SSOT: versionbump.DefaultPaths — the writer the release
+// pipeline's version-bump step runs), CHANGELOG.md (changelog-gen's output),
+// and the tracked binary go/evolve (+ ShipBinaryPath when it differs) that
+// rebuild-binary produces. Paths absent on disk are skipped so a partial
+// layout (tests, exotic repos) never fails staging on a nonexistent pathspec.
+func stageReleaseSet(ctx context.Context, opts *Options) error {
+	vb := versionbump.DefaultPaths(opts.ProjectRoot)
+	abs := []string{vb.PluginJSON, vb.MarketplaceJSON, vb.SkillMD, vb.ReadmeMD,
+		filepath.Join(opts.ProjectRoot, "CHANGELOG.md"),
+		filepath.Join(opts.ProjectRoot, "go", "evolve"),
+	}
+	if p := opts.ShipBinaryPath; p != "" {
+		if rel, err := filepath.Rel(opts.ProjectRoot, p); err == nil && !strings.HasPrefix(rel, "..") {
+			abs = append(abs, p)
+		}
+	}
+	args := []string{"add", "--"}
+	seen := map[string]struct{}{}
+	for _, a := range abs {
+		rel, err := filepath.Rel(opts.ProjectRoot, a)
+		if err != nil {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if _, dup := seen[rel]; dup {
+			continue
+		}
+		if _, err := os.Stat(a); err != nil {
+			continue // absent on disk — nothing to stage
+		}
+		seen[rel] = struct{}{}
+		args = append(args, rel)
+	}
+	if len(args) == 2 {
+		return nil // nothing exists to stage; the staged-diff check decides
+	}
+	exit, err := opts.Runner(ctx, "git", args, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
+	if err != nil || exit != 0 {
+		return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+			fmt.Sprintf("ship: git add (release set) failed (rc=%d): %v", exit, err),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err))
+	}
+	return nil
 }
 
 // discardBinaryChurn discards unaudited tracked-binary rebuild churn from the

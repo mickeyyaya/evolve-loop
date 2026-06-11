@@ -35,7 +35,7 @@ func TestDefaultRebuildBinary_NonDryRun_GoNotOnPath(t *testing.T) {
 	// Clear PATH so exec.LookPath("go") fails.
 	t.Setenv("PATH", "")
 
-	err := defaultRebuildBinary(t.TempDir(), false)
+	err := defaultRebuildBinary(t.TempDir(), "9.9.9", false)
 	if err == nil {
 		t.Fatal("defaultRebuildBinary with no go on PATH: want error, got nil")
 	}

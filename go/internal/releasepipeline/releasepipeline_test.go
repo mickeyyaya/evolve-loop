@@ -19,11 +19,12 @@ func allOkSteps() Steps {
 		Preflight:           func(string, string, bool, bool) error { return nil },
 		ChangelogGen:        func(string, string, string, string, bool) error { return nil },
 		VersionBump:         func(string, string, bool) error { return nil },
-		RebuildBinary:       func(string, bool) error { return nil },
+		RebuildBinary:       func(string, string, bool) error { return nil },
 		ReleaseSh:           func(string, string) error { return nil },
 		Ship:                func(string, string, string) (string, error) { return "deadbeef1234567890", nil },
 		MarketplacePoll:     func(string, string, time.Duration) error { return nil },
 		Rollback:            func(string, string, string) error { return nil },
+		ReleaseVerify:       func(string, string, string) error { return nil },
 	}
 }
 
@@ -56,7 +57,7 @@ func TestRun_HappyPath(t *testing.T) {
 	}
 	expected := []string{
 		"preflight", "changelog-gen", "version-bump", "rebuild-binary",
-		"release-sh-check", "ship", "marketplace-poll",
+		"release-sh-check", "ship", "marketplace-poll", "release-verify",
 	}
 	if !equalStrings(res.StepsCompleted, expected) {
 		t.Errorf("StepsCompleted = %v, want %v", res.StepsCompleted, expected)
@@ -76,8 +77,8 @@ func TestRun_HappyPath(t *testing.T) {
 	if j.CommitSHA != "deadbeef1234567890" {
 		t.Errorf("journal commit_sha = %q", j.CommitSHA)
 	}
-	if len(j.Steps) != 7 {
-		t.Errorf("journal steps = %d, want 7 (added rebuild-binary in v12.2.2): %+v", len(j.Steps), j.Steps)
+	if len(j.Steps) != 8 {
+		t.Errorf("journal steps = %d, want 8 (rebuild-binary v12.2.2 + release-verify): %+v", len(j.Steps), j.Steps)
 	}
 	if j.CompletedAt == "" {
 		t.Error("journal completed_at empty")
