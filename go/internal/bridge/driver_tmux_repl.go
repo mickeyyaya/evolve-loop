@@ -107,6 +107,13 @@ type tmuxLaunch struct {
 	bootMenuSkip   string    // non-empty: keypress sent when an interstitial update menu is detected
 	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
 	bootOnly       bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
+	// guardDeadShell arms the cycle-274 dead-shell checks (boot rejection +
+	// post-paste spill fast-fail). Set by the REAL CLI drivers — their
+	// foreground process is never a shell, so a shell pane means the CLI is
+	// gone. MUST stay false for harnesses whose "REPL" legitimately IS a
+	// shell script (the RealTmux integration fixtures — the PR-71 Ubuntu CI
+	// failure this field exists for).
+	guardDeadShell bool
 }
 
 // launchCmdLine joins an inner-CLI binary with its realized launch flags
@@ -258,6 +265,18 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					_ = deps.Tmux.SendKeys(ctx, lp.session, lp.bootMenuSkip, true)
 					fmt.Fprintf(deps.Stderr, "%s boot interstitial dismissed before prompt delivery\n", pfx)
 					continue
+				}
+				// Cycle-274 fix (codex-update-menu-swallows-injection): the
+				// marker substring alone is not readiness — a stale marker in
+				// scrollback above a DEAD SHELL (codex's updater exited to
+				// zsh) read as ready and the injection landed in the shell.
+				// Reject when the pane's foreground process is a known shell;
+				// controllers without PaneCommander keep marker-only behavior.
+				if lp.guardDeadShell {
+					if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
+						fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", pfx, shellCmd)
+						continue
+					}
 				}
 				promptSeen = true
 				fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", pfx, lp.promptMarker)
@@ -443,6 +462,20 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	sawBusy := false
 	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	recordTokens(intervalBaselinePane)
+	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
+	// baseline (no extra capture, no fixture-frame drift): the prompt was
+	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
+	// AND the pane's foreground process IS a shell (authoritative — a pane
+	// merely quoting spill text under a live CLI must not trip this), the
+	// CLI is gone. Fail fast as a transient so the fallback chain takes
+	// over, instead of the 25-min wedge cycles 274/277 burned. Mid-run
+	// process death past this boundary is the observer's job (plan R3.4).
+	if lp.guardDeadShell && paneLooksLikeShellSpill(intervalBaselinePane) {
+		if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
+			fmt.Fprintf(deps.Stderr, "%s FAIL: prompt spilled into a dead shell (%s) after paste — CLI process gone (cycle-274 class)\n", pfx, shellCmd)
+			return ExitREPLBootTimeout, nil
+		}
+	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
 		if err := ctx.Err(); err != nil {
@@ -656,6 +689,56 @@ func tmuxPaneLooksLikeUpdateMenu(pane string) bool {
 	return strings.Contains(pane, "Update available!") &&
 		strings.Contains(pane, "Update now") &&
 		strings.Contains(pane, "Skip")
+}
+
+// isShellProcess reports whether a pane_current_command value names a known
+// interactive shell. The set is closed and reject-listed (vs requiring a
+// known CLI binary) because CLI process names vary by runtime — claude runs
+// under "node", codex is "codex" — while a wedged pane is always one of
+// these. Login shells report with a leading dash ("-zsh").
+func isShellProcess(cmd string) bool {
+	switch strings.TrimPrefix(cmd, "-") {
+	case "zsh", "bash", "sh", "fish", "dash", "tcsh", "ksh":
+		return true
+	}
+	return false
+}
+
+// paneShellProcess asks the controller (when it implements the optional
+// PaneCommander capability) for the pane's foreground process and reports
+// whether it is a shell. (cmd, false) when the capability is absent, the
+// query fails, or the process is not a shell — all degrade to the
+// pre-handshake marker-only behavior.
+func paneShellProcess(ctx context.Context, tm TmuxController, session string) (string, bool) {
+	pc, ok := tm.(PaneCommander)
+	if !ok {
+		return "", false
+	}
+	cmd, err := pc.PaneCommand(ctx, session)
+	if err != nil {
+		return "", false
+	}
+	return cmd, isShellProcess(cmd)
+}
+
+// paneLooksLikeShellSpill reports the cycle-274 paste-spill signatures: a
+// shell continuation prompt (quote>/bquote>/dquote>/heredoc>) as the LAST
+// non-blank line (continuation prompts only ever render at the cursor), or
+// zsh's command-not-found echo anywhere. Callers MUST pair this with the
+// authoritative paneShellProcess check — agent output may legitimately quote
+// these strings.
+func paneLooksLikeShellSpill(pane string) bool {
+	if strings.Contains(pane, "command not found") {
+		return true
+	}
+	lines := strings.Split(strings.TrimRight(pane, "\n \t"), "\n")
+	last := strings.TrimSpace(lines[len(lines)-1])
+	for _, w := range []string{"quote>", "bquote>", "dquote>", "heredoc>"} {
+		if last == w {
+			return true
+		}
+	}
+	return false
 }
 
 // injectEnvelope delivers one live-injection envelope into the running REPL.

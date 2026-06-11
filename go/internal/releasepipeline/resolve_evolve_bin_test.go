@@ -164,7 +164,7 @@ func TestResolveEvolveBin_RepoBinBeatsTrackedGoEvolve(t *testing.T) {
 // running any go build command (no go toolchain needed).
 func TestDefaultRebuildBinary_DryRunIsNoop(t *testing.T) {
 	// An empty TempDir has no go source; if build were attempted it would fail.
-	err := defaultRebuildBinary(t.TempDir(), true)
+	err := defaultRebuildBinary(t.TempDir(), "9.9.9", true)
 	if err != nil {
 		t.Errorf("defaultRebuildBinary(dryRun=true) = %v, want nil", err)
 	}

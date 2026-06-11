@@ -153,7 +153,7 @@ func TestRun_VersionBumpFails(t *testing.T) {
 		return errors.New("simulated version-bump error")
 	}
 	rebuildCalled := 0
-	steps.RebuildBinary = func(string, bool) error {
+	steps.RebuildBinary = func(string, string, bool) error {
 		rebuildCalled++
 		return nil
 	}

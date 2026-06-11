@@ -18,7 +18,7 @@ func TestDefaultRebuildBinary_NonDryRun_BadSourceDir(t *testing.T) {
 	}
 	// t.TempDir() has no Go source — go build will fail.
 	dir := t.TempDir()
-	err := defaultRebuildBinary(dir, false)
+	err := defaultRebuildBinary(dir, "9.9.9", false)
 	if err == nil {
 		t.Fatal("defaultRebuildBinary with empty source dir: want error, got nil")
 	}
@@ -61,10 +61,20 @@ func TestDefaultRebuildBinary_NonDryRun_RealRepo(t *testing.T) {
 		}
 	})
 
-	if err := defaultRebuildBinary(repoRoot, false); err != nil {
+	if err := defaultRebuildBinary(repoRoot, "9.9.9", false); err != nil {
 		t.Errorf("defaultRebuildBinary on real repo: %v", err)
 	}
 	if _, err := os.Stat(binPath); err != nil {
 		t.Errorf("expected rebuilt binary at %s: %v", binPath, err)
+	}
+	// The ldflags version stamp (release-verify's acceptance): the rebuilt
+	// binary must self-report the target. Without ldflags injection a plain
+	// `go build` reports the VCS revision and release-verify fails on every
+	// release.
+	out, err := exec.Command(binPath, "--version").CombinedOutput()
+	if err != nil {
+		t.Errorf("rebuilt binary --version: %v (%s)", err, out)
+	} else if !strings.Contains(string(out), "9.9.9") {
+		t.Errorf("rebuilt binary --version = %q, want it to report the target 9.9.9 (ldflags stamp)", strings.TrimSpace(string(out)))
 	}
 }

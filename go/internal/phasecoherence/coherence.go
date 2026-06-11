@@ -13,7 +13,7 @@ import (
 
 type Violation struct {
 	Persona  string // base name, e.g. "builder" (evolve- prefix stripped)
-	Kind     string // "disallowed" | "undeclared" (tools checks)
+	Kind     string // "disallowed" | "undeclared" (tools checks) | "unpaired" (missing profile)
 	Severity string // "WARN" for both drift directions
 	Message  string // eval vocabulary: contradiction|mismatch|disallowed|undeclared
 }
@@ -54,6 +54,21 @@ func Check(opts Options) ([]Violation, error) {
 		profile, err := loader.Get(name)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
+				// "-reference" personas are documentation (auditor-reference
+				// etc.), never dispatched — no profile expected. Everything
+				// else unpaired is a visibility WARN, not a silent skip:
+				// cycle-270's debugger died at launch (exit=10) because its
+				// persona existed and its profile didn't, and nothing said so
+				// until the route fired (inbox
+				// dispatchable-agent-profile-completeness).
+				if !strings.HasSuffix(name, "-reference") {
+					violations = append(violations, Violation{
+						Persona:  name,
+						Kind:     "unpaired",
+						Severity: "WARN",
+						Message:  "mismatch: persona agents/evolve-" + name + ".md has no profile .evolve/profiles/" + name + ".json — undispatchable (dies exit=10 at launch if routed)",
+					})
+				}
 				continue
 			}
 			return nil, err

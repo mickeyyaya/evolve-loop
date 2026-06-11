@@ -20,11 +20,12 @@ func TestRun_RebuildBinaryStepInvokedBeforeShip(t *testing.T) {
 		Preflight:    func(_, _ string, _, _ bool) error { rec("preflight")(); return nil },
 		ChangelogGen: func(_, _, _, _ string, _ bool) error { rec("changelog-gen")(); return nil },
 		VersionBump:  func(_, _ string, _ bool) error { rec("version-bump")(); return nil },
-		RebuildBinary: func(_ string, _ bool) error {
+		RebuildBinary: func(_, _ string, _ bool) error {
 			rec("rebuild-binary")()
 			return nil
 		},
-		ReleaseSh: func(_, _ string) error { rec("release-sh-check")(); return nil },
+		ReleaseSh:     func(_, _ string) error { rec("release-sh-check")(); return nil },
+		ReleaseVerify: func(_, _, _ string) error { rec("release-verify")(); return nil },
 		Ship: func(_, _, _ string) (string, error) {
 			rec("ship")()
 			return "deadbeef", nil
@@ -42,7 +43,7 @@ func TestRun_RebuildBinaryStepInvokedBeforeShip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v\nresult=%+v", err, res)
 	}
-	want := []string{"preflight", "changelog-gen", "version-bump", "rebuild-binary", "release-sh-check", "ship", "marketplace-poll"}
+	want := []string{"preflight", "changelog-gen", "version-bump", "rebuild-binary", "release-sh-check", "ship", "marketplace-poll", "release-verify"}
 	if !equalSlices(order, want) {
 		t.Errorf("step order = %v\nwant      %v", order, want)
 	}
@@ -54,7 +55,7 @@ func TestRun_RebuildBinaryFailureBlocksShip(t *testing.T) {
 		Preflight:    func(_, _ string, _, _ bool) error { return nil },
 		ChangelogGen: func(_, _, _, _ string, _ bool) error { return nil },
 		VersionBump:  func(_, _ string, _ bool) error { return nil },
-		RebuildBinary: func(_ string, _ bool) error {
+		RebuildBinary: func(_, _ string, _ bool) error {
 			return errors.New("go build failed: undefined: foo")
 		},
 		ReleaseSh:       func(_, _ string) error { return nil },
@@ -92,13 +93,14 @@ func TestRun_RebuildBinarySkippedInDryRun(t *testing.T) {
 		Preflight:    func(_, _ string, _, _ bool) error { return nil },
 		ChangelogGen: func(_, _, _, _ string, _ bool) error { return nil },
 		VersionBump:  func(_, _ string, _ bool) error { return nil },
-		RebuildBinary: func(_ string, _ bool) error {
+		RebuildBinary: func(_, _ string, _ bool) error {
 			rebuildInvoked = true
 			return nil
 		},
 		ReleaseSh:       func(_, _ string) error { return nil },
 		Ship:            func(_, _, _ string) (string, error) { return "", nil },
 		MarketplacePoll: func(_, _ string, _ time.Duration) error { return nil },
+		ReleaseVerify:   func(_, _, _ string) error { return nil },
 		Rollback:        func(_, _, _ string) error { return nil },
 	}
 	res, err := Run(Options{

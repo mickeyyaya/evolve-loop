@@ -49,6 +49,8 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		cfg.Workspace = tmp
 	}
 	deps = deps.withDefaults()
+	// Dead-shell guard is armed by the real driver constructor (guardDeadShell),
+	// so smoke boots get the same cycle-274 rejection a phase launch gets.
 	rc, _ = d.Launch(ctx, cfg, deps)
 	// runTmuxREPL's deferred tmuxCleanup writes the final scrollback here on both
 	// the booted and timed-out paths — read it back for the caller's diagnostic.

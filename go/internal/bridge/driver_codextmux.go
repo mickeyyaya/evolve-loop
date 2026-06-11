@@ -76,6 +76,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 		bootMenuSkip:   "2",  // codex update menu: Skip before prompt injection
 		exitSeq:        []tmuxKey{{keys: "/quit", enter: true, pauseS: 2}},
 		bootOnly:       cfg.BootOnly,
+		guardDeadShell: true,
 	})
 }
 
