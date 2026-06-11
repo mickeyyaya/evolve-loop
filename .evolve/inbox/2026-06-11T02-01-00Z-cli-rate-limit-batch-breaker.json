@@ -1,0 +1,12 @@
+{
+  "id": "cli-rate-limit-batch-breaker",
+  "priority": "HIGH",
+  "filed_by": "operator-interactive",
+  "filed_at": "2026-06-11T02:01:00Z",
+  "action": "Batch-scoped per-CLI circuit breaker: after N (default 2) rate_limit escalations from one CLI family within a batch, demote that family for the remainder of the batch (route phases directly to their fallback CLI) until a cheap probe succeeds or the batch ends. Evidence: cycle 283 — codex daily quota wall at 2026-06-11T00:28Z; EVERY codex-routed phase (api-contract-design, architecture-design, test-amplification) exited 85 (ExitUnknownPrompt via rate_limit pattern, bridge/exitcodes.go:32) and burned its full boot + stall-detection window (5-15 min each) before the claude fallback ran. The dispatch chain works but wastes ~30-45 min/cycle and turn budget while a CLI is walled. State could live in .evolve/state.json currentBatch (cliHealth map) consulted by llmroute before each dispatch (llmroute.go defaultFallbackOnExit already enumerates 85).",
+  "evidence": [
+    ".evolve/runs/cycle-283/escalation-report.json (pattern_name=rate_limit, cli=codex-tmux)",
+    "evolve-batch2.log dispatch chains codex-tmux=85 -> claude-tmux=0 x3",
+    "docs/operations/batch-failure-review-2026-06-11.md (RC5)"
+  ]
+}

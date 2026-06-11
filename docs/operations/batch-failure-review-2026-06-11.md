@@ -80,8 +80,11 @@ route directly to the fallback. The codex update-menu is NOT implicated (pinned 
 - **S2 — Spine fail-open**: 283 build proceeded despite a missing mandatory predecessor handoff
   artifact (`[orchestrator] WARN spine not satisfied for next=build ... proceeding fail-open`).
   Known open defect class (dead spine gate); becomes dangerous once handoff artifacts gate evals.
-- **S3 — tmux "no server running" in two escalation `final_pane`s** (build attempt 3, amplification
-  attempt 2). Needs timestamp forensics: mid-cycle tmux-server death vs post-operator-kill capture.
+- **S3 — tmux "no server running" in two escalation `final_pane`s** — RESOLVED (benign race):
+  escalation mtimes (23:52Z, 00:43Z) fall mid-cycle while later phases ran fine; tmux's server
+  auto-exits when its last session closes, so the watcher captured `final_pane` AFTER the bridge
+  tore the session down. Not a server-stability problem, but the post-kill capture has zero
+  diagnostic value — watchers should capture before teardown (rider on the workdir inbox item).
 - **S4 — Test residue pollution**: a full nested repo copy at
   `go/internal/phases/swarmrunner/.evolve/worktrees/cycle-1-integration/` (gitignore-invisible).
   Some integration test created `.evolve/worktrees` relative to package cwd. Tests must use `t.TempDir()`.

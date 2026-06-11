@@ -1,0 +1,11 @@
+{
+  "id": "swarm-tests-relative-worktree-base",
+  "priority": "MEDIUM",
+  "filed_by": "operator-interactive",
+  "filed_at": "2026-06-11T02:00:00Z",
+  "action": "Some swarm/swarmrunner tests resolve EVOLVE_WORKTREE_BASE (or its default) relative to the test cwd, so running them outside a guarded env materialized full nested repo copies inside the package dir: 74MB of residue at go/internal/phases/swarmrunner/.evolve/worktrees/{cycle-1-integration,cycle-1-w1} (gitignore-invisible because .evolve/ matches at any depth; removed 2026-06-11). Audit every test that touches worktreeBase/provisioner paths: each must pin EVOLVE_WORKTREE_BASE to t.TempDir() (t.Setenv) or inject the base explicitly. Add a guard: worktreeBase() could refuse a relative result, or a test-helper asserts no .evolve/ dir exists under the package after the suite.",
+  "evidence": [
+    "docs/operations/batch-failure-review-2026-06-11.md (S4)",
+    "go/internal/swarm/provision.go worktreeBase()"
+  ]
+}
