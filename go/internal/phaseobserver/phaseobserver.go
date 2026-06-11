@@ -86,11 +86,32 @@ type Config struct {
 	// inside the INCIDENT envelope (action / action_reason).
 	StallPolicy recovery.StallPolicy
 
+	// ProcessAlive probes whether the observed agent's process group still
+	// exists (R3.4, cycles 274/277: pane/log echo is NOT liveness — a wedged
+	// shell read as alive for 25+ min after the CLI died). A dead group
+	// fires a "process_dead" INCIDENT once, resolved by the stall policy
+	// (chain: kill_retry) regardless of idle budgets. nil DISABLES the probe
+	// (legacy byte-identical — the same nil-seam convention as StallPolicy);
+	// the composition root wires DefaultProcessAlive, so fixture Configs
+	// with fake pgids never see a false "dead".
+	ProcessAlive func(pgid int) bool
+
 	// Testing seams.
 	Now         func() time.Time
 	KillPgrp    func(pgid int, sig syscall.Signal) error
 	ShutdownSig <-chan struct{} // SIGUSR1-equivalent
 	StopAfterMS int             // testing: force shutdown after this many ms
+}
+
+// DefaultProcessAlive is the production R3.4 liveness probe: signal-0 to the
+// process group — ESRCH (an error) means the group is gone. EPERM (also an
+// error) is treated as DEAD here, which is conservative-but-safe only
+// because observer and agent share a UID; if cross-UID subagents are ever
+// introduced this probe must distinguish ESRCH from EPERM. Wired by the
+// composition root (cmd_phase_observer); Run treats nil as probe-off so
+// fixture Configs with fake pgids never see a false "dead".
+func DefaultProcessAlive(pgid int) bool {
+	return syscall.Kill(-pgid, 0) == nil
 }
 
 // Observer holds runtime state.
@@ -114,9 +135,12 @@ type Observer struct {
 	cacheReadTok   int
 	cacheCreateTok int
 	nudged         bool
-	incidents      []map[string]any
-	loopHistory    []loopEntry
-	rateLimitHist  []time.Time
+	// processDeadFired guards the R3.4 dead-process INCIDENT to exactly one
+	// emission — the group cannot come back; re-firing per tick is spam.
+	processDeadFired bool
+	incidents        []map[string]any
+	loopHistory      []loopEntry
+	rateLimitHist    []time.Time
 
 	mu sync.Mutex
 }
@@ -191,6 +215,9 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 			return syscall.Kill(-pgid, sig)
 		}
 	}
+	// cfg.ProcessAlive deliberately has NO default here: nil = probe off
+	// (legacy byte-identical). DefaultProcessAlive is wired at the
+	// composition root (cmd_phase_observer), never inside Run.
 
 	now := cfg.Now()
 	obs := &Observer{
@@ -286,6 +313,20 @@ OUTER:
 			break OUTER
 		case <-pollTicker.C:
 			pollCounter++
+			// R3.4 process-liveness probe — BEFORE the log tail, because a
+			// dead agent's residual log lines must not refresh the liveness
+			// clocks one last time. Fires the INCIDENT exactly once; the
+			// stall policy (chain: process-dead-kill, above busy-extend)
+			// resolves it to kill_retry regardless of idle budgets — pane/
+			// log echo is not liveness (cycles 274/277). nil probe = off.
+			if cfg.ProcessAlive != nil && !obs.processDeadFired && cfg.SubagentPGID > 0 && !cfg.ProcessAlive(cfg.SubagentPGID) {
+				obs.processDeadFired = true
+				handleStallIncident(stallIncident{
+					kind:    "process_dead",
+					payload: map[string]any{"pgid": cfg.SubagentPGID},
+					event:   recovery.StallEvent{Kind: "process_dead", Phase: cfg.Phase},
+				})
+			}
 			newLines, newOffset := obs.tail(stdoutPath)
 			if len(newLines) == 0 {
 				eofQuietCount++

@@ -32,6 +32,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -65,6 +66,20 @@ type loopResult struct {
 	TotalCost           float64            `json:"total_cost_usd"`
 	Resumed             bool               `json:"resumed,omitempty"`
 	RecoverableFailures int                `json:"recoverable_failures,omitempty"`
+	// CycleOutcomes is the R6 SLO classification per cycle (SHIPPED /
+	// SALVAGED / FAILED_EXPLAINED / FAILED_UNEXPLAINED), computed from the
+	// C1 records at emit time — the batch-level "every cycle delivers a
+	// result" accounting the EVOLVE_PHASE_RECOVERY soak reads.
+	CycleOutcomes []cycleOutcomeEntry `json:"cycle_outcomes,omitempty"`
+	// classifyRoot, when set (the loop entry points set it once), makes
+	// emit() populate CycleOutcomes from <root>/.evolve/runs/cycle-N.
+	classifyRoot string
+}
+
+type cycleOutcomeEntry struct {
+	Cycle   int    `json:"cycle"`
+	Outcome string `json:"outcome"`
+	Detail  string `json:"detail,omitempty"`
 }
 
 // emit writes lr to w as the canonical pretty-JSON dispatcher output.
@@ -76,13 +91,56 @@ type loopResult struct {
 // unencodable interface) breaks that, emit a structured error envelope
 // instead of a silent empty line so the failure is observable —
 // dispatchers and `evolve loop` consumers grep stop_reason.
-func (lr loopResult) emit(w io.Writer) {
+func (lr *loopResult) emit(w io.Writer) {
+	// R6: classify every cycle's ending from its C1 records at the single
+	// output chokepoint (every exit path funnels here). A
+	// FAILED_UNEXPLAINED additionally self-files an inbox defect — that
+	// bucket means a terminal path escaped the C1 chokepoint, which is
+	// itself a defect. Best-effort: classification must never break the
+	// dispatcher contract.
+	if lr.classifyRoot != "" && len(lr.Cycles) > 0 && lr.CycleOutcomes == nil {
+		for _, c := range lr.Cycles {
+			oc, detail := cyclehealth.ClassifyOutcome(cycleWorkspace(lr.classifyRoot, c.Cycle))
+			lr.CycleOutcomes = append(lr.CycleOutcomes, cycleOutcomeEntry{Cycle: c.Cycle, Outcome: string(oc), Detail: detail})
+			if oc == cyclehealth.OutcomeFailedUnexplained {
+				fileUnexplainedOutcomeDefect(lr.classifyRoot, c.Cycle, detail)
+			}
+		}
+	}
 	buf, err := json.MarshalIndent(lr, "", "  ")
 	if err != nil {
 		fmt.Fprintf(w, `{"stop_reason":"marshal_error","error":%q}`+"\n", err.Error())
 		return
 	}
 	fmt.Fprintln(w, string(buf))
+}
+
+// fileUnexplainedOutcomeDefect self-files an inbox item for the alarm
+// bucket (R6.3): FAILED_UNEXPLAINED means the "every terminal path records
+// its outcome" invariant (ADR-0044 C1) has a hole — exactly what the inbox
+// exists to capture. Idempotent per cycle (fixed filename); best-effort.
+func fileUnexplainedOutcomeDefect(projectRoot string, cycle int, detail string) {
+	dir := filepath.Join(projectRoot, ".evolve", "inbox")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	path := filepath.Join(dir, fmt.Sprintf("auto-unexplained-outcome-cycle-%d.json", cycle))
+	if _, err := os.Stat(path); err == nil {
+		return // already filed
+	}
+	body, err := json.MarshalIndent(map[string]any{
+		"id":               fmt.Sprintf("unexplained-outcome-cycle-%d", cycle),
+		"action":           fmt.Sprintf("Cycle %d ended FAILED_UNEXPLAINED (%s). Every terminal path must record a ship PASS, a salvage, or an abort_reason (ADR-0044 C1) — locate the escaping path and route it through recordPhaseOutcome.", cycle, detail),
+		"priority":         "HIGH",
+		"weight":           0.8,
+		"evidence_pointer": fmt.Sprintf(".evolve/runs/cycle-%d/phase-timing.json", cycle),
+		"injected_at":      time.Now().UTC().Format(time.RFC3339),
+		"injected_by":      "loop-outcome-classifier",
+	}, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(path, body, 0o644)
 }
 
 // emitFatal is emit for ABNORMAL exits: record the loop-fatal learning
@@ -92,7 +150,7 @@ func (lr loopResult) emit(w io.Writer) {
 // cannot (state_unwritable — the record write is the thing that failed;
 // unfinished-cycle guard — learning is captured downstream by the
 // forced reset/resume).
-func (lr loopResult) emitFatal(w, stderr io.Writer, cfg loopConfig, cycle int) {
+func (lr *loopResult) emitFatal(w, stderr io.Writer, cfg loopConfig, cycle int) {
 	recordLoopFatal(stderr, cfg, cycle, lr.StopReason)
 	lr.emit(w)
 }
@@ -237,7 +295,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	cycleEnv := buildCycleEnv(cfg, os.Environ())
 	cycleCtx := buildCycleContext(cfg)
 
-	lr := loopResult{StopReason: "max_cycles"}
+	lr := loopResult{StopReason: "max_cycles", classifyRoot: cfg.ProjectRoot}
 
 	// Pre-emptive checkpoint thresholds. WARN at warnPct (default 80),
 	// signal next-cycle to checkpoint at criticalPct (default 95).

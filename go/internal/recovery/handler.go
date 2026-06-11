@@ -93,6 +93,18 @@ var chain = []chainHandler{
 		},
 	},
 	{
+		// ABOVE busy-extend deliberately (R3.4, cycles 274/277): a dead
+		// process can render busy-looking chrome forever — pane echo is not
+		// liveness. Only integrity outranks a confirmed-dead process.
+		name: "process-dead-kill",
+		match: func(in RecoverInput) (Decision, bool) {
+			if in.Kind == "process_dead" {
+				return Decision{Action: ActionKillRetry, Reason: "agent process group is gone — no output can ever arrive; fast-fail so the fallback chain owns the fresh dispatch"}, true
+			}
+			return Decision{}, false
+		},
+	},
+	{
 		name: "busy-extend",
 		match: func(in RecoverInput) (Decision, bool) {
 			if in.Busy {

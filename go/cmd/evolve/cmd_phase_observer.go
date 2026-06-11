@@ -92,6 +92,12 @@ func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		// byte-identical legacy Enforce branch — shadow observability for
 		// stalls already exists via the INCIDENT events themselves.
 		StallPolicy: stallPolicyFromEnv(),
+		// R3.4: the process-liveness probe is wired unconditionally — it is
+		// deterministic ground truth (signal-0), not policy; nil in Run
+		// means probe-off (fixture Configs). The ACTION on a dead group
+		// stays policy/Enforce-gated; at shadow the INCIDENT is pure soak
+		// telemetry (pane echo ≠ liveness, cycles 274/277).
+		ProcessAlive: phaseobserver.DefaultProcessAlive,
 	}, "", stderr)
 }
 

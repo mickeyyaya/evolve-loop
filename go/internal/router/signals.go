@@ -70,6 +70,14 @@ type RoutingSignals struct {
 	// typed extractor. Populated by Digest; consumed by resolveField as a
 	// fallback for fields not covered by the typed structs above (Stage 2).
 	Generic map[string]any
+
+	// DigestDegraded lists anchor-handoff reads that failed for reasons
+	// OTHER than absence (EISDIR, permission, transient IO) — the read-miss
+	// vs genuine-gap distinction (R5). A degraded digest means a
+	// Present:false may be a read miss, so the spine gate must stay
+	// fail-open for this evaluation; only a CLEAN absence (empty
+	// DigestDegraded) may fail closed at EVOLVE_PHASE_RECOVERY=enforce.
+	DigestDegraded []string
 }
 
 // GenericValue returns the namespaced generic signal for field (e.g.

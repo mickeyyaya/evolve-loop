@@ -1875,20 +1875,57 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					next = forced
 				}
 				// Full spine-integrity check on the SELECTED next (static OR
-				// override). Fail-open: a missing mandatory-predecessor handoff
-				// is a loud WARN recorded in the decision, never a block —
-				// Digest is fail-open, so an absent artifact may be a read miss
-				// rather than a real gap, and false-blocking a real cycle is
-				// worse than surfacing the signal. The override path already
-				// declines (blocks) divergent edges that fail this check; here
-				// we additionally surface it for the trusted static edge.
+				// override). R5 (cycle-283 fix): the gate now fails CLOSED at
+				// EVOLVE_PHASE_RECOVERY=enforce when the absence is CLEAN —
+				// Digest distinguishes a transient read miss (DigestDegraded)
+				// from a genuine gap, which was the original fail-open
+				// rationale. Sequence: re-digest once (the artifact may have
+				// landed between the routing digest and this check); a
+				// still-unsatisfied spine with a degraded digest, or any miss
+				// below enforce, keeps the loud-WARN fail-open (shadow =
+				// byte-compatible until the R8.5 dial flip); a clean absence
+				// at enforce aborts FAILED-EXPLAINED with the worktree
+				// preserved. The operator waiver stays cfg.Mandatory
+				// (isConfiguredMandatory) — no new escape hatch.
 				if next != PhaseEnd && !o.sm.SpineSatisfiedUpTo(next, signals, o.cfg) {
-					dec.Clamps = append(dec.Clamps, router.Clamp{
-						Rule:     "spine-unsatisfied-warn",
-						Proposed: string(next),
-						Forced:   string(next),
-					})
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN spine not satisfied for next=%s (a mandatory predecessor's handoff artifact is missing); proceeding fail-open\n", next)
+					// The re-digest runs only in this already-anomalous branch
+					// (zero cost on the happy path). A non-nil digest ERROR
+					// means we cannot even establish what is absent — that is
+					// never a "clean absence", so it fails open like a
+					// degraded read (review F6: a missing workspace must not
+					// masquerade as a spine gap at enforce).
+					fresh, derr := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
+					cleanAbsence := derr == nil && len(fresh.DigestDegraded) == 0
+					switch {
+					case derr == nil && o.sm.SpineSatisfiedUpTo(next, fresh, o.cfg):
+						// Transient: the handoff appeared on re-read. Proceed.
+						// (dec was decided from the stale signals — diagnostic
+						// record only; the gate, not Decide, owns blocking.)
+					case o.cfg.PhaseRecovery == config.StageEnforce && cleanAbsence:
+						spineErr := fmt.Errorf("spine gate: next=%s blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-283 class)", next)
+						o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, PhaseResponse{Phase: string(next)}, 0, spineErr.Error()))
+						recordFailureLearning(next, spineErr, 1)
+						return result, spineErr
+					default:
+						// Two fail-open sources, deliberately identical in
+						// behavior: (a) dial below enforce (shadow default —
+						// byte-compatible until the R8.5 flip), (b) the
+						// absence is NOT clean (degraded read or digest
+						// error). The reason string tells them apart.
+						dec.Clamps = append(dec.Clamps, router.Clamp{
+							Rule:     "spine-unsatisfied-warn",
+							Proposed: string(next),
+							Forced:   string(next),
+						})
+						reason := "would-block at enforce"
+						switch {
+						case derr != nil:
+							reason = "re-digest error: " + derr.Error()
+						case len(fresh.DigestDegraded) > 0:
+							reason = "digest degraded: " + strings.Join(fresh.DigestDegraded, "; ")
+						}
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN spine not satisfied for next=%s (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (%s)\n", next, reason)
+					}
 				}
 			}
 			o.recordRoutingDecision(ctx, cycle, cs, routingSeq, dec)

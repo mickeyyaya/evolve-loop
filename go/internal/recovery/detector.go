@@ -100,6 +100,16 @@ func SeedDetector() *FatalPaneDetector {
 			Cause:  CauseDeadShell,
 			Note:   "zsh backquote continuation prompt after prompt spill — the REPL is gone (cycle-274 codex update-menu wedge)",
 		},
+		{
+			Substr: "\ndquote>",
+			Cause:  CauseDeadShell,
+			Note:   "zsh double-quote continuation prompt after prompt spill — the REPL is gone (cycle-274/277 transcript variant, R3.3)",
+		},
+		{
+			Substr: "\nheredoc>",
+			Cause:  CauseDeadShell,
+			Note:   "zsh heredoc continuation prompt after prompt spill — the REPL is gone (cycle-274/277 transcript variant, R3.3)",
+		},
 	})
 }
 
