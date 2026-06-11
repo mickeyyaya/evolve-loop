@@ -395,22 +395,34 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	return resp, errors.New(msg)
 }
 
-// firstDiagnosticLine returns the first non-empty line of the captured
-// launch stderr, trimmed and bounded — the one-line cause threaded into the
-// launch error chain.
+// firstDiagnosticLine picks the one-line cause threaded into the launch
+// error chain. Validate-gauntlet failures put the cause FIRST and prefix it
+// "[bridge]"; driver failures accumulate launch chatter first and end with
+// the causal line (cycle-286: a timeout's first line was a stream_output
+// NOTE while "FAIL: completion never signalled" sat last). So: the first
+// "[bridge]"-prefixed line wins; otherwise the LAST non-empty line.
 func firstDiagnosticLine(stderr string) string {
+	last := ""
 	for _, line := range strings.Split(stderr, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		const maxCause = 300
-		if runes := []rune(line); len(runes) > maxCause {
-			line = string(runes[:maxCause]) + "…" // rune-safe: never split UTF-8 mid-sequence
+		if strings.HasPrefix(line, "[bridge]") {
+			return boundCause(line)
 		}
-		return line
+		last = line
 	}
-	return ""
+	return boundCause(last)
+}
+
+// boundCause caps the cause line rune-safely (never split UTF-8 mid-sequence).
+func boundCause(line string) string {
+	const maxCause = 300
+	if runes := []rune(line); len(runes) > maxCause {
+		return string(runes[:maxCause]) + "…"
+	}
+	return line
 }
 
 // randRead is the entropy source for defaultChallengeToken — a package

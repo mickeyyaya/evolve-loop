@@ -78,3 +78,50 @@ func TestLaunchFailurePersistsLaunchErrorFile(t *testing.T) {
 		t.Errorf("launch-error file missing diagnostic:\n%s", data)
 	}
 }
+
+// TestFirstDiagnosticLine_PrefersCausalLine — cycle-286 field evidence: a
+// driver-timeout stderr starts with chatter ("[claude-tmux] NOTE: …") and
+// ends with the causal line; the gauntlet failures put the cause first
+// ("[bridge] …"). The picker must prefer a [bridge]-prefixed line, else the
+// LAST non-empty line — never leading chatter.
+func TestFirstDiagnosticLine_PrefersCausalLine(t *testing.T) {
+	tests := []struct {
+		name, stderr, want string
+	}{
+		{
+			name:   "gauntlet cause first",
+			stderr: "[bridge] invalid --permission-mode value: 'x'\n[bridge] valid: plan, default\n",
+			want:   "[bridge] invalid --permission-mode value: 'x'",
+		},
+		{
+			name: "driver chatter then causal tail",
+			stderr: "[claude-tmux] NOTE: stream_output=true is no-op for this driver\n" +
+				"[claude-tmux] session=evolve-bridge-c286-scout\n" +
+				"[claude-tmux] prompt delivered\n" +
+				"[claude-tmux] FAIL: completion never signalled\n",
+			want: "[claude-tmux] FAIL: completion never signalled",
+		},
+		{
+			name:   "single line",
+			stderr: "[bridge] bridge:profile: file not found\n",
+			want:   "[bridge] bridge:profile: file not found",
+		},
+		{
+			name:   "non-bridge preamble before the bridge cause",
+			stderr: "some launcher preamble\n[bridge] the cause\ntrailing chatter\n",
+			want:   "[bridge] the cause",
+		},
+		{
+			name:   "empty",
+			stderr: "\n\n",
+			want:   "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := firstDiagnosticLine(tt.stderr); got != tt.want {
+				t.Errorf("firstDiagnosticLine = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
