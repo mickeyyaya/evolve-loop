@@ -67,7 +67,7 @@ func CountCommittedFloors(artifact string, knownPkgs []string) int {
 		if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
 			continue
 		}
-		n := distinctPackageMentions(item, knownPkgs)
+		n := len(mentionedPackages(item, knownPkgs))
 		if n < 1 {
 			n = 1
 		}
@@ -95,21 +95,20 @@ func topNSection(artifact string) (string, bool) {
 // ("adapters/bridge") and prose separators still split.
 var tokenRE = regexp.MustCompile(`[A-Za-z0-9_-]+`)
 
-// distinctPackageMentions counts how many distinct known package names
-// appear as whole tokens in the item text ("swarm" does not match inside
-// "swarmrunner", "config" does not match inside "fake-config").
-func distinctPackageMentions(item string, knownPkgs []string) int {
+// mentionedPackages returns the candidate package names that appear as
+// whole tokens in the item text.
+func mentionedPackages(item string, candidatePkgs []string) []string {
 	tokens := map[string]bool{}
 	for _, tok := range tokenRE.FindAllString(item, -1) {
 		tokens[tok] = true
 	}
-	n := 0
-	for _, pkg := range knownPkgs {
+	var pkgs []string
+	for _, pkg := range candidatePkgs {
 		if pkg != "" && tokens[pkg] {
-			n++
+			pkgs = append(pkgs, pkg)
 		}
 	}
-	return n
+	return pkgs
 }
 
 // KnownPackages enumerates Go package directory basenames under the repo's

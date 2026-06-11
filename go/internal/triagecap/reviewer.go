@@ -72,7 +72,7 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 	if r.stage == config.StageOff || in.Phase != string(core.PhaseTriage) {
 		return core.ReviewResult{Approve: true}
 	}
-	data, err := os.ReadFile(filepath.Join(in.Workspace, triageArtifactName()))
+	data, err := os.ReadFile(filepath.Join(in.Workspace, TriageArtifactName()))
 	if err != nil {
 		// Ambiguity / infra — fail OPEN (the contract gate owns presence checks).
 		r.logf("[triage-cap] ambiguity, failing open: %v", err)

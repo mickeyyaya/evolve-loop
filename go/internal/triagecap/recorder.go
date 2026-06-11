@@ -8,11 +8,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// triageArtifactName resolves the triage deliverable filename from the
+// TriageArtifactName resolves the triage deliverable filename from the
 // contract registry (single source — the same name the runner hook and the
 // contract gate use). The registry is a compile-time table, so the lookup
 // cannot fail; the fallback literal only guards a future registry refactor.
-func triageArtifactName() string {
+// Exported for the evalgate floor-binding gate, which reads the same artifact.
+func TriageArtifactName() string {
 	if c, ok := phasecontract.For("triage"); ok {
 		return c.ArtifactName
 	}
@@ -26,7 +27,7 @@ func triageArtifactName() string {
 // cycle is a no-op — only floor-bearing cycles carry throughput signal.
 func Recorder(projectRoot string) func(state *core.State, cycle int, workspacePath string) {
 	return func(state *core.State, cycle int, workspacePath string) {
-		data, err := os.ReadFile(filepath.Join(workspacePath, triageArtifactName()))
+		data, err := os.ReadFile(filepath.Join(workspacePath, TriageArtifactName()))
 		if err != nil {
 			return
 		}
