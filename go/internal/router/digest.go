@@ -26,25 +26,25 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	done := toSet(completed)
 
 	if done["scout"] {
-		if raw, ok := readFirst(workspace, "handoff-scout.json"); ok {
+		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-scout.json"); ok {
 			sig.Scout = extractScout(raw)
 			sig.foldGeneric("scout", raw)
 		}
 	}
 	if done["triage"] {
-		if raw, ok := readFirst(workspace, "handoff-triage.json"); ok {
+		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-triage.json"); ok {
 			sig.Triage = extractTriage(raw)
 			sig.foldGeneric("triage", raw)
 		}
 	}
 	if done["build"] {
-		if raw, ok := readFirst(workspace, "handoff-build.json", "handoff-builder.json"); ok {
+		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-build.json", "handoff-builder.json"); ok {
 			sig.Build = extractBuild(raw)
 			sig.foldGeneric("build", raw)
 		}
 	}
 	if done["audit"] {
-		if raw, ok := readFirst(workspace, "handoff-audit.json", "handoff-auditor.json"); ok {
+		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-audit.json", "handoff-auditor.json"); ok {
 			sig.Audit = extractAudit(raw)
 			sig.foldGeneric("audit", raw)
 		}
@@ -110,11 +110,18 @@ func toSet(xs []string) map[string]bool {
 	return m
 }
 
-// readFirst returns the bytes of the first existing candidate file in dir.
-func readFirst(dir string, candidates ...string) ([]byte, bool) {
+// readFirstTracked is the sole file-reader for the ANCHOR handoffs: a read failure that
+// is NOT a clean absence (EISDIR, permission, transient IO) is appended to
+// degraded — the R5 read-miss vs genuine-gap distinction the spine gate keys
+// on. Absence stays silent (Present:false is the signal).
+func readFirstTracked(dir string, degraded *[]string, candidates ...string) ([]byte, bool) {
 	for _, name := range candidates {
-		if raw, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
+		raw, err := os.ReadFile(filepath.Join(dir, name))
+		if err == nil {
 			return raw, true
+		}
+		if !os.IsNotExist(err) {
+			*degraded = append(*degraded, name+": "+err.Error())
 		}
 	}
 	return nil, false
