@@ -59,7 +59,7 @@ func TestBootRejectsMarkerOverDeadShell(t *testing.T) {
 	tm := &FakeTmuxController{CaptureFrames: frames, PaneCmd: "zsh"}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 		name: "claude-tmux", session: "handshake-deadshell", launchCmd: "claude",
-		promptMarker: "❯", bootIntervalS: 1, bootOnly: true,
+		promptMarker: "❯", bootIntervalS: 1, bootOnly: true, guardDeadShell: true,
 	})
 	if err != nil {
 		t.Fatalf("runTmuxREPL err: %v", err)
@@ -77,7 +77,7 @@ func TestBootAcceptsMarkerWithCLIProcess(t *testing.T) {
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ done"}, PaneCmd: "node"}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 		name: "claude-tmux", session: "handshake-ok", launchCmd: "claude",
-		promptMarker: "❯", bootIntervalS: 1, bootOnly: true,
+		promptMarker: "❯", bootIntervalS: 1, bootOnly: true, guardDeadShell: true,
 	})
 	if err != nil || code != ExitOK {
 		t.Fatalf("runTmuxREPL = (%d,%v), want ExitOK — a CLI-process pane with the marker is ready", code, err)
@@ -99,7 +99,7 @@ func TestPostPasteShellSpillFailsFast(t *testing.T) {
 	tm := &shellWedgeTmux{FakeTmuxController: base, postPasteCmd: "zsh"}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 		name: "claude-tmux", session: "handshake-spill", launchCmd: "claude",
-		promptMarker: "❯", bootIntervalS: 1,
+		promptMarker: "❯", bootIntervalS: 1, guardDeadShell: true,
 	})
 	if err != nil {
 		t.Fatalf("runTmuxREPL err: %v", err)
@@ -123,10 +123,27 @@ func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 	tm := &artifactOnPasteTmux{FakeTmuxController: base, artifact: cfg.Artifact}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 		name: "claude-tmux", session: "handshake-lookalike", launchCmd: "claude",
-		promptMarker: "❯", bootIntervalS: 1,
+		promptMarker: "❯", bootIntervalS: 1, guardDeadShell: true,
 	})
 	if err != nil || code != ExitOK {
 		t.Fatalf("runTmuxREPL = (%d,%v), want ExitOK — spill-lookalike text with a live CLI process must be ignored (process check is authoritative)", code, err)
+	}
+}
+
+// TestGuardOffShellREPLBoots pins the opt-out (the PR-71 Ubuntu CI
+// regression): a harness whose "REPL" legitimately IS a shell script (the
+// RealTmux integration fixtures) must boot normally when guardDeadShell is
+// unset, even though the pane process reports a shell. Contrast:
+// TestBootRejectsMarkerOverDeadShell covers the armed+shell→reject mirror.
+func TestGuardOffShellREPLBoots(t *testing.T) {
+	cfg := fixtureConfig(t)
+	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ done"}, PaneCmd: "bash"}
+	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
+		name: "itest-tmux", session: "handshake-guardoff", launchCmd: "/tmp/fake-repl.sh",
+		promptMarker: "❯", bootIntervalS: 1, bootOnly: true,
+	})
+	if err != nil || code != ExitOK {
+		t.Fatalf("runTmuxREPL = (%d,%v), want ExitOK — guardDeadShell off must keep shell-script harnesses bootable (Ubuntu CI regression)", code, err)
 	}
 }
 

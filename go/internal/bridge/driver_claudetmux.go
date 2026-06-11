@@ -61,6 +61,7 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		bootIntervalS:  1,
 		exitSeq:        []tmuxKey{{keys: "/exit", enter: true, pauseS: 2}},
 		bootOnly:       cfg.BootOnly,
+		guardDeadShell: true,
 	})
 }
 

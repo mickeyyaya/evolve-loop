@@ -107,6 +107,13 @@ type tmuxLaunch struct {
 	bootMenuSkip   string    // non-empty: keypress sent when an interstitial update menu is detected
 	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
 	bootOnly       bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
+	// guardDeadShell arms the cycle-274 dead-shell checks (boot rejection +
+	// post-paste spill fast-fail). Set by the REAL CLI drivers — their
+	// foreground process is never a shell, so a shell pane means the CLI is
+	// gone. MUST stay false for harnesses whose "REPL" legitimately IS a
+	// shell script (the RealTmux integration fixtures — the PR-71 Ubuntu CI
+	// failure this field exists for).
+	guardDeadShell bool
 }
 
 // launchCmdLine joins an inner-CLI binary with its realized launch flags
@@ -265,9 +272,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				// zsh) read as ready and the injection landed in the shell.
 				// Reject when the pane's foreground process is a known shell;
 				// controllers without PaneCommander keep marker-only behavior.
-				if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
-					fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", pfx, shellCmd)
-					continue
+				if lp.guardDeadShell {
+					if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
+						fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", pfx, shellCmd)
+						continue
+					}
 				}
 				promptSeen = true
 				fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", pfx, lp.promptMarker)
@@ -461,7 +470,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// CLI is gone. Fail fast as a transient so the fallback chain takes
 	// over, instead of the 25-min wedge cycles 274/277 burned. Mid-run
 	// process death past this boundary is the observer's job (plan R3.4).
-	if paneLooksLikeShellSpill(intervalBaselinePane) {
+	if lp.guardDeadShell && paneLooksLikeShellSpill(intervalBaselinePane) {
 		if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
 			fmt.Fprintf(deps.Stderr, "%s FAIL: prompt spilled into a dead shell (%s) after paste — CLI process gone (cycle-274 class)\n", pfx, shellCmd)
 			return ExitREPLBootTimeout, nil
