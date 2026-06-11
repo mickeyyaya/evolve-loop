@@ -82,6 +82,16 @@ type State struct {
 	// throughput that bounds triage's per-cycle floor commitments (R9,
 	// inbox coverage-floor-overpacking). Ops live in internal/triagecap.
 	TriageThroughput []TriageThroughputEntry `json:"triageThroughput,omitempty"`
+	// StateRevision counts writes made through Storage.UpdateState (CA.3
+	// OCC): ++ per serialized RMW. 0 (omitted) = never touched by
+	// UpdateState; a gap/repeat in the sequence betrays a writer that
+	// bypassed the lock. Additive field — single-mode byte-stable.
+	StateRevision int `json:"stateRevision,omitempty"`
+	// LastAllocatedCycleNumber is the CA.4 allocation lease: the highest
+	// cycle number ever minted (≠ LastCycleNumber, the highest COMPLETED).
+	// Bumped atomically via UpdateState before a run starts; a crashed run
+	// burns its number. Additive field — single-mode byte-stable.
+	LastAllocatedCycleNumber int `json:"lastAllocatedCycleNumber,omitempty"`
 }
 
 // TriageThroughputEntry is one observed cycle in the triage-capacity rolling
@@ -138,6 +148,11 @@ type CycleState struct {
 	CompletedPhases []string `json:"completed_phases,omitempty"`
 	WorkspacePath   string   `json:"workspace_path"`
 	IntentRequired  bool     `json:"intent_required"`
+	// RunID is the CA.5 event-sourced run identity: the ULID RunCycle mints
+	// for this run, also stamped on every ledger entry the run emits.
+	// Additive omitempty field — pre-CA.5 cycle-state files decode/encode
+	// unchanged.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // LedgerEntry is one .jsonl line in .evolve/ledger.jsonl.
@@ -179,6 +194,11 @@ type LedgerEntry struct {
 	// Source identifies the skip-decision origin for phase_skipped entries.
 	// Values: router | psmas | content. Omitted for all other entry kinds.
 	Source string `json:"source,omitempty"`
+	// RunID is the event-sourced run identity (CA.2, Track C-A): the ULID
+	// minted per cycle run, threaded into every entry that run emits (CA.5)
+	// so concurrent runs' entries are attributable. Empty (omitted) for
+	// single-mode and all pre-CA.2 lines — additive field only, byte-stable.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // ledgerEntryWire is the JSON-facing twin of LedgerEntry. Cycle is a
@@ -206,6 +226,7 @@ type ledgerEntryWire struct {
 	Action          string          `json:"action,omitempty"`
 	Message         string          `json:"message,omitempty"`
 	Source          string          `json:"source,omitempty"`
+	RunID           string          `json:"run_id,omitempty"`
 }
 
 // UnmarshalJSON accepts cycle as int, whole-number float, or string.
@@ -235,6 +256,7 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.Action = wire.Action
 	e.Message = wire.Message
 	e.Source = wire.Source
+	e.RunID = wire.RunID
 
 	// Route the cycle field: int → Cycle, string → CycleLabel.
 	if len(wire.Cycle) == 0 {

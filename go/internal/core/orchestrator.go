@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
@@ -228,6 +229,11 @@ type Orchestrator struct {
 	// the R9 triage-capacity window (throughput_hook.go). Nil (default) ⇒
 	// no-op. Set via WithThroughputRecorder.
 	throughputRecorder ThroughputRecorder
+
+	// currentRunID holds the in-flight run's ULID (CA.5) as a string; the
+	// construction-time stampingLedger reads it atomically on every Append.
+	// Empty ⇒ no run in flight ⇒ entries are not stamped.
+	currentRunID atomic.Value
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -390,6 +396,11 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	for _, opt := range opts {
 		opt(o)
 	}
+	// CA.5: the run-id stamping decorator wraps the (possibly option-
+	// replaced) ledger exactly once at construction. The per-run identity
+	// flows through the atomic currentRunID — RunCycle never mutates the
+	// ledger field, so goroutine-spawning observers can read it race-free.
+	o.ledger = stampingLedger{inner: o.ledger, runID: &o.currentRunID}
 	return o
 }
 
@@ -1556,7 +1567,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("read state: %w", err)
 	}
-	cycle := state.LastCycleNumber + 1
+	// CA.4: mint the cycle number through the allocation lease when the
+	// storage supports the serialized RMW (legacy +1 otherwise). A crashed
+	// run burns its number; resume re-enters via RunCycleFromPhase with the
+	// run record's cycle and never re-allocates.
+	cycle, err := o.allocateCycle(ctx, &state)
+	if err != nil {
+		return CycleResult{}, fmt.Errorf("allocate cycle: %w", err)
+	}
 
 	startedAt := o.now().UTC().Format(time.RFC3339)
 	// IntentRequired is the gate for the start→intent vs start→scout
@@ -1565,6 +1583,12 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// mirrors the bash dispatcher's check at run-cycle.sh:build_context.
 	intentRequired := req.Context["intent_required"] == "true" ||
 		envchain.BoolValue(req.Env["EVOLVE_REQUIRE_INTENT"], false)
+	// CA.5: one ULID per run — persisted in the cycle state; the
+	// construction-time stampingLedger stamps it on every ledger entry for
+	// as long as it is the current id (cleared on every exit path).
+	runID := MintRunID(o.now())
+	o.currentRunID.Store(runID)
+	defer o.currentRunID.Store("")
 	cs := CycleState{
 		CycleID:        cycle,
 		Phase:          string(PhaseStart),
@@ -1572,6 +1596,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		PhaseStartedAt: startedAt,
 		WorkspacePath:  fmt.Sprintf("%s/.evolve/runs/cycle-%d", req.ProjectRoot, cycle),
 		IntentRequired: intentRequired,
+		RunID:          runID,
 	}
 	// Guard against workspace pollution from a prior killed attempt at
 	// the same cycle number. If `<workspace>/` exists and has files,
@@ -2669,7 +2694,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	}
 
 	state.LastCycleNumber = cycle
-	if err := o.storage.WriteState(ctx, state); err != nil {
+	if err := o.persistCycleEndState(ctx, state); err != nil {
 		return result, fmt.Errorf("write state: %w", err)
 	}
 	cycleCompletedNormally = true

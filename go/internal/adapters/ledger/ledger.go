@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -29,6 +30,7 @@ const ZeroSeed = "00000000000000000000000000000000000000000000000000000000000000
 type FileLedger struct {
 	ledgerPath string
 	tipPath    string
+	lockPath   string
 	mu         sync.Mutex
 }
 
@@ -76,15 +78,24 @@ func New(evolveDir string) *FileLedger {
 	return &FileLedger{
 		ledgerPath: filepath.Join(evolveDir, "ledger.jsonl"),
 		tipPath:    filepath.Join(evolveDir, "ledger.tip"),
+		lockPath:   filepath.Join(evolveDir, "ledger.lock"),
 	}
 }
 
 // Append serializes e (with prev_hash + entry_seq filled in by the
 // ledger), appends it to ledger.jsonl, and updates ledger.tip.
-// Safe under concurrent goroutines (mutex-guarded).
+// Safe under concurrent goroutines (mutex) AND concurrent processes
+// (CA.1: blocking flock on ledger.lock around the whole
+// tip-read→append→tip-write critical section — two `evolve` processes
+// otherwise interleave and break the hash chain).
 func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	release, err := flock.Lock(l.lockPath)
+	if err != nil {
+		return fmt.Errorf("ledger: %w", err)
+	}
+	defer release()
 
 	prevSeq, prevHash, err := l.readTip()
 	if err != nil {
@@ -119,8 +130,17 @@ func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
 
 	newHash := sha256Hex(line)
 	tip := fmt.Sprintf("%d:%s", e.EntrySeq, newHash)
-	if err := hooks.writeF(l.tipPath, []byte(tip), 0o644); err != nil {
+	// Atomic tip replace (tmp+rename): a concurrent reader must never see a
+	// truncated tip — the RED stress run surfaced exactly that (`tip
+	// malformed: ""` from a mid-WriteFile read).
+	tmp := fmt.Sprintf("%s.tmp.%d", l.tipPath, os.Getpid())
+	if err := hooks.writeF(tmp, []byte(tip), 0o644); err != nil {
+		_ = os.Remove(tmp)
 		return fmt.Errorf("tip write: %w", err)
+	}
+	if err := os.Rename(tmp, l.tipPath); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("tip rename: %w", err)
 	}
 	return nil
 }
