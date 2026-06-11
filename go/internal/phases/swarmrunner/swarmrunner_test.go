@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -67,6 +68,36 @@ func writePlan(t *testing.T, ws string, mode swarm.Mode) {
 
 func reqWith(ws string, env map[string]string) core.PhaseRequest {
 	return core.PhaseRequest{Cycle: 1, ProjectRoot: ".", Workspace: ws, Env: env}
+}
+
+func reqWithRoot(root, ws string, env map[string]string) core.PhaseRequest {
+	return core.PhaseRequest{Cycle: 1, ProjectRoot: root, Workspace: ws, Env: env}
+}
+
+// gitInitForTest makes a throwaway repo with one commit so writer-mode
+// worktree provisioning never touches the developer's repository.
+func gitInitForTest(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	root := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	run("config", "user.email", "t@t.local")
+	run("config", "user.name", "T")
+	run("config", "commit.gpgsign", "false")
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "-A")
+	run("commit", "-q", "-m", "init")
+	return root
 }
 
 func TestDecorator_ShadowDelegates(t *testing.T) {
@@ -512,10 +543,14 @@ func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
 func TestDecorator_EnforceWriter_WorkerFailureReturnsFail(t *testing.T) {
 	inner := &fakeInner{name: "build"}
 	d := New(inner, &errBridge{}, swarm.ModeWriter)
+	root := gitInitForTest(t)
+	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ws := t.TempDir()
 	writeWriterPlan(t, ws)
 
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	resp, err := d.Run(context.Background(), reqWithRoot(root, ws, map[string]string{
+		"EVOLVE_SWARM_STAGE": "enforce",
+	}))
 	if err == nil {
 		t.Fatal("enforce writer with transport failure must return error")
 	}

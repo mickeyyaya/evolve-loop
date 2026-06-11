@@ -76,6 +76,9 @@ func (g gitWorkerProvisioner) CreateWorker(ctx context.Context, projectRoot stri
 // reusing an existing valid worktree (and tearing down a stale stub first).
 func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, branch, base string) (string, error) {
 	root := worktreeBase(projectRoot)
+	if !filepath.IsAbs(root) {
+		return "", fmt.Errorf("worktree base must be absolute: %s", root)
+	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", fmt.Errorf("worktree base: %w", err)
 	}

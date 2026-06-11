@@ -139,6 +139,22 @@ func TestWorktreeBase_DefaultPath(t *testing.T) {
 	}
 }
 
+func TestAddWorktree_RelativeBaseRefused(t *testing.T) {
+	root := gitInit(t)
+	t.Setenv("EVOLVE_WORKTREE_BASE", "relative-worktrees")
+
+	_, err := NewGitWorkerProvisioner(nil).CreateIntegration(context.Background(), root, 294)
+	if err == nil {
+		t.Fatal("CreateIntegration with relative EVOLVE_WORKTREE_BASE must fail")
+	}
+	if !strings.Contains(err.Error(), "absolute") {
+		t.Fatalf("relative base error = %q, want message mentioning absolute", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "relative-worktrees")); !os.IsNotExist(statErr) {
+		t.Fatalf("relative base must be rejected before creating directories, stat err=%v", statErr)
+	}
+}
+
 // TestCreateWorker_EmptyIntegrationBranch covers the empty-integrationBranch fallback.
 func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 	root := gitInit(t)

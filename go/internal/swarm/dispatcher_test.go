@@ -226,6 +226,34 @@ func TestDispatch_ConcurrencyCapHonored(t *testing.T) {
 	}
 }
 
+func TestDispatch_CancelWhileQueuedOnSemaphore(t *testing.T) {
+	for attempt := 0; attempt < 20; attempt++ {
+		fk := &fakeLauncher{
+			delay:     20 * time.Millisecond,
+			failAgent: map[string]bool{"r-w0": true},
+		}
+		plan := SwarmPlan{Mode: ModeReader, Partitionable: true, TaskID: "r", Workers: []WorkerSpec{
+			{WorkerID: "w0"}, {WorkerID: "w1"}, {WorkerID: "w2"},
+		}}
+
+		res, err := Dispatch(context.Background(), plan, DispatchRequest{Workspace: t.TempDir()}, Deps{
+			Launcher: fk, Concurrency: 1,
+		})
+		if err == nil {
+			t.Fatal("expected fatal error from w0")
+		}
+		if len(res.Workers) != len(plan.Workers) {
+			t.Fatalf("all workers must receive a result, got %d want %d", len(res.Workers), len(plan.Workers))
+		}
+		for _, wr := range res.Workers {
+			if errors.Is(wr.Err, context.Canceled) {
+				return
+			}
+		}
+	}
+	t.Fatal("expected at least one queued worker to receive context.Canceled")
+}
+
 func TestDispatch_FatalErrorPropagates(t *testing.T) {
 	fk := &fakeLauncher{failAgent: map[string]bool{"r-w0": true}}
 	plan := SwarmPlan{Mode: ModeReader, Partitionable: true, TaskID: "r", Workers: []WorkerSpec{
