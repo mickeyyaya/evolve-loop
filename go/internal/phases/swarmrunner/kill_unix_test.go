@@ -1,7 +1,6 @@
 package swarmrunner
 
 import (
-	"context"
 	"testing"
 )
 
@@ -39,15 +38,8 @@ func TestGroupKiller_ValidPGIDAttempts(t *testing.T) {
 	_ = err
 }
 
-func TestTmuxKiller_BestEffortNoError(t *testing.T) {
-	// tmuxKiller ignores the tmux exit code (session may not exist). Must return nil.
-	if err := tmuxKiller(context.Background(), "no-such-session-evolve-test"); err != nil {
-		t.Errorf("tmuxKiller must always return nil, got %v", err)
-	}
-}
-
-func TestTmuxKiller_EmptySession(t *testing.T) {
-	if err := tmuxKiller(context.Background(), ""); err != nil {
-		t.Errorf("tmuxKiller with empty session must return nil, got %v", err)
-	}
-}
+// tmux teardown tests live in internal/swarm (ExecTmuxKill, seam-based — never
+// a real tmux exec). The predecessor here live-fired `tmux kill-session -t ''`
+// against the shared default socket, which tmux resolves to the CALLER'S OWN
+// session — running this suite from inside any tmux pane killed that session
+// (2026-06-11 killer-B). Do not reintroduce real-tmux calls in unit tests.

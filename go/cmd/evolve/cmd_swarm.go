@@ -13,7 +13,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -114,7 +113,7 @@ func runSwarmReap(args []string, stdout, stderr io.Writer) int {
 			}
 			return syscall.Kill(-pgid, syscall.SIGKILL)
 		},
-		KillTmux: func(ctx context.Context, sess string) error { return killTmuxSession(ctx, sess) },
+		KillTmux: swarm.ExecTmuxKill,
 	}
 	rep := swarm.Reap(context.Background(), reg, killer)
 	fmt.Fprintf(stdout, "reaped %d session(s) for cycle %d\n", len(rep.Killed), cycle)
@@ -122,11 +121,4 @@ func runSwarmReap(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "  warn: %s\n", e)
 	}
 	return 0
-}
-
-// killTmuxSession terminates a tmux session by name (best-effort; a missing
-// session is not an error — an already-dead session is the desired end state).
-func killTmuxSession(ctx context.Context, session string) error {
-	_ = exec.CommandContext(ctx, "tmux", "kill-session", "-t", session).Run()
-	return nil
 }

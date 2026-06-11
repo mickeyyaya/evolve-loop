@@ -108,7 +108,7 @@ func (d *Decorator) dispatchDeps(req core.PhaseRequest) swarm.Deps {
 	deps := swarm.Deps{
 		Launcher:    bridgeLauncher{bridge: d.bridge, env: req.Env},
 		Registry:    reg,
-		Killer:      swarm.ExecSessionKiller{KillGroup: groupKiller, KillTmux: tmuxKiller},
+		Killer:      swarm.ExecSessionKiller{KillGroup: groupKiller, KillTmux: swarm.ExecTmuxKill},
 		Concurrency: d.concurrency,
 	}
 	if d.mode == swarm.ModeWriter {

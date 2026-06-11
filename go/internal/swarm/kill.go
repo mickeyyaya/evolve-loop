@@ -3,6 +3,7 @@ package swarm
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"sort"
 )
 
@@ -20,6 +21,27 @@ type ProcessGroupKiller func(pgid int) error
 // TmuxKiller kills a tmux session by name (the bridge's TmuxController.KillSession
 // shape, narrowed to what teardown needs). Injected for testability.
 type TmuxKiller func(ctx context.Context, session string) error
+
+// tmuxRun is the exec seam for ExecTmuxKill, overridden in tests so the unit
+// suite never touches a real tmux server.
+var tmuxRun = func(ctx context.Context, args ...string) error {
+	return exec.CommandContext(ctx, "tmux", args...).Run()
+}
+
+// ExecTmuxKill is the production TmuxKiller (shared by swarmrunner teardown and
+// `evolve swarm reap`). SAFETY: it refuses an empty session name — tmux resolves
+// an empty `-t` target to the CLIENT'S CURRENT session, so a blank name fired
+// from inside any tmux pane kills the caller's own session (the 2026-06-11
+// killer-B forensics: a test live-firing the empty case destroyed every soak
+// session on the shared default socket). Otherwise best-effort: a missing
+// session is the desired end state, so the tmux exit code is ignored.
+func ExecTmuxKill(ctx context.Context, session string) error {
+	if session == "" {
+		return fmt.Errorf("refusing to kill tmux session with empty name (tmux would resolve it to the caller's own session)")
+	}
+	_ = tmuxRun(ctx, "kill-session", "-t", session)
+	return nil
+}
 
 // ExecSessionKiller is the production SessionKiller: it kills the worker's
 // process group (reaping the inner CLI + any grandchildren that a bare
