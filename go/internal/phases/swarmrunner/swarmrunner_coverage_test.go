@@ -45,9 +45,8 @@ func TestSwarmRunner_CoverageHelpers(t *testing.T) {
 		if err := groupKiller(1); err == nil || !strings.Contains(err.Error(), "refusing") {
 			t.Fatalf("groupKiller must refuse pgid<=1, got %v", err)
 		}
-		if err := tmuxKiller(context.Background(), "definitely-missing-session"); err != nil {
-			t.Fatalf("tmuxKiller is best-effort, got %v", err)
-		}
+		// tmux teardown coverage lives in internal/swarm (ExecTmuxKill, seam-based);
+		// no real tmux exec from this suite — see kill_unix_test.go.
 	})
 
 	t.Run("groupKiller kills a child process group", func(t *testing.T) {
