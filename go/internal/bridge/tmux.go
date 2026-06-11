@@ -101,6 +101,23 @@ func (t execTmux) PasteBuffer(ctx context.Context, session string) error {
 	return err
 }
 
+// windowJiggler is an OPTIONAL TmuxController capability. Controllers that
+// implement it can force a SIGWINCH full re-render (blank-pane wedge recovery).
+// Controllers without it skip the redraw attempt (optional-interface pattern).
+type windowJiggler interface {
+	JiggleWindow(ctx context.Context, session string) error
+}
+
+// JiggleWindow nudges the window width down then back up — a net-zero
+// resize whose two SIGWINCHes force the pane's TUI to repaint.
+func (t execTmux) JiggleWindow(ctx context.Context, session string) error {
+	if _, err := t.run(ctx, "resize-window", "-t", session, "-L", "1"); err != nil {
+		return err
+	}
+	_, err := t.run(ctx, "resize-window", "-t", session, "-R", "1")
+	return err
+}
+
 func (t execTmux) KillSession(ctx context.Context, session string) error {
 	_, err := t.run(ctx, "kill-session", "-t", session)
 	return err
@@ -197,6 +214,14 @@ func (f *FakeTmuxController) PasteBuffer(_ context.Context, _ string) error {
 	defer f.mu.Unlock()
 	f.PasteCount++
 	f.Events = append(f.Events, "paste-buffer")
+	return nil
+}
+
+// JiggleWindow implements windowJiggler for test doubles.
+func (f *FakeTmuxController) JiggleWindow(_ context.Context, session string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Events = append(f.Events, "jiggle:"+session)
 	return nil
 }
 
