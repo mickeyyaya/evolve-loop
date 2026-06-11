@@ -136,6 +136,55 @@ func PromoteRule(dir, regex, responseKeys, note string, corpus []string) (string
 	return id, nil
 }
 
+// EnforceRule flips one promoted rule from shadow to enforce — the I4
+// "measured auto-enforce" transition (R8.2). It re-validates against the
+// CURRENT corpus first (the measured-clean bar includes "0 healthy-corpus
+// hits" — corpus rot since promotion must block the flip), then rewrites the
+// YAML with stage: enforce, preserving every other field. The CALLER owns
+// the fire-count/contradiction evidence; this function owns only the safety
+// re-check and the durable flip. Missing rule → error (never create on
+// flip); already-enforce → idempotent no-op.
+func EnforceRule(dir, id string, corpus []string) error {
+	path := filepath.Join(dir, id+".yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("interaction: enforce %s: %w", id, err)
+	}
+	r, ok := parseRule(string(data))
+	if !ok {
+		return fmt.Errorf("interaction: enforce %s: rule file unparseable", id)
+	}
+	if r.Stage == RuleStageEnforce {
+		return nil
+	}
+	if err := ValidateRule(r.Regex, r.ResponseKeys, corpus); err != nil {
+		return fmt.Errorf("interaction: enforce %s: re-validation failed (corpus rot since promotion?): %w", id, err)
+	}
+	// Line-surgical rewrite: ONLY the stage line changes, so an
+	// operator-edited file (extra fields, reworded note) survives the flip
+	// intact (review MEDIUM: reconstruction silently dropped custom keys).
+	lines := strings.Split(string(data), "\n")
+	flipped := false
+	for i, ln := range lines {
+		if strings.HasPrefix(strings.TrimSpace(ln), "stage:") {
+			lines[i] = "stage: " + RuleStageEnforce
+			flipped = true
+			break
+		}
+	}
+	if !flipped {
+		lines = append(lines, "stage: "+RuleStageEnforce)
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		return fmt.Errorf("interaction: enforce %s: %w", id, err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("interaction: enforce %s: %w", id, err)
+	}
+	return nil
+}
+
 // LoadRules replays every parseable rule in dir, RE-VALIDATING each against
 // the current corpus (a corpus update — e.g. a new CLI version's healthy
 // banner — DEMOTES a rule that now matches, so promotion is never validated

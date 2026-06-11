@@ -106,6 +106,10 @@ func (lr *loopResult) emit(w io.Writer) {
 				fileUnexplainedOutcomeDefect(lr.classifyRoot, c.Cycle, detail)
 			}
 		}
+		// R8.2 / I4 measured auto-enforce sweep rides the same batch-end
+		// bookkeeping slot (evidence is evidence on every exit path).
+		// Best-effort; never breaks the dispatcher contract.
+		sweepRulePromotions(os.Stderr, lr.classifyRoot, lr.Cycles)
 	}
 	buf, err := json.MarshalIndent(lr, "", "  ")
 	if err != nil {
@@ -113,6 +117,65 @@ func (lr *loopResult) emit(w io.Writer) {
 		return
 	}
 	fmt.Fprintln(w, string(buf))
+}
+
+// sweepRulePromotions is the I4 measured auto-enforce sweep (R8.2): scan the
+// batch's interaction ledgers for shadow-rule would-fire evidence and flip
+// rules that cleared the bar — ≥minShadowFires fires, ZERO non-would_fire
+// outcomes for that rule (conservative: any anomaly disqualifies), and a
+// fresh healthy-corpus re-validation inside the flip itself
+// (bridge.EnforceMeasuredRule). Until this sweep existed, "measured
+// auto-enforce never fires" was true by construction (ADR-0045 I4 record).
+// Best-effort throughout: a missing dir/ledger is just absent evidence.
+func sweepRulePromotions(stderr io.Writer, projectRoot string, cycles []core.CycleResult) {
+	const minShadowFires = 5
+	fires := map[string]int{}
+	disqualified := map[string]bool{}
+	for _, c := range cycles {
+		ws := cycleWorkspace(projectRoot, c.Cycle)
+		entries, err := os.ReadDir(ws)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), "-interactions.ndjson") {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(ws, e.Name()))
+			if err != nil {
+				continue
+			}
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+				var out struct {
+					Kind   string `json:"kind"`
+					RuleID string `json:"rule_id"`
+					Result string `json:"result"`
+				}
+				if json.Unmarshal([]byte(line), &out) != nil ||
+					out.Kind != "rule_shadow_fire" || out.RuleID == "" {
+					continue
+				}
+				if out.Result == "would_fire" {
+					fires[out.RuleID]++
+				} else {
+					disqualified[out.RuleID] = true
+				}
+			}
+		}
+	}
+	for id, n := range fires {
+		if n < minShadowFires || disqualified[id] {
+			continue
+		}
+		if err := bridge.EnforceMeasuredRule(projectRoot, id); err != nil {
+			fmt.Fprintf(stderr, "[loop] WARN I4 enforce flip %s: %v\n", id, err)
+			continue
+		}
+		fmt.Fprintf(stderr, "[loop] I4: rule %s measured-clean (%d shadow fires, 0 anomalies) — flipped to enforce\n", id, n)
+	}
 }
 
 // fileUnexplainedOutcomeDefect self-files an inbox item for the alarm

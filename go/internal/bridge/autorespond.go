@@ -136,6 +136,12 @@ type autoResponder struct {
 	broker      *interaction.KernelAnswerer
 	brokerStage string
 	brokerTried bool
+	// shadowRules are the SHADOW-stage promoted rules, matched observe-only
+	// per tick (R8.2): a match records a rule_shadow_fire/would_fire outcome
+	// — the soak evidence the I4 measured auto-enforce sweep reads — and
+	// sends NOTHING. shadowFired dedups to one signal per rule per launch.
+	shadowRules []shadowObserver
+	shadowFired map[string]bool
 }
 
 // pendingAutoRespond is one injection awaiting its outcome: the rule/source
@@ -160,7 +166,7 @@ func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback i
 	if m, err := LoadManifest(cli); err == nil {
 		prompts = m.InteractivePrompts
 	}
-	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}}
+	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
@@ -171,6 +177,24 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// deciding — the pattern no longer matching is the deterministic
 	// "it worked" signal ("prompt-pattern cleared on next capture").
 	ar.resolvePending(pane)
+	// R8.2 / I4 soak signal: shadow-stage promoted rules observe the pane
+	// and record a would-fire ONCE per rule per launch — no keys, no
+	// control-flow change. The batch-end sweep flips measured-clean rules
+	// to enforce on this evidence.
+	if ar.rec != nil {
+		for _, so := range ar.shadowRules {
+			if !ar.shadowFired[so.id] && so.re.MatchString(pane) {
+				ar.shadowFired[so.id] = true
+				ar.rec.Record(interaction.Outcome{Event: interaction.Event{
+					Kind:    "rule_shadow_fire",
+					Phase:   ar.phase,
+					Cycle:   ar.cycle,
+					Trigger: "shadow_rule_matched",
+					RuleID:  so.id,
+				}, Result: "would_fire"})
+			}
+		}
+	}
 	var prevCounts map[string]int
 	if ar.rec != nil {
 		prevCounts = make(map[string]int, len(ar.counts))

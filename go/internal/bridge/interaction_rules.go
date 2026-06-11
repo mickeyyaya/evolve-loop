@@ -13,6 +13,7 @@ package bridge
 import (
 	_ "embed"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
@@ -47,12 +48,52 @@ func interactionRulesDir(projectRoot string) string {
 	return filepath.Join(projectRoot, ".evolve", "instincts", "interaction-rules")
 }
 
+// EnforceMeasuredRule flips one shadow rule to enforce after the batch-end
+// sweep (R8.2) finds it measured-clean. The healthy corpus stays single-
+// sourced here (the same embedded corpus load-time demotion validates
+// against) — callers never supply their own.
+func EnforceMeasuredRule(projectRoot, id string) error {
+	return interaction.EnforceRule(interactionRulesDir(projectRoot), id, healthyCorpus)
+}
+
+// shadowObserver pairs a shadow-stage promoted rule with its compiled
+// pattern for OBSERVE-ONLY matching in the auto-respond tick — the I1
+// would-fire soak signal that feeds the I4 measured auto-enforce sweep
+// (R8.2). Never sends keys, never alters control flow.
+type shadowObserver struct {
+	id string
+	re *regexp.Regexp
+}
+
+// loadShadowObservers returns the SHADOW-stage promoted rules, compiled.
+// (loadPromotedPrompts below returns the enforce set; together they cover
+// the registry — a rule is exactly one of the two.)
+func loadShadowObservers(projectRoot string) []shadowObserver {
+	dir := interactionRulesDir(projectRoot)
+	if dir == "" {
+		return nil
+	}
+	var out []shadowObserver
+	for _, r := range interaction.LoadRules(dir, healthyCorpus) {
+		if r.Stage != interaction.RuleStageShadow {
+			continue
+		}
+		re, err := regexp.Compile(r.Regex)
+		if err != nil {
+			continue // LoadRules already validated; belt-and-suspenders
+		}
+		out = append(out, shadowObserver{id: r.ID, re: re})
+	}
+	return out
+}
+
 // loadPromotedPrompts returns the ENFORCE-stage promoted rules as
-// ManifestPrompts ready to append to a launch's auto-respond set. Shadow-stage
-// rules are deliberately excluded from the active set — they ride in the
-// registry until measured-clean (their would-fire is the I1 soak signal, a
-// follow-up). An empty root or registry yields nothing. Re-validation against
-// the current corpus happens inside interaction.LoadRules.
+// ManifestPrompts ready to append to a launch's auto-respond set. Shadow-
+// stage rules are deliberately excluded from the active set — they ride in
+// the registry observe-only (loadShadowObservers) until the R8.2 sweep
+// measures them clean. An empty root or registry yields nothing.
+// Re-validation against the current corpus happens inside
+// interaction.LoadRules.
 func loadPromotedPrompts(projectRoot string) []ManifestPrompt {
 	dir := interactionRulesDir(projectRoot)
 	if dir == "" {

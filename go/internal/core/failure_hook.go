@@ -49,6 +49,12 @@ func WithFailureAdviser(a FailureAdviser) Option {
 	}
 }
 
+// FailureAdviserWired reports whether the advisor tail is injected —
+// introspection for composition-root wiring tests and the soak preflight
+// (R8: an enforce flip with no adviser wired would silently skip the
+// advise→promote path the flip exists to activate).
+func (o *Orchestrator) FailureAdviserWired() bool { return o.failureAdviser != nil }
+
 // fatalSignaturesDir is where validated promotions persist, relative to the
 // project root (the same dir the tmux driver replays at boot).
 func fatalSignaturesDir(projectRoot string) string {
