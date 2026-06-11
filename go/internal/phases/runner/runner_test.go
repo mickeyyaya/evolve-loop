@@ -16,6 +16,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
+// TestMain clears EVOLVE_CLI from the process env so runner tests that exercise
+// the profile/default CLI tier are not contaminated by a soak-batch
+// EVOLVE_CLI=claude-p in the operator shell. Tests that need to assert
+// "env beats profile" set EVOLVE_CLI explicitly in core.PhaseRequest.Env
+// (tier 1), which always wins over os.Getenv (tier 2) regardless.
+func TestMain(m *testing.M) {
+	os.Unsetenv("EVOLVE_CLI")
+	os.Exit(m.Run())
+}
+
 // fakeHooks is a minimal Hooks impl that records calls and returns
 // scripted values. The phase name and verdict are configurable so a
 // single fakeHooks covers all the BaseRunner branches.
@@ -638,6 +648,8 @@ func TestRun_CLIResolutionPrecedence(t *testing.T) {
 			env := map[string]string(nil)
 			if tc.envCLI != "" {
 				env = map[string]string{"EVOLVE_CLI": tc.envCLI}
+			} else {
+				t.Setenv("EVOLVE_CLI", "") // isolate from soak-batch EVOLVE_CLI=claude-p contamination
 			}
 			got := runOne(t, tc.profileCLI, env)
 			if got != tc.wantCLI {

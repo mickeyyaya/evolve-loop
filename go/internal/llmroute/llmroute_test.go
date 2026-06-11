@@ -2,12 +2,23 @@ package llmroute
 
 import (
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
+
+// TestMain clears EVOLVE_CLI from the process env so tests that exercise the
+// profile/default CLI tier (env=nil) are not contaminated by a soak-batch
+// EVOLVE_CLI=claude-p in the operator shell. Tests that need to assert
+// "env beats profile" inject EVOLVE_CLI via the env map (tier 1 in envchain),
+// which always wins over os.Getenv (tier 2) regardless.
+func TestMain(m *testing.M) {
+	os.Unsetenv("EVOLVE_CLI")
+	os.Exit(m.Run())
+}
 
 // --- CLI chain (ported from runner/cli_chain_test.go; same matrix, now via Resolve) ---
 
