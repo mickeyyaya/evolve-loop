@@ -43,7 +43,7 @@ const fatalTail = "⏺ There's an issue with the selected model (auto). It may n
 func TestFatalPaneVerdict_EnforcePreemptsWithStop(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	v, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, false), "enforce", &buf, "[t]")
+	v, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, false), "enforce", nil, &buf, "[t]")
 	if !preempted {
 		t.Fatal("enforce + fatal pane + not busy must preempt the reviewer (this is the ~20-min maxExtends burn fix)")
 	}
@@ -58,7 +58,7 @@ func TestFatalPaneVerdict_EnforcePreemptsWithStop(t *testing.T) {
 func TestFatalPaneVerdict_ShadowLogsButDoesNotPreempt(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, false), "shadow", &buf, "[t]")
+	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, false), "shadow", nil, &buf, "[t]")
 	if preempted {
 		t.Fatal("shadow must be behavior-neutral — log only, legacy verdict decides")
 	}
@@ -71,7 +71,7 @@ func TestFatalPaneVerdict_ShadowLogsButDoesNotPreempt(t *testing.T) {
 func TestFatalPaneVerdict_BusyPaneNeverPreempted(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, true), "enforce", &buf, "[t]")
+	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, true), "enforce", nil, &buf, "[t]")
 	if preempted {
 		t.Fatal("a Busy pane must never be preempted — never kill a working agent, even on a fatal-looking tail")
 	}
@@ -95,7 +95,7 @@ func TestFatalPaneVerdict_OffSkipsDetection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var buf bytes.Buffer
-			_, preempted := fatalPaneVerdict(tc.det, fatalEv(fatalTail, false), tc.stage, &buf, "[t]")
+			_, preempted := fatalPaneVerdict(tc.det, fatalEv(fatalTail, false), tc.stage, nil, &buf, "[t]")
 			if preempted {
 				t.Fatal("must not preempt")
 			}
@@ -112,7 +112,7 @@ func TestFatalPaneVerdict_ShadowBusySuppressed(t *testing.T) {
 	// for a visibly-working agent, or the soak trail fills with noise about
 	// panes that merely mention a signature.
 	var buf bytes.Buffer
-	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, true), "shadow", &buf, "[t]")
+	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, true), "shadow", nil, &buf, "[t]")
 	if preempted {
 		t.Fatal("shadow never preempts")
 	}
@@ -124,7 +124,7 @@ func TestFatalPaneVerdict_ShadowBusySuppressed(t *testing.T) {
 func TestFatalPaneVerdict_HealthyPaneNotPreempted(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv("⏺ Running go test ./... — 14 packages", false), "enforce", &buf, "[t]")
+	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv("⏺ Running go test ./... — 14 packages", false), "enforce", nil, &buf, "[t]")
 	if preempted {
 		t.Fatal("healthy pane must never preempt")
 	}

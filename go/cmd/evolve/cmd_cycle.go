@@ -389,6 +389,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
 		core.WithPlanner(advisor),
+		// ADR-0044 Slice-6 post-soak step (R8.1): the LLM failure-advisor
+		// tail. Wired unconditionally — the hook is enforce-gated
+		// (cfg.PhaseRecovery) and best-effort, so below enforce it never
+		// dispatches; at enforce it turns one unclassified fatal pane into a
+		// validated promotion (each promotion saves ~20 min of maxExtends
+		// burn on every future occurrence).
+		core.WithFailureAdviser(core.NewFailureAdvisor(br)),
 		// Mint advisor-proposed phases (Steps 11/12): persist their dispatch
 		// profile + spec under .evolve so the unchanged runner resolves them
 		// from disk, then dispatch by name like a built-in. Only active when the

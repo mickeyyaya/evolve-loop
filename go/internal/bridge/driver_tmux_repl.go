@@ -202,6 +202,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// matches is demoted, never fired. Appended AFTER the manifest rules so a
 	// promoted rule can never shadow a vetted built-in (first match wins).
 	ar.prompts = append(ar.prompts, loadPromotedPrompts(cfg.ProjectRoot)...)
+	// R8.2: shadow-stage rules ride along observe-only — their would-fire
+	// outcomes are the measured-clean evidence for the I4 enforce flip.
+	ar.shadowRules = loadShadowObservers(cfg.ProjectRoot)
 	// A send can be in flight on ANY exit path (boot-time trust prompts
 	// included) — flush so the last one is never silently dropped.
 	defer ar.flushPending()
@@ -600,7 +603,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// bridge's own nudge echoed into them, so the legacy
 			// extend-while-progressing flow burned the full maxExtends
 			// backstop on REPLs that no longer existed.
-			v, preempted := fatalPaneVerdict(fatalDet, lastEv, recoveryStage, deps.Stderr, pfx)
+			// fatalPaneVerdict RECORDS a C2 evidence outcome on every
+			// matching call (R8.3) — it must be called exactly once per
+			// stop-review checkpoint, never retried for the same event, or
+			// the soak's C2 counts inflate silently.
+			v, preempted := fatalPaneVerdict(fatalDet, lastEv, recoveryStage, irec, deps.Stderr, pfx)
 			if !preempted {
 				v = reviewer.Review(lastEv)
 			}
