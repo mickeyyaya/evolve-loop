@@ -1,0 +1,42 @@
+[release-pipeline] target: v18.4.0
+[release-pipeline] changelog range: v18.3.0..HEAD
+[release-pipeline] dry-run: false | no-rollback: false | skip-tests: false
+[release-pipeline] journal: /Users/danleemh/ai/claude/evolve-loop/.evolve/release-journal/18.4.0-20260611T022542Z.json
+[release-pipeline] step: preflight
+[preflight] step 1: working tree clean?
+[preflight] OK: working tree clean
+[preflight] step 2: branch attached?
+[preflight] OK: on branch main
+[preflight] step 3: target version 18.4.0 > current?
+[preflight] OK: 18.3.0 → 18.4.0 (valid bump)
+[preflight] step 4: recent auditor PASS verdict?
+[preflight] OK: latest audit PASS, artifact=/Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-281/audit-report.md
+[preflight] step 5: gate-test suites green?
+[preflight]   running ./internal/guards/......
+[preflight]   running ./internal/phases/ship/......
+[preflight] OK: all 2 gate-test suites green
+[preflight] advisory: running auto-respond simulation suite...
+[preflight] OK: auto-respond simulation suite passed
+[preflight] DONE: preflight passed for 18.4.0
+[release-pipeline] step: changelog-gen
+[release-pipeline] step: version-bump
+[release-pipeline] step: rebuild-binary
+[release-pipeline] step: release.sh-check
+
+=== evolve-loop release checklist ===
+
+Target version:    18.4.0
+Canonical version: 18.4.0 (plugin.json)
+
+--- Version strings ---
+OK       .claude-plugin/plugin.json — plugin.json version (18.4.0)
+OK       .claude-plugin/marketplace.json — marketplace.json version (18.4.0)
+OK       skills/loop/SKILL.md — SKILL.md heading (major.minor) (18.4)
+OK       README.md — README.md current version table (18.4)
+
+--- Required content ---
+OK       CHANGELOG.md — CHANGELOG.md entry for 18.4.0 ([18.4.0])
+OK       README.md — README.md version history row for v18.4 (v18.4)
+
+PASSED: All version references are consistent.
+[release-pipeline] step: ship.sh (--class release)
