@@ -161,6 +161,19 @@ var Profiles = map[string]PaneProfile{
 // Verified against every testdata/<cli>/{thinking,answer}.txt.
 var busyAffordanceRE = regexp.MustCompile(`esc to interrupt|esc to cancel`)
 
+// busySpinnerStatsRE matches the in-turn spinner stats line — the ONLY busy
+// chrome claude ≥2.1.173 renders (its self-update removed the esc-to-
+// interrupt affordance from generating panes; the 2026-06-11 soak-killer,
+// cycles 286/288). The shape "(<dur> · <arrow> <n> tokens" is structural —
+// duration, middot, stream-direction arrow (↑ prompt / ↓ response), live
+// token counter — and is rendered only while a turn runs, so it cannot
+// false-match an idle answer the way bare spinner words ("Kneading"/
+// "Inferring") could. The duration span is a digit-leading [\d hms]+ run so
+// every format a turn passes through matches — "4s", "44s", "12m 34s",
+// "1h 5m" (a miss on the hour shapes would re-open the stall wound exactly
+// for the longest turns).
+var busySpinnerStatsRE = regexp.MustCompile(`\(\s*\d[\d hms]*·\s*[↑↓]\s*[\d.,]+k?\s*tokens`)
+
 // PaneBusy reports whether the rendered pane shows the CLI is actively
 // generating a turn (vs idle at the prompt). The driver brackets the
 // correlation span's idle_reached on a busy→idle transition; the input-box
@@ -177,7 +190,7 @@ var busyAffordanceRE = regexp.MustCompile(`esc to interrupt|esc to cancel`)
 // degradation), but live monitoring is unaffected.
 func PaneBusy(rendered string, p PaneProfile) bool {
 	clean := stripANSI(rendered)
-	if busyAffordanceRE.MatchString(clean) {
+	if busyAffordanceRE.MatchString(clean) || busySpinnerStatsRE.MatchString(clean) {
 		return true
 	}
 	if p.IdlePlaceholder != "" && !strings.Contains(clean, p.IdlePlaceholder) {
