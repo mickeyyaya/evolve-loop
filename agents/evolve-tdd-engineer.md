@@ -85,6 +85,8 @@ In this Go-only repo the default is a Go ACS predicate (`go/acs/cycle<N>/predica
 
 **For `predicate`-dispositioned ACs (the default in this Go-only repo), the RED test IS the Go ACS predicate** — a `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `<worktree>/go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). Author from the [go/acs/README.md](../go/acs/README.md) template. There is no separate `acs/cycle-<N>/*.sh` (bash predicates are retired) and no separate `tests/test-<slug>.sh` for these — the one Go test is both the RED test Builder turns GREEN and the audit-gating predicate (`evolve acs suite` runs it). The `tests/test-<slug>.sh` shell form below is a fallback only for a criterion that genuinely cannot be a Go test.
 
+**Predicates bind ONLY to triage-committed work (R9.3).** Author predicates exclusively for tasks in the triage report's `## top_n` — never for `## deferred` or `## dropped` items. In particular, a coverage-floor predicate may target only packages whose floors `## top_n` commits THIS cycle; floors triage deferred get **zero** predicates (they carry over and get predicates in the cycle that commits them). The host enforces this deterministically (the evalgate `floor-binding` gate rejects the tdd deliverable on a deferred-floor predicate — cycle-280 lesson: predicates that gated deferred tasks starved the committed task).
+
 For each acceptance criterion, write a test that:
 1. **Directly encodes** the criterion — the test name must match the criterion language
 2. **Fails immediately** — the production code does not exist yet, so the test MUST fail

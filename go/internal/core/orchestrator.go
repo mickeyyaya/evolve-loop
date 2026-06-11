@@ -223,6 +223,11 @@ type Orchestrator struct {
 	// ⇒ the salvage rung gets zero budget and the ladder degrades to
 	// redispatch-only — exactly the pre-I2 correction loop.
 	contractVerifier ContractVerifier
+
+	// throughputRecorder observes shipped cycles' coverage-floor counts for
+	// the R9 triage-capacity window (throughput_hook.go). Nil (default) ⇒
+	// no-op. Set via WithThroughputRecorder.
+	throughputRecorder ThroughputRecorder
 }
 
 // Option customizes an Orchestrator at construction (functional-options DI).
@@ -2654,6 +2659,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// change — but always worth an operator's eyes.
 	if result.FinalVerdict == CycleOutcomeSkippedUnknown {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but HEAD did not advance and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
+	}
+
+	// R9.1: a shipped cycle's committed floors are observed throughput —
+	// record them into the rolling window before the state write below
+	// persists it (nil seam ⇒ byte-identical no-op).
+	if o.throughputRecorder != nil && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
+		o.throughputRecorder(&state, cycle, cs.WorkspacePath)
 	}
 
 	state.LastCycleNumber = cycle

@@ -368,16 +368,49 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		}
 		return resp, nil
 	}
+	// R3.6 (inbox bridge-launch-validation-stderr-lost): a launch dying in
+	// the validate gauntlet fails BEFORE the per-agent stderr-log exists, so
+	// without these two lines the diagnostic evaporates (cycle-270: a bare
+	// "launch exit=10" cost a forensic session; the cause was one missing
+	// profile file). Persist the captured stderr into the run dir and thread
+	// its first line into the error chain so <phase>-failure-diag.json
+	// carries the "[bridge] …" cause. bridgeExitCode's digit scan stops at
+	// the ':', so appending the cause never breaks exit-code parsing.
+	if stderrBuf.Len() > 0 {
+		_ = os.WriteFile(filepath.Join(req.Workspace, agent+"-launch-error.txt"), stderrBuf.Bytes(), 0o644)
+	}
+	msg := fmt.Sprintf("bridge: launch exit=%d", code)
+	if cause := firstDiagnosticLine(stderrBuf.String()); cause != "" {
+		msg += ": " + cause
+	}
 	// Wrap the artifact-timeout exit with the port-level sentinel so the
 	// generic phase runner can errors.Is-match it (Workstream D soft-fail)
 	// without importing this adapter. Other non-zero codes stay plain.
 	if code == ExitArtifactTimeout {
-		return resp, fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrArtifactTimeout)
+		return resp, fmt.Errorf("%s: %w", msg, core.ErrArtifactTimeout)
 	}
 	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard {
-		return resp, fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrTransientBridgeFailure)
+		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
 	}
-	return resp, fmt.Errorf("bridge: launch exit=%d", code)
+	return resp, errors.New(msg)
+}
+
+// firstDiagnosticLine returns the first non-empty line of the captured
+// launch stderr, trimmed and bounded — the one-line cause threaded into the
+// launch error chain.
+func firstDiagnosticLine(stderr string) string {
+	for _, line := range strings.Split(stderr, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		const maxCause = 300
+		if runes := []rune(line); len(runes) > maxCause {
+			line = string(runes[:maxCause]) + "…" // rune-safe: never split UTF-8 mid-sequence
+		}
+		return line
+	}
+	return ""
 }
 
 // randRead is the entropy source for defaultChallengeToken — a package

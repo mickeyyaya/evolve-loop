@@ -351,16 +351,23 @@ func alternatesOf(s phasecontract.Section) []string {
 // corruption, and a second BEGIN (e.g. from a botched manual merge) errors out
 // rather than leaving an orphaned stale region behind.
 func spliceGeneratedRegion(doc, block string) (string, error) {
+	return spliceMarkedRegion(doc, block, skillFactsBegin, skillFactsEnd, "\n## Composition")
+}
+
+// spliceMarkedRegion is the marker-agnostic splice shared by `evolve skills`
+// and `evolve flags` (L2.2). fallbackAnchor names the section the block is
+// inserted before when no markers exist yet ("" = append at EOF).
+func spliceMarkedRegion(doc, block, beginMarker, endMarker, fallbackAnchor string) (string, error) {
 	block = strings.TrimRight(block, "\n") + "\n"
-	begin := strings.Index(doc, skillFactsBegin)
+	begin := strings.Index(doc, beginMarker)
 	if begin >= 0 {
-		endRel := strings.Index(doc[begin:], skillFactsEnd)
+		endRel := strings.Index(doc[begin:], endMarker)
 		if endRel < 0 {
-			return "", fmt.Errorf("found %q without matching END marker", skillFactsBegin)
+			return "", fmt.Errorf("found %q without matching END marker", beginMarker)
 		}
-		end := begin + endRel + len(skillFactsEnd)
-		if strings.Contains(doc[end:], skillFactsBegin) {
-			return "", fmt.Errorf("multiple %q regions found; keep exactly one pair", skillFactsBegin)
+		end := begin + endRel + len(endMarker)
+		if strings.Contains(doc[end:], beginMarker) {
+			return "", fmt.Errorf("multiple %q regions found; keep exactly one pair", beginMarker)
 		}
 		// Swallow a single trailing newline so regeneration is idempotent.
 		if end < len(doc) && doc[end] == '\n' {
@@ -368,8 +375,10 @@ func spliceGeneratedRegion(doc, block string) (string, error) {
 		}
 		return doc[:begin] + block + doc[end:], nil
 	}
-	if at := strings.Index(doc, "\n## Composition"); at >= 0 {
-		return doc[:at+1] + block + "\n" + doc[at+1:], nil
+	if fallbackAnchor != "" {
+		if at := strings.Index(doc, fallbackAnchor); at >= 0 {
+			return doc[:at+1] + block + "\n" + doc[at+1:], nil
+		}
 	}
 	return strings.TrimRight(doc, "\n") + "\n\n" + block, nil
 }

@@ -156,6 +156,29 @@ func TestLoad_ContractGateStage(t *testing.T) {
 	}
 }
 
+func TestLoad_TriageCapGateStage(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	// Default (no env): enforce — the R9.2 capacity clamp is on by default
+	// (deterministic counter, replay-tested, correction-ladder-bounded).
+	if cfg, _ := Load(absent, map[string]string{}); cfg.TriageCapGate != StageEnforce {
+		t.Errorf("default TriageCapGate = %v, want StageEnforce", cfg.TriageCapGate)
+	}
+	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
+		if cfg, _ := Load(absent, map[string]string{"EVOLVE_TRIAGE_CAP_GATE": v}); cfg.TriageCapGate != want {
+			t.Errorf("EVOLVE_TRIAGE_CAP_GATE=%q → %v, want %v", v, cfg.TriageCapGate, want)
+		}
+	}
+	// A typo defaults to off (never silently keeps a kill-path) and warns.
+	cfg, ws := Load(absent, map[string]string{"EVOLVE_TRIAGE_CAP_GATE": "banana"})
+	if cfg.TriageCapGate != StageOff {
+		t.Errorf("typo EVOLVE_TRIAGE_CAP_GATE → %v, want StageOff", cfg.TriageCapGate)
+	}
+	if !hasWarning(ws, "unknown-value") {
+		t.Error("typo EVOLVE_TRIAGE_CAP_GATE should warn unknown-value")
+	}
+}
+
 func TestLoad_UnknownStageDefaultsSafe(t *testing.T) {
 	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
 		"EVOLVE_DYNAMIC_ROUTING": "banana",

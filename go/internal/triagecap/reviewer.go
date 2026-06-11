@@ -1,0 +1,98 @@
+package triagecap
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+)
+
+// reviewer.go — the R9.2 capacity clamp at the orchestrator's per-phase
+// deliverable-review seam (chained with the evalgate + contract gates via
+// core.ChainReviewers). A reject here enters the existing correction ladder:
+// triage is re-dispatched with the cap directive injected as a
+// "## Correction" block, so the agent re-shapes top_n instead of the cycle
+// burning on an overpacked commitment (inbox coverage-floor-overpacking —
+// cycles 280/282/283 all failed on floors the builder demonstrably cannot
+// clear in one turn).
+//
+// Posture (matches the contract gate):
+//   - Only the triage phase is in scope; everything else is approved.
+//   - Ambiguity (missing/unreadable artifact) → fail OPEN.
+//   - StageShadow → log-only.
+//   - StageEnforce → reject with an actionable cap directive. The ladder
+//     bounds retries, so a miscalibrated clamp costs corrections, not a
+//     bricked loop.
+
+// CapReviewer is the triage capacity clamp. Construct with NewReviewer;
+// tests override pkgsFn/windowFn/logf directly.
+type CapReviewer struct {
+	stage    config.Stage
+	logf     func(format string, args ...any)
+	pkgsFn   func(projectRoot string) []string
+	windowFn func(projectRoot string) []core.TriageThroughputEntry
+}
+
+// NewReviewer builds the capacity clamp for a stage. Callers wire it via
+// core.WithReviewer (chained after the eval + contract gates) only when
+// stage != StageOff.
+func NewReviewer(stage config.Stage) core.DeliverableReviewer {
+	return newCapReviewer(stage)
+}
+
+func newCapReviewer(stage config.Stage) *CapReviewer {
+	return &CapReviewer{
+		stage:    stage,
+		logf:     func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
+		pkgsFn:   KnownPackages,
+		windowFn: readWindow,
+	}
+}
+
+// readWindow loads the rolling throughput window from state.json. The read
+// does NOT acquire the project lock — safe because the orchestrator's own
+// lock prevents concurrent runs, and WriteState's atomic rename prevents
+// torn reads; we deliberately see the window as of the last completed
+// cycle. Any read failure yields an empty window — i.e. the cycle-281 seed.
+func readWindow(projectRoot string) []core.TriageThroughputEntry {
+	st, err := storage.New(filepath.Join(projectRoot, ".evolve")).ReadState(context.Background())
+	if err != nil {
+		return nil
+	}
+	return st.TriageThroughput
+}
+
+// Review adjudicates one finished triage deliverable against observed
+// builder throughput.
+func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewResult {
+	if r.stage == config.StageOff || in.Phase != string(core.PhaseTriage) {
+		return core.ReviewResult{Approve: true}
+	}
+	data, err := os.ReadFile(filepath.Join(in.Workspace, TriageArtifactName()))
+	if err != nil {
+		// Ambiguity / infra — fail OPEN (the contract gate owns presence checks).
+		r.logf("[triage-cap] ambiguity, failing open: %v", err)
+		return core.ReviewResult{Approve: true}
+	}
+	floors := CountCommittedFloors(string(data), r.pkgsFn(in.ProjectRoot))
+	window := r.windowFn(in.ProjectRoot)
+	k := K(window)
+	capacity := Cap(k)
+	if floors <= capacity {
+		return core.ReviewResult{Approve: true}
+	}
+
+	reason := fmt.Sprintf(
+		"triage overpacked: %d committed coverage floors exceed the capacity cap %d (= ceil(1.25×K), K=%d observed floors/turn over %d shipped cycles). Re-emit the triage report keeping at most %d coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.",
+		floors, capacity, k, len(window), capacity)
+	if r.stage != config.StageEnforce {
+		r.logf("[triage-cap] %s (stage=%s, would-block)", reason, r.stage)
+		return core.ReviewResult{Approve: true}
+	}
+	r.logf("[triage-cap] %s (stage=enforce, BLOCK)", reason)
+	return core.ReviewResult{Approve: false, Reason: reason}
+}
