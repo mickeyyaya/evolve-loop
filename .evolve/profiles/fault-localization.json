@@ -1,7 +1,7 @@
 {
   "name": "fault-localization",
   "role": "fault-localization",
-  "cli": "codex-tmux",
+  "cli": "agy-tmux",
   "cli_fallback": [
     "claude-tmux"
   ],
