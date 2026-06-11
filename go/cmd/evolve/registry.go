@@ -49,6 +49,7 @@ var commands = []subcommand{
 	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
 	{Name: "guard", Summary: "Run a trust-kernel guard", Run: runGuard},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
+	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: runPhases},

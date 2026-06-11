@@ -33,6 +33,7 @@ import (
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
@@ -56,7 +57,7 @@ func recoveryStageFromEnv(deps Deps) string {
 // or (zero, false) when the legacy flow decides (off stage, shadow stage,
 // busy pane, or no match). Shadow logs the would-be action to stderr so the
 // soak leaves an auditable trail without changing behavior.
-func fatalPaneVerdict(det *recovery.FatalPaneDetector, ev StopEvent, stage string, stderr io.Writer, pfx string) (ReviewVerdict, bool) {
+func fatalPaneVerdict(det *recovery.FatalPaneDetector, ev StopEvent, stage string, rec *interaction.Recorder, stderr io.Writer, pfx string) (ReviewVerdict, bool) {
 	// "" treated as "off": recoveryStageFromEnv never returns "" (unset →
 	// "shadow"), but a direct caller passing the zero value must not silently
 	// enable a kill-path. Same posture for a nil detector — Detect is
@@ -69,12 +70,34 @@ func fatalPaneVerdict(det *recovery.FatalPaneDetector, ev StopEvent, stage strin
 	if !ok || ev.Busy {
 		return ReviewVerdict{}, false
 	}
+	// R8.3: the match is recorded DURABLY beside the other I1 records —
+	// would_fast_fail at shadow, fast_failed at enforce — so the soak
+	// reporter has C2 evidence to read and the post-flip parity check can
+	// compare would vs did. stderr alone left the soak blind by construction.
+	// DELIBERATE exception to interaction.go's "record at every stage"
+	// principle: at off the DETECTOR itself is not consulted (the early
+	// return above), so there is no observation to record — recording would
+	// require enabling the very classification "off" exists to disable.
+	record := func(result string) {
+		if rec == nil {
+			return
+		}
+		rec.Record(interaction.Outcome{Event: interaction.Event{
+			Kind:    "fatal_pane_shadow",
+			Phase:   ev.Phase,
+			Cycle:   ev.Cycle,
+			Trigger: string(cause),
+			Payload: sig,
+		}, Result: result})
+	}
 	if stage == "enforce" {
+		record("fast_failed")
 		return ReviewVerdict{
 			Action: ReviewStop,
 			Reason: fmt.Sprintf("fatal pane state (%s): matched %q — fast-fail instead of burning the maxExtends backstop (ADR-0044 C2)", cause, sig),
 		}, true
 	}
+	record("would_fast_fail")
 	fmt.Fprintf(stderr, "%s stop-review shadow: would fast-fail — fatal pane state (%s) matched %q (EVOLVE_PHASE_RECOVERY=shadow; legacy verdict decides)\n", pfx, cause, sig)
 	return ReviewVerdict{}, false
 }
