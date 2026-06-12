@@ -126,6 +126,16 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	if err != nil {
 		return nil, "", fmt.Errorf("recipe: %w", err)
 	}
+	// CB.3: the recipe path bypasses the engine's CLIPreflight chokepoint, so
+	// codex-family sessions must pretrust their worktree/workspace here or the
+	// first boot in a fresh worktree renders the cycle-122 trust modal. Same
+	// best-effort semantics as the driver preflight (the boot auto-responder
+	// remains the downstream defense).
+	if strings.HasPrefix(cli, "codex") {
+		if err := pretrustCodexProjects(cfg); err != nil {
+			fmt.Fprintf(deps.Stderr, "[recipe] WARN codex pretrust: %v (continuing — best-effort)\n", err)
+		}
+	}
 	session, _ := resolveSession(cfg, deps, recipeSessionPrefix)
 	workingDir := cfg.Worktree
 	if workingDir == "" {
