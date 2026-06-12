@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,9 +16,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
+
+// errWorktreeRequired is the CB.2 typed refusal: under a fleet supervisor
+// (EVOLVE_FLEET=1) a launch with no explicit worktree must fail closed —
+// the cwd fallback would run the agent over another run's tree (or main).
+var errWorktreeRequired = errors.New("fleet mode: explicit worktree required (refusing process-cwd fallback)")
 
 // emitChannelBreadcrumb writes one structured channel marker to w. The producer's
 // correlator parses these to bracket an injected ask's answer span (ADR-0037).
@@ -134,7 +141,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	workingDir := cfg.Worktree
 	if workingDir == "" {
+		// CB.2: the cwd fallback launches the agent over WHATEVER directory
+		// the dispatching process sits in. Under a fleet supervisor that may
+		// be another run's tree — fail closed (typed, exit 10 is a non-trigger
+		// code: a config bug must surface, never CLI-fallback). Single mode
+		// keeps the fallback for operator ergonomics, but loudly.
+		if v, _ := lookupEnv(deps, "EVOLVE_FLEET"); envchain.BoolValue(v, false) {
+			return ExitBadFlags, fmt.Errorf("%s %w", pfx, errWorktreeRequired)
+		}
 		workingDir, _ = os.Getwd()
+		fmt.Fprintf(deps.Stderr, "%s WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", pfx, workingDir)
 	}
 	if !isDir(workingDir) {
 		fmt.Fprintf(deps.Stderr, "%s working dir does not exist: %s\n", pfx, workingDir)
@@ -211,7 +227,15 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
-		if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+		// CB.2: bind the pane cwd at session birth when the controller can
+		// (`tmux new-session -c`); the cd keystroke below stays as the second
+		// layer for capability-less controllers. (A RESUMED named session gets
+		// neither — it deliberately keeps whatever state it was left in.)
+		if ws, ok := deps.Tmux.(workdirSessionStarter); ok {
+			if err := ws.NewSessionIn(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight, workingDir); err != nil {
+				return ExitBadFlags, fmt.Errorf("%s new-session: %w", pfx, err)
+			}
+		} else if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 			return ExitBadFlags, fmt.Errorf("%s new-session: %w", pfx, err)
 		}
 		deps.Sleep(time.Second)

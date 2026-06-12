@@ -387,3 +387,32 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(b)
 }
+
+// TestRealTmux_NewSessionInBindsPaneCwd pins the CB.2 acceptance on a real
+// server: a session created via the workdirSessionStarter capability has its
+// pane cwd bound to the workdir at BIRTH (`tmux new-session -c`), before any
+// cd keystroke could run (or be swallowed).
+func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
+	requireTmux(t)
+	ctx := context.Background()
+	workdir := t.TempDir()
+	// macOS: /var/folders/... is a symlink target under /private — resolve like
+	// the shell will so the comparison is on canonical paths.
+	canonical, err := filepath.EvalSymlinks(workdir)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(%s): %v", workdir, err)
+	}
+	session := fmt.Sprintf("it-cb2-birthcwd-%d", os.Getpid())
+	if err := itTmuxCtl.NewSessionIn(ctx, session, 200, 50, workdir); err != nil {
+		t.Fatalf("NewSessionIn: %v", err)
+	}
+	t.Cleanup(func() { _ = itTmuxCtl.KillSession(ctx, session) })
+
+	out, err := exec.Command("tmux", "display-message", "-p", "-t", session, "#{pane_current_path}").Output()
+	if err != nil {
+		t.Fatalf("display-message: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != canonical {
+		t.Errorf("pane_current_path=%q, want %q — new-session -c did not bind the cwd at birth", got, canonical)
+	}
+}

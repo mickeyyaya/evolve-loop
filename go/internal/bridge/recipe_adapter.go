@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
 // recipe_adapter.go wires the recipe.Engine (pure, in internal/bridge/recipe)
@@ -64,7 +65,13 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 		fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
 		return nil
 	}
-	if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+	// CB.2: bind the pane cwd at session birth when the controller can; the
+	// cd keystroke stays as the second layer (capability-less controllers).
+	if ws, ok := d.deps.Tmux.(workdirSessionStarter); ok {
+		if err := ws.NewSessionIn(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight, d.workingDir); err != nil {
+			return fmt.Errorf("new-session: %w", err)
+		}
+	} else if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 		return fmt.Errorf("new-session: %w", err)
 	}
 	d.deps.Sleep(time.Second)
@@ -122,7 +129,13 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	session, _ := resolveSession(cfg, deps, recipeSessionPrefix)
 	workingDir := cfg.Worktree
 	if workingDir == "" {
+		// CB.2: same fail-closed contract as runTmuxREPL — the recipe path is
+		// a second launch surface with the identical silent-cwd hazard.
+		if v, _ := lookupEnv(deps, "EVOLVE_FLEET"); envchain.BoolValue(v, false) {
+			return nil, "", fmt.Errorf("recipe: %w", errWorktreeRequired)
+		}
 		workingDir, _ = os.Getwd()
+		fmt.Fprintf(deps.Stderr, "[recipe] WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", workingDir)
 	}
 	drv := &recipeSessionDriver{
 		cfg:        cfg,
