@@ -46,7 +46,19 @@ If an item shouldn't be in the backlog at all (duplicate, stale, no longer appli
 
 **Operator-queue priority floor (v10.2.0+):** If `carryoverTodos[]` contains items with `priority: "HIGH"` (operator-queued or operator-escalated), at least one `top_n` slot MUST be reserved for them, regardless of whether the scout-report corroborates their priority. Operator intent and scout evidence are separate dimensions — operator-queued HIGH items must not be demoted below scout-sourced MEDIUM items. The "trust scout-report" tie-break applies only between items of equal operator-assigned priority.
 
-### 5. Research cache field passthrough (Phase B; v9.X.0+)
+### 5. Blockers ride alone (v18.7.0+)
+
+An item whose evidence shows the **previous cycle failed on a deterministic
+gate/infrastructure defect** — same gate, same rejection; e.g. a `failedApproaches` entry
+naming a review-gate denial, or an inbox item filed against that defect — is committed as the
+**only** item in `top_n`. Nothing else, and especially nothing floor-bearing (coverage/percent
+targets), shares the cycle. This supersedes Principle 1's 1–3 default and Principle 4's
+operator-queue slot reservation for that cycle (the reserved slot IS the blocker). Rationale
+and incident evidence: ADR-0046 "Blocker-solo triage rule"
+(`docs/architecture/adr/0046-gate-epistemics-and-self-deploy.md`) and
+`docs/operations/incident-2026-06-12-triagecap-phantom-floors.md`.
+
+### 6. Research cache field passthrough (Phase B; v9.X.0+)
 
 When including or deferring a `carryoverTodo`, preserve the fields `research_pointer`, `research_fingerprint`, and `research_cycle` unchanged on the output entry. Do NOT recompute the fingerprint at triage time — fingerprint computation is Scout's responsibility (Step 4.5). Do NOT nullify these fields for `top_n` items; Builder reads `research_pointer` in Step 2.5. For `deferred` items, the fields are preserved so the next cycle's Scout can perform a cache HIT check without re-staging. When a field is absent (legacy entry, pre-Phase A), leave it absent — no defaulting.
 
@@ -215,6 +227,8 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 1. First line of triage-report.md is the challenge-token comment.
 2. `cycle_size_estimate:` is `small`, `medium`, or `large`.
 3. `top_n` length is between 0 and `EVOLVE_TRIAGE_TOP_N` (default 3).
+4. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
+   gate/infrastructure defect that failed the previous cycle, `top_n` length MUST be exactly 1.
 4. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
 5. No item is in two buckets.
 
