@@ -1,0 +1,73 @@
+# 2026/06/12 17:17:17.759989 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw n: 6
+# 2026/06/12 17:17:17.760086 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw marker-run-0: false
+# 2026/06/12 17:17:17.760090 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw age-run-0: 0
+# 2026/06/12 17:17:17.760103 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw lease-run-0: 2
+# 2026/06/12 17:17:17.760292 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw marker-run-1: false
+# 2026/06/12 17:17:17.760294 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw age-run-1: 2
+# 2026/06/12 17:17:17.760304 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw lease-run-1: 2
+# 2026/06/12 17:17:17.760488 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw marker-run-2: false
+# 2026/06/12 17:17:17.760489 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw age-run-2: 5
+# 2026/06/12 17:17:17.760505 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw lease-run-2: 2
+# 2026/06/12 17:17:17.760697 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw marker-run-3: true
+# 2026/06/12 17:17:17.760762 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw age-run-3: 0
+# 2026/06/12 17:17:17.760772 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw lease-run-3: 2
+# 2026/06/12 17:17:17.760916 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw current-run-3: false
+# 2026/06/12 17:17:17.760966 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw marker-run-4: true
+# 2026/06/12 17:17:17.761039 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw age-run-4: 26
+# 2026/06/12 17:17:17.761052 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw lease-run-4: 1
+# 2026/06/12 17:17:17.761217 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw current-run-4: false
+# 2026/06/12 17:17:17.761277 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw marker-run-5: true
+# 2026/06/12 17:17:17.761350 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw age-run-5: 4
+# 2026/06/12 17:17:17.761365 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw lease-run-5: 1
+# 2026/06/12 17:17:17.761529 [TestPlanNeverTouchesLiveDirs_Property] [rapid] draw current-run-5: true
+# 2026/06/12 17:17:17.762029 [TestPlanNeverTouchesLiveDirs_Property] INVARIANT BROKEN: live dir targeted: {Path:/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/gcfuzz1084074467/runs/run-4 Action:archive Rule:runs.archive_after_days} (live=/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/gcfuzz1084074467/runs/run-4)
+# 
+v0.4.8#16061234669770991506
+0xcae72bb1123c1
+0x1d61444e97293a
+0x5
+0x0
+0xb89812ed0a3c0
+0xccec6d4162553
+0x0
+0x16785b00ceb6b8
+0x154de72d96b82f
+0x2
+0x0
+0x1c4ebf4b354d15
+0x88205b8b5a93b
+0x2
+0xca0f3bfcd47c2
+0x10a44047095627
+0x2
+0x0
+0xbaf8ce4bd5cfe
+0xd81b252fa000d
+0x5
+0x1f284f7530c078
+0x113d080b741de8
+0x2
+0x1
+0x142d6b2b8f84d6
+0x16c40c5ff07d0
+0x0
+0xa51992b2d66ab
+0xa67f79964507b
+0x2
+0x0
+0x1
+0x1f2bd2b89914df
+0xf71bfa60e8941
+0x1a
+0x19a0d4d46a27ca
+0x1c215c5d922c65
+0x1
+0x0
+0x1
+0xcedeec730bd7d
+0xa3a2fe2050c56
+0x4
+0x17cb423d7de960
+0x14644375f4bb81
+0x1
+0x1

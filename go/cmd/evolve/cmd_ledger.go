@@ -12,16 +12,22 @@ import (
 
 // runLedger implements `evolve ledger <subcommand>`. Subcommands:
 //
-//	verify [--evolve-dir DIR]            walk the chain; exit 2 on break
+//	verify [--evolve-dir DIR] [--deep]   walk the chain; exit 2 on break
+//	                                     (--deep reconstructs sealed
+//	                                     segments + live tail, L3.3)
+//	seal   [--evolve-dir DIR] [--keep N] move all but the newest N lines
+//	                                     into ledger-segments/*.jsonl.gz
 //	tail   [--evolve-dir DIR] [--n N]    print the last N entries as JSONL
 func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve ledger: missing subcommand (try: verify | tail)")
+		fmt.Fprintln(stderr, "evolve ledger: missing subcommand (try: verify | seal | tail)")
 		return 10
 	}
 	switch args[0] {
 	case "verify":
 		return runLedgerVerify(args[1:], stderr)
+	case "seal":
+		return runLedgerSeal(args[1:], stderr)
 	case "tail":
 		return runLedgerTail(args[1:], stdout, stderr)
 	default:
@@ -34,16 +40,47 @@ func runLedgerVerify(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve ledger verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var evolveDir string
+	var deep bool
 	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.BoolVar(&deep, "deep", false, "reconstruct sealed segments + live tail and verify end-to-end")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
 	l := ledger.New(evolveDir)
-	if err := l.Verify(context.Background()); err != nil {
+	verify, scope := l.Verify, "chain intact"
+	if deep {
+		verify, scope = l.VerifyDeep, "chain intact incl. sealed segments"
+	}
+	if err := verify(context.Background()); err != nil {
 		fmt.Fprintf(stderr, "[ledger] BROKEN: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(stderr, "[ledger] OK: chain intact (%s/ledger.jsonl)\n", evolveDir)
+	fmt.Fprintf(stderr, "[ledger] OK: %s (%s/ledger.jsonl)\n", scope, evolveDir)
+	return 0
+}
+
+func runLedgerSeal(args []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve ledger seal", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var evolveDir string
+	var keep int
+	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.IntVar(&keep, "keep", 500, "live-tail lines to keep unsealed (min 1)")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	l := ledger.New(evolveDir)
+	if err := l.Seal(context.Background(), keep); err != nil {
+		fmt.Fprintf(stderr, "[ledger] seal failed: %v\n", err)
+		return 1
+	}
+	// Always leave with a deep-verified chain — a seal that cannot verify
+	// must surface immediately, not at the next audit.
+	if err := l.VerifyDeep(context.Background()); err != nil {
+		fmt.Fprintf(stderr, "[ledger] seal completed but deep verify FAILED: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(stderr, "[ledger] OK: sealed (keep=%d) and deep-verified (%s)\n", keep, evolveDir)
 	return 0
 }
 

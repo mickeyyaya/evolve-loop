@@ -10,8 +10,9 @@
 // (allowed_clis + model_tier_envelope) so policy cannot silently breach the
 // trust-kernel constraints.
 //
-// Layering: imports profiles + stdlib only, so the dispatch resolver (llmroute)
-// and the advisor can consult it without a heavy dependency. The tier/CLI
+// Layering: imports profiles + the stdlib-only gc leaf (for the gc schema),
+// so the dispatch resolver (llmroute) and the advisor can consult it without
+// a heavy dependency. The tier/CLI
 // vocabulary helpers below mirror setup.go's canonical versions (the same
 // accepted "mirror of" pattern llmroute uses for bridge exit codes); a future
 // refactor could extract a shared modeltier vocab package to de-duplicate.
@@ -24,6 +25,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -57,6 +59,12 @@ type Policy struct {
 	// artifacts on every abnormal termination) is NON-configurable, like
 	// the integrity floor.
 	FailureFloor *FailureFloor `json:"failure_floor,omitempty"`
+	// GC is the declarative retention policy for the .evolve data tree
+	// (L3.1). The schema lives in internal/gc (a stdlib-only leaf this
+	// package may import without weight); absent ⇒ gc defaults. The hard
+	// rules — quarantine manual-only, ledger never touched, live runs never
+	// touched — are NOT configurable here, by design.
+	GC *gc.Policy `json:"gc,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
