@@ -1,9 +1,27 @@
 package sessionrecord
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 )
+
+type failingAppendFile struct {
+	writeErr error
+	closeErr error
+}
+
+func (f failingAppendFile) Write([]byte) (int, error) {
+	if f.writeErr != nil {
+		return 0, f.writeErr
+	}
+	return 1, nil
+}
+
+func (f failingAppendFile) Close() error {
+	return f.closeErr
+}
 
 func TestAppendReadRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -52,5 +70,74 @@ func TestReadAllSkipsMalformedLines(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Session != "evolve-bridge-rAAAA0000-c1-tdd-pid9-7" {
 		t.Errorf("ReadAll=%+v, want exactly the well-formed record", got)
+	}
+}
+
+func TestRunScopeToken(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		runID string
+		want  string
+	}{
+		{name: "empty", runID: "", want: "r"},
+		{name: "short", runID: "ABC", want: "rABC"},
+		{name: "exactly eight", runID: "ABCDEFGH", want: "rABCDEFGH"},
+		{name: "truncates long run id", runID: "ABCDEFGH1234", want: "rABCDEFGH"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := RunScopeToken(tt.runID); got != tt.want {
+				t.Fatalf("RunScopeToken(%q) = %q, want %q", tt.runID, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAppendOpenError(t *testing.T) {
+	t.Parallel()
+	base := t.TempDir()
+	notDir := filepath.Join(base, "not-dir")
+	if err := os.WriteFile(notDir, []byte("file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Append(filepath.Join(notDir, FileName), Record{Session: "s"}); err == nil {
+		t.Fatal("Append must fail when the registry parent is not a directory")
+	}
+}
+
+func TestReadAllOpenError(t *testing.T) {
+	t.Parallel()
+	base := t.TempDir()
+	notDir := filepath.Join(base, "not-dir")
+	if err := os.WriteFile(notDir, []byte("file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadAll(filepath.Join(notDir, FileName)); err == nil {
+		t.Fatal("ReadAll must fail when the registry parent is not a directory")
+	}
+}
+
+func TestAppendWriteError(t *testing.T) {
+	old := openAppendFileFn
+	t.Cleanup(func() { openAppendFileFn = old })
+	openAppendFileFn = func(path string) (appendFile, error) {
+		return failingAppendFile{writeErr: errors.New("write failed")}, nil
+	}
+	if err := Append(PathIn(t.TempDir()), Record{Session: "s"}); err == nil {
+		t.Fatal("Append must surface write errors")
+	}
+}
+
+func TestAppendCloseError(t *testing.T) {
+	old := openAppendFileFn
+	t.Cleanup(func() { openAppendFileFn = old })
+	openAppendFileFn = func(path string) (appendFile, error) {
+		return failingAppendFile{closeErr: errors.New("close failed")}, nil
+	}
+	if err := Append(PathIn(t.TempDir()), Record{Session: "s"}); err == nil {
+		t.Fatal("Append must surface close errors")
 	}
 }

@@ -21,6 +21,15 @@ import (
 	"path/filepath"
 )
 
+type appendFile interface {
+	Write([]byte) (int, error)
+	Close() error
+}
+
+var openAppendFileFn = func(path string) (appendFile, error) {
+	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+}
+
 // FileName is the registry's name inside a run workspace.
 const FileName = "tmux-sessions.jsonl"
 
@@ -64,7 +73,7 @@ func Append(path string, r Record) error {
 	if err != nil {
 		return fmt.Errorf("sessionrecord: marshal: %w", err)
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := openAppendFileFn(path)
 	if err != nil {
 		return fmt.Errorf("sessionrecord: open: %w", err)
 	}

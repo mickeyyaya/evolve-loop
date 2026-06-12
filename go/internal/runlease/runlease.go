@@ -29,6 +29,19 @@ import (
 	"time"
 )
 
+type tempFile interface {
+	Name() string
+	Write([]byte) (int, error)
+	Close() error
+}
+
+var (
+	createTempFn = func(dir, pattern string) (tempFile, error) {
+		return os.CreateTemp(dir, pattern)
+	}
+	renameFn = os.Rename
+)
+
 // FileName is the lease file's name inside a run directory.
 const FileName = ".lease"
 
@@ -61,7 +74,7 @@ func Write(runDir string, l Lease, now time.Time) error {
 	if err != nil {
 		return fmt.Errorf("runlease: marshal: %w", err)
 	}
-	tmp, err := os.CreateTemp(runDir, FileName+".*.tmp")
+	tmp, err := createTempFn(runDir, FileName+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("runlease: tmp: %w", err)
 	}
@@ -75,7 +88,7 @@ func Write(runDir string, l Lease, now time.Time) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("runlease: close: %w", err)
 	}
-	if err := os.Rename(tmpPath, PathIn(runDir)); err != nil {
+	if err := renameFn(tmpPath, PathIn(runDir)); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("runlease: rename: %w", err)
 	}
