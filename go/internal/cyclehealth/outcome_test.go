@@ -8,8 +8,10 @@
 // Precedence (first match wins): SHIPPED (ship verdict PASS) → SALVAGED
 // (no ship, but a correction-ladder salvage produced the artifact) →
 // FAILED_EXPLAINED (an abort_reason was recorded — the C1 chokepoint
-// guarantees abort paths record one) → FAILED_UNEXPLAINED (phases ran,
-// nothing explains the ending — the bucket that pages someone).
+// guarantees abort paths record one) → FAILED_EXPLAINED (a phase recorded
+// verdict FAIL with no abort — the audit-FAIL completion terminal,
+// cycle-306) → FAILED_UNEXPLAINED (phases ran, nothing explains the
+// ending — the bucket that pages someone).
 package cyclehealth
 
 import (
@@ -75,6 +77,35 @@ func TestClassifyOutcome(t *testing.T) {
 				"by_result":      map[string]int{"artifact_appeared": 1},
 			},
 			want: OutcomeSalvaged,
+		},
+		{
+			// cycle-306 shape (soak #3, 2026-06-13): the audit-FAIL → retro →
+			// normal-completion terminal records the FAIL verdict but NO
+			// abort_reason — it is a completion, not an abort, so the C1
+			// chokepoint never fires. A recorded FAIL verdict IS the
+			// explanation; this must not page anyone as UNEXPLAINED
+			// (auto-filed defect auto-unexplained-outcome-cycle-306).
+			name: "failed_explained_via_fail_verdict_without_abort",
+			timing: []timingFixture{
+				{Phase: "build", Verdict: "PASS"},
+				{Phase: "audit", Verdict: "FAIL"},
+				{Phase: "retro", Verdict: "FAIL"},
+			},
+			want:    OutcomeFailedExplained,
+			wantSub: "audit",
+		},
+		{
+			// Ordering invariant: an explicit abort_reason ANYWHERE in the
+			// timing log outranks a prior FAIL verdict — the abort is the
+			// more specific cause and must win even when an earlier phase
+			// failed first. Pins the loop order in ClassifyOutcome.
+			name: "abort_reason_beats_prior_fail_verdict",
+			timing: []timingFixture{
+				{Phase: "mutation-gate", Verdict: "FAIL"},
+				{Phase: "audit", Verdict: "FAIL", AbortReason: "observer killed mid-audit"},
+			},
+			want:    OutcomeFailedExplained,
+			wantSub: "observer killed",
 		},
 		{
 			// The alarm bucket: phases ran, nothing explains the ending.

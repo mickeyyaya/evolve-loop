@@ -88,5 +88,17 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 		}
 	}
 
+	// FAILED_EXPLAINED: a phase recorded verdict FAIL. The audit-FAIL →
+	// retro → end terminal is a normal COMPLETION, not an abort — the C1
+	// chokepoint never fires and no abort_reason exists — but the recorded
+	// verdict is the explanation (cycle-306, soak #3: a legitimate audit
+	// FAIL paged as UNEXPLAINED). Scanned in timing order so the detail
+	// names the first failing phase, which is the causal one.
+	for _, e := range timing {
+		if e.Verdict == "FAIL" {
+			return OutcomeFailedExplained, fmt.Sprintf("phase %s recorded verdict FAIL (no abort — cycle completed through its failure path)", e.Phase)
+		}
+	}
+
 	return OutcomeFailedUnexplained, "no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint"
 }
