@@ -2,6 +2,7 @@ package looppreflight
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -40,4 +41,18 @@ func TestDefaultTmuxSessions(t *testing.T) {
 		return
 	}
 	_ = sessions // success path: sessions may be nil or non-nil
+}
+
+func TestDefaultDiskFreeBytes(t *testing.T) {
+	free, err := defaultDiskFreeBytes(t.TempDir())
+	if err != nil {
+		t.Fatalf("defaultDiskFreeBytes on temp dir: %v", err)
+	}
+	if free == 0 {
+		t.Fatal("expected positive free bytes for temp dir")
+	}
+
+	if _, err := defaultDiskFreeBytes(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("defaultDiskFreeBytes on missing path must return an error")
+	}
 }

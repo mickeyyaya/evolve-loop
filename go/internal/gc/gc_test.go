@@ -76,6 +76,36 @@ func TestPlan_KeepFullProtectsNewestRegardlessOfAge(t *testing.T) {
 	}
 }
 
+func TestPlan_RequiresAbsoluteEvolveDir(t *testing.T) {
+	for _, evolveDir := range []string{"", "relative/path"} {
+		_, err := Plan(Options{EvolveDir: evolveDir})
+		if err == nil || !strings.Contains(err.Error(), "must be absolute") {
+			t.Fatalf("Plan(%q) error = %v, want absolute-path rejection", evolveDir, err)
+		}
+	}
+}
+
+func TestPlan_NilNowUsesWallClock(t *testing.T) {
+	dir := t.TempDir()
+	newest := mkRun(t, dir, "cycle-new", time.Now().Add(-time.Hour))
+	stale := mkRun(t, dir, "cycle-stale", time.Now().Add(-48*time.Hour))
+	m, err := Plan(Options{
+		EvolveDir: dir,
+		Policy:    Policy{Runs: RunsPolicy{KeepFull: 1, DeleteAfterDays: 1}},
+		Runs:      []RunDir{stale, newest},
+	})
+	if err != nil {
+		t.Fatalf("Plan with nil Now: %v", err)
+	}
+	items := planItems(t, m)
+	if it := items[stale.Path]; it.Action != ActionDelete {
+		t.Fatalf("nil Now must fall back to wall clock and delete stale run, got %+v", it)
+	}
+	if _, ok := items[newest.Path]; ok {
+		t.Fatalf("newest run inside keep_full window must be kept")
+	}
+}
+
 func TestPlan_ArchiveThenDeleteLadder(t *testing.T) {
 	dir := t.TempDir()
 	old := mkRun(t, dir, "cycle-10", daysAgo(90))    // beyond delete_after=60
@@ -406,6 +436,26 @@ func TestApply_ArchiveCollisionUsesNumericSuffix(t *testing.T) {
 func TestDirEntriesOlderThan_MissingDirIsEmpty(t *testing.T) {
 	if got := dirEntriesOlderThan(filepath.Join(t.TempDir(), "missing"), nowT0(), 1, nil); len(got) != 0 {
 		t.Fatalf("missing dir must yield no entries, got %v", got)
+	}
+}
+
+func TestDirEntriesOlderThan_FilterRejectsEntry(t *testing.T) {
+	dir := t.TempDir()
+	oldLog := filepath.Join(dir, "old.log")
+	oldJSON := filepath.Join(dir, "old.json")
+	for _, p := range []string{oldLog, oldJSON} {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, daysAgo(10), daysAgo(10)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := dirEntriesOlderThan(dir, nowT0(), 1, func(name string, isDir bool) bool {
+		return !isDir && strings.HasSuffix(name, ".log")
+	})
+	if len(got) != 1 || got[0] != oldLog {
+		t.Fatalf("filter must reject non-log entries; got %v", got)
 	}
 }
 

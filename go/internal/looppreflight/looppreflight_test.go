@@ -1,10 +1,14 @@
 package looppreflight
 
 import (
+	"context"
+	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -96,6 +100,50 @@ func TestRun_PipelineStructure_MissingContract_Halts(t *testing.T) {
 	}
 }
 
+func TestRun_PipelineStructure_MissingFactory_Halts(t *testing.T) {
+	opts := goodPipelineOptions(t)
+	opts.FactoryKnown = func(name string) bool { return name != "build" }
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run returned harness error: %v", err)
+	}
+	if !r.Halted() {
+		t.Fatalf("expected halt for missing factory, got %s", r.OverallLevel)
+	}
+	c := findCheck(t, r, "pipeline-structure")
+	if c.Level != LevelHalt || !strings.Contains(c.Detail, "no registered factory") {
+		t.Fatalf("missing factory should halt with detail, got %s (%q)", c.Level, c.Detail)
+	}
+}
+
+func TestRun_PipelineStructure_ProfileListError_Halts(t *testing.T) {
+	opts := goodPipelineOptions(t)
+	opts.ProfileLister = func() ([]string, error) { return nil, errors.New("list boom") }
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run returned harness error: %v", err)
+	}
+	c := findCheck(t, r, "pipeline-structure")
+	if c.Level != LevelHalt || !strings.Contains(c.Detail, "list boom") {
+		t.Fatalf("profile list error should halt with detail, got %s (%q)", c.Level, c.Detail)
+	}
+}
+
+func TestRun_PipelineStructure_ProfileGetError_Halts(t *testing.T) {
+	opts := goodPipelineOptions(t)
+	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
+		return profiles.Profile{}, errors.New("get boom")
+	}
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run returned harness error: %v", err)
+	}
+	c := findCheck(t, r, "pipeline-structure")
+	if c.Level != LevelHalt || !strings.Contains(c.Detail, "get boom") {
+		t.Fatalf("profile get error should halt with detail, got %s (%q)", c.Level, c.Detail)
+	}
+}
+
 func TestRun_PipelineStructure_UnknownCLI_Halts(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
@@ -142,6 +190,20 @@ func TestRun_EmptyProjectRoot_IsHarnessError(t *testing.T) {
 	opts.ProjectRoot = ""
 	if _, err := Run(opts); err == nil {
 		t.Fatalf("expected a harness error for empty ProjectRoot, got nil")
+	}
+}
+
+func TestCheckLevel_StringUnknown(t *testing.T) {
+	if got := CheckLevel(99).String(); got != "unknown" {
+		t.Fatalf("out-of-range level string = %q, want unknown", got)
+	}
+}
+
+func TestNewDefaultBootTester_InvalidDriverReturnsBadFlags(t *testing.T) {
+	tester := newDefaultBootTester(t.TempDir(), io.Discard)
+	rc, scrollback := tester(context.Background(), "not-a-real-driver", true)
+	if rc != bridge.ExitBadFlags {
+		t.Fatalf("invalid driver rc = %d, want ExitBadFlags; scrollback=%q", rc, scrollback)
 	}
 }
 

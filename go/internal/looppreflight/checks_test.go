@@ -152,6 +152,21 @@ func TestRun_HostCapabilities_SandboxWantedButUnavailable_Warns(t *testing.T) {
 	}
 }
 
+func TestRun_HostCapabilities_NoSandboxProfiles_Passes(t *testing.T) {
+	opts := goodPipelineOptions(t)
+	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
+		return profiles.Profile{Name: name, CLI: "claude-tmux"}, nil
+	}
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	c := findCheck(t, r, "host-capabilities")
+	if c.Level != LevelPass || strings.Contains(strings.ToLower(c.Detail), "sandbox") {
+		t.Fatalf("profiles without sandbox should not warn, got %s (%q)", c.Level, c.Detail)
+	}
+}
+
 func TestRun_HostCapabilities_StaleBridgeSessions_Warns(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.TmuxSessions = func() ([]string, error) {

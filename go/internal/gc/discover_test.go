@@ -131,6 +131,27 @@ func TestDiscover_ReadRunsDirError(t *testing.T) {
 	}
 }
 
+func TestDiscover_MissingRunsDirYieldsEmpty(t *testing.T) {
+	got, err := Discover(t.TempDir(), DiscoverOptions{Now: nowT0})
+	if err != nil {
+		t.Fatalf("Discover with missing runs dir: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("missing runs dir must yield nil discovery, got %+v", got)
+	}
+}
+
+func TestDiscover_FailsClosedOnUnreadableRunStateFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "runs", "cycle-1", "run.json"), `{"cycle_id":1}`)
+	if err := os.Mkdir(filepath.Join(dir, "cycle-state.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Discover(dir, DiscoverOptions{Now: nowT0}); err == nil {
+		t.Fatal("unreadable cycle-state.json path must fail discovery closed")
+	}
+}
+
 func TestDiscover_TerminalRunStateIsIdle(t *testing.T) {
 	dir := t.TempDir()
 	run := filepath.Join(dir, "runs", "cycle-1")
