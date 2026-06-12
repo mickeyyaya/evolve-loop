@@ -8,7 +8,8 @@
     "Grep",
     "Glob",
     "Write",
-    "Bash"
+    "Bash",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit(.evolve/state.json)",

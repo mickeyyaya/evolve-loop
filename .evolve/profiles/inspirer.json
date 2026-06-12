@@ -17,6 +17,7 @@
     "Bash(head:*)",
     "Bash(wc:*)",
     "Bash(find .evolve:*)",
+    "Bash(evolve phase verify:*)",
     "Write(.evolve/runs/cycle-*/inspirer-output.md)",
     "Write(.evolve/runs/cycle-*/inspirer-stdout.log)",
     "Edit(.evolve/runs/cycle-*/inspirer-output.md)"

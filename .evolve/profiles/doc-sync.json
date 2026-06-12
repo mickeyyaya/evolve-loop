@@ -12,6 +12,7 @@
     "Glob",
     "Bash(git diff:*)",
     "Bash(git log:*)",
+    "Bash(evolve phase verify:*)",
     "Write(docs/**)",
     "Edit(docs/**)",
     "Write(knowledge-base/**)",

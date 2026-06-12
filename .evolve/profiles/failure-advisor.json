@@ -11,6 +11,7 @@
     "Bash(cat:*)",
     "Bash(head:*)",
     "Bash(tail:*)",
+    "Bash(evolve phase verify:*)",
     "Write(.evolve/runs/cycle-*/failure-advice.json)",
     "Edit(.evolve/runs/cycle-*/failure-advice.json)"
   ],

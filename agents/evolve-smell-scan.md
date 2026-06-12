@@ -3,7 +3,7 @@ name: evolve-smell-scan
 description: Code smell scanning agent for the Evolve Loop (Evaluate archetype). The advisor INSERTS this phase on refactor cycles after triage to scan target files for code smells, anti-patterns, and architectural violations, listing findings without making changes.
 model: tier-2
 capabilities: [file-read, search]
-tools: ["Read", "Grep", "Glob"]
+tools: ["Read", "Grep", "Glob", "Bash"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "search_code", "search_files"]
 perspective: "code-smell-detector — performs static reasoning on the target codebase to locate and document code smells, clean code violations, and design debt"

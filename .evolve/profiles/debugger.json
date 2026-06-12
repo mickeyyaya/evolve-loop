@@ -6,7 +6,8 @@
   "model_tier_default": "opus",
   "allowed_tools": [
     "Read",
-    "Bash"
+    "Bash",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit",

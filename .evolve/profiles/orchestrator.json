@@ -77,7 +77,8 @@
     "Edit(.evolve/runs/cycle-*/orchestrator-report.md)",
     "Edit(.evolve/runs/cycle-*/handoff-orchestrator.json)",
     "Bash(run-acs-suite.sh:*)",
-    "Bash(promote-acs-to-regression.sh:*)"
+    "Bash(promote-acs-to-regression.sh:*)",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Agent",

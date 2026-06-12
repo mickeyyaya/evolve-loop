@@ -10,7 +10,8 @@
     "Read",
     "Grep",
     "Glob",
-    "Bash"
+    "Bash",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit",

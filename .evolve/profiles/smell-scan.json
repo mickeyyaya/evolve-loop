@@ -9,7 +9,8 @@
   "allowed_tools": [
     "Read",
     "Grep",
-    "Glob"
+    "Glob",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit",

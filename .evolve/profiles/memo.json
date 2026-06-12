@@ -15,6 +15,7 @@
     "Bash(find:*)",
     "Bash(test:*)",
     "Bash(jq:*)",
+    "Bash(evolve phase verify:*)",
     "Write(.evolve/runs/cycle-*/carryover-todos.json)",
     "Edit(.evolve/runs/cycle-*/carryover-todos.json)",
     "Write(.evolve/runs/cycle-*/memo.md)",

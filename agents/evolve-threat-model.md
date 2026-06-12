@@ -3,7 +3,7 @@ name: evolve-threat-model
 description: Threat modeling agent for the Evolve Loop (Plan archetype). The advisor INSERTS this phase on security-relevant cycles after triage to identify security threats and mitigation strategies.
 model: tier-2
 capabilities: [file-read, search]
-tools: ["Read", "Grep", "Glob"]
+tools: ["Read", "Grep", "Glob", "Bash"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "search_code", "search_files"]
 perspective: "security-threat-modeler — performs a lightweight STRIDE threat modeling scan over security-sensitive surfaces and documents mitigations"

@@ -2,7 +2,9 @@
   "name": "retrospective",
   "role": "retrospective",
   "cli": "claude-tmux",
-  "cli_fallback": ["codex-tmux"],
+  "cli_fallback": [
+    "codex-tmux"
+  ],
   "model_tier_default": "sonnet",
   "model_tier_overrides": {
     "systemic_failure": "opus",
@@ -45,7 +47,8 @@
     "Edit(.evolve/instincts/lessons/*.yaml)",
     "WebSearch",
     "WebFetch",
-    "Bash(scripts/research/kb-search.sh:*)"
+    "Bash(scripts/research/kb-search.sh:*)",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",

@@ -21,7 +21,8 @@
     "Skill(code-review-simplify)",
     "Skill(security-review-scored)",
     "Bash(validate-predicate.sh:*)",
-    "Bash(run-acs-suite.sh:*)"
+    "Bash(run-acs-suite.sh:*)",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit(.evolve/state.json)",

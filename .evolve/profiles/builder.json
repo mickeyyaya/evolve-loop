@@ -25,7 +25,8 @@
     "Skill(security-review-scored)",
     "WebSearch",
     "WebFetch",
-    "Bash(scripts/research/kb-search.sh:*)"
+    "Bash(scripts/research/kb-search.sh:*)",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit(.evolve/state.json)",

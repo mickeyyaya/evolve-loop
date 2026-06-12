@@ -3,7 +3,7 @@ name: evolve-spec-verify
 description: Spec verifier for the Evolve Loop (Plan archetype). The advisor inserts this phase between scout and tdd to verify the selected task's specification is consistent, complete, and grounded before any test or source work begins. Reads scout-report.md; never writes source.
 model: tier-2
 capabilities: [file-read, search]
-tools: ["Read", "Grep", "Glob"]
+tools: ["Read", "Grep", "Glob", "Bash"]
 ---
 
 # Spec Verify

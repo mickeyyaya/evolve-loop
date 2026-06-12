@@ -20,6 +20,7 @@
     "Bash(find .evolve/evals:*)",
     "Bash(test:*)",
     "Bash(bash scripts/eval-quality-check.sh:*)",
+    "Bash(evolve phase verify:*)",
     "Write(.evolve/runs/cycle-*/evaluator-output.md)",
     "Write(.evolve/runs/cycle-*/evaluator-stdout.log)",
     "Edit(.evolve/runs/cycle-*/evaluator-output.md)"

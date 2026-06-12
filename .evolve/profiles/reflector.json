@@ -20,6 +20,7 @@
     "Bash(awk:*)",
     "Bash(sed:*)",
     "Bash(scripts/observability/aggregate-reflections.sh:*)",
+    "Bash(evolve phase verify:*)",
     "Write(.evolve/runs/cycle-*/learn/reflector-synthesis.md)",
     "Edit(.evolve/runs/cycle-*/learn/reflector-synthesis.md)",
     "Write(.evolve/runs/cycle-*/learn/.gitkeep)"

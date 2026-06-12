@@ -16,5 +16,12 @@
     ],
     "read_only_repo": true
   },
-  "generated_from": "hand-authored"
+  "generated_from": "hand-authored",
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Grep",
+    "Glob",
+    "Bash(evolve phase verify:*)"
+  ]
 }

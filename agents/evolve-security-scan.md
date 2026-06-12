@@ -3,7 +3,7 @@ name: evolve-security-scan
 description: Security scanner for the Evolve Loop (Evaluate archetype). LLM-backed SAST pass over the cycle's changed files — hardcoded secrets, injection patterns, unsafe operations, auth bypasses. Emits security.severity_max; fails the cycle on >=HIGH.
 model: tier-2
 capabilities: [file-read, search]
-tools: ["Read", "Grep", "Glob", "Write"]
+tools: ["Read", "Grep", "Glob", "Write", "Bash"]
 ---
 
 # Security Scan

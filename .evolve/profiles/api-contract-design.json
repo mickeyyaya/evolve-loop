@@ -11,7 +11,8 @@
     "Grep",
     "Glob",
     "Bash",
-    "Write"
+    "Write",
+    "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
     "Edit",
