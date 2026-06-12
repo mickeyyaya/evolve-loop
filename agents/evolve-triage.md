@@ -93,7 +93,7 @@ For each `.evolve/inbox/*.json` (maxdepth 1):
    cycle may be processing it). If claim succeeds, proceed to Step 0 validation.
 
 Emit machine-readable arrays in the companion `triage-decision.json` (see Step 4):
-`skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`.
+`skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]`.
 
 ### 0. Inbox ingestion (v9.5.0+)
 
@@ -211,6 +211,7 @@ phase_skip: []
 {
   "cycle": <N>,
   "top_n": [{"id": "<task_id>", "action": "..."}, ...],
+  "committed_floors": ["<package_floor_committed_in_top_n>", ...],
   "deferred": [{"id": "<task_id>"}],
   "dropped": [{"id": "<task_id>", "reason": "..."}],
   "skip_shipped": [{"task_id": "<id>", "git_sha": "<sha>"}],
@@ -219,6 +220,11 @@ phase_skip: []
   "phase_skip": []
 }
 ```
+
+`committed_floors[]` is the declaration-primary source for the triage capacity
+clamp. Include each package whose coverage/floor target is actually committed
+in `## top_n`; emit `[]` when top_n has no coverage/floor commitment. Do not
+include packages that are only mentioned in `## deferred` or `## dropped`.
 
 The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (key, colon, value, newline). The phase-gate fails on `large`.
 

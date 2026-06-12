@@ -78,7 +78,9 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 		r.logf("[triage-cap] ambiguity, failing open: %v", err)
 		return core.ReviewResult{Approve: true}
 	}
-	floors := CountCommittedFloors(string(data), r.pkgsFn(in.ProjectRoot))
+	pkgs := r.pkgsFn(in.ProjectRoot)
+	companionPath := filepath.Join(in.Workspace, TriageDecisionName())
+	floors := CommittedFloorCount(string(data), companionPath, pkgs)
 	window := r.windowFn(in.ProjectRoot)
 	k := K(window)
 	capacity := Cap(k)
@@ -86,9 +88,13 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 		return core.ReviewResult{Approve: true}
 	}
 
+	corrective := FloorDivergenceCorrective(string(data), companionPath, pkgs)
 	reason := fmt.Sprintf(
 		"triage overpacked: %d committed coverage floors exceed the capacity cap %d (= ceil(1.25×K), K=%d observed floors/turn over %d shipped cycles). Re-emit the triage report keeping at most %d coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.",
 		floors, capacity, k, len(window), capacity)
+	if corrective != "" {
+		reason += " " + corrective
+	}
 	if r.stage != config.StageEnforce {
 		r.logf("[triage-cap] %s (stage=%s, would-block)", reason, r.stage)
 		return core.ReviewResult{Approve: true}

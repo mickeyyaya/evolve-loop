@@ -31,7 +31,11 @@ func Recorder(projectRoot string) func(state *core.State, cycle int, workspacePa
 		if err != nil {
 			return
 		}
-		floors := CountCommittedFloors(string(data), KnownPackages(projectRoot))
+		floors := CommittedFloorCount(
+			string(data),
+			filepath.Join(workspacePath, TriageDecisionName()),
+			KnownPackages(projectRoot),
+		)
 		state.TriageThroughput = Record(state.TriageThroughput, cycle, floors)
 	}
 }

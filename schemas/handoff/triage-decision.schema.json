@@ -46,5 +46,13 @@
       "fail_message": "size value (small|medium|large|XS|S|M|L|XL) not found — Triage must declare cycle size to satisfy gate_triage_to_plan_review"
     }
   ],
+  "json_companion_fields": [
+    {
+      "name": "committed_floors",
+      "type": "array<string>",
+      "required": false,
+      "description": "Agent-owned package floor declarations for top_n; internal/triagecap treats this as the primary committed floor count when present."
+    }
+  ],
   "min_words": 50
 }

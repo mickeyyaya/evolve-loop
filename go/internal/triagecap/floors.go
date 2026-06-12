@@ -13,6 +13,8 @@
 package triagecap
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -38,6 +40,10 @@ var topNHeadingRE = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(phasecontract.
 
 // nextHeadingRE finds the next "## " section heading (section terminator).
 var nextHeadingRE = regexp.MustCompile(`(?m)^## `)
+
+// TriageDecisionName is the companion handoff file emitted beside the triage
+// artifact. It carries agent-owned declarations that are safer than prose.
+func TriageDecisionName() string { return "triage-decision.json" }
 
 // listItemRE captures one Markdown list-item line's text.
 var listItemRE = regexp.MustCompile(`(?m)^[-*]\s+(\S.*)$`)
@@ -74,6 +80,94 @@ func CountCommittedFloors(artifact string, knownPkgs []string) int {
 		total += n
 	}
 	return total
+}
+
+// ReadDeclaredFloors reads committed_floors from a triage-decision.json
+// companion. Missing files or missing fields are not errors: callers should
+// fall back to the prose counter for backward compatibility.
+func ReadDeclaredFloors(companionPath string) ([]string, bool, error) {
+	data, err := os.ReadFile(companionPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, false, err
+	}
+	field, ok := raw["committed_floors"]
+	if !ok {
+		return nil, false, nil
+	}
+	var floors []string
+	if err := json.Unmarshal(field, &floors); err != nil {
+		return nil, false, fmt.Errorf("committed_floors: %w", err)
+	}
+	return floors, true, nil
+}
+
+// CommittedFloorCount is declaration-primary: if the companion declares
+// committed_floors, its length is authoritative. Otherwise the legacy prose
+// counter remains the fail-open fallback for older triage artifacts.
+func CommittedFloorCount(artifact, companionPath string, knownPkgs []string) int {
+	if declared, ok, err := ReadDeclaredFloors(companionPath); err == nil && ok {
+		return len(declared)
+	}
+	return CountCommittedFloors(artifact, knownPkgs)
+}
+
+// FloorDivergenceCorrective cross-checks prose floor package mentions against
+// committed_floors. It returns an actionable correction string, not a reject.
+func FloorDivergenceCorrective(artifact, companionPath string, knownPkgs []string) string {
+	declared, ok, err := ReadDeclaredFloors(companionPath)
+	if err != nil || !ok {
+		return ""
+	}
+	prose := proseFloorPackages(artifact, knownPkgs)
+	declaredSet := map[string]bool{}
+	for _, pkg := range declared {
+		if pkg != "" {
+			declaredSet[pkg] = true
+		}
+	}
+	var proseOnly, declaredOnly []string
+	for pkg := range prose {
+		if !declaredSet[pkg] {
+			proseOnly = append(proseOnly, pkg)
+		}
+	}
+	for pkg := range declaredSet {
+		if !prose[pkg] {
+			declaredOnly = append(declaredOnly, pkg)
+		}
+	}
+	if len(proseOnly) == 0 && len(declaredOnly) == 0 {
+		return ""
+	}
+	sort.Strings(proseOnly)
+	sort.Strings(declaredOnly)
+	return fmt.Sprintf("Prose/declaration floor mismatch: prose-only=[%s], committed_floors-only=[%s]. Reconcile by adding the prose floor packages to committed_floors or removing the stale prose floor mention.",
+		strings.Join(proseOnly, ", "), strings.Join(declaredOnly, ", "))
+}
+
+func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
+	seen := map[string]bool{}
+	body, ok := topNSection(artifact)
+	if !ok {
+		return seen
+	}
+	for _, m := range listItemRE.FindAllStringSubmatch(body, -1) {
+		item := m[1]
+		if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
+			continue
+		}
+		for _, pkg := range mentionedPackages(item, knownPkgs) {
+			seen[pkg] = true
+		}
+	}
+	return seen
 }
 
 // topNSection extracts the ## top_n body (heading to next "## " or EOF).
