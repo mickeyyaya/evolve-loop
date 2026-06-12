@@ -80,3 +80,29 @@ func TestNewReviewer_BackCompatBuiltins(t *testing.T) {
 		t.Errorf("built-in build via NewReviewer should approve; got %+v", got)
 	}
 }
+
+// TestReviewerWithCatalog_FailsOpenWhenNoContractResolves — test-plan P0 #5:
+// a native/no-output phase that resolves to NO contract (CatalogResolver
+// miss) is AMBIGUITY at the gate even at StageEnforce: approve (fail open),
+// and the consecutive-block breaker must not move. This is the
+// "[contract-gate] ship: ambiguity, failing open" line from the 2026-06-12
+// soak — pinned so the fail-open never silently becomes a block (or a
+// breaker leak) for contract-less phases.
+func TestReviewerWithCatalog_FailsOpenWhenNoContractResolves(t *testing.T) {
+	root := t.TempDir()
+	breaker := filepath.Join(root, "breaker.json")
+	// Catalog with NO matching spec — "ghost-phase" resolves nowhere.
+	rev := NewReviewerWithCatalog(config.StageEnforce, phasespec.Catalog{})
+	rev.(*Reviewer).breakerPath = breaker
+
+	got := rev.Review(context.Background(), core.ReviewInput{
+		Phase: "ghost-phase", Workspace: filepath.Join(root, "ws"), ProjectRoot: root,
+	})
+	if !got.Approve {
+		t.Errorf("no resolvable contract = ambiguity; the gate must FAIL OPEN at enforce, got %+v", got)
+	}
+	if _, err := os.Stat(breaker); err == nil {
+		raw, _ := os.ReadFile(breaker)
+		t.Errorf("ambiguity must not touch the circuit breaker; breaker file written: %s", raw)
+	}
+}

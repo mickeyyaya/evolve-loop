@@ -185,7 +185,11 @@ func New(opts Options) *BaseRunner {
 	}
 	verifyFn := opts.VerifyFn
 	if verifyFn == nil {
-		verifyFn = deliverable.Verify
+		// Catalog-aware so the reconcile check resolves user/minted phases
+		// under the SAME policy as the host gate and the agent self-check —
+		// a builtin-only default left an inserted phase's surviving artifact
+		// unresolvable on timeout, synthesizing FAIL.
+		verifyFn = deliverable.VerifyCatalogAware
 	}
 	return &BaseRunner{
 		hooks:          opts.Hooks,
@@ -512,6 +516,12 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// a timeout toward the agent's real verdict, never downgrade a real one.
 		if errors.Is(bridgeErr, core.ErrArtifactTimeout) {
 			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
+			if req.ProjectRoot != "" {
+				// EvolveDir completes the roots (orchestrator-target
+				// deliverables) AND locates the merged catalog for the
+				// catalog-aware default.
+				roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
+			}
 			res, verr := b.verifyFn(phase, roots)
 			switch {
 			case verr == nil && res.OK:

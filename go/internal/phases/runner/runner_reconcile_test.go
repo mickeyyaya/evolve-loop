@@ -3,6 +3,8 @@ package runner
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -184,4 +186,42 @@ func hasWarningDiag(diags []core.Diagnostic) bool {
 		}
 	}
 	return false
+}
+
+// TestNew_DefaultVerifyFnIsCatalogAware — the reconcile default must resolve
+// contracts under the SAME policy as the host gate and the agent self-check
+// (merged catalog), not BuiltinResolver-only: a user/minted phase (e.g. an
+// advisor-inserted mutation-gate) whose artifact survived a bridge timeout
+// was unresolvable and synthesized FAIL.
+func TestNew_DefaultVerifyFnIsCatalogAware(t *testing.T) {
+	root := t.TempDir()
+	regDir := filepath.Join(root, "docs", "architecture")
+	if err := os.MkdirAll(regDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	registry := `{"phases":[]}`
+	if err := os.WriteFile(filepath.Join(regDir, "phase-registry.json"), []byte(registry), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	userDir := filepath.Join(root, ".evolve", "phases", "widget-scan")
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	spec := `{"name":"widget-scan","archetype":"evaluate","agent":"evolve-widget-scan",
+		"outputs":{"files":[".evolve/runs/cycle-{cycle}/widget-scan-report.md"]}}`
+	if err := os.WriteFile(filepath.Join(userDir, "phase.json"), []byte(spec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	hooks := &fakeHooks{phase: "widget-scan", agent: "evolve-widget-scan", model: "sonnet", prompt: "x", verdict: core.VerdictPASS}
+	b := New(Options{Hooks: hooks, Bridge: &fakeBridge{}, Prompts: fakePromptsFS("evolve-widget-scan", "x")})
+
+	roots := phasecontract.Roots{
+		Workspace: filepath.Join(root, ".evolve", "runs", "cycle-7"),
+		EvolveDir: filepath.Join(root, ".evolve"),
+	}
+	if _, err := b.verifyFn("widget-scan", roots); err != nil {
+		t.Fatalf("default verifyFn must resolve a user phase via the merged catalog "+
+			"(reconcile parity with the gate + self-check); got: %v", err)
+	}
 }

@@ -44,18 +44,11 @@ func runPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// mergedCatalog loads the built-in registry and overlays user phases from
-// every discovery root (EVOLVE_PHASE_ROOTS). sources maps user phase name →
-// discovery root (provenance for the ROOT column).
+// mergedCatalog delegates to the single merged-catalog loader in phasespec
+// (built-in registry + EVOLVE_PHASE_ROOTS overlays) — kept as a local name
+// for the eight cmd call sites.
 func mergedCatalog(project string) (phasespec.Catalog, map[string]string, []string, error) {
-	registryPath := filepath.Join(project, "docs", "architecture", "phase-registry.json")
-	builtin, err := phasespec.Load(registryPath)
-	if err != nil {
-		return phasespec.Catalog{}, nil, nil, err
-	}
-	user, sources, warns := phasespec.DiscoverUserSpecsFromRoots(phaseRoots(project))
-	merged, mWarns := builtin.Merge(user)
-	return merged, sources, append(warns, mWarns...), nil
+	return phasespec.MergedCatalog(project)
 }
 
 func phasesList(project string, stdout, stderr io.Writer) int {

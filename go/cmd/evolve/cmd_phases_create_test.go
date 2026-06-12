@@ -318,3 +318,46 @@ func TestPhasesCreate_UsageErrors(t *testing.T) {
 		t.Errorf("--spec and --mint are mutually exclusive (10)")
 	}
 }
+
+// TestPhasesCreate_VerifyRoundtrip — test-plan P0 #3 (leg A→B consistency):
+// a phase minted by `phases create` must be RESOLVABLE and VERIFIABLE by
+// `evolve phase verify` against the same project root — generation and
+// check may never disagree about where the contract lives or what it
+// requires. Would catch any drift between the create-side spec write and
+// the verify-side merged-catalog discovery (registry path, phase roots,
+// FromSpec derivation).
+func TestPhasesCreate_VerifyRoundtrip(t *testing.T) {
+	root := createFixtureProject(t)
+	code, out, errb := runCreate(t, validCreateSpec, "--spec", "-")
+	if code != 0 {
+		t.Fatalf("phases create exit=%d stderr=%s", code, errb)
+	}
+	env := parseEnvelope(t, out)
+	if !env.OK {
+		t.Fatalf("create envelope not OK: %+v", env)
+	}
+
+	// 1. The minted phase must RESOLVE: a missing artifact is exit 1 (a
+	// confirmed violation naming the expected path), never exit 10
+	// (unknown phase — resolution drift between create and verify).
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-1")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, _, verr := runVerify(t, "threat-model", "--workspace="+ws)
+	if code != 1 {
+		t.Fatalf("verify(minted phase, no artifact) exit=%d want 1; stderr=%s", code, verr)
+	}
+
+	// 2. A conforming artifact (the sections + verdict sentinel the create
+	// envelope advertised) must verify clean: exit 0.
+	report := "## Threats\n- spoofing\n\n## Mitigations\n- authn\n\n" +
+		"<!-- evolve-verdict: {\"phase\":\"threat-model\",\"verdict\":\"PASS\"} -->\n"
+	if err := os.WriteFile(filepath.Join(ws, "threat-model-report.md"), []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, verr = runVerify(t, "threat-model", "--workspace="+ws)
+	if code != 0 {
+		t.Fatalf("verify(minted phase, conforming artifact) exit=%d want 0; stderr=%s", code, verr)
+	}
+}

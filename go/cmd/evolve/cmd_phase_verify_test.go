@@ -103,3 +103,23 @@ func TestPhaseVerify_Advisor_EvolveDirDefault(t *testing.T) {
 		t.Errorf("exit=%d want 0; stderr=%s", code, errb)
 	}
 }
+
+// TestPhaseVerify_StrayInWorktree_Exit1 — test-plan P0 #4: an artifact
+// written into the build worktree instead of the workspace is a CONFIRMED
+// violation (exit 1, the agent must fix), not ambiguity (exit 2). Pins the
+// CLI exit-code contract for the recoverBuildLeak failure class.
+func TestPhaseVerify_StrayInWorktree_Exit1(t *testing.T) {
+	ws := t.TempDir()
+	wt := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wt, "build-report.md"),
+		[]byte("## Changes\n- foo.go\nVerdict: PASS\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errb := runVerify(t, "build", "--workspace="+ws, "--worktree="+wt)
+	if code != 1 {
+		t.Errorf("exit=%d want 1 (confirmed violation: stray artifact in worktree); stderr=%s", code, errb)
+	}
+	if !strings.Contains(errb, "stray") && !strings.Contains(errb, "worktree") {
+		t.Errorf("stderr should name the stray-in-worktree correction; got %q", errb)
+	}
+}
