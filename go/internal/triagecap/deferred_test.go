@@ -53,6 +53,18 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 				"## deferred\n- refactor-later: tidy the recovery package\n",
 			want: nil,
 		},
+		{
+			// Pins the metadata-strip semantics on deferred items: the
+			// contract fields' own vocabulary (evidence/scout) never counts,
+			// the first word of defer_reason= is consumed with the key, and
+			// later free-form words naming a package DO count (a reason
+			// naming bridge is about bridge).
+			name: "deferred metadata stripped, free-form defer_reason tail still matches",
+			artifact: "## top_n\n- fix: a bug fix\n\n" +
+				"## deferred\n" +
+				"- coverage-rest: push swarm coverage to ≥98% — priority=M, evidence=scout-report.md#x, defer_reason=budget consumed by bridge work, source=scout\n",
+			want: []string{"bridge", "swarm"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

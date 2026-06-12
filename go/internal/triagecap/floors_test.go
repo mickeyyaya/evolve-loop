@@ -7,13 +7,19 @@ import (
 )
 
 // knownPkgsFixture mirrors the package basenames that exist in the repo —
-// the subset relevant to the cycle-281/283 replay fixtures plus common
-// English-word packages to prove word-boundary matching does not overcount.
+// the subset relevant to the replay fixtures plus common English-word
+// packages to prove word-boundary matching does not overcount. It includes
+// the names that collide with the triage bullet contract's own vocabulary
+// (`evidence`, `scout` — every bullet must carry evidence=/source=scout)
+// and with coverage prose (`paths` — "error paths"): cycle 301 failed on
+// exactly these phantoms, so the production vocabulary must be represented
+// here or the replay pins prove nothing.
 var knownPkgsFixture = []string{
 	"swarmrunner", "swarmplan", "swarm",
 	"bridge", "phasecoherence", "looppreflight", "modelcatalog",
 	"ship", "recovery", "interaction", "evalgate", "faillearn",
 	"core", "config", "router", "registry",
+	"evidence", "scout", "paths", "clihealth", "ledger", "gc",
 }
 
 func readFixture(t *testing.T, name string) string {
@@ -44,6 +50,34 @@ func TestCountCommittedFloors_Cycle281Replay(t *testing.T) {
 	got := CountCommittedFloors(artifact, knownPkgsFixture)
 	if got != 1 {
 		t.Errorf("cycle-281 committed floors = %d, want 1 (single aggregate coverage push)", got)
+	}
+}
+
+// TestCountCommittedFloors_Cycle301Replay pins the soak-#2 incident
+// (2026-06-12): a correctly-sized 2-bullet coverage commitment was counted
+// as 6 floors because the contract-mandated evidence=/source=scout fields
+// and the prose word "paths" matched real package basenames. The phantom
+// floors made the correction directive unsatisfiable — triage could not
+// remove tokens its own bullet contract requires — so the cycle burned both
+// corrections and failed. True count: one package per bullet.
+func TestCountCommittedFloors_Cycle301Replay(t *testing.T) {
+	artifact := readFixture(t, "triage-cycle301.md")
+	got := CountCommittedFloors(artifact, knownPkgsFixture)
+	if got != 2 {
+		t.Errorf("cycle-301 committed floors = %d, want 2 (clihealth + ledger; evidence/scout/paths are phantoms)", got)
+	}
+}
+
+// TestCountCommittedFloors_Cycle298Bullet pins the window-poisoning shape:
+// cycle 298's single floor-bearing bullet was recorded as 4 floors
+// (gc + evidence + scout + "safety-critical paths"), fabricating K=4 for
+// the throughput window. True count: 1.
+func TestCountCommittedFloors_Cycle298Bullet(t *testing.T) {
+	artifact := "## top_n\n" +
+		"- gc-coverage-boost: Boost internal/gc coverage from 88.8% to ≥95% by covering Apply/nowLive/protected/dirEntriesOlderThan safety-critical paths — priority=M, evidence=scout-report.md#task-2, source=scout\n"
+	got := CountCommittedFloors(artifact, knownPkgsFixture)
+	if got != 1 {
+		t.Errorf("cycle-298 bullet floors = %d, want 1 (gc only)", got)
 	}
 }
 
@@ -100,6 +134,42 @@ func TestCountCommittedFloors_Table(t *testing.T) {
 			name: "word-boundary: swarm does not double-count inside swarmrunner",
 			artifact: "## top_n\n" +
 				"- coverage-sw: swarmrunner package floor ≥98% coverage\n",
+			want: 1,
+		},
+		{
+			name: "contract metadata fields never count as packages",
+			artifact: "## top_n\n" +
+				"- coverage-one: Push bridge coverage to ≥98% — priority=H, evidence=scout-report.md#task-1, source=scout\n",
+			want: 1,
+		},
+		{
+			name: "evidence path value still counts its real packages",
+			artifact: "## top_n\n" +
+				"- coverage-seal: add unit tests for writeSegment resume (50% covered) — priority=H, evidence=go/internal/adapters/ledger/seal.go:161, source=scout\n",
+			want: 1,
+		},
+		{
+			name: "prose 'error paths' is not a mention of package paths",
+			artifact: "## top_n\n" +
+				"- coverage-gc: cover gc Apply error paths to ≥95%\n",
+			want: 1,
+		},
+		{
+			name: "slash-qualified internal/paths does count package paths",
+			artifact: "## top_n\n" +
+				"- coverage-paths: raise internal/paths coverage to ≥95%\n",
+			want: 1,
+		},
+		{
+			name: "later slash-qualified mention counts even after a non-boundary one",
+			artifact: "## top_n\n" +
+				"- coverage-paths2: fix scripts/pathsXgen then raise internal/paths coverage to ≥95%\n",
+			want: 1,
+		},
+		{
+			name: "bare scout outside source= is a legitimate package reference",
+			artifact: "## top_n\n" +
+				"- coverage-scout: raise scout package coverage to 90% — priority=M, source=scout\n",
 			want: 1,
 		},
 	}

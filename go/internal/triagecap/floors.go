@@ -95,16 +95,56 @@ func topNSection(artifact string) (string, bool) {
 // ("adapters/bridge") and prose separators still split.
 var tokenRE = regexp.MustCompile(`[A-Za-z0-9_-]+`)
 
+// metadataFieldRE strips the bullet contract's own metadata before package
+// matching: the contract REQUIRES every item to carry evidence=/source=scout
+// fields, and those literals collide with the real packages core/evidence and
+// phases/scout — every conformant bullet counted +2 phantom floors, which made
+// the cap's correction directive unsatisfiable (cycle 301: an honest 2-bullet
+// commitment counted 6, burned both corrections, failed the cycle). The
+// source=/priority=/defer_reason= values are closed contract vocabulary and
+// are dropped whole (\S+ — only the first space-delimited word; later words
+// of a free-form defer_reason stay matchable, which is the intended reading:
+// a reason naming a package is about that package); the evidence= VALUE is
+// kept because evidence pointers carry real package paths
+// ("evidence=go/internal/clihealth/clihealth.go"). RE2's ASCII \b also fires
+// after a hyphen, so a hypothetical slug like "low-priority=x" is stripped
+// too — that only ever undercounts (fail-open direction).
+var metadataFieldRE = regexp.MustCompile(`\b(?:source|priority|defer_reason)=\S+|\bevidence=`)
+
+// pathOnlyPkgs are packages whose basenames are also ordinary coverage prose;
+// they count only when slash-qualified ("internal/paths"), never as bare
+// tokens — cycle 298's "safety-critical paths" counted a phantom floor for
+// go/internal/paths and poisoned the throughput window (K=4, true K=1).
+// Each pattern requires a token boundary after the name (same character
+// class as tokenRE), so "internal/pathsX" is not a mention of "paths".
+// Matching runs on the metadata-stripped item, in which evidence= VALUES
+// survive — "evidence=go/internal/paths/util.go" therefore counts paths,
+// deliberately: that is a real package reference, the mirror image of the
+// prose phantom this list suppresses. Read-only after init.
+var pathOnlyPkgs = map[string]*regexp.Regexp{
+	"paths": regexp.MustCompile(`/paths(?:[^A-Za-z0-9_-]|$)`),
+}
+
 // mentionedPackages returns the candidate package names that appear as
-// whole tokens in the item text.
+// whole tokens in the item text, after contract metadata is stripped.
 func mentionedPackages(item string, candidatePkgs []string) []string {
+	item = metadataFieldRE.ReplaceAllString(item, " ")
 	tokens := map[string]bool{}
 	for _, tok := range tokenRE.FindAllString(item, -1) {
 		tokens[tok] = true
 	}
 	var pkgs []string
 	for _, pkg := range candidatePkgs {
-		if pkg != "" && tokens[pkg] {
+		if pkg == "" {
+			continue
+		}
+		if re, pathOnly := pathOnlyPkgs[pkg]; pathOnly {
+			if re.MatchString(item) {
+				pkgs = append(pkgs, pkg)
+			}
+			continue
+		}
+		if tokens[pkg] {
 			pkgs = append(pkgs, pkg)
 		}
 	}
