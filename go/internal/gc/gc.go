@@ -239,6 +239,16 @@ func Apply(evolveDir string, m Manifest) error {
 			errs = append(errs, fmt.Errorf("gc: refusing protected path %s (quarantine/ledger are manual-only)", it.Path))
 			continue
 		}
+		// TOCTOU re-check (L3.2): liveness can change between Plan and Apply —
+		// a fleet scheduler may lease a run, or a new cycle may claim the dir
+		// as its workspace, in that window. Re-verify at act time on the item
+		// and its parent (subtree items like .ephemeral live under the run
+		// dir) and refuse a now-live target loudly. Any verification error
+		// counts as live (fail closed).
+		if live, why := nowLive(evolveDir, it.Path); live {
+			errs = append(errs, fmt.Errorf("gc: refusing %s — became live after Plan (%s); re-Plan and re-Apply", it.Path, why))
+			continue
+		}
 		switch it.Action {
 		case ActionDelete:
 			if err := os.RemoveAll(it.Path); err != nil {
@@ -289,6 +299,27 @@ func protected(evolveDir, path string) bool {
 		return true
 	}
 	return false
+}
+
+// nowLive re-checks liveness at Apply time (wall clock, default lease TTL):
+// a fresh .lease on the path or its parent, or either being the in-flight
+// run's workspace, refuses the action. currentWorkspace errors count as
+// live — fail closed.
+func nowLive(evolveDir, path string) (bool, string) {
+	now := time.Now()
+	for _, d := range []string{path, filepath.Dir(path)} {
+		if leaseFresh(d, now, 0) {
+			return true, "fresh .lease at " + d
+		}
+	}
+	ws, err := currentWorkspace(evolveDir)
+	if err != nil {
+		return true, "run-state unreadable: " + err.Error()
+	}
+	if ws != "" && (path == ws || filepath.Dir(path) == ws) {
+		return true, "current run workspace"
+	}
+	return false, ""
 }
 
 // ageDays is a helper shared by the TTL rules.
