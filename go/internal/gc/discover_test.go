@@ -123,6 +123,28 @@ func TestDiscover_FailsClosedOnUnreadableRunState(t *testing.T) {
 	}
 }
 
+func TestDiscover_ReadRunsDirError(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "runs"), "not a dir")
+	if _, err := Discover(dir, DiscoverOptions{Now: nowT0}); err == nil {
+		t.Fatal("runs path that exists but is not a directory must report an error")
+	}
+}
+
+func TestDiscover_TerminalRunStateIsIdle(t *testing.T) {
+	dir := t.TempDir()
+	run := filepath.Join(dir, "runs", "cycle-1")
+	writeFile(t, filepath.Join(run, "run.json"), `{"cycle_id":1}`)
+	writeFile(t, filepath.Join(dir, "cycle-state.json"), `{"cycle_id":0,"workspace_path":"`+run+`"}`)
+	got, err := Discover(dir, DiscoverOptions{Now: nowT0})
+	if err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	if len(got) != 1 || got[0].Live {
+		t.Fatalf("cycle_id=0 is idle state; run should be discovered dead, got %+v", got)
+	}
+}
+
 // HIGH-fix pins (L3.2 review): symlinked run dirs must be DISCOVERED (an
 // invisible run bypasses every protection), a malformed in-flight
 // cycle-state fails closed, and Apply re-checks liveness at act time.

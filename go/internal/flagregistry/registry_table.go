@@ -149,6 +149,7 @@ var All = []Flag{
 	{Name: "EVOLVE_FORCE_BARE", Status: StatusDead, Cluster: "Platform / CLI Hybrid", Doc: "Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory]"},
 	{Name: "EVOLVE_FORCE_FRESH", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_FORCE_INNER_SANDBOX", Status: StatusDead, Cluster: "Sandbox Cluster", Doc: "Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory]"},
+	{Name: "EVOLVE_GC", Status: StatusActive, Kind: "enum", Default: "off", Cluster: "GC / Retention", Doc: "GC shadow stage (L3.4). off=disabled (default); shadow=discover+plan+log manifest to workspace without mutations; enforce=shadow+apply (opt-in; honors quarantine/ledger/live hard rules)."},
 	{Name: "EVOLVE_GEMINI_CLAUDE_PATH", Status: StatusDead, Cluster: "Platform / CLI Hybrid", Doc: "Gemini hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory]"},
 	{Name: "EVOLVE_GEMINI_REQUIRE_FULL", Status: StatusDead, Cluster: "Platform / CLI Hybrid", Doc: "Require Gemini full-mode (not degraded) [no reader on any surface as of 2026-06-11 inventory]"},
 	{Name: "EVOLVE_GO_BIN", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},

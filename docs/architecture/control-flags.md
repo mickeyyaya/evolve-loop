@@ -397,6 +397,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_FORCE_BARE` | dead | — | — | Platform / CLI Hybrid | Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_FORCE_FRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FORCE_INNER_SANDBOX` | dead | — | — | Sandbox Cluster | Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
+| `EVOLVE_GC` | active | enum | off | GC / Retention | GC shadow stage (L3.4). off=disabled (default); shadow=discover+plan+log manifest to workspace without mutations; enforce=shadow+apply (opt-in; honors quarantine/ledger/live hard rules). |
 | `EVOLVE_GEMINI_CLAUDE_PATH` | dead | — | — | Platform / CLI Hybrid | Gemini hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_GEMINI_REQUIRE_FULL` | dead | — | — | Platform / CLI Hybrid | Require Gemini full-mode (not degraded) [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_GO_BIN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

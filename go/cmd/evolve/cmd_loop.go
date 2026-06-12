@@ -36,9 +36,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
@@ -119,6 +121,84 @@ func (lr *loopResult) emit(w io.Writer) {
 		return
 	}
 	fmt.Fprintln(w, string(buf))
+}
+
+func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
+	mode := os.Getenv("EVOLVE_GC")
+	if mode == "" {
+		mode = "off"
+	}
+	switch mode {
+	case "off":
+		return
+	case "shadow", "enforce":
+	default:
+		fmt.Fprintf(stderr, "[gc] WARN: invalid EVOLVE_GC=%q (want off|shadow|enforce); skipping\n", mode)
+		return
+	}
+
+	pol, err := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: policy load failed: %v; using zero-value gc policy\n", err)
+	}
+	gcPol := gc.Policy{}
+	if pol.GC != nil {
+		gcPol = *pol.GC
+	}
+
+	runs, err := gc.Discover(cfg.EvolveDir, gc.DiscoverOptions{})
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: discover failed: %v; writing empty manifest\n", err)
+		runs = nil
+	}
+	manifest, err := gc.Plan(gc.Options{EvolveDir: cfg.EvolveDir, Runs: runs, Policy: gcPol})
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: plan failed: %v\n", err)
+		return
+	}
+	raw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: manifest encode failed: %v\n", err)
+		return
+	}
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: create workspace for manifest: %v\n", err)
+		return
+	}
+	target := filepath.Join(workspace, "gc-shadow-manifest.json")
+	tmp := fmt.Sprintf("%s.tmp.%d", target, os.Getpid())
+	if err := os.WriteFile(tmp, append(raw, '\n'), 0o644); err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: write manifest temp: %v\n", err)
+		return
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		_ = os.Remove(tmp)
+		fmt.Fprintf(stderr, "[gc] WARN: publish manifest: %v\n", err)
+		return
+	}
+	archive, del := gcActionCounts(manifest)
+	fmt.Fprintf(stderr, "[gc] shadow: %d items (%d archive, %d delete)\n", len(manifest.Items), archive, del)
+
+	if mode != "enforce" {
+		return
+	}
+	if err := gc.Apply(cfg.EvolveDir, manifest); err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: enforce apply failed: %v\n", err)
+		return
+	}
+	fmt.Fprintf(stderr, "[gc] enforce: applied %d items\n", len(manifest.Items))
+}
+
+func gcActionCounts(manifest gc.Manifest) (archive, del int) {
+	for _, item := range manifest.Items {
+		switch item.Action {
+		case gc.ActionArchive:
+			archive++
+		case gc.ActionDelete:
+			del++
+		}
+	}
+	return archive, del
 }
 
 // sweepRulePromotions is the I4 measured auto-enforce sweep (R8.2): scan the
@@ -449,6 +529,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		lr.emit(stdout)
 		return 2
 	}
+
+	lastBeforeGCHook, _ := readLastCycleNumber(context.Background(), deps.Storage)
+	runGCHook(cfg, cycleWorkspace(cfg.ProjectRoot, lastBeforeGCHook+1), stderr)
 
 	policy := resolveDispatchPolicy(stderr)
 	threshold := resolveCircuitBreakerThreshold()

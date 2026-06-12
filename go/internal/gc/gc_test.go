@@ -12,8 +12,11 @@ package gc
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 var t0 = time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC)
@@ -321,6 +324,133 @@ func TestApply_RefusesProtectedPaths(t *testing.T) {
 func TestApply_RequiresAbsoluteEvolveDir(t *testing.T) {
 	if err := Apply("relative/.evolve", Manifest{}); err == nil {
 		t.Fatal("Apply must refuse a relative evolveDir (archive dst would resolve against CWD)")
+	}
+}
+
+func TestApply_EmptyManifestIsNoop(t *testing.T) {
+	dir := t.TempDir()
+	if err := Apply(dir, Manifest{}); err != nil {
+		t.Fatalf("empty manifest must be a no-op: %v", err)
+	}
+}
+
+func TestApply_RefusesCurrentWorkspaceAfterPlan(t *testing.T) {
+	dir := t.TempDir()
+	run := mkRun(t, dir, "cycle-90", daysAgo(90))
+	state := `{"cycle_id":90,"workspace_path":"` + run.Path + `"}`
+	if err := os.WriteFile(filepath.Join(dir, "cycle-state.json"), []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := Apply(dir, Manifest{Items: []Item{{Path: run.Path, Action: ActionDelete, Rule: "runs.delete_after_days"}}})
+	if err == nil || !strings.Contains(err.Error(), "became live after Plan") {
+		t.Fatalf("Apply must refuse a run that became current after Plan, got %v", err)
+	}
+	if _, statErr := os.Stat(run.Path); statErr != nil {
+		t.Errorf("now-live run must survive: %v", statErr)
+	}
+}
+
+func TestApply_RefusesUnreadableRunState(t *testing.T) {
+	dir := t.TempDir()
+	run := mkRun(t, dir, "cycle-91", daysAgo(90))
+	if err := os.WriteFile(filepath.Join(dir, "cycle-state.json"), []byte("{torn"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := Apply(dir, Manifest{Items: []Item{{Path: run.Path, Action: ActionDelete, Rule: "runs.delete_after_days"}}})
+	if err == nil || !strings.Contains(err.Error(), "run-state unreadable") {
+		t.Fatalf("Apply must fail closed when run state is unreadable, got %v", err)
+	}
+	if _, statErr := os.Stat(run.Path); statErr != nil {
+		t.Errorf("run must survive unreadable run-state refusal: %v", statErr)
+	}
+}
+
+func TestApply_ParentLeaseRefusesSubtree(t *testing.T) {
+	dir := t.TempDir()
+	run := mkRun(t, dir, "cycle-92", daysAgo(90))
+	eph := filepath.Join(run.Path, ".ephemeral")
+	if err := os.MkdirAll(eph, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := runlease.Write(run.Path, runlease.Lease{RunID: "r92"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	err := Apply(dir, Manifest{Items: []Item{{Path: eph, Action: ActionDelete, Rule: "tracker_ttl_days"}}})
+	if err == nil || !strings.Contains(err.Error(), "fresh .lease") {
+		t.Fatalf("Apply must refuse subtree when parent run has a fresh lease, got %v", err)
+	}
+	if _, statErr := os.Stat(eph); statErr != nil {
+		t.Errorf("subtree under leased run must survive: %v", statErr)
+	}
+}
+
+func TestApply_ArchiveCollisionUsesNumericSuffix(t *testing.T) {
+	dir := t.TempDir()
+	run := mkRun(t, dir, "cycle-93", daysAgo(90))
+	if err := os.WriteFile(filepath.Join(run.Path, "build-report.md"), []byte("r"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	existing := filepath.Join(dir, "archive", "runs", "cycle-93")
+	if err := os.MkdirAll(existing, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(dir, Manifest{Items: []Item{{Path: run.Path, Action: ActionArchive, Rule: "runs.archive_after_days"}}}); err != nil {
+		t.Fatalf("Apply archive with collision: %v", err)
+	}
+	moved := filepath.Join(dir, "archive", "runs", "cycle-93.1", "build-report.md")
+	if _, err := os.Stat(moved); err != nil {
+		t.Fatalf("archive collision must move to numeric suffix, missing %s: %v", moved, err)
+	}
+}
+
+func TestDirEntriesOlderThan_MissingDirIsEmpty(t *testing.T) {
+	if got := dirEntriesOlderThan(filepath.Join(t.TempDir(), "missing"), nowT0(), 1, nil); len(got) != 0 {
+		t.Fatalf("missing dir must yield no entries, got %v", got)
+	}
+}
+
+func TestDirEntriesOlderThan_SkipsStatErrors(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(dir, "missing-target"), filepath.Join(dir, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	if got := dirEntriesOlderThan(dir, nowT0(), 1, nil); len(got) != 0 {
+		t.Fatalf("dangling entries must be skipped, got %v", got)
+	}
+}
+
+func TestApply_UnknownActionReportsError(t *testing.T) {
+	dir := t.TempDir()
+	run := mkRun(t, dir, "cycle-94", daysAgo(90))
+	err := Apply(dir, Manifest{Items: []Item{{Path: run.Path, Action: Action("compress"), Rule: "x"}}})
+	if err == nil || !strings.Contains(err.Error(), "unknown action") {
+		t.Fatalf("unknown action must be reported, got %v", err)
+	}
+	if _, statErr := os.Stat(run.Path); statErr != nil {
+		t.Errorf("unknown action must not remove the target: %v", statErr)
+	}
+}
+
+func TestApply_ArchiveMkdirFailureReportsError(t *testing.T) {
+	dir := t.TempDir()
+	run := mkRun(t, dir, "cycle-95", daysAgo(90))
+	if err := os.WriteFile(filepath.Join(dir, "archive"), []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := Apply(dir, Manifest{Items: []Item{{Path: run.Path, Action: ActionArchive, Rule: "runs.archive_after_days"}}})
+	if err == nil || !strings.Contains(err.Error(), "archive mkdir") {
+		t.Fatalf("archive mkdir failure must be reported, got %v", err)
+	}
+	if _, statErr := os.Stat(run.Path); statErr != nil {
+		t.Errorf("archive mkdir failure must leave source in place: %v", statErr)
+	}
+}
+
+func TestProtected_OutsideEvolveDirIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	outside := filepath.Join(filepath.Dir(dir), filepath.Base(dir)+"-outside")
+	if !protected(dir, outside) {
+		t.Fatal("paths outside evolveDir must be protected")
 	}
 }
 
