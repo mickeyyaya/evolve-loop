@@ -1635,7 +1635,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		Phase:          string(PhaseStart),
 		StartedAt:      startedAt,
 		PhaseStartedAt: startedAt,
-		WorkspacePath:  fmt.Sprintf("%s/.evolve/runs/cycle-%d", req.ProjectRoot, cycle),
+		WorkspacePath:  RunWorkspacePath(req.ProjectRoot, cycle),
 		IntentRequired: intentRequired,
 		RunID:          runID,
 	}

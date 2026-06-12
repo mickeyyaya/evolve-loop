@@ -40,7 +40,9 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 		Phase:          "build",
 		ActiveAgent:    "builder",
 		ActiveWorktree: worktree,
-		WorkspacePath:  "/tmp/wt/.evolve/runs/cycle-42",
+		// Writable: WriteCycleState mirrors the state to <workspace>/run.json
+		// (CB.4). The role decisions below never reference this path.
+		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-42"),
 	})
 	g := NewRole(s)
 
@@ -74,7 +76,10 @@ func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 		Phase:          "tdd",
 		ActiveAgent:    "tdd-engineer",
 		ActiveWorktree: worktree,
-		WorkspacePath:  "/work/.evolve/runs/cycle-50",
+		// Writable: WriteCycleState mirrors the state to <workspace>/run.json
+		// (CB.4). The decided path below is under the (fake) worktree, so the
+		// workspace location plays no part in the decision.
+		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-50"),
 	})
 	g := NewRole(s)
 
@@ -96,7 +101,8 @@ func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
 		CycleID:        51,
 		Phase:          "scout",
 		ActiveWorktree: worktree,
-		WorkspacePath:  "/work/.evolve/runs/cycle-51",
+		// Writable for the CB.4 run.json mirror; not referenced by the decision.
+		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-51"),
 	})
 	g := NewRole(s)
 
@@ -110,17 +116,20 @@ func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
 }
 
 func TestRole_AuditPhaseRestricted(t *testing.T) {
+	// t.TempDir()-rooted (not a fixed /tmp path): the CB.4 run.json mirror
+	// writes into the workspace, so it must be cleaned up with the test.
+	ws := filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-7")
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:       7,
 		Phase:         "audit",
-		WorkspacePath: "/tmp/wt/.evolve/runs/cycle-7",
+		WorkspacePath: ws,
 	})
 	g := NewRole(s)
 
 	// audit-report.md inside workspace: allow.
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
-		ToolInput: map[string]any{"file_path": "/tmp/wt/.evolve/runs/cycle-7/audit-report.md"},
+		ToolInput: map[string]any{"file_path": filepath.Join(ws, "audit-report.md")},
 	})
 	if !dec.Allow {
 		t.Errorf("audit-report write denied: %s", dec.Reason)
@@ -166,7 +175,9 @@ func TestRole_NonEditWriteToolsPass(t *testing.T) {
 
 func TestRole_BypassEnvAllows(t *testing.T) {
 	t.Setenv("EVOLVE_BYPASS_ROLE_GATE", "1")
-	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build", WorkspacePath: "/tmp/wt/.evolve/runs/cycle-1"})
+	// t.TempDir()-rooted for the CB.4 run.json mirror; not referenced below.
+	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build",
+		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1")})
 	g := NewRole(s)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
@@ -235,7 +246,9 @@ func TestRole_BuildPhaseNoWorktree_DeniesNonWorkspace(t *testing.T) {
 		CycleID:        1,
 		Phase:          "build",
 		ActiveWorktree: "",
-		WorkspacePath:  "/tmp/wt/.evolve/runs/cycle-1",
+		// t.TempDir()-rooted for the CB.4 run.json mirror; not referenced
+		// by the decision below.
+		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1"),
 	})
 	g := NewRole(s)
 	dec := g.Decide(context.Background(), core.GuardInput{
@@ -260,6 +273,18 @@ func TestRole_MissingFilePathAllows(t *testing.T) {
 }
 
 func TestRoleGuard_RelativeWorkspacePath(t *testing.T) {
+	// Run from a temp cwd: the relative WorkspacePath below is the point of
+	// the test, and since CB.4 WriteCycleState mirrors run.json into it —
+	// without the chdir that mirror would land in the package source tree.
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+
 	abs, err := filepath.Abs("./.evolve/runs/cycle-107")
 	if err != nil {
 		t.Fatal(err)
