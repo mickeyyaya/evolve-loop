@@ -57,10 +57,14 @@ func TestInsertedPhaseWritableInheritsWorktree(t *testing.T) {
 	if _, ok := o.runners[Phase("test-amplification")]; !ok {
 		t.Fatal("precondition: minted phase was not registered into runners")
 	}
-	if !o.runsInWorktree(Phase("test-amplification")) {
-		t.Errorf("RED: inserted phase 'test-amplification' got NO worktree (runsInWorktree=false) — " +
-			"it would dispatch with Worktree=\"\" and trip the tree-diff guard cycle-fatal (cycle-280). " +
-			"A minted phase that does not opt out of source writes must inherit the cycle worktree.")
+	// Post-CB.1 the worktree CWD is universal (every phase dispatches with it —
+	// see TestCB1_EveryDispatchedPhaseCarriesWorktree), so the cycle-280 fatal
+	// class is closed structurally. What this test still pins is the WRITE axis:
+	// a mint that does not opt out of source writes must be write-capable, or
+	// the role-gate denies its edits and the phase stalls.
+	if !o.worktreePhase(Phase("test-amplification")) {
+		t.Errorf("inserted phase 'test-amplification' is not write-capable (worktreePhase=false) — " +
+			"a minted phase that does not opt out of source writes must default to write-capable (cycle-280).")
 	}
 }
 
@@ -82,10 +86,13 @@ func TestInsertedReadOnlyPhaseDoesNotGetWorktree(t *testing.T) {
 	if _, ok := o.runners[Phase("lint-advisor")]; !ok {
 		t.Fatal("precondition: minted phase was not registered into runners")
 	}
-	if o.runsInWorktree(Phase("lint-advisor")) {
-		t.Errorf("inserted phase 'lint-advisor' explicitly set writes_source:false but was granted a worktree " +
-			"(runsInWorktree=true) — an explicit read-only opt-out must be honoured; the fix must not " +
-			"blanket-grant worktrees to every minted phase.")
+	// Post-CB.1 every phase gets the worktree as CWD — including this one; that
+	// is deliberate and harmless (cwd ≠ write permission). What the explicit
+	// writes_source:false opt-out must still buy is the WRITE axis: the
+	// role-gate must see this mint as a non-writer.
+	if o.worktreePhase(Phase("lint-advisor")) {
+		t.Errorf("inserted phase 'lint-advisor' explicitly set writes_source:false but is write-capable " +
+			"(worktreePhase=true) — an explicit read-only opt-out must be honoured on the role-gate axis.")
 	}
 }
 

@@ -125,6 +125,7 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
 		Cycle: 9, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
+		RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -141,6 +142,11 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 	}
 	if fb.gotReq.Agent != "build" {
 		t.Errorf("BridgeRequest.Agent=%q, want build", fb.gotReq.Agent)
+	}
+	// CB.5: the run identity must survive the runner hop, or session names
+	// downstream lose their run scope.
+	if fb.gotReq.RunID != "01ARZ3NDEKTSV4RRFFQ69G5FAV" {
+		t.Errorf("BridgeRequest.RunID=%q, want the PhaseRequest's run id", fb.gotReq.RunID)
 	}
 	if fb.gotReq.Prompt != "composed body" {
 		t.Errorf("BridgeRequest.Prompt=%q, want 'composed body'", fb.gotReq.Prompt)

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // recipe_adapter.go wires the recipe.Engine (pure, in internal/bridge/recipe)
@@ -64,8 +66,24 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 		fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
 		return nil
 	}
-	if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+	// CB.2: bind the pane cwd at session birth when the controller can; the
+	// cd keystroke stays as the second layer (capability-less controllers).
+	if ws, ok := d.deps.Tmux.(workdirSessionStarter); ok {
+		if err := ws.NewSessionIn(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight, d.workingDir); err != nil {
+			return fmt.Errorf("new-session: %w", err)
+		}
+	} else if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 		return fmt.Errorf("new-session: %w", err)
+	}
+	// CB.5: record in the run registry like runTmuxREPL does — the recipe
+	// path is a second creation surface; a crash before the caller's own
+	// teardown must still leave the session registry-reapable. (The attach
+	// branch above skips this: the session was recorded by its creator.)
+	if err := sessionrecord.Append(sessionrecord.PathIn(d.cfg.Workspace), sessionrecord.Record{
+		Session: d.session, RunID: d.cfg.RunID, Cycle: d.cfg.Cycle,
+		Agent: d.cfg.Agent, PID: os.Getpid(),
+	}); err != nil {
+		fmt.Fprintf(d.deps.Stderr, "[recipe] WARN session registry append failed: %v (session %s will not be registry-reapable)\n", err, d.session)
 	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)
@@ -119,10 +137,26 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	if err != nil {
 		return nil, "", fmt.Errorf("recipe: %w", err)
 	}
+	// CB.3: the recipe path bypasses the engine's CLIPreflight chokepoint, so
+	// codex-family sessions must pretrust their worktree/workspace here or the
+	// first boot in a fresh worktree renders the cycle-122 trust modal. Same
+	// best-effort semantics as the driver preflight (the boot auto-responder
+	// remains the downstream defense).
+	if strings.HasPrefix(cli, "codex") {
+		if err := pretrustCodexProjects(cfg); err != nil {
+			fmt.Fprintf(deps.Stderr, "[recipe] WARN codex pretrust: %v (continuing — best-effort)\n", err)
+		}
+	}
 	session, _ := resolveSession(cfg, deps, recipeSessionPrefix)
 	workingDir := cfg.Worktree
 	if workingDir == "" {
+		// CB.2: same fail-closed contract as runTmuxREPL — the recipe path is
+		// a second launch surface with the identical silent-cwd hazard.
+		if v, _ := lookupEnv(deps, "EVOLVE_FLEET"); envchain.BoolValue(v, false) {
+			return nil, "", fmt.Errorf("recipe: %w", errWorktreeRequired)
+		}
 		workingDir, _ = os.Getwd()
+		fmt.Fprintf(deps.Stderr, "[recipe] WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", workingDir)
 	}
 	drv := &recipeSessionDriver{
 		cfg:        cfg,

@@ -113,10 +113,19 @@ type PhaseRequest struct {
 	// source-writing phase edits here, and an EGPS predicate's `go test`
 	// compiles here (acssuite runs predicates with cwd=Worktree while `.evolve/`
 	// still resolves to ProjectRoot via EVOLVE_PROJECT_ROOT — the intentional
-	// dual root, issue #9 + #12). Empty for read-only phases, which then run
-	// against ProjectRoot. Keep ProjectRoot (data) and Worktree (code) distinct:
-	// collapsing them reintroduces the cycle-190 "predicate ran against main" bug.
-	Worktree      string            `json:"worktree"`
+	// dual root, issue #9 + #12). Since CB.1 it is set for EVERY phase (cwd
+	// isolation is universal; write permission stays on the worktreePhase
+	// axis); empty only when provisioning failed — the degraded mode where
+	// phases run against ProjectRoot. Keep ProjectRoot (data) and Worktree
+	// (code) distinct: collapsing them reintroduces the cycle-190 "predicate
+	// ran against main" bug.
+	Worktree string `json:"worktree"`
+	// RunID is the CA.5 event-sourced run identity, threaded to every phase
+	// dispatch (CB.5) so the bridge mints run-scoped tmux session names
+	// (evolve-bridge-r<runid8>-…) and the per-run session registry records
+	// the right owner. Empty on legacy/degraded paths — names then keep the
+	// pre-CB.5 format.
+	RunID         string            `json:"run_id,omitempty"`
 	GoalHash      string            `json:"goal_hash"`
 	Context       map[string]string `json:"context,omitempty"`
 	Budget        BudgetEnvelope    `json:"budget"`

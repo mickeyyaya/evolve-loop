@@ -39,6 +39,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // validStrategies mirrors the bash whitelist at
@@ -388,6 +390,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			Context: cycleCtx,
 		}
 		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
+		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
 		lr.Cycles = append(lr.Cycles, result)
 		if err != nil {
 			lr.StopReason = "error"
@@ -484,6 +487,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			Context: cycleCtx,
 		}
 		result, err := orch.RunCycle(context.Background(), req)
+		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
 		lr.Cycles = append(lr.Cycles, result)
 		if err != nil {
 			var clf *core.ErrCycleLevelFailure
@@ -889,6 +893,24 @@ func unfinishedCycle(cs core.CycleState, lastCycleNumber int) bool {
 // WorkspacePath construction.
 func cycleWorkspace(projectRoot string, cycle int) string {
 	return filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
+}
+
+// reapCycleSessions kills any tmux sessions the cycle's launches registered
+// in its per-run registry (CB.5: by registry, never glob — see
+// swarm.ReapRunSessions). Fired after EVERY cycle attempt: a clean cycle's
+// sessions were already killed by per-launch cleanup (re-kill is a no-op);
+// an aborted cycle's leaked sessions are exactly what the looppreflight
+// stale-session check used to find a batch too late.
+func reapCycleSessions(projectRoot string, cycle int, stderr io.Writer) {
+	if cycle <= 0 {
+		return
+	}
+	path := sessionrecord.PathIn(cycleWorkspace(projectRoot, cycle))
+	rep := swarm.ReapRunSessions(context.Background(), path, swarm.ExecTmuxKill)
+	if rep.Killed > 0 || rep.Errors > 0 || rep.Skipped > 0 {
+		fmt.Fprintf(stderr, "[loop] session registry reap cycle=%d: killed=%d skipped=%d errors=%d\n",
+			cycle, rep.Killed, rep.Skipped, rep.Errors)
+	}
 }
 
 // updateBreaker is the pure step function of the same-cycle circuit

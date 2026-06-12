@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // anyProbe composes liveness probes: the agent is alive if ANY sub-probe says
@@ -58,15 +60,23 @@ func realTmuxRunner(args ...string) ([]byte, error) {
 //
 // The returned closure holds the last-seen hash, so it must be called from a
 // single goroutine (the observer's Watch loop — which it is).
-func newTmuxPaneProbe(cycle int, phase string, run tmuxRunner) func() bool {
+func newTmuxPaneProbe(cycle int, phase, runID string, run tmuxRunner) func() bool {
 	if run == nil {
 		run = realTmuxRunner
 	}
 	infix := fmt.Sprintf("-c%d-%s-", cycle, phase)
+	// CB.6: a probe that knows its run id asserts the run token before
+	// claiming liveness — matching ANOTHER run's session would keep a dead
+	// agent's stall clock fresh (the cross-run false-liveness class).
+	// runID="" (legacy single-driver dispatch) keeps the infix-only match.
+	runInfix := ""
+	if runID != "" {
+		runInfix = "-" + sessionrecord.RunScopeToken(runID) + "-"
+	}
 	var lastHash string
 	var observed bool
 	return func() bool {
-		session := findBridgeSession(run, infix)
+		session := findBridgeSession(run, infix, runInfix)
 		if session == "" {
 			return false
 		}
@@ -87,17 +97,22 @@ func newTmuxPaneProbe(cycle int, phase string, run tmuxRunner) func() bool {
 }
 
 // findBridgeSession returns the first tmux session whose name is an
-// evolve-bridge session containing infix, or "" when none match / tmux errors.
-func findBridgeSession(run tmuxRunner, infix string) string {
+// evolve-bridge session containing infix (and runInfix, when non-empty — the
+// CB.6 run-ownership assertion), or "" when none match / tmux errors.
+func findBridgeSession(run tmuxRunner, infix, runInfix string) string {
 	out, err := run("ls", "-F", "#{session_name}")
 	if err != nil {
 		return ""
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		s := strings.TrimSpace(line)
-		if strings.HasPrefix(s, "evolve-bridge-") && strings.Contains(s, infix) {
-			return s
+		if !strings.HasPrefix(s, "evolve-bridge-") || !strings.Contains(s, infix) {
+			continue
 		}
+		if runInfix != "" && !strings.Contains(s, runInfix) {
+			continue // another run's session: never a liveness claim for ours
+		}
+		return s
 	}
 	return ""
 }

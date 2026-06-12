@@ -148,6 +148,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		Completion:     raw.completion,
 		Cycle:          cycle,
 		Worktree:       raw.worktree,
+		RunID:          raw.runID,
 		ProjectRoot:    raw.projectRoot,
 		Agent:          raw.agent,
 		PermissionMode: permMode,
@@ -217,7 +218,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
 	cycle, worktree, projectRoot, agent, completion                            string
-	permissionMode, sessionName, streamOutput                                  string
+	permissionMode, sessionName, streamOutput, runID                           string
 	validateOnly, dryRun, requireFull, allowBypass, humanInput                 bool
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
 }
@@ -273,6 +274,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		cycle:          get("CYCLE"),
 		worktree:       get("WORKTREE_PATH"),
 		projectRoot:    get("PROJECT_ROOT"),
+		runID:          get("BRIDGE_RUN_ID"),
 		agent:          get("AGENT"),
 		completion:     get("BRIDGE_COMPLETION"),
 		permissionMode: get("BRIDGE_PERMISSION_MODE"),
@@ -291,8 +293,8 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--prompt-file": &r.promptFile, "--workspace": &r.workspace,
 		"--stdout-log": &r.stdoutLog, "--stderr-log": &r.stderrLog,
 		"--artifact": &r.artifact, "--cycle": &r.cycle, "--worktree": &r.worktree,
-		"--project-root": &r.projectRoot,
-		"--agent":        &r.agent, "--permission-mode": &r.permissionMode,
+		"--project-root": &r.projectRoot, "--run-id": &r.runID,
+		"--agent": &r.agent, "--permission-mode": &r.permissionMode,
 		"--session-name": &r.sessionName, "--completion": &r.completion,
 	}
 

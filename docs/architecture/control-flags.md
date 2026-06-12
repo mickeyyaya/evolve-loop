@@ -393,6 +393,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_FANOUT_WORKER_NAME` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FANOUT_WORKER_TOKEN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FANOUT_WORKSPACE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
+| `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
 | `EVOLVE_FORCE_BARE` | dead | — | — | Platform / CLI Hybrid | Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_FORCE_FRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FORCE_INNER_SANDBOX` | dead | — | — | Sandbox Cluster | Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |

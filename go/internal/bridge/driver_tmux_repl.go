@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,9 +16,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
+
+// errWorktreeRequired is the CB.2 typed refusal: under a fleet supervisor
+// (EVOLVE_FLEET=1) a launch with no explicit worktree must fail closed —
+// the cwd fallback would run the agent over another run's tree (or main).
+var errWorktreeRequired = errors.New("fleet mode: explicit worktree required (refusing process-cwd fallback)")
 
 // emitChannelBreadcrumb writes one structured channel marker to w. The producer's
 // correlator parses these to bracket an injected ask's answer span (ADR-0037).
@@ -134,7 +142,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	workingDir := cfg.Worktree
 	if workingDir == "" {
+		// CB.2: the cwd fallback launches the agent over WHATEVER directory
+		// the dispatching process sits in. Under a fleet supervisor that may
+		// be another run's tree — fail closed (typed, exit 10 is a non-trigger
+		// code: a config bug must surface, never CLI-fallback). Single mode
+		// keeps the fallback for operator ergonomics, but loudly.
+		if v, _ := lookupEnv(deps, "EVOLVE_FLEET"); envchain.BoolValue(v, false) {
+			return ExitBadFlags, fmt.Errorf("%s %w", pfx, errWorktreeRequired)
+		}
 		workingDir, _ = os.Getwd()
+		fmt.Fprintf(deps.Stderr, "%s WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", pfx, workingDir)
 	}
 	if !isDir(workingDir) {
 		fmt.Fprintf(deps.Stderr, "%s working dir does not exist: %s\n", pfx, workingDir)
@@ -211,8 +228,26 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
-		if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+		// CB.2: bind the pane cwd at session birth when the controller can
+		// (`tmux new-session -c`); the cd keystroke below stays as the second
+		// layer for capability-less controllers. (A RESUMED named session gets
+		// neither — it deliberately keeps whatever state it was left in.)
+		if ws, ok := deps.Tmux.(workdirSessionStarter); ok {
+			if err := ws.NewSessionIn(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight, workingDir); err != nil {
+				return ExitBadFlags, fmt.Errorf("%s new-session: %w", pfx, err)
+			}
+		} else if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 			return ExitBadFlags, fmt.Errorf("%s new-session: %w", pfx, err)
+		}
+		// CB.5: record the session in the run's registry the moment it exists,
+		// so teardown reaps exactly what this run created (by registry, never
+		// glob) even if this launch crashes before its own deferred cleanup.
+		// Best-effort: a failed write degrades to today's leak-on-crash, loudly.
+		if err := sessionrecord.Append(sessionrecord.PathIn(cfg.Workspace), sessionrecord.Record{
+			Session: lp.session, RunID: cfg.RunID, Cycle: cfg.Cycle,
+			Agent: cfg.Agent, PID: os.Getpid(), CreatedAt: deps.Now().UTC().Format(time.RFC3339),
+		}); err != nil {
+			fmt.Fprintf(deps.Stderr, "%s WARN session registry append failed: %v (session %s will not be registry-reapable)\n", pfx, err, lp.session)
 		}
 		deps.Sleep(time.Second)
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "cd "+workingDir, true)
@@ -465,6 +500,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	sawBusy := false
 	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	recordTokens(intervalBaselinePane)
+	// CB.6: the freshest non-empty pane seen — escalation evidence that
+	// survives a mid-phase server death (cycle-286 masked-evidence class).
+	lastGoodPane := intervalBaselinePane
 	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
 	// baseline (no extra capture, no fixture-frame drift): the prompt was
 	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
@@ -580,6 +618,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)
 			recordTokens(curPane)
+			// CB.6: evidence survives the session's death. When the server
+			// is killed mid-phase every later capture is empty, so the
+			// escalation report's final_pane carried nothing and cycle-286's
+			// retro misattributed the failure. Retain the last NON-EMPTY
+			// pane; a dead capture falls back to it as the freshest real
+			// evidence (the live pane still wins whenever it renders).
+			if strings.TrimSpace(curPane) != "" {
+				lastGoodPane = curPane
+			}
+			evidencePane := lastGoodPane
 			// Progressed = the pane changed during the interval. Stage-0 signal:
 			// good for the common cases (growing token counters, new tool calls),
 			// but a pure spinner/clock animation also reads as progress — so the
@@ -596,7 +644,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				Attempt:    attempt,
 				Progressed: progressed,
 				Busy:       panestream.PaneBusy(curPane, paneProfile) || renderWedged,
-				StdoutTail: lastLines(curPane, 40),
+				StdoutTail: lastLines(evidencePane, 40),
 			}
 			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
 			// self-update, dead shell) preempts the reviewer in enforce —
@@ -862,7 +910,15 @@ func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session str
 		return NamedSessionName(cfg.SessionName), true
 	}
 	agent := orDefault(cfg.Agent, "probe")
-	s := fmt.Sprintf("%sc%d-%s-pid%d-%d", ephemeralPrefix, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
+	// CB.5: a run-scoped token right after the driver prefix namespaces the
+	// session to its run — observers/watchers assert it (CB.6) and `tmux ls`
+	// under an M-run fleet reads unambiguously. RunID="" (single-driver
+	// legacy, degraded paths) keeps the pre-CB.5 name byte-identical.
+	runTok := ""
+	if cfg.RunID != "" {
+		runTok = sessionrecord.RunScopeToken(cfg.RunID) + "-"
+	}
+	s := fmt.Sprintf("%s%sc%d-%s-pid%d-%d", ephemeralPrefix, runTok, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
 	return truncate64(s), false
 }
 

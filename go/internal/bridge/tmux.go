@@ -66,6 +66,21 @@ func (t execTmux) NewSession(ctx context.Context, name string, width, height int
 	return err
 }
 
+// workdirSessionStarter is an OPTIONAL TmuxController capability (CB.2): create
+// the detached session with its pane cwd bound at BIRTH (`tmux new-session -c`)
+// instead of relying solely on the later `cd` keystroke — a swallowed keystroke
+// (the codex-menu class) otherwise leaves the CLI running from the dispatcher's
+// cwd. Controllers without it degrade to plain NewSession + cd (the
+// PaneCommander / windowJiggler optional-interface convention).
+type workdirSessionStarter interface {
+	NewSessionIn(ctx context.Context, name string, width, height int, workdir string) error
+}
+
+func (t execTmux) NewSessionIn(ctx context.Context, name string, width, height int, workdir string) error {
+	_, err := t.run(ctx, "new-session", "-d", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height), "-c", workdir)
+	return err
+}
+
 func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
 	args := []string{"send-keys", "-t", session}
 	if keys != "" {

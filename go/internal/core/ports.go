@@ -314,6 +314,9 @@ type BridgeRequest struct {
 	Prompt    string `json:"prompt"`    // prompt body; adapter materializes as a file
 	Workspace string `json:"workspace"` // absolute path; bridge writes outputs here
 	Worktree  string `json:"worktree,omitempty"`
+	// RunID is the CA.5 run identity (CB.5): the bridge namespaces tmux
+	// session names with r<runid8> and stamps the per-run session registry.
+	RunID string `json:"run_id,omitempty"`
 	// ProjectRoot is the absolute path to the main repo root. Needed by the
 	// bridge's SandboxWrap (Workstream B) to set RepoRoot read-only while
 	// allowing writes to Worktree+Workspace. Optional for back-compat: a zero

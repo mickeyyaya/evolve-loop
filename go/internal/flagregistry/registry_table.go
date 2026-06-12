@@ -145,6 +145,7 @@ var All = []Flag{
 	{Name: "EVOLVE_FANOUT_WORKER_NAME", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_FANOUT_WORKER_TOKEN", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_FANOUT_WORKSPACE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
+	{Name: "EVOLVE_FLEET", Status: StatusActive, Kind: "bool", Default: "0", Cluster: "Fleet Cluster (Track C concurrency)", Doc: "Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback."},
 	{Name: "EVOLVE_FORCE_BARE", Status: StatusDead, Cluster: "Platform / CLI Hybrid", Doc: "Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory]"},
 	{Name: "EVOLVE_FORCE_FRESH", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_FORCE_INNER_SANDBOX", Status: StatusDead, Cluster: "Sandbox Cluster", Doc: "Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory]"},
