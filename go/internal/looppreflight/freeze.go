@@ -22,6 +22,7 @@ package looppreflight
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -67,6 +68,28 @@ func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 	p := filepath.Join(home, rel)
 	if _, err := os.Stat(p); err != nil {
 		return false, "", nil
+	}
+	// claude's NATIVE freeze: settings.json {"autoUpdates": false} disables
+	// the updater at the source — the same convergent steady state as a brew
+	// pin (survives reboots and crashed batches). It is also the ONLY freeze
+	// available on hosts where claude is not brew-installed (the ~/.local/bin
+	// native installer): without this branch the brew-pin remedy is
+	// impossible there and the HALT is permanent. An unreadable/unparsable
+	// settings file is AMBIGUITY (error → WARN), never a silent pass.
+	if bin == "claude" {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return false, "", fmt.Errorf("claude settings unreadable (freeze state unverifiable): %w", err)
+		}
+		var s struct {
+			AutoUpdates *bool `json:"autoUpdates"`
+		}
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return false, "", fmt.Errorf("claude settings unparsable (freeze state unverifiable): %w", err)
+		}
+		if s.AutoUpdates != nil && !*s.AutoUpdates {
+			return false, "", nil // frozen at the source — nothing to pin
+		}
 	}
 	return true, p + " present (" + label + ")", nil
 }

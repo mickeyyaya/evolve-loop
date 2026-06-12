@@ -298,3 +298,74 @@ func TestDefaultPinnedLister_Smoke(t *testing.T) {
 	// brew may be absent; error is acceptable — just verify no panic.
 	_, _ = defaultPinnedLister()
 }
+
+// TestDefaultSelfUpdateEvidence_ClaudeAutoUpdatesDisabled: claude's NATIVE
+// freeze. On hosts where claude is not brew-installed (e.g. the ~/.local/bin
+// native installer) `brew pin claude` is impossible, so the brew-pin remedy
+// made the HALT permanent. settings.json with "autoUpdates": false is the
+// same convergent steady state as a brew pin (survives reboots and crashed
+// batches; the updater never runs) — such a host must report NO self-update
+// evidence.
+func TestDefaultSelfUpdateEvidence_ClaudeAutoUpdatesDisabled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	settings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte(`{"autoUpdates": false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ok, evidence, err := defaultSelfUpdateEvidence("claude")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Fatalf("autoUpdates:false is the native freeze — must report no self-update evidence (got %q)", evidence)
+	}
+	if evidence != "" {
+		t.Fatalf("frozen-host evidence must be empty; got %q", evidence)
+	}
+}
+
+// …and the explicit-true / unparsable axes stay risky/ambiguous: a host that
+// turned the updater back on (or whose settings cannot be read) must never
+// silently pass.
+func TestDefaultSelfUpdateEvidence_ClaudeAutoUpdatesTrueOrGarbage(t *testing.T) {
+	cases := []struct {
+		name      string
+		body      string
+		wantErr   bool
+		wantRisky bool
+	}{
+		{name: "explicit-true", body: `{"autoUpdates": true}`, wantRisky: true},
+		{name: "absent-key", body: `{}`, wantRisky: true},
+		{name: "garbage-settings", body: `{torn`, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			settings := filepath.Join(home, ".claude", "settings.json")
+			if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(settings, []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			ok, _, err := defaultSelfUpdateEvidence("claude")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("unparsable settings.json is AMBIGUITY (error → WARN), never a silent pass")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantRisky && !ok {
+				t.Fatal("claude with auto-updates not disabled must stay risky")
+			}
+		})
+	}
+}
