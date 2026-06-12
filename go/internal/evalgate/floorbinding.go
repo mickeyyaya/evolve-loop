@@ -50,7 +50,8 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 	if err != nil {
 		return "", false // no triage artifact → fail open
 	}
-	deferred := triagecap.DeferredFloorPackages(string(artifact), targets)
+	companionPath := filepath.Join(in.Workspace, triagecap.TriageDecisionName())
+	deferred := triagecap.DeferredFloorPackagesDecl(string(artifact), companionPath, targets)
 	if len(deferred) == 0 {
 		return "", false
 	}

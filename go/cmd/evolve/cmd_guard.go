@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 // guardLogTag maps the Go guard subcommand name to the audit-trail tag
@@ -90,6 +91,9 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if name == "list-audit-fails" {
 		return runListAuditFails(fs.Args()[1:], evolveDir, stdout, stderr)
 	}
+	if name == "triage-floors" {
+		return runGuardTriageFloors(fs.Args()[1:], stdout, stderr)
+	}
 	in, err := readGuardInput(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard %s: stdin parse: %v\n", name, err)
@@ -158,6 +162,9 @@ func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer
 	fs.StringVar(&evolveDir, "evolve-dir", evolveDir, "path to .evolve/ state directory")
 	fs.BoolVar(&asJSON, "json", false, "emit JSON array instead of human-readable table")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 10
 	}
 
@@ -242,6 +249,50 @@ func buildGuard(name, evolveDir string) (core.Guard, error) {
 	case "chain":
 		return guards.NewChain(ledger.New(evolveDir)), nil
 	default:
-		return nil, fmt.Errorf("unknown guard %q (known: ship phase role docdelete quota chain)", name)
+		return nil, fmt.Errorf("unknown guard %q (known: ship phase role docdelete quota chain triage-floors)", name)
 	}
+}
+
+func runGuardTriageFloors(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve guard triage-floors", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(fs.Output(), "usage: evolve guard triage-floors <workspace>")
+		fmt.Fprintln(fs.Output(), "checks committed_floors and deferred_floors declarations against triage prose")
+	}
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 10
+	}
+	if fs.NArg() != 1 {
+		fs.Usage()
+		return 10
+	}
+	workspace := fs.Arg(0)
+	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(workspace)))
+	artifactPath := filepath.Join(workspace, triagecap.TriageArtifactName())
+	companionPath := filepath.Join(workspace, triagecap.TriageDecisionName())
+	artifact, err := os.ReadFile(artifactPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve guard triage-floors: read %s: %v\n", artifactPath, err)
+		return 1
+	}
+	knownPkgs := triagecap.KnownPackages(projectRoot)
+	var messages []string
+	if msg := triagecap.FloorDivergenceCorrective(string(artifact), companionPath, knownPkgs); msg != "" {
+		messages = append(messages, msg)
+	}
+	if msg := triagecap.DeferredFloorDivergence(string(artifact), companionPath, knownPkgs); msg != "" {
+		messages = append(messages, msg)
+	}
+	if len(messages) > 0 {
+		for _, msg := range messages {
+			fmt.Fprintln(stdout, msg)
+		}
+		return 1
+	}
+	fmt.Fprintln(stdout, "triage floor declarations match prose")
+	return 0
 }

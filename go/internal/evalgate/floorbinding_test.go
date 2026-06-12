@@ -3,10 +3,12 @@ package evalgate
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 // newGatesForTest exposes the production gate list so wiring pins can assert
@@ -189,5 +191,139 @@ func TestFloorBindingGate_WiredIntoReviewer(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("floorBindingGate is not wired into NewReviewer's gate list")
+	}
+}
+
+// ----------------------------------------------------------------------------
+// ADR-0046 Layer 1 (cycle 305): the floor-binding gate consumes the triage
+// companion's deferred_floors[] declaration instead of scraping ## deferred /
+// ## dropped prose. Builder rewires floorBindingGate.check() to read
+// <workspace>/triage-decision.json via the declaration-primary
+// triagecap.DeferredFloorPackagesDecl wrapper.
+//
+// RED guarantee: TestFloorBinding_DeclaredDivergenceMessage references the
+// not-yet-existing symbol triagecap.DeferredFloorDivergence, so this whole test
+// package fails to compile until Builder lands the Layer-1 functions — every
+// pin below is RED in the unbuilt tree. The behavioral pins
+// (DeferredFromCompanion, ProseIgnoredWithCompanion) additionally fail on
+// behavior once the package compiles but the gate still reads prose.
+// ----------------------------------------------------------------------------
+
+// committedCoreNoDeferred: a triage artifact that COMMITS core in ## top_n and
+// has no ## deferred section. The prose path therefore finds nothing deferred;
+// only a companion declaration can mark core as deferred.
+const committedCoreNoDeferred = `## top_n (commit to THIS cycle)
+- coverage-core: push internal/core coverage to ≥98% — priority=H
+`
+
+// deferredCoreProse: a triage artifact that DEFERS core in prose (the legacy
+// authority the companion now overrides).
+const deferredCoreProse = `## top_n (commit to THIS cycle)
+- coverage-bridge: adapters/bridge coverage to ≥98% — priority=H
+
+## deferred (carry to NEXT cycle's carryoverTodos)
+- coverage-core: push internal/core coverage to ≥98% — defer_reason=too large
+`
+
+// writeFixtureCompanion writes a triage-decision.json beside the triage report
+// in the fixture workspace. A nil deferredFloors writes a companion WITHOUT the
+// deferred_floors field (the present-file/absent-field fallback case).
+func writeFixtureCompanion(t *testing.T, in core.ReviewInput, deferredFloors []string) {
+	t.Helper()
+	var body string
+	if deferredFloors == nil {
+		body = `{"cycle":300,"top_n":[]}`
+	} else {
+		q := make([]string, len(deferredFloors))
+		for i, f := range deferredFloors {
+			q[i] = `"` + f + `"`
+		}
+		body = `{"cycle":300,"deferred_floors":[` + strings.Join(q, ",") + `]}`
+	}
+	path := filepath.Join(in.Workspace, triagecap.TriageDecisionName())
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFixtureArtifact(t *testing.T, in core.ReviewInput, artifact string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(in.Workspace, "triage-report.md"), []byte(artifact), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// C1: a companion that declares deferred_floors:["core"] blocks a core floor
+// predicate even though the prose COMMITS core (no ## deferred section). Proves
+// the declaration is the gate's source of truth.
+func TestFloorBinding_DeferredFromCompanion(t *testing.T) {
+	in := buildFloorBindingFixture(t, deferredCorePredicates) // binds ./internal/core/
+	writeFixtureArtifact(t, in, committedCoreNoDeferred)      // prose: core committed, nothing deferred
+	writeFixtureCompanion(t, in, []string{"core"})            // declaration: core deferred
+	reason, block := floorBindingGate{}.check(in)
+	if reason == "" || !block {
+		t.Fatalf("companion deferred_floors:[core] must block the core floor predicate; got reason=%q block=%v", reason, block)
+	}
+}
+
+// C2: with NO companion present and a triage artifact that commits core (no
+// prose deferral), the gate must fail open — introducing companion-reading must
+// not spuriously block a committed floor.
+func TestFloorBinding_MissingCompanion_FailOpen(t *testing.T) {
+	in := buildFloorBindingFixture(t, deferredCorePredicates)
+	writeFixtureArtifact(t, in, committedCoreNoDeferred)
+	// no writeFixtureCompanion → companion absent
+	if reason, block := (floorBindingGate{}).check(in); reason != "" || block {
+		t.Errorf("missing companion + committed core must fail open; got reason=%q block=%v", reason, block)
+	}
+}
+
+// N1: a companion declaring a DIFFERENT deferred package makes prose-deferred
+// core non-authoritative — the gate must NOT block core. This is the cycle-280
+// class retirement: prose can no longer over-bind a floor the agent committed.
+func TestFloorBinding_ProseIgnoredWithCompanion(t *testing.T) {
+	in := buildFloorBindingFixture(t, deferredCorePredicates) // binds core
+	writeFixtureArtifact(t, in, deferredCoreProse)            // prose defers core
+	writeFixtureCompanion(t, in, []string{"recovery"})        // declaration defers recovery, NOT core
+	if reason, block := (floorBindingGate{}).check(in); reason != "" || block {
+		t.Errorf("declaration (recovery) must override prose (core); core predicate must pass; got reason=%q block=%v", reason, block)
+	}
+}
+
+// E1: a companion that exists but omits deferred_floors falls back to the prose
+// scan — the field is optional and its absence is not "zero deferred floors".
+func TestFloorBinding_CompanionNoField_FallbackProse(t *testing.T) {
+	in := buildFloorBindingFixture(t, deferredCorePredicates)
+	writeFixtureArtifact(t, in, deferredCoreProse) // prose defers core
+	writeFixtureCompanion(t, in, nil)              // companion present, no deferred_floors
+	reason, block := floorBindingGate{}.check(in)
+	if reason == "" || !block {
+		t.Fatalf("companion without deferred_floors must fall back to prose (core deferred → block); got reason=%q block=%v", reason, block)
+	}
+}
+
+// C5: the divergence reporter (consumed by `evolve guard triage-floors`) returns
+// an actionable message when prose-deferred packages and the companion's
+// deferred_floors disagree, and "" when they agree. This pin references the
+// new triagecap.DeferredFloorDivergence symbol, which keeps the whole evalgate
+// test package RED until Builder lands Layer 1.
+func TestFloorBinding_DeclaredDivergenceMessage(t *testing.T) {
+	dir := t.TempDir()
+	companion := filepath.Join(dir, triagecap.TriageDecisionName())
+	if err := os.WriteFile(companion, []byte(`{"cycle":305,"deferred_floors":["core"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	known := []string{"core", "bridge"}
+
+	// Prose defers bridge; declaration defers core → divergence.
+	diverge := "## top_n\n- x: y\n\n## deferred\n- coverage-bridge: bridge coverage ≥98%\n"
+	if msg := triagecap.DeferredFloorDivergence(diverge, companion, known); msg == "" {
+		t.Error("prose/declaration divergence must yield a non-empty corrective message")
+	}
+
+	// Prose defers core; declaration defers core → agreement, silent.
+	agree := "## top_n\n- x: y\n\n## deferred\n- coverage-core: core coverage ≥98%\n"
+	if msg := triagecap.DeferredFloorDivergence(agree, companion, known); msg != "" {
+		t.Errorf("matching prose/declaration must be silent, got %q", msg)
 	}
 }

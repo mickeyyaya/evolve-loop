@@ -212,6 +212,7 @@ phase_skip: []
   "cycle": <N>,
   "top_n": [{"id": "<task_id>", "action": "..."}, ...],
   "committed_floors": ["<package_floor_committed_in_top_n>", ...],
+  "deferred_floors": ["<package_floor_deferred_or_dropped>", ...],
   "deferred": [{"id": "<task_id>"}],
   "dropped": [{"id": "<task_id>", "reason": "..."}],
   "skip_shipped": [{"task_id": "<id>", "git_sha": "<sha>"}],
@@ -226,6 +227,12 @@ clamp. Include each package whose coverage/floor target is actually committed
 in `## top_n`; emit `[]` when top_n has no coverage/floor commitment. Do not
 include packages that are only mentioned in `## deferred` or `## dropped`.
 
+`deferred_floors[]` is the declaration-primary source for deferred/dropped
+floor work. Include each package whose coverage/floor target appears in
+`## deferred` or `## dropped`; emit `[]` when no deferred/dropped item carries
+a package coverage/floor target. Do not include packages committed in
+`## top_n`.
+
 The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (key, colon, value, newline). The phase-gate fails on `large`.
 
 ### 5. Final checks before exit
@@ -233,9 +240,11 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 1. First line of triage-report.md is the challenge-token comment.
 2. `cycle_size_estimate:` is `small`, `medium`, or `large`.
 3. `top_n` length is between 0 and `EVOLVE_TRIAGE_TOP_N` (default 3).
-4. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
+4. Run `evolve guard triage-floors <workspace>` and reconcile any
+   committed_floors/deferred_floors divergence it reports before exit.
+5. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
    gate/infrastructure defect that failed the previous cycle, `top_n` length MUST be exactly 1.
-4. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
+6. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
 5. No item is in two buckets.
 
 6. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `EVOLVE_PSMAS_SKIP=1`, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.

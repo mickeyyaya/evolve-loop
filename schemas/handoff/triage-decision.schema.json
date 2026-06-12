@@ -52,6 +52,12 @@
       "type": "array<string>",
       "required": false,
       "description": "Agent-owned package floor declarations for top_n; internal/triagecap treats this as the primary committed floor count when present."
+    },
+    {
+      "name": "deferred_floors",
+      "type": "array<string>",
+      "required": false,
+      "description": "Agent-owned package floor declarations for deferred/dropped work; internal/triagecap treats this as the primary deferred floor set when present."
     }
   ],
   "min_words": 50
