@@ -17,6 +17,7 @@ func newTestReviewer(stage config.Stage, window []core.TriageThroughputEntry, lo
 	r := newCapReviewer(stage)
 	r.pkgsFn = func(string) []string { return knownPkgsFixture }
 	r.windowFn = func(string) []core.TriageThroughputEntry { return window }
+	r.failsFn = func(string) []FailEntry { return nil }
 	if logs != nil {
 		r.logf = func(f string, a ...any) { *logs = append(*logs, f) }
 	} else {

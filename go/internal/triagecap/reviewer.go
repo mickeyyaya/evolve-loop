@@ -29,12 +29,13 @@ import (
 //     bricked loop.
 
 // CapReviewer is the triage capacity clamp. Construct with NewReviewer;
-// tests override pkgsFn/windowFn/logf directly.
+// tests override pkgsFn/windowFn/failsFn/logf directly.
 type CapReviewer struct {
 	stage    config.Stage
 	logf     func(format string, args ...any)
 	pkgsFn   func(projectRoot string) []string
 	windowFn func(projectRoot string) []core.TriageThroughputEntry
+	failsFn  func(projectRoot string) []FailEntry
 }
 
 // NewReviewer builds the capacity clamp for a stage. Callers wire it via
@@ -50,6 +51,7 @@ func newCapReviewer(stage config.Stage) *CapReviewer {
 		logf:     func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 		pkgsFn:   KnownPackages,
 		windowFn: readWindow,
+		failsFn:  readFailedApproaches,
 	}
 }
 
@@ -98,6 +100,18 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 	if r.stage != config.StageEnforce {
 		r.logf("[triage-cap] %s (stage=%s, would-block)", reason, r.stage)
 		return core.ReviewResult{Approve: true}
+	}
+	// ADR-0046 Layer 2: before enforcing, consult the identical-rejection
+	// demotion (demotion.go). Two consecutive cycles rejected with this
+	// exact template ⇒ the gate is the suspect ⇒ shadow for this cycle only,
+	// with an auto-filed defect. Consulted at rejection time so a healthy
+	// approve path never pays the state.json read.
+	if cycle, ok := workspaceCycleID(in.Workspace); ok {
+		if demote, why := ShouldDemote(r.failsFn(in.ProjectRoot), cycle); demote {
+			r.logf("[triage-cap] DEMOTED to shadow for cycle %d — %s; gate defect suspected (ADR-0046 L2). Would-block: %s", cycle, why, reason)
+			autoFileDemotionDefect(in.ProjectRoot, cycle, why)
+			return core.ReviewResult{Approve: true}
+		}
 	}
 	r.logf("[triage-cap] %s (stage=enforce, BLOCK)", reason)
 	return core.ReviewResult{Approve: false, Reason: reason}

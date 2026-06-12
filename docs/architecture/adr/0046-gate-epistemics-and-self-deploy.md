@@ -1,6 +1,6 @@
 # ADR-0046: Gate Epistemics, Declarative Commitments, and Loop Self-Deploy
 
-- **Status:** Proposed (Layer 0 + blocker-solo rule implemented; Layers 1–3 designed, not built)
+- **Status:** Partially Implemented (Layer 0 + blocker-solo + Layer 1 [cycles 304/305] + Layer 2 demotion [interactive, after cycles 306/307 both failed building it — see below]; Layer 3 designed only)
 - **Date:** 2026-06-12
 - **Driver:** soak-#2 cycles 301/302 bricked by the R9.2 triage capacity clamp
   ([incident](../../operations/incident-2026-06-12-triagecap-phantom-floors.md))
@@ -59,6 +59,15 @@ a planning clamp, is flagged by the cross-check, and the builder's actual overru
 window honestly.
 
 ### Layer 2 — epistemic gate classes + identical-rejection instinct (contains all future gate bugs)
+
+> **Implementation status (2026-06-13):** the demotion core is LIVE for the one production
+> heuristic gate (`internal/triagecap/demotion.go`: `ReasonTemplateHash` digit-run-length
+> normalization — jitter-insensitive, magnitude-sensitive per the cycle-306 lesson;
+> `ShouldDemote` consecutive-pair check with one-cycle scope; auto-filed idempotent inbox
+> defect; consulted INSIDE `NewReviewer` at rejection time so composition-root wiring cannot
+> be forgotten — the cycle-307 lesson). The generic GateClass registry is DEFERRED until a
+> second heuristic gate exists (YAGNI; documented in demotion.go's header). The self-check
+> CLI admission rule shipped in cycle 305 (`evolve guard triage-floors`).
 
 1. Deliverable reviewers are classified at registration: **fact-gate** (verifies ground truth:
    red_count, attestation hashes, artifact presence) vs **heuristic-gate** (estimates from
