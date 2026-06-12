@@ -458,6 +458,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			Prompt:              prompt,
 			Workspace:           req.Workspace,
 			Worktree:            req.Worktree,
+			RunID:               req.RunID,
 			ProjectRoot:         req.ProjectRoot,
 			ArtifactPath:        artifactPath,
 			Agent:               phase,

@@ -1553,7 +1553,9 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 		Workspace:   fl.CycleState.WorkspacePath,
 		// CB.1: even this out-of-band retro keeps the no-main-tree-cwd
 		// invariant — read-only, but invariants with exceptions aren't structural.
-		Worktree:      fl.CycleState.ActiveWorktree,
+		Worktree: fl.CycleState.ActiveWorktree,
+		// CB.5: and the run identity, for run-scoped session naming.
+		RunID:         fl.CycleState.RunID,
 		GoalHash:      fl.CycleRequest.GoalHash,
 		Budget:        fl.CycleRequest.Budget,
 		PreviousPhase: string(fl.Failed),
@@ -2077,6 +2079,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			ProjectRoot:   req.ProjectRoot,
 			Workspace:     cs.WorkspacePath,
 			Worktree:      phaseWorktree,
+			RunID:         cs.RunID,
 			GoalHash:      req.GoalHash,
 			Budget:        req.Budget,
 			PreviousPhase: string(current),

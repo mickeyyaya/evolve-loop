@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // errWorktreeRequired is the CB.2 typed refusal: under a fleet supervisor
@@ -237,6 +238,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			}
 		} else if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 			return ExitBadFlags, fmt.Errorf("%s new-session: %w", pfx, err)
+		}
+		// CB.5: record the session in the run's registry the moment it exists,
+		// so teardown reaps exactly what this run created (by registry, never
+		// glob) even if this launch crashes before its own deferred cleanup.
+		// Best-effort: a failed write degrades to today's leak-on-crash, loudly.
+		if err := sessionrecord.Append(sessionrecord.PathIn(cfg.Workspace), sessionrecord.Record{
+			Session: lp.session, RunID: cfg.RunID, Cycle: cfg.Cycle,
+			Agent: cfg.Agent, PID: os.Getpid(), CreatedAt: deps.Now().UTC().Format(time.RFC3339),
+		}); err != nil {
+			fmt.Fprintf(deps.Stderr, "%s WARN session registry append failed: %v (session %s will not be registry-reapable)\n", pfx, err, lp.session)
 		}
 		deps.Sleep(time.Second)
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "cd "+workingDir, true)
@@ -886,8 +897,26 @@ func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session str
 		return NamedSessionName(cfg.SessionName), true
 	}
 	agent := orDefault(cfg.Agent, "probe")
-	s := fmt.Sprintf("%sc%d-%s-pid%d-%d", ephemeralPrefix, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
+	// CB.5: a run-scoped token right after the driver prefix namespaces the
+	// session to its run — observers/watchers assert it (CB.6) and `tmux ls`
+	// under an M-run fleet reads unambiguously. RunID="" (single-driver
+	// legacy, degraded paths) keeps the pre-CB.5 name byte-identical.
+	runTok := ""
+	if cfg.RunID != "" {
+		runTok = RunScopeToken(cfg.RunID) + "-"
+	}
+	s := fmt.Sprintf("%s%sc%d-%s-pid%d-%d", ephemeralPrefix, runTok, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
 	return truncate64(s), false
+}
+
+// RunScopeToken is the session-name run namespace: "r" + the first 8 ULID
+// chars. Single source shared by resolveSession (mint) and the CB.6 observer
+// run-scope assertion (match).
+func RunScopeToken(runID string) string {
+	if len(runID) > 8 {
+		runID = runID[:8]
+	}
+	return "r" + runID
 }
 
 func truncate64(s string) string {

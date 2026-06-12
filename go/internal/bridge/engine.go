@@ -193,9 +193,12 @@ type Config struct {
 	// Completion selects the phase-completion contract (ADR-0027): "" /
 	// "artifact" = poll for the artifact file (default, legacy); "stdout" =
 	// complete on REPL-idle for agents that print their answer (router/advisor).
-	Completion     string
-	Cycle          int
-	Worktree       string
+	Completion string
+	Cycle      int
+	Worktree   string
+	// RunID is the CA.5 run identity (CB.5): non-empty → tmux session names
+	// carry the r<runid8> run token and the per-run registry is stamped with it.
+	RunID          string
 	ProjectRoot    string // absolute path; sandbox uses this as the read-only RepoRoot (WS-B)
 	Agent          string
 	PermissionMode string // "" = driver default
@@ -304,6 +307,10 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	}
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)
+	}
+	if req.RunID != "" {
+		// CB.5: run identity → run-scoped session names + per-run registry.
+		args = append(args, "--run-id="+req.RunID)
 	}
 	if req.ProjectRoot != "" {
 		// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as

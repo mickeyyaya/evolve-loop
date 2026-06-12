@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // recipe_adapter.go wires the recipe.Engine (pure, in internal/bridge/recipe)
@@ -73,6 +74,16 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 		}
 	} else if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 		return fmt.Errorf("new-session: %w", err)
+	}
+	// CB.5: record in the run registry like runTmuxREPL does — the recipe
+	// path is a second creation surface; a crash before the caller's own
+	// teardown must still leave the session registry-reapable. (The attach
+	// branch above skips this: the session was recorded by its creator.)
+	if err := sessionrecord.Append(sessionrecord.PathIn(d.cfg.Workspace), sessionrecord.Record{
+		Session: d.session, RunID: d.cfg.RunID, Cycle: d.cfg.Cycle,
+		Agent: d.cfg.Agent, PID: os.Getpid(),
+	}); err != nil {
+		fmt.Fprintf(d.deps.Stderr, "[recipe] WARN session registry append failed: %v (session %s will not be registry-reapable)\n", err, d.session)
 	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)

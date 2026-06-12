@@ -248,7 +248,10 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// CB.1: the resume path is a first-class dispatch surface and must
 			// thread the persisted worktree like the RunCycle loop does — a
 			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
-			Worktree:      cs.ActiveWorktree,
+			Worktree: cs.ActiveWorktree,
+			// CB.5: same rule for the persisted run identity (resume reuses
+			// the run-record id, so session names stay run-scoped).
+			RunID:         cs.RunID,
 			GoalHash:      req.GoalHash,
 			Budget:        req.Budget,
 			PreviousPhase: string(current),
