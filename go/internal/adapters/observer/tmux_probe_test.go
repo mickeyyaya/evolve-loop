@@ -17,7 +17,7 @@ func TestTmuxPaneProbe_NoMatchingSession(t *testing.T) {
 		}
 		return nil, fmt.Errorf("capture-pane should not be reached")
 	}
-	probe := newTmuxPaneProbe(190, "build", run)
+	probe := newTmuxPaneProbe(190, "build", "", run)
 	if probe() {
 		t.Error("no session matching -c190-build- → want false")
 	}
@@ -27,7 +27,7 @@ func TestTmuxPaneProbe_NoMatchingSession(t *testing.T) {
 func TestTmuxPaneProbe_TmuxError(t *testing.T) {
 	t.Parallel()
 	run := func(args ...string) ([]byte, error) { return nil, fmt.Errorf("tmux: not found") }
-	probe := newTmuxPaneProbe(190, "build", run)
+	probe := newTmuxPaneProbe(190, "build", "", run)
 	if probe() {
 		t.Error("tmux error → want false")
 	}
@@ -49,7 +49,7 @@ func TestTmuxPaneProbe_PaneAnimatingIsAlive(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected args %v", args)
 	}
-	probe := newTmuxPaneProbe(190, "build", run)
+	probe := newTmuxPaneProbe(190, "build", "", run)
 
 	if !probe() {
 		t.Fatal("first sighting of a live pane → want true")
@@ -77,7 +77,7 @@ func TestTmuxPaneProbe_CaptureError(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected %v", args)
 	}
-	probe := newTmuxPaneProbe(5, "audit", run)
+	probe := newTmuxPaneProbe(5, "audit", "", run)
 	if probe() {
 		t.Error("capture-pane error → want false")
 	}

@@ -500,6 +500,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	sawBusy := false
 	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	recordTokens(intervalBaselinePane)
+	// CB.6: the freshest non-empty pane seen — escalation evidence that
+	// survives a mid-phase server death (cycle-286 masked-evidence class).
+	lastGoodPane := intervalBaselinePane
 	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
 	// baseline (no extra capture, no fixture-frame drift): the prompt was
 	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
@@ -615,6 +618,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)
 			recordTokens(curPane)
+			// CB.6: evidence survives the session's death. When the server
+			// is killed mid-phase every later capture is empty, so the
+			// escalation report's final_pane carried nothing and cycle-286's
+			// retro misattributed the failure. Retain the last NON-EMPTY
+			// pane; a dead capture falls back to it as the freshest real
+			// evidence (the live pane still wins whenever it renders).
+			if strings.TrimSpace(curPane) != "" {
+				lastGoodPane = curPane
+			}
+			evidencePane := lastGoodPane
 			// Progressed = the pane changed during the interval. Stage-0 signal:
 			// good for the common cases (growing token counters, new tool calls),
 			// but a pure spinner/clock animation also reads as progress — so the
@@ -631,7 +644,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				Attempt:    attempt,
 				Progressed: progressed,
 				Busy:       panestream.PaneBusy(curPane, paneProfile) || renderWedged,
-				StdoutTail: lastLines(curPane, 40),
+				StdoutTail: lastLines(evidencePane, 40),
 			}
 			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
 			// self-update, dead shell) preempts the reviewer in enforce —
@@ -903,20 +916,10 @@ func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session str
 	// legacy, degraded paths) keeps the pre-CB.5 name byte-identical.
 	runTok := ""
 	if cfg.RunID != "" {
-		runTok = RunScopeToken(cfg.RunID) + "-"
+		runTok = sessionrecord.RunScopeToken(cfg.RunID) + "-"
 	}
 	s := fmt.Sprintf("%s%sc%d-%s-pid%d-%d", ephemeralPrefix, runTok, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
 	return truncate64(s), false
-}
-
-// RunScopeToken is the session-name run namespace: "r" + the first 8 ULID
-// chars. Single source shared by resolveSession (mint) and the CB.6 observer
-// run-scope assertion (match).
-func RunScopeToken(runID string) string {
-	if len(runID) > 8 {
-		runID = runID[:8]
-	}
-	return "r" + runID
 }
 
 func truncate64(s string) string {

@@ -24,6 +24,19 @@ import (
 // FileName is the registry's name inside a run workspace.
 const FileName = "tmux-sessions.jsonl"
 
+// RunScopeToken is the session-name run namespace: "r" + the first 8 ULID
+// chars. The single source shared by the bridge's resolveSession (mints it
+// into evolve-bridge-r<runid8>-… names) and the observer's run-scope
+// assertion (CB.6: a probe that knows its run id refuses sessions without
+// this token). Lives in this leaf so the observer adapter doesn't need the
+// whole bridge package for one string rule.
+func RunScopeToken(runID string) string {
+	if len(runID) > 8 {
+		runID = runID[:8]
+	}
+	return "r" + runID
+}
+
 // Record is one created tmux session. Append-only; a session is recorded at
 // creation and never updated — liveness is tmux's truth, not the registry's.
 type Record struct {

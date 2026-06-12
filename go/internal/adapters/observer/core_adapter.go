@@ -104,7 +104,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		//   - process CPU time: the agent subprocess accruing CPU (HEADLESS
 		//     phases, which have no pane; PID written by the bridge at launch).
 		LivenessProbe: anyProbe(
-			newTmuxPaneProbe(req.Cycle, phase, nil),
+			newTmuxPaneProbe(req.Cycle, phase, req.RunID, nil),
 			newProcessCPUProbe(core.BridgePIDFile(stdoutLog), nil),
 		),
 	}
