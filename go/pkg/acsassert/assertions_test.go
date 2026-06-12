@@ -381,3 +381,72 @@ func TestLineContainsAll_MissingFile(t *testing.T) {
 		t.Error("missing file must return false")
 	}
 }
+
+// TestCountInGoFunc — function-scoped occurrence counting. Kills the ACS
+// count-rot class: file-wide counts (CountOccurrencesAny == N) break when a
+// LATER cycle legitimately adds an occurrence elsewhere in the file
+// (cycle-296's IsAbs predicate rotted exactly this way within one day,
+// refreshed 1→2 in 0c210b52). Scoping the assertion to the function whose
+// body carries the invariant ("addWorktree contains NO IsAbs guard") makes
+// it immune to unrelated growth — and a missing/renamed function is a LOUD
+// error, never a silent 0.
+func TestCountInGoFunc(t *testing.T) {
+	dir := t.TempDir()
+	src := `package p
+
+import "path/filepath"
+
+func keeper(s string) bool {
+	if filepath.IsAbs(s) { // one
+		return filepath.IsAbs(s) // two
+	}
+	return false
+}
+
+func clean(s string) string { return s }
+`
+	path := filepath.Join(dir, "x.go")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, err := CountInGoFunc(path, "keeper", "filepath.IsAbs"); err != nil || n != 2 {
+		t.Errorf("CountInGoFunc(keeper) = %d, %v; want 2, nil", n, err)
+	}
+	if n, err := CountInGoFunc(path, "clean", "filepath.IsAbs"); err != nil || n != 0 {
+		t.Errorf("CountInGoFunc(clean) = %d, %v; want 0, nil", n, err)
+	}
+	// Missing function must be a LOUD error (silent 0 would let a renamed
+	// function evade a ==0 predicate forever).
+	if _, err := CountInGoFunc(path, "renamedAway", "filepath.IsAbs"); err == nil {
+		t.Error("CountInGoFunc(missing func) = nil error, want error")
+	}
+	// Missing file must error too.
+	if _, err := CountInGoFunc(filepath.Join(dir, "nope.go"), "keeper", "x"); err == nil {
+		t.Error("CountInGoFunc(missing file) = nil error, want error")
+	}
+	// Variants are OR'd per line, like CountOccurrencesAny.
+	if n, err := CountInGoFunc(path, "keeper", "IsAbs(s) { // one", "// two"); err != nil || n != 2 {
+		t.Errorf("CountInGoFunc(keeper, variants) = %d, %v; want 2, nil", n, err)
+	}
+}
+
+// TestCountInGoFunc_MethodReceiver — the only real-world call site
+// (cycle-296's addWorktree predicate) targets a METHOD; FuncDecl.Name is the
+// bare method name, receiver ignored.
+func TestCountInGoFunc_MethodReceiver(t *testing.T) {
+	dir := t.TempDir()
+	src := `package p
+
+type myT struct{}
+
+func (r myT) method(s string) bool { return len(s) > 0 }
+`
+	path := filepath.Join(dir, "m.go")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := CountInGoFunc(path, "method", "len(s)"); err != nil || n != 1 {
+		t.Errorf("CountInGoFunc(method receiver) = %d, %v; want 1, nil", n, err)
+	}
+}

@@ -12,6 +12,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -272,4 +275,43 @@ func LineContainsAll(path string, needles ...string) bool {
 		}
 	}
 	return false
+}
+
+// CountInGoFunc returns the count of lines INSIDE the named top-level
+// function of the Go source file at path that contain any of the given
+// substring variants. Methods match by bare name too (receiver ignored);
+// on a name collision the FIRST declaration in the file wins. Function-scoped counting is rot-resistant where
+// file-wide CountOccurrencesAny is not: a later cycle adding occurrences
+// elsewhere in the file cannot flip a function-scoped predicate. Unlike the
+// lenient file-wide helpers, a missing file, unparsable source, or missing
+// function returns a non-nil error — a renamed function must fail a
+// predicate LOUDLY, never satisfy an ==0 assertion silently.
+func CountInGoFunc(path, funcName string, variants ...string) (int, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return 0, fmt.Errorf("acsassert: read %s: %w", path, err)
+	}
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, raw, 0)
+	if err != nil {
+		return 0, fmt.Errorf("acsassert: parse %s: %w", path, err)
+	}
+	for _, decl := range f.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if !ok || fd.Name.Name != funcName {
+			continue
+		}
+		body := string(raw[fset.Position(fd.Pos()).Offset:fset.Position(fd.End()).Offset])
+		count := 0
+		for _, line := range strings.Split(body, "\n") {
+			for _, v := range variants {
+				if strings.Contains(line, v) {
+					count++
+					break
+				}
+			}
+		}
+		return count, nil
+	}
+	return 0, fmt.Errorf("acsassert: function %q not found in %s", funcName, path)
 }

@@ -132,14 +132,18 @@ func TestC296_001_WorktreeBaseRefusesRelativeBase(t *testing.T) {
 		t.Errorf("RED: TestWorktreeBase_RelativeEnvReturnsError did not PASS — worktreeBase " +
 			"does not yet refuse a relative EVOLVE_WORKTREE_BASE itself (guard still only in addWorktree)")
 	}
-	// Auxiliary anti-duplication check (not RED-discriminating): the IsAbs guards
-	// live ONLY in worktreeBase — the cycle-296 env-base guard plus the cycle-297
-	// projectRoot guard — and are not duplicated in addWorktree, so provision.go
-	// contains exactly two IsAbs references.
+	// Auxiliary anti-duplication check (not RED-discriminating), FUNCTION-SCOPED
+	// so it cannot rot when later cycles legitimately add IsAbs elsewhere in the
+	// file (the original file-wide ==2 count rotted within a day — 0c210b52):
+	// the IsAbs guard belongs in worktreeBase and must NOT be duplicated in
+	// addWorktree.
 	prov := filepath.Join(goDir(t), "internal", "swarm", "provision.go")
-	if n := acsassert.CountOccurrencesAny(prov, "filepath.IsAbs"); n != 2 {
-		t.Errorf("expected exactly 2 filepath.IsAbs in provision.go (env-base + projectRoot "+
-			"guards, both in worktreeBase, none in addWorktree), found %d", n)
+	if n, err := acsassert.CountInGoFunc(prov, "addWorktree", "filepath.IsAbs"); err != nil || n != 0 {
+		t.Errorf("addWorktree must contain NO filepath.IsAbs (guard lives in worktreeBase, "+
+			"not duplicated): found %d, err=%v", n, err)
+	}
+	if n, err := acsassert.CountInGoFunc(prov, "worktreeBase", "filepath.IsAbs"); err != nil || n < 1 {
+		t.Errorf("worktreeBase must carry the filepath.IsAbs guard itself: found %d, err=%v", n, err)
 	}
 }
 
