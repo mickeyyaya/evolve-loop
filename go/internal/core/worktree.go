@@ -57,7 +57,7 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// tear down a stale stub before recreating.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
 		if exec.Command("git", "-C", wt, "rev-parse", "--git-dir").Run() == nil {
-			linkGuardDeps(wt, projectRoot)
+			linkGuardDeps(wt, projectRoot, cycle)
 			return wt, nil
 		}
 		_ = exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt).Run()
@@ -74,7 +74,7 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("git worktree add -B %s %s: %v: %s", branch, wt, err, eb.String())
 	}
-	linkGuardDeps(wt, projectRoot)
+	linkGuardDeps(wt, projectRoot, cycle)
 	return wt, nil
 }
 
@@ -87,7 +87,7 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 // We symlink the LIVE dispatcher binary + the guard-read state files into the
 // worktree so the hooks resolve to the real binary + current cycle-state.
 // Best-effort: failures are non-fatal (the phase will surface a denial loudly).
-func linkGuardDeps(worktree, projectRoot string) {
+func linkGuardDeps(worktree, projectRoot string, cycle int) {
 	// Binary: the running dispatcher's own executable carries the current guard
 	// logic (incl. the worktree-phase role-gate allowance), avoiding a stale
 	// in-tree go/bin/evolve.
@@ -96,11 +96,20 @@ func linkGuardDeps(worktree, projectRoot string) {
 			symlinkForce(self, filepath.Join(worktree, "go", "bin", "evolve"))
 		}
 	}
-	// Guard-read state: point the worktree's .evolve files at the live main
-	// copies so `--evolve-dir <worktree>/.evolve` reads real cycle-state. File-
-	// level links (not a .evolve dir link) avoid any tree-walk recursion.
+	// Guard-read state, file-level links (not a .evolve dir link — avoids any
+	// tree-walk recursion). cycle-state resolves to the run's OWN run.json
+	// mirror (CB.4): under concurrent runs the host-global cycle-state.json
+	// holds whichever run wrote last, so guards in this worktree must read
+	// this run's phase. The link may briefly dangle — run.json is written by
+	// the first WriteCycleState just after provisioning (see symlinkForce).
+	// state.json + ledger.jsonl stay host-global until CC.1 lands the per-run
+	// events ledger; retargeting the ledger link before a per-run ledger
+	// exists would have the chain guard verify an empty file (vacuous pass).
 	if err := os.MkdirAll(filepath.Join(worktree, ".evolve"), 0o755); err == nil {
-		for _, f := range []string{"cycle-state.json", "state.json", "ledger.jsonl"} {
+		symlinkForce(
+			filepath.Join(RunWorkspacePath(projectRoot, cycle), RunStateFile),
+			filepath.Join(worktree, ".evolve", "cycle-state.json"))
+		for _, f := range []string{"state.json", "ledger.jsonl"} {
 			symlinkForce(filepath.Join(projectRoot, ".evolve", f), filepath.Join(worktree, ".evolve", f))
 		}
 	}

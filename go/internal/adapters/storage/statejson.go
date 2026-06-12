@@ -58,26 +58,54 @@ func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, 
 // WriteCycleState atomically replaces .evolve/cycle-state.json while preserving
 // the checkpoint block written by the checkpoint package. core.CycleState does
 // not model that key, so a plain struct rewrite would erase resume state.
+// It then dual-writes the state to <WorkspacePath>/run.json (CB.4): the
+// per-run mirror the worktree provisioner symlinks guard hooks at, so guards
+// inside a cycle worktree read this run's phase — not whichever concurrent
+// run last wrote the global file.
 func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
 	path := filepath.Join(s.evolveDir, "cycle-state.json")
 	checkpoint, ok, err := readExistingCheckpoint(path)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		return writeJSONAtomic(path, cs)
-	}
 
-	raw, err := json.Marshal(cs)
-	if err != nil {
-		return fmt.Errorf("marshal cycle state: %w", err)
+	// Determine the value to persist at the global path. When a checkpoint
+	// block already exists it must be spliced in (the CycleState struct does
+	// not model it, so a plain rewrite would erase resume state).
+	var global any = cs
+	if ok {
+		raw, err := json.Marshal(cs)
+		if err != nil {
+			return fmt.Errorf("marshal cycle state: %w", err)
+		}
+		var merged map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &merged); err != nil {
+			return fmt.Errorf("unmarshal cycle state: %w", err)
+		}
+		merged["checkpoint"] = checkpoint
+		global = merged
 	}
-	var merged map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &merged); err != nil {
-		return fmt.Errorf("unmarshal cycle state: %w", err)
+	if err := writeJSONAtomic(path, global); err != nil {
+		return err
 	}
-	merged["checkpoint"] = checkpoint
-	return writeJSONAtomic(path, merged)
+	return mirrorRunState(cs)
+}
+
+// mirrorRunState writes the run.json guard mirror into the run workspace.
+// The checkpoint block is deliberately NOT mirrored: it is resume state owned
+// by the global cycle-state.json (guards never read it, and resume reads the
+// global file directly). A failed mirror surfaces as an error — guards inside
+// the worktree deciding on a stale phase would be a fail-open, not a
+// degradation.
+func mirrorRunState(cs core.CycleState) error {
+	if cs.WorkspacePath == "" {
+		return nil
+	}
+	p := filepath.Join(cs.WorkspacePath, core.RunStateFile)
+	if err := writeJSONAtomic(p, cs); err != nil {
+		return fmt.Errorf("run-state mirror %s: %w", p, err)
+	}
+	return nil
 }
 
 func readExistingCheckpoint(path string) (json.RawMessage, bool, error) {

@@ -77,8 +77,10 @@ func TestWriteCycleState_PreservesCheckpoint(t *testing.T) {
 	}
 	path := writeCheckpointedState(t, evolveDir, cp)
 
-	// A new pre-dispatch write for the next phase.
-	next := core.CycleState{CycleID: 294, Phase: "audit", WorkspacePath: "/ws"}
+	// A new pre-dispatch write for the next phase. WorkspacePath must be a
+	// writable dir since CB.4: WriteCycleState mirrors the state to
+	// <WorkspacePath>/run.json.
+	next := core.CycleState{CycleID: 294, Phase: "audit", WorkspacePath: t.TempDir()}
 	if err := s.WriteCycleState(context.Background(), next); err != nil {
 		t.Fatalf("WriteCycleState: %v", err)
 	}
