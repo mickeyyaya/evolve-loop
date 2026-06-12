@@ -87,30 +87,27 @@ func TestWorktreePhase_FromSpec(t *testing.T) {
 // verification commands (git diff HEAD, go test, test -d) inspect the builder's
 // pending work in the worktree — a non-Claude auditor running a relative `cd go`
 // from the project root saw an empty main tree and false-FAILed work that was
-// present in the worktree. runsInWorktree adds audit to the cwd set WITHOUT making
-// it a source-writer (worktreePhase / role-gate write permission stays false).
-func TestRunsInWorktree_AuditInspectsWorktreeButIsNotAWriter(t *testing.T) {
+// present in the worktree. Post-CB.1 the worktree CWD is universal (pinned by
+// TestCB1_EveryDispatchedPhaseCarriesWorktree); what this table pins is the
+// WRITE axis — worktreePhase / role-gate permission stays exactly the source
+// writers, audit and the read-only spine included as non-writers.
+func TestWorktreePhase_WriteAxisIsSourceWritersOnly(t *testing.T) {
 	t.Parallel()
 	o := userPhaseOrchestrator(t)
-	cwdCases := []struct {
+	writeCases := []struct {
 		p    Phase
 		want bool
 	}{
-		{PhaseBuild, true},  // source writer → cwd=worktree
-		{PhaseTDD, true},    // source writer → cwd=worktree
-		{PhaseAudit, true},  // read-only inspector → cwd=worktree (issue #9)
-		{PhaseScout, false}, // scans main tree → no worktree cwd
-		{PhaseRetro, false}, // reads workspace artifacts → no worktree cwd
+		{PhaseBuild, true},  // source writer
+		{PhaseTDD, true},    // source writer
+		{PhaseAudit, false}, // read-only inspector (cwd=worktree, never a writer)
+		{PhaseScout, false}, // read-only discovery
+		{PhaseRetro, false}, // reads workspace artifacts
 	}
-	for _, c := range cwdCases {
-		if got := o.runsInWorktree(c.p); got != c.want {
-			t.Errorf("runsInWorktree(%q) = %v, want %v", c.p, got, c.want)
+	for _, c := range writeCases {
+		if got := o.worktreePhase(c.p); got != c.want {
+			t.Errorf("worktreePhase(%q) = %v, want %v", c.p, got, c.want)
 		}
-	}
-	// Audit gets cwd=worktree but must NOT become a source-writer (role-gate /
-	// swarm-writer semantics key off worktreePhase, not runsInWorktree).
-	if o.worktreePhase(PhaseAudit) {
-		t.Error("audit must remain a NON-writer (worktreePhase(audit) must stay false)")
 	}
 }
 

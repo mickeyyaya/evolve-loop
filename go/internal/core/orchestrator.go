@@ -1548,9 +1548,12 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 	retroCtx["failure_summary"] = summary
 	retroCtx["next_cycle_todo_id"] = todoID
 	return PhaseRequest{
-		Cycle:         fl.Cycle,
-		ProjectRoot:   fl.CycleRequest.ProjectRoot,
-		Workspace:     fl.CycleState.WorkspacePath,
+		Cycle:       fl.Cycle,
+		ProjectRoot: fl.CycleRequest.ProjectRoot,
+		Workspace:   fl.CycleState.WorkspacePath,
+		// CB.1: even this out-of-band retro keeps the no-main-tree-cwd
+		// invariant — read-only, but invariants with exceptions aren't structural.
+		Worktree:      fl.CycleState.ActiveWorktree,
 		GoalHash:      fl.CycleRequest.GoalHash,
 		Budget:        fl.CycleRequest.Budget,
 		PreviousPhase: string(fl.Failed),
@@ -2029,15 +2032,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
-		// Phases that run with cwd=worktree: source writers (tdd/build) so their
-		// code writes land in the isolated worktree the role-gate permits, AND the
-		// audit phase (read-only) so its verification commands inspect the builder's
-		// pending work there instead of the main tree (issue #9). Every other phase
-		// writes only its artifact to the absolute workspace.
-		phaseWorktree := ""
-		if o.runsInWorktree(next) {
-			phaseWorktree = cs.ActiveWorktree
-		}
+		// CB.1 (concurrency campaign W4): EVERY phase runs with cwd = the cycle
+		// worktree — not just the source writers (tdd/build, role-gate-permitted)
+		// and audit (issue #9: its verification commands must inspect the
+		// builder's pending work). A read-only phase's cwd in the main tree let
+		// stray writes and guard misfires land in the live checkout (cycle-280);
+		// with the worktree provisioned at cycle start, no phase subprocess
+		// touches main at all. cwd is NOT write permission: the write axis
+		// (role-gate / tree-diff guard / normalize) still keys off worktreePhase.
+		// Empty when provisioning failed — the pre-existing degraded mode.
+		phaseWorktree := cs.ActiveWorktree
 		// Workstream B: snapshot the main-tree dirty set BEFORE a source-
 		// writing phase runs. After it runs we re-snapshot and compare —
 		// any newly-dirty MAIN-tree path is a leak that escaped the bridge
@@ -3196,10 +3200,13 @@ func orderIndex(order []string, phase string) int {
 	return -1
 }
 
-// worktreePhase reports whether next writes source and so must run with
-// cwd=worktree. Built-in tdd/build always do; a user phase does iff its spec
-// sets writes_source. Method form (vs the free WorktreePhase) so it consults
-// the injected catalog.
+// worktreePhase reports whether next WRITES SOURCE — the write axis the
+// role-gate, tree-diff guard, and build-commit normalize key off. Built-in
+// tdd/build always do; a user phase does iff its spec sets writes_source.
+// Method form (vs the free WorktreePhase) so it consults the injected catalog.
+// Since CB.1 this no longer selects the subprocess cwd — every phase runs
+// cwd=worktree (see the phaseWorktree assignment in the dispatch loop); this
+// predicate is purely about write PERMISSION.
 func (o *Orchestrator) worktreePhase(p Phase) bool {
 	if WorktreePhase(p) {
 		return true
@@ -3208,20 +3215,6 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 		return spec.WritesSource
 	}
 	return false
-}
-
-// runsInWorktree reports whether a phase's subprocess should run with cwd set to
-// the cycle worktree. This is a SUPERSET of worktreePhase (source writers): the
-// audit phase also runs there — read-only — so its verification commands
-// (`git diff HEAD`, `go test`, `test -d`) inspect the builder's PENDING work in
-// the worktree rather than the main tree. (Issue #9: a non-Claude auditor running
-// a relative `cd go` from the project root inspected an empty main tree and
-// false-FAILed work that was present in the worktree; the audit-binding at
-// recordAuditBinding already uses cs.ActiveWorktree, so the auditor's cwd must
-// match it.) Audit is deliberately NOT a worktreePhase — it gets cwd for
-// inspection, never source-write permission (the role-gate keys off worktreePhase).
-func (o *Orchestrator) runsInWorktree(p Phase) bool {
-	return o.worktreePhase(p) || p == PhaseAudit
 }
 
 // phaseFromRouter denormalizes a router phase string back to a core.Phase.

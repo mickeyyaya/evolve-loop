@@ -113,9 +113,12 @@ type PhaseRequest struct {
 	// source-writing phase edits here, and an EGPS predicate's `go test`
 	// compiles here (acssuite runs predicates with cwd=Worktree while `.evolve/`
 	// still resolves to ProjectRoot via EVOLVE_PROJECT_ROOT — the intentional
-	// dual root, issue #9 + #12). Empty for read-only phases, which then run
-	// against ProjectRoot. Keep ProjectRoot (data) and Worktree (code) distinct:
-	// collapsing them reintroduces the cycle-190 "predicate ran against main" bug.
+	// dual root, issue #9 + #12). Since CB.1 it is set for EVERY phase (cwd
+	// isolation is universal; write permission stays on the worktreePhase
+	// axis); empty only when provisioning failed — the degraded mode where
+	// phases run against ProjectRoot. Keep ProjectRoot (data) and Worktree
+	// (code) distinct: collapsing them reintroduces the cycle-190 "predicate
+	// ran against main" bug.
 	Worktree      string            `json:"worktree"`
 	GoalHash      string            `json:"goal_hash"`
 	Context       map[string]string `json:"context,omitempty"`

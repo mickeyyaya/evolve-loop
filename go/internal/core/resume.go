@@ -242,9 +242,13 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		}
 
 		resp, err := runner.Run(ctx, PhaseRequest{
-			Cycle:         cycle,
-			ProjectRoot:   req.ProjectRoot,
-			Workspace:     cs.WorkspacePath,
+			Cycle:       cycle,
+			ProjectRoot: req.ProjectRoot,
+			Workspace:   cs.WorkspacePath,
+			// CB.1: the resume path is a first-class dispatch surface and must
+			// thread the persisted worktree like the RunCycle loop does — a
+			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
+			Worktree:      cs.ActiveWorktree,
 			GoalHash:      req.GoalHash,
 			Budget:        req.Budget,
 			PreviousPhase: string(current),
