@@ -30,11 +30,12 @@ func (c CheckResult) MarshalJSON() ([]byte, error) {
 // resultWire is the JSON shape for a Result; OverallLevel renders as a string
 // and Checks marshal via CheckResult.MarshalJSON.
 type resultWire struct {
-	Checks       []CheckResult `json:"checks"`
-	ChecksPassed int           `json:"checks_passed"`
-	ChecksTotal  int           `json:"checks_total"`
-	OverallLevel string        `json:"overall_level"`
-	GeneratedAt  string        `json:"generated_at"`
+	Checks       []CheckResult     `json:"checks"`
+	ChecksPassed int               `json:"checks_passed"`
+	ChecksTotal  int               `json:"checks_total"`
+	OverallLevel string            `json:"overall_level"`
+	GeneratedAt  string            `json:"generated_at"`
+	CLIVersions  map[string]string `json:"cli_versions,omitempty"`
 }
 
 // MarshalJSON emits the persisted readiness payload.
@@ -45,6 +46,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 		ChecksTotal:  r.ChecksTotal,
 		OverallLevel: r.OverallLevel.String(),
 		GeneratedAt:  r.GeneratedAt,
+		CLIVersions:  r.CLIVersions,
 	})
 }
 

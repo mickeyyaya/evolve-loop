@@ -116,6 +116,12 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			CommitSHA: commitShort,
 		})
 	}
+	// Drain residual claims: items claimed into processing/cycle-<cid>/ that
+	// were NOT in top_n (dropped from triage) are released back to inbox root
+	// so the next cycle re-triages them.
+	if _, releaseErr := inboxmover.ReleaseCycleProcessing(mvOpts, cid); releaseErr != nil {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: residual claim release for cycle %d: %v", cid, releaseErr))
+	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle promote complete for cycle %d", cid))
 	return nil
 }

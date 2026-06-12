@@ -349,6 +349,68 @@ func RecoverOrphans(opts Options) (RecoverResult, error) {
 	return res, nil
 }
 
+// --- Subcommand: release-cycle-processing ---------------------------------
+
+// ReleaseCycleProcessing moves all *.json files from processing/cycle-<cycle>/
+// back to the inbox root. It is scoped to the single named cycle dir and is
+// idempotent: a missing or already-drained dir is a clean no-op. A file whose
+// basename already exists at the inbox root (double-move race) is warned and
+// skipped — the existing inbox-root copy is never clobbered.
+func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
+	opts.resolveOpts()
+	res := RecoverResult{Paths: []string{}}
+
+	cycleDir := filepath.Join(opts.InboxDir, "processing", fmt.Sprintf("cycle-%d", cycle))
+	info, err := os.Stat(cycleDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			opts.logf("", "release-cycle: processing/cycle-%d/ absent — nothing to release", cycle)
+			return res, nil
+		}
+		return res, fmt.Errorf("release-cycle: stat processing/cycle-%d: %w", cycle, err)
+	}
+	if !info.IsDir() {
+		return res, nil
+	}
+
+	files, _ := os.ReadDir(cycleDir)
+	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), ".json") {
+			continue
+		}
+		base := f.Name()
+		src := filepath.Join(cycleDir, base)
+		dest := filepath.Join(opts.InboxDir, base)
+
+		// Double-move race: a concurrent release already landed this file.
+		if _, statErr := os.Stat(dest); statErr == nil {
+			taskID := readTaskIDOrUnknown(src)
+			opts.logf("WARN: ", "release-cycle: %s already at inbox root (double-move for %s) — skipping", base, taskID)
+			continue
+		}
+
+		taskID := readTaskIDOrUnknown(src)
+		if mvErr := os.Rename(src, dest); mvErr != nil {
+			opts.logf("WARN: ", "release-cycle: mv failed for %s (leaving in processing/cycle-%d/): %v", base, cycle, mvErr)
+			continue
+		}
+		opts.logf("", "released: %s ← processing/cycle-%d/", base, cycle)
+		writeLedger(opts, LedgerEntry{
+			Action: "recover",
+			TaskID: taskID,
+			From:   fmt.Sprintf(".evolve/inbox/processing/cycle-%d/%s", cycle, base),
+			To:     ".evolve/inbox/" + base,
+			Cycle:  intPtr(fmt.Sprintf("%d", cycle)),
+			Reason: "cycle-release",
+		})
+		res.Recovered++
+		res.Paths = append(res.Paths, dest)
+	}
+	opts.logf("", "release-cycle: %d file(s) released from cycle-%d", res.Recovered, cycle)
+	return res, nil
+}
+
 // --- Helpers ---------------------------------------------------------------
 
 // findFileByTaskID scans <dir>/*.json and returns the path of the first

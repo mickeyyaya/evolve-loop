@@ -80,6 +80,7 @@ type Result struct {
 	ChecksTotal  int
 	OverallLevel CheckLevel
 	GeneratedAt  string
+	CLIVersions  map[string]string // CLI binary → version string; populated by drift check
 }
 
 // Halted reports whether any check halted (the batch must not start).
@@ -140,6 +141,12 @@ type Options struct {
 	// transient wall, e.g. rate_limit). Default reads
 	// .evolve/cli-health.json via the clihealth store.
 	CLIHealthActive func() []clihealth.Entry
+
+	// VersionInventory returns the current CLI version map (bin→version string).
+	// Default: captures versions of all distinct profile CLI binaries via
+	// captureVersionInventory. Tests inject a deterministic map closure to avoid
+	// shelling out to real CLIs.
+	VersionInventory func() map[string]string
 }
 
 // resolved is Options with every seam and default filled in.
@@ -169,6 +176,8 @@ type resolved struct {
 	selfUpdateEvidence func(string) (bool, string, error)
 	pinnedLister       func() ([]string, error)
 	cliHealthActive    func() []clihealth.Entry
+
+	versionInventory func() map[string]string
 }
 
 // DefaultBootBudget is the per-driver REPL boot deadline (mirrors the
@@ -203,6 +212,8 @@ func resolve(opts Options) (resolved, error) {
 		selfUpdateEvidence: opts.SelfUpdateEvidence,
 		pinnedLister:       opts.PinnedLister,
 		cliHealthActive:    opts.CLIHealthActive,
+
+		versionInventory: opts.VersionInventory,
 	}
 	if o.stderr == nil {
 		o.stderr = io.Discard
@@ -264,6 +275,22 @@ func resolve(opts Options) (resolved, error) {
 	if o.cliHealthActive == nil {
 		o.cliHealthActive = defaultCLIHealthActive(o.projectRoot)
 	}
+	if o.versionInventory == nil {
+		// Capture versions lazily so the closure sees the final resolved state.
+		lister, getter := o.profileLister, o.profileGetter
+		o.versionInventory = func() map[string]string {
+			seen := map[string]struct{}{}
+			var bins []string
+			for _, d := range distinctDrivers(lister, getter) {
+				b := driverBinary(d)
+				if _, dup := seen[b]; !dup {
+					seen[b] = struct{}{}
+					bins = append(bins, b)
+				}
+			}
+			return captureVersionInventory(bins)
+		}
+	}
 	return o, nil
 }
 
@@ -282,9 +309,12 @@ func Run(opts Options) (Result, error) {
 		checkHostCapabilities(o),
 		checkCLIVersionFreeze(o),
 		checkCLIHealth(o),
+		checkCLIVersionDrift(o),
 		checkBridgeBoot(o),
 	}
-	return finalize(checks, o.now()), nil
+	r := finalize(checks, o.now())
+	r.CLIVersions = o.versionInventory()
+	return r, nil
 }
 
 // finalize folds the per-check results into the overall Result.

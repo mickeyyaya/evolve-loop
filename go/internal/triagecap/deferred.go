@@ -90,6 +90,32 @@ func DeferredFloorPackagesDecl(artifact, companionPath string, candidatePkgs []s
 	return DeferredFloorPackages(artifact, candidatePkgs)
 }
 
+// MalformedDeferredFloorWarning returns a non-empty parse-error string when the
+// companion at companionPath is present but its JSON is malformed. Three cases:
+//
+//   - absent file           → "" (silent; backward compat)
+//   - present, field absent → "" (silent; backward compat)
+//   - present-but-malformed → non-empty string naming deferred_floors + the parse error
+func MalformedDeferredFloorWarning(companionPath string) string {
+	data, err := os.ReadFile(companionPath)
+	if err != nil {
+		return "" // absent → silent
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Sprintf("deferred_floors companion malformed (%s): invalid JSON: %v", companionPath, err)
+	}
+	field, ok := raw["deferred_floors"]
+	if !ok {
+		return "" // field absent → silent
+	}
+	var floors []string
+	if err := json.Unmarshal(field, &floors); err != nil {
+		return fmt.Sprintf("deferred_floors malformed (%s): %v", companionPath, err)
+	}
+	return ""
+}
+
 // DeferredFloorDivergence cross-checks prose deferred package mentions against
 // deferred_floors. It returns an actionable correction string, not a reject.
 func DeferredFloorDivergence(artifact, companionPath string, knownPkgs []string) string {

@@ -118,6 +118,32 @@ func CommittedFloorCount(artifact, companionPath string, knownPkgs []string) int
 	return CountCommittedFloors(artifact, knownPkgs)
 }
 
+// MalformedCommittedFloorWarning returns a non-empty parse-error string when the
+// companion at companionPath is present but its JSON is malformed. Three cases:
+//
+//   - absent file           → "" (silent; backward compat)
+//   - present, field absent → "" (silent; backward compat)
+//   - present-but-malformed → non-empty string naming committed_floors + the parse error
+func MalformedCommittedFloorWarning(companionPath string) string {
+	data, err := os.ReadFile(companionPath)
+	if err != nil {
+		return "" // absent → silent
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Sprintf("committed_floors companion malformed (%s): invalid JSON: %v", companionPath, err)
+	}
+	field, ok := raw["committed_floors"]
+	if !ok {
+		return "" // field absent → silent
+	}
+	var floors []string
+	if err := json.Unmarshal(field, &floors); err != nil {
+		return fmt.Sprintf("committed_floors malformed (%s): %v", companionPath, err)
+	}
+	return ""
+}
+
 // FloorDivergenceCorrective cross-checks prose floor package mentions against
 // committed_floors. It returns an actionable correction string, not a reject.
 func FloorDivergenceCorrective(artifact, companionPath string, knownPkgs []string) string {

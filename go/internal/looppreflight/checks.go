@@ -3,6 +3,7 @@ package looppreflight
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -182,5 +183,59 @@ func checkHostCapabilities(o resolved) CheckResult {
 		}
 	default:
 		return CheckResult{Name: name, Level: LevelPass, Message: "tmux present; .evolve writable; disk + sessions healthy"}
+	}
+}
+
+// checkCLIVersionDrift (Warn) detects silent CLI version changes between
+// batches. It compares the current version inventory (via o.versionInventory)
+// against the last-seen versions persisted at .evolve/cli-versions.json.
+// A version change on any inventoried CLI is a WARN — the operator should
+// validate the change was intentional (incident: claude 2.1.173→2.1.175 despite
+// autoUpdates:false, invisible because no version was recorded). First-batch
+// (no prior cache) is always PASS and establishes the baseline. The updated
+// inventory is persisted at the end of each run so the NEXT batch can compare.
+func checkCLIVersionDrift(o resolved) CheckResult {
+	const name = "cli-version-drift"
+
+	current := o.versionInventory()
+	if len(current) == 0 {
+		return CheckResult{Name: name, Level: LevelPass, Message: "no CLI version inventory"}
+	}
+
+	cachePath := filepath.Join(o.evolveDir, "cli-versions.json")
+	prev, _ := loadVersionCache(cachePath)
+
+	var warns []string
+	for bin, curVer := range current {
+		prevVer, hadPrev := prev[bin]
+		if !hadPrev || prevVer == curVer {
+			continue
+		}
+		warns = append(warns, fmt.Sprintf("%s changed: %s → %s", bin, prevVer, curVer))
+	}
+	sort.Strings(warns)
+
+	// Persist current inventory for next batch.
+	_ = saveVersionCache(cachePath, current)
+
+	if len(warns) > 0 {
+		return CheckResult{
+			Name:    name,
+			Level:   LevelWarn,
+			Message: fmt.Sprintf("%d CLI(s) changed version since last batch", len(warns)),
+			Detail:  strings.Join(warns, "\n"),
+		}
+	}
+
+	parts := make([]string, 0, len(current))
+	for b, v := range current {
+		parts = append(parts, b+"="+v)
+	}
+	sort.Strings(parts)
+	return CheckResult{
+		Name:    name,
+		Level:   LevelPass,
+		Message: fmt.Sprintf("CLI version inventory captured (%d bins)", len(current)),
+		Detail:  strings.Join(parts, "\n"),
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 
 	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
 	// so the orchestrator writes a resumable checkpoint at every phase boundary.
@@ -589,6 +590,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				})
 				if recordErr != nil && !errors.Is(recordErr, failurelog.ErrStateMissing) {
 					fmt.Fprintf(stderr, "[loop] WARN: could not record cycle failure: %v\n", recordErr)
+				}
+				// Release all claimed inbox items back to inbox root on cycle failure
+				// so the next batch re-triages them (prevents permanent orphaning).
+				if _, relErr := inboxmover.ReleaseCycleProcessing(inboxmover.Options{
+					ProjectRoot: cfg.ProjectRoot,
+					Stderr:      stderr,
+				}, result.Cycle); relErr != nil {
+					fmt.Fprintf(stderr, "[loop] WARN: could not release cycle %d inbox claims: %v\n", result.Cycle, relErr)
 				}
 				continue
 			}
