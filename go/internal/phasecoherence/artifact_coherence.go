@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path"
 	"strings"
 
@@ -48,24 +47,16 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 		}
 
 		// Read persona file
-		var personaBytes []byte
-		if overridePath, ok := opts.Overrides[name]; ok {
-			personaBytes, err = os.ReadFile(overridePath)
-			if err != nil {
-				return nil, err
+		persona, err := personaContents(opts, name)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
+				continue
 			}
-		} else {
-			personaBytes, err = fs.ReadFile(opts.AgentsFS, "agents/evolve-"+name+".md")
-			if err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					continue
-				}
-				return nil, err
-			}
+			return nil, err
 		}
 
 		// Parse persona frontmatter
-		fm, _, err := prompts.ParseFrontmatter(string(personaBytes))
+		fm, _, err := prompts.ParseFrontmatter(persona)
 		if err != nil {
 			return nil, err
 		}
@@ -84,12 +75,13 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 			continue
 		}
 
-		declared := firstMdToken(outputFormatStr)
-		if declared == "" {
+		// Compare by basename on BOTH sides: persona tokens may be
+		// dir-qualified (reflector's "learn/reflector-synthesis.md") while
+		// the profile side is already path.Base'd.
+		declared := path.Base(firstMdToken(outputFormatStr))
+		if declared == "." {
 			continue
 		}
-
-		profileArtifact := path.Base(profile.OutputArtifact)
 
 		if profile.OutputArtifact == "" {
 			violations = append(violations, Violation{
@@ -98,6 +90,15 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 				Severity: "WARN",
 				Message:  fmt.Sprintf("mismatch: persona declares output artifact %q but profile has no output_artifact field", declared),
 			})
+			continue
+		}
+
+		profileArtifact := path.Base(profile.OutputArtifact)
+
+		// A non-.md contract deliverable (memo → carryover-todos.json) can
+		// never match the persona's first .md token — that token is a
+		// legitimate SECONDARY artifact, not the contract one. Skip.
+		if path.Ext(profile.OutputArtifact) != ".md" {
 			continue
 		}
 

@@ -69,7 +69,7 @@
   ],
   "max_budget_usd": 0.5,
   "max_turns": 25,
-  "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/tester-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",
   "extra_flags_by_cli": {

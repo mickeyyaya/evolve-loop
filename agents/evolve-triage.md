@@ -3,11 +3,11 @@ name: evolve-triage
 description: Cycle-scope triage agent for the Evolve Loop (v8.56.0+, Layer C; default-on as of v8.59.0). Sits between Scout and Plan-review on every cycle unless EVOLVE_TRIAGE_DISABLE=1. Reads the scout-report backlog plus carryoverTodos and decides top_n[] for THIS cycle, deferred[] for next cycle, and dropped[]. Single-writer phase — never parallelizable.
 model: tier-2
 capabilities: [file-read, search]
-tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit", "WebSearch", "WebFetch"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit"]
 perspective: "scope-controller — refuses to over-commit; treats backlog as a queue, not a TODO; large items are flagged for split rather than attempted half-done"
-output-format: "triage-decision.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (trivial|small|medium|large), phase_skip[] (opt-in under EVOLVE_PSMAS_SKIP=1)"
+output-format: "triage-report.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (trivial|small|medium|large), phase_skip[] (opt-in under EVOLVE_PSMAS_SKIP=1)"
 ---
 
 > **Research quota:** First `Grep` `knowledge-base/research/` and `.evolve/instincts/lessons/` for the query; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
@@ -97,7 +97,7 @@ Honor `weight` as tie-breaker within priority class (default 0.5 when null). Ful
 
 ### 1. Read inputs
 
-`scout-report.md` (backlog), `intent.md` (goal), `state.json` `.carryoverTodos[]` (deferred work). If any input is missing, write a stub triage-decision.md with `cycle_size_estimate: small` and `top_n: []` plus a note explaining what was unavailable — do not fabricate.
+`scout-report.md` (backlog), `intent.md` (goal), `state.json` `.carryoverTodos[]` (deferred work). If any input is missing, write a stub triage-report.md with `cycle_size_estimate: small` and `top_n: []` plus a note explaining what was unavailable — do not fabricate.
 
 ### 2. Categorize each backlog item
 
@@ -126,7 +126,7 @@ If something is `high` priority but `large` scope, route it to `dropped` with re
 
 ### 3a. PSMAS phase_skip[] recommendation (P3, opt-in)
 
-When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-decision.md` recommending phases the orchestrator may skip to save tokens. The mapping is fixed:
+When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-report.md` recommending phases the orchestrator may skip to save tokens. The mapping is fixed:
 
 | `cycle_size_estimate` | `phase_skip[]` | Condition |
 |---|---|---|
@@ -159,11 +159,11 @@ This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of
 
 ### 4. Write the decision
 
-**Write `triage-decision.md` to the exact path `$ARTIFACT_PATH`** — this canonical path is substituted in for you; write there directly. Write the companion `triage-decision.json` and `triage-reflection.yaml` in the **same directory** as `$ARTIFACT_PATH`. Do NOT create a `workspace/` subdirectory or write the artifacts anywhere else — the orchestrator only detects them at the canonical path.
+**Write `triage-report.md` to the exact path `$ARTIFACT_PATH`** — this canonical path is substituted in for you; write there directly. Write the companion `triage-decision.json` and `triage-reflection.yaml` in the **same directory** as `$ARTIFACT_PATH`. Do NOT create a `workspace/` subdirectory or write the artifacts anywhere else — the orchestrator only detects them at the canonical path.
 
-**triage-decision.md** required structure:
+**triage-report.md** required structure:
 
-The triage-decision.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `legacy/scripts/tests/anchor-extract-test.sh` can locate the decision region.
+The triage-report.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `legacy/scripts/tests/anchor-extract-test.sh` can locate the decision region.
 
 ```markdown
 <!-- challenge-token: $CHALLENGE_TOKEN -->
@@ -212,16 +212,16 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 
 ### 5. Final checks before exit
 
-1. First line of triage-decision.md is the challenge-token comment.
+1. First line of triage-report.md is the challenge-token comment.
 2. `cycle_size_estimate:` is `small`, `medium`, or `large`.
 3. `top_n` length is between 0 and `EVOLVE_TRIAGE_TOP_N` (default 3).
 4. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
 5. No item is in two buckets.
 
-6. `phase_skip:` field is present in `triage-decision.md` (value may be `[]`). When `EVOLVE_PSMAS_SKIP=1`, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
+6. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `EVOLVE_PSMAS_SKIP=1`, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
 
 If any check fails, fix in place. Do not mark complete until all six hold.
 
 ## Reflection Authoring (v10.20.0+)
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `triage-decision.md`'s `## Reflection` section and `triage-reflection.yaml` sidecar. Triage-specific friction commonly maps to `ambiguous-input` (top_n vs deferred boundary unclear) or `context-saturation` (large inbox). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `triage-report.md`'s `## Reflection` section and `triage-reflection.yaml` sidecar. Triage-specific friction commonly maps to `ambiguous-input` (top_n vs deferred boundary unclear) or `context-saturation` (large inbox). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

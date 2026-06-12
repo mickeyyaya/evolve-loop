@@ -144,3 +144,43 @@ func TestArtifactCoherence_MissingAgentsDirErrors(t *testing.T) {
 		t.Error("CheckArtifactNames(no agents/ dir) = nil error, want error (fail loudly)")
 	}
 }
+
+// TestArtifactCoherence_SkipsNonMdProfileArtifact — a phase whose contract
+// deliverable is JSON (memo → carryover-todos.json) may legitimately mention
+// a SECONDARY .md artifact in its output-format prose (memo.md). Comparing
+// that .md token against a .json deliverable guarantees a false mismatch;
+// the check must skip when the profile artifact is not .md.
+func TestArtifactCoherence_SkipsNonMdProfileArtifact(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{"evolve-memo": personaMD("memo",
+			`output-format: "carryover-todos.json (primary) plus memo.md observations"`)},
+		map[string]string{"memo": `{"name":"memo","role":"memo","cli":"claude-tmux","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/carryover-todos.json"}`},
+	)
+	vs, err := CheckArtifactNames(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("CheckArtifactNames: %v", err)
+	}
+	if len(vs) != 0 {
+		t.Errorf("violations = %+v, want none (non-.md profile artifact must skip the .md comparison)", vs)
+	}
+}
+
+// TestArtifactCoherence_DirQualifiedPersonaTokenMatchesBasename — the
+// reflector persona declares "learn/reflector-synthesis.md" while the
+// profile's output_artifact ends .../learn/reflector-synthesis.md: same
+// file, but the persona token keeps the dir prefix and the profile side is
+// path.Base'd. Both sides must be compared by basename.
+func TestArtifactCoherence_DirQualifiedPersonaTokenMatchesBasename(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{"evolve-reflector": personaMD("reflector",
+			`output-format: "learn/reflector-synthesis.md — ## Synthesis"`)},
+		map[string]string{"reflector": `{"name":"reflector","role":"reflector","cli":"claude-tmux","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/learn/reflector-synthesis.md"}`},
+	)
+	vs, err := CheckArtifactNames(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("CheckArtifactNames: %v", err)
+	}
+	if len(vs) != 0 {
+		t.Errorf("violations = %+v, want none (dir-qualified persona token must match by basename)", vs)
+	}
+}

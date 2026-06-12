@@ -239,7 +239,7 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
          (iii) predicate-dependency-check.sh returns exit 0 (no cross-cycle
                predicate-graph reachability via cycle-91 lesson)
        If ALL three hold AND EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL != 0, write a
-       deterministic stub triage-decision.md to $WORKSPACE with:
+       deterministic stub triage-report.md to $WORKSPACE with:
          - challenge_token (generate via openssl rand or `date +%s` fallback)
          - `cycle_size_estimate: trivial`
          - `auto_skip: true`, `reason: trivial-cycle-no-cross-deps`
@@ -248,7 +248,7 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
        phase state (`cycle-state.sh advance plan-review orchestrator` or the
        next-eligible phase per registry), and log `[triage-auto-skipped]`.
        Else (any condition fails): → subagent-run.sh triage $CYCLE $WORKSPACE
-       Reads scout-report + state.json:carryoverTodos[]; emits triage-decision.md
+       Reads scout-report + state.json:carryoverTodos[]; emits triage-report.md
        with top_n[]/deferred[]/dropped[]/cycle_size_estimate. phase-gate
        (`triage-to-plan-review`) blocks on cycle_size_estimate=large (split required).
        phase-gate (`discover-to-build`) emits a soft WARN if Triage was skipped

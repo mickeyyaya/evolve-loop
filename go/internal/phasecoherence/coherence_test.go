@@ -273,3 +273,36 @@ func TestCoherence_MissingAgentsDirErrors(t *testing.T) {
 		t.Error("Check(no agents/ dir) = nil error, want error (fail loudly)")
 	}
 }
+
+// TestCoherence_DispatchNonePersonaExempt — a persona explicitly marked
+// `dispatch: none` (operator: monitoring persona driven outside the
+// profile/subagent system) is intentionally unpaired; it must not WARN.
+// Contrast: an unmarked unpaired persona still WARNs (cycle-270 debugger
+// died exit=10 at launch precisely because nothing surfaced the gap).
+func TestCoherence_DispatchNonePersonaExempt(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{
+			"evolve-operator": personaMD("operator", `tools: ["Read"]`, `dispatch: none`),
+			"evolve-orphan":   personaMD("orphan", `tools: ["Read"]`),
+		},
+		map[string]string{},
+	)
+	vs, err := Check(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	for _, v := range vs {
+		if v.Persona == "operator" {
+			t.Errorf("dispatch:none persona must be exempt from the unpaired WARN; got %+v", v)
+		}
+	}
+	found := false
+	for _, v := range vs {
+		if v.Persona == "orphan" && v.Kind == "unpaired" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("unmarked unpaired persona must still WARN; got %+v", vs)
+	}
+}

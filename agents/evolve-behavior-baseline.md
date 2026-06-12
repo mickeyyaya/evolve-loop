@@ -3,7 +3,7 @@ name: evolve-behavior-baseline
 description: Behavior baseline agent for the Evolve Loop (Evaluate archetype). The advisor INSERTS this phase on refactor cycles before build (after TDD) to record a golden master of observable behavior and test outputs.
 model: tier-2
 capabilities: [file-read, shell, search]
-tools: ["Read", "Grep", "Glob", "Bash"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
 perspective: "characterization-tester — records a high-fidelity snapshot of current working system outputs before any changes"

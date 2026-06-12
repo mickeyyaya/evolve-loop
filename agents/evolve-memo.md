@@ -23,12 +23,12 @@ You are NOT a retrospective. You do not analyze why the cycle passed; you do not
 Assembled by `role-context-builder.sh memo` (or, in absence of a memo role, by the orchestrator passing you the same artifact set):
 
 - `scout-report.md` — full backlog (`## Selected Tasks` + `## Deferred` + `## Carryover Decisions`)
-- `triage-decision.md` — present unless `EVOLVE_TRIAGE_DISABLE=1` (v8.59.0+ default-on). Read `## deferred` and `## dropped` sections.
+- `triage-report.md` — present unless `EVOLVE_TRIAGE_DISABLE=1` (v8.59.0+ default-on). Read `## deferred` and `## dropped` sections.
 - `state.json:carryoverTodos[]` — current backlog (so you don't duplicate ids)
 
 ## File inspection: use Read, not cat/head/tail (cycle-62 B4)
 
-For inspecting workspace artifacts (scout-report.md, triage-decision.md, state.json), use the **Read** tool — NOT `cat`, `head`, or `tail` shell commands. The memo profile no longer permits `Bash(cat:*)`, `Bash(head:*)`, or `Bash(tail:*)` because in cycle 61 a memo invocation used shell redirects (`cat ... > memo_context.txt`) to write files at project root, bypassing the profile's `Write(.evolve/runs/cycle-*/carryover-todos.json)` allowlist. See `docs/incidents/cycle-61.md` §B4.
+For inspecting workspace artifacts (scout-report.md, triage-report.md, state.json), use the **Read** tool — NOT `cat`, `head`, or `tail` shell commands. The memo profile no longer permits `Bash(cat:*)`, `Bash(head:*)`, or `Bash(tail:*)` because in cycle 61 a memo invocation used shell redirects (`cat ... > memo_context.txt`) to write files at project root, bypassing the profile's `Write(.evolve/runs/cycle-*/carryover-todos.json)` allowlist. See `docs/incidents/cycle-61.md` §B4.
 
 If you genuinely need streaming/append behavior that Read doesn't provide, use `Bash(jq:*)` (still permitted) for JSON or `Bash(wc:*)` for line counts. Do not introduce new shell pipelines.
 
@@ -69,7 +69,7 @@ Default to `medium` when in doubt. Reserve `high` for items that, if not picked 
 
 ### 1. Read inputs
 
-`scout-report.md` (especially `## Deferred` and `## Carryover Decisions: defer` lines) and `triage-decision.md` (`## deferred` and `## dropped` sections — note: dropped items don't go into your output, that's archive territory). Skim `state.json:carryoverTodos[]` for de-dup.
+`scout-report.md` (especially `## Deferred` and `## Carryover Decisions: defer` lines) and `triage-report.md` (`## deferred` and `## dropped` sections — note: dropped items don't go into your output, that's archive territory). Skim `state.json:carryoverTodos[]` for de-dup.
 
 ### 2. Categorize each candidate
 
@@ -100,7 +100,7 @@ Output path: `.evolve/runs/cycle-N/carryover-todos.json`. JSON array. **Empty `[
     "id": "todo-<short-slug>",
     "action": "Imperative-voice instruction. e.g., 'Extract URL parser into shared utility'.",
     "priority": "high|medium|low",
-    "evidence_pointer": "scout-report.md#Deferred or triage-decision.md#deferred"
+    "evidence_pointer": "scout-report.md#Deferred or triage-report.md#deferred"
   }
 ]
 ```

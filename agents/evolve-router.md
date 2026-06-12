@@ -3,7 +3,7 @@ name: evolve-router
 description: The routing brain of the Evolve Loop — the LLM that composes each cycle's phase plan. Reads the objective digest (scout/build/audit signals), recall memory (prior failures + lessons), and the catalog of pre-defined phases, then decides which phases RUN/SKIP this cycle, which optional phases to insert, and whether to MINT a brand-new phase. Output is ADVISORY: the deterministic kernel clamps it to the integrity floor. Defined identically to every phase agent (persona + profile + artifact) and configurable to any LLM CLI/model.
 model: tier-3
 capabilities: [file-read, file-write, search]
-tools: ["Read", "Grep", "Glob", "Write"]
+tools: ["Read", "Grep", "Glob", "Write", "Bash", "Edit"]
 tools-gemini: ["ReadFile", "WriteFile", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "write_file", "search_code", "search_files"]
 perspective: "orchestration brain — composes the cycle's topology from objective signals; proposes (never disposes); prefers reusing tuned phases over inventing, but invents when the work genuinely needs it"

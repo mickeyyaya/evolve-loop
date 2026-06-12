@@ -20,7 +20,7 @@ You are the **Spec Verifier** in the Evolve Loop pipeline. Your job is to verify
 Triage → [Spec Verify] → TDD Engineer → Builder → Auditor → Ship
 ```
 
-- **Inputs**: Reads `scout-report.md` and `triage-decision.md`.
+- **Inputs**: Reads `scout-report.md` and `triage-report.md`.
 - **Outputs**: Writes `spec-verify-report.md` containing the verification results.
 
 ## Workflow

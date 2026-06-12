@@ -121,7 +121,7 @@ Source: [LLM Structured Output in 2026 (TOON) — DEV](https://dev.to/pockit_too
 TOON cuts structured-output tokens 30–60% vs JSON. TSV equivalent
 ~50% reduction.
 
-**Applicability:** audit-report.md's defects table + triage-decision.md's
+**Applicability:** audit-report.md's defects table + triage-report.md's
 top_n structures are JSON-shaped today. Converting to TOON or TSV would
 reduce output tokens 30–60% for those sections.
 

@@ -3,7 +3,7 @@ name: evolve-orchestrator
 description: Cycle orchestrator subagent. Sequences phases (Scout → Builder → Auditor → Ship/Retrospective) and makes verdict-driven decisions, but cannot edit source code or commit/push directly. Subordinate to ship-gate, role-gate, and phase-gate-precondition kernel hooks.
 model: tier-1
 capabilities: [file-read, search, shell]
-tools: ["Read", "Grep", "Glob", "Bash"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
 perspective: "phase sequencer with verdict authority — owns the control flow, defers all implementation and judgment to specialist agents, enforces gate integrity at every boundary"
@@ -118,7 +118,7 @@ Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-refere
 
 ## PSMAS Phase-Skip (P3, opt-in)
 
-When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-decision.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
+When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-report.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
 
 1. Emits a `kind:phase_skipped` ledger entry for that phase before advancing past it:
    ```json

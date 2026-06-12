@@ -55,13 +55,16 @@ func Check(opts Options) ([]Violation, error) {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				// "-reference" personas are documentation (auditor-reference
-				// etc.), never dispatched — no profile expected. Everything
-				// else unpaired is a visibility WARN, not a silent skip:
-				// cycle-270's debugger died at launch (exit=10) because its
-				// persona existed and its profile didn't, and nothing said so
-				// until the route fired (inbox
+				// etc.), never dispatched — no profile expected. Likewise a
+				// persona whose frontmatter declares `dispatch: none`
+				// (operator: monitoring persona driven outside the
+				// profile/subagent system) is intentionally unpaired.
+				// Everything else unpaired is a visibility WARN, not a silent
+				// skip: cycle-270's debugger died at launch (exit=10) because
+				// its persona existed and its profile didn't, and nothing said
+				// so until the route fired (inbox
 				// dispatchable-agent-profile-completeness).
-				if !strings.HasSuffix(name, "-reference") {
+				if !strings.HasSuffix(name, "-reference") && !dispatchNone(opts, name) {
 					violations = append(violations, Violation{
 						Persona:  name,
 						Kind:     "unpaired",
@@ -80,24 +83,16 @@ func Check(opts Options) ([]Violation, error) {
 		}
 
 		// Read persona file
-		var personaBytes []byte
-		if overridePath, ok := opts.Overrides[name]; ok {
-			personaBytes, err = os.ReadFile(overridePath)
-			if err != nil {
-				return nil, err
+		persona, err := personaContents(opts, name)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
+				continue
 			}
-		} else {
-			personaBytes, err = fs.ReadFile(opts.AgentsFS, "agents/evolve-"+name+".md")
-			if err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					continue
-				}
-				return nil, err
-			}
+			return nil, err
 		}
 
 		// Parse persona frontmatter
-		fm, _, err := prompts.ParseFrontmatter(string(personaBytes))
+		fm, _, err := prompts.ParseFrontmatter(persona)
 		if err != nil {
 			return nil, err
 		}
@@ -121,6 +116,32 @@ func Check(opts Options) ([]Violation, error) {
 	}
 
 	return violations, nil
+}
+
+// dispatchNone reports whether the persona's frontmatter opts out of profile
+// pairing with `dispatch: none`. Best-effort: unreadable/unparsable personas
+// return false so the unpaired WARN still fires.
+func dispatchNone(opts Options, name string) bool {
+	raw, err := personaContents(opts, name)
+	if err != nil {
+		return false
+	}
+	fm, _, err := prompts.ParseFrontmatter(raw)
+	if err != nil || fm == nil {
+		return false
+	}
+	v, ok := fm["dispatch"].(string)
+	return ok && strings.TrimSpace(v) == "none"
+}
+
+// personaContents reads agents/evolve-<name>.md, honoring Overrides.
+func personaContents(opts Options, name string) (string, error) {
+	if overridePath, ok := opts.Overrides[name]; ok {
+		b, err := os.ReadFile(overridePath)
+		return string(b), err
+	}
+	b, err := fs.ReadFile(opts.AgentsFS, "agents/evolve-"+name+".md")
+	return string(b), err
 }
 
 func normalizeToolName(name string) string {

@@ -3,7 +3,7 @@ name: evolve-swarm-planner
 description: Swarm-planning agent for the Evolve Loop (ADR-0032). Partitions one phase's task into N independent worker assignments for the multi-CLI swarm harness. Mode-aware — writers require disjoint file ownership (strict), readers allow overlapping focus regions (lenient). Default-off (EVOLVE_SWARM_STAGE=shadow). Never writes production code.
 model: tier-1
 capabilities: [file-read, file-write, shell, search]
-tools: ["Read", "Write", "Bash", "Grep", "Glob"]
+tools: ["Read", "Write", "Bash", "Grep", "Glob", "Edit"]
 tools-gemini: ["ReadFile", "WriteFile", "RunShell", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "write_file", "run_shell", "search_code", "search_files"]
 perspective: "partitioner-before-dispatch — splits a task into independent worker assignments; advisory in shadow/advisory, authoritative in enforce; STRONGLY biased toward N=1 for writers unless a completely disjoint split exists; never writes production code"
@@ -33,7 +33,7 @@ parallel breadth.
 
 ## Inputs
 - `task`: the selected task (acceptance criteria, scope, file targets) from `scout-report.md` /
-  `triage-decision.md` / `test-report.md` as available in the workspace.
+  `triage-report.md` / `test-report.md` as available in the workspace.
 - `mode`: `writer` (the next phase writes source, e.g. build) or `reader` (read-only, e.g. scout).
   Infer from the phase context if not given.
 

@@ -3,7 +3,7 @@ name: evolve-behavior-compare
 description: Behavior comparison agent for the Evolve Loop (Evaluate archetype). The advisor INSERTS this phase on refactor cycles after build to compare post-build outputs against the baseline golden master and fail on unexplained drift.
 model: tier-2
 capabilities: [file-read, shell, search]
-tools: ["Read", "Grep", "Glob", "Bash"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
 perspective: "behavior-sentinel — compares the system output post-patch against the pre-patch baseline golden master and fails on any deviation"

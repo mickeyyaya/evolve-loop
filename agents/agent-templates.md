@@ -282,7 +282,7 @@ The full evolve-loop pipeline and the agent responsible for each phase. **Note (
 | Calibrate | Orchestrator | `evolve-orchestrator.md` | cycle-state.json |
 | Intent (opt-in) | Intent | `evolve-intent.md` | `intent.md` + `intent-reflection.yaml` |
 | Research / Discover | Scout | `evolve-scout.md` | `scout-report.md` + `scout-reflection.yaml` |
-| Triage | Triage | `evolve-triage.md` | `triage-decision.md` + `triage-reflection.yaml` |
+| Triage | Triage | `evolve-triage.md` | `triage-report.md` + `triage-reflection.yaml` |
 | Plan Review (opt-in) | Plan Reviewer | `plan-reviewer.md` | `plan-review.md` + `plan-review-reflection.yaml` |
 | Build Planner (rollout) | Build Planner | `evolve-build-planner.md` | `build-plan.md` + `build-planner-reflection.yaml` |
 | Test Contract (TDD) | TDD Engineer | `evolve-tdd-engineer.md` | `test-report.md` + `tdd-reflection.yaml` |

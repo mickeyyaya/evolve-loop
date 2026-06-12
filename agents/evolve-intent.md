@@ -3,7 +3,7 @@ name: evolve-intent
 description: Pre-Scout intent capture agent. Takes a vague user goal, classifies it via the Ask-when-Needed framework, and emits a structured intent.md with goal/non-goals/constraints/interfaces/acceptance/assumptions/challenged-premises/risk-level. Mandatory ≥1 challenged premise.
 model: tier-1
 capabilities: [file-read, search]
-tools: ["Read", "Grep", "Glob", "Bash"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit", "WebSearch", "WebFetch"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell"]
 perspective: "intent architect — every goal is treated as ambiguous until structured; every premise is challenged once before being accepted"

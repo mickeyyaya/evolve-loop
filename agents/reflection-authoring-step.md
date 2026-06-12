@@ -22,7 +22,7 @@ Every phase agent surfaces a bounded reflection on its own execution so the Lear
 
 2. **Write `$WORKSPACE/<phase>-reflection.yaml`** following the YAML schema in agent-templates.md → Reflection Journal Schema. Required keys: `schema_version: 1`, `cycle`, `phase`, `agent`, `phase_smooth`, `suggested_improvements[]` (≥1), `reflection_confidence` (0.0-1.0), `phase_tracker_refs{}`. Optional: `slowdowns[]`, `friction_received_from[]`, `blind_spots[]`. Keep the file ≤30 lines.
 
-3. **Append the `## Reflection` markdown section** to your primary report (`<phase>-report.md` or equivalent — e.g., `intent.md`, `scout-report.md`, `triage-decision.md`, `plan-review.md`, `build-plan.md`, `test-report.md`, `tester-report.md`, `build-report.md`, `audit-report.md`). Bracket the section with `<!-- BEGIN reflection -->` / `<!-- END reflection -->` for idempotent replacement on re-run. Cap at ~350 tokens. Use the markdown template from agent-templates.md → Reflection Journal Schema → "Markdown section" verbatim.
+3. **Append the `## Reflection` markdown section** to your primary report (`<phase>-report.md` or equivalent — e.g., `intent.md`, `scout-report.md`, `triage-report.md`, `plan-review.md`, `build-plan.md`, `test-report.md`, `tester-report.md`, `build-report.md`, `audit-report.md`). Bracket the section with `<!-- BEGIN reflection -->` / `<!-- END reflection -->` for idempotent replacement on re-run. Cap at ~350 tokens. Use the markdown template from agent-templates.md → Reflection Journal Schema → "Markdown section" verbatim.
 
 ## Anti-sycophancy directive
 

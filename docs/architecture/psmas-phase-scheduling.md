@@ -34,7 +34,7 @@ PSMAS — Predictive Skip via Multi-Agent System — gives the Triage agent (whi
 ```markdown
 ### 3a. PSMAS phase_skip[] recommendation (P3, opt-in)
 
-When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-decision.md` recommending
+When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-report.md` recommending
 phases the orchestrator may skip to save tokens. The mapping is fixed:
 
 | cycle_size_estimate | phase_skip[]                          | Condition           |
@@ -127,7 +127,7 @@ For a batch with 5 trivial PASS cycles, conservatively 5 × ($0.30 + $0.50) = $4
 | Enable PSMAS for a session | `EVOLVE_PSMAS_SKIP=1 /evolve-loop ...` |
 | Check what was skipped | `grep '"kind":"phase_skipped"' .evolve/ledger.jsonl \| tail` |
 | Disable for one cycle only | `EVOLVE_PSMAS_SKIP=0 /evolve-loop ...` for that invocation |
-| Force a phase to run despite skip recommendation | Triage emits the recommendation, but operator can edit `triage-decision.md` to clear `phase_skip[]` before Build phase starts (interactive use only) |
+| Force a phase to run despite skip recommendation | Triage emits the recommendation, but operator can edit `triage-report.md` to clear `phase_skip[]` before Build phase starts (interactive use only) |
 
 ## A/B Verification Results (cycle 99)
 

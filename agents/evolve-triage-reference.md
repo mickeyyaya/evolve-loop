@@ -78,4 +78,4 @@ Existing priority-only todos continue to work; they're assigned weight=0.5 impli
 | `inbox-invalid-weight` | `weight` present but not a float in [0.0, 1.0] |
 | `inbox-id-collision` | `id` matches an existing carryoverTodo or already-ingested inbox item |
 
-All errors result in the file being moved to `.evolve/inbox/rejected/cycle-<N>/` with a WARN line in `triage-decision.md ## Inbox Errors`.
+All errors result in the file being moved to `.evolve/inbox/rejected/cycle-<N>/` with a WARN line in `triage-report.md ## Inbox Errors`.

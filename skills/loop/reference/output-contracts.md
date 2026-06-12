@@ -8,7 +8,7 @@
 |---|---|---|---|---|---|
 | 1 | Intent | `agents/evolve-intent.md` | `intent-report.md` | `schemas/handoff/intent-report.schema.json` | Goal · Constraints · Success Criteria |
 | 2 | Scout | `agents/evolve-scout.md` | `scout-report.md` | `schemas/handoff/scout-report.schema.json` | Proposed Tasks · Acceptance Criteria · (Carryover Decisions when state has todos) |
-| 3 | Triage | `agents/evolve-triage.md` | `triage-decision.md` | `schemas/handoff/triage-decision.schema.json` | Selected Tasks · Rejected Tasks · Cycle Size |
+| 3 | Triage | `agents/evolve-triage.md` | `triage-report.md` | `schemas/handoff/triage-decision.schema.json` | Selected Tasks · Rejected Tasks · Cycle Size |
 | 4 | TDD | `agents/evolve-tdd-engineer.md` | `tdd-report.md` | `schemas/handoff/tdd-report.schema.json` | Tests Written · AC Mapping · Red State |
 | 5 | Build | `agents/evolve-builder.md` | `build-report.md` | `schemas/handoff/build-report.schema.json` | Changes · Self-Verification · Quality Signals |
 | 6 | Audit | `agents/evolve-auditor.md` | `audit-report.md` | `schemas/handoff/audit-report.schema.json` | Artifacts Reviewed · Verdict (with PASS/WARN/FAIL value) |

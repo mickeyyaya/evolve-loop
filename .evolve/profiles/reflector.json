@@ -60,7 +60,7 @@
     "Edit(.evolve/runs/cycle-*/build-report.md)",
     "Edit(.evolve/runs/cycle-*/audit-report.md)",
     "Edit(.evolve/runs/cycle-*/scout-report.md)",
-    "Edit(.evolve/runs/cycle-*/triage-decision.md)",
+    "Edit(.evolve/runs/cycle-*/triage-report.md)",
     "Edit(.evolve/runs/cycle-*/intent.md)",
     "Edit(.evolve/runs/cycle-*/orchestrator-report.md)",
     "Edit(.evolve/runs/cycle-*/*-reflection.yaml)",
@@ -82,7 +82,7 @@
     "Write(.evolve/runs/cycle-*/build-report.md)",
     "Write(.evolve/runs/cycle-*/audit-report.md)",
     "Write(.evolve/runs/cycle-*/scout-report.md)",
-    "Write(.evolve/runs/cycle-*/triage-decision.md)",
+    "Write(.evolve/runs/cycle-*/triage-report.md)",
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/orchestrator-report.md)",
     "Write(.evolve/runs/cycle-*/*-reflection.yaml)"

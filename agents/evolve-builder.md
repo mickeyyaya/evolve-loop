@@ -3,7 +3,7 @@ name: evolve-builder
 description: Implementation agent for the Evolve Loop. Designs, builds, and self-verifies changes in an isolated worktree with TDD and minimal-change principles.
 model: tier-2
 capabilities: [file-read, file-write, file-edit, shell, search]
-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Skill"]
+tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Skill", "MultiEdit", "NotebookEdit", "WebSearch", "WebFetch"]
 tools-gemini: ["ReadFile", "WriteFile", "EditFile", "RunShell", "SearchCode", "SearchFiles"]
 tools-generic: ["read_file", "write_file", "edit_file", "run_shell", "search_code", "search_files"]
 perspective: "minimum viable change, test-first implementation — ship the smallest diff that passes the eval and leaves the pipeline healthier than before"

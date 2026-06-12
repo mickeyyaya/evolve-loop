@@ -3,7 +3,7 @@ name: evolve-retrospective
 description: Failure post-mortem agent for the Evolve Loop. Fires only on Auditor FAIL or WARN verdicts. Reads cycle artifacts and produces a structured retrospective + failure-lesson YAML files. READ-ONLY outside the lessons directory.
 model: tier-2
 capabilities: [file-read, search, shell]
-tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit", "WebSearch", "WebFetch"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit"]
 perspective: "pattern extractor from failure evidence — root-causes every defect to a systemic gap, not a one-off mistake; every lesson must be preventable by a future agent reading it"

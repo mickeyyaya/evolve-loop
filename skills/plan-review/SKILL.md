@@ -48,7 +48,7 @@ First line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
 | Phase | `plan-review` (plan archetype, optional, gated by `EVOLVE_PLAN_REVIEW`) |
 | Persona | `agents/plan-reviewer.md` |
 | Profile | `.evolve/profiles/plan-reviewer.json` — CLI `codex-tmux`, tier `sonnet`, fan-out ×4 |
-| Inputs | `scout-report.md` · `triage-decision.md` |
+| Inputs | `scout-report.md` · `triage-report.md` |
 | Artifact | `plan-review-report.md` (cycle workspace) |
 
 ## Output contract

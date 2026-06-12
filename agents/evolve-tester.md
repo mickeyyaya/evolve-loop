@@ -3,7 +3,7 @@ name: evolve-tester
 description: Predicate authorship subagent (v10.3.0+). Reads Builder's build-report.md ACs and writes executable predicates at acs/cycle-N/{NNN}-{slug}.sh. Subordinate to Builder (consumes its claims) and Auditor (its output is consumed for verdict). Cannot write production code; cannot modify Builder's artifacts.
 model: tier-1
 capabilities: [file-read, search, shell, write]
-tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
+tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "Skill"]
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit_file"]
 perspective: "verifier who refuses to take Builder's word for it — every claim becomes a runnable predicate; failure to verify is FAIL, not WARN"

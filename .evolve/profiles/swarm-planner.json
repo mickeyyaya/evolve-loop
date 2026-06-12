@@ -1,11 +1,9 @@
 {
-  "name": "memo",
-  "role": "memo",
-  "cli": "codex-tmux",
-  "cli_fallback": [
-    "claude-tmux"
-  ],
-  "model_tier_default": "sonnet",
+  "name": "swarm-planner",
+  "role": "swarm-planner",
+  "cli": "claude-tmux",
+  "cli_fallback": [],
+  "model_tier_default": "opus",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -15,10 +13,8 @@
     "Bash(find:*)",
     "Bash(test:*)",
     "Bash(jq:*)",
-    "Write(.evolve/runs/cycle-*/carryover-todos.json)",
-    "Edit(.evolve/runs/cycle-*/carryover-todos.json)",
-    "Write(.evolve/runs/cycle-*/memo.md)",
-    "Edit(.evolve/runs/cycle-*/memo.md)"
+    "Write(.evolve/runs/cycle-*/swarm-plan.md)",
+    "Edit(.evolve/runs/cycle-*/swarm-plan.md)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",
@@ -79,57 +75,5 @@
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/orchestrator-report.md)"
   ],
-  "add_dir": [
-    "."
-  ],
-  "max_budget_usd": 0.3,
-  "max_turns": 15,
-  "turn_budget_hint": 8,
-  "effort_level": "medium",
-  "output_artifact": ".evolve/runs/cycle-{cycle}/carryover-todos.json",
-  "challenge_token_required": false,
-  "extra_flags_by_cli": {
-    "claude-tmux": [
-      "--strict-mcp-config",
-      "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
-      "--setting-sources",
-      "project"
-    ]
-  },
-  "sandbox": {
-    "enabled": true,
-    "write_subpaths": [
-      ".evolve/runs/cycle-*"
-    ],
-    "read_only_repo": true,
-    "deny_subpaths": [
-      ".git",
-      "skills",
-      "agents",
-      "scripts",
-      ".claude-plugin",
-      ".evolve/state.json",
-      ".evolve/ledger.jsonl",
-      ".evolve/profiles",
-      ".evolve/evals",
-      ".evolve/instincts",
-      "CHANGELOG.md",
-      "README.md",
-      "CLAUDE.md"
-    ],
-    "allow_network": false
-  },
-  "parallel_eligible": false,
-  "schema_filter_enabled": true,
-  "model_tier_envelope": {
-    "min": "fast",
-    "default": "fast",
-    "max": "balanced"
-  },
-  "allowed_clis": [
-    "all"
-  ],
-  "stream_output": true,
-  "generated_from": "hand-authored"
+  "output_artifact": ".evolve/runs/cycle-{cycle}/swarm-plan.md"
 }

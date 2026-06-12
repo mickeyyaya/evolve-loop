@@ -64,7 +64,7 @@
         "state_fields": ["carryoverTodos"]
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/triage-decision.md"]
+        "files": [".evolve/runs/cycle-{cycle}/triage-report.md"]
       },
       "gate_in": "gate_discover_to_triage",
       "gate_out": "gate_triage_to_plan_review",
@@ -132,7 +132,7 @@
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
-          ".evolve/runs/cycle-{cycle}/triage-decision.md"
+          ".evolve/runs/cycle-{cycle}/triage-report.md"
         ],
         "state_fields": ["instinctSummary"]
       },
@@ -201,7 +201,7 @@
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
-          ".evolve/runs/cycle-{cycle}/triage-decision.md"
+          ".evolve/runs/cycle-{cycle}/triage-report.md"
         ],
         "state_fields": ["instinctSummary", "failedApproaches"]
       },
