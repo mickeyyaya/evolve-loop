@@ -161,6 +161,187 @@ func TestSeal_NothingToSealIsNoOp(t *testing.T) {
 	}
 }
 
+func TestWriteSegment(t *testing.T) {
+	t.Run("happy path writes gzip atomically", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "nested", "seg-0001.jsonl.gz")
+		raw := []byte("alpha\nbeta\n")
+		if err := writeSegment(path, raw); err != nil {
+			t.Fatalf("writeSegment: %v", err)
+		}
+		lines, sha, err := readSegment(path)
+		if err != nil {
+			t.Fatalf("readSegment: %v", err)
+		}
+		if !linesEqual(lines, [][]byte{[]byte("alpha"), []byte("beta")}) {
+			t.Fatalf("segment lines = %q", lines)
+		}
+		if sha != sha256Hex(raw) {
+			t.Fatalf("segment sha = %s, want %s", sha, sha256Hex(raw))
+		}
+	})
+
+	t.Run("mkdir failure removes no temp file", func(t *testing.T) {
+		dir := t.TempDir()
+		parentFile := filepath.Join(dir, "not-a-dir")
+		if err := os.WriteFile(parentFile, []byte("file"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		err := writeSegment(filepath.Join(parentFile, "seg-0001.jsonl.gz"), []byte("x\n"))
+		if err == nil {
+			t.Fatal("writeSegment with file parent succeeded, want error")
+		}
+	})
+
+	t.Run("rename failure cleans temp file", func(t *testing.T) {
+		dir := t.TempDir()
+		targetDir := filepath.Join(dir, "seg-0001.jsonl.gz")
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		err := writeSegment(targetDir, []byte("x\n"))
+		if err == nil {
+			t.Fatal("writeSegment over directory succeeded, want error")
+		}
+		matches, globErr := filepath.Glob(filepath.Join(dir, "seg-0001.jsonl.gz.*.tmp"))
+		if globErr != nil {
+			t.Fatal(globErr)
+		}
+		if len(matches) != 0 {
+			t.Fatalf("temporary files leaked after failed rename: %v", matches)
+		}
+	})
+}
+
+func TestReadSegmentRoundtrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "seg-0001.jsonl.gz")
+	raw := []byte("one\ntwo\nthree\n")
+	if err := writeSegment(path, raw); err != nil {
+		t.Fatalf("writeSegment: %v", err)
+	}
+	lines, sha, err := readSegment(path)
+	if err != nil {
+		t.Fatalf("readSegment: %v", err)
+	}
+	if !linesEqual(lines, [][]byte{[]byte("one"), []byte("two"), []byte("three")}) {
+		t.Fatalf("roundtrip lines = %q", lines)
+	}
+	if sha != sha256Hex(raw) {
+		t.Fatalf("roundtrip sha = %s, want %s", sha, sha256Hex(raw))
+	}
+}
+
+func TestReadSegmentRejectsCorruption(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "seg-0001.jsonl.gz")
+	if err := writeSegment(path, []byte("one\ntwo\n")); err != nil {
+		t.Fatalf("writeSegment: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw[:len(raw)/2], 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := readSegment(path); err == nil {
+		t.Fatal("readSegment accepted truncated gzip, want error")
+	}
+}
+
+func TestReadSegmentErrors(t *testing.T) {
+	t.Run("missing file", func(t *testing.T) {
+		if _, _, err := readSegment(filepath.Join(t.TempDir(), "missing.jsonl.gz")); err == nil {
+			t.Fatal("readSegment missing file succeeded, want error")
+		}
+	})
+
+	t.Run("invalid gzip header", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "seg-0001.jsonl.gz")
+		if err := os.WriteFile(path, []byte("not gzip"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := readSegment(path); err == nil {
+			t.Fatal("readSegment invalid gzip succeeded, want error")
+		}
+	})
+}
+
+func TestRewriteLive(t *testing.T) {
+	t.Run("replaces live file byte for byte", func(t *testing.T) {
+		dir := t.TempDir()
+		l := New(dir)
+		oldPath := filepath.Join(dir, "ledger.jsonl")
+		if err := os.WriteFile(oldPath, []byte("old\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		lines := [][]byte{[]byte(`{"entry":1}`), []byte(`{"entry":2}`)}
+		if err := l.rewriteLive(lines); err != nil {
+			t.Fatalf("rewriteLive: %v", err)
+		}
+		got, err := os.ReadFile(oldPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []byte("{\"entry\":1}\n{\"entry\":2}\n")
+		if !bytes.Equal(got, want) {
+			t.Fatalf("live bytes = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("temp creation error is reported", func(t *testing.T) {
+		dir := t.TempDir()
+		parentFile := filepath.Join(dir, "not-a-dir")
+		if err := os.WriteFile(parentFile, []byte("file"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		l := &FileLedger{ledgerPath: filepath.Join(parentFile, "ledger.jsonl")}
+		if err := l.rewriteLive([][]byte{[]byte("x")}); err == nil {
+			t.Fatal("rewriteLive with file parent succeeded, want error")
+		}
+	})
+
+	t.Run("rename error cleans temp file", func(t *testing.T) {
+		dir := t.TempDir()
+		l := New(dir)
+		if err := os.MkdirAll(filepath.Join(dir, "ledger.jsonl"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := l.rewriteLive([][]byte{[]byte("x")}); err == nil {
+			t.Fatal("rewriteLive over directory succeeded, want error")
+		}
+		matches, err := filepath.Glob(filepath.Join(dir, "ledger.jsonl.*.tmp"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(matches) != 0 {
+			t.Fatalf("temporary files leaked after failed rename: %v", matches)
+		}
+	})
+}
+
+func TestLinesEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a    [][]byte
+		b    [][]byte
+		want bool
+	}{
+		{name: "equal", a: [][]byte{[]byte("a"), []byte("b")}, b: [][]byte{[]byte("a"), []byte("b")}, want: true},
+		{name: "unequal length", a: [][]byte{[]byte("a")}, b: [][]byte{[]byte("a"), []byte("b")}, want: false},
+		{name: "unequal bytes", a: [][]byte{[]byte("a"), []byte("b")}, b: [][]byte{[]byte("a"), []byte("c")}, want: false},
+		{name: "empty", a: nil, b: nil, want: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := linesEqual(tc.a, tc.b); got != tc.want {
+				t.Fatalf("linesEqual() = %v, want %v", got, tc.want)
+			}
+			if got := linesEqual(tc.b, tc.a); got != tc.want {
+				t.Fatalf("linesEqual() reverse = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 // Interrupted-seal recovery, case A: segment written, live file never
 // truncated. VerifyDeep names the residue; a re-run Seal completes the
 // truncation and the chain deep-verifies again.

@@ -464,6 +464,7 @@ func (failVerdictRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResp
 // breaks with stop_reason=fail, rc=2.
 func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	t.Setenv("EVOLVE_DISPATCH_POLICY", "off") // skip verify so policy doesn't intercept
+	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", "1")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
