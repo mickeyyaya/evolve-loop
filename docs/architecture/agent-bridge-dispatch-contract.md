@@ -2,7 +2,7 @@
 
 > Status: living doc for the agent-bridge hardening program (plan: `sleepy-wandering-salamander`).
 > Covers the invariants that make every subagent/phase-agent dispatch go through the one bridge
-> process, safely and at scale. B1–B4 landed; B5–B6 will extend this doc.
+> process, safely and at scale. B1–B5 landed; B6 will extend this doc.
 
 ## Request
 
@@ -162,8 +162,31 @@ is a real conformance gap. All 14 roles pass.
 | I6 | Artifact verdict is single-sourced | `Verify`/`VerifyArtifact` (`contract.go`); contract table + conformance |
 | I7 | In-process env view == subprocess env view | `lookupEnv` consults `deps.Env`; overlay + e2e tests |
 | I8 | Every registry role satisfies I1/I3–I6 uniformly | `conformance_test.go` (fake-bridge, table over `agentRoles`) |
+| I9 | Fan-out honors its concurrency cap + isolates workers | `fanoutdispatch` race tests (observed bound, high-N partial-failure) |
+
+## B5 — Fan-out concurrency stability
+
+**Problem.** `fanoutdispatch.Run` fans N worker commands across a semaphore-bounded goroutine pool
+(`sema := make(chan struct{}, Concurrency)`), recording results in a mutex-guarded map and per-worker
+`.meta`/`.out` files. The existing `TestRun_BoundedConcurrency` only asserted all workers *complete* —
+it never observed the cap was honored (it would pass with a broken semaphore), and isolation /
+partial-failure were only exercised at N=4.
+
+**Design (tests; no production change — the path was already `-race`-clean).**
+- `TestRun_ConcurrencyBoundIsObserved` — each worker drops a marker file for the lifetime of its
+  command and snapshots how many markers exist. A marker's lifetime ⊆ its held semaphore slot, so no
+  snapshot can exceed `Concurrency`; with N≫`Concurrency` + an overlap sleep, at least one snapshot
+  must observe real parallelism (guards against a vacuous serial pass). Asserts `2 ≤ max ≤ Concurrency`.
+- `TestRun_HighFanoutIsolationPartialFailure` — 12 workers at concurrency 4, half failing: every
+  worker's recorded exit code matches its intent, each `.out` carries only its own line (no
+  cross-clobbering of the results map / files), and `Run` returns `ExitWorkerFail`. Stable under
+  `-race -count=3`.
+
+*Deferred to a follow-up (defense-in-depth, not a live exploit):* the fan-out aggregator's parent-side
+per-worker gate (`aggregator.go`) checks exists+non-empty but not token/freshness — the worker's own
+recursive child already runs the full B3 `Verify` at write time, so the parent re-check is redundant;
+hardening it to call `Verify` (freshness skipped) is tracked separately.
 
 ## Out of scope (later phases)
 
-B5 (concurrency `-race` stability of the fan-out path + aggregator per-worker verification using the
-B3 SSOT with freshness skipped), B6 (registry-driven allow-list + session reaping).
+B6 (registry-driven allow-list + session reaping).
