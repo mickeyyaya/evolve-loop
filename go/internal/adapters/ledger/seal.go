@@ -219,6 +219,36 @@ func (l *FileLedger) unanchoredSegment(segs []string, liveLines [][]byte) (path,
 //   - every segment must re-hash to its chained segment_seal anchor;
 //   - seal residue (segment whose first line is still live) is an error
 //     naming the recovery (re-run Seal).
+//
+// gatherAllLines returns every ledger line in chain order: each sealed segment
+// (oldest first) followed by the live tail. Anchor uses it to locate a line by
+// entry_seq across SEALED history — the ledger-1740 damage is old enough to have
+// been sealed, so reading only the live ledger.jsonl would miss it. VerifyDeep
+// does the same reconstruction inline because it additionally needs the
+// per-segment residue check and segment-SHA anchor binding; this is the plain
+// "all lines in order" projection without those verify-only concerns.
+func (l *FileLedger) gatherAllLines() ([][]byte, error) {
+	evolveDir := filepath.Dir(l.ledgerPath)
+	segs, err := segmentFiles(filepath.Join(evolveDir, segmentsDirName))
+	if err != nil {
+		return nil, err
+	}
+	var full [][]byte
+	for _, s := range segs {
+		segLines, _, err := readSegment(s)
+		if err != nil {
+			return nil, err
+		}
+		full = append(full, segLines...)
+	}
+	liveRaw, err := os.ReadFile(l.ledgerPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("ledger read: %w", err)
+	}
+	full = append(full, splitLines(liveRaw)...)
+	return full, nil
+}
+
 func (l *FileLedger) VerifyDeep(_ context.Context) error {
 	evolveDir := filepath.Dir(l.ledgerPath)
 	segs, err := segmentFiles(filepath.Join(evolveDir, segmentsDirName))
@@ -253,7 +283,7 @@ func (l *FileLedger) VerifyDeep(_ context.Context) error {
 	}
 	full = append(full, liveLines...)
 
-	lastSeq, lastSha, sawV837, err := walkChain(full)
+	lastSeq, lastSha, sawV837, err := walkChain(full, l.loadAnchorSHA())
 	if err != nil {
 		return err
 	}

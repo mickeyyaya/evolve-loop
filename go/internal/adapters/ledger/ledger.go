@@ -31,6 +31,7 @@ type FileLedger struct {
 	ledgerPath string
 	tipPath    string
 	lockPath   string
+	anchorPath string
 	mu         sync.Mutex
 }
 
@@ -79,6 +80,7 @@ func New(evolveDir string) *FileLedger {
 		ledgerPath: filepath.Join(evolveDir, "ledger.jsonl"),
 		tipPath:    filepath.Join(evolveDir, "ledger.tip"),
 		lockPath:   filepath.Join(evolveDir, "ledger.lock"),
+		anchorPath: filepath.Join(evolveDir, "ledger-anchor.json"),
 	}
 }
 
@@ -168,7 +170,7 @@ func (l *FileLedger) Verify(_ context.Context) error {
 		return nil
 	}
 
-	lastSeq, lastSha, sawV837, err := walkChain(lines)
+	lastSeq, lastSha, sawV837, err := walkChain(lines, l.loadAnchorSHA())
 	if err != nil {
 		return err
 	}
@@ -198,10 +200,31 @@ func (l *FileLedger) Verify(_ context.Context) error {
 //     linkage is the trustworthy part). Accepted exactly when the entry's
 //     prev equals the PREVIOUS line's prev (shared parent); the chain
 //     resumes from the last sibling. The CA.1 flock prevents new ones.
-func walkChain(lines [][]byte) (lastSeq int, lastSha string, sawV837 bool, err error) {
+func walkChain(lines [][]byte, anchorLineSHA string) (lastSeq int, lastSha string, sawV837 bool, err error) {
 	seenPrev := map[string]struct{}{}
 	prevLinePrev := "" // previous line's prev_hash (fork-sibling signature)
+	// ADR-0048 ledger epoch-anchor (ledger-1740): when an operator has recorded a
+	// trusted genesis line, lines BEFORE it are NOT chain-validated — the
+	// historical damage is real, preserved (never deleted), and accepted by
+	// explicit operator sign-off. inEpoch starts true when no anchor is set, so
+	// the no-anchor path is byte-identical to the pre-anchor behavior; strict
+	// validation always resumes for every line AFTER the anchor.
+	inEpoch := anchorLineSHA == ""
 	for i, line := range lines {
+		if !inEpoch {
+			// Pre-epoch: skip all validation; only locate the anchor genesis by
+			// its bound SHA. lastSha is set FIRST (computed once) so the first
+			// post-anchor line chains from the anchor line's SHA.
+			lastSha = sha256Hex(line)
+			if lastSha == anchorLineSHA {
+				inEpoch = true
+				sawV837 = true // strict from here forward
+				if _, e, derr := decodeLedgerLine(line); derr == nil {
+					lastSeq = e.EntrySeq
+				}
+			}
+			continue
+		}
 		hasPrev, e, err := decodeLedgerLine(line)
 		if err != nil {
 			return 0, "", false, fmt.Errorf("%w: line %d unmarshal: %v", core.ErrLedgerChainBroken, i, err)
@@ -245,6 +268,12 @@ func walkChain(lines [][]byte) (lastSeq int, lastSha string, sawV837 bool, err e
 		}
 		// Always compute the line SHA for the next iteration's chain check.
 		lastSha = sha256Hex(line)
+	}
+	if !inEpoch {
+		// An anchor was set but no line matched its bound SHA — the anchored
+		// content is absent or was altered. Fail loudly rather than silently
+		// validate the whole (damaged) chain or silently relax it.
+		return 0, "", false, fmt.Errorf("%w: epoch anchor line not found (sha %s) — anchored content absent or altered", core.ErrLedgerChainBroken, anchorLineSHA)
 	}
 	return lastSeq, lastSha, sawV837, nil
 }
