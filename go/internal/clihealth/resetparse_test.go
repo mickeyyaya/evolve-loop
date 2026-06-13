@@ -70,3 +70,27 @@ func TestParseResetHintHonorsNowLocation(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+// TestEvidenceLine_PrefersBannerOverFirstLine pins the bench-evidence accuracy
+// fix (bridge-ratelimit, cycle-314 forensics): the bench Evidence must be the
+// actual wall BANNER line (the one carrying the reset hint), not the pane's
+// first line — which on a scrolled pane caught a later frame ("53 +\tFamily:
+// codex,", an agent edit-diff line) and obscured what really walled the CLI.
+func TestEvidenceLine_PrefersBannerOverFirstLine(t *testing.T) {
+	pane := "   53 +\t\tFamily: \"codex\",\n" +
+		"some intermediate output\n" +
+		"You've hit your usage limit. try again in 3 hours.\n"
+	got := evidenceLine(pane)
+	if got != "You've hit your usage limit. try again in 3 hours." {
+		t.Errorf("evidenceLine picked %q, want the reset-hint banner line", got)
+	}
+}
+
+// TestEvidenceLine_FallsBackToFirstLine: with no reset-hint banner present,
+// keep the legacy firstLine behavior (no regression).
+func TestEvidenceLine_FallsBackToFirstLine(t *testing.T) {
+	pane := "first line here\nsecond line\n"
+	if got := evidenceLine(pane); got != "first line here" {
+		t.Errorf("evidenceLine = %q, want firstLine fallback", got)
+	}
+}

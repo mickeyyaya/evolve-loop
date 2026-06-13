@@ -34,8 +34,12 @@ func TestAmplifiedNewBenchEntryParsesHintAfterEmptyEvidenceLine(t *testing.T) {
 	if got.BenchedAt != now {
 		t.Fatalf("BenchedAt = %s, want %s", got.BenchedAt, now)
 	}
-	if got.Evidence != "" {
-		t.Fatalf("Evidence = %q, want empty first line preserved", got.Evidence)
+	// Evidence is now the wall BANNER line (the reset-hint line), not the empty
+	// first line — evidenceLine picks the line that actually walled the CLI
+	// (bridge-ratelimit evidence-accuracy fix), strictly more useful than a
+	// leading blank line for forensics.
+	if got.Evidence != "try again at 6:11 AM" {
+		t.Fatalf("Evidence = %q, want the reset-hint banner line", got.Evidence)
 	}
 	wantUntil, ok := ParseResetHint(paneText, now)
 	if !ok {

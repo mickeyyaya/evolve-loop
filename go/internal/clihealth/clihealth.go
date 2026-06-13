@@ -65,7 +65,8 @@ func CooldownForStrikes(strikes int) time.Duration {
 // NewBenchEntry composes the bench record for family after a classified wall:
 // strikes continue from prev (zero-value prev → first strike), benched_until
 // honors the pane's own reset hint when one parses (else the strike-scaled
-// cooldown), and the wall's first line is kept as evidence. Single home — the
+// cooldown), and the wall's banner line (the reset-hint line via evidenceLine,
+// or the first line as fallback) is kept as evidence. Single home — the
 // runner's bench-writer and the loop's canary compose entries HERE so the
 // strike/cooldown/evidence logic can never drift between them.
 func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) Entry {
@@ -76,7 +77,7 @@ func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) 
 	}
 	return Entry{
 		Family: family, Reason: pattern, BenchedAt: now, BenchedUntil: until,
-		Evidence: truncateRunes(firstLine(paneText), 160), Strikes: strikes,
+		Evidence: truncateRunes(evidenceLine(paneText), 160), Strikes: strikes,
 	}
 }
 

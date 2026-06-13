@@ -39,6 +39,22 @@ var (
 	relativeHintRe = regexp.MustCompile(`(?i)try again in\s+(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*min(?:ute)?s?)?`)
 )
 
+// evidenceLine returns the most representative line for a bench record: the
+// wall BANNER line that carries the reset hint (the line ParseResetHint keys
+// on), which is what actually walled the CLI — not the pane's first line. On a
+// scrolled pane firstLine catches a later frame or, as in cycle-314, the
+// agent's own edit content ("53 +\tFamily: codex,"), obscuring the real cause
+// in the bench evidence. Falls back to firstLine when no reset-hint line is
+// present (no regression for walls without a parseable hint).
+func evidenceLine(pane string) string {
+	for _, ln := range strings.Split(pane, "\n") {
+		if clockHintRe.MatchString(ln) || relativeHintRe.MatchString(ln) {
+			return ln
+		}
+	}
+	return firstLine(pane)
+}
+
 func parseClockHint(pane string, now time.Time) (time.Time, bool) {
 	m := clockHintRe.FindStringSubmatch(pane)
 	if m == nil {
