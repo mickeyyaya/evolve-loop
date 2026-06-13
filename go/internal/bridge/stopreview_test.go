@@ -10,9 +10,12 @@ import (
 )
 
 // TestDeterministicReviewer covers the Stage-0 review decision: extend while
-// the agent produces output (up to maxExtends), else pause. The key property —
-// a progressing agent is never told to stop until the backstop — is what keeps
-// a slow-but-working phase alive.
+// the agent produces SUBSTANTIVE output (Progressed) — extend without bound;
+// the maxExtends backstop applies only to a busy-but-STALLED pane (spinner, no
+// new content). The key property — a genuinely-progressing agent is NEVER told
+// to stop (cycle-311/312: a scout producing output for >30min was killed at the
+// backstop) — is what keeps a slow-but-working phase alive. Cost/budget caps
+// bound a pathological infinite-producer, not this wait reviewer.
 func TestDeterministicReviewer(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	cases := []struct {
@@ -22,8 +25,8 @@ func TestDeterministicReviewer(t *testing.T) {
 	}{
 		{"progressing, first interval → extend", StopEvent{Progressed: true, Attempt: 0}, ReviewExtend},
 		{"progressing, under cap → extend", StopEvent{Progressed: true, Attempt: 1}, ReviewExtend},
-		{"progressing, at cap → pause", StopEvent{Progressed: true, Attempt: 2}, ReviewPause},
-		{"progressing, past cap → pause", StopEvent{Progressed: true, Attempt: 9}, ReviewPause},
+		{"progressing, at cap → EXTEND (real output is never stuck)", StopEvent{Progressed: true, Attempt: 2}, ReviewExtend},
+		{"progressing, past cap → EXTEND (cycle-311/312: a producing scout killed mid-work)", StopEvent{Progressed: true, Attempt: 9}, ReviewExtend},
 		{"no output → pause immediately", StopEvent{Progressed: false, Attempt: 0}, ReviewPause},
 	}
 	for _, c := range cases {

@@ -78,10 +78,12 @@ type StopReviewer interface {
 // of wall-clock before a hung-yet-noisy agent is surfaced.
 const defaultArtifactMaxExtends = 6
 
-// deterministicReviewer is the Stage-0 reviewer: extend while the agent is
-// producing output (up to maxExtends), else pause for investigation. No LLM
-// call — a fast, cheap first-line decision whose key property is that it never
-// kills an agent that is still doing work.
+// deterministicReviewer is the Stage-0 reviewer: extend WITHOUT bound while the
+// agent produces substantive output (converging work is never "stuck"), extend
+// a busy-but-silent pane only up to maxExtends (a bare spinner proves liveness,
+// not progress), else pause for investigation. No LLM call — a fast, cheap
+// first-line decision whose key property is that it never kills an agent that is
+// still doing work.
 type deterministicReviewer struct {
 	maxExtends int
 }
@@ -94,29 +96,40 @@ func newDeterministicReviewer(maxExtends int) deterministicReviewer {
 }
 
 func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
-	// "Still working" = the agent EITHER emitted substantive new output
-	// (Progressed) OR is visibly mid-turn per the per-CLI busy affordance
-	// (Busy). Busy is load-bearing for quiet extended-thinking models (Opus):
-	// the pane's only delta is the "Deliberating Ns"/token-counter lines that
-	// PaneHasSubstantiveChange strips as volatile, so Progressed reads false
-	// while the agent is demonstrably alive. Pausing/killing such an agent at
-	// interval 0 recorded a PASS audit report as FAIL and halted the batch
-	// (cycles 254/255). The maxExtends backstop still bounds a genuinely-hung
-	// busy-spinner agent, so a busy pane buys extensions, not immortality.
-	if ev.Progressed || ev.Busy {
-		signal := "busy mid-turn (no pane delta — likely extended thinking)"
-		if ev.Progressed {
-			signal = "still producing output"
+	// Two liveness signals, two budgets — conflating them killed working agents:
+	//
+	//  Progressed = the agent emitted substantive new output this interval. Real
+	//  output is proof of work that is CONVERGING, so it is never "stuck": a
+	//  scout reading a large failure backlog produces output for 30+ min and
+	//  must extend UNCONDITIONALLY. Capping progress at maxExtends killed
+	//  cycle-311/312's producing scout mid-work with a bogus "artifact timeout".
+	//
+	//  Busy (no Progressed) = the per-CLI busy affordance is up but the pane has
+	//  no content delta. Load-bearing for quiet extended-thinking models (Opus):
+	//  the only delta is the "Deliberating Ns"/token-counter lines that
+	//  PaneHasSubstantiveChange strips as volatile, so Progressed reads false
+	//  while the agent is demonstrably alive. Pausing such an agent at interval 0
+	//  recorded a PASS audit report as FAIL and halted the batch (cycles
+	//  254/255). But a bare spinner only proves the process is up, not that it is
+	//  converging — so this signal stays BOUNDED by maxExtends to surface a
+	//  genuinely-hung busy-spinner agent. A busy pane buys extensions, not
+	//  immortality.
+	if ev.Progressed {
+		return ReviewVerdict{
+			Action: ReviewExtend,
+			Reason: fmt.Sprintf("agent still producing output (interval %d) — extend; real output is never stuck", ev.Attempt+1),
 		}
+	}
+	if ev.Busy {
 		if ev.Attempt < r.maxExtends {
 			return ReviewVerdict{
 				Action: ReviewExtend,
-				Reason: fmt.Sprintf("agent %s (interval %d/%d) — extend", signal, ev.Attempt+1, r.maxExtends),
+				Reason: fmt.Sprintf("agent busy mid-turn (no pane delta — likely extended thinking) (interval %d/%d) — extend", ev.Attempt+1, r.maxExtends),
 			}
 		}
 		return ReviewVerdict{
 			Action: ReviewPause,
-			Reason: fmt.Sprintf("agent %s but exhausted %d extensions — pause for investigation", signal, r.maxExtends),
+			Reason: fmt.Sprintf("agent busy but produced no output — exhausted %d extensions, pause for investigation", r.maxExtends),
 		}
 	}
 	return ReviewVerdict{
