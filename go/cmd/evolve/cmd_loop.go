@@ -399,7 +399,16 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir)
-	orch := deps.Orchestrator
+	// orch is narrowed to loopCycleRunner so tests can inject a scripted
+	// orchestrator (loopOrchOverride) — the real *core.Orchestrator cannot be
+	// driven to emit FinalVerdict=FAIL without a faithful phase machine, which
+	// would leave the continue-on-fail call site untestable end-to-end. Same
+	// package-var test-seam pattern as wireOrchestratorDepsFn. nil override =
+	// production: the concrete orchestrator (byte-identical behavior).
+	var orch loopCycleRunner = deps.Orchestrator
+	if loopOrchOverride != nil {
+		orch = loopOrchOverride
+	}
 
 	// E2: auto-prune expired failedApproaches at dispatcher start.
 	// Opt-out via EVOLVE_AUTO_PRUNE=0. Non-fatal on error — pruning
@@ -1007,6 +1016,20 @@ func recordAbsorbedFail(cfg loopConfig, ranCycle int, stderr io.Writer) {
 		fmt.Fprintf(stderr, "[loop] WARN: could not record absorbed FAIL for cycle %d: %v\n", ranCycle, err)
 	}
 }
+
+// loopCycleRunner is the slice of *core.Orchestrator the batch loop drives —
+// narrowed to an interface so a scripted fake can exercise the loop's
+// post-cycle wiring (the consecutive-fail breaker, recordAbsorbedFail) which
+// only fires on FinalVerdict=FAIL, a state the real orchestrator cannot reach
+// without a full phase machine.
+type loopCycleRunner interface {
+	RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error)
+	RunCycleFromPhase(context.Context, core.CycleRequest, *core.ResumePoint) (core.CycleResult, error)
+}
+
+// loopOrchOverride is a test-only seam: when non-nil, runLoop drives this
+// instead of the wired *core.Orchestrator. nil in production.
+var loopOrchOverride loopCycleRunner
 
 // defaultMaxConsecutiveFails reproduces the pre-flag contract: a single
 // verdict-FAIL stops the batch.

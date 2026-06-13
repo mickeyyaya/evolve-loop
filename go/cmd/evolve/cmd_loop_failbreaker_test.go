@@ -2,10 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // cmd_loop_failbreaker_test.go — EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS: the
@@ -130,4 +135,76 @@ func TestRecordAbsorbedFail_MissingStateIsSoftWarn(t *testing.T) {
 	cfg := loopConfig{ProjectRoot: projectRoot, EvolveDir: filepath.Join(projectRoot, ".evolve")}
 	var stderr bytes.Buffer
 	recordAbsorbedFail(cfg, 1, &stderr) // no state.json on disk — must not panic
+}
+
+// failingOrch is a loopCycleRunner that returns a fixed FinalVerdict with an
+// incrementing cycle number — the seam that lets the call-site wiring of the
+// consecutive-fail breaker be exercised end-to-end (the real *core.Orchestrator
+// cannot be scripted to emit FinalVerdict=FAIL without a faithful phase
+// machine). Injected via loopOrchOverride.
+type failingOrch struct {
+	verdict string
+	n       int
+}
+
+func (f *failingOrch) RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error) {
+	f.n++
+	return core.CycleResult{Cycle: f.n, FinalVerdict: f.verdict}, nil
+}
+func (f *failingOrch) RunCycleFromPhase(ctx context.Context, req core.CycleRequest, _ *core.ResumePoint) (core.CycleResult, error) {
+	return f.RunCycle(ctx, req)
+}
+
+func runFailLoop(t *testing.T, maxConsecutive string) (int, string) {
+	t.Helper()
+	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
+	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "1")
+	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", maxConsecutive)
+
+	projectRoot := t.TempDir()
+	evolveDir := filepath.Join(projectRoot, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(evolveDir, "state.json"), []byte(`{"failedApproaches":[],"lastCycleNumber":0}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	storage := &fixtures.FakeStorage{}
+	ledger := newFakeLedger()
+	defer installStubDeps(t, storage, ledger)()
+	prev := loopOrchOverride
+	loopOrchOverride = &failingOrch{verdict: core.VerdictFAIL}
+	defer func() { loopOrchOverride = prev }()
+
+	var stdout, stderr bytes.Buffer
+	rc := runLoop([]string{
+		"--project-root", projectRoot,
+		"--evolve-dir", evolveDir,
+		"--goal-text", "fail goal",
+		"--cycles", "5",
+	}, nil, &stdout, &stderr)
+	return rc, stderr.String()
+}
+
+// TestRunLoop_ContinueOnFail_CallSite is the end-to-end regression pin for the
+// continue-on-fail WIRING (not just the pure helpers): with the default max=1
+// the batch stops on the first FAIL; with max=3 it absorbs FAILs and keeps
+// running, emitting the "continuing" line. Guards against a future loop edit
+// silently dropping the breaker/record call.
+func TestRunLoop_ContinueOnFail_CallSite(t *testing.T) {
+	t.Run("default max=1 stops on first FAIL", func(t *testing.T) {
+		_, stderr := runFailLoop(t, "1")
+		if strings.Contains(stderr, "continuing (consecutive") {
+			t.Errorf("default must NOT continue past a FAIL; stderr=%q", stderr)
+		}
+	})
+	t.Run("max=3 absorbs and continues", func(t *testing.T) {
+		_, stderr := runFailLoop(t, "3")
+		if !strings.Contains(stderr, "continuing (consecutive 1 of max 3") {
+			t.Errorf("max=3 must absorb the first FAIL and continue; stderr=%q", stderr)
+		}
+		if !strings.Contains(stderr, "consecutive 2 of max 3") {
+			t.Errorf("max=3 must absorb the second FAIL too; stderr=%q", stderr)
+		}
+	})
 }
