@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
@@ -1280,6 +1281,16 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		AttemptCount: out.AttemptCount,
 		AbortReason:  out.AbortReason,
 	})
+	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
+	// tier graduated-enforcement WOULD apply; changes nothing (the floor still
+	// aborts). Evidence is conservative here (the per-site benign-churn /
+	// verified-rebuild predicates are plumbed in the enforce slice), so only the
+	// always-correctable classes surface in shadow today.
+	if out.AbortReason != "" {
+		if tier := failuregrade.Grade(out.AbortReason, failuregrade.Evidence{}); tier != failuregrade.TierAbort {
+			fmt.Fprintf(os.Stderr, "[graduated-enforcement SHADOW] phase %s abort reason %q would grade as %s (ADR-0048 Slice A; enforce pending)\n", out.Phase, out.AbortReason, tier)
+		}
+	}
 	// Empty workspace ⇒ no sidecar: filepath.Join("", f) is CWD-relative and
 	// leaked <phase>-usage.json into go/cmd/evolve during `go test` (the C1
 	// abort-path recording made previously-silent test cycles write). The
