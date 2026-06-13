@@ -118,6 +118,41 @@ func CommittedFloorCount(artifact, companionPath string, knownPkgs []string) int
 	return CountCommittedFloors(artifact, knownPkgs)
 }
 
+// CommittedFloorPackages returns the candidate packages committed as floors
+// this cycle — declaration-primary (committed_floors filtered to the
+// candidates), prose fallback otherwise. Gate C subtracts this set from the
+// deferred set so a package listed on BOTH sides resolves committed-wins:
+// a floor predicate on this cycle's own committed package is a legitimate
+// ratchet, never the cycle-280 starvation the gate exists to block.
+func CommittedFloorPackages(artifact, companionPath string, candidatePkgs []string) []string {
+	if declared, ok, err := ReadDeclaredFloors(companionPath); err == nil && ok {
+		candidates := map[string]bool{}
+		for _, pkg := range candidatePkgs {
+			candidates[pkg] = true
+		}
+		var pkgs []string
+		seen := map[string]bool{}
+		for _, pkg := range declared {
+			if candidates[pkg] && !seen[pkg] {
+				seen[pkg] = true
+				pkgs = append(pkgs, pkg)
+			}
+		}
+		sort.Strings(pkgs)
+		return pkgs
+	}
+	prose := proseFloorPackages(artifact, candidatePkgs)
+	if len(prose) == 0 {
+		return nil
+	}
+	pkgs := make([]string, 0, len(prose))
+	for pkg := range prose {
+		pkgs = append(pkgs, pkg)
+	}
+	sort.Strings(pkgs)
+	return pkgs
+}
+
 // MalformedCommittedFloorWarning returns a non-empty parse-error string when the
 // companion at companionPath is present but its JSON is malformed. Three cases:
 //
@@ -221,15 +256,17 @@ var tokenRE = regexp.MustCompile(`[A-Za-z0-9_-]+`)
 // phases/scout — every conformant bullet counted +2 phantom floors, which made
 // the cap's correction directive unsatisfiable (cycle 301: an honest 2-bullet
 // commitment counted 6, burned both corrections, failed the cycle). The
-// source=/priority=/defer_reason= values are closed contract vocabulary and
-// are dropped whole (\S+ — only the first space-delimited word; later words
-// of a free-form defer_reason stay matchable, which is the intended reading:
-// a reason naming a package is about that package); the evidence= VALUE is
-// kept because evidence pointers carry real package paths
+// source=/priority= values are closed contract vocabulary, dropped whole;
+// defer_reason= is stripped to END OF LINE — defer reasons are free-form
+// scheduling prose that routinely references OTHER work ("co-scheduling
+// with the looppreflight blocker fix", cycle 310: that mention made Gate C
+// block the COMMITTED package's own predicates — a reason naming a package
+// is NOT a floor on that package). The evidence= VALUE is kept because
+// evidence pointers carry real package paths
 // ("evidence=go/internal/clihealth/clihealth.go"). RE2's ASCII \b also fires
 // after a hyphen, so a hypothetical slug like "low-priority=x" is stripped
 // too — that only ever undercounts (fail-open direction).
-var metadataFieldRE = regexp.MustCompile(`\b(?:source|priority|defer_reason)=\S+|\bevidence=`)
+var metadataFieldRE = regexp.MustCompile(`\bdefer_reason=[^\n]*|\b(?:source|priority)=\S+|\bevidence=`)
 
 // pathOnlyPkgs are packages whose basenames are also ordinary coverage prose;
 // they count only when slash-qualified ("internal/paths"), never as bare

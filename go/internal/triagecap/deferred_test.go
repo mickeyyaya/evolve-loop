@@ -57,15 +57,39 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 		},
 		{
 			// Pins the metadata-strip semantics on deferred items: the
-			// contract fields' own vocabulary (evidence/scout) never counts,
-			// the first word of defer_reason= is consumed with the key, and
-			// later free-form words naming a package DO count (a reason
-			// naming bridge is about bridge).
-			name: "deferred metadata stripped, free-form defer_reason tail still matches",
+			// contract fields' own vocabulary never counts, and the ENTIRE
+			// defer_reason value (to end of line) is stripped — defer
+			// reasons are scheduling prose that routinely references OTHER
+			// work. Cycle 310 (soak #3d) proved the earlier tail-matchable
+			// reading wrong: "co-scheduling with the looppreflight blocker
+			// fix" made Gate C block the COMMITTED package's predicates.
+			name: "deferred metadata stripped including full defer_reason prose",
 			artifact: "## top_n\n- fix: a bug fix\n\n" +
 				"## deferred\n" +
 				"- coverage-rest: push swarm coverage to ≥98% — priority=M, evidence=scout-report.md#x, defer_reason=budget consumed by bridge work, source=scout\n",
-			want: []string{"bridge", "swarm"},
+			want: []string{"swarm"},
+		},
+		{
+			// Counterpart to the strip pin: bridge as the item's ACTUAL
+			// floor package (in the task prose, not defer_reason) is still
+			// detected after the defer_reason strip.
+			name: "genuine bridge floor in task prose still detected",
+			artifact: "## top_n\n- fix: a bug fix\n\n" +
+				"## deferred\n" +
+				"- coverage-bridge: push bridge coverage to ≥98% — priority=M, defer_reason=budget consumed elsewhere\n",
+			want: []string{"bridge"},
+		},
+		{
+			// Cycle-310 verbatim replay (soak #3d): the deferred ledger-seal
+			// item's defer_reason references the committed looppreflight
+			// blocker — that mention must NOT make looppreflight a deferred
+			// floor package (it blocked the committed task's own predicates).
+			name: "cycle-310 replay: defer_reason referencing committed work does not count",
+			artifact: "## top_n\n" +
+				"- looppreflight-env-seams: Convert defaultTmuxSessions to var-seam; add deterministic branch tests; cover saveVersionCache write-error path — priority=H, evidence=scout-report §Task 3, source=scout\n\n" +
+				"## deferred\n" +
+				"- ledger-seal-io-coverage: Roundtrip tests for writeSegment/rewriteLive/readSegment; lift floor to ≥ 85% — priority=H, defer_reason=same as above; co-scheduling with the looppreflight blocker fix risks repeating the phantom-floor capacity failure\n",
+			want: nil,
 		},
 	}
 	for _, tt := range tests {

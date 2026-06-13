@@ -100,6 +100,42 @@ func TestFloorBindingGate_DeferredFloorPredicateBlocks(t *testing.T) {
 	}
 }
 
+// triageWithDualListedCore commits a core floor AND defers more core work —
+// the committed listing must win (a floor predicate on this cycle's own
+// committed package is a legitimate ratchet, never a cycle-280 starvation).
+const triageWithDualListedCore = `## top_n (commit to THIS cycle)
+- coverage-core-now: push internal/core coverage to ≥90% — priority=H
+
+## deferred (carry to NEXT cycle's carryoverTodos)
+- coverage-core-later: push core coverage the rest of the way to ≥98% — defer_reason=too large for one cycle
+`
+
+func TestFloorBindingGate_CommittedWinsOverDeferredMention(t *testing.T) {
+	g := floorBindingGate{}
+	in := buildFloorBindingFixture(t, deferredCorePredicates)
+	if err := os.WriteFile(filepath.Join(in.Workspace, "triage-report.md"), []byte(triageWithDualListedCore), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reason, block := g.check(in)
+	if reason != "" || block {
+		t.Errorf("core is COMMITTED this cycle (and also deferred-for-later) — its floor predicate must pass; got reason=%q block=%v", reason, block)
+	}
+}
+
+// Bilateral declaration: the companion declares core BOTH committed and
+// deferred. Committed-wins applies at equal (declared) rank — the predicate
+// must pass. Pins the committedDeclared branch of the provenance rule.
+func TestFloorBinding_BilateralDeclarationCommittedWins(t *testing.T) {
+	in := buildFloorBindingFixture(t, deferredCorePredicates) // binds ./internal/core/
+	if err := os.WriteFile(filepath.Join(in.Workspace, triagecap.TriageDecisionName()),
+		[]byte(`{"committed_floors":["core"],"deferred_floors":["core"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if reason, block := (floorBindingGate{}).check(in); reason != "" || block {
+		t.Errorf("bilateral declaration: committed wins at equal rank; got reason=%q block=%v", reason, block)
+	}
+}
+
 func TestFloorBindingGate_CommittedFloorPredicatePasses(t *testing.T) {
 	g := floorBindingGate{}
 	reason, block := g.check(buildFloorBindingFixture(t, committedBridgePredicates))

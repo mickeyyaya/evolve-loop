@@ -52,6 +52,31 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 	}
 	companionPath := filepath.Join(in.Workspace, triagecap.TriageDecisionName())
 	deferred := triagecap.DeferredFloorPackagesDecl(string(artifact), companionPath, targets)
+	// Committed-wins subtraction: a package floor-committed this cycle may
+	// carry predicates even if more of its work was ALSO deferred for later
+	// (cycle 310: the gate blocked the committed package's own predicates).
+	// Provenance rule (declarations outrank prose, the Layer-1 contract): a
+	// DECLARED deferred_floors entry yields only to a DECLARED committed
+	// floor; prose-derived deferral yields to committed evidence of any rank.
+	_, deferredDeclared, _ := triagecap.ReadDeferredFloors(companionPath)
+	_, committedDeclared, _ := triagecap.ReadDeclaredFloors(companionPath)
+	if !deferredDeclared || committedDeclared {
+		if committed := triagecap.CommittedFloorPackages(string(artifact), companionPath, targets); len(committed) > 0 {
+			committedSet := map[string]bool{}
+			for _, pkg := range committed {
+				committedSet[pkg] = true
+			}
+			// [:0:0] zero-caps the reuse so appends allocate fresh — a future
+			// callee returning a shared sub-slice cannot be silently corrupted.
+			kept := deferred[:0:0]
+			for _, pkg := range deferred {
+				if !committedSet[pkg] {
+					kept = append(kept, pkg)
+				}
+			}
+			deferred = kept
+		}
+	}
 	if len(deferred) == 0 {
 		return "", false
 	}
