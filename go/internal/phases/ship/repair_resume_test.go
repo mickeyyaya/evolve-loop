@@ -157,9 +157,12 @@ func TestRepair_Resume_OriginDiverged_NoRepair(t *testing.T) {
 func pushDivergentCommit(t *testing.T, bare string) {
 	t.Helper()
 	clone := filepath.Join(tempRepoDir(t), "clone2")
-	cmd := exec.Command("git", "clone", "-q", bare, clone)
-	cmd.Env = filteredEnv()
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := captureWithEBADFRetry(func() ([]byte, error) {
+		cmd := exec.Command("git", "clone", "-q", bare, clone)
+		cmd.Env = filteredEnv()
+		return cmd.CombinedOutput()
+	})
+	if err != nil {
 		t.Fatalf("git clone: %v\n%s", err, out)
 	}
 	// CI parity: the bare remote's HEAD may point at an unborn default branch

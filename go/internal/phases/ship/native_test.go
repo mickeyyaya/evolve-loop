@@ -94,8 +94,10 @@ func makeRepo(t *testing.T) string {
 func addRemote(t *testing.T, repo string) string {
 	t.Helper()
 	bare := filepath.Join(tempRepoDir(t), "remote.git")
-	cmd := exec.Command("git", "init", "-q", "--bare", bare)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := captureWithEBADFRetry(func() ([]byte, error) {
+		return exec.Command("git", "init", "-q", "--bare", bare).CombinedOutput()
+	})
+	if err != nil {
 		t.Fatalf("git init --bare: %v\n%s", err, out)
 	}
 	runGit(t, repo, "remote", "add", "origin", bare)
@@ -195,9 +197,11 @@ func mustMkdir(t *testing.T, path string) {
 
 func runGit(t *testing.T, repo string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-	cmd.Env = filteredEnv()
-	out, err := cmd.CombinedOutput()
+	out, err := captureWithEBADFRetry(func() ([]byte, error) {
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = filteredEnv()
+		return cmd.CombinedOutput()
+	})
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
@@ -205,9 +209,11 @@ func runGit(t *testing.T, repo string, args ...string) {
 
 func runGitOut(t *testing.T, repo string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-	cmd.Env = filteredEnv()
-	out, err := cmd.Output()
+	out, err := captureWithEBADFRetry(func() ([]byte, error) {
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = filteredEnv()
+		return cmd.Output()
+	})
 	if err != nil {
 		t.Fatalf("git %v: %v", args, err)
 	}
