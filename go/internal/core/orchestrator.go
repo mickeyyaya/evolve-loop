@@ -993,6 +993,18 @@ func isLegitimateMainTreePath(p string) bool {
 	return false
 }
 
+// preserveOnVerdict reports whether a cycle that COMPLETED normally (no abort,
+// err==nil) should keep its worktree for salvage based on its final verdict.
+// A FAIL verdict (audit FAIL → retro → end) leaves the builder's work
+// UNCOMMITTED in the worktree; the default exit-cleanup prune would discard
+// it (ADR-0046 Layer 2 was built and lost twice this way, cycles 306/307 —
+// inbox preserve-worktree-on-verdict-fail). A PASS/SHIPPED_VIA_BUILD cycle's
+// work is already in main and a SKIPPED_UNKNOWN produced nothing, so those
+// clean as before. Mirrors the abort-path and ship-failure preservation.
+func preserveOnVerdict(finalVerdict string) bool {
+	return finalVerdict == VerdictFAIL
+}
+
 // isScoutEvalMaterialization reports whether a main-tree write is scout
 // performing its documented eval-materialization contract. Scout writes the
 // SELECTED slugs' evals to projectRoot/.evolve/evals/<slug>.md in the MAIN
@@ -2738,6 +2750,18 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// persists it (nil seam ⇒ byte-identical no-op).
 	if o.throughputRecorder != nil && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
 		o.throughputRecorder(&state, cycle, cs.WorkspacePath)
+	}
+
+	// A completed cycle that FAILED its verdict keeps its worktree for salvage
+	// (inbox preserve-worktree-on-verdict-fail). The exit defer prunes only
+	// when !preserveWorktree, so set the flag before marking completion. This
+	// MUST stay AFTER finalizeOutcome above (line ~2735): it reads the FINAL
+	// verdict, so a SKIPPED/SHIPPED_VIA_BUILD reclassification has already
+	// happened — moving it earlier would preserve on a pre-reclassification
+	// raw FAIL. L3 gc (internal/gc) reclaims preserved worktrees on retention;
+	// `evolve cycle reset` / `evolve loop --resume` reclaim them explicitly.
+	if preserveOnVerdict(result.FinalVerdict) {
+		preserveWorktree = true
 	}
 
 	state.LastCycleNumber = cycle

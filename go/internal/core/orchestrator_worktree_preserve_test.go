@@ -82,3 +82,28 @@ func TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree(t *testing.T) {
 		t.Fatalf("worktree must be cleaned after the ship eventually succeeds; cleaned=%v", wt.cleaned)
 	}
 }
+
+// TestPreserveOnVerdict pins inbox preserve-worktree-on-verdict-fail: a cycle
+// that COMPLETES with a FAIL verdict (audit FAIL → retro → end, err==nil)
+// leaves the builder's work UNCOMMITTED in the worktree. Pruning it discards
+// salvageable work (ADR-0046 Layer 2 was built and lost twice this way, cycles
+// 306/307). Only a FAIL verdict warrants completion-time preservation; PASS
+// (shipped to main) and other outcomes clean as before.
+func TestPreserveOnVerdict(t *testing.T) {
+	cases := []struct {
+		verdict string
+		want    bool
+	}{
+		{VerdictFAIL, true},
+		{VerdictPASS, false},
+		{VerdictWARN, false},
+		{CycleOutcomeShippedViaBuild, false},
+		{CycleOutcomeSkippedUnknown, false},
+		{"", false},
+	}
+	for _, tc := range cases {
+		if got := preserveOnVerdict(tc.verdict); got != tc.want {
+			t.Errorf("preserveOnVerdict(%q) = %v, want %v", tc.verdict, got, tc.want)
+		}
+	}
+}
