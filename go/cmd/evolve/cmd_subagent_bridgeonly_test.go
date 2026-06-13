@@ -22,8 +22,8 @@ func TestSubagentRun_NoInProcessFallbackSignal(t *testing.T) {
 
 	banned := []string{
 		"fall back to in-process Agent tool", // the instruction to the orchestrator
-		`"LEGACY_DISPATCH"`,                   // the stdout escape-hatch token
-		"res.LegacyDispatch",                  // the result field that carried it
+		`"LEGACY_DISPATCH"`,                  // the stdout escape-hatch token
+		"res.LegacyDispatch",                 // the result field that carried it
 	}
 	for _, b := range banned {
 		if strings.Contains(src, b) {
