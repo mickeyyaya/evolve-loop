@@ -2,7 +2,7 @@
 
 > Status: living doc for the agent-bridge hardening program (plan: `sleepy-wandering-salamander`).
 > Covers the invariants that make every subagent/phase-agent dispatch go through the one bridge
-> process, safely and at scale. B1–B5 landed; B6 will extend this doc.
+> process, safely and at scale. B1–B6 are complete; invariants I1–I10 below.
 
 ## Request
 
@@ -163,6 +163,7 @@ is a real conformance gap. All 14 roles pass.
 | I7 | In-process env view == subprocess env view | `lookupEnv` consults `deps.Env`; overlay + e2e tests |
 | I8 | Every registry role satisfies I1/I3–I6 uniformly | `conformance_test.go` (fake-bridge, table over `agentRoles`) |
 | I9 | Fan-out honors its concurrency cap + isolates workers | `fanoutdispatch` race tests (observed bound, high-N partial-failure) |
+| I10 | Allow-list ↔ profiles stay single-sourced; reaping releases sessions | `conformance_registry_test.go` (role↔profile drift-guard); `internal/swarm` reap tests |
 
 ## B5 — Fan-out concurrency stability
 
@@ -187,6 +188,26 @@ per-worker gate (`aggregator.go`) checks exists+non-empty but not token/freshnes
 recursive child already runs the full B3 `Verify` at write time, so the parent re-check is redundant;
 hardening it to call `Verify` (freshness skipped) is tracked separately.
 
-## Out of scope (later phases)
+## B6 — Allow-list ↔ profile single-sourcing (+ reaping)
 
-B6 (registry-driven allow-list + session reaping).
+**Problem.** B1 made the allow-list one source (`agentRoles` → `agentRolePattern`), but the allow-list
+and the on-disk profiles could still drift: a role added to `agentRoles` without a `<role>.json`
+profile (or a profile removed out from under a role) would only fail at dispatch time (`run.go:179`
+loads `ProfilesDir/<role>.json`).
+
+**Design (test; no production change).** `conformance_registry_test.go`:
+- `TestAgentRoles_EveryRoleHasProfile` — every canonical role has a tracked `<role>.json` profile, so
+  the allow-list and profiles cannot drift (`runtime.Caller`-rooted lookup → stable regardless of cwd).
+- `TestAgentRoles_SSOTIntegrity` — no duplicate roles; `agentRolePattern` matches every canonical role
+  and rejects non-members, case variants, and worker-name-shaped strings (those take the separate
+  `parseAgentName` path).
+
+The other B6 scale knob — **session reaping** — is already covered by `internal/swarm`
+(`TestReap_KillsAllLiveAndMarksReaped`, `TestReapRunSessions_KillsOwnRegistryOnly`,
+`TestReapRunSessions_RefusesUnsafeNames`, registry round-trip/idempotency), so it is referenced rather
+than re-tested (single-source).
+
+## Status
+
+B1–B6 of the agent-bridge hardening program are complete. The dispatch contract is enforced by
+invariants I1–I10, each backed by tests.
