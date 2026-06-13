@@ -97,35 +97,76 @@ func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
 	}
 }
 
-// TestShipFromWorktree_PreMergeTreeSHAMismatch_BreachAndRollback: the
-// v10.15.0 pre-merge binding refuses to ff-merge when the audit-bound tree
-// SHA != the worktree commit's tree, and rolls the worktree commit back.
-func TestShipFromWorktree_PreMergeTreeSHAMismatch_BreachAndRollback(t *testing.T) {
+// TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit: ADR-0048 Slice C1.
+// The audit-bound tree-SHA binding is verified against the STAGED INDEX (via
+// `git write-tree`) BEFORE the worktree commit, so a mismatch refuses with NO
+// commit object ever created — eliminating the commit-then-rollback window.
+// The distinguishing signal from the old post-commit-rollback behavior: the
+// "committed in worktree" log MUST be absent (verification preceded mutation).
+func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "cycle-2-branch")
+	wt := makeWorktree(t, repo, "cycle-9-branch")
 	mustWrite(t, filepath.Join(wt, "feature.txt"), "worktree feature\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":2,"phase":"ship","active_worktree":"`+wt+`"}`)
-	// Bogus audit-bound tree SHA — will never equal the real worktree tree.
+		`{"cycle_id":9,"phase":"ship","active_worktree":"`+wt+`"}`)
+	// Bogus audit-bound tree SHA — will never equal the real staged tree.
 	seedAuditWithBoundTree(t, repo, "PASS", strings.Repeat("a", 40))
 
-	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: should breach"})
+	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: should breach pre-commit"})
+
 	if res.ExitCode != ExitIntegrity {
 		t.Fatalf("want ExitIntegrity, got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	if !containsLog(res, "INTEGRITY BREACH (pre-merge)") {
-		t.Errorf("missing pre-merge breach log: %v", res.Logs)
+	// C1 invariant: verification ran BEFORE the commit — no commit was created.
+	if containsLog(res, "committed in worktree") {
+		t.Errorf("commit was created before tree-SHA verification — commit-then-fail window not closed: %v", res.Logs)
 	}
-	// main must NOT have advanced (the ff-merge never ran).
+	// The cycle branch must carry no new commit (never committed, not rolled back).
+	ahead := strings.TrimSpace(runGitOut(t, repo, "rev-list", "--count", "main..cycle-9-branch"))
+	if ahead != "0" {
+		t.Errorf("cycle branch advanced; main..branch ahead=%s", ahead)
+	}
+	// main must be untouched.
 	mainFiles := runGitOut(t, repo, "log", "-1", "--name-only", "--format=")
 	if strings.Contains(mainFiles, "feature.txt") {
 		t.Errorf("main advanced despite breach; files: %q", mainFiles)
 	}
-	// Worktree commit was rolled back: cycle branch no longer ahead of main.
-	ahead := strings.TrimSpace(runGitOut(t, repo, "rev-list", "--count", "main..cycle-2-branch"))
-	if ahead != "0" {
-		t.Errorf("worktree commit not rolled back; main..branch ahead=%s", ahead)
+}
+
+// TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips: ADR-0048 Slice C1
+// happy path — when the staged-index tree equals the audit-bound tree, the
+// pre-commit verification passes, the commit is then made, and the cycle branch
+// ff-merges into main. Proves verification precedes (and gates) the commit.
+func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
+	repo := makeRepo(t)
+	addRemote(t, repo)
+	wt := makeWorktree(t, repo, "cycle-10-branch")
+	mustWrite(t, filepath.Join(wt, "feature.txt"), "worktree feature\n")
+	runGit(t, wt, "add", "feature.txt")
+	// The tree a commit from this staged index would carry == the bound tree.
+	stagedTree := strings.TrimSpace(runGitOut(t, wt, "write-tree"))
+	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
+		`{"cycle_id":10,"phase":"ship","active_worktree":"`+wt+`"}`)
+	seedAuditWithBoundTree(t, repo, "PASS", stagedTree)
+
+	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: bound match ship"})
+	if err != nil {
+		t.Fatalf("bound-match ship errored: %v (logs=%v)", err, res.Logs)
+	}
+	if res.ExitCode != ExitOK {
+		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "pre-commit tree-SHA binding verified") {
+		t.Errorf("missing pre-commit verified log: %v", res.Logs)
+	}
+	if !containsLog(res, "committed in worktree") {
+		t.Errorf("expected a commit after verification passed: %v", res.Logs)
+	}
+	// The verified worktree edit must now live on main.
+	mainFiles := runGitOut(t, repo, "log", "-1", "--name-only", "--format=")
+	if !strings.Contains(mainFiles, "feature.txt") {
+		t.Errorf("worktree edit not merged into main; HEAD files: %q", mainFiles)
 	}
 }
 

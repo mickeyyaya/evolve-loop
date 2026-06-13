@@ -12,7 +12,7 @@
 //   - shipDirect: runCommitPrefixGate error (gitops.go:103)
 //   - shipFromWorktree: runCommitPrefixGate error (gitops.go:186)
 //   - shipFromWorktree: git commit runner failure (gitops.go:195)
-//   - shipFromWorktree: rev-parse HEAD^{tree} error (gitops.go:202)
+//   - shipFromWorktree: write-tree error + empty-output fail-closed (ADR-0048 C1)
 //   - repinPostCycle: readStateMap error (postship.go:167)
 //   - repinPostCycle: writeStateMap error (postship.go:188)
 package ship
@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- verifySelfSHA: sha256File error on unreadable binary (verify.go:65) ---
@@ -302,23 +304,27 @@ func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
 	}
 }
 
-// --- shipFromWorktree: rev-parse HEAD^{tree} error (gitops.go:202) --------
+// --- shipFromWorktree: write-tree error in the pre-commit binding check -----
+// ADR-0048 Slice C1 moved the audit-bound tree-SHA verification to a
+// `git write-tree` on the staged index BEFORE the commit. A write-tree failure
+// must propagate (the binding cannot be verified, so ship must not advance).
 
-func TestShipFromWorktree_RevParseTreeFails_Errors(t *testing.T) {
+func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{
 		Class:         ClassCycle,
-		CommitMessage: "feat: rev-parse tree fail",
+		CommitMessage: "feat: write-tree fail",
 		ProjectRoot:   repo,
 		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			if name == "git" && argsContain(args, "HEAD^{tree}") {
-				return -1, errors.New("rev-parse HEAD^{tree} exploded")
+			if name == "git" && argsContain(args, "write-tree") {
+				return -1, errors.New("write-tree exploded")
 			}
 			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
 		},
-		// Set a non-empty internalAuditBoundTreeSHA so the binding check runs.
+		// Set a non-empty internalAuditBoundTreeSHA so the pre-commit binding
+		// check runs (and reaches the write-tree call we fault-inject).
 		internalAuditBoundTreeSHA: "someboundsha",
 		Stdin:                     strings.NewReader(""),
 		Stdout:                    io.Discard,
@@ -326,7 +332,40 @@ func TestShipFromWorktree_RevParseTreeFails_Errors(t *testing.T) {
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
 	if err == nil {
-		t.Fatal("want rev-parse HEAD^{tree} error, got nil")
+		t.Fatal("want write-tree error, got nil")
+	}
+}
+
+// TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed: ADR-0048 Slice C1
+// fail-closed posture — if `write-tree` returns exit 0 but EMPTY stdout, the
+// audit binding cannot be verified, so ship must abort rather than commit
+// unverified work (a set binding is never silently skipped).
+func TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed(t *testing.T) {
+	repo, wt := makeWorktreeScenario(t)
+
+	opts := &Options{
+		Class:         ClassCycle,
+		CommitMessage: "feat: write-tree empty",
+		ProjectRoot:   repo,
+		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+			if name == "git" && argsContain(args, "write-tree") {
+				return 0, nil // exit 0, no stdout written
+			}
+			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		},
+		internalAuditBoundTreeSHA: "someboundsha",
+		Stdin:                     strings.NewReader(""),
+		Stdout:                    io.Discard,
+		Stderr:                    io.Discard,
+	}
+	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
+	if err == nil {
+		t.Fatal("want fail-closed error on empty write-tree output, got nil")
+	}
+	se, ok := core.AsShipError(err)
+	if !ok || se.Code != core.CodeGitIO {
+		t.Fatalf("want CodeGitIO ShipError, got %v", err)
 	}
 }
 

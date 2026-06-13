@@ -332,6 +332,37 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 				"gate_err", err.Error(), "worktree", worktree)
 		}
 
+		// ADR-0048 Slice C1 (verify-before-mutate): check the audit-bound tree-SHA
+		// binding against the STAGED INDEX via `git write-tree` BEFORE the commit.
+		// write-tree's SHA is exactly the tree a commit from this index would carry,
+		// so this is equivalent to the prior post-commit `HEAD^{tree}` check — minus
+		// the orphan commit + `reset --soft` rollback. A mismatch now refuses with no
+		// commit object ever created, closing the commit-then-fail-verify window.
+		// Runs only when an audit binding is set; skipped on dry-run, which never
+		// stages the index (the `git add -A` above is itself dry-run-guarded), so
+		// write-tree would report a stale tree. The post-push tree assertion below
+		// remains as the transactional post-condition. Fails CLOSED: a set binding
+		// that cannot be verified aborts rather than shipping unverified work.
+		if !opts.DryRun && opts.internalAuditBoundTreeSHA != "" {
+			stagedTreeSHA, err := captureGitOutputAtDir(ctx, opts, worktree, "write-tree")
+			if err != nil {
+				return err
+			}
+			stagedTreeSHA = strings.TrimSpace(stagedTreeSHA)
+			if stagedTreeSHA == "" {
+				return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+					"ship: git write-tree produced no tree SHA — cannot verify audit-bound tree binding before commit",
+					"worktree", worktree)
+			}
+			if opts.internalAuditBoundTreeSHA != stagedTreeSHA {
+				return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip,
+					fmt.Sprintf("INTEGRITY BREACH (pre-commit): audit-bound tree SHA %s != staged tree SHA %s — refused to commit; worktree changes preserved (staged) for operator triage",
+						opts.internalAuditBoundTreeSHA, stagedTreeSHA),
+					"audit_bound_tree", opts.internalAuditBoundTreeSHA, "worktree_tree", stagedTreeSHA, "phase", "pre-commit")
+			}
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-commit tree-SHA binding verified (audit=%s staged=%s)", opts.internalAuditBoundTreeSHA, stagedTreeSHA))
+		}
+
 		if opts.DryRun {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship]   [DRY-RUN] would commit in worktree on %s", cycleBranch))
 		} else {
@@ -343,24 +374,6 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 					"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "worktree", worktree)
 			}
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: committed in worktree on %s", cycleBranch))
-
-			// v10.15.0: pre-merge tree-SHA binding check.
-			wtTreeSHA, err := captureGitOutputAtDir(ctx, opts, worktree, "rev-parse", "HEAD^{tree}")
-			if err != nil {
-				return err
-			}
-			wtTreeSHA = strings.TrimSpace(wtTreeSHA)
-			if opts.internalAuditBoundTreeSHA != "" && wtTreeSHA != "" {
-				if opts.internalAuditBoundTreeSHA != wtTreeSHA {
-					// Rollback worktree.
-					_, _ = opts.Runner(ctx, "git", []string{"-C", worktree, "reset", "--soft", "HEAD~1"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
-					return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip,
-						fmt.Sprintf("INTEGRITY BREACH (pre-merge): audit-bound tree SHA %s != worktree-commit tree SHA — refused to ff-merge; worktree rolled back to staged state for operator triage",
-							opts.internalAuditBoundTreeSHA),
-						"audit_bound_tree", opts.internalAuditBoundTreeSHA, "worktree_tree", wtTreeSHA, "phase", "pre-merge")
-				}
-				res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-merge tree-SHA binding verified (audit=%s worktree=%s)", opts.internalAuditBoundTreeSHA, wtTreeSHA))
-			}
 		}
 	}
 
