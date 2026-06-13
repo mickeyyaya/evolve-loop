@@ -39,7 +39,8 @@ Subcommands:
                      ( run <agent> <cycle> <workspace_path> )
                      Prompt read from stdin (or PROMPT_FILE_OVERRIDE).
                      Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT,
-                     EVOLVE_CACHE_PREFIX_V2, LEGACY_AGENT_DISPATCH.
+                     EVOLVE_CACHE_PREFIX_V2.
+                     (LEGACY_AGENT_DISPATCH is retired — bridge is the only path.)
   dispatch-parallel  Fan-out N workers per profile.parallel_subtasks[],
                      run via fanoutdispatch + aggregator merge.
                      ( dispatch-parallel <agent> <cycle> <workspace_path> )
@@ -294,7 +295,8 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
 		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, ADVERSARIAL_AUDIT,")
 		fmt.Fprintln(stdout, "     EVOLVE_CACHE_PREFIX_V2, EVOLVE_DIFF_COMPLEXITY_DISABLE,")
-		fmt.Fprintln(stdout, "     LEGACY_AGENT_DISPATCH, WORKTREE_PATH")
+		fmt.Fprintln(stdout, "     WORKTREE_PATH")
+		fmt.Fprintln(stdout, "Note: LEGACY_AGENT_DISPATCH is retired — the bridge is the only dispatch path.")
 		return 0
 	}
 	if len(args) != 3 {
@@ -349,11 +351,6 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	}, subagent.RunOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
-		return 1
-	}
-	if res.LegacyDispatch {
-		fmt.Fprintln(stderr, "[subagent-run] LEGACY_AGENT_DISPATCH=1 — orchestrator should fall back to in-process Agent tool")
-		fmt.Fprintln(stdout, "LEGACY_DISPATCH")
 		return 1
 	}
 	for _, w := range res.Warns {

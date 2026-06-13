@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -46,7 +47,28 @@ type RunRequest struct {
 	DiffComplexityDisabled bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
 	CachePrefixV2          bool   // EVOLVE_CACHE_PREFIX_V2 (default true)
 	AdversarialAudit       bool   // ADVERSARIAL_AUDIT (default true)
-	LegacyAgentDispatch    bool   // LEGACY_AGENT_DISPATCH=1 — escape hatch
+	LegacyAgentDispatch    bool   // LEGACY_AGENT_DISPATCH=1 — retired; now a hard error (see ErrInProcessDispatchBanned)
+}
+
+// ErrInProcessDispatchBanned is returned when a caller requests the retired
+// in-process dispatch path (LEGACY_AGENT_DISPATCH=1). The agent-bridge
+// (`evolve subagent run`) is the ONE and ONLY supported dispatch path; no
+// dispatch may ever reach the in-process Agent tool. The historical escape
+// hatch is gone — setting the flag fails loudly rather than silently routing
+// in-process.
+var ErrInProcessDispatchBanned = errors.New(
+	"subagent/run: in-process dispatch (LEGACY_AGENT_DISPATCH) is retired — all agent dispatch must go through the bridge (`evolve subagent run`); unset LEGACY_AGENT_DISPATCH",
+)
+
+// enforceBridgeOnly is the single source of truth for the bridge-only dispatch
+// invariant. It rejects any request for the in-process escape hatch. Every
+// dispatch path funnels through Run, so enforcing here covers single + fan-out
+// + recursive invocations.
+func enforceBridgeOnly(legacyRequested bool) error {
+	if legacyRequested {
+		return ErrInProcessDispatchBanned
+	}
+	return nil
 }
 
 // RunOptions injects the I/O + sub-process seams. Production wires
@@ -79,7 +101,6 @@ type RunResult struct {
 	ExitCode       int
 	DurationMS     int64
 	Warns          []string
-	LegacyDispatch bool   // true ⇒ LEGACY_DISPATCH escape hatch fired
 	Stderr         string // collected adapter stderr for caller logging
 }
 
@@ -87,11 +108,17 @@ type RunResult struct {
 // Subtask names may include digits and hyphens after the first letter.
 var workerNameRE = regexp.MustCompile(`^([a-z][a-z-]+)-worker-([a-z][a-z0-9-]+)$`)
 
-// agentRolePattern is the bash allow-list of canonical agent roles. Must
-// stay in sync with subagent-run.sh:631.
-var agentRolePattern = regexp.MustCompile(
-	`^(scout|tdd-engineer|builder|auditor|inspirer|evaluator|retrospective|orchestrator|plan-reviewer|intent|triage|memo|tester|build-planner)$`,
-)
+// agentRoles is the canonical allow-list of agent roles (single source of
+// truth). agentRolePattern is derived from it, and tests iterate it, so a new
+// role is added in exactly one place. Must stay in sync with subagent-run.sh:631.
+var agentRoles = []string{
+	"scout", "tdd-engineer", "builder", "auditor", "inspirer",
+	"evaluator", "retrospective", "orchestrator", "plan-reviewer",
+	"intent", "triage", "memo", "tester", "build-planner",
+}
+
+// agentRolePattern matches exactly the canonical roles in agentRoles.
+var agentRolePattern = regexp.MustCompile(`^(` + strings.Join(agentRoles, "|") + `)$`)
 
 // Run ports cmd_run from legacy/scripts/dispatch/subagent-run.sh:619.
 //
@@ -100,7 +127,7 @@ var agentRolePattern = regexp.MustCompile(
 //   - worker-name regex parsing
 //   - profile load + JSON validate
 //   - resolve-llm + cli/model resolution + antigravity→agy
-//   - adapter exists check + LEGACY_AGENT_DISPATCH escape hatch
+//   - adapter exists check (bridge-only invariant enforced up front)
 //   - model tier resolution
 //   - artifact path resolution (worker variant)
 //   - challenge token + git state capture
@@ -136,6 +163,13 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		return RunResult{}, fmt.Errorf("subagent/run: workspace dir does not exist: %s", req.WorkspacePath)
 	}
 
+	// Bridge-only invariant: reject the retired in-process escape hatch before
+	// any resolution work. This is the single chokepoint all dispatch funnels
+	// through (single + fan-out + recursion).
+	if err := enforceBridgeOnly(req.LegacyAgentDispatch); err != nil {
+		return RunResult{}, err
+	}
+
 	// Step 2: load + validate profile.
 	profilePath := filepath.Join(req.ProfilesDir, role+".json")
 	profileBody, err := opts.ReadProfile(profilePath)
@@ -158,15 +192,6 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 	}
 	if cli == "" {
 		return RunResult{}, fmt.Errorf("subagent/run: cli unresolved for agent %s", req.Agent)
-	}
-
-	// Step 4: LEGACY_AGENT_DISPATCH escape hatch.
-	if req.LegacyAgentDispatch {
-		return RunResult{
-			Verdict:        VerdictFAIL,
-			CLI:            cli,
-			LegacyDispatch: true,
-		}, nil
 	}
 
 	// Step 5: adapter exists.

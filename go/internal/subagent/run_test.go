@@ -219,7 +219,10 @@ func TestRun_AntigravityRemappedToAgy(t *testing.T) {
 	}
 }
 
-func TestRun_LegacyDispatchEscapeHatch(t *testing.T) {
+// TestRun_InProcessDispatchBanned pins the B1 bridge-only invariant: requesting
+// the retired in-process dispatch path (LEGACY_AGENT_DISPATCH=1) is a hard error,
+// never a soft RunResult that signals the orchestrator to fall back in-process.
+func TestRun_InProcessDispatchBanned(t *testing.T) {
 	tmp := t.TempDir()
 	res, err := Run(context.Background(), RunRequest{
 		Agent:               "scout",
@@ -229,11 +232,36 @@ func TestRun_LegacyDispatchEscapeHatch(t *testing.T) {
 		PromptReader:        strings.NewReader("hi"),
 		LegacyAgentDispatch: true,
 	}, runHappyOpts(t))
-	if err != nil {
-		t.Fatalf("unexpected: %v", err)
+	if !errors.Is(err, ErrInProcessDispatchBanned) {
+		t.Fatalf("expected ErrInProcessDispatchBanned, got err=%v res=%+v", err, res)
 	}
-	if !res.LegacyDispatch || res.Verdict != VerdictFAIL {
-		t.Errorf("expected LegacyDispatch+FAIL verdict, got %+v", res)
+	if res.Verdict != "" || res.CLI != "" {
+		t.Errorf("expected zero RunResult on banned dispatch, got %+v", res)
+	}
+}
+
+// TestRun_BridgeOnlyInvariant_AllRoles proves the in-process escape hatch is
+// unreachable for EVERY registered agent role. It iterates the agentRoles
+// registry SSOT, so a role added there is genuinely auto-covered here.
+func TestRun_BridgeOnlyInvariant_AllRoles(t *testing.T) {
+	if len(agentRoles) == 0 {
+		t.Fatal("agentRoles registry is empty")
+	}
+	for _, role := range agentRoles {
+		t.Run(role, func(t *testing.T) {
+			tmp := t.TempDir()
+			_, err := Run(context.Background(), RunRequest{
+				Agent:               role,
+				Cycle:               0,
+				WorkspacePath:       tmp,
+				ProjectRoot:         tmp,
+				PromptReader:        strings.NewReader("hi"),
+				LegacyAgentDispatch: true,
+			}, runHappyOpts(t))
+			if !errors.Is(err, ErrInProcessDispatchBanned) {
+				t.Errorf("role %s: in-process dispatch must be banned, got err=%v", role, err)
+			}
+		})
 	}
 }
 
