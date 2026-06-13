@@ -234,9 +234,10 @@ func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
 
 // --- postShip: cycle class with inbox-promote error silently WARNs ----------
 
-// TestPostShip_ClassCycle_InboxPromoteErrorIsWarn: inbox promote errors
-// must NOT block ship (they are non-fatal). postShip must log a WARN and
-// continue to the DONE log.
+// TestPostShip_ClassCycle_InboxPromoteErrorIsWarn: an unreadable (present but
+// corrupt/dir) triage-decision.json must NOT block ship — it logs a WARN,
+// skips promote-to-processed, still drains residual claims, and proceeds to
+// the DONE log. Distinct from an ABSENT companion (which logs INFO).
 func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
@@ -267,9 +268,10 @@ func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	if !containsLog(*res, "DONE: shipped cycle at abc") {
 		t.Errorf("missing DONE log after inbox-promote warn; got %v", res.Logs)
 	}
-	// Must log a WARN about the promote failure.
-	if !containsLog(*res, "WARN: inbox promote") {
-		t.Errorf("missing inbox-promote WARN log; got %v", res.Logs)
+	// A present-but-unreadable companion keeps its WARN signal (not demoted to
+	// INFO), and neither it nor the drain blocks ship.
+	if !containsLog(*res, "WARN: triage-decision.json unreadable") {
+		t.Errorf("expected unreadable-companion WARN; got %v", res.Logs)
 	}
 }
 

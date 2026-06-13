@@ -23,8 +23,8 @@ func TestPromoteInbox_WithTriageDecision_Promotes(t *testing.T) {
 	if err := promoteInbox(context.Background(), opts, res); err != nil {
 		t.Fatalf("promoteInbox errored: %v", err)
 	}
-	if !containsLog(*res, "inbox lifecycle promote complete for cycle 5") {
-		t.Errorf("missing promote-complete log: %v", res.Logs)
+	if !containsLog(*res, "inbox lifecycle drain complete for cycle 5") {
+		t.Errorf("missing drain-complete log: %v", res.Logs)
 	}
 }
 

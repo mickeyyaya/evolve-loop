@@ -88,41 +88,46 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	if !ok {
 		return nil
 	}
-	triagePath := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid), "triage-decision.json")
-	if _, err := os.Stat(triagePath); err != nil {
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] INFO: no triage-decision.json for cycle %d — inbox promote skipped", cid))
-		return nil
-	}
-	// Promote top_n[] + skip_shipped[] — read IDs from triage-decision.json.
-	body, err := os.ReadFile(triagePath)
-	if err != nil {
-		return err
-	}
-	ids := extractIDs(body)
-	if len(ids) == 0 {
-		return nil
-	}
-	commitShort := ""
-	if len(res.CommitSHA) >= 8 {
-		commitShort = res.CommitSHA[:8]
-	}
 	mvOpts := inboxmover.Options{
 		ProjectRoot: opts.ProjectRoot,
 		Stderr:      opts.Stderr,
 	}
-	for _, id := range ids {
-		_, _ = inboxmover.Promote(mvOpts, id, "processed", inboxmover.PromoteOpts{
-			Cycle:     fmt.Sprintf("%d", cid),
-			CommitSHA: commitShort,
-		})
+
+	// Promote top_n[] + skip_shipped[] to processed/ — BEST-EFFORT, gated on a
+	// present triage-decision.json. In production the triage agent often emits
+	// only triage-report.md and not the .json companion (cycles 308/316/320-322
+	// all missing it), so this path is frequently skipped; the residual drain
+	// below is the safety net that keeps claims visible regardless.
+	triagePath := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid), "triage-decision.json")
+	if body, rerr := os.ReadFile(triagePath); rerr == nil {
+		commitShort := ""
+		if len(res.CommitSHA) >= 8 {
+			commitShort = res.CommitSHA[:8]
+		}
+		for _, id := range extractIDs(body) {
+			_, _ = inboxmover.Promote(mvOpts, id, "processed", inboxmover.PromoteOpts{
+				Cycle:     fmt.Sprintf("%d", cid),
+				CommitSHA: commitShort,
+			})
+		}
+	} else if os.IsNotExist(rerr) {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] INFO: no triage-decision.json for cycle %d — promote-to-processed skipped (residual claims still drained)", cid))
+	} else {
+		// Present but unreadable (corrupt/permission/dir) — distinct from absent:
+		// a real IO error must keep its WARN signal, not be demoted to INFO.
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: triage-decision.json unreadable for cycle %d (%v) — promote-to-processed skipped (residual claims still drained)", cid, rerr))
 	}
-	// Drain residual claims: items claimed into processing/cycle-<cid>/ that
-	// were NOT in top_n (dropped from triage) are released back to inbox root
-	// so the next cycle re-triages them.
+
+	// ALWAYS drain residual claims: every item still in processing/cycle-<cid>/
+	// is released back to the inbox root so the next cycle's triage re-scans it
+	// (Step 0a reads only inbox/ root, maxdepth 1). This MUST run even when
+	// triage-decision.json is absent — the early-return that used to skip it
+	// stranded EVERY claimed item invisibly (inbox-promote-on-ship-missing;
+	// orphans across cycles 124/265/294/295/308).
 	if _, releaseErr := inboxmover.ReleaseCycleProcessing(mvOpts, cid); releaseErr != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: residual claim release for cycle %d: %v", cid, releaseErr))
 	}
-	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle promote complete for cycle %d", cid))
+	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	return nil
 }
 

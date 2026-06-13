@@ -159,17 +159,22 @@ func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_NoTriageDecisionSkips: cycle_id present but no
-// triage-decision.json ⇒ INFO log + skip (no error).
-func TestPromoteInbox_NoTriageDecisionSkips(t *testing.T) {
+// TestPromoteInbox_NoTriageDecisionStillDrains: cycle_id present but no
+// triage-decision.json ⇒ promote-to-processed is skipped (logged) but the
+// residual drain STILL runs (no early-return strand). Corrected from the
+// pre-fix behavior where a missing companion skipped everything.
+func TestPromoteInbox_NoTriageDecisionStillDrains(t *testing.T) {
 	root := t.TempDir()
 	mustWriteState(t, filepath.Join(root, ".evolve", "cycle-state.json"), map[string]any{"cycle_id": float64(8)})
 	res := &RunResult{}
 	if err := promoteInbox(context.Background(), &Options{ProjectRoot: root}, res); err != nil {
 		t.Fatalf("promoteInbox: %v", err)
 	}
-	if !anyContains(res.Logs, "inbox promote skipped") {
-		t.Errorf("expected 'inbox promote skipped' INFO log; got %v", res.Logs)
+	if !anyContains(res.Logs, "promote-to-processed skipped") {
+		t.Errorf("expected promote-skipped INFO log; got %v", res.Logs)
+	}
+	if !anyContains(res.Logs, "inbox lifecycle drain complete") {
+		t.Errorf("residual drain must still run when triage-decision.json is absent; got %v", res.Logs)
 	}
 }
 

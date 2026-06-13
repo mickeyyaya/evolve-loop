@@ -73,3 +73,40 @@ func TestInboxPromote_UnfinishedClaimReleasedOnShip(t *testing.T) {
 		t.Errorf("committed item 'kept' wrongly released to inbox root — it must go to processed/")
 	}
 }
+
+// TestInboxPromote_NoTriageDecision_StillDrainsClaims pins the PRODUCTION
+// strand bug: triage emits triage-report.md but NOT the triage-decision.json
+// companion (observed missing in cycles 308/316/320-322), so promoteInbox
+// early-returned before draining — leaving EVERY claimed item stranded
+// invisibly in processing/cycle-N/ (Step 0a reads only inbox/ root). The
+// residual drain must run regardless of triage-decision.json's presence.
+func TestInboxPromote_NoTriageDecision_StillDrainsClaims(t *testing.T) {
+	root := t.TempDir()
+	evolve := filepath.Join(root, ".evolve")
+	inbox := filepath.Join(evolve, "inbox")
+
+	mustWriteState(t, filepath.Join(evolve, "cycle-state.json"), map[string]any{"cycle_id": float64(8)})
+	// NO triage-decision.json — the production reality.
+
+	procDir := filepath.Join(inbox, "processing", "cycle-8")
+	if err := os.MkdirAll(procDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(procDir, "claimed-defect.json"), []byte(`{"id":"claimed-defect"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res := &RunResult{}
+	if err := promoteInbox(context.Background(), &Options{ProjectRoot: root}, res); err != nil {
+		t.Fatalf("promoteInbox: %v", err)
+	}
+
+	// Must be released back to the inbox ROOT (visible to the next triage scan),
+	// not stranded in processing/.
+	if _, err := os.Stat(filepath.Join(inbox, "claimed-defect.json")); err != nil {
+		t.Errorf("claim not released to inbox root when triage-decision.json absent: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(procDir, "claimed-defect.json")); err == nil {
+		t.Errorf("claim still stranded in processing/cycle-8/ — the production bug")
+	}
+}
