@@ -290,62 +290,13 @@ func validateRequest(req Request) error {
 	return nil
 }
 
-// classify is the integrity check ported from verify_artifact() at
-// subagent-run.sh:451. Returns (verdict, diagnostics). When bridgeErr is
-// non-nil, the artifact may not exist — the verdict is FAIL with a
-// bridge-error diagnostic.
+// classify judges the artifact through the verification SSOT (contract.go:
+// Verify/VerifyArtifact), the one ladder shared with single-dispatch (run.go).
+// bridgeErr is the launch/exec error — a non-nil value emits a leading
+// bridge-error diagnostic but does not short-circuit the integrity checks.
 func (r *Runner) classify(bridgeErr error, artifactPath, token string, exitCode int) (string, []core.Diagnostic) {
-	var diags []core.Diagnostic
-	if bridgeErr != nil {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("bridge launch failed (exit=%d): %v", exitCode, bridgeErr),
-		})
-	}
-
-	info, statErr := r.cfg.StatMTime(artifactPath)
-	if statErr != nil {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("artifact missing: %s", artifactPath),
-		})
-		return VerdictIntegrityFail, diags
-	}
-	age := r.cfg.Now().Sub(info)
-	if age > ArtifactMaxAge {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("artifact stale (%s old): %s", age.Round(time.Second), artifactPath),
-		})
-		return VerdictIntegrityFail, diags
-	}
-
-	body, readErr := r.cfg.ReadFile(artifactPath)
-	if readErr != nil {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("artifact unreadable: %v", readErr),
-		})
-		return VerdictIntegrityFail, diags
-	}
-	if len(body) == 0 {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("artifact empty: %s", artifactPath),
-		})
-		return VerdictIntegrityFail, diags
-	}
-	if !strings.Contains(string(body), token) {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("challenge token %q missing from artifact", token),
-		})
-		return VerdictIntegrityFail, diags
-	}
-	if bridgeErr != nil || exitCode != 0 {
-		return VerdictFAIL, diags
-	}
-	return VerdictPASS, diags
+	res := VerifyArtifact(r.cfg.StatMTime, r.cfg.ReadFile, r.cfg.Now, artifactPath, token, exitCode, bridgeErr)
+	return res.Verdict, res.Diagnostics
 }
 
 // generateToken returns 16 lowercase hex chars (8 random bytes encoded).

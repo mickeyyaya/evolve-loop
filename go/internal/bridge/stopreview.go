@@ -140,7 +140,8 @@ func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
 	}
 }
 
-// envInt resolves a positive integer from the Deps env overlay (then os.Getenv),
+// envInt resolves a positive integer from the launch environment via
+// lookupEnv (the Deps.Env overlay, then the Deps.LookupEnv seam / os env),
 // falling back to def when unset, empty, or non-positive.
 func envInt(deps Deps, key string, def int) int {
 	v, ok := lookupEnv(deps, key)

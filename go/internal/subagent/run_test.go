@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -759,57 +758,9 @@ func TestAdversarialAuditFraming_ContainsImplicitTaxonomy(t *testing.T) {
 	}
 }
 
-func TestClassifyArtifact_StatErrIsIntegrityFail(t *testing.T) {
-	opts := RunOptions{
-		StatMTime: func(string) (time.Time, error) { return time.Time{}, errors.New("missing") },
-		ReadFile:  os.ReadFile,
-		Now:       time.Now,
-	}
-	if v := classifyArtifact(opts, "/nope", "tok", 0, nil); v != VerdictIntegrityFail {
-		t.Errorf("got %s, want INTEGRITY_FAIL", v)
-	}
-}
-
-func TestClassifyArtifact_StaleArtifactIsIntegrityFail(t *testing.T) {
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "stale.md")
-	_ = os.WriteFile(path, []byte("body with tok"), 0o644)
-	old := time.Now().Add(-10 * time.Minute)
-	_ = os.Chtimes(path, old, old)
-	opts := RunOptions{
-		StatMTime: defaultStatMTime,
-		ReadFile:  os.ReadFile,
-		Now:       time.Now,
-	}
-	if v := classifyArtifact(opts, path, "tok", 0, nil); v != VerdictIntegrityFail {
-		t.Errorf("got %s, want INTEGRITY_FAIL", v)
-	}
-}
-
-func TestClassifyArtifact_EmptyBodyIsIntegrityFail(t *testing.T) {
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "empty.md")
-	_ = os.WriteFile(path, []byte{}, 0o644)
-	opts := RunOptions{StatMTime: defaultStatMTime, ReadFile: os.ReadFile, Now: time.Now}
-	if v := classifyArtifact(opts, path, "tok", 0, nil); v != VerdictIntegrityFail {
-		t.Errorf("got %s, want INTEGRITY_FAIL", v)
-	}
-}
-
-func TestClassifyArtifact_ReadErrIntegrityFail(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("running as root cannot mask read")
-	}
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "sealed.md")
-	_ = os.WriteFile(path, []byte("body with tok"), 0o600)
-	_ = os.Chmod(path, 0o000)
-	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
-	opts := RunOptions{StatMTime: defaultStatMTime, ReadFile: os.ReadFile, Now: time.Now}
-	if v := classifyArtifact(opts, path, "tok", 0, nil); v != VerdictIntegrityFail {
-		t.Errorf("got %s, want INTEGRITY_FAIL", v)
-	}
-}
+// Artifact-verdict tests live in contract_test.go (TestVerify +
+// TestVerifyArtifact_*), which exercise the verification SSOT that both
+// run.go step 13 and subagent.go Runner.classify now delegate to.
 
 func TestCapabilityTier(t *testing.T) {
 	tests := []struct {

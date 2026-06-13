@@ -1,7 +1,6 @@
 package subagent
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -327,9 +326,8 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		Warns:          insp.Warns,
 	}
 
-	// Step 13: verify artifact (exists, fresh, contains token).
-	verdict := classifyArtifact(opts, artifactPath, token, exitCode, execErr)
-	res.Verdict = verdict
+	// Step 13: verify artifact via the one verification SSOT (contract.go).
+	res.Verdict = VerifyArtifact(opts.StatMTime, opts.ReadFile, opts.Now, artifactPath, token, exitCode, execErr).Verdict
 	if sha, hashErr := opts.HashFile(artifactPath); hashErr == nil {
 		res.ArtifactSHA256 = sha
 	}
@@ -433,27 +431,6 @@ Citing only (b) without running the code is allowed ONLY for behavior-preserving
 A criterion with no citation is a FAIL for that criterion, regardless of overall impression.
 
 `
-}
-
-func classifyArtifact(opts RunOptions, artifactPath, token string, exitCode int, execErr error) string {
-	info, statErr := opts.StatMTime(artifactPath)
-	if statErr != nil {
-		return VerdictIntegrityFail
-	}
-	if opts.Now().Sub(info) > ArtifactMaxAge {
-		return VerdictIntegrityFail
-	}
-	body, readErr := opts.ReadFile(artifactPath)
-	if readErr != nil || len(body) == 0 {
-		return VerdictIntegrityFail
-	}
-	if !bytes.Contains(body, []byte(token)) {
-		return VerdictIntegrityFail
-	}
-	if execErr != nil || exitCode != 0 {
-		return VerdictFAIL
-	}
-	return VerdictPASS
 }
 
 type subprocessLedger struct {
