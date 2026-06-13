@@ -71,3 +71,24 @@ func TestSelectedSlugs(t *testing.T) {
 		})
 	}
 }
+
+func TestFencedAfterHeading_FenceWithoutTrailingNewline(t *testing.T) {
+	got, ok := fencedAfterHeading("intro\n\n## Decision Trace\n```", "## Decision Trace")
+	if ok || got != "" {
+		t.Fatalf("fencedAfterHeading()=%q, %v; want empty string, false", got, ok)
+	}
+}
+
+func TestFencedAfterHeading_NoFenceAfterHeading(t *testing.T) {
+	got, ok := fencedAfterHeading("intro\n\n## Decision Trace\nno fenced block here", "## Decision Trace")
+	if ok || got != "" {
+		t.Fatalf("fencedAfterHeading()=%q, %v; want empty string, false", got, ok)
+	}
+}
+
+func TestFencedAfterHeading_MissingClosingFence(t *testing.T) {
+	got, ok := fencedAfterHeading("intro\n\n## Decision Trace\n```json\n{\"slug\":\"x\"}\n", "## Decision Trace")
+	if ok || got != "" {
+		t.Fatalf("fencedAfterHeading()=%q, %v; want empty string, false", got, ok)
+	}
+}

@@ -92,3 +92,13 @@ func TestNewReviewer_ProducesWorkingReviewer(t *testing.T) {
 		t.Error("ship phase (no gate) must approve")
 	}
 }
+
+func TestNewReviewer_ShadowViolationExercisesDefaultLogger(t *testing.T) {
+	ws, root := t.TempDir(), t.TempDir()
+	writeScoutReport(t, ws, "needs-eval")
+	r := NewReviewer(config.StageShadow)
+	res := r.Review(context.Background(), core.ReviewInput{Phase: "scout", Workspace: ws, ProjectRoot: root})
+	if !res.Approve {
+		t.Fatalf("shadow reviewer must approve while logging violation; got %q", res.Reason)
+	}
+}

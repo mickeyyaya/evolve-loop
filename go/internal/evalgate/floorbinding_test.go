@@ -230,6 +230,25 @@ func TestFloorBindingGate_WiredIntoReviewer(t *testing.T) {
 	}
 }
 
+func TestCycleNumFromWorkspace_NonMatchingPath(t *testing.T) {
+	if got := cycleNumFromWorkspace(filepath.Join(t.TempDir(), "not-a-cycle")); got != 0 {
+		t.Fatalf("non-cycle workspace basename parsed as %d, want 0", got)
+	}
+}
+
+func TestCycleNumFromWorkspace_PlainDir(t *testing.T) {
+	if got := cycleNumFromWorkspace("workspace"); got != 0 {
+		t.Fatalf("plain workspace basename parsed as %d, want 0", got)
+	}
+}
+
+func TestCycleNumFromWorkspace_NumericOverflow(t *testing.T) {
+	overflowing := "cycle-9999999999999999999999999"
+	if got := cycleNumFromWorkspace(filepath.Join(t.TempDir(), overflowing)); got != 0 {
+		t.Fatalf("overflowing cycle number parsed as %d, want 0", got)
+	}
+}
+
 // ----------------------------------------------------------------------------
 // ADR-0046 Layer 1 (cycle 305): the floor-binding gate consumes the triage
 // companion's deferred_floors[] declaration instead of scraping ## deferred /
