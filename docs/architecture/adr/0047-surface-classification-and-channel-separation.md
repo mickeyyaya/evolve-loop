@@ -138,6 +138,28 @@ per-phase carve-outs (`a01d666a` was a carve-out the contract would have made un
 - **Stage 4 — Contract-driven tree-diff leak gate + `PaneRegion` chrome-zone scoping** (the
   bridge-ratelimit footer remainder).
 
+  > **Design finding (2026-06-13) — Stage 4 needs a POSITIONAL footer region, not the
+  > `ClassifyLine` Layer; and the corpus gate before it ships.** `panestream.ClassifyLine`'s
+  > `LayerChrome` recognizes only *liveness-volatile* rendering (spinner frames, elapsed clocks,
+  > token counters, separators). A rate-limit / quota banner is **prose** ("You've hit your usage
+  > limit"), so `ClassifyLine` returns `LayerContent` for it — the same layer as an agent *quoting*
+  > the banner. Scoping the escalate detector to the `LayerChrome` zone would therefore make a real
+  > banner never match → the escalation never fires → the CLI hangs to the artifact timeout. The
+  > region Stage 4 needs is a **positional per-CLI footer** (the live status area at the pane
+  > bottom, vs. the scrollback transcript where an agent-quoted banner lives). That window is
+  > CLI-specific (claude captures the visible pane at scrollback=0; codex/agy capture an alt-screen
+  > with scrollback>0, so the agent-quoted banner sits up in history while the live banner is in the
+  > bottom footer). Picking the footer window blind risks a **false negative** (real banner just
+  > above the window → missed → hang) on the most sensitive path in the system, so Stage 4 must land
+  > **on top of the Stage 1 adversarial corpus gate** (real panes with banners in both regions),
+  > which validates the window choice at CI. The interim guards remain in force until then:
+  > `stripAgentDiffLines` (numbered-diff agent edits) + the `paneBusy && policy==escalate` idle-gate
+  > (`8f68f25b`). A second, ORTHOGONAL Stage-4 component — **persistence (≥2 consecutive captures
+  > before an escalate fires)** — is region-independent and purely additive conservatism (guards a
+  > transient one-frame banner); it touches the rc-85 / I3-kernel-answer control flow, so it earns
+  > its own focused increment rather than a bolt-on. Both are deferred to a dedicated Stage-4
+  > increment built corpus-first.
+
 ## Consequences
 
 - **Positive:** the largest recurring bug class becomes structurally impossible; CLI-chrome drift
