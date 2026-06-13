@@ -24,6 +24,7 @@
 package phasecoherence
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -142,6 +143,31 @@ func TestArtifactCoherence_MissingAgentsDirErrors(t *testing.T) {
 	_, profs := fixtures(nil, map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet"}`})
 	if _, err := CheckArtifactNames(Options{AgentsFS: fstest.MapFS{}, ProfilesFS: profs}); err == nil {
 		t.Error("CheckArtifactNames(no agents/ dir) = nil error, want error (fail loudly)")
+	}
+}
+
+func TestArtifactCoherence_MissingProfilesFSErrors(t *testing.T) {
+	agents, _ := fixtures(
+		map[string]string{"evolve-widget": personaMD("widget", `output-format: "widget-report.md"`)},
+		nil,
+	)
+	if _, err := CheckArtifactNames(Options{AgentsFS: agents}); err == nil {
+		t.Error("CheckArtifactNames(missing ProfilesFS) = nil error, want error")
+	}
+}
+
+func TestArtifactCoherence_OverrideReadErrorReturnsError(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{"evolve-widget": personaMD("widget", `output-format: "widget-report.md"`)},
+		map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","output_artifact":"widget-report.md"}`},
+	)
+	_, err := CheckArtifactNames(Options{
+		AgentsFS:   agents,
+		ProfilesFS: profs,
+		Overrides:  map[string]string{"widget": filepath.Join(t.TempDir(), "missing.md")},
+	})
+	if err == nil {
+		t.Fatal("CheckArtifactNames(missing override) = nil error, want error")
 	}
 }
 

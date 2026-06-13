@@ -274,6 +274,16 @@ func TestCoherence_MissingAgentsDirErrors(t *testing.T) {
 	}
 }
 
+func TestCoherence_MissingProfilesFSErrors(t *testing.T) {
+	agents, _ := fixtures(
+		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read"]`)},
+		nil,
+	)
+	if _, err := Check(Options{AgentsFS: agents}); err == nil {
+		t.Error("Check(missing ProfilesFS) = nil error, want error")
+	}
+}
+
 // TestCoherence_DispatchNonePersonaExempt — a persona explicitly marked
 // `dispatch: none` (operator: monitoring persona driven outside the
 // profile/subagent system) is intentionally unpaired; it must not WARN.

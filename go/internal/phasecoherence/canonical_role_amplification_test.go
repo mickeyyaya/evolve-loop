@@ -11,6 +11,13 @@ func TestCanonicalRoleNormalizesKnownAliasesAndUnknowns(t *testing.T) {
 		"Scout":       "scout",
 		"SHIP":        "ship",
 		"CustomPhase": "customphase",
+		"scout":       "scout",
+		"builder":     "builder",
+		"build":       "builder",
+		"auditor":     "auditor",
+		"audit":       "auditor",
+		"intent":      "intent",
+		"memo":        "memo",
 	}
 
 	for input, want := range tests {
