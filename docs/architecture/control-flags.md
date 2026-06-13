@@ -231,6 +231,7 @@
 | `EVOLVE_FANOUT_WORKER_ARTIFACT` | Internal env passed to fanout worker subprocess |
 | `EVOLVE_FANOUT_WORKER_TOKEN` | Internal env passed to fanout worker subprocess |
 | `EVOLVE_FANOUT_WORKSPACE` | Internal env passed to fanout worker subprocess |
+| `EVOLVE_DISPATCH_DEPTH` | Bridge-recursion depth; set on each fan-out worker command (parent+1), read at the `subagent run` / `dispatch-parallel` chokepoint to enforce the recursion cap (max 3). Absent ⇒ depth 0 (top-level). |
 | `EVOLVE_PROJECT_WRITABLE` | Set by resolve-roots.sh after verification |
 
 ---
@@ -346,6 +347,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_DIR_OVERRIDE` | dead | — | — | Dead Flags (remove from docs; no production reader) | Leave in test; document as test-only [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` | deprecated | — | — | Workflow Defaults | Superseded by `policy.json:failure_floor` (ADR-0039) which wins when both set; honored one more release with a `deprecated-flag` WARN; removal target next release |
 | `EVOLVE_DISABLE_WORKSPACE_GUARD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
+| `EVOLVE_DISPATCH_DEPTH` | internal | — | — | — | Bridge-recursion depth (B2): set on each fan-out worker command (parent+1), read at the subagent run / dispatch-parallel chokepoint to enforce the recursion cap (max 3). Absent ⇒ 0 (top-level). |
 | `EVOLVE_DISPATCH_LOG_TTL_DAYS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_DISPATCH_PLAN_LOG` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_DISPATCH_POLICY` | active | — | — | Workflow Defaults | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |

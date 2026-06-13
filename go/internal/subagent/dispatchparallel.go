@@ -35,6 +35,7 @@ type DispatchParallelRequest struct {
 	TrackWorkers       bool   // EVOLVE_FANOUT_TRACK_WORKERS (default true)
 	TestExecutor       string // EVOLVE_FANOUT_TEST_EXECUTOR — bypass LLM
 	WorktreePath       string
+	DispatchDepth      int // EVOLVE_DISPATCH_DEPTH — own recursion depth; workers run at DispatchDepth+1
 }
 
 // DispatchParallelOptions injects seams. Production wires defaults.
@@ -84,6 +85,11 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	}
 	if info, err := os.Stat(req.WorkspacePath); err != nil || !info.IsDir() {
 		return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: workspace dir missing: %s", req.WorkspacePath)
+	}
+	// Recursion bound: refuse to fan out when the workers (DispatchDepth+1) would
+	// exceed the cap. Fail fast rather than spawning doomed workers.
+	if err := enforceChildDispatchDepth(req.DispatchDepth); err != nil {
+		return DispatchParallelResult{}, err
 	}
 
 	// Step 2: load profile + check parallel_eligible.
@@ -196,9 +202,8 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 				req.WorkspacePath, req.TestExecutor,
 			)
 		} else {
-			cmd = fmt.Sprintf(
-				"PROMPT_FILE_OVERRIDE=%s %s subagent run %s-worker-%s %d %s",
-				promptPath, evolveBin, req.Agent, st.Name, req.Cycle, req.WorkspacePath,
+			cmd = buildWorkerRecursionCommand(
+				evolveBin, req.Agent, st.Name, req.Cycle, req.DispatchDepth+1, req.WorkspacePath, promptPath,
 			)
 		}
 		fmt.Fprintf(&cmdsBuf, "%s\t%s\n", workerName, cmd)

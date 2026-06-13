@@ -348,6 +348,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		CachePrefixV2:          cachePrefixV2,
 		AdversarialAudit:       adversarialAudit,
 		LegacyAgentDispatch:    os.Getenv("LEGACY_AGENT_DISPATCH") == "1",
+		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
 	}, subagent.RunOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
@@ -417,6 +418,7 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 		CachePrefixEnabled: os.Getenv("EVOLVE_FANOUT_CACHE_PREFIX") != "0",
 		TrackWorkers:       os.Getenv("EVOLVE_FANOUT_TRACK_WORKERS") != "0",
 		TestExecutor:       os.Getenv("EVOLVE_FANOUT_TEST_EXECUTOR"),
+		DispatchDepth:      subagent.ReadDispatchDepth(os.Getenv),
 	}, subagent.DispatchParallelOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)

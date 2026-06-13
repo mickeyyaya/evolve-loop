@@ -99,6 +99,62 @@ func TestDispatchParallel_HappyPath(t *testing.T) {
 	}
 }
 
+// TestDispatchParallel_ThreadsRecursionDepth proves the worker commands written
+// for the LLM (non-test-executor) path recurse via `subagent run` AND carry an
+// incremented EVOLVE_DISPATCH_DEPTH — so the cap in Run() bounds nesting.
+func TestDispatchParallel_ThreadsRecursionDepth(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	var commandsBody string
+	inner := opts.RunFanout
+	opts.RunFanout = func(cfg fanoutdispatch.Config, w io.Writer) int {
+		data, _ := os.ReadFile(cfg.CommandsFile)
+		commandsBody = string(data)
+		return inner(cfg, w)
+	}
+
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent:              "scout",
+		Cycle:              5,
+		WorkspacePath:      ws,
+		ProjectRoot:        tmp,
+		LedgerPath:         filepath.Join(tmp, "ledger.jsonl"),
+		CachePrefixEnabled: false,
+		DispatchDepth:      1, // workers must run at depth 2
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !strings.Contains(commandsBody, "subagent run scout-worker-codebase 5 '"+ws+"'") {
+		t.Errorf("worker command does not recurse via subagent run (quoted ws):\n%s", commandsBody)
+	}
+	if !strings.Contains(commandsBody, "EVOLVE_DISPATCH_DEPTH=2") {
+		t.Errorf("worker command missing incremented recursion depth:\n%s", commandsBody)
+	}
+}
+
+// TestDispatchParallel_RecursionDepthCap proves a fan-out is refused fast at the
+// boundary: at parentDepth==cap the workers would run at cap+1, so DispatchParallel
+// rejects before spawning doomed workers (the child-fence, not just self-depth).
+func TestDispatchParallel_RecursionDepthCap(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent:         "scout",
+		Cycle:         5,
+		WorkspacePath: ws,
+		ProjectRoot:   tmp,
+		DispatchDepth: maxDispatchDepth, // workers would be cap+1 → refuse fast
+	}, dispatchHappyOpts(t, sampleScoutProfile))
+	if !errors.Is(err, ErrRecursionDepthExceeded) {
+		t.Fatalf("expected ErrRecursionDepthExceeded at parentDepth==cap, got %v", err)
+	}
+}
+
 func TestDispatchParallel_UnknownAgent(t *testing.T) {
 	_, err := DispatchParallel(context.Background(),
 		DispatchParallelRequest{Agent: "not-real", Cycle: 0, WorkspacePath: t.TempDir()},
