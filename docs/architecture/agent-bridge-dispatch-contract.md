@@ -2,7 +2,7 @@
 
 > Status: living doc for the agent-bridge hardening program (plan: `sleepy-wandering-salamander`).
 > Covers the invariants that make every subagent/phase-agent dispatch go through the one bridge
-> process, safely and at scale. B1–B3 landed; B4–B6 will extend this doc.
+> process, safely and at scale. B1–B4 landed; B5–B6 will extend this doc.
 
 ## Request
 
@@ -136,19 +136,34 @@ the deadline. `envInt`'s doc-comment even *claimed* it read "the Deps env overla
 overlay. Tests pin: the overlay is consulted and wins over `LookupEnv`, falls through when absent, the
 override reaches the recorded `StopEvent.IntervalS` end-to-end, and `cfg.ArtifactTimeoutS` still wins.
 
+## B4 — Subagent conformance suite
+
+**Problem.** The invariants above were each enforced by a bespoke test; nothing guaranteed they held
+*uniformly for every role*, so a new agent could silently miss one.
+
+**Design.** `subagent/conformance_test.go` is a single suite driven by a **fake-bridge seam** (the
+`RunOptions.ExecAdapter`, standing in for `evolve subagent run` with no LLM cost) and **table-driven
+over `agentRoles`** — adding a role to the registry auto-subjects it to every invariant. Each role is
+run through: bridge-only rejection (I1), B3 contract verdicts incl. the integrity-guard negatives
+(I6), isolated dispatch (unique token bound into its own artifact under its own project root),
+sandbox-coherent recursion command (I3+I5), depth-cap rejection (I4), no cross-agent token leakage,
+and concurrent dispatch under `-race`. The suite is characterization, not new behavior: a failing row
+is a real conformance gap. All 14 roles pass.
+
 ## Invariants (enforced by tests)
 
 | # | Invariant | Enforced by |
 |---|-----------|-------------|
-| I1 | No dispatch reaches the in-process Agent tool | `enforceBridgeOnly` @ `Run()`; source-guard test |
+| I1 | No dispatch reaches the in-process Agent tool | `enforceBridgeOnly` @ `Run()`; source-guard + conformance |
 | I2 | Agent allow-list is single-sourced | `agentRoles[]` → `agentRolePattern`; all-roles test |
-| I3 | Fan-out workers recurse via `subagent run` | `buildWorkerRecursionCommand` + conformance test |
-| I4 | Recursion depth is bounded | `EVOLVE_DISPATCH_DEPTH` + `enforceDispatchDepth` (cap 3) |
-| I5 | Recursive children stay nested (no inner wrap) | `CLAUDECODE_TYPE` cleared per worker; sandbox test |
-| I6 | Artifact verdict is single-sourced | `Verify`/`VerifyArtifact` (`contract.go`); contract table |
+| I3 | Fan-out workers recurse via `subagent run` | `buildWorkerRecursionCommand` + conformance |
+| I4 | Recursion depth is bounded | `EVOLVE_DISPATCH_DEPTH` + `enforceDispatchDepth` (cap 3); conformance |
+| I5 | Recursive children stay nested (no inner wrap) | `CLAUDECODE_TYPE` cleared per worker; conformance |
+| I6 | Artifact verdict is single-sourced | `Verify`/`VerifyArtifact` (`contract.go`); contract table + conformance |
 | I7 | In-process env view == subprocess env view | `lookupEnv` consults `deps.Env`; overlay + e2e tests |
+| I8 | Every registry role satisfies I1/I3–I6 uniformly | `conformance_test.go` (fake-bridge, table over `agentRoles`) |
 
 ## Out of scope (later phases)
 
-B4 (conformance suite), B5 (concurrency `-race` stability + aggregator per-worker verification using
-the B3 SSOT with freshness skipped), B6 (registry-driven allow-list + session reaping).
+B5 (concurrency `-race` stability of the fan-out path + aggregator per-worker verification using the
+B3 SSOT with freshness skipped), B6 (registry-driven allow-list + session reaping).
