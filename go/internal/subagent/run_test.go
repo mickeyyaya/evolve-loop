@@ -683,6 +683,63 @@ func TestWriteSubprocessLedger_NilClockUsesWallClock(t *testing.T) {
 	}
 }
 
+func TestWriteSubprocessLedger_ChainLinkError(t *testing.T) {
+	tmp := t.TempDir()
+	ledgerDir := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.Mkdir(ledgerDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := writeSubprocessLedger(ledgerDir, subprocessLedger{
+		Cycle: 1, Role: "scout", Model: "sonnet", ChallengeToken: "tok",
+	}, nil)
+	if err == nil {
+		t.Fatalf("expected chain-link error")
+	}
+}
+
+func TestWriteSubprocessLedger_OpenLedgerError(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.WriteFile(ledger, []byte("seed\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ledger, 0o644) })
+	err := writeSubprocessLedger(ledger, subprocessLedger{
+		Cycle: 1, Role: "scout", Model: "sonnet", ChallengeToken: "tok",
+	}, nil)
+	if err == nil {
+		t.Fatalf("expected open ledger error")
+	}
+}
+
+func TestWriteSubprocessLedger_TipWriteError(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.Mkdir(filepath.Join(tmp, "ledger.tip.tmp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := writeSubprocessLedger(ledger, subprocessLedger{
+		Cycle: 1, Role: "scout", Model: "sonnet", ChallengeToken: "tok",
+	}, nil)
+	if err == nil {
+		t.Fatalf("expected tip write error")
+	}
+}
+
+func TestWriteSubprocessLedger_TipRenameError(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.Mkdir(filepath.Join(tmp, "ledger.tip"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := writeSubprocessLedger(ledger, subprocessLedger{
+		Cycle: 1, Role: "scout", Model: "sonnet", ChallengeToken: "tok",
+	}, nil)
+	if err == nil {
+		t.Fatalf("expected tip rename error")
+	}
+}
+
 func TestParseAgentName(t *testing.T) {
 	tests := []struct {
 		in, role, worker string

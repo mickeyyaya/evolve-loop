@@ -68,10 +68,11 @@ func ResolveMode(phase string) MergeMode {
 
 // Inputs collects the arguments to Aggregate.
 type Inputs struct {
-	Phase   string
-	Output  string
-	Workers []string
-	Now     func() time.Time
+	Phase    string
+	Output   string
+	Workers  []string
+	ReadFile func(string) ([]byte, error)
+	Now      func() time.Time
 }
 
 // Aggregate merges the worker artifacts into the output path according to the
@@ -89,6 +90,9 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 		logf("error: at least one worker artifact required")
 		return ExitUsageErr
 	}
+	if in.ReadFile == nil {
+		in.ReadFile = defaultReadFile
+	}
 	for _, w := range in.Workers {
 		info, err := os.Stat(w)
 		if err != nil {
@@ -97,6 +101,10 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 		}
 		if info.Size() == 0 {
 			logf("error: worker artifact is empty: %s", w)
+			return ExitUsageErr
+		}
+		if _, err := in.ReadFile(w); err != nil {
+			logf("error: worker artifact unreadable: %s: %v", w, err)
 			return ExitUsageErr
 		}
 	}
@@ -119,17 +127,22 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 
 	now := in.Now().UTC().Format("2006-01-02T15:04:05Z")
 	var rc int
+	var err error
 	switch mode {
 	case ModeConcat:
-		writeConcat(tmp, in.Phase, in.Workers, now)
+		err = writeConcat(tmp, in.Phase, in.Workers, now, in.ReadFile)
 	case ModeVerdict:
-		rc = writeVerdict(tmp, in.Workers, now)
+		rc, err = writeVerdict(tmp, in.Workers, now, in.ReadFile)
 	case ModeLessons:
-		writeLessons(tmp, in.Workers, now)
+		err = writeLessons(tmp, in.Workers, now, in.ReadFile)
 	case ModePlanReview:
-		rc = writePlanReview(tmp, in.Workers, now)
+		rc, err = writePlanReview(tmp, in.Workers, now, in.ReadFile)
 	case ModeCrossCLIVote:
-		rc = writeCrossCLIVote(tmp, in.Workers, now)
+		rc, err = writeCrossCLIVote(tmp, in.Workers, now, in.ReadFile)
+	}
+	if err != nil {
+		logf("error: read worker: %v", err)
+		return ExitUsageErr
 	}
 
 	if err := os.Rename(tmp, in.Output); err != nil {
@@ -139,20 +152,32 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 	return rc
 }
 
+func defaultReadFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
 // ── concat (scout / research / discover) ──────────────────────────────────
 
-func writeConcat(out, phase string, workers []string, now string) {
+func writeConcat(out, phase string, workers []string, now string, readFile func(string) ([]byte, error)) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Aggregated %s Report\n\n", phase)
 	fmt.Fprintf(&b, "_Aggregated by aggregator.sh at %s. Workers: %d._\n\n", now, len(workers))
 	for _, w := range workers {
 		name := strings.TrimSuffix(filepath.Base(w), ".md")
 		fmt.Fprintf(&b, "## Worker: %s\n\n", name)
-		body, _ := os.ReadFile(w)
+		body, err := readFile(w)
+		if err != nil {
+			return err
+		}
 		b.Write(body)
 		b.WriteString("\n\n")
 	}
-	_ = os.WriteFile(out, []byte(b.String()), 0o644)
+	return os.WriteFile(out, []byte(b.String()), 0o644)
 }
 
 // ── verdict (audit) ────────────────────────────────────────────────────────
@@ -178,7 +203,7 @@ func extractVerdict(path string) string {
 	return ""
 }
 
-func writeVerdict(out string, workers []string, now string) int {
+func writeVerdict(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
 	anyFail := false
 	anyWarn := false
 	allPass := true
@@ -214,15 +239,20 @@ func writeVerdict(out string, workers []string, now string) int {
 	for _, w := range workers {
 		name := strings.TrimSuffix(filepath.Base(w), ".md")
 		fmt.Fprintf(&b, "## Worker: %s\n\n", name)
-		body, _ := os.ReadFile(w)
+		body, err := readFile(w)
+		if err != nil {
+			return ExitUsageErr, err
+		}
 		b.Write(body)
 		b.WriteString("\n\n")
 	}
-	_ = os.WriteFile(out, []byte(b.String()), 0o644)
-	if verdict == "FAIL" {
-		return ExitVerdictBad
+	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
+		return ExitUsageErr, err
 	}
-	return ExitOK
+	if verdict == "FAIL" {
+		return ExitVerdictBad, nil
+	}
+	return ExitOK, nil
 }
 
 // ── lessons (learn / retrospective / retro) ────────────────────────────────
@@ -231,10 +261,13 @@ var lessonHeadingRe = regexp.MustCompile(`(?i)^## Lesson:`)
 
 // writeLessons concats all workers, then iterates lines, capturing each
 // "## Lesson: <title>" block and emitting only once per title.
-func writeLessons(out string, workers []string, now string) {
+func writeLessons(out string, workers []string, now string, readFile func(string) ([]byte, error)) error {
 	var combined strings.Builder
 	for _, w := range workers {
-		body, _ := os.ReadFile(w)
+		body, err := readFile(w)
+		if err != nil {
+			return err
+		}
 		combined.Write(body)
 		combined.WriteString("\n")
 	}
@@ -276,7 +309,7 @@ func writeLessons(out string, workers []string, now string) {
 	fmt.Fprintf(&b, "# Aggregated Retrospective Report\n\n")
 	fmt.Fprintf(&b, "_Aggregated by aggregator.sh at %s. Workers: %d._\n\n", now, len(workers))
 	b.WriteString(dedup.String())
-	_ = os.WriteFile(out, []byte(b.String()), 0o644)
+	return os.WriteFile(out, []byte(b.String()), 0o644)
 }
 
 // ── plan-review ────────────────────────────────────────────────────────────
@@ -301,7 +334,7 @@ func extractScore(path string) float64 {
 	return 0
 }
 
-func writePlanReview(out string, workers []string, now string) int {
+func writePlanReview(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
 	anyAbort := false
 	weakLens := false
 	sum := 0.0
@@ -339,20 +372,25 @@ func writePlanReview(out string, workers []string, now string) int {
 	for _, w := range workers {
 		name := strings.TrimSuffix(filepath.Base(w), ".md")
 		fmt.Fprintf(&b, "## Worker: %s\n\n", name)
-		body, _ := os.ReadFile(w)
+		body, err := readFile(w)
+		if err != nil {
+			return ExitUsageErr, err
+		}
 		b.Write(body)
 		b.WriteString("\n\n")
 	}
-	_ = os.WriteFile(out, []byte(b.String()), 0o644)
-	if verdict == "ABORT" {
-		return ExitVerdictBad
+	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
+		return ExitUsageErr, err
 	}
-	return ExitOK
+	if verdict == "ABORT" {
+		return ExitVerdictBad, nil
+	}
+	return ExitOK, nil
 }
 
 // ── cross-cli-vote / audit-consensus ───────────────────────────────────────
 
-func writeCrossCLIVote(out string, workers []string, now string) int {
+func writeCrossCLIVote(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
 	anyFail := false
 	passCount := 0
 	total := 0
@@ -408,15 +446,20 @@ func writeCrossCLIVote(out string, workers []string, now string) int {
 	for _, w := range workers {
 		name := strings.TrimSuffix(filepath.Base(w), ".md")
 		fmt.Fprintf(&b, "### Worker: %s\n\n", name)
-		body, _ := os.ReadFile(w)
+		body, err := readFile(w)
+		if err != nil {
+			return ExitUsageErr, err
+		}
 		b.Write(body)
 		b.WriteString("\n\n")
 	}
-	_ = os.WriteFile(out, []byte(b.String()), 0o644)
-	if verdict == "FAIL" {
-		return ExitVerdictBad
+	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
+		return ExitUsageErr, err
 	}
-	return ExitOK
+	if verdict == "FAIL" {
+		return ExitVerdictBad, nil
+	}
+	return ExitOK, nil
 }
 
 // ErrUnknownPhase is returned when phase doesn't match any merge mode.

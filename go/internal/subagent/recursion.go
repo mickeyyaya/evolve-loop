@@ -26,6 +26,11 @@ import (
 
 const (
 	dispatchDepthEnv = "EVOLVE_DISPATCH_DEPTH"
+	// fanoutWorkerTokenEnv carries the parent-dictated per-worker challenge
+	// token to the worker dispatch (consumed by run.go as
+	// RunRequest.ChallengeTokenOverride) so the worker's artifact bears the
+	// token the parent verifies — the per-worker provenance boundary.
+	fanoutWorkerTokenEnv = "EVOLVE_FANOUT_WORKER_TOKEN"
 	// maxDispatchDepth bounds nested bridge dispatches. Normal recursion is
 	// fan-out → worker (depth 1); a generous cap of 3 backstops pathological
 	// loops without constraining legitimate nesting.
@@ -87,11 +92,15 @@ func shellQuote(s string) string {
 //	childDepth   the recursion depth the worker will run at (parentDepth+1)
 //	workspace    the workspace path, passed through unchanged
 //	promptPath   the per-worker rendered prompt file
-func buildWorkerRecursionCommand(bin, parentAgent, subtask string, cycle, childDepth int, workspace, promptPath string) string {
-	// Paths are shell-quoted; role/subtask (regex-constrained) and the int
-	// cycle/depth are safe unquoted.
+//	workerToken  the parent-dictated challenge token the worker must write into
+//	             its artifact (parentToken+"-"+subtask) — the provenance the
+//	             parent verifies; threaded via EVOLVE_FANOUT_WORKER_TOKEN
+func buildWorkerRecursionCommand(bin, parentAgent, subtask string, cycle, childDepth int, workspace, promptPath, workerToken string) string {
+	// Paths + token are shell-quoted; role/subtask (regex-constrained) and the
+	// int cycle/depth are safe unquoted.
 	return fmt.Sprintf(
-		"PROMPT_FILE_OVERRIDE=%s CLAUDECODE_TYPE= %s=%d %s subagent run %s-worker-%s %d %s",
-		shellQuote(promptPath), dispatchDepthEnv, childDepth, shellQuote(bin), parentAgent, subtask, cycle, shellQuote(workspace),
+		"PROMPT_FILE_OVERRIDE=%s CLAUDECODE_TYPE= %s=%d %s=%s %s subagent run %s-worker-%s %d %s",
+		shellQuote(promptPath), dispatchDepthEnv, childDepth, fanoutWorkerTokenEnv, shellQuote(workerToken),
+		shellQuote(bin), parentAgent, subtask, cycle, shellQuote(workspace),
 	)
 }

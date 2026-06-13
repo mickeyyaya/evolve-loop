@@ -48,6 +48,12 @@ type RunRequest struct {
 	AdversarialAudit       bool   // ADVERSARIAL_AUDIT (default true)
 	LegacyAgentDispatch    bool   // LEGACY_AGENT_DISPATCH=1 — retired; now a hard error (see ErrInProcessDispatchBanned)
 	DispatchDepth          int    // EVOLVE_DISPATCH_DEPTH — recursion depth; capped at maxDispatchDepth
+	// ChallengeTokenOverride (EVOLVE_FANOUT_WORKER_TOKEN) pins the challenge
+	// token instead of minting a fresh one. A fan-out worker is dispatched with
+	// the parent-dictated token (parentToken+"-"+subtask) so its artifact bears
+	// a token the parent can verify — the provenance boundary for per-worker
+	// artifact verification. Empty ⇒ mint via Rand (the normal path).
+	ChallengeTokenOverride string
 }
 
 // ErrInProcessDispatchBanned is returned when a caller requests the retired
@@ -250,10 +256,16 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		return RunResult{}, fmt.Errorf("subagent/run: mkdir artifact dir: %w", err)
 	}
 
-	// Step 9: challenge token + git state.
-	token, err := generateRunToken(opts.Rand)
-	if err != nil {
-		return RunResult{}, fmt.Errorf("subagent/run: token: %w", err)
+	// Step 9: challenge token + git state. A fan-out worker is given the
+	// parent-dictated token so its artifact bears a token the parent verifies;
+	// otherwise mint a fresh one.
+	token := req.ChallengeTokenOverride
+	if token == "" {
+		var err error
+		token, err = generateRunToken(opts.Rand)
+		if err != nil {
+			return RunResult{}, fmt.Errorf("subagent/run: token: %w", err)
+		}
 	}
 	gitHead, treeDiff, _ := opts.GitState(ctx, req.ProjectRoot)
 	if gitHead == "" {

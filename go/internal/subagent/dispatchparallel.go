@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,18 +49,24 @@ type DispatchParallelOptions struct {
 	WriteCache     func(req CachePrefixRequest, opts CachePrefixOptions) error
 	GitState       func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
 	GenToken       func() (string, error)
-	Now            func() time.Time
+	// VerifyWorkerArtifact verifies one worker's artifact against its expected
+	// per-worker token (parentToken+"-"+subtask). The token is required: a nil
+	// seam defaults to defaultVerifyWorkerArtifact, which checks presence +
+	// readability + non-empty + that the artifact bears the token (provenance).
+	VerifyWorkerArtifact func(artifact, token string) VerifyResult
+	Now                  func() time.Time
 }
 
 // DispatchParallelResult records the outcome of one dispatch.
 type DispatchParallelResult struct {
-	AggregatePath  string
-	WorkerCount    int
-	WorkerNames    []string
-	FanoutExitCode int
-	AggregatorExit int
-	QualityTier    string
-	ParentToken    string
+	AggregatePath        string
+	WorkerCount          int
+	WorkerNames          []string
+	FanoutExitCode       int
+	AggregatorExit       int
+	QualityTier          string
+	ParentToken          string
+	WorkerVerifyFailures []string
 }
 
 // DispatchParallel ports cmd_dispatch_parallel from
@@ -175,6 +182,7 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	var cmdsBuf strings.Builder
 	var workerNames []string
 	var workerArtifacts []string
+	var workerTokens []string
 
 	// Find own binary path so worker recursion targets the same Go binary.
 	evolveBin, err := os.Executable()
@@ -192,23 +200,28 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 			return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: write prompt %s: %w", st.Name, err)
 		}
 
+		// Per-worker token (provenance): the parent dictates it, threads it to
+		// the worker, and verifies it on the artifact. Both dispatch paths use it.
+		workerToken := parentToken + "-" + st.Name
+
 		var cmd string
 		if req.TestExecutor != "" {
 			cmd = fmt.Sprintf(
 				"EVOLVE_FANOUT_PARENT_AGENT=%s EVOLVE_FANOUT_WORKER_NAME=%s "+
 					"EVOLVE_FANOUT_WORKER_ARTIFACT=%s EVOLVE_FANOUT_WORKER_TOKEN=%s "+
 					"EVOLVE_FANOUT_CYCLE=%d EVOLVE_FANOUT_WORKSPACE=%s bash %s",
-				req.Agent, st.Name, artifact, parentToken+"-"+st.Name, req.Cycle,
+				req.Agent, st.Name, artifact, workerToken, req.Cycle,
 				req.WorkspacePath, req.TestExecutor,
 			)
 		} else {
 			cmd = buildWorkerRecursionCommand(
-				evolveBin, req.Agent, st.Name, req.Cycle, req.DispatchDepth+1, req.WorkspacePath, promptPath,
+				evolveBin, req.Agent, st.Name, req.Cycle, req.DispatchDepth+1, req.WorkspacePath, promptPath, workerToken,
 			)
 		}
 		fmt.Fprintf(&cmdsBuf, "%s\t%s\n", workerName, cmd)
 		workerNames = append(workerNames, workerName)
 		workerArtifacts = append(workerArtifacts, artifact)
+		workerTokens = append(workerTokens, workerToken)
 	}
 
 	if err := os.WriteFile(commandsTSV, []byte(cmdsBuf.String()), 0o644); err != nil {
@@ -238,13 +251,23 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	// Step 9: aggregate IF fanout succeeded.
 	aggRC := 0
 	if fanoutRC == 0 {
-		mergePhase := mergePhaseFor(req.Agent)
-		aggRC = opts.RunAggregator(aggregator.Inputs{
-			Phase:   mergePhase,
-			Output:  aggPath,
-			Workers: workerArtifacts,
-		}, os.Stderr)
-		result.AggregatorExit = aggRC
+		for i, artifact := range workerArtifacts {
+			verify := opts.VerifyWorkerArtifact(artifact, workerTokens[i])
+			if verify.Verdict != VerdictPASS {
+				result.WorkerVerifyFailures = append(result.WorkerVerifyFailures, artifact)
+			}
+		}
+		if len(result.WorkerVerifyFailures) > 0 {
+			result.AggregatorExit = aggregator.ExitUsageErr
+		} else {
+			mergePhase := mergePhaseFor(req.Agent)
+			aggRC = opts.RunAggregator(aggregator.Inputs{
+				Phase:   mergePhase,
+				Output:  aggPath,
+				Workers: workerArtifacts,
+			}, os.Stderr)
+			result.AggregatorExit = aggRC
+		}
 	}
 
 	// Step 10: write parent ledger entry regardless of fanout/agg outcome.
@@ -431,4 +454,36 @@ func fillDispatchParallelDefaults(opts *DispatchParallelOptions) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
+	if opts.VerifyWorkerArtifact == nil {
+		now := opts.Now
+		opts.VerifyWorkerArtifact = func(artifact, token string) VerifyResult {
+			return defaultVerifyWorkerArtifact(now, artifact, token)
+		}
+	}
+}
+
+// defaultVerifyWorkerArtifact is the parent-side per-worker artifact verifier.
+// It runs the B3 Verify SSOT over the worker's artifact requiring presence,
+// readability, non-empty, and the expected per-worker token (provenance —
+// fixing H1, where an empty token made bytes.Contains(body, []byte("")) always
+// true and any non-empty file passed). Freshness is intentionally skipped
+// (MaxAge=MaxInt64): the worker's own recursive child already verified
+// freshness at write time, and the parent re-checks only after all workers
+// finish, so an early worker's artifact is legitimately older than the window.
+func defaultVerifyWorkerArtifact(now func() time.Time, artifact, token string) VerifyResult {
+	in := VerifyInput{
+		Now:          now(),
+		MaxAge:       time.Duration(math.MaxInt64),
+		ArtifactPath: artifact,
+		Token:        token,
+	}
+	info, statErr := os.Stat(artifact)
+	in.StatErr = statErr
+	if statErr == nil {
+		in.MTime = info.ModTime()
+		body, readErr := os.ReadFile(artifact)
+		in.Body = body
+		in.ReadErr = readErr
+	}
+	return Verify(in)
 }
