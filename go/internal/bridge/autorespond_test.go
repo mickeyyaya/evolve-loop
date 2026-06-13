@@ -122,6 +122,56 @@ func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 	}
 }
 
+// TestDecideAutoRespond_BareDiffLineNotChrome pins the cycle-314 RESIDUAL that
+// the numbered-diff strip and the busy idle-gate both miss (inbox
+// bridge-ratelimit-matches-agent-content, remaining sub-fix): a BARE unified-
+// diff line ("+content" / "-content" WITHOUT a leading line number) carrying a
+// quoted rate-limit banner is still agent edit content, not CLI chrome. After
+// codex finishes an edit the diff lingers in the IDLE scrollback (paneBusy=
+// false), so the ADR-0047 idle-gate does not fire and agentDiffLineRE (numbered
+// only) does not strip it — the escalate rule then benches codex on the agent's
+// own content. The fix must exclude bare diff lines from escalate-pattern
+// matching while leaving genuine banner chrome (never diff-prefixed) intact.
+func TestDecideAutoRespond_BareDiffLineNotChrome(t *testing.T) {
+	prompts := []ManifestPrompt{
+		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
+	}
+	// Bare unified-diff ADDED line (no line number) the agent is writing into a
+	// fixture; the pane is IDLE so the busy idle-gate does NOT apply — only a
+	// bare-diff strip can save this. Must NOT escalate.
+	bareAdd := "diff --git a/clihealth_test.go b/clihealth_test.go\n" +
+		"+\tpane := \"You've hit your usage limit. Upgrade to Pro\"\n"
+	if a, rc := decideAutoRespond(bareAdd, prompts, map[string]int{}, false); rc == 85 {
+		t.Errorf("bare-diff ADDED line on an idle pane must NOT escalate (agent content): got %q/%d", a, rc)
+	}
+	// Bare unified-diff REMOVED line carrying banner text — same exclusion.
+	bareDel := "-\told := \"quota exceeded for this org\"\n"
+	if a, rc := decideAutoRespond(bareDel, prompts, map[string]int{}, false); rc == 85 {
+		t.Errorf("bare-diff REMOVED line must NOT escalate (agent content): got %q/%d", a, rc)
+	}
+	// Regression: a REAL banner (CLI chrome, never diff-prefixed) on an idle pane
+	// MUST still escalate — the bare-diff strip must not over-suppress chrome.
+	realBanner := "codex\n\n  You've hit your usage limit. try again in 3 hours.\n"
+	if a, rc := decideAutoRespond(realBanner, prompts, map[string]int{}, false); rc != 85 {
+		t.Errorf("real rate-limit banner must still escalate: got %q/%d", a, rc)
+	}
+}
+
+func TestDecideAutoRespond_IndentedBareDiffLineNotChrome(t *testing.T) {
+	prompts := []ManifestPrompt{
+		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
+	}
+	cases := []string{
+		"  + quoted := \"You've hit your usage limit. Upgrade to Pro\"\n",
+		"\t- old := \"quota exceeded while testing clihealth\"\n",
+	}
+	for _, pane := range cases {
+		if a, rc := decideAutoRespond(pane, prompts, map[string]int{}, false); rc == 85 {
+			t.Fatalf("indented bare diff content must not escalate: got %q/%d for %q", a, rc, pane)
+		}
+	}
+}
+
 func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 	prompts := []ManifestPrompt{{Name: "stuck", Regex: "Please log in", Policy: "escalate"}}
 	counts := map[string]int{}

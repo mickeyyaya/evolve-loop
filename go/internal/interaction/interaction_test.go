@@ -101,6 +101,30 @@ func TestRecorder_EmptyWorkspaceSkipsFileKeepsMemory(t *testing.T) {
 	}
 }
 
+// TestRecord_EmptyPhaseFallsBackToUnknownLedger pins the filename fallback:
+// phase-less events are still recorded, but never to an empty basename.
+func TestRecord_EmptyPhaseFallsBackToUnknownLedger(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	rec := interaction.NewRecorder(ws)
+
+	rec.Record(interaction.Outcome{
+		Event:  interaction.Event{Kind: interaction.KindNudge, Trigger: "phase_missing"},
+		Result: interaction.ResultNoEffect,
+	})
+
+	outs := readLedger(t, ws, "unknown")
+	if len(outs) != 1 {
+		t.Fatalf("ledger lines = %d, want 1", len(outs))
+	}
+	if outs[0].Phase != "" {
+		t.Errorf("phase value = %q, want original empty phase preserved in payload", outs[0].Phase)
+	}
+	if _, err := os.Stat(filepath.Join(ws, "-interactions.ndjson")); !os.IsNotExist(err) {
+		t.Errorf("empty phase must not produce an empty-prefix ledger (stat err=%v)", err)
+	}
+}
+
 // TestRecorder_NilSafe — producers carry no nil guards (the recovery-detector
 // idiom): a nil recorder records nothing and never panics.
 func TestRecorder_NilSafe(t *testing.T) {
@@ -149,6 +173,92 @@ func TestLedgerPayload_NeutralizedBeforeWrite(t *testing.T) {
 	}
 	if got := rec.Outcomes()[0].Payload; got != outs[0].Payload {
 		t.Errorf("memory and ledger payloads diverge: %q vs %q", got, outs[0].Payload)
+	}
+}
+
+// TestNeutralize_MultiLineLargePayload exercises the second cap in neutralize:
+// panetrust caps each retained line, then interaction caps the joined digest.
+func TestNeutralize_MultiLineLargePayload(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	rec := interaction.NewRecorder(ws)
+	payload := strings.Join([]string{
+		strings.Repeat("a", 180),
+		strings.Repeat("b", 180),
+		strings.Repeat("c", 180),
+	}, "\n")
+
+	rec.Record(interaction.Outcome{
+		Event:  interaction.Event{Kind: interaction.KindNudge, Phase: "build", Trigger: "large_payload", Payload: payload},
+		Result: interaction.ResultNoEffect,
+	})
+
+	outs := readLedger(t, ws, "build")
+	if len(outs) != 1 {
+		t.Fatalf("ledger lines = %d, want 1", len(outs))
+	}
+	if n := len([]rune(outs[0].Payload)); n > 200 {
+		t.Fatalf("payload length = %d, want <= 200", n)
+	}
+	if n := len([]rune(outs[0].Payload)); n <= 180 {
+		t.Fatalf("payload length = %d, want evidence that multiple lines were joined before the final cap", n)
+	}
+	if got := rec.Outcomes()[0].Payload; got != outs[0].Payload {
+		t.Errorf("memory and ledger payloads diverge: %q vs %q", got, outs[0].Payload)
+	}
+}
+
+func TestNeutralize_LongPayloadCapUsesRunesNotBytes(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	rec := interaction.NewRecorder(ws)
+	payload := strings.Repeat("ab", 150)
+
+	rec.Record(interaction.Outcome{
+		Event:  interaction.Event{Kind: interaction.KindNudge, Phase: "build", Trigger: "ascii_cap", Payload: payload},
+		Result: interaction.ResultNoEffect,
+	})
+
+	outs := readLedger(t, ws, "build")
+	if len(outs) != 1 {
+		t.Fatalf("ledger lines = %d, want 1", len(outs))
+	}
+	if n := len([]rune(outs[0].Payload)); n != 200 {
+		t.Fatalf("payload rune length = %d, want exact 200-rune cap", n)
+	}
+	if len(outs[0].Payload) != 200 {
+		t.Fatalf("ASCII payload byte length = %d, want 200 after rune cap", len(outs[0].Payload))
+	}
+	if got := rec.Outcomes()[0].Payload; got != outs[0].Payload {
+		t.Errorf("memory and ledger payloads diverge: %q vs %q", got, outs[0].Payload)
+	}
+}
+
+// TestRecord_InvalidWorkspaceSwallowsFileError proves telemetry write errors
+// do not abort recording: the in-memory outcome remains available.
+func TestRecord_InvalidWorkspaceSwallowsFileError(t *testing.T) {
+	t.Parallel()
+	parent := t.TempDir()
+	badWorkspace := filepath.Join(parent, "not-a-directory")
+	if err := os.WriteFile(badWorkspace, []byte("occupied"), 0o644); err != nil {
+		t.Fatalf("create bad workspace sentinel: %v", err)
+	}
+	rec := interaction.NewRecorder(badWorkspace)
+
+	rec.Record(interaction.Outcome{
+		Event:  interaction.Event{Kind: interaction.KindNudge, Phase: "build", Trigger: "bad_workspace"},
+		Result: interaction.ResultNoEffect,
+	})
+
+	outs := rec.Outcomes()
+	if len(outs) != 1 {
+		t.Fatalf("in-memory outcomes = %d, want 1 after swallowed file error", len(outs))
+	}
+	if outs[0].Trigger != "bad_workspace" || outs[0].Result != interaction.ResultNoEffect {
+		t.Errorf("in-memory outcome lost event/result: %+v", outs[0])
+	}
+	if _, err := os.Stat(filepath.Join(badWorkspace, "build-interactions.ndjson")); err == nil {
+		t.Errorf("invalid workspace must not create a ledger file")
 	}
 }
 

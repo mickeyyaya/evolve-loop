@@ -36,22 +36,31 @@ const autoRespondLoopGuardLimit = 5
 
 // agentDiffLineRE marks a captured line as agent-authored edit content: a
 // numbered diff line ("   224 +\tpane := ...") as rendered in the codex/claude
-// editor view. CLI chrome — prompts, dialogs, rate-limit banners — is never a
-// numbered-diff line, so these lines carry the agent's content (which can
+// editor view, or a bare unified-diff content line ("+text" / "-text") from
+// lingering patch scrollback. CLI chrome — prompts, dialogs, rate-limit banners
+// — is never diff-prefixed, so these lines carry the agent's content (which can
 // contain prompt-shaped text the agent is writing ABOUT, e.g. a clihealth
 // rate-limit fixture) and must not drive interactive-prompt matching.
 // soak #4 cycle 314: an agent editing the clihealth parser typed "You've hit
 // your usage limit" into a test fixture and the escalate rule benched codex.
-var agentDiffLineRE = regexp.MustCompile(`^[ \t]*\d+[ \t]+[+-]`)
+var agentDiffLineRE = regexp.MustCompile(`^[ \t]*(?:\d+[ \t]+)?[+-]`)
 
-// stripAgentDiffLines removes numbered-diff (agent edit) lines so prompt
-// matching sees only CLI chrome. Non-diff lines — including the CLI's real
-// banners and prompts — pass through unchanged.
+func isAgentDiffLine(ln string) bool {
+	trimmed := strings.TrimLeft(ln, " \t")
+	if strings.HasPrefix(trimmed, "+++") || strings.HasPrefix(trimmed, "---") {
+		return false
+	}
+	return agentDiffLineRE.MatchString(ln)
+}
+
+// stripAgentDiffLines removes diff content lines so prompt matching sees only
+// CLI chrome. Non-diff lines — including the CLI's real banners and prompts —
+// pass through unchanged.
 func stripAgentDiffLines(pane string) string {
 	lines := strings.Split(pane, "\n")
 	kept := lines[:0]
 	for _, ln := range lines {
-		if agentDiffLineRE.MatchString(ln) {
+		if isAgentDiffLine(ln) {
 			continue
 		}
 		kept = append(kept, ln)

@@ -36,6 +36,7 @@
 package phasecoherence
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -281,6 +282,88 @@ func TestCoherence_MissingProfilesFSErrors(t *testing.T) {
 	)
 	if _, err := Check(Options{AgentsFS: agents}); err == nil {
 		t.Error("Check(missing ProfilesFS) = nil error, want error")
+	}
+}
+
+func TestCoherence_NilAgentsFSErrors(t *testing.T) {
+	_, profs := fixtures(nil, map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet"}`})
+	if _, err := Check(Options{ProfilesFS: profs}); err == nil {
+		t.Error("Check(missing AgentsFS) = nil error, want error")
+	}
+}
+
+func TestCoherence_DirectoryEntrySkipped(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read"]`)},
+		map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`},
+	)
+	agents["agents/evolve-directory"] = &fstest.MapFile{Mode: fs.ModeDir}
+
+	vs, err := Check(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if len(vs) != 0 {
+		t.Errorf("directory entries must be skipped; got violations %+v", vs)
+	}
+}
+
+func TestCoherence_NilFrontmatterSkipped(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{"evolve-widget": "# widget\n\nno frontmatter\n"},
+		map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`},
+	)
+
+	vs, err := Check(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if len(vs) != 0 {
+		t.Errorf("nil frontmatter must be skipped; got violations %+v", vs)
+	}
+}
+
+func TestCoherence_NonSliceToolsValSkipped(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{"evolve-widget": personaMD("widget", `tools: Read`)},
+		map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`},
+	)
+
+	vs, err := Check(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if len(vs) != 0 {
+		t.Errorf("non-slice tools value must be skipped; got violations %+v", vs)
+	}
+}
+
+func TestCoherence_SkippedEntriesDoNotMaskValidViolations(t *testing.T) {
+	agents, profs := fixtures(
+		map[string]string{
+			"evolve-clean":        personaMD("clean", `tools: ["Read"]`),
+			"evolve-no-front":     "# no frontmatter\n",
+			"evolve-nonslice":     personaMD("nonslice", `tools: Read`),
+			"evolve-widget-drift": personaMD("widget-drift", `tools: ["Read", "Write"]`),
+		},
+		map[string]string{
+			"clean":        `{"name":"clean","role":"clean","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`,
+			"no-front":     `{"name":"no-front","role":"no-front","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`,
+			"nonslice":     `{"name":"nonslice","role":"nonslice","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`,
+			"widget-drift": `{"name":"widget-drift","role":"widget-drift","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`,
+		},
+	)
+	agents["agents/evolve-subdir"] = &fstest.MapFile{Mode: fs.ModeDir}
+
+	vs, err := Check(Options{AgentsFS: agents, ProfilesFS: profs})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if len(vs) != 1 {
+		t.Fatalf("violations = %+v, want exactly one real drift after skipped entries", vs)
+	}
+	if vs[0].Persona != "widget-drift" || vs[0].Kind != "disallowed" {
+		t.Fatalf("violation = %+v, want widget-drift disallowed", vs[0])
 	}
 }
 
