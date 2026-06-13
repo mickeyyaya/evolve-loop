@@ -125,6 +125,119 @@ func TestCooldownForStrikesDoublesAndCaps(t *testing.T) {
 	}
 }
 
+func TestBenchable(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		pattern string
+		want    bool
+	}{
+		{pattern: "rate_limit", want: true},
+		{pattern: "auth_recheck", want: false},
+		{pattern: "quota", want: false},
+		{pattern: "", want: false},
+	}
+	for _, c := range cases {
+		if got := Benchable(c.pattern); got != c.want {
+			t.Errorf("Benchable(%q)=%v, want %v", c.pattern, got, c.want)
+		}
+	}
+}
+
+func TestFirstLine(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "no newline", in: "single line", want: "single line"},
+		{name: "multi line", in: "first\nsecond\nthird", want: "first"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := firstLine(c.in); got != c.want {
+				t.Errorf("firstLine(%q)=%q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
+func TestTruncateRunes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{name: "below limit", in: "short", n: 10, want: "short"},
+		{name: "at limit", in: "short", n: 5, want: "short"},
+		{name: "above limit", in: "abcdef", n: 3, want: "abc"},
+		{name: "multi byte boundary", in: "■■■ limit", n: 2, want: "■■"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := truncateRunes(c.in, c.n); got != c.want {
+				t.Errorf("truncateRunes(%q, %d)=%q, want %q", c.in, c.n, got, c.want)
+			}
+		})
+	}
+}
+
+func TestNewBenchEntry(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 6, 11, 1, 0, 0, 0, time.UTC)
+
+	t.Run("uses strike cooldown when reset hint is absent", func(t *testing.T) {
+		t.Parallel()
+		prev := Entry{Strikes: 1}
+		pane := "■ You've hit your usage limit.\nUpgrade to Pro."
+		got := NewBenchEntry(prev, "codex", "rate_limit", pane, now)
+		if got.Family != "codex" || got.Reason != "rate_limit" {
+			t.Fatalf("identity fields = (%q, %q), want (codex, rate_limit)", got.Family, got.Reason)
+		}
+		if got.Strikes != 2 {
+			t.Errorf("Strikes=%d, want 2", got.Strikes)
+		}
+		if !got.BenchedAt.Equal(now) {
+			t.Errorf("BenchedAt=%v, want %v", got.BenchedAt, now)
+		}
+		if want := now.Add(time.Hour); !got.BenchedUntil.Equal(want) {
+			t.Errorf("BenchedUntil=%v, want %v", got.BenchedUntil, want)
+		}
+		if got.Evidence != "■ You've hit your usage limit." {
+			t.Errorf("Evidence=%q, want first pane line", got.Evidence)
+		}
+	})
+
+	t.Run("honors parsed reset hint over cooldown and truncates evidence", func(t *testing.T) {
+		t.Parallel()
+		longEvidence := ""
+		for i := 0; i < 170; i++ {
+			longEvidence += "■"
+		}
+		pane := longEvidence + " try again in 2 hours\nsecond line is ignored"
+		got := NewBenchEntry(Entry{}, "codex", "rate_limit", pane, now)
+		if want := now.Add(2*time.Hour + resetMargin); !got.BenchedUntil.Equal(want) {
+			t.Errorf("BenchedUntil=%v, want parsed reset hint %v", got.BenchedUntil, want)
+		}
+		if got.Strikes != 1 {
+			t.Errorf("Strikes=%d, want 1", got.Strikes)
+		}
+		if len([]rune(got.Evidence)) != 160 {
+			t.Fatalf("Evidence rune length=%d, want 160", len([]rune(got.Evidence)))
+		}
+		for _, r := range got.Evidence {
+			if r != '■' {
+				t.Fatalf("Evidence contains split or unexpected rune %q in %q", r, got.Evidence)
+			}
+		}
+	})
+}
+
 // TestParseResetHintBasics — slice-1 baseline (slice 2 hardens). The verbatim
 // cycle-283 wall text must parse to the printed clock time (+margin).
 func TestParseResetHintBasics(t *testing.T) {
