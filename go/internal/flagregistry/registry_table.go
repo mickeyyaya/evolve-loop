@@ -98,6 +98,7 @@ var All = []Flag{
 	{Name: "EVOLVE_DIR_OVERRIDE", Status: StatusDead, Cluster: "Dead Flags (remove from docs; no production reader)", Doc: "Leave in test; document as test-only [no reader on any surface as of 2026-06-11 inventory]"},
 	{Name: "EVOLVE_DISABLE_AUTO_RETROSPECTIVE", Status: StatusDeprecated, Cluster: "Workflow Defaults", Doc: "Superseded by `policy.json:failure_floor` (ADR-0039) which wins when both set; honored one more release with a `deprecated-flag` WARN; removal target next release"},
 	{Name: "EVOLVE_DISABLE_WORKSPACE_GUARD", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
+	{Name: "EVOLVE_DISPATCH_DEPTH", Status: StatusInternal, Doc: "Bridge-recursion depth (B2): set on each fan-out worker command (parent+1), read at the subagent run / dispatch-parallel chokepoint to enforce the recursion cap (max 3). Absent ⇒ 0 (top-level)."},
 	{Name: "EVOLVE_DISPATCH_LOG_TTL_DAYS", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_DISPATCH_PLAN_LOG", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_DISPATCH_POLICY", Status: StatusActive, Cluster: "Workflow Defaults", Doc: "Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast)"},

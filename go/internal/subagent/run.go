@@ -48,6 +48,7 @@ type RunRequest struct {
 	CachePrefixV2          bool   // EVOLVE_CACHE_PREFIX_V2 (default true)
 	AdversarialAudit       bool   // ADVERSARIAL_AUDIT (default true)
 	LegacyAgentDispatch    bool   // LEGACY_AGENT_DISPATCH=1 — retired; now a hard error (see ErrInProcessDispatchBanned)
+	DispatchDepth          int    // EVOLVE_DISPATCH_DEPTH — recursion depth; capped at maxDispatchDepth
 }
 
 // ErrInProcessDispatchBanned is returned when a caller requests the retired
@@ -167,6 +168,11 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 	// any resolution work. This is the single chokepoint all dispatch funnels
 	// through (single + fan-out + recursion).
 	if err := enforceBridgeOnly(req.LegacyAgentDispatch); err != nil {
+		return RunResult{}, err
+	}
+	// Recursion bound: a fan-out worker re-enters here via `subagent run`; cap
+	// nested dispatches so a fan-out loop can't recurse unboundedly.
+	if err := enforceDispatchDepth(req.DispatchDepth); err != nil {
 		return RunResult{}, err
 	}
 
