@@ -3,6 +3,7 @@ package verdictcache
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -88,5 +89,87 @@ func TestLoad_CorruptFile_DegradesToEmpty(t *testing.T) {
 	}
 	if _, ok := s.Lookup("recovered"); !ok {
 		t.Error("Put did not recover the corrupt store")
+	}
+}
+
+func TestLoad_NilVerdicts_DegradesToEmpty(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "verdict-cache.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewStore(root, fixedNow).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("Load nil verdict map = %v, want empty", got)
+	}
+}
+
+func TestNewStore_NilNow_DefaultsToTimeNow(t *testing.T) {
+	s := NewStore(t.TempDir(), nil)
+	if err := s.Put(Entry{TreeSHA: "nil-now", Cycle: 1, Verdict: "PASS"}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	got, ok := s.Lookup("nil-now")
+	if !ok {
+		t.Fatal("Lookup miss after Put")
+	}
+	if got.CachedAt.IsZero() {
+		t.Fatal("nil now function must default to time.Now and stamp CachedAt")
+	}
+}
+
+func TestLoad_ReadError_DegradesToEmpty(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".evolve"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewStore(root, fixedNow).Load()
+	if err != nil {
+		t.Fatalf("Load must degrade read errors to nil error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("Load read error = %v, want empty cache", got)
+	}
+}
+
+func TestWrite_MkdirError_ReturnsError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".evolve"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := NewStore(root, fixedNow).Put(Entry{TreeSHA: "mkdir-error", Cycle: 1, Verdict: "PASS"})
+	if err == nil {
+		t.Fatal("Put with .evolve occupied by a file must fail")
+	}
+	if !strings.Contains(err.Error(), "mkdir") {
+		t.Fatalf("error = %v, want mkdir context", err)
+	}
+}
+
+func TestWrite_WriteError_ReturnsError(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can write through directory permissions")
+	}
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(evolveDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(evolveDir, 0o755) })
+
+	err := NewStore(root, fixedNow).Put(Entry{TreeSHA: "write-error", Cycle: 1, Verdict: "PASS"})
+	if err == nil {
+		t.Fatal("Put with unwritable .evolve dir must fail")
+	}
+	if !strings.Contains(err.Error(), "write temp") {
+		t.Fatalf("error = %v, want write temp context", err)
 	}
 }
