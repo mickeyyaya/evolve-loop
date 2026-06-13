@@ -124,10 +124,16 @@ func orDefault(s, def string) string {
 	return s
 }
 
-// lookupEnv resolves key via the Deps seam, falling back to os.LookupEnv
-// when no seam was injected (defensive — LaunchArgs always passes a
-// defaulted Deps). Used by the credential-isolation guards.
+// lookupEnv resolves key against the same environment the inner CLI sees:
+// the request-local Deps.Env overlay first (the map driverEnv exports to the
+// subprocess), then the Deps.LookupEnv seam, then os.LookupEnv as a defensive
+// fallback. Consulting Deps.Env keeps the in-process int reads (envInt — e.g.
+// the artifact-wait deadline) consistent with the subprocess env, so an
+// operator override carried on the launch is not silently dropped.
 func lookupEnv(deps Deps, key string) (string, bool) {
+	if v, ok := deps.Env[key]; ok {
+		return v, true
+	}
 	if deps.LookupEnv != nil {
 		return deps.LookupEnv(key)
 	}

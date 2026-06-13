@@ -2,7 +2,7 @@
 
 > Status: living doc for the agent-bridge hardening program (plan: `sleepy-wandering-salamander`).
 > Covers the invariants that make every subagent/phase-agent dispatch go through the one bridge
-> process, safely and at scale. B1 + B2 landed; B3–B6 will extend this doc.
+> process, safely and at scale. B1–B3 landed; B4–B6 will extend this doc.
 
 ## Request
 
@@ -68,6 +68,74 @@ every depth.
 process, so the nested signal is already present at every depth. Only the *host* marker can wrongly
 suppress nesting, so only it is cleared.
 
+## B3 — Output-contract verification SSOT + tunable progress-aware deadline
+
+Two single-source-of-truth fixes: one for the *verdict* a dispatched artifact earns, one for the
+*deadline* it is judged within.
+
+### B3a — Artifact verification SSOT
+
+**Problem.** The "is this artifact valid?" ladder (stat → freshness < 5 min → readable/non-empty →
+token-bearing → exec status ⇒ `PASS` / `FAIL` / `INTEGRITY_FAIL`) existed in **three** Go copies that
+could drift: `classifyArtifact` (`run.go`, single dispatch, bare verdict), `(*Runner).classify`
+(`subagent.go`, same ladder + `[]core.Diagnostic`), and the bash `verify_artifact()` they were ported
+from. A fourth, weaker copy — the fan-out aggregator's per-worker gate — is unified separately in B5
+(it must skip freshness, see below).
+
+**Alternatives considered.**
+- *Keep the seams-blob signature (`Verify(opts RunOptions, …)`).* Rejected — couples the verdict to
+  the whole dispatch-options struct and to the filesystem, so the ladder can only be tested with temp
+  files + `os.Chtimes` (no `t.Parallel`).
+- *One pure verdict-only function, callers re-emit their own diagnostics.* Rejected — re-introduces the
+  per-call-site duplication for the diagnostic wording (the exact drift we're removing).
+- *Pure core + one I/O adapter (chosen).* A pure `Verify(VerifyInput) VerifyResult` holds the ladder
+  and the diagnostics; one `VerifyArtifact(stat, read, now, …)` adapter does the filesystem gather and
+  delegates. Both call sites collapse onto the adapter.
+
+**Design (the projection pattern).**
+- `Verify(in VerifyInput) VerifyResult` — pure: no field touches the filesystem or the wall clock
+  (`MTime`/`Body`/`Now`/`MaxAge` are passed in). The verdict ladder and the diagnostic wording live
+  here, once. Table-tested with literals → every case is `t.Parallel`.
+- `VerifyArtifact(stat, read, now, path, token, exitCode, execErr)` — the single I/O-bearing entry
+  point. Gathers the stat (and, only on stat success, the body — preserving the "missing artifact is
+  judged before any read" short-circuit), then calls `Verify` against `ArtifactMaxAge`.
+- `run.go` step 13 calls `VerifyArtifact(…).Verdict`; `(*Runner).classify` calls it and returns
+  `(.Verdict, .Diagnostics)`. `classifyArtifact` is deleted. Verdict and diagnostic bytes are
+  unchanged — the four legacy FS tests retarget onto `VerifyArtifact`, and the new contract table adds
+  the branches they never covered (token mismatch, exit≠0 ⇒ `FAIL`, happy `PASS`, the leading
+  bridge-error diagnostic that does **not** short-circuit integrity).
+
+The `evolve subagent check-token` CLI probe (`checktoken.go`) is deliberately **not** folded in: it is
+a lighter exists+token check for operators, not a dispatch verdict, and adding freshness would change
+that contract.
+
+### B3b — Tunable deadline: env-resolution SSOT
+
+**Problem.** The artifact-wait deadline is already progress-aware — the `deterministicReviewer` extends
+**unbounded** while the pane shows substantive new content (`Progressed`) and up to `maxExtends` while
+it is busy-but-quiet (`Busy`), so a thorough agent is not killed mid-write (the cycle-311/312 and
+254/255 fixes). What was broken is the **tunable** part: the `EVOLVE_ARTIFACT_TIMEOUT_S` override
+silently did nothing. Root cause is a second SSOT split — the *subprocess* env is built by
+`driverEnv = os.Environ() + deps.Env`, but the *in-process* int reads went through
+`lookupEnv → deps.LookupEnv` **only**, never consulting `deps.Env`. An override carried on the launch
+(in `deps.Env`, the same place all other request env lives) reached the inner CLI but was invisible to
+the deadline. `envInt`'s doc-comment even *claimed* it read "the Deps env overlay" — it didn't.
+
+**Alternatives considered.**
+- *Fold the `LaunchArgs` `env` arg into `deps.Env`.* Broader blast radius — would export every
+  request env var to the subprocess; not needed to fix the knob.
+- *Make the env override outrank an explicit `cfg.ArtifactTimeoutS`.* Rejected — livesmoke and
+  integration tests set `cfg.ArtifactTimeoutS` deliberately (1–120 s); a stray global `=600` must not
+  make them hang.
+- *Make `lookupEnv` consult `deps.Env` first (chosen).* The minimal SSOT fix: the in-process env view
+  now matches the subprocess env view, the lying doc-comment becomes true, and the existing precedence
+  (`cfg.ArtifactTimeoutS` > `EVOLVE_ARTIFACT_TIMEOUT_S` > 300 default) is preserved.
+
+**Design.** `lookupEnv(deps, key)` resolves `deps.Env[key]` → `deps.LookupEnv` → `os.LookupEnv`. Every
+`envInt` consumer (the deadline interval and `EVOLVE_ARTIFACT_MAX_EXTENDS`) now honors the launch
+overlay. Tests pin: the overlay is consulted and wins over `LookupEnv`, falls through when absent, the
+override reaches the recorded `StopEvent.IntervalS` end-to-end, and `cfg.ArtifactTimeoutS` still wins.
+
 ## Invariants (enforced by tests)
 
 | # | Invariant | Enforced by |
@@ -77,8 +145,10 @@ suppress nesting, so only it is cleared.
 | I3 | Fan-out workers recurse via `subagent run` | `buildWorkerRecursionCommand` + conformance test |
 | I4 | Recursion depth is bounded | `EVOLVE_DISPATCH_DEPTH` + `enforceDispatchDepth` (cap 3) |
 | I5 | Recursive children stay nested (no inner wrap) | `CLAUDECODE_TYPE` cleared per worker; sandbox test |
+| I6 | Artifact verdict is single-sourced | `Verify`/`VerifyArtifact` (`contract.go`); contract table |
+| I7 | In-process env view == subprocess env view | `lookupEnv` consults `deps.Env`; overlay + e2e tests |
 
 ## Out of scope (later phases)
 
-B3 (output-contract verification program + progress-aware artifact deadline), B4 (conformance suite),
-B5 (concurrency `-race` stability), B6 (registry-driven allow-list + session reaping).
+B4 (conformance suite), B5 (concurrency `-race` stability + aggregator per-worker verification using
+the B3 SSOT with freshness skipped), B6 (registry-driven allow-list + session reaping).
