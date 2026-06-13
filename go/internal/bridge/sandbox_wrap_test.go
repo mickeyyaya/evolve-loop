@@ -157,6 +157,29 @@ func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 	}
 }
 
+func TestDefaultSandboxWrap_NestedViaLookupEnv_DoesNotWrap(t *testing.T) {
+	// depEnvGetter consults the Env map FIRST, then falls back to deps.LookupEnv.
+	// The sibling nested tests cover the Env-map branch; this pins the LookupEnv
+	// fallback branch (a nested signal present only via LookupEnv must still be
+	// detected, so the wrap is skipped). Audit follow-up (cycle-990613 LOW).
+	deps := Deps{
+		Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeAuto},
+		LookupEnv: func(k string) (string, bool) {
+			if k == "CLAUDE_CODE_SESSION_ID" {
+				return "sess-xyz", true
+			}
+			return "", false
+		},
+	}
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	prefix, ok := wrap(SandboxWrapRequest{
+		Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
+	})
+	if ok || prefix != nil {
+		t.Errorf("nested signal via LookupEnv must skip wrap; got (%v, %v)", prefix, ok)
+	}
+}
+
 // fakeProbe returns a deterministic probe so tests don't depend on the host
 // or the package-level sync.Once.
 func fakeProbe(os string, available bool) func() sandbox.ProbeResult {
@@ -223,6 +246,75 @@ func TestDefaultSandboxWrap_AutoMode_UnavailableProbe_Silent(t *testing.T) {
 	_, _ = wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
 	if strings.Contains(stderr.String(), "WARN") {
 		t.Errorf("auto-mode degrade must be silent; got WARN: %q", stderr.String())
+	}
+}
+
+func TestDefaultSandboxWrap_UnknownMode_NestedClaude_DoesNotWrap(t *testing.T) {
+	// Regression (2026-06-13 soak, cycles 324-326): an UNRECOGNIZED
+	// EVOLVE_SANDBOX value (operator typo "1" instead of auto|on|off) was
+	// neither "off" nor "auto", so it slipped past the nested-claude skip
+	// (which only fired for the literal "auto") and forced a sandbox-exec
+	// wrap on nested macOS. That hung claude's REPL boot >60s
+	// (exit=80 ExitREPLBootTimeout), failing every cycle at scout. An
+	// unrecognized value MUST normalize to auto so the nested-skip applies.
+	//
+	// Workspace must be writable: with the bug, the darwin branch writes an
+	// SBPL file there and returns the wrap prefix — t.TempDir() ensures that
+	// write SUCCEEDS, so a missing fix is a true RED (wrap returned), not a
+	// false pass via os.WriteFile failure.
+	deps := Deps{Env: map[string]string{
+		"EVOLVE_SANDBOX":         "1", // unrecognized — not auto|on|off
+		"CLAUDE_CODE_ENTRYPOINT": "cli",
+	}}
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	prefix, ok := wrap(SandboxWrapRequest{
+		Phase: "scout", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
+	})
+	if ok || prefix != nil {
+		t.Errorf("unrecognized EVOLVE_SANDBOX value must normalize to auto and skip wrap under nested-claude; got (%v, %v)", prefix, ok)
+	}
+}
+
+func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNested(t *testing.T) {
+	// The other half of the contract: when NOT nested, an unrecognized value
+	// normalizes to auto (so an available probe still confines — fail-safe is
+	// preserved) AND emits a one-line WARN so the misconfiguration is
+	// observable (mirrors config.applyEnv, which also warns on unknown values).
+	var stderr strings.Builder
+	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": "bogus"}, Stderr: &stderr}
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	prefix, ok := wrap(SandboxWrapRequest{
+		Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
+	})
+	if !ok || len(prefix) == 0 {
+		t.Errorf("unknown value normalizes to auto; not-nested + available probe → should wrap; got (%v, %v)", prefix, ok)
+	}
+	if !strings.Contains(stderr.String(), "EVOLVE_SANDBOX") || !strings.Contains(stderr.String(), "unrecognized") {
+		t.Errorf("expected an unrecognized-value WARN; got %q", stderr.String())
+	}
+}
+
+func TestDefaultSandboxWrap_OnMode_NestedClaude_DoesNotWrap(t *testing.T) {
+	// THE footgun the old auto-only nested skip missed: EVOLVE_SANDBOX=on
+	// (correctly spelled, mandatory confinement) under nested Claude used to
+	// force a sandbox-exec wrap that hangs the REPL boot on macOS (exit=80).
+	// Post-SSOT, nested-Claude skips the wrap for ALL modes — and `on` emits a
+	// loud WARN since its mandatory-confinement request is delegated to the
+	// outer session rather than silently honoured.
+	var stderr strings.Builder
+	deps := Deps{Env: map[string]string{
+		"EVOLVE_SANDBOX":         config.SandboxModeOn,
+		"CLAUDE_CODE_ENTRYPOINT": "cli",
+	}, Stderr: &stderr}
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	prefix, ok := wrap(SandboxWrapRequest{
+		Phase: "scout", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
+	})
+	if ok || prefix != nil {
+		t.Errorf("on-mode + nested-claude must NOT wrap (inner sandbox-exec hangs on nested macOS); got (%v, %v)", prefix, ok)
+	}
+	if !strings.Contains(stderr.String(), "EVOLVE_SANDBOX=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
+		t.Errorf("on-mode nested skip must emit a loud WARN; got %q", stderr.String())
 	}
 }
 

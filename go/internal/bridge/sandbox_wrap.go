@@ -58,30 +58,39 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		if mode == "" {
 			mode = config.SandboxModeAuto
 		}
+		// Normalize any UNRECOGNIZED value to auto, mirroring config.applyEnv's
+		// validation contract. Pre-fix, an unknown value (operator typo like
+		// "1") was neither "off" nor "auto", so it slipped past the
+		// nested-claude skip below and forced a sandbox-exec wrap — which hangs
+		// claude's REPL boot on nested macOS (exit=80 ExitREPLBootTimeout; the
+		// 2026-06-13 soak burned cycles 324-326 on exactly this). Treat an
+		// unknown value as auto (the safe default) and WARN so it's observable.
+		switch mode {
+		case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
+			// recognized — leave as-is
+		default:
+			if deps.Stderr != nil {
+				fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=%q unrecognized (want auto|on|off); treating as auto\n", mode)
+			}
+			mode = config.SandboxModeAuto
+		}
 		if mode == config.SandboxModeOff {
 			return nil, false
 		}
 
-		// Nested-claude detection (mirrors preflight): the outer Claude Code
-		// session already imposes OS sandbox + Tier-1 hooks, so wrapping again
-		// causes EPERM noise without adding safety. Only honored in auto mode;
-		// "on" forces wrap regardless.
-		if mode == config.SandboxModeAuto && isNestedClaude(deps) {
-			return nil, false
-		}
-
+		// Single-source confinement decision — the SAME DetectNested +
+		// ShouldWrap that preflight consumes (internal/adapters/sandbox). The
+		// wrap is skipped for ALL modes when we are nested-Claude (the outer
+		// session already imposes OS sandbox + Tier-1 hooks, and on macOS the
+		// inner sandbox-exec returns sandbox_apply() EPERM and hangs the REPL
+		// boot, exit=80) or when no usable sandbox binary is present. `on`
+		// declares mandatory confinement, so its bypass is surfaced loudly
+		// rather than silently honoured-as-unconfined.
 		probe := probeFunc()
-		if !probe.Available {
-			// EVOLVE_SANDBOX=on declares mandatory confinement, so the silent
-			// degrade `auto` accepts would silently violate operator intent.
-			// Emit a WARN to deps.Stderr (when available) so the bypass is
-			// observable even though we still return false — the driver
-			// boundary doesn't have a hard-fail path today (raising
-			// available=true with no prefix would be worse: an abort with
-			// nothing to abort against). Future work: surface as an error.
+		wrap, reason := sandbox.ShouldWrap(sandbox.DetectNested(depEnvGetter(deps)), probe)
+		if !wrap {
 			if mode == config.SandboxModeOn && deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=on but no host sandbox binary (%s); phase will run UNCONFINED (operator intent violated). Reason: %s\n",
-					probe.OS, probe.Reason)
+				fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied; phase runs UNCONFINED at the inner layer. Reason: %s\n", reason)
 			}
 			return nil, false
 		}
@@ -138,21 +147,25 @@ func sandboxWritePaths(req SandboxWrapRequest) []string {
 	return out
 }
 
-// isNestedClaude reports whether the bridge is running inside an outer Claude
-// Code session. The signal is the same one preflight uses
-// (CLAUDE_CODE_ENTRYPOINT or CLAUDE_CODE_SESSION_ID).
-func isNestedClaude(deps Deps) bool {
-	for _, k := range []string{"CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID"} {
-		if v := deps.Env[k]; v != "" {
-			return true
-		}
-		if deps.LookupEnv != nil {
-			if v, ok := deps.LookupEnv(k); ok && v != "" {
-				return true
+// depEnvGetter adapts a Deps to the getenv func sandbox.DetectNested expects,
+// preserving the bridge's request-local env-chain precedence: the explicit
+// Env map first, then the LookupEnv seam. Centralizing nested detection in
+// adapters/sandbox.DetectNested removed the bridge-local heuristic that used
+// to live here (and diverged from preflight's).
+func depEnvGetter(deps Deps) func(string) string {
+	return func(k string) string {
+		if deps.Env != nil {
+			if v := deps.Env[k]; v != "" {
+				return v
 			}
 		}
+		if deps.LookupEnv != nil {
+			if v, ok := deps.LookupEnv(k); ok {
+				return v
+			}
+		}
+		return ""
 	}
-	return false
 }
 
 // envSandboxMode is the env var that overrides cfg.SandboxMode on the

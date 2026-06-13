@@ -20,6 +20,11 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	// sbx is the single source of truth for nested-Claude detection + the
+	// inner-sandbox wrap policy, shared with the bridge launch path. Aliased
+	// because a local variable in Probe() is named `sandbox`.
+	sbx "github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 )
 
 // Profile is the JSON shape emitted to stdout / .evolve/environment.json.
@@ -135,7 +140,7 @@ func Probe(opts Options) Profile {
 	if opts.IsNested != nil {
 		nested = opts.IsNested()
 	} else {
-		nested = getEnv("CLAUDECODE") != "" && !strings.Contains(strings.ToLower(getEnv("CLAUDECODE_TYPE")), "host")
+		nested = sbx.DetectNested(getEnv)
 	}
 	var claudecodePtr *string
 	if v := getEnv("CLAUDECODE"); v != "" {
@@ -191,15 +196,25 @@ func Probe(opts Options) Profile {
 	if nested {
 		autoEPERM = "1"
 	}
-	innerSandbox := true
+	// The InnerSandbox boolean is the SSOT wrap policy (sbx.ShouldWrap) — the
+	// SAME decision the bridge launch path applies, so preflight's promise and
+	// the hot path can't drift. The reason strings stay preflight-local
+	// (operator-facing host-profile context, not duplicated decision logic).
+	innerProbe := sbx.ProbeResult{OS: osType, Available: (osType == "darwin" && sandboxExec) || (osType == "linux" && bwrap)}
+	innerSandbox, wrapReason := sbx.ShouldWrap(nested, innerProbe)
 	innerReason := "standalone shell with working sandbox: defense-in-depth enabled"
 	switch {
 	case nested:
-		innerSandbox = false
 		innerReason = "nested-Claude: outer Claude Code OS sandbox + Tier-1 hooks suffice; inner sandbox-exec adds friction without protection (intersect-only nesting)"
 	case !sandbox.ExpectedToWork:
-		innerSandbox = false
 		innerReason = "sandbox not expected to work on this host: " + sandbox.Reason
+	case !innerSandbox:
+		// Exhaustiveness guard: ShouldWrap declined to wrap for a reason the
+		// cases above don't cover. Derive the reason from the SSOT decision so
+		// innerReason can never drift from innerSandbox (keeps the host-profile
+		// honest even if decideSandbox's ExpectedToWork ever decouples from the
+		// binary probe). Unreachable with today's Probe inputs.
+		innerReason = "inner sandbox not applied: " + wrapReason
 	}
 
 	var autoReasoning string

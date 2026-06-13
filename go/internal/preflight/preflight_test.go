@@ -89,6 +89,48 @@ func TestProbe_DarwinNested(t *testing.T) {
 	}
 }
 
+func TestProbe_InnerSandboxReason_HonestWhenDisabled(t *testing.T) {
+	t.Parallel()
+	// Guard for the audit MEDIUM (cycle-990613): whenever InnerSandbox is false,
+	// InnerSandboxReason must NOT be the "standalone … defense-in-depth" default —
+	// it must explain WHY the inner sandbox was disabled. Pins the reason switch's
+	// exhaustiveness (incl. the catch-all) so the host profile can't misreport
+	// across every reachable disabled path.
+	const standaloneDefault = "standalone shell with working sandbox: defense-in-depth enabled"
+	root := t.TempDir()
+	cases := []struct {
+		name     string
+		osType   string
+		nested   bool
+		lookPath map[string]string
+	}{
+		{"nested darwin", "darwin", true, map[string]string{"sandbox-exec": "/usr/bin/sandbox-exec"}},
+		{"darwin without sandbox-exec", "darwin", false, map[string]string{}},
+		{"unsupported os", "windows", false, map[string]string{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := Probe(Options{
+				ProjectRoot: root,
+				OSType:      tc.osType,
+				Env:         stubEnv(map[string]string{"HOME": root}),
+				LookPath:    stubLookPath(tc.lookPath),
+				Now:         fixedNow(),
+				IsNested:    func() bool { return tc.nested },
+			})
+			if p.AutoConfig.InnerSandbox {
+				t.Fatalf("%s: expected InnerSandbox=false", tc.name)
+			}
+			if p.AutoConfig.InnerSandboxReason == standaloneDefault {
+				t.Errorf("%s: InnerSandbox=false but reason is the standalone default — host profile misreports", tc.name)
+			}
+			if p.AutoConfig.InnerSandboxReason == "" {
+				t.Errorf("%s: empty InnerSandboxReason", tc.name)
+			}
+		})
+	}
+}
+
 func TestProbe_LinuxWithBwrap(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
