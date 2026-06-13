@@ -2,6 +2,7 @@ package aggregator
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,6 +58,16 @@ func TestAggregate_RejectsEmptyArgs(t *testing.T) {
 	}
 }
 
+func TestAggregate_RejectsNoWorkers(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var b bytes.Buffer
+	rc := Aggregate(Inputs{Phase: "scout", Output: filepath.Join(dir, "o.md")}, &b)
+	if rc != ExitUsageErr {
+		t.Errorf("rc=%d, want %d", rc, ExitUsageErr)
+	}
+}
+
 func TestAggregate_MissingWorker(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -67,6 +78,65 @@ func TestAggregate_MissingWorker(t *testing.T) {
 	}, &b)
 	if rc != ExitUsageErr {
 		t.Errorf("rc=%d, want %d", rc, ExitUsageErr)
+	}
+}
+
+func TestAggregate_OutputDirMkdirFailure(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-dir")
+	writeWorker(t, filepath.Join(dir, "w.md"), "content")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	rc := Aggregate(Inputs{
+		Phase:   "scout",
+		Output:  filepath.Join(blocker, "out.md"),
+		Workers: []string{filepath.Join(dir, "w.md")},
+	}, &b)
+	if rc != ExitUsageErr {
+		t.Fatalf("rc=%d, want %d", rc, ExitUsageErr)
+	}
+}
+
+func TestAggregate_MergeReadFailure(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	w := filepath.Join(dir, "worker.md")
+	writeWorker(t, w, "content")
+	calls := 0
+	var b bytes.Buffer
+	rc := Aggregate(Inputs{
+		Phase:   "scout",
+		Output:  filepath.Join(dir, "out.md"),
+		Workers: []string{w},
+		ReadFile: func(path string) ([]byte, error) {
+			calls++
+			if calls == 1 {
+				return os.ReadFile(path)
+			}
+			return nil, errors.New("read vanished")
+		},
+	}, &b)
+	if rc != ExitUsageErr {
+		t.Fatalf("rc=%d, want %d; stderr=%q", rc, ExitUsageErr, b.String())
+	}
+}
+
+func TestAggregate_OutputRenameFailure(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	w := filepath.Join(dir, "worker.md")
+	writeWorker(t, w, "content")
+	out := filepath.Join(dir, "out.md")
+	if err := os.Mkdir(out, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	rc := Aggregate(Inputs{Phase: "scout", Output: out, Workers: []string{w}}, &b)
+	if rc != ExitUsageErr {
+		t.Fatalf("rc=%d, want %d", rc, ExitUsageErr)
 	}
 }
 
@@ -81,6 +151,49 @@ func TestAggregate_EmptyWorker(t *testing.T) {
 	rc := Aggregate(Inputs{Phase: "audit", Output: filepath.Join(dir, "o.md"), Workers: []string{w}}, &b)
 	if rc != ExitUsageErr {
 		t.Errorf("rc=%d, want usage err", rc)
+	}
+}
+
+func TestAggregate_UnreadableWorker(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	w := filepath.Join(dir, "worker.md")
+	writeWorker(t, w, "content")
+	var b bytes.Buffer
+	rc := Aggregate(Inputs{
+		Phase:    "scout",
+		Output:   filepath.Join(dir, "o.md"),
+		Workers:  []string{w},
+		ReadFile: func(string) ([]byte, error) { return nil, errors.New("permission denied") },
+	}, &b)
+	if rc != ExitUsageErr {
+		t.Fatalf("rc=%d, want %d; stderr=%q", rc, ExitUsageErr, b.String())
+	}
+	if !strings.Contains(b.String(), "unreadable") {
+		t.Fatalf("stderr should explain unreadable worker, got %q", b.String())
+	}
+}
+
+func TestAggregate_NilReadFileSeamDefaultsToOS(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	w := filepath.Join(dir, "worker.md")
+	writeWorker(t, w, "content")
+	out := filepath.Join(dir, "o.md")
+	rc := Aggregate(Inputs{
+		Phase:   "scout",
+		Output:  out,
+		Workers: []string{w},
+	}, os.Stderr)
+	if rc != ExitOK {
+		t.Fatalf("rc=%d, want %d", rc, ExitOK)
+	}
+	body, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if !strings.Contains(string(body), "content") {
+		t.Fatalf("output missing worker body: %s", body)
 	}
 }
 

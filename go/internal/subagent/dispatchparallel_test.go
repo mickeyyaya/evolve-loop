@@ -15,22 +15,51 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
 )
 
+// extractFanoutToken pulls the per-worker token the parent threaded into a
+// worker command (EVOLVE_FANOUT_WORKER_TOKEN=...; shell-quoted or bare).
+func extractFanoutToken(cmd string) string {
+	const key = "EVOLVE_FANOUT_WORKER_TOKEN="
+	i := strings.Index(cmd, key)
+	if i < 0 {
+		return ""
+	}
+	rest := cmd[i+len(key):]
+	if strings.HasPrefix(rest, "'") {
+		rest = rest[1:]
+		if j := strings.IndexByte(rest, '\''); j >= 0 {
+			return rest[:j]
+		}
+		return rest
+	}
+	if j := strings.IndexByte(rest, ' '); j >= 0 {
+		return rest[:j]
+	}
+	return rest
+}
+
+// writeFakeWorkerArtifact mirrors a real worker: it writes an artifact bearing
+// the parent-dictated token from its command line, so the parent-side
+// provenance verification passes.
+func writeFakeWorkerArtifact(commandsFile, line string) {
+	parts := strings.SplitN(line, "\t", 2)
+	if len(parts) != 2 {
+		return
+	}
+	artifact := filepath.Join(filepath.Dir(commandsFile), parts[0]+".md")
+	token := extractFanoutToken(parts[1])
+	_ = os.WriteFile(artifact, []byte("<!-- challenge-token: "+token+" -->\nworker "+parts[0]+" body\n"), 0o644)
+}
+
 func dispatchHappyOpts(t *testing.T, profileBody string) DispatchParallelOptions {
 	t.Helper()
 	clock := fixedClock(t, "2026-05-23T17:30:00Z")
 	return DispatchParallelOptions{
 		ReadProfile: func(string) (string, error) { return profileBody, nil },
 		RunFanout: func(cfg fanoutdispatch.Config, _ io.Writer) int {
-			// Materialize each worker artifact so aggregator finds them.
+			// Materialize each worker artifact (token-bearing) so aggregator finds them.
 			data, _ := os.ReadFile(cfg.CommandsFile)
 			for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
-				parts := strings.SplitN(line, "\t", 2)
-				if len(parts) != 2 {
-					continue
-				}
-				workerName := parts[0]
-				artifact := filepath.Join(filepath.Dir(cfg.CommandsFile), workerName+".md")
-				_ = os.WriteFile(artifact, []byte("worker "+workerName+" body\n"), 0o644)
+				writeFakeWorkerArtifact(cfg.CommandsFile, line)
 			}
 			return 0
 		},
@@ -96,6 +125,82 @@ func TestDispatchParallel_HappyPath(t *testing.T) {
 	body, _ := os.ReadFile(filepath.Join(tmp, "ledger.jsonl"))
 	if !strings.Contains(string(body), `"kind":"agent_fanout"`) {
 		t.Errorf("ledger missing kind: %s", body)
+	}
+}
+
+func TestDispatchParallel_WorkerArtifactVerifySeamInvoked(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	var verifyCount int
+	opts.VerifyWorkerArtifact = func(string, string) VerifyResult {
+		verifyCount++
+		return VerifyResult{Verdict: VerdictPASS}
+	}
+	res, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent:              "scout",
+		Cycle:              5,
+		WorkspacePath:      ws,
+		ProfilesDir:        "/p",
+		AdaptersDir:        "/a",
+		ProjectRoot:        tmp,
+		LedgerPath:         filepath.Join(tmp, "ledger.jsonl"),
+		CachePrefixEnabled: false,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if verifyCount != res.WorkerCount {
+		t.Fatalf("VerifyWorkerArtifact calls=%d, want %d", verifyCount, res.WorkerCount)
+	}
+	if len(res.WorkerVerifyFailures) != 0 {
+		t.Fatalf("unexpected verify failures: %v", res.WorkerVerifyFailures)
+	}
+}
+
+func TestDispatchParallel_WorkerArtifactMissingSkipsAggregation(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	opts := dispatchHappyOpts(t, sampleScoutProfile)
+	opts.RunFanout = func(cfg fanoutdispatch.Config, _ io.Writer) int {
+		data, _ := os.ReadFile(cfg.CommandsFile)
+		lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+		for i, line := range lines {
+			if i == len(lines)-1 {
+				continue // deliberately leave the last worker's artifact missing
+			}
+			writeFakeWorkerArtifact(cfg.CommandsFile, line)
+		}
+		return 0
+	}
+	aggregatorCalled := false
+	opts.RunAggregator = func(aggregator.Inputs, io.Writer) int {
+		aggregatorCalled = true
+		return 0
+	}
+	res, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent:              "scout",
+		Cycle:              5,
+		WorkspacePath:      ws,
+		ProfilesDir:        "/p",
+		AdaptersDir:        "/a",
+		ProjectRoot:        tmp,
+		LedgerPath:         filepath.Join(tmp, "ledger.jsonl"),
+		CachePrefixEnabled: false,
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if len(res.WorkerVerifyFailures) != 1 {
+		t.Fatalf("WorkerVerifyFailures=%v, want one missing artifact", res.WorkerVerifyFailures)
+	}
+	if aggregatorCalled {
+		t.Fatalf("aggregator should be skipped when worker verification fails")
+	}
+	if res.AggregatorExit != aggregator.ExitUsageErr {
+		t.Fatalf("AggregatorExit=%d, want %d", res.AggregatorExit, aggregator.ExitUsageErr)
 	}
 }
 

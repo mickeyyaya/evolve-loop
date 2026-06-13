@@ -377,6 +377,72 @@ func TestWriteFanoutLedgerEntry_MkdirError(t *testing.T) {
 	}
 }
 
+func TestWriteFanoutLedgerEntry_MkdirFails(t *testing.T) {
+	TestWriteFanoutLedgerEntry_MkdirError(t)
+}
+
+func TestWriteFanoutLedgerEntry_EmptyAggregatePath(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := WriteFanoutLedgerEntry(ledger, FanoutLedgerEntry{
+		Cycle: 1, Agent: "scout", ChallengeToken: "x",
+		WorkerNames: []string{"w"}, WorkerCount: 1,
+		AggregatePath: "",
+	}, nil); err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	body, _ := os.ReadFile(ledger)
+	if !strings.Contains(string(body), `"artifact_sha256":""`) {
+		t.Fatalf("empty aggregate path should not compute artifact SHA: %s", body)
+	}
+}
+
+func TestWriteFanoutLedgerEntry_OpenLedgerError(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.WriteFile(ledger, []byte("seed\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ledger, 0o644) })
+	err := WriteFanoutLedgerEntry(ledger, FanoutLedgerEntry{
+		Cycle: 1, Agent: "scout", ChallengeToken: "x",
+		WorkerNames: []string{"w"}, WorkerCount: 1,
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "open ledger") {
+		t.Fatalf("expected open ledger error, got %v", err)
+	}
+}
+
+func TestWriteFanoutLedgerEntry_TipWriteError(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.Mkdir(filepath.Join(tmp, "ledger.tip.tmp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := WriteFanoutLedgerEntry(ledger, FanoutLedgerEntry{
+		Cycle: 1, Agent: "scout", ChallengeToken: "x",
+		WorkerNames: []string{"w"}, WorkerCount: 1,
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "write tip tmp") {
+		t.Fatalf("expected tip write error, got %v", err)
+	}
+}
+
+func TestWriteFanoutLedgerEntry_TipRenameError(t *testing.T) {
+	tmp := t.TempDir()
+	ledger := filepath.Join(tmp, "ledger.jsonl")
+	if err := os.Mkdir(filepath.Join(tmp, "ledger.tip"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := WriteFanoutLedgerEntry(ledger, FanoutLedgerEntry{
+		Cycle: 1, Agent: "scout", ChallengeToken: "x",
+		WorkerNames: []string{"w"}, WorkerCount: 1,
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "rename tip") {
+		t.Fatalf("expected tip rename error, got %v", err)
+	}
+}
+
 // --- shared helpers ---
 
 func TestReadChainLink_EmptyLedger(t *testing.T) {

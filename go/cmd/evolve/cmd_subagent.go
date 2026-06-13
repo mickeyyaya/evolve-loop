@@ -349,6 +349,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		AdversarialAudit:       adversarialAudit,
 		LegacyAgentDispatch:    os.Getenv("LEGACY_AGENT_DISPATCH") == "1",
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
+		ChallengeTokenOverride: os.Getenv("EVOLVE_FANOUT_WORKER_TOKEN"),
 	}, subagent.RunOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)

@@ -13,7 +13,7 @@ import (
 // SAME evolve binary via the bridge dispatch path (`subagent run`), never the
 // in-process tool — and threads the recursion depth + clears the host marker.
 func TestBuildWorkerRecursionCommand(t *testing.T) {
-	cmd := buildWorkerRecursionCommand("/path/to/evolve", "auditor", "security", 7, 2, "/ws", "/tmp/p.txt")
+	cmd := buildWorkerRecursionCommand("/path/to/evolve", "auditor", "security", 7, 2, "/ws", "/tmp/p.txt", "ptok-worker-security")
 
 	// Re-enters the bridge dispatch path for the correct worker name, with the
 	// binary + workspace shell-quoted.
@@ -41,7 +41,7 @@ func TestBuildWorkerRecursionCommand(t *testing.T) {
 // spaces (or shell metacharacters) are quoted so the /bin/sh -c worker command
 // does not word-split or inject.
 func TestBuildWorkerRecursionCommand_QuotesPathsWithSpaces(t *testing.T) {
-	cmd := buildWorkerRecursionCommand("/My Apps/evolve", "scout", "docs", 3, 1, "/home/u/my run/ws", "/tmp/a b.txt")
+	cmd := buildWorkerRecursionCommand("/My Apps/evolve", "scout", "docs", 3, 1, "/home/u/my run/ws", "/tmp/a b.txt", "ptok-worker-docs")
 	for _, want := range []string{
 		"'/My Apps/evolve'",
 		"'/home/u/my run/ws'",

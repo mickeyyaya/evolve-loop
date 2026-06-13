@@ -183,10 +183,26 @@ partial-failure were only exercised at N=4.
   cross-clobbering of the results map / files), and `Run` returns `ExitWorkerFail`. Stable under
   `-race -count=3`.
 
-*Deferred to a follow-up (defense-in-depth, not a live exploit):* the fan-out aggregator's parent-side
-per-worker gate (`aggregator.go`) checks exists+non-empty but not token/freshness — the worker's own
-recursive child already runs the full B3 `Verify` at write time, so the parent re-check is redundant;
-hardening it to call `Verify` (freshness skipped) is tracked separately.
+## H1 — Fan-out per-worker provenance verification
+
+**Problem.** A capstone `evolve loop` cycle implemented parent-side per-worker artifact verification, but
+ran the B3 `Verify` with an **empty token** — `bytes.Contains(body, []byte("")) == true` for any
+non-empty body — so a compromised/buggy worker runner could write arbitrary content to the expected
+artifact path and pass (presence, not provenance). The pipeline's adversarial audit caught this as a
+HIGH finding; this change closes it (the deferred token-threading).
+
+**Design (provenance by a parent-dictated token).** The fan-out parent already derives a per-worker
+token `parentToken+"-"+subtask`. The fix threads it end-to-end: `buildWorkerRecursionCommand` exports
+`EVOLVE_FANOUT_WORKER_TOKEN`; `cmd_subagent` wires it to `RunRequest.ChallengeTokenOverride`; `run.go`
+uses it as the challenge token instead of minting a fresh one (empty ⇒ mint, the normal path), so the
+worker **writes the parent-known token** into its artifact; the parent's `defaultVerifyWorkerArtifact`
+sets `VerifyInput.Token` to the expected value and runs the SSOT `Verify` (freshness skipped via
+`MaxAge=MaxInt64` — the worker's recursive child already verified freshness at write time, and the
+parent re-checks only after all workers finish). A wrong-token or tokenless worker artifact now fails
+verification, which skips aggregation. This also demonstrates the self-correction loop: the audit found
+the defect, and it was completed to PASS rather than shipped with a deferral.
+
+| I11 | Fan-out worker artifacts are provenance-verified | parent-dictated `EVOLVE_FANOUT_WORKER_TOKEN`; `defaultVerifyWorkerArtifact` token check |
 
 ## B6 — Allow-list ↔ profile single-sourcing (+ reaping)
 

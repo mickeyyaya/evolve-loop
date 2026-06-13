@@ -187,7 +187,7 @@ func TestConformance_AllRoles_RecursionSandboxCoherent(t *testing.T) {
 		role := role
 		t.Run(role, func(t *testing.T) {
 			t.Parallel()
-			cmd := buildWorkerRecursionCommand("/bin/evolve", role, "sub1", 7, 1, "/ws", "/p.md")
+			cmd := buildWorkerRecursionCommand("/bin/evolve", role, "sub1", 7, 1, "/ws", "/p.md", "wtok-worker-sub1")
 			if !strings.Contains(cmd, "CLAUDECODE_TYPE= ") {
 				t.Errorf("role %s: worker command must clear CLAUDECODE_TYPE: %s", role, cmd)
 			}
