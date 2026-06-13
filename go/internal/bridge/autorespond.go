@@ -33,10 +33,38 @@ import (
 //	"loop_guard:<n>"  86  same pattern matched >5× → abandon
 const autoRespondLoopGuardLimit = 5
 
+// agentDiffLineRE marks a captured line as agent-authored edit content: a
+// numbered diff line ("   224 +\tpane := ...") as rendered in the codex/claude
+// editor view. CLI chrome — prompts, dialogs, rate-limit banners — is never a
+// numbered-diff line, so these lines carry the agent's content (which can
+// contain prompt-shaped text the agent is writing ABOUT, e.g. a clihealth
+// rate-limit fixture) and must not drive interactive-prompt matching.
+// soak #4 cycle 314: an agent editing the clihealth parser typed "You've hit
+// your usage limit" into a test fixture and the escalate rule benched codex.
+var agentDiffLineRE = regexp.MustCompile(`^[ \t]*\d+[ \t]+[+-]`)
+
+// stripAgentDiffLines removes numbered-diff (agent edit) lines so prompt
+// matching sees only CLI chrome. Non-diff lines — including the CLI's real
+// banners and prompts — pass through unchanged.
+func stripAgentDiffLines(pane string) string {
+	lines := strings.Split(pane, "\n")
+	kept := lines[:0]
+	for _, ln := range lines {
+		if agentDiffLineRE.MatchString(ln) {
+			continue
+		}
+		kept = append(kept, ln)
+	}
+	return strings.Join(kept, "\n")
+}
+
 // decideAutoRespond is the pure decision: first interactive_prompts regex
 // to match the pane wins; counts tracks per-pattern match frequency for
-// the loop guard. Mirrors auto_respond_decide.
+// the loop guard. Mirrors auto_respond_decide. Agent edit-diff lines are
+// stripped first (stripAgentDiffLines) so prompt-shaped text the agent is
+// merely WRITING never drives a send/escalate decision.
 func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]int) (string, int) {
+	pane = stripAgentDiffLines(pane)
 	suppressedOnce := "" // a fire-once prompt that matched but was already handled
 	for _, p := range prompts {
 		if p.Regex == "" {
@@ -202,6 +230,9 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 			prevCounts[k] = v
 		}
 	}
+	// pane here stays RAW: resolvePending, shadow matching, and writeEscalation
+	// (above/below) need the real terminal. stripAgentDiffLines runs only
+	// inside decideAutoRespond, scoped to the prompt-matching decision.
 	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts)
 	switch rc {
 	case 1:

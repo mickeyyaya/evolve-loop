@@ -40,6 +40,43 @@ func TestDecideAutoRespond(t *testing.T) {
 	}
 }
 
+// TestDecideAutoRespond_AgentDiffContentNotChrome pins the soak-#4 cycle-314
+// false positive: the codex agent editing the clihealth package (the
+// rate-limit PARSER) types a test fixture containing "You've hit your usage
+// limit" in a numbered-diff line; the escalate rule matched that agent
+// content and benched codex 30min on a false rate-limit. CLI rate-limit
+// chrome is never a numbered-diff line — agent diff content must be excluded
+// from escalate-pattern matching, while a real banner still escalates.
+func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
+	prompts := []ManifestPrompt{
+		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
+	}
+	// The exact cycle-314 shape: the agent's editor shows a numbered diff of
+	// clihealth_test.go, and the footer shows it actively Working.
+	agentEditPane := "" +
+		"   223 +\t// fixture: codex usage-limit banner\n" +
+		"   224 +\tpane := \"■ You've hit your usage limit. Upgrade to Pro\"\n" +
+		"\n• Working (1m 18s · esc to interrupt)\n› Implement {feature}\n"
+	if a, rc := decideAutoRespond(agentEditPane, prompts, map[string]int{}); rc != 0 {
+		t.Fatalf("agent diff content must NOT escalate, got (%q,%d)", a, rc)
+	}
+	// A real codex rate-limit banner (CLI chrome, not a diff line) must still
+	// escalate.
+	realBanner := "codex\n\n  You've hit your usage limit. try again in 3 hours.\n"
+	if a, rc := decideAutoRespond(realBanner, prompts, map[string]int{}); rc != 85 {
+		t.Fatalf("real rate-limit banner must escalate, got (%q,%d)", a, rc)
+	}
+	// Mixed pane: the agent is editing the fixture AND a real banner appears
+	// on a non-diff line. The strip removes only the diff line, so the real
+	// banner still escalates — the fix never suppresses genuine chrome.
+	mixedPane := "" +
+		"   224 +\tpane := \"■ You've hit your usage limit. Upgrade to Pro\"\n" +
+		"You've hit your usage limit. try again in 3 hours.\n"
+	if a, rc := decideAutoRespond(mixedPane, prompts, map[string]int{}); rc != 85 {
+		t.Fatalf("real banner alongside agent diff content must still escalate, got (%q,%d)", a, rc)
+	}
+}
+
 func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 	prompts := []ManifestPrompt{{Name: "stuck", Regex: "Please log in", Policy: "escalate"}}
 	counts := map[string]int{}
