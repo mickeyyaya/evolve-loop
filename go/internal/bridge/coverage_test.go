@@ -127,12 +127,12 @@ func TestDecideAutoRespond_ExtraBranches(t *testing.T) {
 		{Name: "skipEmpty", Regex: "", Policy: "escalate"}, // empty regex → skipped
 		{Name: "badExtend", Regex: "slow", ResponseKeys: "x", Policy: "extend_timeout"},
 	}
-	if a, rc := decideAutoRespond("slow op", prompts, map[string]int{}); a != "escalate:badExtend" || rc != 85 {
+	if a, rc := decideAutoRespond("slow op", prompts, map[string]int{}, false); a != "escalate:badExtend" || rc != 85 {
 		t.Fatalf("extend_timeout bad keys = (%q,%d), want escalate", a, rc)
 	}
 	// extend_timeout with numeric keys → extend
 	prompts = []ManifestPrompt{{Name: "ext", Regex: "slow", ResponseKeys: "90", Policy: "extend_timeout"}}
-	if a, rc := decideAutoRespond("slow", prompts, map[string]int{}); a != "extend:90" || rc != 2 {
+	if a, rc := decideAutoRespond("slow", prompts, map[string]int{}, false); a != "extend:90" || rc != 2 {
 		t.Fatalf("extend_timeout good = (%q,%d), want extend:90,2", a, rc)
 	}
 }

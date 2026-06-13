@@ -116,7 +116,7 @@ func TestDecideAutoRespond_InvalidRegexSkipped(t *testing.T) {
 		{Name: "bad", Regex: "[unclosed", Policy: "escalate"}, // invalid regex → skipped
 		{Name: "ok", Regex: "match", Policy: "escalate"},
 	}
-	if a, rc := decideAutoRespond("match here", prompts, map[string]int{}); a != "escalate:ok" || rc != 85 {
+	if a, rc := decideAutoRespond("match here", prompts, map[string]int{}, false); a != "escalate:ok" || rc != 85 {
 		t.Fatalf("invalid-regex skip = (%q,%d), want escalate:ok,85", a, rc)
 	}
 }

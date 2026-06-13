@@ -80,7 +80,7 @@ func TestE2E_NovelPrompt_RulePromotedShadow_SecondOccurrenceWouldFire(t *testing
 	// A SECOND occurrence of the prompt now auto-responds through the REAL
 	// decision engine (not a bespoke check) — the promote→consume→fire loop.
 	pane := "│ Accept the workspace terms to continue\n│ 1) Yes  2) No\n❯ "
-	action, rc := decideAutoRespond(pane, prompts, map[string]int{})
+	action, rc := decideAutoRespond(pane, prompts, map[string]int{}, false)
 	if rc != 1 || !strings.HasPrefix(action, "send:") {
 		t.Fatalf("the promoted rule must auto-respond on a second occurrence; got action=%q rc=%d", action, rc)
 	}
@@ -91,7 +91,7 @@ func TestE2E_NovelPrompt_RulePromotedShadow_SecondOccurrenceWouldFire(t *testing
 	// Negative axis: the same engine must NOT fire on healthy output (the
 	// rule was corpus-validated, so it cannot hijack normal work).
 	for _, healthy := range healthyCorpus {
-		if _, rc := decideAutoRespond(healthy, prompts, map[string]int{}); rc != 0 {
+		if _, rc := decideAutoRespond(healthy, prompts, map[string]int{}, false); rc != 0 {
 			t.Errorf("promoted rule fired on a healthy-corpus line %q (rc=%d) — false-positive bomb", healthy, rc)
 		}
 	}

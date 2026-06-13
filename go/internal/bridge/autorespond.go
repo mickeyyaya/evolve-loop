@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 )
@@ -63,7 +64,7 @@ func stripAgentDiffLines(pane string) string {
 // the loop guard. Mirrors auto_respond_decide. Agent edit-diff lines are
 // stripped first (stripAgentDiffLines) so prompt-shaped text the agent is
 // merely WRITING never drives a send/escalate decision.
-func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]int) (string, int) {
+func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]int, paneBusy bool) (string, int) {
 	pane = stripAgentDiffLines(pane)
 	suppressedOnce := "" // a fire-once prompt that matched but was already handled
 	for _, p := range prompts {
@@ -75,6 +76,19 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 			continue
 		}
 		if !re.MatchString(pane) {
+			continue
+		}
+		// ADR-0047 state-gate: a policy=escalate prompt (rate_limit/quota/auth)
+		// means the CLI is BLOCKED needing intervention — mutually exclusive with
+		// the CLI actively generating. If the pane is BUSY, an escalate match is
+		// the agent QUOTING the banner in its own output, not the CLI's chrome —
+		// skip it (don't count toward the loop guard) and keep scanning. Cycle-314:
+		// a clihealth coverage cycle wrote "You've hit your usage limit" into a
+		// test fixture while codex showed "Working… esc to interrupt"; the bridge
+		// benched the codex family 30min on the agent's own content. Scoped to
+		// escalate only — auto_respond prompts (menus/approvals) legitimately
+		// co-occur with an "esc to cancel" affordance and must still fire.
+		if paneBusy && p.Policy == "escalate" {
 			continue
 		}
 		// A fire-once prompt (boot-time trust dialog) is handled a single time.
@@ -233,7 +247,8 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// pane here stays RAW: resolvePending, shadow matching, and writeEscalation
 	// (above/below) need the real terminal. stripAgentDiffLines runs only
 	// inside decideAutoRespond, scoped to the prompt-matching decision.
-	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts)
+	paneBusy := panestream.PaneBusy(pane, panestream.Profiles[strings.TrimSuffix(ar.cli, "-tmux")])
+	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts, paneBusy)
 	switch rc {
 	case 1:
 		keysCSV := strings.TrimPrefix(action, "send:")

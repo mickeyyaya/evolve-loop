@@ -92,7 +92,7 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 				t.Fatalf("LoadManifest(%s): %v", tc.cli, err)
 			}
 			// Fresh counts per case so the loop guard never bleeds across rows.
-			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{})
+			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{}, false)
 			if gotAction != tc.wantAction || gotRC != tc.wantRC {
 				t.Fatalf("decide[%s] on %q\n  = (%q, %d)\n  want (%q, %d)",
 					tc.cli, tc.pane, gotAction, gotRC, tc.wantAction, tc.wantRC)
@@ -127,7 +127,7 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 			counts := map[string]int{} // shared across ticks, like the live ar.counts
 
 			// First tick: the real dialog → auto-respond once.
-			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts)
+			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 			if a == "noop" || rc == 0 {
 				t.Fatalf("%s first tick must auto-respond to the trust dialog; got (%q,%d)", cli, a, rc)
 			}
@@ -138,7 +138,7 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 			// distinct `suppress_once:` sentinel (rc 0) so the caller WARNs once
 			// rather than silently skipping.
 			for i := 0; i < 8; i++ {
-				a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts)
+				a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 				if rc != 0 || a != "suppress_once:trust_prompt" {
 					t.Fatalf("%s tick %d = (%q,%d), want (suppress_once:trust_prompt, 0) — trust is fire-once; re-firing trips the loop guard and abandons the run", cli, i+2, a, rc)
 				}
@@ -158,7 +158,7 @@ func TestAutoRespond_MultiSelectRuleWinsOverSingleSelect(t *testing.T) {
 		t.Fatal(err)
 	}
 	multiPane := "❯ 1. [ ] Cheese\n  2. [ ] Mushroom\nEnter to select · ↑/↓ to navigate · Esc to cancel"
-	action, rc := decideAutoRespond(multiPane, m.InteractivePrompts, map[string]int{})
+	action, rc := decideAutoRespond(multiPane, m.InteractivePrompts, map[string]int{}, false)
 	if action != "send:Enter,Right,Enter" || rc != 1 {
 		t.Fatalf("multi-select pane (footer shared with single-select) = (%q,%d); "+
 			"want send:Enter,Right,Enter — askuserquestion_multiselect must precede askuserquestion_select",
@@ -207,7 +207,7 @@ func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{})
+			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{}, false)
 			if gotAction != tc.wantAction || gotRC != tc.wantRC {
 				t.Errorf("decide on %q\n  = (%q, %d)\n  want (%q, %d)", tc.pane, gotAction, gotRC, tc.wantAction, tc.wantRC)
 			}
@@ -247,7 +247,7 @@ func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{})
+			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{}, false)
 			if gotAction != "noop" || gotRC != 0 {
 				t.Errorf("partial pane %q must be a noop; got (%q, %d)", tc.pane, gotAction, gotRC)
 			}
@@ -293,7 +293,7 @@ func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 	// "send:1,Enter" (both rules emit it). The win-by-ordering is a
 	// log-attribution invariant; this asserts the response is unchanged.
 	mixed := "Working with untrusted contents — Yes, continue\nWould you like to make the following edits?\n  1. Yes, proceed"
-	gotAction, gotRC := decideAutoRespond(mixed, m.InteractivePrompts, map[string]int{})
+	gotAction, gotRC := decideAutoRespond(mixed, m.InteractivePrompts, map[string]int{}, false)
 	if gotAction != "send:1,Enter" || gotRC != 1 {
 		t.Errorf("overlap pane = (%q, %d); want (send:1,Enter, 1)", gotAction, gotRC)
 	}
@@ -321,7 +321,7 @@ func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.
 	pane := `Bash(grep -rn '"Yes, proceed"' internal/) ` + "\n" +
 		`  cmd/codex_test.go:12:  Body: "Yes, proceed"` + "\n" +
 		`  bridge/codex_test.go:45: "Yes, proceed",`
-	gotAction, gotRC := decideAutoRespond(pane, m.InteractivePrompts, map[string]int{})
+	gotAction, gotRC := decideAutoRespond(pane, m.InteractivePrompts, map[string]int{}, false)
 	if gotAction != "send:1,Enter" || gotRC != 1 {
 		t.Logf("DOCUMENTED FOOTGUN: agent code-grep mentioning %q matches per_edit_approval; got (%q, %d); want (send:1,Enter, 1)",
 			"Yes, proceed", gotAction, gotRC)

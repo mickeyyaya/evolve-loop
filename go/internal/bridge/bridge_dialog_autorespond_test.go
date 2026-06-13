@@ -54,7 +54,7 @@ func TestAgyTmuxManifest_SessionRating_AutoResponds(t *testing.T) {
 	}
 	for _, tc := range panes {
 		t.Run(tc.name, func(t *testing.T) {
-			action, rc := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{})
+			action, rc := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{}, false)
 			if rc != 1 || !strings.HasPrefix(action, "send:") {
 				t.Errorf("rating dialog must auto-respond; got action=%q rc=%d (want send:* rc=1)", action, rc)
 			}
@@ -76,7 +76,7 @@ func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
 	}
 	t.Run("normal_output_noops", func(t *testing.T) {
 		pane := "✦ Writing scout-report.md to the workspace…\ndone.\n? for shortcuts"
-		action, rc := decideAutoRespond(pane, m.InteractivePrompts, map[string]int{})
+		action, rc := decideAutoRespond(pane, m.InteractivePrompts, map[string]int{}, false)
 		if rc != 0 {
 			t.Errorf("ordinary working pane must not trigger any rule; got action=%q rc=%d", action, rc)
 		}
@@ -84,7 +84,7 @@ func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
 	t.Run("auth_prompt_still_escalates", func(t *testing.T) {
 		// Regression pin (pre-existing GREEN): adding the rating rule must not
 		// reorder/shadow the escalate-class rules.
-		action, rc := decideAutoRespond("Please log in to continue", m.InteractivePrompts, map[string]int{})
+		action, rc := decideAutoRespond("Please log in to continue", m.InteractivePrompts, map[string]int{}, false)
 		if rc != 85 {
 			t.Errorf("auth pane must still escalate; got action=%q rc=%d", action, rc)
 		}
