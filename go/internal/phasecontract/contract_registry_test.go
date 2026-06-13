@@ -120,9 +120,12 @@ func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 }
 
 func TestContract_JSONContractsDeclareRequiredKeys(t *testing.T) {
-	advisor, _ := For("advisor") // alias → router
-	if !contains(advisor.RequiredKeys, "plan") {
-		t.Errorf("advisor RequiredKeys=%v, want to contain 'plan'", advisor.RequiredKeys)
+	// router/advisor writes a BARE JSON ARRAY (routing-plan.json) — no required
+	// keys (router-contract-bare-array-vs-plan-key). The alias must still
+	// resolve to the canonical router contract.
+	advisor, _ := For("advisor")
+	if len(advisor.RequiredKeys) != 0 {
+		t.Errorf("advisor/router RequiredKeys=%v, want none (bare array)", advisor.RequiredKeys)
 	}
 	if advisor.Phase != "router" {
 		t.Errorf("advisor alias should resolve to canonical router; got Phase=%q", advisor.Phase)

@@ -50,10 +50,12 @@ func TestRenderContractBlock_Deterministic(t *testing.T) {
 }
 
 func TestRenderContractBlock_JSON_UsesRequiredKeys(t *testing.T) {
-	c, _ := For("advisor")
+	// A keyed JSON contract names its required keys in the rendered block. Uses
+	// orchestrator (cycle_id) — router is now a keyless bare JSON array.
+	c, _ := For("orchestrator")
 	block := RenderContractBlock(c)
-	if !strings.Contains(block, "plan") {
-		t.Errorf("advisor JSON block must name the required key 'plan'; got:\n%s", block)
+	if !strings.Contains(block, "cycle_id") {
+		t.Errorf("orchestrator JSON block must name the required key 'cycle_id'; got:\n%s", block)
 	}
 	if strings.Contains(block, "evolve-verdict") {
 		t.Errorf("JSON deliverable has no verdict sentinel; got:\n%s", block)

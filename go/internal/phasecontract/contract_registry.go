@@ -136,7 +136,11 @@ var contracts = map[string]Contract{
 	// injects the contract; "advisor" resolves here too via aliases.
 	"router": {
 		Phase: "router", AgentName: "router", ArtifactName: "routing-plan.json",
-		Kind: KindJSON, RequiredKeys: []string{"plan"},
+		// routing-plan.json is a BARE JSON ARRAY (PhaseAdvisor.Plan writes "a
+		// strict JSON array"; the consumer parses an array). No required keys —
+		// an array has none. The prior RequiredKeys=["plan"] expected an object
+		// and failed `evolve phase verify router` every cycle.
+		Kind: KindJSON, RequiredKeys: nil,
 		WriteTarget: TargetWorkspace,
 	},
 	"orchestrator": {

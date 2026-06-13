@@ -1,0 +1,12 @@
+{
+  "id": "phase-session-workdir-worktree",
+  "priority": "HIGH",
+  "filed_by": "operator-interactive",
+  "filed_at": "2026-06-11T02:02:00Z",
+  "action": "DESIGN-REVIEW FIRST (touches the bridge launch contract for every driver). Phase tmux sessions launch with workdir = main repo root; agents write into their worktree only by prompt discipline, so every write-capable phase is one relative-path mistake away from a main-tree leak (builder leaked 6 files in cycle 283 — recovered; amplification leaked 5 in 282 and 2 in 280 — cycle-fatal on the old binary). Structural fix: launch each phase session with workdir = the phase's resolved worktree when one exists. Prerequisite: codex requires per-directory trust — pre-trust worktree paths at provisioning (pretrustCodexProjects mechanism exists); verify claude/agy need no equivalent. Also update prompts that say 'current directory' semantics. Expected payoff: the entire leak/recover class disappears; tree-diff guard becomes a true invariant check instead of a routine repair trigger. Capture-order fix rider: escalation watchers should capture final_pane BEFORE session teardown — 'no server running' final_panes (cycle-283 build + amplification escalations) are post-kill captures with zero diagnostic value.",
+  "evidence": [
+    "docs/operations/batch-failure-review-2026-06-11.md (S1, S3)",
+    "evolve-batch2.log [orchestrator] build-leak-recover x6",
+    "tmux list-panes cwd observations cycles 280-283 (all = repo root)"
+  ]
+}

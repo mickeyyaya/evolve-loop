@@ -141,12 +141,15 @@ func TestVerify_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestVerify_MissingJSONKey_Advisor(t *testing.T) {
+// TestVerify_MissingJSONKey: a contract that DOES declare RequiredKeys still
+// requires a JSON object containing them. Uses orchestrator (cycle_id+phase) —
+// the router contract no longer has required keys (it is a bare array now).
+func TestVerify_MissingJSONKey(t *testing.T) {
 	ws := t.TempDir()
-	writeFile(t, ws, "routing-plan.json", `{"phases":[]}`) // no "plan"
-	res, _ := Verify("advisor", phasecontract.Roots{Workspace: ws})
+	writeFile(t, ws, "cycle-state.json", `{"phase":"build"}`) // missing cycle_id
+	res, _ := Verify("orchestrator", phasecontract.Roots{EvolveDir: ws})
 	if res.OK {
-		t.Fatal("want !OK: advisor routing-plan.json missing required 'plan'")
+		t.Fatal("want !OK: orchestrator cycle-state.json missing required cycle_id")
 	}
 	if !hasCode(res, "missing_key") {
 		t.Errorf("want missing_key, got %+v", res.Violations)
@@ -247,5 +250,23 @@ func TestVerify_FailureContextNotRequiredOnPassOrLegacy(t *testing.T) {
 		if err != nil || !res.OK {
 			t.Errorf("%s: must verify clean; err=%v violations=%+v", name, err, res.Violations)
 		}
+	}
+}
+
+// TestVerify_RouterBareArray_OK pins the inbox defect
+// router-contract-bare-array-vs-plan-key: PhaseAdvisor.Plan writes
+// routing-plan.json as a BARE JSON ARRAY ("write your whole-cycle plan as a
+// strict JSON array", phase_advisor.go) and the consumer parses an array —
+// producer and consumer agree. The contract wrongly required a {"plan":...}
+// OBJECT, so `evolve phase verify router` failed every fresh cycle.
+func TestVerify_RouterBareArray_OK(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "routing-plan.json", `[{"phase":"build"},{"phase":"audit"}]`)
+	res, err := Verify("router", phasecontract.Roots{Workspace: ws})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !res.OK {
+		t.Errorf("router bare-array routing-plan.json must verify OK; got %+v", res.Violations)
 	}
 }
