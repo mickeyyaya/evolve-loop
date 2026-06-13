@@ -313,3 +313,57 @@ func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
 		t.Errorf("rename must emit both sides; got %v", paths)
 	}
 }
+
+// TestGuardIgnoresScoutEvalMaterialization pins the soak-#6 cycle-319 defect:
+// scout's contract (internal/evalgate/materialization.go) is to write the
+// SELECTED slugs' evals to projectRoot/.evolve/evals/<slug>.md in the MAIN
+// tree, where Gate A reads them. A later cycle iterating the same coverage
+// target re-materializes the same slug, MODIFYING the prior cycle's committed
+// eval (318→319 ledger-seal-io-coverage) — a main-tree write the tree-diff
+// guard wrongly flagged as a deliverable leak and aborted the cycle. Scout's
+// eval materialization is its JOB, not a deliverable escape.
+func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
+	evalPath := ".evolve/evals/ledger-seal-io-coverage.md"
+	dirty := &fakeGitDirty{baseline: []string{}, afterLeak: []string{evalPath}}
+	runners := minimalRunners(PhaseScout, &leakInjector{name: PhaseScout})
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
+		WithGitDirtyPaths(dirty.Fn()),
+	)
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
+	// Non-vacuous: the cycle must ADVANCE PAST scout's guard. minimalRunners
+	// registers only scout, so the next spine phase has no runner — the cycle
+	// errors with "no runner", proving the scout guard passed (not a tree-diff
+	// abort, and the eval path is never named as a leak).
+	if err == nil || !strings.Contains(err.Error(), "no runner") {
+		t.Fatalf("expected the cycle to advance past scout's guard to a no-runner phase; got: %v", err)
+	}
+	if strings.Contains(err.Error(), "tree-diff") || strings.Contains(err.Error(), evalPath) {
+		t.Errorf("guard must NOT fire on scout eval materialization; got: %v", err)
+	}
+}
+
+// TestIsScoutEvalMaterialization pins the exemption's scope so it cannot widen
+// into a deliverable-leak loophole: ONLY scout + .evolve/evals/ is exempt. A
+// non-scout phase writing an eval, or scout writing anything outside evals/,
+// is NOT exempt and still classifies as a leak.
+func TestIsScoutEvalMaterialization(t *testing.T) {
+	cases := []struct {
+		phase Phase
+		path  string
+		want  bool
+	}{
+		{PhaseScout, ".evolve/evals/ledger-seal-io-coverage.md", true},
+		{PhaseScout, ".evolve/evals/x.md", true},
+		{PhaseScout, ".evolve/evals/notamarkdown.sh", false}, // only <slug>.md is the contract
+		{PhaseTriage, ".evolve/evals/smuggled.md", false},    // only scout materializes evals
+		{PhaseBuild, ".evolve/evals/smuggled.md", false},
+		{PhaseScout, ".evolve/phases/x/phase.json", false}, // other deliverables not exempt
+		{PhaseScout, "go/internal/core/leak.go", false},    // source leak from scout still fires
+	}
+	for _, tc := range cases {
+		if got := isScoutEvalMaterialization(tc.phase, tc.path); got != tc.want {
+			t.Errorf("isScoutEvalMaterialization(%q,%q)=%v, want %v", tc.phase, tc.path, got, tc.want)
+		}
+	}
+}

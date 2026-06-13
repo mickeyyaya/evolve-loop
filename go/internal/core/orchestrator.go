@@ -971,6 +971,9 @@ var buildArtifacts = map[string]bool{
 //
 // This is the single classification point consulted by BOTH the build-leak
 // recovery path (recoverBuildLeak) and the every-boundary guard check (R9).
+// See also isScoutEvalMaterialization: a SECOND classifier the boundary guard
+// applies for scout's eval-materialization contract — guard-only, because
+// scout is not a WorktreePhase and so never reaches recoverBuildLeak.
 func isLegitimateMainTreePath(p string) bool {
 	// Build artifacts: a builder may rebuild these into the main tree.
 	if buildArtifacts[p] {
@@ -988,6 +991,21 @@ func isLegitimateMainTreePath(p string) bool {
 		return !isEvolveDeliverablePath(p)
 	}
 	return false
+}
+
+// isScoutEvalMaterialization reports whether a main-tree write is scout
+// performing its documented eval-materialization contract. Scout writes the
+// SELECTED slugs' evals to projectRoot/.evolve/evals/<slug>.md in the MAIN
+// tree (internal/evalgate/materialization.go reads them there for Gate A), so
+// that write is scout's JOB, not a deliverable escape. Without this carve-out
+// a later cycle iterating the same coverage target re-materializes the same
+// slug, MODIFYING the prior cycle's committed eval (soak-#6 cycle 318→319
+// ledger-seal-io-coverage), and the tree-diff guard aborts the cycle. Scoped
+// to scout + .evolve/evals/<slug>.md only: a code phase leaking an eval, or
+// scout writing a non-.md file or any other deliverable (phases/, commit-
+// prefix-scope.json) or a source file, all still fire the guard.
+func isScoutEvalMaterialization(phase Phase, p string) bool {
+	return phase == PhaseScout && strings.HasPrefix(p, ".evolve/evals/") && strings.HasSuffix(p, ".md")
 }
 
 // gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).
@@ -2553,22 +2571,27 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				} else {
 					// Filter the leaked set through isLegitimateMainTreePath for EVERY
 					// phase — the same classification recoverBuildLeak applies (R9: one
-					// vocabulary, two consumers). Non-worktree phases need it for their
+					// shared vocabulary). Non-worktree phases need it for their
 					// .evolve/ workspace writes (R7); worktree phases need it because
 					// orchestrator-side gates write their own untracked runtime state
 					// (.evolve/contract-gate-breaker.json) into the main tree mid-phase
 					// — recovery skips those by design, so a strict guard here turned
 					// every contract-gate trip into a false cycle abort (the cycle-274
-					// salvage CI regression). Real escapes stay armed: source files and
-					// deliverable paths classify as leaks, and porcelainDirtySet emits
-					// both rename sides so a deliverable renamed to a look-alike name
-					// still aborts via its source path.
+					// salvage CI regression). PLUS a guard-only second classifier,
+					// isScoutEvalMaterialization: scout writes its selected evals to the
+					// main tree by contract (materialization.go), which recoverBuildLeak
+					// never sees (scout is not a WorktreePhase) so it lives only here
+					// (soak-#6 cycle 318→319). Real escapes stay armed: source files and
+					// non-scout/non-eval deliverable paths classify as leaks, and
+					// porcelainDirtySet emits both rename sides so a deliverable renamed
+					// to a .evolve/evals/ look-alike still aborts via its source path.
 					leaked := res2.Leaked
 					var realLeaks []string
 					for _, p := range leaked {
-						if !isLegitimateMainTreePath(p) {
-							realLeaks = append(realLeaks, p)
+						if isLegitimateMainTreePath(p) || isScoutEvalMaterialization(next, p) {
+							continue
 						}
+						realLeaks = append(realLeaks, p)
 					}
 					if len(realLeaks) == 0 {
 						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s wrote only legitimate main-tree paths (.evolve/ workspace); continuing\n", next)
