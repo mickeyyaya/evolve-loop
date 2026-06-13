@@ -169,6 +169,7 @@ var All = []Flag{
 	{Name: "EVOLVE_INTERACTIVE_POLICY", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_KB_SEARCH_PATHS", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_LEDGER_OVERRIDE", Status: StatusActive, Cluster: "Override / Test Seams", Doc: "Override ledger.jsonl path"},
+	{Name: "EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", Status: StatusActive, Kind: "int", Default: "1", Cluster: "Workflow Defaults", Doc: "Consecutive verdict-FAIL cycles a batch absorbs before stopping (default 1 = stop on first FAIL). A PASS/SHIPPED resets the streak; the cap still halts a broken run. rc=3 when any FAIL was absorbed."},
 	{Name: "EVOLVE_MANDATORY_PHASES", Status: StatusActive, Cluster: "Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)", Doc: "CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN"},
 	{Name: "EVOLVE_MARKETPLACE_DIR", Status: StatusActive, Cluster: "Observability / Prompt Tuning", Doc: "Override marketplace dir (test/release seam)"},
 	{Name: "EVOLVE_MAX_BUDGET_USD", Status: StatusActive, Cluster: "Budget Cluster", Doc: "Per-subagent budget cap (operator override, highest priority; use for all ceiling needs)"},

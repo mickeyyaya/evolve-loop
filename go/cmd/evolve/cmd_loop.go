@@ -71,6 +71,11 @@ type loopResult struct {
 	TotalCost           float64            `json:"total_cost_usd"`
 	Resumed             bool               `json:"resumed,omitempty"`
 	RecoverableFailures int                `json:"recoverable_failures,omitempty"`
+	// ContinuedFailures counts verdict-FAIL cycles the batch absorbed and
+	// continued past under EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS (>1). Zero under
+	// the default. Like RecoverableFailures it drives the rc=3 "completed but
+	// with failures" exit contract.
+	ContinuedFailures int `json:"continued_failures,omitempty"`
 	// CycleOutcomes is the R6 SLO classification per cycle (SHIPPED /
 	// SALVAGED / FAILED_EXPLAINED / FAILED_UNEXPLAINED), computed from the
 	// C1 records at emit time — the batch-level "every cycle delivers a
@@ -544,6 +549,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	sameCycleStreak := 0
 	budgetUnobsWarned := false // cycle-190: warn once when --budget-usd can't gate
 
+	// Consecutive-verdict-FAIL breaker (EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS).
+	// Default 1 ⇒ stop on the first FAIL (pre-flag contract); >1 lets the
+	// batch absorb isolated work-quality misses so a 3-PASS streak can form,
+	// while the streak cap still halts a genuinely broken run.
+	maxConsecutiveFails := resolveMaxConsecutiveFails()
+	consecutiveFails := 0
+
 	for i := 0; i < cfg.MaxCycles; i++ {
 		// CLI-health canary (the per-cycle health seam): one cheap live probe
 		// per EXPIRED bench — recovered families rejoin dispatch, still-walled
@@ -825,9 +837,18 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			}
 		}
 
-		if result.FinalVerdict == core.VerdictFAIL {
+		var stopOnFail bool
+		consecutiveFails, stopOnFail = consecutiveFailBreaker(
+			result.FinalVerdict == core.VerdictFAIL, consecutiveFails, maxConsecutiveFails)
+		if stopOnFail {
 			lr.StopReason = "fail"
 			break
+		}
+		if result.FinalVerdict == core.VerdictFAIL {
+			recordAbsorbedFail(cfg, ranCycle, stderr)
+			lr.ContinuedFailures++
+			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS)\n",
+				ranCycle, consecutiveFails, maxConsecutiveFails)
 		}
 	}
 
@@ -837,10 +858,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	lr.emit(stdout)
 	// E1 exit-code contract: when any cycle in the batch hit a
-	// recoverable failure (verify-fail + classify → recoverable),
-	// signal rc=3 so CI sees "batch completed but with infra/audit/
-	// build issues". Matches bash dispatcher's DISPATCH_RC=3.
-	if lr.RecoverableFailures > 0 {
+	// recoverable failure (verify-fail + classify → recoverable) OR a
+	// verdict-FAIL the breaker absorbed and continued past, signal rc=3
+	// so CI sees "batch completed but with audit/build/infra issues".
+	// Matches bash dispatcher's DISPATCH_RC=3.
+	if lr.RecoverableFailures > 0 || lr.ContinuedFailures > 0 {
 		return 3
 	}
 	return 0
@@ -959,6 +981,66 @@ func resolveCircuitBreakerThreshold() int {
 		return defaultCircuitBreakerThreshold
 	}
 	return n
+}
+
+// recordAbsorbedFail persists a continue-on-fail-absorbed verdict-FAIL cycle
+// to state.json:failedApproaches. The clean-completion FAIL path (audit
+// FAIL → retro → end, err==nil) is NOT recorded by the orchestrator — only
+// err!=nil cycle-level failures are — and recordLoopFatal runs only on the
+// STOP path the breaker is skipping, so without this the next cycle's scout
+// would see no record of the failure. A missing state.json is a soft WARN
+// (matching the recoverable-failure path). Best-effort: a record failure
+// must not change the loop's continue decision.
+func recordAbsorbedFail(cfg loopConfig, ranCycle int, stderr io.Writer) {
+	workspace := cycleWorkspace(cfg.ProjectRoot, ranCycle)
+	cls := cycleclassify.Classify(workspace)
+	_, err := failurelog.Record(
+		filepath.Join(cfg.EvolveDir, "state.json"),
+		filepath.Join(cfg.EvolveDir, "runs"),
+		failurelog.RecordRequest{
+			Cycle:          ranCycle,
+			Classification: string(cls.Class),
+			ReportPath:     filepath.Join(workspace, "orchestrator-report.md"),
+			Now:            time.Now().UTC(),
+		})
+	if err != nil && !errors.Is(err, failurelog.ErrStateMissing) {
+		fmt.Fprintf(stderr, "[loop] WARN: could not record absorbed FAIL for cycle %d: %v\n", ranCycle, err)
+	}
+}
+
+// defaultMaxConsecutiveFails reproduces the pre-flag contract: a single
+// verdict-FAIL stops the batch.
+const defaultMaxConsecutiveFails = 1
+
+// resolveMaxConsecutiveFails reads EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS — the
+// number of consecutive verdict-FAIL cycles the batch absorbs before
+// stopping. Unset / non-positive / garbage all clamp to the default of 1
+// (stop on first FAIL), so the flag is purely additive.
+func resolveMaxConsecutiveFails() int {
+	v := os.Getenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS")
+	if v == "" {
+		return defaultMaxConsecutiveFails
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return defaultMaxConsecutiveFails
+	}
+	return n
+}
+
+// consecutiveFailBreaker advances the consecutive-verdict-FAIL streak and
+// reports whether the batch must stop. A non-FAIL cycle resets the streak to
+// zero (a PASS/SHIPPED breaks the run); a FAIL increments it and stops once
+// the streak reaches max. max is always ≥1 (resolveMaxConsecutiveFails
+// clamps), so max==1 stops on the first FAIL — byte-identical to the
+// pre-flag unconditional break. Pure for testability, mirroring
+// updateBreaker (the same-cycle dispatcher breaker).
+func consecutiveFailBreaker(failed bool, streak, max int) (newStreak int, stop bool) {
+	if !failed {
+		return 0, false
+	}
+	streak++
+	return streak, streak >= max
 }
 
 // readLastCycleNumber returns state.LastCycleNumber, or 0 on any error

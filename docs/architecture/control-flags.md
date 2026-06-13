@@ -417,6 +417,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_KB_SEARCH_PATHS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_LEDGER_OVERRIDE` | active | — | — | Override / Test Seams | Override ledger.jsonl path |
+| `EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS` | active | int | 1 | Workflow Defaults | Consecutive verdict-FAIL cycles a batch absorbs before stopping (default 1 = stop on first FAIL). A PASS/SHIPPED resets the streak; the cap still halts a broken run. rc=3 when any FAIL was absorbed. |
 | `EVOLVE_MANDATORY_PHASES` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN |
 | `EVOLVE_MARKETPLACE_DIR` | active | — | — | Observability / Prompt Tuning | Override marketplace dir (test/release seam) |
 | `EVOLVE_MAX_BUDGET_USD` | active | — | — | Budget Cluster | Per-subagent budget cap (operator override, highest priority; use for all ceiling needs) |
