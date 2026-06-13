@@ -72,6 +72,20 @@ deterministic equality). The cache is advisory and self-invalidating: a miss cos
 so a lost/corrupt cache only costs time, never correctness (same degradation contract as
 `clihealth`).
 
+> **Implementation note (2026-06-13, shadow stage shipped):** the assumed `inputs_digest`
+> **does not exist as a machine-computed value** — it is only a parse-only field in
+> agent-emitted `phasecoherence` provenance Markdown; no Go code computes or persists it, and
+> it is absent from the ledger and every sidecar. The canonical content identity that *does*
+> exist and is already ledger-persisted is `LedgerEntry.WorktreeTreeSHA` = `git write-tree` of
+> the staged worktree changes (the same value ship verifies in the Slice C1 pre-commit binding).
+> A git tree object hash is itself a content-addressed, collision-resistant identity of the
+> code. **The shadow stage therefore keys on `worktree_tree_sha` alone** (`internal/verdictcache`,
+> populated as a projection of the audit binding in `recordAuditBinding`; observe-only probe in
+> `RunCycle` pre-loop, mirroring the Slice A shadow precedent — no dial). `inputs_digest` (to
+> additionally pin eval-set / goal identity) is a **deferred refinement for the enforce stage**,
+> where actually *skipping* phases on a match warrants the stronger key; enforce also adds the
+> `EVOLVE_VERDICT_CACHE` (`off`/`shadow`/`enforce`, default `shadow`) dial per ADR-0046 discipline.
+
 ### Slice C — Resilient ship (all-or-nothing)
 
 Make the commit→verify→push sequence transactional. Two options; **recommend C1**:

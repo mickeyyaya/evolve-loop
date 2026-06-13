@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
 // Orchestrator phase-1 test surface — uses fake adapters to verify the
@@ -818,6 +820,68 @@ func TestOrchestrator_RecordAuditBinding_WritesShipBindableEntry(t *testing.T) {
 	}
 	if bind.WorktreeTreeSHA == "" || len(bind.WorktreeTreeSHA) != 40 {
 		t.Errorf("worktree_tree_sha=%q, want a 40-char tree SHA (ship binds the audited CHANGES tree)", bind.WorktreeTreeSHA)
+	}
+}
+
+// ADR-0048 Slice B: recordAuditBinding must also project the verdict into the
+// content-addressed verdict cache, keyed by the SAME WorktreeTreeSHA it writes
+// to the ledger entry — so a later cycle whose worktree content matches can be
+// recognized (shadow logs it; enforce will skip the pipeline).
+func TestOrchestrator_RecordAuditBinding_PopulatesVerdictCache(t *testing.T) {
+	repo := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "-A")
+	runGit("commit", "-q", "-m", "init")
+
+	ws := filepath.Join(repo, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "audit-report.md"), []byte("## Verdict\n**PASS**\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	led := &fakeLedger{}
+	o := NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
+	o.recordAuditBinding(context.Background(), 42, repo, ws, repo, VerdictPASS)
+
+	var bind *LedgerEntry
+	for i := range led.entries {
+		if led.entries[i].Role == "auditor" && led.entries[i].Kind == "agent_subprocess" {
+			bind = &led.entries[i]
+		}
+	}
+	if bind == nil || bind.WorktreeTreeSHA == "" {
+		t.Fatalf("no auditor binding with a worktree tree SHA; got %+v", led.entries)
+	}
+	// The cache must hold an entry under that exact tree SHA, carrying the cycle
+	// and verdict — the populate side keyed identically to what ship verifies.
+	got, ok := verdictcache.NewStore(repo, nil).Lookup(bind.WorktreeTreeSHA)
+	if !ok {
+		t.Fatalf("verdict cache not populated for tree_sha=%s", bind.WorktreeTreeSHA)
+	}
+	if got.Cycle != 42 || got.Verdict != VerdictPASS {
+		t.Errorf("cached entry mismatch: %+v (want cycle=42 verdict=PASS)", got)
+	}
+	// Provenance fields the enforce stage will re-serve must be carried, not
+	// dropped — pin them so a populate-side regression is caught here.
+	if got.ArtifactSHA256 == "" {
+		t.Error("cached entry missing artifact_sha256 (enforce re-serves the prior audit artifact)")
+	}
+	if got.ArtifactPath == "" {
+		t.Error("cached entry missing artifact_path")
 	}
 }
 

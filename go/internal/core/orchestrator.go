@@ -32,6 +32,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
 // PhaseBoundaryCheckpointer is a package-level hook to write a checkpoint block
@@ -490,16 +491,7 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// tree → INTEGRITY_TREE_DRIFT every cycle (cycle-152). Ship prefers this
 	// over the auditor's comment. Best-effort: empty ⇒ ship falls back to the
 	// auditor's value. No commit is made (write-tree only); ship re-stages anyway.
-	worktreeTree := ""
-	if worktree != "" {
-		if _, _, aerr := gitCapture(ctx, worktree, "add", "-A"); aerr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git add -A in worktree failed: %v — WorktreeTreeSHA empty, ship falls back to the auditor comment\n", aerr)
-		} else if wt, code, werr := gitCapture(ctx, worktree, "write-tree"); werr == nil && code == 0 {
-			worktreeTree = strings.TrimSpace(wt)
-		} else {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git write-tree in worktree failed (rc=%d): %v\n", code, werr)
-		}
-	}
+	worktreeTree := worktreeContentSHA(ctx, worktree)
 	// `git diff HEAD` returns exit 1 when differences exist — not an error;
 	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
 	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
@@ -536,6 +528,45 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding ledger append: %v\n", err)
 	}
+
+	// ADR-0048 Slice B: project this verdict into the content-addressed verdict
+	// cache, keyed by the SAME worktree tree SHA the binding records. The cache
+	// is a projection of the audit binding (single-source), not a second record.
+	// Best-effort + advisory: an empty key (no worktree content identity) or a
+	// write failure never blocks the cycle — a future lookup miss just costs a
+	// full re-run.
+	if err := verdictcache.NewStore(projectRoot, o.now).Put(verdictcache.Entry{
+		TreeSHA:        worktreeTree,
+		Cycle:          cycle,
+		Verdict:        verdict,
+		ArtifactSHA256: hex.EncodeToString(artSum[:]),
+		ArtifactPath:   artPath,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put: %v\n", err)
+	}
+}
+
+// worktreeContentSHA stages the worktree (git add -A, respecting .gitignore) and
+// writes a tree object (git write-tree) — the content identity of the cycle's
+// changes. It is the SINGLE source for both the audit binding's WorktreeTreeSHA
+// (recordAuditBinding) and the ADR-0048 Slice B verdict-cache key, so the value
+// recorded and the value looked up are computed identically. Best-effort:
+// returns "" when worktree is empty or git fails (callers degrade — ship falls
+// back to the auditor comment; the cache simply does not record/match).
+func worktreeContentSHA(ctx context.Context, worktree string) string {
+	if worktree == "" {
+		return ""
+	}
+	if _, _, aerr := gitCapture(ctx, worktree, "add", "-A"); aerr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git add -A failed: %v\n", aerr)
+		return ""
+	}
+	wt, code, werr := gitCapture(ctx, worktree, "write-tree")
+	if werr != nil || code != 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git write-tree failed (rc=%d): %v\n", code, werr)
+		return ""
+	}
+	return strings.TrimSpace(wt)
 }
 
 // recordBuildBinding writes the builder's provenance ledger entry — role=builder,
@@ -1887,6 +1918,28 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN interaction-summary write: %v\n", werr)
 		}
 	}()
+	// ADR-0048 Slice B (SHADOW): content-addressed audit-reuse probe. If this
+	// cycle's worktree content already matches a prior audited verdict, the
+	// tdd/build/audit pipeline COULD be skipped and the prior verdict carried
+	// forward. Observe-only — logs the would-reuse and changes nothing (mirrors
+	// the Slice A shadow precedent; the EVOLVE_VERDICT_CACHE enforce dial lands
+	// with the enforce stage, after soak observation per ADR-0046 discipline).
+	//
+	// Probe location is pre-loop ON PURPOSE: it targets the "fast re-land" case
+	// (the ADR's cycles 247-248 motivation) — a preserved/re-dispatched worktree
+	// that still carries content a prior cycle audited PASS. A FRESH cycle's
+	// worktree is a clean HEAD clone with no build changes yet, so it will not
+	// match (correctly — there is nothing to reuse before any work runs). A
+	// richer post-build probe (same-tree-already-audited within a normal cycle)
+	// is an enforce-stage decision, deliberately out of the shadow increment.
+	if cs.ActiveWorktree != "" {
+		if sha := worktreeContentSHA(ctx, cs.ActiveWorktree); sha != "" {
+			if e, ok := verdictcache.NewStore(req.ProjectRoot, o.now).Lookup(sha); ok {
+				fmt.Fprintf(os.Stderr, "[verdict-cache SHADOW] worktree tree_sha=%s matched cycle=%d verdict=%s — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)\n", sha, e.Cycle, e.Verdict)
+			}
+		}
+	}
+
 	current := PhaseStart
 	lastVerdict := VerdictPASS
 	// scheduledNext, when non-empty, overrides the state machine for
