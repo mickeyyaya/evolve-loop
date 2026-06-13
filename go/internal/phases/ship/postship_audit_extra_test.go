@@ -28,6 +28,33 @@ func TestPromoteInbox_WithTriageDecision_Promotes(t *testing.T) {
 	}
 }
 
+// TestPromoteInbox_ProjectsDecisionFromReport pins the deterministic fallback
+// (ADR-0047): the triage agent emits only triage-report.md, so promoteInbox
+// PROJECTS the companion from it — guaranteed present, so promotion runs and the
+// projected companion lands on disk for downstream readers.
+func TestPromoteInbox_ProjectsDecisionFromReport(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":7}`)
+	// No triage-decision.json — only the report the agent actually wrote.
+	mustWrite(t, filepath.Join(root, ".evolve", "runs", "cycle-7", "triage-report.md"),
+		"# Triage Decision — Cycle 7\n\n## top_n (commit to THIS cycle)\n- my-task-id: do the thing — priority=H\n\n## deferred\n\n## dropped\n")
+	opts := &Options{ProjectRoot: root, CommitMessage: "x", Stderr: io.Discard}
+	res := &RunResult{CommitSHA: "abcdef1234567890"}
+	if err := promoteInbox(context.Background(), opts, res); err != nil {
+		t.Fatalf("promoteInbox errored: %v", err)
+	}
+	if !containsLog(*res, "projected triage-decision.json for cycle 7") {
+		t.Errorf("expected projection log, got: %v", res.Logs)
+	}
+	// The projected companion must be persisted.
+	if _, err := readStateMap(filepath.Join(root, ".evolve", "runs", "cycle-7", "triage-decision.json")); err != nil {
+		t.Errorf("projected companion not written: %v", err)
+	}
+	if !containsLog(*res, "inbox lifecycle drain complete for cycle 7") {
+		t.Errorf("missing drain-complete log: %v", res.Logs)
+	}
+}
+
 func TestPromoteInbox_TriageDecisionWithNoIDs_NoPromoteLog(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":6}`)

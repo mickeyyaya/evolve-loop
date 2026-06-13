@@ -190,9 +190,16 @@ var busySpinnerStatsRE = regexp.MustCompile(`\(\s*\d[\d hms]*·\s*[↑↓]\s*[\d
 // degradation), but live monitoring is unaffected.
 func PaneBusy(rendered string, p PaneProfile) bool {
 	clean := stripANSI(rendered)
-	if busyAffordanceRE.MatchString(clean) || busySpinnerStatsRE.MatchString(clean) {
-		return true
+	// Rule 1 — a live-turn affordance line is present. Projected from the single
+	// channel separator (ClassifyLine, ADR-0047) so the busy vocabulary cannot
+	// drift from the progress vocabulary that cleanPane reads.
+	for _, line := range strings.Split(clean, "\n") {
+		if IsAffordanceLine(line) {
+			return true
+		}
 	}
+	// Rule 2 — ollama's input placeholder vanishes mid-turn (it has no affordance
+	// line); a whole-pane rule, not a per-line classification.
 	if p.IdlePlaceholder != "" && !strings.Contains(clean, p.IdlePlaceholder) {
 		return true
 	}
@@ -375,28 +382,10 @@ var statusRE = regexp.MustCompile(
 )
 
 // isVolatileTailRow reports whether a row is part of the volatile zone that hugs
-// the input box: a blank line, a `────` separator, a spinner/status row (the
-// claude `✽`/`✻` leaders, the agy `⣯`/`▸` leaders), or a status/footer fragment
-// matched by statusRE.
+// the input box. A row is volatile iff it is NOT agent CONTENT — i.e. chrome
+// (blank, `────` separator, spinner/status/token line) or a live-turn
+// affordance. Projected from the single channel separator (ClassifyLine,
+// ADR-0047) so the trim vocabulary cannot drift from PaneBusy and cleanPane.
 func isVolatileTailRow(line string) bool {
-	t := strings.TrimSpace(line)
-	if t == "" {
-		return true
-	}
-	// Known spinner / status / reasoning-status leaders.
-	for _, lead := range []string{"✽", "✻", "⣯", "▸"} {
-		if strings.HasPrefix(t, lead) {
-			return true
-		}
-	}
-	if statusRE.MatchString(t) {
-		return true
-	}
-	// A run of box-drawing horizontal rules ("─" U+2500) is a separator row.
-	for _, r := range t {
-		if r != '─' {
-			return false
-		}
-	}
-	return true
+	return ClassifyLine(line) != LayerContent
 }

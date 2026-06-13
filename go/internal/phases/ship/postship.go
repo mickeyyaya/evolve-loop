@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 // postShip runs the side-effects that follow a successful commit+push.
@@ -93,13 +94,15 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		Stderr:      opts.Stderr,
 	}
 
-	// Promote top_n[] + skip_shipped[] to processed/ — BEST-EFFORT, gated on a
-	// present triage-decision.json. In production the triage agent often emits
-	// only triage-report.md and not the .json companion (cycles 308/316/320-322
-	// all missing it), so this path is frequently skipped; the residual drain
-	// below is the safety net that keeps claims visible regardless.
-	triagePath := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid), "triage-decision.json")
-	if body, rerr := os.ReadFile(triagePath); rerr == nil {
+	// Promote top_n[] + skip_shipped[] to processed/. The companion the agent is
+	// instructed to emit is in practice almost never written (cycles 308/316/
+	// 320-322 all missing it), so triageDecisionBytes DETERMINISTICALLY PROJECTS
+	// it from triage-report.md when absent — single source, guaranteed present
+	// (triage-decision-json-not-emitted; ADR-0047 single-source-with-projection).
+	cycleDir := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid))
+	body, logLine := triageDecisionBytes(cycleDir, cid)
+	res.Logs = append(res.Logs, logLine)
+	if body != nil {
 		commitShort := ""
 		if len(res.CommitSHA) >= 8 {
 			commitShort = res.CommitSHA[:8]
@@ -110,12 +113,6 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 				CommitSHA: commitShort,
 			})
 		}
-	} else if os.IsNotExist(rerr) {
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] INFO: no triage-decision.json for cycle %d — promote-to-processed skipped (residual claims still drained)", cid))
-	} else {
-		// Present but unreadable (corrupt/permission/dir) — distinct from absent:
-		// a real IO error must keep its WARN signal, not be demoted to INFO.
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: triage-decision.json unreadable for cycle %d (%v) — promote-to-processed skipped (residual claims still drained)", cid, rerr))
 	}
 
 	// ALWAYS drain residual claims: every item still in processing/cycle-<cid>/
@@ -129,6 +126,41 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	return nil
+}
+
+// triageDecisionBytes returns the cycle's triage-decision.json bytes for
+// promotion plus a log line. Preference order:
+//  1. the agent-authored companion if present (carries skip_shipped, the
+//     git-log-verified resolution signal the markdown cannot express);
+//  2. otherwise a deterministic projection of triage-report.md — guaranteed
+//     present so promote-to-processed runs every cycle (the projection emits
+//     top_n only; skip_shipped is empty, so it promotes exactly what a shipped
+//     cycle committed to);
+//  3. nil when neither exists — promotion is skipped, the residual drain (the
+//     caller's safety net) still releases claims.
+func triageDecisionBytes(cycleDir string, cid int) ([]byte, string) {
+	companion := filepath.Join(cycleDir, "triage-decision.json")
+	body, err := os.ReadFile(companion)
+	if err == nil {
+		return body, fmt.Sprintf("[ship] OK: triage-decision.json present for cycle %d — promoting", cid)
+	}
+	if !os.IsNotExist(err) {
+		// Present but unreadable (corrupt/permission) — distinct from absent: a
+		// real IO error keeps its WARN signal, never demoted to INFO.
+		return nil, fmt.Sprintf("[ship] WARN: triage-decision.json unreadable for cycle %d (%v) — promote-to-processed skipped (residual claims still drained)", cid, err)
+	}
+	// Absent — project the companion from the report below.
+	report, err := os.ReadFile(filepath.Join(cycleDir, triagecap.TriageArtifactName()))
+	if err != nil {
+		return nil, fmt.Sprintf("[ship] INFO: no triage-decision.json or report for cycle %d — promote-to-processed skipped (residual claims still drained)", cid)
+	}
+	body, perr := triagecap.ProjectDecisionJSON(string(report), cid)
+	if perr != nil {
+		return nil, fmt.Sprintf("[ship] WARN: triage-decision projection failed for cycle %d (%v) — promote-to-processed skipped (residual claims still drained)", cid, perr)
+	}
+	// Persist so downstream readers (a re-run, forensics) see the same companion.
+	_ = os.WriteFile(companion, body, 0o644)
+	return body, fmt.Sprintf("[ship] OK: projected triage-decision.json for cycle %d from the report (agent omitted it)", cid)
 }
 
 // extractIDs walks triage-decision.json JSON and returns the union of

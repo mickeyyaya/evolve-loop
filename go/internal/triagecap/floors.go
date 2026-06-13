@@ -231,17 +231,10 @@ func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 	return seen
 }
 
-// topNSection extracts the ## top_n body (heading to next "## " or EOF).
+// topNSection extracts the ## top_n body. Delegates to sectionBody (project.go),
+// the single home for "## heading"→body extraction.
 func topNSection(artifact string) (string, bool) {
-	loc := topNHeadingRE.FindStringIndex(artifact)
-	if loc == nil {
-		return "", false
-	}
-	body := artifact[loc[1]:]
-	if next := nextHeadingRE.FindStringIndex(body); next != nil {
-		body = body[:next[0]]
-	}
-	return body, true
+	return sectionBody(artifact, topNHeadingRE)
 }
 
 // tokenRE splits item text into identifier-like tokens. Hyphens are token

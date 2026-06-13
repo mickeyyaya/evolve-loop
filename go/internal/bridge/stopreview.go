@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
 // stopreview.go — Stage-0 of the self-healing review layer (the "vertical
@@ -152,12 +154,9 @@ func envInt(deps Deps, key string, def int) int {
 	return n
 }
 
-var (
-	rxBraille      = regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`)
-	rxAsciiSpinner = regexp.MustCompile(`^[-/|\\]\s`)
-	rxDeliberating = regexp.MustCompile(`Deliberating.*[0-9]+[ms]`)
-	rxTokens       = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)k\s+tokens`)
-)
+// rxTokens parses a ↓ response-token count for extractTokenCount (a VALUE
+// extractor, distinct from panestream.ClassifyLine's chrome classification).
+var rxTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)k\s+tokens`)
 
 func extractTokenCount(pane string) int {
 	peak := 0
@@ -185,22 +184,19 @@ func PaneHasSubstantiveChange(prev, cur string) bool {
 	return cleanPrev != cleanCur
 }
 
+// cleanPane keeps only the agent CONTENT lines, dropping every chrome/affordance
+// line per the single channel separator (panestream.ClassifyLine, ADR-0047).
+// This is what makes a ticking spinner-stats line (claude `· Schlepping… (Ns ·
+// ↑ Nk tokens)`) NOT count as progress — it is the live-turn affordance, the
+// same line PaneBusy reads as busy. A genuinely-working agent still progresses
+// via its real transcript (tool calls, output); a stalled one whose only delta
+// is the clock no longer reads as progress (closes the ticking-clock hole).
 func cleanPane(pane string) string {
 	var lines []string
 	for _, line := range strings.Split(pane, "\n") {
-		if rxBraille.MatchString(line) {
-			continue
+		if panestream.IsContentLine(line) {
+			lines = append(lines, line)
 		}
-		if rxAsciiSpinner.MatchString(line) {
-			continue
-		}
-		if rxDeliberating.MatchString(line) {
-			continue
-		}
-		if rxTokens.MatchString(line) {
-			continue
-		}
-		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
 }
