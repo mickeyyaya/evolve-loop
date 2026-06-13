@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -15,6 +16,21 @@ const FileName = "model-catalog.json"
 // pathFor returns the catalog file path under evolveDir.
 func pathFor(evolveDir string) string {
 	return filepath.Join(evolveDir, FileName)
+}
+
+type tempFile interface {
+	io.Writer
+	Sync() error
+	Close() error
+	Name() string
+}
+
+var createTemp = func(dir, pattern string) (tempFile, error) {
+	f, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 // Read loads the catalog from evolveDir. A missing file is NOT an error: it
@@ -49,7 +65,7 @@ func Write(evolveDir string, c Catalog) error {
 	}
 	data = append(data, '\n')
 
-	tmp, err := os.CreateTemp(evolveDir, FileName+".*.tmp")
+	tmp, err := createTemp(evolveDir, FileName+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("modelcatalog: tempfile: %w", err)
 	}
