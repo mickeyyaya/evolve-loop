@@ -1,3 +1,5 @@
+//go:build integration
+
 // coverage_final_test.go — final targeted tests to push from 87.2% toward ≥95%.
 // Covers:
 //   - verifySelfSHA clean-pass branch (SHA+version both match)

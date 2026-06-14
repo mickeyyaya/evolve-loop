@@ -1,3 +1,5 @@
+//go:build integration
+
 // repair_resume_test.go — RED contract for repair-ladder mode #2
 // (ADR-0039 §8): AUDIT_BINDING_HEAD_MOVED with a resume-unpushed signature.
 //

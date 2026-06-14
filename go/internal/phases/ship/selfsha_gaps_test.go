@@ -1,3 +1,5 @@
+//go:build integration
+
 // selfsha_gaps_test.go — covers verifySelfSHA branches not yet exercised:
 // - sha256File failure (binary path is a directory → can't read)
 // - readStateMap failure (state.json is a directory)

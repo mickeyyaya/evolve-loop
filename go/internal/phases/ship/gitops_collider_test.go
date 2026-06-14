@@ -1,3 +1,5 @@
+//go:build integration
+
 // gitops_collider_test.go — collider pre-flight false-positive guard.
 //
 // History: cycle-232 (retro I-10) added the collider PRE-FLIGHT that refuses

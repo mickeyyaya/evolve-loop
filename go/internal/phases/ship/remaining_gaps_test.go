@@ -1,3 +1,5 @@
+//go:build integration
+
 // remaining_gaps_test.go — targeted coverage for the achievable gaps
 // remaining after 91.5%:
 //

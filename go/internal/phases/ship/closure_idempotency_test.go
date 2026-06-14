@@ -1,3 +1,5 @@
+//go:build integration
+
 // closure_idempotency_test.go — cycle-234 task `ship-closure-idempotency` (RED).
 //
 // Three defects from the cycle-233 landing saga (inbox

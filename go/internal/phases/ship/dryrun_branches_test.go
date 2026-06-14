@@ -1,3 +1,5 @@
+//go:build integration
+
 // dryrun_branches_test.go — behavioral tests for the DryRun=true code paths
 // across shipDirect, shipFromWorktree, Run (end-to-end), and writeDryRunJournal.
 //

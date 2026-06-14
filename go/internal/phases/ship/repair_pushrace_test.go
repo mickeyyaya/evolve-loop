@@ -1,3 +1,5 @@
+//go:build integration
+
 // repair_pushrace_test.go — RED contract for repair-ladder mode #4
 // (ADR-0039 §8): GIT_PUSH_REJECTED with an in-place fetch + ff-retry.
 //

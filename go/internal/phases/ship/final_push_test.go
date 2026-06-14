@@ -1,3 +1,5 @@
+//go:build integration
+
 // final_push_test.go — targets the remaining achievable gaps after the
 // 89.1% mark:
 //

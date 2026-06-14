@@ -1,3 +1,5 @@
+//go:build integration
+
 package ship
 
 // RED-phase contract for cycle-249 task `macos-ebadf-test-hardening`

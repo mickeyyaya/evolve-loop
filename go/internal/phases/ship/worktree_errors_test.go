@@ -1,3 +1,5 @@
+//go:build integration
+
 // worktree_errors_test.go — fault-injected coverage for shipFromWorktree
 // runner-error branches (gitops.go:153-237) and writeShipBinding early
 // error paths (gitops.go:268,287,291).
@@ -15,27 +17,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// makeWorktreeScenario returns (mainRepo, worktreePath) where:
-//   - mainRepo has a remote, a committed file, and a seeded audit
-//   - worktreePath is a linked worktree on branch "cycle-1"
-//     with one staged change so there are uncommitted changes to ship
-func makeWorktreeScenario(t *testing.T) (string, string) {
-	t.Helper()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	seedAudit(t, repo, "PASS")
-
-	// Create a linked worktree on a new branch.
-	wt := tempRepoDir(t)
-	runGit(t, repo, "worktree", "add", "-b", "cycle-1", wt)
-
-	// Stage a file in the worktree so worktreeCleanNoCommit == false.
-	mustWrite(t, filepath.Join(wt, "wt-change.txt"), "worktree change\n")
-	runGit(t, wt, "add", "wt-change.txt")
-
-	return repo, wt
-}
 
 // --- gitops.go:153-154: worktree git add -A runner error -------------------
 

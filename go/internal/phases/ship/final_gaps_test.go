@@ -1,3 +1,5 @@
+//go:build integration
+
 // final_gaps_test.go — last achievable coverage gaps after 92.5%:
 //
 //   - verifySelfSHA: sha256File error on unreadable binary (verify.go:65)

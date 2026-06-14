@@ -1,3 +1,5 @@
+//go:build integration
+
 // misc_gaps_test.go — covers the remaining uncovered branches across
 // verifyClass (ClassRelease, ClassTrivial, invalid), postShip (non-cycle,
 // non-dryrun cycle success), Run (BYPASS_SHIP_VERIFY), writeShipBinding

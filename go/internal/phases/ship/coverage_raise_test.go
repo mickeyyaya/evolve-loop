@@ -1,3 +1,5 @@
+//go:build integration
+
 // coverage_raise_test.go — deterministic error/branch coverage for the
 // ship-package helpers the parity matrix and existing gap suites still miss.
 // Every test pins a behavior (a specific refusal/error or a specific

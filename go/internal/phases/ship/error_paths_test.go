@@ -1,3 +1,5 @@
+//go:build integration
+
 // error_paths_test.go — fault-injected coverage for the git-operation
 // error branches that the real-git happy-path matrix can't reach, plus the
 // finalize() exit-code classifier. Uses faultRunner to fail exactly one git

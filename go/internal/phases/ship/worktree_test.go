@@ -1,3 +1,5 @@
+//go:build integration
+
 // worktree_test.go — coverage for the v8.43.0 worktree-aware ship path
 // (shipFromWorktree + writeShipBinding). The 23-case native_test.go matrix
 // ships directly from ProjectRoot and never sets cycle-state.json's
@@ -15,37 +17,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// makeWorktree adds a git worktree of repo on a fresh branch at main and
-// returns its absolute path. The worktree shares repo's object store, so a
-// commit there is ff-mergeable into main.
-func makeWorktree(t *testing.T, repo, branch string) string {
-	t.Helper()
-	wt := filepath.Join(t.TempDir(), "wt")
-	runGit(t, repo, "worktree", "add", "-b", branch, wt, "main")
-	return wt
-}
-
-// seedAuditWithBoundTree is seedAudit plus an `audit_bound_tree_sha:` line
-// in the report body, so verifyAuditBinding stashes it into
-// opts.internalAuditBoundTreeSHA and gitops enforces the pre-merge check.
-func seedAuditWithBoundTree(t *testing.T, repo, verdict, boundTreeSHA string) {
-	t.Helper()
-	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
-	body := fmt.Sprintf("<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle 1\n\nVerdict: %s\naudit_bound_tree_sha: %s\n\nAll criteria met (test fixture).\n", verdict, boundTreeSHA)
-	mustWrite(t, auditPath, body)
-	sha := mustHashFile(t, auditPath)
-	headSHA := strings.TrimSpace(runGitOut(t, repo, "rev-parse", "HEAD"))
-	treeSHA := treeStateSHA(t, repo)
-	entry := map[string]any{
-		"ts": "2026-04-27T00:00:00Z", "cycle": 1, "role": "auditor",
-		"kind": "agent_subprocess", "model": "sonnet", "exit_code": 0,
-		"duration_s": "30", "artifact_path": auditPath, "artifact_sha256": sha,
-		"challenge_token": "testtoken123", "git_head": headSHA, "tree_state_sha": treeSHA,
-	}
-	line, _ := json.Marshal(entry)
-	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
-}
 
 // TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding: Builder's edits
 // live uncommitted in an active_worktree on a cycle branch. Ship must
