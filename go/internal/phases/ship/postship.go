@@ -61,12 +61,24 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 		// No cycle_id → nothing to advance. Bash silently skips.
 		return nil
 	}
-	stMap, err := readStateMap(stPath)
-	if err != nil {
-		return err
+	// ADR-0049 S2 / G2: serialize the state.json RMW under the shared lock so
+	// it can't lose (or be lost to) a concurrent allocator/UpdateState write.
+	// Preserve the pre-lock contract: a READ error propagates (fail ship);
+	// only a write/lock error is the non-fatal WARN.
+	var readErr error
+	lockErr := withStateLock(stPath, func() error {
+		stMap, err := readStateMap(stPath)
+		if err != nil {
+			readErr = err
+			return err
+		}
+		stMap["lastCycleNumber"] = cid
+		return writeStateMap(stPath, stMap)
+	})
+	if readErr != nil {
+		return readErr
 	}
-	stMap["lastCycleNumber"] = cid
-	if err := writeStateMap(stPath, stMap); err != nil {
+	if lockErr != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: could not advance lastCycleNumber (state.json write failed)")
 		return nil // WARN — don't fail ship
 	}

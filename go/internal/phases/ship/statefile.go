@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
 // readStateMap parses path as JSON into a map. Missing/empty → empty map.
@@ -126,4 +128,23 @@ func pluginVersion(pluginRoot string) string {
 		return ""
 	}
 	return p.Version
+}
+
+// withStateLock runs fn while holding the advisory lock that serializes
+// state.json read-modify-writes — the SAME <path>.lock that
+// storage.UpdateState holds (ADR-0049 S2 / gap G2). flock is BLOCKING and
+// per-open-file-description, so ship's map-based RMW and the typed
+// UpdateState/allocator writers never interleave (the lost-update / stale-pin
+// class). fn does the read→modify→write between the lock and its release. A
+// no-op for the live loop (the whole-cycle project lock already serializes
+// ship vs the allocator); this joins the CA.3 lock domain so it stays correct
+// once that coarse lock is scoped per-run. A lock-acquire failure surfaces as
+// a plain error the caller wraps in its phase-appropriate ShipError.
+func withStateLock(statePath string, fn func() error) error {
+	release, err := flock.Lock(statePath + ".lock")
+	if err != nil {
+		return fmt.Errorf("lock %s: %w", statePath, err)
+	}
+	defer release()
+	return fn()
 }
