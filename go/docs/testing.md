@@ -126,41 +126,57 @@ are tracked as comparison points, not gates.
 
 ### Result and the known fast-suite poles
 
-The cost-axis split cut the default suite from **~206s to ~42s** (no race;
-`make test` with `-race` ≈ 46s) by moving `cmd/evolve`'s full-cycle e2e
-(205s→3.6s) and `internal/bridge`'s tmux/live tests (47s→0.47s) behind tags.
+The cost-axis split + seam work cut the default suite from **~206s** to **~20s
+warm** (`go test ./...`, fast tier; a cold run adds compile). The headline wins
+are **banked**: `cmd/evolve`'s full-cycle e2e (205s→behind `e2e`),
+`internal/bridge`'s tmux/live tests (47s→0.47s), `internal/phases/ship`'s real-git
+suite (**~22s→2.4s** fast — the 23-case `TestNative_*` parity matrix and the other
+git-driven files now carry `//go:build integration`), and `internal/core`'s retry
+backoff (`backoffSleep` is swapped to a no-op in `TestMain`, see
+`orchestrator_main_test.go` — the single highest-leverage core knob).
 
-The remaining poles are **deliberately left fast-resident**:
+**One tiering mechanism: build tags.** `testing.Short()` is *not* used to tier
+tests here. A `-short` skip leaves the test compiled-and-linked, and because CI
+runs `-tags integration` and **never** `-short`, the guard does nothing (it is
+inert). To keep a slow test out of the fast tier, either tag the file
+`//go:build integration` (it does real IO) **or** seam the slow dependency
+(`sysexec.RunFunc` + `fixtures.FakeExec`, a `func() time.Time` clock, an injected
+interval) so the test runs fast *in the default tier with real coverage*. Do not
+reintroduce `if testing.Short() { t.Skip() }` as a tiering device.
 
-- **`internal/phases/ship` (~22s)** — its tests do real `git` commit/merge in
-  temp repos (integration-*cost*), but they are ship's primary safety coverage
-  (audit-binding, gates). They stay in the fast suite so a developer can't break
-  ship without immediate feedback. They are **not** parallelized — for two
-  reasons, both empirically confirmed (2026-06-09):
-  1. **Most tests can't be parallel.** ~22 of 34 test files spawn real `git`;
-     several mutate process env via `t.Setenv` (panics under `t.Parallel`) or
-     save/restore package-var seams (data races), and the `git worktree` tests
-     contend under load.
-  2. **Even the pure-logic subset can't be parallel on macOS.** The ~10 git-free
-     files (69 tests) *can* take `t.Parallel` in principle, but doing so triggers
-     the darwin **EBADF** FD-teardown flake (`close …: bad file descriptor`,
-     `TempDir RemoveAll cleanup: fcntl …: bad file descriptor`) under the trust
-     bar `go test -race -count=3 -shuffle=on`. Isolated proof: serial baseline
-     **clean 2/2**, pure-logic-parallel **flaked 1/1** — the added concurrency
-     raises FD pressure across the package and trips the pre-existing race that
-     `tempRepoDir`'s best-effort cleanup + `captureWithEBADFRetry` only partially
-     contain. The wall is git-subprocess-bound anyway, so parallelizing the cheap
-     pure-logic tail bought **~0s** (26.46s→26.59s, no-race) even before it flaked.
-- **`internal/core` (~12s)** — volume (≈200 small orchestrator-sequencing
-  tests). It overlaps under ship's wall, so parallelizing it would not lower the
-  suite's wall time; the churn/flake risk isn't worth a no-op gain. *(Core +
-  observer were since parallelized in `9724461d` — they are FD-light and pass the
-  stress bar, unlike ship.)*
+The remaining aggregate floor (measured isolated, 2026-06-15):
 
-This is an intentional trade (determinism + safety coverage over shaving a
-ship-bound wall), not an oversight. The only real lever is **faking `git`** (or an
-in-memory FS) — which removes both the subprocess wall *and* the EBADF surface,
-unlocking parallelism — a separate, larger refactor tracked outside this workstream.
+- **`internal/core` (~10s)** — genuine, already-optimized compute: ~317 in-memory
+  orchestrator-cycle tests. `-parallel 1` = 23.5s of CPU work that parallelism
+  caps at ~10s on 8 cores; 78% already take `t.Parallel`. Not forks (the
+  git-driven leak tests are `//go:build integration`) and not sleep
+  (`backoffSleep` no-op). No cheap lever remains — only reducing per-cycle test
+  cost (deep, risky) would move it, and it would still overlap under the aggregate.
+- **`cmd/evolve` (~10s)** — diffuse: ~86 untagged CLI test files each fork real
+  `git` for temp-repo setup; the slowest single test is ~0.7s, so it is
+  death-by-a-thousand-forks, not one hot test. The lever is tagging the genuinely
+  end-to-end tests `//go:build integration`/`e2e` (CLI-logic coverage lives in the
+  underlying `internal/*` units) or seaming the CLI git layer — a sizable refactor.
+- **`internal/looppreflight` (~5s) / `phaseobserver` (~3s) / `adapters/observer`
+  (~2s)** — integer-second timing granularity: host-probe / poll intervals floor
+  at 1s (`EVOLVE_OBSERVER_POLL_S`, `Config.PollS`), so a test waits ~1s for one
+  poll tick. The clean fix is sub-second `time.Duration` injection into those
+  intervals; until then they self-cap at the 1s floor.
+
+Because packages overlap under `go test -p`, the aggregate is **floored by the two
+~10s poles running concurrently with everything else** — the sub-5s poles do not
+move it. Per-package seams still pay off for *that package's* dev-iteration loop
+even when they don't lower the aggregate. The cost-axis split is an intentional
+trade (determinism + safety coverage over shaving a subprocess-bound wall).
+
+**Why ship's fast tier was hard to parallelize (now historical).** When ship's
+real-git tests were fast-resident they could not take `t.Parallel`: `t.Setenv`
+panics under parallel, package-var seam save/restore races, and the darwin
+**EBADF** FD-teardown flake (`close …: bad file descriptor`) under
+`-race -count=3 -shuffle=on`. Tagging them `//go:build integration` removed them
+from the fast tier entirely, so this no longer constrains the fast suite;
+`tempRepoDir`'s best-effort chmod-walk cleanup still contains the EBADF surface in
+the integration tier.
 
 ### Known: real-tmux integration tests are load-sensitive
 
