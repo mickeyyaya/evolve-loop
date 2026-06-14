@@ -6,12 +6,14 @@ on:
     paths:
       - 'go/**'
       - 'commit-gate/**'
+      - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
       - 'go/test/commitgate/commit-gate-test.sh'
       - '.github/workflows/go.yml'
   pull_request:
     paths:
       - 'go/**'
       - 'commit-gate/**'
+      - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
       - 'go/test/commitgate/commit-gate-test.sh'
       - '.github/workflows/go.yml'
 
