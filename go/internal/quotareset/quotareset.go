@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+var hintTimeRE = regexp.MustCompile(`(?i)(\d{1,2}):(\d{2})(am|pm)`)
+
 // Result captures the computed wake-up time + the source that produced it.
 type Result struct {
 	WakeAt time.Time
@@ -97,8 +99,7 @@ func parseHint(hint string, nowT time.Time) (time.Time, bool) {
 		}
 		return r
 	}, hint)
-	re := regexp.MustCompile(`(?i)(\d{1,2}):(\d{2})(am|pm)`)
-	m := re.FindStringSubmatch(hint)
+	m := hintTimeRE.FindStringSubmatch(hint)
 	if len(m) != 4 {
 		return time.Time{}, false
 	}
